@@ -1,30 +1,31 @@
 module Wanxiangshu.Tests.SessionLoopTests
 
 open Wanxiangshu.Tests.Assert
+open Wanxiangshu.Kernel.SessionGateDemand
 open Wanxiangshu.Kernel.SessionLoop
 
 let decideAllOpenFallbackFirst () =
-    let mode = gateModeFromFlags true true true
+    let mode = gateModeFromDemand (resolveGateDemand true true true)
     equal "all open → FallbackContinue" FallbackContinue (decide mode)
 
 let decideFallbackClosedTodoOpen () =
-    let mode = gateModeFromFlags false true true
+    let mode = gateModeFromDemand (resolveGateDemand false true true)
     equal "fallback closed, todo+review open → TodoNudge" TodoNudge (decide mode)
 
 let decideOnlyReviewOpen () =
-    let mode = gateModeFromFlags false false true
+    let mode = gateModeFromDemand (resolveGateDemand false false true)
     equal "only review open → ReviewNudge" ReviewNudge (decide mode)
 
 let decideAllClosedResolve () =
-    let mode = gateModeFromFlags false false false
+    let mode = gateModeFromDemand (resolveGateDemand false false false)
     equal "all closed → Resolve" Resolve (decide mode)
 
 let driveProducesPrioritySequence () =
     let transitions =
-        [ gateModeFromFlags true true true
-          gateModeFromFlags false true true
-          gateModeFromFlags false false true
-          gateModeFromFlags false false false ]
+        [ gateModeFromDemand (resolveGateDemand true true true)
+          gateModeFromDemand (resolveGateDemand false true true)
+          gateModeFromDemand (resolveGateDemand false false true)
+          gateModeFromDemand (resolveGateDemand false false false) ]
 
     let mutable i = 1
     let trace = ResizeArray<GateAction>()
@@ -48,7 +49,7 @@ let driveStopsAfterResolve () =
 
     let step (_: SessionGateMode) (_: GateAction) : SessionGateMode =
         count <- count + 1
-        gateModeFromFlags false false false
+        gateModeFromDemand (resolveGateDemand false false false)
 
     drive
         step
@@ -57,7 +58,7 @@ let driveStopsAfterResolve () =
                 afterResolve <- afterResolve + 1
             elif afterResolve > 0 then
                 afterResolve <- afterResolve + 100)
-        (gateModeFromFlags true true true)
+        (gateModeFromDemand (resolveGateDemand true true true))
 
     equal "Resolve emitted exactly once" 1 afterResolve
     equal "step called exactly once (no loop after Resolve)" 1 count

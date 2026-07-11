@@ -2,6 +2,7 @@ module Wanxiangshu.Tests.MessagingTests
 
 open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Kernel.Messaging
+open Wanxiangshu.Kernel.ToolExecutionStatusModule
 
 let classifySourceEmptyIsNative () =
     equal "native" Native (classifySource "")
@@ -67,7 +68,7 @@ let setPartOutputTypedToolPart () =
             "executor",
             "call1",
             Some
-                { status = "ok"
+                { status = fromString "ok"
                   output = "old"
                   error = ""
                   input = null

@@ -40,7 +40,7 @@ let spec_applyContextBudget_afterTodoResets () =
             { entry with
                 State = Some state
                 LastBacklog = []
-                NudgeInjected = true })
+                NudgeTrack = EmergencySignaled })
 
         // 1. Simulate new todo: add one entry to backlog
         let newTodoEntry =
@@ -72,7 +72,7 @@ let spec_applyContextBudget_afterTodoResets () =
         let! res = applyContextBudget plan backlogOps messages [||] (fun _ -> [||])
         let updatedStore = ContextBudgetStore.get scope "sess-after-todo"
         equal "last todo count updated" 1 updatedStore.LastBacklog.Length
-        equal "nudgeInjected reset" false updatedStore.NudgeInjected
+        equal "nudge track reset after backlog change" Idle updatedStore.NudgeTrack
     }
 
 let spec_applyContextBudget_fiveConsecutiveTodos () =
@@ -108,7 +108,7 @@ let spec_applyContextBudget_fiveConsecutiveTodos () =
             { entry with
                 State = Some state
                 LastBacklog = []
-                NudgeInjected = false })
+                NudgeTrack = Idle })
 
         for i in 1..5 do
             // Update plan context usage return value
@@ -177,7 +177,7 @@ let spec_applyContextBudget_fiveConsecutiveTodos () =
 
             let updatedStore = ContextBudgetStore.get scope sessionID
             equal "LastTodoCount updated" i updatedStore.LastBacklog.Length
-            equal "NudgeInjected reset" false updatedStore.NudgeInjected
+            equal "NudgeTrack reset after todo" Idle updatedStore.NudgeTrack
     }
 
 let run () : JS.Promise<unit> =

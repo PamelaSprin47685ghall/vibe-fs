@@ -3,12 +3,16 @@ module Wanxiangshu.Tests.MessagingPartCodecTests
 open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Tests.Assert
+open Wanxiangshu.Kernel.ToolExecutionStatusModule
 open Wanxiangshu.Shell.MessagingPartCodec
 
 let muxPartStateToKernelStatusMaps () =
-    check "output-available -> completed" (muxPartStateToKernelStatus "output-available" = "completed")
-    check "input-available -> pending" (muxPartStateToKernelStatus "input-available" = "pending")
-    check "passthrough other" (muxPartStateToKernelStatus "running" = "running")
+    check
+        "output-available -> completed"
+        (muxPartStateToKernelStatus "output-available" = ToolExecutionStatus.Completed)
+
+    check "input-available -> pending" (muxPartStateToKernelStatus "input-available" = ToolExecutionStatus.Pending)
+    check "passthrough other" (muxPartStateToKernelStatus "running" = ToolExecutionStatus.Unknown "running")
 
 let toolOutputAndErrorFromHostOutputString () =
     let out, err = toolOutputAndErrorFromHostOutput (box "plain text")
@@ -42,7 +46,7 @@ let decodeMuxDynamicToolStateSomeWithOutput () =
 
     match decodeMuxDynamicToolState part with
     | Some st ->
-        check "mux status mapped" (st.status = "completed")
+        check "mux status mapped" (st.status = ToolExecutionStatus.Completed)
         check "mux output" (st.output = "tool result")
         check "mux operation action" (st.operationAction = "read")
     | None -> check "mux with output" false
@@ -57,7 +61,7 @@ let decodeOpencodeToolStateBoxSomeWithFields () =
 
     match decodeOpencodeToolStateBox state with
     | Some st ->
-        check "opencode status" (st.status = "completed")
+        check "opencode status" (st.status = ToolExecutionStatus.Completed)
         check "opencode output" (st.output = "out")
         check "opencode error" (st.error = "err")
         check "opencode operation action" (st.operationAction = "apply")

@@ -9,11 +9,12 @@ open Wanxiangshu.Shell
 open Wanxiangshu.Shell.MessageTransformCore
 open Wanxiangshu.Shell.MessageTransformPipeline
 
-let spec_applyContextBudget_noReinject () =
+let spec_applyContextBudget_reinjectWhenBudgetStillHot () =
     promise {
-        let scope = RuntimeScope.create()
+        let scope = RuntimeScope.create ()
+
         let plan =
-            { SessionID = "sess-nudge-no-reinject"
+            { SessionID = "sess-nudge-reinject"
               Agent = "main"
               Directory = ""
               Excluded = false
@@ -30,12 +31,15 @@ let spec_applyContextBudget_noReinject () =
               GetOrRebuildBacklog = (fun _ _ -> []) }
 
         let state = beginPhase 30000L 100L 0L
-        ContextBudgetStore.update scope "sess-nudge-no-reinject" (fun entry ->
-            { entry with State = Some state; NudgeInjected = true })
 
-        let msgInfo : MessageInfo<obj> =
+        ContextBudgetStore.update scope "sess-nudge-reinject" (fun entry ->
+            { entry with
+                State = Some state
+                NudgeTrack = EmergencySignaled })
+
+        let msgInfo: MessageInfo<obj> =
             { id = "user-1"
-              sessionID = "sess-nudge-no-reinject"
+              sessionID = "sess-nudge-reinject"
               role = User
               agent = ""
               isError = false
@@ -43,12 +47,16 @@ let spec_applyContextBudget_noReinject () =
               details = null
               time = null }
 
-        let messages = [ { info = msgInfo; parts = []; source = Native; raw = null } ]
+        let messages =
+            [ { info = msgInfo
+                parts = []
+                source = Native
+                raw = null } ]
+
         let! res = applyContextBudget plan backlogOps messages [||] (fun _ -> [||])
-        equal "should not reinject nudge" 1 res.Length
+        equal "must reinject after prior round stripped synthetic nudge" 2 res.Length
+        equal "nudge source" (Synthetic "context-budget-nudge-") (List.last res).source
     }
 
 let run () : JS.Promise<unit> =
-    promise {
-        do! spec_applyContextBudget_noReinject ()
-    }
+    promise { do! spec_applyContextBudget_reinjectWhenBudgetStillHot () }

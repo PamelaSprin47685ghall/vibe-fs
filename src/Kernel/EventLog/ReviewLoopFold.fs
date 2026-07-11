@@ -1,6 +1,7 @@
 module Wanxiangshu.Kernel.EventLog.ReviewLoopFold
 
 open Wanxiangshu.Kernel.EventLog.Types
+open Wanxiangshu.Kernel.EventLog.ReviewVerdictWire
 
 type ReviewLoopFold =
     | Inactive

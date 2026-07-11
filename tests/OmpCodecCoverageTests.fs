@@ -5,6 +5,7 @@ open Fable.Core.JsInterop
 open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Tests.OmpPluginTestsHarness
 open Wanxiangshu.Kernel.Messaging
+open Wanxiangshu.Kernel.ToolExecutionStatusModule
 open Wanxiangshu.Omp.MessagingCodec
 open Wanxiangshu.Omp.Codec
 open Wanxiangshu.Omp.MessagingCodecEncode
@@ -51,7 +52,7 @@ let encText () =
 
 let encToolStateMatch () =
     let st =
-        { status = "running"
+        { status = fromString "running"
           output = "out"
           error = ""
           input = box "in"
@@ -66,7 +67,7 @@ let encToolStateMatch () =
 
 let encToolStateMismatch () =
     let st =
-        { status = "done"
+        { status = fromString "done"
           output = "new"
           error = ""
           input = box "in"
@@ -222,7 +223,7 @@ let dtsFull () =
     | None -> check "dts some" false
     | Some ts ->
         begin
-            equal "st" "done" ts.status
+            equal "st" "done" (toString ts.status)
             equal "out" "r" ts.output
         end
 
@@ -243,7 +244,7 @@ let eht () =
                     "t",
                     "c1",
                     Some
-                        { status = ""
+                        { status = fromString ""
                           output = "to"
                           error = ""
                           input = null

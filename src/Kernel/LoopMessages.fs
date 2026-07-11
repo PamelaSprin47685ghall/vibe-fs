@@ -26,8 +26,7 @@ let commandWithReviewPrecheck = "with-review-precheck"
 
 /// Verdicts that END With-Review Mode. needs_revision/terminate keep it active (the work
 /// continues), so they are deliberately excluded.
-let isEndVerdict (verdict: string) : bool =
-    verdict = verdictAccepted || verdict = verdictCancelled
+let isEndVerdict = Wanxiangshu.Kernel.EventLog.ReviewVerdictWire.isEndVerdict
 
 let loopFooter =
     [ "- report: a detailed description of what you did and why"

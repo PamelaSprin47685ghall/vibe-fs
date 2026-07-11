@@ -3,6 +3,7 @@ module Wanxiangshu.Shell.MessagingEncodeCore
 open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Kernel.Messaging
+open Wanxiangshu.Kernel.ToolExecutionStatusModule
 open Wanxiangshu.Shell.Dyn
 open Thoth.Json
 
@@ -56,7 +57,7 @@ let encodeTextPartBasic (text: string) : obj =
 
 let toolStateUnchanged (rawState: obj) (state: ToolState<obj>) : bool =
     not (isNullish rawState)
-    && str rawState "status" = state.status
+    && str rawState "status" = toString state.status
     && str rawState "output" = state.output
     && str rawState "error" = state.error
 
@@ -64,13 +65,13 @@ let buildToolStateObj (rawState: obj) (state: ToolState<obj>) : obj =
     if isNullish rawState then
         box (
             createObj
-                [ "status", box state.status
+                [ "status", box (toString state.status)
                   "output", box state.output
                   "error", box state.error
                   "input", state.input ]
         )
     else
-        let s1 = withKey rawState "status" (box state.status)
+        let s1 = withKey rawState "status" (box (toString state.status))
         let s2 = withKey s1 "output" (box state.output)
         withKey s2 "error" (box state.error)
 

@@ -5,8 +5,10 @@ open Fable.Core.JsInterop
 open Wanxiangshu.Kernel.OmpSessionTools
 open Wanxiangshu.Kernel.PromptFragments
 open Wanxiangshu.Kernel.Nudge
+open Wanxiangshu.Kernel.EventLog.Fold
 open Wanxiangshu.Kernel.Nudge.Types
 open Wanxiangshu.Kernel.NudgeDerivation
+open Wanxiangshu.Kernel.Nudge.NudgeSnapshotSource
 open Wanxiangshu.Kernel.TreeSitterKernel
 open Wanxiangshu.Omp.ChildSession
 open Wanxiangshu.Omp.Codec
@@ -170,32 +172,22 @@ let agentEndHandler
                             let model = lastAssistantModel sm
                             do! appendAssistantCompletedOrFail root sessionId last None model turnId openTodos
                             let! snap = getNudgeSnapshotFromEventLog root sessionId
-                            let hasRunner = hasRunningRunnerJob ompScope sessionId
-                            let key = nudgeAnchorKey snap.turnId snap.lastAssistantText
-                            let blocked = Set.contains (key.Trim()) snap.dispatchedAnchors
 
-                            let loopActive =
-                                match snap.workState with
-                                | SessionWorkState.LoopActive _ -> true
-                                | SessionWorkState.RunnerActive(_, loopActive) -> loopActive
-                                | _ -> false
+                            let runner =
+                                if hasRunningRunnerJob ompScope sessionId then
+                                    RunnerPresence.Active
+                                else
+                                    RunnerPresence.Absent
 
-                            let workState = getSessionWorkState hasRunner loopActive snap.openTodos
+                            let anchor = nudgeAnchorKey snap.turnId snap.lastAssistantText
 
                             let blockStatus =
-                                if blocked then
+                                if isNudgeBlockedForAnchor { DispatchedAnchors = snap.dispatchedAnchors } anchor then
                                     NudgeBlockStatus.Blocked
                                 else
                                     NudgeBlockStatus.Allowed
 
-                            let snapshot: SessionSnapshot =
-                                { todos = snap.openTodos
-                                  lastAssistantMessage = snap.lastAssistantText
-                                  workState = workState
-                                  blockStatus = blockStatus
-                                  nudgeAnchorKey = key
-                                  agentFromMessage = snap.agentFromMessage
-                                  modelFromMessage = snap.modelFromMessage }
+                            let snapshot = sessionSnapshotFromFold snap runner blockStatus
 
                             match deriveAction snapshot with
                             | NudgeNone -> ()

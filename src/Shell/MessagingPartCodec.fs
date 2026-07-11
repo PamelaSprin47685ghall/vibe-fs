@@ -3,6 +3,7 @@
 module Wanxiangshu.Shell.MessagingPartCodec
 
 open Wanxiangshu.Kernel.Messaging
+open Wanxiangshu.Kernel.ToolExecutionStatusModule
 open Wanxiangshu.Shell.Dyn
 
 let operationActionFromInput (input: obj) : string =
@@ -28,17 +29,17 @@ let decodeOpencodeToolStateBox (state: obj) : ToolState<obj> option =
         let input = Dyn.get state "input"
 
         Some
-            { status = Dyn.str state "status"
+            { status = fromString (Dyn.str state "status")
               output = Dyn.str state "output"
               error = Dyn.str state "error"
               input = input
               operationAction = operationActionFromInput input }
 
-let muxPartStateToKernelStatus (partState: string) : string =
+let muxPartStateToKernelStatus (partState: string) : ToolExecutionStatus =
     match partState with
-    | "output-available" -> "completed"
-    | "input-available" -> "pending"
-    | other -> other
+    | "output-available" -> ToolExecutionStatus.Completed
+    | "input-available" -> ToolExecutionStatus.Pending
+    | other -> fromString other
 
 let decodeMuxDynamicToolState (part: obj) : ToolState<obj> option =
     let output = Dyn.get part "output"

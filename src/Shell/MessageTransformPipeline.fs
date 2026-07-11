@@ -122,7 +122,7 @@ let private resolveCurrentTokens
     match tokenCountOpt with
     | Some t when t > 0 -> Some t
     | _ ->
-        match ContextBudget.estimateTokens totalBytes storeEntry.LastUsage with
+        match estimateTokens totalBytes storeEntry.LastUsage with
         | Some t when t > 0 -> Some t
         | _ -> None
 
@@ -134,7 +134,7 @@ let private rebuildPhaseState
     (encodeMessages: Message<obj> list -> obj array)
     (currentTokens: int)
     (totalBytes: int)
-    : JS.Promise<ContextBudget.ContextState> =
+    : JS.Promise<ContextState> =
     promise {
         if backlog <> currentStore.LastBacklog || currentStore.State.IsNone then
             let stableMessages =
@@ -150,7 +150,7 @@ let private rebuildPhaseState
                 | None ->
                     let currentLastUsage = (ContextBudgetStore.get plan.Scope plan.SessionID).LastUsage
 
-                    match ContextBudget.estimateTokens stableBytes currentLastUsage with
+                    match estimateTokens stableBytes currentLastUsage with
                     | Some t -> int64 t
                     | None -> int64 currentTokens
 
@@ -162,13 +162,13 @@ let private rebuildPhaseState
                     { phaseBaseTokens = 0L
                       backlogTokensAtPhaseStart = 0L }
                 else
-                    ContextBudget.beginPhase stableTokens (int64 stableBytes) (int64 backlogBytes)
+                    beginPhase stableTokens (int64 stableBytes) (int64 backlogBytes)
 
             ContextBudgetStore.update plan.Scope plan.SessionID (fun entry ->
                 { entry with
                     State = Some newState
                     LastBacklog = backlog
-                    NudgeInjected = false })
+                    NudgeTrack = afterPhaseBoundaryReset entry.NudgeTrack })
 
             return newState
         else
@@ -178,26 +178,17 @@ let private rebuildPhaseState
 let private checkAndInjectNudge
     (plan: MessageTransformPlan)
     (currentTokens: int)
-    (state: ContextBudget.ContextState)
+    (state: ContextState)
     (messages: Message<obj> list)
     : Message<obj> list =
-    let state_c = state.backlogTokensAtPhaseStart
-    let state_s = state.phaseBaseTokens - state_c
+    match classifyPressure plan.MaxInputTokens (int64 currentTokens) state with
+    | RequireTodoWriteEmergency ->
+        ContextBudgetStore.update plan.Scope plan.SessionID (fun entry ->
+            { entry with
+                NudgeTrack = afterEmergencyNudge entry.NudgeTrack })
 
-    let effectiveMaxInputTokens = (int64 plan.MaxInputTokens * 75L) / 100L
-
-    if ContextBudget.isCompactingRequired state.phaseBaseTokens effectiveMaxInputTokens then
-        messages
-    elif ContextBudget.F (int64 currentTokens) effectiveMaxInputTokens state_c state_s then
-        let updatedStore = ContextBudgetStore.get plan.Scope plan.SessionID
-
-        if updatedStore.NudgeInjected then
-            messages
-        else
-            ContextBudgetStore.update plan.Scope plan.SessionID (fun entry -> { entry with NudgeInjected = true })
-            List.append messages [ buildContextBudgetNudgeMessage plan.SessionID ]
-    else
-        messages
+        List.append messages [ buildContextBudgetNudgeMessage plan.SessionID ]
+    | _ -> messages
 
 let applyContextBudget
     (plan: MessageTransformPlan)

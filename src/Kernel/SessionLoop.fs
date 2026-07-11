@@ -1,5 +1,7 @@
 module Wanxiangshu.Kernel.SessionLoop
 
+open Wanxiangshu.Kernel.SessionGateDemand
+
 /// Gate priority: FallbackContinue > TodoNudge > ReviewNudge > Resolve.
 /// Resolve is the sole terminal action; drive halts immediately after emitting it.
 type SessionGateMode =
@@ -14,15 +16,12 @@ type GateAction =
     | ReviewNudge
     | Resolve
 
-let gateModeFromFlags (needFallbackContinue: bool) (needTodoNudge: bool) (needReviewNudge: bool) : SessionGateMode =
-    if needFallbackContinue then
-        SessionGateMode.FallbackContinue
-    elif needTodoNudge then
-        SessionGateMode.TodoNudge
-    elif needReviewNudge then
-        SessionGateMode.ReviewNudge
-    else
-        SessionGateMode.Settled
+let gateModeFromDemand (demand: SessionGateDemand) : SessionGateMode =
+    match demand with
+    | SessionGateDemand.FallbackContinue -> SessionGateMode.FallbackContinue
+    | SessionGateDemand.TodoNudge -> SessionGateMode.TodoNudge
+    | SessionGateDemand.ReviewNudge -> SessionGateMode.ReviewNudge
+    | SessionGateDemand.Settled -> SessionGateMode.Settled
 
 let decideFromMode (mode: SessionGateMode) : GateAction =
     match mode with

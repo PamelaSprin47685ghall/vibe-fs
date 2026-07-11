@@ -5,6 +5,7 @@ open Wanxiangshu.Kernel.EventLog.Types
 open Wanxiangshu.Kernel.EventLog.Fold
 open Wanxiangshu.Kernel.Nudge
 open Wanxiangshu.Kernel.NudgeDerivation
+open Wanxiangshu.Kernel.EventLog.ReviewLoopFold
 open Wanxiangshu.Kernel.Nudge.Types
 
 let private ev session kind payload =
@@ -31,11 +32,7 @@ let foldNudgeSnapshotEmpty () =
     check "empty: no agent" (s.agentFromMessage = None)
     check "empty: no turnId" (s.turnId = "")
 
-    check
-        "empty: not loop active"
-        (match s.workState with
-         | SessionWorkState.LoopActive _ -> false
-         | _ -> true)
+    check "empty: not loop active" (not (isLoopActive s.reviewLoop))
 
     check "empty: no dispatched anchors" (s.dispatchedAnchors = Set.empty)
 
@@ -62,12 +59,7 @@ let foldNudgeSnapshotLoopActivated () =
     let events = [ ev "s1" eventKindLoopActivated (Map [ "task", "ship it" ]) ]
     let s = foldNudgeSnapshot "s1" events
 
-    let isLoopActive =
-        match s.workState with
-        | SessionWorkState.LoopActive _ -> true
-        | _ -> false
-
-    check "loop active after activate" isLoopActive
+    check "loop active after activate" (isLoopActive s.reviewLoop)
     check "no todos" (s.openTodos = [])
     check "no text" (s.lastAssistantText = "")
     check "no agent" (s.agentFromMessage = None)
@@ -80,13 +72,7 @@ let foldNudgeSnapshotLoopCancelled () =
           ev "s1" eventKindLoopCancelled Map.empty ]
 
     let s = foldNudgeSnapshot "s1" events
-
-    let isLoopActive =
-        match s.workState with
-        | SessionWorkState.LoopActive _ -> true
-        | _ -> false
-
-    check "not loop active after cancel" (not isLoopActive)
+    check "not loop active after cancel" (not (isLoopActive s.reviewLoop))
     check "no todos" (s.openTodos = [])
     check "no text" (s.lastAssistantText = "")
     check "no agent" (s.agentFromMessage = None)
@@ -99,13 +85,7 @@ let foldNudgeSnapshotAcceptedClears () =
           ev "s1" eventKindReviewVerdict (Map [ "verdict", verdictAccepted ]) ]
 
     let s = foldNudgeSnapshot "s1" events
-
-    let isLoopActive =
-        match s.workState with
-        | SessionWorkState.LoopActive _ -> true
-        | _ -> false
-
-    check "not loop active after accept" (not isLoopActive)
+    check "not loop active after accept" (not (isLoopActive s.reviewLoop))
 
 /// review_verdict needs_revision keeps isLoopActive.
 let foldNudgeSnapshotNeedsRevisionKeeps () =
@@ -114,13 +94,7 @@ let foldNudgeSnapshotNeedsRevisionKeeps () =
           ev "s1" eventKindReviewVerdict (Map [ "verdict", verdictNeedsRevision ]) ]
 
     let s = foldNudgeSnapshot "s1" events
-
-    let isLoopActive =
-        match s.workState with
-        | SessionWorkState.LoopActive _ -> true
-        | _ -> false
-
-    check "loop active after needs_revision" isLoopActive
+    check "loop active after needs_revision" (isLoopActive s.reviewLoop)
 
 /// nudge_dispatched adds both anchors to dispatchedAnchors.
 let foldNudgeSnapshotNudgeDispatched () =
@@ -175,12 +149,7 @@ let foldNudgeSnapshotIntegrated () =
     check "integrated: has todos" (s.openTodos = [ "ship feature" ])
     check "integrated: has assistant text" (s.lastAssistantText = "working on it")
 
-    let isLoopActive =
-        match s.workState with
-        | SessionWorkState.LoopActive _ -> true
-        | _ -> false
-
-    check "integrated: not loop active" (not isLoopActive)
+    check "integrated: not loop active" (not (isLoopActive s.reviewLoop))
     check "integrated: has turnId" (s.turnId = "t42")
     equal "integrated: model" (Some "openai/gpt-4o") s.modelFromMessage
 

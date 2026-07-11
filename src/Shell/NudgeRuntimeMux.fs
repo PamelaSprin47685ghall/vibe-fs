@@ -5,11 +5,14 @@ open Fable.Core.JsInterop
 open Wanxiangshu.Shell.Dyn
 open Wanxiangshu.Kernel.Nudge
 open Wanxiangshu.Kernel.Nudge.TodoStatus
+open Wanxiangshu.Kernel.NudgeDerivation
+open Wanxiangshu.Kernel.Nudge.NudgeSnapshotSource
 open Wanxiangshu.Kernel.Nudge.Types
 open Wanxiangshu.Kernel.HostTools
 open Wanxiangshu.Shell.OpencodeHookInputCodec
 open Wanxiangshu.Shell.OpencodeSessionEventCodecCommon
 open Wanxiangshu.Kernel.EventLog.Fold
+open Wanxiangshu.Kernel.EventLog.ReviewLoopFold
 open Wanxiangshu.Shell.EventLogRuntime
 open Wanxiangshu.Shell.FallbackRuntimeState
 open Wanxiangshu.Shell.NudgeRuntimeTypes
@@ -141,31 +144,14 @@ let collectSnapshotMux
         let! snapshot = getNudgeSnapshotFromEventLog root workspaceId
 
         let currentAnchor = nudgeAnchorKey snapshot.turnId snapshot.lastAssistantText
-        let blocked = Set.contains (currentAnchor.Trim()) snapshot.dispatchedAnchors
-
-        let loopActive =
-            match snapshot.workState with
-            | SessionWorkState.LoopActive _ -> true
-            | SessionWorkState.RunnerActive(_, loopActive) -> loopActive
-            | _ -> false
-
-        let workState = getSessionWorkState false loopActive snapshot.openTodos
 
         let blockStatus =
-            if blocked then
+            if isNudgeBlockedForAnchor { DispatchedAnchors = snapshot.dispatchedAnchors } currentAnchor then
                 NudgeBlockStatus.Blocked
             else
                 NudgeBlockStatus.Allowed
 
-        return
-            Some
-                { todos = snapshot.openTodos
-                  lastAssistantMessage = snapshot.lastAssistantText
-                  workState = workState
-                  blockStatus = blockStatus
-                  nudgeAnchorKey = currentAnchor
-                  agentFromMessage = snapshot.agentFromMessage
-                  modelFromMessage = snapshot.modelFromMessage }
+        return Some(sessionSnapshotFromFold snapshot RunnerPresence.Absent blockStatus)
     }
 
 let sendNudgeMux

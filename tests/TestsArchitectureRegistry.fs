@@ -193,6 +193,15 @@ let architectureTestEntriesPartA () : (string * TestBody) list =
       "ArchitectureTests.wanxiangzhenReconcile", Sync(sync ArchitectureTestsFoundationB.wanxiangzhenReconcile)
       "ArchitectureTests.squadEventFoldUsesTransitionPolicy",
       Sync(sync ArchitectureTestsFoundationB.squadEventFoldUsesTransitionPolicy)
+      "ArchitectureTests.sessionGateNoBoolTriple", Sync(sync ArchitectureTestsFoundationB.sessionGateNoBoolTriple)
+      "ArchitectureTests.fallbackRuntimeNoBoolGateMaps",
+      Sync(sync ArchitectureTestsFoundationB.fallbackRuntimeNoBoolGateMaps)
+      "ArchitectureTests.nudgeSnapshotSourceNoBoolInput",
+      Sync(sync ArchitectureTestsFoundationB.nudgeSnapshotSourceNoBoolInput)
+      "ArchitectureTests.nudgeHostsUseSessionSnapshotFromFold",
+      Sync(sync ArchitectureTestsFoundationB.nudgeHostsUseSessionSnapshotFromFold)
+      "ArchitectureTests.fallbackLifecycleAdt", Sync(sync ArchitectureTestsFoundationB.fallbackLifecycleAdt)
+      "ArchitectureTests.nudgeWorkStateAdt", Sync(sync ArchitectureTestsFoundationB.nudgeWorkStateAdt)
       "ArchitectureTests.reviewLoopFoldAdt", Sync(sync ArchitectureTestsFoundationB.reviewLoopFoldAdt)
       "ArchitectureTests.coordinatorReplayUsesTransitionPolicy",
       Sync(sync ArchitectureTestsFoundationB.coordinatorReplayUsesTransitionPolicy) ]

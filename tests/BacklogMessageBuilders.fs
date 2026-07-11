@@ -5,6 +5,7 @@ open Fable.Core.JsInterop
 
 open Wanxiangshu.Kernel.Messaging
 open Wanxiangshu.Kernel.BacklogProjectionCore
+open Wanxiangshu.Kernel.ToolExecutionStatusModule
 
 
 let mkInfo (id: string) (role: Role) : MessageInfo<obj> =
@@ -18,7 +19,7 @@ let mkInfo (id: string) (role: Role) : MessageInfo<obj> =
       time = null }
 
 let mkState (status: string) (output: string) (input: obj) : ToolState<obj> =
-    { status = status
+    { status = fromString status
       output = output
       error = ""
       input = input
@@ -73,7 +74,7 @@ let todoWriteErrorMsg (id: string) (callID: string) (errorText: string) : Messag
               todoWriteToolNameDefault,
               callID,
               Some(
-                  { status = "error"
+                  { status = ToolExecutionStatus.Error
                     output = ""
                     error = errorText
                     input = box (createObj [])
@@ -122,7 +123,7 @@ let taskMsgWithReport (id: string) (callID: string) (report: string) : Message<o
               "task",
               callID,
               Some(
-                  { status = "completed"
+                  { status = ToolExecutionStatus.Completed
                     output = "ok"
                     error = ""
                     input = input
@@ -151,7 +152,7 @@ let taskMsgWithActionAndReport (action: string) (id: string) (callID: string) (r
               "task",
               callID,
               Some(
-                  { status = "completed"
+                  { status = ToolExecutionStatus.Completed
                     output = "ok"
                     error = ""
                     input = input
@@ -172,7 +173,7 @@ let taskCreateMsg (id: string) (callID: string) : Message<obj> =
               "task",
               callID,
               Some(
-                  { status = "completed"
+                  { status = ToolExecutionStatus.Completed
                     output = "ok"
                     error = ""
                     input = input

@@ -3,6 +3,7 @@ module Wanxiangshu.Omp.MessagingCodec
 open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Kernel.Messaging
+open Wanxiangshu.Kernel.ToolExecutionStatusModule
 open Wanxiangshu.Kernel.ReviewReplayPolicy
 open Wanxiangshu.Shell.Dyn
 open Wanxiangshu.Shell.MessagingDecodeCore
@@ -180,7 +181,7 @@ let decodeToolState (state: obj) : ToolState<obj> option =
         let input = Dyn.get state "input"
 
         Some
-            { status = Dyn.str state "status"
+            { status = fromString (Dyn.str state "status")
               output = Dyn.str state "output"
               error = Dyn.str state "error"
               input = input

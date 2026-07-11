@@ -5,6 +5,7 @@ open Fable.Core.JsInterop
 open System
 open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Kernel.Messaging
+open Wanxiangshu.Kernel.ToolExecutionStatusModule
 open Wanxiangshu.Kernel.ReviewReplayPolicy
 open Wanxiangshu.Kernel.ReviewSession.Types
 open Wanxiangshu.Kernel.Config
@@ -12,7 +13,7 @@ open Wanxiangshu.Kernel.Config
 // ── Kernel.ReviewReplayPolicy ─────────────────────────────────────────────────
 let rrpTextsFromFlatPartsTool () =
     let toolState =
-        { status = "completed"
+        { status = fromString "completed"
           output = "out"
           error = ""
           input = null

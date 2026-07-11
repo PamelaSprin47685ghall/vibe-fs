@@ -2,6 +2,7 @@ module Wanxiangshu.Kernel.BacklogProjectionCore
 
 open Wanxiangshu.Kernel.HostTools
 open Wanxiangshu.Kernel.Messaging
+open Wanxiangshu.Kernel.ToolExecutionStatusModule
 open Wanxiangshu.Kernel.PromptFrontMatter
 open Wanxiangshu.Kernel.Message
 
@@ -28,7 +29,10 @@ let trunc (s: string) : string = if s = null then "" else s.Trim()
 
 let isTodoResultFor (host: Host) (part: Part<'raw>) : bool =
     match part with
-    | ToolPart(toolName, _, Some state, _) when toolName = todoWriteToolNameFor host && state.status = "completed" ->
+    | ToolPart(toolName, _, Some state, _) when
+        toolName = todoWriteToolNameFor host
+        && state.status = ToolExecutionStatus.Completed
+        ->
         true
     | _ -> false
 
@@ -36,7 +40,10 @@ let isTodoResult (part: Part<'raw>) : bool = isTodoResultFor opencode part
 
 let isTodoErrorFor (host: Host) (part: Part<'raw>) : bool =
     match part with
-    | ToolPart(toolName, _, Some state, _) when toolName = todoWriteToolNameFor host && state.status = "error" -> true
+    | ToolPart(toolName, _, Some state, _) when
+        toolName = todoWriteToolNameFor host && state.status = ToolExecutionStatus.Error
+        ->
+        true
     | _ -> false
 
 let isTodoError (part: Part<'raw>) : bool = isTodoErrorFor opencode part
@@ -117,22 +124,32 @@ let buildCompactionAnchorPrompt (backlogEntries: BacklogEntry list) (extractAnch
         renderCompactionAnchorPrompt (anchorBlocks @ backlogBlock)
 
 let private buildTodoSummary (backlog: BacklogEntry list) : string =
-    if backlog.IsEmpty then ""
+    if backlog.IsEmpty then
+        ""
     else
         let sb = System.Text.StringBuilder()
         sb.AppendLine("Todo Backlog Summary:") |> ignore
+
         for entry in backlog do
             sb.AppendLine("## Backlog Entry") |> ignore
+
             if not (System.String.IsNullOrWhiteSpace entry.plan) then
                 sb.AppendLine("- Plan: " + entry.plan.Trim()) |> ignore
+
             if not (System.String.IsNullOrWhiteSpace entry.ahaMoments) then
                 sb.AppendLine("- Aha Moments: " + entry.ahaMoments.Trim()) |> ignore
+
             if not (System.String.IsNullOrWhiteSpace entry.changesAndReasons) then
-                sb.AppendLine("- Changes & Reasons: " + entry.changesAndReasons.Trim()) |> ignore
+                sb.AppendLine("- Changes & Reasons: " + entry.changesAndReasons.Trim())
+                |> ignore
+
             if not (System.String.IsNullOrWhiteSpace entry.gotchas) then
                 sb.AppendLine("- Gotchas: " + entry.gotchas.Trim()) |> ignore
+
             if not (System.String.IsNullOrWhiteSpace entry.lessonsAndConventions) then
-                sb.AppendLine("- Lessons & Conventions: " + entry.lessonsAndConventions.Trim()) |> ignore
+                sb.AppendLine("- Lessons & Conventions: " + entry.lessonsAndConventions.Trim())
+                |> ignore
+
         sb.ToString()
 
 let private buildMessageHistory (cleaned: Message<'raw> list) : string =
@@ -144,6 +161,7 @@ let private buildMessageHistory (cleaned: Message<'raw> list) : string =
             | Assistant -> "Assistant"
             | ToolResult -> "Tool Result"
             | System -> "System"
+
         let contentPartsText =
             m.parts
             |> List.choose (fun p ->
@@ -154,25 +172,33 @@ let private buildMessageHistory (cleaned: Message<'raw> list) : string =
                         match state with
                         | Some s -> $"status={s.status}"
                         | None -> ""
+
                     Some $"Tool Call: name={name}, callID={callID}, state={stateStr}, error={err}"
                 | RawPart _ -> Some "[Raw Content]")
             |> String.concat "\n"
+
         $"Role: {roleStr}\nContent:\n{contentPartsText}\n")
     |> String.concat "\n"
 
 let private buildWrappedText (todoSummary: string) (messageHistory: string) : string =
     let bodyText =
-        let parts = [
-            if todoSummary <> "" then yield todoSummary
-            yield "Dialogue History:"
-            yield messageHistory
-        ]
+        let parts =
+            [ if todoSummary <> "" then
+                  yield todoSummary
+              yield "Dialogue History:"
+              yield messageHistory ]
+
         String.concat "\n\n" parts
+
     "Please summarize the conversation history and progress based on the following do-not-exec block. <do-not-exec>\n"
     + bodyText
     + "\n</do-not-exec> Note that you only need to provide a summary of progress, and should not actually execute the content within."
 
-let compactingTransform (messages: Message<'raw> list) (backlog: BacklogEntry list) (guidGen: unit -> string) : Message<'raw> list =
+let compactingTransform
+    (messages: Message<'raw> list)
+    (backlog: BacklogEntry list)
+    (guidGen: unit -> string)
+    : Message<'raw> list =
     let cleaned = stripSyntheticBySource messages
     let todoSummary = buildTodoSummary backlog
     let messageHistory = buildMessageHistory cleaned
@@ -208,4 +234,3 @@ let compactingTransform (messages: Message<'raw> list) (backlog: BacklogEntry li
           raw = defaultRaw }
 
     [ finalMsg ]
-

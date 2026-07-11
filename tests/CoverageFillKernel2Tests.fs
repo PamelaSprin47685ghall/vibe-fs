@@ -6,6 +6,7 @@ open System
 open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Kernel.HostTools
 open Wanxiangshu.Kernel.Messaging
+open Wanxiangshu.Kernel.ToolExecutionStatusModule
 open Wanxiangshu.Kernel.BacklogProjectionCore
 open Wanxiangshu.Kernel.ReviewSession.Types
 
@@ -49,7 +50,7 @@ let blpIsTodoResultFor () =
             "todowrite",
             "c1",
             Some
-                { status = "completed"
+                { status = ToolExecutionStatus.Completed
                   output = ""
                   error = ""
                   input = null
@@ -64,7 +65,7 @@ let blpIsTodoResultFor () =
             "todowrite",
             "c1",
             Some
-                { status = "error"
+                { status = ToolExecutionStatus.Error
                   output = ""
                   error = "fail"
                   input = null
@@ -79,7 +80,7 @@ let blpIsTodoResultFor () =
             "todowrite",
             "c1",
             Some
-                { status = "completed"
+                { status = ToolExecutionStatus.Completed
                   output = ""
                   error = ""
                   input = null
@@ -94,7 +95,7 @@ let blpIsTodoResultFor () =
             "other",
             "c1",
             Some
-                { status = "completed"
+                { status = ToolExecutionStatus.Completed
                   output = ""
                   error = ""
                   input = null
@@ -110,7 +111,7 @@ let blpIsTodoErrorFor () =
             "todowrite",
             "c1",
             Some
-                { status = "error"
+                { status = ToolExecutionStatus.Error
                   output = ""
                   error = "bad"
                   input = null
@@ -125,7 +126,7 @@ let blpIsTodoErrorFor () =
             "todowrite",
             "c1",
             Some
-                { status = "completed"
+                { status = ToolExecutionStatus.Completed
                   output = ""
                   error = ""
                   input = null
@@ -140,7 +141,7 @@ let blpIsTodoErrorFor () =
             "todowrite",
             "c1",
             Some
-                { status = "error"
+                { status = ToolExecutionStatus.Error
                   output = ""
                   error = "bad"
                   input = null
@@ -155,7 +156,7 @@ let blpIsTodoErrorFor () =
             "other",
             "c1",
             Some
-                { status = "error"
+                { status = ToolExecutionStatus.Error
                   output = ""
                   error = "bad"
                   input = null
@@ -171,7 +172,7 @@ let blpLastTodoErrorText () =
             "todowrite",
             "c1",
             Some
-                { status = "error"
+                { status = ToolExecutionStatus.Error
                   output = ""
                   error = "boom"
                   input = null
@@ -192,7 +193,7 @@ let blpLastTodoErrorText () =
             "todowrite",
             "c1",
             Some
-                { status = "completed"
+                { status = ToolExecutionStatus.Completed
                   output = ""
                   error = ""
                   input = null

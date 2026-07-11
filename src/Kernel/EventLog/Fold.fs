@@ -5,6 +5,7 @@ open Wanxiangshu.Kernel.EventLog.FallbackInjectionFold
 open Wanxiangshu.Kernel.EventLog.ReviewLoopFold
 open Wanxiangshu.Kernel.BacklogProjectionCore
 open Wanxiangshu.Kernel.Nudge.Types
+open Wanxiangshu.Kernel.EventLog.ReviewVerdictWire
 
 let private forSession (sessionId: string) (events: WanEvent list) : WanEvent list =
     events |> List.filter (fun e -> e.Session = sessionId)
@@ -90,6 +91,7 @@ type NudgeSnapshotState =
       agentFromMessage: string option
       modelFromMessage: string option
       turnId: string
+      reviewLoop: ReviewLoopFold
       workState: SessionWorkState
       dispatchedAnchors: Set<string> }
 
@@ -113,9 +115,9 @@ let private parseTodosJson (json: string) : string list =
                 Some(s.Substring(1, s.Length - 2)))
         |> Array.toList
 
-let private updateWorkState (st: NudgeSnapshotState) (loopActive: bool) : NudgeSnapshotState =
+let private syncWorkState (st: NudgeSnapshotState) : NudgeSnapshotState =
     { st with
-        workState = getSessionWorkState false loopActive st.openTodos }
+        workState = workStateFromAxes false (ReviewLoopFold.isLoopActive st.reviewLoop) st.openTodos }
 
 let emptyNudgeSnapshotState: NudgeSnapshotState =
     { openTodos = []
@@ -123,6 +125,7 @@ let emptyNudgeSnapshotState: NudgeSnapshotState =
       agentFromMessage = None
       modelFromMessage = None
       turnId = ""
+      reviewLoop = ReviewLoopFold.initial
       workState = SessionWorkState.Idle
       dispatchedAnchors = Set.empty }
 
@@ -145,28 +148,25 @@ let private nudgeSnapshotFolder (st: NudgeSnapshotState) (e: WanEvent) : NudgeSn
         let tid = payloadField "turnId" e |> strOrEmpty
         let todosFromPayload = payloadField "openTodosJson" e |> Option.map parseTodosJson
 
-        let loopActive =
-            match st.workState with
-            | SessionWorkState.LoopActive _ -> true
-            | SessionWorkState.RunnerActive(_, loopActive) -> loopActive
-            | _ -> false
+        let openTodos =
+            match todosFromPayload with
+            | Some t -> t
+            | None -> st.openTodos
 
-        { st with
-            lastAssistantText = msg
-            agentFromMessage = agent
-            modelFromMessage = model
-            turnId = tid
-            openTodos =
-                match todosFromPayload with
-                | Some t -> t
-                | None -> st.openTodos
-            workState = getSessionWorkState false loopActive st.openTodos }
-    | k when k = eventKindLoopActivated -> updateWorkState st true
-    | k when k = eventKindLoopCancelled -> updateWorkState st false
-    | k when k = eventKindReviewVerdict ->
-        match payloadVerdict e with
-        | Some v when isEndVerdict v -> updateWorkState st false
-        | _ -> st
+        syncWorkState
+            { st with
+                lastAssistantText = msg
+                agentFromMessage = agent
+                modelFromMessage = model
+                turnId = tid
+                openTodos = openTodos }
+    | k when
+        k = eventKindLoopActivated
+        || k = eventKindLoopCancelled
+        || k = eventKindReviewVerdict
+        ->
+        let reviewLoop = ReviewLoopFold.foldEvent st.reviewLoop e
+        syncWorkState { st with reviewLoop = reviewLoop }
     | k when k = eventKindNudgeDispatched ->
         match payloadAnchor e with
         | Some anchor ->
@@ -179,15 +179,9 @@ let private nudgeSnapshotFolder (st: NudgeSnapshotState) (e: WanEvent) : NudgeSn
     | k when k = eventKindWorkBacklogCommitted ->
         let todosOpt = payloadField "todosJson" e |> Option.map parseTodosJson
 
-        let loopActive =
-            match st.workState with
-            | SessionWorkState.LoopActive _ -> true
-            | SessionWorkState.RunnerActive(_, loopActive) -> loopActive
-            | _ -> false
-
-        { st with
-            openTodos = todosOpt |> Option.defaultValue st.openTodos
-            workState = getSessionWorkState false loopActive st.openTodos }
+        syncWorkState
+            { st with
+                openTodos = todosOpt |> Option.defaultValue st.openTodos }
     | _ -> st
 
 let foldNudgeSnapshot (sessionId: string) (events: WanEvent list) : NudgeSnapshotState =

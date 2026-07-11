@@ -1,5 +1,7 @@
 module Wanxiangshu.Kernel.Messaging
 
+open Wanxiangshu.Kernel.ToolExecutionStatusModule
+
 /// Host-agnostic message model. `'raw` carries the original host object reference
 /// through the Kernel without being inspected; only Host codec layers instantiate it.
 
@@ -10,7 +12,7 @@ type Role =
     | System
 
 type ToolState<'raw> =
-    { status: string
+    { status: ToolExecutionStatus
       output: string
       error: string
       input: 'raw
@@ -90,8 +92,7 @@ let decodeRole (s: string) : Role =
     let lowered = s.Trim().ToLowerInvariant()
     Map.tryFind lowered roleMap |> Option.defaultValue System
 
-let isToolResultRoleString (s: string) : bool =
-    decodeRole s = ToolResult
+let isToolResultRoleString (s: string) : bool = decodeRole s = ToolResult
 
 /// Pure typed copy of a tool part with its state.output overwritten.
 let setPartOutputTyped (part: Part<'raw>) (newOutput: string) : Part<'raw> =
@@ -163,6 +164,13 @@ let stripSyntheticBySource (messages: Message<'raw> list) : Message<'raw> list =
 
 /// Extract the first non-empty session ID from a list of messages. Pure.
 let extractSessionID (messages: Message<'raw> list) : string =
-    match messages |> List.tryPick (fun m -> if m.info.sessionID <> "" then Some m.info.sessionID else None) with
+    match
+        messages
+        |> List.tryPick (fun m ->
+            if m.info.sessionID <> "" then
+                Some m.info.sessionID
+            else
+                None)
+    with
     | Some sid -> sid
     | None -> ""

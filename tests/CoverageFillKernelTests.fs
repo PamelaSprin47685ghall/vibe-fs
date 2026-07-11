@@ -7,6 +7,7 @@ open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Kernel.Domain
 open Wanxiangshu.Kernel.Domain.Id
 open Wanxiangshu.Kernel.Messaging
+open Wanxiangshu.Kernel.ToolExecutionStatusModule
 open Wanxiangshu.Kernel.HostTools
 
 // ── Kernel.Domain ──────────────────────────────────────────────────────────
@@ -235,7 +236,7 @@ let msgPartAccessors () =
             "t",
             "c1",
             Some
-                { status = ""
+                { status = fromString ""
                   output = ""
                   error = ""
                   input = null

@@ -2,6 +2,7 @@ module Wanxiangshu.Tests.ReviewReplaySyncTests
 
 open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Kernel.Messaging
+open Wanxiangshu.Kernel.ToolExecutionStatusModule
 open Wanxiangshu.Kernel.ReviewReplayPolicy
 open Wanxiangshu.Kernel.LoopMessages
 open Wanxiangshu.Kernel.PromptFrontMatter
@@ -12,7 +13,7 @@ open Wanxiangshu.Shell.ReviewReplaySync
 
 let textsFromFlatPartsIncludesToolOutput () =
     let toolState =
-        { status = "completed"
+        { status = fromString "completed"
           output = "tool-body"
           error = ""
           input = ()

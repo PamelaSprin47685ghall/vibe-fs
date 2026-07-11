@@ -132,9 +132,47 @@ let run
             scan <- scan + 1
 
 
-        do! withTimeout (cbHarness.dispose ())
         chk "cb.nudgeInjected" foundNudge
         chk "cb.nudgeIdPrefix" (nudgeId <> "")
+
+        // Second transform simulates next host hook round: stripSynthetic removes prior nudge;
+        // budget still hot → must inject again (regression for flaky missing nudge).
+        let userMsg2 =
+            createObj
+                [ "info",
+                  box (
+                      createObj
+                          [ "role", box "user"
+                            "agent", box "build"
+                            "sessionID", box "sess-cb"
+                            "id", box "user-2" ]
+                  )
+                  "parts", box [| box (createObj [ "type", box "text"; "text", box "follow-up user message" ]) |] ]
+
+        let! transformed2 = withTimeout (cbHarness.runMessageTransform transformPlan [| userMsg2 |])
+
+        let msgsOut2: obj array =
+            if Dyn.isNullish transformed2 then
+                [||]
+            else
+                unbox (Dyn.get transformed2 "messages")
+
+        let mutable foundNudge2 = false
+        scan <- 0
+
+        while scan < msgsOut2.Length && not foundNudge2 do
+            let msg = msgsOut2.[scan]
+            let info = Dyn.get msg "info"
+            let idVal = if Dyn.isNullish info then "" else Dyn.str info "id"
+
+            if idVal.StartsWith("context-budget-nudge-") then
+                foundNudge2 <- true
+
+            scan <- scan + 1
+
+        chk "cb.nudgeInjectedSecondTransform" foundNudge2
+
+        do! withTimeout (cbHarness.dispose ())
 
         return 0
     }

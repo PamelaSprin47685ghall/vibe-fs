@@ -4,9 +4,11 @@ open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Kernel.Nudge
 open Wanxiangshu.Kernel.NudgeDerivation
+open Wanxiangshu.Kernel.Nudge.NudgeSnapshotSource
 open Wanxiangshu.Kernel.Nudge.TodoStatus
 open Wanxiangshu.Kernel.Nudge.Types
 open Wanxiangshu.Kernel.EventLog.Fold
+open Wanxiangshu.Kernel.EventLog.ReviewLoopFold
 open Wanxiangshu.Shell.EventLogRuntime
 open Wanxiangshu.Shell.ToolRuntimeContext
 open Wanxiangshu.Kernel.Domain
@@ -135,32 +137,19 @@ let private collectSnapshot
                                 if isForceStopped sessionIDStr then
                                     return None
                                 else
-                                    let key = nudgeAnchorKey snap.turnId snap.lastAssistantText
-                                    let blocked = Set.contains (key.Trim()) snap.dispatchedAnchors
-
-                                    let loopActive =
-                                        match snap.workState with
-                                        | SessionWorkState.LoopActive _ -> true
-                                        | SessionWorkState.RunnerActive(_, loopActive) -> loopActive
-                                        | _ -> false
-
-                                    let workState = getSessionWorkState false loopActive snap.openTodos
+                                    let anchor = nudgeAnchorKey snap.turnId snap.lastAssistantText
 
                                     let blockStatus =
-                                        if blocked then
+                                        if
+                                            isNudgeBlockedForAnchor
+                                                { DispatchedAnchors = snap.dispatchedAnchors }
+                                                anchor
+                                        then
                                             NudgeBlockStatus.Blocked
                                         else
                                             NudgeBlockStatus.Allowed
 
-                                    return
-                                        Some
-                                            { todos = snap.openTodos
-                                              lastAssistantMessage = snap.lastAssistantText
-                                              workState = workState
-                                              blockStatus = blockStatus
-                                              nudgeAnchorKey = key
-                                              agentFromMessage = snap.agentFromMessage
-                                              modelFromMessage = snap.modelFromMessage }
+                                    return Some(sessionSnapshotFromFold snap RunnerPresence.Absent blockStatus)
         with _ ->
             return None
     }

@@ -30,10 +30,12 @@ let eventKindTaskDone = "task_done"
 let eventKindTaskError = "task_error"
 let eventKindSquadCancelled = "squad_cancelled"
 
-let verdictAccepted = "accepted"
-let verdictCancelled = "cancelled"
-let verdictNeedsRevision = "needs_revision"
-let verdictTerminated = "terminated"
+let verdictAccepted = Wanxiangshu.Kernel.EventLog.ReviewVerdictWire.accepted
+let verdictCancelled = Wanxiangshu.Kernel.EventLog.ReviewVerdictWire.cancelled
 
-let isEndVerdict (verdict: string) : bool =
-    verdict = verdictAccepted || verdict = verdictCancelled
+let verdictNeedsRevision =
+    Wanxiangshu.Kernel.EventLog.ReviewVerdictWire.needsRevision
+
+let verdictTerminated = Wanxiangshu.Kernel.EventLog.ReviewVerdictWire.terminated
+
+let isEndVerdict = Wanxiangshu.Kernel.EventLog.ReviewVerdictWire.isEndVerdict

@@ -14,6 +14,7 @@ open Wanxiangshu.Kernel.ReviewSession.Types
 open Wanxiangshu.Kernel.Config
 open Wanxiangshu.Kernel.Executor
 open Wanxiangshu.Kernel.Messaging
+open Wanxiangshu.Kernel.ToolExecutionStatusModule
 
 // ── Kernel.Methodology ────────────────────────────────────────────────────────
 let methToolResultText () =
@@ -167,7 +168,7 @@ let trWireEncodeResultError () =
 // ── Kernel.ReviewReplayPolicy ─────────────────────────────────────────────────
 let rrpTextsFromFlatPartsTool () =
     let toolState =
-        { status = "completed"
+        { status = fromString "completed"
           output = "out"
           error = ""
           input = null

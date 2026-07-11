@@ -7,13 +7,13 @@ type ContextState =
 /// <summary>
 /// Nudge 触发的判定式 F。
 /// 其数学公式为：2 * a >= b + s + c
-/// 
+///
 /// 【参数定义】：
 /// - a: 当前总估算 tokens (currentTokens)
 /// - b: 上下文 token 窗口的最大限制 (maxInputTokens)
 /// - c: 本阶段起点时 backlog 的 token 数 (backlogTokensAtPhaseStart)
 /// - s: 本阶段起点时非 backlog 的基础开销 (phaseBaseTokens - c)
-/// 
+///
 /// 【数学推导与场景解释】：
 /// 阶段起点的基础开销为 c + s。上下文的最大可用自由空间为 b - (c + s)。
 /// 为了保证模型在被 nudge todowrite 强制压缩之前，依然拥有足够的余量来进行下一步的工具调用（如 executor 运行），
@@ -23,11 +23,10 @@ type ContextState =
 ///     2 * (a - (c + s)) >= b - (c + s)
 ///     2a - 2c - 2s >= b - c - s
 ///     2a >= b + c + s
-/// 
+///
 /// 只要该式成立，说明当前阶段新增的会话内容已经消耗了自由空间的一半，必须立即注入 Nudge 以强制 todowrite 压缩。
 /// </summary>
-let F (a: int64) (b: int64) (c: int64) (s: int64) : bool =
-    2L * a >= b + s + c
+let F (a: int64) (b: int64) (c: int64) (s: int64) : bool = 2L * a >= b + s + c
 
 /// 实在腾挪不开的界定条件：
 /// 当折叠完的基线 tokens (phaseBaseTokens) 占总上下文空间上限 (maxInputTokens) 的 80% 以上时，
@@ -38,8 +37,11 @@ let isCompactingRequired (phaseBaseTokens: int64) (maxInputTokens: int64) : bool
 
 let beginPhase (totalTokens: int64) (totalBytes: int64) (backlogBytes: int64) : ContextState =
     let backlogTokens =
-        if totalBytes <= 0L then 0L
-        else totalTokens * backlogBytes / totalBytes
+        if totalBytes <= 0L then
+            0L
+        else
+            totalTokens * backlogBytes / totalBytes
+
     { phaseBaseTokens = totalTokens
       backlogTokensAtPhaseStart = backlogTokens }
 
@@ -50,5 +52,37 @@ let estimateTokens (currentTextBytes: int) (lastUsage: {| tokenCount: int; textB
     match lastUsage with
     | Some u when u.textBytes > 0 && currentTextBytes >= 0 ->
         let estimated = (int64 u.tokenCount * int64 currentTextBytes) / int64 u.textBytes
-        Some (int estimated)
+        Some(int estimated)
     | _ -> None
+
+/// Host strips synthetic nudge each transform round; reinject whenever pressure still holds.
+type BudgetNudgeTrack =
+    | Idle
+    | EmergencySignaled
+
+type ContextBudgetPressure =
+    | Disabled
+    | BelowThreshold
+    | Compacting
+    | RequireTodoWriteEmergency
+
+let effectiveMaxInputTokens (maxInputTokens: int) : int64 = (int64 maxInputTokens * 75L) / 100L
+
+let classifyPressure (maxInputTokens: int) (currentTokens: int64) (state: ContextState) : ContextBudgetPressure =
+    if maxInputTokens <= 0 then
+        Disabled
+    else
+        let bEff = effectiveMaxInputTokens maxInputTokens
+        let c = state.backlogTokensAtPhaseStart
+        let s = state.phaseBaseTokens - c
+
+        if isCompactingRequired state.phaseBaseTokens bEff then
+            Compacting
+        elif F currentTokens bEff c s then
+            RequireTodoWriteEmergency
+        else
+            BelowThreshold
+
+let afterPhaseBoundaryReset (_track: BudgetNudgeTrack) : BudgetNudgeTrack = Idle
+
+let afterEmergencyNudge (_track: BudgetNudgeTrack) : BudgetNudgeTrack = EmergencySignaled

@@ -37,7 +37,7 @@ backlogTokens ≈ (totalTokens * backlogBytes) / totalBytes   // totalBytes>0
 ContextState { phaseBaseTokens; backlogTokensAtPhaseStart }
 ```
 
-成功 `todowrite` 后重测并 `beginPhase`；`ContextBudgetStore` 更新 `LastBacklog` 时重置 `NudgeInjected`。
+成功 `todowrite` 后重测并 `beginPhase`；`ContextBudgetStore` 更新 `LastBacklog` 时 `NudgeTrack` 经 `afterPhaseBoundaryReset` 回到 `Idle`。
 
 **ContextState 非 SSOT**；重启靠 NDJSON fold backlog → `projectBacklogFor` → `beginPhase`。
 
@@ -47,7 +47,7 @@ ContextState { phaseBaseTokens; backlogTokensAtPhaseStart }
 
 1. `GetContextUsage(encoded)` 或 `estimateTokens`（上次 token/byte 比例）
 2. backlog 变化则异步重建 `ContextState`
-3. `F` 为 true 且未 `NudgeInjected` → 追加 synthetic **User** 文本：
+3. `classifyPressure` 为 `RequireTodoWriteEmergency`（每轮 transform 可再注；上轮 synthetic 已被 strip）→ 追加 synthetic **User** 文本：
 
 ```text
 Attention: the system context is about to be suspended. You must immediately force an emergency stop to all work and call the todowrite tool.
@@ -63,7 +63,7 @@ Attention: the system context is about to be suspended. You must immediately for
 { State: ContextState option
   LastUsage: {| tokenCount; textBytes |} option
   LastBacklog: BacklogEntry list
-  NudgeInjected: bool }
+  NudgeTrack: BudgetNudgeTrack }
 ```
 
 ## 与 nudge 优先级

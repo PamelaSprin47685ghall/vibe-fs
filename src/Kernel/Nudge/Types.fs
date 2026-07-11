@@ -1,24 +1,60 @@
 module Wanxiangshu.Kernel.Nudge.Types
 
+/// Nudge priority axes as a single DU (no nested bool tuples).
+[<RequireQualifiedAccess>]
 type SessionWorkState =
     | Idle
-    | RunnerActive of hasTodos: bool * loopActive: bool
-    | LoopActive of hasTodos: bool
-    | BacklogActive of openTodos: string list
+    | BacklogOnly
+    | LoopIdle
+    | LoopWithBacklog
+    | RunnerOnly
+    | RunnerWithBacklog
+    | RunnerWithLoop
+    | AllAxes
 
 type NudgeBlockStatus =
     | Blocked
     | Allowed
 
-let getSessionWorkState (hasActiveRunner: bool) (isLoopActive: bool) (openTodos: string list) : SessionWorkState =
-    if hasActiveRunner then
-        RunnerActive(hasTodos = (not openTodos.IsEmpty), loopActive = isLoopActive)
-    elif isLoopActive then
-        LoopActive(hasTodos = (not openTodos.IsEmpty))
-    elif not openTodos.IsEmpty then
-        BacklogActive(openTodos = openTodos)
-    else
-        Idle
+let workStateFromAxes (hasActiveRunner: bool) (isLoopActive: bool) (openTodos: string list) : SessionWorkState =
+    let hasTodos = not openTodos.IsEmpty
+
+    match hasActiveRunner, isLoopActive, hasTodos with
+    | false, false, false -> SessionWorkState.Idle
+    | false, false, true -> SessionWorkState.BacklogOnly
+    | false, true, false -> SessionWorkState.LoopIdle
+    | false, true, true -> SessionWorkState.LoopWithBacklog
+    | true, false, false -> SessionWorkState.RunnerOnly
+    | true, false, true -> SessionWorkState.RunnerWithBacklog
+    | true, true, false -> SessionWorkState.RunnerWithLoop
+    | true, true, true -> SessionWorkState.AllAxes
+
+let hasActiveRunner (s: SessionWorkState) : bool =
+    match s with
+    | SessionWorkState.RunnerOnly
+    | SessionWorkState.RunnerWithBacklog
+    | SessionWorkState.RunnerWithLoop
+    | SessionWorkState.AllAxes -> true
+    | _ -> false
+
+let isLoopActiveWorkState (s: SessionWorkState) : bool =
+    match s with
+    | SessionWorkState.LoopIdle
+    | SessionWorkState.LoopWithBacklog
+    | SessionWorkState.RunnerWithLoop
+    | SessionWorkState.AllAxes -> true
+    | _ -> false
+
+let hasOpenTodos (s: SessionWorkState) : bool =
+    match s with
+    | SessionWorkState.BacklogOnly
+    | SessionWorkState.LoopWithBacklog
+    | SessionWorkState.RunnerWithBacklog
+    | SessionWorkState.AllAxes -> true
+    | _ -> false
+
+/// Back-compat name for call sites migrating off bool triples.
+let getSessionWorkState = workStateFromAxes
 
 type SessionSnapshot =
     { todos: string list

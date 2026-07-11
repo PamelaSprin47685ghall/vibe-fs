@@ -4,6 +4,7 @@ open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Kernel.Messaging
+open Wanxiangshu.Kernel.ToolExecutionStatusModule
 open Wanxiangshu.Shell.Dyn
 open Wanxiangshu.Kernel.CapsFormat
 open Wanxiangshu.Shell.SembleSearch
@@ -131,7 +132,7 @@ let extractContextCollectsUserAndAssistantText () =
                   "read",
                   "call-1",
                   Some
-                      { status = "completed"
+                      { status = fromString "completed"
                         output = "file content"
                         error = ""
                         input = null

@@ -63,6 +63,49 @@ let squadEventFoldUsesTransitionPolicy () =
         "arch: SquadEvent.fold uses TransitionPolicy"
         (squadEvent.Contains "SquadTaskTransition" && squadEvent.Contains "ReplayFact")
 
+let sessionGateNoBoolTriple () =
+    let sessionLoop = requireFile "src/Kernel/SessionLoop.fs" |> nonCommentCode
+    let recovery = requireFile "src/Shell/FallbackRecoveryWait.fs" |> nonCommentCode
+
+    check "arch: SessionLoop has no gateModeFromFlags" (not (sessionLoop.Contains "gateModeFromFlags"))
+    check "arch: FallbackRecoveryWait has no gateModeFromFlags" (not (recovery.Contains "gateModeFromFlags"))
+    check "arch: SessionLoop uses gateModeFromDemand" (sessionLoop.Contains "gateModeFromDemand")
+
+let fallbackRuntimeNoBoolGateMaps () =
+    let rt = requireFile "src/Shell/FallbackRuntimeState.fs" |> nonCommentCode
+
+    check "arch: no nudgeActive bool map" (not (rt.Contains "nudgeActive <-"))
+    check "arch: uses activeGates" (rt.Contains "activeGates")
+    let gates = requireFile "src/Shell/FallbackRuntimeStateGates.fs" |> nonCommentCode
+
+    check "arch: uses FallbackConsumedStatus" (rt.Contains "emptyConsumed" && gates.Contains "FallbackConsumedStatus")
+
+let nudgeSnapshotSourceNoBoolInput () =
+    let deriv = requireFile "src/Kernel/Nudge/NudgeDerivation.fs" |> nonCommentCode
+
+    check "arch: no SnapshotInput" (not (deriv.Contains "SnapshotInput"))
+    check "arch: NudgeSnapshotSource" (deriv.Contains "NudgeSnapshotSource")
+
+let nudgeHostsUseSessionSnapshotFromFold () =
+    for path in
+        [ "src/Opencode/NudgeEffect.fs"
+          "src/Omp/NudgeHooks.fs"
+          "src/Shell/NudgeRuntimeMux.fs" ] do
+        let code = requireFile path |> nonCommentCode
+        check ($"arch: {path} uses sessionSnapshotFromFold") (code.Contains "sessionSnapshotFromFold")
+
+let fallbackLifecycleAdt () =
+    let rt = requireFile "src/Shell/FallbackRuntimeState.fs" |> nonCommentCode
+
+    check "arch: ApplyContinueMode" (rt.Contains "ApplyContinueMode")
+    check "arch: ApplyTaskCompletion" (rt.Contains "ApplyTaskCompletion")
+
+let nudgeWorkStateAdt () =
+    let types = requireFile "src/Kernel/Nudge/Types.fs" |> nonCommentCode
+
+    check "arch: no RunnerActive bool tuple" (not (types.Contains "RunnerActive"))
+    check "arch: workStateFromAxes present" (types.Contains "workStateFromAxes")
+
 let reviewLoopFoldAdt () =
     let fold = requireFile "src/Kernel/EventLog/Fold.fs" |> nonCommentCode
 
