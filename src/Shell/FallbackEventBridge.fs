@@ -47,7 +47,6 @@ let handleEvent
 
     promise {
         let sessionID = translator.ExtractSessionID rawEvent
-        runtime.SetSubsessionPending sessionID false
 
         if
             translator.IsSessionBusy rawEvent
