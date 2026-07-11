@@ -4,6 +4,7 @@ open Fable.Core
 open Fable.Core.JsInterop
 open Fable.Core.JS
 open Wanxiangshu.Kernel.HostTools
+open Wanxiangshu.Kernel
 open Wanxiangshu.Opencode.ChatHooks
 open Wanxiangshu.Opencode.ToolDefinitionHooks
 open Wanxiangshu.Opencode.HookExecute
@@ -138,9 +139,8 @@ let registerHooks (result: obj) (host: Host) (ctx: obj) (services: CoreServices)
                     let sessionID = Wanxiangshu.Shell.Dyn.str input "sessionID"
 
                     let isAbort =
-                        outcome = "cancelled"
-                        || errorMsg.ToLowerInvariant().Contains("abort")
-                        || errorMsg.ToLowerInvariant().Contains("cancel")
+                        FinishReason.isAbort (FinishReason.fromString outcome)
+                        || FinishReason.isAbort (FinishReason.fromString errorMsg)
 
                     let errName = if isAbort then "MessageAbortedError" else "APIError"
 
@@ -169,9 +169,7 @@ let registerHooks (result: obj) (host: Host) (ctx: obj) (services: CoreServices)
                 if errorMsg <> "" then
                     let sessionID = Wanxiangshu.Shell.Dyn.str input "sessionID"
 
-                    let isAbort =
-                        errorMsg.ToLowerInvariant().Contains("abort")
-                        || errorMsg.ToLowerInvariant().Contains("cancel")
+                    let isAbort = FinishReason.isAbort (FinishReason.fromString errorMsg)
 
                     let errName = if isAbort then "MessageAbortedError" else "APIError"
 

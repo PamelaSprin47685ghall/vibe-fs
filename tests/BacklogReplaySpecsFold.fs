@@ -15,7 +15,7 @@ let findFoldRangeTest () =
               todoWriteMsg "m2" "c2" "R2"
               todoWriteMsg "m3" "c3" "R3" ]
 
-    match findFoldRange flat false with
+    match findFoldRange flat FoldStrategy.FoldAfterSecond with
     | None -> check "fold range: found" false
     | Some r -> check "fold range: secondToLast > first" (r.secondToLast > r.firstResult)
 
@@ -27,7 +27,10 @@ let findFoldRangeOpencodePerCallMimicodePerBurst () =
               todoWriteMsg "m2" "c2" "R2"
               todoWriteMsg "m3" "c3" "R3" ]
 
-    check "opencode: three todowrites enable fold" (findFoldRangeFor Opencode flatOpencode false |> Option.isSome)
+    check
+        "opencode: three todowrites enable fold"
+        (findFoldRangeFor Opencode flatOpencode FoldStrategy.FoldAfterSecond
+         |> Option.isSome)
 
     let flatMimo =
         flatten
@@ -38,7 +41,7 @@ let findFoldRangeOpencodePerCallMimicodePerBurst () =
 
     check
         "mimocode: three task calls now enable fold like opencode"
-        (findFoldRangeFor Mimocode flatMimo false |> Option.isSome)
+        (findFoldRangeFor Mimocode flatMimo FoldStrategy.FoldAfterSecond |> Option.isSome)
 
 let findFoldRangeForMimocodeIgnoresReadOnlyTaskCalls () =
     let flat =
@@ -50,7 +53,7 @@ let findFoldRangeForMimocodeIgnoresReadOnlyTaskCalls () =
 
     check
         "mimocode: read-only concept removed; task calls are anchors"
-        (findFoldRangeFor Mimocode flat false |> Option.isSome)
+        (findFoldRangeFor Mimocode flat FoldStrategy.FoldAfterSecond |> Option.isSome)
 
 let findFoldRangeForMimocodeRequiresThreeProgressBursts () =
     let flat =
@@ -63,7 +66,9 @@ let findFoldRangeForMimocodeRequiresThreeProgressBursts () =
               userMsg "u2" "gap"
               taskMsgWithActionAndReport "block" "m5" "c5" "Work 3" ]
 
-    check "mimocode: three task calls satisfy 3-anchor fold" (findFoldRangeFor Mimocode flat false |> Option.isSome)
+    check
+        "mimocode: three task calls satisfy 3-anchor fold"
+        (findFoldRangeFor Mimocode flat FoldStrategy.FoldAfterSecond |> Option.isSome)
 
 let findFoldRangeForMimocodeUsesLastProgressCallInBurst () =
     let flat =
@@ -80,7 +85,7 @@ let findFoldRangeForMimocodeUsesLastProgressCallInBurst () =
 
     check
         "mimocode: first and second-to-last anchors follow raw call order"
-        (findFoldRangeFor Mimocode flat false
+        (findFoldRangeFor Mimocode flat FoldStrategy.FoldAfterSecond
          |> Option.exists (fun range ->
              partCallID flat.[range.firstResult].part = "c1"
              && partCallID flat.[range.secondToLast].part = "c5"))
@@ -99,7 +104,7 @@ let findFoldRangeForMimocodeAssistantTextKeepsBurst () =
               userMsg "u3" "gap"
               taskMsgWithActionAndReport "done" "m5" "c5" "Work 5" ]
 
-    match findFoldRangeFor Mimocode flat false with
+    match findFoldRangeFor Mimocode flat FoldStrategy.FoldAfterSecond with
     | None -> check "mimocode assistant text in burst: fold found" false
     | Some range ->
         check

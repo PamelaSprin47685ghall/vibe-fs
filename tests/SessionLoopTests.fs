@@ -5,27 +5,35 @@ open Wanxiangshu.Kernel.SessionGateDemand
 open Wanxiangshu.Kernel.SessionLoop
 
 let decideAllOpenFallbackFirst () =
-    let mode = gateModeFromDemand (resolveGateDemand true true true)
+    let mode =
+        gateModeFromDemand (
+            resolveFromSignals [ GateSignal.FallbackContinue; GateSignal.TodoNudge; GateSignal.ReviewNudge ]
+        )
+
     equal "all open → FallbackContinue" FallbackContinue (decide mode)
 
 let decideFallbackClosedTodoOpen () =
-    let mode = gateModeFromDemand (resolveGateDemand false true true)
+    let mode =
+        gateModeFromDemand (resolveFromSignals [ GateSignal.TodoNudge; GateSignal.ReviewNudge ])
+
     equal "fallback closed, todo+review open → TodoNudge" TodoNudge (decide mode)
 
 let decideOnlyReviewOpen () =
-    let mode = gateModeFromDemand (resolveGateDemand false false true)
+    let mode = gateModeFromDemand (resolveFromSignals [ GateSignal.ReviewNudge ])
     equal "only review open → ReviewNudge" ReviewNudge (decide mode)
 
 let decideAllClosedResolve () =
-    let mode = gateModeFromDemand (resolveGateDemand false false false)
+    let mode = gateModeFromDemand (resolveFromSignals [])
     equal "all closed → Resolve" Resolve (decide mode)
 
 let driveProducesPrioritySequence () =
     let transitions =
-        [ gateModeFromDemand (resolveGateDemand true true true)
-          gateModeFromDemand (resolveGateDemand false true true)
-          gateModeFromDemand (resolveGateDemand false false true)
-          gateModeFromDemand (resolveGateDemand false false false) ]
+        [ gateModeFromDemand (
+              resolveFromSignals [ GateSignal.FallbackContinue; GateSignal.TodoNudge; GateSignal.ReviewNudge ]
+          )
+          gateModeFromDemand (resolveFromSignals [ GateSignal.TodoNudge; GateSignal.ReviewNudge ])
+          gateModeFromDemand (resolveFromSignals [ GateSignal.ReviewNudge ])
+          gateModeFromDemand (resolveFromSignals []) ]
 
     let mutable i = 1
     let trace = ResizeArray<GateAction>()
@@ -49,7 +57,7 @@ let driveStopsAfterResolve () =
 
     let step (_: SessionGateMode) (_: GateAction) : SessionGateMode =
         count <- count + 1
-        gateModeFromDemand (resolveGateDemand false false false)
+        gateModeFromDemand (resolveFromSignals [])
 
     drive
         step
@@ -58,7 +66,9 @@ let driveStopsAfterResolve () =
                 afterResolve <- afterResolve + 1
             elif afterResolve > 0 then
                 afterResolve <- afterResolve + 100)
-        (gateModeFromDemand (resolveGateDemand true true true))
+        (gateModeFromDemand (
+            resolveFromSignals [ GateSignal.FallbackContinue; GateSignal.TodoNudge; GateSignal.ReviewNudge ]
+        ))
 
     equal "Resolve emitted exactly once" 1 afterResolve
     equal "step called exactly once (no loop after Resolve)" 1 count

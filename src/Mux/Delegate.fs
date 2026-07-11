@@ -124,7 +124,7 @@ let private createAndWaitTask
 
         match decodeTaskCreateResult createResult with
         | Error e -> return Ok(wireDomainFailure "delegate.create" e)
-        | Ok created ->
+        | Ok taskId ->
             let waitOpts =
                 box
                     {| requestingWorkspaceId = Id.workspaceIdValue ctx.workspaceId
@@ -132,13 +132,13 @@ let private createAndWaitTask
                        backgroundOnMessageQueued = false |}
 
             try
-                let! report = taskWait ctx.taskService created.TaskId waitOpts
+                let! report = taskWait ctx.taskService taskId waitOpts
 
                 match decodeTaskReport report with
                 | Ok markdown -> return Ok markdown
                 | Error e -> return Ok(wireDomainFailure "delegate.report" e)
             with err ->
-                return! translateTaskWaitError err title created.TaskId
+                return! translateTaskWaitError err title taskId
     }
 
 let delegateToSubAgent

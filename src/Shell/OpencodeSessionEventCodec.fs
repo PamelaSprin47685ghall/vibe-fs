@@ -1,6 +1,7 @@
 module Wanxiangshu.Shell.OpencodeSessionEventCodec
 
 open Fable.Core.JsInterop
+open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Messaging
 open Wanxiangshu.Kernel.Nudge
 open Wanxiangshu.Kernel.Nudge.TodoStatus
@@ -162,12 +163,12 @@ let shouldSkipNudge (messagesData: obj) : bool =
         | Some idx ->
             let info = Dyn.get (messagesArr.[idx]) "info"
             let finish = Dyn.str info "finish"
-            let finishLower = finish.ToLower()
+            let reason = FinishReason.fromString finish
 
-            if finishLower.Contains("abort") || finishLower.Contains("cancel") then
+            if FinishReason.isAbort reason then
                 true
             else
-                let isToolFinish = finishLower.Contains("tool") && finishLower <> "tool_use_error"
+                let isToolFinish = FinishReason.isToolFinish reason
 
                 if not isToolFinish then
                     false

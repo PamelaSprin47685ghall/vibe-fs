@@ -18,7 +18,7 @@ type MessageTransformPlan =
     { SessionID: string
       Agent: string
       Directory: string
-      Excluded: bool
+      ProjectionPolicy: ProjectionPolicy
       IsSubagentSession: bool
       Cleaned: Message<obj> list
       RawArray: obj array option
@@ -133,7 +133,7 @@ let private rebuildPhaseState
     promise {
         if backlog <> currentStore.LastBacklog || currentStore.State.IsNone then
             let stableMessages =
-                projectBacklogFor backlogOps.Host plan.Cleaned backlog true plan.SessionID
+                projectBacklogFor backlogOps.Host plan.Cleaned backlog FoldStrategy.FoldAfterFirst plan.SessionID
 
             let stableEncoded = encodeMessages stableMessages
             let stableBytes = JS.JSON.stringify(stableEncoded).Length
@@ -193,7 +193,12 @@ let applyContextBudget
     (encodeMessages: Message<obj> list -> obj array)
     : JS.Promise<Message<obj> list> =
     promise {
-        if plan.Excluded || messages.IsEmpty || plan.MaxInputTokens <= 0 then
+        let isExcluded =
+            match plan.ProjectionPolicy with
+            | ProjectionPolicy.ExcludeProjection -> true
+            | ProjectionPolicy.IncludeProjection -> false
+
+        if isExcluded || messages.IsEmpty || plan.MaxInputTokens <= 0 then
             return messages
         else
             let totalBytes = JS.JSON.stringify(encodedAll).Length
@@ -223,7 +228,7 @@ let runMessageTransformPipeline
     (plan: MessageTransformPlan)
     (backlogOps: BacklogSessionOps)
     (encodeMessages: Message<obj> list -> obj array)
-    (injectFn: bool -> obj array -> JS.Promise<obj array>)
+    (injectFn: ProjectionPolicy -> obj array -> JS.Promise<obj array>)
     (loadCaps: unit -> JS.Promise<CapsFile list>)
     (buildCaps: obj array -> CapsFile list -> string option -> obj array)
     : JS.Promise<obj array> =
@@ -253,11 +258,16 @@ let runMessageTransformPipeline
                                 copy)
                         plan.Cleaned
 
+            let isExcluded =
+                match plan.ProjectionPolicy with
+                | ProjectionPolicy.ExcludeProjection -> true
+                | ProjectionPolicy.IncludeProjection -> false
+
             let afterBacklog =
-                applyBacklogProjection plan.SessionID plan.Excluded backlogOps afterAmend
+                applyBacklogProjection plan.SessionID plan.ProjectionPolicy backlogOps afterAmend
 
             let! afterBudget, encodedBacklogOpt =
-                if plan.Excluded then
+                if isExcluded then
                     promise { return afterBacklog, None }
                 else
                     promise {
@@ -267,7 +277,7 @@ let runMessageTransformPipeline
                     }
 
             let afterPrompt =
-                if plan.Excluded then
+                if isExcluded then
                     afterBudget
                 else
                     tryInjectParallelToolPrompt plan.SessionID afterBudget
@@ -277,7 +287,7 @@ let runMessageTransformPipeline
                 | Some encodedBacklog when afterPrompt.Length = afterBacklog.Length -> encodedBacklog
                 | _ -> encodeMessages afterPrompt
 
-            let! injected = injectFn plan.Excluded encoded
+            let! injected = injectFn plan.ProjectionPolicy encoded
             let! capsFiles = loadCaps ()
             return buildCaps injected capsFiles None
     }

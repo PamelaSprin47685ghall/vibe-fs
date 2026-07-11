@@ -13,6 +13,7 @@ open Wanxiangshu.Shell.FallbackRecoveryWait
 open Wanxiangshu.Shell.SubagentIo
 open Wanxiangshu.Shell.ErrorClassify
 open Wanxiangshu.Kernel.Domain
+open Wanxiangshu.Omp.ChildSessionCommon
 open Wanxiangshu.Kernel.FallbackKernel.Types
 
 module Dyn = Wanxiangshu.Shell.Dyn
@@ -40,7 +41,7 @@ let runSubagentOnExistingSession
                     childId
                     session
                     prompt
-                    false
+                    SubagentResetPolicy.KeepState
 
             let signalObj = Option.defaultValue (box null) signal
             let! text = raceWithAbortSignal signalObj (fun () -> ()) run

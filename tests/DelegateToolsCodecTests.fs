@@ -27,9 +27,7 @@ let decodeTaskCreateResultSuccessTrue () =
         createObj [ "success", box true; "data", box (createObj [ "taskId", box "task-42" ]) ]
 
     match decodeTaskCreateResult createResult with
-    | Ok r ->
-        check "create ok success" r.Success
-        check "create ok taskId" (r.TaskId = "task-42")
+    | Ok taskId -> check "create ok taskId" (taskId = "task-42")
     | Error _ -> check "create success=true with taskId" false
 
 let decodeTaskCreateResultNull () =

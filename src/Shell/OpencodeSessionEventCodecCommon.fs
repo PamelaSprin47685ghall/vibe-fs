@@ -2,6 +2,7 @@ module Wanxiangshu.Shell.OpencodeSessionEventCodecCommon
 
 open Wanxiangshu.Kernel.Nudge
 open Wanxiangshu.Kernel.Nudge.TodoStatus
+open Wanxiangshu.Kernel
 open Wanxiangshu.Shell.Dyn
 
 /// Session lifecycle event types that carry `id` on `info` rather than `sessionID`.
@@ -94,7 +95,8 @@ let isCompletedAssistantMessage (info: obj) : bool =
             let isTerminalFinish =
                 not (Dyn.isNullish finishVal)
                 && Dyn.typeIs finishVal "string"
-                && isTerminalAssistantFinish (string finishVal)
+                && (let reason = FinishReason.fromString (string finishVal)
+                    not (FinishReason.isToolFinish reason) && not (FinishReason.isAbort reason))
 
             let hasTimeCompleted =
                 let time = Dyn.get info "time"

@@ -8,12 +8,15 @@ type SessionGateDemand =
     | ReviewNudge
     | Settled
 
-let resolveGateDemand (needFallbackContinue: bool) (needTodoNudge: bool) (needReviewNudge: bool) : SessionGateDemand =
-    if needFallbackContinue then
-        SessionGateDemand.FallbackContinue
-    elif needTodoNudge then
-        SessionGateDemand.TodoNudge
-    elif needReviewNudge then
-        SessionGateDemand.ReviewNudge
-    else
-        SessionGateDemand.Settled
+[<RequireQualifiedAccess>]
+type GateSignal =
+    | FallbackContinue
+    | TodoNudge
+    | ReviewNudge
+
+let resolveFromSignals (signals: GateSignal list) : SessionGateDemand =
+    match signals |> List.tryHead with
+    | Some GateSignal.FallbackContinue -> SessionGateDemand.FallbackContinue
+    | Some GateSignal.TodoNudge -> SessionGateDemand.TodoNudge
+    | Some GateSignal.ReviewNudge -> SessionGateDemand.ReviewNudge
+    | None -> SessionGateDemand.Settled

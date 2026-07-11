@@ -41,12 +41,12 @@ let testHostNativeToolsTrigger () =
         let loadCaps () = promise { return [] }
         let buildCaps (arr: obj array) _ _ = arr
 
-        let runTransform sessionID excluded msgs =
+        let runTransform sessionID projectionPolicy msgs =
             let plan =
                 { SessionID = sessionID
                   Agent = "main"
                   Directory = ""
-                  Excluded = excluded
+                  ProjectionPolicy = projectionPolicy
                   IsSubagentSession = false
                   Cleaned = msgs
                   RawArray = None
@@ -73,7 +73,7 @@ let testHostNativeToolsTrigger () =
                   mkMsg "a" Assistant [ ToolPart(toolName, "c1", None, null) ]
                   mkMsg "r" ToolResult [] ]
 
-            runTransform sessionID false msgs
+            runTransform sessionID ProjectionPolicy.IncludeProjection msgs
 
         // bash
         let! res8 = singleCallTriggers "bash" "s8"
@@ -154,7 +154,7 @@ let testSynthCallIdExcluded () =
                 { SessionID = sessionID
                   Agent = "main"
                   Directory = ""
-                  Excluded = false
+                  ProjectionPolicy = ProjectionPolicy.IncludeProjection
                   IsSubagentSession = false
                   Cleaned = msgs
                   RawArray = None

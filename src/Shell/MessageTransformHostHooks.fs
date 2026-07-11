@@ -6,6 +6,7 @@ open Wanxiangshu.Kernel.CapsFormat
 open Wanxiangshu.Kernel.Config
 open Wanxiangshu.Kernel.Messaging
 open Wanxiangshu.Shell.CapsFileCache
+open Wanxiangshu.Shell.MessageTransformCore
 open Wanxiangshu.Shell.MessageTransformPipeline
 open Wanxiangshu.Shell.RuntimeScope
 open Wanxiangshu.Shell.WorkspaceFiles
@@ -19,7 +20,12 @@ let injectSubagentFilesIfAny
     (baseFiles: CapsFile list)
     : JS.Promise<CapsFile list> =
     promise {
-        if plan.Excluded || not plan.IsSubagentSession then
+        let isExcluded =
+            match plan.ProjectionPolicy with
+            | ProjectionPolicy.ExcludeProjection -> true
+            | ProjectionPolicy.IncludeProjection -> false
+
+        if isExcluded || not plan.IsSubagentSession then
             return baseFiles
         else
             let objectivesAndTexts =
@@ -83,7 +89,12 @@ let loadCapsForScope
     (policy: CapsLoadPolicy)
     (plan: MessageTransformPlan)
     : JS.Promise<CapsFile list> =
-    if plan.Excluded then
+    let isExcluded =
+        match plan.ProjectionPolicy with
+        | ProjectionPolicy.ExcludeProjection -> true
+        | ProjectionPolicy.IncludeProjection -> false
+
+    if isExcluded then
         Promise.lift []
     else
         match policy with

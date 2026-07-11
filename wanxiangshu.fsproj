@@ -56,6 +56,7 @@
     <Compile Include="src/Kernel/ExecutorStrip.fs"/>
     <Compile Include="src/Kernel/Executor.fs"/>
     <Compile Include="src/Kernel/ToolArgs.fs"/>
+    <Compile Include="src/Kernel/FinishReason.fs"/>
     <Compile Include="src/Kernel/Nudge.fs"/>
     <Compile Include="src/Kernel/Nudge/TodoStatus.fs"/>
     <Compile Include="src/Kernel/Nudge/RetryProgress.fs"/>

@@ -52,7 +52,7 @@ let private logCheck (kind: string) (label: string) (passedNow: bool) (detail: s
     | Some path when verboseEnabled ->
         let status = if passedNow then "OK" else "FAIL"
         let suffix = detail |> Option.map (sprintf " | %s") |> Option.defaultValue ""
-        let line = sprintf "[%s] %s: %s%s\n" status kind label suffix
+        let line = sprintf "[%s] %s > %s: %s%s\n" status currentTestLabel kind label suffix
         appendFile path line "utf8"
         verboseChecksLogged <- verboseChecksLogged + 1
     | _ -> ()
@@ -64,7 +64,7 @@ let check (label: string) (condition: bool) : unit =
         passed <- passed + 1
     else
         failed <- failed + 1
-        failures.Add label
+        failures.Add(sprintf "%s > %s" currentTestLabel label)
 
 let chk = check
 
@@ -76,7 +76,7 @@ let isNone (o: 'a option) : unit = check "isNone" (Option.isNone o)
 
 let recordException (msg: string) : unit =
     failed <- failed + 1
-    failures.Add(msg)
+    failures.Add(sprintf "%s > %s" currentTestLabel msg)
 
 let equal (label: string) (expected: 'a) (actual: 'a) : unit =
     let ok = actual = expected
@@ -93,7 +93,7 @@ let equal (label: string) (expected: 'a) (actual: 'a) : unit =
         passed <- passed + 1
     else
         failed <- failed + 1
-        failures.Add(sprintf "%s | expected %A, got %A" label expected actual)
+        failures.Add(sprintf "%s > %s | expected %A, got %A" currentTestLabel label expected actual)
 
 [<Emit("Promise.race([$0, new Promise((_, reject) => setTimeout(() => reject(new Error($1)), $2))])")>]
 let private raceWithTimeout (p: JS.Promise<'a>) (msg: string) (ms: int) : JS.Promise<'a> = jsNative
@@ -117,7 +117,7 @@ let timed (label: string) (f: unit -> unit) : unit =
     with ex ->
         printfn "TEST %s THREW: %A" label ex
         failed <- failed + 1
-        failures.Add(label + " [THREW]")
+        failures.Add(sprintf "%s > [THREW]" label)
         timings.Add(label, now () - start)
 
 /// Per-spec async ceiling (integration sub-specs use this inside their own loops).
@@ -145,12 +145,12 @@ let timedAsync (label: string) (f: unit -> JS.Promise<'a>) : JS.Promise<unit> =
 
             if msg.Contains "TIMEOUT" then
                 failed <- failed + 1
-                failures.Add(label + $" [TIMEOUT>{asyncSpecTimeoutMs}ms]")
+                failures.Add(sprintf "%s > [TIMEOUT>%dms]" label asyncSpecTimeoutMs)
             else
                 printfn "TEST ASYNC %s THREW: %A" label ex
                 Fable.Core.JS.console.error (ex)
                 failed <- failed + 1
-                failures.Add(label + " [THREW]")
+                failures.Add(sprintf "%s > [THREW]" label)
 
             timings.Add(label, now () - start)
     }
@@ -169,11 +169,11 @@ let timedAsyncSuite (label: string) (f: unit -> JS.Promise<'a>) : JS.Promise<uni
 
             if msg.Contains "TIMEOUT" then
                 failed <- failed + 1
-                failures.Add(label + $" [TIMEOUT>{asyncSuiteTimeoutMs}ms]")
+                failures.Add(sprintf "%s > [TIMEOUT>%dms]" label asyncSuiteTimeoutMs)
             else
                 printfn "TEST SUITE %s THREW: %A" label ex
                 failed <- failed + 1
-                failures.Add(label + " [THREW]")
+                failures.Add(sprintf "%s > [THREW]" label)
 
             timings.Add(label, now () - start)
     }

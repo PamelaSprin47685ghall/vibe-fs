@@ -264,7 +264,8 @@ let runReviewLoopAcceptsWhenPendingResolved () =
 
         let ctx = createObj [ "cwd", box "/tmp/ws" ]
         let! outcome = runReviewLoop testScope pi ctx store "parent-accept" "report body" [| "src/a.fs" |] (Some "fix")
-        check "accepted no feedback" outcome.feedback.IsNone
-        check "accepted not terminated" (not (defaultArg outcome.terminated false))
-        check "accepted flag" (defaultArg outcome.accepted false)
+
+        match outcome with
+        | Accepted fb -> check "accepted no feedback" (fb = "")
+        | _ -> check "accepted outcome" false
     }

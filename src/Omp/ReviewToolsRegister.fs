@@ -73,7 +73,7 @@ let executeSubmitReview
                             unbox<obj array> a |> Array.map string
 
                     let mutable loopError: exn option = None
-                    let mutable result: JsReviewResult option = None
+                    let mutable result: ReviewResult option = None
 
                     try
                         let! r = runReviewLoop ompScope pi ctx store sessionId report files (Some activeTask)
@@ -87,23 +87,24 @@ let executeSubmitReview
                     | Some ex, _ -> return asErrorResult ex
                     | None, None -> return errorResult "Review loop returned no result."
                     | None, Some r ->
-                        let verdict =
-                            if defaultArg r.terminated false then
-                                Wanxiangshu.Kernel.EventLog.Types.verdictTerminated
-                            elif r.accepted = Some true then
-                                Wanxiangshu.Kernel.EventLog.Types.verdictAccepted
-                            else
-                                Wanxiangshu.Kernel.EventLog.Types.verdictNeedsRevision
+                        let verdict, feedback =
+                            match r with
+                            | Accepted fb ->
+                                Wanxiangshu.Kernel.EventLog.Types.verdictAccepted, (if fb = "" then None else Some fb)
+                            | NeedsRevision fb -> Wanxiangshu.Kernel.EventLog.Types.verdictNeedsRevision, Some fb
+                            | Terminated -> Wanxiangshu.Kernel.EventLog.Types.verdictTerminated, None
 
-                        do! appendReviewVerdictOrFail root sessionId verdict r.feedback
+                        do! appendReviewVerdictOrFail root sessionId verdict feedback
                         do! syncReviewFromEventLogDedicated store root sessionId
 
-                        if r.feedback.IsNone && not (defaultArg r.terminated false) then
-                            return textResult "Review passed. Loop mode ended."
-                        elif defaultArg r.terminated false then
-                            return errorResult ("Review terminated: " + defaultArg r.feedback "")
-                        else
-                            return errorResult ("Review feedback:\n\n" + r.feedback.Value)
+                        match r with
+                        | Accepted fb ->
+                            if fb = "" then
+                                return textResult "Review passed. Loop mode ended."
+                            else
+                                return errorResult ("Review feedback:\n\n" + fb)
+                        | NeedsRevision fb -> return errorResult ("Review feedback:\n\n" + fb)
+                        | Terminated -> return errorResult "Review terminated."
     }
 
 let executeReturnReviewer

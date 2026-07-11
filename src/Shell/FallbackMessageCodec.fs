@@ -4,10 +4,13 @@ module Wanxiangshu.Shell.FallbackMessageCodec
 open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Shell.Dyn
+open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Domain
+open Wanxiangshu.Kernel.ToolArgs
 open Wanxiangshu.Kernel.FallbackKernel.Types
 open Wanxiangshu.Shell.FallbackMessageParser
 open Wanxiangshu.Kernel.Messaging
+open Wanxiangshu.Kernel
 
 /// Find the index of the last assistant message.
 let lastAssistantIndex (msgs: obj array) : int option =
@@ -75,7 +78,7 @@ let allTodosCompleted (msgs: obj array) : bool =
                         if Dyn.isArray todos then
                             (todos :?> obj array)
                             |> Array.forall (fun t ->
-                                let s = Dyn.str t "status" in s = "completed" || s = "cancelled")
+                                TodoItemStatus.isTerminal (TodoItemStatus.fromString (Dyn.str t "status")))
                             |> Some
                         else
                             None
@@ -124,11 +127,10 @@ let tryGetLastAssistantAbortInfo (msgs: obj array) : ErrorInput option =
             None
         else
             let f, err = Dyn.str info "finish", Dyn.get info "error"
+            let reason = FinishReason.fromString f
 
             let isAbort =
-                f = "abort"
-                || f = "interrupted"
-                || f = "cancelled"
+                FinishReason.isAbort reason
                 || (not (isNull err)
                     && (Dyn.str err "name" = "MessageAbortedError" || Dyn.str err "name" = "AbortError"))
 
@@ -193,8 +195,14 @@ let isLastAssistantToolFinish (msgs: obj array) : bool =
     | Some idx ->
         let info = Dyn.get msgs.[idx] "info"
         let finish = Dyn.str info "finish"
-        let finishLower = finish.ToLower()
-        finishLower.Contains("tool") && finishLower <> "tool_use_error"
+        let reason = FinishReason.fromString finish
+
+        match reason with
+        | FinishReason.ToolCalls -> true
+        | FinishReason.Unknown s ->
+            let lower = s.ToLowerInvariant()
+            lower.Contains("tool") && lower <> "tool_use_error"
+        | _ -> false
 
 /// Check if there is any tool result message after the last assistant turn.
 let hasToolResultAfter (msgs: obj array) : bool =

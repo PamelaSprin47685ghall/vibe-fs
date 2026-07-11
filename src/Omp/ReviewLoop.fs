@@ -14,17 +14,7 @@ open Wanxiangshu.Shell.ReviewRuntime
 
 module Dyn = Wanxiangshu.Shell.Dyn
 
-type JsReviewResult =
-    { accepted: bool option
-      feedback: string option
-      terminated: bool option }
-
-let private terminatedResult fb =
-    { accepted = Some false
-      feedback = Some fb
-      terminated = Some true }
-
-let private createDeferred () : JS.Promise<JsReviewResult> * (JsReviewResult -> unit) =
+let private createDeferred () : JS.Promise<ReviewResult> * (ReviewResult -> unit) =
     let d = emitJsExpr () "Promise.withResolvers()"
     unbox (Dyn.get d "promise"), unbox (Dyn.get d "resolve")
 
@@ -32,7 +22,7 @@ let private attachReviewChild
     (store: ReviewStore)
     (parentId: string)
     (childId: string)
-    (onResolve: JsReviewResult -> unit)
+    (onResolve: ReviewResult -> unit)
     (childSession: obj)
     =
     store.addChild (parentId, childId)
@@ -45,19 +35,7 @@ let private attachReviewChild
             with _ ->
                 ()
 
-            let js =
-                match kr with
-                | Accepted fb ->
-                    { accepted = Some true
-                      feedback = (if fb = "" then None else Some fb)
-                      terminated = None }
-                | NeedsRevision fb ->
-                    { accepted = Some false
-                      feedback = Some fb
-                      terminated = None }
-                | Terminated -> terminatedResult "Review session closed."
-
-            onResolve js
+            onResolve kr
     )
 
 let private detachReviewChild (store: ReviewStore) (_parentId: string) (childId: string) =
@@ -74,10 +52,10 @@ let private executeNudgeCheck (childSession: obj) : JS.Promise<unit> =
 /// resolving the review), a nudge is dispatched.  No timers.
 let private runNudgeLoop
     (childSession: obj)
-    (resolvedPromise: JS.Promise<JsReviewResult>)
+    (resolvedPromise: JS.Promise<ReviewResult>)
     (currentPrompt: JS.Promise<unit>)
-    (onMaxNudges: unit -> JsReviewResult)
-    : JS.Promise<JsReviewResult> =
+    (onMaxNudges: unit -> ReviewResult)
+    : JS.Promise<ReviewResult> =
     let rec loop nudgeCount promptPromise =
         promise {
             let! winner =
@@ -106,7 +84,7 @@ let runReviewLoop
     (report: string)
     (files: string array)
     (task: string option)
-    : JS.Promise<JsReviewResult> =
+    : JS.Promise<ReviewResult> =
     promise {
         let resolvedPromise, resolveReview = createDeferred ()
         let! child = createChildSession scope pi ctx ompReviewChildToolNames None [||] None
@@ -133,35 +111,18 @@ let runReviewLoop
                     ()
 
             child.dispose |> Option.iter (fun dispose -> dispose ())
-            return terminatedResult "Review child session unavailable"
+            return Terminated
         else
             attachReviewChild store parentId childId (fun r -> resolveReview r) childSession
             let initial = buildOmpReviewInitialPrompt report (files |> Array.toList) task
             let initialPrompt = childSession?prompt (initial) |> unbox<JS.Promise<unit>>
 
-            let onMax () =
-                let sm = unbox<ISessionManager> (Dyn.get childSession "sessionManager")
-
-                let fb =
-                    readAssistantText sm 0 "\n\n"
-                    |> Option.defaultValue "Reviewer failed to finish."
-
-                terminatedResult fb
+            let onMax () = Terminated
 
             let! outcome = runNudgeLoop childSession resolvedPromise initialPrompt onMax
             cleanupChild ()
             return outcome
     }
-
-let private jsToReviewResult (js: JsReviewResult) : ReviewResult =
-    if defaultArg js.terminated false then
-        Terminated
-    elif js.accepted = Some true then
-        Accepted(defaultArg js.feedback "")
-    elif js.accepted = Some false then
-        NeedsRevision(defaultArg js.feedback "")
-    else
-        Terminated
 
 let runPreReviewerSession
     (scope: RuntimeScope)
@@ -204,10 +165,8 @@ let runPreReviewerSession
                     let initial = reviewerPrompt taskTrim "" []
                     let initialPrompt = childSession?prompt (initial) |> unbox<JS.Promise<unit>>
 
-                    let! jsOutcome =
-                        runNudgeLoop childSession resolvedPromise initialPrompt (fun () ->
-                            terminatedResult "Pre-review timed out.")
+                    let! jsOutcome = runNudgeLoop childSession resolvedPromise initialPrompt (fun () -> Terminated)
 
                     cleanupChild ()
-                    return jsToReviewResult jsOutcome
+                    return jsOutcome
     }

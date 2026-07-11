@@ -47,8 +47,11 @@ let messagesTransform
             let agent = decoded.Agent
             let sessionID = decoded.SessionID
 
-            let excluded =
-                shouldExcludeAgentFromProjection agent (isChildWorkspace deps sessionID)
+            let projectionPolicy =
+                if shouldExcludeAgentFromProjection agent (isChildWorkspace deps sessionID) then
+                    ProjectionPolicy.ExcludeProjection
+                else
+                    ProjectionPolicy.IncludeProjection
 
             let typedMessages = decodeMessages sessionID messagesArr
             let cleanedMessages = stripSyntheticBySource typedMessages
@@ -57,14 +60,13 @@ let messagesTransform
                 backlogSessionOpsFrom backlogSession.Host (fun sid msgs ->
                     backlogSession.GetOrRebuildBacklog(sid, msgs))
 
-            let! maxInputTokens =
-                resolveMaxInputTokens [ deps; input ] sessionID
+            let! maxInputTokens = resolveMaxInputTokens [ deps; input ] sessionID
 
             let plan =
                 { SessionID = sessionID
                   Agent = agent
                   Directory = directory
-                  Excluded = excluded
+                  ProjectionPolicy = projectionPolicy
                   IsSubagentSession = isChildWorkspace deps sessionID
                   Cleaned = cleanedMessages
                   RawArray = Some messagesArr
@@ -72,9 +74,9 @@ let messagesTransform
                   Scope = runtimeScope
                   MaxInputTokens = maxInputTokens
                   GetContextUsage =
-                      match ContextBudgetUsageCodec.tryGetRealContextUsage deps sessionID with
-                      | Some f -> f
-                      | None -> fun _ -> Promise.lift None }
+                    match ContextBudgetUsageCodec.tryGetRealContextUsage deps sessionID with
+                    | Some f -> f
+                    | None -> fun _ -> Promise.lift None }
 
             let replayTexts () : JS.Promise<string seq> =
                 Promise.lift (extractTextsFromEncodedMessages messagesArr)
@@ -133,13 +135,18 @@ let compactingTransform
             let typedMessages = decodeMessages sessionID messagesArr
             let cleaned = stripSyntheticBySource typedMessages
             let backlog = backlogSession.GetOrRebuildBacklog(sessionID, cleaned)
+
             let guidGen () =
                 let rg = get deps "RandomGen"
+
                 if not (isNullish rg) then
                     string (rg $ ())
                 else
                     System.Guid.NewGuid().ToString()
-            let result = Wanxiangshu.Kernel.BacklogProjectionCore.compactingTransform cleaned backlog guidGen
+
+            let result =
+                Wanxiangshu.Kernel.BacklogProjectionCore.compactingTransform cleaned backlog guidGen
+
             let encoded = encodeMessages result
             replaceArrayInPlace messagesArr encoded
     }

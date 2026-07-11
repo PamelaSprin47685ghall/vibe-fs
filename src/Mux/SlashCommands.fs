@@ -116,8 +116,7 @@ let createLoopOnlyCommand
                             do! syncReviewFromEventLogDedicated reviewStore root sid
                             return loopCancelledMessage
                         elif existingTask.IsSome then
-                            return
-                                "With-Review Mode is already active. Submit your work via submit_review."
+                            return "With-Review Mode is already active. Submit your work via submit_review."
                         else
                             do! appendLoopActivatedOrFail root sid task
                             do! syncReviewFromEventLogDedicated reviewStore root sid
@@ -155,28 +154,33 @@ let private finalizeLoopReviewActivation
     (reviewStore: Wanxiangshu.Shell.ReviewRuntime.ReviewStore)
     (workspaceIdStr: string)
     (task: string)
-    (isPass: bool)
-    (feedback: string)
+    (reviewResult: ReviewResult)
     : JS.Promise<string> =
     promise {
         let root = eventLogRootFromDeps deps
         do! appendLoopActivatedOrFail root workspaceIdStr task
         do! syncReviewFromEventLogDedicated reviewStore root workspaceIdStr
 
-        if isPass then
+        match reviewResult with
+        | Accepted _ ->
             return
                 buildLoopMessage
                     task
                     [ "With-Review Mode is active. Pre-review passed. Complete the task above, then call submit_review with:" ]
-        else
+        | NeedsRevision fb ->
             return
                 buildLoopMessage
                     task
                     [ "Pre-review feedback:"
                       ""
-                      feedback
+                      fb
                       ""
                       "With-Review Mode is active. Address the pre-review feedback above while completing the task. Then call submit_review with:" ]
+        | Terminated ->
+            return
+                buildLoopMessage
+                    task
+                    [ "With-Review Mode is active. Pre-review was terminated. Complete the task above, then call submit_review with:" ]
     }
 
 let private loopReviewExecute
@@ -218,13 +222,8 @@ let private loopReviewExecute
                             task
                             [ "With-Review Mode was NOT activated because the pre-review timed out. Please retry /loop-review." ]
                 | DelegateTimeout.Report markdown ->
-                    let isPass, feedback =
-                        match parseReviewReportMarkdown markdown with
-                        | Accepted fb -> true, fb
-                        | NeedsRevision fb -> false, fb
-                        | Terminated -> false, markdown
-
-                    return! finalizeLoopReviewActivation deps reviewStore workspaceIdStr task isPass feedback
+                    let reviewResult = parseReviewReportMarkdown markdown
+                    return! finalizeLoopReviewActivation deps reviewStore workspaceIdStr task reviewResult
         }
 
 let createLoopReviewCommand

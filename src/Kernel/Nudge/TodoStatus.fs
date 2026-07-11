@@ -2,6 +2,7 @@ module Wanxiangshu.Kernel.Nudge.TodoStatus
 
 open Wanxiangshu.Kernel.Nudge
 open Wanxiangshu.Kernel.PromptFragments
+open Wanxiangshu.Kernel
 
 /// Terminal todo statuses that should NOT count as open work.
 type TodoStatus =
@@ -37,8 +38,13 @@ let isTerminal (s: TodoStatus) : bool =
     | Pending -> false
 
 let isTerminalAssistantFinish (finish: string) : bool =
-    let normalized = finish.ToLower().Replace("-", "").Replace("_", "").Replace(" ", "")
-    not (normalized.Contains("tool")) && not (normalized.Contains("abort"))
+    match FinishReason.fromString finish with
+    | FinishReason.ToolCalls
+    | FinishReason.ToolUseError
+    | FinishReason.Abort
+    | FinishReason.Interrupted
+    | FinishReason.Cancelled -> false
+    | _ -> true
 
 let syntheticAssistantAgents: Set<string> = Set.ofList [ "compaction"; "title" ]
 

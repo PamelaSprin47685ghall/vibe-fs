@@ -89,8 +89,10 @@ let runReviewLoopResolvesViaAsyncCallbackNotPolling () =
                 return! loop
             }
 
-        check "async-resolve accepted" (defaultArg outcome.accepted false)
-        check "async-resolve not terminated" (not (defaultArg outcome.terminated false))
+        match outcome with
+        | Accepted _ -> check "async-resolve accepted" true
+        | _ -> check "async-resolve accepted" false
+
         check "async-resolve no waitForIdle polling" (waitForIdleCalls.Value = 0)
     }
 
@@ -172,6 +174,8 @@ let runReviewLoopSendsNudgeOnTimeoutThenStopsOnResolve () =
             }
 
         check "nudge prompt calls = 2 (initial + 1 nudge)" (promptCalls.Value = 2)
-        check "nudge outcome accepted" (defaultArg outcome.accepted false)
-        check "nudge outcome not terminated" (not (defaultArg outcome.terminated false))
+
+        match outcome with
+        | Accepted _ -> check "nudge outcome accepted" true
+        | _ -> check "nudge outcome accepted" false
     }

@@ -104,12 +104,12 @@ let testAmendSkippedWhenSembleInjectEnabled () =
             { SessionID = "s-amend-semble"
               Agent = "main"
               Directory = ""
-              Excluded = true
+              ProjectionPolicy = ProjectionPolicy.ExcludeProjection
               IsSubagentSession = false
               Cleaned = msgs
               RawArray = None
               SembleInjectEnabled = true
-              Scope = Wanxiangshu.Shell.RuntimeScope.create()
+              Scope = Wanxiangshu.Shell.RuntimeScope.create ()
               MaxInputTokens = 200000
               GetContextUsage = (fun _ -> Promise.lift None) }
 

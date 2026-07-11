@@ -7,6 +7,7 @@ open Wanxiangshu.Kernel.ToolExecutionStatusModule
 open Wanxiangshu.Kernel.ReviewReplayPolicy
 open Wanxiangshu.Shell.Dyn
 open Wanxiangshu.Shell.MessagingDecodeCore
+open Wanxiangshu.Kernel.Nudge.TodoStatus
 open Wanxiangshu.Omp.Codec
 
 module Dyn = Wanxiangshu.Shell.Dyn
@@ -170,9 +171,7 @@ let openTodoStatuses (sessionManager: ISessionManager) : string list =
                 []
 
     statuses
-    |> List.filter (fun s ->
-        let lower = s.ToLowerInvariant()
-        lower <> "completed" && lower <> "cancelled" && lower <> "abandoned")
+    |> List.filter (fun s -> todoStatusOfString s |> Option.exists (fun st -> not (isTerminal st)))
 
 let decodeToolState (state: obj) : ToolState<obj> option =
     if Dyn.isNullish state then

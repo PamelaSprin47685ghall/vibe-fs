@@ -7,6 +7,11 @@ open Wanxiangshu.Kernel.BacklogProjection
 open Wanxiangshu.Kernel.WorkBacklog
 open Fable.Core
 
+[<RequireQualifiedAccess>]
+type ProjectionPolicy =
+    | IncludeProjection
+    | ExcludeProjection
+
 type BacklogSessionOps =
     { Host: Host
       GetOrRebuildBacklog: string -> Message<obj> list -> BacklogEntry list }
@@ -20,12 +25,12 @@ let backlogSessionOpsFrom
 
 let applyBacklogProjection
     (sessionID: string)
-    (excluded: bool)
+    (policy: ProjectionPolicy)
     (backlogSession: BacklogSessionOps)
     (cleaned: Message<obj> list)
     : Message<obj> list =
-    if excluded then
-        cleaned
-    else
+    match policy with
+    | ProjectionPolicy.ExcludeProjection -> cleaned
+    | ProjectionPolicy.IncludeProjection ->
         let backlog = backlogSession.GetOrRebuildBacklog sessionID cleaned
-        projectBacklogFor backlogSession.Host cleaned backlog false sessionID
+        projectBacklogFor backlogSession.Host cleaned backlog FoldStrategy.FoldAfterSecond sessionID
