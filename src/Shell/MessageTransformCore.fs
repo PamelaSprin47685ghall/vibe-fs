@@ -99,7 +99,7 @@ let private rebuildPhaseState
                 projectBacklogFor backlogOps.Host plan.Cleaned backlog FoldStrategy.FoldAfterFirst plan.SessionID
 
             let stableEncoded = encodeMessages stableMessages
-            let stableBytes = JS.JSON.stringify(stableEncoded).Length
+            let stableBytes = utf8JsonBytes (box stableEncoded)
             let! stableTokensOpt = plan.GetContextUsage stableEncoded
 
             let stableTokens =
@@ -178,7 +178,7 @@ let applyContextBudget
         if messages.IsEmpty || plan.MaxInputTokens <= 0 then
             return messages
         else
-            let totalBytes = JS.JSON.stringify(encodedAll).Length
+            let totalBytes = utf8JsonBytes (box encodedAll)
             let! tokenCountOpt = plan.GetContextUsage encodedAll
             let storeEntry = ContextBudgetStore.get plan.Scope plan.SessionID
 

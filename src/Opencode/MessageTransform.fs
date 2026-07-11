@@ -122,7 +122,7 @@ let messagesTransform
     (runtimeScope: Wanxiangshu.Shell.RuntimeScope.RuntimeScope)
     (backlogSession: BacklogSession)
     (reviewStore: Wanxiangshu.Shell.ReviewRuntime.ReviewStore)
-    (_client: obj)
+    (client: obj)
     (input: obj)
     (output: obj)
     : JS.Promise<unit> =
@@ -156,12 +156,10 @@ let messagesTransform
                     backlogSession.GetOrRebuildBacklog(sid, msgs))
 
             let! maxInputTokens =
-                Wanxiangshu.Shell.ContextBudgetUsageCodec.resolveMaxInputTokens [ _client; input ] sessionID directory
+                Wanxiangshu.Shell.OpencodeContextBudgetObservation.tryEffectiveLimit client directory messagesList
 
-            let getContextUsage =
-                match ContextBudgetUsageCodec.tryGetRealContextUsage _client sessionID directory with
-                | Some f -> f
-                | None -> fun _ -> Promise.lift None
+            let getContextUsage encoded =
+                Wanxiangshu.Shell.OpencodeContextBudgetObservation.tryCurrentUsage client sessionID encoded
 
             let plan =
                 { SessionID = sessionID
@@ -173,7 +171,7 @@ let messagesTransform
                   RawArray = Some messagesArr
                   SembleInjectEnabled = sembleInjectEnabled
                   Scope = runtimeScope
-                  MaxInputTokens = maxInputTokens
+                  MaxInputTokens = (maxInputTokens |> Option.defaultValue 0)
                   GetContextUsage = getContextUsage }
 
             let replayTexts () : JS.Promise<string seq> =

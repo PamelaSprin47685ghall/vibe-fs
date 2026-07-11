@@ -1,254 +1,172 @@
-/// RED tests: verify ContextBudgetUsageCodec reads real OpenCode v1 SDK shapes.
-/// Session = { tokens?: {input,output,reasoning,cache:{read,write}}, model?: {id,providerID,variant?} }
-/// Model = { limit: {context, input?, output} }
-/// session.get({sessionID}) → {data: Session}
-/// provider.list() → {data: {all: Provider[]}}
-/// Provider = { id, models: {[modelId]: Model} }
 module Wanxiangshu.Tests.ContextBudgetRealApiSpecs
 
 open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Tests.Assert
+open Wanxiangshu.Kernel.Messaging
 open Wanxiangshu.Shell.Dyn
 open Wanxiangshu.Shell.ContextBudgetUsageCodec
+open Wanxiangshu.Shell.OpencodeContextBudgetObservation
 
-/// tryGetMaxInputTokensAsync must call the SDK-shaped session.get({path:{id}})
-/// then provider.list() and read model.limit.input or .context
-let spec_tryGetMaxInputTokensAsync_realSchema () =
+let private mockUserMessage (modelObj: obj) : Message<obj> =
+    { info =
+        { id = "u-1"
+          sessionID = "s-1"
+          role = User
+          agent = "main"
+          isError = false
+          toolName = ""
+          details = null
+          time = null }
+      parts = [ TextPart "hello" ]
+      source = Native
+      raw = createObj [ "model", modelObj ] }
+
+let private mockProviderList (response: obj) =
+    System.Func<obj, JS.Promise<obj>>(fun _ -> promise { return response })
+
+let private mockSessionContext (response: obj) =
+    System.Func<obj, JS.Promise<obj>>(fun _ -> promise { return response })
+
+let spec_tryEffectiveLimit_extractsModelAndSubtracts5000 () =
     promise {
-        let mutable capturedSessionArg = null
-        let mutable providerListCalled = false
+        let modelObj =
+            createObj [ "providerID", box "anthropic"; "modelID", box "claude-3-5" ]
 
-        let mockSessionGet (arg: obj) =
-            promise {
-                capturedSessionArg <- arg
+        let messages = [ mockUserMessage modelObj ]
 
-                return
-                    createObj
-                        [ "data",
-                          createObj
-                              [ "model", createObj [ "id", box "claude-sonnet-4"; "providerID", box "anthropic" ] ] ]
-            }
-
-        let mockProviderList (_arg: obj) =
-            promise {
-                providerListCalled <- true
-
-                return
-                    createObj
-                        [ "data",
-                          createObj
-                              [ "all",
-                                box
-                                    [| createObj
-                                           [ "id", box "anthropic"
-                                             "models",
-                                             createObj
-                                                 [ "claude-sonnet-4",
-                                                   createObj
-                                                       [ "limit",
-                                                         createObj
-                                                             [ "context", box 200000
-                                                               "input", box 200000
-                                                               "output", box 16000 ] ] ] ] |] ] ]
-            }
-
-        let client =
+        let listResponse =
             createObj
-                [ "session", createObj [ "get", box (System.Func<obj, JS.Promise<obj>>(mockSessionGet)) ]
-                  "provider", createObj [ "list", box (System.Func<obj, JS.Promise<obj>>(mockProviderList)) ] ]
-
-        let! limit = tryGetMaxInputTokensAsync client "s-async" ""
-        equal "limit.input from provider.list" (Some 200000) limit
-
-        check "session.get sessionID" (string (get capturedSessionArg "sessionID") = "s-async")
-
-        check "provider.list called" providerListCalled
-    }
-
-/// RED: session.get returns model.limit.input without provider.list (e2e harness shape)
-let spec_tryGetMaxInputTokensAsync_limitOnSessionModelWithoutProviderList () =
-    promise {
-        let mockGet (_arg: obj) =
-            promise {
-                return
-                    createObj
-                        [ "data",
-                          createObj
-                              [ "model",
-                                createObj
-                                    [ "id", box "local-model"
-                                      "providerID", box "local"
-                                      "limit", createObj [ "input", box 200000 ] ] ] ]
-            }
+                [ "all",
+                  box
+                      [| createObj
+                             [ "id", box "anthropic"
+                               "models",
+                               createObj [ "claude-3-5", createObj [ "limit", createObj [ "context", box 200000 ] ] ] ] |] ]
 
         let client =
-            createObj [ "session", createObj [ "get", box (System.Func<obj, JS.Promise<obj>>(mockGet)) ] ]
+            createObj [ "provider", createObj [ "list", box (mockProviderList listResponse) ] ]
 
-        let! limit = tryGetMaxInputTokensAsync client "sess-local-limit" ""
-        equal "session.get model.limit.input without provider.list" (Some 200000) limit
+        let! limit = tryEffectiveLimit client "" messages
+        equal "limit is limit.context - 5000" (Some 195000) limit
     }
 
-/// RED: tryGetMaxInputTokensAsync with only limit.context (no input)
-let spec_tryGetMaxInputTokensAsync_contextFallback () =
+let spec_tryEffectiveLimit_idFallback () =
     promise {
-        let mockGet (_arg: obj) =
-            promise {
-                return
-                    createObj
-                        [ "data", createObj [ "model", createObj [ "id", box "gpt-4"; "providerID", box "openai" ] ] ]
-            }
+        let modelObj = createObj [ "providerID", box "anthropic"; "id", box "claude-3-5" ]
+        let messages = [ mockUserMessage modelObj ]
 
-        let mockList (_arg: obj) =
-            promise {
-                return
-                    createObj
-                        [ "data",
-                          createObj
-                              [ "all",
-                                box
-                                    [| createObj
-                                           [ "id", box "openai"
-                                             "models",
-                                             createObj
-                                                 [ "gpt-4",
-                                                   createObj
-                                                       [ "limit",
-                                                         createObj [ "context", box 128000; "output", box 4096 ] ] ] ] |] ] ]
-            }
-
-        let client =
+        let listResponse =
             createObj
-                [ "session", createObj [ "get", box (System.Func<obj, JS.Promise<obj>>(mockGet)) ]
-                  "provider", createObj [ "list", box (System.Func<obj, JS.Promise<obj>>(mockList)) ] ]
-
-        let! limit = tryGetMaxInputTokensAsync client "s-ctx" ""
-        equal "fallback to limit.context" (Some 128000) limit
-    }
-
-/// RED: null client → None
-let spec_tryGetMaxInputTokensAsync_nullClient () =
-    promise {
-        let! limit = tryGetMaxInputTokensAsync (box null) "s-null" ""
-        equal "null client → None" None limit
-    }
-
-/// RED: tryGetRealContextUsage must call session.get({path:{id}})
-/// and read tokens.input + tokens.cache.read (no total field)
-let spec_tryGetRealContextUsage_realSchema () =
-    promise {
-        let mutable capturedArg = null
-
-        let mockGet (arg: obj) =
-            promise {
-                capturedArg <- arg
-
-                return
-                    createObj
-                        [ "data",
-                          createObj
-                              [ "tokens",
-                                createObj
-                                    [ "input", box 45000
-                                      "output", box 5000
-                                      "reasoning", box 1000
-                                      "cache", createObj [ "read", box 5000; "write", box 0 ] ] ] ]
-            }
+                [ "all",
+                  box
+                      [| createObj
+                             [ "id", box "anthropic"
+                               "models",
+                               createObj [ "claude-3-5", createObj [ "limit", createObj [ "context", box 100000 ] ] ] ] |] ]
 
         let client =
-            createObj [ "session", createObj [ "get", box (System.Func<obj, JS.Promise<obj>>(mockGet)) ] ]
+            createObj [ "provider", createObj [ "list", box (mockProviderList listResponse) ] ]
 
-        let opt = tryGetRealContextUsage client "s-real" ""
-        check "Some func returned" opt.IsSome
-        let! tokens = opt.Value [||]
-        // input + cache.read = 45000 + 5000 = 50000
-        equal "tokens = input + cache.read" (Some 50000) tokens
-        check "session.get sessionID" (string (get capturedArg "sessionID") = "s-real")
+        let! limit = tryEffectiveLimit client "" messages
+        equal "limit works with id fallback" (Some 95000) limit
     }
 
-/// RED: session with no tokens → None
-let spec_tryGetRealContextUsage_noTokens () =
+let spec_tryEffectiveLimit_missingModel_returnsNone () =
     promise {
-        let mockGet (_arg: obj) =
-            promise { return createObj [ "data", createObj [ "title", box "no tokens" ] ] }
+        let messages =
+            [ { info =
+                  { id = "u-1"
+                    sessionID = "s-1"
+                    role = User
+                    agent = "main"
+                    isError = false
+                    toolName = ""
+                    details = null
+                    time = null }
+                parts = [ TextPart "hello" ]
+                source = Native
+                raw = null } ]
+
+        let client = createObj []
+        let! limit = tryEffectiveLimit client "" messages
+        equal "no user model -> None" None limit
+    }
+
+let spec_tryEffectiveLimit_missingProviderList_returnsNone () =
+    promise {
+        let modelObj =
+            createObj [ "providerID", box "anthropic"; "modelID", box "claude-3-5" ]
+
+        let messages = [ mockUserMessage modelObj ]
+        let client = createObj []
+
+        let! limit = tryEffectiveLimit client "" messages
+        equal "missing provider list -> None" None limit
+    }
+
+let spec_tryCurrentUsage_prefixBytesRatioCalculation () =
+    promise {
+        let contextMsgs =
+            [| createObj [ "role", box "user"; "content", box "hello" ]
+               createObj
+                   [ "role", box "assistant"
+                     "content", box "hi"
+                     "tokens", createObj [ "input", box 1000 ] ] |]
+
+        let contextResponse = createObj [ "data", box contextMsgs ]
+
+        let encoded =
+            [| box contextMsgs.[0]
+               box contextMsgs.[1]
+               box contextMsgs.[0]
+               box contextMsgs.[1] |]
+
+        let prefixBytes = utf8JsonBytes (box contextMsgs)
+        let currentBytes = utf8JsonBytes (box encoded)
+        let expected = int ((1000.0 * float currentBytes) / float prefixBytes)
 
         let client =
-            createObj [ "session", createObj [ "get", box (System.Func<obj, JS.Promise<obj>>(mockGet)) ] ]
+            createObj [ "session", createObj [ "context", box (mockSessionContext contextResponse) ] ]
 
-        let opt = tryGetRealContextUsage client "s-no-tokens" ""
-        check "Some func returned" opt.IsSome
-        let! tokens = opt.Value [||]
-        equal "no tokens → None" None tokens
+        let! tokens = tryCurrentUsage client "sess-1" encoded
+        equal "tokens estimated by prefix ratio" (Some expected) tokens
     }
 
-/// RED: resolveMaxInputTokens fallback must be 0, not 200000
-let spec_resolveMaxInputTokens_zeroFallback () =
+let spec_tryCurrentUsage_noTokens_returnsNone () =
     promise {
-        let! res = resolveMaxInputTokens [ createObj [] ] "sess-id" ""
-        equal "fallback should be 0" 0 res
+        let contextMsgs =
+            [| createObj [ "role", box "user"; "content", box "hello" ]
+               createObj [ "role", box "assistant"; "content", box "hi" ] |]
 
-        let t =
-            createObj
-                [ "session",
-                  createObj [ "model", createObj [ "limit", createObj [ "context", box 60000; "output", box 4000 ] ] ] ]
+        let contextResponse = createObj [ "data", box contextMsgs ]
+        let encoded = [| box contextMsgs.[0] |]
 
-        let! res2 = resolveMaxInputTokens [ t ] "sess-id" ""
-        equal "sync priority" 60000 res2
+        let client =
+            createObj [ "session", createObj [ "context", box (mockSessionContext contextResponse) ] ]
+
+        let! tokens = tryCurrentUsage client "sess-1" encoded
+        equal "no tokens -> None" None tokens
     }
 
-/// RED: resolveMaxInputTokens must prefer async limit.input over sync limit.context when input < context
-let spec_resolveMaxInputTokens_preferInputOverContextAcrossSyncAsync () =
+let spec_tryCurrentUsage_emptyData_returnsNone () =
     promise {
-        let mockGet (_arg: obj) =
-            promise {
-                return
-                    createObj
-                        [ "data",
-                          createObj
-                              [ "model", createObj [ "id", box "claude-sonnet-4"; "providerID", box "anthropic" ] ] ]
-            }
+        let contextResponse = createObj [ "data", box [||] ]
 
-        let mockList (_arg: obj) =
-            promise {
-                return
-                    createObj
-                        [ "data",
-                          createObj
-                              [ "all",
-                                box
-                                    [| createObj
-                                           [ "id", box "anthropic"
-                                             "models",
-                                             createObj
-                                                 [ "claude-sonnet-4",
-                                                   createObj
-                                                       [ "limit",
-                                                         createObj
-                                                             [ "context", box 200000
-                                                               "input", box 100000
-                                                               "output", box 16000 ] ] ] ] |] ] ]
-            }
+        let client =
+            createObj [ "session", createObj [ "context", box (mockSessionContext contextResponse) ] ]
 
-        let t =
-            createObj
-                [ "session",
-                  createObj
-                      [ "model", createObj [ "limit", createObj [ "context", box 200000; "output", box 16000 ] ]
-                        "get", box (System.Func<obj, JS.Promise<obj>>(mockGet)) ]
-                  "provider", createObj [ "list", box (System.Func<obj, JS.Promise<obj>>(mockList)) ] ]
-
-        let! limit = resolveMaxInputTokens [ t ] "sess-tdd-limit" ""
-        equal "prefer async input limit (100000) over sync context limit (200000)" 100000 limit
+        let! tokens = tryCurrentUsage client "sess-1" [||]
+        equal "empty data -> None" None tokens
     }
 
 let run () : JS.Promise<unit> =
     promise {
-        do! spec_tryGetMaxInputTokensAsync_realSchema ()
-        do! spec_tryGetMaxInputTokensAsync_limitOnSessionModelWithoutProviderList ()
-        do! spec_tryGetMaxInputTokensAsync_contextFallback ()
-        do! spec_tryGetMaxInputTokensAsync_nullClient ()
-        do! spec_tryGetRealContextUsage_realSchema ()
-        do! spec_tryGetRealContextUsage_noTokens ()
-        do! spec_resolveMaxInputTokens_zeroFallback ()
-        do! spec_resolveMaxInputTokens_preferInputOverContextAcrossSyncAsync ()
+        do! spec_tryEffectiveLimit_extractsModelAndSubtracts5000 ()
+        do! spec_tryEffectiveLimit_idFallback ()
+        do! spec_tryEffectiveLimit_missingModel_returnsNone ()
+        do! spec_tryEffectiveLimit_missingProviderList_returnsNone ()
+        do! spec_tryCurrentUsage_prefixBytesRatioCalculation ()
+        do! spec_tryCurrentUsage_noTokens_returnsNone ()
+        do! spec_tryCurrentUsage_emptyData_returnsNone ()
     }

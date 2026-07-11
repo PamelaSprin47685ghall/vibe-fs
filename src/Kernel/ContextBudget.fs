@@ -12,7 +12,7 @@ type ContextState =
 
 /// Nudge 触发判定 F。
 ///
-/// 物理量：a=当前token, bEff=有效窗口上限(0.75b), P=phaseBaseTokens,
+/// 物理量：a=当前token, bEff=调用方已扣 reserve 的有效窗口上限, P=phaseBaseTokens,
 /// N=requiredFoldAnchorCount(foldAfterFirst)。
 ///
 /// 安全条件：触发 nudge 后到 compaction(bEff)，LLM 需 N 次 todowrite
@@ -67,7 +67,10 @@ type ContextBudgetPressure =
     | Compacting
     | RequireTodoWriteEmergency
 
-let effectiveMaxInputTokens (maxInputTokens: int) : int64 = (int64 maxInputTokens * 75L) / 100L
+/// Effective budget calculation.
+/// The caller/host provides the effective budget (e.g. limit minus reserve).
+/// This function acts as an identity.
+let effectiveMaxInputTokens (maxInputTokens: int) : int64 = int64 maxInputTokens
 
 let classifyPressure
     (maxInputTokens: int)

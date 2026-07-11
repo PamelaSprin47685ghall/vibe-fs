@@ -75,24 +75,24 @@ let spec_classifyPressure_emergency () =
         { phaseBaseTokens = 30000L
           backlogTokensAtPhaseStart = 0L }
 
-    equal "pressure emergency at 120k/200k" RequireTodoWriteEmergency (classifyPressure 200000 false 120000L state 0)
+    equal "pressure emergency at 120k/150k" RequireTodoWriteEmergency (classifyPressure 150000 false 120000L state 0)
 
 let spec_classifyPressure_below () =
     let state =
         { phaseBaseTokens = 30000L
           backlogTokensAtPhaseStart = 0L }
 
-    equal "pressure below threshold" BelowThreshold (classifyPressure 200000 false 30000L state 0)
+    equal "pressure below threshold" BelowThreshold (classifyPressure 150000 false 30000L state 0)
 
 let spec_classifyPressure_compacting () =
-    let bEff = effectiveMaxInputTokens 200000
+    let bEff = effectiveMaxInputTokens 150000
     let phaseBase = (bEff * 8L) / 10L
 
     let state =
         { phaseBaseTokens = phaseBase
           backlogTokensAtPhaseStart = 0L }
 
-    equal "pressure compacting" Compacting (classifyPressure 200000 false phaseBase state 0)
+    equal "pressure compacting" Compacting (classifyPressure 150000 false phaseBase state 0)
 
 /// Bug repro: phase reset 后旧逻辑把 phaseBaseTokens 设成 stableTokens
 /// (≈ currentTokens)，导致 F 阈值退化到 ~bEff（100%）。修复后继承旧 P。
@@ -101,7 +101,7 @@ let spec_classifyPressure_compacting () =
 /// P=120000 (bug) → threshold = (150000+360000)/4 = 127500 (85%).
 /// At a=120000: bug → BelowThreshold; correct → RequireTodoWriteEmergency.
 let spec_phaseReset_degradesThreshold () =
-    let maxInputTokens = 200000
+    let maxInputTokens = 150000
     let currentTokens = 100000L
 
     let buggyState =
@@ -125,7 +125,7 @@ let spec_phaseReset_degradesThreshold () =
 /// At a=40000: N=3 triggers (4*40000=160000 >= 150000), N=2 does not
 /// (3*40000=120000 < 150000).
 let spec_foldAfterFirst_triggersEarlier () =
-    let maxInputTokens = 200000
+    let maxInputTokens = 150000
 
     let state =
         { phaseBaseTokens = 0L
@@ -193,8 +193,8 @@ let test_scenario6_N3_R3_clamping () =
         { phaseBaseTokens = P
           backlogTokensAtPhaseStart = 0L }
 
-    let pressureWithR3 = classifyPressure 200000 false 120000L state 3
-    let pressureWithR2 = classifyPressure 200000 false 120000L state 2
+    let pressureWithR3 = classifyPressure 150000 false 120000L state 3
+    let pressureWithR2 = classifyPressure 150000 false 120000L state 2
     equal "Scenario 6: R=3 clamps to R=2" pressureWithR2 pressureWithR3
 
 let test_scenario7_R_negative_clamping () =
@@ -205,19 +205,19 @@ let test_scenario7_R_negative_clamping () =
         { phaseBaseTokens = P
           backlogTokensAtPhaseStart = 0L }
 
-    let pressureWithRNeg = classifyPressure 200000 false 60000L state -1
-    let pressureWithR0 = classifyPressure 200000 false 60000L state 0
+    let pressureWithRNeg = classifyPressure 150000 false 60000L state -1
+    let pressureWithR0 = classifyPressure 150000 false 60000L state 0
     equal "Scenario 7: R=-1 clamps to R=0" pressureWithR0 pressureWithRNeg
 
 let test_scenario8_P_large_compacting () =
-    let bEff = effectiveMaxInputTokens 200000
+    let bEff = effectiveMaxInputTokens 150000
     let P = (bEff * 8L) / 10L
 
     let state =
         { phaseBaseTokens = P
           backlogTokensAtPhaseStart = 0L }
 
-    let pressure = classifyPressure 200000 false 120000L state 0
+    let pressure = classifyPressure 150000 false 120000L state 0
     equal "Scenario 8: P >= 80% bEff triggers Compacting" Compacting pressure
 
 let test_scenario9_maxTokens_disabled () =
@@ -236,11 +236,11 @@ let test_scenario10_nudge_frequency_progression () =
         { phaseBaseTokens = P
           backlogTokensAtPhaseStart = 0L }
 
-    let pressureR0 = classifyPressure 200000 false 70000L state 0
+    let pressureR0 = classifyPressure 150000 false 70000L state 0
     equal "Scenario 10: R=0 triggers nudge at 70k" RequireTodoWriteEmergency pressureR0
-    let pressureR1 = classifyPressure 200000 false 70000L state 1
+    let pressureR1 = classifyPressure 150000 false 70000L state 1
     equal "Scenario 10: R=1 does not trigger nudge at 70k" BelowThreshold pressureR1
-    let pressureR2 = classifyPressure 200000 false 70000L state 2
+    let pressureR2 = classifyPressure 150000 false 70000L state 2
     equal "Scenario 10: R=2 does not trigger nudge at 70k" BelowThreshold pressureR2
 
 let run () : unit =

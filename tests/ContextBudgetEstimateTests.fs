@@ -24,7 +24,7 @@ let spec_applyContextBudget_estimatesFromLastUsageWhenApiMissing () =
               RawArray = None
               SembleInjectEnabled = false
               Scope = scope
-              MaxInputTokens = 200000
+              MaxInputTokens = 150000
               GetContextUsage = fun _ -> Promise.lift None }
 
         let backlogOps =
@@ -90,7 +90,7 @@ let spec_applyContextBudget_seedsLastUsageAfterLiveRead () =
               RawArray = None
               SembleInjectEnabled = false
               Scope = scope
-              MaxInputTokens = 200000
+              MaxInputTokens = 150000
               GetContextUsage = getUsage }
 
         let backlogOps =
@@ -145,7 +145,7 @@ let spec_applyContextBudget_emptyBacklogInitialPhase_injects () =
               RawArray = None
               SembleInjectEnabled = false
               Scope = scope
-              MaxInputTokens = 200000
+              MaxInputTokens = 150000
               GetContextUsage = fun _ -> Promise.lift (Some 120000) }
 
         let backlogOps =

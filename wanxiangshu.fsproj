@@ -189,6 +189,7 @@
     <Compile Include="src/Shell/ContextBudgetLimitResolver.fs"/>
     <Compile Include="src/Shell/ContextBudgetResolve.fs"/>
     <Compile Include="src/Shell/ContextBudgetUsageCodec.fs"/>
+    <Compile Include="src/Shell/OpencodeContextBudgetObservation.fs"/>
     <Compile Include="src/Shell/ContextBudgetStore.fs"/>
     <Compile Include="src/Shell/MessageTransformCore.fs"/>
     <Compile Include="src/Shell/MessageTransformPipeline.fs"/>

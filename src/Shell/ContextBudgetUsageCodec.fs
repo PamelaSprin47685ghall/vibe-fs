@@ -6,6 +6,9 @@ open Wanxiangshu.Kernel.HostTools
 open Wanxiangshu.Kernel.Messaging
 open Wanxiangshu.Shell.Dyn
 
+let utf8JsonBytes (value: obj) : int =
+    emitJsExpr value "new TextEncoder().encode(JSON.stringify($0)).length"
+
 let isBacklogEncodedMessage (host: Host) (msg: obj) : bool =
     if isNullish msg then
         false
@@ -55,7 +58,7 @@ let backlogBytesFromEncoded (host: Host) (encodedAll: obj array) : int =
 
     for msg in encodedAll do
         if isBacklogEncodedMessage host msg then
-            sum <- sum + JS.JSON.stringify(msg).Length
+            sum <- sum + utf8JsonBytes msg
 
     sum
 
