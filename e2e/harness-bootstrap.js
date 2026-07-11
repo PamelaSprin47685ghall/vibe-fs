@@ -106,7 +106,6 @@ export function isolatedEnv(home, llmUrl, opts = {}) {
     OPENCODE_DISABLE_MODELS_FETCH: '1',
     OPENCODE_AUTH_CONTENT: '{}',
     OPENCODE_EXPERIMENTAL_EVENT_SYSTEM: 'true',
-    WANXIANG_E2E_SANDBOX: '1',
     OPENCODE_CONFIG_CONTENT: JSON.stringify(config),
     OPENCODE_PERMISSION: JSON.stringify({ '*': 'allow' }),
     PATH: `${fixtureUvxDir}${path.delimiter}${process.env.PATH ?? ''}`,

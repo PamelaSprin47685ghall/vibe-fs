@@ -53,10 +53,12 @@ class OmpHarness {
 
   expectText(text) {
     this.mockLLM.expectText(text);
+    return Promise.resolve();
   }
 
   expectTool(tool, args) {
     this.mockLLM.expectTool(tool, args);
+    return Promise.resolve();
   }
 
   async runCommand(name, args, sessionId) {

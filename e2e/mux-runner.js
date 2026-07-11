@@ -90,9 +90,9 @@ class MuxHarness {
   constructor(sharedHost, sessionId) {
     this.port = 0;
     this.mockLLM = sharedHost.mockLLM;
-    this.workDir = sharedHost.workdir;
-    this.home = sharedHost.home;
     this.sessionId = sessionId;
+    this.workDir = path.join(sharedHost.workdir, 'sandboxes', sessionId);
+    this.home = sharedHost.home;
     this.queue = sharedHost.queue;
     this.currentReviewTaskRef = { value: null };
     this.nudgesList = [];
@@ -258,7 +258,10 @@ export async function start(opts = {}) {
     const toolNames = namesRes.ok ? namesRes.data.toolNames : [];
     for (const name of toolNames) {
       const schemaRes = await queue.send({ type: 'getToolSchema', name });
-      if (schemaRes.ok) getToolSchemaCache.set(name, schemaRes.data.parameters);
+      if (schemaRes.ok) {
+        const parameters = schemaRes.data.parameters;
+        getToolSchemaCache.set(name, parameters?.jsonSchema ?? parameters);
+      }
     }
 
     return {

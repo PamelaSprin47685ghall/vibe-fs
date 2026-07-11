@@ -83,8 +83,10 @@ let runOmpExecutorTools (h: OmpHarness) (chk: string -> bool -> unit) (sessionId
             "it-is-not-possible-to-do-it-using-other-tools-and-only-run-tests-when-static-analysis-cannot-handle-it"
 
         let! executorResult =
-            withTimeout (
-                h.triggerTool
+            withTimeoutL
+                "omp executor"
+                4000
+                (h.triggerTool
                     "executor"
                     (box
                         {| language = "shell"
@@ -95,8 +97,7 @@ let runOmpExecutorTools (h: OmpHarness) (chk: string -> bool -> unit) (sessionId
                            warn_tdd = warnTdd
                            warn = warn |})
                     sessionId
-                    (createObj [])
-            )
+                    (createObj []))
 
         let execStr = jsonStringify executorResult
         chk "e2e-omp.executor.responded" (execStr.Contains "hello" && not (execStr.Contains "error"))

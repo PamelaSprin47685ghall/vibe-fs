@@ -135,9 +135,9 @@ let runAll (args: string array) : JS.Promise<int> =
 
         // --- 2. Tool schemas -------------------------------------------------
         let propsWrite = toolSchemaProperties harness "write"
-        chk "mux.schema.write.hasFilePath" (not (dynIsNull (dynGet propsWrite "filePath")))
+        chk "mux.schema.write.hasFilePath" (not (dynIsNull (dynGet propsWrite "file_path")))
         chk "mux.schema.write.hasContent" (not (dynIsNull (dynGet propsWrite "content")))
-        chk "mux.schema.write.requiredFilePath" (toolSchemaRequiredArray harness "write" |> Array.contains "filePath")
+        chk "mux.schema.write.requiredFilePath" (toolSchemaRequiredArray harness "write" |> Array.contains "file_path")
         chk "mux.schema.write.requiredContent" (toolSchemaRequiredArray harness "write" |> Array.contains "content")
 
         let propsRead = toolSchemaProperties harness "read"
@@ -160,7 +160,7 @@ let runAll (args: string array) : JS.Promise<int> =
             runTool
                 "write"
                 (createObj
-                    [ "filePath", box "mux-e2e-test.md"
+                    [ "file_path", box "mux-e2e-test.md"
                       "content", box "hello from mux e2e"
                       "warn_tdd", box warnTddValue ])
                 (fun r -> fileExists (harness.workDir + "/mux-e2e-test.md") && r.Contains "Successfully")
