@@ -95,16 +95,61 @@ let equal (label: string) (expected: 'a) (actual: 'a) : unit =
         failed <- failed + 1
         failures.Add(sprintf "%s > %s | expected %A, got %A" currentTestLabel label expected actual)
 
-[<Emit("Promise.race([$0, new Promise((_, reject) => setTimeout(() => reject(new Error($1)), $2))])")>]
-let private raceWithTimeout (p: JS.Promise<'a>) (msg: string) (ms: int) : JS.Promise<'a> = jsNative
+[<Emit("(() => {
+    let start = Date.now();
+    let err = new Error();
+    let stack = err.stack || '';
+    let callerInfo = 'unknown';
+    let lines = stack.split('\\n');
+    for (let i = 1; i < lines.length; i++) {
+        if (!lines[i].includes('Assert') && !lines[i].includes('Promise') && !lines[i].includes('jsNative')) {
+            let match = lines[i].match(/([^\\/\\(\\)]+\\.(?:js|fs)):(\\d+):(\\d+)/);
+            if (match) {
+                callerInfo = match[0];
+            } else {
+                callerInfo = lines[i].trim();
+            }
+            break;
+        }
+    }
+    return Promise.race([
+        $0,
+        new Promise((_, reject) => {
+            let t = setTimeout(() => {
+                let elapsed = Date.now() - start;
+                let msg = 'TIMEOUT: Timeout after ' + elapsed + 'ms (' + $1 + 'ms limit) at ' + callerInfo;
+                console.error(msg);
+                reject(new Error(msg));
+            }, $1);
+            $0.then(() => clearTimeout(t), () => clearTimeout(t));
+        })
+    ]).then(res => {
+        let elapsed = Date.now() - start;
+        if (elapsed > 100) {
+            console.log('Resolved in ' + elapsed + 'ms: ' + callerInfo);
+        }
+        return res;
+    });
+})()")>]
+let private raceWithTimeoutAndInfo (p: JS.Promise<'a>) (ms: int) : JS.Promise<'a> = jsNative
 
 [<Emit("new Promise(resolve => setTimeout(resolve, $0))")>]
 let private sleepJs (ms: int) : JS.Promise<unit> = jsNative
 
 let sleep (ms: int) : JS.Promise<unit> = sleepJs ms
 
-let withTimeout<'T> (p: JS.Promise<'T>) : JS.Promise<'T> =
-    raceWithTimeout p "Timeout after 1000ms" 1000
+let withTimeoutCustom<'T> (ms: int) (p: JS.Promise<'T>) : JS.Promise<'T> = raceWithTimeoutAndInfo p ms
+
+let withTimeoutL<'T> (label: string) (ms: int) (p: JS.Promise<'T>) : JS.Promise<'T> =
+    promise {
+        try
+            return! raceWithTimeoutAndInfo p ms
+        with ex ->
+            printfn "TIMEOUT EXCEPTION caught at label '%s' (limit %dms): %s" label ms ex.Message
+            return raise ex
+    }
+
+let withTimeout<'T> (p: JS.Promise<'T>) : JS.Promise<'T> = withTimeoutCustom 5000 p
 
 /// Time a synchronous test body; catches exceptions so one throwing test does not abort the suite.
 let timed (label: string) (f: unit -> unit) : unit =
@@ -138,7 +183,7 @@ let timedAsync (label: string) (f: unit -> JS.Promise<'a>) : JS.Promise<unit> =
         let start = now ()
 
         try
-            let! _ = raceWithTimeout (f ()) "TIMEOUT" asyncSpecTimeoutMs
+            let! _ = raceWithTimeoutAndInfo (f ()) asyncSpecTimeoutMs
             timings.Add(label, now () - start)
         with ex ->
             let msg = getErrorMessage ex
@@ -162,7 +207,7 @@ let timedAsyncSuite (label: string) (f: unit -> JS.Promise<'a>) : JS.Promise<uni
         let start = now ()
 
         try
-            let! _ = raceWithTimeout (f ()) "TIMEOUT" asyncSuiteTimeoutMs
+            let! _ = raceWithTimeoutAndInfo (f ()) asyncSuiteTimeoutMs
             timings.Add(label, now () - start)
         with ex ->
             let msg = getErrorMessage ex

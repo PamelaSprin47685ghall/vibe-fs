@@ -38,36 +38,43 @@ let private lastNativeUserModel (messages: Message<obj> list) =
                 else
                     Some(providerID, modelID))
 
-let private providerLimit (response: obj) (providerID: string) (modelID: string) =
+let private modelLimitFromProvider (response: obj) (providerID: string) (modelID: string) =
+    // SDK: client.provider.list({ query: { directory } })
+    // Response: { data: { all: [{ id, models: { [id]: { id, limit: { context, output } } } }], default, connected } }
     if isNullish response then
         None
     else
-        let all = get response "all"
+        let payload = get response "data"
 
-        if isNullish all || not (isArray all) then
+        if isNullish payload then
             None
         else
-            unbox<obj array> all
-            |> Array.tryFind (fun provider ->
-                let pId = str provider "id"
-                pId.ToLowerInvariant() = providerID.ToLowerInvariant())
-            |> Option.bind (fun provider ->
-                let models = get provider "models"
+            let all = get payload "all"
 
-                if isNullish models then
-                    None
-                else
-                    let model = get models modelID
+            if isNullish all || not (isArray all) then
+                None
+            else
+                unbox<obj array> all
+                |> Array.tryFind (fun provider ->
+                    let pId = str provider "id"
+                    pId.ToLowerInvariant() = providerID.ToLowerInvariant())
+                |> Option.bind (fun provider ->
+                    let models = get provider "models"
 
-                    if isNullish model then
+                    if isNullish models then
                         None
                     else
-                        let limit = get model "limit"
+                        let model = get models modelID
 
-                        if isNullish limit then
+                        if isNullish model then
                             None
                         else
-                            positiveInt (get limit "context"))
+                            let limit = get model "limit"
+
+                            if isNullish limit then
+                                None
+                            else
+                                positiveInt (get limit "context"))
 
 let tryEffectiveLimit (client: obj) directory messages : JS.Promise<int option> =
     promise {
@@ -77,68 +84,91 @@ let tryEffectiveLimit (client: obj) directory messages : JS.Promise<int option> 
             let provider = get client "provider"
 
             if isNullish provider || isNullish (get provider "list") then
+                printfn "DEBUG: provider list not available on client"
                 return None
             else
                 try
-                    let args = createObj [ "location", box (createObj [ "directory", box directory ]) ]
+                    let args = createObj [ "query", box (createObj [ "directory", box directory ]) ]
+
                     let! response = unbox<JS.Promise<obj>> (provider?list args)
 
                     return
-                        providerLimit response providerID modelID
+                        modelLimitFromProvider response providerID modelID
                         |> Option.filter (fun limit -> limit > reserveTokens)
                         |> Option.map (fun limit -> limit - reserveTokens)
-                with _ ->
+                with ex ->
+                    printfn "DEBUG: provider.list failed: %s" ex.Message
                     return None
     }
 
-let private estimatedTokens usageTokens usageBytes currentBytes =
-    if usageBytes <= 0 || currentBytes < 0 then
+let private positiveInt64 (value: obj) : int64 option =
+    match value with
+    | :? int as n when n > 0 -> Some(int64 n)
+    | :? int64 as n when n > 0L -> Some n
+    | :? float as f when f > 0.0 && not (System.Double.IsNaN f) && not (System.Double.IsInfinity f) -> Some(int64 f)
+    | _ -> None
+
+let private lastAssistantTokenUsage (data: obj) : int option =
+    if isNullish data || not (isArray data) then
         None
     else
-        let estimated = (float usageTokens * float currentBytes) / float usageBytes
+        let messages = unbox<obj array> data
 
-        if
-            System.Double.IsNaN estimated
-            || System.Double.IsInfinity estimated
-            || estimated <= 0.0
-            || estimated > float System.Int32.MaxValue
-        then
-            None
-        else
-            Some(int estimated)
+        messages
+        |> Array.rev
+        |> Array.tryPick (fun item ->
+            // SDK: SessionMessagesResponses item = { info: AssistantMessage, parts: Part[] }
+            let info = get item "info"
 
-let tryCurrentUsage (client: obj) sessionID (encoded: obj array) : JS.Promise<int option> =
+            if isNullish info || str info "role" <> "assistant" then
+                None
+            else
+                let tokens = get info "tokens"
+
+                if isNullish tokens then
+                    None
+                else
+                    let inputOpt = positiveInt64 (get tokens "input")
+                    let cacheReadOpt = positiveInt64 (get (get tokens "cache") "read")
+
+                    match inputOpt with
+                    | None -> None
+                    | Some input ->
+                        let cacheRead = cacheReadOpt |> Option.defaultValue 0L
+                        Some(int (input + cacheRead)))
+
+let tryCurrentUsage (client: obj) sessionID (_encoded: obj array) : JS.Promise<int option> =
     promise {
         let session = get client "session"
 
-        if isNullish session || isNullish (get session "context") then
+        if isNullish session || isNullish (get session "messages") then
+            printfn
+                "DEBUG: session messages not available on client. session is null: %b, messages is null: %b"
+                (isNullish session)
+                (if isNullish session then
+                     true
+                 else
+                     isNullish (get session "messages"))
+
+            if not (isNullish session) then
+                printfn "DEBUG: session keys: %A" (JS.Object.keys session)
+
             return None
         else
             try
-                let! response = unbox<JS.Promise<obj>> (session?context (createObj [ "sessionID", box sessionID ]))
-                let data = get response "data"
+                let arg =
+                    createObj
+                        [ "path", box (createObj [ "id", box sessionID ])
+                          "query", box (createObj [ "directory", box "" ]) ]
 
-                if isNullish data || not (isArray data) then
+                let! response = unbox<JS.Promise<obj>> (session?messages arg)
+
+                if isNullish response then
                     return None
                 else
-                    let messages = unbox<obj array> data
-
-                    let anchor =
-                        messages
-                        |> Array.mapi (fun index message -> index, message)
-                        |> Array.rev
-                        |> Array.tryPick (fun (index, message) ->
-                            if str message "role" <> "assistant" then
-                                None
-                            else
-                                positiveInt (get (get message "tokens") "input")
-                                |> Option.map (fun tokens -> index, tokens))
-
-                    match anchor with
-                    | None -> return None
-                    | Some(index, tokens) ->
-                        let prefix = messages.[0..index]
-                        return estimatedTokens tokens (utf8JsonBytes (box prefix)) (utf8JsonBytes (box encoded))
-            with _ ->
+                    let data = get response "data"
+                    return lastAssistantTokenUsage data
+            with ex ->
+                printfn "DEBUG: session.messages failed: %s" ex.Message
                 return None
     }
