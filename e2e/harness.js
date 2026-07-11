@@ -9,60 +9,157 @@ import {
   gitInit,
   isolatedEnv,
   waitForListening,
+  hostSingletonManager,
 } from './harness-bootstrap.js';
 
-export async function start(opts = {}) {
-  // Exclusive lock: parallel e2e runs kill each other's opencode serve via
-  // pkill. Acquire before any pkill so a second start() dies immediately
-  // instead of reaping the first run's server.
+async function warmupOpencode(baseUrl, workDir, llmHandle) {
   try {
-    fs.openSync(E2E_LOCK, 'wx');
-  } catch (e) {
-    if (e.code === 'EEXIST') {
-      throw new Error('e2e already running (lock exists at ' + E2E_LOCK + ')');
+    const warmSession = await fetch(`${baseUrl}/api/session`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-opencode-directory': workDir },
+      body: JSON.stringify({ model: { id: 'test-model', providerID: 'test' } }),
+    }).then((r) => r.json()).then((r) => {
+      return r.data?.data?.id || r.data?.id || r.data?.data?.data?.id;
+    });
+    if (warmSession) {
+      llmHandle.expectText('warmup');
+      const url = `${baseUrl}/session/${warmSession}/message`;
+      const body = { parts: [{ type: 'text', text: 'warmup' }], model: { providerID: 'test', modelID: 'test-model' } };
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-opencode-directory': workDir },
+        body: JSON.stringify(body),
+      });
+      if (!res.ok) {
+        const text = await res.text();
+        throw new Error(`warmup sendPrompt failed: status=${res.status} body=${text}`);
+      }
+      llmHandle.reset();
+      return warmSession;
     }
-    throw e;
+  } catch (e) {
+    console.error('warmup failed:', e);
   }
+  return null;
+}
 
-  process.once('exit', releaseE2eLock);
+async function replyToPermission(baseUrl, workDir, sessionID, id) {
+  const url = `${baseUrl}/session/${sessionID}/permissions/${id}`;
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-opencode-directory': workDir
+    },
+    body: JSON.stringify({ response: 'once' })
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`Permission reply failed: status=${res.status} body=${text}`);
+  }
+}
 
-  // Stale opencode serve from a prior e2e run that failed dispose can hold the
-  // port and cause the next start() to bind on a dying process. Reap them
-  // before spawn; pkill -f exits non-zero when nothing matches, so swallow.
-  try { execSync("pkill -f 'opencode serve'", { stdio: 'ignore' }); } catch {}
-  await new Promise((r) => setTimeout(r, 500));
+async function handleSseLine(line, baseUrl, workDir) {
+  const trimmed = line.trim();
+  if (!trimmed.startsWith('data:')) return;
+  const jsonStr = trimmed.slice(5).trim();
+  if (!jsonStr) return;
+  const parsed = JSON.parse(jsonStr);
+  if (parsed?.type === 'permission.asked') {
+    const sessionID = parsed?.properties?.sessionID;
+    const id = parsed?.properties?.id;
+    if (sessionID && id) {
+      await replyToPermission(baseUrl, workDir, sessionID, id);
+    }
+  }
+}
 
-  const llm = createMockLLM();
-  const llmHandle = await llm.start();
+async function processBuffer(buffer, baseUrl, workDir) {
+  const lines = buffer.split('\n');
+  const remaining = lines.pop() || '';
+  for (const line of lines) {
+    await handleSseLine(line, baseUrl, workDir);
+  }
+  return remaining;
+}
 
+async function readSseStream(body, baseUrl, workDir, abortSignal, hostObj) {
+  const reader = body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+  try {
+    for (;;) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      buffer = await processBuffer(buffer, baseUrl, workDir);
+    }
+    if (buffer.trim()) {
+      await handleSseLine(buffer, baseUrl, workDir);
+    }
+  } catch (err) {
+    if (err.name === 'AbortError' || err.message?.includes('aborted') || abortSignal.aborted) {
+      return;
+    }
+    hostObj.permissionError = err;
+    throw err;
+  } finally {
+    try { reader.releaseLock(); } catch {}
+  }
+}
+
+function initHostDirAndSpawn(llmHandle, opts) {
   const home = fs.mkdtempSync(path.join(os.tmpdir(), 'wanxiang-e2e-'));
   const workDir = path.join(home, 'workspace');
   fs.mkdirSync(workDir, { recursive: true });
   gitInit(workDir);
 
   const env = isolatedEnv(home, `${llmHandle.url}/v1`, opts);
-
   const child = spawn('opencode', ['serve', '--port', '0', '--hostname', '127.0.0.1'], {
     cwd: workDir,
     env: { ...process.env, ...env },
-    stdio: ['pipe', 'pipe', 'pipe'],
+    stdio: ['pipe', 'pipe', 'ignore'],
     windowsHide: true,
   });
+  return { home, workDir, child };
+}
 
-  let listenLine;
+async function connectPermissionResponder(hostObj) {
   try {
-    listenLine = await waitForListening(child.stdout, child);
-  } catch (err) {
-    child.kill('SIGKILL');
-    const stderr = await new Promise((resolve) => {
-      const t = setTimeout(() => resolve(''), 2000);
-      child.stderr.once('data', (c) => { clearTimeout(t); resolve(c.toString()); });
+    const sseUrl = `${hostObj.baseUrl}/event`;
+    const res = await fetch(sseUrl, {
+      headers: {
+        'Accept': 'text/event-stream',
+        'x-opencode-directory': hostObj.workDir
+      },
+      signal: hostObj.permissionAbort.signal
     });
-    throw new Error('opencode serve failed: ' + err.message + '\nstderr: ' + stderr);
+    if (!res.ok) {
+      throw new Error(`GET /event failed with status ${res.status}`);
+    }
+    hostObj.permissionPromise = readSseStream(
+      res.body,
+      hostObj.baseUrl,
+      hostObj.workDir,
+      hostObj.permissionAbort.signal,
+      hostObj
+    );
+  } catch (err) {
+    hostObj.child.kill('SIGKILL');
+    await hostObj.mockLLM.stop().catch(() => {});
+    throw err;
   }
+}
 
+async function spawnOpencodeHost(variant, opts) {
+  const llm = createMockLLM();
+  const llmHandle = await llm.start();
+  const { home, workDir, child } = initHostDirAndSpawn(llmHandle, opts);
+
+  let listenLine = await waitForListening(child.stdout, child);
   if (!listenLine) {
     child.kill('SIGKILL');
+    await llmHandle.stop().catch(() => {});
     throw new Error('waitForListening returned empty/undefined');
   }
 
@@ -70,15 +167,50 @@ export async function start(opts = {}) {
   const port = m ? Number(m[1]) : 0;
   const baseUrl = `http://127.0.0.1:${port}`;
 
-  // 5. HTTP helpers
-  async function request(method, urlPath, { query, body, headers } = {}) {
+  const permissionAbort = new AbortController();
+  const hostObj = {
+    child,
+    mockLLM: llmHandle,
+    workDir,
+    home,
+    baseUrl,
+    port,
+    permissionAbort,
+    permissionPromise: null,
+    permissionError: null,
+    warmSession: null
+  };
+
+  await connectPermissionResponder(hostObj);
+
+  let warmSession = null;
+  if (opts.plugin) {
+    warmSession = await warmupOpencode(baseUrl, workDir, llmHandle);
+  }
+  hostObj.warmSession = warmSession;
+
+  return hostObj;
+}
+
+class OpencodeHarness {
+  constructor(sharedHost) {
+    this.port = sharedHost.port;
+    this.baseUrl = sharedHost.baseUrl;
+    this.mockLLM = sharedHost.mockLLM;
+    this.workDir = sharedHost.workDir;
+    this.home = sharedHost.home;
+    this.activeSessionId = null;
+  }
+
+  async request(method, urlPath, { query, body, headers } = {}) {
     const qs = query ? '?' + new URLSearchParams(query).toString() : '';
-    const url = baseUrl + urlPath + qs;
+    const url = this.baseUrl + urlPath + qs;
+
     const opts = {
       method,
       headers: {
         'Content-Type': 'application/json',
-        'x-opencode-directory': workDir,
+        'x-opencode-directory': this.workDir, // 全程使用共享根工作目录，防死锁
         ...(headers || {}),
       },
     };
@@ -87,218 +219,190 @@ export async function start(opts = {}) {
     const text = await res.text();
     let data;
     try { data = JSON.parse(text); } catch { data = text; }
+
+    if (urlPath === '/api/session' && method === 'POST' && res.ok) {
+      const newSessId = data?.data?.data?.id || data?.data?.id;
+      if (newSessId) {
+        this.activeSessionId = newSessId;
+      }
+    }
+
     return { status: res.status, ok: res.ok, data };
   }
 
-  const api = {
-    port,
-    baseUrl,
-    mockLLM: llmHandle,
-    workDir,
-    home,
+  async createSession(body = { model: { id: 'test-model', providerID: 'test' } }, query = {}) {
+    return this.request('POST', '/api/session', { query, body });
+  }
 
-    async createSession(body = { model: { id: 'test-model', providerID: 'test' } }, query = {}) {
-      return request('POST', '/api/session', { query, body });
-    },
+  async sendPrompt(sessionID, text, query = {}, timeoutMs = 120000) {
+    if (sessionID) this.activeSessionId = sessionID;
 
-    async sendPrompt(sessionID, text, query = {}, timeoutMs = 120000) {
-      const qs = query ? '?' + new URLSearchParams(query).toString() : '';
-      const url = baseUrl + `/session/${sessionID}/message` + qs;
-      const body = { parts: [{ type: 'text', text }], model: { providerID: 'test', modelID: 'test-model' } };
-      const ac = new AbortController();
-      const timeout = setTimeout(() => ac.abort(), timeoutMs);
-      try {
-        const res = await fetch(url, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'x-opencode-directory': workDir },
-          body: JSON.stringify(body),
-          signal: ac.signal,
-        });
-        const reader = res.body.getReader();
-        const decoder = new TextDecoder();
-        let buffer = '';
-        for (;;) {
-          const { value, done } = await reader.read();
-          if (done) break;
-          buffer += decoder.decode(value, { stream: true });
-          if (buffer.includes('data: [DONE]')) break;
-        }
-        return { status: res.status, ok: res.ok, data: buffer };
-      } catch (e) {
-        return { status: 0, ok: false, data: e.message };
-      } finally {
-        clearTimeout(timeout);
-      }
-    },
-
-    async getMessages(sessionID, query = {}) {
-      return request('GET', `/session/${sessionID}/message`, { query });
-    },
-
-    async getSession(sessionID, query = {}) {
-      return request('GET', `/session/${sessionID}`, { query });
-    },
-
-    async listProviders() {
-      return request('GET', '/provider', {});
-    },
-
-    contextBudgetClient() {
-      return {
-        session: {
-          get: async ({ path: { id } }) => {
-            const response = await request('GET', `/session/${id}`);
-            return { data: response.data };
-          },
-        },
-        provider: {
-          list: async (options = {}) => {
-            const response = await request('GET', '/provider', { query: options.query });
-            return { data: response.data };
-          },
-        },
-      };
-    },
-
-    async getSessions(query = {}) {
-      return request('GET', '/api/session', { query });
-    },
-
-    async listCommands(query = {}) {
-      return request('GET', '/command', { query });
-    },
-
-    async runSessionCommand(sessionID, command, args = '', query = {}) {
-      return request('POST', `/session/${sessionID}/command`, {
-        query,
-        body: { command, arguments: args },
-      });
-    },
-
-    async abortSession(sessionID, query = {}) {
-      return request('POST', `/session/${sessionID}/abort`, { query, body: {} });
-    },
-
-    ndjsonPath() {
-      return path.join(workDir, '.wanxiangshu.ndjson');
-    },
-
-    async readNdjson() {
-      const p = path.join(workDir, '.wanxiangshu.ndjson');
-      if (!fs.existsSync(p)) return '';
-      return fs.readFileSync(p, 'utf8');
-    },
-
-    async waitForNdjson(minLines = 1, timeoutMs = 15000) {
-      const p = path.join(workDir, '.wanxiangshu.ndjson');
-      const deadline = Date.now() + timeoutMs;
-      while (Date.now() < deadline) {
-        if (fs.existsSync(p)) {
-          const text = fs.readFileSync(p, 'utf8').trim();
-          const lines = text ? text.split('\n').filter((l) => l.trim()) : [];
-          if (lines.length >= minLines) return true;
-        }
-        await new Promise((r) => setTimeout(r, 200));
-      }
-      return false;
-    },
-
-    partsText(data) {
-      const parts = data?.parts ?? data?.data?.parts;
-      if (!Array.isArray(parts)) return JSON.stringify(data ?? '');
-      return parts
-        .map((p) => (typeof p?.text === 'string' ? p.text : ''))
-        .filter(Boolean)
-        .join('\n');
-    },
-
-    allMessagesText(messagesPayload) {
-      const data = messagesPayload?.data ?? messagesPayload;
-      const list = Array.isArray(data) ? data : [];
-      const chunks = [];
-      for (const msg of list) {
-        const parts = msg?.parts;
-        if (!Array.isArray(parts)) continue;
-        for (const p of parts) {
-          if (typeof p?.text === 'string' && p.text) chunks.push(p.text);
-        }
-      }
-      return chunks.join('\n');
-    },
-
-    async waitForCalls(count, timeoutMs = 15000) {
-      const deadline = Date.now() + timeoutMs;
-      while (llmHandle.calls.length < count) {
-        if (Date.now() > deadline) {
-          throw new Error(`timed out waiting for ${count} llm calls; saw ${llmHandle.calls.length}`);
-        }
-        await new Promise((r) => setTimeout(r, 50));
-      }
-      return llmHandle.calls.length;
-    },
-
-    async readFile(relPath) {
-      return fs.readFileSync(path.join(workDir, relPath), 'utf8');
-    },
-
-    async fileExists(relPath) {
-      return fs.existsSync(path.join(workDir, relPath));
-    },
-
-    async waitForFile(relPath, timeoutMs = 10000) {
-      const deadline = Date.now() + timeoutMs;
-      const absPath = path.join(workDir, relPath);
-      while (Date.now() < deadline) {
-        if (fs.existsSync(absPath)) return true;
-        await new Promise((r) => setTimeout(r, 500));
-      }
-      return false;
-    },
-
-    async dispose() {
-      releaseE2eLock();
-      await llmHandle.stop().catch(() => {});
-      try {
-        if (child.exitCode === null) {
-          child.kill('SIGTERM');
-          await new Promise((resolve) => {
-            const t = setTimeout(() => {
-              try { child.kill('SIGKILL'); } catch {}
-              resolve();
-            }, 5000);
-            child.once('exit', () => { clearTimeout(t); resolve(); });
-          });
-        }
-      } catch {}
-      try {
-        const lockPath = path.join(workDir, '.wanxiangshu.ndjson.lock');
-        if (fs.existsSync(lockPath)) fs.rmSync(lockPath);
-      } catch {}
-      try { fs.rmSync(home, { recursive: true, force: true }); } catch {}
-    },
-  };
-
-  // opencode >=1.17 blocks the first prompt on a one-time `@opencode-ai/plugin`
-  // dependency install (arborist reify) during plugin bootstrap. Pre-pay that
-  // cost here with a generous timeout so per-test prompts can keep a tight one.
-  if (opts.plugin) {
+    const qs = query ? '?' + new URLSearchParams(query).toString() : '';
+    const url = this.baseUrl + `/session/${sessionID}/message` + qs;
+    const body = { parts: [{ type: 'text', text }], model: { providerID: 'test', modelID: 'test-model' } };
+    const ac = new AbortController();
+    const timeout = setTimeout(() => ac.abort(), timeoutMs);
     try {
-      const warmSession = await api.createSession().then((r) => r.data?.data?.id);
-      if (warmSession) {
-        llmHandle.expectText('warmup');
-        await api.sendPrompt(warmSession, 'warmup', {}, 90000);
-        llmHandle.reset();
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-opencode-directory': this.workDir }, // 全程使用共享根工作目录
+        body: JSON.stringify(body),
+        signal: ac.signal,
+      });
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+      for (;;) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        if (buffer.includes('data: [DONE]')) break;
       }
+      return { status: res.status, ok: res.ok, data: buffer };
     } catch (e) {
-      releaseE2eLock();
-      throw e;
+      return { status: 0, ok: false, data: e.message };
+    } finally {
+      clearTimeout(timeout);
     }
   }
 
-  if (process.env.WANXIANG_E2E_VERBOSE === '1') {
-    child.stdout.on('data', (data) => process.stdout.write(data));
-    child.stderr.on('data', (data) => process.stderr.write(data));
+  async getMessages(sessionID, query = {}) {
+    if (sessionID) this.activeSessionId = sessionID;
+    return this.request('GET', `/session/${sessionID}/message`, { query });
   }
 
-  return api;
+  async getSession(sessionID, query = {}) {
+    if (sessionID) this.activeSessionId = sessionID;
+    return this.request('GET', `/session/${sessionID}`, { query });
+  }
+
+  async listProviders() {
+    return this.request('GET', '/provider', {});
+  }
+
+  contextBudgetClient() {
+    return {
+      session: {
+        get: async ({ path: { id } }) => {
+          const response = await this.request('GET', `/session/${id}`);
+          return { data: response.data };
+        },
+      },
+      provider: {
+        list: async (options = {}) => {
+          const response = await this.request('GET', '/provider', { query: options.query });
+          return { data: response.data };
+        },
+      },
+    };
+  }
+
+  async getSessions(query = {}) {
+    return this.request('GET', '/api/session', { query });
+  }
+
+  async listCommands(query = {}) {
+    return this.request('GET', '/command', { query });
+  }
+
+  async runSessionCommand(sessionID, command, args = '', query = {}) {
+    if (sessionID) this.activeSessionId = sessionID;
+    return this.request('POST', `/session/${sessionID}/command`, {
+      query,
+      body: { command, arguments: args },
+    });
+  }
+
+  async abortSession(sessionID, query = {}) {
+    if (sessionID) this.activeSessionId = sessionID;
+    return this.request('POST', `/session/${sessionID}/abort`, { query, body: {} });
+  }
+
+  ndjsonPath() {
+    return path.join(this.workDir, '.wanxiangshu.ndjson');
+  }
+
+  async readNdjson() {
+    const p = this.ndjsonPath();
+    if (!fs.existsSync(p)) return '';
+    return fs.readFileSync(p, 'utf8');
+  }
+
+  async waitForNdjson(minLines = 1, timeoutMs = 1000) {
+    const p = this.ndjsonPath();
+    const deadline = Date.now() + timeoutMs;
+    while (Date.now() < deadline) {
+      if (fs.existsSync(p)) {
+        const text = fs.readFileSync(p, 'utf8').trim();
+        const lines = text ? text.split('\n').filter((l) => l.trim()) : [];
+        if (lines.length >= minLines) return true;
+      }
+      await new Promise((r) => setTimeout(r, 50));
+    }
+    return false;
+  }
+
+  partsText(data) {
+    const parts = data?.parts ?? data?.data?.parts;
+    if (!Array.isArray(parts)) return JSON.stringify(data ?? '');
+    return parts
+      .map((p) => (typeof p?.text === 'string' ? p.text : ''))
+      .filter(Boolean)
+      .join('\n');
+  }
+
+  allMessagesText(messagesPayload) {
+    const data = messagesPayload?.data ?? messagesPayload;
+    const list = Array.isArray(data) ? data : [];
+    const chunks = [];
+    for (const msg of list) {
+      const parts = msg?.parts;
+      if (!Array.isArray(parts)) continue;
+      for (const p of parts) {
+        if (typeof p?.text === 'string' && p.text) chunks.push(p.text);
+      }
+    }
+    return chunks.join('\n');
+  }
+
+  async waitForCalls(count, timeoutMs = 1000) {
+    const deadline = Date.now() + timeoutMs;
+    while (this.mockLLM.calls.length < count) {
+      if (Date.now() > deadline) {
+        throw new Error(`timed out waiting for ${count} llm calls; saw ${this.mockLLM.calls.length}`);
+      }
+      await new Promise((r) => setTimeout(r, 20));
+    }
+    return this.mockLLM.calls.length;
+  }
+
+  async readFile(relPath) {
+    const p = path.join(this.workDir, relPath);
+    return fs.readFileSync(p, 'utf8');
+  }
+
+  async fileExists(relPath) {
+    const p = path.join(this.workDir, relPath);
+    return fs.existsSync(p);
+  }
+
+  async waitForFile(relPath, timeoutMs = 1000) {
+    const deadline = Date.now() + timeoutMs;
+    const absPath = path.join(this.workDir, relPath);
+    while (Date.now() < deadline) {
+      if (fs.existsSync(absPath)) return true;
+      await new Promise((r) => setTimeout(r, 50));
+    }
+    return false;
+  }
+
+  async dispose() {
+    // 顺序用例不需要物理销毁，保持共享工作区
+  }
+}
+
+export async function start(opts = {}) {
+  const variant = opts.variant || 'opencode';
+  const sharedHost = await hostSingletonManager.getHost(variant, () => spawnOpencodeHost(variant, opts));
+  return new OpencodeHarness(sharedHost);
 }

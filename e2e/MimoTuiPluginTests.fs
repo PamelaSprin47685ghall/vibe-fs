@@ -12,7 +12,7 @@ let runAll (args: string array) : JS.Promise<int> =
     promise {
         clearFailuresForRun ()
         let opts = createObj [ "plugin", box true; "variant", box "mimotui" ]
-        let! apiObj = startHarness opts
+        let! apiObj = withTimeoutCustom 30000 (startHarness opts)
         let harness = unbox<Harness> apiObj
         let mutable ok = 0
 
@@ -23,9 +23,11 @@ let runAll (args: string array) : JS.Promise<int> =
                 ok <- ok + 1
 
         let! createRes =
-            harness.createSession
-                (createObj [ "model", createObj [ "id", box "test-model"; "providerID", box "test" ] ])
-                (createObj [])
+            withTimeout (
+                harness.createSession
+                    (createObj [ "model", createObj [ "id", box "test-model"; "providerID", box "test" ] ])
+                    (createObj [])
+            )
 
         let createData = unbox<obj> createRes
         chk "tui.session-create.ok" (createData?ok = true)
@@ -34,11 +36,11 @@ let runAll (args: string array) : JS.Promise<int> =
 
         harness.mockLLM.reset ()
         harness.mockLLM.expectText "ok"
-        let! _ = harness.sendPrompt sessionID "hello" (createObj [])
-        let! _ = harness.waitForCalls 1 60000
+        let! _ = withTimeout (harness.sendPrompt sessionID "hello" (createObj []))
+        let! _ = withTimeout (harness.waitForCalls 1 60000)
         chk "tui.warmup.success" (harness.mockLLM.calls.Count > 0)
 
-        do! harness.dispose ()
+        do! withTimeoutCustom 4900 (harness.dispose ())
         printfn "\n✓ %d mimotui plugin e2e checks passed" ok
         return summary ()
     }

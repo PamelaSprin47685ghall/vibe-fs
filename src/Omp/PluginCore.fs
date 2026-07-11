@@ -54,7 +54,7 @@ let private wrapRegisterToolForSchema (pi: obj) : unit =
                     if not (Dyn.isNullish parameters) then
                         registerSchemaTypes name parameters
 
-                Dyn.call1 original toolDef |> ignore)
+                Dyn.callWithThis1 original pi toolDef)
 
 let private createCoreServices (pi: obj) : CoreServices =
     wrapRegisterToolForSchema pi
@@ -93,10 +93,10 @@ let private applyAgentConfigIfSupported (pi: obj) : unit =
 
     if Dyn.typeIs getConfig "function" && Dyn.typeIs setConfig "function" then
         try
-            let currentRaw: obj = Dyn.call0 getConfig
+            let currentRaw: obj = Dyn.callMethod0 pi "getConfig"
             let baseCfg = if Dyn.isNullish currentRaw then emptyObj () else currentRaw
             let next = applyAgentConfigFor baseCfg
-            Dyn.call1 setConfig next |> ignore
+            Dyn.callMethod1 pi "setConfig" next |> ignore
         with _ ->
             ()
 

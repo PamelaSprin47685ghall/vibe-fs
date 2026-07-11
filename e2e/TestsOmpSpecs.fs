@@ -19,8 +19,8 @@ let testSpecs (h: OmpHarness) (ok: int ref) : JS.Promise<unit> =
         do! runOmpCommandsAndHandlers h chk
 
         let sessionId = "e2e-omp-session-1"
-        let! _ = h.emitEvent "session_start" (createObj [ "reason", box "start" ]) sessionId
-        let! _ = h.emitEvent "turn_start" (createObj []) sessionId
+        let! _ = withTimeout (h.emitEvent "session_start" (createObj [ "reason", box "start" ]) sessionId)
+        let! _ = withTimeout (h.emitEvent "turn_start" (createObj []) sessionId)
 
         do! runOmpFuzzyTools h chk sessionId
         do! runOmpExecutorTools h chk sessionId

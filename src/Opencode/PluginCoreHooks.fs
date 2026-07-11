@@ -27,6 +27,11 @@ let private twoArgHook (f: obj -> obj -> JS.Promise<unit>) =
     box (System.Func<obj, obj, JS.Promise<unit>>(f))
 
 let registerHooks (result: obj) (host: Host) (ctx: obj) (services: CoreServices) =
+    let client =
+        match getClientFromPluginCtx ctx with
+        | Ok c -> c
+        | Error _ -> box null
+
     setKey
         result
         "chat.message"
@@ -48,11 +53,6 @@ let registerHooks (result: obj) (host: Host) (ctx: obj) (services: CoreServices)
                 services.RuntimeScope
                 input
                 output))
-
-    let client =
-        match getClientFromPluginCtx ctx with
-        | Ok c -> c
-        | Error _ -> box null
 
     setKey
         result

@@ -24,7 +24,7 @@ let runRest
         // 14. history-echo
         do! textRoundWithCalls harness sessionID "first turn" 1
         do! textRoundWithCalls harness sessionID "second turn" 1
-        let! msgs = harness.getMessages sessionID emptyObj
+        let! msgs = withTimeout (harness.getMessages sessionID emptyObj)
         chk "e2e.history-echo.ok" (unbox<obj> msgs?ok = true)
         let mb = jsonStringify (unbox<obj> msgs?data)
         chk "e2e.history-echo.non-empty" (mb.Length > 2)
@@ -32,7 +32,7 @@ let runRest
         chk "e2e.history-echo.second" (mb.Contains "second turn")
 
         // 15. session-listing
-        let! sessionsRes = harness.getSessions emptyObj
+        let! sessionsRes = withTimeout (harness.getSessions emptyObj)
         let sessions = unbox<obj> sessionsRes
         chk "e2e.session-listing" ((jsonStringify (sessions?data)).Contains sessionID)
 
@@ -139,9 +139,11 @@ let runRest
 
         // 23. session-create-second
         let! session2Res =
-            harness.createSession
-                (createObj [ "model", createObj [ "id", box "test-model"; "providerID", box "test" ] ])
-                emptyObj
+            withTimeout (
+                harness.createSession
+                    (createObj [ "model", createObj [ "id", box "test-model"; "providerID", box "test" ] ])
+                    emptyObj
+            )
 
         let session2Data = unbox<obj> session2Res
         chk "e2e.session-create-second.ok" (session2Data?ok = true)

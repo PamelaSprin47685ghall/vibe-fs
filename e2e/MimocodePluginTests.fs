@@ -12,7 +12,7 @@ let runAll (args: string array) : JS.Promise<int> =
     promise {
         clearFailuresForRun ()
         let opts = createObj [ "plugin", box true; "variant", box "mimocode" ]
-        let! apiObj = startHarness opts
+        let! apiObj = withTimeoutCustom 30000 (startHarness opts)
         let harness = unbox<Harness> apiObj
         let mutable ok = 0
 
@@ -23,9 +23,11 @@ let runAll (args: string array) : JS.Promise<int> =
                 ok <- ok + 1
 
         let! createRes =
-            harness.createSession
-                (createObj [ "model", createObj [ "id", box "test-model"; "providerID", box "test" ] ])
-                (createObj [])
+            withTimeout (
+                harness.createSession
+                    (createObj [ "model", createObj [ "id", box "test-model"; "providerID", box "test" ] ])
+                    (createObj [])
+            )
 
         let createData = unbox<obj> createRes
         check "mimo.session-create.ok" (createData?ok = true)
@@ -54,8 +56,8 @@ let runAll (args: string array) : JS.Promise<int> =
                 for _ in 1 .. (expected - 1) do
                     h.mockLLM.expectText "ok"
 
-                let! _ = h.sendPrompt sess prompt emptyObj
-                let! _ = h.waitForCalls expected 60000
+                let! _ = withTimeout (h.sendPrompt sess prompt emptyObj)
+                let! _ = withTimeout (h.waitForCalls expected 60000)
                 return ()
             }
 
@@ -66,8 +68,8 @@ let runAll (args: string array) : JS.Promise<int> =
             promise {
                 h.mockLLM.reset ()
                 h.mockLLM.expectText "ok"
-                let! _ = h.sendPrompt sess prompt emptyObj
-                let! _ = h.waitForCalls 1 60000
+                let! _ = withTimeout (h.sendPrompt sess prompt emptyObj)
+                let! _ = withTimeout (h.waitForCalls 1 60000)
                 return ()
             }
 
@@ -83,7 +85,7 @@ let runAll (args: string array) : JS.Promise<int> =
                 bodies
                 emptyObj
 
-        do! harness.dispose ()
+        do! withTimeoutCustom 4900 (harness.dispose ())
         printfn "\n✓ %d mimocode plugin e2e checks passed" ok
         return summary ()
     }

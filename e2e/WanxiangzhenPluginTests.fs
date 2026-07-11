@@ -48,7 +48,7 @@ let runAll (args: string array) : JS.Promise<int> =
             chk "wxz.inProcess.mode" (harness.mode = "inProcess")
 
             // 1. /squad command — creates a new squad session
-            let! cmdRes = harness.runCommand "squad" "sess-wxz-e2e" (box "add feature-1")
+            let! cmdRes = withTimeout (harness.runCommand "squad" "sess-wxz-e2e" (box "add feature-1"))
             let parts: obj[] = unbox cmdRes
             let mutable text = ""
 
@@ -64,7 +64,7 @@ let runAll (args: string array) : JS.Promise<int> =
                     [ "events",
                       box [| mkTasksCreated [ mkTask "task-e2e-01" "T1" "D1" []; mkTask "task-e2e-02" "T2" "D2" [] ] |] ]
 
-            let! _ = harness.toolRound "squad_update" updateArgs
+            let! _ = withTimeout (harness.toolRound "squad_update" updateArgs)
             chk "wxz.ndjson.tasks_created" ((harness.readMeta ()).Contains "tasks_created")
 
             // 3. scheduler trigger & wait — tasks should transition to Running
@@ -74,11 +74,15 @@ let runAll (args: string array) : JS.Promise<int> =
             chk "wxz.scheduler.wtAdded" (wtAddCalls.Length > 0)
 
             // 4. register — POST /task/{taskId}/register with pid
-            let! regRes1 = harness.coordinatorPost "/task/task-e2e-01/register" (createObj [ "pid", box 12345 ]) None
+            let! regRes1 =
+                withTimeout (harness.coordinatorPost "/task/task-e2e-01/register" (createObj [ "pid", box 12345 ]) None)
+
             let regStatus1 = unbox<int> (get regRes1 "status")
             chk "wxz.register1.status" (regStatus1 = 200)
 
-            let! regRes2 = harness.coordinatorPost "/task/task-e2e-02/register" (createObj [ "pid", box 12346 ]) None
+            let! regRes2 =
+                withTimeout (harness.coordinatorPost "/task/task-e2e-02/register" (createObj [ "pid", box 12346 ]) None)
+
             let regStatus2 = unbox<int> (get regRes2 "status")
             chk "wxz.register2.status" (regStatus2 = 200)
 
@@ -87,12 +91,16 @@ let runAll (args: string array) : JS.Promise<int> =
             harness.setMergeBaseResult true
             harness.setMergeFfResult "merged-sha"
 
-            let! subRes = harness.coordinatorPost "/task/task-e2e-01/submit" (createObj [ "commitSha", box "abc" ]) None
+            let! subRes =
+                withTimeout (
+                    harness.coordinatorPost "/task/task-e2e-01/submit" (createObj [ "commitSha", box "abc" ]) None
+                )
+
             let subStatus = unbox<int> (get subRes "status")
             chk "wxz.submit.status" (subStatus = 200)
 
             // 5b. done — POST /task/{taskId}/done to mark done and write TaskDone (for task-e2e-02)
-            let! doneRes = harness.coordinatorPost "/task/task-e2e-02/done" (createObj []) None
+            let! doneRes = withTimeout (harness.coordinatorPost "/task/task-e2e-02/done" (createObj []) None)
             let doneStatus = unbox<int> (get doneRes "status")
             chk "wxz.done.status" (doneStatus = 200)
 
@@ -105,12 +113,12 @@ let runAll (args: string array) : JS.Promise<int> =
             chk "wxz.chain.task_merged" (ndjson.Contains "task_merged")
             chk "wxz.chain.task_done" (ndjson.Contains "task_done")
 
-            do! harness.dispose ()
+            do! withTimeoutCustom 4900 (harness.dispose ())
             printfn "✓ inProcess tests completed successfully"
 
             // ── opencode serve mode: auth tests ──
             printfn "Starting Wanxiangzhen E2E opencode serve tests..."
-            let! apiObj2 = startHarness (createObj [ "inProcess", box false ])
+            let! apiObj2 = withTimeoutCustom 30000 (startHarness (createObj [ "inProcess", box false ]))
 
             if not (isNullish apiObj2?error) then
                 failwithf "harness2 start failed: %O\n%O" apiObj2?error apiObj2?stack
@@ -120,16 +128,16 @@ let runAll (args: string array) : JS.Promise<int> =
             chk "wxz.opencode.mode" (harness2.mode = "opencode")
 
             // 1. GET /state without auth → 401
-            let! unauthRes = harness2.coordinatorGet "/state" (Some "__NO_AUTH__")
+            let! unauthRes = withTimeout (harness2.coordinatorGet "/state" (Some "__NO_AUTH__"))
             let unauthStatus = unbox<int> (get unauthRes "status")
             chk "wxz.opencode.unauth" (unauthStatus = 401)
 
             // 2. GET /state with default token → 200
-            let! authRes = harness2.coordinatorGet "/state" None
+            let! authRes = withTimeout (harness2.coordinatorGet "/state" None)
             let authStatus = unbox<int> (get authRes "status")
             chk "wxz.opencode.auth" (authStatus = 200)
 
-            do! harness2.dispose ()
+            do! withTimeoutCustom 4900 (harness2.dispose ())
             printfn "✓ opencode serve tests completed successfully"
 
             printfn "\n✓ %d wanxiangzhen E2E checks passed" ok

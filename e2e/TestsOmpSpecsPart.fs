@@ -2,6 +2,7 @@ module Wanxiangshu.E2e.TestsOmpSpecsPart
 
 open Fable.Core
 open Fable.Core.JsInterop
+open Wanxiangshu.Tests.Assert
 open Wanxiangshu.E2e.HarnessTypes
 
 [<Emit("JSON.stringify($0)")>]
@@ -9,7 +10,7 @@ let jsonStringify (o: obj) : string = jsNative
 
 let runOmpToolRegistry (h: OmpHarness) (chk: string -> bool -> unit) =
     promise {
-        let! toolNames = h.getToolNames ()
+        let! toolNames = withTimeout (h.getToolNames ())
 
         for t in
             [ "fuzzy_find"
@@ -31,7 +32,7 @@ let runOmpToolRegistry (h: OmpHarness) (chk: string -> bool -> unit) =
 
 let runOmpCommandsAndHandlers (h: OmpHarness) (chk: string -> bool -> unit) =
     promise {
-        let! commands = h.getCommands ()
+        let! commands = withTimeout (h.getCommands ())
         let commandsStr = jsonStringify commands
         chk "e2e-omp.commands.returned" (commandsStr <> "null" && commandsStr.Length > 2)
 
@@ -54,7 +55,7 @@ let runOmpCommandsAndHandlers (h: OmpHarness) (chk: string -> bool -> unit) =
 let runOmpFuzzyTools (h: OmpHarness) (chk: string -> bool -> unit) (sessionId: string) =
     promise {
         let! fuzzyFindResult =
-            h.triggerTool "fuzzy_find" (box {| pattern = [| "README.md" |] |}) sessionId (createObj [])
+            withTimeout (h.triggerTool "fuzzy_find" (box {| pattern = [| "README.md" |] |}) sessionId (createObj []))
 
         let fuzzyFindStr = jsonStringify fuzzyFindResult
 
@@ -64,7 +65,7 @@ let runOmpFuzzyTools (h: OmpHarness) (chk: string -> bool -> unit) (sessionId: s
              && not (fuzzyFindStr.Contains "error"))
 
         let! fuzzyGrepResult =
-            h.triggerTool "fuzzy_grep" (box {| pattern = [| "wanxiangshu" |] |}) sessionId (createObj [])
+            withTimeout (h.triggerTool "fuzzy_grep" (box {| pattern = [| "wanxiangshu" |] |}) sessionId (createObj []))
 
         let fuzzyGrepStr = jsonStringify fuzzyGrepResult
 
@@ -82,18 +83,20 @@ let runOmpExecutorTools (h: OmpHarness) (chk: string -> bool -> unit) (sessionId
             "it-is-not-possible-to-do-it-using-other-tools-and-only-run-tests-when-static-analysis-cannot-handle-it"
 
         let! executorResult =
-            h.triggerTool
-                "executor"
-                (box
-                    {| language = "shell"
-                       program = "echo hello"
-                       timeout_type = "short"
-                       mode = "ro"
-                       what_to_summarize = "stdout"
-                       warn_tdd = warnTdd
-                       warn = warn |})
-                sessionId
-                (createObj [])
+            withTimeout (
+                h.triggerTool
+                    "executor"
+                    (box
+                        {| language = "shell"
+                           program = "echo hello"
+                           timeout_type = "short"
+                           mode = "ro"
+                           what_to_summarize = "stdout"
+                           warn_tdd = warnTdd
+                           warn = warn |})
+                    sessionId
+                    (createObj [])
+            )
 
         let execStr = jsonStringify executorResult
         chk "e2e-omp.executor.responded" (execStr.Contains "hello" && not (execStr.Contains "error"))
@@ -104,13 +107,15 @@ let runOmpWebTools (h: OmpHarness) (chk: string -> bool -> unit) (sessionId: str
         do! h.expectText "Test search summary details"
 
         let! websearchResult =
-            h.triggerTool
-                "websearch"
-                (box
-                    {| query = "test"
-                       what_to_summarize = "summary" |})
-                sessionId
-                (createObj [])
+            withTimeout (
+                h.triggerTool
+                    "websearch"
+                    (box
+                        {| query = "test"
+                           what_to_summarize = "summary" |})
+                    sessionId
+                    (createObj [])
+            )
 
         let webStr = jsonStringify websearchResult
 
@@ -118,7 +123,8 @@ let runOmpWebTools (h: OmpHarness) (chk: string -> bool -> unit) (sessionId: str
             "e2e-omp.websearch.responded"
             (webStr.Contains "Test search summary details" && not (webStr.Contains "error"))
 
-        let! webfetchResult = h.triggerTool "webfetch" (box {| url = "http://example.com" |}) sessionId (createObj [])
+        let! webfetchResult =
+            withTimeout (h.triggerTool "webfetch" (box {| url = "http://example.com" |}) sessionId (createObj []))
 
         let fetchStr = jsonStringify webfetchResult
         chk "e2e-omp.webfetch.responded" (fetchStr.Contains "Example Domain" && not (fetchStr.Contains "error"))
@@ -130,14 +136,16 @@ let runOmpAgentTools (h: OmpHarness) (chk: string -> bool -> unit) (sessionId: s
             "i-am-sure-i-have-followed-tdd-and-kolmolgorov-principles-and-kept-todo-updated"
 
         let! coderResult =
-            h.triggerTool
-                "coder"
-                (box
-                    {| intents = [||]
-                       tdd = "green"
-                       warn_tdd = warnTdd |})
-                sessionId
-                (createObj [])
+            withTimeout (
+                h.triggerTool
+                    "coder"
+                    (box
+                        {| intents = [||]
+                           tdd = "green"
+                           warn_tdd = warnTdd |})
+                    sessionId
+                    (createObj [])
+            )
 
         let coderStr = jsonStringify coderResult
 
@@ -148,7 +156,8 @@ let runOmpAgentTools (h: OmpHarness) (chk: string -> bool -> unit) (sessionId: s
 
         do! h.expectText "browser mock debug view text"
 
-        let! browserResult = h.triggerTool "browser" (box {| intent = "browse" |}) sessionId (createObj [])
+        let! browserResult =
+            withTimeout (h.triggerTool "browser" (box {| intent = "browse" |}) sessionId (createObj []))
 
         let browserStr = jsonStringify browserResult
 
@@ -164,15 +173,17 @@ let runOmpMethodology (h: OmpHarness) (chk: string -> bool -> unit) (sessionId: 
             do! h.expectText (m.Replace("_", " ") + " output")
 
             let! res =
-                h.triggerTool
-                    "meditator"
-                    (box
-                        {| methodology = m
-                           note = String.replicate 1100 "n"
-                           background = String.replicate 1100 "b"
-                           intent = String.replicate 1100 "i" |})
-                    sessionId
-                    (createObj [])
+                withTimeout (
+                    h.triggerTool
+                        "meditator"
+                        (box
+                            {| methodology = m
+                               note = String.replicate 1100 "n"
+                               background = String.replicate 1100 "b"
+                               intent = String.replicate 1100 "i" |})
+                        sessionId
+                        (createObj [])
+                )
 
             let resStr = jsonStringify res
             let expected = m.Replace("_", " ") + " output"
@@ -195,7 +206,9 @@ let runOmpInvestigator (h: OmpHarness) (chk: string -> bool -> unit) (sessionId:
         do! h.expectText "investigator e2e verification output: mock text content"
 
         let! investigatorResult =
-            h.triggerTool "investigator" (box {| intents = investigatorIntents |}) sessionId (createObj [])
+            withTimeout (
+                h.triggerTool "investigator" (box {| intents = investigatorIntents |}) sessionId (createObj [])
+            )
 
         let invStr = jsonStringify investigatorResult
         chk "e2e-omp.investigator.ran" (invStr.Contains "mock text content")

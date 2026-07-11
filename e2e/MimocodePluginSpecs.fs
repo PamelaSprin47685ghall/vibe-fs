@@ -34,5 +34,5 @@ let testSpecs (harness: Harness) (ok: int ref) : JS.Promise<unit> =
         do! runMimoConfigAndSessionHooks harness chk
         do! runMimoSessionDeletedEvent harness chk
 
-        do! harness.dispose ()
+        do! withTimeout (harness.dispose ())
     }

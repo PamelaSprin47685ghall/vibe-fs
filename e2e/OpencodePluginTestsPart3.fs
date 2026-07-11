@@ -4,6 +4,7 @@ open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Shell.Dyn
 open Wanxiangshu.Tests.Assert
+open Wanxiangshu.Tests.AsyncFlush
 open Wanxiangshu.E2e.OpencodePluginTestsPart2
 
 module Dyn = Wanxiangshu.Shell.Dyn
@@ -56,24 +57,26 @@ let runPart3
                                 Promise.lift (box {| ok = true |})) ]
                   ) ]
 
-        let! nudgeHarnessObj = startHarness nudgeOpts
+        let! nudgeHarnessObj = withTimeoutCustom 30000 (startHarness nudgeOpts)
         let nudgeHarness = unbox<Harness> nudgeHarnessObj
 
         let! _ =
-            nudgeHarness.fireEvent (
-                box
-                    {| event =
-                        {| ``type`` = "session.idle"
-                           properties = {| sessionID = nudgeHarness.sessionId |} |} |}
+            withTimeout (
+                nudgeHarness.fireEvent (
+                    box
+                        {| event =
+                            {| ``type`` = "session.idle"
+                               properties = {| sessionID = nudgeHarness.sessionId |} |} |}
+                )
             )
 
         let mutable nudgeTicks = 0
 
         while nudgePromptCalls = 0 && nudgeTicks < 20 do
-            do! Promise.sleep 50
+            do! yieldMicrotask ()
             nudgeTicks <- nudgeTicks + 1
 
-        do! nudgeHarness.dispose ()
+        do! withTimeoutCustom 4900 (nudgeHarness.dispose ())
         chk "op.nudge.promptSentExactlyOnce" (nudgePromptCalls = 1)
         chk "op.nudge.promptContentValid" ((string nudgePromptBody).IndexOf("There are still incomplete todos") >= 0)
 
@@ -130,24 +133,26 @@ let runPart3
                                 Promise.lift (box {| ok = true |})) ]
                   ) ]
 
-        let! rejectedNudgeHarnessObj = startHarness rejectedNudgeOpts
+        let! rejectedNudgeHarnessObj = withTimeoutCustom 30000 (startHarness rejectedNudgeOpts)
         let rejectedNudgeHarness = unbox<Harness> rejectedNudgeHarnessObj
 
         let! _ =
-            rejectedNudgeHarness.fireEvent (
-                box
-                    {| event =
-                        {| ``type`` = "session.idle"
-                           properties = {| sessionID = rejectedNudgeHarness.sessionId |} |} |}
+            withTimeout (
+                rejectedNudgeHarness.fireEvent (
+                    box
+                        {| event =
+                            {| ``type`` = "session.idle"
+                               properties = {| sessionID = rejectedNudgeHarness.sessionId |} |} |}
+                )
             )
 
         let mutable rejectedNudgeTicks = 0
 
         while rejectedNudgePromptCalls = 0 && rejectedNudgeTicks < 20 do
-            do! Promise.sleep 50
+            do! yieldMicrotask ()
             rejectedNudgeTicks <- rejectedNudgeTicks + 1
 
-        do! rejectedNudgeHarness.dispose ()
+        do! withTimeoutCustom 4900 (rejectedNudgeHarness.dispose ())
         chk "op.nudge.submitReviewRejectedTriggersNudge" (rejectedNudgePromptCalls = 1)
 
         let mutable abortPromptCalls = 0
@@ -187,19 +192,21 @@ let runPart3
                                 Promise.lift (box {| ok = true |})) ]
                   ) ]
 
-        let! abortHarnessObj = startHarness abortOpts
+        let! abortHarnessObj = withTimeoutCustom 30000 (startHarness abortOpts)
         let abortHarness = unbox<Harness> abortHarnessObj
-        let! _ = abortHarness.fireStreamAbort abortHarness.sessionId
+        let! _ = withTimeout (abortHarness.fireStreamAbort abortHarness.sessionId)
 
         let! _ =
-            abortHarness.fireEvent (
-                box
-                    {| event =
-                        {| ``type`` = "session.idle"
-                           properties = {| sessionID = abortHarness.sessionId |} |} |}
+            withTimeout (
+                abortHarness.fireEvent (
+                    box
+                        {| event =
+                            {| ``type`` = "session.idle"
+                               properties = {| sessionID = abortHarness.sessionId |} |} |}
+                )
             )
 
-        do! Promise.sleep 200
-        do! abortHarness.dispose ()
+        do! yieldMicrotask ()
+        do! withTimeout (abortHarness.dispose ())
         chk "op.nudge.aborted.notCalled" (abortPromptCalls = 0)
     }

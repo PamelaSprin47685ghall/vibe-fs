@@ -12,7 +12,7 @@ let start: obj -> JS.Promise<obj> = jsNative
 let runAll (_args: string array) : JS.Promise<int> =
     promise {
         clearFailuresForRun ()
-        let! apiObj = start (createObj [])
+        let! apiObj = withTimeoutCustom 30000 (start (createObj []))
         let h = unbox<OmpHarness> apiObj
 
         let expected = 40

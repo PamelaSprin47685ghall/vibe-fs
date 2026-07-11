@@ -33,81 +33,132 @@ async function callCurried(fn: any, args: any[]) {
 	return current;
 }
 
-async function handleCommand(ex: any, workdir: string, ndjsonPath: string, cmd: Record<string, any>): Promise<boolean | void> {
-	switch (cmd.type) {
-		case 'emit': {
-			const handlers = ex.handlers.get(cmd.eventType) ?? [];
-			const event = { ...(cmd.event ?? {}), type: cmd.eventType, sessionId: cmd.sessionId };
-			const results: Array<{ ok: boolean; error?: string }> = [];
-			for (const handler of handlers) {
-				try { const r = handler(event, createStubExtensionContext(workdir, cmd.sessionId ?? '')); if (r && typeof (r as any).then === 'function') await (r as Promise<unknown>); results.push({ ok: true }); }
-				catch (e) { results.push({ ok: false, error: e instanceof Error ? e.message : String(e) }); }
-			}
-			respond(true, { results }); break;
+function ensureSandbox(workdir: string, sessionId: string) {
+	const finalWorkdir = path.join(workdir, 'sandboxes', sessionId);
+	if (!fs.existsSync(finalWorkdir)) {
+		fs.mkdirSync(finalWorkdir, { recursive: true });
+		try { execSync('git init -q && git config user.email test@test && git config user.name test', { cwd: finalWorkdir, stdio: 'ignore' }); }
+		catch { fs.mkdirSync(path.join(finalWorkdir, '.git'), { recursive: true }); }
+	}
+	return finalWorkdir;
+}
+
+async function handleOmpFileOps(cmd: any, workdir: string) {
+	const sessionId = cmd.sessionId || 'omp-e2e-session';
+	const finalWorkdir = ensureSandbox(workdir, sessionId);
+	const ndjsonPath = path.join(finalWorkdir, '.wanxiangshu.ndjson');
+
+	if (cmd.type === 'readNdjson') {
+		let c = ''; try { c = fs.readFileSync(ndjsonPath, 'utf8'); } catch {} respond(true, { content: c });
+	} else if (cmd.type === 'readFile') {
+		let c = ''; try { c = fs.readFileSync(path.join(finalWorkdir, cmd.path), 'utf8'); }
+		catch (e) { respond(false, null, `Read failed: ${e instanceof Error ? e.message : String(e)}`); return; }
+		respond(true, { content: c });
+	} else if (cmd.type === 'fileExists') {
+		respond(true, { exists: fs.existsSync(path.join(finalWorkdir, cmd.path)) });
+	} else if (cmd.type === 'waitForNdjson') {
+		const min = cmd.min ?? 1, deadline = Date.now() + (cmd.maxMs ?? 1000);
+		let count = 0;
+		while (Date.now() < deadline) {
+			let c = ''; try { c = fs.readFileSync(ndjsonPath, 'utf8'); } catch {}
+			count = c.split('\n').filter(Boolean).length; if (count >= min) break;
+			await new Promise((r) => setTimeout(r, 50));
 		}
-		case 'callTool': {
-			const entry = ex.tools.get(cmd.name);
-			if (!entry) { respond(false, null, `Unknown tool: ${cmd.name}`); break; }
-			const def = (entry as any).definition ?? entry;
-			const onUpdate = (partial: any) => process.stderr.write(`[partial] ${JSON.stringify(partial)}\n`);
-			const toolCallId = cmd.toolCallId ?? 'call-' + Date.now();
-			const toolCtx = createStubExtensionContext(workdir, cmd.sessionId ?? '');
-			let result: unknown, threw = true;
-			try {
-				const callArgs = [
-					toolCallId,
-					cmd.params,
-					undefined,
-					onUpdate,
-					toolCtx
-				];
-				result = await callCurried(def.execute, callArgs);
-				threw = false;
-			}
-			catch (e) { result = { thrown: e instanceof Error ? e.message : String(e) }; }
-			process.stderr.write(`[callTool] ${cmd.name} ok=${!threw} result=${JSON.stringify(result)}\n`);
-			respond(true, result); break;
+		respond(true, { ready: count >= min, count });
+	}
+}
+
+async function executeOmpTool(ex: any, workdir: string, cmd: any) {
+	const entry = ex.tools.get(cmd.name);
+	if (!entry) { respond(false, null, `Unknown tool: ${cmd.name}`); return; }
+	const def = (entry as any).definition ?? entry;
+	const onUpdate = (partial: any) => process.stderr.write(`[partial] ${JSON.stringify(partial)}\n`);
+	const toolCallId = cmd.toolCallId ?? 'call-' + Date.now();
+	const sessionId = cmd.sessionId || 'omp-e2e-session';
+	const finalWorkdir = ensureSandbox(workdir, sessionId);
+	const toolCtx = createStubExtensionContext(finalWorkdir, sessionId);
+	let result: unknown, threw = true;
+	try {
+		const callArgs = [toolCallId, cmd.params, undefined, onUpdate, toolCtx];
+		result = await callCurried(def.execute, callArgs);
+		threw = false;
+	}
+	catch (e) { result = { thrown: e instanceof Error ? e.message : String(e) }; }
+	process.stderr.write(`[callTool] ${cmd.name} ok=${!threw} result=${JSON.stringify(result)}\n`);
+	respond(true, result);
+}
+
+async function runOmpCommand(ex: any, workdir: string, cmd: any) {
+	const entry = ex.commands.get(cmd.name);
+	if (!entry) { respond(false, null, `Unknown command: ${cmd.name}`); return; }
+	const sessionId = cmd.sessionId || 'omp-e2e-session';
+	const finalWorkdir = ensureSandbox(workdir, sessionId);
+	const toolCtx = createStubExtensionContext(finalWorkdir, sessionId);
+	let result: unknown, threw = true;
+	try {
+		let f = entry.handler || entry.execute;
+		process.stderr.write(`[omp-driver] runCommand handler type: ${typeof f}\n`);
+		if (typeof f === 'function') {
+			let r = f;
+			if (typeof r === 'function') r = await r(cmd.args ?? '');
+			if (typeof r === 'function') r = await r(toolCtx);
+			result = r;
+		} else {
+			result = "handler is not a function";
 		}
-		case 'readNdjson': { let c = ''; try { c = fs.readFileSync(ndjsonPath, 'utf8'); } catch {} respond(true, { content: c }); break; }
-		case 'readFile': { let c = ''; try { c = fs.readFileSync(path.join(workdir, cmd.path), 'utf8'); } catch (e) { respond(false, null, `Read failed: ${e instanceof Error ? e.message : String(e)}`); break; } respond(true, { content: c }); break; }
-		case 'fileExists': { respond(true, { exists: fs.existsSync(path.join(workdir, cmd.path)) }); break; }
-		case 'waitForNdjson': {
-			const min = cmd.min ?? 1, deadline = Date.now() + (cmd.maxMs ?? 30000);
-			let count = 0;
-			while (Date.now() < deadline) { let c = ''; try { c = fs.readFileSync(ndjsonPath, 'utf8'); } catch {} count = c.split('\n').filter(Boolean).length; if (count >= min) break; await new Promise((r) => setTimeout(r, 50)); }
-			respond(true, { ready: count >= min, count }); break;
+		threw = false;
+	}
+	catch (e) { result = { thrown: e instanceof Error ? e.message : String(e) }; }
+	respond(true, { success: !threw, result });
+}
+
+async function emitOmpEvent(ex: any, workdir: string, cmd: any) {
+	const handlers = ex.handlers.get(cmd.eventType) ?? [];
+	const event = { ...(cmd.event ?? {}), type: cmd.eventType, sessionId: cmd.sessionId };
+	const sessionId = cmd.sessionId || 'omp-e2e-session';
+	const finalWorkdir = ensureSandbox(workdir, sessionId);
+	const results: Array<{ ok: boolean; error?: string }> = [];
+	for (const handler of handlers) {
+		try {
+			const r = handler(event, createStubExtensionContext(finalWorkdir, sessionId));
+			if (r && typeof (r as any).then === 'function') await (r as Promise<unknown>);
+			results.push({ ok: true });
 		}
-		case 'getToolNames': { respond(true, { toolNames: Array.from(ex.tools.keys()) }); break; }
-		case 'getCommands': { respond(true, { commandNames: Array.from(ex.commands.keys()) }); break; }
-		case 'runCommand': {
-			const entry = ex.commands.get(cmd.name);
-			if (!entry) { respond(false, null, `Unknown command: ${cmd.name}`); break; }
-			const toolCtx = createStubExtensionContext(workdir, cmd.sessionId ?? '');
-			let result: unknown, threw = true;
-			try {
-				let f = entry.handler;
-				process.stderr.write(`[omp-driver] runCommand handler type: ${typeof f}\n`);
-				if (typeof f === 'function') {
-					let r = f;
-					if (typeof r === 'function') r = await r(cmd.args ?? '');
-					if (typeof r === 'function') r = await r(toolCtx);
-					result = r;
-				} else if (entry.execute && typeof entry.execute === 'function') {
-					let r = entry.execute;
-					if (typeof r === 'function') r = await r(cmd.args ?? '');
-					if (typeof r === 'function') r = await r(toolCtx);
-					result = r;
-				} else {
-					result = "handler is not a function";
-				}
-				threw = false;
-			}
-			catch (e) { result = { thrown: e instanceof Error ? e.message : String(e) }; }
-			respond(true, { success: !threw, result }); break;
+		catch (e) {
+			results.push({ ok: false, error: e instanceof Error ? e.message : String(e) });
 		}
-		case 'getHandlers': { respond(true, { handlerKeys: Array.from(ex.handlers.keys()) }); break; }
-		case 'dispose': { try { fs.rmSync(workdir, { recursive: true, force: true }); } catch {} respond(true, { disposed: true }); return true; }
-		default: respond(false, null, `Unknown command: ${cmd.type}`);
+	}
+	respond(true, { results });
+}
+
+async function handleCommand(ex: any, workdir: string, cmd: Record<string, any>): Promise<boolean | void> {
+	if (cmd.type === 'emit') {
+		await emitOmpEvent(ex, workdir, cmd);
+	} else if (cmd.type === 'callTool') {
+		await executeOmpTool(ex, workdir, cmd);
+	} else if (['readNdjson', 'readFile', 'fileExists', 'waitForNdjson'].includes(cmd.type)) {
+		await handleOmpFileOps(cmd, workdir);
+	} else if (cmd.type === 'getToolNames') {
+		respond(true, { toolNames: Array.from(ex.tools.keys()) });
+	} else if (cmd.type === 'getCommands') {
+		respond(true, { commandNames: Array.from(ex.commands.keys()) });
+	} else if (cmd.type === 'runCommand') {
+		await runOmpCommand(ex, workdir, cmd);
+	} else if (cmd.type === 'getHandlers') {
+		respond(true, { handlerKeys: Array.from(ex.handlers.keys()) });
+	} else if (cmd.type === 'cleanSandbox') {
+		const sessionId = cmd.sessionId;
+		if (sessionId) {
+			const finalWorkdir = path.join(workdir, 'sandboxes', sessionId);
+			try { fs.rmSync(finalWorkdir, { recursive: true, force: true }); } catch {}
+		}
+		respond(true, { cleaned: true });
+	} else if (cmd.type === 'dispose') {
+		try { fs.rmSync(workdir, { recursive: true, force: true }); } catch {}
+		respond(true, { disposed: true });
+		return true;
+	} else {
+		respond(false, null, `Unknown command: ${cmd.type}`);
 	}
 }
 
@@ -121,7 +172,6 @@ async function main() {
 	const workdir = fs.mkdtempSync(path.join(os.tmpdir(), 'omp-driver-'));
 	try { execSync('git init -q && git config user.email test@test && git config user.name test', { cwd: workdir, stdio: 'ignore' }); }
 	catch { fs.mkdirSync(path.join(workdir, '.git'), { recursive: true }); }
-	const ndjsonPath = path.join(workdir, '.wanxiangshu.ndjson');
 
 	const mod = await import(pluginPath);
 	const factory = mod.default ?? mod.wanxiangshuExtension ?? mod.plugin;
@@ -137,7 +187,7 @@ async function main() {
 		try { cmd = await readStdinJson(); } catch { respond(false, null, 'Failed to parse stdin JSON'); continue; }
 		if (!cmd) break;
 		try {
-			const done = await handleCommand(extension, workdir, ndjsonPath, cmd);
+			const done = await handleCommand(extension, workdir, cmd);
 			if (done) { try { fs.rmSync(workdir, { recursive: true, force: true }); } catch {} process.exit(0); }
 		} catch (err) { respond(false, null, `Command ${cmd.type} failed: ${err instanceof Error ? err.message : String(err)}`); }
 	}

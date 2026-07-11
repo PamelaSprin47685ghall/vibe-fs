@@ -163,9 +163,11 @@ let runRest
         let nudgeBefore = nudgeCount harness
 
         let! _ =
-            harness.fireStreamEnd
-                "mux-e2e-session"
-                [| "I have completed some work; let me know if there is anything else to do." |]
+            withTimeout (
+                harness.fireStreamEnd
+                    "mux-e2e-session"
+                    [| "I have completed some work; let me know if there is anything else to do." |]
+            )
 
         let nudgeAfter = nudgeCount harness
         chk "mux.eventHook.nudgeCalledOnStreamEnd" (nudgeAfter > nudgeBefore)
@@ -183,7 +185,7 @@ let runRest
         let inputObj =
             createObj [ "agent", box "manager"; "sessionID", box "mux-e2e-session" ]
 
-        let! transformedOutput = harness.runMessageTransform inputObj outputObj
+        let! transformedOutput = withTimeout (harness.runMessageTransform inputObj outputObj)
         let messagesOut: obj[] = unbox<obj[]> (dynGet transformedOutput "messages")
         chk "mux.messageTransform.capsAdded" (messagesOut.Length > 1)
         let firstMsg = messagesOut.[0]
@@ -205,7 +207,7 @@ let runRest
             createObj [ "content", box "long system prompt"; "length", box 1000 ]
 
         let systemOutput = createObj [ "system", box systemObj ]
-        let! _ = harness.runSystemTransform (createEmpty ()) systemOutput
+        let! _ = withTimeout (harness.runSystemTransform (createEmpty ()) systemOutput)
         let systemOut = dynGet systemOutput "system"
         chk "mux.messageTransform.systemTransform.runOk" (dynIsArr systemOut)
         let systemArr = unbox<obj[]> systemOut
@@ -215,7 +217,7 @@ let runRest
             (systemArr.Length = 1 && string systemArr.[0] = harness.workDir)
 
         // --- 6. Slash command: /loop activates review -----------------------
-        let! loopResponse = harness.runSlashCommand "loop" "mux-e2e-session" "implement feature X"
+        let! loopResponse = withTimeout (harness.runSlashCommand "loop" "mux-e2e-session" "implement feature X")
         chk "mux.slash.loop.responseContainsWithReview" (loopResponse.Contains "With-Review Mode")
         chk "mux.slash.loop.eventLogCreated" (fileExists (harness.workDir + "/.wanxiangshu.ndjson"))
 
@@ -239,7 +241,7 @@ let runRest
                 (fun r -> r.Contains "With-Review Mode has ended")
                 "mux.execute.submit_review.wip_false.accepted"
 
-        let! _ = harness.runSlashCommand "loop" "mux-e2e-session" "implement feature X version 2"
+        let! _ = withTimeout (harness.runSlashCommand "loop" "mux-e2e-session" "implement feature X version 2")
         harness.setMockReportMarkdown "REVISE: please verify extreme cases"
 
         do!
@@ -252,39 +254,39 @@ let runRest
                 (fun r -> r.Contains "With-Review Mode is still active")
                 "mux.execute.submit_review.wip_false.needs_revision"
 
-        let! _ = harness.runSlashCommand "loop" "mux-e2e-session" "" // deactivate
+        let! _ = withTimeout (harness.runSlashCommand "loop" "mux-e2e-session" "") // deactivate
 
         // --- 6b. Slash command: /loop-review --------------------------------
         harness.setMockReportMarkdown "PERFECT: precheck passed without revisions"
-        let! loopRevRes1 = harness.runSlashCommand "loop-review" "mux-e2e-session" "implement task Alpha"
+        let! loopRevRes1 = withTimeout (harness.runSlashCommand "loop-review" "mux-e2e-session" "implement task Alpha")
         chk "mux.slash.loop-review.accepted" (loopRevRes1.Contains "Pre-review passed")
 
-        let! _ = harness.runSlashCommand "loop" "mux-e2e-session" "" // deactivate
+        let! _ = withTimeout (harness.runSlashCommand "loop" "mux-e2e-session" "") // deactivate
 
         harness.setMockReportMarkdown "REVISE: precheck requires clarifying objectives"
-        let! loopRevRes2 = harness.runSlashCommand "loop-review" "mux-e2e-session" "implement task Beta"
+        let! loopRevRes2 = withTimeout (harness.runSlashCommand "loop-review" "mux-e2e-session" "implement task Beta")
         chk "mux.slash.loop-review.needs_revision" (loopRevRes2.Contains "Pre-review feedback")
 
-        let! _ = harness.runSlashCommand "loop" "mux-e2e-session" "" // deactivate
+        let! _ = withTimeout (harness.runSlashCommand "loop" "mux-e2e-session" "") // deactivate
 
         // --- 6d. Slash command: /loop empty task & stream abort --------------
-        let! emptyResponse = harness.runSlashCommand "loop" "mux-e2e-session" ""
+        let! emptyResponse = withTimeout (harness.runSlashCommand "loop" "mux-e2e-session" "")
         chk "mux.slash.loop.emptyTaskReturnsCancelled" (emptyResponse.Contains "With-Review Mode cancelled")
 
-        let! loopResponseAbort = harness.runSlashCommand "loop" "mux-e2e-session" "test stream-abort"
+        let! loopResponseAbort = withTimeout (harness.runSlashCommand "loop" "mux-e2e-session" "test stream-abort")
         chk "mux.eventHook.abort.activateOk" (loopResponseAbort.Contains "With-Review Mode is active")
-        let! _ = harness.fireStreamAbort "mux-e2e-session"
+        let! _ = withTimeout (harness.fireStreamAbort "mux-e2e-session")
 
         let reviewStoreSurface = dynGet reg "__reviewStore"
         let getReviewTask = dynGet reviewStoreSurface "getReviewTask"
         let taskResult = getReviewTask $ "mux-e2e-session"
         chk "mux.eventHook.abort.deactivated" (dynIsNull taskResult)
 
-        let! _ = harness.runSlashCommand "loop" "mux-e2e-session" ""
+        let! _ = withTimeout (harness.runSlashCommand "loop" "mux-e2e-session" "")
 
         // --- 7. Verify expectations empty -----------------------------------
         let remaining = harness.mockLLM.getRemainingExpectations ()
         chk "mux.mock-llm.expectations-empty" (remaining = 0)
 
-        do! harness.dispose ()
+        do! withTimeout (harness.dispose ())
     }

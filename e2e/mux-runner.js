@@ -5,13 +5,9 @@ import { fileURLToPath } from 'node:url';
 import readline from 'node:readline';
 import { spawn, spawnSync } from 'node:child_process';
 import { createMockLLM } from './mock-llm.js';
+import { hostSingletonManager } from './harness-bootstrap.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const MUX_E2E_LOCK = '/tmp/wanxiang-mux-e2e.lock';
-
-function releaseLock() {
-  try { fs.unlinkSync(MUX_E2E_LOCK); } catch {}
-}
 
 function resolveBun() {
   return process.env.BUN ?? (() => {
@@ -90,177 +86,195 @@ function startDriverProcess(muxRepo, pluginPath, mockLlmUrl) {
   return child;
 }
 
-async function initMockLLMAndHome() {
-  const mockLlmInstance = createMockLLM();
-  const mockLlm = await mockLlmInstance.start();
-  const tempHome = fs.mkdtempSync(path.join(os.tmpdir(), 'mux-runner-home-'));
-  buildConfig(mockLlm.url, tempHome);
-  return { mockLlmInstance, mockLlm, tempHome };
-}
-
-async function executeToolImpl(queue, api, name, args, config) {
-  const res = await queue.send({ type: 'executeTool', name, args, sessionId: config.sessionID });
-  await api._syncNudges();
-  if (!res.ok) throw new Error(res.error || `executeTool ${name} failed`);
-  return typeof res.data === 'string' ? res.data : JSON.stringify(res.data);
-}
-
-async function runSlashCommandImpl(queue, api, key, args) {
-  const res = await queue.send({ type: 'runCommand', name: key, args: args.join(' ') });
-  await api._syncNudges();
-  if (!res.ok) throw new Error(res.error || `runSlashCommand ${key} failed`);
-  return res.data;
-}
-
-async function getChatHistoryCalledImpl(queue) {
-  const res = await queue.send({ type: 'getChatHistoryCalled' });
-  return res.ok ? res.data.called : false;
-}
-
-async function setMockReportMarkdownImpl(queue, markdown) {
-  await queue.send({ type: 'setMockReportMarkdown', markdown });
-}
-
-async function disposeImpl(cleanupAll, queue, child) {
-  cleanupAll();
-  try { queue.rl.close(); } catch {}
-  try { await queue.send({ type: 'dispose' }); } catch {}
-  try { child.kill('SIGKILL'); } catch {}
-}
-
-async function runMsgTransImpl(queue, input, output) {
-  const res = await queue.send({ type: 'transformMessages', messages: output.messages, workspaceId: input.workspaceId });
-  if (res.ok) output.messages = res.data;
-  return output;
-}
-
-async function runSysTransImpl(queue, input, output) {
-  const res = await queue.send({ type: 'systemTransform', system: output.system });
-  if (res.ok) output.system = res.data.system;
-  return output;
-}
-
-async function fireEventImpl(queue, api, event) {
-  const res = await queue.send({ type: 'emit', eventType: event.type, event, sessionId: event.workspaceId });
-  await api._syncNudges();
-  return res.data;
-}
-
-async function fireStreamEndImpl(queue, api, workspaceId, textParts) {
-  const res = await queue.send({
-    type: 'emit',
-    eventType: 'stream-end',
-    sessionId: workspaceId,
-    event: { parts: (textParts || []).map((t) => ({ type: 'text', text: t })) }
-  });
-  await api._syncNudges();
-  return res;
-}
-
-async function fireStreamAbortImpl(queue, api, workspaceId) {
-  const res = await queue.send({ type: 'emit', eventType: 'stream-abort', sessionId: workspaceId });
-  await api._syncNudges();
-  return res;
-}
-
-async function readNdjsonImpl(queue) { return (await queue.send({ type: 'readNdjson' })).data.content; }
-async function readFileImpl(queue, p) { return (await queue.send({ type: 'readFile', path: p })).data.content; }
-async function fileExistsImpl(queue, p) { return (await queue.send({ type: 'fileExists', path: p })).data.exists; }
-async function waitForNdjsonImpl(queue, min, maxMs) { return (await queue.send({ type: 'waitForNdjson', min, maxMs })).data.ready; }
-async function syncNudgesImpl(queue, nudgesList, currentReviewTaskRef) {
-  const res = await queue.send({ type: 'getNudges' });
-  if (res.ok && Array.isArray(res.data.nudges)) {
-    nudgesList.length = 0;
-    nudgesList.push(...res.data.nudges);
-  }
-  const taskRes = await queue.send({ type: 'getReviewTask', sessionId: 'mux-e2e-session' });
-  if (taskRes.ok) {
-    currentReviewTaskRef.value = taskRes.data.task;
-  }
-}
-
-function buildRunnerApi(child, queue, mockLlm, tempHome, cleanupAll, commands, getToolSchemaCache, nudgesList, currentReviewTaskRef) {
-  const api = {
-    port: 0,
-    mockLLM: mockLlm,
-    workDir: tempHome,
-    home: tempHome,
-    sessionId: 'mux-e2e-session',
-    helpers: { nudges: nudgesList, _setTodoList: () => {} },
-    registration: {
-      tools: [],
-      eventHook: () => {},
-      messagesTransform: () => {},
-      slashCommands: commands,
+class MuxHarness {
+  constructor(sharedHost, sessionId) {
+    this.port = 0;
+    this.mockLLM = sharedHost.mockLLM;
+    this.workDir = sharedHost.workdir;
+    this.home = sharedHost.home;
+    this.sessionId = sessionId;
+    this.queue = sharedHost.queue;
+    this.currentReviewTaskRef = { value: null };
+    this.nudgesList = [];
+    this.helpers = { nudges: this.nudgesList, _setTodoList: () => {} };
+    
+    this.registration = {
+      tools: sharedHost.toolNames.map((name) => ({ name })),
+      eventHook: this.fireEvent.bind(this),
+      messagesTransform: this.runMessageTransform.bind(this),
+      slashCommands: sharedHost.commands,
       __reviewStore: {
-        getReviewTask: () => currentReviewTaskRef.value
+        getReviewTask: () => this.currentReviewTaskRef.value
       }
-    },
-    getToolSchema(name) { return getToolSchemaCache.get(name) || null; },
-    getToolRequired(name) {
-      const s = api.getToolSchema(name);
-      return (s && Array.isArray(s.required)) ? s.required : [];
-    },
-    async executeTool(name, args, config = {}) { return executeToolImpl(queue, api, name, args, config); },
-    async runSlashCommand(key, ...args) { return runSlashCommandImpl(queue, api, key, args); },
-    async runMessageTransform(input, output) { return runMsgTransImpl(queue, input, output); },
-    async runSystemTransform(input, output) { return runSysTransImpl(queue, input, output); },
-    async fireEvent(event) { return fireEventImpl(queue, api, event); },
-    async fireStreamEnd(wsId, textParts) { return fireStreamEndImpl(queue, api, wsId, textParts); },
-    async fireStreamAbort(wsId) { return fireStreamAbortImpl(queue, api, wsId); },
-    async readNdjson() { return readNdjsonImpl(queue); },
-    async readFile(p) { return readFileImpl(queue, p); },
-    async fileExists(p) { return fileExistsImpl(queue, p); },
-    async waitForNdjson(min, maxMs) { return waitForNdjsonImpl(queue, min, maxMs); },
-    getChatHistoryCalled() { return getChatHistoryCalledImpl(queue); },
-    setMockReportMarkdown(markdown) { return setMockReportMarkdownImpl(queue, markdown); },
-    getLastLlmRequest() { return mockLlm.calls.length > 0 ? mockLlm.calls[mockLlm.calls.length - 1] : null; },
-    async _syncNudges() { await syncNudgesImpl(queue, nudgesList, currentReviewTaskRef); },
-    async dispose() { await disposeImpl(cleanupAll, queue, child); },
-  };
-  return api;
-}
+    };
+    this.getToolSchemaCache = sharedHost.getToolSchemaCache;
+  }
 
-async function populateRunnerApi(api, queue, getToolSchemaCache) {
-  const namesRes = await queue.send({ type: 'getToolNames' });
-  if (namesRes.ok && Array.isArray(namesRes.data.toolNames)) {
-    api.registration.tools = namesRes.data.toolNames.map((name) => ({ name }));
-    for (const name of namesRes.data.toolNames) {
-      const schemaRes = await queue.send({ type: 'getToolSchema', name });
-      if (schemaRes.ok) getToolSchemaCache.set(name, schemaRes.data.parameters);
+  getToolSchema(name) { return this.getToolSchemaCache.get(name) || null; }
+  getToolRequired(name) {
+    const s = this.getToolSchema(name);
+    return (s && Array.isArray(s.required)) ? s.required : [];
+  }
+
+  async executeTool(name, args, config = {}) {
+    const sess = config.sessionID || this.sessionId;
+    const res = await this.queue.send({ type: 'executeTool', name, args, sessionId: sess });
+    await this._syncNudges();
+    if (!res.ok) throw new Error(res.error || `executeTool ${name} failed`);
+    return typeof res.data === 'string' ? res.data : JSON.stringify(res.data);
+  }
+
+  async runSlashCommand(key, ...args) {
+    const res = await this.queue.send({ type: 'runCommand', name: key, args: args.join(' ') });
+    await this._syncNudges();
+    if (!res.ok) throw new Error(res.error || `runSlashCommand ${key} failed`);
+    return res.data;
+  }
+
+  async runMessageTransform(input, output) {
+    const res = await this.queue.send({ type: 'transformMessages', messages: output.messages, workspaceId: input.workspaceId || this.sessionId });
+    if (res.ok) output.messages = res.data;
+    return output;
+  }
+
+  async runSystemTransform(input, output) {
+    const res = await this.queue.send({ type: 'systemTransform', system: output.system });
+    if (res.ok) output.system = res.data.system;
+    return output;
+  }
+
+  async fireEvent(event) {
+    const res = await this.queue.send({ type: 'emit', eventType: event.type, event, sessionId: event.workspaceId || this.sessionId });
+    await this._syncNudges();
+    return res.data;
+  }
+
+  async fireStreamEnd(wsId, textParts) {
+    const res = await this.queue.send({
+      type: 'emit',
+      eventType: 'stream-end',
+      sessionId: wsId || this.sessionId,
+      event: { parts: (textParts || []).map((t) => ({ type: 'text', text: t })) }
+    });
+    await this._syncNudges();
+    return res;
+  }
+
+  async fireStreamAbort(wsId) {
+    const res = await this.queue.send({ type: 'emit', eventType: 'stream-abort', sessionId: wsId || this.sessionId });
+    await this._syncNudges();
+    return res;
+  }
+
+  async readNdjson() {
+    return (await this.queue.send({ type: 'readNdjson', sessionId: this.sessionId })).data.content;
+  }
+
+  async readFile(p) {
+    return (await this.queue.send({ type: 'readFile', path: p, sessionId: this.sessionId })).data.content;
+  }
+
+  async fileExists(p) {
+    return (await this.queue.send({ type: 'fileExists', path: p, sessionId: this.sessionId })).data.exists;
+  }
+
+  async waitForNdjson(min, maxMs) {
+    const ms = Math.min(maxMs, 1000);
+    return (await this.queue.send({ type: 'waitForNdjson', min, maxMs: ms, sessionId: this.sessionId })).data.ready;
+  }
+
+  async getChatHistoryCalled() {
+    const res = await this.queue.send({ type: 'getChatHistoryCalled' });
+    return res.ok ? res.data.called : false;
+  }
+
+  setMockReportMarkdown(markdown) {
+    return this.queue.send({ type: 'setMockReportMarkdown', markdown });
+  }
+
+  getLastLlmRequest() {
+    return this.mockLLM.calls.length > 0 ? this.mockLLM.calls[this.mockLLM.calls.length - 1] : null;
+  }
+
+  async _syncNudges() {
+    const res = await this.queue.send({ type: 'getNudges' });
+    if (res.ok && Array.isArray(res.data.nudges)) {
+      this.nudgesList.length = 0;
+      this.nudgesList.push(...res.data.nudges);
+    }
+    const taskRes = await this.queue.send({ type: 'getReviewTask', sessionId: this.sessionId });
+    if (taskRes.ok) {
+      this.currentReviewTaskRef.value = taskRes.data.task;
     }
   }
-  api.registration.eventHook = api.fireEvent;
-  api.registration.messagesTransform = api.runMessageTransform;
+
+  async waitForCalls(count, timeoutMs = 1000) {
+    const deadline = Date.now() + timeoutMs;
+    while (this.mockLLM.calls.length < count) {
+      if (Date.now() > deadline) {
+        throw new Error(`timed out waiting for ${count} llm calls; saw ${this.mockLLM.calls.length}`);
+      }
+      await new Promise((r) => setTimeout(r, 20));
+    }
+    return this.mockLLM.calls.length;
+  }
+
+  async waitForFile(relPath, timeoutMs = 1000) {
+    const deadline = Date.now() + timeoutMs;
+    while (Date.now() < deadline) {
+      if (await this.fileExists(relPath)) return true;
+      await new Promise((r) => setTimeout(r, 50));
+    }
+    return false;
+  }
+
+  async dispose() {
+    if (this.sessionId) {
+      try {
+        await this.queue.send({ type: 'cleanSandbox', sessionId: this.sessionId });
+      } catch {}
+    }
+  }
 }
 
 export async function start(opts = {}) {
-  try { fs.openSync(MUX_E2E_LOCK, 'wx'); }
-  catch (e) {
-    if (e.code === 'EEXIST') throw new Error('mux e2e already running (lock exists at ' + MUX_E2E_LOCK + ')');
-    throw e;
-  }
-  const { mockLlmInstance, mockLlm, tempHome } = await initMockLLMAndHome();
-  const cleanupAll = () => {
-    releaseLock();
-    mockLlm.stop().catch(() => {});
-    try { fs.rmSync(tempHome, { recursive: true, force: true }); } catch {}
-  };
-  process.once('exit', cleanupAll);
-  const muxRepo = process.env.WANXIANGSHU_MUX_REPO || path.resolve(__dirname, '..', '..', 'mux');
-  const pluginPath = path.resolve(__dirname, '..', 'build', 'src', 'Mux', 'Plugin.js');
-  const child = startDriverProcess(muxRepo, pluginPath, mockLlm.url);
-  const queue = buildCommandQueue(child);
-  const workdir = await queue.workdirPromise;
-  const handlerRes = await queue.send({ type: 'getCommands' });
-  const commands = handlerRes.ok ? handlerRes.data.slashCommands : [];
-  const nudgesList = [];
-  const getToolSchemaCache = new Map();
-  const currentReviewTaskRef = { value: null };
-  const api = buildRunnerApi(child, queue, mockLlm, tempHome, cleanupAll, commands, getToolSchemaCache, nudgesList, currentReviewTaskRef);
-  await populateRunnerApi(api, queue, getToolSchemaCache);
-  api.workDir = workdir || api.home;
-  return api;
+  const sharedHost = await hostSingletonManager.getHost('mux', async () => {
+    const mockLlmInstance = createMockLLM();
+    const mockLlm = await mockLlmInstance.start();
+    const tempHome = fs.mkdtempSync(path.join(os.tmpdir(), 'mux-runner-home-'));
+    buildConfig(mockLlm.url, tempHome);
+
+    const muxRepo = process.env.WANXIANGSHU_MUX_REPO || path.resolve(__dirname, '..', '..', 'mux');
+    const pluginPath = path.resolve(__dirname, '..', 'build', 'src', 'Mux', 'Plugin.js');
+    const child = startDriverProcess(muxRepo, pluginPath, mockLlm.url);
+    const queue = buildCommandQueue(child);
+    const workdir = await queue.workdirPromise;
+
+    const handlerRes = await queue.send({ type: 'getCommands' });
+    const commands = handlerRes.ok ? handlerRes.data.slashCommands : [];
+    const getToolSchemaCache = new Map();
+
+    const namesRes = await queue.send({ type: 'getToolNames' });
+    const toolNames = namesRes.ok ? namesRes.data.toolNames : [];
+    for (const name of toolNames) {
+      const schemaRes = await queue.send({ type: 'getToolSchema', name });
+      if (schemaRes.ok) getToolSchemaCache.set(name, schemaRes.data.parameters);
+    }
+
+    return {
+      child,
+      mockLLM: mockLlm,
+      queue,
+      workdir,
+      home: tempHome,
+      commands,
+      getToolSchemaCache,
+      toolNames
+    };
+  });
+
+  const sessionId = opts.workspaceId || 'mux-e2e-session';
+  return new MuxHarness(sharedHost, sessionId);
 }
 
 export default { start };

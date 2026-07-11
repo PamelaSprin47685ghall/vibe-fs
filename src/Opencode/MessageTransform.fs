@@ -27,6 +27,7 @@ open Wanxiangshu.Shell.ChildAgentRegistry
 open Wanxiangshu.Shell.OpencodeHookInputCodec
 open Wanxiangshu.Shell.ChatTransformOutputCodec
 open Wanxiangshu.Shell.MessageTransformCommon
+
 open Wanxiangshu.Shell.JsArrayMutate
 open Wanxiangshu.Shell.SembleMcp
 open Wanxiangshu.Shell.SembleSearch

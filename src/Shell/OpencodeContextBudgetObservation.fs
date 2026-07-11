@@ -142,17 +142,6 @@ let tryCurrentUsage (client: obj) sessionID (_encoded: obj array) : JS.Promise<i
         let session = get client "session"
 
         if isNullish session || isNullish (get session "messages") then
-            printfn
-                "DEBUG: session messages not available on client. session is null: %b, messages is null: %b"
-                (isNullish session)
-                (if isNullish session then
-                     true
-                 else
-                     isNullish (get session "messages"))
-
-            if not (isNullish session) then
-                printfn "DEBUG: session keys: %A" (JS.Object.keys session)
-
             return None
         else
             try
@@ -168,7 +157,6 @@ let tryCurrentUsage (client: obj) sessionID (_encoded: obj array) : JS.Promise<i
                 else
                     let data = get response "data"
                     return lastAssistantTokenUsage data
-            with ex ->
-                printfn "DEBUG: session.messages failed: %s" ex.Message
+            with _ ->
                 return None
     }

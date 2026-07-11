@@ -2,6 +2,7 @@ module Wanxiangshu.E2e.TestsServePlugin
 
 open Fable.Core
 open Fable.Core.JsInterop
+open Wanxiangshu.Tests.Assert
 open Wanxiangshu.E2e.HarnessTypes
 
 [<Emit("JSON.stringify($0)")>]
@@ -70,15 +71,20 @@ let runServePluginChecks
 
         chk "e2e.serve.meditator.tool-called" (containsTool harness "meditator")
 
-        let! loopRes = harness.runSessionCommand sessionID "loop" "implement feature X via serve" emptyObj
+        let! loopRes =
+            withTimeoutL
+                "serve loop command"
+                4000
+                (harness.runSessionCommand sessionID "loop" "implement feature X via serve" emptyObj)
+
         let loopData = unbox<obj> loopRes
         chk "e2e.serve.loop.command.ok" (loopData?ok = true)
-        let! ndLoop = harness.waitForNdjson 1 10000
+        let! ndLoop = withTimeout (harness.waitForNdjson 1 10000)
         chk "e2e.serve.loop.ndjson-written" ndLoop
-        let! ndLoopText = harness.readNdjson ()
+        let! ndLoopText = withTimeout (harness.readNdjson ())
         chk "e2e.serve.loop.ndjson-activated" (ndLoopText.Contains "loop_activated")
         chk "e2e.serve.loop.ndjson-task" (ndLoopText.Contains "implement feature X via serve")
-        let! msgsAfterLoop = harness.getMessages sessionID emptyObj
+        let! msgsAfterLoop = withTimeout (harness.getMessages sessionID emptyObj)
         let historyLoop = harness.allMessagesText (unbox<obj> msgsAfterLoop)
 
         chk
@@ -86,12 +92,14 @@ let runServePluginChecks
             (historyLoop.Contains "With-Review Mode is active"
              || ndLoopText.Contains "loop_activated")
 
-        let! cancelRes = harness.runSessionCommand sessionID "loop" "" emptyObj
+        let! cancelRes =
+            withTimeoutL "serve loop cancel command" 4000 (harness.runSessionCommand sessionID "loop" "" emptyObj)
+
         let cancelData = unbox<obj> cancelRes
         chk "e2e.serve.loop.cancel.ok" (cancelData?ok = true)
-        let! ndAfterCancel = harness.readNdjson ()
+        let! ndAfterCancel = withTimeout (harness.readNdjson ())
         chk "e2e.serve.loop.cancel.ndjson" (ndAfterCancel.Contains "loop_cancelled")
-        let! msgsAfterCancel = harness.getMessages sessionID emptyObj
+        let! msgsAfterCancel = withTimeout (harness.getMessages sessionID emptyObj)
         let historyCancel = harness.allMessagesText (unbox<obj> msgsAfterCancel)
 
         chk
@@ -99,7 +107,7 @@ let runServePluginChecks
             (historyCancel.Contains "With-Review Mode cancelled"
              || ndAfterCancel.Contains "loop_cancelled")
 
-        let! cmdRes = harness.listCommands emptyObj
+        let! cmdRes = withTimeout (harness.listCommands emptyObj)
         let cmdJson = jsonStringify (unbox<obj> cmdRes?data)
         chk "e2e.serve.commands.has-loop" (cmdJson.Contains "loop")
 
@@ -127,8 +135,8 @@ let runServePluginChecks
 
         do! toolRound harness sessionID "todowrite" todoArgs "commit todo backlog via todowrite"
         chk "e2e.serve.todowrite.tool-called" (containsTool harness "todowrite")
-        let! ndTodo = harness.waitForNdjson 2 15000
+        let! ndTodo = withTimeout (harness.waitForNdjson 2 15000)
         chk "e2e.serve.todowrite.ndjson" ndTodo
-        let! ndTodoText = harness.readNdjson ()
+        let! ndTodoText = withTimeout (harness.readNdjson ())
         chk "e2e.serve.todowrite.work-backlog" (ndTodoText.Contains "work_backlog_committed")
     }

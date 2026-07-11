@@ -124,7 +124,11 @@ let checkSyntax (content: string) (filePath: string) : JS.Promise<SyntaxCheckRes
             else
                 filePath.ToLowerInvariant()
 
-        if lowerPath.EndsWith(".md") || lowerPath.EndsWith(".markdown") then
+        if
+            lowerPath.EndsWith(".md")
+            || lowerPath.EndsWith(".markdown")
+            || lowerPath.EndsWith(".txt")
+        then
             return Ok("", [||])
         else
             match tryGetPack () with

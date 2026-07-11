@@ -26,6 +26,10 @@ function getPluginUrl(variant) {
 
 const FIXTURE_MCP = path.resolve(__dirname, 'stealth-mcp-fixture.js');
 export const E2E_LOCK = '/tmp/wanxiang-e2e.lock';
+const E2E_CACHE_HOME = process.env.WANXIANG_E2E_CACHE_HOME || path.join(os.tmpdir(), 'wanxiang-e2e-cache');
+try {
+  fs.mkdirSync(E2E_CACHE_HOME, { recursive: true });
+} catch {}
 
 export function releaseE2eLock() {
   try { fs.unlinkSync(E2E_LOCK); } catch {}
@@ -53,12 +57,11 @@ export function gitInit(dir) {
   execSync('git commit -m init', { cwd: dir, stdio: 'ignore' });
 }
 
-export function isolatedEnv(home, llmUrl, opts = {}) {
-  const xdg = path.join(home, 'xdg');
-  const fixtureUvxDir = createFixtureUvx(home);
-  const config = {
+function makeConfig(llmUrl, opts) {
+  return {
     formatter: false,
     lsp: false,
+    permission: { '*': 'allow' },
     model: 'test/test-model',
     provider: {
       test: {
@@ -85,11 +88,17 @@ export function isolatedEnv(home, llmUrl, opts = {}) {
     },
     plugin: opts.plugin ? [getPluginUrl(opts.variant)] : [],
   };
+}
+
+export function isolatedEnv(home, llmUrl, opts = {}) {
+  const xdg = path.join(home, 'xdg');
+  const fixtureUvxDir = createFixtureUvx(home);
+  const config = makeConfig(llmUrl, opts);
   return {
     OPENCODE_TEST_HOME: home,
-    HOME: home,
+    HOME: process.env.HOME || process.env.USERPROFILE || home,
     XDG_DATA_HOME: xdg,
-    XDG_CACHE_HOME: xdg,
+    XDG_CACHE_HOME: E2E_CACHE_HOME,
     XDG_CONFIG_HOME: xdg,
     XDG_STATE_HOME: xdg,
     OPENCODE_DISABLE_AUTOUPDATE: '1',
@@ -97,7 +106,9 @@ export function isolatedEnv(home, llmUrl, opts = {}) {
     OPENCODE_DISABLE_MODELS_FETCH: '1',
     OPENCODE_AUTH_CONTENT: '{}',
     OPENCODE_EXPERIMENTAL_EVENT_SYSTEM: 'true',
+    WANXIANG_E2E_SANDBOX: '1',
     OPENCODE_CONFIG_CONTENT: JSON.stringify(config),
+    OPENCODE_PERMISSION: JSON.stringify({ '*': 'allow' }),
     PATH: `${fixtureUvxDir}${path.delimiter}${process.env.PATH ?? ''}`,
     STEALTH_BROWSER_MCP_FIXTURE: FIXTURE_MCP,
   };
@@ -114,8 +125,7 @@ export async function waitForListening(stdout, child, timeoutMs = 30000) {
     };
     child.on('exit', exitHandler);
     dataHandler = (chunk) => {
-      const chunkStr = chunk.toString();
-      buf += chunkStr;
+      buf += chunk.toString();
       const idx = buf.indexOf('\n');
       if (idx !== -1) {
         const line = buf.slice(0, idx).trim();
@@ -140,6 +150,105 @@ export async function waitForListening(stdout, child, timeoutMs = 30000) {
     check();
   }).finally(() => {
     child.removeListener('exit', exitHandler);
-    stdout.removeListener('data', dataHandler);
+    if (dataHandler) {
+      stdout.removeListener('data', dataHandler);
+    }
   });
 }
+
+class HostSingletonManager {
+  constructor() {
+    this.hosts = new Map();
+    this.e2eLockAcquired = false;
+    this.isTeardown = false;
+  }
+
+  acquireLockOnce() {
+    if (this.e2eLockAcquired) return;
+    try {
+      fs.openSync(E2E_LOCK, 'wx');
+      this.e2eLockAcquired = true;
+    } catch (e) {
+      if (e.code === 'EEXIST') {
+        throw new Error('e2e already running (lock exists at ' + E2E_LOCK + ')');
+      }
+      throw e;
+    }
+  }
+
+  releaseLockOnce() {
+    if (this.e2eLockAcquired) {
+      try { fs.unlinkSync(E2E_LOCK); } catch {}
+      this.e2eLockAcquired = false;
+    }
+  }
+
+  async getHost(type, spawnFn) {
+    if (this.isTeardown) {
+      throw new Error('HostSingletonManager already teared down');
+    }
+    if (this.hosts.has(type)) {
+      return this.hosts.get(type);
+    }
+    if (this.hosts.size === 0) {
+      this.acquireLockOnce();
+      try { execSync("pkill -9 -f 'opencode serve'", { stdio: 'ignore' }); } catch {}
+      try { execSync("pkill -9 -f 'mux-driver'", { stdio: 'ignore' }); } catch {}
+      try { execSync("pkill -9 -f 'omp-driver'", { stdio: 'ignore' }); } catch {}
+      await new Promise(r => setTimeout(r, 200));
+    }
+    const hostInstance = await spawnFn();
+    this.hosts.set(type, hostInstance);
+    return hostInstance;
+  }
+
+  async teardownAll() {
+    if (this.isTeardown) return;
+    this.isTeardown = true;
+    for (const [type, host] of this.hosts.entries()) {
+      console.log(`[HostSingletonManager] Tearing down ${type}...`);
+      if (host.permissionAbort) {
+        host.permissionAbort.abort();
+      }
+      if (host.permissionPromise) {
+        await host.permissionPromise.catch(() => {});
+      }
+      if (host.mockLLM) {
+        await host.mockLLM.stop().catch(() => {});
+      }
+      if (host.child) {
+        try { host.child.kill('SIGKILL'); } catch {}
+      }
+      if (host.home) {
+        try { fs.rmSync(host.home, { recursive: true, force: true }); } catch {}
+      }
+      if (host.tmpDir) {
+        try { fs.rmSync(host.tmpDir, { recursive: true, force: true }); } catch {}
+      }
+    }
+    this.hosts.clear();
+    this.releaseLockOnce();
+  }
+}
+
+if (!globalThis.__hostSingletonManager) {
+  const manager = new HostSingletonManager();
+  globalThis.__hostSingletonManager = manager;
+
+  const clean = () => {
+    for (const [type, host] of manager.hosts.entries()) {
+      if (host.permissionAbort) {
+        host.permissionAbort.abort();
+      }
+      if (host.child) {
+        try { process.kill(host.child.pid, 'SIGKILL'); } catch {}
+      }
+    }
+    try { fs.unlinkSync(E2E_LOCK); } catch {}
+  };
+  process.once('exit', clean);
+  process.once('SIGINT', () => { clean(); process.exit(130); });
+  process.once('SIGTERM', () => { clean(); process.exit(143); });
+}
+
+export const hostSingletonManager = globalThis.__hostSingletonManager;

@@ -102,7 +102,7 @@ let run
         let opts =
             createObj [ "plugin", box true; "sessionId", box "sess-cb"; "contextLimit", box 20000 ]
 
-        let! cbHarnessObj = startHarnessFn opts
+        let! cbHarnessObj = withTimeoutCustom 30000 (startHarnessFn opts)
         let cbHarness = unbox<Harness> cbHarnessObj
 
         let! res = withTimeout (cbHarness.createSession (createObj []) createEmptyFn)
@@ -176,6 +176,6 @@ let run
 
         chk "cb.round2.nudgeInjectedAfterPhaseReset" (anyLlmBodyHasNudge cbHarness)
 
-        do! withTimeout (cbHarness.dispose ())
+        do! withTimeoutCustom 4000 (cbHarness.dispose ())
         return 0
     }

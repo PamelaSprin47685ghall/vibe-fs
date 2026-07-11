@@ -41,8 +41,15 @@ let private toolRoundWithCalls
         for _ in 1 .. (expectedCalls - 1) do
             harness.mockLLM.expectText "ok"
 
-        let! _ = harness.sendPrompt sessionID promptText emptyObj
-        let! _ = harness.waitForCalls expectedCalls 60000
+        let! _ =
+            withTimeoutL
+                (sprintf "sendPrompt for tool: %s" toolName)
+                10000
+                (harness.sendPrompt sessionID promptText emptyObj)
+
+        let! _ =
+            withTimeoutL (sprintf "waitForCalls for tool: %s" toolName) 10000 (harness.waitForCalls expectedCalls 60000)
+
         return ()
     }
 
@@ -61,8 +68,11 @@ let private browserMcpRound (harness: Harness) (sessionID: string) : JS.Promise<
         harness.mockLLM.expectTool "browser" (box {| intent = "open page" |})
         harness.mockLLM.expectTool "stealth-browser-mcp_get_debug_view" (createObj [])
         harness.mockLLM.expectText "browser mcp done"
-        let! _ = harness.sendPrompt sessionID "open browser" emptyObj
-        let! _ = harness.waitForCalls 3 60000
+
+        let! _ =
+            withTimeoutL "sendPrompt for browserMcRound" 4000 (harness.sendPrompt sessionID "open browser" emptyObj)
+
+        let! _ = withTimeoutL "waitForCalls for browserMcRound" 4000 (harness.waitForCalls 3 60000)
         return ()
     }
 
@@ -78,8 +88,18 @@ let private textRoundWithCalls
         for _ in 1..expectedCalls do
             harness.mockLLM.expectText "ok"
 
-        let! _ = harness.sendPrompt sessionID promptText emptyObj
-        let! _ = harness.waitForCalls expectedCalls 60000
+        let! _ =
+            withTimeoutL
+                (sprintf "sendPrompt for textRound: %s" promptText)
+                4000
+                (harness.sendPrompt sessionID promptText emptyObj)
+
+        let! _ =
+            withTimeoutL
+                (sprintf "waitForCalls for textRound: %s" promptText)
+                4000
+                (harness.waitForCalls expectedCalls 60000)
+
         return ()
     }
 
@@ -90,7 +110,7 @@ let runAll (args: string array) : JS.Promise<int> =
     promise {
         clearFailuresForRun ()
         let opts = createObj [ "plugin", box true ]
-        let! apiObj = start opts
+        let! apiObj = withTimeoutL "harness.start" 30000 (start opts)
         let harness = harnessFromObj apiObj
 
         let expected = 53
@@ -107,9 +127,13 @@ let runAll (args: string array) : JS.Promise<int> =
                 let! sessionID =
                     promise {
                         let! createRes =
-                            harness.createSession
-                                (createObj [ "model", createObj [ "id", box "test-model"; "providerID", box "test" ] ])
-                                emptyObj
+                            withTimeoutL
+                                "harness.createSession"
+                                4000
+                                (harness.createSession
+                                    (createObj
+                                        [ "model", createObj [ "id", box "test-model"; "providerID", box "test" ] ])
+                                    emptyObj)
 
                         let createData = unbox<obj> createRes
                         check "e2e.session-create.ok" (createData?ok = true)
@@ -271,7 +295,7 @@ let runAll (args: string array) : JS.Promise<int> =
             |> Promise.map Ok
             |> Promise.catch (fun ex -> Error ex)
 
-        do! harness.dispose ()
+        do! withTimeout (harness.dispose ())
 
         match outcome with
         | Ok result -> return result

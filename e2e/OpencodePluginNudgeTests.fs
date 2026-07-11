@@ -64,19 +64,21 @@ let runNudgeTests
                                 Promise.lift (box {| ok = true |})) ]
                   ) ]
 
-        let! nudgeAbortHarnessObj = startHarness nudgeAbortOpts
+        let! nudgeAbortHarnessObj = withTimeoutCustom 30000 (startHarness nudgeAbortOpts)
         let nudgeAbortHarness = unbox<Harness> nudgeAbortHarnessObj
 
         let! _ =
-            nudgeAbortHarness.fireEvent (
-                box
-                    {| event =
-                        {| ``type`` = "session.idle"
-                           properties = {| sessionID = nudgeAbortHarness.sessionId |} |} |}
+            withTimeout (
+                nudgeAbortHarness.fireEvent (
+                    box
+                        {| event =
+                            {| ``type`` = "session.idle"
+                               properties = {| sessionID = nudgeAbortHarness.sessionId |} |} |}
+                )
             )
 
         do! yieldMicrotask ()
-        do! nudgeAbortHarness.dispose ()
+        do! withTimeoutCustom 4900 (nudgeAbortHarness.dispose ())
         chk "op.nudge.skippedWhenLastAssistantFinishIsAbort" (nudgeAbortPromptCalls = 0)
 
         // --- 12. Fallback continue on tool-finish idle followed by error --------
@@ -129,7 +131,7 @@ let runNudgeTests
                                    providerID = "test" |} ]
                   ) ]
 
-        let! fbHarnessObj = startHarness fbOpts
+        let! fbHarnessObj = withTimeoutCustom 30000 (startHarness fbOpts)
         let fbHarness = unbox<Harness> fbHarnessObj
 
         let fbConfigArgs =
@@ -138,27 +140,31 @@ let runNudgeTests
         let! _ = fbHarness.runConfigHook fbConfigArgs
 
         let! _ =
-            fbHarness.fireEvent (
-                box
-                    {| event =
-                        {| ``type`` = "session.idle"
-                           properties = {| sessionID = fbHarness.sessionId |} |} |}
+            withTimeout (
+                fbHarness.fireEvent (
+                    box
+                        {| event =
+                            {| ``type`` = "session.idle"
+                               properties = {| sessionID = fbHarness.sessionId |} |} |}
+                )
             )
 
         do! yieldMicrotask ()
 
         let! _ =
-            fbHarness.runLifecycleHook
-                "session.post"
-                (createObj
-                    [ "sessionID", box fbHarness.sessionId
-                      "outcome", box "error"
-                      "error", box (createObj [ "name", box "EmptyOutputError"; "message", box "empty output" ]) ])
-                (createObj [])
+            withTimeout (
+                fbHarness.runLifecycleHook
+                    "session.post"
+                    (createObj
+                        [ "sessionID", box fbHarness.sessionId
+                          "outcome", box "error"
+                          "error", box (createObj [ "name", box "EmptyOutputError"; "message", box "empty output" ]) ])
+                    (createObj [])
+            )
 
         do! withTimeout fbPromptCalled
 
-        do! fbHarness.dispose ()
+        do! withTimeoutCustom 4900 (fbHarness.dispose ())
         chk "op.fallback.continueOnToolFinishIdleError" (fbPromptCalls = 1)
         chk "op.fallback.continueBodyCorrect" (fbPromptText = "​")
 
@@ -196,21 +202,23 @@ let runNudgeTests
                             "create", box (fun _ -> Promise.lift (box {| data = {| id = "mock-review" |} |})) ]
                   ) ]
 
-        let! bug1HarnessObj = startHarness bug1Opts
+        let! bug1HarnessObj = withTimeoutCustom 30000 (startHarness bug1Opts)
         let bug1Harness = unbox<Harness> bug1HarnessObj
 
-        let! _ = bug1Harness.runCommandExecuteBefore "loop" "fix the bug"
+        let! _ = withTimeout (bug1Harness.runCommandExecuteBefore "loop" "fix the bug")
 
         let! _ =
-            bug1Harness.fireEvent (
-                box
-                    {| event =
-                        {| ``type`` = "session.idle"
-                           properties = {| sessionID = bug1Harness.sessionId |} |} |}
+            withTimeout (
+                bug1Harness.fireEvent (
+                    box
+                        {| event =
+                            {| ``type`` = "session.idle"
+                               properties = {| sessionID = bug1Harness.sessionId |} |} |}
+                )
             )
 
         do! withTimeout bug1PromptCalled
-        do! bug1Harness.dispose ()
+        do! withTimeoutCustom 4900 (bug1Harness.dispose ())
         chk "op.bug1.loopActiveEmptyTextTriggersNudge" (bug1PromptCalls >= 1)
 
         // --- 14. Bug2: loop active + missing finish/time + string status idle -> nudge loop ---
@@ -247,11 +255,11 @@ let runNudgeTests
                             "create", box (fun _ -> Promise.lift (box {| data = {| id = "mock-review" |} |})) ]
                   ) ]
 
-        let! bug2HarnessObj = startHarness bug2Opts
+        let! bug2HarnessObj = withTimeoutCustom 30000 (startHarness bug2Opts)
         let bug2Harness = unbox<Harness> bug2HarnessObj
 
-        let! _ = bug2Harness.runCommandExecuteBefore "loop" "fix the bug"
-        do! Promise.sleep 50
+        let! _ = withTimeout (bug2Harness.runCommandExecuteBefore "loop" "fix the bug")
+        do! yieldMicrotask ()
 
         // status is a string instead of object
         let statusEvent =
@@ -264,9 +272,9 @@ let runNudgeTests
                                 {| sessionID = bug2Harness.sessionId
                                    status = box "idle" |} |} |}
 
-        let! _ = bug2Harness.fireEvent statusEvent
-        do! Promise.sleep 100
-        do! bug2Harness.dispose ()
+        let! _ = withTimeout (bug2Harness.fireEvent statusEvent)
+        do! yieldMicrotask ()
+        do! withTimeoutCustom 4900 (bug2Harness.dispose ())
         chk "op.bug2.loopActiveMissingFinishTriggersNudge" (bug2PromptCalls >= 1)
 
         chk

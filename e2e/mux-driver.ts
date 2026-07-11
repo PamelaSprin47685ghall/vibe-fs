@@ -51,8 +51,7 @@ function prepareWorkspace() {
   } catch {
     fs.mkdirSync(path.join(workdir, '.git'), { recursive: true });
   }
-  const ndjsonPath = path.join(workdir, '.wanxiangshu.ndjson');
-  return { workdir, ndjsonPath };
+  return { workdir };
 }
 
 let chatHistoryCalled = false;
@@ -106,13 +105,45 @@ function setupMocks(workdir: string, bindWanxiangshuHost: any) {
   return mockTaskService;
 }
 
+const sessionToolsMap = new Map<string, { tools: Record<string, any>, allowlisted: Set<string> }>();
+
+function getOrCreateToolsForSession(sessionId: string, bindings: any, mockTaskService: any, globalWorkdir: string) {
+  if (sessionToolsMap.has(sessionId)) {
+    return sessionToolsMap.get(sessionId)!;
+  }
+  const sessionWorkdir = path.join(globalWorkdir, 'sandboxes', sessionId);
+  fs.mkdirSync(sessionWorkdir, { recursive: true });
+  try {
+    execSync('git init -q && git config user.email test@test && git config user.name test', { cwd: sessionWorkdir, stdio: 'ignore' });
+  } catch {
+    fs.mkdirSync(path.join(sessionWorkdir, '.git'), { recursive: true });
+  }
+
+  const tools: Record<string, any> = {};
+  const allowlisted = new Set<string>();
+  bindings.integrateWanxiangshuTools(tools, allowlisted, {
+    cwd: sessionWorkdir,
+    runtime: { getProject: () => undefined } as any,
+    runtimeTempDir: os.tmpdir(),
+    workspaceId: sessionId,
+    sessionID: sessionId,
+    taskService: mockTaskService,
+  } as any, sessionId);
+
+  const res = { tools, allowlisted };
+  sessionToolsMap.set(sessionId, res);
+  return res;
+}
+
 async function handleToolAndCommand(
   cmd: any,
-  tools: any,
-  allowlisted: Set<string>,
-  registration: any,
-  executeWanxiangshuSlashCommand: any
+  bindings: any,
+  globalWorkdir: string,
+  mockTaskService: any
 ) {
+  const sessionId = cmd.sessionId ?? 'mux-e2e-session';
+  const { tools, allowlisted } = getOrCreateToolsForSession(sessionId, bindings, mockTaskService, globalWorkdir);
+
   if (cmd.type === 'getToolNames') {
     respond(true, { toolNames: Array.from(allowlisted) });
   } else if (cmd.type === 'getToolSchema') {
@@ -121,8 +152,8 @@ async function handleToolAndCommand(
     else respond(true, { parameters: t.inputSchema });
   } else if (cmd.type === 'getCommands') {
     respond(true, {
-      commandNames: registration.slashCommands.map((c: any) => c.key),
-      slashCommands: registration.slashCommands.map((c: any) => ({ key: c.key, description: c.description })),
+      commandNames: bindings.registration.slashCommands.map((c: any) => c.key),
+      slashCommands: bindings.registration.slashCommands.map((c: any) => ({ key: c.key, description: c.description })),
     });
   } else if (cmd.type === 'executeTool') {
     const t = tools[cmd.name];
@@ -136,7 +167,7 @@ async function handleToolAndCommand(
     }
     respond(!threw, res);
   } else if (cmd.type === 'runCommand') {
-    const res = await executeWanxiangshuSlashCommand(cmd.name, cmd.sessionId ?? 'mux-e2e-session', cmd.args ?? '');
+    const res = await bindings.executeWanxiangshuSlashCommand(cmd.name, cmd.sessionId ?? 'mux-e2e-session', cmd.args ?? '');
     respond(true, res);
   }
 }
@@ -146,13 +177,15 @@ async function handleTransformAndEvent(
   transformWanxiangshuMessages: any,
   runWanxiangshuSystemTransform: any,
   registration: any,
-  eventHelpers: any,
-  nudges: string[]
+  eventHelpers: any
 ) {
+  const sessionId = cmd.workspaceId || cmd.sessionId || 'mux-e2e-session';
   if (cmd.type === 'transformMessages') {
+    const sessionWorkdir = path.join(eventHelpers.getTodos(), 'sandboxes', sessionId);
+    fs.mkdirSync(sessionWorkdir, { recursive: true });
     const res = await transformWanxiangshuMessages({
-      workspacePath: eventHelpers.getTodos(),
-      workspaceId: cmd.workspaceId ?? 'mux-e2e-session',
+      workspacePath: sessionWorkdir,
+      workspaceId: sessionId,
       messages: cmd.messages,
     });
     respond(true, res);
@@ -161,30 +194,33 @@ async function handleTransformAndEvent(
     respond(true, res);
   } else if (cmd.type === 'emit') {
     const res = await registration.eventHook(
-      { type: cmd.eventType, workspaceId: cmd.sessionId ?? 'mux-e2e-session', properties: cmd.event },
+      { type: cmd.eventType, workspaceId: sessionId, properties: cmd.event },
       eventHelpers
     );
     respond(true, res);
-  } else if (cmd.type === 'getNudges') {
-    respond(true, { nudges });
   }
 }
 
-async function handleFileOps(cmd: any, workdir: string, ndjsonPath: string) {
+async function handleFileOps(cmd: any, globalWorkdir: string) {
+  const sessionId = cmd.sessionId || 'mux-e2e-session';
+  const finalWorkdir = path.join(globalWorkdir, 'sandboxes', sessionId);
+  fs.mkdirSync(finalWorkdir, { recursive: true });
+  const ndjsonPath = path.join(finalWorkdir, '.wanxiangshu.ndjson');
+
   if (cmd.type === 'readNdjson') {
     let c = '';
     try { c = fs.readFileSync(ndjsonPath, 'utf8'); } catch {}
     respond(true, { content: c });
   } else if (cmd.type === 'readFile') {
     let c = '';
-    try { c = fs.readFileSync(path.join(workdir, cmd.path), 'utf8'); }
+    try { c = fs.readFileSync(path.join(finalWorkdir, cmd.path), 'utf8'); }
     catch (e) { respond(false, null, `Read failed: ${e instanceof Error ? e.message : String(e)}`); return; }
     respond(true, { content: c });
   } else if (cmd.type === 'fileExists') {
-    respond(true, { exists: fs.existsSync(path.join(workdir, cmd.path)) });
+    respond(true, { exists: fs.existsSync(path.join(finalWorkdir, cmd.path)) });
   } else if (cmd.type === 'waitForNdjson') {
     const min = cmd.min ?? 1;
-    const deadline = Date.now() + (cmd.maxMs ?? 30000);
+    const deadline = Date.now() + (cmd.maxMs ?? 1000);
     let count = 0;
     while (Date.now() < deadline) {
       let c = '';
@@ -197,32 +233,42 @@ async function handleFileOps(cmd: any, workdir: string, ndjsonPath: string) {
   }
 }
 
-function patchBoundConfig(bindings: any, workdir: string) {
+function patchBoundConfig(bindings: any, globalWorkdir: string) {
   if (bindings.boundConfig) {
-    bindings.boundConfig.getSessionDir = (workspaceId?: string) => workdir;
-    bindings.boundConfig.rootDir = workdir;
+    bindings.boundConfig.getSessionDir = (workspaceId?: string) => {
+      if (workspaceId) {
+        const p = path.join(globalWorkdir, 'sandboxes', workspaceId);
+        fs.mkdirSync(p, { recursive: true });
+        return p;
+      }
+      return globalWorkdir;
+    };
+    bindings.boundConfig.rootDir = globalWorkdir;
   }
 }
 
 async function patchConfigPrototypesAsync(muxRepo: string, workdir: string) {
   try {
     const c1 = await import("@/node/config");
-    c1.Config.prototype.getSessionDir = () => workdir;
-  } catch (e) {
-    process.stderr.write(`[mux-driver-err] failed to import c1: ${e}\n`);
-  }
+    c1.Config.prototype.getSessionDir = (workspaceId?: string) => {
+      if (workspaceId) return path.join(workdir, 'sandboxes', workspaceId);
+      return workdir;
+    };
+  } catch (e) {}
   try {
     const c2 = await import(`${muxRepo}/src/node/config`);
-    c2.Config.prototype.getSessionDir = () => workdir;
-  } catch (e) {
-    process.stderr.write(`[mux-driver-err] failed to import c2: ${e}\n`);
-  }
+    c2.Config.prototype.getSessionDir = (workspaceId?: string) => {
+      if (workspaceId) return path.join(workdir, 'sandboxes', workspaceId);
+      return workdir;
+    };
+  } catch (e) {}
   try {
     const c3 = await import("../../mux/src/node/config");
-    c3.Config.prototype.getSessionDir = () => workdir;
-  } catch (e) {
-    process.stderr.write(`[mux-driver-err] failed to import c3: ${e}\n`);
-  }
+    c3.Config.prototype.getSessionDir = (workspaceId?: string) => {
+      if (workspaceId) return path.join(workdir, 'sandboxes', workspaceId);
+      return workdir;
+    };
+  } catch (e) {}
 }
 
 async function initializePluginAndHost(muxRepo: string, workdir: string) {
@@ -241,7 +287,10 @@ async function initializePluginAndHost(muxRepo: string, workdir: string) {
   const bindings = await import("@/node/services/wanxiangshuBinding");
   const mockTaskService = setupMocks(workdir, (deps: any) => {
     if (deps && deps.config) {
-      deps.config.getSessionDir = () => workdir;
+      deps.config.getSessionDir = (workspaceId?: string) => {
+        if (workspaceId) return path.join(workdir, 'sandboxes', workspaceId);
+        return workdir;
+      };
       deps.config.rootDir = workdir;
     }
     return bindings.bindWanxiangshuHost(deps);
@@ -257,7 +306,7 @@ async function initializePluginAndHost(muxRepo: string, workdir: string) {
     taskService: mockTaskService,
   } as any, 'mux-e2e-session');
   patchBoundConfig(bindings, workdir);
-  return { tools, allowlisted, bindings };
+  return { tools, allowlisted, bindings, mockTaskService };
 }
 
 async function executeAction(action: any) {
@@ -276,51 +325,68 @@ const eventHelpers = {
   getTodos: () => globalWorkdir,
 };
 
+async function processCommand(cmd: any, bindings: any, globalWorkdir: string, mockTaskService: any, symlinkPath: string) {
+  if (cmd.type === 'dispose') {
+    try { fs.unlinkSync(symlinkPath); } catch {}
+    try { fs.rmSync(globalWorkdir, { recursive: true, force: true }); } catch {}
+    respond(true, { disposed: true });
+    process.exit(0);
+  }
+  if (cmd.type === 'cleanSandbox') {
+    const sessionId = cmd.sessionId;
+    if (sessionId) {
+      const finalWorkdir = path.join(globalWorkdir, 'sandboxes', sessionId);
+      try { fs.rmSync(finalWorkdir, { recursive: true, force: true }); } catch {}
+    }
+    respond(true, { cleaned: true });
+    return;
+  }
+  if (cmd.type === 'getChatHistoryCalled') {
+    respond(true, { called: chatHistoryCalled });
+    return;
+  }
+  if (cmd.type === 'getReviewTask') {
+    const task = bindings.registration.__reviewStore.getReviewTask(cmd.sessionId ?? 'mux-e2e-session');
+    respond(true, { task: task ?? null });
+    return;
+  }
+  if (cmd.type === 'setMockReportMarkdown') {
+    mockReportMarkdown = cmd.markdown;
+    respond(true, { success: true });
+    return;
+  }
+  if (cmd.type === 'getNudges') {
+    respond(true, { nudges });
+    return;
+  }
+  const categories = [
+    () => handleToolAndCommand(cmd, bindings, globalWorkdir, mockTaskService),
+    () => handleTransformAndEvent(cmd, bindings.transformWanxiangshuMessages, bindings.runWanxiangshuSystemTransform, bindings.registration, eventHelpers),
+    () => handleFileOps(cmd, globalWorkdir)
+  ];
+  let matched = false;
+  for (const action of categories) {
+    if (await executeAction(action)) { matched = true; break; }
+  }
+  if (!matched) respond(false, null, `Unhandled command ${cmd.type}`);
+}
+
 async function main() {
   const muxRepo = process.env.WANXIANGSHU_MUX_REPO ?? process.cwd();
-  const { workdir, ndjsonPath } = prepareWorkspace();
+  const { workdir } = prepareWorkspace();
   globalWorkdir = workdir;
   const symlinkPath = path.join(muxRepo, 'mux-e2e-session');
   if (fs.existsSync(symlinkPath)) {
     try { fs.unlinkSync(symlinkPath); } catch {}
   }
   try { fs.symlinkSync(workdir, symlinkPath); } catch {}
-  const { tools, allowlisted, bindings } = await initializePluginAndHost(muxRepo, workdir);
+  const { tools, allowlisted, bindings, mockTaskService } = await initializePluginAndHost(muxRepo, workdir);
   process.stdout.write('ready|' + workdir + '\n');
   for (;;) {
     const cmd = await readStdinJson();
     if (!cmd) break;
     patchBoundConfig(bindings, workdir);
-    if (cmd.type === 'dispose') {
-      try { fs.unlinkSync(symlinkPath); } catch {}
-      try { fs.rmSync(workdir, { recursive: true, force: true }); } catch {}
-      respond(true, { disposed: true });
-      process.exit(0);
-    }
-    if (cmd.type === 'getChatHistoryCalled') {
-      respond(true, { called: chatHistoryCalled });
-      continue;
-    }
-    if (cmd.type === 'getReviewTask') {
-      const task = bindings.registration.__reviewStore.getReviewTask(cmd.sessionId ?? 'mux-e2e-session');
-      respond(true, { task: task ?? null });
-      continue;
-    }
-    if (cmd.type === 'setMockReportMarkdown') {
-      mockReportMarkdown = cmd.markdown;
-      respond(true, { success: true });
-      continue;
-    }
-    const categories = [
-      () => handleToolAndCommand(cmd, tools, allowlisted, bindings.registration, bindings.executeWanxiangshuSlashCommand),
-      () => handleTransformAndEvent(cmd, bindings.transformWanxiangshuMessages, bindings.runWanxiangshuSystemTransform, bindings.registration, eventHelpers, nudges),
-      () => handleFileOps(cmd, workdir, ndjsonPath)
-    ];
-    let matched = false;
-    for (const action of categories) {
-      if (await executeAction(action)) { matched = true; break; }
-    }
-    if (!matched) respond(false, null, `Unhandled command ${cmd.type}`);
+    await processCommand(cmd, bindings, workdir, mockTaskService, symlinkPath);
   }
 }
 

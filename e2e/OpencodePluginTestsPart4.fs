@@ -4,6 +4,7 @@ open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Shell.Dyn
 open Wanxiangshu.Tests.Assert
+open Wanxiangshu.Tests.AsyncFlush
 open Wanxiangshu.E2e.OpencodePluginTestsPart2
 
 module Dyn = Wanxiangshu.Shell.Dyn
@@ -54,25 +55,27 @@ let runPart4
                                 Promise.lift (box {| ok = true |})) ]
                   ) ]
 
-        let! errNudgeHarnessObj = startHarness errNudgeOpts
+        let! errNudgeHarnessObj = withTimeoutCustom 30000 (startHarness errNudgeOpts)
         let errNudgeHarness = unbox<Harness> errNudgeHarnessObj
 
         let! _ =
-            errNudgeHarness.runLifecycleHook
-                "session.post"
-                (createObj
-                    [ "sessionID", box errNudgeHarness.sessionId
-                      "outcome", box "error"
-                      "error", box "something went wrong" ])
-                (createEmpty ())
+            withTimeout (
+                errNudgeHarness.runLifecycleHook
+                    "session.post"
+                    (createObj
+                        [ "sessionID", box errNudgeHarness.sessionId
+                          "outcome", box "error"
+                          "error", box "something went wrong" ])
+                    (createEmpty ())
+            )
 
         let mutable errTicks = 0
 
         while errNudgeCalls = 0 && errTicks < 20 do
-            do! Promise.sleep 50
+            do! yieldMicrotask ()
             errTicks <- errTicks + 1
 
-        do! errNudgeHarness.dispose ()
+        do! withTimeout (errNudgeHarness.dispose ())
         chk "op.sessionPost.errorTriggersNudge" (errNudgeCalls = 1)
 
         // --- 11. continue priority -------------------------------------------
@@ -100,31 +103,33 @@ let runPart4
                                 Promise.lift (box {| ok = true |})) ]
                   ) ]
 
-        let! continueHarnessObj = startHarness continueOpts
+        let! continueHarnessObj = withTimeoutCustom 30000 (startHarness continueOpts)
         let continueHarness = unbox<Harness> continueHarnessObj
 
         let! _ =
-            continueHarness.fireEvent (
-                box
-                    {| event =
-                        {| ``type`` = "session.error"
-                           properties =
-                            {| sessionID = continueHarness.sessionId
-                               error =
-                                {| name = "RateLimitError"
-                                   message = "rate limit"
-                                   statusCode = "429"
-                                   isRetryable = "true" |} |} |} |}
+            withTimeout (
+                continueHarness.fireEvent (
+                    box
+                        {| event =
+                            {| ``type`` = "session.error"
+                               properties =
+                                {| sessionID = continueHarness.sessionId
+                                   error =
+                                    {| name = "RateLimitError"
+                                       message = "rate limit"
+                                       statusCode = "429"
+                                       isRetryable = "true" |} |} |} |}
+                )
             )
 
         let mutable continueTicks = 0
 
         while continueModel = "" && continueTicks < 20 do
-            do! Promise.sleep 50
+            do! yieldMicrotask ()
             continueTicks <- continueTicks + 1
 
-        do! continueHarness.dispose ()
+        do! withTimeoutCustom 4000 (continueHarness.dispose ())
         chk "op.continue.prioritizesManualModel" (continueModel = "claude-3-5")
 
-        do! harness.dispose ()
+        do! withTimeoutCustom 4000 (harness.dispose ())
     }

@@ -1,9 +1,18 @@
 module Wanxiangshu.Shell.ToolContextCodec
 
+open Fable.Core
+open Fable.Core.JsInterop
 open Wanxiangshu.Kernel.Domain
 open Wanxiangshu.Kernel.ToolContext
 open Wanxiangshu.Shell.Dyn
 open Wanxiangshu.Shell.ChildAgentRegistry
+
+[<Global("process")>]
+let private nodeProcess: obj = jsNative
+
+let private envVar (name: string) : string =
+    let v = nodeProcess?env?(name)
+    if Wanxiangshu.Shell.Dyn.isNullish v then "" else string v
 
 type IOpenCodeToolContext =
     abstract directory: string with get
@@ -51,7 +60,9 @@ let decodeOpencodeToolContext (context: IOpenCodeToolContext) (fallbackDir: stri
         | Some s -> s
         | None -> ""
 
-    { Directory = directory
+    let finalDir = directory
+
+    { Directory = finalDir
       SessionId = Id.sessionIdQuick sessionId
       WorkspaceId = None
       ChildRegistry = ChildAgentRegistry.Create() }

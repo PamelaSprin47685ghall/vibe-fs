@@ -113,7 +113,7 @@ let run
                 [ "agentsContent", box "---\nmodels:\n  default:\n    - test/test-model\n---\n"
                   "mockSessionClient", box mockSessionClient ]
 
-        let! harnessObject = startHarness opts
+        let! harnessObject = withTimeoutCustom 30000 (startHarness opts)
         let harness = unbox<Harness> harnessObject
         runtimeRef.Value <- harness.getFallbackRuntime ()
 
@@ -136,7 +136,10 @@ let run
                   "sessionID", box childID
                   "args", box (createObj []) ]
 
-        let! _ = harness.runLifecycleHook "tool.execute.after" taskCompleteInput (createObj [ "output", box "done" ])
+        let! _ =
+            withTimeout (
+                harness.runLifecycleHook "tool.execute.after" taskCompleteInput (createObj [ "output", box "done" ])
+            )
 
         let! spawnOutput = withTimeout spawnP
         let iterator = iteratorFromOutput spawnOutput
@@ -162,7 +165,7 @@ let run
                             ) ]
                   ) ]
 
-        let! _ = harness.fireEvent statusEvent
+        let! _ = withTimeout (harness.fireEvent statusEvent)
 
         match iterator with
         | None -> failwith "spawn did not return an iterator"
@@ -183,7 +186,7 @@ let run
                                 box (createObj [ "sessionID", box childID; "status", box {| ``type`` = "busy" |} ]) ]
                       ) ]
 
-            let! _ = harness.fireEvent busyEvent
+            let! _ = withTimeout (harness.fireEvent busyEvent)
 
             let continueP = harness.executePluginTool "continue" continueArgs (createEmpty ())
             do! withTimeout continuePromptSeen
@@ -206,17 +209,19 @@ let run
                                 ) ]
                       ) ]
 
-            let! _ = harness.fireEvent errorEvent
+            let! _ = withTimeout (harness.fireEvent errorEvent)
 
             do! withTimeout recoveryPromptSeen
             check "continue does not extract before task completion" (finalExtractionCalls.Value = 0)
 
             let! _ =
-                harness.runLifecycleHook "tool.execute.after" taskCompleteInput (createObj [ "output", box "done" ])
+                withTimeout (
+                    harness.runLifecycleHook "tool.execute.after" taskCompleteInput (createObj [ "output", box "done" ])
+                )
 
             let! continueOutput = withTimeout continueP
             check "continue extracts after task completion" (finalExtractionCalls.Value > 0)
             check "continue returns final child output" (continueOutput.Contains "continue final output")
 
-        do! harness.dispose ()
+        do! withTimeoutCustom 4900 (harness.dispose ())
     }

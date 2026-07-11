@@ -86,11 +86,23 @@ if (target === 'mux') {
 const extraArgs = process.argv.slice(3);
 console.log('e2e runner started');
 runAll(extraArgs)
-    .then(code => {
+    .then(async (code) => {
         console.log('e2e runner finished with code:', code);
+        try {
+            const { hostSingletonManager } = await import('../e2e/harness-bootstrap.js');
+            await hostSingletonManager.teardownAll();
+        } catch (e) {
+            console.error('Teardown failed:', e);
+        }
         process.exit(code);
     })
-    .catch(err => {
+    .catch(async (err) => {
         console.error('RUNALL_FAILED:', err);
+        try {
+            const { hostSingletonManager } = await import('../e2e/harness-bootstrap.js');
+            await hostSingletonManager.teardownAll();
+        } catch (e) {
+            console.error('Teardown failed on catch:', e);
+        }
         process.exit(2);
     });

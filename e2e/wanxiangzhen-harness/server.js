@@ -91,7 +91,7 @@ async function waitForMeta(tmpDir) {
   await spinUntil(async () => {
     if (!fs.existsSync(ndjsonPath)) return false;
     return fs.readFileSync(ndjsonPath, 'utf-8').trim().length > 0;
-  }, 5000);
+  }, 1000);
   return fs.existsSync(ndjsonPath) ? fs.readFileSync(ndjsonPath, 'utf-8') : '';
 }
 
@@ -100,7 +100,7 @@ async function waitForScheduler(runtime, taskId) {
     await tickScheduler(runtime, log);
     const task = await findTaskInDag(runtime, taskId);
     return task?.Status?.tag === 1;
-  }, 5000);
+  }, 1000);
 }
 
 async function ensureSchedulerCapacity(hooks, runtime) {
