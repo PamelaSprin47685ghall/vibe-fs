@@ -189,13 +189,59 @@ let tryGetModelLimitFromProviderList (target: obj) (modelId: string) (providerId
 
 let tryGetMaxInputTokensAsyncDetailed (target: obj) (sessionID: string) : JS.Promise<LimitResolution option> =
     promise {
-        let! modelRefOpt = tryGetSessionModelRef target sessionID
+        if isNullish target then
+            return None
+        else
+            let client =
+                if not (isNullish (get target "session")) then
+                    target
+                else
+                    let c = get target "client"
 
-        match modelRefOpt with
-        | None -> return None
-        | Some(modelId, providerId) ->
-            let! limit = tryGetModelLimitFromProviderListDetailed target modelId providerId
-            return limit
+                    if not (isNullish c) && not (isNullish (get c "session")) then
+                        c
+                    else
+                        box null
+
+            if isNullish client then
+                return None
+            else
+                let sessionApi = get client "session"
+
+                if isNullish sessionApi || isNullish (get sessionApi "get") then
+                    return None
+                else
+                    try
+                        let arg = createObj [ "sessionID", box sessionID ]
+                        let! res = unbox<JS.Promise<obj>> (sessionApi?get (arg))
+
+                        if isNullish res then
+                            return None
+                        else
+                            let data = get res "data"
+
+                            if isNullish data then
+                                return None
+                            else
+                                let modelObj = get data "model"
+
+                                match extractLimitFromModelDetailed modelObj with
+                                | Some limit -> return Some limit
+                                | None ->
+                                    if isNullish modelObj then
+                                        return None
+                                    else
+                                        let mId = string (get modelObj "id")
+                                        let pId = string (get modelObj "providerID")
+
+                                        if mId = "" || pId = "" then
+                                            return None
+                                        else
+                                            let! limit = tryGetModelLimitFromProviderListDetailed target mId pId
+
+                                            return limit
+                    with _ ->
+                        return None
     }
 
 let tryGetMaxInputTokensAsync (target: obj) (sessionID: string) : JS.Promise<int option> =

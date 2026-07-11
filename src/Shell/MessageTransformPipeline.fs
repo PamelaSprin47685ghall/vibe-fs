@@ -12,6 +12,7 @@ open Wanxiangshu.Kernel.BacklogProjection
 open Wanxiangshu.Shell.RuntimeScope
 open Wanxiangshu.Shell.ContextBudgetStore
 open Wanxiangshu.Shell.ContextBudgetUsageCodec
+open Wanxiangshu.Kernel.ContextBudget
 
 type MessageTransformPlan =
     { SessionID: string
@@ -113,13 +114,17 @@ let buildContextBudgetNudgeMessage (sessionID: string) : Message<obj> =
       source = Synthetic "context-budget-nudge-"
       raw = null }
 
-let private estimateCurrentTokens (totalBytes: int) (tokenCountOpt: int option) (storeEntry: ContextBudgetEntry) : int =
+let private resolveCurrentTokens
+    (totalBytes: int)
+    (tokenCountOpt: int option)
+    (storeEntry: ContextBudgetEntry)
+    : int option =
     match tokenCountOpt with
-    | Some t -> t
-    | None ->
+    | Some t when t > 0 -> Some t
+    | _ ->
         match ContextBudget.estimateTokens totalBytes storeEntry.LastUsage with
-        | Some t -> t
-        | None -> 0
+        | Some t when t > 0 -> Some t
+        | _ -> None
 
 let private rebuildPhaseState
     (plan: MessageTransformPlan)
@@ -153,7 +158,11 @@ let private rebuildPhaseState
                 ContextBudgetUsageCodec.backlogBytesFromEncoded backlogOps.Host stableEncoded
 
             let newState =
-                ContextBudget.beginPhase stableTokens (int64 stableBytes) (int64 backlogBytes)
+                if backlog.IsEmpty && currentStore.State.IsNone then
+                    { phaseBaseTokens = 0L
+                      backlogTokensAtPhaseStart = 0L }
+                else
+                    ContextBudget.beginPhase stableTokens (int64 stableBytes) (int64 backlogBytes)
 
             ContextBudgetStore.update plan.Scope plan.SessionID (fun entry ->
                 { entry with
@@ -204,11 +213,10 @@ let applyContextBudget
             let totalBytes = JS.JSON.stringify(encodedAll).Length
             let! tokenCountOpt = plan.GetContextUsage encodedAll
             let storeEntry = ContextBudgetStore.get plan.Scope plan.SessionID
-            let currentTokens = estimateCurrentTokens totalBytes tokenCountOpt storeEntry
 
-            if currentTokens <= 0 then
-                return messages
-            else
+            match resolveCurrentTokens totalBytes tokenCountOpt storeEntry with
+            | None -> return messages
+            | Some currentTokens ->
                 ContextBudgetStore.update plan.Scope plan.SessionID (fun entry ->
                     { entry with
                         LastUsage =

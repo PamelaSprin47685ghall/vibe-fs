@@ -11,6 +11,8 @@ if (target === 'mux') {
     runAll = (await import('../build/e2e/TestsOmp.js')).runAll;
 } else if (target === 'wanxiangzhen') {
     runAll = (await import('../build/e2e/WanxiangzhenPluginTests.js')).runAll;
+} else if (target === 'opencode-context-budget') {
+    runAll = (await import('../build/e2e/OpencodePluginContextBudgetE2e.js')).runAll;
 } else if (target === 'opencode-plugin') {
     runAll = async (args) => {
         const suites = [

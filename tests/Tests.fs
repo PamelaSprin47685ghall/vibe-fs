@@ -43,6 +43,7 @@ open Wanxiangshu.Tests.ContextBudgetNoReinjectTests
 open Wanxiangshu.Tests.ContextBudgetAfterTodoTests
 open Wanxiangshu.Tests.ContextBudgetIntegrationTests
 open Wanxiangshu.Tests.ContextBudgetRealApiSpecs
+open Wanxiangshu.Tests.ContextBudgetEstimateTests
 
 open Wanxiangshu.Tests.ExecutorToolsCodecTests
 open Wanxiangshu.Tests.ExecutorTests
@@ -143,7 +144,8 @@ let private tests: (string * TestBody) list =
         "ContextBudgetNoReinjectTests.run", TestBody.Async ContextBudgetNoReinjectTests.run
         "ContextBudgetAfterTodoTests.run", TestBody.Async ContextBudgetAfterTodoTests.run
         "ContextBudgetIntegrationTests.run", TestBody.Async ContextBudgetIntegrationTests.run
-        "ContextBudgetRealApiSpecs.run", TestBody.Async ContextBudgetRealApiSpecs.run ]
+        "ContextBudgetRealApiSpecs.run", TestBody.Async ContextBudgetRealApiSpecs.run
+        "ContextBudgetEstimateTests.run", TestBody.Async ContextBudgetEstimateTests.run ]
     @ integrationToolFlatTests
 
 let private matchesSelector (selectors: string array) (label: string) =

@@ -688,6 +688,7 @@
     <Compile Include="tests/ArchitectureTests.fs"/>
     <Compile Include="tests/ContextBudgetSpecs.fs"/>
     <Compile Include="tests/ContextBudgetHookTests.fs"/>
+    <Compile Include="tests/ContextBudgetEstimateTests.fs"/>
     <Compile Include="tests/ContextBudgetNoReinjectTests.fs"/>
     <Compile Include="tests/ContextBudgetAfterTodoTests.fs"/>
     <Compile Include="tests/ContextBudgetRealApiSpecs.fs"/>
@@ -706,6 +707,8 @@
     <Compile Include="e2e/OpencodePluginTestsPart4.fs"/>
     <Compile Include="e2e/OpencodePluginContinueRecoveryTests.fs"/>
     <Compile Include="e2e/OpencodePluginNudgeTests.fs"/>
+    <Compile Include="e2e/OpencodePluginContextBudgetTests.fs"/>
+    <Compile Include="e2e/OpencodePluginContextBudgetE2e.fs"/>
     <Compile Include="e2e/OpencodePluginTests.fs"/>
     <Compile Include="e2e/MimocodePluginSpecsPart.fs"/>
     <Compile Include="e2e/MimocodePluginSpecSections.fs"/>

@@ -98,7 +98,7 @@ let testApplyContextBudgetShortCircuit () =
               SembleInjectEnabled = false
               Scope = Wanxiangshu.Shell.RuntimeScope.create ()
               MaxInputTokens = 100000
-              GetContextUsage = (fun _ -> Promise.lift (Some 90000)) }
+              GetContextUsage = (fun _ -> Promise.lift (Some 30000)) }
 
         let backlogOps =
             { Host = opencode

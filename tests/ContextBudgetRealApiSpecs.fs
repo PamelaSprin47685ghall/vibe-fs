@@ -69,6 +69,29 @@ let spec_tryGetMaxInputTokensAsync_realSchema () =
         check "provider.list called" providerListCalled
     }
 
+/// RED: session.get returns model.limit.input without provider.list (e2e harness shape)
+let spec_tryGetMaxInputTokensAsync_limitOnSessionModelWithoutProviderList () =
+    promise {
+        let mockGet (_arg: obj) =
+            promise {
+                return
+                    createObj
+                        [ "data",
+                          createObj
+                              [ "model",
+                                createObj
+                                    [ "id", box "local-model"
+                                      "providerID", box "local"
+                                      "limit", createObj [ "input", box 200000 ] ] ] ]
+            }
+
+        let client =
+            createObj [ "session", createObj [ "get", box (System.Func<obj, JS.Promise<obj>>(mockGet)) ] ]
+
+        let! limit = tryGetMaxInputTokensAsync client "sess-local-limit"
+        equal "session.get model.limit.input without provider.list" (Some 200000) limit
+    }
+
 /// RED: tryGetMaxInputTokensAsync with only limit.context (no input)
 let spec_tryGetMaxInputTokensAsync_contextFallback () =
     promise {
@@ -224,6 +247,7 @@ let spec_resolveMaxInputTokens_preferInputOverContextAcrossSyncAsync () =
 let run () : JS.Promise<unit> =
     promise {
         do! spec_tryGetMaxInputTokensAsync_realSchema ()
+        do! spec_tryGetMaxInputTokensAsync_limitOnSessionModelWithoutProviderList ()
         do! spec_tryGetMaxInputTokensAsync_contextFallback ()
         do! spec_tryGetMaxInputTokensAsync_nullClient ()
         do! spec_tryGetRealContextUsage_realSchema ()

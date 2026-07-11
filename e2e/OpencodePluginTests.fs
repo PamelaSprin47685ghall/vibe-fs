@@ -16,6 +16,7 @@ let private fileExists (path: string) : bool = jsNative
 
 open Wanxiangshu.E2e.OpencodePluginTestsPart2
 open Wanxiangshu.E2e.OpencodePluginTestsPart4
+open Wanxiangshu.E2e.OpencodePluginContextBudgetTests
 
 let private harnessFromObj (o: obj) : Harness = unbox o
 let private createEmpty () = createObj []
@@ -224,6 +225,8 @@ let runAll (args: string array) : JS.Promise<int> =
 
         do! OpencodePluginTestsPart3.runPart3 harness chk startHarness jsonStringify createEmpty
         do! OpencodePluginTestsPart4.runPart4 harness chk startHarness jsonStringify createEmpty
+
+        let! _cb = OpencodePluginContextBudgetTests.run harness chk startHarness createEmpty
 
         return!
             Wanxiangshu.E2e.OpencodePluginNudgeTests.runNudgeTests
