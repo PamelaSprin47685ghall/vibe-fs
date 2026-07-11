@@ -121,4 +121,4 @@ let createMuxFallbackHandler
     (helpers: obj)
     (workspaceRoot: string)
     : (obj -> JS.Promise<FallbackHookResult>) =
-    createHandler muxEventTranslator runtime configLookup (muxActionExecutor helpers) workspaceRoot
+    createHandler muxEventTranslator runtime configLookup (muxActionExecutor helpers) workspaceRoot None

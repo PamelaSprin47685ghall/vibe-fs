@@ -42,6 +42,7 @@ let handleEvent
     (executor: IActionExecutor)
     (workspaceRoot: string)
     (rawEvent: obj)
+    (pendingReview: (string -> bool) option)
     : JS.Promise<FallbackHookResult> =
 
     promise {
@@ -76,15 +77,18 @@ let handleEvent
                             | Some abortErr -> return Some(FallbackEvent.SessionError abortErr)
                             | None ->
                                 if isIdleNoContentAndNoTools msgs then
-                                    return
-                                        Some(
-                                            FallbackEvent.SessionError
-                                                { ErrorName = "EmptyOutputError"
-                                                  DomainError = None
-                                                  Message = "LLM returned empty output without tools"
-                                                  StatusCode = None
-                                                  IsRetryable = Some true }
-                                        )
+                                    if pendingReview |> Option.exists (fun f -> f sessionID) then
+                                        return Some FallbackEvent.SessionIdle
+                                    else
+                                        return
+                                            Some(
+                                                FallbackEvent.SessionError
+                                                    { ErrorName = "EmptyOutputError"
+                                                      DomainError = None
+                                                      Message = "LLM returned empty output without tools"
+                                                      StatusCode = None
+                                                      IsRetryable = Some true }
+                                            )
                                 else
                                     return Some FallbackEvent.SessionIdle
                     }
@@ -258,6 +262,7 @@ let createHandler
     (configLookup: ConfigLookup)
     (executor: IActionExecutor)
     (workspaceRoot: string)
+    (pendingReview: (string -> bool) option)
     : (obj -> JS.Promise<FallbackHookResult>) =
 
     let mutable queues = Map.ofList<string, SerialQueue> []
@@ -275,7 +280,8 @@ let createHandler
                     q
 
             let! result =
-                queue.Enqueue(fun () -> handleEvent translator runtime configLookup executor workspaceRoot rawEvent)
+                queue.Enqueue(fun () ->
+                    handleEvent translator runtime configLookup executor workspaceRoot rawEvent pendingReview)
 
             return result
         }

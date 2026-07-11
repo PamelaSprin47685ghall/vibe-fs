@@ -67,6 +67,7 @@ let createCoreServices (host: Host) (ctx: obj) =
                 fallbackConfigLookup
                 directory
                 childAgentRegistry
+                reviewStore
         )
 
     let scope = create ()

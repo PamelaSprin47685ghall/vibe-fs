@@ -92,11 +92,7 @@ let submitReviewTool
 
                                         let verdict, fb = verdictStringFromReviewResult result
                                         do! appendReviewVerdictOrFail runtime.Execution.Directory sessionID verdict fb
-                                        do!
-                                            syncReviewFromEventLogDedicated
-                                                store
-                                                runtime.Execution.Directory
-                                                sessionID
+                                        do! syncReviewFromEventLogDedicated store runtime.Execution.Directory sessionID
 
                                         return formatReviewResult result
                                 finally
@@ -143,5 +139,5 @@ let submitReviewResultTool (ctx: obj) (store: Wanxiangshu.Shell.ReviewRuntime.Re
                             else
                                 let verdict, fb = verdictStringFromReviewResult result
                                 do! appendReviewVerdictOrFail directory sessionID verdict fb
-                                return "Verdict submitted."
+                                return returnReviewerVerdictSubmittedMessage
             })

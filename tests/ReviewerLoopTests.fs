@@ -3,6 +3,7 @@ module Wanxiangshu.Tests.ReviewerLoopTests
 open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Tests.Assert
+open Wanxiangshu.Tests.AsyncFlush
 open Wanxiangshu.Kernel.ReviewSession.Types
 open Wanxiangshu.Shell.ReviewRuntime
 open Wanxiangshu.Shell.ChildAgentRegistry
@@ -66,8 +67,7 @@ let runReviewerLoop_rebindsPendingEachRound () =
                       if promptCount = 1 then
                           Promise.lift ()
                       else
-                          secondRoundHadPending <-
-                              store.resolvePendingReview ("child-1", Accepted "nudge-round")
+                          secondRoundHadPending <- store.resolvePendingReview ("child-1", Accepted "nudge-round")
 
                           Promise.lift ()) ]
 
@@ -92,11 +92,44 @@ let runReviewerLoop_promptFailedReturnsTerminated () =
         equal "prompt fail -> Terminated" Terminated result
     }
 
+let runReviewerLoop_verdictAbortsPromptWithoutWaiting () =
+    promise {
+        let mutable promptResolved = false
+        let neverResolving = Promise.create (fun _ _ -> ())
+
+        let session =
+            createObj
+                [ "prompt",
+                  box (fun (_: obj) ->
+                      promise {
+                          do! neverResolving
+                          promptResolved <- true
+                      }) ]
+
+        let client = createObj [ "session", box session ]
+
+        let store = createReviewStore ()
+        store.applyReviewTaskProjection ("child-1", Some "task")
+
+        // Start the loop in the background; the pending prompt will never
+        // resolve on its own.  Resolve the review verdict in a later microtask
+        // so the abort suppressor fires while the prompt is still pending.
+        let loopTask = runReviewerLoop client store "child-1" [ "reviewerPrompt test" ] null
+
+        let! () = yieldMicrotask ()
+        store.resolvePendingReview ("child-1", Accepted "abort verdict") |> ignore
+        let! result = loopTask
+
+        equal "abort returns accepted verdict" (Accepted "abort verdict") result
+        check "prompt never resolved on its own" (not promptResolved)
+    }
+
 let run () : JS.Promise<unit> =
     promise {
         do! createReviewerChild_success ()
         do! createReviewerChild_noSessionApi ()
         do! runReviewerLoop_resolvesVerdict ()
         do! runReviewerLoop_rebindsPendingEachRound ()
+        do! runReviewerLoop_verdictAbortsPromptWithoutWaiting ()
         do! runReviewerLoop_promptFailedReturnsTerminated ()
     }

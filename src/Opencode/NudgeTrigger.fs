@@ -20,6 +20,7 @@ type NudgeTrigger
         host: Host,
         ctx: obj,
         fallbackRuntime: Wanxiangshu.Shell.FallbackRuntimeState.FallbackRuntimeState,
+        reviewStore: Wanxiangshu.Shell.ReviewRuntime.ReviewStore,
         markForceStopped: string -> unit,
         removeForceStopped: string -> unit,
         isForceStopped: string -> bool
@@ -95,7 +96,11 @@ type NudgeTrigger
                 match Id.trySessionId sessionIDStr with
                 | None -> ()
                 | Some sessionID ->
-                    if NudgeTrigger.isNaturalStop eventType props && not (isForceStopped sessionIDStr) then
+                    if
+                        NudgeTrigger.isNaturalStop eventType props
+                        && not (isForceStopped sessionIDStr)
+                        && not (reviewStore.getPendingReviewIds () |> List.contains sessionIDStr)
+                    then
                         match getClientFromPluginCtx ctx with
                         | Ok client ->
                             try
@@ -121,8 +126,9 @@ let createNudgeTrigger
     (host: Host)
     (ctx: obj)
     (fallbackRuntime: Wanxiangshu.Shell.FallbackRuntimeState.FallbackRuntimeState)
+    (reviewStore: Wanxiangshu.Shell.ReviewRuntime.ReviewStore)
     (markForceStopped: string -> unit)
     (removeForceStopped: string -> unit)
     (isForceStopped: string -> bool)
     : NudgeTrigger =
-    NudgeTrigger(host, ctx, fallbackRuntime, markForceStopped, removeForceStopped, isForceStopped)
+    NudgeTrigger(host, ctx, fallbackRuntime, reviewStore, markForceStopped, removeForceStopped, isForceStopped)

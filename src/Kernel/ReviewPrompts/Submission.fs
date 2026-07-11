@@ -82,3 +82,6 @@ let preReviewVerdictPrompt (task: string) : string =
             []
 
     frontMatterPrompt taskLine preReviewVerdictBody
+
+let returnReviewerVerdictSubmittedMessage: string =
+    "Verdict submitted.\n\nPlease stop the session immediately."

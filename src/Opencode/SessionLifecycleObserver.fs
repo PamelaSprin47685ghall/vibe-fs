@@ -42,6 +42,7 @@ type SessionLifecycleObserver
             host
             ctx
             fallbackRuntime
+            reviewStore
             (fun sid -> forceStoppedSessions <- Set.add sid forceStoppedSessions)
             (fun sid -> forceStoppedSessions <- Set.remove sid forceStoppedSessions)
             (fun sid -> Set.contains sid forceStoppedSessions)

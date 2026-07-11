@@ -11,6 +11,9 @@ open Wanxiangshu.Opencode.SessionIo
 open Wanxiangshu.Shell
 open Wanxiangshu.Shell.Dyn
 open Wanxiangshu.Shell.OpencodeClientCodec
+open Wanxiangshu.Shell.SubagentSpawn
+open Wanxiangshu.Shell.ErrorClassify
+open Wanxiangshu.Kernel.Domain
 
 let private maxNudges = 3
 
@@ -69,6 +72,9 @@ let runReviewerLoop
     : JS.Promise<ReviewResult> =
     promise {
         let verdict: ReviewResult option ref = ref None
+        let childAbort = AbortController()
+
+        reviewStore.setAbortSuppressor (childID, (fun () -> childAbort.abort ()))
         reviewStore.setPendingReview (childID, (fun r -> verdict.Value <- Some r))
         reviewStore.tryLockReview childID |> ignore
 
@@ -84,13 +90,15 @@ let runReviewerLoop
                                    tools = box (createObj [ "return_reviewer", box true ]) |} |}
 
                 try
-                    do! promptWithAbort client promptBody abortSignal
+                    do! promptWithAbort client promptBody childAbort.signal
 
                     match verdict.Value with
                     | Some v -> return Resolved v
                     | None -> return NoResult
-                with _ ->
-                    return PromptFailed
+                with err ->
+                    match verdict.Value, translateJsError err with
+                    | Some v, (MessageAborted | ClientCancellation _) -> return Resolved v
+                    | _ -> return PromptFailed
             }
 
         let rec loop nudgeCount =

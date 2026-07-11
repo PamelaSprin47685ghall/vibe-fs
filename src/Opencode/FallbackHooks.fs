@@ -223,11 +223,21 @@ let createOpencodeFallbackHandler
     (configLookup: ConfigLookup)
     (workspaceRoot: string)
     (_registry: ChildAgentRegistry)
+    (reviewStore: Wanxiangshu.Shell.ReviewRuntime.ReviewStore)
     : (obj -> JS.Promise<FallbackHookResult>) =
     let translator = opencodeEventTranslator runtime
 
+    let pendingReview sid =
+        reviewStore.getPendingReviewIds () |> List.contains sid
+
     let baseHandler =
-        createHandler translator runtime configLookup (opencodeActionExecutor runtime client) workspaceRoot
+        createHandler
+            translator
+            runtime
+            configLookup
+            (opencodeActionExecutor runtime client)
+            workspaceRoot
+            (Some pendingReview)
 
     fun rawEvent ->
         promise {

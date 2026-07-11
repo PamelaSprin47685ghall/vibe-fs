@@ -245,7 +245,7 @@ let createOmpFallbackHandler
     let translator = ompEventTranslator runtime
 
     let baseHandler =
-        createHandler translator runtime configLookup (ompActionExecutor runtime sessionApi) workspaceRoot
+        createHandler translator runtime configLookup (ompActionExecutor runtime sessionApi) workspaceRoot None
 
     fun (rawEvent: obj) ->
         promise {

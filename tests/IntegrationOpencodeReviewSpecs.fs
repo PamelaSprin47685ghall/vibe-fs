@@ -96,6 +96,11 @@ let secondPassResolvesAcceptedSpec () =
                 (reviewerContext workspaceDir sessionID)
 
         check "opencode return_reviewer second PERFECT reports submitted" (result.Contains "Verdict submitted.")
+
+        check
+            "opencode return_reviewer second PERFECT asks stop"
+            (result.Contains "Please stop the session immediately.")
+
         check "opencode return_reviewer second PERFECT resolves accepted" (resolved.Value = Some(Accepted ""))
         do! rmAsync workspaceDir
     }
@@ -116,6 +121,8 @@ let reviseResolvesNeedsRevisionSpec () =
                 (reviewerContext workspaceDir sessionID)
 
         check "opencode return_reviewer REVISE reports submitted" (result.Contains "Verdict submitted.")
+
+        check "opencode return_reviewer REVISE asks stop" (result.Contains "Please stop the session immediately.")
 
         check
             "opencode return_reviewer REVISE resolves needs_revision with feedback"
@@ -140,6 +147,8 @@ let reviseEmptyFeedbackStillNeedsRevisionSpec () =
                 (reviewerContext workspaceDir sessionID)
 
         check "opencode return_reviewer REVISE empty feedback reports submitted" (result.Contains "Verdict submitted.")
+
+        check "opencode return_reviewer REVISE empty asks stop" (result.Contains "Please stop the session immediately.")
 
         check
             "opencode return_reviewer REVISE empty feedback still needs_revision"

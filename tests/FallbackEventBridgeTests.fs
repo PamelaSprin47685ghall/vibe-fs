@@ -8,6 +8,7 @@ open Wanxiangshu.Kernel.FallbackKernel.Types
 open Wanxiangshu.Shell.FallbackRuntimeState
 open Wanxiangshu.Shell.FallbackEventBridge
 open Wanxiangshu.Tests.FallbackEventBridgeTestsPart2
+open Wanxiangshu.Tests.FallbackEventBridgeTestsPendingReview
 
 
 type FakeExecutor(?messages: obj array) =
@@ -122,7 +123,7 @@ let handleEvent_retrySame_consumedAndSendContinue () =
 
         let executor = FakeExecutor()
 
-        let! result = handleEvent translator rt defaultCfgLookup executor "" (box ())
+        let! result = handleEvent translator rt defaultCfgLookup executor "" (box ()) None
 
         equal "consumed" true result.Consumed
         equal "phase Retrying 1" (FallbackPhase.Retrying 1) result.State.Phase
@@ -151,7 +152,7 @@ let handleEvent_exhausted_notConsumed () =
 
         let executor = FakeExecutor()
 
-        let! result = handleEvent translator rt defaultCfgLookup executor "" (box ())
+        let! result = handleEvent translator rt defaultCfgLookup executor "" (box ()) None
 
         equal "not consumed when exhausted" false result.Consumed
     }
@@ -167,7 +168,7 @@ let handleEvent_noChain_notConsumed () =
 
         let executor = FakeExecutor()
 
-        let! result = handleEvent translator rt defaultCfgLookup executor "" (box ())
+        let! result = handleEvent translator rt defaultCfgLookup executor "" (box ()) None
 
         equal "no chain → not consumed" false result.Consumed
     }
@@ -187,7 +188,7 @@ let handleEvent_sessionAborted_setsCancelled () =
 
         let executor = FakeExecutor()
 
-        let! result = handleEvent translator rt defaultCfgLookup executor "" (box ())
+        let! result = handleEvent translator rt defaultCfgLookup executor "" (box ()) None
 
         equal "consumed" true result.Consumed
         equal "lifecycle Cancelled" FallbackLifecycle.Cancelled result.State.Lifecycle
@@ -217,7 +218,7 @@ let handleEvent_newUserMessage_resetsState () =
 
         let executor = FakeExecutor()
 
-        let! result = handleEvent translator rt defaultCfgLookup executor "" (box ())
+        let! result = handleEvent translator rt defaultCfgLookup executor "" (box ()) None
 
         equal "consumed" false result.Consumed
         equal "phase Idle" FallbackPhase.Idle result.State.Phase
@@ -241,7 +242,7 @@ let createHandler_returnsCallable () =
 
         let executor = FakeExecutor()
 
-        let handler = createHandler translator rt defaultCfgLookup executor ""
+        let handler = createHandler translator rt defaultCfgLookup executor "" None
         check "handler is non-null" (not (isNull (box handler)))
     }
 
@@ -269,8 +270,8 @@ let createHandler_twoSessionsIndependent () =
         let ex1 = FakeExecutor()
         let ex2 = FakeExecutor()
 
-        let h1 = createHandler tr1 rt1 defaultCfgLookup ex1 ""
-        let h2 = createHandler tr2 rt2 defaultCfgLookup ex2 ""
+        let h1 = createHandler tr1 rt1 defaultCfgLookup ex1 "" None
+        let h2 = createHandler tr2 rt2 defaultCfgLookup ex2 "" None
 
         check "handlers non-null" (not (isNull (box h1)) && not (isNull (box h2)))
 
@@ -291,4 +292,5 @@ let run () =
         do! createHandler_returnsCallable ()
         do! createHandler_twoSessionsIndependent ()
         do! FallbackEventBridgeTestsPart2.run ()
+        do! FallbackEventBridgeTestsPendingReview.run ()
     }
