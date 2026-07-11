@@ -3,6 +3,8 @@ module Wanxiangshu.Tests.Wanxiangzhen.FfDecisionTests
 open Wanxiangshu.Kernel.Wanxiangzhen.FfDecision
 open Wanxiangshu.Tests.Wanxiangzhen.AssertCompat
 
+let private doneStatus = Wanxiangshu.Kernel.Wanxiangzhen.SquadTask.Done
+
 let entries () : (string * (unit -> unit)) list =
     [ ("FfDecision.format Merged",
        fun () ->
@@ -27,7 +29,7 @@ let entries () : (string * (unit -> unit)) list =
 
       ("FfDecision.format NotSubmittable",
        fun () ->
-           let r = formatSubmitOutcome "main" (Response(NotSubmittable "done"))
+           let r = formatSubmitOutcome "main" (Response(NotSubmittable doneStatus))
            checkBare (r.Contains "done"))
 
       ("FfDecision.format TaskNotFound",

@@ -190,7 +190,12 @@ let architectureTestEntriesPartA () : (string * TestBody) list =
       Sync(sync ArchitectureTestsWirePipeline.messageTransformUsesPipeline)
       "ArchitectureTests.wanxiangzhenBoundary", Sync(sync ArchitectureTestsFoundationB.wanxiangzhenBoundary)
       "ArchitectureTests.wanxiangzhenGitQueue", Sync(sync ArchitectureTestsFoundationB.wanxiangzhenGitQueue)
-      "ArchitectureTests.wanxiangzhenReconcile", Sync(sync ArchitectureTestsFoundationB.wanxiangzhenReconcile) ]
+      "ArchitectureTests.wanxiangzhenReconcile", Sync(sync ArchitectureTestsFoundationB.wanxiangzhenReconcile)
+      "ArchitectureTests.squadEventFoldUsesTransitionPolicy",
+      Sync(sync ArchitectureTestsFoundationB.squadEventFoldUsesTransitionPolicy)
+      "ArchitectureTests.reviewLoopFoldAdt", Sync(sync ArchitectureTestsFoundationB.reviewLoopFoldAdt)
+      "ArchitectureTests.coordinatorReplayUsesTransitionPolicy",
+      Sync(sync ArchitectureTestsFoundationB.coordinatorReplayUsesTransitionPolicy) ]
 
 open Wanxiangshu.Tests.TestsArchitectureRegistryB
 

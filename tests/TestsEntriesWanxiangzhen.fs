@@ -38,6 +38,7 @@ let wanxiangzhenTestEntries () : (string * TestBody) list =
     @ prefix (Wanxiangshu.Tests.Wanxiangzhen.SquadPromptsTests.entries ())
     @ prefix (Wanxiangshu.Tests.Wanxiangzhen.SquadUpdateIdAssignTests.entries ())
     @ prefix (Wanxiangshu.Tests.Wanxiangzhen.TaskTests.entries ())
+    @ prefix (Wanxiangshu.Tests.Wanxiangzhen.SquadTaskTransitionTests.entries ())
     @ prefix (Wanxiangshu.Tests.Wanxiangzhen.SlaveRuntimeTests.entries ())
     @ prefixAsync (Wanxiangshu.Tests.Wanxiangzhen.CoordinatorLifecycleEventLogTests.entries ())
     @ prefixAsync (Wanxiangshu.Tests.Wanxiangzhen.CoordinatorLifecycleTests.entries ())

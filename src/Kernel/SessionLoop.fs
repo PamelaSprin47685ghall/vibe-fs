@@ -2,10 +2,11 @@ module Wanxiangshu.Kernel.SessionLoop
 
 /// Gate priority: FallbackContinue > TodoNudge > ReviewNudge > Resolve.
 /// Resolve is the sole terminal action; drive halts immediately after emitting it.
-type GateState =
-    { NeedFallbackContinue: bool
-      NeedTodoNudge: bool
-      NeedReviewNudge: bool }
+type SessionGateMode =
+    | FallbackContinue
+    | TodoNudge
+    | ReviewNudge
+    | Settled
 
 type GateAction =
     | FallbackContinue
@@ -13,16 +14,33 @@ type GateAction =
     | ReviewNudge
     | Resolve
 
-let decide (state: GateState) : GateAction =
-    if state.NeedFallbackContinue then FallbackContinue
-    elif state.NeedTodoNudge then TodoNudge
-    elif state.NeedReviewNudge then ReviewNudge
-    else Resolve
+let gateModeFromFlags (needFallbackContinue: bool) (needTodoNudge: bool) (needReviewNudge: bool) : SessionGateMode =
+    if needFallbackContinue then
+        SessionGateMode.FallbackContinue
+    elif needTodoNudge then
+        SessionGateMode.TodoNudge
+    elif needReviewNudge then
+        SessionGateMode.ReviewNudge
+    else
+        SessionGateMode.Settled
 
-let rec drive (transition: GateState -> GateAction -> GateState) (emit: GateAction -> unit) (state: GateState) : unit =
-    let action = decide state
+let decideFromMode (mode: SessionGateMode) : GateAction =
+    match mode with
+    | SessionGateMode.FallbackContinue -> GateAction.FallbackContinue
+    | SessionGateMode.TodoNudge -> GateAction.TodoNudge
+    | SessionGateMode.ReviewNudge -> GateAction.ReviewNudge
+    | SessionGateMode.Settled -> GateAction.Resolve
+
+let decide (mode: SessionGateMode) : GateAction = decideFromMode mode
+
+let rec drive
+    (transition: SessionGateMode -> GateAction -> SessionGateMode)
+    (emit: GateAction -> unit)
+    (mode: SessionGateMode)
+    : unit =
+    let action = decide mode
     emit action
 
     if action <> Resolve then
-        let nextState = transition state action
-        drive transition emit nextState
+        let nextMode = transition mode action
+        drive transition emit nextMode

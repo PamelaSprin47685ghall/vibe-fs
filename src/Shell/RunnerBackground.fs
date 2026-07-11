@@ -5,18 +5,14 @@ open Fable.Core.JsInterop
 open Wanxiangshu.Shell.RuntimeScope
 open Wanxiangshu.Shell.SessionExecutor
 
-type private RunnerJobEntry = { status: string }
-
 type private RunnerState =
-    { Jobs: Map<string, RunnerJobEntry>
-      ActiveSessions: Set<string>
+    { ActiveSessions: Set<string>
       LogBuffers: Map<string, string>
       ChildByParent: Map<string, string>
       ChildDispose: Map<string, unit -> unit> }
 
 let private emptyState =
-    { Jobs = Map.empty
-      ActiveSessions = Set.empty
+    { ActiveSessions = Set.empty
       LogBuffers = Map.empty
       ChildByParent = Map.empty
       ChildDispose = Map.empty }
@@ -80,7 +76,6 @@ let private childActiveForParent (scope: RuntimeScope) (parentSessionId: string)
 let hasRunningRunnerJob (scope: RuntimeScope) (sessionId: string) : bool =
     hasActiveExecutorRun sessionId
     || Set.contains sessionId (getState scope).ActiveSessions
-    || Map.containsKey sessionId (getState scope).Jobs
     || childActiveForParent scope sessionId
 
 let private readLogSnippet (scope: RuntimeScope) (sessionId: string) : string =
@@ -119,7 +114,6 @@ let abortRunnerJobCore (scope: RuntimeScope) (sessionId: string) : unit =
 
     updateState scope (fun s ->
         { s with
-            Jobs = Map.remove sessionId s.Jobs
             LogBuffers = Map.remove sessionId s.LogBuffers })
 
 let abortRunnerJob (scope: RuntimeScope) (sessionId: string) : string =

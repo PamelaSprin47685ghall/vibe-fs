@@ -22,6 +22,9 @@ let private taskA: SquadTask =
       CreatedAt = "2024-01-01T00:00:00Z"
       UpdatedAt = "2024-01-01T00:00:00Z" }
 
+let private mergedStatus = Wanxiangshu.Kernel.Wanxiangzhen.SquadTask.Merged
+let private doneStatus = Wanxiangshu.Kernel.Wanxiangzhen.SquadTask.Done
+
 let entries () : (string * (unit -> unit)) list =
     [
 
@@ -102,7 +105,7 @@ let entries () : (string * (unit -> unit)) list =
 
       ("HttpCodec.encodeFfResponseBody: NotSubmittable status",
        fun () ->
-           let o = encodeFfResponseBody (NotSubmittable "merged") |> unbox<obj>
+           let o = encodeFfResponseBody (NotSubmittable mergedStatus) |> unbox<obj>
            equal "not_submittable" (str o "result")
            equal "merged" (str o "currentStatus"))
 
@@ -145,7 +148,7 @@ let entries () : (string * (unit -> unit)) list =
            let body = createObj [ "result" ==> "not_submittable"; "currentStatus" ==> "done" ]
 
            match decodeFfResult body with
-           | Some(Wanxiangshu.Kernel.Wanxiangzhen.FfDecision.NotSubmittable s) -> equal "done" s
+           | Some(Wanxiangshu.Kernel.Wanxiangzhen.FfDecision.NotSubmittable s) -> equal doneStatus s
            | _ -> checkBare false)
 
       ("HttpCodec.decodeFfResult: unknown returns None",

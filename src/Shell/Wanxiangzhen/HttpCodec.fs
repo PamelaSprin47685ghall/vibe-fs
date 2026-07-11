@@ -71,7 +71,7 @@ let encodeFfResponseBody (r: FfResult) : obj =
     | NotSubmittable status ->
         box
             {| result = "not_submittable"
-               currentStatus = status |}
+               currentStatus = statusToString status |}
 
 let encodeResult (label: string) : obj = box {| result = label |}
 
@@ -83,7 +83,10 @@ let decodeFfResult (body: obj) : FfResult option =
     | "rebase_needed" -> Some(RebaseNeeded(str body "masterSha"))
     | "stale_commit" -> Some StaleCommit
     | "coordinator_not_ready" -> Some(CoordinatorNotReady(str body "reason"))
-    | "not_submittable" -> Some(NotSubmittable(str body "currentStatus"))
+    | "not_submittable" ->
+        match statusFromString (str body "currentStatus") with
+        | Some s -> Some(NotSubmittable s)
+        | None -> None
     | _ -> None
 
 let decodeSubmitBody (body: obj) : string option =

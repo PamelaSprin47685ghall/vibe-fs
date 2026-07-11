@@ -34,8 +34,14 @@ let noQuadraticListAppend () =
 
 let parallelToolPromptSSOTGuard () =
     let content = requireFile "src/Shell/MessageTransformPipeline.fs"
-    check "arch: MessageTransformPipeline references ToolCatalog.all" (content.Contains "Wanxiangshu.Kernel.ToolCatalog.all")
-    check "arch: MessageTransformPipeline does not hardcode tool catalog list" (not (content.Contains "let catalogNames =\n            [ \"coder\""))
+
+    check
+        "arch: MessageTransformPipeline references ToolCatalog.all"
+        (content.Contains "Wanxiangshu.Kernel.ToolCatalog.all")
+
+    check
+        "arch: MessageTransformPipeline does not hardcode tool catalog list"
+        (not (content.Contains "let catalogNames =\n            [ \"coder\""))
 
 let wanxiangzhenBoundary () =
     for f in fsFilesRecursive "src/Kernel/Wanxiangzhen" do
@@ -49,7 +55,38 @@ let wanxiangzhenGitQueue () =
     check "arch: CoordinatorOps uses rt.GitQueue" (ops.Contains "rt.GitQueue.Enqueue")
     check "arch: CoordinatorOps uses rt.DagQueue" (ops.Contains "rt.DagQueue.Enqueue")
 
+let squadEventFoldUsesTransitionPolicy () =
+    let squadEvent =
+        requireFile "src/Kernel/Wanxiangzhen/SquadEvent.fs" |> nonCommentCode
+
+    check
+        "arch: SquadEvent.fold uses TransitionPolicy"
+        (squadEvent.Contains "SquadTaskTransition" && squadEvent.Contains "ReplayFact")
+
+let reviewLoopFoldAdt () =
+    let fold = requireFile "src/Kernel/EventLog/Fold.fs" |> nonCommentCode
+
+    check
+        "arch: EventLog fold uses ReviewLoopFold ADT"
+        (fold.Contains "ReviewLoopFold" && fold.Contains "foldReviewLoop")
+
+let coordinatorReplayUsesTransitionPolicy () =
+    let replay =
+        requireFile "src/Shell/Wanxiangzhen/CoordinatorReplay.fs" |> nonCommentCode
+
+    check
+        "arch: CoordinatorReplay uses SquadTaskTransition"
+        (replay.Contains "SquadTaskTransition"
+         && replay.Contains "applyStatus ReplayFact")
+
 let wanxiangzhenReconcile () =
-    let replay = requireFile "src/Shell/Wanxiangzhen/CoordinatorReplay.fs" |> nonCommentCode
-    check "arch: CoordinatorReplay has Submitted to Running fallback" (replay.Contains "Submitted" && replay.Contains "Running")
-    check "arch: CoordinatorReplay does not touch Cancelled" (not (replay.Contains "withReconciledStatus t SquadTaskStatus.Merged" && replay.Contains "Cancelled"))
+    let replay =
+        requireFile "src/Shell/Wanxiangzhen/CoordinatorReplay.fs" |> nonCommentCode
+
+    check
+        "arch: CoordinatorReplay Submitted to Running via ReplayFact"
+        (replay.Contains "Submitted" && replay.Contains "Running")
+
+    check
+        "arch: CoordinatorReplay does not reconcile Cancelled to Merged"
+        (not (replay.Contains "Cancelled" && replay.Contains "applyStatus ReplayFact t Merged"))

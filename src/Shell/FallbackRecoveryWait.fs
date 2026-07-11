@@ -116,13 +116,11 @@ let terminalObservation (runtime: FallbackRuntimeState) (sessionID: string) : bo
         || (runtime.GetConsumed sessionID = Some false)
     | None -> (runtime.GetConsumed sessionID = Some false)
 
-/// Derive the GateState from runtime observation.
+/// Derive SessionGateMode from runtime observation.
 /// NeedReviewNudge is always false here because review/nudge dispatch is represented
 /// by the runtime's active gate (event handling / awaiting busy), not a separate nudge flag.
-let gateState (runtime: FallbackRuntimeState) (sessionID: string) : GateState =
-    { NeedFallbackContinue = fallbackGateOpen runtime sessionID
-      NeedTodoNudge = runtime.IsNudgeActive sessionID
-      NeedReviewNudge = false }
+let gateMode (runtime: FallbackRuntimeState) (sessionID: string) : SessionGateMode =
+    gateModeFromFlags (fallbackGateOpen runtime sessionID) (runtime.IsNudgeActive sessionID) false
 
 /// The session is settled only when: non-empty sessionID, terminal observation holds,
 /// and the gate model resolves to Resolve (no higher-priority gate open).
@@ -137,8 +135,7 @@ let isSubagentSettled (runtime: FallbackRuntimeState) (sessionID: string) : bool
             if not (terminalObservation runtime sessionID) then
                 false
             else
-                let gates = gateState runtime sessionID
-                decide gates = Resolve
+                decide (gateMode runtime sessionID) = Resolve
 
 /// Register OnStateChanged exactly once; resolve on the next state-change signal.
 let private waitForStateChange (runtime: FallbackRuntimeState) (sessionID: string) : JS.Promise<unit> =
@@ -154,7 +151,7 @@ let rec waitForSubagentSettle (runtime: FallbackRuntimeState) (sessionID: string
         elif isSubagentSettled runtime sessionID then
             return ()
         else
-            match decide (gateState runtime sessionID) with
+            match decide (gateMode runtime sessionID) with
             | FallbackContinue ->
                 do! waitForStateChange runtime sessionID
                 return! waitForSubagentSettle runtime sessionID

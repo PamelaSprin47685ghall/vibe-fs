@@ -1,11 +1,13 @@
 module Wanxiangshu.Kernel.Wanxiangzhen.FfDecision
 
+open Wanxiangshu.Kernel.Wanxiangzhen.SquadTask
+
 type FfResult =
     | Merged of masterSha: string
     | RebaseNeeded of masterSha: string
     | StaleCommit
     | CoordinatorNotReady of reason: string
-    | NotSubmittable of currentStatus: string
+    | NotSubmittable of currentStatus: SquadTaskStatus
 
 type SubmitOutcome =
     | Response of FfResult
@@ -35,9 +37,11 @@ let formatSubmitOutcome (masterBranch: string) (o: SubmitOutcome) : string =
         "Branch HEAD differs from reported commit. Commit your latest work, then call submit_to_squad again."
     | Response(CoordinatorNotReady _) ->
         sprintf "Coordinator not ready (not on %s or dirty). Wait and call submit_to_squad again shortly." masterBranch
-    | Response(NotSubmittable s) -> sprintf "Task no longer submittable (status: %s). Report to user and stop." s
+    | Response(NotSubmittable s) ->
+        sprintf "Task no longer submittable (status: %s). Report to user and stop." (statusToString s)
     | TaskNotFound ->
         "Task not found on coordinator. The coordinator may have restarted and lost state. Report to user and stop."
     | CoordinatorUnreachable -> "Coordinator unreachable (crashed or port changed). Report to user and wait."
-    | Unauthorized -> "Authentication failed (token mismatch). The coordinator may have restarted. Report to user and stop."
+    | Unauthorized ->
+        "Authentication failed (token mismatch). The coordinator may have restarted. Report to user and stop."
     | LocalGitError msg -> sprintf "Local git error: %s. Fix the git issue and call submit_to_squad again." msg

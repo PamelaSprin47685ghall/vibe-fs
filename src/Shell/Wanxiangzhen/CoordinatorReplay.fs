@@ -4,6 +4,7 @@ open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Kernel.Wanxiangzhen.SquadTask
 open Wanxiangshu.Kernel.Wanxiangzhen.Dag
+open Wanxiangshu.Kernel.Wanxiangzhen.SquadTaskTransition
 open Wanxiangshu.Shell.Wanxiangzhen.CoordinatorRuntime
 
 let replayFromEventLog (rt: CoordinatorRuntime) : JS.Promise<unit> =
@@ -15,6 +16,7 @@ let replayFromEventLog (rt: CoordinatorRuntime) : JS.Promise<unit> =
         let sessions = dags |> Map.remove sessionId
 
         let hasCommits = rt.Deps.HasCommits rt.ProjectRoot
+        let now = rt.Deps.Now()
 
         let reconciledTasks =
             currentDag.Tasks
@@ -23,7 +25,7 @@ let replayFromEventLog (rt: CoordinatorRuntime) : JS.Promise<unit> =
                     match rt.GitError with
                     | Some _ ->
                         if t.Status = Submitted then
-                            withReconciledStatus t SquadTaskStatus.Running (rt.Deps.Now())
+                            applyStatus ReplayFact t Running now
                         else
                             t
                     | None ->
@@ -31,11 +33,11 @@ let replayFromEventLog (rt: CoordinatorRuntime) : JS.Promise<unit> =
                         | Some b when hasCommits && rt.Deps.MergeBaseIsAncestor rt.ProjectRoot rt.MasterBranch b ->
                             let sha = rt.Deps.RevParseRef rt.ProjectRoot rt.MasterBranch
 
-                            { (withReconciledStatus t SquadTaskStatus.Merged (rt.Deps.Now())) with
+                            { (applyStatus ReplayFact t Merged now) with
                                 MergedSha = Some sha }
                         | _ ->
                             if t.Status = Submitted then
-                                withReconciledStatus t SquadTaskStatus.Running (rt.Deps.Now())
+                                applyStatus ReplayFact t Running now
                             else
                                 t
                 else

@@ -82,6 +82,7 @@
     <Compile Include="src/Kernel/SubagentToolPolicy.fs"/>
     <Compile Include="src/Kernel/BacklogProjectionCore.fs"/>
     <Compile Include="src/Kernel/Wanxiangzhen/SquadTask.fs"/>
+    <Compile Include="src/Kernel/Wanxiangzhen/SquadTaskTransition.fs"/>
     <Compile Include="src/Kernel/Wanxiangzhen/SquadConfig.fs"/>
     <Compile Include="src/Kernel/Wanxiangzhen/Dag.fs"/>
     <Compile Include="src/Kernel/Wanxiangzhen/SquadEvent.fs"/>
@@ -91,6 +92,7 @@
     <Compile Include="src/Kernel/Wanxiangzhen/FfDecision.fs"/>
     <Compile Include="src/Kernel/Wanxiangzhen/SquadPrompts.fs"/>
     <Compile Include="src/Kernel/EventLog/Types.fs"/>
+    <Compile Include="src/Kernel/EventLog/ReviewLoopFold.fs"/>
     <Compile Include="src/Kernel/EventLog/FallbackInjectionFold.fs"/>
     <Compile Include="src/Kernel/Nudge/Types.fs"/>
     <Compile Include="src/Kernel/EventLog/Fold.fs"/>
@@ -365,6 +367,7 @@
     <Compile Include="tests/SessionLoopTests.fs"/>
     <Compile Include="tests/AsyncFlush.fs"/>
     <Compile Include="tests/EventLogFoldTests.fs"/>
+    <Compile Include="tests/EventLogReviewLoopFoldTests.fs"/>
     <Compile Include="tests/WanxiangzhenSquadEventTests.fs"/>
     <Compile Include="tests/EventLogCodecTests.fs"/>
     <Compile Include="tests/EventLogTestSeed.fs"/>
@@ -678,6 +681,7 @@
     <Compile Include="tests/Wanxiangzhen/SquadPromptsTests.fs"/>
     <Compile Include="tests/Wanxiangzhen/SquadUpdateIdAssignTests.fs"/>
     <Compile Include="tests/Wanxiangzhen/TaskTests.fs"/>
+    <Compile Include="tests/Wanxiangzhen/SquadTaskTransitionTests.fs"/>
     <Compile Include="tests/TestsEntriesWanxiangzhen.fs"/>
     <Compile Include="tests/TestsEntriesCoreTail.fs"/>
     <Compile Include="tests/TestsEntriesSessionLoop.fs"/>

@@ -3,6 +3,8 @@ module Wanxiangshu.Tests.Wanxiangzhen.ExtendedFfDecisionTests
 open Wanxiangshu.Kernel.Wanxiangzhen.FfDecision
 open Wanxiangshu.Tests.Wanxiangzhen.AssertCompat
 
+let private mergedStatus = Wanxiangshu.Kernel.Wanxiangzhen.SquadTask.Merged
+
 let entries () : (string * (unit -> unit)) list =
     [ ("FfDecision.ffResultLabel Merged returns 'merged'",
        fun () ->
@@ -26,5 +28,5 @@ let entries () : (string * (unit -> unit)) list =
 
       ("FfDecision.ffResultLabel NotSubmittable returns 'not_submittable'",
        fun () ->
-           let label = ffResultLabel (NotSubmittable "merged")
+           let label = ffResultLabel (NotSubmittable mergedStatus)
            equal "not_submittable" label) ]

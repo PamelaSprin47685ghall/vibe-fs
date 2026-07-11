@@ -2,6 +2,7 @@ module Wanxiangshu.Kernel.Wanxiangzhen.SquadEvent
 
 open Wanxiangshu.Kernel.Wanxiangzhen.SquadTask
 open Wanxiangshu.Kernel.Wanxiangzhen.Dag
+open Wanxiangshu.Kernel.Wanxiangzhen.SquadTaskTransition
 
 type TaskItem =
     { taskId: string
@@ -82,6 +83,10 @@ let eventProse (e: SquadEvent) : string =
     | TaskError(_, _, err) -> sprintf "Git error for task: %s" err
     | SquadCancelled _ -> "Squad session cancelled by user. Remaining tasks marked cancelled."
 
+let private replayAt = ""
+
+let private mapTask (tid: string) (f: SquadTask -> SquadTask) (dag: Dag) : Dag = dag |> updateTask tid f
+
 let foldEvent (dag: Dag) (e: SquadEvent) : Dag =
     match e with
     | SquadCreated(sid, req) ->
@@ -96,20 +101,24 @@ let foldEvent (dag: Dag) (e: SquadEvent) : Dag =
                 addTask t d)
             dag
     | TaskStarted(_, tid, wt, branch) ->
-        dag
-        |> updateTask tid (fun t ->
-            { t with
-                Status = Running
-                WorktreePath = Some wt
-                BranchName = Some branch })
-    | TaskSubmitted(_, tid, _) -> dag |> updateTask tid (fun t -> { t with Status = Submitted })
+        mapTask
+            tid
+            (fun t ->
+                applyStatus ReplayFact t Running replayAt
+                |> fun t' ->
+                    { t' with
+                        WorktreePath = Some wt
+                        BranchName = Some branch })
+            dag
+    | TaskSubmitted(_, tid, _) -> mapTask tid (fun t -> applyStatus ReplayFact t Submitted replayAt) dag
     | TaskMerged(_, tid, sha) ->
-        dag
-        |> updateTask tid (fun t ->
-            { t with
-                Status = Merged
-                MergedSha = Some sha })
-    | TaskDone(_, tid, _) -> dag |> updateTask tid (fun t -> { t with Status = Done })
+        mapTask
+            tid
+            (fun t ->
+                applyStatus ReplayFact t Merged replayAt
+                |> fun t' -> { t' with MergedSha = Some sha })
+            dag
+    | TaskDone(_, tid, _) -> mapTask tid (fun t -> applyStatus ReplayFact t Done replayAt) dag
     | TaskError _ -> dag
     | SquadCancelled _ ->
         { dag with
@@ -119,6 +128,6 @@ let foldEvent (dag: Dag) (e: SquadEvent) : Dag =
                     if isTerminal t.Status then
                         t
                     else
-                        { t with Status = Cancelled }) }
+                        applyStatus ReplayFact t Cancelled replayAt) }
 
 let foldEvents (events: SquadEvent list) (dag: Dag) : Dag = List.fold foldEvent dag events

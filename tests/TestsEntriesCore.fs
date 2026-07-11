@@ -29,6 +29,7 @@ open Wanxiangshu.Tests.ReviewSessionRegistryTests
 open Wanxiangshu.Tests.ReviewSessionQueryTests
 open Wanxiangshu.Tests.ReviewPromptsFormatTests
 open Wanxiangshu.Tests.EventLogFoldTests
+open Wanxiangshu.Tests.EventLogReviewLoopFoldTests
 open Wanxiangshu.Tests.WanxiangzhenSquadEventTests
 open Wanxiangshu.Tests.EventLogCodecTests
 open Wanxiangshu.Tests.EventLogRuntimeTests
@@ -64,6 +65,7 @@ let coreTestEntries () : (string * TestBody) list =
       "ReviewTests.disposeSessionTreeTerminatesAll",
       TestBody.Sync(sync ReviewTestsReplay.disposeSessionTreeTerminatesAll)
       "EventLogFoldTests.run", TestBody.Sync(sync EventLogFoldTests.run)
+      "EventLogReviewLoopFoldTests.run", TestBody.Sync(sync EventLogReviewLoopFoldTests.run)
       "WanxiangzhenSquadEventTests.run", TestBody.Sync(sync WanxiangzhenSquadEventTests.run)
       "EventLogCodecTests.run", TestBody.Sync(sync EventLogCodecTests.run)
       "EventLogRuntimeTests.run", TestBody.Async EventLogRuntimeTests.run

@@ -121,6 +121,7 @@ let schedulerTick (rt: CoordinatorRuntime) : JS.Promise<unit> =
 let private cleanupAndReport (rt: CoordinatorRuntime) (task: SquadTask) : JS.Promise<unit> =
     promise {
         cleanupTask rt task
+
         match rt.GitError with
         | Some err ->
             let! _ = commitEvent rt (TaskError(rt.Dag.SessionId, task.Id, sprintf "cleanup failed: %s" err))
@@ -140,10 +141,14 @@ let handleSlaveExitCore (rt: CoordinatorRuntime) (taskId: string) : JS.Promise<u
             | Error _ -> return ()
             | Ok() ->
                 let now = rt.Deps.Now()
-                rt.Dag <- rt.Dag |> updateTask taskId (fun (t: SquadTask) ->
-                    match tryWithStatus t Done now with
-                    | Ok t2 -> t2
-                    | Error _ -> t)
+
+                rt.Dag <-
+                    rt.Dag
+                    |> updateTask taskId (fun (t: SquadTask) ->
+                        match tryWithStatus t Done now with
+                        | Ok t2 -> t2
+                        | Error _ -> t)
+
                 do! cleanupAndReport rt task
                 do! schedulerTick rt
     }
@@ -157,7 +162,11 @@ let safeKillPid (rt: CoordinatorRuntime) (pid: int) : unit =
     with ex ->
         rt.GitError <- Some(sprintf "kill pid %d failed: %s" pid (string ex.Message))
 
-let private handleSubmitCore (rt: CoordinatorRuntime) (taskId: string) (reportedSha: string) : JS.Promise<HttpResponse> =
+let private handleSubmitCore
+    (rt: CoordinatorRuntime)
+    (taskId: string)
+    (reportedSha: string)
+    : JS.Promise<HttpResponse> =
     match findTask taskId rt.Dag with
     | None ->
         Promise.lift
@@ -166,7 +175,7 @@ let private handleSubmitCore (rt: CoordinatorRuntime) (taskId: string) (reported
     | Some task when task.Status <> Running ->
         Promise.lift
             { StatusCode = 200
-              Body = encodeFfResponseBody (NotSubmittable(statusToString task.Status)) }
+              Body = encodeFfResponseBody (NotSubmittable task.Status) }
     | Some task ->
         let branchName = task.BranchName |> Option.defaultValue taskId
 
@@ -180,10 +189,13 @@ let private handleSubmitCore (rt: CoordinatorRuntime) (taskId: string) (reported
                       Body = encodeResult "event_log_failed" }
             | Ok() ->
                 let now = rt.Deps.Now()
-                rt.Dag <- rt.Dag |> updateTask taskId (fun (t: SquadTask) ->
-                    match tryWithStatus t Submitted now with
-                    | Ok t2 -> t2
-                    | Error _ -> t)
+
+                rt.Dag <-
+                    rt.Dag
+                    |> updateTask taskId (fun (t: SquadTask) ->
+                        match tryWithStatus t Submitted now with
+                        | Ok t2 -> t2
+                        | Error _ -> t)
 
                 let! result =
                     rt.GitQueue.Enqueue(fun () ->
@@ -213,7 +225,15 @@ let private handleSubmitCore (rt: CoordinatorRuntime) (taskId: string) (reported
 
                     match mCommit with
                     | Error err ->
-                        do! commitEvent rt (TaskError(rt.Dag.SessionId, taskId, sprintf "git merged but event log write failed: %s" err)) |> Promise.map ignore
+                        do!
+                            commitEvent
+                                rt
+                                (TaskError(
+                                    rt.Dag.SessionId,
+                                    taskId,
+                                    sprintf "git merged but event log write failed: %s" err
+                                ))
+                            |> Promise.map ignore
                     | Ok() ->
                         let n2 = rt.Deps.Now()
 
@@ -238,10 +258,14 @@ let private handleSubmitCore (rt: CoordinatorRuntime) (taskId: string) (reported
                     do! schedulerTick rt
                 | _ ->
                     let n2 = rt.Deps.Now()
-                    rt.Dag <- rt.Dag |> updateTask taskId (fun (t: SquadTask) ->
-                        match tryWithStatus t Running n2 with
-                        | Ok t2 -> t2
-                        | Error _ -> t)
+
+                    rt.Dag <-
+                        rt.Dag
+                        |> updateTask taskId (fun (t: SquadTask) ->
+                            match tryWithStatus t Running n2 with
+                            | Ok t2 -> t2
+                            | Error _ -> t)
+
                     do! schedulerTick rt
 
                 return

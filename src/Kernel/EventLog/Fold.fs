@@ -2,15 +2,9 @@ module Wanxiangshu.Kernel.EventLog.Fold
 
 open Wanxiangshu.Kernel.EventLog.Types
 open Wanxiangshu.Kernel.EventLog.FallbackInjectionFold
+open Wanxiangshu.Kernel.EventLog.ReviewLoopFold
 open Wanxiangshu.Kernel.BacklogProjectionCore
 open Wanxiangshu.Kernel.Nudge.Types
-
-let private payloadTask (e: WanEvent) : string option =
-    e.Payload
-    |> Map.tryFind "task"
-    |> Option.bind (fun t -> if t = "" then None else Some t)
-
-let private payloadVerdict (e: WanEvent) : string option = e.Payload |> Map.tryFind "verdict"
 
 let private forSession (sessionId: string) (events: WanEvent list) : WanEvent list =
     events |> List.filter (fun e -> e.Session = sessionId)
@@ -23,24 +17,22 @@ let foldEventStream
     : 'State =
     forSession sessionId events |> List.fold folder zero
 
-let private reviewTaskFolder (current: string option) (e: WanEvent) : string option =
-    match e.Kind with
-    | k when k = eventKindLoopActivated -> payloadTask e |> Option.orElse current
-    | k when k = eventKindLoopCancelled -> None
-    | k when k = eventKindReviewVerdict ->
-        match payloadVerdict e with
-        | Some v when isEndVerdict v -> None
-        | _ -> current
-    | _ -> current
+let private reviewLoopFolder (current: ReviewLoopFold) (e: WanEvent) : ReviewLoopFold =
+    ReviewLoopFold.foldEvent current e
+
+let foldReviewLoop (sessionId: string) (events: WanEvent list) : ReviewLoopFold =
+    foldEventStream sessionId ReviewLoopFold.initial reviewLoopFolder events
 
 let foldReviewTask (sessionId: string) (events: WanEvent list) : string option =
-    foldEventStream sessionId None reviewTaskFolder events
+    foldReviewLoop sessionId events |> ReviewLoopFold.activeTask
 
 type WorkBacklogSnapshot =
     { TodosJson: string option
       LatestEntry: BacklogEntry option }
 
 let private payloadField (key: string) (e: WanEvent) : string option = e.Payload |> Map.tryFind key
+
+let private payloadVerdict (e: WanEvent) : string option = payloadField "verdict" e
 
 let backlogEntryFromPayload (payload: Map<string, string>) : BacklogEntry option =
     match
@@ -281,7 +273,13 @@ let emptySessionState () : SessionState =
 let applyEvent (st: SessionState) (e: WanEvent) : SessionState =
     let isBacklog = e.Kind = eventKindWorkBacklogCommitted
 
-    { ReviewTask = reviewTaskFolder st.ReviewTask e
+    { ReviewTask =
+        reviewLoopFolder
+            (match st.ReviewTask with
+             | Some t -> Active t
+             | None -> Inactive)
+            e
+        |> activeTask
       Backlog =
         if isBacklog then
             match backlogEntryFromPayload e.Payload with
