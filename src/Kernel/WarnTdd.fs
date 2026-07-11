@@ -35,7 +35,8 @@ let isModificationTool (tool: string) : bool =
 
 // ── warn hook (acknowledgement for tools with side effects beyond code modification) ──
 
-let warnCanonicalValue = "it-is-not-possible-to-do-it-using-other-tools"
+let warnCanonicalValue =
+    "it-is-not-possible-to-do-it-using-other-tools-and-only-run-tests-when-static-analysis-cannot-handle-it"
 
 let parseWarn (s: string) : bool = s = warnCanonicalValue
 
@@ -48,7 +49,7 @@ let isWarnRequiredTool (tool: string) : bool =
 let warnDescription =
     "Warning acknowledgement: '"
     + warnCanonicalValue
-    + "' — acknowledge that this task cannot be done with other tools."
+    + "' — acknowledge that this task cannot be done with other tools and only run tests when static analysis cannot handle it."
 
 let warnTddDescription =
     "Warning acknowledgement: '"

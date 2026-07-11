@@ -46,7 +46,8 @@ let private toolSchemaProperties (harness: Harness) (name: string) : obj =
 let private warnTddValue =
     "i-am-sure-i-have-followed-tdd-and-kolmolgorov-principles-and-kept-todo-updated"
 
-let private warnValue = "it-is-not-possible-to-do-it-using-other-tools"
+let private warnValue =
+    "it-is-not-possible-to-do-it-using-other-tools-and-only-run-tests-when-static-analysis-cannot-handle-it"
 
 let runAll (args: string array) : JS.Promise<int> =
     promise {

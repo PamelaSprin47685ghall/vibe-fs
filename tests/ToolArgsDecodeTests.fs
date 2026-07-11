@@ -75,7 +75,9 @@ let decodeExecutorOkShell () =
               "timeout_type", box "long"
               "mode", box "rw"
               "what_to_summarize", box "focus on exit codes and stderr"
-              "warn", box "it-is-not-possible-to-do-it-using-other-tools" ]
+              "warn",
+              box
+                  "it-is-not-possible-to-do-it-using-other-tools-and-only-run-tests-when-static-analysis-cannot-handle-it" ]
 
     match decodeToolInvocation "executor" args with
     | Ok(Typed(Executor ex)) ->
@@ -94,7 +96,9 @@ let decodeExecutorMissingWhatToSummarize () =
               "program", box "echo ok"
               "timeout_type", box "long"
               "mode", box "rw"
-              "warn", box "it-is-not-possible-to-do-it-using-other-tools" ]
+              "warn",
+              box
+                  "it-is-not-possible-to-do-it-using-other-tools-and-only-run-tests-when-static-analysis-cannot-handle-it" ]
 
     match decodeToolInvocation "executor" args with
     | Error(InvalidIntent("executor", "what_to_summarize", "required")) ->
