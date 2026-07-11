@@ -72,7 +72,8 @@ let executorMapping () =
           timeoutType = Long
           mode = "ro"
           cwd = None
-          whatToSummarize = "" }
+          whatToSummarize = ""
+          maxBytes = 8192 }
 
     let run o =
         Wanxiangshu.Shell.Executor.mapOutcome opts 10000 "out" o

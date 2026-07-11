@@ -31,8 +31,6 @@ let timeoutMs =
     | Short -> 10_000
     | Long -> 100_000
 
-let summaryThresholdBytes = 8192
-
 type ExecuteOptions =
     { program: string
       language: ExecutorLanguage
@@ -40,7 +38,8 @@ type ExecuteOptions =
       timeoutType: ExecutorTimeoutType
       mode: string
       cwd: string option
-      whatToSummarize: string }
+      whatToSummarize: string
+      maxBytes: int }
 
 type ExecuteResult =
     | Completed of output: string * exitCode: int
@@ -117,8 +116,7 @@ let prependSafetyWarning (output: string) (program: string) (language: ExecutorL
                     info = [ InfoItem.Hint hintExecutorMisuse ]
                     body = output }
 
-let shouldSummarize (byteLength: string -> int) (output: string) : bool =
-    byteLength output > summaryThresholdBytes
+let shouldSummarize (byteLength: string -> int) (maxBytes: int) (output: string) : bool = byteLength output > maxBytes
 
 let prepareShellProgram (program: string) : string = (strip program).script
 

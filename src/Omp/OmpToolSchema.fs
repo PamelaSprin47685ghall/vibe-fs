@@ -150,7 +150,8 @@ let executorParameters (tb: obj) : obj =
                ("dependencies", opt Params.executorDeps tb (fun desc tb -> strArray desc tb))
                ("timeout_type", enumOf [| "short"; "long" |] Params.executorTimeout tb)
                ("mode", enumOf [| "ro"; "rw" |] Params.executorMode tb)
-               ("what_to_summarize", str Params.executorWhatToSummarize tb) |]
+               ("what_to_summarize", str Params.executorWhatToSummarize tb)
+               ("max_bytes", num Params.executorMaxBytes tb) |]
             tb
 
     if isModificationTool "executor" then
@@ -179,6 +180,7 @@ let executorParameters (tb: obj) : obj =
                            "description", box warnDescription |]
                 )
 
+    addRequired schema "max_bytes"
     addRequired schema "what_to_summarize"
     injectAmendIntoOmpParameters schema
 

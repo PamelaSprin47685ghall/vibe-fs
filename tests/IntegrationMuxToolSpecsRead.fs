@@ -34,6 +34,7 @@ let muxExecutorRoCatPrependsWarningSpec () =
                       "timeout_type", box "short"
                       "mode", box "ro"
                       "what_to_summarize", box "summarize exit codes"
+                      "max_bytes", box 8192
                       "warn",
                       box
                           "it-is-not-possible-to-do-it-using-other-tools-and-only-run-tests-when-static-analysis-cannot-handle-it" ]

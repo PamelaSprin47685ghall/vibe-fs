@@ -44,7 +44,8 @@ let decodeExecutorOkShell () =
               "dependencies", box [| "dep-a" |]
               "timeout_type", box "long"
               "mode", box "rw"
-              "what_to_summarize", box "summarize exit codes and stderr only" ]
+              "what_to_summarize", box "summarize exit codes and stderr only"
+              "max_bytes", box 8192 ]
 
     match decodeExecutorArgs args with
     | Ok ex ->

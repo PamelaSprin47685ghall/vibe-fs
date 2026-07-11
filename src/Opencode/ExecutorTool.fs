@@ -46,7 +46,8 @@ let executorTool
                dependencies = strArrayOpt Params.executorDeps
                timeout_type = enumReq [| "short"; "long" |] Params.executorTimeout
                mode = enumReq [| "ro"; "rw" |] Params.executorMode
-               what_to_summarize = strReq Params.executorWhatToSummarize |})
+               what_to_summarize = strReq Params.executorWhatToSummarize
+               max_bytes = numReq Params.executorMaxBytes |})
         (fun args context ->
             match decodeExecutorArgs args with
             | Error e -> resolveStr (wireDomainFailure "Executor" e)
@@ -69,7 +70,7 @@ let executorTool
                                     let! result = Wanxiangshu.Shell.Executor.execute options sessionID
                                     let output = outputFromResult result
 
-                                    if not (shouldSummarize byteLength output) then
+                                    if not (shouldSummarize byteLength options.maxBytes output) then
                                         let formatted = formatToolResponse result None
                                         return prependSafetyWarningForExecution formatted options
                                     else

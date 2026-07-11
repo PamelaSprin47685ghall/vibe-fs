@@ -11,6 +11,7 @@ open Wanxiangshu.Omp.Codec
 open Wanxiangshu.Omp.MessagingCodec
 open Wanxiangshu.Omp.OmpToolSchema
 open Wanxiangshu.Omp.Schema
+open Wanxiangshu.Shell.DynField
 
 module Dyn = Wanxiangshu.Shell.Dyn
 
@@ -49,7 +50,13 @@ let private parseExecutorParams (params': obj) (ctx: obj) =
             unbox<obj array> d |> Array.map string |> List.ofArray
 
     let cwd = Dyn.str ctx "cwd"
-    (lang, program, what, timeoutType, mode, deps, cwd)
+
+    let maxBytes =
+        match optInt params' "max_bytes" with
+        | Some mb -> mb
+        | None -> 8192
+
+    (lang, program, what, timeoutType, mode, deps, cwd, maxBytes)
 
 let private runExecutorJob (options: ExecuteOptions) (signal: obj) (childId: string) =
     promise {
@@ -93,7 +100,7 @@ let private summarizeOutput
 
 let private executeExecutor (pi: obj) (_id: string) (params': obj) (signal: obj) (_onUpdate: obj) (ctx: obj) =
     promise {
-        let (lang, program, what, timeoutType, mode, deps, cwd) =
+        let (lang, program, what, timeoutType, mode, deps, cwd, maxBytes) =
             parseExecutorParams params' ctx
 
         let mutable childHolder: ChildSession option = None
@@ -138,12 +145,13 @@ let private executeExecutor (pi: obj) (_id: string) (params': obj) (signal: obj)
                           timeoutType = timeoutType
                           mode = mode
                           cwd = Some cwd
-                          whatToSummarize = what }
+                          whatToSummarize = what
+                          maxBytes = maxBytes }
 
                     let! result = runExecutorJob options signal childId
                     let output = outputFromResult result
 
-                    if not (shouldSummarize byteLength output) then
+                    if not (shouldSummarize byteLength options.maxBytes output) then
                         finishJob ()
                         return textResult output
                     else
