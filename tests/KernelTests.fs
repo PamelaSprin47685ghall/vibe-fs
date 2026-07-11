@@ -7,6 +7,7 @@ open Wanxiangshu.Kernel.ToolOutputInfo
 open Wanxiangshu.Kernel.Executor
 open Wanxiangshu.Kernel.Domain
 open Wanxiangshu.Kernel.Messaging
+open Wanxiangshu.Kernel
 open Wanxiangshu.Shell.ErrorClassify
 open Wanxiangshu.Shell.Dyn
 
@@ -148,3 +149,46 @@ let dynDeleteKey () =
     check "deleteKey preserves siblings" (str target "keep" = "yes")
     deleteKey null "missing"
     check "deleteKey null is a no-op" true
+
+let finishReason' () =
+    // Test parsing
+    equal "fromString stop" FinishReason.Stop (FinishReason.fromString "stop")
+    equal "fromString STOP with spaces" FinishReason.Stop (FinishReason.fromString "  STOP  ")
+    equal "fromString end" FinishReason.End (FinishReason.fromString "end")
+    equal "fromString tool" FinishReason.ToolCalls (FinishReason.fromString "tool")
+    equal "fromString tool_calls" FinishReason.ToolCalls (FinishReason.fromString "tool_calls")
+    equal "fromString tool-calls" FinishReason.ToolCalls (FinishReason.fromString "tool-calls")
+    equal "fromString tool_use_error" FinishReason.ToolUseError (FinishReason.fromString "tool_use_error")
+    equal "fromString tool-use-error" FinishReason.ToolUseError (FinishReason.fromString "tool-use-error")
+    equal "fromString abort" FinishReason.Abort (FinishReason.fromString "abort")
+    equal "fromString interrupted" FinishReason.Interrupted (FinishReason.fromString "interrupted")
+    equal "fromString cancelled" FinishReason.Cancelled (FinishReason.fromString "cancelled")
+    equal "fromString queued-message" FinishReason.QueuedMessage (FinishReason.fromString "queued-message")
+    equal "fromString queued_message" FinishReason.QueuedMessage (FinishReason.fromString "queued_message")
+    equal "fromString unknown" (FinishReason.Unknown "unknown_val") (FinishReason.fromString "unknown_val")
+
+    // Test toString
+    equal "toString Stop" "stop" (FinishReason.toString FinishReason.Stop)
+    equal "toString End" "end" (FinishReason.toString FinishReason.End)
+    equal "toString ToolCalls" "tool_calls" (FinishReason.toString FinishReason.ToolCalls)
+    equal "toString ToolUseError" "tool_use_error" (FinishReason.toString FinishReason.ToolUseError)
+    equal "toString Abort" "abort" (FinishReason.toString FinishReason.Abort)
+    equal "toString Interrupted" "interrupted" (FinishReason.toString FinishReason.Interrupted)
+    equal "toString Cancelled" "cancelled" (FinishReason.toString FinishReason.Cancelled)
+    equal "toString QueuedMessage" "queued_message" (FinishReason.toString FinishReason.QueuedMessage)
+    equal "toString Unknown" "custom_val" (FinishReason.toString (FinishReason.Unknown "custom_val"))
+
+    // Test queries
+    check "Stop isTerminal" (FinishReason.isTerminal FinishReason.Stop)
+    check "End isTerminal" (FinishReason.isTerminal FinishReason.End)
+    check "ToolCalls not isTerminal" (not (FinishReason.isTerminal FinishReason.ToolCalls))
+    check "Abort not isTerminal" (not (FinishReason.isTerminal FinishReason.Abort))
+
+    check "ToolCalls isToolFinish" (FinishReason.isToolFinish FinishReason.ToolCalls)
+    check "ToolUseError isToolFinish" (FinishReason.isToolFinish FinishReason.ToolUseError)
+    check "Stop not isToolFinish" (not (FinishReason.isToolFinish FinishReason.Stop))
+
+    check "Abort isAbort" (FinishReason.isAbort FinishReason.Abort)
+    check "Interrupted isAbort" (FinishReason.isAbort FinishReason.Interrupted)
+    check "Cancelled isAbort" (FinishReason.isAbort FinishReason.Cancelled)
+    check "Stop not isAbort" (not (FinishReason.isAbort FinishReason.Stop))

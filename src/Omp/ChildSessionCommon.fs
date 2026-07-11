@@ -15,6 +15,11 @@ open Wanxiangshu.Kernel.FallbackKernel.Types
 
 module Dyn = Wanxiangshu.Shell.Dyn
 
+[<RequireQualifiedAccess>]
+type SubagentResetPolicy =
+    | ResetToActive
+    | KeepState
+
 let noOutputText = "(no output)"
 let abortedPrefix = "(aborted)"
 
@@ -24,17 +29,19 @@ let runOmpSubagentCore
     (childId: string)
     (session: obj)
     (prompt: string)
-    (resetTaskComplete: bool)
+    (resetPolicy: SubagentResetPolicy)
     : JS.Promise<string> =
     promise {
         if childId <> "" && fallbackConfigOpt.IsSome then
             let initSt = fallbackRuntime.GetOrCreateState childId
 
-            if resetTaskComplete then
+            match resetPolicy with
+            | SubagentResetPolicy.ResetToActive ->
                 fallbackRuntime.UpdateState
                     childId
                     { initSt with
                         Lifecycle = FallbackLifecycle.Active }
+            | SubagentResetPolicy.KeepState -> ()
 
             fallbackRuntime.SetSubsessionPending childId true
 

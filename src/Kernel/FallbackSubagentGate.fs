@@ -51,7 +51,18 @@ let needFallbackContinue (obs: FallbackGateObservation) : bool =
             | None -> false
 
 let gateDemandFromObservation (obs: FallbackGateObservation) : SessionGateDemand =
-    resolveGateDemand (needFallbackContinue obs) (gateOn obs FallbackSessionGateFlag.NudgeActive) false
+    let signals =
+        [ if needFallbackContinue obs then
+              Some GateSignal.FallbackContinue
+          else
+              None
+          if gateOn obs FallbackSessionGateFlag.NudgeActive then
+              Some GateSignal.TodoNudge
+          else
+              None ]
+        |> List.choose id
+
+    resolveFromSignals signals
 
 let gateModeFromObservation (obs: FallbackGateObservation) : SessionGateMode =
     gateModeFromDemand (gateDemandFromObservation obs)

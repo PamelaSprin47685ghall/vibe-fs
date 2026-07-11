@@ -206,7 +206,13 @@ let runSubagentWithId
             |> Option.iter (fun chain -> fallbackRuntime.SetChain childId chain)
 
         let run =
-            runOmpSubagentCore fallbackRuntime fallbackConfigOpt childId session prompt true
+            runOmpSubagentCore
+                fallbackRuntime
+                fallbackConfigOpt
+                childId
+                session
+                prompt
+                SubagentResetPolicy.ResetToActive
 
         let cleanup () =
             let childSess = unbox<IChildSession> session

@@ -51,12 +51,12 @@ let testTransformO1Cache () =
             { SessionID = ""
               Agent = "main"
               Directory = ""
-              Excluded = false
+              ProjectionPolicy = ProjectionPolicy.IncludeProjection
               IsSubagentSession = false
               Cleaned = []
               RawArray = None
               SembleInjectEnabled = false
-              Scope = Wanxiangshu.Shell.RuntimeScope.create()
+              Scope = Wanxiangshu.Shell.RuntimeScope.create ()
               MaxInputTokens = 200000
               GetContextUsage = (fun _ -> Promise.lift None) }
 
@@ -65,7 +65,7 @@ let testTransformO1Cache () =
               GetOrRebuildBacklog = fun _ _ -> [] }
 
         let encodeMessages (msgs: Message<obj> list) = [||]
-        let injectFn (_excluded: bool) (arr: obj array) = promise { return arr }
+        let injectFn (_policy: ProjectionPolicy) (arr: obj array) = promise { return arr }
         let loadCaps () = promise { return [] }
         let buildCaps (arr: obj array) (_caps: CapsFile list) (_hint: string option) = arr
 
@@ -143,17 +143,17 @@ let testSingleToolCallPromptInjection () =
         let loadCaps () = promise { return [] }
         let buildCaps (arr: obj array) _ _ = arr
 
-        let runTransform sessionID excluded msgs =
+        let runTransform sessionID projectionPolicy msgs =
             let plan =
                 { SessionID = sessionID
                   Agent = "main"
                   Directory = ""
-                  Excluded = excluded
+                  ProjectionPolicy = projectionPolicy
                   IsSubagentSession = false
                   Cleaned = msgs
                   RawArray = None
                   SembleInjectEnabled = false
-                  Scope = Wanxiangshu.Shell.RuntimeScope.create()
+                  Scope = Wanxiangshu.Shell.RuntimeScope.create ()
                   MaxInputTokens = 200000
                   GetContextUsage = (fun _ -> Promise.lift None) }
 
@@ -175,7 +175,7 @@ let testSingleToolCallPromptInjection () =
               mkMsg "assist" Assistant [ ToolPart("read", "call-1", None, null) ]
               mkMsg "result" ToolResult [] ]
 
-        let! res1 = runTransform "s1" false msgs1
+        let! res1 = runTransform "s1" ProjectionPolicy.IncludeProjection msgs1
         equal "Case 1 output length (should be 4)" 4 res1.Length
         let lastMsg = res1.[res1.Length - 1] :?> Message<obj>
         equal "last message role" User lastMsg.info.role
@@ -186,7 +186,7 @@ let testSingleToolCallPromptInjection () =
             | Some(TextPart txt) -> txt
             | _ -> ""
 
-        check "promptText contains '并行'" (promptText.Contains("并行"))
+        check "promptText contains 'parallel'" (promptText.Contains("parallel"))
 
         // Case 2: 双工具调用 + ToolResult -> 不应附加
         let msgs2 =
@@ -198,7 +198,7 @@ let testSingleToolCallPromptInjection () =
                     ToolPart("write", "call-2", None, null) ]
               mkMsg "result" ToolResult [] ]
 
-        let! res2 = runTransform "s2" false msgs2
+        let! res2 = runTransform "s2" ProjectionPolicy.IncludeProjection msgs2
         equal "Case 2 length" 3 res2.Length
 
         // Case 3: 伪造工具调用 (semble) + ToolResult -> 不应附加
@@ -207,7 +207,7 @@ let testSingleToolCallPromptInjection () =
               mkMsg "assist" Assistant [ ToolPart("read", "semble-call-123", None, null) ]
               mkMsg "result" ToolResult [] ]
 
-        let! res3 = runTransform "s3" false msgs3
+        let! res3 = runTransform "s3" ProjectionPolicy.IncludeProjection msgs3
         equal "Case 3 length" 3 res3.Length
 
         // Case 4: 混合场景 (1 个真工具 + 1 个 semble 工具) -> 不应附加
@@ -220,17 +220,17 @@ let testSingleToolCallPromptInjection () =
                     ToolPart("write", "semble-call-2", None, null) ]
               mkMsg "result" ToolResult [] ]
 
-        let! res4 = runTransform "s4" false msgs4
+        let! res4 = runTransform "s4" ProjectionPolicy.IncludeProjection msgs4
         equal "Case 4 length" 3 res4.Length
 
         // Case 5: Excluded = true -> 不应附加
-        let! res5 = runTransform "s5" true msgs1
+        let! res5 = runTransform "s5" ProjectionPolicy.ExcludeProjection msgs1
         equal "Case 5 length (excluded)" 3 res5.Length
 
         // Case 6: 多轮迭代不变性 (使用全新 sessionID 以绕过缓存，输入包含上一轮注入的 synth 消息，排除合成消息后应重新注入)
         let typedRes1 = res1 |> Array.toList |> List.map (fun x -> x :?> Message<obj>)
         let strippedRes1 = Wanxiangshu.Kernel.Messaging.stripSyntheticBySource typedRes1
-        let! res6 = runTransform "s6" false strippedRes1
+        let! res6 = runTransform "s6" ProjectionPolicy.IncludeProjection strippedRes1
         equal "Case 6 length after second round" 4 res6.Length
 
         // Case 7: 边界情况 - 重复 ID 消息安全通过不崩溃
@@ -239,7 +239,7 @@ let testSingleToolCallPromptInjection () =
               mkMsg "dup-id" Assistant [ ToolPart("read", "call-1", None, null) ]
               mkMsg "dup-id" ToolResult [] ]
 
-        let! res7 = runTransform "s7" false msgs7
+        let! res7 = runTransform "s7" ProjectionPolicy.IncludeProjection msgs7
         equal "Case 7 length with duplicate IDs" 4 res7.Length
     }
 

@@ -109,6 +109,7 @@ let coreTestEntries () : (string * TestBody) list =
       "KernelTests.headTail'", TestBody.Sync(sync KernelTests.headTail')
       "KernelTests.stripLexer'", TestBody.Sync(sync KernelTests.stripLexer')
       "KernelTests.jsBoundary'", TestBody.Sync(sync KernelTests.jsBoundary')
+      "KernelTests.finishReason'", TestBody.Sync(sync KernelTests.finishReason')
       "KernelPromptSpecs.hostKernel'", TestBody.Sync(sync KernelPromptSpecs.hostKernel')
       "DynFieldTests.run", TestBody.Sync(sync DynFieldTests.run)
       "KernelPromptSpecs.toolCatalogCentralized", TestBody.Sync(sync KernelPromptSpecs.toolCatalogCentralized)

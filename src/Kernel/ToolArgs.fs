@@ -39,6 +39,26 @@ type TodoItemStatus =
     | Completed
     | Cancelled
 
+module TodoItemStatus =
+    let fromString (s: string) : TodoItemStatus =
+        if isNull s then
+            Todo
+        else
+            match s.Trim().ToLowerInvariant() with
+            | "completed" -> Completed
+            | "cancelled"
+            | "canceled" -> Cancelled
+            | "in_progress"
+            | "inprogress" -> InProgress
+            | _ -> Todo
+
+    let isTerminal (s: TodoItemStatus) : bool =
+        match s with
+        | Completed
+        | Cancelled -> true
+        | Todo
+        | InProgress -> false
+
 type TodoItemPriority =
     | Low
     | Medium

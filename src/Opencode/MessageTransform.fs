@@ -138,10 +138,18 @@ let messagesTransform
             let sessionID = extractSessionID messagesList
             let cleaned = Messaging.stripSyntheticBySource messagesList
             let isSub = registry.ResolveSubsessionParentID(Some sessionID) |> Option.isSome
-            let excluded = shouldExcludeAgentFromProjection agent false
+
+            let projectionPolicy =
+                if shouldExcludeAgentFromProjection agent false then
+                    ProjectionPolicy.ExcludeProjection
+                else
+                    ProjectionPolicy.IncludeProjection
 
             let sembleInjectEnabled =
-                not excluded && (agent = "investigator" || agent = "reviewer")
+                (match projectionPolicy with
+                 | ProjectionPolicy.ExcludeProjection -> false
+                 | ProjectionPolicy.IncludeProjection -> true)
+                && (agent = "investigator" || agent = "reviewer")
 
             let backlogOps =
                 backlogSessionOpsFrom backlogSession.Host (fun sid msgs ->
@@ -159,7 +167,7 @@ let messagesTransform
                 { SessionID = sessionID
                   Agent = agent
                   Directory = directory
-                  Excluded = excluded
+                  ProjectionPolicy = projectionPolicy
                   IsSubagentSession = isSub
                   Cleaned = cleaned
                   RawArray = Some messagesArr
@@ -171,11 +179,10 @@ let messagesTransform
             let replayTexts () : JS.Promise<string seq> =
                 Promise.lift (extractTextsFromEncodedMessages messagesArr)
 
-            let injectFn excluded encoded =
-                if excluded then
-                    Promise.lift encoded
-                else
-                    injectSembleIntoEncoded directory agent sessionID encoded
+            let injectFn policy encoded =
+                match policy with
+                | ProjectionPolicy.ExcludeProjection -> Promise.lift encoded
+                | ProjectionPolicy.IncludeProjection -> injectSembleIntoEncoded directory agent sessionID encoded
 
             let loadCaps () =
                 let parentSessionID =

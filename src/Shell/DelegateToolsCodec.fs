@@ -14,11 +14,6 @@ type DelegateOptionsFields =
     { Experiments: obj
       AiSettingsAgentId: string }
 
-type TaskCreateResult =
-    { Success: bool
-      Error: string
-      TaskId: string }
-
 let decodeSubagentRole (config: obj) : string =
     defaultArg (strField config "subagentRole") ""
 
@@ -43,7 +38,7 @@ let decodeDelegateOptions (options: obj) : DelegateOptionsFields =
     { Experiments = Dyn.get options "experiments"
       AiSettingsAgentId = defaultArg (strField options "aiSettingsAgentId") "" }
 
-let decodeTaskCreateResult (createResult: obj) : Result<TaskCreateResult, DomainError> =
+let decodeTaskCreateResult (createResult: obj) : Result<string, DomainError> =
     if Dyn.isNullish createResult then
         Error(InvalidIntent("delegate", "createResult", "missing"))
     else
@@ -65,10 +60,7 @@ let decodeTaskCreateResult (createResult: obj) : Result<TaskCreateResult, Domain
             if taskId.Trim() = "" then
                 Error(InvalidIntent("delegate.create", "taskId", "missing or empty"))
             else
-                Ok
-                    { Success = true
-                      Error = ""
-                      TaskId = taskId }
+                Ok taskId
 
 let decodeTaskReport (report: obj) : Result<string, DomainError> =
     if Dyn.isNullish report then

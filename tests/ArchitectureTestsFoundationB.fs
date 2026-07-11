@@ -34,14 +34,21 @@ let noQuadraticListAppend () =
 
 let parallelToolPromptSSOTGuard () =
     let content = requireFile "src/Shell/MessageTransformPipeline.fs"
+    let hostTools = requireFile "src/Kernel/HostTools.fs"
 
     check
-        "arch: MessageTransformPipeline references ToolCatalog.all"
-        (content.Contains "Wanxiangshu.Kernel.ToolCatalog.all")
+        "arch: MessageTransformPipeline uses HostTools.isSynthCallId"
+        (content.Contains "Wanxiangshu.Kernel.HostTools.isSynthCallId")
 
     check
-        "arch: MessageTransformPipeline does not hardcode tool catalog list"
-        (not (content.Contains "let catalogNames =\n            [ \"coder\""))
+        "arch: MessageTransformPipeline does not hardcode tool exclude list"
+        (not (content.Contains "let catalogNames ="))
+
+    check "arch: HostTools defines synthCallIdPrefixes" (hostTools.Contains "let synthCallIdPrefixes")
+
+    check "arch: HostTools excludes semble-call- from trigger" (hostTools.Contains "\"semble-call-\"")
+
+    check "arch: HostTools excludes caps-call- from trigger" (hostTools.Contains "\"caps-call-\"")
 
 let wanxiangzhenBoundary () =
     for f in fsFilesRecursive "src/Kernel/Wanxiangzhen" do

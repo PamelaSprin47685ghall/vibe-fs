@@ -131,6 +131,14 @@ let muxSpawnToolUniverse =
        "google_search"
        "url_context" |]
 
+/// Synthetic callID prefixes injected by the host (Semble search, caps
+/// project-file reads). These are never the LLM's own decision and must not
+/// trigger the parallel-tool hint.
+let synthCallIdPrefixes: Set<string> = Set.ofList [ "semble-call-"; "caps-call-" ]
+
+let isSynthCallId (callID: string) : bool =
+    synthCallIdPrefixes |> Set.exists callID.StartsWith
+
 let allToolNames (host: Host) : string array =
     [| "coder"
        "investigator"

@@ -4,6 +4,7 @@ open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Shell.Dyn
 open Wanxiangshu.Kernel.Nudge.TodoStatus
+open Wanxiangshu.Kernel
 open Wanxiangshu.Shell.NudgeRuntimeTypes
 open Wanxiangshu.Shell.NudgeRuntimeMux
 open Wanxiangshu.Shell.EventLogRuntime
@@ -31,17 +32,25 @@ type NudgeRuntime
             match parsed with
             | Ignore -> return ()
             | StreamEnd(workspaceId, stopReason, lastMsg) ->
+                let reason = FinishReason.fromString stopReason
+
                 if
                     not (Dyn.isNullish helpers)
-                    && stopReason <> "queued-message"
-                    && (isTerminalAssistantFinish stopReason || stopReason = "tool_use_error")
+                    && reason <> FinishReason.QueuedMessage
+                    && (isTerminalAssistantFinish stopReason || reason = FinishReason.ToolUseError)
                 then
                     let! newState =
                         runNudgeFlowWithRetryCheck
                             workspaceDirectory
                             runtimeState
                             workspaceId
-                            (collectSnapshotMux fallbackRuntime getChatHistory workspaceDirectory helpers workspaceId lastMsg)
+                            (collectSnapshotMux
+                                fallbackRuntime
+                                getChatHistory
+                                workspaceDirectory
+                                helpers
+                                workspaceId
+                                lastMsg)
                             (sendNudgeMux fallbackRuntime helpers workspaceId)
 
                     runtimeState <- newState

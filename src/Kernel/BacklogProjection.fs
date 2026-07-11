@@ -5,6 +5,11 @@ open Wanxiangshu.Kernel.Messaging
 open Wanxiangshu.Kernel.BacklogProjectionCore
 open Wanxiangshu.Kernel.Message
 
+[<RequireQualifiedAccess>]
+type FoldStrategy =
+    | FoldAfterFirst
+    | FoldAfterSecond
+
 let private isFoldAnchorFor (host: Host) (part: Part<'raw>) : bool = isTodoResultFor host part
 
 type FoldRange = { firstResult: int; secondToLast: int }
@@ -16,7 +21,10 @@ let private todoIndexesFor (host: Host) (flat: FlatPart<'raw> list) : int list =
 
 let private foldTodoAnchorsFor (host: Host) (flat: FlatPart<'raw> list) : int list = todoIndexesFor host flat
 
-let private requiredFoldAnchorCount (foldAfterFirst: bool) : int = if foldAfterFirst then 2 else 3
+let private requiredFoldAnchorCount (strategy: FoldStrategy) : int =
+    match strategy with
+    | FoldStrategy.FoldAfterFirst -> 2
+    | FoldStrategy.FoldAfterSecond -> 3
 
 let private messageTimeOrNull (msg: Message<'raw>) : 'raw = msg.info.time
 
@@ -35,9 +43,9 @@ let private collectUserText (flat: FlatPart<'raw> list) (fromIdx: int) (toIdx: i
             else
                 None)
 
-let findFoldRangeFor (host: Host) (flat: FlatPart<'raw> list) (foldAfterFirst: bool) : FoldRange option =
+let findFoldRangeFor (host: Host) (flat: FlatPart<'raw> list) (strategy: FoldStrategy) : FoldRange option =
     let todoIdxs = foldTodoAnchorsFor host flat
-    let minResults = requiredFoldAnchorCount foldAfterFirst
+    let minResults = requiredFoldAnchorCount strategy
 
     if todoIdxs.Length < minResults then
         None
@@ -52,8 +60,8 @@ let findFoldRangeFor (host: Host) (flat: FlatPart<'raw> list) (foldAfterFirst: b
                 { firstResult = firstResult
                   secondToLast = secondToLast }
 
-let findFoldRange (flat: FlatPart<'raw> list) (foldAfterFirst: bool) : FoldRange option =
-    findFoldRangeFor opencode flat foldAfterFirst
+let findFoldRange (flat: FlatPart<'raw> list) (strategy: FoldStrategy) : FoldRange option =
+    findFoldRangeFor opencode flat strategy
 
 let private buildPrefixUserMessage (id: string) (text: string) (sessionID: string) (time: 'raw) : Message<'raw> =
     { info =
@@ -121,7 +129,7 @@ let projectBacklogFor
     (host: Host)
     (messages: Message<'raw> list)
     (backlog: BacklogEntry list)
-    (foldAfterFirst: bool)
+    (strategy: FoldStrategy)
     (sessionID: string)
     : Message<'raw> list =
     if messages.IsEmpty then
@@ -129,7 +137,7 @@ let projectBacklogFor
     else
         let flat = flatten messages
 
-        match findFoldRangeFor host flat foldAfterFirst with
+        match findFoldRangeFor host flat strategy with
         | None -> messages
         | Some range ->
             let foldedBacklog =
@@ -176,7 +184,7 @@ let projectBacklogFor
 let projectBacklog
     (messages: Message<'raw> list)
     (backlog: BacklogEntry list)
-    (foldAfterFirst: bool)
+    (strategy: FoldStrategy)
     (sessionID: string)
     : Message<'raw> list =
-    projectBacklogFor opencode messages backlog foldAfterFirst sessionID
+    projectBacklogFor opencode messages backlog strategy sessionID

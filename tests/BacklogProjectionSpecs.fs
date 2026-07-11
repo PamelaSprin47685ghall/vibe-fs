@@ -27,7 +27,7 @@ let projectBacklogFolds () =
           backlogEntry 2 "Report 2"
           backlogEntry 3 "Report 3" ]
 
-    let r = projectBacklog msgs backlog false "test"
+    let r = projectBacklog msgs backlog FoldStrategy.FoldAfterSecond "test"
     let allJson: string = Fable.Core.JS.JSON.stringify (encodeMessages r)
     check "backlog fold: has prefix" (allJson.Contains(backlogPrefixIdPrefix))
     check "backlog fold: has Report 1" (allJson.Contains("Report 1"))
@@ -36,7 +36,7 @@ let projectBacklogFolds () =
 let projectBacklogNoFold () =
     let msgs = [ todoWriteMsg "m1" "c1" "R1"; todoWriteMsg "m2" "c2" "R2" ]
     let backlog = [ backlogEntry 1 "R1"; backlogEntry 2 "R2" ]
-    let r = projectBacklog msgs backlog false "test"
+    let r = projectBacklog msgs backlog FoldStrategy.FoldAfterSecond "test"
     check "magic no fold: passthrough" (obj.ReferenceEquals(r, msgs))
 
 let projectBacklogForMimocodeUsesTask () =
@@ -50,7 +50,7 @@ let projectBacklogForMimocodeUsesTask () =
           toolMsg "task" "m4" "c4" "Report 3b" ]
 
     let backlog = replayBacklogFor Mimocode (create ()) msgs
-    let r = projectBacklogFor Mimocode msgs backlog false "test"
+    let r = projectBacklogFor Mimocode msgs backlog FoldStrategy.FoldAfterSecond "test"
     let allJson: string = Fable.Core.JS.JSON.stringify (encodeMessages r)
     check "mimocode project: has prefix" (allJson.Contains(backlogPrefixIdPrefix))
     check "mimocode project: has Report 1" (allJson.Contains("Report 1"))
@@ -70,7 +70,7 @@ let projectBacklogHidesErrors () =
           todoWriteMsg "m3" "c3" "R3" ]
 
     let backlog = [ backlogEntry 1 "R1"; backlogEntry 2 "R2"; backlogEntry 3 "R3" ]
-    let r = projectBacklog msgs backlog false "test"
+    let r = projectBacklog msgs backlog FoldStrategy.FoldAfterSecond "test"
     let allJson: string = Fable.Core.JS.JSON.stringify (encodeMessages r)
     check "magic errors: error surfaced in notice" (allJson.Contains("Validation failed"))
 
@@ -83,7 +83,7 @@ let projectBacklogDropsFoldedUserMessages () =
           todoWriteMsg "m3" "c3" "R3" ]
 
     let backlog = [ backlogEntry 1 "R1"; backlogEntry 2 "R2"; backlogEntry 3 "R3" ]
-    let r = projectBacklog msgs backlog false "test"
+    let r = projectBacklog msgs backlog FoldStrategy.FoldAfterSecond "test"
     let allJson: string = Fable.Core.JS.JSON.stringify (encodeMessages r)
     let text = visibleText r
     check "backlog fold: hides original folded users" (not (allJson.Contains("\"id\":\"u2\"")))
@@ -105,7 +105,7 @@ let projectBacklogKeepsReviewInFold () =
           todoWriteMsg "m3" "c3" "R3" ]
 
     let backlog = [ backlogEntry 1 "R1"; backlogEntry 2 "R2"; backlogEntry 3 "R3" ]
-    let r = projectBacklog msgs backlog false "test"
+    let r = projectBacklog msgs backlog FoldStrategy.FoldAfterSecond "test"
     let allJson: string = Fable.Core.JS.JSON.stringify (encodeMessages r)
     check "magic review: tool name kept" (allJson.Contains(reviewToolName))
     check "magic review: output kept" (allJson.Contains("Review accepted the work"))
@@ -120,7 +120,7 @@ let projectBacklogPrefixUsesTodoTime () =
           todoWriteMsg "m3" "c3" "R3" ]
 
     let backlog = [ backlogEntry 1 "R1"; backlogEntry 2 "R2"; backlogEntry 3 "R3" ]
-    let r = projectBacklog msgs backlog false "test"
+    let r = projectBacklog msgs backlog FoldStrategy.FoldAfterSecond "test"
     let prefixTime = r.[0].info.time
     check "backlog prefix: keeps folded todo created time" (unbox<int> (get prefixTime "created") = 111)
     check "backlog prefix: keeps folded todo completed time" (unbox<int> (get prefixTime "completed") = 222)
@@ -142,7 +142,7 @@ let projectBacklogPrefixStaysStableWhenGrowing () =
           backlogEntry 3 "R3"
           backlogEntry 4 "R4" ]
 
-    let projected3 = projectBacklog msgs3 backlog3 false "test"
+    let projected3 = projectBacklog msgs3 backlog3 FoldStrategy.FoldAfterSecond "test"
 
     let msgs4 =
         [ userMsg "u1" "start"
@@ -163,7 +163,7 @@ let projectBacklogPrefixStaysStableWhenGrowing () =
           backlogEntry 4 "R4"
           backlogEntry 5 "R5" ]
 
-    let projected4 = projectBacklog msgs4 backlog4 false "test"
+    let projected4 = projectBacklog msgs4 backlog4 FoldStrategy.FoldAfterSecond "test"
 
     let sharedPrefix3: string =
         Fable.Core.JS.JSON.stringify (encodeMessages projected3.[0..2])

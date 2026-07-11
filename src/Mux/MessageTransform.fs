@@ -47,8 +47,11 @@ let messagesTransform
             let agent = decoded.Agent
             let sessionID = decoded.SessionID
 
-            let excluded =
-                shouldExcludeAgentFromProjection agent (isChildWorkspace deps sessionID)
+            let projectionPolicy =
+                if shouldExcludeAgentFromProjection agent (isChildWorkspace deps sessionID) then
+                    ProjectionPolicy.ExcludeProjection
+                else
+                    ProjectionPolicy.IncludeProjection
 
             let typedMessages = decodeMessages sessionID messagesArr
             let cleanedMessages = stripSyntheticBySource typedMessages
@@ -68,7 +71,7 @@ let messagesTransform
                 { SessionID = sessionID
                   Agent = agent
                   Directory = directory
-                  Excluded = excluded
+                  ProjectionPolicy = projectionPolicy
                   IsSubagentSession = isChildWorkspace deps sessionID
                   Cleaned = cleanedMessages
                   RawArray = Some messagesArr

@@ -58,8 +58,11 @@ let transformEntriesAsyncWithAgent
             else
                 let messagesList = decodeEntries sessionId entriesArr
 
-                let excluded =
-                    shouldExcludeAgentFromProjection agent (isChildSession ExecutorTools.ompScope sessionId)
+                let projectionPolicy =
+                    if shouldExcludeAgentFromProjection agent (isChildSession ExecutorTools.ompScope sessionId) then
+                        ProjectionPolicy.ExcludeProjection
+                    else
+                        ProjectionPolicy.IncludeProjection
 
                 let cleaned = stripSyntheticBySource messagesList
 
@@ -76,7 +79,7 @@ let transformEntriesAsyncWithAgent
                     { SessionID = sessionId
                       Agent = agent
                       Directory = cwd
-                      Excluded = excluded
+                      ProjectionPolicy = projectionPolicy
                       IsSubagentSession = isChildSession ExecutorTools.ompScope sessionId
                       Cleaned = cleaned
                       RawArray = Some entriesArr
@@ -93,7 +96,12 @@ let transformEntriesAsyncWithAgent
 
                 let loadCaps () : JS.Promise<CapsFile list> =
                     promise {
-                        if plan.Excluded || cwd = "" then
+                        let isExcluded =
+                            match plan.ProjectionPolicy with
+                            | ProjectionPolicy.ExcludeProjection -> true
+                            | ProjectionPolicy.IncludeProjection -> false
+
+                        if isExcluded || cwd = "" then
                             return ([]: CapsFile list)
                         else
                             let! ompFiles = findOmpCapsFiles cwd
