@@ -38,7 +38,7 @@
 
 ## 与万象阵 (wanxiangzhen) 的边界
 
-- **万象术**：单工作区内多代理工具、review、事件日志 SSOT = `.wanxiangshu.ndjson`。
+- **万象术**：单工作区内多代理工具、review；durable 事件 SSOT = `.wanxiangshu.ndjson`（`loop_*`、`work_backlog_*`、`nudge_*` 等 kind）。
 - **万象阵**：独立协调器插件，DAG + worktree + ff-only 合并；durable 事件与万象术**共用** `.wanxiangshu.ndjson`（`squad_*`/`task_*` 行，见 [19-wanxiangzhen.md](./19-wanxiangzhen.md)）。
 - 两插件**互不 import**；协同靠 slash / prompt front-matter（如 slave 侧触发 `/loop`）。
 - npm 子路径 `wanxiangshu/wanxiangzhen` → `build/src/Opencode/PluginWanxiangzhen.js`，与默认 Mux 入口不同。

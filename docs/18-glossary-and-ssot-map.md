@@ -27,7 +27,7 @@
 | 宝典/铁律正文 | `Kernel.CapsPrelude`（组装经 Shell cache） | MessageTransform 内联长文 |
 | 宿主工具名映射 | `HostTools` | 魔字符串散落 |
 | OpenCode hook 字段 | 原地 mutate + codec | 替换 output 对象引用 |
-| 万象阵 DAG | **当前实现**：`squad_*`/`task_*` 行写入 **同一** `.wanxiangshu.ndjson` + `EventLogSquadProjection` / `CoordinatorReplay`；逻辑 SSOT = `Kernel/Wanxiangzhen` fold | 宿主 session 历史、独立 `.wanxiangzhen.ndjson` 文件名（规格专篇仍描述后者，见 [wanxiangzhen/02](./wanxiangzhen/02-event-sourcing.md) 与实现对齐说明） |
+| 万象阵 DAG | **物理**：`[workspace]/.wanxiangshu.ndjson` + `.wanxiangshu.ndjson.lock`（与万象术共用）；**逻辑**：`squad_*`/`task_*` 行 + `Kernel/Wanxiangzhen` fold + `CoordinatorReplay` / `EventLogSquadProjection` | 宿主 session 历史、已废止的独立 `.wanxiangzhen.ndjson` 文件名（历史规格别名，见 [wanxiangzhen/02](./wanxiangzhen/02-event-sourcing.md) §2） |
 | 子代理 durable 投影 | `subagent_spawned` / `subagent_continued` + `foldSubagents` | 仅 `SubagentIteratorStore` 内存 |
 | Fallback 注入记忆 | `fallback_continue_injected` + `FallbackInjectionFold` | 嗅探消息零宽字符 |
 

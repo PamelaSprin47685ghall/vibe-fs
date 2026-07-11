@@ -32,7 +32,7 @@
 | :--- | :--- |
 | [wanxiangzhen/00-index.md](./wanxiangzhen/00-index.md) | 索引 |
 | [wanxiangzhen/01-master-spec.md](./wanxiangzhen/01-master-spec.md) | 完整主规格（~1590 行） |
-| [wanxiangzhen/02-event-sourcing.md](./wanxiangzhen/02-event-sourcing.md) | `.wanxiangzhen.ndjson` |
+| [wanxiangzhen/02-event-sourcing.md](./wanxiangzhen/02-event-sourcing.md) | 万象阵事件（物理：`.wanxiangshu.ndjson`） |
 | [wanxiangzhen/03-dev-talk.md](./wanxiangzhen/03-dev-talk.md) | 决策与 API 核实 |
 
 ## 推荐阅读路径

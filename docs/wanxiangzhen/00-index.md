@@ -8,7 +8,7 @@
 | :--- | ---: | :--- |
 | [00-index.md](./00-index.md) | — | 本索引 |
 | [01-master-spec.md](./01-master-spec.md) | ~1590 | 保姆级主规格：DAG、Coordinator/Slave、HTTP、git、错误处理、附录 API/事件 |
-| [02-event-sourcing.md](./02-event-sourcing.md) | ~120 | `.wanxiangzhen.ndjson` SSOT、事件表、分层、废弃行为对照 |
+| [02-event-sourcing.md](./02-event-sourcing.md) | ~120 | NDJSON SSOT（物理 `.wanxiangshu.ndjson`）、事件表、分层、废弃行为对照 |
 | [03-dev-talk.md](./03-dev-talk.md) | ~363 | API 核实与决策纪要（轮次记录）；读 master-spec 前可先扫修正点 |
 
 ## 阅读顺序
@@ -29,7 +29,7 @@
 
 | 项 | 万象术 | 万象阵 |
 | :--- | :--- | :--- |
-| SSOT | `.wanxiangshu.ndjson` | **实现**：同左文件内的万象阵 `kind` 行（见 [02-event-sourcing.md](./02-event-sourcing.md) §2） |
+| SSOT | `.wanxiangshu.ndjson`（与万象术共用） | 万象阵 `squad_*`/`task_*` 行写入同一 NDJSON（见 [02-event-sourcing.md](./02-event-sourcing.md) §2） |
 | npm | `wanxiangshu` / `omp` | `wanxiangshu/wanxiangzhen` |
 | 协同 | `/loop`、todowrite | slave prompt / slash，无代码 import |
 
