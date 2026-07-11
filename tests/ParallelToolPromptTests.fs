@@ -1,0 +1,201 @@
+module Wanxiangshu.Tests.ParallelToolPromptTests
+
+open Fable.Core
+open Fable.Core.JsInterop
+open Wanxiangshu.Tests.Assert
+open Wanxiangshu.Kernel.Messaging
+open Wanxiangshu.Kernel.CapsFormat
+open Wanxiangshu.Kernel.BacklogProjectionCore
+open Wanxiangshu.Kernel.HostTools
+open Wanxiangshu.Shell.MessageTransformCore
+open Wanxiangshu.Shell.MessageTransformPipeline
+open Wanxiangshu.Shell.MessageTransformHostEntry
+open Wanxiangshu.Shell.ReviewRuntime
+
+module Dyn = Wanxiangshu.Shell.Dyn
+
+let mkMsg id role parts =
+    { info =
+        { id = id
+          sessionID = "test"
+          role = role
+          agent = "main"
+          isError = false
+          toolName = ""
+          details = null
+          time = null }
+      parts = parts
+      source = Native
+      raw = null }
+
+let testHostNativeToolsTrigger () =
+    promise {
+        let reviewStore = createReviewStore ()
+
+        let backlogOps =
+            { Host = opencode
+              GetOrRebuildBacklog = fun _ _ -> [] }
+
+        let encodeMessages (msgs: Message<obj> list) = msgs |> List.map box |> List.toArray
+        let injectFn _ (arr: obj array) = promise { return arr }
+        let loadCaps () = promise { return [] }
+        let buildCaps (arr: obj array) _ _ = arr
+
+        let runTransform sessionID excluded msgs =
+            let plan =
+                { SessionID = sessionID
+                  Agent = "main"
+                  Directory = ""
+                  Excluded = excluded
+                  IsSubagentSession = false
+                  Cleaned = msgs
+                  RawArray = None
+                  SembleInjectEnabled = false
+                  Scope = Wanxiangshu.Shell.RuntimeScope.create ()
+                  MaxInputTokens = 200000
+                  GetContextUsage = (fun _ -> Promise.lift None) }
+
+            runHostMessagesTransform
+                reviewStore
+                sessionID
+                IfStoreEmpty
+                (fun _ -> promise { return Seq.empty })
+                plan
+                backlogOps
+                encodeMessages
+                injectFn
+                loadCaps
+                buildCaps
+
+        let singleCallTriggers toolName sessionID =
+            let msgs =
+                [ mkMsg "u" User []
+                  mkMsg "a" Assistant [ ToolPart(toolName, "c1", None, null) ]
+                  mkMsg "r" ToolResult [] ]
+
+            runTransform sessionID false msgs
+
+        // bash
+        let! res8 = singleCallTriggers "bash" "s8"
+        equal "bash triggers" 4 res8.Length
+        let last8 = res8.[res8.Length - 1] :?> Message<obj>
+        equal "bash agent=orchestrator" "orchestrator" last8.info.agent
+
+        // edit
+        let! res9 = singleCallTriggers "edit" "s9"
+        equal "edit triggers" 4 res9.Length
+
+        // glob
+        let! res10 = singleCallTriggers "glob" "s10"
+        equal "glob triggers" 4 res10.Length
+
+        // grep
+        let! res11 = singleCallTriggers "grep" "s11"
+        equal "grep triggers" 4 res11.Length
+
+        // patch
+        let! res12 = singleCallTriggers "patch" "s12"
+        equal "patch triggers" 4 res12.Length
+
+        // list
+        let! res13 = singleCallTriggers "list" "s13"
+        equal "list triggers" 4 res13.Length
+
+        // submit_review 也触发（任何单工具）
+        let! res14 = singleCallTriggers "submit_review" "s14"
+        equal "submit_review triggers" 4 res14.Length
+
+        // return_reviewer
+        let! res15 = singleCallTriggers "return_reviewer" "s15"
+        equal "return_reviewer triggers" 4 res15.Length
+
+        // todowrite
+        let! res16 = singleCallTriggers "todowrite" "s16"
+        equal "todowrite triggers" 4 res16.Length
+
+        // coder
+        let! res17 = singleCallTriggers "coder" "s17"
+        equal "coder triggers" 4 res17.Length
+
+        // investigator
+        let! res18 = singleCallTriggers "investigator" "s18"
+        equal "investigator triggers" 4 res18.Length
+
+        // task
+        let! res19 = singleCallTriggers "task" "s19"
+        equal "task triggers" 4 res19.Length
+
+        // prompt 文案校验
+        let promptText =
+            match last8.parts |> List.tryHead with
+            | Some(TextPart txt) -> txt
+            | _ -> ""
+
+        check "promptText no scolding 严禁" (not (promptText.Contains "严禁"))
+        check "promptText no scolding 杜绝" (not (promptText.Contains "杜绝"))
+        check "promptText constructive (parallel)" (promptText.Contains "parallel")
+    }
+
+let testSynthCallIdExcluded () =
+    promise {
+        let reviewStore = createReviewStore ()
+
+        let backlogOps =
+            { Host = opencode
+              GetOrRebuildBacklog = fun _ _ -> [] }
+
+        let encodeMessages (msgs: Message<obj> list) = msgs |> List.map box |> List.toArray
+        let injectFn _ (arr: obj array) = promise { return arr }
+        let loadCaps () = promise { return [] }
+        let buildCaps (arr: obj array) _ _ = arr
+
+        let runTransform sessionID msgs =
+            let plan =
+                { SessionID = sessionID
+                  Agent = "main"
+                  Directory = ""
+                  Excluded = false
+                  IsSubagentSession = false
+                  Cleaned = msgs
+                  RawArray = None
+                  SembleInjectEnabled = false
+                  Scope = Wanxiangshu.Shell.RuntimeScope.create ()
+                  MaxInputTokens = 200000
+                  GetContextUsage = (fun _ -> Promise.lift None) }
+
+            runHostMessagesTransform
+                reviewStore
+                sessionID
+                IfStoreEmpty
+                (fun _ -> promise { return Seq.empty })
+                plan
+                backlogOps
+                encodeMessages
+                injectFn
+                loadCaps
+                buildCaps
+
+        // 合成 callID（semble-call-*）不触发——宿主内部注入
+        let msgs20 =
+            [ mkMsg "u" User []
+              mkMsg "a" Assistant [ ToolPart("bash", "semble-call-123", None, null) ]
+              mkMsg "r" ToolResult [] ]
+
+        let! res20 = runTransform "s20" msgs20
+        equal "semble-call-* excluded" 3 res20.Length
+
+        // 合成 callID（caps-call-*）不触发
+        let msgs21 =
+            [ mkMsg "u" User []
+              mkMsg "a" Assistant [ ToolPart("read", "caps-call-fp-0", None, null) ]
+              mkMsg "r" ToolResult [] ]
+
+        let! res21 = runTransform "s21" msgs21
+        equal "caps-call-* excluded" 3 res21.Length
+    }
+
+let run () =
+    promise {
+        do! testHostNativeToolsTrigger ()
+        do! testSynthCallIdExcluded ()
+    }

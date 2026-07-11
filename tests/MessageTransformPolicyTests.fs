@@ -56,7 +56,7 @@ let testTransformO1Cache () =
               Cleaned = []
               RawArray = None
               SembleInjectEnabled = false
-              Scope = Wanxiangshu.Shell.RuntimeScope.create()
+              Scope = Wanxiangshu.Shell.RuntimeScope.create ()
               MaxInputTokens = 200000
               GetContextUsage = (fun _ -> Promise.lift None) }
 
@@ -153,7 +153,7 @@ let testSingleToolCallPromptInjection () =
                   Cleaned = msgs
                   RawArray = None
                   SembleInjectEnabled = false
-                  Scope = Wanxiangshu.Shell.RuntimeScope.create()
+                  Scope = Wanxiangshu.Shell.RuntimeScope.create ()
                   MaxInputTokens = 200000
                   GetContextUsage = (fun _ -> Promise.lift None) }
 
@@ -186,7 +186,7 @@ let testSingleToolCallPromptInjection () =
             | Some(TextPart txt) -> txt
             | _ -> ""
 
-        check "promptText contains '并行'" (promptText.Contains("并行"))
+        check "promptText contains 'parallel'" (promptText.Contains("parallel"))
 
         // Case 2: 双工具调用 + ToolResult -> 不应附加
         let msgs2 =

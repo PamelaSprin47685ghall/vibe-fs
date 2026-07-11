@@ -30,40 +30,35 @@ type MessageTransformPlan =
 let tryInjectParallelToolPrompt (sessionID: string) (messages: Message<obj> list) : Message<obj> list =
     let cleaned = messages |> List.filter (fun m -> m.source = Native)
 
-    let realToolNames =
-        let catalogNames = Wanxiangshu.Kernel.ToolCatalog.all |> List.map (fun s -> s.name)
-        "methodology" :: catalogNames |> Set.ofList
-
-    let isRealToolName (name: string) : bool = Set.contains name realToolNames
-
     let isToolPart (part: Part<obj>) : bool =
         match part with
         | ToolPart _ -> true
         | _ -> false
 
-    let isRealToolPart (part: Part<obj>) : bool =
+    let isTriggerableToolPart (part: Part<obj>) : bool =
         match part with
-        | ToolPart(toolName, callID, _, _) ->
-            isRealToolName toolName
-            && not (callID.StartsWith("semble-call-") || callID.StartsWith("caps-call-"))
+        | ToolPart(_, callID, _, _) -> not (Wanxiangshu.Kernel.HostTools.isSynthCallId callID)
         | _ -> false
 
     let assistantToolCalls =
         cleaned
-        |> List.filter (fun m -> m.info.role = Assistant && m.parts |> List.exists isRealToolPart)
+        |> List.filter (fun m -> m.info.role = Assistant && m.parts |> List.exists isTriggerableToolPart)
 
     match List.tryLast assistantToolCalls with
     | None -> messages
     | Some lastAssistantMsg ->
         let allToolParts = lastAssistantMsg.parts |> List.filter isToolPart
-        let realToolParts = lastAssistantMsg.parts |> List.filter isRealToolPart
-        let toolPartsCount = List.length realToolParts
 
-        if allToolParts.Length <> 1 || toolPartsCount <> 1 then
+        let triggerableToolParts =
+            lastAssistantMsg.parts |> List.filter isTriggerableToolPart
+
+        let triggerableCount = List.length triggerableToolParts
+
+        if allToolParts.Length <> 1 || triggerableCount <> 1 then
             messages
         else
             let targetCallID =
-                match List.tryHead realToolParts with
+                match List.tryHead triggerableToolParts with
                 | Some(ToolPart(_, callID, _, _)) -> callID
                 | _ -> ""
 
@@ -84,7 +79,7 @@ let tryInjectParallelToolPrompt (sessionID: string) (messages: Message<obj> list
                             { id = "parallel-tool-synth-" + targetCallID
                               sessionID = sessionID
                               role = User
-                              agent = ""
+                              agent = "orchestrator"
                               isError = false
                               toolName = ""
                               details = null

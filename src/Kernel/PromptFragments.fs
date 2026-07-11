@@ -72,4 +72,10 @@ let managerSystemPromptFor (host: Host) =
 let managerSystemPrompt = managerSystemPromptFor opencode
 
 let parallelToolPromptProse =
-    "【万象铁律】检测到上一轮仅执行了单工具调用。严禁单步调试式控制流，杜绝拖延。请穷尽当前可并行执行的步骤，一次性调用所有正交工具（如并行 fuzzy_grep/read/write/executor），严禁一次只调用一个工具！编译器和运行时已为你站岗，速去并行执行，提高效率！"
+    "Hint: if your next response can perform several independent tool calls "
+    + "(for example multiple `read`/`fuzzy_grep`/`executor`/`bash` operations on "
+    + "different targets, or a mix of independent reads, greps and searches), "
+    + "issue them all in one assistant turn. The runtime executes parallel "
+    + "tool calls concurrently and there is no reason to serialize independent "
+    + "operations. Reserve a single tool call only when the next step strictly "
+    + "depends on the current result."
