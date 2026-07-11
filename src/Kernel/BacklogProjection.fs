@@ -53,7 +53,7 @@ let findFoldRangeFor (host: Host) (flat: FlatPart<'raw> list) (strategy: FoldStr
         let firstResult = todoIdxs.[0]
         let secondToLast = todoIdxs.[todoIdxs.Length - 2]
 
-        if secondToLast <= firstResult then
+        if secondToLast < firstResult then
             None
         else
             Some

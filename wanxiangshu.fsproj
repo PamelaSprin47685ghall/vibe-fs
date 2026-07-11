@@ -184,13 +184,13 @@
     <Compile Include="src/Shell/MessageTransformCommon.fs"/>
     <Compile Include="src/Shell/ChatTransformOutputCodec.fs"/>
     <Compile Include="src/Shell/AmendFilter.fs"/>
-    <Compile Include="src/Shell/MessageTransformCore.fs"/>
     <Compile Include="src/Shell/MessagingEncodeHelpers.fs"/>
     <Compile Include="src/Shell/SerialStateHolder.fs"/>
     <Compile Include="src/Shell/ContextBudgetLimitResolver.fs"/>
     <Compile Include="src/Shell/ContextBudgetResolve.fs"/>
     <Compile Include="src/Shell/ContextBudgetUsageCodec.fs"/>
     <Compile Include="src/Shell/ContextBudgetStore.fs"/>
+    <Compile Include="src/Shell/MessageTransformCore.fs"/>
     <Compile Include="src/Shell/MessageTransformPipeline.fs"/>
     <Compile Include="src/Shell/OpencodeClientCodec.fs"/>
     <Compile Include="src/Shell/SessionIoSpawn.fs"/>

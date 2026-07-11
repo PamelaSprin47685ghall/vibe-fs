@@ -26,9 +26,10 @@ type ContextState =
 /// 首次 phase P=0 → a >= bEff/(N+1)。
 /// N=3(foldAfterFirst=false) → a >= bEff/4 = 25%（75% 空间做 3 次 todo+reserve）。
 /// N=2(foldAfterFirst=true)  → a >= bEff/3 ≈ 33%。
-let F (a: int64) (bEff: int64) (P: int64) (N: int) : bool =
+let F (a: int64) (bEff: int64) (P: int64) (N: int) (R: int) : bool =
     let n = int64 N
-    (n + 1L) * a >= bEff + n * P
+    let r = int64 R
+    (n + 1L) * a >= (r + 1L) * bEff + (n - r) * P
 
 /// phaseBaseTokens 占有效窗口 80% 以上 → 折叠基线已饱和，
 /// 持续 nudge 无意义，回落宿主 compact。
@@ -73,6 +74,7 @@ let classifyPressure
     (foldAfterFirst: bool)
     (currentTokens: int64)
     (state: ContextState)
+    (completedTodoCount: int)
     : ContextBudgetPressure =
     if maxInputTokens <= 0 then
         Disabled
@@ -81,10 +83,14 @@ let classifyPressure
 
         if isCompactingRequired state.phaseBaseTokens bEff then
             Compacting
-        elif F currentTokens bEff state.phaseBaseTokens (requiredFoldAnchorCount foldAfterFirst) then
-            RequireTodoWriteEmergency
         else
-            BelowThreshold
+            let N = requiredFoldAnchorCount foldAfterFirst
+            let R = max 0 (min completedTodoCount (N - 1))
+
+            if F currentTokens bEff state.phaseBaseTokens N R then
+                RequireTodoWriteEmergency
+            else
+                BelowThreshold
 
 let afterPhaseBoundaryReset (_track: BudgetNudgeTrack) : BudgetNudgeTrack = Idle
 
