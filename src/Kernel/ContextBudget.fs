@@ -1,37 +1,37 @@
 module Wanxiangshu.Kernel.ContextBudget
 
+/// Nudge 触发所需的 todo anchor 数。foldAfterFirst=true 需 2 个 anchor
+/// 才缩减投影，foldAfterFirst=false 需 3 个。每次 anchor = 一次 todowrite
+/// 调用。Nudge 触发后 LLM 需连续 N 次 todowrite 才能让投影缩减上下文，
+/// 故触发点到 compaction 之间须预留 N 份 todowrite 空间 + 1 份 reserve。
+let requiredFoldAnchorCount (foldAfterFirst: bool) : int = if foldAfterFirst then 2 else 3
+
 type ContextState =
     { phaseBaseTokens: int64
       backlogTokensAtPhaseStart: int64 }
 
-/// <summary>
-/// Nudge 触发的判定式 F。
-/// 其数学公式为：2 * a >= b + s + c
+/// Nudge 触发判定 F。
 ///
-/// 【参数定义】：
-/// - a: 当前总估算 tokens (currentTokens)
-/// - b: 上下文 token 窗口的最大限制 (maxInputTokens)
-/// - c: 本阶段起点时 backlog 的 token 数 (backlogTokensAtPhaseStart)
-/// - s: 本阶段起点时非 backlog 的基础开销 (phaseBaseTokens - c)
+/// 物理量：a=当前token, bEff=有效窗口上限(0.75b), P=phaseBaseTokens,
+/// N=requiredFoldAnchorCount(foldAfterFirst)。
 ///
-/// 【数学推导与场景解释】：
-/// 阶段起点的基础开销为 c + s。上下文的最大可用自由空间为 b - (c + s)。
-/// 为了保证模型在被 nudge todowrite 强制压缩之前，依然拥有足够的余量来进行下一步的工具调用（如 executor 运行），
-/// 我们应将本阶段新增的消息空间 (a - (c + s)) 限制在最大可用自由空间的一半以内：
-///     a - (c + s) >= (b - (c + s)) / 2
-/// 整理该不等式：
-///     2 * (a - (c + s)) >= b - (c + s)
-///     2a - 2c - 2s >= b - c - s
-///     2a >= b + c + s
+/// 安全条件：触发 nudge 后到 compaction(bEff)，LLM 需 N 次 todowrite
+/// 才缩减投影。可用空间 (bEff-P) 分成 N+1 份：N 份给 N 次 todowrite，
+/// 1 份 reserve。当阶段新增 u=a-P 消耗了 1/(N+1) 份时触发：
+///   u >= (bEff - P) / (N + 1)
+/// 等价：
+///   (N+1)(a-P) >= bEff - P
+///   (N+1)a >= bEff + N*P
 ///
-/// 只要该式成立，说明当前阶段新增的会话内容已经消耗了自由空间的一半，必须立即注入 Nudge 以强制 todowrite 压缩。
-/// </summary>
-let F (a: int64) (b: int64) (c: int64) (s: int64) : bool = 2L * a >= b + s + c
+/// 首次 phase P=0 → a >= bEff/(N+1)。
+/// N=3(foldAfterFirst=false) → a >= bEff/4 = 25%（75% 空间做 3 次 todo+reserve）。
+/// N=2(foldAfterFirst=true)  → a >= bEff/3 ≈ 33%。
+let F (a: int64) (bEff: int64) (P: int64) (N: int) : bool =
+    let n = int64 N
+    (n + 1L) * a >= bEff + n * P
 
-/// 实在腾挪不开的界定条件：
-/// 当折叠完的基线 tokens (phaseBaseTokens) 占总上下文空间上限 (maxInputTokens) 的 80% 以上时，
-/// 剩余的可支配自由空间已小于 20%。由于下一步的工具调用（如 executor 运行）和对话很容易再次撑爆上下文，
-/// 使得持续进行 todo 折叠与 nudge 意义不大，应直接回落至系统的 compact。
+/// phaseBaseTokens 占有效窗口 80% 以上 → 折叠基线已饱和，
+/// 持续 nudge 无意义，回落宿主 compact。
 let isCompactingRequired (phaseBaseTokens: int64) (maxInputTokens: int64) : bool =
     phaseBaseTokens >= (maxInputTokens * 8L) / 10L
 
@@ -68,17 +68,20 @@ type ContextBudgetPressure =
 
 let effectiveMaxInputTokens (maxInputTokens: int) : int64 = (int64 maxInputTokens * 75L) / 100L
 
-let classifyPressure (maxInputTokens: int) (currentTokens: int64) (state: ContextState) : ContextBudgetPressure =
+let classifyPressure
+    (maxInputTokens: int)
+    (foldAfterFirst: bool)
+    (currentTokens: int64)
+    (state: ContextState)
+    : ContextBudgetPressure =
     if maxInputTokens <= 0 then
         Disabled
     else
         let bEff = effectiveMaxInputTokens maxInputTokens
-        let c = state.backlogTokensAtPhaseStart
-        let s = state.phaseBaseTokens - c
 
         if isCompactingRequired state.phaseBaseTokens bEff then
             Compacting
-        elif F currentTokens bEff c s then
+        elif F currentTokens bEff state.phaseBaseTokens (requiredFoldAnchorCount foldAfterFirst) then
             RequireTodoWriteEmergency
         else
             BelowThreshold

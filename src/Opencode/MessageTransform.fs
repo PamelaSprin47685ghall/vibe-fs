@@ -156,7 +156,12 @@ let messagesTransform
                     backlogSession.GetOrRebuildBacklog(sid, msgs))
 
             let! maxInputTokens =
-                Wanxiangshu.Shell.ContextBudgetUsageCodec.resolveMaxInputTokens [ _client; input ] sessionID
+                Wanxiangshu.Shell.ContextBudgetUsageCodec.resolveMaxInputTokens [ _client; input ] sessionID directory
+
+            let getContextUsage =
+                match ContextBudgetUsageCodec.tryGetRealContextUsage _client sessionID directory with
+                | Some f -> f
+                | None -> fun _ -> Promise.lift None
 
             let plan =
                 { SessionID = sessionID
@@ -169,10 +174,7 @@ let messagesTransform
                   SembleInjectEnabled = sembleInjectEnabled
                   Scope = runtimeScope
                   MaxInputTokens = maxInputTokens
-                  GetContextUsage =
-                    match ContextBudgetUsageCodec.tryGetRealContextUsage _client sessionID with
-                    | Some f -> f
-                    | None -> fun _ -> Promise.lift None }
+                  GetContextUsage = getContextUsage }
 
             let replayTexts () : JS.Promise<string seq> =
                 Promise.lift (extractTextsFromEncodedMessages messagesArr)

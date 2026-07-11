@@ -12,7 +12,7 @@ open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Shell.Dyn
 open Wanxiangshu.Shell.ContextBudgetUsageCodec
 
-/// RED: tryGetMaxInputTokensAsync must call session.get({sessionID})
+/// tryGetMaxInputTokensAsync must call the SDK-shaped session.get({path:{id}})
 /// then provider.list() and read model.limit.input or .context
 let spec_tryGetMaxInputTokensAsync_realSchema () =
     promise {
@@ -58,13 +58,11 @@ let spec_tryGetMaxInputTokensAsync_realSchema () =
                 [ "session", createObj [ "get", box (System.Func<obj, JS.Promise<obj>>(mockSessionGet)) ]
                   "provider", createObj [ "list", box (System.Func<obj, JS.Promise<obj>>(mockProviderList)) ] ]
 
-        let! limit = tryGetMaxInputTokensAsync client "s-async"
+        let! limit = tryGetMaxInputTokensAsync client "s-async" ""
         equal "limit.input from provider.list" (Some 200000) limit
 
-        check
-            "session.get flat sessionID arg"
-            (not (isNullish capturedSessionArg)
-             && string (get capturedSessionArg "sessionID") = "s-async")
+        let capturedPath = get capturedSessionArg "path"
+        check "session.get path id" (not (isNullish capturedPath) && string (get capturedPath "id") = "s-async")
 
         check "provider.list called" providerListCalled
     }
@@ -88,7 +86,7 @@ let spec_tryGetMaxInputTokensAsync_limitOnSessionModelWithoutProviderList () =
         let client =
             createObj [ "session", createObj [ "get", box (System.Func<obj, JS.Promise<obj>>(mockGet)) ] ]
 
-        let! limit = tryGetMaxInputTokensAsync client "sess-local-limit"
+        let! limit = tryGetMaxInputTokensAsync client "sess-local-limit" ""
         equal "session.get model.limit.input without provider.list" (Some 200000) limit
     }
 
@@ -125,18 +123,18 @@ let spec_tryGetMaxInputTokensAsync_contextFallback () =
                 [ "session", createObj [ "get", box (System.Func<obj, JS.Promise<obj>>(mockGet)) ]
                   "provider", createObj [ "list", box (System.Func<obj, JS.Promise<obj>>(mockList)) ] ]
 
-        let! limit = tryGetMaxInputTokensAsync client "s-ctx"
+        let! limit = tryGetMaxInputTokensAsync client "s-ctx" ""
         equal "fallback to limit.context" (Some 128000) limit
     }
 
 /// RED: null client → None
 let spec_tryGetMaxInputTokensAsync_nullClient () =
     promise {
-        let! limit = tryGetMaxInputTokensAsync (box null) "s-null"
+        let! limit = tryGetMaxInputTokensAsync (box null) "s-null" ""
         equal "null client → None" None limit
     }
 
-/// RED: tryGetRealContextUsage must call session.get({sessionID})
+/// RED: tryGetRealContextUsage must call session.get({path:{id}})
 /// and read tokens.input + tokens.cache.read (no total field)
 let spec_tryGetRealContextUsage_realSchema () =
     promise {
@@ -161,12 +159,13 @@ let spec_tryGetRealContextUsage_realSchema () =
         let client =
             createObj [ "session", createObj [ "get", box (System.Func<obj, JS.Promise<obj>>(mockGet)) ] ]
 
-        let opt = tryGetRealContextUsage client "s-real"
+        let opt = tryGetRealContextUsage client "s-real" ""
         check "Some func returned" opt.IsSome
         let! tokens = opt.Value [||]
         // input + cache.read = 45000 + 5000 = 50000
         equal "tokens = input + cache.read" (Some 50000) tokens
-        check "flat sessionID arg" (not (isNullish capturedArg) && string (get capturedArg "sessionID") = "s-real")
+        let capturedPath = get capturedArg "path"
+        check "session.get path id" (not (isNullish capturedPath) && string (get capturedPath "id") = "s-real")
     }
 
 /// RED: session with no tokens → None
@@ -178,7 +177,7 @@ let spec_tryGetRealContextUsage_noTokens () =
         let client =
             createObj [ "session", createObj [ "get", box (System.Func<obj, JS.Promise<obj>>(mockGet)) ] ]
 
-        let opt = tryGetRealContextUsage client "s-no-tokens"
+        let opt = tryGetRealContextUsage client "s-no-tokens" ""
         check "Some func returned" opt.IsSome
         let! tokens = opt.Value [||]
         equal "no tokens → None" None tokens
@@ -187,7 +186,7 @@ let spec_tryGetRealContextUsage_noTokens () =
 /// RED: resolveMaxInputTokens fallback must be 0, not 200000
 let spec_resolveMaxInputTokens_zeroFallback () =
     promise {
-        let! res = resolveMaxInputTokens [ createObj [] ] "sess-id"
+        let! res = resolveMaxInputTokens [ createObj [] ] "sess-id" ""
         equal "fallback should be 0" 0 res
 
         let t =
@@ -195,7 +194,7 @@ let spec_resolveMaxInputTokens_zeroFallback () =
                 [ "session",
                   createObj [ "model", createObj [ "limit", createObj [ "context", box 60000; "output", box 4000 ] ] ] ]
 
-        let! res2 = resolveMaxInputTokens [ t ] "sess-id"
+        let! res2 = resolveMaxInputTokens [ t ] "sess-id" ""
         equal "sync priority" 60000 res2
     }
 
@@ -240,7 +239,7 @@ let spec_resolveMaxInputTokens_preferInputOverContextAcrossSyncAsync () =
                         "get", box (System.Func<obj, JS.Promise<obj>>(mockGet)) ]
                   "provider", createObj [ "list", box (System.Func<obj, JS.Promise<obj>>(mockList)) ] ]
 
-        let! limit = resolveMaxInputTokens [ t ] "sess-tdd-limit"
+        let! limit = resolveMaxInputTokens [ t ] "sess-tdd-limit" ""
         equal "prefer async input limit (100000) over sync context limit (200000)" 100000 limit
     }
 

@@ -25,7 +25,7 @@ let spec_applyContextBudget_afterTodoResets () =
               SembleInjectEnabled = false
               Scope = scope
               MaxInputTokens = 200000
-              GetContextUsage = (fun _ -> Promise.lift (Some 120000)) }
+              GetContextUsage = (fun _ -> Promise.lift (Some 20000)) }
 
         let backlogRef = ref ([]: BacklogEntry list)
 
@@ -33,7 +33,6 @@ let spec_applyContextBudget_afterTodoResets () =
             { Host = opencode
               GetOrRebuildBacklog = (fun _ _ -> backlogRef.Value) }
 
-        // Start phase with totalTokens = 30000, totalBytes = 100, backlogBytes = 0
         let state = beginPhase 30000L 100L 0L
 
         ContextBudgetStore.update scope "sess-after-todo" (fun entry ->
@@ -42,7 +41,6 @@ let spec_applyContextBudget_afterTodoResets () =
                 LastBacklog = []
                 NudgeTrack = EmergencySignaled })
 
-        // 1. Simulate new todo: add one entry to backlog
         let newTodoEntry =
             { ahaMoments = "aha"
               changesAndReasons = "changes"
@@ -68,8 +66,7 @@ let spec_applyContextBudget_afterTodoResets () =
                 source = Native
                 raw = null } ]
 
-        // Since LastTodoCount (0) <> backlogRef length (1), it should begin a new phase and reset nudgeInjected
-        let! res = applyContextBudget plan backlogOps messages [||] (fun _ -> [||])
+        let! _res = applyContextBudget plan backlogOps messages [||] (fun _ -> [||])
         let updatedStore = ContextBudgetStore.get scope "sess-after-todo"
         equal "last todo count updated" 1 updatedStore.LastBacklog.Length
         equal "nudge track reset after backlog change" Idle updatedStore.NudgeTrack
@@ -100,9 +97,8 @@ let spec_applyContextBudget_fiveConsecutiveTodos () =
             { Host = opencode
               GetOrRebuildBacklog = (fun _ _ -> backlogRef.Value) }
 
-        // Start phase 0
-        let mutable currentTokens = 30000L
-        let state = beginPhase currentTokens 100L 0L
+        let mutable phaseBase = 30000L
+        let state = beginPhase phaseBase 100L 0L
 
         ContextBudgetStore.update scope sessionID (fun entry ->
             { entry with
@@ -110,21 +106,15 @@ let spec_applyContextBudget_fiveConsecutiveTodos () =
                 LastBacklog = []
                 NudgeTrack = Idle })
 
+        let bEff = effectiveMaxInputTokens (int maxTokens)
+        let N = 3
+
         for i in 1..5 do
-            // Update plan context usage return value
-            let getUsageFun = (fun _ -> Promise.lift (Some(int currentTokens)))
-
-            let currentPlan =
-                { plan with
-                    GetContextUsage = getUsageFun }
-
-            // 1. Run below threshold
-            // b=200000 -> effectiveLimit=150000, s=currentTokens, c=0. F trigger: 2*a >= 150000 + s. -> a >= 75000 + s/2
-            let boundary = 75000L + currentTokens / 2L
+            let boundary = (bEff + int64 N * phaseBase) / int64 (N + 1)
             let belowTokens = boundary - 5000L
 
             let planBelow =
-                { currentPlan with
+                { plan with
                     GetContextUsage = (fun _ -> Promise.lift (Some(int belowTokens))) }
 
             let messages =
@@ -144,19 +134,16 @@ let spec_applyContextBudget_fiveConsecutiveTodos () =
             let! resBelow = applyContextBudget planBelow backlogOps messages [||] (fun _ -> [||])
             equal "no nudge below threshold" 1 resBelow.Length
 
-            // 2. Run at trigger threshold
             let triggerTokens = boundary + 5000L
-            // Verify trigger token is strictly less than maxInputTokens (a < b)
-            check "trigger point a < b" (triggerTokens < maxTokens)
+            check "trigger point a < bEff" (triggerTokens < bEff)
 
             let planTrigger =
-                { currentPlan with
+                { plan with
                     GetContextUsage = (fun _ -> Promise.lift (Some(int triggerTokens))) }
 
             let! resTrigger = applyContextBudget planTrigger backlogOps messages [||] (fun _ -> [||])
             equal "nudge injected at threshold" 2 resTrigger.Length
 
-            // 3. Simulate a successful todowrite committing
             let newTodoEntry =
                 { ahaMoments = sprintf "aha-%d" i
                   changesAndReasons = "changes"
@@ -166,14 +153,11 @@ let spec_applyContextBudget_fiveConsecutiveTodos () =
 
             backlogRef.Value <- backlogRef.Value @ [ newTodoEntry ]
 
-            // Update base prompt tokens for the next phase
-            currentTokens <- currentTokens + 5000L
-
-            let nextPlan =
+            let lowPlan =
                 { plan with
-                    GetContextUsage = (fun _ -> Promise.lift (Some(int currentTokens))) }
+                    GetContextUsage = (fun _ -> Promise.lift (Some(int belowTokens))) }
 
-            let! resTodo = applyContextBudget nextPlan backlogOps messages [||] (fun _ -> [||])
+            let! _resTodo = applyContextBudget lowPlan backlogOps messages [||] (fun _ -> [||])
 
             let updatedStore = ContextBudgetStore.get scope sessionID
             equal "LastTodoCount updated" i updatedStore.LastBacklog.Length
