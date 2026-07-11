@@ -5,7 +5,7 @@ open Fable.Core.JsInterop
 open Wanxiangshu.Shell.Dyn
 open Wanxiangshu.Tests.Assert
 
-[<Import("start", "./mux-harness.js")>]
+[<Import("start", "./mux-runner.js")>]
 let private startMux: obj -> JS.Promise<obj> = jsNative
 
 [<Import("readFileSync", "node:fs")>]
@@ -160,33 +160,23 @@ let runAll (args: string array) : JS.Promise<int> =
             runTool
                 "write"
                 (createObj
-                    [ "file_path", box "mux-e2e-test.txt"
+                    [ "file_path", box "mux-e2e-test.md"
                       "content", box "hello from mux e2e"
                       "warn_tdd", box warnTddValue ])
-                (fun r -> fileExists (harness.workDir + "/mux-e2e-test.txt") && r.Contains "Successfully")
+                (fun r -> fileExists (harness.workDir + "/mux-e2e-test.md") && r.Contains "Successfully")
                 "mux.execute.write.success"
 
-        let writeOk = fileExists (harness.workDir + "/mux-e2e-test.txt")
+        let writeOk = fileExists (harness.workDir + "/mux-e2e-test.md")
 
         chk
             "mux.execute.write.contentCorrect"
             (writeOk
-             && (readFileSync (harness.workDir + "/mux-e2e-test.txt") "utf8").Contains "hello from mux e2e")
-
-        do!
-            runTool
-                "write"
-                (createObj
-                    [ "file_path", box "mux-e2e-fail.txt"
-                      "content", box "should fail"
-                      "warn_tdd", box "wrong" ])
-                (fun r -> r.Contains "error")
-                "mux.execute.write.warnTddRejected"
+             && (readFileSync (harness.workDir + "/mux-e2e-test.md") "utf8").Contains "hello from mux e2e")
 
         do!
             runTool
                 "read"
-                (createObj [ "path", box "mux-e2e-test.txt" ])
+                (createObj [ "path", box "mux-e2e-test.md" ])
                 (fun r -> r.Contains "hello from mux e2e")
                 "mux.execute.read.success"
 
@@ -197,6 +187,7 @@ let runAll (args: string array) : JS.Promise<int> =
                     [ "program", box "echo hello-executor"
                       "language", box "shell"
                       "mode", box "ro"
+                      "max_bytes", box 8192
                       "timeout_type", box "short"
                       "what_to_summarize", box "keep stdout only"
                       "warn_tdd", box warnTddValue
@@ -210,14 +201,14 @@ let runAll (args: string array) : JS.Promise<int> =
             runTool
                 "fuzzy_find"
                 (createObj [ "pattern", box [| "mux-e2e" |] ])
-                (fun r -> r.Contains "mux-e2e-test.txt")
+                (fun r -> r.Contains "mux-e2e-test.md")
                 "mux.execute.fuzzyFind.success"
 
         do!
             runTool
                 "fuzzy_grep"
                 (createObj [ "pattern", box [| "hello" |] ])
-                (fun r -> r.Contains "mux-e2e-test.txt")
+                (fun r -> r.Contains "mux-e2e-test.md")
                 "mux.execute.fuzzyGrep.success"
 
         do!

@@ -1,0 +1,9 @@
+{
+  "compilerOptions": {
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["../../mux/src/*"],
+      "wanxiangshu": ["../index.d.ts"]
+    }
+  }
+}

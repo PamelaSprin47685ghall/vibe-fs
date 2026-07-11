@@ -11,7 +11,19 @@ if (!fs.existsSync(PLUGIN_JS)) {
   WANXIANG_ROOT = path.resolve(__dirname, '../..');
   PLUGIN_JS = path.resolve(WANXIANG_ROOT, 'build/src/Opencode/Plugin.js');
 }
-const PLUGIN_URL = pathToFileURL(PLUGIN_JS).href;
+
+function getPluginUrl(variant) {
+  let file = 'Plugin.js';
+  if (variant === 'mimocode') file = 'PluginMimo.js';
+  if (variant === 'mimotui') file = 'PluginMimoTui.js';
+  let p = path.resolve(WANXIANG_ROOT, `build/src/Opencode/${file}`);
+  if (!fs.existsSync(p)) {
+    let altRoot = path.resolve(__dirname, '../..');
+    p = path.resolve(altRoot, `build/src/Opencode/${file}`);
+  }
+  return pathToFileURL(p).href;
+}
+
 const FIXTURE_MCP = path.resolve(__dirname, 'stealth-mcp-fixture.js');
 export const E2E_LOCK = '/tmp/wanxiang-e2e.lock';
 
@@ -71,7 +83,7 @@ export function isolatedEnv(home, llmUrl, opts = {}) {
         options: { apiKey: 'test-key', baseURL: llmUrl },
       },
     },
-    plugin: opts.plugin ? [PLUGIN_URL] : [],
+    plugin: opts.plugin ? [getPluginUrl(opts.variant)] : [],
   };
   return {
     OPENCODE_TEST_HOME: home,

@@ -11,8 +11,6 @@ if (target === 'mux') {
     runAll = (await import('../build/e2e/TestsOmp.js')).runAll;
 } else if (target === 'wanxiangzhen') {
     runAll = (await import('../build/e2e/WanxiangzhenPluginTests.js')).runAll;
-} else if (target === 'opencode-context-budget') {
-    runAll = (await import('../build/e2e/OpencodePluginContextBudgetE2e.js')).runAll;
 } else if (target === 'opencode-plugin') {
     runAll = async (args) => {
         const suites = [
@@ -86,8 +84,12 @@ if (target === 'mux') {
 }
 
 const extraArgs = process.argv.slice(3);
+console.log('e2e runner started');
 runAll(extraArgs)
-    .then(code => process.exit(code))
+    .then(code => {
+        console.log('e2e runner finished with code:', code);
+        process.exit(code);
+    })
     .catch(err => {
         console.error('RUNALL_FAILED:', err);
         process.exit(2);

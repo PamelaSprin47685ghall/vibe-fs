@@ -71,7 +71,7 @@ let decodeMuxConfig (config: IMuxToolContext) : Result<ToolExecutionContext, Dom
             | None -> ""
 
         let sessionId =
-            match firstNonEmpty [ config.sessionID; config.sessionId; config.session_id ] with
+            match firstNonEmpty [ config.sessionID; config.sessionId; config.session_id; config.workspaceId ] with
             | Some s -> s
             | None -> ""
 

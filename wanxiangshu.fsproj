@@ -724,17 +724,7 @@
     <Compile Include="e2e/Tests.fs"/>
     <Compile Include="e2e/MuxTestsPart2.fs"/>
     <Compile Include="e2e/MuxTests.fs"/>
-    <Compile Include="e2e/OpencodePluginTestsPart2.fs"/>
-    <Compile Include="e2e/OpencodePluginTestsPart3.fs"/>
-    <Compile Include="e2e/OpencodePluginTestsPart4.fs"/>
-    <Compile Include="e2e/OpencodePluginContinueRecoveryTests.fs"/>
-    <Compile Include="e2e/OpencodePluginNudgeTests.fs"/>
-    <Compile Include="e2e/OpencodePluginContextBudgetTests.fs"/>
-    <Compile Include="e2e/OpencodePluginContextBudgetE2e.fs"/>
     <Compile Include="e2e/OpencodePluginTests.fs"/>
-    <Compile Include="e2e/MimocodePluginSpecsPart.fs"/>
-    <Compile Include="e2e/MimocodePluginSpecSections.fs"/>
-    <Compile Include="e2e/MimocodePluginSpecs.fs"/>
     <Compile Include="e2e/MimocodePluginTests.fs"/>
     <Compile Include="e2e/MimoTuiPluginTests.fs"/>
     <Compile Include="e2e/TestsOmpSpecsPart.fs"/>

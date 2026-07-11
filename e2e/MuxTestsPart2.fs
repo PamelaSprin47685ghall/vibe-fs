@@ -57,8 +57,9 @@ let runRest
                    {| objective = "Test"
                       background = "none"
                       questions = [| "ok?" |]
-                      entries = [| "mux-e2e-test.txt" |] |} |]
+                      entries = [| "mux-e2e-test.md" |] |} |]
 
+        harness.setMockReportMarkdown "investigator output mock text"
         harness.mockLLM.expectText "investigator output mock text"
 
         do!
@@ -72,6 +73,7 @@ let runRest
                 (fun r -> r.Contains "investigator output mock text")
                 "mux.execute.investigator.success"
 
+        harness.setMockReportMarkdown "browser mock debug view text"
         harness.mockLLM.expectText "browser mock debug view text"
 
         do!
@@ -83,6 +85,7 @@ let runRest
                 (fun r -> r.Contains "browser mock debug view text")
                 "mux.execute.browser.success"
 
+        harness.setMockReportMarkdown "websearch mock output summary text"
         harness.mockLLM.expectText "websearch mock output summary text"
 
         do!
@@ -99,6 +102,7 @@ let runRest
                 (fun r -> r.Contains "Example Domain")
                 "mux.execute.webfetch.success"
 
+        harness.setMockReportMarkdown "meditator mock report output"
         harness.mockLLM.expectText "meditator mock report output"
 
         do!
@@ -123,9 +127,10 @@ let runRest
                       background = "none"
                       targets =
                        [| box
-                              {| file = "mux-e2e-test.txt"
+                              {| file = "mux-e2e-test.md"
                                  guide = "Fix all typos" |} |] |} |]
 
+        harness.setMockReportMarkdown "coder mock execution output"
         harness.mockLLM.expectText "coder mock execution output"
 
         do!
@@ -138,6 +143,17 @@ let runRest
                       "warn_reuse", box "this-task-is-not-suitable-to-be-completed-via-continue-tool" ])
                 (fun r -> r.Contains "coder mock execution output")
                 "mux.execute.coder.success"
+
+        do!
+            runTool
+                "coder"
+                (createObj
+                    [ "intents", box coderIntents
+                      "tdd", box "green"
+                      "warn_tdd", box "wrong_warn_tdd"
+                      "warn_reuse", box "this-task-is-not-suitable-to-be-completed-via-continue-tool" ])
+                (fun r -> r.Contains "acknowledge")
+                "mux.execute.coder.warnTddRejected"
 
         // --- 4. Event hook: nudge via stream-end with open todos -------------
         let todoItem: obj =
