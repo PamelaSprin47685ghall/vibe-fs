@@ -61,8 +61,7 @@ let spec_tryGetMaxInputTokensAsync_realSchema () =
         let! limit = tryGetMaxInputTokensAsync client "s-async" ""
         equal "limit.input from provider.list" (Some 200000) limit
 
-        let capturedPath = get capturedSessionArg "path"
-        check "session.get path id" (not (isNullish capturedPath) && string (get capturedPath "id") = "s-async")
+        check "session.get sessionID" (string (get capturedSessionArg "sessionID") = "s-async")
 
         check "provider.list called" providerListCalled
     }
@@ -164,8 +163,7 @@ let spec_tryGetRealContextUsage_realSchema () =
         let! tokens = opt.Value [||]
         // input + cache.read = 45000 + 5000 = 50000
         equal "tokens = input + cache.read" (Some 50000) tokens
-        let capturedPath = get capturedArg "path"
-        check "session.get path id" (not (isNullish capturedPath) && string (get capturedPath "id") = "s-real")
+        check "session.get sessionID" (string (get capturedArg "sessionID") = "s-real")
     }
 
 /// RED: session with no tokens → None

@@ -95,10 +95,7 @@ let tryGetRealContextUsage
                 Some(fun (_encoded: obj array) ->
                     promise {
                         try
-                            let arg =
-                                createObj
-                                    [ "path", createObj [ "id", box sessionID ]
-                                      "query", createObj [ "directory", box directory ] ]
+                            let arg = createObj [ "sessionID", box sessionID; "directory", box directory ]
 
                             let! res = unbox<JS.Promise<obj>> (sessionApi?get (arg))
 

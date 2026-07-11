@@ -101,10 +101,7 @@ let tryGetSessionModelRef (target: obj) (sessionID: string) : JS.Promise<(string
                     return None
                 else
                     try
-                        let arg =
-                            createObj
-                                [ "path", createObj [ "id", box sessionID ]
-                                  "query", createObj [ "directory", box "" ] ]
+                        let arg = createObj [ "sessionID", box sessionID; "directory", box "" ]
 
                         let! res = unbox<JS.Promise<obj>> (sessionApi?get (arg))
 
@@ -153,7 +150,7 @@ let tryGetModelLimitFromProviderListDetailed
                     return None
                 else
                     try
-                        let listArg = createObj [ "query", createObj [ "directory", box directory ] ]
+                        let listArg = createObj [ "directory", box directory ]
 
                         let! res = unbox<JS.Promise<obj>> (providerApi?list (listArg))
 
@@ -228,10 +225,7 @@ let tryGetMaxInputTokensAsyncDetailed
                     return None
                 else
                     try
-                        let arg =
-                            createObj
-                                [ "path", createObj [ "id", box sessionID ]
-                                  "query", createObj [ "directory", box directory ] ]
+                        let arg = createObj [ "sessionID", box sessionID; "directory", box directory ]
 
                         let! res = unbox<JS.Promise<obj>> (sessionApi?get (arg))
 
