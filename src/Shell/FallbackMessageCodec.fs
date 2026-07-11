@@ -9,6 +9,14 @@ open Wanxiangshu.Kernel.FallbackKernel.Types
 open Wanxiangshu.Shell.FallbackMessageParser
 open Wanxiangshu.Kernel.Messaging
 
+/// Find the index of the last assistant message.
+let lastAssistantIndex (msgs: obj array) : int option =
+    if isNull msgs || msgs.Length = 0 then
+        None
+    else
+        msgs
+        |> Array.tryFindIndexBack (fun msg -> Dyn.str (Dyn.get msg "info") "role" = "assistant")
+
 /// Recovery prompt returned when a tool-call-as-text is detected.
 /// `RecoverWithPrompt` injects this verbatim into the user turn; the
 /// SSOT for the recovery event is the per-session log file, not this string.
@@ -78,71 +86,61 @@ let allTodosCompleted (msgs: obj array) : bool =
 /// Detect whether the last assistant message carries no tool calls and no
 /// visible text content — i.e. the LLM returned an empty output.
 let isIdleNoContentAndNoTools (msgs: obj array) : bool =
-    if isNull msgs || msgs.Length = 0 then
-        false
-    else
-        msgs
-        |> Array.rev
-        |> Array.tryPick (fun msg ->
-            if Dyn.str (Dyn.get msg "info") "role" <> "assistant" then
-                None
+    match lastAssistantIndex msgs with
+    | None -> false
+    | Some idx ->
+        let msg = msgs.[idx]
+        let parts = Dyn.get msg "parts"
+
+        if isNull parts || Dyn.isNullish parts || not (Dyn.isArray parts) then
+            true
+        else
+            let arr = parts :?> obj array
+
+            let hasTool =
+                arr
+                |> Array.exists (fun p -> let pt = Dyn.str p "type" in pt = "tool" || pt = "dynamic-tool")
+
+            if hasTool then
+                false
             else
-                let parts = Dyn.get msg "parts"
-
-                if not (Dyn.isArray parts) then
-                    None
-                else
-                    let arr = parts :?> obj array
-
-                    let hasTool =
-                        arr
-                        |> Array.exists (fun p -> let pt = Dyn.str p "type" in pt = "tool" || pt = "dynamic-tool")
-
-                    if hasTool then
-                        None
-                    else
-                        Some(
-                            not (
-                                arr
-                                |> Array.exists (fun p ->
-                                    Dyn.str p "type" = "text"
-                                    && not (System.String.IsNullOrWhiteSpace(Dyn.str p "text")))
-                            )
-                        ))
-        |> Option.defaultValue false
+                not (
+                    arr
+                    |> Array.exists (fun p ->
+                        Dyn.str p "type" = "text"
+                        && not (System.String.IsNullOrWhiteSpace(Dyn.str p "text")))
+                )
 
 /// Check if the last assistant message shows it was aborted by the user.
 /// Returns Some ErrorInput if aborted, otherwise None.
 let tryGetLastAssistantAbortInfo (msgs: obj array) : ErrorInput option =
-    if isNull msgs || msgs.Length = 0 then
-        None
-    else
-        msgs
-        |> Array.rev
-        |> Array.tryPick (fun msg ->
-            let info = Dyn.get msg "info"
+    match lastAssistantIndex msgs with
+    | None -> None
+    | Some idx ->
+        let msg = msgs.[idx]
+        let info = Dyn.get msg "info"
 
-            if isNull info || Dyn.str info "role" <> "assistant" then
-                None
+        if isNull info || Dyn.isNullish info then
+            None
+        else
+            let f, err = Dyn.str info "finish", Dyn.get info "error"
+
+            let isAbort =
+                f = "abort"
+                || f = "interrupted"
+                || f = "cancelled"
+                || (not (isNull err)
+                    && (Dyn.str err "name" = "MessageAbortedError" || Dyn.str err "name" = "AbortError"))
+
+            if isAbort then
+                Some
+                    { ErrorName = "MessageAbortedError"
+                      DomainError = Some MessageAborted
+                      Message = "Generation aborted before producing content"
+                      StatusCode = None
+                      IsRetryable = Some false }
             else
-                let f, err = Dyn.str info "finish", Dyn.get info "error"
-
-                let isAbort =
-                    f = "abort"
-                    || f = "interrupted"
-                    || f = "cancelled"
-                    || (not (isNull err)
-                        && (Dyn.str err "name" = "MessageAbortedError" || Dyn.str err "name" = "AbortError"))
-
-                if isAbort then
-                    Some
-                        { ErrorName = "MessageAbortedError"
-                          DomainError = Some MessageAborted
-                          Message = "Generation aborted before producing content"
-                          StatusCode = None
-                          IsRetryable = Some false }
-                else
-                    None)
+                None
 
 /// Decode a FallbackModel from a raw host object (which can be a string like "openai/gpt-5" or an object).
 let decodeModelFromObj (modelObj: obj) : FallbackModel option =
@@ -187,14 +185,6 @@ let decodeModelFromObj (modelObj: obj) : FallbackModel option =
                   Thinking = false }
         else
             None
-
-/// Find the index of the last assistant message.
-let lastAssistantIndex (msgs: obj array) : int option =
-    if isNull msgs || msgs.Length = 0 then
-        None
-    else
-        msgs
-        |> Array.tryFindIndexBack (fun msg -> Dyn.str (Dyn.get msg "info") "role" = "assistant")
 
 /// Check if the last assistant message finished because of a tool call.
 let isLastAssistantToolFinish (msgs: obj array) : bool =

@@ -136,6 +136,43 @@ let isIdleNoContentAndNoTools_withTool () =
     let m = mkAssistantMsg [| mkToolPart "read" |]
     check "assistant with tool → false" (not (isIdleNoContentAndNoTools [| m |]))
 
+let isIdleNoContentAndNoTools_shouldNotScanPastLatestAssistant () =
+    let emptyMsg = mkAssistantMsg [||]
+
+    let userMsg =
+        createObj
+            [ "info", box (createObj [ "role", box "user" ])
+              "parts", box [| mkTextPart "new question" |] ]
+
+    let toolMsg = mkAssistantMsg [| mkToolPart "read" |]
+    let msgs = [| emptyMsg; userMsg; toolMsg |]
+
+    check
+        "latest assistant has tool, even if history has empty assistant -> false"
+        (not (isIdleNoContentAndNoTools msgs))
+
+let tryGetLastAssistantAbortInfo_shouldNotScanPastLatestAssistant () =
+    let abortMsg =
+        createObj
+            [ "info", box (createObj [ "role", box "assistant"; "finish", box "abort" ])
+              "parts", box [||] ]
+
+    let userMsg =
+        createObj
+            [ "info", box (createObj [ "role", box "user" ])
+              "parts", box [| mkTextPart "new question" |] ]
+
+    let successMsg =
+        createObj
+            [ "info", box (createObj [ "role", box "assistant"; "finish", box "stop" ])
+              "parts", box [| mkTextPart "success output" |] ]
+
+    let msgs = [| abortMsg; userMsg; successMsg |]
+
+    check
+        "latest assistant is successful, even if history has aborted assistant -> None"
+        (Option.isNone (tryGetLastAssistantAbortInfo msgs))
+
 let private mkMsg (role: string) (text: string) (modelStr: string option) : obj =
     let info =
         let baseObj = createObj [ "role", box role ]
@@ -231,4 +268,6 @@ let run () =
     isIdleNoContentAndNoTools_onlyReasoning ()
     isIdleNoContentAndNoTools_withText ()
     isIdleNoContentAndNoTools_withTool ()
+    isIdleNoContentAndNoTools_shouldNotScanPastLatestAssistant ()
+    tryGetLastAssistantAbortInfo_shouldNotScanPastLatestAssistant ()
     testResolveNudgeModel ()
