@@ -22,7 +22,9 @@
 4. **跨轮状态**：review、todo backlog、nudge 须在进程重启后恢复。
 5. **副作用**：Node IO 不可避免，但业务规则须可单测、可重放。
 
-## 七条设计公理（与 README 对齐）
+## 七条设计公理
+
+速查表如下；**逐条展开、推论与纪律**见 **[01-first-principles.md](./01-first-principles.md)**（原 README 第一性原理正文已迁入该文）。
 
 | # | 公理 | 工程含义 |
 | :---: | :--- | :--- |
@@ -76,6 +78,7 @@ flowchart LR
 
 ## 下一步阅读
 
+- 公理展开：[01-first-principles.md](./01-first-principles.md)
 - 结构：[02-architecture.md](./02-architecture.md)
 - 持久化：[05-event-sourcing.md](./05-event-sourcing.md)
 - 构建验证：[17-build-test-verify.md](./17-build-test-verify.md)

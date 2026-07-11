@@ -53,7 +53,7 @@
 ## E2E
 
 - `e2e/wanxiangzhen-harness/` 等
-- 时间无关：轮询状态而非固定 sleep（见 README 公理）
+- 时间无关：轮询状态而非固定 sleep（见 [01-first-principles.md](./01-first-principles.md) §7）
 
 ## 非功能需求与架构不变量
 

@@ -7,7 +7,8 @@
 | 编号 | 文件 | 内容 |
 | :--- | :--- | :--- |
 | 00 | [00-index.md](./00-index.md) | 本索引 |
-| 01 | [01-overview.md](./01-overview.md) | 产品、公理、万象阵边界 |
+| 01 | [01-overview.md](./01-overview.md) | 产品、公理速查、万象阵边界 |
+| 01′ | [01-first-principles.md](./01-first-principles.md) | 七条公理展开（设计动机与纪律） |
 | 02 | [02-architecture.md](./02-architecture.md) | 三层架构、依赖纪律、演进路线 |
 | 03 | [03-kernel.md](./03-kernel.md) | 纯内核模块族 |
 | 04 | [04-shell.md](./04-shell.md) | IO、codec、运行时 |
@@ -36,7 +37,7 @@
 
 ## 推荐阅读路径
 
-**新人**：01 → 02 → 17 → 05 → 06 → 07  
+**新人**：01 → 01-first-principles → 02 → 17 → 05 → 06 → 07  
 
 **宿主适配**：02 → 04 → 08 → 14/15/16 → 10  
 
