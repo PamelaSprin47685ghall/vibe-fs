@@ -12,7 +12,6 @@ open Wanxiangshu.Tests.SubagentIoFallbackRecoveryTests
 open Wanxiangshu.Tests.SubagentIoFallbackRecoveryTestsPart2
 open Wanxiangshu.Tests.SubagentIoFallbackRecoveryTestsPart3
 open Wanxiangshu.Tests.SubagentIoFallbackRecoveryTestsPart4
-open Wanxiangshu.Tests.ArchitectureTestsFallback
 open Wanxiangshu.Tests.WebFetchGuardTests
 open Wanxiangshu.Tests.ReviewVerdictTests
 open Wanxiangshu.Tests.ToolCopyTests
@@ -36,13 +35,7 @@ let fallbackTestEntries () : (string * TestBody) list =
       "SubagentIoFallbackRecoveryTests.run", Async SubagentIoFallbackRecoveryTests.run
       "SubagentIoFallbackRecoveryTestsPart2.run", Async SubagentIoFallbackRecoveryTestsPart2.run
       "SubagentIoFallbackRecoveryTestsPart3.run", Async SubagentIoFallbackRecoveryTestsPart3.run
-      "SubagentIoFallbackRecoveryTestsPart4.run", Async SubagentIoFallbackRecoveryTestsPart4.run
-      "Arch.Fallback.zeroTimer", Sync(sync ArchitectureTestsFallback.zeroTimer)
-      "Arch.Fallback.kernelPurity", Sync(sync ArchitectureTestsFallback.kernelPurity)
-      "Arch.Fallback.ompFallbackIsolation", Sync(sync ArchitectureTestsFallback.ompFallbackIsolation)
-      "Arch.Fallback.configSsot", Sync(sync ArchitectureTestsFallback.configSsot)
-      "Arch.Fallback.injectionStateMustReplayHistory",
-      Sync(sync ArchitectureTestsFallback.fallbackInjectionStateMustReplayHistory) ]
+      "SubagentIoFallbackRecoveryTestsPart4.run", Async SubagentIoFallbackRecoveryTestsPart4.run ]
 
 let tailTestEntries () : (string * TestBody) list =
     [ "WebFetchGuardTests.run", Sync(sync WebFetchGuardTests.run)

@@ -24,7 +24,7 @@
 | :--- | :--- | :--- |
 | 纯内核 | `tests/*Tests.fs` | 无 IO，时间无关 |
 | Shell / Codec | `tests/` codec 条目 | 边界解析 |
-| 架构探针 | `ArchitectureTests*.fs` | 源码文本/结构不变量 |
+| 行为/契约 | `*Tests.fs`、`Integration*`、`e2e/` | 公共输入、输出与状态事实 |
 | 集成 | `Integration*`、`IntegrationToolSpecCatalog` | 工具契约 |
 | OMP 专项 | `ompTestEntries` | 扩展边界 |
 | 万象阵 | `wanxiangzhenTestEntries` | 协调器（若启用） |
@@ -32,23 +32,7 @@
 
 `tests/runner.js` 调用 `runAll(selectors)`；可传前缀过滤用例。
 
-## ArchitectureTests 主题（摘要）
-
-注册于 `TestsArchitectureRegistry.fs` + `PartB`：
-
-- Kernel/Shell 分层、文件行数、无 Dyn in Kernel
-- Opencode↔Mux 无交叉引用、Omp 隔离
-- EventLog fold 强制用于 nudge
-- MessageTransform 用 projection + caps cache
-- Tool catalog / wire hook / wire pipeline
-- Subagent、executor、tree-sitter 边界
-- `parallelToolPromptSSOTGuard`、`noQuadraticListAppend`
-- Omp 全工具注册、子会话、review runtime
-- 万象阵：`wanxiangzhenBoundary`、`wanxiangzhenGitQueue`、`wanxiangzhenReconcile`（`ArchitectureTestsFoundationB.fs`）
-- Fallback：`fallback_continue_injected` kind 声明（`ArchitectureTestsFallback.fs`）
-- E2E：`e2e/OpencodePluginTests.fs`（`pty_spawn` 注册契约）
-
-**新增纪律**应优先加架构测试，再加实现。
+新增纪律应优先加行为测试，再加实现；测试断言公共输入、输出、事件或状态，不断言源码布局与模块引用。
 
 ## E2E
 
@@ -57,16 +41,15 @@
 
 ## 非功能需求与架构不变量
 
-由 `ArchitectureTests*` 与内核模块共同约束（原 master-spec §5 并入）：
+由行为测试、编译器与运行时共同约束：
 
 | 类别 | 规约 |
 | :--- | :--- |
-| Kernel 纯度 | `src/Kernel/` 禁止 Shell、Dyn、Node、`JS.Promise` |
-| 宿主隔离 | Opencode↔Mux 禁互引；Omp 禁 Opencode/Mux/`engine/` |
-| 文件体量 | `src/`、`tests/` 单文件有效行 ≤300（200 起警惕） |
-| 标记禁令 | 禁止 TODO/FIXME/HACK 等悬空标记（探针扫描） |
-| Codec | 宿主 tool args 必经 Shell codec；禁业务层裸 `Dyn.get` |
-| Fallback | Fallback 路径禁 `setTimeout`/`setInterval`/`Date.now` |
+| Kernel 纯度 | F# 编译边界与纯函数行为测试 |
+| 宿主隔离 | 各宿主公开插件行为与集成测试 |
+| 文件体量 | 设计审查与自然模块边界，不删空行规避复杂度 |
+| Codec | 输入解码、结果编码与 hook 输出契约测试 |
+| Fallback | 可重复状态转移、事件重放与集成测试 |
 | 性能纪律 | 热路径禁无界 `@` 列表追加（见 [10](./10-message-transform.md)） |
 | SSRF | `webfetch` 经 `Kernel.WebFetchGuard`：私网、回环、链路本地、元数据地址等拒绝 |
 
@@ -78,7 +61,7 @@ EventLog 目标（实现与压测以代码为准）：万行级 replay 与单次
 | :--- | :--- |
 | 单元 | `ReviewTests`、`EventLogFoldTests`、`FallbackKernelTests` |
 | Codec | `ToolArgsDecodeTests`、`WorkBacklogToolsCodecTests` |
-| 架构 | `TestsArchitectureRegistry` |
+| 行为 | `TestsEntries*`、`Integration*`、`e2e/` |
 | 集成 | `IntegrationToolSpecCatalog`、`IntegrationMuxMethodologySpecs` |
 | E2E | `e2e/` + `wanxiangzhen-harness` |
 

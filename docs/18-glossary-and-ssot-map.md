@@ -44,7 +44,7 @@
 ## 文档维护
 
 - 规格只写 `docs/`；冲突以 `src/` 为准后改 docs
-- 实施顺序（`AGENTS.md`）：文档 → 测试 → 代码
+- 实施顺序（`AGENTS.md`）：文档 → 行为测试 → 代码
 - 万象阵专题：[19-wanxiangzhen.md](./19-wanxiangzhen.md) → 全文 [wanxiangzhen/01-master-spec.md](./wanxiangzhen/01-master-spec.md)
 
 ## 跨仓库

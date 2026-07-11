@@ -22,10 +22,10 @@ open Wanxiangshu.Tests.IntegrationChatTests
 open Wanxiangshu.Tests.WorkBacklogTests
 open Wanxiangshu.Tests.MethodologyTests
 open Wanxiangshu.Tests.AmendTests
+open Wanxiangshu.Tests.TestRunnerBehaviorTests
 
 open Wanxiangshu.Tests.TitleFetchGuardTests
 open Wanxiangshu.Tests.TestsTestBody
-open Wanxiangshu.Tests.TestsArchitectureRegistry
 open Wanxiangshu.Tests.TestsEntriesCore
 open Wanxiangshu.Tests.TestsEntriesWanxiangzhen
 open Wanxiangshu.Tests.TestsEntriesCodec
@@ -93,7 +93,6 @@ open Wanxiangshu.Tests.OmpMagicTodoTests
 open Wanxiangshu.Tests.OmpPluginCoreIntegrationTests
 open Wanxiangshu.Tests.EventDrivenHarnessDemo
 open Wanxiangshu.Tests.SubagentIoTests
-open Wanxiangshu.Tests.E2eHarnessContractTests
 open Wanxiangshu.Tests.ToolCatalogClassificationTests
 open Wanxiangshu.Tests.ToolOutputInfoTests
 open Wanxiangshu.Tests.KernelHelpersTests
@@ -133,10 +132,9 @@ let private integrationToolFlatTests: (string * TestBody) list =
     integrationToolSpecs ()
     |> List.map (fun (shortName, spec) -> "IntegrationTool." + shortName, Async spec)
 
-let private tests: (string * TestBody) list =
+let private allOtherTests: (string * TestBody) list =
     coreTestEntries ()
     @ wanxiangzhenTestEntries ()
-    @ (architectureTestEntries ())
     @ codecTestEntries ()
     @ ompTestEntries ()
     @ [ "ContextBudgetSpecs.run", TestBody.Sync(sync ContextBudgetSpecs.run)
@@ -147,6 +145,11 @@ let private tests: (string * TestBody) list =
         "ContextBudgetRealApiSpecs.run", TestBody.Async ContextBudgetRealApiSpecs.run
         "ContextBudgetEstimateTests.run", TestBody.Async ContextBudgetEstimateTests.run ]
     @ integrationToolFlatTests
+
+let private tests: (string * TestBody) list =
+    allOtherTests
+    @ [ "TestRunnerBehaviorTests.defaultSuiteHasNoArchitectureLabels",
+        TestBody.Sync(fun () -> defaultSuiteHasNoArchitectureLabels (allOtherTests |> List.map fst)) ]
 
 let private matchesSelector (selectors: string array) (label: string) =
     selectors.Length = 0

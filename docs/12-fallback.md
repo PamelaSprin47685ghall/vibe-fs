@@ -57,7 +57,7 @@ models:
 
 ## 测试
 
-`FallbackKernelTests`、`FallbackConfigCodecTests`、`FallbackIntegrationTests`、`ArchitectureTestsFallback`。
+`FallbackKernelTests`、`FallbackConfigCodecTests`、`FallbackIntegrationTests`、`FallbackEventBridgeTests`。
 
 ## 相关
 
