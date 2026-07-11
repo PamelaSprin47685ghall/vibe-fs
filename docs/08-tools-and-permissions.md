@@ -78,7 +78,7 @@
 
 **高风险执行**（`executor`、`pty_*`）另须 `warn`：
 
-`it-is-not-possible-to-do-it-using-other-tools`
+`it-is-not-possible-to-do-it-using-other-tools-and-only-run-tests-when-static-analysis-cannot-handle-it`
 
 SSOT：`Kernel/WarnTdd.fs`、`ToolCatalog`；测试 `WarnTddKernelFactsTests`。
 

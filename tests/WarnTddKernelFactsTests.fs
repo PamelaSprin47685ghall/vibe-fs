@@ -119,7 +119,10 @@ let kernelParseWarnTddRejectsVariants () =
         check ("parseWarnTdd rejects: " + value) (parseWarnTdd value = None)
 
 let kernelParseWarnCanonical () =
-    check "parseWarn accepts canonical" (parseWarn warnCanonicalValue)
+    check
+        "parseWarn accepts canonical"
+        (parseWarn
+            "it-is-not-possible-to-do-it-using-other-tools-and-only-run-tests-when-static-analysis-cannot-handle-it")
 
 let kernelParseWarnRejectsVariants () =
     let invalidValues =
@@ -128,14 +131,20 @@ let kernelParseWarnRejectsVariants () =
           "YES"
           " y"
           "x"
-          "  it-is-not-possible-to-do-it-using-other-tools" ]
+          "it-is-not-possible-to-do-it-using-other-tools"
+          "  it-is-not-possible-to-do-it-using-other-tools-and-only-run-tests-when-static-analysis-cannot-handle-it" ]
 
     for value in invalidValues do
         check ("parseWarn rejects: " + value) (not (parseWarn value))
 
 let kernelCanonicalValuesAreNonEmpty () =
     check "warn_tdd canonicalValue non-empty" (canonicalValue <> "")
-    check "warn canonicalValue non-empty" (warnCanonicalValue <> "")
+
+    equal
+        "warnCanonicalValue matches new format"
+        "it-is-not-possible-to-do-it-using-other-tools-and-only-run-tests-when-static-analysis-cannot-handle-it"
+        warnCanonicalValue
+
     check "warnDescription non-empty" (warnDescription <> "")
 
 let kernelWarnDescriptionsDiffer () =

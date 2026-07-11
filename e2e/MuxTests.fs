@@ -200,7 +200,9 @@ let runAll (args: string array) : JS.Promise<int> =
                       "timeout_type", box "short"
                       "what_to_summarize", box "keep stdout only"
                       "warn_tdd", box warnTddValue
-                      "warn", box "it-is-not-possible-to-do-it-using-other-tools" ])
+                      "warn",
+                      box
+                          "it-is-not-possible-to-do-it-using-other-tools-and-only-run-tests-when-static-analysis-cannot-handle-it" ])
                 (fun r -> r.Contains "hello-executor")
                 "mux.execute.executor.success"
 

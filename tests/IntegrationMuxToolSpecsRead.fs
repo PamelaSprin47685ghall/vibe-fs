@@ -34,7 +34,9 @@ let muxExecutorRoCatPrependsWarningSpec () =
                       "timeout_type", box "short"
                       "mode", box "ro"
                       "what_to_summarize", box "summarize exit codes"
-                      "warn", box "it-is-not-possible-to-do-it-using-other-tools" ]
+                      "warn",
+                      box
+                          "it-is-not-possible-to-do-it-using-other-tools-and-only-run-tests-when-static-analysis-cannot-handle-it" ]
 
             let! result = ((get executor "execute") $ (ctx, args)) |> unbox<JS.Promise<string>>
             check "mux executor ro cat includes misuse hint in envelope" (hasExactHint result hintExecutorMisuse)
