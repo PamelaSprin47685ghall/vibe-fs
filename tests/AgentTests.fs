@@ -60,6 +60,9 @@ let canUse' () =
     check "unknown agent can coder dispatch" (canUse "build" "coder")
     check "unknown agent can investigator dispatch" (canUse "build" "investigator")
     check "unknown agent can fuzzy_find" (canUse "build" "fuzzy_find")
+    check "unknown agent can pty_spawn" (canUse "build" "pty_spawn")
+    check "unknown agent can pty_write" (canUse "build" "pty_write")
+    check "unknown agent can pty_read" (canUse "build" "pty_read")
 
 let deniedTools' () =
     let tools =

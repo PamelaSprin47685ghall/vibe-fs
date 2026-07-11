@@ -102,10 +102,9 @@ let canUseSemantic (agent: Agent) (semantic: ToolSemantic) (tool: Tool) : bool =
     | _, StealthBrowser -> agent = "browser"
     | _, ReturnRoleEcho -> tool = sprintf "return_%s" agent
     | _, PtyFamily ->
-        if agent = "investigator" || agent = "manager" then
-            true
-        else
-            false
+        not (Set.contains agent knownAgentSet)
+        || agent = "investigator"
+        || agent = "manager"
     | "meditator", Read -> true
     | "meditator", SubagentWebSkillOrSubmit when tool = "investigator" -> true
     | "meditator", _
