@@ -34,8 +34,11 @@
 | `submit_review_wip_recorded` | WIP 提交记录 |
 | `nudge_dedup_cleared` | 去重表清空（如新用户消息） |
 | `assistant_completed` | 助手轮次完成（辅助 nudge 快照） |
+| `fallback_continue_injected` | Fallback `SendContinue` 已注入（payload：`model` / `agent` / `at` 等） |
+| `subagent_spawned` | 子代理 spawn 成功（durable 投影，见 [11-subagents.md](./11-subagents.md)） |
+| `subagent_continued` | `continue` 工具续跑子会话 |
 
-另有 **万象阵** 相关 kind（`squad_*`、`task_*`）在同文件定义，由万象阵运行时写入**同一或独立**日志策略见万象阵 PRD；万象术核心 fold 主要消费 review/backlog/nudge 族。
+**万象阵** kind（同文件、`session` = 万象阵 session id）：`squad_created`、`tasks_created`、`task_started`、`task_submitted`、`task_merged`、`task_done`、`task_error`、`squad_cancelled`。运行时经 `AppendSquadEvent` **追加到同一文件** `[workspace]/.wanxiangshu.ndjson`（与万象术事件共用锁与 `EventLogStore`）；DAG fold 在 `Kernel/Wanxiangzhen` + `Shell/EventLogSquadProjection`。规格叙事见 [wanxiangzhen/02-event-sourcing.md](./wanxiangzhen/02-event-sourcing.md)（物理路径以 `EventLogCodec.eventLogFileName` 为准）。
 
 ## 信封字段（概念）
 
@@ -49,6 +52,9 @@
 - **`foldWorkBacklogSnapshot`**：取最后一次 `work_backlog_committed`。
 - **`foldNudgeDedup`**：记录已派发 anchor；WIP / dedup_cleared 重置策略。
 - **`foldNudgeSnapshot`**：供 nudge 决策的聚合视图（open todos、loop 是否活跃等）。
+- **`foldSubagents`** / `SessionState.Subagents`：`subagent_spawned` / `subagent_continued` 投影。
+- **`foldFallbackInjection`** / `SessionState.FallbackInjection`：`fallback_continue_injected`（见 [12-fallback.md](./12-fallback.md)）。
+- **万象阵**：`EventLogSquadProjection.applyWanEvent` 与 `CoordinatorReplay`（读同一 NDJSON）。
 
 `SessionState`（Shell 缓存）聚合上述投影，供 `EventLogRuntimeNudge` / `Sync` 读取。
 

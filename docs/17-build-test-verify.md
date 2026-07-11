@@ -44,6 +44,9 @@
 - Subagent、executor、tree-sitter 边界
 - `parallelToolPromptSSOTGuard`、`noQuadraticListAppend`
 - Omp 全工具注册、子会话、review runtime
+- 万象阵：`wanxiangzhenBoundary`、`wanxiangzhenGitQueue`、`wanxiangzhenReconcile`（`ArchitectureTestsFoundationB.fs`）
+- Fallback：`fallback_continue_injected` kind 声明（`ArchitectureTestsFallback.fs`）
+- E2E：`e2e/OpencodePluginTests.fs`（`pty_spawn` 注册契约）
 
 **新增纪律**应优先加架构测试，再加实现。
 

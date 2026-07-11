@@ -38,6 +38,21 @@
 
 共用：`SubagentPromptBuild`、`SubagentIntentsCodec`。**Omp 禁止**引用 Opencode/Mux。
 
+## SubagentDispatcher（已落地）
+
+OpenCode / Mux / OMP 的 spawn 与并行多意图路径经 **`Shell/SubagentDispatcher`** + `Kernel.HostAdapter.IHostAdapter`，替代各宿主重复 spawn 逻辑（`Opencode/SubagentTools.fs`、`Mux/MuxSubagentToolExecute.fs`、`Omp/SubagentTools.fs` 等接线）。架构探针：`ArchitectureTestsSubagent*`、`SubagentDispatcherTests`。
+
+## 事件溯源（子代理）
+
+成功 spawn / continue 会 append（父 session）：
+
+| kind | 时机 |
+| :--- | :--- |
+| `subagent_spawned` | 子代理首次委派成功 |
+| `subagent_continued` | `continue` 续跑成功 |
+
+Fold：`Kernel/EventLog/Fold.fs` → `foldSubagents`；与 iterator 内存态互补，重启后可从 NDJSON 重建子代理投影（见 [05-event-sourcing.md](./05-event-sourcing.md)）。
+
 ## Reviewer
 
 `submit_review` 拉起 reviewer；仅 `return_reviewer` + read 类工具。

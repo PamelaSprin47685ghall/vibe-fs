@@ -206,13 +206,13 @@ npm run build-and-test
 
 完整管线：
 
-1. `npm run build`：`wanxiangshu-core` + `wanxiangshu-omp` + `wanxiangshu-wanxiangzhen` → `build/`
-2. 清理 `build/fable_modules/.gitignore` + 拷贝 `build-package.json` 为 `build/package.json`
+1. `npm run build`：单工程 `wanxiangshu.fsproj`（Fable → `build/`，含 Mux / Opencode / Omp / 万象阵插件 JS）
+2. `postbuild.mjs`：整理 `build/package.json`（自 `build-package.json`）、同步测试/e2e 资产
 3. `node tests/runner.js`：全部测试
 
 无独立编译/watch/子测试集命令。
 
-npm 包主导出入口：`build/src/Mux/Plugin.js`（`"."`）；OMP：`build/src/Omp/Plugin.js`（`"./omp"`）。测试入口：`tests/runner.js` 加载 `build/tests/Tests.js`。`TargetFramework` 在根 `Directory.Build.props`（`net10.0`）。中间产物（MSBuild `bin/`/`obj/`）统一落到根目录 `artifacts/`；清理直接 `rm -rf build artifacts`。
+npm 包主导出入口：`build/src/Mux/Plugin.js`（`"."`）；OMP：`build/src/Omp/Plugin.js`（`"./omp"`）；万象阵：`build/src/Opencode/PluginWanxiangzhen.js`（`"./wanxiangzhen"`，见根 `package.json` `exports`）。消费方以**仓库根** `package.json` 为准；`build/package.json` 为发布子集（可能不含 `./wanxiangzhen`）。测试入口：`tests/runner.js` 加载 `build/tests/Tests.js`。`TargetFramework` 在根 `Directory.Build.props`（`net10.0`）。中间产物（MSBuild `bin/`/`obj/`）统一落到根目录 `artifacts/`；清理直接 `rm -rf build artifacts`。
 
 ## 源码入口速览
 

@@ -85,7 +85,7 @@
 | :--- | :--- |
 | 宿主 `obj` 渗入内核 | Shell DTO（`HostMessageDto` 等）+ 边界 decode |
 | 内存与盘双写风险 | 突变仅经 EventLog append，投影只读 fold |
-| 三宿主重复 spawn/fuzzy | `IHostAdapter` / `SubagentDispatcher` 统一 |
+| 三宿主重复 spawn/fuzzy | **spawn**：已用 `IHostAdapter` + `SubagentDispatcher`（`Shell/SubagentDispatcher.fs`）；fuzzy 仍分 Kernel 规则 + Shell 后端 |
 | 魔法字符串错误 | `DomainError` DU |
 | 巨型 SessionLifecycleObserver | 拆为 Progress / Fallback / Nudge 观察片 |
 

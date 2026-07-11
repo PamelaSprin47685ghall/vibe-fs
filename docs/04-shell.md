@@ -9,7 +9,7 @@ Shell（约 **139** 个 `.fs`）是 Kernel 与 Node/宿主之间的**唯一**常
 | 分簇 | 代表模块 | 说明 |
 | :--- | :--- | :--- |
 | 文件系统 | `FileSys`、`WorkspaceFiles` | 读写工作区 |
-| 事件日志 | `EventLogCodec`、`EventLogIo`、`EventLogFiles`、`EventLogRuntime*` | NDJSON、锁、缓存、sync |
+| 事件日志 | `EventLogCodec`、`EventLogIo`、`EventLogFiles`、`EventLogRuntime*`、`EventLogSquadProjection` | NDJSON（含万象阵行）、锁、缓存、sync |
 | 搜索 | `FuzzyFinderShell`、`FuzzySearch/*`、`FuzzyIteratorStore` | fff 后端、iterator 状态 |
 | Semble | `SembleMcp`、`SembleSearch` | MCP 客户端与 investigator 断点注入 |
 | 执行器 | `Executor*`、`SessionExecutor` | shell/python/js、spawn、会话级执行 |
@@ -18,15 +18,16 @@ Shell（约 **139** 个 `.fs`）是 Kernel 与 Node/宿主之间的**唯一**常
 | 动态类型 | `Dyn`、`DynField`、`ErrorClassify`、`JsArrayMutate`、`PromiseStr` | `obj` 安全访问 |
 | 并发 | `PromiseQueue`、`SerialStateHolder`、`LivelockGuard`、`CoordinatorLifecycle` | 串行队列与守卫 |
 | 时钟 | `Clock` | 可注入时间（测试） |
-| 子代理 | `ChildAgentRegistry`、`SubagentSpawn`、`SubagentIo`、`SubagentToolExecute`、`MuxSubagentToolExecute`、`SessionIoSpawn` | 各宿主 spawn 公共路径 |
+| 子代理 | `SubagentDispatcher`、`ChildAgentRegistry`、`SubagentSpawn`、`SubagentIo`、`SubagentToolExecute`、`MuxSubagentToolExecute`、`SessionIoSpawn` | 统一委派 + 各宿主接线 |
 | Review/Nudge | `ReviewRuntime`、`ReviewReplaySync`、`NudgeRuntime` | 投影同步与异步 nudge |
 | Fallback | `FallbackConfigCodec`、`FallbackRuntimeState`、`FallbackMessageCodec`、`FallbackEventBridge` | 降级运行时 |
-| Context budget | `ContextBudgetStore`、`ContextBudgetUsageCodec` | 用量与触发 |
+| Context budget | `ContextBudgetStore`、`ContextBudgetUsageCodec`、`ContextBudgetLimitResolver` | 用量、触发、从 session/model 解析 `maxInputTokens` |
 | Caps | `CapsFileCache`、`CapsSynthCommon`、`OmpCaps` | caps 文件缓存与组装 |
 | MessageTransform | `MessageTransformPipeline`、`MessageTransformCore`、`MessageTransformHost*`、`Messaging*Codec`、`Chat*Codec` | 共享管线 |
 | Tool 编解码 | `ToolArgsDecode`、`ToolExecute`、`ToolRuntimeContext`、`*ToolsCodec`、`JsonSchemaBuilders`、`MuxJsonSchema` | 参数解析与执行分发 |
 | 宿主专用 codec | `Opencode*Codec`、`Mux*Codec` | hook 入参/出参 |
 | OMP 绑定 | `OmpHostBindings`、`MuxHostBindings` | 宿主 API 薄封装 |
+| 万象阵 | `Shell/Wanxiangzhen/*`（`CoordinatorReplay`、`HttpServer`、`SquadEventLogRuntime`、`GitShell`…） | 协调器副作用；事件 append 走共用 `EventLogFiles` |
 
 ## EventLog 运行时链（写路径）
 

@@ -17,8 +17,11 @@
 - **审查**：`submit_review`、`return_reviewer`
 - **文件**：`read`、`write`（及 edit/patch 族在 Classification）
 - **搜索**：`fuzzy_find`、`fuzzy_grep`、`fuzzy_continue`
-- **网络**：`websearch`、`webfetch`
-- **执行**：`executor`、`executor_wait`、`executor_abort`
+- **网络**：`websearch`、`webfetch`（Mux 别名 `web_search` / `google_search` → `websearch`，见 `HostTools.normalizeToolNameForMux`）
+- **执行**：`executor`（**必填** `max_bytes`：超阈值走摘要子路径，非固定 8192）
+- **PTY**（OpenCode / Mimocode，`opencode-pty`）：`pty_spawn`、`pty_write`、`pty_read`、`pty_list`、`pty_kill`
+
+> `executor_wait` / `executor_abort` **已不在** `Registry.all`；OMP `executor` 为同步语义，不注册 wait/abort（见 [16-host-omp.md](./16-host-omp.md)）。
 
 **方法论**：`methodology_<id>` 不在 `Registry.all` 单列表中，而由 `Methodology/Registry` 批量注册（见 [09-methodology.md](./09-methodology.md)）。
 
@@ -67,6 +70,8 @@
 | `return_reviewer` | 仅 reviewer 角色；驱动 `review_verdict` |
 | `fuzzy_continue` | 搜索 iterator 翻页 |
 | `amend` | 工具参数纠偏回溯（见 [10-message-transform.md](./10-message-transform.md)） |
+| `executor` | `max_bytes` 必填；输出过大时 `what_to_summarize` 驱动摘要 |
+| `pty_*` | 交互式伪终端；须 `warn` + `warn_tdd`（`WarnTdd.fs`） |
 
 ## warn_tdd / warn_reuse
 

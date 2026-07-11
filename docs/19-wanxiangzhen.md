@@ -20,7 +20,7 @@
 - Coordinator：HTTP + Scheduler + `SerialQueue` git + 本地 NDJSON append
 - Slave：独立 `opencode tui --prompt …` + worktree；`submit_to_squad` / `query_squad`
 - 合并：仅 fast-forward；并行 submit 竞争见 master-spec §7
-- Durable：`.wanxiangzhen.ndjson`；git 为合并第二真理源
+- Durable：**实现**为 `.wanxiangshu.ndjson` 内万象阵 `kind` 行 + git 第二真理源（见 [05](./05-event-sourcing.md)、[wanxiangzhen/02](./wanxiangzhen/02-event-sourcing.md)）
 - Review：依赖万象术 `/loop`，万象阵不自实现 reviewer
 
 ## 入口与代码

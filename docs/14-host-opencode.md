@@ -14,8 +14,11 @@
 ## 工具
 
 - `Opencode/Tools.fs`：总表 + `registerMethodologyTools`
-- 分族：`SearchTools.fs`、`SubagentTools.fs`、`MimoTodoTool.fs` 等
+- 分族：`SearchTools.fs`、`SubagentTools.fs`、`MimoTodoTool.fs`、`ExecutorTool.fs`、`PtySpawn.fs`、`PtyIo.fs` 等
+- **PTY**：`pty_*` 五工具注册于 `Tools.fs`；运行时依赖 npm `opencode-pty`（根 `package.json`）
+- **Executor**：Zod schema 含必填 `max_bytes`
 - Schema：**Zod**（禁止在 hook 文件直接 import Zod，架构测试）
+- 契约：`e2e/OpencodePluginTests.fs`（`pty_spawn` 注册与 execute）
 
 ## 消息
 

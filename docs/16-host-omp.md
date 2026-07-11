@@ -14,7 +14,8 @@
 ## 工具
 
 - 分模块：`FuzzyTools`、`ExecutorTools`、`WebTools`、`ReviewToolsRegister`、`TodoTool`、`SubagentTools` 等
-- Schema：**TypeBox** via `OmpToolSchema.fs`
+- **Executor**：同步语义；**不**注册 `executor_wait` / `executor_abort`（与 OpenCode 异步执行器模型对齐方式不同）
+- Schema：**TypeBox** via `OmpToolSchema.fs`（`executor` 含 `max_bytes`）
 - `pi?registerTool` 动态注册
 
 ## 子 workspace

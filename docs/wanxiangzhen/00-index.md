@@ -29,7 +29,7 @@
 
 | 项 | 万象术 | 万象阵 |
 | :--- | :--- | :--- |
-| SSOT | `.wanxiangshu.ndjson` | `.wanxiangzhen.ndjson` |
+| SSOT | `.wanxiangshu.ndjson` | **实现**：同左文件内的万象阵 `kind` 行（见 [02-event-sourcing.md](./02-event-sourcing.md) §2） |
 | npm | `wanxiangshu` / `omp` | `wanxiangshu/wanxiangzhen` |
 | 协同 | `/loop`、todowrite | slave prompt / slash，无代码 import |
 
