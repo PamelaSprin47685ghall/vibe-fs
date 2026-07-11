@@ -37,7 +37,8 @@ let summarizerInputCap () =
           timeoutType = Long
           mode = "ro"
           cwd = None
-          whatToSummarize = "" }
+          whatToSummarize = ""
+          maxBytes = 8192 }
 
     let small = String.replicate 100 "x"
     let smallPrompt = buildSummaryPrompt bl trunc opts (Completed(small, 0))
@@ -67,7 +68,8 @@ let safetyWarning () =
               timeoutType = Short
               mode = "ro"
               cwd = None
-              whatToSummarize = "" }
+              whatToSummarize = ""
+              maxBytes = 8192 }
 
     check "leading grep warns" (hasExactHint (warn "grep foo") hintExecutorMisuse)
     check "grep after && warns" (hasExactHint (warn "cd src && grep foo") hintExecutorMisuse)

@@ -52,7 +52,7 @@ let private summarizeWhenNeeded
     promise {
         let output = outputFromResult result
 
-        if not (shouldSummarize byteLength output) then
+        if not (shouldSummarize byteLength options.maxBytes output) then
             let formatted = formatToolResponse result None
             return prependSafetyWarningForExecution formatted options
         else

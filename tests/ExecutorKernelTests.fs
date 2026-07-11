@@ -4,6 +4,9 @@ open System.Text
 open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Kernel.Executor
 open Wanxiangshu.Kernel.SubagentPrompts
+open Wanxiangshu.Kernel.Domain
+open Wanxiangshu.Shell.ExecutorToolsCodec
+open Fable.Core.JsInterop
 
 let private truncateUtf8 (s: string) (max: int) = truncateUtf8ByBytes s max
 
@@ -106,9 +109,46 @@ let noWarningNonShell () =
 
 let shouldSummarizeThreshold () =
     let byteLength (s: string) = s.Length
-    check "below threshold no summarize" (not (shouldSummarize byteLength (String.replicate 100 "x")))
-    check "at threshold no summarize" (not (shouldSummarize byteLength (String.replicate 8192 "x")))
-    check "above threshold summarize" (shouldSummarize byteLength (String.replicate 8193 "x"))
+    let maxBytes = 100
+    check "below threshold no summarize" (not (shouldSummarize byteLength maxBytes (String.replicate 99 "x")))
+    check "at threshold no summarize" (not (shouldSummarize byteLength maxBytes (String.replicate 100 "x")))
+    check "above threshold summarize" (shouldSummarize byteLength maxBytes (String.replicate 101 "x"))
+
+    let sameString = String.replicate 5000 "x"
+    check "shouldSummarize fires at non-default threshold 4096" (shouldSummarize byteLength 4096 sameString)
+
+    check
+        "shouldSummarize does not fire at non-default threshold 8192"
+        (not (shouldSummarize byteLength 8192 sameString))
+
+let decodeExecutorArgsMissingMaxBytes () =
+    let args =
+        createObj
+            [ "program", box "echo hi"
+              "mode", box "ro"
+              "what_to_summarize", box "files"
+              "timeout_type", box "short" ]
+
+    let result = decodeExecutorArgs args
+
+    match result with
+    | Error(InvalidIntent("executor", "max_bytes", "required")) -> check "missing max_bytes recognized" true
+    | _ -> failwith "expected missing max_bytes error"
+
+let decodeExecutorArgsValidMaxBytes () =
+    let args =
+        createObj
+            [ "program", box "echo hi"
+              "mode", box "ro"
+              "what_to_summarize", box "files"
+              "max_bytes", box 4096
+              "timeout_type", box "short" ]
+
+    let result = decodeExecutorArgs args
+
+    match result with
+    | Ok(args) when args.MaxBytes = 4096 -> check "max_bytes 4096 decoded" true
+    | _ -> failwith "expected MaxBytes = 4096"
 
 // ── prependSafetyWarning ──────────────────────────────────────────────
 
@@ -175,7 +215,8 @@ let buildSummaryPromptSmall () =
           timeoutType = Short
           mode = "ro"
           cwd = None
-          whatToSummarize = "files" }
+          whatToSummarize = "files"
+          maxBytes = 8192 }
 
     let prompt =
         buildSummaryPrompt byteLength truncateToBytes opts (Completed("small output", 0))
@@ -193,7 +234,8 @@ let buildSummaryPromptLarge () =
           timeoutType = Short
           mode = "ro"
           cwd = None
-          whatToSummarize = "files" }
+          whatToSummarize = "files"
+          maxBytes = 8192 }
 
     let large = String.replicate 200_001 "x"
     let prompt = buildSummaryPrompt byteLength truncateUtf8 opts (Completed(large, 0))
@@ -209,7 +251,8 @@ let buildSummaryPromptUtf8Boundary () =
           timeoutType = Short
           mode = "ro"
           cwd = None
-          whatToSummarize = "files" }
+          whatToSummarize = "files"
+          maxBytes = 8192 }
 
     let raw = String.replicate 66_667 "你"
     let prompt = buildSummaryPrompt byteLength truncateUtf8 opts (Completed(raw, 0))
@@ -238,6 +281,8 @@ let run () : unit =
     noWarningNonReadCommand ()
     noWarningNonShell ()
     shouldSummarizeThreshold ()
+    decodeExecutorArgsMissingMaxBytes ()
+    decodeExecutorArgsValidMaxBytes ()
     prependWarningReadCommand ()
     prependWarningNonRead ()
     prependWarningNonShell ()

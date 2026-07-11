@@ -10,7 +10,8 @@ type ExecutorArgs =
       Dependencies: string list
       TimeoutType: ExecutorTimeoutType
       Mode: string
-      WhatToSummarize: string }
+      WhatToSummarize: string
+      MaxBytes: int }
 
 let private parseLanguageField (value: string) : Result<ExecutorLanguage, DomainError> =
     match value.Trim().ToLowerInvariant() with
@@ -52,6 +53,11 @@ let decodeExecutorArgs (args: obj) : Result<ExecutorArgs, DomainError> =
             Error(InvalidIntent("executor", "what_to_summarize", "required"))
         | Some w -> Ok w
 
+    let maxBytesResult =
+        match optInt args "max_bytes" with
+        | None -> Error(InvalidIntent("executor", "max_bytes", "required"))
+        | Some mb -> Ok mb
+
     languageResult
     |> Result.bind (fun language ->
         programResult
@@ -59,13 +65,16 @@ let decodeExecutorArgs (args: obj) : Result<ExecutorArgs, DomainError> =
             modeResult
             |> Result.bind (fun mode ->
                 whatResult
-                |> Result.map (fun whatToSummarize ->
-                    { Language = language
-                      Program = program
-                      Dependencies = defaultArg (strListField args "dependencies") []
-                      TimeoutType = parseTimeout (defaultArg (strField args "timeout_type") "")
-                      Mode = mode
-                      WhatToSummarize = whatToSummarize }))))
+                |> Result.bind (fun whatToSummarize ->
+                    maxBytesResult
+                    |> Result.map (fun maxBytes ->
+                        { Language = language
+                          Program = program
+                          Dependencies = defaultArg (strListField args "dependencies") []
+                          TimeoutType = parseTimeout (defaultArg (strField args "timeout_type") "")
+                          Mode = mode
+                          WhatToSummarize = whatToSummarize
+                          MaxBytes = maxBytes })))))
 
 let toExecuteOptions (cwd: string option) (decoded: ExecutorArgs) : ExecuteOptions =
     { program = decoded.Program
@@ -74,4 +83,5 @@ let toExecuteOptions (cwd: string option) (decoded: ExecutorArgs) : ExecuteOptio
       timeoutType = decoded.TimeoutType
       mode = decoded.Mode
       cwd = cwd
-      whatToSummarize = decoded.WhatToSummarize }
+      whatToSummarize = decoded.WhatToSummarize
+      maxBytes = decoded.MaxBytes }

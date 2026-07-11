@@ -142,6 +142,11 @@ let numOpt (desc: string) : obj =
     let n = call0 n "positive"
     call1 (call0 n "optional") "describe" (box desc)
 
+let numReq (desc: string) : obj =
+    let n = call0 schema "number"
+    let n = call0 n "int"
+    call1 n "describe" (box desc)
+
 let enumReq (values: string array) (desc: string) : obj =
     let e = call1 schema "enum" values
     call1 e "describe" (box desc)

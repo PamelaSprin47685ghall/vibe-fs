@@ -75,6 +75,7 @@ let decodeExecutorOkShell () =
               "timeout_type", box "long"
               "mode", box "rw"
               "what_to_summarize", box "focus on exit codes and stderr"
+              "max_bytes", box 8192
               "warn", box "it-is-not-possible-to-do-it-using-other-tools" ]
 
     match decodeToolInvocation "executor" args with
@@ -172,6 +173,7 @@ let testSanitizeNullArgs () =
               "timeout_type", box "long"
               "mode", box "rw"
               "what_to_summarize", box (createObj []) // Empty object on required field, must be kept
+              "max_bytes", box 8192
               "empty_obj", box (createObj []) // Empty object on optional field, must be deleted
               "non_empty_obj", box (createObj [ "a", box 1 ]) ] // Non-empty object on optional field, must be kept
 

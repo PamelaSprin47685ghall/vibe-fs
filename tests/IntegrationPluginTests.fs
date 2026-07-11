@@ -96,11 +96,18 @@ let systemTransformSpec (p: obj) =
         check "system transform first element is not empty" (head <> "")
     }
 
+let executorSchemaSpec (p: obj) =
+    let toolObj = get (get p "tool") "executor"
+    check "plugin.tool.executor exists" (not (isNullish toolObj))
+    let args = get toolObj "args"
+    check "executor zod schema has max_bytes" (not (isNullish (get args "max_bytes")))
+
 let run () : JS.Promise<unit> =
     promise {
         let! workspaceDir = mkdtempAsync "plugin-run-"
         let! p = plugin (box {| directory = workspaceDir |})
         pluginShape p
+        executorSchemaSpec p
         do! systemTransformSpec p
         let reg = Wanxiangshu.Tests.IntegrationToolSetup.sharedMuxRegistration ()
         registrationShape reg

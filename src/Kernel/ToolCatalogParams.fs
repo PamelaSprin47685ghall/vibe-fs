@@ -20,6 +20,7 @@ let executorDeps = executor "dependencies"
 let executorTimeout = executor "timeout_type"
 let executorMode = executor "mode"
 let executorWhatToSummarize = executor "what_to_summarize"
+let executorMaxBytes = executor "max_bytes"
 let executorWarn = warnDescription
 
 let warnTddDesc = warnTddDescription
