@@ -69,7 +69,8 @@ let transformEntriesAsyncWithAgent
                     backlogSessionOpsFrom defaultBacklogSession.Host (fun sid msgs ->
                         defaultBacklogSession.GetOrRebuildBacklog(sid, msgs))
 
-                let! maxInputTokens = Wanxiangshu.Shell.ContextBudgetUsageCodec.resolveMaxInputTokens [ ctx ] sessionId
+                let! maxInputTokens =
+                    Wanxiangshu.Shell.ContextBudgetUsageCodec.resolveMaxInputTokens [ ctx ] sessionId cwd
 
                 let plan =
                     { SessionID = sessionId
@@ -190,7 +191,7 @@ let registerContextTransform (pi: obj) (reviewStore: ReviewStore) : unit =
                 return event
             else
                 let getContextUsage =
-                    match Wanxiangshu.Shell.ContextBudgetUsageCodec.tryGetRealContextUsage ctx sessionId with
+                    match Wanxiangshu.Shell.ContextBudgetUsageCodec.tryGetRealContextUsage ctx sessionId cwd with
                     | Some f -> f
                     | None -> fun _ -> Promise.lift None
 

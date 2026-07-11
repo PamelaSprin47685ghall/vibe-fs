@@ -63,7 +63,7 @@ export function isolatedEnv(home, llmUrl, opts = {}) {
             temperature: false,
             tool_call: true,
             release_date: '2025-01-01',
-            limit: { context: 100000, output: 10000 },
+            limit: { context: opts.contextLimit ?? 100000, input: opts.contextLimit ?? 100000, output: 10000 },
             cost: { input: 0, output: 0 },
             options: {},
           },

@@ -187,6 +187,7 @@
     <Compile Include="src/Shell/MessagingEncodeHelpers.fs"/>
     <Compile Include="src/Shell/SerialStateHolder.fs"/>
     <Compile Include="src/Shell/ContextBudgetLimitResolver.fs"/>
+    <Compile Include="src/Shell/ContextBudgetResolve.fs"/>
     <Compile Include="src/Shell/ContextBudgetUsageCodec.fs"/>
     <Compile Include="src/Shell/ContextBudgetStore.fs"/>
     <Compile Include="src/Shell/MessageTransformPipeline.fs"/>

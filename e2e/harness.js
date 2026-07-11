@@ -135,6 +135,31 @@ export async function start(opts = {}) {
       return request('GET', `/session/${sessionID}/message`, { query });
     },
 
+    async getSession(sessionID, query = {}) {
+      return request('GET', `/session/${sessionID}`, { query });
+    },
+
+    async listProviders() {
+      return request('GET', '/provider', {});
+    },
+
+    contextBudgetClient() {
+      return {
+        session: {
+          get: async ({ path: { id } }) => {
+            const response = await request('GET', `/session/${id}`);
+            return { data: response.data };
+          },
+        },
+        provider: {
+          list: async (options = {}) => {
+            const response = await request('GET', '/provider', { query: options.query });
+            return { data: response.data };
+          },
+        },
+      };
+    },
+
     async getSessions(query = {}) {
       return request('GET', '/api/session', { query });
     },
@@ -277,4 +302,3 @@ export async function start(opts = {}) {
 
   return api;
 }
-

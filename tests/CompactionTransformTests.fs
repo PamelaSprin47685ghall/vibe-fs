@@ -82,8 +82,12 @@ let testCompactionThresholdAndTransform () =
     }
 
 let testContextBudgetF () =
-    check "F should be true" (Wanxiangshu.Kernel.ContextBudget.F 60000L 100000L 10000L 10000L)
-    check "F should be false" (not (Wanxiangshu.Kernel.ContextBudget.F 59000L 100000L 10000L 10000L))
+    let bEff = 100000L
+    let P = 20000L
+    let N = 3
+    let threshold = (bEff + int64 N * P) / int64 (N + 1)
+    check "F should be true above threshold" (Wanxiangshu.Kernel.ContextBudget.F (threshold + 1000L) bEff P N)
+    check "F should be false below threshold" (not (Wanxiangshu.Kernel.ContextBudget.F (threshold - 1000L) bEff P N))
 
 let testApplyContextBudgetShortCircuit () =
     promise {
@@ -98,7 +102,7 @@ let testApplyContextBudgetShortCircuit () =
               SembleInjectEnabled = false
               Scope = Wanxiangshu.Shell.RuntimeScope.create ()
               MaxInputTokens = 100000
-              GetContextUsage = (fun _ -> Promise.lift (Some 30000)) }
+              GetContextUsage = (fun _ -> Promise.lift (Some 10000)) }
 
         let backlogOps =
             { Host = opencode
@@ -169,7 +173,7 @@ let testTryGetRealContextUsage () =
         let mockClient = createObj [ "session", mockSession ]
 
         let getUsageOpt =
-            Wanxiangshu.Shell.ContextBudgetUsageCodec.tryGetRealContextUsage mockClient "s-test-real-api"
+            Wanxiangshu.Shell.ContextBudgetUsageCodec.tryGetRealContextUsage mockClient "s-test-real-api" ""
 
         check "tryGetRealContextUsage should return Some" getUsageOpt.IsSome
         let getUsage = getUsageOpt.Value

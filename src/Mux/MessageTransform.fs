@@ -57,8 +57,12 @@ let messagesTransform
                 backlogSessionOpsFrom backlogSession.Host (fun sid msgs ->
                     backlogSession.GetOrRebuildBacklog(sid, msgs))
 
-            let! maxInputTokens =
-                resolveMaxInputTokens [ deps; input ] sessionID
+            let! maxInputTokens = resolveMaxInputTokens [ deps; input ] sessionID directory
+
+            let getContextUsage =
+                match ContextBudgetUsageCodec.tryGetRealContextUsage deps sessionID directory with
+                | Some f -> f
+                | None -> fun _ -> Promise.lift None
 
             let plan =
                 { SessionID = sessionID
@@ -71,10 +75,7 @@ let messagesTransform
                   SembleInjectEnabled = false
                   Scope = runtimeScope
                   MaxInputTokens = maxInputTokens
-                  GetContextUsage =
-                      match ContextBudgetUsageCodec.tryGetRealContextUsage deps sessionID with
-                      | Some f -> f
-                      | None -> fun _ -> Promise.lift None }
+                  GetContextUsage = getContextUsage }
 
             let replayTexts () : JS.Promise<string seq> =
                 Promise.lift (extractTextsFromEncodedMessages messagesArr)
@@ -133,13 +134,18 @@ let compactingTransform
             let typedMessages = decodeMessages sessionID messagesArr
             let cleaned = stripSyntheticBySource typedMessages
             let backlog = backlogSession.GetOrRebuildBacklog(sessionID, cleaned)
+
             let guidGen () =
                 let rg = get deps "RandomGen"
+
                 if not (isNullish rg) then
                     string (rg $ ())
                 else
                     System.Guid.NewGuid().ToString()
-            let result = Wanxiangshu.Kernel.BacklogProjectionCore.compactingTransform cleaned backlog guidGen
+
+            let result =
+                Wanxiangshu.Kernel.BacklogProjectionCore.compactingTransform cleaned backlog guidGen
+
             let encoded = encodeMessages result
             replaceArrayInPlace messagesArr encoded
     }

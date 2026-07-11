@@ -62,10 +62,14 @@ let backlogBytesFromEncoded (host: Host) (encodedAll: obj array) : int =
 let tryExtractMaxInputTokens (target: obj) : int option =
     ContextBudgetLimitResolver.tryExtractMaxInputTokens target
 
-let tryGetMaxInputTokensAsync (target: obj) (sessionID: string) : JS.Promise<int option> =
-    ContextBudgetLimitResolver.tryGetMaxInputTokensAsync target sessionID
+let tryGetMaxInputTokensAsync (target: obj) (sessionID: string) (directory: string) : JS.Promise<int option> =
+    ContextBudgetLimitResolver.tryGetMaxInputTokensAsync target sessionID directory
 
-let tryGetRealContextUsage (target: obj) (sessionID: string) : (obj array -> JS.Promise<int option>) option =
+let tryGetRealContextUsage
+    (target: obj)
+    (sessionID: string)
+    (directory: string)
+    : (obj array -> JS.Promise<int option>) option =
     if isNullish target then
         None
     else
@@ -91,7 +95,11 @@ let tryGetRealContextUsage (target: obj) (sessionID: string) : (obj array -> JS.
                 Some(fun (_encoded: obj array) ->
                     promise {
                         try
-                            let arg = createObj [ "sessionID", box sessionID ]
+                            let arg =
+                                createObj
+                                    [ "path", createObj [ "id", box sessionID ]
+                                      "query", createObj [ "directory", box directory ] ]
+
                             let! res = unbox<JS.Promise<obj>> (sessionApi?get (arg))
 
                             if isNullish res then
@@ -131,5 +139,5 @@ let tryGetRealContextUsage (target: obj) (sessionID: string) : (obj array -> JS.
                             return None
                     })
 
-let resolveMaxInputTokens (targets: obj list) (sessionID: string) : JS.Promise<int> =
-    ContextBudgetLimitResolver.resolveMaxInputTokens targets sessionID
+let resolveMaxInputTokens (targets: obj list) (sessionID: string) (directory: string) : JS.Promise<int> =
+    ContextBudgetResolve.resolveMaxInputTokens targets sessionID directory

@@ -157,12 +157,25 @@ let private rebuildPhaseState
             let backlogBytes =
                 ContextBudgetUsageCodec.backlogBytesFromEncoded backlogOps.Host stableEncoded
 
+            let backlogTokens =
+                if int64 stableBytes <= 0L then
+                    0L
+                else
+                    stableTokens * int64 backlogBytes / int64 stableBytes
+
             let newState =
-                if backlog.IsEmpty && currentStore.State.IsNone then
+                match currentStore.State with
+                | None when backlog.IsEmpty ->
                     { phaseBaseTokens = 0L
                       backlogTokensAtPhaseStart = 0L }
-                else
-                    beginPhase stableTokens (int64 stableBytes) (int64 backlogBytes)
+                | None ->
+                    { phaseBaseTokens = stableTokens
+                      backlogTokensAtPhaseStart = backlogTokens }
+                | Some old ->
+                    let p = max old.phaseBaseTokens backlogTokens
+
+                    { phaseBaseTokens = p
+                      backlogTokensAtPhaseStart = backlogTokens }
 
             ContextBudgetStore.update plan.Scope plan.SessionID (fun entry ->
                 { entry with
@@ -181,7 +194,7 @@ let private checkAndInjectNudge
     (state: ContextState)
     (messages: Message<obj> list)
     : Message<obj> list =
-    match classifyPressure plan.MaxInputTokens (int64 currentTokens) state with
+    match classifyPressure plan.MaxInputTokens false (int64 currentTokens) state with
     | RequireTodoWriteEmergency ->
         ContextBudgetStore.update plan.Scope plan.SessionID (fun entry ->
             { entry with
@@ -198,7 +211,7 @@ let applyContextBudget
     (encodeMessages: Message<obj> list -> obj array)
     : JS.Promise<Message<obj> list> =
     promise {
-        if plan.Excluded || messages.IsEmpty || plan.MaxInputTokens <= 0 then
+        if messages.IsEmpty || plan.MaxInputTokens <= 0 then
             return messages
         else
             let totalBytes = JS.JSON.stringify(encodedAll).Length
@@ -261,15 +274,9 @@ let runMessageTransformPipeline
             let afterBacklog =
                 applyBacklogProjection plan.SessionID plan.Excluded backlogOps afterAmend
 
-            let! afterBudget, encodedBacklogOpt =
-                if plan.Excluded then
-                    promise { return afterBacklog, None }
-                else
-                    promise {
-                        let encodedBacklog = encodeMessages afterBacklog
-                        let! res = applyContextBudget plan backlogOps afterBacklog encodedBacklog encodeMessages
-                        return res, Some encodedBacklog
-                    }
+            let encodedBacklog = encodeMessages afterBacklog
+
+            let! afterBudget = applyContextBudget plan backlogOps afterBacklog encodedBacklog encodeMessages
 
             let afterPrompt =
                 if plan.Excluded then
@@ -278,9 +285,10 @@ let runMessageTransformPipeline
                     tryInjectParallelToolPrompt plan.SessionID afterBudget
 
             let encoded =
-                match encodedBacklogOpt with
-                | Some encodedBacklog when afterPrompt.Length = afterBacklog.Length -> encodedBacklog
-                | _ -> encodeMessages afterPrompt
+                if afterPrompt.Length = afterBacklog.Length then
+                    encodedBacklog
+                else
+                    encodeMessages afterPrompt
 
             let! injected = injectFn plan.Excluded encoded
             let! capsFiles = loadCaps ()

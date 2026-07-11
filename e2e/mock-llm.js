@@ -19,19 +19,24 @@ function createMockLLM() {
     res.end();
   }
 
-  function toolCallChunks(id, name, argsStr) {
+  function toolCallChunks(id, name, argsStr, promptTokens) {
     return [
       { id, object: 'chat.completion.chunk', created: 1, model: 'mock', choices: [{ index: 0, delta: { role: 'assistant', content: null }, finish_reason: null }] },
       { id, object: 'chat.completion.chunk', created: 1, model: 'mock', choices: [{ index: 0, delta: { tool_calls: [{ index: 0, id, type: 'function', function: { name, arguments: argsStr } }] }, finish_reason: null }] },
-      { id, object: 'chat.completion.chunk', created: 1, model: 'mock', choices: [{ index: 0, delta: {}, finish_reason: 'tool_calls' }] },
+      { id, object: 'chat.completion.chunk', created: 1, model: 'mock', choices: [{ index: 0, delta: {}, finish_reason: 'tool_calls' }], usage: { prompt_tokens: promptTokens, completion_tokens: 100, total_tokens: promptTokens + 100 } },
     ];
   }
 
-  function textChunks(id, text) {
+  function textChunks(id, text, promptTokens) {
     return [
       { id, object: 'chat.completion.chunk', created: 1, model: 'mock', choices: [{ index: 0, delta: { role: 'assistant', content: text }, finish_reason: null }] },
-      { id, object: 'chat.completion.chunk', created: 1, model: 'mock', choices: [{ index: 0, delta: {}, finish_reason: 'stop' }] },
+      { id, object: 'chat.completion.chunk', created: 1, model: 'mock', choices: [{ index: 0, delta: {}, finish_reason: 'stop' }], usage: { prompt_tokens: promptTokens, completion_tokens: 100, total_tokens: promptTokens + 100 } },
     ];
+  }
+
+  function estimatePromptTokens(body) {
+    const json = JSON.stringify(body?.messages ?? []);
+    return Math.max(1, Math.ceil(json.length / 2));
   }
 
   function toolNames(body) {
@@ -103,15 +108,16 @@ function createMockLLM() {
 
         const item = nextItemFor(parsed);
         const id = `call_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+        const promptTokens = estimatePromptTokens(parsed);
 
         if (item?.tool) {
           const args = { ...(item.args ?? {}), warn_tdd: 'i-am-sure-i-have-followed-tdd-and-kolmolgorov-principles-and-kept-todo-updated' };
           call.response = { type: 'tool_call', name: item.tool, args };
-          sendSSE(res, toolCallChunks(id, item.tool, JSON.stringify(args)));
+          sendSSE(res, toolCallChunks(id, item.tool, JSON.stringify(args), promptTokens));
         } else {
           const text = item?.text ?? 'ok';
           call.response = { type: 'text', text };
-          sendSSE(res, textChunks(id, text));
+          sendSSE(res, textChunks(id, text, promptTokens));
         }
         _calls.push(call);
       });

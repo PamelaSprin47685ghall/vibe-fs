@@ -5,7 +5,7 @@ open Fable.Core.JsInterop
 open Wanxiangshu.Tests.Assert
 open Wanxiangshu.E2e.OpencodePluginContextBudgetTests
 
-[<Import("start", "./opencode-harness.js")>]
+[<Import("start", "./harness.js")>]
 let private startHarness: obj -> JS.Promise<obj> = jsNative
 
 let private createEmpty () = createObj []
@@ -23,5 +23,6 @@ let runAll (_args: string array) : JS.Promise<int> =
 
         let! _ = OpencodePluginContextBudgetTests.run (unbox null) chk startHarness createEmpty
 
-        return if failCount > 0 then 1 else 0
+        let failed = summary ()
+        return failed
     }

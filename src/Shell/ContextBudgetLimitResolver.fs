@@ -101,7 +101,11 @@ let tryGetSessionModelRef (target: obj) (sessionID: string) : JS.Promise<(string
                     return None
                 else
                     try
-                        let arg = createObj [ "sessionID", box sessionID ]
+                        let arg =
+                            createObj
+                                [ "path", createObj [ "id", box sessionID ]
+                                  "query", createObj [ "directory", box "" ] ]
+
                         let! res = unbox<JS.Promise<obj>> (sessionApi?get (arg))
 
                         if isNullish res then
@@ -132,6 +136,7 @@ let tryGetModelLimitFromProviderListDetailed
     (target: obj)
     (modelId: string)
     (providerId: string)
+    (directory: string)
     : JS.Promise<LimitResolution option> =
     promise {
         if isNullish target then
@@ -148,7 +153,9 @@ let tryGetModelLimitFromProviderListDetailed
                     return None
                 else
                     try
-                        let! res = unbox<JS.Promise<obj>> (providerApi?list (box null))
+                        let listArg = createObj [ "query", createObj [ "directory", box directory ] ]
+
+                        let! res = unbox<JS.Promise<obj>> (providerApi?list (listArg))
 
                         if isNullish res then
                             return None
@@ -181,13 +188,22 @@ let tryGetModelLimitFromProviderListDetailed
                         return None
     }
 
-let tryGetModelLimitFromProviderList (target: obj) (modelId: string) (providerId: string) : JS.Promise<int option> =
+let tryGetModelLimitFromProviderList
+    (target: obj)
+    (modelId: string)
+    (providerId: string)
+    (directory: string)
+    : JS.Promise<int option> =
     promise {
-        let! res = tryGetModelLimitFromProviderListDetailed target modelId providerId
+        let! res = tryGetModelLimitFromProviderListDetailed target modelId providerId directory
         return res |> Option.map valueOf
     }
 
-let tryGetMaxInputTokensAsyncDetailed (target: obj) (sessionID: string) : JS.Promise<LimitResolution option> =
+let tryGetMaxInputTokensAsyncDetailed
+    (target: obj)
+    (sessionID: string)
+    (directory: string)
+    : JS.Promise<LimitResolution option> =
     promise {
         if isNullish target then
             return None
@@ -212,7 +228,11 @@ let tryGetMaxInputTokensAsyncDetailed (target: obj) (sessionID: string) : JS.Pro
                     return None
                 else
                     try
-                        let arg = createObj [ "sessionID", box sessionID ]
+                        let arg =
+                            createObj
+                                [ "path", createObj [ "id", box sessionID ]
+                                  "query", createObj [ "directory", box directory ] ]
+
                         let! res = unbox<JS.Promise<obj>> (sessionApi?get (arg))
 
                         if isNullish res then
@@ -237,54 +257,16 @@ let tryGetMaxInputTokensAsyncDetailed (target: obj) (sessionID: string) : JS.Pro
                                         if mId = "" || pId = "" then
                                             return None
                                         else
-                                            let! limit = tryGetModelLimitFromProviderListDetailed target mId pId
+                                            let! limit =
+                                                tryGetModelLimitFromProviderListDetailed target mId pId directory
 
                                             return limit
                     with _ ->
                         return None
     }
 
-let tryGetMaxInputTokensAsync (target: obj) (sessionID: string) : JS.Promise<int option> =
+let tryGetMaxInputTokensAsync (target: obj) (sessionID: string) (directory: string) : JS.Promise<int option> =
     promise {
-        let! res = tryGetMaxInputTokensAsyncDetailed target sessionID
+        let! res = tryGetMaxInputTokensAsyncDetailed target sessionID directory
         return res |> Option.map valueOf
-    }
-
-let resolveMaxInputTokens (targets: obj list) (sessionID: string) : JS.Promise<int> =
-    promise {
-        let syncRes = targets |> List.map tryExtractMaxInputTokensDetailed |> List.choose id
-
-        let syncInputOpt =
-            syncRes
-            |> List.tryPick (function
-                | InputLimit v -> Some v
-                | _ -> None)
-
-        match syncInputOpt with
-        | Some limit -> return limit
-        | None ->
-            let syncContextOpt =
-                syncRes
-                |> List.tryPick (function
-                    | ContextLimit v -> Some v
-                    | _ -> None)
-
-            let mutable asyncInputOpt = None
-            let mutable asyncContextOpt = None
-
-            for t in targets do
-                if asyncInputOpt.IsNone then
-                    let! limitRes = tryGetMaxInputTokensAsyncDetailed t sessionID
-
-                    match limitRes with
-                    | Some(InputLimit v) -> asyncInputOpt <- Some v
-                    | Some(ContextLimit v) when asyncContextOpt.IsNone -> asyncContextOpt <- Some v
-                    | _ -> ()
-
-            match asyncInputOpt with
-            | Some limit -> return limit
-            | None ->
-                match asyncContextOpt with
-                | Some limit -> return limit
-                | None -> return Option.defaultValue 0 syncContextOpt
     }
