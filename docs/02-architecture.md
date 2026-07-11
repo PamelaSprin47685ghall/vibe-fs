@@ -28,12 +28,10 @@
 
 | 规则 | 探针示例 |
 | :--- | :--- |
-| Kernel 禁止 `Dyn.*`、禁止直接 Shell | `ArchitectureTests.kernelBoundary` |
-| Kernel 单文件有效行 ≤300（黄牌 200） | `ArchitectureTests.fileBodyUnder300` |
-| Opencode ↔ Mux 禁止互引 | `opencodeNoMuxRef` / `muxNoOpencodeRef` |
-| Omp 禁止 Opencode/Mux/engine | `ArchitectureTests.ompBoundary` |
-| Nudge loop 态必须事件 fold | `nudgeLoopStateMustReplayHistory` |
-| Hook output 经 codec，禁裸 `Dyn.set` | `ArchitectureTestsWireHook` 系列 |
+| Kernel 规则可直接执行 | Kernel 单元测试与编译器边界 |
+| 宿主边界稳定 | 宿主行为与 codec 契约测试 |
+| Nudge loop 态必须事件 fold | Nudge 事件溯源行为测试 |
+| Hook output 经 codec | Hook 输入输出契约测试 |
 
 完整列表见 [17-build-test-verify.md](./17-build-test-verify.md)。
 
@@ -89,7 +87,7 @@
 | 魔法字符串错误 | `DomainError` DU |
 | 巨型 SessionLifecycleObserver | 拆为 Progress / Fallback / Nudge 观察片 |
 
-迁移策略：分阶段、每步 `npm run build-and-test` 全绿；禁止大爆炸重写。当前真相仍以 **四套宿主目录 + ArchitectureTests*** 为准。
+迁移策略：分阶段、每步 `npm run build-and-test` 全绿；禁止大爆炸重写。当前真相以 **四套宿主目录 + 行为/契约测试** 为准。
 
 ## 相关文档
 

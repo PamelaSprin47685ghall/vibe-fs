@@ -93,7 +93,7 @@ SSOT：`Kernel/WarnTdd.fs`、`ToolCatalog`；测试 `WarnTddKernelFactsTests`。
 
 ## OMP 注册
 
-`ArchitectureTests.ompToolsRegisterAll`：须注册与 Catalog 对齐的工具子集 + 全部 `methodology_*`。
+OMP 行为测试须验证注册工具与 Catalog 对齐，并覆盖全部 `methodology_*`。
 
 ## 执行分发（概念）
 

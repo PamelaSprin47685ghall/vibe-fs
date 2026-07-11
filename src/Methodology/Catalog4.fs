@@ -105,7 +105,7 @@ let entries: MethodologyEntry list =
           "When behavior can be pinned by tests (schema registry, Args.parse required fields, architecture gates)."
         noteDescription =
           "behavior_claim, executable_oracles, red_phase_plan, green_phase_plan, refactor_safeties, non_testable_residual, tdd_sequence"
-        meditatorRole = "Bind reasoning to executable oracles in tests/ArchitectureTests.fs style."
+        meditatorRole = "Bind reasoning to executable behavior oracles in tests/*Tests.fs."
         outputSections =
           [ "Behavior claim"
             "Oracles"

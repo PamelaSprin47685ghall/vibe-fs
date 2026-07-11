@@ -40,7 +40,7 @@
 
 ## SubagentDispatcher（已落地）
 
-OpenCode / Mux / OMP 的 spawn 与并行多意图路径经 **`Shell/SubagentDispatcher`** + `Kernel.HostAdapter.IHostAdapter`，替代各宿主重复 spawn 逻辑（`Opencode/SubagentTools.fs`、`Mux/MuxSubagentToolExecute.fs`、`Omp/SubagentTools.fs` 等接线）。架构探针：`ArchitectureTestsSubagent*`、`SubagentDispatcherTests`。
+OpenCode / Mux / OMP 的 spawn 与并行多意图路径经 **`Shell/SubagentDispatcher`** + `Kernel.HostAdapter.IHostAdapter`，替代各宿主重复 spawn 逻辑（`Opencode/SubagentTools.fs`、`Mux/MuxSubagentToolExecute.fs`、`Omp/SubagentTools.fs` 等接线）。行为覆盖：`SubagentDispatcherTests`、`IntegrationSubagentSpecs`。
 
 ## 事件溯源（子代理）
 
@@ -59,7 +59,7 @@ Fold：`Kernel/EventLog/Fold.fs` → `foldSubagents`；与 iterator 内存态互
 
 ## 测试
 
-`SubagentIteratorStoreTests`、`IntegrationSubagentSpecs`、`ArchitectureTestsSubagent*`。
+`SubagentIteratorStoreTests`、`IntegrationSubagentSpecs`、宿主 E2E 测试。
 
 ## 恢复错误与子会话完成协议
 

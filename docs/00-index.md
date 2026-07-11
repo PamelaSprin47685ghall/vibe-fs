@@ -22,7 +22,7 @@
 | 12 | [12-fallback.md](./12-fallback.md) | 模型降级 FSM |
 | 13 | [13-context-budget.md](./13-context-budget.md) | F 触发、budget nudge |
 | 14–16 | host 文档 | OpenCode / Mux / OMP |
-| 17 | [17-build-test-verify.md](./17-build-test-verify.md) | 构建与 ArchitectureTests |
+| 17 | [17-build-test-verify.md](./17-build-test-verify.md) | 构建与行为验证 |
 | 18 | [18-glossary-and-ssot-map.md](./18-glossary-and-ssot-map.md) | 术语与真相源 |
 | 19 | [19-wanxiangzhen.md](./19-wanxiangzhen.md) | 万象阵导航（完整规格在 `wanxiangzhen/`） |
 
