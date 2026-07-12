@@ -84,6 +84,7 @@ let muxTodoWriteCapturesCompletedWorkReportSpec () =
                       "gotchas", box (System.String('c', 1024))
                       "lessonsAndConventions", box (System.String('d', 1024))
                       "plan", box (System.String('e', 1024))
+                      "select_methodology", box [| "first_principles" |]
                       "todos",
                       box
                           [| createObj
@@ -117,7 +118,9 @@ let muxTodoWriteCapturesCompletedWorkReportSpec () =
                                   lessonsAndConventions = System.String('d', 1024)
                                   plan = System.String('e', 1024) })
 
-            check "mux todo_write wrapper keeps nudge behavior" (hasExactHint (str result "output") hintTodosUpdated)
+            check
+                "mux todo_write wrapper keeps nudge behavior"
+                (hasExactHint (str result "output") (hintMethodologyFollowup "first_principles"))
     }
 
 let muxBacklogProjectionSpec () =

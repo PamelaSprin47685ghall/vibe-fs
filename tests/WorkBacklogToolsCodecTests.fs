@@ -76,6 +76,7 @@ let decodeTodoItemMissingAhaMoments () =
               "gotchas", box ""
               "lessonsAndConventions", box ""
               "plan", box ""
+              "select_methodology", box [| "first_principles" |]
               "todos", box [| createObj [ "content", box "x"; "status", box "pending"; "priority", box "high" ] |] ]
 
     match decodeTodoWriteArgs false args with
@@ -105,6 +106,48 @@ let decodeTodoInvalidStatusOrPriority () =
         check "todo invalid status gets error" (msg.Contains("unknown status: invalid-status"))
     | _ -> check "todo invalid status gets error" false
 
+let decodeTodoHardValidation () =
+    let argsMissingTodos =
+        createObj
+            [ "ahaMoments", box ""
+              "changesAndReasons", box ""
+              "gotchas", box ""
+              "lessonsAndConventions", box ""
+              "plan", box ""
+              "select_methodology", box [| "first_principles" |] ]
+
+    match decodeTodoWriteArgs false argsMissingTodos with
+    | Error(InvalidIntent("todowrite", "todos", _)) -> check "todo missing todos gets hard error" true
+    | _ -> check "todo missing todos gets hard error" false
+
+    let argsMissingMethodology =
+        createObj
+            [ "ahaMoments", box ""
+              "changesAndReasons", box ""
+              "gotchas", box ""
+              "lessonsAndConventions", box ""
+              "plan", box ""
+              "todos", box [||] ]
+
+    match decodeTodoWriteArgs false argsMissingMethodology with
+    | Error(InvalidIntent("todowrite", "select_methodology", _)) ->
+        check "todo missing methodology gets hard error" true
+    | _ -> check "todo missing methodology gets hard error" false
+
+    let argsEmptyMethodology =
+        createObj
+            [ "ahaMoments", box ""
+              "changesAndReasons", box ""
+              "gotchas", box ""
+              "lessonsAndConventions", box ""
+              "plan", box ""
+              "select_methodology", box [||]
+              "todos", box [||] ]
+
+    match decodeTodoWriteArgs false argsEmptyMethodology with
+    | Error(InvalidIntent("todowrite", "select_methodology", _)) -> check "todo empty methodology gets hard error" true
+    | _ -> check "todo empty methodology gets hard error" false
+
 let run () =
     decodeTodoMissingCompletedWorkReport ()
     decodeTodoOk ()
@@ -112,3 +155,4 @@ let run () =
     decodeTodoToolOptsMissingToolCallId ()
     decodeTodoItemMissingAhaMoments ()
     decodeTodoInvalidStatusOrPriority ()
+    decodeTodoHardValidation ()

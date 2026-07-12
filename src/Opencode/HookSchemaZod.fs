@@ -144,11 +144,9 @@ let buildExtensionProperties
     : (string * obj) list =
     let mutable extProps: (string * obj) list = []
 
-    let missingReportFields =
-        Wanxiangshu.Kernel.WorkBacklog.reportFieldNames
-        |> List.filter (fun f -> not (Set.contains f existingReportFields))
+    let reportFields = Wanxiangshu.Kernel.WorkBacklog.reportFieldNames
 
-    for field in missingReportFields do
+    for field in reportFields do
         let desc =
             match field with
             | "ahaMoments" -> ahaMomentsDesc

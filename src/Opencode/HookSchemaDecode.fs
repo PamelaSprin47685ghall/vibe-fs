@@ -192,14 +192,48 @@ let mergeWorkBacklogReportIntoTaskSchema (schema: obj) : obj =
         if isNullish properties then
             schema
         else
-            [| "ahaMoments"
-               "changesAndReasons"
-               "gotchas"
-               "lessonsAndConventions"
-               "plan" |]
+            let reportFields =
+                [| "ahaMoments"
+                   "changesAndReasons"
+                   "gotchas"
+                   "lessonsAndConventions"
+                   "plan" |]
+
+            let filterRequired (req: obj) =
+                if isNullish req || not (Dyn.isArray req) then
+                    req
+                else
+                    let arr = unbox<obj array> req
+
+                    arr
+                    |> Array.filter (fun k ->
+                        let s = string k
+                        not (Array.contains s reportFields))
+                    |> box
+
+            reportFields
             |> Array.iter (fun field ->
-                if isNullish (get properties field) then
-                    properties?(field) <- jsonStringMinLengthProperty 1024 (reportFieldDescs.[field]))
+                let existingProp = get properties field
+
+                if isNullish existingProp then
+                    properties?(field) <- jsonStringMinLengthProperty 1024 (reportFieldDescs.[field])
+                else
+                    if not (isNullish (get existingProp "minLength")) then
+                        Dyn.deleteKey existingProp "minLength"
+
+                    existingProp?("x-wanxiangshu-soft-min-length") <- box 1024
+                    let currentDesc = Dyn.str existingProp "description"
+
+                    let cleanDesc =
+                        if currentDesc.Contains("MUST be at least") then
+                            currentDesc
+                        else
+                            "MUST be at least 1024 characters. "
+                            + currentDesc
+                            + " "
+                            + reportFieldDescs.[field]
+
+                    existingProp?("description") <- box (cleanDesc.Trim()))
 
             if isNullish (get properties "select_methodology") then
                 properties?("select_methodology") <- selectMethodologyProperty
@@ -215,16 +249,15 @@ let mergeWorkBacklogReportIntoTaskSchema (schema: obj) : obj =
                               if key = "properties" then
                                   yield key, nextProperties
                               elif key = "required" then
-                                  yield
-                                      key,
-                                      requiredWithoutTaskId (get schema "required")
-                                      |> appendRequiredKey "select_methodology"
+                                  let filteredReq = filterRequired (get schema "required")
+                                  yield key, requiredWithoutTaskId filteredReq |> appendRequiredKey "select_methodology"
                               else
                                   yield key, get schema key ]
             else
                 createObj
                     [ for key in Dyn.keys schema do
                           if key = "required" then
-                              yield key, appendRequiredKey "select_methodology" (get schema "required")
+                              let filteredReq = filterRequired (get schema "required")
+                              yield key, appendRequiredKey "select_methodology" filteredReq
                           else
                               yield key, get schema key ]

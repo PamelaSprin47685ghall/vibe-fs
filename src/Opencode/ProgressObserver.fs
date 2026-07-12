@@ -53,9 +53,14 @@ type ProgressObserver
             if tool = todoWriteToolName host then
                 let methodologies = selectMethodologiesFromHookArgs (argsFromHookInput input)
 
+                let isError =
+                    hookOutputError output <> ""
+                    || ToolExecute.isNetworkErrorText (hookOutputText output)
+
                 match hookOutputString output with
                 | Some _ ->
-                    setHookOutputString output (todoWriteOutput methodologies)
+                    if not isError then
+                        setHookOutputString output (todoWriteOutput methodologies)
 
                     let directory =
                         (fromOpencode input (pluginDirectoryFromCtx ctx)).Execution.Directory

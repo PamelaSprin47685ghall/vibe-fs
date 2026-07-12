@@ -75,7 +75,7 @@ let private decodeTodoItem (todo: obj) (index: int) : Result<TodoItem, DomainErr
 
 let private decodeTodos (args: obj) : Result<TodoItem array, DomainError> =
     match objListField args "todos" with
-    | None -> Ok [||]
+    | None -> Error(InvalidIntent("todowrite", "todos", "required"))
     | Some items ->
         items
         |> Array.ofList
@@ -88,10 +88,14 @@ let private decodeTodos (args: obj) : Result<TodoItem array, DomainError> =
                 | Ok soFar, Ok item -> Ok(Array.append soFar [| item |]))
             (Ok [||])
 
-let private decodeSelectMethodology (args: obj) : string list =
+let private decodeSelectMethodology (args: obj) : Result<string list, DomainError> =
     match strListField args "select_methodology" with
-    | None -> []
-    | Some items -> items
+    | None -> Error(InvalidIntent("todowrite", "select_methodology", "required"))
+    | Some items ->
+        if items.IsEmpty then
+            Error(InvalidIntent("todowrite", "select_methodology", "required"))
+        else
+            Ok items
 
 let decodeTodoWriteArgs (isTask: bool) (args: obj) : Result<TodoWriteArgs * string list, DomainError> =
     let decodeReportField k =
@@ -118,16 +122,19 @@ let decodeTodoWriteArgs (isTask: bool) (args: obj) : Result<TodoWriteArgs * stri
     match decodeTodos args with
     | Error e -> Error e
     | Ok todos ->
-        let decodedArgs =
-            { AhaMoments = ahaMoments
-              ChangesAndReasons = changesAndReasons
-              Gotchas = gotchas
-              LessonsAndConventions = lessonsAndConventions
-              Plan = plan
-              Todos = todos
-              SelectMethodology = decodeSelectMethodology args }
+        match decodeSelectMethodology args with
+        | Error e -> Error e
+        | Ok methodology ->
+            let decodedArgs =
+                { AhaMoments = ahaMoments
+                  ChangesAndReasons = changesAndReasons
+                  Gotchas = gotchas
+                  LessonsAndConventions = lessonsAndConventions
+                  Plan = plan
+                  Todos = todos
+                  SelectMethodology = methodology }
 
-        Ok(decodedArgs, violations)
+            Ok(decodedArgs, violations)
 
 let decodeTodoToolOpts (opts: obj) : Result<TodoToolOpts, DomainError> =
     match strField opts "toolCallId" with
