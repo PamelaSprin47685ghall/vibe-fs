@@ -21,9 +21,9 @@ let injectSubagentFilesIfAny
     : JS.Promise<CapsFile list> =
     promise {
         let isExcluded =
-            match plan.ProjectionPolicy with
-            | ProjectionPolicy.ExcludeProjection -> true
-            | ProjectionPolicy.IncludeProjection -> false
+            match plan.CapsInjectionPolicy with
+            | Wanxiangshu.Kernel.MessageTransformPolicy.CapsInjectionPolicy.Exclude -> true
+            | Wanxiangshu.Kernel.MessageTransformPolicy.CapsInjectionPolicy.Include -> false
 
         if isExcluded || not plan.IsSubagentSession then
             return baseFiles
@@ -90,9 +90,9 @@ let loadCapsForScope
     (plan: MessageTransformPlan)
     : JS.Promise<CapsFile list> =
     let isExcluded =
-        match plan.ProjectionPolicy with
-        | ProjectionPolicy.ExcludeProjection -> true
-        | ProjectionPolicy.IncludeProjection -> false
+        match plan.CapsInjectionPolicy with
+        | Wanxiangshu.Kernel.MessageTransformPolicy.CapsInjectionPolicy.Exclude -> true
+        | Wanxiangshu.Kernel.MessageTransformPolicy.CapsInjectionPolicy.Include -> false
 
     if isExcluded then
         Promise.lift []

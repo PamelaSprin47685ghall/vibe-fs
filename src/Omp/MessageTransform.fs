@@ -58,11 +58,19 @@ let transformEntriesAsyncWithAgent
             else
                 let messagesList = decodeEntries sessionId entriesArr
 
-                let projectionPolicy =
-                    if shouldExcludeAgentFromProjection agent (isChildSession ExecutorTools.ompScope sessionId) then
-                        ProjectionPolicy.ExcludeProjection
-                    else
-                        ProjectionPolicy.IncludeProjection
+                let isChild = isChildSession ExecutorTools.ompScope sessionId
+
+                let backlogPolicy =
+                    Wanxiangshu.Kernel.MessageTransformPolicy.getBacklogProjectionPolicy agent isChild
+
+                let capsPolicy =
+                    Wanxiangshu.Kernel.MessageTransformPolicy.getCapsInjectionPolicy agent isChild
+
+                let parallelHintPolicy =
+                    Wanxiangshu.Kernel.MessageTransformPolicy.getParallelHintPolicy agent isChild
+
+                let contextBudgetPolicy =
+                    Wanxiangshu.Kernel.MessageTransformPolicy.getContextBudgetPolicy agent isChild
 
                 let cleaned = stripSyntheticBySource messagesList
 
@@ -79,8 +87,18 @@ let transformEntriesAsyncWithAgent
                     { SessionID = sessionId
                       Agent = agent
                       Directory = cwd
-                      ProjectionPolicy = projectionPolicy
-                      IsSubagentSession = isChildSession ExecutorTools.ompScope sessionId
+                      ProjectionPolicy =
+                        (if
+                             backlogPolicy = Wanxiangshu.Kernel.MessageTransformPolicy.BacklogProjectionPolicy.Include
+                         then
+                             ProjectionPolicy.IncludeProjection
+                         else
+                             ProjectionPolicy.ExcludeProjection)
+                      BacklogProjectionPolicy = backlogPolicy
+                      CapsInjectionPolicy = capsPolicy
+                      ParallelHintPolicy = parallelHintPolicy
+                      ContextBudgetPolicy = contextBudgetPolicy
+                      IsSubagentSession = isChild
                       Cleaned = cleaned
                       RawArray = Some entriesArr
                       SembleInjectEnabled = false
@@ -97,9 +115,9 @@ let transformEntriesAsyncWithAgent
                 let loadCaps () : JS.Promise<CapsFile list> =
                     promise {
                         let isExcluded =
-                            match plan.ProjectionPolicy with
-                            | ProjectionPolicy.ExcludeProjection -> true
-                            | ProjectionPolicy.IncludeProjection -> false
+                            match plan.CapsInjectionPolicy with
+                            | Wanxiangshu.Kernel.MessageTransformPolicy.CapsInjectionPolicy.Exclude -> true
+                            | Wanxiangshu.Kernel.MessageTransformPolicy.CapsInjectionPolicy.Include -> false
 
                         if isExcluded || cwd = "" then
                             return ([]: CapsFile list)

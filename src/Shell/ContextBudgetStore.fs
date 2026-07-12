@@ -13,7 +13,10 @@ type ContextBudgetEntry =
       NudgeTrack: BudgetNudgeTrack
       ResolvedLimit: {| limit: int; source: string |} option
       EpisodeID: string
-      NudgeCount: int }
+      NudgeCount: int
+      SignalTodoOrdinal: int option
+      SignalTokens: int64 option
+      StableSyntheticNudgeID: string option }
 
 let private keyFor (sessionID: string) = "contextbudget_" + sessionID
 
@@ -24,7 +27,10 @@ let private defaultEntry: ContextBudgetEntry =
       NudgeTrack = Idle
       ResolvedLimit = None
       EpisodeID = ""
-      NudgeCount = 0 }
+      NudgeCount = 0
+      SignalTodoOrdinal = None
+      SignalTokens = None
+      StableSyntheticNudgeID = None }
 
 let private getHolder (scope: RuntimeScope) (sessionID: string) : StateHolder<ContextBudgetEntry> =
     let key = keyFor sessionID

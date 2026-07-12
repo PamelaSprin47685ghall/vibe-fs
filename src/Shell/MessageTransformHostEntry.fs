@@ -324,7 +324,7 @@ let runHostMessagesTransform
     (plan: MessageTransformPlan)
     (backlogOps: BacklogSessionOps)
     (encodeMessages: Message<obj> list -> obj array)
-    (injectFn: ProjectionPolicy -> obj array -> JS.Promise<obj array>)
+    (injectFn: Wanxiangshu.Kernel.MessageTransformPolicy.BacklogProjectionPolicy -> obj array -> JS.Promise<obj array>)
     (loadCaps: unit -> JS.Promise<CapsFile list>)
     (buildCaps: obj array -> CapsFile list -> string option -> obj array)
     : JS.Promise<obj array> =

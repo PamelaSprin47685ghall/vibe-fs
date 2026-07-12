@@ -140,16 +140,22 @@ let messagesTransform
             let cleaned = Messaging.stripSyntheticBySource messagesList
             let isSub = registry.ResolveSubsessionParentID(Some sessionID) |> Option.isSome
 
-            let projectionPolicy =
-                if shouldExcludeAgentFromProjection agent false then
-                    ProjectionPolicy.ExcludeProjection
-                else
-                    ProjectionPolicy.IncludeProjection
+            let backlogPolicy =
+                Wanxiangshu.Kernel.MessageTransformPolicy.getBacklogProjectionPolicy agent isSub
+
+            let capsPolicy =
+                Wanxiangshu.Kernel.MessageTransformPolicy.getCapsInjectionPolicy agent isSub
+
+            let parallelHintPolicy =
+                Wanxiangshu.Kernel.MessageTransformPolicy.getParallelHintPolicy agent isSub
+
+            let contextBudgetPolicy =
+                Wanxiangshu.Kernel.MessageTransformPolicy.getContextBudgetPolicy agent isSub
 
             let sembleInjectEnabled =
-                (match projectionPolicy with
-                 | ProjectionPolicy.ExcludeProjection -> false
-                 | ProjectionPolicy.IncludeProjection -> true)
+                (match backlogPolicy with
+                 | Wanxiangshu.Kernel.MessageTransformPolicy.BacklogProjectionPolicy.Exclude -> false
+                 | Wanxiangshu.Kernel.MessageTransformPolicy.BacklogProjectionPolicy.Include -> true)
                 && (agent = "investigator" || agent = "reviewer")
 
             let backlogOps =
@@ -166,7 +172,15 @@ let messagesTransform
                 { SessionID = sessionID
                   Agent = agent
                   Directory = directory
-                  ProjectionPolicy = projectionPolicy
+                  ProjectionPolicy =
+                    (if backlogPolicy = Wanxiangshu.Kernel.MessageTransformPolicy.BacklogProjectionPolicy.Include then
+                         ProjectionPolicy.IncludeProjection
+                     else
+                         ProjectionPolicy.ExcludeProjection)
+                  BacklogProjectionPolicy = backlogPolicy
+                  CapsInjectionPolicy = capsPolicy
+                  ParallelHintPolicy = parallelHintPolicy
+                  ContextBudgetPolicy = contextBudgetPolicy
                   IsSubagentSession = isSub
                   Cleaned = cleaned
                   RawArray = Some messagesArr
@@ -180,8 +194,9 @@ let messagesTransform
 
             let injectFn policy encoded =
                 match policy with
-                | ProjectionPolicy.ExcludeProjection -> Promise.lift encoded
-                | ProjectionPolicy.IncludeProjection -> injectSembleIntoEncoded directory agent sessionID encoded
+                | Wanxiangshu.Kernel.MessageTransformPolicy.BacklogProjectionPolicy.Exclude -> Promise.lift encoded
+                | Wanxiangshu.Kernel.MessageTransformPolicy.BacklogProjectionPolicy.Include ->
+                    injectSembleIntoEncoded directory agent sessionID encoded
 
             let loadCaps () =
                 let parentSessionID =

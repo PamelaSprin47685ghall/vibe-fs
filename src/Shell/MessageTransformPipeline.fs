@@ -12,73 +12,103 @@ open Wanxiangshu.Shell.MessageTransformCore
 type MessageTransformPlan = Wanxiangshu.Shell.MessageTransformCore.MessageTransformPlan
 
 let tryInjectParallelToolPrompt (sessionID: string) (messages: Message<obj> list) : Message<obj> list =
-    let cleaned = messages |> List.filter (fun m -> m.source = Native)
+    let isRealCallId (callID: string) : bool =
+        not (System.String.IsNullOrWhiteSpace callID)
+        && not (Wanxiangshu.Kernel.HostTools.isSynthCallId callID)
+        && not (callID.StartsWith "semble-")
+        && not (callID.StartsWith "caps-")
+        && not (callID.StartsWith "prefetch-")
+        && not (callID.StartsWith "internal-")
 
-    let isToolPart (part: Part<obj>) : bool =
-        match part with
-        | ToolPart _ -> true
-        | _ -> false
+    let getRealCallIds (m: Message<obj>) : string list =
+        m.parts
+        |> List.choose (fun p ->
+            match p with
+            | ToolPart(_, callID, _, _) when isRealCallId callID -> Some callID
+            | _ -> None)
 
-    let isTriggerableToolPart (part: Part<obj>) : bool =
-        match part with
-        | ToolPart(_, callID, _, _) -> not (Wanxiangshu.Kernel.HostTools.isSynthCallId callID)
-        | _ -> false
+    let isResultForCallID (callID: string) (m: Message<obj>) : bool =
+        m.info.role = ToolResult
+        && (m.parts
+            |> List.exists (fun p ->
+                match p with
+                | ToolPart(_, cid, _, _) -> cid = callID
+                | _ -> false)
+            || m.info.id = callID
+            || m.info.id.Contains(callID)
+            || m.parts.IsEmpty)
 
-    let assistantToolCalls =
-        cleaned
-        |> List.filter (fun m -> m.info.role = Assistant && m.parts |> List.exists isTriggerableToolPart)
+    let nativeMsgs = messages |> List.filter (fun m -> m.source = Native)
 
-    match List.tryLast assistantToolCalls with
+    let lastAssistantOpt =
+        nativeMsgs |> List.tryFindBack (fun m -> m.info.role = Assistant)
+
+    match lastAssistantOpt with
     | None -> messages
     | Some lastAssistantMsg ->
-        let allToolParts = lastAssistantMsg.parts |> List.filter isToolPart
+        let realCallIDs = getRealCallIds lastAssistantMsg
 
-        let triggerableToolParts =
-            lastAssistantMsg.parts |> List.filter isTriggerableToolPart
-
-        let triggerableCount = List.length triggerableToolParts
-
-        if allToolParts.Length <> 1 || triggerableCount <> 1 then
+        if realCallIDs.Length <> 1 then
             messages
         else
-            let targetCallID =
-                match List.tryHead triggerableToolParts with
-                | Some(ToolPart(_, callID, _, _)) -> callID
-                | _ -> ""
+            let targetCallID = List.head realCallIDs
 
-            if targetCallID = "" then
-                messages
-            else
-                let lastIdx =
-                    cleaned |> List.findIndex (fun m -> m.info.id = lastAssistantMsg.info.id)
+            let lastIdx =
+                nativeMsgs |> List.findIndex (fun m -> m.info.id = lastAssistantMsg.info.id)
 
-                let laterMessages = cleaned.[lastIdx + 1 ..]
-                let hasResult = laterMessages |> List.exists (fun m -> m.info.role = ToolResult)
+            let laterMessages = nativeMsgs.[lastIdx + 1 ..]
 
-                if not hasResult then
+            let targetResultOpt = laterMessages |> List.tryFind (isResultForCallID targetCallID)
+
+            match targetResultOpt with
+            | None -> messages
+            | Some targetResultMsg ->
+                let resultIdx =
+                    laterMessages |> List.findIndex (fun m -> m.info.id = targetResultMsg.info.id)
+
+                let messagesAfterResult = laterMessages.[resultIdx + 1 ..]
+
+                let hasLaterAssistant =
+                    messagesAfterResult |> List.exists (fun m -> m.info.role = Assistant)
+
+                if hasLaterAssistant then
                     messages
                 else
-                    let synthMsg: Message<obj> =
-                        { info =
-                            { id = "parallel-tool-synth-" + targetCallID
-                              sessionID = sessionID
-                              role = User
-                              agent = "orchestrator"
-                              isError = false
-                              toolName = ""
-                              details = null
-                              time = null }
-                          parts = [ TextPart Wanxiangshu.Kernel.PromptFragments.parallelToolPromptProse ]
-                          source = Synthetic "parallel-tool-synth-"
-                          raw = null }
+                    let hintId = "parallel-tool-hint:" + targetCallID
 
-                    List.append messages [ synthMsg ]
+                    let alreadyHasHint =
+                        messages
+                        |> List.exists (fun m ->
+                            m.info.id = hintId
+                            || (match m.source with
+                                | Synthetic s ->
+                                    s.StartsWith("parallel-tool-synth-") || s.StartsWith("parallel-tool-hint:")
+                                | _ -> false))
+
+                    if alreadyHasHint then
+                        messages
+                    else
+                        let synthMsg: Message<obj> =
+                            { info =
+                                { id = hintId
+                                  sessionID = sessionID
+                                  role = User
+                                  agent = "orchestrator"
+                                  isError = false
+                                  toolName = ""
+                                  details = null
+                                  time = null }
+                              parts = [ TextPart Wanxiangshu.Kernel.PromptFragments.parallelToolPromptProse ]
+                              source = Synthetic "parallel-tool-hint:"
+                              raw = null }
+
+                        List.append messages [ synthMsg ]
 
 let runMessageTransformPipeline
     (plan: MessageTransformPlan)
     (backlogOps: BacklogSessionOps)
     (encodeMessages: Message<obj> list -> obj array)
-    (injectFn: ProjectionPolicy -> obj array -> JS.Promise<obj array>)
+    (injectFn: Wanxiangshu.Kernel.MessageTransformPolicy.BacklogProjectionPolicy -> obj array -> JS.Promise<obj array>)
     (loadCaps: unit -> JS.Promise<CapsFile list>)
     (buildCaps: obj array -> CapsFile list -> string option -> obj array)
     : JS.Promise<obj array> =
@@ -108,22 +138,17 @@ let runMessageTransformPipeline
                                 copy)
                         plan.Cleaned
 
-            let isExcluded =
-                match plan.ProjectionPolicy with
-                | ProjectionPolicy.ExcludeProjection -> true
-                | ProjectionPolicy.IncludeProjection -> false
-
             let afterBacklog =
-                applyBacklogProjection plan.SessionID plan.ProjectionPolicy backlogOps afterAmend
+                applyBacklogProjection plan.SessionID plan.BacklogProjectionPolicy backlogOps afterAmend
 
             let encodedBacklog = encodeMessages afterBacklog
 
             let! afterBudget = applyContextBudget plan backlogOps afterBacklog encodedBacklog encodeMessages
 
             let afterPrompt =
-                if isExcluded then
-                    afterBudget
-                else
+                match plan.ParallelHintPolicy with
+                | Wanxiangshu.Kernel.MessageTransformPolicy.ParallelHintPolicy.Exclude -> afterBudget
+                | Wanxiangshu.Kernel.MessageTransformPolicy.ParallelHintPolicy.Include ->
                     tryInjectParallelToolPrompt plan.SessionID afterBudget
 
             let encoded =
@@ -132,7 +157,7 @@ let runMessageTransformPipeline
                 else
                     encodeMessages afterPrompt
 
-            let! injected = injectFn plan.ProjectionPolicy encoded
+            let! injected = injectFn plan.BacklogProjectionPolicy encoded
             let! capsFiles = loadCaps ()
             return buildCaps injected capsFiles None
     }

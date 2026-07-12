@@ -52,6 +52,10 @@ let testTransformO1Cache () =
               Agent = "main"
               Directory = ""
               ProjectionPolicy = ProjectionPolicy.IncludeProjection
+              BacklogProjectionPolicy = Wanxiangshu.Kernel.MessageTransformPolicy.BacklogProjectionPolicy.Include
+              CapsInjectionPolicy = Wanxiangshu.Kernel.MessageTransformPolicy.CapsInjectionPolicy.Include
+              ParallelHintPolicy = Wanxiangshu.Kernel.MessageTransformPolicy.ParallelHintPolicy.Include
+              ContextBudgetPolicy = Wanxiangshu.Kernel.MessageTransformPolicy.ContextBudgetPolicy.Include
               IsSubagentSession = false
               Cleaned = []
               RawArray = None
@@ -65,7 +69,7 @@ let testTransformO1Cache () =
               GetOrRebuildBacklog = fun _ _ -> [] }
 
         let encodeMessages (msgs: Message<obj> list) = [||]
-        let injectFn (_policy: ProjectionPolicy) (arr: obj array) = promise { return arr }
+        let injectFn (_policy: BacklogProjectionPolicy) (arr: obj array) = promise { return arr }
         let loadCaps () = promise { return [] }
         let buildCaps (arr: obj array) (_caps: CapsFile list) (_hint: string option) = arr
 
@@ -149,6 +153,26 @@ let testSingleToolCallPromptInjection () =
                   Agent = "main"
                   Directory = ""
                   ProjectionPolicy = projectionPolicy
+                  BacklogProjectionPolicy =
+                    (if projectionPolicy = ProjectionPolicy.IncludeProjection then
+                         Wanxiangshu.Kernel.MessageTransformPolicy.BacklogProjectionPolicy.Include
+                     else
+                         Wanxiangshu.Kernel.MessageTransformPolicy.BacklogProjectionPolicy.Exclude)
+                  CapsInjectionPolicy =
+                    (if projectionPolicy = ProjectionPolicy.IncludeProjection then
+                         Wanxiangshu.Kernel.MessageTransformPolicy.CapsInjectionPolicy.Include
+                     else
+                         Wanxiangshu.Kernel.MessageTransformPolicy.CapsInjectionPolicy.Exclude)
+                  ParallelHintPolicy =
+                    (if projectionPolicy = ProjectionPolicy.IncludeProjection then
+                         Wanxiangshu.Kernel.MessageTransformPolicy.ParallelHintPolicy.Include
+                     else
+                         Wanxiangshu.Kernel.MessageTransformPolicy.ParallelHintPolicy.Exclude)
+                  ContextBudgetPolicy =
+                    (if projectionPolicy = ProjectionPolicy.IncludeProjection then
+                         Wanxiangshu.Kernel.MessageTransformPolicy.ContextBudgetPolicy.Include
+                     else
+                         Wanxiangshu.Kernel.MessageTransformPolicy.ContextBudgetPolicy.Disable)
                   IsSubagentSession = false
                   Cleaned = msgs
                   RawArray = None
@@ -179,7 +203,11 @@ let testSingleToolCallPromptInjection () =
         equal "Case 1 output length (should be 4)" 4 res1.Length
         let lastMsg = res1.[res1.Length - 1] :?> Message<obj>
         equal "last message role" User lastMsg.info.role
-        check "last message id starts with parallel-tool-synth-" (lastMsg.info.id.StartsWith("parallel-tool-synth-"))
+
+        check
+            "last message id starts with parallel-tool-synth-"
+            (lastMsg.info.id.StartsWith("parallel-tool-synth-")
+             || lastMsg.info.id.StartsWith("parallel-tool-hint:"))
 
         let promptText =
             match lastMsg.parts |> List.tryHead with
@@ -221,7 +249,7 @@ let testSingleToolCallPromptInjection () =
               mkMsg "result" ToolResult [] ]
 
         let! res4 = runTransform "s4" ProjectionPolicy.IncludeProjection msgs4
-        equal "Case 4 length" 3 res4.Length
+        equal "Case 4 length" 4 res4.Length
 
         // Case 5: Excluded = true -> 不应附加
         let! res5 = runTransform "s5" ProjectionPolicy.ExcludeProjection msgs1

@@ -47,11 +47,19 @@ let messagesTransform
             let agent = decoded.Agent
             let sessionID = decoded.SessionID
 
-            let projectionPolicy =
-                if shouldExcludeAgentFromProjection agent (isChildWorkspace deps sessionID) then
-                    ProjectionPolicy.ExcludeProjection
-                else
-                    ProjectionPolicy.IncludeProjection
+            let isChild = isChildWorkspace deps sessionID
+
+            let backlogPolicy =
+                Wanxiangshu.Kernel.MessageTransformPolicy.getBacklogProjectionPolicy agent isChild
+
+            let capsPolicy =
+                Wanxiangshu.Kernel.MessageTransformPolicy.getCapsInjectionPolicy agent isChild
+
+            let parallelHintPolicy =
+                Wanxiangshu.Kernel.MessageTransformPolicy.getParallelHintPolicy agent isChild
+
+            let contextBudgetPolicy =
+                Wanxiangshu.Kernel.MessageTransformPolicy.getContextBudgetPolicy agent isChild
 
             let typedMessages = decodeMessages sessionID messagesArr
             let cleanedMessages = stripSyntheticBySource typedMessages
@@ -71,8 +79,16 @@ let messagesTransform
                 { SessionID = sessionID
                   Agent = agent
                   Directory = directory
-                  ProjectionPolicy = projectionPolicy
-                  IsSubagentSession = isChildWorkspace deps sessionID
+                  ProjectionPolicy =
+                    (if backlogPolicy = Wanxiangshu.Kernel.MessageTransformPolicy.BacklogProjectionPolicy.Include then
+                         ProjectionPolicy.IncludeProjection
+                     else
+                         ProjectionPolicy.ExcludeProjection)
+                  BacklogProjectionPolicy = backlogPolicy
+                  CapsInjectionPolicy = capsPolicy
+                  ParallelHintPolicy = parallelHintPolicy
+                  ContextBudgetPolicy = contextBudgetPolicy
+                  IsSubagentSession = isChild
                   Cleaned = cleanedMessages
                   RawArray = Some messagesArr
                   SembleInjectEnabled = false

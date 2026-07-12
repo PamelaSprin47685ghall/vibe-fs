@@ -47,6 +47,26 @@ let testHostNativeToolsTrigger () =
                   Agent = "main"
                   Directory = ""
                   ProjectionPolicy = projectionPolicy
+                  BacklogProjectionPolicy =
+                    (if projectionPolicy = ProjectionPolicy.IncludeProjection then
+                         Wanxiangshu.Kernel.MessageTransformPolicy.BacklogProjectionPolicy.Include
+                     else
+                         Wanxiangshu.Kernel.MessageTransformPolicy.BacklogProjectionPolicy.Exclude)
+                  CapsInjectionPolicy =
+                    (if projectionPolicy = ProjectionPolicy.IncludeProjection then
+                         Wanxiangshu.Kernel.MessageTransformPolicy.CapsInjectionPolicy.Include
+                     else
+                         Wanxiangshu.Kernel.MessageTransformPolicy.CapsInjectionPolicy.Exclude)
+                  ParallelHintPolicy =
+                    (if projectionPolicy = ProjectionPolicy.IncludeProjection then
+                         Wanxiangshu.Kernel.MessageTransformPolicy.ParallelHintPolicy.Include
+                     else
+                         Wanxiangshu.Kernel.MessageTransformPolicy.ParallelHintPolicy.Exclude)
+                  ContextBudgetPolicy =
+                    (if projectionPolicy = ProjectionPolicy.IncludeProjection then
+                         Wanxiangshu.Kernel.MessageTransformPolicy.ContextBudgetPolicy.Include
+                     else
+                         Wanxiangshu.Kernel.MessageTransformPolicy.ContextBudgetPolicy.Disable)
                   IsSubagentSession = false
                   Cleaned = msgs
                   RawArray = None
@@ -155,6 +175,10 @@ let testSynthCallIdExcluded () =
                   Agent = "main"
                   Directory = ""
                   ProjectionPolicy = ProjectionPolicy.IncludeProjection
+                  BacklogProjectionPolicy = Wanxiangshu.Kernel.MessageTransformPolicy.BacklogProjectionPolicy.Include
+                  CapsInjectionPolicy = Wanxiangshu.Kernel.MessageTransformPolicy.CapsInjectionPolicy.Include
+                  ParallelHintPolicy = Wanxiangshu.Kernel.MessageTransformPolicy.ParallelHintPolicy.Include
+                  ContextBudgetPolicy = Wanxiangshu.Kernel.MessageTransformPolicy.ContextBudgetPolicy.Include
                   IsSubagentSession = false
                   Cleaned = msgs
                   RawArray = None

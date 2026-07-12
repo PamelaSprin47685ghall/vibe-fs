@@ -19,6 +19,10 @@ let spec_applyContextBudget_estimatesFromLastUsageWhenApiMissing () =
               Agent = "main"
               Directory = ""
               ProjectionPolicy = ProjectionPolicy.IncludeProjection
+              BacklogProjectionPolicy = Wanxiangshu.Kernel.MessageTransformPolicy.BacklogProjectionPolicy.Include
+              CapsInjectionPolicy = Wanxiangshu.Kernel.MessageTransformPolicy.CapsInjectionPolicy.Include
+              ParallelHintPolicy = Wanxiangshu.Kernel.MessageTransformPolicy.ParallelHintPolicy.Include
+              ContextBudgetPolicy = Wanxiangshu.Kernel.MessageTransformPolicy.ContextBudgetPolicy.Include
               IsSubagentSession = false
               Cleaned = []
               RawArray = None
@@ -85,6 +89,10 @@ let spec_applyContextBudget_seedsLastUsageAfterLiveRead () =
               Agent = "main"
               Directory = ""
               ProjectionPolicy = ProjectionPolicy.IncludeProjection
+              BacklogProjectionPolicy = Wanxiangshu.Kernel.MessageTransformPolicy.BacklogProjectionPolicy.Include
+              CapsInjectionPolicy = Wanxiangshu.Kernel.MessageTransformPolicy.CapsInjectionPolicy.Include
+              ParallelHintPolicy = Wanxiangshu.Kernel.MessageTransformPolicy.ParallelHintPolicy.Include
+              ContextBudgetPolicy = Wanxiangshu.Kernel.MessageTransformPolicy.ContextBudgetPolicy.Include
               IsSubagentSession = false
               Cleaned = []
               RawArray = None
@@ -140,6 +148,10 @@ let spec_applyContextBudget_emptyBacklogInitialPhase_injects () =
               Agent = "main"
               Directory = ""
               ProjectionPolicy = ProjectionPolicy.IncludeProjection
+              BacklogProjectionPolicy = Wanxiangshu.Kernel.MessageTransformPolicy.BacklogProjectionPolicy.Include
+              CapsInjectionPolicy = Wanxiangshu.Kernel.MessageTransformPolicy.CapsInjectionPolicy.Include
+              ParallelHintPolicy = Wanxiangshu.Kernel.MessageTransformPolicy.ParallelHintPolicy.Include
+              ContextBudgetPolicy = Wanxiangshu.Kernel.MessageTransformPolicy.ContextBudgetPolicy.Include
               IsSubagentSession = false
               Cleaned = []
               RawArray = None
@@ -172,7 +184,7 @@ let spec_applyContextBudget_emptyBacklogInitialPhase_injects () =
         let encodeMessages (msgs: Message<obj> list) = msgs |> List.map box |> List.toArray
 
         let! res = applyContextBudget plan backlogOps messages encoded encodeMessages
-        equal "empty backlog initial phase injects nudge at high usage" 2 res.Length
+        equal "empty backlog initial phase injects nudge at high usage" 1 res.Length
     }
 
 let run () : JS.Promise<unit> =
