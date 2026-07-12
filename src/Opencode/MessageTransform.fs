@@ -303,5 +303,4 @@ let compactingTransform
                         [||]
 
                 output?context <- Array.append currentContext [| wrappedText |]
-                output?prompt <- zwsChar
     }

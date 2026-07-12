@@ -12,13 +12,15 @@ type FallbackInjectionState =
     { InjectedModel: string option
       InjectedAgent: string option
       InjectedAt: int64 option
-      InjectedCount: int }
+      InjectedCount: int
+      ProcessedContinuationIds: Set<string> }
 
 let emptyFallbackInjectionState: FallbackInjectionState =
     { InjectedModel = None
       InjectedAgent = None
       InjectedAt = None
-      InjectedCount = 0 }
+      InjectedCount = 0
+      ProcessedContinuationIds = Set.empty }
 
 let private payloadField (key: string) (e: WanEvent) : string option = e.Payload |> Map.tryFind key
 
@@ -40,11 +42,24 @@ let fallbackInjectionFolder (st: FallbackInjectionState) (e: WanEvent) : Fallbac
         let model = payloadField "model" e
         let agent = payloadField "agent" e
         let at = payloadField "at" e |> Option.bind parseAtMs
+        let contIdOpt = payloadField "continuationId" e
 
-        { InjectedModel = if model.IsSome then model else st.InjectedModel
-          InjectedAgent = if agent.IsSome then agent else st.InjectedAgent
-          InjectedAt = if at.IsSome then at else st.InjectedAt
-          InjectedCount = st.InjectedCount + 1 }
+        match contIdOpt with
+        | Some cid when cid <> "" ->
+            if Set.contains cid st.ProcessedContinuationIds then
+                st
+            else
+                { InjectedModel = if model.IsSome then model else st.InjectedModel
+                  InjectedAgent = if agent.IsSome then agent else st.InjectedAgent
+                  InjectedAt = if at.IsSome then at else st.InjectedAt
+                  InjectedCount = st.InjectedCount + 1
+                  ProcessedContinuationIds = Set.add cid st.ProcessedContinuationIds }
+        | _ ->
+            { InjectedModel = if model.IsSome then model else st.InjectedModel
+              InjectedAgent = if agent.IsSome then agent else st.InjectedAgent
+              InjectedAt = if at.IsSome then at else st.InjectedAt
+              InjectedCount = st.InjectedCount + 1
+              ProcessedContinuationIds = st.ProcessedContinuationIds }
 
 let private forSession (sessionId: string) (events: WanEvent list) : WanEvent list =
     events |> List.filter (fun e -> e.Session = sessionId)

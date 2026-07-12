@@ -163,6 +163,12 @@ let private selectedTests (selectors: string array) =
 
 let runAll (args: string array) : JS.Promise<int> =
     promise {
+        try
+            let p: obj = Fable.Core.JsInterop.emitJsExpr () "process"
+            p?env?("WANXIANGSHU_TEST") <- "true"
+        with _ ->
+            ()
+
         clearFailuresForRun ()
         Assert.setSilent false
         let selectors = args

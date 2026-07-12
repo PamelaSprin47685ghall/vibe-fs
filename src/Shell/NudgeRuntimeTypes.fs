@@ -82,12 +82,19 @@ let tryGetModelStringFromMessage (msg: obj) : string option =
         else
             let providerID = Dyn.str modelVal "providerID"
             let modelID = Dyn.str modelVal "modelID"
+            let variant = Dyn.str modelVal "variant"
+            let suffix = if variant <> "" then ":" + variant else ""
 
             if providerID = "" || modelID = "" then
                 let idVal = Dyn.str modelVal "id"
-                if idVal <> "" then Some idVal else None
+                if idVal <> "" then Some(idVal + suffix) else None
             else
-                Some(sprintf "%s/%s" providerID modelID)
+                Some(sprintf "%s/%s%s" providerID modelID suffix)
+
+let private modelWithVariantString (m: FallbackModel) : string =
+    match m.Variant with
+    | Some v -> sprintf "%s/%s:%s" m.ProviderID m.ModelID v
+    | None -> sprintf "%s/%s" m.ProviderID m.ModelID
 
 let resolveNudgeModel
     (msgs: obj array)
@@ -99,10 +106,10 @@ let resolveNudgeModel
     | Some m -> Some m
     | None ->
         match fallbackRuntime.GetInjectedModel sessionID with
-        | Some m -> Some(sprintf "%s/%s" m.ProviderID m.ModelID)
+        | Some m -> Some(modelWithVariantString m)
         | None ->
             match fallbackRuntime.GetModel sessionID with
-            | Some m -> Some(sprintf "%s/%s" m.ProviderID m.ModelID)
+            | Some m -> Some(modelWithVariantString m)
             | None ->
                 if isNull msgs || msgs.Length = 0 then
                     lastAssistantModel

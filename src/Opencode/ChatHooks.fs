@@ -66,8 +66,40 @@ let chatMessageFor
 
         do! lifecycleObserver.handleChatMessage (sessionID, agent, partsFromHookOutput output)
 
-        let modelOpt = tryGetModelStringFromHook input output
-        do! lifecycleObserver.OnNewHumanMessage(Wanxiangshu.Kernel.Domain.Id.sessionIdValue sessionID, agent, modelOpt)
+        let msgObj = Dyn.get output "message"
+        let msgId = if Dyn.isNullish msgObj then "" else Dyn.str msgObj "id"
+        let sessionIDStr = Wanxiangshu.Kernel.Domain.Id.sessionIdValue sessionID
+        let fr = lifecycleObserver.FallbackRuntime
+
+        let isSystem =
+            let owner = fr.GetSessionOwner sessionIDStr
+
+            let hasPending =
+                match fr.TryGetPendingLease sessionIDStr with
+                | Some lease -> lease.Status = "dispatch_started"
+                | None -> false
+
+            if hasPending then
+                if msgId <> "" then
+                    fr.AddSystemMessageId sessionIDStr msgId "Fallback"
+
+                true
+            elif fr.IsNudgeActive sessionIDStr then
+                if msgId <> "" then
+                    fr.AddSystemMessageId sessionIDStr msgId "Nudge"
+
+                true
+            elif owner = "Compaction" then
+                if msgId <> "" then
+                    fr.AddSystemMessageId sessionIDStr msgId "Compaction"
+
+                true
+            else
+                false
+
+        if not isSystem then
+            let modelOpt = tryGetModelStringFromHook input output
+            do! lifecycleObserver.OnNewHumanMessage(sessionIDStr, agent, modelOpt)
 
         match chatMessageFromHookOutput output with
         | None -> ()

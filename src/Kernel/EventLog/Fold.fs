@@ -423,10 +423,7 @@ type SessionState =
       PendingLease: ReplayLeaseState option
       ActiveCompactionId: string option
       IsCompacted: bool
-      ProcessedEventIds: Set<string>
-      ProcessedMessageIds: Set<string>
-      ProcessedPartIds: Set<string>
-      ProcessedCallIds: Set<string> }
+      ProcessedKeys: Set<string> }
 
 let emptySessionState () : SessionState =
     { ReviewLoop = ReviewLoopFold.initial
@@ -448,46 +445,71 @@ let emptySessionState () : SessionState =
       PendingLease = None
       ActiveCompactionId = None
       IsCompacted = false
-      ProcessedEventIds = Set.empty
-      ProcessedMessageIds = Set.empty
-      ProcessedPartIds = Set.empty
-      ProcessedCallIds = Set.empty }
+      ProcessedKeys = Set.empty }
 
-let applyEvent (st: SessionState) (e: WanEvent) : SessionState =
+let private getEventDuplicateKeys (e: WanEvent) : string list =
     let payload = e.Payload
     let eventIdOpt = Map.tryFind "eventId" payload
     let messageIdOpt = Map.tryFind "messageId" payload
     let partIdOpt = Map.tryFind "partId" payload
     let callIdOpt = Map.tryFind "callId" payload
 
+    let contIdOpt =
+        (payloadField "continuationId" e)
+        |> Option.orElse (payloadField "continuationID" e)
+
+    [ match eventIdOpt with
+      | Some id when id <> "" -> yield e.Kind + "_" + id
+      | _ -> ()
+
+      match messageIdOpt with
+      | Some id when id <> "" ->
+          let rev =
+              payload
+              |> Map.tryFind "revision"
+              |> Option.orElse (payload |> Map.tryFind "messageRevision")
+              |> Option.defaultValue ""
+
+          yield e.Kind + "_" + id + "_" + rev
+      | _ -> ()
+
+      match partIdOpt with
+      | Some id when id <> "" ->
+          let state =
+              payload
+              |> Map.tryFind "state"
+              |> Option.orElse (payload |> Map.tryFind "partState")
+              |> Option.defaultValue ""
+
+          yield e.Kind + "_" + id + "_" + state
+      | _ -> ()
+
+      match callIdOpt with
+      | Some id when id <> "" -> yield e.Kind + "_" + id
+      | _ -> ()
+
+      match contIdOpt with
+      | Some id when id <> "" ->
+          let stage =
+              payload
+              |> Map.tryFind "stage"
+              |> Option.orElse (payload |> Map.tryFind "lifecycleStage")
+              |> Option.defaultValue ""
+
+          yield id + "_" + stage
+      | _ -> () ]
+
+let applyEvent (st: SessionState) (e: WanEvent) : SessionState =
+    let candidateKeys = getEventDuplicateKeys e
+
     let isDuplicate =
-        (eventIdOpt |> Option.exists (fun id -> Set.contains id st.ProcessedEventIds))
-        || (messageIdOpt |> Option.exists (fun id -> Set.contains id st.ProcessedMessageIds))
-        || (partIdOpt |> Option.exists (fun id -> Set.contains id st.ProcessedPartIds))
-        || (callIdOpt |> Option.exists (fun id -> Set.contains id st.ProcessedCallIds))
+        candidateKeys |> List.exists (fun key -> Set.contains key st.ProcessedKeys)
 
     if isDuplicate then
         st
     else
-        let nextProcessedEventIds =
-            match eventIdOpt with
-            | Some id -> Set.add id st.ProcessedEventIds
-            | None -> st.ProcessedEventIds
-
-        let nextProcessedMessageIds =
-            match messageIdOpt with
-            | Some id -> Set.add id st.ProcessedMessageIds
-            | None -> st.ProcessedMessageIds
-
-        let nextProcessedPartIds =
-            match partIdOpt with
-            | Some id -> Set.add id st.ProcessedPartIds
-            | None -> st.ProcessedPartIds
-
-        let nextProcessedCallIds =
-            match callIdOpt with
-            | Some id -> Set.add id st.ProcessedCallIds
-            | None -> st.ProcessedCallIds
+        let nextProcessedKeys =
+            candidateKeys |> List.fold (fun acc key -> Set.add key acc) st.ProcessedKeys
 
         let isBacklog = e.Kind = eventKindWorkBacklogCommitted
         let nextReviewLoop = ReviewLoopFold.foldEvent st.ReviewLoop e
@@ -537,10 +559,7 @@ let applyEvent (st: SessionState) (e: WanEvent) : SessionState =
           PendingLease = nextLease
           ActiveCompactionId = nextCompId
           IsCompacted = nextIsCompacted
-          ProcessedEventIds = nextProcessedEventIds
-          ProcessedMessageIds = nextProcessedMessageIds
-          ProcessedPartIds = nextProcessedPartIds
-          ProcessedCallIds = nextProcessedCallIds }
+          ProcessedKeys = nextProcessedKeys }
 
 let foldSubagents (sessionId: string) (events: WanEvent list) : Map<string, SubagentState> =
     foldEventStream sessionId Map.empty subagentFolder events
