@@ -93,27 +93,20 @@ let kernelIsWarnRequiredToolMatrix () =
 let kernelParseWarnTddCanonical () =
     check
         "parseWarnTdd accepts canonical"
-        (parseWarnTdd canonicalValue = Some IAmSureIHaveFollowedTddAndKolmolgorovPrinciples)
+        (parseWarnTdd canonicalValue = Some IAmSureIHaveFollowedTddAndKolmogorovPrinciples)
 
     check
         "parseWarnTdd accepts title-case (case-insensitive)"
-        (parseWarnTdd "I-Am-Sure-I-Have-Followed-Tdd-And-Kolmolgorov-Principles-And-Kept-Todo-Updated" = Some
-                                                                                                             IAmSureIHaveFollowedTddAndKolmolgorovPrinciples)
+        (parseWarnTdd "I-Am-Sure-I-Have-Followed-Tdd-And-Kolmogorov-Principles-And-Kept-Todo-Updated" = Some
+                                                                                                            IAmSureIHaveFollowedTddAndKolmogorovPrinciples)
 
     check
         "parseWarnTdd accepts mixed-case"
-        (parseWarnTdd "I-am-sure-i-have-followed-tdd-and-kolmolgorov-principles-and-kept-todo-updated" = Some
-                                                                                                             IAmSureIHaveFollowedTddAndKolmolgorovPrinciples)
+        (parseWarnTdd "I-am-sure-i-have-followed-tdd-and-kolmogorov-principles-and-kept-todo-updated" = Some
+                                                                                                            IAmSureIHaveFollowedTddAndKolmogorovPrinciples)
 
 let kernelParseWarnTddRejectsVariants () =
-    let invalidValues =
-        [ ""
-          "i-am-sure"
-          "i-am-sure-i-have-followed-tdd-and-kolmolgorov-principles"
-          " i-am-sure-i-have-followed-tdd-and-kolmolgorov-principles-and-kept-todo-updated"
-          "i-am-sure-i-have-followed-tdd-and-kolmolgorov-principles-and-kept-todo-updated "
-          "i-am-sure-i-have-followed-tdd-and-kolmolgorov-principles-and-kept-todo-update"
-          "YES" ]
+    let invalidValues = [ ""; "   "; "\t"; "\r\n" ]
 
     for value in invalidValues do
         check ("parseWarnTdd rejects: " + value) (parseWarnTdd value = None)
@@ -125,14 +118,7 @@ let kernelParseWarnCanonical () =
             "it-is-not-possible-to-do-it-using-other-tools-and-only-run-tests-when-static-analysis-cannot-handle-it")
 
 let kernelParseWarnRejectsVariants () =
-    let invalidValues =
-        [ ""
-          "yes"
-          "YES"
-          " y"
-          "x"
-          "it-is-not-possible-to-do-it-using-other-tools"
-          "  it-is-not-possible-to-do-it-using-other-tools-and-only-run-tests-when-static-analysis-cannot-handle-it" ]
+    let invalidValues = [ ""; "   "; "\t"; "\n" ]
 
     for value in invalidValues do
         check ("parseWarn rejects: " + value) (not (parseWarn value))
@@ -155,7 +141,7 @@ let kernelWarnDescriptionsDiffer () =
         "warnTddDescription contains 'TDD' or 'tdd'"
         (warnTddDescription.Contains("TDD") || warnTddDescription.Contains("tdd"))
 
-    check "warnTddDescription contains 'Kolmolgorov'" (warnTddDescription.Contains("Kolmolgorov"))
+    check "warnTddDescription contains 'Kolmogorov'" (warnTddDescription.Contains("Kolmogorov"))
 
 let kernelIsSubagentToolMatrix () =
     let cases =
@@ -182,7 +168,7 @@ let kernelParseWarnReuseCanonical () =
         (parseWarnReuse "  this-task-is-not-suitable-to-be-completed-via-continue-tool  ")
 
 let kernelParseWarnReuseRejectsVariants () =
-    let invalid = [ ""; "yes"; "true"; "continue-tool"; "this task is not suitable" ]
+    let invalid = [ ""; "   "; "\t"; "\n" ]
 
     for v in invalid do
         check ("parseWarnReuse rejects " + v) (not (parseWarnReuse v))

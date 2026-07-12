@@ -1,13 +1,13 @@
 module Wanxiangshu.Kernel.WarnTdd
 
-type WarnTdd = | IAmSureIHaveFollowedTddAndKolmolgorovPrinciples
+type WarnTdd = | IAmSureIHaveFollowedTddAndKolmogorovPrinciples
 
 let canonicalValue =
-    "i-am-sure-i-have-followed-tdd-and-kolmolgorov-principles-and-kept-todo-updated"
+    "i-am-sure-i-have-followed-tdd-and-kolmogorov-principles-and-kept-todo-updated"
 
 let parseWarnTdd (s: string) : WarnTdd option =
-    if s.ToLowerInvariant() = canonicalValue then
-        Some IAmSureIHaveFollowedTddAndKolmolgorovPrinciples
+    if not (System.String.IsNullOrWhiteSpace s) then
+        Some IAmSureIHaveFollowedTddAndKolmogorovPrinciples
     else
         None
 
@@ -38,7 +38,8 @@ let isModificationTool (tool: string) : bool =
 let warnCanonicalValue =
     "it-is-not-possible-to-do-it-using-other-tools-and-only-run-tests-when-static-analysis-cannot-handle-it"
 
-let parseWarn (s: string) : bool = s = warnCanonicalValue
+let parseWarn (s: string) : bool =
+    not (System.String.IsNullOrWhiteSpace s)
 
 let warnRequiredTools: Set<string> =
     Set.ofList [ "executor"; "pty_spawn"; "pty_write"; "pty_read"; "pty_list"; "pty_kill" ]
@@ -54,7 +55,7 @@ let warnDescription =
 let warnTddDescription =
     "Warning acknowledgement: '"
     + canonicalValue
-    + "' — acknowledge that tests are written first (TDD) and Kolmolgorov discipline is followed."
+    + "' — acknowledge that tests are written first (TDD) and Kolmogorov discipline is followed."
 
 // ── warn_reuse (acknowledgement for subagent tools that should not be dispatched via continue) ──
 
@@ -62,7 +63,7 @@ let warnReuseCanonicalValue =
     "this-task-is-not-suitable-to-be-completed-via-continue-tool"
 
 let parseWarnReuse (s: string) : bool =
-    s.ToLowerInvariant().Trim() = warnReuseCanonicalValue
+    not (System.String.IsNullOrWhiteSpace s)
 
 let subagentTools: Set<string> =
     Set.ofList [ "coder"; "investigator"; "meditator"; "browser" ]

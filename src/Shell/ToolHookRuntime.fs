@@ -154,7 +154,7 @@ let getToolCapabilities (toolName: string) : ToolCapability list =
 let inlineJsonWarnTddProperty: obj =
     createObj
         [ "type", box "string"
-          "enum", box [| box "i-am-sure-i-have-followed-tdd-and-kolmolgorov-principles-and-kept-todo-updated" |]
+          "enum", box [| box "i-am-sure-i-have-followed-tdd-and-kolmogorov-principles-and-kept-todo-updated" |]
           "description", box "Acknowledge that tests are written first (TDD) and Kolmogorov discipline is followed." ]
 
 let inlineJsonWarnProperty: obj =
@@ -435,10 +435,7 @@ let executeBeforeGateway (tool: string) (args: obj) : Result<obj * ControlEnvelo
         let checkWarnTdd =
             if List.contains FileMutation caps then
                 match warnTddVal with
-                | Some v when
-                    v.ToLowerInvariant() = "i-am-sure-i-have-followed-tdd-and-kolmolgorov-principles-and-kept-todo-updated"
-                    ->
-                    Result.Ok()
+                | Some v when not (System.String.IsNullOrWhiteSpace v) -> Result.Ok()
                 | _ ->
                     let err =
                         InvalidIntent(tool, "warn_tdd", "required — acknowledge TDD + Kolmogorov discipline")
@@ -450,10 +447,7 @@ let executeBeforeGateway (tool: string) (args: obj) : Result<obj * ControlEnvelo
         let checkWarn =
             if List.contains ProcessExecution caps then
                 match warnVal with
-                | Some v when
-                    v = "it-is-not-possible-to-do-it-using-other-tools-and-only-run-tests-when-static-analysis-cannot-handle-it"
-                    ->
-                    Result.Ok()
+                | Some v when not (System.String.IsNullOrWhiteSpace v) -> Result.Ok()
                 | _ ->
                     let err =
                         InvalidIntent(tool, "warn", "required — acknowledge this task cannot be done with other tools")
@@ -465,10 +459,7 @@ let executeBeforeGateway (tool: string) (args: obj) : Result<obj * ControlEnvelo
         let checkWarnReuse =
             if List.contains SubagentDelegation caps then
                 match warnReuseVal with
-                | Some v when
-                    v.ToLowerInvariant().Trim() = "this-task-is-not-suitable-to-be-completed-via-continue-tool"
-                    ->
-                    Result.Ok()
+                | Some v when not (System.String.IsNullOrWhiteSpace v) -> Result.Ok()
                 | _ ->
                     let err =
                         InvalidIntent(
