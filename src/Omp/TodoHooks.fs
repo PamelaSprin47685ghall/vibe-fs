@@ -238,5 +238,6 @@ let sessionShutdownHandler (reviewStore: ReviewStore) (ctx: obj) : JS.Promise<un
 
             do! cleanupRunnerJob ExecutorTools.ompScope sessionId
             Wanxiangshu.Shell.LivelockGuard.cleanup ExecutorTools.ompScope sessionId
+            Wanxiangshu.Shell.ToolHookRuntime.clearSessionCompliance sessionId
             Wanxiangshu.Shell.ToolHookRuntime.closeSession sessionId
     }

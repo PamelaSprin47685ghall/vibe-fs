@@ -212,10 +212,13 @@ let private mkTodoWriteWrapper (host: Host) (projection: ProjectionStore) : obj 
                                 | None -> violations
 
                             let status =
-                                if isError then
-                                    ToolHookRuntime.ExecutionStatus.Failure
-                                else
-                                    ToolHookRuntime.ExecutionStatus.Success
+                                match envOpt with
+                                | Some env when env.Cancelled -> ToolHookRuntime.ExecutionStatus.Cancelled
+                                | _ ->
+                                    if isError then
+                                        ToolHookRuntime.ExecutionStatus.Failure
+                                    else
+                                        ToolHookRuntime.ExecutionStatus.Success
 
                             let finalOutput = ToolHookRuntime.appendCriticism output allViolations status
 

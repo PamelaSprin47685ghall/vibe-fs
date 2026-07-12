@@ -129,6 +129,7 @@ let registerHooks (result: obj) (host: Host) (ctx: obj) (services: CoreServices)
                         cleanupPtyBySession ptyCleanupSessionId
                         Wanxiangshu.Shell.LivelockGuard.cleanup services.RuntimeScope ptyCleanupSessionId
                         services.FallbackRuntime.CleanupSession ptyCleanupSessionId
+                        Wanxiangshu.Shell.ToolHookRuntime.clearSessionCompliance ptyCleanupSessionId
                         Wanxiangshu.Shell.ToolHookRuntime.closeSession ptyCleanupSessionId
 
                     do! services.SessionLifecycleObserver.handleEvent input

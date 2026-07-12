@@ -177,11 +177,11 @@ let toolExecuteAfter (scope: RuntimeScope) (input: obj) (output: obj) : JS.Promi
 
         match ToolHookRuntime.tryGetCompliance sessionID toolCallID with
         | Some env ->
-            restoreAmendToArgs decoded.Args env
+            restoreWarnToArgs decoded.Args env
             let inputArgs = argsFromMuxToolExecuteInput input
-            restoreAmendToArgs inputArgs env
+            restoreWarnToArgs inputArgs env
             let outputArgs = argsFromHookOutputMux output
-            restoreAmendToArgs outputArgs env
+            restoreWarnToArgs outputArgs env
 
             let status =
                 if env.Cancelled then
@@ -216,7 +216,7 @@ let toolExecuteAfter (scope: RuntimeScope) (input: obj) (output: obj) : JS.Promi
         if isNetworkErrorText finalOutput then
             setHookErrorMux output "network connection lost"
 
-        if LivelockGuard.check scope sessionID tool argsJson finalOutput then
+        if LivelockGuard.check scope sessionID tool argsJson currentOutput then
             setHookErrorMux output "livelock guard: repeated identical tool call with identical result"
     }
 

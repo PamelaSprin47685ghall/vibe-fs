@@ -230,7 +230,7 @@ let toolExecuteAfterFor
             setHookError output "network connection lost"
 
         if hookOutputError output = "" then
-            if LivelockGuard.check scope sessionID tool argsJson finalOutput then
+            if LivelockGuard.check scope sessionID tool argsJson currentOutput then
                 setHookError output "livelock guard: repeated identical tool call with identical result"
 
         do! lifecycleObserver.handleToolExecuteAfter input output
