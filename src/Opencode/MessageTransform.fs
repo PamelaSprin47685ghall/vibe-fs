@@ -117,6 +117,9 @@ let injectSembleIntoEncoded
                                 return encoded
     }
 
+let private maxInputTokensCache =
+    System.Collections.Generic.Dictionary<string, int>()
+
 let messagesTransform
     (registry: ChildAgentRegistry)
     (directory: string)
@@ -163,7 +166,19 @@ let messagesTransform
                     backlogSession.GetOrRebuildBacklog(sid, msgs))
 
             let! maxInputTokens =
-                Wanxiangshu.Shell.ContextBudgetUsageCodec.resolveMaxInputTokens [ client ] sessionID directory
+                match maxInputTokensCache.TryGetValue(sessionID) with
+                | true, limit -> Promise.lift limit
+                | _ ->
+                    promise {
+                        let! limit =
+                            Wanxiangshu.Shell.ContextBudgetUsageCodec.resolveMaxInputTokens
+                                [ client ]
+                                sessionID
+                                directory
+
+                        maxInputTokensCache.[sessionID] <- limit
+                        return limit
+                    }
 
             let getContextUsage encoded =
                 Wanxiangshu.Shell.OpencodeContextBudgetObservation.tryCurrentUsage client sessionID encoded

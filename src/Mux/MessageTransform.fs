@@ -27,6 +27,9 @@ open Wanxiangshu.Shell.ChatTransformOutputCodec
 open Wanxiangshu.Shell.Dyn
 open Wanxiangshu.Shell.ContextBudgetUsageCodec
 
+let private maxInputTokensCache =
+    System.Collections.Generic.Dictionary<string, int>()
+
 let messagesTransform
     (deps: obj)
     (runtimeScope: Wanxiangshu.Shell.RuntimeScope.RuntimeScope)
@@ -68,7 +71,15 @@ let messagesTransform
                 backlogSessionOpsFrom backlogSession.Host (fun sid msgs ->
                     backlogSession.GetOrRebuildBacklog(sid, msgs))
 
-            let! maxInputTokens = resolveMaxInputTokens [ deps; input ] sessionID directory
+            let! maxInputTokens =
+                match maxInputTokensCache.TryGetValue(sessionID) with
+                | true, limit -> Promise.lift limit
+                | _ ->
+                    promise {
+                        let! limit = resolveMaxInputTokens [ deps; input ] sessionID directory
+                        maxInputTokensCache.[sessionID] <- limit
+                        return limit
+                    }
 
             let getContextUsage =
                 match ContextBudgetUsageCodec.tryGetRealContextUsage deps sessionID directory with

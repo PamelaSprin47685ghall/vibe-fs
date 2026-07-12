@@ -29,6 +29,9 @@ module Dyn = Wanxiangshu.Shell.Dyn
 
 let private defaultBacklogSession = BacklogSession omp
 
+let private maxInputTokensCache =
+    System.Collections.Generic.Dictionary<string, int>()
+
 let private resolveAgent (ctx: obj) : string =
     let sm = Dyn.get ctx "sessionManager"
 
@@ -81,7 +84,16 @@ let transformEntriesAsyncWithAgent
                         defaultBacklogSession.GetOrRebuildBacklog(sid, msgs))
 
                 let! maxInputTokens =
-                    Wanxiangshu.Shell.ContextBudgetUsageCodec.resolveMaxInputTokens [ ctx ] sessionId cwd
+                    match maxInputTokensCache.TryGetValue(sessionId) with
+                    | true, limit -> Promise.lift limit
+                    | _ ->
+                        promise {
+                            let! limit =
+                                Wanxiangshu.Shell.ContextBudgetUsageCodec.resolveMaxInputTokens [ ctx ] sessionId cwd
+
+                            maxInputTokensCache.[sessionId] <- limit
+                            return limit
+                        }
 
                 let plan =
                     { SessionID = sessionId
