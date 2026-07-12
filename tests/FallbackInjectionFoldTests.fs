@@ -82,6 +82,79 @@ let applyEventIntegratesFallbackInjection () =
     equal "SessionState.FallbackInjection.InjectedModel" (Some "openai/gpt-5") st2.FallbackInjection.InjectedModel
     equal "SessionState.FallbackInjection.InjectedCount" 1 st2.FallbackInjection.InjectedCount
 
+let applyEventDuplicateContinuationDispatchedIgnored () =
+    let st = emptySessionState ()
+
+    let req =
+        ev
+            "s1"
+            eventKindContinuationRequested
+            (Map
+                [ "continuationId", "c1"
+                  "model", "p/m"
+                  "agent", "a"
+                  "continuationOrdinal", "1" ])
+
+    let dispatchStarted =
+        ev "s1" eventKindContinuationDispatchStarted (Map [ "continuationId", "c1"; "continuationOrdinal", "1" ])
+
+    let dispatched =
+        ev
+            "s1"
+            eventKindContinuationDispatched
+            (Map
+                [ "continuationId", "c1"
+                  "model", "p/m"
+                  "agent", "a"
+                  "continuationOrdinal", "1" ])
+
+    let dispatchedDup =
+        ev
+            "s1"
+            eventKindContinuationDispatched
+            (Map
+                [ "continuationId", "c1"
+                  "model", "p/m"
+                  "agent", "a"
+                  "continuationOrdinal", "1" ])
+
+    let st1 = applyEvent st req
+    let st2 = applyEvent st1 dispatchStarted
+    let st3 = applyEvent st2 dispatched
+    let st4 = applyEvent st3 dispatchedDup
+    equal "SessionState.FallbackInjection.InjectedCount" 1 st4.FallbackInjection.InjectedCount
+
+let foldFallbackInjection_duplicateContinuationDispatchedIgnored () =
+    let events =
+        [ ev
+              "s1"
+              eventKindContinuationRequested
+              (Map
+                  [ "continuationId", "c1"
+                    "model", "p/m"
+                    "agent", "a"
+                    "continuationOrdinal", "1" ])
+          ev "s1" eventKindContinuationDispatchStarted (Map [ "continuationId", "c1"; "continuationOrdinal", "1" ])
+          ev
+              "s1"
+              eventKindContinuationDispatched
+              (Map
+                  [ "continuationId", "c1"
+                    "model", "p/m"
+                    "agent", "a"
+                    "continuationOrdinal", "1" ])
+          ev
+              "s1"
+              eventKindContinuationDispatched
+              (Map
+                  [ "continuationId", "c1"
+                    "model", "p/m"
+                    "agent", "a"
+                    "continuationOrdinal", "1" ]) ]
+
+    let s = foldFallbackInjection "s1" events
+    equal "fold: duplicate continuation_dispatched ignored" 1 s.InjectedCount
+
 let run () =
     foldFallbackInjection_empty ()
     foldFallbackInjection_singleEvent ()
@@ -89,3 +162,5 @@ let run () =
     foldFallbackInjection_crossSessionIsolation ()
     foldFallbackInjection_nonFallbackEventIgnored ()
     applyEventIntegratesFallbackInjection ()
+    applyEventDuplicateContinuationDispatchedIgnored ()
+    foldFallbackInjection_duplicateContinuationDispatchedIgnored ()

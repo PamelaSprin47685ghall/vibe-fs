@@ -150,8 +150,8 @@ let collectSnapshotMux
         let blockStatus =
             if
                 isNudgeBlockedForAnchor
-                    { DispatchedAnchors = snapshot.dispatchedAnchors
-                      PendingNudges = snapshot.pendingNudges }
+                    { PendingNudge = snapshot.pendingNudge
+                      LastDispatchedAnchor = snapshot.lastDispatchedAnchor }
                     currentAnchor
             then
                 NudgeBlockStatus.Blocked

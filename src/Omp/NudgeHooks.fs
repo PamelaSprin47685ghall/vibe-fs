@@ -212,8 +212,8 @@ let agentEndHandler
                             let blockStatus =
                                 if
                                     isNudgeBlockedForAnchor
-                                        { DispatchedAnchors = snap.dispatchedAnchors
-                                          PendingNudges = snap.pendingNudges }
+                                        { PendingNudge = snap.pendingNudge
+                                          LastDispatchedAnchor = snap.lastDispatchedAnchor }
                                         anchor
                                 then
                                     NudgeBlockStatus.Blocked
@@ -247,8 +247,6 @@ let agentEndHandler
 
                                 if not claimed then
                                     ()
-                                elif isSessionForceStopped sessionId then
-                                    ()
                                 else
                                     let lease: NudgeLease =
                                         { NudgeID = nudgeId
@@ -265,30 +263,63 @@ let agentEndHandler
                                     fallbackRuntime.SetActiveNudgeNonce sessionId nonce
                                     fallbackRuntime.SetAwaitingBusy sessionId true
 
-                                    try
-                                        do! sendNudgeReminder pi action snapshot
-                                        let dispatchedLease = { lease with Status = "dispatched" }
-                                        fallbackRuntime.SetPendingNudgeLease(sessionId, dispatchedLease)
-
-                                        do!
-                                            finishNudge
-                                                fallbackRuntime
-                                                root
-                                                sessionId
-                                                dispatchedLease
-                                                "dispatched"
-                                                ""
-                                                (Wanxiangshu.Kernel.Nudge.toString action)
-                                                snapshot.nudgeAnchorKey
-                                    with _ ->
+                                    if isSessionForceStopped sessionId then
                                         do!
                                             finishNudge
                                                 fallbackRuntime
                                                 root
                                                 sessionId
                                                 lease
-                                                "failed"
-                                                "Send failed"
+                                                "cancelled"
+                                                "Force stopped"
                                                 ""
                                                 ""
+                                    else
+                                        try
+                                            do! sendNudgeReminder pi action snapshot
+
+                                            if
+                                                not (
+                                                    fallbackRuntime.TryTransitionPendingNudgeLease(
+                                                        sessionId,
+                                                        lease.NudgeID,
+                                                        "dispatch_started",
+                                                        "dispatched"
+                                                    )
+                                                )
+                                            then
+                                                do!
+                                                    finishNudge
+                                                        fallbackRuntime
+                                                        root
+                                                        sessionId
+                                                        lease
+                                                        "cancelled"
+                                                        "Cancelled after dispatch"
+                                                        ""
+                                                        ""
+                                            else
+                                                let dispatchedLease = { lease with Status = "dispatched" }
+
+                                                do!
+                                                    finishNudge
+                                                        fallbackRuntime
+                                                        root
+                                                        sessionId
+                                                        dispatchedLease
+                                                        "dispatched"
+                                                        ""
+                                                        (Wanxiangshu.Kernel.Nudge.toString action)
+                                                        snapshot.nudgeAnchorKey
+                                        with _ ->
+                                            do!
+                                                finishNudge
+                                                    fallbackRuntime
+                                                    root
+                                                    sessionId
+                                                    lease
+                                                    "failed"
+                                                    "Send failed"
+                                                    ""
+                                                    ""
                     }

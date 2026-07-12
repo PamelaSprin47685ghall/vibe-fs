@@ -47,7 +47,7 @@ let foldNudgeSnapshotEmpty () =
 
     check "empty: not loop active" (not (isLoopActive s.reviewLoop))
 
-    check "empty: no dispatched anchors" (s.dispatchedAnchors = Set.empty)
+    check "empty: no dispatched anchors" s.lastDispatchedAnchor.IsNone
 
 /// assistant_completed populates lastAssistantText, agentFromMessage, turnId, modelFromMessage.
 let foldNudgeSnapshotAssistantCompleted () =
@@ -76,7 +76,7 @@ let foldNudgeSnapshotLoopActivated () =
     check "no todos" (s.openTodos = [])
     check "no text" (s.lastAssistantText = "")
     check "no agent" (s.agentFromMessage = None)
-    check "no dispatched anchors" (s.dispatchedAnchors = Set.empty)
+    check "no dispatched anchors" s.lastDispatchedAnchor.IsNone
 
 /// loop_cancelled clears isLoopActive.
 let foldNudgeSnapshotLoopCancelled () =
@@ -89,7 +89,7 @@ let foldNudgeSnapshotLoopCancelled () =
     check "no todos" (s.openTodos = [])
     check "no text" (s.lastAssistantText = "")
     check "no agent" (s.agentFromMessage = None)
-    check "no dispatched anchors" (s.dispatchedAnchors = Set.empty)
+    check "no dispatched anchors" s.lastDispatchedAnchor.IsNone
 
 /// review_verdict accepted clears isLoopActive.
 let foldNudgeSnapshotAcceptedClears () =
@@ -109,25 +109,23 @@ let foldNudgeSnapshotNeedsRevisionKeeps () =
     let s = foldNudgeSnapshot "s1" events
     check "loop active after needs_revision" (isLoopActive s.reviewLoop)
 
-/// nudge_dispatched adds both anchors to dispatchedAnchors.
+/// nudge_dispatched sets lastDispatchedAnchor to the latest anchor.
 let foldNudgeSnapshotNudgeDispatched () =
     let events =
         [ ev "s1" eventKindNudgeDispatched (Map [ "anchor", "t1\u001emsg body" ])
           ev "s1" eventKindNudgeDispatched (Map [ "anchor", "t2\u001emsg body" ]) ]
 
     let s = foldNudgeSnapshot "s1" events
-    check "dispatched contains anchor 1" (s.dispatchedAnchors.Contains "t1\u001emsg body")
-    check "dispatched contains anchor 2" (s.dispatchedAnchors.Contains "t2\u001emsg body")
-    check "dispatched size = 2" (s.dispatchedAnchors.Count = 2)
+    equal "dispatched contains anchor 2" (Some "t2\u001emsg body") s.lastDispatchedAnchor
 
-/// submit_review_wip_recorded clears dispatchedAnchors.
+/// submit_review_wip_recorded clears lastDispatchedAnchor.
 let foldNudgeSnapshotDedupCleared () =
     let events =
         [ ev "s1" eventKindNudgeDispatched (Map [ "anchor", "t1\u001emsg body" ])
           ev "s1" eventKindSubmitReviewWipRecorded Map.empty ]
 
     let s = foldNudgeSnapshot "s1" events
-    check "dispatched anchors cleared" (s.dispatchedAnchors = Set.empty)
+    check "dispatched anchors cleared" s.lastDispatchedAnchor.IsNone
 
 /// work_backlog_committed updates openTodos.
 let foldNudgeSnapshotWorkBacklogUpdatesTodos () =

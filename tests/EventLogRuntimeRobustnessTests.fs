@@ -81,7 +81,7 @@ let testTryClaimNudgeDispatchFailsMemoryNotPolluted () =
         | Ok _ -> failwith "expected nudge claim to reject"
 
         let! state = store.GetSessionState sessionId
-        equal "nudge dispatch should not be recorded in memory" 0 state.NudgeDedup.DispatchedAnchors.Count
+        check "nudge dispatch should not be recorded in memory" state.NudgeDedup.LastDispatchedAnchor.IsNone
         do! rmAsync dir
     }
 

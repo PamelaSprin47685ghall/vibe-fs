@@ -39,6 +39,21 @@ type NudgeRuntime
                     && reason <> FinishReason.QueuedMessage
                     && (isTerminalAssistantFinish stopReason || reason = FinishReason.ToolUseError)
                 then
+                    if fallbackRuntime.GetSessionOwner workspaceId = "Nudge" then
+                        match fallbackRuntime.TryGetPendingNudgeLease workspaceId with
+                        | Some lease ->
+                            do!
+                                finishNudge
+                                    fallbackRuntime
+                                    workspaceDirectory
+                                    workspaceId
+                                    lease
+                                    "settled"
+                                    "completed"
+                                    ""
+                                    ""
+                        | None -> fallbackRuntime.SetSessionOwner workspaceId "None"
+
                     let! newState =
                         runNudgeFlowWithRetryCheck
                             fallbackRuntime

@@ -66,12 +66,12 @@ let foldWorkBacklogSnapshot (sessionId: string) (events: WanEvent list) : WorkBa
     foldEventStream sessionId { TodosJson = None; LatestEntry = None } workBacklogFolder events
 
 type NudgeDedupState =
-    { DispatchedAnchors: Set<string>
-      PendingNudges: Map<string, string> }
+    { PendingNudge: (string * string) option // (anchor, nudgeId)
+      LastDispatchedAnchor: string option }
 
 let emptyNudgeDedupState =
-    { DispatchedAnchors = Set.empty
-      PendingNudges = Map.empty }
+    { PendingNudge = None
+      LastDispatchedAnchor = None }
 
 let private payloadAnchor (e: WanEvent) : string option =
     e.Payload
@@ -84,27 +84,23 @@ let private nudgeDedupFolder (st: NudgeDedupState) (e: WanEvent) : NudgeDedupSta
         match payloadAnchor e, payloadField "nudgeId" e with
         | Some anchor, Some nid ->
             { st with
-                PendingNudges = Map.add anchor nid st.PendingNudges }
+                PendingNudge = Some(anchor, nid) }
         | _ -> st
     | k when k = eventKindNudgeDispatched ->
         match payloadAnchor e with
         | Some anchor ->
             { st with
-                DispatchedAnchors = Set.add anchor st.DispatchedAnchors
-                PendingNudges = Map.remove anchor st.PendingNudges }
+                LastDispatchedAnchor = Some anchor
+                PendingNudge = None }
         | None -> st
     | k when k = eventKindNudgeFailed || k = eventKindNudgeCancelled ->
         let nidOpt = payloadField "nudgeId" e
 
         match nidOpt with
         | Some nid ->
-            let anchorOpt = st.PendingNudges |> Map.tryFindKey (fun _ v -> v = nid)
-
-            match anchorOpt with
-            | Some anchor ->
-                { st with
-                    PendingNudges = Map.remove anchor st.PendingNudges }
-            | None -> st
+            match st.PendingNudge with
+            | Some(_, pendingNid) when pendingNid = nid -> { st with PendingNudge = None }
+            | _ -> st
         | None -> st
     | k when
         (k = eventKindSubmitReviewWipRecorded
@@ -125,8 +121,8 @@ type NudgeSnapshotState =
       turnId: string
       reviewLoop: ReviewLoopFold
       workState: SessionWorkState
-      dispatchedAnchors: Set<string>
-      pendingNudges: Map<string, string> }
+      pendingNudge: (string * string) option
+      lastDispatchedAnchor: string option }
 
 let private parseTodosJson (json: string) : string list =
     let trimmed = json.Trim()
@@ -160,8 +156,8 @@ let emptyNudgeSnapshotState: NudgeSnapshotState =
       turnId = ""
       reviewLoop = ReviewLoopFold.initial
       workState = SessionWorkState.Idle
-      dispatchedAnchors = Set.empty
-      pendingNudges = Map.empty }
+      pendingNudge = None
+      lastDispatchedAnchor = None }
 
 let private strOrEmpty (o: string option) : string =
     match o with
@@ -205,27 +201,23 @@ let private nudgeSnapshotFolder (st: NudgeSnapshotState) (e: WanEvent) : NudgeSn
         match payloadAnchor e, payloadField "nudgeId" e with
         | Some anchor, Some nid ->
             { st with
-                pendingNudges = Map.add anchor nid st.pendingNudges }
+                pendingNudge = Some(anchor, nid) }
         | _ -> st
     | k when k = eventKindNudgeDispatched ->
         match payloadAnchor e with
         | Some anchor ->
             { st with
-                dispatchedAnchors = Set.add anchor st.dispatchedAnchors
-                pendingNudges = Map.remove anchor st.pendingNudges }
+                lastDispatchedAnchor = Some anchor
+                pendingNudge = None }
         | None -> st
     | k when k = eventKindNudgeFailed || k = eventKindNudgeCancelled ->
         let nidOpt = payloadField "nudgeId" e
 
         match nidOpt with
         | Some nid ->
-            let anchorOpt = st.pendingNudges |> Map.tryFindKey (fun _ v -> v = nid)
-
-            match anchorOpt with
-            | Some anchor ->
-                { st with
-                    pendingNudges = Map.remove anchor st.pendingNudges }
-            | None -> st
+            match st.pendingNudge with
+            | Some(_, pendingNid) when pendingNid = nid -> { st with pendingNudge = None }
+            | _ -> st
         | None -> st
     | k when
         (k = eventKindSubmitReviewWipRecorded
@@ -233,8 +225,8 @@ let private nudgeSnapshotFolder (st: NudgeSnapshotState) (e: WanEvent) : NudgeSn
          || k = eventKindHumanTurnStarted)
         ->
         { st with
-            dispatchedAnchors = Set.empty
-            pendingNudges = Map.empty }
+            lastDispatchedAnchor = None
+            pendingNudge = None }
     | k when k = eventKindWorkBacklogCommitted ->
         let todosOpt = payloadField "todosJson" e |> Option.map parseTodosJson
 
@@ -254,8 +246,12 @@ let nudgeAnchorKey (turnId: string) (assistantMessage: string) : string =
 let isNudgeBlockedForAnchor (st: NudgeDedupState) (anchorKey: string) : bool =
     let trimmed = anchorKey.Trim()
 
-    Set.contains trimmed st.DispatchedAnchors
-    || Map.containsKey trimmed st.PendingNudges
+    match st.PendingNudge with
+    | Some(anchor, _) when anchor = trimmed -> true
+    | _ ->
+        match st.LastDispatchedAnchor with
+        | Some anchor when anchor = trimmed -> true
+        | _ -> false
 
 type SubagentState =
     { ChildId: string
@@ -971,7 +967,7 @@ let applyEvent (st: SessionState) (e: WanEvent) : SessionState =
         let nextEpisode = ownerAndLeaseFolder episodeState e
 
         let nextFallbackInjection =
-            fallbackInjectionFolder nextEpisode.ContinuationOrdinal nextEpisode.ContinuationStage st.FallbackInjection e
+            fallbackInjectionFolder st.ContinuationOrdinal st.ContinuationStage st.FallbackInjection e
 
         let isBacklog = e.Kind = eventKindWorkBacklogCommitted
 

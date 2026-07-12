@@ -264,6 +264,29 @@ type FallbackRuntimeState() =
                 false
         | None -> false
 
+    member this.TryTransitionPendingLease
+        (sessionID: string, expectedID: string, expectedStatus: string, nextStatus: string)
+        : bool =
+        match Map.tryFind sessionID pendingLeases with
+        | Some leaseObj ->
+            let lease = leaseObj :?> PendingLease
+
+            let isCurrent =
+                lease.ContinuationID = expectedID
+                && lease.Status = expectedStatus
+                && lease.SessionGeneration = this.GetSessionGeneration(sessionID)
+                && lease.HumanTurnID = this.GetHumanTurnId(sessionID)
+                && lease.CancelGeneration = this.GetCancelGeneration(sessionID)
+                && this.GetSessionOwner(sessionID) = "Fallback"
+
+            if isCurrent then
+                pendingLeases <- Map.add sessionID (box { lease with Status = nextStatus }) pendingLeases
+
+                true
+            else
+                false
+        | None -> false
+
     member _.ClearPendingLease(sessionID: string) : unit =
         pendingLeases <- Map.remove sessionID pendingLeases
 
@@ -285,6 +308,26 @@ type FallbackRuntimeState() =
 
             Some lease
         | None -> None
+
+    member this.TryTransitionPendingNudgeLease
+        (sessionID: string, expectedID: string, expectedStatus: string, nextStatus: string)
+        : bool =
+        match Map.tryFind sessionID pendingNudgeLeases with
+        | Some lease ->
+            let isCurrent =
+                lease.NudgeID = expectedID
+                && lease.Status = expectedStatus
+                && lease.SessionGeneration = this.GetSessionGeneration(sessionID)
+                && lease.HumanTurnID = this.GetHumanTurnId(sessionID)
+                && lease.CancelGeneration = this.GetCancelGeneration(sessionID)
+                && this.GetSessionOwner(sessionID) = "Nudge"
+
+            if isCurrent then
+                pendingNudgeLeases <- Map.add sessionID { lease with Status = nextStatus } pendingNudgeLeases
+                true
+            else
+                false
+        | None -> false
 
     member _.TryClearPendingNudgeLease(sessionID: string, expectedNudgeID: string) : bool =
         match Map.tryFind sessionID pendingNudgeLeases with

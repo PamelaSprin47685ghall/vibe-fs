@@ -187,9 +187,12 @@ type EventLogStore(workspaceRoot: string, ?appendLineOverride: string -> WanEven
                 elif
                     oldState.SessionOwner = Some "Fallback"
                     || oldState.SessionOwner = Some "Compaction"
+                    || oldState.SessionOwner = Some "Nudge"
                 then
                     return false
-                elif oldState.PendingLease.IsSome then
+                elif oldState.PendingLease.IsSome || oldState.PendingNudgeLease.IsSome then
+                    return false
+                elif oldState.NudgeStage = Requested || oldState.NudgeStage = Dispatched then
                     return false
                 else
                     let payload =

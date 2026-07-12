@@ -100,9 +100,12 @@ let finishContinuation
     (errorOrReason: string)
     : JS.Promise<unit> =
     promise {
-        let cleared = runtime.TryClearPendingLease(sessionID, lease.ContinuationID)
+        let isLeaseStillActive =
+            match runtime.TryGetPendingLease sessionID with
+            | Some pending when pending.ContinuationID = lease.ContinuationID -> true
+            | _ -> false
 
-        if cleared then
+        if isLeaseStillActive then
             if outcome = "failed" then
                 do!
                     appendContinuationFailedOrFail
@@ -130,6 +133,9 @@ let finishContinuation
                         errorOrReason
                         lease.ContinuationOrdinal
 
+        let cleared = runtime.TryClearPendingLease(sessionID, lease.ContinuationID)
+
+        if cleared then
             if runtime.GetSessionOwner sessionID = "Fallback" then
                 runtime.SetSessionOwner sessionID "None"
 
@@ -182,9 +188,28 @@ let executeContinuationIntent
                                 lease
                                 "cancelled"
                                 "Cancelled after dispatch"
+                    elif
+                        not (
+                            runtime.TryTransitionPendingLease(
+                                sessionID,
+                                lease.ContinuationID,
+                                "dispatch_started",
+                                "dispatched"
+                            )
+                        )
+                    then
+                        do! executor.AbortRun sessionID
+
+                        do!
+                            finishContinuation
+                                runtime
+                                workspaceRoot
+                                sessionID
+                                lease
+                                "cancelled"
+                                "Cancelled after dispatch"
                     else
                         let dispatchedLease = { lease with Status = "dispatched" }
-                        runtime.SetPendingLease(sessionID, dispatchedLease)
 
                         let modelStr =
                             match model.Variant with
@@ -246,9 +271,28 @@ let executeContinuationIntent
                                 lease
                                 "cancelled"
                                 "Cancelled after dispatch"
+                    elif
+                        not (
+                            runtime.TryTransitionPendingLease(
+                                sessionID,
+                                lease.ContinuationID,
+                                "dispatch_started",
+                                "dispatched"
+                            )
+                        )
+                    then
+                        do! executor.AbortRun sessionID
+
+                        do!
+                            finishContinuation
+                                runtime
+                                workspaceRoot
+                                sessionID
+                                lease
+                                "cancelled"
+                                "Cancelled after dispatch"
                     else
                         let dispatchedLease = { lease with Status = "dispatched" }
-                        runtime.SetPendingLease(sessionID, dispatchedLease)
 
                         let modelStr =
                             match model.Variant with
