@@ -7,7 +7,7 @@ open Wanxiangshu.Kernel.ToolContext
 open Wanxiangshu.Shell.Dyn
 open Wanxiangshu.Shell.ChildAgentRegistry
 
-[<Global("process")>]
+[<Global("globalThis.process")>]
 let private nodeProcess: obj = jsNative
 
 let private envVar (name: string) : string =

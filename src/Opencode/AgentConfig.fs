@@ -14,7 +14,7 @@ open Wanxiangshu.Shell.Dyn
 open Wanxiangshu.Shell.OpencodeAgentConfigCodec
 open Wanxiangshu.Shell.OpencodeAgentConfigWire
 
-[<Global("process")>]
+[<Global("globalThis.process")>]
 let private nodeProcess: obj = jsNative
 
 let envVar (name: string) : string =

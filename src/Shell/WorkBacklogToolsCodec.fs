@@ -102,11 +102,16 @@ let private requireReportField (args: obj) (field: string) : Result<string, Doma
         | None -> Error(InvalidIntent("todowrite", field, "required"))
 
 let decodeTodoWriteArgs (args: obj) : Result<TodoWriteArgs, DomainError> =
-    let ahaResult = requireReportField args "ahaMoments"
-    let changesResult = requireReportField args "changesAndReasons"
-    let gotchasResult = requireReportField args "gotchas"
-    let lessonsResult = requireReportField args "lessonsAndConventions"
-    let planResult = requireReportField args "plan"
+    let isTask = Dyn.isNullish (Dyn.get args "ahaMoments")
+
+    let getReportField k =
+        if isTask then Ok "" else requireReportField args k
+
+    let ahaResult = getReportField "ahaMoments"
+    let changesResult = getReportField "changesAndReasons"
+    let gotchasResult = getReportField "gotchas"
+    let lessonsResult = getReportField "lessonsAndConventions"
+    let planResult = getReportField "plan"
     let todosResult = decodeTodos args
 
     ahaResult

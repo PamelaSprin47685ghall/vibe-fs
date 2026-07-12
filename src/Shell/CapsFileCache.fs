@@ -56,7 +56,7 @@ let buildCapsFileReadData (projectRoot: string) : JS.Promise<CapsFileReadEntry[]
 type private INodeProcess =
     abstract cwd: unit -> string
 
-[<Global("process")>]
+[<Global("globalThis.process")>]
 let private nodeProcess: INodeProcess = jsNative
 
 let private normalizeDirectory (directory: string) : string =

@@ -28,7 +28,7 @@ let private pathDirname (p: string) : string = jsNative
 [<Import("join", "node:path")>]
 let private pathJoin (a: string) (b: string) : string = jsNative
 
-[<Global("process")>]
+[<Global("globalThis.process")>]
 let private nodeProcess: obj = jsNative
 
 let internal extractTaskId (path: string) (suffix: string) : string =

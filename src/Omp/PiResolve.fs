@@ -16,7 +16,7 @@ let private existsSync (p: string) : bool = jsNative
 [<Import("pathToFileURL", "node:url")>]
 let private pathToFileURL (p: string) : obj = jsNative
 
-[<Global("process")>]
+[<Global("globalThis.process")>]
 let private nodeProcess: obj = jsNative
 
 let private piBaseCandidates () : string array =

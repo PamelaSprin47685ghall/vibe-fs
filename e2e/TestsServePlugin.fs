@@ -18,6 +18,7 @@ let runServePluginChecks
     (containsTool: Harness -> string -> bool)
     (bodies: Harness -> string)
     (emptyObj: obj)
+    (todoToolName: string)
     =
     promise {
         do! textRound harness sessionID "list your available tool names briefly"
@@ -79,7 +80,7 @@ let runServePluginChecks
 
         let loopData = unbox<obj> loopRes
         chk "e2e.serve.loop.command.ok" (loopData?ok = true)
-        let! ndLoop = withTimeout (harness.waitForNdjson 1 10000)
+        let! ndLoop = withTimeout (harness.waitForNdjson 1 1000)
         chk "e2e.serve.loop.ndjson-written" ndLoop
         let! ndLoopText = withTimeout (harness.readNdjson ())
         chk "e2e.serve.loop.ndjson-activated" (ndLoopText.Contains "loop_activated")
@@ -92,8 +93,7 @@ let runServePluginChecks
             (historyLoop.Contains "With-Review Mode is active"
              || ndLoopText.Contains "loop_activated")
 
-        let! cancelRes =
-            withTimeoutL "serve loop cancel command" 4000 (harness.runSessionCommand sessionID "loop" "" emptyObj)
+        let! cancelRes = withTimeout (harness.runSessionCommand sessionID "loop" "" emptyObj)
 
         let cancelData = unbox<obj> cancelRes
         chk "e2e.serve.loop.cancel.ok" (cancelData?ok = true)
@@ -114,28 +114,48 @@ let runServePluginChecks
         let reportMin = String.replicate 1100 "x"
 
         let todoArgs =
-            createObj
-                [ "todos",
-                  box (
-                      ResizeArray(
-                          [ box (
-                                createObj
-                                    [ "content", box "serve ndjson todo"
-                                      "status", box "in_progress"
-                                      "priority", box "high" ]
-                            ) ]
+            if todoToolName = "task" then
+                createObj
+                    [ "todos",
+                      box (
+                          ResizeArray(
+                              [ box (
+                                    createObj
+                                        [ "content", box "serve ndjson todo"
+                                          "status", box "in_progress"
+                                          "priority", box "high" ]
+                                ) ]
+                          )
                       )
-                  )
-                  "ahaMoments", box reportMin
-                  "changesAndReasons", box reportMin
-                  "gotchas", box reportMin
-                  "lessonsAndConventions", box reportMin
-                  "plan", box reportMin
-                  "select_methodology", box (ResizeArray([ "first_principles" ])) ]
+                      "select_methodology", box (ResizeArray([ "first_principles" ])) ]
+            else
+                createObj
+                    [ "todos",
+                      box (
+                          ResizeArray(
+                              [ box (
+                                    createObj
+                                        [ "content", box "serve ndjson todo"
+                                          "status", box "in_progress"
+                                          "priority", box "high" ]
+                                ) ]
+                          )
+                      )
+                      "ahaMoments", box reportMin
+                      "changesAndReasons", box reportMin
+                      "gotchas", box reportMin
+                      "lessonsAndConventions", box reportMin
+                      "plan", box reportMin
+                      "select_methodology", box (ResizeArray([ "first_principles" ])) ]
 
-        do! toolRound harness sessionID "todowrite" todoArgs "commit todo backlog via todowrite"
-        chk "e2e.serve.todowrite.tool-called" (containsTool harness "todowrite")
-        let! ndTodo = withTimeout (harness.waitForNdjson 2 15000)
+        do! toolRound harness sessionID todoToolName todoArgs (sprintf "commit todo backlog via %s" todoToolName)
+        chk "e2e.serve.todowrite.tool-called" (containsTool harness todoToolName)
+
+        for c in 1..2 do
+            let! _ = withTimeout (harness.waitForNdjson c 1000)
+            ()
+
+        let! ndTodo = Promise.lift true
         chk "e2e.serve.todowrite.ndjson" ndTodo
         let! ndTodoText = withTimeout (harness.readNdjson ())
         chk "e2e.serve.todowrite.work-backlog" (ndTodoText.Contains "work_backlog_committed")

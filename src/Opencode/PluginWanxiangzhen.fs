@@ -5,8 +5,11 @@ open Fable.Core.JsInterop
 open Wanxiangshu.Shell.Dyn
 open Wanxiangshu.Shell.Wanxiangzhen.SlaveRuntime
 
-[<Global("process")>]
+[<Global("globalThis.process")>]
 let private nodeProcess: obj = jsNative
+
+[<Import("appendFileSync", "node:fs")>]
+let private appendFileSync (path: string) (data: string) : unit = jsNative
 
 let private envVar (key: string) : string =
     let e = nodeProcess?("env")
@@ -19,6 +22,14 @@ let private coordinatorPlugin (ctx: obj) : JS.Promise<obj> =
     promise {
         let directory = Wanxiangshu.Shell.Dyn.str ctx "directory"
         let! result = PluginWanxiangzhenDeps.pluginWithDeps ctx (PluginWanxiangzhenDeps.realCoordinatorDeps directory)
+        let options = Wanxiangshu.Shell.Dyn.get ctx "options"
+
+        let isE2e =
+            not (isNullish options) && unbox<bool> (Wanxiangshu.Shell.Dyn.get options "e2e")
+
+        if isE2e then
+            result.runtime.IsE2e <- true
+
         Wanxiangshu.Opencode.PluginWanxiangzhenE2eMeta.writeE2eMetaIfEnabled result.runtime
         return result.hooks
     }
@@ -58,5 +69,13 @@ let pluginModule: obj =
     createObj
         [ "id", box "wanxiangzhen"
           "server", box plugin
+          "setup",
+          box (fun (ctx: obj) ->
+              try
+                  appendFileSync "/tmp/debug-wanxiangzhen.txt" "setup called\n"
+              with _ ->
+                  ()
+
+              plugin ctx)
           "plugin", box plugin
           "pluginWithDeps", box pluginWithDeps ]

@@ -17,7 +17,7 @@ type Client(info: obj, capabilities: obj) =
 [<Import("StdioClientTransport", "@modelcontextprotocol/sdk/client/stdio.js")>]
 type StdioClientTransport(opts: obj) = class end
 
-[<Global("process")>]
+[<Global("globalThis.process")>]
 let private nodeProcess: obj = jsNative
 
 let private envVar (name: string) : string =

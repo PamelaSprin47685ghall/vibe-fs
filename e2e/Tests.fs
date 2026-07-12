@@ -41,15 +41,14 @@ let private toolRoundWithCalls
         for _ in 1 .. (expectedCalls - 1) do
             harness.mockLLM.expectText "ok"
 
-        let! _ =
-            withTimeoutL
-                (sprintf "sendPrompt for tool: %s" toolName)
-                10000
-                (harness.sendPrompt sessionID promptText emptyObj)
+        let! _ = withTimeout (harness.sendPrompt sessionID promptText emptyObj)
 
-        let! _ =
-            withTimeoutL (sprintf "waitForCalls for tool: %s" toolName) 10000 (harness.waitForCalls expectedCalls 60000)
+        for c in 1..expectedCalls do
+            let! _ = withTimeout (harness.waitForCalls c 60000)
+            ()
 
+        let! _ = harness.waitForIdle sessionID 10000
+        do! sleep 200
         return ()
     }
 
@@ -69,10 +68,14 @@ let private browserMcpRound (harness: Harness) (sessionID: string) : JS.Promise<
         harness.mockLLM.expectTool "stealth-browser-mcp_get_debug_view" (createObj [])
         harness.mockLLM.expectText "browser mcp done"
 
-        let! _ =
-            withTimeoutL "sendPrompt for browserMcRound" 4000 (harness.sendPrompt sessionID "open browser" emptyObj)
+        let! _ = withTimeout (harness.sendPrompt sessionID "open browser" emptyObj)
 
-        let! _ = withTimeoutL "waitForCalls for browserMcRound" 4000 (harness.waitForCalls 3 60000)
+        for c in 1..3 do
+            let! _ = withTimeout (harness.waitForCalls c 60000)
+            ()
+
+        let! _ = harness.waitForIdle sessionID 10000
+        do! sleep 200
         return ()
     }
 
@@ -88,18 +91,14 @@ let private textRoundWithCalls
         for _ in 1..expectedCalls do
             harness.mockLLM.expectText "ok"
 
-        let! _ =
-            withTimeoutL
-                (sprintf "sendPrompt for textRound: %s" promptText)
-                4000
-                (harness.sendPrompt sessionID promptText emptyObj)
+        let! _ = withTimeout (harness.sendPrompt sessionID promptText emptyObj)
 
-        let! _ =
-            withTimeoutL
-                (sprintf "waitForCalls for textRound: %s" promptText)
-                4000
-                (harness.waitForCalls expectedCalls 60000)
+        for c in 1..expectedCalls do
+            let! _ = withTimeout (harness.waitForCalls c 60000)
+            ()
 
+        let! _ = harness.waitForIdle sessionID 10000
+        do! sleep 200
         return ()
     }
 
@@ -127,17 +126,25 @@ let runAll (args: string array) : JS.Promise<int> =
                 let! sessionID =
                     promise {
                         let! createRes =
-                            withTimeoutL
-                                "harness.createSession"
-                                4000
-                                (harness.createSession
+                            withTimeout (
+                                harness.createSession
                                     (createObj
                                         [ "model", createObj [ "id", box "test-model"; "providerID", box "test" ] ])
-                                    emptyObj)
+                                    emptyObj
+                            )
 
                         let createData = unbox<obj> createRes
                         check "e2e.session-create.ok" (createData?ok = true)
-                        return string (createData?data?data?id)
+                        let sess = string (createData?data?data?id)
+
+                        harness.mockLLM.reset ()
+                        harness.mockLLM.expectText "ok"
+                        let! _ = withTimeoutCustom 30000 (harness.sendPrompt sess "warmup" emptyObj)
+                        let! _ = withTimeoutCustom 30000 (harness.waitForCalls 1 10000)
+                        let! _ = withTimeoutCustom 30000 (harness.waitForIdle sess 10000)
+                        harness.mockLLM.reset ()
+
+                        return sess
                     }
 
                 // 1. caps-prelude

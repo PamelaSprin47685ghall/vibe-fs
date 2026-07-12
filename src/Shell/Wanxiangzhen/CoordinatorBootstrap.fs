@@ -20,7 +20,7 @@ let createWithDeps
     : JS.Promise<CoordinatorRuntime> =
     promise {
         let token =
-            System.String([| for _ in 0..31 -> "0123456789abcdef".[int (deps.RandomGen () * 16.0)] |])
+            System.String([| for _ in 0..31 -> "0123456789abcdef".[int (deps.RandomGen() * 16.0)] |])
 
         let rtRef = ref None
 
@@ -53,6 +53,7 @@ let createWithDeps
               PidPollHandle = None
               GitError = gitError
               InjectError = None
+              IsE2e = false
               Deps = deps }
 
         rtRef.Value <- Some runtime

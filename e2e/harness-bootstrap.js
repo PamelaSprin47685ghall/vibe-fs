@@ -21,7 +21,7 @@ function getPluginUrl(variant) {
     let altRoot = path.resolve(__dirname, '../..');
     p = path.resolve(altRoot, `build/src/Opencode/${file}`);
   }
-  return pathToFileURL(p).href;
+  return p;
 }
 
 const FIXTURE_MCP = path.resolve(__dirname, 'stealth-mcp-fixture.js');
@@ -194,7 +194,7 @@ class HostSingletonManager {
     }
     if (this.hosts.size === 0) {
       this.acquireLockOnce();
-      try { execSync("pkill -9 -f 'opencode serve'", { stdio: 'ignore' }); } catch {}
+      try { execSync("pkill -9 -f 'opencode'", { stdio: 'ignore' }); } catch {}
       try { execSync("pkill -9 -f 'mux-driver'", { stdio: 'ignore' }); } catch {}
       try { execSync("pkill -9 -f 'omp-driver'", { stdio: 'ignore' }); } catch {}
       await new Promise(r => setTimeout(r, 200));
@@ -222,10 +222,10 @@ class HostSingletonManager {
         try { host.child.kill('SIGKILL'); } catch {}
       }
       if (host.home) {
-        try { fs.rmSync(host.home, { recursive: true, force: true }); } catch {}
+        console.log(`[HostSingletonManager] Keeping home dir: ${host.home}`);
       }
       if (host.tmpDir) {
-        try { fs.rmSync(host.tmpDir, { recursive: true, force: true }); } catch {}
+        console.log(`[HostSingletonManager] Keeping tmp dir: ${host.tmpDir}`);
       }
     }
     this.hosts.clear();

@@ -5,7 +5,7 @@ open Fable.Core.JsInterop
 open Wanxiangshu.Shell.Dyn
 open Wanxiangshu.Shell.Wanxiangzhen.CoordinatorRuntime
 
-[<Global("process")>]
+[<Global("globalThis.process")>]
 let private nodeProcess: obj = jsNative
 
 [<Global>]
@@ -13,6 +13,9 @@ let private JSON: obj = jsNative
 
 [<Import("writeFileSync", "node:fs")>]
 let private writeFileSync (path: string) (data: string) : unit = jsNative
+
+[<Import("appendFileSync", "node:fs")>]
+let private appendFileSync (path: string) (data: string) : unit = jsNative
 
 [<Import("join", "node:path")>]
 let private pathJoin (path: string) (seg: string) : string = jsNative
@@ -23,9 +26,37 @@ let private envVar (key: string) : string =
 
 let writeE2eMetaIfEnabled (rt: CoordinatorRuntime) : unit =
     let isE2e =
-        envVar "WANXIANGZHEN_E2E" = "1" || envVar "WANXIANGZHEN_E2E_INPROCESS" = "1"
+        rt.IsE2e
+        || envVar "WANXIANGZHEN_E2E" = "1"
+        || envVar "WANXIANGZHEN_E2E_INPROCESS" = "1"
 
     let fullPath = pathJoin rt.ProjectRoot ".wanxiangzhen-e2e-meta.json"
+
+    try
+        let e = nodeProcess?("env")
+
+        let envKeys =
+            if isNullish e then
+                "null"
+            else
+                String.concat "," (unbox<string array> (JS.Object.keys e))
+
+        let targetVal = if isNullish e then "null" else str e "WANXIANGZHEN_E2E"
+
+        appendFileSync
+            "/tmp/debug-wanxiangzhen.txt"
+            (sprintf
+                "writeE2eMetaIfEnabled called, isE2e=%b, ProjectRoot=%s, fullPath=%s, val=%s, keys=%s\n"
+                isE2e
+                rt.ProjectRoot
+                fullPath
+                targetVal
+                envKeys)
+    with ex ->
+        try
+            appendFileSync "/tmp/debug-wanxiangzhen.txt" (sprintf "writeE2eMetaIfEnabled print error: %s\n" ex.Message)
+        with _ ->
+            ()
 
     if isE2e then
         JS.console.log ("writeE2eMetaIfEnabled", "isE2e:", isE2e, "path:", fullPath, "port:", rt.CoordinatorUrl)

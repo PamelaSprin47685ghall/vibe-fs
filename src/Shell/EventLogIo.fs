@@ -5,6 +5,9 @@ open Fable.Core.JsInterop
 open Wanxiangshu.Kernel.EventLog.Types
 open Wanxiangshu.Shell.EventLogCodec
 
+[<Import("appendFileSync", "node:fs")>]
+let private appendFileSync (path: string) (data: string) : unit = jsNative
+
 [<Import("appendFile", "node:fs/promises")>]
 let appendFileAsync (path: string) (data: string) : JS.Promise<unit> = jsNative
 
@@ -69,6 +72,11 @@ let private lockfileOptions () =
           ) ]
 
 let withWorkspaceLock (filePath: string) (action: unit -> JS.Promise<'T>) : JS.Promise<'T> =
+    try
+        appendFileSync "/tmp/debug-wanxiangzhen.txt" (sprintf "withWorkspaceLock called for %s\n" filePath)
+    with _ ->
+        ()
+
     promise {
         try
             let! _ = statAsync filePath
@@ -90,7 +98,18 @@ let withWorkspaceLock (filePath: string) (action: unit -> JS.Promise<'T>) : JS.P
         with _ ->
             ()
 
+        try
+            appendFileSync "/tmp/debug-wanxiangzhen.txt" (sprintf "locking %s\n" filePath)
+        with _ ->
+            ()
+
         let! release = lockfileLock filePath (lockfileOptions ())
+
+        try
+            appendFileSync "/tmp/debug-wanxiangzhen.txt" (sprintf "locked %s\n" filePath)
+        with _ ->
+            ()
+
         let mutable caught = None
 
         let! resOpt =
@@ -105,6 +124,11 @@ let withWorkspaceLock (filePath: string) (action: unit -> JS.Promise<'T>) : JS.P
 
         try
             do! release ()
+
+            try
+                appendFileSync "/tmp/debug-wanxiangzhen.txt" (sprintf "released %s\n" filePath)
+            with _ ->
+                ()
         with _ ->
             ()
 

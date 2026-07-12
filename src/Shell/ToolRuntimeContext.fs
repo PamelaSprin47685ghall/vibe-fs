@@ -8,7 +8,7 @@ open Wanxiangshu.Shell.Dyn
 open Wanxiangshu.Shell.OpencodeContextCodec
 open Wanxiangshu.Shell.ToolContextCodec
 
-[<Global("process")>]
+[<Global("globalThis.process")>]
 let private nodeProcess: obj = jsNative
 
 let private getCwd () : string = unbox<string> (nodeProcess?cwd ())

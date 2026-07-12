@@ -5,7 +5,7 @@ open Fable.Core.JsInterop
 open System.Text.RegularExpressions
 open Wanxiangshu.Kernel.Domain
 
-[<Global("process")>]
+[<Global("globalThis.process")>]
 let private nodeProcess: obj = jsNative
 
 let platform: string = nodeProcess?platform

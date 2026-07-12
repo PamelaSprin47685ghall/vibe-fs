@@ -7,7 +7,7 @@ open Wanxiangshu.Shell.Dyn
 open Wanxiangshu.Shell.Wanxiangzhen.GitShell
 open Wanxiangshu.Shell.Wanxiangzhen.HttpCodec
 
-[<Global("process")>]
+[<Global("globalThis.process")>]
 let private nodeProcess: obj = jsNative
 
 [<Global>]
