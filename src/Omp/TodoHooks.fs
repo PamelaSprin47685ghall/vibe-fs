@@ -31,6 +31,7 @@ open Wanxiangshu.Shell.ReviewRuntime
 open Wanxiangshu.Kernel.BacklogProjectionCore
 open Wanxiangshu.Omp.ExecutorTools
 open Wanxiangshu.Shell.ReviewRuntime
+open Wanxiangshu.Shell.WorkBacklogToolsCodec
 
 /// Shared BacklogSession bound to the OMP host.
 let private backlogSession = BacklogSession omp
@@ -44,100 +45,132 @@ let toolResultHandler (_pi: obj) (_reviewStore: ReviewStore) (event: obj) (ctx: 
     promise {
         let toolName = Dyn.str event "toolName"
         let args = getToolInput event
-        let content = getToolResultText event
         let sessionId = getSessionIdFromContext ctx |> Option.defaultValue ""
+        let toolCallId = getToolCallId event
 
-        if
-            sessionId <> ""
-            && check ExecutorTools.ompScope sessionId toolName (JS.JSON.stringify args) content
-        then
-            setToolResultText event "livelock guard: repeated identical tool call with identical result"
-        else
-            let toolCallId = getToolCallId event
+        let envOpt = ToolHookRuntime.tryGetCompliance sessionId toolCallId
 
-            match ToolHookRuntime.tryGetCompliance sessionId toolCallId with
+        try
+            match envOpt with
             | Some env ->
                 ToolHookRuntime.restoreWarnToArgs args env
                 let currentOutput = getToolResultText event
 
                 if not env.Violations.IsEmpty then
-                    let criticism = ToolHookRuntime.appendCriticism currentOutput env.Violations
-                    setToolResultText event criticism
+                    let isError =
+                        Dyn.truthy (Dyn.get event "isError")
+                        || (let err = Dyn.get event "error" in not (Dyn.isNullish err) && string err <> "")
 
-                ToolHookRuntime.removeCompliance sessionId toolCallId
+                    let status =
+                        if env.Cancelled then
+                            ToolHookRuntime.ExecutionStatus.Cancelled
+                        elif isError then
+                            ToolHookRuntime.ExecutionStatus.Failure
+                        else
+                            ToolHookRuntime.ExecutionStatus.Success
+
+                    let criticism = ToolHookRuntime.appendCriticism currentOutput env.Violations status
+                    setToolResultText event criticism
             | None -> ()
 
-            applyToolResultHook toolName args
-            do! appendToolResultSyntax (Dyn.str ctx "cwd") event
+            let content = getToolResultText event
 
-            if toolName = todoWriteToolName omp then
-                let callId = getToolCallId event
-                let input = getToolInput event
+            if
+                sessionId <> ""
+                && check ExecutorTools.ompScope sessionId toolName (JS.JSON.stringify args) content
+            then
+                setToolResultText event "livelock guard: repeated identical tool call with identical result"
+            else
+                applyToolResultHook toolName args
+                do! appendToolResultSyntax (Dyn.str ctx "cwd") event
 
-                let ahaMoments =
-                    if Dyn.isNullish input then
-                        ""
-                    else
-                        (Dyn.str input "ahaMoments").Trim()
+                if toolName = todoWriteToolName omp then
+                    let callId = getToolCallId event
+                    let input = getToolInput event
 
-                let changesAndReasons =
-                    if Dyn.isNullish input then
-                        ""
-                    else
-                        (Dyn.str input "changesAndReasons").Trim()
-
-                let gotchas =
-                    if Dyn.isNullish input then
-                        ""
-                    else
-                        (Dyn.str input "gotchas").Trim()
-
-                let lessonsAndConventions =
-                    if Dyn.isNullish input then
-                        ""
-                    else
-                        (Dyn.str input "lessonsAndConventions").Trim()
-
-                let plan =
-                    if Dyn.isNullish input then
-                        ""
-                    else
-                        (Dyn.str input "plan").Trim()
-
-                if
-                    (ahaMoments <> ""
-                     || changesAndReasons <> ""
-                     || gotchas <> ""
-                     || lessonsAndConventions <> ""
-                     || plan <> "")
-                    && callId <> ""
-                then
-                    let entry: BacklogEntry =
-                        { ahaMoments = ahaMoments
-                          changesAndReasons = changesAndReasons
-                          gotchas = gotchas
-                          lessonsAndConventions = lessonsAndConventions
-                          plan = plan }
-
-                    backlogSession.CaptureReport(callId, entry.plan)
-
-                let methodologies =
-                    let raw =
-                        if Dyn.isNullish args then
-                            null
+                    let ahaMoments =
+                        if Dyn.isNullish input then
+                            ""
                         else
-                            Dyn.get args "select_methodology"
+                            (Dyn.str input "ahaMoments").Trim()
 
-                    if Dyn.isNullish raw || not (Dyn.isArray raw) then
-                        []
-                    else
-                        let rawArr = unbox<obj array> raw
-                        rawArr |> Seq.map string |> List.ofSeq
+                    let changesAndReasons =
+                        if Dyn.isNullish input then
+                            ""
+                        else
+                            (Dyn.str input "changesAndReasons").Trim()
 
-                let content = getToolResultText event
+                    let gotchas =
+                        if Dyn.isNullish input then
+                            ""
+                        else
+                            (Dyn.str input "gotchas").Trim()
 
-                if content <> "" then
-                    setToolResultText event (todoWriteOutput methodologies)
+                    let lessonsAndConventions =
+                        if Dyn.isNullish input then
+                            ""
+                        else
+                            (Dyn.str input "lessonsAndConventions").Trim()
+
+                    let plan =
+                        if Dyn.isNullish input then
+                            ""
+                        else
+                            (Dyn.str input "plan").Trim()
+
+                    if
+                        (ahaMoments <> ""
+                         || changesAndReasons <> ""
+                         || gotchas <> ""
+                         || lessonsAndConventions <> ""
+                         || plan <> "")
+                        && callId <> ""
+                    then
+                        let entry: BacklogEntry =
+                            { ahaMoments = ahaMoments
+                              changesAndReasons = changesAndReasons
+                              gotchas = gotchas
+                              lessonsAndConventions = lessonsAndConventions
+                              plan = plan }
+
+                        backlogSession.CaptureReport(callId, entry.plan)
+
+                    let methodologies =
+                        let raw =
+                            if Dyn.isNullish args then
+                                null
+                            else
+                                Dyn.get args "select_methodology"
+
+                        if Dyn.isNullish raw || not (Dyn.isArray raw) then
+                            []
+                        else
+                            let rawArr = unbox<obj array> raw
+                            rawArr |> Seq.map string |> List.ofSeq
+
+                    let content = getToolResultText event
+
+                    if content <> "" then
+                        let baseOutput = todoWriteOutput methodologies
+
+                        let violations =
+                            match decodeTodoWriteArgs false args with
+                            | Result.Ok(_, viols) -> viols
+                            | Result.Error _ -> []
+
+                        let finalOutput =
+                            if not (List.isEmpty violations) then
+                                ToolHookRuntime.appendCriticism
+                                    baseOutput
+                                    violations
+                                    ToolHookRuntime.ExecutionStatus.Success
+                            else
+                                baseOutput
+
+                        setToolResultText event finalOutput
+        finally
+            if envOpt.IsSome then
+                ToolHookRuntime.removeCompliance sessionId toolCallId
     }
 
 let sessionStartHandler (pi: obj) (reviewStore: ReviewStore) (ctx: obj) : JS.Promise<unit> =

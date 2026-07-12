@@ -108,11 +108,12 @@ let private rebuildPhaseState
     (encodeMessages: Message<obj> list -> obj array)
     (currentTokens: int)
     (totalBytes: int)
+    (forceRebuild: bool)
     : JS.Promise<ContextState * bool> =
     promise {
         let isJustInitialized = currentStore.State.IsNone
 
-        if backlog <> currentStore.LastBacklog || isJustInitialized then
+        if backlog <> currentStore.LastBacklog || isJustInitialized || forceRebuild then
             let stableMessages =
                 projectBacklogFor backlogOps.Host plan.Cleaned backlog FoldStrategy.FoldAfterFirst plan.SessionID
 
@@ -248,6 +249,15 @@ let applyContextBudget
             let currentTokens, confidence =
                 resolveCurrentTokens totalBytes tokenCountOpt storeEntry
 
+            let prevConfidence =
+                match storeEntry.LastUsage with
+                | Some u -> Some u.confidence
+                | None -> None
+
+            let transitioned =
+                prevConfidence = Some UsageConfidence.BootstrapEstimate
+                && confidence = UsageConfidence.Observed
+
             ContextBudgetStore.update plan.Scope plan.SessionID (fun entry ->
                 { entry with
                     LastUsage =
@@ -260,9 +270,17 @@ let applyContextBudget
             let currentStore = ContextBudgetStore.get plan.Scope plan.SessionID
 
             let! state, isJustInitialized =
-                rebuildPhaseState plan backlogOps backlog currentStore encodeMessages currentTokens totalBytes
+                rebuildPhaseState
+                    plan
+                    backlogOps
+                    backlog
+                    currentStore
+                    encodeMessages
+                    currentTokens
+                    totalBytes
+                    transitioned
 
-            if isJustInitialized then
+            if isJustInitialized || transitioned then
                 return messages
             else
                 let finalStoreEntry = ContextBudgetStore.get plan.Scope plan.SessionID

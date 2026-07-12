@@ -100,8 +100,8 @@ let private stringZodProperty (description: string) : obj =
 let private jsonStringMinLengthProperty (minLength: int) (description: string) : obj =
     createObj
         [ "type", box "string"
-          "minLength", box minLength
-          "description", box description ]
+          "x-wanxiangshu-soft-min-length", box minLength
+          "description", box ("MUST be at least " + string minLength + " characters. " + description) ]
 
 let private reportFieldDescs =
     [| "ahaMoments", ahaMomentsDesc

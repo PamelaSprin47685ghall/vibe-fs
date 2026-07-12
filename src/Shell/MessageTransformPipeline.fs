@@ -30,21 +30,19 @@ let tryInjectParallelToolPrompt (sessionID: string) (messages: Message<obj> list
 
     let nativeMsgs = messages |> List.filter (fun m -> m.source = Native)
 
-    let lastAssistantOpt =
-        nativeMsgs |> List.tryFindBack (fun m -> m.info.role = Assistant)
+    let lastAssistantIdxOpt =
+        nativeMsgs |> List.tryFindIndexBack (fun m -> m.info.role = Assistant)
 
-    match lastAssistantOpt with
+    match lastAssistantIdxOpt with
     | None -> messages
-    | Some lastAssistantMsg ->
+    | Some lastIdx ->
+        let lastAssistantMsg = nativeMsgs.[lastIdx]
         let realCallIDs = getRealCallIds lastAssistantMsg
 
         if realCallIDs.Length <> 1 then
             messages
         else
             let targetCallID = List.head realCallIDs
-
-            let lastIdx =
-                nativeMsgs |> List.findIndex (fun m -> m.info.id = lastAssistantMsg.info.id)
 
             let laterMessages = nativeMsgs.[lastIdx + 1 ..]
 
@@ -63,9 +61,9 @@ let tryInjectParallelToolPrompt (sessionID: string) (messages: Message<obj> list
                 if isTerminalInAssistant then
                     (true, laterMessages)
                 else
-                    let completionMsgOpt =
+                    let completionIdxOpt =
                         laterMessages
-                        |> List.tryFind (fun m ->
+                        |> List.tryFindIndex (fun m ->
                             let hasTerminalPart =
                                 m.parts
                                 |> List.exists (fun p ->
@@ -86,13 +84,9 @@ let tryInjectParallelToolPrompt (sessionID: string) (messages: Message<obj> list
 
                             hasTerminalPart || isMatchingToolResult)
 
-                    match completionMsgOpt with
+                    match completionIdxOpt with
                     | None -> (false, [])
-                    | Some completionMsg ->
-                        let completionIdx =
-                            laterMessages |> List.findIndex (fun m -> m.info.id = completionMsg.info.id)
-
-                        (true, laterMessages.[completionIdx + 1 ..])
+                    | Some completionIdx -> (true, laterMessages.[completionIdx + 1 ..])
 
             if not isCompleted then
                 messages

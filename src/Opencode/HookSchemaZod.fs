@@ -22,6 +22,7 @@ type IZodSchema =
     abstract describe: obj
     abstract array: obj
     abstract min: obj
+    abstract optional: obj
 
 let hasSchemaMethod (schema: IZodSchema) (methodName: string) : bool =
     let f =
@@ -32,6 +33,7 @@ let hasSchemaMethod (schema: IZodSchema) (methodName: string) : bool =
         | "describe" -> schema.describe
         | "array" -> schema.array
         | "min" -> schema.min
+        | "optional" -> schema.optional
         | _ -> null
 
     not (Dyn.isNullish f) && jsType f = "function"
@@ -41,6 +43,7 @@ let tryCallSchemaMethod0 (schema: IZodSchema) (methodName: string) : obj option 
         match methodName with
         | "unwrap" -> schema.unwrap
         | "array" -> schema.array
+        | "optional" -> schema.optional
         | _ -> null
 
     if not (Dyn.isNullish f) && jsType f = "function" then
@@ -156,7 +159,13 @@ let buildExtensionProperties
             | _ -> ""
 
         match tryCallSchemaMethod templateStr "describe" (box desc) with
-        | Some describedStr -> extProps <- (field, describedStr) :: extProps
+        | Some describedStr ->
+            let optStr =
+                match tryCallSchemaMethod0 (unbox<IZodSchema> describedStr) "optional" with
+                | Some optionalStr -> optionalStr
+                | None -> describedStr
+
+            extProps <- (field, optStr) :: extProps
         | None -> ()
 
     if existingMethodology.IsNone then

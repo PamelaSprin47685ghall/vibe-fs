@@ -95,19 +95,16 @@ let private decodeSelectMethodology (args: obj) : string list =
 
 let decodeTodoWriteArgs (isTask: bool) (args: obj) : Result<TodoWriteArgs * string list, DomainError> =
     let decodeReportField k =
-        if isTask then
-            ("", None)
-        else
-            match strField args k with
-            | None -> ("", Some(sprintf "%s: missing required field" k))
-            | Some v ->
-                let trimmed = v.Trim()
+        match strField args k with
+        | None -> ("", Some(sprintf "%s: missing required field" k))
+        | Some v ->
+            let trimmed = v.Trim()
 
-                if trimmed.Length < reportMinLength then
-                    (trimmed,
-                     Some(sprintf "%s: length is %d, expected at least %d characters" k trimmed.Length reportMinLength))
-                else
-                    (trimmed, None)
+            if trimmed.Length < reportMinLength then
+                (trimmed,
+                 Some(sprintf "%s: length is %d, expected at least %d characters" k trimmed.Length reportMinLength))
+            else
+                (trimmed, None)
 
     let ahaMoments, ahaViol = decodeReportField "ahaMoments"
     let changesAndReasons, changesViol = decodeReportField "changesAndReasons"

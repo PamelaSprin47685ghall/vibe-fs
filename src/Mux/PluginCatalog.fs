@@ -173,9 +173,18 @@ let toolExecuteAfter (scope: RuntimeScope) (input: obj) (output: obj) : JS.Promi
             ToolHookRuntime.restoreWarnToArgs outputArgs env
 
             let currentOutput = hookOutputTextMux output
+            let isError = hookOutputErrorMux output <> "" || isNetworkErrorText currentOutput
+
+            let status =
+                if env.Cancelled then
+                    ToolHookRuntime.ExecutionStatus.Cancelled
+                elif isError then
+                    ToolHookRuntime.ExecutionStatus.Failure
+                else
+                    ToolHookRuntime.ExecutionStatus.Success
 
             if not env.Violations.IsEmpty then
-                let criticism = ToolHookRuntime.appendCriticism currentOutput env.Violations
+                let criticism = ToolHookRuntime.appendCriticism currentOutput env.Violations status
                 setHookOutputStringMux output criticism
 
             ToolHookRuntime.removeCompliance sessionID toolCallID

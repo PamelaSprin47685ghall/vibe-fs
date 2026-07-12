@@ -116,6 +116,22 @@ let registerTodoTool (pi: obj) : unit =
                                           do! appendWorkBacklogCommittedOrFail root sid args
                                   | None -> ()
 
-                                  return textResult (todoWriteOutput methodologies)
+                                  let baseOutput = todoWriteOutput methodologies
+
+                                  let violations =
+                                      match decodeTodoWriteArgs false params' with
+                                      | Ok(_, viols) -> viols
+                                      | Error _ -> []
+
+                                  let finalOutput =
+                                      if not violations.IsEmpty then
+                                          Wanxiangshu.Shell.ToolHookRuntime.appendCriticism
+                                              baseOutput
+                                              violations
+                                              Wanxiangshu.Shell.ToolHookRuntime.ExecutionStatus.Success
+                                      else
+                                          baseOutput
+
+                                  return textResult finalOutput
                   }) ]
     )

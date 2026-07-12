@@ -79,7 +79,17 @@ type ProgressObserver
 
                             if not violations.IsEmpty then
                                 let currentOutput = hookOutputText output
-                                let criticism = ToolHookRuntime.appendCriticism currentOutput violations
+
+                                let isError =
+                                    hookOutputError output <> "" || ToolExecute.isNetworkErrorText currentOutput
+
+                                let status =
+                                    if isError then
+                                        ToolHookRuntime.ExecutionStatus.Failure
+                                    else
+                                        ToolHookRuntime.ExecutionStatus.Success
+
+                                let criticism = ToolHookRuntime.appendCriticism currentOutput violations status
                                 setHookOutputString output criticism
                         | Error err -> failwithf "DECODE_FAILED: %A" err
                 | None -> ()

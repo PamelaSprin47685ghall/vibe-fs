@@ -178,7 +178,15 @@ let private mkTodoWriteWrapper (host: Host) (projection: ProjectionStore) : obj 
                                     Promise.lift raw
 
                             let output = todoWriteOutput methodologies
-                            let finalOutput = ToolHookRuntime.appendCriticism output violations
+                            let isError = not (Dyn.isNullish result) && not (truthy (Dyn.get result "success"))
+
+                            let status =
+                                if isError then
+                                    ToolHookRuntime.ExecutionStatus.Failure
+                                else
+                                    ToolHookRuntime.ExecutionStatus.Success
+
+                            let finalOutput = ToolHookRuntime.appendCriticism output violations status
 
                             let nextResult =
                                 if Dyn.typeIs result "object" then

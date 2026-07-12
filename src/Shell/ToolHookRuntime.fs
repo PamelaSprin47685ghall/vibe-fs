@@ -128,18 +128,26 @@ type ControlEnvelope =
       Warn: string option
       WarnReuse: string option
       Amend: int option
-      Violations: string list }
+      Violations: string list
+      mutable Cancelled: bool }
 
 let private complianceStore =
-    System.Collections.Generic.Dictionary<string, ControlEnvelope>()
+    System.Collections.Generic.Dictionary<string, System.Collections.Generic.Dictionary<string, ControlEnvelope>>()
 
 let saveCompliance (sessionID: string) (toolCallID: string) (env: ControlEnvelope) : unit =
     if
         not (System.String.IsNullOrWhiteSpace sessionID)
         && not (System.String.IsNullOrWhiteSpace toolCallID)
     then
-        let key = sessionID + "_" + toolCallID
-        complianceStore.[key] <- env
+        let innerStore =
+            match complianceStore.TryGetValue(sessionID) with
+            | true, store -> store
+            | _ ->
+                let store = System.Collections.Generic.Dictionary<string, ControlEnvelope>()
+                complianceStore.[sessionID] <- store
+                store
+
+        innerStore.[toolCallID] <- env
 
 let tryGetCompliance (sessionID: string) (toolCallID: string) : ControlEnvelope option =
     if
@@ -148,10 +156,11 @@ let tryGetCompliance (sessionID: string) (toolCallID: string) : ControlEnvelope 
     then
         None
     else
-        let key = sessionID + "_" + toolCallID
-
-        match complianceStore.TryGetValue(key) with
-        | true, env -> Some env
+        match complianceStore.TryGetValue(sessionID) with
+        | true, innerStore ->
+            match innerStore.TryGetValue(toolCallID) with
+            | true, env -> Some env
+            | _ -> None
         | _ -> None
 
 let removeCompliance (sessionID: string) (toolCallID: string) : unit =
@@ -159,18 +168,33 @@ let removeCompliance (sessionID: string) (toolCallID: string) : unit =
         not (System.String.IsNullOrWhiteSpace sessionID)
         && not (System.String.IsNullOrWhiteSpace toolCallID)
     then
-        let key = sessionID + "_" + toolCallID
-        complianceStore.Remove(key) |> ignore
+        match complianceStore.TryGetValue(sessionID) with
+        | true, innerStore ->
+            innerStore.Remove(toolCallID) |> ignore
+
+            if innerStore.Count = 0 then
+                complianceStore.Remove(sessionID) |> ignore
+        | _ -> ()
 
 let clearSessionCompliance (sessionID: string) : unit =
     if not (System.String.IsNullOrWhiteSpace sessionID) then
-        let keysToRemove =
-            complianceStore.Keys
-            |> Seq.filter (fun k -> k.StartsWith(sessionID + "_"))
-            |> Seq.toList
+        match complianceStore.TryGetValue(sessionID) with
+        | true, innerStore ->
+            let keysToRemove =
+                innerStore
+                |> Seq.filter (fun kv -> kv.Value.Cancelled)
+                |> Seq.map (fun kv -> kv.Key)
+                |> Seq.toList
 
-        for k in keysToRemove do
-            complianceStore.Remove(k) |> ignore
+            for k in keysToRemove do
+                innerStore.Remove(k) |> ignore
+
+            for kv in innerStore do
+                kv.Value.Cancelled <- true
+
+            if innerStore.Count = 0 then
+                complianceStore.Remove(sessionID) |> ignore
+        | _ -> ()
 
 let restoreWarnToArgs (args: obj) (env: ControlEnvelope) : unit =
     if not (Dyn.isNullish args) then
@@ -186,22 +210,34 @@ let restoreWarnToArgs (args: obj) (env: ControlEnvelope) : unit =
         | Some v -> args?("warn_reuse") <- box v
         | None -> ()
 
-let appendCriticism (output: string) (violations: string list) : string =
-    if violations.IsEmpty then
+[<RequireQualifiedAccess>]
+type ExecutionStatus =
+    | Success
+    | Failure
+    | Cancelled
+
+let reprimandMarker = "<WANXIANGSHU_COMPLIANCE_REPRIMAND>"
+
+let appendCriticism (output: string) (violations: string list) (status: ExecutionStatus) : string =
+    if violations.IsEmpty || (output <> null && output.Contains(reprimandMarker)) then
         output
     else
         let builder = System.Text.StringBuilder()
         builder.AppendLine() |> ignore
-        builder.AppendLine() |> ignore
+        builder.AppendLine(reprimandMarker) |> ignore
         builder.AppendLine("严重协议违例：") |> ignore
 
         for v in violations do
             builder.AppendLine("- " + v) |> ignore
 
         builder.AppendLine() |> ignore
-        builder.AppendLine("工具已经成功执行。不要重复本次工具调用。") |> ignore
-        let criticism = builder.ToString()
 
+        match status with
+        | ExecutionStatus.Success -> builder.AppendLine("工具已经成功执行。不要重复本次工具调用。") |> ignore
+        | ExecutionStatus.Failure
+        | ExecutionStatus.Cancelled -> builder.AppendLine("本次工具调用已经结束，不要仅为补齐协议字段而机械重复调用。") |> ignore
+
+        let criticism = builder.ToString()
         if output = null then criticism else output + criticism
 
 let tryExtractToolCallId (input: obj) : string option =
@@ -502,7 +538,8 @@ let executeBeforeGateway (tool: string) (args: obj) : Result<obj * ControlEnvelo
               Warn = None
               WarnReuse = None
               Amend = None
-              Violations = [] }
+              Violations = []
+              Cancelled = false }
         )
     else
         coerceArgsTypes tool args
@@ -601,6 +638,7 @@ let executeBeforeGateway (tool: string) (args: obj) : Result<obj * ControlEnvelo
               Warn = warnVal
               WarnReuse = warnReuseVal
               Amend = amendVal
-              Violations = violations }
+              Violations = violations
+              Cancelled = false }
 
         Result.Ok(nextArgs, env)

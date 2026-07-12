@@ -174,9 +174,18 @@ let toolExecuteAfterFor
             ToolHookRuntime.restoreWarnToArgs outputArgs env
 
             let currentOutput = hookOutputText output
+            let isError = hookOutputError output <> "" || isNetworkErrorText currentOutput
+
+            let status =
+                if env.Cancelled then
+                    ToolHookRuntime.ExecutionStatus.Cancelled
+                elif isError then
+                    ToolHookRuntime.ExecutionStatus.Failure
+                else
+                    ToolHookRuntime.ExecutionStatus.Success
 
             if not env.Violations.IsEmpty then
-                let criticism = ToolHookRuntime.appendCriticism currentOutput env.Violations
+                let criticism = ToolHookRuntime.appendCriticism currentOutput env.Violations status
                 setHookOutputString output criticism
 
             ToolHookRuntime.removeCompliance sessionID toolCallID

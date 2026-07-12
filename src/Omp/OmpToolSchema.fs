@@ -203,11 +203,11 @@ let todowriteParameters (tb: obj) : obj =
     injectAmendIntoOmpParameters (
         objectOf
             [| ("todos", arrayOf todoItem todosDesc tb)
-               ("ahaMoments", str ahaMomentsDesc tb)
-               ("changesAndReasons", str changesAndReasonsDesc tb)
-               ("gotchas", str gotchasDesc tb)
-               ("lessonsAndConventions", str lessonsAndConventionsDesc tb)
-               ("plan", str planDesc tb)
+               ("ahaMoments", opt ahaMomentsDesc tb str)
+               ("changesAndReasons", opt changesAndReasonsDesc tb str)
+               ("gotchas", opt gotchasDesc tb str)
+               ("lessonsAndConventions", opt lessonsAndConventionsDesc tb str)
+               ("plan", opt planDesc tb str)
                ("select_methodology",
                 arrayOf
                     (enumOf Wanxiangshu.Methodology.Registry.enumValuesArray.Value "Methodology name" tb)
