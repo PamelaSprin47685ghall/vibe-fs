@@ -87,6 +87,21 @@ let restoreFallbackRuntimeState
         | None -> ()
 
         rt.SetCompacted sid state.IsCompacted
+        rt.SetCompactionGeneration sid state.CompactionGeneration
+
+        match state.PendingNudgeLease with
+        | Some nl ->
+            let lease: Wanxiangshu.Shell.FallbackRuntimeState.NudgeLease =
+                { NudgeID = nl.NudgeID
+                  Nonce = nl.Nonce
+                  HumanTurnID = nl.HumanTurnID
+                  SessionGeneration = nl.SessionGeneration
+                  CancelGeneration = nl.CancelGeneration
+                  Owner = "Nudge"
+                  Status = nl.Status }
+
+            rt.SetPendingNudgeLease(sid, lease)
+        | None -> rt.ClearPendingNudgeLease sid
     | None -> ()
 
 let syncAllSessionsFromEventLogDedicated

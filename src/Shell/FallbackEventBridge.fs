@@ -372,6 +372,15 @@ let handleEvent
                     do! appendCompactionSettledOrFail workspaceRoot sessionID activeComp "cancelled"
                     runtime.SetSessionOwner sessionID "None"
 
+                match runtime.TryGetPendingNudgeLease sessionID with
+                | Some nudgeLease ->
+                    do! appendNudgeCancelledOrFail workspaceRoot sessionID nudgeLease.NudgeID "New user message"
+                    runtime.ClearPendingNudgeLease sessionID
+
+                    if runtime.GetSessionOwner sessionID = "Nudge" then
+                        runtime.SetSessionOwner sessionID "None"
+                | None -> ()
+
                 runtime.SetChain sessionID []
                 runtime.ClearModel sessionID
                 runtime.ClearInjected sessionID
@@ -488,14 +497,16 @@ let handleEvent
                                     "User aborted"
                         | None -> ()
 
-                    let mutable finalState = ns
+                        match runtime.TryGetPendingNudgeLease sessionID with
+                        | Some nudgeLease ->
+                            do! appendNudgeCancelledOrFail workspaceRoot sessionID nudgeLease.NudgeID "User aborted"
+                            runtime.ClearPendingNudgeLease sessionID
 
-                    let terminalStates =
-                        evt <> FallbackEvent.SessionBusy
-                        && (ns.Lifecycle = FallbackLifecycle.TaskComplete
-                            || ns.Lifecycle = FallbackLifecycle.Cancelled
-                            || ns.Phase = FallbackPhase.Exhausted
-                            || (ns.Phase = FallbackPhase.Idle && action = FallbackAction.DoNothing))
+                            if runtime.GetSessionOwner sessionID = "Nudge" then
+                                runtime.SetSessionOwner sessionID "None"
+                        | None -> ()
+
+                    let mutable finalState = ns
 
                     if evt = FallbackEvent.SessionBusy then
                         match runtime.TryGetPendingLease sessionID with
@@ -509,21 +520,6 @@ let handleEvent
                             let runningLease = { lease with Status = "running" }
                             runtime.SetPendingNudgeLease(sessionID, runningLease)
                         | _ -> ()
-
-                    if terminalStates then
-                        match runtime.TryGetPendingLease sessionID with
-                        | Some lease ->
-                            do!
-                                appendContinuationSettledOrFail
-                                    workspaceRoot
-                                    sessionID
-                                    lease.ContinuationID
-                                    lease.HumanTurnID
-                                    lease.SessionGeneration
-                                    "completed"
-
-                            runtime.ClearPendingLease sessionID
-                        | None -> ()
 
                     let! (finalState2, intentOpt) =
                         promise {
@@ -742,6 +738,33 @@ let handleEvent
                                         return updated, None
                             | FallbackAction.PropagateFailure -> return finalState, Some PropagateFailureIntent
                         }
+
+                    let isPostTerminal =
+                        evt <> FallbackEvent.SessionBusy
+                        && (finalState2.Lifecycle = FallbackLifecycle.TaskComplete
+                            || finalState2.Lifecycle = FallbackLifecycle.Cancelled
+                            || finalState2.Phase = FallbackPhase.Exhausted
+                            || (finalState2.Phase = FallbackPhase.Idle && intentOpt.IsNone))
+
+                    if isPostTerminal then
+                        match runtime.TryGetPendingLease sessionID with
+                        | Some lease ->
+                            do!
+                                appendContinuationSettledOrFail
+                                    workspaceRoot
+                                    sessionID
+                                    lease.ContinuationID
+                                    lease.HumanTurnID
+                                    lease.SessionGeneration
+                                    "completed"
+
+                            runtime.ClearPendingLease sessionID
+
+                            if runtime.GetSessionOwner sessionID = "Fallback" then
+                                runtime.SetSessionOwner sessionID "None"
+
+                            runtime.SetAwaitingBusy sessionID false
+                        | None -> ()
 
                     let consumed =
                         match evt with

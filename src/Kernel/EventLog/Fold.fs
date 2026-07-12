@@ -106,7 +106,12 @@ let private nudgeDedupFolder (st: NudgeDedupState) (e: WanEvent) : NudgeDedupSta
                     PendingNudges = Map.remove anchor st.PendingNudges }
             | None -> st
         | None -> st
-    | k when k = eventKindSubmitReviewWipRecorded || k = eventKindNudgeDedupCleared -> emptyNudgeDedupState
+    | k when
+        k = eventKindSubmitReviewWipRecorded
+        || k = eventKindNudgeDedupCleared
+        || k = eventKindHumanTurnStarted
+        ->
+        emptyNudgeDedupState
     | _ -> st
 
 let foldNudgeDedup (sessionId: string) (events: WanEvent list) : NudgeDedupState =
@@ -222,7 +227,11 @@ let private nudgeSnapshotFolder (st: NudgeSnapshotState) (e: WanEvent) : NudgeSn
                     pendingNudges = Map.remove anchor st.pendingNudges }
             | None -> st
         | None -> st
-    | k when k = eventKindSubmitReviewWipRecorded || k = eventKindNudgeDedupCleared ->
+    | k when
+        k = eventKindSubmitReviewWipRecorded
+        || k = eventKindNudgeDedupCleared
+        || k = eventKindHumanTurnStarted
+        ->
         { st with
             dispatchedAnchors = Set.empty
             pendingNudges = Map.empty }
@@ -321,6 +330,15 @@ type ReplayLeaseState =
       PromptText: string option
       Status: string }
 
+type ReplayNudgeLeaseState =
+    { NudgeID: string
+      Nonce: string
+      Anchor: string
+      HumanTurnID: string
+      SessionGeneration: int
+      CancelGeneration: int
+      Status: string }
+
 let private humanTurnFolder (st: HumanTurnState option) (e: WanEvent) : HumanTurnState option =
     if e.Kind = eventKindHumanTurnStarted then
         let turnId = payloadField "turnId" e |> Option.defaultValue ""
@@ -383,7 +401,9 @@ let private ownerAndLeaseFolder
     (
         owner: string option,
         lease: ReplayLeaseState option,
+        nudgeLease: ReplayNudgeLeaseState option,
         compId: string option,
+        compGen: int,
         isCompacted: bool,
         currentGen: int,
         currentCancelGen: int,
@@ -392,13 +412,25 @@ let private ownerAndLeaseFolder
     (e: WanEvent)
     =
     match e.Kind with
-    | k when k = eventKindHumanTurnStarted -> Some "Human", None, None, false
-    | k when k = eventKindUserAbortObserved -> Some "None", None, None, false
+    | k when k = eventKindHumanTurnStarted -> Some "Human", None, None, None, compGen, false
+    | k when k = eventKindUserAbortObserved -> Some "None", None, None, None, compGen, false
     | k when k = eventKindCompactionStarted ->
         let cid = payloadField "compactionId" e
-        Some "Compaction", None, cid, false
-    | k when k = eventKindContextGenerationChanged -> owner, lease, compId, true
-    | k when k = eventKindCompactionSettled -> Some "None", None, None, false
+
+        let genVal =
+            e.Payload
+            |> Map.tryFind "generationAtStart"
+            |> Option.orElse (e.Payload |> Map.tryFind "generation")
+            |> Option.bind (fun s ->
+                try
+                    Some(int s)
+                with _ ->
+                    None)
+            |> Option.defaultValue currentGen
+
+        Some "Compaction", None, None, cid, genVal, false
+    | k when k = eventKindContextGenerationChanged -> owner, lease, nudgeLease, compId, compGen, true
+    | k when k = eventKindCompactionSettled -> Some "None", None, None, None, compGen, false
     | k when k = eventKindContinuationRequested ->
         let contId = payloadField "continuationId" e |> Option.defaultValue ""
         let model = payloadField "model" e |> Option.defaultValue ""
@@ -433,7 +465,7 @@ let private ownerAndLeaseFolder
               PromptText = None
               Status = "requested" }
 
-        Some ownerVal, Some nextLease, compId, isCompacted
+        Some ownerVal, Some nextLease, nudgeLease, compId, compGen, isCompacted
     | k when k = eventKindContinuationDispatchStarted ->
         let cid = payloadField "continuationId" e |> Option.defaultValue ""
 
@@ -445,7 +477,7 @@ let private ownerAndLeaseFolder
                 else
                     l)
 
-        owner, nextLease, compId, isCompacted
+        owner, nextLease, nudgeLease, compId, compGen, isCompacted
     | k when k = eventKindContinuationDispatched ->
         let cid = payloadField "continuationId" e |> Option.defaultValue ""
 
@@ -457,31 +489,14 @@ let private ownerAndLeaseFolder
                 else
                     l)
 
-        owner, nextLease, compId, isCompacted
-    | k when k = eventKindContinuationFailed ->
-        let cid = payloadField "continuationId" e |> Option.defaultValue ""
+        owner, nextLease, nudgeLease, compId, compGen, isCompacted
+    | k when k = eventKindContinuationFailed || k = eventKindContinuationCancelled ->
+        let nextOwner =
+            match owner with
+            | Some "Fallback" -> Some "None"
+            | _ -> owner
 
-        let nextLease =
-            lease
-            |> Option.map (fun l ->
-                if l.ContinuationID = cid then
-                    { l with Status = "failed" }
-                else
-                    l)
-
-        owner, nextLease, compId, isCompacted
-    | k when k = eventKindContinuationCancelled ->
-        let cid = payloadField "continuationId" e |> Option.defaultValue ""
-
-        let nextLease =
-            lease
-            |> Option.map (fun l ->
-                if l.ContinuationID = cid then
-                    { l with Status = "cancelled" }
-                else
-                    l)
-
-        owner, nextLease, compId, isCompacted
+        nextOwner, None, nudgeLease, compId, compGen, isCompacted
     | k when k = eventKindContinuationSettled ->
         let cid = payloadField "continuationId" e |> Option.defaultValue ""
 
@@ -493,24 +508,48 @@ let private ownerAndLeaseFolder
             | Some "Fallback" -> Some "None"
             | _ -> owner
 
-        nextOwner, nextLease, compId, isCompacted
-    | k when k = eventKindNudgeDispatched || k = eventKindNudgeRequested -> Some "Nudge", lease, compId, isCompacted
+        nextOwner, nextLease, nudgeLease, compId, compGen, isCompacted
+    | k when k = eventKindNudgeRequested ->
+        let nid = payloadField "nudgeId" e |> Option.defaultValue ""
+        let nonce = payloadField "nonce" e |> Option.defaultValue ""
+        let anchor = payloadField "anchor" e |> Option.defaultValue ""
+
+        let humanTurnId =
+            payloadField "humanTurnId" e
+            |> Option.orElse (latestHumanTurn |> Option.map (fun t -> t.TurnId))
+            |> Option.defaultValue ""
+
+        let nextNudgeLease =
+            { NudgeID = nid
+              Nonce = nonce
+              Anchor = anchor
+              HumanTurnID = humanTurnId
+              SessionGeneration = currentGen
+              CancelGeneration = currentCancelGen
+              Status = "requested" }
+
+        Some "Nudge", lease, Some nextNudgeLease, compId, compGen, isCompacted
+    | k when k = eventKindNudgeDispatched ->
+        let nextNudgeLease =
+            nudgeLease |> Option.map (fun nl -> { nl with Status = "dispatched" })
+
+        Some "Nudge", lease, nextNudgeLease, compId, compGen, isCompacted
     | k when
         k = eventKindNudgeFailed
         || k = eventKindNudgeCancelled
         || k = eventKindNudgeSettled
         ->
-        Some "None", lease, compId, isCompacted
+        Some "None", lease, None, compId, compGen, isCompacted
     | k when k = eventKindAssistantCompleted ->
         let nextOwner =
             match owner with
             | Some "Nudge" -> Some "None"
             | _ -> owner
 
-        nextOwner, lease, compId, isCompacted
+        nextOwner, lease, nudgeLease, compId, compGen, isCompacted
     | k when k = eventKindNudgeDedupCleared || k = eventKindSubmitReviewWipRecorded ->
-        Some "None", lease, compId, isCompacted
-    | _ -> owner, lease, compId, isCompacted
+        Some "None", lease, None, compId, compGen, isCompacted
+    | _ -> owner, lease, nudgeLease, compId, compGen, isCompacted
 
 type SessionState =
     { ReviewLoop: ReviewLoopFold
@@ -530,10 +569,13 @@ type SessionState =
       FallbackPhase: FallbackPhase option
       SessionOwner: string option
       PendingLease: ReplayLeaseState option
+      PendingNudgeLease: ReplayNudgeLeaseState option
       ActiveCompactionId: string option
+      CompactionGeneration: int
       IsCompacted: bool
-      LastSettledContinuationID: string option
-      ProcessedKeys: Set<string> }
+      LastFinalizedContinuationID: string option
+      LastFinalizedNudgeID: string option
+      EventCount: int }
 
 let emptySessionState () : SessionState =
     { ReviewLoop = ReviewLoopFold.initial
@@ -553,10 +595,13 @@ let emptySessionState () : SessionState =
       FallbackPhase = None
       SessionOwner = None
       PendingLease = None
+      PendingNudgeLease = None
       ActiveCompactionId = None
+      CompactionGeneration = 0
       IsCompacted = false
-      LastSettledContinuationID = None
-      ProcessedKeys = Set.empty }
+      LastFinalizedContinuationID = None
+      LastFinalizedNudgeID = None
+      EventCount = 0 }
 
 let private getEventDeduplicationKey (e: WanEvent) : string option =
     let payload = e.Payload
@@ -593,8 +638,6 @@ let private getEventDeduplicationKey (e: WanEvent) : string option =
         None
 
 let applyEvent (st: SessionState) (e: WanEvent) : SessionState =
-    let keyOpt = getEventDeduplicationKey e
-
     let contIdOpt =
         (payloadField "continuationId" e)
         |> Option.orElse (payloadField "continuationID" e)
@@ -603,53 +646,34 @@ let applyEvent (st: SessionState) (e: WanEvent) : SessionState =
 
     let isDuplicate =
         (match contIdOpt with
-         | Some id when id <> "" && st.LastSettledContinuationID = Some id -> true
+         | Some id when id <> "" && st.LastFinalizedContinuationID = Some id -> true
          | _ -> false)
         || (match nudgeIdOpt with
-            | Some id when id <> "" && st.LastSettledContinuationID = Some id -> true
+            | Some id when id <> "" && st.LastFinalizedNudgeID = Some id -> true
             | _ -> false)
-        || (match keyOpt with
-            | Some key -> Set.contains key st.ProcessedKeys
-            | None -> false)
 
     if isDuplicate then
         st
     else
-        let nextProcessedKeys =
-            if e.Kind = eventKindHumanTurnStarted then
-                Set.empty
-            else
-                let tempKeys =
-                    match keyOpt with
-                    | Some key -> Set.add key st.ProcessedKeys
-                    | None -> st.ProcessedKeys
-
-                if
-                    e.Kind = eventKindContinuationSettled
-                    || e.Kind = eventKindContinuationFailed
-                    || e.Kind = eventKindContinuationCancelled
-                then
-                    match contIdOpt with
-                    | Some id when id <> "" -> tempKeys |> Set.filter (fun key -> not (key.StartsWith(id + "_")))
-                    | _ -> tempKeys
-                else
-                    tempKeys
-
-        let nextLastSettledCont =
+        let nextLastFinalizedCont =
             if
                 e.Kind = eventKindContinuationSettled
                 || e.Kind = eventKindContinuationFailed
                 || e.Kind = eventKindContinuationCancelled
             then
                 contIdOpt
-            elif
+            else
+                st.LastFinalizedContinuationID
+
+        let nextLastFinalizedNudge =
+            if
                 e.Kind = eventKindNudgeFailed
                 || e.Kind = eventKindNudgeCancelled
                 || e.Kind = eventKindNudgeSettled
             then
                 nudgeIdOpt
             else
-                st.LastSettledContinuationID
+                st.LastFinalizedNudgeID
 
         let isBacklog = e.Kind = eventKindWorkBacklogCommitted
         let nextReviewLoop = ReviewLoopFold.foldEvent st.ReviewLoop e
@@ -663,11 +687,13 @@ let applyEvent (st: SessionState) (e: WanEvent) : SessionState =
         let nextLifecycle = fallbackLifecycleFolder st.FallbackLifecycle e
         let nextPhase = fallbackPhaseFolder st.FallbackPhase e
 
-        let nextOwner, nextLease, nextCompId, nextIsCompacted =
+        let nextOwner, nextLease, nextNudgeLease, nextCompId, nextCompGen, nextIsCompacted =
             ownerAndLeaseFolder
                 (st.SessionOwner,
                  st.PendingLease,
+                 st.PendingNudgeLease,
                  st.ActiveCompactionId,
+                 st.CompactionGeneration,
                  st.IsCompacted,
                  nextSessionGen,
                  nextCancelGen,
@@ -703,10 +729,13 @@ let applyEvent (st: SessionState) (e: WanEvent) : SessionState =
           FallbackPhase = nextPhase
           SessionOwner = nextOwner
           PendingLease = nextLease
+          PendingNudgeLease = nextNudgeLease
           ActiveCompactionId = nextCompId
+          CompactionGeneration = nextCompGen
           IsCompacted = nextIsCompacted
-          LastSettledContinuationID = nextLastSettledCont
-          ProcessedKeys = nextProcessedKeys }
+          LastFinalizedContinuationID = nextLastFinalizedCont
+          LastFinalizedNudgeID = nextLastFinalizedNudge
+          EventCount = st.EventCount + 1 }
 
 let foldSubagents (sessionId: string) (events: WanEvent list) : Map<string, SubagentState> =
     foldEventStream sessionId Map.empty subagentFolder events

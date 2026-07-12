@@ -163,7 +163,24 @@ let compactingTransform
                 | None -> None
 
             let compactionId = "compact-" + System.Guid.NewGuid().ToString("N")
-            do! Wanxiangshu.Shell.EventLogRuntime.appendCompactionStartedOrFail directory sessionID compactionId
+
+            let gen =
+                match fallbackRuntime with
+                | Some fr -> fr.GetSessionGeneration sessionID
+                | None -> 0
+
+            let turnId =
+                match fallbackRuntime with
+                | Some fr -> fr.GetHumanTurnId sessionID
+                | None -> ""
+
+            do!
+                Wanxiangshu.Shell.EventLogRuntime.appendCompactionStartedOrFail
+                    directory
+                    sessionID
+                    compactionId
+                    gen
+                    turnId
 
             match fallbackRuntime with
             | Some fr ->

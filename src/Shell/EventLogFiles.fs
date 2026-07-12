@@ -172,6 +172,24 @@ type EventLogStore(workspaceRoot: string, ?appendLineOverride: string -> WanEven
                     return false
                 elif isBlocked oldState.NudgeDedup trimmedAnchor then
                     return false
+                elif oldState.SessionGeneration <> sessionGen then
+                    return false
+                elif oldState.CancelGeneration <> cancelGen then
+                    return false
+                elif
+                    (oldState.LatestHumanTurn
+                     |> Option.map (fun t -> t.TurnId)
+                     |> Option.defaultValue "")
+                    <> humanTurnId
+                then
+                    return false
+                elif
+                    oldState.SessionOwner = Some "Fallback"
+                    || oldState.SessionOwner = Some "Compaction"
+                then
+                    return false
+                elif oldState.PendingLease.IsSome then
+                    return false
                 else
                     let payload =
                         Map

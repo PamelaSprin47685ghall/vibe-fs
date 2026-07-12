@@ -363,8 +363,15 @@ let appendCompactionStartedOrFail
     (workspaceRoot: string)
     (sessionID: string)
     (compactionId: string)
+    (generationAtStart: int)
+    (humanTurnId: string)
     : JS.Promise<unit> =
-    let payload = Map [ "compactionId", compactionId ]
+    let payload =
+        Map
+            [ "compactionId", compactionId
+              "generationAtStart", generationAtStart.ToString()
+              "humanTurnId", humanTurnId ]
+
     appendOrFail workspaceRoot (buildEvent sessionID eventKindCompactionStarted payload (getTimestampMs().ToString()))
 
 let appendCompactionSettledOrFail
