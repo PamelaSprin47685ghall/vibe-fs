@@ -210,8 +210,21 @@ let createPromptBody (agent: string option) (text: string) : obj =
 
 /// Build prompt body with optional agent and model override.
 /// Build prompt body with optional agent and model override.
-let createPromptBodyWithModel (agent: string option) (model: string option) (text: string) : obj =
-    let textPart = box {| ``type`` = "text"; text = text |}
+let createPromptBodyWithModelAndNonce
+    (agent: string option)
+    (model: string option)
+    (text: string)
+    (nonce: string option)
+    : obj =
+    let textPart =
+        match nonce with
+        | Some n ->
+            box
+                {| ``type`` = "text"
+                   text = text
+                   metadata = box {| nonce = n |} |}
+        | None -> box {| ``type`` = "text"; text = text |}
+
     let parts: obj array = [| textPart |]
 
     let baseBody =
@@ -222,3 +235,6 @@ let createPromptBodyWithModel (agent: string option) (model: string option) (tex
     match model |> Option.bind tryDecodePromptModelFromModelString with
     | Some promptModel -> Dyn.withKey baseBody "model" promptModel
     | None -> baseBody
+
+let createPromptBodyWithModel (agent: string option) (model: string option) (text: string) : obj =
+    createPromptBodyWithModelAndNonce agent model text None

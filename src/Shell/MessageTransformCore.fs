@@ -146,7 +146,8 @@ let private rebuildPhaseState
                     State = Some newState
                     LastBacklog = backlog
                     NudgeTrack = afterPhaseBoundaryReset entry.NudgeTrack
-                    EpisodeID = nextEpisode })
+                    EpisodeID = nextEpisode
+                    NudgeCount = 0 })
 
             return newState
         else
@@ -159,7 +160,7 @@ let private checkAndInjectNudge
     (state: ContextState)
     (messages: Message<obj> list)
     (host: Host)
-    (_storeEntry: ContextBudgetEntry)
+    (storeEntry: ContextBudgetEntry)
     : Message<obj> list =
     let completedTodoCount =
         flatten messages
@@ -168,20 +169,24 @@ let private checkAndInjectNudge
 
     match classifyPressure plan.MaxInputTokens false (int64 currentTokens) state completedTodoCount with
     | RequireTodoWriteEmergency ->
+        let isMaxReached = storeEntry.NudgeCount >= 2
+
         let alreadyHasNudge =
-            messages
-            |> List.exists (fun m ->
-                m.info.id.StartsWith("context-budget-nudge-")
-                || (match m.source with
-                    | Synthetic s when s.StartsWith("context-budget-nudge-") -> true
-                    | _ -> false))
+            isMaxReached
+            || messages
+               |> List.exists (fun m ->
+                   m.info.id.StartsWith("context-budget-nudge-")
+                   || (match m.source with
+                       | Synthetic s when s.StartsWith("context-budget-nudge-") -> true
+                       | _ -> false))
 
         if alreadyHasNudge then
             messages
         else
             ContextBudgetStore.update plan.Scope plan.SessionID (fun entry ->
                 { entry with
-                    NudgeTrack = afterEmergencyNudge entry.NudgeTrack })
+                    NudgeTrack = afterEmergencyNudge entry.NudgeTrack
+                    NudgeCount = entry.NudgeCount + 1 })
 
             List.append messages [ buildContextBudgetNudgeMessage plan.SessionID ]
     | _ -> messages

@@ -19,11 +19,11 @@ type FakeExecutor(?messages: obj array, ?currentModel: FallbackModel) =
     let msgs = defaultArg messages [||]
 
     interface IActionExecutor with
-        member _.SendContinue(sessionID, model) : JS.Promise<unit> =
+        member _.SendContinue(sessionID, model, continuationID) : JS.Promise<unit> =
             continueCalls.Add(sessionID, model)
             Promise.lift ()
 
-        member _.RecoverWithPrompt(sessionID, model, promptText) : JS.Promise<unit> =
+        member _.RecoverWithPrompt(sessionID, model, promptText, continuationID) : JS.Promise<unit> =
             recoverCalls.Add(sessionID, model, promptText)
             Promise.lift ()
 

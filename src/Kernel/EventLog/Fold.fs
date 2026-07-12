@@ -378,18 +378,52 @@ let private ownerAndLeaseFolder
 
         Some ownerVal, Some nextLease, compId, isCompacted
     | k when k = eventKindContinuationDispatchStarted ->
+        let cid = payloadField "continuationId" e |> Option.defaultValue ""
+
         let nextLease =
-            lease |> Option.map (fun l -> { l with Status = "dispatch_started" })
+            lease
+            |> Option.map (fun l ->
+                if l.ContinuationID = cid then
+                    { l with Status = "dispatch_started" }
+                else
+                    l)
 
         owner, nextLease, compId, isCompacted
     | k when k = eventKindContinuationDispatched ->
-        let nextLease = lease |> Option.map (fun l -> { l with Status = "dispatched" })
+        let cid = payloadField "continuationId" e |> Option.defaultValue ""
+
+        let nextLease =
+            lease
+            |> Option.map (fun l ->
+                if l.ContinuationID = cid then
+                    { l with Status = "dispatched" }
+                else
+                    l)
+
         owner, nextLease, compId, isCompacted
     | k when k = eventKindContinuationFailed ->
-        let nextLease = lease |> Option.map (fun l -> { l with Status = "failed" })
+        let cid = payloadField "continuationId" e |> Option.defaultValue ""
+
+        let nextLease =
+            lease
+            |> Option.map (fun l ->
+                if l.ContinuationID = cid then
+                    { l with Status = "failed" }
+                else
+                    l)
+
         owner, nextLease, compId, isCompacted
     | k when k = eventKindContinuationCancelled ->
-        let nextLease = lease |> Option.map (fun l -> { l with Status = "cancelled" })
+        let cid = payloadField "continuationId" e |> Option.defaultValue ""
+
+        let nextLease =
+            lease
+            |> Option.map (fun l ->
+                if l.ContinuationID = cid then
+                    { l with Status = "cancelled" }
+                else
+                    l)
+
         owner, nextLease, compId, isCompacted
     | k when k = eventKindNudgeDispatched -> Some "Nudge", lease, compId, isCompacted
     | k when k = eventKindAssistantCompleted ->
@@ -489,14 +523,7 @@ let private getEventDuplicateKeys (e: WanEvent) : string list =
       | _ -> ()
 
       match contIdOpt with
-      | Some id when id <> "" ->
-          let stage =
-              payload
-              |> Map.tryFind "stage"
-              |> Option.orElse (payload |> Map.tryFind "lifecycleStage")
-              |> Option.defaultValue ""
-
-          yield id + "_" + stage
+      | Some id when id <> "" -> yield id + "_" + e.Kind
       | _ -> () ]
 
 let applyEvent (st: SessionState) (e: WanEvent) : SessionState =

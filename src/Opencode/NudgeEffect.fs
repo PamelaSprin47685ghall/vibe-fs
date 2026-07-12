@@ -161,6 +161,7 @@ let private collectSnapshot
     }
 
 let private sendNudge
+    (fallbackRuntime: FallbackRuntimeState)
     (client: obj)
     (sessionID: SessionId)
     (agentOpt: string option)
@@ -168,19 +169,29 @@ let private sendNudge
     (promptText: string)
     : JS.Promise<unit> =
     promise {
-        let body = createPromptBodyWithModel agentOpt modelOpt promptText
+        let sidStr = Id.sessionIdValue sessionID
+        let nudgeNonce = "nudge_" + System.Guid.NewGuid().ToString("N")
+        fallbackRuntime.SetActiveNudgeNonce sidStr nudgeNonce
+
+        let body =
+            createPromptBodyWithModelAndNonce agentOpt modelOpt promptText (Some nudgeNonce)
 
         let promptArg =
             box
-                {| path = box {| id = Id.sessionIdValue sessionID |}
+                {| path = box {| id = sidStr |}
                    body = body |}
 
         match getSessionApiFromClient client with
         | Error _ -> ()
-        | Ok session -> do! invoke1 promptArg "prompt" session |> Promise.map ignore
+        | Ok session ->
+            try
+                do! invoke1 promptArg "prompt" session |> Promise.map ignore
+            finally
+                fallbackRuntime.ClearActiveNudgeNonce sidStr
     }
 
 let private sendNudgeOutcome
+    (fallbackRuntime: FallbackRuntimeState)
     (client: obj)
     (sessionID: SessionId)
     (promptText: string)
@@ -188,7 +199,9 @@ let private sendNudgeOutcome
     (modelOpt: string option)
     : JS.Promise<SendOutcome> =
     promise {
-        let! caught = sendNudge client sessionID agentOpt modelOpt promptText |> Promise.result
+        let! caught =
+            sendNudge fallbackRuntime client sessionID agentOpt modelOpt promptText
+            |> Promise.result
 
         return
             match caught with
@@ -218,7 +231,8 @@ let startNudgeFlow
         runtimeState
         sid
         (fun () -> collectSnapshot fallbackRuntime client pluginCtx sessionID isForceStopped)
-        (fun promptText agentOpt modelOpt -> sendNudgeOutcome client sessionID promptText agentOpt modelOpt)
+        (fun promptText agentOpt modelOpt ->
+            sendNudgeOutcome fallbackRuntime client sessionID promptText agentOpt modelOpt)
 
 let dispatchPostStopFromHistory
     (host: Host)

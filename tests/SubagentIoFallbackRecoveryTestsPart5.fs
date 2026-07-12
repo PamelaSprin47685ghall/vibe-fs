@@ -85,11 +85,11 @@ let handleEvent_doesNotClearSubsessionPending () =
 
         let executor =
             { new IActionExecutor with
-                member _.SendContinue(_, _) = Promise.lift ()
+                member _.SendContinue(_, _, _) = Promise.lift ()
                 member _.FetchMessages _ = Promise.lift [||]
                 member _.PropagateFailure _ = Promise.lift ()
                 member _.CaptureCurrentModel _ = Promise.lift None
-                member _.RecoverWithPrompt(_, _, _) = Promise.lift ()
+                member _.RecoverWithPrompt(_, _, _, _) = Promise.lift ()
                 member _.AbortRun _ = Promise.lift () }
 
         let lookup (_agent: string) = cfg
@@ -182,11 +182,11 @@ let runSubagentWaitsThroughFallbackSendContinue () =
 
         let executor =
             { new IActionExecutor with
-                member _.SendContinue(_, _) = Promise.lift ()
+                member _.SendContinue(_, _, _) = Promise.lift ()
                 member _.FetchMessages _ = Promise.lift [||]
                 member _.PropagateFailure _ = Promise.lift ()
                 member _.CaptureCurrentModel _ = Promise.lift None
-                member _.RecoverWithPrompt(_, _, _) = Promise.lift ()
+                member _.RecoverWithPrompt(_, _, _, _) = Promise.lift ()
                 member _.AbortRun _ = Promise.lift () }
 
         let lookup (_agent: string) = cfg

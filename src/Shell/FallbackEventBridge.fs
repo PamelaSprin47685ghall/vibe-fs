@@ -24,11 +24,14 @@ type IEventTranslator =
     abstract ExtractRoutingContext: rawEvent: obj -> (string option * string option)
 
 type IActionExecutor =
-    abstract SendContinue: sessionID: string * model: FallbackModel -> JS.Promise<unit>
+    abstract SendContinue: sessionID: string * model: FallbackModel * continuationID: string -> JS.Promise<unit>
     abstract FetchMessages: sessionID: string -> JS.Promise<obj array>
     abstract PropagateFailure: sessionID: string -> JS.Promise<unit>
     abstract CaptureCurrentModel: sessionID: string -> JS.Promise<FallbackModel option>
-    abstract RecoverWithPrompt: sessionID: string * model: FallbackModel * promptText: string -> JS.Promise<unit>
+
+    abstract RecoverWithPrompt:
+        sessionID: string * model: FallbackModel * promptText: string * continuationID: string -> JS.Promise<unit>
+
     abstract AbortRun: sessionID: string -> JS.Promise<unit>
 
 type ConfigLookup = (string -> FallbackConfig)
@@ -114,7 +117,7 @@ let executeContinuationIntent
                 do! appendContinuationDispatchStartedOrFail workspaceRoot sessionID continuationID
 
                 try
-                    do! executor.SendContinue(sessionID, model)
+                    do! executor.SendContinue(sessionID, model, continuationID)
 
                     let isValid = verifyLeaseWithStatus "dispatch_started" runtime sessionID lease
 
@@ -179,7 +182,7 @@ let executeContinuationIntent
                 do! appendContinuationDispatchStartedOrFail workspaceRoot sessionID continuationID
 
                 try
-                    do! executor.RecoverWithPrompt(sessionID, model, promptText)
+                    do! executor.RecoverWithPrompt(sessionID, model, promptText, continuationID)
 
                     let isValid = verifyLeaseWithStatus "dispatch_started" runtime sessionID lease
 

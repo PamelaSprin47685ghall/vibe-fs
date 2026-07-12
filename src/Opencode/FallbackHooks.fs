@@ -177,12 +177,14 @@ let opencodeActionExecutor (runtime: FallbackRuntimeState) (client: obj) : IActi
         }
 
     { new IActionExecutor with
-        member _.SendContinue(sessionID, model) =
+        member _.SendContinue(sessionID, model, continuationID) =
             promise {
                 let! _, liveAgentOpt = tryGetSessionModelAndAgentAsync client sessionID
                 let! infoOpt = tryReadLatestMessageInfo client sessionID
                 let modelStr, agent = resolveModelAndAgent liveAgentOpt model sessionID infoOpt
-                let body = createPromptBodyWithModel agent (Some modelStr) zwsChar
+
+                let body =
+                    createPromptBodyWithModelAndNonce agent (Some modelStr) zwsChar (Some continuationID)
 
                 let arg =
                     box
@@ -208,12 +210,14 @@ let opencodeActionExecutor (runtime: FallbackRuntimeState) (client: obj) : IActi
                     | None -> return! tryReadCurrentModel client sessionID
             }
 
-        member _.RecoverWithPrompt(sessionID, model, promptText) =
+        member _.RecoverWithPrompt(sessionID, model, promptText, continuationID) =
             promise {
                 let! _, liveAgentOpt = tryGetSessionModelAndAgentAsync client sessionID
                 let! infoOpt = tryReadLatestMessageInfo client sessionID
                 let modelStr, agent = resolveModelAndAgent liveAgentOpt model sessionID infoOpt
-                let body = createPromptBodyWithModel agent (Some modelStr) promptText
+
+                let body =
+                    createPromptBodyWithModelAndNonce agent (Some modelStr) promptText (Some continuationID)
 
                 let arg =
                     box

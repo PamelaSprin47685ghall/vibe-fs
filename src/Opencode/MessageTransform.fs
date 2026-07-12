@@ -252,6 +252,21 @@ let compactingTransform
         let sessionID = Dyn.str input "sessionID"
 
         if sessionID <> "" then
+            let fallbackRuntime =
+                match runtimeScope.TryFindKey("fallbackRuntime") with
+                | Some obj -> Some(unbox<Wanxiangshu.Shell.FallbackRuntimeState.FallbackRuntimeState> obj)
+                | None -> None
+
+            let compactionId = "compact-" + System.Guid.NewGuid().ToString("N")
+            do! Wanxiangshu.Shell.EventLogRuntime.appendCompactionStartedOrFail directory sessionID compactionId
+
+            match fallbackRuntime with
+            | Some fr ->
+                fr.SetSessionOwner sessionID "Compaction"
+                fr.SetActiveCompactionId(sessionID, compactionId)
+                fr.SetCompacted sessionID false
+            | None -> ()
+
             let arg = box {| path = box {| id = sessionID |} |}
             let! resp = invokeClient client "messages" arg
             let data = Dyn.get resp "data"
@@ -267,21 +282,6 @@ let compactingTransform
                 let cleaned = Messaging.stripSyntheticBySource messagesList
                 let backlog = backlogSession.GetOrRebuildBacklog(sessionID, cleaned)
                 let guidGen () = string (runtimeScope.RandomGen())
-
-                let fallbackRuntime =
-                    match runtimeScope.TryFindKey("fallbackRuntime") with
-                    | Some obj -> Some(unbox<Wanxiangshu.Shell.FallbackRuntimeState.FallbackRuntimeState> obj)
-                    | None -> None
-
-                let compactionId = "compact-" + System.Guid.NewGuid().ToString("N")
-                do! Wanxiangshu.Shell.EventLogRuntime.appendCompactionStartedOrFail directory sessionID compactionId
-
-                match fallbackRuntime with
-                | Some fr ->
-                    fr.SetSessionOwner sessionID "Compaction"
-                    fr.SetActiveCompactionId(sessionID, compactionId)
-                    fr.SetCompacted sessionID false
-                | None -> ()
 
                 let result =
                     Wanxiangshu.Kernel.BacklogProjectionCore.compactingTransform cleaned backlog guidGen

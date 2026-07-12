@@ -93,7 +93,7 @@ let muxActionExecutor (helpers: obj) : IActionExecutor =
                 unbox<JS.Promise<obj array>> (Dyn.call1 getter workspaceId)
 
     { new IActionExecutor with
-        member _.SendContinue(sessionID, model) =
+        member _.SendContinue(sessionID, model, continuationID) =
             let modelStr =
                 match model.Variant with
                 | Some v -> sprintf "%s/%s:%s" model.ProviderID model.ModelID v
@@ -101,7 +101,7 @@ let muxActionExecutor (helpers: obj) : IActionExecutor =
 
             invokeNudge sessionID ("continue " + modelStr)
 
-        member _.RecoverWithPrompt(sessionID, model, promptText) =
+        member _.RecoverWithPrompt(sessionID, model, promptText, continuationID) =
             let modelStr =
                 match model.Variant with
                 | Some v -> sprintf "%s/%s:%s" model.ProviderID model.ModelID v

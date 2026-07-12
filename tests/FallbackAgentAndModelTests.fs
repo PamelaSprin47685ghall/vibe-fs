@@ -45,7 +45,7 @@ let ompFallbackHooksPreservesAgentAndModelSpec () =
               ReasoningEffort = None
               Thinking = false }
 
-        do! executor.SendContinue(sid, model)
+        do! executor.SendContinue(sid, model, "dummy")
 
         check "sessionPrompt was called" (not (isNull lastPromptArg))
         let body = Dyn.get lastPromptArg "body"
@@ -79,7 +79,7 @@ let ompCaptureCurrentModelReturnsModelWhenSessionHasModelSpec () =
 let opencodeExecutorUsesRuntimeAgentWhenNoAssistantMessageSpec () =
     promise {
         let rt = FallbackRuntimeState()
-        let sid = "opencode-subagent-sess"
+        let sid = "opencode-no-assistant"
         rt.SetAgentName sid "investigator"
 
         let mutable lastPromptArg = null
@@ -108,7 +108,7 @@ let opencodeExecutorUsesRuntimeAgentWhenNoAssistantMessageSpec () =
               ReasoningEffort = None
               Thinking = false }
 
-        do! executor.SendContinue(sid, model)
+        do! executor.SendContinue(sid, model, "dummy")
 
         check "prompt was called" (not (isNull lastPromptArg))
         let body = Dyn.get lastPromptArg "body"
@@ -151,7 +151,7 @@ let opencodeExecutorRespectsUserSelectedModelAndAgentSpec () =
               ReasoningEffort = None
               Thinking = false }
 
-        do! executor.SendContinue(sid, model)
+        do! executor.SendContinue(sid, model, "dummy")
 
         check "prompt was called" (not (isNull lastPromptArg))
         let body = Dyn.get lastPromptArg "body"
@@ -195,7 +195,7 @@ let ompExecutorRespectsUserSelectedModelAndAgentSpec () =
               ReasoningEffort = None
               Thinking = false }
 
-        do! executor.SendContinue(sid, model)
+        do! executor.SendContinue(sid, model, "dummy")
 
         check "sessionPrompt was called" (not (isNull lastPromptArg))
         let body = Dyn.get lastPromptArg "body"

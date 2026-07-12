@@ -216,7 +216,7 @@ let ompActionExecutor (runtime: FallbackRuntimeState) (sessionApi: obj) : IActio
         }
 
     { new IActionExecutor with
-        member _.SendContinue(sessionID, model) =
+        member _.SendContinue(sessionID, model, continuationID) =
             promise {
                 let modelStr, agent = resolveModelAndAgent model sessionID
 
@@ -231,7 +231,7 @@ let ompActionExecutor (runtime: FallbackRuntimeState) (sessionApi: obj) : IActio
                 do! invoke "sessionPrompt" arg |> Promise.map ignore
             }
 
-        member _.RecoverWithPrompt(sessionID, model, promptText) =
+        member _.RecoverWithPrompt(sessionID, model, promptText, continuationID) =
             promise {
                 let modelStr, agent = resolveModelAndAgent model sessionID
 

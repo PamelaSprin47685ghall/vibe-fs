@@ -45,7 +45,7 @@ type FallbackRuntimeState() =
     let mutable activeCompactionIds = Map.empty<string, string>
     let mutable forceStoppedSessions = Set.empty<string>
     let mutable compactedSessions = Set.empty<string>
-    let mutable systemMessageIds = Map.empty<string, Map<string, string>>
+    let mutable activeNudgeNonces = Map.empty<string, string>
 
     let triggerStateChanged (sessionID: string) : unit =
         match Map.tryFind sessionID listeners with
@@ -174,17 +174,14 @@ type FallbackRuntimeState() =
     member _.SetActiveCompactionId(sessionID: string, id: string) : unit =
         activeCompactionIds <- Map.add sessionID id activeCompactionIds
 
-    member _.AddSystemMessageId (sessionID: string) (msgId: string) (provenance: string) : unit =
-        let current =
-            Map.tryFind sessionID systemMessageIds |> Option.defaultValue Map.empty
+    member _.SetActiveNudgeNonce (sessionID: string) (nonce: string) : unit =
+        activeNudgeNonces <- Map.add sessionID nonce activeNudgeNonces
 
-        let updated = Map.add msgId provenance current
-        systemMessageIds <- Map.add sessionID updated systemMessageIds
+    member _.GetActiveNudgeNonce(sessionID: string) : string =
+        Map.tryFind sessionID activeNudgeNonces |> Option.defaultValue ""
 
-    member _.TryGetSystemMessageId (sessionID: string) (msgId: string) : string option =
-        match Map.tryFind sessionID systemMessageIds with
-        | Some m -> Map.tryFind msgId m
-        | None -> None
+    member _.ClearActiveNudgeNonce(sessionID: string) : unit =
+        activeNudgeNonces <- Map.remove sessionID activeNudgeNonces
 
     member _.SetCompacted (sessionID: string) (value: bool) : unit =
         if value then
@@ -346,5 +343,5 @@ type FallbackRuntimeState() =
         activeCompactionIds <- Map.remove sessionID activeCompactionIds
         forceStoppedSessions <- Set.remove sessionID forceStoppedSessions
         compactedSessions <- Set.remove sessionID compactedSessions
-        systemMessageIds <- Map.remove sessionID systemMessageIds
+        activeNudgeNonces <- Map.remove sessionID activeNudgeNonces
         triggerStateChanged sessionID

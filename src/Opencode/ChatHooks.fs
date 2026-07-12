@@ -51,6 +51,22 @@ let tryGetModelStringFromHook (input: obj) (output: obj) : string option =
             else
                 Some(sprintf "%s/%s%s" providerID modelID suffix))
 
+let tryGetNonceFromParts (parts: obj) : string option =
+    if Dyn.isNullish parts || not (Dyn.isArray parts) then
+        None
+    else
+        let arr = parts :?> obj array
+
+        arr
+        |> Array.tryPick (fun part ->
+            let metadata = Dyn.get part "metadata"
+
+            if Dyn.isNullish metadata then
+                None
+            else
+                let nonce = Dyn.str metadata "nonce"
+                if nonce <> "" then Some nonce else None)
+
 let chatMessageFor
     (host: Host)
     (registry: ChildAgentRegistry)
@@ -64,7 +80,8 @@ let chatMessageFor
         let sessionID =
             Wanxiangshu.Kernel.Domain.Id.sessionIdQuick (sessionIdFromHookInput input "")
 
-        do! lifecycleObserver.handleChatMessage (sessionID, agent, partsFromHookOutput output)
+        let parts = partsFromHookOutput output
+        do! lifecycleObserver.handleChatMessage (sessionID, agent, parts)
 
         let msgObj = Dyn.get output "message"
         let msgId = if Dyn.isNullish msgObj then "" else Dyn.str msgObj "id"
@@ -72,30 +89,21 @@ let chatMessageFor
         let fr = lifecycleObserver.FallbackRuntime
 
         let isSystem =
-            let owner = fr.GetSessionOwner sessionIDStr
+            let nonceOpt = tryGetNonceFromParts parts
 
-            let hasPending =
-                match fr.TryGetPendingLease sessionIDStr with
-                | Some lease -> lease.Status = "dispatch_started"
-                | None -> false
+            match nonceOpt with
+            | Some nonce ->
+                let activeNudgeNonce = fr.GetActiveNudgeNonce sessionIDStr
 
-            if hasPending then
-                if msgId <> "" then
-                    fr.AddSystemMessageId sessionIDStr msgId "Fallback"
-
-                true
-            elif fr.IsNudgeActive sessionIDStr then
-                if msgId <> "" then
-                    fr.AddSystemMessageId sessionIDStr msgId "Nudge"
-
-                true
-            elif owner = "Compaction" then
-                if msgId <> "" then
-                    fr.AddSystemMessageId sessionIDStr msgId "Compaction"
-
-                true
-            else
-                false
+                if activeNudgeNonce <> "" && nonce = activeNudgeNonce then
+                    true
+                else
+                    match fr.TryGetPendingLease sessionIDStr with
+                    | Some lease when lease.Status = "dispatch_started" && lease.ContinuationID = nonce -> true
+                    | _ -> false
+            | None ->
+                let owner = fr.GetSessionOwner sessionIDStr
+                if owner = "Compaction" then true else false
 
         if not isSystem then
             let modelOpt = tryGetModelStringFromHook input output
