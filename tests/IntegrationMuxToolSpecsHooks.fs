@@ -193,9 +193,15 @@ let muxLoopSlashCommandWritesEventLogUnderDepsDirectorySpec () =
 let muxToolExecuteAfterBlocksRepeatedIdenticalCallSpec () =
     promise {
         let reg = sharedMuxRegistration ()
+
+        let scope =
+            unbox<Wanxiangshu.Shell.RuntimeScope.RuntimeScope> (Dyn.get reg "__runtimeScope")
+
+        let sessionID = "mux-livelock-blocks-" + System.Guid.NewGuid().ToString("N")
+        Wanxiangshu.Shell.LivelockGuard.cleanup scope sessionID
+
         let after = get reg "tool.execute.after"
         check "mux registration exposes tool.execute.after" (not (isNullish after))
-        let sessionID = "mux-livelock-blocks"
         let args = createObj [ "language", box "shell"; "program", box "echo hi" ]
 
         let input =

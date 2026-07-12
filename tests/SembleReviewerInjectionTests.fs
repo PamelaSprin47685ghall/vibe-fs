@@ -26,7 +26,7 @@ let testSembleInjectsForReviewer () =
         setClientForTest (Some(mockClientObj :?> Client))
 
         try
-            let sessionID = "session-test-reviewer"
+            let sessionID = "session-test-reviewer-" + System.Guid.NewGuid().ToString("N")
 
             let encoded =
                 [| box (

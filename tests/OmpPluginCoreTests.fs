@@ -12,6 +12,7 @@ module Dyn = Wanxiangshu.Shell.Dyn
 
 open Wanxiangshu.Shell.FallbackRuntimeState
 open Wanxiangshu.Shell.FallbackEventBridge
+open Wanxiangshu.Shell.ReviewRuntime
 open Wanxiangshu.Omp.PluginCore
 open Wanxiangshu.Tests.AsyncFlush
 open Wanxiangshu.Tests.TempWorkspace
@@ -81,19 +82,21 @@ let private invokeFallbackHandler (handler: obj) (event: obj) (ctx: obj) : unit 
 /// Drive the registered abort handler with `evtType` against a sessionId
 /// resolved through a `sessionManager.getSessionId` ctx, and assert review
 /// state matches `expectActive`.
-let private driveAbort (evtType: string) (sessionId: string) (expectActive: bool) : JS.Promise<unit> =
+let private driveAbort
+    (store: ReviewStore)
+    (evtType: string)
+    (sessionId: string)
+    (expectActive: bool)
+    : JS.Promise<unit> =
     promise {
         let! root = mkdtempAsync "omp-abort-hook-"
         let sessionMgr = createObj [ "getSessionId", box (fun () -> box sessionId) ]
 
-        let ctx =
-            createObj
-                [ "sessionManager", box sessionMgr
-                  "cwd", box root ]
+        let ctx = createObj [ "sessionManager", box sessionMgr; "cwd", box root ]
         let event = createObj [ "type", box evtType ]
         let pi, getHandlers = capturePi ()
         let runtime = FallbackRuntimeState()
-        registerAbortHandler pi reviewStore runtime None
+        registerAbortHandler pi store runtime None
         let handlers = getHandlers ()
         check $"{evtType} captured exactly one handler" (handlers.Length = 1)
         let handler = handlers.[0]
@@ -102,7 +105,7 @@ let private driveAbort (evtType: string) (sessionId: string) (expectActive: bool
             emitJsExpr (handler, event, ctx) "Promise.resolve($0($1, $2))"
             |> unbox<JS.Promise<obj>>
 
-        let actual = reviewStore.getReviewState sessionId |> Option.isSome
+        let actual = store.getReviewState sessionId |> Option.isSome
         check $"{evtType} leaves review inactive for {sessionId}" (actual = expectActive)
     }
 
@@ -111,16 +114,17 @@ let private driveAbort (evtType: string) (sessionId: string) (expectActive: bool
 /// abort and re-emerge as if the next session owned it.
 let abortHookDeactivatesReview () =
     promise {
+        let localStore = createReviewStore ()
         let sid = "abort-hook-sid-1"
-        reviewStore.applyReviewTaskProjection (sid, Some "task")
-        check "precondition: review active" (reviewStore.getReviewTask sid = Some "task")
+        localStore.applyReviewTaskProjection (sid, Some "task")
+        check "precondition: review active" (localStore.getReviewTask sid = Some "task")
         Wanxiangshu.Shell.RunnerBackground.registerActiveRunnerSession Wanxiangshu.Omp.ExecutorTools.ompScope sid
 
         check
             "precondition: has running runner job"
             (Wanxiangshu.Shell.RunnerBackground.hasRunningRunnerJob Wanxiangshu.Omp.ExecutorTools.ompScope sid)
 
-        do! driveAbort "session.abort" sid false
+        do! driveAbort localStore "session.abort" sid false
 
         check
             "postcondition: runner job was aborted"
@@ -130,16 +134,17 @@ let abortHookDeactivatesReview () =
 /// `stream.abort` must mirror the session.abort path: review state clears.
 let streamAbortHookDeactivatesReview () =
     promise {
+        let localStore = createReviewStore ()
         let sid = "stream-abort-hook-sid-1"
-        reviewStore.applyReviewTaskProjection (sid, Some "task")
-        check "precondition: review active" (reviewStore.getReviewTask sid = Some "task")
+        localStore.applyReviewTaskProjection (sid, Some "task")
+        check "precondition: review active" (localStore.getReviewTask sid = Some "task")
         Wanxiangshu.Shell.RunnerBackground.registerActiveRunnerSession Wanxiangshu.Omp.ExecutorTools.ompScope sid
 
         check
             "precondition: has running runner job"
             (Wanxiangshu.Shell.RunnerBackground.hasRunningRunnerJob Wanxiangshu.Omp.ExecutorTools.ompScope sid)
 
-        do! driveAbort "stream.abort" sid false
+        do! driveAbort localStore "stream.abort" sid false
 
         check
             "postcondition: runner job was aborted"
@@ -149,19 +154,21 @@ let streamAbortHookDeactivatesReview () =
 /// `session.error` collapses to the same outcome as aborts.
 let sessionErrorHookDeactivatesReview () =
     promise {
+        let localStore = createReviewStore ()
         let sid = "session-error-hook-sid-1"
-        reviewStore.applyReviewTaskProjection (sid, Some "task")
-        check "precondition: review active" (reviewStore.getReviewTask sid = Some "task")
-        do! driveAbort "session.error" sid false
+        localStore.applyReviewTaskProjection (sid, Some "task")
+        check "precondition: review active" (localStore.getReviewTask sid = Some "task")
+        do! driveAbort localStore "session.error" sid false
     }
 
 /// Events outside the abort/error set must be ignored: review state stays put.
 let unrelatedEventLeavesReviewActive () =
     promise {
+        let localStore = createReviewStore ()
         let sid = "unrelated-event-sid-1"
-        reviewStore.applyReviewTaskProjection (sid, Some "task")
-        check "precondition: review active" (reviewStore.getReviewTask sid = Some "task")
-        do! driveAbort "session.idle" sid true
+        localStore.applyReviewTaskProjection (sid, Some "task")
+        check "precondition: review active" (localStore.getReviewTask sid = Some "task")
+        do! driveAbort localStore "session.idle" sid true
     }
 
 /// OMP session.error must be routed through the fallback handler before
