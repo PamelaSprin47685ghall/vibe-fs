@@ -88,7 +88,13 @@ let createEventHook (deps: obj) (reviewStore: ReviewStore) (scope: RuntimeScope)
     scope.Add("fallbackRuntime", box fallbackRuntime)
     let fallbackConfigOpt = loadFallbackConfig directory
 
-    let runtime = createNudgeRuntime getChatHistory directory fallbackRuntime
+    let isReviewLoopActive (sessionID: string) =
+        match reviewStore.getReviewState (sessionID) with
+        | Some state -> ReviewSession.StateMachine.isActive state
+        | None -> false
+
+    let runtime =
+        createNudgeRuntime getChatHistory directory fallbackRuntime isReviewLoopActive
 
     let configLookup: ConfigLookup =
         match fallbackConfigOpt with

@@ -315,6 +315,8 @@ let handleEvent_userAbort_invalidatesLease () =
         let turnId = rt.IncrementHumanTurnId sid
         let gen = rt.GetSessionGeneration sid
         let cancelGen = rt.GetCancelGeneration sid
+        rt.SetActiveContinuationGeneration sid gen
+        rt.SetActiveContinuationCancelGeneration sid cancelGen
         let continuationID = "cont-1"
 
         let intent =

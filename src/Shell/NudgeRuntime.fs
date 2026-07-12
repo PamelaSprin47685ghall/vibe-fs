@@ -22,7 +22,8 @@ type NudgeRuntime
     (
         getChatHistory: (string -> JS.Promise<obj array>) option,
         workspaceDirectory: string,
-        fallbackRuntime: FallbackRuntimeState
+        fallbackRuntime: FallbackRuntimeState,
+        isReviewLoopActive: string -> bool
     ) =
 
     let mutable runtimeState = emptyRuntimeState
@@ -55,7 +56,7 @@ type NudgeRuntime
                                     ""
                         | None -> fallbackRuntime.SetSessionOwner workspaceId "None"
 
-                    if not isNudgeOwner then
+                    if not isNudgeOwner || isReviewLoopActive workspaceId then
                         let! newState =
                             runNudgeFlowWithRetryCheck
                                 fallbackRuntime
@@ -100,5 +101,6 @@ let createNudgeRuntime
     (getChatHistory: (string -> JS.Promise<obj array>) option)
     (workspaceDirectory: string)
     (fallbackRuntime: FallbackRuntimeState)
+    (isReviewLoopActive: string -> bool)
     : NudgeRuntime =
-    NudgeRuntime(getChatHistory, workspaceDirectory, fallbackRuntime)
+    NudgeRuntime(getChatHistory, workspaceDirectory, fallbackRuntime, isReviewLoopActive)
