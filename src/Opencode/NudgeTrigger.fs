@@ -5,6 +5,7 @@ open Fable.Core.JsInterop
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Domain
 open Wanxiangshu.Kernel.Nudge
+open Wanxiangshu.Kernel.Nudge.Types
 open Wanxiangshu.Kernel.HostTools
 open Wanxiangshu.Shell
 open Wanxiangshu.Shell.Dyn
@@ -63,7 +64,7 @@ type NudgeTrigger
                                 || containsAbortText msg
                             then
                                 markForceStopped sessionIDStr
-                    | "session.next.prompted" -> removeForceStopped sessionIDStr
+                    | "session.next.prompted" -> ()
                     | "session.status" ->
                         let statusObj = Dyn.get envelope.Props "status"
 
@@ -73,7 +74,7 @@ type NudgeTrigger
                             if status = "interrupted" || status = "abort" then
                                 markForceStopped sessionIDStr
                             elif status = "busy" then
-                                removeForceStopped sessionIDStr
+                                ()
                     | "session.deleted"
                     | "session.delete"
                     | "session.remove"
@@ -97,11 +98,33 @@ type NudgeTrigger
                 | None -> ()
                 | Some sessionID ->
                     let owner = fallbackRuntime.GetSessionOwner sessionIDStr
+                    let isForce = isForceStopped sessionIDStr
+
+                    let origin =
+                        if owner = "Human" || owner = "None" then
+                            if isForce then
+                                TerminalOrigin.HumanTurnAborted
+                            else
+                                TerminalOrigin.HumanTurnCompleted
+                        elif owner = "Fallback" then
+                            TerminalOrigin.FallbackContinuationCompleted
+                        elif owner = "Compaction" then
+                            TerminalOrigin.CompactionSummaryCompleted
+                        elif owner = "Nudge" then
+                            TerminalOrigin.NudgeCompleted
+                        elif owner = "Title" then
+                            TerminalOrigin.TitleCompleted
+                        else
+                            TerminalOrigin.Unknown
+
+                    let isEligible =
+                        match origin with
+                        | TerminalOrigin.HumanTurnCompleted -> true
+                        | _ -> false
 
                     if
                         NudgeTrigger.isNaturalStop eventType props
-                        && (owner = "None" || owner = "Human")
-                        && not (isForceStopped sessionIDStr)
+                        && isEligible
                         && not (reviewStore.getPendingReviewIds () |> List.contains sessionIDStr)
                     then
                         match getClientFromPluginCtx ctx with

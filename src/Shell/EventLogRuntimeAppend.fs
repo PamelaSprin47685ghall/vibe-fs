@@ -241,3 +241,132 @@ let appendFallbackContinueInjectedOrFail
             eventKindFallbackContinueInjected
             (fallbackInjectionPayload modelStr agentStr atMs)
             (getTimestampMs().ToString()))
+
+let appendHumanTurnStartedOrFail
+    (workspaceRoot: string)
+    (sessionID: string)
+    (turnId: string)
+    (provider: string)
+    (model: string)
+    (variant: string)
+    (agent: string)
+    : JS.Promise<unit> =
+    let payload =
+        Map
+            [ "turnId", turnId
+              "provider", provider
+              "model", model
+              "variant", variant
+              "agent", agent ]
+
+    appendOrFail workspaceRoot (buildEvent sessionID eventKindHumanTurnStarted payload (getTimestampMs().ToString()))
+
+let appendUserAbortObservedOrFail (workspaceRoot: string) (sessionID: string) : JS.Promise<unit> =
+    appendOrFail workspaceRoot (buildEvent sessionID eventKindUserAbortObserved Map.empty (getTimestampMs().ToString()))
+
+let appendContinuationRequestedOrFail
+    (workspaceRoot: string)
+    (sessionID: string)
+    (continuationID: string)
+    (modelStr: string)
+    (agentStr: string)
+    (atMs: int64)
+    : JS.Promise<unit> =
+    let payload =
+        Map
+            [ "continuationId", continuationID
+              "model", modelStr
+              "agent", agentStr
+              "at", atMs.ToString() ]
+
+    appendOrFail
+        workspaceRoot
+        (buildEvent sessionID eventKindContinuationRequested payload (getTimestampMs().ToString()))
+
+let appendContinuationDispatchStartedOrFail
+    (workspaceRoot: string)
+    (sessionID: string)
+    (continuationID: string)
+    : JS.Promise<unit> =
+    let payload = Map [ "continuationId", continuationID ]
+
+    appendOrFail
+        workspaceRoot
+        (buildEvent sessionID eventKindContinuationDispatchStarted payload (getTimestampMs().ToString()))
+
+let appendContinuationDispatchedOrFail
+    (workspaceRoot: string)
+    (sessionID: string)
+    (continuationID: string)
+    (modelStr: string)
+    (agentStr: string)
+    (atMs: int64)
+    : JS.Promise<unit> =
+    let payload =
+        Map
+            [ "continuationId", continuationID
+              "model", modelStr
+              "agent", agentStr
+              "at", atMs.ToString() ]
+
+    appendOrFail
+        workspaceRoot
+        (buildEvent sessionID eventKindContinuationDispatched payload (getTimestampMs().ToString()))
+
+let appendContinuationFailedOrFail
+    (workspaceRoot: string)
+    (sessionID: string)
+    (continuationID: string)
+    (errorMsg: string)
+    : JS.Promise<unit> =
+    let payload = Map [ "continuationId", continuationID; "error", errorMsg ]
+    appendOrFail workspaceRoot (buildEvent sessionID eventKindContinuationFailed payload (getTimestampMs().ToString()))
+
+let appendContinuationCancelledOrFail
+    (workspaceRoot: string)
+    (sessionID: string)
+    (continuationID: string)
+    (reason: string)
+    : JS.Promise<unit> =
+    let payload = Map [ "continuationId", continuationID; "reason", reason ]
+
+    appendOrFail
+        workspaceRoot
+        (buildEvent sessionID eventKindContinuationCancelled payload (getTimestampMs().ToString()))
+
+let appendCompactionStartedOrFail
+    (workspaceRoot: string)
+    (sessionID: string)
+    (compactionId: string)
+    : JS.Promise<unit> =
+    let payload = Map [ "compactionId", compactionId ]
+    appendOrFail workspaceRoot (buildEvent sessionID eventKindCompactionStarted payload (getTimestampMs().ToString()))
+
+let appendCompactionSettledOrFail
+    (workspaceRoot: string)
+    (sessionID: string)
+    (compactionId: string)
+    (status: string)
+    : JS.Promise<unit> =
+    let payload = Map [ "compactionId", compactionId; "status", status ]
+    appendOrFail workspaceRoot (buildEvent sessionID eventKindCompactionSettled payload (getTimestampMs().ToString()))
+
+let appendContextGenerationChangedOrFail (workspaceRoot: string) (sessionID: string) (newGen: int) : JS.Promise<unit> =
+    let payload = Map [ "generation", newGen.ToString() ]
+
+    appendOrFail
+        workspaceRoot
+        (buildEvent sessionID eventKindContextGenerationChanged payload (getTimestampMs().ToString()))
+
+let appendRouteObservedOrFail
+    (workspaceRoot: string)
+    (sessionID: string)
+    (provider: string)
+    (model: string)
+    (variant: string)
+    (agent: string)
+    : JS.Promise<unit> =
+    let payload =
+        Map [ "provider", provider; "model", model; "variant", variant; "agent", agent ]
+
+    appendOrFail workspaceRoot (buildEvent sessionID eventKindRouteObserved payload (getTimestampMs().ToString()))

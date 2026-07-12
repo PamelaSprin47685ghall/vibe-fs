@@ -183,7 +183,8 @@ let timedAsync (label: string) (f: unit -> JS.Promise<'a>) : JS.Promise<unit> =
         let start = now ()
 
         try
-            let! _ = raceWithTimeoutAndInfo (f ()) asyncSpecTimeoutMs
+            let p = f ()
+            let! _ = raceWithTimeoutAndInfo p asyncSpecTimeoutMs
             timings.Add(label, now () - start)
         with ex ->
             let msg = getErrorMessage ex
@@ -207,7 +208,8 @@ let timedAsyncSuite (label: string) (f: unit -> JS.Promise<'a>) : JS.Promise<uni
         let start = now ()
 
         try
-            let! _ = raceWithTimeoutAndInfo (f ()) asyncSuiteTimeoutMs
+            let p = f ()
+            let! _ = raceWithTimeoutAndInfo p asyncSuiteTimeoutMs
             timings.Add(label, now () - start)
         with ex ->
             let msg = getErrorMessage ex

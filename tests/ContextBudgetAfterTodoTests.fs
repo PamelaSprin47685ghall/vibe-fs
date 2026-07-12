@@ -162,6 +162,7 @@ let spec_applyContextBudget_fiveConsecutiveTodos () =
             let updatedStore = ContextBudgetStore.get scope sessionID
             equal "LastTodoCount updated" i updatedStore.LastBacklog.Length
             equal "NudgeTrack reset after todo" Idle updatedStore.NudgeTrack
+            phaseBase <- updatedStore.State.Value.phaseBaseTokens
     }
 
 let run () : JS.Promise<unit> =

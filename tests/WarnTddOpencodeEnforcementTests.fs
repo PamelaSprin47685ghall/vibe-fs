@@ -26,8 +26,11 @@ let private runOpencodeHook (tool: string) (args: obj) : JS.Promise<string> =
     let output = createObj [ "args", box args ]
 
     promise {
-        do! Wanxiangshu.Opencode.HookExecute.toolExecuteBefore input output
-        return str output "error"
+        try
+            do! Wanxiangshu.Opencode.HookExecute.toolExecuteBefore input output
+            return str output "error"
+        with ex ->
+            return ex.Message
     }
 
 let private runWithWarnTdd (tool: string) : JS.Promise<string> =
@@ -83,8 +86,14 @@ let opencodeRejectsCoderWhenOutputArgsAbsent () =
                   "args", box args ]
 
         let output = createObj []
-        do! Wanxiangshu.Opencode.HookExecute.toolExecuteBefore input output
-        let err = str output "error"
+        let mutable err = ""
+
+        try
+            do! Wanxiangshu.Opencode.HookExecute.toolExecuteBefore input output
+            err <- str output "error"
+        with ex ->
+            err <- ex.Message
+
         check "opencode coder missing output.args still rejects bad warn_tdd" (err <> "")
         check "opencode coder error mentions warn_tdd when output.args absent" (err.Contains "warn_tdd")
     }
@@ -101,8 +110,14 @@ let opencodeRejectsCoderMissingWarnWhenOutputArgsAbsent () =
                   "args", box args ]
 
         let output = createObj []
-        do! Wanxiangshu.Opencode.HookExecute.toolExecuteBefore input output
-        let err = str output "error"
+        let mutable err = ""
+
+        try
+            do! Wanxiangshu.Opencode.HookExecute.toolExecuteBefore input output
+            err <- str output "error"
+        with ex ->
+            err <- ex.Message
+
         check "opencode coder missing output.args rejects missing warn_tdd" (err <> "")
     }
 

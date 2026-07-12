@@ -46,12 +46,14 @@ let private tryGetModelStringFromInfo (info: obj) : string option =
         else
             let providerID = Dyn.str modelVal "providerID"
             let modelID = Dyn.str modelVal "modelID"
+            let variant = Dyn.str modelVal "variant"
+            let suffix = if variant <> "" then ":" + variant else ""
 
             if providerID = "" || modelID = "" then
                 let idVal = Dyn.str modelVal "id"
-                if idVal <> "" then Some idVal else None
+                if idVal <> "" then Some(idVal + suffix) else None
             else
-                Some(sprintf "%s/%s" providerID modelID)
+                Some(sprintf "%s/%s%s" providerID modelID suffix)
 
 let private isNewUserMessageImpl (runtime: FallbackRuntimeState) (sessionID: string) (rawEvent: obj) : bool =
     let t = getEventType rawEvent

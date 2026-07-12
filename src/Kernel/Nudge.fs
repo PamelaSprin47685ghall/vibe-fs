@@ -1,3 +1,4 @@
+[<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
 module Wanxiangshu.Kernel.Nudge
 
 open System.Text.RegularExpressions

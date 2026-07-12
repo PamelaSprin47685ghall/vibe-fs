@@ -61,12 +61,25 @@ let private appendSyntaxDiagnostics (directory: string) (input: obj) (output: ob
 let toolExecuteBeforeFor (host: Host) (input: obj) (output: obj) : JS.Promise<unit> =
     promise {
         let tool = toolNameFromHookInput input
+        let inputArgs = argsFromHookInput input
+        let outputArgs = argsFromHookOutput output
+
+        if
+            (isNull inputArgs || Dyn.isNullish inputArgs)
+            && (isNull outputArgs || Dyn.isNullish outputArgs)
+        then
+            raise (System.Exception("Tool validation error: arguments are null"))
+
         let rawArgs = resolveHookExecuteArgs input output
 
         if host = Mimocode && tool = "apply_patch" then
             rewriteMimocodeApplyPatchArgsForExecute output input rawArgs
 
         let args = resolveHookExecuteArgs input output
+
+        if isNull args || Dyn.isNullish args then
+            raise (System.Exception("Tool validation error: resolved arguments are null"))
+
         let inputArgs = argsFromHookInput input
 
         if
@@ -79,7 +92,9 @@ let toolExecuteBeforeFor (host: Host) (input: obj) (output: obj) : JS.Promise<un
                     args?(k) <- inputArgs?(k)
 
         match ToolHookRuntime.executeBeforeGateway tool args with
-        | Result.Error e -> setHookError output e
+        | Result.Error e ->
+            setHookError output e
+            raise (System.Exception("Tool validation error: " + e))
         | Result.Ok(nextArgs, env) ->
             setHookArgs output nextArgs
 

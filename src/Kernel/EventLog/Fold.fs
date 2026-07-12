@@ -6,6 +6,7 @@ open Wanxiangshu.Kernel.EventLog.ReviewLoopFold
 open Wanxiangshu.Kernel.BacklogProjectionCore
 open Wanxiangshu.Kernel.Nudge.Types
 open Wanxiangshu.Kernel.EventLog.ReviewVerdictWire
+open Wanxiangshu.Kernel.FallbackKernel.Types
 
 let private forSession (sessionId: string) (events: WanEvent list) : WanEvent list =
     events |> List.filter (fun e -> e.Session = sessionId)
@@ -246,52 +247,186 @@ let private subagentFolder (current: Map<string, SubagentState>) (e: WanEvent) :
                 Map.add childId state current
     | _ -> current
 
+type HumanTurnState =
+    { TurnId: string
+      Provider: string
+      Model: string
+      Variant: string
+      Agent: string }
+
+let private humanTurnFolder (st: HumanTurnState option) (e: WanEvent) : HumanTurnState option =
+    if e.Kind = eventKindHumanTurnStarted then
+        let turnId = payloadField "turnId" e |> Option.defaultValue ""
+        let provider = payloadField "provider" e |> Option.defaultValue ""
+        let model = payloadField "model" e |> Option.defaultValue ""
+        let variant = payloadField "variant" e |> Option.defaultValue ""
+        let agent = payloadField "agent" e |> Option.defaultValue ""
+
+        Some
+            { TurnId = turnId
+              Provider = provider
+              Model = model
+              Variant = variant
+              Agent = agent }
+    else
+        st
+
+let private generationFolder (sessionGen: int, cancelGen: int, activeContGen: int, activeCancelGen: int) (e: WanEvent) =
+    match e.Kind with
+    | k when k = eventKindHumanTurnStarted ->
+        let nextGen = sessionGen + 1
+        nextGen, cancelGen, nextGen, cancelGen
+    | k when k = eventKindUserAbortObserved -> sessionGen, cancelGen + 1, activeContGen, activeCancelGen
+    | k when k = eventKindContinuationRequested ->
+        let reqGen =
+            e.Payload
+            |> Map.tryFind "generation"
+            |> Option.bind (fun s -> Some(int s))
+            |> Option.defaultValue sessionGen
+
+        let reqCancel =
+            e.Payload
+            |> Map.tryFind "cancelGeneration"
+            |> Option.bind (fun s -> Some(int s))
+            |> Option.defaultValue cancelGen
+
+        sessionGen, cancelGen, reqGen, reqCancel
+    | k when k = eventKindContextGenerationChanged ->
+        let newGen =
+            e.Payload
+            |> Map.tryFind "generation"
+            |> Option.bind (fun s -> Some(int s))
+            |> Option.defaultValue sessionGen
+
+        newGen, cancelGen, activeContGen, activeCancelGen
+    | _ -> sessionGen, cancelGen, activeContGen, activeCancelGen
+
+let private fallbackLifecycleFolder (st: FallbackLifecycle option) (e: WanEvent) : FallbackLifecycle option =
+    match e.Kind with
+    | k when k = eventKindUserAbortObserved -> Some FallbackLifecycle.Cancelled
+    | k when k = eventKindHumanTurnStarted -> Some FallbackLifecycle.Active
+    | _ -> st
+
+let private fallbackPhaseFolder (st: FallbackPhase option) (e: WanEvent) : FallbackPhase option =
+    match e.Kind with
+    | k when k = eventKindHumanTurnStarted -> Some FallbackPhase.Idle
+    | _ -> st
+
 type SessionState =
-    { ReviewTask: string option
+    { ReviewLoop: ReviewLoopFold
+      ReviewTask: string option
       Backlog: BacklogEntry list
       BacklogSnapshot: WorkBacklogSnapshot
       NudgeDedup: NudgeDedupState
       NudgeSnapshot: NudgeSnapshotState
       Subagents: Map<string, SubagentState>
-      FallbackInjection: FallbackInjectionState }
+      FallbackInjection: FallbackInjectionState
+      LatestHumanTurn: HumanTurnState option
+      SessionGeneration: int
+      CancelGeneration: int
+      ActiveContinuationGen: int
+      ActiveContinuationCancelGen: int
+      FallbackLifecycle: FallbackLifecycle option
+      FallbackPhase: FallbackPhase option
+      ProcessedEventIds: Set<string>
+      ProcessedMessageIds: Set<string>
+      ProcessedPartIds: Set<string>
+      ProcessedCallIds: Set<string> }
 
 let emptySessionState () : SessionState =
-    { ReviewTask = None
+    { ReviewLoop = ReviewLoopFold.initial
+      ReviewTask = None
       Backlog = []
       BacklogSnapshot = { TodosJson = None; LatestEntry = None }
       NudgeDedup = emptyNudgeDedupState
       NudgeSnapshot = emptyNudgeSnapshotState
       Subagents = Map.empty
-      FallbackInjection = emptyFallbackInjectionState }
+      FallbackInjection = emptyFallbackInjectionState
+      LatestHumanTurn = None
+      SessionGeneration = 0
+      CancelGeneration = 0
+      ActiveContinuationGen = 0
+      ActiveContinuationCancelGen = 0
+      FallbackLifecycle = None
+      FallbackPhase = None
+      ProcessedEventIds = Set.empty
+      ProcessedMessageIds = Set.empty
+      ProcessedPartIds = Set.empty
+      ProcessedCallIds = Set.empty }
 
 let applyEvent (st: SessionState) (e: WanEvent) : SessionState =
-    let isBacklog = e.Kind = eventKindWorkBacklogCommitted
+    let payload = e.Payload
+    let eventIdOpt = Map.tryFind "eventId" payload
+    let messageIdOpt = Map.tryFind "messageId" payload
+    let partIdOpt = Map.tryFind "partId" payload
+    let callIdOpt = Map.tryFind "callId" payload
 
-    { ReviewTask =
-        reviewLoopFolder
-            (match st.ReviewTask with
-             | Some t ->
-                 Active
-                     { task = t
-                       reviewLoopId = ""
-                       currentRound = 1
-                       latestVerdict = None
-                       latestFeedback = None }
-             | None -> Inactive)
-            e
-        |> activeTask
-      Backlog =
-        if isBacklog then
-            match backlogEntryFromPayload e.Payload with
-            | Some entry -> entry :: st.Backlog
-            | None -> st.Backlog
-        else
-            st.Backlog
-      BacklogSnapshot = workBacklogFolder st.BacklogSnapshot e
-      NudgeDedup = nudgeDedupFolder st.NudgeDedup e
-      NudgeSnapshot = nudgeSnapshotFolder st.NudgeSnapshot e
-      Subagents = subagentFolder st.Subagents e
-      FallbackInjection = fallbackInjectionFolder st.FallbackInjection e }
+    let isDuplicate =
+        (eventIdOpt |> Option.exists (fun id -> Set.contains id st.ProcessedEventIds))
+        || (messageIdOpt |> Option.exists (fun id -> Set.contains id st.ProcessedMessageIds))
+        || (partIdOpt |> Option.exists (fun id -> Set.contains id st.ProcessedPartIds))
+        || (callIdOpt |> Option.exists (fun id -> Set.contains id st.ProcessedCallIds))
+
+    if isDuplicate then
+        st
+    else
+        let nextProcessedEventIds =
+            match eventIdOpt with
+            | Some id -> Set.add id st.ProcessedEventIds
+            | None -> st.ProcessedEventIds
+
+        let nextProcessedMessageIds =
+            match messageIdOpt with
+            | Some id -> Set.add id st.ProcessedMessageIds
+            | None -> st.ProcessedMessageIds
+
+        let nextProcessedPartIds =
+            match partIdOpt with
+            | Some id -> Set.add id st.ProcessedPartIds
+            | None -> st.ProcessedPartIds
+
+        let nextProcessedCallIds =
+            match callIdOpt with
+            | Some id -> Set.add id st.ProcessedCallIds
+            | None -> st.ProcessedCallIds
+
+        let isBacklog = e.Kind = eventKindWorkBacklogCommitted
+        let nextReviewLoop = ReviewLoopFold.foldEvent st.ReviewLoop e
+        let nextHumanTurn = humanTurnFolder st.LatestHumanTurn e
+
+        let nextSessionGen, nextCancelGen, nextActiveContGen, nextActiveCancelGen =
+            generationFolder
+                (st.SessionGeneration, st.CancelGeneration, st.ActiveContinuationGen, st.ActiveContinuationCancelGen)
+                e
+
+        let nextLifecycle = fallbackLifecycleFolder st.FallbackLifecycle e
+        let nextPhase = fallbackPhaseFolder st.FallbackPhase e
+
+        { ReviewLoop = nextReviewLoop
+          ReviewTask = ReviewLoopFold.activeTask nextReviewLoop
+          Backlog =
+            if isBacklog then
+                match backlogEntryFromPayload e.Payload with
+                | Some entry -> entry :: st.Backlog
+                | None -> st.Backlog
+            else
+                st.Backlog
+          BacklogSnapshot = workBacklogFolder st.BacklogSnapshot e
+          NudgeDedup = nudgeDedupFolder st.NudgeDedup e
+          NudgeSnapshot = nudgeSnapshotFolder st.NudgeSnapshot e
+          Subagents = subagentFolder st.Subagents e
+          FallbackInjection = fallbackInjectionFolder st.FallbackInjection e
+          LatestHumanTurn = nextHumanTurn
+          SessionGeneration = nextSessionGen
+          CancelGeneration = nextCancelGen
+          ActiveContinuationGen = nextActiveContGen
+          ActiveContinuationCancelGen = nextActiveCancelGen
+          FallbackLifecycle = nextLifecycle
+          FallbackPhase = nextPhase
+          ProcessedEventIds = nextProcessedEventIds
+          ProcessedMessageIds = nextProcessedMessageIds
+          ProcessedPartIds = nextProcessedPartIds
+          ProcessedCallIds = nextProcessedCallIds }
 
 let foldSubagents (sessionId: string) (events: WanEvent list) : Map<string, SubagentState> =
     foldEventStream sessionId Map.empty subagentFolder events

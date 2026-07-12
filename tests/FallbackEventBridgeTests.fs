@@ -125,7 +125,11 @@ let handleEvent_retrySame_consumedAndSendContinue () =
 
         let executor = FakeExecutor()
 
-        let! result = handleEvent translator rt defaultCfgLookup executor "" (box ()) None
+        let! result, intentOpt = handleEvent translator rt defaultCfgLookup executor "" (box ()) None
+
+        match intentOpt with
+        | Some intent -> do! executeContinuationIntent rt executor "" sid intent
+        | None -> ()
 
         equal "consumed" true result.Consumed
         equal "phase Retrying 1" (FallbackPhase.Retrying 1) result.State.Phase
@@ -154,7 +158,7 @@ let handleEvent_exhausted_notConsumed () =
 
         let executor = FakeExecutor()
 
-        let! result = handleEvent translator rt defaultCfgLookup executor "" (box ()) None
+        let! result, _ = handleEvent translator rt defaultCfgLookup executor "" (box ()) None
 
         equal "not consumed when exhausted" false result.Consumed
     }
@@ -170,7 +174,7 @@ let handleEvent_noChain_notConsumed () =
 
         let executor = FakeExecutor()
 
-        let! result = handleEvent translator rt defaultCfgLookup executor "" (box ()) None
+        let! result, _ = handleEvent translator rt defaultCfgLookup executor "" (box ()) None
 
         equal "no chain → not consumed" false result.Consumed
     }
@@ -190,7 +194,7 @@ let handleEvent_sessionAborted_setsCancelled () =
 
         let executor = FakeExecutor()
 
-        let! result = handleEvent translator rt defaultCfgLookup executor "" (box ()) None
+        let! result, _ = handleEvent translator rt defaultCfgLookup executor "" (box ()) None
 
         equal "consumed" true result.Consumed
         equal "lifecycle Cancelled" FallbackLifecycle.Cancelled result.State.Lifecycle
@@ -220,7 +224,7 @@ let handleEvent_newUserMessage_resetsState () =
 
         let executor = FakeExecutor()
 
-        let! result = handleEvent translator rt defaultCfgLookup executor "" (box ()) None
+        let! result, _ = handleEvent translator rt defaultCfgLookup executor "" (box ()) None
 
         equal "consumed" false result.Consumed
         equal "phase Idle" FallbackPhase.Idle result.State.Phase

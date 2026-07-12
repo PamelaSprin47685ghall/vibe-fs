@@ -1,3 +1,4 @@
+[<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
 module Wanxiangshu.Kernel.ReviewSession
 
 type ReviewState = Wanxiangshu.Kernel.ReviewSession.Types.ReviewState

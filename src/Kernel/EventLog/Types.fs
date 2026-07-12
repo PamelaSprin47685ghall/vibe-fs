@@ -18,6 +18,18 @@ let eventKindSubmitReviewWipRecorded = "submit_review_wip_recorded"
 let eventKindNudgeDedupCleared = "nudge_dedup_cleared"
 let eventKindFallbackContinueInjected = "fallback_continue_injected"
 
+let eventKindHumanTurnStarted = "human_turn_started"
+let eventKindUserAbortObserved = "user_abort_observed"
+let eventKindContinuationRequested = "continuation_requested"
+let eventKindContinuationDispatchStarted = "continuation_dispatch_started"
+let eventKindContinuationDispatched = "continuation_dispatched"
+let eventKindContinuationFailed = "continuation_failed"
+let eventKindContinuationCancelled = "continuation_cancelled"
+let eventKindCompactionStarted = "compaction_started"
+let eventKindCompactionSettled = "compaction_settled"
+let eventKindContextGenerationChanged = "context_generation_changed"
+let eventKindRouteObserved = "route_observed"
+
 let eventKindSubagentSpawned = "subagent_spawned"
 let eventKindSubagentContinued = "subagent_continued"
 

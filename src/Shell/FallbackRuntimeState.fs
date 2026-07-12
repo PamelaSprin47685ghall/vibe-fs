@@ -5,6 +5,16 @@ open Wanxiangshu.Kernel.FallbackRuntimeFlags
 open Wanxiangshu.Kernel.FallbackRuntimeLifecycle
 open Wanxiangshu.Shell.FallbackRuntimeStateGates
 
+type PendingLease =
+    { ContinuationID: string
+      SessionGeneration: int
+      HumanTurnID: string
+      CancelGeneration: int
+      Owner: string
+      Model: FallbackModel
+      PromptText: string option
+      Status: string }
+
 let private freshState: SessionFallbackState =
     { Phase = FallbackPhase.Idle
       CurrentIndex = 0
@@ -31,6 +41,9 @@ type FallbackRuntimeState() =
     let mutable activeContinuationGens = Map.ofList<string, int> []
     let mutable activeContinuationCancelGens = Map.ofList<string, int> []
     let mutable sessionOwners = Map.ofList<string, string> []
+    let mutable pendingLeases = Map.empty<string, obj>
+    let mutable activeCompactionIds = Map.empty<string, string>
+    let mutable forceStoppedSessions = Set.empty<string>
 
     let triggerStateChanged (sessionID: string) : unit =
         match Map.tryFind sessionID listeners with
@@ -105,6 +118,15 @@ type FallbackRuntimeState() =
     member _.GetHumanTurnId(sessionID: string) : string =
         Map.tryFind sessionID humanTurnIds |> Option.defaultValue ""
 
+    member _.SetHumanTurnId (sessionID: string) (turnId: string) : unit =
+        humanTurnIds <- Map.add sessionID turnId humanTurnIds
+
+    member _.SetSessionGeneration (sessionID: string) (gen: int) : unit =
+        sessionGenerations <- Map.add sessionID gen sessionGenerations
+
+    member _.SetCancelGeneration (sessionID: string) (gen: int) : unit =
+        cancelGenerations <- Map.add sessionID gen cancelGenerations
+
     member _.IncrementHumanTurnId(sessionID: string) : string =
         let nextId = "turn-" + System.Guid.NewGuid().ToString("N")
         humanTurnIds <- Map.add sessionID nextId humanTurnIds
@@ -135,6 +157,32 @@ type FallbackRuntimeState() =
 
     member _.GetActiveContinuationCancelGeneration(sessionID: string) : int =
         Map.tryFind sessionID activeContinuationCancelGens |> Option.defaultValue 0
+
+    member _.SetPendingLease(sessionID: string, lease: PendingLease) : unit =
+        pendingLeases <- Map.add sessionID (box lease) pendingLeases
+
+    member _.TryGetPendingLease(sessionID: string) : PendingLease option =
+        match Map.tryFind sessionID pendingLeases with
+        | Some leaseObj -> Some(leaseObj :?> PendingLease)
+        | None -> None
+
+    member _.ClearPendingLease(sessionID: string) : unit =
+        pendingLeases <- Map.remove sessionID pendingLeases
+
+    member _.SetActiveCompactionId(sessionID: string, id: string) : unit =
+        activeCompactionIds <- Map.add sessionID id activeCompactionIds
+
+    member _.GetActiveCompactionId(sessionID: string) : string =
+        Map.tryFind sessionID activeCompactionIds |> Option.defaultValue ""
+
+    member _.MarkForceStopped(sessionID: string) : unit =
+        forceStoppedSessions <- Set.add sessionID forceStoppedSessions
+
+    member _.RemoveForceStopped(sessionID: string) : unit =
+        forceStoppedSessions <- Set.remove sessionID forceStoppedSessions
+
+    member _.IsForceStopped(sessionID: string) : bool =
+        Set.contains sessionID forceStoppedSessions
 
     member _.GetChain(sessionID: string) : FallbackChain =
         Map.tryFind sessionID chains |> Option.defaultValue []
@@ -269,4 +317,7 @@ type FallbackRuntimeState() =
         activeContinuationGens <- Map.remove sessionID activeContinuationGens
         activeContinuationCancelGens <- Map.remove sessionID activeContinuationCancelGens
         sessionOwners <- Map.remove sessionID sessionOwners
+        pendingLeases <- Map.remove sessionID pendingLeases
+        activeCompactionIds <- Map.remove sessionID activeCompactionIds
+        forceStoppedSessions <- Set.remove sessionID forceStoppedSessions
         triggerStateChanged sessionID

@@ -150,15 +150,24 @@ let decodeModelFromObj (modelObj: obj) : FallbackModel option =
         None
     elif Dyn.typeIs modelObj "string" then
         let s = string modelObj
-        let slash = s.IndexOf('/')
+        let colon = s.IndexOf(':')
+        let providerAndModel = if colon > 0 then s.[0 .. colon - 1] else s
 
-        if slash <= 0 || slash >= s.Length - 1 then
+        let variantOpt =
+            if colon > 0 && colon < s.Length - 1 then
+                Some(s.[colon + 1 ..].Trim())
+            else
+                None
+
+        let slash = providerAndModel.IndexOf('/')
+
+        if slash <= 0 || slash >= providerAndModel.Length - 1 then
             None
         else
             Some
-                { ProviderID = s.[0 .. slash - 1].Trim()
-                  ModelID = s.[slash + 1 ..].Trim()
-                  Variant = None
+                { ProviderID = providerAndModel.[0 .. slash - 1].Trim()
+                  ModelID = providerAndModel.[slash + 1 ..].Trim()
+                  Variant = variantOpt
                   Temperature = None
                   TopP = None
                   MaxTokens = None
@@ -175,11 +184,14 @@ let decodeModelFromObj (modelObj: obj) : FallbackModel option =
             let v = if v <> "" then v else Dyn.str modelObj "id"
             if v <> "" then v else Dyn.str modelObj "model"
 
+        let variant = Dyn.str modelObj "variant"
+        let variantOpt = if variant <> "" then Some variant else None
+
         if provider <> "" && modelId <> "" then
             Some
                 { ProviderID = provider
                   ModelID = modelId
-                  Variant = None
+                  Variant = variantOpt
                   Temperature = None
                   TopP = None
                   MaxTokens = None

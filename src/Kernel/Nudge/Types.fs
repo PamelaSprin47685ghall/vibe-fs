@@ -63,6 +63,18 @@ type ReviewLoopSnapshotInfo =
       latestVerdict: string option
       latestFeedback: string option }
 
+[<RequireQualifiedAccess>]
+type TerminalOrigin =
+    | HumanTurnCompleted
+    | HumanTurnAborted
+    | FallbackContinuationCompleted
+    | CompactionSummaryCompleted
+    | CompactionContinuationCompleted
+    | NudgeCompleted
+    | TitleCompleted
+    | ToolSubturnCompleted
+    | Unknown
+
 type SessionSnapshot =
     { todos: string list
       lastAssistantMessage: string

@@ -38,7 +38,10 @@ let foldEvent (current: ReviewLoopFold) (e: WanEvent) : ReviewLoopFold =
     | k when k = eventKindLoopActivated ->
         match payloadTask e with
         | Some task ->
-            let loopId = e.At
+            let loopId =
+                match e.Payload |> Map.tryFind "reviewLoopId" with
+                | Some id when id <> "" -> id
+                | _ -> e.At
 
             Active
                 { task = task

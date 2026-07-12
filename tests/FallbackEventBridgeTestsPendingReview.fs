@@ -23,7 +23,7 @@ let handleEvent_sessionIdle_emptyOutput_pendingReview_skipsContinue () =
         let translator = FakeTranslator(sid, FallbackEvent.SessionIdle) :> IEventTranslator
         let executor = FakeExecutor(messages = [| emptyAssistant |])
 
-        let! result = handleEvent translator rt defaultCfgLookup executor "" (box ()) (Some(fun s -> s = sid))
+        let! result, _ = handleEvent translator rt defaultCfgLookup executor "" (box ()) (Some(fun s -> s = sid))
 
         equal "no continue when pending review" 0 (executor.ContinueCalls.Length)
         equal "not consumed" false result.Consumed

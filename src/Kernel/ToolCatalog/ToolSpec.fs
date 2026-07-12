@@ -1,3 +1,4 @@
+[<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
 module Wanxiangshu.Kernel.ToolCatalog.ToolSpec
 
 /// Pure description of a tool: name, prose description shown to the model,

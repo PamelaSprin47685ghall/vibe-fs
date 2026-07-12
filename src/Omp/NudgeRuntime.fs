@@ -5,16 +5,29 @@ open Wanxiangshu.Kernel.Nudge
 open Wanxiangshu.Kernel.NudgeDerivation
 open Wanxiangshu.Kernel.PromptFragments
 
-let mutable private forceStoppedSessions: Set<string> = Set.empty
+let mutable private fallbackRuntimeInstance: Wanxiangshu.Shell.FallbackRuntimeState.FallbackRuntimeState option =
+    None
+
+let setFallbackRuntime (rt: Wanxiangshu.Shell.FallbackRuntimeState.FallbackRuntimeState) : unit =
+    fallbackRuntimeInstance <- Some rt
+
+let private getFallbackRuntime () : Wanxiangshu.Shell.FallbackRuntimeState.FallbackRuntimeState option =
+    fallbackRuntimeInstance
 
 let markSessionForceStopped (sessionId: string) : unit =
-    forceStoppedSessions <- Set.add sessionId forceStoppedSessions
+    match getFallbackRuntime () with
+    | Some rt -> rt.MarkForceStopped sessionId
+    | None -> ()
 
 let clearNudgeSession (sessionId: string) : unit =
-    forceStoppedSessions <- Set.remove sessionId forceStoppedSessions
+    match getFallbackRuntime () with
+    | Some rt -> rt.RemoveForceStopped sessionId
+    | None -> ()
 
 let isSessionForceStopped (sessionId: string) : bool =
-    Set.contains sessionId forceStoppedSessions
+    match getFallbackRuntime () with
+    | Some rt -> rt.IsForceStopped sessionId
+    | None -> false
 
 let todoReminderContent (todos: string list) = todoNudgePromptFor todos
 let loopReminderContent (todos: string list) = loopNudgePromptFor todos

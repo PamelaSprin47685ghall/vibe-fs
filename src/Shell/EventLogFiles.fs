@@ -80,6 +80,8 @@ type EventLogStore(workspaceRoot: string, ?appendLineOverride: string -> WanEven
             return Seq.toList readAllResult
         }
 
+    member _.GetRevision() : int = readAllResult.Count
+
     member _.GetSessionStateSync(sessionId: string) : SessionState =
         match Map.tryFind sessionId sessionStates with
         | Some st -> st

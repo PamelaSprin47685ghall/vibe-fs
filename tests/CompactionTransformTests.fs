@@ -126,8 +126,6 @@ let testMuxCompactionTransform () =
                   "maxInputTokens", box 100000
                   "RandomGen", box (fun () -> 0.12345) ]
 
-        let input = createObj [ "sessionID", box "s-mux"; "agent", box "main" ]
-
         let originalMsg =
             createObj
                 [ "id", box "msg-mux-1"
@@ -135,11 +133,17 @@ let testMuxCompactionTransform () =
                   "agent", box "main"
                   "parts", box [| box (createObj [ "type", box "text"; "text", box "hello mux" ]) |] ]
 
-        let output = createObj [ "messages", box [| originalMsg |] ]
+        let input =
+            createObj
+                [ "sessionID", box "s-mux"
+                  "agent", box "main"
+                  "messages", box [| originalMsg |] ]
+
+        let output = createObj []
 
         do! Wanxiangshu.Mux.MessageTransform.compactingTransform deps runtimeScope backlogSession input output
 
-        let messages = Wanxiangshu.Shell.Dyn.get output "messages" :?> obj array
+        let messages = Wanxiangshu.Shell.Dyn.get output "context" :?> obj array
         equal "Mux compacted length should be 1" 1 messages.Length
         let first = messages.[0]
         let role = Wanxiangshu.Shell.Dyn.str first "role"
@@ -149,6 +153,8 @@ let testMuxCompactionTransform () =
         let content = Wanxiangshu.Shell.Dyn.str firstPart "text"
         check "Mux compacted content contains <do-not-exec>" (content.Contains("<do-not-exec>"))
         check "Mux compacted content contains 'hello mux'" (content.Contains("hello mux"))
+        let prompt = Wanxiangshu.Shell.Dyn.get output "prompt"
+        check "Mux compacted prompt is not null" (not (Wanxiangshu.Shell.Dyn.isNullish prompt))
     }
 
 let testTryGetRealContextUsage () =

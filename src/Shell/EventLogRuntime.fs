@@ -44,10 +44,44 @@ let appendAssistantCompleted = EventLogRuntimeAppend.appendAssistantCompleted
 let appendAssistantCompletedOrFail =
     EventLogRuntimeAppend.appendAssistantCompletedOrFail
 
+let appendHumanTurnStartedOrFail =
+    EventLogRuntimeAppend.appendHumanTurnStartedOrFail
+
+let appendUserAbortObservedOrFail =
+    EventLogRuntimeAppend.appendUserAbortObservedOrFail
+
+let appendContinuationRequestedOrFail =
+    EventLogRuntimeAppend.appendContinuationRequestedOrFail
+
+let appendContinuationDispatchStartedOrFail =
+    EventLogRuntimeAppend.appendContinuationDispatchStartedOrFail
+
+let appendContinuationDispatchedOrFail =
+    EventLogRuntimeAppend.appendContinuationDispatchedOrFail
+
+let appendContinuationFailedOrFail =
+    EventLogRuntimeAppend.appendContinuationFailedOrFail
+
+let appendContinuationCancelledOrFail =
+    EventLogRuntimeAppend.appendContinuationCancelledOrFail
+
+let appendCompactionStartedOrFail =
+    EventLogRuntimeAppend.appendCompactionStartedOrFail
+
+let appendCompactionSettledOrFail =
+    EventLogRuntimeAppend.appendCompactionSettledOrFail
+
+let appendContextGenerationChangedOrFail =
+    EventLogRuntimeAppend.appendContextGenerationChangedOrFail
+
+let appendRouteObservedOrFail = EventLogRuntimeAppend.appendRouteObservedOrFail
+
 let appendSubagentSpawned = EventLogRuntimeAppend.appendSubagentSpawned
 let appendSubagentSpawnedOrFail = EventLogRuntimeAppend.appendSubagentSpawnedOrFail
 let appendSubagentContinued = EventLogRuntimeAppend.appendSubagentContinued
-let appendSubagentContinuedOrFail = EventLogRuntimeAppend.appendSubagentContinuedOrFail
+
+let appendSubagentContinuedOrFail =
+    EventLogRuntimeAppend.appendSubagentContinuedOrFail
 
 let isLoopActiveFromEventLog = EventLogRuntimeNudge.isLoopActiveFromEventLog
 let nudgeBlockedForTurn = EventLogRuntimeNudge.nudgeBlockedForTurn

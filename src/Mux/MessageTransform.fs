@@ -130,9 +130,20 @@ let compactingTransform
         runtimeScope.TriggerInit(directory)
         do! runtimeScope.WaitInit()
 
-        match tryGetMessagesArrayFromOutput output with
-        | None -> ()
-        | Some messagesArr ->
+        let messagesArr =
+            let fromInput = Dyn.get input "messages"
+
+            if not (Dyn.isNullish fromInput) && Dyn.isArray fromInput then
+                fromInput :?> obj array
+            else
+                let fromOutput = Dyn.get output "messages"
+
+                if not (Dyn.isNullish fromOutput) && Dyn.isArray fromOutput then
+                    fromOutput :?> obj array
+                else
+                    [||]
+
+        if messagesArr.Length > 0 then
             let sessionID = decoded.SessionID
             let typedMessages = decodeMessages sessionID messagesArr
             let cleaned = stripSyntheticBySource typedMessages
@@ -151,18 +162,21 @@ let compactingTransform
                 | Some obj -> Some(unbox<Wanxiangshu.Shell.FallbackRuntimeState.FallbackRuntimeState> obj)
                 | None -> None
 
+            let compactionId = "compact-" + System.Guid.NewGuid().ToString("N")
+            do! Wanxiangshu.Shell.EventLogRuntime.appendCompactionStartedOrFail directory sessionID compactionId
+
             match fallbackRuntime with
-            | Some fr -> fr.SetSessionOwner sessionID "Compaction"
+            | Some fr ->
+                fr.SetSessionOwner sessionID "Compaction"
+                fr.SetActiveCompactionId(sessionID, compactionId)
             | None -> ()
 
-            try
-                let result =
-                    Wanxiangshu.Kernel.BacklogProjectionCore.compactingTransform cleaned backlog guidGen
+            let result =
+                Wanxiangshu.Kernel.BacklogProjectionCore.compactingTransform cleaned backlog guidGen
 
-                let encoded = encodeMessages result
-                replaceArrayInPlace messagesArr encoded
-            finally
-                match fallbackRuntime with
-                | Some fr -> fr.SetSessionOwner sessionID "None"
-                | None -> ()
+            let encoded = encodeMessages result
+            let promptBody = box {| parts = [| box {| ``type`` = "text"; text = "​" |} |] |}
+
+            output?context <- encoded
+            output?prompt <- promptBody
     }

@@ -16,10 +16,27 @@ type ReviewReplayMode =
     | IfStoreEmpty
     | Always
 
+type FingerprintMetadata =
+    { Model: string
+      ContextLimit: int
+      TokenUsage: int
+      BacklogRevision: int
+      EventlogRevision: int
+      ReviewRound: int
+      ReviewFeedback: string
+      CapsVersion: string
+      PhaseBaseTokens: int64
+      PhaseStartTodoOrdinal: int
+      NudgeTrack: string
+      SessionGen: int
+      CancelGen: int
+      ActiveContGen: int
+      ActiveCancelGen: int }
+
 type TransformFingerprint =
     | NoInput
     | ArrayRef of int
-    | ArrayCopy of obj array
+    | ArrayCopyWithMetadata of obj array * FingerprintMetadata
 
 type SessionTransformCache =
     { mutable InputFingerprint: TransformFingerprint
@@ -32,8 +49,10 @@ let private fingerprintEqual (a: TransformFingerprint) (b: TransformFingerprint)
     match a, b with
     | NoInput, NoInput -> true
     | ArrayRef x, ArrayRef y -> x = y
-    | ArrayCopy arr1, ArrayCopy arr2 ->
-        if System.Object.ReferenceEquals(arr1, arr2) then
+    | ArrayCopyWithMetadata(arr1, meta1), ArrayCopyWithMetadata(arr2, meta2) ->
+        if meta1 <> meta2 then
+            false
+        elif System.Object.ReferenceEquals(arr1, arr2) then
             true
         elif arr1.Length <> arr2.Length then
             false
@@ -50,7 +69,8 @@ let private fingerprintEqual (a: TransformFingerprint) (b: TransformFingerprint)
             eq
     | _ -> false
 
-let private computeFingerprint (raw: obj array) : TransformFingerprint = ArrayCopy raw
+let private computeFingerprint (raw: obj array) (meta: FingerprintMetadata) : TransformFingerprint =
+    ArrayCopyWithMetadata(raw, meta)
 
 let private sessionTransformCaches =
     System.Collections.Generic.Dictionary<string, SessionTransformCache>()
@@ -207,6 +227,95 @@ let rec private sanitizeEmptyStrings (visited: System.Collections.Generic.HashSe
                         if not (isNullish child) && (typeIs child "object" || isArray child) then
                             sanitizeEmptyStrings visited child
 
+[<Emit("new Error().stack")>]
+let private getStack () : string = jsNative
+
+let computeMetadata
+    (plan: MessageTransformPlan)
+    (store: Wanxiangshu.Shell.EventLogFiles.EventLogStore)
+    (loadCaps: unit -> JS.Promise<CapsFile list>)
+    : JS.Promise<FingerprintMetadata> =
+    promise {
+        let! (state: Wanxiangshu.Kernel.EventLog.Fold.SessionState) = store.GetSessionState plan.SessionID
+        let eventlogRevision = store.GetRevision()
+        let backlogRevision = state.Backlog.Length
+
+        let fallbackRuntime =
+            match plan.Scope.TryFindKey("fallbackRuntime") with
+            | Some obj -> Some(unbox<Wanxiangshu.Shell.FallbackRuntimeState.FallbackRuntimeState> obj)
+            | None -> None
+
+        let currentModelStr =
+            match fallbackRuntime with
+            | Some fr ->
+                match fr.GetLatestHumanModel plan.SessionID with
+                | Some m -> m
+                | None ->
+                    match fr.GetModel plan.SessionID with
+                    | Some fm ->
+                        fm.ProviderID
+                        + "/"
+                        + fm.ModelID
+                        + (match fm.Variant with
+                           | Some v -> ":" + v
+                           | None -> "")
+                    | None -> ""
+            | None -> ""
+
+        let contextLimit = plan.MaxInputTokens
+
+        let budgetEntry = ContextBudgetStore.get plan.Scope plan.SessionID
+
+        let tokenUsage =
+            match budgetEntry.LastUsage with
+            | Some u -> u.tokenCount
+            | None -> 0
+
+        let (reviewRound, reviewFeedback) =
+            match state.ReviewLoop with
+            | Wanxiangshu.Kernel.EventLog.ReviewLoopFold.Active info ->
+                info.currentRound, (info.latestFeedback |> Option.defaultValue "")
+            | Wanxiangshu.Kernel.EventLog.ReviewLoopFold.Inactive -> 0, ""
+
+        let! capsFiles = loadCaps ()
+
+        let capsFingerprint =
+            Wanxiangshu.Kernel.CapsFormat.stableFingerprint Wanxiangshu.Shell.FileSys.sha256HexTruncated capsFiles
+
+        let (phaseBase, phaseStartTodo) =
+            match budgetEntry.State with
+            | Some s -> s.phaseBaseTokens, s.phaseStartTodoOrdinal
+            | None -> 0L, 0
+
+        let nudgeTrackStr = sprintf "%A" budgetEntry.NudgeTrack
+
+        let (sessionGen, cancelGen, activeContGen, activeCancelGen) =
+            match fallbackRuntime with
+            | Some fr ->
+                fr.GetSessionGeneration plan.SessionID,
+                fr.GetCancelGeneration plan.SessionID,
+                fr.GetActiveContinuationGeneration plan.SessionID,
+                fr.GetActiveContinuationCancelGeneration plan.SessionID
+            | None -> 0, 0, 0, 0
+
+        return
+            { Model = currentModelStr
+              ContextLimit = contextLimit
+              TokenUsage = tokenUsage
+              BacklogRevision = backlogRevision
+              EventlogRevision = eventlogRevision
+              ReviewRound = reviewRound
+              ReviewFeedback = reviewFeedback
+              CapsVersion = capsFingerprint
+              PhaseBaseTokens = phaseBase
+              PhaseStartTodoOrdinal = phaseStartTodo
+              NudgeTrack = nudgeTrackStr
+              SessionGen = sessionGen
+              CancelGen = cancelGen
+              ActiveContGen = activeContGen
+              ActiveCancelGen = activeCancelGen }
+    }
+
 let runHostMessagesTransform
     (_reviewStore: ReviewStore)
     (sessionID: string)
@@ -230,8 +339,10 @@ let runHostMessagesTransform
             sanitizeEmptyStrings visited raw
             return raw
         else
-            let cache = getSessionCache sessionTransformCaches sessionID
-            let currentFingerprint = computeFingerprint raw
+            let store = Wanxiangshu.Shell.EventLogRuntimeStore.getStore plan.Directory
+            let! meta = computeMetadata plan store loadCaps
+            let cache = getSessionCache sessionTransformCaches plan.SessionID
+            let currentFingerprint = computeFingerprint raw meta
 
             let! finalResult =
                 if cache.InputFingerprint = currentFingerprint then
@@ -248,8 +359,9 @@ let runHostMessagesTransform
                         let! result =
                             runMessageTransformPipeline plan backlogOps encodeMessages injectFn loadCaps buildCaps
 
-                        cache.InputFingerprint <- currentFingerprint
-                        cache.OutputFingerprint <- computeFingerprint result
+                        let! metaAfter = computeMetadata plan store loadCaps
+                        cache.InputFingerprint <- computeFingerprint raw metaAfter
+                        cache.OutputFingerprint <- computeFingerprint result metaAfter
                         cache.OutputArray <- result
                         return result
                     }

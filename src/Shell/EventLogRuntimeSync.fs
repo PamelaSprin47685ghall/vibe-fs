@@ -8,6 +8,49 @@ open Wanxiangshu.Shell.ReviewReplaySync
 open Wanxiangshu.Shell.SessionProjectionStore
 open Wanxiangshu.Shell.RuntimeScope
 
+let restoreFallbackRuntimeState
+    (scope: RuntimeScope)
+    (sid: string)
+    (state: Wanxiangshu.Kernel.EventLog.Fold.SessionState)
+    : unit =
+    match scope.TryFindKey("fallbackRuntime") with
+    | Some obj ->
+        let rt = unbox<Wanxiangshu.Shell.FallbackRuntimeState.FallbackRuntimeState> obj
+
+        match state.LatestHumanTurn with
+        | Some turn ->
+            let modelStr =
+                turn.Provider
+                + "/"
+                + turn.Model
+                + (if turn.Variant <> "" then ":" + turn.Variant else "")
+
+            rt.SetLatestHumanModel sid modelStr
+            rt.SetHumanTurnId sid turn.TurnId
+
+            if turn.Agent <> "" then
+                rt.SetAgentName sid turn.Agent
+        | None -> ()
+
+        rt.SetSessionGeneration sid state.SessionGeneration
+        rt.SetCancelGeneration sid state.CancelGeneration
+        rt.SetActiveContinuationGeneration sid state.ActiveContinuationGen
+        rt.SetActiveContinuationCancelGeneration sid state.ActiveContinuationCancelGen
+
+        let fallbackState = rt.GetOrCreateState sid
+
+        let updatedFallbackState =
+            { fallbackState with
+                Lifecycle =
+                    state.FallbackLifecycle
+                    |> Option.defaultValue Wanxiangshu.Kernel.FallbackKernel.Types.FallbackLifecycle.Active
+                Phase =
+                    state.FallbackPhase
+                    |> Option.defaultValue Wanxiangshu.Kernel.FallbackKernel.Types.FallbackPhase.Idle }
+
+        rt.UpdateState sid updatedFallbackState
+    | None -> ()
+
 let syncAllSessionsFromEventLogDedicated
     (host: Host)
     (store: ReviewStore)
@@ -31,6 +74,7 @@ let syncAllSessionsFromEventLogDedicated
                         let! state = getStore(workspaceRoot).GetSessionState(sid)
                         syncReviewProjection store sid state.ReviewTask
                         scope.Projection.StoreBacklog(host, sid, List.rev state.Backlog)
+                        restoreFallbackRuntimeState scope sid state
         with _ ->
             ()
     }

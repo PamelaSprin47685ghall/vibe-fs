@@ -157,7 +157,7 @@ let messagesTransform
                     backlogSession.GetOrRebuildBacklog(sid, msgs))
 
             let! maxInputTokens =
-                Wanxiangshu.Shell.OpencodeContextBudgetObservation.tryEffectiveLimit client directory messagesList
+                Wanxiangshu.Shell.ContextBudgetUsageCodec.resolveMaxInputTokens [ client ] sessionID directory
 
             let getContextUsage encoded =
                 Wanxiangshu.Shell.OpencodeContextBudgetObservation.tryCurrentUsage client sessionID encoded
@@ -172,7 +172,7 @@ let messagesTransform
                   RawArray = Some messagesArr
                   SembleInjectEnabled = sembleInjectEnabled
                   Scope = runtimeScope
-                  MaxInputTokens = (maxInputTokens |> Option.defaultValue 0)
+                  MaxInputTokens = maxInputTokens
                   GetContextUsage = getContextUsage }
 
             let replayTexts () : JS.Promise<string seq> =
@@ -218,6 +218,8 @@ let private invoke1 (arg: obj) (method: string) (target: obj) : JS.Promise<obj> 
 let systemTransform (directory: string) (_input: obj) (output: obj) : JS.Promise<unit> =
     promise { setSystemOutputToDirectory directory output }
 
+let private zwsChar = "​"
+
 let compactingTransform
     (registry: ChildAgentRegistry)
     (directory: string)
@@ -231,9 +233,20 @@ let compactingTransform
         runtimeScope.TriggerInit(directory)
         do! runtimeScope.WaitInit()
 
-        match tryGetMessagesArrayFromOutput output with
-        | None -> ()
-        | Some messagesArr ->
+        let messagesArr =
+            let fromInput = Dyn.get input "messages"
+
+            if not (Dyn.isNullish fromInput) && Dyn.isArray fromInput then
+                fromInput :?> obj array
+            else
+                let fromOutput = Dyn.get output "messages"
+
+                if not (Dyn.isNullish fromOutput) && Dyn.isArray fromOutput then
+                    fromOutput :?> obj array
+                else
+                    [||]
+
+        if messagesArr.Length > 0 then
             let messagesList = MessagingCodec.decodeMessages messagesArr
             let sessionID = extractSessionID messagesList
             let cleaned = Messaging.stripSyntheticBySource messagesList
@@ -245,18 +258,21 @@ let compactingTransform
                 | Some obj -> Some(unbox<Wanxiangshu.Shell.FallbackRuntimeState.FallbackRuntimeState> obj)
                 | None -> None
 
+            let compactionId = "compact-" + System.Guid.NewGuid().ToString("N")
+            do! Wanxiangshu.Shell.EventLogRuntime.appendCompactionStartedOrFail directory sessionID compactionId
+
             match fallbackRuntime with
-            | Some fr -> fr.SetSessionOwner sessionID "Compaction"
+            | Some fr ->
+                fr.SetSessionOwner sessionID "Compaction"
+                fr.SetActiveCompactionId(sessionID, compactionId)
             | None -> ()
 
-            try
-                let result =
-                    Wanxiangshu.Kernel.BacklogProjectionCore.compactingTransform cleaned backlog guidGen
+            let result =
+                Wanxiangshu.Kernel.BacklogProjectionCore.compactingTransform cleaned backlog guidGen
 
-                let encoded = MessagingCodec.encodeMessages result
-                replaceArrayInPlace messagesArr encoded
-            finally
-                match fallbackRuntime with
-                | Some fr -> fr.SetSessionOwner sessionID "None"
-                | None -> ()
+            let encoded = MessagingCodec.encodeMessages result
+            let promptBody = createPromptBodyWithModel None None zwsChar
+
+            output?context <- encoded
+            output?prompt <- promptBody
     }

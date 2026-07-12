@@ -135,17 +135,18 @@ let private rebuildPhaseState
                       backlogTokensAtPhaseStart = backlogTokens
                       phaseStartTodoOrdinal = currentOrdinal }
                 | Some old ->
-                    let p = max old.phaseBaseTokens backlogTokens
-
-                    { phaseBaseTokens = p
+                    { phaseBaseTokens = stableTokens
                       backlogTokensAtPhaseStart = backlogTokens
-                      phaseStartTodoOrdinal = old.phaseStartTodoOrdinal }
+                      phaseStartTodoOrdinal = currentOrdinal }
+
+            let nextEpisode = System.Guid.NewGuid().ToString("N")
 
             ContextBudgetStore.update plan.Scope plan.SessionID (fun entry ->
                 { entry with
                     State = Some newState
                     LastBacklog = backlog
-                    NudgeTrack = afterPhaseBoundaryReset entry.NudgeTrack })
+                    NudgeTrack = afterPhaseBoundaryReset entry.NudgeTrack
+                    EpisodeID = nextEpisode })
 
             return newState
         else

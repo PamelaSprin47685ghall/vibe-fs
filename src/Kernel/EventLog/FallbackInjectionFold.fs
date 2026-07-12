@@ -31,7 +31,10 @@ let private parseAtMs (raw: string) : int64 option =
         | _ -> None
 
 let fallbackInjectionFolder (st: FallbackInjectionState) (e: WanEvent) : FallbackInjectionState =
-    if e.Kind <> eventKindFallbackContinueInjected then
+    if
+        e.Kind <> eventKindFallbackContinueInjected
+        && e.Kind <> eventKindContinuationDispatched
+    then
         st
     else
         let model = payloadField "model" e

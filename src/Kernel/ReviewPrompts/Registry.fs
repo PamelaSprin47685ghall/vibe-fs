@@ -1,3 +1,4 @@
+[<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
 module Wanxiangshu.Kernel.ReviewPrompts
 
 let reviewInstructionsProse =
