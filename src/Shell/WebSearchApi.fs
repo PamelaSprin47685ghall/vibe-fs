@@ -26,7 +26,18 @@ let postInit (apiKey: string) (body: string) (signal: obj option) : obj =
 
 let responseMethod0 (response: obj) (methodName: string) : obj = response?(methodName) ()
 
-let webApiBase = "https://ollama.com/api"
+/// Effective gateway base URL: `OLLAMA_API_BASE` env override (E2E mock server) or production Ollama default.
+let webApiBase () : string =
+    let env = nodeProcess?env
+
+    let envValue =
+        if Dyn.isNullish env then
+            ""
+        else
+            let v = env?("OLLAMA_API_BASE")
+            if Dyn.isNullish v then "" else string v
+
+    Wanxiangshu.Kernel.Config.webApiBase envValue
 
 let getWebApiKey () : string =
     let env = nodeProcess?env
@@ -63,7 +74,7 @@ let webApiPost (pathname: string) (body: obj) (abortSignal: obj option) : JS.Pro
         match validatedWebApiKey () with
         | Error e -> return Error e
         | Ok apiKey ->
-            let url = $"{webApiBase}{normalizeWebApiPath pathname}"
+            let url = $"{webApiBase ()}{normalizeWebApiPath pathname}"
             let bodyStr = Encode.Auto.toString (0, body)
             let init = postInit apiKey bodyStr abortSignal
 

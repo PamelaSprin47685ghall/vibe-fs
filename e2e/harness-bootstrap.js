@@ -94,6 +94,7 @@ export function isolatedEnv(home, llmUrl, opts = {}) {
   const xdg = path.join(home, 'xdg');
   const fixtureUvxDir = createFixtureUvx(home);
   const config = makeConfig(llmUrl, opts);
+  const mockApiBase = llmUrl.replace(/\/v1$/, '') + '/api';
   return {
     OPENCODE_TEST_HOME: home,
     HOME: process.env.HOME || process.env.USERPROFILE || home,
@@ -106,6 +107,8 @@ export function isolatedEnv(home, llmUrl, opts = {}) {
     OPENCODE_DISABLE_MODELS_FETCH: '1',
     OPENCODE_AUTH_CONTENT: '{}',
     OPENCODE_EXPERIMENTAL_EVENT_SYSTEM: 'true',
+    OLLAMA_API_KEY: 'test-key',
+    OLLAMA_API_BASE: mockApiBase,
     OPENCODE_CONFIG_CONTENT: JSON.stringify(config),
     OPENCODE_PERMISSION: JSON.stringify({ '*': 'allow' }),
     PATH: `${fixtureUvxDir}${path.delimiter}${process.env.PATH ?? ''}`,

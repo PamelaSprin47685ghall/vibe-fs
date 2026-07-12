@@ -63,6 +63,12 @@ let getSembleMcpCommandCustomRef () =
     let cmd = getSembleMcpCommand "dev-branch"
     check "args contains custom ref" (cmd.args |> Array.exists (fun a -> a.Contains "dev-branch"))
 
+let webApiBaseEmptyReturnsOllamaDefault () =
+    equal "empty env -> ollama default" "https://ollama.com/api" (webApiBase "")
+
+let webApiBaseNonEmptyPassthrough () =
+    equal "non-empty env passthrough" "http://127.0.0.1:9999" (webApiBase "http://127.0.0.1:9999")
+
 let run () =
     stealthBrowserMcpRefEmptyReturnsMaster ()
     stealthBrowserMcpRefNonEmptyPassthrough ()
@@ -74,3 +80,5 @@ let run () =
     sembleMcpRefNonEmptyPassthrough ()
     getSembleMcpCommandElements ()
     getSembleMcpCommandCustomRef ()
+    webApiBaseEmptyReturnsOllamaDefault ()
+    webApiBaseNonEmptyPassthrough ()

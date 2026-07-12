@@ -48,6 +48,8 @@ let integrationToolSpecs () : (string * (unit -> JS.Promise<unit>)) list =
       "mimoTaskExecuteInPlaceStrip", mimoTaskExecuteInPlaceStripSpec
       "mimoTaskExecuteStripsTaskId", mimoTaskExecuteStripsTaskIdSpec
       "mimoTaskDefinitionHandlesZodLikeParameters", mimoTaskDefinitionHandlesZodLikeParametersSpec
+      "mimoTaskDefinitionRoutesEffectSchemaShapedParametersToJsonSchema",
+      mimoTaskDefinitionRoutesEffectSchemaShapedParametersToJsonSchemaSpec
       "coderTool", coderToolSpec
       "investigatorTool", investigatorToolSpec
       "muxCoderInvalidIntents", muxCoderInvalidIntentsSpec

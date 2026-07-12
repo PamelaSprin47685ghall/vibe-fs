@@ -80,6 +80,31 @@ function handleExpect(req, res, queue) {
   });
 }
 
+function handleWebSearch(req, res) {
+  req.on('data', () => {});
+  req.on('end', () => {
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({
+      results: [
+        { title: 'Test Search Title', url: 'http://example.com', content: 'Test search content for E2E.' },
+      ],
+    }));
+  });
+}
+
+function handleWebFetch(req, res) {
+  req.on('data', () => {});
+  req.on('end', () => {
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({
+      title: 'Example Domain',
+      byline: 'IANA',
+      length: 500,
+      content: 'Example Domain\n\nThis domain is for use in documentation examples.',
+    }));
+  });
+}
+
 function handleChat(req, res, queue, calls, url) {
   let body = '';
   req.on('data', chunk => body += chunk);
@@ -124,6 +149,12 @@ function createMockLLM() {
     }
     if ((url.pathname === '/v1/chat/completions' || url.pathname === '/v1/responses') && req.method === 'POST') {
       return handleChat(req, res, _queue, _calls, url);
+    }
+    if (url.pathname === '/api/web_search' && req.method === 'POST') {
+      return handleWebSearch(req, res);
+    }
+    if (url.pathname === '/api/web_fetch' && req.method === 'POST') {
+      return handleWebFetch(req, res);
     }
     res.writeHead(404);
     res.end('{"error":"not found"}');

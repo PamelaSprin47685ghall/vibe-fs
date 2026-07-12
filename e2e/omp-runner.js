@@ -210,7 +210,7 @@ async function spawnOmpHost(opts) {
 
 export async function start(opts = {}) {
   const sharedHost = await hostSingletonManager.getHost('omp', () => spawnOmpHost(opts));
-  const sessionId = 'omp-e2e-session-' + Math.random().toString(36).slice(2, 8);
+  const sessionId = 'e2e-omp-session-1';
   return new OmpHarness(sharedHost, sessionId);
 }
 
