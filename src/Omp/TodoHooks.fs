@@ -77,7 +77,7 @@ let toolResultHandler (_pi: obj) (_reviewStore: ReviewStore) (event: obj) (ctx: 
 
             let isLivelock =
                 sessionId <> ""
-                && check ExecutorTools.ompScope sessionId toolName (JS.JSON.stringify args) rawContent
+                && check ExecutorTools.ompScope sessionId toolName (cleanArgsJson args) rawContent
 
             let mutable businessProcessedText = rawContent
             let mutable isBusinessLivelock = false

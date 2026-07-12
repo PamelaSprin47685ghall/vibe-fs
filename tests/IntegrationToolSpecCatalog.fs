@@ -91,6 +91,7 @@ let integrationToolSpecs () : (string * (unit -> JS.Promise<unit>)) list =
       muxToolSchemasAreCleanStaticallyButInjectedDynamicallySpec
       "muxLoopSlashCommandWritesEventLogUnderDepsDirectory", muxLoopSlashCommandWritesEventLogUnderDepsDirectorySpec
       "muxToolExecuteAfterBlocksRepeatedIdenticalCall", muxToolExecuteAfterBlocksRepeatedIdenticalCallSpec
+      "muxToolExecuteAfterBlocksRepeatedCallIgnoringControls", muxToolExecuteAfterBlocksRepeatedCallIgnoringControlsSpec
       "muxToolExecuteAfterMapsNetworkError", muxToolExecuteAfterMapsNetworkErrorSpec
       "muxToolExecuteRestoresAmend", muxToolExecuteRestoresAmendSpec
       "muxStreamEndToolUseErrorTriggersNudge", muxStreamEndToolUseErrorTriggersNudgeSpec

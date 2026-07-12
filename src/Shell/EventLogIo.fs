@@ -71,70 +71,32 @@ let private lockfileOptions () =
                     "maxTimeout", box 100 ]
           ) ]
 
-let withWorkspaceLock (filePath: string) (action: unit -> JS.Promise<'T>) : JS.Promise<'T> =
-    try
-        appendFileSync "/tmp/debug-wanxiangzhen.txt" (sprintf "withWorkspaceLock called for %s\n" filePath)
-    with _ ->
-        ()
+let private fileQueues =
+    System.Collections.Generic.Dictionary<string, JS.Promise<obj>>()
+
+let withWorkspaceLock<'T> (filePath: string) (action: unit -> JS.Promise<'T>) : JS.Promise<'T> =
+    let prev =
+        match fileQueues.TryGetValue(filePath) with
+        | true, p -> p
+        | _ -> Promise.lift (box null)
+
+    let next =
+        promise {
+            try
+                let! _ = prev
+                ()
+            with _ ->
+                ()
+
+            let! res = action ()
+            return box res
+        }
+
+    fileQueues.[filePath] <- next
 
     promise {
-        try
-            let! _ = statAsync filePath
-            ()
-        with _ ->
-            try
-                do! writeFileFlagAsync filePath "" (createObj [ "flag", box "wx" ])
-            with _ ->
-                ()
-
-        let lockPath = filePath + ".lock"
-
-        try
-            let! stats = statAsync lockPath
-            let isDir = unbox<bool> (stats?isDirectory ())
-
-            if not isDir then
-                do! unlinkAsync lockPath
-        with _ ->
-            ()
-
-        try
-            appendFileSync "/tmp/debug-wanxiangzhen.txt" (sprintf "locking %s\n" filePath)
-        with _ ->
-            ()
-
-        let! release = lockfileLock filePath (lockfileOptions ())
-
-        try
-            appendFileSync "/tmp/debug-wanxiangzhen.txt" (sprintf "locked %s\n" filePath)
-        with _ ->
-            ()
-
-        let mutable caught = None
-
-        let! resOpt =
-            promise {
-                try
-                    let! result = action ()
-                    return Some result
-                with ex ->
-                    caught <- Some ex
-                    return None
-            }
-
-        try
-            do! release ()
-
-            try
-                appendFileSync "/tmp/debug-wanxiangzhen.txt" (sprintf "released %s\n" filePath)
-            with _ ->
-                ()
-        with _ ->
-            ()
-
-        match caught with
-        | Some ex -> return raise ex
-        | None -> return resOpt.Value
+        let! res = next
+        return unbox<'T> res
     }
 
 let fileExists (filePath: string) : JS.Promise<bool> =

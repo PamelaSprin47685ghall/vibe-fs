@@ -209,7 +209,7 @@ let toolExecuteAfter (scope: RuntimeScope) (input: obj) (output: obj) : JS.Promi
                 let criticism = ToolHookRuntime.appendCriticism currentOutput todoViolations status
                 setHookOutputStringMux output criticism
 
-        let argsJson = JS.JSON.stringify decoded.Args
+        let argsJson = LivelockGuard.cleanArgsJson decoded.Args
 
         let finalOutput = hookOutputTextMux output
 

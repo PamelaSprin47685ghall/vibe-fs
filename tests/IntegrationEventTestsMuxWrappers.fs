@@ -110,6 +110,18 @@ let todoWriteWrapperDecodeFailureSpec (reg: obj) =
             |> unbox<JS.Promise<obj>>
 
         check "todo_write missing ahaMoments success true" (truthy (get r1 "success"))
+
+        let afterHook = get reg "tool.execute.after"
+
+        let afterInput =
+            createObj
+                [ "tool", box "todowrite"
+                  "sessionID", box "integration-todo-decode-session"
+                  "args", box missingReportArgs
+                  "toolCallId", box "integration-todo-decode-1" ]
+
+        do! afterHook $ (afterInput, r1) |> unbox<JS.Promise<unit>>
+
         let out1 = str r1 "output"
         check "todo_write missing ahaMoments output has criticism" (out1.Contains "严重协议违例")
         check "todo_write missing ahaMoments mentions missing field" (out1.Contains "ahaMoments: missing")

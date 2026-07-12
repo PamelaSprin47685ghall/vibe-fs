@@ -222,7 +222,7 @@ let toolExecuteAfterFor
                 let criticism = ToolHookRuntime.appendCriticism currentOutput todoViolations status
                 setHookOutputString output criticism
 
-        let argsJson = JS.JSON.stringify (argsFromHookInput input)
+        let argsJson = LivelockGuard.cleanArgsJson (argsFromHookInput input)
 
         let finalOutput = hookOutputText output
 

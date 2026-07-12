@@ -204,29 +204,11 @@ let private mkTodoWriteWrapper (host: Host) (projection: ProjectionStore) : obj 
                                             do! appendWorkBacklogCommitted root sid tw |> Promise.map ignore
                                     | _ -> ()
 
-                            let envOpt = ToolHookRuntime.tryGetCompliance sid toolCallID
-
-                            let allViolations =
-                                match envOpt with
-                                | Some env -> env.Violations @ violations |> List.distinct
-                                | None -> violations
-
-                            let status =
-                                match envOpt with
-                                | Some env when env.Cancelled -> ToolHookRuntime.ExecutionStatus.Cancelled
-                                | _ ->
-                                    if isError then
-                                        ToolHookRuntime.ExecutionStatus.Failure
-                                    else
-                                        ToolHookRuntime.ExecutionStatus.Success
-
-                            let finalOutput = ToolHookRuntime.appendCriticism output allViolations status
-
                             let nextResult =
                                 if Dyn.typeIs result "object" then
-                                    Dyn.withKey result "output" (box finalOutput)
+                                    Dyn.withKey result "output" (box output)
                                 else
-                                    createObj [ "success", box (not isError); "output", box finalOutput ]
+                                    createObj [ "success", box (not isError); "output", box output ]
 
                             return nextResult
                     })

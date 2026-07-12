@@ -634,7 +634,8 @@ let executeBeforeGateway (tool: string) (args: obj) : Result<obj * ControlEnvelo
                       let norm = v.Trim().ToLowerInvariant()
 
                       if norm <> WarnTdd.canonicalValue then
-                          yield $"warn_tdd: value is invalid (got '%s{v}', expected '%s{WarnTdd.canonicalValue}')"
+                          yield
+                              $"warn_tdd: value is invalid (got '%s{v}', expected canonical acknowledgement '%s{WarnTdd.canonicalValue}')"
 
               if List.contains ProcessExecution caps then
                   match warnVal with
@@ -643,7 +644,8 @@ let executeBeforeGateway (tool: string) (args: obj) : Result<obj * ControlEnvelo
                       let norm = v.Trim().ToLowerInvariant()
 
                       if norm <> WarnTdd.warnCanonicalValue then
-                          yield $"warn: value is invalid (got '%s{v}', expected '%s{WarnTdd.warnCanonicalValue}')"
+                          yield
+                              $"warn: value is invalid (got '%s{v}', expected canonical acknowledgement '%s{WarnTdd.warnCanonicalValue}')"
 
               if List.contains SubagentDelegation caps then
                   match warnReuseVal with
@@ -653,7 +655,7 @@ let executeBeforeGateway (tool: string) (args: obj) : Result<obj * ControlEnvelo
 
                       if norm <> WarnTdd.warnReuseCanonicalValue then
                           yield
-                              $"warn_reuse: value is invalid (got '%s{v}', expected '%s{WarnTdd.warnReuseCanonicalValue}')" ]
+                              $"warn_reuse: value is invalid (got '%s{v}', expected canonical acknowledgement '%s{WarnTdd.warnReuseCanonicalValue}')" ]
 
         match amendVal with
         | Some n ->

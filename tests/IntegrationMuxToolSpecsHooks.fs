@@ -237,6 +237,66 @@ let muxToolExecuteAfterBlocksRepeatedIdenticalCallSpec () =
         check "3rd identical call: error mentions livelock" (err.Contains "livelock")
     }
 
+/// `tool.execute.after` must detect repeated identical tool call and set error on 3rd call
+/// even if the control parameters (warn, warn_tdd, warn_reuse, amend) differ.
+let muxToolExecuteAfterBlocksRepeatedCallIgnoringControlsSpec () =
+    promise {
+        let reg = sharedMuxRegistration ()
+
+        let scope =
+            unbox<Wanxiangshu.Shell.RuntimeScope.RuntimeScope> (Dyn.get reg "__runtimeScope")
+
+        let sessionID =
+            "mux-livelock-ignore-controls-" + System.Guid.NewGuid().ToString("N")
+
+        Wanxiangshu.Shell.LivelockGuard.cleanup scope sessionID
+
+        let after = get reg "tool.execute.after"
+        check "mux registration exposes tool.execute.after for controls test" (not (isNullish after))
+
+        // 1st call: normal args
+        let args1 = createObj [ "language", box "shell"; "program", box "echo hi" ]
+
+        let input1 =
+            createObj [ "tool", box "executor"; "sessionID", box sessionID; "args", box args1 ]
+
+        let output1 = createObj [ "output", box "hi" ]
+        do! (after $ (input1, output1)) |> unbox<JS.Promise<unit>>
+        check "1st call: no livelock error" (Dyn.str output1 "error" = "")
+
+        // 2nd call: args with warn and amend
+        let args2 =
+            createObj
+                [ "language", box "shell"
+                  "program", box "echo hi"
+                  "warn", box "some-warn-val"
+                  "amend", box 1 ]
+
+        let input2 =
+            createObj [ "tool", box "executor"; "sessionID", box sessionID; "args", box args2 ]
+
+        let output2 = createObj [ "output", box "hi" ]
+        do! (after $ (input2, output2)) |> unbox<JS.Promise<unit>>
+        check "2nd call: no livelock error" (Dyn.str output2 "error" = "")
+
+        // 3rd call: args with warn_tdd and warn_reuse
+        let args3 =
+            createObj
+                [ "language", box "shell"
+                  "program", box "echo hi"
+                  "warn_tdd", box "some-tdd-val"
+                  "warn_reuse", box "some-reuse-val" ]
+
+        let input3 =
+            createObj [ "tool", box "executor"; "sessionID", box sessionID; "args", box args3 ]
+
+        let output3 = createObj [ "output", box "hi" ]
+        do! (after $ (input3, output3)) |> unbox<JS.Promise<unit>>
+        let err = Dyn.str output3 "error"
+        check "3rd call with different controls: livelock error set" (err <> "")
+        check "3rd call with different controls: error mentions livelock" (err.Contains "livelock")
+    }
+
 /// `tool.execute.after` must map single-line tool output containing both
 /// "error" and "network" (case-insensitive) to `output.error = "network
 /// connection lost"`.  TDD-red: current Mux `toolExecuteAfter` is noop.
