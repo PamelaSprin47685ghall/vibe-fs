@@ -33,6 +33,7 @@ let tryClaimNudgeDispatch
     (sessionGen: int)
     (cancelGen: int)
     (humanTurnId: string)
+    (nudgeOrdinal: int)
     : JS.Promise<bool> =
     getStore(workspaceRoot).TryClaimNudgeDispatch
         sessionID
@@ -43,6 +44,7 @@ let tryClaimNudgeDispatch
         sessionGen
         cancelGen
         humanTurnId
+        nudgeOrdinal
         isNudgeBlockedForAnchor
 
 let getNudgeSnapshotFromEventLog (workspaceRoot: string) (sessionID: string) : JS.Promise<NudgeSnapshotState> =

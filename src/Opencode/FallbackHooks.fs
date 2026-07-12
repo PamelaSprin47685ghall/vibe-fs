@@ -119,6 +119,8 @@ let opencodeEventTranslator (runtime: FallbackRuntimeState) : IEventTranslator =
         member _.IsNewUserMessage(sessionID, rawEvent) =
             isNewUserMessageImpl runtime sessionID rawEvent
 
+        member _.ExtractNewUserMessageId(_rawEvent) = None
+
         member _.ExtractRoutingContext(rawEvent) =
             let props = getProps rawEvent
             let info = Dyn.get props "info"

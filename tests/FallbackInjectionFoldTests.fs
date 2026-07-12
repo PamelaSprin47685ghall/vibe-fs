@@ -71,10 +71,14 @@ let foldFallbackInjection_nonFallbackEventIgnored () =
 let applyEventIntegratesFallbackInjection () =
     let st = emptySessionState ()
 
-    let e =
+    let req =
+        ev "s1" eventKindContinuationRequested (Map [ "continuationId", "c1"; "model", "p/m"; "agent", "a" ])
+
+    let inj =
         ev "s1" eventKindFallbackContinueInjected (Map [ "model", "openai/gpt-5"; "agent", "coder"; "at", "1000" ])
 
-    let st2 = applyEvent st e
+    let st1 = applyEvent st req
+    let st2 = applyEvent st1 inj
     equal "SessionState.FallbackInjection.InjectedModel" (Some "openai/gpt-5") st2.FallbackInjection.InjectedModel
     equal "SessionState.FallbackInjection.InjectedCount" 1 st2.FallbackInjection.InjectedCount
 

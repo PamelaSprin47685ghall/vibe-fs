@@ -174,10 +174,10 @@ let tryClaimNudgeDispatchPreventsOutdatedAnchor () =
         do! appendAssistantCompletedOrFail dir sessionID "task 2" (Some "agent1") (Some "provider/model-b") "t2" []
         let anchorB = nudgeAnchorKey "t2" "task 2"
 
-        let! claimA = tryClaimNudgeDispatch dir sessionID Wanxiangshu.Kernel.Nudge.NudgeTodo anchorA "" "" 0 0 ""
+        let! claimA = tryClaimNudgeDispatch dir sessionID Wanxiangshu.Kernel.Nudge.NudgeTodo anchorA "" "" 0 0 "" 1
         check "claim never-claimed outdated anchor A" (not claimA)
 
-        let! claimB = tryClaimNudgeDispatch dir sessionID Wanxiangshu.Kernel.Nudge.NudgeTodo anchorB "" "" 0 0 ""
+        let! claimB = tryClaimNudgeDispatch dir sessionID Wanxiangshu.Kernel.Nudge.NudgeTodo anchorB "" "" 0 0 "" 1
         check "claim latest anchor B" claimB
 
         do! rmAsync dir

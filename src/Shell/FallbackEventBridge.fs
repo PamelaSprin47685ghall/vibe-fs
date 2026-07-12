@@ -21,6 +21,7 @@ type IEventTranslator =
     abstract IsSessionIdle: obj -> bool
     abstract IsSessionBusy: obj -> bool
     abstract IsNewUserMessage: sessionID: string * rawEvent: obj -> bool
+    abstract ExtractNewUserMessageId: rawEvent: obj -> string option
     abstract ExtractRoutingContext: rawEvent: obj -> (string option * string option)
 
 type IActionExecutor =
@@ -47,7 +48,8 @@ type ContinuationIntent =
         turnId: string *
         gen: int *
         cancelGen: int *
-        continuationID: string
+        continuationID: string *
+        continuationOrdinal: int
     | RecoverWithPromptIntent of
         model: FallbackModel *
         promptText: string *
@@ -55,7 +57,8 @@ type ContinuationIntent =
         turnId: string *
         gen: int *
         cancelGen: int *
-        continuationID: string
+        continuationID: string *
+        continuationOrdinal: int
     | PropagateFailureIntent
 
 let verifyLeaseWithStatus
@@ -101,9 +104,21 @@ let finishContinuation
 
         if cleared then
             if outcome = "failed" then
-                do! appendContinuationFailedOrFail workspaceRoot sessionID lease.ContinuationID errorOrReason
+                do!
+                    appendContinuationFailedOrFail
+                        workspaceRoot
+                        sessionID
+                        lease.ContinuationID
+                        errorOrReason
+                        lease.ContinuationOrdinal
             elif outcome = "cancelled" then
-                do! appendContinuationCancelledOrFail workspaceRoot sessionID lease.ContinuationID errorOrReason
+                do!
+                    appendContinuationCancelledOrFail
+                        workspaceRoot
+                        sessionID
+                        lease.ContinuationID
+                        errorOrReason
+                        lease.ContinuationOrdinal
             elif outcome = "settled" then
                 do!
                     appendContinuationSettledOrFail
@@ -113,6 +128,7 @@ let finishContinuation
                         lease.HumanTurnID
                         lease.SessionGeneration
                         errorOrReason
+                        lease.ContinuationOrdinal
 
             if runtime.GetSessionOwner sessionID = "Fallback" then
                 runtime.SetSessionOwner sessionID "None"
@@ -129,9 +145,10 @@ let executeContinuationIntent
     : JS.Promise<unit> =
     promise {
         match intent with
-        | SendContinueIntent(model, agent, turnId, gen, cancelGen, continuationID) ->
+        | SendContinueIntent(model, agent, turnId, gen, cancelGen, continuationID, continuationOrdinal) ->
             let lease =
                 { ContinuationID = continuationID
+                  ContinuationOrdinal = continuationOrdinal
                   SessionGeneration = gen
                   HumanTurnID = turnId
                   CancelGeneration = cancelGen
@@ -146,7 +163,8 @@ let executeContinuationIntent
                         Status = "dispatch_started" }
 
                 runtime.SetPendingLease(sessionID, startedLease)
-                do! appendContinuationDispatchStartedOrFail workspaceRoot sessionID continuationID
+
+                do! appendContinuationDispatchStartedOrFail workspaceRoot sessionID continuationID continuationOrdinal
 
                 try
                     do! executor.SendContinue(sessionID, model, continuationID)
@@ -185,14 +203,16 @@ let executeContinuationIntent
                                 modelStr
                                 agent
                                 atMs
+                                continuationOrdinal
                 with ex ->
                     do! finishContinuation runtime workspaceRoot sessionID lease "failed" ex.Message
             else
                 do! finishContinuation runtime workspaceRoot sessionID lease "cancelled" "Lease validation failed"
 
-        | RecoverWithPromptIntent(model, promptText, agent, turnId, gen, cancelGen, continuationID) ->
+        | RecoverWithPromptIntent(model, promptText, agent, turnId, gen, cancelGen, continuationID, continuationOrdinal) ->
             let lease =
                 { ContinuationID = continuationID
+                  ContinuationOrdinal = continuationOrdinal
                   SessionGeneration = gen
                   HumanTurnID = turnId
                   CancelGeneration = cancelGen
@@ -207,7 +227,8 @@ let executeContinuationIntent
                         Status = "dispatch_started" }
 
                 runtime.SetPendingLease(sessionID, startedLease)
-                do! appendContinuationDispatchStartedOrFail workspaceRoot sessionID continuationID
+
+                do! appendContinuationDispatchStartedOrFail workspaceRoot sessionID continuationID continuationOrdinal
 
                 try
                     do! executor.RecoverWithPrompt(sessionID, model, promptText, continuationID)
@@ -244,6 +265,7 @@ let executeContinuationIntent
                                 modelStr
                                 agent
                                 atMs
+                                continuationOrdinal
                 with ex ->
                     do! finishContinuation runtime workspaceRoot sessionID lease "failed" ex.Message
             else
@@ -370,48 +392,79 @@ let handleEvent
             if evt = FallbackEvent.NewUserMessage then
                 if runtime.GetSessionOwner sessionID = "Compaction" then
                     let activeComp = runtime.GetActiveCompactionId sessionID
-                    do! appendCompactionSettledOrFail workspaceRoot sessionID activeComp "cancelled"
-                    runtime.SetSessionOwner sessionID "None"
+                    let activeCompOrdinal = runtime.GetActiveCompactionOrdinal sessionID
+                    let settled = runtime.TrySettleCompaction(sessionID, activeComp)
 
-                match runtime.TryCancelPendingNudgeLease sessionID with
-                | Some nudgeLease ->
-                    do! appendNudgeCancelledOrFail workspaceRoot sessionID nudgeLease.NudgeID "New user message"
-                | None -> ()
+                    if settled then
+                        do!
+                            appendCompactionSettledOrFail
+                                workspaceRoot
+                                sessionID
+                                activeComp
+                                "cancelled"
+                                activeCompOrdinal
 
-                runtime.SetChain sessionID []
-                runtime.ClearModel sessionID
-                runtime.ClearInjected sessionID
-                runtime.SetSessionOwner sessionID "Human"
-                let turnId = runtime.IncrementHumanTurnId sessionID
-                runtime.RemoveForceStopped sessionID
+                let msgId = translator.ExtractNewUserMessageId rawEvent |> Option.defaultValue ""
+                let lastMsgId = runtime.GetLastHumanMessageId sessionID
 
-                let currentGen = runtime.GetSessionGeneration sessionID
-                let currentCancelGen = runtime.GetCancelGeneration sessionID
-                runtime.SetActiveContinuationGeneration sessionID currentGen
-                runtime.SetActiveContinuationCancelGeneration sessionID currentCancelGen
+                if msgId = "" || msgId <> lastMsgId then
+                    match runtime.TryCancelPendingNudgeLease sessionID with
+                    | Some nudgeLease ->
+                        do!
+                            appendNudgeCancelledOrFail
+                                workspaceRoot
+                                sessionID
+                                nudgeLease.NudgeID
+                                "New user message"
+                                nudgeLease.NudgeOrdinal
+                    | None -> ()
 
-                let modelOpt, agentOpt = translator.ExtractRoutingContext rawEvent
+                    runtime.SetChain sessionID []
+                    runtime.ClearModel sessionID
+                    runtime.ClearInjected sessionID
+                    runtime.SetSessionOwner sessionID "Human"
+                    let turnId = runtime.IncrementHumanTurnId sessionID
+                    runtime.SetLastHumanMessageId sessionID msgId
+                    runtime.RemoveForceStopped sessionID
 
-                match modelOpt with
-                | Some m -> runtime.SetLatestHumanModel sessionID m
-                | None -> runtime.ClearLatestHumanModel sessionID
+                    let currentGen = runtime.GetSessionGeneration sessionID
+                    let currentCancelGen = runtime.GetCancelGeneration sessionID
+                    runtime.SetActiveContinuationGeneration sessionID currentGen
+                    runtime.SetActiveContinuationCancelGeneration sessionID currentCancelGen
 
-                match agentOpt with
-                | Some a -> runtime.SetAgentName sessionID a
-                | None -> ()
+                    let modelOpt, agentOpt = translator.ExtractRoutingContext rawEvent
 
-                let provider, model, variant =
                     match modelOpt with
-                    | Some m ->
-                        match decodeModelFromObj (box m) with
-                        | Some modelObj ->
-                            modelObj.ProviderID, modelObj.ModelID, (modelObj.Variant |> Option.defaultValue "")
-                        | None -> "", m, ""
-                    | None -> "", "", ""
+                    | Some m -> runtime.SetLatestHumanModel sessionID m
+                    | None -> runtime.ClearLatestHumanModel sessionID
 
-                let agent = agentOpt |> Option.defaultValue ""
+                    match agentOpt with
+                    | Some a -> runtime.SetAgentName sessionID a
+                    | None -> ()
 
-                do! appendHumanTurnStartedOrFail workspaceRoot sessionID turnId provider model variant agent
+                    let provider, model, variant =
+                        match modelOpt with
+                        | Some m ->
+                            match decodeModelFromObj (box m) with
+                            | Some modelObj ->
+                                modelObj.ProviderID, modelObj.ModelID, (modelObj.Variant |> Option.defaultValue "")
+                            | None -> "", m, ""
+                        | None -> "", "", ""
+
+                    let agent = agentOpt |> Option.defaultValue ""
+                    let humanTurnOrdinal = runtime.IncrementHumanTurnOrdinal sessionID
+
+                    do!
+                        appendHumanTurnStartedOrFail
+                            workspaceRoot
+                            sessionID
+                            turnId
+                            provider
+                            model
+                            variant
+                            agent
+                            humanTurnOrdinal
+                            msgId
 
                 let state = runtime.GetOrCreateState sessionID
                 let agentName = runtime.GetAgentName sessionID
@@ -483,20 +536,18 @@ let handleEvent
 
                         match runtime.TryGetPendingLease sessionID with
                         | Some lease ->
-                            let cancelledLease = { lease with Status = "cancelled" }
-                            runtime.SetPendingLease(sessionID, cancelledLease)
-
-                            do!
-                                appendContinuationCancelledOrFail
-                                    workspaceRoot
-                                    sessionID
-                                    lease.ContinuationID
-                                    "User aborted"
+                            do! finishContinuation runtime workspaceRoot sessionID lease "cancelled" "User aborted"
                         | None -> ()
 
                         match runtime.TryCancelPendingNudgeLease sessionID with
                         | Some nudgeLease ->
-                            do! appendNudgeCancelledOrFail workspaceRoot sessionID nudgeLease.NudgeID "User aborted"
+                            do!
+                                appendNudgeCancelledOrFail
+                                    workspaceRoot
+                                    sessionID
+                                    nudgeLease.NudgeID
+                                    "User aborted"
+                                    nudgeLease.NudgeOrdinal
                         | None -> ()
 
                     let mutable finalState = ns
@@ -535,9 +586,11 @@ let handleEvent
                                 runtime.SetActiveContinuationCancelGeneration sessionID currentCancelGen
 
                                 let continuationID = System.Guid.NewGuid().ToString("N")
+                                let continuationOrdinal = runtime.IncrementContinuationOrdinal sessionID
 
                                 let lease =
                                     { ContinuationID = continuationID
+                                      ContinuationOrdinal = continuationOrdinal
                                       SessionGeneration = currentGen
                                       HumanTurnID = runtime.GetHumanTurnId sessionID
                                       CancelGeneration = currentCancelGen
@@ -560,6 +613,7 @@ let handleEvent
                                         currentCancelGen
                                         (runtime.GetHumanTurnId sessionID)
                                         "Fallback"
+                                        continuationOrdinal
 
                                 let intent =
                                     SendContinueIntent(
@@ -568,7 +622,8 @@ let handleEvent
                                         runtime.GetHumanTurnId sessionID,
                                         currentGen,
                                         currentCancelGen,
-                                        continuationID
+                                        continuationID,
+                                        continuationOrdinal
                                     )
 
                                 return finalState, Some intent
@@ -582,9 +637,11 @@ let handleEvent
                                 runtime.SetActiveContinuationCancelGeneration sessionID currentCancelGen
 
                                 let continuationID = System.Guid.NewGuid().ToString("N")
+                                let continuationOrdinal = runtime.IncrementContinuationOrdinal sessionID
 
                                 let lease =
                                     { ContinuationID = continuationID
+                                      ContinuationOrdinal = continuationOrdinal
                                       SessionGeneration = currentGen
                                       HumanTurnID = runtime.GetHumanTurnId sessionID
                                       CancelGeneration = currentCancelGen
@@ -614,6 +671,7 @@ let handleEvent
                                         currentCancelGen
                                         (runtime.GetHumanTurnId sessionID)
                                         "Fallback"
+                                        continuationOrdinal
 
                                 let intent =
                                     RecoverWithPromptIntent(
@@ -623,7 +681,8 @@ let handleEvent
                                         runtime.GetHumanTurnId sessionID,
                                         currentGen,
                                         currentCancelGen,
-                                        continuationID
+                                        continuationID,
+                                        continuationOrdinal
                                     )
 
                                 return finalState, Some intent
@@ -658,9 +717,11 @@ let handleEvent
                                             runtime.SetSessionOwner sessionID "Fallback"
 
                                             let continuationID = System.Guid.NewGuid().ToString("N")
+                                            let continuationOrdinal = runtime.IncrementContinuationOrdinal sessionID
 
                                             let lease =
                                                 { ContinuationID = continuationID
+                                                  ContinuationOrdinal = continuationOrdinal
                                                   SessionGeneration = currentGen
                                                   HumanTurnID = runtime.GetHumanTurnId sessionID
                                                   CancelGeneration = currentCancelGen
@@ -690,6 +751,7 @@ let handleEvent
                                                     currentCancelGen
                                                     (runtime.GetHumanTurnId sessionID)
                                                     "Fallback"
+                                                    continuationOrdinal
 
                                             let intent =
                                                 RecoverWithPromptIntent(
@@ -699,7 +761,8 @@ let handleEvent
                                                     runtime.GetHumanTurnId sessionID,
                                                     currentGen,
                                                     currentCancelGen,
-                                                    continuationID
+                                                    continuationID,
+                                                    continuationOrdinal
                                                 )
 
                                             return updated, Some intent
@@ -742,21 +805,22 @@ let handleEvent
                     if isPostTerminal then
                         match runtime.TryGetPendingLease sessionID with
                         | Some lease ->
-                            do!
-                                appendContinuationSettledOrFail
-                                    workspaceRoot
-                                    sessionID
-                                    lease.ContinuationID
-                                    lease.HumanTurnID
-                                    lease.SessionGeneration
-                                    "completed"
+                            if lease.Status <> "cancelled" then
+                                do!
+                                    appendContinuationSettledOrFail
+                                        workspaceRoot
+                                        sessionID
+                                        lease.ContinuationID
+                                        lease.HumanTurnID
+                                        lease.SessionGeneration
+                                        "completed"
+                                        lease.ContinuationOrdinal
 
-                            runtime.ClearPendingLease sessionID
+                            if runtime.TryClearPendingLease(sessionID, lease.ContinuationID) then
+                                if runtime.GetSessionOwner sessionID = "Fallback" then
+                                    runtime.SetSessionOwner sessionID "None"
 
-                            if runtime.GetSessionOwner sessionID = "Fallback" then
-                                runtime.SetSessionOwner sessionID "None"
-
-                            runtime.SetAwaitingBusy sessionID false
+                                runtime.SetAwaitingBusy sessionID false
                         | None -> ()
 
                     let consumed =

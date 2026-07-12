@@ -36,6 +36,14 @@ let restoreFallbackRuntimeState
         rt.SetCancelGeneration sid state.CancelGeneration
         rt.SetActiveContinuationGeneration sid state.ActiveContinuationGen
         rt.SetActiveContinuationCancelGeneration sid state.ActiveContinuationCancelGen
+        rt.SetHumanTurnOrdinal sid state.HumanTurnOrdinal
+        rt.SetContinuationOrdinal sid state.ContinuationOrdinal
+        rt.SetNudgeOrdinal sid state.NudgeOrdinal
+        rt.SetCompactionOrdinal sid state.CompactionOrdinal
+
+        match state.LastHumanTurnMessageId with
+        | Some id -> rt.SetLastHumanMessageId sid id
+        | None -> rt.ClearLastHumanMessageId sid
 
         let fallbackState = rt.GetOrCreateState sid
 
@@ -71,6 +79,7 @@ let restoreFallbackRuntimeState
 
             let pendingLease: Wanxiangshu.Shell.FallbackRuntimeState.PendingLease =
                 { ContinuationID = lease.ContinuationID
+                  ContinuationOrdinal = lease.ContinuationOrdinal
                   SessionGeneration = lease.SessionGeneration
                   HumanTurnID = lease.HumanTurnID
                   CancelGeneration = lease.CancelGeneration
@@ -82,9 +91,10 @@ let restoreFallbackRuntimeState
             rt.SetPendingLease(sid, pendingLease)
         | None -> rt.ClearPendingLease sid
 
-        match state.ActiveCompactionId with
-        | Some cid -> rt.SetActiveCompactionId(sid, cid)
-        | None -> ()
+        match state.ActiveCompaction, state.ActiveCompactionId with
+        | Some comp, _ -> rt.SetActiveCompactionId(sid, comp.CompactionID, comp.CompactionOrdinal)
+        | None, Some cid -> rt.SetActiveCompactionId(sid, cid, state.CompactionOrdinal)
+        | None, None -> ()
 
         rt.SetCompacted sid state.IsCompacted
         rt.SetCompactionGeneration sid state.CompactionGeneration
@@ -93,6 +103,7 @@ let restoreFallbackRuntimeState
         | Some nl ->
             let lease: Wanxiangshu.Shell.FallbackRuntimeState.NudgeLease =
                 { NudgeID = nl.NudgeID
+                  NudgeOrdinal = nl.NudgeOrdinal
                   Nonce = nl.Nonce
                   HumanTurnID = nl.HumanTurnID
                   SessionGeneration = nl.SessionGeneration

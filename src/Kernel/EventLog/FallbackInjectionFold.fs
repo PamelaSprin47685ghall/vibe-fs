@@ -13,14 +13,14 @@ type FallbackInjectionState =
       InjectedAgent: string option
       InjectedAt: int64 option
       InjectedCount: int
-      ProcessedContinuationIds: Set<string> }
+      ActiveContinuationOrdinal: int option }
 
 let emptyFallbackInjectionState: FallbackInjectionState =
     { InjectedModel = None
       InjectedAgent = None
       InjectedAt = None
       InjectedCount = 0
-      ProcessedContinuationIds = Set.empty }
+      ActiveContinuationOrdinal = None }
 
 let private payloadField (key: string) (e: WanEvent) : string option = e.Payload |> Map.tryFind key
 
@@ -32,46 +32,70 @@ let private parseAtMs (raw: string) : int64 option =
         | true, n -> Some n
         | _ -> None
 
-let fallbackInjectionFolder (st: FallbackInjectionState) (e: WanEvent) : FallbackInjectionState =
-    if
+let private parseIntOpt (raw: string) : int option =
+    if raw = "" then
+        None
+    else
+        try
+            Some(int raw)
+        with _ ->
+            None
+
+let private continuationOrdinal (e: WanEvent) : int option =
+    e.Payload |> Map.tryFind "continuationOrdinal" |> Option.bind parseIntOpt
+
+let fallbackInjectionFolder
+    (currentContinuationOrdinal: int)
+    (currentContinuationStage: EpisodeStage)
+    (st: FallbackInjectionState)
+    (e: WanEvent)
+    : FallbackInjectionState =
+    if e.Kind = eventKindContinuationRequested then
+        let contOrdinal =
+            continuationOrdinal e |> Option.defaultValue (currentContinuationOrdinal + 1)
+
+        if contOrdinal <= currentContinuationOrdinal then
+            st
+        else
+            { st with
+                ActiveContinuationOrdinal = Some contOrdinal }
+    elif
         e.Kind = eventKindContinuationSettled
         || e.Kind = eventKindContinuationFailed
         || e.Kind = eventKindContinuationCancelled
     then
-        let contIdOpt = payloadField "continuationId" e
-
-        match contIdOpt with
-        | Some cid when cid <> "" ->
+        if currentContinuationStage = Terminal then
             { st with
-                ProcessedContinuationIds = Set.remove cid st.ProcessedContinuationIds }
-        | _ -> st
+                ActiveContinuationOrdinal = None }
+        else
+            st
     elif
         e.Kind <> eventKindFallbackContinueInjected
         && e.Kind <> eventKindContinuationDispatched
     then
         st
+    elif currentContinuationStage = NoEpisode || currentContinuationStage = Terminal then
+        st
     else
         let model = payloadField "model" e
         let agent = payloadField "agent" e
         let at = payloadField "at" e |> Option.bind parseAtMs
-        let contIdOpt = payloadField "continuationId" e
+        let contOrdinal = continuationOrdinal e
 
-        match contIdOpt with
-        | Some cid when cid <> "" ->
-            if Set.contains cid st.ProcessedContinuationIds then
-                st
-            else
-                { InjectedModel = if model.IsSome then model else st.InjectedModel
-                  InjectedAgent = if agent.IsSome then agent else st.InjectedAgent
-                  InjectedAt = if at.IsSome then at else st.InjectedAt
-                  InjectedCount = st.InjectedCount + 1
-                  ProcessedContinuationIds = Set.add cid st.ProcessedContinuationIds }
-        | _ ->
+        let shouldProcess =
+            match st.ActiveContinuationOrdinal, contOrdinal with
+            | Some active, Some eventOrd -> eventOrd = active || eventOrd > active
+            | Some _, None -> true
+            | None, _ -> true
+
+        if not shouldProcess then
+            st
+        else
             { InjectedModel = if model.IsSome then model else st.InjectedModel
               InjectedAgent = if agent.IsSome then agent else st.InjectedAgent
               InjectedAt = if at.IsSome then at else st.InjectedAt
               InjectedCount = st.InjectedCount + 1
-              ProcessedContinuationIds = st.ProcessedContinuationIds }
+              ActiveContinuationOrdinal = st.ActiveContinuationOrdinal }
 
 let private forSession (sessionId: string) (events: WanEvent list) : WanEvent list =
     events |> List.filter (fun e -> e.Session = sessionId)
@@ -86,4 +110,4 @@ let private foldEventStream
 
 /// Fold fallback injection state for one session; file line order preserved.
 let foldFallbackInjection (sessionId: string) (events: WanEvent list) : FallbackInjectionState =
-    foldEventStream sessionId emptyFallbackInjectionState fallbackInjectionFolder events
+    foldEventStream sessionId emptyFallbackInjectionState (fallbackInjectionFolder 0 Requested) events

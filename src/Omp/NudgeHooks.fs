@@ -28,6 +28,7 @@ open Wanxiangshu.Shell.LivelockGuard
 open Wanxiangshu.Shell.RuntimeScope
 open Wanxiangshu.Shell.Dyn
 open Wanxiangshu.Shell.FallbackRuntimeState
+open Wanxiangshu.Shell.NudgeRuntimeTypes
 
 module Dyn = Wanxiangshu.Shell.Dyn
 
@@ -162,6 +163,16 @@ let agentEndHandler
 
         if isSyntheticAssistantAgent currentAgent then
             Promise.lift ()
+        elif owner = "Nudge" then
+            let root = ctx.cwd |> Option.defaultValue ""
+
+            promise {
+                match fallbackRuntime.TryGetPendingNudgeLease sessionId with
+                | Some lease ->
+                    if root <> "" then
+                        do! finishNudge fallbackRuntime root sessionId lease "settled" "completed" "" ""
+                | None -> fallbackRuntime.SetSessionOwner sessionId "None"
+            }
         elif owner <> "None" && owner <> "Human" then
             Promise.lift ()
         elif isSessionForceStopped sessionId then
@@ -214,14 +225,70 @@ let agentEndHandler
                             match deriveAction snapshot with
                             | NudgeNone -> ()
                             | action ->
+                                let nudgeId = "nudge-" + System.Guid.NewGuid().ToString("N")
+                                let nonce = "nudge_" + System.Guid.NewGuid().ToString("N")
+                                let sessionGen = fallbackRuntime.GetSessionGeneration sessionId
+                                let cancelGen = fallbackRuntime.GetCancelGeneration sessionId
+                                let humanTurnId = fallbackRuntime.GetHumanTurnId sessionId
+                                let nudgeOrdinal = fallbackRuntime.IncrementNudgeOrdinal sessionId
+
                                 let! claimed =
-                                    tryClaimNudgeDispatch root sessionId action snapshot.nudgeAnchorKey "" "" 0 0 ""
+                                    tryClaimNudgeDispatch
+                                        root
+                                        sessionId
+                                        action
+                                        snapshot.nudgeAnchorKey
+                                        nudgeId
+                                        nonce
+                                        sessionGen
+                                        cancelGen
+                                        humanTurnId
+                                        nudgeOrdinal
 
                                 if not claimed then
                                     ()
                                 elif isSessionForceStopped sessionId then
                                     ()
                                 else
+                                    let lease: NudgeLease =
+                                        { NudgeID = nudgeId
+                                          NudgeOrdinal = nudgeOrdinal
+                                          Nonce = nonce
+                                          HumanTurnID = humanTurnId
+                                          SessionGeneration = sessionGen
+                                          CancelGeneration = cancelGen
+                                          Owner = "Nudge"
+                                          Status = "dispatch_started" }
+
+                                    fallbackRuntime.SetPendingNudgeLease(sessionId, lease)
+                                    fallbackRuntime.SetSessionOwner sessionId "Nudge"
+                                    fallbackRuntime.SetActiveNudgeNonce sessionId nonce
                                     fallbackRuntime.SetAwaitingBusy sessionId true
-                                    do! sendNudgeReminder pi action snapshot
+
+                                    try
+                                        do! sendNudgeReminder pi action snapshot
+                                        let dispatchedLease = { lease with Status = "dispatched" }
+                                        fallbackRuntime.SetPendingNudgeLease(sessionId, dispatchedLease)
+
+                                        do!
+                                            finishNudge
+                                                fallbackRuntime
+                                                root
+                                                sessionId
+                                                dispatchedLease
+                                                "dispatched"
+                                                ""
+                                                (Wanxiangshu.Kernel.Nudge.toString action)
+                                                snapshot.nudgeAnchorKey
+                                    with _ ->
+                                        do!
+                                            finishNudge
+                                                fallbackRuntime
+                                                root
+                                                sessionId
+                                                lease
+                                                "failed"
+                                                "Send failed"
+                                                ""
+                                                ""
                     }

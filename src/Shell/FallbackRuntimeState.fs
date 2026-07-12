@@ -7,6 +7,7 @@ open Wanxiangshu.Shell.FallbackRuntimeStateGates
 
 type PendingLease =
     { ContinuationID: string
+      ContinuationOrdinal: int
       SessionGeneration: int
       HumanTurnID: string
       CancelGeneration: int
@@ -17,6 +18,7 @@ type PendingLease =
 
 type NudgeLease =
     { NudgeID: string
+      NudgeOrdinal: int
       Nonce: string
       HumanTurnID: string
       SessionGeneration: int
@@ -53,11 +55,17 @@ type FallbackRuntimeState() =
     let mutable pendingLeases = Map.empty<string, obj>
     let mutable pendingNudgeLeases = Map.empty<string, NudgeLease>
     let mutable activeCompactionIds = Map.empty<string, string>
+    let mutable activeCompactionOrdinals = Map.empty<string, int>
     let mutable forceStoppedSessions = Set.empty<string>
     let mutable compactedSessions = Set.empty<string>
     let mutable compactionContinuationObserved = Set.empty<string>
     let mutable compactionGenerations = Map.empty<string, int>
     let mutable activeNudgeNonces = Map.empty<string, string>
+    let mutable humanTurnOrdinals = Map.empty<string, int>
+    let mutable continuationOrdinals = Map.empty<string, int>
+    let mutable nudgeOrdinals = Map.empty<string, int>
+    let mutable compactionOrdinals = Map.empty<string, int>
+    let mutable lastHumanMessageIds = Map.empty<string, string>
 
     let triggerStateChanged (sessionID: string) : unit =
         match Map.tryFind sessionID listeners with
@@ -146,10 +154,74 @@ type FallbackRuntimeState() =
         humanTurnIds <- Map.add sessionID nextId humanTurnIds
         let currentGen = Map.tryFind sessionID sessionGenerations |> Option.defaultValue 0
         sessionGenerations <- Map.add sessionID (currentGen + 1) sessionGenerations
+
+        humanTurnOrdinals <-
+            Map.add
+                sessionID
+                (Map.tryFind sessionID humanTurnOrdinals |> Option.defaultValue 0 |> (+) 1)
+                humanTurnOrdinals
+
         nextId
 
     member _.GetSessionGeneration(sessionID: string) : int =
         Map.tryFind sessionID sessionGenerations |> Option.defaultValue 0
+
+    member _.GetHumanTurnOrdinal(sessionID: string) : int =
+        Map.tryFind sessionID humanTurnOrdinals |> Option.defaultValue 0
+
+    member _.SetHumanTurnOrdinal (sessionID: string) (ordinal: int) : unit =
+        humanTurnOrdinals <- Map.add sessionID ordinal humanTurnOrdinals
+
+    member _.IncrementHumanTurnOrdinal(sessionID: string) : int =
+        let current = Map.tryFind sessionID humanTurnOrdinals |> Option.defaultValue 0
+        let next = current + 1
+        humanTurnOrdinals <- Map.add sessionID next humanTurnOrdinals
+        next
+
+    member _.GetContinuationOrdinal(sessionID: string) : int =
+        Map.tryFind sessionID continuationOrdinals |> Option.defaultValue 0
+
+    member _.SetContinuationOrdinal (sessionID: string) (ordinal: int) : unit =
+        continuationOrdinals <- Map.add sessionID ordinal continuationOrdinals
+
+    member _.IncrementContinuationOrdinal(sessionID: string) : int =
+        let current = Map.tryFind sessionID continuationOrdinals |> Option.defaultValue 0
+        let next = current + 1
+        continuationOrdinals <- Map.add sessionID next continuationOrdinals
+        next
+
+    member _.GetNudgeOrdinal(sessionID: string) : int =
+        Map.tryFind sessionID nudgeOrdinals |> Option.defaultValue 0
+
+    member _.SetNudgeOrdinal (sessionID: string) (ordinal: int) : unit =
+        nudgeOrdinals <- Map.add sessionID ordinal nudgeOrdinals
+
+    member _.IncrementNudgeOrdinal(sessionID: string) : int =
+        let current = Map.tryFind sessionID nudgeOrdinals |> Option.defaultValue 0
+        let next = current + 1
+        nudgeOrdinals <- Map.add sessionID next nudgeOrdinals
+        next
+
+    member _.GetCompactionOrdinal(sessionID: string) : int =
+        Map.tryFind sessionID compactionOrdinals |> Option.defaultValue 0
+
+    member _.SetCompactionOrdinal (sessionID: string) (ordinal: int) : unit =
+        compactionOrdinals <- Map.add sessionID ordinal compactionOrdinals
+
+    member _.IncrementCompactionOrdinal(sessionID: string) : int =
+        let current = Map.tryFind sessionID compactionOrdinals |> Option.defaultValue 0
+        let next = current + 1
+        compactionOrdinals <- Map.add sessionID next compactionOrdinals
+        next
+
+    member _.GetLastHumanMessageId(sessionID: string) : string =
+        Map.tryFind sessionID lastHumanMessageIds |> Option.defaultValue ""
+
+    member _.SetLastHumanMessageId (sessionID: string) (messageId: string) : unit =
+        lastHumanMessageIds <- Map.add sessionID messageId lastHumanMessageIds
+
+    member _.ClearLastHumanMessageId(sessionID: string) : unit =
+        lastHumanMessageIds <- Map.remove sessionID lastHumanMessageIds
 
     member _.IncrementCancelGeneration(sessionID: string) : int =
         let current = Map.tryFind sessionID cancelGenerations |> Option.defaultValue 0
@@ -207,14 +279,29 @@ type FallbackRuntimeState() =
             pendingNudgeLeases <- Map.remove sessionID pendingNudgeLeases
             activeNudgeNonces <- Map.remove sessionID activeNudgeNonces
             this.SetNudgeActive sessionID false
+
+            if this.GetSessionOwner sessionID = "Nudge" then
+                this.SetSessionOwner sessionID "None"
+
             Some lease
         | None -> None
+
+    member _.TryClearPendingNudgeLease(sessionID: string, expectedNudgeID: string) : bool =
+        match Map.tryFind sessionID pendingNudgeLeases with
+        | Some lease when lease.NudgeID = expectedNudgeID ->
+            pendingNudgeLeases <- Map.remove sessionID pendingNudgeLeases
+            true
+        | _ -> false
 
     member _.ClearPendingNudgeLease(sessionID: string) : unit =
         pendingNudgeLeases <- Map.remove sessionID pendingNudgeLeases
 
-    member _.SetActiveCompactionId(sessionID: string, id: string) : unit =
+    member _.SetActiveCompactionId(sessionID: string, id: string, ordinal: int) : unit =
         activeCompactionIds <- Map.add sessionID id activeCompactionIds
+        activeCompactionOrdinals <- Map.add sessionID ordinal activeCompactionOrdinals
+
+    member _.GetActiveCompactionOrdinal(sessionID: string) : int =
+        Map.tryFind sessionID activeCompactionOrdinals |> Option.defaultValue 0
 
     member this.TrySettleCompaction(sessionID: string, expectedCompactionID: string) : bool =
         if expectedCompactionID = "" then
@@ -223,6 +310,7 @@ type FallbackRuntimeState() =
             match Map.tryFind sessionID activeCompactionIds with
             | Some currentCompID when currentCompID = expectedCompactionID ->
                 activeCompactionIds <- Map.remove sessionID activeCompactionIds
+                activeCompactionOrdinals <- Map.remove sessionID activeCompactionOrdinals
                 compactionGenerations <- Map.remove sessionID compactionGenerations
                 compactedSessions <- Set.remove sessionID compactedSessions
                 compactionContinuationObserved <- Set.remove sessionID compactionContinuationObserved
@@ -417,10 +505,16 @@ type FallbackRuntimeState() =
         sessionOwners <- Map.remove sessionID sessionOwners
         pendingLeases <- Map.remove sessionID pendingLeases
         activeCompactionIds <- Map.remove sessionID activeCompactionIds
+        activeCompactionOrdinals <- Map.remove sessionID activeCompactionOrdinals
         forceStoppedSessions <- Set.remove sessionID forceStoppedSessions
         compactedSessions <- Set.remove sessionID compactedSessions
         compactionContinuationObserved <- Set.remove sessionID compactionContinuationObserved
         compactionGenerations <- Map.remove sessionID compactionGenerations
         activeNudgeNonces <- Map.remove sessionID activeNudgeNonces
         pendingNudgeLeases <- Map.remove sessionID pendingNudgeLeases
+        humanTurnOrdinals <- Map.remove sessionID humanTurnOrdinals
+        continuationOrdinals <- Map.remove sessionID continuationOrdinals
+        nudgeOrdinals <- Map.remove sessionID nudgeOrdinals
+        compactionOrdinals <- Map.remove sessionID compactionOrdinals
+        lastHumanMessageIds <- Map.remove sessionID lastHumanMessageIds
         triggerStateChanged sessionID

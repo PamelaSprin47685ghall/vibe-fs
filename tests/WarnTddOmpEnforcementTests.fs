@@ -112,7 +112,7 @@ let ompRejectsCoderMalformedWarnReuse () =
     let result =
         ompHookResult "coder" (createObj [ "warn_tdd", box canonicalValue; "warn_reuse", box "wrong" ])
 
-    check "omp coder malformed warn_reuse returns Some" (Option.isSome result)
+    check "omp coder malformed warn_reuse returns None" (Option.isNone result)
 
 let ompAcceptsCoderWithWarnReuse () =
     let args =

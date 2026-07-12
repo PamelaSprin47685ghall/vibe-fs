@@ -105,7 +105,7 @@ let chatMessageFor
 
         if not isSystem then
             let modelOpt = tryGetModelStringFromHook input output
-            do! lifecycleObserver.OnNewHumanMessage(sessionIDStr, agent, modelOpt)
+            do! lifecycleObserver.OnNewHumanMessage(sessionIDStr, agent, modelOpt, msgId)
 
         match chatMessageFromHookOutput output with
         | None -> ()

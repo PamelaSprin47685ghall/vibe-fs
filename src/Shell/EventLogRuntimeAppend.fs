@@ -250,6 +250,8 @@ let appendHumanTurnStartedOrFail
     (model: string)
     (variant: string)
     (agent: string)
+    (humanTurnOrdinal: int)
+    (messageId: string)
     : JS.Promise<unit> =
     let payload =
         Map
@@ -257,7 +259,9 @@ let appendHumanTurnStartedOrFail
               "provider", provider
               "model", model
               "variant", variant
-              "agent", agent ]
+              "agent", agent
+              "humanTurnOrdinal", humanTurnOrdinal.ToString()
+              "messageId", messageId ]
 
     appendOrFail workspaceRoot (buildEvent sessionID eventKindHumanTurnStarted payload (getTimestampMs().ToString()))
 
@@ -275,6 +279,7 @@ let appendContinuationRequestedOrFail
     (cancelGeneration: int)
     (humanTurnID: string)
     (owner: string)
+    (continuationOrdinal: int)
     : JS.Promise<unit> =
     let payload =
         Map
@@ -285,7 +290,8 @@ let appendContinuationRequestedOrFail
               "generation", generation.ToString()
               "cancelGeneration", cancelGeneration.ToString()
               "humanTurnId", humanTurnID
-              "owner", owner ]
+              "owner", owner
+              "continuationOrdinal", continuationOrdinal.ToString() ]
 
     appendOrFail
         workspaceRoot
@@ -295,8 +301,12 @@ let appendContinuationDispatchStartedOrFail
     (workspaceRoot: string)
     (sessionID: string)
     (continuationID: string)
+    (continuationOrdinal: int)
     : JS.Promise<unit> =
-    let payload = Map [ "continuationId", continuationID ]
+    let payload =
+        Map
+            [ "continuationId", continuationID
+              "continuationOrdinal", continuationOrdinal.ToString() ]
 
     appendOrFail
         workspaceRoot
@@ -309,13 +319,15 @@ let appendContinuationDispatchedOrFail
     (modelStr: string)
     (agentStr: string)
     (atMs: int64)
+    (continuationOrdinal: int)
     : JS.Promise<unit> =
     let payload =
         Map
             [ "continuationId", continuationID
               "model", modelStr
               "agent", agentStr
-              "at", atMs.ToString() ]
+              "at", atMs.ToString()
+              "continuationOrdinal", continuationOrdinal.ToString() ]
 
     appendOrFail
         workspaceRoot
@@ -326,8 +338,14 @@ let appendContinuationFailedOrFail
     (sessionID: string)
     (continuationID: string)
     (errorMsg: string)
+    (continuationOrdinal: int)
     : JS.Promise<unit> =
-    let payload = Map [ "continuationId", continuationID; "error", errorMsg ]
+    let payload =
+        Map
+            [ "continuationId", continuationID
+              "error", errorMsg
+              "continuationOrdinal", continuationOrdinal.ToString() ]
+
     appendOrFail workspaceRoot (buildEvent sessionID eventKindContinuationFailed payload (getTimestampMs().ToString()))
 
 let appendContinuationCancelledOrFail
@@ -335,8 +353,13 @@ let appendContinuationCancelledOrFail
     (sessionID: string)
     (continuationID: string)
     (reason: string)
+    (continuationOrdinal: int)
     : JS.Promise<unit> =
-    let payload = Map [ "continuationId", continuationID; "reason", reason ]
+    let payload =
+        Map
+            [ "continuationId", continuationID
+              "reason", reason
+              "continuationOrdinal", continuationOrdinal.ToString() ]
 
     appendOrFail
         workspaceRoot
@@ -349,13 +372,15 @@ let appendContinuationSettledOrFail
     (humanTurnID: string)
     (generation: int)
     (status: string)
+    (continuationOrdinal: int)
     : JS.Promise<unit> =
     let payload =
         Map
             [ "continuationId", continuationID
               "humanTurnId", humanTurnID
               "generation", generation.ToString()
-              "status", status ]
+              "status", status
+              "continuationOrdinal", continuationOrdinal.ToString() ]
 
     appendOrFail workspaceRoot (buildEvent sessionID eventKindContinuationSettled payload (getTimestampMs().ToString()))
 
@@ -365,12 +390,14 @@ let appendCompactionStartedOrFail
     (compactionId: string)
     (generationAtStart: int)
     (humanTurnId: string)
+    (compactionOrdinal: int)
     : JS.Promise<unit> =
     let payload =
         Map
             [ "compactionId", compactionId
               "generationAtStart", generationAtStart.ToString()
-              "humanTurnId", humanTurnId ]
+              "humanTurnId", humanTurnId
+              "compactionOrdinal", compactionOrdinal.ToString() ]
 
     appendOrFail workspaceRoot (buildEvent sessionID eventKindCompactionStarted payload (getTimestampMs().ToString()))
 
@@ -379,8 +406,14 @@ let appendCompactionSettledOrFail
     (sessionID: string)
     (compactionId: string)
     (status: string)
+    (compactionOrdinal: int)
     : JS.Promise<unit> =
-    let payload = Map [ "compactionId", compactionId; "status", status ]
+    let payload =
+        Map
+            [ "compactionId", compactionId
+              "status", status
+              "compactionOrdinal", compactionOrdinal.ToString() ]
+
     appendOrFail workspaceRoot (buildEvent sessionID eventKindCompactionSettled payload (getTimestampMs().ToString()))
 
 let appendContextGenerationChangedOrFail (workspaceRoot: string) (sessionID: string) (newGen: int) : JS.Promise<unit> =
@@ -412,6 +445,7 @@ let appendNudgeRequestedOrFail
     (sessionGen: int)
     (cancelGen: int)
     (humanTurnID: string)
+    (nudgeOrdinal: int)
     : JS.Promise<unit> =
     let payload =
         Map
@@ -420,7 +454,8 @@ let appendNudgeRequestedOrFail
               "anchor", anchor
               "generation", sessionGen.ToString()
               "cancelGeneration", cancelGen.ToString()
-              "humanTurnId", humanTurnID ]
+              "humanTurnId", humanTurnID
+              "nudgeOrdinal", nudgeOrdinal.ToString() ]
 
     appendOrFail workspaceRoot (buildEvent sessionID eventKindNudgeRequested payload (getTimestampMs().ToString()))
 
@@ -430,8 +465,14 @@ let appendNudgeDispatchedOrFail
     (nudgeID: string)
     (action: string)
     (anchor: string)
+    (nudgeOrdinal: int)
     : JS.Promise<unit> =
-    let payload = Map [ "nudgeId", nudgeID; "action", action; "anchor", anchor ]
+    let payload =
+        Map
+            [ "nudgeId", nudgeID
+              "action", action
+              "anchor", anchor
+              "nudgeOrdinal", nudgeOrdinal.ToString() ]
 
     appendOrFail workspaceRoot (buildEvent sessionID eventKindNudgeDispatched payload (getTimestampMs().ToString()))
 
@@ -440,8 +481,14 @@ let appendNudgeFailedOrFail
     (sessionID: string)
     (nudgeID: string)
     (errorMsg: string)
+    (nudgeOrdinal: int)
     : JS.Promise<unit> =
-    let payload = Map [ "nudgeId", nudgeID; "error", errorMsg ]
+    let payload =
+        Map
+            [ "nudgeId", nudgeID
+              "error", errorMsg
+              "nudgeOrdinal", nudgeOrdinal.ToString() ]
+
     appendOrFail workspaceRoot (buildEvent sessionID eventKindNudgeFailed payload (getTimestampMs().ToString()))
 
 let appendNudgeCancelledOrFail
@@ -449,8 +496,14 @@ let appendNudgeCancelledOrFail
     (sessionID: string)
     (nudgeID: string)
     (reason: string)
+    (nudgeOrdinal: int)
     : JS.Promise<unit> =
-    let payload = Map [ "nudgeId", nudgeID; "reason", reason ]
+    let payload =
+        Map
+            [ "nudgeId", nudgeID
+              "reason", reason
+              "nudgeOrdinal", nudgeOrdinal.ToString() ]
+
     appendOrFail workspaceRoot (buildEvent sessionID eventKindNudgeCancelled payload (getTimestampMs().ToString()))
 
 let appendNudgeSettledOrFail
@@ -458,6 +511,12 @@ let appendNudgeSettledOrFail
     (sessionID: string)
     (nudgeID: string)
     (status: string)
+    (nudgeOrdinal: int)
     : JS.Promise<unit> =
-    let payload = Map [ "nudgeId", nudgeID; "status", status ]
+    let payload =
+        Map
+            [ "nudgeId", nudgeID
+              "status", status
+              "nudgeOrdinal", nudgeOrdinal.ToString() ]
+
     appendOrFail workspaceRoot (buildEvent sessionID eventKindNudgeSettled payload (getTimestampMs().ToString()))

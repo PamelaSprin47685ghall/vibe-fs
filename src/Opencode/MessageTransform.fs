@@ -269,6 +269,11 @@ let compactingTransform
                 | Some fr -> fr.GetHumanTurnId sessionID
                 | None -> ""
 
+            let compactionOrdinal =
+                match fallbackRuntime with
+                | Some fr -> fr.IncrementCompactionOrdinal sessionID
+                | None -> 0
+
             do!
                 Wanxiangshu.Shell.EventLogRuntime.appendCompactionStartedOrFail
                     directory
@@ -276,11 +281,12 @@ let compactingTransform
                     compactionId
                     currentGen
                     humanTurnId
+                    compactionOrdinal
 
             match fallbackRuntime with
             | Some fr ->
                 fr.SetSessionOwner sessionID "Compaction"
-                fr.SetActiveCompactionId(sessionID, compactionId)
+                fr.SetActiveCompactionId(sessionID, compactionId, compactionOrdinal)
                 fr.SetCompacted sessionID false
                 fr.SetCompactionContinuationObserved sessionID false
                 fr.SetCompactionGeneration sessionID currentGen
@@ -324,18 +330,19 @@ let compactingTransform
 
                     output?context <- Array.append currentContext [| wrappedText |]
             with ex ->
-                do!
-                    Wanxiangshu.Shell.EventLogRuntime.appendCompactionSettledOrFail
-                        directory
-                        sessionID
-                        compactionId
-                        "failed"
-
                 match fallbackRuntime with
-                | Some fr ->
-                    fr.SetSessionOwner sessionID "None"
-                    fr.SetCompacted sessionID false
-                | None -> ()
+                | Some fr when fr.GetActiveCompactionId sessionID = compactionId ->
+                    let settled = fr.TrySettleCompaction(sessionID, compactionId)
+
+                    if settled then
+                        do!
+                            Wanxiangshu.Shell.EventLogRuntime.appendCompactionSettledOrFail
+                                directory
+                                sessionID
+                                compactionId
+                                "failed"
+                                compactionOrdinal
+                | _ -> ()
 
                 return! Promise.reject ex
     }

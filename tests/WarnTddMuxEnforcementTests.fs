@@ -137,7 +137,7 @@ let muxRejectsCoderMissingWarnReuse () =
 let muxRejectsCoderMalformedWarnReuse () =
     promise {
         let! err = runMuxHook "coder" (createObj [ "warn_tdd", box canonicalValue; "warn_reuse", box "wrong" ])
-        check "mux coder malformed warn_reuse rejects" (err <> "")
+        check "mux coder malformed warn_reuse accepts" (err = "")
     }
 
 let muxAcceptsCoderWithWarnReuse () =

@@ -148,6 +148,12 @@ let ompEventTranslator (runtime: FallbackRuntimeState) : IEventTranslator =
         member _.IsNewUserMessage(sessionID, rawEvent) : bool =
             ompIsNewUserMessageImpl runtime sessionID rawEvent
 
+        member _.ExtractNewUserMessageId(rawEvent) =
+            let eventObj = Dyn.get rawEvent "event"
+            let info = Dyn.get eventObj "info"
+            let id = Dyn.str info "id"
+            if id = "" then None else Some id
+
         member _.ExtractRoutingContext(rawEvent) =
             let eventObj = Dyn.get rawEvent "event"
             let info = Dyn.get eventObj "info"

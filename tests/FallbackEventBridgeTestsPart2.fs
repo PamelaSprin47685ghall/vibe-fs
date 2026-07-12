@@ -73,6 +73,8 @@ type FakeTranslator(sessionID: string, evt: FallbackEvent) =
             | FallbackEvent.NewUserMessage -> true
             | _ -> false
 
+        member _.ExtractNewUserMessageId(_raw) = None
+
         member _.ExtractRoutingContext(_raw: obj) = None, None
 
 

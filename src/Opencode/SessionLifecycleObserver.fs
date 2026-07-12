@@ -14,6 +14,7 @@ module Dyn = Wanxiangshu.Shell.Dyn
 open Wanxiangshu.Shell.OpencodeHookInputCodec
 open Wanxiangshu.Shell.OpencodeSessionEventCodecCommon
 open Wanxiangshu.Shell.FallbackRuntimeState
+open Wanxiangshu.Shell.FallbackEventBridge
 open Wanxiangshu.Shell.EventLogRuntime
 open Wanxiangshu.Shell.ToolRuntimeContext
 open Wanxiangshu.Opencode.ProgressObserver
@@ -50,76 +51,105 @@ type SessionLifecycleObserver
     member _.handleChatMessage(sessionID: SessionId, agent: string, parts: obj) : JS.Promise<unit> =
         progress.OnChatMessage(sessionID, agent, parts)
 
-    member _.OnNewHumanMessage(sessionID: string, agent: string, modelOpt: string option) : JS.Promise<unit> =
+    member _.OnNewHumanMessage
+        (sessionID: string, agent: string, modelOpt: string option, messageId: string)
+        : JS.Promise<unit> =
         promise {
             let directory = if Dyn.isNullish ctx then "" else pluginDirectoryFromCtx ctx
 
             // Cancel any pending continuation lease on new human turn
             match fallbackRuntime.TryGetPendingLease sessionID with
             | Some lease ->
-                let cancelledLease = { lease with Status = "cancelled" }
-                fallbackRuntime.SetPendingLease(sessionID, cancelledLease)
-
-                if directory <> "" then
-                    do! appendContinuationCancelledOrFail directory sessionID lease.ContinuationID "new_human_turn"
+                do! finishContinuation fallbackRuntime directory sessionID lease "cancelled" "new_human_turn"
             | None -> ()
 
-            if directory <> "" then
-                match fallbackRuntime.TryCancelPendingNudgeLease sessionID with
-                | Some nudgeLease ->
-                    do! appendNudgeCancelledOrFail directory sessionID nudgeLease.NudgeID "new_human_turn"
-                | None -> ()
+            let msgId =
+                if messageId = "" then
+                    "human-" + System.Guid.NewGuid().ToString("N")
+                else
+                    messageId
 
-                let activeComp = fallbackRuntime.GetActiveCompactionId sessionID
-                let settled = fallbackRuntime.TrySettleCompaction(sessionID, activeComp)
+            let lastMsgId = fallbackRuntime.GetLastHumanMessageId sessionID
 
-                if settled then
-                    do! appendCompactionSettledOrFail directory sessionID activeComp "cancelled"
+            if msgId <> lastMsgId then
+                if directory <> "" then
+                    match fallbackRuntime.TryCancelPendingNudgeLease sessionID with
+                    | Some nudgeLease ->
+                        do!
+                            appendNudgeCancelledOrFail
+                                directory
+                                sessionID
+                                nudgeLease.NudgeID
+                                "new_human_turn"
+                                nudgeLease.NudgeOrdinal
+                    | None -> ()
 
-            fallbackRuntime.SetChain sessionID []
-            fallbackRuntime.ClearModel sessionID
-            fallbackRuntime.ClearInjected sessionID
-            fallbackRuntime.SetSessionOwner sessionID "Human"
-            let turnId = fallbackRuntime.IncrementHumanTurnId sessionID
-            fallbackRuntime.RemoveForceStopped sessionID
+                    let activeComp = fallbackRuntime.GetActiveCompactionId sessionID
+                    let activeCompOrdinal = fallbackRuntime.GetActiveCompactionOrdinal sessionID
+                    let settled = fallbackRuntime.TrySettleCompaction(sessionID, activeComp)
 
-            let currentGen = fallbackRuntime.GetSessionGeneration sessionID
-            let currentCancelGen = fallbackRuntime.GetCancelGeneration sessionID
-            fallbackRuntime.SetActiveContinuationGeneration sessionID currentGen
-            fallbackRuntime.SetActiveContinuationCancelGeneration sessionID currentCancelGen
+                    if settled then
+                        do! appendCompactionSettledOrFail directory sessionID activeComp "cancelled" activeCompOrdinal
 
-            match modelOpt with
-            | Some m -> fallbackRuntime.SetLatestHumanModel sessionID m
-            | None -> fallbackRuntime.ClearLatestHumanModel sessionID
+                fallbackRuntime.SetChain sessionID []
+                fallbackRuntime.ClearModel sessionID
+                fallbackRuntime.ClearInjected sessionID
+                fallbackRuntime.SetSessionOwner sessionID "Human"
+                let turnId = fallbackRuntime.IncrementHumanTurnId sessionID
+                let humanTurnOrdinal = fallbackRuntime.IncrementHumanTurnOrdinal sessionID
+                fallbackRuntime.SetLastHumanMessageId sessionID msgId
+                fallbackRuntime.RemoveForceStopped sessionID
 
-            if agent <> "" then
-                fallbackRuntime.SetAgentName sessionID agent
+                let currentGen = fallbackRuntime.GetSessionGeneration sessionID
+                let currentCancelGen = fallbackRuntime.GetCancelGeneration sessionID
+                fallbackRuntime.SetActiveContinuationGeneration sessionID currentGen
+                fallbackRuntime.SetActiveContinuationCancelGeneration sessionID currentCancelGen
 
-            let provider, model, variant =
                 match modelOpt with
-                | Some m ->
-                    match Wanxiangshu.Shell.FallbackMessageCodec.decodeModelFromObj (box m) with
-                    | Some modelObj ->
-                        modelObj.ProviderID, modelObj.ModelID, (modelObj.Variant |> Option.defaultValue "")
-                    | None -> "", m, ""
-                | None -> "", "", ""
+                | Some m -> fallbackRuntime.SetLatestHumanModel sessionID m
+                | None -> fallbackRuntime.ClearLatestHumanModel sessionID
 
-            if directory <> "" then
-                do! appendHumanTurnStartedOrFail directory sessionID turnId provider model variant agent
+                if agent <> "" then
+                    fallbackRuntime.SetAgentName sessionID agent
 
-            let state = fallbackRuntime.GetOrCreateState sessionID
+                let provider, model, variant =
+                    match modelOpt with
+                    | Some m ->
+                        match Wanxiangshu.Shell.FallbackMessageCodec.decodeModelFromObj (box m) with
+                        | Some modelObj ->
+                            modelObj.ProviderID, modelObj.ModelID, (modelObj.Variant |> Option.defaultValue "")
+                        | None -> "", m, ""
+                    | None -> "", "", ""
 
-            let ns =
-                { state with
-                    Phase = FallbackPhase.Idle
-                    ContinueCount = 0
-                    FailureCount = 0
-                    Lifecycle = FallbackLifecycle.Active
-                    RecoveryCount = 0 }
+                if directory <> "" then
+                    do!
+                        appendHumanTurnStartedOrFail
+                            directory
+                            sessionID
+                            turnId
+                            provider
+                            model
+                            variant
+                            agent
+                            humanTurnOrdinal
+                            msgId
 
-            fallbackRuntime.UpdateState sessionID ns
-            fallbackRuntime.SetConsumed sessionID false
-            fallbackRuntime.ClearConsumed sessionID
+                let state = fallbackRuntime.GetOrCreateState sessionID
+
+                let ns =
+                    { state with
+                        Phase = FallbackPhase.Idle
+                        ContinueCount = 0
+                        FailureCount = 0
+                        Lifecycle = FallbackLifecycle.Active
+                        RecoveryCount = 0 }
+
+                fallbackRuntime.UpdateState sessionID ns
+                fallbackRuntime.SetConsumed sessionID false
+                fallbackRuntime.ClearConsumed sessionID
+            else
+                // Duplicate new-human-message hook for the same source message; state already reset.
+                ()
         }
 
     member _.FallbackRuntime = fallbackRuntime

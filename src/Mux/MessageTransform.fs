@@ -174,6 +174,11 @@ let compactingTransform
                 | Some fr -> fr.GetHumanTurnId sessionID
                 | None -> ""
 
+            let compactionOrdinal =
+                match fallbackRuntime with
+                | Some fr -> fr.IncrementCompactionOrdinal sessionID
+                | None -> 0
+
             do!
                 Wanxiangshu.Shell.EventLogRuntime.appendCompactionStartedOrFail
                     directory
@@ -181,11 +186,12 @@ let compactingTransform
                     compactionId
                     gen
                     turnId
+                    compactionOrdinal
 
             match fallbackRuntime with
             | Some fr ->
                 fr.SetSessionOwner sessionID "Compaction"
-                fr.SetActiveCompactionId(sessionID, compactionId)
+                fr.SetActiveCompactionId(sessionID, compactionId, compactionOrdinal)
             | None -> ()
 
             let result =

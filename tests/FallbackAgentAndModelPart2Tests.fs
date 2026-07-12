@@ -218,7 +218,7 @@ let opencodeNewUserMessageResetsChainAndModelSpec () =
                 BacklogSession(Opencode, create ())
             )
 
-        do! observer.OnNewHumanMessage(sid, "manager", None)
+        do! observer.OnNewHumanMessage(sid, "manager", None, "msg-1")
 
         let chain = rt.GetChain sid
         let modelOpt = rt.GetModel sid

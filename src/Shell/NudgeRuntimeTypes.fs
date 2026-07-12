@@ -151,29 +151,33 @@ let finishNudge
     (anchor: string)
     : JS.Promise<unit> =
     promise {
-        let isCurrent =
-            match runtime.TryGetPendingNudgeLease sessionKey with
-            | Some nl -> nl.NudgeID = lease.NudgeID
-            | None -> false
-
-        if isCurrent then
+        match runtime.TryGetPendingNudgeLease sessionKey with
+        | Some nl when nl.NudgeID = lease.NudgeID ->
             if outcome = "failed" then
-                do! appendNudgeFailedOrFail workspaceRoot sessionKey lease.NudgeID errorOrReason
+                do! appendNudgeFailedOrFail workspaceRoot sessionKey lease.NudgeID errorOrReason lease.NudgeOrdinal
             elif outcome = "cancelled" then
-                do! appendNudgeCancelledOrFail workspaceRoot sessionKey lease.NudgeID errorOrReason
+                do! appendNudgeCancelledOrFail workspaceRoot sessionKey lease.NudgeID errorOrReason lease.NudgeOrdinal
             elif outcome = "dispatched" then
-                do! appendNudgeDispatchedOrFail workspaceRoot sessionKey lease.NudgeID actionStr anchor
+                do!
+                    appendNudgeDispatchedOrFail
+                        workspaceRoot
+                        sessionKey
+                        lease.NudgeID
+                        actionStr
+                        anchor
+                        lease.NudgeOrdinal
             elif outcome = "settled" then
-                do! appendNudgeSettledOrFail workspaceRoot sessionKey lease.NudgeID errorOrReason
+                do! appendNudgeSettledOrFail workspaceRoot sessionKey lease.NudgeID errorOrReason lease.NudgeOrdinal
 
             if outcome <> "dispatched" then
-                runtime.ClearPendingNudgeLease sessionKey
-                runtime.ClearActiveNudgeNonce sessionKey
+                if runtime.TryClearPendingNudgeLease(sessionKey, lease.NudgeID) then
+                    runtime.ClearActiveNudgeNonce sessionKey
 
-                if runtime.GetSessionOwner sessionKey = "Nudge" then
-                    runtime.SetSessionOwner sessionKey "None"
+                    if runtime.GetSessionOwner sessionKey = "Nudge" then
+                        runtime.SetSessionOwner sessionKey "None"
 
-                runtime.SetNudgeActive sessionKey false
+                    runtime.SetNudgeActive sessionKey false
+        | _ -> ()
     }
 
 let runNudgeFlowCore
@@ -199,6 +203,7 @@ let runNudgeFlowCore
                     let sessionGen = fallbackRuntime.GetSessionGeneration sessionKey
                     let cancelGen = fallbackRuntime.GetCancelGeneration sessionKey
                     let humanTurnId = fallbackRuntime.GetHumanTurnId sessionKey
+                    let nudgeOrdinal = fallbackRuntime.IncrementNudgeOrdinal sessionKey
                     let nudgeId = "nudge-" + System.Guid.NewGuid().ToString("N")
                     let nonce = "nudge_" + System.Guid.NewGuid().ToString("N")
 
@@ -216,6 +221,7 @@ let runNudgeFlowCore
                                         sessionGen
                                         cancelGen
                                         humanTurnId
+                                        nudgeOrdinal
                             with _ ->
                                 return false
                         }
@@ -227,6 +233,7 @@ let runNudgeFlowCore
                     else
                         let lease: NudgeLease =
                             { NudgeID = nudgeId
+                              NudgeOrdinal = nudgeOrdinal
                               Nonce = nonce
                               HumanTurnID = humanTurnId
                               SessionGeneration = sessionGen

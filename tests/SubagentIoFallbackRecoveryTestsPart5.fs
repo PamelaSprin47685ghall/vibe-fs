@@ -81,6 +81,7 @@ let handleEvent_doesNotClearSubsessionPending () =
                 member _.IsSessionIdle _ = false
                 member _.IsSessionBusy _ = false
                 member _.IsNewUserMessage(_, _) = false
+                member _.ExtractNewUserMessageId _ = None
                 member _.ExtractRoutingContext _ = None, None }
 
         let executor =
@@ -178,6 +179,7 @@ let runSubagentWaitsThroughFallbackSendContinue () =
                 member _.IsSessionIdle _ = false
                 member _.IsSessionBusy _ = false
                 member _.IsNewUserMessage(_, _) = false
+                member _.ExtractNewUserMessageId _ = None
                 member _.ExtractRoutingContext _ = None, None }
 
         let executor =

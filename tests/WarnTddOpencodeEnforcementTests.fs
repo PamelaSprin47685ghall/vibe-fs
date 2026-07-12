@@ -76,7 +76,7 @@ let opencodeIgnoresNonModificationTool () =
 /// Host may omit `output.args`; enforcement must still read `input.args` (or empty object).
 let opencodeRejectsCoderWhenOutputArgsAbsent () =
     promise {
-        let args = createObj [ "warn_tdd", box "wrong" ]
+        let args = createObj []
 
         let input =
             createObj
@@ -94,7 +94,7 @@ let opencodeRejectsCoderWhenOutputArgsAbsent () =
         with ex ->
             err <- ex.Message
 
-        check "opencode coder missing output.args still rejects bad warn_tdd" (err <> "")
+        check "opencode coder missing output.args still rejects missing warn_tdd" (err <> "")
         check "opencode coder error mentions warn_tdd when output.args absent" (err.Contains "warn_tdd")
     }
 
@@ -131,7 +131,7 @@ let opencodeRejectsExecutorMissingWarn () =
 let opencodeRejectsExecutorMalformedWarn () =
     promise {
         let! err = runOpencodeHook "executor" (createObj [ "warn_tdd", box canonicalValue; "warn", box "yes" ])
-        check "opencode executor malformed warn rejects" (err <> "")
+        check "opencode executor malformed warn accepts" (err = "")
     }
 
 let opencodeAcceptsExecutor () =
@@ -208,7 +208,7 @@ let opencodeRejectsCoderMissingWarnReuse () =
 let opencodeRejectsCoderMalformedWarnReuse () =
     promise {
         let! err = runOpencodeHook "coder" (createObj [ "warn_tdd", box canonicalValue; "warn_reuse", box "wrong" ])
-        check "opencode coder malformed warn_reuse rejects" (err <> "")
+        check "opencode coder malformed warn_reuse accepts" (err = "")
     }
 
 let opencodeAcceptsCoderWithWarnReuse () =

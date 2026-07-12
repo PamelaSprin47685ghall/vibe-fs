@@ -70,12 +70,14 @@ type FakeTranslator(sessionID: string, evt: FallbackEvent) =
             | FallbackEvent.SessionBusy -> true
             | _ -> false
 
-        member _.IsNewUserMessage(_sid, _raw: obj) : bool =
+        member _.IsNewUserMessage(_sid, _rawEvent: obj) : bool =
             match _ev with
             | FallbackEvent.NewUserMessage -> true
             | _ -> false
 
-        member _.ExtractRoutingContext(_raw: obj) = None, None
+        member _.ExtractNewUserMessageId(_rawEvent) = None
+
+        member _.ExtractRoutingContext(_rawEvent: obj) = None, None
 
 
 let mkModel (pid: string) (mid: string) : FallbackModel =

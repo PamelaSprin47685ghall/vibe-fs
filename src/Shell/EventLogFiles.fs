@@ -153,6 +153,7 @@ type EventLogStore(workspaceRoot: string, ?appendLineOverride: string -> WanEven
         (sessionGen: int)
         (cancelGen: int)
         (humanTurnId: string)
+        (nudgeOrdinal: int)
         (isBlocked: NudgeDedupState -> string -> bool)
         : JS.Promise<bool> =
         queue.Enqueue(fun () ->
@@ -199,7 +200,8 @@ type EventLogStore(workspaceRoot: string, ?appendLineOverride: string -> WanEven
                               "nonce", nonce
                               "generation", sessionGen.ToString()
                               "cancelGeneration", cancelGen.ToString()
-                              "humanTurnId", humanTurnId ]
+                              "humanTurnId", humanTurnId
+                              "nudgeOrdinal", nudgeOrdinal.ToString() ]
 
                     let ev =
                         buildEvent sessionId eventKindNudgeRequested payload (getTimestampMs().ToString())

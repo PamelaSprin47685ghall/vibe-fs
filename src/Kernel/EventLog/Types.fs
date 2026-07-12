@@ -8,6 +8,13 @@ type WanEvent =
       At: string
       Payload: Map<string, string> }
 
+type EpisodeStage =
+    | NoEpisode
+    | Requested
+    | DispatchStarted
+    | Dispatched
+    | Terminal
+
 let eventKindAssistantCompleted = "assistant_completed"
 let eventKindLoopActivated = "loop_activated"
 let eventKindLoopCancelled = "loop_cancelled"

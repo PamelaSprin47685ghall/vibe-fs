@@ -67,6 +67,8 @@ let muxEventTranslator: IEventTranslator =
 
         member _.IsNewUserMessage(_sessionID, _rawEvent) : bool = false
 
+        member _.ExtractNewUserMessageId(_rawEvent) = None
+
         member _.ExtractRoutingContext(_rawEvent) = None, None }
 
 let muxActionExecutor (helpers: obj) : IActionExecutor =
