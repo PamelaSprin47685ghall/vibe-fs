@@ -67,7 +67,7 @@ Payload 在 Kernel 层多为 `Map<string,string>`（与 Shell codec 解耦）。
 
 ## 提示词与宝典
 
-用户可见「Kolmolgorov 宝典 / 铁律」类长文本的 SSOT 在 **`CapsPrelude`**（及 `CapsFormat` 组装）。MessageTransform 只**引用** Shell 缓存组装结果，不在宿主目录复制 caps 正文；行为测试验证最终注入内容。
+用户可见「Kolmogorov 宝典 / 铁律」类长文本的 SSOT 在 **`CapsPrelude`**（及 `CapsFormat` 组装）。MessageTransform 只**引用** Shell 缓存组装结果，不在宿主目录复制 caps 正文；行为测试验证最终注入内容。
 
 ## 修改 Kernel 的检查清单
 

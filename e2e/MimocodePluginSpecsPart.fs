@@ -38,7 +38,7 @@ let dynTypeIs (o: obj) (t: string) = typeIs o t
 let dynStr (o: obj) (k: string) = str o k
 
 let warnTddValue =
-    "i-am-sure-i-have-followed-tdd-and-kolmolgorov-principles-and-kept-todo-updated"
+    "i-am-sure-i-have-followed-tdd-and-kolmogorov-principles-and-kept-todo-updated"
 
 let warnValue =
     "it-is-not-possible-to-do-it-using-other-tools-and-only-run-tests-when-static-analysis-cannot-handle-it"

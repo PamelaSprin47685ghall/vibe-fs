@@ -166,7 +166,6 @@ let private mkTodoWriteWrapper (host: Host) (projection: ProjectionStore) : obj 
                         | _, Error e ->
                             return createObj [ "success", box false; "output", box (wireDecodeFailure "todowrite" e) ]
                         | Ok(tw, violations), Ok o ->
-                            captureTodoReportFromDecoded host projection tw o
                             let methodologies = tw.SelectMethodology
                             let nativeArgs = createObj [ "todos", todoArrayForNativeWrite tw ]
                             let raw = invokeToolExecute tool nativeArgs opts
@@ -186,28 +185,45 @@ let private mkTodoWriteWrapper (host: Host) (projection: ProjectionStore) : obj 
                                 else
                                     todoWriteOutput methodologies
 
+                            let sid =
+                                match fromMuxConfig opts with
+                                | Ok runtime -> workspaceIdString runtime
+                                | _ -> ""
+
+                            let toolCallID = o.ToolCallId
+
+                            if not isError then
+                                captureTodoReportFromDecoded host projection tw o
+
+                                if sid <> "" then
+                                    match fromMuxConfig opts with
+                                    | Ok runtime ->
+                                        let root = runtime.Execution.Directory
+
+                                        if root <> "" then
+                                            do! appendWorkBacklogCommitted root sid tw |> Promise.map ignore
+                                    | _ -> ()
+
+                            let envOpt = ToolHookRuntime.tryGetCompliance sid toolCallID
+
+                            let allViolations =
+                                match envOpt with
+                                | Some env -> env.Violations @ violations |> List.distinct
+                                | None -> violations
+
                             let status =
                                 if isError then
                                     ToolHookRuntime.ExecutionStatus.Failure
                                 else
                                     ToolHookRuntime.ExecutionStatus.Success
 
-                            let finalOutput = ToolHookRuntime.appendCriticism output violations status
+                            let finalOutput = ToolHookRuntime.appendCriticism output allViolations status
 
                             let nextResult =
                                 if Dyn.typeIs result "object" then
                                     Dyn.withKey result "output" (box finalOutput)
                                 else
-                                    createObj [ "success", box true; "output", box finalOutput ]
-
-                            match fromMuxConfig opts with
-                            | Ok runtime ->
-                                let root = runtime.Execution.Directory
-                                let sid = workspaceIdString runtime
-
-                                if sid <> "" && root <> "" then
-                                    do! appendWorkBacklogCommitted root sid tw |> Promise.map ignore
-                            | _ -> ()
+                                    createObj [ "success", box (not isError); "output", box finalOutput ]
 
                             return nextResult
                     })

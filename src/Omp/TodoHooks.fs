@@ -90,6 +90,7 @@ let toolResultHandler (_pi: obj) (_reviewStore: ReviewStore) (event: obj) (ctx: 
                 do! appendToolResultSyntax (Dyn.str ctx "cwd") event
 
                 let mutable textAfterSyntax = getToolResultText event
+                businessProcessedText <- textAfterSyntax
 
                 if toolName = todoWriteToolName omp then
                     let callId = getToolCallId event
@@ -125,12 +126,17 @@ let toolResultHandler (_pi: obj) (_reviewStore: ReviewStore) (event: obj) (ctx: 
                         else
                             (Dyn.str input "plan").Trim()
 
+                    let isError =
+                        Dyn.truthy (Dyn.get event "isError")
+                        || (let err = Dyn.get event "error" in not (Dyn.isNullish err) && string err <> "")
+
                     if
-                        (ahaMoments <> ""
-                         || changesAndReasons <> ""
-                         || gotchas <> ""
-                         || lessonsAndConventions <> ""
-                         || plan <> "")
+                        not isError
+                        && (ahaMoments <> ""
+                            || changesAndReasons <> ""
+                            || gotchas <> ""
+                            || lessonsAndConventions <> ""
+                            || plan <> "")
                         && callId <> ""
                     then
                         let entry: BacklogEntry =
@@ -155,14 +161,8 @@ let toolResultHandler (_pi: obj) (_reviewStore: ReviewStore) (event: obj) (ctx: 
                             let rawArr = unbox<obj array> raw
                             rawArr |> Seq.map string |> List.ofSeq
 
-                    let isError =
-                        Dyn.truthy (Dyn.get event "isError")
-                        || (let err = Dyn.get event "error" in not (Dyn.isNullish err) && string err <> "")
-
                     if textAfterSyntax <> "" && not isError then
-                        textAfterSyntax <- todoWriteOutput methodologies
-
-                    businessProcessedText <- textAfterSyntax
+                        businessProcessedText <- todoWriteOutput methodologies
 
             // 5. 确定最终 Success / Failure / Cancelled 状态
             let isError =
@@ -238,4 +238,5 @@ let sessionShutdownHandler (reviewStore: ReviewStore) (ctx: obj) : JS.Promise<un
 
             do! cleanupRunnerJob ExecutorTools.ompScope sessionId
             Wanxiangshu.Shell.LivelockGuard.cleanup ExecutorTools.ompScope sessionId
+            Wanxiangshu.Shell.ToolHookRuntime.closeSession sessionId
     }

@@ -199,7 +199,7 @@ let runRest
             else
                 ""
 
-        chk "mux.messageTransform.capsHasKolmolgorov" (firstText.Contains "# Kolmolgorov 宝典")
+        chk "mux.messageTransform.capsHasKolmogorov" (firstText.Contains "# Kolmogorov 宝典")
         chk "mux.messageTransform.capsHasIronLaw" (firstText.Contains "铁律")
 
         // --- 5c. Message transform: system transform injection ----------------

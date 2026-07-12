@@ -161,7 +161,7 @@ function handleChat(req, res, queue, calls, url) {
 
     if (item?.tool) {
       const args = {
-        warn_tdd: 'i-am-sure-i-have-followed-tdd-and-kolmolgorov-principles-and-kept-todo-updated',
+        warn_tdd: 'i-am-sure-i-have-followed-tdd-and-kolmogorov-principles-and-kept-todo-updated',
         warn_reuse: 'this-task-is-not-suitable-to-be-completed-via-continue-tool',
         warn: 'it-is-not-possible-to-do-it-using-other-tools-and-only-run-tests-when-static-analysis-cannot-handle-it',
         ...(item.args ?? {})

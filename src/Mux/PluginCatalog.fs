@@ -161,19 +161,27 @@ let toolExecuteAfter (scope: RuntimeScope) (input: obj) (output: obj) : JS.Promi
             let outputArgs = argsFromHookOutputMux output
             restoreAmendToArgs outputArgs amendVal
 
+        let todoViolations =
+            if tool = todoWriteToolName Mux && not (Dyn.isNullish decoded.Args) then
+                match Wanxiangshu.Shell.WorkBacklogToolsCodec.decodeTodoWriteArgs false decoded.Args with
+                | Ok(_, viols) -> viols
+                | Error _ -> []
+            else
+                []
+
+        let currentOutput = hookOutputTextMux output
+        let isError = hookOutputErrorMux output <> "" || isNetworkErrorText currentOutput
+
         let toolCallID =
             ToolHookRuntime.tryExtractToolCallId input |> Option.defaultValue ""
 
         match ToolHookRuntime.tryGetCompliance sessionID toolCallID with
         | Some env ->
-            ToolHookRuntime.restoreWarnToArgs decoded.Args env
+            restoreAmendToArgs decoded.Args env
             let inputArgs = argsFromMuxToolExecuteInput input
-            ToolHookRuntime.restoreWarnToArgs inputArgs env
+            restoreAmendToArgs inputArgs env
             let outputArgs = argsFromHookOutputMux output
-            ToolHookRuntime.restoreWarnToArgs outputArgs env
-
-            let currentOutput = hookOutputTextMux output
-            let isError = hookOutputErrorMux output <> "" || isNetworkErrorText currentOutput
+            restoreAmendToArgs outputArgs env
 
             let status =
                 if env.Cancelled then
@@ -183,12 +191,23 @@ let toolExecuteAfter (scope: RuntimeScope) (input: obj) (output: obj) : JS.Promi
                 else
                     ToolHookRuntime.ExecutionStatus.Success
 
-            if not env.Violations.IsEmpty then
-                let criticism = ToolHookRuntime.appendCriticism currentOutput env.Violations status
+            let allViolations = env.Violations @ todoViolations |> List.distinct
+
+            if not allViolations.IsEmpty then
+                let criticism = ToolHookRuntime.appendCriticism currentOutput allViolations status
                 setHookOutputStringMux output criticism
 
             ToolHookRuntime.removeCompliance sessionID toolCallID
-        | None -> ()
+        | None ->
+            let status =
+                if isError then
+                    ToolHookRuntime.ExecutionStatus.Failure
+                else
+                    ToolHookRuntime.ExecutionStatus.Success
+
+            if not todoViolations.IsEmpty then
+                let criticism = ToolHookRuntime.appendCriticism currentOutput todoViolations status
+                setHookOutputStringMux output criticism
 
         let argsJson = JS.JSON.stringify decoded.Args
 

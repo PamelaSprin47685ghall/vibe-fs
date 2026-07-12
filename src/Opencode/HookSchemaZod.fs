@@ -158,12 +158,9 @@ let buildExtensionProperties
 
         match tryCallSchemaMethod templateStr "describe" (box desc) with
         | Some describedStr ->
-            let optStr =
-                match tryCallSchemaMethod0 (unbox<IZodSchema> describedStr) "optional" with
-                | Some optionalStr -> optionalStr
-                | None -> describedStr
-
-            extProps <- (field, optStr) :: extProps
+            match tryCallSchemaMethod0 (unbox<IZodSchema> describedStr) "optional" with
+            | Some optionalStr -> extProps <- (field, optionalStr) :: extProps
+            | None -> ()
         | None -> ()
 
     if existingMethodology.IsNone then

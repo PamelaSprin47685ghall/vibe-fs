@@ -220,7 +220,7 @@ let runMimoMessageTransform (h: Harness) (chk: string -> bool -> unit) =
                 else
                     ""
 
-            chk "mimo.messageTransform.capsHasKolmolgorov" (firstText.Contains "# Kolmolgorov 宝典")
+            chk "mimo.messageTransform.capsHasKolmogorov" (firstText.Contains "# Kolmogorov 宝典")
     }
 
 let runMimoSystemTransform (h: Harness) (chk: string -> bool -> unit) =

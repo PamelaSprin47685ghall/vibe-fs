@@ -58,9 +58,19 @@ type ProgressObserver
                     || ToolExecute.isNetworkErrorText (hookOutputText output)
 
                 match hookOutputString output with
-                | Some _ ->
+                | Some oldText ->
                     if not isError then
-                        setHookOutputString output (todoWriteOutput methodologies)
+                        let newBase = todoWriteOutput methodologies
+
+                        let finalOutput =
+                            let markerIdx = oldText.IndexOf(ToolHookRuntime.reprimandMarker)
+
+                            if markerIdx >= 0 then
+                                newBase + oldText.Substring(markerIdx)
+                            else
+                                newBase
+
+                        setHookOutputString output finalOutput
 
                     let directory =
                         (fromOpencode input (pluginDirectoryFromCtx ctx)).Execution.Directory
@@ -77,26 +87,11 @@ type ProgressObserver
 
                     let args = argsFromHookInput input
 
-                    if not (Dyn.isNullish args) then
+                    if not (Dyn.isNullish args) && not isError then
                         match decodeTodoWriteArgs (host = Mimocode) args with
-                        | Ok(decodedArgs, violations) when sid <> "" ->
+                        | Ok(decodedArgs, _) when sid <> "" ->
                             do! appendWorkBacklogCommittedOrFail directory sid decodedArgs
-
-                            if not violations.IsEmpty then
-                                let currentOutput = hookOutputText output
-
-                                let isError =
-                                    hookOutputError output <> "" || ToolExecute.isNetworkErrorText currentOutput
-
-                                let status =
-                                    if isError then
-                                        ToolHookRuntime.ExecutionStatus.Failure
-                                    else
-                                        ToolHookRuntime.ExecutionStatus.Success
-
-                                let criticism = ToolHookRuntime.appendCriticism currentOutput violations status
-                                setHookOutputString output criticism
-                        | Error err -> failwithf "DECODE_FAILED: %A" err
+                        | _ -> ()
                 | None -> ()
             elif tool = "task_complete" then
                 let sid = sessionIdFromHookInput input ""

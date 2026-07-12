@@ -150,7 +150,7 @@ let runAll (args: string array) : JS.Promise<int> =
                 // 1. caps-prelude
                 do! textRound harness sessionID "hello"
                 let b = bodies harness
-                chk "e2e.caps-prelude.injected" (b.Contains "# Kolmolgorov 宝典")
+                chk "e2e.caps-prelude.injected" (b.Contains "# Kolmogorov 宝典")
                 chk "e2e.caps-prelude.has-iron-law" (b.Contains "# 铁律")
 
                 // 2. write

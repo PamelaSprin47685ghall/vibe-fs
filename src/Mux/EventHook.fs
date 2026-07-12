@@ -124,6 +124,7 @@ let createEventHook (deps: obj) (reviewStore: ReviewStore) (scope: RuntimeScope)
                         do! syncReviewFromEventLogDedicated reviewStore root workspaceId
 
                         Wanxiangshu.Shell.ToolHookRuntime.clearSessionCompliance workspaceId
+                        Wanxiangshu.Shell.ToolHookRuntime.closeSession workspaceId
                         Wanxiangshu.Shell.RunnerBackground.abortRunnerJobCore scope workspaceId
                     | _ -> ()
 

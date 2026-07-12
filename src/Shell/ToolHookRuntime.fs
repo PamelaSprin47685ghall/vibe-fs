@@ -126,6 +126,8 @@ type ToolCapability =
 let private sessionCancelGenerations =
     System.Collections.Generic.Dictionary<string, int>()
 
+let private closedSessions = System.Collections.Generic.HashSet<string>()
+
 let getSessionCancelGeneration (sessionID: string) : int =
     if System.String.IsNullOrWhiteSpace sessionID then
         0
@@ -198,7 +200,24 @@ let removeCompliance (sessionID: string) (toolCallID: string) : unit =
 
             if innerStore.Count = 0 then
                 complianceStore.Remove(sessionID) |> ignore
+
+                if closedSessions.Contains(sessionID) then
+                    sessionCancelGenerations.Remove(sessionID) |> ignore
+                    closedSessions.Remove(sessionID) |> ignore
         | _ -> ()
+
+let closeSession (sessionID: string) : unit =
+    if not (System.String.IsNullOrWhiteSpace sessionID) then
+        closedSessions.Add(sessionID) |> ignore
+
+        let isEmpty =
+            match complianceStore.TryGetValue(sessionID) with
+            | true, innerStore -> innerStore.Count = 0
+            | _ -> true
+
+        if isEmpty then
+            sessionCancelGenerations.Remove(sessionID) |> ignore
+            closedSessions.Remove(sessionID) |> ignore
 
 let clearSessionCompliance (sessionID: string) : unit =
     if not (System.String.IsNullOrWhiteSpace sessionID) then
