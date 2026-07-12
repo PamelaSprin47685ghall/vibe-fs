@@ -14,6 +14,7 @@ open Wanxiangshu.Shell.OpencodeSessionEventCodecCommon
 open Wanxiangshu.Shell.OpencodeHookInputCodec
 open Wanxiangshu.Shell.ToolRuntimeContext
 open Wanxiangshu.Shell.EventLogRuntime
+open Wanxiangshu.Shell.NudgeRuntimeTypes
 open Wanxiangshu.Opencode.NudgeEffect
 open Wanxiangshu.Opencode.FallbackHooksHelper
 
@@ -162,8 +163,16 @@ type NudgeTrigger
                         else
                             TerminalOrigin.Unknown
 
-                    if owner = "Fallback" || owner = "Nudge" || owner = "Title" then
+                    if owner = "Fallback" || owner = "Title" then
                         fallbackRuntime.SetSessionOwner sessionIDStr "None"
+                    elif owner = "Nudge" then
+                        match fallbackRuntime.TryGetPendingNudgeLease sessionIDStr with
+                        | Some lease ->
+                            let directory = pluginDirectoryFromCtx ctx
+
+                            if directory <> "" then
+                                do! finishNudge fallbackRuntime directory sessionIDStr lease "settled" "completed" "" ""
+                        | None -> fallbackRuntime.SetSessionOwner sessionIDStr "None"
                     elif
                         owner = "Compaction"
                         && fallbackRuntime.IsCompacted sessionIDStr

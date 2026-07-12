@@ -162,7 +162,8 @@ let private collectSnapshot
                                     let blockStatus =
                                         if
                                             isNudgeBlockedForAnchor
-                                                { DispatchedAnchors = snap.dispatchedAnchors }
+                                                { DispatchedAnchors = snap.dispatchedAnchors
+                                                  PendingNudges = snap.pendingNudges }
                                                 anchor
                                         then
                                             NudgeBlockStatus.Blocked

@@ -83,6 +83,7 @@ let appendNudgeRequestedOrFail = EventLogRuntimeAppend.appendNudgeRequestedOrFai
 let appendNudgeDispatchedOrFail = EventLogRuntimeAppend.appendNudgeDispatchedOrFail
 let appendNudgeFailedOrFail = EventLogRuntimeAppend.appendNudgeFailedOrFail
 let appendNudgeCancelledOrFail = EventLogRuntimeAppend.appendNudgeCancelledOrFail
+let appendNudgeSettledOrFail = EventLogRuntimeAppend.appendNudgeSettledOrFail
 
 let appendSubagentSpawned = EventLogRuntimeAppend.appendSubagentSpawned
 let appendSubagentSpawnedOrFail = EventLogRuntimeAppend.appendSubagentSpawnedOrFail

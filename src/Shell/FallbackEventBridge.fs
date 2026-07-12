@@ -88,6 +88,37 @@ let verifyLeaseWithStatus
 let verifyLease (runtime: FallbackRuntimeState) (sessionID: string) (lease: PendingLease) : bool =
     verifyLeaseWithStatus "requested" runtime sessionID lease
 
+let finishContinuation
+    (runtime: FallbackRuntimeState)
+    (workspaceRoot: string)
+    (sessionID: string)
+    (lease: PendingLease)
+    (outcome: string) // "failed", "cancelled", "settled"
+    (errorOrReason: string)
+    : JS.Promise<unit> =
+    promise {
+        if outcome = "failed" then
+            do! appendContinuationFailedOrFail workspaceRoot sessionID lease.ContinuationID errorOrReason
+        elif outcome = "cancelled" then
+            do! appendContinuationCancelledOrFail workspaceRoot sessionID lease.ContinuationID errorOrReason
+        elif outcome = "settled" then
+            do!
+                appendContinuationSettledOrFail
+                    workspaceRoot
+                    sessionID
+                    lease.ContinuationID
+                    lease.HumanTurnID
+                    lease.SessionGeneration
+                    errorOrReason
+
+        runtime.ClearPendingLease sessionID
+
+        if runtime.GetSessionOwner sessionID = "Fallback" then
+            runtime.SetSessionOwner sessionID "None"
+
+        runtime.SetAwaitingBusy sessionID false
+    }
+
 let executeContinuationIntent
     (runtime: FallbackRuntimeState)
     (executor: IActionExecutor)
@@ -123,14 +154,14 @@ let executeContinuationIntent
 
                     if not isValid then
                         do! executor.AbortRun sessionID
-                        let cancelledLease = { lease with Status = "cancelled" }
-                        runtime.SetPendingLease(sessionID, cancelledLease)
 
                         do!
-                            appendContinuationCancelledOrFail
+                            finishContinuation
+                                runtime
                                 workspaceRoot
                                 sessionID
-                                continuationID
+                                lease
+                                "cancelled"
                                 "Cancelled after dispatch"
                     else
                         let dispatchedLease = { lease with Status = "dispatched" }
@@ -154,13 +185,9 @@ let executeContinuationIntent
                                 agent
                                 atMs
                 with ex ->
-                    let failedLease = { lease with Status = "failed" }
-                    runtime.SetPendingLease(sessionID, failedLease)
-                    do! appendContinuationFailedOrFail workspaceRoot sessionID continuationID ex.Message
+                    do! finishContinuation runtime workspaceRoot sessionID lease "failed" ex.Message
             else
-                let cancelledLease = { lease with Status = "cancelled" }
-                runtime.SetPendingLease(sessionID, cancelledLease)
-                do! appendContinuationCancelledOrFail workspaceRoot sessionID continuationID "Lease validation failed"
+                do! finishContinuation runtime workspaceRoot sessionID lease "cancelled" "Lease validation failed"
 
         | RecoverWithPromptIntent(model, promptText, agent, turnId, gen, cancelGen, continuationID) ->
             let lease =
@@ -188,14 +215,14 @@ let executeContinuationIntent
 
                     if not isValid then
                         do! executor.AbortRun sessionID
-                        let cancelledLease = { lease with Status = "cancelled" }
-                        runtime.SetPendingLease(sessionID, cancelledLease)
 
                         do!
-                            appendContinuationCancelledOrFail
+                            finishContinuation
+                                runtime
                                 workspaceRoot
                                 sessionID
-                                continuationID
+                                lease
+                                "cancelled"
                                 "Cancelled after dispatch"
                     else
                         let dispatchedLease = { lease with Status = "dispatched" }
@@ -217,13 +244,9 @@ let executeContinuationIntent
                                 agent
                                 atMs
                 with ex ->
-                    let failedLease = { lease with Status = "failed" }
-                    runtime.SetPendingLease(sessionID, failedLease)
-                    do! appendContinuationFailedOrFail workspaceRoot sessionID continuationID ex.Message
+                    do! finishContinuation runtime workspaceRoot sessionID lease "failed" ex.Message
             else
-                let cancelledLease = { lease with Status = "cancelled" }
-                runtime.SetPendingLease(sessionID, cancelledLease)
-                do! appendContinuationCancelledOrFail workspaceRoot sessionID continuationID "Lease validation failed"
+                do! finishContinuation runtime workspaceRoot sessionID lease "cancelled" "Lease validation failed"
 
         | PropagateFailureIntent -> do! executor.PropagateFailure sessionID
     }
@@ -468,10 +491,24 @@ let handleEvent
                     let mutable finalState = ns
 
                     let terminalStates =
-                        ns.Lifecycle = FallbackLifecycle.TaskComplete
-                        || ns.Lifecycle = FallbackLifecycle.Cancelled
-                        || ns.Phase = FallbackPhase.Exhausted
-                        || (ns.Phase = FallbackPhase.Idle && action = FallbackAction.DoNothing)
+                        evt <> FallbackEvent.SessionBusy
+                        && (ns.Lifecycle = FallbackLifecycle.TaskComplete
+                            || ns.Lifecycle = FallbackLifecycle.Cancelled
+                            || ns.Phase = FallbackPhase.Exhausted
+                            || (ns.Phase = FallbackPhase.Idle && action = FallbackAction.DoNothing))
+
+                    if evt = FallbackEvent.SessionBusy then
+                        match runtime.TryGetPendingLease sessionID with
+                        | Some lease when lease.Status = "dispatch_started" || lease.Status = "dispatched" ->
+                            let runningLease = { lease with Status = "running" }
+                            runtime.SetPendingLease(sessionID, runningLease)
+                        | _ -> ()
+
+                        match runtime.TryGetPendingNudgeLease sessionID with
+                        | Some lease when lease.Status = "dispatch_started" || lease.Status = "dispatched" ->
+                            let runningLease = { lease with Status = "running" }
+                            runtime.SetPendingNudgeLease(sessionID, runningLease)
+                        | _ -> ()
 
                     if terminalStates then
                         match runtime.TryGetPendingLease sessionID with

@@ -103,10 +103,8 @@ let syncAllSessionsFromEventLogDedicated
                 let! exists = directoryExists workspaceRoot
 
                 if exists then
-                    let! allEvents = getStore(workspaceRoot).ReadAllEvents()
-
-                    let sessionIds =
-                        allEvents |> Seq.map (fun e -> e.Session) |> Seq.distinct |> Seq.toList
+                    let! allStates = getStore(workspaceRoot).GetAllSessionStates()
+                    let sessionIds = allStates |> Map.keys |> Seq.toList
 
                     for sid in sessionIds do
                         let! state = getStore(workspaceRoot).GetSessionState(sid)

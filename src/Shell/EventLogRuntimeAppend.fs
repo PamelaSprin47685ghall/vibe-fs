@@ -445,3 +445,12 @@ let appendNudgeCancelledOrFail
     : JS.Promise<unit> =
     let payload = Map [ "nudgeId", nudgeID; "reason", reason ]
     appendOrFail workspaceRoot (buildEvent sessionID eventKindNudgeCancelled payload (getTimestampMs().ToString()))
+
+let appendNudgeSettledOrFail
+    (workspaceRoot: string)
+    (sessionID: string)
+    (nudgeID: string)
+    (status: string)
+    : JS.Promise<unit> =
+    let payload = Map [ "nudgeId", nudgeID; "status", status ]
+    appendOrFail workspaceRoot (buildEvent sessionID eventKindNudgeSettled payload (getTimestampMs().ToString()))

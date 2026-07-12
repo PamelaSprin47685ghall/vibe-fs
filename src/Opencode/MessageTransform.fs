@@ -266,6 +266,8 @@ let compactingTransform
                 fr.SetActiveCompactionId(sessionID, compactionId)
                 fr.SetCompacted sessionID false
                 fr.SetCompactionContinuationObserved sessionID false
+                let currentGen = fr.GetSessionGeneration sessionID
+                fr.SetCompactionGeneration sessionID currentGen
             | None -> ()
 
             try

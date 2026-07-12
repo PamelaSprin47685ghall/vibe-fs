@@ -56,6 +56,7 @@ type FallbackRuntimeState() =
     let mutable forceStoppedSessions = Set.empty<string>
     let mutable compactedSessions = Set.empty<string>
     let mutable compactionContinuationObserved = Set.empty<string>
+    let mutable compactionGenerations = Map.empty<string, int>
     let mutable activeNudgeNonces = Map.empty<string, string>
 
     let triggerStateChanged (sessionID: string) : unit =
@@ -225,6 +226,12 @@ type FallbackRuntimeState() =
     member _.IsCompactionContinuationObserved(sessionID: string) : bool =
         Set.contains sessionID compactionContinuationObserved
 
+    member _.SetCompactionGeneration (sessionID: string) (gen: int) : unit =
+        compactionGenerations <- Map.add sessionID gen compactionGenerations
+
+    member _.GetCompactionGeneration(sessionID: string) : int =
+        Map.tryFind sessionID compactionGenerations |> Option.defaultValue 0
+
     member _.GetActiveCompactionId(sessionID: string) : string =
         Map.tryFind sessionID activeCompactionIds |> Option.defaultValue ""
 
@@ -375,6 +382,7 @@ type FallbackRuntimeState() =
         forceStoppedSessions <- Set.remove sessionID forceStoppedSessions
         compactedSessions <- Set.remove sessionID compactedSessions
         compactionContinuationObserved <- Set.remove sessionID compactionContinuationObserved
+        compactionGenerations <- Map.remove sessionID compactionGenerations
         activeNudgeNonces <- Map.remove sessionID activeNudgeNonces
         pendingNudgeLeases <- Map.remove sessionID pendingNudgeLeases
         triggerStateChanged sessionID

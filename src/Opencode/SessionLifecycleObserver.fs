@@ -161,11 +161,16 @@ type SessionLifecycleObserver
                     let sid = getSessionID "session.compacted" props
 
                     if sid <> "" then
-                        let nextGen = fallbackRuntime.GetSessionGeneration sid + 1
-                        fallbackRuntime.SetSessionGeneration sid nextGen
-                        let directory = pluginDirectoryFromCtx ctx
-                        do! appendContextGenerationChangedOrFail directory sid nextGen
-                        fallbackRuntime.SetCompacted sid true
+                        let currentOwner = fallbackRuntime.GetSessionOwner sid
+                        let compactionGen = fallbackRuntime.GetCompactionGeneration sid
+                        let currentGen = fallbackRuntime.GetSessionGeneration sid
+
+                        if currentOwner = "Compaction" && currentGen = compactionGen then
+                            let nextGen = currentGen + 1
+                            fallbackRuntime.SetSessionGeneration sid nextGen
+                            let directory = pluginDirectoryFromCtx ctx
+                            do! appendContextGenerationChangedOrFail directory sid nextGen
+                            fallbackRuntime.SetCompacted sid true
                 | Some { EventType = "message.updated"
                          Props = props } ->
                     let sid = getSessionID "message.updated" props
@@ -191,7 +196,12 @@ type SessionLifecycleObserver
                                             && (Dyn.get meta "compaction_continue" |> unbox<bool>)))
 
                                 if isCompactionContinue then
-                                    fallbackRuntime.SetCompactionContinuationObserved sid true
+                                    let currentOwner = fallbackRuntime.GetSessionOwner sid
+                                    let compactionGen = fallbackRuntime.GetCompactionGeneration sid
+                                    let currentGen = fallbackRuntime.GetSessionGeneration sid
+
+                                    if currentOwner = "Compaction" && currentGen = compactionGen + 1 then
+                                        fallbackRuntime.SetCompactionContinuationObserved sid true
                 | _ -> ()
 
                 fallback.UpdateBusyCount eventEnvelope

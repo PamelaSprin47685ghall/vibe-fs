@@ -140,6 +140,36 @@ let resolveNudgeModel
                         | Some m -> Some m
                         | None -> lastAssistantModel
 
+let finishNudge
+    (runtime: FallbackRuntimeState)
+    (workspaceRoot: string)
+    (sessionKey: string)
+    (lease: NudgeLease)
+    (outcome: string) // "failed", "cancelled", "dispatched", "settled"
+    (errorOrReason: string)
+    (actionStr: string)
+    (anchor: string)
+    : JS.Promise<unit> =
+    promise {
+        if outcome = "failed" then
+            do! appendNudgeFailedOrFail workspaceRoot sessionKey lease.NudgeID errorOrReason
+        elif outcome = "cancelled" then
+            do! appendNudgeCancelledOrFail workspaceRoot sessionKey lease.NudgeID errorOrReason
+        elif outcome = "dispatched" then
+            do! appendNudgeDispatchedOrFail workspaceRoot sessionKey lease.NudgeID actionStr anchor
+        elif outcome = "settled" then
+            do! appendNudgeSettledOrFail workspaceRoot sessionKey lease.NudgeID errorOrReason
+
+        if outcome <> "dispatched" then
+            runtime.ClearPendingNudgeLease sessionKey
+            runtime.ClearActiveNudgeNonce sessionKey
+
+            if runtime.GetSessionOwner sessionKey = "Nudge" then
+                runtime.SetSessionOwner sessionKey "None"
+
+            runtime.SetNudgeActive sessionKey false
+    }
+
 let runNudgeFlowCore
     (host: Host)
     (workspaceRoot: string)
@@ -211,20 +241,30 @@ let runNudgeFlowCore
                         let currentOwner = fallbackRuntime.GetSessionOwner sessionKey
 
                         let isValid =
+                            let curLease = fallbackRuntime.TryGetPendingNudgeLease sessionKey
+
                             lease.SessionGeneration = currentGen
                             && lease.HumanTurnID = currentTurnId
                             && lease.CancelGeneration = currentCancelGen
                             && currentOwner = "Nudge"
                             && not (fallbackRuntime.IsForceStopped sessionKey)
-                            && (match fallbackRuntime.TryGetPendingNudgeLease sessionKey with
+                            && (match curLease with
                                 | Some pending -> pending.NudgeID = lease.NudgeID && pending.Status = "dispatch_started"
                                 | None -> false)
 
                         if not isValid then
                             do! abortRun sessionKey
-                            let cancelledLease = { lease with Status = "cancelled" }
-                            fallbackRuntime.SetPendingNudgeLease(sessionKey, cancelledLease)
-                            do! appendNudgeCancelledOrFail workspaceRoot sessionKey nudgeId "Cancelled after dispatch"
+
+                            do!
+                                finishNudge
+                                    fallbackRuntime
+                                    workspaceRoot
+                                    sessionKey
+                                    lease
+                                    "cancelled"
+                                    "Cancelled after dispatch"
+                                    ""
+                                    ""
                         else
                             match outcome with
                             | Delivered ->
@@ -232,24 +272,48 @@ let runNudgeFlowCore
                                 fallbackRuntime.SetPendingNudgeLease(sessionKey, dispatchedLease)
 
                                 do!
-                                    appendNudgeDispatchedOrFail
+                                    finishNudge
+                                        fallbackRuntime
                                         workspaceRoot
                                         sessionKey
-                                        nudgeId
+                                        dispatchedLease
+                                        "dispatched"
+                                        ""
                                         (Wanxiangshu.Kernel.Nudge.toString action)
                                         snapshot.nudgeAnchorKey
                             | Busy ->
-                                let failedLease = { lease with Status = "failed" }
-                                fallbackRuntime.SetPendingNudgeLease(sessionKey, failedLease)
-                                do! appendNudgeFailedOrFail workspaceRoot sessionKey nudgeId "Session busy"
+                                do!
+                                    finishNudge
+                                        fallbackRuntime
+                                        workspaceRoot
+                                        sessionKey
+                                        lease
+                                        "failed"
+                                        "Session busy"
+                                        ""
+                                        ""
                             | Aborted ->
-                                let cancelledLease = { lease with Status = "cancelled" }
-                                fallbackRuntime.SetPendingNudgeLease(sessionKey, cancelledLease)
-                                do! appendNudgeCancelledOrFail workspaceRoot sessionKey nudgeId "Aborted by client"
+                                do!
+                                    finishNudge
+                                        fallbackRuntime
+                                        workspaceRoot
+                                        sessionKey
+                                        lease
+                                        "cancelled"
+                                        "Aborted by client"
+                                        ""
+                                        ""
                             | Failed ->
-                                let failedLease = { lease with Status = "failed" }
-                                fallbackRuntime.SetPendingNudgeLease(sessionKey, failedLease)
-                                do! appendNudgeFailedOrFail workspaceRoot sessionKey nudgeId "Send failed"
+                                do!
+                                    finishNudge
+                                        fallbackRuntime
+                                        workspaceRoot
+                                        sessionKey
+                                        lease
+                                        "failed"
+                                        "Send failed"
+                                        ""
+                                        ""
 
                         return runtimeState
     }

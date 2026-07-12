@@ -199,7 +199,12 @@ let agentEndHandler
                             let anchor = nudgeAnchorKey snap.turnId snap.lastAssistantText
 
                             let blockStatus =
-                                if isNudgeBlockedForAnchor { DispatchedAnchors = snap.dispatchedAnchors } anchor then
+                                if
+                                    isNudgeBlockedForAnchor
+                                        { DispatchedAnchors = snap.dispatchedAnchors
+                                          PendingNudges = snap.pendingNudges }
+                                        anchor
+                                then
                                     NudgeBlockStatus.Blocked
                                 else
                                     NudgeBlockStatus.Allowed

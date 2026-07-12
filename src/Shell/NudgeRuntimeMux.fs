@@ -148,7 +148,12 @@ let collectSnapshotMux
         let currentAnchor = nudgeAnchorKey snapshot.turnId snapshot.lastAssistantText
 
         let blockStatus =
-            if isNudgeBlockedForAnchor { DispatchedAnchors = snapshot.dispatchedAnchors } currentAnchor then
+            if
+                isNudgeBlockedForAnchor
+                    { DispatchedAnchors = snapshot.dispatchedAnchors
+                      PendingNudges = snapshot.pendingNudges }
+                    currentAnchor
+            then
                 NudgeBlockStatus.Blocked
             else
                 NudgeBlockStatus.Allowed
