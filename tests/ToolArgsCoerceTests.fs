@@ -121,7 +121,7 @@ let testCoerceArgsTypesOk () =
         createObj
             [ "intents", box intentsJson
               "tdd", box "red"
-              "warn_tdd", box "i-am-sure-i-have-followed-tdd-and-kolmolgorov-principles-and-kept-todo-updated" ]
+              "warn_tdd", box "i-am-sure-i-have-followed-tdd-and-kolmogorov-principles-and-kept-todo-updated" ]
 
     coerceArgsTypes "coder" coderArgs
 

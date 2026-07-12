@@ -79,7 +79,7 @@
 
 **修改类工具**须 `warn_tdd`，规范值：
 
-`i-am-sure-i-have-followed-tdd-and-kolmolgorov-principles-and-kept-todo-updated`
+`i-am-sure-i-have-followed-tdd-and-kolmogorov-principles-and-kept-todo-updated`
 
 **高风险执行**（`executor`、`pty_*`）另须 `warn`：
 

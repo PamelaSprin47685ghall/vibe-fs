@@ -50,7 +50,7 @@ let muxToolExecuteBeforeSetsUiLabelSpec () =
         let args =
             createObj
                 [ "intents", box [| intentOne; intentTwo |]
-                  "warn_tdd", box "i-am-sure-i-have-followed-tdd-and-kolmolgorov-principles-and-kept-todo-updated"
+                  "warn_tdd", box "i-am-sure-i-have-followed-tdd-and-kolmogorov-principles-and-kept-todo-updated"
                   "warn_reuse", box "this-task-is-not-suitable-to-be-completed-via-continue-tool" ]
 
         let input = createObj [ "tool", box "coder"; "args", box args ]
@@ -279,7 +279,7 @@ let muxToolExecuteRestoresAmendSpec () =
                 [ "language", box "shell"
                   "program", box "echo hi"
                   "amend", box 2
-                  "warn_tdd", box "i-am-sure-i-have-followed-tdd-and-kolmolgorov-principles-and-kept-todo-updated"
+                  "warn_tdd", box "i-am-sure-i-have-followed-tdd-and-kolmogorov-principles-and-kept-todo-updated"
                   "warn",
                   box
                       "it-is-not-possible-to-do-it-using-other-tools-and-only-run-tests-when-static-analysis-cannot-handle-it" ]

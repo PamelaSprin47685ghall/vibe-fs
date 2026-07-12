@@ -77,7 +77,7 @@ let runOmpFuzzyTools (h: OmpHarness) (chk: string -> bool -> unit) (sessionId: s
 let runOmpExecutorTools (h: OmpHarness) (chk: string -> bool -> unit) (sessionId: string) =
     promise {
         let warnTdd =
-            "i-am-sure-i-have-followed-tdd-and-kolmolgorov-principles-and-kept-todo-updated"
+            "i-am-sure-i-have-followed-tdd-and-kolmogorov-principles-and-kept-todo-updated"
 
         let warn =
             "it-is-not-possible-to-do-it-using-other-tools-and-only-run-tests-when-static-analysis-cannot-handle-it"
@@ -134,7 +134,7 @@ let runOmpWebTools (h: OmpHarness) (chk: string -> bool -> unit) (sessionId: str
 let runOmpAgentTools (h: OmpHarness) (chk: string -> bool -> unit) (sessionId: string) =
     promise {
         let warnTdd =
-            "i-am-sure-i-have-followed-tdd-and-kolmolgorov-principles-and-kept-todo-updated"
+            "i-am-sure-i-have-followed-tdd-and-kolmogorov-principles-and-kept-todo-updated"
 
         let! coderResult =
             withTimeout (

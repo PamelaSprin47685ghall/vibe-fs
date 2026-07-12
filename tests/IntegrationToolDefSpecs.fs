@@ -239,7 +239,7 @@ let toolExecuteBeforeSpec () =
         let originalArgs =
             createObj
                 [ "intents", box intents
-                  "warn_tdd", box "i-am-sure-i-have-followed-tdd-and-kolmolgorov-principles-and-kept-todo-updated"
+                  "warn_tdd", box "i-am-sure-i-have-followed-tdd-and-kolmogorov-principles-and-kept-todo-updated"
                   "warn_reuse", box "this-task-is-not-suitable-to-be-completed-via-continue-tool" ]
 
         let execOut = createObj [ "args", box originalArgs ]
