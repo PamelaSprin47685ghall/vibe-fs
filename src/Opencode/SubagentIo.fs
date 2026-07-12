@@ -76,6 +76,20 @@ let runSubagentCoreResult
                     if cleanup then
                         abortAndUnregister ()
 
+                let! currentMessages =
+                    match getSessionApiFromClient client with
+                    | Ok session ->
+                        let msgPromise: JS.Promise<obj> =
+                            invoke1 (box {| path = box {| id = childID |} |}) "messages" session
+
+                        msgPromise |> Promise.map (fun r -> unbox<obj[]> (Dyn.get r "data"))
+                    | Error _ -> Promise.lift [||]
+
+                let startCount = currentMessages.Length
+
+                let runId = "run-" + System.Guid.NewGuid().ToString("N").Substring(0, 8)
+                runtime.StartSubsessionRun(childID, sessionID, runId)
+
                 try
                     // Reset TaskComplete ONLY for new spawn (existingChildID is None).
                     // For continue (existingChildID is Some), TaskComplete will be set to false when the subsession
@@ -102,6 +116,7 @@ let runSubagentCoreResult
                         let st = runtime.GetOrCreateState childID
 
                         if st.Lifecycle = FallbackLifecycle.Cancelled then
+                            runtime.UpdateSubsessionRunStatus(childID, SubsessionRunStatus.Cancelled)
                             return Ok abortedPrefix
                         elif
                             st.Lifecycle <> FallbackLifecycle.TaskComplete
@@ -111,12 +126,27 @@ let runSubagentCoreResult
                             let st2 = runtime.GetOrCreateState childID
 
                             if st2.Lifecycle = FallbackLifecycle.Cancelled then
+                                runtime.UpdateSubsessionRunStatus(childID, SubsessionRunStatus.Cancelled)
                                 return Ok abortedPrefix
                             else
-                                let! text = extractSessionText client childID directory
+                                let status =
+                                    if st2.Lifecycle = FallbackLifecycle.TaskComplete then
+                                        SubsessionRunStatus.Settled
+                                    else
+                                        SubsessionRunStatus.Failed
+
+                                runtime.UpdateSubsessionRunStatus(childID, status)
+                                let! text = extractSessionText client childID directory startCount
                                 return Ok(formatSubagentReport noOutputText abortedPrefix text false)
                         else
-                            let! text = extractSessionText client childID directory
+                            let status =
+                                if st.Lifecycle = FallbackLifecycle.TaskComplete then
+                                    SubsessionRunStatus.Settled
+                                else
+                                    SubsessionRunStatus.Failed
+
+                            runtime.UpdateSubsessionRunStatus(childID, status)
+                            let! text = extractSessionText client childID directory startCount
                             return Ok(formatSubagentReport noOutputText abortedPrefix text false)
                     finally
                         cleanupChildIfRequested ()
@@ -124,24 +154,32 @@ let runSubagentCoreResult
                     match translateJsError err with
                     | MessageAborted
                     | ClientCancellation _ ->
+                        runtime.UpdateSubsessionRunStatus(childID, SubsessionRunStatus.Cancelled)
                         runtime.ClearSubsessionPending childID
                         abortAndUnregister ()
 
                         if not (Dyn.isNullish signal) && Dyn.truthy (Dyn.get signal "aborted") then
                             return Ok abortedPrefix
                         else
-                            let! text = extractSessionText client childID directory
+                            let! text = extractSessionText client childID directory startCount
                             return Ok(formatSubagentReport noOutputText abortedPrefix text true)
                     | other ->
                         do! waitForSubagentSettle runtime childID
                         runtime.ClearSubsessionPending childID
 
                         let st = runtime.GetOrCreateState childID
-
                         let isSuccess = st.Lifecycle = FallbackLifecycle.TaskComplete
 
+                        let status =
+                            if isSuccess then
+                                SubsessionRunStatus.Settled
+                            else
+                                SubsessionRunStatus.Failed
+
+                        runtime.UpdateSubsessionRunStatus(childID, status)
+
                         if isSuccess then
-                            let! text = extractSessionText client childID directory
+                            let! text = extractSessionText client childID directory startCount
                             return Ok(formatSubagentReport noOutputText abortedPrefix text false)
                         else
                             return Error other

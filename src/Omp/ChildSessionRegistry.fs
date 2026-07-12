@@ -34,6 +34,10 @@ let runSubagentOnExistingSession
         | Some sessionObj ->
             let session = unbox<obj> sessionObj
 
+            let parentSessionId =
+                let s = Dyn.get ctx "sessionId"
+                if Dyn.isNullish s then "" else string s
+
             let run =
                 Wanxiangshu.Omp.ChildSessionCommon.runOmpSubagentCore
                     fallbackRuntime
@@ -42,6 +46,7 @@ let runSubagentOnExistingSession
                     session
                     prompt
                     SubagentResetPolicy.KeepState
+                    parentSessionId
 
             let signalObj = Option.defaultValue (box null) signal
             let! text = raceWithAbortSignal signalObj (fun () -> ()) run

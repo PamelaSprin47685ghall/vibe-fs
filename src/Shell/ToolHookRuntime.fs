@@ -142,6 +142,14 @@ let incrementSessionCancelGeneration (sessionID: string) : unit =
         | true, g -> sessionCancelGenerations.[sessionID] <- g + 1
         | _ -> sessionCancelGenerations.[sessionID] <- 1
 
+        let stack: string = emitJsExpr () "new Error().stack"
+
+        printfn
+            "DEBUG incrementSessionCancelGeneration: sessionID=%s, gen=%d, stack:\n%s"
+            sessionID
+            sessionCancelGenerations.[sessionID]
+            stack
+
 type ControlEnvelope =
     { WarnTdd: string option
       Warn: string option

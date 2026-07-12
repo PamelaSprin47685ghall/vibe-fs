@@ -109,7 +109,7 @@ let sessionIoSubagentExtractSessionText () =
     let fakeClient = createObj [ "session", box fakeSession ]
 
     promise {
-        let! text = extractSessionText fakeClient "sess-1" ""
+        let! text = extractSessionText fakeClient "sess-1" "" 0
         equal "assistant text" "Hello from assistant" text
     }
 

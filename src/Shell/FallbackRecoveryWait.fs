@@ -79,7 +79,14 @@ let gateMode (runtime: FallbackRuntimeState) (sessionID: string) : SessionGateMo
     gateModeFromObservation (observe runtime sessionID)
 
 let isSubagentSettled (runtime: FallbackRuntimeState) (sessionID: string) : bool =
-    isSubagentSettledFromObservation sessionID (observe runtime sessionID)
+    match runtime.GetSubsessionRun sessionID with
+    | Some run ->
+        match run.Status with
+        | SubsessionRunStatus.Settled
+        | SubsessionRunStatus.Failed
+        | SubsessionRunStatus.Cancelled -> true
+        | _ -> false
+    | None -> isSubagentSettledFromObservation sessionID (observe runtime sessionID)
 
 /// Register OnStateChanged exactly once; resolve on the next state-change signal.
 let private waitForStateChange (runtime: FallbackRuntimeState) (sessionID: string) : JS.Promise<unit> =
@@ -104,17 +111,22 @@ let rec waitForSubagentSettle (runtime: FallbackRuntimeState) (sessionID: string
                 do! waitForStateChange runtime sessionID
                 return! waitForSubagentSettle runtime sessionID
             | Resolve ->
-                if terminalObservation runtime sessionID then
-                    return ()
-                elif
-                    not (runtime.HasState sessionID)
-                    && not (runtime.IsAwaitingBusy sessionID)
-                    && not (runtime.IsNudgeActive sessionID)
-                then
-                    // No runtime state ever registered and no gates open → caller
-                    // has observed the host's initial idle boundary → settle.
-                    return ()
-                else
+                match runtime.GetSubsessionRun sessionID with
+                | Some _ ->
                     do! waitForStateChange runtime sessionID
                     return! waitForSubagentSettle runtime sessionID
+                | None ->
+                    if terminalObservation runtime sessionID then
+                        return ()
+                    elif
+                        not (runtime.HasState sessionID)
+                        && not (runtime.IsAwaitingBusy sessionID)
+                        && not (runtime.IsNudgeActive sessionID)
+                    then
+                        // No runtime state ever registered and no gates open → caller
+                        // has observed the host's initial idle boundary → settle.
+                        return ()
+                    else
+                        do! waitForStateChange runtime sessionID
+                        return! waitForSubagentSettle runtime sessionID
     }

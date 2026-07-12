@@ -30,8 +30,19 @@ let runOmpSubagentCore
     (session: obj)
     (prompt: string)
     (resetPolicy: SubagentResetPolicy)
+    (parentSessionId: string)
     : JS.Promise<string> =
     promise {
+        let sm = unbox<ISessionManager> (Dyn.get session "sessionManager")
+
+        let startCount =
+            let msgs = Dyn.get sm "messages"
+
+            if Dyn.isNullish msgs || not (Dyn.isArray msgs) then
+                0
+            else
+                (unbox<obj[]> msgs).Length
+
         if childId <> "" && fallbackConfigOpt.IsSome then
             let initSt = fallbackRuntime.GetOrCreateState childId
 
@@ -43,6 +54,8 @@ let runOmpSubagentCore
                         Lifecycle = FallbackLifecycle.Active }
             | SubagentResetPolicy.KeepState -> ()
 
+            let runId = "run-" + System.Guid.NewGuid().ToString("N").Substring(0, 8)
+            fallbackRuntime.StartSubsessionRun(childId, parentSessionId, runId)
             fallbackRuntime.SetSubsessionPending childId true
 
         try
@@ -57,6 +70,19 @@ let runOmpSubagentCore
 
             let st = fallbackRuntime.GetOrCreateState childId
 
+            if childId <> "" then
+                let status =
+                    if st.Lifecycle = FallbackLifecycle.TaskComplete then
+                        SubsessionRunStatus.Settled
+                    elif st.Lifecycle = FallbackLifecycle.Cancelled then
+                        SubsessionRunStatus.Cancelled
+                    elif st.Phase = FallbackPhase.Exhausted then
+                        SubsessionRunStatus.Failed
+                    else
+                        SubsessionRunStatus.Settled
+
+                fallbackRuntime.UpdateSubsessionRunStatus(childId, status)
+
             if
                 fallbackConfigOpt.IsSome
                 && st.Lifecycle <> FallbackLifecycle.TaskComplete
@@ -67,8 +93,39 @@ let runOmpSubagentCore
                 return abortedPrefix
             else
                 let sm = unbox<ISessionManager> (Dyn.get session "sessionManager")
-                return readAssistantText sm 0 "\n\n" |> Option.defaultValue noOutputText
+                let msgs = Dyn.get sm "messages"
+
+                let lastUserIdx =
+                    if Dyn.isNullish msgs || not (Dyn.isArray msgs) then
+                        0
+                    else
+                        let arr = unbox<obj[]> msgs
+
+                        arr
+                        |> Array.tryFindIndexBack (fun m -> Dyn.str m "role" = "user")
+                        |> Option.defaultValue 0
+
+                let finalStartIndex =
+                    if Dyn.isNullish msgs || not (Dyn.isArray msgs) then
+                        lastUserIdx
+                    else
+                        let arr = unbox<obj[]> msgs
+
+                        if startCount >= arr.Length then lastUserIdx
+                        else if lastUserIdx >= startCount then lastUserIdx
+                        else startCount
+
+                return readAssistantText sm finalStartIndex "\n\n" |> Option.defaultValue noOutputText
         with err ->
+            if childId <> "" then
+                let status =
+                    match translateJsError err with
+                    | MessageAborted
+                    | ClientCancellation _ -> SubsessionRunStatus.Cancelled
+                    | _ -> SubsessionRunStatus.Failed
+
+                fallbackRuntime.UpdateSubsessionRunStatus(childId, status)
+
             if childId <> "" && fallbackConfigOpt.IsSome then
                 match translateJsError err with
                 | MessageAborted
@@ -84,7 +141,29 @@ let runOmpSubagentCore
 
                     if isSuccess then
                         let sm = unbox<ISessionManager> (Dyn.get session "sessionManager")
-                        return readAssistantText sm 0 "\n\n" |> Option.defaultValue noOutputText
+                        let msgs = Dyn.get sm "messages"
+
+                        let lastUserIdx =
+                            if Dyn.isNullish msgs || not (Dyn.isArray msgs) then
+                                0
+                            else
+                                let arr = unbox<obj[]> msgs
+
+                                arr
+                                |> Array.tryFindIndexBack (fun m -> Dyn.str m "role" = "user")
+                                |> Option.defaultValue 0
+
+                        let finalStartIndex =
+                            if Dyn.isNullish msgs || not (Dyn.isArray msgs) then
+                                lastUserIdx
+                            else
+                                let arr = unbox<obj[]> msgs
+
+                                if startCount >= arr.Length then lastUserIdx
+                                else if lastUserIdx >= startCount then lastUserIdx
+                                else startCount
+
+                        return readAssistantText sm finalStartIndex "\n\n" |> Option.defaultValue noOutputText
                     else
                         return! Promise.reject err
             else

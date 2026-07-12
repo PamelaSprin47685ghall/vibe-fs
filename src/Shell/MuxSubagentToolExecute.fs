@@ -2,6 +2,7 @@ module Wanxiangshu.Shell.MuxSubagentToolExecute
 
 open Fable.Core
 open Fable.Core.JsInterop
+open Wanxiangshu.Shell.FallbackRuntimeState
 open Wanxiangshu.Kernel.Domain
 open Wanxiangshu.Kernel.HostAdapter
 open Wanxiangshu.Kernel.HostTools
@@ -47,16 +48,23 @@ type MuxHostAdapter
         member _.SpawnSubagent(request: SubagentRequest) : JS.Promise<SubagentResponse> =
             promise {
                 try
-                    let! text = runMux deps config spawn.AgentId request.Prompt spawn.Title spawn.ToolOptions
                     let counterVal = sessionScope.NextChildSessionId()
                     let cid = "mux-task-" + string counterVal
 
+                    match sessionScope.TryFindKey("fallbackRuntime") with
+                    | Some obj ->
+                        let rt = unbox<FallbackRuntimeState> obj
+                        let runId = "run-" + System.Guid.NewGuid().ToString("N").Substring(0, 8)
+                        rt.StartSubsessionRun(cid, sessionId, runId)
+                    | None -> ()
+
                     match fromMuxConfig config with
-                    | Ok runtime ->
-                        let registry = unbox<ChildAgentRegistry> runtime.Execution.ChildRegistry
+                    | Ok r ->
+                        let registry = unbox<ChildAgentRegistry> r.Execution.ChildRegistry
                         registry.RegisterChildAgent(cid, spawn.Role, None)
                     | Error _ -> ()
 
+                    let! text = runMux deps config spawn.AgentId request.Prompt spawn.Title spawn.ToolOptions
                     return Success text
                 with ex ->
                     return Failure(translateJsError ex)
@@ -65,6 +73,13 @@ type MuxHostAdapter
         member _.ContinueSubagent(childID: string, agent: string, prompt: string) : JS.Promise<SubagentResponse> =
             promise {
                 try
+                    match sessionScope.TryFindKey("fallbackRuntime") with
+                    | Some obj ->
+                        let rt = unbox<FallbackRuntimeState> obj
+                        let runId = "run-" + System.Guid.NewGuid().ToString("N").Substring(0, 8)
+                        rt.StartSubsessionRun(childID, sessionId, runId)
+                    | None -> ()
+
                     let! text = runMux deps config agent prompt spawn.Title spawn.ToolOptions
                     return Success text
                 with ex ->

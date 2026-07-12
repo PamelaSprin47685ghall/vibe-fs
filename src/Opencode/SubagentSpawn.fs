@@ -60,7 +60,7 @@ let buildPromptBody (options: SubagentLaunchOptions) childID : obj =
 
     createObj [ "path", box {| id = childID |}; "body", body ]
 
-let extractSessionText (client: obj) (sessionId: string) (directory: string) : JS.Promise<string> =
+let extractSessionText (client: obj) (sessionId: string) (directory: string) (startIndex: int) : JS.Promise<string> =
     promise {
         try
             match getSessionApiFromClient client with
@@ -82,7 +82,17 @@ let extractSessionText (client: obj) (sessionId: string) (directory: string) : J
                 else
                     let messagesList = MessagingCodec.decodeMessages (unbox<obj[]> data)
 
-                    match Messaging.readAssistantText messagesList 0 "\n\n" with
+                    let lastUserIdx =
+                        messagesList
+                        |> List.tryFindIndexBack (fun m -> m.info.role = User)
+                        |> Option.defaultValue 0
+
+                    let finalStartIndex =
+                        if startIndex >= List.length messagesList then lastUserIdx
+                        else if lastUserIdx >= startIndex then lastUserIdx
+                        else startIndex
+
+                    match Messaging.readAssistantText messagesList finalStartIndex "\n\n" with
                     | Some text -> return text
                     | None -> return noOutputText
         with _ ->
