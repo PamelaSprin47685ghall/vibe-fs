@@ -159,4 +159,48 @@ let runServePluginChecks
         chk "e2e.serve.todowrite.ndjson" ndTodo
         let! ndTodoText = withTimeout (harness.readNdjson ())
         chk "e2e.serve.todowrite.work-backlog" (ndTodoText.Contains "work_backlog_committed")
+
+        // --- E2E Test: Todo soft-required validation (short fields should not be rejected, but trigger criticism) ---
+        let shortTodoArgs =
+            createObj
+                [ "todos",
+                  box (
+                      ResizeArray(
+                          [ box (
+                                createObj
+                                    [ "content", box "serve short todo"
+                                      "status", box "in_progress"
+                                      "priority", box "high" ]
+                            ) ]
+                      )
+                  )
+                  "ahaMoments", box "short ahaMoments"
+                  "changesAndReasons", box "short changesAndReasons"
+                  "gotchas", box "short gotchas"
+                  "lessonsAndConventions", box "short lessonsAndConventions"
+                  "plan", box "short plan"
+                  "select_methodology", box (ResizeArray([ "first_principles" ])) ]
+
+        do! toolRound harness sessionID todoToolName shortTodoArgs (sprintf "commit short todo via %s" todoToolName)
+        chk "e2e.serve.todowrite.short.tool-called" (containsTool harness todoToolName)
+
+        let! msgsAfterShortTodo = withTimeout (harness.getMessages sessionID emptyObj)
+        let historyShortTodo = harness.allMessagesText (unbox<obj> msgsAfterShortTodo)
+        chk "e2e.serve.todowrite.short.has-criticism" (historyShortTodo.Contains "严重协议违例")
+        chk "e2e.serve.todowrite.short.has-length-error" (historyShortTodo.Contains "expected at least 1024 characters")
+
+        // --- E2E Test: Warn soft-required validation (missing warn_tdd should not block execution, but trigger criticism) ---
+        let writeArgsWithoutWarnTdd =
+            createObj [ "filePath", box "test_warn_tdd.txt"; "content", box "hello without warn_tdd" ]
+
+        do! toolRound harness sessionID "write" writeArgsWithoutWarnTdd "write without warn_tdd"
+        chk "e2e.serve.write.missing-warn_tdd.tool-called" (containsTool harness "write")
+
+        let! msgsAfterWrite = withTimeout (harness.getMessages sessionID emptyObj)
+        let historyWrite = harness.allMessagesText (unbox<obj> msgsAfterWrite)
+        chk "e2e.serve.write.missing-warn_tdd.has-criticism" (historyWrite.Contains "严重协议违例")
+
+        chk
+            "e2e.serve.write.missing-warn_tdd.mentions-warn_tdd"
+            (historyWrite.Contains "warn_tdd: missing required acknowledgement")
     }
