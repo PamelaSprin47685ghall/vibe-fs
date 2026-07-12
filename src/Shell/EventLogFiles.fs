@@ -1,6 +1,7 @@
 module Wanxiangshu.Shell.EventLogFiles
 
 open Fable.Core
+open Fable.Core.JsInterop
 open Wanxiangshu.Kernel.Nudge
 open Wanxiangshu.Kernel.EventLog.Types
 open Wanxiangshu.Kernel.EventLog.Fold
@@ -26,6 +27,8 @@ type EventLogStore(workspaceRoot: string, ?appendLineOverride: string -> WanEven
     let mutable initPromise: JS.Promise<unit> option = None
     let mutable readCalled = false
     let mutable revision = 0
+    let mutable eventCountRead = 0
+    let mutable lastKnownSize = 0L
 
     let foldWan (e: WanEvent) =
         let sId = e.Session
@@ -63,6 +66,9 @@ type EventLogStore(workspaceRoot: string, ?appendLineOverride: string -> WanEven
                                     foldWan e
 
                                 initDone <- true
+                                eventCountRead <- events.Length
+                                let! stats = statAsync eventFilePath
+                                lastKnownSize <- unbox<int64> (stats?size)
                             })
         }
 
@@ -74,10 +80,46 @@ type EventLogStore(workspaceRoot: string, ?appendLineOverride: string -> WanEven
             initPromise <- Some p
             p
 
-    member _.ReadAllEvents() : JS.Promise<WanEvent list> =
+    let syncNewEvents () : JS.Promise<unit> =
+        promise {
+            try
+                let! stats = statAsync eventFilePath
+                let size = unbox<int64> (stats?size)
+
+                if size > lastKnownSize then
+                    let! events = readEventsFile eventFilePath
+
+                    if events.Length > eventCountRead then
+                        let newEvents = events.[eventCountRead..]
+
+                        for e in newEvents do
+                            foldWan e
+
+                        eventCountRead <- events.Length
+
+                    lastKnownSize <- size
+            with _ ->
+                ()
+        }
+
+    let ensureSynced () : JS.Promise<unit> =
         promise {
             do! ensureInitialized ()
-            let! events = readEventsFile eventFilePath
+
+            try
+                let! stats = statAsync eventFilePath
+                let size = unbox<int64> (stats?size)
+
+                if size > lastKnownSize then
+                    do! withWorkspaceLock eventFilePath (fun () -> syncNewEvents ())
+            with _ ->
+                ()
+        }
+
+    member _.ReadAllEvents() : JS.Promise<WanEvent list> =
+        promise {
+            do! ensureSynced ()
+            let! events = withWorkspaceLock eventFilePath (fun () -> readEventsFile eventFilePath)
             return events
         }
 
@@ -90,13 +132,13 @@ type EventLogStore(workspaceRoot: string, ?appendLineOverride: string -> WanEven
 
     member this.GetSessionState(sessionId: string) : JS.Promise<SessionState> =
         promise {
-            do! ensureInitialized ()
+            do! ensureSynced ()
             return this.GetSessionStateSync(sessionId)
         }
 
     member _.GetAllSessionStates() : JS.Promise<Map<string, SessionState>> =
         promise {
-            do! ensureInitialized ()
+            do! ensureSynced ()
             return sessionStates
         }
 
@@ -108,8 +150,17 @@ type EventLogStore(workspaceRoot: string, ?appendLineOverride: string -> WanEven
                 do! ensureInitialized ()
 
                 try
-                    do! withWorkspaceLock eventFilePath (fun () -> appendLineFn eventFilePath e)
+                    do!
+                        withWorkspaceLock eventFilePath (fun () ->
+                            promise {
+                                do! syncNewEvents ()
+                                do! appendLineFn eventFilePath e
+                                let! stats = statAsync eventFilePath
+                                lastKnownSize <- unbox<int64> (stats?size)
+                            })
+
                     foldWan e
+                    eventCountRead <- eventCountRead + 1
                     return Ok()
                 with ex ->
                     return Error ex.Message
@@ -119,25 +170,35 @@ type EventLogStore(workspaceRoot: string, ?appendLineOverride: string -> WanEven
         queue.Enqueue(fun () ->
             promise {
                 do! ensureInitialized ()
-                do! withWorkspaceLock eventFilePath (fun () -> appendLineFn eventFilePath e)
+
+                do!
+                    withWorkspaceLock eventFilePath (fun () ->
+                        promise {
+                            do! syncNewEvents ()
+                            do! appendLineFn eventFilePath e
+                            let! stats = statAsync eventFilePath
+                            lastKnownSize <- unbox<int64> (stats?size)
+                        })
+
                 foldWan e
+                eventCountRead <- eventCountRead + 1
             })
 
     member _.GetSquadDag(sessionId: string) : JS.Promise<Dag> =
         promise {
-            do! ensureInitialized ()
+            do! ensureSynced ()
             return getDag squadProj sessionId
         }
 
     member _.GetLatestSquadSessionId() : JS.Promise<string option> =
         promise {
-            do! ensureInitialized ()
+            do! ensureSynced ()
             return latestSessionId
         }
 
     member _.GetSquadSessions() : JS.Promise<Map<string, Dag>> =
         promise {
-            do! ensureInitialized ()
+            do! ensureSynced ()
             return squadProj.Dags
         }
 
@@ -161,57 +222,63 @@ type EventLogStore(workspaceRoot: string, ?appendLineOverride: string -> WanEven
                 do! ensureInitialized ()
                 let trimmedAnchor = anchor.Trim()
 
-                let oldState =
-                    match Map.tryFind sessionId sessionStates with
-                    | Some st -> st
-                    | None -> emptySessionState ()
+                let mutable claimed = false
 
-                let snap = oldState.NudgeSnapshot
-                let currentAnchor = nudgeAnchorKey snap.turnId snap.lastAssistantText
+                do!
+                    withWorkspaceLock eventFilePath (fun () ->
+                        promise {
+                            do! syncNewEvents ()
 
-                if currentAnchor.Trim() <> trimmedAnchor then
-                    return false
-                elif isBlocked oldState.NudgeDedup trimmedAnchor then
-                    return false
-                elif oldState.SessionGeneration <> sessionGen then
-                    return false
-                elif oldState.CancelGeneration <> cancelGen then
-                    return false
-                elif
-                    (oldState.LatestHumanTurn
-                     |> Option.map (fun t -> t.TurnId)
-                     |> Option.defaultValue "")
-                    <> humanTurnId
-                then
-                    return false
-                elif
-                    oldState.SessionOwner = Some "Fallback"
-                    || oldState.SessionOwner = Some "Compaction"
-                    || oldState.SessionOwner = Some "Nudge"
-                then
-                    return false
-                elif oldState.PendingLease.IsSome || oldState.PendingNudgeLease.IsSome then
-                    return false
-                elif oldState.NudgeStage = Requested || oldState.NudgeStage = Dispatched then
-                    return false
-                elif oldState.NudgeOrdinal >= nudgeOrdinal then
-                    return false
-                else
-                    let payload =
-                        Map
-                            [ "action", Wanxiangshu.Kernel.Nudge.toString action
-                              "anchor", trimmedAnchor
-                              "nudgeId", nudgeId
-                              "nonce", nonce
-                              "generation", sessionGen.ToString()
-                              "cancelGeneration", cancelGen.ToString()
-                              "humanTurnId", humanTurnId
-                              "nudgeOrdinal", nudgeOrdinal.ToString() ]
+                            let oldState =
+                                match Map.tryFind sessionId sessionStates with
+                                | Some st -> st
+                                | None -> emptySessionState ()
 
-                    let ev =
-                        buildEvent sessionId eventKindNudgeRequested payload (getTimestampMs().ToString())
+                            let snap = oldState.NudgeSnapshot
+                            let currentAnchor = nudgeAnchorKey snap.turnId snap.lastAssistantText
 
-                    do! withWorkspaceLock eventFilePath (fun () -> appendLineFn eventFilePath ev)
-                    foldWan ev
-                    return true
+                            let currentHumanTurnId =
+                                oldState.LatestHumanTurn
+                                |> Option.map (fun t -> t.TurnId)
+                                |> Option.defaultValue ""
+
+                            let canClaim =
+                                currentAnchor.Trim() = trimmedAnchor
+                                && not (isBlocked oldState.NudgeDedup trimmedAnchor)
+                                && oldState.SessionGeneration = sessionGen
+                                && oldState.CancelGeneration = cancelGen
+                                && currentHumanTurnId = humanTurnId
+                                && oldState.SessionOwner <> Some "Fallback"
+                                && oldState.SessionOwner <> Some "Compaction"
+                                && oldState.SessionOwner <> Some "Nudge"
+                                && oldState.PendingLease.IsNone
+                                && oldState.PendingNudgeLease.IsNone
+                                && oldState.NudgeStage <> Requested
+                                && oldState.NudgeStage <> Dispatched
+                                && oldState.NudgeOrdinal < nudgeOrdinal
+
+                            if canClaim then
+                                let payload =
+                                    Map
+                                        [ "action", Wanxiangshu.Kernel.Nudge.toString action
+                                          "anchor", trimmedAnchor
+                                          "nudgeId", nudgeId
+                                          "nonce", nonce
+                                          "generation", sessionGen.ToString()
+                                          "cancelGeneration", cancelGen.ToString()
+                                          "humanTurnId", humanTurnId
+                                          "nudgeOrdinal", nudgeOrdinal.ToString() ]
+
+                                let ev =
+                                    buildEvent sessionId eventKindNudgeRequested payload (getTimestampMs().ToString())
+
+                                do! appendLineFn eventFilePath ev
+                                let! stats = statAsync eventFilePath
+                                lastKnownSize <- unbox<int64> (stats?size)
+                                foldWan ev
+                                eventCountRead <- eventCountRead + 1
+                                claimed <- true
+                        })
+
+                return claimed
             })

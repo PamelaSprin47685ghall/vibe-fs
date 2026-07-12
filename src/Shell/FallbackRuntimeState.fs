@@ -1,5 +1,6 @@
 module Wanxiangshu.Shell.FallbackRuntimeState
 
+open Fable.Core.JsInterop
 open Wanxiangshu.Kernel.FallbackKernel.Types
 open Wanxiangshu.Kernel.FallbackRuntimeFlags
 open Wanxiangshu.Kernel.FallbackRuntimeLifecycle

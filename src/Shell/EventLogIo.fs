@@ -74,11 +74,22 @@ let private lockfileOptions () =
 let private fileQueues =
     System.Collections.Generic.Dictionary<string, JS.Promise<obj>>()
 
+let fileExists (filePath: string) : JS.Promise<bool> =
+    promise {
+        try
+            let! _ = statAsync filePath
+            return true
+        with _ ->
+            return false
+    }
+
 let withWorkspaceLock<'T> (filePath: string) (action: unit -> JS.Promise<'T>) : JS.Promise<'T> =
     let prev =
         match fileQueues.TryGetValue(filePath) with
         | true, p -> p
         | _ -> Promise.lift (box null)
+
+    let mutable selfPromise = None
 
     let next =
         promise {
@@ -88,24 +99,56 @@ let withWorkspaceLock<'T> (filePath: string) (action: unit -> JS.Promise<'T>) : 
             with _ ->
                 ()
 
-            let! res = action ()
-            return box res
+            let! exists = fileExists filePath
+
+            if not exists then
+                try
+                    do! writeFileFlagAsync filePath "" (createObj [ "flag", box "wx" ])
+                with _ ->
+                    ()
+
+            let lockPath = filePath + ".lock"
+
+            try
+                let! stats = statAsync lockPath
+                let isDir = unbox<bool> (stats?isDirectory ())
+
+                if not isDir then
+                    do! unlinkAsync lockPath
+            with _ ->
+                ()
+
+            let! release = lockfileLock filePath (lockfileOptions ())
+
+            let mutable caught = None
+            let mutable resOpt = None
+
+            try
+                let! res = action ()
+                resOpt <- Some res
+            with ex ->
+                caught <- Some ex
+
+            try
+                do! release ()
+            with _ ->
+                ()
+
+            match fileQueues.TryGetValue(filePath) with
+            | true, current when Some current = selfPromise -> fileQueues.Remove(filePath) |> ignore
+            | _ -> ()
+
+            match caught with
+            | Some ex -> return raise ex
+            | None -> return box resOpt.Value
         }
 
+    selfPromise <- Some next
     fileQueues.[filePath] <- next
 
     promise {
         let! res = next
         return unbox<'T> res
-    }
-
-let fileExists (filePath: string) : JS.Promise<bool> =
-    promise {
-        try
-            let! _ = statAsync filePath
-            return true
-        with _ ->
-            return false
     }
 
 let appendLine (path: string) (e: WanEvent) : JS.Promise<unit> =

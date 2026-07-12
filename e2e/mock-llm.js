@@ -85,6 +85,12 @@ function handleTitleGeneration(res, url) {
 
 function nextItemFor(body, queue) {
   const names = new Set(toolNames(body));
+  if (names.has('return_reviewer') && queue.length === 0) {
+    return {
+      tool: 'return_reviewer',
+      args: { verdict: 'accepted', feedback: 'everything looks perfectly clean' }
+    };
+  }
   if (names.size === 0 && !hasToolResult(body)) return undefined;
   if (queue[0]?.tool && names.size > 0 && !names.has(queue[0].tool)) {
     const toolIndex = queue.findIndex((item) => item?.tool && names.has(item.tool));

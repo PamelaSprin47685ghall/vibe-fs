@@ -36,10 +36,25 @@ let restoreFallbackRuntimeState
         rt.SetCancelGeneration sid state.CancelGeneration
         rt.SetActiveContinuationGeneration sid state.ActiveContinuationGen
         rt.SetActiveContinuationCancelGeneration sid state.ActiveContinuationCancelGen
-        rt.SetHumanTurnOrdinal sid state.HumanTurnOrdinal
-        rt.SetContinuationOrdinal sid state.ContinuationOrdinal
-        rt.SetNudgeOrdinal sid state.NudgeOrdinal
-        rt.SetCompactionOrdinal sid state.CompactionOrdinal
+        let curHuman = rt.GetHumanTurnOrdinal sid
+
+        if state.HumanTurnOrdinal > curHuman then
+            rt.SetHumanTurnOrdinal sid state.HumanTurnOrdinal
+
+        let curCont = rt.GetContinuationOrdinal sid
+
+        if state.ContinuationOrdinal > curCont then
+            rt.SetContinuationOrdinal sid state.ContinuationOrdinal
+
+        let curNudge = rt.GetNudgeOrdinal sid
+
+        if state.NudgeOrdinal > curNudge then
+            rt.SetNudgeOrdinal sid state.NudgeOrdinal
+
+        let curComp = rt.GetCompactionOrdinal sid
+
+        if state.CompactionOrdinal > curComp then
+            rt.SetCompactionOrdinal sid state.CompactionOrdinal
 
         match state.LastHumanTurnMessageId with
         | Some id -> rt.SetLastHumanMessageId sid id

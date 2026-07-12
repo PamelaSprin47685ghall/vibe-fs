@@ -19,7 +19,8 @@ let postInit (apiKey: string) (body: string) (signal: obj option) : obj =
           "headers"
           ==> createObj
                   [ "Content-Type" ==> "application/json"
-                    "Authorization" ==> $"Bearer {apiKey}" ]
+                    "Authorization" ==> $"Bearer {apiKey}"
+                    "Connection" ==> "keep-alive" ]
           "body" ==> body
           if signal.IsSome then
               "signal" ==> signal.Value ]
