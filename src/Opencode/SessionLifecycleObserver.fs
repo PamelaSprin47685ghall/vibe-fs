@@ -64,13 +64,17 @@ type SessionLifecycleObserver
                     do! appendContinuationCancelledOrFail directory sessionID lease.ContinuationID "new_human_turn"
             | None -> ()
 
-            if directory <> "" && fallbackRuntime.GetSessionOwner sessionID = "Compaction" then
+            if directory <> "" then
+                match fallbackRuntime.TryCancelPendingNudgeLease sessionID with
+                | Some nudgeLease ->
+                    do! appendNudgeCancelledOrFail directory sessionID nudgeLease.NudgeID "new_human_turn"
+                | None -> ()
+
                 let activeComp = fallbackRuntime.GetActiveCompactionId sessionID
+                let settled = fallbackRuntime.TrySettleCompaction(sessionID, activeComp)
 
-                if activeComp <> "" then
+                if settled then
                     do! appendCompactionSettledOrFail directory sessionID activeComp "cancelled"
-
-                fallbackRuntime.SetSessionOwner sessionID "None"
 
             fallbackRuntime.SetChain sessionID []
             fallbackRuntime.ClearModel sessionID

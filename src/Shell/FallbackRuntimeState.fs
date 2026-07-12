@@ -180,6 +180,18 @@ type FallbackRuntimeState() =
         | Some leaseObj -> Some(leaseObj :?> PendingLease)
         | None -> None
 
+    member _.TryClearPendingLease(sessionID: string, continuationID: string) : bool =
+        match Map.tryFind sessionID pendingLeases with
+        | Some leaseObj ->
+            let lease = leaseObj :?> PendingLease
+
+            if lease.ContinuationID = continuationID then
+                pendingLeases <- Map.remove sessionID pendingLeases
+                true
+            else
+                false
+        | None -> false
+
     member _.ClearPendingLease(sessionID: string) : unit =
         pendingLeases <- Map.remove sessionID pendingLeases
 
@@ -189,11 +201,37 @@ type FallbackRuntimeState() =
     member _.TryGetPendingNudgeLease(sessionID: string) : NudgeLease option =
         Map.tryFind sessionID pendingNudgeLeases
 
+    member this.TryCancelPendingNudgeLease(sessionID: string) : NudgeLease option =
+        match Map.tryFind sessionID pendingNudgeLeases with
+        | Some lease ->
+            pendingNudgeLeases <- Map.remove sessionID pendingNudgeLeases
+            activeNudgeNonces <- Map.remove sessionID activeNudgeNonces
+            this.SetNudgeActive sessionID false
+            Some lease
+        | None -> None
+
     member _.ClearPendingNudgeLease(sessionID: string) : unit =
         pendingNudgeLeases <- Map.remove sessionID pendingNudgeLeases
 
     member _.SetActiveCompactionId(sessionID: string, id: string) : unit =
         activeCompactionIds <- Map.add sessionID id activeCompactionIds
+
+    member this.TrySettleCompaction(sessionID: string, expectedCompactionID: string) : bool =
+        if expectedCompactionID = "" then
+            false
+        else
+            match Map.tryFind sessionID activeCompactionIds with
+            | Some currentCompID when currentCompID = expectedCompactionID ->
+                activeCompactionIds <- Map.remove sessionID activeCompactionIds
+                compactionGenerations <- Map.remove sessionID compactionGenerations
+                compactedSessions <- Set.remove sessionID compactedSessions
+                compactionContinuationObserved <- Set.remove sessionID compactionContinuationObserved
+
+                if this.GetSessionOwner sessionID = "Compaction" then
+                    this.ClearSessionOwner sessionID
+
+                true
+            | _ -> false
 
     member _.SetActiveNudgeNonce (sessionID: string) (nonce: string) : unit =
         activeNudgeNonces <- Map.add sessionID nonce activeNudgeNonces

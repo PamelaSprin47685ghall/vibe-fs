@@ -184,9 +184,11 @@ type NudgeTrigger
                             let directory = pluginDirectoryFromCtx ctx
 
                             if directory <> "" then
-                                do! appendCompactionSettledOrFail directory sessionIDStr activeComp "completed"
+                                let settled = fallbackRuntime.TrySettleCompaction(sessionIDStr, activeComp)
 
-                        fallbackRuntime.SetSessionOwner sessionIDStr "None"
+                                if settled then
+                                    do! appendCompactionSettledOrFail directory sessionIDStr activeComp "completed"
+
                         fallbackRuntime.SetCompacted sessionIDStr false
                         fallbackRuntime.SetCompactionContinuationObserved sessionIDStr false
 
@@ -204,7 +206,6 @@ type NudgeTrigger
                         | Ok client ->
                             try
                                 fallbackRuntime.SetNudgeActive sessionIDStr true
-                                fallbackRuntime.SetSessionOwner sessionIDStr "Nudge"
 
                                 let dispatchPostStop
                                     : Host

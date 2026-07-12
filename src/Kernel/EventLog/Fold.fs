@@ -430,7 +430,14 @@ let private ownerAndLeaseFolder
 
         Some "Compaction", None, None, cid, genVal, false
     | k when k = eventKindContextGenerationChanged -> owner, lease, nudgeLease, compId, compGen, true
-    | k when k = eventKindCompactionSettled -> Some "None", None, None, None, compGen, false
+    | k when k = eventKindCompactionSettled ->
+        let cid = payloadField "compactionId" e |> Option.defaultValue ""
+        let isMatch = compId |> Option.exists (fun id -> id = cid)
+
+        if isMatch then
+            Some "None", lease, nudgeLease, None, compGen, false
+        else
+            owner, lease, nudgeLease, compId, compGen, isCompacted
     | k when k = eventKindContinuationRequested ->
         let contId = payloadField "continuationId" e |> Option.defaultValue ""
         let model = payloadField "model" e |> Option.defaultValue ""
@@ -491,24 +498,31 @@ let private ownerAndLeaseFolder
 
         owner, nextLease, nudgeLease, compId, compGen, isCompacted
     | k when k = eventKindContinuationFailed || k = eventKindContinuationCancelled ->
-        let nextOwner =
-            match owner with
-            | Some "Fallback" -> Some "None"
-            | _ -> owner
+        let cid = payloadField "continuationId" e |> Option.defaultValue ""
+        let isMatch = lease |> Option.exists (fun l -> l.ContinuationID = cid)
 
-        nextOwner, None, nudgeLease, compId, compGen, isCompacted
+        if isMatch then
+            let nextOwner =
+                match owner with
+                | Some "Fallback" -> Some "None"
+                | _ -> owner
+
+            nextOwner, None, nudgeLease, compId, compGen, isCompacted
+        else
+            owner, lease, nudgeLease, compId, compGen, isCompacted
     | k when k = eventKindContinuationSettled ->
         let cid = payloadField "continuationId" e |> Option.defaultValue ""
+        let isMatch = lease |> Option.exists (fun l -> l.ContinuationID = cid)
 
-        let nextLease =
-            lease |> Option.bind (fun l -> if l.ContinuationID = cid then None else Some l)
+        if isMatch then
+            let nextOwner =
+                match owner with
+                | Some "Fallback" -> Some "None"
+                | _ -> owner
 
-        let nextOwner =
-            match owner with
-            | Some "Fallback" -> Some "None"
-            | _ -> owner
-
-        nextOwner, nextLease, nudgeLease, compId, compGen, isCompacted
+            nextOwner, None, nudgeLease, compId, compGen, isCompacted
+        else
+            owner, lease, nudgeLease, compId, compGen, isCompacted
     | k when k = eventKindNudgeRequested ->
         let nid = payloadField "nudgeId" e |> Option.defaultValue ""
         let nonce = payloadField "nonce" e |> Option.defaultValue ""
@@ -539,7 +553,13 @@ let private ownerAndLeaseFolder
         || k = eventKindNudgeCancelled
         || k = eventKindNudgeSettled
         ->
-        Some "None", lease, None, compId, compGen, isCompacted
+        let nid = payloadField "nudgeId" e |> Option.defaultValue ""
+        let isMatch = nudgeLease |> Option.exists (fun nl -> nl.NudgeID = nid)
+
+        if isMatch then
+            Some "None", lease, None, compId, compGen, isCompacted
+        else
+            owner, lease, nudgeLease, compId, compGen, isCompacted
     | k when k = eventKindAssistantCompleted ->
         let nextOwner =
             match owner with
@@ -573,8 +593,9 @@ type SessionState =
       ActiveCompactionId: string option
       CompactionGeneration: int
       IsCompacted: bool
-      LastFinalizedContinuationID: string option
-      LastFinalizedNudgeID: string option
+      FinalizedContinuationIDs: Set<string>
+      FinalizedNudgeIDs: Set<string>
+      ProcessedKeys: Set<string>
       EventCount: int }
 
 let emptySessionState () : SessionState =
@@ -599,8 +620,9 @@ let emptySessionState () : SessionState =
       ActiveCompactionId = None
       CompactionGeneration = 0
       IsCompacted = false
-      LastFinalizedContinuationID = None
-      LastFinalizedNudgeID = None
+      FinalizedContinuationIDs = Set.empty
+      FinalizedNudgeIDs = Set.empty
+      ProcessedKeys = Set.empty
       EventCount = 0 }
 
 let private getEventDeduplicationKey (e: WanEvent) : string option =
@@ -643,38 +665,22 @@ let applyEvent (st: SessionState) (e: WanEvent) : SessionState =
         |> Option.orElse (payloadField "continuationID" e)
 
     let nudgeIdOpt = payloadField "nudgeId" e
+    let keyOpt = getEventDeduplicationKey e
 
     let isDuplicate =
-        (match contIdOpt with
-         | Some id when id <> "" && st.LastFinalizedContinuationID = Some id -> true
-         | _ -> false)
+        (match keyOpt with
+         | Some k -> Set.contains k st.ProcessedKeys
+         | None -> false)
+        || (match contIdOpt with
+            | Some id when id <> "" -> Set.contains id st.FinalizedContinuationIDs
+            | _ -> false)
         || (match nudgeIdOpt with
-            | Some id when id <> "" && st.LastFinalizedNudgeID = Some id -> true
+            | Some id when id <> "" -> Set.contains id st.FinalizedNudgeIDs
             | _ -> false)
 
     if isDuplicate then
         st
     else
-        let nextLastFinalizedCont =
-            if
-                e.Kind = eventKindContinuationSettled
-                || e.Kind = eventKindContinuationFailed
-                || e.Kind = eventKindContinuationCancelled
-            then
-                contIdOpt
-            else
-                st.LastFinalizedContinuationID
-
-        let nextLastFinalizedNudge =
-            if
-                e.Kind = eventKindNudgeFailed
-                || e.Kind = eventKindNudgeCancelled
-                || e.Kind = eventKindNudgeSettled
-            then
-                nudgeIdOpt
-            else
-                st.LastFinalizedNudgeID
-
         let isBacklog = e.Kind = eventKindWorkBacklogCommitted
         let nextReviewLoop = ReviewLoopFold.foldEvent st.ReviewLoop e
         let nextHumanTurn = humanTurnFolder st.LatestHumanTurn e
@@ -699,6 +705,43 @@ let applyEvent (st: SessionState) (e: WanEvent) : SessionState =
                  nextCancelGen,
                  nextHumanTurn)
                 e
+
+        let isContSettled =
+            e.Kind = eventKindContinuationSettled
+            || e.Kind = eventKindContinuationFailed
+            || e.Kind = eventKindContinuationCancelled
+
+        let isNudgeSettled =
+            e.Kind = eventKindNudgeFailed
+            || e.Kind = eventKindNudgeCancelled
+            || e.Kind = eventKindNudgeSettled
+
+        let nextFinalizedCont =
+            if isContSettled then
+                match contIdOpt with
+                | Some id when id <> "" -> Set.add id st.FinalizedContinuationIDs
+                | _ -> st.FinalizedContinuationIDs
+            else
+                st.FinalizedContinuationIDs
+
+        let nextFinalizedNudge =
+            if isNudgeSettled then
+                match nudgeIdOpt with
+                | Some id when id <> "" -> Set.add id st.FinalizedNudgeIDs
+                | _ -> st.FinalizedNudgeIDs
+            else
+                st.FinalizedNudgeIDs
+
+        let nextProcessedKeys =
+            match keyOpt with
+            | Some k -> Set.add k st.ProcessedKeys
+            | None -> st.ProcessedKeys
+
+        let finalFinalizedCont, finalFinalizedNudge, finalProcessedKeys =
+            if e.Kind = eventKindHumanTurnStarted then
+                Set.empty, Set.empty, Set.empty
+            else
+                nextFinalizedCont, nextFinalizedNudge, nextProcessedKeys
 
         { ReviewLoop = nextReviewLoop
           ReviewTask = ReviewLoopFold.activeTask nextReviewLoop
@@ -733,8 +776,9 @@ let applyEvent (st: SessionState) (e: WanEvent) : SessionState =
           ActiveCompactionId = nextCompId
           CompactionGeneration = nextCompGen
           IsCompacted = nextIsCompacted
-          LastFinalizedContinuationID = nextLastFinalizedCont
-          LastFinalizedNudgeID = nextLastFinalizedNudge
+          FinalizedContinuationIDs = finalFinalizedCont
+          FinalizedNudgeIDs = finalFinalizedNudge
+          ProcessedKeys = finalProcessedKeys
           EventCount = st.EventCount + 1 }
 
 let foldSubagents (sessionId: string) (events: WanEvent list) : Map<string, SubagentState> =

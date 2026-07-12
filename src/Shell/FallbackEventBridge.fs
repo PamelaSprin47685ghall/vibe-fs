@@ -97,26 +97,27 @@ let finishContinuation
     (errorOrReason: string)
     : JS.Promise<unit> =
     promise {
-        if outcome = "failed" then
-            do! appendContinuationFailedOrFail workspaceRoot sessionID lease.ContinuationID errorOrReason
-        elif outcome = "cancelled" then
-            do! appendContinuationCancelledOrFail workspaceRoot sessionID lease.ContinuationID errorOrReason
-        elif outcome = "settled" then
-            do!
-                appendContinuationSettledOrFail
-                    workspaceRoot
-                    sessionID
-                    lease.ContinuationID
-                    lease.HumanTurnID
-                    lease.SessionGeneration
-                    errorOrReason
+        let cleared = runtime.TryClearPendingLease(sessionID, lease.ContinuationID)
 
-        runtime.ClearPendingLease sessionID
+        if cleared then
+            if outcome = "failed" then
+                do! appendContinuationFailedOrFail workspaceRoot sessionID lease.ContinuationID errorOrReason
+            elif outcome = "cancelled" then
+                do! appendContinuationCancelledOrFail workspaceRoot sessionID lease.ContinuationID errorOrReason
+            elif outcome = "settled" then
+                do!
+                    appendContinuationSettledOrFail
+                        workspaceRoot
+                        sessionID
+                        lease.ContinuationID
+                        lease.HumanTurnID
+                        lease.SessionGeneration
+                        errorOrReason
 
-        if runtime.GetSessionOwner sessionID = "Fallback" then
-            runtime.SetSessionOwner sessionID "None"
+            if runtime.GetSessionOwner sessionID = "Fallback" then
+                runtime.SetSessionOwner sessionID "None"
 
-        runtime.SetAwaitingBusy sessionID false
+            runtime.SetAwaitingBusy sessionID false
     }
 
 let executeContinuationIntent
@@ -372,13 +373,9 @@ let handleEvent
                     do! appendCompactionSettledOrFail workspaceRoot sessionID activeComp "cancelled"
                     runtime.SetSessionOwner sessionID "None"
 
-                match runtime.TryGetPendingNudgeLease sessionID with
+                match runtime.TryCancelPendingNudgeLease sessionID with
                 | Some nudgeLease ->
                     do! appendNudgeCancelledOrFail workspaceRoot sessionID nudgeLease.NudgeID "New user message"
-                    runtime.ClearPendingNudgeLease sessionID
-
-                    if runtime.GetSessionOwner sessionID = "Nudge" then
-                        runtime.SetSessionOwner sessionID "None"
                 | None -> ()
 
                 runtime.SetChain sessionID []
@@ -497,13 +494,9 @@ let handleEvent
                                     "User aborted"
                         | None -> ()
 
-                        match runtime.TryGetPendingNudgeLease sessionID with
+                        match runtime.TryCancelPendingNudgeLease sessionID with
                         | Some nudgeLease ->
                             do! appendNudgeCancelledOrFail workspaceRoot sessionID nudgeLease.NudgeID "User aborted"
-                            runtime.ClearPendingNudgeLease sessionID
-
-                            if runtime.GetSessionOwner sessionID = "Nudge" then
-                                runtime.SetSessionOwner sessionID "None"
                         | None -> ()
 
                     let mutable finalState = ns

@@ -151,23 +151,29 @@ let finishNudge
     (anchor: string)
     : JS.Promise<unit> =
     promise {
-        if outcome = "failed" then
-            do! appendNudgeFailedOrFail workspaceRoot sessionKey lease.NudgeID errorOrReason
-        elif outcome = "cancelled" then
-            do! appendNudgeCancelledOrFail workspaceRoot sessionKey lease.NudgeID errorOrReason
-        elif outcome = "dispatched" then
-            do! appendNudgeDispatchedOrFail workspaceRoot sessionKey lease.NudgeID actionStr anchor
-        elif outcome = "settled" then
-            do! appendNudgeSettledOrFail workspaceRoot sessionKey lease.NudgeID errorOrReason
+        let isCurrent =
+            match runtime.TryGetPendingNudgeLease sessionKey with
+            | Some nl -> nl.NudgeID = lease.NudgeID
+            | None -> false
 
-        if outcome <> "dispatched" then
-            runtime.ClearPendingNudgeLease sessionKey
-            runtime.ClearActiveNudgeNonce sessionKey
+        if isCurrent then
+            if outcome = "failed" then
+                do! appendNudgeFailedOrFail workspaceRoot sessionKey lease.NudgeID errorOrReason
+            elif outcome = "cancelled" then
+                do! appendNudgeCancelledOrFail workspaceRoot sessionKey lease.NudgeID errorOrReason
+            elif outcome = "dispatched" then
+                do! appendNudgeDispatchedOrFail workspaceRoot sessionKey lease.NudgeID actionStr anchor
+            elif outcome = "settled" then
+                do! appendNudgeSettledOrFail workspaceRoot sessionKey lease.NudgeID errorOrReason
 
-            if runtime.GetSessionOwner sessionKey = "Nudge" then
-                runtime.SetSessionOwner sessionKey "None"
+            if outcome <> "dispatched" then
+                runtime.ClearPendingNudgeLease sessionKey
+                runtime.ClearActiveNudgeNonce sessionKey
 
-            runtime.SetNudgeActive sessionKey false
+                if runtime.GetSessionOwner sessionKey = "Nudge" then
+                    runtime.SetSessionOwner sessionKey "None"
+
+                runtime.SetNudgeActive sessionKey false
     }
 
 let runNudgeFlowCore
