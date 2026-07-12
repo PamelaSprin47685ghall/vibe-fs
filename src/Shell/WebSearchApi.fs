@@ -75,7 +75,7 @@ let webApiPost (pathname: string) (body: obj) (abortSignal: obj option) : JS.Pro
         | Error e -> return Error e
         | Ok apiKey ->
             let url = $"{webApiBase ()}{normalizeWebApiPath pathname}"
-            let bodyStr = Encode.Auto.toString (0, body)
+            let bodyStr = JS.JSON.stringify body
             let init = postInit apiKey bodyStr abortSignal
 
             try
