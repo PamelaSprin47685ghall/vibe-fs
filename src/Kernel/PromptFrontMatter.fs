@@ -178,7 +178,15 @@ let hasCompactionAnchorPrompt (text: string) : bool =
 /// Only blocks containing at least one of these keys are carried into the
 /// compaction anchor prompt; everything else is dropped to save tokens.
 let compactionAnchorWhitelist =
-    Set.ofList [ "task"; "verdict"; "double-check"; "squad_event" ]
+    Set.ofList
+        [ "task"
+          "verdict"
+          "double-check"
+          "squad_event"
+          "original_task"
+          "review_loop_id"
+          "review_round"
+          "prompt_origin" ]
 
 /// Check whether a block's YAML content contains at least one whitelist key.
 let private blockHasWhitelistKey (blockContent: string) : bool =

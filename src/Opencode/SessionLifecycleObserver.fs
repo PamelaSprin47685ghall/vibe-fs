@@ -54,6 +54,16 @@ type SessionLifecycleObserver
         promise {
             let directory = if Dyn.isNullish ctx then "" else pluginDirectoryFromCtx ctx
 
+            // Cancel any pending continuation lease on new human turn
+            match fallbackRuntime.TryGetPendingLease sessionID with
+            | Some lease ->
+                let cancelledLease = { lease with Status = "cancelled" }
+                fallbackRuntime.SetPendingLease(sessionID, cancelledLease)
+
+                if directory <> "" then
+                    do! appendContinuationCancelledOrFail directory sessionID lease.ContinuationID "new_human_turn"
+            | None -> ()
+
             if directory <> "" && fallbackRuntime.GetSessionOwner sessionID = "Compaction" then
                 let activeComp = fallbackRuntime.GetActiveCompactionId sessionID
 
@@ -107,6 +117,8 @@ type SessionLifecycleObserver
             fallbackRuntime.SetConsumed sessionID false
             fallbackRuntime.ClearConsumed sessionID
         }
+
+    member _.FallbackRuntime = fallbackRuntime
 
     member _.handleCommandExecuteBefore (input: obj) (_output: obj) : JS.Promise<unit> =
         let _sessionIDStr = sessionIdFromHookInput input ""

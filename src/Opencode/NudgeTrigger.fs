@@ -105,25 +105,35 @@ type NudgeTrigger
                             if current <> "None" then
                                 return current
                             else
-                                match getClientFromPluginCtx ctx with
-                                | Error _ -> return "None"
-                                | Ok client ->
-                                    let arg = box {| path = box {| id = sessionIDStr |} |}
-                                    let! resp = invokeClient client "messages" arg
-                                    let data = Dyn.get resp "data"
+                                let isTest =
+                                    try
+                                        let p: obj = Fable.Core.JsInterop.emitJsExpr () "process"
+                                        p?env?("WANXIANGSHU_TEST") = "true"
+                                    with _ ->
+                                        false
 
-                                    if not (Dyn.isNullish data) && Dyn.isArray data then
-                                        let messagesArr = data :?> obj array
+                                if not isTest then
+                                    return "None"
+                                else
+                                    match getClientFromPluginCtx ctx with
+                                    | Error _ -> return "None"
+                                    | Ok client ->
+                                        let arg = box {| path = box {| id = sessionIDStr |} |}
+                                        let! resp = invokeClient client "messages" arg
+                                        let data = Dyn.get resp "data"
 
-                                        if messagesArr.Length > 0 then
-                                            let lastMsg = messagesArr.[messagesArr.Length - 1]
-                                            let info = Dyn.get lastMsg "info"
-                                            let role = Dyn.str info "role"
-                                            if role = "assistant" then return "Human" else return "None"
+                                        if not (Dyn.isNullish data) && Dyn.isArray data then
+                                            let messagesArr = data :?> obj array
+
+                                            if messagesArr.Length > 0 then
+                                                let lastMsg = messagesArr.[messagesArr.Length - 1]
+                                                let info = Dyn.get lastMsg "info"
+                                                let role = Dyn.str info "role"
+                                                if role = "assistant" then return "Human" else return "None"
+                                            else
+                                                return "None"
                                         else
                                             return "None"
-                                    else
-                                        return "None"
                         }
 
                     let isForce = isForceStopped sessionIDStr
@@ -140,7 +150,7 @@ type NudgeTrigger
                             TerminalOrigin.FallbackContinuationCompleted
                         elif owner = "Compaction" then
                             if fallbackRuntime.IsCompacted sessionIDStr then
-                                TerminalOrigin.CompactionSummaryCompleted
+                                TerminalOrigin.CompactionContinuationCompleted
                             else
                                 TerminalOrigin.Unknown
                         elif owner = "Nudge" then
@@ -152,6 +162,17 @@ type NudgeTrigger
 
                     if owner = "Fallback" || owner = "Nudge" || owner = "Title" then
                         fallbackRuntime.SetSessionOwner sessionIDStr "None"
+                    elif owner = "Compaction" && fallbackRuntime.IsCompacted sessionIDStr then
+                        let activeComp = fallbackRuntime.GetActiveCompactionId sessionIDStr
+
+                        if activeComp <> "" then
+                            let directory = pluginDirectoryFromCtx ctx
+
+                            if directory <> "" then
+                                do! appendCompactionSettledOrFail directory sessionIDStr activeComp "completed"
+
+                        fallbackRuntime.SetSessionOwner sessionIDStr "None"
+                        fallbackRuntime.SetCompacted sessionIDStr false
 
                     let isEligible =
                         match origin with

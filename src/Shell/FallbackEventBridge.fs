@@ -55,7 +55,12 @@ type ContinuationIntent =
         continuationID: string
     | PropagateFailureIntent
 
-let verifyLease (runtime: FallbackRuntimeState) (sessionID: string) (lease: PendingLease) : bool =
+let verifyLeaseWithStatus
+    (expectedStatus: string)
+    (runtime: FallbackRuntimeState)
+    (sessionID: string)
+    (lease: PendingLease)
+    : bool =
     let currentGen = runtime.GetSessionGeneration sessionID
     let currentCancelGen = runtime.GetCancelGeneration sessionID
     let currentTurnId = runtime.GetHumanTurnId sessionID
@@ -72,10 +77,13 @@ let verifyLease (runtime: FallbackRuntimeState) (sessionID: string) (lease: Pend
             | Some s -> s.Lifecycle = FallbackLifecycle.Active
             | None -> false)
         && (match runtime.TryGetPendingLease sessionID with
-            | Some pending -> pending.ContinuationID = lease.ContinuationID && pending.Status = "requested"
+            | Some pending -> pending.ContinuationID = lease.ContinuationID && pending.Status = expectedStatus
             | None -> false)
 
     matches
+
+let verifyLease (runtime: FallbackRuntimeState) (sessionID: string) (lease: PendingLease) : bool =
+    verifyLeaseWithStatus "requested" runtime sessionID lease
 
 let executeContinuationIntent
     (runtime: FallbackRuntimeState)
@@ -108,15 +116,9 @@ let executeContinuationIntent
                 try
                     do! executor.SendContinue(sessionID, model)
 
-                    let currentCancelGen = runtime.GetCancelGeneration sessionID
+                    let isValid = verifyLeaseWithStatus "dispatch_started" runtime sessionID lease
 
-                    let isCancelled =
-                        currentCancelGen > cancelGen
-                        || (match runtime.TryGetPendingLease sessionID with
-                            | Some pending -> pending.Status = "cancelled"
-                            | None -> true)
-
-                    if isCancelled then
+                    if not isValid then
                         do! executor.AbortRun sessionID
                         let cancelledLease = { lease with Status = "cancelled" }
                         runtime.SetPendingLease(sessionID, cancelledLease)
@@ -148,8 +150,6 @@ let executeContinuationIntent
                                 modelStr
                                 agent
                                 atMs
-
-                        do! appendFallbackContinueInjectedOrFail workspaceRoot sessionID modelStr agent atMs
                 with ex ->
                     let failedLease = { lease with Status = "failed" }
                     runtime.SetPendingLease(sessionID, failedLease)
@@ -181,15 +181,9 @@ let executeContinuationIntent
                 try
                     do! executor.RecoverWithPrompt(sessionID, model, promptText)
 
-                    let currentCancelGen = runtime.GetCancelGeneration sessionID
+                    let isValid = verifyLeaseWithStatus "dispatch_started" runtime sessionID lease
 
-                    let isCancelled =
-                        currentCancelGen > cancelGen
-                        || (match runtime.TryGetPendingLease sessionID with
-                            | Some pending -> pending.Status = "cancelled"
-                            | None -> true)
-
-                    if isCancelled then
+                    if not isValid then
                         do! executor.AbortRun sessionID
                         let cancelledLease = { lease with Status = "cancelled" }
                         runtime.SetPendingLease(sessionID, cancelledLease)
@@ -396,16 +390,6 @@ let handleEvent
                 return { Consumed = false; State = ns }, None
             else
                 let state = runtime.GetOrCreateState sessionID
-
-                if
-                    evt = FallbackEvent.SessionIdle
-                    && runtime.GetSessionOwner sessionID = "Compaction"
-                then
-                    if runtime.IsCompacted sessionID then
-                        let activeComp = runtime.GetActiveCompactionId sessionID
-                        do! appendCompactionSettledOrFail workspaceRoot sessionID activeComp "completed"
-                        runtime.SetSessionOwner sessionID "None"
-                        runtime.SetCompacted sessionID false
 
                 let agentName = runtime.GetAgentName sessionID
                 let cfg = configLookup agentName
