@@ -217,6 +217,33 @@ let opencodeHookSchemaMergeWorkBacklogReportRemoveTaskId () =
         (not (isArray required)
          || not ((required :?> obj array) |> Array.exists (fun x -> string x = "task_id")))
 
+let opencodeHookSchemaMergeWorkBacklogReportSoftenExistingFields () =
+    let schema =
+        createObj
+            [ "type", box "object"
+              "properties",
+              createObj
+                  [ "plan",
+                    createObj
+                        [ "type", box "string"
+                          "minLength", box 1024
+                          "description", box "Original plan description" ]
+                    "description", createObj [ "type", box "string" ] ]
+              "required", box [| box "plan"; box "description" |] ]
+
+    let result = mergeWorkBacklogReportIntoTaskSchema schema
+    let resultProps = get result "properties"
+    let resultRequired = get result "required"
+    let planProp = get resultProps "plan"
+
+    check "minLength removed from plan" (Dyn.isNullish (get planProp "minLength"))
+    check "soft min length added to plan" (unbox<int> (get planProp "x-wanxiangshu-soft-min-length") = 1024)
+    check "plan description softened" ((Dyn.str planProp "description").Contains("MUST be at least 1024 characters"))
+
+    let required = resultRequired :?> obj array
+    check "plan removed from required" (not (required |> Array.exists (fun x -> string x = "plan")))
+    check "description still in required" (required |> Array.exists (fun x -> string x = "description"))
+
 // ── buildWorkBacklogSchema ────────────────────────────────────────────────────
 
 let opencodeHookSchemaTryBuildJsonSchemaFromEffectSchemaDefs () =
@@ -276,5 +303,6 @@ let run () =
         opencodeHookSchemaInjectWarnTddNullSchema ()
         opencodeHookSchemaMergeWorkBacklogReportIntoPureSchema ()
         opencodeHookSchemaMergeWorkBacklogReportRemoveTaskId ()
+        opencodeHookSchemaMergeWorkBacklogReportSoftenExistingFields ()
         opencodeHookSchemaTryBuildJsonSchemaFromEffectSchemaDefs ()
     }

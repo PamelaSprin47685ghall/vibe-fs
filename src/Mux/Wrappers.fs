@@ -177,8 +177,14 @@ let private mkTodoWriteWrapper (host: Host) (projection: ProjectionStore) : obj 
                                 else
                                     Promise.lift raw
 
-                            let output = todoWriteOutput methodologies
                             let isError = not (Dyn.isNullish result) && not (truthy (Dyn.get result "success"))
+
+                            let output =
+                                if isError then
+                                    let errOut = Dyn.str result "output"
+                                    if errOut = "" then Dyn.str result "error" else errOut
+                                else
+                                    todoWriteOutput methodologies
 
                             let status =
                                 if isError then

@@ -51,38 +51,45 @@ let toolResultHandler (_pi: obj) (_reviewStore: ReviewStore) (event: obj) (ctx: 
         let envOpt = ToolHookRuntime.tryGetCompliance sessionId toolCallId
 
         try
+            // 1. 恢复控制字段
             match envOpt with
-            | Some env ->
-                ToolHookRuntime.restoreWarnToArgs args env
-                let currentOutput = getToolResultText event
-
-                if not env.Violations.IsEmpty then
-                    let isError =
-                        Dyn.truthy (Dyn.get event "isError")
-                        || (let err = Dyn.get event "error" in not (Dyn.isNullish err) && string err <> "")
-
-                    let status =
-                        if env.Cancelled then
-                            ToolHookRuntime.ExecutionStatus.Cancelled
-                        elif isError then
-                            ToolHookRuntime.ExecutionStatus.Failure
-                        else
-                            ToolHookRuntime.ExecutionStatus.Success
-
-                    let criticism = ToolHookRuntime.appendCriticism currentOutput env.Violations status
-                    setToolResultText event criticism
+            | Some env -> ToolHookRuntime.restoreWarnToArgs args env
             | None -> ()
 
-            let content = getToolResultText event
+            // 2. 收集 warn violations & 3. 收集 todo report violations
+            let warnViolations =
+                match envOpt with
+                | Some env -> env.Violations
+                | None -> []
 
-            if
+            let todoReportViolations =
+                if toolName = todoWriteToolName omp then
+                    match decodeTodoWriteArgs false args with
+                    | Result.Ok(_, viols) -> viols
+                    | Result.Error _ -> []
+                else
+                    []
+
+            let violations = warnViolations @ todoReportViolations
+
+            // 4. 执行 syntax、livelock、todo 标准化等业务处理
+            let rawContent = getToolResultText event
+
+            let isLivelock =
                 sessionId <> ""
-                && check ExecutorTools.ompScope sessionId toolName (JS.JSON.stringify args) content
-            then
-                setToolResultText event "livelock guard: repeated identical tool call with identical result"
+                && check ExecutorTools.ompScope sessionId toolName (JS.JSON.stringify args) rawContent
+
+            let mutable businessProcessedText = rawContent
+            let mutable isBusinessLivelock = false
+
+            if isLivelock then
+                businessProcessedText <- "livelock guard: repeated identical tool call with identical result"
+                isBusinessLivelock <- true
             else
                 applyToolResultHook toolName args
                 do! appendToolResultSyntax (Dyn.str ctx "cwd") event
+
+                let mutable textAfterSyntax = getToolResultText event
 
                 if toolName = todoWriteToolName omp then
                     let callId = getToolCallId event
@@ -148,27 +155,36 @@ let toolResultHandler (_pi: obj) (_reviewStore: ReviewStore) (event: obj) (ctx: 
                             let rawArr = unbox<obj array> raw
                             rawArr |> Seq.map string |> List.ofSeq
 
-                    let content = getToolResultText event
+                    let isError =
+                        Dyn.truthy (Dyn.get event "isError")
+                        || (let err = Dyn.get event "error" in not (Dyn.isNullish err) && string err <> "")
 
-                    if content <> "" then
-                        let baseOutput = todoWriteOutput methodologies
+                    if textAfterSyntax <> "" && not isError then
+                        textAfterSyntax <- todoWriteOutput methodologies
 
-                        let violations =
-                            match decodeTodoWriteArgs false args with
-                            | Result.Ok(_, viols) -> viols
-                            | Result.Error _ -> []
+                    businessProcessedText <- textAfterSyntax
 
-                        let finalOutput =
-                            if not (List.isEmpty violations) then
-                                ToolHookRuntime.appendCriticism
-                                    baseOutput
-                                    violations
-                                    ToolHookRuntime.ExecutionStatus.Success
-                            else
-                                baseOutput
+            // 5. 确定最终 Success / Failure / Cancelled 状态
+            let isError =
+                Dyn.truthy (Dyn.get event "isError")
+                || (let err = Dyn.get event "error" in not (Dyn.isNullish err) && string err <> "")
 
-                        setToolResultText event finalOutput
+            let status =
+                match envOpt with
+                | Some env when env.Cancelled -> ToolHookRuntime.ExecutionStatus.Cancelled
+                | _ ->
+                    if isError || isBusinessLivelock then
+                        ToolHookRuntime.ExecutionStatus.Failure
+                    else
+                        ToolHookRuntime.ExecutionStatus.Success
+
+            // 6. 在最终结果上追加合并后的批评
+            let criticism =
+                ToolHookRuntime.appendCriticism businessProcessedText violations status
+
+            setToolResultText event criticism
         finally
+            // 7. finally 删除 compliance envelope
             if envOpt.IsSome then
                 ToolHookRuntime.removeCompliance sessionId toolCallId
     }

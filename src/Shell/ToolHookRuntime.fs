@@ -123,13 +123,34 @@ type ToolCapability =
     | ProcessExecution
     | SubagentDelegation
 
+let private sessionCancelGenerations =
+    System.Collections.Generic.Dictionary<string, int>()
+
+let getSessionCancelGeneration (sessionID: string) : int =
+    if System.String.IsNullOrWhiteSpace sessionID then
+        0
+    else
+        match sessionCancelGenerations.TryGetValue(sessionID) with
+        | true, g -> g
+        | _ -> 0
+
+let incrementSessionCancelGeneration (sessionID: string) : unit =
+    if not (System.String.IsNullOrWhiteSpace sessionID) then
+        match sessionCancelGenerations.TryGetValue(sessionID) with
+        | true, g -> sessionCancelGenerations.[sessionID] <- g + 1
+        | _ -> sessionCancelGenerations.[sessionID] <- 1
+
 type ControlEnvelope =
     { WarnTdd: string option
       Warn: string option
       WarnReuse: string option
       Amend: int option
       Violations: string list
-      mutable Cancelled: bool }
+      mutable GenerationAtStart: int
+      mutable SessionId: string }
+
+    member this.Cancelled =
+        this.GenerationAtStart < getSessionCancelGeneration this.SessionId
 
 let private complianceStore =
     System.Collections.Generic.Dictionary<string, System.Collections.Generic.Dictionary<string, ControlEnvelope>>()
@@ -139,6 +160,9 @@ let saveCompliance (sessionID: string) (toolCallID: string) (env: ControlEnvelop
         not (System.String.IsNullOrWhiteSpace sessionID)
         && not (System.String.IsNullOrWhiteSpace toolCallID)
     then
+        env.SessionId <- sessionID
+        env.GenerationAtStart <- getSessionCancelGeneration sessionID
+
         let innerStore =
             match complianceStore.TryGetValue(sessionID) with
             | true, store -> store
@@ -178,23 +202,7 @@ let removeCompliance (sessionID: string) (toolCallID: string) : unit =
 
 let clearSessionCompliance (sessionID: string) : unit =
     if not (System.String.IsNullOrWhiteSpace sessionID) then
-        match complianceStore.TryGetValue(sessionID) with
-        | true, innerStore ->
-            let keysToRemove =
-                innerStore
-                |> Seq.filter (fun kv -> kv.Value.Cancelled)
-                |> Seq.map (fun kv -> kv.Key)
-                |> Seq.toList
-
-            for k in keysToRemove do
-                innerStore.Remove(k) |> ignore
-
-            for kv in innerStore do
-                kv.Value.Cancelled <- true
-
-            if innerStore.Count = 0 then
-                complianceStore.Remove(sessionID) |> ignore
-        | _ -> ()
+        incrementSessionCancelGeneration sessionID
 
 let restoreWarnToArgs (args: obj) (env: ControlEnvelope) : unit =
     if not (Dyn.isNullish args) then
@@ -539,7 +547,8 @@ let executeBeforeGateway (tool: string) (args: obj) : Result<obj * ControlEnvelo
               WarnReuse = None
               Amend = None
               Violations = []
-              Cancelled = false }
+              GenerationAtStart = 0
+              SessionId = "" }
         )
     else
         coerceArgsTypes tool args
@@ -639,6 +648,7 @@ let executeBeforeGateway (tool: string) (args: obj) : Result<obj * ControlEnvelo
               WarnReuse = warnReuseVal
               Amend = amendVal
               Violations = violations
-              Cancelled = false }
+              GenerationAtStart = 0
+              SessionId = "" }
 
         Result.Ok(nextArgs, env)

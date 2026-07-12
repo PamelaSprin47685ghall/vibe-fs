@@ -114,6 +114,7 @@ let decodeTodowriteMissingCompletedWorkReport () =
               "gotchas", box ""
               "lessonsAndConventions", box ""
               "plan", box ""
+              "select_methodology", box [| "first_principles" |]
               "todos", box [||] ]
 
     match decodeToolInvocation "todowrite" args with

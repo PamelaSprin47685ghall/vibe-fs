@@ -80,7 +80,14 @@ let tryInjectParallelToolPrompt (sessionID: string) (messages: Message<obj> list
 
                             let isMatchingToolResult =
                                 m.info.role = ToolResult
-                                && (m.info.id = targetCallID || m.info.id.Contains(targetCallID))
+                                && (m.info.id = targetCallID
+                                    || m.info.id = targetCallID + "-result"
+                                    || m.info.id = targetCallID + "_result"
+                                    || m.info.id = targetCallID + ":result"
+                                    || m.info.id.StartsWith(targetCallID + "-")
+                                    || m.info.id.StartsWith(targetCallID + ":")
+                                    || m.info.id.StartsWith(targetCallID + "_")
+                                    || (let callIDs = AmendFilter.getCallIDs m in List.contains targetCallID callIDs))
 
                             hasTerminalPart || isMatchingToolResult)
 
