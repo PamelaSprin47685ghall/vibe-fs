@@ -8,9 +8,6 @@ open Wanxiangshu.Shell.Wanxiangzhen.SlaveRuntime
 [<Global("globalThis.process")>]
 let private nodeProcess: obj = jsNative
 
-[<Import("appendFileSync", "node:fs")>]
-let private appendFileSync (path: string) (data: string) : unit = jsNative
-
 let private envVar (key: string) : string =
     let e = nodeProcess?("env")
     if isNullish e then "" else str e key
@@ -69,13 +66,6 @@ let pluginModule: obj =
     createObj
         [ "id", box "wanxiangzhen"
           "server", box plugin
-          "setup",
-          box (fun (ctx: obj) ->
-              try
-                  appendFileSync "/tmp/debug-wanxiangzhen.txt" "setup called\n"
-              with _ ->
-                  ()
-
-              plugin ctx)
+          "setup", box (fun (ctx: obj) -> plugin ctx)
           "plugin", box plugin
           "pluginWithDeps", box pluginWithDeps ]

@@ -111,7 +111,7 @@ let runSubagentWaitsForToolCallTextRecovery () =
         let childId = "child-tct-wait"
         registry.RegisterChildAgent(childId, "investigator", Some "parent-1")
 
-        let textExtracted = ref false
+        let messagesCallCount = ref 0
 
         let client =
             createObj
@@ -142,7 +142,7 @@ let runSubagentWaitsForToolCallTextRecovery () =
                             box (
                                 System.Func<obj, JS.Promise<obj>>(fun _ ->
                                     promise {
-                                        textExtracted.Value <- true
+                                        messagesCallCount.Value <- messagesCallCount.Value + 1
 
                                         return
                                             box
@@ -180,7 +180,9 @@ let runSubagentWaitsForToolCallTextRecovery () =
         do! waitForListenerRegistered rt childId
         do! yieldMicrotask ()
 
-        check "text not extracted while recovery in progress" (not textExtracted.Value)
+        check
+            "messages called once for startCount baseline query while recovery in progress"
+            (messagesCallCount.Value = 1)
 
         let s1 = rt.GetOrCreateState childId
 
@@ -194,7 +196,7 @@ let runSubagentWaitsForToolCallTextRecovery () =
 
         let! result = runP
 
-        check "text extracted after recovery settled" textExtracted.Value
+        check "messages called twice after recovery settled" (messagesCallCount.Value = 2)
 
         match result with
         | Ok text -> check "recovered output present" (text.Contains "recovered")

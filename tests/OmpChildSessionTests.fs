@@ -86,14 +86,18 @@ let runSubagentOnExistingSessionDoesNotResetTaskComplete () =
             { s0 with
                 Lifecycle = FallbackLifecycle.TaskComplete }
 
-        let promptCalled = ref false
+        let promptStartedResolver = ref (fun () -> ())
+
+        let promptStarted =
+            Promise.create (fun resolve _ -> promptStartedResolver.Value <- resolve)
+
         let sessionManagerMock = createObj [ "getSessionId", box (fun () -> box childId) ]
 
         let sessionMock =
             createObj
                 [ "prompt",
                   box (fun (_p: string) ->
-                      promptCalled.Value <- true
+                      promptStartedResolver.Value()
                       Promise.lift ())
                   "waitForIdle", box (fun () -> Promise.lift ())
                   "sessionManager", box sessionManagerMock ]
@@ -130,12 +134,15 @@ let runSubagentOnExistingSessionDoesNotResetTaskComplete () =
                 rt
                 (Some config)
 
+        do! promptStarted
+        do! yieldMicrotask ()
         do! yieldMicrotask ()
 
         check
             "OMP continue does NOT reset TaskComplete to false"
             ((rt.GetOrCreateState childId).Lifecycle = FallbackLifecycle.TaskComplete)
 
+        rt.SetTaskComplete childId true
         let! text = runP
         equal "OMP continue gets output" "(no output)" text
     }

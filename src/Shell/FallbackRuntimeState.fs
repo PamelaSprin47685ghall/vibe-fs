@@ -312,26 +312,6 @@ type FallbackRuntimeState() =
         | Some leaseObj ->
             let lease = leaseObj :?> PendingLease
 
-            printfn "DEBUG TryTransitionPendingLease: leaseID=%s vs expectedID=%s" lease.ContinuationID expectedID
-            printfn "DEBUG TryTransitionPendingLease: leaseStatus=%s vs expectedStatus=%s" lease.Status expectedStatus
-
-            printfn
-                "DEBUG TryTransitionPendingLease: leaseGen=%d vs currentGen=%d"
-                lease.SessionGeneration
-                (this.GetSessionGeneration sessionID)
-
-            printfn
-                "DEBUG TryTransitionPendingLease: leaseTurnID='%s' vs currentTurnID='%s'"
-                lease.HumanTurnID
-                (this.GetHumanTurnId sessionID)
-
-            printfn
-                "DEBUG TryTransitionPendingLease: leaseCancelGen=%d vs currentCancelGen=%d"
-                lease.CancelGeneration
-                (this.GetCancelGeneration sessionID)
-
-            printfn "DEBUG TryTransitionPendingLease: currentOwner='%s'" (this.GetSessionOwner sessionID)
-
             let isCurrent =
                 lease.ContinuationID = expectedID
                 && lease.Status = expectedStatus
@@ -346,9 +326,7 @@ type FallbackRuntimeState() =
                 true
             else
                 false
-        | None ->
-            printfn "DEBUG TryTransitionPendingLease: no lease found for session %s" sessionID
-            false
+        | None -> false
 
     member _.ClearPendingLease(sessionID: string) : unit =
         pendingLeases <- Map.remove sessionID pendingLeases

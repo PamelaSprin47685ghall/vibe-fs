@@ -673,6 +673,7 @@
     <Compile Include="tests/Wanxiangzhen/TaskTests.fs"/>
     <Compile Include="tests/Wanxiangzhen/SquadTaskTransitionTests.fs"/>
     <Compile Include="tests/TestsEntriesWanxiangzhen.fs"/>
+    <Compile Include="tests/ProductionDebugOutputTests.fs"/>
     <Compile Include="tests/TestsEntriesCoreTail.fs"/>
     <Compile Include="tests/TestsEntriesSessionLoop.fs"/>
     <Compile Include="tests/TestsEntriesCore.fs"/>

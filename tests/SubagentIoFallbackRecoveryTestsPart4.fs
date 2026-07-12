@@ -23,7 +23,7 @@ let runSubagentContinueDoesNotResetTaskComplete () =
             { s0 with
                 Lifecycle = FallbackLifecycle.TaskComplete }
 
-        let textExtracted = ref false
+        let messagesCallCount = ref 0
         let promptStartedResolver = ref (fun () -> ())
 
         let promptStarted =
@@ -54,7 +54,7 @@ let runSubagentContinueDoesNotResetTaskComplete () =
                   "messages",
                   box (
                       System.Func<obj, JS.Promise<obj>>(fun _ ->
-                          textExtracted.Value <- true
+                          messagesCallCount.Value <- messagesCallCount.Value + 1
                           Promise.lift finalMessages)
                   )
                   "abort", box (System.Func<obj, JS.Promise<unit>>(fun _ -> Promise.lift ())) ]
@@ -76,13 +76,20 @@ let runSubagentContinueDoesNotResetTaskComplete () =
                 false
                 (Some childId)
 
-        let! result = runP
+        do! promptStarted
+        do! yieldMicrotask ()
+        do! yieldMicrotask ()
 
         check
-            "TaskComplete not reset on continue, resolves early"
+            "TaskComplete not reset on continue"
             ((rt.GetOrCreateState childId).Lifecycle = FallbackLifecycle.TaskComplete)
 
-        check "text extracted immediately" textExtracted.Value
+        check "messages read exactly once before terminal event" (messagesCallCount.Value = 1)
+
+        rt.SetTaskComplete childId true
+        let! result = runP
+
+        check "messages read exactly twice after completion" (messagesCallCount.Value = 2)
 
         match result with
         | Ok text -> check "continue output present" (text.Contains "final-output")
@@ -103,7 +110,7 @@ let runSubagentContinueResetsTaskComplete () =
             { s0 with
                 Lifecycle = FallbackLifecycle.TaskComplete }
 
-        let textExtracted = ref false
+        let messagesCallCount = ref 0
         let promptStartedResolver = ref (fun () -> ())
 
         let promptStarted =
@@ -134,7 +141,7 @@ let runSubagentContinueResetsTaskComplete () =
                   "messages",
                   box (
                       System.Func<obj, JS.Promise<obj>>(fun _ ->
-                          textExtracted.Value <- true
+                          messagesCallCount.Value <- messagesCallCount.Value + 1
                           Promise.lift finalMessages)
                   )
                   "abort", box (System.Func<obj, JS.Promise<unit>>(fun _ -> Promise.lift ())) ]
@@ -160,11 +167,11 @@ let runSubagentContinueResetsTaskComplete () =
         do! yieldMicrotask ()
         do! yieldMicrotask ()
 
-        check "TaskComplete=false blocks early extract on continue" (not textExtracted.Value)
+        check "messages read exactly once before terminal event" (messagesCallCount.Value = 1)
 
         rt.SetTaskComplete childId true
         let! result = runP
-        check "text extracted after continue task completes" textExtracted.Value
+        check "messages read exactly twice after completion" (messagesCallCount.Value = 2)
     }
 
 let runSubagentSpawnResetsTaskComplete () =
@@ -180,7 +187,7 @@ let runSubagentSpawnResetsTaskComplete () =
             { s0 with
                 Lifecycle = FallbackLifecycle.TaskComplete }
 
-        let textExtracted = ref false
+        let messagesCallCount = ref 0
         let promptStartedResolver = ref (fun () -> ())
 
         let promptStarted =
@@ -211,7 +218,7 @@ let runSubagentSpawnResetsTaskComplete () =
                   "messages",
                   box (
                       System.Func<obj, JS.Promise<obj>>(fun _ ->
-                          textExtracted.Value <- true
+                          messagesCallCount.Value <- messagesCallCount.Value + 1
                           Promise.lift finalMessages)
                   )
                   "abort", box (System.Func<obj, JS.Promise<unit>>(fun _ -> Promise.lift ())) ]
@@ -236,11 +243,11 @@ let runSubagentSpawnResetsTaskComplete () =
         do! promptStarted
         do! yieldMicrotask ()
         do! yieldMicrotask ()
-        check "TaskComplete reset to false blocks early extract on spawn" (not textExtracted.Value)
+        check "messages read exactly once before terminal event" (messagesCallCount.Value = 1)
 
         rt.SetTaskComplete childId true
         let! result = runP
-        check "text extracted after spawn task completes" textExtracted.Value
+        check "messages read exactly twice after completion" (messagesCallCount.Value = 2)
     }
 
 let run () =

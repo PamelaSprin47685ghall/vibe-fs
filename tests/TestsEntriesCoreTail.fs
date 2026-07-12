@@ -143,4 +143,5 @@ let tailCoreTestEntries () : (string * TestBody) list =
       "WarnTddOpencodeEnforcementTests.run", TestBody.Async WarnTddOpencodeEnforcementTests.run
       "WarnTddMuxEnforcementTests.run", TestBody.Async WarnTddMuxEnforcementTests.run
       "WarnTddOmpEnforcementTests.run", TestBody.Sync(sync WarnTddOmpEnforcementTests.run)
-      "EventDrivenHarnessDemo.run", TestBody.Async(fun () -> EventDrivenHarnessDemo.run ()) ]
+      "EventDrivenHarnessDemo.run", TestBody.Async(fun () -> EventDrivenHarnessDemo.run ())
+      "ProductionDebugOutputTests.run", TestBody.Sync(sync Wanxiangshu.Tests.ProductionDebugOutputTests.run) ]

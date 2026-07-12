@@ -39,7 +39,7 @@ let runSubagentDoesNotExtractTextWhilePendingAfterEarlyPromptResolve () =
                 Lifecycle = FallbackLifecycle.Active }
 
         rt.SetConsumed childId false
-        let textExtracted = ref false
+        let messagesCallCount = ref 0
 
         let client =
             createObj
@@ -56,7 +56,7 @@ let runSubagentDoesNotExtractTextWhilePendingAfterEarlyPromptResolve () =
                             box (
                                 System.Func<obj, JS.Promise<obj>>(fun _ ->
                                     promise {
-                                        textExtracted.Value <- true
+                                        messagesCallCount.Value <- messagesCallCount.Value + 1
 
                                         return
                                             box
@@ -90,12 +90,12 @@ let runSubagentDoesNotExtractTextWhilePendingAfterEarlyPromptResolve () =
         do! waitForListenerRegistered rt childId
         do! yieldMicrotask ()
 
-        check "pending blocks extract" (not textExtracted.Value)
+        check "pending blocks extract" (messagesCallCount.Value = 1)
 
         rt.ClearSubsessionPending childId
         rt.SetBusyCount childId 1
         do! yieldMicrotask ()
-        check "busy blocks extract" (not textExtracted.Value)
+        check "busy blocks extract" (messagesCallCount.Value = 1)
 
         rt.SetBusyCount childId 0
         let s0 = rt.GetOrCreateState childId
@@ -107,7 +107,7 @@ let runSubagentDoesNotExtractTextWhilePendingAfterEarlyPromptResolve () =
 
         let! result = runP
 
-        check "extract after complete" textExtracted.Value
+        check "extract after complete" (messagesCallCount.Value = 2)
 
         match result with
         | Ok text -> check "output present" (text.Contains "after-busy")
@@ -139,7 +139,7 @@ let runSubagentCompletesDespiteRetryingPhaseAfterNetworkError () =
         let promptRejected: JS.Promise<unit> =
             Promise.create (fun resolve _ -> promptRejectedResolver.Value <- resolve)
 
-        let textExtracted = ref false
+        let messagesCallCount = ref 0
 
         let finalMessagePart = createObj [ "type", box "text"; "text", box "final-output" ]
 
@@ -170,7 +170,7 @@ let runSubagentCompletesDespiteRetryingPhaseAfterNetworkError () =
                   "messages",
                   box (
                       System.Func<obj, JS.Promise<obj>>(fun _ ->
-                          textExtracted.Value <- true
+                          messagesCallCount.Value <- messagesCallCount.Value + 1
                           Promise.lift finalMessages)
                   )
                   "abort", box (System.Func<obj, JS.Promise<unit>>(fun _ -> Promise.lift ())) ]
@@ -207,16 +207,17 @@ let runSubagentCompletesDespiteRetryingPhaseAfterNetworkError () =
 
         promptReleaseResolver.Value()
         do! promptRejected
-        check "continue error waits before completion" (not textExtracted.Value)
+        check "continue error waits before completion" (messagesCallCount.Value = 1)
         rt.SetTaskComplete childId true
 
         for _ in 1..8 do
             do! yieldMicrotask ()
 
-        let completedBeforePhaseReset = textExtracted.Value
+        let completedBeforePhaseReset = (messagesCallCount.Value = 2)
         let! result = runP
 
         check "completed before residual phase reset" completedBeforePhaseReset
+        check "extract after complete" (messagesCallCount.Value = 2)
 
         match result with
         | Ok text -> check "output contains final-output" (text.Contains "final-output")

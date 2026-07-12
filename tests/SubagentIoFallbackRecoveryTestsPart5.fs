@@ -116,7 +116,7 @@ let runSubagentWaitsThroughFallbackSendContinue () =
         rt.SetChain childId chain
         rt.SetAgentName childId "coder"
 
-        let textExtracted = ref false
+        let messagesCallCount = ref 0
 
         let client =
             createObj
@@ -133,7 +133,7 @@ let runSubagentWaitsThroughFallbackSendContinue () =
                             box (
                                 System.Func<obj, JS.Promise<obj>>(fun _ ->
                                     promise {
-                                        textExtracted.Value <- true
+                                        messagesCallCount.Value <- messagesCallCount.Value + 1
 
                                         return
                                             box
@@ -167,7 +167,7 @@ let runSubagentWaitsThroughFallbackSendContinue () =
         do! waitForListenerRegistered rt childId
         do! yieldMicrotask ()
 
-        check "text not extracted while pending" (not textExtracted.Value)
+        check "messagesCallCount is 1 while pending" (messagesCallCount.Value = 1)
 
         let translator =
             { new IEventTranslator with
@@ -198,7 +198,7 @@ let runSubagentWaitsThroughFallbackSendContinue () =
         do! yieldMicrotask ()
 
         check "SubsessionPending still true after fallback event" (rt.IsSubsessionPending childId)
-        check "text not extracted after fallback event" (not textExtracted.Value)
+        check "messagesCallCount is 1 after fallback event" (messagesCallCount.Value = 1)
 
         let s = rt.GetOrCreateState childId
 
@@ -209,7 +209,7 @@ let runSubagentWaitsThroughFallbackSendContinue () =
 
         let! result = withTimeout runP
 
-        check "text extracted after TaskComplete" textExtracted.Value
+        check "messagesCallCount is 2 after TaskComplete" (messagesCallCount.Value = 2)
 
         match result with
         | Ok text -> check "output present" (text.Contains "after-fallback")

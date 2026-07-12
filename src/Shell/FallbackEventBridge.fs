@@ -75,23 +75,6 @@ let verifyLeaseWithStatus
 
     let pending = runtime.TryGetPendingLease sessionID
 
-    printfn
-        "DEBUG verifyLeaseWithStatus: expectedStatus=%s, leaseID=%s, pendingID=%A, pendingStatus=%A"
-        expectedStatus
-        lease.ContinuationID
-        (pending |> Option.map (fun p -> p.ContinuationID))
-        (pending |> Option.map (fun p -> p.Status))
-
-    printfn
-        "DEBUG details: currentGen=%d (leaseGen=%d), currentCancelGen=%d (leaseCancel=%d), currentTurnId='%s' (leaseTurn='%s'), currentOwner='%s'"
-        currentGen
-        lease.SessionGeneration
-        currentCancelGen
-        lease.CancelGeneration
-        currentTurnId
-        lease.HumanTurnID
-        currentOwner
-
     let matches =
         lease.SessionGeneration = currentGen
         && lease.HumanTurnID = currentTurnId
@@ -105,7 +88,6 @@ let verifyLeaseWithStatus
             | Some p -> p.ContinuationID = lease.ContinuationID && p.Status = expectedStatus
             | None -> false)
 
-    printfn "DEBUG verifyLeaseWithStatus matches=%b" matches
     matches
 
 let verifyLease (runtime: FallbackRuntimeState) (sessionID: string) (lease: PendingLease) : bool =

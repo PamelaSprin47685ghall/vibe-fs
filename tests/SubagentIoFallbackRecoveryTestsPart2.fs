@@ -34,7 +34,7 @@ let runSubagentWaitsForNudgeToComplete () =
         let childId = "child-nudge-wait"
         registry.RegisterChildAgent(childId, "coder", Some "parent-1")
 
-        let textExtracted = ref false
+        let messagesCallCount = ref 0
 
         let client =
             createObj
@@ -60,7 +60,7 @@ let runSubagentWaitsForNudgeToComplete () =
                             box (
                                 System.Func<obj, JS.Promise<obj>>(fun _ ->
                                     promise {
-                                        textExtracted.Value <- true
+                                        messagesCallCount.Value <- messagesCallCount.Value + 1
 
                                         return
                                             box
@@ -100,7 +100,7 @@ let runSubagentWaitsForNudgeToComplete () =
 
         // BUG: without the nudge-wait, the subagent has already returned Error here.
         // The text should NOT have been extracted because the nudge is still active.
-        check "text not extracted while nudge active" (not textExtracted.Value)
+        check "text not extracted while nudge active" (messagesCallCount.Value = 1)
 
         // Now the nudge completes — TaskComplete is set, nudge no longer active.
         rt.SetNudgeActive childId false
@@ -117,7 +117,7 @@ let runSubagentWaitsForNudgeToComplete () =
         let! result = runP
 
         // After nudge completes, the subagent should recover and return Ok.
-        check "text extracted after nudge settled" textExtracted.Value
+        check "text extracted after nudge settled" (messagesCallCount.Value = 2)
 
         match result with
         | Ok text -> check "nudge-recovered output present" (text.Contains "nudge-recovered")
@@ -136,7 +136,7 @@ let runSubagentWaitsForContinueToComplete () =
         let childId = "child-continue-wait"
         registry.RegisterChildAgent(childId, "investigator", Some "parent-1")
 
-        let textExtracted = ref false
+        let messagesCallCount = ref 0
 
         let client =
             createObj
@@ -170,7 +170,7 @@ let runSubagentWaitsForContinueToComplete () =
                             box (
                                 System.Func<obj, JS.Promise<obj>>(fun _ ->
                                     promise {
-                                        textExtracted.Value <- true
+                                        messagesCallCount.Value <- messagesCallCount.Value + 1
 
                                         return
                                             box
@@ -210,7 +210,7 @@ let runSubagentWaitsForContinueToComplete () =
 
         // BUG: without the continue-wait, the subagent has already returned Error here.
         // The text should NOT have been extracted because the continue is still active.
-        check "text not extracted while continue active" (not textExtracted.Value)
+        check "text not extracted while continue active" (messagesCallCount.Value = 1)
 
         // Now the continue resolves — TaskComplete is set, continue no longer active.
         rt.SetContinueActive childId false
@@ -229,7 +229,7 @@ let runSubagentWaitsForContinueToComplete () =
         let! result = runP
 
         // After continue resolves, the subagent should recover and return Ok.
-        check "text extracted after continue settled" textExtracted.Value
+        check "text extracted after continue settled" (messagesCallCount.Value = 2)
 
         match result with
         | Ok text -> check "continue-recovered output present" (text.Contains "continue-recovered")
