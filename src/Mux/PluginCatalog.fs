@@ -89,55 +89,36 @@ let toolExecuteBefore (input: obj) (output: obj) : JS.Promise<unit> =
         let args = argsFromMuxToolExecuteInput input
 
         if not (Dyn.isNullish args) then
-            ToolHookRuntime.coerceArgsTypes tool args
+            match ToolHookRuntime.executeBeforeGateway tool args with
+            | Result.Error e -> setHookErrorMux output e
+            | Result.Ok(nextArgs, env) ->
+                setHookArgsMux output nextArgs
 
-            match ToolHookRuntime.filterAmendFromArgs args with
-            | Some n ->
-                output?("_amend") <- box n
-                input?("_amend") <- box n
-            | None -> ()
+                match env.Amend with
+                | Some n ->
+                    output?("_amend") <- box n
+                    input?("_amend") <- box n
+                | None -> ()
 
-            ToolHookRuntime.sanitizeNullArgs tool args
+                let rawOpt: obj option = nextArgs?intents
 
-            let mutable hasError = false
+                let labelResult =
+                    match tool with
+                    | "coder" ->
+                        match rawOpt with
+                        | Some r -> joinCoderUiLabel r
+                        | None -> Result.Error ""
+                    | "investigator" ->
+                        match rawOpt with
+                        | Some r -> joinInvestigatorUiLabel r
+                        | None -> Result.Error ""
+                    | _ -> Result.Error ""
 
-            match ToolHookRuntime.requireWarnTddOnArgs tool args with
-            | Result.Error e ->
-                setHookErrorMux output e
-                hasError <- true
-            | Result.Ok() -> ()
-
-            if not hasError then
-                match ToolHookRuntime.requireWarnOnArgs tool args with
-                | Result.Error e ->
-                    setHookErrorMux output e
-                    hasError <- true
-                | Result.Ok() -> ()
-
-            if not hasError then
-                match ToolHookRuntime.requireWarnReuseOnArgs tool args with
-                | Result.Error e ->
-                    setHookErrorMux output e
-                    hasError <- true
-                | Result.Ok() -> ()
-
-            let rawOpt: obj option = args?intents
-
-            let labelResult =
-                match tool with
-                | "coder" ->
-                    match rawOpt with
-                    | Some r -> joinCoderUiLabel r
-                    | None -> Result.Error ""
-                | "investigator" ->
-                    match rawOpt with
-                    | Some r -> joinInvestigatorUiLabel r
-                    | None -> Result.Error ""
-                | _ -> Result.Error ""
-
-            match labelResult with
-            | Result.Ok label when label <> "" -> args?("_ui") <- box label
-            | _ -> ()
+                match labelResult with
+                | Result.Ok label when label <> "" ->
+                    args?("_ui") <- box label
+                    nextArgs?("_ui") <- box label
+                | _ -> ()
     }
 
 let toolExecuteAfter (scope: RuntimeScope) (input: obj) (output: obj) : JS.Promise<unit> =

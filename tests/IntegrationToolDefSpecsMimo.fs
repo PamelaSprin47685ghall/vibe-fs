@@ -11,6 +11,7 @@ open Wanxiangshu.Kernel.Domain
 open Wanxiangshu.Kernel.ToolResult
 open Wanxiangshu.Kernel.ToolOutputInfo
 open Wanxiangshu.Shell.Dyn
+open Wanxiangshu.Kernel
 
 let mimoApplyPatchExecuteBeforeSpec () =
     promise {
@@ -19,10 +20,14 @@ let mimoApplyPatchExecuteBeforeSpec () =
         let teb = get p "tool.execute.before"
         let stringArgsOut = createObj [ "args", box "*** Begin Patch\n*** End Patch" ]
 
-        do!
-            teb
-            $ (createObj [ "tool", box "apply_patch"; "sessionID", box "s1"; "callID", box "c1" ], stringArgsOut)
-            |> unbox<JS.Promise<unit>>
+        let input1 =
+            createObj
+                [ "tool", box "apply_patch"
+                  "sessionID", box "s1"
+                  "callID", box "c1"
+                  "args", box (createObj [ "warn_tdd", box WarnTdd.canonicalValue ]) ]
+
+        do! teb $ (input1, stringArgsOut) |> unbox<JS.Promise<unit>>
 
         check
             "mimo apply_patch execute.before wraps string args"
@@ -31,10 +36,14 @@ let mimoApplyPatchExecuteBeforeSpec () =
         let patchArgsOut =
             createObj [ "args", box (createObj [ "patch", box "*** Begin Patch\n*** End Patch" ]) ]
 
-        do!
-            teb
-            $ (createObj [ "tool", box "apply_patch"; "sessionID", box "s1"; "callID", box "c2" ], patchArgsOut)
-            |> unbox<JS.Promise<unit>>
+        let input2 =
+            createObj
+                [ "tool", box "apply_patch"
+                  "sessionID", box "s1"
+                  "callID", box "c2"
+                  "args", box (createObj [ "warn_tdd", box WarnTdd.canonicalValue ]) ]
+
+        do! teb $ (input2, patchArgsOut) |> unbox<JS.Promise<unit>>
 
         check
             "mimo apply_patch execute.before rewrites patch field"
@@ -43,10 +52,14 @@ let mimoApplyPatchExecuteBeforeSpec () =
         let correctArgsOut =
             createObj [ "args", box (createObj [ "patchText", box "already-correct" ]) ]
 
-        do!
-            teb
-            $ (createObj [ "tool", box "apply_patch"; "sessionID", box "s1"; "callID", box "c3" ], correctArgsOut)
-            |> unbox<JS.Promise<unit>>
+        let input3 =
+            createObj
+                [ "tool", box "apply_patch"
+                  "sessionID", box "s1"
+                  "callID", box "c3"
+                  "args", box (createObj [ "warn_tdd", box WarnTdd.canonicalValue ]) ]
+
+        do! teb $ (input3, correctArgsOut) |> unbox<JS.Promise<unit>>
 
         check
             "mimo apply_patch execute.before preserves patchText"
@@ -54,10 +67,14 @@ let mimoApplyPatchExecuteBeforeSpec () =
 
         let invalidArgsOut = createObj [ "args", box (createObj []) ]
 
-        do!
-            teb
-            $ (createObj [ "tool", box "apply_patch"; "sessionID", box "s1"; "callID", box "c4" ], invalidArgsOut)
-            |> unbox<JS.Promise<unit>>
+        let input4 =
+            createObj
+                [ "tool", box "apply_patch"
+                  "sessionID", box "s1"
+                  "callID", box "c4"
+                  "args", box (createObj [ "warn_tdd", box WarnTdd.canonicalValue ]) ]
+
+        do! teb $ (input4, invalidArgsOut) |> unbox<JS.Promise<unit>>
 
         let errText = str invalidArgsOut "error"
 
@@ -94,7 +111,7 @@ let mimoTaskExecuteRoundTripSpec () =
             (get taskTool "execute") $ (args, createObj [ "sessionID", box "s1" ])
             |> unbox<JS.Promise<string>>
 
-        check "mimo task execute returns todo envelope" (result.Contains (hintMethodologyFollowup "first_principles"))
+        check "mimo task execute returns todo envelope" (result.Contains(hintMethodologyFollowup "first_principles"))
         do! rmAsync workspaceDir
     }
 
@@ -123,7 +140,10 @@ let mimoTaskExecuteNestedReportSpec () =
             (get taskTool "execute") $ (args, createObj [ "sessionID", box "s1" ])
             |> unbox<JS.Promise<string>>
 
-        check "mimo task execute with methodology returns success" (result.Contains (hintMethodologyFollowup "first_principles"))
+        check
+            "mimo task execute with methodology returns success"
+            (result.Contains(hintMethodologyFollowup "first_principles"))
+
         do! rmAsync workspaceDir
     }
 
@@ -182,7 +202,7 @@ let mimoTaskExecuteStripsTaskIdSpec () =
             (get taskTool "execute") $ (args, createObj [ "sessionID", box "s1" ])
             |> unbox<JS.Promise<string>>
 
-        check "mimo task execute ignores stray task_id" (result.Contains (hintMethodologyFollowup "first_principles"))
+        check "mimo task execute ignores stray task_id" (result.Contains(hintMethodologyFollowup "first_principles"))
         do! rmAsync workspaceDir
     }
 

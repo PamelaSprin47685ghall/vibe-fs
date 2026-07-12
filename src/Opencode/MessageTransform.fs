@@ -240,9 +240,23 @@ let compactingTransform
             let backlog = backlogSession.GetOrRebuildBacklog(sessionID, cleaned)
             let guidGen () = string (runtimeScope.RandomGen())
 
-            let result =
-                Wanxiangshu.Kernel.BacklogProjectionCore.compactingTransform cleaned backlog guidGen
+            let fallbackRuntime =
+                match runtimeScope.TryFindKey("fallbackRuntime") with
+                | Some obj -> Some(unbox<Wanxiangshu.Shell.FallbackRuntimeState.FallbackRuntimeState> obj)
+                | None -> None
 
-            let encoded = MessagingCodec.encodeMessages result
-            replaceArrayInPlace messagesArr encoded
+            match fallbackRuntime with
+            | Some fr -> fr.SetSessionOwner sessionID "Compaction"
+            | None -> ()
+
+            try
+                let result =
+                    Wanxiangshu.Kernel.BacklogProjectionCore.compactingTransform cleaned backlog guidGen
+
+                let encoded = MessagingCodec.encodeMessages result
+                replaceArrayInPlace messagesArr encoded
+            finally
+                match fallbackRuntime with
+                | Some fr -> fr.SetSessionOwner sessionID "None"
+                | None -> ()
     }

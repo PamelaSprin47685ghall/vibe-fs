@@ -35,7 +35,6 @@ let private env (key: string) : string =
 
 let readSlaveConfig () : SlaveConfig option =
     let url = env "SQUAD_COORDINATOR_URL"
-    printfn "DEBUG SLAVE: env SQUAD_COORDINATOR_URL = '%s'" url
 
     if url = "" then
         None

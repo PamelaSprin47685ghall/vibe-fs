@@ -21,6 +21,7 @@ type IEventTranslator =
     abstract IsSessionIdle: obj -> bool
     abstract IsSessionBusy: obj -> bool
     abstract IsNewUserMessage: sessionID: string * rawEvent: obj -> bool
+    abstract ExtractRoutingContext: rawEvent: obj -> (string option * string option)
 
 type IActionExecutor =
     abstract SendContinue: sessionID: string * model: FallbackModel -> JS.Promise<unit>
@@ -94,6 +95,35 @@ let handleEvent
                 else
                     promise { return None }
 
+        let isStale =
+            match eventOpt with
+            | None -> false
+            | Some evt ->
+                if evt = FallbackEvent.NewUserMessage then
+                    false
+                else
+                    let isAbortError =
+                        match evt with
+                        | FallbackEvent.SessionError err when
+                            Wanxiangshu.Kernel.FallbackKernel.Decision.errorInputIsAbort err
+                            ->
+                            true
+                        | _ -> false
+
+                    if isAbortError then
+                        false
+                    else
+                        let state = runtime.GetOrCreateState sessionID
+
+                        state.Lifecycle = FallbackLifecycle.Cancelled
+                        || (let activeGen = runtime.GetActiveContinuationGeneration sessionID
+                            let activeCancel = runtime.GetActiveContinuationCancelGeneration sessionID
+                            let currentGen = runtime.GetSessionGeneration sessionID
+                            let currentCancel = runtime.GetCancelGeneration sessionID
+                            activeGen < currentGen || activeCancel < currentCancel)
+
+        let eventOpt = if isStale then None else eventOpt
+
         match eventOpt with
         | None ->
             return
@@ -104,6 +134,19 @@ let handleEvent
             if evt = FallbackEvent.NewUserMessage then
                 runtime.SetChain sessionID []
                 runtime.ClearModel sessionID
+                runtime.ClearInjected sessionID
+                runtime.SetSessionOwner sessionID "Human"
+                let turnId = runtime.IncrementHumanTurnId sessionID
+                let modelOpt, agentOpt = translator.ExtractRoutingContext rawEvent
+
+                match modelOpt with
+                | Some m -> runtime.SetLatestHumanModel sessionID m
+                | None -> runtime.ClearLatestHumanModel sessionID
+
+                match agentOpt with
+                | Some a -> runtime.SetAgentName sessionID a
+                | None -> ()
+
                 let state = runtime.GetOrCreateState sessionID
                 let agentName = runtime.GetAgentName sessionID
                 let cfg = configLookup agentName
@@ -161,9 +204,19 @@ let handleEvent
 
                     let mutable finalState = ns
 
+                    let terminalStates =
+                        ns.Lifecycle = FallbackLifecycle.TaskComplete
+                        || ns.Lifecycle = FallbackLifecycle.Cancelled
+                        || ns.Phase = FallbackPhase.Exhausted
+                        || (ns.Phase = FallbackPhase.Idle && action = FallbackAction.DoNothing)
+
+                    if terminalStates then
+                        runtime.SetSessionOwner sessionID "None"
+
                     match action with
                     | FallbackAction.DoNothing -> ()
                     | FallbackAction.SendContinue model ->
+                        runtime.SetSessionOwner sessionID "Fallback"
                         let atMs = getTimestampMs ()
                         let agent = runtime.GetAgentName sessionID
 
@@ -176,9 +229,18 @@ let handleEvent
                         runtime.SetInjectedAt sessionID atMs
                         runtime.SetInjectedModel sessionID model
                         runtime.SetAwaitingBusy sessionID true
+                        let currentGen = runtime.GetSessionGeneration sessionID
+                        let currentCancelGen = runtime.GetCancelGeneration sessionID
+                        runtime.SetActiveContinuationGeneration sessionID currentGen
+                        runtime.SetActiveContinuationCancelGeneration sessionID currentCancelGen
                         do! executor.SendContinue(sessionID, model)
                     | FallbackAction.RecoverWithPrompt(model, promptText) ->
+                        runtime.SetSessionOwner sessionID "Fallback"
                         runtime.SetAwaitingBusy sessionID true
+                        let currentGen = runtime.GetSessionGeneration sessionID
+                        let currentCancelGen = runtime.GetCancelGeneration sessionID
+                        runtime.SetActiveContinuationGeneration sessionID currentGen
+                        runtime.SetActiveContinuationCancelGeneration sessionID currentCancelGen
                         do! executor.RecoverWithPrompt(sessionID, model, promptText)
                     | FallbackAction.ScanToolCallAsText ->
                         let! msgs = executor.FetchMessages sessionID
@@ -191,6 +253,7 @@ let handleEvent
 
                             runtime.UpdateState sessionID updated
                             finalState <- updated
+                            runtime.SetSessionOwner sessionID "None"
                         else
                             match FallbackMessageCodec.scanToolCallAsText msgs with
                             | Some promptText ->
@@ -203,11 +266,17 @@ let handleEvent
                                     runtime.UpdateState sessionID updated
                                     finalState <- updated
                                     runtime.SetAwaitingBusy sessionID true
+                                    let currentGen = runtime.GetSessionGeneration sessionID
+                                    let currentCancelGen = runtime.GetCancelGeneration sessionID
+                                    runtime.SetActiveContinuationGeneration sessionID currentGen
+                                    runtime.SetActiveContinuationCancelGeneration sessionID currentCancelGen
+                                    runtime.SetSessionOwner sessionID "Fallback"
                                     do! executor.RecoverWithPrompt(sessionID, model, promptText)
                                 | None ->
                                     let updated = { ns with Phase = FallbackPhase.Idle }
                                     runtime.UpdateState sessionID updated
                                     finalState <- updated
+                                    runtime.SetSessionOwner sessionID "None"
                             | None ->
                                 let isToolFinish = FallbackMessageCodec.isLastAssistantToolFinish msgs
                                 let hasResult = FallbackMessageCodec.hasToolResultAfter msgs
@@ -224,6 +293,9 @@ let handleEvent
 
                                 runtime.UpdateState sessionID updated
                                 finalState <- updated
+
+                                if updated.Lifecycle = FallbackLifecycle.TaskComplete then
+                                    runtime.SetSessionOwner sessionID "None"
                     | FallbackAction.PropagateFailure -> do! executor.PropagateFailure sessionID
 
                     let consumed =

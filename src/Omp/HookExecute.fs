@@ -53,59 +53,21 @@ let private normalizePatchArgs (toolName: string) (args: obj) : unit =
 /// and `_ui` label injection for subagent intents. Called by both the
 /// `tool_call` pre-execute hook and the `tool_result` post-execute hook
 /// (the latter via `applyToolCallHook` to keep the logic in one place).
-let private requireWarnTddOmp (toolName: string) (args: obj) : string option =
-    if not (Wanxiangshu.Kernel.WarnTdd.isModificationTool toolName) then
-        None
-    else
-        let raw = Dyn.str args "warn_tdd"
-
-        match Wanxiangshu.Kernel.WarnTdd.parseWarnTdd raw with
-        | Some _ ->
-            Dyn.deleteKey args "warn_tdd"
-            None
-        | None -> Some(sprintf "Tool '%s': warn_tdd required — acknowledge TDD + Kolmolgorov discipline" toolName)
-
-let private requireWarnOmp (toolName: string) (args: obj) : string option =
-    if not (Wanxiangshu.Kernel.WarnTdd.isWarnRequiredTool toolName) then
-        None
-    else
-        let raw = Dyn.str args "warn"
-
-        if Wanxiangshu.Kernel.WarnTdd.parseWarn raw then
-            Dyn.deleteKey args "warn"
-            None
-        else
-            Some(sprintf "Tool '%s': warn required — acknowledge this task cannot be done with other tools" toolName)
-
-let private requireWarnReuseOmp (toolName: string) (args: obj) : string option =
-    if not (Wanxiangshu.Kernel.WarnTdd.isSubagentTool toolName) then
-        None
-    else
-        let raw = Dyn.str args "warn_reuse"
-
-        if Wanxiangshu.Kernel.WarnTdd.parseWarnReuse raw then
-            Dyn.deleteKey args "warn_reuse"
-            None
-        else
-            Some(
-                sprintf
-                    "Tool '%s': warn_reuse required — acknowledge this task is not suitable for completion via continue tool"
-                    toolName
-            )
-
 let applyPreExecuteHook (toolName: string) (args: obj) : string option =
-    ToolHookRuntime.coerceArgsTypes toolName args
-    ToolHookRuntime.filterAmendFromArgs args |> ignore
-    ToolHookRuntime.sanitizeNullArgs toolName args
-    normalizePatchArgs toolName args
-    setUiLabel args toolName
+    if Dyn.isNullish args then
+        None
+    else
+        match ToolHookRuntime.executeBeforeGateway toolName args with
+        | Result.Error e -> Some e
+        | Result.Ok(nextArgs, env) ->
+            for k in Dyn.keys args do
+                Dyn.deleteKey args k
 
-    match requireWarnTddOmp toolName args with
-    | Some err -> Some err
-    | None ->
-        match requireWarnOmp toolName args with
-        | Some err -> Some err
-        | None -> requireWarnReuseOmp toolName args
+            Dyn.assignInto args nextArgs |> ignore
+
+            normalizePatchArgs toolName args
+            setUiLabel args toolName
+            None
 
 /// Apply the Omp pre-tool argument normalisations that must run before any
 /// downstream consumer reads the args reference. pi exposes a `tool_call`
@@ -113,13 +75,11 @@ let applyPreExecuteHook (toolName: string) (args: obj) : string option =
 /// Returns Some error message if the tool call should be blocked.
 let applyToolCallHook (toolName: string) (args: obj) : string option = applyPreExecuteHook toolName args
 
-/// Apply the Omp post-tool argument normalisations. Runs the same normalisation
-/// as a post-execute idempotency guard — the `tool_call` pre-hook might not
-/// fire under race conditions, so `tool_result` is the last safe insertion point.
 let applyToolResultHook (toolName: string) (args: obj) : unit =
-    applyPreExecuteHook toolName args |> ignore
-
     if not (Dyn.isNullish args) then
+        normalizePatchArgs toolName args
+        setUiLabel args toolName
+
         let amendVal = Dyn.get args "_amend"
 
         if not (Dyn.isNullish amendVal) then

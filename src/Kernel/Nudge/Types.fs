@@ -56,6 +56,13 @@ let hasOpenTodos (s: SessionWorkState) : bool =
 /// Back-compat name for call sites migrating off bool triples.
 let getSessionWorkState = workStateFromAxes
 
+type ReviewLoopSnapshotInfo =
+    { originalTask: string
+      reviewLoopId: string
+      currentRound: int
+      latestVerdict: string option
+      latestFeedback: string option }
+
 type SessionSnapshot =
     { todos: string list
       lastAssistantMessage: string
@@ -63,7 +70,9 @@ type SessionSnapshot =
       blockStatus: NudgeBlockStatus
       nudgeAnchorKey: string
       agentFromMessage: string option
-      modelFromMessage: string option }
+      modelFromMessage: string option
+      reviewLoop: ReviewLoopSnapshotInfo option
+      humanTurnId: string option }
 
 type SendOutcome =
     | Delivered

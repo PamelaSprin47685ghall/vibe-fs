@@ -16,13 +16,26 @@ let private ev session kind payload =
       Payload = payload }
 
 let private toSessionSnapshot (s: NudgeSnapshotState) : SessionSnapshot =
+    let reviewLoopInfo =
+        match s.reviewLoop with
+        | Active info ->
+            Some
+                { originalTask = info.task
+                  reviewLoopId = info.reviewLoopId
+                  currentRound = info.currentRound
+                  latestVerdict = info.latestVerdict
+                  latestFeedback = info.latestFeedback }
+        | _ -> None
+
     { todos = s.openTodos
       lastAssistantMessage = s.lastAssistantText
       workState = s.workState
       blockStatus = NudgeBlockStatus.Allowed
       nudgeAnchorKey = nudgeAnchorKey s.turnId s.lastAssistantText
       agentFromMessage = s.agentFromMessage
-      modelFromMessage = s.modelFromMessage }
+      modelFromMessage = s.modelFromMessage
+      reviewLoop = reviewLoopInfo
+      humanTurnId = Some s.turnId }
 
 /// No events → all fields empty/default.
 let foldNudgeSnapshotEmpty () =

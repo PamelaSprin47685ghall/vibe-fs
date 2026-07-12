@@ -16,26 +16,86 @@ let inactiveInitial () =
 
 let activateSetsTask () =
     let e = ev eventKindLoopActivated (Map [ "task", "ship" ])
-    equal "activate" (Active "ship") (foldEvent Inactive e)
+
+    let expected =
+        Active
+            { task = "ship"
+              reviewLoopId = "t"
+              currentRound = 1
+              latestVerdict = None
+              latestFeedback = None }
+
+    equal "activate" expected (foldEvent Inactive e)
 
 let cancelClears () =
     let e = ev eventKindLoopCancelled Map.empty
-    equal "cancel" Inactive (foldEvent (Active "x") e)
+
+    let active =
+        Active
+            { task = "x"
+              reviewLoopId = ""
+              currentRound = 1
+              latestVerdict = None
+              latestFeedback = None }
+
+    equal "cancel" Inactive (foldEvent active e)
 
 let acceptClears () =
     let e = ev eventKindReviewVerdict (Map [ "verdict", verdictAccepted ])
-    equal "accept" Inactive (foldEvent (Active "x") e)
+
+    let active =
+        Active
+            { task = "x"
+              reviewLoopId = ""
+              currentRound = 1
+              latestVerdict = None
+              latestFeedback = None }
+
+    equal "accept" Inactive (foldEvent active e)
 
 let needsRevisionKeeps () =
     let e = ev eventKindReviewVerdict (Map [ "verdict", verdictNeedsRevision ])
-    equal "needs_revision" (Active "x") (foldEvent (Active "x") e)
+
+    let active =
+        Active
+            { task = "x"
+              reviewLoopId = ""
+              currentRound = 1
+              latestVerdict = None
+              latestFeedback = None }
+
+    let expected =
+        Active
+            { task = "x"
+              reviewLoopId = ""
+              currentRound = 2
+              latestVerdict = Some verdictNeedsRevision
+              latestFeedback = None }
+
+    equal "needs_revision" expected (foldEvent active e)
 
 let activeTaskProjection () =
-    equal "projection" (Some "t") (activeTask (Active "t"))
+    let active =
+        Active
+            { task = "t"
+              reviewLoopId = ""
+              currentRound = 1
+              latestVerdict = None
+              latestFeedback = None }
+
+    equal "projection" (Some "t") (activeTask active)
     equal "none when inactive" None (activeTask Inactive)
 
 let isLoopActiveFlag () =
-    checkBare (isLoopActive (Active "t"))
+    let active =
+        Active
+            { task = "t"
+              reviewLoopId = ""
+              currentRound = 1
+              latestVerdict = None
+              latestFeedback = None }
+
+    checkBare (isLoopActive active)
     checkBare (not (isLoopActive Inactive))
 
 let run () =

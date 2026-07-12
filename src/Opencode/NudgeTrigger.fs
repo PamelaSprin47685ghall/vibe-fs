@@ -96,8 +96,11 @@ type NudgeTrigger
                 match Id.trySessionId sessionIDStr with
                 | None -> ()
                 | Some sessionID ->
+                    let owner = fallbackRuntime.GetSessionOwner sessionIDStr
+
                     if
                         NudgeTrigger.isNaturalStop eventType props
+                        && (owner = "None" || owner = "Human")
                         && not (isForceStopped sessionIDStr)
                         && not (reviewStore.getPendingReviewIds () |> List.contains sessionIDStr)
                     then

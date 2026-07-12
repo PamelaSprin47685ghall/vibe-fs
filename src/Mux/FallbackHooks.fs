@@ -65,7 +65,9 @@ let muxEventTranslator: IEventTranslator =
 
         member _.IsSessionBusy(rawEvent: obj) : bool = false
 
-        member _.IsNewUserMessage(_sessionID, _rawEvent) : bool = false }
+        member _.IsNewUserMessage(_sessionID, _rawEvent) : bool = false
+
+        member _.ExtractRoutingContext(_rawEvent) = None, None }
 
 let muxActionExecutor (helpers: obj) : IActionExecutor =
     let invokeNudge (workspaceId: string) (text: string) : JS.Promise<unit> =

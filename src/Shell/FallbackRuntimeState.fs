@@ -24,6 +24,13 @@ type FallbackRuntimeState() =
     let mutable injectedModels = Map.ofList<string, FallbackModel> []
     let mutable injectedAts = Map.ofList<string, int64> []
     let mutable listeners = Map.empty<string, ResizeArray<unit -> unit>>
+    let mutable latestHumanModels = Map.empty<string, string>
+    let mutable humanTurnIds = Map.empty<string, string>
+    let mutable sessionGenerations = Map.ofList<string, int> []
+    let mutable cancelGenerations = Map.ofList<string, int> []
+    let mutable activeContinuationGens = Map.ofList<string, int> []
+    let mutable activeContinuationCancelGens = Map.ofList<string, int> []
+    let mutable sessionOwners = Map.ofList<string, string> []
 
     let triggerStateChanged (sessionID: string) : unit =
         match Map.tryFind sessionID listeners with
@@ -65,9 +72,69 @@ type FallbackRuntimeState() =
             states <- Map.add sessionID freshState states
             freshState
 
-    member _.UpdateState (sessionID: string) (state: SessionFallbackState) : unit =
-        states <- Map.add sessionID state states
+    member this.UpdateState (sessionID: string) (state: SessionFallbackState) : unit =
+        let finalState =
+            if state.Lifecycle = FallbackLifecycle.Cancelled then
+                activeGates <- setGateActive activeGates sessionID FallbackSessionGateFlag.AwaitingBusy false
+                activeGates <- setGateActive activeGates sessionID FallbackSessionGateFlag.SubsessionPending false
+                activeGates <- setGateActive activeGates sessionID FallbackSessionGateFlag.EventHandlingActive false
+                activeGates <- setGateActive activeGates sessionID FallbackSessionGateFlag.NudgeActive false
+                busyCounts <- Map.add sessionID 0 busyCounts
+                consumed <- clearConsumedMap consumed sessionID
+                injectedModels <- Map.remove sessionID injectedModels
+                injectedAts <- Map.remove sessionID injectedAts
+
+                { state with
+                    Phase = FallbackPhase.Idle
+                    ContinueCount = 0
+                    FailureCount = 0 }
+            else
+                state
+
+        states <- Map.add sessionID finalState states
         triggerStateChanged sessionID
+
+    member _.SetLatestHumanModel (sessionID: string) (model: string) : unit =
+        latestHumanModels <- Map.add sessionID model latestHumanModels
+
+    member _.GetLatestHumanModel(sessionID: string) : string option = Map.tryFind sessionID latestHumanModels
+
+    member _.ClearLatestHumanModel(sessionID: string) : unit =
+        latestHumanModels <- Map.remove sessionID latestHumanModels
+
+    member _.GetHumanTurnId(sessionID: string) : string =
+        Map.tryFind sessionID humanTurnIds |> Option.defaultValue ""
+
+    member _.IncrementHumanTurnId(sessionID: string) : string =
+        let nextId = "turn-" + System.Guid.NewGuid().ToString("N")
+        humanTurnIds <- Map.add sessionID nextId humanTurnIds
+        let currentGen = Map.tryFind sessionID sessionGenerations |> Option.defaultValue 0
+        sessionGenerations <- Map.add sessionID (currentGen + 1) sessionGenerations
+        nextId
+
+    member _.GetSessionGeneration(sessionID: string) : int =
+        Map.tryFind sessionID sessionGenerations |> Option.defaultValue 0
+
+    member _.IncrementCancelGeneration(sessionID: string) : int =
+        let current = Map.tryFind sessionID cancelGenerations |> Option.defaultValue 0
+        let next = current + 1
+        cancelGenerations <- Map.add sessionID next cancelGenerations
+        next
+
+    member _.GetCancelGeneration(sessionID: string) : int =
+        Map.tryFind sessionID cancelGenerations |> Option.defaultValue 0
+
+    member _.SetActiveContinuationGeneration (sessionID: string) (gen: int) : unit =
+        activeContinuationGens <- Map.add sessionID gen activeContinuationGens
+
+    member _.GetActiveContinuationGeneration(sessionID: string) : int =
+        Map.tryFind sessionID activeContinuationGens |> Option.defaultValue 0
+
+    member _.SetActiveContinuationCancelGeneration (sessionID: string) (gen: int) : unit =
+        activeContinuationCancelGens <- Map.add sessionID gen activeContinuationCancelGens
+
+    member _.GetActiveContinuationCancelGeneration(sessionID: string) : int =
+        Map.tryFind sessionID activeContinuationCancelGens |> Option.defaultValue 0
 
     member _.GetChain(sessionID: string) : FallbackChain =
         Map.tryFind sessionID chains |> Option.defaultValue []
@@ -176,6 +243,15 @@ type FallbackRuntimeState() =
         injectedModels <- Map.remove sessionID injectedModels
         injectedAts <- Map.remove sessionID injectedAts
 
+    member _.SetSessionOwner (sessionID: string) (owner: string) : unit =
+        sessionOwners <- Map.add sessionID owner sessionOwners
+
+    member _.GetSessionOwner(sessionID: string) : string =
+        Map.tryFind sessionID sessionOwners |> Option.defaultValue "None"
+
+    member _.ClearSessionOwner(sessionID: string) : unit =
+        sessionOwners <- Map.remove sessionID sessionOwners
+
     member _.CleanupSession(sessionID: string) : unit =
         states <- Map.remove sessionID states
         chains <- Map.remove sessionID chains
@@ -186,4 +262,11 @@ type FallbackRuntimeState() =
         activeGates <- removeSessionGates activeGates sessionID
         injectedModels <- Map.remove sessionID injectedModels
         injectedAts <- Map.remove sessionID injectedAts
+        latestHumanModels <- Map.remove sessionID latestHumanModels
+        humanTurnIds <- Map.remove sessionID humanTurnIds
+        sessionGenerations <- Map.remove sessionID sessionGenerations
+        cancelGenerations <- Map.remove sessionID cancelGenerations
+        activeContinuationGens <- Map.remove sessionID activeContinuationGens
+        activeContinuationCancelGens <- Map.remove sessionID activeContinuationCancelGens
+        sessionOwners <- Map.remove sessionID sessionOwners
         triggerStateChanged sessionID

@@ -83,15 +83,6 @@ let extractSchemaTypes (schema: obj) : (string * SchemaType) list =
                 | None -> None)
             |> Array.toList
 
-/// Replace prior registrations for this tool, then register types from schema.
-let registerSchemaTypes (toolName: string) (schema: obj) : unit =
-    if toolName <> "" then
-        removeRegistryForTool toolName
-
-        extractSchemaTypes schema
-        |> List.map (fun (field, st) -> (toolName, field, st))
-        |> registerToolParameterTypes
-
 /// Look up the registered SchemaType for a (tool, field) pair.
 let parseSchemaToTypes (tool: string) (field: string) : SchemaType option =
     registry
@@ -127,22 +118,169 @@ let sanitizeNullArgs (toolName: string) (args: obj) : unit =
             if (isNullish || isEmptyObject) && not (Set.contains k req) then
                 Dyn.deleteKey args k
 
-/// Validate warn_tdd on tool args: parse and delete if valid, else produce domain error string.
-let requireWarnTddOnArgs (tool: string) (args: obj) : Result<unit, string> =
-    if not (WarnTdd.isModificationTool tool) then
-        Result.Ok()
+type ToolCapability =
+    | FileMutation
+    | ProcessExecution
+    | SubagentDelegation
+
+type ControlEnvelope =
+    { WarnTdd: string option
+      Warn: string option
+      WarnReuse: string option
+      Amend: int option }
+
+let getToolCapabilities (toolName: string) : ToolCapability list =
+    let t = toolName.ToLowerInvariant().Trim()
+
+    [ if
+          t = "coder"
+          || t = "edit"
+          || t = "write"
+          || t = "apply_patch"
+          || t = "patch"
+          || t = "ast_edit"
+          || t = "ast_grep_replace"
+          || t = "file_edit_replace_string"
+          || t = "file_edit_insert"
+          || t = "executor"
+          || t.StartsWith("pty_")
+      then
+          yield FileMutation
+      if t = "executor" || t.StartsWith("pty_") then
+          yield ProcessExecution
+      if t = "coder" || t = "investigator" || t = "meditator" || t = "browser" then
+          yield SubagentDelegation ]
+
+let inlineJsonWarnTddProperty: obj =
+    createObj
+        [ "type", box "string"
+          "enum", box [| box "i-am-sure-i-have-followed-tdd-and-kolmolgorov-principles-and-kept-todo-updated" |]
+          "description", box "Acknowledge that tests are written first (TDD) and Kolmogorov discipline is followed." ]
+
+let inlineJsonWarnProperty: obj =
+    createObj
+        [ "type", box "string"
+          "enum",
+          box
+              [| box
+                     "it-is-not-possible-to-do-it-using-other-tools-and-only-run-tests-when-static-analysis-cannot-handle-it" |]
+          "description",
+          box
+              "Acknowledge that this task cannot be done with other tools and only run tests when static analysis cannot handle it." ]
+
+let inlineJsonWarnReuseProperty: obj =
+    createObj
+        [ "type", box "string"
+          "enum", box [| box "this-task-is-not-suitable-to-be-completed-via-continue-tool" |]
+          "description", box "Acknowledge that this task is not suitable for completion via continue tool." ]
+
+let inlineJsonAmendProperty: obj =
+    createObj
+        [ "type", box "integer"
+          "minimum", box 1
+          "description", box "Undo/amend the last N tool call chains by backtracking." ]
+
+let decorateAndValidateSchema (toolName: string) (schema: obj) : obj =
+    if Dyn.isNullish schema then
+        schema
     else
-        let raw = DynField.strField args "warn_tdd" |> Option.defaultValue ""
+        let props = Dyn.get schema "properties"
 
-        match WarnTdd.parseWarnTdd raw with
-        | Some _ ->
-            Dyn.deleteKey args "warn_tdd"
-            Result.Ok()
-        | None ->
-            let err =
-                InvalidIntent(tool, "warn_tdd", "required — acknowledge TDD + Kolmolgorov discipline")
+        if Dyn.isNullish props then
+            schema
+        else
+            let caps = getToolCapabilities toolName
 
-            Result.Error(wireDomainFailure tool err)
+            // Injections
+            if List.contains FileMutation caps then
+                if Dyn.isNullish (Dyn.get props "warn_tdd") then
+                    Dyn.setKey props "warn_tdd" inlineJsonWarnTddProperty
+
+                let req = Dyn.get schema "required"
+
+                if Dyn.isArray req then
+                    let arr = req :?> obj array
+
+                    if not (Array.exists (fun x -> string x = "warn_tdd") arr) then
+                        let nextReq = Array.append arr [| box "warn_tdd" |]
+                        Dyn.setKey schema "required" nextReq
+                else
+                    Dyn.setKey schema "required" [| box "warn_tdd" |]
+
+            if List.contains ProcessExecution caps then
+                if Dyn.isNullish (Dyn.get props "warn") then
+                    Dyn.setKey props "warn" inlineJsonWarnProperty
+
+                let req = Dyn.get schema "required"
+
+                if Dyn.isArray req then
+                    let arr = req :?> obj array
+
+                    if not (Array.exists (fun x -> string x = "warn") arr) then
+                        let nextReq = Array.append arr [| box "warn" |]
+                        Dyn.setKey schema "required" nextReq
+                else
+                    Dyn.setKey schema "required" [| box "warn" |]
+
+            if List.contains SubagentDelegation caps then
+                if Dyn.isNullish (Dyn.get props "warn_reuse") then
+                    Dyn.setKey props "warn_reuse" inlineJsonWarnReuseProperty
+
+                let req = Dyn.get schema "required"
+
+                if Dyn.isArray req then
+                    let arr = req :?> obj array
+
+                    if not (Array.exists (fun x -> string x = "warn_reuse") arr) then
+                        let nextReq = Array.append arr [| box "warn_reuse" |]
+                        Dyn.setKey schema "required" nextReq
+                else
+                    Dyn.setKey schema "required" [| box "warn_reuse" |]
+
+            if Dyn.isNullish (Dyn.get props "amend") then
+                Dyn.setKey props "amend" inlineJsonAmendProperty
+
+            // Validation (Fail Closed)
+            let requiredList =
+                let req = Dyn.get schema "required"
+
+                if Dyn.isArray req then
+                    (req :?> obj array) |> Array.map string |> Array.toList
+                else
+                    []
+
+            for reqField in requiredList do
+                if Dyn.isNullish (Dyn.get props reqField) then
+                    failwith
+                        $"Schema Validation Failed: required field '{reqField}' is not defined in properties of tool '{toolName}'"
+
+            if List.contains FileMutation caps && not (List.contains "warn_tdd" requiredList) then
+                failwith
+                    $"Schema Validation Failed: FileMutation tool '{toolName}' is missing required field 'warn_tdd'"
+
+            if List.contains ProcessExecution caps && not (List.contains "warn" requiredList) then
+                failwith
+                    $"Schema Validation Failed: ProcessExecution tool '{toolName}' is missing required field 'warn'"
+
+            if
+                List.contains SubagentDelegation caps
+                && not (List.contains "warn_reuse" requiredList)
+            then
+                failwith
+                    $"Schema Validation Failed: SubagentDelegation tool '{toolName}' is missing required field 'warn_reuse'"
+
+            schema
+
+/// Replace prior registrations for this tool, then register types from schema.
+let registerSchemaTypes (toolName: string) (schema: obj) : unit =
+    if toolName <> "" then
+        removeRegistryForTool toolName
+
+        let decorated = decorateAndValidateSchema toolName schema
+
+        extractSchemaTypes decorated
+        |> List.map (fun (field, st) -> (toolName, field, st))
+        |> registerToolParameterTypes
 
 [<Emit("Object.defineProperty($0, '_amend', { value: $1, enumerable: false, writable: true, configurable: true })")>]
 let private defineHiddenAmend (args: obj) (value: obj) : unit = jsNative
@@ -150,67 +288,6 @@ let private defineHiddenAmend (args: obj) (value: obj) : unit = jsNative
 let restoreAmendToArgs (args: obj) (amendVal: obj) : unit =
     if not (Dyn.isNullish args) && not (Dyn.isNullish amendVal) then
         args?("amend") <- amendVal
-
-/// Read and delete the 'amend' field from tool args.
-/// Returns Some n if a valid positive integer was present, None otherwise.
-/// After this call, the 'amend' key is removed from args so downstream tool
-/// execution never sees it.
-let filterAmendFromArgs (args: obj) : int option =
-    match DynField.optField args "amend" with
-    | None -> None
-    | Some v ->
-        Dyn.deleteKey args "amend"
-
-        let parsed =
-            match v with
-            | :? int as n when n > 0 -> Some n
-            | :? float as f when f > 0.0 -> Some(int f)
-            | :? string as s ->
-                match System.Int32.TryParse s with
-                | true, n when n > 0 -> Some n
-                | _ -> None
-            | _ -> None
-
-        match parsed with
-        | Some n ->
-            defineHiddenAmend args (box n)
-            Some n
-        | None -> None
-
-/// Validate warn on tool args: parse and delete if valid, else produce domain error string.
-let requireWarnOnArgs (tool: string) (args: obj) : Result<unit, string> =
-    if not (WarnTdd.isWarnRequiredTool tool) then
-        Result.Ok()
-    else
-        let raw = DynField.strField args "warn" |> Option.defaultValue ""
-
-        if WarnTdd.parseWarn raw then
-            Dyn.deleteKey args "warn"
-            Result.Ok()
-        else
-            let err =
-                InvalidIntent(tool, "warn", "required — acknowledge this task cannot be done with other tools")
-
-            Result.Error(wireDomainFailure tool err)
-
-let requireWarnReuseOnArgs (tool: string) (args: obj) : Result<unit, string> =
-    if not (WarnTdd.isSubagentTool tool) then
-        Result.Ok()
-    else
-        let raw = DynField.strField args "warn_reuse" |> Option.defaultValue ""
-
-        if WarnTdd.parseWarnReuse raw then
-            Dyn.deleteKey args "warn_reuse"
-            Result.Ok()
-        else
-            let err =
-                InvalidIntent(
-                    tool,
-                    "warn_reuse",
-                    "required — acknowledge this task is not suitable for completion via continue tool"
-                )
-
-            Result.Error(wireDomainFailure tool err)
 
 let private canonicalToolName (toolName: string) : string =
     match toolName.ToLowerInvariant() with
@@ -286,3 +363,143 @@ let private registerCoreToolSchemas () : unit =
           ("submit_review", "affectedFiles", SArray) ]
 
 do registerCoreToolSchemas ()
+
+let executeBeforeGateway (tool: string) (args: obj) : Result<obj * ControlEnvelope, string> =
+    if Dyn.isNullish args then
+        let empty = createObj []
+
+        Result.Ok(
+            empty,
+            { WarnTdd = None
+              Warn = None
+              WarnReuse = None
+              Amend = None }
+        )
+    else
+        coerceArgsTypes tool args
+        sanitizeNullArgs tool args
+
+        let caps = getToolCapabilities tool
+
+        // Extract control fields from the original args object (in-place)
+        let warnTddVal =
+            match DynField.strField args "warn_tdd" with
+            | Some v ->
+                Dyn.deleteKey args "warn_tdd"
+                Some v
+            | None -> None
+
+        let warnVal =
+            match DynField.strField args "warn" with
+            | Some v ->
+                Dyn.deleteKey args "warn"
+                Some v
+            | None -> None
+
+        let warnReuseVal =
+            match DynField.strField args "warn_reuse" with
+            | Some v ->
+                Dyn.deleteKey args "warn_reuse"
+                Some v
+            | None -> None
+
+        let amendVal =
+            match DynField.optField args "amend" with
+            | None -> None
+            | Some v ->
+                Dyn.deleteKey args "amend"
+
+                let parsed =
+                    match v with
+                    | :? int as n when n > 0 -> Some n
+                    | :? float as f when f > 0.0 -> Some(int f)
+                    | :? string as s ->
+                        match System.Int32.TryParse s with
+                        | true, n when n > 0 -> Some n
+                        | _ -> None
+                    | _ -> None
+
+                parsed
+
+        let hasControlFields =
+            warnTddVal.IsSome || warnVal.IsSome || warnReuseVal.IsSome || amendVal.IsSome
+
+        // Shallow clone the purified args to nextArgs if needed
+        let nextArgs =
+            if not caps.IsEmpty || hasControlFields then
+                Dyn.cloneShallow args
+            else
+                args
+
+        // Validate applicability & correctness
+        let checkWarnTdd =
+            if List.contains FileMutation caps then
+                match warnTddVal with
+                | Some v when
+                    v.ToLowerInvariant() = "i-am-sure-i-have-followed-tdd-and-kolmolgorov-principles-and-kept-todo-updated"
+                    ->
+                    Result.Ok()
+                | _ ->
+                    let err =
+                        InvalidIntent(tool, "warn_tdd", "required — acknowledge TDD + Kolmogorov discipline")
+
+                    Result.Error(wireDomainFailure tool err)
+            else
+                Result.Ok()
+
+        let checkWarn =
+            if List.contains ProcessExecution caps then
+                match warnVal with
+                | Some v when
+                    v = "it-is-not-possible-to-do-it-using-other-tools-and-only-run-tests-when-static-analysis-cannot-handle-it"
+                    ->
+                    Result.Ok()
+                | _ ->
+                    let err =
+                        InvalidIntent(tool, "warn", "required — acknowledge this task cannot be done with other tools")
+
+                    Result.Error(wireDomainFailure tool err)
+            else
+                Result.Ok()
+
+        let checkWarnReuse =
+            if List.contains SubagentDelegation caps then
+                match warnReuseVal with
+                | Some v when
+                    v.ToLowerInvariant().Trim() = "this-task-is-not-suitable-to-be-completed-via-continue-tool"
+                    ->
+                    Result.Ok()
+                | _ ->
+                    let err =
+                        InvalidIntent(
+                            tool,
+                            "warn_reuse",
+                            "required — acknowledge this task is not suitable for completion via continue tool"
+                        )
+
+                    Result.Error(wireDomainFailure tool err)
+            else
+                Result.Ok()
+
+        match checkWarnTdd with
+        | Result.Error e -> Result.Error e
+        | Result.Ok() ->
+            match checkWarn with
+            | Result.Error e -> Result.Error e
+            | Result.Ok() ->
+                match checkWarnReuse with
+                | Result.Error e -> Result.Error e
+                | Result.Ok() ->
+                    match amendVal with
+                    | Some n ->
+                        defineHiddenAmend args (box n)
+                        defineHiddenAmend nextArgs (box n)
+                    | None -> ()
+
+                    let env =
+                        { WarnTdd = warnTddVal
+                          Warn = warnVal
+                          WarnReuse = warnReuseVal
+                          Amend = amendVal }
+
+                    Result.Ok(nextArgs, env)

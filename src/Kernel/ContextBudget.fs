@@ -8,7 +8,8 @@ let requiredFoldAnchorCount (foldAfterFirst: bool) : int = if foldAfterFirst the
 
 type ContextState =
     { phaseBaseTokens: int64
-      backlogTokensAtPhaseStart: int64 }
+      backlogTokensAtPhaseStart: int64
+      phaseStartTodoOrdinal: int }
 
 /// Nudge 触发判定 F。
 ///
@@ -44,10 +45,35 @@ let beginPhase (totalTokens: int64) (totalBytes: int64) (backlogBytes: int64) : 
             totalTokens * backlogBytes / totalBytes
 
     { phaseBaseTokens = totalTokens
-      backlogTokensAtPhaseStart = backlogTokens }
+      backlogTokensAtPhaseStart = backlogTokens
+      phaseStartTodoOrdinal = 0 }
+
+let beginPhaseWithOrdinal
+    (totalTokens: int64)
+    (totalBytes: int64)
+    (backlogBytes: int64)
+    (todoOrdinal: int)
+    : ContextState =
+    let backlogTokens =
+        if totalBytes <= 0L then
+            0L
+        else
+            totalTokens * backlogBytes / totalBytes
+
+    { phaseBaseTokens = totalTokens
+      backlogTokensAtPhaseStart = backlogTokens
+      phaseStartTodoOrdinal = todoOrdinal }
 
 let afterSuccessfulTodo (totalTokens: int64) (totalBytes: int64) (backlogBytes: int64) : ContextState =
     beginPhase totalTokens totalBytes backlogBytes
+
+let afterSuccessfulTodoWithOrdinal
+    (totalTokens: int64)
+    (totalBytes: int64)
+    (backlogBytes: int64)
+    (todoOrdinal: int)
+    : ContextState =
+    beginPhaseWithOrdinal totalTokens totalBytes backlogBytes todoOrdinal
 
 let estimateTokens (currentTextBytes: int) (lastUsage: {| tokenCount: int; textBytes: int |} option) : int option =
     match lastUsage with
@@ -88,7 +114,8 @@ let classifyPressure
             Compacting
         else
             let N = requiredFoldAnchorCount foldAfterFirst
-            let R = max 0 (min completedTodoCount (N - 1))
+            let currentR = completedTodoCount - state.phaseStartTodoOrdinal
+            let R = max 0 (min currentR (N - 1))
 
             if F currentTokens bEff state.phaseBaseTokens N R then
                 RequireTodoWriteEmergency

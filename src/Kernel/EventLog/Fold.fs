@@ -270,7 +270,13 @@ let applyEvent (st: SessionState) (e: WanEvent) : SessionState =
     { ReviewTask =
         reviewLoopFolder
             (match st.ReviewTask with
-             | Some t -> Active t
+             | Some t ->
+                 Active
+                     { task = t
+                       reviewLoopId = ""
+                       currentRound = 1
+                       latestVerdict = None
+                       latestFeedback = None }
              | None -> Inactive)
             e
         |> activeTask

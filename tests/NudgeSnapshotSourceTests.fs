@@ -11,7 +11,13 @@ let workStateRunnerAndLoop () =
           lastAssistantText = ""
           agentFromMessage = None
           modelFromMessage = None
-          reviewLoop = Active "t"
+          reviewLoop =
+            Active
+                { task = "t"
+                  reviewLoopId = ""
+                  currentRound = 1
+                  latestVerdict = None
+                  latestFeedback = None }
           runnerPresence = RunnerPresence.Active
           blockStatus = NudgeBlockStatus.Allowed
           turnId = "" }

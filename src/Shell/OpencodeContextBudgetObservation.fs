@@ -84,7 +84,6 @@ let tryEffectiveLimit (client: obj) directory messages : JS.Promise<int option> 
             let provider = get client "provider"
 
             if isNullish provider || isNullish (get provider "list") then
-                printfn "DEBUG: provider list not available on client"
                 return None
             else
                 try
@@ -97,7 +96,6 @@ let tryEffectiveLimit (client: obj) directory messages : JS.Promise<int option> 
                         |> Option.filter (fun limit -> limit > reserveTokens)
                         |> Option.map (fun limit -> limit - reserveTokens)
                 with ex ->
-                    printfn "DEBUG: provider.list failed: %s" ex.Message
                     return None
     }
 

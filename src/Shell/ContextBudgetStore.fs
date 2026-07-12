@@ -10,7 +10,8 @@ type ContextBudgetEntry =
     { State: ContextState option
       LastUsage: {| tokenCount: int; textBytes: int |} option
       LastBacklog: Wanxiangshu.Kernel.BacklogProjectionCore.BacklogEntry list
-      NudgeTrack: BudgetNudgeTrack }
+      NudgeTrack: BudgetNudgeTrack
+      ResolvedLimit: {| limit: int; source: string |} option }
 
 let private keyFor (sessionID: string) = "contextbudget_" + sessionID
 
@@ -18,7 +19,8 @@ let private defaultEntry: ContextBudgetEntry =
     { State = None
       LastUsage = None
       LastBacklog = []
-      NudgeTrack = Idle }
+      NudgeTrack = Idle
+      ResolvedLimit = None }
 
 let private getHolder (scope: RuntimeScope) (sessionID: string) : StateHolder<ContextBudgetEntry> =
     let key = keyFor sessionID

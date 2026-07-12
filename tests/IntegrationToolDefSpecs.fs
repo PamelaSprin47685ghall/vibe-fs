@@ -231,7 +231,12 @@ let toolExecuteBeforeSpec () =
         let intents: obj array =
             [| sampleCoderIntent "fix bug" "a.ts"; sampleCoderIntent "add feature" "b.ts" |]
 
-        let originalArgs = createObj [ "intents", box intents ]
+        let originalArgs =
+            createObj
+                [ "intents", box intents
+                  "warn_tdd", box "i-am-sure-i-have-followed-tdd-and-kolmolgorov-principles-and-kept-todo-updated"
+                  "warn_reuse", box "this-task-is-not-suitable-to-be-completed-via-continue-tool" ]
+
         let execOut = createObj [ "args", box originalArgs ]
 
         do!
@@ -239,8 +244,12 @@ let toolExecuteBeforeSpec () =
             $ (createObj [ "tool", box "coder"; "sessionID", box "s1"; "callID", box "c1" ], execOut)
             |> unbox<JS.Promise<unit>>
 
-        check "tool.execute.before populates _ui" (str (get execOut "args") "_ui" = "fix bug; add feature")
-        check "tool.execute.before mutates args in place" (obj.ReferenceEquals(get execOut "args", originalArgs))
+        let nextArgs = get execOut "args"
+        check "tool.execute.before populates _ui on returned args" (str nextArgs "_ui" = "fix bug; add feature")
+
+        check
+            "tool.execute.before clones and does not mutate in place"
+            (not (obj.ReferenceEquals(nextArgs, originalArgs)))
 
         check
             "tool.execute.before writes _ui onto host args reference"

@@ -73,14 +73,16 @@ let spec_afterSuccessfulTodo_sameAsBeginPhase () =
 let spec_classifyPressure_emergency () =
     let state =
         { phaseBaseTokens = 30000L
-          backlogTokensAtPhaseStart = 0L }
+          backlogTokensAtPhaseStart = 0L
+          phaseStartTodoOrdinal = 0 }
 
     equal "pressure emergency at 120k/150k" RequireTodoWriteEmergency (classifyPressure 150000 false 120000L state 0)
 
 let spec_classifyPressure_below () =
     let state =
         { phaseBaseTokens = 30000L
-          backlogTokensAtPhaseStart = 0L }
+          backlogTokensAtPhaseStart = 0L
+          phaseStartTodoOrdinal = 0 }
 
     equal "pressure below threshold" BelowThreshold (classifyPressure 150000 false 30000L state 0)
 
@@ -90,7 +92,8 @@ let spec_classifyPressure_compacting () =
 
     let state =
         { phaseBaseTokens = phaseBase
-          backlogTokensAtPhaseStart = 0L }
+          backlogTokensAtPhaseStart = 0L
+          phaseStartTodoOrdinal = 0 }
 
     equal "pressure compacting" Compacting (classifyPressure 150000 false phaseBase state 0)
 
@@ -106,11 +109,13 @@ let spec_phaseReset_degradesThreshold () =
 
     let buggyState =
         { phaseBaseTokens = currentTokens
-          backlogTokensAtPhaseStart = 10000L }
+          backlogTokensAtPhaseStart = 10000L
+          phaseStartTodoOrdinal = 0 }
 
     let correctState =
         { phaseBaseTokens = 30000L
-          backlogTokensAtPhaseStart = 10000L }
+          backlogTokensAtPhaseStart = 10000L
+          phaseStartTodoOrdinal = 0 }
 
     let buggyResult = classifyPressure maxInputTokens false currentTokens buggyState 0
 
@@ -129,7 +134,8 @@ let spec_foldAfterFirst_triggersEarlier () =
 
     let state =
         { phaseBaseTokens = 0L
-          backlogTokensAtPhaseStart = 0L }
+          backlogTokensAtPhaseStart = 0L
+          phaseStartTodoOrdinal = 0 }
 
     let a = 40000L
 
@@ -191,7 +197,8 @@ let test_scenario6_N3_R3_clamping () =
 
     let state =
         { phaseBaseTokens = P
-          backlogTokensAtPhaseStart = 0L }
+          backlogTokensAtPhaseStart = 0L
+          phaseStartTodoOrdinal = 0 }
 
     let pressureWithR3 = classifyPressure 150000 false 120000L state 3
     let pressureWithR2 = classifyPressure 150000 false 120000L state 2
@@ -203,7 +210,8 @@ let test_scenario7_R_negative_clamping () =
 
     let state =
         { phaseBaseTokens = P
-          backlogTokensAtPhaseStart = 0L }
+          backlogTokensAtPhaseStart = 0L
+          phaseStartTodoOrdinal = 0 }
 
     let pressureWithRNeg = classifyPressure 150000 false 60000L state -1
     let pressureWithR0 = classifyPressure 150000 false 60000L state 0
@@ -215,7 +223,8 @@ let test_scenario8_P_large_compacting () =
 
     let state =
         { phaseBaseTokens = P
-          backlogTokensAtPhaseStart = 0L }
+          backlogTokensAtPhaseStart = 0L
+          phaseStartTodoOrdinal = 0 }
 
     let pressure = classifyPressure 150000 false 120000L state 0
     equal "Scenario 8: P >= 80% bEff triggers Compacting" Compacting pressure
@@ -223,7 +232,8 @@ let test_scenario8_P_large_compacting () =
 let test_scenario9_maxTokens_disabled () =
     let state =
         { phaseBaseTokens = 30000L
-          backlogTokensAtPhaseStart = 0L }
+          backlogTokensAtPhaseStart = 0L
+          phaseStartTodoOrdinal = 0 }
 
     let pressure = classifyPressure 0 false 60000L state 0
     equal "Scenario 9: maxTokens <= 0 disables pressure nudge" Disabled pressure
@@ -234,7 +244,8 @@ let test_scenario10_nudge_frequency_progression () =
 
     let state =
         { phaseBaseTokens = P
-          backlogTokensAtPhaseStart = 0L }
+          backlogTokensAtPhaseStart = 0L
+          phaseStartTodoOrdinal = 0 }
 
     let pressureR0 = classifyPressure 150000 false 70000L state 0
     equal "Scenario 10: R=0 triggers nudge at 70k" RequireTodoWriteEmergency pressureR0

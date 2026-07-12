@@ -27,7 +27,8 @@ let private phaseNeedsFallbackGate (phase: FallbackPhase) : bool =
 
 let needFallbackContinue (obs: FallbackGateObservation) : bool =
     match obs.Lifecycle with
-    | Some FallbackLifecycle.TaskComplete -> false
+    | Some FallbackLifecycle.TaskComplete
+    | Some FallbackLifecycle.Cancelled -> false
     | _ ->
         if gateOn obs FallbackSessionGateFlag.EventHandlingActive then
             true
@@ -69,7 +70,8 @@ let gateModeFromObservation (obs: FallbackGateObservation) : SessionGateMode =
 
 let terminalObservation (obs: FallbackGateObservation) : bool =
     match obs.Lifecycle with
-    | Some FallbackLifecycle.TaskComplete -> true
+    | Some FallbackLifecycle.TaskComplete
+    | Some FallbackLifecycle.Cancelled -> true
     | _ ->
         match obs.Phase with
         | Some FallbackPhase.Exhausted -> true
@@ -78,7 +80,10 @@ let terminalObservation (obs: FallbackGateObservation) : bool =
 let isSubagentSettledFromObservation (sessionID: string) (obs: FallbackGateObservation) : bool =
     if sessionID = "" then
         false
-    elif obs.Lifecycle = Some FallbackLifecycle.TaskComplete then
+    elif
+        obs.Lifecycle = Some FallbackLifecycle.TaskComplete
+        || obs.Lifecycle = Some FallbackLifecycle.Cancelled
+    then
         true
     elif not (terminalObservation obs) then
         false

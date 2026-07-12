@@ -47,7 +47,12 @@ let muxToolExecuteBeforeSetsUiLabelSpec () =
                   "background", box "coverage"
                   "targets", box [| createObj [ "file", box "src/x.test.ts"; "guide", box "add cases" ] |] ]
 
-        let args = createObj [ "intents", box [| intentOne; intentTwo |] ]
+        let args =
+            createObj
+                [ "intents", box [| intentOne; intentTwo |]
+                  "warn_tdd", box "i-am-sure-i-have-followed-tdd-and-kolmolgorov-principles-and-kept-todo-updated"
+                  "warn_reuse", box "this-task-is-not-suitable-to-be-completed-via-continue-tool" ]
+
         let input = createObj [ "tool", box "coder"; "args", box args ]
         do! (before $ (input, createObj [ "args", box args ])) |> unbox<JS.Promise<unit>>
         let ui = str args "_ui"
@@ -245,7 +250,14 @@ let muxToolExecuteRestoresAmendSpec () =
         let sessionID = "mux-amend-restore"
 
         let args =
-            createObj [ "language", box "shell"; "program", box "echo hi"; "amend", box 2 ]
+            createObj
+                [ "language", box "shell"
+                  "program", box "echo hi"
+                  "amend", box 2
+                  "warn_tdd", box "i-am-sure-i-have-followed-tdd-and-kolmolgorov-principles-and-kept-todo-updated"
+                  "warn",
+                  box
+                      "it-is-not-possible-to-do-it-using-other-tools-and-only-run-tests-when-static-analysis-cannot-handle-it" ]
 
         let input =
             createObj [ "tool", box "executor"; "sessionID", box sessionID; "args", box args ]

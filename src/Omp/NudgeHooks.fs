@@ -7,6 +7,7 @@ open Wanxiangshu.Kernel.PromptFragments
 open Wanxiangshu.Kernel.Nudge
 open Wanxiangshu.Kernel.EventLog.Fold
 open Wanxiangshu.Kernel.Nudge.Types
+open Wanxiangshu.Kernel.Nudge.TodoStatus
 open Wanxiangshu.Kernel.NudgeDerivation
 open Wanxiangshu.Kernel.Nudge.NudgeSnapshotSource
 open Wanxiangshu.Kernel.TreeSitterKernel
@@ -135,6 +136,15 @@ let private sendNudgeReminder (pi: IPi) (action: NudgeAction) (snapshot: Session
             | NudgeNone -> ()
     }
 
+let private resolveAgentLocal (ctx: obj) : string =
+    let sm = Dyn.get ctx "sessionManager"
+
+    if Dyn.isNullish sm then
+        "manager"
+    else
+        let name = Dyn.str sm "agentName"
+        if name <> "" then name else "manager"
+
 let agentEndHandler
     (piObj: obj)
     (_reviewStore: ReviewStore)
@@ -147,7 +157,14 @@ let agentEndHandler
     match getSessionIdFromContext ctxObj with
     | None -> Promise.lift ()
     | Some sessionId ->
-        if isSessionForceStopped sessionId then
+        let owner = fallbackRuntime.GetSessionOwner sessionId
+        let currentAgent = resolveAgentLocal ctxObj
+
+        if isSyntheticAssistantAgent currentAgent then
+            Promise.lift ()
+        elif owner <> "None" && owner <> "Human" then
+            Promise.lift ()
+        elif isSessionForceStopped sessionId then
             Promise.lift ()
         else
             match ctx.sessionManager with

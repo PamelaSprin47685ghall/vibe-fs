@@ -99,12 +99,16 @@ let private collectSnapshot
                                 let model =
                                     if Dyn.isNullish modelVal then
                                         None
+                                    elif Dyn.typeIs modelVal "string" then
+                                        let s = string modelVal
+                                        if s = "" then None else Some s
                                     else
                                         let providerID = Dyn.str modelVal "providerID"
                                         let modelID = Dyn.str modelVal "modelID"
 
                                         if providerID = "" || modelID = "" then
-                                            None
+                                            let idVal = Dyn.str modelVal "id"
+                                            if idVal <> "" then Some idVal else None
                                         else
                                             Some(sprintf "%s/%s" providerID modelID)
 

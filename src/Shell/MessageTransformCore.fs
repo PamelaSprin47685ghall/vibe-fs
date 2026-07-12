@@ -72,17 +72,15 @@ let buildContextBudgetNudgeMessage (sessionID: string) : Message<obj> =
       source = Synthetic "context-budget-nudge-"
       raw = null }
 
-let private resolveCurrentTokens
-    (totalBytes: int)
-    (tokenCountOpt: int option)
-    (storeEntry: ContextBudgetEntry)
-    : int option =
+let private resolveCurrentTokens (totalBytes: int) (tokenCountOpt: int option) (storeEntry: ContextBudgetEntry) : int =
     match tokenCountOpt with
-    | Some t when t > 0 -> Some t
+    | Some t when t > 0 -> t
     | _ ->
         match estimateTokens totalBytes storeEntry.LastUsage with
-        | Some t when t > 0 -> Some t
-        | _ -> None
+        | Some t when t > 0 -> t
+        | _ ->
+            let estimate = totalBytes / 2
+            max 1 estimate
 
 let private rebuildPhaseState
     (plan: MessageTransformPlan)
@@ -121,19 +119,27 @@ let private rebuildPhaseState
                 else
                     stableTokens * int64 backlogBytes / int64 stableBytes
 
+            let currentOrdinal =
+                flatten plan.Cleaned
+                |> List.filter (fun fp -> isTodoResultFor backlogOps.Host fp.part)
+                |> List.length
+
             let newState =
                 match currentStore.State with
                 | None when backlog.IsEmpty ->
                     { phaseBaseTokens = 0L
-                      backlogTokensAtPhaseStart = 0L }
+                      backlogTokensAtPhaseStart = 0L
+                      phaseStartTodoOrdinal = currentOrdinal }
                 | None ->
                     { phaseBaseTokens = stableTokens
-                      backlogTokensAtPhaseStart = backlogTokens }
+                      backlogTokensAtPhaseStart = backlogTokens
+                      phaseStartTodoOrdinal = currentOrdinal }
                 | Some old ->
                     let p = max old.phaseBaseTokens backlogTokens
 
                     { phaseBaseTokens = p
-                      backlogTokensAtPhaseStart = backlogTokens }
+                      backlogTokensAtPhaseStart = backlogTokens
+                      phaseStartTodoOrdinal = old.phaseStartTodoOrdinal }
 
             ContextBudgetStore.update plan.Scope plan.SessionID (fun entry ->
                 { entry with
@@ -152,6 +158,7 @@ let private checkAndInjectNudge
     (state: ContextState)
     (messages: Message<obj> list)
     (host: Host)
+    (_storeEntry: ContextBudgetEntry)
     : Message<obj> list =
     let completedTodoCount =
         flatten messages
@@ -160,11 +167,22 @@ let private checkAndInjectNudge
 
     match classifyPressure plan.MaxInputTokens false (int64 currentTokens) state completedTodoCount with
     | RequireTodoWriteEmergency ->
-        ContextBudgetStore.update plan.Scope plan.SessionID (fun entry ->
-            { entry with
-                NudgeTrack = afterEmergencyNudge entry.NudgeTrack })
+        let alreadyHasNudge =
+            messages
+            |> List.exists (fun m ->
+                m.info.id.StartsWith("context-budget-nudge-")
+                || (match m.source with
+                    | Synthetic s when s.StartsWith("context-budget-nudge-") -> true
+                    | _ -> false))
 
-        List.append messages [ buildContextBudgetNudgeMessage plan.SessionID ]
+        if alreadyHasNudge then
+            messages
+        else
+            ContextBudgetStore.update plan.Scope plan.SessionID (fun entry ->
+                { entry with
+                    NudgeTrack = afterEmergencyNudge entry.NudgeTrack })
+
+            List.append messages [ buildContextBudgetNudgeMessage plan.SessionID ]
     | _ -> messages
 
 let applyContextBudget
@@ -182,21 +200,20 @@ let applyContextBudget
             let! tokenCountOpt = plan.GetContextUsage encodedAll
             let storeEntry = ContextBudgetStore.get plan.Scope plan.SessionID
 
-            match resolveCurrentTokens totalBytes tokenCountOpt storeEntry with
-            | None -> return messages
-            | Some currentTokens ->
-                ContextBudgetStore.update plan.Scope plan.SessionID (fun entry ->
-                    { entry with
-                        LastUsage =
-                            Some
-                                {| tokenCount = currentTokens
-                                   textBytes = totalBytes |} })
+            let currentTokens = resolveCurrentTokens totalBytes tokenCountOpt storeEntry
 
-                let backlog = backlogOps.GetOrRebuildBacklog plan.SessionID plan.Cleaned
-                let currentStore = ContextBudgetStore.get plan.Scope plan.SessionID
+            ContextBudgetStore.update plan.Scope plan.SessionID (fun entry ->
+                { entry with
+                    LastUsage =
+                        Some
+                            {| tokenCount = currentTokens
+                               textBytes = totalBytes |} })
 
-                let! state =
-                    rebuildPhaseState plan backlogOps backlog currentStore encodeMessages currentTokens totalBytes
+            let backlog = backlogOps.GetOrRebuildBacklog plan.SessionID plan.Cleaned
+            let currentStore = ContextBudgetStore.get plan.Scope plan.SessionID
 
-                return checkAndInjectNudge plan currentTokens state messages backlogOps.Host
+            let! state = rebuildPhaseState plan backlogOps backlog currentStore encodeMessages currentTokens totalBytes
+
+            let finalStoreEntry = ContextBudgetStore.get plan.Scope plan.SessionID
+            return checkAndInjectNudge plan currentTokens state messages backlogOps.Host finalStoreEntry
     }

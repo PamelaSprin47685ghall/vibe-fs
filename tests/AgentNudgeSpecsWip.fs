@@ -18,7 +18,9 @@ let private snap todos msg blocked agent : Wanxiangshu.Kernel.Nudge.Types.Sessio
              NudgeBlockStatus.Allowed)
       nudgeAnchorKey = msg
       agentFromMessage = agent
-      modelFromMessage = None }
+      modelFromMessage = None
+      reviewLoop = None
+      humanTurnId = None }
 
 let private ev session kind payload =
     { V = 1

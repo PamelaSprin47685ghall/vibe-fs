@@ -85,6 +85,7 @@ let createEventHook (deps: obj) (reviewStore: ReviewStore) (scope: RuntimeScope)
     let directory = if Dyn.isNullish deps then "" else Dyn.str deps "directory"
 
     let fallbackRuntime = FallbackRuntimeState()
+    scope.Add("fallbackRuntime", box fallbackRuntime)
     let fallbackConfigOpt = loadFallbackConfig directory
 
     let runtime = createNudgeRuntime getChatHistory directory fallbackRuntime

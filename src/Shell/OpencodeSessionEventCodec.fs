@@ -152,36 +152,49 @@ let shouldSkipNudge (messagesData: obj) : bool =
     else
         let messagesArr = messagesData :?> obj array
 
-        let absoluteLastAssistantIdx =
-            messagesArr
-            |> Array.tryFindIndexBack (fun msg ->
-                let info = Dyn.get msg "info"
+        let lastIsSynthetic =
+            if messagesArr.Length > 0 then
+                let last = messagesArr.[messagesArr.Length - 1]
+                let info = Dyn.get last "info"
                 let role = Dyn.str info "role"
-                role = "assistant" && not (isSyntheticAssistantAgent (Dyn.str info "agent")))
-
-        match absoluteLastAssistantIdx with
-        | Some idx ->
-            let info = Dyn.get (messagesArr.[idx]) "info"
-            let finish = Dyn.str info "finish"
-            let reason = FinishReason.fromString finish
-
-            if FinishReason.isAbort reason then
-                true
+                let agent = Dyn.str info "agent"
+                role = "assistant" && isSyntheticAssistantAgent agent
             else
-                let isToolFinish = FinishReason.isToolFinish reason
+                false
 
-                if not isToolFinish then
-                    false
+        if lastIsSynthetic then
+            true
+        else
+            let absoluteLastAssistantIdx =
+                messagesArr
+                |> Array.tryFindIndexBack (fun msg ->
+                    let info = Dyn.get msg "info"
+                    let role = Dyn.str info "role"
+                    role = "assistant" && not (isSyntheticAssistantAgent (Dyn.str info "agent")))
+
+            match absoluteLastAssistantIdx with
+            | Some idx ->
+                let info = Dyn.get (messagesArr.[idx]) "info"
+                let finish = Dyn.str info "finish"
+                let reason = FinishReason.fromString finish
+
+                if FinishReason.isAbort reason then
+                    true
                 else
-                    let hasToolResultAfter =
-                        messagesArr.[idx + 1 ..]
-                        |> Array.exists (fun msg ->
-                            let mInfo = Dyn.get msg "info"
-                            let mRole = Dyn.str mInfo "role"
-                            isToolResultRoleString mRole)
+                    let isToolFinish = FinishReason.isToolFinish reason
 
-                    not hasToolResultAfter
-        | None -> false
+                    if not isToolFinish then
+                        false
+                    else
+                        let hasToolResultAfter =
+                            messagesArr.[idx + 1 ..]
+                            |> Array.exists (fun msg ->
+                                let mInfo = Dyn.get msg "info"
+                                let mRole = Dyn.str mInfo "role"
+                                isToolResultRoleString mRole)
+
+                        not hasToolResultAfter
+            | None -> false
 
 /// Build the host wire prompt body for `session.prompt`. The agent-scoped
 /// variant carries an `agent` field so the host routes to the same assistant

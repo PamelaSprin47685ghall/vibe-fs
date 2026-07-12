@@ -71,6 +71,7 @@ let createCoreServices (host: Host) (ctx: obj) =
         )
 
     let scope = create ()
+    scope.Add("fallbackRuntime", box fallbackRuntime)
     let backlogSession = BacklogSession(host, scope)
 
     let lifecycleObserver =

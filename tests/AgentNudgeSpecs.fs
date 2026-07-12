@@ -26,7 +26,9 @@ let private snap todos msg blocked agent isLoop : Wanxiangshu.Kernel.Nudge.Types
              NudgeBlockStatus.Allowed)
       nudgeAnchorKey = msg
       agentFromMessage = agent
-      modelFromMessage = None }
+      modelFromMessage = None
+      reviewLoop = None
+      humanTurnId = None }
 
 let private snap' todos msg blocked agent isLoop hasActiveRunner : Wanxiangshu.Kernel.Nudge.Types.SessionSnapshot =
     { todos = todos
@@ -39,7 +41,9 @@ let private snap' todos msg blocked agent isLoop hasActiveRunner : Wanxiangshu.K
              NudgeBlockStatus.Allowed)
       nudgeAnchorKey = msg
       agentFromMessage = agent
-      modelFromMessage = None }
+      modelFromMessage = None
+      reviewLoop = None
+      humanTurnId = None }
 
 let test_isNaturalStop () =
     equal "session.idle → true" true (Wanxiangshu.Opencode.NudgeTrigger.NudgeTrigger.isNaturalStop "session.idle" null)
@@ -131,7 +135,19 @@ let decideNudge' () =
 
 let selectPrompt () =
     let todoSnapshot = snap [ "todo1"; "todo2" ] "working" false None false
-    let loopSnapshot = snap [] "ok" false None true
+
+    let loopSnapshot =
+        let baseSnap = snap [] "ok" false None true
+
+        { baseSnap with
+            reviewLoop =
+                Some
+                    { originalTask = "some task"
+                      reviewLoopId = "loop-123"
+                      currentRound = 1
+                      latestVerdict = None
+                      latestFeedback = None } }
+
     let noneSnapshot = snap [] "done" false None false
 
     match selectNudgePrompt opencode NudgeTodo todoSnapshot with
@@ -145,7 +161,9 @@ let selectPrompt () =
     match selectNudgePrompt opencode NudgeLoop loopSnapshot with
     | Some prompt ->
         check "selectNudgePrompt NudgeLoop returns prompt" true
-        check "loop prompt does not contain front matter" (not (prompt.Contains("---")))
+        check "loop prompt contains front matter" (prompt.Contains("---"))
+        check "loop prompt contains original_task" (prompt.Contains("original_task"))
+        check "loop prompt contains review_loop_id" (prompt.Contains("review_loop_id"))
     | None -> check "selectNudgePrompt NudgeLoop returns prompt" false
 
     match selectNudgePrompt opencode NudgeNone noneSnapshot with

@@ -95,48 +95,43 @@ let resolveNudgeModel
     (sessionID: string)
     (lastAssistantModel: string option)
     : string option =
-    if isNull msgs || msgs.Length = 0 then
-        lastAssistantModel
-    else
-        let lastAssistantModelFromMsg =
-            msgs
-            |> Array.tryFindBack (fun msg ->
-                let role = Dyn.str msg "role"
-                let info = Dyn.get msg "info"
-                let msgRole = if not (Dyn.isNullish info) then Dyn.str info "role" else ""
+    match fallbackRuntime.GetLatestHumanModel sessionID with
+    | Some m -> Some m
+    | None ->
+        match fallbackRuntime.GetInjectedModel sessionID with
+        | Some m -> Some(sprintf "%s/%s" m.ProviderID m.ModelID)
+        | None ->
+            match fallbackRuntime.GetModel sessionID with
+            | Some m -> Some(sprintf "%s/%s" m.ProviderID m.ModelID)
+            | None ->
+                if isNull msgs || msgs.Length = 0 then
+                    lastAssistantModel
+                else
+                    let lastUserMsgOpt =
+                        msgs
+                        |> Array.tryFindBack (fun msg ->
+                            let role = Dyn.str msg "role"
+                            let info = Dyn.get msg "info"
+                            let msgRole = if not (Dyn.isNullish info) then Dyn.str info "role" else ""
+                            role = "user" || msgRole = "user")
 
-                (role = "assistant" || msgRole = "assistant")
-                && not (isSyntheticAssistantAgent (Dyn.str info "agent")))
-            |> Option.bind tryGetModelStringFromMessage
-
-        let defaultModel = lastAssistantModelFromMsg |> Option.orElse lastAssistantModel
-
-        let lastUserMsgOpt =
-            msgs
-            |> Array.tryFindBack (fun msg ->
-                let role = Dyn.str msg "role"
-                let info = Dyn.get msg "info"
-                let msgRole = if not (Dyn.isNullish info) then Dyn.str info "role" else ""
-                role = "user" || msgRole = "user")
-
-        match lastUserMsgOpt with
-        | None -> defaultModel
-        | Some lastUserMsg ->
-            match classifyUserMessage lastUserMsg with
-            | "nudge" ->
-                match tryGetModelStringFromMessage lastUserMsg with
-                | Some m -> Some m
-                | None -> defaultModel
-            | _ ->
-                match fallbackRuntime.GetInjectedModel sessionID with
-                | Some m -> Some(sprintf "%s/%s" m.ProviderID m.ModelID)
-                | None ->
-                    match tryGetModelStringFromMessage lastUserMsg with
+                    match lastUserMsgOpt |> Option.bind tryGetModelStringFromMessage with
                     | Some m -> Some m
                     | None ->
-                        match fallbackRuntime.GetModel sessionID with
-                        | Some m -> Some(sprintf "%s/%s" m.ProviderID m.ModelID)
-                        | None -> defaultModel
+                        let lastAssistantModelFromMsg =
+                            msgs
+                            |> Array.tryFindBack (fun msg ->
+                                let role = Dyn.str msg "role"
+                                let info = Dyn.get msg "info"
+                                let msgRole = if not (Dyn.isNullish info) then Dyn.str info "role" else ""
+
+                                (role = "assistant" || msgRole = "assistant")
+                                && not (isSyntheticAssistantAgent (Dyn.str info "agent")))
+                            |> Option.bind tryGetModelStringFromMessage
+
+                        match lastAssistantModelFromMsg with
+                        | Some m -> Some m
+                        | None -> lastAssistantModel
 
 let runNudgeFlowCore
     (host: Host)

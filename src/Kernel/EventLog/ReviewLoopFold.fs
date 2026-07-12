@@ -3,9 +3,16 @@ module Wanxiangshu.Kernel.EventLog.ReviewLoopFold
 open Wanxiangshu.Kernel.EventLog.Types
 open Wanxiangshu.Kernel.EventLog.ReviewVerdictWire
 
+type ActiveReviewLoopInfo =
+    { task: string
+      reviewLoopId: string
+      currentRound: int
+      latestVerdict: string option
+      latestFeedback: string option }
+
 type ReviewLoopFold =
     | Inactive
-    | Active of task: string
+    | Active of ActiveReviewLoopInfo
 
 let initial = Inactive
 
@@ -17,7 +24,7 @@ let isLoopActive (s: ReviewLoopFold) : bool =
 let activeTask (s: ReviewLoopFold) : string option =
     match s with
     | Inactive -> None
-    | Active task -> Some task
+    | Active info -> Some info.task
 
 let private payloadTask (e: WanEvent) : string option =
     e.Payload
@@ -30,16 +37,32 @@ let foldEvent (current: ReviewLoopFold) (e: WanEvent) : ReviewLoopFold =
     match e.Kind with
     | k when k = eventKindLoopActivated ->
         match payloadTask e with
-        | Some task -> Active task
+        | Some task ->
+            let loopId = e.At
+
+            Active
+                { task = task
+                  reviewLoopId = loopId
+                  currentRound = 1
+                  latestVerdict = None
+                  latestFeedback = None }
         | None -> current
     | k when k = eventKindLoopCancelled -> Inactive
     | k when k = eventKindReviewVerdict ->
         match payloadVerdict e with
         | Some v when isEndVerdict v -> Inactive
-        | _ ->
+        | Some v ->
             match current with
-            | Active _ -> current
+            | Active info ->
+                let fb = e.Payload |> Map.tryFind "feedback" |> Option.filter (fun s -> s <> "")
+
+                Active
+                    { info with
+                        currentRound = info.currentRound + 1
+                        latestVerdict = Some v
+                        latestFeedback = fb }
             | Inactive -> Inactive
+        | None -> current
     | _ -> current
 
 let foldEvents (events: WanEvent list) : ReviewLoopFold = List.fold foldEvent initial events

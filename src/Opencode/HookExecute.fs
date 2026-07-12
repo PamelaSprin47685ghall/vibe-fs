@@ -60,44 +60,37 @@ let private appendSyntaxDiagnostics (directory: string) (input: obj) (output: ob
 
 let toolExecuteBeforeFor (host: Host) (input: obj) (output: obj) : JS.Promise<unit> =
     promise {
-        let args = resolveHookExecuteArgs input output
         let tool = toolNameFromHookInput input
-        ToolHookRuntime.coerceArgsTypes tool args
+        let rawArgs = resolveHookExecuteArgs input output
 
-        match ToolHookRuntime.filterAmendFromArgs args with
-        | Some n ->
-            output?("_amend") <- box n
-            input?("_amend") <- box n
-        | None -> ()
+        if host = Mimocode && tool = "apply_patch" then
+            rewriteMimocodeApplyPatchArgsForExecute output input rawArgs
 
-        ToolHookRuntime.sanitizeNullArgs tool args
+        let args = resolveHookExecuteArgs input output
+        let inputArgs = argsFromHookInput input
 
-        let mutable hasError = false
+        if
+            not (Dyn.isNullish inputArgs)
+            && Dyn.typeIs inputArgs "object"
+            && Dyn.typeIs args "object"
+        then
+            for k in [| "warn_tdd"; "warn"; "warn_reuse"; "amend" |] do
+                if Dyn.has inputArgs k && not (Dyn.has args k) then
+                    args?(k) <- inputArgs?(k)
 
-        match ToolHookRuntime.requireWarnTddOnArgs tool args with
-        | Result.Error e ->
-            setHookError output e
-            hasError <- true
-        | Result.Ok() -> ()
+        match ToolHookRuntime.executeBeforeGateway tool args with
+        | Result.Error e -> setHookError output e
+        | Result.Ok(nextArgs, env) ->
+            setHookArgs output nextArgs
 
-        if not hasError then
-            match ToolHookRuntime.requireWarnOnArgs tool args with
-            | Result.Error e ->
-                setHookError output e
-                hasError <- true
-            | Result.Ok() -> ()
+            match env.Amend with
+            | Some n ->
+                output?("_amend") <- box n
+                input?("_amend") <- box n
+            | None -> ()
 
-        if not hasError then
-            match ToolHookRuntime.requireWarnReuseOnArgs tool args with
-            | Result.Error e ->
-                setHookError output e
-                hasError <- true
-            | Result.Ok() -> ()
-
-        HookSchema.setUiLabel args tool
-
-        if host = Mimocode then
-            rewriteMimocodeApplyPatchArgsForExecute output input args
+            HookSchema.setUiLabel args tool
+            HookSchema.setUiLabel nextArgs tool
     }
 
 let toolExecuteBefore (input: obj) (output: obj) : JS.Promise<unit> =

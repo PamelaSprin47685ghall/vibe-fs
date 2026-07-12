@@ -22,35 +22,73 @@ open Wanxiangshu.Opencode.FallbackHooksHelper
 /// mistake for a real user message.
 let private zwsChar = "​"
 
+let private isSyntheticText (text: string) : bool =
+    let t = text.Trim()
+
+    t = "​"
+    || t.Contains("There are still incomplete todos")
+    || t.Contains("You are in loop mode. You must call the submit_review")
+    || t.Contains("A background runner task is still active")
+    || t.Contains("the system context is about to be suspended")
+    || t.Contains("You must immediately force an emergency stop")
+
+let private tryGetModelStringFromInfo (info: obj) : string option =
+    if isNull info || Dyn.isNullish info then
+        None
+    else
+        let modelVal = Dyn.get info "model"
+
+        if isNull modelVal || Dyn.isNullish modelVal then
+            None
+        elif Dyn.typeIs modelVal "string" then
+            let s = string modelVal
+            if s = "" then None else Some s
+        else
+            let providerID = Dyn.str modelVal "providerID"
+            let modelID = Dyn.str modelVal "modelID"
+
+            if providerID = "" || modelID = "" then
+                let idVal = Dyn.str modelVal "id"
+                if idVal <> "" then Some idVal else None
+            else
+                Some(sprintf "%s/%s" providerID modelID)
+
 let private isNewUserMessageImpl (runtime: FallbackRuntimeState) (sessionID: string) (rawEvent: obj) : bool =
     let t = getEventType rawEvent
 
     if t <> "message.updated" then
         false
     else
-        let info = Dyn.get (getProps rawEvent) "info"
+        let props = getProps rawEvent
+        let info = Dyn.get props "info"
 
         if Dyn.str info "role" <> "user" then
             false
         else
-            let msgTime =
-                let time = Dyn.get info "time"
+            let parts = Dyn.get props "parts"
+            let text = getPartsText parts
 
-                if isNull time then
-                    0L
-                else
-                    let completed = Dyn.get time "completed"
+            if isSyntheticText text then
+                false
+            else
+                let msgTime =
+                    let time = Dyn.get info "time"
 
-                    if isNull completed then
+                    if isNull time then
                         0L
                     else
-                        match completed with
-                        | :? int64 as i -> i
-                        | :? float as f -> int64 f
-                        | :? int as i32 -> int64 i32
-                        | _ -> 0L
+                        let completed = Dyn.get time "completed"
 
-            not (runtime.IsInjectedSince sessionID msgTime)
+                        if isNull completed then
+                            0L
+                        else
+                            match completed with
+                            | :? int64 as i -> i
+                            | :? float as f -> int64 f
+                            | :? int as i32 -> int64 i32
+                            | _ -> 0L
+
+                not (runtime.IsInjectedSince sessionID msgTime)
 
 let opencodeEventTranslator (runtime: FallbackRuntimeState) : IEventTranslator =
     { new IEventTranslator with
@@ -112,7 +150,21 @@ let opencodeEventTranslator (runtime: FallbackRuntimeState) : IEventTranslator =
             && resolveStatusValue (Dyn.get (getProps rawEvent) "status") = "busy"
 
         member _.IsNewUserMessage(sessionID, rawEvent) =
-            isNewUserMessageImpl runtime sessionID rawEvent }
+            isNewUserMessageImpl runtime sessionID rawEvent
+
+        member _.ExtractRoutingContext(rawEvent) =
+            let props = getProps rawEvent
+            let info = Dyn.get props "info"
+            let modelStr = tryGetModelStringFromInfo info
+            let agentVal = Dyn.get info "agent"
+
+            let agent =
+                if Dyn.isNullish agentVal then
+                    None
+                else
+                    Some(string agentVal)
+
+            modelStr, agent }
 
 let opencodeActionExecutor (runtime: FallbackRuntimeState) (client: obj) : IActionExecutor =
     let resolveModelAndAgent
