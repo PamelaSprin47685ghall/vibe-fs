@@ -95,6 +95,13 @@ let mkRetryableErr () : ErrorInput =
       StatusCode = None
       IsRetryable = Some true }
 
+let mkAbortErr () : ErrorInput =
+    { ErrorName = "MessageAbortedError"
+      DomainError = Some MessageAborted
+      Message = "abort"
+      StatusCode = None
+      IsRetryable = None }
+
 let mkConfig () : FallbackConfig =
     { DefaultChain = []
       AgentChains = Map.empty
@@ -296,6 +303,40 @@ let handleEvent_chainPrependsCurrentModel () =
         equal "second is m2" m2 chain2.[1]
     }
 
+let handleEvent_userAbort_invalidatesLease () =
+    promise {
+        let model = mkModel "oai" "gpt-5"
+        let rt = FallbackRuntimeState()
+        let sid = "sess-abort"
+        rt.SetChain sid [ model ]
+        rt.SetAgentName sid "reviewer"
+
+        // Setup initial state
+        let turnId = rt.IncrementHumanTurnId sid
+        let gen = rt.GetSessionGeneration sid
+        let cancelGen = rt.GetCancelGeneration sid
+        let continuationID = "cont-1"
+
+        let intent =
+            SendContinueIntent(model, "reviewer", turnId, gen, cancelGen, continuationID, 1)
+
+        let executor = FakeExecutor()
+
+        let translator =
+            FakeTranslator(sid, FallbackEvent.SessionError(mkAbortErr ())) :> IEventTranslator
+
+        // Start dispatch
+        let! _ = handleEvent translator rt defaultCfgLookup executor "" (box ()) None
+
+        // Ensure state is Cancelled
+        equal "lifecycle Cancelled" FallbackLifecycle.Cancelled (rt.GetOrCreateState sid).Lifecycle
+
+        // Simulate late dispatch intent execution
+        do! executeContinuationIntent rt executor "" sid intent
+
+        equal "executor called 0 times" 0 executor.ContinueCalls.Length
+    }
+
 let run () =
     promise {
         do! handleEvent_sessionIdle_idle_emitsScanToolCallAsText ()
@@ -304,4 +345,5 @@ let run () =
         do! handleEvent_sessionIdle_retryToIdle_emitsScanToolCallAsText ()
         do! handleEvent_sessionBusy_duringRetrying_consumedTrue ()
         do! handleEvent_chainPrependsCurrentModel ()
+        do! handleEvent_userAbort_invalidatesLease ()
     }

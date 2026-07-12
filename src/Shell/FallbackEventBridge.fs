@@ -73,6 +73,25 @@ let verifyLeaseWithStatus
     let currentOwner = runtime.GetSessionOwner sessionID
     let stateOpt = runtime.TryGetState sessionID
 
+    let pending = runtime.TryGetPendingLease sessionID
+
+    printfn
+        "DEBUG verifyLeaseWithStatus: expectedStatus=%s, leaseID=%s, pendingID=%A, pendingStatus=%A"
+        expectedStatus
+        lease.ContinuationID
+        (pending |> Option.map (fun p -> p.ContinuationID))
+        (pending |> Option.map (fun p -> p.Status))
+
+    printfn
+        "DEBUG details: currentGen=%d (leaseGen=%d), currentCancelGen=%d (leaseCancel=%d), currentTurnId='%s' (leaseTurn='%s'), currentOwner='%s'"
+        currentGen
+        lease.SessionGeneration
+        currentCancelGen
+        lease.CancelGeneration
+        currentTurnId
+        lease.HumanTurnID
+        currentOwner
+
     let matches =
         lease.SessionGeneration = currentGen
         && lease.HumanTurnID = currentTurnId
@@ -82,10 +101,11 @@ let verifyLeaseWithStatus
         && (match stateOpt with
             | Some s -> s.Lifecycle = FallbackLifecycle.Active
             | None -> false)
-        && (match runtime.TryGetPendingLease sessionID with
-            | Some pending -> pending.ContinuationID = lease.ContinuationID && pending.Status = expectedStatus
+        && (match pending with
+            | Some p -> p.ContinuationID = lease.ContinuationID && p.Status = expectedStatus
             | None -> false)
 
+    printfn "DEBUG verifyLeaseWithStatus matches=%b" matches
     matches
 
 let verifyLease (runtime: FallbackRuntimeState) (sessionID: string) (lease: PendingLease) : bool =
@@ -142,6 +162,24 @@ let finishContinuation
             runtime.SetAwaitingBusy sessionID false
     }
 
+let ensureActiveAndOwner (runtime: FallbackRuntimeState) (sessionID: string) (lease: PendingLease) : bool =
+    let state = runtime.GetOrCreateState sessionID
+    let isOwner = runtime.GetSessionOwner sessionID = "Fallback"
+    let isLifecycleActive = state.Lifecycle = FallbackLifecycle.Active
+    let isNotForceStopped = not (runtime.IsForceStopped sessionID)
+    let isTurnValid = runtime.GetHumanTurnId sessionID = lease.HumanTurnID
+    let isGenValid = runtime.GetSessionGeneration sessionID = lease.SessionGeneration
+
+    let isCancelGenValid =
+        runtime.GetCancelGeneration sessionID = lease.CancelGeneration
+
+    isOwner
+    && isLifecycleActive
+    && isNotForceStopped
+    && isTurnValid
+    && isGenValid
+    && isCancelGenValid
+
 let executeContinuationIntent
     (runtime: FallbackRuntimeState)
     (executor: IActionExecutor)
@@ -163,41 +201,28 @@ let executeContinuationIntent
                   PromptText = None
                   Status = "requested" }
 
-            if verifyLease runtime sessionID lease then
-                let startedLease =
-                    { lease with
-                        Status = "dispatch_started" }
-
-                runtime.SetPendingLease(sessionID, startedLease)
-
-                do! appendContinuationDispatchStartedOrFail workspaceRoot sessionID continuationID continuationOrdinal
-
+            if
+                verifyLease runtime sessionID lease
+                && ensureActiveAndOwner runtime sessionID lease
+            then
                 try
-                    do! executor.SendContinue(sessionID, model, continuationID)
+                    do!
+                        appendContinuationDispatchStartedOrFail
+                            workspaceRoot
+                            sessionID
+                            continuationID
+                            continuationOrdinal
 
-                    let isValid = verifyLeaseWithStatus "dispatch_started" runtime sessionID lease
-
-                    if not isValid then
-                        do! executor.AbortRun sessionID
-
-                        do!
-                            finishContinuation
-                                runtime
-                                workspaceRoot
-                                sessionID
-                                lease
-                                "cancelled"
-                                "Cancelled after dispatch"
-                    elif
-                        not (
-                            runtime.TryTransitionPendingLease(
-                                sessionID,
-                                lease.ContinuationID,
-                                "dispatch_started",
-                                "dispatched"
-                            )
+                    // FINAL DISPATCH GATE: Atomically verify lease just before IO
+                    let isLeaseStillValid =
+                        runtime.TryTransitionPendingLease(
+                            sessionID,
+                            lease.ContinuationID,
+                            "requested",
+                            "dispatch_started"
                         )
-                    then
+
+                    if not isLeaseStillValid then
                         do! executor.AbortRun sessionID
 
                         do!
@@ -207,28 +232,65 @@ let executeContinuationIntent
                                 sessionID
                                 lease
                                 "cancelled"
-                                "Cancelled after dispatch"
+                                "Lease invalid at dispatch"
                     else
-                        let dispatchedLease = { lease with Status = "dispatched" }
+                        do! executor.SendContinue(sessionID, model, continuationID)
 
-                        let modelStr =
-                            match model.Variant with
-                            | Some v -> model.ProviderID + "/" + model.ModelID + ":" + v
-                            | None -> model.ProviderID + "/" + model.ModelID
+                        let isValid = verifyLeaseWithStatus "dispatch_started" runtime sessionID lease
 
-                        let atMs = getTimestampMs ()
-                        runtime.SetInjectedAt sessionID atMs
-                        runtime.SetInjectedModel sessionID model
+                        if not isValid then
+                            do! executor.AbortRun sessionID
 
-                        do!
-                            appendContinuationDispatchedOrFail
-                                workspaceRoot
-                                sessionID
-                                continuationID
-                                modelStr
-                                agent
-                                atMs
-                                continuationOrdinal
+                            do!
+                                finishContinuation
+                                    runtime
+                                    workspaceRoot
+                                    sessionID
+                                    lease
+                                    "cancelled"
+                                    "Cancelled after dispatch"
+                        else
+
+                            let modelStr =
+                                match model.Variant with
+                                | Some v -> model.ProviderID + "/" + model.ModelID + ":" + v
+                                | None -> model.ProviderID + "/" + model.ModelID
+
+                            let atMs = getTimestampMs ()
+
+                            do!
+                                appendContinuationDispatchedOrFail
+                                    workspaceRoot
+                                    sessionID
+                                    continuationID
+                                    modelStr
+                                    agent
+                                    atMs
+                                    continuationOrdinal
+
+                            if
+                                not (
+                                    runtime.TryTransitionPendingLease(
+                                        sessionID,
+                                        lease.ContinuationID,
+                                        "dispatch_started",
+                                        "dispatched"
+                                    )
+                                )
+                            then
+                                do! executor.AbortRun sessionID
+
+                                do!
+                                    finishContinuation
+                                        runtime
+                                        workspaceRoot
+                                        sessionID
+                                        lease
+                                        "cancelled"
+                                        "Cancelled after dispatch"
+                            else
+                                runtime.SetInjectedAt sessionID atMs
+                                runtime.SetInjectedModel sessionID model
                 with ex ->
                     do! finishContinuation runtime workspaceRoot sessionID lease "failed" ex.Message
             else
@@ -246,41 +308,28 @@ let executeContinuationIntent
                   PromptText = Some promptText
                   Status = "requested" }
 
-            if verifyLease runtime sessionID lease then
-                let startedLease =
-                    { lease with
-                        Status = "dispatch_started" }
-
-                runtime.SetPendingLease(sessionID, startedLease)
-
-                do! appendContinuationDispatchStartedOrFail workspaceRoot sessionID continuationID continuationOrdinal
-
+            if
+                verifyLease runtime sessionID lease
+                && ensureActiveAndOwner runtime sessionID lease
+            then
                 try
-                    do! executor.RecoverWithPrompt(sessionID, model, promptText, continuationID)
+                    do!
+                        appendContinuationDispatchStartedOrFail
+                            workspaceRoot
+                            sessionID
+                            continuationID
+                            continuationOrdinal
 
-                    let isValid = verifyLeaseWithStatus "dispatch_started" runtime sessionID lease
-
-                    if not isValid then
-                        do! executor.AbortRun sessionID
-
-                        do!
-                            finishContinuation
-                                runtime
-                                workspaceRoot
-                                sessionID
-                                lease
-                                "cancelled"
-                                "Cancelled after dispatch"
-                    elif
-                        not (
-                            runtime.TryTransitionPendingLease(
-                                sessionID,
-                                lease.ContinuationID,
-                                "dispatch_started",
-                                "dispatched"
-                            )
+                    // FINAL DISPATCH GATE: Atomically verify lease just before IO
+                    let isLeaseStillValid =
+                        runtime.TryTransitionPendingLease(
+                            sessionID,
+                            lease.ContinuationID,
+                            "requested",
+                            "dispatch_started"
                         )
-                    then
+
+                    if not isLeaseStillValid then
                         do! executor.AbortRun sessionID
 
                         do!
@@ -290,26 +339,65 @@ let executeContinuationIntent
                                 sessionID
                                 lease
                                 "cancelled"
-                                "Cancelled after dispatch"
+                                "Lease invalid at dispatch"
                     else
-                        let dispatchedLease = { lease with Status = "dispatched" }
+                        do! executor.RecoverWithPrompt(sessionID, model, promptText, continuationID)
 
-                        let modelStr =
-                            match model.Variant with
-                            | Some v -> model.ProviderID + "/" + model.ModelID + ":" + v
-                            | None -> model.ProviderID + "/" + model.ModelID
+                        let isValid = verifyLeaseWithStatus "dispatch_started" runtime sessionID lease
 
-                        let atMs = getTimestampMs ()
+                        if not isValid then
+                            do! executor.AbortRun sessionID
 
-                        do!
-                            appendContinuationDispatchedOrFail
-                                workspaceRoot
-                                sessionID
-                                continuationID
-                                modelStr
-                                agent
-                                atMs
-                                continuationOrdinal
+                            do!
+                                finishContinuation
+                                    runtime
+                                    workspaceRoot
+                                    sessionID
+                                    lease
+                                    "cancelled"
+                                    "Cancelled after dispatch"
+                        else
+
+                            let modelStr =
+                                match model.Variant with
+                                | Some v -> model.ProviderID + "/" + model.ModelID + ":" + v
+                                | None -> model.ProviderID + "/" + model.ModelID
+
+                            let atMs = getTimestampMs ()
+
+                            do!
+                                appendContinuationDispatchedOrFail
+                                    workspaceRoot
+                                    sessionID
+                                    continuationID
+                                    modelStr
+                                    agent
+                                    atMs
+                                    continuationOrdinal
+
+                            if
+                                not (
+                                    runtime.TryTransitionPendingLease(
+                                        sessionID,
+                                        lease.ContinuationID,
+                                        "dispatch_started",
+                                        "dispatched"
+                                    )
+                                )
+                            then
+                                do! executor.AbortRun sessionID
+
+                                do!
+                                    finishContinuation
+                                        runtime
+                                        workspaceRoot
+                                        sessionID
+                                        lease
+                                        "cancelled"
+                                        "Cancelled after dispatch"
+                            else
+                                runtime.SetInjectedAt sessionID atMs
+                                runtime.SetInjectedModel sessionID model
                 with ex ->
                     do! finishContinuation runtime workspaceRoot sessionID lease "failed" ex.Message
             else
@@ -436,23 +524,20 @@ let handleEvent
             if evt = FallbackEvent.NewUserMessage then
                 if runtime.GetSessionOwner sessionID = "Compaction" then
                     let activeComp = runtime.GetActiveCompactionId sessionID
-                    let activeCompOrdinal = runtime.GetActiveCompactionOrdinal sessionID
-                    let settled = runtime.TrySettleCompaction(sessionID, activeComp)
+                    let settleInfo = runtime.TryGetSettleInfo(sessionID, activeComp)
 
-                    if settled then
-                        do!
-                            appendCompactionSettledOrFail
-                                workspaceRoot
-                                sessionID
-                                activeComp
-                                "cancelled"
-                                activeCompOrdinal
+                    match settleInfo with
+                    | Some(_, ordinal) ->
+                        do! appendCompactionSettledOrFail workspaceRoot sessionID activeComp "cancelled" ordinal
+                        let _ = runtime.ApplySettle(sessionID, activeComp)
+                        ()
+                    | None -> ()
 
                 let msgId = translator.ExtractNewUserMessageId rawEvent |> Option.defaultValue ""
                 let lastMsgId = runtime.GetLastHumanMessageId sessionID
 
                 if msgId = "" || msgId <> lastMsgId then
-                    match runtime.TryCancelPendingNudgeLease sessionID with
+                    match runtime.TryGetPendingNudgeLease sessionID with
                     | Some nudgeLease ->
                         do!
                             appendNudgeCancelledOrFail
@@ -461,6 +546,9 @@ let handleEvent
                                 nudgeLease.NudgeID
                                 "New user message"
                                 nudgeLease.NudgeOrdinal
+
+                        let _ = runtime.ApplyCancelNudgeLease(sessionID, nudgeLease.NudgeID)
+                        ()
                     | None -> ()
 
                     runtime.SetChain sessionID []
@@ -496,7 +584,7 @@ let handleEvent
                         | None -> "", "", ""
 
                     let agent = agentOpt |> Option.defaultValue ""
-                    let humanTurnOrdinal = runtime.IncrementHumanTurnOrdinal sessionID
+                    let humanTurnOrdinal = runtime.GetHumanTurnOrdinal sessionID
 
                     do!
                         appendHumanTurnStartedOrFail
@@ -583,7 +671,7 @@ let handleEvent
                             do! finishContinuation runtime workspaceRoot sessionID lease "cancelled" "User aborted"
                         | None -> ()
 
-                        match runtime.TryCancelPendingNudgeLease sessionID with
+                        match runtime.TryGetPendingNudgeLease sessionID with
                         | Some nudgeLease ->
                             do!
                                 appendNudgeCancelledOrFail
@@ -592,6 +680,9 @@ let handleEvent
                                     nudgeLease.NudgeID
                                     "User aborted"
                                     nudgeLease.NudgeOrdinal
+
+                            let _ = runtime.ApplyCancelNudgeLease(sessionID, nudgeLease.NudgeID)
+                            ()
                         | None -> ()
 
                     let mutable finalState = ns

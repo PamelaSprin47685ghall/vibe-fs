@@ -33,13 +33,14 @@ type NudgeRuntime
             | Ignore -> return ()
             | StreamEnd(workspaceId, stopReason, lastMsg) ->
                 let reason = FinishReason.fromString stopReason
+                let isNudgeOwner = fallbackRuntime.GetSessionOwner workspaceId = "Nudge"
 
                 if
                     not (Dyn.isNullish helpers)
                     && reason <> FinishReason.QueuedMessage
                     && (isTerminalAssistantFinish stopReason || reason = FinishReason.ToolUseError)
                 then
-                    if fallbackRuntime.GetSessionOwner workspaceId = "Nudge" then
+                    if isNudgeOwner then
                         match fallbackRuntime.TryGetPendingNudgeLease workspaceId with
                         | Some lease ->
                             do!
@@ -54,22 +55,23 @@ type NudgeRuntime
                                     ""
                         | None -> fallbackRuntime.SetSessionOwner workspaceId "None"
 
-                    let! newState =
-                        runNudgeFlowWithRetryCheck
-                            fallbackRuntime
-                            workspaceDirectory
-                            runtimeState
-                            workspaceId
-                            (collectSnapshotMux
+                    if not isNudgeOwner then
+                        let! newState =
+                            runNudgeFlowWithRetryCheck
                                 fallbackRuntime
-                                getChatHistory
                                 workspaceDirectory
-                                helpers
+                                runtimeState
                                 workspaceId
-                                lastMsg)
-                            (sendNudgeMux fallbackRuntime helpers workspaceId)
+                                (collectSnapshotMux
+                                    fallbackRuntime
+                                    getChatHistory
+                                    workspaceDirectory
+                                    helpers
+                                    workspaceId
+                                    lastMsg)
+                                (sendNudgeMux fallbackRuntime helpers workspaceId)
 
-                    runtimeState <- newState
+                        runtimeState <- newState
 
                 return ()
             | StreamAbort workspaceId

@@ -185,16 +185,21 @@ type NudgeTrigger
                             let directory = pluginDirectoryFromCtx ctx
 
                             if directory <> "" then
-                                let settled = fallbackRuntime.TrySettleCompaction(sessionIDStr, activeComp)
+                                let settleInfo = fallbackRuntime.TryGetSettleInfo(sessionIDStr, activeComp)
 
-                                if settled then
+                                match settleInfo with
+                                | Some(_, ordinal) ->
                                     do!
                                         appendCompactionSettledOrFail
                                             directory
                                             sessionIDStr
                                             activeComp
                                             "completed"
-                                            activeCompOrdinal
+                                            ordinal
+
+                                    let _ = fallbackRuntime.ApplySettle(sessionIDStr, activeComp)
+                                    ()
+                                | None -> ()
 
                         fallbackRuntime.SetCompacted sessionIDStr false
                         fallbackRuntime.SetCompactionContinuationObserved sessionIDStr false

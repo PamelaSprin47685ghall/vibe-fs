@@ -194,6 +194,8 @@ type EventLogStore(workspaceRoot: string, ?appendLineOverride: string -> WanEven
                     return false
                 elif oldState.NudgeStage = Requested || oldState.NudgeStage = Dispatched then
                     return false
+                elif oldState.NudgeOrdinal >= nudgeOrdinal then
+                    return false
                 else
                     let payload =
                         Map

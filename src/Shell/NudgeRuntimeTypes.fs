@@ -289,6 +289,19 @@ let runNudgeFlowCore
                             else
                                 match outcome with
                                 | Delivered ->
+                                    let dispatchedLease = { lease with Status = "dispatched" }
+
+                                    do!
+                                        finishNudge
+                                            fallbackRuntime
+                                            workspaceRoot
+                                            sessionKey
+                                            dispatchedLease
+                                            "dispatched"
+                                            ""
+                                            (Wanxiangshu.Kernel.Nudge.toString action)
+                                            snapshot.nudgeAnchorKey
+
                                     if
                                         not (
                                             fallbackRuntime.TryTransitionPendingNudgeLease(
@@ -311,19 +324,6 @@ let runNudgeFlowCore
                                                 "Cancelled after dispatch"
                                                 ""
                                                 ""
-                                    else
-                                        let dispatchedLease = { lease with Status = "dispatched" }
-
-                                        do!
-                                            finishNudge
-                                                fallbackRuntime
-                                                workspaceRoot
-                                                sessionKey
-                                                dispatchedLease
-                                                "dispatched"
-                                                ""
-                                                (Wanxiangshu.Kernel.Nudge.toString action)
-                                                snapshot.nudgeAnchorKey
                                 | Busy ->
                                     do!
                                         finishNudge

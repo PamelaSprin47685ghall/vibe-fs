@@ -406,10 +406,19 @@ let private generationFolder
         let newGen =
             e.Payload
             |> Map.tryFind "generation"
-            |> Option.bind (fun s -> Some(int s))
+            |> Option.bind parseIntOpt
             |> Option.defaultValue sessionGen
 
-        newGen, cancelGen, activeContGen, activeCancelGen
+        let eventCompactionId =
+            e.Payload |> Map.tryFind "compactionId" |> Option.defaultValue ""
+
+        let eventCompactionOrdinal =
+            e.Payload |> Map.tryFind "compactionOrdinal" |> Option.bind parseIntOpt
+
+        if eventCompactionId <> "" && eventCompactionOrdinal.IsSome then
+            sessionGen, cancelGen, activeContGen, activeCancelGen
+        else
+            newGen, cancelGen, activeContGen, activeCancelGen
     | _ -> sessionGen, cancelGen, activeContGen, activeCancelGen
 
 let private fallbackLifecycleFolder (st: FallbackLifecycle option) (e: WanEvent) : FallbackLifecycle option =
@@ -514,7 +523,6 @@ let private ownerAndLeaseFolder (st: OwnerEpisodeState) (e: WanEvent) : OwnerEpi
             { st with
                 HumanTurnOrdinal = newOrdinal
                 LastHumanTurnMessageId = msgId
-                SessionGeneration = st.SessionGeneration + 1
                 CancelGeneration = st.CancelGeneration }
             |> clearEpisodeState
 
@@ -563,7 +571,22 @@ let private ownerAndLeaseFolder (st: OwnerEpisodeState) (e: WanEvent) : OwnerEpi
                 CompactionGeneration = genVal
                 IsCompacted = false }
 
-    | k when k = eventKindContextGenerationChanged -> { st with IsCompacted = true }
+    | k when k = eventKindContextGenerationChanged ->
+        let eventCompactionId =
+            e.Payload |> Map.tryFind "compactionId" |> Option.defaultValue ""
+
+        let eventCompactionOrdinal =
+            e.Payload |> Map.tryFind "compactionOrdinal" |> Option.bind parseIntOpt
+
+        let isMatch =
+            eventCompactionId = ""
+            || eventCompactionOrdinal.IsNone
+            || (st.Compaction
+                |> Option.exists (fun c ->
+                    c.CompactionID = eventCompactionId
+                    && c.CompactionOrdinal = eventCompactionOrdinal.Value))
+
+        if isMatch then { st with IsCompacted = true } else st
 
     | k when k = eventKindCompactionSettled ->
         let eventOrdinal = compactionStageOrdinal st.CompactionOrdinal e

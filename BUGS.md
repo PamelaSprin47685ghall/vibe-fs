@@ -1,19 +1,19 @@
-1. 用户按 Esc 强制退出，但受到 fallback auto-continue 的干扰(就是那个零宽)。
+- 目前的错误行为: investigator agent 不注入 caps
+- 正确的行为: 也要注入
 
-2. warn: warn-tdd: 等几个字段没有强制 llm 加上，同时也没有稳定强制在下游之前剥离。
+- 目前的错误行为: 某回合调用了单个工具没有成功触发 user hint
+- 正确的行为: 提醒 llm 并行调用工具
 
-3. 本来 todowrite 按照数学在给定上下文长度处要求要求 llm 触发，但这个机制不工作。
+- 目前的错误行为: warn warn tdd warn reuse 在 tool before 中删除后再也没有了
+- 正确的行为: 在 tool after 中恢复
 
-4. 代码和控制台输出很多 DEBUG:
+- 目前的错误行为: warn warn tdd warn reuse 如果 llm 没写就严正拒绝
+- 正确的行为: schema 强调必须写，但假如真的不写，也没事，但在工具返回时狠狠批斗 llm 一顿
 
-5. 压缩后错误地触发 nudge，其实如果系统自动继续则不 nudge
+- 目前的错误行为: todo 每项写不够 1024 字就拒绝
+- 正确的行为: schema 强调必须写够，但假如真的不写够，也没事，但在工具返回时狠狠批斗 llm 一顿
 
-6. todo/review nudge 用的不是用户最后一条消息的 llm，而是旧的
-
-7. review nudge 中没有配上原始任务 front matter，llm 遗忘
-
-
-
-
+- 目前的错误行为: 紧急要求 todowrite 的提醒几乎在对话一开始必然触发
+- 正确的行为: 去除 bug 并在正确的时机触发。可能是对话开始没读到 llm context 或者计算错的 bug?
 
 请你给出保姆级别修复方案，但不写代码。

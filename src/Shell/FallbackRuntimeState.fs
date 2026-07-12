@@ -271,6 +271,26 @@ type FallbackRuntimeState() =
         | Some leaseObj ->
             let lease = leaseObj :?> PendingLease
 
+            printfn "DEBUG TryTransitionPendingLease: leaseID=%s vs expectedID=%s" lease.ContinuationID expectedID
+            printfn "DEBUG TryTransitionPendingLease: leaseStatus=%s vs expectedStatus=%s" lease.Status expectedStatus
+
+            printfn
+                "DEBUG TryTransitionPendingLease: leaseGen=%d vs currentGen=%d"
+                lease.SessionGeneration
+                (this.GetSessionGeneration sessionID)
+
+            printfn
+                "DEBUG TryTransitionPendingLease: leaseTurnID='%s' vs currentTurnID='%s'"
+                lease.HumanTurnID
+                (this.GetHumanTurnId sessionID)
+
+            printfn
+                "DEBUG TryTransitionPendingLease: leaseCancelGen=%d vs currentCancelGen=%d"
+                lease.CancelGeneration
+                (this.GetCancelGeneration sessionID)
+
+            printfn "DEBUG TryTransitionPendingLease: currentOwner='%s'" (this.GetSessionOwner sessionID)
+
             let isCurrent =
                 lease.ContinuationID = expectedID
                 && lease.Status = expectedStatus
@@ -285,7 +305,9 @@ type FallbackRuntimeState() =
                 true
             else
                 false
-        | None -> false
+        | None ->
+            printfn "DEBUG TryTransitionPendingLease: no lease found for session %s" sessionID
+            false
 
     member _.ClearPendingLease(sessionID: string) : unit =
         pendingLeases <- Map.remove sessionID pendingLeases
@@ -296,9 +318,9 @@ type FallbackRuntimeState() =
     member _.TryGetPendingNudgeLease(sessionID: string) : NudgeLease option =
         Map.tryFind sessionID pendingNudgeLeases
 
-    member this.TryCancelPendingNudgeLease(sessionID: string) : NudgeLease option =
+    member this.ApplyCancelNudgeLease(sessionID: string, expectedNudgeID: string) : bool =
         match Map.tryFind sessionID pendingNudgeLeases with
-        | Some lease ->
+        | Some lease when lease.NudgeID = expectedNudgeID ->
             pendingNudgeLeases <- Map.remove sessionID pendingNudgeLeases
             activeNudgeNonces <- Map.remove sessionID activeNudgeNonces
             this.SetNudgeActive sessionID false
@@ -306,8 +328,8 @@ type FallbackRuntimeState() =
             if this.GetSessionOwner sessionID = "Nudge" then
                 this.SetSessionOwner sessionID "None"
 
-            Some lease
-        | None -> None
+            true
+        | _ -> false
 
     member this.TryTransitionPendingNudgeLease
         (sessionID: string, expectedID: string, expectedStatus: string, nextStatus: string)
@@ -346,23 +368,29 @@ type FallbackRuntimeState() =
     member _.GetActiveCompactionOrdinal(sessionID: string) : int =
         Map.tryFind sessionID activeCompactionOrdinals |> Option.defaultValue 0
 
-    member this.TrySettleCompaction(sessionID: string, expectedCompactionID: string) : bool =
-        if expectedCompactionID = "" then
-            false
-        else
-            match Map.tryFind sessionID activeCompactionIds with
-            | Some currentCompID when currentCompID = expectedCompactionID ->
-                activeCompactionIds <- Map.remove sessionID activeCompactionIds
-                activeCompactionOrdinals <- Map.remove sessionID activeCompactionOrdinals
-                compactionGenerations <- Map.remove sessionID compactionGenerations
-                compactedSessions <- Set.remove sessionID compactedSessions
-                compactionContinuationObserved <- Set.remove sessionID compactionContinuationObserved
+    member _.TryGetSettleInfo(sessionID: string, expectedCompactionID: string) : (string * int) option =
+        match Map.tryFind sessionID activeCompactionIds with
+        | Some currentCompID when currentCompID = expectedCompactionID ->
+            let ordinal =
+                Map.tryFind sessionID activeCompactionOrdinals |> Option.defaultValue 0
 
-                if this.GetSessionOwner sessionID = "Compaction" then
-                    this.ClearSessionOwner sessionID
+            Some(currentCompID, ordinal)
+        | _ -> None
 
-                true
-            | _ -> false
+    member this.ApplySettle(sessionID: string, expectedCompactionID: string) : bool =
+        match Map.tryFind sessionID activeCompactionIds with
+        | Some currentCompID when currentCompID = expectedCompactionID ->
+            activeCompactionIds <- Map.remove sessionID activeCompactionIds
+            activeCompactionOrdinals <- Map.remove sessionID activeCompactionOrdinals
+            compactionGenerations <- Map.remove sessionID compactionGenerations
+            compactedSessions <- Set.remove sessionID compactedSessions
+            compactionContinuationObserved <- Set.remove sessionID compactionContinuationObserved
+
+            if this.GetSessionOwner sessionID = "Compaction" then
+                this.ClearSessionOwner sessionID
+
+            true
+        | _ -> false
 
     member _.SetActiveNudgeNonce (sessionID: string) (nonce: string) : unit =
         activeNudgeNonces <- Map.add sessionID nonce activeNudgeNonces

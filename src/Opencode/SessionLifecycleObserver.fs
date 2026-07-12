@@ -73,7 +73,7 @@ type SessionLifecycleObserver
 
             if msgId <> lastMsgId then
                 if directory <> "" then
-                    match fallbackRuntime.TryCancelPendingNudgeLease sessionID with
+                    match fallbackRuntime.TryGetPendingNudgeLease sessionID with
                     | Some nudgeLease ->
                         do!
                             appendNudgeCancelledOrFail
@@ -82,21 +82,28 @@ type SessionLifecycleObserver
                                 nudgeLease.NudgeID
                                 "new_human_turn"
                                 nudgeLease.NudgeOrdinal
+
+                        let _ = fallbackRuntime.ApplyCancelNudgeLease(sessionID, nudgeLease.NudgeID)
+                        ()
                     | None -> ()
 
                     let activeComp = fallbackRuntime.GetActiveCompactionId sessionID
                     let activeCompOrdinal = fallbackRuntime.GetActiveCompactionOrdinal sessionID
-                    let settled = fallbackRuntime.TrySettleCompaction(sessionID, activeComp)
+                    let settleInfo = fallbackRuntime.TryGetSettleInfo(sessionID, activeComp)
 
-                    if settled then
-                        do! appendCompactionSettledOrFail directory sessionID activeComp "cancelled" activeCompOrdinal
+                    match settleInfo with
+                    | Some(_, ordinal) ->
+                        do! appendCompactionSettledOrFail directory sessionID activeComp "cancelled" ordinal
+                        let _ = fallbackRuntime.ApplySettle(sessionID, activeComp)
+                        ()
+                    | None -> ()
 
                 fallbackRuntime.SetChain sessionID []
                 fallbackRuntime.ClearModel sessionID
                 fallbackRuntime.ClearInjected sessionID
                 fallbackRuntime.SetSessionOwner sessionID "Human"
                 let turnId = fallbackRuntime.IncrementHumanTurnId sessionID
-                let humanTurnOrdinal = fallbackRuntime.IncrementHumanTurnOrdinal sessionID
+                let humanTurnOrdinal = fallbackRuntime.GetHumanTurnOrdinal sessionID
                 fallbackRuntime.SetLastHumanMessageId sessionID msgId
                 fallbackRuntime.RemoveForceStopped sessionID
 

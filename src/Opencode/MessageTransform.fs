@@ -332,16 +332,21 @@ let compactingTransform
             with ex ->
                 match fallbackRuntime with
                 | Some fr when fr.GetActiveCompactionId sessionID = compactionId ->
-                    let settled = fr.TrySettleCompaction(sessionID, compactionId)
+                    let settleInfo = fr.TryGetSettleInfo(sessionID, compactionId)
 
-                    if settled then
+                    match settleInfo with
+                    | Some(_, ordinal) ->
                         do!
                             Wanxiangshu.Shell.EventLogRuntime.appendCompactionSettledOrFail
                                 directory
                                 sessionID
                                 compactionId
                                 "failed"
-                                compactionOrdinal
+                                ordinal
+
+                        let _ = fr.ApplySettle(sessionID, compactionId)
+                        ()
+                    | None -> ()
                 | _ -> ()
 
                 return! Promise.reject ex
