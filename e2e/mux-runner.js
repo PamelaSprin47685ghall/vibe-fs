@@ -96,7 +96,12 @@ class MuxHarness {
     this.queue = sharedHost.queue;
     this.currentReviewTaskRef = { value: null };
     this.nudgesList = [];
-    this.helpers = { nudges: this.nudgesList, _setTodoList: () => {} };
+    this.helpers = {
+      nudges: this.nudgesList,
+      _setTodoList: (todos) => {
+        this.queue.send({ type: 'setTodoList', todos, sessionId: this.sessionId }).catch(() => {});
+      }
+    };
     
     this.registration = {
       tools: sharedHost.toolNames.map((name) => ({ name })),
@@ -125,7 +130,9 @@ class MuxHarness {
   }
 
   async runSlashCommand(key, ...args) {
-    const res = await this.queue.send({ type: 'runCommand', name: key, args: args.join(' ') });
+    const sessionId = args[0];
+    const rest = args.slice(1);
+    const res = await this.queue.send({ type: 'runCommand', name: key, args: rest.join(' '), sessionId });
     await this._syncNudges();
     if (!res.ok) throw new Error(res.error || `runSlashCommand ${key} failed`);
     return res.data;
@@ -154,7 +161,15 @@ class MuxHarness {
       type: 'emit',
       eventType: 'stream-end',
       sessionId: wsId || this.sessionId,
-      event: { parts: (textParts || []).map((t) => ({ type: 'text', text: t })) }
+      event: {
+        properties: {
+          parts: (textParts || []).map((t) => ({ type: 'text', text: t })),
+          metadata: {
+            finishReason: 'stop',
+            muxStopReason: 'stop'
+          }
+        }
+      }
     });
     await this._syncNudges();
     return res;

@@ -94,7 +94,7 @@ let mimoTaskExecuteRoundTripSpec () =
             (get taskTool "execute") $ (args, createObj [ "sessionID", box "s1" ])
             |> unbox<JS.Promise<string>>
 
-        check "mimo task execute returns todo envelope" (result.Contains (hintMethodologyFollowup "first_principles"))
+        check "mimo task execute returns todo envelope" (result.Contains(hintMethodologyFollowup "first_principles"))
         do! rmAsync workspaceDir
     }
 
@@ -123,7 +123,10 @@ let mimoTaskExecuteNestedReportSpec () =
             (get taskTool "execute") $ (args, createObj [ "sessionID", box "s1" ])
             |> unbox<JS.Promise<string>>
 
-        check "mimo task execute with methodology returns success" (result.Contains (hintMethodologyFollowup "first_principles"))
+        check
+            "mimo task execute with methodology returns success"
+            (result.Contains(hintMethodologyFollowup "first_principles"))
+
         do! rmAsync workspaceDir
     }
 
@@ -182,7 +185,7 @@ let mimoTaskExecuteStripsTaskIdSpec () =
             (get taskTool "execute") $ (args, createObj [ "sessionID", box "s1" ])
             |> unbox<JS.Promise<string>>
 
-        check "mimo task execute ignores stray task_id" (result.Contains (hintMethodologyFollowup "first_principles"))
+        check "mimo task execute ignores stray task_id" (result.Contains(hintMethodologyFollowup "first_principles"))
         do! rmAsync workspaceDir
     }
 
@@ -272,5 +275,36 @@ let mimoTaskDefinitionHandlesZodLikeParametersSpec () =
              && describeCalls.[0] = Wanxiangshu.Opencode.HookSchema.selectMethodologyFieldDescription)
 
         check "mimo task.definition makes methodology required" (optionalCalls.Count = 0)
+        do! rmAsync workspaceDir
+    }
+
+let mimoTaskDefinitionRoutesEffectSchemaShapedParametersToJsonSchemaSpec () =
+    promise {
+        let! workspaceDir = mkdtempAsync "mimo-task-effect-params-"
+        let! p = Wanxiangshu.Opencode.PluginMimo.plugin (box {| directory = workspaceDir |})
+        let td = get p "tool.definition"
+
+        let effectLikeParams =
+            createObj [ "ast", box (createObj []); "pipe", box (createObj []) ]
+
+        let taskDef =
+            createObj [ "description", box "native"; "parameters", box effectLikeParams ]
+
+        do! td $ (createObj [ "toolID", box "task" ], taskDef) |> unbox<JS.Promise<unit>>
+
+        check
+            "mimo task.definition under Effect parameters sets jsonSchema"
+            (not (isNullish (get taskDef "jsonSchema")))
+
+        let jsonSchema = get taskDef "jsonSchema"
+
+        check
+            "mimo task.definition under Effect parameters jsonSchema contains ahaMoments"
+            (not (isNullish (get (get jsonSchema "properties") "ahaMoments")))
+
+        check
+            "mimo task.definition under Effect parameters preserves original parameters reference"
+            (obj.ReferenceEquals(get taskDef "parameters", effectLikeParams))
+
         do! rmAsync workspaceDir
     }

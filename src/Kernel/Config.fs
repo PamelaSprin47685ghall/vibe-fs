@@ -12,6 +12,11 @@ let stealthBrowserMcpRef (envValue: string) : string =
 let sembleMcpRef (envValue: string) : string =
     if envValue = "" then "main" else envValue
 
+/// Ollama web-search/web-fetch gateway base URL. Empty env → production default;
+/// non-empty (e.g. E2E mock server) overrides it so no real network call happens in tests.
+let webApiBase (envValue: string) : string =
+    if envValue = "" then "https://ollama.com/api" else envValue
+
 let getStealthBrowserMcpCommand (envValue: string) : string =
     $"uvx --python 3.13 --from git+{repo}@{stealthBrowserMcpRef envValue} python -m server"
 

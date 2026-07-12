@@ -48,10 +48,16 @@ function buildConfigJson(llmUrl) {
   };
 }
 
-function spawnOpencode(tmpDir, home, config) {
+function spawnOpencode(tmpDir, home, config, llmUrl) {
+    const E2E_CACHE_HOME = process.env.WANXIANG_E2E_CACHE_HOME || path.join(os.tmpdir(), 'wanxiang-e2e-cache');
+    const xdg = path.join(home, 'xdg');
     const env = {
       ...process.env,
-      HOME: home,
+      HOME: process.env.HOME || process.env.USERPROFILE || home,
+      XDG_CACHE_HOME: E2E_CACHE_HOME,
+      XDG_DATA_HOME: xdg,
+      XDG_CONFIG_HOME: xdg,
+      XDG_STATE_HOME: xdg,
       OPENCODE_DISABLE_AUTOUPDATE: '1',
       OPENCODE_DISABLE_AUTOCOMPACT: '1',
       OPENCODE_DISABLE_MODELS_FETCH: '1',
@@ -61,6 +67,10 @@ function spawnOpencode(tmpDir, home, config) {
       WANXIANG_E2E_SANDBOX: '1',
       OPENCODE_PLUGIN: PLUGIN_JS,
       OPENCODE_CONFIG_CONTENT: JSON.stringify(config),
+      // Redirect the OLLAMA web-search/web-fetch gateway to the local mock server so no
+      // real network call to https://ollama.com/api ever happens from a squad slave session.
+      OLLAMA_API_BASE: `${llmUrl}/api`,
+      OLLAMA_API_KEY: 'test-key',
     };
   return spawn('opencode', ['serve', '--port', '0', '--hostname', '127.0.0.1'], { cwd: tmpDir, env, stdio: ['ignore', 'pipe', 'pipe'] });
 }
@@ -68,8 +78,8 @@ function spawnOpencode(tmpDir, home, config) {
 function spawnOpencodeChildAndGetPort(tmpDir, home, llmUrl) {
   return new Promise((resolve, reject) => {
     const config = buildConfigJson(llmUrl);
-    const child = spawnOpencode(tmpDir, home, config);
-    
+    const child = spawnOpencode(tmpDir, home, config, llmUrl);
+
     let buf = '';
     const onData = (chunk) => {
       buf += chunk.toString();
@@ -191,6 +201,7 @@ async function spawnWanxiangzhenHost(opts) {
   let port;
   try {
     ({ child, port } = await spawnOpencodeChildAndGetPort(tmpDir, home, llmHandle.url));
+    await warmupOpencodeChild(port, tmpDir);
   } catch (e) {
     await llmHandle.stop().catch(() => {});
     try { fs.rmSync(tmpDir, { recursive: true, force: true }); } catch {}

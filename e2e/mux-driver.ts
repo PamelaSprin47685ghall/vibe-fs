@@ -56,6 +56,67 @@ function prepareWorkspace() {
 
 let chatHistoryCalled = false;
 let mockReportMarkdown = 'Accepted: Pre-review passed.';
+const nudges: string[] = [];
+let todoList: any[] = [];
+
+const taskReports = new Map<string, string>();
+
+async function callMockLLM(prompt: string) {
+  const llmUrl = process.env.MOCK_LLM_URL;
+  if (!llmUrl) return mockReportMarkdown;
+  const res = await fetch(`${llmUrl}/v1/chat/completions`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      messages: [{ role: 'user', content: prompt }],
+      model: 'test-model',
+      tools: [{ type: 'function', function: { name: 'dummy_tool' } }]
+    })
+  });
+  if (!res.ok) {
+    throw new Error(`mock-llm fetch failed: ${res.status}`);
+  }
+  const text = await res.text();
+  let content = '';
+  for (const line of text.split('\n')) {
+    if (line.startsWith('data: ')) {
+      const dataStr = line.slice(6).trim();
+      if (dataStr === '[DONE]') continue;
+      try {
+        const parsed = JSON.parse(dataStr);
+        const delta = parsed.choices?.[0]?.delta;
+        if (delta && typeof delta.content === 'string') {
+          content += delta.content;
+        }
+      } catch {}
+    }
+  }
+  return content;
+}
+
+function buildMockTaskService() {
+  return {
+    create: async (input: any) => {
+      const taskId = `task-${Math.random().toString(36).slice(2, 8)}`;
+      if (input.title === 'Review' || input.title === 'Pre-review') {
+        taskReports.set(taskId, mockReportMarkdown);
+      } else {
+        try {
+          const report = await callMockLLM(input.prompt);
+          taskReports.set(taskId, report);
+        } catch (err) {
+          process.stderr.write(`Failed to call mock LLM in mockTaskService: ${err}\n`);
+          taskReports.set(taskId, mockReportMarkdown);
+        }
+      }
+      return { success: true, data: { taskId } };
+    },
+    waitForAgentReport: async (taskId: string) => {
+      const report = taskReports.get(taskId) || mockReportMarkdown;
+      return { reportMarkdown: report };
+    },
+  };
+}
 
 function setupMocks(workdir: string, bindWanxiangshuHost: any) {
   const mockConfig = {
@@ -69,10 +130,7 @@ function setupMocks(workdir: string, bindWanxiangshuHost: any) {
     getServerSshHost: () => 'devbox',
   };
 
-  const mockTaskService = {
-    create: async () => ({ success: true, data: { taskId: `task-${Math.random().toString(36).slice(2, 8)}` } }),
-    waitForAgentReport: async () => ({ reportMarkdown: mockReportMarkdown }),
-  };
+  const mockTaskService = buildMockTaskService();
 
   bindWanxiangshuHost({
     config: mockConfig as any,
@@ -81,6 +139,7 @@ function setupMocks(workdir: string, bindWanxiangshuHost: any) {
         success: true,
         data: {
           id: 'mux-e2e-session',
+          name: 'mux-e2e-session',
           projectName: 'workspace',
           projectPath: workdir,
           runtimeConfig: { type: 'local' },
@@ -91,7 +150,11 @@ function setupMocks(workdir: string, bindWanxiangshuHost: any) {
     } as any,
     workspaceService: {
       getGoalContinuationKickoffSendOptions: () => ({ model: 'openai/gpt-4o', agentId: 'build' }),
-      sendMessage: async () => ({ success: true }),
+      sendMessage: async (workspaceId: string, message: any) => {
+        const text = message.parts?.[0]?.text || message.text || JSON.stringify(message);
+        nudges.push(text);
+        return { success: true };
+      },
     } as any,
     historyService: {
       getHistoryFromLatestBoundary: async () => {
@@ -160,7 +223,15 @@ async function handleToolAndCommand(
     if (!t) { respond(false, null, `Tool ${cmd.name} not found`); return; }
     let res: any, threw = true;
     try {
-      res = await t.execute(cmd.args, { toolCallId: cmd.toolCallId ?? 'call-123' });
+      const sessionWorkdir = path.join(globalWorkdir, 'sandboxes', sessionId);
+      const toolCtx = {
+        toolCallId: cmd.toolCallId ?? 'call-123',
+        workspaceId: sessionId,
+        sessionID: sessionId,
+        directory: sessionWorkdir,
+        cwd: sessionWorkdir,
+      };
+      res = await t.execute(cmd.args, toolCtx);
       threw = false;
     } catch (e) {
       res = e instanceof Error ? e.message : String(e);
@@ -181,7 +252,7 @@ async function handleTransformAndEvent(
 ) {
   const sessionId = cmd.workspaceId || cmd.sessionId || 'mux-e2e-session';
   if (cmd.type === 'transformMessages') {
-    const sessionWorkdir = path.join(eventHelpers.getTodos(), 'sandboxes', sessionId);
+    const sessionWorkdir = path.join(globalWorkdir, 'sandboxes', sessionId);
     fs.mkdirSync(sessionWorkdir, { recursive: true });
     const res = await transformWanxiangshuMessages({
       workspacePath: sessionWorkdir,
@@ -193,9 +264,17 @@ async function handleTransformAndEvent(
     const res = await runWanxiangshuSystemTransform({ system: cmd.system ?? null });
     respond(true, res);
   } else if (cmd.type === 'emit') {
+    const sessionWorkdir = path.join(globalWorkdir, 'sandboxes', sessionId);
+    const nudgeCtx = {
+      getTodos: () => Promise.resolve(todoList),
+      nudge: async (wsId: string, msg: string) => { nudges.push(msg); return true; },
+      cwd: sessionWorkdir,
+      sessionId,
+      workspaceId: sessionId,
+    };
     const res = await registration.eventHook(
       { type: cmd.eventType, workspaceId: sessionId, properties: cmd.event },
-      eventHelpers
+      nudgeCtx
     );
     respond(true, res);
   }
@@ -318,7 +397,6 @@ async function executeAction(action: any) {
   return intercepted;
 }
 
-const nudges: string[] = [];
 let globalWorkdir = "";
 const eventHelpers = {
   nudge: async (wsId: string, msg: string) => { nudges.push(msg); return true; },
@@ -326,6 +404,11 @@ const eventHelpers = {
 };
 
 async function processCommand(cmd: any, bindings: any, globalWorkdir: string, mockTaskService: any, symlinkPath: string) {
+  if (cmd.type === 'setTodoList') {
+    todoList = cmd.todos ?? [];
+    respond(true, { success: true });
+    return;
+  }
   if (cmd.type === 'dispose') {
     try { fs.unlinkSync(symlinkPath); } catch {}
     try { fs.rmSync(globalWorkdir, { recursive: true, force: true }); } catch {}

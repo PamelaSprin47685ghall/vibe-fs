@@ -43,6 +43,14 @@ function ensureSandbox(workdir: string, sessionId: string) {
 	return finalWorkdir;
 }
 
+function createOmpContext(workdir: string, sessionId: string) {
+	const finalWorkdir = ensureSandbox(workdir, sessionId);
+	return Object.assign(createStubExtensionContext(finalWorkdir, sessionId), {
+		workspaceRoot: finalWorkdir,
+		root: finalWorkdir,
+	});
+}
+
 async function handleOmpFileOps(cmd: any, workdir: string) {
 	const sessionId = cmd.sessionId || 'omp-e2e-session';
 	const finalWorkdir = ensureSandbox(workdir, sessionId);
@@ -92,8 +100,7 @@ async function runOmpCommand(ex: any, workdir: string, cmd: any) {
 	const entry = ex.commands.get(cmd.name);
 	if (!entry) { respond(false, null, `Unknown command: ${cmd.name}`); return; }
 	const sessionId = cmd.sessionId || 'omp-e2e-session';
-	const finalWorkdir = ensureSandbox(workdir, sessionId);
-	const toolCtx = createStubExtensionContext(finalWorkdir, sessionId);
+	const toolCtx = createOmpContext(workdir, sessionId);
 	let result: unknown, threw = true;
 	try {
 		let f = entry.handler || entry.execute;
@@ -116,11 +123,11 @@ async function emitOmpEvent(ex: any, workdir: string, cmd: any) {
 	const handlers = ex.handlers.get(cmd.eventType) ?? [];
 	const event = { ...(cmd.event ?? {}), type: cmd.eventType, sessionId: cmd.sessionId };
 	const sessionId = cmd.sessionId || 'omp-e2e-session';
-	const finalWorkdir = ensureSandbox(workdir, sessionId);
+	const toolCtx = createOmpContext(workdir, sessionId);
 	const results: Array<{ ok: boolean; error?: string }> = [];
 	for (const handler of handlers) {
 		try {
-			const r = handler(event, createStubExtensionContext(finalWorkdir, sessionId));
+			const r = handler(event, toolCtx);
 			if (r && typeof (r as any).then === 'function') await (r as Promise<unknown>);
 			results.push({ ok: true });
 		}
@@ -169,7 +176,7 @@ async function main() {
 	const { EventBus } = await import(`${ompRepo}/packages/coding-agent/src/utils/event-bus`);
 	const pluginPath = process.env.WANXIANGSHU_PLUGIN_PATH;
 	if (!pluginPath) { process.stderr.write('WANXIANGSHU_PLUGIN_PATH env var required\n'); process.exit(1); }
-	const workdir = fs.mkdtempSync(path.join(os.tmpdir(), 'omp-driver-'));
+	let workdir = fs.mkdtempSync(path.join(os.tmpdir(), 'omp-driver-'));
 	try { execSync('git init -q && git config user.email test@test && git config user.name test', { cwd: workdir, stdio: 'ignore' }); }
 	catch { fs.mkdirSync(path.join(workdir, '.git'), { recursive: true }); }
 
@@ -180,16 +187,19 @@ async function main() {
 	patchRuntime(runtime);
 	let extension: any;
 	try { extension = await loadExtensionFromFactory(factory, workdir, new EventBus(), runtime, 'wanxiangshu'); }
-	catch (err) { respond(false, null, `loadExtensionFromFactory failed: ${err instanceof Error ? err.message : String(err)}`); process.exit(1); }
+	catch (err) { respond(false, null, `loadExtensionFromFactory failed: ${err instanceof Error ? e.message : String(err)}`); process.exit(1); }
+	process.stderr.write(`[omp-driver] base workdir=${workdir}\n`);
 	process.stdout.write('ready\n');
 	for (;;) {
 		let cmd: Record<string, any> | null;
 		try { cmd = await readStdinJson(); } catch { respond(false, null, 'Failed to parse stdin JSON'); continue; }
 		if (!cmd) break;
 		try {
+			const overrideDir = (typeof cmd.workdir === 'string' && cmd.workdir) ? cmd.workdir : null;
+			if (overrideDir) workdir = overrideDir;
 			const done = await handleCommand(extension, workdir, cmd);
 			if (done) { try { fs.rmSync(workdir, { recursive: true, force: true }); } catch {} process.exit(0); }
-		} catch (err) { respond(false, null, `Command ${cmd.type} failed: ${err instanceof Error ? err.message : String(err)}`); }
+		} catch (err) { respond(false, null, `Command ${cmd.type} failed: ${err instanceof Error ? e.message : String(err)}`); }
 	}
 	try { fs.rmSync(workdir, { recursive: true, force: true }); } catch {}
 	process.exit(0);

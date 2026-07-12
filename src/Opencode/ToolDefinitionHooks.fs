@@ -42,7 +42,12 @@ let toolDefinitionFor (host: Host) (input: obj) (output: obj) : JS.Promise<unit>
                     then
                         setKey output "parameters" (mergeWorkBacklogReportIntoTaskSchema parameters)
                     else
-                        setKey output "parameters" (buildWorkBacklogSchema ())
+                        let properties = get parameters "properties"
+
+                        if not (isNullish properties) then
+                            setKey output "parameters" (mergeWorkBacklogReportIntoTaskSchema parameters)
+                        else
+                            setKey output "jsonSchema" (buildWorkBacklogSchema ())
                 else
                     setKey output "jsonSchema" (buildWorkBacklogSchema ())
             | Omp -> ()
