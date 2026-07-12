@@ -16,7 +16,7 @@ function resolveAuthToken(authToken, meta) {
 }
 
 function buildConfigJson(llmUrl) {
-  const pluginUrl = new URL('file://' + PLUGIN_JS).href;
+  const pluginUrl = PLUGIN_JS;
   return {
     formatter: false,
     lsp: false,
@@ -44,35 +44,34 @@ function buildConfigJson(llmUrl) {
         options: { apiKey: 'test-key', baseURL: `${llmUrl}/v1` },
       },
     },
-    plugin: [pluginUrl],
+    plugin: [[pluginUrl, { e2e: true }]],
   };
 }
 
 function spawnOpencode(tmpDir, home, config, llmUrl) {
     const E2E_CACHE_HOME = process.env.WANXIANG_E2E_CACHE_HOME || path.join(os.tmpdir(), 'wanxiang-e2e-cache');
     const xdg = path.join(home, 'xdg');
-    const env = {
-      ...process.env,
-      HOME: process.env.HOME || process.env.USERPROFILE || home,
-      XDG_CACHE_HOME: E2E_CACHE_HOME,
-      XDG_DATA_HOME: xdg,
-      XDG_CONFIG_HOME: xdg,
-      XDG_STATE_HOME: xdg,
-      OPENCODE_DISABLE_AUTOUPDATE: '1',
-      OPENCODE_DISABLE_AUTOCOMPACT: '1',
-      OPENCODE_DISABLE_MODELS_FETCH: '1',
-      OPENCODE_AUTH_CONTENT: '{}',
-      OPENCODE_EXPERIMENTAL_EVENT_SYSTEM: 'true',
-      WANXIANGZHEN_E2E: '1',
-      WANXIANG_E2E_SANDBOX: '1',
-      OPENCODE_PLUGIN: PLUGIN_JS,
-      OPENCODE_CONFIG_CONTENT: JSON.stringify(config),
-      // Redirect the OLLAMA web-search/web-fetch gateway to the local mock server so no
-      // real network call to https://ollama.com/api ever happens from a squad slave session.
-      OLLAMA_API_BASE: `${llmUrl}/api`,
-      OLLAMA_API_KEY: 'test-key',
-    };
-  return spawn('opencode', ['serve', '--port', '0', '--hostname', '127.0.0.1'], { cwd: tmpDir, env, stdio: ['ignore', 'pipe', 'pipe'] });
+    
+    // Set variables on process.env directly to ensure propagation through Bun wrappers
+    process.env.HOME = process.env.HOME || process.env.USERPROFILE || home;
+    process.env.XDG_CACHE_HOME = E2E_CACHE_HOME;
+    process.env.XDG_DATA_HOME = xdg;
+    process.env.XDG_CONFIG_HOME = xdg;
+    process.env.XDG_STATE_HOME = xdg;
+    process.env.OPENCODE_DISABLE_AUTOUPDATE = '1';
+    process.env.OPENCODE_DISABLE_AUTOCOMPACT = '1';
+    process.env.OPENCODE_DISABLE_MODELS_FETCH = '1';
+    process.env.OPENCODE_AUTH_CONTENT = '{}';
+    process.env.OPENCODE_EXPERIMENTAL_EVENT_SYSTEM = 'true';
+    process.env.OPENCODE_PRINT_LOGS = '1';
+    process.env.WANXIANGZHEN_E2E = '1';
+    process.env.WANXIANG_E2E_SANDBOX = '1';
+    process.env.OPENCODE_PLUGIN = PLUGIN_JS;
+    process.env.OPENCODE_CONFIG_CONTENT = JSON.stringify(config);
+    process.env.OLLAMA_API_BASE = `${llmUrl}/api`;
+    process.env.OLLAMA_API_KEY = 'test-key';
+
+  return spawn('opencode', ['serve', '--port', '0', '--hostname', '127.0.0.1'], { cwd: tmpDir, env: process.env, stdio: ['ignore', 'pipe', 'pipe'] });
 }
 
 function spawnOpencodeChildAndGetPort(tmpDir, home, llmUrl) {
@@ -83,13 +82,18 @@ function spawnOpencodeChildAndGetPort(tmpDir, home, llmUrl) {
     let buf = '';
     const onData = (chunk) => {
       buf += chunk.toString();
-      const m = buf.match(/opencode server listening on http:\/\/127\.0\.0\.1:(\d+)/) || buf.match(/http:\/\/localhost:(\d+)/) || buf.match(/:(\d+)/);
+      process.stderr.write(`[opencode-stdout] ${chunk.toString()}`);
+      const m = buf.match(/opencode server listening on http:\/\/127\.0\.0\.1:(\d+)/) || buf.match(/http:\/\/127\.0\.0\.1:(\d+)/);
       if (m) {
         child.stdout.removeListener('data', onData);
+        console.log(`[Wanxiangzhen] spawnOpencodeChildAndGetPort resolved, port = ${m[1]}`);
         resolve({ child, port: Number(m[1]) });
       }
     };
     child.stdout.on('data', onData);
+    child.stderr.on('data', (chunk) => {
+      process.stderr.write(`[opencode-stderr] ${chunk.toString()}`);
+    });
     child.on('error', (err) => reject(err));
     child.on('exit', (code) => reject(new Error(`opencode exited with code ${code}`)));
     setTimeout(() => reject(new Error('opencode serve timeout')), 30000);
@@ -167,24 +171,22 @@ export function assembleServeHarness(tmpDir, home, child, meta, llmHandle) {
 async function warmupOpencodeChild(port, tmpDir) {
   const warmupUrl = `http://127.0.0.1:${port}/api/session`;
   try {
+    console.log(`[Wanxiangzhen] Calling warmupUrl: ${warmupUrl}`);
     const res = await fetch(warmupUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'x-opencode-directory': tmpDir },
       body: JSON.stringify({ model: { id: 'test-model', providerID: 'test' } }),
     });
-    const data = await res.json();
-    const sessionId = data?.data?.id;
-    if (sessionId) {
-      const msgUrl = `http://127.0.0.1:${port}/session/${sessionId}/message`;
-      await fetch(msgUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-opencode-directory': tmpDir },
-        body: JSON.stringify({
-          parts: [{ type: 'text', text: 'warmup' }],
-          model: { providerID: 'test', modelID: 'test-model' }
-        }),
-      }).catch(() => {});
-    }
+    console.log(`[Wanxiangzhen] warmupUrl resolved: status=${res.status}`);
+
+    // Trigger InstanceContextMiddleware by calling /session/status
+    const statusUrl = `http://127.0.0.1:${port}/session/status`;
+    console.log(`[Wanxiangzhen] Calling statusUrl to trigger plugin loading: ${statusUrl}`);
+    const statusRes = await fetch(statusUrl, {
+      method: 'GET',
+      headers: { 'x-opencode-directory': tmpDir },
+    });
+    console.log(`[Wanxiangzhen] statusUrl resolved: status=${statusRes.status}`);
   } catch (fetchErr) {
     console.error('WARMUP FETCH ERROR:', fetchErr);
   }
@@ -197,6 +199,16 @@ async function spawnWanxiangzhenHost(opts) {
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'wxz-e2e-'));
   gitInit(tmpDir, opts);
 
+  const nodeModulesSource = path.resolve('node_modules');
+  if (fs.existsSync(nodeModulesSource)) {
+    try { fs.symlinkSync(nodeModulesSource, path.join(tmpDir, 'node_modules'), 'dir'); } catch {}
+    try { fs.symlinkSync(nodeModulesSource, path.join(home, 'node_modules'), 'dir'); } catch {}
+    try { fs.copyFileSync(path.resolve('package.json'), path.join(tmpDir, 'package.json')); } catch {}
+    try { fs.copyFileSync(path.resolve('package-lock.json'), path.join(tmpDir, 'package-lock.json')); } catch {}
+    try { fs.copyFileSync(path.resolve('package.json'), path.join(home, 'package.json')); } catch {}
+    try { fs.copyFileSync(path.resolve('package-lock.json'), path.join(home, 'package-lock.json')); } catch {}
+  }
+
   let child;
   let port;
   try {
@@ -204,8 +216,7 @@ async function spawnWanxiangzhenHost(opts) {
     await warmupOpencodeChild(port, tmpDir);
   } catch (e) {
     await llmHandle.stop().catch(() => {});
-    try { fs.rmSync(tmpDir, { recursive: true, force: true }); } catch {}
-    try { fs.rmSync(home, { recursive: true, force: true }); } catch {}
+    console.log(`[Wanxiangzhen] keeping tmpDir: ${tmpDir} home: ${home}`);
     throw e;
   }
 
@@ -216,8 +227,7 @@ async function spawnWanxiangzhenHost(opts) {
   } catch (e) {
     await llmHandle.stop().catch(() => {});
     child.kill('SIGKILL');
-    try { fs.rmSync(tmpDir, { recursive: true, force: true }); } catch {}
-    try { fs.rmSync(home, { recursive: true, force: true }); } catch {}
+    console.log(`[Wanxiangzhen] keeping tmpDir: ${tmpDir} home: ${home}`);
     throw e;
   }
   return { child, mockLLM: llmHandle, tmpDir, home, meta, port };

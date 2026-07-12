@@ -38,7 +38,7 @@ let runAll (args: string array) : JS.Promise<int> =
 
         try
             printfn "Starting Wanxiangzhen E2E inProcess tests..."
-            let! apiObj = startHarness (createObj [ "inProcess", box true ])
+            let! apiObj = withTimeoutCustom 30000 (startHarness (createObj [ "inProcess", box true ]))
 
             if not (isNullish apiObj?error) then
                 failwithf "harness start failed: %O\n%O" apiObj?error apiObj?stack

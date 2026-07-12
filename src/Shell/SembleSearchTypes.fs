@@ -3,7 +3,7 @@ module Wanxiangshu.Shell.SembleSearchTypes
 open Fable.Core
 open Fable.Core.JsInterop
 
-[<Global("process")>]
+[<Global("globalThis.process")>]
 let private nodeProcess: obj = jsNative
 
 let private envVar (name: string) : string =

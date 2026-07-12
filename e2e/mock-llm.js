@@ -54,6 +54,35 @@ function hasToolResult(body) {
   });
 }
 
+// opencode 内部在会话首条真实用户消息后，会异步向同一 provider/model 发起一次
+// 「生成会话标题」的旁路 LLM 调用（见 packages/opencode/src/session/prompt.ts
+// SessionPrompt.ensureTitle：messages 首项 content 固定前缀
+// "Generate a title for this conversation:"）。该调用与测试用例的
+// expectTool/expectText 队列无关，但会异步落在 mock 服务器上，若不识别会
+// 窃取下一个测试回合 reset() 后的队列项，破坏 FIFO 语义（BUGS.md 未涉及此项，
+// 纯 e2e mock 边界问题，不改动 Nudge/Fallback 内核）。
+const TITLE_GENERATION_MARKER = 'Generate a title for this conversation:';
+
+function isTitleGenerationRequest(body) {
+  const messages = body?.messages ?? [];
+  return messages.some((message) => {
+    const content = message?.content;
+    if (typeof content === 'string') return content.includes(TITLE_GENERATION_MARKER);
+    if (Array.isArray(content)) {
+      return content.some((part) => typeof part?.text === 'string' && part.text.includes(TITLE_GENERATION_MARKER));
+    }
+    return false;
+  });
+}
+
+function handleTitleGeneration(res, url) {
+  if (process.env.WANXIANG_E2E_DEBUG) {
+    console.error('[MOCKLLM_DEBUG]', Date.now(), 'title-generation side-call bypassed, path=', url.pathname);
+  }
+  const id = `title_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+  sendSSE(res, textChunks(id, 'E2E Test Session', 1));
+}
+
 function nextItemFor(body, queue) {
   const names = new Set(toolNames(body));
   if (names.size === 0 && !hasToolResult(body)) return undefined;
@@ -106,11 +135,17 @@ function handleWebFetch(req, res) {
 }
 
 function handleChat(req, res, queue, calls, url) {
-  let body = '';
-  req.on('data', chunk => body += chunk);
+  if (process.env.WANXIANG_E2E_DEBUG) {
+    console.error('[MOCKLLM_DEBUG]', Date.now(), 'chat endpoint hit, path=', url.pathname);
+  }
+  let rawBody = '';
+  req.on('data', chunk => rawBody += chunk);
   req.on('end', () => {
     let parsed = {};
-    try { parsed = JSON.parse(body); } catch { /* keep {} */ }
+    try { parsed = JSON.parse(rawBody); } catch { /* keep {} */ }
+    if (isTitleGenerationRequest(parsed)) {
+      return handleTitleGeneration(res, url);
+    }
     const messages = parsed.messages || [];
     const lastUser = [...messages].reverse().find(m => m.role === 'user');
 
@@ -125,7 +160,12 @@ function handleChat(req, res, queue, calls, url) {
     const promptTokens = estimatePromptTokens(parsed);
 
     if (item?.tool) {
-      const args = { ...(item.args ?? {}), warn_tdd: 'i-am-sure-i-have-followed-tdd-and-kolmolgorov-principles-and-kept-todo-updated' };
+      const args = {
+        ...(item.args ?? {}),
+        warn_tdd: 'i-am-sure-i-have-followed-tdd-and-kolmolgorov-principles-and-kept-todo-updated',
+        warn_reuse: 'this-task-is-not-suitable-to-be-completed-via-continue-tool',
+        warn: 'it-is-not-possible-to-do-it-using-other-tools-and-only-run-tests-when-static-analysis-cannot-handle-it'
+      };
       call.response = { type: 'tool_call', name: item.tool, args };
       sendSSE(res, toolCallChunks(id, item.tool, JSON.stringify(args), promptTokens));
     } else {
@@ -134,6 +174,9 @@ function handleChat(req, res, queue, calls, url) {
       sendSSE(res, textChunks(id, text, promptTokens));
     }
     calls.push(call);
+    if (process.env.WANXIANG_E2E_DEBUG) {
+      console.error('[MOCKLLM_DEBUG]', Date.now(), 'calls.push done, total calls=', calls.length);
+    }
   });
 }
 

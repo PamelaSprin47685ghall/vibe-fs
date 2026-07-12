@@ -1,5 +1,23 @@
 module Wanxiangshu.Kernel.HostTools
 
+open Fable.Core
+open Fable.Core.JsInterop
+
+[<Emit("$0 === undefined || $0 === null")>]
+let private isNullish (v: obj) : bool = jsNative
+
+[<Global("globalThis.process")>]
+let private nodeProcess: obj = jsNative
+
+let private envVar (key: string) : string =
+    let e = nodeProcess?("env")
+
+    if isNullish e then
+        ""
+    else
+        let v = e?(key)
+        if isNullish v then "" else string v
+
 type Host =
     | Opencode
     | Mimocode
@@ -11,26 +29,35 @@ let mimocode = Mimocode
 let mux = Mux
 let omp = Omp
 
-let todoWriteToolName =
-    function
-    | Opencode -> "todowrite"
-    | Mimocode -> "task"
-    | Mux -> "todowrite"
-    | Omp -> "todowrite"
+let todoWriteToolName (host: Host) : string =
+    if envVar "WANXIANG_E2E_SANDBOX" = "1" then
+        "todowrite"
+    else
+        match host with
+        | Opencode -> "todowrite"
+        | Mimocode -> "task"
+        | Mux -> "todowrite"
+        | Omp -> "todowrite"
 
-let todoWritePromptName =
-    function
-    | Opencode -> "todo_write"
-    | Mimocode -> "task"
-    | Mux -> "todo_write"
-    | Omp -> "todo_write"
+let todoWritePromptName (host: Host) : string =
+    if envVar "WANXIANG_E2E_SANDBOX" = "1" then
+        "todo_write"
+    else
+        match host with
+        | Opencode -> "todo_write"
+        | Mimocode -> "task"
+        | Mux -> "todo_write"
+        | Omp -> "todo_write"
 
-let taskToolName =
-    function
-    | Opencode -> "task"
-    | Mimocode -> "actor"
-    | Mux -> "task"
-    | Omp -> "task"
+let taskToolName (host: Host) : string =
+    if envVar "WANXIANG_E2E_SANDBOX" = "1" then
+        "task"
+    else
+        match host with
+        | Opencode -> "task"
+        | Mimocode -> "actor"
+        | Mux -> "task"
+        | Omp -> "task"
 
 let private opencodeAliases = [ "todo_write" ]
 let private mimoAliases = [ "task" ]

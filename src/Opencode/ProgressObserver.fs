@@ -21,6 +21,9 @@ open Wanxiangshu.Shell.ToolRuntimeContext
 open Wanxiangshu.Shell.OpencodeSessionEventCodecCommon
 open Wanxiangshu.Opencode.BacklogSession
 
+[<Import("appendFileSync", "node:fs")>]
+let private appendFileSync (path: string) (data: string) : unit = jsNative
+
 module Dyn = Wanxiangshu.Shell.Dyn
 
 type ProgressObserver
@@ -59,8 +62,22 @@ type ProgressObserver
 
                     let sid = sessionIdFromHookInput input ""
 
+                    let directory =
+                        (fromOpencode input (pluginDirectoryFromCtx ctx)).Execution.Directory
+
+                    let sid = sessionIdFromHookInput input ""
+
+                    let debugMsg =
+                        sprintf "DEBUG PROGRESS_OBSERVER: tool=%s, sid=%s, directory=%s\n" tool sid directory
+
+                    try
+                        appendFileSync "/tmp/debug-mimocode.txt" debugMsg
+                    with _ ->
+                        ()
+
                     match decodeTodoWriteArgs (argsFromHookInput input) with
                     | Ok args when sid <> "" -> do! appendWorkBacklogCommittedOrFail directory sid args
+                    | Error err -> failwithf "DECODE_FAILED: %A" err
                     | _ -> ()
                 | None -> ()
             elif tool = "task_complete" then

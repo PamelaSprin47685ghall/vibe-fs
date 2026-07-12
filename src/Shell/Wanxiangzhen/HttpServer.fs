@@ -10,6 +10,9 @@ let private createServer (handler: System.Func<obj, obj, unit>) : obj = jsNative
 [<Global>]
 let private JSON: obj = jsNative
 
+[<Import("appendFileSync", "node:fs")>]
+let private appendFileSync (path: string) (data: string) : unit = jsNative
+
 type HttpResponse = { StatusCode: int; Body: obj }
 
 type RouteHandler = string -> string -> obj -> JS.Promise<HttpResponse>
@@ -39,6 +42,11 @@ type StartedServer =
       Close: unit -> unit }
 
 let startServer (token: string) (handler: RouteHandler) : JS.Promise<StartedServer> =
+    try
+        appendFileSync "/tmp/debug-wanxiangzhen.txt" "startServer called\n"
+    with _ ->
+        ()
+
     Promise.create (fun resolve reject ->
         let server =
             createServer (
@@ -81,6 +89,11 @@ let startServer (token: string) (handler: RouteHandler) : JS.Promise<StartedServ
             System.Func<unit, unit>(fun () ->
                 let addr = server?address ()
                 let port = unbox<int> (addr?port)
+
+                try
+                    appendFileSync "/tmp/debug-wanxiangzhen.txt" (sprintf "startServer listening on port %d\n" port)
+                with _ ->
+                    ()
 
                 resolve
                     { Port = port

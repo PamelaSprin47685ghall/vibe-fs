@@ -40,7 +40,7 @@ let extname (filePath: string) : string = jsNative
 [<Import("dirname", "node:path")>]
 let dirname (filePath: string) : string = jsNative
 
-[<Global("process")>]
+[<Global("globalThis.process")>]
 let private nodeProcess: obj = jsNative
 
 [<Import("promises", "node:fs")>]

@@ -29,7 +29,7 @@ let internal getOrCall (o: obj) (key: string) : obj = callOrGet o key (fun () ->
 let internal getOrCallWith (o: obj) (key: string) (arg: obj) : obj =
     callOrGet o key (fun () -> o?(key) (arg))
 
-[<Global("process")>]
+[<Global("globalThis.process")>]
 let private nodeProcess: obj = jsNative
 
 [<Import("resolve", "node:path")>]

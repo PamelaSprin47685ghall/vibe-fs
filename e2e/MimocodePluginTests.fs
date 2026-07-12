@@ -33,6 +33,13 @@ let runAll (args: string array) : JS.Promise<int> =
         check "mimo.session-create.ok" (createData?ok = true)
         let sessionID = string (createData?data?data?id)
 
+        harness.mockLLM.reset ()
+        harness.mockLLM.expectText "ok"
+        let! _ = withTimeoutCustom 30000 (harness.sendPrompt sessionID "warmup" (createObj []))
+        let! _ = withTimeoutCustom 30000 (harness.waitForCalls 1 10000)
+        let! _ = withTimeoutCustom 30000 (harness.waitForIdle sessionID 10000)
+        harness.mockLLM.reset ()
+
         let emptyObj = createObj []
         let jsonStringify (o: obj) : string = JS.JSON.stringify (o)
 
@@ -57,7 +64,13 @@ let runAll (args: string array) : JS.Promise<int> =
                     h.mockLLM.expectText "ok"
 
                 let! _ = withTimeout (h.sendPrompt sess prompt emptyObj)
-                let! _ = withTimeout (h.waitForCalls expected 60000)
+
+                for c in 1..expected do
+                    let! _ = withTimeout (h.waitForCalls c 60000)
+                    ()
+
+                let! _ = h.waitForIdle sess 10000
+                do! sleep 200
                 return ()
             }
 
@@ -70,6 +83,8 @@ let runAll (args: string array) : JS.Promise<int> =
                 h.mockLLM.expectText "ok"
                 let! _ = withTimeout (h.sendPrompt sess prompt emptyObj)
                 let! _ = withTimeout (h.waitForCalls 1 60000)
+                let! _ = h.waitForIdle sess 10000
+                do! sleep 200
                 return ()
             }
 
@@ -84,6 +99,7 @@ let runAll (args: string array) : JS.Promise<int> =
                 containsTool
                 bodies
                 emptyObj
+                "todowrite"
 
         do! withTimeoutCustom 4900 (harness.dispose ())
         printfn "\n✓ %d mimocode plugin e2e checks passed" ok

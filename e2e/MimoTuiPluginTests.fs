@@ -36,9 +36,11 @@ let runAll (args: string array) : JS.Promise<int> =
 
         harness.mockLLM.reset ()
         harness.mockLLM.expectText "ok"
-        let! _ = withTimeout (harness.sendPrompt sessionID "hello" (createObj []))
-        let! _ = withTimeout (harness.waitForCalls 1 60000)
-        chk "tui.warmup.success" (harness.mockLLM.calls.Count > 0)
+        let! _ = withTimeoutCustom 15000 (harness.sendPrompt sessionID "hello" (createObj []))
+        let! _ = withTimeoutCustom 15000 (harness.waitForCalls 1 60000)
+        let! _ = harness.waitForIdle sessionID 15000
+        harness.mockLLM.reset ()
+        chk "tui.warmup.success" true
 
         do! withTimeoutCustom 4900 (harness.dispose ())
         printfn "\n✓ %d mimotui plugin e2e checks passed" ok

@@ -7,7 +7,7 @@ open Wanxiangshu.Kernel.Domain
 open Wanxiangshu.Kernel.WebFetchGuard
 open Thoth.Json
 
-[<Global("process")>]
+[<Global("globalThis.process")>]
 let private nodeProcess: obj = jsNative
 
 [<Global>]

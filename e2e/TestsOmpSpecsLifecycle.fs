@@ -29,7 +29,7 @@ let runOmpTodowrite (h: OmpHarness) (chk: string -> bool -> unit) (sessionId: st
 
         let! _ = withTimeout (h.triggerTool "todowrite" todowriteArgs sessionId (createObj []))
         chk "e2e-omp.todowrite.ran" true
-        let! ndWritten = withTimeoutL "omp todowrite ndjson" 5000 (h.waitForNdjson 1 5000)
+        let! ndWritten = withTimeout (h.waitForNdjson 1 1000)
         chk "e2e-omp.todowrite.ndjson-written" ndWritten
         let! ndLines = withTimeout (h.readNdjson ())
         chk "e2e-omp.todowrite.ndjson-has-work-backlog" (ndLines.Contains "work_backlog_committed")
@@ -39,7 +39,11 @@ let runOmpTodowrite (h: OmpHarness) (chk: string -> bool -> unit) (sessionId: st
 let runOmpLoopCommand (h: OmpHarness) (chk: string -> bool -> unit) (sessionId: string) =
     promise {
         let! _ = withTimeout (h.runCommand "loop" "implement task X" sessionId)
-        let! ndWritten = withTimeoutL "omp loop ndjson" 5000 (h.waitForNdjson 2 5000)
+
+        for c in 1..2 do
+            let! _ = withTimeout (h.waitForNdjson c 1000)
+            ()
+
         let! ndLines = withTimeout (h.readNdjson ())
         chk "e2e-omp.cmd.loop.success" (ndLines.Contains "loop_activated" && ndLines.Contains "implement task X")
     }
@@ -98,8 +102,12 @@ let runOmpReview (h: OmpHarness) (chk: string -> bool -> unit) (sessionId: strin
 
 let runOmpLoopReview (h: OmpHarness) (chk: string -> bool -> unit) (sessionId: string) =
     promise {
-        let! _ = withTimeoutL "omp loop-review command" 5000 (h.runCommand "loop-review" "implement task Y" sessionId)
-        let! ndWritten = withTimeoutL "omp loop-review ndjson" 5000 (h.waitForNdjson 5 5000)
+        let! _ = withTimeout (h.runCommand "loop-review" "implement task Y" sessionId)
+
+        for c in 1..5 do
+            let! _ = withTimeout (h.waitForNdjson c 1000)
+            ()
+
         let! ndLines = withTimeout (h.readNdjson ())
         chk "e2e-omp.cmd.loop-review.success" (ndLines.Contains "implement task Y")
     }

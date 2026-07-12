@@ -14,6 +14,7 @@ open Wanxiangshu.Shell.Wanxiangzhen.CoordinatorRuntime
 
 let stubDeps () : CoordinatorDeps =
     let mutable seed = 42
+
     let prng () =
         seed <- (seed * 1103515245 + 12345) &&& 0x7FFFFFFF
         float seed / 2147483647.0
@@ -72,6 +73,7 @@ let mkRuntimeWithDeps (deps: CoordinatorDeps) : CoordinatorRuntime =
       PidPollHandle = None
       GitError = None
       InjectError = None
+      IsE2e = false
       Deps = deps }
 
 let mkRuntime () : CoordinatorRuntime = mkRuntimeWithDeps (stubDeps ())

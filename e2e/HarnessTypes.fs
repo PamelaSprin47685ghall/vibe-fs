@@ -25,6 +25,7 @@ type Harness =
     abstract abortSession: string -> obj -> JS.Promise<obj>
     abstract readNdjson: unit -> JS.Promise<string>
     abstract waitForNdjson: int -> int -> JS.Promise<bool>
+    abstract waitForIdle: string -> int -> JS.Promise<bool>
     abstract partsText: obj -> string
     abstract allMessagesText: obj -> string
     abstract waitForCalls: int -> int -> JS.Promise<int>

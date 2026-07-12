@@ -17,7 +17,7 @@ open Wanxiangshu.Shell.EventLogRuntime
 open Wanxiangshu.Shell.FallbackRuntimeState
 open Wanxiangshu.Shell.NudgeRuntimeTypes
 
-[<Global("process")>]
+[<Global("globalThis.process")>]
 let private nodeProcess: obj = jsNative
 
 let tryGetTodos (helpers: obj) (workspaceId: string) : JS.Promise<string list> =

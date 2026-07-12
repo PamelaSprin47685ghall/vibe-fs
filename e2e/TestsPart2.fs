@@ -269,6 +269,7 @@ let runRest
                 containsTool
                 bodies
                 emptyObj
+                "todowrite"
 
         return summary ()
     }

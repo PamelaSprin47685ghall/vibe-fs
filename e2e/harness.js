@@ -114,6 +114,16 @@ function initHostDirAndSpawn(llmHandle, opts) {
   fs.mkdirSync(workDir, { recursive: true });
   gitInit(workDir);
 
+  const nodeModulesSource = path.resolve('node_modules');
+  if (fs.existsSync(nodeModulesSource)) {
+    try { fs.symlinkSync(nodeModulesSource, path.join(workDir, 'node_modules'), 'dir'); } catch {}
+    try { fs.symlinkSync(nodeModulesSource, path.join(home, 'node_modules'), 'dir'); } catch {}
+    try { fs.copyFileSync(path.resolve('package.json'), path.join(workDir, 'package.json')); } catch {}
+    try { fs.copyFileSync(path.resolve('package-lock.json'), path.join(workDir, 'package-lock.json')); } catch {}
+    try { fs.copyFileSync(path.resolve('package.json'), path.join(home, 'package.json')); } catch {}
+    try { fs.copyFileSync(path.resolve('package-lock.json'), path.join(home, 'package-lock.json')); } catch {}
+  }
+
   const env = isolatedEnv(home, `${llmHandle.url}/v1`, opts);
   const child = spawn('opencode', ['serve', '--port', '0', '--hostname', '127.0.0.1'], {
     cwd: workDir,
@@ -184,9 +194,9 @@ async function spawnOpencodeHost(variant, opts) {
   await connectPermissionResponder(hostObj);
 
   let warmSession = null;
-  if (opts.plugin) {
-    warmSession = await warmupOpencode(baseUrl, workDir, llmHandle);
-  }
+  // if (opts.plugin) {
+  //   warmSession = await warmupOpencode(baseUrl, workDir, llmHandle);
+  // }
   hostObj.warmSession = warmSession;
 
   return hostObj;
@@ -238,7 +248,7 @@ class OpencodeHarness {
     if (sessionID) this.activeSessionId = sessionID;
 
     const qs = query ? '?' + new URLSearchParams(query).toString() : '';
-    const url = this.baseUrl + `/session/${sessionID}/message` + qs;
+    const url = this.baseUrl + `/session/${sessionID}/prompt_async` + qs;
     const body = { parts: [{ type: 'text', text }], model: { providerID: 'test', modelID: 'test-model' } };
     const ac = new AbortController();
     const timeout = setTimeout(() => ac.abort(), timeoutMs);
@@ -249,16 +259,8 @@ class OpencodeHarness {
         body: JSON.stringify(body),
         signal: ac.signal,
       });
-      const reader = res.body.getReader();
-      const decoder = new TextDecoder();
-      let buffer = '';
-      for (;;) {
-        const { value, done } = await reader.read();
-        if (done) break;
-        buffer += decoder.decode(value, { stream: true });
-        if (buffer.includes('data: [DONE]')) break;
-      }
-      return { status: res.status, ok: res.ok, data: buffer };
+      const data = await res.text();
+      return { status: res.status, ok: res.ok, data };
     } catch (e) {
       return { status: 0, ok: false, data: e.message };
     } finally {
@@ -342,6 +344,23 @@ class OpencodeHarness {
     return false;
   }
 
+  async waitForIdle(sessionID, timeoutMs = 1000) {
+    const deadline = Date.now() + timeoutMs;
+    while (Date.now() < deadline) {
+      const res = await this.request('GET', '/session/status', {});
+      if (res.ok && res.data) {
+        const statusMap = res.data.data || res.data;
+        const status = statusMap[sessionID];
+        // If the session status is not present, or is explicitly 'idle', the session is idle
+        if (!status || status.type === 'idle') {
+          return true;
+        }
+      }
+      await new Promise((r) => setTimeout(r, 50));
+    }
+    return false;
+  }
+
   partsText(data) {
     const parts = data?.parts ?? data?.data?.parts;
     if (!Array.isArray(parts)) return JSON.stringify(data ?? '');
@@ -366,6 +385,9 @@ class OpencodeHarness {
   }
 
   async waitForCalls(count, timeoutMs = 1000) {
+    if (process.env.WANXIANG_E2E_DEBUG) {
+      console.error('[HARNESS_DEBUG]', Date.now(), 'waitForCalls start, want=', count, 'have=', this.mockLLM.calls.length);
+    }
     const deadline = Date.now() + timeoutMs;
     while (this.mockLLM.calls.length < count) {
       if (Date.now() > deadline) {

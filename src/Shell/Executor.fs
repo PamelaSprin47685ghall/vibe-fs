@@ -8,7 +8,7 @@ open Wanxiangshu.Kernel.Executor
 open Wanxiangshu.Shell.ExecutorSpawn
 open Wanxiangshu.Shell.ExecutorSpawnRunners
 
-[<Global("process")>]
+[<Global("globalThis.process")>]
 let private nodeProcess: obj = jsNative
 
 type RunOutcome = ExecutorSpawn.RunOutcome

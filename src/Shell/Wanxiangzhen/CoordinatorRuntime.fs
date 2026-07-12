@@ -73,6 +73,7 @@ type CoordinatorRuntime =
       mutable PidPollHandle: obj option
       mutable GitError: string option
       mutable InjectError: string option
+      mutable IsE2e: bool
       Deps: CoordinatorDeps }
 
 let commitEvent (rt: CoordinatorRuntime) (e: SquadEvent) : JS.Promise<Result<unit, string>> =

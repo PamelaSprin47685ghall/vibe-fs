@@ -21,7 +21,7 @@ open Wanxiangshu.Shell.Dyn
 open Wanxiangshu.Shell.EventLogRuntime
 open Wanxiangshu.Shell.RuntimeScope
 
-[<Global("process")>]
+[<Global("globalThis.process")>]
 let private nodeProcess: obj = jsNative
 
 let private eventLogRootFromDeps (deps: obj) : string =
