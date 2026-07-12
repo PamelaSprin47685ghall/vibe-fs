@@ -41,6 +41,7 @@ type NudgeRuntime
                 then
                     let! newState =
                         runNudgeFlowWithRetryCheck
+                            fallbackRuntime
                             workspaceDirectory
                             runtimeState
                             workspaceId

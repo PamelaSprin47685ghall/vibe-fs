@@ -101,9 +101,7 @@ let chatMessageFor
                     match fr.TryGetPendingLease sessionIDStr with
                     | Some lease when lease.Status = "dispatch_started" && lease.ContinuationID = nonce -> true
                     | _ -> false
-            | None ->
-                let owner = fr.GetSessionOwner sessionIDStr
-                if owner = "Compaction" then true else false
+            | None -> false
 
         if not isSystem then
             let modelOpt = tryGetModelStringFromHook input output

@@ -342,6 +342,23 @@ let appendContinuationCancelledOrFail
         workspaceRoot
         (buildEvent sessionID eventKindContinuationCancelled payload (getTimestampMs().ToString()))
 
+let appendContinuationSettledOrFail
+    (workspaceRoot: string)
+    (sessionID: string)
+    (continuationID: string)
+    (humanTurnID: string)
+    (generation: int)
+    (status: string)
+    : JS.Promise<unit> =
+    let payload =
+        Map
+            [ "continuationId", continuationID
+              "humanTurnId", humanTurnID
+              "generation", generation.ToString()
+              "status", status ]
+
+    appendOrFail workspaceRoot (buildEvent sessionID eventKindContinuationSettled payload (getTimestampMs().ToString()))
+
 let appendCompactionStartedOrFail
     (workspaceRoot: string)
     (sessionID: string)
@@ -378,3 +395,53 @@ let appendRouteObservedOrFail
         Map [ "provider", provider; "model", model; "variant", variant; "agent", agent ]
 
     appendOrFail workspaceRoot (buildEvent sessionID eventKindRouteObserved payload (getTimestampMs().ToString()))
+
+let appendNudgeRequestedOrFail
+    (workspaceRoot: string)
+    (sessionID: string)
+    (nudgeID: string)
+    (action: string)
+    (anchor: string)
+    (sessionGen: int)
+    (cancelGen: int)
+    (humanTurnID: string)
+    : JS.Promise<unit> =
+    let payload =
+        Map
+            [ "nudgeId", nudgeID
+              "action", action
+              "anchor", anchor
+              "generation", sessionGen.ToString()
+              "cancelGeneration", cancelGen.ToString()
+              "humanTurnId", humanTurnID ]
+
+    appendOrFail workspaceRoot (buildEvent sessionID eventKindNudgeRequested payload (getTimestampMs().ToString()))
+
+let appendNudgeDispatchedOrFail
+    (workspaceRoot: string)
+    (sessionID: string)
+    (nudgeID: string)
+    (action: string)
+    (anchor: string)
+    : JS.Promise<unit> =
+    let payload = Map [ "nudgeId", nudgeID; "action", action; "anchor", anchor ]
+
+    appendOrFail workspaceRoot (buildEvent sessionID eventKindNudgeDispatched payload (getTimestampMs().ToString()))
+
+let appendNudgeFailedOrFail
+    (workspaceRoot: string)
+    (sessionID: string)
+    (nudgeID: string)
+    (errorMsg: string)
+    : JS.Promise<unit> =
+    let payload = Map [ "nudgeId", nudgeID; "error", errorMsg ]
+    appendOrFail workspaceRoot (buildEvent sessionID eventKindNudgeFailed payload (getTimestampMs().ToString()))
+
+let appendNudgeCancelledOrFail
+    (workspaceRoot: string)
+    (sessionID: string)
+    (nudgeID: string)
+    (reason: string)
+    : JS.Promise<unit> =
+    let payload = Map [ "nudgeId", nudgeID; "reason", reason ]
+    appendOrFail workspaceRoot (buildEvent sessionID eventKindNudgeCancelled payload (getTimestampMs().ToString()))

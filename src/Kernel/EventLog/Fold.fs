@@ -425,7 +425,20 @@ let private ownerAndLeaseFolder
                     l)
 
         owner, nextLease, compId, isCompacted
-    | k when k = eventKindNudgeDispatched -> Some "Nudge", lease, compId, isCompacted
+    | k when k = eventKindContinuationSettled ->
+        let cid = payloadField "continuationId" e |> Option.defaultValue ""
+
+        let nextLease =
+            lease |> Option.bind (fun l -> if l.ContinuationID = cid then None else Some l)
+
+        let nextOwner =
+            match owner with
+            | Some "Fallback" -> Some "None"
+            | _ -> owner
+
+        nextOwner, nextLease, compId, isCompacted
+    | k when k = eventKindNudgeDispatched || k = eventKindNudgeRequested -> Some "Nudge", lease, compId, isCompacted
+    | k when k = eventKindNudgeFailed || k = eventKindNudgeCancelled -> Some "None", lease, compId, isCompacted
     | k when k = eventKindAssistantCompleted ->
         let nextOwner =
             match owner with
@@ -481,62 +494,74 @@ let emptySessionState () : SessionState =
       IsCompacted = false
       ProcessedKeys = Set.empty }
 
-let private getEventDuplicateKeys (e: WanEvent) : string list =
+let private getEventDeduplicationKey (e: WanEvent) : string option =
     let payload = e.Payload
     let eventIdOpt = Map.tryFind "eventId" payload
-    let messageIdOpt = Map.tryFind "messageId" payload
-    let partIdOpt = Map.tryFind "partId" payload
-    let callIdOpt = Map.tryFind "callId" payload
 
     let contIdOpt =
         (payloadField "continuationId" e)
         |> Option.orElse (payloadField "continuationID" e)
 
-    [ match eventIdOpt with
-      | Some id when id <> "" -> yield e.Kind + "_" + id
-      | _ -> ()
+    let messageIdOpt = Map.tryFind "messageId" payload
+    let partIdOpt = Map.tryFind "partId" payload
 
-      match messageIdOpt with
-      | Some id when id <> "" ->
-          let rev =
-              payload
-              |> Map.tryFind "revision"
-              |> Option.orElse (payload |> Map.tryFind "messageRevision")
-              |> Option.defaultValue ""
+    if eventIdOpt.IsSome && eventIdOpt.Value <> "" then
+        Some(e.Kind + "_" + eventIdOpt.Value)
+    elif contIdOpt.IsSome && contIdOpt.Value <> "" then
+        Some(contIdOpt.Value + "_" + e.Kind)
+    elif messageIdOpt.IsSome && messageIdOpt.Value <> "" then
+        let rev =
+            payload
+            |> Map.tryFind "revision"
+            |> Option.orElse (payload |> Map.tryFind "messageRevision")
+            |> Option.defaultValue ""
 
-          yield e.Kind + "_" + id + "_" + rev
-      | _ -> ()
+        Some(e.Kind + "_" + messageIdOpt.Value + "_" + rev)
+    elif partIdOpt.IsSome && partIdOpt.Value <> "" then
+        let state =
+            payload
+            |> Map.tryFind "state"
+            |> Option.orElse (payload |> Map.tryFind "partState")
+            |> Option.defaultValue ""
 
-      match partIdOpt with
-      | Some id when id <> "" ->
-          let state =
-              payload
-              |> Map.tryFind "state"
-              |> Option.orElse (payload |> Map.tryFind "partState")
-              |> Option.defaultValue ""
-
-          yield e.Kind + "_" + id + "_" + state
-      | _ -> ()
-
-      match callIdOpt with
-      | Some id when id <> "" -> yield e.Kind + "_" + id
-      | _ -> ()
-
-      match contIdOpt with
-      | Some id when id <> "" -> yield id + "_" + e.Kind
-      | _ -> () ]
+        Some(e.Kind + "_" + partIdOpt.Value + "_" + state)
+    else
+        None
 
 let applyEvent (st: SessionState) (e: WanEvent) : SessionState =
-    let candidateKeys = getEventDuplicateKeys e
+    let keyOpt = getEventDeduplicationKey e
 
     let isDuplicate =
-        candidateKeys |> List.exists (fun key -> Set.contains key st.ProcessedKeys)
+        match keyOpt with
+        | Some key -> Set.contains key st.ProcessedKeys
+        | None -> false
 
     if isDuplicate then
         st
     else
         let nextProcessedKeys =
-            candidateKeys |> List.fold (fun acc key -> Set.add key acc) st.ProcessedKeys
+            if e.Kind = eventKindHumanTurnStarted then
+                Set.empty
+            else
+                let tempKeys =
+                    match keyOpt with
+                    | Some key -> Set.add key st.ProcessedKeys
+                    | None -> st.ProcessedKeys
+
+                if
+                    e.Kind = eventKindContinuationSettled
+                    || e.Kind = eventKindContinuationFailed
+                    || e.Kind = eventKindContinuationCancelled
+                then
+                    let contIdOpt =
+                        (payloadField "continuationId" e)
+                        |> Option.orElse (payloadField "continuationID" e)
+
+                    match contIdOpt with
+                    | Some id when id <> "" -> tempKeys |> Set.filter (fun key -> not (key.StartsWith(id + "_")))
+                    | _ -> tempKeys
+                else
+                    tempKeys
 
         let isBacklog = e.Kind = eventKindWorkBacklogCommitted
         let nextReviewLoop = ReviewLoopFold.foldEvent st.ReviewLoop e

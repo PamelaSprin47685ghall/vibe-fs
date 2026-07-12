@@ -65,6 +65,9 @@ let appendContinuationFailedOrFail =
 let appendContinuationCancelledOrFail =
     EventLogRuntimeAppend.appendContinuationCancelledOrFail
 
+let appendContinuationSettledOrFail =
+    EventLogRuntimeAppend.appendContinuationSettledOrFail
+
 let appendCompactionStartedOrFail =
     EventLogRuntimeAppend.appendCompactionStartedOrFail
 
@@ -75,6 +78,11 @@ let appendContextGenerationChangedOrFail =
     EventLogRuntimeAppend.appendContextGenerationChangedOrFail
 
 let appendRouteObservedOrFail = EventLogRuntimeAppend.appendRouteObservedOrFail
+
+let appendNudgeRequestedOrFail = EventLogRuntimeAppend.appendNudgeRequestedOrFail
+let appendNudgeDispatchedOrFail = EventLogRuntimeAppend.appendNudgeDispatchedOrFail
+let appendNudgeFailedOrFail = EventLogRuntimeAppend.appendNudgeFailedOrFail
+let appendNudgeCancelledOrFail = EventLogRuntimeAppend.appendNudgeCancelledOrFail
 
 let appendSubagentSpawned = EventLogRuntimeAppend.appendSubagentSpawned
 let appendSubagentSpawnedOrFail = EventLogRuntimeAppend.appendSubagentSpawnedOrFail

@@ -474,8 +474,19 @@ let handleEvent
                         || (ns.Phase = FallbackPhase.Idle && action = FallbackAction.DoNothing)
 
                     if terminalStates then
-                        // runtime.SetSessionOwner sessionID "None"
-                        ()
+                        match runtime.TryGetPendingLease sessionID with
+                        | Some lease ->
+                            do!
+                                appendContinuationSettledOrFail
+                                    workspaceRoot
+                                    sessionID
+                                    lease.ContinuationID
+                                    lease.HumanTurnID
+                                    lease.SessionGeneration
+                                    "completed"
+
+                            runtime.ClearPendingLease sessionID
+                        | None -> ()
 
                     let! (finalState2, intentOpt) =
                         promise {

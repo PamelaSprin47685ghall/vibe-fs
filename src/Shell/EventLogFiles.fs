@@ -25,7 +25,7 @@ type EventLogStore(workspaceRoot: string, ?appendLineOverride: string -> WanEven
     let mutable initDone = false
     let mutable initPromise: JS.Promise<unit> option = None
     let mutable readCalled = false
-    let readAllResult = ResizeArray<WanEvent>()
+    let mutable revision = 0
 
     let foldWan (e: WanEvent) =
         let sId = e.Session
@@ -37,6 +37,7 @@ type EventLogStore(workspaceRoot: string, ?appendLineOverride: string -> WanEven
 
         sessionStates <- Map.add sId (applyEvent oldState e) sessionStates
         squadProj <- applyWanEvent squadProj e
+        revision <- revision + 1
 
         if isSquadEventKind e.Kind then
             latestSessionId <- Some e.Session
@@ -57,7 +58,6 @@ type EventLogStore(workspaceRoot: string, ?appendLineOverride: string -> WanEven
                         withWorkspaceLock eventFilePath (fun () ->
                             promise {
                                 let! events = readEventsFile eventFilePath
-                                readAllResult.AddRange(events)
 
                                 for e in events do
                                     foldWan e
@@ -77,10 +77,11 @@ type EventLogStore(workspaceRoot: string, ?appendLineOverride: string -> WanEven
     member _.ReadAllEvents() : JS.Promise<WanEvent list> =
         promise {
             do! ensureInitialized ()
-            return Seq.toList readAllResult
+            let! events = readEventsFile eventFilePath
+            return events
         }
 
-    member _.GetRevision() : int = readAllResult.Count
+    member _.GetRevision() : int = revision
 
     member _.GetSessionStateSync(sessionId: string) : SessionState =
         match Map.tryFind sessionId sessionStates with
@@ -109,7 +110,6 @@ type EventLogStore(workspaceRoot: string, ?appendLineOverride: string -> WanEven
                 try
                     do! withWorkspaceLock eventFilePath (fun () -> appendLineFn eventFilePath e)
                     foldWan e
-                    readAllResult.Add(e) |> ignore
                     return Ok()
                 with ex ->
                     return Error ex.Message
@@ -121,7 +121,6 @@ type EventLogStore(workspaceRoot: string, ?appendLineOverride: string -> WanEven
                 do! ensureInitialized ()
                 do! withWorkspaceLock eventFilePath (fun () -> appendLineFn eventFilePath e)
                 foldWan e
-                readAllResult.Add(e) |> ignore
             })
 
     member _.GetSquadDag(sessionId: string) : JS.Promise<Dag> =
@@ -149,6 +148,11 @@ type EventLogStore(workspaceRoot: string, ?appendLineOverride: string -> WanEven
         (sessionId: string)
         (action: NudgeAction)
         (anchor: string)
+        (nudgeId: string)
+        (nonce: string)
+        (sessionGen: int)
+        (cancelGen: int)
+        (humanTurnId: string)
         (isBlocked: NudgeDedupState -> string -> bool)
         : JS.Promise<bool> =
         queue.Enqueue(fun () ->
@@ -170,13 +174,19 @@ type EventLogStore(workspaceRoot: string, ?appendLineOverride: string -> WanEven
                     return false
                 else
                     let payload =
-                        Map [ "action", Wanxiangshu.Kernel.Nudge.toString action; "anchor", trimmedAnchor ]
+                        Map
+                            [ "action", Wanxiangshu.Kernel.Nudge.toString action
+                              "anchor", trimmedAnchor
+                              "nudgeId", nudgeId
+                              "nonce", nonce
+                              "generation", sessionGen.ToString()
+                              "cancelGeneration", cancelGen.ToString()
+                              "humanTurnId", humanTurnId ]
 
                     let ev =
-                        buildEvent sessionId eventKindNudgeDispatched payload (getTimestampMs().ToString())
+                        buildEvent sessionId eventKindNudgeRequested payload (getTimestampMs().ToString())
 
                     do! withWorkspaceLock eventFilePath (fun () -> appendLineFn eventFilePath ev)
                     foldWan ev
-                    readAllResult.Add(ev) |> ignore
                     return true
             })

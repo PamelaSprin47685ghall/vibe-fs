@@ -265,42 +265,59 @@ let compactingTransform
                 fr.SetSessionOwner sessionID "Compaction"
                 fr.SetActiveCompactionId(sessionID, compactionId)
                 fr.SetCompacted sessionID false
+                fr.SetCompactionContinuationObserved sessionID false
             | None -> ()
 
-            let arg = box {| path = box {| id = sessionID |} |}
-            let! resp = invokeClient client "messages" arg
-            let data = Dyn.get resp "data"
+            try
+                let arg = box {| path = box {| id = sessionID |} |}
+                let! resp = invokeClient client "messages" arg
+                let data = Dyn.get resp "data"
 
-            let messagesArr =
-                if not (Dyn.isNullish data) && Dyn.isArray data then
-                    data :?> obj array
-                else
-                    [||]
-
-            if messagesArr.Length > 0 then
-                let messagesList = MessagingCodec.decodeMessages messagesArr
-                let cleaned = Messaging.stripSyntheticBySource messagesList
-                let backlog = backlogSession.GetOrRebuildBacklog(sessionID, cleaned)
-                let guidGen () = string (runtimeScope.RandomGen())
-
-                let result =
-                    Wanxiangshu.Kernel.BacklogProjectionCore.compactingTransform cleaned backlog guidGen
-
-                let wrappedText =
-                    match result with
-                    | m :: _ ->
-                        match m.parts with
-                        | TextPart t :: _ -> t
-                        | _ -> ""
-                    | [] -> ""
-
-                let currentContext =
-                    let c = Dyn.get output "context"
-
-                    if not (Dyn.isNullish c) && Dyn.isArray c then
-                        c :?> string array
+                let messagesArr =
+                    if not (Dyn.isNullish data) && Dyn.isArray data then
+                        data :?> obj array
                     else
                         [||]
 
-                output?context <- Array.append currentContext [| wrappedText |]
+                if messagesArr.Length > 0 then
+                    let messagesList = MessagingCodec.decodeMessages messagesArr
+                    let cleaned = Messaging.stripSyntheticBySource messagesList
+                    let backlog = backlogSession.GetOrRebuildBacklog(sessionID, cleaned)
+                    let guidGen () = string (runtimeScope.RandomGen())
+
+                    let result =
+                        Wanxiangshu.Kernel.BacklogProjectionCore.compactingTransform cleaned backlog guidGen
+
+                    let wrappedText =
+                        match result with
+                        | m :: _ ->
+                            match m.parts with
+                            | TextPart t :: _ -> t
+                            | _ -> ""
+                        | [] -> ""
+
+                    let currentContext =
+                        let c = Dyn.get output "context"
+
+                        if not (Dyn.isNullish c) && Dyn.isArray c then
+                            c :?> string array
+                        else
+                            [||]
+
+                    output?context <- Array.append currentContext [| wrappedText |]
+            with ex ->
+                do!
+                    Wanxiangshu.Shell.EventLogRuntime.appendCompactionSettledOrFail
+                        directory
+                        sessionID
+                        compactionId
+                        "failed"
+
+                match fallbackRuntime with
+                | Some fr ->
+                    fr.SetSessionOwner sessionID "None"
+                    fr.SetCompacted sessionID false
+                | None -> ()
+
+                return! Promise.reject ex
     }

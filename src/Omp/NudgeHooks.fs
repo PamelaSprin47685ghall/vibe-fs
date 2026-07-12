@@ -209,7 +209,8 @@ let agentEndHandler
                             match deriveAction snapshot with
                             | NudgeNone -> ()
                             | action ->
-                                let! claimed = tryClaimNudgeDispatch root sessionId action snapshot.nudgeAnchorKey
+                                let! claimed =
+                                    tryClaimNudgeDispatch root sessionId action snapshot.nudgeAnchorKey "" "" 0 0 ""
 
                                 if not claimed then
                                     ()

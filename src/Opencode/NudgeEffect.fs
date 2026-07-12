@@ -25,6 +25,20 @@ open Wanxiangshu.Shell.FallbackRuntimeState
 
 let private invoke1 (arg: obj) (method: string) (target: obj) : JS.Promise<obj> = unbox (target?(method) (arg))
 
+let private invokeClient (client: obj) (method_: string) (arg: obj) : JS.Promise<obj> =
+    if Dyn.isNullish client then
+        Promise.lift (unbox null)
+    else
+        match getSessionApiFromClient client with
+        | Error _ -> Promise.lift (unbox null)
+        | Ok session ->
+            let api: obj = Dyn.get session method_
+
+            if Dyn.isNullish api then
+                Promise.lift (unbox null)
+            else
+                unbox<JS.Promise<obj>> (Dyn.callMethod1 session method_ arg)
+
 let private collectSnapshot
     (fallbackRuntime: FallbackRuntimeState)
     (client: obj)
@@ -167,14 +181,15 @@ let private sendNudge
     (agentOpt: string option)
     (modelOpt: string option)
     (promptText: string)
+    (nudgeId: string)
+    (nonce: string)
     : JS.Promise<unit> =
     promise {
         let sidStr = Id.sessionIdValue sessionID
-        let nudgeNonce = "nudge_" + System.Guid.NewGuid().ToString("N")
-        fallbackRuntime.SetActiveNudgeNonce sidStr nudgeNonce
+        fallbackRuntime.SetActiveNudgeNonce sidStr nonce
 
         let body =
-            createPromptBodyWithModelAndNonce agentOpt modelOpt promptText (Some nudgeNonce)
+            createPromptBodyWithModelAndNonce agentOpt modelOpt promptText (Some nonce)
 
         let promptArg =
             box
@@ -197,10 +212,12 @@ let private sendNudgeOutcome
     (promptText: string)
     (agentOpt: string option)
     (modelOpt: string option)
+    (nudgeId: string)
+    (nonce: string)
     : JS.Promise<SendOutcome> =
     promise {
         let! caught =
-            sendNudge fallbackRuntime client sessionID agentOpt modelOpt promptText
+            sendNudge fallbackRuntime client sessionID agentOpt modelOpt promptText nudgeId nonce
             |> Promise.result
 
         return
@@ -225,14 +242,22 @@ let startNudgeFlow
     let sid = Id.sessionIdValue sessionID
     let root = pluginDirectoryFromCtx pluginCtx
 
+    let abortRun sessionIDStr =
+        promise {
+            let arg = box {| path = box {| id = sessionIDStr |} |}
+            do! invokeClient client "abort" arg |> Promise.map ignore
+        }
+
     runNudgeFlowCore
         host
         root
+        fallbackRuntime
         runtimeState
         sid
         (fun () -> collectSnapshot fallbackRuntime client pluginCtx sessionID isForceStopped)
-        (fun promptText agentOpt modelOpt ->
-            sendNudgeOutcome fallbackRuntime client sessionID promptText agentOpt modelOpt)
+        (fun promptText agentOpt modelOpt nudgeId nonce ->
+            sendNudgeOutcome fallbackRuntime client sessionID promptText agentOpt modelOpt nudgeId nonce)
+        abortRun
 
 let dispatchPostStopFromHistory
     (host: Host)

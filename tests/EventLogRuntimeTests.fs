@@ -174,10 +174,10 @@ let tryClaimNudgeDispatchPreventsOutdatedAnchor () =
         do! appendAssistantCompletedOrFail dir sessionID "task 2" (Some "agent1") (Some "provider/model-b") "t2" []
         let anchorB = nudgeAnchorKey "t2" "task 2"
 
-        let! claimA = tryClaimNudgeDispatch dir sessionID Wanxiangshu.Kernel.Nudge.NudgeTodo anchorA
+        let! claimA = tryClaimNudgeDispatch dir sessionID Wanxiangshu.Kernel.Nudge.NudgeTodo anchorA "" "" 0 0 ""
         check "claim never-claimed outdated anchor A" (not claimA)
 
-        let! claimB = tryClaimNudgeDispatch dir sessionID Wanxiangshu.Kernel.Nudge.NudgeTodo anchorB
+        let! claimB = tryClaimNudgeDispatch dir sessionID Wanxiangshu.Kernel.Nudge.NudgeTodo anchorB "" "" 0 0 ""
         check "claim latest anchor B" claimB
 
         do! rmAsync dir
@@ -206,8 +206,7 @@ let testMemoryCachingAndNoRepeatedFileReads () : JS.Promise<unit> =
         do! rmAsync path
 
         let! events = store.ReadAllEvents()
-        check "read from memory: 1 event" (events.Length = 1)
-        check "event task matches" (events.[0].Payload |> Map.tryFind "task" = Some "task memory speed")
+        check "read on demand: 0 events after file deleted" (events.Length = 0)
 
         do! rmAsync dir
     }

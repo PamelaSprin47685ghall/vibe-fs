@@ -28,8 +28,22 @@ let tryClaimNudgeDispatch
     (sessionID: string)
     (action: NudgeAction)
     (anchor: string)
+    (nudgeId: string)
+    (nonce: string)
+    (sessionGen: int)
+    (cancelGen: int)
+    (humanTurnId: string)
     : JS.Promise<bool> =
-    getStore(workspaceRoot).TryClaimNudgeDispatch sessionID action anchor isNudgeBlockedForAnchor
+    getStore(workspaceRoot).TryClaimNudgeDispatch
+        sessionID
+        action
+        anchor
+        nudgeId
+        nonce
+        sessionGen
+        cancelGen
+        humanTurnId
+        isNudgeBlockedForAnchor
 
 let getNudgeSnapshotFromEventLog (workspaceRoot: string) (sessionID: string) : JS.Promise<NudgeSnapshotState> =
     promise {

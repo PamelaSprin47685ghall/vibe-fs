@@ -15,6 +15,15 @@ type PendingLease =
       PromptText: string option
       Status: string }
 
+type NudgeLease =
+    { NudgeID: string
+      Nonce: string
+      HumanTurnID: string
+      SessionGeneration: int
+      CancelGeneration: int
+      Owner: string
+      Status: string }
+
 let private freshState: SessionFallbackState =
     { Phase = FallbackPhase.Idle
       CurrentIndex = 0
@@ -42,9 +51,11 @@ type FallbackRuntimeState() =
     let mutable activeContinuationCancelGens = Map.ofList<string, int> []
     let mutable sessionOwners = Map.ofList<string, string> []
     let mutable pendingLeases = Map.empty<string, obj>
+    let mutable pendingNudgeLeases = Map.empty<string, NudgeLease>
     let mutable activeCompactionIds = Map.empty<string, string>
     let mutable forceStoppedSessions = Set.empty<string>
     let mutable compactedSessions = Set.empty<string>
+    let mutable compactionContinuationObserved = Set.empty<string>
     let mutable activeNudgeNonces = Map.empty<string, string>
 
     let triggerStateChanged (sessionID: string) : unit =
@@ -171,6 +182,15 @@ type FallbackRuntimeState() =
     member _.ClearPendingLease(sessionID: string) : unit =
         pendingLeases <- Map.remove sessionID pendingLeases
 
+    member _.SetPendingNudgeLease(sessionID: string, lease: NudgeLease) : unit =
+        pendingNudgeLeases <- Map.add sessionID lease pendingNudgeLeases
+
+    member _.TryGetPendingNudgeLease(sessionID: string) : NudgeLease option =
+        Map.tryFind sessionID pendingNudgeLeases
+
+    member _.ClearPendingNudgeLease(sessionID: string) : unit =
+        pendingNudgeLeases <- Map.remove sessionID pendingNudgeLeases
+
     member _.SetActiveCompactionId(sessionID: string, id: string) : unit =
         activeCompactionIds <- Map.add sessionID id activeCompactionIds
 
@@ -193,6 +213,17 @@ type FallbackRuntimeState() =
 
     member _.IsCompacted(sessionID: string) : bool =
         Set.contains sessionID compactedSessions
+
+    member _.SetCompactionContinuationObserved (sessionID: string) (value: bool) : unit =
+        if value then
+            compactionContinuationObserved <- Set.add sessionID compactionContinuationObserved
+        else
+            compactionContinuationObserved <- Set.remove sessionID compactionContinuationObserved
+
+        triggerStateChanged sessionID
+
+    member _.IsCompactionContinuationObserved(sessionID: string) : bool =
+        Set.contains sessionID compactionContinuationObserved
 
     member _.GetActiveCompactionId(sessionID: string) : string =
         Map.tryFind sessionID activeCompactionIds |> Option.defaultValue ""
@@ -343,5 +374,7 @@ type FallbackRuntimeState() =
         activeCompactionIds <- Map.remove sessionID activeCompactionIds
         forceStoppedSessions <- Set.remove sessionID forceStoppedSessions
         compactedSessions <- Set.remove sessionID compactedSessions
+        compactionContinuationObserved <- Set.remove sessionID compactionContinuationObserved
         activeNudgeNonces <- Map.remove sessionID activeNudgeNonces
+        pendingNudgeLeases <- Map.remove sessionID pendingNudgeLeases
         triggerStateChanged sessionID

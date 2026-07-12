@@ -34,6 +34,18 @@ let private parseAtMs (raw: string) : int64 option =
 
 let fallbackInjectionFolder (st: FallbackInjectionState) (e: WanEvent) : FallbackInjectionState =
     if
+        e.Kind = eventKindContinuationSettled
+        || e.Kind = eventKindContinuationFailed
+        || e.Kind = eventKindContinuationCancelled
+    then
+        let contIdOpt = payloadField "continuationId" e
+
+        match contIdOpt with
+        | Some cid when cid <> "" ->
+            { st with
+                ProcessedContinuationIds = Set.remove cid st.ProcessedContinuationIds }
+        | _ -> st
+    elif
         e.Kind <> eventKindFallbackContinueInjected
         && e.Kind <> eventKindContinuationDispatched
     then

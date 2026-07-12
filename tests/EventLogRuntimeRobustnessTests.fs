@@ -73,7 +73,7 @@ let testTryClaimNudgeDispatchFailsMemoryNotPolluted () =
         let isBlocked _ _ = false
 
         let! claimRes =
-            store.TryClaimNudgeDispatch sessionId NudgeTodo anchor isBlocked
+            store.TryClaimNudgeDispatch sessionId NudgeTodo anchor "" "" 0 0 "" isBlocked
             |> Promise.result
 
         match claimRes with

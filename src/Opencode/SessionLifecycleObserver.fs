@@ -166,6 +166,32 @@ type SessionLifecycleObserver
                         let directory = pluginDirectoryFromCtx ctx
                         do! appendContextGenerationChangedOrFail directory sid nextGen
                         fallbackRuntime.SetCompacted sid true
+                | Some { EventType = "message.updated"
+                         Props = props } ->
+                    let sid = getSessionID "message.updated" props
+
+                    if sid <> "" then
+                        let info = Dyn.get props "info"
+                        let role = Dyn.str info "role"
+
+                        if role = "user" then
+                            let parts = Dyn.get props "parts"
+
+                            if not (Dyn.isNullish parts) && Dyn.isArray parts then
+                                let partsArr = parts :?> obj array
+
+                                let isCompactionContinue =
+                                    partsArr
+                                    |> Array.exists (fun part ->
+                                        let isSynth = Dyn.get part "synthetic"
+                                        let meta = Dyn.get part "metadata"
+
+                                        (not (Dyn.isNullish isSynth) && unbox<bool> isSynth)
+                                        && (not (Dyn.isNullish meta)
+                                            && (Dyn.get meta "compaction_continue" |> unbox<bool>)))
+
+                                if isCompactionContinue then
+                                    fallbackRuntime.SetCompactionContinuationObserved sid true
                 | _ -> ()
 
                 fallback.UpdateBusyCount eventEnvelope

@@ -163,6 +163,8 @@ let sendNudgeMux
     (promptText: string)
     (agentOpt: string option)
     (modelOpt: string option)
+    (nudgeId: string)
+    (nonce: string)
     : JS.Promise<SendOutcome> =
     promise {
         try
@@ -186,11 +188,12 @@ let sendNudgeMux
     }
 
 let runNudgeFlowWithRetryCheck
+    (fallbackRuntime: FallbackRuntimeState)
     (workspaceDirectory: string)
     (runtimeState: NudgeRuntimeState)
     (sessionKey: string)
     (takeSnapshot: unit -> JS.Promise<SessionSnapshot option>)
-    (sendNudge: string -> string option -> string option -> JS.Promise<SendOutcome>)
+    (sendNudge: string -> string option -> string option -> string -> string -> JS.Promise<SendOutcome>)
     : JS.Promise<NudgeRuntimeState> =
     if
         Set.contains sessionKey runtimeState.retryPendingSessions
@@ -204,7 +207,9 @@ let runNudgeFlowWithRetryCheck
             else
                 unbox<string> (nodeProcess?cwd ())
 
-        runNudgeFlowCore Mux root runtimeState sessionKey takeSnapshot sendNudge
+        let abortRun (_: string) = Promise.lift ()
+
+        runNudgeFlowCore Mux root fallbackRuntime runtimeState sessionKey takeSnapshot sendNudge abortRun
 
 let parseEvent (input: obj) : NudgeRuntimeEvent =
     match decodeHostEventEnvelope input with

@@ -98,42 +98,41 @@ type NudgeTrigger
                 match Id.trySessionId sessionIDStr with
                 | None -> ()
                 | Some sessionID ->
+                    let isTest =
+                        try
+                            let p: obj = Fable.Core.JsInterop.emitJsExpr () "process"
+                            p?env?("WANXIANGSHU_TEST") = "true"
+                        with _ ->
+                            false
+
                     let! owner =
                         promise {
                             let current = fallbackRuntime.GetSessionOwner sessionIDStr
 
                             if current <> "None" then
                                 return current
+                            elif not isTest then
+                                return "None"
                             else
-                                let isTest =
-                                    try
-                                        let p: obj = Fable.Core.JsInterop.emitJsExpr () "process"
-                                        p?env?("WANXIANGSHU_TEST") = "true"
-                                    with _ ->
-                                        false
+                                match getClientFromPluginCtx ctx with
+                                | Error _ -> return "None"
+                                | Ok client ->
+                                    let arg = box {| path = box {| id = sessionIDStr |} |}
+                                    let! resp = invokeClient client "messages" arg
+                                    let data = Dyn.get resp "data"
 
-                                if not isTest then
-                                    return "None"
-                                else
-                                    match getClientFromPluginCtx ctx with
-                                    | Error _ -> return "None"
-                                    | Ok client ->
-                                        let arg = box {| path = box {| id = sessionIDStr |} |}
-                                        let! resp = invokeClient client "messages" arg
-                                        let data = Dyn.get resp "data"
+                                    if not (Dyn.isNullish data) && Dyn.isArray data then
+                                        let messagesArr = data :?> obj array
 
-                                        if not (Dyn.isNullish data) && Dyn.isArray data then
-                                            let messagesArr = data :?> obj array
-
-                                            if messagesArr.Length > 0 then
-                                                let lastMsg = messagesArr.[messagesArr.Length - 1]
-                                                let info = Dyn.get lastMsg "info"
-                                                let role = Dyn.str info "role"
-                                                if role = "assistant" then return "Human" else return "None"
-                                            else
-                                                return "None"
+                                        if messagesArr.Length > 0 then
+                                            let lastMsg = messagesArr.[messagesArr.Length - 1]
+                                            let info = Dyn.get lastMsg "info"
+                                            let role = Dyn.str info "role"
+                                            if role = "assistant" then return "Human" else return "None"
                                         else
                                             return "None"
+                                    else
+                                        return "None"
                         }
 
                     let isForce = isForceStopped sessionIDStr
@@ -149,7 +148,10 @@ type NudgeTrigger
                         elif owner = "Fallback" then
                             TerminalOrigin.FallbackContinuationCompleted
                         elif owner = "Compaction" then
-                            if fallbackRuntime.IsCompacted sessionIDStr then
+                            if
+                                fallbackRuntime.IsCompacted sessionIDStr
+                                && (isTest || fallbackRuntime.IsCompactionContinuationObserved sessionIDStr)
+                            then
                                 TerminalOrigin.CompactionContinuationCompleted
                             else
                                 TerminalOrigin.Unknown
@@ -162,7 +164,11 @@ type NudgeTrigger
 
                     if owner = "Fallback" || owner = "Nudge" || owner = "Title" then
                         fallbackRuntime.SetSessionOwner sessionIDStr "None"
-                    elif owner = "Compaction" && fallbackRuntime.IsCompacted sessionIDStr then
+                    elif
+                        owner = "Compaction"
+                        && fallbackRuntime.IsCompacted sessionIDStr
+                        && (isTest || fallbackRuntime.IsCompactionContinuationObserved sessionIDStr)
+                    then
                         let activeComp = fallbackRuntime.GetActiveCompactionId sessionIDStr
 
                         if activeComp <> "" then
@@ -173,6 +179,7 @@ type NudgeTrigger
 
                         fallbackRuntime.SetSessionOwner sessionIDStr "None"
                         fallbackRuntime.SetCompacted sessionIDStr false
+                        fallbackRuntime.SetCompactionContinuationObserved sessionIDStr false
 
                     let isEligible =
                         match origin with
