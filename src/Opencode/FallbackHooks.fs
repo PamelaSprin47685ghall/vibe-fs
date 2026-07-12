@@ -55,42 +55,7 @@ let private tryGetModelStringFromInfo (info: obj) : string option =
             else
                 Some(sprintf "%s/%s%s" providerID modelID suffix)
 
-let private isNewUserMessageImpl (runtime: FallbackRuntimeState) (sessionID: string) (rawEvent: obj) : bool =
-    let t = getEventType rawEvent
-
-    if t <> "message.updated" then
-        false
-    else
-        let props = getProps rawEvent
-        let info = Dyn.get props "info"
-
-        if Dyn.str info "role" <> "user" then
-            false
-        else
-            let parts = Dyn.get props "parts"
-            let text = getPartsText parts
-
-            if isSyntheticText text then
-                false
-            else
-                let msgTime =
-                    let time = Dyn.get info "time"
-
-                    if isNull time then
-                        0L
-                    else
-                        let completed = Dyn.get time "completed"
-
-                        if isNull completed then
-                            0L
-                        else
-                            match completed with
-                            | :? int64 as i -> i
-                            | :? float as f -> int64 f
-                            | :? int as i32 -> int64 i32
-                            | _ -> 0L
-
-                not (runtime.IsInjectedSince sessionID msgTime)
+let private isNewUserMessageImpl (runtime: FallbackRuntimeState) (sessionID: string) (rawEvent: obj) : bool = false
 
 let opencodeEventTranslator (runtime: FallbackRuntimeState) : IEventTranslator =
     { new IEventTranslator with
@@ -256,6 +221,12 @@ let opencodeActionExecutor (runtime: FallbackRuntimeState) (client: obj) : IActi
                            body = body |}
 
                 do! invokeClient client "prompt" arg |> Promise.map ignore
+            }
+
+        member _.AbortRun sessionID =
+            promise {
+                let arg = box {| path = box {| id = sessionID |} |}
+                do! invokeClient client "abort" arg |> Promise.map ignore
             }
 
     }

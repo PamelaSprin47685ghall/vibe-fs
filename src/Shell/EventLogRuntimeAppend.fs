@@ -271,13 +271,21 @@ let appendContinuationRequestedOrFail
     (modelStr: string)
     (agentStr: string)
     (atMs: int64)
+    (generation: int)
+    (cancelGeneration: int)
+    (humanTurnID: string)
+    (owner: string)
     : JS.Promise<unit> =
     let payload =
         Map
             [ "continuationId", continuationID
               "model", modelStr
               "agent", agentStr
-              "at", atMs.ToString() ]
+              "at", atMs.ToString()
+              "generation", generation.ToString()
+              "cancelGeneration", cancelGeneration.ToString()
+              "humanTurnId", humanTurnID
+              "owner", owner ]
 
     appendOrFail
         workspaceRoot

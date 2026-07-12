@@ -35,6 +35,8 @@ type FakeExecutor(?messages: obj array, ?currentModel: FallbackModel) =
 
         member _.CaptureCurrentModel(_sessionID: string) : JS.Promise<FallbackModel option> = Promise.lift currentModel
 
+        member _.AbortRun(_sessionID: string) : JS.Promise<unit> = Promise.lift ()
+
     member _.ContinueCalls = continueCalls |> Seq.toList
     member _.RecoverCalls = recoverCalls |> Seq.toList
     member _.PropagateCalls = propagateCalls |> Seq.toList

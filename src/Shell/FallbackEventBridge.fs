@@ -29,6 +29,7 @@ type IActionExecutor =
     abstract PropagateFailure: sessionID: string -> JS.Promise<unit>
     abstract CaptureCurrentModel: sessionID: string -> JS.Promise<FallbackModel option>
     abstract RecoverWithPrompt: sessionID: string * model: FallbackModel * promptText: string -> JS.Promise<unit>
+    abstract AbortRun: sessionID: string -> JS.Promise<unit>
 
 type ConfigLookup = (string -> FallbackConfig)
 
@@ -66,6 +67,7 @@ let verifyLease (runtime: FallbackRuntimeState) (sessionID: string) (lease: Pend
         && lease.HumanTurnID = currentTurnId
         && lease.CancelGeneration = currentCancelGen
         && currentOwner = "Fallback"
+        && not (runtime.IsForceStopped sessionID)
         && (match stateOpt with
             | Some s -> s.Lifecycle = FallbackLifecycle.Active
             | None -> false)
@@ -106,20 +108,48 @@ let executeContinuationIntent
                 try
                     do! executor.SendContinue(sessionID, model)
 
-                    let dispatchedLease = { lease with Status = "dispatched" }
-                    runtime.SetPendingLease(sessionID, dispatchedLease)
+                    let currentCancelGen = runtime.GetCancelGeneration sessionID
 
-                    let modelStr =
-                        match model.Variant with
-                        | Some v -> model.ProviderID + "/" + model.ModelID + ":" + v
-                        | None -> model.ProviderID + "/" + model.ModelID
+                    let isCancelled =
+                        currentCancelGen > cancelGen
+                        || (match runtime.TryGetPendingLease sessionID with
+                            | Some pending -> pending.Status = "cancelled"
+                            | None -> true)
 
-                    let atMs = getTimestampMs ()
-                    runtime.SetInjectedAt sessionID atMs
-                    runtime.SetInjectedModel sessionID model
+                    if isCancelled then
+                        do! executor.AbortRun sessionID
+                        let cancelledLease = { lease with Status = "cancelled" }
+                        runtime.SetPendingLease(sessionID, cancelledLease)
 
-                    do! appendContinuationDispatchedOrFail workspaceRoot sessionID continuationID modelStr agent atMs
-                    do! appendFallbackContinueInjectedOrFail workspaceRoot sessionID modelStr agent atMs
+                        do!
+                            appendContinuationCancelledOrFail
+                                workspaceRoot
+                                sessionID
+                                continuationID
+                                "Cancelled after dispatch"
+                    else
+                        let dispatchedLease = { lease with Status = "dispatched" }
+                        runtime.SetPendingLease(sessionID, dispatchedLease)
+
+                        let modelStr =
+                            match model.Variant with
+                            | Some v -> model.ProviderID + "/" + model.ModelID + ":" + v
+                            | None -> model.ProviderID + "/" + model.ModelID
+
+                        let atMs = getTimestampMs ()
+                        runtime.SetInjectedAt sessionID atMs
+                        runtime.SetInjectedModel sessionID model
+
+                        do!
+                            appendContinuationDispatchedOrFail
+                                workspaceRoot
+                                sessionID
+                                continuationID
+                                modelStr
+                                agent
+                                atMs
+
+                        do! appendFallbackContinueInjectedOrFail workspaceRoot sessionID modelStr agent atMs
                 with ex ->
                     let failedLease = { lease with Status = "failed" }
                     runtime.SetPendingLease(sessionID, failedLease)
@@ -151,16 +181,44 @@ let executeContinuationIntent
                 try
                     do! executor.RecoverWithPrompt(sessionID, model, promptText)
 
-                    let dispatchedLease = { lease with Status = "dispatched" }
-                    runtime.SetPendingLease(sessionID, dispatchedLease)
+                    let currentCancelGen = runtime.GetCancelGeneration sessionID
 
-                    let modelStr =
-                        match model.Variant with
-                        | Some v -> model.ProviderID + "/" + model.ModelID + ":" + v
-                        | None -> model.ProviderID + "/" + model.ModelID
+                    let isCancelled =
+                        currentCancelGen > cancelGen
+                        || (match runtime.TryGetPendingLease sessionID with
+                            | Some pending -> pending.Status = "cancelled"
+                            | None -> true)
 
-                    let atMs = getTimestampMs ()
-                    do! appendContinuationDispatchedOrFail workspaceRoot sessionID continuationID modelStr agent atMs
+                    if isCancelled then
+                        do! executor.AbortRun sessionID
+                        let cancelledLease = { lease with Status = "cancelled" }
+                        runtime.SetPendingLease(sessionID, cancelledLease)
+
+                        do!
+                            appendContinuationCancelledOrFail
+                                workspaceRoot
+                                sessionID
+                                continuationID
+                                "Cancelled after dispatch"
+                    else
+                        let dispatchedLease = { lease with Status = "dispatched" }
+                        runtime.SetPendingLease(sessionID, dispatchedLease)
+
+                        let modelStr =
+                            match model.Variant with
+                            | Some v -> model.ProviderID + "/" + model.ModelID + ":" + v
+                            | None -> model.ProviderID + "/" + model.ModelID
+
+                        let atMs = getTimestampMs ()
+
+                        do!
+                            appendContinuationDispatchedOrFail
+                                workspaceRoot
+                                sessionID
+                                continuationID
+                                modelStr
+                                agent
+                                atMs
                 with ex ->
                     let failedLease = { lease with Status = "failed" }
                     runtime.SetPendingLease(sessionID, failedLease)
@@ -343,9 +401,11 @@ let handleEvent
                     evt = FallbackEvent.SessionIdle
                     && runtime.GetSessionOwner sessionID = "Compaction"
                 then
-                    let activeComp = runtime.GetActiveCompactionId sessionID
-                    do! appendCompactionSettledOrFail workspaceRoot sessionID activeComp "completed"
-                    runtime.SetSessionOwner sessionID "None"
+                    if runtime.IsCompacted sessionID then
+                        let activeComp = runtime.GetActiveCompactionId sessionID
+                        do! appendCompactionSettledOrFail workspaceRoot sessionID activeComp "completed"
+                        runtime.SetSessionOwner sessionID "None"
+                        runtime.SetCompacted sessionID false
 
                 let agentName = runtime.GetAgentName sessionID
                 let cfg = configLookup agentName
@@ -404,7 +464,19 @@ let handleEvent
                     if isAborting then
                         do! appendUserAbortObservedOrFail workspaceRoot sessionID
                         let _ = runtime.IncrementCancelGeneration sessionID
-                        ()
+
+                        match runtime.TryGetPendingLease sessionID with
+                        | Some lease ->
+                            let cancelledLease = { lease with Status = "cancelled" }
+                            runtime.SetPendingLease(sessionID, cancelledLease)
+
+                            do!
+                                appendContinuationCancelledOrFail
+                                    workspaceRoot
+                                    sessionID
+                                    lease.ContinuationID
+                                    "User aborted"
+                        | None -> ()
 
                     let mutable finalState = ns
 
@@ -415,7 +487,8 @@ let handleEvent
                         || (ns.Phase = FallbackPhase.Idle && action = FallbackAction.DoNothing)
 
                     if terminalStates then
-                        runtime.SetSessionOwner sessionID "None"
+                        // runtime.SetSessionOwner sessionID "None"
+                        ()
 
                     let! (finalState2, intentOpt) =
                         promise {
@@ -459,6 +532,10 @@ let handleEvent
                                         modelStr
                                         agent
                                         atMs
+                                        currentGen
+                                        currentCancelGen
+                                        (runtime.GetHumanTurnId sessionID)
+                                        "Fallback"
 
                                 let intent =
                                     SendContinueIntent(
@@ -509,6 +586,10 @@ let handleEvent
                                         modelStr
                                         agent
                                         (getTimestampMs ())
+                                        currentGen
+                                        currentCancelGen
+                                        (runtime.GetHumanTurnId sessionID)
+                                        "Fallback"
 
                                 let intent =
                                     RecoverWithPromptIntent(
@@ -533,7 +614,7 @@ let handleEvent
                                             Lifecycle = FallbackLifecycle.TaskComplete }
 
                                     runtime.UpdateState sessionID updated
-                                    runtime.SetSessionOwner sessionID "None"
+                                    // runtime.SetSessionOwner sessionID "None"
                                     return updated, None
                                 else
                                     match FallbackMessageCodec.scanToolCallAsText msgs with
@@ -581,6 +662,10 @@ let handleEvent
                                                     modelStr
                                                     agent
                                                     (getTimestampMs ())
+                                                    currentGen
+                                                    currentCancelGen
+                                                    (runtime.GetHumanTurnId sessionID)
+                                                    "Fallback"
 
                                             let intent =
                                                 RecoverWithPromptIntent(
@@ -597,7 +682,7 @@ let handleEvent
                                         | None ->
                                             let updated = { ns with Phase = FallbackPhase.Idle }
                                             runtime.UpdateState sessionID updated
-                                            runtime.SetSessionOwner sessionID "None"
+                                            // runtime.SetSessionOwner sessionID "None"
                                             return updated, None
                                     | None ->
                                         let isToolFinish = FallbackMessageCodec.isLastAssistantToolFinish msgs
@@ -616,7 +701,8 @@ let handleEvent
                                         runtime.UpdateState sessionID updated
 
                                         if updated.Lifecycle = FallbackLifecycle.TaskComplete then
-                                            runtime.SetSessionOwner sessionID "None"
+                                            // runtime.SetSessionOwner sessionID "None"
+                                            ()
 
                                         return updated, None
                             | FallbackAction.PropagateFailure -> return finalState, Some PropagateFailureIntent

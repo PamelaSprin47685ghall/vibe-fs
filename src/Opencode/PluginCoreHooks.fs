@@ -83,6 +83,11 @@ let registerHooks (result: obj) (host: Host) (ctx: obj) (services: CoreServices)
 
     setKey
         result
+        "experimental.compaction.autocontinue"
+        (twoArgHook (fun input output -> compactionAutocontinue input output))
+
+    setKey
+        result
         "command.execute.before"
         (twoArgHook (fun input output ->
             promise {
@@ -123,6 +128,7 @@ let registerHooks (result: obj) (host: Host) (ctx: obj) (services: CoreServices)
                     if ptyCleanupSessionId <> "" then
                         cleanupPtyBySession ptyCleanupSessionId
                         Wanxiangshu.Shell.LivelockGuard.cleanup services.RuntimeScope ptyCleanupSessionId
+                        services.FallbackRuntime.CleanupSession ptyCleanupSessionId
 
                     do! services.SessionLifecycleObserver.handleEvent input
                 }))

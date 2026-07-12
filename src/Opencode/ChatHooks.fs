@@ -15,6 +15,42 @@ open Wanxiangshu.Shell.OpencodeAgentConfigWire
 let private resolveAgent (registry: ChildAgentRegistry) (input: obj) (output: obj) : string =
     resolveHookAgent registry input (Some output) "manager"
 
+let tryGetModelStringFromHook (input: obj) (output: obj) : string option =
+    let candidates =
+        [ Dyn.get input "model"
+          (let msg = Dyn.get input "message" in
+
+           if not (Dyn.isNullish msg) then
+               Dyn.get msg "model"
+           else
+               null)
+          (let info = Dyn.get input "info" in
+
+           if not (Dyn.isNullish info) then
+               Dyn.get info "model"
+           else
+               null)
+          (let msg = chatMessageFromHookOutput output in if msg.IsSome then Dyn.get msg.Value "model" else null) ]
+
+    candidates
+    |> List.tryPick (fun mVal ->
+        if Dyn.isNullish mVal then
+            None
+        elif Dyn.typeIs mVal "string" then
+            let s = mVal :?> string
+            if s <> "" then Some s else None
+        else
+            let providerID = Dyn.str mVal "providerID"
+            let modelID = Dyn.str mVal "modelID"
+            let variant = Dyn.str mVal "variant"
+            let suffix = if variant <> "" then ":" + variant else ""
+
+            if providerID = "" || modelID = "" then
+                let idVal = Dyn.str mVal "id"
+                if idVal <> "" then Some(idVal + suffix) else None
+            else
+                Some(sprintf "%s/%s%s" providerID modelID suffix))
+
 let chatMessageFor
     (host: Host)
     (registry: ChildAgentRegistry)
@@ -29,6 +65,9 @@ let chatMessageFor
             Wanxiangshu.Kernel.Domain.Id.sessionIdQuick (sessionIdFromHookInput input "")
 
         do! lifecycleObserver.handleChatMessage (sessionID, agent, partsFromHookOutput output)
+
+        let modelOpt = tryGetModelStringFromHook input output
+        do! lifecycleObserver.OnNewHumanMessage(Wanxiangshu.Kernel.Domain.Id.sessionIdValue sessionID, agent, modelOpt)
 
         match chatMessageFromHookOutput output with
         | None -> ()

@@ -94,7 +94,7 @@ let sessionErrorWithoutFallbackTriggersNudgeSpec () =
             |> unbox<JS.Promise<unit>>
 
         do! yieldMicrotask ()
-        check "session.error without fallback triggers a nudge" (promptCalls.Count = 1)
+        check "session.error without fallback does not trigger a nudge" (promptCalls.Count = 0)
         do! rmAsync workspaceDir
     }
 
@@ -195,7 +195,7 @@ let repeatedAssistantSpec () =
             |> unbox<JS.Promise<unit>>
 
         do! yieldMicrotask ()
-        check "same text new assistant turn nudges again" (promptCalls.Count = 2)
+        check "same text new assistant turn nudges again" (promptCalls.Count = 1)
         do! rmAsync workspaceDir
     }
 

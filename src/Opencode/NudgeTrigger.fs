@@ -15,6 +15,7 @@ open Wanxiangshu.Shell.OpencodeHookInputCodec
 open Wanxiangshu.Shell.ToolRuntimeContext
 open Wanxiangshu.Shell.EventLogRuntime
 open Wanxiangshu.Opencode.NudgeEffect
+open Wanxiangshu.Opencode.FallbackHooksHelper
 
 type NudgeTrigger
     (
@@ -97,19 +98,51 @@ type NudgeTrigger
                 match Id.trySessionId sessionIDStr with
                 | None -> ()
                 | Some sessionID ->
-                    let owner = fallbackRuntime.GetSessionOwner sessionIDStr
+                    let! owner =
+                        promise {
+                            let current = fallbackRuntime.GetSessionOwner sessionIDStr
+
+                            if current <> "None" then
+                                return current
+                            else
+                                match getClientFromPluginCtx ctx with
+                                | Error _ -> return "None"
+                                | Ok client ->
+                                    let arg = box {| path = box {| id = sessionIDStr |} |}
+                                    let! resp = invokeClient client "messages" arg
+                                    let data = Dyn.get resp "data"
+
+                                    if not (Dyn.isNullish data) && Dyn.isArray data then
+                                        let messagesArr = data :?> obj array
+
+                                        if messagesArr.Length > 0 then
+                                            let lastMsg = messagesArr.[messagesArr.Length - 1]
+                                            let info = Dyn.get lastMsg "info"
+                                            let role = Dyn.str info "role"
+                                            if role = "assistant" then return "Human" else return "None"
+                                        else
+                                            return "None"
+                                    else
+                                        return "None"
+                        }
+
                     let isForce = isForceStopped sessionIDStr
 
                     let origin =
-                        if owner = "Human" || owner = "None" then
+                        if owner = "Human" then
                             if isForce then
                                 TerminalOrigin.HumanTurnAborted
                             else
                                 TerminalOrigin.HumanTurnCompleted
+                        elif owner = "None" then
+                            TerminalOrigin.Unknown
                         elif owner = "Fallback" then
                             TerminalOrigin.FallbackContinuationCompleted
                         elif owner = "Compaction" then
-                            TerminalOrigin.CompactionSummaryCompleted
+                            if fallbackRuntime.IsCompacted sessionIDStr then
+                                TerminalOrigin.CompactionSummaryCompleted
+                            else
+                                TerminalOrigin.Unknown
                         elif owner = "Nudge" then
                             TerminalOrigin.NudgeCompleted
                         elif owner = "Title" then
@@ -117,9 +150,12 @@ type NudgeTrigger
                         else
                             TerminalOrigin.Unknown
 
+                    if owner = "Fallback" || owner = "Nudge" || owner = "Title" then
+                        fallbackRuntime.SetSessionOwner sessionIDStr "None"
+
                     let isEligible =
                         match origin with
-                        | TerminalOrigin.HumanTurnCompleted -> true
+                        | TerminalOrigin.HumanTurnCompleted when eventType <> "session.error" -> true
                         | _ -> false
 
                     if
@@ -131,6 +167,7 @@ type NudgeTrigger
                         | Ok client ->
                             try
                                 fallbackRuntime.SetNudgeActive sessionIDStr true
+                                fallbackRuntime.SetSessionOwner sessionIDStr "Nudge"
 
                                 let dispatchPostStop
                                     : Host

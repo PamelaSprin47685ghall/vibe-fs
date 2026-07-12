@@ -49,6 +49,44 @@ let restoreFallbackRuntimeState
                     |> Option.defaultValue Wanxiangshu.Kernel.FallbackKernel.Types.FallbackPhase.Idle }
 
         rt.UpdateState sid updatedFallbackState
+
+        match state.SessionOwner with
+        | Some o -> rt.SetSessionOwner sid o
+        | None -> ()
+
+        match state.PendingLease with
+        | Some lease ->
+            let modelObj =
+                match Wanxiangshu.Shell.FallbackMessageCodec.decodeModelFromObj (box lease.Model) with
+                | Some m -> m
+                | None ->
+                    { ProviderID = ""
+                      ModelID = lease.Model
+                      Variant = None
+                      Temperature = None
+                      TopP = None
+                      MaxTokens = None
+                      ReasoningEffort = None
+                      Thinking = false }
+
+            let pendingLease: Wanxiangshu.Shell.FallbackRuntimeState.PendingLease =
+                { ContinuationID = lease.ContinuationID
+                  SessionGeneration = lease.SessionGeneration
+                  HumanTurnID = lease.HumanTurnID
+                  CancelGeneration = lease.CancelGeneration
+                  Owner = lease.Owner
+                  Model = modelObj
+                  PromptText = lease.PromptText
+                  Status = lease.Status }
+
+            rt.SetPendingLease(sid, pendingLease)
+        | None -> rt.ClearPendingLease sid
+
+        match state.ActiveCompactionId with
+        | Some cid -> rt.SetActiveCompactionId(sid, cid)
+        | None -> ()
+
+        rt.SetCompacted sid state.IsCompacted
     | None -> ()
 
 let syncAllSessionsFromEventLogDedicated

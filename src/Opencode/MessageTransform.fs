@@ -215,6 +215,22 @@ let messagesTransform
 
 let private invoke1 (arg: obj) (method: string) (target: obj) : JS.Promise<obj> = unbox (target?(method) (arg))
 
+let private invokeClient (client: obj) (method_: string) (arg: obj) : JS.Promise<obj> =
+    if Dyn.isNullish client then
+        Promise.lift (unbox null)
+    else
+        match getSessionApiFromClient client with
+        | Error _ -> Promise.lift (unbox null)
+        | Ok session ->
+            let api: obj = Dyn.get session method_
+
+            if Dyn.isNullish api then
+                Promise.lift (unbox null)
+            else
+                unbox<JS.Promise<obj>> (Dyn.callMethod1 session method_ arg)
+
+let compactionAutocontinue (input: obj) (output: obj) : JS.Promise<unit> = promise { output?enabled <- true }
+
 let systemTransform (directory: string) (_input: obj) (output: obj) : JS.Promise<unit> =
     promise { setSystemOutputToDirectory directory output }
 
@@ -225,7 +241,7 @@ let compactingTransform
     (directory: string)
     (runtimeScope: Wanxiangshu.Shell.RuntimeScope.RuntimeScope)
     (backlogSession: BacklogSession)
-    (_client: obj)
+    (client: obj)
     (input: obj)
     (output: obj)
     : JS.Promise<unit> =
@@ -233,46 +249,59 @@ let compactingTransform
         runtimeScope.TriggerInit(directory)
         do! runtimeScope.WaitInit()
 
-        let messagesArr =
-            let fromInput = Dyn.get input "messages"
+        let sessionID = Dyn.str input "sessionID"
 
-            if not (Dyn.isNullish fromInput) && Dyn.isArray fromInput then
-                fromInput :?> obj array
-            else
-                let fromOutput = Dyn.get output "messages"
+        if sessionID <> "" then
+            let arg = box {| path = box {| id = sessionID |} |}
+            let! resp = invokeClient client "messages" arg
+            let data = Dyn.get resp "data"
 
-                if not (Dyn.isNullish fromOutput) && Dyn.isArray fromOutput then
-                    fromOutput :?> obj array
+            let messagesArr =
+                if not (Dyn.isNullish data) && Dyn.isArray data then
+                    data :?> obj array
                 else
                     [||]
 
-        if messagesArr.Length > 0 then
-            let messagesList = MessagingCodec.decodeMessages messagesArr
-            let sessionID = extractSessionID messagesList
-            let cleaned = Messaging.stripSyntheticBySource messagesList
-            let backlog = backlogSession.GetOrRebuildBacklog(sessionID, cleaned)
-            let guidGen () = string (runtimeScope.RandomGen())
+            if messagesArr.Length > 0 then
+                let messagesList = MessagingCodec.decodeMessages messagesArr
+                let cleaned = Messaging.stripSyntheticBySource messagesList
+                let backlog = backlogSession.GetOrRebuildBacklog(sessionID, cleaned)
+                let guidGen () = string (runtimeScope.RandomGen())
 
-            let fallbackRuntime =
-                match runtimeScope.TryFindKey("fallbackRuntime") with
-                | Some obj -> Some(unbox<Wanxiangshu.Shell.FallbackRuntimeState.FallbackRuntimeState> obj)
-                | None -> None
+                let fallbackRuntime =
+                    match runtimeScope.TryFindKey("fallbackRuntime") with
+                    | Some obj -> Some(unbox<Wanxiangshu.Shell.FallbackRuntimeState.FallbackRuntimeState> obj)
+                    | None -> None
 
-            let compactionId = "compact-" + System.Guid.NewGuid().ToString("N")
-            do! Wanxiangshu.Shell.EventLogRuntime.appendCompactionStartedOrFail directory sessionID compactionId
+                let compactionId = "compact-" + System.Guid.NewGuid().ToString("N")
+                do! Wanxiangshu.Shell.EventLogRuntime.appendCompactionStartedOrFail directory sessionID compactionId
 
-            match fallbackRuntime with
-            | Some fr ->
-                fr.SetSessionOwner sessionID "Compaction"
-                fr.SetActiveCompactionId(sessionID, compactionId)
-            | None -> ()
+                match fallbackRuntime with
+                | Some fr ->
+                    fr.SetSessionOwner sessionID "Compaction"
+                    fr.SetActiveCompactionId(sessionID, compactionId)
+                    fr.SetCompacted sessionID false
+                | None -> ()
 
-            let result =
-                Wanxiangshu.Kernel.BacklogProjectionCore.compactingTransform cleaned backlog guidGen
+                let result =
+                    Wanxiangshu.Kernel.BacklogProjectionCore.compactingTransform cleaned backlog guidGen
 
-            let encoded = MessagingCodec.encodeMessages result
-            let promptBody = createPromptBodyWithModel None None zwsChar
+                let wrappedText =
+                    match result with
+                    | m :: _ ->
+                        match m.parts with
+                        | TextPart t :: _ -> t
+                        | _ -> ""
+                    | [] -> ""
 
-            output?context <- encoded
-            output?prompt <- promptBody
+                let currentContext =
+                    let c = Dyn.get output "context"
+
+                    if not (Dyn.isNullish c) && Dyn.isArray c then
+                        c :?> string array
+                    else
+                        [||]
+
+                output?context <- Array.append currentContext [| wrappedText |]
+                output?prompt <- zwsChar
     }

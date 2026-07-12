@@ -277,9 +277,9 @@
     <Compile Include="src/Opencode/NudgeEffect.fs"/>
     <Compile Include="src/Opencode/ProgressObserver.fs"/>
     <Compile Include="src/Opencode/FallbackCoordinator.fs"/>
+    <Compile Include="src/Opencode/FallbackHooksHelper.fs"/>
     <Compile Include="src/Opencode/NudgeTrigger.fs"/>
     <Compile Include="src/Opencode/SessionLifecycleObserver.fs"/>
-    <Compile Include="src/Opencode/FallbackHooksHelper.fs"/>
     <Compile Include="src/Opencode/FallbackHooks.fs"/>
     <Compile Include="src/Opencode/SubagentTypes.fs"/>
     <Compile Include="src/Opencode/SubagentSpawn.fs"/>

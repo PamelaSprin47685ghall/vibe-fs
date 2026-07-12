@@ -254,6 +254,16 @@ type HumanTurnState =
       Variant: string
       Agent: string }
 
+type ReplayLeaseState =
+    { ContinuationID: string
+      SessionGeneration: int
+      HumanTurnID: string
+      CancelGeneration: int
+      Owner: string
+      Model: string
+      PromptText: string option
+      Status: string }
+
 let private humanTurnFolder (st: HumanTurnState option) (e: WanEvent) : HumanTurnState option =
     if e.Kind = eventKindHumanTurnStarted then
         let turnId = payloadField "turnId" e |> Option.defaultValue ""
@@ -312,6 +322,87 @@ let private fallbackPhaseFolder (st: FallbackPhase option) (e: WanEvent) : Fallb
     | k when k = eventKindHumanTurnStarted -> Some FallbackPhase.Idle
     | _ -> st
 
+let private ownerAndLeaseFolder
+    (
+        owner: string option,
+        lease: ReplayLeaseState option,
+        compId: string option,
+        isCompacted: bool,
+        currentGen: int,
+        currentCancelGen: int,
+        latestHumanTurn: HumanTurnState option
+    )
+    (e: WanEvent)
+    =
+    match e.Kind with
+    | k when k = eventKindHumanTurnStarted -> Some "Human", None, None, false
+    | k when k = eventKindUserAbortObserved -> Some "None", None, None, false
+    | k when k = eventKindCompactionStarted ->
+        let cid = payloadField "compactionId" e
+        Some "Compaction", None, cid, false
+    | k when k = eventKindContextGenerationChanged -> owner, lease, compId, true
+    | k when k = eventKindCompactionSettled -> Some "None", None, None, false
+    | k when k = eventKindContinuationRequested ->
+        let contId = payloadField "continuationId" e |> Option.defaultValue ""
+        let model = payloadField "model" e |> Option.defaultValue ""
+        let agent = payloadField "agent" e |> Option.defaultValue ""
+
+        let gen =
+            e.Payload
+            |> Map.tryFind "generation"
+            |> Option.bind (fun s -> Some(int s))
+            |> Option.defaultValue currentGen
+
+        let cancelGen =
+            e.Payload
+            |> Map.tryFind "cancelGeneration"
+            |> Option.bind (fun s -> Some(int s))
+            |> Option.defaultValue currentCancelGen
+
+        let humanTurnId =
+            payloadField "humanTurnId" e
+            |> Option.orElse (latestHumanTurn |> Option.map (fun t -> t.TurnId))
+            |> Option.defaultValue ""
+
+        let ownerVal = payloadField "owner" e |> Option.defaultValue "Fallback"
+
+        let nextLease =
+            { ContinuationID = contId
+              SessionGeneration = gen
+              HumanTurnID = humanTurnId
+              CancelGeneration = cancelGen
+              Owner = ownerVal
+              Model = model
+              PromptText = None
+              Status = "requested" }
+
+        Some ownerVal, Some nextLease, compId, isCompacted
+    | k when k = eventKindContinuationDispatchStarted ->
+        let nextLease =
+            lease |> Option.map (fun l -> { l with Status = "dispatch_started" })
+
+        owner, nextLease, compId, isCompacted
+    | k when k = eventKindContinuationDispatched ->
+        let nextLease = lease |> Option.map (fun l -> { l with Status = "dispatched" })
+        owner, nextLease, compId, isCompacted
+    | k when k = eventKindContinuationFailed ->
+        let nextLease = lease |> Option.map (fun l -> { l with Status = "failed" })
+        owner, nextLease, compId, isCompacted
+    | k when k = eventKindContinuationCancelled ->
+        let nextLease = lease |> Option.map (fun l -> { l with Status = "cancelled" })
+        owner, nextLease, compId, isCompacted
+    | k when k = eventKindNudgeDispatched -> Some "Nudge", lease, compId, isCompacted
+    | k when k = eventKindAssistantCompleted ->
+        let nextOwner =
+            match owner with
+            | Some "Nudge" -> Some "None"
+            | _ -> owner
+
+        nextOwner, lease, compId, isCompacted
+    | k when k = eventKindNudgeDedupCleared || k = eventKindSubmitReviewWipRecorded ->
+        Some "None", lease, compId, isCompacted
+    | _ -> owner, lease, compId, isCompacted
+
 type SessionState =
     { ReviewLoop: ReviewLoopFold
       ReviewTask: string option
@@ -328,6 +419,10 @@ type SessionState =
       ActiveContinuationCancelGen: int
       FallbackLifecycle: FallbackLifecycle option
       FallbackPhase: FallbackPhase option
+      SessionOwner: string option
+      PendingLease: ReplayLeaseState option
+      ActiveCompactionId: string option
+      IsCompacted: bool
       ProcessedEventIds: Set<string>
       ProcessedMessageIds: Set<string>
       ProcessedPartIds: Set<string>
@@ -349,6 +444,10 @@ let emptySessionState () : SessionState =
       ActiveContinuationCancelGen = 0
       FallbackLifecycle = None
       FallbackPhase = None
+      SessionOwner = None
+      PendingLease = None
+      ActiveCompactionId = None
+      IsCompacted = false
       ProcessedEventIds = Set.empty
       ProcessedMessageIds = Set.empty
       ProcessedPartIds = Set.empty
@@ -402,6 +501,17 @@ let applyEvent (st: SessionState) (e: WanEvent) : SessionState =
         let nextLifecycle = fallbackLifecycleFolder st.FallbackLifecycle e
         let nextPhase = fallbackPhaseFolder st.FallbackPhase e
 
+        let nextOwner, nextLease, nextCompId, nextIsCompacted =
+            ownerAndLeaseFolder
+                (st.SessionOwner,
+                 st.PendingLease,
+                 st.ActiveCompactionId,
+                 st.IsCompacted,
+                 nextSessionGen,
+                 nextCancelGen,
+                 nextHumanTurn)
+                e
+
         { ReviewLoop = nextReviewLoop
           ReviewTask = ReviewLoopFold.activeTask nextReviewLoop
           Backlog =
@@ -423,6 +533,10 @@ let applyEvent (st: SessionState) (e: WanEvent) : SessionState =
           ActiveContinuationCancelGen = nextActiveCancelGen
           FallbackLifecycle = nextLifecycle
           FallbackPhase = nextPhase
+          SessionOwner = nextOwner
+          PendingLease = nextLease
+          ActiveCompactionId = nextCompId
+          IsCompacted = nextIsCompacted
           ProcessedEventIds = nextProcessedEventIds
           ProcessedMessageIds = nextProcessedMessageIds
           ProcessedPartIds = nextProcessedPartIds

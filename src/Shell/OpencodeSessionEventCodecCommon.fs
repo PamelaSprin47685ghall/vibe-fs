@@ -30,7 +30,8 @@ let pluginObservedHostEventTypes =
           "session.delete"
           "session.remove"
           "session.close"
-          "message.updated" ]
+          "message.updated"
+          "session.compacted" ]
 
 let isPluginObservedHostEvent (eventType: string) : bool =
     Set.contains eventType pluginObservedHostEventTypes

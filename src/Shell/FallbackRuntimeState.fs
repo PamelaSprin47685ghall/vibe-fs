@@ -44,6 +44,7 @@ type FallbackRuntimeState() =
     let mutable pendingLeases = Map.empty<string, obj>
     let mutable activeCompactionIds = Map.empty<string, string>
     let mutable forceStoppedSessions = Set.empty<string>
+    let mutable compactedSessions = Set.empty<string>
 
     let triggerStateChanged (sessionID: string) : unit =
         match Map.tryFind sessionID listeners with
@@ -171,6 +172,17 @@ type FallbackRuntimeState() =
 
     member _.SetActiveCompactionId(sessionID: string, id: string) : unit =
         activeCompactionIds <- Map.add sessionID id activeCompactionIds
+
+    member _.SetCompacted (sessionID: string) (value: bool) : unit =
+        if value then
+            compactedSessions <- Set.add sessionID compactedSessions
+        else
+            compactedSessions <- Set.remove sessionID compactedSessions
+
+        triggerStateChanged sessionID
+
+    member _.IsCompacted(sessionID: string) : bool =
+        Set.contains sessionID compactedSessions
 
     member _.GetActiveCompactionId(sessionID: string) : string =
         Map.tryFind sessionID activeCompactionIds |> Option.defaultValue ""
@@ -320,4 +332,5 @@ type FallbackRuntimeState() =
         pendingLeases <- Map.remove sessionID pendingLeases
         activeCompactionIds <- Map.remove sessionID activeCompactionIds
         forceStoppedSessions <- Set.remove sessionID forceStoppedSessions
+        compactedSessions <- Set.remove sessionID compactedSessions
         triggerStateChanged sessionID

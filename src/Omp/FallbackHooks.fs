@@ -248,6 +248,12 @@ let ompActionExecutor (runtime: FallbackRuntimeState) (sessionApi: obj) : IActio
                 do! invoke "sessionPrompt" arg |> Promise.map ignore
             }
 
+        member _.AbortRun sessionID =
+            promise {
+                let arg = box {| sessionId = sessionID |}
+                do! invoke "sessionAbort" arg |> Promise.map ignore
+            }
+
         member _.FetchMessages sessionID = fetchMessages sessionID
 
         member _.PropagateFailure(_sessionID: string) = Promise.lift ()

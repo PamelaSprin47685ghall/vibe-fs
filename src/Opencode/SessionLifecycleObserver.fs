@@ -14,6 +14,8 @@ module Dyn = Wanxiangshu.Shell.Dyn
 open Wanxiangshu.Shell.OpencodeHookInputCodec
 open Wanxiangshu.Shell.OpencodeSessionEventCodecCommon
 open Wanxiangshu.Shell.FallbackRuntimeState
+open Wanxiangshu.Shell.EventLogRuntime
+open Wanxiangshu.Shell.ToolRuntimeContext
 open Wanxiangshu.Opencode.ProgressObserver
 open Wanxiangshu.Opencode.FallbackCoordinator
 open Wanxiangshu.Opencode.NudgeTrigger
@@ -30,8 +32,6 @@ type SessionLifecycleObserver
         backlogSession: Wanxiangshu.Opencode.BacklogSession.BacklogSession
     ) =
 
-    let mutable forceStoppedSessions: Set<string> = Set.empty
-
     let resolvedUnitPromise () : JS.Promise<unit> = Promise.lift ()
 
     let progress = ProgressObserver(host, ctx, backlogSession, fallbackRuntime)
@@ -43,12 +43,70 @@ type SessionLifecycleObserver
             ctx
             fallbackRuntime
             reviewStore
-            (fun sid -> forceStoppedSessions <- Set.add sid forceStoppedSessions)
-            (fun sid -> forceStoppedSessions <- Set.remove sid forceStoppedSessions)
-            (fun sid -> Set.contains sid forceStoppedSessions)
+            (fun sid -> fallbackRuntime.MarkForceStopped sid)
+            (fun sid -> fallbackRuntime.RemoveForceStopped sid)
+            (fun sid -> fallbackRuntime.IsForceStopped sid)
 
     member _.handleChatMessage(sessionID: SessionId, agent: string, parts: obj) : JS.Promise<unit> =
         progress.OnChatMessage(sessionID, agent, parts)
+
+    member _.OnNewHumanMessage(sessionID: string, agent: string, modelOpt: string option) : JS.Promise<unit> =
+        promise {
+            let directory = if Dyn.isNullish ctx then "" else pluginDirectoryFromCtx ctx
+
+            if directory <> "" && fallbackRuntime.GetSessionOwner sessionID = "Compaction" then
+                let activeComp = fallbackRuntime.GetActiveCompactionId sessionID
+
+                if activeComp <> "" then
+                    do! appendCompactionSettledOrFail directory sessionID activeComp "cancelled"
+
+                fallbackRuntime.SetSessionOwner sessionID "None"
+
+            fallbackRuntime.SetChain sessionID []
+            fallbackRuntime.ClearModel sessionID
+            fallbackRuntime.ClearInjected sessionID
+            fallbackRuntime.SetSessionOwner sessionID "Human"
+            let turnId = fallbackRuntime.IncrementHumanTurnId sessionID
+            fallbackRuntime.RemoveForceStopped sessionID
+
+            let currentGen = fallbackRuntime.GetSessionGeneration sessionID
+            let currentCancelGen = fallbackRuntime.GetCancelGeneration sessionID
+            fallbackRuntime.SetActiveContinuationGeneration sessionID currentGen
+            fallbackRuntime.SetActiveContinuationCancelGeneration sessionID currentCancelGen
+
+            match modelOpt with
+            | Some m -> fallbackRuntime.SetLatestHumanModel sessionID m
+            | None -> fallbackRuntime.ClearLatestHumanModel sessionID
+
+            if agent <> "" then
+                fallbackRuntime.SetAgentName sessionID agent
+
+            let provider, model, variant =
+                match modelOpt with
+                | Some m ->
+                    match Wanxiangshu.Shell.FallbackMessageCodec.decodeModelFromObj (box m) with
+                    | Some modelObj ->
+                        modelObj.ProviderID, modelObj.ModelID, (modelObj.Variant |> Option.defaultValue "")
+                    | None -> "", m, ""
+                | None -> "", "", ""
+
+            if directory <> "" then
+                do! appendHumanTurnStartedOrFail directory sessionID turnId provider model variant agent
+
+            let state = fallbackRuntime.GetOrCreateState sessionID
+
+            let ns =
+                { state with
+                    Phase = FallbackPhase.Idle
+                    ContinueCount = 0
+                    FailureCount = 0
+                    Lifecycle = FallbackLifecycle.Active
+                    RecoveryCount = 0 }
+
+            fallbackRuntime.UpdateState sessionID ns
+            fallbackRuntime.SetConsumed sessionID false
+            fallbackRuntime.ClearConsumed sessionID
+        }
 
     member _.handleCommandExecuteBefore (input: obj) (_output: obj) : JS.Promise<unit> =
         let _sessionIDStr = sessionIdFromHookInput input ""
@@ -86,6 +144,16 @@ type SessionLifecycleObserver
                         match Wanxiangshu.Shell.FallbackMessageCodec.decodeModelFromObj modelObj with
                         | Some m -> fallbackRuntime.SetModel sid m
                         | None -> ()
+                | Some { EventType = "session.compacted"
+                         Props = props } ->
+                    let sid = getSessionID "session.compacted" props
+
+                    if sid <> "" then
+                        let nextGen = fallbackRuntime.GetSessionGeneration sid + 1
+                        fallbackRuntime.SetSessionGeneration sid nextGen
+                        let directory = pluginDirectoryFromCtx ctx
+                        do! appendContextGenerationChangedOrFail directory sid nextGen
+                        fallbackRuntime.SetCompacted sid true
                 | _ -> ()
 
                 fallback.UpdateBusyCount eventEnvelope

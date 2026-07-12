@@ -115,6 +115,8 @@ let muxActionExecutor (helpers: obj) : IActionExecutor =
 
         member _.CaptureCurrentModel(_sessionID: string) = Promise.lift None
 
+        member _.AbortRun(_sessionID: string) = Promise.lift ()
+
     }
 
 let createMuxFallbackHandler

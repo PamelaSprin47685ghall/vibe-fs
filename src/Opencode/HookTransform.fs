@@ -40,6 +40,9 @@ let messagesTransform
 let systemTransform (directory: string) (input: obj) (output: obj) : JS.Promise<unit> =
     MessageTransform.systemTransform directory input output
 
+let compactionAutocontinue (input: obj) (output: obj) : JS.Promise<unit> =
+    MessageTransform.compactionAutocontinue input output
+
 let toolDefinitionFor (host: Host) (input: obj) (output: obj) : JS.Promise<unit> =
     ToolDefinitionHooks.toolDefinitionFor host input output
 

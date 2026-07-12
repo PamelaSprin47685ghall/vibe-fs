@@ -89,7 +89,8 @@ let handleEvent_doesNotClearSubsessionPending () =
                 member _.FetchMessages _ = Promise.lift [||]
                 member _.PropagateFailure _ = Promise.lift ()
                 member _.CaptureCurrentModel _ = Promise.lift None
-                member _.RecoverWithPrompt(_, _, _) = Promise.lift () }
+                member _.RecoverWithPrompt(_, _, _) = Promise.lift ()
+                member _.AbortRun _ = Promise.lift () }
 
         let lookup (_agent: string) = cfg
         let! _ = handleEvent translator rt lookup executor "" (box ()) None
@@ -185,7 +186,8 @@ let runSubagentWaitsThroughFallbackSendContinue () =
                 member _.FetchMessages _ = Promise.lift [||]
                 member _.PropagateFailure _ = Promise.lift ()
                 member _.CaptureCurrentModel _ = Promise.lift None
-                member _.RecoverWithPrompt(_, _, _) = Promise.lift () }
+                member _.RecoverWithPrompt(_, _, _) = Promise.lift ()
+                member _.AbortRun _ = Promise.lift () }
 
         let lookup (_agent: string) = cfg
 
