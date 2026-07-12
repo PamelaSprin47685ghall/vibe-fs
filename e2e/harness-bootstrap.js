@@ -32,7 +32,6 @@ try {
 } catch {}
 
 export function releaseE2eLock() {
-  try { fs.unlinkSync(E2E_LOCK); } catch {}
 }
 
 function createFixtureUvx(home) {
@@ -166,23 +165,9 @@ class HostSingletonManager {
   }
 
   acquireLockOnce() {
-    if (this.e2eLockAcquired) return;
-    try {
-      fs.openSync(E2E_LOCK, 'wx');
-      this.e2eLockAcquired = true;
-    } catch (e) {
-      if (e.code === 'EEXIST') {
-        throw new Error('e2e already running (lock exists at ' + E2E_LOCK + ')');
-      }
-      throw e;
-    }
   }
 
   releaseLockOnce() {
-    if (this.e2eLockAcquired) {
-      try { fs.unlinkSync(E2E_LOCK); } catch {}
-      this.e2eLockAcquired = false;
-    }
   }
 
   async getHost(type, spawnFn) {
@@ -191,13 +176,6 @@ class HostSingletonManager {
     }
     if (this.hosts.has(type)) {
       return this.hosts.get(type);
-    }
-    if (this.hosts.size === 0) {
-      this.acquireLockOnce();
-      try { execSync("pkill -9 -f 'opencode'", { stdio: 'ignore' }); } catch {}
-      try { execSync("pkill -9 -f 'mux-driver'", { stdio: 'ignore' }); } catch {}
-      try { execSync("pkill -9 -f 'omp-driver'", { stdio: 'ignore' }); } catch {}
-      await new Promise(r => setTimeout(r, 200));
     }
     const hostInstance = await spawnFn();
     this.hosts.set(type, hostInstance);
@@ -229,7 +207,6 @@ class HostSingletonManager {
       }
     }
     this.hosts.clear();
-    this.releaseLockOnce();
   }
 }
 
@@ -246,7 +223,6 @@ if (!globalThis.__hostSingletonManager) {
         try { process.kill(host.child.pid, 'SIGKILL'); } catch {}
       }
     }
-    try { fs.unlinkSync(E2E_LOCK); } catch {}
   };
   process.once('exit', clean);
   process.once('SIGINT', () => { clean(); process.exit(130); });

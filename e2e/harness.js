@@ -378,7 +378,20 @@ class OpencodeHarness {
       const parts = msg?.parts;
       if (!Array.isArray(parts)) continue;
       for (const p of parts) {
-        if (typeof p?.text === 'string' && p.text) chunks.push(p.text);
+        if (typeof p?.text === 'string' && p.text) {
+          chunks.push(p.text);
+        } else {
+          const output = p?.state?.output ?? p?.output;
+          if (typeof output === 'string' && output) {
+            chunks.push(output);
+          } else if (output && typeof output.content === 'string' && output.content) {
+            chunks.push(output.content);
+          }
+          const error = p?.state?.error ?? p?.error;
+          if (typeof error === 'string' && error) {
+            chunks.push(error);
+          }
+        }
       }
     }
     return chunks.join('\n');

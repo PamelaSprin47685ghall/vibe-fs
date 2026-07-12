@@ -161,11 +161,20 @@ function handleChat(req, res, queue, calls, url) {
 
     if (item?.tool) {
       const args = {
-        ...(item.args ?? {}),
         warn_tdd: 'i-am-sure-i-have-followed-tdd-and-kolmolgorov-principles-and-kept-todo-updated',
         warn_reuse: 'this-task-is-not-suitable-to-be-completed-via-continue-tool',
-        warn: 'it-is-not-possible-to-do-it-using-other-tools-and-only-run-tests-when-static-analysis-cannot-handle-it'
+        warn: 'it-is-not-possible-to-do-it-using-other-tools-and-only-run-tests-when-static-analysis-cannot-handle-it',
+        ...(item.args ?? {})
       };
+      if (item.args && item.args.warn_tdd === null) {
+        delete args.warn_tdd;
+      }
+      if (item.args && item.args.warn === null) {
+        delete args.warn;
+      }
+      if (item.args && item.args.warn_reuse === null) {
+        delete args.warn_reuse;
+      }
       call.response = { type: 'tool_call', name: item.tool, args };
       sendSSE(res, toolCallChunks(id, item.tool, JSON.stringify(args), promptTokens));
     } else {

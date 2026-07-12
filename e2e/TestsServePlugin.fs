@@ -122,7 +122,7 @@ let runServePluginChecks
                               [ box (
                                     createObj
                                         [ "content", box "serve ndjson todo"
-                                          "status", box "in_progress"
+                                          "status", box "completed"
                                           "priority", box "high" ]
                                 ) ]
                           )
@@ -136,7 +136,7 @@ let runServePluginChecks
                               [ box (
                                     createObj
                                         [ "content", box "serve ndjson todo"
-                                          "status", box "in_progress"
+                                          "status", box "completed"
                                           "priority", box "high" ]
                                 ) ]
                           )
@@ -169,7 +169,7 @@ let runServePluginChecks
                           [ box (
                                 createObj
                                     [ "content", box "serve short todo"
-                                      "status", box "in_progress"
+                                      "status", box "completed"
                                       "priority", box "high" ]
                             ) ]
                       )
@@ -191,7 +191,10 @@ let runServePluginChecks
 
         // --- E2E Test: Warn soft-required validation (missing warn_tdd should not block execution, but trigger criticism) ---
         let writeArgsWithoutWarnTdd =
-            createObj [ "filePath", box "test_warn_tdd.txt"; "content", box "hello without warn_tdd" ]
+            createObj
+                [ "filePath", box "test_warn_tdd.txt"
+                  "content", box "hello without warn_tdd"
+                  "warn_tdd", box null ]
 
         do! toolRound harness sessionID "write" writeArgsWithoutWarnTdd "write without warn_tdd"
         chk "e2e.serve.write.missing-warn_tdd.tool-called" (containsTool harness "write")
