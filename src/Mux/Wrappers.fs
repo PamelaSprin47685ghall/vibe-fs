@@ -161,7 +161,7 @@ let private mkTodoWriteWrapper (host: Host) (projection: ProjectionStore) : obj 
             let execFn =
                 System.Func<obj, obj, JS.Promise<obj>>(fun (args: obj) (opts: obj) ->
                     promise {
-                        match decodeTodoWriteArgs args, decodeTodoToolOpts opts with
+                        match decodeTodoWriteArgs false args, decodeTodoToolOpts opts with
                         | Error e, _
                         | _, Error e ->
                             return createObj [ "success", box false; "output", box (wireDecodeFailure "todowrite" e) ]

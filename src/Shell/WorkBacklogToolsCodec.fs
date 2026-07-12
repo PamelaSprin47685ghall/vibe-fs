@@ -101,9 +101,7 @@ let private requireReportField (args: obj) (field: string) : Result<string, Doma
         | Some _ -> Error(InvalidIntent("todowrite", field, sprintf "must be at least %d characters" reportMinLength))
         | None -> Error(InvalidIntent("todowrite", field, "required"))
 
-let decodeTodoWriteArgs (args: obj) : Result<TodoWriteArgs, DomainError> =
-    let isTask = Dyn.isNullish (Dyn.get args "ahaMoments")
-
+let decodeTodoWriteArgs (isTask: bool) (args: obj) : Result<TodoWriteArgs, DomainError> =
     let getReportField k =
         if isTask then Ok "" else requireReportField args k
 

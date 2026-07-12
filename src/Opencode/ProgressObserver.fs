@@ -62,11 +62,6 @@ type ProgressObserver
 
                     let sid = sessionIdFromHookInput input ""
 
-                    let directory =
-                        (fromOpencode input (pluginDirectoryFromCtx ctx)).Execution.Directory
-
-                    let sid = sessionIdFromHookInput input ""
-
                     let debugMsg =
                         sprintf "DEBUG PROGRESS_OBSERVER: tool=%s, sid=%s, directory=%s\n" tool sid directory
 
@@ -75,10 +70,12 @@ type ProgressObserver
                     with _ ->
                         ()
 
-                    match decodeTodoWriteArgs (argsFromHookInput input) with
-                    | Ok args when sid <> "" -> do! appendWorkBacklogCommittedOrFail directory sid args
-                    | Error err -> failwithf "DECODE_FAILED: %A" err
-                    | _ -> ()
+                    let args = argsFromHookInput input
+
+                    if not (Dyn.isNullish args) then
+                        match decodeTodoWriteArgs (host = Mimocode) args with
+                        | Ok args when sid <> "" -> do! appendWorkBacklogCommittedOrFail directory sid args
+                        | Error err -> failwithf "DECODE_FAILED: %A" err
                 | None -> ()
             elif tool = "task_complete" then
                 let sid = sessionIdFromHookInput input ""

@@ -17,7 +17,7 @@ let decodeTodoMissingCompletedWorkReport () =
               "todos", box [| createObj [ "content", box "x"; "status", box "pending"; "priority", box "high" ] |]
               "select_methodology", box [| "first_principles" |] ]
 
-    match decodeTodoWriteArgs args with
+    match decodeTodoWriteArgs false args with
     | Error(InvalidIntent("todowrite", "ahaMoments", _)) -> check "todo missing ahaMoments" true
     | _ -> check "todo missing ahaMoments" false
 
@@ -41,7 +41,7 @@ let decodeTodoOk () =
                            "status", box "pending"
                            "priority", box "medium" ] |] ]
 
-    match decodeTodoWriteArgs args with
+    match decodeTodoWriteArgs false args with
     | Ok tw ->
         check "todo ok ahaMoments" (tw.AhaMoments = "x".PadRight(1024, 'a'))
         equal "todo ok todos count" 2 tw.Todos.Length
@@ -75,7 +75,7 @@ let decodeTodoItemMissingAhaMoments () =
               "plan", box ""
               "todos", box [| createObj [ "status", box "pending"; "priority", box "high" ] |] ]
 
-    match decodeTodoWriteArgs args with
+    match decodeTodoWriteArgs false args with
     | Error(InvalidIntent("todowrite", "ahaMoments", _)) -> check "todo item missing ahaMoments" true
     | _ -> check "todo item missing ahaMoments" false
 
@@ -95,7 +95,7 @@ let decodeTodoInvalidStatusOrPriority () =
                            "status", box "invalid-status"
                            "priority", box "high" ] |] ]
 
-    match decodeTodoWriteArgs args with
+    match decodeTodoWriteArgs false args with
     | Error(InvalidIntent("todowrite", "todos", msg)) ->
         check "todo invalid status gets error" (msg.Contains("unknown status: invalid-status"))
     | _ -> check "todo invalid status gets error" false

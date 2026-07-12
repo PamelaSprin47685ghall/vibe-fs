@@ -115,8 +115,8 @@ let private decodeExecutor args =
     ExecutorToolsCodec.decodeExecutorArgs args
     |> Result.map (fun e -> Typed(ToolArgs.Executor(mapExecutor e)))
 
-let private decodeTodoWrite args =
-    decodeTodoWriteArgs args
+let private decodeTodoWrite (originalToolName: string) args =
+    decodeTodoWriteArgs (originalToolName = "task") args
     |> Result.map (fun tw -> Typed(ToolArgs.TodoWrite(mapTodoWrite tw)))
 
 let private decodeApplyPatch args =
@@ -145,7 +145,7 @@ let decodeToolInvocation (toolName: string) (args: obj) : Result<DecodedToolInvo
     | "websearch" -> decodeWebsearch args
     | "webfetch" -> decodeWebfetch args
     | "executor" -> decodeExecutor args
-    | "todowrite" -> decodeTodoWrite args
+    | "todowrite" -> decodeTodoWrite toolName args
     | "apply_patch" -> decodeApplyPatch args
     | "submit_review" -> decodeSubmitReview args
     | _ -> Error(InvalidIntent(toolName, "tool", "unknown tool for ToolArgs decode"))
