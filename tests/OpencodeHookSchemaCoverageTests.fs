@@ -158,12 +158,14 @@ let opencodeHookSchemaInjectWarnTddIntoEmptySchema () =
     injectWarnTddIntoJsonSchema schema |> ignore
     let props = get schema "properties"
     check "warn_tdd property injected" (not (Dyn.isNullish (get props "warn_tdd")))
+    let prop = get props "warn_tdd"
+    check "warn_tdd has soft-required metadata" (Dyn.truthy (get prop "x-wanxiangshu-soft-required"))
     let required = get schema "required"
 
     check
-        "warn_tdd added to required"
-        (isArray required
-         && (required :?> obj array |> Array.exists (fun x -> string x = "warn_tdd")))
+        "warn_tdd NOT added to required"
+        (Dyn.isNullish required
+         || not (required :?> obj array |> Array.exists (fun x -> string x = "warn_tdd")))
 
 let opencodeHookSchemaInjectWarnTddAlreadyPresent () =
     let schema =

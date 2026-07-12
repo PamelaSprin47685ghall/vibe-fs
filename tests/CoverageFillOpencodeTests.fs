@@ -78,8 +78,8 @@ let hookSchemaRewriteToolJsonSchema () =
     equal "no schema no setKey" "" lastKey
 
 let hookSchemaWarnRequiredAlways () =
-    // (1) injectWarnIntoJsonSchema must append 'warn' to required even when 'warn' is already present.
-    // First: empty required → append.
+    // (1) injectWarnIntoJsonSchema must ensure 'warn' is in properties with soft-required metadata, but NOT in required.
+    // First: empty required → NOT in required.
     let schemaEmpty =
         createObj
             [ "type", box "object"
@@ -96,8 +96,8 @@ let hookSchemaWarnRequiredAlways () =
 
     let resultEmpty = injectWarnIntoJsonSchema schemaEmpty
     let reqEmpty = unbox<obj[]> (Dyn.get resultEmpty "required")
-    check "warn required after injectWarn (was empty)" (reqEmpty |> Array.exists (fun x -> string x = "warn"))
-    // Second: 'warn' already in required → no duplicate, still present.
+    check "warn NOT required after injectWarn (was empty)" (not (reqEmpty |> Array.exists (fun x -> string x = "warn")))
+    // Second: 'warn' already in required → removed.
     let schemaPresent =
         createObj
             [ "type", box "object"
@@ -118,11 +118,11 @@ let hookSchemaWarnRequiredAlways () =
     let warnCount =
         reqPresent |> Array.filter (fun x -> string x = "warn") |> Array.length
 
-    equal "warn count after injectWarn (was already present)" 1 warnCount
+    equal "warn count after injectWarn (should be removed from required)" 0 warnCount
 
 let hookSchemaWarnTddRequiredAlways () =
-    // (2) injectWarnTddIntoJsonSchema must append 'warn_tdd' to required even when 'warn_tdd' is already present.
-    // First: empty required → append.
+    // (2) injectWarnTddIntoJsonSchema must ensure 'warn_tdd' is in properties, but NOT in required.
+    // First: empty required → NOT in required.
     let schemaEmpty =
         createObj
             [ "type", box "object"
@@ -141,9 +141,9 @@ let hookSchemaWarnTddRequiredAlways () =
     let reqEmpty = unbox<obj[]> (Dyn.get resultEmpty "required")
 
     check
-        "warn_tdd required after injectWarnTdd (was empty)"
-        (reqEmpty |> Array.exists (fun x -> string x = "warn_tdd"))
-    // Second: 'warn_tdd' already in required → no duplicate, still present.
+        "warn_tdd NOT required after injectWarnTdd (was empty)"
+        (not (reqEmpty |> Array.exists (fun x -> string x = "warn_tdd")))
+    // Second: 'warn_tdd' already in required → removed.
     let schemaPresent =
         createObj
             [ "type", box "object"
@@ -164,7 +164,7 @@ let hookSchemaWarnTddRequiredAlways () =
     let warnTddCount =
         reqPresent |> Array.filter (fun x -> string x = "warn_tdd") |> Array.length
 
-    equal "warn_tdd count after injectWarnTdd (was already present)" 1 warnTddCount
+    equal "warn_tdd count after injectWarnTdd (should be removed from required)" 0 warnTddCount
 
 let hookSchemaExecutorCombinedWarns () =
     // (3) Real Opencode tool.definition hook provides output.jsonSchema directly.
@@ -187,8 +187,8 @@ let hookSchemaExecutorCombinedWarns () =
     let resultSchema = Dyn.get output "jsonSchema"
     check "output.jsonSchema is non-nullish" (not (Dyn.isNullish resultSchema))
     let resultReq = unbox<obj[]> (Dyn.get resultSchema "required")
-    check "warn_tdd in required" (resultReq |> Array.exists (fun x -> string x = "warn_tdd"))
-    check "warn in required" (resultReq |> Array.exists (fun x -> string x = "warn"))
+    check "warn_tdd NOT in required" (not (resultReq |> Array.exists (fun x -> string x = "warn_tdd")))
+    check "warn NOT in required" (not (resultReq |> Array.exists (fun x -> string x = "warn")))
     check "command in required" (resultReq |> Array.exists (fun x -> string x = "command"))
 
 let hookSchemaPtySpawnWarnSets () =

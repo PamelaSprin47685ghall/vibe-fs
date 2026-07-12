@@ -117,7 +117,7 @@ let private decodeExecutor args =
 
 let private decodeTodoWrite (originalToolName: string) args =
     decodeTodoWriteArgs (originalToolName = "task") args
-    |> Result.map (fun tw -> Typed(ToolArgs.TodoWrite(mapTodoWrite tw)))
+    |> Result.map (fun (tw, _) -> Typed(ToolArgs.TodoWrite(mapTodoWrite tw)))
 
 let private decodeApplyPatch args =
     decodeApplyPatchFields args

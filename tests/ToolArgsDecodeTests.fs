@@ -117,8 +117,8 @@ let decodeTodowriteMissingCompletedWorkReport () =
               "todos", box [||] ]
 
     match decodeToolInvocation "todowrite" args with
-    | Error(InvalidIntent("todowrite", "ahaMoments", _)) -> check "todowrite missing ahaMoments" true
-    | _ -> check "todowrite missing ahaMoments" false
+    | Ok(Typed(TodoWrite tw)) -> check "todowrite missing ahaMoments returns Ok" true
+    | _ -> check "todowrite missing ahaMoments returns Ok" false
 
 let decodeTodowriteOk () =
     let args =

@@ -12,31 +12,47 @@ module Dyn = Wanxiangshu.Shell.Dyn
 // call `setHookErrorMux` whenever a modification tool (resp. warn-required
 // tool) omits the canonical acknowledgement. Mirrors the Opencode tests.
 
-let private runMuxHook (tool: string) (args: obj) : JS.Promise<string> =
-    let input = createObj [ "tool", box tool; "args", box args ]
+let private runMuxHook (tool: string) (args: obj) : JS.Promise<string * string list> =
+    let input =
+        createObj
+            [ "tool", box tool
+              "workspaceId", box "s-warn-enforce-mux"
+              "toolCallId", box "c-warn-enforce-mux"
+              "args", box args ]
+
     let output = createObj [ "args", box args ]
 
     promise {
+        Wanxiangshu.Shell.ToolHookRuntime.clearSessionCompliance "s-warn-enforce-mux"
         do! Wanxiangshu.Mux.PluginCatalog.toolExecuteBefore input output
-        return str output "error"
+        let err = str output "error"
+
+        let violations =
+            match Wanxiangshu.Shell.ToolHookRuntime.tryGetCompliance "s-warn-enforce-mux" "c-warn-enforce-mux" with
+            | Some env -> env.Violations
+            | None -> []
+
+        return (err, violations)
     }
 
-let private runRaw (tool: string) : JS.Promise<string> = runMuxHook tool (createObj [])
+let private runRaw (tool: string) : JS.Promise<string * string list> = runMuxHook tool (createObj [])
 
-let private runWithWarnTdd (tool: string) : JS.Promise<string> =
+let private runWithWarnTdd (tool: string) : JS.Promise<string * string list> =
     runMuxHook tool (createObj [ "warn_tdd", box canonicalValue ])
 
 let muxRejectsCoderMissing () =
     promise {
-        let! err = runRaw "coder"
-        check "mux coder missing warn_tdd rejects" (err <> "")
-        check "mux coder error mentions warn_tdd" (err.Contains "warn_tdd")
+        let! err, violations = runRaw "coder"
+        check "mux coder missing warn_tdd does not reject" (err = "")
+        check "mux coder missing warn_tdd has violations" (violations.Length > 0)
+        check "mux coder violations mention warn_tdd" (violations |> List.exists (fun x -> x.Contains "warn_tdd"))
     }
 
 let muxRejectsCoderMalformed () =
     promise {
-        let! err = runMuxHook "coder" (createObj [ "warn_tdd", box "wrong" ])
-        check "mux coder malformed warn_tdd rejects" (err <> "")
+        let! err, violations = runMuxHook "coder" (createObj [ "warn_tdd", box "wrong" ])
+        check "mux coder malformed warn_tdd does not reject" (err = "")
+        check "mux coder malformed warn_tdd has violations" (violations.Length > 0)
     }
 
 let muxAcceptsCoder () =
@@ -44,23 +60,28 @@ let muxAcceptsCoder () =
         let args =
             createObj [ "warn_tdd", box canonicalValue; "warn_reuse", box warnReuseCanonicalValue ]
 
-        let! err = runMuxHook "coder" args
+        let! err, violations = runMuxHook "coder" args
         check "mux coder canonical passes" (err = "")
+        check "mux coder canonical has no violations" (violations.IsEmpty)
         check "mux coder warn_tdd removed from args" (Dyn.str args "warn_tdd" = "")
         check "mux coder warn_reuse removed from args" (Dyn.str args "warn_reuse" = "")
     }
 
 let muxIgnoresNonModificationTool () =
     promise {
-        let! err = runRaw "read"
+        let! err, violations = runRaw "read"
         check "mux read passes" (err = "")
+        check "mux read has no violations" (violations.IsEmpty)
     }
 
 let muxRejectsExecutorMissingWarn () =
     promise {
-        let! err = runWithWarnTdd "executor"
-        check "mux executor missing warn rejects" (err <> "")
-        check "mux executor error mentions warn" (err.Contains "warn")
+        let! err, violations = runWithWarnTdd "executor"
+        check "mux executor missing warn does not reject" (err = "")
+
+        check
+            "mux executor missing warn has violations"
+            (violations |> List.exists (fun x -> x.Contains "warn: missing"))
     }
 
 let muxAcceptsExecutor () =
@@ -68,15 +89,17 @@ let muxAcceptsExecutor () =
         let args =
             createObj [ "warn_tdd", box canonicalValue; "warn", box warnCanonicalValue ]
 
-        let! err = runMuxHook "executor" args
+        let! err, violations = runMuxHook "executor" args
         check "mux executor canonical passes" (err = "")
+        check "mux executor canonical has no violations" (violations.IsEmpty)
         check "mux executor warn removed from args" (Dyn.str args "warn" = "")
     }
 
 let muxWriteDoesNotRequireWarn () =
     promise {
-        let! err = runWithWarnTdd "write"
+        let! err, violations = runWithWarnTdd "write"
         check "mux write does not require warn" (err = "")
+        check "mux write has no violations" (violations.IsEmpty)
     }
 
 let exhaustiveMuxWarnTdd () : JS.Promise<unit> =
@@ -88,8 +111,9 @@ let exhaustiveMuxWarnTdd () : JS.Promise<unit> =
                 else
                     createObj []
 
-            let! err = runMuxHook tool args
-            check ("mux " + tool + " missing warn_tdd rejects") (err <> "")
+            let! err, violations = runMuxHook tool args
+            check ("mux " + tool + " missing warn_tdd does not reject") (err = "")
+            check ("mux " + tool + " missing warn_tdd has violations") (violations.Length > 0)
     }
 
 let exhaustiveMuxWarnTddAccepts () : JS.Promise<unit> =
@@ -103,16 +127,18 @@ let exhaustiveMuxWarnTddAccepts () : JS.Promise<unit> =
             if isSubagentTool tool then
                 args?warn_reuse <- box warnReuseCanonicalValue
 
-            let! err = runMuxHook tool args
+            let! err, violations = runMuxHook tool args
             check ("mux " + tool + " canonical fields pass") (err = "")
+            check ("mux " + tool + " canonical fields have no violations") (violations.IsEmpty)
     }
 
 let exhaustiveMuxWarn () : JS.Promise<unit> =
     promise {
         for tool in warnRequiredTools do
             let args = createObj [ "warn_tdd", box canonicalValue ]
-            let! err = runMuxHook tool args
-            check ("mux " + tool + " missing warn rejects") (err <> "")
+            let! err, violations = runMuxHook tool args
+            check ("mux " + tool + " missing warn does not reject") (err = "")
+            check ("mux " + tool + " missing warn has violations") (violations.Length > 0)
     }
 
 let exhaustiveMuxWarnAccepts () : JS.Promise<unit> =
@@ -121,23 +147,28 @@ let exhaustiveMuxWarnAccepts () : JS.Promise<unit> =
             let args =
                 createObj [ "warn_tdd", box canonicalValue; "warn", box warnCanonicalValue ]
 
-            let! err = runMuxHook tool args
+            let! err, violations = runMuxHook tool args
             check ("mux " + tool + " canonical warn passes") (err = "")
+            check ("mux " + tool + " canonical warn has no violations") (violations.IsEmpty)
     }
 
 // ── warn_reuse: subagent tools must carry warn_reuse acknowledgement ──
 
 let muxRejectsCoderMissingWarnReuse () =
     promise {
-        let! err = runMuxHook "coder" (createObj [ "warn_tdd", box canonicalValue ])
-        check "mux coder missing warn_reuse rejects" (err <> "")
-        check "mux coder error mentions warn_reuse" (err.Contains "warn_reuse")
+        let! err, violations = runMuxHook "coder" (createObj [ "warn_tdd", box canonicalValue ])
+        check "mux coder missing warn_reuse does not reject" (err = "")
+        check "mux coder missing warn_reuse has violations" (violations.Length > 0)
+        check "mux coder violations mention warn_reuse" (violations |> List.exists (fun x -> x.Contains "warn_reuse"))
     }
 
 let muxRejectsCoderMalformedWarnReuse () =
     promise {
-        let! err = runMuxHook "coder" (createObj [ "warn_tdd", box canonicalValue; "warn_reuse", box "wrong" ])
-        check "mux coder malformed warn_reuse accepts" (err = "")
+        let! err, violations =
+            runMuxHook "coder" (createObj [ "warn_tdd", box canonicalValue; "warn_reuse", box "wrong" ])
+
+        check "mux coder malformed warn_reuse does not reject" (err = "")
+        check "mux coder malformed warn_reuse has violations" (violations.Length > 0)
     }
 
 let muxAcceptsCoderWithWarnReuse () =
@@ -145,16 +176,18 @@ let muxAcceptsCoderWithWarnReuse () =
         let args =
             createObj [ "warn_tdd", box canonicalValue; "warn_reuse", box warnReuseCanonicalValue ]
 
-        let! err = runMuxHook "coder" args
+        let! err, violations = runMuxHook "coder" args
         check "mux coder canonical warn_reuse passes" (err = "")
+        check "mux coder canonical warn_reuse has no violations" (violations.IsEmpty)
         check "mux coder warn_tdd removed from args" (Dyn.str args "warn_tdd" = "")
         check "mux coder warn_reuse removed from args" (Dyn.str args "warn_reuse" = "")
     }
 
 let muxNonSubagentIgnoresWarnReuse () =
     promise {
-        let! err = runRaw "read"
+        let! err, violations = runRaw "read"
         check "mux read ignoring warn_reuse passes" (err = "")
+        check "mux read has no violations" (violations.IsEmpty)
     }
 
 let run () : JS.Promise<unit> =

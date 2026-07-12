@@ -79,11 +79,11 @@ let mimoTodoTool (_pluginCtx: obj) : obj =
         (toolDescriptionFor Mimocode)
         (box
             {| todos = ToolSchema.call1 (arr todoItem) "describe" (box todosDesc)
-               ahaMoments = strMin 1024 ahaMomentsDesc
-               changesAndReasons = strMin 1024 changesAndReasonsDesc
-               gotchas = strMin 1024 gotchasDesc
-               lessonsAndConventions = strMin 1024 lessonsAndConventionsDesc
-               plan = strMin 1024 planDesc
+               ahaMoments = strOpt ahaMomentsDesc
+               changesAndReasons = strOpt changesAndReasonsDesc
+               gotchas = strOpt gotchasDesc
+               lessonsAndConventions = strOpt lessonsAndConventionsDesc
+               plan = strOpt planDesc
                select_methodology =
                 enumArrayMin enumVals 1 Wanxiangshu.Kernel.Methodology.selectMethodologyFieldDescription |})
         (fun args context ->
@@ -97,16 +97,6 @@ let mimoTodoTool (_pluginCtx: obj) : obj =
 
             if sessionID = "" then
                 resolveStr "task requires sessionID"
-            elif ahaMoments.Length < 1024 then
-                resolveStr "task requires ahaMoments (min 1024 chars)"
-            elif changesAndReasons.Length < 1024 then
-                resolveStr "task requires changesAndReasons (min 1024 chars)"
-            elif gotchas.Length < 1024 then
-                resolveStr "task requires gotchas (min 1024 chars)"
-            elif lessonsAndConventions.Length < 1024 then
-                resolveStr "task requires lessonsAndConventions (min 1024 chars)"
-            elif plan.Length < 1024 then
-                resolveStr "task requires plan (min 1024 chars)"
             elif methodologies.IsEmpty then
                 resolveStr "task requires select_methodology"
             else

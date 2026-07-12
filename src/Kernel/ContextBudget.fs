@@ -1,5 +1,11 @@
 module Wanxiangshu.Kernel.ContextBudget
 
+[<RequireQualifiedAccess>]
+type UsageConfidence =
+    | Observed
+    | CalibratedEstimate
+    | BootstrapEstimate
+
 /// Nudge 触发所需的 todo anchor 数。foldAfterFirst=true 需 2 个 anchor
 /// 才缩减投影，foldAfterFirst=false 需 3 个。每次 anchor = 一次 todowrite
 /// 调用。Nudge 触发后 LLM 需连续 N 次 todowrite 才能让投影缩减上下文，

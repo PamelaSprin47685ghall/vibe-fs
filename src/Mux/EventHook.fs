@@ -123,6 +123,7 @@ let createEventHook (deps: obj) (reviewStore: ReviewStore) (scope: RuntimeScope)
                         do! appendLoopCancelledOrFail root workspaceId
                         do! syncReviewFromEventLogDedicated reviewStore root workspaceId
 
+                        Wanxiangshu.Shell.ToolHookRuntime.clearSessionCompliance workspaceId
                         Wanxiangshu.Shell.RunnerBackground.abortRunnerJobCore scope workspaceId
                     | _ -> ()
 

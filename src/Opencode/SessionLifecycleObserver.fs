@@ -101,6 +101,7 @@ type SessionLifecycleObserver
                 fallbackRuntime.SetChain sessionID []
                 fallbackRuntime.ClearModel sessionID
                 fallbackRuntime.ClearInjected sessionID
+                Wanxiangshu.Shell.ToolHookRuntime.clearSessionCompliance sessionID
                 fallbackRuntime.SetSessionOwner sessionID "Human"
                 let turnId = fallbackRuntime.IncrementHumanTurnId sessionID
                 let humanTurnOrdinal = fallbackRuntime.GetHumanTurnOrdinal sessionID

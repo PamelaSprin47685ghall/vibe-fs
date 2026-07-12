@@ -17,6 +17,7 @@ open Wanxiangshu.Omp.NudgeRuntime
 open Wanxiangshu.Kernel.HostTools
 open Wanxiangshu.Kernel.WorkBacklog
 open Wanxiangshu.Kernel.ToolOutputInfo
+open Wanxiangshu.Shell
 open Wanxiangshu.Shell.RunnerBackground
 open Wanxiangshu.Shell.LivelockGuard
 open Wanxiangshu.Shell.EventLogRuntime
@@ -52,6 +53,20 @@ let toolResultHandler (_pi: obj) (_reviewStore: ReviewStore) (event: obj) (ctx: 
         then
             setToolResultText event "livelock guard: repeated identical tool call with identical result"
         else
+            let toolCallId = getToolCallId event
+
+            match ToolHookRuntime.tryGetCompliance sessionId toolCallId with
+            | Some env ->
+                ToolHookRuntime.restoreWarnToArgs args env
+                let currentOutput = getToolResultText event
+
+                if not env.Violations.IsEmpty then
+                    let criticism = ToolHookRuntime.appendCriticism currentOutput env.Violations
+                    setToolResultText event criticism
+
+                ToolHookRuntime.removeCompliance sessionId toolCallId
+            | None -> ()
+
             applyToolResultHook toolName args
             do! appendToolResultSyntax (Dyn.str ctx "cwd") event
 

@@ -94,6 +94,13 @@ let toolExecuteBefore (input: obj) (output: obj) : JS.Promise<unit> =
             | Result.Ok(nextArgs, env) ->
                 setHookArgsMux output nextArgs
 
+                let sessionID = ToolHookRuntime.tryExtractSessionId input |> Option.defaultValue ""
+
+                let toolCallID =
+                    ToolHookRuntime.tryExtractToolCallId input |> Option.defaultValue ""
+
+                ToolHookRuntime.saveCompliance sessionID toolCallID env
+
                 match env.Amend with
                 | Some n ->
                     output?("_amend") <- box n
@@ -154,12 +161,34 @@ let toolExecuteAfter (scope: RuntimeScope) (input: obj) (output: obj) : JS.Promi
             let outputArgs = argsFromHookOutputMux output
             restoreAmendToArgs outputArgs amendVal
 
+        let toolCallID =
+            ToolHookRuntime.tryExtractToolCallId input |> Option.defaultValue ""
+
+        match ToolHookRuntime.tryGetCompliance sessionID toolCallID with
+        | Some env ->
+            ToolHookRuntime.restoreWarnToArgs decoded.Args env
+            let inputArgs = argsFromMuxToolExecuteInput input
+            ToolHookRuntime.restoreWarnToArgs inputArgs env
+            let outputArgs = argsFromHookOutputMux output
+            ToolHookRuntime.restoreWarnToArgs outputArgs env
+
+            let currentOutput = hookOutputTextMux output
+
+            if not env.Violations.IsEmpty then
+                let criticism = ToolHookRuntime.appendCriticism currentOutput env.Violations
+                setHookOutputStringMux output criticism
+
+            ToolHookRuntime.removeCompliance sessionID toolCallID
+        | None -> ()
+
         let argsJson = JS.JSON.stringify decoded.Args
 
-        if isNetworkErrorText originalOutput then
+        let finalOutput = hookOutputTextMux output
+
+        if isNetworkErrorText finalOutput then
             setHookErrorMux output "network connection lost"
 
-        if LivelockGuard.check scope sessionID tool argsJson originalOutput then
+        if LivelockGuard.check scope sessionID tool argsJson finalOutput then
             setHookErrorMux output "livelock guard: repeated identical tool call with identical result"
     }
 

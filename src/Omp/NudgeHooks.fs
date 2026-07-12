@@ -75,8 +75,10 @@ let toolCallHandler (_pi: obj) (_reviewStore: ReviewStore) (event: obj) (ctx: ob
     promise {
         let toolName = Dyn.str event "toolName"
         let args = getToolInput event
+        let sessionId = getSessionIdFromContext ctx |> Option.defaultValue ""
+        let toolCallId = ToolResultEvent.getToolCallId event
 
-        match applyToolCallHook toolName args with
+        match Wanxiangshu.Omp.HookExecute.applyToolCallHookWithIds toolName args sessionId toolCallId with
         | Some reason -> return createObj [ "block", box true; "reason", box reason ]
         | None ->
             match getSessionIdFromContext ctx with
@@ -98,6 +100,7 @@ let turnStartHandler
     | Some sid ->
         clearNudgeSession sid
         fallbackRuntime.SetAwaitingBusy sid false
+        Wanxiangshu.Shell.ToolHookRuntime.clearSessionCompliance sid
     | None -> ()
 
     applyActiveToolFilterForMainSession piObj ctxObj

@@ -42,6 +42,20 @@ let childWorkspaceNotExcluded () =
     check "main still not excluded even in child workspace" (not (shouldExcludeAgentFromProjection "main" true))
     check "agent still not excluded even in child workspace" (not (shouldExcludeAgentFromProjection "agent" true))
 
+let agentNormalizationTest () =
+    check "Investigator (caps)" (getCapsInjectionPolicy "Investigator" false = CapsInjectionPolicy.Include)
+    check "investigator  (caps)" (getCapsInjectionPolicy "investigator " false = CapsInjectionPolicy.Include)
+
+    check
+        "Investigator (context budget)"
+        (getContextBudgetPolicy "Investigator" false = ContextBudgetPolicy.DisableTodoEmergency)
+
+    check
+        "investigator  (context budget)"
+        (getContextBudgetPolicy "investigator " false = ContextBudgetPolicy.DisableTodoEmergency)
+
+    check "EXec (caps)" (getCapsInjectionPolicy "EXec" false = CapsInjectionPolicy.Exclude)
+
 let testTransformO1Cache () =
     promise {
         pipelineRunCount <- 0
@@ -197,7 +211,7 @@ let testSingleToolCallPromptInjection () =
         let msgs1 =
             [ mkMsg "user" User []
               mkMsg "assist" Assistant [ ToolPart("read", "call-1", None, null) ]
-              mkMsg "result" ToolResult [] ]
+              mkMsg "call-1" ToolResult [] ]
 
         let! res1 = runTransform "s1" ProjectionPolicy.IncludeProjection msgs1
         equal "Case 1 output length (should be 4)" 4 res1.Length
@@ -224,7 +238,7 @@ let testSingleToolCallPromptInjection () =
                   Assistant
                   [ ToolPart("read", "call-1", None, null)
                     ToolPart("write", "call-2", None, null) ]
-              mkMsg "result" ToolResult [] ]
+              mkMsg "call-1" ToolResult [] ]
 
         let! res2 = runTransform "s2" ProjectionPolicy.IncludeProjection msgs2
         equal "Case 2 length" 3 res2.Length
@@ -233,7 +247,7 @@ let testSingleToolCallPromptInjection () =
         let msgs3 =
             [ mkMsg "user" User []
               mkMsg "assist" Assistant [ ToolPart("read", "semble-call-123", None, null) ]
-              mkMsg "result" ToolResult [] ]
+              mkMsg "semble-call-123" ToolResult [] ]
 
         let! res3 = runTransform "s3" ProjectionPolicy.IncludeProjection msgs3
         equal "Case 3 length" 3 res3.Length
@@ -246,7 +260,7 @@ let testSingleToolCallPromptInjection () =
                   Assistant
                   [ ToolPart("read", "call-1", None, null)
                     ToolPart("write", "semble-call-2", None, null) ]
-              mkMsg "result" ToolResult [] ]
+              mkMsg "call-1" ToolResult [] ]
 
         let! res4 = runTransform "s4" ProjectionPolicy.IncludeProjection msgs4
         equal "Case 4 length" 4 res4.Length
@@ -265,7 +279,7 @@ let testSingleToolCallPromptInjection () =
         let msgs7 =
             [ mkMsg "dup-id" User []
               mkMsg "dup-id" Assistant [ ToolPart("read", "call-1", None, null) ]
-              mkMsg "dup-id" ToolResult [] ]
+              mkMsg "call-1" ToolResult [] ]
 
         let! res7 = runTransform "s7" ProjectionPolicy.IncludeProjection msgs7
         equal "Case 7 length with duplicate IDs" 4 res7.Length
@@ -277,6 +291,7 @@ let run () =
         defaultExcludedFalse ()
         childWorkspaceExtraExcluded ()
         childWorkspaceNotExcluded ()
+        agentNormalizationTest ()
         do! testTransformO1Cache ()
         do! testSingleToolCallPromptInjection ()
     }

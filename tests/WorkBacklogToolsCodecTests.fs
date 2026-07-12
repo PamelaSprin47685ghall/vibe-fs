@@ -18,8 +18,10 @@ let decodeTodoMissingCompletedWorkReport () =
               "select_methodology", box [| "first_principles" |] ]
 
     match decodeTodoWriteArgs false args with
-    | Error(InvalidIntent("todowrite", "ahaMoments", _)) -> check "todo missing ahaMoments" true
-    | _ -> check "todo missing ahaMoments" false
+    | Ok(tw, violations) ->
+        check "todo missing ahaMoments returns Ok with violations" (violations.Length > 0)
+        check "violations mention ahaMoments" (violations |> List.exists (fun x -> x.Contains "ahaMoments"))
+    | Error _ -> check "todo missing ahaMoments returns Ok" false
 
 let decodeTodoOk () =
     let args =
@@ -42,13 +44,14 @@ let decodeTodoOk () =
                            "priority", box "medium" ] |] ]
 
     match decodeTodoWriteArgs false args with
-    | Ok tw ->
+    | Ok(tw, violations) ->
         check "todo ok ahaMoments" (tw.AhaMoments = "x".PadRight(1024, 'a'))
         equal "todo ok todos count" 2 tw.Todos.Length
         check "todo ok first content" (tw.Todos.[0].Content = "实现 codec")
         check "todo ok first status" (tw.Todos.[0].Status = Wanxiangshu.Kernel.ToolArgs.TodoItemStatus.InProgress)
         equal "todo ok methodology count" 2 tw.SelectMethodology.Length
         check "todo ok methodology head" (tw.SelectMethodology.[0] = "test_driven_reasoning")
+        check "todo ok has no violations" (violations.IsEmpty)
     | Error _ -> check "todo ok" false
 
 let decodeTodoToolOptsExtractsToolCallId () =
@@ -73,11 +76,13 @@ let decodeTodoItemMissingAhaMoments () =
               "gotchas", box ""
               "lessonsAndConventions", box ""
               "plan", box ""
-              "todos", box [| createObj [ "status", box "pending"; "priority", box "high" ] |] ]
+              "todos", box [| createObj [ "content", box "x"; "status", box "pending"; "priority", box "high" ] |] ]
 
     match decodeTodoWriteArgs false args with
-    | Error(InvalidIntent("todowrite", "ahaMoments", _)) -> check "todo item missing ahaMoments" true
-    | _ -> check "todo item missing ahaMoments" false
+    | Ok(tw, violations) ->
+        check "todo item missing ahaMoments returns Ok with violations" (violations.Length > 0)
+        check "violations mention ahaMoments" (violations |> List.exists (fun x -> x.Contains "ahaMoments"))
+    | _ -> check "todo item missing ahaMoments returns Ok" false
 
 let decodeTodoInvalidStatusOrPriority () =
     let args =

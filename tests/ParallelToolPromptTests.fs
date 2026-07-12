@@ -4,6 +4,7 @@ open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Kernel.Messaging
+open Wanxiangshu.Kernel.ToolExecutionStatusModule
 open Wanxiangshu.Kernel.CapsFormat
 open Wanxiangshu.Kernel.BacklogProjectionCore
 open Wanxiangshu.Kernel.HostTools
@@ -91,7 +92,7 @@ let testHostNativeToolsTrigger () =
             let msgs =
                 [ mkMsg "u" User []
                   mkMsg "a" Assistant [ ToolPart(toolName, "c1", None, null) ]
-                  mkMsg "r" ToolResult [] ]
+                  mkMsg "c1" ToolResult [] ]
 
             runTransform sessionID ProjectionPolicy.IncludeProjection msgs
 
@@ -203,7 +204,7 @@ let testSynthCallIdExcluded () =
         let msgs20 =
             [ mkMsg "u" User []
               mkMsg "a" Assistant [ ToolPart("bash", "semble-call-123", None, null) ]
-              mkMsg "r" ToolResult [] ]
+              mkMsg "semble-call-123" ToolResult [] ]
 
         let! res20 = runTransform "s20" msgs20
         equal "semble-call-* excluded" 3 res20.Length
@@ -212,14 +213,76 @@ let testSynthCallIdExcluded () =
         let msgs21 =
             [ mkMsg "u" User []
               mkMsg "a" Assistant [ ToolPart("read", "caps-call-fp-0", None, null) ]
-              mkMsg "r" ToolResult [] ]
+              mkMsg "caps-call-fp-0" ToolResult [] ]
 
         let! res21 = runTransform "s21" msgs21
         equal "caps-call-* excluded" 3 res21.Length
+    }
+
+let testCompletedToolPartInAssistantTriggers () =
+    promise {
+        let reviewStore = createReviewStore ()
+
+        let backlogOps =
+            { Host = opencode
+              GetOrRebuildBacklog = fun _ _ -> [] }
+
+        let encodeMessages (msgs: Message<obj> list) = msgs |> List.map box |> List.toArray
+        let injectFn _ (arr: obj array) = promise { return arr }
+        let loadCaps () = promise { return [] }
+        let buildCaps (arr: obj array) _ _ = arr
+
+        let runTransform sessionID msgs =
+            let plan =
+                { SessionID = sessionID
+                  Agent = "main"
+                  Directory = ""
+                  ProjectionPolicy = ProjectionPolicy.IncludeProjection
+                  BacklogProjectionPolicy = Wanxiangshu.Kernel.MessageTransformPolicy.BacklogProjectionPolicy.Include
+                  CapsInjectionPolicy = Wanxiangshu.Kernel.MessageTransformPolicy.CapsInjectionPolicy.Include
+                  ParallelHintPolicy = Wanxiangshu.Kernel.MessageTransformPolicy.ParallelHintPolicy.Include
+                  ContextBudgetPolicy = Wanxiangshu.Kernel.MessageTransformPolicy.ContextBudgetPolicy.Include
+                  IsSubagentSession = false
+                  Cleaned = msgs
+                  RawArray = None
+                  SembleInjectEnabled = false
+                  Scope = Wanxiangshu.Shell.RuntimeScope.create ()
+                  MaxInputTokens = 200000
+                  GetContextUsage = (fun _ -> Promise.lift None) }
+
+            runHostMessagesTransform
+                reviewStore
+                sessionID
+                IfStoreEmpty
+                (fun _ -> promise { return Seq.empty })
+                plan
+                backlogOps
+                encodeMessages
+                injectFn
+                loadCaps
+                buildCaps
+
+        let state =
+            { status = ToolExecutionStatus.Completed
+              output = "done"
+              error = ""
+              input = null
+              operationAction = "" }
+
+        let msgs =
+            [ mkMsg "u" User []
+              mkMsg "a" Assistant [ ToolPart("bash", "c1", Some state, null) ] ]
+
+        let! res = runTransform "s_term_assist" msgs
+        equal "terminal in assistant triggers" 3 res.Length
+        let last = res.[res.Length - 1] :?> Message<obj>
+        equal "last message role is User for hint" User last.info.role
+        check "ID starts with parallel-tool-synth-" (last.info.id.StartsWith("parallel-tool-synth-"))
     }
 
 let run () =
     promise {
         do! testHostNativeToolsTrigger ()
         do! testSynthCallIdExcluded ()
+        do! testCompletedToolPartInAssistantTriggers ()
     }

@@ -38,10 +38,11 @@ let injectWarnTddIntoMuxSchema (tool: ToolDefinition) : ToolDefinition =
                     createObj
                         [| "type", box "string"
                            "enum", box [| box WarnTdd.canonicalValue |]
-                           "description", box WarnTdd.warnTddDescription |]
+                           "description", box WarnTdd.warnTddDescription
+                           "x-wanxiangshu-soft-required", box true |]
                 )
-
-        addRequired tool.parameters "warn_tdd"
+        else
+            props?("warn_tdd")?("x-wanxiangshu-soft-required") <- true
 
     tool
 
@@ -55,10 +56,11 @@ let injectWarnIntoMuxSchema (tool: ToolDefinition) : ToolDefinition =
                     createObj
                         [| "type", box "string"
                            "enum", box [| box WarnTdd.warnCanonicalValue |]
-                           "description", box WarnTdd.warnDescription |]
+                           "description", box WarnTdd.warnDescription
+                           "x-wanxiangshu-soft-required", box true |]
                 )
-
-        addRequired tool.parameters "warn"
+        else
+            props?("warn")?("x-wanxiangshu-soft-required") <- true
 
     tool
 
@@ -91,9 +93,10 @@ let injectWarnReuseIntoMuxSchema (tool: ToolDefinition) : ToolDefinition =
                     createObj
                         [| "type", box "string"
                            "enum", box [| box WarnTdd.warnReuseCanonicalValue |]
-                           "description", box WarnTdd.warnReuseDescription |]
+                           "description", box WarnTdd.warnReuseDescription
+                           "x-wanxiangshu-soft-required", box true |]
                 )
-
-        addRequired tool.parameters "warn_reuse"
+        else
+            props?("warn_reuse")?("x-wanxiangshu-soft-required") <- true
 
     tool

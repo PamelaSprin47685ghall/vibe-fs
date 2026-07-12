@@ -15,7 +15,7 @@ module Dyn = Wanxiangshu.Shell.Dyn
 // modificationTools and warnRequiredTools set; any drift between Kernel SSOT
 // and Opencode runtime MUST show up here as a failing check.
 
-let private runOpencodeHook (tool: string) (args: obj) : JS.Promise<string> =
+let private runOpencodeHook (tool: string) (args: obj) : JS.Promise<string * string list> =
     let input =
         createObj
             [ "tool", box tool
@@ -27,33 +27,43 @@ let private runOpencodeHook (tool: string) (args: obj) : JS.Promise<string> =
 
     promise {
         try
+            Wanxiangshu.Shell.ToolHookRuntime.clearSessionCompliance "s-warn-enforce"
             do! Wanxiangshu.Opencode.HookExecute.toolExecuteBefore input output
-            return str output "error"
+            let err = str output "error"
+
+            let violations =
+                match Wanxiangshu.Shell.ToolHookRuntime.tryGetCompliance "s-warn-enforce" "c-warn-enforce" with
+                | Some env -> env.Violations
+                | None -> []
+
+            return (err, violations)
         with ex ->
-            return ex.Message
+            return (ex.Message, [])
     }
 
-let private runWithWarnTdd (tool: string) : JS.Promise<string> =
+let private runWithWarnTdd (tool: string) : JS.Promise<string * string list> =
     runOpencodeHook tool (createObj [ "warn_tdd", box canonicalValue ])
 
-let private runWithBoth (tool: string) : JS.Promise<string> =
+let private runWithBoth (tool: string) : JS.Promise<string * string list> =
     runOpencodeHook tool (createObj [ "warn_tdd", box canonicalValue; "warn", box warnCanonicalValue ])
 
-let private runRaw (tool: string) : JS.Promise<string> = runOpencodeHook tool (createObj [])
+let private runRaw (tool: string) : JS.Promise<string * string list> = runOpencodeHook tool (createObj [])
 
 // ── Direct per-tool cases ───────────────────────────────────────────────────
 
 let opencodeRejectsCoderMissing () =
     promise {
-        let! err = runRaw "coder"
-        check "opencode coder missing warn_tdd rejects" (err <> "")
-        check "opencode coder error mentions warn_tdd" (err.Contains "warn_tdd")
+        let! err, violations = runRaw "coder"
+        check "opencode coder missing warn_tdd does not reject" (err = "")
+        check "opencode coder missing warn_tdd has violations" (violations.Length > 0)
+        check "opencode coder violations mention warn_tdd" (violations |> List.exists (fun x -> x.Contains "warn_tdd"))
     }
 
 let opencodeRejectsCoderMalformed () =
     promise {
-        let! err = runOpencodeHook "coder" (createObj [ "warn_tdd", box "wrong" ])
-        check "opencode coder malformed warn_tdd rejects" (err <> "")
+        let! err, violations = runOpencodeHook "coder" (createObj [ "warn_tdd", box "wrong" ])
+        check "opencode coder malformed warn_tdd does not reject" (err = "")
+        check "opencode coder malformed warn_tdd has violations" (violations.Length > 0)
     }
 
 let opencodeAcceptsCoder () =
@@ -61,16 +71,18 @@ let opencodeAcceptsCoder () =
         let args =
             createObj [ "warn_tdd", box canonicalValue; "warn_reuse", box warnReuseCanonicalValue ]
 
-        let! err = runOpencodeHook "coder" args
+        let! err, violations = runOpencodeHook "coder" args
         check "opencode coder canonical passes" (err = "")
+        check "opencode coder canonical has no violations" (violations.IsEmpty)
         check "opencode coder warn_tdd removed from args" (Dyn.str args "warn_tdd" = "")
         check "opencode coder warn_reuse removed from args" (Dyn.str args "warn_reuse" = "")
     }
 
 let opencodeIgnoresNonModificationTool () =
     promise {
-        let! err = runRaw "read"
+        let! err, violations = runRaw "read"
         check "opencode read passes" (err = "")
+        check "opencode read has no violations" (violations.IsEmpty)
     }
 
 /// Host may omit `output.args`; enforcement must still read `input.args` (or empty object).
@@ -87,15 +99,26 @@ let opencodeRejectsCoderWhenOutputArgsAbsent () =
 
         let output = createObj []
         let mutable err = ""
+        let mutable violations = []
 
         try
+            Wanxiangshu.Shell.ToolHookRuntime.clearSessionCompliance "s-warn-enforce"
             do! Wanxiangshu.Opencode.HookExecute.toolExecuteBefore input output
             err <- str output "error"
+
+            violations <-
+                match Wanxiangshu.Shell.ToolHookRuntime.tryGetCompliance "s-warn-enforce" "c-warn-enforce" with
+                | Some env -> env.Violations
+                | None -> []
         with ex ->
             err <- ex.Message
 
-        check "opencode coder missing output.args still rejects missing warn_tdd" (err <> "")
-        check "opencode coder error mentions warn_tdd when output.args absent" (err.Contains "warn_tdd")
+        check "opencode coder missing output.args does not reject" (err = "")
+        check "opencode coder missing output.args has violations" (violations.Length > 0)
+
+        check
+            "opencode coder violations mention warn_tdd when output.args absent"
+            (violations |> List.exists (fun x -> x.Contains "warn_tdd"))
     }
 
 let opencodeRejectsCoderMissingWarnWhenOutputArgsAbsent () =
@@ -111,27 +134,44 @@ let opencodeRejectsCoderMissingWarnWhenOutputArgsAbsent () =
 
         let output = createObj []
         let mutable err = ""
+        let mutable violations = []
 
         try
+            Wanxiangshu.Shell.ToolHookRuntime.clearSessionCompliance "s-warn-enforce"
             do! Wanxiangshu.Opencode.HookExecute.toolExecuteBefore input output
             err <- str output "error"
+
+            violations <-
+                match Wanxiangshu.Shell.ToolHookRuntime.tryGetCompliance "s-warn-enforce" "c-warn-enforce" with
+                | Some env -> env.Violations
+                | None -> []
         with ex ->
             err <- ex.Message
 
-        check "opencode coder missing output.args rejects missing warn_tdd" (err <> "")
+        check "opencode coder missing output.args does not reject missing warn_tdd" (err = "")
+        check "opencode coder missing output.args has violations" (violations.Length > 0)
     }
 
 let opencodeRejectsExecutorMissingWarn () =
     promise {
-        let! err = runWithWarnTdd "executor"
-        check "opencode executor missing warn rejects" (err <> "")
-        check "opencode executor error mentions warn" (err.Contains "warn")
+        let! err, violations = runWithWarnTdd "executor"
+        check "opencode executor missing warn does not reject" (err = "")
+
+        check
+            "opencode executor missing warn has violations"
+            (violations |> List.exists (fun x -> x.Contains "warn: missing"))
     }
 
 let opencodeRejectsExecutorMalformedWarn () =
     promise {
-        let! err = runOpencodeHook "executor" (createObj [ "warn_tdd", box canonicalValue; "warn", box "yes" ])
-        check "opencode executor malformed warn accepts" (err = "")
+        let! err, violations =
+            runOpencodeHook "executor" (createObj [ "warn_tdd", box canonicalValue; "warn", box "yes" ])
+
+        check "opencode executor malformed warn does not reject" (err = "")
+
+        check
+            "opencode executor malformed warn has violations"
+            (violations |> List.exists (fun x -> x.Contains "warn: value is invalid"))
     }
 
 let opencodeAcceptsExecutor () =
@@ -139,15 +179,18 @@ let opencodeAcceptsExecutor () =
         let args =
             createObj [ "warn_tdd", box canonicalValue; "warn", box warnCanonicalValue ]
 
-        let! err = runOpencodeHook "executor" args
+        let! err, violations = runOpencodeHook "executor" args
         check "opencode executor canonical passes" (err = "")
+        check "opencode executor canonical has no violations" (violations.IsEmpty)
         check "opencode executor warn removed from args" (Dyn.str args "warn" = "")
     }
 
 let opencodeWriteDoesNotRequireWarn () =
     promise {
-        let! err = runWithWarnTdd "write"
+        let! err, violations = runWithWarnTdd "write"
         check "opencode write does not require warn" (err = "")
+        // write requires warn_tdd (which is provided in runWithWarnTdd), so it should have no violations
+        check "opencode write has no violations" (violations.IsEmpty)
     }
 
 // ── Exhaustive matrices driven from Kernel SSOT ────────────────────────────
@@ -161,8 +204,9 @@ let exhaustiveOpencodeWarnTdd () : JS.Promise<unit> =
                 else
                     createObj []
 
-            let! err = runOpencodeHook tool args
-            check ("opencode " + tool + " missing warn_tdd rejects") (err <> "")
+            let! err, violations = runOpencodeHook tool args
+            check ("opencode " + tool + " missing warn_tdd does not reject") (err = "")
+            check ("opencode " + tool + " missing warn_tdd has violations") (violations.Length > 0)
     }
 
 let exhaustiveOpencodeWarnTddAccepts () : JS.Promise<unit> =
@@ -177,38 +221,48 @@ let exhaustiveOpencodeWarnTddAccepts () : JS.Promise<unit> =
             if isSubagentTool tool then
                 args?warn_reuse <- box warnReuseCanonicalValue
 
-            let! err = runOpencodeHook tool args
+            let! err, violations = runOpencodeHook tool args
             check ("opencode " + tool + " canonical fields pass") (err = "")
+            check ("opencode " + tool + " canonical fields have no violations") (violations.IsEmpty)
     }
 
 let exhaustiveOpencodeWarn () : JS.Promise<unit> =
     promise {
         for tool in warnRequiredTools do
             let args = createObj [ "warn_tdd", box canonicalValue ]
-            let! err = runOpencodeHook tool args
-            check ("opencode " + tool + " missing warn rejects") (err <> "")
+            let! err, violations = runOpencodeHook tool args
+            check ("opencode " + tool + " missing warn does not reject") (err = "")
+            check ("opencode " + tool + " missing warn has violations") (violations.Length > 0)
     }
 
 let exhaustiveOpencodeWarnAccepts () : JS.Promise<unit> =
     promise {
         for tool in warnRequiredTools do
-            let! err = runWithBoth tool
+            let! err, violations = runWithBoth tool
             check ("opencode " + tool + " canonical warn passes") (err = "")
+            check ("opencode " + tool + " canonical warn has no violations") (violations.IsEmpty)
     }
 
 // ── warn_reuse: subagent tools must carry warn_reuse acknowledgement ──
 
 let opencodeRejectsCoderMissingWarnReuse () =
     promise {
-        let! err = runOpencodeHook "coder" (createObj [ "warn_tdd", box canonicalValue ])
-        check "opencode coder missing warn_reuse rejects" (err <> "")
-        check "opencode coder error mentions warn_reuse" (err.Contains "warn_reuse")
+        let! err, violations = runOpencodeHook "coder" (createObj [ "warn_tdd", box canonicalValue ])
+        check "opencode coder missing warn_reuse does not reject" (err = "")
+        check "opencode coder missing warn_reuse has violations" (violations.Length > 0)
+
+        check
+            "opencode coder violations mention warn_reuse"
+            (violations |> List.exists (fun x -> x.Contains "warn_reuse"))
     }
 
 let opencodeRejectsCoderMalformedWarnReuse () =
     promise {
-        let! err = runOpencodeHook "coder" (createObj [ "warn_tdd", box canonicalValue; "warn_reuse", box "wrong" ])
-        check "opencode coder malformed warn_reuse accepts" (err = "")
+        let! err, violations =
+            runOpencodeHook "coder" (createObj [ "warn_tdd", box canonicalValue; "warn_reuse", box "wrong" ])
+
+        check "opencode coder malformed warn_reuse does not reject" (err = "")
+        check "opencode coder malformed warn_reuse has violations" (violations.Length > 0)
     }
 
 let opencodeAcceptsCoderWithWarnReuse () =
@@ -216,16 +270,18 @@ let opencodeAcceptsCoderWithWarnReuse () =
         let args =
             createObj [ "warn_tdd", box canonicalValue; "warn_reuse", box warnReuseCanonicalValue ]
 
-        let! err = runOpencodeHook "coder" args
+        let! err, violations = runOpencodeHook "coder" args
         check "opencode coder canonical warn_reuse passes" (err = "")
+        check "opencode coder canonical warn_reuse has no violations" (violations.IsEmpty)
         check "opencode coder warn_tdd removed from args" (Dyn.str args "warn_tdd" = "")
         check "opencode coder warn_reuse removed from args" (Dyn.str args "warn_reuse" = "")
     }
 
 let opencodeNonSubagentIgnoresWarnReuse () =
     promise {
-        let! err = runRaw "read"
+        let! err, violations = runRaw "read"
         check "opencode read ignoring warn_reuse passes" (err = "")
+        check "opencode read has no violations" (violations.IsEmpty)
     }
 
 // ── Opencode Hook Schema warn_reuse injection tests ─────────────────────────
@@ -237,12 +293,14 @@ let opencodeHookSchemaInjectWarnReuseIntoEmptySchema () =
     injectWarnReuseIntoJsonSchema schema |> ignore
     let props = get schema "properties"
     check "warn_reuse property injected" (not (Dyn.isNullish (get props "warn_reuse")))
+    let prop = get props "warn_reuse"
+    check "warn_reuse soft-required metadata set" (Dyn.truthy (get prop "x-wanxiangshu-soft-required"))
     let required = get schema "required"
 
     check
-        "warn_reuse added to required"
-        (isArray required
-         && (required :?> obj array |> Array.exists (fun x -> string x = "warn_reuse")))
+        "warn_reuse NOT added to required"
+        (Dyn.isNullish required
+         || not (required :?> obj array |> Array.exists (fun x -> string x = "warn_reuse")))
 
 let opencodeHookSchemaInjectWarnReuseAlreadyPresent () =
     let schema =

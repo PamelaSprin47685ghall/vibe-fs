@@ -17,12 +17,6 @@ type ProjectionPolicy =
     | IncludeProjection
     | ExcludeProjection
 
-[<RequireQualifiedAccess>]
-type UsageConfidence =
-    | Observed
-    | CalibratedEstimate
-    | BootstrapEstimate
-
 type MessageTransformPlan =
     { SessionID: string
       Agent: string
@@ -90,8 +84,18 @@ let private resolveCurrentTokens
     match tokenCountOpt with
     | Some t when t > 0 -> (t, UsageConfidence.Observed)
     | _ ->
-        match estimateTokens totalBytes storeEntry.LastUsage with
-        | Some t when t > 0 -> (t, UsageConfidence.CalibratedEstimate)
+        match storeEntry.LastUsage with
+        | Some u when u.confidence <> UsageConfidence.BootstrapEstimate ->
+            let simplified =
+                Some
+                    {| tokenCount = u.tokenCount
+                       textBytes = u.textBytes |}
+
+            match estimateTokens totalBytes simplified with
+            | Some t when t > 0 -> (t, UsageConfidence.CalibratedEstimate)
+            | _ ->
+                let estimate = totalBytes / 2
+                (max 1 estimate, UsageConfidence.BootstrapEstimate)
         | _ ->
             let estimate = totalBytes / 2
             (max 1 estimate, UsageConfidence.BootstrapEstimate)
@@ -120,7 +124,11 @@ let private rebuildPhaseState
                 match stableTokensOpt with
                 | Some t -> int64 t
                 | None ->
-                    let currentLastUsage = (ContextBudgetStore.get plan.Scope plan.SessionID).LastUsage
+                    let currentLastUsage =
+                        (ContextBudgetStore.get plan.Scope plan.SessionID).LastUsage
+                        |> Option.map (fun u ->
+                            {| tokenCount = u.tokenCount
+                               textBytes = u.textBytes |})
 
                     match estimateTokens stableBytes currentLastUsage with
                     | Some t -> int64 t
@@ -245,7 +253,8 @@ let applyContextBudget
                     LastUsage =
                         Some
                             {| tokenCount = currentTokens
-                               textBytes = totalBytes |} })
+                               textBytes = totalBytes
+                               confidence = confidence |} })
 
             let backlog = backlogOps.GetOrRebuildBacklog plan.SessionID plan.Cleaned
             let currentStore = ContextBudgetStore.get plan.Scope plan.SessionID

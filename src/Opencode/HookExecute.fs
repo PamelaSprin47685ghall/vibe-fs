@@ -98,6 +98,13 @@ let toolExecuteBeforeFor (host: Host) (input: obj) (output: obj) : JS.Promise<un
         | Result.Ok(nextArgs, env) ->
             setHookArgs output nextArgs
 
+            let sessionID = ToolHookRuntime.tryExtractSessionId input |> Option.defaultValue ""
+
+            let toolCallID =
+                ToolHookRuntime.tryExtractToolCallId input |> Option.defaultValue ""
+
+            ToolHookRuntime.saveCompliance sessionID toolCallID env
+
             match env.Amend with
             | Some n ->
                 output?("_amend") <- box n
@@ -155,13 +162,35 @@ let toolExecuteAfterFor
             let outputArgs = argsFromHookOutput output
             ToolHookRuntime.restoreAmendToArgs outputArgs amendVal
 
+        let toolCallID =
+            ToolHookRuntime.tryExtractToolCallId input |> Option.defaultValue ""
+
+        match ToolHookRuntime.tryGetCompliance sessionID toolCallID with
+        | Some env ->
+            ToolHookRuntime.restoreWarnToArgs decodedArgs env
+            let inputArgs = argsFromHookInput input
+            ToolHookRuntime.restoreWarnToArgs inputArgs env
+            let outputArgs = argsFromHookOutput output
+            ToolHookRuntime.restoreWarnToArgs outputArgs env
+
+            let currentOutput = hookOutputText output
+
+            if not env.Violations.IsEmpty then
+                let criticism = ToolHookRuntime.appendCriticism currentOutput env.Violations
+                setHookOutputString output criticism
+
+            ToolHookRuntime.removeCompliance sessionID toolCallID
+        | None -> ()
+
         let argsJson = JS.JSON.stringify (argsFromHookInput input)
 
-        if isNetworkErrorText originalOutput then
+        let finalOutput = hookOutputText output
+
+        if isNetworkErrorText finalOutput then
             setHookError output "network connection lost"
 
         if hookOutputError output = "" then
-            if LivelockGuard.check scope sessionID tool argsJson originalOutput then
+            if LivelockGuard.check scope sessionID tool argsJson finalOutput then
                 setHookError output "livelock guard: repeated identical tool call with identical result"
 
         do! lifecycleObserver.handleToolExecuteAfter input output

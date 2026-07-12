@@ -5,7 +5,12 @@ let defaultExcludedAgents =
 
 let childWorkspaceExcludedAgents = set [ "exec"; "explore" ]
 
+let normalizeAgent (agent: string) : string =
+    if isNull agent then "" else agent.Trim().ToLowerInvariant()
+
 let shouldExcludeAgentFromProjection (agent: string) (isChildWorkspace: bool) : bool =
+    let agent = normalizeAgent agent
+
     Set.contains agent defaultExcludedAgents
     || (isChildWorkspace && Set.contains agent childWorkspaceExcludedAgents)
 
@@ -31,12 +36,16 @@ type ContextBudgetPolicy =
     | Disable
 
 let getBacklogProjectionPolicy (agent: string) (isChildWorkspace: bool) : BacklogProjectionPolicy =
+    let agent = normalizeAgent agent
+
     if shouldExcludeAgentFromProjection agent isChildWorkspace then
         BacklogProjectionPolicy.Exclude
     else
         BacklogProjectionPolicy.Include
 
 let getCapsInjectionPolicy (agent: string) (isChildWorkspace: bool) : CapsInjectionPolicy =
+    let agent = normalizeAgent agent
+
     match agent with
     | "browser"
     | "executor"
@@ -51,6 +60,8 @@ let getCapsInjectionPolicy (agent: string) (isChildWorkspace: bool) : CapsInject
             CapsInjectionPolicy.Include
 
 let getParallelHintPolicy (agent: string) (isChildWorkspace: bool) : ParallelHintPolicy =
+    let agent = normalizeAgent agent
+
     match agent with
     | "browser"
     | "executor"
@@ -65,6 +76,8 @@ let getParallelHintPolicy (agent: string) (isChildWorkspace: bool) : ParallelHin
             ParallelHintPolicy.Include
 
 let getContextBudgetPolicy (agent: string) (isChildWorkspace: bool) : ContextBudgetPolicy =
+    let agent = normalizeAgent agent
+
     match agent with
     | "browser"
     | "executor"

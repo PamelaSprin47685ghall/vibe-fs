@@ -6,6 +6,7 @@ open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.HostTools
 open Wanxiangshu.Kernel.CapsFormat
 open Wanxiangshu.Kernel.Messaging
+open Wanxiangshu.Kernel.ToolExecutionStatusModule
 open Wanxiangshu.Shell.Dyn
 open Wanxiangshu.Shell.MessageTransformCore
 
@@ -27,17 +28,6 @@ let tryInjectParallelToolPrompt (sessionID: string) (messages: Message<obj> list
             | ToolPart(_, callID, _, _) when isRealCallId callID -> Some callID
             | _ -> None)
 
-    let isResultForCallID (callID: string) (m: Message<obj>) : bool =
-        m.info.role = ToolResult
-        && (m.parts
-            |> List.exists (fun p ->
-                match p with
-                | ToolPart(_, cid, _, _) -> cid = callID
-                | _ -> false)
-            || m.info.id = callID
-            || m.info.id.Contains(callID)
-            || m.parts.IsEmpty)
-
     let nativeMsgs = messages |> List.filter (fun m -> m.source = Native)
 
     let lastAssistantOpt =
@@ -58,23 +48,62 @@ let tryInjectParallelToolPrompt (sessionID: string) (messages: Message<obj> list
 
             let laterMessages = nativeMsgs.[lastIdx + 1 ..]
 
-            let targetResultOpt = laterMessages |> List.tryFind (isResultForCallID targetCallID)
+            let isTerminalInAssistant =
+                lastAssistantMsg.parts
+                |> List.exists (fun p ->
+                    match p with
+                    | ToolPart(_, cid, Some state, _) when cid = targetCallID ->
+                        match state.status with
+                        | ToolExecutionStatus.Completed
+                        | ToolExecutionStatus.Error -> true
+                        | _ -> false
+                    | _ -> false)
 
-            match targetResultOpt with
-            | None -> messages
-            | Some targetResultMsg ->
-                let resultIdx =
-                    laterMessages |> List.findIndex (fun m -> m.info.id = targetResultMsg.info.id)
+            let isCompleted, messagesAfterCompletion =
+                if isTerminalInAssistant then
+                    (true, laterMessages)
+                else
+                    let completionMsgOpt =
+                        laterMessages
+                        |> List.tryFind (fun m ->
+                            let hasTerminalPart =
+                                m.parts
+                                |> List.exists (fun p ->
+                                    match p with
+                                    | ToolPart(_, cid, stateOpt, _) when cid = targetCallID ->
+                                        match stateOpt with
+                                        | Some state ->
+                                            match state.status with
+                                            | ToolExecutionStatus.Completed
+                                            | ToolExecutionStatus.Error -> true
+                                            | _ -> false
+                                        | None -> true
+                                    | _ -> false)
 
-                let messagesAfterResult = laterMessages.[resultIdx + 1 ..]
+                            let isMatchingToolResult =
+                                m.info.role = ToolResult
+                                && (m.info.id = targetCallID || m.info.id.Contains(targetCallID))
 
+                            hasTerminalPart || isMatchingToolResult)
+
+                    match completionMsgOpt with
+                    | None -> (false, [])
+                    | Some completionMsg ->
+                        let completionIdx =
+                            laterMessages |> List.findIndex (fun m -> m.info.id = completionMsg.info.id)
+
+                        (true, laterMessages.[completionIdx + 1 ..])
+
+            if not isCompleted then
+                messages
+            else
                 let hasLaterAssistant =
-                    messagesAfterResult |> List.exists (fun m -> m.info.role = Assistant)
+                    messagesAfterCompletion |> List.exists (fun m -> m.info.role = Assistant)
 
                 if hasLaterAssistant then
                     messages
                 else
-                    let hintId = "parallel-tool-hint:" + targetCallID
+                    let hintId = "parallel-tool-synth-" + targetCallID
 
                     let alreadyHasHint =
                         messages
@@ -99,7 +128,7 @@ let tryInjectParallelToolPrompt (sessionID: string) (messages: Message<obj> list
                                   details = null
                                   time = null }
                               parts = [ TextPart Wanxiangshu.Kernel.PromptFragments.parallelToolPromptProse ]
-                              source = Synthetic "parallel-tool-hint:"
+                              source = Synthetic "parallel-tool-synth-"
                               raw = null }
 
                         List.append messages [ synthMsg ]

@@ -165,7 +165,7 @@ let private mkTodoWriteWrapper (host: Host) (projection: ProjectionStore) : obj 
                         | Error e, _
                         | _, Error e ->
                             return createObj [ "success", box false; "output", box (wireDecodeFailure "todowrite" e) ]
-                        | Ok tw, Ok o ->
+                        | Ok(tw, violations), Ok o ->
                             captureTodoReportFromDecoded host projection tw o
                             let methodologies = tw.SelectMethodology
                             let nativeArgs = createObj [ "todos", todoArrayForNativeWrite tw ]
@@ -178,12 +178,13 @@ let private mkTodoWriteWrapper (host: Host) (projection: ProjectionStore) : obj 
                                     Promise.lift raw
 
                             let output = todoWriteOutput methodologies
+                            let finalOutput = ToolHookRuntime.appendCriticism output violations
 
                             let nextResult =
                                 if Dyn.typeIs result "object" then
-                                    Dyn.withKey result "output" (box output)
+                                    Dyn.withKey result "output" (box finalOutput)
                                 else
-                                    createObj [ "success", box true; "output", box output ]
+                                    createObj [ "success", box true; "output", box finalOutput ]
 
                             match fromMuxConfig opts with
                             | Ok runtime ->

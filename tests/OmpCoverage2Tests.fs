@@ -30,7 +30,7 @@ let processCwd () : string = jsNative
 let childOnlySet = Set.ofArray ompChildOnlyToolNames
 
 let fakeEvent (toolName: string) (input: obj) : obj =
-    createObj [ "toolName", box toolName; "input", box input ]
+    createObj [ "toolName", box toolName; "input", box input; "toolCallId", box "c1" ]
 
 let fakeResultEvent (toolName: string) (content: string) : obj =
     createObj
@@ -62,9 +62,12 @@ let toolCallHandler_missingWarnTddBlocks () =
     let event = fakeEvent "coder" (createObj [])
 
     promise {
+        Wanxiangshu.Shell.ToolHookRuntime.clearSessionCompliance "s1"
         let! result = toolCallHandler pi store event (fakeCtx "s1" "/tmp")
-        let block = Dyn.getValue<bool> result "block"
-        check "block is true for missing warn_tdd" block
+        check "missing warn_tdd does not block" (Dyn.isNullish result)
+        let comp = Wanxiangshu.Shell.ToolHookRuntime.tryGetCompliance "s1" "c1"
+        check "missing warn_tdd has compliance entry" comp.IsSome
+        check "compliance entry has violations" (comp.Value.Violations.Length > 0)
     }
 
 let toolCallHandler_childOnlyToolBlockedInMainSession () =
@@ -108,9 +111,12 @@ let toolCallHandler_childSessionCoderMissingWarnTddBlocked () =
     let event = fakeEvent "coder" (createObj [])
 
     promise {
+        Wanxiangshu.Shell.ToolHookRuntime.clearSessionCompliance childId
         let! result = toolCallHandler pi store event (fakeCtx childId "/tmp")
-        let block = Dyn.getValue<bool> result "block"
-        check "child session coder without warn_tdd blocked" block
+        check "child session coder without warn_tdd does not block" (Dyn.isNullish result)
+        let comp = Wanxiangshu.Shell.ToolHookRuntime.tryGetCompliance childId "c1"
+        check "missing warn_tdd child session has compliance entry" comp.IsSome
+        check "compliance entry child session has violations" (comp.Value.Violations.Length > 0)
         Wanxiangshu.Omp.ChildSession.unmarkChildSession scope childId
     }
 
@@ -125,9 +131,12 @@ let toolCallHandler_childSessionExecutorMissingWarnBlocked () =
     let event = fakeEvent "executor" (createObj [])
 
     promise {
+        Wanxiangshu.Shell.ToolHookRuntime.clearSessionCompliance childId
         let! result = toolCallHandler pi store event (fakeCtx childId "/tmp")
-        let block = Dyn.getValue<bool> result "block"
-        check "child session executor without warn blocked" block
+        check "child session executor without warn does not block" (Dyn.isNullish result)
+        let comp = Wanxiangshu.Shell.ToolHookRuntime.tryGetCompliance childId "c1"
+        check "missing warn child session has compliance entry" comp.IsSome
+        check "compliance entry child session executor has violations" (comp.Value.Violations.Length > 0)
         Wanxiangshu.Omp.ChildSession.unmarkChildSession scope childId
     }
 

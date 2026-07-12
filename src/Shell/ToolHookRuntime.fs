@@ -127,7 +127,135 @@ type ControlEnvelope =
     { WarnTdd: string option
       Warn: string option
       WarnReuse: string option
-      Amend: int option }
+      Amend: int option
+      Violations: string list }
+
+let private complianceStore =
+    System.Collections.Generic.Dictionary<string, ControlEnvelope>()
+
+let saveCompliance (sessionID: string) (toolCallID: string) (env: ControlEnvelope) : unit =
+    if
+        not (System.String.IsNullOrWhiteSpace sessionID)
+        && not (System.String.IsNullOrWhiteSpace toolCallID)
+    then
+        let key = sessionID + "_" + toolCallID
+        complianceStore.[key] <- env
+
+let tryGetCompliance (sessionID: string) (toolCallID: string) : ControlEnvelope option =
+    if
+        System.String.IsNullOrWhiteSpace sessionID
+        || System.String.IsNullOrWhiteSpace toolCallID
+    then
+        None
+    else
+        let key = sessionID + "_" + toolCallID
+
+        match complianceStore.TryGetValue(key) with
+        | true, env -> Some env
+        | _ -> None
+
+let removeCompliance (sessionID: string) (toolCallID: string) : unit =
+    if
+        not (System.String.IsNullOrWhiteSpace sessionID)
+        && not (System.String.IsNullOrWhiteSpace toolCallID)
+    then
+        let key = sessionID + "_" + toolCallID
+        complianceStore.Remove(key) |> ignore
+
+let clearSessionCompliance (sessionID: string) : unit =
+    if not (System.String.IsNullOrWhiteSpace sessionID) then
+        let keysToRemove =
+            complianceStore.Keys
+            |> Seq.filter (fun k -> k.StartsWith(sessionID + "_"))
+            |> Seq.toList
+
+        for k in keysToRemove do
+            complianceStore.Remove(k) |> ignore
+
+let restoreWarnToArgs (args: obj) (env: ControlEnvelope) : unit =
+    if not (Dyn.isNullish args) then
+        match env.WarnTdd with
+        | Some v -> args?("warn_tdd") <- box v
+        | None -> ()
+
+        match env.Warn with
+        | Some v -> args?("warn") <- box v
+        | None -> ()
+
+        match env.WarnReuse with
+        | Some v -> args?("warn_reuse") <- box v
+        | None -> ()
+
+let appendCriticism (output: string) (violations: string list) : string =
+    if violations.IsEmpty then
+        output
+    else
+        let builder = System.Text.StringBuilder()
+        builder.AppendLine() |> ignore
+        builder.AppendLine() |> ignore
+        builder.AppendLine("严重协议违例：") |> ignore
+
+        for v in violations do
+            builder.AppendLine("- " + v) |> ignore
+
+        builder.AppendLine() |> ignore
+        builder.AppendLine("工具已经成功执行。不要重复本次工具调用。") |> ignore
+        let criticism = builder.ToString()
+
+        if output = null then criticism else output + criticism
+
+let tryExtractToolCallId (input: obj) : string option =
+    if Dyn.isNullish input then
+        None
+    else
+        match DynField.strField input "toolCallId" with
+        | Some id when id <> "" -> Some id
+        | _ ->
+            match DynField.strField input "callId" with
+            | Some id when id <> "" -> Some id
+            | _ ->
+                match DynField.strField input "callID" with
+                | Some id when id <> "" -> Some id
+                | _ ->
+                    let toolObj = Dyn.get input "tool"
+
+                    if not (Dyn.isNullish toolObj) && Dyn.typeIs toolObj "object" then
+                        match DynField.strField toolObj "callID" with
+                        | Some id when id <> "" -> Some id
+                        | _ ->
+                            match DynField.strField toolObj "callId" with
+                            | Some id when id <> "" -> Some id
+                            | _ ->
+                                match DynField.strField toolObj "toolCallId" with
+                                | Some id when id <> "" -> Some id
+                                | _ -> None
+                    else
+                        None
+
+let tryExtractSessionId (input: obj) : string option =
+    if Dyn.isNullish input then
+        None
+    else
+        match DynField.strField input "sessionID" with
+        | Some id when id <> "" -> Some id
+        | _ ->
+            match DynField.strField input "sessionId" with
+            | Some id when id <> "" -> Some id
+            | _ ->
+                match DynField.strField input "session_id" with
+                | Some id when id <> "" -> Some id
+                | _ ->
+                    match DynField.strField input "workspaceId" with
+                    | Some id when id <> "" -> Some id
+                    | _ ->
+                        let sessionObj = Dyn.get input "session"
+
+                        if not (Dyn.isNullish sessionObj) && Dyn.typeIs sessionObj "object" then
+                            match DynField.strField sessionObj "id" with
+                            | Some id when id <> "" -> Some id
+                            | _ -> None
+                        else
+                            None
 
 let getToolCapabilities (toolName: string) : ToolCapability list =
     let t = toolName.ToLowerInvariant().Trim()
@@ -155,7 +283,9 @@ let inlineJsonWarnTddProperty: obj =
     createObj
         [ "type", box "string"
           "enum", box [| box "i-am-sure-i-have-followed-tdd-and-kolmogorov-principles-and-kept-todo-updated" |]
-          "description", box "Acknowledge that tests are written first (TDD) and Kolmogorov discipline is followed." ]
+          "description",
+          box "MUST acknowledge that tests are written first (TDD) and Kolmogorov discipline is followed."
+          "x-wanxiangshu-soft-required", box true ]
 
 let inlineJsonWarnProperty: obj =
     createObj
@@ -166,13 +296,15 @@ let inlineJsonWarnProperty: obj =
                      "it-is-not-possible-to-do-it-using-other-tools-and-only-run-tests-when-static-analysis-cannot-handle-it" |]
           "description",
           box
-              "Acknowledge that this task cannot be done with other tools and only run tests when static analysis cannot handle it." ]
+              "MUST acknowledge that this task cannot be done with other tools and only run tests when static analysis cannot handle it."
+          "x-wanxiangshu-soft-required", box true ]
 
 let inlineJsonWarnReuseProperty: obj =
     createObj
         [ "type", box "string"
           "enum", box [| box "this-task-is-not-suitable-to-be-completed-via-continue-tool" |]
-          "description", box "Acknowledge that this task is not suitable for completion via continue tool." ]
+          "description", box "MUST acknowledge that this task is not suitable for completion via continue tool."
+          "x-wanxiangshu-soft-required", box true ]
 
 let inlineJsonAmendProperty: obj =
     createObj
@@ -195,50 +327,46 @@ let decorateAndValidateSchema (toolName: string) (schema: obj) : obj =
             if List.contains FileMutation caps then
                 if Dyn.isNullish (Dyn.get props "warn_tdd") then
                     Dyn.setKey props "warn_tdd" inlineJsonWarnTddProperty
-
-                let req = Dyn.get schema "required"
-
-                if Dyn.isArray req then
-                    let arr = req :?> obj array
-
-                    if not (Array.exists (fun x -> string x = "warn_tdd") arr) then
-                        let nextReq = Array.append arr [| box "warn_tdd" |]
-                        Dyn.setKey schema "required" nextReq
                 else
-                    Dyn.setKey schema "required" [| box "warn_tdd" |]
+                    let prop = Dyn.get props "warn_tdd"
+
+                    if not (Dyn.isNullish prop) then
+                        Dyn.setKey prop "x-wanxiangshu-soft-required" true
 
             if List.contains ProcessExecution caps then
                 if Dyn.isNullish (Dyn.get props "warn") then
                     Dyn.setKey props "warn" inlineJsonWarnProperty
-
-                let req = Dyn.get schema "required"
-
-                if Dyn.isArray req then
-                    let arr = req :?> obj array
-
-                    if not (Array.exists (fun x -> string x = "warn") arr) then
-                        let nextReq = Array.append arr [| box "warn" |]
-                        Dyn.setKey schema "required" nextReq
                 else
-                    Dyn.setKey schema "required" [| box "warn" |]
+                    let prop = Dyn.get props "warn"
+
+                    if not (Dyn.isNullish prop) then
+                        Dyn.setKey prop "x-wanxiangshu-soft-required" true
 
             if List.contains SubagentDelegation caps then
                 if Dyn.isNullish (Dyn.get props "warn_reuse") then
                     Dyn.setKey props "warn_reuse" inlineJsonWarnReuseProperty
-
-                let req = Dyn.get schema "required"
-
-                if Dyn.isArray req then
-                    let arr = req :?> obj array
-
-                    if not (Array.exists (fun x -> string x = "warn_reuse") arr) then
-                        let nextReq = Array.append arr [| box "warn_reuse" |]
-                        Dyn.setKey schema "required" nextReq
                 else
-                    Dyn.setKey schema "required" [| box "warn_reuse" |]
+                    let prop = Dyn.get props "warn_reuse"
+
+                    if not (Dyn.isNullish prop) then
+                        Dyn.setKey prop "x-wanxiangshu-soft-required" true
 
             if Dyn.isNullish (Dyn.get props "amend") then
                 Dyn.setKey props "amend" inlineJsonAmendProperty
+
+            // Remove warn fields from required list to avoid host hard rejection
+            let req = Dyn.get schema "required"
+
+            if Dyn.isArray req then
+                let arr = req :?> obj array
+
+                let nextReq =
+                    arr
+                    |> Array.filter (fun x ->
+                        let s = string x
+                        s <> "warn_tdd" && s <> "warn" && s <> "warn_reuse")
+
+                Dyn.setKey schema "required" nextReq
 
             // Validation (Fail Closed)
             let requiredList =
@@ -254,20 +382,20 @@ let decorateAndValidateSchema (toolName: string) (schema: obj) : obj =
                     failwith
                         $"Schema Validation Failed: required field '{reqField}' is not defined in properties of tool '{toolName}'"
 
-            if List.contains FileMutation caps && not (List.contains "warn_tdd" requiredList) then
+            if List.contains FileMutation caps && Dyn.isNullish (Dyn.get props "warn_tdd") then
                 failwith
-                    $"Schema Validation Failed: FileMutation tool '{toolName}' is missing required field 'warn_tdd'"
+                    $"Schema Validation Failed: FileMutation tool '{toolName}' is missing field 'warn_tdd' in properties"
 
-            if List.contains ProcessExecution caps && not (List.contains "warn" requiredList) then
+            if List.contains ProcessExecution caps && Dyn.isNullish (Dyn.get props "warn") then
                 failwith
-                    $"Schema Validation Failed: ProcessExecution tool '{toolName}' is missing required field 'warn'"
+                    $"Schema Validation Failed: ProcessExecution tool '{toolName}' is missing field 'warn' in properties"
 
             if
                 List.contains SubagentDelegation caps
-                && not (List.contains "warn_reuse" requiredList)
+                && Dyn.isNullish (Dyn.get props "warn_reuse")
             then
                 failwith
-                    $"Schema Validation Failed: SubagentDelegation tool '{toolName}' is missing required field 'warn_reuse'"
+                    $"Schema Validation Failed: SubagentDelegation tool '{toolName}' is missing field 'warn_reuse' in properties"
 
             schema
 
@@ -373,7 +501,8 @@ let executeBeforeGateway (tool: string) (args: obj) : Result<obj * ControlEnvelo
             { WarnTdd = None
               Warn = None
               WarnReuse = None
-              Amend = None }
+              Amend = None
+              Violations = [] }
         )
     else
         coerceArgsTypes tool args
@@ -431,66 +560,47 @@ let executeBeforeGateway (tool: string) (args: obj) : Result<obj * ControlEnvelo
             else
                 args
 
-        // Validate applicability & correctness
-        let checkWarnTdd =
-            if List.contains FileMutation caps then
-                match warnTddVal with
-                | Some v when not (System.String.IsNullOrWhiteSpace v) -> Result.Ok()
-                | _ ->
-                    let err =
-                        InvalidIntent(tool, "warn_tdd", "required — acknowledge TDD + Kolmogorov discipline")
+        // Validate soft required fields into violations list
+        let violations =
+            [ if List.contains FileMutation caps then
+                  match warnTddVal with
+                  | None -> yield "warn_tdd: missing required acknowledgement"
+                  | Some v ->
+                      let norm = v.Trim().ToLowerInvariant()
 
-                    Result.Error(wireDomainFailure tool err)
-            else
-                Result.Ok()
+                      if norm <> WarnTdd.canonicalValue then
+                          yield $"warn_tdd: value is invalid (got '%s{v}', expected '%s{WarnTdd.canonicalValue}')"
 
-        let checkWarn =
-            if List.contains ProcessExecution caps then
-                match warnVal with
-                | Some v when not (System.String.IsNullOrWhiteSpace v) -> Result.Ok()
-                | _ ->
-                    let err =
-                        InvalidIntent(tool, "warn", "required — acknowledge this task cannot be done with other tools")
+              if List.contains ProcessExecution caps then
+                  match warnVal with
+                  | None -> yield "warn: missing required acknowledgement"
+                  | Some v ->
+                      let norm = v.Trim().ToLowerInvariant()
 
-                    Result.Error(wireDomainFailure tool err)
-            else
-                Result.Ok()
+                      if norm <> WarnTdd.warnCanonicalValue then
+                          yield $"warn: value is invalid (got '%s{v}', expected '%s{WarnTdd.warnCanonicalValue}')"
 
-        let checkWarnReuse =
-            if List.contains SubagentDelegation caps then
-                match warnReuseVal with
-                | Some v when not (System.String.IsNullOrWhiteSpace v) -> Result.Ok()
-                | _ ->
-                    let err =
-                        InvalidIntent(
-                            tool,
-                            "warn_reuse",
-                            "required — acknowledge this task is not suitable for completion via continue tool"
-                        )
+              if List.contains SubagentDelegation caps then
+                  match warnReuseVal with
+                  | None -> yield "warn_reuse: missing required acknowledgement"
+                  | Some v ->
+                      let norm = v.Trim().ToLowerInvariant()
 
-                    Result.Error(wireDomainFailure tool err)
-            else
-                Result.Ok()
+                      if norm <> WarnTdd.warnReuseCanonicalValue then
+                          yield
+                              $"warn_reuse: value is invalid (got '%s{v}', expected '%s{WarnTdd.warnReuseCanonicalValue}')" ]
 
-        match checkWarnTdd with
-        | Result.Error e -> Result.Error e
-        | Result.Ok() ->
-            match checkWarn with
-            | Result.Error e -> Result.Error e
-            | Result.Ok() ->
-                match checkWarnReuse with
-                | Result.Error e -> Result.Error e
-                | Result.Ok() ->
-                    match amendVal with
-                    | Some n ->
-                        defineHiddenAmend args (box n)
-                        defineHiddenAmend nextArgs (box n)
-                    | None -> ()
+        match amendVal with
+        | Some n ->
+            defineHiddenAmend args (box n)
+            defineHiddenAmend nextArgs (box n)
+        | None -> ()
 
-                    let env =
-                        { WarnTdd = warnTddVal
-                          Warn = warnVal
-                          WarnReuse = warnReuseVal
-                          Amend = amendVal }
+        let env =
+            { WarnTdd = warnTddVal
+              Warn = warnVal
+              WarnReuse = warnReuseVal
+              Amend = amendVal
+              Violations = violations }
 
-                    Result.Ok(nextArgs, env)
+        Result.Ok(nextArgs, env)

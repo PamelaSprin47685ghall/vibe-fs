@@ -74,7 +74,13 @@ type ProgressObserver
 
                     if not (Dyn.isNullish args) then
                         match decodeTodoWriteArgs (host = Mimocode) args with
-                        | Ok args when sid <> "" -> do! appendWorkBacklogCommittedOrFail directory sid args
+                        | Ok(decodedArgs, violations) when sid <> "" ->
+                            do! appendWorkBacklogCommittedOrFail directory sid decodedArgs
+
+                            if not violations.IsEmpty then
+                                let currentOutput = hookOutputText output
+                                let criticism = ToolHookRuntime.appendCriticism currentOutput violations
+                                setHookOutputString output criticism
                         | Error err -> failwithf "DECODE_FAILED: %A" err
                 | None -> ()
             elif tool = "task_complete" then

@@ -70,7 +70,10 @@ let todoWriteWrapperSpec (reg: obj) =
         check "todo_write wrapper succeeds after codec decode" (truthy (get result "success"))
         let output = str result "output"
         check "todo_write wrapper produces output" (output.Length > 0)
-        check "todo_write wrapper includes methodology followup hint in envelope" (hasExactHint output (hintMethodologyFollowup "test_driven_reasoning"))
+
+        check
+            "todo_write wrapper includes methodology followup hint in envelope"
+            (hasExactHint output (hintMethodologyFollowup "test_driven_reasoning"))
     }
 
 let todoWriteWrapperDecodeFailureSpec (reg: obj) =
@@ -106,10 +109,10 @@ let todoWriteWrapperDecodeFailureSpec (reg: obj) =
             $ (missingReportArgs, createObj [ "toolCallId", box "integration-todo-decode-1" ])
             |> unbox<JS.Promise<obj>>
 
-        check "todo_write missing ahaMoments success false" (not (truthy (get r1 "success")))
+        check "todo_write missing ahaMoments success true" (truthy (get r1 "success"))
         let out1 = str r1 "output"
-        check "todo_write missing ahaMoments output invalid" (out1.Contains "invalid")
-        check "todo_write missing ahaMoments names todowrite" (out1.Contains "todowrite")
+        check "todo_write missing ahaMoments output has criticism" (out1.Contains "严重协议违例")
+        check "todo_write missing ahaMoments mentions missing field" (out1.Contains "ahaMoments: missing")
 
         let validArgs =
             createObj

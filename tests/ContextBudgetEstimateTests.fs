@@ -43,7 +43,8 @@ let spec_applyContextBudget_estimatesFromLastUsageWhenApiMissing () =
                 LastUsage =
                     Some
                         {| tokenCount = 60000
-                           textBytes = 10000 |} })
+                           textBytes = 10000
+                           confidence = UsageConfidence.Observed |} })
 
         let msgInfo: MessageInfo<obj> =
             { id = "user-1"

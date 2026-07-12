@@ -8,7 +8,10 @@ open Wanxiangshu.Shell.SerialStateHolder
 
 type ContextBudgetEntry =
     { State: ContextState option
-      LastUsage: {| tokenCount: int; textBytes: int |} option
+      LastUsage:
+          {| tokenCount: int
+             textBytes: int
+             confidence: UsageConfidence |} option
       LastBacklog: Wanxiangshu.Kernel.BacklogProjectionCore.BacklogEntry list
       NudgeTrack: BudgetNudgeTrack
       ResolvedLimit: {| limit: int; source: string |} option

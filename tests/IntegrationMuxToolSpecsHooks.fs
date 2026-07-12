@@ -114,7 +114,11 @@ let muxToolSchemasAreCleanStaticallyButInjectedDynamicallySpec () =
         check "coder tool exists" (not (isNullish coder))
         let coderProps = staticProperties coder
         check "registered coder schema has warn_tdd" (not (isNullish (Dyn.get coderProps "warn_tdd")))
-        check "registered coder required has warn_tdd" (staticRequired coder |> Array.contains "warn_tdd")
+        check "registered coder required has NO warn_tdd" (not (staticRequired coder |> Array.contains "warn_tdd"))
+
+        check
+            "registered coder warn_tdd is soft-required"
+            (Dyn.truthy (Dyn.get (Dyn.get coderProps "warn_tdd") "x-wanxiangshu-soft-required"))
         // executor: no warn or warn_tdd in raw static BuiltinTools schema
         let staticExec =
             Wanxiangshu.Mux.BuiltinTools.executorTool
@@ -131,8 +135,19 @@ let muxToolSchemasAreCleanStaticallyButInjectedDynamicallySpec () =
         let execProps = staticProperties executor
         check "registered executor schema has warn" (not (isNullish (Dyn.get execProps "warn")))
         check "registered executor schema has warn_tdd" (not (isNullish (Dyn.get execProps "warn_tdd")))
-        check "registered executor required has warn" (staticRequired executor |> Array.contains "warn")
-        check "registered executor required has warn_tdd" (staticRequired executor |> Array.contains "warn_tdd")
+        check "registered executor required has NO warn" (not (staticRequired executor |> Array.contains "warn"))
+
+        check
+            "registered executor required has NO warn_tdd"
+            (not (staticRequired executor |> Array.contains "warn_tdd"))
+
+        check
+            "registered executor warn is soft-required"
+            (Dyn.truthy (Dyn.get (Dyn.get execProps "warn") "x-wanxiangshu-soft-required"))
+
+        check
+            "registered executor warn_tdd is soft-required"
+            (Dyn.truthy (Dyn.get (Dyn.get execProps "warn_tdd") "x-wanxiangshu-soft-required"))
         // write (staticWrite): no warn_tdd in raw BuiltinTools.writeTool schema
         let staticWrite = Wanxiangshu.Mux.BuiltinTools.writeTool (createObj [])
         let staticWriteProps = staticProperties (box staticWrite)
@@ -142,7 +157,11 @@ let muxToolSchemasAreCleanStaticallyButInjectedDynamicallySpec () =
         check "write tool exists" (not (isNullish write))
         let writeProps = staticProperties write
         check "registered write schema has warn_tdd" (not (isNullish (Dyn.get writeProps "warn_tdd")))
-        check "registered write required has warn_tdd" (staticRequired write |> Array.contains "warn_tdd")
+        check "registered write required has NO warn_tdd" (not (staticRequired write |> Array.contains "warn_tdd"))
+
+        check
+            "registered write warn_tdd is soft-required"
+            (Dyn.truthy (Dyn.get (Dyn.get writeProps "warn_tdd") "x-wanxiangshu-soft-required"))
         // dynamic injection hook must be present
         let hook = get reg "tool.execute.before"
         check "tool.execute.before hook is present for dynamic warn/warn_tdd injection" (not (isNullish hook))

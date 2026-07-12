@@ -87,8 +87,12 @@ let toolDefinitionSpec () =
             unbox<obj[]> (get (get patchDef "jsonSchema") "required") |> Array.map string
 
         check
-            "tool.definition requires warn_tdd for apply_patch jsonSchema"
-            (patchRequired |> Array.contains "warn_tdd")
+            "tool.definition does NOT require warn_tdd in required for apply_patch jsonSchema"
+            (not (patchRequired |> Array.contains "warn_tdd"))
+
+        let patchProps = get (get patchDef "jsonSchema") "properties"
+        let warnTddProp = get patchProps "warn_tdd"
+        check "warn_tdd soft-required in jsonSchema properties" (truthy (get warnTddProp "x-wanxiangshu-soft-required"))
 
         let todoParams = createObj [ "__effectSchema", box true ]
 
@@ -116,9 +120,10 @@ let toolDefinitionSpec () =
 
         check
             "tool.definition builds todo report description"
-            (str reportSchema "description" = Wanxiangshu.Kernel.WorkBacklog.ahaMomentsDesc)
+            ((str reportSchema "description")
+                .Contains(Wanxiangshu.Kernel.WorkBacklog.ahaMomentsDesc))
 
-        check "tool.definition requires todo report" (required |> Array.contains "ahaMoments")
+        check "tool.definition does NOT require todo report" (not (required |> Array.contains "ahaMoments"))
         check "tool.definition requires todos" (required |> Array.contains "todos")
 
         check

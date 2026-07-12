@@ -43,7 +43,7 @@ let muxTodoWriteWrapperSchemaSpec () =
             let todoProps = get todoItem "properties"
             let required = unbox<string[]> (get schema "required")
             let todoRequired = unbox<string[]> (get todoItem "required")
-            check "mux todo_write wrapper requires ahaMoments" (required |> Array.contains "ahaMoments")
+            check "mux todo_write wrapper does NOT require ahaMoments" (not (required |> Array.contains "ahaMoments"))
             check "mux todo_write wrapper exposes priority" (not (isNullish (get todoProps "priority")))
             check "mux todo_write wrapper requires priority" (todoRequired |> Array.contains "priority")
     }

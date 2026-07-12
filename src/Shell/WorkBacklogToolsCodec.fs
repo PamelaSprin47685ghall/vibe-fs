@@ -93,44 +93,44 @@ let private decodeSelectMethodology (args: obj) : string list =
     | None -> []
     | Some items -> items
 
-let private requireReportField (args: obj) (field: string) : Result<string, DomainError> =
-    strField args field
-    |> Option.map (fun v -> v.Trim())
-    |> function
-        | Some v when v.Length >= reportMinLength -> Ok v
-        | Some _ -> Error(InvalidIntent("todowrite", field, sprintf "must be at least %d characters" reportMinLength))
-        | None -> Error(InvalidIntent("todowrite", field, "required"))
+let decodeTodoWriteArgs (isTask: bool) (args: obj) : Result<TodoWriteArgs * string list, DomainError> =
+    let decodeReportField k =
+        if isTask then
+            ("", None)
+        else
+            match strField args k with
+            | None -> ("", Some(sprintf "%s: missing required field" k))
+            | Some v ->
+                let trimmed = v.Trim()
 
-let decodeTodoWriteArgs (isTask: bool) (args: obj) : Result<TodoWriteArgs, DomainError> =
-    let getReportField k =
-        if isTask then Ok "" else requireReportField args k
+                if trimmed.Length < reportMinLength then
+                    (trimmed,
+                     Some(sprintf "%s: length is %d, expected at least %d characters" k trimmed.Length reportMinLength))
+                else
+                    (trimmed, None)
 
-    let ahaResult = getReportField "ahaMoments"
-    let changesResult = getReportField "changesAndReasons"
-    let gotchasResult = getReportField "gotchas"
-    let lessonsResult = getReportField "lessonsAndConventions"
-    let planResult = getReportField "plan"
-    let todosResult = decodeTodos args
+    let ahaMoments, ahaViol = decodeReportField "ahaMoments"
+    let changesAndReasons, changesViol = decodeReportField "changesAndReasons"
+    let gotchas, gotchasViol = decodeReportField "gotchas"
+    let lessonsAndConventions, lessonsViol = decodeReportField "lessonsAndConventions"
+    let plan, planViol = decodeReportField "plan"
 
-    ahaResult
-    |> Result.bind (fun ahaMoments ->
-        changesResult
-        |> Result.bind (fun changesAndReasons ->
-            gotchasResult
-            |> Result.bind (fun gotchas ->
-                lessonsResult
-                |> Result.bind (fun lessonsAndConventions ->
-                    planResult
-                    |> Result.bind (fun plan ->
-                        todosResult
-                        |> Result.map (fun todos ->
-                            { AhaMoments = ahaMoments
-                              ChangesAndReasons = changesAndReasons
-                              Gotchas = gotchas
-                              LessonsAndConventions = lessonsAndConventions
-                              Plan = plan
-                              Todos = todos
-                              SelectMethodology = decodeSelectMethodology args }))))))
+    let violations =
+        [ ahaViol; changesViol; gotchasViol; lessonsViol; planViol ] |> List.choose id
+
+    match decodeTodos args with
+    | Error e -> Error e
+    | Ok todos ->
+        let decodedArgs =
+            { AhaMoments = ahaMoments
+              ChangesAndReasons = changesAndReasons
+              Gotchas = gotchas
+              LessonsAndConventions = lessonsAndConventions
+              Plan = plan
+              Todos = todos
+              SelectMethodology = decodeSelectMethodology args }
+
+        Ok(decodedArgs, violations)
 
 let decodeTodoToolOpts (opts: obj) : Result<TodoToolOpts, DomainError> =
     match strField opts "toolCallId" with

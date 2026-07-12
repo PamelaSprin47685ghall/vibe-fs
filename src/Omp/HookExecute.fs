@@ -49,17 +49,22 @@ let private normalizePatchArgs (toolName: string) (args: obj) : unit =
                 if fromText <> "" then
                     args?patchText <- box fromText
 
-/// Shared pre-execute normalisation: patch argument unification to `patchText`
-/// and `_ui` label injection for subagent intents. Called by both the
-/// `tool_call` pre-execute hook and the `tool_result` post-execute hook
-/// (the latter via `applyToolCallHook` to keep the logic in one place).
-let applyPreExecuteHook (toolName: string) (args: obj) : string option =
+let applyPreExecuteHookWithIds
+    (toolName: string)
+    (args: obj)
+    (sessionIdOpt: string option)
+    (toolCallIdOpt: string option)
+    : string option =
     if Dyn.isNullish args then
         None
     else
         match ToolHookRuntime.executeBeforeGateway toolName args with
         | Result.Error e -> Some e
         | Result.Ok(nextArgs, env) ->
+            let sessionId = sessionIdOpt |> Option.defaultValue ""
+            let toolCallId = toolCallIdOpt |> Option.defaultValue ""
+            ToolHookRuntime.saveCompliance sessionId toolCallId env
+
             for k in Dyn.keys args do
                 Dyn.deleteKey args k
 
@@ -69,11 +74,21 @@ let applyPreExecuteHook (toolName: string) (args: obj) : string option =
             setUiLabel args toolName
             None
 
+/// Shared pre-execute normalisation: patch argument unification to `patchText`
+/// and `_ui` label injection for subagent intents. Called by both the
+/// `tool_call` pre-execute hook and the `tool_result` post-execute hook
+/// (the latter via `applyToolCallHook` to keep the logic in one place).
+let applyPreExecuteHook (toolName: string) (args: obj) : string option =
+    applyPreExecuteHookWithIds toolName args None None
+
 /// Apply the Omp pre-tool argument normalisations that must run before any
 /// downstream consumer reads the args reference. pi exposes a `tool_call`
 /// hook that fires pre-execute — this is the right insertion point.
 /// Returns Some error message if the tool call should be blocked.
 let applyToolCallHook (toolName: string) (args: obj) : string option = applyPreExecuteHook toolName args
+
+let applyToolCallHookWithIds (toolName: string) (args: obj) (sessionId: string) (toolCallId: string) : string option =
+    applyPreExecuteHookWithIds toolName args (Some sessionId) (Some toolCallId)
 
 let applyToolResultHook (toolName: string) (args: obj) : unit =
     if not (Dyn.isNullish args) then
