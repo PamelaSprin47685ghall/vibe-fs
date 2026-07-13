@@ -87,7 +87,7 @@ let toolExecuteBeforeFor (host: Host) (input: obj) (output: obj) : JS.Promise<un
             && Dyn.typeIs inputArgs "object"
             && Dyn.typeIs args "object"
         then
-            for k in [| "warn_tdd"; "warn"; "warn_reuse"; "amend" |] do
+            for k in [| "warn_tdd"; "warn"; "warn_reuse" |] do
                 if Dyn.has inputArgs k && not (Dyn.has args k) then
                     args?(k) <- inputArgs?(k)
 
@@ -105,11 +105,6 @@ let toolExecuteBeforeFor (host: Host) (input: obj) (output: obj) : JS.Promise<un
 
             ToolHookRuntime.saveCompliance sessionID toolCallID env
 
-            match env.Amend with
-            | Some n ->
-                output?("_amend") <- box n
-                input?("_amend") <- box n
-            | None -> ()
 
             HookSchema.setUiLabel args tool
             HookSchema.setUiLabel nextArgs tool
@@ -138,29 +133,6 @@ let toolExecuteAfterFor
 
         let decodedArgs = argsFromHookInput input
 
-        let amendVal =
-            let fromOutput = Dyn.get output "_amend"
-
-            if not (Dyn.isNullish fromOutput) then
-                fromOutput
-            else
-                let fromInput = Dyn.get input "_amend"
-
-                if not (Dyn.isNullish fromInput) then
-                    fromInput
-                else
-                    let fromArgs =
-                        if not (Dyn.isNullish decodedArgs) then
-                            Dyn.get decodedArgs "_amend"
-                        else
-                            null
-
-                    if not (Dyn.isNullish fromArgs) then fromArgs else null
-
-        if not (Dyn.isNullish amendVal) then
-            ToolHookRuntime.restoreAmendToArgs decodedArgs amendVal
-            let outputArgs = argsFromHookOutput output
-            ToolHookRuntime.restoreAmendToArgs outputArgs amendVal
 
         let todoViolationsResult =
             if tool = todoWriteToolName host && not (Dyn.isNullish decodedArgs) then

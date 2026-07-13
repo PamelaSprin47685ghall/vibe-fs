@@ -264,13 +264,12 @@ let muxToolExecuteAfterBlocksRepeatedCallIgnoringControlsSpec () =
         do! (after $ (input1, output1)) |> unbox<JS.Promise<unit>>
         check "1st call: no livelock error" (Dyn.str output1 "error" = "")
 
-        // 2nd call: args with warn and amend
+        // 2nd call: args with warn
         let args2 =
             createObj
                 [ "language", box "shell"
                   "program", box "echo hi"
-                  "warn", box "some-warn-val"
-                  "amend", box 1 ]
+                  "warn", box "some-warn-val" ]
 
         let input2 =
             createObj [ "tool", box "executor"; "sessionID", box sessionID; "args", box args2 ]
@@ -319,45 +318,4 @@ let muxToolExecuteAfterMapsNetworkErrorSpec () =
         let netOutput = createObj [ "output", box "error: network connection refused" ]
         do! (after $ (input, netOutput)) |> unbox<JS.Promise<unit>>
         check "network error output: error field set" (Dyn.str netOutput "error" = "network connection lost")
-    }
-
-/// `tool.execute.before` must strip `amend` from args so downstream never sees it;
-/// `tool.execute.after` must restore `amend` onto `input.args` so host wire retains the
-/// original payload.  TDD-red: current `muxToolExecuteAfter` has no restore path.
-let muxToolExecuteRestoresAmendSpec () =
-    promise {
-        let reg = sharedMuxRegistration ()
-        let before = get reg "tool.execute.before"
-        let after = get reg "tool.execute.after"
-        check "mux registration exposes tool.execute.before" (not (isNullish before))
-        check "mux registration exposes tool.execute.after" (not (isNullish after))
-
-        let sessionID = "mux-amend-restore"
-
-        let args =
-            createObj
-                [ "language", box "shell"
-                  "program", box "echo hi"
-                  "amend", box 2
-                  "warn_tdd", box "i-am-sure-i-have-followed-tdd-and-kolmogorov-principles-and-kept-todo-updated"
-                  "warn",
-                  box
-                      "it-is-not-possible-to-do-it-using-other-tools-and-only-run-tests-when-static-analysis-cannot-handle-it" ]
-
-        let input =
-            createObj [ "tool", box "executor"; "sessionID", box sessionID; "args", box args ]
-
-        let beforeOutput = createObj [ "args", box args ]
-
-        // before hook must strip amend from args
-        do! (before $ (input, beforeOutput)) |> unbox<JS.Promise<unit>>
-        check "before hook strips amend from args" (Dyn.isNullish (Dyn.get args "amend"))
-        check "beforeOutput has _amend" (not (Dyn.isNullish (Dyn.get beforeOutput "_amend")))
-        check "input has _amend" (not (Dyn.isNullish (Dyn.get input "_amend")))
-        check "args has hidden _amend" (not (Dyn.isNullish (Dyn.get args "_amend")))
-
-        // after hook must restore amend onto input.args
-        let afterOutput = createObj [ "output", box "hi" ]
-        do! (after $ (input, afterOutput)) |> unbox<JS.Promise<unit>>
-        check "after hook restores amend onto input.args" (string (Dyn.get args "amend") = "2")
     }

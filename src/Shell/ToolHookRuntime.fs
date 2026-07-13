@@ -146,7 +146,6 @@ type ControlEnvelope =
     { WarnTdd: string option
       Warn: string option
       WarnReuse: string option
-      Amend: int option
       Violations: string list
       mutable GenerationAtStart: int
       mutable SessionId: string }
@@ -369,11 +368,6 @@ let inlineJsonWarnReuseProperty: obj =
           "description", box "MUST acknowledge that this task is not suitable for completion via continue tool."
           "x-wanxiangshu-soft-required", box true ]
 
-let inlineJsonAmendProperty: obj =
-    createObj
-        [ "type", box "integer"
-          "minimum", box 1
-          "description", box "Undo/amend the last N tool call chains by backtracking." ]
 
 let decorateAndValidateSchema (toolName: string) (schema: obj) : obj =
     if Dyn.isNullish schema then
@@ -414,8 +408,6 @@ let decorateAndValidateSchema (toolName: string) (schema: obj) : obj =
                     if not (Dyn.isNullish prop) then
                         Dyn.setKey prop "x-wanxiangshu-soft-required" true
 
-            if Dyn.isNullish (Dyn.get props "amend") then
-                Dyn.setKey props "amend" inlineJsonAmendProperty
 
             // Remove warn fields from required list to avoid host hard rejection
             let req = Dyn.get schema "required"
@@ -473,12 +465,6 @@ let registerSchemaTypes (toolName: string) (schema: obj) : unit =
         |> List.map (fun (field, st) -> (toolName, field, st))
         |> registerToolParameterTypes
 
-[<Emit("Object.defineProperty($0, '_amend', { value: $1, enumerable: false, writable: true, configurable: true })")>]
-let private defineHiddenAmend (args: obj) (value: obj) : unit = jsNative
-
-let restoreAmendToArgs (args: obj) (amendVal: obj) : unit =
-    if not (Dyn.isNullish args) && not (Dyn.isNullish amendVal) then
-        args?("amend") <- amendVal
 
 let private canonicalToolName (toolName: string) : string =
     match toolName.ToLowerInvariant() with
@@ -564,7 +550,6 @@ let executeBeforeGateway (tool: string) (args: obj) : Result<obj * ControlEnvelo
             { WarnTdd = None
               Warn = None
               WarnReuse = None
-              Amend = None
               Violations = []
               GenerationAtStart = 0
               SessionId = "" }
@@ -597,26 +582,8 @@ let executeBeforeGateway (tool: string) (args: obj) : Result<obj * ControlEnvelo
                 Some v
             | None -> None
 
-        let amendVal =
-            match DynField.optField args "amend" with
-            | None -> None
-            | Some v ->
-                Dyn.deleteKey args "amend"
 
-                let parsed =
-                    match v with
-                    | :? int as n when n > 0 -> Some n
-                    | :? float as f when f > 0.0 -> Some(int f)
-                    | :? string as s ->
-                        match System.Int32.TryParse s with
-                        | true, n when n > 0 -> Some n
-                        | _ -> None
-                    | _ -> None
-
-                parsed
-
-        let hasControlFields =
-            warnTddVal.IsSome || warnVal.IsSome || warnReuseVal.IsSome || amendVal.IsSome
+        let hasControlFields = warnTddVal.IsSome || warnVal.IsSome || warnReuseVal.IsSome
 
         // Shallow clone the purified args to nextArgs if needed
         let nextArgs =
@@ -657,17 +624,11 @@ let executeBeforeGateway (tool: string) (args: obj) : Result<obj * ControlEnvelo
                           yield
                               $"warn_reuse: value is invalid (got '%s{v}', expected canonical acknowledgement '%s{WarnTdd.warnReuseCanonicalValue}')" ]
 
-        match amendVal with
-        | Some n ->
-            defineHiddenAmend args (box n)
-            defineHiddenAmend nextArgs (box n)
-        | None -> ()
 
         let env =
             { WarnTdd = warnTddVal
               Warn = warnVal
               WarnReuse = warnReuseVal
-              Amend = amendVal
               Violations = violations
               GenerationAtStart = 0
               SessionId = "" }

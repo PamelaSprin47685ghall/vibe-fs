@@ -183,7 +183,6 @@
     <Compile Include="src/Shell/MessagingPartCodec.fs"/>
     <Compile Include="src/Shell/MessageTransformCommon.fs"/>
     <Compile Include="src/Shell/ChatTransformOutputCodec.fs"/>
-    <Compile Include="src/Shell/AmendFilter.fs"/>
     <Compile Include="src/Shell/MessagingEncodeHelpers.fs"/>
     <Compile Include="src/Shell/SerialStateHolder.fs"/>
     <Compile Include="src/Shell/ContextBudgetLimitResolver.fs"/>
@@ -374,8 +373,6 @@
     <Compile Include="src/Opencode/PluginWanxiangzhen.fs"/>
     <!-- Tests -->
     <Compile Include="tests/Assert.fs"/>
-    <Compile Include="tests/AmendTests.fs"/>
-    <Compile Include="tests/AmendSchemaTests.fs"/>
     <Compile Include="tests/SessionLoopTests.fs"/>
     <Compile Include="tests/ToolExecutionStatusTests.fs"/>
     <Compile Include="tests/SessionGateDemandTests.fs"/>

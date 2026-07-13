@@ -8,6 +8,7 @@ open Wanxiangshu.Shell.FallbackRuntimeState
 let makeMockClient (pObjRef: obj ref) (parentId: string) (responseText: string) =
     let createCalls = ResizeArray<obj>()
     let promptCalls = ResizeArray<obj>()
+    let mutable sessionCounter = 0
 
     let mockClient =
         createObj
@@ -19,7 +20,9 @@ let makeMockClient (pObjRef: obj ref) (parentId: string) (responseText: string) 
                             System.Func<obj, JS.Promise<obj>>(fun arg ->
                                 (promise {
                                     createCalls.Add(arg)
-                                    return box {| data = box {| id = parentId + "-session" |} |}
+                                    sessionCounter <- sessionCounter + 1
+                                    let childId = parentId + "-session-" + string sessionCounter
+                                    return box {| data = box {| id = childId |} |}
                                 }))
                         )
                         "prompt",
@@ -31,7 +34,7 @@ let makeMockClient (pObjRef: obj ref) (parentId: string) (responseText: string) 
                                     if not (isNull pObjRef.Value) then
                                         let runtime = pObjRef.Value?__fallbackRuntime |> unbox<FallbackRuntimeState>
 
-                                        let childId = parentId + "-session"
+                                        let childId = str (get arg "path") "id"
                                         runtime.ClearSubsessionPending childId
                                         runtime.SetTaskComplete childId true
                                 }))

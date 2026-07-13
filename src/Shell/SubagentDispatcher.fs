@@ -111,7 +111,9 @@ let dispatch
                         | Some cid -> Some cid
                         | None ->
                             match host with
-                            | Opencode -> Some("child-session-1") // For fakeAdapter test to correctly find childID!
+                            | Opencode ->
+                                let r = scope.NextChildSessionId()
+                                Some("child-session-" + string r)
                             | Mimocode -> None
                             | Mux ->
                                 let r = scope.NextChildSessionId()
@@ -138,8 +140,15 @@ let dispatch
                         let iter = storeSubagentIterator scope.SubagentIteratorStore "global" item
                         let root = adapter.WorkspaceRoot
                         let parentSid = adapter.SessionId
+
                         if root <> "" && parentSid <> "" then
-                            do! Wanxiangshu.Shell.EventLogRuntime.appendSubagentSpawnedOrFail root parentSid cid roleStr title
+                            do!
+                                Wanxiangshu.Shell.EventLogRuntime.appendSubagentSpawnedOrFail
+                                    root
+                                    parentSid
+                                    cid
+                                    roleStr
+                                    title
 
                         return Wanxiangshu.Kernel.ToolOutputInfo.withIterator text iter
                 }
@@ -210,8 +219,14 @@ let dispatch
                             | Success text ->
                                 let root = adapter.WorkspaceRoot
                                 let parentSid = adapter.SessionId
+
                                 if root <> "" && parentSid <> "" then
-                                    do! Wanxiangshu.Shell.EventLogRuntime.appendSubagentContinuedOrFail root parentSid item.childID c.Prompt
+                                    do!
+                                        Wanxiangshu.Shell.EventLogRuntime.appendSubagentContinuedOrFail
+                                            root
+                                            parentSid
+                                            item.childID
+                                            c.Prompt
 
                                 // Re-store/preserve the exact same iterator ID so the caller can reuse it directly!
                                 preserveSubagentIterator scope.SubagentIteratorStore cleanIter item

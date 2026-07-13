@@ -662,25 +662,39 @@ type FallbackRuntimeState() =
         | Some runId ->
             match Map.tryFind (sessionID, runId) subsessionRuns with
             | Some subRun ->
-                if continuationId <> "" then
+                if subRun.ActiveAttemptOrdinal = 0 || subRun.ActiveContinuationId = "" then
+                    None
+                elif continuationId <> "" then
                     Some(continuationId = subRun.ActiveContinuationId)
                 elif continuationOrdinal <> 0 then
                     Some(continuationOrdinal = subRun.ActiveContinuationOrdinal)
                 else
-                    // No ID and no ordinal
                     match eventMessageBoundary, subRun.DispatchMessageBoundary with
                     | Some evB, Some dispB ->
-                        if evB > dispB then
+                        if evB <> dispB then
                             if isBusyOrAssistant then
                                 subRun.ObservedCurrentAttemptBoundary <- Some evB
                                 Some true
                             else
                                 match subRun.ObservedCurrentAttemptBoundary with
-                                | Some obsB when obsB > dispB -> Some true
+                                | Some obsB when obsB = evB -> Some true
                                 | _ -> Some false
                         else
                             Some false
-                    | _ -> Some false
+                    | Some evB, None ->
+                        if isBusyOrAssistant then
+                            subRun.ObservedCurrentAttemptBoundary <- Some evB
+                            Some true
+                        else
+                            match subRun.ObservedCurrentAttemptBoundary with
+                            | Some obsB when obsB = evB -> Some true
+                            | _ -> Some false
+                    | None, None ->
+                        if isBusyOrAssistant then
+                            Some(isGateActive activeGates sessionID FallbackSessionGateFlag.AwaitingBusy)
+                        else
+                            Some(subRun.ObservedCurrentAttemptBoundary.IsSome)
+                    | None, Some _ -> Some false
             | None -> Some false
         | None -> None
 

@@ -95,7 +95,6 @@ let integrationToolSpecs () : (string * (unit -> JS.Promise<unit>)) list =
       ("muxToolExecuteAfterBlocksRepeatedCallIgnoringControls",
        muxToolExecuteAfterBlocksRepeatedCallIgnoringControlsSpec)
       ("muxToolExecuteAfterMapsNetworkError", muxToolExecuteAfterMapsNetworkErrorSpec)
-      ("muxToolExecuteRestoresAmend", muxToolExecuteRestoresAmendSpec)
       ("muxStreamEndToolUseErrorTriggersNudge", muxStreamEndToolUseErrorTriggersNudgeSpec)
       ("muxStreamEndToolCallsDoesNotTriggerNudge", muxStreamEndToolCallsDoesNotTriggerNudgeSpec)
       ("muxSessionErrorTriggersFallbackContinue", muxSessionErrorTriggersFallbackContinueSpec)

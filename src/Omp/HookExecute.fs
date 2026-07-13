@@ -94,8 +94,3 @@ let applyToolResultHook (toolName: string) (args: obj) : unit =
     if not (Dyn.isNullish args) then
         normalizePatchArgs toolName args
         setUiLabel args toolName
-
-        let amendVal = Dyn.get args "_amend"
-
-        if not (Dyn.isNullish amendVal) then
-            ToolHookRuntime.restoreAmendToArgs args amendVal

@@ -34,8 +34,6 @@ open Wanxiangshu.Tests.WanxiangzhenSquadEventTests
 open Wanxiangshu.Tests.EventLogCodecTests
 open Wanxiangshu.Tests.EventLogRuntimeTests
 open Wanxiangshu.Tests.EventLogRuntimeRobustnessTests
-open Wanxiangshu.Tests.AmendTests
-open Wanxiangshu.Tests.AmendSchemaTests
 open Wanxiangshu.Tests.TestsEntriesSessionLoop
 
 let coreTestEntries () : (string * TestBody) list =
@@ -130,9 +128,7 @@ let coreTestEntries () : (string * TestBody) list =
       "KernelPromptSpecs.reviewMarkdownCodec", TestBody.Sync(sync KernelPromptSpecs.reviewMarkdownCodec)
       "KernelPromptSpecs.executorSummarizerNoExitStatus",
       TestBody.Sync(sync KernelPromptSpecs.executorSummarizerNoExitStatus)
-      "KernelPromptSpecs.domainErrorsShared", TestBody.Sync(sync KernelPromptSpecs.domainErrorsShared)
-      "AmendTests.runAll", TestBody.Sync AmendTests.runAll
-      "AmendSchemaTests.runAll", TestBody.Sync AmendSchemaTests.runAll ]
+      "KernelPromptSpecs.domainErrorsShared", TestBody.Sync(sync KernelPromptSpecs.domainErrorsShared) ]
     @ sessionLoopTestEntries ()
     @ TestsEntriesCoreTail.tailCoreTestEntries ()
     @ TestsEntriesFallback.tailTestEntries ()

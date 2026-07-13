@@ -88,44 +88,38 @@ let tryExtractEventMessageBoundary (rawEvent: obj) : string option =
     if isNull rawEvent || Dyn.isNullish rawEvent then
         None
     else
-        let tryPath (obj: obj) (path: string list) : string option =
-            let mutable current = obj
-            let mutable failed = false
+        let eventType = Dyn.str rawEvent "type"
 
-            for segment in path do
+        if eventType = "session.idle" || eventType = "session.error" then
+            None
+        else
+            let tryPath (obj: obj) (path: string list) : string option =
+                let mutable current = obj
+                let mutable failed = false
+
+                for segment in path do
+                    if not failed && not (Dyn.isNullish current) then
+                        current <- Dyn.get current segment
+                    else
+                        failed <- true
+
                 if not failed && not (Dyn.isNullish current) then
-                    current <- Dyn.get current segment
-                else
-                    failed <- true
+                    let s = string current
 
-            if not failed && not (Dyn.isNullish current) then
-                let s = string current
-
-                if s <> "" && s <> "undefined" && s <> "[object Object]" then
-                    Some s
+                    if s <> "" && s <> "undefined" && s <> "[object Object]" then
+                        Some s
+                    else
+                        None
                 else
                     None
-            else
-                None
 
-        let paths =
-            [ [ "properties"; "message"; "id" ]
-              [ "properties"; "info"; "id" ]
-              [ "properties"; "messageId" ]
-              [ "properties"; "id" ]
-              [ "event"; "properties"; "message"; "id" ]
-              [ "event"; "properties"; "info"; "id" ]
-              [ "event"; "properties"; "messageId" ]
-              [ "event"; "properties"; "id" ]
-              [ "event"; "info"; "id" ]
-              [ "event"; "message"; "id" ]
-              [ "event"; "id" ]
-              [ "message"; "id" ]
-              [ "info"; "id" ]
-              [ "messageId" ]
-              [ "id" ] ]
+            let paths =
+                [ [ "properties"; "info"; "id" ]
+                  [ "properties"; "message"; "id" ]
+                  [ "event"; "info"; "id" ]
+                  [ "event"; "message"; "id" ] ]
 
-        paths |> List.tryPick (tryPath rawEvent)
+            paths |> List.tryPick (tryPath rawEvent)
 
 let verifyLeaseWithStatus
     (expectedStatus: string)

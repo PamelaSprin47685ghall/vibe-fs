@@ -12,6 +12,69 @@ open Wanxiangshu.Shell.MessageTransformCore
 
 type MessageTransformPlan = Wanxiangshu.Shell.MessageTransformCore.MessageTransformPlan
 
+let private isObject (o: obj) : bool =
+    if isNull o then false else jsTypeof o = "object"
+
+let private tryGetString (o: obj) (prop: string) : string option =
+    if not (isObject o) then
+        None
+    else
+        let v = o?(prop)
+
+        match jsTypeof v with
+        | "string" -> let s = string v in if s <> "" then Some s else None
+        | "number" -> Some(string v)
+        | _ -> None
+
+let private tryCallIDFromRaw (raw: obj) : string option =
+    match tryGetString raw "toolCallId" with
+    | Some id -> Some id
+    | None ->
+        match tryGetString raw "callId" with
+        | Some id -> Some id
+        | None -> tryGetString raw "callID"
+
+let private getCallIDsFromRaw (msg: Message<'raw>) : string list =
+    let ids = System.Collections.Generic.HashSet<string>()
+
+    let rec inspect (o: obj) =
+        if isObject o then
+            match tryCallIDFromRaw o with
+            | Some id -> ids.Add(id) |> ignore
+            | None -> ()
+
+            let info: obj = o?info
+
+            if isObject info then
+                match tryCallIDFromRaw info with
+                | Some id -> ids.Add(id) |> ignore
+                | None -> ()
+
+            let parts: obj = o?parts
+
+            if isObject parts && JS.Constructors.Array.isArray (parts) then
+                let arr: obj array = unbox parts
+
+                for part in arr do
+                    if isObject part then
+                        match tryCallIDFromRaw part with
+                        | Some id -> ids.Add(id) |> ignore
+                        | None -> ()
+
+    inspect (box msg.raw)
+    Seq.toList ids
+
+let private getCallIDs (msg: Message<'raw>) : string list =
+    let partsCallIDs =
+        msg.parts
+        |> List.choose (fun part ->
+            match part with
+            | ToolPart(_, callID, _, _) -> Some callID
+            | _ -> None)
+
+    let rawCallIDs = getCallIDsFromRaw msg
+    (partsCallIDs @ rawCallIDs) |> Seq.distinct |> Seq.toList
+
 let tryInjectParallelToolPrompt (sessionID: string) (messages: Message<obj> list) : Message<obj> list =
     let isRealCallId (callID: string) : bool =
         not (System.String.IsNullOrWhiteSpace callID)
@@ -84,7 +147,7 @@ let tryInjectParallelToolPrompt (sessionID: string) (messages: Message<obj> list
                                     || m.info.id = targetCallID + "-result"
                                     || m.info.id = targetCallID + "_result"
                                     || m.info.id = targetCallID + ":result"
-                                    || (let callIDs = AmendFilter.getCallIDs m in List.contains targetCallID callIDs))
+                                    || (let callIDs = getCallIDs m in List.contains targetCallID callIDs))
 
                             hasTerminalPart || isMatchingToolResult)
 
@@ -143,27 +206,7 @@ let runMessageTransformPipeline
         if plan.Cleaned.IsEmpty then
             return [||]
         else
-            let afterAmend =
-                if plan.SembleInjectEnabled then
-                    plan.Cleaned
-                else
-                    AmendFilter.filterAmendMessages
-                        (fun raw ->
-                            match DynField.optField raw "amend" with
-                            | None -> None
-                            | Some v ->
-                                match v with
-                                | :? int as n when n > 0 -> Some n
-                                | :? float as f when f > 0.0 -> Some(int f)
-                                | _ -> None)
-                        (fun raw ->
-                            if Dyn.isNullish raw || not (Dyn.typeIs raw "object") then
-                                raw
-                            else
-                                let copy = JS.Constructors.Object.assign (createObj [], raw)
-                                Dyn.deleteKey copy "amend"
-                                copy)
-                        plan.Cleaned
+            let afterAmend = plan.Cleaned
 
             let afterBacklog =
                 applyBacklogProjection plan.SessionID plan.BacklogProjectionPolicy backlogOps afterAmend

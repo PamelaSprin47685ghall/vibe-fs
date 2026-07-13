@@ -38,7 +38,6 @@ let injectWarnIntoJsonSchema = HookSchemaDecode.injectWarnIntoJsonSchema
 
 let injectWarnReuseIntoJsonSchema = HookSchemaDecode.injectWarnReuseIntoJsonSchema
 
-let injectAmendIntoJsonSchema = HookSchemaDecode.injectAmendIntoJsonSchema
 
 let mergeWorkBacklogReportIntoTaskSchema =
     HookSchemaDecode.mergeWorkBacklogReportIntoTaskSchema

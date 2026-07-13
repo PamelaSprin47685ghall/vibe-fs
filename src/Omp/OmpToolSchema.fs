@@ -24,25 +24,6 @@ let private addRequired (schema: obj) (key: string) : unit =
     else
         schema?("required") <- box [| box key |]
 
-let injectAmendIntoOmpParameters (schema: obj) : obj =
-    if isNullish schema then
-        schema
-    else
-        let props = Dyn.get schema "properties"
-
-        if not (isNullish props) then
-            if isNullish (Dyn.get props "amend") then
-                props?("amend") <-
-                    box (
-                        createObj
-                            [| "type", box "integer"
-                               "minimum", box 1
-                               "description",
-                               box
-                                   "Undo/amend the last N tool call chains (including calls, results, and intermediate reasoning) by backtracking in history. The amend message itself is kept as a fresh starting point." |]
-                    )
-
-        schema
 
 let private injectWarnReuseIntoOmpParameters (schema: obj) (toolName: string) : obj =
     if isSubagentTool toolName then
@@ -62,15 +43,13 @@ let private injectWarnReuseIntoOmpParameters (schema: obj) (toolName: string) : 
     schema
 
 let meditatorParameters (tb: obj) : obj =
-    injectAmendIntoOmpParameters (
-        objectOf
-            [| ("methodology",
-                enumOf (Wanxiangshu.Methodology.Registry.enumValuesArray.Value) "Select which methodology to apply." tb)
-               ("intent", str intentFieldDescription tb)
-               ("background", str backgroundFieldDescription tb)
-               ("note", str unifiedNoteDescription.Value tb) |]
-            tb
-    )
+    objectOf
+        [| ("methodology",
+            enumOf (Wanxiangshu.Methodology.Registry.enumValuesArray.Value) "Select which methodology to apply." tb)
+           ("intent", str intentFieldDescription tb)
+           ("background", str backgroundFieldDescription tb)
+           ("note", str unifiedNoteDescription.Value tb) |]
+        tb
 
 let private coderIntentItem (tb: obj) : obj =
     let targetShape =
@@ -119,26 +98,20 @@ let private investigatorIntentItem (tb: obj) : obj =
 
 let investigatorParameters (tb: obj) : obj =
     injectWarnReuseIntoOmpParameters
-        (injectAmendIntoOmpParameters (
-            objectOf [| ("intents", arrayOf (investigatorIntentItem tb) Params.investigatorIntents tb) |] tb
-        ))
+        (objectOf [| ("intents", arrayOf (investigatorIntentItem tb) Params.investigatorIntents tb) |] tb)
         "investigator"
 
 let browserParameters (tb: obj) : obj =
-    injectWarnReuseIntoOmpParameters
-        (injectAmendIntoOmpParameters (objectOf [| ("intent", str Params.browserIntent tb) |] tb))
-        "browser"
+    injectWarnReuseIntoOmpParameters (objectOf [| ("intent", str Params.browserIntent tb) |] tb) "browser"
 
 let continueParameters (tb: obj) : obj =
-    injectAmendIntoOmpParameters (
-        objectOf
-            [| ("iterator",
-                str
-                    "The iterator ID representing the target subagent session (usually returned in the front matter of a previous subagent run)."
-                    tb)
-               ("prompt", str "The new query, instructions, or follow-up question to send to the subagent session." tb) |]
-            tb
-    )
+    objectOf
+        [| ("iterator",
+            str
+                "The iterator ID representing the target subagent session (usually returned in the front matter of a previous subagent run)."
+                tb)
+           ("prompt", str "The new query, instructions, or follow-up question to send to the subagent session." tb) |]
+        tb
 
 let executorParameters (tb: obj) : obj =
     let schema =
@@ -182,15 +155,13 @@ let executorParameters (tb: obj) : obj =
 
     addRequired schema "max_bytes"
     addRequired schema "what_to_summarize"
-    injectAmendIntoOmpParameters schema
+    schema
 
 let returnReviewerParameters (tb: obj) : obj =
-    injectAmendIntoOmpParameters (
-        objectOf
-            [| ("verdict", enumOf [| "PERFECT"; "REVISE" |] "PERFECT to accept, REVISE to request revision" tb)
-               ("feedback", opt "Detailed, actionable feedback when requesting revision; omit when passing." tb str) |]
-            tb
-    )
+    objectOf
+        [| ("verdict", enumOf [| "PERFECT"; "REVISE" |] "PERFECT to accept, REVISE to request revision" tb)
+           ("feedback", opt "Detailed, actionable feedback when requesting revision; omit when passing." tb str) |]
+        tb
 
 let todowriteParameters (tb: obj) : obj =
     let todoItem =
@@ -200,18 +171,16 @@ let todowriteParameters (tb: obj) : obj =
                ("priority", str todoPriorityDesc tb) |]
             tb
 
-    injectAmendIntoOmpParameters (
-        objectOf
-            [| ("todos", arrayOf todoItem todosDesc tb)
-               ("ahaMoments", opt ahaMomentsDesc tb str)
-               ("changesAndReasons", opt changesAndReasonsDesc tb str)
-               ("gotchas", opt gotchasDesc tb str)
-               ("lessonsAndConventions", opt lessonsAndConventionsDesc tb str)
-               ("plan", opt planDesc tb str)
-               ("select_methodology",
-                arrayOf
-                    (enumOf Wanxiangshu.Methodology.Registry.enumValuesArray.Value "Methodology name" tb)
-                    selectMethodologyFieldDescription
-                    tb) |]
-            tb
-    )
+    objectOf
+        [| ("todos", arrayOf todoItem todosDesc tb)
+           ("ahaMoments", opt ahaMomentsDesc tb str)
+           ("changesAndReasons", opt changesAndReasonsDesc tb str)
+           ("gotchas", opt gotchasDesc tb str)
+           ("lessonsAndConventions", opt lessonsAndConventionsDesc tb str)
+           ("plan", opt planDesc tb str)
+           ("select_methodology",
+            arrayOf
+                (enumOf Wanxiangshu.Methodology.Registry.enumValuesArray.Value "Methodology name" tb)
+                selectMethodologyFieldDescription
+                tb) |]
+        tb

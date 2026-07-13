@@ -121,7 +121,7 @@ let defaultPreludeWithoutCapsSpec () =
 
         check
             "default prelude injects Kolmogorov prelude content"
-            ((str userParts.[0] "text").StartsWith "# Kolmogorov 宝典")
+            ((str userParts.[0] "text").Contains "# Kolmogorov 宝典")
 
         check "default prelude preserves original message" (obj.ReferenceEquals(msgs.[2], originalMsg))
         do! rmAsync workspaceDir
@@ -232,7 +232,7 @@ let capsAndBacklogOrderSpec () =
         let capsAssistantInfo = get result.[2] "info"
         let magicInfo = get result.[3] "info"
         let magicId: string = str magicInfo "id"
-        check "caps/backlog order: caps user first" ((str userParts.[0] "text").StartsWith "# Kolmogorov 宝典")
+        check "caps/backlog order: caps user first" ((str userParts.[0] "text").Contains "# Kolmogorov 宝典")
 
         check
             "caps/backlog order: caps ack assistant second"

@@ -201,6 +201,8 @@ let runSubagentWaitsThroughFallbackSendContinue () =
         check "messagesCallCount is 1 after fallback event" (messagesCallCount.Value = 1)
 
         let s = rt.GetOrCreateState childId
+        rt.ClearPendingLease childId
+        rt.SetAwaitingBusy childId false
 
         rt.UpdateState
             childId
