@@ -81,14 +81,11 @@ let gateMode (runtime: FallbackRuntimeState) (sessionID: string) : SessionGateMo
 let isSubagentSettled (runtime: FallbackRuntimeState) (sessionID: string) (expectedRunId: string) : bool =
     match runtime.GetSubsessionRun(sessionID, expectedRunId) with
     | Some run ->
-        if run.RunId <> expectedRunId then
-            true
-        else
-            match run.Status with
-            | SubsessionRunStatus.Settled
-            | SubsessionRunStatus.Failed
-            | SubsessionRunStatus.Cancelled -> true
-            | _ -> false
+        match run.Status with
+        | SubsessionRunStatus.Settled
+        | SubsessionRunStatus.Failed
+        | SubsessionRunStatus.Cancelled -> true
+        | _ -> false
     | None -> terminalObservation runtime sessionID
 
 /// Register OnStateChanged exactly once; resolve on the next state-change signal.

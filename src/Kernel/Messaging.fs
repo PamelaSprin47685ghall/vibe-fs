@@ -109,8 +109,13 @@ let classifySource (id: string) (parts: Part<obj> list option) (raw: obj option)
                     let rtoolCallId = r?toolCallId
                     let rmetadata = r?metadata
                     let rkind = if box rmetadata <> null then rmetadata?kind else null
+                    let rtext = r?text
 
-                    checkVal rid || checkVal rcallID || checkVal rtoolCallId || checkVal rkind
+                    checkVal rid
+                    || checkVal rcallID
+                    || checkVal rtoolCallId
+                    || checkVal rkind
+                    || checkVal rtext
                 else
                     let rStr = string r
                     checkText rStr || checkMeta rStr
@@ -231,36 +236,47 @@ let readAssistantText (messages: Message<'raw> list) (startIndex: int) (joiner: 
 let stripSyntheticBySource (messages: Message<'raw> list) : Message<'raw> list =
     messages
     |> List.filter (fun m ->
-        match m.source with
-        | Synthetic _ -> false
-        | Native ->
-            let id = m.info.id
-            let rawStr = if box m.raw <> null then string m.raw else ""
+        let containsCaps =
+            m.parts
+            |> List.exists (fun p ->
+                match p with
+                | TextPart t -> t <> null && t.Contains("<wanxiangshu-caps")
+                | ToolPart(_, _, Some st, _) -> st.output <> null && st.output.Contains("<wanxiangshu-caps")
+                | _ -> false)
 
-            let isCaps =
-                (id <> null
-                 && (id.StartsWith("caps-synth-")
-                     || id.StartsWith("caps-call-")
-                     || id.StartsWith("caps-fr-")
-                     || id.StartsWith("caps-tool-")
-                     || id.StartsWith("caps-tool-")))
-                || (rawStr <> null && rawStr.Contains("<wanxiangshu-caps"))
-                || (m.parts
-                    |> List.exists (fun p ->
-                        match p with
-                        | TextPart t -> t <> null && t.Contains("<wanxiangshu-caps")
-                        | ToolPart(_, callID, stateOpt, _) ->
-                            (callID <> null
-                             && (callID.StartsWith("caps-synth-")
-                                 || callID.StartsWith("caps-call-")
-                                 || callID.StartsWith("caps-fr-")
-                                 || callID.StartsWith("caps-tool-")))
-                            || (match stateOpt with
-                                | Some st -> st.output <> null && st.output.Contains("<wanxiangshu-caps")
-                                | None -> false)
-                        | _ -> false))
+        if containsCaps then
+            false
+        else
+            match m.source with
+            | Synthetic _ -> false
+            | Native ->
+                let id = m.info.id
+                let rawStr = if box m.raw <> null then string m.raw else ""
 
-            not isCaps)
+                let isCaps =
+                    (id <> null
+                     && (id.StartsWith("caps-synth-")
+                         || id.StartsWith("caps-call-")
+                         || id.StartsWith("caps-fr-")
+                         || id.StartsWith("caps-tool-")
+                         || id.StartsWith("caps-tool-")))
+                    || (rawStr <> null && rawStr.Contains("<wanxiangshu-caps"))
+                    || (m.parts
+                        |> List.exists (fun p ->
+                            match p with
+                            | TextPart t -> t <> null && t.Contains("<wanxiangshu-caps")
+                            | ToolPart(_, callID, stateOpt, _) ->
+                                (callID <> null
+                                 && (callID.StartsWith("caps-synth-")
+                                     || callID.StartsWith("caps-call-")
+                                     || callID.StartsWith("caps-fr-")
+                                     || callID.StartsWith("caps-tool-")))
+                                || (match stateOpt with
+                                    | Some st -> st.output <> null && st.output.Contains("<wanxiangshu-caps")
+                                    | None -> false)
+                            | _ -> false))
+
+                not isCaps)
 
 /// Extract the first non-empty session ID from a list of messages. Pure.
 let extractSessionID (messages: Message<'raw> list) : string =

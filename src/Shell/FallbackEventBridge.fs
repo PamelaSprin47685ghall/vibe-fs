@@ -142,7 +142,8 @@ let finishContinuation
                 runtime.SetSessionOwner sessionID "None"
 
             runtime.SetAwaitingBusy sessionID false
-            runtime.UpdateState sessionID (runtime.GetOrCreateState sessionID)
+
+        runtime.UpdateState sessionID (runtime.GetOrCreateState sessionID)
     }
 
 let ensureActiveAndOwner (runtime: FallbackRuntimeState) (sessionID: string) (lease: PendingLease) : bool =
@@ -402,6 +403,20 @@ let handleEvent
     promise {
         let sessionID = translator.ExtractSessionID rawEvent
 
+        let continuationId =
+            let props = Dyn.get rawEvent "properties"
+            let props = if Dyn.isNullish props then rawEvent else props
+            let cid = Dyn.str props "continuationId"
+            let cid = if cid <> "" then cid else Dyn.str props "continuationID"
+            let cid = if cid <> "" then cid else Dyn.str rawEvent "continuationId"
+            let cid = if cid <> "" then cid else Dyn.str rawEvent "continuationID"
+            cid
+
+        let isContinuationIdMismatch =
+            match runtime.TryGetPendingLease sessionID with
+            | Some lease -> continuationId <> "" && continuationId <> lease.ContinuationID
+            | None -> false
+
         if sessionID <> "" then
             let eventType = Dyn.str rawEvent "type"
             let props = Dyn.get rawEvent "properties"
@@ -412,7 +427,10 @@ let handleEvent
                 && (let info = Dyn.get props "info"
                     not (Dyn.isNullish info) && Dyn.str info "role" = "assistant")
 
-            if translator.IsSessionBusy rawEvent || isAssistantMsg then
+            if
+                (translator.IsSessionBusy rawEvent || isAssistantMsg)
+                && not isContinuationIdMismatch
+            then
                 runtime.SetBusyObserved sessionID true
 
         let isAwaiting = runtime.IsAwaitingBusy sessionID
@@ -490,24 +508,10 @@ let handleEvent
                 match eventOpt with
                 | None -> false
                 | Some evt ->
-                    let continuationId =
-                        let props = Dyn.get rawEvent "properties"
-                        let props = if Dyn.isNullish props then rawEvent else props
-                        let cid = Dyn.str props "continuationId"
-                        let cid = if cid <> "" then cid else Dyn.str props "continuationID"
-                        let cid = if cid <> "" then cid else Dyn.str rawEvent "continuationId"
-                        let cid = if cid <> "" then cid else Dyn.str rawEvent "continuationID"
-                        cid
-
-                    let isContinuationIdMismatch =
-                        match runtime.TryGetPendingLease sessionID with
-                        | Some lease -> continuationId <> "" && continuationId <> lease.ContinuationID
-                        | None -> false
-
-                    if evt = FallbackEvent.NewUserMessage then
-                        isContinuationIdMismatch
-                    else if isContinuationIdMismatch then
+                    if isContinuationIdMismatch then
                         true
+                    elif evt = FallbackEvent.NewUserMessage then
+                        false
                     else
                         let isAbortError =
                             match evt with
