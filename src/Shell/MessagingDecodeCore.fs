@@ -55,6 +55,8 @@ let decodeMessage (adapters: DecodeAdapters) (sessionID: string) (raw: obj) : Me
                 let s = adapters.MessageSessionID raw
                 if not (System.String.IsNullOrEmpty s) then s else sessionID
 
+            let parts = decodeParts adapters raw
+
             Some
                 { info =
                     { id = id
@@ -65,8 +67,8 @@ let decodeMessage (adapters: DecodeAdapters) (sessionID: string) (raw: obj) : Me
                       toolName = adapters.MessageToolName raw
                       details = adapters.MessageDetails raw
                       time = adapters.MessageTime raw }
-                  parts = decodeParts adapters raw
-                  source = classifySource id
+                  parts = parts
+                  source = classifySource id (Some parts) (Some raw)
                   raw = raw }
 
 let decodeMessages (adapters: DecodeAdapters) (sessionID: string) (messages: obj array) : Message<obj> list =

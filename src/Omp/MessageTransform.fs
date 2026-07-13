@@ -159,7 +159,7 @@ let transformEntriesAsyncWithAgent
                               label = f.label
                               content = f.content })
 
-                    buildCapsEntries sha256HexTruncated encoded cwd ompCaps prelude
+                    buildCapsEntries sha256HexTruncated sessionId encoded cwd ompCaps prelude
 
                 return!
                     runHostMessagesTransform

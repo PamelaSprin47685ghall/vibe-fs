@@ -125,7 +125,7 @@ let messagesTransform
                 loadCapsForScope runtimeScope RequireDirectory planWithParent
 
             let buildCaps encoded capsFiles prelude =
-                buildCapsMessages encoded capsFiles prelude
+                buildCapsMessages sessionID encoded capsFiles prelude
 
             let! final =
                 runHostMessagesTransform

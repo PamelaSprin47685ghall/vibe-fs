@@ -225,7 +225,13 @@ let messagesTransform
                 loadCapsForScope runtimeScope AllowEmptyDirectory planWithParent
 
             let buildCaps encoded capsFiles prelude =
-                buildCapsMessages Wanxiangshu.Shell.FileSys.sha256HexTruncated encoded directory capsFiles prelude
+                buildCapsMessages
+                    Wanxiangshu.Shell.FileSys.sha256HexTruncated
+                    sessionID
+                    encoded
+                    directory
+                    capsFiles
+                    prelude
 
             let! final =
                 runHostMessagesTransform

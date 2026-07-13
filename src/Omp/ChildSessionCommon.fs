@@ -43,6 +43,8 @@ let runOmpSubagentCore
             else
                 (unbox<obj[]> msgs).Length
 
+        let runId = "run-" + System.Guid.NewGuid().ToString("N").Substring(0, 8)
+
         if childId <> "" && fallbackConfigOpt.IsSome then
             let initSt = fallbackRuntime.GetOrCreateState childId
 
@@ -54,7 +56,6 @@ let runOmpSubagentCore
                         Lifecycle = FallbackLifecycle.Active }
             | SubagentResetPolicy.KeepState -> ()
 
-            let runId = "run-" + System.Guid.NewGuid().ToString("N").Substring(0, 8)
             fallbackRuntime.StartSubsessionRun(childId, parentSessionId, runId)
             fallbackRuntime.SetSubsessionPending childId true
 
@@ -66,7 +67,7 @@ let runOmpSubagentCore
                 fallbackRuntime.SetSubsessionPending childId false
 
                 if fallbackConfigOpt.IsSome then
-                    do! waitForSubagentSettle fallbackRuntime childId
+                    do! waitForSubagentSettle fallbackRuntime childId runId
 
             let st = fallbackRuntime.GetOrCreateState childId
 
@@ -81,7 +82,7 @@ let runOmpSubagentCore
                     else
                         SubsessionRunStatus.Settled
 
-                fallbackRuntime.UpdateSubsessionRunStatus(childId, status)
+                fallbackRuntime.UpdateSubsessionRunStatus(childId, runId, status)
 
             if
                 fallbackConfigOpt.IsSome
@@ -117,29 +118,27 @@ let runOmpSubagentCore
 
                 return readAssistantText sm finalStartIndex "\n\n" |> Option.defaultValue noOutputText
         with err ->
-            if childId <> "" then
-                let status =
-                    match translateJsError err with
-                    | MessageAborted
-                    | ClientCancellation _ -> SubsessionRunStatus.Cancelled
-                    | _ -> SubsessionRunStatus.Failed
-
-                fallbackRuntime.UpdateSubsessionRunStatus(childId, status)
-
             if childId <> "" && fallbackConfigOpt.IsSome then
+                do! waitForSubagentSettle fallbackRuntime childId runId
+                fallbackRuntime.SetSubsessionPending childId false
+
+                let st = fallbackRuntime.GetOrCreateState childId
+
+                let status =
+                    if st.Lifecycle = FallbackLifecycle.TaskComplete then
+                        SubsessionRunStatus.Settled
+                    elif st.Lifecycle = FallbackLifecycle.Cancelled then
+                        SubsessionRunStatus.Cancelled
+                    else
+                        SubsessionRunStatus.Failed
+
+                fallbackRuntime.UpdateSubsessionRunStatus(childId, runId, status)
+
                 match translateJsError err with
                 | MessageAborted
-                | ClientCancellation _ ->
-                    fallbackRuntime.SetSubsessionPending childId false
-                    return abortedPrefix
+                | ClientCancellation _ -> return abortedPrefix
                 | other ->
-                    do! waitForSubagentSettle fallbackRuntime childId
-                    fallbackRuntime.SetSubsessionPending childId false
-
-                    let st = fallbackRuntime.GetOrCreateState childId
-                    let isSuccess = st.Lifecycle = FallbackLifecycle.TaskComplete
-
-                    if isSuccess then
+                    if st.Lifecycle = FallbackLifecycle.TaskComplete then
                         let sm = unbox<ISessionManager> (Dyn.get session "sessionManager")
                         let msgs = Dyn.get sm "messages"
 

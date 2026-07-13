@@ -47,15 +47,18 @@ type MuxHostAdapter
 
         member _.SpawnSubagent(request: SubagentRequest) : JS.Promise<SubagentResponse> =
             promise {
-                try
-                    let counterVal = sessionScope.NextChildSessionId()
-                    let cid = "mux-task-" + string counterVal
+                let counterVal = sessionScope.NextChildSessionId()
+                let cid = "mux-task-" + string counterVal
+                let runId = "run-" + System.Guid.NewGuid().ToString("N").Substring(0, 8)
 
+                let rtOpt =
                     match sessionScope.TryFindKey("fallbackRuntime") with
-                    | Some obj ->
-                        let rt = unbox<FallbackRuntimeState> obj
-                        let runId = "run-" + System.Guid.NewGuid().ToString("N").Substring(0, 8)
-                        rt.StartSubsessionRun(cid, sessionId, runId)
+                    | Some obj -> Some(unbox<FallbackRuntimeState> obj)
+                    | None -> None
+
+                try
+                    match rtOpt with
+                    | Some rt -> rt.StartSubsessionRun(cid, sessionId, runId)
                     | None -> ()
 
                     match fromMuxConfig config with
@@ -64,25 +67,55 @@ type MuxHostAdapter
                         registry.RegisterChildAgent(cid, spawn.Role, None)
                     | Error _ -> ()
 
+                    match rtOpt with
+                    | Some rt -> rt.UpdateSubsessionRunStatus(cid, runId, SubsessionRunStatus.Running)
+                    | None -> ()
+
                     let! text = runMux deps config spawn.AgentId request.Prompt spawn.Title spawn.ToolOptions
+
+                    match rtOpt with
+                    | Some rt -> rt.UpdateSubsessionRunStatus(cid, runId, SubsessionRunStatus.Settled)
+                    | None -> ()
+
                     return Success text
                 with ex ->
+                    match rtOpt with
+                    | Some rt -> rt.UpdateSubsessionRunStatus(cid, runId, SubsessionRunStatus.Failed)
+                    | None -> ()
+
                     return Failure(translateJsError ex)
             }
 
         member _.ContinueSubagent(childID: string, agent: string, prompt: string) : JS.Promise<SubagentResponse> =
             promise {
-                try
+                let runId = "run-" + System.Guid.NewGuid().ToString("N").Substring(0, 8)
+
+                let rtOpt =
                     match sessionScope.TryFindKey("fallbackRuntime") with
-                    | Some obj ->
-                        let rt = unbox<FallbackRuntimeState> obj
-                        let runId = "run-" + System.Guid.NewGuid().ToString("N").Substring(0, 8)
-                        rt.StartSubsessionRun(childID, sessionId, runId)
+                    | Some obj -> Some(unbox<FallbackRuntimeState> obj)
+                    | None -> None
+
+                try
+                    match rtOpt with
+                    | Some rt -> rt.StartSubsessionRun(childID, sessionId, runId)
+                    | None -> ()
+
+                    match rtOpt with
+                    | Some rt -> rt.UpdateSubsessionRunStatus(childID, runId, SubsessionRunStatus.Running)
                     | None -> ()
 
                     let! text = runMux deps config agent prompt spawn.Title spawn.ToolOptions
+
+                    match rtOpt with
+                    | Some rt -> rt.UpdateSubsessionRunStatus(childID, runId, SubsessionRunStatus.Settled)
+                    | None -> ()
+
                     return Success text
                 with ex ->
+                    match rtOpt with
+                    | Some rt -> rt.UpdateSubsessionRunStatus(childID, runId, SubsessionRunStatus.Failed)
+                    | None -> ()
+
                     return Failure(translateJsError ex)
             }
 

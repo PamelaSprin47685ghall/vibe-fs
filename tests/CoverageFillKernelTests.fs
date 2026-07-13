@@ -207,14 +207,14 @@ let msgReadAssistantText () =
     equal "no assistant" None (readAssistantText [ userMsg ] 0 " ")
 
 let msgClassifySourceAndDecodeRole () =
-    equal "empty source" Native (classifySource "")
-    equal "unknown source" Native (classifySource "chat-123")
+    equal "empty source" Native (classifySource "" None None)
+    equal "unknown source" Native (classifySource "chat-123" None None)
 
-    match classifySource "caps-synth-user-x" with
+    match classifySource "caps-synth-user-x" None None with
     | Synthetic k -> equal "synth user kind" "caps-synth-user-" k
     | _ -> failwith "expected Synthetic"
 
-    match classifySource "backlog-projection-y" with
+    match classifySource "backlog-projection-y" None None with
     | Synthetic _ -> ()
     | _ -> failwith "expected Synthetic"
 

@@ -29,6 +29,8 @@ type EventLogStore(workspaceRoot: string, ?appendLineOverride: string -> WanEven
     let mutable revision = 0
     let mutable eventCountRead = 0
     let mutable lastKnownSize = 0L
+    let mutable lastReadByteOffset = 0L
+    let mutable partialLineBuffer = ""
 
     let foldWan (e: WanEvent) =
         let sId = e.Session
@@ -69,6 +71,8 @@ type EventLogStore(workspaceRoot: string, ?appendLineOverride: string -> WanEven
                                 eventCountRead <- events.Length
                                 let! stats = statAsync eventFilePath
                                 lastKnownSize <- unbox<int64> (stats?size)
+                                lastReadByteOffset <- lastKnownSize
+                                partialLineBuffer <- ""
                             })
         }
 
@@ -86,17 +90,54 @@ type EventLogStore(workspaceRoot: string, ?appendLineOverride: string -> WanEven
                 let! stats = statAsync eventFilePath
                 let size = unbox<int64> (stats?size)
 
-                if size > lastKnownSize then
+                if size < lastReadByteOffset then
+                    sessionStates <- Map.empty
+                    squadProj <- emptyProjection ()
+                    latestSessionId <- None
+                    revision <- 0
+                    eventCountRead <- 0
+
                     let! events = readEventsFile eventFilePath
 
-                    if events.Length > eventCountRead then
-                        let newEvents = events.[eventCountRead..]
+                    for e in events do
+                        foldWan e
 
-                        for e in newEvents do
-                            foldWan e
+                    let! newStats = statAsync eventFilePath
+                    lastReadByteOffset <- unbox<int64> (newStats?size)
+                    lastKnownSize <- lastReadByteOffset
+                    partialLineBuffer <- ""
+                elif size > lastReadByteOffset then
+                    let offset = lastReadByteOffset
+                    let length = int (size - offset)
+                    let! newText = readChunkAsync eventFilePath (float offset) length
+                    let combinedText = partialLineBuffer + newText
+                    let lines = combinedText.Split('\n')
 
-                        eventCountRead <- events.Length
+                    let completeLines =
+                        if lines.Length > 1 then
+                            lines.[0 .. lines.Length - 2]
+                        else
+                            [||]
 
+                    let newPartialLineBuffer =
+                        if combinedText.EndsWith("\n") then
+                            ""
+                        else
+                            lines.[lines.Length - 1]
+
+                    let mutable stop = false
+
+                    for line in completeLines do
+                        if not stop then
+                            if line.Trim() <> "" then
+                                match tryParseEventLine line with
+                                | Some e ->
+                                    foldWan e
+                                    eventCountRead <- eventCountRead + 1
+                                | None -> stop <- true
+
+                    partialLineBuffer <- newPartialLineBuffer
+                    lastReadByteOffset <- size
                     lastKnownSize <- size
             with _ ->
                 ()
@@ -110,7 +151,7 @@ type EventLogStore(workspaceRoot: string, ?appendLineOverride: string -> WanEven
                 let! stats = statAsync eventFilePath
                 let size = unbox<int64> (stats?size)
 
-                if size > lastKnownSize then
+                if size <> lastKnownSize then
                     do! withWorkspaceLock eventFilePath (fun () -> syncNewEvents ())
             with _ ->
                 ()
@@ -157,6 +198,7 @@ type EventLogStore(workspaceRoot: string, ?appendLineOverride: string -> WanEven
                                 do! appendLineFn eventFilePath e
                                 let! stats = statAsync eventFilePath
                                 lastKnownSize <- unbox<int64> (stats?size)
+                                lastReadByteOffset <- lastKnownSize
                             })
 
                     foldWan e
@@ -178,6 +220,7 @@ type EventLogStore(workspaceRoot: string, ?appendLineOverride: string -> WanEven
                             do! appendLineFn eventFilePath e
                             let! stats = statAsync eventFilePath
                             lastKnownSize <- unbox<int64> (stats?size)
+                            lastReadByteOffset <- lastKnownSize
                         })
 
                 foldWan e
@@ -275,6 +318,7 @@ type EventLogStore(workspaceRoot: string, ?appendLineOverride: string -> WanEven
                                 do! appendLineFn eventFilePath ev
                                 let! stats = statAsync eventFilePath
                                 lastKnownSize <- unbox<int64> (stats?size)
+                                lastReadByteOffset <- lastKnownSize
                                 foldWan ev
                                 eventCountRead <- eventCountRead + 1
                                 claimed <- true

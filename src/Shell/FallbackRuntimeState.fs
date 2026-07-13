@@ -150,7 +150,11 @@ type FallbackRuntimeState() =
         match Map.tryFind sessionID subsessionRuns with
         | Some lease ->
             if finalState.Lifecycle = FallbackLifecycle.TaskComplete then
-                lease.Status <- SubsessionRunStatus.Settled
+                if
+                    this.TryGetPendingLease(sessionID).IsNone
+                    && not (this.IsAwaitingBusy(sessionID))
+                then
+                    lease.Status <- SubsessionRunStatus.Settled
             elif finalState.Lifecycle = FallbackLifecycle.Cancelled then
                 lease.Status <- SubsessionRunStatus.Cancelled
             elif finalState.Phase = FallbackPhase.Exhausted then
@@ -596,19 +600,22 @@ type FallbackRuntimeState() =
 
         subsessionRuns <- Map.add childID lease subsessionRuns
 
-    member _.GetSubsessionRun(childID: string) : SubsessionRunLease option = Map.tryFind childID subsessionRuns
-
-    member _.UpdateSubsessionRunStatus(childID: string, status: SubsessionRunStatus) : unit =
+    member _.GetSubsessionRun(childID: string, expectedRunId: string) : SubsessionRunLease option =
         match Map.tryFind childID subsessionRuns with
-        | Some lease -> lease.Status <- status
-        | None -> ()
+        | Some lease when lease.RunId = expectedRunId -> Some lease
+        | _ -> None
 
-    member _.IncrementSubsessionRunAttempt(childID: string) : int =
+    member _.UpdateSubsessionRunStatus(childID: string, expectedRunId: string, status: SubsessionRunStatus) : unit =
         match Map.tryFind childID subsessionRuns with
-        | Some lease ->
+        | Some lease when lease.RunId = expectedRunId -> lease.Status <- status
+        | _ -> ()
+
+    member _.IncrementSubsessionRunAttempt(childID: string, expectedRunId: string) : int =
+        match Map.tryFind childID subsessionRuns with
+        | Some lease when lease.RunId = expectedRunId ->
             lease.ActiveAttemptOrdinal <- lease.ActiveAttemptOrdinal + 1
             lease.ActiveAttemptOrdinal
-        | None -> 0
+        | _ -> 0
 
     member _.ClearSubsessionRun(childID: string) : unit =
         subsessionRuns <- Map.remove childID subsessionRuns

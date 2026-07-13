@@ -18,13 +18,18 @@ let private buildTextPart (text: string) : obj =
 let private buildMuxMessage (id: string) (role: string) (parts: obj array) : obj =
     createObj [ "id", box id; "role", box role; "parts", box parts ]
 
-let private buildUserMessage (userId: string) (preludeText: string option) : obj =
-    buildMuxMessage userId "user" [| buildTextPart (userCapsText preludeText) |]
+let private buildUserMessage (userId: string) (preludeText: string option) (epochId: string) (version: string) : obj =
+    let body = userCapsText preludeText
 
-let private buildMuxToolPart (fp: string) (index: int) (cap: CapsFile) : obj =
+    let wrappedText =
+        $"<wanxiangshu-caps epoch='{epochId}' version='{version}'>\n{body}\n</wanxiangshu-caps>"
+
+    buildMuxMessage userId "user" [| buildTextPart wrappedText |]
+
+let private buildMuxToolPart (epochId: string) (index: int) (cap: CapsFile) : obj =
     createObj
         [ "type", box "dynamic-tool"
-          "toolCallId", box $"caps-fr-{fp}-{index}"
+          "toolCallId", box $"caps-fr-{epochId}-{index}"
           "toolName", box "file_read"
           "state", box "output-available"
           "input", box (createObj [ "path", box cap.filePath ])
@@ -38,14 +43,24 @@ let private buildMuxToolPart (fp: string) (index: int) (cap: CapsFile) : obj =
                     "content", box (formatReadOutput cap.filePath cap.content 1 None) ]
           ) ]
 
-let private buildCapsAssistantMessage (id: string) (parentId: string) (capsFiles: CapsFile list) (fp: string) : obj =
-    let parts = capsFiles |> List.mapi (buildMuxToolPart fp) |> Array.ofList
+let private buildCapsAssistantMessage
+    (id: string)
+    (parentId: string)
+    (capsFiles: CapsFile list)
+    (epochId: string)
+    : obj =
+    let parts = capsFiles |> List.mapi (buildMuxToolPart epochId) |> Array.ofList
     buildMuxMessage id "assistant" parts
 
 let private buildAckMessage (ackId: string) : obj =
     buildMuxMessage ackId "assistant" [| createObj [ "type", box "reasoning"; "text", box acknowledgeText ] |]
 
-let buildCapsMessages (messages: obj array) (capsFiles: CapsFile list) (preludeText: string option) : obj array =
+let buildCapsMessages
+    (sessionID: string)
+    (messages: obj array)
+    (capsFiles: CapsFile list)
+    (preludeText: string option)
+    : obj array =
     match findFirstNonSynthMessage messageId messages with
     | None -> messages
     | Some _ ->
@@ -55,16 +70,17 @@ let buildCapsMessages (messages: obj array) (capsFiles: CapsFile list) (preludeT
             messages
         else
             let fp = stableFingerprint sha256HexTruncated capsFiles
-            let userId = $"{capsUserPrefix}{fp}"
-            let assistantId = $"{capsAssistantPrefix}{fp}"
-            let ackId = $"{capsAcknowledgePrefix}{fp}"
-            let userMsg = buildUserMessage userId preludeText
+            let epochId = sessionID
+            let userId = $"{capsUserPrefix}{epochId}"
+            let assistantId = $"{capsAssistantPrefix}{epochId}"
+            let ackId = $"{capsAcknowledgePrefix}{epochId}"
+            let userMsg = buildUserMessage userId preludeText epochId fp
             let ackMsg = buildAckMessage ackId
 
             let assistantMsgs =
                 if capsFiles.IsEmpty then
                     [| ackMsg |]
                 else
-                    [| ackMsg; buildCapsAssistantMessage assistantId userId capsFiles fp |]
+                    [| ackMsg; buildCapsAssistantMessage assistantId userId capsFiles epochId |]
 
             Array.concat [| [| userMsg |]; assistantMsgs; existingStripped |]

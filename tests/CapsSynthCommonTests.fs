@@ -53,7 +53,7 @@ let shellCapsPreludeReExportsKernel () =
     equal "shell llmText" llmText Wanxiangshu.Shell.CapsPrelude.llmText
 
 let classifySourceCoversAck () =
-    match classifySource $"{capsAcknowledgePrefix}xyz" with
+    match classifySource $"{capsAcknowledgePrefix}xyz" None None with
     | Synthetic kind -> equal "ack kind" capsAcknowledgePrefix kind
     | _ -> check "expected Synthetic" false
 

@@ -78,15 +78,18 @@ let terminalObservation (runtime: FallbackRuntimeState) (sessionID: string) : bo
 let gateMode (runtime: FallbackRuntimeState) (sessionID: string) : SessionGateMode =
     gateModeFromObservation (observe runtime sessionID)
 
-let isSubagentSettled (runtime: FallbackRuntimeState) (sessionID: string) : bool =
-    match runtime.GetSubsessionRun sessionID with
+let isSubagentSettled (runtime: FallbackRuntimeState) (sessionID: string) (expectedRunId: string) : bool =
+    match runtime.GetSubsessionRun(sessionID, expectedRunId) with
     | Some run ->
-        match run.Status with
-        | SubsessionRunStatus.Settled
-        | SubsessionRunStatus.Failed
-        | SubsessionRunStatus.Cancelled -> true
-        | _ -> false
-    | None -> isSubagentSettledFromObservation sessionID (observe runtime sessionID)
+        if run.RunId <> expectedRunId then
+            true
+        else
+            match run.Status with
+            | SubsessionRunStatus.Settled
+            | SubsessionRunStatus.Failed
+            | SubsessionRunStatus.Cancelled -> true
+            | _ -> false
+    | None -> true
 
 /// Register OnStateChanged exactly once; resolve on the next state-change signal.
 let private waitForStateChange (runtime: FallbackRuntimeState) (sessionID: string) : JS.Promise<unit> =
@@ -95,26 +98,30 @@ let private waitForStateChange (runtime: FallbackRuntimeState) (sessionID: strin
 /// Nested gate loop: fallback continue gate must settle first, then todo/review
 /// nudge gates, then resolve.  Each gate waits for exactly one state change
 /// before re-evaluating, mirroring the priority order in `SessionLoop.decide`.
-let rec waitForSubagentSettle (runtime: FallbackRuntimeState) (sessionID: string) : JS.Promise<unit> =
+let rec waitForSubagentSettle
+    (runtime: FallbackRuntimeState)
+    (sessionID: string)
+    (expectedRunId: string)
+    : JS.Promise<unit> =
     promise {
         if sessionID = "" then
             return ()
-        elif isSubagentSettled runtime sessionID then
+        elif isSubagentSettled runtime sessionID expectedRunId then
             return ()
         else
             match decide (gateMode runtime sessionID) with
             | FallbackContinue ->
                 do! waitForStateChange runtime sessionID
-                return! waitForSubagentSettle runtime sessionID
+                return! waitForSubagentSettle runtime sessionID expectedRunId
             | TodoNudge
             | ReviewNudge ->
                 do! waitForStateChange runtime sessionID
-                return! waitForSubagentSettle runtime sessionID
+                return! waitForSubagentSettle runtime sessionID expectedRunId
             | Resolve ->
-                match runtime.GetSubsessionRun sessionID with
+                match runtime.GetSubsessionRun(sessionID, expectedRunId) with
                 | Some _ ->
                     do! waitForStateChange runtime sessionID
-                    return! waitForSubagentSettle runtime sessionID
+                    return! waitForSubagentSettle runtime sessionID expectedRunId
                 | None ->
                     if terminalObservation runtime sessionID then
                         return ()
@@ -128,5 +135,5 @@ let rec waitForSubagentSettle (runtime: FallbackRuntimeState) (sessionID: string
                         return ()
                     else
                         do! waitForStateChange runtime sessionID
-                        return! waitForSubagentSettle runtime sessionID
+                        return! waitForSubagentSettle runtime sessionID expectedRunId
     }

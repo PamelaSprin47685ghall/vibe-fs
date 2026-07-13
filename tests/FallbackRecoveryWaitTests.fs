@@ -103,7 +103,7 @@ let isSubagentSettled_falseWhenEventHandlingActive () =
     let rt = FallbackRuntimeState()
     let sid = "t-sess-event"
     rt.SetEventHandlingActive sid true
-    check "subagent not settled while event handling is active" (not (isSubagentSettled rt sid))
+    check "subagent not settled while event handling is active" (not (isSubagentSettled rt sid ""))
 
 let waitForSubagentSettle_waitsUntilEventHandlingInactive () =
     promise {
@@ -114,7 +114,7 @@ let waitForSubagentSettle_waitsUntilEventHandlingInactive () =
 
         let waitP =
             promise {
-                do! waitForSubagentSettle rt sid
+                do! waitForSubagentSettle rt sid ""
                 resolved.Value <- true
             }
 
@@ -130,7 +130,7 @@ let isSubagentSettled_falseWhenAwaitingBusy () =
     let rt = FallbackRuntimeState()
     let sid = "t-sess-awaiting"
     rt.SetAwaitingBusy sid true
-    check "subagent not settled while awaiting busy" (not (isSubagentSettled rt sid))
+    check "subagent not settled while awaiting busy" (not (isSubagentSettled rt sid ""))
 
 /// Regression: after a fallback continue receives a busy event, phase becomes
 /// Idle and consumed remains true while the continued model turn is still
@@ -148,7 +148,7 @@ let isSubagentSettled_falseAfterFallbackContinueWhileTaskIncomplete () =
             Phase = FallbackPhase.Idle
             Lifecycle = FallbackLifecycle.Active }
 
-    check "Idle + Consumed + TaskComplete=false not settled" (not (isSubagentSettled rt sid))
+    check "Idle + Consumed + TaskComplete=false not settled" (not (isSubagentSettled rt sid ""))
 
 /// Bug2 regression: after fallback SendContinue, the next SessionBusy event
 /// transitions Retrying→Idle (handleSessionBusy).  FallbackEventBridge must
@@ -175,7 +175,7 @@ let isSubagentSettled_falseAfterSessionBusyDuringRetrying () =
     rt.SetConsumed sid true
 
     check "SessionBusy during Retrying consumed stays true" (rt.GetConsumed sid = Some true)
-    check "SessionBusy during Retrying must not settle" (not (isSubagentSettled rt sid))
+    check "SessionBusy during Retrying must not settle" (not (isSubagentSettled rt sid ""))
 
 let waitForSubagentSettle_waitsUntilAwaitingBusyInactive () =
     promise {
@@ -186,7 +186,7 @@ let waitForSubagentSettle_waitsUntilAwaitingBusyInactive () =
 
         let waitP =
             promise {
-                do! waitForSubagentSettle rt sid
+                do! waitForSubagentSettle rt sid ""
                 resolved.Value <- true
             }
 
@@ -212,7 +212,7 @@ let isSubagentSettled_trueWhenConsumedFalseAndIdle () =
             Phase = FallbackPhase.Idle
             Lifecycle = FallbackLifecycle.Active }
 
-    check "Consumed=false + Idle + no active gates → settled" (isSubagentSettled rt sid)
+    check "Consumed=false + Idle + no active gates → settled" (isSubagentSettled rt sid "")
 
 /// Regression: nested gate loop must close fallback gate first, then nudge gate,
 /// then resolve only when terminal observation holds.  Opening event-handling
@@ -229,7 +229,7 @@ let waitForSubagentSettle_nestedGateLoopResolvesInOrder () =
 
         let waitP =
             promise {
-                do! waitForSubagentSettle rt sid
+                do! waitForSubagentSettle rt sid ""
                 resolved.Value <- true
             }
 
@@ -267,7 +267,7 @@ let isSubagentSettled_trueWhenTaskCompleteDespiteRetrying () =
 
     rt.SetConsumed sid true
 
-    check "TaskComplete=true overrides Retrying → settled" (isSubagentSettled rt sid)
+    check "TaskComplete=true overrides Retrying → settled" (isSubagentSettled rt sid "")
 
 let run () =
     promise {

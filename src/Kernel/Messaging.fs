@@ -69,14 +69,59 @@ let private synthPrefixes =
       "context-budget-nudge-"
       "parallel-tool-synth-" ]
 
-let classifySource (id: string) : Source =
-    if id = "" then
-        Native
+let classifySource (id: string) (parts: Part<obj> list option) (raw: obj option) : Source =
+    let isSynth =
+        if id <> "" then
+            synthPrefixes |> List.exists id.StartsWith
+        else
+            false
+
+    let hasCapsTextOrMeta =
+        let checkText (t: string) =
+            t <> null && t.Contains("<wanxiangshu-caps")
+
+        let checkMeta (t: string) =
+            t <> null
+            && (t.Contains("caps-synth-")
+                || t.Contains("caps-call-")
+                || t.Contains("caps-fr-")
+                || t.Contains("caps-tool-"))
+
+        let partsContain =
+            match parts with
+            | Some pts ->
+                pts
+                |> List.exists (fun p ->
+                    match p with
+                    | TextPart t -> checkText t
+                    | ToolPart(tool, callID, stateOpt, _) ->
+                        checkText tool
+                        || checkText callID
+                        || checkMeta callID
+                        || (match stateOpt with
+                            | Some st -> checkText st.output || checkText st.error
+                            | None -> false)
+                    | RawPart r ->
+                        let rStr = if box r <> null then string r else ""
+                        checkText rStr || checkMeta rStr)
+            | None -> false
+
+        let rawContain =
+            match raw with
+            | Some r ->
+                let rStr = if box r <> null then string r else ""
+                checkText rStr || checkMeta rStr
+            | None -> false
+
+        partsContain || rawContain
+
+    if isSynth then
+        let prefix = synthPrefixes |> List.find id.StartsWith
+        Synthetic prefix
+    elif hasCapsTextOrMeta then
+        Synthetic "caps"
     else
-        synthPrefixes
-        |> List.tryFind id.StartsWith
-        |> Option.map Synthetic
-        |> Option.defaultValue Native
+        Native
 
 let private roleMap =
     Map.ofList
@@ -160,7 +205,34 @@ let readAssistantText (messages: Message<'raw> list) (startIndex: int) (joiner: 
 
 /// Drop synthetic messages, keeping only Native-sourced ones. Pure.
 let stripSyntheticBySource (messages: Message<'raw> list) : Message<'raw> list =
-    messages |> List.filter (fun m -> m.source = Native)
+    messages
+    |> List.filter (fun m ->
+        match m.source with
+        | Synthetic _ -> false
+        | Native ->
+            let id = m.info.id
+            let rawStr = if box m.raw <> null then string m.raw else ""
+
+            let isCaps =
+                (id <> null
+                 && (id.StartsWith("caps-synth-")
+                     || id.StartsWith("caps-call-")
+                     || id.StartsWith("caps-fr-")
+                     || id.StartsWith("caps-tool-")))
+                || (rawStr <> null && rawStr.Contains("<wanxiangshu-caps"))
+                || (m.parts
+                    |> List.exists (fun p ->
+                        match p with
+                        | TextPart t -> t <> null && t.Contains("<wanxiangshu-caps")
+                        | ToolPart(_, callID, _, _) ->
+                            callID <> null
+                            && (callID.StartsWith("caps-synth-")
+                                || callID.StartsWith("caps-call-")
+                                || callID.StartsWith("caps-fr-")
+                                || callID.StartsWith("caps-tool-"))
+                        | _ -> false))
+
+            not isCaps)
 
 /// Extract the first non-empty session ID from a list of messages. Pure.
 let extractSessionID (messages: Message<'raw> list) : string =

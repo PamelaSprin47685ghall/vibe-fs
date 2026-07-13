@@ -22,7 +22,7 @@ let waitForSubagentSettle_completesWhenTaskCompleteDespiteRetrying () =
 
         let waitP =
             promise {
-                do! waitForSubagentSettle rt sid
+                do! waitForSubagentSettle rt sid ""
                 completed.Value <- true
             }
 

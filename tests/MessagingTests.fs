@@ -5,43 +5,43 @@ open Wanxiangshu.Kernel.Messaging
 open Wanxiangshu.Kernel.ToolExecutionStatusModule
 
 let classifySourceEmptyIsNative () =
-    equal "native" Native (classifySource "")
+    equal "native" Native (classifySource "" None None)
 
 let classifySourceUnknownIsNative () =
-    equal "native" Native (classifySource "chat-123")
+    equal "native" Native (classifySource "chat-123" None None)
 
 let classifySourceCapsSynthUser () =
-    match classifySource "caps-synth-user-xyz" with
+    match classifySource "caps-synth-user-xyz" None None with
     | Synthetic kind -> equal "kind" "caps-synth-user-" kind
     | _ -> failwith "expected synthetic"
 
 let classifySourceCapsSynthAssistant () =
-    match classifySource "caps-synth-assistant-xyz" with
+    match classifySource "caps-synth-assistant-xyz" None None with
     | Synthetic kind -> equal "kind" "caps-synth-assistant-" kind
     | _ -> failwith "expected synthetic"
 
 let classifySourceBacklogProjection () =
-    match classifySource "backlog-projection-abc" with
+    match classifySource "backlog-projection-abc" None None with
     | Synthetic kind -> check "backlog" (kind.StartsWith "backlog-")
     | _ -> failwith "expected synthetic"
 
 let classifySourceBacklogPrefix () =
-    match classifySource "backlog-prefix-xyz" with
+    match classifySource "backlog-prefix-xyz" None None with
     | Synthetic _ -> ()
     | _ -> failwith "expected synthetic"
 
 let classifySourceMagicTodo () =
-    match classifySource "magic-todo-projection-x" with
+    match classifySource "magic-todo-projection-x" None None with
     | Synthetic _ -> ()
     | _ -> failwith "expected synthetic"
 
 let classifySourceMethodologyProbe () =
-    match classifySource "methodology-probe-test" with
+    match classifySource "methodology-probe-test" None None with
     | Synthetic _ -> ()
     | _ -> failwith "expected synthetic"
 
 let classifySourceSembleSynth () =
-    match classifySource "semble-synth-abc123" with
+    match classifySource "semble-synth-abc123" None None with
     | Synthetic kind -> equal "kind" "semble-synth-" kind
     | _ -> failwith "expected synthetic"
 

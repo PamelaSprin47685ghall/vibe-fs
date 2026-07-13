@@ -38,7 +38,7 @@ let private sessionBox (sessionID: string option) : obj =
 
 let private buildToolParts
     (capsFiles: CapsFile list)
-    (fp: string)
+    (epochId: string)
     (sessionID: string option)
     (assistantId: string)
     : obj array =
@@ -48,8 +48,8 @@ let private buildToolParts
             createObj
                 [ "type", box "tool"
                   "tool", box "read"
-                  "callID", box $"caps-call-{fp}-{index}"
-                  "id", box $"caps-tool-{fp}-{index}"
+                  "callID", box $"caps-call-{epochId}-{index}"
+                  "id", box $"caps-tool-{epochId}-{index}"
                   "sessionID", sessionBox sessionID
                   "messageID", box assistantId
                   "state",
@@ -65,7 +65,18 @@ let private buildToolParts
         ))
     |> Array.ofList
 
-let private buildUserMessage (userId: string) (sessionID: string option) (preludeText: string option) : obj =
+let private buildUserMessage
+    (userId: string)
+    (sessionID: string option)
+    (preludeText: string option)
+    (epochId: string)
+    (version: string)
+    : obj =
+    let body = userCapsText preludeText
+
+    let wrappedText =
+        $"<wanxiangshu-caps epoch='{epochId}' version='{version}'>\n{body}\n</wanxiangshu-caps>"
+
     box (
         createObj
             [ "info",
@@ -82,7 +93,7 @@ let private buildUserMessage (userId: string) (sessionID: string option) (prelud
               box
                   [| box
                          {| ``type`` = "text"
-                            text = userCapsText preludeText |} |] ]
+                            text = wrappedText |} |] ]
     )
 
 let private assistantInfo
@@ -141,6 +152,7 @@ let private buildAckMessage (ackId: string) (parentID: string) (sessionID: strin
 /// onto when there is no real message.
 let buildCapsMessages
     (hashFn: string -> string)
+    (sessionID: string)
     (messages: obj array)
     (projectRoot: string)
     (capsFiles: CapsFile list)
@@ -154,20 +166,26 @@ let buildCapsMessages
         if existingStripped.Length = 0 then
             messages
         else
-            let sessionID = messageSessionID existingStripped.[0]
-            let sessionOpt = if sessionID = "" then None else Some sessionID
+            let realSessionID =
+                if sessionID <> "" then
+                    sessionID
+                else
+                    messageSessionID existingStripped.[0]
+
+            let sessionOpt = if realSessionID = "" then None else Some realSessionID
             let fp = stableFingerprint hashFn capsFiles
-            let userId = $"{capsUserPrefix}{fp}"
-            let assistantId = $"{capsAssistantPrefix}{fp}"
-            let ackId = $"{capsAcknowledgePrefix}{fp}"
+            let epochId = realSessionID
+            let userId = $"{capsUserPrefix}{epochId}"
+            let assistantId = $"{capsAssistantPrefix}{epochId}"
+            let ackId = $"{capsAcknowledgePrefix}{epochId}"
 
             let toolParts =
                 if capsFiles.IsEmpty then
                     [||]
                 else
-                    buildToolParts capsFiles fp sessionOpt assistantId
+                    buildToolParts capsFiles epochId sessionOpt assistantId
 
-            let userMsg = buildUserMessage userId sessionOpt preludeText
+            let userMsg = buildUserMessage userId sessionOpt preludeText epochId fp
             let ackMsg = buildAckMessage ackId userId sessionOpt projectRoot
 
             let assistantMessages =

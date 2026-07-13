@@ -13,6 +13,7 @@ type CapsFile =
 /// injected `hashFn` decides HOW (e.g. Shell.Crypto.sha256HexTruncated).
 let stableFingerprint (hashFn: string -> string) (capsFiles: CapsFile list) : string =
     capsFiles
+    |> List.sortBy (fun cap -> cap.label, cap.filePath)
     |> List.collect (fun cap -> [ cap.filePath; "\u0000"; cap.content; "\u0000" ])
     |> String.concat ""
     |> hashFn

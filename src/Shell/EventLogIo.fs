@@ -23,6 +23,25 @@ let unlinkAsync (path: string) : JS.Promise<unit> = jsNative
 [<Import("stat", "node:fs/promises")>]
 let statAsync (path: string) : JS.Promise<obj> = jsNative
 
+[<Import("open", "node:fs/promises")>]
+let private openFileHandleAsync (path: string) (flags: string) : JS.Promise<obj> = jsNative
+
+[<Global("Buffer")>]
+let private nodeBuffer: obj = jsNative
+
+let readChunkAsync (path: string) (position: float) (length: int) : JS.Promise<string> =
+    promise {
+        let! handle = openFileHandleAsync path "r"
+
+        try
+            let buffer = nodeBuffer?alloc (length)
+            let! readResult = handle?read (buffer, 0, length, position)
+            let bytesRead = unbox<int> readResult?bytesRead
+            return buffer?toString ("utf-8", 0, bytesRead)
+        finally
+            handle?close () |> ignore
+    }
+
 let readEventsFromText (text: string) : WanEvent list =
     if text = "" then
         []

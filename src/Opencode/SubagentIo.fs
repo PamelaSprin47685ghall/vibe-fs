@@ -109,24 +109,24 @@ let runSubagentCoreResult
                     runtime.SetSubsessionPending childID true
                     do! promptWithAbort client (buildPromptBody options childID) signal
 
-                    do! waitForSubagentSettle runtime childID
+                    do! waitForSubagentSettle runtime childID runId
                     runtime.ClearSubsessionPending childID
 
                     try
                         let st = runtime.GetOrCreateState childID
 
                         if st.Lifecycle = FallbackLifecycle.Cancelled then
-                            runtime.UpdateSubsessionRunStatus(childID, SubsessionRunStatus.Cancelled)
+                            runtime.UpdateSubsessionRunStatus(childID, runId, SubsessionRunStatus.Cancelled)
                             return Ok abortedPrefix
                         elif
                             st.Lifecycle <> FallbackLifecycle.TaskComplete
                             && st.Phase <> FallbackPhase.Exhausted
                         then
-                            do! waitForSubagentSettle runtime childID
+                            do! waitForSubagentSettle runtime childID runId
                             let st2 = runtime.GetOrCreateState childID
 
                             if st2.Lifecycle = FallbackLifecycle.Cancelled then
-                                runtime.UpdateSubsessionRunStatus(childID, SubsessionRunStatus.Cancelled)
+                                runtime.UpdateSubsessionRunStatus(childID, runId, SubsessionRunStatus.Cancelled)
                                 return Ok abortedPrefix
                             else
                                 let status =
@@ -135,7 +135,7 @@ let runSubagentCoreResult
                                     else
                                         SubsessionRunStatus.Failed
 
-                                runtime.UpdateSubsessionRunStatus(childID, status)
+                                runtime.UpdateSubsessionRunStatus(childID, runId, status)
                                 let! text = extractSessionText client childID directory startCount
                                 return Ok(formatSubagentReport noOutputText abortedPrefix text false)
                         else
@@ -145,7 +145,7 @@ let runSubagentCoreResult
                                 else
                                     SubsessionRunStatus.Failed
 
-                            runtime.UpdateSubsessionRunStatus(childID, status)
+                            runtime.UpdateSubsessionRunStatus(childID, runId, status)
                             let! text = extractSessionText client childID directory startCount
                             return Ok(formatSubagentReport noOutputText abortedPrefix text false)
                     finally
@@ -154,7 +154,7 @@ let runSubagentCoreResult
                     match translateJsError err with
                     | MessageAborted
                     | ClientCancellation _ ->
-                        runtime.UpdateSubsessionRunStatus(childID, SubsessionRunStatus.Cancelled)
+                        runtime.UpdateSubsessionRunStatus(childID, runId, SubsessionRunStatus.Cancelled)
                         runtime.ClearSubsessionPending childID
                         abortAndUnregister ()
 
@@ -164,7 +164,7 @@ let runSubagentCoreResult
                             let! text = extractSessionText client childID directory startCount
                             return Ok(formatSubagentReport noOutputText abortedPrefix text true)
                     | other ->
-                        do! waitForSubagentSettle runtime childID
+                        do! waitForSubagentSettle runtime childID runId
                         runtime.ClearSubsessionPending childID
 
                         let st = runtime.GetOrCreateState childID
@@ -176,7 +176,7 @@ let runSubagentCoreResult
                             else
                                 SubsessionRunStatus.Failed
 
-                        runtime.UpdateSubsessionRunStatus(childID, status)
+                        runtime.UpdateSubsessionRunStatus(childID, runId, status)
 
                         if isSuccess then
                             let! text = extractSessionText client childID directory startCount

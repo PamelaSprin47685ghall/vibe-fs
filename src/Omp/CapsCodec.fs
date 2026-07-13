@@ -6,6 +6,7 @@ open Wanxiangshu.Kernel.CapsFormat
 open Wanxiangshu.Kernel.CapsSynthPolicy
 open Wanxiangshu.Shell.CapsPrelude
 open Wanxiangshu.Shell.OmpCaps
+open Wanxiangshu.Shell.CapsSynthCommon
 
 module Dyn = Wanxiangshu.Shell.Dyn
 
@@ -39,11 +40,11 @@ let private ompCapsToKernel (files: OmpCapsFile list) : CapsFile list =
 let private buildTextPart (text: string) : obj =
     createObj [ "type", box "text"; "text", box text ]
 
-let private buildUserEntry (userId: string) (sessionId: string) (preludeText: string option) : obj =
+let private buildUserEntry (userId: string) (sessionId: string) (preludeText: string option) (version: string) : obj =
+    let body = userCapsText preludeText
+
     let text =
-        match preludeText with
-        | Some prelude when prelude.Trim() <> "" -> prelude.Trim() + "\n\n" + thinkWrapped
-        | _ -> thinkWrapped
+        $"<wanxiangshu-caps epoch='{sessionId}' version='{version}'>\n{body}\n</wanxiangshu-caps>"
 
     let info = createObj [ "id", box userId; "role", box "user" ]
 
@@ -52,11 +53,11 @@ let private buildUserEntry (userId: string) (sessionId: string) (preludeText: st
 
     createObj [ "info", box info; "parts", box [| buildTextPart text |] ]
 
-let private buildReadToolPart (cap: CapsFile) (fp: string) (index: int) : obj =
+let private buildReadToolPart (cap: CapsFile) (epochId: string) (index: int) : obj =
     createObj
         [ "type", box "tool"
           "tool", box "read"
-          "callID", box $"caps-call-{fp}-{index}"
+          "callID", box $"caps-call-{epochId}-{index}"
           "state",
           box (
               createObj
@@ -72,10 +73,12 @@ let private buildAssistantEntry
     (sessionId: string)
     (projectRoot: string)
     (capsFiles: CapsFile list)
-    (fp: string)
+    (epochId: string)
     : obj =
     let parts =
-        capsFiles |> List.mapi (fun i cap -> buildReadToolPart cap fp i) |> List.toArray
+        capsFiles
+        |> List.mapi (fun i cap -> buildReadToolPart cap epochId i)
+        |> List.toArray
 
     let info =
         createObj [ "id", box assistantId; "role", box "assistant"; "parentID", box parentUserId ]
@@ -111,6 +114,7 @@ let private findFirstRealEntry (entries: obj array) : obj option =
 
 let buildCapsEntries
     (hashFn: string -> string)
+    (sessionId: string)
     (entries: obj array)
     (projectRoot: string)
     (ompCaps: OmpCapsFile list)
@@ -125,12 +129,12 @@ let buildCapsEntries
             entries
         else
             let capsFiles = ompCapsToKernel ompCaps
-            let sessionId = entrySessionId stripped.[0]
             let fp = stableFingerprint hashFn capsFiles
-            let userId = $"{capsUserPrefix}{fp}"
-            let assistantId = $"{capsAssistantPrefix}{fp}"
-            let ackId = $"{capsAcknowledgePrefix}{fp}"
-            let userEntry = buildUserEntry userId sessionId preludeText
+            let epochId = sessionId
+            let userId = $"{capsUserPrefix}{epochId}"
+            let assistantId = $"{capsAssistantPrefix}{epochId}"
+            let ackId = $"{capsAcknowledgePrefix}{epochId}"
+            let userEntry = buildUserEntry userId sessionId preludeText fp
             let ackEntry = buildAckEntry ackId userId sessionId
 
             let assistantEntries =
@@ -138,6 +142,6 @@ let buildCapsEntries
                     [| ackEntry |]
                 else
                     [| ackEntry
-                       buildAssistantEntry assistantId userId sessionId projectRoot capsFiles fp |]
+                       buildAssistantEntry assistantId userId sessionId projectRoot capsFiles epochId |]
 
             Array.concat [| [| userEntry |]; assistantEntries; stripped |]
