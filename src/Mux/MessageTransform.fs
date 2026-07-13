@@ -113,16 +113,19 @@ let messagesTransform
             let injectFn _ encoded = Promise.lift encoded
 
             let loadCaps () =
-                let parentSessionID =
-                    match tryGetParentWorkspaceId deps sessionID with
-                    | Some parentId -> parentId
-                    | None -> sessionID
+                promise {
+                    let parentSessionID =
+                        match tryGetParentWorkspaceId deps sessionID with
+                        | Some parentId -> parentId
+                        | None -> sessionID
 
-                let planWithParent =
-                    { plan with
-                        SessionID = parentSessionID }
+                    let planWithParent =
+                        { plan with
+                            SessionID = parentSessionID }
 
-                loadCapsForScope runtimeScope RequireDirectory planWithParent
+                    let! caps = loadCapsForScope runtimeScope RequireDirectory planWithParent
+                    return caps |> List.sortBy (fun cf -> cf.label, cf.filePath)
+                }
 
             let buildCaps encoded capsFiles prelude =
                 buildCapsMessages sessionID encoded capsFiles prelude

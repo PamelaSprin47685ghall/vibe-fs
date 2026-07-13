@@ -142,6 +142,7 @@ let finishContinuation
                 runtime.SetSessionOwner sessionID "None"
 
             runtime.SetAwaitingBusy sessionID false
+            runtime.UpdateState sessionID (runtime.GetOrCreateState sessionID)
     }
 
 let ensureActiveAndOwner (runtime: FallbackRuntimeState) (sessionID: string) (lease: PendingLease) : bool =
@@ -489,8 +490,24 @@ let handleEvent
                 match eventOpt with
                 | None -> false
                 | Some evt ->
+                    let continuationId =
+                        let props = Dyn.get rawEvent "properties"
+                        let props = if Dyn.isNullish props then rawEvent else props
+                        let cid = Dyn.str props "continuationId"
+                        let cid = if cid <> "" then cid else Dyn.str props "continuationID"
+                        let cid = if cid <> "" then cid else Dyn.str rawEvent "continuationId"
+                        let cid = if cid <> "" then cid else Dyn.str rawEvent "continuationID"
+                        cid
+
+                    let isContinuationIdMismatch =
+                        match runtime.TryGetPendingLease sessionID with
+                        | Some lease -> continuationId <> "" && continuationId <> lease.ContinuationID
+                        | None -> false
+
                     if evt = FallbackEvent.NewUserMessage then
-                        false
+                        isContinuationIdMismatch
+                    else if isContinuationIdMismatch then
+                        true
                     else
                         let isAbortError =
                             match evt with

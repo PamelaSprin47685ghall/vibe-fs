@@ -83,7 +83,7 @@ type FallbackRuntimeState() =
     let mutable nudgeOrdinals = Map.empty<string, int>
     let mutable compactionOrdinals = Map.empty<string, int>
     let mutable lastHumanMessageIds = Map.empty<string, string>
-    let mutable subsessionRuns = Map.empty<string, SubsessionRunLease>
+    let mutable subsessionRuns = Map.empty<string * string, SubsessionRunLease>
     let mutable busyObserved = Map.empty<string, bool>
 
     let triggerStateChanged (sessionID: string) : unit =
@@ -147,7 +147,31 @@ type FallbackRuntimeState() =
 
         states <- Map.add sessionID finalState states
 
-        match Map.tryFind sessionID subsessionRuns with
+        let activeLeaseOpt =
+            let childLeases =
+                subsessionRuns
+                |> Map.toList
+                |> List.map snd
+                |> List.filter (fun lease -> lease.ChildId = sessionID)
+
+            let nonTerminalOpt =
+                childLeases
+                |> List.tryFind (fun lease ->
+                    match lease.Status with
+                    | SubsessionRunStatus.Settled
+                    | SubsessionRunStatus.Failed
+                    | SubsessionRunStatus.Cancelled -> false
+                    | _ -> true)
+
+            match nonTerminalOpt with
+            | Some lease -> Some lease
+            | None ->
+                if not childLeases.IsEmpty then
+                    Some(childLeases.[childLeases.Length - 1])
+                else
+                    None
+
+        match activeLeaseOpt with
         | Some lease ->
             if finalState.Lifecycle = FallbackLifecycle.TaskComplete then
                 if
@@ -165,7 +189,7 @@ type FallbackRuntimeState() =
                 | _ -> false
             then
                 lease.Status <- SubsessionRunStatus.Continuing
-            else if
+            elif
                 lease.Status = SubsessionRunStatus.Requested
                 || lease.Status = SubsessionRunStatus.Continuing
             then
@@ -590,7 +614,18 @@ type FallbackRuntimeState() =
     member _.ClearSessionOwner(sessionID: string) : unit =
         sessionOwners <- Map.remove sessionID sessionOwners
 
-    member _.StartSubsessionRun(childID: string, parentSessionID: string, runId: string) : unit =
+    member this.StartSubsessionRun(childID: string, parentSessionID: string, runId: string) : unit =
+        subsessionRuns
+        |> Map.iter (fun (cid, rid) lease ->
+            if cid = childID then
+                match lease.Status with
+                | SubsessionRunStatus.Requested
+                | SubsessionRunStatus.Running
+                | SubsessionRunStatus.Continuing ->
+                    lease.Status <- SubsessionRunStatus.Cancelled
+                    triggerStateChanged childID
+                | _ -> ())
+
         let lease =
             { RunId = runId
               ChildId = childID
@@ -598,27 +633,25 @@ type FallbackRuntimeState() =
               ActiveAttemptOrdinal = 0
               Status = SubsessionRunStatus.Requested }
 
-        subsessionRuns <- Map.add childID lease subsessionRuns
+        subsessionRuns <- Map.add (childID, runId) lease subsessionRuns
 
     member _.GetSubsessionRun(childID: string, expectedRunId: string) : SubsessionRunLease option =
-        match Map.tryFind childID subsessionRuns with
-        | Some lease when lease.RunId = expectedRunId -> Some lease
-        | _ -> None
+        Map.tryFind (childID, expectedRunId) subsessionRuns
 
     member _.UpdateSubsessionRunStatus(childID: string, expectedRunId: string, status: SubsessionRunStatus) : unit =
-        match Map.tryFind childID subsessionRuns with
-        | Some lease when lease.RunId = expectedRunId -> lease.Status <- status
+        match Map.tryFind (childID, expectedRunId) subsessionRuns with
+        | Some lease -> lease.Status <- status
         | _ -> ()
 
     member _.IncrementSubsessionRunAttempt(childID: string, expectedRunId: string) : int =
-        match Map.tryFind childID subsessionRuns with
-        | Some lease when lease.RunId = expectedRunId ->
+        match Map.tryFind (childID, expectedRunId) subsessionRuns with
+        | Some lease ->
             lease.ActiveAttemptOrdinal <- lease.ActiveAttemptOrdinal + 1
             lease.ActiveAttemptOrdinal
         | _ -> 0
 
-    member _.ClearSubsessionRun(childID: string) : unit =
-        subsessionRuns <- Map.remove childID subsessionRuns
+    member _.ClearSubsessionRun(childID: string, runId: string) : unit =
+        subsessionRuns <- Map.remove (childID, runId) subsessionRuns
 
     member _.CleanupSession(sessionID: string) : unit =
         states <- Map.remove sessionID states
@@ -649,7 +682,7 @@ type FallbackRuntimeState() =
         humanTurnOrdinals <- Map.remove sessionID humanTurnOrdinals
         continuationOrdinals <- Map.remove sessionID continuationOrdinals
         nudgeOrdinals <- Map.remove sessionID nudgeOrdinals
-        subsessionRuns <- Map.remove sessionID subsessionRuns
+        subsessionRuns <- subsessionRuns |> Map.filter (fun (cid, _) _ -> cid <> sessionID)
         compactionOrdinals <- Map.remove sessionID compactionOrdinals
         lastHumanMessageIds <- Map.remove sessionID lastHumanMessageIds
         triggerStateChanged sessionID

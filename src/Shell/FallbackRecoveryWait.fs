@@ -89,7 +89,7 @@ let isSubagentSettled (runtime: FallbackRuntimeState) (sessionID: string) (expec
             | SubsessionRunStatus.Failed
             | SubsessionRunStatus.Cancelled -> true
             | _ -> false
-    | None -> true
+    | None -> terminalObservation runtime sessionID
 
 /// Register OnStateChanged exactly once; resolve on the next state-change signal.
 let private waitForStateChange (runtime: FallbackRuntimeState) (sessionID: string) : JS.Promise<unit> =

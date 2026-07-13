@@ -39,17 +39,23 @@ let private sessionBox (sessionID: string option) : obj =
 let private buildToolParts
     (capsFiles: CapsFile list)
     (epochId: string)
+    (fp: string)
     (sessionID: string option)
     (assistantId: string)
     : obj array =
     capsFiles
     |> List.mapi (fun index cap ->
+        let formattedOutput = formatReadOutput cap.filePath cap.content 1 None
+
+        let wrappedOutput =
+            $"<wanxiangshu-caps-tools>\n{formattedOutput}\n</wanxiangshu-caps-tools>"
+
         box (
             createObj
                 [ "type", box "tool"
                   "tool", box "read"
-                  "callID", box $"caps-call-{epochId}-{index}"
-                  "id", box $"caps-tool-{epochId}-{index}"
+                  "callID", box $"caps-call-{epochId}-{fp}-{index}"
+                  "id", box $"caps-tool-{epochId}-{fp}-{index}"
                   "sessionID", sessionBox sessionID
                   "messageID", box assistantId
                   "state",
@@ -57,7 +63,7 @@ let private buildToolParts
                       createObj
                           [ "status", box "completed"
                             "input", box (createObj [ "filePath", box cap.filePath ])
-                            "output", box (formatReadOutput cap.filePath cap.content 1 None)
+                            "output", box wrappedOutput
                             "title", box $"Read {cap.filePath}"
                             "metadata", box (createObj [])
                             "time", box (createObj [ "start", box 0; "end", box 1 ]) ]
@@ -136,12 +142,15 @@ let private buildAssistantMessage
     )
 
 let private buildAckMessage (ackId: string) (parentID: string) (sessionID: string option) (projectRoot: string) : obj =
+    let wrappedAck =
+        $"<wanxiangshu-caps-ack>\n{acknowledgeText}\n</wanxiangshu-caps-ack>"
+
     buildAssistantMessage
         ackId
         parentID
         sessionID
         projectRoot
-        [| box (createObj [ "type", box "text"; "text", box acknowledgeText ]) |]
+        [| box (createObj [ "type", box "text"; "text", box wrappedAck ]) |]
 
 /// Build the synthetic caps prefix: a single user message whose text wraps
 /// thinkText + llmText in <think></think>, then an assistant reasoning ack
@@ -173,23 +182,24 @@ let buildCapsMessages
                     messageSessionID existingStripped.[0]
 
             let sessionOpt = if realSessionID = "" then None else Some realSessionID
-            let fp = stableFingerprint hashFn capsFiles
+            let sortedCaps = capsFiles |> List.sortBy (fun cf -> cf.label, cf.filePath)
+            let fp = stableFingerprint hashFn sortedCaps
             let epochId = realSessionID
             let userId = $"{capsUserPrefix}{epochId}"
             let assistantId = $"{capsAssistantPrefix}{epochId}"
             let ackId = $"{capsAcknowledgePrefix}{epochId}"
 
             let toolParts =
-                if capsFiles.IsEmpty then
+                if sortedCaps.IsEmpty then
                     [||]
                 else
-                    buildToolParts capsFiles epochId sessionOpt assistantId
+                    buildToolParts sortedCaps epochId fp sessionOpt assistantId
 
             let userMsg = buildUserMessage userId sessionOpt preludeText epochId fp
             let ackMsg = buildAckMessage ackId userId sessionOpt projectRoot
 
             let assistantMessages =
-                if capsFiles.IsEmpty then
+                if sortedCaps.IsEmpty then
                     [| ackMsg |]
                 else
                     let explainPart =

@@ -26,10 +26,15 @@ let private buildUserMessage (userId: string) (preludeText: string option) (epoc
 
     buildMuxMessage userId "user" [| buildTextPart wrappedText |]
 
-let private buildMuxToolPart (epochId: string) (index: int) (cap: CapsFile) : obj =
+let private buildMuxToolPart (epochId: string) (fp: string) (index: int) (cap: CapsFile) : obj =
+    let formattedOutput = formatReadOutput cap.filePath cap.content 1 None
+
+    let wrappedOutput =
+        $"<wanxiangshu-caps-tools>\n{formattedOutput}\n</wanxiangshu-caps-tools>"
+
     createObj
         [ "type", box "dynamic-tool"
-          "toolCallId", box $"caps-fr-{epochId}-{index}"
+          "toolCallId", box $"caps-fr-{epochId}-{fp}-{index}"
           "toolName", box "file_read"
           "state", box "output-available"
           "input", box (createObj [ "path", box cap.filePath ])
@@ -40,7 +45,7 @@ let private buildMuxToolPart (epochId: string) (index: int) (cap: CapsFile) : ob
                     "file_size", box cap.content.Length
                     "modifiedTime", box "1970-01-01T00:00:00.000Z"
                     "lines_read", box (cap.content.Split('\n').Length)
-                    "content", box (formatReadOutput cap.filePath cap.content 1 None) ]
+                    "content", box wrappedOutput ]
           ) ]
 
 let private buildCapsAssistantMessage
@@ -48,15 +53,23 @@ let private buildCapsAssistantMessage
     (parentId: string)
     (capsFiles: CapsFile list)
     (epochId: string)
+    (fp: string)
     : obj =
-    let parts = capsFiles |> List.mapi (buildMuxToolPart epochId) |> Array.ofList
+    let parts =
+        capsFiles
+        |> List.mapi (fun i cap -> buildMuxToolPart epochId fp i cap)
+        |> Array.ofList
+
     buildMuxMessage id "assistant" parts
 
 let private buildAckMessage (ackId: string) : obj =
-    buildMuxMessage ackId "assistant" [| createObj [ "type", box "reasoning"; "text", box acknowledgeText ] |]
+    let wrappedAck =
+        $"<wanxiangshu-caps-ack>\n{acknowledgeText}\n</wanxiangshu-caps-ack>"
+
+    buildMuxMessage ackId "assistant" [| createObj [ "type", box "reasoning"; "text", box wrappedAck ] |]
 
 let buildCapsMessages
-    (sessionID: string)
+    (epochId: string)
     (messages: obj array)
     (capsFiles: CapsFile list)
     (preludeText: string option)
@@ -69,8 +82,8 @@ let buildCapsMessages
         if existingStripped.Length = 0 then
             messages
         else
-            let fp = stableFingerprint sha256HexTruncated capsFiles
-            let epochId = sessionID
+            let sortedCaps = capsFiles |> List.sortBy (fun cf -> cf.label, cf.filePath)
+            let fp = stableFingerprint sha256HexTruncated sortedCaps
             let userId = $"{capsUserPrefix}{epochId}"
             let assistantId = $"{capsAssistantPrefix}{epochId}"
             let ackId = $"{capsAcknowledgePrefix}{epochId}"
@@ -78,9 +91,9 @@ let buildCapsMessages
             let ackMsg = buildAckMessage ackId
 
             let assistantMsgs =
-                if capsFiles.IsEmpty then
+                if sortedCaps.IsEmpty then
                     [| ackMsg |]
                 else
-                    [| ackMsg; buildCapsAssistantMessage assistantId userId capsFiles epochId |]
+                    [| ackMsg; buildCapsAssistantMessage assistantId userId sortedCaps epochId fp |]
 
             Array.concat [| [| userMsg |]; assistantMsgs; existingStripped |]

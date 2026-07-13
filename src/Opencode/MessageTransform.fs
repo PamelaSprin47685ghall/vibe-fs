@@ -214,15 +214,18 @@ let messagesTransform
                     injectSembleIntoEncoded directory agent sessionID encoded
 
             let loadCaps () =
-                let parentSessionID =
-                    registry.ResolveSubsessionParentID(Some sessionID)
-                    |> Option.defaultValue sessionID
+                promise {
+                    let parentSessionID =
+                        registry.ResolveSubsessionParentID(Some sessionID)
+                        |> Option.defaultValue sessionID
 
-                let planWithParent =
-                    { plan with
-                        SessionID = parentSessionID }
+                    let planWithParent =
+                        { plan with
+                            SessionID = parentSessionID }
 
-                loadCapsForScope runtimeScope AllowEmptyDirectory planWithParent
+                    let! caps = loadCapsForScope runtimeScope AllowEmptyDirectory planWithParent
+                    return caps |> List.sortBy (fun cf -> cf.label, cf.filePath)
+                }
 
             let buildCaps encoded capsFiles prelude =
                 buildCapsMessages

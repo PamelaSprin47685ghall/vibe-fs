@@ -144,11 +144,13 @@ let transformEntriesAsyncWithAgent
                                        content = f.content }
                                     : CapsFile))
 
-                            return!
+                            let! injected =
                                 Wanxiangshu.Shell.MessageTransformHostHooks.injectSubagentFilesIfAny
                                     ExecutorTools.ompScope
                                     plan
                                     baseFiles
+
+                            return injected |> List.sortBy (fun cf -> cf.label, cf.filePath)
                     }
 
                 let buildCaps encoded (capsFiles: CapsFile list) prelude =

@@ -53,17 +53,22 @@ let private buildUserEntry (userId: string) (sessionId: string) (preludeText: st
 
     createObj [ "info", box info; "parts", box [| buildTextPart text |] ]
 
-let private buildReadToolPart (cap: CapsFile) (epochId: string) (index: int) : obj =
+let private buildReadToolPart (cap: CapsFile) (epochId: string) (fp: string) (index: int) : obj =
+    let formattedOutput = formatReadOutput cap.filePath cap.content 1 None
+
+    let wrappedOutput =
+        $"<wanxiangshu-caps-tools>\n{formattedOutput}\n</wanxiangshu-caps-tools>"
+
     createObj
         [ "type", box "tool"
           "tool", box "read"
-          "callID", box $"caps-call-{epochId}-{index}"
+          "callID", box $"caps-call-{epochId}-{fp}-{index}"
           "state",
           box (
               createObj
                   [ "status", box "completed"
                     "input", box (createObj [ "filePath", box cap.filePath ])
-                    "output", box (formatReadOutput cap.filePath cap.content 1 None)
+                    "output", box wrappedOutput
                     "error", box "" ]
           ) ]
 
@@ -74,10 +79,11 @@ let private buildAssistantEntry
     (projectRoot: string)
     (capsFiles: CapsFile list)
     (epochId: string)
+    (fp: string)
     : obj =
     let parts =
         capsFiles
-        |> List.mapi (fun i cap -> buildReadToolPart cap epochId i)
+        |> List.mapi (fun i cap -> buildReadToolPart cap epochId fp i)
         |> List.toArray
 
     let info =
@@ -98,9 +104,12 @@ let private buildAckEntry (ackId: string) (parentUserId: string) (sessionId: str
     if sessionId <> "" then
         info?sessionID <- box sessionId
 
+    let wrappedAck =
+        $"<wanxiangshu-caps-ack>\n{acknowledgeText}\n</wanxiangshu-caps-ack>"
+
     createObj
         [ "info", box info
-          "parts", box [| createObj [ "type", box "reasoning"; "text", box acknowledgeText ] |] ]
+          "parts", box [| createObj [ "type", box "reasoning"; "text", box wrappedAck ] |] ]
 
 let private findFirstRealEntry (entries: obj array) : obj option =
     entries
@@ -128,7 +137,9 @@ let buildCapsEntries
         if stripped.Length = 0 then
             entries
         else
-            let capsFiles = ompCapsToKernel ompCaps
+            let capsFiles =
+                ompCapsToKernel ompCaps |> List.sortBy (fun cf -> cf.label, cf.filePath)
+
             let fp = stableFingerprint hashFn capsFiles
             let epochId = sessionId
             let userId = $"{capsUserPrefix}{epochId}"
@@ -142,6 +153,6 @@ let buildCapsEntries
                     [| ackEntry |]
                 else
                     [| ackEntry
-                       buildAssistantEntry assistantId userId sessionId projectRoot capsFiles epochId |]
+                       buildAssistantEntry assistantId userId sessionId projectRoot capsFiles epochId fp |]
 
             Array.concat [| [| userEntry |]; assistantEntries; stripped |]

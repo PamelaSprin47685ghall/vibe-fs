@@ -1,5 +1,7 @@
 module Wanxiangshu.Kernel.Messaging
 
+open Fable.Core
+open Fable.Core.JsInterop
 open Wanxiangshu.Kernel.ToolExecutionStatusModule
 
 /// Host-agnostic message model. `'raw` carries the original host object reference
@@ -69,6 +71,9 @@ let private synthPrefixes =
       "context-budget-nudge-"
       "parallel-tool-synth-" ]
 
+[<Emit("typeof $0")>]
+let private jsTypeOf (o: obj) : string = Fable.Core.JS.undefined
+
 let classifySource (id: string) (parts: Part<obj> list option) (raw: obj option) : Source =
     let isSynth =
         if id <> "" then
@@ -87,6 +92,29 @@ let classifySource (id: string) (parts: Part<obj> list option) (raw: obj option)
                 || t.Contains("caps-fr-")
                 || t.Contains("caps-tool-"))
 
+        let checkObj (r: obj) =
+            if box r = null then
+                false
+            else
+                let checkVal (v: obj) =
+                    if box v = null then
+                        false
+                    else
+                        let s = string v
+                        checkText s || checkMeta s
+
+                if jsTypeOf r = "object" then
+                    let rid = r?id
+                    let rcallID = r?callID
+                    let rtoolCallId = r?toolCallId
+                    let rmetadata = r?metadata
+                    let rkind = if box rmetadata <> null then rmetadata?kind else null
+
+                    checkVal rid || checkVal rcallID || checkVal rtoolCallId || checkVal rkind
+                else
+                    let rStr = string r
+                    checkText rStr || checkMeta rStr
+
         let partsContain =
             match parts with
             | Some pts ->
@@ -101,16 +129,12 @@ let classifySource (id: string) (parts: Part<obj> list option) (raw: obj option)
                         || (match stateOpt with
                             | Some st -> checkText st.output || checkText st.error
                             | None -> false)
-                    | RawPart r ->
-                        let rStr = if box r <> null then string r else ""
-                        checkText rStr || checkMeta rStr)
+                    | RawPart r -> checkObj r)
             | None -> false
 
         let rawContain =
             match raw with
-            | Some r ->
-                let rStr = if box r <> null then string r else ""
-                checkText rStr || checkMeta rStr
+            | Some r -> checkObj r
             | None -> false
 
         partsContain || rawContain
@@ -218,18 +242,22 @@ let stripSyntheticBySource (messages: Message<'raw> list) : Message<'raw> list =
                  && (id.StartsWith("caps-synth-")
                      || id.StartsWith("caps-call-")
                      || id.StartsWith("caps-fr-")
+                     || id.StartsWith("caps-tool-")
                      || id.StartsWith("caps-tool-")))
                 || (rawStr <> null && rawStr.Contains("<wanxiangshu-caps"))
                 || (m.parts
                     |> List.exists (fun p ->
                         match p with
                         | TextPart t -> t <> null && t.Contains("<wanxiangshu-caps")
-                        | ToolPart(_, callID, _, _) ->
-                            callID <> null
-                            && (callID.StartsWith("caps-synth-")
-                                || callID.StartsWith("caps-call-")
-                                || callID.StartsWith("caps-fr-")
-                                || callID.StartsWith("caps-tool-"))
+                        | ToolPart(_, callID, stateOpt, _) ->
+                            (callID <> null
+                             && (callID.StartsWith("caps-synth-")
+                                 || callID.StartsWith("caps-call-")
+                                 || callID.StartsWith("caps-fr-")
+                                 || callID.StartsWith("caps-tool-")))
+                            || (match stateOpt with
+                                | Some st -> st.output <> null && st.output.Contains("<wanxiangshu-caps")
+                                | None -> false)
                         | _ -> false))
 
             not isCaps)
