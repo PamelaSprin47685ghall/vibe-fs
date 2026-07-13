@@ -139,7 +139,23 @@ let messagesTransform
         | Some messagesArr ->
             let messagesList = MessagingCodec.decodeMessages messagesArr
             let agent = resolveMessagesTransformAgent registry input messagesList "build"
-            let sessionID = extractSessionID messagesList
+            let rawSessionID = extractSessionID messagesList
+
+            let sessionID =
+                let key = "caps_epoch_" + rawSessionID
+
+                match runtimeScope.TryFindKey(key) with
+                | Some stored -> stored :?> string
+                | None ->
+                    let epochVal =
+                        if not (System.String.IsNullOrEmpty rawSessionID) then
+                            rawSessionID
+                        else
+                            "epoch-" + System.Guid.NewGuid().ToString("N")
+
+                    runtimeScope.Add(key, box epochVal)
+                    epochVal
+
             let cleaned = Messaging.stripSyntheticBySource messagesList
             let isSub = registry.ResolveSubsessionParentID(Some sessionID) |> Option.isSome
 

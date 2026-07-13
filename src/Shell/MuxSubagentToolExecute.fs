@@ -56,34 +56,44 @@ type MuxHostAdapter
                     | Some obj -> Some(unbox<FallbackRuntimeState> obj)
                     | None -> None
 
-                try
-                    match rtOpt with
-                    | Some rt -> rt.StartSubsessionRun(cid, sessionId, runId)
-                    | None -> ()
+                let mutable started = true
 
-                    match fromMuxConfig config with
-                    | Ok r ->
-                        let registry = unbox<ChildAgentRegistry> r.Execution.ChildRegistry
-                        registry.RegisterChildAgent(cid, spawn.Role, None)
-                    | Error _ -> ()
+                match rtOpt with
+                | Some rt -> started <- rt.StartSubsessionRun(cid, sessionId, runId)
+                | None -> ()
 
-                    match rtOpt with
-                    | Some rt -> rt.UpdateSubsessionRunStatus(cid, runId, SubsessionRunStatus.Running)
-                    | None -> ()
+                if not started then
+                    return Failure(InvalidIntent("subagent", "run", "Subagent session already running"))
+                else
+                    try
+                        try
+                            match fromMuxConfig config with
+                            | Ok r ->
+                                let registry = unbox<ChildAgentRegistry> r.Execution.ChildRegistry
+                                registry.RegisterChildAgent(cid, spawn.Role, None)
+                            | Error _ -> ()
 
-                    let! text = runMux deps config spawn.AgentId request.Prompt spawn.Title spawn.ToolOptions
+                            match rtOpt with
+                            | Some rt -> rt.UpdateSubsessionRunStatus(cid, runId, SubsessionRunStatus.Running)
+                            | None -> ()
 
-                    match rtOpt with
-                    | Some rt -> rt.UpdateSubsessionRunStatus(cid, runId, SubsessionRunStatus.Settled)
-                    | None -> ()
+                            let! text = runMux deps config spawn.AgentId request.Prompt spawn.Title spawn.ToolOptions
 
-                    return Success text
-                with ex ->
-                    match rtOpt with
-                    | Some rt -> rt.UpdateSubsessionRunStatus(cid, runId, SubsessionRunStatus.Failed)
-                    | None -> ()
+                            match rtOpt with
+                            | Some rt -> rt.UpdateSubsessionRunStatus(cid, runId, SubsessionRunStatus.Settled)
+                            | None -> ()
 
-                    return Failure(translateJsError ex)
+                            return Success text
+                        with ex ->
+                            match rtOpt with
+                            | Some rt -> rt.UpdateSubsessionRunStatus(cid, runId, SubsessionRunStatus.Failed)
+                            | None -> ()
+
+                            return Failure(translateJsError ex)
+                    finally
+                        match rtOpt with
+                        | Some rt -> rt.ClearSubsessionRun(cid, runId)
+                        | None -> ()
             }
 
         member _.ContinueSubagent(childID: string, agent: string, prompt: string) : JS.Promise<SubagentResponse> =
@@ -95,28 +105,38 @@ type MuxHostAdapter
                     | Some obj -> Some(unbox<FallbackRuntimeState> obj)
                     | None -> None
 
-                try
-                    match rtOpt with
-                    | Some rt -> rt.StartSubsessionRun(childID, sessionId, runId)
-                    | None -> ()
+                let mutable started = true
 
-                    match rtOpt with
-                    | Some rt -> rt.UpdateSubsessionRunStatus(childID, runId, SubsessionRunStatus.Running)
-                    | None -> ()
+                match rtOpt with
+                | Some rt -> started <- rt.StartSubsessionRun(childID, sessionId, runId)
+                | None -> ()
 
-                    let! text = runMux deps config agent prompt spawn.Title spawn.ToolOptions
+                if not started then
+                    return Failure(InvalidIntent("subagent", "run", "Subagent session already running"))
+                else
+                    try
+                        try
+                            match rtOpt with
+                            | Some rt -> rt.UpdateSubsessionRunStatus(childID, runId, SubsessionRunStatus.Running)
+                            | None -> ()
 
-                    match rtOpt with
-                    | Some rt -> rt.UpdateSubsessionRunStatus(childID, runId, SubsessionRunStatus.Settled)
-                    | None -> ()
+                            let! text = runMux deps config agent prompt spawn.Title spawn.ToolOptions
 
-                    return Success text
-                with ex ->
-                    match rtOpt with
-                    | Some rt -> rt.UpdateSubsessionRunStatus(childID, runId, SubsessionRunStatus.Failed)
-                    | None -> ()
+                            match rtOpt with
+                            | Some rt -> rt.UpdateSubsessionRunStatus(childID, runId, SubsessionRunStatus.Settled)
+                            | None -> ()
 
-                    return Failure(translateJsError ex)
+                            return Success text
+                        with ex ->
+                            match rtOpt with
+                            | Some rt -> rt.UpdateSubsessionRunStatus(childID, runId, SubsessionRunStatus.Failed)
+                            | None -> ()
+
+                            return Failure(translateJsError ex)
+                    finally
+                        match rtOpt with
+                        | Some rt -> rt.ClearSubsessionRun(childID, runId)
+                        | None -> ()
             }
 
         member _.RegisterTempFiles(prompt, files) =

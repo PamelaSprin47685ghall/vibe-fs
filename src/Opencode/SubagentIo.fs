@@ -88,50 +88,63 @@ let runSubagentCoreResult
                 let startCount = currentMessages.Length
 
                 let runId = "run-" + System.Guid.NewGuid().ToString("N").Substring(0, 8)
-                runtime.StartSubsessionRun(childID, sessionID, runId)
+                let started = runtime.StartSubsessionRun(childID, sessionID, runId)
 
-                try
+                if not started then
+                    return Error(InvalidIntent("subagent", "run", "Subagent session already running"))
+                else
                     try
-                        // Reset TaskComplete ONLY for new spawn (existingChildID is None).
-                        // For continue (existingChildID is Some), TaskComplete will be set to false when the subsession
-                        // receives a new tool/nudge cycle.
-                        // Note: We intentionally do NOT clear Consumed or Retrying phase at the start of a continue call
-                        // because they represent the ongoing fallback state chain. Once the new run completes and triggers
-                        // a new task_complete event hook, it will update the state to Phase = Idle and TaskComplete = true,
-                        // cleanly overriding the residual Retrying phase.
-                        let initSt = runtime.GetOrCreateState childID
-
-                        if existingChildID.IsNone then
-                            runtime.UpdateState
-                                childID
-                                { initSt with
-                                    Lifecycle = FallbackLifecycle.Active }
-
-                        runtime.SetSubsessionPending childID true
-                        do! promptWithAbort client (buildPromptBody options childID) signal
-
-                        do! waitForSubagentSettle runtime childID runId
-                        runtime.ClearSubsessionPending childID
-
                         try
-                            let st = runtime.GetOrCreateState childID
+                            // Reset TaskComplete ONLY for new spawn (existingChildID is None).
+                            // For continue (existingChildID is Some), TaskComplete will be set to false when the subsession
+                            // receives a new tool/nudge cycle.
+                            // Note: We intentionally do NOT clear Consumed or Retrying phase at the start of a continue call
+                            // because they represent the ongoing fallback state chain. Once the new run completes and triggers
+                            // a new task_complete event hook, it will update the state to Phase = Idle and TaskComplete = true,
+                            // cleanly overriding the residual Retrying phase.
+                            let initSt = runtime.GetOrCreateState childID
 
-                            if st.Lifecycle = FallbackLifecycle.Cancelled then
-                                runtime.UpdateSubsessionRunStatus(childID, runId, SubsessionRunStatus.Cancelled)
-                                return Ok abortedPrefix
-                            elif
-                                st.Lifecycle <> FallbackLifecycle.TaskComplete
-                                && st.Phase <> FallbackPhase.Exhausted
-                            then
-                                do! waitForSubagentSettle runtime childID runId
-                                let st2 = runtime.GetOrCreateState childID
+                            if existingChildID.IsNone then
+                                runtime.UpdateState
+                                    childID
+                                    { initSt with
+                                        Lifecycle = FallbackLifecycle.Active }
 
-                                if st2.Lifecycle = FallbackLifecycle.Cancelled then
+                            runtime.SetSubsessionPending childID true
+                            do! promptWithAbort client (buildPromptBody options childID) signal
+
+                            do! waitForSubagentSettle runtime childID runId
+                            runtime.ClearSubsessionPending childID
+
+                            try
+                                let st = runtime.GetOrCreateState childID
+
+                                if st.Lifecycle = FallbackLifecycle.Cancelled then
                                     runtime.UpdateSubsessionRunStatus(childID, runId, SubsessionRunStatus.Cancelled)
                                     return Ok abortedPrefix
+                                elif
+                                    st.Lifecycle <> FallbackLifecycle.TaskComplete
+                                    && st.Phase <> FallbackPhase.Exhausted
+                                then
+                                    do! waitForSubagentSettle runtime childID runId
+                                    let st2 = runtime.GetOrCreateState childID
+
+                                    if st2.Lifecycle = FallbackLifecycle.Cancelled then
+                                        runtime.UpdateSubsessionRunStatus(childID, runId, SubsessionRunStatus.Cancelled)
+                                        return Ok abortedPrefix
+                                    else
+                                        let status =
+                                            if st2.Lifecycle = FallbackLifecycle.TaskComplete then
+                                                SubsessionRunStatus.Settled
+                                            else
+                                                SubsessionRunStatus.Failed
+
+                                        runtime.UpdateSubsessionRunStatus(childID, runId, status)
+                                        let! text = extractSessionText client childID directory startCount
+                                        return Ok(formatSubagentReport noOutputText abortedPrefix text false)
                                 else
                                     let status =
-                                        if st2.Lifecycle = FallbackLifecycle.TaskComplete then
+                                        if st.Lifecycle = FallbackLifecycle.TaskComplete then
                                             SubsessionRunStatus.Settled
                                         else
                                             SubsessionRunStatus.Failed
@@ -139,54 +152,44 @@ let runSubagentCoreResult
                                     runtime.UpdateSubsessionRunStatus(childID, runId, status)
                                     let! text = extractSessionText client childID directory startCount
                                     return Ok(formatSubagentReport noOutputText abortedPrefix text false)
-                            else
+                            finally
+                                cleanupChildIfRequested ()
+                        with err ->
+                            match translateJsError err with
+                            | MessageAborted
+                            | ClientCancellation _ ->
+                                runtime.UpdateSubsessionRunStatus(childID, runId, SubsessionRunStatus.Cancelled)
+                                runtime.ClearSubsessionPending childID
+                                abortAndUnregister ()
+
+                                if not (Dyn.isNullish signal) && Dyn.truthy (Dyn.get signal "aborted") then
+                                    return Ok abortedPrefix
+                                else
+                                    let! text = extractSessionText client childID directory startCount
+                                    return Ok(formatSubagentReport noOutputText abortedPrefix text true)
+                            | other ->
+                                do! waitForSubagentSettle runtime childID runId
+                                runtime.ClearSubsessionPending childID
+
+                                let st = runtime.GetOrCreateState childID
+                                let isSuccess = st.Lifecycle = FallbackLifecycle.TaskComplete
+
                                 let status =
-                                    if st.Lifecycle = FallbackLifecycle.TaskComplete then
+                                    if isSuccess then
                                         SubsessionRunStatus.Settled
                                     else
                                         SubsessionRunStatus.Failed
 
                                 runtime.UpdateSubsessionRunStatus(childID, runId, status)
-                                let! text = extractSessionText client childID directory startCount
-                                return Ok(formatSubagentReport noOutputText abortedPrefix text false)
-                        finally
-                            cleanupChildIfRequested ()
-                    with err ->
-                        match translateJsError err with
-                        | MessageAborted
-                        | ClientCancellation _ ->
-                            runtime.UpdateSubsessionRunStatus(childID, runId, SubsessionRunStatus.Cancelled)
-                            runtime.ClearSubsessionPending childID
-                            abortAndUnregister ()
 
-                            if not (Dyn.isNullish signal) && Dyn.truthy (Dyn.get signal "aborted") then
-                                return Ok abortedPrefix
-                            else
-                                let! text = extractSessionText client childID directory startCount
-                                return Ok(formatSubagentReport noOutputText abortedPrefix text true)
-                        | other ->
-                            do! waitForSubagentSettle runtime childID runId
-                            runtime.ClearSubsessionPending childID
-
-                            let st = runtime.GetOrCreateState childID
-                            let isSuccess = st.Lifecycle = FallbackLifecycle.TaskComplete
-
-                            let status =
                                 if isSuccess then
-                                    SubsessionRunStatus.Settled
+                                    let! text = extractSessionText client childID directory startCount
+                                    return Ok(formatSubagentReport noOutputText abortedPrefix text false)
                                 else
-                                    SubsessionRunStatus.Failed
-
-                            runtime.UpdateSubsessionRunStatus(childID, runId, status)
-
-                            if isSuccess then
-                                let! text = extractSessionText client childID directory startCount
-                                return Ok(formatSubagentReport noOutputText abortedPrefix text false)
-                            else
-                                return Error other
-                finally
-                    if childID <> "" then
-                        runtime.ClearSubsessionRun(childID, runId)
+                                    return Error other
+                    finally
+                        if childID <> "" then
+                            runtime.ClearSubsessionRun(childID, runId)
         with err ->
             return Error(translateJsError err)
     }

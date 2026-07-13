@@ -27,8 +27,7 @@ type DecodeAdapters =
 
 let decodeSinglePart (adapters: DecodeAdapters) (raw: obj) : Part<obj> option =
     match adapters.PartType raw with
-    | "text"
-    | "reasoning" -> Some(TextPart(adapters.DecodeTextPart raw))
+    | "text" -> Some(TextPart(adapters.DecodeTextPart raw))
     | t when t = "tool" || t = "dynamic-tool" ->
         let tool = adapters.PartToolName raw
         let callID = adapters.PartCallID raw

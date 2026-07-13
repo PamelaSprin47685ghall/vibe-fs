@@ -598,31 +598,46 @@ type FallbackRuntimeState() =
     member _.ClearSessionOwner(sessionID: string) : unit =
         sessionOwners <- Map.remove sessionID sessionOwners
 
-    member this.StartSubsessionRun(childID: string, parentSessionID: string, runId: string) : unit =
+    member _.StartSubsessionRun(childID: string, parentSessionID: string, runId: string) : bool =
+        let mutable canStart = true
+
         match Map.tryFind childID activeRunByChild with
         | Some oldRunId ->
             match Map.tryFind (childID, oldRunId) subsessionRuns with
             | Some oldLease ->
-                oldLease.Status <- SubsessionRunStatus.Cancelled
-                triggerStateChanged childID
+                if
+                    oldLease.Status = SubsessionRunStatus.Requested
+                    || oldLease.Status = SubsessionRunStatus.Running
+                    || oldLease.Status = SubsessionRunStatus.Continuing
+                then
+                    canStart <- false
+                else
+                    oldLease.Status <- SubsessionRunStatus.Cancelled
+                    triggerStateChanged childID
             | None -> ()
         | None -> ()
 
-        activeRunByChild <- Map.add childID runId activeRunByChild
+        if canStart then
+            activeRunByChild <- Map.add childID runId activeRunByChild
 
-        let lease =
-            { RunId = runId
-              ChildId = childID
-              ParentSessionId = parentSessionID
-              ActiveAttemptOrdinal = 0
-              Status = SubsessionRunStatus.Requested
-              ActiveContinuationId = ""
-              ActiveContinuationOrdinal = 0 }
+            let lease =
+                { RunId = runId
+                  ChildId = childID
+                  ParentSessionId = parentSessionID
+                  ActiveAttemptOrdinal = 0
+                  Status = SubsessionRunStatus.Requested
+                  ActiveContinuationId = ""
+                  ActiveContinuationOrdinal = 0 }
 
-        subsessionRuns <- Map.add (childID, runId) lease subsessionRuns
+            subsessionRuns <- Map.add (childID, runId) lease subsessionRuns
+            true
+        else
+            false
 
     member _.GetSubsessionRun(childID: string, expectedRunId: string) : SubsessionRunLease option =
         Map.tryFind (childID, expectedRunId) subsessionRuns
+
+    member _.TryGetActiveRunId(childID: string) : string option = Map.tryFind childID activeRunByChild
 
     member _.UpdateSubsessionRunStatus(childID: string, expectedRunId: string, status: SubsessionRunStatus) : unit =
         match Map.tryFind (childID, expectedRunId) subsessionRuns with

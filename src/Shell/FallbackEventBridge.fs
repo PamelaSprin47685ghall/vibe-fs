@@ -218,6 +218,16 @@ let executeContinuationIntent
                                 "cancelled"
                                 "Lease invalid at dispatch"
                     else
+                        // UPDATE ACTIVE CONTINUATION ID AND ORDINAL HERE
+                        match runtime.TryGetActiveRunId(sessionID) with
+                        | Some activeRunId ->
+                            match runtime.GetSubsessionRun(sessionID, activeRunId) with
+                            | Some subRun ->
+                                subRun.ActiveContinuationId <- continuationID
+                                subRun.ActiveContinuationOrdinal <- continuationOrdinal
+                            | None -> ()
+                        | None -> ()
+
                         do! executor.SendContinue(sessionID, model, continuationID)
 
                         let isValid = verifyLeaseWithStatus "dispatch_started" runtime sessionID lease
@@ -325,6 +335,16 @@ let executeContinuationIntent
                                 "cancelled"
                                 "Lease invalid at dispatch"
                     else
+                        // UPDATE ACTIVE CONTINUATION ID AND ORDINAL HERE
+                        match runtime.TryGetActiveRunId(sessionID) with
+                        | Some activeRunId ->
+                            match runtime.GetSubsessionRun(sessionID, activeRunId) with
+                            | Some subRun ->
+                                subRun.ActiveContinuationId <- continuationID
+                                subRun.ActiveContinuationOrdinal <- continuationOrdinal
+                            | None -> ()
+                        | None -> ()
+
                         do! executor.RecoverWithPrompt(sessionID, model, promptText, continuationID)
 
                         let isValid = verifyLeaseWithStatus "dispatch_started" runtime sessionID lease
@@ -412,10 +432,18 @@ let handleEvent
             let cid = if cid <> "" then cid else Dyn.str rawEvent "continuationID"
             cid
 
-        let isContinuationIdMismatch =
+        let isEventContIdMatch =
             match runtime.TryGetPendingLease sessionID with
-            | Some lease -> continuationId <> "" && continuationId <> lease.ContinuationID
-            | None -> false
+            | Some lease ->
+                if continuationId <> "" then
+                    continuationId = lease.ContinuationID
+                else
+                    let activeGen = runtime.GetActiveContinuationGeneration sessionID
+                    let activeCancel = runtime.GetActiveContinuationCancelGeneration sessionID
+                    let currentGen = runtime.GetSessionGeneration sessionID
+                    let currentCancel = runtime.GetCancelGeneration sessionID
+                    activeGen = currentGen && activeCancel = currentCancel
+            | None -> true
 
         if sessionID <> "" then
             let eventType = Dyn.str rawEvent "type"
@@ -427,10 +455,7 @@ let handleEvent
                 && (let info = Dyn.get props "info"
                     not (Dyn.isNullish info) && Dyn.str info "role" = "assistant")
 
-            if
-                (translator.IsSessionBusy rawEvent || isAssistantMsg)
-                && not isContinuationIdMismatch
-            then
+            if (translator.IsSessionBusy rawEvent || isAssistantMsg) && isEventContIdMatch then
                 runtime.SetBusyObserved sessionID true
 
         let isAwaiting = runtime.IsAwaitingBusy sessionID
@@ -508,7 +533,7 @@ let handleEvent
                 match eventOpt with
                 | None -> false
                 | Some evt ->
-                    if isContinuationIdMismatch then
+                    if not isEventContIdMatch then
                         true
                     elif evt = FallbackEvent.NewUserMessage then
                         false

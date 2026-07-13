@@ -56,7 +56,11 @@ let runOmpSubagentCore
                         Lifecycle = FallbackLifecycle.Active }
             | SubagentResetPolicy.KeepState -> ()
 
-            fallbackRuntime.StartSubsessionRun(childId, parentSessionId, runId)
+            let started = fallbackRuntime.StartSubsessionRun(childId, parentSessionId, runId)
+
+            if not started then
+                failwith "Subagent session already running"
+
             fallbackRuntime.SetSubsessionPending childId true
 
         try
