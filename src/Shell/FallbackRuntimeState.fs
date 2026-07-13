@@ -43,7 +43,9 @@ type SubsessionRunLease =
       mutable ActiveAttemptOrdinal: int
       mutable Status: SubsessionRunStatus
       mutable ActiveContinuationId: string
-      mutable ActiveContinuationOrdinal: int }
+      mutable ActiveContinuationOrdinal: int
+      mutable DispatchMessageBoundary: string option
+      mutable ObservedCurrentAttemptBoundary: string option }
 
 let private freshState: SessionFallbackState =
     { Phase = FallbackPhase.Idle
@@ -611,9 +613,6 @@ type FallbackRuntimeState() =
                     || oldLease.Status = SubsessionRunStatus.Continuing
                 then
                     canStart <- false
-                else
-                    oldLease.Status <- SubsessionRunStatus.Cancelled
-                    triggerStateChanged childID
             | None -> ()
         | None -> ()
 
@@ -627,12 +626,63 @@ type FallbackRuntimeState() =
                   ActiveAttemptOrdinal = 0
                   Status = SubsessionRunStatus.Requested
                   ActiveContinuationId = ""
-                  ActiveContinuationOrdinal = 0 }
+                  ActiveContinuationOrdinal = 0
+                  DispatchMessageBoundary = None
+                  ObservedCurrentAttemptBoundary = None }
 
             subsessionRuns <- Map.add (childID, runId) lease subsessionRuns
             true
         else
             false
+
+    member this.ActivateAttempt
+        (sessionID: string, continuationID: string, continuationOrdinal: int, dispatchBoundary: string option)
+        : unit =
+        match Map.tryFind sessionID activeRunByChild with
+        | Some runId ->
+            match Map.tryFind (sessionID, runId) subsessionRuns with
+            | Some lease ->
+                lease.ActiveAttemptOrdinal <- lease.ActiveAttemptOrdinal + 1
+                lease.ActiveContinuationId <- continuationID
+                lease.ActiveContinuationOrdinal <- continuationOrdinal
+                lease.DispatchMessageBoundary <- dispatchBoundary
+                lease.ObservedCurrentAttemptBoundary <- None
+            | None -> ()
+        | None -> ()
+
+    member this.CheckSubsessionEventMatch
+        (
+            sessionID: string,
+            continuationId: string,
+            continuationOrdinal: int,
+            isBusyOrAssistant: bool,
+            eventMessageBoundary: string option
+        ) : bool option =
+        match Map.tryFind sessionID activeRunByChild with
+        | Some runId ->
+            match Map.tryFind (sessionID, runId) subsessionRuns with
+            | Some subRun ->
+                if continuationId <> "" then
+                    Some(continuationId = subRun.ActiveContinuationId)
+                elif continuationOrdinal <> 0 then
+                    Some(continuationOrdinal = subRun.ActiveContinuationOrdinal)
+                else
+                    // No ID and no ordinal
+                    match eventMessageBoundary, subRun.DispatchMessageBoundary with
+                    | Some evB, Some dispB ->
+                        if evB > dispB then
+                            if isBusyOrAssistant then
+                                subRun.ObservedCurrentAttemptBoundary <- Some evB
+                                Some true
+                            else
+                                match subRun.ObservedCurrentAttemptBoundary with
+                                | Some obsB when obsB > dispB -> Some true
+                                | _ -> Some false
+                        else
+                            Some false
+                    | _ -> Some false
+            | None -> Some false
+        | None -> None
 
     member _.GetSubsessionRun(childID: string, expectedRunId: string) : SubsessionRunLease option =
         Map.tryFind (childID, expectedRunId) subsessionRuns
@@ -643,13 +693,6 @@ type FallbackRuntimeState() =
         match Map.tryFind (childID, expectedRunId) subsessionRuns with
         | Some lease -> lease.Status <- status
         | _ -> ()
-
-    member _.IncrementSubsessionRunAttempt(childID: string, expectedRunId: string) : int =
-        match Map.tryFind (childID, expectedRunId) subsessionRuns with
-        | Some lease ->
-            lease.ActiveAttemptOrdinal <- lease.ActiveAttemptOrdinal + 1
-            lease.ActiveAttemptOrdinal
-        | _ -> 0
 
     member _.ClearSubsessionRun(childID: string, expectedRunId: string) : unit =
         subsessionRuns <- Map.remove (childID, expectedRunId) subsessionRuns

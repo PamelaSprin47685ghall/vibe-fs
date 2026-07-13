@@ -132,6 +132,10 @@ let registerHooks (result: obj) (host: Host) (ctx: obj) (services: CoreServices)
                         Wanxiangshu.Shell.ToolHookRuntime.clearSessionCompliance ptyCleanupSessionId
                         Wanxiangshu.Shell.ToolHookRuntime.closeSession ptyCleanupSessionId
 
+                        Wanxiangshu.Opencode.MessageTransform.cleanupCapsEpochBySession
+                            services.RuntimeScope
+                            ptyCleanupSessionId
+
                     do! services.SessionLifecycleObserver.handleEvent input
                 }))
 

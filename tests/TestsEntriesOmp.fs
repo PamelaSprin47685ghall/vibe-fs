@@ -15,6 +15,7 @@ open Wanxiangshu.Tests.OmpHelpersTests
 open Wanxiangshu.Tests.OmpRunnerTests
 open Wanxiangshu.Tests.OmpContextTransformTests
 open Wanxiangshu.Tests.OmpChildSessionTests
+open Wanxiangshu.Tests.OmpChildSessionCommonTests
 open Wanxiangshu.Tests.OmpAgentConfigTests
 open Wanxiangshu.Tests.OmpHookExecuteTests
 open Wanxiangshu.Tests.OmpSessionLifecycleTests
@@ -202,4 +203,6 @@ let ompTestEntries () : (string * TestBody) list =
       "OmpCoverage2Tests.run", Async OmpCoverage2Tests.run
       "OmpTodoToolTests.run", Async OmpTodoToolTests.run
       "OmpExecutorToolsTests.registersExecutorTools", Sync(sync OmpExecutorToolsTests.registersExecutorTools)
-      "OmpExecutorToolsTests.run", Async OmpExecutorToolsTests.run ]
+      "OmpExecutorToolsTests.run", Async OmpExecutorToolsTests.run
+      "OmpChildSessionCommonTests.runOmpSubagentCore_concurrentRunRejected_leavesOriginalLifecycleIntact",
+      Async OmpChildSessionCommonTests.runOmpSubagentCore_concurrentRunRejected_leavesOriginalLifecycleIntact ]

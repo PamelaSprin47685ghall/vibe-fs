@@ -483,6 +483,7 @@
     <Compile Include="tests/OmpContextTransformTests.fs"/>
     <Compile Include="tests/OmpReviewTests.fs"/>
     <Compile Include="tests/OmpChildSessionTests.fs"/>
+    <Compile Include="tests/OmpChildSessionCommonTests.fs"/>
     <Compile Include="tests/OmpHelpersTests.fs"/>
     <Compile Include="tests/OmpRunnerTests.fs"/>
     <Compile Include="tests/OmpPluginCoreTests.fs"/>

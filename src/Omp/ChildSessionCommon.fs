@@ -46,6 +46,11 @@ let runOmpSubagentCore
         let runId = "run-" + System.Guid.NewGuid().ToString("N").Substring(0, 8)
 
         if childId <> "" && fallbackConfigOpt.IsSome then
+            let started = fallbackRuntime.StartSubsessionRun(childId, parentSessionId, runId)
+
+            if not started then
+                failwith "Subagent session already running"
+
             let initSt = fallbackRuntime.GetOrCreateState childId
 
             match resetPolicy with
@@ -55,11 +60,6 @@ let runOmpSubagentCore
                     { initSt with
                         Lifecycle = FallbackLifecycle.Active }
             | SubagentResetPolicy.KeepState -> ()
-
-            let started = fallbackRuntime.StartSubsessionRun(childId, parentSessionId, runId)
-
-            if not started then
-                failwith "Subagent session already running"
 
             fallbackRuntime.SetSubsessionPending childId true
 

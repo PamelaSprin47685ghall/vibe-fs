@@ -31,16 +31,17 @@ let integrationToolSpecs () : (string * (unit -> JS.Promise<unit>)) list =
       "computeCountSpec", (fun () -> promise { computeCountSpec reg })
       "subagentCapsInjection", subagentCapsInjectionSpec
       "crossSessionIsolation", crossSessionIsolationSpec
-      "ompChildSessionObjectiveReRegister", ompChildSessionObjectiveReRegisterSpec
-      "opencodeSubsessionParentID", opencodeSubsessionParentIDSpec
-      "subagentFallbackRawText", subagentFallbackRawTextSpec
-      "muxSubsessionParentID", muxSubsessionParentIDSpec
-      "buildCapsFileReadData", buildCapsFileReadDataSpec
-      "capsTransform", capsTransformSpec
-      "capsTransformInPlace", capsTransformInPlaceSpec
-      "defaultPreludeWithoutCaps", defaultPreludeWithoutCapsSpec
-      "capsAndBacklogOrder", capsAndBacklogOrderSpec
-      "toolDefinition", toolDefinitionSpec
+      ("ompChildSessionObjectiveReRegister", ompChildSessionObjectiveReRegisterSpec)
+      ("opencodeSubsessionParentID", opencodeSubsessionParentIDSpec)
+      ("subagentFallbackRawText", subagentFallbackRawTextSpec)
+      ("muxSubsessionParentID", muxSubsessionParentIDSpec)
+      ("buildCapsFileReadData", buildCapsFileReadDataSpec)
+      ("capsTransform", capsTransformSpec)
+      ("capsTransformInPlace", capsTransformInPlaceSpec)
+      ("defaultPreludeWithoutCaps", defaultPreludeWithoutCapsSpec)
+      ("capsAndBacklogOrder", capsAndBacklogOrderSpec)
+      ("capsEpochIsolationAndStability", capsEpochIsolationAndStabilitySpecs)
+      ("toolDefinition", toolDefinitionSpec)
       "toolExecuteBefore", toolExecuteBeforeSpec
       "mimoApplyPatchExecuteBefore", mimoApplyPatchExecuteBeforeSpec
       "mimoTaskExecuteRoundTrip", mimoTaskExecuteRoundTripSpec
@@ -86,15 +87,16 @@ let integrationToolSpecs () : (string * (unit -> JS.Promise<unit>)) list =
       "muxTodoWriteMethodologySchema", muxTodoWriteMethodologySchemaSpec
       "muxEventHookAbortDeactivatesReview", muxEventHookAbortDeactivatesReviewSpec
       "muxToolExecuteBeforeSetsUiLabel", muxToolExecuteBeforeSetsUiLabelSpec
-      "muxSystemTransformClearsOutputLength", muxSystemTransformClearsOutputLengthSpec
-      "muxToolSchemasAreCleanStaticallyButInjectedDynamically",
-      muxToolSchemasAreCleanStaticallyButInjectedDynamicallySpec
-      "muxLoopSlashCommandWritesEventLogUnderDepsDirectory", muxLoopSlashCommandWritesEventLogUnderDepsDirectorySpec
-      "muxToolExecuteAfterBlocksRepeatedIdenticalCall", muxToolExecuteAfterBlocksRepeatedIdenticalCallSpec
-      "muxToolExecuteAfterBlocksRepeatedCallIgnoringControls", muxToolExecuteAfterBlocksRepeatedCallIgnoringControlsSpec
-      "muxToolExecuteAfterMapsNetworkError", muxToolExecuteAfterMapsNetworkErrorSpec
-      "muxToolExecuteRestoresAmend", muxToolExecuteRestoresAmendSpec
-      "muxStreamEndToolUseErrorTriggersNudge", muxStreamEndToolUseErrorTriggersNudgeSpec
-      "muxStreamEndToolCallsDoesNotTriggerNudge", muxStreamEndToolCallsDoesNotTriggerNudgeSpec
-      "muxSessionErrorTriggersFallbackContinue", muxSessionErrorTriggersFallbackContinueSpec
-      "muxStreamEndToolCallAsTextTriggersFallback", muxStreamEndToolCallAsTextTriggersFallbackSpec ]
+      ("muxSystemTransformClearsOutputLength", muxSystemTransformClearsOutputLengthSpec)
+      ("muxToolSchemasAreCleanStaticallyButInjectedDynamically",
+       muxToolSchemasAreCleanStaticallyButInjectedDynamicallySpec)
+      ("muxLoopSlashCommandWritesEventLogUnderDepsDirectory", muxLoopSlashCommandWritesEventLogUnderDepsDirectorySpec)
+      ("muxToolExecuteAfterBlocksRepeatedIdenticalCall", muxToolExecuteAfterBlocksRepeatedIdenticalCallSpec)
+      ("muxToolExecuteAfterBlocksRepeatedCallIgnoringControls",
+       muxToolExecuteAfterBlocksRepeatedCallIgnoringControlsSpec)
+      ("muxToolExecuteAfterMapsNetworkError", muxToolExecuteAfterMapsNetworkErrorSpec)
+      ("muxToolExecuteRestoresAmend", muxToolExecuteRestoresAmendSpec)
+      ("muxStreamEndToolUseErrorTriggersNudge", muxStreamEndToolUseErrorTriggersNudgeSpec)
+      ("muxStreamEndToolCallsDoesNotTriggerNudge", muxStreamEndToolCallsDoesNotTriggerNudgeSpec)
+      ("muxSessionErrorTriggersFallbackContinue", muxSessionErrorTriggersFallbackContinueSpec)
+      ("muxStreamEndToolCallAsTextTriggersFallback", muxStreamEndToolCallAsTextTriggersFallbackSpec) ]

@@ -117,6 +117,26 @@ let injectSembleIntoEncoded
                                 return encoded
     }
 
+let cleanupCapsEpochBySession (runtimeScope: Wanxiangshu.Shell.RuntimeScope.RuntimeScope) (sessionID: string) : unit =
+    if sessionID <> "" then
+        let sessionKey = "caps_epoch_session_" + sessionID
+
+        match runtimeScope.TryFindKey(sessionKey) with
+        | Some epObj ->
+            let epoch = epObj :?> string
+            runtimeScope.Remove(sessionKey)
+            runtimeScope.Remove("caps_epoch_reverse_session_" + epoch)
+
+            let reverseConvKey = "caps_epoch_reverse_conv_" + epoch
+
+            match runtimeScope.TryFindKey(reverseConvKey) with
+            | Some ckObj ->
+                let ck = ckObj :?> string
+                runtimeScope.Remove("caps_epoch_conv_" + ck)
+                runtimeScope.Remove(reverseConvKey)
+            | None -> ()
+        | None -> ()
+
 let private maxInputTokensCache =
     System.Collections.Generic.Dictionary<string, int>()
 
@@ -139,22 +159,107 @@ let messagesTransform
         | Some messagesArr ->
             let messagesList = MessagingCodec.decodeMessages messagesArr
             let agent = resolveMessagesTransformAgent registry input messagesList "build"
-            let rawSessionID = extractSessionID messagesList
 
-            let sessionID =
-                let key = "caps_epoch_" + rawSessionID
+            let rawSessionID =
+                let sid1 = Dyn.str input "sessionID"
 
-                match runtimeScope.TryFindKey(key) with
-                | Some stored -> stored :?> string
-                | None ->
-                    let epochVal =
-                        if not (System.String.IsNullOrEmpty rawSessionID) then
-                            rawSessionID
+                if sid1 <> "" then
+                    sid1
+                else
+                    let sid2 = Dyn.str input "sessionId"
+
+                    if sid2 <> "" then
+                        sid2
+                    else
+                        let sid3 = Dyn.str input "session_id"
+                        if sid3 <> "" then sid3 else extractSessionID messagesList
+
+            let sessionID = rawSessionID
+
+            let capsEpoch =
+                let rec findExistingEpoch (msgs: Message<obj> list) =
+                    match msgs with
+                    | [] -> None
+                    | msg :: rest ->
+                        let id = msg.info.id
+
+                        if id.StartsWith "caps-synth-user-" then
+                            Some(id.Substring("caps-synth-user-".Length))
+                        elif id.StartsWith "caps-synth-assistant-" then
+                            Some(id.Substring("caps-synth-assistant-".Length))
+                        elif id.StartsWith "caps-synth-ack-" then
+                            Some(id.Substring("caps-synth-ack-".Length))
                         else
-                            "epoch-" + System.Guid.NewGuid().ToString("N")
+                            findExistingEpoch rest
 
-                    runtimeScope.Add(key, box epochVal)
-                    epochVal
+                match findExistingEpoch messagesList with
+                | Some ep when ep <> "" -> ep
+                | _ ->
+                    let rec findFirstNativeUserMsgId (msgs: Message<obj> list) =
+                        match msgs with
+                        | [] -> None
+                        | msg :: rest ->
+                            let id = msg.info.id
+                            let isUser = msg.info.role = User
+
+                            let isSynth =
+                                id.StartsWith "caps-synth-"
+                                || id.StartsWith "backlog-projection-"
+                                || id.StartsWith "backlog-prefix-"
+                                || id.StartsWith "semble-call-"
+                                || id.StartsWith "nudge-"
+                                || id.StartsWith "context-budget-nudge-"
+
+                            if isUser && not isSynth && id <> "" then
+                                Some id
+                            else
+                                findFirstNativeUserMsgId rest
+
+                    let convKeyOpt = findFirstNativeUserMsgId messagesList
+
+                    let tryFindEpoch () =
+                        let ep1 =
+                            match convKeyOpt with
+                            | Some ck ->
+                                match runtimeScope.TryFindKey("caps_epoch_conv_" + ck) with
+                                | Some ep -> Some(ep :?> string)
+                                | None -> None
+                            | None -> None
+
+                        match ep1 with
+                        | Some ep -> Some ep
+                        | None ->
+                            if sessionID <> "" then
+                                match runtimeScope.TryFindKey("caps_epoch_session_" + sessionID) with
+                                | Some ep -> Some(ep :?> string)
+                                | None -> None
+                            else
+                                None
+
+                    match tryFindEpoch () with
+                    | Some ep ->
+                        if sessionID <> "" then
+                            runtimeScope.Add("caps_epoch_session_" + sessionID, box ep)
+                            runtimeScope.Add("caps_epoch_reverse_session_" + ep, box sessionID)
+
+                        ep
+                    | None ->
+                        match convKeyOpt, sessionID with
+                        | None, "" -> ""
+                        | _ ->
+                            let newEpoch = "epoch-" + System.Guid.NewGuid().ToString("N")
+
+                            match convKeyOpt with
+                            | Some ck ->
+                                runtimeScope.Add("caps_epoch_conv_" + ck, box newEpoch)
+                                runtimeScope.Add("caps_epoch_reverse_conv_" + newEpoch, box ck)
+                            | None -> ()
+
+                            if sessionID <> "" then
+                                runtimeScope.Add("caps_epoch_session_" + sessionID, box newEpoch)
+                                runtimeScope.Add("caps_epoch_reverse_session_" + newEpoch, box sessionID)
+
+                            newEpoch
 
             let cleaned = Messaging.stripSyntheticBySource messagesList
             let isSub = registry.ResolveSubsessionParentID(Some sessionID) |> Option.isSome
@@ -246,7 +351,7 @@ let messagesTransform
             let buildCaps encoded capsFiles prelude =
                 buildCapsMessages
                     Wanxiangshu.Shell.FileSys.sha256HexTruncated
-                    sessionID
+                    capsEpoch
                     encoded
                     directory
                     capsFiles

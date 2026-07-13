@@ -61,6 +61,72 @@ type ContinuationIntent =
         continuationOrdinal: int
     | PropagateFailureIntent
 
+let tryExtractLastMessageId (msgs: obj array) : string option =
+    if isNull msgs || msgs.Length = 0 then
+        None
+    else
+        let lastMsg = Array.last msgs
+
+        if isNull lastMsg || Dyn.isNullish lastMsg then
+            None
+        else
+            let idVal = Dyn.get lastMsg "id"
+            let idStr = if Dyn.isNullish idVal then "" else string idVal
+
+            if idStr <> "" && idStr <> "undefined" then
+                Some idStr
+            else
+                let info = Dyn.get lastMsg "info"
+                let infoId = if Dyn.isNullish info then "" else Dyn.str info "id"
+
+                if infoId <> "" && infoId <> "undefined" then
+                    Some infoId
+                else
+                    None
+
+let tryExtractEventMessageBoundary (rawEvent: obj) : string option =
+    if isNull rawEvent || Dyn.isNullish rawEvent then
+        None
+    else
+        let tryPath (obj: obj) (path: string list) : string option =
+            let mutable current = obj
+            let mutable failed = false
+
+            for segment in path do
+                if not failed && not (Dyn.isNullish current) then
+                    current <- Dyn.get current segment
+                else
+                    failed <- true
+
+            if not failed && not (Dyn.isNullish current) then
+                let s = string current
+
+                if s <> "" && s <> "undefined" && s <> "[object Object]" then
+                    Some s
+                else
+                    None
+            else
+                None
+
+        let paths =
+            [ [ "properties"; "message"; "id" ]
+              [ "properties"; "info"; "id" ]
+              [ "properties"; "messageId" ]
+              [ "properties"; "id" ]
+              [ "event"; "properties"; "message"; "id" ]
+              [ "event"; "properties"; "info"; "id" ]
+              [ "event"; "properties"; "messageId" ]
+              [ "event"; "properties"; "id" ]
+              [ "event"; "info"; "id" ]
+              [ "event"; "message"; "id" ]
+              [ "event"; "id" ]
+              [ "message"; "id" ]
+              [ "info"; "id" ]
+              [ "messageId" ]
+              [ "id" ] ]
+
+        paths |> List.tryPick (tryPath rawEvent)
+
 let verifyLeaseWithStatus
     (expectedStatus: string)
     (runtime: FallbackRuntimeState)
@@ -218,15 +284,10 @@ let executeContinuationIntent
                                 "cancelled"
                                 "Lease invalid at dispatch"
                     else
-                        // UPDATE ACTIVE CONTINUATION ID AND ORDINAL HERE
-                        match runtime.TryGetActiveRunId(sessionID) with
-                        | Some activeRunId ->
-                            match runtime.GetSubsessionRun(sessionID, activeRunId) with
-                            | Some subRun ->
-                                subRun.ActiveContinuationId <- continuationID
-                                subRun.ActiveContinuationOrdinal <- continuationOrdinal
-                            | None -> ()
-                        | None -> ()
+                        let! msgs = executor.FetchMessages sessionID
+                        let lastMsgIdOpt = tryExtractLastMessageId msgs
+                        // UPDATE ACTIVE CONTINUATION ID AND ORDINAL AND INCREMENT ATTEMPT HERE
+                        runtime.ActivateAttempt(sessionID, continuationID, continuationOrdinal, lastMsgIdOpt)
 
                         do! executor.SendContinue(sessionID, model, continuationID)
 
@@ -335,15 +396,10 @@ let executeContinuationIntent
                                 "cancelled"
                                 "Lease invalid at dispatch"
                     else
-                        // UPDATE ACTIVE CONTINUATION ID AND ORDINAL HERE
-                        match runtime.TryGetActiveRunId(sessionID) with
-                        | Some activeRunId ->
-                            match runtime.GetSubsessionRun(sessionID, activeRunId) with
-                            | Some subRun ->
-                                subRun.ActiveContinuationId <- continuationID
-                                subRun.ActiveContinuationOrdinal <- continuationOrdinal
-                            | None -> ()
-                        | None -> ()
+                        let! msgs = executor.FetchMessages sessionID
+                        let lastMsgIdOpt = tryExtractLastMessageId msgs
+                        // UPDATE ACTIVE CONTINUATION ID AND ORDINAL AND INCREMENT ATTEMPT HERE
+                        runtime.ActivateAttempt(sessionID, continuationID, continuationOrdinal, lastMsgIdOpt)
 
                         do! executor.RecoverWithPrompt(sessionID, model, promptText, continuationID)
 
@@ -432,18 +488,73 @@ let handleEvent
             let cid = if cid <> "" then cid else Dyn.str rawEvent "continuationID"
             cid
 
-        let isEventContIdMatch =
-            match runtime.TryGetPendingLease sessionID with
-            | Some lease ->
-                if continuationId <> "" then
-                    continuationId = lease.ContinuationID
+        let continuationOrdinal =
+            let props = Dyn.get rawEvent "properties"
+            let props = if Dyn.isNullish props then rawEvent else props
+
+            let getOrdinal o =
+                if Dyn.isNullish o then
+                    0
+                elif Dyn.typeIs o "number" then
+                    unbox<int> o
+                elif Dyn.typeIs o "string" then
+                    let s = unbox<string> o
+
+                    match System.Int32.TryParse s with
+                    | true, v -> v
+                    | _ -> 0
                 else
-                    let activeGen = runtime.GetActiveContinuationGeneration sessionID
-                    let activeCancel = runtime.GetActiveContinuationCancelGeneration sessionID
-                    let currentGen = runtime.GetSessionGeneration sessionID
-                    let currentCancel = runtime.GetCancelGeneration sessionID
-                    activeGen = currentGen && activeCancel = currentCancel
-            | None -> true
+                    0
+
+            let o = Dyn.get props "continuationOrdinal"
+
+            let o =
+                if Dyn.isNullish o then
+                    Dyn.get rawEvent "continuationOrdinal"
+                else
+                    o
+
+            getOrdinal o
+
+        let isEventContIdMatch =
+            let eventType = Dyn.str rawEvent "type"
+            let props = Dyn.get rawEvent "properties"
+
+            let isAssistantMsg =
+                (eventType = "message.updated" || eventType.StartsWith("message.part."))
+                && not (Dyn.isNullish props)
+                && (let info = Dyn.get props "info"
+                    not (Dyn.isNullish info) && Dyn.str info "role" = "assistant")
+
+            let isBusyOrAssistant = translator.IsSessionBusy rawEvent || isAssistantMsg
+            let eventMessageBoundary = tryExtractEventMessageBoundary rawEvent
+
+            let subsessionMatchOpt =
+                if sessionID <> "" then
+                    runtime.CheckSubsessionEventMatch(
+                        sessionID,
+                        continuationId,
+                        continuationOrdinal,
+                        isBusyOrAssistant,
+                        eventMessageBoundary
+                    )
+                else
+                    None
+
+            match subsessionMatchOpt with
+            | Some matched -> matched
+            | None ->
+                match runtime.TryGetPendingLease sessionID with
+                | Some lease ->
+                    if continuationId <> "" then
+                        continuationId = lease.ContinuationID
+                    else
+                        let activeGen = runtime.GetActiveContinuationGeneration sessionID
+                        let activeCancel = runtime.GetActiveContinuationCancelGeneration sessionID
+                        let currentGen = runtime.GetSessionGeneration sessionID
+                        let currentCancel = runtime.GetCancelGeneration sessionID
+                        activeGen = currentGen && activeCancel = currentCancel
+                | None -> true
 
         if sessionID <> "" then
             let eventType = Dyn.str rawEvent "type"
@@ -455,7 +566,7 @@ let handleEvent
                 && (let info = Dyn.get props "info"
                     not (Dyn.isNullish info) && Dyn.str info "role" = "assistant")
 
-            if (translator.IsSessionBusy rawEvent || isAssistantMsg) && isEventContIdMatch then
+            if isEventContIdMatch && (translator.IsSessionBusy rawEvent || isAssistantMsg) then
                 runtime.SetBusyObserved sessionID true
 
         let isAwaiting = runtime.IsAwaitingBusy sessionID
@@ -484,9 +595,10 @@ let handleEvent
         | None ->
 
             if
-                translator.IsSessionBusy rawEvent
-                || translator.IsSessionIdle rawEvent
-                || translator.IsSessionError rawEvent
+                isEventContIdMatch
+                && (translator.IsSessionBusy rawEvent
+                    || translator.IsSessionIdle rawEvent
+                    || translator.IsSessionError rawEvent)
             then
                 runtime.SetAwaitingBusy sessionID false
 

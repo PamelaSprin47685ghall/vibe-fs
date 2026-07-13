@@ -254,3 +254,93 @@ let capsAndBacklogOrderSpec () =
 
         do! rmAsync workspaceDir
     }
+
+let capsEpochIsolationAndStabilitySpecs () =
+    promise {
+        let! workspaceDir = mkdtempAsync "caps-epoch-isolation-"
+        do! writeFileAsync (unbox<string> (pathModule?join (workspaceDir, "CAPS.md"))) "# Capabilities\nTest content"
+
+        do!
+            writeFileAsync
+                (unbox<string> (pathModule?join (workspaceDir, "AGENTS.md")))
+                "---\nimport:\n  - CAPS.md\n---\n"
+
+        let! p = plugin (box {| directory = workspaceDir |})
+        let tf = get p "experimental.chat.messages.transform"
+
+        // 1. 隔离性测试：两个无 sessionID（均设为 ""），但有不同首个 native user message ID 的对话生成不同 CAPS epoch
+        let messagesA =
+            createObj [ "messages", box [| mockUserMsg "msg-user-a" "" "start a" |] ]
+
+        let messagesB =
+            createObj [ "messages", box [| mockUserMsg "msg-user-b" "" "start b" |] ]
+
+        do!
+            tf
+            $ (createObj [ "sessionID", box ""; "directory", box workspaceDir ], messagesA)
+            |> unbox<JS.Promise<unit>>
+
+        do!
+            tf
+            $ (createObj [ "sessionID", box ""; "directory", box workspaceDir ], messagesB)
+            |> unbox<JS.Promise<unit>>
+
+        let resultA = unbox<obj[]> (get messagesA "messages")
+        let resultB = unbox<obj[]> (get messagesB "messages")
+
+        let ackIdA = str (get resultA.[1] "info") "id"
+        let ackIdB = str (get resultB.[1] "info") "id"
+
+        let epochA = ackIdA.Substring(capsAcknowledgePrefix.Length)
+        let epochB = ackIdB.Substring(capsAcknowledgePrefix.Length)
+
+        check "epochA is not empty" (epochA <> "")
+        check "epochB is not empty" (epochB <> "")
+        check "epochs for different conversation keys are isolated" (epochA <> epochB)
+
+        // 验证业务 sessionID 没有被改写为 epoch-*。
+        let nativeMsgAInfo = get resultA.[3] "info"
+        let nativeSessionID_A = str nativeMsgAInfo "sessionID"
+        check "native message sessionID remains empty" (nativeSessionID_A = "")
+
+        // 2. 连续性测试：同一对话从无 sessionID 到后来出现真实 sessionID 时，synthetic CAPS ID 保持相同 epoch
+        let messagesC_1 =
+            createObj [ "messages", box [| mockUserMsg "msg-user-c" "" "start c" |] ]
+
+        do!
+            tf
+            $ (createObj [ "sessionID", box ""; "directory", box workspaceDir ], messagesC_1)
+            |> unbox<JS.Promise<unit>>
+
+        let resultC_1 = unbox<obj[]> (get messagesC_1 "messages")
+        let ackIdC_1 = str (get resultC_1.[1] "info") "id"
+        let epochC_1 = ackIdC_1.Substring(capsAcknowledgePrefix.Length)
+
+        // 模拟稍后 Host 传入了真实 sessionID "real-session-c"
+        for msg in resultC_1 do
+            let info = get msg "info"
+            let role = str info "role"
+
+            if role = "user" && not ((str info "id").StartsWith("caps-synth-")) then
+                info?sessionID <- box "real-session-c"
+
+        let messagesC_2 = createObj [ "messages", box resultC_1 ]
+
+        do!
+            tf
+            $ (createObj [ "sessionID", box "real-session-c"; "directory", box workspaceDir ], messagesC_2)
+            |> unbox<JS.Promise<unit>>
+
+        let resultC_2 = unbox<obj[]> (get messagesC_2 "messages")
+        let ackIdC_2 = str (get resultC_2.[1] "info") "id"
+        let epochC_2 = ackIdC_2.Substring(capsAcknowledgePrefix.Length)
+
+        check "epoch remains stable when session ID is later assigned" (epochC_1 = epochC_2)
+
+        // 再次验证业务 sessionID 没有被改写为 epoch-*。
+        let nativeMsgCInfo = get resultC_2.[3] "info"
+        let nativeSessionID_C = str nativeMsgCInfo "sessionID"
+        check "native message sessionID remains real-session-c" (nativeSessionID_C = "real-session-c")
+
+        do! rmAsync workspaceDir
+    }
