@@ -16,12 +16,13 @@ type OmpSubsessionHost(session: obj, agent: string, pi: obj) =
     interface ISubsessionHost with
         member _.Dispatch(sessionId, turn) =
             promise {
-                let model = turn.Model
-
                 let modelStr =
-                    match model.Variant with
-                    | Some v -> sprintf "%s/%s:%s" model.ProviderID model.ModelID v
-                    | None -> sprintf "%s/%s" model.ProviderID model.ModelID
+                    match turn.Model with
+                    | Some model ->
+                        match model.Variant with
+                        | Some v -> sprintf "%s/%s:%s" model.ProviderID model.ModelID v
+                        | None -> sprintf "%s/%s" model.ProviderID model.ModelID
+                    | None -> ""
 
                 let turnIdStr = TurnId.value turn.TurnId
 

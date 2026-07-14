@@ -7,11 +7,26 @@ open Wanxiangshu.Kernel.Subsession.Policy
 
 // ── Helpers ──
 
+/// Placeholder model recorded on TurnData/events when the turn's model
+/// selection is delegated to the host (ModelDirective.DelegateToHost).
+/// TurnData.Model stays non-optional because it is an audit/event payload
+/// field, not a dispatch instruction — DispatchPrompt (Effect) is what
+/// actually carries TurnPlan.Model: FallbackModel option to the host adapter.
+let private delegateToHostSentinel: FallbackModel =
+    { ProviderID = ""
+      ModelID = ""
+      Variant = None
+      Temperature = None
+      TopP = None
+      MaxTokens = None
+      ReasoningEffort = None
+      Thinking = false }
+
 let private makeTurnData (ctx: RunContext) (plan: TurnPlan) : TurnData =
     { RunId = ctx.RunId
       TurnId = plan.TurnId
       Ordinal = plan.Ordinal
-      Model = plan.Model
+      Model = plan.Model |> Option.defaultValue delegateToHostSentinel
       Prompt = plan.Prompt }
 
 let private nextTurnFromPolicy (ctx: RunContext) (decision: PolicyDecision) : (RunContext * TurnPlan) option =
@@ -25,7 +40,7 @@ let private nextTurnFromPolicy (ctx: RunContext) (decision: PolicyDecision) : (R
         let plan =
             { TurnId = turnId
               Ordinal = ordinal
-              Model = model
+              Model = Some model
               Prompt = prompt }
 
         let ctx2 =
@@ -241,10 +256,8 @@ let decide (state: SubsessionState) (cmd: Command) : Result<DecisionResult, Deci
         Ok(decided (Available avail) events effects)
 
     | Available _, StartRun req ->
-        match req.Chain with
-        | [] -> Ok(decided state [] [ RejectStart NoModelAvailable ])
-        | firstModel :: _ ->
-            let policy = initialPolicy req.FallbackConfig req.Chain
+        let dispatchTurn (chainForCtx: FallbackChain) (modelForPlan: FallbackModel option) =
+            let policy = initialPolicy req.FallbackConfig chainForCtx
 
             let ctx =
                 { RunId = req.RunId
@@ -252,13 +265,13 @@ let decide (state: SubsessionState) (cmd: Command) : Result<DecisionResult, Deci
                   SessionId = req.SessionId
                   Policy = policy
                   FallbackConfig = req.FallbackConfig
-                  Chain = req.Chain
+                  Chain = chainForCtx
                   NextTurnOrdinal = TurnOrdinal.next TurnOrdinal.first }
 
             let plan =
                 { TurnId = TurnId.create (RunId.value req.RunId + "-t0")
                   Ordinal = TurnOrdinal.first
-                  Model = firstModel
+                  Model = modelForPlan
                   Prompt = req.Prompt }
 
             let events =
@@ -270,7 +283,12 @@ let decide (state: SubsessionState) (cmd: Command) : Result<DecisionResult, Deci
 
             let effects = [ ArmTurnDeadline plan.TurnId; DispatchPrompt plan ]
 
-            Ok(decided (Dispatching(ctx, plan, CurrentTurnEvidence.empty)) events effects)
+            decided (Dispatching(ctx, plan, CurrentTurnEvidence.empty)) events effects
+
+        match req.Directive with
+        | RetryChain [] -> Ok(decided state [] [ RejectStart NoModelAvailable ])
+        | RetryChain(firstModel :: _ as chain) -> Ok(dispatchTurn chain (Some firstModel))
+        | DelegateToHost -> Ok(dispatchTurn [] None)
 
     | Available _, CancelRequested -> Ok(noChange StaleTimer)
 

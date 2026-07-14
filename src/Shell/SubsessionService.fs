@@ -32,7 +32,7 @@ type SubsessionService
             parentSessionId: string,
             prompt: string,
             cfg: FallbackConfig,
-            chain: FallbackChain,
+            directive: ModelDirective,
             ?abortSignal: obj
         ) : JS.Promise<RunResult> =
         promise {
@@ -60,7 +60,7 @@ type SubsessionService
                   ParentSessionId = SessionId.create parentSessionId
                   Prompt = prompt
                   FallbackConfig = cfg
-                  Chain = chain
+                  Directive = directive
                   InitiallyCancelled = initiallyCancelled }
 
             // 1. Atomic BeginRun enqueued first.

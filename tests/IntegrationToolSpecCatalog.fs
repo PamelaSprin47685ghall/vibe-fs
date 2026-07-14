@@ -54,6 +54,7 @@ let integrationToolSpecs () : (string * (unit -> JS.Promise<unit>)) list =
       "investigatorTool", investigatorToolSpec
       "muxCoderInvalidIntents", muxCoderInvalidIntentsSpec
       "investigatorToolLateClientInjection", investigatorToolLateClientInjectionSpec
+      "investigatorToolWithHostConfiguredModel", investigatorToolWithHostConfiguredModelSpec
       "writeTool", (fun () -> writeToolSpec reg)
       "loopCommand", (fun () -> loopCommandSpec reg)
       "agentConfig", agentConfigSpec

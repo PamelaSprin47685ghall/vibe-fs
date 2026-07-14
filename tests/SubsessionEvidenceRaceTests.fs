@@ -35,7 +35,7 @@ let private request: StartRunRequest =
       ParentSessionId = parent
       Prompt = "investigate README"
       FallbackConfig = cfg
-      Chain = [ model0 ]
+      Directive = RetryChain [ model0 ]
       InitiallyCancelled = false }
 
 let private mustDecide state cmd =

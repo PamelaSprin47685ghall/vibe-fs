@@ -48,7 +48,7 @@ let private request: StartRunRequest =
       ParentSessionId = parent
       Prompt = "do work"
       FallbackConfig = cfg
-      Chain = chain
+      Directive = RetryChain chain
       InitiallyCancelled = false }
 
 let private mustDecide state cmd =

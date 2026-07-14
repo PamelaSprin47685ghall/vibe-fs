@@ -46,6 +46,7 @@ open Wanxiangshu.Tests.OpencodeSessionPromptCodecTests
 open Wanxiangshu.Tests.OpencodeSessionSpawnCodecTests
 open Wanxiangshu.Tests.SessionIoPromptBodyTests
 open Wanxiangshu.Tests.OpencodeAgentConfigCodecTests
+open Wanxiangshu.Tests.OpencodeClientCodecTests
 open Wanxiangshu.Tests.OpencodeSessionEventCodecTests
 open Wanxiangshu.Tests.OpencodeSessionEventCodecCommonTests
 open Wanxiangshu.Tests.MuxAiSettingsCodecTests
@@ -96,6 +97,7 @@ let codecTestEntries () : (string * TestBody) list =
       "OpencodeSessionSpawnCodecTests.run", Sync(sync OpencodeSessionSpawnCodecTests.run)
       "SessionIoPromptBodyTests.run", Sync(sync SessionIoPromptBodyTests.run)
       "OpencodeAgentConfigCodecTests.run", Sync(sync OpencodeAgentConfigCodecTests.run)
+      "OpencodeClientCodecTests.run", Sync(sync OpencodeClientCodecTests.run)
       "OpencodeSessionEventCodecTests.run", Sync(sync OpencodeSessionEventCodecTests.run)
       "OpencodeSessionEventCodecCommonTests.run", Sync(sync OpencodeSessionEventCodecCommonTests.run)
       "MuxAiSettingsCodecTests.run", Sync(sync MuxAiSettingsCodecTests.run)

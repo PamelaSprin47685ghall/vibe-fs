@@ -56,7 +56,7 @@ let private ctx: RunContext =
 let private plan: TurnPlan =
     { TurnId = turn0
       Ordinal = TurnOrdinal.first
-      Model = model0
+      Model = Some model0
       Prompt = "go" }
 
 let private receipt = OrderedTurnMarkerObserved
@@ -407,7 +407,7 @@ let private dispatchingAcceptanceUnknownEntersReconcile () =
     let plan =
         { TurnId = turn0
           Ordinal = TurnOrdinal.first
-          Model = model0
+          Model = Some model0
           Prompt = "go" }
 
     let state = Dispatching(ctx, plan, CurrentTurnEvidence.empty)

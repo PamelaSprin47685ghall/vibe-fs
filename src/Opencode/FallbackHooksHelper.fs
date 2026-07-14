@@ -142,3 +142,39 @@ let tryReadCurrentModel (client: obj) (sessionID: string) : JS.Promise<FallbackM
                     let model = Dyn.get info "model"
                     return decodeModelFromObj model
     }
+
+/// Query whether the host already has an explicit static model configured
+/// for this agent (e.g. opencode.jsonc agent.<name>.model). Used to decide
+/// ModelDirective priority: an explicit host-side config must always win
+/// over any wanxiangshu-injected parent-session model.
+let tryGetAgentExplicitModel (client: obj) (agentName: string) : JS.Promise<string option> =
+    promise {
+        if Dyn.isNullish client then
+            return None
+        else
+            match getConfigApiFromClient client with
+            | Error _ -> return None
+            | Ok configApi ->
+                let api: obj = Dyn.get configApi "get"
+
+                if Dyn.isNullish api then
+                    return None
+                else
+                    try
+                        let! resp = unbox<JS.Promise<obj>> (Dyn.callMethod0 configApi "get")
+
+                        if Dyn.isNullish resp then
+                            return None
+                        else
+                            let cfg = Dyn.get resp "data"
+
+                            if Dyn.isNullish cfg then
+                                return None
+                            else
+                                let agents = Dyn.get cfg "agent"
+                                let agentCfg = Dyn.get agents agentName
+                                let model = Dyn.str agentCfg "model"
+                                if model <> "" then return Some model else return None
+                    with _ ->
+                        return None
+    }

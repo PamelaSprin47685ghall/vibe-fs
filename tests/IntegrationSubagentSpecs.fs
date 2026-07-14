@@ -154,6 +154,55 @@ let investigatorToolLateClientInjectionSpec () =
         do! rmAsync workspaceDir
     }
 
+let investigatorToolWithHostConfiguredModelSpec () =
+    promise {
+        let pObjRef = ref null
+
+        let configApi =
+            createObj
+                [ "get",
+                  box (fun () ->
+                      promise {
+                          return
+                              box
+                                  {| data =
+                                      box
+                                          {| agent =
+                                              createObj
+                                                  [ "investigator", box (createObj [ "model", box "openai/gpt-4o" ]) ] |} |}
+                      }) ]
+
+        let createCalls, promptCalls, mockClient =
+            makeMockClient pObjRef "investigator-parent-config" "Found src/Opencode/Tools.fs"
+
+        setKey mockClient "config" configApi
+        let! workspaceDir = mkdtempAsync "investigator-tool-config-"
+
+        let! p =
+            plugin (
+                box
+                    {| directory = workspaceDir
+                       client = mockClient |}
+            )
+
+        pObjRef.Value <- p
+        let investigator = get (get p "tool") "investigator"
+
+        let! result =
+            (get investigator "execute")
+            $ (createObj [ "intents", box [| sampleInvestigatorIntent "find investigator registration" |] ],
+               createObj
+                   [ "directory", box workspaceDir
+                     "sessionID", box "investigator-parent-config"
+                     "abort", box null ])
+            |> unbox<JS.Promise<string>>
+
+        check "investigator tool returns subagent output" (result.Contains("src/Opencode/Tools.fs"))
+        let promptBody = get promptCalls.[0] "body"
+        check "prompt body does not contain model" (isNullish (get promptBody "model"))
+        do! rmAsync workspaceDir
+    }
+
 let muxCoderInvalidIntentsSpec () =
     promise {
         let reg = sharedMuxRegistration ()

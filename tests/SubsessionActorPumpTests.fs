@@ -70,7 +70,7 @@ let private mkRequest runId =
       ParentSessionId = SessionId.create "parent"
       Prompt = "go"
       FallbackConfig = cfg
-      Chain = [ model0 ]
+      Directive = RetryChain [ model0 ]
       InitiallyCancelled = false }
 
 /// 1. Dispatch Ok → DispatchAccepted → Running (no queue self-deadlock)

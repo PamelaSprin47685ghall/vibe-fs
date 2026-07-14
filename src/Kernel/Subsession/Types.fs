@@ -204,7 +204,7 @@ type CancelContext = AbortContext
 type TurnPlan =
     { TurnId: TurnId
       Ordinal: TurnOrdinal
-      Model: FallbackModel
+      Model: FallbackModel option
       Prompt: string }
 
 type StartedTurn =
@@ -285,6 +285,18 @@ type StartRunError =
     | SessionPoisoned of PoisonReason
     | NoModelAvailable
 
+// ── Model directive: retry-capable chain vs delegate-to-host ──
+
+/// Whether this run should be driven by wanxiangshu's own fallback retry
+/// policy (RetryChain, chain non-empty is the caller's invariant to uphold)
+/// or should delegate model selection entirely to the host (DelegateToHost:
+/// no model field is ever passed to the host; the host's own static agent
+/// config / currentModel resolution takes effect, matching OpenCode's
+/// session.prompt priority: input.model ?? ag.model ?? currentModel).
+type ModelDirective =
+    | RetryChain of FallbackChain
+    | DelegateToHost
+
 type StartRunRequest =
     {
         RunId: RunId
@@ -292,7 +304,7 @@ type StartRunRequest =
         ParentSessionId: SessionId
         Prompt: string
         FallbackConfig: FallbackConfig
-        Chain: FallbackChain
+        Directive: ModelDirective
         /// True when AbortSignal was already aborted at StartRun commit time.
         InitiallyCancelled: bool
     }

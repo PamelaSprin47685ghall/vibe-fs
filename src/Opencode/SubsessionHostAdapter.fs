@@ -15,6 +15,19 @@ open Wanxiangshu.Shell.SubsessionActorRegistry
 
 let private invoke1 (arg: obj) (method: string) (target: obj) : JS.Promise<obj> = unbox (target?(method) (arg))
 
+/// Format a FallbackModel option into the string option shape expected by
+/// createPromptBodyWithModelAndNonce. None means ModelDirective.DelegateToHost:
+/// no model field will be sent to the host, letting OpenCode's own
+/// agent.<name>.model static config (or currentModel fallback chain) resolve
+/// the model — this is the exact mechanism that stops wanxiangshu's parent-
+/// session model injection from overriding opencode.jsonc.
+let buildDispatchModelString (model: FallbackModel option) : string option =
+    model
+    |> Option.map (fun m ->
+        match m.Variant with
+        | Some v -> sprintf "%s/%s:%s" m.ProviderID m.ModelID v
+        | None -> sprintf "%s/%s" m.ProviderID m.ModelID)
+
 module PendingTurnReceipt =
     type Waiter =
         { SessionId: string
@@ -74,17 +87,11 @@ type OpencodeSubsessionHost(client: obj, agent: string, _directory: string) =
         member _.Dispatch(sessionId, turn) =
             // Parallel wait: fire prompt without blocking receipt.
             promise {
-                let model = turn.Model
-
-                let modelStr =
-                    match model.Variant with
-                    | Some v -> sprintf "%s/%s:%s" model.ProviderID model.ModelID v
-                    | None -> sprintf "%s/%s" model.ProviderID model.ModelID
-
+                let modelStr = buildDispatchModelString turn.Model
                 let nonce = TurnId.value turn.TurnId
 
                 let body =
-                    createPromptBodyWithModelAndNonce (Some agent) (Some modelStr) turn.Prompt (Some nonce)
+                    createPromptBodyWithModelAndNonce (Some agent) modelStr turn.Prompt (Some nonce)
 
                 let arg =
                     box

@@ -18,3 +18,11 @@ let getSessionApiFromClient (client: obj) : Result<obj, DomainError> =
         Error(InvalidIntent("plugin", "session", "missing"))
     else
         Ok session
+
+let getConfigApiFromClient (client: obj) : Result<obj, DomainError> =
+    let config = Dyn.get client "config"
+
+    if Dyn.isNullish config then
+        Error(InvalidIntent("plugin", "config", "missing"))
+    else
+        Ok config

@@ -85,7 +85,7 @@ let private mkReq sid runId =
       ParentSessionId = SessionId.create "parent"
       Prompt = "go"
       FallbackConfig = cfg
-      Chain = [ model0 ]
+      Directive = RetryChain [ model0 ]
       InitiallyCancelled = false }
 
 // 1+2: BeginRun atomic — CancelRequested cannot insert before StartRun commit
@@ -171,7 +171,7 @@ let idleBeforeBarrierIgnored () =
     let plan =
         { TurnId = turn0
           Ordinal = TurnOrdinal.first
-          Model = model0
+          Model = Some model0
           Prompt = "x" }
 
     let abortCtx =

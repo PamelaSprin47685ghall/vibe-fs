@@ -159,49 +159,52 @@ let runSubagentCoreResult
 
                     let! parentLiveModel = resolveParentLiveModel runtime client parentSessionID
 
-                    let chain =
-                        Wanxiangshu.Shell.FallbackConfigCodec.resolveSubagentChain
+                    let! hostExplicitModelOpt =
+                        Wanxiangshu.Opencode.FallbackHooksHelper.tryGetAgentExplicitModel client agent
+
+                    let hostConfigured = Option.isSome hostExplicitModelOpt
+
+                    let directive =
+                        Wanxiangshu.Shell.FallbackConfigCodec.resolveModelDirective
                             cfg
                             agent
+                            hostConfigured
                             (runtime.GetChain childID)
                             (runtime.GetChain parentSessionID)
                             parentLiveModel
 
-                    if chain.IsEmpty then
-                        cleanupChildIfRequested ()
-
-                        return Error(DomainError.InvalidIntent("subagent", "run", formatRunFailure NoModelConfigured))
-                    else
-                        // Cache the resolved chain on the child so continue/recovery reuse it.
+                    match directive with
+                    | RetryChain chain ->
                         runtime.SetChain childID chain
 
                         match List.tryHead chain with
                         | Some first -> runtime.SetModel childID first
                         | None -> ()
+                    | DelegateToHost -> runtime.SetChain childID []
 
-                        let hostFactory (_sid: string) = createHost client agent directory
+                    let hostFactory (_sid: string) = createHost client agent directory
 
-                        let eventStoreFactory (_sid: string) =
-                            create (if directory = "" then "" else directory)
+                    let eventStoreFactory (_sid: string) =
+                        create (if directory = "" then "" else directory)
 
-                        let service = SubsessionService(hostFactory, eventStoreFactory)
+                    let service = SubsessionService(hostFactory, eventStoreFactory)
 
+                    try
                         try
-                            try
-                                let! runResult =
-                                    service.StartRun(childID, sessionID, prompt, cfg, chain, abortSignal = signal)
+                            let! runResult =
+                                service.StartRun(childID, sessionID, prompt, cfg, directive, abortSignal = signal)
 
-                                match runResult with
-                                | Succeeded _output ->
-                                    let! text = extractSessionText client childID directory startCount
-                                    return Ok(formatSubagentReport noOutputText abortedPrefix text false)
-                                | Cancelled -> return Ok abortedPrefix
-                                | Failed reason ->
-                                    return Error(DomainError.InvalidIntent("subagent", "run", formatRunFailure reason))
-                            with err ->
-                                return Error(translateJsError err)
-                        finally
-                            cleanupChildIfRequested ()
+                            match runResult with
+                            | Succeeded _output ->
+                                let! text = extractSessionText client childID directory startCount
+                                return Ok(formatSubagentReport noOutputText abortedPrefix text false)
+                            | Cancelled -> return Ok abortedPrefix
+                            | Failed reason ->
+                                return Error(DomainError.InvalidIntent("subagent", "run", formatRunFailure reason))
+                        with err ->
+                            return Error(translateJsError err)
+                    finally
+                        cleanupChildIfRequested ()
         with err ->
             return Error(translateJsError err)
     }

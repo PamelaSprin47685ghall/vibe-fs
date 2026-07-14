@@ -542,6 +542,7 @@
     <Compile Include="tests/OpencodeSessionSpawnCodecTests.fs"/>
     <Compile Include="tests/SessionIoPromptBodyTests.fs"/>
     <Compile Include="tests/OpencodeAgentConfigCodecTests.fs"/>
+    <Compile Include="tests/OpencodeClientCodecTests.fs"/>
     <Compile Include="tests/OpencodeSessionEventCodecTestsSession.fs"/>
     <Compile Include="tests/OpencodeSessionEventCodecTests.fs"/>
     <Compile Include="tests/OpencodeSessionEventCodecCommonTests.fs"/>
@@ -621,12 +622,14 @@
     <Compile Include="tests/FallbackAgentAndModelPart2Tests.fs"/>
     <Compile Include="tests/FallbackInjectionFoldTests.fs"/>
     <Compile Include="tests/SubsessionDecisionTests.fs"/>
+    <Compile Include="tests/OpencodeSubsessionHostAdapterModelTests.fs"/>
     <Compile Include="tests/SubsessionScenarioTests.fs"/>
     <Compile Include="tests/SubsessionActorPumpTests.fs"/>
     <Compile Include="tests/SubsessionV36HardTests.fs"/>
     <Compile Include="tests/SubsessionV37HardTests.fs"/>
     <Compile Include="tests/SubsessionV38DecisionTests.fs"/>
     <Compile Include="tests/SubsessionEvidenceRaceTests.fs"/>
+    <Compile Include="tests/FallbackHooksHelperAgentModelTests.fs"/>
     <Compile Include="tests/FallbackMessageCodecTests.fs"/>
     <Compile Include="tests/FallbackRecoveryWaitTests.fs"/>
     <Compile Include="tests/FallbackIntegrationTests.fs"/>

@@ -72,7 +72,7 @@ let appendFailTriggersAbort () =
               ParentSessionId = SessionId.create "parent"
               Prompt = "x"
               FallbackConfig = cfg
-              Chain = [ model0 ]
+              Directive = RetryChain [ model0 ]
               InitiallyCancelled = false }
 
         let p = actor.StartRun request
@@ -270,7 +270,7 @@ let memoryStoreKeepsAllDomainEvents () =
               ParentSessionId = SessionId.create "parent"
               Prompt = "x"
               FallbackConfig = cfg
-              Chain = [ model0 ]
+              Directive = RetryChain [ model0 ]
               InitiallyCancelled = false }
 
         let p = actor.StartRun request

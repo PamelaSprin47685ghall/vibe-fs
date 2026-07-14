@@ -52,7 +52,7 @@ let private request: StartRunRequest =
       ParentSessionId = parent
       Prompt = "do work"
       FallbackConfig = cfg
-      Chain = chain
+      Directive = RetryChain chain
       InitiallyCancelled = false }
 
 let private policy0 = initialPolicy cfg chain
@@ -69,7 +69,7 @@ let private mkCtx policy ordinal =
 let private mkPlan tid ordinal model prompt =
     { TurnId = tid
       Ordinal = ordinal
-      Model = model
+      Model = Some model
       Prompt = prompt }
 
 let private hasEffect pred (effects: Effect list) = List.exists pred effects
@@ -616,6 +616,64 @@ let turnDeadlineAfterAbortIsTimeoutNotCancelled () =
         | other -> fail ("expected ReconcilingAbortSettle, got " + string other)
     | other -> fail ("unexpected: " + string other)
 
+// ── ModelDirective: DelegateToHost vs RetryChain ──
+
+/// DelegateToHost must produce a TurnPlan with Model=None and proceed through
+/// the full normal dispatch lifecycle — it is NOT a rejection path. This is
+/// the branch that lets OpenCode's session.prompt fall through to
+/// ag.model / opencode.jsonc static config instead of wanxiangshu forcing a
+/// parent-session model override.
+let startRunWithDelegateToHostProducesNoneModel () =
+    let req =
+        { request with
+            Directive = DelegateToHost }
+
+    match decide avail (StartRun req) with
+    | Ok(Decided d) ->
+        match d.NextState with
+        | Dispatching(_, plan, _) -> check "DelegateToHost plan has no model" plan.Model.IsNone
+        | other -> fail ("expected Dispatching, got " + string other)
+
+        check "DelegateToHost still dispatches" (hasEffect isDispatchPrompt d.Effects)
+    | other -> fail ("unexpected: " + string other)
+
+/// RetryChain [] is a defensive branch for callers that violate the
+/// invariant "non-empty chain when retry capability is requested". Must
+/// reject exactly like the current empty-Chain behavior — no dispatch.
+let startRunWithEmptyRetryChainRejectsNoModel () =
+    let req =
+        { request with
+            Directive = RetryChain [] }
+
+    match decide avail (StartRun req) with
+    | Ok(Decided d) ->
+        check
+            "RejectStart NoModelAvailable"
+            (hasEffect
+                (function
+                | RejectStart NoModelAvailable -> true
+                | _ -> false)
+                d.Effects)
+
+        check "no DispatchPrompt on empty retry chain" (not (hasEffect isDispatchPrompt d.Effects))
+    | other -> fail ("unexpected: " + string other)
+
+/// RetryChain with a non-empty chain must behave exactly as today: first
+/// model dispatched, full chain preserved on RunContext for later retries.
+let startRunWithRetryChainProducesSomeModel () =
+    let req =
+        { request with
+            Directive = RetryChain chain }
+
+    match decide avail (StartRun req) with
+    | Ok(Decided d) ->
+        match d.NextState with
+        | Dispatching(ctx, plan, _) ->
+            check "RetryChain plan model is first of chain" (plan.Model = Some model0)
+            check "RetryChain ctx keeps full chain" (ctx.Chain = chain)
+        | other -> fail ("expected Dispatching, got " + string other)
+    | other -> fail ("unexpected: " + string other)
+
 let run () =
     startRunFromAvailable ()
     secondStartRunRejected ()
@@ -638,3 +696,6 @@ let run () =
     initiallyCancelledNoDispatch ()
     acceptanceUnknownRetriesAfterAbortConfirmed ()
     turnDeadlineAfterAbortIsTimeoutNotCancelled ()
+    startRunWithDelegateToHostProducesNoneModel ()
+    startRunWithEmptyRetryChainRejectsNoModel ()
+    startRunWithRetryChainProducesSomeModel ()

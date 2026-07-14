@@ -4,6 +4,7 @@ open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Shell.Dyn
 open Wanxiangshu.Kernel.FallbackKernel.Types
+open Wanxiangshu.Kernel.Subsession.Types
 
 [<Import("parse", "yaml")>]
 let private yamlParse (text: string) : obj = jsNative
@@ -158,6 +159,35 @@ let resolveSubagentChain
         match parentLiveModel with
         | Some m -> [ m ]
         | None -> []
+
+/// Three-state priority for subagent model selection:
+/// 1. Host already has an explicit static model configured for this agent
+///    (e.g. opencode.jsonc agent.<name>.model) → DelegateToHost unconditionally.
+///    Wanxiangshu must never override an explicit host-side config with an
+///    injected parent-session model.
+/// 2. Otherwise, resolve via the existing chain logic (config → child runtime
+///    → parent runtime → parent live model). A non-empty result becomes a
+///    RetryChain (wanxiangshu owns model selection/retry for this run).
+/// 3. If nothing is known at all, delegate to the host instead of failing
+///    the whole subagent run with NoModelConfigured — an empty chain most
+///    likely means the host has its own default resolution path (agent
+///    config, or its own currentModel fallback), and rejecting outright
+///    would be a false negative.
+let resolveModelDirective
+    (cfg: FallbackConfig)
+    (agentName: string)
+    (hostConfiguredModel: bool)
+    (childRuntimeChain: FallbackChain)
+    (parentRuntimeChain: FallbackChain)
+    (parentLiveModel: FallbackModel option)
+    : ModelDirective =
+    if hostConfiguredModel then
+        DelegateToHost
+    else
+        let chain =
+            resolveSubagentChain cfg agentName childRuntimeChain parentRuntimeChain parentLiveModel
+
+        if chain.IsEmpty then DelegateToHost else RetryChain chain
 
 let extractFallbackConfig (frontmatter: obj) : FallbackConfig option =
     if isNullish frontmatter then

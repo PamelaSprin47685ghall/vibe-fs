@@ -6,6 +6,7 @@ open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Shell.FallbackConfigCodec
 open Wanxiangshu.Opencode.FallbackConfigLoader
 open Wanxiangshu.Kernel.FallbackKernel.Types
+open Wanxiangshu.Kernel.Subsession.Types
 
 // ---------------------------------------------------------------------------
 // normalizeAgentName
@@ -260,6 +261,51 @@ let resolveConfiguredChain_normalizesAgentName () =
     equal "provider" "oai" chain.[0].ProviderID
 
 // ---------------------------------------------------------------------------
+// resolveModelDirective: three-state priority
+// ---------------------------------------------------------------------------
+
+let resolveModelDirective_hostConfiguredAlwaysDelegates () =
+    let cfg: FallbackConfig =
+        { emptyConfig with
+            DefaultChain = [ mkModel "a" "default" None ] }
+
+    match
+        resolveModelDirective
+            cfg
+            "coder"
+            true
+            [ mkModel "child" "m1" None ]
+            [ mkModel "parent" "m2" None ]
+            (Some(mkModel "live" "m3" None))
+    with
+    | DelegateToHost -> ()
+    | _ -> check "expected DelegateToHost" false
+
+let resolveModelDirective_notHostConfiguredWithNonEmptyChainRetries () =
+    match resolveModelDirective emptyConfig "coder" false [] [] (Some(mkModel "openai" "gpt-4.1" None)) with
+    | RetryChain [ m ] -> equal "provider" "openai" m.ProviderID
+    | _ -> check "expected RetryChain singleton" false
+
+let resolveModelDirective_notHostConfiguredWithEmptyEverythingDelegatesInsteadOfRejecting () =
+    match resolveModelDirective emptyConfig "coder" false [] [] None with
+    | DelegateToHost -> ()
+    | _ -> check "expected DelegateToHost when nothing known" false
+
+let resolveModelDirective_configuredChainStillWinsOverParentWhenNotHostConfigured () =
+    let cfg: FallbackConfig =
+        { emptyConfig with
+            AgentChains = Map.ofList [ "coder", [ mkModel "oai" "gpt5" None ] ] }
+
+    let parent = Some(mkModel "openai" "gpt-4.1" None)
+
+    match resolveModelDirective cfg "coder" false [] [] parent with
+    | RetryChain chain ->
+        equal "length" 2 chain.Length
+        equal "parent prepended to head" "openai" chain.[0].ProviderID
+        equal "config chain follows" "oai" chain.[1].ProviderID
+    | _ -> check "expected RetryChain" false
+
+// ---------------------------------------------------------------------------
 // Suite entry
 // ---------------------------------------------------------------------------
 
@@ -286,3 +332,7 @@ let run () =
     resolveSubagentChain_childRuntimeBeatsParent ()
     resolveSubagentChain_parentRuntimeWhenNoConfigOrChild ()
     resolveConfiguredChain_normalizesAgentName ()
+    resolveModelDirective_hostConfiguredAlwaysDelegates ()
+    resolveModelDirective_notHostConfiguredWithNonEmptyChainRetries ()
+    resolveModelDirective_notHostConfiguredWithEmptyEverythingDelegatesInsteadOfRejecting ()
+    resolveModelDirective_configuredChainStillWinsOverParentWhenNotHostConfigured ()
