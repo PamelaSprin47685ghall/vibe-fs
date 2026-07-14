@@ -31,7 +31,6 @@ let integrationToolSpecs () : (string * (unit -> JS.Promise<unit>)) list =
       "computeCountSpec", (fun () -> promise { computeCountSpec reg })
       "subagentCapsInjection", subagentCapsInjectionSpec
       "crossSessionIsolation", crossSessionIsolationSpec
-      ("ompChildSessionObjectiveReRegister", ompChildSessionObjectiveReRegisterSpec)
       ("opencodeSubsessionParentID", opencodeSubsessionParentIDSpec)
       ("subagentFallbackRawText", subagentFallbackRawTextSpec)
       ("muxSubsessionParentID", muxSubsessionParentIDSpec)

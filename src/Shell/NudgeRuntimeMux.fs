@@ -185,7 +185,7 @@ let sendNudgeMux
                 | Some m -> box m
                 | None -> null
 
-            fallbackRuntime.SetAwaitingBusy workspaceId true
+            fallbackRuntime.SetMainContinuationAwaitingStart workspaceId true
             let! delivered = unbox<JS.Promise<bool>> (Dyn.call4 nudgeFn workspaceId promptText modelVal agentVal)
             return if delivered then Delivered else Busy
         with _ ->

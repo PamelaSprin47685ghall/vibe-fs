@@ -8,7 +8,6 @@ open Wanxiangshu.Opencode.Plugin
 open Wanxiangshu.Shell.ChildAgentRegistry
 open Wanxiangshu.Opencode.SessionIo
 open Wanxiangshu.Shell.Dyn
-open Wanxiangshu.Shell.ChildSessionMailbox
 
 let websearchBoundariesSpec () =
     promise {
@@ -32,171 +31,6 @@ let websearchBoundariesSpec () =
         let tools = get (get coderChat "message") "tools"
         check "coder websearch forced false" (not (unbox<bool> (get tools "websearch")))
         check "coder webfetch forced false" (not (unbox<bool> (get tools "webfetch")))
-        do! rmAsync workspaceDir
-    }
-
-let subagentParentSpec () =
-    promise {
-        let createCalls = ResizeArray<obj>()
-        let promptCalls = ResizeArray<obj>()
-        let runtime = Wanxiangshu.Shell.FallbackRuntimeState.FallbackRuntimeState()
-
-        let mockClient =
-            createObj
-                [ "session",
-                  box (
-                      createObj
-                          [ "create",
-                            box (
-                                System.Func<obj, JS.Promise<obj>>(fun arg ->
-                                    (promise {
-                                        createCalls.Add(arg)
-                                        return box {| data = box {| id = "child-session-123" |} |}
-                                    }))
-                            )
-                            "prompt",
-                            box (
-                                System.Func<obj, JS.Promise<unit>>(fun arg ->
-                                    (promise {
-                                        promptCalls.Add(arg)
-                                        let childId = "child-session-123"
-                                        runtime.ClearSubsessionPending childId
-                                        runtime.SetTaskComplete childId true
-
-                                        match ChildSessionMailboxRegistry.TryGet childId with
-                                        | Some mb ->
-                                            do! mb.Post(Command.TaskComplete "")
-                                            do! mb.Post(Command.SessionIdle)
-                                        | None -> ()
-                                    }))
-                            )
-                            "messages",
-                            box (
-                                System.Func<obj, JS.Promise<obj>>(fun _ ->
-                                    (promise {
-                                        return
-                                            box
-                                                {| data =
-                                                    [| box
-                                                           {| info = box {| role = "user" |}
-                                                              parts =
-                                                               [| box
-                                                                      {| ``type`` = "text"
-                                                                         text = "navigate to example.com" |} |] |}
-                                                       box
-                                                           {| info = box {| role = "assistant" |}
-                                                              parts =
-                                                               [| box
-                                                                      {| ``type`` = "text"
-                                                                         text = "Found the page title: Example Domain" |} |] |} |] |}
-                                    }))
-                            )
-                            "abort", box (System.Func<obj, JS.Promise<unit>>(fun _ -> Promise.lift ())) ]
-                  ) ]
-
-        let registry = ChildAgentRegistry.Create()
-        let! workspaceDir = mkdtempAsync "subagent-parent-"
-
-        let! result =
-            runSubagent
-                runtime
-                registry
-                mockClient
-                "browser"
-                "Browser"
-                "navigate to example.com"
-                workspaceDir
-                "parent-session-456"
-                (createObj [ "abort", box null ])
-                null
-
-        check "runSubagent returns Ok" (result.IsOk)
-
-        check
-            "runSubagent text"
-            (match result with
-             | Ok t -> t.Contains "Example Domain"
-             | _ -> false)
-
-        check "session.create received parentID" (str (get createCalls.[0] "body") "parentID" = "parent-session-456")
-        check "session.prompt uses child id" (str (get promptCalls.[0] "path") "id" = "child-session-123")
-        check "session.prompt uses browser agent" (str (get promptCalls.[0] "body") "agent" = "browser")
-        do! rmAsync workspaceDir
-    }
-
-let nestedSubagentSpec () =
-    promise {
-        let createCalls = ResizeArray<obj>()
-
-        let mkClient (runtime: Wanxiangshu.Shell.FallbackRuntimeState.FallbackRuntimeState) =
-            createObj
-                [ "session",
-                  box (
-                      createObj
-                          [ "create",
-                            box (
-                                System.Func<obj, JS.Promise<obj>>(fun arg ->
-                                    (promise {
-                                        createCalls.Add(arg)
-                                        return box {| data = box {| id = $"child-{createCalls.Count}" |} |}
-                                    }))
-                            )
-                            "prompt",
-                            box (
-                                System.Func<obj, JS.Promise<unit>>(fun _ ->
-                                    (promise {
-                                        let cid = $"child-{createCalls.Count}"
-                                        runtime.ClearSubsessionPending cid
-                                        runtime.SetTaskComplete cid true
-
-                                        match ChildSessionMailboxRegistry.TryGet cid with
-                                        | Some mb ->
-                                            do! mb.Post(Command.TaskComplete "")
-                                            do! mb.Post(Command.SessionIdle)
-                                        | None -> ()
-                                    }))
-                            )
-                            "messages",
-                            box (System.Func<obj, JS.Promise<obj>>(fun _ -> (promise { return box {| data = [||] |} })))
-                            "abort", box (System.Func<obj, JS.Promise<unit>>(fun _ -> Promise.lift ())) ]
-                  ) ]
-
-        let registry = ChildAgentRegistry.Create()
-        let! workspaceDir = mkdtempAsync "nested-subagent-"
-
-        let runtime1 = Wanxiangshu.Shell.FallbackRuntimeState.FallbackRuntimeState()
-
-        do!
-            runSubagent
-                runtime1
-                registry
-                (mkClient runtime1)
-                "browser"
-                "Browser"
-                "first"
-                workspaceDir
-                "root-session"
-                (createObj [ "abort", box null ])
-                null
-            |> Promise.map (fun _ -> ())
-
-        let runtime2 = Wanxiangshu.Shell.FallbackRuntimeState.FallbackRuntimeState()
-
-        do!
-            runSubagent
-                runtime2
-                registry
-                (mkClient runtime2)
-                "coder"
-                "Coder"
-                "second"
-                workspaceDir
-                "child-1"
-                (createObj [ "abort", box null ])
-                null
-            |> Promise.map (fun _ -> ())
-
-        check "nested subagent resolves to root parent" (str (get createCalls.[1] "body") "parentID" = "root-session")
         do! rmAsync workspaceDir
     }
 
@@ -271,7 +105,5 @@ let subagentParentAlreadyAbortedSpec () =
 let run () : JS.Promise<unit> =
     promise {
         do! websearchBoundariesSpec ()
-        do! subagentParentSpec ()
-        do! nestedSubagentSpec ()
         do! subagentParentAlreadyAbortedSpec ()
     }

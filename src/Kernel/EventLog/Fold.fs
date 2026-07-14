@@ -833,14 +833,7 @@ let private ownerAndLeaseFolder (st: OwnerEpisodeState) (e: WanEvent) : OwnerEpi
 type ReplaySubsessionRunState =
     { RunId: string
       ChildId: string
-      ParentSessionId: string
-      ActiveAttemptOrdinal: int
-      Status: string
-      ActiveContinuationId: string
-      ActiveContinuationOrdinal: int
-      DispatchMessageBoundary: string option
-      ActiveObservation: string
-      InjectedUserMessageId: string option }
+      ParentSessionId: string }
 
 type SessionState =
     { ReviewLoop: ReviewLoopFold
@@ -977,55 +970,9 @@ let private subsessionRunsFolder
             let state =
                 { RunId = runId
                   ChildId = childId
-                  ParentSessionId = parentSessionId
-                  ActiveAttemptOrdinal = 0
-                  Status = "requested"
-                  ActiveContinuationId = ""
-                  ActiveContinuationOrdinal = 0
-                  DispatchMessageBoundary = None
-                  ActiveObservation = "AwaitingStart"
-                  InjectedUserMessageId = None }
+                  ParentSessionId = parentSessionId }
 
             Map.add (childId, runId) state current
-    | k when k = eventKindSubsessionAttemptActivated ->
-        let childId = defaultArg (e.Payload |> Map.tryFind "childId") ""
-        let runId = defaultArg (e.Payload |> Map.tryFind "runId") ""
-
-        if childId = "" || runId = "" then
-            current
-        else
-            match Map.tryFind (childId, runId) current with
-            | Some state ->
-                let continuationId = defaultArg (e.Payload |> Map.tryFind "continuationId") ""
-
-                let contOrdinal =
-                    e.Payload
-                    |> Map.tryFind "continuationOrdinal"
-                    |> Option.bind parseIntOpt
-                    |> Option.defaultValue 0
-
-                let attemptOrdinal =
-                    e.Payload
-                    |> Map.tryFind "attemptOrdinal"
-                    |> Option.bind parseIntOpt
-                    |> Option.defaultValue 0
-
-                let dispatchBoundary =
-                    e.Payload
-                    |> Map.tryFind "dispatchBoundary"
-                    |> Option.bind (fun s -> if s = "" then None else Some s)
-
-                let updated =
-                    { state with
-                        ActiveAttemptOrdinal = attemptOrdinal
-                        ActiveContinuationId = continuationId
-                        ActiveContinuationOrdinal = contOrdinal
-                        DispatchMessageBoundary = dispatchBoundary
-                        ActiveObservation = "AwaitingStart"
-                        InjectedUserMessageId = None }
-
-                Map.add (childId, runId) updated current
-            | None -> current
     | k when k = eventKindSubsessionRunSettled ->
         let childId = defaultArg (e.Payload |> Map.tryFind "childId") ""
         let runId = defaultArg (e.Payload |> Map.tryFind "runId") ""
@@ -1033,61 +980,7 @@ let private subsessionRunsFolder
         if childId = "" || runId = "" then
             current
         else
-            match Map.tryFind (childId, runId) current with
-            | Some state ->
-                let status = defaultArg (e.Payload |> Map.tryFind "status") "settled"
-                let updated = { state with Status = status }
-                Map.add (childId, runId) updated current
-            | None -> current
-    | k when k = eventKindSubsessionInjectedUserObserved ->
-        let childId = defaultArg (e.Payload |> Map.tryFind "childId") ""
-        let runId = defaultArg (e.Payload |> Map.tryFind "runId") ""
-
-        if childId = "" || runId = "" then
-            current
-        else
-            match Map.tryFind (childId, runId) current with
-            | Some state ->
-                let msgId = defaultArg (e.Payload |> Map.tryFind "injectedUserMessageId") ""
-
-                let updated =
-                    { state with
-                        InjectedUserMessageId = if msgId = "" then None else Some msgId }
-
-                Map.add (childId, runId) updated current
-            | None -> current
-    | k when k = eventKindSubsessionAssistantObserved ->
-        let childId = defaultArg (e.Payload |> Map.tryFind "childId") ""
-        let runId = defaultArg (e.Payload |> Map.tryFind "runId") ""
-
-        if childId = "" || runId = "" then
-            current
-        else
-            match Map.tryFind (childId, runId) current with
-            | Some state ->
-                let msgId = defaultArg (e.Payload |> Map.tryFind "assistantMessageId") ""
-
-                let updated =
-                    { state with
-                        ActiveObservation = "AssistantObserved:" + msgId }
-
-                Map.add (childId, runId) updated current
-            | None -> current
-    | k when k = eventKindSubsessionRunningObserved ->
-        let childId = defaultArg (e.Payload |> Map.tryFind "childId") ""
-        let runId = defaultArg (e.Payload |> Map.tryFind "runId") ""
-
-        if childId = "" || runId = "" then
-            current
-        else
-            match Map.tryFind (childId, runId) current with
-            | Some state ->
-                let updated =
-                    { state with
-                        ActiveObservation = "RunningObserved" }
-
-                Map.add (childId, runId) updated current
-            | None -> current
+            Map.remove (childId, runId) current
     | _ -> current
 
 let applyEvent (st: SessionState) (e: WanEvent) : SessionState =

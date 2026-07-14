@@ -31,6 +31,8 @@ type MuxSubagentSpawn =
 
 type RunMuxSubagent = obj -> obj -> string -> string -> string -> obj option -> JS.Promise<string>
 
+/// Mux already has a Promise-terminal host path. We do not invent mailbox/lease
+/// state here — the Promise completion is the run terminal.
 type MuxHostAdapter
     (
         runMux: RunMuxSubagent,
@@ -49,112 +51,27 @@ type MuxHostAdapter
             promise {
                 let counterVal = sessionScope.NextChildSessionId()
                 let cid = "mux-task-" + string counterVal
-                let runId = "run-" + System.Guid.NewGuid().ToString("N").Substring(0, 8)
 
-                let rtOpt =
-                    match sessionScope.TryFindKey("fallbackRuntime") with
-                    | Some obj -> Some(unbox<FallbackRuntimeState> obj)
-                    | None -> None
+                try
+                    match fromMuxConfig config with
+                    | Ok r ->
+                        let registry = unbox<ChildAgentRegistry> r.Execution.ChildRegistry
+                        registry.RegisterChildAgent(cid, spawn.Role, None)
+                    | Error _ -> ()
 
-                let mutable started = true
-
-                match rtOpt with
-                | Some rt -> started <- rt.StartSubsessionRun(cid, sessionId, runId)
-                | None -> ()
-
-                if not started then
-                    return Failure(InvalidIntent("subagent", "run", "Subagent session already running"))
-                else
-                    if rtOpt.IsSome && directory <> "" then
-                        do!
-                            Wanxiangshu.Shell.EventLogRuntimeAppend.appendSubsessionRunStartedOrFail
-                                directory
-                                cid
-                                cid
-                                sessionId
-                                runId
-
-                    try
-                        try
-                            match fromMuxConfig config with
-                            | Ok r ->
-                                let registry = unbox<ChildAgentRegistry> r.Execution.ChildRegistry
-                                registry.RegisterChildAgent(cid, spawn.Role, None)
-                            | Error _ -> ()
-
-                            match rtOpt with
-                            | Some rt -> rt.UpdateSubsessionRunStatus(cid, runId, SubsessionRunStatus.Running)
-                            | None -> ()
-
-                            let! text = runMux deps config spawn.AgentId request.Prompt spawn.Title spawn.ToolOptions
-
-                            match rtOpt with
-                            | Some rt -> rt.UpdateSubsessionRunStatus(cid, runId, SubsessionRunStatus.Settled)
-                            | None -> ()
-
-                            return Success text
-                        with ex ->
-                            match rtOpt with
-                            | Some rt -> rt.UpdateSubsessionRunStatus(cid, runId, SubsessionRunStatus.Failed)
-                            | None -> ()
-
-                            return Failure(translateJsError ex)
-                    finally
-                        match rtOpt with
-                        | Some rt -> rt.ClearSubsessionRun(cid, runId)
-                        | None -> ()
+                    let! text = runMux deps config spawn.AgentId request.Prompt spawn.Title spawn.ToolOptions
+                    return Success text
+                with ex ->
+                    return Failure(translateJsError ex)
             }
 
         member _.ContinueSubagent(childID: string, agent: string, prompt: string) : JS.Promise<SubagentResponse> =
             promise {
-                let runId = "run-" + System.Guid.NewGuid().ToString("N").Substring(0, 8)
-
-                let rtOpt =
-                    match sessionScope.TryFindKey("fallbackRuntime") with
-                    | Some obj -> Some(unbox<FallbackRuntimeState> obj)
-                    | None -> None
-
-                let mutable started = true
-
-                match rtOpt with
-                | Some rt -> started <- rt.StartSubsessionRun(childID, sessionId, runId)
-                | None -> ()
-
-                if not started then
-                    return Failure(InvalidIntent("subagent", "run", "Subagent session already running"))
-                else
-                    if rtOpt.IsSome && directory <> "" then
-                        do!
-                            Wanxiangshu.Shell.EventLogRuntimeAppend.appendSubsessionRunStartedOrFail
-                                directory
-                                childID
-                                childID
-                                sessionId
-                                runId
-
-                    try
-                        try
-                            match rtOpt with
-                            | Some rt -> rt.UpdateSubsessionRunStatus(childID, runId, SubsessionRunStatus.Running)
-                            | None -> ()
-
-                            let! text = runMux deps config agent prompt spawn.Title spawn.ToolOptions
-
-                            match rtOpt with
-                            | Some rt -> rt.UpdateSubsessionRunStatus(childID, runId, SubsessionRunStatus.Settled)
-                            | None -> ()
-
-                            return Success text
-                        with ex ->
-                            match rtOpt with
-                            | Some rt -> rt.UpdateSubsessionRunStatus(childID, runId, SubsessionRunStatus.Failed)
-                            | None -> ()
-
-                            return Failure(translateJsError ex)
-                    finally
-                        match rtOpt with
-                        | Some rt -> rt.ClearSubsessionRun(childID, runId)
-                        | None -> ()
+                try
+                    let! text = runMux deps config agent prompt spawn.Title spawn.ToolOptions
+                    return Success text
+                with ex ->
+                    return Failure(translateJsError ex)
             }
 
         member _.RegisterTempFiles(prompt, files) =

@@ -11,6 +11,7 @@ open Wanxiangshu.Shell.ChildAgentRegistry
 open Wanxiangshu.Shell.OpencodeHookInputCodec
 open Wanxiangshu.Shell.ChatHookOutputCodec
 open Wanxiangshu.Shell.OpencodeAgentConfigWire
+open Wanxiangshu.Opencode.SubsessionHostAdapter
 
 let private resolveAgent (registry: ChildAgentRegistry) (input: obj) (output: obj) : string =
     resolveHookAgent registry input (Some output) "manager"
@@ -88,18 +89,19 @@ let chatMessageFor
         let sessionIDStr = Wanxiangshu.Kernel.Domain.Id.sessionIdValue sessionID
         let fr = lifecycleObserver.FallbackRuntime
 
-        let mutable injectAction = fun () -> Promise.lift ()
-
         let isSystem =
             let nonceOpt = tryGetNonceFromParts parts
 
             match nonceOpt with
             | Some nonce ->
-                match ChildSessionMailbox.ChildSessionMailboxRegistry.TryGet sessionIDStr with
-                | Some mailbox ->
-                    mailbox.Post(ChildSessionMailbox.Command.TurnStarted nonce) |> ignore
+                // Child subsession turn marker: ChatHooks resolves the host
+                // receipt for SubsessionActor. Never forges TurnStarted from
+                // the prompt Promise alone.
+                if
+                    PendingTurnReceipt.tryResolve nonce (Wanxiangshu.Kernel.Subsession.Types.UserMessageObserved msgId)
+                then
                     true
-                | None ->
+                else
                     let activeNudgeNonce = fr.GetActiveNudgeNonce sessionIDStr
 
                     if activeNudgeNonce <> "" && nonce = activeNudgeNonce then
@@ -112,42 +114,9 @@ let chatMessageFor
                              || lease.Status = "running")
                             && lease.ContinuationID = nonce
                             ->
-                            let curGen = fr.GetSessionGeneration sessionIDStr
-                            let curCancel = fr.GetCancelGeneration sessionIDStr
-                            let curTurnId = fr.GetHumanTurnId sessionIDStr
-
-                            if
-                                lease.SessionGeneration = curGen
-                                && lease.CancelGeneration = curCancel
-                                && lease.HumanTurnID = curTurnId
-                            then
-                                match fr.TryGetActiveRunId sessionIDStr with
-                                | Some runId ->
-                                    match fr.GetSubsessionRun(sessionIDStr, runId) with
-                                    | Some subRun ->
-                                        injectAction <-
-                                            fun () ->
-                                                promise {
-                                                    subRun.InjectedUserMessageId <- Some msgId
-                                                    let workspaceRoot = lifecycleObserver.WorkspaceRoot
-
-                                                    do!
-                                                        Wanxiangshu.Shell.EventLogRuntimeAppend.appendSubsessionInjectedUserObservedOrFail
-                                                            workspaceRoot
-                                                            sessionIDStr
-                                                            sessionIDStr
-                                                            runId
-                                                            msgId
-                                                }
-                                    | None -> ()
-                                | None -> ()
-
                             true
                         | _ -> false
             | None -> false
-
-        if isSystem then
-            do! injectAction ()
 
         if not isSystem then
             let modelOpt = tryGetModelStringFromHook input output

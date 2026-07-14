@@ -4,7 +4,6 @@ open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Shell.Dyn
 open Wanxiangshu.Shell.FallbackRuntimeState
-open Wanxiangshu.Shell.ChildSessionMailbox
 
 let makeMockClient (pObjRef: obj ref) (parentId: string) (responseText: string) =
     let createCalls = ResizeArray<obj>()
@@ -36,15 +35,7 @@ let makeMockClient (pObjRef: obj ref) (parentId: string) (responseText: string) 
                                         let runtime = pObjRef.Value?__fallbackRuntime |> unbox<FallbackRuntimeState>
 
                                         let childId = str (get arg "path") "id"
-                                        runtime.ClearSubsessionPending childId
                                         runtime.SetTaskComplete childId true
-
-                                        // Post events to child session mailbox for event-driven flow
-                                        match ChildSessionMailboxRegistry.TryGet childId with
-                                        | Some mb ->
-                                            do! mb.Post(Command.TaskComplete "")
-                                            do! mb.Post(Command.SessionIdle)
-                                        | None -> ()
                                 }))
                         )
                         "messages",

@@ -63,7 +63,7 @@ let beforeAgentStartHandler
         let sp = Dyn.get event "systemPrompt"
 
         match getSessionIdFromContext ctxObj with
-        | Some sid -> fallbackRuntime.SetAwaitingBusy sid false
+        | Some sid -> fallbackRuntime.SetMainContinuationAwaitingStart sid false
         | None -> ()
 
         let! patch = beforeAgentStart cwd sp
@@ -99,7 +99,7 @@ let turnStartHandler
     match getSessionIdFromContext ctxObj with
     | Some sid ->
         clearNudgeSession sid
-        fallbackRuntime.SetAwaitingBusy sid false
+        fallbackRuntime.SetMainContinuationAwaitingStart sid false
         Wanxiangshu.Shell.ToolHookRuntime.clearSessionCompliance sid
     | None -> ()
 
@@ -264,7 +264,7 @@ let agentEndHandler
                                     fallbackRuntime.SetPendingNudgeLease(sessionId, lease)
                                     fallbackRuntime.SetSessionOwner sessionId "Nudge"
                                     fallbackRuntime.SetActiveNudgeNonce sessionId nonce
-                                    fallbackRuntime.SetAwaitingBusy sessionId true
+                                    fallbackRuntime.SetMainContinuationAwaitingStart sessionId true
 
                                     if isSessionForceStopped sessionId then
                                         do!

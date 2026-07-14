@@ -193,44 +193,6 @@ let duplicateHumanTurnMessageIdIgnored () =
     equal "duplicate message id ignored; only one human turn" 1 st.HumanTurnOrdinal
     check "latest turn id is still t1" (st.LatestHumanTurn |> Option.exists (fun t -> t.TurnId = "t1"))
 
-let foldSubsessionRunsTest () =
-    let events =
-        [ ev "s1" eventKindSubsessionRunStarted (Map [ "childId", "c1"; "parentSessionId", "s1"; "runId", "r1" ])
-          ev
-              "s1"
-              eventKindSubsessionAttemptActivated
-              (Map
-                  [ "childId", "c1"
-                    "runId", "r1"
-                    "continuationId", "cont-1"
-                    "continuationOrdinal", "1"
-                    "attemptOrdinal", "1"
-                    "dispatchBoundary", "msg-1" ])
-          ev
-              "s1"
-              eventKindSubsessionInjectedUserObserved
-              (Map [ "childId", "c1"; "runId", "r1"; "injectedUserMessageId", "user-msg-1" ])
-          ev "s1" eventKindSubsessionRunningObserved (Map [ "childId", "c1"; "runId", "r1" ])
-          ev
-              "s1"
-              eventKindSubsessionAssistantObserved
-              (Map [ "childId", "c1"; "runId", "r1"; "assistantMessageId", "asst-msg-1" ])
-          ev "s1" eventKindSubsessionRunSettled (Map [ "childId", "c1"; "runId", "r1"; "status", "settled" ]) ]
-
-    let st = foldSessionState events
-    check "subsession run exists in folded state" (Map.containsKey ("c1", "r1") st.SubsessionRuns)
-    let run = Map.find ("c1", "r1") st.SubsessionRuns
-    equal "runId matches" "r1" run.RunId
-    equal "childId matches" "c1" run.ChildId
-    equal "parentSessionId matches" "s1" run.ParentSessionId
-    equal "attempt ordinal matches" 1 run.ActiveAttemptOrdinal
-    equal "continuation id matches" "cont-1" run.ActiveContinuationId
-    equal "continuation ordinal matches" 1 run.ActiveContinuationOrdinal
-    equal "dispatch boundary matches" (Some "msg-1") run.DispatchMessageBoundary
-    equal "injected user msg matches" (Some "user-msg-1") run.InjectedUserMessageId
-    equal "active observation matches" "AssistantObserved:asst-msg-1" run.ActiveObservation
-    equal "status matches" "settled" run.Status
-
 let run () =
     foldEventStreamFiltersOtherSessions ()
     foldSubagentsTest ()
@@ -247,4 +209,3 @@ let run () =
     ordinalRejectsLateNudgeDispatched ()
     ordinalRejectsLateContinuationDispatched ()
     duplicateHumanTurnMessageIdIgnored ()
-    foldSubsessionRunsTest ()

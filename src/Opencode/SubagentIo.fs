@@ -5,75 +5,32 @@ open Fable.Core.JsInterop
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Domain
 open Wanxiangshu.Kernel.FallbackKernel.Types
+open Wanxiangshu.Kernel.Subsession.Types
 open Wanxiangshu.Kernel.ToolResult
 open Wanxiangshu.Shell.ErrorClassify
 open Wanxiangshu.Shell.ChildAgentRegistry
 open Wanxiangshu.Shell.FallbackRuntimeState
-open Wanxiangshu.Shell.FallbackRecoveryWait
 open Wanxiangshu.Shell.DelegatedAiSettings
 open Wanxiangshu.Shell.OpencodeClientCodec
 open Wanxiangshu.Shell.SessionIoSpawn
+open Wanxiangshu.Shell.SubsessionService
 open Wanxiangshu.Opencode.SubagentSpawn
-open Wanxiangshu.Shell.ChildSessionMailbox
-
-type OpencodeSessionTurnHost(client: obj, agent: string, runtime: FallbackRuntimeState) =
-    interface ISessionTurnHost with
-        member _.RunOneTurn(sessionId, model, prompt) =
-            let deferred = createDeferred<TurnOutcome> ()
-
-            let mailbox: ChildSessionMailbox =
-                ChildSessionMailboxRegistry.GetOrCreate(
-                    sessionId,
-                    (fun () ->
-                        match getSessionApiFromClient client with
-                        | Ok session ->
-                            let abortPromise: JS.Promise<obj> =
-                                invoke1 (box {| path = box {| id = sessionId |} |}) "abort" session
-
-                            abortPromise |> ignore
-                        | Error _ -> ())
-                )
-
-            let sendFn turnId =
-                promise {
-                    let modelStr =
-                        match model.Variant with
-                        | Some v -> sprintf "%s/%s:%s" model.ProviderID model.ModelID v
-                        | None -> sprintf "%s/%s" model.ProviderID model.ModelID
-
-                    let body =
-                        Wanxiangshu.Shell.OpencodeSessionEventCodec.createPromptBodyWithModelAndNonce
-                            (Some agent)
-                            (Some modelStr)
-                            prompt
-                            (Some turnId)
-
-                    let arg =
-                        box
-                            {| path = box {| id = sessionId |}
-                               body = body |}
-
-                    try
-                        match getSessionApiFromClient client with
-                        | Ok session ->
-                            let! _ = invoke1 arg "prompt" session
-                            ()
-                        | Error _ -> ()
-                    with _ex ->
-                        () // Prompt rejection handled via event bridge posting TurnError
-
-                    do! mailbox.Post(TurnStarted(turnId))
-                }
-
-            let turnId =
-                "wanxiangshu-turn-" + System.Guid.NewGuid().ToString("N").Substring(0, 8)
-
-            mailbox.Post(RunTurn(model, prompt, turnId, sendFn, deferred)) |> ignore
-            deferred.Promise
+open Wanxiangshu.Opencode.SubsessionHostAdapter
 
 module Dyn = Wanxiangshu.Shell.Dyn
 
 open Wanxiangshu.Opencode.SubagentTypes
+
+let private formatRunFailure (f: RunFailure) : string =
+    match f with
+    | NoModelConfigured -> "No model available in fallback chain"
+    | FallbackExhausted err -> err.Message
+    | RecoveryExhausted reason -> reason
+    | ProtocolViolation reason -> reason
+    | InfrastructureFailure reason -> reason
+
+let private abortedPrefix = "(aborted)"
+let private noOutputText = "(no output)"
 
 let runSubagentCoreResult
     (runtime: FallbackRuntimeState)
@@ -154,131 +111,56 @@ let runSubagentCoreResult
                         | Error _ -> Promise.lift [||]
 
                     let startCount = currentMessages.Length
-                    let runId = "run-" + System.Guid.NewGuid().ToString("N").Substring(0, 8)
-                    let started = runtime.StartSubsessionRun(childID, sessionID, runId)
 
-                    if not started then
-                        return Error(InvalidIntent("subagent", "run", "Subagent session already running"))
-                    else
-                        runtime.SetSubsessionPending childID true
+                    let cfg =
+                        let dir = if directory = "" then "." else directory
+                        let fallbackConfigOpt = Wanxiangshu.Shell.FallbackConfigCodec.loadFallbackConfig dir
 
-                        if directory <> "" then
-                            do!
-                                Wanxiangshu.Shell.EventLogRuntimeAppend.appendSubsessionRunStartedOrFail
-                                    directory
-                                    childID
-                                    childID
-                                    sessionID
-                                    runId
+                        match fallbackConfigOpt with
+                        | Some c -> c
+                        | None -> Wanxiangshu.Shell.FallbackConfigCodec.emptyConfig
 
-                        let host = OpencodeSessionTurnHost(client, agent, runtime)
+                    let chain =
+                        let configChain =
+                            match Map.tryFind agent cfg.AgentChains with
+                            | Some c -> c
+                            | None -> cfg.DefaultChain
 
-                        let cfg =
-                            let dir = if directory = "" then "." else directory
-                            let fallbackConfigOpt = Wanxiangshu.Shell.FallbackConfigCodec.loadFallbackConfig dir
+                        if configChain.IsEmpty then
+                            let runtimeChain = runtime.GetChain childID
 
-                            match fallbackConfigOpt with
-                            | Some cfg -> cfg
-                            | None -> Wanxiangshu.Shell.FallbackConfigCodec.emptyConfig
-
-                        let chain =
-                            let configChain =
-                                match Map.tryFind agent cfg.AgentChains with
-                                | Some c -> c
-                                | None -> cfg.DefaultChain
-
-                            if configChain.IsEmpty then
-                                let runtimeChain = runtime.GetChain childID
-
-                                if runtimeChain.IsEmpty then
-                                    [ { ProviderID = "default"
-                                        ModelID = "default"
-                                        Variant = None
-                                        Temperature = None
-                                        TopP = None
-                                        MaxTokens = None
-                                        ReasoningEffort = None
-                                        Thinking = false } ]
-                                else
-                                    runtimeChain
+                            if runtimeChain.IsEmpty then
+                                [ { ProviderID = "default"
+                                    ModelID = "default"
+                                    Variant = None
+                                    Temperature = None
+                                    TopP = None
+                                    MaxTokens = None
+                                    ReasoningEffort = None
+                                    Thinking = false } ]
                             else
-                                configChain
+                                runtimeChain
+                        else
+                            configChain
 
-                        let fetchMessages (sid: string) =
-                            promise {
-                                match getSessionApiFromClient client with
-                                | Ok session ->
-                                    let! resp = invoke1 (box {| path = box {| id = sid |} |}) "messages" session
-                                    let data = Dyn.get resp "data"
+                    let hostFactory (sid: string) = createHost client agent directory
+                    let service = SubsessionService(hostFactory)
 
-                                    if Dyn.isArray data then
-                                        return (unbox<obj[]> data)
-                                    else
-                                        return [||]
-                                | Error _ -> return [||]
-                            }
-
+                    try
                         try
-                            try
-                                try
-                                    let! loopResult =
-                                        runSubsessionLoop host childID prompt cfg chain runtime fetchMessages
+                            let! runResult = service.StartRun(childID, sessionID, prompt, cfg, chain)
 
-                                    let st = runtime.GetOrCreateState childID
-
-                                    let isSuccess =
-                                        match loopResult with
-                                        | Ok() -> true
-                                        | Error _ -> false
-
-                                    let status =
-                                        if isSuccess then
-                                            SubsessionRunStatus.Settled
-                                        elif st.Lifecycle = FallbackLifecycle.Cancelled then
-                                            SubsessionRunStatus.Cancelled
-                                        else
-                                            SubsessionRunStatus.Failed
-
-                                    runtime.UpdateSubsessionRunStatus(childID, runId, status)
-
-                                    if st.Lifecycle = FallbackLifecycle.Cancelled then
-                                        return Ok abortedPrefix
-                                    elif isSuccess then
-                                        let! text = extractSessionText client childID directory startCount
-                                        return Ok(formatSubagentReport noOutputText abortedPrefix text false)
-                                    else
-                                        match loopResult with
-                                        | Error msg -> return Error(DomainError.InvalidIntent("subagent", "run", msg))
-                                        | Ok() -> return Ok ""
-                                with err ->
-                                    let st = runtime.GetOrCreateState childID
-                                    let isSuccess = st.Lifecycle = FallbackLifecycle.TaskComplete
-
-                                    let status =
-                                        if isSuccess then
-                                            SubsessionRunStatus.Settled
-                                        elif st.Lifecycle = FallbackLifecycle.Cancelled then
-                                            SubsessionRunStatus.Cancelled
-                                        else
-                                            SubsessionRunStatus.Failed
-
-                                    runtime.UpdateSubsessionRunStatus(childID, runId, status)
-
-                                    if st.Lifecycle = FallbackLifecycle.Cancelled then
-                                        return Ok abortedPrefix
-                                    elif isSuccess then
-                                        let! text = extractSessionText client childID directory startCount
-                                        return Ok(formatSubagentReport noOutputText abortedPrefix text false)
-                                    else
-                                        return Error(translateJsError err)
-                            finally
-                                cleanupChildIfRequested ()
-                        finally
-                            ChildSessionMailboxRegistry.Remove childID
-
-                            if childID <> "" then
-                                runtime.ClearSubsessionPending childID
-                                runtime.ClearSubsessionRun(childID, runId)
+                            match runResult with
+                            | Succeeded _output ->
+                                let! text = extractSessionText client childID directory startCount
+                                return Ok(formatSubagentReport noOutputText abortedPrefix text false)
+                            | Cancelled -> return Ok abortedPrefix
+                            | Failed reason ->
+                                return Error(DomainError.InvalidIntent("subagent", "run", formatRunFailure reason))
+                        with err ->
+                            return Error(translateJsError err)
+                    finally
+                        cleanupChildIfRequested ()
         with err ->
             return Error(translateJsError err)
     }

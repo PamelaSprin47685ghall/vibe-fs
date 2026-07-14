@@ -13,6 +13,7 @@ open Wanxiangshu.Kernel.Domain
 open Wanxiangshu.Kernel.FallbackKernel.Types
 open Wanxiangshu.Shell.FallbackEventBridge
 open Wanxiangshu.Shell.FallbackRuntimeState
+open Wanxiangshu.Shell.SubsessionEventRouter
 open Wanxiangshu.Opencode.FallbackHooksHelper
 
 /// Zero-width space character used as the fallback `SendContinue` prompt
@@ -344,27 +345,33 @@ let createOpencodeFallbackHandler
         promise {
             let sessionID = translator.ExtractSessionID rawEvent
 
-            match ChildSessionMailbox.ChildSessionMailboxRegistry.TryGet(sessionID) with
-            | Some mailbox ->
-                if translator.IsSessionError rawEvent then
-                    let errorObj =
-                        match translator.TranslateError rawEvent with
-                        | Some(FallbackEvent.SessionError err) -> err
-                        | _ ->
-                            { ErrorName = "UnknownError"
-                              DomainError = None
-                              Message = "An unknown error occurred"
-                              StatusCode = None
-                              IsRetryable = None }
+            // Child sessions are owned solely by SubsessionActor. Route facts
+            // there and skip main fallback processing for those sessions.
+            let! routed =
+                promise {
+                    if translator.IsSessionError rawEvent then
+                        let errorObj =
+                            match translator.TranslateError rawEvent with
+                            | Some(FallbackEvent.SessionError err) -> err
+                            | _ ->
+                                { ErrorName = "UnknownError"
+                                  DomainError = None
+                                  Message = "An unknown error occurred"
+                                  StatusCode = None
+                                  IsRetryable = None }
 
-                    do! mailbox.Post(ChildSessionMailbox.Command.TurnError errorObj)
-                elif translator.IsSessionIdle rawEvent then
-                    do! mailbox.Post(ChildSessionMailbox.Command.SessionIdle)
+                        return! tryError sessionID errorObj
+                    elif translator.IsSessionIdle rawEvent then
+                        return! tryIdle sessionID
+                    else
+                        return false
+                }
 
+            if routed then
                 return
                     { Consumed = true
                       State = runtime.GetOrCreateState sessionID }
-            | None ->
+            else
                 let! result = baseHandler rawEvent
                 setConsumedFromResult runtime sessionID result
                 clearConsumedOnNewUserMessage runtime sessionID rawEvent

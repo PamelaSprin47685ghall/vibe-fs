@@ -55,12 +55,7 @@ let eventKindTaskError = "task_error"
 let eventKindSquadCancelled = "squad_cancelled"
 
 let eventKindSubsessionRunStarted = "subsession_run_started"
-let eventKindSubsessionAttemptActivated = "subsession_attempt_activated"
 let eventKindSubsessionRunSettled = "subsession_run_settled"
-
-let eventKindSubsessionInjectedUserObserved = "subsession_injected_user_observed"
-let eventKindSubsessionAssistantObserved = "subsession_assistant_observed"
-let eventKindSubsessionRunningObserved = "subsession_running_observed"
 
 let verdictAccepted = Wanxiangshu.Kernel.EventLog.ReviewVerdictWire.accepted
 let verdictCancelled = Wanxiangshu.Kernel.EventLog.ReviewVerdictWire.cancelled

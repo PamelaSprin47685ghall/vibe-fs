@@ -27,39 +27,6 @@ type NudgeLease =
       Owner: string
       Status: string }
 
-[<RequireQualifiedAccess>]
-type SubsessionRunStatus =
-    | Requested
-    | Running
-    | Continuing
-    | Settled
-    | Failed
-    | Cancelled
-
-[<RequireQualifiedAccess>]
-type SubsessionMatchResult =
-    | NoMatch
-    | StrongMatch
-    | BoundaryMatch
-
-[<RequireQualifiedAccess>]
-type AttemptObservation =
-    | AwaitingStart
-    | RunningObserved
-    | AssistantObserved of string
-
-type SubsessionRunLease =
-    { RunId: string
-      ChildId: string
-      ParentSessionId: string
-      mutable ActiveAttemptOrdinal: int
-      mutable Status: SubsessionRunStatus
-      mutable ActiveContinuationId: string
-      mutable ActiveContinuationOrdinal: int
-      mutable DispatchMessageBoundary: string option
-      mutable ActiveObservation: AttemptObservation
-      mutable InjectedUserMessageId: string option }
-
 let private freshState: SessionFallbackState =
     { Phase = FallbackPhase.Idle
       CurrentIndex = 0
@@ -100,9 +67,6 @@ type FallbackRuntimeState() =
     let mutable nudgeOrdinals = Map.empty<string, int>
     let mutable compactionOrdinals = Map.empty<string, int>
     let mutable lastHumanMessageIds = Map.empty<string, string>
-    let mutable subsessionRuns = Map.empty<string * string, SubsessionRunLease>
-    let mutable activeRunByChild = Map.empty<string, string>
-    let mutable activeObservations = Map.empty<string, AttemptObservation>
 
     let triggerStateChanged (sessionID: string) : unit =
         match Map.tryFind sessionID listeners with
@@ -128,11 +92,6 @@ type FallbackRuntimeState() =
 
         list.Add(callback)
 
-    member _.HasListeners(sessionID: string) : bool =
-        match Map.tryFind sessionID listeners with
-        | Some arr -> arr.Count > 0
-        | None -> false
-
     member _.HasState(sessionID: string) : bool = Map.containsKey sessionID states
 
     member _.TryGetState(sessionID: string) : SessionFallbackState option = Map.tryFind sessionID states
@@ -147,15 +106,15 @@ type FallbackRuntimeState() =
     member this.UpdateState (sessionID: string) (state: SessionFallbackState) : unit =
         let finalState =
             if state.Lifecycle = FallbackLifecycle.Cancelled then
-                activeGates <- setGateActive activeGates sessionID FallbackSessionGateFlag.AwaitingBusy false
-                activeGates <- setGateActive activeGates sessionID FallbackSessionGateFlag.SubsessionPending false
+                activeGates <-
+                    setGateActive activeGates sessionID FallbackSessionGateFlag.MainContinuationAwaitingStart false
+
                 activeGates <- setGateActive activeGates sessionID FallbackSessionGateFlag.EventHandlingActive false
                 activeGates <- setGateActive activeGates sessionID FallbackSessionGateFlag.NudgeActive false
                 busyCounts <- Map.add sessionID 0 busyCounts
                 consumed <- clearConsumedMap consumed sessionID
                 injectedModels <- Map.remove sessionID injectedModels
                 injectedAts <- Map.remove sessionID injectedAts
-                activeObservations <- Map.remove sessionID activeObservations
 
                 { state with
                     Phase = FallbackPhase.Idle
@@ -165,37 +124,6 @@ type FallbackRuntimeState() =
                 state
 
         states <- Map.add sessionID finalState states
-
-        let activeLeaseOpt =
-            match Map.tryFind sessionID activeRunByChild with
-            | Some activeRunId -> Map.tryFind (sessionID, activeRunId) subsessionRuns
-            | None -> None
-
-        match activeLeaseOpt with
-        | Some lease ->
-            if finalState.Lifecycle = FallbackLifecycle.TaskComplete then
-                if
-                    this.TryGetPendingLease(sessionID).IsNone
-                    && not (this.IsAwaitingBusy(sessionID))
-                then
-                    lease.Status <- SubsessionRunStatus.Settled
-            elif finalState.Lifecycle = FallbackLifecycle.Cancelled then
-                lease.Status <- SubsessionRunStatus.Cancelled
-            elif finalState.Phase = FallbackPhase.Exhausted then
-                lease.Status <- SubsessionRunStatus.Failed
-            elif
-                match finalState.Phase with
-                | FallbackPhase.Retrying _ -> true
-                | _ -> false
-            then
-                lease.Status <- SubsessionRunStatus.Continuing
-            elif
-                lease.Status = SubsessionRunStatus.Requested
-                || lease.Status = SubsessionRunStatus.Continuing
-            then
-                lease.Status <- SubsessionRunStatus.Running
-        | None -> ()
-
         triggerStateChanged sessionID
 
     member _.SetLatestHumanModel (sessionID: string) (model: string) : unit =
@@ -528,17 +456,6 @@ type FallbackRuntimeState() =
     member _.IsNudgeActive(sessionID: string) : bool =
         isGateActive activeGates sessionID FallbackSessionGateFlag.NudgeActive
 
-    member _.SetSubsessionPending (sessionID: string) (value: bool) : unit =
-        activeGates <- setGateActive activeGates sessionID FallbackSessionGateFlag.SubsessionPending value
-        triggerStateChanged sessionID
-
-    member _.IsSubsessionPending(sessionID: string) : bool =
-        isGateActive activeGates sessionID FallbackSessionGateFlag.SubsessionPending
-
-    member _.ClearSubsessionPending(sessionID: string) : unit =
-        activeGates <- setGateActive activeGates sessionID FallbackSessionGateFlag.SubsessionPending false
-        triggerStateChanged sessionID
-
     member _.SetEventHandlingActive (sessionID: string) (value: bool) : unit =
         activeGates <- setGateActive activeGates sessionID FallbackSessionGateFlag.EventHandlingActive value
         triggerStateChanged sessionID
@@ -546,62 +463,12 @@ type FallbackRuntimeState() =
     member _.IsEventHandlingActive(sessionID: string) : bool =
         isGateActive activeGates sessionID FallbackSessionGateFlag.EventHandlingActive
 
-    member _.SetAwaitingBusy (sessionID: string) (value: bool) : unit =
-        activeGates <- setGateActive activeGates sessionID FallbackSessionGateFlag.AwaitingBusy value
-
-        if value then
-            activeObservations <- Map.add sessionID AttemptObservation.AwaitingStart activeObservations
-
+    member _.SetMainContinuationAwaitingStart (sessionID: string) (value: bool) : unit =
+        activeGates <- setGateActive activeGates sessionID FallbackSessionGateFlag.MainContinuationAwaitingStart value
         triggerStateChanged sessionID
 
-    member _.IsAwaitingBusy(sessionID: string) : bool =
-        isGateActive activeGates sessionID FallbackSessionGateFlag.AwaitingBusy
-
-    member this.UpdateActiveObservation(sessionID: string, obs: AttemptObservation) : unit =
-        activeObservations <- Map.add sessionID obs activeObservations
-
-        match Map.tryFind sessionID activeRunByChild with
-        | Some runId ->
-            match Map.tryFind (sessionID, runId) subsessionRuns with
-            | Some subRun ->
-                match subRun.ActiveObservation, obs with
-                | AttemptObservation.AssistantObserved _, AttemptObservation.RunningObserved -> ()
-                | _ -> subRun.ActiveObservation <- obs
-            | None -> ()
-        | None -> ()
-
-    member this.SetBusyObserved(sessionID: string, value: bool) : unit =
-        let obs =
-            if value then
-                AttemptObservation.RunningObserved
-            else
-                AttemptObservation.AwaitingStart
-
-        this.UpdateActiveObservation(sessionID, obs)
-
-    member this.IsBusyOrAssistantObserved(sessionID: string) : bool =
-        let subRunObs =
-            match Map.tryFind sessionID activeRunByChild with
-            | Some runId ->
-                match Map.tryFind (sessionID, runId) subsessionRuns with
-                | Some subRun -> Some subRun.ActiveObservation
-                | None -> None
-            | None -> None
-
-        let obs =
-            match subRunObs with
-            | Some o -> o
-            | None ->
-                Map.tryFind sessionID activeObservations
-                |> Option.defaultValue AttemptObservation.AwaitingStart
-
-        match obs with
-        | AttemptObservation.RunningObserved
-        | AttemptObservation.AssistantObserved _ -> true
-        | AttemptObservation.AwaitingStart -> false
-
-    member this.IsBusyObserved(sessionID: string) : bool =
-        this.IsBusyOrAssistantObserved sessionID
+    member _.IsMainContinuationAwaitingStart(sessionID: string) : bool =
+        isGateActive activeGates sessionID FallbackSessionGateFlag.MainContinuationAwaitingStart
 
     member _.GetActiveGates(sessionID: string) : Set<FallbackSessionGateFlag> =
         Map.tryFind sessionID activeGates |> Option.defaultValue emptyActiveGates
@@ -654,210 +521,6 @@ type FallbackRuntimeState() =
     member _.ClearSessionOwner(sessionID: string) : unit =
         sessionOwners <- Map.remove sessionID sessionOwners
 
-    member _.RestoreSubsessionRun(lease: SubsessionRunLease) : unit =
-        subsessionRuns <- Map.add (lease.ChildId, lease.RunId) lease subsessionRuns
-
-        if
-            lease.Status = SubsessionRunStatus.Requested
-            || lease.Status = SubsessionRunStatus.Running
-            || lease.Status = SubsessionRunStatus.Continuing
-        then
-            activeRunByChild <- Map.add lease.ChildId lease.RunId activeRunByChild
-
-    member _.StartSubsessionRun(childID: string, parentSessionID: string, runId: string) : bool =
-        let mutable canStart = true
-
-        match Map.tryFind childID activeRunByChild with
-        | Some oldRunId ->
-            match Map.tryFind (childID, oldRunId) subsessionRuns with
-            | Some oldLease ->
-                if
-                    oldLease.Status = SubsessionRunStatus.Requested
-                    || oldLease.Status = SubsessionRunStatus.Running
-                    || oldLease.Status = SubsessionRunStatus.Continuing
-                then
-                    canStart <- false
-            | None -> ()
-        | None -> ()
-
-        if canStart then
-            activeRunByChild <- Map.add childID runId activeRunByChild
-
-            let lease =
-                { RunId = runId
-                  ChildId = childID
-                  ParentSessionId = parentSessionID
-                  ActiveAttemptOrdinal = 0
-                  Status = SubsessionRunStatus.Requested
-                  ActiveContinuationId = ""
-                  ActiveContinuationOrdinal = 0
-                  DispatchMessageBoundary = None
-                  ActiveObservation = AttemptObservation.AwaitingStart
-                  InjectedUserMessageId = None }
-
-            subsessionRuns <- Map.add (childID, runId) lease subsessionRuns
-            true
-        else
-            false
-
-    member this.ActivateAttempt
-        (sessionID: string, continuationID: string, continuationOrdinal: int, dispatchBoundary: string option)
-        : unit =
-        match Map.tryFind sessionID activeRunByChild with
-        | Some runId ->
-            match Map.tryFind (sessionID, runId) subsessionRuns with
-            | Some lease ->
-                lease.ActiveAttemptOrdinal <- lease.ActiveAttemptOrdinal + 1
-                lease.ActiveContinuationId <- continuationID
-                lease.ActiveContinuationOrdinal <- continuationOrdinal
-                lease.DispatchMessageBoundary <- dispatchBoundary
-                lease.ActiveObservation <- AttemptObservation.AwaitingStart
-                lease.InjectedUserMessageId <- None
-            | None -> ()
-        | None -> ()
-
-    member this.CheckSubsessionEventMatch
-        (
-            sessionID: string,
-            continuationId: string,
-            continuationOrdinal: int,
-            isBusyOrAssistant: bool,
-            eventMessageBoundary: string option,
-            eventParentId: string option,
-            eventHostRunId: string option,
-            isError: bool
-        ) : SubsessionMatchResult option =
-        let res =
-            match Map.tryFind sessionID activeRunByChild with
-            | Some runId ->
-                match Map.tryFind (sessionID, runId) subsessionRuns with
-                | Some subRun ->
-                    if subRun.ActiveAttemptOrdinal = 0 || subRun.ActiveContinuationId = "" then
-                        None
-                    else
-                        let hostRunMatches =
-                            match eventHostRunId with
-                            | Some rid ->
-                                (subRun.InjectedUserMessageId |> Option.exists (fun inj -> inj = rid))
-                                || (subRun.RunId = rid)
-                            | None -> false
-
-                        let parentIdMatches =
-                            match eventParentId, subRun.InjectedUserMessageId with
-                            | Some pId, Some injId when pId = injId -> true
-                            | _ -> false
-
-                        let hasIdMismatch =
-                            (match eventParentId, subRun.InjectedUserMessageId with
-                             | Some pId, Some injId when pId <> injId -> true
-                             | None, Some _ -> true // Expected a parent ID, but none was provided
-                             | _ -> false)
-                            || (match eventHostRunId with
-                                | Some rid ->
-                                    rid <> subRun.RunId
-                                    && not (subRun.InjectedUserMessageId |> Option.exists (fun inj -> inj = rid))
-                                | None -> false)
-                            || (continuationId <> "" && continuationId <> subRun.ActiveContinuationId)
-                            || (continuationOrdinal <> 0
-                                && continuationOrdinal <> subRun.ActiveContinuationOrdinal)
-
-                        if hasIdMismatch then
-                            Some SubsessionMatchResult.NoMatch
-                        elif hostRunMatches || parentIdMatches then
-                            if isBusyOrAssistant then
-                                match eventMessageBoundary with
-                                | Some evB -> subRun.ActiveObservation <- AttemptObservation.AssistantObserved evB
-                                | None -> subRun.ActiveObservation <- AttemptObservation.RunningObserved
-
-                            Some SubsessionMatchResult.StrongMatch
-                        elif continuationId <> "" then
-                            let matched = continuationId = subRun.ActiveContinuationId
-
-                            if matched then
-                                if isBusyOrAssistant then
-                                    match eventMessageBoundary with
-                                    | Some evB -> subRun.ActiveObservation <- AttemptObservation.AssistantObserved evB
-                                    | None -> subRun.ActiveObservation <- AttemptObservation.RunningObserved
-
-                                Some SubsessionMatchResult.StrongMatch
-                            else
-                                Some SubsessionMatchResult.NoMatch
-                        elif continuationOrdinal <> 0 then
-                            let matched = continuationOrdinal = subRun.ActiveContinuationOrdinal
-
-                            if matched then
-                                if isBusyOrAssistant then
-                                    match eventMessageBoundary with
-                                    | Some evB -> subRun.ActiveObservation <- AttemptObservation.AssistantObserved evB
-                                    | None -> subRun.ActiveObservation <- AttemptObservation.RunningObserved
-
-                                Some SubsessionMatchResult.StrongMatch
-                            else
-                                Some SubsessionMatchResult.NoMatch
-                        else
-                            match eventMessageBoundary, subRun.DispatchMessageBoundary with
-                            | Some evB, Some dispB ->
-                                if evB <> dispB then
-                                    if isBusyOrAssistant then
-                                        subRun.ActiveObservation <- AttemptObservation.AssistantObserved evB
-                                        Some SubsessionMatchResult.BoundaryMatch
-                                    else
-                                        match subRun.ActiveObservation with
-                                        | AttemptObservation.AssistantObserved obsB when obsB = evB ->
-                                            Some SubsessionMatchResult.BoundaryMatch
-                                        | _ -> Some SubsessionMatchResult.NoMatch
-                                else
-                                    Some SubsessionMatchResult.NoMatch
-                            | Some evB, None ->
-                                if isBusyOrAssistant then
-                                    subRun.ActiveObservation <- AttemptObservation.AssistantObserved evB
-                                    Some SubsessionMatchResult.BoundaryMatch
-                                else
-                                    match subRun.ActiveObservation with
-                                    | AttemptObservation.AssistantObserved obsB when obsB = evB ->
-                                        Some SubsessionMatchResult.BoundaryMatch
-                                    | _ -> Some SubsessionMatchResult.NoMatch
-                            | None, _ ->
-                                if isBusyOrAssistant then
-                                    match subRun.ActiveObservation with
-                                    | AttemptObservation.AwaitingStart ->
-                                        match subRun.DispatchMessageBoundary with
-                                        | None ->
-                                            subRun.ActiveObservation <- AttemptObservation.RunningObserved
-                                            Some SubsessionMatchResult.StrongMatch
-                                        | Some _ ->
-                                            if isError then
-                                                Some SubsessionMatchResult.StrongMatch
-                                            else
-                                                Some SubsessionMatchResult.NoMatch
-                                    | _ -> Some SubsessionMatchResult.StrongMatch
-                                else
-                                    match subRun.ActiveObservation with
-                                    | AttemptObservation.RunningObserved
-                                    | AttemptObservation.AssistantObserved _ -> Some SubsessionMatchResult.StrongMatch
-                                    | AttemptObservation.AwaitingStart -> Some SubsessionMatchResult.NoMatch
-                | None -> Some SubsessionMatchResult.NoMatch
-            | None -> None
-
-        res
-
-    member _.GetSubsessionRun(childID: string, expectedRunId: string) : SubsessionRunLease option =
-        Map.tryFind (childID, expectedRunId) subsessionRuns
-
-    member _.TryGetActiveRunId(childID: string) : string option = Map.tryFind childID activeRunByChild
-
-    member _.UpdateSubsessionRunStatus(childID: string, expectedRunId: string, status: SubsessionRunStatus) : unit =
-        match Map.tryFind (childID, expectedRunId) subsessionRuns with
-        | Some lease -> lease.Status <- status
-        | _ -> ()
-
-    member _.ClearSubsessionRun(childID: string, expectedRunId: string) : unit =
-        subsessionRuns <- Map.remove (childID, expectedRunId) subsessionRuns
-
-        match Map.tryFind childID activeRunByChild with
-        | Some activeId when activeId = expectedRunId -> activeRunByChild <- Map.remove childID activeRunByChild
-        | _ -> ()
-
     member _.CleanupSession(sessionID: string) : unit =
         states <- Map.remove sessionID states
         chains <- Map.remove sessionID chains
@@ -887,9 +550,6 @@ type FallbackRuntimeState() =
         humanTurnOrdinals <- Map.remove sessionID humanTurnOrdinals
         continuationOrdinals <- Map.remove sessionID continuationOrdinals
         nudgeOrdinals <- Map.remove sessionID nudgeOrdinals
-        subsessionRuns <- subsessionRuns |> Map.filter (fun (cid, _) _ -> cid <> sessionID)
-        activeRunByChild <- Map.remove sessionID activeRunByChild
-        activeObservations <- Map.remove sessionID activeObservations
         compactionOrdinals <- Map.remove sessionID compactionOrdinals
         lastHumanMessageIds <- Map.remove sessionID lastHumanMessageIds
         triggerStateChanged sessionID

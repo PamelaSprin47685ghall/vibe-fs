@@ -15,6 +15,7 @@ open Wanxiangshu.Shell
 open Wanxiangshu.Shell.Dyn
 open Wanxiangshu.Shell.OpencodeHookInputCodec
 open Wanxiangshu.Shell.FallbackRuntimeState
+open Wanxiangshu.Shell.SubsessionEventRouter
 open Wanxiangshu.Shell.EventLogRuntime
 open Wanxiangshu.Shell.WorkBacklogToolsCodec
 open Wanxiangshu.Shell.ToolRuntimeContext
@@ -84,12 +85,11 @@ type ProgressObserver
                 let sid = sessionIdFromHookInput input ""
 
                 if sid <> "" then
-                    match ChildSessionMailbox.ChildSessionMailboxRegistry.TryGet sid with
-                    | Some mailbox ->
-                        let args = argsFromHookInput input
-                        let output = if Dyn.isNullish args then "" else Dyn.str args "output"
-                        mailbox.Post(ChildSessionMailbox.Command.TaskComplete output) |> ignore
-                    | None ->
+                    let args = argsFromHookInput input
+                    let output = if Dyn.isNullish args then "" else Dyn.str args "output"
+                    let! routed = tryTaskComplete sid output
+
+                    if not routed then
                         let st = fallbackRuntime.GetOrCreateState sid
 
                         fallbackRuntime.UpdateState

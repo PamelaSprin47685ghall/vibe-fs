@@ -21,7 +21,6 @@ open Wanxiangshu.Omp
 open Wanxiangshu.Omp.MessageTransform
 open Wanxiangshu.Omp.ChildSession
 open Wanxiangshu.Shell.RuntimeScope
-open Wanxiangshu.Shell.ChildSessionMailbox
 
 let private mockUserMsg (id: string) (sessionID: string) (prompt: string) : obj =
     let info =
@@ -128,102 +127,6 @@ let crossSessionIsolationSpec () =
         finally
             unmarkChildSession ExecutorTools.ompScope "session-B"
             rmAsync workspaceDir |> ignore
-    }
-
-let ompChildSessionObjectiveReRegisterSpec () =
-    promise {
-        let scope = RuntimeScope()
-
-        let mockSessionManagerType =
-            createObj
-                [ "create",
-                  box (fun (cwd: string) ->
-                      createObj
-                          [ "sessionId", box (Some "child-sess-1")
-                            "getSessionId", box (Some(fun () -> box "child-sess-1"))
-                            "prompt",
-                            box (fun (p: string) ->
-                                promise {
-                                    match ChildSessionMailboxRegistry.TryGet "child-sess-1" with
-                                    | Some mb ->
-                                        do! mb.Post(Command.TaskComplete "")
-                                        do! mb.Post(Command.SessionIdle)
-                                    | None -> ()
-                                })
-                            "waitForIdle", box (fun () -> Promise.lift ()) ]) ]
-
-        let mockCodingAgent = createObj [ "SessionManager", box mockSessionManagerType ]
-
-        scope.Add("omp.coding_agent_module", box mockCodingAgent)
-
-        let parentSessionId = "parent-sess-1"
-        let objective = "Build target component"
-        scope.RegisterTempFiles(parentSessionId + "\u0000" + objective, [ "OmpTarget.fs" ])
-
-        let mockInnerPi =
-            createObj
-                [ "createAgentSession",
-                  box (fun (body: obj) ->
-                      let wrapper =
-                          createObj
-                              [ "session",
-                                box (
-                                    createObj
-                                        [ "sessionManager",
-                                          box (
-                                              createObj
-                                                  [ "sessionId", box (Some "child-sess-1")
-                                                    "getSessionId", box (Some(fun () -> box "child-sess-1"))
-                                                    "getEntries", box (Some(fun () -> [||])) ]
-                                          )
-                                          "prompt",
-                                          box (fun (p: string) ->
-                                              promise {
-                                                  match ChildSessionMailboxRegistry.TryGet "child-sess-1" with
-                                                  | Some mb ->
-                                                      do! mb.Post(Command.TaskComplete "")
-                                                      do! mb.Post(Command.SessionIdle)
-                                                  | None -> ()
-                                              })
-                                          "waitForIdle", box (fun () -> Promise.lift ()) ]
-                                )
-                                "dispose", box (Some(fun () -> ())) ]
-
-                      Promise.lift wrapper) ]
-
-        let mockPi =
-            createObj
-                [ "registerTool", box (fun _ -> ())
-                  "getActiveTools", box (Some(fun () -> box null))
-                  "setActiveTools", box (Some(fun _ -> Promise.lift ()))
-                  "sendMessage", box (Some(fun _ -> Promise.lift ()))
-                  "pi", box (Some mockInnerPi) ]
-
-        let ctx =
-            createObj
-                [ "sessionManager",
-                  box (
-                      Some(
-                          createObj
-                              [ "sessionId", box (Some parentSessionId)
-                                "getSessionId", box (Some(fun () -> box parentSessionId)) ]
-                      )
-                  )
-                  "sessionId", box parentSessionId
-                  "cwd", box "/mock/dir" ]
-
-        let prompt =
-            "---\nobjective: Build target component\n---\nWrite code in OmpTarget.fs"
-
-        let fallbackRuntime = Wanxiangshu.Shell.FallbackRuntimeState.FallbackRuntimeState()
-
-        let! result = runSubagent scope mockPi ctx [||] prompt None fallbackRuntime None
-
-        let copiedFiles = scope.TryGetTempFiles("child-sess-1\u0000" + objective)
-
-        check
-            "OMP ChildSession automatically replicates temp file registrations to child session ID"
-            (copiedFiles = Some [ "OmpTarget.fs" ])
     }
 
 let opencodeSubsessionParentIDSpec () =

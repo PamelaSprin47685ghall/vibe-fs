@@ -8,11 +8,6 @@ open Wanxiangshu.Tests.FallbackEventBridgeTests
 open Wanxiangshu.Tests.FallbackMessageCodecTests
 open Wanxiangshu.Tests.FallbackIntegrationTests
 open Wanxiangshu.Tests.FallbackRecoveryWaitTests
-open Wanxiangshu.Tests.SubagentIoFallbackRecoveryTests
-open Wanxiangshu.Tests.SubagentIoFallbackRecoveryTestsPart2
-open Wanxiangshu.Tests.SubagentIoFallbackRecoveryTestsPart3
-open Wanxiangshu.Tests.SubagentIoFallbackRecoveryTestsPart4
-open Wanxiangshu.Tests.SubagentIoFallbackRecoveryTestsPart5
 open Wanxiangshu.Tests.WebFetchGuardTests
 open Wanxiangshu.Tests.ReviewVerdictTests
 open Wanxiangshu.Tests.ToolCopyTests
@@ -20,6 +15,8 @@ open Wanxiangshu.Tests.JsArrayMutateTests
 open Wanxiangshu.Tests.FallbackAgentAndModelTests
 open Wanxiangshu.Tests.FallbackAgentAndModelPart2Tests
 open Wanxiangshu.Tests.FallbackInjectionFoldTests
+open Wanxiangshu.Tests.SubsessionDecisionTests
+open Wanxiangshu.Tests.SubsessionScenarioTests
 
 let fallbackTestEntries () : (string * TestBody) list =
     [ "FallbackKernelTests.run", Sync(sync FallbackKernelTests.run)
@@ -32,12 +29,8 @@ let fallbackTestEntries () : (string * TestBody) list =
       "FallbackMessageCodecTests.run", Sync(sync FallbackMessageCodecTests.run)
       "FallbackIntegrationTests.run", Sync(sync FallbackIntegrationTests.run)
       "FallbackRecoveryWaitTests.run", Async FallbackRecoveryWaitTests.run
-      "FallbackRecoveryWaitTestsPart2.run", Async FallbackRecoveryWaitTestsPart2.run
-      "SubagentIoFallbackRecoveryTests.run", Async SubagentIoFallbackRecoveryTests.run
-      "SubagentIoFallbackRecoveryTestsPart2.run", Async SubagentIoFallbackRecoveryTestsPart2.run
-      "SubagentIoFallbackRecoveryTestsPart3.run", Async SubagentIoFallbackRecoveryTestsPart3.run
-      "SubagentIoFallbackRecoveryTestsPart4.run", Async SubagentIoFallbackRecoveryTestsPart4.run
-      "SubagentIoFallbackRecoveryTestsPart5.run", Async SubagentIoFallbackRecoveryTestsPart5.run ]
+      "SubsessionDecisionTests.run", Sync(sync SubsessionDecisionTests.run)
+      "SubsessionScenarioTests.run", Sync(sync SubsessionScenarioTests.run) ]
 
 let tailTestEntries () : (string * TestBody) list =
     [ "WebFetchGuardTests.run", Sync(sync WebFetchGuardTests.run)

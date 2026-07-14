@@ -12,9 +12,8 @@ type FallbackConsumedStatus =
 type FallbackSessionGateFlag =
     | Inactive
     | NudgeActive
-    | SubsessionPending
     | EventHandlingActive
-    | AwaitingBusy
+    | MainContinuationAwaitingStart
 
 let consumedFromBool (value: bool) : FallbackConsumedStatus =
     if value then

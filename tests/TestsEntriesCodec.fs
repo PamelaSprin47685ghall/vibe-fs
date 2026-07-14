@@ -63,7 +63,6 @@ open Wanxiangshu.Tests.OmpReviewTests
 open Wanxiangshu.Tests.OmpHelpersTests
 open Wanxiangshu.Tests.OmpRunnerTests
 open Wanxiangshu.Tests.OmpContextTransformTests
-open Wanxiangshu.Tests.OmpChildSessionTests
 open Wanxiangshu.Tests.OmpAgentConfigTests
 open Wanxiangshu.Tests.OmpHookExecuteTests
 open Wanxiangshu.Tests.OmpSessionLifecycleTests

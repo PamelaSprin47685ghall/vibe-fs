@@ -32,9 +32,7 @@ let needFallbackContinue (obs: FallbackGateObservation) : bool =
     | _ ->
         if gateOn obs FallbackSessionGateFlag.EventHandlingActive then
             true
-        elif gateOn obs FallbackSessionGateFlag.AwaitingBusy then
-            true
-        elif gateOn obs FallbackSessionGateFlag.SubsessionPending then
+        elif gateOn obs FallbackSessionGateFlag.MainContinuationAwaitingStart then
             true
         elif obs.BusyCount > 0 then
             true
