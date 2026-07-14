@@ -5,6 +5,7 @@ open Fable.Core.JsInterop
 open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Kernel.Domain
 open Wanxiangshu.Kernel.FallbackKernel.Types
+open Wanxiangshu.Kernel.Subsession.Types
 open Wanxiangshu.Shell.FallbackRuntimeState
 open Wanxiangshu.Shell.FallbackEventBridge
 open Wanxiangshu.Shell
@@ -141,6 +142,8 @@ type FakeTranslator(sessionID: string, evt: FallbackEvent) =
             let tid = if tid <> "" then tid else Dyn.str props "runId"
             let tid = if tid <> "" then tid else Dyn.str props "runID"
             if tid <> "" then Some tid else None
+
+        member _.ExtractTurnObservation(rawEvent: obj) : TurnObservation option = None
 
 
 let mkModel (pid: string) (mid: string) : FallbackModel =

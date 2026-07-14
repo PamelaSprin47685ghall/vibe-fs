@@ -6,10 +6,14 @@ open Wanxiangshu.Shell
 open Wanxiangshu.Shell.ErrorClassify
 open Wanxiangshu.Shell.Dyn
 open Wanxiangshu.Kernel.Domain
+open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.FallbackKernel.Types
+open Wanxiangshu.Kernel.Subsession.Types
+open Wanxiangshu.Kernel.Subsession.PartTypeClassify
 open Wanxiangshu.Shell.FallbackEventBridge
 open Wanxiangshu.Shell.FallbackRuntimeState
 open Wanxiangshu.Shell.SubsessionEventRouter
+open Wanxiangshu.Shell.SubsessionChildObserver
 
 let ompErrorInput (errorObj: obj) : ErrorInput =
     let errorName = Dyn.str errorObj "name"
@@ -274,7 +278,44 @@ let ompEventTranslator (runtime: FallbackRuntimeState) : IEventTranslator =
             let tid = if tid <> "" then tid else Dyn.str rawEvent "turnID"
             let tid = if tid <> "" then tid else Dyn.str rawEvent "runId"
             let tid = if tid <> "" then tid else Dyn.str rawEvent "runID"
-            if tid <> "" then Some tid else None }
+            if tid <> "" then Some tid else None
+
+        member _.ExtractTurnObservation(rawEvent: obj) : TurnObservation option =
+            let eventObj = Dyn.get rawEvent "event"
+            if Dyn.isNullish eventObj then
+                None
+            else
+                let t = Dyn.str eventObj "type"
+                if t = "message.updated" || t.StartsWith("message.part.") then
+                    let info = Dyn.get eventObj "info"
+                    if not (Dyn.isNullish info) then
+                        let role = Dyn.str info "role"
+                        if role = "assistant" then
+                            let parts = Dyn.get eventObj "parts"
+                            let text = getPartsTextLocal parts
+                            let finishVal = Dyn.str info "finish"
+                            let reason = FinishReason.fromString finishVal
+                            let isToolFinish = FinishReason.isToolFinish reason || (let lower = finishVal.ToLowerInvariant() in lower.Contains("tool") && lower <> "tool_use_error")
+                            let hasToolCallPart =
+                                if Dyn.isArray parts then
+                                    (parts :?> obj array) |> Array.exists (fun part -> isToolCallPartType (Dyn.str part "type"))
+                                else
+                                    false
+                            let hasToolCall = isToolFinish || hasToolCallPart
+                            Some { TurnId = TurnId.create ""
+                                   Evidence = { CurrentTurnEvidence.empty with Assistant = AssistantContent(text, Some (if hasToolCall then ToolFinish else NormalFinish)) } }
+                        elif role = "toolResult" then
+                            Some { TurnId = TurnId.create ""
+                                   Evidence = { CurrentTurnEvidence.empty with Tool = HasToolResult } }
+                        else
+                            None
+                    else
+                        None
+                elif t = "tool_result" then
+                    Some { TurnId = TurnId.create ""
+                           Evidence = { CurrentTurnEvidence.empty with Tool = HasToolResult } }
+                else
+                    None }
 
 let private tryGetSession (sessionID: string) (sessionApi: obj) : obj option =
     match Wanxiangshu.Omp.ExecutorTools.ompScope.TryFindKey("omp_session_" + sessionID) with
@@ -457,11 +498,18 @@ let createOmpFallbackHandler
                         return! tryError sessionID errorObj
                     elif translator.IsSessionIdle rawEvent then
                         return! tryIdle sessionID
+                    elif isChildSession sessionID then
+                        // Still observe agent/model for child; never Main bridge.
+                        match translator.ExtractTurnObservation rawEvent with
+                        | Some obs -> do! routeToChild sessionID (EvidenceUpdated obs) |> Promise.map ignore
+                        | None -> ()
+                        return absorbChildMetadata runtime sessionID rawEvent
                     else
                         return false
                 }
 
             if routed then
+                // Child control path already observed metadata when applicable.
                 return
                     { Consumed = true
                       State = runtime.GetOrCreateState sessionID }

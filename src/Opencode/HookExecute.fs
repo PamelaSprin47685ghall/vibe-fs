@@ -50,6 +50,7 @@ let private appendSyntaxDiagnostics (directory: string) (input: obj) (output: ob
                     let! diagnostics =
                         paths
                         |> List.map (fun path -> readAndCheckSyntax path directory false)
+                        |> List.toArray
                         |> Promise.all
 
                     let formatted = diagnostics |> Array.choose id |> String.concat "\n"

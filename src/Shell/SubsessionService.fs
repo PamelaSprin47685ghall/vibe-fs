@@ -1,24 +1,59 @@
 module Wanxiangshu.Shell.SubsessionService
 
 open Fable.Core
+open Fable.Core.JsInterop
 open Wanxiangshu.Kernel.FallbackKernel.Types
 open Wanxiangshu.Kernel.Subsession.Types
+open Wanxiangshu.Shell.Dyn
 open Wanxiangshu.Shell.SubsessionActor
 open Wanxiangshu.Shell.SubsessionActorRegistry
+open Wanxiangshu.Shell.SubsessionEventStore
 
-/// Public entry point for child-session runs.
-/// Callers only use StartRun; they never touch actor state, runtime leases,
-/// or FallbackRuntimeState child fields.
-type SubsessionService(hostFactory: string -> ISubsessionHost) =
+type SubsessionService
+    (
+        hostFactory: string -> ISubsessionHost,
+        ?eventStoreFactory: string -> ISubsessionEventStore,
+        ?initBarrier: unit -> JS.Promise<unit>
+    )
+    =
 
-    /// Start (or continue) a run on the given physical child session.
-    /// The actor is reused across runs on the same physical session.
+    let storeFor (childId: string) =
+        match eventStoreFactory with
+        | Some f -> f childId
+        | None -> create ""
+
+    let waitInit () =
+        match initBarrier with
+        | Some barrier -> barrier ()
+        | None -> Promise.lift ()
+
     member _.StartRun
-        (childSessionId: string, parentSessionId: string, prompt: string, cfg: FallbackConfig, chain: FallbackChain)
-        : JS.Promise<RunResult> =
+        (
+            childSessionId: string,
+            parentSessionId: string,
+            prompt: string,
+            cfg: FallbackConfig,
+            chain: FallbackChain,
+            ?abortSignal: obj
+        ) : JS.Promise<RunResult> =
         promise {
+            // Initialization barrier: reconcile must complete before any StartRun.
+            do! waitInit ()
+
             let host = hostFactory childSessionId
-            let actor = SubsessionActorRegistry.GetOrCreate childSessionId host
+            let store = storeFor childSessionId
+            let actor = SubsessionActorRegistry.GetOrCreate childSessionId host store
+
+            // Snapshot aborted BEFORE BeginRun so InitiallyCancelled is set when
+            // the call already cancelled. Race after this snapshot is closed by:
+            //   1) atomic BeginRun (register+decide+append+commit in one queue item)
+            //   2) bind listener AFTER BeginRun is queued
+            //   3) re-check aborted and Post CancelRequested (now after StartRun in queue)
+            let initiallyCancelled =
+                match abortSignal with
+                | Some signal when not (isNull signal) && not (Dyn.isNullish signal) ->
+                    Dyn.truthy (Dyn.get signal "aborted")
+                | _ -> false
 
             let request =
                 { RunId = RunId.newId ()
@@ -26,17 +61,58 @@ type SubsessionService(hostFactory: string -> ISubsessionHost) =
                   ParentSessionId = SessionId.create parentSessionId
                   Prompt = prompt
                   FallbackConfig = cfg
-                  Chain = chain }
+                  Chain = chain
+                  InitiallyCancelled = initiallyCancelled }
 
-            return! actor.StartRun request
+            // 1. Atomic BeginRun enqueued first.
+            let runPromise = actor.BeginRun request
+
+            // 2. Bind AbortSignal AFTER BeginRun so CancelRequested is ordered after StartRun.
+            let mutable onAbort: System.Action<obj> option = None
+            let mutable boundSignal: obj option = None
+
+            try
+                match abortSignal with
+                | Some signal when not (isNull signal) && not (Dyn.isNullish signal) && not initiallyCancelled ->
+                    let handler =
+                        System.Action<obj>(fun _ -> actor.Post CancelRequested |> ignore)
+
+                    onAbort <- Some handler
+                    boundSignal <- Some signal
+
+                    try
+                        signal?addEventListener ("abort", handler)
+                    with _ ->
+                        try
+                            signal?addEventListener ("abort", box handler)
+                        with _ ->
+                            ()
+
+                    // 3. Re-check: if aborted between snapshot and now, Post Cancel
+                    //    (queue order: StartRun then CancelRequested).
+                    if Dyn.truthy (Dyn.get signal "aborted") then
+                        do! actor.Post CancelRequested
+                | _ -> ()
+
+                // 5. Await run result.
+                return! runPromise
+            finally
+                match boundSignal, onAbort with
+                | Some signal, Some handler ->
+                    try
+                        signal?removeEventListener ("abort", handler)
+                    with _ ->
+                        try
+                            signal?removeEventListener ("abort", box handler)
+                        with _ ->
+                            ()
+                | _ -> ()
         }
 
-    /// Post a typed fact to the actor for a child session (if one exists).
     member _.TryPost (childSessionId: string) (cmd: Command) : JS.Promise<unit> =
         match SubsessionActorRegistry.TryGet childSessionId with
         | Some actor -> actor.Post cmd
         | None -> Promise.lift ()
 
-    /// Remove the actor when the physical child session is deleted.
     member _.RemoveSession(childSessionId: string) : unit =
         SubsessionActorRegistry.Remove childSessionId

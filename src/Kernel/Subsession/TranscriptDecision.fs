@@ -10,24 +10,34 @@ type TranscriptDecision =
     | ContinueNormally of prompt: string
     | IncompleteWithoutRecovery of reason: string
 
-/// Pure function: classify a transcript snapshot into a decision.
-///
-/// Mirrors the existing logic from FallbackMessageCodec:
-///   1. allTodosCompleted → CompleteNaturally
-///   2. scanToolCallAsText → RecoverWithPrompt
-///   3. (not isToolFinish) || hasToolResult → CompleteNaturally
-///   4. otherwise → IncompleteWithoutRecovery
-let classifyTranscript (snap: TranscriptSnapshot) : TranscriptDecision =
-    if snap.AllTodosCompleted then
-        CompleteNaturally snap.LastAssistantText
-    else
-        match snap.ToolCallAsTextRecoveryPrompt with
-        | Some prompt -> RecoverWithPrompt prompt
-        | None ->
-            let taskComplete =
-                (not snap.LastAssistantToolFinish) || snap.HasToolResultAfterLastAssistant
+/// Pure function: classify CurrentTurnEvidence (turn-sliced) into a decision.
+/// This is the primary path — only analyzes messages from the current turn.
+let classifyTurnEvidence (evidence: CurrentTurnEvidence) : TranscriptDecision =
+    match evidence.Todos with
+    | TodosCompleted -> CompleteNaturally ""
+    | TodosNotCompleted ->
+        match evidence.Recovery with
+        | RecoveryPrompt prompt -> RecoverWithPrompt prompt
+        | NoRecoveryPrompt ->
+            match evidence.Assistant with
+            | NoAssistant ->
+                IncompleteWithoutRecovery "No assistant message in current turn"
+            | EmptyAssistant ->
+                IncompleteWithoutRecovery "Assistant message in current turn has no content"
+            | AssistantContent(text, finish) ->
+                let toolFinish =
+                    match finish with
+                    | Some ToolFinish -> true
+                    | _ -> false
 
-            if taskComplete then
-                CompleteNaturally snap.LastAssistantText
-            else
-                IncompleteWithoutRecovery "Session idle without task completion and no recovery available"
+                let hasToolResult =
+                    match evidence.Tool with
+                    | HasToolResult -> true
+                    | NoToolResult -> false
+
+                let taskComplete = (not toolFinish) || hasToolResult
+
+                if taskComplete then
+                    CompleteNaturally text
+                else
+                    IncompleteWithoutRecovery "Session idle without task completion and no recovery available"

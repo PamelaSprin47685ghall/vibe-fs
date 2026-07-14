@@ -1,6 +1,7 @@
 module Wanxiangshu.Opencode.PluginCoreServices
 
 open Fable.Core
+module FablePromise = Promise
 open Fable.Core.JsInterop
 open Fable.Core.JS
 open Wanxiangshu.Kernel
@@ -90,7 +91,11 @@ let createCoreServices (host: Host) (ctx: obj) =
 
     scope.OnInit <-
         Some(fun dir ->
-            Wanxiangshu.Shell.EventLogRuntime.syncAllSessionsFromEventLogDedicated host reviewStore scope dir)
+            promise {
+                // Initialization barrier: reconcile unfinished subsession runs before anything else.
+                do! Wanxiangshu.Shell.SubsessionReconcile.reconcileUnfinishedRuns dir |> FablePromise.map ignore
+                return! Wanxiangshu.Shell.EventLogRuntime.syncAllSessionsFromEventLogDedicated host reviewStore scope dir
+            })
 
     scope.TriggerInit(directory)
 

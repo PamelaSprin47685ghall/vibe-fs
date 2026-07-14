@@ -11,9 +11,12 @@ open Wanxiangshu.Shell.OpencodeSessionEventCodecCommon
 open Wanxiangshu.Shell.ChildAgentRegistry
 open Wanxiangshu.Kernel.Domain
 open Wanxiangshu.Kernel.FallbackKernel.Types
+open Wanxiangshu.Kernel.Subsession.Types
+open Wanxiangshu.Kernel.Subsession.PartTypeClassify
 open Wanxiangshu.Shell.FallbackEventBridge
 open Wanxiangshu.Shell.FallbackRuntimeState
 open Wanxiangshu.Shell.SubsessionEventRouter
+open Wanxiangshu.Shell.SubsessionChildObserver
 open Wanxiangshu.Opencode.FallbackHooksHelper
 
 /// Zero-width space character used as the fallback `SendContinue` prompt
@@ -204,7 +207,38 @@ let opencodeEventTranslator (runtime: FallbackRuntimeState) : IEventTranslator =
             let tid = if tid <> "" then tid else Dyn.str info "turnID"
             let tid = if tid <> "" then tid else Dyn.str info "runId"
             let tid = if tid <> "" then tid else Dyn.str info "runID"
-            if tid <> "" then Some tid else None }
+            if tid <> "" then Some tid else None
+
+        member _.ExtractTurnObservation rawEvent : TurnObservation option =
+            let eventType = getEventType rawEvent
+            let props = getProps rawEvent
+            if eventType = "message.updated" && not (Dyn.isNullish props) then
+                let info = Dyn.get props "info"
+                if not (Dyn.isNullish info) && Dyn.str info "role" = "assistant" then
+                    let parts = Dyn.get props "parts"
+                    let text = getPartsText parts
+                    let hasToolCall =
+                        if not (Dyn.isNullish parts) && Dyn.isArray parts then
+                            (parts :?> obj array)
+                            |> Array.exists (fun p -> let pt = Dyn.str p "type" in isToolCallPartType pt)
+                        else
+                            false
+                    Some { TurnId = TurnId.create ""; Evidence = { CurrentTurnEvidence.empty with Assistant = AssistantContent(text, Some (if hasToolCall then ToolFinish else NormalFinish)) } }
+                else
+                    let parts = Dyn.get props "parts"
+                    if not (Dyn.isNullish parts) && Dyn.isArray parts then
+                        let partsArr = parts :?> obj array
+                        let hasToolResult =
+                            partsArr
+                            |> Array.exists (fun part -> let pt = Dyn.str part "type" in isToolResultPartType pt)
+                        if hasToolResult then
+                            Some { TurnId = TurnId.create ""; Evidence = { CurrentTurnEvidence.empty with Tool = HasToolResult } }
+                        else
+                            None
+                    else
+                        None
+            else
+                None }
 
 let opencodeActionExecutor (runtime: FallbackRuntimeState) (client: obj) : IActionExecutor =
     let resolveModelAndAgent
@@ -345,8 +379,8 @@ let createOpencodeFallbackHandler
         promise {
             let sessionID = translator.ExtractSessionID rawEvent
 
-            // Child sessions are owned solely by SubsessionActor. Route facts
-            // there and skip main fallback processing for those sessions.
+            // Child sessions are owned solely by SubsessionActor. Route control facts
+            // there; absorb busy/message.* metadata without main fallback.
             let! routed =
                 promise {
                     if translator.IsSessionError rawEvent then
@@ -363,6 +397,12 @@ let createOpencodeFallbackHandler
                         return! tryError sessionID errorObj
                     elif translator.IsSessionIdle rawEvent then
                         return! tryIdle sessionID
+                    elif isChildSession sessionID then
+                        // busy / message.updated / part.* — observe model/agent only.
+                        match translator.ExtractTurnObservation rawEvent with
+                        | Some obs -> do! routeToChild sessionID (EvidenceUpdated obs) |> Promise.map ignore
+                        | None -> ()
+                        return absorbChildMetadata runtime sessionID rawEvent
                     else
                         return false
                 }

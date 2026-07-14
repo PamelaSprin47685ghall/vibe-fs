@@ -20,6 +20,7 @@
     <Compile Include="src/Kernel/FallbackKernel/StateMachine.fs"/>
     <Compile Include="src/Kernel/Subsession/Types.fs"/>
     <Compile Include="src/Kernel/Subsession/TranscriptDecision.fs"/>
+    <Compile Include="src/Kernel/Subsession/PartTypeClassify.fs"/>
     <Compile Include="src/Kernel/Subsession/Policy.fs"/>
     <Compile Include="src/Kernel/Subsession/Decision.fs"/>
     <Compile Include="src/Kernel/Subsession/Fold.fs"/>
@@ -133,7 +134,6 @@
     <Compile Include="src/Shell/PromiseQueue.fs"/>
     <Compile Include="src/Shell/SubsessionActor.fs"/>
     <Compile Include="src/Shell/SubsessionActorRegistry.fs"/>
-    <Compile Include="src/Shell/SubsessionService.fs"/>
     <Compile Include="src/Shell/SubsessionEventRouter.fs"/>
     <Compile Include="src/Shell/FallbackConfigCodec.fs"/>
     <Compile Include="src/Shell/FallbackRuntimeStateGates.fs"/>
@@ -141,6 +141,7 @@
     <Compile Include="src/Shell/FallbackGateObservation.fs"/>
     <Compile Include="src/Shell/FallbackMessageParser.fs"/>
     <Compile Include="src/Shell/FallbackMessageCodec.fs"/>
+    <Compile Include="src/Shell/SubsessionChildObserver.fs"/>
     <Compile Include="src/Shell/SubsessionTranscript.fs"/>
     <Compile Include="src/Shell/FallbackRecoveryWait.fs"/>
     <Compile Include="src/Shell/PromiseStr.fs"/>
@@ -233,6 +234,10 @@
     <Compile Include="src/Shell/EventLogRuntimeStore.fs"/>
     <Compile Include="src/Shell/EventLogRuntimeSync.fs"/>
     <Compile Include="src/Shell/EventLogRuntimeAppend.fs"/>
+    <Compile Include="src/Shell/SubsessionEventStore.fs"/>
+    <Compile Include="src/Shell/SubsessionEventWire.fs"/>
+    <Compile Include="src/Shell/SubsessionReconcile.fs"/>
+    <Compile Include="src/Shell/SubsessionService.fs"/>
     <Compile Include="src/Shell/EventLogRuntimeNudge.fs"/>
     <Compile Include="src/Shell/EventLogRuntime.fs"/>
     <Compile Include="src/Shell/FallbackEventBridge.fs"/>
@@ -617,6 +622,10 @@
     <Compile Include="tests/FallbackInjectionFoldTests.fs"/>
     <Compile Include="tests/SubsessionDecisionTests.fs"/>
     <Compile Include="tests/SubsessionScenarioTests.fs"/>
+    <Compile Include="tests/SubsessionActorPumpTests.fs"/>
+    <Compile Include="tests/SubsessionV36HardTests.fs"/>
+    <Compile Include="tests/SubsessionV37HardTests.fs"/>
+    <Compile Include="tests/SubsessionV38DecisionTests.fs"/>
     <Compile Include="tests/FallbackMessageCodecTests.fs"/>
     <Compile Include="tests/FallbackRecoveryWaitTests.fs"/>
     <Compile Include="tests/FallbackIntegrationTests.fs"/>

@@ -9,10 +9,6 @@ open Wanxiangshu.Shell.Dyn
 open Wanxiangshu.Shell.RuntimeScope
 open Wanxiangshu.Shell.OmpHostBindings
 open Wanxiangshu.Shell.FallbackRuntimeState
-open Wanxiangshu.Shell.FallbackRecoveryWait
-open Wanxiangshu.Shell.SubagentIo
-open Wanxiangshu.Shell.ErrorClassify
-open Wanxiangshu.Kernel.Domain
 open Wanxiangshu.Omp.ChildSessionCommon
 open Wanxiangshu.Kernel.FallbackKernel.Types
 
@@ -38,7 +34,7 @@ let runSubagentOnExistingSession
                 let s = Dyn.get ctx "sessionId"
                 if Dyn.isNullish s then "" else string s
 
-            let run =
+            let! text =
                 Wanxiangshu.Omp.ChildSessionCommon.runOmpSubagentCore
                     fallbackRuntime
                     fallbackConfigOpt
@@ -48,9 +44,7 @@ let runSubagentOnExistingSession
                     SubagentResetPolicy.KeepState
                     parentSessionId
                     pi
-
-            let signalObj = Option.defaultValue (box null) signal
-            let! text = raceWithAbortSignal signalObj (fun () -> ()) run
+                    signal
 
             return text
     }

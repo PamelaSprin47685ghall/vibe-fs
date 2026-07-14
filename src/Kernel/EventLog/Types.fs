@@ -56,6 +56,14 @@ let eventKindSquadCancelled = "squad_cancelled"
 
 let eventKindSubsessionRunStarted = "subsession_run_started"
 let eventKindSubsessionRunSettled = "subsession_run_settled"
+let eventKindSubsessionTurnDispatchRequested = "subsession_turn_dispatch_requested"
+let eventKindSubsessionTurnStarted = "subsession_turn_started"
+let eventKindSubsessionTurnOutcomeObserved = "subsession_turn_outcome_observed"
+let eventKindSubsessionTurnFinished = "subsession_turn_finished"
+let eventKindSubsessionAbortRequested = "subsession_abort_requested"
+let eventKindSubsessionSessionPoisoned = "subsession_session_poisoned"
+let eventKindSubsessionPhysicalSessionClosed = "subsession_physical_session_closed"
+let eventKindSubsessionDecisionCommitted = "subsession_decision_committed"
 
 let verdictAccepted = Wanxiangshu.Kernel.EventLog.ReviewVerdictWire.accepted
 let verdictCancelled = Wanxiangshu.Kernel.EventLog.ReviewVerdictWire.cancelled

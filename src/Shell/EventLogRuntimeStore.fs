@@ -33,6 +33,10 @@ let appendAndCache (workspaceRoot: string) (e: WanEvent) : JS.Promise<Result<uni
 let appendAndCacheOrFail (workspaceRoot: string) (e: WanEvent) : JS.Promise<unit> =
     getStore(workspaceRoot).AppendEventOrFail e
 
+/// One lock + one contiguous write for a Decision's event list.
+let appendEventsAndCacheOrFail (workspaceRoot: string) (events: WanEvent list) : JS.Promise<unit> =
+    getStore(workspaceRoot).AppendEventsOrFail events
+
 let assistantPayload
     (assistantMessage: string)
     (agent: string option)

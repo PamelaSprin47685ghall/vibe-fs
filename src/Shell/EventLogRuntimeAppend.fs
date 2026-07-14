@@ -547,3 +547,28 @@ let appendSubsessionRunSettledOrFail
     appendOrFail
         workspaceRoot
         (buildEvent sessionID eventKindSubsessionRunSettled payload (getTimestampMs().ToString()))
+
+let appendSubsessionDomainEventOrFail
+    (workspaceRoot: string)
+    (sessionID: string)
+    (kind: string)
+    (payload: Map<string, string>)
+    : JS.Promise<unit> =
+    appendOrFail workspaceRoot (buildEvent sessionID kind payload (getTimestampMs().ToString()))
+
+/// Atomic multi-event append for one Subsession Decision.
+let appendSubsessionDomainEventsOrFail
+    (workspaceRoot: string)
+    (sessionID: string)
+    (items: (string * Map<string, string>) list)
+    : JS.Promise<unit> =
+    if List.isEmpty items then
+        Promise.lift ()
+    else
+        let at = getTimestampMs().ToString()
+
+        let events =
+            items
+            |> List.map (fun (kind, payload) -> buildEvent sessionID kind payload at)
+
+        appendEventsAndCacheOrFail workspaceRoot events

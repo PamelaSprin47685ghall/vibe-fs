@@ -22,6 +22,9 @@ open Wanxiangshu.Shell.LivelockGuard
 open Wanxiangshu.Shell.ToolRuntimeContext
 open Wanxiangshu.Opencode.PtySpawn
 open Wanxiangshu.Opencode.PluginCoreServices
+open Wanxiangshu.Shell.SubsessionActorRegistry
+open Wanxiangshu.Shell
+open Wanxiangshu.Kernel.Subsession.Types
 
 let private twoArgHook (f: obj -> obj -> JS.Promise<unit>) =
     box (System.Func<obj, obj, JS.Promise<unit>>(f))
@@ -135,6 +138,12 @@ let registerHooks (result: obj) (host: Host) (ctx: obj) (services: CoreServices)
                         Wanxiangshu.Opencode.MessageTransform.cleanupCapsEpochBySession
                             services.RuntimeScope
                             ptyCleanupSessionId
+
+                        let sid = SessionId.create ptyCleanupSessionId
+                        let eventStore = SubsessionEventStore.create services.Directory
+                        eventStore.Append(sid, [ PhysicalSessionClosed sid ]) |> ignore
+                        SubsessionActorRegistry.ClearPoison ptyCleanupSessionId
+                        SubsessionActorRegistry.Remove ptyCleanupSessionId
 
                     do! services.SessionLifecycleObserver.handleEvent input
                 }))

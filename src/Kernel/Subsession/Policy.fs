@@ -6,45 +6,73 @@ open Wanxiangshu.Kernel.FallbackKernel.Recovery
 open Wanxiangshu.Kernel.Subsession.Types
 open Wanxiangshu.Kernel.Subsession.TranscriptDecision
 
-/// Policy decision returned after an error or transcript analysis.
 type PolicyDecision =
     | NextTurn of FallbackPolicyState * FallbackModel * prompt: string
     | StopWithFailure of RunFailure
 
-/// Zero-width-space continuation prompt (same as existing codebase).
 let private continuationPrompt = "\u200B"
 
-/// Create initial policy state from config and chain.
 let initialPolicy (_cfg: FallbackConfig) (_chain: FallbackChain) : FallbackPolicyState =
-    { ModelIndex = 0
-      RetryCount = 0
+    { Selection = StableAt 0
       FailureCount = 0
       ContinueCount = 0
       RecoveryCount = 0 }
 
-/// Map FallbackPolicyState back to a SessionFallbackState for reuse of
-/// the existing classifyError function.  This is an internal shim — the
-/// new code never stores or observes the SessionFallbackState.
+let modelIndexOf (p: FallbackPolicyState) : int =
+    match p.Selection with
+    | StableAt i -> i
+    | RetryingAt(i, _) -> i
+    | Scanning(c, _) -> c
+
 let private phaseFromPolicy (p: FallbackPolicyState) : FallbackPhase =
-    if p.RetryCount > 0 then
-        FallbackPhase.Retrying p.RetryCount
-    elif p.RecoveryCount > 0 then
-        FallbackPhase.RecoveringToolCallText
-    else
-        FallbackPhase.Idle
+    match p.Selection with
+    | RetryingAt(_, c) -> FallbackPhase.Retrying c
+    | Scanning(c, o) -> FallbackPhase.Scanning(c, o)
+    | StableAt _ when p.RecoveryCount > 0 -> FallbackPhase.RecoveringToolCallText
+    | StableAt _ -> FallbackPhase.Idle
 
 let private stateForClassification (p: FallbackPolicyState) : SessionFallbackState =
     { Phase = phaseFromPolicy p
-      CurrentIndex = p.ModelIndex
+      CurrentIndex = modelIndexOf p
       FailureCount = p.FailureCount
       Lifecycle = FallbackLifecycle.Active
       ContinueCount = p.ContinueCount
       RecoveryCount = p.RecoveryCount }
 
-/// Decide next turn after an error has been observed and the turn has gone idle.
-///
-/// Reuses classifyError, isPerfectSquare, scanStartIndex, selectModel
-/// from the existing FallbackKernel without coupling to lifecycle/phase.
+let private trySendContinue
+    (cfg: FallbackConfig)
+    (err: ErrorInput)
+    (p: FallbackPolicyState)
+    (model: FallbackModel)
+    : PolicyDecision =
+    if p.ContinueCount >= cfg.LoopMaxContinues then
+        StopWithFailure(FallbackExhausted err)
+    else
+        NextTurn(
+            { p with
+                ContinueCount = p.ContinueCount + 1 },
+            model,
+            continuationPrompt
+        )
+
+/// After a turn finishes successfully while Scanning, stabilize at the candidate.
+let afterSuccessfulTurn (policy: FallbackPolicyState) : FallbackPolicyState =
+    match policy.Selection with
+    | Scanning(c, orig) ->
+        let k = updateFailureCount c orig policy.FailureCount
+
+        { policy with
+            Selection = StableAt c
+            FailureCount = k
+            ContinueCount = 0 }
+    | RetryingAt(i, _) ->
+        { policy with
+            Selection = StableAt i
+            ContinueCount = 0 }
+    | StableAt _ ->
+        { policy with
+            ContinueCount = 0 }
+
 let afterError
     (cfg: FallbackConfig)
     (chain: FallbackChain)
@@ -54,52 +82,63 @@ let afterError
     let shim = stateForClassification policy
     let errorClass = classifyError err shim cfg
 
-    let trySendContinue (p: FallbackPolicyState) (model: FallbackModel) : PolicyDecision =
-        if p.ContinueCount >= cfg.LoopMaxContinues then
-            StopWithFailure(FallbackExhausted err)
-        else
-            NextTurn(
-                { p with
-                    ContinueCount = p.ContinueCount + 1 },
-                model,
-                continuationPrompt
-            )
+    match policy.Selection, errorClass with
+    | _, ErrorClass.Ignore -> StopWithFailure(FallbackExhausted err)
 
-    match errorClass with
-    | ErrorClass.Ignore ->
-        // Abort / cancel — no model change, surface the failure.
-        StopWithFailure(FallbackExhausted err)
+    // Already scanning: always advance candidate (original Scanning phase behavior).
+    | Scanning(scanIdx, origIdx), _ ->
+        let nextIdx = scanIdx + 1
 
-    | ErrorClass.RetrySame when policy.RetryCount < cfg.MaxRetries ->
-        match selectModel chain policy.ModelIndex with
+        match selectModel chain nextIdx with
         | Some model ->
             trySendContinue
+                cfg
+                err
                 { policy with
-                    RetryCount = policy.RetryCount + 1 }
+                    Selection = Scanning(nextIdx, origIdx) }
                 model
         | None -> StopWithFailure(FallbackExhausted err)
 
-    | ErrorClass.RetrySame
-    | ErrorClass.ImmediateFallback
-    | ErrorClass.Exhausted ->
-        // Retries exhausted or immediate fallback → scan chain.
+    // Stable / retrying with same-model retry budget.
+    | StableAt i, ErrorClass.RetrySame when 0 < cfg.MaxRetries ->
+        match selectModel chain i with
+        | Some model ->
+            trySendContinue
+                cfg
+                err
+                { policy with
+                    Selection = RetryingAt(i, 1) }
+                model
+        | None -> StopWithFailure(FallbackExhausted err)
+
+    | RetryingAt(i, count), ErrorClass.RetrySame when count < cfg.MaxRetries ->
+        match selectModel chain i with
+        | Some model ->
+            trySendContinue
+                cfg
+                err
+                { policy with
+                    Selection = RetryingAt(i, count + 1) }
+                model
+        | None -> StopWithFailure(FallbackExhausted err)
+
+    // Retries exhausted / immediate fallback / non-retryable → enter Scanning.
+    | (StableAt i | RetryingAt(i, _)),
+      (ErrorClass.RetrySame | ErrorClass.ImmediateFallback | ErrorClass.Exhausted) ->
         let k = policy.FailureCount + 1
-        let start = scanStartIndex k policy.ModelIndex
+        let start = scanStartIndex k i
 
         match selectModel chain start with
         | Some model ->
             trySendContinue
+                cfg
+                err
                 { policy with
-                    ModelIndex = start
-                    FailureCount = k
-                    RetryCount = 0 }
+                    Selection = Scanning(start, i)
+                    FailureCount = k }
                 model
         | None -> StopWithFailure(FallbackExhausted err)
 
-/// Decide next turn after transcript analysis.
-///
-/// CompleteNaturally should be handled by the caller before invoking this
-/// function (it produces a success, not a policy decision).
 let afterTranscript
     (cfg: FallbackConfig)
     (chain: FallbackChain)
@@ -108,18 +147,23 @@ let afterTranscript
     : PolicyDecision =
     match decision with
     | CompleteNaturally _ ->
-        // Should never reach here — reducer handles success directly.
         StopWithFailure(ProtocolViolation "CompleteNaturally should not reach afterTranscript")
 
     | RecoverWithPrompt prompt ->
         if policy.RecoveryCount >= cfg.MaxRecoveries then
             StopWithFailure(RecoveryExhausted "max recoveries exceeded")
         else
+            let idx = modelIndexOf policy
+
             let policy2 =
                 { policy with
-                    RecoveryCount = policy.RecoveryCount + 1 }
+                    RecoveryCount = policy.RecoveryCount + 1
+                    Selection =
+                        match policy.Selection with
+                        | Scanning _ as s -> s
+                        | _ -> StableAt idx }
 
-            match selectModel chain policy.ModelIndex with
+            match selectModel chain idx with
             | Some model -> NextTurn(policy2, model, prompt)
             | None -> StopWithFailure NoModelConfigured
 
@@ -127,11 +171,13 @@ let afterTranscript
         if policy.ContinueCount >= cfg.LoopMaxContinues then
             StopWithFailure(RecoveryExhausted "max continues exceeded")
         else
+            let idx = modelIndexOf policy
+
             let policy2 =
                 { policy with
                     ContinueCount = policy.ContinueCount + 1 }
 
-            match selectModel chain policy.ModelIndex with
+            match selectModel chain idx with
             | Some model -> NextTurn(policy2, model, prompt)
             | None -> StopWithFailure NoModelConfigured
 

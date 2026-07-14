@@ -22,8 +22,6 @@ let resolveRoute (sessionId: string) (isMainSession: string -> bool) : SessionRo
         match SubsessionActorRegistry.TryGet sessionId with
         | Some actor -> ChildSession actor
         | None ->
-            // Not registered as a child and not main → unknown.
-            // Could be a transient host session we don't own.
             if isMainSession sessionId then
                 MainSession
             else
@@ -49,6 +47,9 @@ let tryIdle (sessionId: string) : JS.Promise<bool> =
 let tryError (sessionId: string) (err: Wanxiangshu.Kernel.FallbackKernel.Types.ErrorInput) : JS.Promise<bool> =
     routeToChild sessionId (TurnErrorObserved err)
 
-/// Convenience: post TaskCompleteObserved.
-let tryTaskComplete (sessionId: string) (output: string) : JS.Promise<bool> =
-    routeToChild sessionId (TaskCompleteObserved output)
+/// True when this session is owned by a SubsessionActor (child).
+let isChildSession (sessionId: string) : bool =
+    match SubsessionActorRegistry.TryGet sessionId with
+    | Some _ -> true
+    | None -> false
+

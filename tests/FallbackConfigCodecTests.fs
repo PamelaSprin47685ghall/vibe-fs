@@ -187,6 +187,84 @@ let applyOverride_matchesSpacedAgentName () =
     | None -> check "config extracted" false
 
 // ---------------------------------------------------------------------------
+// resolveSubagentChain / prependCurrentModel
+// ---------------------------------------------------------------------------
+
+let resolveSubagentChain_usesParentLiveModelWhenEmpty () =
+    let cfg = emptyConfig
+    let parent = mkModel "openai" "gpt-4.1" None
+
+    let chain =
+        resolveSubagentChain cfg "coder" [] [] (Some parent)
+
+    equal "singleton from parent" 1 chain.Length
+    equal "provider" "openai" chain.[0].ProviderID
+    equal "model" "gpt-4.1" chain.[0].ModelID
+
+let resolveSubagentChain_neverInventDefaultDefault () =
+    let cfg = emptyConfig
+    let chain = resolveSubagentChain cfg "coder" [] [] None
+    equal "empty when nothing known" 0 chain.Length
+
+let resolveSubagentChain_prefersConfigThenPrependsParent () =
+    let cfg: FallbackConfig =
+        { emptyConfig with
+            DefaultChain = [ mkModel "a" "fallback" None; mkModel "b" "spare" None ] }
+
+    let parent = mkModel "openai" "gpt-4.1" (Some "high")
+
+    let chain =
+        resolveSubagentChain cfg "coder" [] [] (Some parent)
+
+    equal "length" 3 chain.Length
+    equal "head is parent" "openai" chain.[0].ProviderID
+    equal "head model" "gpt-4.1" chain.[0].ModelID
+    equal "second from config" "a" chain.[1].ProviderID
+
+let resolveSubagentChain_configFirstMatchesParentNoDup () =
+    let parent = mkModel "openai" "gpt-4.1" None
+
+    let cfg: FallbackConfig =
+        { emptyConfig with
+            DefaultChain = [ mkModel "openai" "gpt-4.1" (Some "high"); mkModel "b" "spare" None ] }
+
+    let chain =
+        resolveSubagentChain cfg "coder" [] [] (Some parent)
+
+    equal "no dup" 2 chain.Length
+    equal "keeps config head" "openai" chain.[0].ProviderID
+    equal "keeps config variant" (Some "high") chain.[0].Variant
+
+let resolveSubagentChain_childRuntimeBeatsParent () =
+    let child = [ mkModel "child" "m1" None ]
+    let parent = [ mkModel "parent" "m2" None ]
+    let live = mkModel "live" "m3" None
+
+    let chain =
+        resolveSubagentChain emptyConfig "coder" child parent (Some live)
+
+    equal "uses child runtime chain" 1 chain.Length
+    equal "child provider" "child" chain.[0].ProviderID
+
+let resolveSubagentChain_parentRuntimeWhenNoConfigOrChild () =
+    let parent = [ mkModel "parent" "m2" None ]
+
+    let chain =
+        resolveSubagentChain emptyConfig "coder" [] parent None
+
+    equal "uses parent runtime" 1 chain.Length
+    equal "parent provider" "parent" chain.[0].ProviderID
+
+let resolveConfiguredChain_normalizesAgentName () =
+    let cfg: FallbackConfig =
+        { emptyConfig with
+            AgentChains = Map.ofList [ "sisyphus-ultraworker", [ mkModel "oai" "gpt5" None ] ] }
+
+    let chain = resolveConfiguredChain cfg "Sisyphus - Ultraworker"
+    equal "found via normalize" 1 chain.Length
+    equal "provider" "oai" chain.[0].ProviderID
+
+// ---------------------------------------------------------------------------
 // Suite entry
 // ---------------------------------------------------------------------------
 
@@ -206,3 +284,10 @@ let run () =
     defaultPreferredModel_returnsFirst ()
     defaultPreferredModel_emptyChain ()
     applyOverride_matchesSpacedAgentName ()
+    resolveSubagentChain_usesParentLiveModelWhenEmpty ()
+    resolveSubagentChain_neverInventDefaultDefault ()
+    resolveSubagentChain_prefersConfigThenPrependsParent ()
+    resolveSubagentChain_configFirstMatchesParentNoDup ()
+    resolveSubagentChain_childRuntimeBeatsParent ()
+    resolveSubagentChain_parentRuntimeWhenNoConfigOrChild ()
+    resolveConfiguredChain_normalizesAgentName ()

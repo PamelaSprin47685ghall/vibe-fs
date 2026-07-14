@@ -185,7 +185,7 @@ let search (query: string) (repoPath: string) (topK: int) : JS.Promise<SembleRes
                     )
 
                 let parsed = parseResults result
-                let! enriched = parsed |> List.map (enrichSembleResult repoPath) |> Promise.all
+                let! enriched = parsed |> List.map (enrichSembleResult repoPath) |> List.toArray |> Promise.all
                 trace "SEARCH" $"query='{query}' repo={repoPath} results={List.length parsed}"
                 return Array.toList enriched
             with ex ->

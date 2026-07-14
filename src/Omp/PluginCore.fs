@@ -205,4 +205,11 @@ let pluginFor (pi: obj) : JS.Promise<unit> =
         let services = createCoreServices pi
         applyAgentConfigIfSupported pi
         registerHooks pi services
+
+        // Minimal safe restart: unfinished subsession runs become poisoned actors.
+        let directory = Dyn.str pi "directory"
+
+        do!
+            Wanxiangshu.Shell.SubsessionReconcile.reconcileUnfinishedRuns directory
+            |> Promise.map ignore
     }

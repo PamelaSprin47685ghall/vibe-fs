@@ -32,6 +32,8 @@ open Wanxiangshu.Kernel.BacklogProjectionCore
 open Wanxiangshu.Omp.ExecutorTools
 open Wanxiangshu.Shell.ReviewRuntime
 open Wanxiangshu.Shell.WorkBacklogToolsCodec
+open Wanxiangshu.Shell.SubsessionActorRegistry
+open Wanxiangshu.Kernel.Subsession.Types
 
 /// Shared BacklogSession bound to the OMP host.
 let private backlogSession = BacklogSession omp
@@ -235,6 +237,11 @@ let sessionShutdownHandler (reviewStore: ReviewStore) (ctx: obj) : JS.Promise<un
             if cwd <> "" then
                 do! appendLoopCancelledOrFail cwd sessionId
                 do! syncReviewFromEventLogDedicated reviewStore cwd sessionId
+                let sid = SessionId.create sessionId
+                let eventStore = SubsessionEventStore.create cwd
+                do! eventStore.Append(sid, [ PhysicalSessionClosed sid ])
+                SubsessionActorRegistry.ClearPoison sessionId
+                SubsessionActorRegistry.Remove sessionId
 
             do! cleanupRunnerJob ExecutorTools.ompScope sessionId
             Wanxiangshu.Shell.LivelockGuard.cleanup ExecutorTools.ompScope sessionId

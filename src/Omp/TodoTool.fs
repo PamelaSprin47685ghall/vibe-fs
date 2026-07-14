@@ -9,6 +9,8 @@ open Wanxiangshu.Omp.Codec
 open Wanxiangshu.Omp.OmpToolSchema
 open Wanxiangshu.Shell.EventLogRuntime
 open Wanxiangshu.Shell.WorkBacklogToolsCodec
+open Wanxiangshu.Kernel.Subsession.Types
+open Wanxiangshu.Shell
 
 module Dyn = Wanxiangshu.Shell.Dyn
 
@@ -114,6 +116,15 @@ let registerTodoTool (pi: obj) : unit =
 
                                       if root <> "" then
                                           do! appendWorkBacklogCommittedOrFail root sid args
+                                          let allCompleted =
+                                              args.Todos
+                                              |> Array.forall (fun t ->
+                                                  match t.Status with
+                                                  | Wanxiangshu.Kernel.ToolArgs.TodoItemStatus.Completed
+                                                  | Wanxiangshu.Kernel.ToolArgs.TodoItemStatus.Cancelled -> true
+                                                  | _ -> false)
+                                          let ev = { CurrentTurnEvidence.empty with Todos = if allCompleted then TodosCompleted else TodosNotCompleted }
+                                          do! SubsessionEventRouter.routeToChild sid (EvidenceUpdated { TurnId = TurnId.create ""; Evidence = ev }) |> Promise.map ignore
                                   | None -> ()
 
                                   let baseOutput = todoWriteOutput methodologies

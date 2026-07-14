@@ -2,31 +2,50 @@ module Wanxiangshu.Kernel.Subsession.Fold
 
 open Wanxiangshu.Kernel.Subsession.Types
 
-// ── Active-run projection ──
-// Tracks only currently-active runs; historical runs are kept in NDJSON only.
+// ── Session safety projection ──
+// Tracks active runs AND persistently poisoned sessions.
+// Historical runs (RunFinished) are kept in NDJSON only.
 
 type ActiveRunProjection =
     { RunId: RunId
       ParentSessionId: SessionId }
 
-type ActiveSubsessionProjection = Map<SessionId, ActiveRunProjection>
+type SessionSafetyEntry =
+    | ActiveRun of ActiveRunProjection
+    | PersistentlyPoisoned of PoisonReason
 
-let emptyProjection: ActiveSubsessionProjection = Map.empty
+type SessionSafetyProjection = Map<SessionId, SessionSafetyEntry>
 
-/// Fold a single domain event into the active-run projection.
-/// RunFinished removes the entry → memory is O(active child sessions).
-let projectEvent (proj: ActiveSubsessionProjection) (evt: SubsessionEvent) : ActiveSubsessionProjection =
+let emptyProjection: SessionSafetyProjection = Map.empty
+
+/// Fold a single domain event into the session safety projection.
+/// RunFinished removes only ActiveRun entries matching runId (never PersistentlyPoisoned).
+/// SessionPoisoned replaces any existing entry with PersistentlyPoisoned.
+let projectEvent (proj: SessionSafetyProjection) (evt: SubsessionEvent) : SessionSafetyProjection =
     match evt with
     | RunStarted data ->
-        Map.add
-            data.SessionId
-            { RunId = data.RunId
-              ParentSessionId = data.ParentSessionId }
-            proj
-    | RunFinished(runId, _) -> proj |> Map.filter (fun _ v -> v.RunId <> runId)
-    | SessionPoisoned(sessionId, _) -> Map.remove sessionId proj
-    | _ -> proj
+        match Map.tryFind data.SessionId proj with
+        | Some (PersistentlyPoisoned _) -> proj
+        | _ ->
+            Map.add
+                data.SessionId
+                (ActiveRun
+                    { RunId = data.RunId
+                      ParentSessionId = data.ParentSessionId })
+                proj
+    | RunFinished(runId, _) ->
+        proj
+        |> Map.filter (fun _ v ->
+            match v with
+            | ActiveRun r -> r.RunId <> runId
+            | PersistentlyPoisoned _ -> true)
+    | SessionPoisoned(sessionId, reason) -> Map.add sessionId (PersistentlyPoisoned reason) proj
+    | PhysicalSessionClosed sessionId -> Map.remove sessionId proj
+    | TurnDispatchRequested _
+    | TurnStarted _
+    | TurnFinished _
+    | AbortRequested _ -> proj
 
 /// Fold a list of events into an initial projection.
-let projectEvents (events: SubsessionEvent list) : ActiveSubsessionProjection =
+let projectEvents (events: SubsessionEvent list) : SessionSafetyProjection =
     List.fold projectEvent emptyProjection events

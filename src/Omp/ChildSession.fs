@@ -139,10 +139,20 @@ let createChildSession
                         try
                             d ()
                         finally
+                            // Physical session teardown: dispose actor registry entry.
+                            if childId <> "" then
+                                Wanxiangshu.Shell.SubsessionActorRegistry.SubsessionActorRegistry.Remove childId
+
                             unmarkChildSession scope childId
 
                     Some wrapped
-                | None -> None
+                | None ->
+                    if childId = "" then
+                        None
+                    else
+                        Some(fun () ->
+                            Wanxiangshu.Shell.SubsessionActorRegistry.SubsessionActorRegistry.Remove childId
+                            unmarkChildSession scope childId)
 
             return
                 { session = session
@@ -205,7 +215,9 @@ let runSubagentWithId
             defaultChain
             |> Option.iter (fun chain -> fallbackRuntime.SetChain childId chain)
 
-        let run =
+        // AbortSignal is bound inside SubsessionService → CancelRequested.
+        // Parent waits for actor terminal; no outer race that returns early.
+        let! text =
             runOmpSubagentCore
                 fallbackRuntime
                 fallbackConfigOpt
@@ -215,21 +227,7 @@ let runSubagentWithId
                 SubagentResetPolicy.ResetToActive
                 sessionId
                 pi
-
-        let cleanup () =
-            let childSess = unbox<IChildSession> session
-
-            match childSess.abort with
-            | Some _ ->
-                try
-                    Dyn.callMethod0 session "abort" |> ignore
-                with _ ->
-                    ()
-            | None -> ()
-
-            child.dispose |> Option.iter (fun dispose -> dispose ())
-
-        let! text = raceWithAbortSignal (Option.defaultValue (box null) signal) (fun () -> ()) run
+                signal
 
         return (text, childId)
     }

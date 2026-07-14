@@ -3,6 +3,7 @@ module Wanxiangshu.Shell.FallbackEventBridge
 open Fable.Core
 open Wanxiangshu.Kernel.FallbackKernel.Types
 open Wanxiangshu.Kernel.FallbackKernel.StateMachine
+open Wanxiangshu.Kernel.Subsession.Types
 open Wanxiangshu.Shell.FallbackMessageCodec
 open Wanxiangshu.Shell.FallbackRuntimeState
 open Wanxiangshu.Shell.FallbackConfigCodec
@@ -42,6 +43,7 @@ type IEventTranslator =
     abstract ExtractAssistantParentId: rawEvent: obj -> string option
     abstract ExtractContinuationIdentity: rawEvent: obj -> (string * int) option
     abstract ExtractHostRunId: rawEvent: obj -> string option
+    abstract ExtractTurnObservation: rawEvent: obj -> TurnObservation option
 
 type IActionExecutor =
     abstract SendContinue: sessionID: string * model: FallbackModel * continuationID: string -> JS.Promise<unit>

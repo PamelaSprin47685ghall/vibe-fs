@@ -182,7 +182,7 @@ let dispatch
                     |> List.iter (fun (prompt, intent) ->
                         adapter.RegisterTempFiles(intent.objective, coderTargetFiles intent))
 
-                    let! reports = prompts |> List.map (spawnOne HostAdapter.Coder "Coder") |> Promise.all
+                    let! reports = prompts |> List.map (spawnOne HostAdapter.Coder "Coder") |> List.toArray |> Promise.all
                     return formatBatchReports (List.ofArray reports)
             | InvestigatorBatch intents ->
                 let prompts = promptsFromInvestigatorIntents host intents
@@ -197,6 +197,7 @@ let dispatch
                     let! reports =
                         prompts
                         |> List.map (spawnOne HostAdapter.Investigator "Investigator")
+                        |> List.toArray
                         |> Promise.all
 
                     return formatBatchReports (List.ofArray reports)

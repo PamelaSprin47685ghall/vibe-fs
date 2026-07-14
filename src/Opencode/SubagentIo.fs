@@ -14,6 +14,7 @@ open Wanxiangshu.Shell.DelegatedAiSettings
 open Wanxiangshu.Shell.OpencodeClientCodec
 open Wanxiangshu.Shell.SessionIoSpawn
 open Wanxiangshu.Shell.SubsessionService
+open Wanxiangshu.Shell.SubsessionEventStore
 open Wanxiangshu.Opencode.SubagentSpawn
 open Wanxiangshu.Opencode.SubsessionHostAdapter
 
@@ -31,6 +32,37 @@ let private formatRunFailure (f: RunFailure) : string =
 
 let private abortedPrefix = "(aborted)"
 let private noOutputText = "(no output)"
+
+let private resolveParentLiveModel
+    (runtime: FallbackRuntimeState)
+    (client: obj)
+    (parentSessionID: string)
+    : JS.Promise<FallbackModel option> =
+    promise {
+        if parentSessionID = "" then
+            return None
+        else
+            match runtime.GetModel parentSessionID with
+            | Some m -> return Some m
+            | None ->
+                match getSessionApiFromClient client with
+                | Error _ -> return None
+                | Ok session ->
+                    let! msgsResp =
+                        invoke1 (box {| path = box {| id = parentSessionID |} |}) "messages" session
+
+                    let data = Dyn.get msgsResp "data"
+
+                    let msgs =
+                        if Dyn.isArray data then
+                            unbox<obj[]> data
+                        else
+                            [||]
+
+                    match Wanxiangshu.Shell.FallbackMessageCodec.tryGetLatestUserModel msgs with
+                    | Some m -> return Some m
+                    | None -> return! Wanxiangshu.Opencode.FallbackHooksHelper.tryReadCurrentModel client parentSessionID
+    }
 
 let runSubagentCoreResult
     (runtime: FallbackRuntimeState)
@@ -83,6 +115,8 @@ let runSubagentCoreResult
                         abortPromise |> ignore
                     | Error _ -> ()
 
+                    // Physical session teardown: dispose actor registry entry.
+                    Wanxiangshu.Shell.SubsessionActorRegistry.SubsessionActorRegistry.Remove childID
                     registry.UnregisterChildAgent(childID)
 
                 let cleanupChildIfRequested () =
@@ -120,47 +154,72 @@ let runSubagentCoreResult
                         | Some c -> c
                         | None -> Wanxiangshu.Shell.FallbackConfigCodec.emptyConfig
 
-                    let chain =
-                        let configChain =
-                            match Map.tryFind agent cfg.AgentChains with
-                            | Some c -> c
-                            | None -> cfg.DefaultChain
-
-                        if configChain.IsEmpty then
-                            let runtimeChain = runtime.GetChain childID
-
-                            if runtimeChain.IsEmpty then
-                                [ { ProviderID = "default"
-                                    ModelID = "default"
-                                    Variant = None
-                                    Temperature = None
-                                    TopP = None
-                                    MaxTokens = None
-                                    ReasoningEffort = None
-                                    Thinking = false } ]
-                            else
-                                runtimeChain
+                    let parentSessionID =
+                        if sessionID = "" then
+                            ""
                         else
-                            configChain
+                            registry.ResolveSubsessionParentID(Some sessionID)
+                            |> Option.defaultValue sessionID
 
-                    let hostFactory (sid: string) = createHost client agent directory
-                    let service = SubsessionService(hostFactory)
+                    let! parentLiveModel = resolveParentLiveModel runtime client parentSessionID
 
-                    try
-                        try
-                            let! runResult = service.StartRun(childID, sessionID, prompt, cfg, chain)
+                    let chain =
+                        Wanxiangshu.Shell.FallbackConfigCodec.resolveSubagentChain
+                            cfg
+                            agent
+                            (runtime.GetChain childID)
+                            (runtime.GetChain parentSessionID)
+                            parentLiveModel
 
-                            match runResult with
-                            | Succeeded _output ->
-                                let! text = extractSessionText client childID directory startCount
-                                return Ok(formatSubagentReport noOutputText abortedPrefix text false)
-                            | Cancelled -> return Ok abortedPrefix
-                            | Failed reason ->
-                                return Error(DomainError.InvalidIntent("subagent", "run", formatRunFailure reason))
-                        with err ->
-                            return Error(translateJsError err)
-                    finally
+                    if chain.IsEmpty then
                         cleanupChildIfRequested ()
+
+                        return
+                            Error(
+                                DomainError.InvalidIntent(
+                                    "subagent",
+                                    "run",
+                                    formatRunFailure NoModelConfigured
+                                )
+                            )
+                    else
+                        // Cache the resolved chain on the child so continue/recovery reuse it.
+                        runtime.SetChain childID chain
+
+                        match List.tryHead chain with
+                        | Some first -> runtime.SetModel childID first
+                        | None -> ()
+
+                        let hostFactory (_sid: string) = createHost client agent directory
+
+                        let eventStoreFactory (_sid: string) =
+                            create (if directory = "" then "" else directory)
+
+                        let service = SubsessionService(hostFactory, eventStoreFactory)
+
+                        try
+                            try
+                                let! runResult =
+                                    service.StartRun(
+                                        childID,
+                                        sessionID,
+                                        prompt,
+                                        cfg,
+                                        chain,
+                                        abortSignal = signal
+                                    )
+
+                                match runResult with
+                                | Succeeded _output ->
+                                    let! text = extractSessionText client childID directory startCount
+                                    return Ok(formatSubagentReport noOutputText abortedPrefix text false)
+                                | Cancelled -> return Ok abortedPrefix
+                                | Failed reason ->
+                                    return Error(DomainError.InvalidIntent("subagent", "run", formatRunFailure reason))
+                            with err ->
+                                return Error(translateJsError err)
+                        finally
+                            cleanupChildIfRequested ()
         with err ->
             return Error(translateJsError err)
     }

@@ -9,6 +9,7 @@ open Wanxiangshu.Shell.Dyn
 open Wanxiangshu.Shell.OmpHostBindings
 open Wanxiangshu.Shell.FallbackRuntimeState
 open Wanxiangshu.Shell.SubsessionService
+open Wanxiangshu.Shell.SubsessionEventStore
 open Wanxiangshu.Shell.ErrorClassify
 open Wanxiangshu.Kernel.Domain
 open Wanxiangshu.Kernel.FallbackKernel.Types
@@ -42,6 +43,7 @@ let runOmpSubagentCore
     (resetPolicy: SubagentResetPolicy)
     (parentSessionId: string)
     (pi: obj)
+    (abortSignal: obj option)
     : JS.Promise<string> =
     promise {
         let sm = unbox<ISessionManager> (Dyn.get session "sessionManager")
@@ -60,40 +62,48 @@ let runOmpSubagentCore
 
         let agentName = fallbackRuntime.GetAgentName childId
 
+        let parentLiveModel =
+            match fallbackRuntime.GetModel parentSessionId with
+            | Some m -> Some m
+            | None -> fallbackRuntime.GetModel childId
+
         let chain =
-            let configChain =
-                let agentChainOpt =
-                    if agentName <> "" then
-                        Map.tryFind agentName cfg.AgentChains
-                    else
-                        None
+            Wanxiangshu.Shell.FallbackConfigCodec.resolveSubagentChain
+                cfg
+                agentName
+                (fallbackRuntime.GetChain childId)
+                (fallbackRuntime.GetChain parentSessionId)
+                parentLiveModel
 
-                match agentChainOpt with
-                | Some c -> c
-                | None -> cfg.DefaultChain
+        if chain.IsEmpty then
+            return! Promise.reject (failwith (formatRunFailure NoModelConfigured))
 
-            if configChain.IsEmpty then
-                let runtimeChain = fallbackRuntime.GetChain childId
+        // Cache the resolved chain so continue/recovery reuse it.
+        fallbackRuntime.SetChain childId chain
 
-                if runtimeChain.IsEmpty then
-                    [ { ProviderID = "default"
-                        ModelID = "default"
-                        Variant = None
-                        Temperature = None
-                        TopP = None
-                        MaxTokens = None
-                        ReasoningEffort = None
-                        Thinking = false } ]
-                else
-                    runtimeChain
-            else
-                configChain
+        match List.tryHead chain with
+        | Some first -> fallbackRuntime.SetModel childId first
+        | None -> ()
 
         let hostFactory (_sid: string) = createHost session agentName pi
-        let service = SubsessionService(hostFactory)
+
+        let root = Wanxiangshu.Omp.MagicTodo.workspaceRoot
+        let eventStoreFactory (_sid: string) = create root
+        let service = SubsessionService(hostFactory, eventStoreFactory)
 
         try
-            let! runResult = service.StartRun(childId, parentSessionId, prompt, cfg, chain)
+            let! runResult =
+                match abortSignal with
+                | Some sig_ ->
+                    service.StartRun(
+                        childId,
+                        parentSessionId,
+                        prompt,
+                        cfg,
+                        chain,
+                        abortSignal = sig_
+                    )
+                | None -> service.StartRun(childId, parentSessionId, prompt, cfg, chain)
 
             match runResult with
             | Succeeded _output ->

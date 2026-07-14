@@ -830,11 +830,6 @@ let private ownerAndLeaseFolder (st: OwnerEpisodeState) (e: WanEvent) : OwnerEpi
 
     | _ -> st
 
-type ReplaySubsessionRunState =
-    { RunId: string
-      ChildId: string
-      ParentSessionId: string }
-
 type SessionState =
     { ReviewLoop: ReviewLoopFold
       ReviewTask: string option
@@ -843,7 +838,6 @@ type SessionState =
       NudgeDedup: NudgeDedupState
       NudgeSnapshot: NudgeSnapshotState
       Subagents: Map<string, SubagentState>
-      SubsessionRuns: Map<string * string, ReplaySubsessionRunState>
       FallbackInjection: FallbackInjectionState
       LatestHumanTurn: HumanTurnState option
       SessionGeneration: int
@@ -877,7 +871,6 @@ let emptySessionState () : SessionState =
       NudgeDedup = emptyNudgeDedupState
       NudgeSnapshot = emptyNudgeSnapshotState
       Subagents = Map.empty
-      SubsessionRuns = Map.empty
       FallbackInjection = emptyFallbackInjectionState
       LatestHumanTurn = None
       SessionGeneration = 0
@@ -953,35 +946,6 @@ let private isDuplicateHumanTurn (currentHumanTurnOrdinal: int) (lastMsgId: stri
 
         newOrdinal <= currentHumanTurnOrdinal
         || (msgId.IsSome && lastMsgId.IsSome && msgId.Value = lastMsgId.Value)
-
-let private subsessionRunsFolder
-    (current: Map<string * string, ReplaySubsessionRunState>)
-    (e: WanEvent)
-    : Map<string * string, ReplaySubsessionRunState> =
-    match e.Kind with
-    | k when k = eventKindSubsessionRunStarted ->
-        let childId = defaultArg (e.Payload |> Map.tryFind "childId") ""
-        let parentSessionId = defaultArg (e.Payload |> Map.tryFind "parentSessionId") ""
-        let runId = defaultArg (e.Payload |> Map.tryFind "runId") ""
-
-        if childId = "" || runId = "" then
-            current
-        else
-            let state =
-                { RunId = runId
-                  ChildId = childId
-                  ParentSessionId = parentSessionId }
-
-            Map.add (childId, runId) state current
-    | k when k = eventKindSubsessionRunSettled ->
-        let childId = defaultArg (e.Payload |> Map.tryFind "childId") ""
-        let runId = defaultArg (e.Payload |> Map.tryFind "runId") ""
-
-        if childId = "" || runId = "" then
-            current
-        else
-            Map.remove (childId, runId) current
-    | _ -> current
 
 let applyEvent (st: SessionState) (e: WanEvent) : SessionState =
     if isLateEvent st e then
@@ -1063,7 +1027,6 @@ let applyEvent (st: SessionState) (e: WanEvent) : SessionState =
           NudgeDedup = nextNudgeDedup
           NudgeSnapshot = nextNudgeSnapshot
           Subagents = subagentFolder st.Subagents e
-          SubsessionRuns = subsessionRunsFolder st.SubsessionRuns e
           FallbackInjection = nextFallbackInjection
           LatestHumanTurn = nextHumanTurn
           SessionGeneration = nextSessionGen

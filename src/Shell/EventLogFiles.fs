@@ -227,6 +227,36 @@ type EventLogStore(workspaceRoot: string, ?appendLineOverride: string -> WanEven
                 eventCountRead <- eventCountRead + 1
             })
 
+    /// Atomic multi-event append: one lock, one contiguous write of all lines.
+    member _.AppendEventsOrFail(events: WanEvent list) : JS.Promise<unit> =
+        if List.isEmpty events then
+            Promise.lift ()
+        else
+            queue.Enqueue(fun () ->
+                promise {
+                    do! ensureInitialized ()
+
+                    do!
+                        withWorkspaceLock eventFilePath (fun () ->
+                            promise {
+                                do! syncNewEvents ()
+
+                                let block =
+                                    events
+                                    |> List.map (fun e -> wanEventToLine e + "\n")
+                                    |> String.concat ""
+
+                                do! appendFileAsync eventFilePath block
+                                let! stats = statAsync eventFilePath
+                                lastKnownSize <- unbox<int64> (stats?size)
+                                lastReadByteOffset <- lastKnownSize
+                            })
+
+                    for e in events do
+                        foldWan e
+                        eventCountRead <- eventCountRead + 1
+                })
+
     member _.GetSquadDag(sessionId: string) : JS.Promise<Dag> =
         promise {
             do! ensureSynced ()

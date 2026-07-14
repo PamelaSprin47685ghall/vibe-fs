@@ -111,6 +111,60 @@ let emptyConfig: FallbackConfig =
       LoopMaxContinues = 3
       MaxRecoveries = 5 }
 
+/// True when two models share the same provider/model identity (variant ignored).
+let sameModelIdentity (a: FallbackModel) (b: FallbackModel) : bool =
+    a.ProviderID = b.ProviderID && a.ModelID = b.ModelID
+
+/// Resolve the configured agent chain (normalized agent name) or the default chain.
+let resolveConfiguredChain (cfg: FallbackConfig) (agentName: string) : FallbackChain =
+    let key =
+        if agentName = "" then
+            ""
+        else
+            normalizeAgentName agentName
+
+    match Map.tryFind key cfg.AgentChains with
+    | Some c -> c
+    | None -> cfg.DefaultChain
+
+/// Prepend the live session model to a configured chain, de-duplicating by identity.
+/// Mirrors FallbackEventBridge's first-time chain materialization.
+let prependCurrentModel (current: FallbackModel option) (resolved: FallbackChain) : FallbackChain =
+    match current with
+    | Some current ->
+        match resolved with
+        | first :: _ when sameModelIdentity first current -> resolved
+        | _ ->
+            let filtered =
+                resolved
+                |> List.filter (fun m -> not (sameModelIdentity m current))
+
+            current :: filtered
+    | None -> resolved
+
+/// Build a subagent fallback chain without inventing a fake "default/default" model.
+/// Priority: non-empty config chain → child runtime chain → parent runtime chain →
+/// parent live model (as singleton) → empty (caller must fail closed).
+let resolveSubagentChain
+    (cfg: FallbackConfig)
+    (agentName: string)
+    (childRuntimeChain: FallbackChain)
+    (parentRuntimeChain: FallbackChain)
+    (parentLiveModel: FallbackModel option)
+    : FallbackChain =
+    let configured = resolveConfiguredChain cfg agentName
+
+    if not configured.IsEmpty then
+        prependCurrentModel parentLiveModel configured
+    elif not childRuntimeChain.IsEmpty then
+        childRuntimeChain
+    elif not parentRuntimeChain.IsEmpty then
+        parentRuntimeChain
+    else
+        match parentLiveModel with
+        | Some m -> [ m ]
+        | None -> []
+
 let extractFallbackConfig (frontmatter: obj) : FallbackConfig option =
     if isNullish frontmatter then
         None

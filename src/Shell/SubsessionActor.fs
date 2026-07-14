@@ -26,37 +26,40 @@ let createDeferred<'T> () : Deferred<'T> =
       Reject = rejectFn
       Promise = p }
 
-// ── Host port ──
+// ── Ports ──
 
-/// Host adapter port. Kernel never sees host JSON; the adapter translates
-/// host facts into Commands and executes Effects.
+/// Host adapter: dispatch / abort / read transcript only.
 type ISubsessionHost =
-    abstract Dispatch: sessionId: SessionId * turn: TurnPlan -> JS.Promise<Result<HostStartReceipt, ErrorInput>>
+    abstract Dispatch:
+        sessionId: SessionId * turn: TurnPlan -> JS.Promise<Result<HostStartReceipt, DispatchFailure>>
 
-    abstract Abort: sessionId: SessionId * turnId: TurnId -> JS.Promise<unit>
+    abstract Abort: sessionId: SessionId * turnId: TurnId -> JS.Promise<AbortResult>
 
-    abstract ReadTranscript: sessionId: SessionId -> JS.Promise<TranscriptSnapshot>
+    /// Cancel an in-flight PendingTurnReceipt / dispatch waiter for this turn.
+    abstract CancelPendingDispatch: turnId: TurnId -> unit
 
-    /// Optional domain-event sink (EventLog append). Default no-op.
-    abstract AppendEvents: events: SubsessionEvent list -> JS.Promise<unit>
+    abstract QueryDispatchStatus: SessionId * TurnId -> JS.Promise<DispatchStatus>
 
-// ── Timer handle ──
+/// Required event store — append failure is infrastructure failure.
+/// Implementations MUST treat the events list as one atomic write.
+type ISubsessionEventStore =
+    abstract Append: sessionId: SessionId * events: SubsessionEvent list -> JS.Promise<unit>
 
 type TimerHandle = int
 
 // ── Actor ──
 
-/// One SubsessionActor owns one physical child session for its entire life.
-/// Actor is the sole owner of run state. Host hooks / callers only Post facts.
-type SubsessionActor(sessionId: SessionId, host: ISubsessionHost) as this =
+/// Queue only commits decide/state. Host effects run detached outside the queue.
+type SubsessionActor
+    (sessionId: SessionId, host: ISubsessionHost, eventStore: ISubsessionEventStore, ?onDispose: unit -> unit, ?initialState: SubsessionState)
+    as this
+    =
     let queue = SerialQueue()
-    let mutable state: SubsessionState = Available { SessionId = sessionId }
+    let mutable state: SubsessionState = defaultArg initialState (Available { SessionId = sessionId })
     let mutable pendingReplies: Map<RunId, Deferred<RunResult>> = Map.empty
     let mutable turnTimers: Map<TurnId, TimerHandle> = Map.empty
     let mutable abortTimers: Map<TurnId, TimerHandle> = Map.empty
-    let mutable pendingReject: StartRunError option = None
-
-    // ── Timer helpers (effect interpreter resources, not domain state) ──
+    let mutable disposed = false
 
     let clearTurnTimer (turnId: TurnId) =
         match Map.tryFind turnId turnTimers with
@@ -72,9 +75,19 @@ type SubsessionActor(sessionId: SessionId, host: ISubsessionHost) as this =
             abortTimers <- Map.remove turnId abortTimers
         | None -> ()
 
+    let clearAllTimers () =
+        for KeyValue(_, h) in turnTimers do
+            JS.clearTimeout h
+
+        for KeyValue(_, h) in abortTimers do
+            JS.clearTimeout h
+
+        turnTimers <- Map.empty
+        abortTimers <- Map.empty
+
     let armTurnTimer (turnId: TurnId) =
         clearTurnTimer turnId
-        // 5-minute turn deadline
+
         let handle =
             JS.setTimeout (fun () -> this.Post(TurnDeadlineExpired turnId) |> ignore) 300_000
 
@@ -82,110 +95,253 @@ type SubsessionActor(sessionId: SessionId, host: ISubsessionHost) as this =
 
     let armAbortTimer (turnId: TurnId) =
         clearAbortTimer turnId
-        // 1-minute abort deadline
+
         let handle =
             JS.setTimeout (fun () -> this.Post(AbortDeadlineExpired turnId) |> ignore) 60_000
 
         abortTimers <- Map.add turnId handle abortTimers
 
-    // ── Effect interpreter ──
+    let infrastructureError (ex: exn) : ErrorInput =
+        { ErrorName = "InfrastructureFailure"
+          DomainError = None
+          Message = ex.Message
+          StatusCode = None
+          IsRetryable = Some false }
 
-    let executeEffect (effect: Effect) : JS.Promise<unit> =
+    let resolveAll (result: RunResult) =
+        for KeyValue(_, reply) in pendingReplies do
+            reply.Resolve result
+
+        pendingReplies <- Map.empty
+
+    let tryExtractActive (s: SubsessionState) : (RunContext * ActiveTurn) option =
+        match s with
+        | Dispatching(ctx, plan) -> Some(ctx, NotYetStarted plan)
+        | CancellingDispatch(ctx, plan, _) -> Some(ctx, NotYetStarted plan)
+        | ReconcilingUnknownDispatch(ctx, plan, _) -> Some(ctx, NotYetStarted plan)
+        | Running(ctx, started, _) -> Some(ctx, Started started)
+        | Draining(ctx, started, _) -> Some(ctx, Started started)
+        | IssuingAbort(ctx, turn, _) -> Some(ctx, turn)
+        | AwaitingAbortSettle(ctx, turn, _) -> Some(ctx, turn)
+        | ReconcilingAbortSettle(ctx, turn, _) -> Some(ctx, turn)
+        | Available _
+        | Poisoned _ -> None
+
+    /// Local / synchronous effects only — never awaits host or Post.
+    let applyLocalEffect (effect: Effect) : unit =
+        match effect with
+        | ArmTurnDeadline turnId -> armTurnTimer turnId
+        | CancelTurnDeadline turnId -> clearTurnTimer turnId
+        | ArmAbortDeadline turnId -> armAbortTimer turnId
+        | CancelAbortDeadline turnId -> clearAbortTimer turnId
+        | CancelPendingDispatch turnId -> host.CancelPendingDispatch turnId
+        | CompleteCaller(runId, result) ->
+            match Map.tryFind runId pendingReplies with
+            | Some reply ->
+                pendingReplies <- Map.remove runId pendingReplies
+                reply.Resolve result
+            | None -> ()
+        | RejectStart err -> ignore err
+        | DisposeActor ->
+            disposed <- true
+            clearAllTimers ()
+            onDispose |> Option.iter (fun f -> f ())
+        | DispatchPrompt _
+        | QueryDispatchStatus _
+        | AbortHostSession _ -> ()
+
+    /// Host effects: fire-and-forget; completion re-enters via Post (never awaited here).
+    let launchHostEffect (effect: Effect) : unit =
+        match effect with
+        | DispatchPrompt plan ->
+            host.Dispatch(sessionId, plan)
+            |> Promise.map (function
+                | Ok receipt -> this.Post(DispatchAccepted(plan.TurnId, receipt)) |> ignore
+                | Error failure -> this.Post(DispatchRejected(plan.TurnId, failure)) |> ignore)
+            |> Promise.catch (fun ex ->
+                this.Post(DispatchRejected(plan.TurnId, DispatchFailure.HostAcceptanceUnknown(infrastructureError ex)))
+                |> ignore)
+            |> ignore
+
+        | QueryDispatchStatus(sid, tid) ->
+            host.QueryDispatchStatus(sid, tid)
+            |> Promise.map (fun status -> this.Post(DispatchStatusResolved status) |> ignore)
+            |> Promise.catch (fun _ -> this.Post(DispatchStatusResolved Unknown) |> ignore)
+            |> ignore
+
+        | AbortHostSession(sid, tid) ->
+            host.Abort(sid, tid)
+            |> Promise.map (function
+                | ConfirmedStopped -> this.Post(AbortConfirmed tid) |> ignore
+                | RequestAcceptedAwaitIdle -> this.Post(AbortHostAccepted tid) |> ignore
+                | AbortUnavailable ->
+                    this.Post(
+                        AbortRequestFailed(
+                            tid,
+                            { ErrorName = "AbortUnavailable"
+                              DomainError = None
+                              Message = "host abort API unavailable"
+                              StatusCode = None
+                              IsRetryable = Some false }
+                        )
+                    )
+                    |> ignore)
+            |> Promise.catch (fun ex ->
+                this.Post(AbortRequestFailed(tid, infrastructureError ex)) |> ignore)
+            |> ignore
+
+        | _ -> ()
+
+    let isHostEffect =
+        function
+        | DispatchPrompt _
+        | QueryDispatchStatus _
+        | AbortHostSession _ -> true
+        | _ -> false
+
+    let isLocalEffect e = not (isHostEffect e)
+
+    /// Build a fail-safe abort decision when event append fails while host may be running.
+    let failSafeFromAppend (priorState: SubsessionState) (ex: exn) : Decision option =
+        match tryExtractActive priorState with
+        | None -> None
+        | Some(ctx, turn) ->
+            let tid =
+                match turn with
+                | NotYetStarted p -> p.TurnId
+                | Started s -> s.Plan.TurnId
+
+            let reason = EventStoreFailure ex.Message
+
+            let abortCtx =
+                { Reason = reason
+                  AfterStop = FinishFailed(InfrastructureFailure("event store append failed: " + ex.Message)) }
+
+            // Runtime-only recovery; do not append more domain events that would fail again.
+            Some
+                { NextState = IssuingAbort(ctx, turn, abortCtx)
+                  Events = []
+                  Effects =
+                    [ AbortHostSession(ctx.SessionId, tid)
+                      CancelTurnDeadline tid
+                      CancelPendingDispatch tid
+                      ArmAbortDeadline tid ] }
+
+    /// Apply a decision that is already computed (used by BeginRun atomic path).
+    let applyDecision (priorState: SubsessionState) (decision: Decision) : JS.Promise<Effect list * StartRunError option> =
         promise {
-            match effect with
-            | AppendDomainEvents events -> do! host.AppendEvents events
+            let rejectOpt =
+                decision.Effects
+                |> List.tryPick (function
+                    | RejectStart err -> Some err
+                    | _ -> None)
 
-            | DispatchPrompt plan ->
-                let! result = host.Dispatch(sessionId, plan)
+            let hasCompleteCaller =
+                decision.Effects
+                |> List.exists (function
+                    | CompleteCaller _ -> true
+                    | _ -> false)
 
-                match result with
-                | Ok receipt -> do! this.Post(DispatchAccepted(plan.TurnId, receipt))
-                | Error err -> do! this.Post(DispatchRejected(plan.TurnId, err))
-
-            | ReadTranscript sid ->
-                let! snap = host.ReadTranscript sid
-                do! this.Post(TranscriptLoaded snap)
-
-            | AbortHostSession(sid, tid) -> do! host.Abort(sid, tid)
-
-            | ArmTurnDeadline turnId -> armTurnTimer turnId
-
-            | CancelTurnDeadline turnId -> clearTurnTimer turnId
-
-            | ArmAbortDeadline turnId -> armAbortTimer turnId
-
-            | CancelAbortDeadline turnId -> clearAbortTimer turnId
-
-            | CompleteCaller(runId, result) ->
-                match Map.tryFind runId pendingReplies with
-                | Some reply ->
-                    pendingReplies <- Map.remove runId pendingReplies
-                    reply.Resolve result
-                | None -> ()
-
-            | RejectStart err ->
-                // Consumed by StartRun caller via pendingReject handshake.
-                pendingReject <- Some err
-        }
-
-    // ── Core step: pure decide → update state → run effects ──
-
-    let handleCommand (cmd: Command) : JS.Promise<unit> =
-        promise {
-            match decide state cmd with
-            | Ok(Decided decision) ->
-                // Append domain events first (if any)
+            try
                 if not (List.isEmpty decision.Events) then
-                    do! host.AppendEvents decision.Events
+                    do! eventStore.Append(sessionId, decision.Events)
 
-                // Apply new state
                 state <- decision.NextState
 
-                // Arm deadlines before Dispatch/Abort so a hung host call cannot
-                // prevent the watchdog from starting.
-                let ordered =
-                    decision.Effects
-                    |> List.sortBy (function
-                        | ArmTurnDeadline _
-                        | ArmAbortDeadline _
+                for e in decision.Effects do
+                    if isLocalEffect e then
+                        applyLocalEffect e
+
+                let hostEffects = decision.Effects |> List.filter isHostEffect
+                return hostEffects, rejectOpt
+            with ex ->
+                // Terminal append failure: never return original Succeeded/Cancelled.
+                // Domain fact was not persisted → InfrastructureFailure + poison.
+                if hasCompleteCaller then
+                    let poisonReason = EventStoreCorrupt("terminal append failed: " + ex.Message)
+                    state <- Poisoned poisonReason
+
+                    // Rewrite CompleteCaller to InfrastructureFailure; still resolve parent.
+                    for e in decision.Effects do
+                        match e with
+                        | CompleteCaller(runId, _) ->
+                            applyLocalEffect (
+                                CompleteCaller(
+                                    runId,
+                                    Failed(InfrastructureFailure("event store append failed: " + ex.Message))
+                                )
+                            )
                         | CancelTurnDeadline _
-                        | CancelAbortDeadline _ -> 0
-                        | AppendDomainEvents _ -> 1
-                        | _ -> 2)
+                        | CancelAbortDeadline _
+                        | CancelPendingDispatch _
+                        | DisposeActor -> applyLocalEffect e
+                        | _ -> ()
 
-                for effect in ordered do
-                    try
-                        do! executeEffect effect
-                    with ex ->
-                        // Infrastructure failure during effect execution:
-                        // poison the session and complete any pending caller.
-                        state <- Poisoned(HostProtocolBroken ex.Message)
+                    return [], rejectOpt
+                else
+                    match failSafeFromAppend priorState ex with
+                    | Some recovery ->
+                        state <- recovery.NextState
 
-                        for KeyValue(runId, reply) in pendingReplies do
-                            reply.Resolve(Failed(InfrastructureFailure("effect failed: " + ex.Message)))
+                        for e in recovery.Effects do
+                            if isLocalEffect e then
+                                applyLocalEffect e
 
-                        pendingReplies <- Map.empty
-
-            | Ok(NoChange _reason) ->
-                // Named ignore — log-only in production; no state change.
-                ()
-
-            | Error(IllegalTransition(s, c)) ->
-                // Loud failure: poison + complete pending callers.
-                state <- Poisoned(HostProtocolBroken("illegal: " + s + " + " + c))
-
-                for KeyValue(runId, reply) in pendingReplies do
-                    reply.Resolve(Failed(InfrastructureFailure("illegal transition: " + s + " + " + c)))
-
-                pendingReplies <- Map.empty
-
-            | Error(StaleTurnCommand(expected, actual)) ->
-                // Stale timer/marker — ignore after logging.
-                let _ = TurnId.value expected, TurnId.value actual
-                ()
+                        return recovery.Effects |> List.filter isHostEffect, None
+                    | None ->
+                        state <- Poisoned(HostProtocolBroken("event append failed: " + ex.Message))
+                        resolveAll (Failed(InfrastructureFailure("event append failed: " + ex.Message)))
+                        return [], None
         }
 
-    // ── Public API ──
+    /// Queue-bound: decide + append events + commit state + return effects.
+    /// NEVER awaits host dispatch / Post.
+    let commitCommand (cmd: Command) : JS.Promise<Effect list * StartRunError option> =
+        queue.Enqueue(fun () ->
+            promise {
+                if disposed then
+                    return [], Some(StartRunError.SessionPoisoned SessionStateUnknownAfterRestart)
+                else
+                    let priorState = state
+
+                    match decide state cmd with
+                    | Ok(Decided decision) -> return! applyDecision priorState decision
+
+                    | Ok(NoChange _) -> return [], None
+
+                    | Error(IllegalTransition(s, c)) ->
+                        match tryExtractActive priorState with
+                        | Some(ctx, turn) ->
+                            let tid =
+                                match turn with
+                                | NotYetStarted p -> p.TurnId
+                                | Started s -> s.Plan.TurnId
+
+                            let abortCtx =
+                                { Reason = IllegalTransitionFailSafe(s + " + " + c)
+                                  AfterStop =
+                                    FinishFailed(InfrastructureFailure("illegal transition: " + s + " + " + c)) }
+
+                            state <- IssuingAbort(ctx, turn, abortCtx)
+
+                            let effects =
+                                [ AbortHostSession(ctx.SessionId, tid)
+                                  CancelTurnDeadline tid
+                                  CancelPendingDispatch tid
+                                  ArmAbortDeadline tid ]
+
+                            for e in effects do
+                                if isLocalEffect e then
+                                    applyLocalEffect e
+
+                            return effects |> List.filter isHostEffect, None
+                        | None ->
+                            state <- Poisoned(HostProtocolBroken("illegal: " + s + " + " + c))
+                            resolveAll (Failed(InfrastructureFailure("illegal transition: " + s + " + " + c)))
+                            return [], None
+
+                    | Error(StaleTurnCommand _) -> return [], None
+            })
 
     member _.SessionId = sessionId
 
@@ -196,41 +352,90 @@ type SubsessionActor(sessionId: SessionId, host: ISubsessionHost) as this =
         | Poisoned _ -> true
         | _ -> false
 
-    /// Enqueue a typed Command. All external facts enter here.
-    member _.Post(cmd: Command) : JS.Promise<unit> =
-        queue.Enqueue(fun () -> handleCommand cmd)
+    member _.IsDisposed = disposed
 
-    /// Start a run. Returns a Promise that resolves when the actor completes
-    /// the run (or immediately rejects if the session is not Available).
-    member this.StartRun(request: StartRunRequest) : JS.Promise<RunResult> =
+    /// Startup reconcile: unfinished NDJSON run → poison so StartRun is rejected
+    /// until physical session is disposed.
+    member _.MarkUnknownAfterRestart() : JS.Promise<unit> =
+        queue.Enqueue(fun () ->
+            promise {
+                match state with
+                | Available _ ->
+                    state <- Poisoned SessionStateUnknownAfterRestart
+                | Poisoned _ -> ()
+                | _ ->
+                    // Active host turn after restart is unsafe; poison and resolve callers.
+                    state <- Poisoned SessionStateUnknownAfterRestart
+                    resolveAll (Failed(InfrastructureFailure "session state unknown after restart"))
+                    clearAllTimers ()
+
+                return ()
+            })
+
+    /// Post a fact. Commits on the queue, then launches host effects detached.
+    member _.Post(cmd: Command) : JS.Promise<unit> =
+        promise {
+            let! hostEffects, _ = commitCommand cmd
+
+            for e in hostEffects do
+                launchHostEffect e
+        }
+
+    /// Atomic BeginRun: register Deferred + decide StartRun + append + commit
+    /// in ONE queue item so CancelRequested cannot insert between them.
+    member this.BeginRun(request: StartRunRequest) : JS.Promise<RunResult> =
         promise {
             let deferred = createDeferred<RunResult> ()
 
-            // Enqueue the StartRun command and wait for either:
-            //   - RejectStart (immediate reject via pendingReject)
-            //   - CompleteCaller (normal completion via pendingReplies)
-            do!
+            let! hostEffects, rejectOpt =
                 queue.Enqueue(fun () ->
                     promise {
-                        pendingReject <- None
-                        pendingReplies <- Map.add request.RunId deferred pendingReplies
-                        do! handleCommand (StartRun request)
+                        if disposed then
+                            return [], Some(StartRunError.SessionPoisoned SessionStateUnknownAfterRestart)
+                        else
+                            // Register reply inside the same queue item as StartRun.
+                            pendingReplies <- Map.add request.RunId deferred pendingReplies
+                            let priorState = state
 
-                        match pendingReject with
-                        | Some err ->
-                            pendingReplies <- Map.remove request.RunId pendingReplies
-                            pendingReject <- None
+                            match decide state (StartRun request) with
+                            | Ok(Decided decision) -> return! applyDecision priorState decision
+                            | Ok(NoChange _) ->
+                                pendingReplies <- Map.remove request.RunId pendingReplies
+                                return [], None
+                            | Error(IllegalTransition(s, c)) ->
+                                pendingReplies <- Map.remove request.RunId pendingReplies
+                                state <- Poisoned(HostProtocolBroken("illegal: " + s + " + " + c))
 
-                            let result =
-                                match err with
-                                | AlreadyRunning -> Failed(ProtocolViolation "subagent session already running")
-                                | StartRunError.SessionPoisoned reason ->
-                                    Failed(InfrastructureFailure("session poisoned: " + string reason))
-                                | NoModelAvailable -> Failed NoModelConfigured
-
-                            deferred.Resolve result
-                        | None -> ()
+                                return
+                                    [],
+                                    Some(
+                                        StartRunError.SessionPoisoned(
+                                            HostProtocolBroken("illegal: " + s + " + " + c)
+                                        )
+                                    )
+                            | Error(StaleTurnCommand _) ->
+                                pendingReplies <- Map.remove request.RunId pendingReplies
+                                return [], None
                     })
+
+            match rejectOpt with
+            | Some err ->
+                pendingReplies <- Map.remove request.RunId pendingReplies
+
+                let result =
+                    match err with
+                    | AlreadyRunning -> Failed(ProtocolViolation "subagent session already running")
+                    | StartRunError.SessionPoisoned reason ->
+                        Failed(InfrastructureFailure("session poisoned: " + string reason))
+                    | NoModelAvailable -> Failed NoModelConfigured
+
+                deferred.Resolve result
+            | None ->
+                for e in hostEffects do
+                    launchHostEffect e
 
             return! deferred.Promise
         }
+
+    /// Back-compat alias for BeginRun (atomic).
+    member this.StartRun(request: StartRunRequest) : JS.Promise<RunResult> = this.BeginRun request

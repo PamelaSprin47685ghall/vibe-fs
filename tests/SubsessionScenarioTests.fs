@@ -20,14 +20,15 @@ let private model0: FallbackModel =
       ReasoningEffort = None
       Thinking = false }
 
-let private model1: FallbackModel = { model0 with ModelID = "m1" }
+let private model1: FallbackModel =
+    { model0 with ModelID = "m1" }
 
 let private chain: FallbackChain = [ model0; model1 ]
 
 let private cfg: FallbackConfig =
     { DefaultChain = chain
       AgentChains = Map.empty
-      MaxRetries = 0 // force model switch on first retryable error after idle
+      MaxRetries = 0
       LoopMaxContinues = 10
       MaxRecoveries = 3 }
 
@@ -48,7 +49,8 @@ let private request: StartRunRequest =
       ParentSessionId = parent
       Prompt = "do work"
       FallbackConfig = cfg
-      Chain = chain }
+      Chain = chain
+      InitiallyCancelled = false }
 
 let private mustDecide state cmd =
     match decide state cmd with
@@ -77,44 +79,7 @@ let private dispatchPromptCount (effects: Effect list) =
 
 // ── Scenarios ──
 
-/// TaskComplete → idle → success
-let scenarioTaskCompleteIdleSuccess () =
-    let d0 = mustDecide (Available { SessionId = sid }) (StartRun request)
-
-    let state1 =
-        match d0.NextState with
-        | Dispatching(ctx, plan) ->
-            let d1 =
-                mustDecide d0.NextState (DispatchAccepted(plan.TurnId, OrderedTurnMarkerObserved))
-
-            match d1.NextState with
-            | Running(ctx2, started) ->
-                let d2 = mustDecide d1.NextState (TaskCompleteObserved "hello")
-
-                match d2.NextState with
-                | Draining _ ->
-                    check "no CompleteCaller after task_complete" (completeCallerCount d2.Effects = 0)
-                    let d3 = mustDecide d2.NextState SessionIdleObserved
-
-                    match d3.NextState with
-                    | Available _ ->
-                        check
-                            "CompleteCaller Succeeded once"
-                            (completeCallerCount d3.Effects = 1
-                             && List.exists
-                                 (function
-                                 | CompleteCaller(_, Succeeded "hello") -> true
-                                 | _ -> false)
-                                 d3.Effects)
-                    | other -> fail ("expected Available, got " + string other)
-                | other -> fail ("expected Draining, got " + string other)
-            | other -> fail ("expected Running, got " + string other)
-        | other -> fail ("expected Dispatching, got " + string other)
-
-    ignore state1
-
-/// Error → TaskComplete → idle → success (task_complete wins)
-let scenarioErrorThenTaskComplete () =
+let scenarioErrorThenIdleRetriesThenSucceeds () =
     let d0 = mustDecide (Available { SessionId = sid }) (StartRun request)
 
     match d0.NextState with
@@ -123,22 +88,27 @@ let scenarioErrorThenTaskComplete () =
             mustDecide d0.NextState (DispatchAccepted(plan.TurnId, OrderedTurnMarkerObserved))
 
         let d2 = mustDecide d1.NextState (TurnErrorObserved err)
-        let d3 = mustDecide d2.NextState (TaskCompleteObserved "won")
-        let d4 = mustDecide d3.NextState SessionIdleObserved
 
-        match d4.NextState with
+        match d2.NextState with
+        | Draining _ -> check "no CompleteCaller while error held" (completeCallerCount d2.Effects = 0)
+        | other -> fail ("expected Draining, got " + string other)
+
+        // MaxRetries=0 → error resolved on idle exhausts the chain immediately.
+        let d3 = mustDecide d2.NextState SessionIdleObserved
+
+        match d3.NextState with
         | Available _ ->
             check
-                "success after error+task_complete"
+                "failed (not succeeded) after error resolved on idle"
                 (List.exists
                     (function
-                    | CompleteCaller(_, Succeeded "won") -> true
+                    | CompleteCaller(_, Failed _) -> true
                     | _ -> false)
-                    d4.Effects)
-        | other -> fail ("expected Available, got " + string other)
+                    d3.Effects)
+        | Dispatching _ -> check "or retries" (dispatchPromptCount d3.Effects = 1)
+        | other -> fail ("unexpected: " + string other)
     | other -> fail ("expected Dispatching, got " + string other)
 
-/// Error → idle → retry DispatchPrompt (no CompleteCaller on error alone)
 let scenarioErrorIdleRetry () =
     let d0 = mustDecide (Available { SessionId = sid }) (StartRun request)
 
@@ -156,19 +126,17 @@ let scenarioErrorIdleRetry () =
         | Dispatching _ ->
             check "retry DispatchPrompt after idle" (dispatchPromptCount d3.Effects = 1)
             check "no CompleteCaller on retry path" (completeCallerCount d3.Effects = 0)
-        | Available _ ->
-            // Exhausted chain is also valid if policy stops
-            check "CompleteCaller Failed" (completeCallerCount d3.Effects = 1)
+        | Available _ -> check "CompleteCaller Failed" (completeCallerCount d3.Effects = 1)
         | other -> fail ("unexpected after error idle: " + string other)
     | other -> fail ("expected Dispatching, got " + string other)
 
-/// Dispatch reject → next turn without waiting idle
 let scenarioDispatchRejectRetry () =
     let d0 = mustDecide (Available { SessionId = sid }) (StartRun request)
 
     match d0.NextState with
     | Dispatching(_, plan) ->
-        let d1 = mustDecide d0.NextState (DispatchRejected(plan.TurnId, err))
+        let d1 =
+            mustDecide d0.NextState (DispatchRejected(plan.TurnId, HostRejected err))
 
         match d1.NextState with
         | Dispatching _ -> check "DispatchPrompt without idle" (dispatchPromptCount d1.Effects = 1)
@@ -176,7 +144,45 @@ let scenarioDispatchRejectRetry () =
         | other -> fail ("unexpected: " + string other)
     | other -> fail ("expected Dispatching, got " + string other)
 
-/// Cancel → Aborting → idle → Cancelled
+let scenarioAcceptanceUnknownAborts () =
+    let d0 = mustDecide (Available { SessionId = sid }) (StartRun request)
+
+    match d0.NextState with
+    | Dispatching(_, plan) ->
+        let d1 =
+            mustDecide d0.NextState (DispatchRejected(plan.TurnId, HostAcceptanceUnknown err))
+
+        match d1.NextState with
+        | ReconcilingUnknownDispatch(ctx, plan, cancelCtx) ->
+            check "no DispatchPrompt on acceptance unknown" (dispatchPromptCount d1.Effects = 0)
+
+            let d2 =
+                mustDecide d1.NextState (DispatchStatusResolved (DispatchStatus.Accepted OrderedTurnMarkerObserved))
+
+            match d2.NextState with
+            | IssuingAbort(_, _, abortCtx) ->
+                check "AbortHostSession" (List.exists (function AbortHostSession _ -> true | _ -> false) d2.Effects)
+
+                match abortCtx.AfterStop with
+                | RetryAfterSafeStop _ -> ()
+                | other -> fail ("expected RetryAfterSafeStop, got " + string other)
+
+                // AbortConfirmed applies AfterStop — never Cancelled.
+                let d3 = mustDecide d2.NextState (AbortConfirmed plan.TurnId)
+
+                check
+                    "not Cancelled after AcceptanceUnknown"
+                    (not (
+                        List.exists
+                            (function
+                            | CompleteCaller(_, Cancelled) -> true
+                            | _ -> false)
+                            d3.Effects
+                    ))
+            | other -> fail ("expected IssuingAbort, got " + string other)
+        | other -> fail ("expected ReconcilingUnknownDispatch, got " + string other)
+    | other -> fail ("expected Dispatching, got " + string other)
+
 let scenarioCancelIdle () =
     let d0 = mustDecide (Available { SessionId = sid }) (StartRun request)
 
@@ -188,23 +194,40 @@ let scenarioCancelIdle () =
         let d2 = mustDecide d1.NextState CancelRequested
 
         match d2.NextState with
-        | Aborting _ ->
-            let d3 = mustDecide d2.NextState SessionIdleObserved
+        | IssuingAbort _ ->
+            let d3 = mustDecide d2.NextState (AbortHostAccepted plan.TurnId)
 
             match d3.NextState with
-            | Available _ ->
-                check
-                    "CompleteCaller Cancelled"
-                    (List.exists
-                        (function
-                        | CompleteCaller(_, Cancelled) -> true
-                        | _ -> false)
-                        d3.Effects)
-            | other -> fail ("expected Available, got " + string other)
-        | other -> fail ("expected Aborting, got " + string other)
+            | AwaitingAbortSettle _ ->
+                let d4 = mustDecide d3.NextState SessionIdleObserved
+
+                match d4.NextState with
+                | ReconcilingAbortSettle _ ->
+                    let d5 = mustDecide d4.NextState (DispatchStatusResolved (DispatchStatus.Accepted OrderedTurnMarkerObserved))
+
+                    match d5.NextState with
+                    | Available _ ->
+                        check
+                            "CompleteCaller Cancelled"
+                            (List.exists
+                                (function
+                                | CompleteCaller(_, Cancelled) -> true
+                                | _ -> false)
+                                d5.Effects)
+
+                        check
+                            "CancelAbortDeadline present"
+                            (List.exists
+                                (function
+                                | CancelAbortDeadline _ -> true
+                                | _ -> false)
+                                d5.Effects)
+                    | other -> fail ("expected Available, got " + string other)
+                | other -> fail ("expected ReconcilingAbortSettle, got " + string other)
+            | other -> fail ("expected AwaitingAbortSettle, got " + string other)
+        | other -> fail ("expected IssuingAbort, got " + string other)
     | other -> fail ("expected Dispatching, got " + string other)
 
-/// Abort deadline → Poisoned + InfrastructureFailure
 let scenarioAbortDeadlinePoisons () =
     let d0 = mustDecide (Available { SessionId = sid }) (StartRun request)
 
@@ -216,7 +239,7 @@ let scenarioAbortDeadlinePoisons () =
         let d2 = mustDecide d1.NextState CancelRequested
 
         match d2.NextState with
-        | Aborting(_, turn, _) ->
+        | IssuingAbort(_, turn, _) ->
             let tid =
                 match turn with
                 | NotYetStarted p -> p.TurnId
@@ -234,10 +257,9 @@ let scenarioAbortDeadlinePoisons () =
                         | _ -> false)
                         d3.Effects)
             | other -> fail ("expected Poisoned, got " + string other)
-        | other -> fail ("expected Aborting, got " + string other)
+        | other -> fail ("expected IssuingAbort, got " + string other)
     | other -> fail ("expected Dispatching, got " + string other)
 
-/// Stale timer does not affect new turn
 let scenarioStaleTimerIgnored () =
     let d0 = mustDecide (Available { SessionId = sid }) (StartRun request)
 
@@ -254,7 +276,6 @@ let scenarioStaleTimerIgnored () =
 
 // ── Properties ──
 
-/// Property 2: TurnErrorObserved never directly produces DispatchPrompt
 let propErrorNeverDispatches () =
     let d0 = mustDecide (Available { SessionId = sid }) (StartRun request)
 
@@ -267,20 +288,6 @@ let propErrorNeverDispatches () =
         check "prop2: no DispatchPrompt" (dispatchPromptCount d2.Effects = 0)
     | other -> fail ("expected Dispatching, got " + string other)
 
-/// Property 3: TaskCompleteObserved never directly CompleteCaller
-let propTaskCompleteNeverCompletes () =
-    let d0 = mustDecide (Available { SessionId = sid }) (StartRun request)
-
-    match d0.NextState with
-    | Dispatching(_, plan) ->
-        let d1 =
-            mustDecide d0.NextState (DispatchAccepted(plan.TurnId, OrderedTurnMarkerObserved))
-
-        let d2 = mustDecide d1.NextState (TaskCompleteObserved "x")
-        check "prop3: no CompleteCaller" (completeCallerCount d2.Effects = 0)
-    | other -> fail ("expected Dispatching, got " + string other)
-
-/// Property 5: any RunId at most one CompleteCaller across a success path
 let propAtMostOneCompleteCaller () =
     let d0 = mustDecide (Available { SessionId = sid }) (StartRun request)
 
@@ -289,7 +296,11 @@ let propAtMostOneCompleteCaller () =
         let d1 =
             mustDecide d0.NextState (DispatchAccepted(plan.TurnId, OrderedTurnMarkerObserved))
 
-        let d2 = mustDecide d1.NextState (TaskCompleteObserved "x")
+        let evidence =
+            { CurrentTurnEvidence.empty with
+                Assistant = AssistantContent("x", Some NormalFinish) }
+
+        let d2 = mustDecide d1.NextState (EvidenceUpdated { TurnId = plan.TurnId; Evidence = evidence })
         let d3 = mustDecide d2.NextState SessionIdleObserved
 
         let total =
@@ -301,29 +312,20 @@ let propAtMostOneCompleteCaller () =
         check "prop5: exactly one CompleteCaller" (total = 1)
     | other -> fail ("expected Dispatching, got " + string other)
 
-/// Property 7: Poisoned never DispatchPrompt
 let propPoisonedNoDispatch () =
     let state = Poisoned(HostProtocolBroken "test")
     let d = mustDecide state (StartRun request)
     check "prop7: no DispatchPrompt" (dispatchPromptCount d.Effects = 0)
-
-    check
-        "prop7: RejectStart"
-        (List.exists
-            (function
-            | RejectStart _ -> true
-            | _ -> false)
-            d.Effects)
+    check "prop7: RejectStart" (List.exists (function RejectStart _ -> true | _ -> false) d.Effects)
 
 let run () =
-    scenarioTaskCompleteIdleSuccess ()
-    scenarioErrorThenTaskComplete ()
+    scenarioErrorThenIdleRetriesThenSucceeds ()
     scenarioErrorIdleRetry ()
     scenarioDispatchRejectRetry ()
+    scenarioAcceptanceUnknownAborts ()
     scenarioCancelIdle ()
     scenarioAbortDeadlinePoisons ()
     scenarioStaleTimerIgnored ()
     propErrorNeverDispatches ()
-    propTaskCompleteNeverCompletes ()
     propAtMostOneCompleteCaller ()
     propPoisonedNoDispatch ()

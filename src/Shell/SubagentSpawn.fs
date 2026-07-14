@@ -14,7 +14,7 @@ let private abortableConfig (config: obj) (signal: obj) = Dyn.withKey config "ab
 
 let runParallelSpawns (prompts: string list) (spawnOne: string -> JS.Promise<string>) : JS.Promise<string> =
     promise {
-        let! reports = prompts |> List.map spawnOne |> Promise.all
+        let! reports = prompts |> List.map spawnOne |> List.toArray |> Promise.all
         return joinReports reports
     }
 
