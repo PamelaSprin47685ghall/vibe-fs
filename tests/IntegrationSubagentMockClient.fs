@@ -41,13 +41,19 @@ let makeMockClient (pObjRef: obj ref) (parentId: string) (responseText: string) 
 
                                         let nonce =
                                             let body = Dyn.get arg "body"
-                                            if Dyn.isNullish body then ""
+
+                                            if Dyn.isNullish body then
+                                                ""
                                             else
                                                 let parts = Dyn.get body "parts"
-                                                if Dyn.isNullish parts || not (Dyn.isArray parts) then ""
+
+                                                if Dyn.isNullish parts || not (Dyn.isArray parts) then
+                                                    ""
                                                 else
                                                     let firstPart = Dyn.get parts "0"
-                                                    if Dyn.isNullish firstPart then ""
+
+                                                    if Dyn.isNullish firstPart then
+                                                        ""
                                                     else
                                                         let meta = Dyn.get firstPart "metadata"
                                                         if Dyn.isNullish meta then "" else Dyn.str meta "nonce"

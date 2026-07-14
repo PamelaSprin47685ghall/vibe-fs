@@ -9,8 +9,11 @@ let private lastUserMessageIndex (msgs: obj array) : int option =
     msgs
     |> Array.tryFindIndexBack (fun msg ->
         let info = Dyn.get msg "info"
-        if Dyn.isNullish info then false
-        else Dyn.str info "role" = "user")
+
+        if Dyn.isNullish info then
+            false
+        else
+            Dyn.str info "role" = "user")
 
 /// Find the index of the anchor message (user message with given ID).
 let private findAnchorIndex (msgs: obj array) (anchor: TurnAnchor) : Result<int, TranscriptReadFailure> =
@@ -23,7 +26,9 @@ let private findAnchorIndex (msgs: obj array) (anchor: TurnAnchor) : Result<int,
             let role = if Dyn.isNullish info then "" else Dyn.str info "role"
             (id = messageId || Dyn.str info "id" = messageId) && role = "user")
         |> Option.map Ok
-        |> Option.defaultValue (Error { TranscriptReadFailure.Message = sprintf "Anchor user message %s not found in transcript" messageId })
+        |> Option.defaultValue (
+            Error { TranscriptReadFailure.Message = sprintf "Anchor user message %s not found in transcript" messageId }
+        )
     | AnchorByHostRunId runId ->
         msgs
         |> Array.tryFindIndexBack (fun msg ->
@@ -34,7 +39,9 @@ let private findAnchorIndex (msgs: obj array) (anchor: TurnAnchor) : Result<int,
             let infoRunId2 = if Dyn.isNullish info then "" else Dyn.str info "runID"
             runId1 = runId || runId2 = runId || infoRunId1 = runId || infoRunId2 = runId)
         |> Option.map Ok
-        |> Option.defaultValue (Error { TranscriptReadFailure.Message = sprintf "Anchor message with host run ID %s not found" runId })
+        |> Option.defaultValue (
+            Error { TranscriptReadFailure.Message = sprintf "Anchor message with host run ID %s not found" runId }
+        )
     | AnchorByTurnMarkerOnly ->
         match lastUserMessageIndex msgs with
         | Some idx -> Ok idx
@@ -51,7 +58,11 @@ let buildTurnEvidence (msgs: obj array) (anchor: TurnAnchor) : Result<CurrentTur
         | Ok anchorIdx ->
             let slice = msgs.[anchorIdx..]
 
-            let todos = if allTodosCompleted slice then TodosCompleted else TodosNotCompleted
+            let todos =
+                if allTodosCompleted slice then
+                    TodosCompleted
+                else
+                    TodosNotCompleted
 
             let recovery =
                 match scanToolCallAsText slice with
@@ -82,11 +93,16 @@ let buildTurnEvidence (msgs: obj array) (anchor: TurnAnchor) : Result<CurrentTur
                         EmptyAssistant
                     else
                         let toolFinish = isLastAssistantToolFinish slice
-                        AssistantContent(text, Some (if toolFinish then ToolFinish else NormalFinish))
+                        AssistantContent(text, Some(if toolFinish then ToolFinish else NormalFinish))
 
-            let tool = if hasToolResultAfter slice then HasToolResult else NoToolResult
+            let tool =
+                if hasToolResultAfter slice then
+                    HasToolResult
+                else
+                    NoToolResult
 
-            Ok { Assistant = assistant
-                 Todos = todos
-                 Tool = tool
-                 Recovery = recovery }
+            Ok
+                { Assistant = assistant
+                  Todos = todos
+                  Tool = tool
+                  Recovery = recovery }

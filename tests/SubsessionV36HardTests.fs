@@ -187,8 +187,7 @@ let allEventsReplayFromWire () =
             Session = SessionId.value sid
             Kind = eventKindSubsessionAbortRequested
             At = "6"
-            Payload =
-              Map [ "turnId", TurnId.value turnId; "sessionId", SessionId.value sid ] }
+            Payload = Map [ "turnId", TurnId.value turnId; "sessionId", SessionId.value sid ] }
           { V = 1
             Session = SessionId.value sid
             Kind = eventKindSubsessionRunSettled
@@ -202,10 +201,7 @@ let allEventsReplayFromWire () =
             Session = SessionId.value sid
             Kind = eventKindSubsessionSessionPoisoned
             At = "8"
-            Payload =
-              Map
-                  [ "sessionId", SessionId.value sid
-                    "reason", "host_protocol:test" ] } ]
+            Payload = Map [ "sessionId", SessionId.value sid; "reason", "host_protocol:test" ] } ]
 
     let decoded = wanEvents |> List.choose tryDecodeWanEvent
     equal "decoded all 7 domain events" 7 decoded.Length
@@ -215,14 +211,22 @@ let allEventsReplayFromWire () =
     let proj = projectEvents domainEvents
 
     let hasActiveRun =
-        proj |> Map.exists (fun _ v -> match v with | ActiveRun _ -> true | _ -> false)
+        proj
+        |> Map.exists (fun _ v ->
+            match v with
+            | ActiveRun _ -> true
+            | _ -> false)
 
     check "no active run after finish+poison" (not hasActiveRun)
 
     let projWire = projectFromWanEvents wanEvents
 
     let hasActiveRunWire =
-        projWire |> Map.exists (fun _ v -> match v with | ActiveRun _ -> true | _ -> false)
+        projWire
+        |> Map.exists (fun _ v ->
+            match v with
+            | ActiveRun _ -> true
+            | _ -> false)
 
     check "wire fold also empty" (not hasActiveRunWire)
 
@@ -276,7 +280,13 @@ let memoryStoreKeepsAllDomainEvents () =
             { CurrentTurnEvidence.empty with
                 Assistant = AssistantContent("out", Some NormalFinish) }
 
-        do! actor.Post(EvidenceUpdated { TurnId = TurnId.create ""; Evidence = evidence })
+        do!
+            actor.Post(
+                EvidenceUpdated
+                    { TurnId = TurnId.create ""
+                      Evidence = evidence }
+            )
+
         do! sleep 5
         do! actor.Post SessionIdleObserved
         let! _ = p

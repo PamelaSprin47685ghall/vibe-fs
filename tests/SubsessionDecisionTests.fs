@@ -21,8 +21,7 @@ let private model0: FallbackModel =
       ReasoningEffort = None
       Thinking = false }
 
-let private model1: FallbackModel =
-    { model0 with ModelID = "m1" }
+let private model1: FallbackModel = { model0 with ModelID = "m1" }
 
 let private chain: FallbackChain = [ model0; model1 ]
 
@@ -95,7 +94,15 @@ let startRunFromAvailable () =
         | other -> fail ("expected Dispatching, got " + string other)
 
         check "emits DispatchPrompt" (hasEffect isDispatchPrompt d.Effects)
-        check "arms turn deadline" (hasEffect (function ArmTurnDeadline _ -> true | _ -> false) d.Effects)
+
+        check
+            "arms turn deadline"
+            (hasEffect
+                (function
+                | ArmTurnDeadline _ -> true
+                | _ -> false)
+                d.Effects)
+
         check "no CompleteCaller on start" (not (hasEffect isCompleteCaller d.Effects))
     | other -> fail ("unexpected: " + string other)
 
@@ -108,7 +115,11 @@ let secondStartRunRejected () =
     | Ok(Decided d) ->
         check
             "RejectStart AlreadyRunning"
-            (hasEffect (function RejectStart AlreadyRunning -> true | _ -> false) d.Effects)
+            (hasEffect
+                (function
+                | RejectStart AlreadyRunning -> true
+                | _ -> false)
+                d.Effects)
 
         check "state unchanged" (d.NextState = state)
     | other -> fail ("unexpected: " + string other)
@@ -192,7 +203,11 @@ let idleDuringDispatchingThenRealIdleConverges () =
 let runningErrorDrains () =
     let ctx = mkCtx policy0 (TurnOrdinal.next TurnOrdinal.first)
     let plan = mkPlan turn0 TurnOrdinal.first model0 "do work"
-    let started = { Plan = plan; StartReceipt = OrderedTurnMarkerObserved }
+
+    let started =
+        { Plan = plan
+          StartReceipt = OrderedTurnMarkerObserved }
+
     let state = Running(ctx, started, CurrentTurnEvidence.empty)
 
     match decide state (TurnErrorObserved err) with
@@ -209,7 +224,11 @@ let runningErrorDrains () =
 let drainingDuplicateErrorIgnored () =
     let ctx = mkCtx policy0 (TurnOrdinal.next TurnOrdinal.first)
     let plan = mkPlan turn0 TurnOrdinal.first model0 "do work"
-    let started = { Plan = plan; StartReceipt = OrderedTurnMarkerObserved }
+
+    let started =
+        { Plan = plan
+          StartReceipt = OrderedTurnMarkerObserved }
+
     let state = Draining(ctx, started, err)
 
     match decide state (TurnErrorObserved err) with
@@ -219,14 +238,25 @@ let drainingDuplicateErrorIgnored () =
 let drainingIdleRetriesViaFallbackPolicy () =
     let ctx = mkCtx policy0 (TurnOrdinal.next TurnOrdinal.first)
     let plan = mkPlan turn0 TurnOrdinal.first model0 "do work"
-    let started = { Plan = plan; StartReceipt = OrderedTurnMarkerObserved }
+
+    let started =
+        { Plan = plan
+          StartReceipt = OrderedTurnMarkerObserved }
+
     let state = Draining(ctx, started, err)
 
     match decide state SessionIdleObserved with
     | Ok(Decided d) ->
         match d.NextState with
         | Dispatching _ -> check "retries after held error resolved on idle" (hasEffect isDispatchPrompt d.Effects)
-        | Available _ -> check "or exhausts to CompleteCaller Failed" (hasEffect (function CompleteCaller(_, Failed _) -> true | _ -> false) d.Effects)
+        | Available _ ->
+            check
+                "or exhausts to CompleteCaller Failed"
+                (hasEffect
+                    (function
+                    | CompleteCaller(_, Failed _) -> true
+                    | _ -> false)
+                    d.Effects)
         | other -> fail ("unexpected: " + string other)
     | other -> fail ("unexpected: " + string other)
 
@@ -237,7 +267,11 @@ let poisonedRejectsStart () =
     | Ok(Decided d) ->
         check
             "RejectStart SessionPoisoned"
-            (hasEffect (function RejectStart(StartRunError.SessionPoisoned _) -> true | _ -> false) d.Effects)
+            (hasEffect
+                (function
+                | RejectStart(StartRunError.SessionPoisoned _) -> true
+                | _ -> false)
+                d.Effects)
 
         check "no DispatchPrompt when poisoned" (not (hasEffect isDispatchPrompt d.Effects))
     | other -> fail ("unexpected: " + string other)
@@ -245,7 +279,11 @@ let poisonedRejectsStart () =
 let sessionClosedCompletesCaller () =
     let ctx = mkCtx policy0 (TurnOrdinal.next TurnOrdinal.first)
     let plan = mkPlan turn0 TurnOrdinal.first model0 "do work"
-    let started = { Plan = plan; StartReceipt = OrderedTurnMarkerObserved }
+
+    let started =
+        { Plan = plan
+          StartReceipt = OrderedTurnMarkerObserved }
+
     let state = Running(ctx, started, CurrentTurnEvidence.empty)
 
     match decide state SessionClosed with
@@ -256,15 +294,28 @@ let sessionClosedCompletesCaller () =
 
         check
             "CompleteCaller on SessionClosed"
-            (hasEffect (function CompleteCaller _ -> true | _ -> false) d.Effects)
+            (hasEffect
+                (function
+                | CompleteCaller _ -> true
+                | _ -> false)
+                d.Effects)
 
-        check "DisposeActor" (hasEffect (function DisposeActor -> true | _ -> false) d.Effects)
+        check
+            "DisposeActor"
+            (hasEffect
+                (function
+                | DisposeActor -> true
+                | _ -> false)
+                d.Effects)
     | other -> fail ("unexpected: " + string other)
 
 let abortIdleTriggersReconcile () =
     let ctx = mkCtx policy0 (TurnOrdinal.next TurnOrdinal.first)
     let plan = mkPlan turn0 TurnOrdinal.first model0 "do work"
-    let started = { Plan = plan; StartReceipt = OrderedTurnMarkerObserved }
+
+    let started =
+        { Plan = plan
+          StartReceipt = OrderedTurnMarkerObserved }
 
     let abortCtx =
         { Reason = UserRequested
@@ -278,14 +329,27 @@ let abortIdleTriggersReconcile () =
         | ReconcilingAbortSettle _ -> ()
         | other -> fail ("expected ReconcilingAbortSettle, got " + string other)
 
-        check "QueryDispatchStatus effect" (hasEffect (function QueryDispatchStatus _ -> true | _ -> false) d.Effects)
+        check
+            "QueryDispatchStatus effect"
+            (hasEffect
+                (function
+                | QueryDispatchStatus _ -> true
+                | _ -> false)
+                d.Effects)
     | other -> fail ("unexpected: " + string other)
 
 let reconcileAbortSettleAccepted () =
     let ctx = mkCtx policy0 (TurnOrdinal.next TurnOrdinal.first)
     let plan = mkPlan turn0 TurnOrdinal.first model0 "do work"
-    let started = { Plan = plan; StartReceipt = OrderedTurnMarkerObserved }
-    let abortCtx = { Reason = UserRequested; AfterStop = FinishCancelled }
+
+    let started =
+        { Plan = plan
+          StartReceipt = OrderedTurnMarkerObserved }
+
+    let abortCtx =
+        { Reason = UserRequested
+          AfterStop = FinishCancelled }
+
     let state = ReconcilingAbortSettle(ctx, Started started, abortCtx)
     let receipt = HostRunAccepted "host-run-1"
 
@@ -294,14 +358,28 @@ let reconcileAbortSettleAccepted () =
         match d.NextState with
         | Available _ -> ()
         | other -> fail ("expected Available state, got " + string other)
-        check "CompleteCaller Cancelled" (hasEffect (function CompleteCaller(_, Cancelled) -> true | _ -> false) d.Effects)
+
+        check
+            "CompleteCaller Cancelled"
+            (hasEffect
+                (function
+                | CompleteCaller(_, Cancelled) -> true
+                | _ -> false)
+                d.Effects)
     | other -> fail ("unexpected: " + string other)
 
 let reconcileAbortSettleDefinitelyNotAccepted () =
     let ctx = mkCtx policy0 (TurnOrdinal.next TurnOrdinal.first)
     let plan = mkPlan turn0 TurnOrdinal.first model0 "do work"
-    let started = { Plan = plan; StartReceipt = OrderedTurnMarkerObserved }
-    let abortCtx = { Reason = UserRequested; AfterStop = FinishCancelled }
+
+    let started =
+        { Plan = plan
+          StartReceipt = OrderedTurnMarkerObserved }
+
+    let abortCtx =
+        { Reason = UserRequested
+          AfterStop = FinishCancelled }
+
     let state = ReconcilingAbortSettle(ctx, Started started, abortCtx)
 
     match decide state (DispatchStatusResolved DispatchStatus.DefinitelyNotAccepted) with
@@ -309,14 +387,28 @@ let reconcileAbortSettleDefinitelyNotAccepted () =
         match d.NextState with
         | Available _ -> ()
         | other -> fail ("expected Available state, got " + string other)
-        check "CompleteCaller Cancelled" (hasEffect (function CompleteCaller(_, Cancelled) -> true | _ -> false) d.Effects)
+
+        check
+            "CompleteCaller Cancelled"
+            (hasEffect
+                (function
+                | CompleteCaller(_, Cancelled) -> true
+                | _ -> false)
+                d.Effects)
     | other -> fail ("unexpected: " + string other)
 
 let reconcileAbortSettleStillPending () =
     let ctx = mkCtx policy0 (TurnOrdinal.next TurnOrdinal.first)
     let plan = mkPlan turn0 TurnOrdinal.first model0 "do work"
-    let started = { Plan = plan; StartReceipt = OrderedTurnMarkerObserved }
-    let abortCtx = { Reason = UserRequested; AfterStop = FinishCancelled }
+
+    let started =
+        { Plan = plan
+          StartReceipt = OrderedTurnMarkerObserved }
+
+    let abortCtx =
+        { Reason = UserRequested
+          AfterStop = FinishCancelled }
+
     let state = ReconcilingAbortSettle(ctx, Started started, abortCtx)
 
     match decide state (DispatchStatusResolved DispatchStatus.StillPending) with
@@ -329,8 +421,15 @@ let reconcileAbortSettleStillPending () =
 let reconcileAbortSettleUnknown () =
     let ctx = mkCtx policy0 (TurnOrdinal.next TurnOrdinal.first)
     let plan = mkPlan turn0 TurnOrdinal.first model0 "do work"
-    let started = { Plan = plan; StartReceipt = OrderedTurnMarkerObserved }
-    let abortCtx = { Reason = UserRequested; AfterStop = FinishCancelled }
+
+    let started =
+        { Plan = plan
+          StartReceipt = OrderedTurnMarkerObserved }
+
+    let abortCtx =
+        { Reason = UserRequested
+          AfterStop = FinishCancelled }
+
     let state = ReconcilingAbortSettle(ctx, Started started, abortCtx)
 
     match decide state (DispatchStatusResolved DispatchStatus.Unknown) with
@@ -338,7 +437,14 @@ let reconcileAbortSettleUnknown () =
         match d.NextState with
         | Poisoned(AbortDidNotSettle tid) when tid = turn0 -> ()
         | other -> fail ("expected Poisoned AbortDidNotSettle, got " + string other)
-        check "CompleteCaller Failed" (hasEffect (function CompleteCaller(_, Failed _) -> true | _ -> false) d.Effects)
+
+        check
+            "CompleteCaller Failed"
+            (hasEffect
+                (function
+                | CompleteCaller(_, Failed _) -> true
+                | _ -> false)
+                d.Effects)
     | other -> fail ("unexpected: " + string other)
 
 
@@ -423,7 +529,11 @@ let initiallyCancelledNoDispatch () =
 
         check
             "CompleteCaller Cancelled"
-            (hasEffect (function CompleteCaller(_, Cancelled) -> true | _ -> false) d.Effects)
+            (hasEffect
+                (function
+                | CompleteCaller(_, Cancelled) -> true
+                | _ -> false)
+                d.Effects)
     | other -> fail ("unexpected: " + string other)
 
 let acceptanceUnknownRetriesAfterAbortConfirmed () =
@@ -444,18 +554,31 @@ let acceptanceUnknownRetriesAfterAbortConfirmed () =
             // Exhausted chain is also acceptable.
             check
                 "failed not cancelled"
-                (hasEffect (function CompleteCaller(_, Failed _) -> true | _ -> false) d.Effects)
+                (hasEffect
+                    (function
+                    | CompleteCaller(_, Failed _) -> true
+                    | _ -> false)
+                    d.Effects)
         | other -> fail ("unexpected next: " + string other)
 
         check
             "not Cancelled"
-            (not (hasEffect (function CompleteCaller(_, Cancelled) -> true | _ -> false) d.Effects))
+            (not (
+                hasEffect
+                    (function
+                    | CompleteCaller(_, Cancelled) -> true
+                    | _ -> false)
+                    d.Effects
+            ))
     | other -> fail ("unexpected: " + string other)
 
 let turnDeadlineAfterAbortIsTimeoutNotCancelled () =
     let ctx = mkCtx policy0 (TurnOrdinal.next TurnOrdinal.first)
     let plan = mkPlan turn0 TurnOrdinal.first model0 "do work"
-    let started = { Plan = plan; StartReceipt = OrderedTurnMarkerObserved }
+
+    let started =
+        { Plan = plan
+          StartReceipt = OrderedTurnMarkerObserved }
 
     let abortCtx =
         { Reason = TurnDeadline
@@ -467,7 +590,7 @@ let turnDeadlineAfterAbortIsTimeoutNotCancelled () =
     | Ok(Decided d) ->
         match d.NextState with
         | ReconcilingAbortSettle _ ->
-            match decide d.NextState (DispatchStatusResolved (DispatchStatus.Accepted OrderedTurnMarkerObserved)) with
+            match decide d.NextState (DispatchStatusResolved(DispatchStatus.Accepted OrderedTurnMarkerObserved)) with
             | Ok(Decided d2) ->
                 match d2.NextState with
                 | Available _ ->
@@ -481,7 +604,13 @@ let turnDeadlineAfterAbortIsTimeoutNotCancelled () =
 
                     check
                         "not Cancelled"
-                        (not (hasEffect (function CompleteCaller(_, Cancelled) -> true | _ -> false) d2.Effects))
+                        (not (
+                            hasEffect
+                                (function
+                                | CompleteCaller(_, Cancelled) -> true
+                                | _ -> false)
+                                d2.Effects
+                        ))
                 | other -> fail ("expected Available state, got " + string other)
             | other -> fail ("unexpected decide d2: " + string other)
         | other -> fail ("expected ReconcilingAbortSettle, got " + string other)

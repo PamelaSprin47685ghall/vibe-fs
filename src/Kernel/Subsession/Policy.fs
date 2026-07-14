@@ -69,9 +69,7 @@ let afterSuccessfulTurn (policy: FallbackPolicyState) : FallbackPolicyState =
         { policy with
             Selection = StableAt i
             ContinueCount = 0 }
-    | StableAt _ ->
-        { policy with
-            ContinueCount = 0 }
+    | StableAt _ -> { policy with ContinueCount = 0 }
 
 let afterError
     (cfg: FallbackConfig)
@@ -123,8 +121,7 @@ let afterError
         | None -> StopWithFailure(FallbackExhausted err)
 
     // Retries exhausted / immediate fallback / non-retryable → enter Scanning.
-    | (StableAt i | RetryingAt(i, _)),
-      (ErrorClass.RetrySame | ErrorClass.ImmediateFallback | ErrorClass.Exhausted) ->
+    | (StableAt i | RetryingAt(i, _)), (ErrorClass.RetrySame | ErrorClass.ImmediateFallback | ErrorClass.Exhausted) ->
         let k = policy.FailureCount + 1
         let start = scanStartIndex k i
 
@@ -146,8 +143,7 @@ let afterTranscript
     (decision: TranscriptDecision)
     : PolicyDecision =
     match decision with
-    | CompleteNaturally _ ->
-        StopWithFailure(ProtocolViolation "CompleteNaturally should not reach afterTranscript")
+    | CompleteNaturally _ -> StopWithFailure(ProtocolViolation "CompleteNaturally should not reach afterTranscript")
 
     | RecoverWithPrompt prompt ->
         if policy.RecoveryCount >= cfg.MaxRecoveries then

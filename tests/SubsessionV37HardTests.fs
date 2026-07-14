@@ -54,8 +54,7 @@ type ScriptedHost
         ?dispatch: unit -> Result<HostStartReceipt, DispatchFailure>,
         ?abort: unit -> AbortResult,
         ?queryDispatchStatus: unit -> DispatchStatus
-    )
-    =
+    ) =
     let mutable dispatchCount = 0
     let mutable abortCount = 0
     let mutable abortResults: AbortResult list = []
@@ -196,7 +195,14 @@ let idleBeforeBarrierIgnored () =
                 match d2.NextState with
                 | ReconcilingAbortSettle _ -> ()
                 | other -> fail ("expected ReconcilingAbortSettle, got " + string other)
-                check "emits QueryDispatchStatus" (hasEffect (function QueryDispatchStatus _ -> true | _ -> false) d2.Effects)
+
+                check
+                    "emits QueryDispatchStatus"
+                    (hasEffect
+                        (function
+                        | QueryDispatchStatus _ -> true
+                        | _ -> false)
+                        d2.Effects)
             | other -> fail ("expected transition to ReconcilingAbortSettle, got " + string other)
         | other -> fail ("expected AwaitingAbortSettle, got " + string other)
     | other -> fail ("expected AbortHostAccepted transition, got " + string other)
@@ -224,7 +230,13 @@ let terminalAppendFailNotSucceeded () =
             { CurrentTurnEvidence.empty with
                 Assistant = AssistantContent("out", Some NormalFinish) }
 
-        do! actor.Post(EvidenceUpdated { TurnId = TurnId.create ""; Evidence = evidence })
+        do!
+            actor.Post(
+                EvidenceUpdated
+                    { TurnId = TurnId.create ""
+                      Evidence = evidence }
+            )
+
         do! sleep 10
         do! actor.Post SessionIdleObserved
         let! result = p
@@ -382,30 +394,17 @@ let richerWireRoundTrip () =
             Session = sid
             Kind = eventKindSubsessionRunStarted
             At = "1"
-            Payload =
-              Map
-                  [ "childId", sid
-                    "parentSessionId", "parent"
-                    "runId", runId ] }
+            Payload = Map [ "childId", sid; "parentSessionId", "parent"; "runId", runId ] }
           { V = 1
             Session = sid
             Kind = eventKindSubsessionTurnFinished
             At = "3"
-            Payload =
-              Map
-                  [ "turnId", turnId
-                    "finish", "completed"
-                    "output", "hello-out" ] }
+            Payload = Map [ "turnId", turnId; "finish", "completed"; "output", "hello-out" ] }
           { V = 1
             Session = sid
             Kind = eventKindSubsessionRunSettled
             At = "4"
-            Payload =
-              Map
-                  [ "childId", sid
-                    "runId", runId
-                    "status", "succeeded"
-                    "detail", "hello-out" ] } ]
+            Payload = Map [ "childId", sid; "runId", runId; "status", "succeeded"; "detail", "hello-out" ] } ]
 
     let decoded = wan |> List.choose tryDecodeWanEvent
     equal "decoded 3" 3 decoded.Length

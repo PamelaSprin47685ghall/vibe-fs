@@ -34,7 +34,11 @@ type OmpSubsessionHost(session: obj, agent: string, pi: obj) =
                     if agent <> "" then Dyn.withKey p "agent" agent else box p
 
                 let body = box {| prompt = pObj |}
-                let arg = box {| sessionId = SessionId.value sessionId; body = body |}
+
+                let arg =
+                    box
+                        {| sessionId = SessionId.value sessionId
+                           body = body |}
 
                 try
                     let! resp = unbox<JS.Promise<obj>> (session?prompt (arg))
@@ -42,7 +46,10 @@ type OmpSubsessionHost(session: obj, agent: string, pi: obj) =
                     let msgId =
                         let id1 = Dyn.str resp "id"
                         let id2 = Dyn.str (Dyn.get resp "data") "id"
-                        if id1 <> "" then id1 elif id2 <> "" then id2 else ""
+
+                        if id1 <> "" then id1
+                        elif id2 <> "" then id2
+                        else ""
 
                     if msgId <> "" then
                         return Ok(UserMessageObserved msgId)
@@ -108,11 +115,12 @@ type OmpSubsessionHost(session: obj, agent: string, pi: obj) =
                             if not (Dyn.isNullish sessionApi) then
                                 let arg = box {| sessionId = SessionId.value sessionId |}
                                 let! resp = unbox<JS.Promise<obj>> (sessionApi?sessionMessages (arg))
-                                return Some (Dyn.get resp "data")
+                                return Some(Dyn.get resp "data")
                             else
                                 let sm = Dyn.get session "sessionManager"
+
                                 if not (Dyn.isNullish sm) then
-                                    return Some (Dyn.get sm "messages")
+                                    return Some(Dyn.get sm "messages")
                                 else
                                     return None
                         }
@@ -125,9 +133,11 @@ type OmpSubsessionHost(session: obj, agent: string, pi: obj) =
 
                         for msg in msgs do
                             let info = Dyn.get msg "info"
+
                             if not (Dyn.isNullish info) then
                                 let cId1 = Dyn.str info "continuationId"
                                 let cId2 = Dyn.str info "continuationID"
+
                                 if cId1 = target || cId2 = target then
                                     found <- true
 
@@ -135,8 +145,7 @@ type OmpSubsessionHost(session: obj, agent: string, pi: obj) =
                             return DispatchStatus.Accepted OrderedTurnMarkerObserved
                         else
                             return DispatchStatus.DefinitelyNotAccepted
-                    | _ ->
-                        return DispatchStatus.Unknown
+                    | _ -> return DispatchStatus.Unknown
                 with _ ->
                     return DispatchStatus.Unknown
             }

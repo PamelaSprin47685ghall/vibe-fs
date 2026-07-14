@@ -48,7 +48,9 @@ type SessionLifecycleObserver
             (fun sid -> fallbackRuntime.RemoveForceStopped sid)
             (fun sid -> fallbackRuntime.IsForceStopped sid)
 
-    member _.handleChatMessage(sessionID: Wanxiangshu.Kernel.Domain.SessionId, agent: string, parts: obj) : JS.Promise<unit> =
+    member _.handleChatMessage
+        (sessionID: Wanxiangshu.Kernel.Domain.SessionId, agent: string, parts: obj)
+        : JS.Promise<unit> =
         progress.OnChatMessage(sessionID, agent, parts)
 
     member _.OnNewHumanMessage

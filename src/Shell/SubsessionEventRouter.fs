@@ -52,4 +52,3 @@ let isChildSession (sessionId: string) : bool =
     match SubsessionActorRegistry.TryGet sessionId with
     | Some _ -> true
     | None -> false
-

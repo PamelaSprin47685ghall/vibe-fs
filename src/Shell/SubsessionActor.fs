@@ -30,8 +30,7 @@ let createDeferred<'T> () : Deferred<'T> =
 
 /// Host adapter: dispatch / abort / read transcript only.
 type ISubsessionHost =
-    abstract Dispatch:
-        sessionId: SessionId * turn: TurnPlan -> JS.Promise<Result<HostStartReceipt, DispatchFailure>>
+    abstract Dispatch: sessionId: SessionId * turn: TurnPlan -> JS.Promise<Result<HostStartReceipt, DispatchFailure>>
 
     abstract Abort: sessionId: SessionId * turnId: TurnId -> JS.Promise<AbortResult>
 
@@ -51,11 +50,18 @@ type TimerHandle = int
 
 /// Queue only commits decide/state. Host effects run detached outside the queue.
 type SubsessionActor
-    (sessionId: SessionId, host: ISubsessionHost, eventStore: ISubsessionEventStore, ?onDispose: unit -> unit, ?initialState: SubsessionState)
-    as this
-    =
+    (
+        sessionId: SessionId,
+        host: ISubsessionHost,
+        eventStore: ISubsessionEventStore,
+        ?onDispose: unit -> unit,
+        ?initialState: SubsessionState
+    ) as this =
     let queue = SerialQueue()
-    let mutable state: SubsessionState = defaultArg initialState (Available { SessionId = sessionId })
+
+    let mutable state: SubsessionState =
+        defaultArg initialState (Available { SessionId = sessionId })
+
     let mutable pendingReplies: Map<RunId, Deferred<RunResult>> = Map.empty
     let mutable turnTimers: Map<TurnId, TimerHandle> = Map.empty
     let mutable abortTimers: Map<TurnId, TimerHandle> = Map.empty
@@ -186,8 +192,7 @@ type SubsessionActor
                         )
                     )
                     |> ignore)
-            |> Promise.catch (fun ex ->
-                this.Post(AbortRequestFailed(tid, infrastructureError ex)) |> ignore)
+            |> Promise.catch (fun ex -> this.Post(AbortRequestFailed(tid, infrastructureError ex)) |> ignore)
             |> ignore
 
         | _ -> ()
@@ -228,7 +233,10 @@ type SubsessionActor
                       ArmAbortDeadline tid ] }
 
     /// Apply a decision that is already computed (used by BeginRun atomic path).
-    let applyDecision (priorState: SubsessionState) (decision: Decision) : JS.Promise<Effect list * StartRunError option> =
+    let applyDecision
+        (priorState: SubsessionState)
+        (decision: Decision)
+        : JS.Promise<Effect list * StartRunError option> =
         promise {
             let rejectOpt =
                 decision.Effects
@@ -360,8 +368,7 @@ type SubsessionActor
         queue.Enqueue(fun () ->
             promise {
                 match state with
-                | Available _ ->
-                    state <- Poisoned SessionStateUnknownAfterRestart
+                | Available _ -> state <- Poisoned SessionStateUnknownAfterRestart
                 | Poisoned _ -> ()
                 | _ ->
                     // Active host turn after restart is unsafe; poison and resolve callers.
@@ -409,9 +416,7 @@ type SubsessionActor
                                 return
                                     [],
                                     Some(
-                                        StartRunError.SessionPoisoned(
-                                            HostProtocolBroken("illegal: " + s + " + " + c)
-                                        )
+                                        StartRunError.SessionPoisoned(HostProtocolBroken("illegal: " + s + " + " + c))
                                     )
                             | Error(StaleTurnCommand _) ->
                                 pendingReplies <- Map.remove request.RunId pendingReplies

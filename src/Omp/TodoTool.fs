@@ -116,6 +116,7 @@ let registerTodoTool (pi: obj) : unit =
 
                                       if root <> "" then
                                           do! appendWorkBacklogCommittedOrFail root sid args
+
                                           let allCompleted =
                                               args.Todos
                                               |> Array.forall (fun t ->
@@ -123,8 +124,18 @@ let registerTodoTool (pi: obj) : unit =
                                                   | Wanxiangshu.Kernel.ToolArgs.TodoItemStatus.Completed
                                                   | Wanxiangshu.Kernel.ToolArgs.TodoItemStatus.Cancelled -> true
                                                   | _ -> false)
-                                          let ev = { CurrentTurnEvidence.empty with Todos = if allCompleted then TodosCompleted else TodosNotCompleted }
-                                          do! SubsessionEventRouter.routeToChild sid (EvidenceUpdated { TurnId = TurnId.create ""; Evidence = ev }) |> Promise.map ignore
+
+                                          let ev =
+                                              { CurrentTurnEvidence.empty with
+                                                  Todos = if allCompleted then TodosCompleted else TodosNotCompleted }
+
+                                          do!
+                                              SubsessionEventRouter.routeToChild
+                                                  sid
+                                                  (EvidenceUpdated
+                                                      { TurnId = TurnId.create ""
+                                                        Evidence = ev })
+                                              |> Promise.map ignore
                                   | None -> ()
 
                                   let baseOutput = todoWriteOutput methodologies

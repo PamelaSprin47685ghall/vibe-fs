@@ -20,8 +20,7 @@ let private model0: FallbackModel =
       ReasoningEffort = None
       Thinking = false }
 
-let private model1: FallbackModel =
-    { model0 with ModelID = "m1" }
+let private model1: FallbackModel = { model0 with ModelID = "m1" }
 
 let private chain: FallbackChain = [ model0; model1 ]
 
@@ -135,8 +134,7 @@ let scenarioDispatchRejectRetry () =
 
     match d0.NextState with
     | Dispatching(_, plan) ->
-        let d1 =
-            mustDecide d0.NextState (DispatchRejected(plan.TurnId, HostRejected err))
+        let d1 = mustDecide d0.NextState (DispatchRejected(plan.TurnId, HostRejected err))
 
         match d1.NextState with
         | Dispatching _ -> check "DispatchPrompt without idle" (dispatchPromptCount d1.Effects = 1)
@@ -157,11 +155,17 @@ let scenarioAcceptanceUnknownAborts () =
             check "no DispatchPrompt on acceptance unknown" (dispatchPromptCount d1.Effects = 0)
 
             let d2 =
-                mustDecide d1.NextState (DispatchStatusResolved (DispatchStatus.Accepted OrderedTurnMarkerObserved))
+                mustDecide d1.NextState (DispatchStatusResolved(DispatchStatus.Accepted OrderedTurnMarkerObserved))
 
             match d2.NextState with
             | IssuingAbort(_, _, abortCtx) ->
-                check "AbortHostSession" (List.exists (function AbortHostSession _ -> true | _ -> false) d2.Effects)
+                check
+                    "AbortHostSession"
+                    (List.exists
+                        (function
+                        | AbortHostSession _ -> true
+                        | _ -> false)
+                        d2.Effects)
 
                 match abortCtx.AfterStop with
                 | RetryAfterSafeStop _ -> ()
@@ -203,7 +207,10 @@ let scenarioCancelIdle () =
 
                 match d4.NextState with
                 | ReconcilingAbortSettle _ ->
-                    let d5 = mustDecide d4.NextState (DispatchStatusResolved (DispatchStatus.Accepted OrderedTurnMarkerObserved))
+                    let d5 =
+                        mustDecide
+                            d4.NextState
+                            (DispatchStatusResolved(DispatchStatus.Accepted OrderedTurnMarkerObserved))
 
                     match d5.NextState with
                     | Available _ ->
@@ -300,7 +307,13 @@ let propAtMostOneCompleteCaller () =
             { CurrentTurnEvidence.empty with
                 Assistant = AssistantContent("x", Some NormalFinish) }
 
-        let d2 = mustDecide d1.NextState (EvidenceUpdated { TurnId = plan.TurnId; Evidence = evidence })
+        let d2 =
+            mustDecide
+                d1.NextState
+                (EvidenceUpdated
+                    { TurnId = plan.TurnId
+                      Evidence = evidence })
+
         let d3 = mustDecide d2.NextState SessionIdleObserved
 
         let total =
@@ -316,7 +329,14 @@ let propPoisonedNoDispatch () =
     let state = Poisoned(HostProtocolBroken "test")
     let d = mustDecide state (StartRun request)
     check "prop7: no DispatchPrompt" (dispatchPromptCount d.Effects = 0)
-    check "prop7: RejectStart" (List.exists (function RejectStart _ -> true | _ -> false) d.Effects)
+
+    check
+        "prop7: RejectStart"
+        (List.exists
+            (function
+            | RejectStart _ -> true
+            | _ -> false)
+            d.Effects)
 
 let run () =
     scenarioErrorThenIdleRetriesThenSucceeds ()

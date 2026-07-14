@@ -121,7 +121,12 @@ let createEventHook (deps: obj) (reviewStore: ReviewStore) (scope: RuntimeScope)
 
                 try
                     if workspaceId <> "" then
-                        if decoded.eventType = "session.deleted" || decoded.eventType = "session.close" || decoded.eventType = "session.delete" || decoded.eventType = "session.remove" then
+                        if
+                            decoded.eventType = "session.deleted"
+                            || decoded.eventType = "session.close"
+                            || decoded.eventType = "session.delete"
+                            || decoded.eventType = "session.remove"
+                        then
                             let sid = SessionId.create workspaceId
                             let eventStore = SubsessionEventStore.create directory
                             do! eventStore.Append(sid, [ PhysicalSessionClosed sid ]) |> Promise.map ignore
@@ -149,6 +154,7 @@ let createEventHook (deps: obj) (reviewStore: ReviewStore) (scope: RuntimeScope)
                                       Message = "An unknown error occurred"
                                       StatusCode = None
                                       IsRetryable = None }
+
                             let! _ = SubsessionEventRouter.tryError workspaceId errorObj
                             ()
                         elif muxEventTranslator.IsSessionIdle event then
@@ -176,6 +182,7 @@ let createEventHook (deps: obj) (reviewStore: ReviewStore) (scope: RuntimeScope)
                                 match muxEventTranslator.ExtractTurnObservation event with
                                 | Some obs -> do! routeToChild workspaceId (EvidenceUpdated obs) |> Promise.map ignore
                                 | None -> ()
+
                             do! runtime.HandleEvent(parseHookEvent event, helpers)
                 finally
                     if workspaceId <> "" then

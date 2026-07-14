@@ -20,10 +20,8 @@ let classifyTurnEvidence (evidence: CurrentTurnEvidence) : TranscriptDecision =
         | RecoveryPrompt prompt -> RecoverWithPrompt prompt
         | NoRecoveryPrompt ->
             match evidence.Assistant with
-            | NoAssistant ->
-                IncompleteWithoutRecovery "No assistant message in current turn"
-            | EmptyAssistant ->
-                IncompleteWithoutRecovery "Assistant message in current turn has no content"
+            | NoAssistant -> IncompleteWithoutRecovery "No assistant message in current turn"
+            | EmptyAssistant -> IncompleteWithoutRecovery "Assistant message in current turn has no content"
             | AssistantContent(text, finish) ->
                 let toolFinish =
                     match finish with

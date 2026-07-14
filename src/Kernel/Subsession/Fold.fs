@@ -25,7 +25,7 @@ let projectEvent (proj: SessionSafetyProjection) (evt: SubsessionEvent) : Sessio
     match evt with
     | RunStarted data ->
         match Map.tryFind data.SessionId proj with
-        | Some (PersistentlyPoisoned _) -> proj
+        | Some(PersistentlyPoisoned _) -> proj
         | _ ->
             Map.add
                 data.SessionId

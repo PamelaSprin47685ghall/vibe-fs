@@ -48,20 +48,16 @@ let private resolveParentLiveModel
                 match getSessionApiFromClient client with
                 | Error _ -> return None
                 | Ok session ->
-                    let! msgsResp =
-                        invoke1 (box {| path = box {| id = parentSessionID |} |}) "messages" session
+                    let! msgsResp = invoke1 (box {| path = box {| id = parentSessionID |} |}) "messages" session
 
                     let data = Dyn.get msgsResp "data"
 
-                    let msgs =
-                        if Dyn.isArray data then
-                            unbox<obj[]> data
-                        else
-                            [||]
+                    let msgs = if Dyn.isArray data then unbox<obj[]> data else [||]
 
                     match Wanxiangshu.Shell.FallbackMessageCodec.tryGetLatestUserModel msgs with
                     | Some m -> return Some m
-                    | None -> return! Wanxiangshu.Opencode.FallbackHooksHelper.tryReadCurrentModel client parentSessionID
+                    | None ->
+                        return! Wanxiangshu.Opencode.FallbackHooksHelper.tryReadCurrentModel client parentSessionID
     }
 
 let runSubagentCoreResult
@@ -174,14 +170,7 @@ let runSubagentCoreResult
                     if chain.IsEmpty then
                         cleanupChildIfRequested ()
 
-                        return
-                            Error(
-                                DomainError.InvalidIntent(
-                                    "subagent",
-                                    "run",
-                                    formatRunFailure NoModelConfigured
-                                )
-                            )
+                        return Error(DomainError.InvalidIntent("subagent", "run", formatRunFailure NoModelConfigured))
                     else
                         // Cache the resolved chain on the child so continue/recovery reuse it.
                         runtime.SetChain childID chain
@@ -200,14 +189,7 @@ let runSubagentCoreResult
                         try
                             try
                                 let! runResult =
-                                    service.StartRun(
-                                        childID,
-                                        sessionID,
-                                        prompt,
-                                        cfg,
-                                        chain,
-                                        abortSignal = signal
-                                    )
+                                    service.StartRun(childID, sessionID, prompt, cfg, chain, abortSignal = signal)
 
                                 match runResult with
                                 | Succeeded _output ->

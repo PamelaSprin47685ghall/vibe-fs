@@ -242,9 +242,7 @@ type EventLogStore(workspaceRoot: string, ?appendLineOverride: string -> WanEven
                                 do! syncNewEvents ()
 
                                 let block =
-                                    events
-                                    |> List.map (fun e -> wanEventToLine e + "\n")
-                                    |> String.concat ""
+                                    events |> List.map (fun e -> wanEventToLine e + "\n") |> String.concat ""
 
                                 do! appendFileAsync eventFilePath block
                                 let! stats = statAsync eventFilePath

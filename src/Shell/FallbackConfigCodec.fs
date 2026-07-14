@@ -117,11 +117,7 @@ let sameModelIdentity (a: FallbackModel) (b: FallbackModel) : bool =
 
 /// Resolve the configured agent chain (normalized agent name) or the default chain.
 let resolveConfiguredChain (cfg: FallbackConfig) (agentName: string) : FallbackChain =
-    let key =
-        if agentName = "" then
-            ""
-        else
-            normalizeAgentName agentName
+    let key = if agentName = "" then "" else normalizeAgentName agentName
 
     match Map.tryFind key cfg.AgentChains with
     | Some c -> c
@@ -135,9 +131,7 @@ let prependCurrentModel (current: FallbackModel option) (resolved: FallbackChain
         match resolved with
         | first :: _ when sameModelIdentity first current -> resolved
         | _ ->
-            let filtered =
-                resolved
-                |> List.filter (fun m -> not (sameModelIdentity m current))
+            let filtered = resolved |> List.filter (fun m -> not (sameModelIdentity m current))
 
             current :: filtered
     | None -> resolved

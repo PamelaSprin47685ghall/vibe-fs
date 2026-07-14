@@ -194,8 +194,7 @@ let resolveSubagentChain_usesParentLiveModelWhenEmpty () =
     let cfg = emptyConfig
     let parent = mkModel "openai" "gpt-4.1" None
 
-    let chain =
-        resolveSubagentChain cfg "coder" [] [] (Some parent)
+    let chain = resolveSubagentChain cfg "coder" [] [] (Some parent)
 
     equal "singleton from parent" 1 chain.Length
     equal "provider" "openai" chain.[0].ProviderID
@@ -213,8 +212,7 @@ let resolveSubagentChain_prefersConfigThenPrependsParent () =
 
     let parent = mkModel "openai" "gpt-4.1" (Some "high")
 
-    let chain =
-        resolveSubagentChain cfg "coder" [] [] (Some parent)
+    let chain = resolveSubagentChain cfg "coder" [] [] (Some parent)
 
     equal "length" 3 chain.Length
     equal "head is parent" "openai" chain.[0].ProviderID
@@ -228,8 +226,7 @@ let resolveSubagentChain_configFirstMatchesParentNoDup () =
         { emptyConfig with
             DefaultChain = [ mkModel "openai" "gpt-4.1" (Some "high"); mkModel "b" "spare" None ] }
 
-    let chain =
-        resolveSubagentChain cfg "coder" [] [] (Some parent)
+    let chain = resolveSubagentChain cfg "coder" [] [] (Some parent)
 
     equal "no dup" 2 chain.Length
     equal "keeps config head" "openai" chain.[0].ProviderID
@@ -240,8 +237,7 @@ let resolveSubagentChain_childRuntimeBeatsParent () =
     let parent = [ mkModel "parent" "m2" None ]
     let live = mkModel "live" "m3" None
 
-    let chain =
-        resolveSubagentChain emptyConfig "coder" child parent (Some live)
+    let chain = resolveSubagentChain emptyConfig "coder" child parent (Some live)
 
     equal "uses child runtime chain" 1 chain.Length
     equal "child provider" "child" chain.[0].ProviderID
@@ -249,8 +245,7 @@ let resolveSubagentChain_childRuntimeBeatsParent () =
 let resolveSubagentChain_parentRuntimeWhenNoConfigOrChild () =
     let parent = [ mkModel "parent" "m2" None ]
 
-    let chain =
-        resolveSubagentChain emptyConfig "coder" [] parent None
+    let chain = resolveSubagentChain emptyConfig "coder" [] parent None
 
     equal "uses parent runtime" 1 chain.Length
     equal "parent provider" "parent" chain.[0].ProviderID

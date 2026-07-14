@@ -13,8 +13,7 @@ open Wanxiangshu.Shell.SubsessionActor
 open Wanxiangshu.Shell.SubsessionTranscript
 open Wanxiangshu.Shell.SubsessionActorRegistry
 
-let private invoke1 (arg: obj) (method: string) (target: obj) : JS.Promise<obj> =
-    unbox (target?(method) (arg))
+let private invoke1 (arg: obj) (method: string) (target: obj) : JS.Promise<obj> = unbox (target?(method) (arg))
 
 module PendingTurnReceipt =
     type Waiter =
@@ -25,14 +24,18 @@ module PendingTurnReceipt =
 
     let mutable private pending = Map.empty<string, Waiter>
 
-    let tryFindWaiter (turnId: string) : Waiter option =
-        Map.tryFind turnId pending
+    let tryFindWaiter (turnId: string) : Waiter option = Map.tryFind turnId pending
 
     let tryFind (turnId: string) : Waiter option = Map.tryFind turnId pending
 
     let register (sessionId: string) (turnId: string) : JS.Promise<HostStartReceipt> =
         Promise.create (fun resolve reject ->
-            let w = { SessionId = sessionId; Resolve = resolve; Reject = reject; Completed = false }
+            let w =
+                { SessionId = sessionId
+                  Resolve = resolve
+                  Reject = reject
+                  Completed = false }
+
             pending <- Map.add turnId w pending)
 
     let tryResolve (turnId: string) (receipt: HostStartReceipt) : bool =
@@ -40,14 +43,15 @@ module PendingTurnReceipt =
         | Some w ->
             if w.Completed then
                 pending <- Map.remove turnId pending
+
                 match SubsessionActorRegistry.TryGet w.SessionId with
-                | Some actor ->
-                    actor.Post(DispatchAccepted(TurnId.create turnId, receipt)) |> ignore
+                | Some actor -> actor.Post(DispatchAccepted(TurnId.create turnId, receipt)) |> ignore
                 | None -> ()
             else
                 w.Completed <- true
                 pending <- Map.remove turnId pending
                 w.Resolve receipt
+
             true
         | None -> false
 
@@ -62,7 +66,7 @@ module PendingTurnReceipt =
         match Map.tryFind turnId pending with
         | Some w ->
             pending <- Map.remove turnId pending
-            w.Reject (exn "dispatch cancelled")
+            w.Reject(exn "dispatch cancelled")
         | None -> ()
 
 type OpencodeSubsessionHost(client: obj, agent: string, _directory: string) =
@@ -117,7 +121,7 @@ type OpencodeSubsessionHost(client: obj, agent: string, _directory: string) =
                                   Message = ex.Message
                                   StatusCode = None
                                   IsRetryable = Some true }
-                            )
+                        )
             }
 
         member _.Abort(sessionId, turnId) =
@@ -145,6 +149,7 @@ type OpencodeSubsessionHost(client: obj, agent: string, _directory: string) =
         member _.QueryDispatchStatus(sessionId, turnId) =
             promise {
                 let nonce = TurnId.value turnId
+
                 match getSessionApiFromClient client with
                 | Ok session ->
                     try
@@ -157,30 +162,40 @@ type OpencodeSubsessionHost(client: obj, agent: string, _directory: string) =
                             return Unknown
                         else
                             let msgs = unbox<obj array> data
+
                             let foundOpt =
                                 msgs
                                 |> Array.tryFind (fun msg ->
                                     let id = Dyn.str msg "id"
                                     let props = Dyn.get msg "props"
-                                    let propsNonce = if not (Dyn.isNullish props) then Dyn.str props "nonce" else ""
+
+                                    let propsNonce =
+                                        if not (Dyn.isNullish props) then
+                                            Dyn.str props "nonce"
+                                        else
+                                            ""
+
                                     let info = Dyn.get msg "info"
-                                    let infoNonce = if not (Dyn.isNullish info) then Dyn.str info "nonce" else ""
-                                    id = nonce || propsNonce = nonce || infoNonce = nonce
-                                )
+
+                                    let infoNonce =
+                                        if not (Dyn.isNullish info) then
+                                            Dyn.str info "nonce"
+                                        else
+                                            ""
+
+                                    id = nonce || propsNonce = nonce || infoNonce = nonce)
+
                             match foundOpt with
                             | Some msg ->
                                 let msgId = Dyn.str msg "id"
                                 return Accepted(UserMessageObserved msgId)
                             | None ->
                                 match PendingTurnReceipt.tryFind nonce with
-                                | Some w when not w.Completed ->
-                                    return StillPending
-                                | _ ->
-                                    return DefinitelyNotAccepted
+                                | Some w when not w.Completed -> return StillPending
+                                | _ -> return DefinitelyNotAccepted
                     with _ ->
                         return Unknown
-                | Error _ ->
-                    return Unknown
+                | Error _ -> return Unknown
             }
 
 let createHost (client: obj) (agent: string) (directory: string) : ISubsessionHost =

@@ -31,8 +31,7 @@ type FakeHost
         ?dispatchScript: unit -> Result<HostStartReceipt, DispatchFailure>,
         ?abortScript: unit -> AbortResult,
         ?queryDispatchStatusScript: unit -> DispatchStatus
-    )
-    =
+    ) =
     let mutable dispatchCount = 0
     let mutable abortCount = 0
     let mutable cancelled: TurnId list = []
@@ -45,8 +44,7 @@ type FakeHost
         member _.Dispatch(_sid, _turn) =
             dispatchCount <- dispatchCount + 1
 
-            let script =
-                defaultArg dispatchScript (fun () -> Ok OrderedTurnMarkerObserved)
+            let script = defaultArg dispatchScript (fun () -> Ok OrderedTurnMarkerObserved)
 
             Promise.lift (script ())
 
@@ -58,7 +56,9 @@ type FakeHost
         member _.CancelPendingDispatch(tid) = cancelled <- tid :: cancelled
 
         member _.QueryDispatchStatus(_, _) =
-            let script = defaultArg queryDispatchStatusScript (fun () -> DispatchStatus.DefinitelyNotAccepted)
+            let script =
+                defaultArg queryDispatchStatusScript (fun () -> DispatchStatus.DefinitelyNotAccepted)
+
             Promise.lift (script ())
 
 let private sleep (ms: int) : JS.Promise<unit> =
@@ -98,7 +98,13 @@ let dispatchOkReachesRunning () =
             { CurrentTurnEvidence.empty with
                 Assistant = AssistantContent("out", Some NormalFinish) }
 
-        do! actor.Post(EvidenceUpdated { TurnId = TurnId.create ""; Evidence = evidence })
+        do!
+            actor.Post(
+                EvidenceUpdated
+                    { TurnId = TurnId.create ""
+                      Evidence = evidence }
+            )
+
         do! sleep 10
         do! actor.Post SessionIdleObserved
         let! result = runP
@@ -136,7 +142,15 @@ let concurrentStartRejected () =
         | Failed(ProtocolViolation _) -> check "second start rejected" true
         | other -> fail ("expected ProtocolViolation, got " + string other)
 
-        do! actor.Post(EvidenceUpdated { TurnId = TurnId.create ""; Evidence = { CurrentTurnEvidence.empty with Assistant = AssistantContent("x", Some NormalFinish) } })
+        do!
+            actor.Post(
+                EvidenceUpdated
+                    { TurnId = TurnId.create ""
+                      Evidence =
+                        { CurrentTurnEvidence.empty with
+                            Assistant = AssistantContent("x", Some NormalFinish) } }
+            )
+
         do! sleep 5
         do! actor.Post SessionIdleObserved
         let! r1 = p1
@@ -231,7 +245,7 @@ let acceptanceUnknownAbortConfirmed () =
             // With MaxRetries=1 may retry then exhaust, or fail; either is fine.
             check "not cancelled after AcceptanceUnknown" true
             check "abort was requested" (host.AbortCount >= 1)
-        // Cancelled already handled
+    // Cancelled already handled
     }
 
 /// 7. AbortConfirmed on idle session settles without waiting full abort deadline

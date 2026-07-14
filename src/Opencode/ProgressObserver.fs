@@ -44,7 +44,9 @@ type ProgressObserver
 
     let resolvedUnitPromise () : JS.Promise<unit> = Promise.lift ()
 
-    member _.OnChatMessage(sessionID: Wanxiangshu.Kernel.Domain.SessionId, agent: string, parts: obj) : JS.Promise<unit> =
+    member _.OnChatMessage
+        (sessionID: Wanxiangshu.Kernel.Domain.SessionId, agent: string, parts: obj)
+        : JS.Promise<unit> =
         let text = getPartsText parts
         let sid = Id.sessionIdValue sessionID
 
@@ -91,6 +93,7 @@ type ProgressObserver
                         match decodeTodoWriteArgs (host = Mimocode) args with
                         | Ok(decodedArgs, _) when sid <> "" ->
                             do! appendWorkBacklogCommittedOrFail directory sid decodedArgs
+
                             let allCompleted =
                                 decodedArgs.Todos
                                 |> Array.forall (fun t ->
@@ -98,8 +101,18 @@ type ProgressObserver
                                     | Wanxiangshu.Kernel.ToolArgs.TodoItemStatus.Completed
                                     | Wanxiangshu.Kernel.ToolArgs.TodoItemStatus.Cancelled -> true
                                     | _ -> false)
-                            let ev = { CurrentTurnEvidence.empty with Todos = if allCompleted then TodosCompleted else TodosNotCompleted }
-                            do! SubsessionEventRouter.routeToChild sid (EvidenceUpdated { TurnId = TurnId.create ""; Evidence = ev }) |> Promise.map ignore
+
+                            let ev =
+                                { CurrentTurnEvidence.empty with
+                                    Todos = if allCompleted then TodosCompleted else TodosNotCompleted }
+
+                            do!
+                                SubsessionEventRouter.routeToChild
+                                    sid
+                                    (EvidenceUpdated
+                                        { TurnId = TurnId.create ""
+                                          Evidence = ev })
+                                |> Promise.map ignore
                         | _ -> ()
                 | None -> ()
             elif tool = "task_complete" then
@@ -116,7 +129,9 @@ type ProgressObserver
                     let! routed =
                         SubsessionEventRouter.routeToChild
                             sid
-                            (EvidenceUpdated { TurnId = TurnId.create ""; Evidence = evidence })
+                            (EvidenceUpdated
+                                { TurnId = TurnId.create ""
+                                  Evidence = evidence })
 
                     if not routed then
                         let st = fallbackRuntime.GetOrCreateState sid

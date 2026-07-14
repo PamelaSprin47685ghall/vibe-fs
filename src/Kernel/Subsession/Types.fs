@@ -108,7 +108,7 @@ type CurrentTurnEvidence =
       Recovery: RecoveryEvidence }
 
 module CurrentTurnEvidence =
-    let empty : CurrentTurnEvidence =
+    let empty: CurrentTurnEvidence =
         { Assistant = NoAssistant
           Todos = TodosNotCompleted
           Tool = NoToolResult
@@ -127,6 +127,7 @@ module CurrentTurnEvidence =
                     | Some f, _ -> Some f
                     | _, Some f -> Some f
                     | None, None -> None
+
                 AssistantContent(t1 + t2, mergedFinish)
 
         let mergedTodos =
@@ -147,7 +148,7 @@ module CurrentTurnEvidence =
                 if r1 = r2 then RecoveryPrompt r1
                 elif r1 = "" then RecoveryPrompt r2
                 elif r2 = "" then RecoveryPrompt r1
-                else RecoveryPrompt (r1 + "\n" + r2)
+                else RecoveryPrompt(r1 + "\n" + r2)
             | RecoveryPrompt r, NoRecoveryPrompt -> RecoveryPrompt r
             | NoRecoveryPrompt, RecoveryPrompt r -> RecoveryPrompt r
             | NoRecoveryPrompt, NoRecoveryPrompt -> NoRecoveryPrompt
@@ -275,14 +276,16 @@ type StartRunError =
     | NoModelAvailable
 
 type StartRunRequest =
-    { RunId: RunId
-      SessionId: SessionId
-      ParentSessionId: SessionId
-      Prompt: string
-      FallbackConfig: FallbackConfig
-      Chain: FallbackChain
-      /// True when AbortSignal was already aborted at StartRun commit time.
-      InitiallyCancelled: bool }
+    {
+        RunId: RunId
+        SessionId: SessionId
+        ParentSessionId: SessionId
+        Prompt: string
+        FallbackConfig: FallbackConfig
+        Chain: FallbackChain
+        /// True when AbortSignal was already aborted at StartRun commit time.
+        InitiallyCancelled: bool
+    }
 
 // ── Command ADT ──
 

@@ -212,27 +212,43 @@ let opencodeEventTranslator (runtime: FallbackRuntimeState) : IEventTranslator =
         member _.ExtractTurnObservation rawEvent : TurnObservation option =
             let eventType = getEventType rawEvent
             let props = getProps rawEvent
+
             if eventType = "message.updated" && not (Dyn.isNullish props) then
                 let info = Dyn.get props "info"
+
                 if not (Dyn.isNullish info) && Dyn.str info "role" = "assistant" then
                     let parts = Dyn.get props "parts"
                     let text = getPartsText parts
+
                     let hasToolCall =
                         if not (Dyn.isNullish parts) && Dyn.isArray parts then
                             (parts :?> obj array)
                             |> Array.exists (fun p -> let pt = Dyn.str p "type" in isToolCallPartType pt)
                         else
                             false
-                    Some { TurnId = TurnId.create ""; Evidence = { CurrentTurnEvidence.empty with Assistant = AssistantContent(text, Some (if hasToolCall then ToolFinish else NormalFinish)) } }
+
+                    Some
+                        { TurnId = TurnId.create ""
+                          Evidence =
+                            { CurrentTurnEvidence.empty with
+                                Assistant =
+                                    AssistantContent(text, Some(if hasToolCall then ToolFinish else NormalFinish)) } }
                 else
                     let parts = Dyn.get props "parts"
+
                     if not (Dyn.isNullish parts) && Dyn.isArray parts then
                         let partsArr = parts :?> obj array
+
                         let hasToolResult =
                             partsArr
                             |> Array.exists (fun part -> let pt = Dyn.str part "type" in isToolResultPartType pt)
+
                         if hasToolResult then
-                            Some { TurnId = TurnId.create ""; Evidence = { CurrentTurnEvidence.empty with Tool = HasToolResult } }
+                            Some
+                                { TurnId = TurnId.create ""
+                                  Evidence =
+                                    { CurrentTurnEvidence.empty with
+                                        Tool = HasToolResult } }
                         else
                             None
                     else
@@ -402,6 +418,7 @@ let createOpencodeFallbackHandler
                         match translator.ExtractTurnObservation rawEvent with
                         | Some obs -> do! routeToChild sessionID (EvidenceUpdated obs) |> Promise.map ignore
                         | None -> ()
+
                         return absorbChildMetadata runtime sessionID rawEvent
                     else
                         return false

@@ -14,8 +14,7 @@ type SubsessionService
         hostFactory: string -> ISubsessionHost,
         ?eventStoreFactory: string -> ISubsessionEventStore,
         ?initBarrier: unit -> JS.Promise<unit>
-    )
-    =
+    ) =
 
     let storeFor (childId: string) =
         match eventStoreFactory with
@@ -74,8 +73,7 @@ type SubsessionService
             try
                 match abortSignal with
                 | Some signal when not (isNull signal) && not (Dyn.isNullish signal) && not initiallyCancelled ->
-                    let handler =
-                        System.Action<obj>(fun _ -> actor.Post CancelRequested |> ignore)
+                    let handler = System.Action<obj>(fun _ -> actor.Post CancelRequested |> ignore)
 
                     onAbort <- Some handler
                     boundSignal <- Some signal

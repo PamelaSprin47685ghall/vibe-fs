@@ -38,11 +38,7 @@ let private receiptTag (r: HostStartReceipt) : string =
 let private finishPayload (o: TurnFinishOutcome) : Map<string, string> =
     match o with
     | TurnCompleted output -> Map [ "finish", "completed"; "output", output ]
-    | TurnFailed err ->
-        Map
-            [ "finish", "failed"
-              "errorName", err.ErrorName
-              "message", err.Message ]
+    | TurnFailed err -> Map [ "finish", "failed"; "errorName", err.ErrorName; "message", err.Message ]
     | TurnCancelled -> Map [ "finish", "cancelled" ]
     | TurnRecovering -> Map [ "finish", "recovering" ]
     | TurnInfrastructureFailed reason -> Map [ "finish", "infra"; "reason", reason ]
@@ -107,14 +103,9 @@ let private encodeEvent (sid: string) (evt: SubsessionEvent) : string * Map<stri
         Map [ "turnId", TurnId.value turnId; "sessionId", sid; "runId", RunId.value runId ]
 
     | SessionPoisoned(s, reason) ->
-        eventKindSubsessionSessionPoisoned,
-        Map
-            [ "sessionId", SessionId.value s
-              "reason", poisonTag reason ]
+        eventKindSubsessionSessionPoisoned, Map [ "sessionId", SessionId.value s; "reason", poisonTag reason ]
 
-    | PhysicalSessionClosed s ->
-        eventKindSubsessionPhysicalSessionClosed,
-        Map [ "sessionId", SessionId.value s ]
+    | PhysicalSessionClosed s -> eventKindSubsessionPhysicalSessionClosed, Map [ "sessionId", SessionId.value s ]
 
 let private encodeEnvelopePayload (sid: string) (events: SubsessionEvent list) : Map<string, string> =
     let inner =
@@ -137,12 +128,7 @@ type NdjsonSubsessionEventStore(workspaceRoot: string) =
                     let sid = SessionId.value sessionId
                     let payload = encodeEnvelopePayload sid events
 
-                    do!
-                        appendSubsessionDomainEventOrFail
-                            root
-                            sid
-                            eventKindSubsessionDecisionCommitted
-                            payload
+                    do! appendSubsessionDomainEventOrFail root sid eventKindSubsessionDecisionCommitted payload
             }
 
 let create (workspaceRoot: string) : ISubsessionEventStore =

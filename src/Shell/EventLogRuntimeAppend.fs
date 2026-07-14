@@ -568,7 +568,6 @@ let appendSubsessionDomainEventsOrFail
         let at = getTimestampMs().ToString()
 
         let events =
-            items
-            |> List.map (fun (kind, payload) -> buildEvent sessionID kind payload at)
+            items |> List.map (fun (kind, payload) -> buildEvent sessionID kind payload at)
 
         appendEventsAndCacheOrFail workspaceRoot events

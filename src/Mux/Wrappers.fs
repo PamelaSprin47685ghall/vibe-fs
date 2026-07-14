@@ -204,6 +204,7 @@ let private mkTodoWriteWrapper (host: Host) (projection: ProjectionStore) : obj 
 
                                         if root <> "" then
                                             do! appendWorkBacklogCommitted root sid tw |> Promise.map ignore
+
                                             let allCompleted =
                                                 tw.Todos
                                                 |> Array.forall (fun t ->
@@ -211,8 +212,18 @@ let private mkTodoWriteWrapper (host: Host) (projection: ProjectionStore) : obj 
                                                     | Wanxiangshu.Kernel.ToolArgs.TodoItemStatus.Completed
                                                     | Wanxiangshu.Kernel.ToolArgs.TodoItemStatus.Cancelled -> true
                                                     | _ -> false)
-                                            let ev = { CurrentTurnEvidence.empty with Todos = if allCompleted then TodosCompleted else TodosNotCompleted }
-                                            do! SubsessionEventRouter.routeToChild sid (EvidenceUpdated { TurnId = TurnId.create ""; Evidence = ev }) |> Promise.map ignore
+
+                                            let ev =
+                                                { CurrentTurnEvidence.empty with
+                                                    Todos = if allCompleted then TodosCompleted else TodosNotCompleted }
+
+                                            do!
+                                                SubsessionEventRouter.routeToChild
+                                                    sid
+                                                    (EvidenceUpdated
+                                                        { TurnId = TurnId.create ""
+                                                          Evidence = ev })
+                                                |> Promise.map ignore
                                     | _ -> ()
 
                             let nextResult =

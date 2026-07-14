@@ -7,8 +7,7 @@ open Wanxiangshu.Kernel.Subsession.Types
 open Wanxiangshu.Kernel.Subsession.Fold
 open Wanxiangshu.Shell.FallbackConfigCodec
 
-let private payload (e: WanEvent) (k: string) : string =
-    defaultArg (Map.tryFind k e.Payload) ""
+let private payload (e: WanEvent) (k: string) : string = defaultArg (Map.tryFind k e.Payload) ""
 
 let private emptyModel: FallbackModel =
     { ProviderID = ""
@@ -63,6 +62,7 @@ let private tryParseFinish (e: WanEvent) : TurnFinishOutcome option =
     elif finish = "failed" || finish.StartsWith("failed") then
         let name =
             let n = payload e "errorName"
+
             if n <> "" then n
             elif finish.StartsWith("failed:") then finish.[7..]
             else "UnknownError"
@@ -125,7 +125,10 @@ let private ordinalFromInt (n: int) : TurnOrdinal =
     let rec loop i acc =
         if i <= 0 then acc else loop (i - 1) (TurnOrdinal.next acc)
 
-    if n <= 0 then TurnOrdinal.first else loop n TurnOrdinal.first
+    if n <= 0 then
+        TurnOrdinal.first
+    else
+        loop n TurnOrdinal.first
 
 /// Decode a WanEvent into a SubsessionEvent when kind matches.
 let tryDecodeWanEvent (e: WanEvent) : SubsessionEvent option =
@@ -202,7 +205,11 @@ let tryDecodeWanEvent (e: WanEvent) : SubsessionEvent option =
     elif kind = eventKindSubsessionAbortRequested then
         let turnId = payload e "turnId"
         let runId = payload e "runId"
-        if turnId = "" then None else Some(AbortRequested(RunId.create runId, TurnId.create turnId))
+
+        if turnId = "" then
+            None
+        else
+            Some(AbortRequested(RunId.create runId, TurnId.create turnId))
     elif kind = eventKindSubsessionSessionPoisoned then
         let sessionId = payload e "sessionId"
         let reason = payload e "reason"
@@ -212,7 +219,11 @@ let tryDecodeWanEvent (e: WanEvent) : SubsessionEvent option =
         | Some p -> Some(SessionPoisoned(SessionId.create sessionId, p))
     elif kind = eventKindSubsessionPhysicalSessionClosed then
         let sessionId = payload e "sessionId"
-        if sessionId = "" then None else Some(PhysicalSessionClosed(SessionId.create sessionId))
+
+        if sessionId = "" then
+            None
+        else
+            Some(PhysicalSessionClosed(SessionId.create sessionId))
     else
         None
 
@@ -225,6 +236,7 @@ type private CommittedEventEnvelope =
 
 let tryDecodeWanEventBatch (e: WanEvent) : SubsessionEvent list =
     let sessionId = SessionId.create e.Session
+
     if e.Kind = eventKindSubsessionDecisionCommitted then
         let eventsJson = defaultArg (Map.tryFind "events" e.Payload) ""
 
@@ -246,11 +258,13 @@ let tryDecodeWanEventBatch (e: WanEvent) : SubsessionEvent list =
                         tryDecodeWanEvent synth)
 
                 if List.exists Option.isNone decodedOpts then
-                    [ SessionPoisoned(sessionId, EventStoreCorrupt "One or more inner events in decision committed envelope failed to decode") ]
+                    [ SessionPoisoned(
+                          sessionId,
+                          EventStoreCorrupt "One or more inner events in decision committed envelope failed to decode"
+                      ) ]
                 else
                     decodedOpts |> List.choose id
-            | Error err ->
-                [ SessionPoisoned(sessionId, EventStoreCorrupt err) ]
+            | Error err -> [ SessionPoisoned(sessionId, EventStoreCorrupt err) ]
     else
         match tryDecodeWanEvent e with
         | Some evt -> [ evt ]
@@ -258,6 +272,4 @@ let tryDecodeWanEventBatch (e: WanEvent) : SubsessionEvent list =
 
 /// Decode all matching WanEvents and fold active-run projection.
 let projectFromWanEvents (events: WanEvent list) : SessionSafetyProjection =
-    events
-    |> List.collect tryDecodeWanEventBatch
-    |> projectEvents
+    events |> List.collect tryDecodeWanEventBatch |> projectEvents

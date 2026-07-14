@@ -94,15 +94,7 @@ let runOmpSubagentCore
         try
             let! runResult =
                 match abortSignal with
-                | Some sig_ ->
-                    service.StartRun(
-                        childId,
-                        parentSessionId,
-                        prompt,
-                        cfg,
-                        chain,
-                        abortSignal = sig_
-                    )
+                | Some sig_ -> service.StartRun(childId, parentSessionId, prompt, cfg, chain, abortSignal = sig_)
                 | None -> service.StartRun(childId, parentSessionId, prompt, cfg, chain)
 
             match runResult with

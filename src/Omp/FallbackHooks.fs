@@ -282,38 +282,63 @@ let ompEventTranslator (runtime: FallbackRuntimeState) : IEventTranslator =
 
         member _.ExtractTurnObservation(rawEvent: obj) : TurnObservation option =
             let eventObj = Dyn.get rawEvent "event"
+
             if Dyn.isNullish eventObj then
                 None
             else
                 let t = Dyn.str eventObj "type"
+
                 if t = "message.updated" || t.StartsWith("message.part.") then
                     let info = Dyn.get eventObj "info"
+
                     if not (Dyn.isNullish info) then
                         let role = Dyn.str info "role"
+
                         if role = "assistant" then
                             let parts = Dyn.get eventObj "parts"
                             let text = getPartsTextLocal parts
                             let finishVal = Dyn.str info "finish"
                             let reason = FinishReason.fromString finishVal
-                            let isToolFinish = FinishReason.isToolFinish reason || (let lower = finishVal.ToLowerInvariant() in lower.Contains("tool") && lower <> "tool_use_error")
+
+                            let isToolFinish =
+                                FinishReason.isToolFinish reason
+                                || (let lower = finishVal.ToLowerInvariant() in
+                                    lower.Contains("tool") && lower <> "tool_use_error")
+
                             let hasToolCallPart =
                                 if Dyn.isArray parts then
-                                    (parts :?> obj array) |> Array.exists (fun part -> isToolCallPartType (Dyn.str part "type"))
+                                    (parts :?> obj array)
+                                    |> Array.exists (fun part -> isToolCallPartType (Dyn.str part "type"))
                                 else
                                     false
+
                             let hasToolCall = isToolFinish || hasToolCallPart
-                            Some { TurnId = TurnId.create ""
-                                   Evidence = { CurrentTurnEvidence.empty with Assistant = AssistantContent(text, Some (if hasToolCall then ToolFinish else NormalFinish)) } }
+
+                            Some
+                                { TurnId = TurnId.create ""
+                                  Evidence =
+                                    { CurrentTurnEvidence.empty with
+                                        Assistant =
+                                            AssistantContent(
+                                                text,
+                                                Some(if hasToolCall then ToolFinish else NormalFinish)
+                                            ) } }
                         elif role = "toolResult" then
-                            Some { TurnId = TurnId.create ""
-                                   Evidence = { CurrentTurnEvidence.empty with Tool = HasToolResult } }
+                            Some
+                                { TurnId = TurnId.create ""
+                                  Evidence =
+                                    { CurrentTurnEvidence.empty with
+                                        Tool = HasToolResult } }
                         else
                             None
                     else
                         None
                 elif t = "tool_result" then
-                    Some { TurnId = TurnId.create ""
-                           Evidence = { CurrentTurnEvidence.empty with Tool = HasToolResult } }
+                    Some
+                        { TurnId = TurnId.create ""
+                          Evidence =
+                            { CurrentTurnEvidence.empty with
+                                Tool = HasToolResult } }
                 else
                     None }
 
@@ -503,6 +528,7 @@ let createOmpFallbackHandler
                         match translator.ExtractTurnObservation rawEvent with
                         | Some obs -> do! routeToChild sessionID (EvidenceUpdated obs) |> Promise.map ignore
                         | None -> ()
+
                         return absorbChildMetadata runtime sessionID rawEvent
                     else
                         return false

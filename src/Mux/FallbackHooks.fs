@@ -106,10 +106,12 @@ let muxEventTranslator: IEventTranslator =
 
         member _.ExtractTurnObservation(rawEvent: obj) : TurnObservation option =
             let eventType = Dyn.str rawEvent "type"
+
             if eventType = "stream-end" then
                 let properties = Dyn.get rawEvent "properties"
                 let properties = if Dyn.isNullish properties then rawEvent else properties
                 let parts = Dyn.get properties "parts"
+
                 let text =
                     if Dyn.isNullish parts || not (Dyn.isArray parts) then
                         ""
@@ -118,15 +120,21 @@ let muxEventTranslator: IEventTranslator =
                         |> Array.filter (fun p -> Dyn.str p "type" = "text")
                         |> Array.map (fun p -> Dyn.str p "text")
                         |> String.concat "\n"
+
                 let hasToolCall =
                     if Dyn.isNullish parts || not (Dyn.isArray parts) then
                         false
                     else
                         (parts :?> obj array)
                         |> Array.exists (fun p -> isToolCallPartType (Dyn.str p "type"))
+
                 let finish = if hasToolCall then ToolFinish else NormalFinish
-                Some { TurnId = TurnId.create ""
-                       Evidence = { CurrentTurnEvidence.empty with Assistant = AssistantContent(text, Some finish) } }
+
+                Some
+                    { TurnId = TurnId.create ""
+                      Evidence =
+                        { CurrentTurnEvidence.empty with
+                            Assistant = AssistantContent(text, Some finish) } }
             else
                 None }
 
