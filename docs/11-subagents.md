@@ -1,8 +1,175 @@
-# 11 — 子代理
+# 11 — 子代理与子会话 Actor
 
 ## 模型
 
 子代理 = 独立会话（OMP 可为子 workspace）。委派工具：`coder`、`investigator`、`browser`、`meditator` 等；参数 `intents[]` 可多项并发。
+
+子代理的运行有两种路径：
+
+1. **旧路径**：直接通过宿主 `session.prompt` 在子 session 中执行，由 `SubagentDispatcher` 编排
+2. **新路径（生产路径）**：通过 `SubsessionActor` 轻量 Actor 消息泵运行，提供完整的错误隔离、降级恢复、安全性保障
+
+## SubsessionActor 子系统
+
+### 动机
+
+子代理（Coder、Investigator、Browser、Meditator）的错误不应直接穿透到父 session。`session.prompt` 的网络错误、模型降级超时、非法回复等需要在一个受控的沙箱中处理，沙箱拥有自己的 Fallback 状态机、事件溯源和超时机制。
+
+### 架构
+
+```
+父工具（coder/investigator 等）
+  → SubsessionService.StartRun
+    → SubsessionActorRegistry.GetOrCreate(childID, host, eventStore)
+      → SubsessionActor (SerialQueue 串行消息泵)
+        → Kernel/Subsession/Decision.fs 纯函数决策
+          → ISubsessionHost (宿主适配)
+            → host.Dispatch (session.prompt)
+            → host.Abort
+            → host.QueryDispatchStatus
+          → ISubsessionEventStore (NDJSON 持久化)
+```
+
+### 核心模块
+
+| 层 | 模块 | 职责 |
+| :--- | :--- | :--- |
+| Kernel | `Subsession/Types.fs` | `SubsessionState` DU（9 种状态）、`Command`、`Effect`、`Decision`、`RunResult`、`TurnObservation`、`CurrentTurnEvidence` |
+| Kernel | `Subsession/Decision.fs` | `decide(state, cmd)` 纯函数（~873 行），处理所有状态转移 |
+| Kernel | `Subsession/Policy.fs` | Fallback 策略决策（`afterError`、`afterTranscript`、`afterSuccessfulTurn`） |
+| Kernel | `Subsession/TranscriptDecision.fs` | `classifyTurnEvidence`：从 `CurrentTurnEvidence` 分类为 `CompleteNaturally` / `RecoverWithPrompt` / `ContinueNormally` / `IncompleteWithoutRecovery` |
+| Kernel | `Subsession/Fold.fs` | `SessionSafetyProjection`：从 `SubsessionEvent` 列表 fold 出活跃 run 和持久中毒状态 |
+| Kernel | `Subsession/PartTypeClassify.fs` | 跨宿主的 tool-call / tool-result part type 标准化集合 |
+| Shell | `SubsessionActor.fs` | Actor 消息泵（~447 行）：`Post`、`BeginRun`、`GetState`、MarkUnknownAfterRestart |
+| Shell | `SubsessionActorRegistry.fs` | sessionID → SubsessionActor 注册表，`GetOrCreate`、`Remove`、`ClearPoison` |
+| Shell | `SubsessionEventRouter.fs` | `routeToChild`、`tryIdle`、`tryError`、`isChildSession` |
+| Shell | `SubsessionEventStore.fs` | `NdjsonSubsessionEventStore`（生产）+ `MemorySubsessionEventStore`（测试） |
+| Shell | `SubsessionEventWire.fs` | `tryDecodeWanEvent`、`tryDecodeWanEventBatch`、`projectFromWanEvents`（NDJSON 行 → SubsessionEvent） |
+| Shell | `SubsessionReconcile.fs` | `reconcileUnfinishedRuns`：启动时扫描 NDJSON，发现 RunStarted 无 RunFinished → 持久化 Poison + 内存中毒 |
+| Shell | `SubsessionService.fs` | 顶层 Service：`StartRun`（原子 BeginRun + AbortSignal 绑定）、`TryPost`、`RemoveSession` |
+| Shell | `SubsessionTranscript.fs` | `buildTurnEvidence`：从消息数组切片构建 `CurrentTurnEvidence` |
+| Shell | `SubsessionChildObserver.fs` | 非控制路径观察：更新 agent/model 元数据，不进入主 Fallback 桥 |
+| 宿主 | `Opencode/SubsessionHostAdapter.fs` | OpenCode 的 `ISubsessionHost` 实现 |
+| 宿主 | `Omp/SubsessionHostAdapter.fs` | OMP 的 `ISubsessionHost` 实现 |
+
+### SubsessionState 状态机（9 种状态）
+
+```
+Available → Dispatching → Running → [Draining →] [IssuingAbort → AwaitingAbortSettle → ReconcilingAbortSettle]
+         →                                                                               → Poisoned
+         → CancellingDispatch → ReconcilingUnknownDispatch → ...
+```
+
+| 状态 | 含义 |
+| :--- | :--- |
+| `Available` | 空闲，可接受 StartRun |
+| `Dispatching(ctx, plan, bufferedEvidence)` | 已向宿主发起 `session.prompt`，等待接受确认 |
+| `CancellingDispatch` | 取消请求已发出，等待 dispatch 结果 |
+| `ReconcilingUnknownDispatch` | 宿主接受状态未知，主动查询 |
+| `Running(ctx, started, evidence)` | 正在运行，收集 `CurrentTurnEvidence` |
+| `Draining(ctx, started, error)` | 宿主报告错误，等待 idle 确认停止 |
+| `IssuingAbort(ctx, turn, abortCtx)` | 正在向宿主发出 abort 请求 |
+| `AwaitingAbortSettle` | abort 已被宿主接受，等待 idle 确认停止 |
+| `ReconcilingAbortSettle` | idle 后查询 dispatch 状态以确保停止 |
+| `Poisoned(reason)` | 中毒，后续 StartRun 被拒绝直至 SessionClosed |
+
+### 关键命令（Command）
+
+| 命令 | 触发时机 |
+| :--- | :--- |
+| `StartRun` | `SubsessionService.StartRun` |
+| `DispatchAccepted` | 宿主 `session.prompt` resolve |
+| `DispatchRejected` | 宿主拒绝或返回未知错误 |
+| `TurnErrorObserved` | 宿主 event 报告错误 |
+| `SessionIdleObserved` | 宿主 event 报告 idle |
+| `EvidenceUpdated` | 宿主 event 报告 assistant 消息或 tool result |
+| `CancelRequested` | AbortSignal 触发 |
+| `TurnDeadlineExpired` | 5 分钟超时 |
+| `AbortDeadlineExpired` | 1 分钟 abort 超时 |
+| `AbortConfirmed` | 宿主确认停止 |
+| `AbortHostAccepted` | 宿主接受 abort 请求 |
+| `AbortRequestFailed` | 宿主 abort API 不可用 |
+| `SessionClosed` | 物理 session 关闭 |
+
+### 原子 BeginRun
+
+`SubsessionActor.BeginRun` 在 `SerialQueue` 内原子执行：
+
+1. 注册 `Deferred<RunResult>`（reply 占位）
+2. `decide(state, StartRun)` 纯函数决策
+3. 若决策成功 → `eventStore.Append`（NDJSON 持久化）
+4. 若 append 失败 → fail-safe abort（`IssuingAbort`）
+5. commit 新 state
+6. 启动宿主效果（DispatchPrompt）
+7. 返回 `Deferred.Promise`（等待终局通知）
+
+### 恢复协议
+
+`SubsessionReconcile.reconcileUnfinishedRuns` 在插件启动时执行：
+
+1. `store.ReadAllEvents()` → `projectFromWanEvents` 构建 `SessionSafetyProjection`
+2. 对每个 `ActiveRun`（RunStarted 无 RunFinished）：
+   a. 持久化 `SessionPoisoned` + `TurnFinished` + `RunFinished`（crash-atomic 信封）
+   b. `actor.MarkUnknownAfterRestart()` → 内存中毒
+3. 设置 `SubsessionActorRegistry.SetSafetyProjection(proj)`
+
+`SubsessionActorRegistry.GetOrCreate` 检查 `SafetyProjection`：若 session 曾持久中毒 → 直接以 `Poisoned` 状态创建 actor。
+
+### 事件信封（Crash-Atomic Envelope）
+
+为减少 NDJSON 行数并保证原子性，`SubsessionEventStore` 将一次决策的多个事件打包为：
+
+```
+{ kind: "subsession_decision_committed", payload: { events: JSON } }
+```
+
+`tryDecodeWanEventBatch` 解码时拆分：
+
+- `subsession_decision_committed` → 解码 `events` JSON 数组 → 逐个映射
+- 其他 `subsession_*` kind → 单事件解码
+- 任意解码失败 → `SessionPoisoned(EventStoreCorrupt)`
+
+### ISubsessionHost 接口（宿主需实现）
+
+| 方法 | 返回 | 说明 |
+| :--- | :--- | :--- |
+| `Dispatch(sessionId, turn)` | `Result<HostStartReceipt, DispatchFailure>` | 发送 `session.prompt`，含 model 和 nonce |
+| `Abort(sessionId, turnId)` | `AbortResult`（ConfirmedStopped / RequestAcceptedAwaitIdle / AbortUnavailable） | 终止运行 |
+| `CancelPendingDispatch(turnId)` | unit | 取消正在等待的 dispatch |
+| `QueryDispatchStatus(sessionId, turnId)` | `DispatchStatus` | 查询 nonce 是否已被宿主接受 |
+
+### ISubsessionEventStore 接口
+
+| 方法 | 说明 |
+| :--- | :--- |
+| `Append(sessionId, events)` | 原子追加事件列表；失败 = 基础设施故障 |
+
+### 错误恢复优先级
+
+`SubsessionDecision.decide` 中的 `afterError` 和 `afterTranscript` 使用 `FallbackPolicyState` 决策：
+
+1. 可重试错误 → `RetryAt(i, count+1)` 继续
+2. 不可重试 / 重试耗尽 → `Scanning(start, i)` 扫描链中后续模型
+3. 扫描也耗尽 → `StopWithFailure(FallbackExhausted)`
+4. 转录不完整（无 assistant 消息、空回复）→ `RecoverWithPrompt` 或 `ContinueNormally`（零宽字符）
+5. 恢复超限 → `StopWithFailure(RecoveryExhausted)`
+
+## SubagentDispatcher（多意图编排）
+
+`Shell/SubagentDispatcher.fs` 统一处理 `coder` 和 `investigator` 工具的多意图并发：
+
+- `dispatch(host, adapter, toolName, args, scope, registry)`：
+  1. `decodeToolInvocation` → `CoderBatch` / `InvestigatorBatch` / `Typed`
+  2. 多意图 → `promptsFromCoderIntents` / `promptsFromInvestigatorIntents` 生成并行 prompt
+  3. `adapter.SpawnSubagent` 并行执行（`Promise.all`）
+  4. `formatBatchReports` 合并结果
+  5. `storeSubagentIterator` 写入 iterator 供后续 `continue` 使用
+- `continue` 工具 → `consumeSubagentIterator` → `adapter.ContinueSubagent`
+
+`IHostAdapter` 接口：
+- `SpawnSubagent(request)` → `SubagentResponse`
+- `ContinueSubagent(childID, agent, prompt)` → `SubagentResponse`
+- `RegisterTempFiles` / `TryGetTempFiles` — 跨 prompt 暂存文件路径
 
 ## Continue 多轮（`continue` 工具）
 
@@ -10,8 +177,8 @@
 
 **Iterator**：
 
-- id 形如 `sai_s…`
-- 绑定 `{ childID; agent }`
+- id 形如 `sci_s:<childID>:<agent>:<host>`（自包含迭代器，不依赖内存存储）
+- 绑定 `{ childID; agent; host }`
 - 存储：`Shell` 侧 `SubagentIteratorStore`（scope 内 LRU，默认上限约 50）
 - scope 清理时 `clearTypedIteratorScope` 一并回收
 
@@ -24,9 +191,7 @@
 | `iterator` | 上一步返回的 id |
 | `prompt` | 追问内容 |
 
-流程：`consumeSubagentIterator`（单次有效）→ 宿主 `ContinueSubagent(childID, agent, prompt)` → 成功则 **新** iterator 写回输出。
-
-**Catalog**：`Kernel.ToolCatalog` 含 `continueSpec`。
+流程：`consumeSubagentIterator`（解析自包含 id）→ 宿主 `ContinueSubagent(childID, agent, prompt)` → 成功则 **新** iterator 写回输出。
 
 ## 各宿主 Spawn
 
@@ -37,10 +202,6 @@
 | OMP | `Omp/SubagentTools.fs`、`ChildSession.fs` |
 
 共用：`SubagentPromptBuild`、`SubagentIntentsCodec`。**Omp 禁止**引用 Opencode/Mux。
-
-## SubagentDispatcher（已落地）
-
-OpenCode / Mux / OMP 的 spawn 与并行多意图路径经 **`Shell/SubagentDispatcher`** + `Kernel.HostAdapter.IHostAdapter`，替代各宿主重复 spawn 逻辑（`Opencode/SubagentTools.fs`、`Mux/MuxSubagentToolExecute.fs`、`Omp/SubagentTools.fs` 等接线）。行为覆盖：`SubagentDispatcherTests`、`IntegrationSubagentSpecs`。
 
 ## 事件溯源（子代理）
 
@@ -59,7 +220,7 @@ Fold：`Kernel/EventLog/Fold.fs` → `foldSubagents`；与 iterator 内存态互
 
 ## 测试
 
-`SubagentIteratorStoreTests`、`IntegrationSubagentSpecs`、宿主 E2E 测试。
+`SubagentIteratorStoreTests`、`IntegrationSubagentSpecs`、宿主 E2E 测试、`SubsessionActorTests`。
 
 ## 恢复错误与子会话完成协议
 
@@ -78,3 +239,5 @@ Fold：`Kernel/EventLog/Fold.fs` → `foldSubagents`；与 iterator 内存态互
 
 - [08-tools-and-permissions.md](./08-tools-and-permissions.md)
 - [06-review-and-nudge.md](./06-review-and-nudge.md)
+- [12-fallback.md](./12-fallback.md) § 子会话 Fallback 路由
+- [05-event-sourcing.md](./05-event-sourcing.md) § 子会话事件

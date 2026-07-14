@@ -22,7 +22,9 @@
 
 ## 事件种类（Kernel SSOT）
 
-定义于 `src/Kernel/EventLog/Types.fs`：
+定义于 `src/Kernel/EventLog/Types.fs`。**所有事件种类均在此处以 `eventKind*` 常量定义**，Shell 层 codec 引用这些常量，宿主层不复制字符串。
+
+### 核心业务事件
 
 | `Kind` 常量 | 含义 |
 | :--- | :--- |
@@ -30,13 +32,79 @@
 | `loop_cancelled` | 取消 loop |
 | `review_verdict` | 审查结论（accepted / needs_revision / terminated / cancelled） |
 | `work_backlog_committed` | todowrite/task 校验通过后全量 todos + 五报告 + `select_methodology` |
-| `nudge_dispatched` | nudge 已派发（含 action、anchor） |
 | `submit_review_wip_recorded` | WIP 提交记录 |
-| `nudge_dedup_cleared` | 去重表清空（如新用户消息） |
-| `assistant_completed` | 助手轮次完成（辅助 nudge 快照） |
-| `fallback_continue_injected` | Fallback `SendContinue` 已注入（payload：`model` / `agent` / `at` 等） |
-| `subagent_spawned` | 子代理 spawn 成功（durable 投影，见 [11-subagents.md](./11-subagents.md)） |
-| `subagent_continued` | `continue` 工具续跑子会话 |
+| `assistant_completed` | 助手轮次完成（辅助 nudge 快照，含 `agent` / `model` / `turnId` / `openTodosJson`） |
+| `subagent_spawned` | 子代理 spawn 成功（payload：`childId` / `agent` / `title`） |
+| `subagent_continued` | `continue` 工具续跑子会话（payload：`childId` / `prompt`） |
+
+### nudge 生命周期事件（六阶段闭环）
+
+| `Kind` 含义 | 触发时机 |
+| :--- | :--- |
+| `nudge_requested` | nudge 决策通过，进入串行 Claim 前（payload：`action` / `anchor` / `nudgeId` / `nonce` / `generation` / `cancelGeneration` / `humanTurnId` / `nudgeOrdinal`） |
+| `nudge_dispatched` | nudge 已成功派发（payload：`action` / `anchor` / `nudgeId` / `nudgeOrdinal`） |
+| `nudge_failed` | nudge 派发失败（payload：`nudgeId` / `error` / `nudgeOrdinal`） |
+| `nudge_cancelled` | nudge 被取消（如新用户消息打断，payload：`nudgeId` / `reason` / `nudgeOrdinal`） |
+| `nudge_settled` | nudge 终局（payload：`nudgeId` / `status` / `nudgeOrdinal`） |
+| `nudge_dedup_cleared` | 去重表清空（如新用户消息或 WIP 提交） |
+
+去重逻辑：`foldNudgeDedup` 在 `nudge_requested` 时记录 `PendingNudge`，`nudge_dispatched` 时记 `LastDispatchedAnchor`；`nudge_dedup_cleared` / `submit_review_wip_recorded` / `human_turn_started` 清空两者。`isNudgeBlockedForAnchor` 检查当前 anchor 是否已在 Pending 或 LastDispatched 中。
+
+### 人机交互轮次事件
+
+| `Kind` 含义 | 触发时机 |
+| :--- | :--- |
+| `human_turn_started` | 用户新消息开始（payload：`turnId` / `provider` / `model` / `variant` / `agent` / `humanTurnOrdinal` / `messageId`） |
+| `user_abort_observed` | 用户中断观察（payload 空） |
+
+### 模型降级（Fallback）续命事件
+
+| `Kind` 含义 | 触发时机 |
+| :--- | :--- |
+| `continuation_requested` | 降级决策选好模型，即将发起续命（payload：`continuationId` / `model` / `agent` / `at` / `generation` / `cancelGeneration` / `humanTurnId` / `owner` / `continuationOrdinal`） |
+| `continuation_dispatch_started` | 续命已进入宿主 API 调用前（payload：`continuationId` / `continuationOrdinal`） |
+| `continuation_dispatched` | 续命已成功派发（payload：`continuationId` / `model` / `agent` / `at` / `continuationOrdinal`） |
+| `continuation_failed` | 续命失败（payload：`continuationId` / `error` / `continuationOrdinal`） |
+| `continuation_cancelled` | 续命被取消（payload：`continuationId` / `reason` / `continuationOrdinal`） |
+| `continuation_settled` | 续命终局（payload：`continuationId` / `humanTurnId` / `generation` / `status` / `continuationOrdinal`） |
+
+`fallback_continue_injected`（旧版，payload：`model` / `agent` / `at`）仍保留但已逐步被上述六阶段续命事件取代。
+
+### 上下文压缩（Compaction）事件
+
+| `Kind` 含义 | 触发时机 |
+| :--- | :--- |
+| `compaction_started` | 宿主 compaction 开始（payload：`compactionId` / `generationAtStart` / `humanTurnId` / `compactionOrdinal`） |
+| `compaction_settled` | compaction 完成或取消（payload：`compactionId` / `status` / `compactionOrdinal`） |
+| `context_generation_changed` | compaction 后上下文代数变更（payload：`generation`） |
+
+### 子会话 Actor 事件（Subsession）
+
+| `Kind` 含义 | 触发时机 |
+| :--- | :--- |
+| `subsession_run_started` | 子会话 run 开始（payload：`childId` / `parentSessionId` / `runId`） |
+| `subsession_run_settled` | 子会话 run 终局（payload：`childId` / `runId` / `status` / `detail`） |
+| `subsession_turn_dispatch_requested` | 子会话 turn 派发请求（payload：`runId` / `turnId` / `turnOrdinal` / `model` / `prompt`） |
+| `subsession_turn_started` | 子会话 turn 开始（payload：`runId` / `turnId` / `receipt`） |
+| `subsession_turn_outcome_observed` | 子会话 turn 结果观察 |
+| `subsession_turn_finished` | 子会话 turn 结束（payload：`finish` / `errorName` / `message` / `output`） |
+| `subsession_abort_requested` | 子会话 abort 请求 |
+| `subsession_session_poisoned` | 子会话中毒（payload：`reason`） |
+| `subsession_physical_session_closed` | 子会话物理 session 关闭 |
+| `subsession_decision_committed` | 子会话决策已持久化（原子信封，内含 `events` JSON 数组） |
+
+### 万象阵事件
+
+| `Kind` 含义 | 触发时机 |
+| :--- | :--- |
+| `squad_created` | 万象阵 Session 创建 |
+| `tasks_created` | DAG 拆解产物 |
+| `task_started` | worktree 创建 + slave 启动 |
+| `task_submitted` | slave 调用 submit |
+| `task_merged` | ff 合并成功 |
+| `task_done` | slave 进程退出 |
+| `task_error` | git/worktree 操作失败 |
+| `squad_cancelled` | /squad-kill 触发 |
 
 **万象阵** kind（同文件、`session` = 万象阵 session id）：`squad_created`、`tasks_created`、`task_started`、`task_submitted`、`task_merged`、`task_done`、`task_error`、`squad_cancelled`。运行时经 `AppendSquadEvent` **追加到同一文件** `[workspace]/.wanxiangshu.ndjson`（与万象术事件共用锁与 `EventLogStore`）；DAG fold 在 `Kernel/Wanxiangzhen` + `Shell/EventLogSquadProjection`。规格叙事见 [wanxiangzhen/02-event-sourcing.md](./wanxiangzhen/02-event-sourcing.md)（物理路径以 `EventLogCodec.eventLogFileName` 为准）。
 

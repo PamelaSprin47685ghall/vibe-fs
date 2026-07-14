@@ -42,33 +42,157 @@
 
 ## Nudge 子系统
 
-### 两层拆分
+### 三层架构
 
 | 层 | 位置 | 职责 |
 | :--- | :--- | :--- |
 | 纯决策 | `Kernel/Nudge/*` | 给定 `SessionSnapshot`，是否应 nudge、哪种 action |
-| 运行时 | `Shell/NudgeRuntime` + 宿主 `NudgeEffect` / `Omp.NudgeHooks` | 锁、去重、`session.prompt`、错误与 abort |
+| 运行时 | `Shell/NudgeRuntime` + `NudgeRuntimeTypes` + `NudgeRuntimeMux` | 锁、去重、`session.prompt`、错误与 abort |
+| 宿主 | 各 `*/Nudge*` | 事件翻译、`sendNudge` 实现 |
 
 **禁止**在 nudge 入口用内存布尔代替事件 fold 的 loop 态（`ompNudgeHooksDoNotReadReviewStoreForLoopState`）。
 
-### 去重
+### 决策路径（`Kernel/Nudge/NudgeDerivation.fs`）
 
-`nudge_dispatched` 事件 + `foldNudgeDedup`；用户新消息或 WIP 可触发 `nudge_dedup_cleared` / `submit_review_wip_recorded` 策略。
+#### SessionSnapshot 来源
 
-`EventLogRuntimeNudge.TryClaimNudgeDispatch`：在锁内追加 `nudge_dispatched`，避免重复派发。
+`deriveSnapshot` 从 `NudgeSnapshotSource` 构造 `SessionSnapshot`：
 
-### 决策优先级（`Kernel/Nudge`）
+```
+snapshot = {
+  todos,                // open todo 列表
+  lastAssistantMessage, // 末次 assistant 文本
+  workState,            // 从 hasRunner + isLoopActive + openTodos 三轴派生
+  blockStatus,          // Blocked / Allowed
+  nudgeAnchorKey,       // 去重锚点 key
+  agentFromMessage,
+  modelFromMessage,
+  reviewLoop,           // ReviewLoop 快照
+  humanTurnId
+}
+```
 
-1. backlog 有 open todos → `nudge-todo`
-2. 子代理 / runner 活跃 → `nudge-runner`
-3. review loop 活跃（**事件 fold**）→ `nudge-loop`
-4. 否则 → none
+`sessionSnapshotFromFold` 从 `NudgeSnapshotState`（事件 fold 产物）+ `RunnerPresence` + `NudgeBlockStatus` 构造快照，供决策使用。
 
-**抑制**：末条 assistant 含 `<skip-todo-check/>`（跳过待办检查）或 `<skip-review-check/>`（跳过 review/loop 检查）。两者独立：只写一个不跳过另一个；两个都写则两个都跳过。
+#### 工作状态七轴（`Kernel/Nudge/Types.fs`）
 
-**与 context budget**：`context-budget-nudge` 优先级更高（见 [13](./13-context-budget.md)）。
+`workStateFromAxes(hasActiveRunner, isLoopActive, openTodos)` 派生出：
 
-action / payload：`EventLogRuntimeAppend`、`nudge_dispatched`。
+| 状态（SessionWorkState） | Runner | Loop | Todos |
+| :--- | :---: | :---: | :---: |
+| Idle | ✗ | ✗ | ✗ |
+| BacklogOnly | ✗ | ✗ | ✓ |
+| LoopIdle | ✗ | ✓ | ✗ |
+| LoopWithBacklog | ✗ | ✓ | ✓ |
+| RunnerOnly | ✓ | ✗ | ✗ |
+| RunnerWithBacklog | ✓ | ✗ | ✓ |
+| RunnerWithLoop | ✓ | ✓ | ✗ |
+| AllAxes | ✓ | ✓ | ✓ |
+
+#### Action 推导（`deriveAction`）
+
+```
+Blocked → NudgeNone
+Idle → NudgeNone
+RunnerWithBacklog / AllAxes → NudgeNone
+RunnerWithLoop → skipsReview ? NudgeNone : NudgeLoop
+RunnerOnly → NudgeRunner
+LoopWithBacklog → skipsTodo ? (skipsReview ? NudgeNone : NudgeLoop) : NudgeTodo
+LoopIdle → skipsReview ? NudgeNone : NudgeLoop
+BacklogOnly → skipsTodo ? NudgeNone : NudgeTodo
+```
+
+#### 抑制标记
+
+- `<skip-todo-check/>`：跳过待办检查
+- `<skip-review-check/>`：跳过 review/loop 检查
+- 两者独立：只写一个不跳过另一个；两个都写则两个都跳过
+- 解析：`Kernel/Nudge.fs` 中 `skipsTodo` / `skipsReview`，在代码围栏外检测
+
+### 运行时层（`Shell/NudgeRuntime*`）
+
+#### NudgeFlow 核心循环（`runNudgeFlowCore`）
+
+```
+1. takeSnapshot() → SessionSnapshot option
+2. deriveAction(snapshot) → NudgeAction
+3. selectNudgePrompt(host, action, snapshot) → promptText
+4. tryClaimNudgeDispatch(...)  → 在锁内追加 nudge_requested 事件
+   - 检查：anchor 匹配、NudgeDedup 未阻塞、generation/cancelGen/humanTurnId 匹配、
+     SessionOwner 非 Fallback/Compaction/Nudge、无 pending lease
+5. 若 claim 成功：
+   - 设置 PendingNudgeLease（dispatch_started）
+   - 设置 SessionOwner = "Nudge"
+   - 设置 ActiveNudgeNonce
+   - sendNudge(promptText, agent, model, nudgeId, nonce)
+   - 若成功 → appendNudgeDispatched, 过渡到 "dispatched"
+   - 若失败 → appendNudgeFailed / Cancelled / Settled
+```
+
+#### 去重机制
+
+`tryClaimNudgeDispatch` 在 `EventLogStore` 的 `SerialQueue` 内执行：
+
+1. 同步最新 NDJSON 状态
+2. 检查 `NudgeDedupState`（PendingNudge + LastDispatchedAnchor）
+3. 检查 `SessionOwner` 非 Fallback/Compaction/Nudge
+4. 检查无 pending continuation lease 或 nudge lease
+5. 检查 nudge ordinal 单调递增
+6. 检查当前 anchor 与 snapshot anchor 一致
+7. 全部通过 → 追加 `nudge_requested` 事件 → fold → 返回 true
+
+#### Nudge 生命周期事件
+
+| 事件 | 时机 | payload |
+| :--- | :--- | :--- |
+| `nudge_requested` | Claim 成功时 | `action`、`anchor`、`nudgeId`、`nonce`、`generation`、`cancelGeneration`、`humanTurnId`、`nudgeOrdinal` |
+| `nudge_dispatched` | `session.prompt` 成功 | `action`、`anchor`、`nudgeId`、`nudgeOrdinal` |
+| `nudge_failed` | 发送失败 | `nudgeId`、`error`、`nudgeOrdinal` |
+| `nudge_cancelled` | 被新用户消息打断 | `nudgeId`、`reason`、`nudgeOrdinal` |
+| `nudge_settled` | 后续 idle 事件确认完成 | `nudgeId`、`status`、`nudgeOrdinal` |
+
+#### NudgeSnapshotState（事件折叠）
+
+`Kernel/EventLog/Fold.fs` 的 `foldNudgeSnapshot` 从事件流折叠出 `NudgeSnapshotState`：
+
+- `assistant_completed` → 更新 `lastAssistantText`、`agentFromMessage`、`modelFromMessage`、`turnId`、`openTodos`
+- `loop_activated` / `loop_cancelled` / `review_verdict` → 更新 `reviewLoop` 状态
+- `nudge_requested` / `nudge_dispatched` / `nudge_failed` / `nudge_cancelled` → 更新 `pendingNudge` / `lastDispatchedAnchor`
+- `submit_review_wip_recorded` / `nudge_dedup_cleared` / `human_turn_started` → 清空去重表
+- `work_backlog_committed` → 更新 `openTodos`
+
+### 宿主实现
+
+#### OpenCode（`Opencode/NudgeEffect.fs`）
+
+`startNudgeFlow` → `collectSnapshot`（从 OpenCode 的 `todo` API 和 `messages` API 获取）→ `runNudgeFlowCore`。
+
+`NudgeTrigger`（`Opencode/NudgeTrigger.fs`）：
+
+- `TrackLifetimeEvents`：监听 `stream-abort`、`session.abort`、`session.error`、`session.status` 等，标记 `forceStopped`
+- `HandleNaturalStop`：`session.idle` / `session.status=idle` 时触发 nudge 决策
+
+#### Mux（`Shell/NudgeRuntimeMux.fs`）
+
+`collectSnapshotMux` 从 `getChatHistory` helper 获取消息，`sendNudgeMux` 调用 `helpers.nudge`。
+
+#### OMP（`Omp/NudgeHooks.fs`）
+
+`agentEndHandler` 在 agent 轮次结束时：
+
+1. 检查 `openTodoStatuses` + `lastAssistantMessage`
+2. `appendAssistantCompletedOrFail` 记录事件
+3. `getNudgeSnapshotFromEventLog` 获取折叠快照
+4. `deriveAction` + `tryClaimNudgeDispatch` 并发安全派发
+5. `sendNudgeReminder` 通过 `pi.sendMessage` 注入 nudge 提示
+
+### 决策优先级
+
+1. `context-budget-nudge`（见 [13](./13-context-budget.md)）— 上下文预算紧急 nudge
+2. backlog 有 open todos → `nudge-todo`
+3. 子代理 / runner 活跃 → `nudge-runner`
+4. review loop 活跃（**事件 fold**）→ `nudge-loop`
+5. 否则 → none
 
 ### 与 PromiseQueue 的关系
 
@@ -103,12 +227,19 @@ sequenceDiagram
 | :--- | :--- |
 | FSM | `Kernel/ReviewSession/StateMachine.fs` |
 | Review 运行时 | `Shell/ReviewRuntime.fs`、`ReviewReplaySync.fs` |
+| Nudge 决策 | `Kernel/Nudge/NudgeDerivation.fs`、`Nudge.fs`、`Nudge/Types.fs` |
+| Nudge 状态 | `Kernel/Nudge/TodoStatus.fs`、`SubmitReviewHooks.fs` |
+| Nudge 运行时 | `Shell/NudgeRuntime.fs`、`NudgeRuntimeTypes.fs`、`NudgeRuntimeMux.fs` |
 | Event append | `Shell/EventLogRuntimeAppend.fs` |
-| Opencode nudge | `Opencode/NudgeEffect.fs`、`Shell/OpencodeSessionEventCodec*.fs` |
-| OMP nudge | `Omp/NudgeHooks.fs` |
+| Event fold | `Kernel/EventLog/Fold.fs`（`foldNudgeSnapshot`、`foldNudgeDedup`） |
+| Event claim | `Shell/EventLogFiles.fs`（`TryClaimNudgeDispatch`） |
+| Opencode nudge | `Opencode/NudgeEffect.fs`、`NudgeTrigger.fs` |
+| Mux nudge | `Shell/NudgeRuntimeMux.fs` |
+| OMP nudge | `Omp/NudgeHooks.fs`、`NudgeRuntime.fs` |
 
 ## 相关文档
 
-- [05-event-sourcing.md](./05-event-sourcing.md)
+- [05-event-sourcing.md](./05-event-sourcing.md) § nudge 事件
 - [11-subagents.md](./11-subagents.md)
 - [08-tools-and-permissions.md](./08-tools-and-permissions.md)
+- [13-context-budget.md](./13-context-budget.md)

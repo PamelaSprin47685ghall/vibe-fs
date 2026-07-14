@@ -69,7 +69,6 @@
 | `submit_review` | 仅 loop 活跃时有效；与 review FSM 联动 |
 | `return_reviewer` | 仅 reviewer 角色；驱动 `review_verdict` |
 | `fuzzy_continue` | 搜索 iterator 翻页 |
-| `amend` | 工具参数纠偏回溯（见 [10-message-transform.md](./10-message-transform.md)） |
 | `executor` | `max_bytes` 必填；输出过大时 `what_to_summarize` 驱动摘要 |
 | `pty_*` | 交互式伪终端；须 `warn` + `warn_tdd`（`WarnTdd.fs`） |
 

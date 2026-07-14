@@ -13,6 +13,9 @@
 | Caps | 系统前导提示（宝典/铁律/工具说明） |
 | WIP | `submit_review` 部分完成标记 |
 | Iterator | fuzzy_continue / continue 的翻页或子会话句柄 |
+| Subsession | 轻量 Actor 消息泵，隔离子代理的错误与状态 |
+| Fallback 续命 | 模型降级后的 `SendContinue` 六阶段生命周期 |
+| 门闩 (Gate) | `FallbackRuntimeState` 中的互斥标志位，防并发 |
 
 ## 真相源对照表
 
@@ -20,22 +23,28 @@
 | :--- | :--- | :--- |
 | Review task / loop 活跃 | `.wanxiangshu.ndjson` + `foldReviewTask` | 仅读 `ReviewStore` 捷径、compaction 前消息 |
 | Todo backlog 内容 | 最后 `work_backlog_committed` | 历史 todowrite tool 消息全文 fold |
-| Nudge 去重 | `foldNudgeDedup` / `nudge_dispatched` | 内存去重表单独为准 |
+| Nudge 去重 | `foldNudgeDedup` / `nudge_*` 事件 | 内存去重表单独为准 |
+| Nudge 决策快照 | `foldNudgeSnapshot` / `assistant_completed` 等 | 末条消息文本直接嗅探 |
 | 工具 description | `Kernel.ToolCatalog` | 宿主手写重复文案 |
 | 工具权限 | `ToolPermission` + `ToolCatalog.Classification` | 宿主 if/else |
 | 方法论 enum | `Methodology.Registry` 派生 | 三处手写列表 |
 | 宝典/铁律正文 | `Kernel.CapsPrelude`（组装经 Shell cache） | MessageTransform 内联长文 |
 | 宿主工具名映射 | `HostTools` | 魔字符串散落 |
 | OpenCode hook 字段 | 原地 mutate + codec | 替换 output 对象引用 |
-| 万象阵 DAG | **物理**：`[workspace]/.wanxiangshu.ndjson` + `.wanxiangshu.ndjson.lock`（与万象术共用）；**逻辑**：`squad_*`/`task_*` 行 + `Kernel/Wanxiangzhen` fold + `CoordinatorReplay` / `EventLogSquadProjection` | 宿主 session 历史、已废止的独立 `.wanxiangzhen.ndjson` 文件名（历史规格别名，见 [wanxiangzhen/02](./wanxiangzhen/02-event-sourcing.md) §2） |
+| Subsession 活跃 run | `.wanxiangshu.ndjson` + `subsession_*` 事件 + `SessionSafetyProjection` | 仅内存 actor 注册表 |
+| Subsession Agent 状态 | `Kernel/Subsession/Decision.fs` 纯函数 + NDJSON 决策信封 | 宿主 session 消息历史 |
+| 万象阵 DAG | **物理**：`[workspace]/.wanxiangshu.ndjson` + `.wanxiangshu.ndjson.lock`（与万象术共用）；**逻辑**：`squad_*`/`task_*` 行 + `Kernel/Wanxiangzhen` fold + `CoordinatorReplay` / `EventLogSquadProjection` | 宿主 session 历史、已废止的独立 `.wanxiangzhen.ndjson` 文件名 |
 | 子代理 durable 投影 | `subagent_spawned` / `subagent_continued` + `foldSubagents` | 仅 `SubagentIteratorStore` 内存 |
+| Fallback 续命租约 | `.wanxiangshu.ndjson` + `continuation_*` 事件 + `ownerAndLeaseFolder` | `FallbackRuntimeState` 内存 alone |
 | Fallback 注入记忆 | `fallback_continue_injected` + `FallbackInjectionFold` | 嗅探消息零宽字符 |
+| 上下文预算 phase | `ContextBudgetStore` 内存（重启后从 NDJSON fold backlog 重建） | 仅 `maxInputTokens` 静态值 |
+| 会话拥有者 | `continuation_*` / `human_turn_started` 事件 + `SessionOwner` fold | 内存 `FallbackRuntimeState` |
 
 ## 文件路径速查
 
 | 路径 | 说明 |
 | :--- | :--- |
-| `[workspace]/.wanxiangshu.ndjson` | 万象术事件日志 |
+| `[workspace]/.wanxiangshu.ndjson` | 万象术事件日志（含万象阵 `squad_*`/`task_*` 行和 `subsession_*` 行） |
 | `[workspace]/.wanxiangshu.ndjson.lock` | 追加锁 |
 | `build/src/Mux/Plugin.js` | 默认包入口 |
 | `build/src/Omp/Plugin.js` | OMP 入口 |
