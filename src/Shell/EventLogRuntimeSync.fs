@@ -128,6 +128,44 @@ let restoreFallbackRuntimeState
 
             rt.SetPendingNudgeLease(sid, lease)
         | None -> rt.ClearPendingNudgeLease sid
+
+        let toStatus (s: string) =
+            match s.ToLowerInvariant() with
+            | "requested" -> Wanxiangshu.Shell.FallbackRuntimeState.SubsessionRunStatus.Requested
+            | "running" -> Wanxiangshu.Shell.FallbackRuntimeState.SubsessionRunStatus.Running
+            | "continuing" -> Wanxiangshu.Shell.FallbackRuntimeState.SubsessionRunStatus.Continuing
+            | "settled" -> Wanxiangshu.Shell.FallbackRuntimeState.SubsessionRunStatus.Settled
+            | "failed" -> Wanxiangshu.Shell.FallbackRuntimeState.SubsessionRunStatus.Failed
+            | "cancelled" -> Wanxiangshu.Shell.FallbackRuntimeState.SubsessionRunStatus.Cancelled
+            | _ -> Wanxiangshu.Shell.FallbackRuntimeState.SubsessionRunStatus.Requested
+
+        let toObs (o: string) =
+            if o = "AwaitingStart" then
+                Wanxiangshu.Shell.FallbackRuntimeState.AttemptObservation.AwaitingStart
+            elif o = "RunningObserved" then
+                Wanxiangshu.Shell.FallbackRuntimeState.AttemptObservation.RunningObserved
+            elif o.StartsWith("AssistantObserved:") then
+                let msgId = o.Substring("AssistantObserved:".Length)
+                Wanxiangshu.Shell.FallbackRuntimeState.AttemptObservation.AssistantObserved msgId
+            else
+                Wanxiangshu.Shell.FallbackRuntimeState.AttemptObservation.AwaitingStart
+
+        for kv in state.SubsessionRuns do
+            let run = kv.Value
+
+            let lease: Wanxiangshu.Shell.FallbackRuntimeState.SubsessionRunLease =
+                { RunId = run.RunId
+                  ChildId = run.ChildId
+                  ParentSessionId = run.ParentSessionId
+                  ActiveAttemptOrdinal = run.ActiveAttemptOrdinal
+                  Status = toStatus run.Status
+                  ActiveContinuationId = run.ActiveContinuationId
+                  ActiveContinuationOrdinal = run.ActiveContinuationOrdinal
+                  DispatchMessageBoundary = run.DispatchMessageBoundary
+                  ActiveObservation = toObs run.ActiveObservation
+                  InjectedUserMessageId = run.InjectedUserMessageId }
+
+            rt.RestoreSubsessionRun(lease)
     | None -> ()
 
 let syncAllSessionsFromEventLogDedicated

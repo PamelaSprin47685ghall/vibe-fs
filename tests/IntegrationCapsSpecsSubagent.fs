@@ -21,6 +21,7 @@ open Wanxiangshu.Omp
 open Wanxiangshu.Omp.MessageTransform
 open Wanxiangshu.Omp.ChildSession
 open Wanxiangshu.Shell.RuntimeScope
+open Wanxiangshu.Shell.ChildSessionMailbox
 
 let private mockUserMsg (id: string) (sessionID: string) (prompt: string) : obj =
     let info =
@@ -46,10 +47,17 @@ let subagentCapsInjectionSpec () =
             let reviewStore = createReviewStore ()
             let userEntry = mockUserMsg "user-1" "test" prompt
             let entries = [| userEntry |]
+
             let! out =
                 transformEntriesAsyncWithAgent
-                    reviewStore workspaceDir "test" (box entries) "coder"
-                    (fun _ -> Promise.lift None) (box null)
+                    reviewStore
+                    workspaceDir
+                    "test"
+                    (box entries)
+                    "coder"
+                    (fun _ -> Promise.lift None)
+                    (box null)
+
             let mutable foundTargetRead = false
 
             for entry in out do
@@ -89,8 +97,14 @@ let crossSessionIsolationSpec () =
         try
             let! out =
                 transformEntriesAsyncWithAgent
-                    reviewStore workspaceDir "session-B" (box entries) "coder"
-                    (fun _ -> Promise.lift None) (box null)
+                    reviewStore
+                    workspaceDir
+                    "session-B"
+                    (box entries)
+                    "coder"
+                    (fun _ -> Promise.lift None)
+                    (box null)
+
             let mutable foundA = false
             let mutable foundB = false
 
@@ -127,7 +141,15 @@ let ompChildSessionObjectiveReRegisterSpec () =
                       createObj
                           [ "sessionId", box (Some "child-sess-1")
                             "getSessionId", box (Some(fun () -> box "child-sess-1"))
-                            "prompt", box (fun (p: string) -> Promise.lift ())
+                            "prompt",
+                            box (fun (p: string) ->
+                                promise {
+                                    match ChildSessionMailboxRegistry.TryGet "child-sess-1" with
+                                    | Some mb ->
+                                        do! mb.Post(Command.TaskComplete "")
+                                        do! mb.Post(Command.SessionIdle)
+                                    | None -> ()
+                                })
                             "waitForIdle", box (fun () -> Promise.lift ()) ]) ]
 
         let mockCodingAgent = createObj [ "SessionManager", box mockSessionManagerType ]
@@ -154,7 +176,15 @@ let ompChildSessionObjectiveReRegisterSpec () =
                                                     "getSessionId", box (Some(fun () -> box "child-sess-1"))
                                                     "getEntries", box (Some(fun () -> [||])) ]
                                           )
-                                          "prompt", box (fun (p: string) -> Promise.lift ())
+                                          "prompt",
+                                          box (fun (p: string) ->
+                                              promise {
+                                                  match ChildSessionMailboxRegistry.TryGet "child-sess-1" with
+                                                  | Some mb ->
+                                                      do! mb.Post(Command.TaskComplete "")
+                                                      do! mb.Post(Command.SessionIdle)
+                                                  | None -> ()
+                                              })
                                           "waitForIdle", box (fun () -> Promise.lift ()) ]
                                 )
                                 "dispose", box (Some(fun () -> ())) ]
@@ -271,8 +301,14 @@ let subagentFallbackRawTextSpec () =
         try
             let! out =
                 transformEntriesAsyncWithAgent
-                    reviewStore workspaceDir "test-session" (box entries) "coder"
-                    (fun _ -> Promise.lift None) (box null)
+                    reviewStore
+                    workspaceDir
+                    "test-session"
+                    (box entries)
+                    "coder"
+                    (fun _ -> Promise.lift None)
+                    (box null)
+
             let mutable foundRawRead = false
 
             for entry in out do

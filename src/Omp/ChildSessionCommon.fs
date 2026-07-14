@@ -9,11 +9,54 @@ open Wanxiangshu.Shell.Dyn
 open Wanxiangshu.Shell.OmpHostBindings
 open Wanxiangshu.Shell.FallbackRuntimeState
 open Wanxiangshu.Shell.FallbackRecoveryWait
+open Wanxiangshu.Shell.ChildSessionMailbox
 open Wanxiangshu.Shell.ErrorClassify
 open Wanxiangshu.Kernel.Domain
 open Wanxiangshu.Kernel.FallbackKernel.Types
 
 module Dyn = Wanxiangshu.Shell.Dyn
+
+type OmpSessionTurnHost(pi: obj, childId: string, fallbackRuntime: FallbackRuntimeState, session: obj) =
+    interface ISessionTurnHost with
+        member _.RunOneTurn(sessionId, model, prompt) =
+            let deferred = createDeferred<TurnOutcome> ()
+
+            let mailbox =
+                ChildSessionMailboxRegistry.GetOrCreate(sessionId, (fun () -> sessionAbort session |> ignore))
+
+            let sendFn turnId =
+                promise {
+                    let modelStr =
+                        match model.Variant with
+                        | Some v -> sprintf "%s/%s:%s" model.ProviderID model.ModelID v
+                        | None -> sprintf "%s/%s" model.ProviderID model.ModelID
+
+                    let pObj =
+                        let p =
+                            {| text = prompt
+                               model = modelStr
+                               continuationID = turnId |}
+
+                        let agent = fallbackRuntime.GetAgentName sessionId
+                        if agent <> "" then Dyn.withKey p "agent" agent else box p
+
+                    let body = box {| prompt = pObj |}
+                    let arg = box {| sessionId = sessionId; body = body |}
+
+                    try
+                        do! unbox<JS.Promise<obj>> (session?prompt (arg)) |> Promise.map ignore
+                    with _ex ->
+                        () // Prompt rejection handled via event bridge
+
+                    do! mailbox.Post(TurnStarted(turnId))
+                }
+
+            let turnId =
+                "wanxiangshu-turn-" + System.Guid.NewGuid().ToString("N").Substring(0, 8)
+
+            mailbox.Post(RunTurn(model, prompt, turnId, sendFn, deferred)) |> ignore
+            deferred.Promise
+
 
 [<RequireQualifiedAccess>]
 type SubagentResetPolicy =
@@ -31,6 +74,7 @@ let runOmpSubagentCore
     (prompt: string)
     (resetPolicy: SubagentResetPolicy)
     (parentSessionId: string)
+    (pi: obj)
     : JS.Promise<string> =
     promise {
         let sm = unbox<ISessionManager> (Dyn.get session "sessionManager")
@@ -50,35 +94,90 @@ let runOmpSubagentCore
 
             if not started then
                 failwith "Subagent session already running"
+            else
+                fallbackRuntime.SetSubsessionPending childId true
+                let root = Wanxiangshu.Omp.MagicTodo.workspaceRoot
 
-            let initSt = fallbackRuntime.GetOrCreateState childId
+                if root <> "" then
+                    let! exists = Wanxiangshu.Shell.EventLogRuntimeStore.directoryExists root
 
-            match resetPolicy with
-            | SubagentResetPolicy.ResetToActive ->
-                fallbackRuntime.UpdateState
-                    childId
-                    { initSt with
-                        Lifecycle = FallbackLifecycle.Active }
-            | SubagentResetPolicy.KeepState -> ()
-
-            fallbackRuntime.SetSubsessionPending childId true
+                    if exists then
+                        do!
+                            Wanxiangshu.Shell.EventLogRuntimeAppend.appendSubsessionRunStartedOrFail
+                                root
+                                childId
+                                childId
+                                parentSessionId
+                                runId
 
         try
             try
-                do! sessionPrompt session prompt
-                do! sessionWaitForIdle session
+                try
+                    let host = OmpSessionTurnHost(pi, childId, fallbackRuntime, session)
 
-                if childId <> "" then
-                    fallbackRuntime.SetSubsessionPending childId false
+                    let cfg =
+                        fallbackConfigOpt
+                        |> Option.defaultValue Wanxiangshu.Shell.FallbackConfigCodec.emptyConfig
 
-                    if fallbackConfigOpt.IsSome then
-                        do! waitForSubagentSettle fallbackRuntime childId runId
+                    let agentName = fallbackRuntime.GetAgentName childId
 
-                let st = fallbackRuntime.GetOrCreateState childId
+                    let chain =
+                        let configChain =
+                            let agentChainOpt =
+                                if agentName <> "" then
+                                    Map.tryFind agentName cfg.AgentChains
+                                else
+                                    None
 
-                if childId <> "" then
+                            match agentChainOpt with
+                            | Some c -> c
+                            | None -> cfg.DefaultChain
+
+                        if configChain.IsEmpty then
+                            let runtimeChain = fallbackRuntime.GetChain childId
+
+                            if runtimeChain.IsEmpty then
+                                [ { ProviderID = "default"
+                                    ModelID = "default"
+                                    Variant = None
+                                    Temperature = None
+                                    TopP = None
+                                    MaxTokens = None
+                                    ReasoningEffort = None
+                                    Thinking = false } ]
+                            else
+                                runtimeChain
+                        else
+                            configChain
+
+                    let fetchMessages (sid: string) =
+                        promise {
+                            let sessionApi = Dyn.get pi "session"
+
+                            if not (Dyn.isNullish sessionApi) then
+                                let arg = box {| sessionId = sid |}
+                                let! resp = unbox<JS.Promise<obj>> (sessionApi?sessionMessages (arg))
+                                let data = Dyn.get resp "data"
+
+                                if Dyn.isArray data then
+                                    return (unbox<obj[]> data)
+                                else
+                                    return [||]
+                            else
+                                return [||]
+                        }
+
+                    let! loopResult = runSubsessionLoop host childId prompt cfg chain fallbackRuntime fetchMessages
+
+                    let st = fallbackRuntime.GetOrCreateState childId
+
+                    let isSuccess =
+                        match loopResult with
+                        | Ok() -> true
+                        | Error _ -> false
+
                     let status =
-                        if st.Lifecycle = FallbackLifecycle.TaskComplete then
+                        if isSuccess then
                             SubsessionRunStatus.Settled
                         elif st.Lifecycle = FallbackLifecycle.Cancelled then
                             SubsessionRunStatus.Cancelled
@@ -89,48 +188,43 @@ let runOmpSubagentCore
 
                     fallbackRuntime.UpdateSubsessionRunStatus(childId, runId, status)
 
-                if
-                    fallbackConfigOpt.IsSome
-                    && st.Lifecycle <> FallbackLifecycle.TaskComplete
-                    && st.Lifecycle <> FallbackLifecycle.Cancelled
-                then
-                    return! Promise.reject (failwith "Subagent failed to complete")
-                elif st.Lifecycle = FallbackLifecycle.Cancelled then
-                    return abortedPrefix
-                else
-                    let sm = unbox<ISessionManager> (Dyn.get session "sessionManager")
-                    let msgs = Dyn.get sm "messages"
+                    if st.Lifecycle = FallbackLifecycle.Cancelled then
+                        return abortedPrefix
+                    elif isSuccess then
+                        let sm = unbox<ISessionManager> (Dyn.get session "sessionManager")
+                        let msgs = Dyn.get sm "messages"
 
-                    let lastUserIdx =
-                        if Dyn.isNullish msgs || not (Dyn.isArray msgs) then
-                            0
-                        else
-                            let arr = unbox<obj[]> msgs
+                        let lastUserIdx =
+                            if Dyn.isNullish msgs || not (Dyn.isArray msgs) then
+                                0
+                            else
+                                let arr = unbox<obj[]> msgs
 
-                            arr
-                            |> Array.tryFindIndexBack (fun m -> Dyn.str m "role" = "user")
-                            |> Option.defaultValue 0
+                                arr
+                                |> Array.tryFindIndexBack (fun m -> Dyn.str m "role" = "user")
+                                |> Option.defaultValue 0
 
-                    let finalStartIndex =
-                        if Dyn.isNullish msgs || not (Dyn.isArray msgs) then
-                            lastUserIdx
-                        else
-                            let arr = unbox<obj[]> msgs
+                        let finalStartIndex =
+                            if Dyn.isNullish msgs || not (Dyn.isArray msgs) then
+                                lastUserIdx
+                            else
+                                let arr = unbox<obj[]> msgs
 
-                            if startCount >= arr.Length then lastUserIdx
-                            else if lastUserIdx >= startCount then lastUserIdx
-                            else startCount
+                                if startCount >= arr.Length then lastUserIdx
+                                else if lastUserIdx >= startCount then lastUserIdx
+                                else startCount
 
-                    return readAssistantText sm finalStartIndex "\n\n" |> Option.defaultValue noOutputText
-            with err ->
-                if childId <> "" && fallbackConfigOpt.IsSome then
-                    do! waitForSubagentSettle fallbackRuntime childId runId
-                    fallbackRuntime.SetSubsessionPending childId false
-
+                        return readAssistantText sm finalStartIndex "\n\n" |> Option.defaultValue noOutputText
+                    else
+                        match loopResult with
+                        | Error msg -> return! Promise.reject (failwith msg)
+                        | Ok() -> return ""
+                with err ->
                     let st = fallbackRuntime.GetOrCreateState childId
+                    let isSuccess = st.Lifecycle = FallbackLifecycle.TaskComplete
 
                     let status =
-                        if st.Lifecycle = FallbackLifecycle.TaskComplete then
+                        if isSuccess then
                             SubsessionRunStatus.Settled
                         elif st.Lifecycle = FallbackLifecycle.Cancelled then
                             SubsessionRunStatus.Cancelled
@@ -139,40 +233,41 @@ let runOmpSubagentCore
 
                     fallbackRuntime.UpdateSubsessionRunStatus(childId, runId, status)
 
-                    match translateJsError err with
-                    | MessageAborted
-                    | ClientCancellation _ -> return abortedPrefix
-                    | other ->
-                        if st.Lifecycle = FallbackLifecycle.TaskComplete then
-                            let sm = unbox<ISessionManager> (Dyn.get session "sessionManager")
-                            let msgs = Dyn.get sm "messages"
+                    if st.Lifecycle = FallbackLifecycle.Cancelled then
+                        return abortedPrefix
+                    elif isSuccess then
+                        let sm = unbox<ISessionManager> (Dyn.get session "sessionManager")
+                        let msgs = Dyn.get sm "messages"
 
-                            let lastUserIdx =
-                                if Dyn.isNullish msgs || not (Dyn.isArray msgs) then
-                                    0
-                                else
-                                    let arr = unbox<obj[]> msgs
+                        let lastUserIdx =
+                            if Dyn.isNullish msgs || not (Dyn.isArray msgs) then
+                                0
+                            else
+                                let arr = unbox<obj[]> msgs
 
-                                    arr
-                                    |> Array.tryFindIndexBack (fun m -> Dyn.str m "role" = "user")
-                                    |> Option.defaultValue 0
+                                arr
+                                |> Array.tryFindIndexBack (fun m -> Dyn.str m "role" = "user")
+                                |> Option.defaultValue 0
 
-                            let finalStartIndex =
-                                if Dyn.isNullish msgs || not (Dyn.isArray msgs) then
-                                    lastUserIdx
-                                else
-                                    let arr = unbox<obj[]> msgs
+                        let finalStartIndex =
+                            if Dyn.isNullish msgs || not (Dyn.isArray msgs) then
+                                lastUserIdx
+                            else
+                                let arr = unbox<obj[]> msgs
 
-                                    if startCount >= arr.Length then lastUserIdx
-                                    else if lastUserIdx >= startCount then lastUserIdx
-                                    else startCount
+                                if startCount >= arr.Length then lastUserIdx
+                                else if lastUserIdx >= startCount then lastUserIdx
+                                else startCount
 
-                            return readAssistantText sm finalStartIndex "\n\n" |> Option.defaultValue noOutputText
-                        else
-                            return! Promise.reject err
-                else
-                    return! Promise.reject err
-        finally
-            if childId <> "" then
-                fallbackRuntime.ClearSubsessionRun(childId, runId)
+                        return readAssistantText sm finalStartIndex "\n\n" |> Option.defaultValue noOutputText
+                    else
+                        return! Promise.reject err
+            finally
+                ChildSessionMailboxRegistry.Remove childId
+
+                if childId <> "" then
+                    fallbackRuntime.ClearSubsessionPending childId
+                    fallbackRuntime.ClearSubsessionRun(childId, runId)
+        with err ->
+            return! Promise.reject err
     }

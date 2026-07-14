@@ -166,7 +166,114 @@ let ompEventTranslator (runtime: FallbackRuntimeState) : IEventTranslator =
                 else
                     Some(string agentVal)
 
-            modelStr, agent }
+            modelStr, agent
+
+        member _.IsAssistantMessage(rawEvent: obj) =
+            let ev = Dyn.get rawEvent "event"
+
+            if Dyn.isNullish ev then
+                false
+            else
+                let t = Dyn.str ev "type"
+                let info = Dyn.get ev "info"
+
+                (t = "message.updated" || t.StartsWith("message.part."))
+                && not (Dyn.isNullish info)
+                && Dyn.str info "role" = "assistant"
+
+        member _.ExtractAssistantMessageId(rawEvent: obj) =
+            let ev = Dyn.get rawEvent "event"
+
+            if Dyn.isNullish ev then
+                None
+            else
+                let t = Dyn.str ev "type"
+
+                if t = "session.idle" || t = "session.error" then
+                    None
+                else
+                    let info = Dyn.get ev "info"
+                    let info = if Dyn.isNullish info then ev else info
+                    let id = Dyn.str info "id"
+                    if id <> "" then Some id else None
+
+        member _.ExtractAssistantParentId(rawEvent: obj) =
+            let ev = Dyn.get rawEvent "event"
+
+            if Dyn.isNullish ev then
+                None
+            else
+                let info = Dyn.get ev "info"
+                let info = if Dyn.isNullish info then ev else info
+                let pid = Dyn.str info "parentID"
+                let pid = if pid <> "" then pid else Dyn.str info "parentId"
+                if pid <> "" then Some pid else None
+
+        member _.ExtractContinuationIdentity(rawEvent: obj) =
+            let ev = Dyn.get rawEvent "event"
+            let ev = if Dyn.isNullish ev then rawEvent else ev
+            let info = Dyn.get ev "info"
+            let info = if Dyn.isNullish info then ev else info
+            let props = Dyn.get rawEvent "props"
+            let props = if Dyn.isNullish props then rawEvent else props
+
+            let cid = Dyn.str info "continuationId"
+            let cid = if cid <> "" then cid else Dyn.str info "continuationID"
+            let cid = if cid <> "" then cid else Dyn.str ev "continuationId"
+            let cid = if cid <> "" then cid else Dyn.str ev "continuationID"
+            let cid = if cid <> "" then cid else Dyn.str props "continuationId"
+            let cid = if cid <> "" then cid else Dyn.str props "continuationID"
+            let cid = if cid <> "" then cid else Dyn.str rawEvent "continuationId"
+            let cid = if cid <> "" then cid else Dyn.str rawEvent "continuationID"
+
+            let o = Dyn.get info "continuationOrdinal"
+
+            let o =
+                if Dyn.isNullish o then
+                    Dyn.get ev "continuationOrdinal"
+                else
+                    o
+
+            let o =
+                if Dyn.isNullish o then
+                    Dyn.get props "continuationOrdinal"
+                else
+                    o
+
+            let o =
+                if Dyn.isNullish o then
+                    Dyn.get rawEvent "continuationOrdinal"
+                else
+                    o
+
+            let ord = getOrdinal o
+            if cid <> "" then Some(cid, ord) else None
+
+        member _.ExtractHostRunId(rawEvent: obj) =
+            let ev = Dyn.get rawEvent "event"
+            let ev = if Dyn.isNullish ev then rawEvent else ev
+            let info = Dyn.get ev "info"
+            let info = if Dyn.isNullish info then ev else info
+            let props = Dyn.get rawEvent "props"
+            let props = if Dyn.isNullish props then rawEvent else props
+
+            let tid = Dyn.str info "turnId"
+            let tid = if tid <> "" then tid else Dyn.str info "turnID"
+            let tid = if tid <> "" then tid else Dyn.str info "runId"
+            let tid = if tid <> "" then tid else Dyn.str info "runID"
+            let tid = if tid <> "" then tid else Dyn.str ev "turnId"
+            let tid = if tid <> "" then tid else Dyn.str ev "turnID"
+            let tid = if tid <> "" then tid else Dyn.str ev "runId"
+            let tid = if tid <> "" then tid else Dyn.str ev "runID"
+            let tid = if tid <> "" then tid else Dyn.str props "turnId"
+            let tid = if tid <> "" then tid else Dyn.str props "turnID"
+            let tid = if tid <> "" then tid else Dyn.str props "runId"
+            let tid = if tid <> "" then tid else Dyn.str props "runID"
+            let tid = if tid <> "" then tid else Dyn.str rawEvent "turnId"
+            let tid = if tid <> "" then tid else Dyn.str rawEvent "turnID"
+            let tid = if tid <> "" then tid else Dyn.str rawEvent "runId"
+            let tid = if tid <> "" then tid else Dyn.str rawEvent "runID"
+            if tid <> "" then Some tid else None }
 
 let private tryGetSession (sessionID: string) (sessionApi: obj) : obj option =
     match Wanxiangshu.Omp.ExecutorTools.ompScope.TryFindKey("omp_session_" + sessionID) with
@@ -227,7 +334,10 @@ let ompActionExecutor (runtime: FallbackRuntimeState) (sessionApi: obj) : IActio
                 let modelStr, agent = resolveModelAndAgent model sessionID
 
                 let pObj =
-                    let p = {| text = zwsChar; model = modelStr |}
+                    let p =
+                        {| text = zwsChar
+                           model = modelStr
+                           continuationID = continuationID |}
 
                     if agent <> "" then Dyn.withKey p "agent" agent else box p
 
@@ -244,7 +354,8 @@ let ompActionExecutor (runtime: FallbackRuntimeState) (sessionApi: obj) : IActio
                 let pObj =
                     let p =
                         {| text = promptText
-                           model = modelStr |}
+                           model = modelStr
+                           continuationID = continuationID |}
 
                     if agent <> "" then Dyn.withKey p "agent" agent else box p
 
@@ -328,9 +439,80 @@ let createOmpFallbackHandler
     fun (rawEvent: obj) ->
         promise {
             let sessionID = translator.ExtractSessionID rawEvent
-            bindAgentAndModel runtime rawEvent
-            let! result = baseHandler rawEvent
-            setConsumedFromResult runtime sessionID result
-            clearConsumedOnNewUserMessage runtime sessionID rawEvent
-            return result
+
+            match ChildSessionMailbox.ChildSessionMailboxRegistry.TryGet(sessionID) with
+            | Some mailbox ->
+                if translator.IsSessionError rawEvent then
+                    let errorObj =
+                        match translator.TranslateError rawEvent with
+                        | Some(FallbackEvent.SessionError err) -> err
+                        | _ ->
+                            { ErrorName = "UnknownError"
+                              DomainError = None
+                              Message = "An unknown error occurred"
+                              StatusCode = None
+                              IsRetryable = None }
+
+                    do! mailbox.Post(ChildSessionMailbox.Command.TurnError errorObj)
+                elif translator.IsSessionIdle rawEvent then
+                    do! mailbox.Post(ChildSessionMailbox.Command.SessionIdle)
+
+                return
+                    { Consumed = true
+                      State = runtime.GetOrCreateState sessionID }
+            | None ->
+                bindAgentAndModel runtime rawEvent
+
+                let eventObj = Dyn.get rawEvent "event"
+
+                if not (Dyn.isNullish eventObj) && Dyn.str eventObj "type" = "message.updated" then
+                    let info = Dyn.get eventObj "info"
+
+                    if not (Dyn.isNullish info) && Dyn.str info "role" = "user" then
+                        let parts = Dyn.get eventObj "parts"
+                        let text = getPartsTextLocal parts
+
+                        if isSyntheticText text then
+                            let msgId = Dyn.str info "id"
+
+                            match translator.ExtractContinuationIdentity rawEvent with
+                            | Some(nonce, _) ->
+                                match runtime.TryGetPendingLease sessionID with
+                                | Some lease when
+                                    (lease.Status = "dispatch_started"
+                                     || lease.Status = "dispatched"
+                                     || lease.Status = "running")
+                                    && lease.ContinuationID = nonce
+                                    ->
+                                    let curGen = runtime.GetSessionGeneration sessionID
+                                    let curCancel = runtime.GetCancelGeneration sessionID
+                                    let curTurnId = runtime.GetHumanTurnId sessionID
+
+                                    if
+                                        lease.SessionGeneration = curGen
+                                        && lease.CancelGeneration = curCancel
+                                        && lease.HumanTurnID = curTurnId
+                                    then
+                                        match runtime.TryGetActiveRunId sessionID with
+                                        | Some runId ->
+                                            match runtime.GetSubsessionRun(sessionID, runId) with
+                                            | Some subRun ->
+                                                subRun.InjectedUserMessageId <- Some msgId
+
+                                                do!
+                                                    Wanxiangshu.Shell.EventLogRuntimeAppend.appendSubsessionInjectedUserObservedOrFail
+                                                        workspaceRoot
+                                                        sessionID
+                                                        sessionID
+                                                        runId
+                                                        msgId
+                                            | None -> ()
+                                        | None -> ()
+                                | _ -> ()
+                            | None -> ()
+
+                let! result = baseHandler rawEvent
+                setConsumedFromResult runtime sessionID result
+                clearConsumedOnNewUserMessage runtime sessionID rawEvent
+                return result
         }

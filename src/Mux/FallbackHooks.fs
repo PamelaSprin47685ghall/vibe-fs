@@ -69,7 +69,38 @@ let muxEventTranslator: IEventTranslator =
 
         member _.ExtractNewUserMessageId(_rawEvent) = None
 
-        member _.ExtractRoutingContext(_rawEvent) = None, None }
+        member _.ExtractRoutingContext(_rawEvent) = None, None
+
+        member _.IsAssistantMessage(rawEvent: obj) = false
+        member _.ExtractAssistantMessageId(rawEvent: obj) = None
+        member _.ExtractAssistantParentId(rawEvent: obj) = None
+
+        member _.ExtractContinuationIdentity(rawEvent: obj) =
+            let props = Dyn.get rawEvent "properties"
+            let props = if Dyn.isNullish props then rawEvent else props
+            let cid = Dyn.str props "continuationId"
+            let cid = if cid <> "" then cid else Dyn.str props "continuationID"
+            let cid = if cid <> "" then cid else Dyn.str rawEvent "continuationId"
+            let cid = if cid <> "" then cid else Dyn.str rawEvent "continuationID"
+            let o = Dyn.get props "continuationOrdinal"
+
+            let o =
+                if Dyn.isNullish o then
+                    Dyn.get rawEvent "continuationOrdinal"
+                else
+                    o
+
+            let ord = getOrdinal o
+            if cid <> "" then Some(cid, ord) else None
+
+        member _.ExtractHostRunId(rawEvent: obj) =
+            let props = Dyn.get rawEvent "properties"
+            let props = if Dyn.isNullish props then rawEvent else props
+            let tid = Dyn.str props "turnId"
+            let tid = if tid <> "" then tid else Dyn.str props "turnID"
+            let tid = if tid <> "" then tid else Dyn.str props "runId"
+            let tid = if tid <> "" then tid else Dyn.str props "runID"
+            if tid <> "" then Some tid else None }
 
 let muxActionExecutor (helpers: obj) : IActionExecutor =
     let invokeNudge (workspaceId: string) (text: string) : JS.Promise<unit> =

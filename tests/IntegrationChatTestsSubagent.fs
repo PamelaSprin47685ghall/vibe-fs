@@ -8,6 +8,7 @@ open Wanxiangshu.Opencode.Plugin
 open Wanxiangshu.Shell.ChildAgentRegistry
 open Wanxiangshu.Opencode.SessionIo
 open Wanxiangshu.Shell.Dyn
+open Wanxiangshu.Shell.ChildSessionMailbox
 
 let websearchBoundariesSpec () =
     promise {
@@ -61,6 +62,12 @@ let subagentParentSpec () =
                                         let childId = "child-session-123"
                                         runtime.ClearSubsessionPending childId
                                         runtime.SetTaskComplete childId true
+
+                                        match ChildSessionMailboxRegistry.TryGet childId with
+                                        | Some mb ->
+                                            do! mb.Post(Command.TaskComplete "")
+                                            do! mb.Post(Command.SessionIdle)
+                                        | None -> ()
                                     }))
                             )
                             "messages",
@@ -141,6 +148,12 @@ let nestedSubagentSpec () =
                                         let cid = $"child-{createCalls.Count}"
                                         runtime.ClearSubsessionPending cid
                                         runtime.SetTaskComplete cid true
+
+                                        match ChildSessionMailboxRegistry.TryGet cid with
+                                        | Some mb ->
+                                            do! mb.Post(Command.TaskComplete "")
+                                            do! mb.Post(Command.SessionIdle)
+                                        | None -> ()
                                     }))
                             )
                             "messages",

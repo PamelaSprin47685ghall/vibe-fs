@@ -111,6 +111,32 @@ let cleanupSession_doesNotAffectOtherSessions () =
     equal "sess-2 model" "m2" ch2.[0].ModelID
 
 // ---------------------------------------------------------------------------
+// Subsession Event Match
+// ---------------------------------------------------------------------------
+
+let subsessionMatch_awaitingStart_refusesTerminalWithoutId () =
+    let rt = FallbackRuntimeState()
+    let childID = "child-1"
+    let parentID = "parent-1"
+    let runId = "run-1"
+    let started = rt.StartSubsessionRun(childID, parentID, runId)
+    equal "subsession started" true started
+    rt.ActivateAttempt(childID, "cont-1", 1, None)
+
+    let matchResError =
+        rt.CheckSubsessionEventMatch(childID, "", 0, false, None, None, None, true)
+
+    equal
+        "should not match terminal error without ID in AwaitingStart"
+        (Some SubsessionMatchResult.NoMatch)
+        matchResError
+
+    let matchResIdle =
+        rt.CheckSubsessionEventMatch(childID, "", 0, false, None, None, None, false)
+
+    equal "should not match terminal idle without ID in AwaitingStart" (Some SubsessionMatchResult.NoMatch) matchResIdle
+
+// ---------------------------------------------------------------------------
 // Suite entry
 // ---------------------------------------------------------------------------
 
@@ -124,3 +150,4 @@ let run () =
     agentName_emptyByDefault ()
     cleanupSession_removesAllState ()
     cleanupSession_doesNotAffectOtherSessions ()
+    subsessionMatch_awaitingStart_refusesTerminalWithoutId ()

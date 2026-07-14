@@ -9,11 +9,16 @@ open Wanxiangshu.Shell.FallbackRuntimeState
 open Wanxiangshu.Shell.ChildAgentRegistry
 open Wanxiangshu.Opencode.SubagentIo
 open Wanxiangshu.Kernel.Domain
+open Wanxiangshu.Shell.ChildSessionMailbox
+open Wanxiangshu.Tests.TempWorkspace
 
 let private waitForListenerRegistered (runtime: FallbackRuntimeState) (sessionID: string) : JS.Promise<unit> =
     let rec poll () =
         promise {
-            if runtime.HasListeners sessionID then
+            if
+                runtime.HasListeners sessionID
+                || ChildSessionMailboxRegistry.TryGet sessionID |> Option.isSome
+            then
                 return ()
             else
                 do! yieldMicrotask ()
@@ -25,93 +30,107 @@ let private waitForListenerRegistered (runtime: FallbackRuntimeState) (sessionID
 /// session.prompt may resolve before child events; SubsessionPending must block settle.
 let runSubagentDoesNotExtractTextWhilePendingAfterEarlyPromptResolve () =
     promise {
-        let rt = FallbackRuntimeState()
-        let registry = ChildAgentRegistry.Create()
-        let childId = "child-early-prompt"
-        registry.RegisterChildAgent(childId, "coder", Some "parent-1")
+        let! dir = mkdtempAsync "subagent-early-prompt-"
 
-        let s0 = rt.GetOrCreateState childId
+        try
+            let rt = FallbackRuntimeState()
+            let registry = ChildAgentRegistry.Create()
+            let childId = "child-early-prompt"
+            registry.RegisterChildAgent(childId, "coder", Some "parent-1")
 
-        rt.UpdateState
-            childId
-            { s0 with
-                Phase = FallbackPhase.Idle
-                Lifecycle = FallbackLifecycle.Active }
+            let s0 = rt.GetOrCreateState childId
 
-        rt.SetConsumed childId false
-        let messagesCallCount = ref 0
+            rt.UpdateState
+                childId
+                { s0 with
+                    Phase = FallbackPhase.Idle
+                    Lifecycle = FallbackLifecycle.Active }
 
-        let client =
-            createObj
-                [ "session",
-                  box (
-                      createObj
-                          [ "create",
-                            box (
-                                System.Func<obj, JS.Promise<obj>>(fun _ ->
-                                    promise { return box {| data = box {| id = childId |} |} })
-                            )
-                            "prompt", box (System.Func<obj, JS.Promise<unit>>(fun _ -> promise { return () }))
-                            "messages",
-                            box (
-                                System.Func<obj, JS.Promise<obj>>(fun _ ->
-                                    promise {
-                                        messagesCallCount.Value <- messagesCallCount.Value + 1
+            rt.SetConsumed childId false
+            let messagesCallCount = ref 0
 
-                                        return
-                                            box
-                                                {| data =
-                                                    [| box
-                                                           {| info = box {| role = "assistant" |}
-                                                              parts =
-                                                               [| box
-                                                                      {| ``type`` = "text"
-                                                                         text = "after-busy" |} |] |} |] |}
-                                    })
-                            )
-                            "abort", box (System.Func<obj, JS.Promise<unit>>(fun _ -> Promise.lift ())) ]
-                  ) ]
+            let client =
+                createObj
+                    [ "session",
+                      box (
+                          createObj
+                              [ "create",
+                                box (
+                                    System.Func<obj, JS.Promise<obj>>(fun _ ->
+                                        promise { return box {| data = box {| id = childId |} |} })
+                                )
+                                "prompt", box (System.Func<obj, JS.Promise<unit>>(fun _ -> promise { return () }))
+                                "messages",
+                                box (
+                                    System.Func<obj, JS.Promise<obj>>(fun _ ->
+                                        promise {
+                                            messagesCallCount.Value <- messagesCallCount.Value + 1
 
-        let runP =
-            runSubagentCoreResult
-                rt
-                registry
-                client
-                "coder"
-                "Continue"
-                "go"
-                "/tmp"
-                "parent-1"
-                (box null)
-                (box null)
-                false
-                (Some childId)
+                                            return
+                                                box
+                                                    {| data =
+                                                        [| box
+                                                               {| info = box {| role = "assistant" |}
+                                                                  parts =
+                                                                   [| box
+                                                                          {| ``type`` = "text"
+                                                                             text = "after-busy" |} |] |} |] |}
+                                        })
+                                )
+                                "abort", box (System.Func<obj, JS.Promise<unit>>(fun _ -> Promise.lift ())) ]
+                      ) ]
 
-        do! waitForListenerRegistered rt childId
-        do! yieldMicrotask ()
+            let runP =
+                runSubagentCoreResult
+                    rt
+                    registry
+                    client
+                    "coder"
+                    "Continue"
+                    "go"
+                    dir
+                    "parent-1"
+                    (box null)
+                    (box null)
+                    false
+                    (Some childId)
 
-        check "pending blocks extract" (messagesCallCount.Value = 1)
+            do! waitForListenerRegistered rt childId
+            do! yieldMicrotask ()
 
-        rt.ClearSubsessionPending childId
-        rt.SetBusyCount childId 1
-        do! yieldMicrotask ()
-        check "busy blocks extract" (messagesCallCount.Value = 1)
+            check "pending blocks extract" (messagesCallCount.Value = 1)
 
-        rt.SetBusyCount childId 0
-        let s0 = rt.GetOrCreateState childId
+            rt.ClearSubsessionPending childId
+            rt.SetBusyCount childId 1
+            do! yieldMicrotask ()
+            check "busy blocks extract" (messagesCallCount.Value = 1)
 
-        rt.UpdateState
-            childId
-            { s0 with
-                Lifecycle = FallbackLifecycle.TaskComplete }
+            rt.SetBusyCount childId 0
+            let s0 = rt.GetOrCreateState childId
 
-        let! result = runP
+            rt.UpdateState
+                childId
+                { s0 with
+                    Lifecycle = FallbackLifecycle.TaskComplete }
 
-        check "extract after complete" (messagesCallCount.Value = 2)
+            match ChildSessionMailboxRegistry.TryGet childId with
+            | Some mb ->
+                do! mb.Post(Command.TaskComplete "")
+                do! mb.Post(Command.SessionIdle)
+            | None -> ()
 
-        match result with
-        | Ok text -> check "output present" (text.Contains "after-busy")
-        | Error _ -> failwith "expected Ok"
+            let! result = runP
+
+            check "extract after complete" (messagesCallCount.Value = 2)
+
+            do! rmAsync dir
+
+            match result with
+            | Ok text -> check "output present" (text.Contains "after-busy")
+            | Error _ -> failwith "expected Ok"
+        with ex ->
+            do! rmAsync dir
+            return! Promise.reject ex
     }
 
 /// Regression: prompt network error → inner catch waitForSubagentSettle.
@@ -119,109 +138,123 @@ let runSubagentDoesNotExtractTextWhilePendingAfterEarlyPromptResolve () =
 /// fallbackGateOpen ignores TaskComplete. Must NOT hang; must extract text.
 let runSubagentCompletesDespiteRetryingPhaseAfterNetworkError () =
     promise {
-        let rt = FallbackRuntimeState()
-        let registry = ChildAgentRegistry.Create()
-        let childId = "child-retrying-complete"
-        registry.RegisterChildAgent(childId, "investigator", Some "parent-2")
+        let! dir = mkdtempAsync "subagent-retrying-complete-"
 
-        let promptStartedResolver = ref (fun () -> ())
+        try
+            let rt = FallbackRuntimeState()
+            let registry = ChildAgentRegistry.Create()
+            let childId = "child-retrying-complete"
+            registry.RegisterChildAgent(childId, "investigator", Some "parent-2")
 
-        let promptStarted: JS.Promise<unit> =
-            Promise.create (fun resolve _ -> promptStartedResolver.Value <- resolve)
+            let promptStartedResolver = ref (fun () -> ())
 
-        let promptReleaseResolver = ref (fun () -> ())
+            let promptStarted: JS.Promise<unit> =
+                Promise.create (fun resolve _ -> promptStartedResolver.Value <- resolve)
 
-        let promptRelease: JS.Promise<unit> =
-            Promise.create (fun resolve _ -> promptReleaseResolver.Value <- resolve)
+            let promptReleaseResolver = ref (fun () -> ())
 
-        let promptRejectedResolver = ref (fun () -> ())
+            let promptRelease: JS.Promise<unit> =
+                Promise.create (fun resolve _ -> promptReleaseResolver.Value <- resolve)
 
-        let promptRejected: JS.Promise<unit> =
-            Promise.create (fun resolve _ -> promptRejectedResolver.Value <- resolve)
+            let promptRejectedResolver = ref (fun () -> ())
 
-        let messagesCallCount = ref 0
+            let promptRejected: JS.Promise<unit> =
+                Promise.create (fun resolve _ -> promptRejectedResolver.Value <- resolve)
 
-        let finalMessagePart = createObj [ "type", box "text"; "text", box "final-output" ]
+            let messagesCallCount = ref 0
 
-        let finalMessage =
-            createObj
-                [ "info", box (createObj [ "role", box "assistant" ])
-                  "parts", box [| box finalMessagePart |] ]
+            let finalMessagePart = createObj [ "type", box "text"; "text", box "final-output" ]
 
-        let finalMessages = createObj [ "data", box [| box finalMessage |] ]
+            let finalMessage =
+                createObj
+                    [ "info", box (createObj [ "role", box "assistant" ])
+                      "parts", box [| box finalMessagePart |] ]
 
-        let session =
-            createObj
-                [ "create",
-                  box (
-                      System.Func<obj, JS.Promise<obj>>(fun _ ->
-                          promise { return box {| data = box {| id = childId |} |} })
-                  )
-                  "prompt",
-                  box (
-                      System.Func<obj, JS.Promise<unit>>(fun _ ->
-                          promise {
-                              promptStartedResolver.Value()
-                              do! promptRelease
-                              promptRejectedResolver.Value()
-                              return! Promise.reject (exn "network connection lost")
-                          })
-                  )
-                  "messages",
-                  box (
-                      System.Func<obj, JS.Promise<obj>>(fun _ ->
-                          messagesCallCount.Value <- messagesCallCount.Value + 1
-                          Promise.lift finalMessages)
-                  )
-                  "abort", box (System.Func<obj, JS.Promise<unit>>(fun _ -> Promise.lift ())) ]
+            let finalMessages = createObj [ "data", box [| box finalMessage |] ]
 
-        let client = createObj [ "session", box session ]
+            let session =
+                createObj
+                    [ "create",
+                      box (
+                          System.Func<obj, JS.Promise<obj>>(fun _ ->
+                              promise { return box {| data = box {| id = childId |} |} })
+                      )
+                      "prompt",
+                      box (
+                          System.Func<obj, JS.Promise<unit>>(fun _ ->
+                              promise {
+                                  promptStartedResolver.Value()
+                                  do! promptRelease
+                                  promptRejectedResolver.Value()
+                                  return! Promise.reject (exn "network connection lost")
+                              })
+                      )
+                      "messages",
+                      box (
+                          System.Func<obj, JS.Promise<obj>>(fun _ ->
+                              messagesCallCount.Value <- messagesCallCount.Value + 1
+                              Promise.lift finalMessages)
+                      )
+                      "abort", box (System.Func<obj, JS.Promise<unit>>(fun _ -> Promise.lift ())) ]
 
-        let runP =
-            runSubagentCoreResult
-                rt
-                registry
-                client
-                "investigator"
-                "Continue"
-                "go"
-                "/tmp"
-                "parent-2"
-                (box null)
-                (box null)
-                false
-                (Some childId)
+            let client = createObj [ "session", box session ]
 
-        do! promptStarted
+            let runP =
+                runSubagentCoreResult
+                    rt
+                    registry
+                    client
+                    "investigator"
+                    "Continue"
+                    "go"
+                    dir
+                    "parent-2"
+                    (box null)
+                    (box null)
+                    false
+                    (Some childId)
 
-        let s0 = rt.GetOrCreateState childId
+            do! promptStarted
 
-        rt.UpdateState
-            childId
-            { s0 with
-                Phase = FallbackPhase.Retrying 1
-                Lifecycle = FallbackLifecycle.Active }
+            let s0 = rt.GetOrCreateState childId
 
-        rt.SetConsumed childId true
-        rt.ClearSubsessionPending childId
+            rt.UpdateState
+                childId
+                { s0 with
+                    Phase = FallbackPhase.Retrying 1
+                    Lifecycle = FallbackLifecycle.Active }
 
-        promptReleaseResolver.Value()
-        do! promptRejected
-        check "continue error waits before completion" (messagesCallCount.Value = 1)
-        rt.SetTaskComplete childId true
+            rt.SetConsumed childId true
+            rt.ClearSubsessionPending childId
 
-        for _ in 1..8 do
-            do! yieldMicrotask ()
+            promptReleaseResolver.Value()
+            do! promptRejected
+            check "continue error waits before completion" (messagesCallCount.Value = 1)
+            rt.SetTaskComplete childId true
 
-        let completedBeforePhaseReset = (messagesCallCount.Value = 2)
-        let! result = runP
+            match ChildSessionMailboxRegistry.TryGet childId with
+            | Some mb ->
+                do! mb.Post(Command.TaskComplete "")
+                do! mb.Post(Command.SessionIdle)
+            | None -> ()
 
-        check "completed before residual phase reset" completedBeforePhaseReset
-        check "extract after complete" (messagesCallCount.Value = 2)
+            for _ in 1..8 do
+                do! yieldMicrotask ()
 
-        match result with
-        | Ok text -> check "output contains final-output" (text.Contains "final-output")
-        | Error _ -> failwith "expected Ok result"
+            let completedBeforePhaseReset = (messagesCallCount.Value = 2)
+            let! result = runP
+
+            check "completed before residual phase reset" completedBeforePhaseReset
+            check "extract after complete" (messagesCallCount.Value = 2)
+
+            do! rmAsync dir
+
+            match result with
+            | Ok text -> check "output contains final-output" (text.Contains "final-output")
+            | Error _ -> failwith "expected Ok result"
+        with ex ->
+            do! rmAsync dir
+            return! Promise.reject ex
     }
 
 let run () =

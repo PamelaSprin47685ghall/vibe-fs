@@ -162,6 +162,8 @@ type SessionLifecycleObserver
 
     member _.FallbackRuntime = fallbackRuntime
 
+    member _.WorkspaceRoot = if Dyn.isNullish ctx then "" else pluginDirectoryFromCtx ctx
+
     member _.handleCommandExecuteBefore (input: obj) (_output: obj) : JS.Promise<unit> =
         let _sessionIDStr = sessionIdFromHookInput input ""
         resolvedUnitPromise ()

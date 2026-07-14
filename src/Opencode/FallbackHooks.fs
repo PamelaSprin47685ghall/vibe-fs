@@ -133,7 +133,77 @@ let opencodeEventTranslator (runtime: FallbackRuntimeState) : IEventTranslator =
                 else
                     Some(string agentVal)
 
-            modelStr, agent }
+            modelStr, agent
+
+        member _.IsAssistantMessage rawEvent =
+            let eventType = getEventType rawEvent
+            let props = getProps rawEvent
+
+            (eventType = "message.updated" || eventType.StartsWith("message.part."))
+            && not (Dyn.isNullish props)
+            && (let info = Dyn.get props "info"
+                not (Dyn.isNullish info) && Dyn.str info "role" = "assistant")
+
+        member _.ExtractAssistantMessageId rawEvent =
+            let eventType = getEventType rawEvent
+
+            if eventType = "session.idle" || eventType = "session.error" then
+                None
+            else
+                let props = getProps rawEvent
+                let info = Dyn.get props "info"
+                let msg = Dyn.get props "message"
+
+                let info =
+                    if not (Dyn.isNullish info) then info
+                    else if not (Dyn.isNullish msg) then msg
+                    else props
+
+                let id = Dyn.str info "id"
+                if id <> "" then Some id else None
+
+        member _.ExtractAssistantParentId rawEvent =
+            let props = getProps rawEvent
+            let info = Dyn.get props "info"
+            let msg = Dyn.get props "message"
+
+            let info =
+                if not (Dyn.isNullish info) then info
+                else if not (Dyn.isNullish msg) then msg
+                else props
+
+            let pid = Dyn.str info "parentID"
+            let pid = if pid <> "" then pid else Dyn.str info "parentId"
+            if pid <> "" then Some pid else None
+
+        member _.ExtractContinuationIdentity rawEvent =
+            let props = getProps rawEvent
+            let props = if Dyn.isNullish props then rawEvent else props
+            let cid = Dyn.str props "continuationId"
+            let cid = if cid <> "" then cid else Dyn.str props "continuationID"
+            let cid = if cid <> "" then cid else Dyn.str rawEvent "continuationId"
+            let cid = if cid <> "" then cid else Dyn.str rawEvent "continuationID"
+            let o = Dyn.get props "continuationOrdinal"
+
+            let o =
+                if Dyn.isNullish o then
+                    Dyn.get rawEvent "continuationOrdinal"
+                else
+                    o
+
+            let ord = getOrdinal o
+            if cid <> "" then Some(cid, ord) else None
+
+        member _.ExtractHostRunId rawEvent =
+            let props = getProps rawEvent
+            let props = if Dyn.isNullish props then rawEvent else props
+            let info = Dyn.get props "info"
+            let info = if Dyn.isNullish info then props else info
+            let tid = Dyn.str info "turnId"
+            let tid = if tid <> "" then tid else Dyn.str info "turnID"
+            let tid = if tid <> "" then tid else Dyn.str info "runId"
+            let tid = if tid <> "" then tid else Dyn.str info "runID"
+            if tid <> "" then Some tid else None }
 
 let opencodeActionExecutor (runtime: FallbackRuntimeState) (client: obj) : IActionExecutor =
     let resolveModelAndAgent
@@ -273,8 +343,30 @@ let createOpencodeFallbackHandler
     fun rawEvent ->
         promise {
             let sessionID = translator.ExtractSessionID rawEvent
-            let! result = baseHandler rawEvent
-            setConsumedFromResult runtime sessionID result
-            clearConsumedOnNewUserMessage runtime sessionID rawEvent
-            return result
+
+            match ChildSessionMailbox.ChildSessionMailboxRegistry.TryGet(sessionID) with
+            | Some mailbox ->
+                if translator.IsSessionError rawEvent then
+                    let errorObj =
+                        match translator.TranslateError rawEvent with
+                        | Some(FallbackEvent.SessionError err) -> err
+                        | _ ->
+                            { ErrorName = "UnknownError"
+                              DomainError = None
+                              Message = "An unknown error occurred"
+                              StatusCode = None
+                              IsRetryable = None }
+
+                    do! mailbox.Post(ChildSessionMailbox.Command.TurnError errorObj)
+                elif translator.IsSessionIdle rawEvent then
+                    do! mailbox.Post(ChildSessionMailbox.Command.SessionIdle)
+
+                return
+                    { Consumed = true
+                      State = runtime.GetOrCreateState sessionID }
+            | None ->
+                let! result = baseHandler rawEvent
+                setConsumedFromResult runtime sessionID result
+                clearConsumedOnNewUserMessage runtime sessionID rawEvent
+                return result
         }

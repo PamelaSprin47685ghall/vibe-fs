@@ -7,6 +7,10 @@ open Wanxiangshu.Kernel.Domain
 open Wanxiangshu.Kernel.FallbackKernel.Types
 open Wanxiangshu.Shell.FallbackRuntimeState
 open Wanxiangshu.Shell.FallbackEventBridge
+open Wanxiangshu.Shell
+
+module Dyn = Wanxiangshu.Shell.Dyn
+
 open Wanxiangshu.Tests.FallbackEventBridgeTestsPart2
 open Wanxiangshu.Tests.FallbackEventBridgeTestsPendingReview
 
@@ -78,6 +82,65 @@ type FakeTranslator(sessionID: string, evt: FallbackEvent) =
         member _.ExtractNewUserMessageId(_rawEvent) = None
 
         member _.ExtractRoutingContext(_rawEvent: obj) = None, None
+
+        member _.IsAssistantMessage(rawEvent: obj) =
+            let props = Dyn.get rawEvent "properties"
+
+            if Dyn.isNullish props then
+                false
+            else
+                let info = Dyn.get props "info"
+                not (Dyn.isNullish info) && Dyn.str info "role" = "assistant"
+
+        member _.ExtractAssistantMessageId(rawEvent: obj) =
+            let props = Dyn.get rawEvent "properties"
+
+            if Dyn.isNullish props then
+                None
+            else
+                let info = Dyn.get props "info"
+                let info = if Dyn.isNullish info then props else info
+                let id = Dyn.str info "id"
+                if id <> "" then Some id else None
+
+        member _.ExtractAssistantParentId(rawEvent: obj) =
+            let props = Dyn.get rawEvent "properties"
+
+            if Dyn.isNullish props then
+                None
+            else
+                let info = Dyn.get props "info"
+                let info = if Dyn.isNullish info then props else info
+                let pid = Dyn.str info "parentID"
+                let pid = if pid <> "" then pid else Dyn.str info "parentId"
+                if pid <> "" then Some pid else None
+
+        member _.ExtractContinuationIdentity(rawEvent: obj) =
+            let props = Dyn.get rawEvent "properties"
+            let props = if Dyn.isNullish props then rawEvent else props
+            let cid = Dyn.str props "continuationId"
+            let cid = if cid <> "" then cid else Dyn.str props "continuationID"
+            let cid = if cid <> "" then cid else Dyn.str rawEvent "continuationId"
+            let cid = if cid <> "" then cid else Dyn.str rawEvent "continuationID"
+            let o = Dyn.get props "continuationOrdinal"
+
+            let o =
+                if Dyn.isNullish o then
+                    Dyn.get rawEvent "continuationOrdinal"
+                else
+                    o
+
+            let ord = getOrdinal o
+            if cid <> "" then Some(cid, ord) else None
+
+        member _.ExtractHostRunId(rawEvent: obj) =
+            let props = Dyn.get rawEvent "properties"
+            let props = if Dyn.isNullish props then rawEvent else props
+            let tid = Dyn.str props "turnId"
+            let tid = if tid <> "" then tid else Dyn.str props "turnID"
+            let tid = if tid <> "" then tid else Dyn.str props "runId"
+            let tid = if tid <> "" then tid else Dyn.str props "runID"
+            if tid <> "" then Some tid else None
 
 
 let mkModel (pid: string) (mid: string) : FallbackModel =

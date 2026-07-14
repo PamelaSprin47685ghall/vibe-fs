@@ -214,6 +214,7 @@ let runSubagentWithId
                 prompt
                 SubagentResetPolicy.ResetToActive
                 sessionId
+                pi
 
         let cleanup () =
             let childSess = unbox<IChildSession> session

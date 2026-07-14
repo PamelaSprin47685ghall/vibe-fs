@@ -830,6 +830,18 @@ let private ownerAndLeaseFolder (st: OwnerEpisodeState) (e: WanEvent) : OwnerEpi
 
     | _ -> st
 
+type ReplaySubsessionRunState =
+    { RunId: string
+      ChildId: string
+      ParentSessionId: string
+      ActiveAttemptOrdinal: int
+      Status: string
+      ActiveContinuationId: string
+      ActiveContinuationOrdinal: int
+      DispatchMessageBoundary: string option
+      ActiveObservation: string
+      InjectedUserMessageId: string option }
+
 type SessionState =
     { ReviewLoop: ReviewLoopFold
       ReviewTask: string option
@@ -838,6 +850,7 @@ type SessionState =
       NudgeDedup: NudgeDedupState
       NudgeSnapshot: NudgeSnapshotState
       Subagents: Map<string, SubagentState>
+      SubsessionRuns: Map<string * string, ReplaySubsessionRunState>
       FallbackInjection: FallbackInjectionState
       LatestHumanTurn: HumanTurnState option
       SessionGeneration: int
@@ -871,6 +884,7 @@ let emptySessionState () : SessionState =
       NudgeDedup = emptyNudgeDedupState
       NudgeSnapshot = emptyNudgeSnapshotState
       Subagents = Map.empty
+      SubsessionRuns = Map.empty
       FallbackInjection = emptyFallbackInjectionState
       LatestHumanTurn = None
       SessionGeneration = 0
@@ -946,6 +960,135 @@ let private isDuplicateHumanTurn (currentHumanTurnOrdinal: int) (lastMsgId: stri
 
         newOrdinal <= currentHumanTurnOrdinal
         || (msgId.IsSome && lastMsgId.IsSome && msgId.Value = lastMsgId.Value)
+
+let private subsessionRunsFolder
+    (current: Map<string * string, ReplaySubsessionRunState>)
+    (e: WanEvent)
+    : Map<string * string, ReplaySubsessionRunState> =
+    match e.Kind with
+    | k when k = eventKindSubsessionRunStarted ->
+        let childId = defaultArg (e.Payload |> Map.tryFind "childId") ""
+        let parentSessionId = defaultArg (e.Payload |> Map.tryFind "parentSessionId") ""
+        let runId = defaultArg (e.Payload |> Map.tryFind "runId") ""
+
+        if childId = "" || runId = "" then
+            current
+        else
+            let state =
+                { RunId = runId
+                  ChildId = childId
+                  ParentSessionId = parentSessionId
+                  ActiveAttemptOrdinal = 0
+                  Status = "requested"
+                  ActiveContinuationId = ""
+                  ActiveContinuationOrdinal = 0
+                  DispatchMessageBoundary = None
+                  ActiveObservation = "AwaitingStart"
+                  InjectedUserMessageId = None }
+
+            Map.add (childId, runId) state current
+    | k when k = eventKindSubsessionAttemptActivated ->
+        let childId = defaultArg (e.Payload |> Map.tryFind "childId") ""
+        let runId = defaultArg (e.Payload |> Map.tryFind "runId") ""
+
+        if childId = "" || runId = "" then
+            current
+        else
+            match Map.tryFind (childId, runId) current with
+            | Some state ->
+                let continuationId = defaultArg (e.Payload |> Map.tryFind "continuationId") ""
+
+                let contOrdinal =
+                    e.Payload
+                    |> Map.tryFind "continuationOrdinal"
+                    |> Option.bind parseIntOpt
+                    |> Option.defaultValue 0
+
+                let attemptOrdinal =
+                    e.Payload
+                    |> Map.tryFind "attemptOrdinal"
+                    |> Option.bind parseIntOpt
+                    |> Option.defaultValue 0
+
+                let dispatchBoundary =
+                    e.Payload
+                    |> Map.tryFind "dispatchBoundary"
+                    |> Option.bind (fun s -> if s = "" then None else Some s)
+
+                let updated =
+                    { state with
+                        ActiveAttemptOrdinal = attemptOrdinal
+                        ActiveContinuationId = continuationId
+                        ActiveContinuationOrdinal = contOrdinal
+                        DispatchMessageBoundary = dispatchBoundary
+                        ActiveObservation = "AwaitingStart"
+                        InjectedUserMessageId = None }
+
+                Map.add (childId, runId) updated current
+            | None -> current
+    | k when k = eventKindSubsessionRunSettled ->
+        let childId = defaultArg (e.Payload |> Map.tryFind "childId") ""
+        let runId = defaultArg (e.Payload |> Map.tryFind "runId") ""
+
+        if childId = "" || runId = "" then
+            current
+        else
+            match Map.tryFind (childId, runId) current with
+            | Some state ->
+                let status = defaultArg (e.Payload |> Map.tryFind "status") "settled"
+                let updated = { state with Status = status }
+                Map.add (childId, runId) updated current
+            | None -> current
+    | k when k = eventKindSubsessionInjectedUserObserved ->
+        let childId = defaultArg (e.Payload |> Map.tryFind "childId") ""
+        let runId = defaultArg (e.Payload |> Map.tryFind "runId") ""
+
+        if childId = "" || runId = "" then
+            current
+        else
+            match Map.tryFind (childId, runId) current with
+            | Some state ->
+                let msgId = defaultArg (e.Payload |> Map.tryFind "injectedUserMessageId") ""
+
+                let updated =
+                    { state with
+                        InjectedUserMessageId = if msgId = "" then None else Some msgId }
+
+                Map.add (childId, runId) updated current
+            | None -> current
+    | k when k = eventKindSubsessionAssistantObserved ->
+        let childId = defaultArg (e.Payload |> Map.tryFind "childId") ""
+        let runId = defaultArg (e.Payload |> Map.tryFind "runId") ""
+
+        if childId = "" || runId = "" then
+            current
+        else
+            match Map.tryFind (childId, runId) current with
+            | Some state ->
+                let msgId = defaultArg (e.Payload |> Map.tryFind "assistantMessageId") ""
+
+                let updated =
+                    { state with
+                        ActiveObservation = "AssistantObserved:" + msgId }
+
+                Map.add (childId, runId) updated current
+            | None -> current
+    | k when k = eventKindSubsessionRunningObserved ->
+        let childId = defaultArg (e.Payload |> Map.tryFind "childId") ""
+        let runId = defaultArg (e.Payload |> Map.tryFind "runId") ""
+
+        if childId = "" || runId = "" then
+            current
+        else
+            match Map.tryFind (childId, runId) current with
+            | Some state ->
+                let updated =
+                    { state with
+                        ActiveObservation = "RunningObserved" }
+
+                Map.add (childId, runId) updated current
+            | None -> current
+    | _ -> current
 
 let applyEvent (st: SessionState) (e: WanEvent) : SessionState =
     if isLateEvent st e then
@@ -1027,6 +1170,7 @@ let applyEvent (st: SessionState) (e: WanEvent) : SessionState =
           NudgeDedup = nextNudgeDedup
           NudgeSnapshot = nextNudgeSnapshot
           Subagents = subagentFolder st.Subagents e
+          SubsessionRuns = subsessionRunsFolder st.SubsessionRuns e
           FallbackInjection = nextFallbackInjection
           LatestHumanTurn = nextHumanTurn
           SessionGeneration = nextSessionGen

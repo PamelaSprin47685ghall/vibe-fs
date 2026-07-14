@@ -137,7 +137,20 @@ let withWorkspaceLock<'T> (filePath: string) (action: unit -> JS.Promise<'T>) : 
             with _ ->
                 ()
 
-            let! release = lockfileLock filePath (lockfileOptions ())
+            let mutable releaseVal = None
+            let mutable lockError = None
+
+            try
+                let! rel = lockfileLock filePath (lockfileOptions ())
+                releaseVal <- Some rel
+            with ex ->
+                lockError <- Some ex
+
+            match lockError with
+            | Some ex -> return raise ex
+            | _ -> ()
+
+            let release = releaseVal.Value
 
             let mutable caught = None
             let mutable resOpt = None

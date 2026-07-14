@@ -65,6 +65,15 @@ type MuxHostAdapter
                 if not started then
                     return Failure(InvalidIntent("subagent", "run", "Subagent session already running"))
                 else
+                    if rtOpt.IsSome && directory <> "" then
+                        do!
+                            Wanxiangshu.Shell.EventLogRuntimeAppend.appendSubsessionRunStartedOrFail
+                                directory
+                                cid
+                                cid
+                                sessionId
+                                runId
+
                     try
                         try
                             match fromMuxConfig config with
@@ -114,6 +123,15 @@ type MuxHostAdapter
                 if not started then
                     return Failure(InvalidIntent("subagent", "run", "Subagent session already running"))
                 else
+                    if rtOpt.IsSome && directory <> "" then
+                        do!
+                            Wanxiangshu.Shell.EventLogRuntimeAppend.appendSubsessionRunStartedOrFail
+                                directory
+                                childID
+                                childID
+                                sessionId
+                                runId
+
                     try
                         try
                             match rtOpt with

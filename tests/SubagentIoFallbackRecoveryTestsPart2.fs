@@ -7,13 +7,18 @@ open Wanxiangshu.Tests.AsyncFlush
 open Wanxiangshu.Kernel.FallbackKernel.Types
 open Wanxiangshu.Shell.FallbackRuntimeState
 open Wanxiangshu.Shell.ChildAgentRegistry
+open Wanxiangshu.Shell.ChildSessionMailbox
 open Wanxiangshu.Opencode.SubagentIo
 open Wanxiangshu.Kernel.Domain
+open Wanxiangshu.Tests.TempWorkspace
 
 let private waitForListenerRegistered (runtime: FallbackRuntimeState) (sessionID: string) : JS.Promise<unit> =
     let rec poll () =
         promise {
-            if runtime.HasListeners sessionID then
+            if
+                runtime.HasListeners sessionID
+                || ChildSessionMailboxRegistry.TryGet sessionID |> Option.isSome
+            then
                 return ()
             else
                 do! yieldMicrotask ()
@@ -29,99 +34,113 @@ let private waitForListenerRegistered (runtime: FallbackRuntimeState) (sessionID
 /// while the nudge is still in flight.
 let runSubagentWaitsForNudgeToComplete () =
     promise {
-        let rt = FallbackRuntimeState()
-        let registry = ChildAgentRegistry.Create()
-        let childId = "child-nudge-wait"
-        registry.RegisterChildAgent(childId, "coder", Some "parent-1")
+        let! dir = mkdtempAsync "subagent-nudge-wait-"
 
-        let messagesCallCount = ref 0
+        try
+            let rt = FallbackRuntimeState()
+            let registry = ChildAgentRegistry.Create()
+            let childId = "child-nudge-wait"
+            registry.RegisterChildAgent(childId, "coder", Some "parent-1")
 
-        let client =
-            createObj
-                [ "session",
-                  box (
-                      createObj
-                          [ "create",
-                            box (
-                                System.Func<obj, JS.Promise<obj>>(fun _ ->
-                                    promise { return box {| data = box {| id = childId |} |} })
-                            )
-                            "prompt",
-                            box (
-                                System.Func<obj, JS.Promise<unit>>(fun _ ->
-                                    promise {
-                                        // Simulate: a nudge is currently active when prompt rejects.
-                                        // The runtime should expose this so the subagent can wait.
-                                        rt.SetNudgeActive childId true
-                                        return! Promise.reject (exn "model failed during nudge")
-                                    })
-                            )
-                            "messages",
-                            box (
-                                System.Func<obj, JS.Promise<obj>>(fun _ ->
-                                    promise {
-                                        messagesCallCount.Value <- messagesCallCount.Value + 1
+            let messagesCallCount = ref 0
 
-                                        return
-                                            box
-                                                {| data =
-                                                    [| box
-                                                           {| info = box {| role = "assistant" |}
-                                                              parts =
-                                                               [| box
-                                                                      {| ``type`` = "text"
-                                                                         text = "nudge-recovered" |} |] |} |] |}
-                                    })
-                            )
-                            "abort", box (System.Func<obj, JS.Promise<unit>>(fun _ -> Promise.lift ())) ]
-                  ) ]
+            let client =
+                createObj
+                    [ "session",
+                      box (
+                          createObj
+                              [ "create",
+                                box (
+                                    System.Func<obj, JS.Promise<obj>>(fun _ ->
+                                        promise { return box {| data = box {| id = childId |} |} })
+                                )
+                                "prompt",
+                                box (
+                                    System.Func<obj, JS.Promise<unit>>(fun _ ->
+                                        promise {
+                                            // Simulate: a nudge is currently active when prompt rejects.
+                                            // The runtime should expose this so the subagent can wait.
+                                            rt.SetNudgeActive childId true
+                                            return! Promise.reject (exn "model failed during nudge")
+                                        })
+                                )
+                                "messages",
+                                box (
+                                    System.Func<obj, JS.Promise<obj>>(fun _ ->
+                                        promise {
+                                            messagesCallCount.Value <- messagesCallCount.Value + 1
 
-        let runP =
-            let rscr
-                : FallbackRuntimeState
-                      -> ChildAgentRegistry
-                      -> obj
-                      -> string
-                      -> string
-                      -> string
-                      -> string
-                      -> string
-                      -> obj
-                      -> obj
-                      -> bool
-                      -> string option
-                      -> JS.Promise<Result<string, DomainError>> =
-                runSubagentCoreResult
+                                            return
+                                                box
+                                                    {| data =
+                                                        [| box
+                                                               {| info = box {| role = "assistant" |}
+                                                                  parts =
+                                                                   [| box
+                                                                          {| ``type`` = "text"
+                                                                             text = "nudge-recovered" |} |] |} |] |}
+                                        })
+                                )
+                                "abort", box (System.Func<obj, JS.Promise<unit>>(fun _ -> Promise.lift ())) ]
+                      ) ]
 
-            rscr rt registry client "coder" "t" "go" "/tmp" "parent-1" (box null) (box null) false None
+            let runP =
+                let rscr
+                    : FallbackRuntimeState
+                          -> ChildAgentRegistry
+                          -> obj
+                          -> string
+                          -> string
+                          -> string
+                          -> string
+                          -> string
+                          -> obj
+                          -> obj
+                          -> bool
+                          -> string option
+                          -> JS.Promise<Result<string, DomainError>> =
+                    runSubagentCoreResult
 
-        // Let the prompt rejection land and the error path execute.
-        do! waitForListenerRegistered rt childId
+                rscr rt registry client "coder" "t" "go" dir "parent-1" (box null) (box null) false None
 
-        // BUG: without the nudge-wait, the subagent has already returned Error here.
-        // The text should NOT have been extracted because the nudge is still active.
-        check "text not extracted while nudge active" (messagesCallCount.Value = 1)
+            // Let the prompt rejection land and the error path execute.
+            do! waitForListenerRegistered rt childId
 
-        // Now the nudge completes — TaskComplete is set, nudge no longer active.
-        rt.SetNudgeActive childId false
+            // BUG: without the nudge-wait, the subagent has already returned Error here.
+            // The text should NOT have been extracted because the nudge is still active.
+            check "text not extracted while nudge active" (messagesCallCount.Value = 1)
 
-        let s1 = rt.GetOrCreateState childId
+            // Now the nudge completes — TaskComplete is set, nudge no longer active.
+            rt.SetNudgeActive childId false
 
-        rt.UpdateState
-            childId
-            { s1 with
-                Lifecycle = FallbackLifecycle.TaskComplete }
+            let s1 = rt.GetOrCreateState childId
 
-        rt.ClearSubsessionPending childId
+            rt.UpdateState
+                childId
+                { s1 with
+                    Lifecycle = FallbackLifecycle.TaskComplete }
 
-        let! result = runP
+            rt.ClearSubsessionPending childId
 
-        // After nudge completes, the subagent should recover and return Ok.
-        check "text extracted after nudge settled" (messagesCallCount.Value = 2)
+            match ChildSessionMailboxRegistry.TryGet childId with
+            | Some mb ->
+                do! mb.Post(Command.TaskComplete "")
+                do! mb.Post(Command.SessionIdle)
+            | None -> ()
 
-        match result with
-        | Ok text -> check "nudge-recovered output present" (text.Contains "nudge-recovered")
-        | Error _ -> failwith "expected Ok after nudge completed"
+            let! result = runP
+
+            // After nudge completes, the subagent should recover and return Ok.
+            check "text extracted after nudge settled" (messagesCallCount.Value = 2)
+
+            do! rmAsync dir
+
+            match result with
+            | Ok text -> check "nudge-recovered output present" (text.Contains "nudge-recovered")
+            | Error _ -> failwith "expected Ok after nudge completed"
+        with ex ->
+            do! rmAsync dir
+            return! Promise.reject ex
     }
 
 /// When a continue is in progress (fallback state machine sent a continue action),
@@ -131,109 +150,123 @@ let runSubagentWaitsForNudgeToComplete () =
 /// Error while the continue is still in flight.
 let runSubagentWaitsForContinueToComplete () =
     promise {
-        let rt = FallbackRuntimeState()
-        let registry = ChildAgentRegistry.Create()
-        let childId = "child-continue-wait"
-        registry.RegisterChildAgent(childId, "investigator", Some "parent-1")
+        let! dir = mkdtempAsync "subagent-continue-wait-"
 
-        let messagesCallCount = ref 0
+        try
+            let rt = FallbackRuntimeState()
+            let registry = ChildAgentRegistry.Create()
+            let childId = "child-continue-wait"
+            registry.RegisterChildAgent(childId, "investigator", Some "parent-1")
 
-        let client =
-            createObj
-                [ "session",
-                  box (
-                      createObj
-                          [ "create",
-                            box (
-                                System.Func<obj, JS.Promise<obj>>(fun _ ->
-                                    promise { return box {| data = box {| id = childId |} |} })
-                            )
-                            "prompt",
-                            box (
-                                System.Func<obj, JS.Promise<unit>>(fun _ ->
-                                    promise {
-                                        // Simulate: fallback state machine has dispatched a continue
-                                        // action and is waiting for the model to respond.
-                                        let s = rt.GetOrCreateState childId
+            let messagesCallCount = ref 0
 
-                                        rt.UpdateState
-                                            childId
-                                            { s with
-                                                Phase = FallbackPhase.Retrying 1 }
+            let client =
+                createObj
+                    [ "session",
+                      box (
+                          createObj
+                              [ "create",
+                                box (
+                                    System.Func<obj, JS.Promise<obj>>(fun _ ->
+                                        promise { return box {| data = box {| id = childId |} |} })
+                                )
+                                "prompt",
+                                box (
+                                    System.Func<obj, JS.Promise<unit>>(fun _ ->
+                                        promise {
+                                            // Simulate: fallback state machine has dispatched a continue
+                                            // action and is waiting for the model to respond.
+                                            let s = rt.GetOrCreateState childId
 
-                                        rt.SetConsumed childId true
-                                        rt.SetContinueActive childId true
-                                        return! Promise.reject (exn "model failed during continue")
-                                    })
-                            )
-                            "messages",
-                            box (
-                                System.Func<obj, JS.Promise<obj>>(fun _ ->
-                                    promise {
-                                        messagesCallCount.Value <- messagesCallCount.Value + 1
+                                            rt.UpdateState
+                                                childId
+                                                { s with
+                                                    Phase = FallbackPhase.Retrying 1 }
 
-                                        return
-                                            box
-                                                {| data =
-                                                    [| box
-                                                           {| info = box {| role = "assistant" |}
-                                                              parts =
-                                                               [| box
-                                                                      {| ``type`` = "text"
-                                                                         text = "continue-recovered" |} |] |} |] |}
-                                    })
-                            )
-                            "abort", box (System.Func<obj, JS.Promise<unit>>(fun _ -> Promise.lift ())) ]
-                  ) ]
+                                            rt.SetConsumed childId true
+                                            rt.SetContinueActive childId true
+                                            return! Promise.reject (exn "model failed during continue")
+                                        })
+                                )
+                                "messages",
+                                box (
+                                    System.Func<obj, JS.Promise<obj>>(fun _ ->
+                                        promise {
+                                            messagesCallCount.Value <- messagesCallCount.Value + 1
 
-        let runP =
-            let rscr
-                : FallbackRuntimeState
-                      -> ChildAgentRegistry
-                      -> obj
-                      -> string
-                      -> string
-                      -> string
-                      -> string
-                      -> string
-                      -> obj
-                      -> obj
-                      -> bool
-                      -> string option
-                      -> JS.Promise<Result<string, DomainError>> =
-                runSubagentCoreResult
+                                            return
+                                                box
+                                                    {| data =
+                                                        [| box
+                                                               {| info = box {| role = "assistant" |}
+                                                                  parts =
+                                                                   [| box
+                                                                          {| ``type`` = "text"
+                                                                             text = "continue-recovered" |} |] |} |] |}
+                                        })
+                                )
+                                "abort", box (System.Func<obj, JS.Promise<unit>>(fun _ -> Promise.lift ())) ]
+                      ) ]
 
-            rscr rt registry client "investigator" "t" "go" "/tmp" "parent-1" (box null) (box null) false None
+            let runP =
+                let rscr
+                    : FallbackRuntimeState
+                          -> ChildAgentRegistry
+                          -> obj
+                          -> string
+                          -> string
+                          -> string
+                          -> string
+                          -> string
+                          -> obj
+                          -> obj
+                          -> bool
+                          -> string option
+                          -> JS.Promise<Result<string, DomainError>> =
+                    runSubagentCoreResult
 
-        // Let the prompt rejection land and the error path execute.
-        do! waitForListenerRegistered rt childId
+                rscr rt registry client "investigator" "t" "go" dir "parent-1" (box null) (box null) false None
 
-        // BUG: without the continue-wait, the subagent has already returned Error here.
-        // The text should NOT have been extracted because the continue is still active.
-        check "text not extracted while continue active" (messagesCallCount.Value = 1)
+            // Let the prompt rejection land and the error path execute.
+            do! waitForListenerRegistered rt childId
 
-        // Now the continue resolves — TaskComplete is set, continue no longer active.
-        rt.SetContinueActive childId false
-        rt.SetTaskComplete childId true
-        let s1 = rt.GetOrCreateState childId
+            // BUG: without the continue-wait, the subagent has already returned Error here.
+            // The text should NOT have been extracted because the continue is still active.
+            check "text not extracted while continue active" (messagesCallCount.Value = 1)
 
-        rt.UpdateState
-            childId
-            { s1 with
-                Phase = FallbackPhase.Idle
-                Lifecycle = FallbackLifecycle.TaskComplete }
+            // Now the continue resolves — TaskComplete is set, continue no longer active.
+            rt.SetContinueActive childId false
+            rt.SetTaskComplete childId true
+            let s1 = rt.GetOrCreateState childId
 
-        rt.SetConsumed childId false
-        rt.ClearSubsessionPending childId
+            rt.UpdateState
+                childId
+                { s1 with
+                    Phase = FallbackPhase.Idle
+                    Lifecycle = FallbackLifecycle.TaskComplete }
 
-        let! result = runP
+            rt.SetConsumed childId false
+            rt.ClearSubsessionPending childId
 
-        // After continue resolves, the subagent should recover and return Ok.
-        check "text extracted after continue settled" (messagesCallCount.Value = 2)
+            match ChildSessionMailboxRegistry.TryGet childId with
+            | Some mb ->
+                do! mb.Post(Command.TaskComplete "")
+                do! mb.Post(Command.SessionIdle)
+            | None -> ()
 
-        match result with
-        | Ok text -> check "continue-recovered output present" (text.Contains "continue-recovered")
-        | Error _ -> failwith "expected Ok after continue completed"
+            let! result = runP
+
+            // After continue resolves, the subagent should recover and return Ok.
+            check "text extracted after continue settled" (messagesCallCount.Value = 2)
+
+            do! rmAsync dir
+
+            match result with
+            | Ok text -> check "continue-recovered output present" (text.Contains "continue-recovered")
+            | Error _ -> failwith "expected Ok after continue completed"
+        with ex ->
+            do! rmAsync dir
+            return! Promise.reject ex
     }
 
 let run () =

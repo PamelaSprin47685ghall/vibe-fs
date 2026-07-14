@@ -126,6 +126,7 @@
     <Compile Include="src/Shell/CapsSynthCommon.fs"/>
     <Compile Include="src/Shell/ReviewReplaySync.fs"/>
     <Compile Include="src/Shell/PromiseQueue.fs"/>
+    <Compile Include="src/Shell/ChildSessionMailbox.fs"/>
     <Compile Include="src/Shell/FallbackConfigCodec.fs"/>
     <Compile Include="src/Shell/FallbackRuntimeStateGates.fs"/>
     <Compile Include="src/Shell/FallbackRuntimeState.fs"/>
@@ -317,10 +318,10 @@
     <Compile Include="src/Omp/Codec.fs"/>
     <Compile Include="src/Omp/MessagingCodecEncode.fs"/>
     <Compile Include="src/Omp/MessagingCodec.fs"/>
+    <Compile Include="src/Omp/MagicTodo.fs"/>
     <Compile Include="src/Omp/ChildSessionCommon.fs"/>
     <Compile Include="src/Omp/ChildSession.fs"/>
     <Compile Include="src/Omp/ChildSessionRegistry.fs"/>
-    <Compile Include="src/Omp/MagicTodo.fs"/>
     <Compile Include="src/Omp/ToolResultEvent.fs"/>
     <Compile Include="src/Omp/PruneGuard.fs"/>
     <Compile Include="src/Omp/NudgeRuntime.fs"/>

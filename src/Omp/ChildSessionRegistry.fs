@@ -47,6 +47,7 @@ let runSubagentOnExistingSession
                     prompt
                     SubagentResetPolicy.KeepState
                     parentSessionId
+                    pi
 
             let signalObj = Option.defaultValue (box null) signal
             let! text = raceWithAbortSignal signalObj (fun () -> ()) run

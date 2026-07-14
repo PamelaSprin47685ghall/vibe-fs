@@ -84,12 +84,18 @@ type ProgressObserver
                 let sid = sessionIdFromHookInput input ""
 
                 if sid <> "" then
-                    let st = fallbackRuntime.GetOrCreateState sid
+                    match ChildSessionMailbox.ChildSessionMailboxRegistry.TryGet sid with
+                    | Some mailbox ->
+                        let args = argsFromHookInput input
+                        let output = if Dyn.isNullish args then "" else Dyn.str args "output"
+                        mailbox.Post(ChildSessionMailbox.Command.TaskComplete output) |> ignore
+                    | None ->
+                        let st = fallbackRuntime.GetOrCreateState sid
 
-                    fallbackRuntime.UpdateState
-                        sid
-                        { st with
-                            Lifecycle = FallbackLifecycle.TaskComplete }
+                        fallbackRuntime.UpdateState
+                            sid
+                            { st with
+                                Lifecycle = FallbackLifecycle.TaskComplete }
             elif tool = "submit_review" then
                 match hookOutputString output with
                 | Some text when isSubmitReviewWipProgressOutput text -> ()

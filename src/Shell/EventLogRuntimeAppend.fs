@@ -520,3 +520,96 @@ let appendNudgeSettledOrFail
               "nudgeOrdinal", nudgeOrdinal.ToString() ]
 
     appendOrFail workspaceRoot (buildEvent sessionID eventKindNudgeSettled payload (getTimestampMs().ToString()))
+
+let appendSubsessionRunStartedOrFail
+    (workspaceRoot: string)
+    (sessionID: string)
+    (childId: string)
+    (parentSessionId: string)
+    (runId: string)
+    : JS.Promise<unit> =
+    let payload =
+        Map [ "childId", childId; "parentSessionId", parentSessionId; "runId", runId ]
+
+    appendOrFail
+        workspaceRoot
+        (buildEvent sessionID eventKindSubsessionRunStarted payload (getTimestampMs().ToString()))
+
+let appendSubsessionAttemptActivatedOrFail
+    (workspaceRoot: string)
+    (sessionID: string)
+    (childId: string)
+    (runId: string)
+    (continuationId: string)
+    (continuationOrdinal: int)
+    (attemptOrdinal: int)
+    (dispatchBoundary: string option)
+    : JS.Promise<unit> =
+    let payload =
+        Map
+            [ "childId", childId
+              "runId", runId
+              "continuationId", continuationId
+              "continuationOrdinal", continuationOrdinal.ToString()
+              "attemptOrdinal", attemptOrdinal.ToString()
+              "dispatchBoundary", (dispatchBoundary |> Option.defaultValue "") ]
+
+    appendOrFail
+        workspaceRoot
+        (buildEvent sessionID eventKindSubsessionAttemptActivated payload (getTimestampMs().ToString()))
+
+let appendSubsessionRunSettledOrFail
+    (workspaceRoot: string)
+    (sessionID: string)
+    (childId: string)
+    (runId: string)
+    (status: string)
+    : JS.Promise<unit> =
+    let payload = Map [ "childId", childId; "runId", runId; "status", status ]
+
+    appendOrFail
+        workspaceRoot
+        (buildEvent sessionID eventKindSubsessionRunSettled payload (getTimestampMs().ToString()))
+
+let appendSubsessionInjectedUserObservedOrFail
+    (workspaceRoot: string)
+    (sessionID: string)
+    (childId: string)
+    (runId: string)
+    (injectedUserMessageId: string)
+    : JS.Promise<unit> =
+    let payload =
+        Map
+            [ "childId", childId
+              "runId", runId
+              "injectedUserMessageId", injectedUserMessageId ]
+
+    appendOrFail
+        workspaceRoot
+        (buildEvent sessionID eventKindSubsessionInjectedUserObserved payload (getTimestampMs().ToString()))
+
+let appendSubsessionAssistantObservedOrFail
+    (workspaceRoot: string)
+    (sessionID: string)
+    (childId: string)
+    (runId: string)
+    (assistantMessageId: string)
+    : JS.Promise<unit> =
+    let payload =
+        Map [ "childId", childId; "runId", runId; "assistantMessageId", assistantMessageId ]
+
+    appendOrFail
+        workspaceRoot
+        (buildEvent sessionID eventKindSubsessionAssistantObserved payload (getTimestampMs().ToString()))
+
+let appendSubsessionRunningObservedOrFail
+    (workspaceRoot: string)
+    (sessionID: string)
+    (childId: string)
+    (runId: string)
+    : JS.Promise<unit> =
+    let payload = Map [ "childId", childId; "runId", runId ]
+
+    appendOrFail
+        workspaceRoot
+        (buildEvent sessionID eventKindSubsessionRunningObserved payload (getTimestampMs().ToString()))

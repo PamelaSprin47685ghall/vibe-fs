@@ -8,6 +8,7 @@ open Wanxiangshu.Shell.Dyn
 open Wanxiangshu.Shell.FallbackRuntimeState
 open Wanxiangshu.Kernel.FallbackKernel.Types
 open Wanxiangshu.Tests.AsyncFlush
+open Wanxiangshu.Shell.ChildSessionMailbox
 
 let runOmpSubagentCore_concurrentRunRejected_leavesOriginalLifecycleIntact () =
     promise {
@@ -20,6 +21,13 @@ let runOmpSubagentCore_concurrentRunRejected_leavesOriginalLifecycleIntact () =
             childId
             { s0 with
                 Lifecycle = FallbackLifecycle.TaskComplete }
+
+        // Post events to child session mailbox for event-driven flow
+        match ChildSessionMailboxRegistry.TryGet childId with
+        | Some mb ->
+            do! mb.Post(Command.TaskComplete "")
+            do! mb.Post(Command.SessionIdle)
+        | None -> ()
 
         // Start the first run via StartSubsessionRun to make it busy/running
         let started1 = rt.StartSubsessionRun(childId, "parent-session-id", "run-1")
@@ -58,6 +66,9 @@ let runOmpSubagentCore_concurrentRunRejected_leavesOriginalLifecycleIntact () =
         // It must throw/fail with "Subagent session already running".
         let mutable secondRunRejected = false
 
+        let piMock =
+            createObj [ "session", box (createObj [ "sessionPrompt", box (fun () -> Promise.lift (box null)) ]) ]
+
         let! _ =
             runOmpSubagentCore
                 rt
@@ -67,6 +78,7 @@ let runOmpSubagentCore_concurrentRunRejected_leavesOriginalLifecycleIntact () =
                 "second prompt"
                 SubagentResetPolicy.ResetToActive
                 "parent-session-id"
+                piMock
             |> Promise.catch (fun ex ->
                 secondRunRejected <- ex.Message.Contains "already running"
                 abortedPrefix)

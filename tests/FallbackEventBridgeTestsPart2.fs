@@ -7,6 +7,9 @@ open Wanxiangshu.Kernel.Domain
 open Wanxiangshu.Kernel.FallbackKernel.Types
 open Wanxiangshu.Shell.FallbackRuntimeState
 open Wanxiangshu.Shell.FallbackEventBridge
+open Wanxiangshu.Shell
+
+module Dyn = Wanxiangshu.Shell.Dyn
 open Wanxiangshu.Tests.TempWorkspace
 
 
@@ -77,6 +80,65 @@ type FakeTranslator(sessionID: string, evt: FallbackEvent) =
         member _.ExtractNewUserMessageId(_raw) = None
 
         member _.ExtractRoutingContext(_raw: obj) = None, None
+
+        member _.IsAssistantMessage(rawEvent: obj) =
+            let props = Dyn.get rawEvent "properties"
+
+            if Dyn.isNullish props then
+                false
+            else
+                let info = Dyn.get props "info"
+                not (Dyn.isNullish info) && Dyn.str info "role" = "assistant"
+
+        member _.ExtractAssistantMessageId(rawEvent: obj) =
+            let props = Dyn.get rawEvent "properties"
+
+            if Dyn.isNullish props then
+                None
+            else
+                let info = Dyn.get props "info"
+                let info = if Dyn.isNullish info then props else info
+                let id = Dyn.str info "id"
+                if id <> "" then Some id else None
+
+        member _.ExtractAssistantParentId(rawEvent: obj) =
+            let props = Dyn.get rawEvent "properties"
+
+            if Dyn.isNullish props then
+                None
+            else
+                let info = Dyn.get props "info"
+                let info = if Dyn.isNullish info then props else info
+                let pid = Dyn.str info "parentID"
+                let pid = if pid <> "" then pid else Dyn.str info "parentId"
+                if pid <> "" then Some pid else None
+
+        member _.ExtractContinuationIdentity(rawEvent: obj) =
+            let props = Dyn.get rawEvent "properties"
+            let props = if Dyn.isNullish props then rawEvent else props
+            let cid = Dyn.str props "continuationId"
+            let cid = if cid <> "" then cid else Dyn.str props "continuationID"
+            let cid = if cid <> "" then cid else Dyn.str rawEvent "continuationId"
+            let cid = if cid <> "" then cid else Dyn.str rawEvent "continuationID"
+            let o = Dyn.get props "continuationOrdinal"
+
+            let o =
+                if Dyn.isNullish o then
+                    Dyn.get rawEvent "continuationOrdinal"
+                else
+                    o
+
+            let ord = getOrdinal o
+            if cid <> "" then Some(cid, ord) else None
+
+        member _.ExtractHostRunId(rawEvent: obj) =
+            let props = Dyn.get rawEvent "properties"
+            let props = if Dyn.isNullish props then rawEvent else props
+            let tid = Dyn.str props "turnId"
+            let tid = if tid <> "" then tid else Dyn.str props "turnID"
+            let tid = if tid <> "" then tid else Dyn.str props "runId"
+            let tid = if tid <> "" then tid else Dyn.str props "runID"
+            if tid <> "" then Some tid else None
 
 
 let mkModel (pid: string) (mid: string) : FallbackModel =
@@ -448,6 +510,7 @@ let handleEvent_oldAttemptEventWithoutContinuationId_isIgnored () =
         | Some subRun ->
             subRun.ActiveContinuationId <- "cont-2"
             subRun.ActiveContinuationOrdinal <- 2
+            subRun.ActiveAttemptOrdinal <- 2
         | None -> failwith "subRun not found"
 
         // Set pending lease status to dispatched or similar for cont-2
@@ -466,7 +529,7 @@ let handleEvent_oldAttemptEventWithoutContinuationId_isIgnored () =
         rt.SetActiveContinuationGeneration sid gen
         rt.SetActiveContinuationCancelGeneration sid cancelGen
         rt.SetAwaitingBusy sid true
-        rt.SetBusyObserved sid false
+        rt.SetBusyObserved(sid, false)
 
         // Construct a raw event that has continuationOrdinal = 1 but no continuationId (empty string)
         let props = createObj [ "continuationOrdinal", box 1; "continuationId", box "" ]
@@ -609,7 +672,10 @@ let handleEvent_subRunAttempt_withoutId_newerAssistantOpensAttempt () =
 
         match rt.GetSubsessionRun(sid, runId) with
         | Some subRun ->
-            equal "ObservedCurrentAttemptBoundary is msg-2" (Some "msg-2") subRun.ObservedCurrentAttemptBoundary
+            equal
+                "ActiveObservation is AssistantObserved msg-2"
+                (AttemptObservation.AssistantObserved "msg-2")
+                subRun.ActiveObservation
         | None -> failwith "subRun not found"
 
         // Now send matching session.idle event with boundary "msg-2"
@@ -621,6 +687,520 @@ let handleEvent_subRunAttempt_withoutId_newerAssistantOpensAttempt () =
         let! resultIdle, _ = handleEvent translator rt defaultCfgLookup executor "" rawEventIdle None
 
         equal "AwaitingBusy is false" false (rt.IsAwaitingBusy sid)
+    }
+
+let handleEvent_subRunAttempt_withDispatchBoundary_idleWithoutId_matchesAndSettles () =
+    promise {
+        let model = mkModel "oai" "gpt-5"
+        let rt = FallbackRuntimeState()
+        let sid = "sess-subrun-idle-noid"
+        rt.SetChain sid [ model ]
+        rt.SetAgentName sid "reviewer"
+        rt.SetSessionOwner sid "Fallback"
+
+        let turnId = rt.IncrementHumanTurnId sid
+        let gen = rt.GetSessionGeneration sid
+        let cancelGen = rt.GetCancelGeneration sid
+        rt.SetActiveContinuationGeneration sid gen
+        rt.SetActiveContinuationCancelGeneration sid cancelGen
+
+        let runId = "subrun-idle-noid-1"
+        let started = rt.StartSubsessionRun(sid, "parent-session", runId)
+        equal "subsession run started" true started
+
+        let continuationID = "cont-1"
+
+        let lease =
+            { ContinuationID = continuationID
+              ContinuationOrdinal = 1
+              SessionGeneration = gen
+              HumanTurnID = turnId
+              CancelGeneration = cancelGen
+              Owner = "Fallback"
+              Model = model
+              PromptText = None
+              Status = "requested" }
+
+        rt.SetPendingLease(sid, lease)
+
+        let executor = FakeExecutor(messages = [| createObj [ "id", box "msg-1" ] |])
+
+        rt.ActivateAttempt(sid, continuationID, 1, Some "msg-1")
+        rt.SetAwaitingBusy sid true
+
+        match rt.GetSubsessionRun(sid, runId) with
+        | Some subRun -> subRun.ActiveObservation <- AttemptObservation.AssistantObserved "msg-2"
+        | None -> failwith "subRun not found"
+
+        let rawEventIdle = createObj [ "type", box "session.idle" ]
+        let translator = FakeTranslator(sid, FallbackEvent.SessionIdle) :> IEventTranslator
+
+        let! resultIdle, _ = handleEvent translator rt defaultCfgLookup executor "" rawEventIdle None
+
+        equal "AwaitingBusy is false" false (rt.IsAwaitingBusy sid)
+    }
+
+let handleEvent_subRunAttempt_noDispatchBoundary_busyThenIdleWithoutId_matchesAndSettles () =
+    promise {
+        let model = mkModel "oai" "gpt-5"
+        let rt = FallbackRuntimeState()
+        let sid = "sess-nodisp-busyidle"
+        rt.SetChain sid [ model ]
+        rt.SetAgentName sid "reviewer"
+        rt.SetSessionOwner sid "Fallback"
+
+        let turnId = rt.IncrementHumanTurnId sid
+        let gen = rt.GetSessionGeneration sid
+        let cancelGen = rt.GetCancelGeneration sid
+        rt.SetActiveContinuationGeneration sid gen
+        rt.SetActiveContinuationCancelGeneration sid cancelGen
+
+        let runId = "subrun-nodisp-1"
+        let started = rt.StartSubsessionRun(sid, "parent-session", runId)
+        equal "subsession run started" true started
+
+        let continuationID = "cont-1"
+
+        let lease =
+            { ContinuationID = continuationID
+              ContinuationOrdinal = 1
+              SessionGeneration = gen
+              HumanTurnID = turnId
+              CancelGeneration = cancelGen
+              Owner = "Fallback"
+              Model = model
+              PromptText = None
+              Status = "requested" }
+
+        rt.SetPendingLease(sid, lease)
+
+        let executor = FakeExecutor()
+
+        rt.ActivateAttempt(sid, continuationID, 1, None)
+        rt.SetAwaitingBusy sid true
+
+        let rawEventBusy = createObj [ "type", box "session.busy" ]
+
+        let translatorBusy =
+            FakeTranslator(sid, FallbackEvent.SessionBusy) :> IEventTranslator
+
+        let! resultBusy, _ = handleEvent translatorBusy rt defaultCfgLookup executor "" rawEventBusy None
+
+        let rawEventIdle = createObj [ "type", box "session.idle" ]
+
+        let translatorIdle =
+            FakeTranslator(sid, FallbackEvent.SessionIdle) :> IEventTranslator
+
+        let! resultIdle, _ = handleEvent translatorIdle rt defaultCfgLookup executor "" rawEventIdle None
+
+        equal "AwaitingBusy is false" false (rt.IsAwaitingBusy sid)
+    }
+
+let handleEvent_subRunAttempt_awaitingStart_errorWithoutId_matchesAndPropagates () =
+    promise {
+        let model = mkModel "oai" "gpt-5"
+        let rt = FallbackRuntimeState()
+        let sid = "sess-awaiting-err"
+        rt.SetChain sid []
+        rt.SetAgentName sid "reviewer"
+        rt.SetSessionOwner sid "Fallback"
+
+        let turnId = rt.IncrementHumanTurnId sid
+        let gen = rt.GetSessionGeneration sid
+        let cancelGen = rt.GetCancelGeneration sid
+        rt.SetActiveContinuationGeneration sid gen
+        rt.SetActiveContinuationCancelGeneration sid cancelGen
+
+        let runId = "subrun-err-1"
+        let started = rt.StartSubsessionRun(sid, "parent-session", runId)
+        equal "subsession run started" true started
+
+        let continuationID = "cont-1"
+
+        let lease =
+            { ContinuationID = continuationID
+              ContinuationOrdinal = 1
+              SessionGeneration = gen
+              HumanTurnID = turnId
+              CancelGeneration = cancelGen
+              Owner = "Fallback"
+              Model = model
+              PromptText = None
+              Status = "requested" }
+
+        rt.SetPendingLease(sid, lease)
+
+        let executor = FakeExecutor()
+
+        rt.ActivateAttempt(sid, continuationID, 1, Some "msg-1")
+        rt.SetAwaitingBusy sid true
+        rt.SetBusyObserved(sid, true)
+
+        let errInput =
+            { ErrorName = "FatalError"
+              DomainError = Some(UnknownJsError "fatal")
+              Message = "fatal"
+              StatusCode = None
+              IsRetryable = Some false }
+
+        let rawEventErr = createObj [ "type", box "session.error" ]
+
+        let translator =
+            FakeTranslator(sid, FallbackEvent.SessionError errInput) :> IEventTranslator
+
+        let customCfgLookup _ = { mkConfig () with DefaultChain = [] }
+        let! result, intentOpt = handleEvent translator rt customCfgLookup executor "" rawEventErr None
+
+        match intentOpt with
+        | Some intent -> do! executeContinuationIntent rt executor "" sid intent
+        | None -> ()
+
+        equal "event is not consumed" false result.Consumed
+        equal "propagated failure" 1 (executor.PropagateCalls.Length)
+        equal "phase is exhausted" FallbackPhase.Exhausted result.State.Phase
+    }
+
+let handleEvent_subRunAttempt_staleAssistantMessage_ignored () =
+    promise {
+        let model = mkModel "oai" "gpt-5"
+        let rt = FallbackRuntimeState()
+        let sid = "sess-stale-msg"
+        rt.SetChain sid [ model ]
+        rt.SetAgentName sid "reviewer"
+        rt.SetSessionOwner sid "Fallback"
+
+        let turnId = rt.IncrementHumanTurnId sid
+        let gen = rt.GetSessionGeneration sid
+        let cancelGen = rt.GetCancelGeneration sid
+        rt.SetActiveContinuationGeneration sid gen
+        rt.SetActiveContinuationCancelGeneration sid cancelGen
+
+        let runId = "subrun-stale-1"
+        let started = rt.StartSubsessionRun(sid, "parent-session", runId)
+        equal "subsession run started" true started
+
+        let continuationID = "cont-1"
+
+        let lease =
+            { ContinuationID = continuationID
+              ContinuationOrdinal = 1
+              SessionGeneration = gen
+              HumanTurnID = turnId
+              CancelGeneration = cancelGen
+              Owner = "Fallback"
+              Model = model
+              PromptText = None
+              Status = "requested" }
+
+        rt.SetPendingLease(sid, lease)
+
+        let executor = FakeExecutor()
+
+        rt.ActivateAttempt(sid, continuationID, 1, Some "msg-2")
+        rt.SetAwaitingBusy sid true
+
+        // Set the active subsession run lease InjectedUserMessageId to "msg-user-2"
+        match rt.GetSubsessionRun(sid, runId) with
+        | Some subRun -> subRun.InjectedUserMessageId <- Some "msg-user-2"
+        | None -> failwith "subRun not found"
+
+        let infoObj =
+            createObj [ "role", box "assistant"; "id", box "msg-1"; "parentId", box "msg-user-1" ]
+
+        let props = createObj [ "info", box infoObj ]
+
+        let rawEventMsg =
+            createObj [ "type", box "message.updated"; "properties", box props ]
+
+        let translator = FakeTranslator(sid, FallbackEvent.SessionIdle) :> IEventTranslator
+        let! result, _ = handleEvent translator rt defaultCfgLookup executor "" rawEventMsg None
+
+        equal "stale assistant message is ignored" false result.Consumed
+    }
+
+let handleEvent_AwaitingStart_rejectsUnmatchedTerminalEvent () =
+    promise {
+        let model = mkModel "oai" "gpt-5"
+        let rt = FallbackRuntimeState()
+        let sid = "sess-awaiting-start-test"
+        rt.SetChain sid [ model ]
+        rt.SetAgentName sid "reviewer"
+        rt.SetSessionOwner sid "Fallback"
+
+        let turnId = rt.IncrementHumanTurnId sid
+        let gen = rt.GetSessionGeneration sid
+        let cancelGen = rt.GetCancelGeneration sid
+        rt.SetActiveContinuationGeneration sid gen
+        rt.SetActiveContinuationCancelGeneration sid cancelGen
+
+        let runId = "subrun-awaiting-start-test"
+        let started = rt.StartSubsessionRun(sid, "parent-session", runId)
+        equal "subsession run started" true started
+
+        let continuationID = "cont-1"
+        rt.ActivateAttempt(sid, continuationID, 1, Some "msg-1")
+        rt.SetAwaitingBusy sid true
+
+        // Terminal event (idle) without matching continuation ID or parent ID
+        let rawEvent =
+            createObj [ "type", box "session.idle"; "properties", box (createObj []) ]
+
+        let translator = FakeTranslator(sid, FallbackEvent.SessionIdle) :> IEventTranslator
+        let executor = FakeExecutor()
+
+        let! result, _ = handleEvent translator rt defaultCfgLookup executor "" rawEvent None
+        equal "Consumed is false because terminal event does not match inside AwaitingStart" false result.Consumed
+        equal "AwaitingBusy remains true" true (rt.IsAwaitingBusy sid)
+    }
+
+let handleEvent_newUserMessage_doesNotClearAwaitingBusy () =
+    promise {
+        let model = mkModel "oai" "gpt-5"
+        let rt = FallbackRuntimeState()
+        let sid = "sess-new-user-test"
+        rt.SetChain sid [ model ]
+        rt.SetAgentName sid "reviewer"
+        rt.SetAwaitingBusy sid true
+
+        let rawEvent =
+            createObj
+                [ "type", box "message.updated"
+                  "properties", box (createObj [ "info", box (createObj [ "role", box "user" ]) ]) ]
+
+        let translator =
+            FakeTranslator(sid, FallbackEvent.NewUserMessage) :> IEventTranslator
+
+        let executor = FakeExecutor()
+
+        let! result, _ = handleEvent translator rt defaultCfgLookup executor "" rawEvent None
+        equal "AwaitingBusy is still true on new user message" true (rt.IsAwaitingBusy sid)
+    }
+
+let handleEvent_emptyFallbackChain_isNotBypassed () =
+    promise {
+        let rt = FallbackRuntimeState()
+        let sid = "sess-empty-chain-test"
+        rt.SetAgentName sid "reviewer"
+        rt.SetChain sid []
+
+        let translator =
+            FakeTranslator(sid, FallbackEvent.SessionError(mkRetryableErr ())) :> IEventTranslator
+
+        let executor = FakeExecutor()
+
+        let! result, _ = handleEvent translator rt defaultCfgLookup executor "" (box ()) None
+        equal "Consumed is false when fallback chain is empty" false result.Consumed
+    }
+
+let handleEvent_AwaitingStart_lateIdleDoesNotTerminateNewAttempt () =
+    promise {
+        let model = mkModel "oai" "gpt-5"
+        let rt = FallbackRuntimeState()
+        let sid = "sess-late-idle-test"
+        rt.SetChain sid [ model ]
+        rt.SetAgentName sid "reviewer"
+        rt.SetSessionOwner sid "Fallback"
+
+        let turnId = rt.IncrementHumanTurnId sid
+        let gen = rt.GetSessionGeneration sid
+        let cancelGen = rt.GetCancelGeneration sid
+        rt.SetActiveContinuationGeneration sid gen
+        rt.SetActiveContinuationCancelGeneration sid cancelGen
+
+        let runId = "subrun-late-idle"
+        let started = rt.StartSubsessionRun(sid, "parent-session", runId)
+        equal "subsession run started" true started
+
+        let continuationID = "cont-1"
+        rt.ActivateAttempt(sid, continuationID, 1, Some "msg-1")
+        rt.SetAwaitingBusy sid true
+
+        // Simulate busy has been observed previously (so busyObserved is true for the session)
+        rt.SetBusyObserved(sid, true)
+
+        // Force subsession run active observation back to AwaitingStart to simulate active AwaitingStart
+        match rt.GetSubsessionRun(sid, runId) with
+        | Some subRun -> subRun.ActiveObservation <- AttemptObservation.AwaitingStart
+        | None -> ()
+
+        // Construct a late session.idle event from a previous attempt (continuationOrdinal = 0 or mismatching)
+        // without matching continuation ID or parent ID
+        let props = createObj [ "continuationOrdinal", box 0; "continuationId", box "" ]
+        let rawEvent = createObj [ "type", box "session.idle"; "properties", box props ]
+        let translator = FakeTranslator(sid, FallbackEvent.SessionIdle) :> IEventTranslator
+        let executor = FakeExecutor()
+
+        let! result, _ = handleEvent translator rt defaultCfgLookup executor "" rawEvent None
+
+        // Assert that the late idle is not consumed and AwaitingBusy remains true
+        equal "Consumed is false because late idle from previous attempt is not matched" false result.Consumed
+        equal "AwaitingBusy remains true" true (rt.IsAwaitingBusy sid)
+
+        // Assert that the subsession status is still Running or Requested
+        match rt.GetSubsessionRun(sid, runId) with
+        | Some subRun ->
+            let isRunningOrRequested =
+                subRun.Status = SubsessionRunStatus.Running
+                || subRun.Status = SubsessionRunStatus.Requested
+
+            equal "Subsession status is still Running/Requested" true isRunningOrRequested
+        | None -> failwith "subRun not found"
+    }
+
+type CustomTestTranslator(sessionID: string, isIdleVal: bool, isBusyVal: bool, isErrorVal: bool) =
+    interface IEventTranslator with
+        member _.TranslateError(_raw: obj) = None
+        member _.ExtractSessionID(_raw: obj) = sessionID
+        member _.IsSessionError(_raw: obj) = isErrorVal
+        member _.IsSessionIdle(_raw: obj) = isIdleVal
+        member _.IsSessionBusy(_raw: obj) = isBusyVal
+        member _.IsNewUserMessage(_sid, _raw: obj) = false
+        member _.ExtractNewUserMessageId(_raw) = None
+        member _.ExtractRoutingContext(_raw) = None, None
+
+        member _.IsAssistantMessage(rawEvent: obj) =
+            let props = Dyn.get rawEvent "properties"
+
+            if Dyn.isNullish props then
+                false
+            else
+                let info = Dyn.get props "info"
+                not (Dyn.isNullish info) && Dyn.str info "role" = "assistant"
+
+        member _.ExtractAssistantMessageId(rawEvent: obj) =
+            let props = Dyn.get rawEvent "properties"
+
+            if Dyn.isNullish props then
+                None
+            else
+                let info = Dyn.get props "info"
+                let info = if Dyn.isNullish info then props else info
+                let id = Dyn.str info "id"
+                if id <> "" then Some id else None
+
+        member _.ExtractAssistantParentId(rawEvent: obj) =
+            let props = Dyn.get rawEvent "properties"
+
+            if Dyn.isNullish props then
+                None
+            else
+                let info = Dyn.get props "info"
+                let info = if Dyn.isNullish info then props else info
+                let pid = Dyn.str info "parentID"
+                let pid = if pid <> "" then pid else Dyn.str info "parentId"
+                if pid <> "" then Some pid else None
+
+        member _.ExtractContinuationIdentity(rawEvent: obj) = None
+        member _.ExtractHostRunId(rawEvent: obj) = None
+
+let handleEvent_AwaitingStart_lateAssistantThenLateIdle_ignored () =
+    promise {
+        let model = mkModel "oai" "gpt-5"
+        let rt = FallbackRuntimeState()
+        let sid = "sess-late-seq"
+        rt.SetChain sid [ model ]
+        rt.SetAgentName sid "reviewer"
+        rt.SetSessionOwner sid "Fallback"
+
+        let turnId = rt.IncrementHumanTurnId sid
+        let gen = rt.GetSessionGeneration sid
+        let cancelGen = rt.GetCancelGeneration sid
+        rt.SetActiveContinuationGeneration sid gen
+        rt.SetActiveContinuationCancelGeneration sid cancelGen
+
+        let runId = "subrun-late-seq-1"
+        let started = rt.StartSubsessionRun(sid, "parent-session", runId)
+        equal "subsession run started" true started
+
+
+        let continuationID = "cont-2"
+
+        let lease =
+            { ContinuationID = continuationID
+              ContinuationOrdinal = 2
+              SessionGeneration = gen
+              HumanTurnID = turnId
+              CancelGeneration = cancelGen
+              Owner = "Fallback"
+              Model = model
+              PromptText = None
+              Status = "requested" }
+
+        rt.SetPendingLease(sid, lease)
+
+        // Activate attempt 2 with dispatch boundary "msg-1"
+        rt.ActivateAttempt(sid, continuationID, 2, Some "msg-1")
+        rt.SetAwaitingBusy sid true
+
+        // Set the active subsession run lease details
+        match rt.GetSubsessionRun(sid, runId) with
+        | Some subRun ->
+            subRun.InjectedUserMessageId <- Some "msg-user-2"
+            subRun.ActiveContinuationId <- "cont-2"
+            subRun.ActiveContinuationOrdinal <- 2
+        | None -> failwith "subRun not found"
+
+        // 1. Send late assistant message from attempt 1.
+        // It has parentId = "msg-user-1" (mismatched) and id = "msg-old-assistant"
+        let infoObj =
+            createObj
+                [ "role", box "assistant"
+                  "id", box "msg-old-assistant"
+                  "parentId", box "msg-user-1" ]
+
+        let props = createObj [ "info", box infoObj ]
+        let rawEventMsg = createObj [ "properties", box props ]
+
+        let translatorMsg =
+            CustomTestTranslator(sid, false, false, false) :> IEventTranslator
+
+        let executor = FakeExecutor()
+        let! resultMsg, _ = handleEvent translatorMsg rt defaultCfgLookup executor "" rawEventMsg None
+
+        // Since parentId is mismatched, the late assistant message should return NoMatch, Consumed is false, and AwaitingBusy remains true
+        equal "stale assistant is not consumed" false resultMsg.Consumed
+        equal "AwaitingBusy remains true after stale assistant" true (rt.IsAwaitingBusy sid)
+
+        // 2. Send late idle (no message ID boundary)
+        let rawEventIdle = createObj []
+
+        let translatorIdle =
+            CustomTestTranslator(sid, true, false, false) :> IEventTranslator
+
+        let! resultIdle, _ = handleEvent translatorIdle rt defaultCfgLookup executor "" rawEventIdle None
+
+        // The late idle should be unmatched (NoMatch), Consumed is false, AwaitingBusy remains true, and status is still Requested/Running
+        equal "stale idle is not consumed" false resultIdle.Consumed
+        equal "AwaitingBusy remains true after stale idle" true (rt.IsAwaitingBusy sid)
+
+        match rt.GetSubsessionRun(sid, runId) with
+        | Some subRun ->
+            let isRunningOrRequested =
+                subRun.Status = SubsessionRunStatus.Running
+                || subRun.Status = SubsessionRunStatus.Requested
+
+            equal "Subsession status is still Running/Requested" true isRunningOrRequested
+        | None -> failwith "subRun not found"
+    }
+
+let ompEventTranslator_correctlyExtractsContinuationIdAndOrdinal () =
+    promise {
+        let rt = FallbackRuntimeState()
+        let translator = Wanxiangshu.Omp.FallbackHooks.ompEventTranslator rt
+
+        let props =
+            createObj [ "continuationID", box "cont-omp-1"; "continuationOrdinal", box 3 ]
+
+        let evObj = createObj [ "type", box "session.busy"; "info", box props ]
+
+        let rawEvent =
+            createObj [ "event", box evObj; "props", box (createObj [ "sessionID", box "s-1" ]) ]
+
+        let identity = translator.ExtractContinuationIdentity rawEvent
+        check "identity extracted" identity.IsSome
+        let cid, ord = identity.Value
+        equal "extracted continuationID" "cont-omp-1" cid
+        equal "extracted ordinal" 3 ord
     }
 
 let run () =
@@ -636,4 +1216,14 @@ let run () =
         do! handleEvent_oldAttemptEventWithoutContinuationId_isIgnored ()
         do! handleEvent_subRunAttempt_withoutId_oldBusyDoesNotOpenAttempt ()
         do! handleEvent_subRunAttempt_withoutId_newerAssistantOpensAttempt ()
+        do! handleEvent_subRunAttempt_withDispatchBoundary_idleWithoutId_matchesAndSettles ()
+        do! handleEvent_subRunAttempt_noDispatchBoundary_busyThenIdleWithoutId_matchesAndSettles ()
+        do! handleEvent_subRunAttempt_awaitingStart_errorWithoutId_matchesAndPropagates ()
+        do! handleEvent_subRunAttempt_staleAssistantMessage_ignored ()
+        do! handleEvent_AwaitingStart_rejectsUnmatchedTerminalEvent ()
+        do! handleEvent_newUserMessage_doesNotClearAwaitingBusy ()
+        do! handleEvent_emptyFallbackChain_isNotBypassed ()
+        do! handleEvent_AwaitingStart_lateIdleDoesNotTerminateNewAttempt ()
+        do! handleEvent_AwaitingStart_lateAssistantThenLateIdle_ignored ()
+        do! ompEventTranslator_correctlyExtractsContinuationIdAndOrdinal ()
     }

@@ -13,8 +13,9 @@ let private projection = ProjectionStore()
 let backlogEntryFromTodoInput =
     Wanxiangshu.Shell.BacklogSessionCodec.backlogEntryFromTodoInput
 
+let mutable workspaceRoot = ""
+
 type BacklogSession(host: Host) =
-    let mutable workspaceRoot = ""
 
     member _.Host = host
     member _.Projection = projection

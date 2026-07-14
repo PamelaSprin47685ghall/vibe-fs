@@ -11,11 +11,16 @@ open Wanxiangshu.Shell.FallbackEventBridge
 open Wanxiangshu.Shell.ChildAgentRegistry
 open Wanxiangshu.Opencode.SubagentIo
 open Wanxiangshu.Kernel.Domain
+open Wanxiangshu.Tests.TempWorkspace
+open Wanxiangshu.Shell.ChildSessionMailbox
 
 let private waitForListenerRegistered (runtime: FallbackRuntimeState) (sessionID: string) : JS.Promise<unit> =
     let rec poll () =
         promise {
-            if runtime.HasListeners sessionID then
+            if
+                runtime.HasListeners sessionID
+                || ChildSessionMailboxRegistry.TryGet sessionID |> Option.isSome
+            then
                 return ()
             else
                 do! yieldMicrotask ()
@@ -62,41 +67,53 @@ let mkConfig () : FallbackConfig =
 /// returns.
 let handleEvent_doesNotClearSubsessionPending () =
     promise {
-        let model = mkModel "oai" "gpt-5"
-        let chain = [ model ]
-        let cfg = mkConfig ()
-        let rt = FallbackRuntimeState()
-        let sid = "sess-sub-pending"
-        rt.SetChain sid chain
-        rt.SetAgentName sid "coder"
-        rt.SetSubsessionPending sid true
+        let! dir = mkdtempAsync "subagent-sub-pending-"
 
-        let translator =
-            { new IEventTranslator with
-                member _.TranslateError _ =
-                    Some(FallbackEvent.SessionError(mkRetryableErr ()))
+        try
+            let model = mkModel "oai" "gpt-5"
+            let chain = [ model ]
+            let cfg = mkConfig ()
+            let rt = FallbackRuntimeState()
+            let sid = "sess-sub-pending"
+            rt.SetChain sid chain
+            rt.SetAgentName sid "coder"
+            rt.SetSubsessionPending sid true
 
-                member _.ExtractSessionID _ = sid
-                member _.IsSessionError _ = true
-                member _.IsSessionIdle _ = false
-                member _.IsSessionBusy _ = false
-                member _.IsNewUserMessage(_, _) = false
-                member _.ExtractNewUserMessageId _ = None
-                member _.ExtractRoutingContext _ = None, None }
+            let translator =
+                { new IEventTranslator with
+                    member _.TranslateError _ =
+                        Some(FallbackEvent.SessionError(mkRetryableErr ()))
 
-        let executor =
-            { new IActionExecutor with
-                member _.SendContinue(_, _, _) = Promise.lift ()
-                member _.FetchMessages _ = Promise.lift [||]
-                member _.PropagateFailure _ = Promise.lift ()
-                member _.CaptureCurrentModel _ = Promise.lift None
-                member _.RecoverWithPrompt(_, _, _, _) = Promise.lift ()
-                member _.AbortRun _ = Promise.lift () }
+                    member _.ExtractSessionID _ = sid
+                    member _.IsSessionError _ = true
+                    member _.IsSessionIdle _ = false
+                    member _.IsSessionBusy _ = false
+                    member _.IsNewUserMessage(_, _) = false
+                    member _.ExtractNewUserMessageId _ = None
+                    member _.ExtractRoutingContext _ = None, None
+                    member _.IsAssistantMessage _ = false
+                    member _.ExtractAssistantMessageId _ = None
+                    member _.ExtractAssistantParentId _ = None
+                    member _.ExtractContinuationIdentity _ = None
+                    member _.ExtractHostRunId _ = None }
 
-        let lookup (_agent: string) = cfg
-        let! _ = handleEvent translator rt lookup executor "" (box ()) None
+            let executor =
+                { new IActionExecutor with
+                    member _.SendContinue(_, _, _) = Promise.lift ()
+                    member _.FetchMessages _ = Promise.lift [||]
+                    member _.PropagateFailure _ = Promise.lift ()
+                    member _.CaptureCurrentModel _ = Promise.lift None
+                    member _.RecoverWithPrompt(_, _, _, _) = Promise.lift ()
+                    member _.AbortRun _ = Promise.lift () }
 
-        check "SubsessionPending preserved after handleEvent" (rt.IsSubsessionPending sid)
+            let lookup (_agent: string) = cfg
+            let! _ = handleEvent translator rt lookup executor dir (box ()) None
+
+            check "SubsessionPending preserved after handleEvent" (rt.IsSubsessionPending sid)
+            do! rmAsync dir
+        with ex ->
+            do! rmAsync dir
+            return! Promise.reject ex
     }
 
 /// Full integration: SubagentIo sets SubsessionPending=true, promptWithAbort
@@ -105,117 +122,136 @@ let handleEvent_doesNotClearSubsessionPending () =
 /// keeps waiting until TaskComplete is set.
 let runSubagentWaitsThroughFallbackSendContinue () =
     promise {
-        let rt = FallbackRuntimeState()
-        let registry = ChildAgentRegistry.Create()
-        let childId = "child-fb-zws"
-        registry.RegisterChildAgent(childId, "coder", Some "parent-fb")
+        let! dir = mkdtempAsync "subagent-fb-zws-"
 
-        let model = mkModel "oai" "gpt-5"
-        let chain = [ model ]
-        let cfg = mkConfig ()
-        rt.SetChain childId chain
-        rt.SetAgentName childId "coder"
+        try
+            let rt = FallbackRuntimeState()
+            let registry = ChildAgentRegistry.Create()
+            let childId = "child-fb-zws"
+            registry.RegisterChildAgent(childId, "coder", Some "parent-fb")
 
-        let messagesCallCount = ref 0
+            let model = mkModel "oai" "gpt-5"
+            let chain = [ model ]
+            let cfg = mkConfig ()
+            rt.SetChain childId chain
+            rt.SetAgentName childId "coder"
 
-        let client =
-            createObj
-                [ "session",
-                  box (
-                      createObj
-                          [ "create",
-                            box (
-                                System.Func<obj, JS.Promise<obj>>(fun _ ->
-                                    promise { return box {| data = box {| id = childId |} |} })
-                            )
-                            "prompt", box (System.Func<obj, JS.Promise<unit>>(fun _ -> promise { return () }))
-                            "messages",
-                            box (
-                                System.Func<obj, JS.Promise<obj>>(fun _ ->
-                                    promise {
-                                        messagesCallCount.Value <- messagesCallCount.Value + 1
+            let messagesCallCount = ref 0
 
-                                        return
-                                            box
-                                                {| data =
-                                                    [| box
-                                                           {| info = box {| role = "assistant" |}
-                                                              parts =
-                                                               [| box
-                                                                      {| ``type`` = "text"
-                                                                         text = "after-fallback" |} |] |} |] |}
-                                    })
-                            )
-                            "abort", box (System.Func<obj, JS.Promise<unit>>(fun _ -> Promise.lift ())) ]
-                  ) ]
+            let client =
+                createObj
+                    [ "session",
+                      box (
+                          createObj
+                              [ "create",
+                                box (
+                                    System.Func<obj, JS.Promise<obj>>(fun _ ->
+                                        promise { return box {| data = box {| id = childId |} |} })
+                                )
+                                "prompt", box (System.Func<obj, JS.Promise<unit>>(fun _ -> promise { return () }))
+                                "messages",
+                                box (
+                                    System.Func<obj, JS.Promise<obj>>(fun _ ->
+                                        promise {
+                                            messagesCallCount.Value <- messagesCallCount.Value + 1
 
-        let runP =
-            runSubagentCoreResult
-                rt
-                registry
-                client
-                "coder"
-                "Spawn"
-                "go"
-                "/tmp"
-                "parent-fb"
-                (box null)
-                (box null)
-                false
-                None
+                                            return
+                                                box
+                                                    {| data =
+                                                        [| box
+                                                               {| info = box {| role = "assistant" |}
+                                                                  parts =
+                                                                   [| box
+                                                                          {| ``type`` = "text"
+                                                                             text = "after-fallback" |} |] |} |] |}
+                                        })
+                                )
+                                "abort", box (System.Func<obj, JS.Promise<unit>>(fun _ -> Promise.lift ())) ]
+                      ) ]
 
-        do! waitForListenerRegistered rt childId
-        do! yieldMicrotask ()
+            let runP =
+                runSubagentCoreResult
+                    rt
+                    registry
+                    client
+                    "coder"
+                    "Spawn"
+                    "go"
+                    dir
+                    "parent-fb"
+                    (box null)
+                    (box null)
+                    false
+                    None
 
-        check "messagesCallCount is 1 while pending" (messagesCallCount.Value = 1)
+            do! waitForListenerRegistered rt childId
+            do! yieldMicrotask ()
 
-        let translator =
-            { new IEventTranslator with
-                member _.TranslateError _ =
-                    Some(FallbackEvent.SessionError(mkRetryableErr ()))
+            check "messagesCallCount is 1 while pending" (messagesCallCount.Value = 1)
 
-                member _.ExtractSessionID _ = childId
-                member _.IsSessionError _ = true
-                member _.IsSessionIdle _ = false
-                member _.IsSessionBusy _ = false
-                member _.IsNewUserMessage(_, _) = false
-                member _.ExtractNewUserMessageId _ = None
-                member _.ExtractRoutingContext _ = None, None }
+            let translator =
+                { new IEventTranslator with
+                    member _.TranslateError _ =
+                        Some(FallbackEvent.SessionError(mkRetryableErr ()))
 
-        let executor =
-            { new IActionExecutor with
-                member _.SendContinue(_, _, _) = Promise.lift ()
-                member _.FetchMessages _ = Promise.lift [||]
-                member _.PropagateFailure _ = Promise.lift ()
-                member _.CaptureCurrentModel _ = Promise.lift None
-                member _.RecoverWithPrompt(_, _, _, _) = Promise.lift ()
-                member _.AbortRun _ = Promise.lift () }
+                    member _.ExtractSessionID _ = childId
+                    member _.IsSessionError _ = true
+                    member _.IsSessionIdle _ = false
+                    member _.IsSessionBusy _ = false
+                    member _.IsNewUserMessage(_, _) = false
+                    member _.ExtractNewUserMessageId _ = None
+                    member _.ExtractRoutingContext _ = None, None
+                    member _.IsAssistantMessage _ = false
+                    member _.ExtractAssistantMessageId _ = None
+                    member _.ExtractAssistantParentId _ = None
+                    member _.ExtractContinuationIdentity _ = None
+                    member _.ExtractHostRunId _ = None }
 
-        let lookup (_agent: string) = cfg
+            let executor =
+                { new IActionExecutor with
+                    member _.SendContinue(_, _, _) = Promise.lift ()
+                    member _.FetchMessages _ = Promise.lift [||]
+                    member _.PropagateFailure _ = Promise.lift ()
+                    member _.CaptureCurrentModel _ = Promise.lift None
+                    member _.RecoverWithPrompt(_, _, _, _) = Promise.lift ()
+                    member _.AbortRun _ = Promise.lift () }
 
-        let! _ = handleEvent translator rt lookup executor "" (box ()) None
+            let lookup (_agent: string) = cfg
 
-        do! yieldMicrotask ()
+            let! _ = handleEvent translator rt lookup executor dir (box ()) None
 
-        check "SubsessionPending still true after fallback event" (rt.IsSubsessionPending childId)
-        check "messagesCallCount is 1 after fallback event" (messagesCallCount.Value = 1)
+            do! yieldMicrotask ()
 
-        let s = rt.GetOrCreateState childId
-        rt.ClearPendingLease childId
-        rt.SetAwaitingBusy childId false
+            check "SubsessionPending still true after fallback event" (rt.IsSubsessionPending childId)
+            check "messagesCallCount is 1 after fallback event" (messagesCallCount.Value = 1)
 
-        rt.UpdateState
-            childId
-            { s with
-                Lifecycle = FallbackLifecycle.TaskComplete }
+            let s = rt.GetOrCreateState childId
+            rt.ClearPendingLease childId
+            rt.SetAwaitingBusy childId false
 
-        let! result = withTimeout runP
+            rt.UpdateState
+                childId
+                { s with
+                    Lifecycle = FallbackLifecycle.TaskComplete }
 
-        check "messagesCallCount is 2 after TaskComplete" (messagesCallCount.Value = 2)
+            match ChildSessionMailboxRegistry.TryGet childId with
+            | Some mb ->
+                do! mb.Post(Command.TaskComplete "")
+                do! mb.Post(Command.SessionIdle)
+            | None -> ()
 
-        match result with
-        | Ok text -> check "output present" (text.Contains "after-fallback")
-        | Error _ -> failwith "expected Ok"
+            let! result = withTimeout runP
+
+            check "messagesCallCount is 2 after TaskComplete" (messagesCallCount.Value = 2)
+
+            match result with
+            | Ok text -> check "output present" (text.Contains "after-fallback")
+            | Error _ -> failwith "expected Ok"
+
+            do! rmAsync dir
+        with ex ->
+            do! rmAsync dir
+            return! Promise.reject ex
     }
 
 let run () =
