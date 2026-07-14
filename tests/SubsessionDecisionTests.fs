@@ -109,7 +109,7 @@ let startRunFromAvailable () =
 let secondStartRunRejected () =
     let ctx = mkCtx policy0 (TurnOrdinal.next TurnOrdinal.first)
     let plan = mkPlan turn0 TurnOrdinal.first model0 "do work"
-    let state = Dispatching(ctx, plan)
+    let state = Dispatching(ctx, plan, CurrentTurnEvidence.empty)
 
     match decide state (StartRun request) with
     | Ok(Decided d) ->
@@ -127,7 +127,7 @@ let secondStartRunRejected () =
 let dispatchingIdleIgnored () =
     let ctx = mkCtx policy0 (TurnOrdinal.next TurnOrdinal.first)
     let plan = mkPlan turn0 TurnOrdinal.first model0 "do work"
-    let state = Dispatching(ctx, plan)
+    let state = Dispatching(ctx, plan, CurrentTurnEvidence.empty)
 
     match decide state SessionIdleObserved with
     | Ok(NoChange DuplicateIdleBeforeTurnMarker) -> ()
@@ -136,7 +136,7 @@ let dispatchingIdleIgnored () =
 let dispatchingErrorIgnored () =
     let ctx = mkCtx policy0 (TurnOrdinal.next TurnOrdinal.first)
     let plan = mkPlan turn0 TurnOrdinal.first model0 "do work"
-    let state = Dispatching(ctx, plan)
+    let state = Dispatching(ctx, plan, CurrentTurnEvidence.empty)
 
     match decide state (TurnErrorObserved err) with
     | Ok(NoChange UnattributedObservationBeforeStart) -> ()
@@ -154,7 +154,7 @@ let dispatchingErrorIgnored () =
 let idleDuringDispatchingThenRealIdleConverges () =
     let ctx = mkCtx policy0 (TurnOrdinal.next TurnOrdinal.first)
     let plan = mkPlan turn0 TurnOrdinal.first model0 "do work"
-    let dispatchingState = Dispatching(ctx, plan)
+    let dispatchingState = Dispatching(ctx, plan, CurrentTurnEvidence.empty)
 
     // Premature idle while still Dispatching: must be a named ignore, not a
     // state transition (i.e. the actor must remain Dispatching afterwards).

@@ -164,7 +164,7 @@ let private applyAfterAbort (ctx: RunContext) (turn: ActiveTurn) (abortCtx: Abor
                   ArmTurnDeadline plan2.TurnId
                   DispatchPrompt plan2 ]
 
-            decided (Dispatching(ctx2, plan2)) events effects
+            decided (Dispatching(ctx2, plan2, CurrentTurnEvidence.empty)) events effects
         | None ->
             let failure' =
                 match policyDec with
@@ -270,7 +270,7 @@ let decide (state: SubsessionState) (cmd: Command) : Result<DecisionResult, Deci
 
             let effects = [ ArmTurnDeadline plan.TurnId; DispatchPrompt plan ]
 
-            Ok(decided (Dispatching(ctx, plan)) events effects)
+            Ok(decided (Dispatching(ctx, plan, CurrentTurnEvidence.empty)) events effects)
 
     | Available _, CancelRequested -> Ok(noChange StaleTimer)
 
@@ -283,7 +283,14 @@ let decide (state: SubsessionState) (cmd: Command) : Result<DecisionResult, Deci
     | Available _, _ -> illegal (stateName ()) (cmdName ())
 
     // ── Dispatching ──
-    | Dispatching(ctx, plan), DispatchAccepted(tid, receipt) when tid = plan.TurnId ->
+    // Third field buffers CurrentTurnEvidence collected while still waiting for
+    // the host's own dispatch-acceptance confirmation. Host truth: session.prompt
+    // resolving (→ DispatchAccepted) and the host event bus delivering
+    // message.updated(role=assistant) (→ EvidenceUpdated) are two INDEPENDENT
+    // async chains — a fast provider can deliver the full assistant reply
+    // before our own dispatch call itself resolves. That evidence MUST survive
+    // into Running, not be destroyed by an accident of arrival order.
+    | Dispatching(ctx, plan, bufferedEvidence), DispatchAccepted(tid, receipt) when tid = plan.TurnId ->
         let started = { Plan = plan; StartReceipt = receipt }
 
         let events =
@@ -292,11 +299,11 @@ let decide (state: SubsessionState) (cmd: Command) : Result<DecisionResult, Deci
                     TurnId = tid
                     Receipt = receipt } ]
 
-        Ok(decided (Running(ctx, started, CurrentTurnEvidence.empty)) events [])
+        Ok(decided (Running(ctx, started, bufferedEvidence)) events [])
 
     | Dispatching _, DispatchAccepted _ -> Ok(noChange StaleTurnMarker)
 
-    | Dispatching(ctx, plan), DispatchRejected(tid, failure) when tid = plan.TurnId ->
+    | Dispatching(ctx, plan, _), DispatchRejected(tid, failure) when tid = plan.TurnId ->
         match failure with
         | HostRejected error ->
             let policyDec = afterError ctx.FallbackConfig ctx.Chain ctx.Policy error
@@ -311,7 +318,7 @@ let decide (state: SubsessionState) (cmd: Command) : Result<DecisionResult, Deci
                       ArmTurnDeadline plan2.TurnId
                       DispatchPrompt plan2 ]
 
-                Ok(decided (Dispatching(ctx2, plan2)) events effects)
+                Ok(decided (Dispatching(ctx2, plan2, CurrentTurnEvidence.empty)) events effects)
             | None ->
                 let failure' =
                     match policyDec with
@@ -332,11 +339,21 @@ let decide (state: SubsessionState) (cmd: Command) : Result<DecisionResult, Deci
 
     | Dispatching _, TurnErrorObserved _ -> Ok(noChange UnattributedObservationBeforeStart)
 
-    | Dispatching _, EvidenceUpdated _ -> Ok(noChange EvidenceBeforeRun)
+    // Evidence for the current turn (matched by TurnId, or empty TurnId which
+    // several host translators use as a placeholder) MUST be buffered here,
+    // not discarded. See the Dispatching type comment in Types.fs for why this
+    // window exists and why silently dropping it broke every subagent tool
+    // (investigator/coder/browser/meditator) under fast-provider timing.
+    | Dispatching(ctx, plan, bufferedEvidence), EvidenceUpdated obs ->
+        if TurnId.value obs.TurnId = "" || obs.TurnId = plan.TurnId then
+            let merged = CurrentTurnEvidence.merge bufferedEvidence obs.Evidence
+            Ok(decided (Dispatching(ctx, plan, merged)) [] [])
+        else
+            Ok(noChange StaleTurnMarker)
 
     | Dispatching _, SessionIdleObserved -> Ok(noChange DuplicateIdleBeforeTurnMarker)
 
-    | Dispatching(ctx, plan), CancelRequested ->
+    | Dispatching(ctx, plan, _), CancelRequested ->
         let cancelCtx: CancelContext =
             { Reason = UserRequested
               AfterStop = FinishCancelled }
@@ -344,7 +361,7 @@ let decide (state: SubsessionState) (cmd: Command) : Result<DecisionResult, Deci
         let effects = [ CancelPendingDispatch plan.TurnId ]
         Ok(decided (CancellingDispatch(ctx, plan, cancelCtx)) [] effects)
 
-    | Dispatching(ctx, plan), TurnDeadlineExpired tid when tid = plan.TurnId ->
+    | Dispatching(ctx, plan, _), TurnDeadlineExpired tid when tid = plan.TurnId ->
         let cancelCtx: CancelContext =
             { Reason = TurnDeadline
               AfterStop = FinishFailed(InfrastructureFailure "turn deadline expired before host accepted") }
@@ -354,7 +371,7 @@ let decide (state: SubsessionState) (cmd: Command) : Result<DecisionResult, Deci
 
     | Dispatching _, TurnDeadlineExpired _ -> Ok(noChange StaleTimer)
 
-    | Dispatching(ctx, plan), SessionClosed -> Ok(closeActive ctx plan.TurnId)
+    | Dispatching(ctx, plan, _), SessionClosed -> Ok(closeActive ctx plan.TurnId)
 
     | Dispatching _,
       (AbortDeadlineExpired _ | DispatchStatusResolved _ | AbortConfirmed _ | AbortHostAccepted _ | AbortRequestFailed _) ->
@@ -546,7 +563,7 @@ let decide (state: SubsessionState) (cmd: Command) : Result<DecisionResult, Deci
                       ArmTurnDeadline plan2.TurnId
                       DispatchPrompt plan2 ]
 
-                Ok(decided (Dispatching(ctx2, plan2)) events effects)
+                Ok(decided (Dispatching(ctx2, plan2, CurrentTurnEvidence.empty)) events effects)
             | None ->
                 let failure' =
                     match policyDec with
@@ -603,7 +620,7 @@ let decide (state: SubsessionState) (cmd: Command) : Result<DecisionResult, Deci
                   ArmTurnDeadline plan2.TurnId
                   DispatchPrompt plan2 ]
 
-            Ok(decided (Dispatching(ctx2, plan2)) events effects)
+            Ok(decided (Dispatching(ctx2, plan2, CurrentTurnEvidence.empty)) events effects)
         | None ->
             let failure' =
                 match policyDec with
@@ -798,7 +815,7 @@ let decide (state: SubsessionState) (cmd: Command) : Result<DecisionResult, Deci
 
 let private tryExtractActiveForReconcile (s: SubsessionState) : (RunContext * ActiveTurn) option =
     match s with
-    | Dispatching(ctx, plan) -> Some(ctx, NotYetStarted plan)
+    | Dispatching(ctx, plan, _) -> Some(ctx, NotYetStarted plan)
     | CancellingDispatch(ctx, plan, _) -> Some(ctx, NotYetStarted plan)
     | ReconcilingUnknownDispatch(ctx, plan, _) -> Some(ctx, NotYetStarted plan)
     | Running(ctx, started, _) -> Some(ctx, Started started)

@@ -626,6 +626,7 @@
     <Compile Include="tests/SubsessionV36HardTests.fs"/>
     <Compile Include="tests/SubsessionV37HardTests.fs"/>
     <Compile Include="tests/SubsessionV38DecisionTests.fs"/>
+    <Compile Include="tests/SubsessionEvidenceRaceTests.fs"/>
     <Compile Include="tests/FallbackMessageCodecTests.fs"/>
     <Compile Include="tests/FallbackRecoveryWaitTests.fs"/>
     <Compile Include="tests/FallbackIntegrationTests.fs"/>

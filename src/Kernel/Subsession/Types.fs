@@ -258,7 +258,17 @@ type PoisonReason =
 /// CurrentTurnEvidence classification in Running.
 type SubsessionState =
     | Available of AvailableState
-    | Dispatching of RunContext * TurnPlan
+    /// Third field buffers CurrentTurnEvidence that arrives BEFORE the host
+    /// confirms acceptance of the dispatched prompt (DispatchAccepted). Host
+    /// truth: session.prompt resolving and the host's event bus delivering
+    /// message.updated(role=assistant) are two independent async chains —
+    /// nothing orders one before the other. A fast provider can deliver the
+    /// full assistant reply while we are still Dispatching. This evidence
+    /// MUST survive into Running (see Decision.fs Dispatching+DispatchAccepted),
+    /// not be silently destroyed — that was the root cause of subagent runs
+    /// (investigator/coder/browser/meditator) spuriously failing with
+    /// "No assistant message in current turn".
+    | Dispatching of RunContext * TurnPlan * CurrentTurnEvidence
     | CancellingDispatch of RunContext * TurnPlan * CancelContext
     | ReconcilingUnknownDispatch of RunContext * TurnPlan * CancelContext
     | Running of RunContext * StartedTurn * CurrentTurnEvidence

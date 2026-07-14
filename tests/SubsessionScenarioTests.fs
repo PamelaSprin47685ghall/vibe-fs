@@ -82,7 +82,7 @@ let scenarioErrorThenIdleRetriesThenSucceeds () =
     let d0 = mustDecide (Available { SessionId = sid }) (StartRun request)
 
     match d0.NextState with
-    | Dispatching(_, plan) ->
+    | Dispatching(_, plan, _) ->
         let d1 =
             mustDecide d0.NextState (DispatchAccepted(plan.TurnId, OrderedTurnMarkerObserved))
 
@@ -112,7 +112,7 @@ let scenarioErrorIdleRetry () =
     let d0 = mustDecide (Available { SessionId = sid }) (StartRun request)
 
     match d0.NextState with
-    | Dispatching(_, plan) ->
+    | Dispatching(_, plan, _) ->
         let d1 =
             mustDecide d0.NextState (DispatchAccepted(plan.TurnId, OrderedTurnMarkerObserved))
 
@@ -133,7 +133,7 @@ let scenarioDispatchRejectRetry () =
     let d0 = mustDecide (Available { SessionId = sid }) (StartRun request)
 
     match d0.NextState with
-    | Dispatching(_, plan) ->
+    | Dispatching(_, plan, _) ->
         let d1 = mustDecide d0.NextState (DispatchRejected(plan.TurnId, HostRejected err))
 
         match d1.NextState with
@@ -146,7 +146,7 @@ let scenarioAcceptanceUnknownAborts () =
     let d0 = mustDecide (Available { SessionId = sid }) (StartRun request)
 
     match d0.NextState with
-    | Dispatching(_, plan) ->
+    | Dispatching(_, plan, _) ->
         let d1 =
             mustDecide d0.NextState (DispatchRejected(plan.TurnId, HostAcceptanceUnknown err))
 
@@ -191,7 +191,7 @@ let scenarioCancelIdle () =
     let d0 = mustDecide (Available { SessionId = sid }) (StartRun request)
 
     match d0.NextState with
-    | Dispatching(_, plan) ->
+    | Dispatching(_, plan, _) ->
         let d1 =
             mustDecide d0.NextState (DispatchAccepted(plan.TurnId, OrderedTurnMarkerObserved))
 
@@ -239,7 +239,7 @@ let scenarioAbortDeadlinePoisons () =
     let d0 = mustDecide (Available { SessionId = sid }) (StartRun request)
 
     match d0.NextState with
-    | Dispatching(_, plan) ->
+    | Dispatching(_, plan, _) ->
         let d1 =
             mustDecide d0.NextState (DispatchAccepted(plan.TurnId, OrderedTurnMarkerObserved))
 
@@ -271,7 +271,7 @@ let scenarioStaleTimerIgnored () =
     let d0 = mustDecide (Available { SessionId = sid }) (StartRun request)
 
     match d0.NextState with
-    | Dispatching(_, plan) ->
+    | Dispatching(_, plan, _) ->
         let stale = TurnId.create "stale-turn"
         mustNoChange d0.NextState (TurnDeadlineExpired stale) StaleTimer
 
@@ -287,7 +287,7 @@ let propErrorNeverDispatches () =
     let d0 = mustDecide (Available { SessionId = sid }) (StartRun request)
 
     match d0.NextState with
-    | Dispatching(_, plan) ->
+    | Dispatching(_, plan, _) ->
         let d1 =
             mustDecide d0.NextState (DispatchAccepted(plan.TurnId, OrderedTurnMarkerObserved))
 
@@ -299,7 +299,7 @@ let propAtMostOneCompleteCaller () =
     let d0 = mustDecide (Available { SessionId = sid }) (StartRun request)
 
     match d0.NextState with
-    | Dispatching(_, plan) ->
+    | Dispatching(_, plan, _) ->
         let d1 =
             mustDecide d0.NextState (DispatchAccepted(plan.TurnId, OrderedTurnMarkerObserved))
 

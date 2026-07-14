@@ -122,7 +122,7 @@ type SubsessionActor
 
     let tryExtractActive (s: SubsessionState) : (RunContext * ActiveTurn) option =
         match s with
-        | Dispatching(ctx, plan) -> Some(ctx, NotYetStarted plan)
+        | Dispatching(ctx, plan, _) -> Some(ctx, NotYetStarted plan)
         | CancellingDispatch(ctx, plan, _) -> Some(ctx, NotYetStarted plan)
         | ReconcilingUnknownDispatch(ctx, plan, _) -> Some(ctx, NotYetStarted plan)
         | Running(ctx, started, _) -> Some(ctx, Started started)
