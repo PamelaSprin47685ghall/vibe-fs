@@ -7,7 +7,6 @@ open Wanxiangshu.Shell
 
 open Wanxiangshu.Kernel.HostTools
 open Wanxiangshu.Kernel.Messaging
-open Wanxiangshu.Kernel.ReviewReplayPolicy
 open Wanxiangshu.Kernel.BacklogProjectionCore
 open Wanxiangshu.Shell.MessageTransformCore
 open Wanxiangshu.Shell.MessageTransformHostEntry
@@ -261,7 +260,6 @@ let messagesTransform
 
                             newEpoch
 
-            let cleaned = Messaging.stripSyntheticBySource messagesList
             let isSub = registry.ResolveSubsessionParentID(Some sessionID) |> Option.isSome
 
             let backlogPolicy =
@@ -318,15 +316,12 @@ let messagesTransform
                   ParallelHintPolicy = parallelHintPolicy
                   ContextBudgetPolicy = contextBudgetPolicy
                   IsSubagentSession = isSub
-                  Cleaned = cleaned
+                  Cleaned = messagesList
                   RawArray = Some messagesArr
                   SembleInjectEnabled = sembleInjectEnabled
                   Scope = runtimeScope
                   MaxInputTokens = maxInputTokens
                   GetContextUsage = getContextUsage }
-
-            let replayTexts () : JS.Promise<string seq> =
-                Promise.lift (extractTextsFromEncodedMessages messagesArr)
 
             let injectFn policy encoded =
                 match policy with
@@ -361,8 +356,6 @@ let messagesTransform
                 runHostMessagesTransform
                     reviewStore
                     sessionID
-                    IfStoreEmpty
-                    replayTexts
                     plan
                     backlogOps
                     MessagingCodec.encodeMessages

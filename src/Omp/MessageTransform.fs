@@ -75,8 +75,6 @@ let transformEntriesAsyncWithAgent
                 let contextBudgetPolicy =
                     Wanxiangshu.Kernel.MessageTransformPolicy.getContextBudgetPolicy agent isChild
 
-                let cleaned = stripSyntheticBySource messagesList
-
                 defaultBacklogSession.WorkspaceRoot <- cwd
 
                 let backlogOps =
@@ -111,16 +109,13 @@ let transformEntriesAsyncWithAgent
                       ParallelHintPolicy = parallelHintPolicy
                       ContextBudgetPolicy = contextBudgetPolicy
                       IsSubagentSession = isChild
-                      Cleaned = cleaned
+                      Cleaned = messagesList
                       RawArray = Some entriesArr
                       SembleInjectEnabled = false
                       Scope = ExecutorTools.ompScope
                       MaxInputTokens = maxInputTokens
                       GetContextUsage = getContextUsage }
 
-
-                let replayTexts () : JS.Promise<string seq> =
-                    Promise.lift (extractHistoryTexts messagesList |> Seq.ofList)
 
                 let injectFn _ encoded = Promise.lift encoded
 
@@ -167,8 +162,6 @@ let transformEntriesAsyncWithAgent
                     runHostMessagesTransform
                         reviewStore
                         sessionId
-                        IfStoreEmpty
-                        replayTexts
                         plan
                         backlogOps
                         encodeMessages

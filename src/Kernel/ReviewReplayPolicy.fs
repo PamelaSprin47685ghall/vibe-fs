@@ -1,7 +1,6 @@
 module Wanxiangshu.Kernel.ReviewReplayPolicy
 
 open Wanxiangshu.Kernel.Messaging
-open Wanxiangshu.Kernel.LoopMessages
 
 let textsFromFlatParts (flat: FlatPart<'raw> seq) : string seq =
     flat
@@ -10,5 +9,3 @@ let textsFromFlatParts (flat: FlatPart<'raw> seq) : string seq =
         | TextPart text -> text
         | ToolPart(_, _, Some state, _) -> state.output
         | _ -> "")
-
-let reviewTaskFromTexts = inferReviewTaskFromTexts

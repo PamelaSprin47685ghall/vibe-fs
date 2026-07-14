@@ -76,17 +76,7 @@ let testHostNativeToolsTrigger () =
                   MaxInputTokens = 200000
                   GetContextUsage = (fun _ -> Promise.lift None) }
 
-            runHostMessagesTransform
-                reviewStore
-                sessionID
-                IfStoreEmpty
-                (fun _ -> promise { return Seq.empty })
-                plan
-                backlogOps
-                encodeMessages
-                injectFn
-                loadCaps
-                buildCaps
+            runHostMessagesTransform reviewStore sessionID plan backlogOps encodeMessages injectFn loadCaps buildCaps
 
         let singleCallTriggers toolName sessionID =
             let msgs =
@@ -188,17 +178,7 @@ let testSynthCallIdExcluded () =
                   MaxInputTokens = 200000
                   GetContextUsage = (fun _ -> Promise.lift None) }
 
-            runHostMessagesTransform
-                reviewStore
-                sessionID
-                IfStoreEmpty
-                (fun _ -> promise { return Seq.empty })
-                plan
-                backlogOps
-                encodeMessages
-                injectFn
-                loadCaps
-                buildCaps
+            runHostMessagesTransform reviewStore sessionID plan backlogOps encodeMessages injectFn loadCaps buildCaps
 
         // 合成 callID（semble-call-*）不触发——宿主内部注入
         let msgs20 =
@@ -216,7 +196,7 @@ let testSynthCallIdExcluded () =
               mkMsg "caps-call-fp-0" ToolResult [] ]
 
         let! res21 = runTransform "s21" msgs21
-        equal "caps-call-* excluded" 3 res21.Length
+        equal "caps-call-* excluded (stripped by runHostMessagesTransform)" 1 res21.Length
     }
 
 let testCompletedToolPartInAssistantTriggers () =
@@ -250,17 +230,7 @@ let testCompletedToolPartInAssistantTriggers () =
                   MaxInputTokens = 200000
                   GetContextUsage = (fun _ -> Promise.lift None) }
 
-            runHostMessagesTransform
-                reviewStore
-                sessionID
-                IfStoreEmpty
-                (fun _ -> promise { return Seq.empty })
-                plan
-                backlogOps
-                encodeMessages
-                injectFn
-                loadCaps
-                buildCaps
+            runHostMessagesTransform reviewStore sessionID plan backlogOps encodeMessages injectFn loadCaps buildCaps
 
         let state =
             { status = ToolExecutionStatus.Completed

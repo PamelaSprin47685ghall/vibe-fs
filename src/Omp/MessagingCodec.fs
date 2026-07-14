@@ -4,7 +4,7 @@ open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Kernel.Messaging
 open Wanxiangshu.Kernel.ToolExecutionStatusModule
-open Wanxiangshu.Kernel.ReviewReplayPolicy
+open Wanxiangshu.Kernel.LoopMessages
 open Wanxiangshu.Shell.Dyn
 open Wanxiangshu.Shell.MessagingDecodeCore
 open Wanxiangshu.Kernel.Nudge.TodoStatus
@@ -257,14 +257,14 @@ let hasActiveLoopFromHistory (sessionManager: ISessionManager) : bool =
     entries sessionManager
     |> decodeEntries ""
     |> extractHistoryTexts
-    |> reviewTaskFromTexts
+    |> inferReviewTaskFromTexts
     |> Option.isSome
 
 let activeLoopTaskFromHistory (sessionManager: ISessionManager) : string option =
     entries sessionManager
     |> decodeEntries ""
     |> extractHistoryTexts
-    |> reviewTaskFromTexts
+    |> inferReviewTaskFromTexts
 
 open Wanxiangshu.Omp.MessagingCodecEncode
 

@@ -121,8 +121,6 @@ let testAmendSkippedWhenSembleInjectEnabled () =
             runHostMessagesTransform
                 reviewStore
                 "s-amend-semble"
-                IfStoreEmpty
-                (fun _ -> promise { return Seq.empty })
                 plan
                 backlogOps
                 encodeMessages

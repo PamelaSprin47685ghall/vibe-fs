@@ -65,7 +65,7 @@ let messagesTransform
                 Wanxiangshu.Kernel.MessageTransformPolicy.getContextBudgetPolicy agent isChild
 
             let typedMessages = decodeMessages sessionID messagesArr
-            let cleanedMessages = stripSyntheticBySource typedMessages
+            let cleanedMessages = typedMessages
 
             let backlogOps =
                 backlogSessionOpsFrom backlogSession.Host (fun sid msgs ->
@@ -107,9 +107,6 @@ let messagesTransform
                   MaxInputTokens = maxInputTokens
                   GetContextUsage = getContextUsage }
 
-            let replayTexts () : JS.Promise<string seq> =
-                Promise.lift (extractTextsFromEncodedMessages messagesArr)
-
             let injectFn _ encoded = Promise.lift encoded
 
             let loadCaps () =
@@ -134,8 +131,6 @@ let messagesTransform
                 runHostMessagesTransform
                     reviewStore
                     sessionID
-                    IfStoreEmpty
-                    replayTexts
                     plan
                     backlogOps
                     encodeMessages

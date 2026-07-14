@@ -1,7 +1,5 @@
 module Wanxiangshu.Shell.ReviewReplaySync
 
-open Wanxiangshu.Kernel.ReviewReplayPolicy
-open Wanxiangshu.Shell.ReviewRuntime
-
-let syncReviewFromTexts (store: ReviewStore) (sessionID: string) (texts: string seq) : unit =
-    reviewTaskFromTexts texts |> syncReviewProjection store sessionID
+// This module previously hosted syncReviewFromTexts, which was dead code
+// on the messagesTransform path. It has been removed along with the
+// review-replay parameters from runHostMessagesTransform.

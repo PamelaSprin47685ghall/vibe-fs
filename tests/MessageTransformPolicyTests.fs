@@ -56,13 +56,21 @@ let agentNormalizationTest () =
 
     check "EXec (caps)" (getCapsInjectionPolicy "EXec" false = CapsInjectionPolicy.Exclude)
 
-let testTransformO1Cache () =
+let testCapsSlotReuse () =
     promise {
-        pipelineRunCount <- 0
         let reviewStore = createReviewStore ()
 
-        let plan =
-            { SessionID = ""
+        let scope = Wanxiangshu.Shell.RuntimeScope.create ()
+
+        let capsObj =
+            box (
+                createObj
+                    [ "info", box (createObj [ "id", box "caps-synth-user-test"; "role", box "user" ])
+                      "parts", box [||] ]
+            )
+
+        let mkPlan cleanMsgs =
+            { SessionID = "caps-slot-test"
               Agent = "main"
               Directory = ""
               ProjectionPolicy = ProjectionPolicy.IncludeProjection
@@ -71,10 +79,10 @@ let testTransformO1Cache () =
               ParallelHintPolicy = Wanxiangshu.Kernel.MessageTransformPolicy.ParallelHintPolicy.Include
               ContextBudgetPolicy = Wanxiangshu.Kernel.MessageTransformPolicy.ContextBudgetPolicy.Include
               IsSubagentSession = false
-              Cleaned = []
+              Cleaned = cleanMsgs
               RawArray = None
               SembleInjectEnabled = false
-              Scope = Wanxiangshu.Shell.RuntimeScope.create ()
+              Scope = scope
               MaxInputTokens = 200000
               GetContextUsage = (fun _ -> Promise.lift None) }
 
@@ -82,56 +90,62 @@ let testTransformO1Cache () =
             { Host = opencode
               GetOrRebuildBacklog = fun _ _ -> [] }
 
-        let encodeMessages (msgs: Message<obj> list) = [||]
+        let encodeMessages (msgs: Message<obj> list) = msgs |> List.map box |> List.toArray
+
         let injectFn (_policy: BacklogProjectionPolicy) (arr: obj array) = promise { return arr }
-        let loadCaps () = promise { return [] }
-        let buildCaps (arr: obj array) (_caps: CapsFile list) (_hint: string option) = arr
 
-        let plan2 =
-            { plan with
-                Cleaned =
-                    [ { info =
-                          { id = "msg1"
-                            sessionID = "test"
-                            role = User
-                            agent = "manager"
-                            isError = false
-                            toolName = ""
-                            details = null
-                            time = null }
-                        parts = []
-                        source = Native
-                        raw = null } ] }
+        let loadCapsCount = ref 0
 
-        let! _ =
+        let loadCaps () =
+            loadCapsCount.Value <- loadCapsCount.Value + 1
+            promise { return [] }
+
+        let buildCaps (arr: obj array) (_caps: CapsFile list) (_hint: string option) = Array.append [| capsObj |] arr
+
+        let msg =
+            { info =
+                { id = "msg1"
+                  sessionID = "caps-slot-test"
+                  role = User
+                  agent = "manager"
+                  isError = false
+                  toolName = ""
+                  details = null
+                  time = null }
+              parts = [ TextPart "hello" ]
+              source = Native
+              raw = null }
+
+        let plan = mkPlan [ msg ]
+
+        let! res1 =
             runHostMessagesTransform
                 reviewStore
-                ""
-                IfStoreEmpty
-                (fun _ -> promise { return Seq.empty })
-                plan2
+                "caps-slot-test"
+                plan
                 backlogOps
                 encodeMessages
                 injectFn
                 loadCaps
                 buildCaps
 
-        equal "count after first call" 1 pipelineRunCount
+        equal "first call invokes loadCaps" 1 loadCapsCount.Value
+        equal "first call prepends caps" 2 res1.Length
 
-        let! _ =
+        let! res2 =
             runHostMessagesTransform
                 reviewStore
-                ""
-                IfStoreEmpty
-                (fun _ -> promise { return Seq.empty })
-                plan2
+                "caps-slot-test"
+                plan
                 backlogOps
                 encodeMessages
                 injectFn
                 loadCaps
                 buildCaps
 
-        equal "count after second call should stay 1 (cache hit)" 1 pipelineRunCount
+        equal "second call does NOT invoke loadCaps (CapsSlot hit)" 1 loadCapsCount.Value
+
+        check "caps prefix reference stable across calls" (System.Object.ReferenceEquals(res1.[0], res2.[0]))
     }
 
 let mkMsg id role parts =
@@ -195,17 +209,7 @@ let testSingleToolCallPromptInjection () =
                   MaxInputTokens = 200000
                   GetContextUsage = (fun _ -> Promise.lift None) }
 
-            runHostMessagesTransform
-                reviewStore
-                sessionID
-                IfStoreEmpty
-                (fun _ -> promise { return Seq.empty })
-                plan
-                backlogOps
-                encodeMessages
-                injectFn
-                loadCaps
-                buildCaps
+            runHostMessagesTransform reviewStore sessionID plan backlogOps encodeMessages injectFn loadCaps buildCaps
 
         // Case 1: 单工具调用 + ToolResult -> 应当被附加
         let msgs1 =
@@ -292,6 +296,6 @@ let run () =
         childWorkspaceExtraExcluded ()
         childWorkspaceNotExcluded ()
         agentNormalizationTest ()
-        do! testTransformO1Cache ()
+        do! testCapsSlotReuse ()
         do! testSingleToolCallPromptInjection ()
     }

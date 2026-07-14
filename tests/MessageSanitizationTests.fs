@@ -74,17 +74,7 @@ let testMessageSanitization () =
                   MaxInputTokens = 200000
                   GetContextUsage = (fun _ -> Promise.lift None) }
 
-            runHostMessagesTransform
-                reviewStore
-                sessionID
-                IfStoreEmpty
-                (fun _ -> promise { return Seq.empty })
-                plan
-                backlogOps
-                encodeMessages
-                injectFn
-                loadCaps
-                buildCaps
+            runHostMessagesTransform reviewStore sessionID plan backlogOps encodeMessages injectFn loadCaps buildCaps
 
         let! res1 = runTransform "sanitize-session" [ mkMsg "user" User [] ]
         equal "sanitize result length" 1 res1.Length
@@ -169,8 +159,6 @@ let testEmptyArrayAndMissingContentSanitization () =
             runHostMessagesTransform
                 reviewStore
                 "sanitize-session-2"
-                IfStoreEmpty
-                (fun _ -> promise { return Seq.empty })
                 plan
                 backlogOps
                 (fun _ -> [||])
