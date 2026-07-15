@@ -109,7 +109,7 @@ let testCheckFunctionLengthIsError () =
 
     let diags = checkFunctionLengths limits nodes
     equal "diags length" 1 diags.Length
-    equal "severity error" "error" diags.[0].severity
+    equal "severity warning" "warning" diags.[0].severity
 
     check
         "message contains suggest"
@@ -176,8 +176,22 @@ let testCheckFunctionLengths () =
         "diag 2 msg"
         (diags.[1].message.Contains "Do not compress code to bypass length limits; you must split functions.")
 
-    equal "diag 1 severity" "error" diags.[0].severity
-    equal "diag 2 severity" "error" diags.[1].severity
+    equal "diag 1 severity" "warning" diags.[0].severity
+    equal "diag 2 severity" "warning" diags.[1].severity
+
+let testCheckFunctionLengthsErrorThreshold () =
+    let limits = defaultStyleLimits
+
+    let nodes =
+        [| { kind = "function_definition"
+             startLine = 1
+             endLine = 61 } |]
+
+    let diags = checkFunctionLengths limits nodes
+    equal "error diags length" 1 diags.Length
+    equal "severity error" "error" diags.[0].severity
+
+    check "error message" (diags.[0].message.Contains "Function exceeds 60 lines")
 
 let run () =
     isFileEditToolTrueForEdit ()
@@ -200,3 +214,4 @@ let run () =
     testCheckFunctionLengthIsError ()
     testCheckFileLineCount ()
     testCheckFunctionLengths ()
+    testCheckFunctionLengthsErrorThreshold ()

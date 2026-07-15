@@ -170,7 +170,10 @@ let checkSyntax (content: string) (filePath: string) : JS.Promise<SyntaxCheckRes
                             let astErrors = errors |> List.rev |> Array.ofList
                             let astNodes = collectAstNodes rootNode [] |> Array.ofList
 
-                            let styleErrors = checkFunctionLengths defaultStyleLimits astNodes
+                            let styleErrors =
+                                let funcErrors = checkFunctionLengths defaultStyleLimits astNodes
+                                let fileErrors = checkFileLineCount defaultStyleLimits content
+                                Array.append funcErrors fileErrors
 
                             return Ok(lang, Array.append astErrors styleErrors)
     }

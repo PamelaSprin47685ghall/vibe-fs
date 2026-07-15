@@ -31,7 +31,7 @@ type StyleLimits =
 
 let defaultStyleLimits: StyleLimits =
     { maxFileLines = 300
-      maxFunctionLines = 50
+      maxFunctionLines = 60
       functionKinds =
         Set.ofList
             [ "function"
@@ -42,6 +42,8 @@ let defaultStyleLimits: StyleLimits =
               "arrow_function"
               "let_binding"
               "value_declaration" ] }
+
+let warningFunctionLines = 50
 
 let checkFileLineCount (limits: StyleLimits) (content: string) : SyntaxDiagnostic[] =
     if System.String.IsNullOrEmpty content then
@@ -82,6 +84,15 @@ let checkFunctionLengths (limits: StyleLimits) (nodes: AstNodeInfo[]) : SyntaxDi
                   endLine = node.endLine
                   endColumn = 1
                   severity = "error"
+                  message =
+                    $"Function exceeds 60 lines (currently {len} lines). Do not compress code to bypass length limits; you must split functions." }
+        elif len > warningFunctionLines then
+            Some
+                { line = node.startLine
+                  column = 1
+                  endLine = node.endLine
+                  endColumn = 1
+                  severity = "warning"
                   message =
                     $"Function exceeds 50 lines (currently {len} lines). Do not compress code to bypass length limits; you must split functions." }
         else
