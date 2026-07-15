@@ -153,7 +153,7 @@ let rec private sanitizeEmptyStrings (visited: System.Collections.Generic.HashSe
 let private getStack () : string = jsNative
 
 let runHostMessagesTransform
-    (reviewStore: ReviewStore)
+    (_reviewStore: ReviewStore)
     (sessionID: string)
     (plan: MessageTransformPlan)
     (backlogOps: BacklogSessionOps)
@@ -168,20 +168,12 @@ let runHostMessagesTransform
             | Some a -> a
             | None -> [||]
 
-        // Strip synthetic messages from the decoded list so the pipeline
-        // operates on clean native messages.  This was previously done
-        // unconditionally by each host; it now lives here so the hosts
-        // can pass the raw decoded list directly.
-        let cleaned = stripSyntheticBySource plan.Cleaned
-
-        if cleaned.IsEmpty then
+        if plan.Cleaned.IsEmpty then
             let visited = System.Collections.Generic.HashSet<obj>()
             sanitizeEmptyStrings visited raw
             return raw
         else
-            let cleanPlan = { plan with Cleaned = cleaned }
-
-            let! result = runMessageTransformPipeline cleanPlan backlogOps encodeMessages injectFn loadCaps buildCaps
+            let! result = runMessageTransformPipeline plan backlogOps encodeMessages injectFn loadCaps buildCaps
 
             let visited = System.Collections.Generic.HashSet<obj>()
             sanitizeEmptyStrings visited result

@@ -31,14 +31,16 @@ let hostKernel' () =
     check "coder has objective" (intent.IndexOf("fix bug") >= 0)
     check "coder has do_not_touch" (intent.IndexOf("shared.ts") >= 0)
 
-    let dummyEntry : Wanxiangshu.Methodology.SchemaCommon.MethodologyEntry =
+    let dummyEntry: Wanxiangshu.Methodology.SchemaCommon.MethodologyEntry =
         { methodologyId = "test_methodology"
           shortDefinition = "test def"
           triggerWhen = "test trigger"
           noteDescription = "test note desc"
           meditatorRole = "test role"
           outputSections = [] }
-    let prompt = Wanxiangshu.Methodology.SchemaCommon.renderMeditatorIntent dummyEntry "why?" "my background" "note detail"
+
+    let prompt =
+        Wanxiangshu.Methodology.SchemaCommon.renderMeditatorIntent dummyEntry "why?" "my background" "note detail"
 
     check "meditator has question" (prompt.IndexOf("why?") >= 0)
     check "meditator read-only" (prompt.IndexOf("quiet room") >= 0)

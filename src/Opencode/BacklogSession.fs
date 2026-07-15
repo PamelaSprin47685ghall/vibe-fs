@@ -51,6 +51,9 @@ type BacklogSession(host: Host, scope: RuntimeScope) =
                 else
                     []
 
+    member _.GetEventCount(sessionID: string) : int =
+        getStore(scope.WorkspaceRoot).GetSessionStateSync(sessionID).EventCount
+
 let replayBacklogFor (host: Host) (scope: RuntimeScope) (messages: Message<obj> list) : BacklogEntry list =
     BacklogSession(host, scope).ReplayBacklog messages
 

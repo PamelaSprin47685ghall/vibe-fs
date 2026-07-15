@@ -70,6 +70,7 @@ let createCoreServices (host: Host) (ctx: obj) =
                 directory
                 childAgentRegistry
                 reviewStore
+                (Some ctx)
         )
 
     let scope = create ()

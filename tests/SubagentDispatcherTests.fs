@@ -160,17 +160,30 @@ let testContinueFlow () =
 
                 // Verify event log contains expected spawned and continued events
                 let! events = getStore(tempDir).ReadAllEvents()
-                let spawnedEvents = events |> List.filter (fun e -> e.Kind = eventKindSubagentSpawned)
+
+                let spawnedEvents =
+                    events |> List.filter (fun e -> e.Kind = eventKindSubagentSpawned)
+
                 check "has 1 subagent_spawned event" (spawnedEvents.Length = 1)
                 let firstSpawned = spawnedEvents.[0]
                 equal "spawned childId matches" "session-1" (firstSpawned.Payload |> Map.find "childId")
                 equal "spawned agent matches" "coder" (firstSpawned.Payload |> Map.find "agent")
                 equal "spawned title matches" "Coder" (firstSpawned.Payload |> Map.find "title")
 
-                let continuedEvents = events |> List.filter (fun e -> e.Kind = eventKindSubagentContinued)
+                let continuedEvents =
+                    events |> List.filter (fun e -> e.Kind = eventKindSubagentContinued)
+
                 check "has 2 subagent_continued events" (continuedEvents.Length = 2)
-                equal "first continued prompt matches" "continue standard" (continuedEvents.[0].Payload |> Map.find "prompt")
-                equal "second continued prompt matches" "second continue" (continuedEvents.[1].Payload |> Map.find "prompt")
+
+                equal
+                    "first continued prompt matches"
+                    "continue standard"
+                    (continuedEvents.[0].Payload |> Map.find "prompt")
+
+                equal
+                    "second continued prompt matches"
+                    "second continue"
+                    (continuedEvents.[1].Payload |> Map.find "prompt")
 
                 // Assert invalid iterator still fails (since parts length will be 5, failing validation)
                 let invalidArgs =

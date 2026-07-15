@@ -53,7 +53,8 @@ type ScriptedHost
     (
         ?dispatch: unit -> Result<HostStartReceipt, DispatchFailure>,
         ?abort: unit -> AbortResult,
-        ?queryDispatchStatus: unit -> DispatchStatus
+        ?queryDispatchStatus: unit -> DispatchStatus,
+        ?querySessionQuiescence: unit -> QuiescenceStatus
     ) =
     let mutable dispatchCount = 0
     let mutable abortCount = 0
@@ -77,7 +78,10 @@ type ScriptedHost
         member _.CancelPendingDispatch(_) = ()
 
         member _.QueryDispatchStatus(_, _) =
-            Promise.lift ((defaultArg queryDispatchStatus (fun () -> DispatchStatus.DefinitelyNotAccepted)) ())
+            Promise.lift ((defaultArg queryDispatchStatus (fun () -> DispatchStatus.Unknown)) ())
+
+        member _.QuerySessionQuiescence(_, _) =
+            Promise.lift ((defaultArg querySessionQuiescence (fun () -> Stopped)) ())
 
 let private mkReq sid runId =
     { RunId = RunId.create runId
@@ -178,11 +182,17 @@ let idleBeforeBarrierIgnored () =
         { Reason = AcceptanceUnknownAfterDispatch
           AfterStop = RetryAfterSafeStop err }
 
-    let state = IssuingAbort(ctx, NotYetStarted plan, abortCtx)
+    let state = IssuingAbort(ctx, NotYetStarted plan, abortCtx, false)
 
     match decide state SessionIdleObserved with
-    | Ok(NoChange IdleBeforeAbortBarrier) -> check "idle ignored in IssuingAbort" true
-    | other -> fail ("expected NoChange IdleBeforeAbortBarrier, got " + string other)
+    | Ok(Decided d) ->
+        match d.NextState with
+        | IssuingAbort(_, _, _, true) -> check "idle buffered before barrier" true
+        | other -> fail ("expected IssuingAbort with idleBuffered=true, got " + string other)
+
+        check "no events on idle buffer" (List.isEmpty d.Events)
+        check "no effects on idle buffer" (List.isEmpty d.Effects)
+    | other -> fail ("expected Decided, got " + string other)
 
     // After AbortHostAccepted, state becomes AwaitingAbortSettle.
     match decide state (AbortHostAccepted turn0) with
@@ -197,10 +207,10 @@ let idleBeforeBarrierIgnored () =
                 | other -> fail ("expected ReconcilingAbortSettle, got " + string other)
 
                 check
-                    "emits QueryDispatchStatus"
+                    "emits QuerySessionQuiescence"
                     (hasEffect
                         (function
-                        | QueryDispatchStatus _ -> true
+                        | QuerySessionQuiescence _ -> true
                         | _ -> false)
                         d2.Effects)
             | other -> fail ("expected transition to ReconcilingAbortSettle, got " + string other)
@@ -228,14 +238,9 @@ let terminalAppendFailNotSucceeded () =
 
         let evidence =
             { CurrentTurnEvidence.empty with
-                Assistant = AssistantContent("out", Some NormalFinish) }
+                Assistant = AssistantSnapshot("", 0L, "out", Some NormalFinish) }
 
-        do!
-            actor.Post(
-                EvidenceUpdated
-                    { TurnId = TurnId.create ""
-                      Evidence = evidence }
-            )
+        do! actor.Post(EvidenceUpdated { TurnId = None; Evidence = evidence })
 
         do! sleep 10
         do! actor.Post SessionIdleObserved

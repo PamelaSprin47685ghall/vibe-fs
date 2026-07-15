@@ -64,17 +64,24 @@ let makeMockClient (pObjRef: obj ref) (parentId: string) (responseText: string) 
                                             let _ = PendingTurnReceipt.tryResolve nonce receipt
                                             ()
 
-                                        // Drive the real "event" hook the same way the host would, but only
-                                        // AFTER this prompt call resolves: Dispatch awaits this promise and
-                                        // posts DispatchAccepted only once it settles, so firing session.idle
-                                        // synchronously in-line here would race Dispatching -> DuplicateIdleBeforeTurnMarker
-                                        // (the idle would arrive before Running is ever reached).
+                                        // Drive the real event hook after prompt resolution. The final assistant
+                                        // message event intentionally follows idle: OpenCode emits these through
+                                        // independent async paths, so idle must reconcile the transcript first.
                                         let eventHook = Dyn.get pObjRef.Value "event"
 
                                         if not (Dyn.isNullish eventHook) then
                                             JS.setTimeout
                                                 (fun () ->
                                                     promise {
+                                                        let idleEvent =
+                                                            box
+                                                                {| event =
+                                                                    box
+                                                                        {| ``type`` = "session.idle"
+                                                                           properties = box {| sessionID = childId |} |} |}
+
+                                                        do! (eventHook $ idleEvent) |> unbox<JS.Promise<unit>>
+
                                                         let messageUpdatedEvent =
                                                             box
                                                                 {| event =
@@ -92,15 +99,6 @@ let makeMockClient (pObjRef: obj ref) (parentId: string) (responseText: string) 
                                                         do!
                                                             (eventHook $ messageUpdatedEvent)
                                                             |> unbox<JS.Promise<unit>>
-
-                                                        let idleEvent =
-                                                            box
-                                                                {| event =
-                                                                    box
-                                                                        {| ``type`` = "session.idle"
-                                                                           properties = box {| sessionID = childId |} |} |}
-
-                                                        do! (eventHook $ idleEvent) |> unbox<JS.Promise<unit>>
                                                     }
                                                     |> ignore)
                                                 0
@@ -111,21 +109,37 @@ let makeMockClient (pObjRef: obj ref) (parentId: string) (responseText: string) 
                         box (
                             System.Func<obj, JS.Promise<obj>>(fun _ ->
                                 (promise {
-                                    return
-                                        box
-                                            {| data =
-                                                [| box
-                                                       {| info =
-                                                           box
-                                                               {| role = "assistant"
-                                                                  model =
-                                                                   box
-                                                                       {| providerID = "mock"
-                                                                          modelID = "mock-model" |} |}
-                                                          parts =
-                                                           [| box
-                                                                  {| ``type`` = "text"
-                                                                     text = responseText |} |] |} |] |}
+                                    let userMessage =
+                                        box (
+                                            createObj
+                                                [ "info", box (createObj [ "role", box "user" ])
+                                                  "parts",
+                                                  box
+                                                      [| box (createObj [ "type", box "text"; "text", box "prompt" ]) |] ]
+                                        )
+
+                                    let assistantMessage =
+                                        box (
+                                            createObj
+                                                [ "info",
+                                                  box (
+                                                      createObj
+                                                          [ "role", box "assistant"
+                                                            "model",
+                                                            box (
+                                                                createObj
+                                                                    [ "providerID", box "mock"
+                                                                      "modelID", box "mock-model" ]
+                                                            ) ]
+                                                  )
+                                                  "parts",
+                                                  box
+                                                      [| box (
+                                                             createObj [ "type", box "text"; "text", box responseText ]
+                                                         ) |] ]
+                                        )
+
+                                    return box {| data = [| userMessage; assistantMessage |] |}
                                 }))
                         )
                         "abort", box (System.Func<obj, JS.Promise<unit>>(fun _ -> (Promise.lift ()))) ]

@@ -11,7 +11,13 @@ open Wanxiangshu.Shell.Wanxiangzhen.CoordinatorSquadUpdate
 
 let foldEventsMergedChain () =
     let events =
-        [ TasksCreated("s1", [ { taskId = "a"; title = "t"; description = "d"; dependsOn = [] } ])
+        [ TasksCreated(
+              "s1",
+              [ { taskId = "a"
+                  title = "t"
+                  description = "d"
+                  dependsOn = [] } ]
+          )
           TaskStarted("s1", "a", "/wt", "a")
           TaskSubmitted("s1", "a", "sha")
           TaskMerged("s1", "a", "sha") ]
@@ -26,7 +32,13 @@ let squadCreatedSetsRequirement () =
 let squadCancelledMarksNonTerminalCancelled () =
     let d0 =
         foldEvents
-            [ TasksCreated("s1", [ { taskId = "a"; title = "t"; description = "d"; dependsOn = [] } ])
+            [ TasksCreated(
+                  "s1",
+                  [ { taskId = "a"
+                      title = "t"
+                      description = "d"
+                      dependsOn = [] } ]
+              )
               TaskStarted("s1", "a", "/wt", "b") ]
             (empty "s1" "")
 

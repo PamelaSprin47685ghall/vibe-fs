@@ -74,6 +74,14 @@ let isCapsSynthIdRejects () =
     check "no prefix invalid caps id" (not (isCapsSynthId "other-123"))
     check "nullish not applicable (value type is string)" true
 
+let capsToolCallIdFitsProviderLimit () =
+    let epochId = "session-0123456789abcdefghijklmnopqrstuvwxyz-0123456789"
+    let callId = capsToolCallId "caps-call-" epochId "0123456789abcdef" 12
+
+    check "caps call ID stays within provider limit" (callId.Length <= 64)
+    check "caps call ID preserves session suffix" (callId.Contains "defghijklmnopqrstuvwxyz-0123456789")
+    check "caps call ID preserves fingerprint and index" (callId.EndsWith "-0123456789abcdef-12")
+
 // ── WarnTdd ─────────────────────────────────────────────────────────────────
 
 let parseWarnTddExactMatch () =
@@ -129,6 +137,7 @@ let run () =
     // CapsSynthPolicy
     isCapsSynthIdMatches ()
     isCapsSynthIdRejects ()
+    capsToolCallIdFitsProviderLimit ()
     // WarnTdd
     parseWarnTddExactMatch ()
     parseWarnTddCaseInsensitive ()

@@ -19,6 +19,31 @@ type FallbackModel =
 /// Ordered list of candidate models tried in sequence.
 type FallbackChain = FallbackModel list
 
+[<RequireQualifiedAccess>]
+/// Owner of the session's active lifecycle operation.
+type SessionOwner =
+    | NoOwner
+    | Human
+    | Fallback
+    | Nudge
+    | Compaction
+
+[<RequireQualifiedAccess>]
+/// Lifecycle state of a pending continuation or nudge lease.
+type LeaseStatus =
+    | Requested
+    | DispatchStarted
+    | Dispatched
+    | Running
+    | Cancelled
+
+[<RequireQualifiedAccess>]
+/// Terminal result emitted when a continuation lease is finished.
+type ContinuationOutcome =
+    | Failed
+    | Cancelled
+    | Settled
+
 /// Per-agent and global fallback policy.
 type FallbackConfig =
     { DefaultChain: FallbackChain

@@ -51,11 +51,7 @@ let private parseSquadConfig (parsed: obj) : SquadConfig =
         let mb = get squad "masterBranch"
         let sd = get squad "sharedDirs"
 
-        { MaxConcurrent =
-            if isNullish mc then
-                defaults.MaxConcurrent
-            else
-                safeInt mc
+        { MaxConcurrent = if isNullish mc then defaults.MaxConcurrent else safeInt mc
           Terminal =
             if System.String.IsNullOrEmpty term then
                 defaults.Terminal

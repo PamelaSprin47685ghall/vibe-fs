@@ -196,7 +196,7 @@ let testSynthCallIdExcluded () =
               mkMsg "caps-call-fp-0" ToolResult [] ]
 
         let! res21 = runTransform "s21" msgs21
-        equal "caps-call-* excluded (stripped by runHostMessagesTransform)" 1 res21.Length
+        equal "caps-call-* remains a native host message" 3 res21.Length
     }
 
 let testCompletedToolPartInAssistantTriggers () =

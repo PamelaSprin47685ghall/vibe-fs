@@ -46,6 +46,7 @@ let private buildToolParts
     capsFiles
     |> List.mapi (fun index cap ->
         let formattedOutput = formatReadOutput cap.filePath cap.content 1 None
+        let callId = capsToolCallId "caps-call-" epochId fp index
 
         let wrappedOutput =
             $"<wanxiangshu-caps-tools>\n{formattedOutput}\n</wanxiangshu-caps-tools>"
@@ -54,7 +55,7 @@ let private buildToolParts
             createObj
                 [ "type", box "tool"
                   "tool", box "read"
-                  "callID", box $"caps-call-{epochId}-{fp}-{index}"
+                  "callID", box callId
                   "id", box $"caps-tool-{epochId}-{fp}-{index}"
                   "sessionID", sessionBox sessionID
                   "messageID", box assistantId

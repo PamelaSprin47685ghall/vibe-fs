@@ -117,11 +117,10 @@ let registerFuzzyTools (pi: obj) (finderCache: FinderCache) (iteratorStore: Type
         createObj
             [ "name", box "fuzzy_continue"
               "label", box "Fuzzy Continue"
-              "description", box "Continue a previously running fuzzy_find or fuzzy_grep session. Returns the next page of results."
+              "description",
+              box "Continue a previously running fuzzy_find or fuzzy_grep session. Returns the next page of results."
               "parameters",
-              objectOf
-                  [| ("iterator", str "Opaque single-use iterator from a previous search result." tb) |]
-                  tb
+              objectOf [| ("iterator", str "Opaque single-use iterator from a previous search result." tb) |] tb
               "execute",
               box (fun (_id: string) (params': obj) (_signal: obj) (_onUpdate: obj) (ctx: obj) ->
                   promise {

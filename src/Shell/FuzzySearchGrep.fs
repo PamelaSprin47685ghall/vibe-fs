@@ -222,9 +222,14 @@ let fuzzyGrep (params': FuzzyGrepParams) (opts: SearchOptions) : JS.Promise<Sear
     | [] -> fuzzyGrepSingle params' opts
     | multi -> fuzzyGrepMulti multi params' opts
 
-let fuzzyGrepContinue (iteratorState: GrepIteratorState) (store: TypedIteratorStore) (opts: SearchOptions) : JS.Promise<SearchOutcome> =
+let fuzzyGrepContinue
+    (iteratorState: GrepIteratorState)
+    (store: TypedIteratorStore)
+    (opts: SearchOptions)
+    : JS.Promise<SearchOutcome> =
     promise {
         let! finderResult = acquireFinderFromOptions iteratorState.core.externalBasePath opts
+
         return
             runWithFinder
                 finderResult

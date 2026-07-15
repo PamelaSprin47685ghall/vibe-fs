@@ -17,10 +17,7 @@ let private okGrep args =
 
 let decodeFindOkFull () =
     let args =
-        createObj
-            [ "pattern", box [| "foo" |]
-              "path", box "src/"
-              "limit", box 10 ]
+        createObj [ "pattern", box [| "foo" |]; "path", box "src/"; "limit", box 10 ]
 
     let p = okFind args
     check "find pattern" (p.pattern = [ "foo" ])
@@ -83,12 +80,14 @@ let decodeGrepLimitBelowOneErrors () =
 
 let decodeContinueOk () =
     let args = createObj [ "iterator", box "ffi_f_1" ]
+
     match decodeFuzzyContinueArgs args with
     | Ok p -> check "continue iterator" (p.iterator = "ffi_f_1")
     | Error _ -> failwith "decodeFuzzyContinueArgs expected Ok"
 
 let decodeContinueMissingIteratorErrors () =
     let args = createObj []
+
     match decodeFuzzyContinueArgs args with
     | Error(InvalidIntent("fuzzy_continue", "iterator", _)) -> check "continue missing iterator error" true
     | _ -> check "continue missing iterator error" false

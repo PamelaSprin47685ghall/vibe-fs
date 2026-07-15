@@ -145,10 +145,17 @@ type OmpSubsessionHost(session: obj, agent: string, pi: obj) =
                         if found then
                             return DispatchStatus.Accepted OrderedTurnMarkerObserved
                         else
-                            return DispatchStatus.DefinitelyNotAccepted
+                            return DispatchStatus.Unknown
                     | _ -> return DispatchStatus.Unknown
                 with _ ->
                     return DispatchStatus.Unknown
+            }
+
+        member _.QuerySessionQuiescence(_sessionId, _turnId) =
+            promise {
+                // OMP provides no explicit stopped signal; returning StopUnknown directly
+                // without calling QueryDispatchStatus to avoid conflating dispatch status with session quiescence.
+                return StopUnknown
             }
 
 let createHost (session: obj) (agent: string) (pi: obj) : ISubsessionHost =

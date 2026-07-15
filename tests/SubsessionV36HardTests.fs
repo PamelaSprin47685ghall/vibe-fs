@@ -56,6 +56,8 @@ type CountingHost() =
 
         member _.QueryDispatchStatus(_, _) = Promise.lift Unknown
 
+        member _.QuerySessionQuiescence(_, _) = Promise.lift Stopped
+
 /// 3. TurnStarted EventLog append failure → fail-safe abort, not early return without abort
 let appendFailTriggersAbort () =
     promise {
@@ -278,14 +280,9 @@ let memoryStoreKeepsAllDomainEvents () =
 
         let evidence =
             { CurrentTurnEvidence.empty with
-                Assistant = AssistantContent("out", Some NormalFinish) }
+                Assistant = AssistantSnapshot("", 0L, "out", Some NormalFinish) }
 
-        do!
-            actor.Post(
-                EvidenceUpdated
-                    { TurnId = TurnId.create ""
-                      Evidence = evidence }
-            )
+        do! actor.Post(EvidenceUpdated { TurnId = None; Evidence = evidence })
 
         do! sleep 5
         do! actor.Post SessionIdleObserved

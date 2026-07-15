@@ -6,13 +6,31 @@ open Wanxiangshu.Kernel.Subsession.Fold
 
 module SubsessionActorRegistry =
     let mutable private actors = Map.empty<string, SubsessionActor>
-    let mutable private safetyProj = Map.empty<SessionId, SessionSafetyEntry>
+    // Safety projection is keyed by workspace root so multiple plugin instances
+    // in the same Node process cannot overwrite each other's durable poison state.
+    let mutable private safetyProj = Map.empty<string, SessionSafetyProjection>
 
-    let SetSafetyProjection (proj: SessionSafetyProjection) : unit = safetyProj <- proj
+    /// Replace the safety projection for the given workspace root.
+    let SetSafetyProjection (workspaceRoot: string) (proj: SessionSafetyProjection) : unit =
+        safetyProj <- Map.add workspaceRoot proj safetyProj
+
+    /// Find a safety entry for this session id across all workspace projections.
+    /// If any workspace has marked the session as persistently poisoned, that entry
+    /// wins over an active-run entry in another workspace.
+    let private tryFindSafetyEntry (sid: SessionId) : SessionSafetyEntry option =
+        safetyProj
+        |> Map.tryPick (fun _ proj ->
+            match Map.tryFind sid proj with
+            | Some(PersistentlyPoisoned _ as entry) -> Some entry
+            | _ -> None)
+
+    /// Remove the session id from every workspace projection.
+    let private removeFromAllSafetyProjections (sid: SessionId) : unit =
+        safetyProj <- safetyProj |> Map.map (fun _ proj -> Map.remove sid proj)
 
     let ClearPoison (sessionId: string) : unit =
         let sid = SessionId.create sessionId
-        safetyProj <- Map.remove sid safetyProj
+        removeFromAllSafetyProjections sid
 
         match Map.tryFind sessionId actors with
         | Some actor ->
@@ -29,7 +47,7 @@ module SubsessionActorRegistry =
         | Some actor when not actor.IsDisposed -> actor
         | _ ->
             let initialState =
-                match Map.tryFind sid safetyProj with
+                match tryFindSafetyEntry sid with
                 | Some(PersistentlyPoisoned reason) -> Some(Poisoned reason)
                 | _ -> None
 
@@ -40,8 +58,6 @@ module SubsessionActorRegistry =
                     sid,
                     host,
                     eventStore,
-                    // Remove registry entry if not already removed by Remove/ClearPoison.
-                    // This acts as a double safety net to ensure final cleanup.
                     onDispose =
                         (fun () ->
                             match Map.tryFind sessionId actors with
@@ -55,16 +71,12 @@ module SubsessionActorRegistry =
                 )
 
             actorOpt <- Some actor
-
             actors <- Map.add sessionId actor actors
             actor
 
-    /// Physical session deletion: synchronously remove from the registry map first
-    /// to prevent concurrent GetOrCreate from reusing this poisoned actor,
-    /// then post SessionClosed to trigger asynchronous disposal.
     let Remove (sessionId: string) : unit =
         let sid = SessionId.create sessionId
-        safetyProj <- Map.remove sid safetyProj
+        removeFromAllSafetyProjections sid
 
         match Map.tryFind sessionId actors with
         | Some actor ->

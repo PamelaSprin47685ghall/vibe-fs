@@ -28,13 +28,14 @@ let private buildUserMessage (userId: string) (preludeText: string option) (epoc
 
 let private buildMuxToolPart (epochId: string) (fp: string) (index: int) (cap: CapsFile) : obj =
     let formattedOutput = formatReadOutput cap.filePath cap.content 1 None
+    let callId = capsToolCallId "caps-fr-" epochId fp index
 
     let wrappedOutput =
         $"<wanxiangshu-caps-tools>\n{formattedOutput}\n</wanxiangshu-caps-tools>"
 
     createObj
         [ "type", box "dynamic-tool"
-          "toolCallId", box $"caps-fr-{epochId}-{fp}-{index}"
+          "toolCallId", box callId
           "toolName", box "file_read"
           "state", box "output-available"
           "input", box (createObj [ "path", box cap.filePath ])

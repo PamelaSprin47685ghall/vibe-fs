@@ -68,7 +68,7 @@ let evidenceDuringDispatchingMustSurviveIntoRunning () =
     | Dispatching(_, plan, _) ->
         let earlyEvidence =
             { CurrentTurnEvidence.empty with
-                Assistant = AssistantContent("investigator report: README found at docs/", Some NormalFinish) }
+                Assistant = AssistantSnapshot("", 0L, "investigator report: README found at docs/", Some NormalFinish) }
 
         // The assistant's full reply lands via message.updated BEFORE the host
         // has confirmed acceptance of our own prompt call.
@@ -76,7 +76,7 @@ let evidenceDuringDispatchingMustSurviveIntoRunning () =
             decide
                 d0.NextState
                 (EvidenceUpdated
-                    { TurnId = plan.TurnId
+                    { TurnId = Some plan.TurnId
                       Evidence = earlyEvidence })
         with
         | Ok(Decided d1) ->
@@ -91,13 +91,14 @@ let evidenceDuringDispatchingMustSurviveIntoRunning () =
                 match d2.NextState with
                 | Running(_, _, evidence) ->
                     match evidence.Assistant with
-                    | AssistantContent(text, _) ->
+                    | AssistantSnapshot(_, _, text, _) ->
                         equal
                             "assistant evidence collected before acceptance is preserved into Running"
                             "investigator report: README found at docs/"
                             text
                     | NoAssistant -> fail "premature evidence was destroyed on the Dispatching→Running transition"
                     | EmptyAssistant -> fail "premature evidence was replaced with EmptyAssistant"
+                    | AssistantDelta _ -> fail "premature evidence was a delta"
                 | other -> fail ("expected Running with preserved evidence, got " + string other)
 
                 // Idle now arrives. The subagent must be recognized as having
@@ -139,7 +140,7 @@ let toolResultDuringDispatchingMustSurviveIntoRunning () =
             decide
                 d0.NextState
                 (EvidenceUpdated
-                    { TurnId = plan.TurnId
+                    { TurnId = Some plan.TurnId
                       Evidence = earlyToolEvidence })
         with
         | Ok(Decided d1) ->
@@ -164,13 +165,13 @@ let mismatchedTurnEvidenceDuringDispatchingIsRejected () =
 
         let evidence =
             { CurrentTurnEvidence.empty with
-                Assistant = AssistantContent("stale", Some NormalFinish) }
+                Assistant = AssistantSnapshot("", 0L, "stale", Some NormalFinish) }
 
         match
             decide
                 d0.NextState
                 (EvidenceUpdated
-                    { TurnId = staleTurn
+                    { TurnId = Some staleTurn
                       Evidence = evidence })
         with
         | Ok(NoChange StaleTurnMarker) -> check "mismatched turn evidence correctly rejected" true

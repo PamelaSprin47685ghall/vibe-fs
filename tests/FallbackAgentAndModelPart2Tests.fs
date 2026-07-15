@@ -205,7 +205,7 @@ let opencodeNewUserMessageResetsChainAndModelSpec () =
             createObj [ "session", box (createObj [ "messages", box (fun _ -> Promise.lift (box {| data = [||] |})) ]) ]
 
         let handler =
-            createOpencodeFallbackHandler mockClient rt configLookup "" registry (createReviewStore ())
+            createOpencodeFallbackHandler mockClient rt configLookup "" registry (createReviewStore ()) None
 
         let observer =
             createSessionLifecycleObserver (

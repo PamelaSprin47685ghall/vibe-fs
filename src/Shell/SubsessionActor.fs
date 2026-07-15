@@ -39,6 +39,8 @@ type ISubsessionHost =
 
     abstract QueryDispatchStatus: SessionId * TurnId -> JS.Promise<DispatchStatus>
 
+    abstract QuerySessionQuiescence: SessionId * TurnId -> JS.Promise<QuiescenceStatus>
+
 /// Required event store — append failure is infrastructure failure.
 /// Implementations MUST treat the events list as one atomic write.
 type ISubsessionEventStore =
@@ -65,6 +67,7 @@ type SubsessionActor
     let mutable pendingReplies: Map<RunId, Deferred<RunResult>> = Map.empty
     let mutable turnTimers: Map<TurnId, TimerHandle> = Map.empty
     let mutable abortTimers: Map<TurnId, TimerHandle> = Map.empty
+    let mutable reconciliationTimers: Map<TurnId, TimerHandle> = Map.empty
     let mutable disposed = false
 
     let clearTurnTimer (turnId: TurnId) =
@@ -81,6 +84,13 @@ type SubsessionActor
             abortTimers <- Map.remove turnId abortTimers
         | None -> ()
 
+    let clearReconciliationTimer (turnId: TurnId) =
+        match Map.tryFind turnId reconciliationTimers with
+        | Some handle ->
+            JS.clearTimeout handle
+            reconciliationTimers <- Map.remove turnId reconciliationTimers
+        | None -> ()
+
     let clearAllTimers () =
         for KeyValue(_, h) in turnTimers do
             JS.clearTimeout h
@@ -88,8 +98,12 @@ type SubsessionActor
         for KeyValue(_, h) in abortTimers do
             JS.clearTimeout h
 
+        for KeyValue(_, h) in reconciliationTimers do
+            JS.clearTimeout h
+
         turnTimers <- Map.empty
         abortTimers <- Map.empty
+        reconciliationTimers <- Map.empty
 
     let armTurnTimer (turnId: TurnId) =
         clearTurnTimer turnId
@@ -106,6 +120,14 @@ type SubsessionActor
             JS.setTimeout (fun () -> this.Post(AbortDeadlineExpired turnId) |> ignore) 60_000
 
         abortTimers <- Map.add turnId handle abortTimers
+
+    let armReconciliationTimer (turnId: TurnId) =
+        clearReconciliationTimer turnId
+
+        let handle =
+            JS.setTimeout (fun () -> this.Post(ReconciliationDeadlineExpired turnId) |> ignore) 30_000
+
+        reconciliationTimers <- Map.add turnId handle reconciliationTimers
 
     let infrastructureError (ex: exn) : ErrorInput =
         { ErrorName = "InfrastructureFailure"
@@ -126,8 +148,8 @@ type SubsessionActor
         | CancellingDispatch(ctx, plan, _) -> Some(ctx, NotYetStarted plan)
         | ReconcilingUnknownDispatch(ctx, plan, _) -> Some(ctx, NotYetStarted plan)
         | Running(ctx, started, _) -> Some(ctx, Started started)
-        | Draining(ctx, started, _) -> Some(ctx, Started started)
-        | IssuingAbort(ctx, turn, _) -> Some(ctx, turn)
+        | Draining(ctx, started, _, _) -> Some(ctx, Started started)
+        | IssuingAbort(ctx, turn, _, _) -> Some(ctx, turn)
         | AwaitingAbortSettle(ctx, turn, _) -> Some(ctx, turn)
         | ReconcilingAbortSettle(ctx, turn, _) -> Some(ctx, turn)
         | Available _
@@ -140,6 +162,8 @@ type SubsessionActor
         | CancelTurnDeadline turnId -> clearTurnTimer turnId
         | ArmAbortDeadline turnId -> armAbortTimer turnId
         | CancelAbortDeadline turnId -> clearAbortTimer turnId
+        | ArmReconciliationDeadline turnId -> armReconciliationTimer turnId
+        | CancelReconciliationDeadline turnId -> clearReconciliationTimer turnId
         | CancelPendingDispatch turnId -> host.CancelPendingDispatch turnId
         | CompleteCaller(runId, result) ->
             match Map.tryFind runId pendingReplies with
@@ -154,6 +178,7 @@ type SubsessionActor
             onDispose |> Option.iter (fun f -> f ())
         | DispatchPrompt _
         | QueryDispatchStatus _
+        | QuerySessionQuiescence _
         | AbortHostSession _ -> ()
 
     /// Host effects: fire-and-forget; completion re-enters via Post (never awaited here).
@@ -173,6 +198,12 @@ type SubsessionActor
             host.QueryDispatchStatus(sid, tid)
             |> Promise.map (fun status -> this.Post(DispatchStatusResolved status) |> ignore)
             |> Promise.catch (fun _ -> this.Post(DispatchStatusResolved Unknown) |> ignore)
+            |> ignore
+
+        | QuerySessionQuiescence(sid, tid) ->
+            host.QuerySessionQuiescence(sid, tid)
+            |> Promise.map (fun status -> this.Post(SessionQuiescenceResolved status) |> ignore)
+            |> Promise.catch (fun _ -> this.Post(SessionQuiescenceResolved StopUnknown) |> ignore)
             |> ignore
 
         | AbortHostSession(sid, tid) ->
@@ -201,6 +232,7 @@ type SubsessionActor
         function
         | DispatchPrompt _
         | QueryDispatchStatus _
+        | QuerySessionQuiescence _
         | AbortHostSession _ -> true
         | _ -> false
 
@@ -224,7 +256,7 @@ type SubsessionActor
 
             // Runtime-only recovery; do not append more domain events that would fail again.
             Some
-                { NextState = IssuingAbort(ctx, turn, abortCtx)
+                { NextState = IssuingAbort(ctx, turn, abortCtx, false)
                   Events = []
                   Effects =
                     [ AbortHostSession(ctx.SessionId, tid)
@@ -330,7 +362,7 @@ type SubsessionActor
                                   AfterStop =
                                     FinishFailed(InfrastructureFailure("illegal transition: " + s + " + " + c)) }
 
-                            state <- IssuingAbort(ctx, turn, abortCtx)
+                            state <- IssuingAbort(ctx, turn, abortCtx, false)
 
                             let effects =
                                 [ AbortHostSession(ctx.SessionId, tid)
@@ -351,9 +383,27 @@ type SubsessionActor
                     | Error(StaleTurnCommand _) -> return [], None
             })
 
+    let activeTurnId (turn: ActiveTurn) : TurnId =
+        match turn with
+        | NotYetStarted p -> p.TurnId
+        | Started s -> s.Plan.TurnId
+
     member _.SessionId = sessionId
 
     member _.GetState() = state
+
+    member _.GetCurrentTurn() : TurnId option =
+        match state with
+        | Dispatching(_, plan, _) -> Some plan.TurnId
+        | CancellingDispatch(_, plan, _) -> Some plan.TurnId
+        | ReconcilingUnknownDispatch(_, plan, _) -> Some plan.TurnId
+        | Running(_, started, _) -> Some started.Plan.TurnId
+        | Draining(_, started, _, _) -> Some started.Plan.TurnId
+        | IssuingAbort(_, turn, _, _) -> Some(activeTurnId turn)
+        | AwaitingAbortSettle(_, turn, _) -> Some(activeTurnId turn)
+        | ReconcilingAbortSettle(_, turn, _) -> Some(activeTurnId turn)
+        | Available _
+        | Poisoned _ -> None
 
     member _.IsPoisoned =
         match state with

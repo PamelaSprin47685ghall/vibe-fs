@@ -82,13 +82,12 @@ let private aggregateAssignedTasks (events: obj list) : RawTask list * bool =
                             else
                                 (dr :?> obj array) |> Array.map string |> Array.toList)
 
-                    let newAcc =
-                        extracted
-                        |> List.fold (fun a x -> x :: a) acc
+                    let newAcc = extracted |> List.fold (fun a x -> x :: a) acc
                     (newAcc, hasCancelled)
                 else
                     (acc, true))
             ([], false)
+
     (List.rev rawTasks, hasCancelled)
 
 let private commitAssigned
@@ -132,11 +131,15 @@ let private commitAssigned
                 | Ok() ->
                     if assigned <> [] then
                         let now = rt.Deps.Now()
+
                         let updatedDag =
                             assigned
-                            |> List.fold (fun dag item ->
-                                let t = create item.taskId item.title item.description item.dependsOn now
-                                addTask t dag) rt.Dag
+                            |> List.fold
+                                (fun dag item ->
+                                    let t = create item.taskId item.title item.description item.dependsOn now
+                                    addTask t dag)
+                                rt.Dag
+
                         rt.Dag <- updatedDag
 
                     if hasCancelled then

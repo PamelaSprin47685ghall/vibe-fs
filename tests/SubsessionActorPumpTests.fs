@@ -56,10 +56,11 @@ type FakeHost
         member _.CancelPendingDispatch(tid) = cancelled <- tid :: cancelled
 
         member _.QueryDispatchStatus(_, _) =
-            let script =
-                defaultArg queryDispatchStatusScript (fun () -> DispatchStatus.DefinitelyNotAccepted)
+            let script = defaultArg queryDispatchStatusScript (fun () -> DispatchStatus.Unknown)
 
             Promise.lift (script ())
+
+        member _.QuerySessionQuiescence(_, _) = Promise.lift Stopped
 
 let private sleep (ms: int) : JS.Promise<unit> =
     Promise.create (fun resolve _ -> JS.setTimeout (fun () -> resolve ()) ms |> ignore)
@@ -96,12 +97,14 @@ let dispatchOkReachesRunning () =
 
         let evidence =
             { CurrentTurnEvidence.empty with
-                Assistant = AssistantContent("out", Some NormalFinish) }
+                Assistant = AssistantSnapshot("", 0L, "out", Some NormalFinish) }
+
+        let turnId = TurnId.create (RunId.value request.RunId + "-t0")
 
         do!
             actor.Post(
                 EvidenceUpdated
-                    { TurnId = TurnId.create ""
+                    { TurnId = Some turnId
                       Evidence = evidence }
             )
 
@@ -142,13 +145,15 @@ let concurrentStartRejected () =
         | Failed(ProtocolViolation _) -> check "second start rejected" true
         | other -> fail ("expected ProtocolViolation, got " + string other)
 
+        let turnId = TurnId.create (RunId.value req1.RunId + "-t0")
+
         do!
             actor.Post(
                 EvidenceUpdated
-                    { TurnId = TurnId.create ""
+                    { TurnId = Some turnId
                       Evidence =
                         { CurrentTurnEvidence.empty with
-                            Assistant = AssistantContent("x", Some NormalFinish) } }
+                            Assistant = AssistantSnapshot("", 0L, "x", Some NormalFinish) } }
             )
 
         do! sleep 5

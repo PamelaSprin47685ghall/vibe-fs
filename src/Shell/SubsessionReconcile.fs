@@ -32,6 +32,8 @@ type private ReconcileHost() =
 
         member _.QueryDispatchStatus(_, _) = Promise.lift Unknown
 
+        member _.QuerySessionQuiescence(_, _) = Promise.lift Stopped
+
 /// Load NDJSON, find RunStarted without RunFinished, and ensure those physical
 /// sessions cannot accept a new StartRun until SessionClosed dispose.
 /// Persists SessionPoisoned + TurnFinished + RunFinished so the decision is durable.
@@ -44,6 +46,7 @@ let reconcileUnfinishedRuns (workspaceRoot: string) : JS.Promise<SessionSafetyPr
             let store = getStore root
             let! events = store.ReadAllEvents()
             let proj = projectFromWanEvents events
+            let mutable currentProj = proj
 
             for KeyValue(sessionId, entry) in proj do
                 match entry with
@@ -71,11 +74,12 @@ let reconcileUnfinishedRuns (workspaceRoot: string) : JS.Promise<SessionSafetyPr
                         // will be rediscovered and re-reconciled (idempotent).
                         try
                             do! eventStore.Append(sessionId, poisonEvents)
+                            currentProj <- List.fold projectEvent currentProj poisonEvents
                         with _ ->
                             ()
 
                         do! actor.MarkUnknownAfterRestart()
 
-            SubsessionActorRegistry.SetSafetyProjection proj
-            return proj
+            SubsessionActorRegistry.SetSafetyProjection workspaceRoot currentProj
+            return currentProj
     }

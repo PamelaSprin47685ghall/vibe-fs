@@ -8,6 +8,7 @@ open Wanxiangshu.Shell.Dyn
 open Wanxiangshu.Shell.OpencodeClientCodec
 open Wanxiangshu.Shell.OpencodeSessionEventCodec
 open Wanxiangshu.Shell.OpencodeSessionEventCodecCommon
+open Wanxiangshu.Shell.FallbackMessageCodec
 open Wanxiangshu.Shell.ChildAgentRegistry
 open Wanxiangshu.Kernel.Domain
 open Wanxiangshu.Kernel.FallbackKernel.Types
@@ -17,6 +18,7 @@ open Wanxiangshu.Shell.FallbackEventBridge
 open Wanxiangshu.Shell.FallbackRuntimeState
 open Wanxiangshu.Shell.SubsessionEventRouter
 open Wanxiangshu.Shell.SubsessionChildObserver
+open Wanxiangshu.Shell.SubsessionTranscript
 open Wanxiangshu.Opencode.FallbackHooksHelper
 
 /// Zero-width space character used as the fallback `SendContinue` prompt
@@ -35,6 +37,18 @@ let private isSyntheticText (text: string) : bool =
     || t.Contains("A background runner task is still active")
     || t.Contains("the system context is about to be suspended")
     || t.Contains("You must immediately force an emergency stop")
+
+let private tryExtractTurnIdFromEvent (rawEvent: obj) : TurnId option =
+    let props = getProps rawEvent
+    let info = Dyn.get props "info"
+    let nonce = Dyn.str props "nonce"
+    let nonce = if nonce <> "" then nonce else Dyn.str info "nonce"
+    let cid = Dyn.str props "continuationId"
+    let cid = if cid <> "" then cid else Dyn.str props "continuationID"
+    let cid = if cid <> "" then cid else Dyn.str info "continuationId"
+    let cid = if cid <> "" then cid else Dyn.str info "continuationID"
+    let id = if nonce <> "" then nonce else cid
+    if id <> "" then Some(TurnId.create id) else None
 
 let private tryGetModelStringFromInfo (info: obj) : string option =
     if isNull info || Dyn.isNullish info then
@@ -213,7 +227,7 @@ let opencodeEventTranslator (runtime: FallbackRuntimeState) : IEventTranslator =
             let eventType = getEventType rawEvent
             let props = getProps rawEvent
 
-            if eventType = "message.updated" && not (Dyn.isNullish props) then
+            if eventType = "message.updated" || eventType.StartsWith("message.part.") then
                 let info = Dyn.get props "info"
 
                 if not (Dyn.isNullish info) && Dyn.str info "role" = "assistant" then
@@ -227,12 +241,26 @@ let opencodeEventTranslator (runtime: FallbackRuntimeState) : IEventTranslator =
                         else
                             false
 
+                    let assistantEvidence =
+                        if eventType.StartsWith("message.part.") then
+                            AssistantDelta("", 0L, text, Some(if hasToolCall then ToolFinish else NormalFinish))
+                        else
+                            AssistantSnapshot("", 0L, text, Some(if hasToolCall then ToolFinish else NormalFinish))
+
+                    let recovery =
+                        if eventType = "message.updated" then
+                            match scanToolCallAsText [| rawEvent |] with
+                            | Some prompt -> RawToolCallDetected prompt
+                            | None -> NoRecoveryPrompt
+                        else
+                            NoRecoveryPrompt
+
                     Some
-                        { TurnId = TurnId.create ""
+                        { TurnId = tryExtractTurnIdFromEvent rawEvent
                           Evidence =
                             { CurrentTurnEvidence.empty with
-                                Assistant =
-                                    AssistantContent(text, Some(if hasToolCall then ToolFinish else NormalFinish)) } }
+                                Assistant = assistantEvidence
+                                Recovery = recovery } }
                 else
                     let parts = Dyn.get props "parts"
 
@@ -245,7 +273,7 @@ let opencodeEventTranslator (runtime: FallbackRuntimeState) : IEventTranslator =
 
                         if hasToolResult then
                             Some
-                                { TurnId = TurnId.create ""
+                                { TurnId = tryExtractTurnIdFromEvent rawEvent
                                   Evidence =
                                     { CurrentTurnEvidence.empty with
                                         Tool = HasToolResult } }
@@ -376,8 +404,35 @@ let createOpencodeFallbackHandler
     (workspaceRoot: string)
     (_registry: ChildAgentRegistry)
     (reviewStore: Wanxiangshu.Shell.ReviewRuntime.ReviewStore)
+    (clientContext: obj option)
     : (obj -> JS.Promise<FallbackHookResult>) =
     let translator = opencodeEventTranslator runtime
+
+    let currentClient () =
+        match clientContext with
+        | Some context ->
+            match getClientFromPluginCtx context with
+            | Ok current -> current
+            | Error _ -> client
+        | None -> client
+
+    let refreshChildTurnEvidence (sessionID: string) : JS.Promise<unit> =
+        promise {
+            try
+                let arg = box {| path = box {| id = sessionID |} |}
+                let! response = invokeClient (currentClient ()) "messages" arg
+                let messages = Dyn.get response "data"
+
+                if Dyn.isArray messages then
+                    match buildTurnEvidence (messages :?> obj array) AnchorByTurnMarkerOnly with
+                    | Ok evidence ->
+                        do!
+                            routeToChild sessionID (EvidenceUpdated { TurnId = None; Evidence = evidence })
+                            |> Promise.map ignore
+                    | Error _ -> ()
+            with _ ->
+                ()
+        }
 
     let pendingReview sid =
         reviewStore.getPendingReviewIds () |> List.contains sid
@@ -412,6 +467,11 @@ let createOpencodeFallbackHandler
 
                         return! tryError sessionID errorObj
                     elif translator.IsSessionIdle rawEvent then
+                        if isChildSession sessionID then
+                            // OpenCode can publish idle before its final message event. Read the
+                            // transcript first so idle is evaluated against committed assistant text.
+                            do! refreshChildTurnEvidence sessionID
+
                         return! tryIdle sessionID
                     elif isChildSession sessionID then
                         // busy / message.updated / part.* — observe model/agent only.

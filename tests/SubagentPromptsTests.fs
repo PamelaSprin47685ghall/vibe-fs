@@ -56,14 +56,21 @@ let browserPromptContainsStealth () =
     check "contains stealth" (p.Contains "stealth-browser")
 
 let meditatorPromptContainsQuestion () =
-    let dummyEntry : Wanxiangshu.Methodology.SchemaCommon.MethodologyEntry =
+    let dummyEntry: Wanxiangshu.Methodology.SchemaCommon.MethodologyEntry =
         { methodologyId = "test_methodology"
           shortDefinition = "test def"
           triggerWhen = "test trigger"
           noteDescription = "test note desc"
           meditatorRole = "test role"
           outputSections = [] }
-    let p = Wanxiangshu.Methodology.SchemaCommon.renderMeditatorIntent dummyEntry "Analyze auth" "JWT background" "note detail"
+
+    let p =
+        Wanxiangshu.Methodology.SchemaCommon.renderMeditatorIntent
+            dummyEntry
+            "Analyze auth"
+            "JWT background"
+            "note detail"
+
     check "contains question/intent" (p.Contains "Analyze auth")
     check "contains background" (p.Contains "JWT background")
     check "contains quiet room" (p.Contains "quiet room")

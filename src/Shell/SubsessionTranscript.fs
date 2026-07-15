@@ -93,7 +93,7 @@ let buildTurnEvidence (msgs: obj array) (anchor: TurnAnchor) : Result<CurrentTur
                         EmptyAssistant
                     else
                         let toolFinish = isLastAssistantToolFinish slice
-                        AssistantContent(text, Some(if toolFinish then ToolFinish else NormalFinish))
+                        AssistantSnapshot("", 0L, text, Some(if toolFinish then ToolFinish else NormalFinish))
 
             let tool =
                 if hasToolResultAfter slice then
@@ -105,4 +105,5 @@ let buildTurnEvidence (msgs: obj array) (anchor: TurnAnchor) : Result<CurrentTur
                 { Assistant = assistant
                   Todos = todos
                   Tool = tool
-                  Recovery = recovery }
+                  Recovery = recovery
+                  Outcome = NoOutcome }

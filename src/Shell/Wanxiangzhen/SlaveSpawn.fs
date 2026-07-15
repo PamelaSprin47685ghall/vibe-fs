@@ -20,7 +20,8 @@ let buildSlaveCommand (terminal: string) (worktree: string) (prompt: string) : s
     | "wezterm" -> "wezterm", Array.append [| "start"; "--cwd"; worktree; "--"; "opencode" |] ocArgs
     | "wt" -> "wt.exe", Array.append [| "-d"; worktree; "opencode" |] ocArgs
     | "iterm2" ->
-        let script = sprintf "cd '%s' && opencode tui --prompt '%s'" (shellEscape worktree) (shellEscape prompt)
+        let script =
+            sprintf "cd '%s' && opencode tui --prompt '%s'" (shellEscape worktree) (shellEscape prompt)
 
         "osascript",
         [| "-e"

@@ -196,116 +196,47 @@ let tryInjectParallelToolPrompt (sessionID: string) (messages: Message<obj> list
 
                         List.append messages [ synthMsg ]
 
-// ── Stack-slot helpers ──────────────────────────────────────────────────────
+// ── Synthetic-state helpers ─────────────────────────────────────────────────
 
-/// Extract the message ID from an encoded host object. Works across
-/// opencode (info.id), mux (id), and omp (info.id) layouts.
-let private tryEncodedMessageId (o: obj) : string =
-    if isNull o then
-        ""
-    else
-        let infoObj = get o "info"
-
-        if not (isNullish infoObj) then
-            let id = Dyn.str infoObj "id"
-            if id <> "" then id else ""
-        else
-            Dyn.str o "id"
-
-/// Determine whether an encoded object is a trailing synthetic (nudge or
-/// parallel-tool hint) by inspecting its message ID.
-let private isTrailingSyntheticId (id: string) : bool =
-    id.StartsWith("context-budget-nudge-")
-    || id.StartsWith("parallel-tool-synth-")
-    || id.StartsWith("parallel-tool-hint:")
-
-/// Replace the backlog-prefix encoded segment with the cached version when
-/// the folded-backlog count is unchanged, preserving JS object references.
 let private applyBacklogSlot
-    (scope: RuntimeScope)
-    (sessionID: string)
-    (backlogCount: int)
+    (state: TransformState)
+    (eventCount: int)
+    (segmentLength: int)
     (encoded: obj array)
-    : obj array =
-    if backlogCount <= 1 then
-        // No fold range → no synthetic prefix to cache
-        encoded
+    : obj array * TransformState =
+    if state.Backlog.EventCount = eventCount && state.Backlog.Segment.Length > 0 then
+        let segmentLength = min state.Backlog.Segment.Length encoded.Length
+        Array.blit state.Backlog.Segment 0 encoded 0 segmentLength
+        encoded, state
     else
-        // synthetic-prefix count = max(0, backlogCount - 1); the element at
-        // that index is the modified anchor. So the cacheable segment is
-        // encoded.[0 .. prefixCount] (prefixCount + 1 elements).
-        let prefixCount = backlogCount - 1
-        let segmentLen = prefixCount + 1
+        // Only the leading projection messages belong to the hook. Native host
+        // messages must remain the freshly decoded objects from this turn.
+        let length = min segmentLength encoded.Length
+        let segment = if length = 0 then [||] else encoded.[.. length - 1]
 
-        if encoded.Length < segmentLen then
-            encoded
-        else
-            match getBacklogSlot scope sessionID with
-            | Some slot when slot.FoldedCount = backlogCount && slot.EncodedSegment.Length = segmentLen ->
-                // Count unchanged → splice cached segment
-                Array.blit slot.EncodedSegment 0 encoded 0 segmentLen
-                encoded
-            | _ ->
-                // Count changed (or first time) → cache new segment
-                let segment = encoded.[.. segmentLen - 1]
+        encoded,
+        { state with
+            Backlog =
+                { EventCount = eventCount
+                  Segment = segment } }
 
-                setBacklogSlot
-                    scope
-                    sessionID
-                    { FoldedCount = backlogCount
-                      EncodedSegment = segment }
+let private applyTopSlot (state: TransformState) (kind: TopSlotKind) (encoded: obj array) : obj array * TransformState =
+    match kind, state.Top with
+    | NoTop, _ ->
+        encoded,
+        { state with
+            Top = { Kind = NoTop; Item = None } }
+    | _, { Kind = cachedKind; Item = Some item } when cachedKind = kind ->
+        encoded.[encoded.Length - 1] <- item
+        encoded, state
+    | _ ->
+        encoded,
+        { state with
+            Top =
+                { Kind = kind
+                  Item = Some encoded.[encoded.Length - 1] } }
 
-                encoded
-
-/// Replace the trailing synthetic (nudge or parallel-hint) at the end of the
-/// encoded array with its cached version when the message ID matches, so the
-/// same JS object reference is reused across turns in the same episode.
-let private applyTopSlot (scope: RuntimeScope) (sessionID: string) (encoded: obj array) (baseLength: int) : obj array =
-    if encoded.Length = 0 || encoded.Length <= baseLength then
-        clearTopSlot scope sessionID
-        encoded
-    else
-        let lastIdx = encoded.Length - 1
-        let lastObj = encoded.[lastIdx]
-        let lastId = tryEncodedMessageId lastObj
-
-        if not (isTrailingSyntheticId lastId) then
-            clearTopSlot scope sessionID
-            encoded
-        else
-            match getTopSlot scope sessionID with
-            | Some slot ->
-                match slot.Item with
-                | Some cached when tryEncodedMessageId cached = lastId ->
-                    encoded.[lastIdx] <- cached
-                    encoded
-                | _ ->
-                    setTopSlot scope sessionID { Item = Some lastObj }
-                    encoded
-            | None ->
-                setTopSlot scope sessionID { Item = Some lastObj }
-                encoded
-
-/// Determine the conversation key from the first native user message ID.
-/// Used to invalidate CapsSlot when the conversation changes under the
-/// same (possibly empty) sessionID.
-let private firstNativeUserMsgId (messages: Message<obj> list) : string =
-    messages
-    |> List.tryPick (fun m ->
-        if m.source = Native && m.info.role = User then
-            let id = m.info.id
-
-            if id <> "" && not (id.StartsWith("caps-")) && not (id.StartsWith("backlog-")) then
-                Some id
-            else
-                None
-        else
-            None)
-    |> Option.defaultValue ""
-
-/// Prepend caps using CapsSlot: build once, reuse the same encoded prefix
-/// forever (until process restart clears the in-memory slot).
-let private prependCapsWithSlot
+let private prependCapsWithState
     (scope: RuntimeScope)
     (sessionID: string)
     (plan: MessageTransformPlan)
@@ -314,18 +245,29 @@ let private prependCapsWithSlot
     (buildCaps: obj array -> CapsFile list -> string option -> obj array)
     : JS.Promise<obj array> =
     promise {
-        let convKey = firstNativeUserMsgId plan.Cleaned
+        // Some hosts omit a session ID. Do not let independent conversations
+        // share a CAPS prefix in that case.
+        let capsSessionID =
+            if sessionID <> "" then
+                sessionID
+            else
+                plan.Cleaned
+                |> List.tryFind (fun message -> message.source = Native && message.info.role = User)
+                |> Option.map (fun message -> "anonymous-" + message.info.id)
+                |> Option.defaultValue "anonymous-empty"
 
-        match getCapsSlot scope sessionID with
-        | Some slot when slot.Prefix.Length > 0 && slot.ConvKey = convKey -> return Array.append slot.Prefix encoded
-        | _ ->
+        let state = get scope capsSessionID
+
+        match state.Caps with
+        | Some prefix -> return Array.append prefix encoded
+        | None ->
             let! capsFiles = loadCaps ()
             let result = buildCaps encoded capsFiles None
             let prefixLen = result.Length - encoded.Length
 
             if prefixLen > 0 then
                 let prefix = result.[.. prefixLen - 1]
-                setCapsSlot scope sessionID { Prefix = prefix; ConvKey = convKey }
+                set scope capsSessionID { state with Caps = Some prefix }
 
             return result
     }
@@ -351,18 +293,20 @@ let runMessageTransformPipeline
 
             let encodedBacklog = encodeMessages afterBacklog
 
-            // Determine the backlog entry count for BacklogSlot keying
-            let backlogCount =
-                if
-                    plan.BacklogProjectionPolicy = Wanxiangshu.Kernel.MessageTransformPolicy.BacklogProjectionPolicy.Include
-                then
-                    (backlogOps.GetOrRebuildBacklog plan.SessionID plan.Cleaned).Length
-                else
-                    0
+            // Event-log-backed hosts return the durable backlog directly; its
+            // count is the compatibility key for hosts without an event store.
+            let eventCount = (backlogOps.GetOrRebuildBacklog plan.SessionID plan.Cleaned).Length
+            let state = get plan.Scope plan.SessionID
 
-            // Apply BacklogSlot to the freshly encoded array
-            let encodedBacklogSlot =
-                applyBacklogSlot plan.Scope plan.SessionID backlogCount encodedBacklog
+            let backlogSegmentLength =
+                afterBacklog
+                |> List.takeWhile (fun message -> message.source <> Native)
+                |> List.length
+
+            let encodedBacklogSlot, stateAfterBacklog =
+                applyBacklogSlot state eventCount backlogSegmentLength encodedBacklog
+
+            set plan.Scope plan.SessionID stateAfterBacklog
 
             let! afterBudget = applyContextBudget plan backlogOps afterBacklog encodedBacklogSlot encodeMessages
 
@@ -378,20 +322,26 @@ let runMessageTransformPipeline
                 else
                     encodeMessages afterPrompt
 
-            // Apply BacklogSlot again when re-encoded (length changed due to nudge/hint)
-            let encodedAfterBacklogSlot2 =
+            let encodedAfterBacklogSlot, stateAfterReencode =
                 if afterPrompt.Length <> afterBacklog.Length then
-                    applyBacklogSlot plan.Scope plan.SessionID backlogCount encoded
+                    applyBacklogSlot (get plan.Scope plan.SessionID) eventCount backlogSegmentLength encoded
                 else
-                    encoded
+                    encoded, get plan.Scope plan.SessionID
 
-            // Apply TopSlot: reuse trailing synthetic references
-            let trailingCount = afterPrompt.Length - afterBacklog.Length
+            let topKind =
+                if afterBudget.Length > afterBacklog.Length then
+                    BudgetNudgeTop
+                elif afterPrompt.Length > afterBacklog.Length then
+                    ParallelHintTop
+                else
+                    NoTop
 
-            let encodedWithTopSlot =
-                applyTopSlot plan.Scope plan.SessionID encodedAfterBacklogSlot2 afterBacklog.Length
+            let encodedWithTopSlot, stateAfterTop =
+                applyTopSlot stateAfterReencode topKind encodedAfterBacklogSlot
+
+            set plan.Scope plan.SessionID stateAfterTop
 
             let! injected = injectFn plan.BacklogProjectionPolicy encodedWithTopSlot
 
-            return! prependCapsWithSlot plan.Scope plan.SessionID plan injected loadCaps buildCaps
+            return! prependCapsWithState plan.Scope plan.SessionID plan injected loadCaps buildCaps
     }

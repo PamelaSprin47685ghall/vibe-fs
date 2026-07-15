@@ -109,9 +109,7 @@ let capsBuiltOnceReferenceStable () =
 
         // Verify the CapsSlot is actually populated
         match getCapsSlot scope "stack-caps-test" with
-        | Some slot ->
-            check "CapsSlot prefix is the stored object" (System.Object.ReferenceEquals(slot.Prefix.[0], capsObj))
-            equal "CapsSlot convKey matches" "native-user-1" slot.ConvKey
+        | Some slot -> check "caps prefix is the stored object" (System.Object.ReferenceEquals(slot.[0], capsObj))
         | None -> check "CapsSlot should be populated" false
     }
 

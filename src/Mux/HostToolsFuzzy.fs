@@ -105,11 +105,7 @@ let fuzzyContinueTool
     : ToolDefinition =
     { name = "fuzzy_continue"
       description = description "fuzzy_continue"
-      parameters =
-        mkSchema
-            (createObj
-                [ "iterator", box (strProp Params.fuzzyContinueIterator) ])
-            [| "iterator" |]
+      parameters = mkSchema (createObj [ "iterator", box (strProp Params.fuzzyContinueIterator) ]) [| "iterator" |]
       execute =
         fun config args ->
             match fromMuxConfig config with

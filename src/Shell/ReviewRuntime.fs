@@ -61,9 +61,7 @@ let createReviewStore () : ReviewStore =
                     state <-
                         { state with
                             Registry =
-                                reduce
-                                    state.Registry
-                                    (RegistryAction.Activate(sessionID, nextTask, getTimestampMs ())) }
+                                reduce state.Registry (RegistryAction.Activate(sessionID, nextTask, getTimestampMs ())) }
             | None ->
                 if stateOf state.Registry sessionID |> Option.isSome then
                     let nextEffects = disposeSessionTree state.Effects [ sessionID ]

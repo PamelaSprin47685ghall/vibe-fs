@@ -220,9 +220,7 @@ let private mkTodoWriteWrapper (host: Host) (projection: ProjectionStore) : obj 
                                             do!
                                                 SubsessionEventRouter.routeToChild
                                                     sid
-                                                    (EvidenceUpdated
-                                                        { TurnId = TurnId.create ""
-                                                          Evidence = ev })
+                                                    (EvidenceUpdated { TurnId = None; Evidence = ev })
                                                 |> Promise.map ignore
                                     | _ -> ()
 

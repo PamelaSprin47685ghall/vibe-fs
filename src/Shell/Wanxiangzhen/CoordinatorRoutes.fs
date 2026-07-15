@@ -11,6 +11,7 @@ let routeHandler (rt: CoordinatorRuntime) : RouteHandler =
     fun method path body ->
         promise {
             let p = path.Split('?').[0]
+
             match method, p with
             | "POST", p when p.EndsWith "/submit" ->
                 let tid = extractTaskId p "submit"
@@ -21,9 +22,10 @@ let routeHandler (rt: CoordinatorRuntime) : RouteHandler =
 
                 match decodeRegisterBody body with
                 | Some pid ->
-                    do! rt.DagQueue.Enqueue(fun () ->
-                        rt.Dag <- rt.Dag |> updateTask tid (fun (t: SquadTask) -> { t with SlavePid = Some pid })
-                        Promise.lift ())
+                    do!
+                        rt.DagQueue.Enqueue(fun () ->
+                            rt.Dag <- rt.Dag |> updateTask tid (fun (t: SquadTask) -> { t with SlavePid = Some pid })
+                            Promise.lift ())
 
                     return
                         { StatusCode = 200

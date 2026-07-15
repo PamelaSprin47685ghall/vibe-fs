@@ -33,13 +33,21 @@ let assignTaskIds
             | Some id ->
                 go (Set.add id used) rest
                 |> Result.map (fun tail ->
-                    { taskId = id; title = title; description = desc; dependsOn = deps } :: tail)
+                    { taskId = id
+                      title = title
+                      description = desc
+                      dependsOn = deps }
+                    :: tail)
             | None ->
                 match genUnique used 10 with
                 | Some tid ->
                     go (Set.add tid used) rest
                     |> Result.map (fun tail ->
-                        { taskId = tid; title = title; description = desc; dependsOn = deps } :: tail)
+                        { taskId = tid
+                          title = title
+                          description = desc
+                          dependsOn = deps }
+                        :: tail)
                 | None -> Error()
 
     go Set.empty raw

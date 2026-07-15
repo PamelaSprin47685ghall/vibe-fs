@@ -41,8 +41,7 @@ type FuzzyGrepParams =
       context: int option
       limit: int option }
 
-type FuzzyContinueParams =
-    { iterator: string }
+type FuzzyContinueParams = { iterator: string }
 
 type FuzzyFindState =
     { query: string

@@ -61,6 +61,9 @@ type BacklogSession(host: Host) =
                 else
                     []
 
+    member _.GetEventCount(sessionID: string) : int =
+        getStore(workspaceRoot).GetSessionStateSync(sessionID).EventCount
+
 let private shared (host: Host) : BacklogSession = BacklogSession host
 
 let replayBacklogFor (host: Host) (messages: Message<obj> list) : BacklogEntry list =

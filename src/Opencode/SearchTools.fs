@@ -113,8 +113,7 @@ let fuzzyContinueTool
     : obj =
     buildFuzzyTool
         ToolSchemaModule.fuzzyContinue
-        (box
-            {| iterator = strReq Params.fuzzyContinueIterator |})
+        (box {| iterator = strReq Params.fuzzyContinueIterator |})
         "fuzzy_continue"
         decodeFuzzyContinueArgs
         FuzzyCommandsModule.fuzzyContinue

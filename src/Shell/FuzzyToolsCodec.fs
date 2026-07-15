@@ -24,6 +24,7 @@ let decodeFuzzyFindArgs (args: obj) : Result<FuzzyFindParams, DomainError> =
         | first :: _ when first.Trim() = "" -> Error(InvalidIntent("fuzzy_find", "pattern", "pattern cannot be empty"))
         | _ ->
             let limit = optInt args "limit"
+
             requirePositiveOptInt "fuzzy_find" "limit" limit
             |> Result.map (fun () ->
                 { pattern = patterns
@@ -39,6 +40,7 @@ let decodeFuzzyGrepArgs (args: obj) : Result<FuzzyGrepParams, DomainError> =
         | _ ->
             let limit = optInt args "limit"
             let context = optInt args "context"
+
             requirePositiveOptInt "fuzzy_grep" "limit" limit
             |> Result.bind (fun () ->
                 match context with

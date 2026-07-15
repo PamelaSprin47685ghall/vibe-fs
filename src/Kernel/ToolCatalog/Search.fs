@@ -32,9 +32,6 @@ let internal fuzzyGrepSpec: ToolSpec =
 
 let internal fuzzyContinueSpec: ToolSpec =
     { name = "fuzzy_continue"
-      description =
-        "Continue a previously running fuzzy_find or fuzzy_grep session. Returns the next page of results."
-      paramDocs =
-        map
-            [ "iterator", "Opaque single-use iterator from a previous search result." ]
+      description = "Continue a previously running fuzzy_find or fuzzy_grep session. Returns the next page of results."
+      paramDocs = map [ "iterator", "Opaque single-use iterator from a previous search result." ]
       requiredFields = [ "iterator" ] }

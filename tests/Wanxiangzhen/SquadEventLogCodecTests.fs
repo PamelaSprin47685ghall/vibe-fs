@@ -8,7 +8,12 @@ open Wanxiangshu.Tests.Wanxiangzhen.AssertCompat
 let entries () : (string * (unit -> unit)) list =
     [ ("SquadEventLog.TasksCreated round-trip",
        fun () ->
-           let tasks = [ { taskId = "a1"; title = "t"; description = "d"; dependsOn = [ "x" ] } ]
+           let tasks =
+               [ { taskId = "a1"
+                   title = "t"
+                   description = "d"
+                   dependsOn = [ "x" ] } ]
+
            let we = squadEventToWanEvent "2025-01-01T00:00:00Z" (TasksCreated("s1", tasks))
 
            match trySquadEventFromWanEvent we with

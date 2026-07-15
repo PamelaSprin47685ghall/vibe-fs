@@ -173,9 +173,15 @@ let idleDuringDispatchingThenRealIdleConverges () =
             // Evidence arrives (assistant text, normal finish) before idle.
             let evidence =
                 { CurrentTurnEvidence.empty with
-                    Assistant = AssistantContent("done", Some NormalFinish) }
+                    Assistant = AssistantSnapshot("", 0L, "done", Some NormalFinish) }
 
-            match decide d1.NextState (EvidenceUpdated { TurnId = turn0; Evidence = evidence }) with
+            match
+                decide
+                    d1.NextState
+                    (EvidenceUpdated
+                        { TurnId = Some turn0
+                          Evidence = evidence })
+            with
             | Ok(Decided d2) ->
                 match d2.NextState with
                 | Running _ ->
@@ -213,7 +219,7 @@ let runningErrorDrains () =
     match decide state (TurnErrorObserved err) with
     | Ok(Decided d) ->
         match d.NextState with
-        | Draining(_, _, heldErr) -> equal "held error preserved" err.Message heldErr.Message
+        | Draining(_, _, heldErr, _) -> equal "held error preserved" err.Message heldErr.Message
         | other -> fail ("expected Draining, got " + string other)
 
         check "no DispatchPrompt on error" (not (hasEffect isDispatchPrompt d.Effects))
@@ -229,7 +235,7 @@ let drainingDuplicateErrorIgnored () =
         { Plan = plan
           StartReceipt = OrderedTurnMarkerObserved }
 
-    let state = Draining(ctx, started, err)
+    let state = Draining(ctx, started, err, CurrentTurnEvidence.empty)
 
     match decide state (TurnErrorObserved err) with
     | Ok(NoChange DuplicateError) -> ()
@@ -243,7 +249,7 @@ let drainingIdleRetriesViaFallbackPolicy () =
         { Plan = plan
           StartReceipt = OrderedTurnMarkerObserved }
 
-    let state = Draining(ctx, started, err)
+    let state = Draining(ctx, started, err, CurrentTurnEvidence.empty)
 
     match decide state SessionIdleObserved with
     | Ok(Decided d) ->
@@ -330,10 +336,10 @@ let abortIdleTriggersReconcile () =
         | other -> fail ("expected ReconcilingAbortSettle, got " + string other)
 
         check
-            "QueryDispatchStatus effect"
+            "QuerySessionQuiescence effect"
             (hasEffect
                 (function
-                | QueryDispatchStatus _ -> true
+                | QuerySessionQuiescence _ -> true
                 | _ -> false)
                 d.Effects)
     | other -> fail ("unexpected: " + string other)
@@ -351,9 +357,8 @@ let reconcileAbortSettleAccepted () =
           AfterStop = FinishCancelled }
 
     let state = ReconcilingAbortSettle(ctx, Started started, abortCtx)
-    let receipt = HostRunAccepted "host-run-1"
 
-    match decide state (DispatchStatusResolved(DispatchStatus.Accepted receipt)) with
+    match decide state (SessionQuiescenceResolved Stopped) with
     | Ok(Decided d) ->
         match d.NextState with
         | Available _ -> ()
@@ -368,7 +373,7 @@ let reconcileAbortSettleAccepted () =
                 d.Effects)
     | other -> fail ("unexpected: " + string other)
 
-let reconcileAbortSettleDefinitelyNotAccepted () =
+let reconcileAbortSettleStopped () =
     let ctx = mkCtx policy0 (TurnOrdinal.next TurnOrdinal.first)
     let plan = mkPlan turn0 TurnOrdinal.first model0 "do work"
 
@@ -382,7 +387,7 @@ let reconcileAbortSettleDefinitelyNotAccepted () =
 
     let state = ReconcilingAbortSettle(ctx, Started started, abortCtx)
 
-    match decide state (DispatchStatusResolved DispatchStatus.DefinitelyNotAccepted) with
+    match decide state (SessionQuiescenceResolved Stopped) with
     | Ok(Decided d) ->
         match d.NextState with
         | Available _ -> ()
@@ -411,7 +416,7 @@ let reconcileAbortSettleStillPending () =
 
     let state = ReconcilingAbortSettle(ctx, Started started, abortCtx)
 
-    match decide state (DispatchStatusResolved DispatchStatus.StillPending) with
+    match decide state (SessionQuiescenceResolved StillRunning) with
     | Ok(Decided d) ->
         match d.NextState with
         | AwaitingAbortSettle _ -> ()
@@ -432,7 +437,7 @@ let reconcileAbortSettleUnknown () =
 
     let state = ReconcilingAbortSettle(ctx, Started started, abortCtx)
 
-    match decide state (DispatchStatusResolved DispatchStatus.Unknown) with
+    match decide state (SessionQuiescenceResolved StopUnknown) with
     | Ok(Decided d) ->
         match d.NextState with
         | Poisoned(AbortDidNotSettle tid) when tid = turn0 -> ()
@@ -498,11 +503,17 @@ let idleBeforeAbortBarrierIgnored () =
         { Reason = AcceptanceUnknownAfterDispatch
           AfterStop = RetryAfterSafeStop err }
 
-    let state = IssuingAbort(ctx, NotYetStarted plan, abortCtx)
+    let state = IssuingAbort(ctx, NotYetStarted plan, abortCtx, false)
 
     match decide state SessionIdleObserved with
-    | Ok(NoChange IdleBeforeAbortBarrier) -> ()
-    | other -> fail ("expected NoChange IdleBeforeAbortBarrier, got " + string other)
+    | Ok(Decided d) ->
+        match d.NextState with
+        | IssuingAbort(_, _, _, true) -> check "idle buffered before barrier" true
+        | other -> fail ("expected IssuingAbort with idleBuffered=true, got " + string other)
+
+        check "no events on idle buffer" (List.isEmpty d.Events)
+        check "no effects on idle buffer" (List.isEmpty d.Effects)
+    | other -> fail ("expected Decided, got " + string other)
 
 let abortUnavailableStaysIssuing () =
     let ctx = mkCtx policy0 (TurnOrdinal.next TurnOrdinal.first)
@@ -512,7 +523,7 @@ let abortUnavailableStaysIssuing () =
         { Reason = UserRequested
           AfterStop = FinishCancelled }
 
-    let state = IssuingAbort(ctx, NotYetStarted plan, abortCtx)
+    let state = IssuingAbort(ctx, NotYetStarted plan, abortCtx, false)
 
     match decide state (AbortRequestFailed(turn0, err)) with
     | Ok(NoChange AbortInProgress) -> ()
@@ -590,7 +601,7 @@ let turnDeadlineAfterAbortIsTimeoutNotCancelled () =
     | Ok(Decided d) ->
         match d.NextState with
         | ReconcilingAbortSettle _ ->
-            match decide d.NextState (DispatchStatusResolved(DispatchStatus.Accepted OrderedTurnMarkerObserved)) with
+            match decide d.NextState (SessionQuiescenceResolved Stopped) with
             | Ok(Decided d2) ->
                 match d2.NextState with
                 | Available _ ->
@@ -687,7 +698,7 @@ let run () =
     sessionClosedCompletesCaller ()
     abortIdleTriggersReconcile ()
     reconcileAbortSettleAccepted ()
-    reconcileAbortSettleDefinitelyNotAccepted ()
+    reconcileAbortSettleStopped ()
     reconcileAbortSettleStillPending ()
     reconcileAbortSettleUnknown ()
     policyAdvancesModels ()

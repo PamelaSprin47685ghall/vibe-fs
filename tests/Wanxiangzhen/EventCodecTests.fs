@@ -7,7 +7,16 @@ open Wanxiangshu.Tests.Wanxiangzhen.AssertCompat
 let entries () : (string * (unit -> unit)) list =
     [ ("Codec.TasksCreated round-trip",
        fun () ->
-           let tasks = [ { taskId = "a1"; title = "title1"; description = "desc1"; dependsOn = [] }; { taskId = "a2"; title = "title2"; description = "desc2"; dependsOn = [ "a1" ] } ]
+           let tasks =
+               [ { taskId = "a1"
+                   title = "title1"
+                   description = "desc1"
+                   dependsOn = [] }
+                 { taskId = "a2"
+                   title = "title2"
+                   description = "desc2"
+                   dependsOn = [ "a1" ] } ]
+
            let encoded = encodeEvent (TasksCreated("s1", tasks))
            checkBare (encoded.StartsWith "---")
 
@@ -99,7 +108,16 @@ let entries () : (string * (unit -> unit)) list =
       ("Codec.multi frontmatter decodes first event",
        fun () ->
            let ev1 = SquadCreated("s1", "req one")
-           let ev2 = TasksCreated("s2", [ { taskId = "t1"; title = "title1"; description = "desc1"; dependsOn = [] } ])
+
+           let ev2 =
+               TasksCreated(
+                   "s2",
+                   [ { taskId = "t1"
+                       title = "title1"
+                       description = "desc1"
+                       dependsOn = [] } ]
+               )
+
            let combined = encodeEvent ev1 + "\n" + encodeEvent ev2
 
            match decodeEvent combined with
@@ -109,7 +127,16 @@ let entries () : (string * (unit -> unit)) list =
       ("Codec.encodeEvents two events has two frontmatter blocks",
        fun () ->
            let ev1 = SquadCreated("s1", "req one")
-           let ev2 = TasksCreated("s2", [ { taskId = "t1"; title = "title1"; description = "desc1"; dependsOn = [] } ])
+
+           let ev2 =
+               TasksCreated(
+                   "s2",
+                   [ { taskId = "t1"
+                       title = "title1"
+                       description = "desc1"
+                       dependsOn = [] } ]
+               )
+
            let encoded = encodeEvents [ ev1; ev2 ]
 
            let eventLines =
@@ -122,7 +149,16 @@ let entries () : (string * (unit -> unit)) list =
       ("Codec.decodeEvents parses multiple frontmatter events",
        fun () ->
            let ev1 = SquadCreated("s1", "req one")
-           let ev2 = TasksCreated("s2", [ { taskId = "t1"; title = "title1"; description = "desc1"; dependsOn = [] } ])
+
+           let ev2 =
+               TasksCreated(
+                   "s2",
+                   [ { taskId = "t1"
+                       title = "title1"
+                       description = "desc1"
+                       dependsOn = [] } ]
+               )
+
            let combined = encodeEvent ev1 + "\n" + encodeEvent ev2
            let decoded = decodeEvents combined
            equal 2 decoded.Length
@@ -158,7 +194,17 @@ let entries () : (string * (unit -> unit)) list =
        fun () ->
            let events =
                [ SquadCreated("s1", "req one")
-                 TasksCreated("s1", [ { taskId = "t1"; title = "title1"; description = "desc1"; dependsOn = [] }; { taskId = "t2"; title = "title2"; description = "desc2"; dependsOn = [ "t1" ] } ])
+                 TasksCreated(
+                     "s1",
+                     [ { taskId = "t1"
+                         title = "title1"
+                         description = "desc1"
+                         dependsOn = [] }
+                       { taskId = "t2"
+                         title = "title2"
+                         description = "desc2"
+                         dependsOn = [ "t1" ] } ]
+                 )
                  TaskStarted("s1", "t1", "/wt/path", "branch-x")
                  TaskSubmitted("s1", "t1", "abc123")
                  TaskMerged("s1", "t1", "sha999")

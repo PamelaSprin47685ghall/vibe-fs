@@ -36,8 +36,7 @@ let run () : JS.Promise<unit> =
     promise {
         let! muxEventDir = mkdtempAsync "mux-event-hook-"
         let muxWorkspaceId = "mux-event-ws"
-        let reg =
-            createRegistration (createObj [ "directory", box muxEventDir ])
+        let reg = createRegistration (createObj [ "directory", box muxEventDir ])
         do! eventHookSpec reg muxWorkspaceId
         do! repeatedTodoNudgeSpec ()
         do! reviewerReviseRenudgesLoopSpec ()

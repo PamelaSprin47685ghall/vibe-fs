@@ -56,6 +56,52 @@ let private activeTurnId (turn: ActiveTurn) : TurnId =
     | NotYetStarted p -> p.TurnId
     | Started s -> s.Plan.TurnId
 
+let private isStaleTimerCommand =
+    function
+    | TurnDeadlineExpired _
+    | AbortDeadlineExpired _
+    | AbortConfirmed _
+    | AbortHostAccepted _
+    | AbortRequestFailed _
+    | EvidenceUpdated _
+    | ReconciliationDeadlineExpired _
+    | SessionQuiescenceResolved _ -> true
+    | _ -> false
+
+let private isIllegalWhenDispatching =
+    function
+    | AbortDeadlineExpired _
+    | DispatchStatusResolved _
+    | AbortConfirmed _
+    | AbortHostAccepted _
+    | AbortRequestFailed _
+    | ReconciliationDeadlineExpired _
+    | SessionQuiescenceResolved _ -> true
+    | _ -> false
+
+let private isIllegalWhenCancelling =
+    function
+    | DispatchStatusResolved _
+    | AbortConfirmed _
+    | AbortHostAccepted _
+    | AbortRequestFailed _
+    | ReconciliationDeadlineExpired _
+    | SessionQuiescenceResolved _ -> true
+    | _ -> false
+
+let private isIllegalWhenRunning =
+    function
+    | DispatchStatusResolved _
+    | AbortDeadlineExpired _
+    | AbortConfirmed _
+    | AbortHostAccepted _
+    | AbortRequestFailed _
+    | ReconciliationDeadlineExpired _
+    | SessionQuiescenceResolved _ -> true
+    | _ -> false
+
+let private isIllegalWhenDraining = isIllegalWhenRunning
+
 let private decided state events effects : DecisionResult =
     Decided
         { NextState = state
@@ -135,7 +181,7 @@ let private beginAbort (ctx: RunContext) (turn: ActiveTurn) (reason: AbortReason
           ArmAbortDeadline tid ]
 
     // Host abort not yet accepted — idle must not settle yet.
-    decided (IssuingAbort(ctx, turn, abortCtx)) events effects
+    decided (IssuingAbort(ctx, turn, abortCtx, false)) events effects
 
 /// Physical session is gone: force-complete, do not wait for idle/abort.
 let private closeActive (ctx: RunContext) (turnId: TurnId) =
@@ -190,11 +236,11 @@ let private applyAfterAbort (ctx: RunContext) (turn: ActiveTurn) (abortCtx: Abor
 
 let private isActiveAbortState =
     function
-    | IssuingAbort _
-    | AwaitingAbortSettle _
-    | ReconcilingAbortSettle _
-    | CancellingDispatch _
-    | ReconcilingUnknownDispatch _ -> true
+    | IssuingAbort(_, _, _, _)
+    | AwaitingAbortSettle(_, _, _)
+    | ReconcilingAbortSettle(_, _, _)
+    | CancellingDispatch(_, _, _)
+    | ReconcilingUnknownDispatch(_, _, _) -> true
     | _ -> false
 
 // ── Pure reducer ──
@@ -203,14 +249,14 @@ let decide (state: SubsessionState) (cmd: Command) : Result<DecisionResult, Deci
     let stateName () =
         match state with
         | Available _ -> "Available"
-        | Dispatching _ -> "Dispatching"
-        | CancellingDispatch _ -> "CancellingDispatch"
-        | ReconcilingUnknownDispatch _ -> "ReconcilingUnknownDispatch"
-        | Running _ -> "Running(evidence)"
-        | Draining _ -> "Draining"
-        | IssuingAbort _ -> "IssuingAbort"
-        | AwaitingAbortSettle _ -> "AwaitingAbortSettle"
-        | ReconcilingAbortSettle _ -> "ReconcilingAbortSettle"
+        | Dispatching(_, _, _) -> "Dispatching"
+        | CancellingDispatch(_, _, _) -> "CancellingDispatch"
+        | ReconcilingUnknownDispatch(_, _, _) -> "ReconcilingUnknownDispatch"
+        | Running(_, _, _) -> "Running(evidence)"
+        | Draining(_, _, _, _) -> "Draining"
+        | IssuingAbort(_, _, _, _) -> "IssuingAbort"
+        | AwaitingAbortSettle(_, _, _) -> "AwaitingAbortSettle"
+        | ReconcilingAbortSettle(_, _, _) -> "ReconcilingAbortSettle"
         | Poisoned _ -> "Poisoned"
 
     let cmdName () =
@@ -225,9 +271,11 @@ let decide (state: SubsessionState) (cmd: Command) : Result<DecisionResult, Deci
         | CancelRequested -> "CancelRequested"
         | TurnDeadlineExpired _ -> "TurnDeadlineExpired"
         | AbortDeadlineExpired _ -> "AbortDeadlineExpired"
+        | ReconciliationDeadlineExpired _ -> "ReconciliationDeadlineExpired"
         | AbortConfirmed _ -> "AbortConfirmed"
         | AbortHostAccepted _ -> "AbortHostAccepted"
         | AbortRequestFailed _ -> "AbortRequestFailed"
+        | SessionQuiescenceResolved _ -> "SessionQuiescenceResolved"
         | SessionClosed -> "SessionClosed"
 
     match state, cmd with
@@ -239,7 +287,15 @@ let decide (state: SubsessionState) (cmd: Command) : Result<DecisionResult, Deci
     | Poisoned _, _ -> Ok(noChange StaleTimer)
 
     // ── StartRun concurrency ──
-    | (Dispatching _ | Running _ | Draining _ | IssuingAbort _ | AwaitingAbortSettle _ | ReconcilingAbortSettle _ | ReconcilingUnknownDispatch _),
+    | (Dispatching(_, _, _) | Running(_, _, _) | Draining(_, _, _, _) | IssuingAbort(_, _, _, _) | AwaitingAbortSettle(_,
+                                                                                                                       _,
+                                                                                                                       _) | ReconcilingAbortSettle(_,
+                                                                                                                                                   _,
+                                                                                                                                                   _) | ReconcilingUnknownDispatch(_,
+                                                                                                                                                                                   _,
+                                                                                                                                                                                   _) | CancellingDispatch(_,
+                                                                                                                                                                                                           _,
+                                                                                                                                                                                                           _)),
       StartRun _ -> Ok(decided state [] [ RejectStart AlreadyRunning ])
 
     // ── Available + StartRun ──
@@ -294,20 +350,11 @@ let decide (state: SubsessionState) (cmd: Command) : Result<DecisionResult, Deci
 
     | Available _, SessionClosed -> Ok(decided state [] [ DisposeActor ])
 
-    | Available _,
-      (TurnDeadlineExpired _ | AbortDeadlineExpired _ | AbortConfirmed _ | AbortHostAccepted _ | AbortRequestFailed _ | EvidenceUpdated _) ->
-        Ok(noChange StaleTimer)
+    | Available _, cmd when isStaleTimerCommand cmd -> Ok(noChange StaleTimer)
 
     | Available _, _ -> illegal (stateName ()) (cmdName ())
 
     // ── Dispatching ──
-    // Third field buffers CurrentTurnEvidence collected while still waiting for
-    // the host's own dispatch-acceptance confirmation. Host truth: session.prompt
-    // resolving (→ DispatchAccepted) and the host event bus delivering
-    // message.updated(role=assistant) (→ EvidenceUpdated) are two INDEPENDENT
-    // async chains — a fast provider can deliver the full assistant reply
-    // before our own dispatch call itself resolves. That evidence MUST survive
-    // into Running, not be destroyed by an accident of arrival order.
     | Dispatching(ctx, plan, bufferedEvidence), DispatchAccepted(tid, receipt) when tid = plan.TurnId ->
         let started = { Plan = plan; StartReceipt = receipt }
 
@@ -350,24 +397,23 @@ let decide (state: SubsessionState) (cmd: Command) : Result<DecisionResult, Deci
                 { Reason = AcceptanceUnknownAfterDispatch
                   AfterStop = RetryAfterSafeStop error }
 
-            let effects = [ QueryDispatchStatus(ctx.SessionId, plan.TurnId) ]
+            let effects =
+                [ QueryDispatchStatus(ctx.SessionId, plan.TurnId)
+                  ArmReconciliationDeadline plan.TurnId ]
+
             Ok(decided (ReconcilingUnknownDispatch(ctx, plan, cancelCtx)) [] effects)
 
     | Dispatching _, DispatchRejected _ -> Ok(noChange StaleTurnMarker)
 
     | Dispatching _, TurnErrorObserved _ -> Ok(noChange UnattributedObservationBeforeStart)
 
-    // Evidence for the current turn (matched by TurnId, or empty TurnId which
-    // several host translators use as a placeholder) MUST be buffered here,
-    // not discarded. See the Dispatching type comment in Types.fs for why this
-    // window exists and why silently dropping it broke every subagent tool
-    // (investigator/coder/browser/meditator) under fast-provider timing.
     | Dispatching(ctx, plan, bufferedEvidence), EvidenceUpdated obs ->
-        if TurnId.value obs.TurnId = "" || obs.TurnId = plan.TurnId then
+        match obs.TurnId with
+        | Some tid when tid = plan.TurnId ->
             let merged = CurrentTurnEvidence.merge bufferedEvidence obs.Evidence
             Ok(decided (Dispatching(ctx, plan, merged)) [] [])
-        else
-            Ok(noChange StaleTurnMarker)
+        | Some _ -> Ok(noChange StaleTurnMarker)
+        | None -> Ok(noChange UnattributableObservation)
 
     | Dispatching _, SessionIdleObserved -> Ok(noChange DuplicateIdleBeforeTurnMarker)
 
@@ -391,9 +437,7 @@ let decide (state: SubsessionState) (cmd: Command) : Result<DecisionResult, Deci
 
     | Dispatching(ctx, plan, _), SessionClosed -> Ok(closeActive ctx plan.TurnId)
 
-    | Dispatching _,
-      (AbortDeadlineExpired _ | DispatchStatusResolved _ | AbortConfirmed _ | AbortHostAccepted _ | AbortRequestFailed _) ->
-        illegal (stateName ()) (cmdName ())
+    | Dispatching _, cmd when isIllegalWhenDispatching cmd -> illegal (stateName ()) (cmdName ())
 
     // ── CancellingDispatch: waiting for dispatch result after cancel requested ──
     | CancellingDispatch(ctx, plan, cancelCtx), DispatchAccepted(tid, receipt) when tid = plan.TurnId ->
@@ -413,7 +457,7 @@ let decide (state: SubsessionState) (cmd: Command) : Result<DecisionResult, Deci
 
         let effects = [ AbortHostSession(ctx.SessionId, tid); ArmAbortDeadline tid ]
 
-        Ok(decided (IssuingAbort(ctx, Started started, abortCtx)) events effects)
+        Ok(decided (IssuingAbort(ctx, Started started, abortCtx, false)) events effects)
 
     | CancellingDispatch _, DispatchAccepted _ -> Ok(noChange StaleTurnMarker)
 
@@ -437,7 +481,10 @@ let decide (state: SubsessionState) (cmd: Command) : Result<DecisionResult, Deci
 
         | HostAcceptanceUnknown _ ->
             // Cannot confirm host didn't receive → query host to determine.
-            let effects = [ QueryDispatchStatus(ctx.SessionId, plan.TurnId) ]
+            let effects =
+                [ QueryDispatchStatus(ctx.SessionId, plan.TurnId)
+                  ArmReconciliationDeadline plan.TurnId ]
+
             Ok(decided (ReconcilingUnknownDispatch(ctx, plan, cancelCtx)) [] effects)
 
     | CancellingDispatch _, DispatchRejected _ -> Ok(noChange StaleTurnMarker)
@@ -449,17 +496,17 @@ let decide (state: SubsessionState) (cmd: Command) : Result<DecisionResult, Deci
     | CancellingDispatch(ctx, plan, cancelCtx), TurnDeadlineExpired tid when tid = plan.TurnId ->
         // Dispatch result not received within deadline → cannot confirm acceptance.
         // Enter ReconcilingUnknownDispatch to query or poison.
-        let effects = [ QueryDispatchStatus(ctx.SessionId, plan.TurnId) ]
+        let effects =
+            [ QueryDispatchStatus(ctx.SessionId, plan.TurnId)
+              ArmReconciliationDeadline plan.TurnId ]
+
         Ok(decided (ReconcilingUnknownDispatch(ctx, plan, cancelCtx)) [] effects)
     | CancellingDispatch _, TurnDeadlineExpired _ -> Ok(noChange StaleTimer)
     | CancellingDispatch _, AbortDeadlineExpired _ -> Ok(noChange StaleTimer)
 
-    | (CancellingDispatch _), StartRun _ -> Ok(decided state [] [ RejectStart AlreadyRunning ])
-
     | CancellingDispatch(ctx, plan, _), SessionClosed -> Ok(closeActive ctx plan.TurnId)
 
-    | CancellingDispatch _, (DispatchStatusResolved _ | AbortConfirmed _ | AbortHostAccepted _ | AbortRequestFailed _) ->
-        illegal (stateName ()) (cmdName ())
+    | CancellingDispatch _, cmd when isIllegalWhenCancelling cmd -> illegal (stateName ()) (cmdName ())
 
     // ── ReconcilingUnknownDispatch ──
     | ReconcilingUnknownDispatch(ctx, plan, cancelCtx), DispatchStatusResolved status ->
@@ -481,9 +528,20 @@ let decide (state: SubsessionState) (cmd: Command) : Result<DecisionResult, Deci
             let effects =
                 [ AbortHostSession(ctx.SessionId, plan.TurnId); ArmAbortDeadline plan.TurnId ]
 
-            Ok(decided (IssuingAbort(ctx, Started started, abortCtx)) events effects)
-        | DispatchStatus.DefinitelyNotAccepted -> Ok(applyAfterAbort ctx (NotYetStarted plan) cancelCtx false)
-        | DispatchStatus.StillPending -> Ok(noChange AbortInProgress)
+            Ok(decided (IssuingAbort(ctx, Started started, abortCtx, false)) events effects)
+
+        | DispatchStatus.TransportRejectedBeforeSend _ ->
+            match applyAfterAbort ctx (NotYetStarted plan) cancelCtx false with
+            | Decided dec ->
+                let updatedEffects = CancelReconciliationDeadline plan.TurnId :: dec.Effects
+                Ok(decided dec.NextState dec.Events updatedEffects)
+            | res -> Ok(res)
+
+        | DispatchStatus.StillPending
+        | DispatchStatus.TransportFailedAfterUnknownAcceptance _ ->
+            let effects = [ ArmReconciliationDeadline plan.TurnId ]
+            Ok(decided (ReconcilingUnknownDispatch(ctx, plan, cancelCtx)) [] effects)
+
         | DispatchStatus.Unknown ->
             let poisonReason = HostProtocolBroken "acceptance unknown and unresolvable"
             let poisoned = Poisoned poisonReason
@@ -496,8 +554,42 @@ let decide (state: SubsessionState) (cmd: Command) : Result<DecisionResult, Deci
                   TurnFinished(plan.TurnId, TurnInfrastructureFailed "acceptance unknown")
                   RunFinished(ctx.RunId, result) ]
 
-            let effects = [ CompleteCaller(ctx.RunId, result) ]
+            let effects =
+                [ CancelReconciliationDeadline plan.TurnId; CompleteCaller(ctx.RunId, result) ]
+
             Ok(decided poisoned events effects)
+
+    | ReconcilingUnknownDispatch(ctx, plan, cancelCtx), ReconciliationDeadlineExpired tid when tid = plan.TurnId ->
+        match cancelCtx.Reason with
+        | IllegalTransitionFailSafe "reconciliation_attempt_1" ->
+            // Second expiry -> poison
+            let poisonReason = HostProtocolBroken "reconciliation deadline expired twice"
+            let poisoned = Poisoned poisonReason
+
+            let result = Failed(InfrastructureFailure "reconciliation deadline expired twice")
+
+            let events =
+                [ SessionPoisoned(ctx.SessionId, poisonReason)
+                  TurnFinished(plan.TurnId, TurnInfrastructureFailed "reconciliation deadline expired twice")
+                  RunFinished(ctx.RunId, result) ]
+
+            let effects =
+                [ CancelReconciliationDeadline plan.TurnId; CompleteCaller(ctx.RunId, result) ]
+
+            Ok(decided poisoned events effects)
+        | _ ->
+            // First expiry -> re-issue QueryDispatchStatus + ArmReconciliationDeadline
+            let updatedCancelCtx =
+                { cancelCtx with
+                    Reason = IllegalTransitionFailSafe "reconciliation_attempt_1" }
+
+            let effects =
+                [ QueryDispatchStatus(ctx.SessionId, plan.TurnId)
+                  ArmReconciliationDeadline plan.TurnId ]
+
+            Ok(decided (ReconcilingUnknownDispatch(ctx, plan, updatedCancelCtx)) [] effects)
+
+    | ReconcilingUnknownDispatch _, ReconciliationDeadlineExpired _ -> Ok(noChange StaleTimer)
 
     | ReconcilingUnknownDispatch(ctx, plan, cancelCtx), DispatchAccepted(tid, receipt) when tid = plan.TurnId ->
         // Late acceptance confirms host received → must abort.
@@ -516,7 +608,7 @@ let decide (state: SubsessionState) (cmd: Command) : Result<DecisionResult, Deci
 
         let effects = [ AbortHostSession(ctx.SessionId, tid); ArmAbortDeadline tid ]
 
-        Ok(decided (IssuingAbort(ctx, Started started, abortCtx)) events effects)
+        Ok(decided (IssuingAbort(ctx, Started started, abortCtx, false)) events effects)
 
     | ReconcilingUnknownDispatch _, DispatchAccepted _ -> Ok(noChange StaleTurnMarker)
 
@@ -547,13 +639,19 @@ let decide (state: SubsessionState) (cmd: Command) : Result<DecisionResult, Deci
     | ReconcilingUnknownDispatch _, TurnErrorObserved _ -> Ok(noChange StaleTimer)
     | ReconcilingUnknownDispatch _, EvidenceUpdated _ -> Ok(noChange EvidenceBeforeRun)
 
-    | ReconcilingUnknownDispatch _, (AbortConfirmed _ | AbortHostAccepted _ | AbortRequestFailed _) ->
+    | ReconcilingUnknownDispatch _,
+      (AbortConfirmed _ | AbortHostAccepted _ | AbortRequestFailed _ | SessionQuiescenceResolved _) ->
         illegal (stateName ()) (cmdName ())
 
     // ── Running ──
-    | Running(ctx, started, _), TurnErrorObserved error ->
-        // Hold the error — do not act until idle proves the host has stopped.
-        Ok(decided (Draining(ctx, started, error)) [] [])
+    | Running(ctx, started, evidence), TurnErrorObserved error ->
+        match evidence.Outcome with
+        | CompletionRequested _ ->
+            // CompletionRequested outcome overrides FailureObserved and still requires idle to finish. Stay in Running.
+            Ok(decided (Running(ctx, started, evidence)) [] [])
+        | _ ->
+            // Transition to Draining carrying the evidence
+            Ok(decided (Draining(ctx, started, error, evidence)) [] [])
 
     | Running(ctx, started, evidence), SessionIdleObserved ->
         let transcriptDec = classifyTurnEvidence evidence
@@ -600,11 +698,12 @@ let decide (state: SubsessionState) (cmd: Command) : Result<DecisionResult, Deci
                 )
 
     | Running(ctx, started, evidence), EvidenceUpdated obs ->
-        if TurnId.value obs.TurnId = "" || obs.TurnId = started.Plan.TurnId then
+        match obs.TurnId with
+        | Some tid when tid = started.Plan.TurnId ->
             let merged = CurrentTurnEvidence.merge evidence obs.Evidence
             Ok(decided (Running(ctx, started, merged)) [] [])
-        else
-            Ok(noChange StaleTurnMarker)
+        | Some _ -> Ok(noChange StaleTurnMarker)
+        | None -> Ok(noChange UnattributableObservation)
 
     | Running(ctx, started, _), CancelRequested -> Ok(beginAbort ctx (Started started) UserRequested FinishCancelled)
 
@@ -617,39 +716,56 @@ let decide (state: SubsessionState) (cmd: Command) : Result<DecisionResult, Deci
 
     | Running(ctx, started, _), SessionClosed -> Ok(closeActive ctx started.Plan.TurnId)
 
-    | Running _,
-      (DispatchStatusResolved _ | AbortDeadlineExpired _ | AbortConfirmed _ | AbortHostAccepted _ | AbortRequestFailed _) ->
-        illegal (stateName ()) (cmdName ())
+    | Running _, cmd when isIllegalWhenRunning cmd -> illegal (stateName ()) (cmdName ())
 
     // ── Draining: host reported an error but has not gone idle yet ──
     | Draining _, TurnErrorObserved _ -> Ok(noChange DuplicateError)
 
-    | Draining(ctx, started, error), SessionIdleObserved ->
-        let policyDec = afterError ctx.FallbackConfig ctx.Chain ctx.Policy error
+    | Draining(ctx, started, error, evidence), SessionIdleObserved ->
+        match evidence.Outcome with
+        | CompletionRequested output when not (System.String.IsNullOrWhiteSpace output) ->
+            Ok(succeedRun ctx output started.Plan.TurnId)
+        | _ ->
+            let policyDec = afterError ctx.FallbackConfig ctx.Chain ctx.Policy error
 
-        match nextTurnFromPolicy ctx policyDec with
-        | Some(ctx2, plan2) ->
-            let events =
-                [ TurnFinished(started.Plan.TurnId, TurnFailed error)
-                  TurnDispatchRequested(makeTurnData ctx2 plan2) ]
+            match nextTurnFromPolicy ctx policyDec with
+            | Some(ctx2, plan2) ->
+                let events =
+                    [ TurnFinished(started.Plan.TurnId, TurnFailed error)
+                      TurnDispatchRequested(makeTurnData ctx2 plan2) ]
 
-            let effects =
-                [ CancelTurnDeadline started.Plan.TurnId
-                  ArmTurnDeadline plan2.TurnId
-                  DispatchPrompt plan2 ]
+                let effects =
+                    [ CancelTurnDeadline started.Plan.TurnId
+                      ArmTurnDeadline plan2.TurnId
+                      DispatchPrompt plan2 ]
 
-            Ok(decided (Dispatching(ctx2, plan2, CurrentTurnEvidence.empty)) events effects)
-        | None ->
-            let failure' =
-                match policyDec with
-                | StopWithFailure f -> f
-                | _ -> FallbackExhausted error
+                Ok(decided (Dispatching(ctx2, plan2, CurrentTurnEvidence.empty)) events effects)
+            | None ->
+                let failure' =
+                    match policyDec with
+                    | StopWithFailure f -> f
+                    | _ -> FallbackExhausted error
 
-            Ok(failRun ctx failure' (Some started.Plan.TurnId) [ TurnFinished(started.Plan.TurnId, TurnFailed error) ])
+                Ok(
+                    failRun
+                        ctx
+                        failure'
+                        (Some started.Plan.TurnId)
+                        [ TurnFinished(started.Plan.TurnId, TurnFailed error) ]
+                )
 
-    | Draining(ctx, started, _), CancelRequested -> Ok(beginAbort ctx (Started started) UserRequested FinishCancelled)
+    | Draining(ctx, started, error, evidence), EvidenceUpdated obs ->
+        match obs.TurnId with
+        | Some tid when tid = started.Plan.TurnId ->
+            let merged = CurrentTurnEvidence.merge evidence obs.Evidence
+            Ok(decided (Draining(ctx, started, error, merged)) [] [])
+        | Some _ -> Ok(noChange StaleTurnMarker)
+        | None -> Ok(noChange UnattributableObservation)
 
-    | Draining(ctx, started, _), TurnDeadlineExpired tid when tid = started.Plan.TurnId ->
+    | Draining(ctx, started, _, _), CancelRequested ->
+        Ok(beginAbort ctx (Started started) UserRequested FinishCancelled)
+
+    | Draining(ctx, started, _, _), TurnDeadlineExpired tid when tid = started.Plan.TurnId ->
         Ok(
             beginAbort
                 ctx
@@ -662,22 +778,21 @@ let decide (state: SubsessionState) (cmd: Command) : Result<DecisionResult, Deci
 
     | Draining _, (DispatchAccepted _ | DispatchRejected _) -> Ok(noChange StaleTurnMarker)
 
-    | Draining _, EvidenceUpdated _ -> Ok(noChange StaleTimer)
+    | Draining(ctx, started, _, _), SessionClosed -> Ok(closeActive ctx started.Plan.TurnId)
 
-    | Draining _,
-      (DispatchStatusResolved _ | AbortDeadlineExpired _ | AbortConfirmed _ | AbortHostAccepted _ | AbortRequestFailed _) ->
-        illegal (stateName ()) (cmdName ())
-
-    | Draining(ctx, started, _), SessionClosed -> Ok(closeActive ctx started.Plan.TurnId)
+    | Draining _, cmd when isIllegalWhenDraining cmd -> illegal (stateName ()) (cmdName ())
 
     // ── IssuingAbort: host abort not yet accepted; idle must NOT settle ──
-    | IssuingAbort(ctx, turn, abortCtx), AbortConfirmed tid when tid = activeTurnId turn ->
+    | IssuingAbort(ctx, turn, abortCtx, idleObserved), AbortConfirmed tid when tid = activeTurnId turn ->
         Ok(applyAfterAbort ctx turn abortCtx true)
 
     | IssuingAbort _, AbortConfirmed _ -> Ok(noChange StaleTurnMarker)
 
-    | IssuingAbort(ctx, turn, abortCtx), AbortHostAccepted tid when tid = activeTurnId turn ->
-        Ok(decided (AwaitingAbortSettle(ctx, turn, abortCtx)) [] [])
+    | IssuingAbort(ctx, turn, abortCtx, idleObserved), AbortHostAccepted tid when tid = activeTurnId turn ->
+        if idleObserved then
+            Ok(applyAfterAbort ctx turn abortCtx true)
+        else
+            Ok(decided (AwaitingAbortSettle(ctx, turn, abortCtx)) [] [])
 
     | IssuingAbort _, AbortHostAccepted _ -> Ok(noChange StaleTurnMarker)
 
@@ -685,9 +800,10 @@ let decide (state: SubsessionState) (cmd: Command) : Result<DecisionResult, Deci
         // Stay IssuingAbort; wait for deadline / SessionClosed. Never treat as stopped.
         Ok(noChange AbortInProgress)
 
-    | IssuingAbort _, SessionIdleObserved -> Ok(noChange IdleBeforeAbortBarrier)
+    | IssuingAbort(ctx, turn, abortCtx, idleObserved), SessionIdleObserved ->
+        Ok(decided (IssuingAbort(ctx, turn, abortCtx, true)) [] [])
 
-    | IssuingAbort(ctx, turn, abortCtx), DispatchAccepted(tid, receipt) when tid = activeTurnId turn ->
+    | IssuingAbort(ctx, turn, abortCtx, idleObserved), DispatchAccepted(tid, receipt) when tid = activeTurnId turn ->
         // Late acceptance: host confirmed it received the prompt. Upgrade ActiveTurn.
         match turn with
         | NotYetStarted plan ->
@@ -699,7 +815,7 @@ let decide (state: SubsessionState) (cmd: Command) : Result<DecisionResult, Deci
                         TurnId = tid
                         Receipt = receipt } ]
 
-            Ok(decided (IssuingAbort(ctx, Started started, abortCtx)) events [])
+            Ok(decided (IssuingAbort(ctx, Started started, abortCtx, idleObserved)) events [])
         | Started _ ->
             // Already started — duplicate acceptance, ignore.
             Ok(noChange StaleTurnMarker)
@@ -708,7 +824,7 @@ let decide (state: SubsessionState) (cmd: Command) : Result<DecisionResult, Deci
 
     | IssuingAbort _, DispatchRejected _ -> Ok(noChange StaleTurnMarker)
 
-    | IssuingAbort(ctx, turn, _), AbortDeadlineExpired tid when tid = activeTurnId turn ->
+    | IssuingAbort(ctx, turn, _, _), AbortDeadlineExpired tid when tid = activeTurnId turn ->
         let poisoned = Poisoned(AbortDidNotSettle tid)
         let result = Failed(InfrastructureFailure "abort deadline expired")
 
@@ -729,9 +845,10 @@ let decide (state: SubsessionState) (cmd: Command) : Result<DecisionResult, Deci
 
     | IssuingAbort _, (TurnErrorObserved _ | EvidenceUpdated _) -> Ok(noChange StaleTimer)
 
-    | IssuingAbort(ctx, turn, _), SessionClosed -> Ok(closeActive ctx (activeTurnId turn))
+    | IssuingAbort(ctx, turn, _, _), SessionClosed -> Ok(closeActive ctx (activeTurnId turn))
 
-    | IssuingAbort _, (DispatchStatusResolved _) -> illegal (stateName ()) (cmdName ())
+    | IssuingAbort _, (DispatchStatusResolved _ | ReconciliationDeadlineExpired _ | SessionQuiescenceResolved _) ->
+        illegal (stateName ()) (cmdName ())
 
     // ── AwaitingAbortSettle: barrier accepted; idle proves stop ──
     | AwaitingAbortSettle(ctx, turn, abortCtx), AbortConfirmed tid when tid = activeTurnId turn ->
@@ -741,7 +858,7 @@ let decide (state: SubsessionState) (cmd: Command) : Result<DecisionResult, Deci
 
     | AwaitingAbortSettle(ctx, turn, abortCtx), SessionIdleObserved ->
         let tid = activeTurnId turn
-        let effects = [ QueryDispatchStatus(ctx.SessionId, tid) ]
+        let effects = [ QuerySessionQuiescence(ctx.SessionId, tid) ]
         Ok(decided (ReconcilingAbortSettle(ctx, turn, abortCtx)) [] effects)
 
     | AwaitingAbortSettle _, AbortHostAccepted _ -> Ok(noChange AbortInProgress)
@@ -773,17 +890,17 @@ let decide (state: SubsessionState) (cmd: Command) : Result<DecisionResult, Deci
 
     | AwaitingAbortSettle(ctx, turn, _), SessionClosed -> Ok(closeActive ctx (activeTurnId turn))
 
-    | AwaitingAbortSettle _, (DispatchStatusResolved _) -> illegal (stateName ()) (cmdName ())
+    | AwaitingAbortSettle _, (DispatchStatusResolved _ | ReconciliationDeadlineExpired _ | SessionQuiescenceResolved _) ->
+        illegal (stateName ()) (cmdName ())
 
     // ── ReconcilingAbortSettle: reconcile status after idle ──
-    | ReconcilingAbortSettle(ctx, turn, abortCtx), DispatchStatusResolved status ->
+    | ReconcilingAbortSettle(ctx, turn, abortCtx), SessionQuiescenceResolved status ->
         let tid = activeTurnId turn
 
         match status with
-        | DispatchStatus.Accepted _
-        | DispatchStatus.DefinitelyNotAccepted -> Ok(applyAfterAbort ctx turn abortCtx true)
-        | DispatchStatus.StillPending -> Ok(decided (AwaitingAbortSettle(ctx, turn, abortCtx)) [] [])
-        | DispatchStatus.Unknown ->
+        | Stopped -> Ok(applyAfterAbort ctx turn abortCtx true)
+        | StillRunning -> Ok(decided (AwaitingAbortSettle(ctx, turn, abortCtx)) [] [])
+        | StopUnknown ->
             let poisoned = Poisoned(AbortDidNotSettle tid)
             let result = Failed(InfrastructureFailure "abort did not settle")
 
@@ -829,6 +946,12 @@ let decide (state: SubsessionState) (cmd: Command) : Result<DecisionResult, Deci
 
     | ReconcilingAbortSettle _, (AbortHostAccepted _ | AbortRequestFailed _) -> Ok(noChange AbortInProgress)
 
+    | ReconcilingAbortSettle _, (DispatchStatusResolved _ | ReconciliationDeadlineExpired _) ->
+        illegal (stateName ()) (cmdName ())
+
+    // Catch-all for any state/command pair not handled above: illegal transition.
+    | _, _ -> illegal (stateName ()) (cmdName ())
+
 // ── Reconcile: produce poison decision for unfinished state after restart ──
 
 let private tryExtractActiveForReconcile (s: SubsessionState) : (RunContext * ActiveTurn) option =
@@ -837,8 +960,8 @@ let private tryExtractActiveForReconcile (s: SubsessionState) : (RunContext * Ac
     | CancellingDispatch(ctx, plan, _) -> Some(ctx, NotYetStarted plan)
     | ReconcilingUnknownDispatch(ctx, plan, _) -> Some(ctx, NotYetStarted plan)
     | Running(ctx, started, _) -> Some(ctx, Started started)
-    | Draining(ctx, started, _) -> Some(ctx, Started started)
-    | IssuingAbort(ctx, turn, _) -> Some(ctx, turn)
+    | Draining(ctx, started, _, _) -> Some(ctx, Started started)
+    | IssuingAbort(ctx, turn, _, _) -> Some(ctx, turn)
     | AwaitingAbortSettle(ctx, turn, _) -> Some(ctx, turn)
     | ReconcilingAbortSettle(ctx, turn, _) -> Some(ctx, turn)
     | Available _

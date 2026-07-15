@@ -82,14 +82,21 @@ let topologicalOrder (tasks: (string * string list) list) : Result<string list, 
     let rec visit (state: VisitState) (id: string) : Result<VisitState, string list> =
         if state.Visiting.Contains id then
             let path = List.rev state.Path
-            let cycle = List.foldBack (fun x acc -> x :: acc) (path |> List.skipWhile (fun x -> x <> id)) [ id ]
+
+            let cycle =
+                List.foldBack (fun x acc -> x :: acc) (path |> List.skipWhile (fun x -> x <> id)) [ id ]
+
             Error cycle
         elif state.Visited.Contains id then
             Ok state
         else
             let visiting' = state.Visiting.Add id
             let deps = Map.tryFind id depMap |> Option.defaultValue []
-            let st' = { state with Visiting = visiting'; Path = id :: state.Path }
+
+            let st' =
+                { state with
+                    Visiting = visiting'
+                    Path = id :: state.Path }
 
             let rec processDeps (st: VisitState) (remaining: string list) : Result<VisitState, string list> =
                 match remaining with

@@ -5,8 +5,11 @@ open Wanxiangshu.Kernel.FallbackKernel.Types
 // ── Strong-typed identifiers ──
 
 type RunId = private RunId of string
+
 type TurnId = private TurnId of string
+
 type SessionId = private SessionId of string
+
 type TurnOrdinal = private TurnOrdinal of int
 
 module RunId =
@@ -14,14 +17,24 @@ module RunId =
     let value (RunId s) : string = s
 
     let newId () : RunId =
-        RunId("run-" + System.Guid.NewGuid().ToString("N").Substring(0, 8))
+        RunId("run-" + System.Guid.NewGuid().ToString("N"))
 
 module TurnId =
-    let create (s: string) : TurnId = TurnId s
+    let create (s: string) : TurnId =
+        if s = "" then
+            failwith "TurnId cannot be empty"
+
+        TurnId s
+
     let value (TurnId s) : string = s
 
 module SessionId =
-    let create (s: string) : SessionId = SessionId s
+    let create (s: string) : SessionId =
+        if s = "" then
+            failwith "SessionId cannot be empty"
+
+        SessionId s
+
     let value (SessionId s) : string = s
 
 module TurnOrdinal =
@@ -80,6 +93,13 @@ type TranscriptReadFailure = { Message: string }
 
 /// Evidence about the current turn, accumulated from transcript slice.
 /// Replaces the old boolean-based TranscriptSnapshot for turn-sliced evaluation.
+type RecordedOutcome =
+    | NoOutcome
+    | FailureObserved of ErrorInput
+    | CompletionRequested of output: string
+
+/// Evidence about the current turn, accumulated from transcript slice.
+/// Replaces the old boolean-based TranscriptSnapshot for turn-sliced evaluation.
 type AssistantFinish =
     | ToolFinish
     | NormalFinish
@@ -87,9 +107,11 @@ type AssistantFinish =
 type AssistantEvidence =
     | NoAssistant
     | EmptyAssistant
-    | AssistantContent of text: string * finish: AssistantFinish option
+    | AssistantSnapshot of messageId: string * revision: int64 * text: string * finish: AssistantFinish option
+    | AssistantDelta of messageId: string * revision: int64 * text: string * finish: AssistantFinish option
 
 type TodoEvidence =
+    | NoTodoInfo
     | TodosNotCompleted
     | TodosCompleted
 
@@ -100,73 +122,152 @@ type ToolEvidence =
 type RecoveryEvidence =
     | NoRecoveryPrompt
     | RecoveryPrompt of recoveryPrompt: string
+    | RawToolCallDetected of recoveryPrompt: string
 
 type CurrentTurnEvidence =
     { Assistant: AssistantEvidence
       Todos: TodoEvidence
       Tool: ToolEvidence
-      Recovery: RecoveryEvidence }
+      Recovery: RecoveryEvidence
+      Outcome: RecordedOutcome }
 
 module CurrentTurnEvidence =
     let empty: CurrentTurnEvidence =
         { Assistant = NoAssistant
-          Todos = TodosNotCompleted
+          Todos = NoTodoInfo
           Tool = NoToolResult
-          Recovery = NoRecoveryPrompt }
+          Recovery = NoRecoveryPrompt
+          Outcome = NoOutcome }
+
+    let private mergeAssistant e1 e2 =
+        match e1, e2 with
+        | NoAssistant, x -> x
+        | x, NoAssistant -> x
+        | EmptyAssistant, x -> x
+        | x, EmptyAssistant -> x
+        | AssistantSnapshot(id1, rev1, t1, f1), AssistantSnapshot(id2, rev2, t2, f2) ->
+            if id1 <> "" && id2 <> "" && id1 = id2 then
+                if rev2 >= rev1 then
+                    AssistantSnapshot(id2, rev2, t2, f2)
+                else
+                    AssistantSnapshot(id1, rev1, t1, f1)
+            elif id1 = "" && id2 = "" then
+                AssistantSnapshot("", 0L, t2, f2)
+            elif rev2 > rev1 then
+                AssistantSnapshot(id2, rev2, t2, f2)
+            else
+                AssistantSnapshot(id1, rev1, t1, f1)
+        | AssistantDelta(id1, rev1, t1, f1), AssistantDelta(id2, rev2, t2, f2) ->
+            if id1 <> "" && id2 <> "" && id1 = id2 then
+                AssistantDelta(id1, max rev1 rev2, t1 + t2, (if rev2 > rev1 then f2 else f1))
+            elif id1 = "" && id2 = "" then
+                AssistantDelta("", 0L, t2, f2)
+            elif rev2 > rev1 then
+                AssistantDelta(id2, rev2, t2, f2)
+            else
+                AssistantDelta(id1, rev1, t1, f1)
+        | AssistantSnapshot(id1, rev1, t1, f1), AssistantDelta(id2, rev2, t2, f2)
+        | AssistantDelta(id2, rev2, t2, f2), AssistantSnapshot(id1, rev1, t1, f1) ->
+            if id1 <> "" && id2 <> "" && id1 = id2 then
+                if rev2 > rev1 then
+                    AssistantSnapshot(id1, rev2, t1 + t2, f2)
+                else
+                    AssistantSnapshot(id1, rev1, t1, f1)
+            elif id1 = "" && id2 = "" then
+                AssistantSnapshot("", 0L, t2, f2)
+            elif rev2 > rev1 then
+                AssistantSnapshot(id2, rev2, t2, f2)
+            else
+                AssistantSnapshot(id1, rev1, t1, f1)
+
+
+    let private mergeTodos e1 e2 =
+        match e2 with
+        | NoTodoInfo -> e1
+        | _ -> e2
+
+    let private mergeTool e1 e2 =
+        match e1, e2 with
+        | HasToolResult, _ -> HasToolResult
+        | _, HasToolResult -> HasToolResult
+        | NoToolResult, NoToolResult -> NoToolResult
+
+    let private mergeRecovery e1 e2 =
+        match e1, e2 with
+        | RawToolCallDetected r1, RawToolCallDetected r2 ->
+            if r1 = r2 then RawToolCallDetected r1
+            elif r1 = "" then RawToolCallDetected r2
+            elif r2 = "" then RawToolCallDetected r1
+            else RawToolCallDetected(r1 + "\n" + r2)
+        | RawToolCallDetected r, _ -> RawToolCallDetected r
+        | _, RawToolCallDetected r -> RawToolCallDetected r
+        | RecoveryPrompt r1, RecoveryPrompt r2 ->
+            if r1 = r2 then RecoveryPrompt r1
+            elif r1 = "" then RecoveryPrompt r2
+            elif r2 = "" then RecoveryPrompt r1
+            else RecoveryPrompt(r1 + "\n" + r2)
+        | RecoveryPrompt r, NoRecoveryPrompt -> RecoveryPrompt r
+        | NoRecoveryPrompt, RecoveryPrompt r -> RecoveryPrompt r
+        | NoRecoveryPrompt, NoRecoveryPrompt -> NoRecoveryPrompt
+
+    let private mergeOutcome e1 e2 =
+        match e1, e2 with
+        | CompletionRequested _, _ -> e1
+        | _, CompletionRequested _ -> e2
+        | FailureObserved _, _ -> e1
+        | _, FailureObserved _ -> e2
+        | NoOutcome, NoOutcome -> NoOutcome
 
     let merge (e1: CurrentTurnEvidence) (e2: CurrentTurnEvidence) : CurrentTurnEvidence =
-        let mergedAssistant =
-            match e1.Assistant, e2.Assistant with
-            | NoAssistant, x -> x
-            | x, NoAssistant -> x
-            | EmptyAssistant, x -> x
-            | x, EmptyAssistant -> x
-            | AssistantContent(t1, f1), AssistantContent(t2, f2) ->
-                let mergedFinish =
-                    match f1, f2 with
-                    | Some f, _ -> Some f
-                    | _, Some f -> Some f
-                    | None, None -> None
+        { Assistant = mergeAssistant e1.Assistant e2.Assistant
+          Todos = mergeTodos e1.Todos e2.Todos
+          Tool = mergeTool e1.Tool e2.Tool
+          Recovery = mergeRecovery e1.Recovery e2.Recovery
+          Outcome = mergeOutcome e1.Outcome e2.Outcome }
 
-                AssistantContent(t1 + t2, mergedFinish)
+module AssistantEvidence =
+    let content text finish = AssistantSnapshot("", 0L, text, finish)
 
-        let mergedTodos =
-            match e1.Todos, e2.Todos with
-            | TodosCompleted, _ -> TodosCompleted
-            | _, TodosCompleted -> TodosCompleted
-            | TodosNotCompleted, TodosNotCompleted -> TodosNotCompleted
+    let snapshot messageId revision text finish =
+        AssistantSnapshot(messageId, revision, text, finish)
 
-        let mergedTool =
-            match e1.Tool, e2.Tool with
-            | HasToolResult, _ -> HasToolResult
-            | _, HasToolResult -> HasToolResult
-            | NoToolResult, NoToolResult -> NoToolResult
+    let delta messageId revision text finish =
+        AssistantDelta(messageId, revision, text, finish)
 
-        let mergedRecovery =
-            match e1.Recovery, e2.Recovery with
-            | RecoveryPrompt r1, RecoveryPrompt r2 ->
-                if r1 = r2 then RecoveryPrompt r1
-                elif r1 = "" then RecoveryPrompt r2
-                elif r2 = "" then RecoveryPrompt r1
-                else RecoveryPrompt(r1 + "\n" + r2)
-            | RecoveryPrompt r, NoRecoveryPrompt -> RecoveryPrompt r
-            | NoRecoveryPrompt, RecoveryPrompt r -> RecoveryPrompt r
-            | NoRecoveryPrompt, NoRecoveryPrompt -> NoRecoveryPrompt
+    let isSnapshot =
+        function
+        | AssistantSnapshot _ -> true
+        | _ -> false
 
-        { Assistant = mergedAssistant
-          Todos = mergedTodos
-          Tool = mergedTool
-          Recovery = mergedRecovery }
+    let isDelta =
+        function
+        | AssistantDelta _ -> true
+        | _ -> false
+
+    let isContent =
+        function
+        | AssistantSnapshot _
+        | AssistantDelta _ -> true
+        | _ -> false
 
 type TurnObservation =
-    { TurnId: TurnId
+    { TurnId: TurnId option
       Evidence: CurrentTurnEvidence }
 
 type DispatchStatus =
     | Accepted of HostStartReceipt
-    | DefinitelyNotAccepted
+    | TransportRejectedBeforeSend of ErrorInput
+    | TransportFailedAfterUnknownAcceptance of ErrorInput
     | StillPending
     | Unknown
+
+/// Proof that a physical session has stopped after abort. Stopped means the
+/// host reports no active turn for this session; StillRunning means it does;
+/// StopUnknown means the host cannot tell.
+type QuiescenceStatus =
+    | Stopped
+    | StillRunning
+    | StopUnknown
 
 // ── Abort ──
 
@@ -254,14 +355,16 @@ type PoisonReason =
 /// Draining: host reported a turn error (TurnErrorObserved) but has not yet
 /// gone idle. The error is held here — NOT acted on — until SessionIdleObserved
 /// proves the host has actually stopped for this turn, then resolved via the
-/// fallback policy (afterError). Same idle-barrier discipline as
-/// CurrentTurnEvidence classification in Running.
+/// fallback policy (afterError) unless the turn already produced a
+/// CompletionRequested outcome, which takes priority. The buffered
+/// CurrentTurnEvidence is preserved so task_complete / error ordering cannot
+/// lose a successful completion.
 type SubsessionState =
     | Available of AvailableState
     /// Third field buffers CurrentTurnEvidence that arrives BEFORE the host
     /// confirms acceptance of the dispatched prompt (DispatchAccepted). Host
     /// truth: session.prompt resolving and the host's event bus delivering
-    /// message.updated(role=assistant) are two independent async chains —
+    /// message.updated(role=assistant) are two INDEPENDENT async chains —
     /// nothing orders one before the other. A fast provider can deliver the
     /// full assistant reply while we are still Dispatching. This evidence
     /// MUST survive into Running (see Decision.fs Dispatching+DispatchAccepted),
@@ -272,8 +375,8 @@ type SubsessionState =
     | CancellingDispatch of RunContext * TurnPlan * CancelContext
     | ReconcilingUnknownDispatch of RunContext * TurnPlan * CancelContext
     | Running of RunContext * StartedTurn * CurrentTurnEvidence
-    | Draining of RunContext * StartedTurn * ErrorInput
-    | IssuingAbort of RunContext * ActiveTurn * AbortContext
+    | Draining of RunContext * StartedTurn * ErrorInput * CurrentTurnEvidence
+    | IssuingAbort of RunContext * ActiveTurn * AbortContext * idleObserved: bool
     | AwaitingAbortSettle of RunContext * ActiveTurn * AbortContext
     | ReconcilingAbortSettle of RunContext * ActiveTurn * AbortContext
     | Poisoned of PoisonReason
@@ -323,12 +426,16 @@ type Command =
     | CancelRequested
     | TurnDeadlineExpired of TurnId
     | AbortDeadlineExpired of TurnId
+    /// Deadline for dispatch reconciliation has expired; query again or poison.
+    | ReconciliationDeadlineExpired of TurnId
     /// Host confirmed session stopped (safe to apply AfterAbort).
     | AbortConfirmed of TurnId
     /// Host accepted abort request; subsequent idle may settle.
     | AbortHostAccepted of TurnId
     /// Host abort call failed or API unavailable.
     | AbortRequestFailed of TurnId * ErrorInput
+    /// Host confirmed whether the session is still running after abort.
+    | SessionQuiescenceResolved of QuiescenceStatus
     | SessionClosed
 
 // ── Domain events ──
@@ -372,12 +479,15 @@ type SubsessionEvent =
 type Effect =
     | DispatchPrompt of TurnPlan
     | QueryDispatchStatus of SessionId * TurnId
+    | QuerySessionQuiescence of SessionId * TurnId
     | AbortHostSession of SessionId * TurnId
     | CancelPendingDispatch of TurnId
     | ArmTurnDeadline of TurnId
     | CancelTurnDeadline of TurnId
     | ArmAbortDeadline of TurnId
     | CancelAbortDeadline of TurnId
+    | ArmReconciliationDeadline of TurnId
+    | CancelReconciliationDeadline of TurnId
     | CompleteCaller of RunId * RunResult
     | RejectStart of StartRunError
     | DisposeActor
@@ -393,6 +503,7 @@ type IgnoreReason =
     | AbortInProgress
     | EvidenceBeforeRun
     | IdleBeforeAbortBarrier
+    | UnattributableObservation
 
 type Decision =
     { NextState: SubsessionState

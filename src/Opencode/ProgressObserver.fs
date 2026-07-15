@@ -109,9 +109,7 @@ type ProgressObserver
                             do!
                                 SubsessionEventRouter.routeToChild
                                     sid
-                                    (EvidenceUpdated
-                                        { TurnId = TurnId.create ""
-                                          Evidence = ev })
+                                    (EvidenceUpdated { TurnId = None; Evidence = ev })
                                 |> Promise.map ignore
                         | _ -> ()
                 | None -> ()
@@ -124,14 +122,10 @@ type ProgressObserver
 
                     let evidence =
                         { CurrentTurnEvidence.empty with
-                            Assistant = AssistantContent(output, Some NormalFinish) }
+                            Outcome = CompletionRequested output }
 
                     let! routed =
-                        SubsessionEventRouter.routeToChild
-                            sid
-                            (EvidenceUpdated
-                                { TurnId = TurnId.create ""
-                                  Evidence = evidence })
+                        SubsessionEventRouter.routeToChild sid (EvidenceUpdated { TurnId = None; Evidence = evidence })
 
                     if not routed then
                         let st = fallbackRuntime.GetOrCreateState sid

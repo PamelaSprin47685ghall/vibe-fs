@@ -29,25 +29,30 @@ let buildDispatchModelString (model: FallbackModel option) : string option =
         | None -> sprintf "%s/%s" m.ProviderID m.ModelID)
 
 module PendingTurnReceipt =
+    type TransportState =
+        | InFlight
+        | RejectedBeforeSend of ErrorInput
+        | FailedAfterUnknown of ErrorInput
+
     type Waiter =
         { SessionId: string
-          Resolve: HostStartReceipt -> unit
+          Resolve: Result<HostStartReceipt, DispatchFailure> -> unit
           Reject: exn -> unit
-          mutable Completed: bool }
+          mutable Completed: bool
+          mutable TransportState: TransportState }
 
     let mutable private pending = Map.empty<string, Waiter>
 
-    let tryFindWaiter (turnId: string) : Waiter option = Map.tryFind turnId pending
-
     let tryFind (turnId: string) : Waiter option = Map.tryFind turnId pending
 
-    let register (sessionId: string) (turnId: string) : JS.Promise<HostStartReceipt> =
+    let register (sessionId: string) (turnId: string) : JS.Promise<Result<HostStartReceipt, DispatchFailure>> =
         Promise.create (fun resolve reject ->
             let w =
                 { SessionId = sessionId
                   Resolve = resolve
                   Reject = reject
-                  Completed = false }
+                  Completed = false
+                  TransportState = InFlight }
 
             pending <- Map.add turnId w pending)
 
@@ -63,17 +68,25 @@ module PendingTurnReceipt =
             else
                 w.Completed <- true
                 pending <- Map.remove turnId pending
-                w.Resolve receipt
+                w.Resolve(Ok receipt)
 
             true
         | None -> false
 
-    let tryReject (turnId: string) (ex: exn) : unit =
+    let markTransportRejected (turnId: string) (err: ErrorInput) : unit =
         match Map.tryFind turnId pending with
-        | Some w ->
-            w.Completed <- true
-            w.Reject ex
+        | Some w -> w.TransportState <- RejectedBeforeSend err
         | None -> ()
+
+    let markTransportFailed (turnId: string) (err: ErrorInput) : unit =
+        match Map.tryFind turnId pending with
+        | Some w -> w.TransportState <- FailedAfterUnknown err
+        | None -> ()
+
+    let tryGetTransportState (turnId: string) : TransportState option =
+        match Map.tryFind turnId pending with
+        | Some w -> Some w.TransportState
+        | None -> None
 
     let cancel (turnId: string) : unit =
         match Map.tryFind turnId pending with
@@ -98,37 +111,53 @@ type OpencodeSubsessionHost(client: obj, agent: string, _directory: string) =
                         {| path = box {| id = SessionId.value sessionId |}
                            body = body |}
 
-                try
-                    match getSessionApiFromClient client with
-                    | Ok session ->
-                        let promptPromise: JS.Promise<obj> = invoke1 arg "prompt" session
-                        let! _ = promptPromise
-                        return Ok OrderedTurnMarkerObserved
-                    | Error derr ->
-                        let msg =
-                            match derr with
-                            | InvalidIntent(_, _, m) -> m
-                            | _ -> "session API missing"
+                let receiptPromise = PendingTurnReceipt.register (SessionId.value sessionId) nonce
 
-                        return
-                            Error(
-                                DispatchFailure.HostRejected
+                let firePrompt () =
+                    promise {
+                        try
+                            match getSessionApiFromClient client with
+                            | Ok session ->
+                                try
+                                    let! _ = invoke1 arg "prompt" session
+                                    ()
+                                with ex ->
+                                    let errInput =
+                                        { ErrorName = "DispatchFailed"
+                                          DomainError = None
+                                          Message = ex.Message
+                                          StatusCode = None
+                                          IsRetryable = Some true }
+
+                                    PendingTurnReceipt.markTransportFailed nonce errInput
+                            | Error derr ->
+                                let msg =
+                                    match derr with
+                                    | InvalidIntent(_, _, m) -> m
+                                    | _ -> "session API missing"
+
+                                let errInput =
                                     { ErrorName = "DispatchFailed"
                                       DomainError = Some derr
                                       Message = msg
                                       StatusCode = None
                                       IsRetryable = Some false }
-                            )
-                with ex ->
-                    return
-                        Error(
-                            DispatchFailure.HostAcceptanceUnknown
+
+                                PendingTurnReceipt.markTransportRejected nonce errInput
+                        with ex ->
+                            let errInput =
                                 { ErrorName = "DispatchFailed"
                                   DomainError = None
                                   Message = ex.Message
                                   StatusCode = None
                                   IsRetryable = Some true }
-                        )
+
+                            PendingTurnReceipt.markTransportFailed nonce errInput
+                    }
+
+                let _ = firePrompt ()
+
+                return! receiptPromise
             }
 
         member _.Abort(sessionId, turnId) =
@@ -157,6 +186,13 @@ type OpencodeSubsessionHost(client: obj, agent: string, _directory: string) =
             promise {
                 let nonce = TurnId.value turnId
 
+                let checkWaiterState () =
+                    match PendingTurnReceipt.tryGetTransportState nonce with
+                    | Some(PendingTurnReceipt.RejectedBeforeSend err) -> TransportRejectedBeforeSend err
+                    | Some(PendingTurnReceipt.FailedAfterUnknown err) -> TransportFailedAfterUnknownAcceptance err
+                    | Some(PendingTurnReceipt.InFlight) -> StillPending
+                    | None -> Unknown
+
                 match getSessionApiFromClient client with
                 | Ok session ->
                     try
@@ -166,7 +202,7 @@ type OpencodeSubsessionHost(client: obj, agent: string, _directory: string) =
                         let data = Dyn.get resp "data"
 
                         if Dyn.isNullish data || not (Dyn.isArray data) then
-                            return Unknown
+                            return checkWaiterState ()
                         else
                             let msgs = unbox<obj array> data
 
@@ -196,14 +232,13 @@ type OpencodeSubsessionHost(client: obj, agent: string, _directory: string) =
                             | Some msg ->
                                 let msgId = Dyn.str msg "id"
                                 return Accepted(UserMessageObserved msgId)
-                            | None ->
-                                match PendingTurnReceipt.tryFind nonce with
-                                | Some w when not w.Completed -> return StillPending
-                                | _ -> return DefinitelyNotAccepted
+                            | None -> return checkWaiterState ()
                     with _ ->
-                        return Unknown
-                | Error _ -> return Unknown
+                        return checkWaiterState ()
+                | Error _ -> return checkWaiterState ()
             }
+
+        member this.QuerySessionQuiescence(sessionId, turnId) = promise { return StopUnknown }
 
 let createHost (client: obj) (agent: string) (directory: string) : ISubsessionHost =
     OpencodeSubsessionHost(client, agent, directory) :> ISubsessionHost

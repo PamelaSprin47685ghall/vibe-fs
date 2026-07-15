@@ -190,7 +190,11 @@ let fuzzyFind (params': FuzzyFindParams) (opts: SearchOptions) : JS.Promise<Sear
     | [] -> fuzzyFindSingle params' opts
     | multi -> fuzzyFindMulti multi params' opts
 
-let fuzzyFindContinue (state: FuzzyFindState) (store: TypedIteratorStore) (opts: SearchOptions) : JS.Promise<SearchOutcome> =
+let fuzzyFindContinue
+    (state: FuzzyFindState)
+    (store: TypedIteratorStore)
+    (opts: SearchOptions)
+    : JS.Promise<SearchOutcome> =
     promise {
         let! finderResult = acquireFinderFromOptions state.externalBasePath opts
         return runWithFinder finderResult state.externalBasePath (runFind state store opts)

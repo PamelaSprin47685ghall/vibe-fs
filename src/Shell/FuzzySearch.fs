@@ -25,22 +25,33 @@ let fuzzyContinue (params': FuzzyContinueParams) (opts: SearchOptions) : JS.Prom
         | Error msg -> return { output = msg; isError = true }
         | Ok store ->
             let it = params'.iterator
-            let isFind = it.Contains(":" + findIteratorNamespace + ":") || it.StartsWith(findIteratorNamespace)
-            let isGrep = it.Contains(":" + grepIteratorNamespace + ":") || it.StartsWith(grepIteratorNamespace)
+
+            let isFind =
+                it.Contains(":" + findIteratorNamespace + ":")
+                || it.StartsWith(findIteratorNamespace)
+
+            let isGrep =
+                it.Contains(":" + grepIteratorNamespace + ":")
+                || it.StartsWith(grepIteratorNamespace)
+
             if isFind then
                 match consumeFindIterator store it with
-                | Some state ->
-                    return! FuzzySearchFind.fuzzyFindContinue state store opts
+                | Some state -> return! FuzzySearchFind.fuzzyFindContinue state store opts
                 | None ->
-                    return { output = iteratorError "fuzzy_continue" it; isError = true }
+                    return
+                        { output = iteratorError "fuzzy_continue" it
+                          isError = true }
             elif isGrep then
                 match consumeGrepIterator store it with
-                | Some state ->
-                    return! FuzzySearchGrep.fuzzyGrepContinue state store opts
+                | Some state -> return! FuzzySearchGrep.fuzzyGrepContinue state store opts
                 | None ->
-                    return { output = iteratorError "fuzzy_continue" it; isError = true }
+                    return
+                        { output = iteratorError "fuzzy_continue" it
+                          isError = true }
             else
-                return { output = $"fuzzy_continue error: invalid iterator format \"{it}\""; isError = true }
+                return
+                    { output = $"fuzzy_continue error: invalid iterator format \"{it}\""
+                      isError = true }
     }
 
 // Re-export helpers used by FuzzyToolsCodec and tests

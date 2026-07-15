@@ -55,6 +55,7 @@ let private buildUserEntry (userId: string) (sessionId: string) (preludeText: st
 
 let private buildReadToolPart (cap: CapsFile) (epochId: string) (fp: string) (index: int) : obj =
     let formattedOutput = formatReadOutput cap.filePath cap.content 1 None
+    let callId = capsToolCallId "caps-call-" epochId fp index
 
     let wrappedOutput =
         $"<wanxiangshu-caps-tools>\n{formattedOutput}\n</wanxiangshu-caps-tools>"
@@ -62,7 +63,7 @@ let private buildReadToolPart (cap: CapsFile) (epochId: string) (fp: string) (in
     createObj
         [ "type", box "tool"
           "tool", box "read"
-          "callID", box $"caps-call-{epochId}-{fp}-{index}"
+          "callID", box callId
           "state",
           box (
               createObj

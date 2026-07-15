@@ -9,6 +9,7 @@ open Wanxiangshu.Kernel.FallbackKernel.Types
 open Wanxiangshu.Kernel.Subsession.Types
 open Wanxiangshu.Kernel.Subsession.PartTypeClassify
 open Wanxiangshu.Shell.FallbackEventBridge
+open Wanxiangshu.Shell.FallbackMessageCodec
 open Wanxiangshu.Shell.FallbackRuntimeState
 
 let private muxErrorInput (props: obj) : ErrorInput =
@@ -26,6 +27,15 @@ let private muxErrorInput (props: obj) : ErrorInput =
         if ir <> "" then Some(ir = "true") else None }
 
 let muxEventTranslator: IEventTranslator =
+    let tryExtractTurnIdFromEvent rawEvent =
+        let props = Dyn.get rawEvent "properties"
+        let props = if Dyn.isNullish props then rawEvent else props
+        let tid = Dyn.str props "turnId"
+        let tid = if tid <> "" then tid else Dyn.str props "turnID"
+        let tid = if tid <> "" then tid else Dyn.str props "runId"
+        let tid = if tid <> "" then tid else Dyn.str props "runID"
+        if tid <> "" then Some(TurnId.create tid) else None
+
     { new IEventTranslator with
         member _.TranslateError(rawEvent: obj) : FallbackEvent option =
             let eventType = Dyn.str rawEvent "type"
@@ -130,11 +140,17 @@ let muxEventTranslator: IEventTranslator =
 
                 let finish = if hasToolCall then ToolFinish else NormalFinish
 
+                let recovery =
+                    match scanToolCallAsText [| rawEvent |] with
+                    | Some prompt -> RawToolCallDetected prompt
+                    | None -> NoRecoveryPrompt
+
                 Some
-                    { TurnId = TurnId.create ""
+                    { TurnId = tryExtractTurnIdFromEvent rawEvent
                       Evidence =
                         { CurrentTurnEvidence.empty with
-                            Assistant = AssistantContent(text, Some finish) } }
+                            Assistant = AssistantSnapshot("", 0L, text, Some finish)
+                            Recovery = recovery } }
             else
                 None }
 

@@ -36,21 +36,27 @@ let promptsForParallelIntentsMatchesFormatPrompt () =
         equal $"investigator prompts match formatPrompt host={host}" invFormat invHelper
 
 let buildMeditatorSectionsMatchesManualZip () =
-    let dummyEntry : Wanxiangshu.Methodology.SchemaCommon.MethodologyEntry =
+    let dummyEntry: Wanxiangshu.Methodology.SchemaCommon.MethodologyEntry =
         { methodologyId = "test_methodology"
           shortDefinition = "test def"
           triggerWhen = "test trigger"
           noteDescription = "test note desc"
           meditatorRole = "test role"
           outputSections = [] }
-    let viaText = Wanxiangshu.Methodology.SchemaCommon.renderMeditatorIntent dummyEntry "why?" "my background" "note detail"
+
+    let viaText =
+        Wanxiangshu.Methodology.SchemaCommon.renderMeditatorIntent dummyEntry "why?" "my background" "note detail"
+
     for host in [| opencode; mimocode |] do
         let viaFormat = formatPrompt host (Meditator viaText) |> List.head
+
         let expected =
             if host = mimocode then
-                viaText + "\n\nWhen you have finished the task, you MUST call the agent_report tool. Use structuredOutput with relatedFiles (and relatedCode where applicable) so the caller can act on your findings."
+                viaText
+                + "\n\nWhen you have finished the task, you MUST call the agent_report tool. Use structuredOutput with relatedFiles (and relatedCode where applicable) so the caller can act on your findings."
             else
                 viaText
+
         equal $"meditator prompt matches formatPrompt host={host}" expected viaFormat
 
 let browserPromptTextMatchesFormatPrompt () =

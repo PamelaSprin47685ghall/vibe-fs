@@ -89,7 +89,7 @@ let scenarioErrorThenIdleRetriesThenSucceeds () =
         let d2 = mustDecide d1.NextState (TurnErrorObserved err)
 
         match d2.NextState with
-        | Draining _ -> check "no CompleteCaller while error held" (completeCallerCount d2.Effects = 0)
+        | Draining(_, _, _, _) -> check "no CompleteCaller while error held" (completeCallerCount d2.Effects = 0)
         | other -> fail ("expected Draining, got " + string other)
 
         // MaxRetries=0 → error resolved on idle exhausts the chain immediately.
@@ -158,7 +158,7 @@ let scenarioAcceptanceUnknownAborts () =
                 mustDecide d1.NextState (DispatchStatusResolved(DispatchStatus.Accepted OrderedTurnMarkerObserved))
 
             match d2.NextState with
-            | IssuingAbort(_, _, abortCtx) ->
+            | IssuingAbort(_, _, abortCtx, _) ->
                 check
                     "AbortHostSession"
                     (List.exists
@@ -198,7 +198,7 @@ let scenarioCancelIdle () =
         let d2 = mustDecide d1.NextState CancelRequested
 
         match d2.NextState with
-        | IssuingAbort _ ->
+        | IssuingAbort(_, _, _, _) ->
             let d3 = mustDecide d2.NextState (AbortHostAccepted plan.TurnId)
 
             match d3.NextState with
@@ -207,10 +207,7 @@ let scenarioCancelIdle () =
 
                 match d4.NextState with
                 | ReconcilingAbortSettle _ ->
-                    let d5 =
-                        mustDecide
-                            d4.NextState
-                            (DispatchStatusResolved(DispatchStatus.Accepted OrderedTurnMarkerObserved))
+                    let d5 = mustDecide d4.NextState (SessionQuiescenceResolved Stopped)
 
                     match d5.NextState with
                     | Available _ ->
@@ -246,7 +243,7 @@ let scenarioAbortDeadlinePoisons () =
         let d2 = mustDecide d1.NextState CancelRequested
 
         match d2.NextState with
-        | IssuingAbort(_, turn, _) ->
+        | IssuingAbort(_, turn, _, _) ->
             let tid =
                 match turn with
                 | NotYetStarted p -> p.TurnId
@@ -305,13 +302,13 @@ let propAtMostOneCompleteCaller () =
 
         let evidence =
             { CurrentTurnEvidence.empty with
-                Assistant = AssistantContent("x", Some NormalFinish) }
+                Assistant = AssistantSnapshot("", 0L, "x", Some NormalFinish) }
 
         let d2 =
             mustDecide
                 d1.NextState
                 (EvidenceUpdated
-                    { TurnId = plan.TurnId
+                    { TurnId = Some plan.TurnId
                       Evidence = evidence })
 
         let d3 = mustDecide d2.NextState SessionIdleObserved

@@ -17,7 +17,10 @@ let private fmKey (e: SquadEvent) =
 
          for item in tasks do
              let o2 =
-                 createObj [ "task_id", box item.taskId; "title", box item.title; "description", box item.description ]
+                 createObj
+                     [ "task_id", box item.taskId
+                       "title", box item.title
+                       "description", box item.description ]
 
              if item.dependsOn <> [] then
                  setKey o2 "depends_on" (box (List.toArray item.dependsOn))
@@ -88,33 +91,37 @@ let private parseEvent (parsed: obj) (typeName: string) : SquadEvent option =
         let req = strField "requirement" |> Option.defaultValue ""
         Some(SquadCreated(sid, req))
     | "tasks_created" ->
-         let tasksRaw = get parsed "tasks"
+        let tasksRaw = get parsed "tasks"
 
-         let tasks =
-             if isNullish tasksRaw || not (isArray tasksRaw) then
-                 []
-             else
-                 (tasksRaw :?> obj array)
-                 |> Array.toList
-                 |> List.choose (fun o ->
-                     let tid = str o "task_id"
+        let tasks =
+            if isNullish tasksRaw || not (isArray tasksRaw) then
+                []
+            else
+                (tasksRaw :?> obj array)
+                |> Array.toList
+                |> List.choose (fun o ->
+                    let tid = str o "task_id"
 
-                     if tid = "" then
-                         None
-                     else
-                         let title = str o "title"
-                         let desc = str o "description"
-                         let depsArr = get o "depends_on"
+                    if tid = "" then
+                        None
+                    else
+                        let title = str o "title"
+                        let desc = str o "description"
+                        let depsArr = get o "depends_on"
 
-                         let deps =
-                             if isNullish depsArr || not (isArray depsArr) then
-                                 []
-                             else
-                                 (depsArr :?> obj array) |> Array.map string |> Array.toList
+                        let deps =
+                            if isNullish depsArr || not (isArray depsArr) then
+                                []
+                            else
+                                (depsArr :?> obj array) |> Array.map string |> Array.toList
 
-                         Some { taskId = tid; title = title; description = desc; dependsOn = deps })
+                        Some
+                            { taskId = tid
+                              title = title
+                              description = desc
+                              dependsOn = deps })
 
-         Some(TasksCreated(sid, tasks))
+        Some(TasksCreated(sid, tasks))
     | "task_started" ->
         let tid = optStr "task_id"
         let wt = optStr "worktree_path"

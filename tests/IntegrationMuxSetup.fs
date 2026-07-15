@@ -49,7 +49,8 @@ let muxActivateReviewForTest (reg: obj) (sessionID: string) (task: string) : uni
     let store = muxReviewStore reg
 
     let apply =
-        get store "applyReviewTaskProjection" |> unbox<System.Func<string, string option, unit>>
+        get store "applyReviewTaskProjection"
+        |> unbox<System.Func<string, string option, unit>>
 
     apply.Invoke(sessionID, Some task)
 
@@ -57,7 +58,8 @@ let muxReplayReviewTaskForTest (reg: obj) (sessionID: string) (task: string opti
     let store = muxReviewStore reg
 
     let apply =
-        get store "applyReviewTaskProjection" |> unbox<System.Func<string, string option, unit>>
+        get store "applyReviewTaskProjection"
+        |> unbox<System.Func<string, string option, unit>>
 
     apply.Invoke(sessionID, task)
 

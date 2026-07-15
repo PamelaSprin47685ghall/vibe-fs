@@ -25,5 +25,3 @@ let parallelPromptsFromIntents
     match parse intentsObj with
     | Error message -> Error(ParseError("intents", message))
     | Ok intents -> Ok(promptsForParallelIntents host constructor intents)
-
-

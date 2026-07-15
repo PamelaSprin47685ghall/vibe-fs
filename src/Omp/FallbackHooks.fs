@@ -11,6 +11,7 @@ open Wanxiangshu.Kernel.FallbackKernel.Types
 open Wanxiangshu.Kernel.Subsession.Types
 open Wanxiangshu.Kernel.Subsession.PartTypeClassify
 open Wanxiangshu.Shell.FallbackEventBridge
+open Wanxiangshu.Shell.FallbackMessageCodec
 open Wanxiangshu.Shell.FallbackRuntimeState
 open Wanxiangshu.Shell.SubsessionEventRouter
 open Wanxiangshu.Shell.SubsessionChildObserver
@@ -53,6 +54,32 @@ let private isSyntheticText (text: string) : bool =
     || t.Contains("A background runner task is still active")
     || t.Contains("the system context is about to be suspended")
     || t.Contains("You must immediately force an emergency stop")
+
+let private tryExtractTurnIdFromEvent (rawEvent: obj) : TurnId option =
+    let ev = Dyn.get rawEvent "event"
+    let ev = if Dyn.isNullish ev then rawEvent else ev
+    let info = Dyn.get ev "info"
+    let info = if Dyn.isNullish info then ev else info
+    let props = Dyn.get rawEvent "props"
+    let props = if Dyn.isNullish props then rawEvent else props
+
+    let tid = Dyn.str info "turnId"
+    let tid = if tid <> "" then tid else Dyn.str info "turnID"
+    let tid = if tid <> "" then tid else Dyn.str info "runId"
+    let tid = if tid <> "" then tid else Dyn.str info "runID"
+    let tid = if tid <> "" then tid else Dyn.str ev "turnId"
+    let tid = if tid <> "" then tid else Dyn.str ev "turnID"
+    let tid = if tid <> "" then tid else Dyn.str ev "runId"
+    let tid = if tid <> "" then tid else Dyn.str ev "runID"
+    let tid = if tid <> "" then tid else Dyn.str props "turnId"
+    let tid = if tid <> "" then tid else Dyn.str props "turnID"
+    let tid = if tid <> "" then tid else Dyn.str props "runId"
+    let tid = if tid <> "" then tid else Dyn.str props "runID"
+    let tid = if tid <> "" then tid else Dyn.str rawEvent "turnId"
+    let tid = if tid <> "" then tid else Dyn.str rawEvent "turnID"
+    let tid = if tid <> "" then tid else Dyn.str rawEvent "runId"
+    let tid = if tid <> "" then tid else Dyn.str rawEvent "runID"
+    if tid <> "" then Some(TurnId.create tid) else None
 
 let private tryGetModelStringFromInfo (info: obj) : string option =
     if isNull info || Dyn.isNullish info then
@@ -314,18 +341,34 @@ let ompEventTranslator (runtime: FallbackRuntimeState) : IEventTranslator =
 
                             let hasToolCall = isToolFinish || hasToolCallPart
 
+                            let assistantEvidence =
+                                if t.StartsWith("message.part.") then
+                                    AssistantDelta("", 0L, text, Some(if hasToolCall then ToolFinish else NormalFinish))
+                                else
+                                    AssistantSnapshot(
+                                        "",
+                                        0L,
+                                        text,
+                                        Some(if hasToolCall then ToolFinish else NormalFinish)
+                                    )
+
+                            let recovery =
+                                if t = "message.updated" then
+                                    match scanToolCallAsText [| rawEvent |] with
+                                    | Some prompt -> RawToolCallDetected prompt
+                                    | None -> NoRecoveryPrompt
+                                else
+                                    NoRecoveryPrompt
+
                             Some
-                                { TurnId = TurnId.create ""
+                                { TurnId = tryExtractTurnIdFromEvent rawEvent
                                   Evidence =
                                     { CurrentTurnEvidence.empty with
-                                        Assistant =
-                                            AssistantContent(
-                                                text,
-                                                Some(if hasToolCall then ToolFinish else NormalFinish)
-                                            ) } }
+                                        Assistant = assistantEvidence
+                                        Recovery = recovery } }
                         elif role = "toolResult" then
                             Some
-                                { TurnId = TurnId.create ""
+                                { TurnId = tryExtractTurnIdFromEvent rawEvent
                                   Evidence =
                                     { CurrentTurnEvidence.empty with
                                         Tool = HasToolResult } }
@@ -335,7 +378,7 @@ let ompEventTranslator (runtime: FallbackRuntimeState) : IEventTranslator =
                         None
                 elif t = "tool_result" then
                     Some
-                        { TurnId = TurnId.create ""
+                        { TurnId = tryExtractTurnIdFromEvent rawEvent
                           Evidence =
                             { CurrentTurnEvidence.empty with
                                 Tool = HasToolResult } }
