@@ -388,6 +388,7 @@ let private reconciliationRetryPreservesAbortReason () =
             equal "retry count is 1 after retry" 1 retryCount
             equal "reconciliation retry preserves abort cause" UserRequested retryContext.Reason
         | other -> fail ("expected reconciliation retry, got " + string other)
+    | Ok(NoChange reason) -> fail ("expected decision, got NoChange: " + string reason)
     | Error err -> fail ("unexpected decision error " + string err)
 
 // ── Registry workspace isolation ──

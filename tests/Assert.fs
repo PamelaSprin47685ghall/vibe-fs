@@ -194,7 +194,7 @@ let timedAsync (label: string) (f: unit -> JS.Promise<'a>) : JS.Promise<unit> =
                 failures.Add(sprintf "%s > [TIMEOUT>%dms]" label asyncSpecTimeoutMs)
             else
                 printfn "TEST ASYNC %s THREW: %A" label ex
-                printfn "KEYS of EX: %A" (Fable.Core.JS.Object.keys ex)
+                printfn "KEYS of EX: %A" (Fable.Core.JS.Constructors.Object.keys ex)
                 printfn "EX STACK: %s" (string ex?stack)
 
                 try
@@ -231,7 +231,7 @@ let timedAsyncSuite (label: string) (f: unit -> JS.Promise<'a>) : JS.Promise<uni
                 failures.Add(sprintf "%s > [TIMEOUT>%dms]" label asyncSuiteTimeoutMs)
             else
                 printfn "TEST SUITE %s THREW: %A" label ex
-                printfn "KEYS of EX: %A" (Fable.Core.JS.Object.keys ex)
+                printfn "KEYS of EX: %A" (Fable.Core.JS.Constructors.Object.keys ex)
                 printfn "EX STACK: %s" (string ex?stack)
                 failed <- failed + 1
                 failures.Add(sprintf "%s > [THREW]" label)
