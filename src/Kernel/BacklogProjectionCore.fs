@@ -199,7 +199,7 @@ let compactingTransform
     (backlog: BacklogEntry list)
     (guidGen: unit -> string)
     : Message<'raw> list =
-    let cleaned = stripSyntheticBySource messages
+    let cleaned = messages
     let todoSummary = buildTodoSummary backlog
     let messageHistory = buildMessageHistory cleaned
     let wrappedText = buildWrappedText todoSummary messageHistory

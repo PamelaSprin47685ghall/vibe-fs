@@ -27,6 +27,28 @@ let isSettled_trueWhenExhausted () =
 
     check "exhausted settled" (isRecoverySettled rt "s1")
 
+let isSettled_trueWhenCancelled () =
+    let rt = FallbackRuntimeState()
+    let s0 = rt.GetOrCreateState "s1"
+
+    rt.UpdateState
+        "s1"
+        { s0 with
+            Lifecycle = FallbackLifecycle.Cancelled }
+
+    check "cancelled settled" (isRecoverySettled rt "s1")
+
+let isSettled_trueWhenTaskComplete () =
+    let rt = FallbackRuntimeState()
+    let s0 = rt.GetOrCreateState "s1"
+
+    rt.UpdateState
+        "s1"
+        { s0 with
+            Lifecycle = FallbackLifecycle.TaskComplete }
+
+    check "task complete settled" (isRecoverySettled rt "s1")
+
 let waitCompletesAfterConsumedSetAsync () =
     promise {
         let rt = FallbackRuntimeState()
@@ -104,6 +126,8 @@ let run () =
         isSettled_falseWhenFresh ()
         isSettled_trueWhenConsumed ()
         isSettled_trueWhenExhausted ()
+        isSettled_trueWhenCancelled ()
+        isSettled_trueWhenTaskComplete ()
         do! waitCompletesAfterConsumedSetAsync ()
         isToolCallTextRecovery_inProgressWhenScanning ()
         isToolCallTextRecovery_inProgressWhenRecovering ()

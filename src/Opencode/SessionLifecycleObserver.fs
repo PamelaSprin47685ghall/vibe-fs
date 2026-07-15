@@ -62,7 +62,14 @@ type SessionLifecycleObserver
             // Cancel any pending continuation lease on new human turn
             match fallbackRuntime.TryGetPendingLease sessionID with
             | Some lease ->
-                do! finishContinuation fallbackRuntime directory sessionID lease "cancelled" "new_human_turn"
+                do!
+                    finishContinuation
+                        fallbackRuntime
+                        directory
+                        sessionID
+                        lease
+                        ContinuationOutcome.Cancelled
+                        "new_human_turn"
             | None -> ()
 
             let msgId =
@@ -104,7 +111,7 @@ type SessionLifecycleObserver
                 fallbackRuntime.ClearModel sessionID
                 fallbackRuntime.ClearInjected sessionID
                 Wanxiangshu.Shell.ToolHookRuntime.clearSessionCompliance sessionID
-                fallbackRuntime.SetSessionOwner sessionID "Human"
+                fallbackRuntime.SetSessionOwner sessionID SessionOwner.Human
                 let turnId = fallbackRuntime.IncrementHumanTurnId sessionID
                 let humanTurnOrdinal = fallbackRuntime.GetHumanTurnOrdinal sessionID
                 fallbackRuntime.SetLastHumanMessageId sessionID msgId
@@ -216,7 +223,7 @@ type SessionLifecycleObserver
                         // The session generation identifies the human/session
                         // lifecycle and must remain stable across compaction.
                         if
-                            currentOwner = "Compaction"
+                            currentOwner = SessionOwner.Compaction
                             && compactionId <> ""
                             && not (fallbackRuntime.IsCompacted sid)
                         then
@@ -260,7 +267,7 @@ type SessionLifecycleObserver
                                 if isCompactionContinue then
                                     let currentOwner = fallbackRuntime.GetSessionOwner sid
 
-                                    if currentOwner = "Compaction" && fallbackRuntime.IsCompacted sid then
+                                    if currentOwner = SessionOwner.Compaction && fallbackRuntime.IsCompacted sid then
                                         fallbackRuntime.SetCompactionContinuationObserved sid true
                 | _ -> ()
 

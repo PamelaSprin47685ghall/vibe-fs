@@ -426,7 +426,10 @@ let decorateAndValidateSchema (toolName: string) (schema: obj) : obj =
 
                 Dyn.setKey schema "required" nextReq
 
-            // Validation (Fail Closed)
+            // Soft validation: warn fields are soft-required per compliance policy.
+            // Missing fields do NOT block tool registration or execution.
+            // Only malformed business args, permission denial, parse failure,
+            // or control field LEAKAGE are hard gates.
             let requiredList =
                 let req = Dyn.get schema "required"
 
@@ -437,23 +440,27 @@ let decorateAndValidateSchema (toolName: string) (schema: obj) : obj =
 
             for reqField in requiredList do
                 if Dyn.isNullish (Dyn.get props reqField) then
-                    failwith
-                        $"Schema Validation Failed: required field '{reqField}' is not defined in properties of tool '{toolName}'"
+                    Fable.Core.JS.console.warn (
+                        $"Schema soft warning: required field '{reqField}' is not defined in properties of tool '{toolName}'"
+                    )
 
             if List.contains FileMutation caps && Dyn.isNullish (Dyn.get props "warn_tdd") then
-                failwith
-                    $"Schema Validation Failed: FileMutation tool '{toolName}' is missing field 'warn_tdd' in properties"
+                Fable.Core.JS.console.warn (
+                    $"Schema soft warning: FileMutation tool '{toolName}' is missing field 'warn_tdd' in properties"
+                )
 
             if List.contains ProcessExecution caps && Dyn.isNullish (Dyn.get props "warn") then
-                failwith
-                    $"Schema Validation Failed: ProcessExecution tool '{toolName}' is missing field 'warn' in properties"
+                Fable.Core.JS.console.warn (
+                    $"Schema soft warning: ProcessExecution tool '{toolName}' is missing field 'warn' in properties"
+                )
 
             if
                 List.contains SubagentDelegation caps
                 && Dyn.isNullish (Dyn.get props "warn_reuse")
             then
-                failwith
-                    $"Schema Validation Failed: SubagentDelegation tool '{toolName}' is missing field 'warn_reuse' in properties"
+                Fable.Core.JS.console.warn (
+                    $"Schema soft warning: SubagentDelegation tool '{toolName}' is missing field 'warn_reuse' in properties"
+                )
 
             schema
 

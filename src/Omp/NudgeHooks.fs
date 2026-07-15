@@ -29,6 +29,7 @@ open Wanxiangshu.Shell.RuntimeScope
 open Wanxiangshu.Shell.Dyn
 open Wanxiangshu.Shell.FallbackRuntimeState
 open Wanxiangshu.Shell.NudgeRuntimeTypes
+open Wanxiangshu.Kernel.FallbackKernel.Types
 
 module Dyn = Wanxiangshu.Shell.Dyn
 
@@ -166,17 +167,17 @@ let agentEndHandler
 
         if isSyntheticAssistantAgent currentAgent then
             Promise.lift ()
-        elif owner = "Nudge" then
+        elif owner = SessionOwner.Nudge then
             let root = ctx.cwd |> Option.defaultValue ""
 
             promise {
                 match fallbackRuntime.TryGetPendingNudgeLease sessionId with
                 | Some lease ->
                     if root <> "" then
-                        do! finishNudge fallbackRuntime root sessionId lease "settled" "completed" "" ""
-                | None -> fallbackRuntime.SetSessionOwner sessionId "None"
+                        do! finishNudge fallbackRuntime root sessionId lease NudgeOutcome.Settled "completed" "" ""
+                | None -> fallbackRuntime.SetSessionOwner sessionId SessionOwner.NoOwner
             }
-        elif owner <> "None" && owner <> "Human" then
+        elif owner <> SessionOwner.NoOwner && owner <> SessionOwner.Human then
             Promise.lift ()
         elif isSessionForceStopped sessionId then
             Promise.lift ()
@@ -258,11 +259,11 @@ let agentEndHandler
                                           HumanTurnID = humanTurnId
                                           SessionGeneration = sessionGen
                                           CancelGeneration = cancelGen
-                                          Owner = "Nudge"
-                                          Status = "dispatch_started" }
+                                          Owner = SessionOwner.Nudge
+                                          Status = LeaseStatus.DispatchStarted }
 
                                     fallbackRuntime.SetPendingNudgeLease(sessionId, lease)
-                                    fallbackRuntime.SetSessionOwner sessionId "Nudge"
+                                    fallbackRuntime.SetSessionOwner sessionId SessionOwner.Nudge
                                     fallbackRuntime.SetActiveNudgeNonce sessionId nonce
                                     fallbackRuntime.SetMainContinuationAwaitingStart sessionId true
 
@@ -273,7 +274,7 @@ let agentEndHandler
                                                 root
                                                 sessionId
                                                 lease
-                                                "cancelled"
+                                                NudgeOutcome.Cancelled
                                                 "Force stopped"
                                                 ""
                                                 ""
@@ -286,8 +287,8 @@ let agentEndHandler
                                                     fallbackRuntime.TryTransitionPendingNudgeLease(
                                                         sessionId,
                                                         lease.NudgeID,
-                                                        "dispatch_started",
-                                                        "dispatched"
+                                                        LeaseStatus.DispatchStarted,
+                                                        LeaseStatus.Dispatched
                                                     )
                                                 )
                                             then
@@ -297,12 +298,14 @@ let agentEndHandler
                                                         root
                                                         sessionId
                                                         lease
-                                                        "cancelled"
+                                                        NudgeOutcome.Cancelled
                                                         "Cancelled after dispatch"
                                                         ""
                                                         ""
                                             else
-                                                let dispatchedLease = { lease with Status = "dispatched" }
+                                                let dispatchedLease =
+                                                    { lease with
+                                                        Status = LeaseStatus.Dispatched }
 
                                                 do!
                                                     finishNudge
@@ -310,7 +313,7 @@ let agentEndHandler
                                                         root
                                                         sessionId
                                                         dispatchedLease
-                                                        "dispatched"
+                                                        NudgeOutcome.Dispatched
                                                         ""
                                                         (Wanxiangshu.Kernel.Nudge.toString action)
                                                         snapshot.nudgeAnchorKey
@@ -321,7 +324,7 @@ let agentEndHandler
                                                     root
                                                     sessionId
                                                     lease
-                                                    "failed"
+                                                    NudgeOutcome.Failed
                                                     "Send failed"
                                                     ""
                                                     ""

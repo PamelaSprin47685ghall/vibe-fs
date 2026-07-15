@@ -3,6 +3,7 @@ module Wanxiangshu.Opencode.NudgeTrigger
 open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Kernel
+open Wanxiangshu.Kernel.FallbackKernel.Types
 open Wanxiangshu.Kernel.Domain
 open Wanxiangshu.Kernel.Nudge
 open Wanxiangshu.Kernel.Nudge.Types
@@ -110,13 +111,13 @@ type NudgeTrigger
                         promise {
                             let current = fallbackRuntime.GetSessionOwner sessionIDStr
 
-                            if current <> "None" then
+                            if current <> SessionOwner.NoOwner then
                                 return current
                             elif not isTest then
-                                return "None"
+                                return SessionOwner.NoOwner
                             else
                                 match getClientFromPluginCtx ctx with
-                                | Error _ -> return "None"
+                                | Error _ -> return SessionOwner.NoOwner
                                 | Ok client ->
                                     let arg = box {| path = box {| id = sessionIDStr |} |}
                                     let! resp = invokeClient client "messages" arg
@@ -129,26 +130,30 @@ type NudgeTrigger
                                             let lastMsg = messagesArr.[messagesArr.Length - 1]
                                             let info = Dyn.get lastMsg "info"
                                             let role = Dyn.str info "role"
-                                            if role = "assistant" then return "Human" else return "None"
+
+                                            if role = "assistant" then
+                                                return SessionOwner.Human
+                                            else
+                                                return SessionOwner.NoOwner
                                         else
-                                            return "None"
+                                            return SessionOwner.NoOwner
                                     else
-                                        return "None"
+                                        return SessionOwner.NoOwner
                         }
 
                     let isForce = isForceStopped sessionIDStr
 
                     let origin =
-                        if owner = "Human" then
+                        if owner = SessionOwner.Human then
                             if isForce then
                                 TerminalOrigin.HumanTurnAborted
                             else
                                 TerminalOrigin.HumanTurnCompleted
-                        elif owner = "None" then
+                        elif owner = SessionOwner.NoOwner then
                             TerminalOrigin.Unknown
-                        elif owner = "Fallback" then
+                        elif owner = SessionOwner.Fallback then
                             TerminalOrigin.FallbackContinuationCompleted
-                        elif owner = "Compaction" then
+                        elif owner = SessionOwner.Compaction then
                             if
                                 fallbackRuntime.IsCompacted sessionIDStr
                                 && (isTest || fallbackRuntime.IsCompactionContinuationObserved sessionIDStr)
@@ -156,25 +161,34 @@ type NudgeTrigger
                                 TerminalOrigin.CompactionContinuationCompleted
                             else
                                 TerminalOrigin.Unknown
-                        elif owner = "Nudge" then
+                        elif owner = SessionOwner.Nudge then
                             TerminalOrigin.NudgeCompleted
-                        elif owner = "Title" then
+                        elif owner = SessionOwner.Title then
                             TerminalOrigin.TitleCompleted
                         else
                             TerminalOrigin.Unknown
 
-                    if owner = "Fallback" || owner = "Title" then
-                        fallbackRuntime.SetSessionOwner sessionIDStr "None"
-                    elif owner = "Nudge" then
+                    if owner = SessionOwner.Fallback || owner = SessionOwner.Title then
+                        fallbackRuntime.SetSessionOwner sessionIDStr SessionOwner.NoOwner
+                    elif owner = SessionOwner.Nudge then
                         match fallbackRuntime.TryGetPendingNudgeLease sessionIDStr with
                         | Some lease ->
                             let directory = pluginDirectoryFromCtx ctx
 
                             if directory <> "" then
-                                do! finishNudge fallbackRuntime directory sessionIDStr lease "settled" "completed" "" ""
-                        | None -> fallbackRuntime.SetSessionOwner sessionIDStr "None"
+                                do!
+                                    finishNudge
+                                        fallbackRuntime
+                                        directory
+                                        sessionIDStr
+                                        lease
+                                        NudgeOutcome.Settled
+                                        "completed"
+                                        ""
+                                        ""
+                        | None -> fallbackRuntime.SetSessionOwner sessionIDStr SessionOwner.NoOwner
                     elif
-                        owner = "Compaction"
+                        owner = SessionOwner.Compaction
                         && fallbackRuntime.IsCompacted sessionIDStr
                         && (isTest || fallbackRuntime.IsCompactionContinuationObserved sessionIDStr)
                     then

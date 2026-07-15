@@ -77,22 +77,22 @@ let private getCallIDs (msg: Message<'raw>) : string list =
     let rawCallIDs = getCallIDsFromRaw msg
     (partsCallIDs @ rawCallIDs) |> Seq.distinct |> Seq.toList
 
+let private isRealCallId (callID: string) : bool =
+    not (System.String.IsNullOrWhiteSpace callID)
+    && not (Wanxiangshu.Kernel.HostTools.isSynthCallId callID)
+    && not (callID.StartsWith "semble-")
+    && not (callID.StartsWith "caps-")
+    && not (callID.StartsWith "prefetch-")
+    && not (callID.StartsWith "internal-")
+
+let private getRealCallIds (m: Message<obj>) : string list =
+    m.parts
+    |> List.choose (fun p ->
+        match p with
+        | ToolPart(_, callID, _, _) when isRealCallId callID -> Some callID
+        | _ -> None)
+
 let tryInjectParallelToolPrompt (sessionID: string) (messages: Message<obj> list) : Message<obj> list =
-    let isRealCallId (callID: string) : bool =
-        not (System.String.IsNullOrWhiteSpace callID)
-        && not (Wanxiangshu.Kernel.HostTools.isSynthCallId callID)
-        && not (callID.StartsWith "semble-")
-        && not (callID.StartsWith "caps-")
-        && not (callID.StartsWith "prefetch-")
-        && not (callID.StartsWith "internal-")
-
-    let getRealCallIds (m: Message<obj>) : string list =
-        m.parts
-        |> List.choose (fun p ->
-            match p with
-            | ToolPart(_, callID, _, _) when isRealCallId callID -> Some callID
-            | _ -> None)
-
     let nativeMsgs = messages |> List.filter (fun m -> m.source = Native)
 
     let lastAssistantIdxOpt =
@@ -214,27 +214,68 @@ let private applyBacklogSlot
         let length = min segmentLength encoded.Length
         let segment = if length = 0 then [||] else encoded.[.. length - 1]
 
+        let backlogRevision = state.BacklogRevision
+
         encoded,
         { state with
             Backlog =
                 { EventCount = eventCount
-                  Segment = segment } }
+                  Segment = segment
+                  BacklogRevision = backlogRevision } }
 
-let private applyTopSlot (state: TransformState) (kind: TopSlotKind) (encoded: obj array) : obj array * TransformState =
-    match kind, state.Top with
+let private computeTopSlotKey
+    (plan: MessageTransformPlan)
+    (afterBacklog: Message<obj> list)
+    (afterBudget: Message<obj> list)
+    (afterPrompt: Message<obj> list)
+    : TopSlotKey =
+    if afterBudget.Length > afterBacklog.Length then
+        let storeEntry = Wanxiangshu.Shell.ContextBudgetStore.get plan.Scope plan.SessionID
+        let episodeId = storeEntry.EpisodeID
+        let syntheticId = storeEntry.StableSyntheticNudgeID |> Option.defaultValue ""
+        let contentVersion = storeEntry.NudgeCount
+        BudgetNudgeTop(episodeId, syntheticId, contentVersion)
+    elif afterPrompt.Length > afterBacklog.Length then
+        let nativeMsgs = afterBudget |> List.filter (fun m -> m.source = Native)
+
+        let lastAssistantIdxOpt =
+            nativeMsgs |> List.tryFindIndexBack (fun m -> m.info.role = Assistant)
+
+        match lastAssistantIdxOpt with
+        | Some lastIdx ->
+            let lastAssistantMsg = nativeMsgs.[lastIdx]
+            let realCallIDs = getRealCallIds lastAssistantMsg
+
+            match realCallIDs with
+            | targetCallID :: _ -> ParallelHintTop(targetCallID, lastAssistantMsg.info.id, 1)
+            | [] -> NoTop
+        | None -> NoTop
+    else
+        NoTop
+
+let private applyTopSlot (state: TransformState) (key: TopSlotKey) (encoded: obj array) : obj array * TransformState =
+    match key, state.Top with
     | NoTop, _ ->
-        encoded,
-        { state with
-            Top = { Kind = NoTop; Item = None } }
-    | _, { Kind = cachedKind; Item = Some item } when cachedKind = kind ->
-        encoded.[encoded.Length - 1] <- item
-        encoded, state
-    | _ ->
+        let budgetRevision = state.BudgetRevision
+
         encoded,
         { state with
             Top =
-                { Kind = kind
-                  Item = Some encoded.[encoded.Length - 1] } }
+                { Key = NoTop
+                  Item = None
+                  BudgetRevision = budgetRevision } }
+    | _, { Key = cachedKey; Item = Some item } when cachedKey = key ->
+        encoded.[encoded.Length - 1] <- item
+        encoded, state
+    | _ ->
+        let budgetRevision = state.BudgetRevision
+
+        encoded,
+        { state with
+            Top =
+                { Key = key
+                  Item = Some encoded.[encoded.Length - 1]
+                  BudgetRevision = budgetRevision } }
 
 let private prependCapsWithState
     (scope: RuntimeScope)
@@ -259,7 +300,25 @@ let private prependCapsWithState
         let state = get scope capsSessionID
 
         match state.Caps with
-        | Some prefix -> return Array.append prefix encoded
+        | Some capsSlot ->
+            match capsSlot.Segment with
+            | Some prefix -> return Array.append prefix encoded
+            | None ->
+                let! capsFiles = loadCaps ()
+                let result = buildCaps encoded capsFiles None
+                let prefixLen = result.Length - encoded.Length
+
+                if prefixLen > 0 then
+                    let prefix = result.[.. prefixLen - 1]
+                    let updatedCapsSlot = { capsSlot with Segment = Some prefix }
+
+                    set
+                        scope
+                        capsSessionID
+                        { state with
+                            Caps = Some updatedCapsSlot }
+
+                return result
         | None ->
             let! capsFiles = loadCaps ()
             let result = buildCaps encoded capsFiles None
@@ -267,7 +326,14 @@ let private prependCapsWithState
 
             if prefixLen > 0 then
                 let prefix = result.[.. prefixLen - 1]
-                set scope capsSessionID { state with Caps = Some prefix }
+
+                let capsSlot: CapsSlot =
+                    { Segment = Some prefix
+                      ScopeId = capsSessionID
+                      CapsRevision = state.CapsRevision
+                      PolicyVersion = state.PolicyVersion }
+
+                set scope capsSessionID { state with Caps = Some capsSlot }
 
             return result
     }
@@ -328,16 +394,10 @@ let runMessageTransformPipeline
                 else
                     encoded, get plan.Scope plan.SessionID
 
-            let topKind =
-                if afterBudget.Length > afterBacklog.Length then
-                    BudgetNudgeTop
-                elif afterPrompt.Length > afterBacklog.Length then
-                    ParallelHintTop
-                else
-                    NoTop
+            let topKey = computeTopSlotKey plan afterBacklog afterBudget afterPrompt
 
             let encodedWithTopSlot, stateAfterTop =
-                applyTopSlot stateAfterReencode topKind encodedAfterBacklogSlot
+                applyTopSlot stateAfterReencode topKey encodedAfterBacklogSlot
 
             set plan.Scope plan.SessionID stateAfterTop
 

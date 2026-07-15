@@ -154,14 +154,13 @@ let private nudgeBlockedByFallbackState (runtime: FallbackRuntimeState) (session
     let owner = runtime.GetSessionOwner sessionKey
 
     let fallbackOwnerActive =
-        owner = "Fallback" || owner = "Compaction" || owner = "Nudge"
+        owner = SessionOwner.Fallback
+        || owner = SessionOwner.Compaction
+        || owner = SessionOwner.Nudge
 
     let settledFallbackLease =
         match runtime.TryGetPendingLease sessionKey with
-        | Some lease ->
-            lease.Status = "settled"
-            || lease.Status = "cancelled"
-            || lease.Status = "invalidated"
+        | Some lease -> lease.Status = LeaseStatus.Settled || lease.Status = LeaseStatus.Cancelled
         | None -> false
 
     lifecycleTerminal
@@ -174,7 +173,7 @@ let finishNudge
     (workspaceRoot: string)
     (sessionKey: string)
     (lease: NudgeLease)
-    (outcome: string) // "failed", "cancelled", "dispatched", "settled"
+    (outcome: NudgeOutcome)
     (errorOrReason: string)
     (actionStr: string)
     (anchor: string)
@@ -182,11 +181,12 @@ let finishNudge
     promise {
         match runtime.TryGetPendingNudgeLease sessionKey with
         | Some nl when nl.NudgeID = lease.NudgeID ->
-            if outcome = "failed" then
+            match outcome with
+            | NudgeOutcome.Failed ->
                 do! appendNudgeFailedOrFail workspaceRoot sessionKey lease.NudgeID errorOrReason lease.NudgeOrdinal
-            elif outcome = "cancelled" then
+            | NudgeOutcome.Cancelled ->
                 do! appendNudgeCancelledOrFail workspaceRoot sessionKey lease.NudgeID errorOrReason lease.NudgeOrdinal
-            elif outcome = "dispatched" then
+            | NudgeOutcome.Dispatched ->
                 do!
                     appendNudgeDispatchedOrFail
                         workspaceRoot
@@ -195,15 +195,15 @@ let finishNudge
                         actionStr
                         anchor
                         lease.NudgeOrdinal
-            elif outcome = "settled" then
+            | NudgeOutcome.Settled ->
                 do! appendNudgeSettledOrFail workspaceRoot sessionKey lease.NudgeID errorOrReason lease.NudgeOrdinal
 
-            if outcome <> "dispatched" then
+            if outcome <> NudgeOutcome.Dispatched then
                 if runtime.TryClearPendingNudgeLease(sessionKey, lease.NudgeID) then
                     runtime.ClearActiveNudgeNonce sessionKey
 
-                    if runtime.GetSessionOwner sessionKey = "Nudge" then
-                        runtime.SetSessionOwner sessionKey "None"
+                    if runtime.GetSessionOwner sessionKey = SessionOwner.Nudge then
+                        runtime.SetSessionOwner sessionKey SessionOwner.NoOwner
 
                     runtime.SetNudgeActive sessionKey false
         | _ -> ()
@@ -268,11 +268,11 @@ let runNudgeFlowCore
                                   HumanTurnID = humanTurnId
                                   SessionGeneration = sessionGen
                                   CancelGeneration = cancelGen
-                                  Owner = "Nudge"
-                                  Status = "dispatch_started" }
+                                  Owner = SessionOwner.Nudge
+                                  Status = LeaseStatus.DispatchStarted }
 
                             fallbackRuntime.SetPendingNudgeLease(sessionKey, lease)
-                            fallbackRuntime.SetSessionOwner sessionKey "Nudge"
+                            fallbackRuntime.SetSessionOwner sessionKey SessionOwner.Nudge
                             fallbackRuntime.SetActiveNudgeNonce sessionKey nonce
 
                             let isLifecycleActive =
@@ -287,7 +287,7 @@ let runNudgeFlowCore
                                         workspaceRoot
                                         sessionKey
                                         lease
-                                        "cancelled"
+                                        NudgeOutcome.Cancelled
                                         (if fallbackRuntime.IsForceStopped sessionKey then
                                              "Force stopped"
                                          else
@@ -315,8 +315,8 @@ let runNudgeFlowCore
                                     lease.SessionGeneration = currentGen
                                     && lease.HumanTurnID = currentTurnId
                                     && lease.CancelGeneration = currentCancelGen
-                                    && lease.Owner = "Nudge"
-                                    && currentOwner = "Nudge"
+                                    && lease.Owner = SessionOwner.Nudge
+                                    && currentOwner = SessionOwner.Nudge
                                     && not (fallbackRuntime.IsForceStopped sessionKey)
                                     && (match fallbackRuntime.TryGetState sessionKey with
                                         | Some state -> state.Lifecycle = FallbackLifecycle.Active
@@ -331,14 +331,16 @@ let runNudgeFlowCore
                                             workspaceRoot
                                             sessionKey
                                             lease
-                                            "cancelled"
+                                            NudgeOutcome.Cancelled
                                             "Cancelled after dispatch"
                                             ""
                                             ""
                                 else
                                     match outcome with
                                     | Delivered ->
-                                        let dispatchedLease = { lease with Status = "dispatched" }
+                                        let dispatchedLease =
+                                            { lease with
+                                                Status = LeaseStatus.Dispatched }
 
                                         do!
                                             finishNudge
@@ -346,7 +348,7 @@ let runNudgeFlowCore
                                                 workspaceRoot
                                                 sessionKey
                                                 dispatchedLease
-                                                "dispatched"
+                                                NudgeOutcome.Dispatched
                                                 ""
                                                 (Wanxiangshu.Kernel.Nudge.toString action)
                                                 snapshot.nudgeAnchorKey
@@ -356,8 +358,8 @@ let runNudgeFlowCore
                                                 fallbackRuntime.TryTransitionPendingNudgeLease(
                                                     sessionKey,
                                                     lease.NudgeID,
-                                                    "dispatch_started",
-                                                    "dispatched"
+                                                    LeaseStatus.DispatchStarted,
+                                                    LeaseStatus.Dispatched
                                                 )
                                             )
                                         then
@@ -369,7 +371,7 @@ let runNudgeFlowCore
                                                     workspaceRoot
                                                     sessionKey
                                                     lease
-                                                    "cancelled"
+                                                    NudgeOutcome.Cancelled
                                                     "Cancelled after dispatch"
                                                     ""
                                                     ""
@@ -380,7 +382,7 @@ let runNudgeFlowCore
                                                 workspaceRoot
                                                 sessionKey
                                                 lease
-                                                "failed"
+                                                NudgeOutcome.Failed
                                                 "Session busy"
                                                 ""
                                                 ""
@@ -391,7 +393,7 @@ let runNudgeFlowCore
                                                 workspaceRoot
                                                 sessionKey
                                                 lease
-                                                "cancelled"
+                                                NudgeOutcome.Cancelled
                                                 "Aborted by client"
                                                 ""
                                                 ""
@@ -402,7 +404,7 @@ let runNudgeFlowCore
                                                 workspaceRoot
                                                 sessionKey
                                                 lease
-                                                "failed"
+                                                NudgeOutcome.Failed
                                                 "Send failed"
                                                 ""
                                                 ""

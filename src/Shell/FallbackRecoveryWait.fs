@@ -11,6 +11,11 @@ let isRecoverySettled (runtime: FallbackRuntimeState) (sessionID: string) : bool
     | Some true -> true
     | _ ->
         match runtime.TryGetState sessionID with
+        | Some st when
+            st.Lifecycle = FallbackLifecycle.Cancelled
+            || st.Lifecycle = FallbackLifecycle.TaskComplete
+            ->
+            true
         | Some st -> st.Phase = FallbackPhase.Exhausted
         | None -> false
 

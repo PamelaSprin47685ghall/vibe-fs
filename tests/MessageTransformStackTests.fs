@@ -109,7 +109,10 @@ let capsBuiltOnceReferenceStable () =
 
         // Verify the CapsSlot is actually populated
         match getCapsSlot scope "stack-caps-test" with
-        | Some slot -> check "caps prefix is the stored object" (System.Object.ReferenceEquals(slot.[0], capsObj))
+        | Some capsSlot ->
+            match capsSlot.Segment with
+            | Some seg -> check "caps prefix is the stored object" (System.Object.ReferenceEquals(seg.[0], capsObj))
+            | None -> check "CapsSlot.Segment should be populated" false
         | None -> check "CapsSlot should be populated" false
     }
 

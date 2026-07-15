@@ -26,6 +26,7 @@ open Wanxiangshu.Shell.ChildAgentRegistry
 open Wanxiangshu.Shell.OpencodeHookInputCodec
 open Wanxiangshu.Shell.ChatTransformOutputCodec
 open Wanxiangshu.Shell.MessageTransformCommon
+open Wanxiangshu.Kernel.FallbackKernel.Types
 
 open Wanxiangshu.Shell.JsArrayMutate
 open Wanxiangshu.Shell.SembleMcp
@@ -438,7 +439,7 @@ let compactingTransform
 
             match fallbackRuntime with
             | Some fr ->
-                fr.SetSessionOwner sessionID "Compaction"
+                fr.SetSessionOwner sessionID SessionOwner.Compaction
                 fr.SetActiveCompactionId(sessionID, compactionId, compactionOrdinal)
                 fr.SetCompacted sessionID false
                 fr.SetCompactionContinuationObserved sessionID false
@@ -458,7 +459,7 @@ let compactingTransform
 
                 if messagesArr.Length > 0 then
                     let messagesList = MessagingCodec.decodeMessages messagesArr
-                    let cleaned = Messaging.stripSyntheticBySource messagesList
+                    let cleaned = messagesList
                     let backlog = backlogSession.GetOrRebuildBacklog(sessionID, cleaned)
                     let guidGen () = string (runtimeScope.RandomGen())
 

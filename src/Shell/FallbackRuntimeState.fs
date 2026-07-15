@@ -12,10 +12,10 @@ type PendingLease =
       SessionGeneration: int
       HumanTurnID: string
       CancelGeneration: int
-      Owner: string
+      Owner: SessionOwner
       Model: FallbackModel
       PromptText: string option
-      Status: string }
+      Status: LeaseStatus }
 
 type NudgeLease =
     { NudgeID: string
@@ -24,8 +24,8 @@ type NudgeLease =
       HumanTurnID: string
       SessionGeneration: int
       CancelGeneration: int
-      Owner: string
-      Status: string }
+      Owner: SessionOwner
+      Status: LeaseStatus }
 
 let private freshState: SessionFallbackState =
     { Phase = FallbackPhase.Idle
@@ -52,7 +52,7 @@ type FallbackRuntimeState() =
     let mutable cancelGenerations = Map.ofList<string, int> []
     let mutable activeContinuationGens = Map.ofList<string, int> []
     let mutable activeContinuationCancelGens = Map.ofList<string, int> []
-    let mutable sessionOwners = Map.ofList<string, string> []
+    let mutable sessionOwners = Map.ofList<string, SessionOwner> []
     let mutable pendingLeases = Map.empty<string, obj>
     let mutable pendingNudgeLeases = Map.empty<string, NudgeLease>
     let mutable activeCompactionIds = Map.empty<string, string>
@@ -120,8 +120,8 @@ type FallbackRuntimeState() =
                 activeNudgeNonces <- Map.remove sessionID activeNudgeNonces
 
                 match this.GetSessionOwner sessionID with
-                | "Fallback"
-                | "Nudge" -> this.SetSessionOwner sessionID "None"
+                | SessionOwner.Fallback
+                | SessionOwner.Nudge -> this.SetSessionOwner sessionID SessionOwner.NoOwner
                 | _ -> ()
 
                 { state with
@@ -276,7 +276,7 @@ type FallbackRuntimeState() =
         | None -> false
 
     member this.TryTransitionPendingLease
-        (sessionID: string, expectedID: string, expectedStatus: string, nextStatus: string)
+        (sessionID: string, expectedID: string, expectedStatus: LeaseStatus, nextStatus: LeaseStatus)
         : bool =
         match Map.tryFind sessionID pendingLeases with
         | Some leaseObj ->
@@ -288,8 +288,8 @@ type FallbackRuntimeState() =
                 && lease.SessionGeneration = this.GetSessionGeneration(sessionID)
                 && lease.HumanTurnID = this.GetHumanTurnId(sessionID)
                 && lease.CancelGeneration = this.GetCancelGeneration(sessionID)
-                && lease.Owner = "Fallback"
-                && this.GetSessionOwner(sessionID) = "Fallback"
+                && lease.Owner = SessionOwner.Fallback
+                && this.GetSessionOwner(sessionID) = SessionOwner.Fallback
                 && (match this.TryGetState sessionID with
                     | Some state -> state.Lifecycle = FallbackLifecycle.Active
                     | None -> false)
@@ -318,14 +318,14 @@ type FallbackRuntimeState() =
             activeNudgeNonces <- Map.remove sessionID activeNudgeNonces
             this.SetNudgeActive sessionID false
 
-            if this.GetSessionOwner sessionID = "Nudge" then
-                this.SetSessionOwner sessionID "None"
+            if this.GetSessionOwner sessionID = SessionOwner.Nudge then
+                this.SetSessionOwner sessionID SessionOwner.NoOwner
 
             true
         | _ -> false
 
     member this.TryTransitionPendingNudgeLease
-        (sessionID: string, expectedID: string, expectedStatus: string, nextStatus: string)
+        (sessionID: string, expectedID: string, expectedStatus: LeaseStatus, nextStatus: LeaseStatus)
         : bool =
         match Map.tryFind sessionID pendingNudgeLeases with
         | Some lease ->
@@ -335,8 +335,8 @@ type FallbackRuntimeState() =
                 && lease.SessionGeneration = this.GetSessionGeneration(sessionID)
                 && lease.HumanTurnID = this.GetHumanTurnId(sessionID)
                 && lease.CancelGeneration = this.GetCancelGeneration(sessionID)
-                && lease.Owner = "Nudge"
-                && this.GetSessionOwner(sessionID) = "Nudge"
+                && lease.Owner = SessionOwner.Nudge
+                && this.GetSessionOwner(sessionID) = SessionOwner.Nudge
                 && (match this.TryGetState sessionID with
                     | Some state -> state.Lifecycle = FallbackLifecycle.Active
                     | None -> false)
@@ -383,7 +383,7 @@ type FallbackRuntimeState() =
             compactedSessions <- Set.remove sessionID compactedSessions
             compactionContinuationObserved <- Set.remove sessionID compactionContinuationObserved
 
-            if this.GetSessionOwner sessionID = "Compaction" then
+            if this.GetSessionOwner sessionID = SessionOwner.Compaction then
                 this.ClearSessionOwner sessionID
 
             true
@@ -534,11 +534,11 @@ type FallbackRuntimeState() =
         injectedModels <- Map.remove sessionID injectedModels
         injectedAts <- Map.remove sessionID injectedAts
 
-    member _.SetSessionOwner (sessionID: string) (owner: string) : unit =
+    member _.SetSessionOwner (sessionID: string) (owner: SessionOwner) : unit =
         sessionOwners <- Map.add sessionID owner sessionOwners
 
-    member _.GetSessionOwner(sessionID: string) : string =
-        Map.tryFind sessionID sessionOwners |> Option.defaultValue "None"
+    member _.GetSessionOwner(sessionID: string) : SessionOwner =
+        Map.tryFind sessionID sessionOwners |> Option.defaultValue SessionOwner.NoOwner
 
     member _.ClearSessionOwner(sessionID: string) : unit =
         sessionOwners <- Map.remove sessionID sessionOwners

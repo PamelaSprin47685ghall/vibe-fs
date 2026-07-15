@@ -21,6 +21,7 @@ open Wanxiangshu.Mux.CapsCodec
 open Wanxiangshu.Shell.ReviewRuntime
 open Wanxiangshu.Shell.JsArrayMutate
 open Wanxiangshu.Shell.MessageTransformCommon
+open Wanxiangshu.Kernel.FallbackKernel.Types
 open Wanxiangshu.Shell.MuxHookInputCodec
 open Wanxiangshu.Shell.MuxWorkspaceCodec
 open Wanxiangshu.Shell.ChatTransformOutputCodec
@@ -171,7 +172,7 @@ let compactingTransform
         if messagesArr.Length > 0 then
             let sessionID = decoded.SessionID
             let typedMessages = decodeMessages sessionID messagesArr
-            let cleaned = stripSyntheticBySource typedMessages
+            let cleaned = typedMessages
             let backlog = backlogSession.GetOrRebuildBacklog(sessionID, cleaned)
 
             let guidGen () =
@@ -215,7 +216,7 @@ let compactingTransform
 
             match fallbackRuntime with
             | Some fr ->
-                fr.SetSessionOwner sessionID "Compaction"
+                fr.SetSessionOwner sessionID SessionOwner.Compaction
                 fr.SetActiveCompactionId(sessionID, compactionId, compactionOrdinal)
             | None -> ()
 

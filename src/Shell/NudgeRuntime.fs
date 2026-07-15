@@ -34,7 +34,7 @@ type NudgeRuntime
             | Ignore -> return ()
             | StreamEnd(workspaceId, stopReason, lastMsg) ->
                 let reason = FinishReason.fromString stopReason
-                let isNudgeOwner = fallbackRuntime.GetSessionOwner workspaceId = "Nudge"
+                let isNudgeOwner = fallbackRuntime.GetSessionOwner workspaceId = SessionOwner.Nudge
 
                 if
                     not (Dyn.isNullish helpers)
@@ -50,11 +50,11 @@ type NudgeRuntime
                                     workspaceDirectory
                                     workspaceId
                                     lease
-                                    "settled"
+                                    NudgeOutcome.Settled
                                     "completed"
                                     ""
                                     ""
-                        | None -> fallbackRuntime.SetSessionOwner workspaceId "None"
+                        | None -> fallbackRuntime.SetSessionOwner workspaceId SessionOwner.NoOwner
 
                     if not isNudgeOwner || isReviewLoopActive workspaceId then
                         let! newState =

@@ -7,6 +7,7 @@ open Wanxiangshu.Shell.ReviewRuntime
 open Wanxiangshu.Shell.ReviewReplaySync
 open Wanxiangshu.Shell.SessionProjectionStore
 open Wanxiangshu.Shell.RuntimeScope
+open Wanxiangshu.Kernel.FallbackKernel.Types
 
 let restoreFallbackRuntimeState
     (scope: RuntimeScope)
@@ -74,7 +75,19 @@ let restoreFallbackRuntimeState
         rt.UpdateState sid updatedFallbackState
 
         match state.SessionOwner with
-        | Some o -> rt.SetSessionOwner sid o
+        | Some o ->
+            let ownerObj =
+                match o with
+                | "NoOwner"
+                | "None" -> SessionOwner.NoOwner
+                | "Human" -> SessionOwner.Human
+                | "Fallback" -> SessionOwner.Fallback
+                | "Nudge" -> SessionOwner.Nudge
+                | "Compaction" -> SessionOwner.Compaction
+                | "Title" -> SessionOwner.Title
+                | _ -> SessionOwner.NoOwner
+
+            rt.SetSessionOwner sid ownerObj
         | None -> ()
 
         match state.PendingLease with
@@ -92,16 +105,41 @@ let restoreFallbackRuntimeState
                       ReasoningEffort = None
                       Thinking = false }
 
+            let leaseOwner =
+                match lease.Owner with
+                | "NoOwner"
+                | "None" -> SessionOwner.NoOwner
+                | "Human" -> SessionOwner.Human
+                | "Fallback" -> SessionOwner.Fallback
+                | "Nudge" -> SessionOwner.Nudge
+                | "Compaction" -> SessionOwner.Compaction
+                | "Title" -> SessionOwner.Title
+                | _ -> SessionOwner.NoOwner
+
+            let leaseStatus =
+                match lease.Status with
+                | "requested"
+                | "Requested" -> LeaseStatus.Requested
+                | "dispatch_started"
+                | "DispatchStarted" -> LeaseStatus.DispatchStarted
+                | "dispatched"
+                | "Dispatched" -> LeaseStatus.Dispatched
+                | "running"
+                | "Running" -> LeaseStatus.Running
+                | "cancelled"
+                | "Cancelled" -> LeaseStatus.Cancelled
+                | _ -> LeaseStatus.Requested
+
             let pendingLease: Wanxiangshu.Shell.FallbackRuntimeState.PendingLease =
                 { ContinuationID = lease.ContinuationID
                   ContinuationOrdinal = lease.ContinuationOrdinal
                   SessionGeneration = lease.SessionGeneration
                   HumanTurnID = lease.HumanTurnID
                   CancelGeneration = lease.CancelGeneration
-                  Owner = lease.Owner
+                  Owner = leaseOwner
                   Model = modelObj
                   PromptText = lease.PromptText
-                  Status = lease.Status }
+                  Status = leaseStatus }
 
             rt.SetPendingLease(sid, pendingLease)
         | None -> rt.ClearPendingLease sid
@@ -116,6 +154,20 @@ let restoreFallbackRuntimeState
 
         match state.PendingNudgeLease with
         | Some nl ->
+            let nudgeStatus =
+                match nl.Status with
+                | "requested"
+                | "Requested" -> LeaseStatus.Requested
+                | "dispatch_started"
+                | "DispatchStarted" -> LeaseStatus.DispatchStarted
+                | "dispatched"
+                | "Dispatched" -> LeaseStatus.Dispatched
+                | "running"
+                | "Running" -> LeaseStatus.Running
+                | "cancelled"
+                | "Cancelled" -> LeaseStatus.Cancelled
+                | _ -> LeaseStatus.Requested
+
             let lease: Wanxiangshu.Shell.FallbackRuntimeState.NudgeLease =
                 { NudgeID = nl.NudgeID
                   NudgeOrdinal = nl.NudgeOrdinal
@@ -123,8 +175,8 @@ let restoreFallbackRuntimeState
                   HumanTurnID = nl.HumanTurnID
                   SessionGeneration = nl.SessionGeneration
                   CancelGeneration = nl.CancelGeneration
-                  Owner = "Nudge"
-                  Status = nl.Status }
+                  Owner = SessionOwner.Nudge
+                  Status = nudgeStatus }
 
             rt.SetPendingNudgeLease(sid, lease)
         | None -> rt.ClearPendingNudgeLease sid

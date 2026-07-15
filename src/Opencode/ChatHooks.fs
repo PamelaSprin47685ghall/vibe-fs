@@ -3,6 +3,7 @@ module Wanxiangshu.Opencode.ChatHooks
 open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Kernel
+open Wanxiangshu.Kernel.FallbackKernel.Types
 open Wanxiangshu.Shell
 
 open Wanxiangshu.Kernel.Config
@@ -109,9 +110,9 @@ let chatMessageFor
                     else
                         match fr.TryGetPendingLease sessionIDStr with
                         | Some lease when
-                            (lease.Status = "dispatch_started"
-                             || lease.Status = "dispatched"
-                             || lease.Status = "running")
+                            (lease.Status = LeaseStatus.DispatchStarted
+                             || lease.Status = LeaseStatus.Dispatched
+                             || lease.Status = LeaseStatus.Running)
                             && lease.ContinuationID = nonce
                             ->
                             true

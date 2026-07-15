@@ -27,6 +27,7 @@ type SessionOwner =
     | Fallback
     | Nudge
     | Compaction
+    | Title
 
 [<RequireQualifiedAccess>]
 /// Lifecycle state of a pending continuation or nudge lease.
@@ -36,12 +37,21 @@ type LeaseStatus =
     | Dispatched
     | Running
     | Cancelled
+    | Settled
 
 [<RequireQualifiedAccess>]
 /// Terminal result emitted when a continuation lease is finished.
 type ContinuationOutcome =
     | Failed
     | Cancelled
+    | Settled
+
+[<RequireQualifiedAccess>]
+/// Terminal result emitted when a nudge lease is finished.
+type NudgeOutcome =
+    | Failed
+    | Cancelled
+    | Dispatched
     | Settled
 
 /// Per-agent and global fallback policy.

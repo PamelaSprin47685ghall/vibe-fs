@@ -83,7 +83,7 @@ type ContinuationIntent =
     | PropagateFailureIntent
 
 let verifyLeaseWithStatus
-    (expectedStatus: string)
+    (expectedStatus: LeaseStatus)
     (runtime: FallbackRuntimeState)
     (sessionID: string)
     (lease: PendingLease)
@@ -100,8 +100,8 @@ let verifyLeaseWithStatus
         lease.SessionGeneration = currentGen
         && lease.HumanTurnID = currentTurnId
         && lease.CancelGeneration = currentCancelGen
-        && lease.Owner = "Fallback"
-        && currentOwner = "Fallback"
+        && lease.Owner = SessionOwner.Fallback
+        && currentOwner = SessionOwner.Fallback
         && not (runtime.IsForceStopped sessionID)
         && runtime.GetActiveCompactionId sessionID = ""
         && not (runtime.IsCompacted sessionID)
@@ -115,14 +115,14 @@ let verifyLeaseWithStatus
     matches
 
 let verifyLease (runtime: FallbackRuntimeState) (sessionID: string) (lease: PendingLease) : bool =
-    verifyLeaseWithStatus "requested" runtime sessionID lease
+    verifyLeaseWithStatus LeaseStatus.Requested runtime sessionID lease
 
 let finishContinuation
     (runtime: FallbackRuntimeState)
     (workspaceRoot: string)
     (sessionID: string)
     (lease: PendingLease)
-    (outcome: string) // "failed", "cancelled", "settled"
+    (outcome: ContinuationOutcome)
     (errorOrReason: string)
     : JS.Promise<unit> =
     promise {
@@ -132,7 +132,8 @@ let finishContinuation
             | _ -> false
 
         if isLeaseStillActive then
-            if outcome = "failed" then
+            match outcome with
+            | ContinuationOutcome.Failed ->
                 do!
                     appendContinuationFailedOrFail
                         workspaceRoot
@@ -140,7 +141,7 @@ let finishContinuation
                         lease.ContinuationID
                         errorOrReason
                         lease.ContinuationOrdinal
-            elif outcome = "cancelled" then
+            | ContinuationOutcome.Cancelled ->
                 do!
                     appendContinuationCancelledOrFail
                         workspaceRoot
@@ -148,7 +149,7 @@ let finishContinuation
                         lease.ContinuationID
                         errorOrReason
                         lease.ContinuationOrdinal
-            elif outcome = "settled" then
+            | ContinuationOutcome.Settled ->
                 do!
                     appendContinuationSettledOrFail
                         workspaceRoot
@@ -162,8 +163,8 @@ let finishContinuation
         let cleared = runtime.TryClearPendingLease(sessionID, lease.ContinuationID)
 
         if cleared then
-            if runtime.GetSessionOwner sessionID = "Fallback" then
-                runtime.SetSessionOwner sessionID "None"
+            if runtime.GetSessionOwner sessionID = SessionOwner.Fallback then
+                runtime.SetSessionOwner sessionID SessionOwner.NoOwner
 
             runtime.SetMainContinuationAwaitingStart sessionID false
 
@@ -172,7 +173,7 @@ let finishContinuation
 
 let ensureActiveAndOwner (runtime: FallbackRuntimeState) (sessionID: string) (lease: PendingLease) : bool =
     let state = runtime.GetOrCreateState sessionID
-    let isOwner = runtime.GetSessionOwner sessionID = "Fallback"
+    let isOwner = runtime.GetSessionOwner sessionID = SessionOwner.Fallback
     let isLifecycleActive = state.Lifecycle = FallbackLifecycle.Active
     let isNotForceStopped = not (runtime.IsForceStopped sessionID)
 
@@ -187,7 +188,7 @@ let ensureActiveAndOwner (runtime: FallbackRuntimeState) (sessionID: string) (le
         runtime.GetCancelGeneration sessionID = lease.CancelGeneration
 
     isOwner
-    && lease.Owner = "Fallback"
+    && lease.Owner = SessionOwner.Fallback
     && isLifecycleActive
     && isNotForceStopped
     && isNotCompacting
@@ -211,10 +212,10 @@ let executeContinuationIntent
                   SessionGeneration = gen
                   HumanTurnID = turnId
                   CancelGeneration = cancelGen
-                  Owner = "Fallback"
+                  Owner = SessionOwner.Fallback
                   Model = model
                   PromptText = None
-                  Status = "requested" }
+                  Status = LeaseStatus.Requested }
 
             if
                 verifyLease runtime sessionID lease
@@ -233,8 +234,8 @@ let executeContinuationIntent
                         runtime.TryTransitionPendingLease(
                             sessionID,
                             lease.ContinuationID,
-                            "requested",
-                            "dispatch_started"
+                            LeaseStatus.Requested,
+                            LeaseStatus.DispatchStarted
                         )
 
                     if not isLeaseStillValid then
@@ -246,12 +247,13 @@ let executeContinuationIntent
                                 workspaceRoot
                                 sessionID
                                 lease
-                                "cancelled"
+                                ContinuationOutcome.Cancelled
                                 "Lease invalid at dispatch"
                     else
                         do! executor.SendContinue(sessionID, model, continuationID)
 
-                        let isValid = verifyLeaseWithStatus "dispatch_started" runtime sessionID lease
+                        let isValid =
+                            verifyLeaseWithStatus LeaseStatus.DispatchStarted runtime sessionID lease
 
                         if not isValid then
                             do! executor.AbortRun sessionID
@@ -262,7 +264,7 @@ let executeContinuationIntent
                                     workspaceRoot
                                     sessionID
                                     lease
-                                    "cancelled"
+                                    ContinuationOutcome.Cancelled
                                     "Cancelled after dispatch"
                         else
 
@@ -288,8 +290,8 @@ let executeContinuationIntent
                                     runtime.TryTransitionPendingLease(
                                         sessionID,
                                         lease.ContinuationID,
-                                        "dispatch_started",
-                                        "dispatched"
+                                        LeaseStatus.DispatchStarted,
+                                        LeaseStatus.Dispatched
                                     )
                                 )
                             then
@@ -301,15 +303,22 @@ let executeContinuationIntent
                                         workspaceRoot
                                         sessionID
                                         lease
-                                        "cancelled"
+                                        ContinuationOutcome.Cancelled
                                         "Cancelled after dispatch"
                             else
                                 runtime.SetInjectedAt sessionID atMs
                                 runtime.SetInjectedModel sessionID model
                 with ex ->
-                    do! finishContinuation runtime workspaceRoot sessionID lease "failed" ex.Message
+                    do! finishContinuation runtime workspaceRoot sessionID lease ContinuationOutcome.Failed ex.Message
             else
-                do! finishContinuation runtime workspaceRoot sessionID lease "cancelled" "Lease validation failed"
+                do!
+                    finishContinuation
+                        runtime
+                        workspaceRoot
+                        sessionID
+                        lease
+                        ContinuationOutcome.Cancelled
+                        "Lease validation failed"
 
         | RecoverWithPromptIntent(model, promptText, agent, turnId, gen, cancelGen, continuationID, continuationOrdinal) ->
             let lease =
@@ -318,10 +327,10 @@ let executeContinuationIntent
                   SessionGeneration = gen
                   HumanTurnID = turnId
                   CancelGeneration = cancelGen
-                  Owner = "Fallback"
+                  Owner = SessionOwner.Fallback
                   Model = model
                   PromptText = Some promptText
-                  Status = "requested" }
+                  Status = LeaseStatus.Requested }
 
             if
                 verifyLease runtime sessionID lease
@@ -340,8 +349,8 @@ let executeContinuationIntent
                         runtime.TryTransitionPendingLease(
                             sessionID,
                             lease.ContinuationID,
-                            "requested",
-                            "dispatch_started"
+                            LeaseStatus.Requested,
+                            LeaseStatus.DispatchStarted
                         )
 
                     if not isLeaseStillValid then
@@ -353,12 +362,13 @@ let executeContinuationIntent
                                 workspaceRoot
                                 sessionID
                                 lease
-                                "cancelled"
+                                ContinuationOutcome.Cancelled
                                 "Lease invalid at dispatch"
                     else
                         do! executor.RecoverWithPrompt(sessionID, model, promptText, continuationID)
 
-                        let isValid = verifyLeaseWithStatus "dispatch_started" runtime sessionID lease
+                        let isValid =
+                            verifyLeaseWithStatus LeaseStatus.DispatchStarted runtime sessionID lease
 
                         if not isValid then
                             do! executor.AbortRun sessionID
@@ -369,7 +379,7 @@ let executeContinuationIntent
                                     workspaceRoot
                                     sessionID
                                     lease
-                                    "cancelled"
+                                    ContinuationOutcome.Cancelled
                                     "Cancelled after dispatch"
                         else
 
@@ -395,8 +405,8 @@ let executeContinuationIntent
                                     runtime.TryTransitionPendingLease(
                                         sessionID,
                                         lease.ContinuationID,
-                                        "dispatch_started",
-                                        "dispatched"
+                                        LeaseStatus.DispatchStarted,
+                                        LeaseStatus.Dispatched
                                     )
                                 )
                             then
@@ -408,15 +418,22 @@ let executeContinuationIntent
                                         workspaceRoot
                                         sessionID
                                         lease
-                                        "cancelled"
+                                        ContinuationOutcome.Cancelled
                                         "Cancelled after dispatch"
                             else
                                 runtime.SetInjectedAt sessionID atMs
                                 runtime.SetInjectedModel sessionID model
                 with ex ->
-                    do! finishContinuation runtime workspaceRoot sessionID lease "failed" ex.Message
+                    do! finishContinuation runtime workspaceRoot sessionID lease ContinuationOutcome.Failed ex.Message
             else
-                do! finishContinuation runtime workspaceRoot sessionID lease "cancelled" "Lease validation failed"
+                do!
+                    finishContinuation
+                        runtime
+                        workspaceRoot
+                        sessionID
+                        lease
+                        ContinuationOutcome.Cancelled
+                        "Lease validation failed"
 
         | PropagateFailureIntent -> do! executor.PropagateFailure sessionID
     }
@@ -578,10 +595,7 @@ let handleEvent
 
             let settledFallbackLease =
                 match runtime.TryGetPendingLease sessionID with
-                | Some lease ->
-                    lease.Status = "settled"
-                    || lease.Status = "cancelled"
-                    || lease.Status = "invalidated"
+                | Some lease -> lease.Status = LeaseStatus.Settled || lease.Status = LeaseStatus.Cancelled
                 | None -> false
 
             // Terminal fallback state and settled leases are sticky.  A
@@ -597,7 +611,7 @@ let handleEvent
                       State = currentState },
                     None
             elif evt = FallbackEvent.NewUserMessage then
-                if runtime.GetSessionOwner sessionID = "Compaction" then
+                if runtime.GetSessionOwner sessionID = SessionOwner.Compaction then
                     let activeComp = runtime.GetActiveCompactionId sessionID
                     let settleInfo = runtime.TryGetSettleInfo(sessionID, activeComp)
 
@@ -614,7 +628,14 @@ let handleEvent
                 if msgId = "" || msgId <> lastMsgId then
                     match runtime.TryGetPendingLease sessionID with
                     | Some lease ->
-                        do! finishContinuation runtime workspaceRoot sessionID lease "cancelled" "New user message"
+                        do!
+                            finishContinuation
+                                runtime
+                                workspaceRoot
+                                sessionID
+                                lease
+                                ContinuationOutcome.Cancelled
+                                "New user message"
                     | None -> ()
 
                     match runtime.TryGetPendingNudgeLease sessionID with
@@ -634,7 +655,7 @@ let handleEvent
                     runtime.SetChain sessionID []
                     runtime.ClearModel sessionID
                     runtime.ClearInjected sessionID
-                    runtime.SetSessionOwner sessionID "Human"
+                    runtime.SetSessionOwner sessionID SessionOwner.Human
                     let turnId = runtime.IncrementHumanTurnId sessionID
                     runtime.SetLastHumanMessageId sessionID msgId
                     runtime.RemoveForceStopped sessionID
@@ -747,7 +768,14 @@ let handleEvent
 
                         match runtime.TryGetPendingLease sessionID with
                         | Some lease ->
-                            do! finishContinuation runtime workspaceRoot sessionID lease "cancelled" "User aborted"
+                            do!
+                                finishContinuation
+                                    runtime
+                                    workspaceRoot
+                                    sessionID
+                                    lease
+                                    ContinuationOutcome.Cancelled
+                                    "User aborted"
                         | None -> ()
 
                         match runtime.TryGetPendingNudgeLease sessionID with
@@ -770,14 +798,26 @@ let handleEvent
 
                     if evt = FallbackEvent.SessionBusy then
                         match runtime.TryGetPendingLease sessionID with
-                        | Some lease when lease.Status = "dispatch_started" || lease.Status = "dispatched" ->
-                            let runningLease = { lease with Status = "running" }
+                        | Some lease when
+                            lease.Status = LeaseStatus.DispatchStarted
+                            || lease.Status = LeaseStatus.Dispatched
+                            ->
+                            let runningLease =
+                                { lease with
+                                    Status = LeaseStatus.Running }
+
                             runtime.SetPendingLease(sessionID, runningLease)
                         | _ -> ()
 
                         match runtime.TryGetPendingNudgeLease sessionID with
-                        | Some lease when lease.Status = "dispatch_started" || lease.Status = "dispatched" ->
-                            let runningLease = { lease with Status = "running" }
+                        | Some lease when
+                            lease.Status = LeaseStatus.DispatchStarted
+                            || lease.Status = LeaseStatus.Dispatched
+                            ->
+                            let runningLease =
+                                { lease with
+                                    Status = LeaseStatus.Running }
+
                             runtime.SetPendingNudgeLease(sessionID, runningLease)
                         | _ -> ()
 
@@ -796,7 +836,7 @@ let handleEvent
                             match action with
                             | FallbackAction.DoNothing -> return finalState, None
                             | FallbackAction.SendContinue model ->
-                                runtime.SetSessionOwner sessionID "Fallback"
+                                runtime.SetSessionOwner sessionID SessionOwner.Fallback
                                 let atMs = getTimestampMs ()
                                 let agent = runtime.GetAgentName sessionID
 
@@ -820,10 +860,10 @@ let handleEvent
                                       SessionGeneration = currentGen
                                       HumanTurnID = runtime.GetHumanTurnId sessionID
                                       CancelGeneration = currentCancelGen
-                                      Owner = "Fallback"
+                                      Owner = SessionOwner.Fallback
                                       Model = model
                                       PromptText = None
-                                      Status = "requested" }
+                                      Status = LeaseStatus.Requested }
 
                                 runtime.SetPendingLease(sessionID, lease)
 
@@ -855,7 +895,7 @@ let handleEvent
                                 return finalState, Some intent
 
                             | FallbackAction.RecoverWithPrompt(model, promptText) ->
-                                runtime.SetSessionOwner sessionID "Fallback"
+                                runtime.SetSessionOwner sessionID SessionOwner.Fallback
                                 runtime.SetMainContinuationAwaitingStart sessionID true
                                 let currentGen = runtime.GetSessionGeneration sessionID
                                 let currentCancelGen = runtime.GetCancelGeneration sessionID
@@ -871,10 +911,10 @@ let handleEvent
                                       SessionGeneration = currentGen
                                       HumanTurnID = runtime.GetHumanTurnId sessionID
                                       CancelGeneration = currentCancelGen
-                                      Owner = "Fallback"
+                                      Owner = SessionOwner.Fallback
                                       Model = model
                                       PromptText = Some promptText
-                                      Status = "requested" }
+                                      Status = LeaseStatus.Requested }
 
                                 runtime.SetPendingLease(sessionID, lease)
 
@@ -940,7 +980,7 @@ let handleEvent
                                             let currentCancelGen = runtime.GetCancelGeneration sessionID
                                             runtime.SetActiveContinuationGeneration sessionID currentGen
                                             runtime.SetActiveContinuationCancelGeneration sessionID currentCancelGen
-                                            runtime.SetSessionOwner sessionID "Fallback"
+                                            runtime.SetSessionOwner sessionID SessionOwner.Fallback
 
                                             let continuationID = System.Guid.NewGuid().ToString("N")
                                             let continuationOrdinal = runtime.IncrementContinuationOrdinal sessionID
@@ -951,10 +991,10 @@ let handleEvent
                                                   SessionGeneration = currentGen
                                                   HumanTurnID = runtime.GetHumanTurnId sessionID
                                                   CancelGeneration = currentCancelGen
-                                                  Owner = "Fallback"
+                                                  Owner = SessionOwner.Fallback
                                                   Model = model
                                                   PromptText = Some promptText
-                                                  Status = "requested" }
+                                                  Status = LeaseStatus.Requested }
 
                                             runtime.SetPendingLease(sessionID, lease)
 
@@ -1031,7 +1071,7 @@ let handleEvent
                     if isPostTerminal then
                         match runtime.TryGetPendingLease sessionID with
                         | Some lease ->
-                            if lease.Status <> "cancelled" then
+                            if lease.Status <> LeaseStatus.Cancelled then
                                 do!
                                     appendContinuationSettledOrFail
                                         workspaceRoot
@@ -1043,8 +1083,8 @@ let handleEvent
                                         lease.ContinuationOrdinal
 
                             if runtime.TryClearPendingLease(sessionID, lease.ContinuationID) then
-                                if runtime.GetSessionOwner sessionID = "Fallback" then
-                                    runtime.SetSessionOwner sessionID "None"
+                                if runtime.GetSessionOwner sessionID = SessionOwner.Fallback then
+                                    runtime.SetSessionOwner sessionID SessionOwner.NoOwner
 
                                 runtime.SetMainContinuationAwaitingStart sessionID false
                         | None -> ()
