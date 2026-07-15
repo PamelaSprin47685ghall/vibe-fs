@@ -563,16 +563,17 @@ let createOmpFallbackHandler
                                   StatusCode = None
                                   IsRetryable = None }
 
-                        return! tryError sessionID errorObj
+                        return! tryError workspaceRoot sessionID errorObj
                     elif translator.IsSessionIdle rawEvent then
-                        return! tryIdle sessionID
-                    elif isChildSession sessionID then
+                        return! tryIdle workspaceRoot sessionID
+                    elif isChildSession workspaceRoot sessionID then
                         // Still observe agent/model for child; never Main bridge.
                         match translator.ExtractTurnObservation rawEvent with
-                        | Some obs -> do! routeToChild sessionID (EvidenceUpdated obs) |> Promise.map ignore
+                        | Some obs ->
+                            do! routeToChild workspaceRoot sessionID (EvidenceUpdated obs) |> Promise.map ignore
                         | None -> ()
 
-                        return absorbChildMetadata runtime sessionID rawEvent
+                        return absorbChildMetadata workspaceRoot runtime sessionID rawEvent
                     else
                         return false
                 }

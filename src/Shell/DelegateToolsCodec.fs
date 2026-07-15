@@ -72,3 +72,16 @@ let decodeTaskReport (report: obj) : Result<string, DomainError> =
             Error(InvalidIntent("delegate.report", "reportMarkdown", "missing or empty"))
         else
             Ok markdown
+
+let decodeTaskContinueResult (continueResult: obj) : Result<unit, DomainError> =
+    if Dyn.isNullish continueResult then
+        Error(InvalidIntent("delegate", "continueResult", "missing"))
+    else
+        let success = Dyn.truthy (Dyn.get continueResult "success")
+        let err = defaultArg (strField continueResult "error") ""
+
+        if not success then
+            let msg = if err <> "" then err else "continuation failed"
+            Error(InvalidIntent("delegate.continue", "taskService", msg))
+        else
+            Ok()

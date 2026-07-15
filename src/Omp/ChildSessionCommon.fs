@@ -89,7 +89,7 @@ let runOmpSubagentCore
 
         let root = Wanxiangshu.Omp.MagicTodo.workspaceRoot
         let eventStoreFactory (_sid: string) = create root
-        let service = SubsessionService(hostFactory, eventStoreFactory)
+        let service = SubsessionService(root, hostFactory, eventStoreFactory)
 
         try
             let! runResult =

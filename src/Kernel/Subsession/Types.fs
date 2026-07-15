@@ -161,7 +161,7 @@ module CurrentTurnEvidence =
             if id1 <> "" && id2 <> "" && id1 = id2 then
                 AssistantDelta(id1, max rev1 rev2, t1 + t2, (if rev2 > rev1 then f2 else f1))
             elif id1 = "" && id2 = "" then
-                AssistantDelta("", 0L, t2, f2)
+                AssistantDelta("", max rev1 rev2, t1 + t2, (if rev2 >= rev1 then f2 else f1))
             elif rev2 > rev1 then
                 AssistantDelta(id2, rev2, t2, f2)
             else
@@ -373,7 +373,8 @@ type SubsessionState =
     /// "No assistant message in current turn".
     | Dispatching of RunContext * TurnPlan * CurrentTurnEvidence
     | CancellingDispatch of RunContext * TurnPlan * CancelContext
-    | ReconcilingUnknownDispatch of RunContext * TurnPlan * CancelContext
+    | ReconcilingUnknownDispatch of RunContext * TurnPlan * CancelContext * retryCount: int
+    | ClosingUnknownDispatch of RunContext * TurnPlan * PoisonReason
     | Running of RunContext * StartedTurn * CurrentTurnEvidence
     | Draining of RunContext * StartedTurn * ErrorInput * CurrentTurnEvidence
     | IssuingAbort of RunContext * ActiveTurn * AbortContext * idleObserved: bool
@@ -436,6 +437,7 @@ type Command =
     | AbortRequestFailed of TurnId * ErrorInput
     /// Host confirmed whether the session is still running after abort.
     | SessionQuiescenceResolved of QuiescenceStatus
+    | PhysicalCloseResolved of QuiescenceStatus
     | SessionClosed
 
 // ── Domain events ──
@@ -480,6 +482,7 @@ type Effect =
     | DispatchPrompt of TurnPlan
     | QueryDispatchStatus of SessionId * TurnId
     | QuerySessionQuiescence of SessionId * TurnId
+    | ClosePhysicalSession of SessionId
     | AbortHostSession of SessionId * TurnId
     | CancelPendingDispatch of TurnId
     | ArmTurnDeadline of TurnId

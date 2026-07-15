@@ -41,6 +41,8 @@ type ISubsessionHost =
 
     abstract QuerySessionQuiescence: SessionId * TurnId -> JS.Promise<QuiescenceStatus>
 
+    abstract ClosePhysicalSession: SessionId -> JS.Promise<QuiescenceStatus>
+
 /// Required event store — append failure is infrastructure failure.
 /// Implementations MUST treat the events list as one atomic write.
 type ISubsessionEventStore =
@@ -146,7 +148,8 @@ type SubsessionActor
         match s with
         | Dispatching(ctx, plan, _) -> Some(ctx, NotYetStarted plan)
         | CancellingDispatch(ctx, plan, _) -> Some(ctx, NotYetStarted plan)
-        | ReconcilingUnknownDispatch(ctx, plan, _) -> Some(ctx, NotYetStarted plan)
+        | ReconcilingUnknownDispatch(ctx, plan, _, _) -> Some(ctx, NotYetStarted plan)
+        | ClosingUnknownDispatch(ctx, plan, _) -> Some(ctx, NotYetStarted plan)
         | Running(ctx, started, _) -> Some(ctx, Started started)
         | Draining(ctx, started, _, _) -> Some(ctx, Started started)
         | IssuingAbort(ctx, turn, _, _) -> Some(ctx, turn)
@@ -179,6 +182,7 @@ type SubsessionActor
         | DispatchPrompt _
         | QueryDispatchStatus _
         | QuerySessionQuiescence _
+        | ClosePhysicalSession _
         | AbortHostSession _ -> ()
 
     /// Host effects: fire-and-forget; completion re-enters via Post (never awaited here).
@@ -204,6 +208,12 @@ type SubsessionActor
             host.QuerySessionQuiescence(sid, tid)
             |> Promise.map (fun status -> this.Post(SessionQuiescenceResolved status) |> ignore)
             |> Promise.catch (fun _ -> this.Post(SessionQuiescenceResolved StopUnknown) |> ignore)
+            |> ignore
+
+        | ClosePhysicalSession sid ->
+            host.ClosePhysicalSession sid
+            |> Promise.map (fun status -> this.Post(PhysicalCloseResolved status) |> ignore)
+            |> Promise.catch (fun _ -> this.Post(PhysicalCloseResolved StopUnknown) |> ignore)
             |> ignore
 
         | AbortHostSession(sid, tid) ->
@@ -233,6 +243,7 @@ type SubsessionActor
         | DispatchPrompt _
         | QueryDispatchStatus _
         | QuerySessionQuiescence _
+        | ClosePhysicalSession _
         | AbortHostSession _ -> true
         | _ -> false
 
@@ -396,7 +407,8 @@ type SubsessionActor
         match state with
         | Dispatching(_, plan, _) -> Some plan.TurnId
         | CancellingDispatch(_, plan, _) -> Some plan.TurnId
-        | ReconcilingUnknownDispatch(_, plan, _) -> Some plan.TurnId
+        | ReconcilingUnknownDispatch(_, plan, _, _) -> Some plan.TurnId
+        | ClosingUnknownDispatch(_, plan, _) -> Some plan.TurnId
         | Running(_, started, _) -> Some started.Plan.TurnId
         | Draining(_, started, _, _) -> Some started.Plan.TurnId
         | IssuingAbort(_, turn, _, _) -> Some(activeTurnId turn)

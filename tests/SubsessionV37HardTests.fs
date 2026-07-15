@@ -83,6 +83,8 @@ type ScriptedHost
         member _.QuerySessionQuiescence(_, _) =
             Promise.lift ((defaultArg querySessionQuiescence (fun () -> Stopped)) ())
 
+        member _.ClosePhysicalSession(_) = Promise.lift StopUnknown
+
 let private mkReq sid runId =
     { RunId = RunId.create runId
       SessionId = SessionId.create sid
@@ -311,7 +313,7 @@ let reconcilePoisonsUnfinished () =
         let host = ScriptedHost()
         let store = MemorySubsessionEventStore()
         let sid = "child-v37-recon"
-        let actor = SubsessionActorRegistry.GetOrCreate sid host store
+        let actor = SubsessionActorRegistry.GetOrCreate "" sid host store
 
         do! actor.MarkUnknownAfterRestart()
 
@@ -333,24 +335,24 @@ let removeKeepsClosingActor () =
         let host = ScriptedHost()
         let store = MemorySubsessionEventStore()
         let sid = "child-v37-remove"
-        let actor = SubsessionActorRegistry.GetOrCreate sid host store
+        let actor = SubsessionActorRegistry.GetOrCreate "" sid host store
 
         // Start a run so SessionClosed goes through closeActive (not just Available dispose).
         let p = actor.BeginRun(mkReq sid "run-rem")
         do! sleep 20
 
         // Remove only posts SessionClosed — actor still addressable until dispose completes.
-        match SubsessionActorRegistry.TryGet sid with
+        match SubsessionActorRegistry.TryGet "" sid with
         | Some a when obj.ReferenceEquals(a, actor) -> check "still registered before close settles" true
         | _ -> fail "should still be in registry immediately after create"
 
-        SubsessionActorRegistry.Remove sid
+        SubsessionActorRegistry.Remove "" sid
         // While closing, TryGet should still find it until DisposeActor runs.
         // Give queue a moment; closeActive includes DisposeActor which removes entry.
         do! sleep 40
         let! _ = p
 
-        match SubsessionActorRegistry.TryGet sid with
+        match SubsessionActorRegistry.TryGet "" sid with
         | None -> check "removed after dispose" true
         | Some _ -> fail "should be gone after SessionClosed dispose"
 
@@ -363,7 +365,7 @@ let childMetadataUpdatesModel () =
     let host = ScriptedHost()
     let store = MemorySubsessionEventStore()
     let sid = "child-v37-meta"
-    let _ = SubsessionActorRegistry.GetOrCreate sid host store
+    let _ = SubsessionActorRegistry.GetOrCreate "" sid host store
     let runtime = FallbackRuntimeState()
 
     let rawEvent =
@@ -377,7 +379,7 @@ let childMetadataUpdatesModel () =
                                model = box {| providerID = "p"; modelID = "mB" |} |} |}
                props = box {| sessionID = sid |} |}
 
-    check "absorbed" (absorbChildMetadata runtime sid rawEvent)
+    check "absorbed" (absorbChildMetadata "" runtime sid rawEvent)
 
     match runtime.GetModel sid with
     | Some m ->

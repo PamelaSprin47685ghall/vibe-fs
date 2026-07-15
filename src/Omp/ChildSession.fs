@@ -141,7 +141,7 @@ let createChildSession
                         finally
                             // Physical session teardown: dispose actor registry entry.
                             if childId <> "" then
-                                Wanxiangshu.Shell.SubsessionActorRegistry.SubsessionActorRegistry.Remove childId
+                                Wanxiangshu.Shell.SubsessionActorRegistry.SubsessionActorRegistry.Remove cwd childId
 
                             unmarkChildSession scope childId
 
@@ -151,7 +151,7 @@ let createChildSession
                         None
                     else
                         Some(fun () ->
-                            Wanxiangshu.Shell.SubsessionActorRegistry.SubsessionActorRegistry.Remove childId
+                            Wanxiangshu.Shell.SubsessionActorRegistry.SubsessionActorRegistry.Remove cwd childId
                             unmarkChildSession scope childId)
 
             return

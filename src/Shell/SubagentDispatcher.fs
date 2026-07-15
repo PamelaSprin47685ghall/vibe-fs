@@ -104,23 +104,26 @@ let dispatch
                         else
                             Some(fst (List.last matches))
 
-            let wrapWithIterator text role title =
+            let wrapWithIterator provenChildId text role title =
                 promise {
                     let spawnedChildId =
-                        match getChildIDForSpawn role with
+                        match provenChildId with
                         | Some cid -> Some cid
                         | None ->
-                            match host with
-                            | Opencode ->
-                                let r = scope.NextChildSessionId()
-                                Some("child-session-" + string r)
-                            | Mimocode -> None
-                            | Mux ->
-                                let r = scope.NextChildSessionId()
-                                Some("mux-task-" + string r)
-                            | Omp ->
-                                let r = scope.NextChildSessionId()
-                                Some("omp-session-" + string r)
+                            match getChildIDForSpawn role with
+                            | Some cid -> Some cid
+                            | None ->
+                                match host with
+                                | Opencode ->
+                                    let r = scope.NextChildSessionId()
+                                    Some("child-session-" + string r)
+                                | Mimocode -> None
+                                | Mux ->
+                                    let r = scope.NextChildSessionId()
+                                    Some("mux-task-" + string r)
+                                | Omp ->
+                                    let r = scope.NextChildSessionId()
+                                    Some("omp-session-" + string r)
 
                     match spawnedChildId with
                     | None -> return text
@@ -131,6 +134,10 @@ let dispatch
                             | HostAdapter.Investigator -> "investigator"
                             | HostAdapter.Meditator -> "meditator"
                             | HostAdapter.Browser -> "browser"
+
+                        match registry with
+                        | Some reg -> reg.RegisterChildAgent(cid, roleStr, None)
+                        | None -> ()
 
                         let item =
                             { childID = cid
@@ -164,8 +171,11 @@ let dispatch
                     let! response = adapter.SpawnSubagent request
 
                     match response with
+                    | Spawned(childID, text) ->
+                        let! res = wrapWithIterator (Some childID) text role title
+                        return res
                     | Success text ->
-                        let! res = wrapWithIterator text role title
+                        let! res = wrapWithIterator None text role title
                         return res
                     | Failure err -> return subagentToolFailed toolName err
                     | Aborted -> return subagentToolFailed toolName MessageAborted
@@ -222,7 +232,8 @@ let dispatch
                     let! textResult =
                         promise {
                             match response with
-                            | Success text ->
+                            | Success text
+                            | Spawned(_, text) ->
                                 let root = adapter.WorkspaceRoot
                                 let parentSid = adapter.SessionId
 

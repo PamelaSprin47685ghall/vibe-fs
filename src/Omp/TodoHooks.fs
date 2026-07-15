@@ -240,8 +240,8 @@ let sessionShutdownHandler (reviewStore: ReviewStore) (ctx: obj) : JS.Promise<un
                 let sid = SessionId.create sessionId
                 let eventStore = SubsessionEventStore.create cwd
                 do! eventStore.Append(sid, [ PhysicalSessionClosed sid ])
-                SubsessionActorRegistry.ClearPoison sessionId
-                SubsessionActorRegistry.Remove sessionId
+                SubsessionActorRegistry.ClearPoison cwd sessionId
+                SubsessionActorRegistry.Remove cwd sessionId
 
             do! cleanupRunnerJob ExecutorTools.ompScope sessionId
             Wanxiangshu.Shell.LivelockGuard.cleanup ExecutorTools.ompScope sessionId

@@ -26,6 +26,7 @@ open Wanxiangshu.Shell.Dyn
 open Wanxiangshu.Shell.OpencodeClientCodec
 open Wanxiangshu.Shell.ToolRuntimeContext
 open Wanxiangshu.Opencode.PtySpawn
+open Wanxiangshu.Opencode.SubsessionHostAdapter
 
 type CoreServices =
     { ReviewStore: Wanxiangshu.Shell.ReviewRuntime.ReviewStore
@@ -96,7 +97,12 @@ let createCoreServices (host: Host) (ctx: obj) =
             promise {
                 // Initialization barrier: reconcile unfinished subsession runs before anything else.
                 do!
-                    Wanxiangshu.Shell.SubsessionReconcile.reconcileUnfinishedRuns dir
+                    Wanxiangshu.Shell.SubsessionReconcile.reconcileUnfinishedRuns
+                        dir
+                        (Some(fun _ ->
+                            match getClientFromPluginCtx ctx with
+                            | Ok client -> createHost client "" dir
+                            | Error _ -> createHost (box null) "" dir))
                     |> FablePromise.map ignore
 
                 return!

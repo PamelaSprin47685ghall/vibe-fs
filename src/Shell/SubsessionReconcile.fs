@@ -34,10 +34,15 @@ type private ReconcileHost() =
 
         member _.QuerySessionQuiescence(_, _) = Promise.lift Stopped
 
+        member _.ClosePhysicalSession(_) = Promise.lift StopUnknown
+
 /// Load NDJSON, find RunStarted without RunFinished, and ensure those physical
 /// sessions cannot accept a new StartRun until SessionClosed dispose.
 /// Persists SessionPoisoned + TurnFinished + RunFinished so the decision is durable.
-let reconcileUnfinishedRuns (workspaceRoot: string) : JS.Promise<SessionSafetyProjection> =
+let reconcileUnfinishedRuns
+    (workspaceRoot: string)
+    (hostFactory: (string -> ISubsessionHost) option)
+    : JS.Promise<SessionSafetyProjection> =
     promise {
         if System.String.IsNullOrWhiteSpace workspaceRoot then
             return emptyProjection
@@ -53,10 +58,17 @@ let reconcileUnfinishedRuns (workspaceRoot: string) : JS.Promise<SessionSafetyPr
                 | PersistentlyPoisoned _ -> ()
                 | ActiveRun runProj ->
                     let sid = SessionId.value sessionId
-                    let host = ReconcileHost() :> ISubsessionHost
+
+                    let host =
+                        hostFactory
+                        |> Option.map (fun factory -> factory sid)
+                        |> Option.defaultValue (ReconcileHost() :> ISubsessionHost)
+
                     let eventStore = create root
-                    let actor = SubsessionActorRegistry.GetOrCreate sid host eventStore
+                    let actor = SubsessionActorRegistry.GetOrCreate workspaceRoot sid host eventStore
                     let tid = TurnId.create (RunId.value runProj.RunId + "-reconcile")
+
+                    let! stopStatus = host.ClosePhysicalSession sessionId
 
                     let poisonEvents: SubsessionEvent list =
                         [ SessionPoisoned(sessionId, SessionStateUnknownAfterRestart)
@@ -65,6 +77,14 @@ let reconcileUnfinishedRuns (workspaceRoot: string) : JS.Promise<SessionSafetyPr
                               runProj.RunId,
                               Failed(InfrastructureFailure "session state unknown after restart")
                           ) ]
+
+                    match actor.GetState(), stopStatus with
+                    | _, Stopped ->
+                        try
+                            do! eventStore.Append(sessionId, [ PhysicalSessionClosed sessionId ])
+                        with _ ->
+                            ()
+                    | _ -> ()
 
                     match actor.GetState() with
                     | Poisoned _ -> ()

@@ -11,6 +11,7 @@ let makeMockClient (pObjRef: obj ref) (parentId: string) (responseText: string) 
     let createCalls = ResizeArray<obj>()
     let promptCalls = ResizeArray<obj>()
     let mutable sessionCounter = 0
+    let mutable sessionNonces = Map.empty<string, string>
 
     let mockClient =
         createObj
@@ -59,10 +60,13 @@ let makeMockClient (pObjRef: obj ref) (parentId: string) (responseText: string) 
                                                         if Dyn.isNullish meta then "" else Dyn.str meta "nonce"
 
                                         if nonce <> "" then
+                                            sessionNonces <- Map.add childId nonce sessionNonces
                                             let msgId = childId + "-msg"
                                             let receipt = UserMessageObserved msgId
                                             let _ = PendingTurnReceipt.tryResolve nonce receipt
                                             ()
+                                        else
+                                            sessionNonces <- Map.remove childId sessionNonces
 
                                         // Drive the real event hook after prompt resolution. The final assistant
                                         // message event intentionally follows idle: OpenCode emits these through
@@ -83,6 +87,12 @@ let makeMockClient (pObjRef: obj ref) (parentId: string) (responseText: string) 
                                                         do! (eventHook $ idleEvent) |> unbox<JS.Promise<unit>>
 
                                                         let messageUpdatedEvent =
+                                                            let infoObj =
+                                                                match Map.tryFind childId sessionNonces with
+                                                                | Some n when n <> "" ->
+                                                                    box {| role = "assistant"; nonce = n |}
+                                                                | _ -> box {| role = "assistant" |}
+
                                                             box
                                                                 {| event =
                                                                     box
@@ -90,7 +100,7 @@ let makeMockClient (pObjRef: obj ref) (parentId: string) (responseText: string) 
                                                                            properties =
                                                                             box
                                                                                 {| sessionID = childId
-                                                                                   info = box {| role = "assistant" |}
+                                                                                   info = infoObj
                                                                                    parts =
                                                                                     [| box
                                                                                            {| ``type`` = "text"
@@ -107,8 +117,15 @@ let makeMockClient (pObjRef: obj ref) (parentId: string) (responseText: string) 
                         )
                         "messages",
                         box (
-                            System.Func<obj, JS.Promise<obj>>(fun _ ->
+                            System.Func<obj, JS.Promise<obj>>(fun arg ->
                                 (promise {
+                                    let childId =
+                                        if Dyn.isNullish arg then
+                                            ""
+                                        else
+                                            let path = Dyn.get arg "path"
+                                            if Dyn.isNullish path then "" else Dyn.str path "id"
+
                                     let userMessage =
                                         box (
                                             createObj
@@ -118,20 +135,23 @@ let makeMockClient (pObjRef: obj ref) (parentId: string) (responseText: string) 
                                                       [| box (createObj [ "type", box "text"; "text", box "prompt" ]) |] ]
                                         )
 
+                                    let infoList: (string * obj) list =
+                                        [ "role", box "assistant"
+                                          "model",
+                                          box (createObj [ "providerID", box "mock"; "modelID", box "mock-model" ]) ]
+
+                                    let infoListWithNonce =
+                                        if childId <> "" then
+                                            match Map.tryFind childId sessionNonces with
+                                            | Some n when n <> "" -> infoList @ [ "nonce", box n ]
+                                            | _ -> infoList
+                                        else
+                                            infoList
+
                                     let assistantMessage =
                                         box (
                                             createObj
-                                                [ "info",
-                                                  box (
-                                                      createObj
-                                                          [ "role", box "assistant"
-                                                            "model",
-                                                            box (
-                                                                createObj
-                                                                    [ "providerID", box "mock"
-                                                                      "modelID", box "mock-model" ]
-                                                            ) ]
-                                                  )
+                                                [ "info", box (createObj infoListWithNonce)
                                                   "parts",
                                                   box
                                                       [| box (

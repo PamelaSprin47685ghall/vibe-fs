@@ -130,17 +130,18 @@ let createEventHook (deps: obj) (reviewStore: ReviewStore) (scope: RuntimeScope)
                             let sid = SessionId.create workspaceId
                             let eventStore = SubsessionEventStore.create directory
                             do! eventStore.Append(sid, [ PhysicalSessionClosed sid ]) |> Promise.map ignore
-                            SubsessionActorRegistry.ClearPoison workspaceId
-                            SubsessionActorRegistry.Remove workspaceId
+                            SubsessionActorRegistry.ClearPoison directory workspaceId
+                            SubsessionActorRegistry.Remove directory workspaceId
 
-                    let isChild = workspaceId <> "" && SubsessionEventRouter.isChildSession workspaceId
+                    let isChild =
+                        workspaceId <> "" && SubsessionEventRouter.isChildSession directory workspaceId
 
                     if isChild then
                         SubsessionChildObserver.observeChildMetadata fallbackRuntime workspaceId event
 
                         match muxEventTranslator.ExtractTurnObservation event with
                         | Some obs ->
-                            let! _ = SubsessionEventRouter.routeToChild workspaceId (EvidenceUpdated obs)
+                            let! _ = SubsessionEventRouter.routeToChild directory workspaceId (EvidenceUpdated obs)
                             ()
                         | None -> ()
 
@@ -155,10 +156,10 @@ let createEventHook (deps: obj) (reviewStore: ReviewStore) (scope: RuntimeScope)
                                       StatusCode = None
                                       IsRetryable = None }
 
-                            let! _ = SubsessionEventRouter.tryError workspaceId errorObj
+                            let! _ = SubsessionEventRouter.tryError directory workspaceId errorObj
                             ()
                         elif muxEventTranslator.IsSessionIdle event then
-                            let! _ = SubsessionEventRouter.tryIdle workspaceId
+                            let! _ = SubsessionEventRouter.tryIdle directory workspaceId
                             ()
                     else
                         match parseHookEvent event with
@@ -178,9 +179,10 @@ let createEventHook (deps: obj) (reviewStore: ReviewStore) (scope: RuntimeScope)
                         let! fbResult = fallbackHandler event
 
                         if not fbResult.Consumed then
-                            if SubsessionEventRouter.isChildSession workspaceId then
+                            if SubsessionEventRouter.isChildSession directory workspaceId then
                                 match muxEventTranslator.ExtractTurnObservation event with
-                                | Some obs -> do! routeToChild workspaceId (EvidenceUpdated obs) |> Promise.map ignore
+                                | Some obs ->
+                                    do! routeToChild directory workspaceId (EvidenceUpdated obs) |> Promise.map ignore
                                 | None -> ()
 
                             do! runtime.HandleEvent(parseHookEvent event, helpers)

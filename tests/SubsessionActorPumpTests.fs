@@ -62,6 +62,8 @@ type FakeHost
 
         member _.QuerySessionQuiescence(_, _) = Promise.lift Stopped
 
+        member _.ClosePhysicalSession(_) = Promise.lift Stopped
+
 let private sleep (ms: int) : JS.Promise<unit> =
     Promise.create (fun resolve _ -> JS.setTimeout (fun () -> resolve ()) ms |> ignore)
 

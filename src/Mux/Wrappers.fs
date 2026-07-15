@@ -217,11 +217,7 @@ let private mkTodoWriteWrapper (host: Host) (projection: ProjectionStore) : obj 
                                                 { CurrentTurnEvidence.empty with
                                                     Todos = if allCompleted then TodosCompleted else TodosNotCompleted }
 
-                                            do!
-                                                SubsessionEventRouter.routeToChild
-                                                    sid
-                                                    (EvidenceUpdated { TurnId = None; Evidence = ev })
-                                                |> Promise.map ignore
+                                            do! SubsessionEventRouter.routeEvidence root sid ev |> Promise.map ignore
                                     | _ -> ()
 
                             let nextResult =

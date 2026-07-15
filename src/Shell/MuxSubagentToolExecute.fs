@@ -31,11 +31,17 @@ type MuxSubagentSpawn =
 
 type RunMuxSubagent = obj -> obj -> string -> string -> string -> obj option -> JS.Promise<string>
 
+type RunMuxSubagentWithTaskId =
+    obj -> obj -> string -> string -> string -> obj option -> JS.Promise<Result<string * string, DomainError>>
+
+type ContinueMuxSubagent = obj -> obj -> string -> string -> string -> obj option -> JS.Promise<string>
+
 /// Mux already has a Promise-terminal host path. We do not invent mailbox/lease
 /// state here — the Promise completion is the run terminal.
 type MuxHostAdapter
     (
-        runMux: RunMuxSubagent,
+        runMuxWithTaskId: RunMuxSubagentWithTaskId,
+        continueMux: ContinueMuxSubagent,
         deps: obj,
         config: obj,
         spawn: MuxSubagentSpawn,
@@ -49,18 +55,13 @@ type MuxHostAdapter
 
         member _.SpawnSubagent(request: SubagentRequest) : JS.Promise<SubagentResponse> =
             promise {
-                let counterVal = sessionScope.NextChildSessionId()
-                let cid = "mux-task-" + string counterVal
-
                 try
-                    match fromMuxConfig config with
-                    | Ok r ->
-                        let registry = unbox<ChildAgentRegistry> r.Execution.ChildRegistry
-                        registry.RegisterChildAgent(cid, spawn.Role, None)
-                    | Error _ -> ()
+                    let! res = runMuxWithTaskId deps config spawn.AgentId request.Prompt spawn.Title spawn.ToolOptions
 
-                    let! text = runMux deps config spawn.AgentId request.Prompt spawn.Title spawn.ToolOptions
-                    return Success text
+                    match res with
+                    | Ok(taskId, report) when taskId <> "" -> return Spawned(taskId, report)
+                    | Ok _ -> return Failure(InvalidIntent("mux", "taskId", "missing from created subagent task"))
+                    | Error err -> return Failure err
                 with ex ->
                     return Failure(translateJsError ex)
             }
@@ -68,7 +69,7 @@ type MuxHostAdapter
         member _.ContinueSubagent(childID: string, agent: string, prompt: string) : JS.Promise<SubagentResponse> =
             promise {
                 try
-                    let! text = runMux deps config agent prompt spawn.Title spawn.ToolOptions
+                    let! text = continueMux deps config childID prompt spawn.Title spawn.ToolOptions
                     return Success text
                 with ex ->
                     return Failure(translateJsError ex)
@@ -88,7 +89,9 @@ let private muxConfigMessage (title: string) (error: DomainError) : string =
     | _ -> subagentToolFailed title error
 
 let executeMuxSubagentTool
+    (runMuxWithTaskId: RunMuxSubagentWithTaskId)
     (runMux: RunMuxSubagent)
+    (continueMux: ContinueMuxSubagent)
     (deps: obj)
     (spawn: MuxSubagentSpawn)
     (args: obj)
@@ -103,7 +106,8 @@ let executeMuxSubagentTool
         | Ok runtime ->
             let adapter =
                 MuxHostAdapter(
-                    runMux,
+                    runMuxWithTaskId,
+                    continueMux,
                     deps,
                     config,
                     spawn,
@@ -113,5 +117,5 @@ let executeMuxSubagentTool
                 )
 
             let registry = unbox<ChildAgentRegistry> runtime.Execution.ChildRegistry
-            return! dispatch mimocode adapter toolName args sessionScope (Some registry)
+            return! dispatch mux adapter toolName args sessionScope (Some registry)
     }

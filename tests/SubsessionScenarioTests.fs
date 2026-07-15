@@ -151,7 +151,7 @@ let scenarioAcceptanceUnknownAborts () =
             mustDecide d0.NextState (DispatchRejected(plan.TurnId, HostAcceptanceUnknown err))
 
         match d1.NextState with
-        | ReconcilingUnknownDispatch(ctx, plan, cancelCtx) ->
+        | ReconcilingUnknownDispatch(ctx, plan, cancelCtx, _) ->
             check "no DispatchPrompt on acceptance unknown" (dispatchPromptCount d1.Effects = 0)
 
             let d2 =

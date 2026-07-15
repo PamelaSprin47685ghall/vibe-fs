@@ -229,7 +229,7 @@ let private cancellingDispatchAcceptanceUnknownReconciles () =
     match decide state (DispatchRejected(turn0, HostAcceptanceUnknown err)) with
     | Ok(Decided d) ->
         match d.NextState with
-        | ReconcilingUnknownDispatch(ctx', plan', cancelCtx') ->
+        | ReconcilingUnknownDispatch(ctx', plan', cancelCtx', _) ->
             equal "ctx preserved" ctx.RunId ctx'.RunId
             equal "plan preserved" plan.TurnId plan'.TurnId
             equal "reason preserved" UserRequested cancelCtx'.Reason
@@ -245,20 +245,20 @@ let private cancellingDispatchAcceptanceUnknownReconciles () =
         check "no AbortHostSession" (not (hasEffect isAbortHostSession d.Effects))
     | other -> fail ("expected Decided, got " + string other)
 
-// ── 8: ReconcilingUnknownDispatch + DispatchStatusResolved(Unknown) → Poisoned (fail-closed) ──
+// ── 8: Unknown dispatch requires physical-session closure ──
 let private reconcilingDispatchStatusNotConfirmedPoisons () =
     let cancelCtx: CancelContext =
         { Reason = UserRequested
           AfterStop = FinishCancelled }
 
-    let state = ReconcilingUnknownDispatch(ctx, plan, cancelCtx)
+    let state = ReconcilingUnknownDispatch(ctx, plan, cancelCtx, 0)
 
     match decide state (DispatchStatusResolved Unknown) with
     | Ok(Decided d) ->
         match d.NextState with
-        | Poisoned _ -> check "fail-closed: poisoned when cannot confirm" true
+        | ClosingUnknownDispatch _ -> check "physical close required when cannot confirm" true
         | Available _ -> fail "v38: must NOT cancel when acceptance unknown — must poison"
-        | other -> fail ("expected Poisoned, got " + string other)
+        | other -> fail ("expected ClosingUnknownDispatch, got " + string other)
     | other -> fail ("expected Decided, got " + string other)
 
 // ── 9: ReconcilingUnknownDispatch + DispatchStatusResolved(Accepted receipt) → IssuingAbort ──
@@ -267,7 +267,7 @@ let private reconcilingDispatchStatusConfirmedAborts () =
         { Reason = UserRequested
           AfterStop = FinishCancelled }
 
-    let state = ReconcilingUnknownDispatch(ctx, plan, cancelCtx)
+    let state = ReconcilingUnknownDispatch(ctx, plan, cancelCtx, 0)
 
     match decide state (DispatchStatusResolved(Accepted receipt)) with
     | Ok(Decided d) ->
@@ -421,7 +421,7 @@ let private dispatchingAcceptanceUnknownEntersReconcile () =
     match decide state (DispatchRejected(turn0, HostAcceptanceUnknown err)) with
     | Ok(Decided d) ->
         match d.NextState with
-        | ReconcilingUnknownDispatch(ctx', plan', cancelCtx') ->
+        | ReconcilingUnknownDispatch(ctx', plan', cancelCtx', _) ->
             equal "ctx preserved" ctx.RunId ctx'.RunId
             equal "plan preserved" plan.TurnId plan'.TurnId
             equal "reason matches" AcceptanceUnknownAfterDispatch cancelCtx'.Reason

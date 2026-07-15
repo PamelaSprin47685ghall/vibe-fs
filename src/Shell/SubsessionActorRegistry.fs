@@ -5,7 +5,7 @@ open Wanxiangshu.Shell.SubsessionActor
 open Wanxiangshu.Kernel.Subsession.Fold
 
 module SubsessionActorRegistry =
-    let mutable private actors = Map.empty<string, SubsessionActor>
+    let mutable private actors = Map.empty<string * string, SubsessionActor>
     // Safety projection is keyed by workspace root so multiple plugin instances
     // in the same Node process cannot overwrite each other's durable poison state.
     let mutable private safetyProj = Map.empty<string, SessionSafetyProjection>
@@ -14,40 +14,49 @@ module SubsessionActorRegistry =
     let SetSafetyProjection (workspaceRoot: string) (proj: SessionSafetyProjection) : unit =
         safetyProj <- Map.add workspaceRoot proj safetyProj
 
-    /// Find a safety entry for this session id across all workspace projections.
-    /// If any workspace has marked the session as persistently poisoned, that entry
-    /// wins over an active-run entry in another workspace.
-    let private tryFindSafetyEntry (sid: SessionId) : SessionSafetyEntry option =
-        safetyProj
-        |> Map.tryPick (fun _ proj ->
-            match Map.tryFind sid proj with
-            | Some(PersistentlyPoisoned _ as entry) -> Some entry
-            | _ -> None)
+    /// Find a safety entry for this session id in the specified workspace.
+    let private tryFindSafetyEntry (workspaceRoot: string) (sid: SessionId) : SessionSafetyEntry option =
+        match Map.tryFind workspaceRoot safetyProj with
+        | Some proj -> Map.tryFind sid proj
+        | None -> None
 
-    /// Remove the session id from every workspace projection.
-    let private removeFromAllSafetyProjections (sid: SessionId) : unit =
-        safetyProj <- safetyProj |> Map.map (fun _ proj -> Map.remove sid proj)
+    /// Remove the session id from safety projection in the specified workspace.
+    let private removeSafetyEntry (workspaceRoot: string) (sid: SessionId) : unit =
+        match Map.tryFind workspaceRoot safetyProj with
+        | Some proj ->
+            let updated = Map.remove sid proj
+            safetyProj <- Map.add workspaceRoot updated safetyProj
+        | None -> ()
 
-    let ClearPoison (sessionId: string) : unit =
+    let ClearPoison (workspaceRoot: string) (sessionId: string) : unit =
         let sid = SessionId.create sessionId
-        removeFromAllSafetyProjections sid
+        removeSafetyEntry workspaceRoot sid
 
-        match Map.tryFind sessionId actors with
+        let key = (workspaceRoot, sessionId)
+
+        match Map.tryFind key actors with
         | Some actor ->
-            actors <- Map.remove sessionId actors
+            actors <- Map.remove key actors
             actor.Post SessionClosed |> ignore
         | None -> ()
 
-    let TryGet (sessionId: string) : SubsessionActor option = Map.tryFind sessionId actors
+    let TryGet (workspaceRoot: string) (sessionId: string) : SubsessionActor option =
+        Map.tryFind (workspaceRoot, sessionId) actors
 
-    let GetOrCreate (sessionId: string) (host: ISubsessionHost) (eventStore: ISubsessionEventStore) : SubsessionActor =
+    let GetOrCreate
+        (workspaceRoot: string)
+        (sessionId: string)
+        (host: ISubsessionHost)
+        (eventStore: ISubsessionEventStore)
+        : SubsessionActor =
         let sid = SessionId.create sessionId
+        let key = (workspaceRoot, sessionId)
 
-        match Map.tryFind sessionId actors with
+        match Map.tryFind key actors with
         | Some actor when not actor.IsDisposed -> actor
         | _ ->
             let initialState =
-                match tryFindSafetyEntry sid with
+                match tryFindSafetyEntry workspaceRoot sid with
                 | Some(PersistentlyPoisoned reason) -> Some(Poisoned reason)
                 | _ -> None
 
@@ -60,27 +69,28 @@ module SubsessionActorRegistry =
                     eventStore,
                     onDispose =
                         (fun () ->
-                            match Map.tryFind sessionId actors with
+                            match Map.tryFind key actors with
                             | Some currentActor ->
                                 match actorOpt with
-                                | Some a when obj.ReferenceEquals(currentActor, a) ->
-                                    actors <- Map.remove sessionId actors
+                                | Some a when obj.ReferenceEquals(currentActor, a) -> actors <- Map.remove key actors
                                 | _ -> ()
                             | None -> ()),
                     ?initialState = initialState
                 )
 
             actorOpt <- Some actor
-            actors <- Map.add sessionId actor actors
+            actors <- Map.add key actor actors
             actor
 
-    let Remove (sessionId: string) : unit =
+    let Remove (workspaceRoot: string) (sessionId: string) : unit =
         let sid = SessionId.create sessionId
-        removeFromAllSafetyProjections sid
+        removeSafetyEntry workspaceRoot sid
 
-        match Map.tryFind sessionId actors with
+        let key = (workspaceRoot, sessionId)
+
+        match Map.tryFind key actors with
         | Some actor ->
-            actors <- Map.remove sessionId actors
+            actors <- Map.remove key actors
             actor.Post SessionClosed |> ignore
         | None -> ()
 

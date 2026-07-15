@@ -22,6 +22,7 @@ type SubagentRequest =
 /// MessageAborted so the caller never needs to match those DU cases.
 type SubagentResponse =
     | Success of string
+    | Spawned of childID: string * report: string
     | Failure of DomainError
     | Aborted
 

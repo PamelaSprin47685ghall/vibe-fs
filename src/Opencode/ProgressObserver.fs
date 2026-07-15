@@ -106,11 +106,7 @@ type ProgressObserver
                                 { CurrentTurnEvidence.empty with
                                     Todos = if allCompleted then TodosCompleted else TodosNotCompleted }
 
-                            do!
-                                SubsessionEventRouter.routeToChild
-                                    sid
-                                    (EvidenceUpdated { TurnId = None; Evidence = ev })
-                                |> Promise.map ignore
+                            do! SubsessionEventRouter.routeEvidence directory sid ev |> Promise.map ignore
                         | _ -> ()
                 | None -> ()
             elif tool = "task_complete" then
@@ -124,8 +120,10 @@ type ProgressObserver
                         { CurrentTurnEvidence.empty with
                             Outcome = CompletionRequested output }
 
-                    let! routed =
-                        SubsessionEventRouter.routeToChild sid (EvidenceUpdated { TurnId = None; Evidence = evidence })
+                    let directory =
+                        (fromOpencode input (pluginDirectoryFromCtx ctx)).Execution.Directory
+
+                    let! routed = SubsessionEventRouter.routeEvidence directory sid evidence
 
                     if not routed then
                         let st = fallbackRuntime.GetOrCreateState sid

@@ -6,6 +6,7 @@ open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Kernel.ReviewSession
 open Wanxiangshu.Kernel.ReviewSession.Types
 open Wanxiangshu.Kernel.FallbackKernel.Types
+open Wanxiangshu.Kernel.Subsession.Types
 open Wanxiangshu.Shell.Dyn
 
 module Dyn = Wanxiangshu.Shell.Dyn
@@ -16,6 +17,7 @@ open Wanxiangshu.Shell.ReviewRuntime
 open Wanxiangshu.Omp.PluginCore
 open Wanxiangshu.Tests.AsyncFlush
 open Wanxiangshu.Tests.TempWorkspace
+open Wanxiangshu.Shell.SubsessionActorRegistry
 
 /// Verify the reviewStore singleton is wired into the CoreServices so the
 /// registered tools see the same instance that tests manipulate.
@@ -231,6 +233,55 @@ let ompIdleEventRoutesToFallback () =
     invokeFallbackHandler handlers.[0] event ctx
     check "fallback handler saw session.idle" handlerCalled
 
+/// Verify that when reconcileUnfinishedRuns runs on startup, it constructs a real hostFactory
+/// and triggers physical close (sessionDelete) on zombie sessions.
+let ompReconciliationClosesZombieSessions () =
+    promise {
+        let! root = mkdtempAsync "omp-reconcile-test-"
+        let sid = SessionId.create "omp-zombie-sid-1"
+        let parent = SessionId.create "parent-sid"
+        let rid = RunId.create "run-zombie-1"
+
+        let eventStore = Wanxiangshu.Shell.SubsessionEventStore.create root
+
+        let runStartedData =
+            { SessionId = sid
+              ParentSessionId = parent
+              RunId = rid }
+
+        do! eventStore.Append(sid, [ RunStarted runStartedData ])
+
+        let mutable sessionDeleteCalled = false
+        let mutable calledSessionId = ""
+
+        let sessionApi =
+            createObj
+                [ "sessionDelete",
+                  box (fun (arg: obj) ->
+                      sessionDeleteCalled <- true
+                      calledSessionId <- Dyn.str arg "sessionId"
+                      Promise.lift (box null)) ]
+
+        let pi = createObj [ "directory", box root; "session", box sessionApi ]
+
+        let hostFactory (s: string) =
+            Wanxiangshu.Omp.SubsessionHostAdapter.createHost null "" pi
+
+        let! _ = Wanxiangshu.Shell.SubsessionReconcile.reconcileUnfinishedRuns root (Some hostFactory)
+
+        check "sessionDelete was called" sessionDeleteCalled
+        check "sessionDelete called with correct sessionId" (calledSessionId = "omp-zombie-sid-1")
+
+        let actor =
+            Wanxiangshu.Shell.SubsessionActorRegistry.SubsessionActorRegistry.GetOrCreate
+                root
+                "omp-zombie-sid-1"
+                (hostFactory "omp-zombie-sid-1")
+                eventStore
+
+        check "actor state is poisoned after reconcile" actor.IsPoisoned
+    }
+
 let run () =
     promise {
         reviewStoreIsSharedSingleton ()
@@ -241,4 +292,5 @@ let run () =
         do! unrelatedEventLeavesReviewActive ()
         ompErrorEventRoutesToFallback ()
         ompIdleEventRoutesToFallback ()
+        do! ompReconciliationClosesZombieSessions ()
     }

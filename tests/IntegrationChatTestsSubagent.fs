@@ -68,7 +68,8 @@ let subagentParentAlreadyAbortedSpec () =
                                     }))
                             )
                             "abort",
-                            box (System.Func<obj, JS.Promise<unit>>(fun arg -> (promise { abortCalls.Add(arg) }))) ]
+                            box (System.Func<obj, JS.Promise<unit>>(fun arg -> (promise { abortCalls.Add(arg) })))
+                            "delete", box (System.Func<obj, JS.Promise<unit>>(fun _ -> Promise.lift ())) ]
                   ) ]
 
         let registry = ChildAgentRegistry.Create()

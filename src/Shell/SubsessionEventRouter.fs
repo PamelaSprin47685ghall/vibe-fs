@@ -13,13 +13,13 @@ type SessionRoute =
 
 /// Resolve whether a session id is a child actor or a main session.
 /// `isMainSession` is host-provided (e.g. "no parent id" or "not in registry").
-let resolveRoute (sessionId: string) (isMainSession: string -> bool) : SessionRoute =
+let resolveRoute (workspaceRoot: string) (sessionId: string) (isMainSession: string -> bool) : SessionRoute =
     if sessionId = "" then
         UnknownSession
     elif isMainSession sessionId then
         MainSession
     else
-        match SubsessionActorRegistry.TryGet sessionId with
+        match SubsessionActorRegistry.TryGet workspaceRoot sessionId with
         | Some actor -> ChildSession actor
         | None ->
             if isMainSession sessionId then
@@ -28,45 +28,38 @@ let resolveRoute (sessionId: string) (isMainSession: string -> bool) : SessionRo
                 UnknownSession
 
 /// Resolve the current turn id for a registered child actor, if any.
-let private tryGetCurrentTurnId (sessionId: string) : TurnId option =
-    match SubsessionActorRegistry.TryGet sessionId with
+let private tryGetCurrentTurnId (workspaceRoot: string) (sessionId: string) : TurnId option =
+    match SubsessionActorRegistry.TryGet workspaceRoot sessionId with
     | Some actor -> actor.GetCurrentTurn()
     | None -> None
-
-/// EvidenceUpdated with an empty TurnId is a placeholder from a host translator
-/// that cannot attribute the observation itself. The router attributes it to
-/// the actor's current turn, so the core reducer never sees an unattributed
-/// observation. Observations that already carry a TurnId pass through unchanged.
-let private attributeObservation (sessionId: string) (cmd: Command) : Command =
-    match cmd with
-    | EvidenceUpdated obs when obs.TurnId.IsNone ->
-        match tryGetCurrentTurnId sessionId with
-        | Some turnId -> EvidenceUpdated { obs with TurnId = Some turnId }
-        | None -> cmd
-    | _ -> cmd
 
 /// Translate a host-level fact into a Command and post it to the child actor.
 /// Returns true if the event was routed to a child (caller should NOT also
 /// feed it into the main FallbackEventBridge).
-let routeToChild (sessionId: string) (cmd: Command) : JS.Promise<bool> =
+/// If the command is an EvidenceUpdated observation with TurnId of None, we do
+/// not post it to the actor to avoid cross-turn contamination, but we still
+/// consider it routed if the child exists in the registry.
+let routeToChild (workspaceRoot: string) (sessionId: string) (cmd: Command) : JS.Promise<bool> =
     promise {
-        let cmd = attributeObservation sessionId cmd
-
-        match SubsessionActorRegistry.TryGet sessionId with
+        match SubsessionActorRegistry.TryGet workspaceRoot sessionId with
         | Some actor ->
-            do! actor.Post cmd
-            return true
+            match cmd with
+            | EvidenceUpdated obs when obs.TurnId.IsNone -> return true
+            | _ ->
+                do! actor.Post cmd
+                return true
         | None -> return false
     }
 
 /// Convenience: post evidence to the current turn of a child actor.
 /// Returns true if the actor exists and has an active turn.
-let routeEvidence (sessionId: string) (evidence: CurrentTurnEvidence) : JS.Promise<bool> =
+let routeEvidence (workspaceRoot: string) (sessionId: string) (evidence: CurrentTurnEvidence) : JS.Promise<bool> =
     promise {
-        match tryGetCurrentTurnId sessionId with
+        match tryGetCurrentTurnId workspaceRoot sessionId with
         | Some turnId ->
             return!
                 routeToChild
+                    workspaceRoot
                     sessionId
                     (EvidenceUpdated
                         { TurnId = Some turnId
@@ -75,15 +68,19 @@ let routeEvidence (sessionId: string) (evidence: CurrentTurnEvidence) : JS.Promi
     }
 
 /// Convenience: post SessionIdleObserved to a child if it exists.
-let tryIdle (sessionId: string) : JS.Promise<bool> =
-    routeToChild sessionId SessionIdleObserved
+let tryIdle (workspaceRoot: string) (sessionId: string) : JS.Promise<bool> =
+    routeToChild workspaceRoot sessionId SessionIdleObserved
 
 /// Convenience: post TurnErrorObserved.
-let tryError (sessionId: string) (err: Wanxiangshu.Kernel.FallbackKernel.Types.ErrorInput) : JS.Promise<bool> =
-    routeToChild sessionId (TurnErrorObserved err)
+let tryError
+    (workspaceRoot: string)
+    (sessionId: string)
+    (err: Wanxiangshu.Kernel.FallbackKernel.Types.ErrorInput)
+    : JS.Promise<bool> =
+    routeToChild workspaceRoot sessionId (TurnErrorObserved err)
 
 /// True when this session is owned by a SubsessionActor (child).
-let isChildSession (sessionId: string) : bool =
-    match SubsessionActorRegistry.TryGet sessionId with
+let isChildSession (workspaceRoot: string) (sessionId: string) : bool =
+    match SubsessionActorRegistry.TryGet workspaceRoot sessionId with
     | Some _ -> true
     | None -> false

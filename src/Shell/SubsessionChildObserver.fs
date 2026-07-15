@@ -56,8 +56,13 @@ let observeChildMetadata (runtime: FallbackRuntimeState) (sessionId: string) (ra
                     | None -> ()
 
 /// Consume a non-control child event: observe metadata, never enter Main FallbackEventBridge.
-let absorbChildMetadata (runtime: FallbackRuntimeState) (sessionId: string) (rawEvent: obj) : bool =
-    if isChildSession sessionId then
+let absorbChildMetadata
+    (workspaceRoot: string)
+    (runtime: FallbackRuntimeState)
+    (sessionId: string)
+    (rawEvent: obj)
+    : bool =
+    if isChildSession workspaceRoot sessionId then
         observeChildMetadata runtime sessionId rawEvent
         true
     else

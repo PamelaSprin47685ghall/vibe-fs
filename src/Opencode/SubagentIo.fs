@@ -103,26 +103,47 @@ let runSubagentCoreResult
             | Error err -> return Error err
             | Ok childID ->
                 let abortAndUnregister () =
-                    match getSessionApiFromClient client with
-                    | Ok session ->
-                        let abortPromise: JS.Promise<obj> =
-                            invoke1 (box {| path = box {| id = childID |} |}) "abort" session
+                    promise {
+                        match getSessionApiFromClient client with
+                        | Ok session ->
+                            try
+                                let! _ = invoke1 (box {| path = box {| id = childID |} |}) "abort" session
+                                ()
+                            with _ ->
+                                ()
 
-                        abortPromise |> ignore
-                    | Error _ -> ()
+                            try
+                                let arg = box {| path = box {| id = childID |} |}
+                                let! _ = invoke1 arg "delete" session
 
-                    // Physical session teardown: dispose actor registry entry.
-                    Wanxiangshu.Shell.SubsessionActorRegistry.SubsessionActorRegistry.Remove childID
-                    registry.UnregisterChildAgent(childID)
+                                let sid = SessionId.create childID
+                                let eventStore = create directory
+                                do! eventStore.Append(sid, [ PhysicalSessionClosed sid ])
+
+                                Wanxiangshu.Shell.SubsessionActorRegistry.SubsessionActorRegistry.ClearPoison
+                                    directory
+                                    childID
+
+                                Wanxiangshu.Shell.SubsessionActorRegistry.SubsessionActorRegistry.Remove
+                                    directory
+                                    childID
+
+                                registry.UnregisterChildAgent(childID)
+                            with _ ->
+                                ()
+                        | Error _ -> ()
+                    }
 
                 let cleanupChildIfRequested () =
-                    if cleanup then
-                        abortAndUnregister ()
+                    promise {
+                        if cleanup then
+                            do! abortAndUnregister ()
+                    }
 
                 let! abortedResult =
                     promise {
                         if not (isNull signal) && Dyn.truthy (Dyn.get signal "aborted") then
-                            abortAndUnregister ()
+                            do! abortAndUnregister ()
                             return Some(Ok abortedPrefix)
                         else
                             return None
@@ -187,24 +208,33 @@ let runSubagentCoreResult
                     let eventStoreFactory (_sid: string) =
                         create (if directory = "" then "" else directory)
 
-                    let service = SubsessionService(hostFactory, eventStoreFactory)
+                    let service = SubsessionService(directory, hostFactory, eventStoreFactory)
+
+                    let mutable runErrorOpt = None
+                    let mutable runResultOpt = None
 
                     try
-                        try
-                            let! runResult =
-                                service.StartRun(childID, sessionID, prompt, cfg, directive, abortSignal = signal)
+                        let! runResult =
+                            service.StartRun(childID, sessionID, prompt, cfg, directive, abortSignal = signal)
 
-                            match runResult with
-                            | Succeeded _output ->
-                                let! text = extractSessionText client childID directory startCount
-                                return Ok(formatSubagentReport noOutputText abortedPrefix text false)
-                            | Cancelled -> return Ok abortedPrefix
-                            | Failed reason ->
-                                return Error(DomainError.InvalidIntent("subagent", "run", formatRunFailure reason))
-                        with err ->
-                            return Error(translateJsError err)
-                    finally
-                        cleanupChildIfRequested ()
+                        runResultOpt <- Some runResult
+                    with err ->
+                        runErrorOpt <- Some err
+
+                    do! cleanupChildIfRequested ()
+
+                    match runErrorOpt with
+                    | Some err -> return Error(translateJsError err)
+                    | None ->
+                        match runResultOpt with
+                        | Some(Succeeded _output) ->
+                            let! text = extractSessionText client childID directory startCount
+                            return Ok(formatSubagentReport noOutputText abortedPrefix text false)
+                        | Some Cancelled -> return Ok abortedPrefix
+                        | Some(Failed reason) ->
+                            return Error(DomainError.InvalidIntent("subagent", "run", formatRunFailure reason))
+                        | None ->
+                            return Error(DomainError.InvalidIntent("subagent", "run", "Unknown start run outcome"))
         with err ->
             return Error(translateJsError err)
     }

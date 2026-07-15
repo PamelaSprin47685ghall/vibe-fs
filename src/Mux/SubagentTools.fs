@@ -73,7 +73,9 @@ let private execute
     (args: obj)
     : JS.Promise<string> =
     executeMuxSubagentTool
+        runMuxSubagentWithTaskId
         runMuxSubagent
+        continueMuxSubagent
         deps
         (spawnFor deps toolNames agentId title aiSettingsAgentId role)
         args

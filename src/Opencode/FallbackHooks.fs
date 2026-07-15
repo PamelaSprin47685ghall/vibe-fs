@@ -424,12 +424,42 @@ let createOpencodeFallbackHandler
                 let messages = Dyn.get response "data"
 
                 if Dyn.isArray messages then
-                    match buildTurnEvidence (messages :?> obj array) AnchorByTurnMarkerOnly with
-                    | Ok evidence ->
-                        do!
-                            routeToChild sessionID (EvidenceUpdated { TurnId = None; Evidence = evidence })
-                            |> Promise.map ignore
-                    | Error _ -> ()
+                    let msgs = messages :?> obj array
+
+                    let nonceOpt =
+                        msgs
+                        |> Array.tryFindBack (fun msg ->
+                            if Dyn.isNullish msg then
+                                false
+                            else
+                                let info = Dyn.get msg "info"
+
+                                if Dyn.isNullish info then
+                                    false
+                                else
+                                    Dyn.str info "role" = "assistant")
+                        |> Option.bind (fun msg ->
+                            let info = Dyn.get msg "info"
+                            let nonce = Dyn.str msg "nonce"
+                            let nonce = if nonce <> "" then nonce else Dyn.str info "nonce"
+                            if nonce <> "" then Some nonce else None)
+
+                    match nonceOpt with
+                    | Some nonce ->
+                        match buildTurnEvidence msgs AnchorByTurnMarkerOnly with
+                        | Ok evidence ->
+                            let turnId = TurnId.create nonce
+
+                            do!
+                                routeToChild
+                                    workspaceRoot
+                                    sessionID
+                                    (EvidenceUpdated
+                                        { TurnId = Some turnId
+                                          Evidence = evidence })
+                                |> Promise.map ignore
+                        | Error _ -> ()
+                    | None -> ()
             with _ ->
                 ()
         }
@@ -465,21 +495,22 @@ let createOpencodeFallbackHandler
                                   StatusCode = None
                                   IsRetryable = None }
 
-                        return! tryError sessionID errorObj
+                        return! tryError workspaceRoot sessionID errorObj
                     elif translator.IsSessionIdle rawEvent then
-                        if isChildSession sessionID then
+                        if isChildSession workspaceRoot sessionID then
                             // OpenCode can publish idle before its final message event. Read the
                             // transcript first so idle is evaluated against committed assistant text.
                             do! refreshChildTurnEvidence sessionID
 
-                        return! tryIdle sessionID
-                    elif isChildSession sessionID then
+                        return! tryIdle workspaceRoot sessionID
+                    elif isChildSession workspaceRoot sessionID then
                         // busy / message.updated / part.* — observe model/agent only.
                         match translator.ExtractTurnObservation rawEvent with
-                        | Some obs -> do! routeToChild sessionID (EvidenceUpdated obs) |> Promise.map ignore
+                        | Some obs ->
+                            do! routeToChild workspaceRoot sessionID (EvidenceUpdated obs) |> Promise.map ignore
                         | None -> ()
 
-                        return absorbChildMetadata runtime sessionID rawEvent
+                        return absorbChildMetadata workspaceRoot runtime sessionID rawEvent
                     else
                         return false
                 }

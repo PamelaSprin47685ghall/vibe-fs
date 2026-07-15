@@ -27,6 +27,7 @@ open Wanxiangshu.Shell.FallbackConfigCodec
 open Wanxiangshu.Kernel.FallbackKernel.Types
 open Wanxiangshu.Omp.FallbackHooks
 open Wanxiangshu.Shell.ToolHookRuntime
+open Wanxiangshu.Shell.SubsessionActor
 
 type CoreServices =
     { ReviewStore: ReviewStore
@@ -209,7 +210,10 @@ let pluginFor (pi: obj) : JS.Promise<unit> =
         // Minimal safe restart: unfinished subsession runs become poisoned actors.
         let directory = Dyn.str pi "directory"
 
+        let hostFactory (_sid: string) : ISubsessionHost =
+            Wanxiangshu.Omp.SubsessionHostAdapter.createHost null "" pi
+
         do!
-            Wanxiangshu.Shell.SubsessionReconcile.reconcileUnfinishedRuns directory
+            Wanxiangshu.Shell.SubsessionReconcile.reconcileUnfinishedRuns directory (Some hostFactory)
             |> Promise.map ignore
     }

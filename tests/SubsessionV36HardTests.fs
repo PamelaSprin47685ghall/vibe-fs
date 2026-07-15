@@ -58,6 +58,8 @@ type CountingHost() =
 
         member _.QuerySessionQuiescence(_, _) = Promise.lift Stopped
 
+        member _.ClosePhysicalSession(_) = Promise.lift Stopped
+
 /// 3. TurnStarted EventLog append failure → fail-safe abort, not early return without abort
 let appendFailTriggersAbort () =
     promise {
@@ -99,16 +101,16 @@ let removeSessionClearsRegistry () =
         let host = CountingHost()
         let store = MemorySubsessionEventStore()
         let childId = "child-hard-remove"
-        let actor = SubsessionActorRegistry.GetOrCreate childId host store
+        let actor = SubsessionActorRegistry.GetOrCreate "" childId host store
 
-        match SubsessionActorRegistry.TryGet childId with
+        match SubsessionActorRegistry.TryGet "" childId with
         | Some a -> check "actor registered" (obj.ReferenceEquals(a, actor))
         | None -> fail "actor missing after GetOrCreate"
 
-        SubsessionActorRegistry.Remove childId
+        SubsessionActorRegistry.Remove "" childId
         do! sleep 20
 
-        match SubsessionActorRegistry.TryGet childId with
+        match SubsessionActorRegistry.TryGet "" childId with
         | None -> check "actor removed" true
         | Some _ -> fail "actor still in registry after Remove"
 
@@ -249,12 +251,12 @@ let childMetadataAbsorbed () =
     let host = CountingHost()
     let store = MemorySubsessionEventStore()
     let childId = "child-meta-absorb"
-    let _ = SubsessionActorRegistry.GetOrCreate childId host store
+    let _ = SubsessionActorRegistry.GetOrCreate "" childId host store
     let runtime = FallbackRuntimeState()
 
-    check "isChildSession true" (isChildSession childId)
-    check "absorb returns true" (absorbChildMetadata runtime childId (box null))
-    check "unknown session false" (not (isChildSession "main-session-xyz"))
+    check "isChildSession true" (isChildSession "" childId)
+    check "absorb returns true" (absorbChildMetadata "" runtime childId (box null))
+    check "unknown session false" (not (isChildSession "" "main-session-xyz"))
 
     SubsessionActorRegistry.Clear()
 

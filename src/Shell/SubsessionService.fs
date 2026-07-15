@@ -11,6 +11,7 @@ open Wanxiangshu.Shell.SubsessionEventStore
 
 type SubsessionService
     (
+        workspaceRoot: string,
         hostFactory: string -> ISubsessionHost,
         ?eventStoreFactory: string -> ISubsessionEventStore,
         ?initBarrier: unit -> JS.Promise<unit>
@@ -41,7 +42,9 @@ type SubsessionService
 
             let host = hostFactory childSessionId
             let store = storeFor childSessionId
-            let actor = SubsessionActorRegistry.GetOrCreate childSessionId host store
+
+            let actor =
+                SubsessionActorRegistry.GetOrCreate workspaceRoot childSessionId host store
 
             // Snapshot aborted BEFORE BeginRun so InitiallyCancelled is set when
             // the call already cancelled. Race after this snapshot is closed by:
@@ -108,9 +111,9 @@ type SubsessionService
         }
 
     member _.TryPost (childSessionId: string) (cmd: Command) : JS.Promise<unit> =
-        match SubsessionActorRegistry.TryGet childSessionId with
+        match SubsessionActorRegistry.TryGet workspaceRoot childSessionId with
         | Some actor -> actor.Post cmd
         | None -> Promise.lift ()
 
     member _.RemoveSession(childSessionId: string) : unit =
-        SubsessionActorRegistry.Remove childSessionId
+        SubsessionActorRegistry.Remove workspaceRoot childSessionId

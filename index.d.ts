@@ -101,6 +101,15 @@ export interface TaskCreateError {
   readonly error: string;
 }
 
+export interface TaskContinueResult {
+  readonly success: true;
+}
+
+export interface TaskContinueError {
+  readonly success: false;
+  readonly error: string;
+}
+
 export interface TaskWaitOptions {
   readonly requestingWorkspaceId: string;
   readonly abortSignal?: AbortSignal;
@@ -115,6 +124,11 @@ export interface TaskWaitResult {
 export interface TaskServiceLike {
   create(input: TaskCreateInput): Promise<TaskCreateResult | TaskCreateError>;
   waitForAgentReport(taskId: string, opts: TaskWaitOptions): Promise<TaskWaitResult>;
+  continueAgentTask(
+    taskId: string,
+    prompt: string,
+    opts: TaskWaitOptions
+  ): Promise<TaskContinueResult | TaskContinueError>;
 }
 
 export interface LoggerLike {

@@ -142,8 +142,8 @@ let registerHooks (result: obj) (host: Host) (ctx: obj) (services: CoreServices)
                         let sid = SessionId.create ptyCleanupSessionId
                         let eventStore = SubsessionEventStore.create services.Directory
                         do! eventStore.Append(sid, [ PhysicalSessionClosed sid ])
-                        SubsessionActorRegistry.ClearPoison ptyCleanupSessionId
-                        SubsessionActorRegistry.Remove ptyCleanupSessionId
+                        SubsessionActorRegistry.ClearPoison services.Directory ptyCleanupSessionId
+                        SubsessionActorRegistry.Remove services.Directory ptyCleanupSessionId
 
                     do! services.SessionLifecycleObserver.handleEvent input
                 }))
