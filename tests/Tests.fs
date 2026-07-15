@@ -96,6 +96,13 @@ open Wanxiangshu.Tests.ToolOutputInfoTests
 open Wanxiangshu.Tests.KernelHelpersTests
 
 open Wanxiangshu.Tests.ReviewPromptsFormatTests
+open Wanxiangshu.Tests.Phase0BaselineTests
+open Wanxiangshu.Tests.CommandProcessorE2ETests
+open Wanxiangshu.Tests.ReplayEquivalenceTests
+open Wanxiangshu.Tests.FlowKernelTests
+open Wanxiangshu.Tests.ReactiveTests
+open Wanxiangshu.Tests.ResourcePlanTests
+open Wanxiangshu.Tests.SessionOverviewTests
 open Wanxiangshu.Omp
 open Wanxiangshu.Omp.Plugin
 open Wanxiangshu.Omp.PluginCore
@@ -135,7 +142,14 @@ let private allOtherTests: (string * TestBody) list =
     @ wanxiangzhenTestEntries ()
     @ codecTestEntries ()
     @ ompTestEntries ()
-    @ [ "ContextBudgetSpecs.run", TestBody.Sync(sync ContextBudgetSpecs.run)
+    @ [ "Phase0BaselineTests.run", TestBody.Sync Phase0BaselineTests.run
+        "CommandProcessorE2ETests.run", TestBody.Async CommandProcessorE2ETests.run
+        "ReplayEquivalenceTests.run", TestBody.Sync ReplayEquivalenceTests.run
+        "FlowKernelTests.run", TestBody.Async FlowKernelTests.run
+        "ReactiveTests.run", TestBody.Sync ReactiveTests.run
+        "ResourcePlanTests.run", TestBody.Sync ResourcePlanTests.run
+        "SessionOverviewTests.run", TestBody.Sync SessionOverviewTests.run
+        "ContextBudgetSpecs.run", TestBody.Sync(sync ContextBudgetSpecs.run)
         "ContextBudgetHookTests.run", TestBody.Async ContextBudgetHookTests.run
         "ContextBudgetNoReinjectTests.run", TestBody.Async ContextBudgetNoReinjectTests.run
         "ContextBudgetAfterTodoTests.run", TestBody.Async ContextBudgetAfterTodoTests.run

@@ -708,6 +708,13 @@
     <Compile Include="tests/Wanxiangzhen/SquadTaskTransitionTests.fs"/>
     <Compile Include="tests/TestsEntriesWanxiangzhen.fs"/>
     <Compile Include="tests/ProductionDebugOutputTests.fs"/>
+    <Compile Include="tests/Phase0BaselineTests.fs"/>
+    <Compile Include="tests/CommandProcessorE2ETests.fs"/>
+    <Compile Include="tests/ReplayEquivalenceTests.fs"/>
+    <Compile Include="tests/FlowKernelTests.fs"/>
+    <Compile Include="tests/ReactiveTests.fs"/>
+    <Compile Include="tests/ResourcePlanTests.fs"/>
+    <Compile Include="tests/SessionOverviewTests.fs"/>
     <Compile Include="tests/TestsEntriesCoreTail.fs"/>
     <Compile Include="tests/TestsEntriesSessionLoop.fs"/>
     <Compile Include="tests/TestsEntriesCore.fs"/>
