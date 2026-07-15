@@ -156,7 +156,7 @@ let coderTool
             (createObj
                 [ "intents", coderIntentsSchema Params.coderIntents
                   "tdd", enumReq [| "red"; "green" |] Params.coderTdd
-                  "_ui", uiParam ]))
+                  "ui_", uiParam ]))
         (fun args context -> executeSubagent host registry ctx "coder" args context runtime sessionScope)
 
 let investigatorTool
@@ -174,7 +174,7 @@ let investigatorTool
             investigatorRequiredKeys
             (createObj
                 [ "intents", investigatorIntentsSchema Params.investigatorIntents
-                  "_ui", uiParam ]))
+                  "ui_", uiParam ]))
         (fun args context -> executeSubagent host registry ctx "investigator" args context runtime sessionScope)
 
 let browserTool

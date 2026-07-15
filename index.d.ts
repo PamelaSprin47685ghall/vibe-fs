@@ -312,7 +312,7 @@ export interface PluginRegistration {
     output: { output: string; error: string; args?: unknown },
   ) => Promise<void>;
   /**
-   * Pre-tool hook (runtime key `tool.execute.before`). Sets the `_ui` label on
+   * Pre-tool hook (runtime key `tool.execute.before`). Sets the `ui_` label on
    * `output.args` in place; the host keeps the same args reference it passed in.
    */
   readonly ["tool.execute.before"]?: (

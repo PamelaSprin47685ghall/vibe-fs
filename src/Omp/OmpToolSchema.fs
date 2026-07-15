@@ -24,6 +24,15 @@ let private addRequired (schema: obj) (key: string) : unit =
     else
         schema?("required") <- box [| box key |]
 
+let private softenControlProperty (property: obj) : unit =
+    if not (isNullish property) then
+        Dyn.deleteKey property "enum"
+        Dyn.deleteKey property "const"
+        Dyn.deleteKey property "pattern"
+        Dyn.deleteKey property "minLength"
+        Dyn.deleteKey property "maxLength"
+        property?("x-wanxiangshu-soft-required") <- true
+
 
 let private injectWarnReuseIntoOmpParameters (schema: obj) (toolName: string) : obj =
     if isSubagentTool toolName then
@@ -35,10 +44,11 @@ let private injectWarnReuseIntoOmpParameters (schema: obj) (toolName: string) : 
                     box (
                         createObj
                             [| "type", box "string"
-                               "enum", box [| box warnReuseCanonicalValue |]
                                "description", box warnReuseDescription
                                "x-wanxiangshu-soft-required", box true |]
                     )
+            else
+                softenControlProperty (Dyn.get props "warn_reuse")
 
     schema
 
@@ -81,10 +91,11 @@ let coderParameters (tb: obj) : obj =
                 box (
                     createObj
                         [| "type", box "string"
-                           "enum", box [| box canonicalValue |]
                            "description", box warnTddDescription
                            "x-wanxiangshu-soft-required", box true |]
                 )
+        else
+            softenControlProperty (Dyn.get props "warn_tdd")
 
     injectWarnReuseIntoOmpParameters schema "coder"
 
@@ -135,10 +146,11 @@ let executorParameters (tb: obj) : obj =
                 box (
                     createObj
                         [| "type", box "string"
-                           "enum", box [| box canonicalValue |]
                            "description", box warnTddDescription
                            "x-wanxiangshu-soft-required", box true |]
                 )
+        else
+            softenControlProperty (Dyn.get props "warn_tdd")
 
     if isWarnRequiredTool "executor" then
         let props = Dyn.get schema "properties"
@@ -148,10 +160,11 @@ let executorParameters (tb: obj) : obj =
                 box (
                     createObj
                         [| "type", box "string"
-                           "enum", box [| box warnCanonicalValue |]
                            "description", box warnDescription
                            "x-wanxiangshu-soft-required", box true |]
                 )
+        else
+            softenControlProperty (Dyn.get props "warn")
 
     addRequired schema "max_bytes"
     addRequired schema "what_to_summarize"

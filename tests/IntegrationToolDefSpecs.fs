@@ -32,14 +32,14 @@ let toolDefinitionSpec () =
                             box (
                                 createObj
                                     [ "intents", box (createObj [ "type", box "array" ])
-                                      "_ui", box (createObj [ "type", box "string" ]) ]
+                                      "ui_", box (createObj [ "type", box "string" ]) ]
                             )
-                            "required", box [| "intents"; "_ui" |] ]
+                            "required", box [| "intents"; "ui_" |] ]
                   ) ]
 
         do! td $ (createObj [ "toolID", box "coder" ], coderDef) |> unbox<JS.Promise<unit>>
         let props = get (get coderDef "jsonSchema") "properties"
-        check "tool.definition does not strip coder _ui property" (not (isNullish (get props "_ui")))
+        check "tool.definition does not strip coder ui_ property" (not (isNullish (get props "ui_")))
         check "tool.definition keeps coder intents" (not (isNullish (get props "intents")))
 
         let editParameters =
@@ -250,15 +250,15 @@ let toolExecuteBeforeSpec () =
             |> unbox<JS.Promise<unit>>
 
         let nextArgs = get execOut "args"
-        check "tool.execute.before populates _ui on returned args" (str nextArgs "_ui" = "fix bug; add feature")
+        check "tool.execute.before populates ui_ on returned args" (str nextArgs "ui_" = "fix bug; add feature")
 
         check
             "tool.execute.before clones and does not mutate in place"
             (not (obj.ReferenceEquals(nextArgs, originalArgs)))
 
         check
-            "tool.execute.before writes _ui onto host args reference"
-            (str originalArgs "_ui" = "fix bug; add feature")
+            "tool.execute.before writes ui_ onto host args reference"
+            (str originalArgs "ui_" = "fix bug; add feature")
 
         do! rmAsync workspaceDir
     }

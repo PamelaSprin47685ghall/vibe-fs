@@ -100,8 +100,11 @@ let verifyLeaseWithStatus
         lease.SessionGeneration = currentGen
         && lease.HumanTurnID = currentTurnId
         && lease.CancelGeneration = currentCancelGen
+        && lease.Owner = "Fallback"
         && currentOwner = "Fallback"
         && not (runtime.IsForceStopped sessionID)
+        && runtime.GetActiveCompactionId sessionID = ""
+        && not (runtime.IsCompacted sessionID)
         && (match stateOpt with
             | Some s -> s.Lifecycle = FallbackLifecycle.Active
             | None -> false)
@@ -172,6 +175,11 @@ let ensureActiveAndOwner (runtime: FallbackRuntimeState) (sessionID: string) (le
     let isOwner = runtime.GetSessionOwner sessionID = "Fallback"
     let isLifecycleActive = state.Lifecycle = FallbackLifecycle.Active
     let isNotForceStopped = not (runtime.IsForceStopped sessionID)
+
+    let isNotCompacting =
+        runtime.GetActiveCompactionId sessionID = ""
+        && not (runtime.IsCompacted sessionID)
+
     let isTurnValid = runtime.GetHumanTurnId sessionID = lease.HumanTurnID
     let isGenValid = runtime.GetSessionGeneration sessionID = lease.SessionGeneration
 
@@ -179,8 +187,10 @@ let ensureActiveAndOwner (runtime: FallbackRuntimeState) (sessionID: string) (le
         runtime.GetCancelGeneration sessionID = lease.CancelGeneration
 
     isOwner
+    && lease.Owner = "Fallback"
     && isLifecycleActive
     && isNotForceStopped
+    && isNotCompacting
     && isTurnValid
     && isGenValid
     && isCancelGenValid
@@ -560,7 +570,33 @@ let handleEvent
                 None
 
         | Some evt ->
-            if evt = FallbackEvent.NewUserMessage then
+            let currentState = runtime.GetOrCreateState sessionID
+
+            let terminalFallbackState =
+                currentState.Lifecycle = FallbackLifecycle.Cancelled
+                || currentState.Lifecycle = FallbackLifecycle.TaskComplete
+
+            let settledFallbackLease =
+                match runtime.TryGetPendingLease sessionID with
+                | Some lease ->
+                    lease.Status = "settled"
+                    || lease.Status = "cancelled"
+                    || lease.Status = "invalidated"
+                | None -> false
+
+            // Terminal fallback state and settled leases are sticky.  A
+            // trailing session.idle must not reopen the state machine and
+            // manufacture another continuation; only a distinct human
+            // message can reset these gates.
+            if
+                evt <> FallbackEvent.NewUserMessage
+                && (terminalFallbackState || settledFallbackLease)
+            then
+                return
+                    { Consumed = false
+                      State = currentState },
+                    None
+            elif evt = FallbackEvent.NewUserMessage then
                 if runtime.GetSessionOwner sessionID = "Compaction" then
                     let activeComp = runtime.GetActiveCompactionId sessionID
                     let settleInfo = runtime.TryGetSettleInfo(sessionID, activeComp)
@@ -576,6 +612,11 @@ let handleEvent
                 let lastMsgId = runtime.GetLastHumanMessageId sessionID
 
                 if msgId = "" || msgId <> lastMsgId then
+                    match runtime.TryGetPendingLease sessionID with
+                    | Some lease ->
+                        do! finishContinuation runtime workspaceRoot sessionID lease "cancelled" "New user message"
+                    | None -> ()
+
                     match runtime.TryGetPendingNudgeLease sessionID with
                     | Some nudgeLease ->
                         do!
@@ -691,7 +732,6 @@ let handleEvent
                     return { Consumed = false; State = state }, None
                 else
                     let ns, action = transition state evt cfg chain
-                    runtime.UpdateState sessionID ns
 
                     let isAborting =
                         match evt with
@@ -724,6 +764,8 @@ let handleEvent
                             ()
                         | None -> ()
 
+                    runtime.UpdateState sessionID ns
+
                     let mutable finalState = ns
 
                     if evt = FallbackEvent.SessionBusy then
@@ -738,6 +780,16 @@ let handleEvent
                             let runningLease = { lease with Status = "running" }
                             runtime.SetPendingNudgeLease(sessionID, runningLease)
                         | _ -> ()
+
+                    // Compaction owns the session until its episode settles.
+                    // Keep the transition result for observability, but
+                    // suppress any fallback dispatch planned from a racing
+                    // idle/error event.
+                    let action =
+                        if runtime.GetActiveCompactionId sessionID <> "" || runtime.IsCompacted sessionID then
+                            FallbackAction.DoNothing
+                        else
+                            action
 
                     let! (finalState2, intentOpt) =
                         promise {

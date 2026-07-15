@@ -344,7 +344,6 @@ let getToolCapabilities (toolName: string) : ToolCapability list =
 let inlineJsonWarnTddProperty: obj =
     createObj
         [ "type", box "string"
-          "enum", box [| box "i-am-sure-i-have-followed-tdd-and-kolmogorov-principles-and-kept-todo-updated" |]
           "description",
           box "MUST acknowledge that tests are written first (TDD) and Kolmogorov discipline is followed."
           "x-wanxiangshu-soft-required", box true ]
@@ -352,10 +351,6 @@ let inlineJsonWarnTddProperty: obj =
 let inlineJsonWarnProperty: obj =
     createObj
         [ "type", box "string"
-          "enum",
-          box
-              [| box
-                     "it-is-not-possible-to-do-it-using-other-tools-and-only-run-tests-when-static-analysis-cannot-handle-it" |]
           "description",
           box
               "MUST acknowledge that this task cannot be done with other tools and only run tests when static analysis cannot handle it."
@@ -364,9 +359,17 @@ let inlineJsonWarnProperty: obj =
 let inlineJsonWarnReuseProperty: obj =
     createObj
         [ "type", box "string"
-          "enum", box [| box "this-task-is-not-suitable-to-be-completed-via-continue-tool" |]
           "description", box "MUST acknowledge that this task is not suitable for completion via continue tool."
           "x-wanxiangshu-soft-required", box true ]
+
+let private softenControlProperty (property: obj) : unit =
+    if not (Dyn.isNullish property) then
+        Dyn.deleteKey property "enum"
+        Dyn.deleteKey property "const"
+        Dyn.deleteKey property "pattern"
+        Dyn.deleteKey property "minLength"
+        Dyn.deleteKey property "maxLength"
+        Dyn.setKey property "x-wanxiangshu-soft-required" true
 
 
 let decorateAndValidateSchema (toolName: string) (schema: obj) : obj =
@@ -388,7 +391,7 @@ let decorateAndValidateSchema (toolName: string) (schema: obj) : obj =
                     let prop = Dyn.get props "warn_tdd"
 
                     if not (Dyn.isNullish prop) then
-                        Dyn.setKey prop "x-wanxiangshu-soft-required" true
+                        softenControlProperty prop
 
             if List.contains ProcessExecution caps then
                 if Dyn.isNullish (Dyn.get props "warn") then
@@ -397,7 +400,7 @@ let decorateAndValidateSchema (toolName: string) (schema: obj) : obj =
                     let prop = Dyn.get props "warn"
 
                     if not (Dyn.isNullish prop) then
-                        Dyn.setKey prop "x-wanxiangshu-soft-required" true
+                        softenControlProperty prop
 
             if List.contains SubagentDelegation caps then
                 if Dyn.isNullish (Dyn.get props "warn_reuse") then
@@ -406,7 +409,7 @@ let decorateAndValidateSchema (toolName: string) (schema: obj) : obj =
                     let prop = Dyn.get props "warn_reuse"
 
                     if not (Dyn.isNullish prop) then
-                        Dyn.setKey prop "x-wanxiangshu-soft-required" true
+                        softenControlProperty prop
 
 
             // Remove warn fields from required list to avoid host hard rejection

@@ -222,7 +222,8 @@ let private nudgeSnapshotFolder (st: NudgeSnapshotState) (e: WanEvent) : NudgeSn
     | k when
         (k = eventKindSubmitReviewWipRecorded
          || k = eventKindNudgeDedupCleared
-         || k = eventKindHumanTurnStarted)
+         || k = eventKindHumanTurnStarted
+         || k = eventKindNudgeSettled)
         ->
         { st with
             lastDispatchedAnchor = None
@@ -385,8 +386,8 @@ let private generationFolder
         if turnId <> "" && latestHumanTurn |> Option.exists (fun t -> t.TurnId = turnId) then
             sessionGen, cancelGen, activeContGen, activeCancelGen
         else
-            let nextGen = sessionGen + 1
-            nextGen, cancelGen, nextGen, cancelGen
+            let nextCancelGen = cancelGen + 1
+            sessionGen, nextCancelGen, sessionGen, nextCancelGen
     | k when k = eventKindUserAbortObserved -> sessionGen, cancelGen + 1, activeContGen, activeCancelGen
     | k when k = eventKindContinuationRequested ->
         let reqGen =
@@ -523,7 +524,7 @@ let private ownerAndLeaseFolder (st: OwnerEpisodeState) (e: WanEvent) : OwnerEpi
             { st with
                 HumanTurnOrdinal = newOrdinal
                 LastHumanTurnMessageId = msgId
-                CancelGeneration = st.CancelGeneration }
+                CancelGeneration = st.CancelGeneration + 1 }
             |> clearEpisodeState
 
     | k when k = eventKindUserAbortObserved ->
@@ -578,6 +579,12 @@ let private ownerAndLeaseFolder (st: OwnerEpisodeState) (e: WanEvent) : OwnerEpi
         let eventCompactionOrdinal =
             e.Payload |> Map.tryFind "compactionOrdinal" |> Option.bind parseIntOpt
 
+        let contextGeneration =
+            e.Payload
+            |> Map.tryFind "generation"
+            |> Option.bind parseIntOpt
+            |> Option.defaultValue st.CompactionGeneration
+
         let isMatch =
             eventCompactionId = ""
             || eventCompactionOrdinal.IsNone
@@ -586,7 +593,16 @@ let private ownerAndLeaseFolder (st: OwnerEpisodeState) (e: WanEvent) : OwnerEpi
                     c.CompactionID = eventCompactionId
                     && c.CompactionOrdinal = eventCompactionOrdinal.Value))
 
-        if isMatch then { st with IsCompacted = true } else st
+        if isMatch then
+            { st with
+                IsCompacted = true
+                CompactionGeneration =
+                    if eventCompactionId <> "" && eventCompactionOrdinal.IsSome then
+                        contextGeneration
+                    else
+                        st.CompactionGeneration }
+        else
+            st
 
     | k when k = eventKindCompactionSettled ->
         let eventOrdinal = compactionStageOrdinal st.CompactionOrdinal e

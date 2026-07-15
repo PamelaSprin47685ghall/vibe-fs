@@ -44,7 +44,15 @@ let createReviewStore () : ReviewStore =
         if sessionID = "" then
             ()
         else
-            match task with
+            let normalizedTask =
+                task
+                |> Option.bind (fun value ->
+                    if System.String.IsNullOrWhiteSpace value then
+                        None
+                    else
+                        Some value)
+
+            match normalizedTask with
             | Some nextTask ->
                 if
                     taskOf state.Registry sessionID <> Some nextTask

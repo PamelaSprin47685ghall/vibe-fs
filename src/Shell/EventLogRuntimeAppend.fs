@@ -423,6 +423,25 @@ let appendContextGenerationChangedOrFail (workspaceRoot: string) (sessionID: str
         workspaceRoot
         (buildEvent sessionID eventKindContextGenerationChanged payload (getTimestampMs().ToString()))
 
+/// Context-generation events for a compaction episode carry episode identity
+/// so replay can advance contextGeneration without mutating sessionGeneration.
+let appendCompactionContextGenerationChangedOrFail
+    (workspaceRoot: string)
+    (sessionID: string)
+    (newGen: int)
+    (compactionId: string)
+    (compactionOrdinal: int)
+    : JS.Promise<unit> =
+    let payload =
+        Map
+            [ "generation", newGen.ToString()
+              "compactionId", compactionId
+              "compactionOrdinal", compactionOrdinal.ToString() ]
+
+    appendOrFail
+        workspaceRoot
+        (buildEvent sessionID eventKindContextGenerationChanged payload (getTimestampMs().ToString()))
+
 let appendRouteObservedOrFail
     (workspaceRoot: string)
     (sessionID: string)

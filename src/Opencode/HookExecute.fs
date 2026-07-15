@@ -83,14 +83,22 @@ let toolExecuteBeforeFor (host: Host) (input: obj) (output: obj) : JS.Promise<un
 
         let inputArgs = argsFromHookInput input
 
+        // Host runtimes may expose a distinct output rewriter object while
+        // retaining the original input args reference for the real execute
+        // call.  Transfer controls to the gateway's execution object, then
+        // remove them from the original reference too.
         if
             not (Dyn.isNullish inputArgs)
             && Dyn.typeIs inputArgs "object"
             && Dyn.typeIs args "object"
         then
             for k in [| "warn_tdd"; "warn"; "warn_reuse" |] do
-                if Dyn.has inputArgs k && not (Dyn.has args k) then
+                if Dyn.has inputArgs k then
                     args?(k) <- inputArgs?(k)
+
+            if not (obj.ReferenceEquals(inputArgs, args)) then
+                for k in [| "warn_tdd"; "warn"; "warn_reuse" |] do
+                    Dyn.deleteKey inputArgs k
 
         match ToolHookRuntime.executeBeforeGateway tool args with
         | Result.Error e ->
@@ -163,12 +171,6 @@ let toolExecuteAfterFor
 
         match ToolHookRuntime.tryGetCompliance sessionID toolCallID with
         | Some env ->
-            ToolHookRuntime.restoreWarnToArgs decodedArgs env
-            let inputArgs = argsFromHookInput input
-            ToolHookRuntime.restoreWarnToArgs inputArgs env
-            let outputArgs = argsFromHookOutput output
-            ToolHookRuntime.restoreWarnToArgs outputArgs env
-
             let status =
                 if env.Cancelled then
                     ToolHookRuntime.ExecutionStatus.Cancelled

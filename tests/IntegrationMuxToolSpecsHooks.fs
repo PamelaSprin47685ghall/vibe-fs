@@ -55,8 +55,8 @@ let muxToolExecuteBeforeSetsUiLabelSpec () =
 
         let input = createObj [ "tool", box "coder"; "args", box args ]
         do! (before $ (input, createObj [ "args", box args ])) |> unbox<JS.Promise<unit>>
-        let ui = str args "_ui"
-        check "mux tool.execute.before sets _ui label" (ui.Contains "Refactor module X" && ui.Contains "Add tests")
+        let ui = str args "ui_"
+        check "mux tool.execute.before sets ui_ label" (ui.Contains "Refactor module X" && ui.Contains "Add tests")
     }
 
 let muxSystemTransformClearsOutputLengthSpec () =

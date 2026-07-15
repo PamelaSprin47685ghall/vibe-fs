@@ -82,7 +82,7 @@ let hookSchemaSetUiLabel () =
 
     let argsCoder = createObj [ "intents", box [| intentCoder |] ]
     setUiLabel argsCoder "coder"
-    check "coder label set" (string argsCoder?("_ui") = "do")
+    check "coder label set" (string argsCoder?("ui_") = "do")
 
     let intentInv =
         createObj
@@ -93,24 +93,24 @@ let hookSchemaSetUiLabel () =
 
     let argsInv = createObj [ "intents", box [| intentInv |] ]
     setUiLabel argsInv "investigator"
-    check "investigator label set" (string argsInv?("_ui") = "inv")
+    check "investigator label set" (string argsInv?("ui_") = "inv")
     let argsOther = createObj []
     setUiLabel argsOther "other"
-    check "other label not set" (isNullish (get argsOther "_ui"))
+    check "other label not set" (isNullish (get argsOther "ui_"))
 
 let hookSchemaStripUi () =
     let schema =
         createObj
             [ "type", box "object"
-              "properties", createObj [ "x", box 1; "_ui", box 2 ]
-              "required", box [| box "x"; box "_ui" |] ]
+              "properties", createObj [ "x", box 1; "ui_", box 2 ]
+              "required", box [| box "x"; box "ui_" |] ]
 
     let r = stripUiFromJsonSchema schema
     let props = get r "properties"
-    check "ui removed from properties" (isNullish (get props "_ui"))
+    check "ui removed from properties" (isNullish (get props "ui_"))
     check "x kept" (not (isNullish (get props "x")))
     let req = get r "required"
-    check "ui removed from required" (not (Array.contains (box "_ui") (unbox<obj[]> req)))
+    check "ui removed from required" (not (Array.contains (box "ui_") (unbox<obj[]> req)))
 
 let hookSchemaInjectWarnTdd () =
     let schema =

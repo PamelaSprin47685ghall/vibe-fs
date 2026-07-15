@@ -436,7 +436,7 @@ let private actorRegistryWorkspaceIsolation () =
 
     SubsessionActorRegistry.Clear()
 
-let private routeNoneTurnIdEvidenceNotMergedWhenActive () =
+let private routeNoneTurnIdEvidenceAttributedToCurrentTurn () =
     promise {
         let store = MemorySubsessionEventStore()
         let sid = "child-v40-router-none"
@@ -465,7 +465,7 @@ let private routeNoneTurnIdEvidenceNotMergedWhenActive () =
 
         let targetEvidence =
             { CurrentTurnEvidence.empty with
-                Assistant = AssistantSnapshot("", 0L, "should-not-merge", Some NormalFinish) }
+                Assistant = AssistantSnapshot("", 0L, "investigator-report", Some NormalFinish) }
 
         let obs =
             { TurnId = None
@@ -479,10 +479,13 @@ let private routeNoneTurnIdEvidenceNotMergedWhenActive () =
         | Running(_, _, currentEvidence) ->
             match currentEvidence.Assistant with
             | AssistantSnapshot(_, _, text, _) ->
-                check
-                    "EvidenceUpdated with TurnId = None must NOT be mapped to current turn and merged"
-                    (text <> "should-not-merge")
-            | _ -> check "evidence remains empty" true
+                equal
+                    "EvidenceUpdated with TurnId = None is attributed to current turn and merged"
+                    "investigator-report"
+                    text
+            | NoAssistant ->
+                fail "TurnId=None evidence was dropped — host without nonce propagation loses all assistant content"
+            | other -> fail ("unexpected assistant evidence: " + string other)
         | other -> fail ("expected actor to remain in Running state, got " + string other)
     }
 
@@ -507,6 +510,6 @@ let run () =
                   opencodeQuiescenceStillRunning ()
                   opencodeQuiescenceStopped ()
                   ompQuiescenceHonestUnknown ()
-                  routeNoneTurnIdEvidenceNotMergedWhenActive () ]
+                  routeNoneTurnIdEvidenceAttributedToCurrentTurn () ]
             |> Promise.map ignore
     }

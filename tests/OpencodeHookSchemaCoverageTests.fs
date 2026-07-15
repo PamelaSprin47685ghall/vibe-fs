@@ -32,7 +32,7 @@ let opencodeHookSchemaSetUiLabelCoder () =
                      ) |] ]
 
     setUiLabel args "coder"
-    check "coder _ui set" (not (Dyn.isNullish (Dyn.get args "_ui")))
+    check "coder ui_ set" (not (Dyn.isNullish (Dyn.get args "ui_")))
 
 let opencodeHookSchemaSetUiLabelInvestigator () =
     let args =
@@ -46,7 +46,7 @@ let opencodeHookSchemaSetUiLabelInvestigator () =
                             entries = [||] |} |] ]
 
     setUiLabel args "investigator"
-    check "investigator _ui set" (not (Dyn.isNullish (Dyn.get args "_ui")))
+    check "investigator ui_ set" (not (Dyn.isNullish (Dyn.get args "ui_")))
 
 let opencodeHookSchemaSetUiLabelOther () =
     let args =
@@ -60,7 +60,7 @@ let opencodeHookSchemaSetUiLabelOther () =
                             do_not_touch = [||] |} |] ]
 
     setUiLabel args "other"
-    check "other _ui not set" (Dyn.isNullish (Dyn.get args "_ui"))
+    check "other ui_ not set" (Dyn.isNullish (Dyn.get args "ui_"))
 
 // ── stripUiFromJsonSchema ─────────────────────────────────────────────────────
 
@@ -68,11 +68,11 @@ let opencodeHookSchemaStripUiFromJsonSchemaWithUi () =
     let schema =
         createObj
             [ "type", box "object"
-              "properties", createObj [ "name", box (createObj []); "_ui", box (createObj []) ] ]
+              "properties", createObj [ "name", box (createObj []); "ui_", box (createObj []) ] ]
 
     let result = stripUiFromJsonSchema schema
     check "type preserved" (Dyn.str result "type" = "object")
-    check "_ui removed" (Dyn.isNullish (Dyn.get (Dyn.get result "properties") "_ui"))
+    check "ui_ removed" (Dyn.isNullish (Dyn.get (Dyn.get result "properties") "ui_"))
     check "name kept" (not (Dyn.isNullish (Dyn.get (Dyn.get result "properties") "name")))
 
 let opencodeHookSchemaStripUiFromJsonSchemaNoUi () =
@@ -80,7 +80,7 @@ let opencodeHookSchemaStripUiFromJsonSchemaNoUi () =
         createObj [ "type", box "object"; "properties", createObj [ "name", box (createObj []) ] ]
 
     let result = stripUiFromJsonSchema schema
-    check "type preserved no _ui" (Dyn.str result "type" = "object")
+    check "type preserved no ui_" (Dyn.str result "type" = "object")
     check "name still present" (not (Dyn.isNullish (Dyn.get (Dyn.get result "properties") "name")))
 
 let opencodeHookSchemaStripUiFromJsonSchemaNull () =

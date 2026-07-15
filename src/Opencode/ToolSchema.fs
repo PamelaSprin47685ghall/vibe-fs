@@ -128,7 +128,7 @@ let uiParam: obj =
         (call0 (str ()) "optional")
         "describe"
         (box
-            "Internal UI label. Visible to the LLM and UI, but the LLM must never fill it. Leave `_ui` unset; the tool.execute.before hook populates it automatically.")
+            "Internal UI label. Visible to the LLM and UI, but the LLM must never fill it. Leave `ui_` unset; the tool.execute.before hook populates it automatically.")
 
 let strArrayReq (desc: string) : obj =
     call1 (arr (strMin 1 "")) "describe" (box desc)

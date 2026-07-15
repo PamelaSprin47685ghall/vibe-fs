@@ -35,13 +35,12 @@ let toolHelpers () =
 let hookSchemaWarnTddProps () =
     let p = warnTddProperty
     equal "warnTdd type" "string" (Dyn.str p "type")
-    equal "warnTdd minLength" 1 (unbox<int> (Dyn.get p "minLength"))
+    check "warnTdd has no hard minLength" (Dyn.isNullish (Dyn.get p "minLength"))
     check "warnTdd desc non-empty" ((Dyn.str p "description") <> "")
-    let enumArr = unbox<obj[]> (Dyn.get p "enum")
-    check "warnTdd enum has value" (enumArr.Length > 0)
+    check "warnTdd has no hard enum" (Dyn.isNullish (Dyn.get p "enum"))
     let ip = inlineJsonWarnTddProperty
     equal "inline type" "string" (Dyn.str ip "type")
-    check "inline enum" (Dyn.isArray (Dyn.get ip "enum"))
+    check "inline has no hard enum" (Dyn.isNullish (Dyn.get ip "enum"))
 
 let hookSchemaBuildWorkBacklogSchema () =
     let s = buildWorkBacklogSchema ()

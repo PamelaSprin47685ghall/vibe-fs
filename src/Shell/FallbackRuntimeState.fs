@@ -115,6 +115,14 @@ type FallbackRuntimeState() =
                 consumed <- clearConsumedMap consumed sessionID
                 injectedModels <- Map.remove sessionID injectedModels
                 injectedAts <- Map.remove sessionID injectedAts
+                pendingLeases <- Map.remove sessionID pendingLeases
+                pendingNudgeLeases <- Map.remove sessionID pendingNudgeLeases
+                activeNudgeNonces <- Map.remove sessionID activeNudgeNonces
+
+                match this.GetSessionOwner sessionID with
+                | "Fallback"
+                | "Nudge" -> this.SetSessionOwner sessionID "None"
+                | _ -> ()
 
                 { state with
                     Phase = FallbackPhase.Idle
@@ -149,8 +157,14 @@ type FallbackRuntimeState() =
     member _.IncrementHumanTurnId(sessionID: string) : string =
         let nextId = "turn-" + System.Guid.NewGuid().ToString("N")
         humanTurnIds <- Map.add sessionID nextId humanTurnIds
-        let currentGen = Map.tryFind sessionID sessionGenerations |> Option.defaultValue 0
-        sessionGenerations <- Map.add sessionID (currentGen + 1) sessionGenerations
+
+        // A human turn is a new causality branch, not a new session lifecycle.
+        // Keep sessionGeneration stable; cancelGeneration invalidates effects
+        // belonging to the previous turn.
+        let currentCancelGen =
+            Map.tryFind sessionID cancelGenerations |> Option.defaultValue 0
+
+        cancelGenerations <- Map.add sessionID (currentCancelGen + 1) cancelGenerations
 
         humanTurnOrdinals <-
             Map.add
@@ -274,7 +288,11 @@ type FallbackRuntimeState() =
                 && lease.SessionGeneration = this.GetSessionGeneration(sessionID)
                 && lease.HumanTurnID = this.GetHumanTurnId(sessionID)
                 && lease.CancelGeneration = this.GetCancelGeneration(sessionID)
+                && lease.Owner = "Fallback"
                 && this.GetSessionOwner(sessionID) = "Fallback"
+                && (match this.TryGetState sessionID with
+                    | Some state -> state.Lifecycle = FallbackLifecycle.Active
+                    | None -> false)
 
             if isCurrent then
                 pendingLeases <- Map.add sessionID (box { lease with Status = nextStatus }) pendingLeases
@@ -317,7 +335,11 @@ type FallbackRuntimeState() =
                 && lease.SessionGeneration = this.GetSessionGeneration(sessionID)
                 && lease.HumanTurnID = this.GetHumanTurnId(sessionID)
                 && lease.CancelGeneration = this.GetCancelGeneration(sessionID)
+                && lease.Owner = "Nudge"
                 && this.GetSessionOwner(sessionID) = "Nudge"
+                && (match this.TryGetState sessionID with
+                    | Some state -> state.Lifecycle = FallbackLifecycle.Active
+                    | None -> false)
 
             if isCurrent then
                 pendingNudgeLeases <- Map.add sessionID { lease with Status = nextStatus } pendingNudgeLeases

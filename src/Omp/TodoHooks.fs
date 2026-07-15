@@ -53,12 +53,9 @@ let toolResultHandler (_pi: obj) (_reviewStore: ReviewStore) (event: obj) (ctx: 
         let envOpt = ToolHookRuntime.tryGetCompliance sessionId toolCallId
 
         try
-            // 1. 恢复控制字段
-            match envOpt with
-            | Some env -> ToolHookRuntime.restoreWarnToArgs args env
-            | None -> ()
-
-            // 2. 收集 warn violations & 3. 收集 todo report violations
+            // Collect warn violations & todo report violations.  Control
+            // fields were removed in the pre-execute gateway and must stay
+            // absent from the post-execute args object.
             let warnViolations =
                 match envOpt with
                 | Some env -> env.Violations
@@ -74,7 +71,7 @@ let toolResultHandler (_pi: obj) (_reviewStore: ReviewStore) (event: obj) (ctx: 
 
             let violations = warnViolations @ todoReportViolations
 
-            // 4. 执行 syntax、livelock、todo 标准化等业务处理
+            // 2. 执行 syntax、livelock、todo 标准化等业务处理
             let rawContent = getToolResultText event
 
             let isLivelock =
@@ -166,7 +163,7 @@ let toolResultHandler (_pi: obj) (_reviewStore: ReviewStore) (event: obj) (ctx: 
                     if textAfterSyntax <> "" && not isError then
                         businessProcessedText <- todoWriteOutput methodologies
 
-            // 5. 确定最终 Success / Failure / Cancelled 状态
+            // 3. 确定最终 Success / Failure / Cancelled 状态
             let isError =
                 Dyn.truthy (Dyn.get event "isError")
                 || (let err = Dyn.get event "error" in not (Dyn.isNullish err) && string err <> "")
@@ -180,13 +177,13 @@ let toolResultHandler (_pi: obj) (_reviewStore: ReviewStore) (event: obj) (ctx: 
                     else
                         ToolHookRuntime.ExecutionStatus.Success
 
-            // 6. 在最终结果上追加合并后的批评
+            // 4. 在最终结果上追加合并后的批评
             let criticism =
                 ToolHookRuntime.appendCriticism businessProcessedText violations status
 
             setToolResultText event criticism
         finally
-            // 7. finally 删除 compliance envelope
+            // 5. finally 删除 compliance envelope
             if envOpt.IsSome then
                 ToolHookRuntime.removeCompliance sessionId toolCallId
     }

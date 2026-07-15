@@ -71,7 +71,7 @@ let argsFromHookOutput (output: obj) : obj = Dyn.get output "args"
 let setHookArgs (output: obj) (args: obj) : unit = output?("args") <- args
 
 /// Args for `tool.execute.before`: prefer `output.args` (host rewriter slot), else
-/// `input.args`, else empty object written onto `output` so warn/_ui hooks always run.
+/// `input.args`, else empty object written onto `output` so warn/ui_ hooks always run.
 let resolveHookExecuteArgs (input: obj) (output: obj) : obj =
     let fromOutput = argsFromHookOutput output
 

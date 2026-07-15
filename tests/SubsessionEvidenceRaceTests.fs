@@ -178,7 +178,82 @@ let mismatchedTurnEvidenceDuringDispatchingIsRejected () =
         | other -> fail ("expected NoChange StaleTurnMarker for mismatched turn, got " + string other)
     | other -> fail ("expected Dispatching, got " + string other)
 
+/// Unattributed evidence (TurnId = None) in Running must be accepted and merged.
+///
+/// Hosts do not always propagate our nonce/TurnId in their events. When they
+/// don't, ExtractTurnObservation produces TurnId = None. For child sessions
+/// there is exactly one active turn — unattributed evidence necessarily belongs
+/// to it. Dropping it causes "No assistant message in current turn" even though
+/// the subagent produced real output.
+let unattributedEvidenceInRunningIsAccepted () =
+    let d0 = mustDecide (Available { SessionId = sid }) (StartRun request)
+
+    match d0.NextState with
+    | Dispatching(_, plan, _) ->
+        match decide d0.NextState (DispatchAccepted(plan.TurnId, OrderedTurnMarkerObserved)) with
+        | Ok(Decided d1) ->
+            match d1.NextState with
+            | Running _ ->
+                let unattributed =
+                    { CurrentTurnEvidence.empty with
+                        Assistant = AssistantSnapshot("", 0L, "investigator report found", Some NormalFinish) }
+
+                match
+                    decide
+                        d1.NextState
+                        (EvidenceUpdated
+                            { TurnId = None
+                              Evidence = unattributed })
+                with
+                | Ok(Decided d2) ->
+                    match d2.NextState with
+                    | Running(_, _, evidence) ->
+                        match evidence.Assistant with
+                        | AssistantSnapshot(_, _, text, _) ->
+                            equal "unattributed evidence accepted in Running" "investigator report found" text
+                        | NoAssistant -> fail "unattributed evidence was dropped in Running"
+                        | other -> fail ("unexpected assistant evidence: " + string other)
+                    | other -> fail ("expected Running, got " + string other)
+                | Ok(NoChange _) ->
+                    fail "unattributed evidence must not be dropped as UnattributableObservation in Running"
+                | Error e -> fail ("decision error: " + string e)
+            | other -> fail ("expected Running, got " + string other)
+        | other -> fail ("unexpected on DispatchAccepted: " + string other)
+    | other -> fail ("expected Dispatching, got " + string other)
+
+/// Same invariant for Dispatching: unattributed evidence must be buffered.
+let unattributedEvidenceInDispatchingIsBuffered () =
+    let d0 = mustDecide (Available { SessionId = sid }) (StartRun request)
+
+    match d0.NextState with
+    | Dispatching(_, plan, _) ->
+        let unattributed =
+            { CurrentTurnEvidence.empty with
+                Assistant = AssistantSnapshot("", 0L, "early report", Some NormalFinish) }
+
+        match
+            decide
+                d0.NextState
+                (EvidenceUpdated
+                    { TurnId = None
+                      Evidence = unattributed })
+        with
+        | Ok(Decided d1) ->
+            match d1.NextState with
+            | Dispatching(_, _, evidence) ->
+                match evidence.Assistant with
+                | AssistantSnapshot(_, _, text, _) ->
+                    equal "unattributed evidence buffered in Dispatching" "early report" text
+                | NoAssistant -> fail "unattributed evidence was dropped in Dispatching"
+                | other -> fail ("unexpected assistant evidence: " + string other)
+            | other -> fail ("expected Dispatching, got " + string other)
+        | Ok(NoChange _) -> fail "unattributed evidence must not be dropped in Dispatching"
+        | Error e -> fail ("decision error: " + string e)
+    | other -> fail ("expected Dispatching, got " + string other)
+
 let run () =
     evidenceDuringDispatchingMustSurviveIntoRunning ()
     toolResultDuringDispatchingMustSurviveIntoRunning ()
     mismatchedTurnEvidenceDuringDispatchingIsRejected ()
+    unattributedEvidenceInRunningIsAccepted ()
+    unattributedEvidenceInDispatchingIsBuffered ()

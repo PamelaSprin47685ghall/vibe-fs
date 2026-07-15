@@ -24,10 +24,10 @@ let private effectSchemaNs: obj = jsNative
 [<Import("toJSONSchema", "zod/v4")>]
 let private zodToJsonSchema (schema: obj) (opts: obj) : obj = jsNative
 
-/// Write `_ui` directly onto the host's args reference when the tool exposes a
+/// Write `ui_` directly onto the host's args reference when the tool exposes a
 /// UI label (coder/investigator). The host keeps the same args object it passed
 /// in, so the label survives into the message history the UI reads. Replacing
-/// the reference dropped `_ui` — the host never saw the new object.
+/// the reference dropped `ui_` — the host never saw the new object.
 let setUiLabel (args: obj) (tool: string) : unit =
     let raw = intentsRawFromArgs args
 
@@ -38,7 +38,7 @@ let setUiLabel (args: obj) (tool: string) : unit =
         | _ -> Result.Error ""
 
     match labelResult with
-    | Result.Ok label when label <> "" -> args?("_ui") <- box label
+    | Result.Ok label when label <> "" -> args?("ui_") <- box label
     | _ -> ()
 
 let filterRequired (excludeKey: string) (required: obj) : obj =
@@ -49,7 +49,7 @@ let filterRequired (excludeKey: string) (required: obj) : obj =
         |> Array.choose (fun item -> let key = string item in if key = excludeKey then None else Some(box key))
         |> box
 
-let requiredWithoutUi (required: obj) : obj = filterRequired "_ui" required
+let requiredWithoutUi (required: obj) : obj = filterRequired "ui_" required
 
 let requiredWithoutTaskId (required: obj) : obj = filterRequired "task_id" required
 
@@ -76,7 +76,7 @@ let stripUiFromJsonSchema (schema: obj) : obj =
         else
             let nextProperties =
                 Dyn.keys properties
-                |> Array.choose (fun key -> if key = "_ui" then None else Some(key, get properties key))
+                |> Array.choose (fun key -> if key = "ui_" then None else Some(key, get properties key))
                 |> createObj
 
             createObj
@@ -166,28 +166,24 @@ let rewriteToolJsonSchema (setKey: obj -> string -> obj -> unit) (rewrite: obj -
 let warnTddProperty: obj =
     createObj
         [ "type", box "string"
-          "minLength", box 1
           "description", box Params.warnTddDesc
-          "enum", [| WarnTdd.canonicalValue |] |> box ]
+          "x-wanxiangshu-soft-required", box true ]
 
 let inlineJsonWarnTddProperty: obj =
     createObj
         [ "type", box "string"
-          "enum", [| WarnTdd.canonicalValue |] |> box
           "description", box Params.warnTddDesc
           "x-wanxiangshu-soft-required", box true ]
 
 let inlineJsonWarnProperty: obj =
     createObj
         [ "type", box "string"
-          "enum", [| WarnTdd.warnCanonicalValue |] |> box
           "description", box WarnTdd.warnDescription
           "x-wanxiangshu-soft-required", box true ]
 
 let inlineJsonWarnReuseProperty: obj =
     createObj
         [ "type", box "string"
-          "enum", [| WarnTdd.warnReuseCanonicalValue |] |> box
           "description", box WarnTdd.warnReuseDescription
           "x-wanxiangshu-soft-required", box true ]
 

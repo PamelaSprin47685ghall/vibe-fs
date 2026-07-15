@@ -77,6 +77,9 @@ let appendCompactionSettledOrFail =
 let appendContextGenerationChangedOrFail =
     EventLogRuntimeAppend.appendContextGenerationChangedOrFail
 
+let appendCompactionContextGenerationChangedOrFail =
+    EventLogRuntimeAppend.appendCompactionContextGenerationChangedOrFail
+
 let appendRouteObservedOrFail = EventLogRuntimeAppend.appendRouteObservedOrFail
 
 let appendNudgeRequestedOrFail = EventLogRuntimeAppend.appendNudgeRequestedOrFail

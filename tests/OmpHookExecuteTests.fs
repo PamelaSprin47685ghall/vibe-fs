@@ -7,7 +7,7 @@ open Wanxiangshu.Shell.Dyn
 open Wanxiangshu.Omp.HookExecute
 
 /// applyToolResultHook on a `coder` invocation must mirror the agent's intents
-/// onto `_ui` so the chat UI shows a one-line summary before the agent finishes.
+/// onto `ui_` so the chat UI shows a one-line summary before the agent finishes.
 let hookCoderInjectUiLabel () =
     let args =
         createObj
@@ -29,7 +29,7 @@ let hookCoderInjectUiLabel () =
                                        guide = "Call applyToolResultHook before backlog append." |} |] |} |] ]
 
     applyToolResultHook "coder" args
-    let label = get args "_ui"
+    let label = get args "ui_"
     check "ui label present" (not (isNullish label))
     let text = string label
     check "ui label contains first objective" (text.Contains "Add submit_review wip field")
@@ -37,7 +37,7 @@ let hookCoderInjectUiLabel () =
     check "ui label joins with semicolon space" (text.Contains "; ")
 
 /// applyToolResultHook on an `investigator` invocation must produce a single
-/// joined label of all its entries. Without `_ui` injection the chat UI is
+/// joined label of all its entries. Without `ui_` injection the chat UI is
 /// stuck waiting for a verbose tool call.
 let hookInvestigatorInjectUiLabel () =
     let args =
@@ -50,19 +50,19 @@ let hookInvestigatorInjectUiLabel () =
                             questions = [| "Is the queue map keyed by workspaceRoot?" |] |} |] ]
 
     applyToolResultHook "investigator" args
-    let label = get args "_ui"
+    let label = get args "ui_"
     check "investigator ui label present" (not (isNullish label))
     let text = string label
     check "investigator label text" (text.Contains "Confirm per-workspace writeQueues contract")
 
 /// For tools that do not declare intents, applyToolResultHook must not invent
-/// a UI label. `_ui` is opt-in, never fabricated.
+/// a UI label. `ui_` is opt-in, never fabricated.
 let hookNonSubagentDoesNotInjectUiLabel () =
     let args = createObj []
     applyToolResultHook "read" args
-    check "read args untouched" (isNullish (get args "_ui"))
+    check "read args untouched" (isNullish (get args "ui_"))
     applyToolResultHook "executor" args
-    check "executor args untouched" (isNullish (get args "_ui"))
+    check "executor args untouched" (isNullish (get args "ui_"))
 
 /// pi accepts three names for the patch tool. The hook must rewrite
 /// `apply_patch` payload (`patch` key) into the canonical `patchText` key so

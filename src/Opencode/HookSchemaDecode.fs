@@ -36,18 +36,33 @@ let private removeRequiredKey (schema: obj) (key: string) : unit =
             let nextReq = arr |> Array.filter (fun x -> string x <> key)
             schema?("required") <- box nextReq
 
+let private softenControlProperty (property: obj) (description: string) : unit =
+    if not (isNullish property) then
+        // These controls are advisory.  Remove executable constraints that
+        // would make a missing, short, or non-canonical value a host reject.
+        Dyn.deleteKey property "enum"
+        Dyn.deleteKey property "const"
+        Dyn.deleteKey property "pattern"
+        Dyn.deleteKey property "minLength"
+        Dyn.deleteKey property "maxLength"
+        property?("x-wanxiangshu-soft-required") <- true
+
+        if Dyn.str property "description" = "" then
+            property?("description") <- box description
+
 let private injectWarnTddIntoJsonSchemaInPlace (schema: obj) : unit =
     let props = get schema "properties"
 
     if not (isNullish props) then
         if isNullish (get props "warn_tdd") then
             props?("warn_tdd") <- inlineJsonWarnTddProperty
+        else
+            softenControlProperty (get props "warn_tdd") Params.warnTddDesc
 
         appendRequiredWarnTddInPlace schema
 
 let private injectWarnTddIntoArgsShapeInPlace (shape: obj) : unit =
-    if isNullish (get shape "warn_tdd") then
-        shape?("warn_tdd") <- enumOpt [| WarnTdd.canonicalValue |] Params.warnTddDesc
+    shape?("warn_tdd") <- strOpt Params.warnTddDesc
 
 /// Inject warn_tdd into an Opencode tool schema in place.
 let injectWarnTddIntoJsonSchema (schema: obj) : obj =
@@ -72,12 +87,13 @@ let private injectWarnIntoJsonSchemaInPlace (schema: obj) : unit =
     if not (isNullish props) then
         if isNullish (get props "warn") then
             props?("warn") <- inlineJsonWarnProperty
+        else
+            softenControlProperty (get props "warn") WarnTdd.warnDescription
 
         appendRequiredWarnInPlace schema
 
 let private injectWarnIntoArgsShapeInPlace (shape: obj) : unit =
-    if isNullish (get shape "warn") then
-        shape?("warn") <- enumOpt [| WarnTdd.warnCanonicalValue |] WarnTdd.warnDescription
+    shape?("warn") <- strOpt WarnTdd.warnDescription
 
 /// Inject warn into an Opencode tool schema in place.
 let injectWarnIntoJsonSchema (schema: obj) : obj =
@@ -122,12 +138,13 @@ let private injectWarnReuseIntoJsonSchemaInPlace (schema: obj) : unit =
     if not (isNullish props) then
         if isNullish (get props "warn_reuse") then
             props?("warn_reuse") <- inlineJsonWarnReuseProperty
+        else
+            softenControlProperty (get props "warn_reuse") WarnTdd.warnReuseDescription
 
         appendRequiredWarnReuseInPlace schema
 
 let private injectWarnReuseIntoArgsShapeInPlace (shape: obj) : unit =
-    if isNullish (get shape "warn_reuse") then
-        shape?("warn_reuse") <- enumOpt [| WarnTdd.warnReuseCanonicalValue |] WarnTdd.warnReuseDescription
+    shape?("warn_reuse") <- strOpt WarnTdd.warnReuseDescription
 
 /// Inject warn_reuse into an Opencode tool schema in place.
 let injectWarnReuseIntoJsonSchema (schema: obj) : obj =

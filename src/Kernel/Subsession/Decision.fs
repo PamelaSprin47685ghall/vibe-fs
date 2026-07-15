@@ -419,7 +419,9 @@ let decide (state: SubsessionState) (cmd: Command) : Result<DecisionResult, Deci
             let merged = CurrentTurnEvidence.merge bufferedEvidence obs.Evidence
             Ok(decided (Dispatching(ctx, plan, merged)) [] [])
         | Some _ -> Ok(noChange StaleTurnMarker)
-        | None -> Ok(noChange UnattributableObservation)
+        | None ->
+            let merged = CurrentTurnEvidence.merge bufferedEvidence obs.Evidence
+            Ok(decided (Dispatching(ctx, plan, merged)) [] [])
 
     | Dispatching _, SessionIdleObserved -> Ok(noChange DuplicateIdleBeforeTurnMarker)
 
@@ -716,7 +718,9 @@ let decide (state: SubsessionState) (cmd: Command) : Result<DecisionResult, Deci
             let merged = CurrentTurnEvidence.merge evidence obs.Evidence
             Ok(decided (Running(ctx, started, merged)) [] [])
         | Some _ -> Ok(noChange StaleTurnMarker)
-        | None -> Ok(noChange UnattributableObservation)
+        | None ->
+            let merged = CurrentTurnEvidence.merge evidence obs.Evidence
+            Ok(decided (Running(ctx, started, merged)) [] [])
 
     | Running(ctx, started, _), CancelRequested -> Ok(beginAbort ctx (Started started) UserRequested FinishCancelled)
 
@@ -773,7 +777,9 @@ let decide (state: SubsessionState) (cmd: Command) : Result<DecisionResult, Deci
             let merged = CurrentTurnEvidence.merge evidence obs.Evidence
             Ok(decided (Draining(ctx, started, error, merged)) [] [])
         | Some _ -> Ok(noChange StaleTurnMarker)
-        | None -> Ok(noChange UnattributableObservation)
+        | None ->
+            let merged = CurrentTurnEvidence.merge evidence obs.Evidence
+            Ok(decided (Draining(ctx, started, error, merged)) [] [])
 
     | Draining(ctx, started, _, _), CancelRequested ->
         Ok(beginAbort ctx (Started started) UserRequested FinishCancelled)

@@ -44,7 +44,12 @@ let routeToChild (workspaceRoot: string) (sessionId: string) (cmd: Command) : JS
         match SubsessionActorRegistry.TryGet workspaceRoot sessionId with
         | Some actor ->
             match cmd with
-            | EvidenceUpdated obs when obs.TurnId.IsNone -> return true
+            | EvidenceUpdated obs when obs.TurnId.IsNone ->
+                match actor.GetCurrentTurn() with
+                | Some turnId -> do! actor.Post(EvidenceUpdated { obs with TurnId = Some turnId })
+                | None -> ()
+
+                return true
             | _ ->
                 do! actor.Post cmd
                 return true

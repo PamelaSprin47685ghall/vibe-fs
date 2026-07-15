@@ -18,7 +18,7 @@ let private setUiLabel (args: obj) (toolName: string) : unit =
         | _ -> Result.Error ""
 
     match labelResult with
-    | Result.Ok label when label <> "" -> args?("_ui") <- box label
+    | Result.Ok label when label <> "" -> args?("ui_") <- box label
     | _ -> ()
 
 /// pi accepts three names for the patch tool. Normalise them to a single
@@ -75,7 +75,7 @@ let applyPreExecuteHookWithIds
             None
 
 /// Shared pre-execute normalisation: patch argument unification to `patchText`
-/// and `_ui` label injection for subagent intents. Called by both the
+/// and `ui_` label injection for subagent intents. Called by both the
 /// `tool_call` pre-execute hook and the `tool_result` post-execute hook
 /// (the latter via `applyToolCallHook` to keep the logic in one place).
 let applyPreExecuteHook (toolName: string) (args: obj) : string option =

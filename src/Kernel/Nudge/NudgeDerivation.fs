@@ -51,17 +51,22 @@ let sessionSnapshotFromFold
 let deriveAction (snapshot: Snapshot) : NudgeAction =
     let text = snapshot.lastAssistantMessage.Trim()
 
+    let reviewTaskAvailable =
+        match snapshot.reviewLoop with
+        | Some info -> not (System.String.IsNullOrWhiteSpace info.originalTask)
+        | None -> true
+
     match snapshot.blockStatus, snapshot.workState with
     | NudgeBlockStatus.Blocked, _ -> NudgeNone
     | _, SessionWorkState.Idle -> NudgeNone
     | _, SessionWorkState.RunnerWithBacklog
     | _, SessionWorkState.AllAxes -> NudgeNone
-    | _, SessionWorkState.RunnerWithLoop when not (skipsReview text) -> NudgeLoop
+    | _, SessionWorkState.RunnerWithLoop when reviewTaskAvailable && not (skipsReview text) -> NudgeLoop
     | _, SessionWorkState.RunnerWithLoop -> NudgeNone
     | _, SessionWorkState.RunnerOnly -> NudgeRunner
     | _, SessionWorkState.LoopWithBacklog when not (skipsTodo text) -> NudgeTodo
-    | _, SessionWorkState.LoopWithBacklog when not (skipsReview text) -> NudgeLoop
-    | _, SessionWorkState.LoopIdle when not (skipsReview text) -> NudgeLoop
+    | _, SessionWorkState.LoopWithBacklog when reviewTaskAvailable && not (skipsReview text) -> NudgeLoop
+    | _, SessionWorkState.LoopIdle when reviewTaskAvailable && not (skipsReview text) -> NudgeLoop
     | _, SessionWorkState.BacklogOnly when not (skipsTodo text) -> NudgeTodo
     | _ -> NudgeNone
 
@@ -70,7 +75,7 @@ let selectNudgePrompt (host: Host) (action: NudgeAction) (snapshot: Snapshot) : 
     | NudgeTodo -> Some(todoNudgePromptFor snapshot.todos)
     | NudgeLoop ->
         match snapshot.reviewLoop with
-        | Some info ->
+        | Some info when not (System.String.IsNullOrWhiteSpace info.originalTask) ->
             let fields =
                 [ yamlField "original_task" info.originalTask
                   yamlField "review_loop_id" info.reviewLoopId
@@ -88,6 +93,7 @@ let selectNudgePrompt (host: Host) (action: NudgeAction) (snapshot: Snapshot) : 
                        [])
 
             Some(frontMatterPrompt fields (loopNudgePromptFor snapshot.todos))
+        | Some _ -> None
         | None -> None
     | NudgeRunner -> Some(runnerNudgePromptFor host)
     | _ -> None

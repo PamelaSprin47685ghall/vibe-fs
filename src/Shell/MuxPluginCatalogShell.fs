@@ -28,6 +28,15 @@ let addRequired (schema: obj) (key: string) : unit =
     else
         schema?("required") <- box [| box key |]
 
+let private softenControlProperty (property: obj) : unit =
+    if not (isNullish property) then
+        Dyn.deleteKey property "enum"
+        Dyn.deleteKey property "const"
+        Dyn.deleteKey property "pattern"
+        Dyn.deleteKey property "minLength"
+        Dyn.deleteKey property "maxLength"
+        property?("x-wanxiangshu-soft-required") <- true
+
 let injectWarnTddIntoMuxSchema (tool: ToolDefinition) : ToolDefinition =
     if WarnTdd.isModificationTool tool.name then
         let props = tool.parameters.properties
@@ -37,12 +46,11 @@ let injectWarnTddIntoMuxSchema (tool: ToolDefinition) : ToolDefinition =
                 box (
                     createObj
                         [| "type", box "string"
-                           "enum", box [| box WarnTdd.canonicalValue |]
                            "description", box WarnTdd.warnTddDescription
                            "x-wanxiangshu-soft-required", box true |]
                 )
         else
-            props?("warn_tdd")?("x-wanxiangshu-soft-required") <- true
+            softenControlProperty (props?warn_tdd)
 
     tool
 
@@ -55,12 +63,11 @@ let injectWarnIntoMuxSchema (tool: ToolDefinition) : ToolDefinition =
                 box (
                     createObj
                         [| "type", box "string"
-                           "enum", box [| box WarnTdd.warnCanonicalValue |]
                            "description", box WarnTdd.warnDescription
                            "x-wanxiangshu-soft-required", box true |]
                 )
         else
-            props?("warn")?("x-wanxiangshu-soft-required") <- true
+            softenControlProperty (props?warn)
 
     tool
 
@@ -77,11 +84,10 @@ let injectWarnReuseIntoMuxSchema (tool: ToolDefinition) : ToolDefinition =
                 box (
                     createObj
                         [| "type", box "string"
-                           "enum", box [| box WarnTdd.warnReuseCanonicalValue |]
                            "description", box WarnTdd.warnReuseDescription
                            "x-wanxiangshu-soft-required", box true |]
                 )
         else
-            props?("warn_reuse")?("x-wanxiangshu-soft-required") <- true
+            softenControlProperty (props?warn_reuse)
 
     tool

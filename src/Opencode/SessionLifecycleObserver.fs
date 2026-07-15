@@ -209,13 +209,29 @@ type SessionLifecycleObserver
                     if sid <> "" then
                         let currentOwner = fallbackRuntime.GetSessionOwner sid
                         let compactionGen = fallbackRuntime.GetCompactionGeneration sid
-                        let currentGen = fallbackRuntime.GetSessionGeneration sid
+                        let compactionId = fallbackRuntime.GetActiveCompactionId sid
+                        let compactionOrdinal = fallbackRuntime.GetActiveCompactionOrdinal sid
 
-                        if currentOwner = "Compaction" && currentGen = compactionGen then
-                            let nextGen = currentGen + 1
-                            fallbackRuntime.SetSessionGeneration sid nextGen
+                        // Compaction advances only the context generation.
+                        // The session generation identifies the human/session
+                        // lifecycle and must remain stable across compaction.
+                        if
+                            currentOwner = "Compaction"
+                            && compactionId <> ""
+                            && not (fallbackRuntime.IsCompacted sid)
+                        then
+                            let nextContextGen = compactionGen + 1
+                            fallbackRuntime.SetCompactionGeneration sid nextContextGen
                             let directory = pluginDirectoryFromCtx ctx
-                            do! appendContextGenerationChangedOrFail directory sid nextGen
+
+                            do!
+                                appendCompactionContextGenerationChangedOrFail
+                                    directory
+                                    sid
+                                    nextContextGen
+                                    compactionId
+                                    compactionOrdinal
+
                             fallbackRuntime.SetCompacted sid true
                 | Some { EventType = "message.updated"
                          Props = props } ->
@@ -243,10 +259,8 @@ type SessionLifecycleObserver
 
                                 if isCompactionContinue then
                                     let currentOwner = fallbackRuntime.GetSessionOwner sid
-                                    let compactionGen = fallbackRuntime.GetCompactionGeneration sid
-                                    let currentGen = fallbackRuntime.GetSessionGeneration sid
 
-                                    if currentOwner = "Compaction" && currentGen = compactionGen + 1 then
+                                    if currentOwner = "Compaction" && fallbackRuntime.IsCompacted sid then
                                         fallbackRuntime.SetCompactionContinuationObserved sid true
                 | _ -> ()
 

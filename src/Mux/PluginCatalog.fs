@@ -118,8 +118,8 @@ let toolExecuteBefore (input: obj) (output: obj) : JS.Promise<unit> =
 
                 match labelResult with
                 | Result.Ok label when label <> "" ->
-                    args?("_ui") <- box label
-                    nextArgs?("_ui") <- box label
+                    args?("ui_") <- box label
+                    nextArgs?("ui_") <- box label
                 | _ -> ()
     }
 
@@ -147,12 +147,6 @@ let toolExecuteAfter (scope: RuntimeScope) (input: obj) (output: obj) : JS.Promi
 
         match ToolHookRuntime.tryGetCompliance sessionID toolCallID with
         | Some env ->
-            restoreWarnToArgs decoded.Args env
-            let inputArgs = argsFromMuxToolExecuteInput input
-            restoreWarnToArgs inputArgs env
-            let outputArgs = argsFromHookOutputMux output
-            restoreWarnToArgs outputArgs env
-
             let status =
                 if env.Cancelled then
                     ToolHookRuntime.ExecutionStatus.Cancelled

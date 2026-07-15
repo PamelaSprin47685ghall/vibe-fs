@@ -73,7 +73,29 @@ let private tryGetModelStringFromInfo (info: obj) : string option =
             else
                 Some(sprintf "%s/%s%s" providerID modelID suffix)
 
-let private isNewUserMessageImpl (runtime: FallbackRuntimeState) (sessionID: string) (rawEvent: obj) : bool = false
+let private isNewUserMessageImpl (runtime: FallbackRuntimeState) (sessionID: string) (rawEvent: obj) : bool =
+    if getEventType rawEvent <> "message.updated" then
+        false
+    else
+        let props = getProps rawEvent
+        let info = Dyn.get props "info"
+
+        if Dyn.isNullish info || Dyn.str info "role" <> "user" then
+            false
+        else
+            let parts = Dyn.get props "parts"
+            let text = getPartsText parts
+
+            let hasSyntheticMarker =
+                if Dyn.isArray parts then
+                    (parts :?> obj array)
+                    |> Array.exists (fun part ->
+                        let synthetic = Dyn.get part "synthetic"
+                        not (Dyn.isNullish synthetic) && unbox<bool> synthetic)
+                else
+                    false
+
+            not hasSyntheticMarker && not (isSyntheticText text)
 
 let opencodeEventTranslator (runtime: FallbackRuntimeState) : IEventTranslator =
     { new IEventTranslator with
@@ -137,7 +159,12 @@ let opencodeEventTranslator (runtime: FallbackRuntimeState) : IEventTranslator =
         member _.IsNewUserMessage(sessionID, rawEvent) =
             isNewUserMessageImpl runtime sessionID rawEvent
 
-        member _.ExtractNewUserMessageId(_rawEvent) = None
+        member _.ExtractNewUserMessageId(rawEvent) =
+            let props = getProps rawEvent
+            let info = Dyn.get props "info"
+            let info = if Dyn.isNullish info then props else info
+            let id = Dyn.str info "id"
+            if id = "" then None else Some id
 
         member _.ExtractRoutingContext(rawEvent) =
             let props = getProps rawEvent
@@ -445,19 +472,9 @@ let createOpencodeFallbackHandler
                             if nonce <> "" then Some nonce else None)
 
                     match nonceOpt with
-                    | Some nonce ->
+                    | Some _ ->
                         match buildTurnEvidence msgs AnchorByTurnMarkerOnly with
-                        | Ok evidence ->
-                            let turnId = TurnId.create nonce
-
-                            do!
-                                routeToChild
-                                    workspaceRoot
-                                    sessionID
-                                    (EvidenceUpdated
-                                        { TurnId = Some turnId
-                                          Evidence = evidence })
-                                |> Promise.map ignore
+                        | Ok evidence -> do! routeEvidence workspaceRoot sessionID evidence |> Promise.map ignore
                         | Error _ -> ()
                     | None -> ()
             with _ ->
