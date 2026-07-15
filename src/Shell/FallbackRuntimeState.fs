@@ -106,28 +106,12 @@ type FallbackRuntimeState() =
     member this.UpdateState (sessionID: string) (state: SessionFallbackState) : unit =
         let finalState =
             if state.Lifecycle = FallbackLifecycle.Cancelled then
-                activeGates <-
-                    setGateActive activeGates sessionID FallbackSessionGateFlag.MainContinuationAwaitingStart false
-
-                activeGates <- setGateActive activeGates sessionID FallbackSessionGateFlag.EventHandlingActive false
-                activeGates <- setGateActive activeGates sessionID FallbackSessionGateFlag.NudgeActive false
-                busyCounts <- Map.add sessionID 0 busyCounts
-                consumed <- clearConsumedMap consumed sessionID
-                injectedModels <- Map.remove sessionID injectedModels
-                injectedAts <- Map.remove sessionID injectedAts
-                pendingLeases <- Map.remove sessionID pendingLeases
-                pendingNudgeLeases <- Map.remove sessionID pendingNudgeLeases
-                activeNudgeNonces <- Map.remove sessionID activeNudgeNonces
-
-                match this.GetSessionOwner sessionID with
-                | SessionOwner.Fallback
-                | SessionOwner.Nudge -> this.SetSessionOwner sessionID SessionOwner.NoOwner
-                | _ -> ()
-
-                { state with
-                    Phase = FallbackPhase.Idle
-                    ContinueCount = 0
-                    FailureCount = 0 }
+                // Use CancelEpisode for atomic cleanup of all gates/leases/owners.
+                // CancelEpisode already resets state to freshState (Idle/Active);
+                // the original state (with Cancelled lifecycle) is returned as finalState
+                // and written below.
+                this.CancelEpisode sessionID
+                state
             else
                 state
 
@@ -542,6 +526,46 @@ type FallbackRuntimeState() =
 
     member _.ClearSessionOwner(sessionID: string) : unit =
         sessionOwners <- Map.remove sessionID sessionOwners
+
+    /// CancelEpisode — atomic cleanup of ALL fallback/nudge/compaction gates.
+    /// Called when abort is confirmed (user Esc, timeout, etc.) to prevent
+    /// stale gates from blocking or triggering fallback for a cancelled session.
+    member _.CancelEpisode(sessionID: string) : unit =
+        // Clear all transient gates.
+        activeGates <- setGateActive activeGates sessionID FallbackSessionGateFlag.MainContinuationAwaitingStart false
+        activeGates <- setGateActive activeGates sessionID FallbackSessionGateFlag.EventHandlingActive false
+        activeGates <- setGateActive activeGates sessionID FallbackSessionGateFlag.NudgeActive false
+
+        // Clear busy count and consumed flags.
+        busyCounts <- Map.add sessionID 0 busyCounts
+        consumed <- clearConsumedMap consumed sessionID
+
+        // Clear injected model and continuation state.
+        injectedModels <- Map.remove sessionID injectedModels
+        injectedAts <- Map.remove sessionID injectedAts
+        pendingLeases <- Map.remove sessionID pendingLeases
+        pendingNudgeLeases <- Map.remove sessionID pendingNudgeLeases
+        activeNudgeNonces <- Map.remove sessionID activeNudgeNonces
+
+        // Clear compaction state.
+        activeCompactionIds <- Map.remove sessionID activeCompactionIds
+        activeCompactionOrdinals <- Map.remove sessionID activeCompactionOrdinals
+        compactionGenerations <- Map.remove sessionID compactionGenerations
+        compactedSessions <- Set.remove sessionID compactedSessions
+        compactionContinuationObserved <- Set.remove sessionID compactionContinuationObserved
+
+        // Reset session state to Idle.
+        states <- Map.add sessionID freshState states
+
+        // Reset owner.
+        sessionOwners <- Map.remove sessionID sessionOwners
+
+        // Reset continuation generations.
+        activeContinuationGens <- Map.remove sessionID activeContinuationGens
+        activeContinuationCancelGens <- Map.remove sessionID activeContinuationCancelGens
+
+        // Notify listeners.
+        triggerStateChanged sessionID
 
     member _.CleanupSession(sessionID: string) : unit =
         states <- Map.remove sessionID states

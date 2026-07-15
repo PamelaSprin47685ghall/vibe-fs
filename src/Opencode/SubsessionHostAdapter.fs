@@ -9,6 +9,7 @@ open Wanxiangshu.Shell
 open Wanxiangshu.Shell.Dyn
 open Wanxiangshu.Shell.OpencodeClientCodec
 open Wanxiangshu.Shell.OpencodeSessionEventCodec
+open Wanxiangshu.Shell.CommandProcessor
 open Wanxiangshu.Shell.SubsessionActor
 open Wanxiangshu.Shell.SubsessionTranscript
 open Wanxiangshu.Shell.SubsessionActorRegistry

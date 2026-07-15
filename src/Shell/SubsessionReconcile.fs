@@ -6,6 +6,7 @@ open Wanxiangshu.Kernel.Subsession.Types
 open Wanxiangshu.Kernel.Subsession.Fold
 open Wanxiangshu.Kernel.Subsession.Decision
 open Wanxiangshu.Shell.EventLogRuntimeStore
+open Wanxiangshu.Shell.CommandProcessor
 open Wanxiangshu.Shell.SubsessionActor
 open Wanxiangshu.Shell.SubsessionActorRegistry
 open Wanxiangshu.Shell.SubsessionEventStore

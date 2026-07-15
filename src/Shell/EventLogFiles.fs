@@ -5,6 +5,8 @@ open Fable.Core.JsInterop
 open Wanxiangshu.Kernel.Nudge
 open Wanxiangshu.Kernel.EventLog.Types
 open Wanxiangshu.Kernel.EventLog.Fold
+open Wanxiangshu.Kernel.EventLog.NudgeProjection
+open Wanxiangshu.Kernel.SessionOverview
 open Wanxiangshu.Kernel.Wanxiangzhen.Dag
 open Wanxiangshu.Kernel.Wanxiangzhen.SquadEvent
 open Wanxiangshu.Shell.EventLogCodec
@@ -176,6 +178,10 @@ type EventLogStore(workspaceRoot: string, ?appendLineOverride: string -> WanEven
             do! ensureSynced ()
             return this.GetSessionStateSync(sessionId)
         }
+
+    member this.GetSessionOverview(sessionId: string) : SessionOverview =
+        let st = this.GetSessionStateSync(sessionId)
+        fromSessionState st
 
     member _.GetAllSessionStates() : JS.Promise<Map<string, SessionState>> =
         promise {

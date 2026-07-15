@@ -6,7 +6,7 @@ open Wanxiangshu.Kernel.EventLog.Types
 open Wanxiangshu.Kernel.FallbackKernel.Types
 open Wanxiangshu.Kernel.Subsession.Types
 open Wanxiangshu.Shell.EventLogRuntimeAppend
-open Wanxiangshu.Shell.SubsessionActor
+open Wanxiangshu.Shell.CommandProcessor
 
 let private runResultStatus (r: RunResult) : string =
     match r with

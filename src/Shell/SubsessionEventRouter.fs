@@ -2,6 +2,7 @@ module Wanxiangshu.Shell.SubsessionEventRouter
 
 open Fable.Core
 open Wanxiangshu.Kernel.Subsession.Types
+open Wanxiangshu.Shell.CommandProcessor
 open Wanxiangshu.Shell.SubsessionActor
 open Wanxiangshu.Shell.SubsessionActorRegistry
 

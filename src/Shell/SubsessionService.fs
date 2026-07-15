@@ -5,6 +5,7 @@ open Fable.Core.JsInterop
 open Wanxiangshu.Kernel.FallbackKernel.Types
 open Wanxiangshu.Kernel.Subsession.Types
 open Wanxiangshu.Shell.Dyn
+open Wanxiangshu.Shell.CommandProcessor
 open Wanxiangshu.Shell.SubsessionActor
 open Wanxiangshu.Shell.SubsessionActorRegistry
 open Wanxiangshu.Shell.SubsessionEventStore

@@ -95,13 +95,8 @@ let startRunFromAvailable () =
 
         check "emits DispatchPrompt" (hasEffect isDispatchPrompt d.Effects)
 
-        check
-            "arms turn deadline"
-            (hasEffect
-                (function
-                | ArmTurnDeadline _ -> true
-                | _ -> false)
-                d.Effects)
+        // Timer effects (ArmTurnDeadline) are now managed by ResourceScope
+        // via projectResources/diffResources, not emitted as Effect DUs.
 
         check "no CompleteCaller on start" (not (hasEffect isCompleteCaller d.Effects))
     | other -> fail ("unexpected: " + string other)

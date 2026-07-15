@@ -5,7 +5,7 @@ open Wanxiangshu.Kernel.Nudge.TodoStatus
 open Wanxiangshu.Kernel.PromptFragments
 open Wanxiangshu.Kernel.PromptFrontMatter
 open Wanxiangshu.Kernel.HostTools
-open Wanxiangshu.Kernel.EventLog.Fold
+open Wanxiangshu.Kernel.EventLog.NudgeProjection
 open Wanxiangshu.Kernel.Nudge.NudgeSnapshotSource
 open Wanxiangshu.Kernel.Nudge.Types
 

@@ -112,23 +112,11 @@ let private noChange reason : DecisionResult = NoChange reason
 
 let private illegal state cmd : Result<DecisionResult, DecisionError> = Error(IllegalTransition(state, cmd))
 
-let private failRun
-    (ctx: RunContext)
-    (failure: RunFailure)
-    (cancelTurn: TurnId option)
-    (extraEvents: SubsessionEvent list)
-    =
+let private failRun (ctx: RunContext) (failure: RunFailure) (extraEvents: SubsessionEvent list) =
     let avail = Available { SessionId = ctx.SessionId }
     let result = Failed failure
-
     let events = extraEvents @ [ RunFinished(ctx.RunId, result) ]
-
-    let effects =
-        [ match cancelTurn with
-          | Some tid -> CancelTurnDeadline tid
-          | None -> ()
-          CompleteCaller(ctx.RunId, result) ]
-
+    let effects = [ CompleteCaller(ctx.RunId, result) ]
     decided avail events effects
 
 let private succeedRun (ctx: RunContext) (output: string) (turnId: TurnId) =
@@ -138,11 +126,11 @@ let private succeedRun (ctx: RunContext) (output: string) (turnId: TurnId) =
     let events =
         [ TurnFinished(turnId, TurnCompleted output); RunFinished(ctx.RunId, result) ]
 
-    let effects = [ CancelTurnDeadline turnId; CompleteCaller(ctx.RunId, result) ]
+    let effects = [ CompleteCaller(ctx.RunId, result) ]
 
     decided avail events effects
 
-let private finishWithResult (ctx: RunContext) (result: RunResult) (turnId: TurnId) (cancelAbort: bool) =
+let private finishWithResult (ctx: RunContext) (result: RunResult) (turnId: TurnId) =
     let avail = Available { SessionId = ctx.SessionId }
 
     let finishEvent =
@@ -157,11 +145,7 @@ let private finishWithResult (ctx: RunContext) (result: RunResult) (turnId: Turn
 
     let events = [ finishEvent; RunFinished(ctx.RunId, result) ]
 
-    let effects =
-        [ if cancelAbort then
-              CancelAbortDeadline turnId
-          CancelTurnDeadline turnId
-          CompleteCaller(ctx.RunId, result) ]
+    let effects = [ CompleteCaller(ctx.RunId, result) ]
 
     decided avail events effects
 
@@ -174,11 +158,7 @@ let private beginAbort (ctx: RunContext) (turn: ActiveTurn) (reason: AbortReason
 
     let events = [ AbortRequested(ctx.RunId, tid) ]
 
-    let effects =
-        [ AbortHostSession(ctx.SessionId, tid)
-          CancelTurnDeadline tid
-          CancelPendingDispatch tid
-          ArmAbortDeadline tid ]
+    let effects = [ AbortHostSession(ctx.SessionId, tid); CancelPendingDispatch tid ]
 
     // Host abort not yet accepted — idle must not settle yet.
     decided (IssuingAbort(ctx, turn, abortCtx, false)) events effects
@@ -194,21 +174,19 @@ let private closeActive (ctx: RunContext) (turnId: TurnId) =
           RunFinished(ctx.RunId, result) ]
 
     let effects =
-        [ CancelTurnDeadline turnId
-          CancelAbortDeadline turnId
-          CancelPendingDispatch turnId
+        [ CancelPendingDispatch turnId
           CompleteCaller(ctx.RunId, result)
           DisposeActor ]
 
     decided poisoned events effects
 
 /// After host is confirmed stopped, apply AfterAbort.
-let private applyAfterAbort (ctx: RunContext) (turn: ActiveTurn) (abortCtx: AbortContext) (cancelAbort: bool) =
+let private applyAfterAbort (ctx: RunContext) (turn: ActiveTurn) (abortCtx: AbortContext) =
     let tid = activeTurnId turn
 
     match abortCtx.AfterStop with
-    | FinishCancelled -> finishWithResult ctx Cancelled tid cancelAbort
-    | FinishFailed failure -> finishWithResult ctx (Failed failure) tid cancelAbort
+    | FinishCancelled -> finishWithResult ctx Cancelled tid
+    | FinishFailed failure -> finishWithResult ctx (Failed failure) tid
     | RetryAfterSafeStop error ->
         let policyDec = afterError ctx.FallbackConfig ctx.Chain ctx.Policy error
 
@@ -218,13 +196,7 @@ let private applyAfterAbort (ctx: RunContext) (turn: ActiveTurn) (abortCtx: Abor
                 [ TurnFinished(tid, TurnFailed error)
                   TurnDispatchRequested(makeTurnData ctx2 plan2) ]
 
-            let effects =
-                [ if cancelAbort then
-                      CancelAbortDeadline tid
-                  CancelTurnDeadline tid
-                  ArmTurnDeadline plan2.TurnId
-                  DispatchPrompt plan2 ]
-
+            let effects = [ DispatchPrompt plan2 ]
             decided (Dispatching(ctx2, plan2, CurrentTurnEvidence.empty)) events effects
         | None ->
             let failure' =
@@ -232,7 +204,7 @@ let private applyAfterAbort (ctx: RunContext) (turn: ActiveTurn) (abortCtx: Abor
                 | StopWithFailure f -> f
                 | _ -> FallbackExhausted error
 
-            finishWithResult ctx (Failed failure') tid cancelAbort
+            finishWithResult ctx (Failed failure') tid
 
 let private isActiveAbortState =
     function
@@ -343,7 +315,7 @@ let decide (state: SubsessionState) (cmd: Command) : Result<DecisionResult, Deci
                         SessionId = req.SessionId }
                   TurnDispatchRequested(makeTurnData ctx plan) ]
 
-            let effects = [ ArmTurnDeadline plan.TurnId; DispatchPrompt plan ]
+            let effects = [ DispatchPrompt plan ]
 
             decided (Dispatching(ctx, plan, CurrentTurnEvidence.empty)) events effects
 
@@ -383,11 +355,7 @@ let decide (state: SubsessionState) (cmd: Command) : Result<DecisionResult, Deci
             | Some(ctx2, plan2) ->
                 let events = [ TurnDispatchRequested(makeTurnData ctx2 plan2) ]
 
-                let effects =
-                    [ CancelTurnDeadline plan.TurnId
-                      CancelPendingDispatch plan.TurnId
-                      ArmTurnDeadline plan2.TurnId
-                      DispatchPrompt plan2 ]
+                let effects = [ CancelPendingDispatch plan.TurnId; DispatchPrompt plan2 ]
 
                 Ok(decided (Dispatching(ctx2, plan2, CurrentTurnEvidence.empty)) events effects)
             | None ->
@@ -396,16 +364,14 @@ let decide (state: SubsessionState) (cmd: Command) : Result<DecisionResult, Deci
                     | StopWithFailure f -> f
                     | _ -> FallbackExhausted error
 
-                Ok(failRun ctx failure' (Some plan.TurnId) [ TurnFinished(plan.TurnId, TurnFailed error) ])
+                Ok(failRun ctx failure' [ TurnFinished(plan.TurnId, TurnFailed error) ])
 
         | HostAcceptanceUnknown error ->
             let cancelCtx =
                 { Reason = AcceptanceUnknownAfterDispatch
                   AfterStop = RetryAfterSafeStop error }
 
-            let effects =
-                [ QueryDispatchStatus(ctx.SessionId, plan.TurnId)
-                  ArmReconciliationDeadline plan.TurnId ]
+            let effects = [ QueryDispatchStatus(ctx.SessionId, plan.TurnId) ]
 
             Ok(decided (ReconcilingUnknownDispatch(ctx, plan, cancelCtx, 0)) [] effects)
 
@@ -438,7 +404,7 @@ let decide (state: SubsessionState) (cmd: Command) : Result<DecisionResult, Deci
             { Reason = TurnDeadline
               AfterStop = FinishFailed(InfrastructureFailure "turn deadline expired before host accepted") }
 
-        let effects = [ CancelPendingDispatch plan.TurnId; CancelTurnDeadline plan.TurnId ]
+        let effects = [ CancelPendingDispatch plan.TurnId ]
         Ok(decided (CancellingDispatch(ctx, plan, cancelCtx)) [] effects)
 
     | Dispatching _, TurnDeadlineExpired _ -> Ok(noChange StaleTimer)
@@ -463,7 +429,7 @@ let decide (state: SubsessionState) (cmd: Command) : Result<DecisionResult, Deci
                     Receipt = receipt }
               AbortRequested(ctx.RunId, tid) ]
 
-        let effects = [ AbortHostSession(ctx.SessionId, tid); ArmAbortDeadline tid ]
+        let effects = [ AbortHostSession(ctx.SessionId, tid) ]
 
         Ok(decided (IssuingAbort(ctx, Started started, abortCtx, false)) events effects)
 
@@ -489,9 +455,7 @@ let decide (state: SubsessionState) (cmd: Command) : Result<DecisionResult, Deci
 
         | HostAcceptanceUnknown _ ->
             // Cannot confirm host didn't receive → query host to determine.
-            let effects =
-                [ QueryDispatchStatus(ctx.SessionId, plan.TurnId)
-                  ArmReconciliationDeadline plan.TurnId ]
+            let effects = [ QueryDispatchStatus(ctx.SessionId, plan.TurnId) ]
 
             Ok(decided (ReconcilingUnknownDispatch(ctx, plan, cancelCtx, 0)) [] effects)
 
@@ -504,9 +468,7 @@ let decide (state: SubsessionState) (cmd: Command) : Result<DecisionResult, Deci
     | CancellingDispatch(ctx, plan, cancelCtx), TurnDeadlineExpired tid when tid = plan.TurnId ->
         // Dispatch result not received within deadline → cannot confirm acceptance.
         // Enter ReconcilingUnknownDispatch to query or poison.
-        let effects =
-            [ QueryDispatchStatus(ctx.SessionId, plan.TurnId)
-              ArmReconciliationDeadline plan.TurnId ]
+        let effects = [ QueryDispatchStatus(ctx.SessionId, plan.TurnId) ]
 
         Ok(decided (ReconcilingUnknownDispatch(ctx, plan, cancelCtx, 0)) [] effects)
     | CancellingDispatch _, TurnDeadlineExpired _ -> Ok(noChange StaleTimer)
@@ -533,28 +495,26 @@ let decide (state: SubsessionState) (cmd: Command) : Result<DecisionResult, Deci
                         Receipt = receipt }
                   AbortRequested(ctx.RunId, plan.TurnId) ]
 
-            let effects =
-                [ AbortHostSession(ctx.SessionId, plan.TurnId); ArmAbortDeadline plan.TurnId ]
+            let effects = [ AbortHostSession(ctx.SessionId, plan.TurnId) ]
 
             Ok(decided (IssuingAbort(ctx, Started started, abortCtx, false)) events effects)
 
         | DispatchStatus.TransportRejectedBeforeSend _ ->
-            match applyAfterAbort ctx (NotYetStarted plan) cancelCtx false with
+            match applyAfterAbort ctx (NotYetStarted plan) cancelCtx with
             | Decided dec ->
-                let updatedEffects = CancelReconciliationDeadline plan.TurnId :: dec.Effects
+                let updatedEffects = dec.Effects
                 Ok(decided dec.NextState dec.Events updatedEffects)
             | res -> Ok(res)
 
         | DispatchStatus.StillPending
         | DispatchStatus.TransportFailedAfterUnknownAcceptance _ ->
-            let effects = [ ArmReconciliationDeadline plan.TurnId ]
+            let effects = []
             Ok(decided (ReconcilingUnknownDispatch(ctx, plan, cancelCtx, retryCount)) [] effects)
 
         | DispatchStatus.Unknown ->
             let poisonReason = HostProtocolBroken "acceptance unknown and unresolvable"
 
-            let effects =
-                [ CancelReconciliationDeadline plan.TurnId; ClosePhysicalSession ctx.SessionId ]
+            let effects = [ ClosePhysicalSession ctx.SessionId ]
 
             Ok(decided (ClosingUnknownDispatch(ctx, plan, poisonReason)) [] effects)
 
@@ -592,15 +552,12 @@ let decide (state: SubsessionState) (cmd: Command) : Result<DecisionResult, Deci
             // Second expiry -> poison
             let poisonReason = HostProtocolBroken "reconciliation deadline expired twice"
 
-            let effects =
-                [ CancelReconciliationDeadline plan.TurnId; ClosePhysicalSession ctx.SessionId ]
+            let effects = [ ClosePhysicalSession ctx.SessionId ]
 
             Ok(decided (ClosingUnknownDispatch(ctx, plan, poisonReason)) [] effects)
         else
-            // First expiry -> re-issue QueryDispatchStatus + ArmReconciliationDeadline
-            let effects =
-                [ QueryDispatchStatus(ctx.SessionId, plan.TurnId)
-                  ArmReconciliationDeadline plan.TurnId ]
+            // First expiry -> re-issue QueryDispatchStatus
+            let effects = [ QueryDispatchStatus(ctx.SessionId, plan.TurnId) ]
 
             Ok(decided (ReconcilingUnknownDispatch(ctx, plan, cancelCtx, 1)) [] effects)
 
@@ -621,7 +578,7 @@ let decide (state: SubsessionState) (cmd: Command) : Result<DecisionResult, Deci
                     Receipt = receipt }
               AbortRequested(ctx.RunId, tid) ]
 
-        let effects = [ AbortHostSession(ctx.SessionId, tid); ArmAbortDeadline tid ]
+        let effects = [ AbortHostSession(ctx.SessionId, tid) ]
 
         Ok(decided (IssuingAbort(ctx, Started started, abortCtx, false)) events effects)
 
@@ -689,10 +646,7 @@ let decide (state: SubsessionState) (cmd: Command) : Result<DecisionResult, Deci
                     [ TurnFinished(started.Plan.TurnId, TurnRecovering)
                       TurnDispatchRequested(makeTurnData ctx2 plan2) ]
 
-                let effects =
-                    [ CancelTurnDeadline started.Plan.TurnId
-                      ArmTurnDeadline plan2.TurnId
-                      DispatchPrompt plan2 ]
+                let effects = [ DispatchPrompt plan2 ]
 
                 Ok(decided (Dispatching(ctx2, plan2, CurrentTurnEvidence.empty)) events effects)
             | None ->
@@ -705,7 +659,6 @@ let decide (state: SubsessionState) (cmd: Command) : Result<DecisionResult, Deci
                     failRun
                         ctx
                         failure'
-                        (Some started.Plan.TurnId)
                         [ TurnFinished(
                               started.Plan.TurnId,
                               TurnInfrastructureFailed "session idle without task completion"
@@ -751,10 +704,7 @@ let decide (state: SubsessionState) (cmd: Command) : Result<DecisionResult, Deci
                     [ TurnFinished(started.Plan.TurnId, TurnFailed error)
                       TurnDispatchRequested(makeTurnData ctx2 plan2) ]
 
-                let effects =
-                    [ CancelTurnDeadline started.Plan.TurnId
-                      ArmTurnDeadline plan2.TurnId
-                      DispatchPrompt plan2 ]
+                let effects = [ DispatchPrompt plan2 ]
 
                 Ok(decided (Dispatching(ctx2, plan2, CurrentTurnEvidence.empty)) events effects)
             | None ->
@@ -763,13 +713,7 @@ let decide (state: SubsessionState) (cmd: Command) : Result<DecisionResult, Deci
                     | StopWithFailure f -> f
                     | _ -> FallbackExhausted error
 
-                Ok(
-                    failRun
-                        ctx
-                        failure'
-                        (Some started.Plan.TurnId)
-                        [ TurnFinished(started.Plan.TurnId, TurnFailed error) ]
-                )
+                Ok(failRun ctx failure' [ TurnFinished(started.Plan.TurnId, TurnFailed error) ])
 
     | Draining(ctx, started, error, evidence), EvidenceUpdated obs ->
         match obs.TurnId with
@@ -803,7 +747,7 @@ let decide (state: SubsessionState) (cmd: Command) : Result<DecisionResult, Deci
 
     // ── IssuingAbort: host abort not yet accepted; idle must NOT settle ──
     | IssuingAbort(ctx, turn, abortCtx, idleObserved), AbortConfirmed tid when tid = activeTurnId turn ->
-        Ok(applyAfterAbort ctx turn abortCtx true)
+        Ok(applyAfterAbort ctx turn abortCtx)
 
     | IssuingAbort _, AbortConfirmed _ -> Ok(noChange StaleTurnMarker)
 
@@ -871,7 +815,7 @@ let decide (state: SubsessionState) (cmd: Command) : Result<DecisionResult, Deci
 
     // ── AwaitingAbortSettle: barrier accepted; idle proves stop ──
     | AwaitingAbortSettle(ctx, turn, abortCtx), AbortConfirmed tid when tid = activeTurnId turn ->
-        Ok(applyAfterAbort ctx turn abortCtx true)
+        Ok(applyAfterAbort ctx turn abortCtx)
 
     | AwaitingAbortSettle _, AbortConfirmed _ -> Ok(noChange StaleTurnMarker)
 
@@ -917,7 +861,7 @@ let decide (state: SubsessionState) (cmd: Command) : Result<DecisionResult, Deci
         let tid = activeTurnId turn
 
         match status with
-        | Stopped -> Ok(applyAfterAbort ctx turn abortCtx true)
+        | Stopped -> Ok(applyAfterAbort ctx turn abortCtx)
         | StillRunning -> Ok(decided (AwaitingAbortSettle(ctx, turn, abortCtx)) [] [])
         | StopUnknown ->
             let poisoned = Poisoned(AbortDidNotSettle tid)
@@ -932,7 +876,7 @@ let decide (state: SubsessionState) (cmd: Command) : Result<DecisionResult, Deci
             Ok(decided poisoned events effects)
 
     | ReconcilingAbortSettle(ctx, turn, abortCtx), AbortConfirmed tid when tid = activeTurnId turn ->
-        Ok(applyAfterAbort ctx turn abortCtx true)
+        Ok(applyAfterAbort ctx turn abortCtx)
 
     | ReconcilingAbortSettle _, AbortConfirmed _ -> Ok(noChange StaleTurnMarker)
 

@@ -1,6 +1,7 @@
 module Wanxiangshu.Shell.SubsessionChildObserver
 
 open Fable.Core
+open Wanxiangshu.Shell.CommandProcessor
 open Wanxiangshu.Shell.Dyn
 open Wanxiangshu.Shell.FallbackMessageCodec
 open Wanxiangshu.Shell.FallbackRuntimeState

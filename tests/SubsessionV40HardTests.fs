@@ -7,6 +7,7 @@ open Wanxiangshu.Kernel.Subsession.Types
 open Wanxiangshu.Kernel.Subsession.Decision
 open Wanxiangshu.Kernel.Subsession.Policy
 open Wanxiangshu.Kernel.Subsession.Fold
+open Wanxiangshu.Shell.CommandProcessor
 open Wanxiangshu.Shell.SubsessionActor
 open Wanxiangshu.Shell.SubsessionActorRegistry
 open Wanxiangshu.Shell.SubsessionEventStore

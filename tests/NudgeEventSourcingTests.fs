@@ -3,6 +3,7 @@ module Wanxiangshu.Tests.NudgeEventSourcingTests
 open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Kernel.EventLog.Types
 open Wanxiangshu.Kernel.EventLog.Fold
+open Wanxiangshu.Kernel.EventLog.NudgeProjection
 open Wanxiangshu.Kernel.Nudge
 open Wanxiangshu.Kernel.NudgeDerivation
 open Wanxiangshu.Kernel.EventLog.ReviewLoopFold
@@ -18,7 +19,7 @@ let private ev session kind payload =
 let private toSessionSnapshot (s: NudgeSnapshotState) : SessionSnapshot =
     let reviewLoopInfo =
         match s.reviewLoop with
-        | Active info ->
+        | ReviewLoopFold.Active info ->
             Some
                 { originalTask = info.task
                   reviewLoopId = info.reviewLoopId

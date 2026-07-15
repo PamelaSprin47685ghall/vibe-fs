@@ -485,12 +485,6 @@ type Effect =
     | ClosePhysicalSession of SessionId
     | AbortHostSession of SessionId * TurnId
     | CancelPendingDispatch of TurnId
-    | ArmTurnDeadline of TurnId
-    | CancelTurnDeadline of TurnId
-    | ArmAbortDeadline of TurnId
-    | CancelAbortDeadline of TurnId
-    | ArmReconciliationDeadline of TurnId
-    | CancelReconciliationDeadline of TurnId
     | CompleteCaller of RunId * RunResult
     | RejectStart of StartRunError
     | DisposeActor

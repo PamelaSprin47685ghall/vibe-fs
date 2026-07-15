@@ -27,6 +27,7 @@ open Wanxiangshu.Shell.FallbackConfigCodec
 open Wanxiangshu.Kernel.FallbackKernel.Types
 open Wanxiangshu.Omp.FallbackHooks
 open Wanxiangshu.Shell.ToolHookRuntime
+open Wanxiangshu.Shell.CommandProcessor
 open Wanxiangshu.Shell.SubsessionActor
 
 type CoreServices =

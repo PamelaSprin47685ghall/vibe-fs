@@ -1,12 +1,33 @@
 module Wanxiangshu.Kernel.EventLog.Fold
 
+/// Phase 6: Composite projection that delegates to independent projection modules.
+/// SessionState is the composite view, but each projection axis is independently
+/// maintained in its own module.
+///
+/// Projection modules:
+///   - ReviewProjection  — review loop / task state
+///   - BacklogProjection — todo backlog snapshot
+///   - NudgeProjection   — nudge dedup / snapshot state
+///   - SubsessionProjection — subagent registry
+///   - HumanTurnProjection   — human turn state
+///   - ContinuationProjection — owner/lease episode state machine
+
 open Wanxiangshu.Kernel.EventLog.Types
 open Wanxiangshu.Kernel.EventLog.FallbackInjectionFold
 open Wanxiangshu.Kernel.EventLog.ReviewLoopFold
+open Wanxiangshu.Kernel.EventLog.ReviewProjection
+open Wanxiangshu.Kernel.EventLog.BacklogProjection
+open Wanxiangshu.Kernel.EventLog.NudgeProjection
+open Wanxiangshu.Kernel.EventLog.SubsessionProjection
+open Wanxiangshu.Kernel.EventLog.HumanTurnProjection
+open Wanxiangshu.Kernel.EventLog.ContinuationProjection
 open Wanxiangshu.Kernel.BacklogProjectionCore
 open Wanxiangshu.Kernel.Nudge.Types
+open Wanxiangshu.Kernel.Nudge
 open Wanxiangshu.Kernel.EventLog.ReviewVerdictWire
 open Wanxiangshu.Kernel.FallbackKernel.Types
+
+// ── Utilities ──
 
 let private forSession (sessionId: string) (events: WanEvent list) : WanEvent list =
     events |> List.filter (fun e -> e.Session = sessionId)
@@ -19,348 +40,7 @@ let foldEventStream
     : 'State =
     forSession sessionId events |> List.fold folder zero
 
-let private reviewLoopFolder (current: ReviewLoopFold) (e: WanEvent) : ReviewLoopFold =
-    ReviewLoopFold.foldEvent current e
-
-let foldReviewLoop (sessionId: string) (events: WanEvent list) : ReviewLoopFold =
-    foldEventStream sessionId ReviewLoopFold.initial reviewLoopFolder events
-
-let foldReviewTask (sessionId: string) (events: WanEvent list) : string option =
-    foldReviewLoop sessionId events |> ReviewLoopFold.activeTask
-
-type WorkBacklogSnapshot =
-    { TodosJson: string option
-      LatestEntry: BacklogEntry option }
-
 let private payloadField (key: string) (e: WanEvent) : string option = e.Payload |> Map.tryFind key
-
-let private payloadVerdict (e: WanEvent) : string option = payloadField "verdict" e
-
-let backlogEntryFromPayload (payload: Map<string, string>) : BacklogEntry option =
-    match
-        Map.tryFind "ahaMoments" payload,
-        Map.tryFind "changesAndReasons" payload,
-        Map.tryFind "gotchas" payload,
-        Map.tryFind "lessonsAndConventions" payload,
-        Map.tryFind "plan" payload
-    with
-    | Some aha, Some car, Some got, Some les, Some pl ->
-        Some
-            { ahaMoments = aha
-              changesAndReasons = car
-              gotchas = got
-              lessonsAndConventions = les
-              plan = pl }
-    | _ -> None
-
-let private workBacklogFolder (snap: WorkBacklogSnapshot) (e: WanEvent) : WorkBacklogSnapshot =
-    if e.Kind <> eventKindWorkBacklogCommitted then
-        snap
-    else
-        let entryOpt = backlogEntryFromPayload e.Payload
-
-        { TodosJson = payloadField "todosJson" e |> Option.orElse snap.TodosJson
-          LatestEntry = entryOpt |> Option.orElse snap.LatestEntry }
-
-let foldWorkBacklogSnapshot (sessionId: string) (events: WanEvent list) : WorkBacklogSnapshot =
-    foldEventStream sessionId { TodosJson = None; LatestEntry = None } workBacklogFolder events
-
-type NudgeDedupState =
-    { PendingNudge: (string * string) option // (anchor, nudgeId)
-      LastDispatchedAnchor: string option }
-
-let emptyNudgeDedupState =
-    { PendingNudge = None
-      LastDispatchedAnchor = None }
-
-let private payloadAnchor (e: WanEvent) : string option =
-    e.Payload
-    |> Map.tryFind "anchor"
-    |> Option.bind (fun t -> if t.Trim() = "" then None else Some(t.Trim()))
-
-let private nudgeDedupFolder (st: NudgeDedupState) (e: WanEvent) : NudgeDedupState =
-    match e.Kind with
-    | k when k = eventKindNudgeRequested ->
-        match payloadAnchor e, payloadField "nudgeId" e with
-        | Some anchor, Some nid ->
-            { st with
-                PendingNudge = Some(anchor, nid) }
-        | _ -> st
-    | k when k = eventKindNudgeDispatched ->
-        match payloadAnchor e with
-        | Some anchor ->
-            { st with
-                LastDispatchedAnchor = Some anchor
-                PendingNudge = None }
-        | None -> st
-    | k when k = eventKindNudgeFailed || k = eventKindNudgeCancelled ->
-        let nidOpt = payloadField "nudgeId" e
-
-        match nidOpt with
-        | Some nid ->
-            match st.PendingNudge with
-            | Some(_, pendingNid) when pendingNid = nid -> { st with PendingNudge = None }
-            | _ -> st
-        | None -> st
-    | k when
-        (k = eventKindSubmitReviewWipRecorded
-         || k = eventKindNudgeDedupCleared
-         || k = eventKindHumanTurnStarted)
-        ->
-        emptyNudgeDedupState
-    | _ -> st
-
-let foldNudgeDedup (sessionId: string) (events: WanEvent list) : NudgeDedupState =
-    foldEventStream sessionId emptyNudgeDedupState nudgeDedupFolder events
-
-type NudgeSnapshotState =
-    { openTodos: string list
-      lastAssistantText: string
-      agentFromMessage: string option
-      modelFromMessage: string option
-      turnId: string
-      reviewLoop: ReviewLoopFold
-      workState: SessionWorkState
-      pendingNudge: (string * string) option
-      lastDispatchedAnchor: string option }
-
-let private parseTodosJson (json: string) : string list =
-    let trimmed = json.Trim()
-
-    if trimmed = "" || trimmed = "[]" then
-        []
-    else if trimmed.Length < 2 || trimmed.[0] <> '[' || trimmed.[trimmed.Length - 1] <> ']' then
-        []
-    else
-        let inner = trimmed.Substring(1, trimmed.Length - 2)
-
-        inner.Split(',')
-        |> Array.choose (fun segment ->
-            let s = segment.Trim()
-
-            if s.Length < 2 || s.[0] <> '"' || s.[s.Length - 1] <> '"' then
-                None
-            else
-                Some(s.Substring(1, s.Length - 2)))
-        |> Array.toList
-
-let private syncWorkState (st: NudgeSnapshotState) : NudgeSnapshotState =
-    { st with
-        workState = workStateFromAxes false (ReviewLoopFold.isLoopActive st.reviewLoop) st.openTodos }
-
-let emptyNudgeSnapshotState: NudgeSnapshotState =
-    { openTodos = []
-      lastAssistantText = ""
-      agentFromMessage = None
-      modelFromMessage = None
-      turnId = ""
-      reviewLoop = ReviewLoopFold.initial
-      workState = SessionWorkState.Idle
-      pendingNudge = None
-      lastDispatchedAnchor = None }
-
-let private strOrEmpty (o: string option) : string =
-    match o with
-    | Some s -> s
-    | None -> ""
-
-let private nudgeSnapshotFolder (st: NudgeSnapshotState) (e: WanEvent) : NudgeSnapshotState =
-    match e.Kind with
-    | k when k = eventKindAssistantCompleted ->
-        let msg = payloadField "assistantMessage" e |> strOrEmpty
-
-        let agent =
-            payloadField "agent" e |> Option.bind (fun a -> if a = "" then None else Some a)
-
-        let model =
-            payloadField "model" e |> Option.bind (fun m -> if m = "" then None else Some m)
-
-        let tid = payloadField "turnId" e |> strOrEmpty
-        let todosFromPayload = payloadField "openTodosJson" e |> Option.map parseTodosJson
-
-        let openTodos =
-            match todosFromPayload with
-            | Some t -> t
-            | None -> st.openTodos
-
-        syncWorkState
-            { st with
-                lastAssistantText = msg
-                agentFromMessage = agent
-                modelFromMessage = model
-                turnId = tid
-                openTodos = openTodos }
-    | k when
-        (k = eventKindLoopActivated
-         || k = eventKindLoopCancelled
-         || k = eventKindReviewVerdict)
-        ->
-        let reviewLoop = ReviewLoopFold.foldEvent st.reviewLoop e
-        syncWorkState { st with reviewLoop = reviewLoop }
-    | k when k = eventKindNudgeRequested ->
-        match payloadAnchor e, payloadField "nudgeId" e with
-        | Some anchor, Some nid ->
-            { st with
-                pendingNudge = Some(anchor, nid) }
-        | _ -> st
-    | k when k = eventKindNudgeDispatched ->
-        match payloadAnchor e with
-        | Some anchor ->
-            { st with
-                lastDispatchedAnchor = Some anchor
-                pendingNudge = None }
-        | None -> st
-    | k when k = eventKindNudgeFailed || k = eventKindNudgeCancelled ->
-        let nidOpt = payloadField "nudgeId" e
-
-        match nidOpt with
-        | Some nid ->
-            match st.pendingNudge with
-            | Some(_, pendingNid) when pendingNid = nid -> { st with pendingNudge = None }
-            | _ -> st
-        | None -> st
-    | k when
-        (k = eventKindSubmitReviewWipRecorded
-         || k = eventKindNudgeDedupCleared
-         || k = eventKindHumanTurnStarted
-         || k = eventKindNudgeSettled)
-        ->
-        { st with
-            lastDispatchedAnchor = None
-            pendingNudge = None }
-    | k when k = eventKindWorkBacklogCommitted ->
-        let todosOpt = payloadField "todosJson" e |> Option.map parseTodosJson
-
-        syncWorkState
-            { st with
-                openTodos = todosOpt |> Option.defaultValue st.openTodos }
-    | _ -> st
-
-let foldNudgeSnapshot (sessionId: string) (events: WanEvent list) : NudgeSnapshotState =
-    foldEventStream sessionId emptyNudgeSnapshotState nudgeSnapshotFolder events
-
-let nudgeAnchorKey (turnId: string) (assistantMessage: string) : string =
-    let body = assistantMessage.Trim()
-    let tid = turnId.Trim()
-    if tid = "" then body else tid + "\u001e" + body
-
-let isNudgeBlockedForAnchor (st: NudgeDedupState) (anchorKey: string) : bool =
-    let trimmed = anchorKey.Trim()
-
-    match st.PendingNudge with
-    | Some(anchor, _) when anchor = trimmed -> true
-    | _ ->
-        match st.LastDispatchedAnchor with
-        | Some anchor when anchor = trimmed -> true
-        | _ -> false
-
-type SubagentState =
-    { ChildId: string
-      Agent: string
-      Title: string
-      ContinuedPrompts: string list }
-
-let private subagentFolder (current: Map<string, SubagentState>) (e: WanEvent) : Map<string, SubagentState> =
-    match e.Kind with
-    | k when k = eventKindSubagentSpawned ->
-        let childId = defaultArg (e.Payload |> Map.tryFind "childId") ""
-
-        if childId = "" then
-            current
-        else
-            let agent = defaultArg (e.Payload |> Map.tryFind "agent") ""
-            let title = defaultArg (e.Payload |> Map.tryFind "title") ""
-
-            let state =
-                { ChildId = childId
-                  Agent = agent
-                  Title = title
-                  ContinuedPrompts = [] }
-
-            Map.add childId state current
-    | k when k = eventKindSubagentContinued ->
-        let childId = defaultArg (e.Payload |> Map.tryFind "childId") ""
-
-        if childId = "" then
-            current
-        else
-            match Map.tryFind childId current with
-            | Some state ->
-                let prompt = defaultArg (e.Payload |> Map.tryFind "prompt") ""
-                let nextList = prompt :: state.ContinuedPrompts
-
-                let updated =
-                    { state with
-                        ContinuedPrompts =
-                            if nextList.Length > 5 then
-                                List.truncate 5 nextList
-                            else
-                                nextList }
-
-                Map.add childId updated current
-            | None ->
-                let prompt = defaultArg (e.Payload |> Map.tryFind "prompt") ""
-
-                let state =
-                    { ChildId = childId
-                      Agent = ""
-                      Title = ""
-                      ContinuedPrompts = [ prompt ] }
-
-                Map.add childId state current
-    | _ -> current
-
-type HumanTurnState =
-    { TurnId: string
-      Provider: string
-      Model: string
-      Variant: string
-      Agent: string }
-
-let private humanTurnFolder (st: HumanTurnState option) (e: WanEvent) : HumanTurnState option =
-    if e.Kind = eventKindHumanTurnStarted then
-        let turnId = defaultArg (payloadField "turnId" e) ""
-        let provider = defaultArg (payloadField "provider" e) ""
-        let model = defaultArg (payloadField "model" e) ""
-        let variant = defaultArg (payloadField "variant" e) ""
-        let agent = defaultArg (payloadField "agent" e) ""
-
-        Some
-            { TurnId = turnId
-              Provider = provider
-              Model = model
-              Variant = variant
-              Agent = agent }
-    else
-        st
-
-type ReplayLeaseState =
-    { ContinuationID: string
-      ContinuationOrdinal: int
-      SessionGeneration: int
-      HumanTurnID: string
-      CancelGeneration: int
-      Owner: string
-      Model: string
-      PromptText: string option
-      Status: string }
-
-type ReplayNudgeLeaseState =
-    { NudgeID: string
-      NudgeOrdinal: int
-      Nonce: string
-      Anchor: string
-      HumanTurnID: string
-      SessionGeneration: int
-      CancelGeneration: int
-      Status: string }
-
-type ReplayCompactionState =
-    { CompactionID: string
-      CompactionOrdinal: int
-      SessionGeneration: int
-      HumanTurnID: string
-      Status: string }
 
 let private parseIntOpt (raw: string) : int option =
     if raw = "" then
@@ -371,67 +51,47 @@ let private parseIntOpt (raw: string) : int option =
         with _ ->
             None
 
-let private humanTurnMessageId (e: WanEvent) : string option =
-    payloadField "messageId" e
-    |> Option.bind (fun s -> if s = "" then None else Some s)
+// ── Backward-compatible thin wrappers ──
 
-let private generationFolder
-    (sessionGen: int, cancelGen: int, activeContGen: int, activeCancelGen: int, latestHumanTurn: HumanTurnState option)
-    (e: WanEvent)
-    =
-    match e.Kind with
-    | k when k = eventKindHumanTurnStarted ->
-        let turnId = payloadField "turnId" e |> Option.defaultValue ""
+/// Delegate to ReviewProjection.
+let foldReviewLoop (sessionId: string) (events: WanEvent list) : ReviewLoopFold =
+    ReviewProjection.foldReviewLoopStream sessionId events
 
-        if turnId <> "" && latestHumanTurn |> Option.exists (fun t -> t.TurnId = turnId) then
-            sessionGen, cancelGen, activeContGen, activeCancelGen
-        else
-            let nextCancelGen = cancelGen + 1
-            sessionGen, nextCancelGen, sessionGen, nextCancelGen
-    | k when k = eventKindUserAbortObserved -> sessionGen, cancelGen + 1, activeContGen, activeCancelGen
-    | k when k = eventKindContinuationRequested ->
-        let reqGen =
-            e.Payload
-            |> Map.tryFind "generation"
-            |> Option.bind (fun s -> Some(int s))
-            |> Option.defaultValue sessionGen
+/// Delegate to ReviewProjection.
+let foldReviewTask (sessionId: string) (events: WanEvent list) : string option =
+    ReviewProjection.foldReviewTask sessionId events
 
-        let reqCancel =
-            e.Payload
-            |> Map.tryFind "cancelGeneration"
-            |> Option.bind (fun s -> Some(int s))
-            |> Option.defaultValue cancelGen
+/// Delegate to BacklogProjection.
+let foldWorkBacklogSnapshot (sessionId: string) (events: WanEvent list) : WorkBacklogSnapshot =
+    BacklogProjection.foldBacklogStream sessionId events
 
-        sessionGen, cancelGen, reqGen, reqCancel
-    | k when k = eventKindContextGenerationChanged ->
-        let newGen =
-            e.Payload
-            |> Map.tryFind "generation"
-            |> Option.bind parseIntOpt
-            |> Option.defaultValue sessionGen
+/// Delegate to BacklogProjection.
+let backlogEntryFromPayload (payload: Map<string, string>) : BacklogEntry option =
+    BacklogProjection.backlogEntryFromPayload payload
 
-        let eventCompactionId =
-            e.Payload |> Map.tryFind "compactionId" |> Option.defaultValue ""
+/// Delegate to NudgeProjection.
+let foldNudgeDedup (sessionId: string) (events: WanEvent list) : NudgeDedupState =
+    NudgeProjection.foldDedupStream sessionId events
 
-        let eventCompactionOrdinal =
-            e.Payload |> Map.tryFind "compactionOrdinal" |> Option.bind parseIntOpt
+/// Delegate to NudgeProjection.
+let foldNudgeSnapshot (sessionId: string) (events: WanEvent list) : NudgeSnapshotState =
+    NudgeProjection.foldSnapshotStream sessionId events
 
-        if eventCompactionId <> "" && eventCompactionOrdinal.IsSome then
-            sessionGen, cancelGen, activeContGen, activeCancelGen
-        else
-            newGen, cancelGen, activeContGen, activeCancelGen
-    | _ -> sessionGen, cancelGen, activeContGen, activeCancelGen
+/// Delegate to NudgeProjection.
+let nudgeAnchorKey (turnId: string) (assistantMessage: string) : string =
+    NudgeProjection.nudgeAnchorKey turnId assistantMessage
 
-let private fallbackLifecycleFolder (st: FallbackLifecycle option) (e: WanEvent) : FallbackLifecycle option =
-    match e.Kind with
-    | k when k = eventKindUserAbortObserved -> Some FallbackLifecycle.Cancelled
-    | k when k = eventKindHumanTurnStarted -> Some FallbackLifecycle.Active
-    | _ -> st
+/// Delegate to NudgeProjection.
+let isNudgeBlockedForAnchor (st: NudgeDedupState) (anchorKey: string) : bool = NudgeProjection.isBlocked st anchorKey
 
-let private fallbackPhaseFolder (st: FallbackPhase option) (e: WanEvent) : FallbackPhase option =
-    match e.Kind with
-    | k when k = eventKindHumanTurnStarted -> Some FallbackPhase.Idle
-    | _ -> st
+/// Delegate to SubsessionProjection.
+let foldSubagents (sessionId: string) (events: WanEvent list) : Map<string, SubagentState> =
+    SubsessionProjection.foldSubagents sessionId events
+
+/// Delegate to ContinuationProjection.
+let isEpisodeEvent (e: WanEvent) : bool = ContinuationProjection.isEpisodeEvent e
+
+// ── Local ordinal helpers (kept private for isLateEvent) ──
 
 let private continuationStartOrdinal (currentOrdinal: int) (e: WanEvent) : int =
     e.Payload
@@ -475,376 +135,7 @@ let private humanTurnOrdinal (currentOrdinal: int) (e: WanEvent) : int =
     |> Option.bind parseIntOpt
     |> Option.defaultValue (currentOrdinal + 1)
 
-type OwnerEpisodeState =
-    { Owner: string option
-      ContinuationLease: ReplayLeaseState option
-      ContinuationOrdinal: int
-      ContinuationStage: EpisodeStage
-      NudgeLease: ReplayNudgeLeaseState option
-      NudgeOrdinal: int
-      NudgeStage: EpisodeStage
-      Compaction: ReplayCompactionState option
-      CompactionOrdinal: int
-      CompactionStage: EpisodeStage
-      IsCompacted: bool
-      CompactionGeneration: int
-      SessionGeneration: int
-      CancelGeneration: int
-      HumanTurn: HumanTurnState option
-      HumanTurnOrdinal: int
-      LastHumanTurnMessageId: string option }
-
-let private clearEpisodeState (st: OwnerEpisodeState) : OwnerEpisodeState =
-    { st with
-        Owner = Some "Human"
-        ContinuationLease = None
-        ContinuationStage = NoEpisode
-        NudgeLease = None
-        NudgeStage = NoEpisode
-        Compaction = None
-        CompactionStage = NoEpisode
-        IsCompacted = false
-        CompactionGeneration = 0 }
-
-let private ownerAndLeaseFolder (st: OwnerEpisodeState) (e: WanEvent) : OwnerEpisodeState =
-    match e.Kind with
-    | k when k = eventKindHumanTurnStarted ->
-        let newOrdinal = humanTurnOrdinal st.HumanTurnOrdinal e
-        let msgId = humanTurnMessageId e
-        let turnId = payloadField "turnId" e |> Option.defaultValue ""
-
-        if
-            newOrdinal <= st.HumanTurnOrdinal
-            || (msgId.IsSome
-                && st.LastHumanTurnMessageId.IsSome
-                && msgId.Value = st.LastHumanTurnMessageId.Value)
-        then
-            st
-        else
-            { st with
-                HumanTurnOrdinal = newOrdinal
-                LastHumanTurnMessageId = msgId
-                CancelGeneration = st.CancelGeneration + 1 }
-            |> clearEpisodeState
-
-    | k when k = eventKindUserAbortObserved ->
-        { st with
-            Owner = Some "None"
-            ContinuationLease = None
-            ContinuationStage = NoEpisode
-            NudgeLease = None
-            NudgeStage = NoEpisode
-            Compaction = None
-            CompactionStage = NoEpisode
-            IsCompacted = false
-            CompactionGeneration = 0 }
-
-    | k when k = eventKindCompactionStarted ->
-        let newOrdinal = compactionStartOrdinal st.CompactionOrdinal e
-        let cid = payloadField "compactionId" e |> Option.defaultValue ""
-
-        if newOrdinal <= st.CompactionOrdinal then
-            st
-        else
-            let genVal =
-                e.Payload
-                |> Map.tryFind "generationAtStart"
-                |> Option.orElse (e.Payload |> Map.tryFind "generation")
-                |> Option.bind parseIntOpt
-                |> Option.defaultValue st.SessionGeneration
-
-            let humanTurnId =
-                payloadField "humanTurnId" e
-                |> Option.orElse (st.HumanTurn |> Option.map (fun t -> t.TurnId))
-                |> Option.defaultValue ""
-
-            { st with
-                Owner = Some "Compaction"
-                CompactionOrdinal = newOrdinal
-                CompactionStage = Requested
-                Compaction =
-                    Some
-                        { CompactionID = cid
-                          CompactionOrdinal = newOrdinal
-                          SessionGeneration = genVal
-                          HumanTurnID = humanTurnId
-                          Status = "started" }
-                CompactionGeneration = genVal
-                IsCompacted = false }
-
-    | k when k = eventKindContextGenerationChanged ->
-        let eventCompactionId =
-            e.Payload |> Map.tryFind "compactionId" |> Option.defaultValue ""
-
-        let eventCompactionOrdinal =
-            e.Payload |> Map.tryFind "compactionOrdinal" |> Option.bind parseIntOpt
-
-        let contextGeneration =
-            e.Payload
-            |> Map.tryFind "generation"
-            |> Option.bind parseIntOpt
-            |> Option.defaultValue st.CompactionGeneration
-
-        let isMatch =
-            eventCompactionId = ""
-            || eventCompactionOrdinal.IsNone
-            || (st.Compaction
-                |> Option.exists (fun c ->
-                    c.CompactionID = eventCompactionId
-                    && c.CompactionOrdinal = eventCompactionOrdinal.Value))
-
-        if isMatch then
-            { st with
-                IsCompacted = true
-                CompactionGeneration =
-                    if eventCompactionId <> "" && eventCompactionOrdinal.IsSome then
-                        contextGeneration
-                    else
-                        st.CompactionGeneration }
-        else
-            st
-
-    | k when k = eventKindCompactionSettled ->
-        let eventOrdinal = compactionStageOrdinal st.CompactionOrdinal e
-        let cid = payloadField "compactionId" e |> Option.defaultValue ""
-
-        let isMatch =
-            eventOrdinal = st.CompactionOrdinal
-            && st.CompactionStage <> Terminal
-            && st.Compaction |> Option.exists (fun c -> c.CompactionID = cid)
-
-        if isMatch then
-            { st with
-                Owner =
-                    (if st.Owner = Some "Compaction" then
-                         Some "None"
-                     else
-                         st.Owner)
-                CompactionStage = Terminal
-                Compaction = None
-                IsCompacted = false
-                CompactionGeneration = 0 }
-        else
-            st
-
-    | k when k = eventKindContinuationRequested ->
-        let newOrdinal = continuationStartOrdinal st.ContinuationOrdinal e
-        let contId = payloadField "continuationId" e |> Option.defaultValue ""
-
-        if newOrdinal <= st.ContinuationOrdinal then
-            st
-        else
-            let model = payloadField "model" e |> Option.defaultValue ""
-            let agent = payloadField "agent" e |> Option.defaultValue ""
-
-            let gen =
-                e.Payload
-                |> Map.tryFind "generation"
-                |> Option.bind parseIntOpt
-                |> Option.defaultValue st.SessionGeneration
-
-            let cancelGen =
-                e.Payload
-                |> Map.tryFind "cancelGeneration"
-                |> Option.bind parseIntOpt
-                |> Option.defaultValue st.CancelGeneration
-
-            let humanTurnId =
-                payloadField "humanTurnId" e
-                |> Option.orElse (st.HumanTurn |> Option.map (fun t -> t.TurnId))
-                |> Option.defaultValue ""
-
-            let ownerVal = payloadField "owner" e |> Option.defaultValue "Fallback"
-
-            let nextLease =
-                { ContinuationID = contId
-                  ContinuationOrdinal = newOrdinal
-                  SessionGeneration = gen
-                  HumanTurnID = humanTurnId
-                  CancelGeneration = cancelGen
-                  Owner = ownerVal
-                  Model = model
-                  PromptText = None
-                  Status = "requested" }
-
-            { st with
-                Owner = Some ownerVal
-                ContinuationOrdinal = newOrdinal
-                ContinuationStage = Requested
-                ContinuationLease = Some nextLease }
-
-    | k when k = eventKindContinuationDispatchStarted ->
-        let eventOrdinal = continuationStageOrdinal st.ContinuationOrdinal e
-        let cid = payloadField "continuationId" e |> Option.defaultValue ""
-
-        if eventOrdinal <> st.ContinuationOrdinal || st.ContinuationStage <> Requested then
-            st
-        else
-            let nextLease =
-                st.ContinuationLease
-                |> Option.bind (fun l ->
-                    if l.ContinuationID = cid then
-                        Some { l with Status = "dispatch_started" }
-                    else
-                        None)
-
-            match nextLease with
-            | Some l ->
-                { st with
-                    ContinuationLease = Some l
-                    ContinuationStage = DispatchStarted }
-            | None -> st
-
-    | k when k = eventKindContinuationDispatched ->
-        let eventOrdinal = continuationStageOrdinal st.ContinuationOrdinal e
-        let cid = payloadField "continuationId" e |> Option.defaultValue ""
-
-        if
-            eventOrdinal <> st.ContinuationOrdinal
-            || st.ContinuationStage <> DispatchStarted
-        then
-            st
-        else
-            let nextLease =
-                st.ContinuationLease
-                |> Option.bind (fun l ->
-                    if l.ContinuationID = cid then
-                        Some { l with Status = "dispatched" }
-                    else
-                        None)
-
-            match nextLease with
-            | Some l ->
-                { st with
-                    ContinuationLease = Some l
-                    ContinuationStage = Dispatched }
-            | None -> st
-
-    | k when
-        (k = eventKindContinuationFailed
-         || k = eventKindContinuationCancelled
-         || k = eventKindContinuationSettled)
-        ->
-        let eventOrdinal = continuationStageOrdinal st.ContinuationOrdinal e
-        let cid = payloadField "continuationId" e |> Option.defaultValue ""
-
-        if eventOrdinal <> st.ContinuationOrdinal || st.ContinuationStage = Terminal then
-            st
-        else
-            let isMatch =
-                st.ContinuationLease |> Option.exists (fun l -> l.ContinuationID = cid)
-
-            if isMatch then
-                let nextOwner = if st.Owner = Some "Fallback" then Some "None" else st.Owner
-
-                { st with
-                    Owner = nextOwner
-                    ContinuationLease = None
-                    ContinuationStage = Terminal }
-            else
-                st
-
-    | k when k = eventKindNudgeRequested ->
-        let newOrdinal = nudgeStartOrdinal st.NudgeOrdinal e
-        let nid = payloadField "nudgeId" e |> Option.defaultValue ""
-
-        if newOrdinal <= st.NudgeOrdinal then
-            st
-        else
-            let nonce = payloadField "nonce" e |> Option.defaultValue ""
-            let anchor = payloadField "anchor" e |> Option.defaultValue ""
-
-            let humanTurnId =
-                payloadField "humanTurnId" e
-                |> Option.orElse (st.HumanTurn |> Option.map (fun t -> t.TurnId))
-                |> Option.defaultValue ""
-
-            let gen =
-                e.Payload
-                |> Map.tryFind "generation"
-                |> Option.bind parseIntOpt
-                |> Option.defaultValue st.SessionGeneration
-
-            let cancelGen =
-                e.Payload
-                |> Map.tryFind "cancelGeneration"
-                |> Option.bind parseIntOpt
-                |> Option.defaultValue st.CancelGeneration
-
-            let nextNudgeLease =
-                { NudgeID = nid
-                  NudgeOrdinal = newOrdinal
-                  Nonce = nonce
-                  Anchor = anchor
-                  HumanTurnID = humanTurnId
-                  SessionGeneration = gen
-                  CancelGeneration = cancelGen
-                  Status = "requested" }
-
-            { st with
-                Owner = Some "Nudge"
-                NudgeOrdinal = newOrdinal
-                NudgeStage = Requested
-                NudgeLease = Some nextNudgeLease }
-
-    | k when k = eventKindNudgeDispatched ->
-        let eventOrdinal = nudgeStageOrdinal st.NudgeOrdinal e
-        let nid = payloadField "nudgeId" e |> Option.defaultValue ""
-
-        if eventOrdinal <> st.NudgeOrdinal || st.NudgeStage <> Requested then
-            st
-        else
-            let nextLease =
-                st.NudgeLease
-                |> Option.bind (fun nl ->
-                    if nl.NudgeID = nid then
-                        Some { nl with Status = "dispatched" }
-                    else
-                        None)
-
-            match nextLease with
-            | Some l ->
-                { st with
-                    NudgeLease = Some l
-                    NudgeStage = Dispatched }
-            | None -> st
-
-    | k when
-        (k = eventKindNudgeFailed
-         || k = eventKindNudgeCancelled
-         || k = eventKindNudgeSettled)
-        ->
-        let eventOrdinal = nudgeStageOrdinal st.NudgeOrdinal e
-        let nid = payloadField "nudgeId" e |> Option.defaultValue ""
-
-        if eventOrdinal <> st.NudgeOrdinal || st.NudgeStage = Terminal then
-            st
-        else
-            let isMatch = st.NudgeLease |> Option.exists (fun nl -> nl.NudgeID = nid)
-
-            if isMatch then
-                { st with
-                    Owner = (if st.Owner = Some "Nudge" then Some "None" else st.Owner)
-                    NudgeLease = None
-                    NudgeStage = Terminal }
-            else
-                st
-
-    | k when k = eventKindAssistantCompleted ->
-        let nextOwner =
-            match st.Owner with
-            | Some "Nudge" -> Some "None"
-            | _ -> st.Owner
-
-        { st with Owner = nextOwner }
-
-    | k when k = eventKindNudgeDedupCleared || k = eventKindSubmitReviewWipRecorded ->
-        { st with
-            Owner = Some "None"
-            NudgeLease = None
-            NudgeStage = NoEpisode }
-
-    | _ -> st
+// ── Composite SessionState ──
 
 type SessionState =
     { ReviewLoop: ReviewLoopFold
@@ -883,9 +174,9 @@ let emptySessionState () : SessionState =
     { ReviewLoop = ReviewLoopFold.initial
       ReviewTask = None
       Backlog = []
-      BacklogSnapshot = { TodosJson = None; LatestEntry = None }
-      NudgeDedup = emptyNudgeDedupState
-      NudgeSnapshot = emptyNudgeSnapshotState
+      BacklogSnapshot = BacklogProjection.emptySnapshot
+      NudgeDedup = NudgeProjection.emptyDedupState
+      NudgeSnapshot = NudgeProjection.emptySnapshotState
       Subagents = Map.empty
       FallbackInjection = emptyFallbackInjectionState
       LatestHumanTurn = None
@@ -912,21 +203,20 @@ let emptySessionState () : SessionState =
       LastHumanTurnMessageId = None
       EventCount = 0 }
 
-let private isEpisodeEvent (e: WanEvent) : bool =
-    e.Kind = eventKindContinuationRequested
-    || e.Kind = eventKindContinuationDispatchStarted
-    || e.Kind = eventKindContinuationDispatched
-    || e.Kind = eventKindContinuationFailed
-    || e.Kind = eventKindContinuationCancelled
-    || e.Kind = eventKindContinuationSettled
-    || e.Kind = eventKindNudgeRequested
-    || e.Kind = eventKindNudgeDispatched
-    || e.Kind = eventKindNudgeFailed
-    || e.Kind = eventKindNudgeCancelled
-    || e.Kind = eventKindNudgeSettled
-    || e.Kind = eventKindCompactionStarted
-    || e.Kind = eventKindCompactionSettled
-    || e.Kind = eventKindHumanTurnStarted
+// ── Local fallback lifecycle helpers ──
+
+let private fallbackLifecycleFolder (st: FallbackLifecycle option) (e: WanEvent) : FallbackLifecycle option =
+    match e.Kind with
+    | k when k = eventKindUserAbortObserved -> Some FallbackLifecycle.Cancelled
+    | k when k = eventKindHumanTurnStarted -> Some FallbackLifecycle.Active
+    | _ -> st
+
+let private fallbackPhaseFolder (st: FallbackPhase option) (e: WanEvent) : FallbackPhase option =
+    match e.Kind with
+    | k when k = eventKindHumanTurnStarted -> Some FallbackPhase.Idle
+    | _ -> st
+
+// ── Late event detection ──
 
 let private isLateEvent (st: SessionState) (e: WanEvent) : bool =
     match e.Kind with
@@ -953,30 +243,35 @@ let private isLateEvent (st: SessionState) (e: WanEvent) : bool =
     | k when k = eventKindHumanTurnStarted -> humanTurnOrdinal st.HumanTurnOrdinal e <= st.HumanTurnOrdinal
     | _ -> false
 
-let private isDuplicateHumanTurn (currentHumanTurnOrdinal: int) (lastMsgId: string option) (e: WanEvent) : bool =
+let private isDuplicateHumanTurn (currentOrdinal: int) (lastMsgId: string option) (e: WanEvent) : bool =
     if e.Kind <> eventKindHumanTurnStarted then
         false
     else
-        let newOrdinal = humanTurnOrdinal currentHumanTurnOrdinal e
-        let msgId = humanTurnMessageId e
+        let newOrdinal = humanTurnOrdinal currentOrdinal e
+        let msgId = HumanTurnProjection.messageId e
 
-        newOrdinal <= currentHumanTurnOrdinal
+        newOrdinal <= currentOrdinal
         || (msgId.IsSome && lastMsgId.IsSome && msgId.Value = lastMsgId.Value)
+
+// ── Main fold orchestrator ──
 
 let applyEvent (st: SessionState) (e: WanEvent) : SessionState =
     if isLateEvent st e then
         st
     else
+        // 1. Review projection
         let nextReviewLoop = ReviewLoopFold.foldEvent st.ReviewLoop e
 
+        // 2. Human turn projection (with duplicate detection)
         let nextHumanTurn =
             if isDuplicateHumanTurn st.HumanTurnOrdinal st.LastHumanTurnMessageId e then
                 st.LatestHumanTurn
             else
-                humanTurnFolder st.LatestHumanTurn e
+                HumanTurnProjection.foldSingleEvent e |> Option.orElse st.LatestHumanTurn
 
+        // 3. Generation tracking
         let nextSessionGen, nextCancelGen, nextActiveContGen, nextActiveCancelGen =
-            generationFolder
+            ContinuationProjection.foldGeneration
                 (st.SessionGeneration,
                  st.CancelGeneration,
                  st.ActiveContinuationGen,
@@ -984,7 +279,8 @@ let applyEvent (st: SessionState) (e: WanEvent) : SessionState =
                  st.LatestHumanTurn)
                 e
 
-        let episodeState =
+        // 4. Owner/lease episode state
+        let episodeState: OwnerEpisodeState =
             { Owner = st.SessionOwner
               ContinuationLease = st.PendingLease
               ContinuationOrdinal = st.ContinuationOrdinal
@@ -1003,32 +299,20 @@ let applyEvent (st: SessionState) (e: WanEvent) : SessionState =
               HumanTurnOrdinal = st.HumanTurnOrdinal
               LastHumanTurnMessageId = st.LastHumanTurnMessageId }
 
-        let nextEpisode = ownerAndLeaseFolder episodeState e
+        let nextEpisode = ContinuationProjection.foldOwnerAndLease episodeState e
 
+        // 5. Fallback injection
         let nextFallbackInjection =
             fallbackInjectionFolder st.ContinuationOrdinal st.ContinuationStage st.FallbackInjection e
 
+        // 6. Nudge state (conditional on not being a late episode event)
         let isBacklog = e.Kind = eventKindWorkBacklogCommitted
+        let shouldUpdateNudge = not (isEpisodeEvent e) || not (isLateEvent st e)
 
-        let shouldUpdateNudgeDedup = not (isEpisodeEvent e) || not (isLateEvent st e)
-
-        let nextNudgeDedup =
-            if shouldUpdateNudgeDedup then
-                nudgeDedupFolder st.NudgeDedup e
-            else
-                st.NudgeDedup
-
-        let nextNudgeSnapshot =
-            if shouldUpdateNudgeDedup then
-                nudgeSnapshotFolder st.NudgeSnapshot e
-            else
-                st.NudgeSnapshot
-
-        { ReviewLoop = nextReviewLoop
-          ReviewTask = ReviewLoopFold.activeTask nextReviewLoop
-          Backlog =
+        // 7. Backlog (handle + truncate)
+        let nextBacklog =
             if isBacklog then
-                match backlogEntryFromPayload e.Payload with
+                match BacklogProjection.backlogEntryFromPayload e.Payload with
                 | Some entry ->
                     let nextList = entry :: st.Backlog
 
@@ -1039,10 +323,30 @@ let applyEvent (st: SessionState) (e: WanEvent) : SessionState =
                 | None -> st.Backlog
             else
                 st.Backlog
-          BacklogSnapshot = workBacklogFolder st.BacklogSnapshot e
+
+        let nextBacklogSnapshot = BacklogProjection.foldSingleEvent st.BacklogSnapshot e
+
+        let nextNudgeDedup =
+            if shouldUpdateNudge then
+                NudgeProjection.foldSingleDedupEvent st.NudgeDedup e
+            else
+                st.NudgeDedup
+
+        let nextNudgeSnapshot =
+            if shouldUpdateNudge then
+                NudgeProjection.foldSingleSnapshotEvent st.NudgeSnapshot e
+            else
+                st.NudgeSnapshot
+
+        let nextSubagents = SubsessionProjection.foldSingleSubagentEvent st.Subagents e
+
+        { ReviewLoop = nextReviewLoop
+          ReviewTask = ReviewLoopFold.activeTask nextReviewLoop
+          Backlog = nextBacklog
+          BacklogSnapshot = nextBacklogSnapshot
           NudgeDedup = nextNudgeDedup
           NudgeSnapshot = nextNudgeSnapshot
-          Subagents = subagentFolder st.Subagents e
+          Subagents = nextSubagents
           FallbackInjection = nextFallbackInjection
           LatestHumanTurn = nextHumanTurn
           SessionGeneration = nextSessionGen
@@ -1067,6 +371,3 @@ let applyEvent (st: SessionState) (e: WanEvent) : SessionState =
           HumanTurnOrdinal = nextEpisode.HumanTurnOrdinal
           LastHumanTurnMessageId = nextEpisode.LastHumanTurnMessageId
           EventCount = st.EventCount + 1 }
-
-let foldSubagents (sessionId: string) (events: WanEvent list) : Map<string, SubagentState> =
-    foldEventStream sessionId Map.empty subagentFolder events

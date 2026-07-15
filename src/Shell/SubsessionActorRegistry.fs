@@ -1,6 +1,7 @@
 module Wanxiangshu.Shell.SubsessionActorRegistry
 
 open Wanxiangshu.Kernel.Subsession.Types
+open Wanxiangshu.Shell.CommandProcessor
 open Wanxiangshu.Shell.SubsessionActor
 open Wanxiangshu.Kernel.Subsession.Fold
 

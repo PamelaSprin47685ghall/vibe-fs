@@ -93,6 +93,12 @@ type BudgetNudgeTrack =
     | Idle
     | EmergencySignaled
 
+/// Measurement quality indicator for context budget.
+type MeasurementQuality =
+    | Precise
+    | Estimated
+    | Degraded
+
 type ContextBudgetPressure =
     | Disabled
     | BelowThreshold
@@ -127,6 +133,33 @@ let classifyPressure
                 RequireTodoWriteEmergency
             else
                 BelowThreshold
+
+/// Conservative fallback: estimate current tokens from last known usage,
+/// degrading gracefully when measurements are unavailable.
+/// Returns Some(currentTokens) with a MeasurementQuality indicator.
+/// Reuses estimateTokens() for token/byte ratio estimation.
+let resolveCurrentTokens
+    (maybeCurrentUsage: int64 option)
+    (maybeRatio: (int * int) option)
+    (encodedBytes: int)
+    : (int64 * MeasurementQuality) option =
+    match maybeCurrentUsage with
+    | Some tokens -> Some(tokens, MeasurementQuality.Precise)
+    | None ->
+        let ratio =
+            maybeRatio |> Option.map (fun (tc, tb) -> {| tokenCount = tc; textBytes = tb |})
+
+        match estimateTokens encodedBytes ratio with
+        | Some estimated -> Some(int64 estimated, MeasurementQuality.Estimated)
+        | None ->
+            // Neither real-time nor historical data available.
+            // Conservative fallback: ~2 bytes/token (empirically reasonable for code-heavy
+            // workloads; may degrade precision for CJK-heavy text).
+            // The caller treats Degraded as a signal to be extra conservative.
+            if encodedBytes > 0 then
+                Some(int64 encodedBytes / 2L, MeasurementQuality.Degraded)
+            else
+                None
 
 let afterPhaseBoundaryReset (_track: BudgetNudgeTrack) : BudgetNudgeTrack = Idle
 

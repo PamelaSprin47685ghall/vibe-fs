@@ -73,7 +73,13 @@ type TerminalOrigin =
     | NudgeCompleted
     | TitleCompleted
     | ToolSubturnCompleted
+    | UnknownLegacyStop
     | Unknown
+
+let isNaturalStop (origin: TerminalOrigin) : bool =
+    match origin with
+    | TerminalOrigin.HumanTurnCompleted -> true
+    | _ -> false
 
 type SessionSnapshot =
     { todos: string list

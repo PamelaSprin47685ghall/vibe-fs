@@ -219,13 +219,9 @@ let scenarioCancelIdle () =
                                 | _ -> false)
                                 d5.Effects)
 
-                        check
-                            "CancelAbortDeadline present"
-                            (List.exists
-                                (function
-                                | CancelAbortDeadline _ -> true
-                                | _ -> false)
-                                d5.Effects)
+                        // CancelAbortDeadline now managed by ResourceScope
+                        // (ResourcePlan.diffResources), not emitted as Effect DU.
+                        ()
                     | other -> fail ("expected Available, got " + string other)
                 | other -> fail ("expected ReconcilingAbortSettle, got " + string other)
             | other -> fail ("expected AwaitingAbortSettle, got " + string other)

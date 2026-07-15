@@ -3,6 +3,7 @@ module Wanxiangshu.Shell.EventLogRuntimeNudge
 open Fable.Core
 open Wanxiangshu.Kernel.Nudge
 open Wanxiangshu.Kernel.EventLog.Fold
+open Wanxiangshu.Kernel.EventLog.NudgeProjection
 open Wanxiangshu.Shell.EventLogRuntimeStore
 
 let isLoopActiveFromEventLog (workspaceRoot: string) (sessionID: string) : JS.Promise<bool> =
@@ -50,7 +51,7 @@ let tryClaimNudgeDispatch
 let getNudgeSnapshotFromEventLog (workspaceRoot: string) (sessionID: string) : JS.Promise<NudgeSnapshotState> =
     promise {
         if sessionID = "" || workspaceRoot = "" then
-            return emptyNudgeSnapshotState
+            return emptySnapshotState
         else
             let! state = getStore(workspaceRoot).GetSessionState(sessionID)
             return state.NudgeSnapshot

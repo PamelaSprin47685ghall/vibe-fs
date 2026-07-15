@@ -8,6 +8,7 @@ open Wanxiangshu.Kernel.Subsession.Types
 open Wanxiangshu.Kernel.Subsession.Decision
 open Wanxiangshu.Kernel.Subsession.TranscriptDecision
 open Wanxiangshu.Shell.FallbackRuntimeState
+open Wanxiangshu.Shell.CommandProcessor
 open Wanxiangshu.Shell.SubsessionActor
 open Wanxiangshu.Shell.SubsessionActorRegistry
 open Wanxiangshu.Shell.SubsessionEventStore
