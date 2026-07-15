@@ -161,6 +161,10 @@ let toolExecuteAfter (scope: RuntimeScope) (input: obj) (output: obj) : JS.Promi
                 let criticism = ToolHookRuntime.appendCriticism currentOutput allViolations status
                 setHookOutputStringMux output criticism
 
+            // Restore warn fields to decoded args so LLM history sees them.
+            if not (Dyn.isNullish decoded.Args) then
+                ToolHookRuntime.restoreWarnToArgs decoded.Args env
+
             ToolHookRuntime.removeCompliance sessionID toolCallID
         | None ->
             let status =

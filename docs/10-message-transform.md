@@ -10,8 +10,9 @@
 | :--- | :--- |
 | `Shell/MessageTransformPipeline.fs` | 主编排、`applyContextBudget`、`tryInjectParallelToolPrompt` |
 | `Shell/MessageTransformCore.fs` | 纯变换步骤 |
-| `Shell/ToolHookRuntime.fs` | 控制字段软校验与净化 |
-| `Kernel/MessageTransformPolicy.fs` | 策略 |
+| `Shell/MessageTransformStack.fs` | TransformState 三段状态（Caps、Backlog、Top slot） |
+| `Shell/ToolHookRuntime.fs` | 控制字段软校验、净化、after 还原、违例批评 |
+| `Kernel/MessageTransformPolicy.fs` | 策略（Backlog/Caps/ParallelHint/ContextBudget 四分） |
 | `Shell/SembleSearch.fs` | investigator 断点注入 |
 
 架构测试：三宿主须 `UsesProjectionPolicy` + Shell caps cache；`noQuadraticListAppend`。
@@ -20,13 +21,14 @@
 
 以 `runMessageTransformPipeline` 为准：
 
-1. 剥离 synthetic（含 `semble-synth-`、`parallel-tool-synth-`、`context-budget-nudge`）
-2. Caps / 清理
-3. Backlog 投影（事件 fold，非历史 tool SSOT）
-4. Review replay
-5. **applyContextBudget**（见 [13](./13-context-budget.md)）
-6. **tryInjectParallelToolPrompt**
-7. Semble（investigator + 开关）
+1. Caps — 按 `scopeId × CapsRevision × PolicyVersion` 缓存，复用段引用
+2. Backlog 投影（事件 fold，非历史 tool SSOT；`BacklogRevision` 驱动）
+3. **applyContextBudget**（`BudgetRevision` + `TopSlotKey` 驱动，见 [13](./13-context-budget.md)）
+4. **tryInjectParallelToolPrompt**（与 budget nudge 互斥，`ParallelHintTop` key）
+5. Semble（investigator + 开关）
+6. **replaceArrayInPlace** 原地替换宿主数组
+
+管线不再剥离 synthetic 段：host 每轮从 DB 重读数组，上一轮 synthetic 自然消失；`TransformState` 维护三段引用，revision/key 未变时复用对象引用以减少分配。发送前以 canonical outbound bytes/prefix equality 验证 prompt-cache 可命中。
 
 ## 并行工具鼓励 (FEATURE1)
 
@@ -76,6 +78,20 @@
 `Opencode/MessageTransform.fs`、`Mux/MessageTransform.fs`、`Omp/MessageTransform.fs`。
 
 OpenCode：**原地 mutate** hook 字段（`AGENTS.md`）。
+
+## 控制字段生命周期
+
+控制字段（`warn_tdd`、`warn`、`warn_reuse`）在工具执行边界经历完整生命周期：
+
+| 阶段 | 动作 | 模块 |
+| :--- | :--- | :--- |
+| Schema 注册 | 注入 `x-wanxiangshu-soft-required` 元数据，不放入 Host 强制 `required`/`minLength` | `ToolHookRuntime.decorateAndValidateSchema` |
+| Before hook | 提取并原地删除字段，构造 `ControlEnvelope` 存入 `ToolComplianceStore` | `executeBeforeGateway` + `saveCompliance` |
+| 真实执行 | 工具收到净化后的业务参数 | Host execute |
+| After hook | 追加违例批评（`WANXIANGSHU_COMPLIANCE_REPRIMAND`），调用 `restoreWarnToArgs` 将原始字段恢复到历史可见 args | `tryGetCompliance` → `appendCriticism` → `restoreWarnToArgs` → `removeCompliance` |
+| Finally | 删除 compliance envelope | `removeCompliance` |
+
+缺失/空白/非规范值的字段不阻止工具执行，仅在 after 阶段追加一次严厉批评。硬拒绝只保留给 malformed business args、权限/安全拒绝、解析失败或净化后仍泄漏的控制字段。
 
 ## 相关
 

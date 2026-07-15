@@ -55,7 +55,8 @@ let toolResultHandler (_pi: obj) (_reviewStore: ReviewStore) (event: obj) (ctx: 
         try
             // Collect warn violations & todo report violations.  Control
             // fields were removed in the pre-execute gateway and must stay
-            // absent from the post-execute args object.
+            // absent from the post-execute args object (they will be restored
+            // in the finally block for LLM history visibility).
             let warnViolations =
                 match envOpt with
                 | Some env -> env.Violations
@@ -183,9 +184,15 @@ let toolResultHandler (_pi: obj) (_reviewStore: ReviewStore) (event: obj) (ctx: 
 
             setToolResultText event criticism
         finally
-            // 5. finally 删除 compliance envelope
-            if envOpt.IsSome then
+            // 5. Restore warn fields to args so LLM history sees them, then
+            //    delete compliance envelope.
+            match envOpt with
+            | Some env ->
+                if not (Dyn.isNullish args) then
+                    ToolHookRuntime.restoreWarnToArgs args env
+
                 ToolHookRuntime.removeCompliance sessionId toolCallId
+            | None -> ()
     }
 
 let sessionStartHandler (pi: obj) (reviewStore: ReviewStore) (ctx: obj) : JS.Promise<unit> =

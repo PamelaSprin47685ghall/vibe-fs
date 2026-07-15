@@ -105,20 +105,50 @@
 
 ## 演进路线（类型安全与去重）
 
-已识别问题与分阶段目标（非全部已落地）：
+已识别问题与分阶段目标：
 
-| 问题 | 状态 |
+| 问题 | 状态 | 实现在 |
+| :--- | :--- | :--- |
+| 宿主 `obj` 渗入内核 | 已落地 | Shell DTO + 边界 decode |
+| 内存与盘双写风险 | 已落地 | 突变仅经 EventLog append，投影只读 fold |
+| 三宿主重复 spawn/fuzzy | 已落地 | spawn 用 `IHostAdapter` + `SubagentDispatcher`；fuzzy 分 Kernel 规则 + Shell 后端 |
+| 魔法字符串错误 | 已落地 | `DomainError` DU |
+| 巨型 SessionLifecycleObserver | 已落地 | 拆为 Progress / Fallback / Nudge 观察片 |
+| 子代理错误隔离 | 已落地 | `SubsessionActor` 消息泵 + `SubsessionState` 9 种状态 |
+| ContinuationLease 原子 claim | 已落地 | `PendingLease` + `LeaseStatus` ADT + `TryTransitionPendingLease` 原子门闩 |
+| Nudge 并发去重 | 已落地 | `tryClaimNudgeDispatch` 事件级 Claim |
+| Compaction 事件溯源 | 已落地 | `compaction_*` 事件 + `ownerAndLeaseFolder` + `ReplayCompactionState` |
+| 上下文预算 R 参数 | 已落地 | 动态防过度触发，`classifyPressure` 公式 |
+| 控制字段软合规 | 已落地 | 三层防线（schema 软提示 → before 原地删除 → after 批评+还原） |
+| TransformState 三段缓存 | 已落地 | `MessageTransformStack` 管理 Caps/Backlog/Top slot 引用，revision/key 驱动 |
+| SessionEpoch/CausalityContext/TurnIdentity | 已落地 | `Kernel/Domain.fs` 类型定义 + `matchesCausality` 过滤 |
+| Investigator CAPS 注入 | 已落地 | `CapsInjectionPolicy` 独立于 backlog projection |
+| 并行工具提示 | 已落地 | `ParallelHintPolicy` 独立，单工具调用后稳定注入 |
+| 首轮 context budget 误触 | 已落地 | `UsageConfidence` 限制，首次观测只校准不触发 |
+| Warn 字段 after 还原 | 已落地 | 三宿主 after hook 调用 `restoreWarnToArgs` |
+| Per-session serial mailbox | 已落地 | `SerialQueue` + `FallbackEventBridge.createHandler` 每 session 独立队列 |
+| 取消粘性 + CancelEpisode | 已落地 | `FallbackRuntimeState.UpdateState` 在 Cancelled 时清除所有门禁 |
+| Subsession dispatch/reconcile | 已落地 | `Dispatching → Running → Draining → ReconcilingUnknownDispatch → ReconcilingAbortSettle` 状态机 |
+| UserAbortObserved 事件 | 已落地 | `user_abort_observed` 事件 + `eventKindUserAbortObserved` fold |
+| 事件日志 NDJSON 前缀完整性 | 已落地 | `EventLogFiles` 首行损坏截断、快照指纹校验 |
+| NudgeBlockStatus 门禁 | 已落地 | `Kernel/Nudge/Types.fs` `NudgeBlockStatus` (Blocked/Allowed) |
+
+### 设计文档映射
+
+PRD-00 描述的 Flow-first 架构以以下等价形式实现，而非字面 `IAsyncEnumerable`/`Channel`/`scanCommit`：
+
+| PRD 概念 | 实现等价物 |
 | :--- | :--- |
-| 宿主 `obj` 渗入内核 | 已落地：Shell DTO + 边界 decode |
-| 内存与盘双写风险 | 已落地：突变仅经 EventLog append，投影只读 fold |
-| 三宿主重复 spawn/fuzzy | spawn 已用 `IHostAdapter` + `SubagentDispatcher`；fuzzy 仍分 Kernel 规则 + Shell 后端 |
-| 魔法字符串错误 | 已落地：`DomainError` DU |
-| 巨型 SessionLifecycleObserver | 已拆为 Progress / Fallback / Nudge 观察片 |
-| 子代理错误隔离 | 已落地：`SubsessionActor` 消息泵 |
-| Fallback 续命租约 | 已落地：六阶段续命生命周期 + 原子门闩 |
-| Nudge 并发去重 | 已落地：`tryClaimNudgeDispatch` 事件级 Claim |
-| Compaction 事件溯源 | 已落地：`compaction_*` 事件 + `ownerAndLeaseFolder` |
-| 上下文预算 R 参数 | 已落地：动态防过度触发 |
+| `Channel<SessionInput>` | `SerialQueue` per-session mailbox + `FallbackEventBridge.createHandler` |
+| `scanCommit` | `SerialQueue.Enqueue` → `handleEvent` → `appendEvent` → `UpdateState` |
+| `Effect Flow` | `executeContinuationIntent` 在队列外 fire-and-forget，结果通过 `Post` 回队列 |
+| `IAsyncEnumerable` | JS `Promise` chain + `SerialQueue` |
+| `HumanTurnProjection` | `SessionState.LatestHumanTurn` + `humanTurnFolder` |
+| `CancellationProjection` | `SessionState.CancelGeneration` + `user_abort_observed` fold |
+| `ContinuationProjection` | `SessionState.PendingLease` + `ownerAndLeaseFolder` |
+| `CompactionProjection` | `SessionState.ActiveCompaction` + `ReplayCompactionState` |
+| `ContextBudgetProjection` | `ContextBudgetStore` 内存状态 + `classifyPressure` |
+| `ReviewProjection` | `ReviewLoopFold` + `SessionState.ReviewTask` |
 
 迁移策略：分阶段、每步 `npm run build-and-test` 全绿；禁止大爆炸重写。当前真相以 **四套宿主目录 + 行为/契约测试** 为准。
 

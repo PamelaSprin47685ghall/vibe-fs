@@ -185,6 +185,11 @@ let toolExecuteAfterFor
                 let criticism = ToolHookRuntime.appendCriticism currentOutput allViolations status
                 setHookOutputString output criticism
 
+            // Restore warn fields to all visible args so the LLM can see
+            // what it submitted in subsequent turns.
+            if not (Dyn.isNullish decodedArgs) then
+                ToolHookRuntime.restoreWarnToArgs decodedArgs env
+
             ToolHookRuntime.removeCompliance sessionID toolCallID
         | None ->
             let status =
