@@ -145,7 +145,7 @@ let ``3 Error observed preserves evidence`` () =
           Todos = TodosCompleted
           Tool = HasToolResult
           Recovery = NoRecoveryPrompt
-          Outcome = CompletionRequested "done" }
+          Outcome = NoOutcome }
 
     let state = Running(makeCtx sid rid, makeStarted tid "m1", evidence)
 
@@ -220,14 +220,9 @@ let ``5 Abort request failed stays issuing`` () =
     let result = unwrapDecide "05" (decide state (AbortRequestFailed(tid, err)))
 
     match result with
-    | Decided d ->
-        check
-            "05: stays issuing or poisons"
-            (match d.NextState with
-             | IssuingAbort _
-             | Poisoned _ -> true
-             | _ -> false)
-    | NoChange _ -> check "05: expected Decided" false
+    | NoChange AbortInProgress -> check "05: stays issuing (no change)" true
+    | NoChange _ -> check "05: expected AbortInProgress" false
+    | Decided _ -> check "05: expected NoChange" false
 
 // ──────────────────────────────────────────────
 //  6. Deadline and idle arrive simultaneously

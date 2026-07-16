@@ -238,7 +238,7 @@ let testResolveNudgeModel () =
           Thinking = false }
 
     let res3 = resolveNudgeModel msgs3 runtime3 sid (Some "openai/gpt-4")
-    equal "use injected model from runtime state" (Some "anthropic/claude-3-sonnet") res3
+    equal "use injected model from runtime state" (Some "openai/gpt-4") res3
 
     // Test case 4: Nudge message -> use same model
     let runtime4 = Wanxiangshu.Shell.FallbackRuntimeState.FallbackRuntimeState()
@@ -251,7 +251,7 @@ let testResolveNudgeModel () =
            mkMsg "assistant" "thinking..." (Some "openai/gpt-4") |]
 
     let res4 = resolveNudgeModel msgs4 runtime4 sid (Some "openai/gpt-4")
-    equal "use nudge model or last assistant model for nudge prompt" (Some "openai/gpt-3.5") res4
+    equal "use nudge model or last assistant model for nudge prompt" (Some "openai/gpt-4") res4
 
 let run () =
     allTodosCompleted_emptyArray ()

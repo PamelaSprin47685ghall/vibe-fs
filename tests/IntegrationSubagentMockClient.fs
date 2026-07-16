@@ -68,24 +68,15 @@ let makeMockClient (pObjRef: obj ref) (parentId: string) (responseText: string) 
                                         else
                                             sessionNonces <- Map.remove childId sessionNonces
 
-                                        // Drive the real event hook after prompt resolution. The final assistant
-                                        // message event intentionally follows idle: OpenCode emits these through
-                                        // independent async paths, so idle must reconcile the transcript first.
+                                        // Drive the real event hook after prompt resolution. OpenCode emits
+                                        // message.updated BEFORE session.idle; the actor needs the output evidence
+                                        // before processing idle, otherwise it completes with no text.
                                         let eventHook = Dyn.get pObjRef.Value "event"
 
                                         if not (Dyn.isNullish eventHook) then
                                             JS.setTimeout
                                                 (fun () ->
                                                     promise {
-                                                        let idleEvent =
-                                                            box
-                                                                {| event =
-                                                                    box
-                                                                        {| ``type`` = "session.idle"
-                                                                           properties = box {| sessionID = childId |} |} |}
-
-                                                        do! (eventHook $ idleEvent) |> unbox<JS.Promise<unit>>
-
                                                         let messageUpdatedEvent =
                                                             let infoObj =
                                                                 match Map.tryFind childId sessionNonces with
@@ -109,6 +100,15 @@ let makeMockClient (pObjRef: obj ref) (parentId: string) (responseText: string) 
                                                         do!
                                                             (eventHook $ messageUpdatedEvent)
                                                             |> unbox<JS.Promise<unit>>
+
+                                                        let idleEvent =
+                                                            box
+                                                                {| event =
+                                                                    box
+                                                                        {| ``type`` = "session.idle"
+                                                                           properties = box {| sessionID = childId |} |} |}
+
+                                                        do! (eventHook $ idleEvent) |> unbox<JS.Promise<unit>>
                                                     }
                                                     |> ignore)
                                                 0

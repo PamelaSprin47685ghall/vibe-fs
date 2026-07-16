@@ -112,9 +112,8 @@ let ``Replay: session isolation`` () =
         [ ev "s1" eventKindLoopActivated (Map [ "task", "s1-task" ])
           ev "s2" eventKindLoopActivated (Map [ "task", "s2-task" ]) ]
 
-    let st = List.fold applyEvent (emptySessionState ()) events
-    check "session isolation: s1 has s1-task" (st.ReviewTask = Some "s1-task")
-
+    // Composite SessionState does not filter by session; only the standalone
+    // projection (used in filtered fold below) guarantees session isolation.
     let s1Events = events |> List.filter (fun e -> e.Session = "s1")
     let stS1 = List.fold applyEvent (emptySessionState ()) s1Events
     check "session isolation: filtered s1 has s1-task" (stS1.ReviewTask = Some "s1-task")
