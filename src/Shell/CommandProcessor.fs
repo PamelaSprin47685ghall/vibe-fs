@@ -311,7 +311,9 @@ type CommandProcessor
 
     member _.Post(cmd: Command) : JS.Promise<Effect list * StartRunError option> = commitCommand cmd
 
-    member this.BeginRun(request: StartRunRequest) : JS.Promise<RunResult * Effect list> =
+    /// Commit StartRun and return the caller completion promise separately from
+    /// the host effects that must make that promise settle.
+    member this.BeginRun(request: StartRunRequest) : JS.Promise<JS.Promise<RunResult> * Effect list> =
         promise {
             let deferred = createDeferred<RunResult> ()
 
@@ -325,9 +327,7 @@ type CommandProcessor
                             let priorState = state
 
                             match decide state (StartRun request) with
-                            | Ok(Decided decision) ->
-                                let! effects, _ = applyDecision priorState decision
-                                return effects, None
+                            | Ok(Decided decision) -> return! applyDecision priorState decision
                             | Ok(NoChange _) ->
                                 pendingReplies <- Map.remove request.RunId pendingReplies
                                 return [], None
@@ -357,8 +357,8 @@ type CommandProcessor
                     | NoModelAvailable -> Failed NoModelConfigured
 
                 deferred.Resolve result
-                return result, []
-            | None -> return! deferred.Promise |> Promise.map (fun r -> r, hostEffects)
+                return deferred.Promise, []
+            | None -> return deferred.Promise, hostEffects
         }
 
     member _.MarkUnknownAfterRestart() : JS.Promise<unit> =

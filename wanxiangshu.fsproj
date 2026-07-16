@@ -645,6 +645,7 @@
     <Compile Include="tests/SubsessionV38DecisionTests.fs"/>
     <Compile Include="tests/SubsessionV40HardTests.fs"/>
     <Compile Include="tests/SubsessionEvidenceRaceTests.fs"/>
+    <Compile Include="tests/OpencodeFallbackChildIdleTests.fs"/>
     <Compile Include="tests/FallbackHooksHelperAgentModelTests.fs"/>
     <Compile Include="tests/FallbackMessageCodecTests.fs"/>
     <Compile Include="tests/FallbackRecoveryWaitTests.fs"/>

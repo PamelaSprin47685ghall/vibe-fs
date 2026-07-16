@@ -100,9 +100,9 @@ type SubsessionActor
     /// in ONE queue item so CancelRequested cannot insert between them.
     member this.BeginRun(request: StartRunRequest) : JS.Promise<RunResult> =
         promise {
-            let! result, hostEffects = processor.BeginRun request
+            let! resultPromise, hostEffects = processor.BeginRun request
             supervisor.LaunchAll hostEffects
-            return result
+            return! resultPromise
         }
 
     /// Back-compat alias for BeginRun (atomic).

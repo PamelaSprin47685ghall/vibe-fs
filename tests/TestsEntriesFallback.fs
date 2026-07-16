@@ -24,6 +24,7 @@ open Wanxiangshu.Tests.SubsessionV37HardTests
 open Wanxiangshu.Tests.SubsessionV38DecisionTests
 open Wanxiangshu.Tests.SubsessionV40HardTests
 open Wanxiangshu.Tests.SubsessionEvidenceRaceTests
+open Wanxiangshu.Tests.OpencodeFallbackChildIdleTests
 open Wanxiangshu.Tests.FallbackHooksHelperAgentModelTests
 
 let fallbackTestEntries () : (string * TestBody) list =
@@ -46,6 +47,7 @@ let fallbackTestEntries () : (string * TestBody) list =
       "SubsessionV38DecisionTests.run", Sync(sync SubsessionV38DecisionTests.run)
       "SubsessionV40HardTests.run", Async SubsessionV40HardTests.run
       "SubsessionEvidenceRaceTests.run", Sync(sync SubsessionEvidenceRaceTests.run)
+      "OpencodeFallbackChildIdleTests.run", Async OpencodeFallbackChildIdleTests.run
       "FallbackHooksHelperAgentModelTests.run", Async FallbackHooksHelperAgentModelTests.run ]
 
 let tailTestEntries () : (string * TestBody) list =

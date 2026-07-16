@@ -16,6 +16,7 @@ open Wanxiangshu.Kernel.Subsession.Types
 open Wanxiangshu.Kernel.Subsession.PartTypeClassify
 open Wanxiangshu.Shell.FallbackEventBridge
 open Wanxiangshu.Shell.FallbackRuntimeState
+open Wanxiangshu.Shell.SubsessionActorRegistry
 open Wanxiangshu.Shell.SubsessionEventRouter
 open Wanxiangshu.Shell.SubsessionChildObserver
 open Wanxiangshu.Shell.SubsessionTranscript
@@ -453,29 +454,42 @@ let createOpencodeFallbackHandler
                 if Dyn.isArray messages then
                     let msgs = messages :?> obj array
 
-                    let nonceOpt =
-                        msgs
-                        |> Array.tryFindBack (fun msg ->
-                            if Dyn.isNullish msg then
-                                false
-                            else
-                                let info = Dyn.get msg "info"
+                    match SubsessionActorRegistry.TryGet workspaceRoot sessionID with
+                    | Some actor ->
+                        match actor.GetCurrentTurn() with
+                        | Some turnId ->
+                            let turnNonce = TurnId.value turnId
 
-                                if Dyn.isNullish info then
-                                    false
-                                else
-                                    Dyn.str info "role" = "assistant")
-                        |> Option.bind (fun msg ->
-                            let info = Dyn.get msg "info"
-                            let nonce = Dyn.str msg "nonce"
-                            let nonce = if nonce <> "" then nonce else Dyn.str info "nonce"
-                            if nonce <> "" then Some nonce else None)
+                            let anchorMessageId =
+                                msgs
+                                |> Array.tryFindBack (fun msg ->
+                                    if Dyn.isNullish msg then
+                                        false
+                                    else
+                                        let info = Dyn.get msg "info"
+                                        let parts = Dyn.get msg "parts"
 
-                    match nonceOpt with
-                    | Some _ ->
-                        match buildTurnEvidence msgs AnchorByTurnMarkerOnly with
-                        | Ok evidence -> do! routeEvidence workspaceRoot sessionID evidence |> Promise.map ignore
-                        | Error _ -> ()
+                                        not (Dyn.isNullish info)
+                                        && Dyn.str info "role" = "user"
+                                        && Dyn.isArray parts
+                                        && ((parts :?> obj array)
+                                            |> Array.exists (fun part ->
+                                                Dyn.str part "type" = "text"
+                                                && Dyn.str (Dyn.get part "metadata") "nonce" = turnNonce)))
+                                |> Option.bind (fun msg ->
+                                    let info = Dyn.get msg "info"
+                                    let messageId = Dyn.str msg "id"
+                                    let messageId = if messageId <> "" then messageId else Dyn.str info "id"
+                                    if messageId <> "" then Some messageId else None)
+
+                            match anchorMessageId with
+                            | Some messageId ->
+                                match buildTurnEvidence msgs (AnchorByUserMessageId messageId) with
+                                | Ok evidence ->
+                                    do! routeEvidence workspaceRoot sessionID evidence |> Promise.map ignore
+                                | Error _ -> ()
+                            | None -> ()
+                        | None -> ()
                     | None -> ()
             with _ ->
                 ()
