@@ -252,4 +252,6 @@ let sessionShutdownHandler (reviewStore: ReviewStore) (ctx: obj) : JS.Promise<un
             Wanxiangshu.Runtime.LivelockGuard.cleanup ExecutorTools.ompScope sessionId
             Wanxiangshu.Runtime.ToolHookRuntime.clearSessionCompliance sessionId
             Wanxiangshu.Runtime.ToolHookRuntime.closeSession sessionId
+            ExecutorTools.ompScope.RemoveSessionQueue sessionId
+            ExecutorTools.ompScope.RemoveTempFiles sessionId
     }

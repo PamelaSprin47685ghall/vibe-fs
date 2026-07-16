@@ -303,22 +303,42 @@ let createHandler
     fun (rawEvent: obj) ->
         promise {
             let sessionID = translator.ExtractSessionID rawEvent
+            // Synchronous pre-filter: skip the SerialQueue entirely when the
+            // event cannot produce a FallbackEvent or affect continuation state.
+            // This is critical — the queue captures rawEvent in a closure and
+            // under high-frequency streaming messages the accumulated Promise
+            // nodes retain every raw object, causing O(n²) heap growth.
+            let isError = translator.TranslateError rawEvent |> Option.isSome
+            let isNewUser = translator.IsNewUserMessage(sessionID, rawEvent)
+            let isBusy = translator.IsSessionBusy rawEvent
+            let isIdle = translator.IsSessionIdle rawEvent
 
-            let queue =
-                match Map.tryFind sessionID queues with
-                | Some q -> q
-                | None ->
-                    let q = SerialQueue()
-                    queues <- Map.add sessionID q queues
-                    q
+            let hasContinuation =
+                match translator.ExtractContinuationIdentity rawEvent with
+                | Some _ -> true
+                | None -> false
 
-            let! (result, intentOpt) =
-                queue.Enqueue(fun () ->
-                    handleEvent translator runtime configLookup executor workspaceRoot rawEvent pendingReview)
+            if not isError && not isNewUser && not isBusy && not isIdle && not hasContinuation then
+                let state = runtime.GetOrCreateState sessionID
+                return { Consumed = false; State = state }
+            else
+                // Relevant event — enqueue for ordered processing.
+                let queue =
+                    match Map.tryFind sessionID queues with
+                    | Some q -> q
+                    | None ->
+                        let q = SerialQueue()
+                        queues <- Map.add sessionID q queues
+                        q
 
-            match intentOpt with
-            | Some intent -> do! executeContinuationIntent runtime executor workspaceRoot sessionID intent
-            | None -> ()
 
-            return result
+                let! (result, intentOpt) =
+                    queue.Enqueue(fun () ->
+                        handleEvent translator runtime configLookup executor workspaceRoot rawEvent pendingReview)
+
+                match intentOpt with
+                | Some intent -> do! executeContinuationIntent runtime executor workspaceRoot sessionID intent
+                | None -> ()
+
+                return result
         }

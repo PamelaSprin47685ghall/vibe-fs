@@ -78,6 +78,21 @@ let private parseHookEvent (event: obj) : NudgeRuntimeEvent =
         | "error" when decoded.errorType = "aborted" -> AbortedError decoded.workspaceId
         | _ -> Ignore
 
+/// Only terminal / lifecycle events should enter the Promise machinery.
+/// Every streaming chunk (message.updated, message.part.*, stream-* mid-flow)
+/// is discarded synchronously here so the closure never captures a rawEvent.
+let private shouldObserveMuxEvent (eventType: string) : bool =
+    match eventType with
+    | "stream-end"
+    | "stream-abort"
+    | "error"
+    | "session.error"
+    | "session.deleted"
+    | "session.close"
+    | "session.delete"
+    | "session.remove" -> true
+    | _ -> false
+
 let createEventHook (deps: obj) (reviewStore: ReviewStore) (scope: RuntimeScope) : obj =
     let getChatHistory =
         if Dyn.isNullish deps then
@@ -114,83 +129,92 @@ let createEventHook (deps: obj) (reviewStore: ReviewStore) (scope: RuntimeScope)
 
     let fn =
         System.Func<obj, obj, JS.Promise<unit>>(fun event helpers ->
-            promise {
-                let decoded = decodeHookEvent event
-                let workspaceId = decoded.workspaceId
+            let decoded = decodeHookEvent event
 
-                if workspaceId <> "" then
-                    fallbackRuntime.SetEventHandlingActive workspaceId true
+            // Gate: discard streaming/token events synchronously so they
+            // never create a Promise closure, SerialQueue entry, or
+            // fallback handler invocation.
+            if not (shouldObserveMuxEvent decoded.eventType) then
+                Promise.lift ()
+            else
+                promise {
+                    let workspaceId = decoded.workspaceId
 
-                try
                     if workspaceId <> "" then
-                        if
-                            decoded.eventType = "session.deleted"
-                            || decoded.eventType = "session.close"
-                            || decoded.eventType = "session.delete"
-                            || decoded.eventType = "session.remove"
-                        then
-                            let sid = SessionId.create workspaceId
-                            let eventStore = SubsessionEventStore.create directory
-                            do! eventStore.Append(sid, [ PhysicalSessionClosed sid ]) |> Promise.map ignore
-                            SubsessionActorRegistry.ClearPoison directory workspaceId
-                            SubsessionActorRegistry.Remove directory workspaceId
+                        fallbackRuntime.SetEventHandlingActive workspaceId true
 
-                    let isChild =
-                        workspaceId <> "" && SubsessionEventRouter.isChildSession directory workspaceId
+                    try
+                        if workspaceId <> "" then
+                            if
+                                decoded.eventType = "session.deleted"
+                                || decoded.eventType = "session.close"
+                                || decoded.eventType = "session.delete"
+                                || decoded.eventType = "session.remove"
+                            then
+                                let sid = SessionId.create workspaceId
+                                let eventStore = SubsessionEventStore.create directory
+                                do! eventStore.Append(sid, [ PhysicalSessionClosed sid ]) |> Promise.map ignore
+                                SubsessionActorRegistry.ClearPoison directory workspaceId
+                                SubsessionActorRegistry.Remove directory workspaceId
 
-                    if isChild then
-                        SubsessionChildObserver.observeChildMetadata fallbackRuntime workspaceId event
+                        let isChild =
+                            workspaceId <> "" && SubsessionEventRouter.isChildSession directory workspaceId
 
-                        match muxEventTranslator.ExtractTurnObservation event with
-                        | Some obs ->
-                            let! _ = SubsessionEventRouter.routeToChild directory workspaceId (EvidenceUpdated obs)
-                            ()
-                        | None -> ()
+                        if isChild then
+                            SubsessionChildObserver.observeChildMetadata fallbackRuntime workspaceId event
 
-                        if muxEventTranslator.IsSessionError event then
-                            let errorObj =
-                                match muxEventTranslator.TranslateError event with
-                                | Some(FallbackEvent.SessionError err) -> err
-                                | _ ->
-                                    { ErrorName = "UnknownError"
-                                      DomainError = None
-                                      Message = "An unknown error occurred"
-                                      StatusCode = None
-                                      IsRetryable = None }
+                            match muxEventTranslator.ExtractTurnObservation event with
+                            | Some obs ->
+                                let! _ = SubsessionEventRouter.routeToChild directory workspaceId (EvidenceUpdated obs)
+                                ()
+                            | None -> ()
 
-                            let! _ = SubsessionEventRouter.tryError directory workspaceId errorObj
-                            ()
-                        elif muxEventTranslator.IsSessionIdle event then
-                            let! _ = SubsessionEventRouter.tryIdle directory workspaceId
-                            ()
-                    else
-                        match parseHookEvent event with
-                        | StreamAbort workspaceId
-                        | AbortedError workspaceId when workspaceId <> "" ->
-                            let root = if directory = "" then workspaceId else directory
-                            scope.TriggerInit(root)
-                            do! scope.WaitInit()
-                            do! appendLoopCancelledOrFail root workspaceId
-                            do! syncReviewFromEventLogDedicated reviewStore root workspaceId
+                            if muxEventTranslator.IsSessionError event then
+                                let errorObj =
+                                    match muxEventTranslator.TranslateError event with
+                                    | Some(FallbackEvent.SessionError err) -> err
+                                    | _ ->
+                                        { ErrorName = "UnknownError"
+                                          DomainError = None
+                                          Message = "An unknown error occurred"
+                                          StatusCode = None
+                                          IsRetryable = None }
 
-                            Wanxiangshu.Runtime.ToolHookRuntime.clearSessionCompliance workspaceId
-                            Wanxiangshu.Runtime.ToolHookRuntime.closeSession workspaceId
-                            Wanxiangshu.Runtime.RunnerBackground.abortRunnerJobCore scope workspaceId
-                        | _ -> ()
+                                let! _ = SubsessionEventRouter.tryError directory workspaceId errorObj
+                                ()
+                            elif muxEventTranslator.IsSessionIdle event then
+                                let! _ = SubsessionEventRouter.tryIdle directory workspaceId
+                                ()
+                        else
+                            match parseHookEvent event with
+                            | StreamAbort workspaceId
+                            | AbortedError workspaceId when workspaceId <> "" ->
+                                let root = if directory = "" then workspaceId else directory
+                                scope.TriggerInit(root)
+                                do! scope.WaitInit()
+                                do! appendLoopCancelledOrFail root workspaceId
+                                do! syncReviewFromEventLogDedicated reviewStore root workspaceId
 
-                        let! fbResult = fallbackHandler event
+                                Wanxiangshu.Runtime.ToolHookRuntime.clearSessionCompliance workspaceId
+                                Wanxiangshu.Runtime.ToolHookRuntime.closeSession workspaceId
+                                Wanxiangshu.Runtime.RunnerBackground.abortRunnerJobCore scope workspaceId
+                            | _ -> ()
 
-                        if not fbResult.Consumed then
-                            if SubsessionEventRouter.isChildSession directory workspaceId then
-                                match muxEventTranslator.ExtractTurnObservation event with
-                                | Some obs ->
-                                    do! routeToChild directory workspaceId (EvidenceUpdated obs) |> Promise.map ignore
-                                | None -> ()
+                            let! fbResult = fallbackHandler event
 
-                            do! runtime.HandleEvent(parseHookEvent event, helpers)
-                finally
-                    if workspaceId <> "" then
-                        fallbackRuntime.SetEventHandlingActive workspaceId false
-            })
+                            if not fbResult.Consumed then
+                                if SubsessionEventRouter.isChildSession directory workspaceId then
+                                    match muxEventTranslator.ExtractTurnObservation event with
+                                    | Some obs ->
+                                        do!
+                                            routeToChild directory workspaceId (EvidenceUpdated obs)
+                                            |> Promise.map ignore
+                                    | None -> ()
+
+                                do! runtime.HandleEvent(parseHookEvent event, helpers)
+                    finally
+                        if workspaceId <> "" then
+                            fallbackRuntime.SetEventHandlingActive workspaceId false
+                })
 
     box fn

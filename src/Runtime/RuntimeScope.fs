@@ -125,6 +125,14 @@ type RuntimeScope() =
 
     member _.ClearSessionQueues() : unit = sessionLocks <- Map.empty
 
+    member _.RemoveSessionQueue(sessionId: string) : unit =
+        sessionLocks <- Map.remove sessionId sessionLocks
+
+    member _.RemoveTempFiles(sessionId: string) : unit =
+        tempFilesByPrompt <-
+            tempFilesByPrompt
+            |> Map.filter (fun k _ -> not (k.StartsWith(sessionId + "\u0000")))
+
     member _.EnqueuePerSession(sessionId: string, work: unit -> JS.Promise<'T>) : JS.Promise<'T> =
         let lock =
             match Map.tryFind sessionId sessionLocks with

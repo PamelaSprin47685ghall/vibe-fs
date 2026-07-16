@@ -30,17 +30,24 @@ type ProjectionCache() =
     member _.FoldWan(e: WanEvent) =
         let sId = e.Session
 
-        let oldState =
-            match Map.tryFind sId sessionStates with
-            | Some st -> st
-            | None -> emptySessionState ()
+        // Evict closed sessions — the accumulated state is useless and
+        // without this the map grows unboundedly with short-lived sessions.
+        if e.Kind = eventKindSubsessionPhysicalSessionClosed then
+            sessionStates <- Map.remove sId sessionStates
+            revision <- revision + 1
+        else
+            let oldState =
+                match Map.tryFind sId sessionStates with
+                | Some st -> st
+                | None -> emptySessionState ()
 
-        sessionStates <- Map.add sId (applyEvent oldState e) sessionStates
-        squadProj <- applyWanEvent squadProj e
-        revision <- revision + 1
+            sessionStates <- Map.add sId (applyEvent oldState e) sessionStates
+            squadProj <- applyWanEvent squadProj e
+            revision <- revision + 1
 
-        if isSquadEventKind e.Kind then
-            latestSessionId <- Some e.Session
+            if isSquadEventKind e.Kind then
+                latestSessionId <- Some e.Session
+                ()
 
     member _.GetSessionStateSync(sessionId: string) : SessionState =
         match Map.tryFind sessionId sessionStates with

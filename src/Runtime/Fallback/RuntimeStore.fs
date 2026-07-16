@@ -78,4 +78,5 @@ type FallbackRuntimeStore() =
     member _.CleanupSession(sessionID: string) : unit =
         sessionStates <- Map.remove sessionID sessionStates
         activeGates <- removeSessionGates activeGates sessionID
+        listeners <- Map.remove sessionID listeners // release registered callbacks
         triggerStateChanged sessionID

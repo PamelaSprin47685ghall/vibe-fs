@@ -2,19 +2,38 @@ module Wanxiangshu.Runtime.PromiseQueue
 
 open Fable.Core
 
-/// Single-threaded, lock-free async serial queue. Replaces the legacy F# Agent
-/// actor pattern with a plain Promise chain: tasks run in the
-/// order they are enqueued, the tail swallows predecessor exceptions so the queue
-/// never jams, and each Enqueue resolves/rejects with its own task's outcome.
+/// Single-threaded serial queue backed by a ResizeArray. Unlike the prior
+/// Promise-chain design, completed tasks are removed immediately so their
+/// closures — including any captured rawEvent objects — become unreachable.
+/// Without this, high-frequency streaming events build an unbounded chain of
+/// PromiseReaction nodes that V8 cannot GC.
 type IExceptionObserver =
     abstract OnException: exn -> unit
 
 type SerialQueue(?observer: IExceptionObserver) =
-    let tail = ref (Promise.lift ())
+    let queue = ResizeArray<unit -> JS.Promise<unit>>()
+    let mutable running = false
+
+    let rec processQueue () =
+        promise {
+            if queue.Count = 0 then
+                running <- false
+            else
+                running <- true
+                let task = queue.[0]
+                queue.RemoveAt(0)
+
+                try
+                    do! task ()
+                with _ ->
+                    ()
+
+                do! processQueue ()
+        }
 
     member _.Enqueue(work: unit -> JS.Promise<'T>) : JS.Promise<'T> =
         Promise.create (fun resolve reject ->
-            let runNext () =
+            let task () =
                 promise {
                     try
                         let! result = work ()
@@ -24,12 +43,11 @@ type SerialQueue(?observer: IExceptionObserver) =
                         reject ex
                 }
 
-            let oldTail = tail.Value
+            queue.Add(task)
 
-            tail.Value <-
-                oldTail
-                |> Promise.catch (fun ex -> observer |> Option.iter (fun o -> o.OnException ex))
-                |> Promise.bind (fun _ -> runNext () |> Promise.map ignore))
+            if not running then
+                running <- true
+                processQueue () |> Promise.start)
 
 /// Race a promise against a timeout. Returns None when the timeout wins, Some
 /// value when the work resolves first.

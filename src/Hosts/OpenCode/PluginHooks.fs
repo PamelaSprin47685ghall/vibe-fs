@@ -115,6 +115,9 @@ let private handleSessionCleanup (services: CoreServices) (env: HostEventEnvelop
                 services.RuntimeScope
                 ptyCleanupSessionId
 
+            services.RuntimeScope.RemoveSessionQueue ptyCleanupSessionId
+            services.RuntimeScope.RemoveTempFiles ptyCleanupSessionId
+
             let sid = SessionId.create ptyCleanupSessionId
             let eventStore = SubsessionEventStore.create services.Directory
             do! eventStore.Append(sid, [ PhysicalSessionClosed sid ])
