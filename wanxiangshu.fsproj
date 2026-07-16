@@ -542,6 +542,7 @@
     <Compile Include="tests/ToolArgsDecodeTests.fs"/>
     <Compile Include="tests/ToolArgsCoerceTests.fs"/>
     <Compile Include="tests/SubagentToolExecuteTests.fs"/>
+    <Compile Include="tests/SubagentCleanupCompletionTests.fs"/>
     <Compile Include="tests/FileToolsCodecTests.fs"/>
     <Compile Include="tests/FuzzyToolsCodecTests.fs"/>
     <Compile Include="tests/WorkBacklogToolsCodecTests.fs"/>

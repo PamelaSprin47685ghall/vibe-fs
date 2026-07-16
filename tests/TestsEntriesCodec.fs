@@ -72,6 +72,7 @@ open Wanxiangshu.Tests.OmpTitleFetchGuardTests
 open Wanxiangshu.Tests.OmpMagicTodoTests
 open Wanxiangshu.Tests.OmpPluginCoreIntegrationTests
 open Wanxiangshu.Tests.SubagentIoTests
+open Wanxiangshu.Tests.SubagentCleanupCompletionTests
 open Wanxiangshu.Tests.TestsTestBody
 
 let codecTestEntries () : (string * TestBody) list =
@@ -82,6 +83,7 @@ let codecTestEntries () : (string * TestBody) list =
       "ToolArgsCoerceTests.run", Sync(sync ToolArgsCoerceTests.run)
       "ToolResultWireTests.run", Sync(sync ToolResultWireTests.run)
       "SubagentToolExecuteTests.run", Async SubagentToolExecuteTests.run
+      "SubagentCleanupCompletionTests.run", Async SubagentCleanupCompletionTests.run
       "WebToolsCodecTests.run", Sync(sync WebToolsCodecTests.run)
       "ReviewToolsCodecTests.run", Sync(sync ReviewToolsCodecTests.run)
       "FileToolsCodecTests.run", Sync(sync FileToolsCodecTests.run)

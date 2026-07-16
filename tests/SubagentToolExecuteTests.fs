@@ -18,6 +18,8 @@ open Wanxiangshu.Opencode.SubagentIo
 open Wanxiangshu.Tests.TempWorkspace
 open Wanxiangshu.Kernel.Subsession.Types
 
+module Dyn = Wanxiangshu.Shell.Dyn
+
 let private stubMuxSpawn role =
     { ToolNames = [||]
       AgentId = "coder-agent"

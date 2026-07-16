@@ -227,9 +227,8 @@ let runSubagentCoreResult
                     | Some err -> return Error(translateJsError err)
                     | None ->
                         match runResultOpt with
-                        | Some(Succeeded _output) ->
-                            let! text = extractSessionText client childID directory startCount
-                            return Ok(formatSubagentReport noOutputText abortedPrefix text false)
+                        | Some(Succeeded output) ->
+                            return Ok(formatSubagentReport noOutputText abortedPrefix output false)
                         | Some Cancelled -> return Ok abortedPrefix
                         | Some(Failed reason) ->
                             return Error(DomainError.InvalidIntent("subagent", "run", formatRunFailure reason))
