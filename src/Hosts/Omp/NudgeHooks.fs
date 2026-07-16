@@ -41,6 +41,10 @@ open Wanxiangshu.Runtime.FuzzyIteratorStore
 open Wanxiangshu.Runtime.ReviewRuntime
 open Wanxiangshu.Kernel.EventSourcing.Fold
 open Wanxiangshu.Runtime.EventLogRuntime
+open Wanxiangshu.Hosts.Omp.NudgeHooksHelpers
+
+let sendNudgeReminder = NudgeHooksHelpers.sendNudgeReminder
+let resolveAgentLocal = NudgeHooksHelpers.resolveAgentLocal
 
 let beforeAgentStartHandler
     (piObj: obj)
@@ -94,50 +98,6 @@ let turnStartHandler
     | None -> ()
 
     applyActiveToolFilterForMainSession piObj ctxObj
-
-let private sendNudgeReminder (pi: IPi) (action: NudgeAction) (snapshot: SessionSnapshot) : JS.Promise<unit> =
-    promise {
-        if pi.sendMessage.IsSome then
-            let call (msg: obj) (opts: obj) =
-                let r = pi?sendMessage (msg, opts)
-                if Dyn.isNullish r then Promise.lift () else unbox r
-
-            match action with
-            | NudgeRunner ->
-                do!
-                    call
-                        (createObj
-                            [ "customType", box "wanxiangshu-runner-reminder"
-                              "content", box (runnerReminderContent ())
-                              "display", box false ])
-                        (createObj [ "triggerTurn", box true; "deliverAs", box "nextTurn" ])
-            | NudgeLoop ->
-                do!
-                    call
-                        (createObj
-                            [ "customType", box "wanxiangshu-loop-reminder"
-                              "content", box (loopReminderContent snapshot.todos)
-                              "display", box false ])
-                        (createObj [ "triggerTurn", box true; "deliverAs", box "nextTurn" ])
-            | NudgeTodo ->
-                do!
-                    call
-                        (createObj
-                            [ "customType", box "wanxiangshu-todo-reminder"
-                              "content", box (todoReminderContent snapshot.todos)
-                              "display", box false ])
-                        (createObj [ "triggerTurn", box true; "deliverAs", box "nextTurn" ])
-            | NudgeNone -> ()
-    }
-
-let private resolveAgentLocal (ctx: obj) : string =
-    let sm = Dyn.get ctx "sessionManager"
-
-    if Dyn.isNullish sm then
-        "manager"
-    else
-        let name = Dyn.str sm "agentName"
-        if name <> "" then name else "manager"
 
 let performNudgeDispatch
     (pi: IPi)

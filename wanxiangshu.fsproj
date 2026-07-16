@@ -434,12 +434,12 @@
     <Compile Include="src/Hosts/Omp/HookExecute.fs"/>
     <Compile Include="src/Hosts/Omp/AgentConfig.fs"/>
     <Compile Include="src/Hosts/Omp/NudgeToolFilter.fs"/>
+    <Compile Include="src/Hosts/Omp/NudgeHooksHelpers.fs"/>
     <Compile Include="src/Hosts/Omp/NudgeHooks.fs"/>
     <Compile Include="src/Hosts/Omp/TodoHooks.fs"/>
     <Compile Include="src/Hosts/Omp/SessionLifecycleHooks.fs"/>
     <Compile Include="src/Hosts/Omp/SessionLifecycle.fs"/>
     <Compile Include="src/Hosts/Omp/Tools.fs"/>
-    <Compile Include="src/Hosts/Omp/Fallback/EventTranslatorHelpers.fs"/>
     <Compile Include="src/Hosts/Omp/Fallback/EventTranslator.fs"/>
     <Compile Include="src/Hosts/Omp/Fallback/ActionExecutor.fs"/>
     <Compile Include="src/Hosts/Omp/Fallback/Hook.fs"/>

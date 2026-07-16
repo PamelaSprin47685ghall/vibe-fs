@@ -1,5 +1,7 @@
 module Wanxiangshu.Hosts.Opencode.Fallback.EventTranslator
 
+/// Private implementation helpers for the OpenCode fallback event translator.
+
 open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Runtime
@@ -23,7 +25,7 @@ open Wanxiangshu.Hosts.Opencode.Fallback.HostEventInspection
 let private isSyntheticText (text: string) : bool =
     let t = text.Trim()
 
-    t = "​"
+    t = "\u200b"
     || t.Contains("There are still incomplete todos")
     || t.Contains("You are in loop mode. You must call the submit_review")
     || t.Contains("A background runner task is still active")
@@ -33,61 +35,51 @@ let private isSyntheticText (text: string) : bool =
 let private tryExtractTurnIdFromEvent (rawEvent: obj) : TurnId option =
     let props = getProps rawEvent
     let info = Dyn.get props "info"
-    let nonce = Dyn.str props "nonce"
-    let nonce = if nonce <> "" then nonce else Dyn.str info "nonce"
-    let cid = Dyn.str props "continuationId"
-    let cid = if cid <> "" then cid else Dyn.str props "continuationID"
-    let cid = if cid <> "" then cid else Dyn.str info "continuationId"
-    let cid = if cid <> "" then cid else Dyn.str info "continuationID"
-    let id = if nonce <> "" then nonce else cid
-    if id <> "" then Some(TurnId.create id) else None
+    let info = if Dyn.isNullish info then props else info
+    let tid = Dyn.str info "turnId"
+    let tid = if tid <> "" then tid else Dyn.str info "turnID"
+    let tid = if tid <> "" then tid else Dyn.str info "runId"
+    let tid = if tid <> "" then tid else Dyn.str info "runID"
+    if tid <> "" then Some(TurnId.create tid) else None
 
 let private tryGetModelStringFromInfo (info: obj) : string option =
-    if isNull info || Dyn.isNullish info then
+    if Dyn.isNullish info then
         None
     else
-        let modelVal = Dyn.get info "model"
+        let mv = Dyn.get info "model"
 
-        if isNull modelVal || Dyn.isNullish modelVal then
+        if Dyn.isNullish mv then
             None
-        elif Dyn.typeIs modelVal "string" then
-            let s = string modelVal
-            if s = "" then None else Some s
+        elif Dyn.typeIs mv "string" then
+            let s = string mv in if s = "" then None else Some s
         else
-            let providerID = Dyn.str modelVal "providerID"
-            let modelID = Dyn.str modelVal "modelID"
-            let variant = Dyn.str modelVal "variant"
+            let pID, mID, variant =
+                Dyn.str mv "providerID", Dyn.str mv "modelID", Dyn.str mv "variant"
+
             let suffix = if variant <> "" then ":" + variant else ""
 
-            if providerID = "" || modelID = "" then
-                let idVal = Dyn.str modelVal "id"
-                if idVal <> "" then Some(idVal + suffix) else None
+            if pID = "" || mID = "" then
+                let idVal = Dyn.str mv "id" in if idVal <> "" then Some(idVal + suffix) else None
             else
-                Some(sprintf "%s/%s%s" providerID modelID suffix)
+                Some(sprintf "%s/%s%s" pID mID suffix)
 
 let isNewUserMessageImpl (runtime: FallbackRuntimeStore) (sessionID: string) (rawEvent: obj) : bool =
-    if getEventType rawEvent <> "message.updated" then
+    let props = getProps rawEvent
+    let parts = Dyn.get props "parts"
+
+    if Dyn.isNullish parts then
         false
     else
-        let props = getProps rawEvent
-        let info = Dyn.get props "info"
+        let partsArr = parts :?> obj array
+        let text = getPartsText parts
 
-        if Dyn.isNullish info || Dyn.str info "role" <> "user" then
-            false
-        else
-            let parts = Dyn.get props "parts"
-            let text = getPartsText parts
+        let hasSyntheticMarker =
+            partsArr
+            |> Array.exists (fun part ->
+                let synthetic = Dyn.get part "synthetic"
+                not (Dyn.isNullish synthetic) && unbox<bool> synthetic)
 
-            let hasSyntheticMarker =
-                if Dyn.isArray parts then
-                    (parts :?> obj array)
-                    |> Array.exists (fun part ->
-                        let synthetic = Dyn.get part "synthetic"
-                        not (Dyn.isNullish synthetic) && unbox<bool> synthetic)
-                else
-                    false
-
-            not hasSyntheticMarker && not (isSyntheticText text)
+        not hasSyntheticMarker && not (isSyntheticText text)
 
 let private translateErrorImpl (rawEvent: obj) : FallbackEvent option =
     let eventType = getEventType rawEvent
@@ -166,11 +158,10 @@ let private extractToolObservation (rawEvent: obj) (props: obj) : TurnObservatio
     if not (Dyn.isNullish parts) && Dyn.isArray parts then
         let partsArr = parts :?> obj array
 
-        let hasToolResult =
+        if
             partsArr
             |> Array.exists (fun part -> let pt = Dyn.str part "type" in isToolResultPartType pt)
-
-        if hasToolResult then
+        then
             Some
                 { TurnId = tryExtractTurnIdFromEvent rawEvent
                   Evidence =
@@ -201,8 +192,7 @@ let private isAssistantMessageImpl (rawEvent: obj) : bool =
 
     (eventType = "message.updated" || eventType.StartsWith("message.part."))
     && not (Dyn.isNullish props)
-    && (let info = Dyn.get props "info"
-        not (Dyn.isNullish info) && Dyn.str info "role" = "assistant")
+    && (let info = Dyn.get props "info" in not (Dyn.isNullish info) && Dyn.str info "role" = "assistant")
 
 let private extractAssistantMessageIdImpl (rawEvent: obj) : string option =
     let eventType = getEventType rawEvent
@@ -219,7 +209,7 @@ let private extractAssistantMessageIdImpl (rawEvent: obj) : string option =
             else if not (Dyn.isNullish msg) then msg
             else props
 
-        let id = Dyn.str info "id"
+        let id = Dyn.str info "id" in
         if id <> "" then Some id else None
 
 let private extractAssistantParentIdImpl (rawEvent: obj) : string option =
@@ -232,24 +222,32 @@ let private extractAssistantParentIdImpl (rawEvent: obj) : string option =
         else if not (Dyn.isNullish msg) then msg
         else props
 
-    let pid = Dyn.str info "parentID"
+    let pid = Dyn.str info "parentID" in
     let pid = if pid <> "" then pid else Dyn.str info "parentId"
     if pid <> "" then Some pid else None
 
 let private extractContinuationIdentityImpl (rawEvent: obj) : (string * int) option =
     let props = getProps rawEvent
     let props = if Dyn.isNullish props then rawEvent else props
-    let cid = Dyn.str props "continuationId"
-    let cid = if cid <> "" then cid else Dyn.str props "continuationID"
-    let cid = if cid <> "" then cid else Dyn.str rawEvent "continuationId"
-    let cid = if cid <> "" then cid else Dyn.str rawEvent "continuationID"
-    let o = Dyn.get props "continuationOrdinal"
+
+    let cid =
+        Dyn.str props "continuationId"
+        |> fun c -> if c <> "" then c else Dyn.str props "continuationID"
+
+    let cid =
+        if cid <> "" then
+            cid
+        else
+            Dyn.str rawEvent "continuationId"
+            |> fun c -> if c <> "" then c else Dyn.str rawEvent "continuationID"
 
     let o =
-        if Dyn.isNullish o then
-            Dyn.get rawEvent "continuationOrdinal"
-        else
-            o
+        Dyn.get props "continuationOrdinal"
+        |> fun x ->
+            if Dyn.isNullish x then
+                Dyn.get rawEvent "continuationOrdinal"
+            else
+                x
 
     let ord = getOrdinal o
     if cid <> "" then Some(cid, ord) else None
@@ -257,12 +255,17 @@ let private extractContinuationIdentityImpl (rawEvent: obj) : (string * int) opt
 let private extractHostRunIdImpl (rawEvent: obj) : string option =
     let props = getProps rawEvent
     let props = if Dyn.isNullish props then rawEvent else props
-    let info = Dyn.get props "info"
-    let info = if Dyn.isNullish info then props else info
-    let tid = Dyn.str info "turnId"
-    let tid = if tid <> "" then tid else Dyn.str info "turnID"
-    let tid = if tid <> "" then tid else Dyn.str info "runId"
-    let tid = if tid <> "" then tid else Dyn.str info "runID"
+    let info = Dyn.get props "info" |> fun x -> if Dyn.isNullish x then props else x
+
+    let tid =
+        Dyn.str info "turnId" |> fun t -> if t <> "" then t else Dyn.str info "turnID"
+
+    let tid =
+        if tid <> "" then
+            tid
+        else
+            Dyn.str info "runId" |> fun t -> if t <> "" then t else Dyn.str info "runID"
+
     if tid <> "" then Some tid else None
 
 let opencodeEventTranslator (runtime: FallbackRuntimeStore) : IEventTranslator =
@@ -273,8 +276,7 @@ let opencodeEventTranslator (runtime: FallbackRuntimeStore) : IEventTranslator =
             getSessionID (getEventType rawEvent) (getProps rawEvent)
 
         member _.IsSessionError rawEvent =
-            let t = getEventType rawEvent
-            t = "session.error" || t = "session.interrupted"
+            let t = getEventType rawEvent in t = "session.error" || t = "session.interrupted"
 
         member _.IsSessionIdle rawEvent =
             let t = getEventType rawEvent
@@ -294,9 +296,8 @@ let opencodeEventTranslator (runtime: FallbackRuntimeStore) : IEventTranslator =
 
         member _.ExtractNewUserMessageId(rawEvent) =
             let props = getProps rawEvent
-            let info = Dyn.get props "info"
-            let info = if Dyn.isNullish info then props else info
-            let id = Dyn.str info "id"
+            let info = Dyn.get props "info" |> fun x -> if Dyn.isNullish x then props else x
+            let id = Dyn.str info "id" in
             if id = "" then None else Some id
 
         member _.ExtractRoutingContext(rawEvent) =
