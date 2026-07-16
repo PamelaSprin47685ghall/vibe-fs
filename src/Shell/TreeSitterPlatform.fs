@@ -59,7 +59,9 @@ let internal tryGetPack () : Result<obj, string> =
         // Monkey-patch: force glibc detection to succeed even when Node.js
         // report doesn't expose glibcVersion (broken musl false-positive in
         // @kreuzberg/tree-sitter-language-pack/index.js).
-        emitJsExpr () """
+        emitJsExpr
+            ()
+            """
         if (typeof process.report === 'object' && typeof process.report.getReport === 'function') {
             const orig = process.report.getReport.bind(process.report);
             process.report.getReport = function() {
@@ -108,32 +110,6 @@ let internal tryGetPack () : Result<obj, string> =
 
         cachedPack <- Some result
         result
-
-/// Debug: return unique node kind names from a file parsed with tree-sitter.
-/// Used to discover F# grammar node kinds for function-length checks.
-let listNodeKinds (filePath: string) : JS.Promise<Result<string[], string>> =
-    promise {
-        let! content = (nodeRequire "fs/promises")?readFile (filePath, "utf-8") |> unbox<JS.Promise<string>>
-        match tryGetPack () with
-        | Result.Error reason -> return Result.Error reason
-        | Result.Ok pack ->
-            try
-                let parser = getOrCallWith pack "getParser" "fsharp"
-                let tree = getOrCallWith parser "parse" content
-                let root = getOrCall tree "rootNode"
-                let kinds = System.Collections.Generic.HashSet<string>()
-                let rec walk (n: obj) =
-                    let k = string (getOrCall n "kind")
-                    if not (System.String.IsNullOrEmpty k) then kinds.Add k |> ignore
-                    let count = unbox<int> (getOrCall n "childCount")
-                    for i = 0 to count - 1 do
-                        let child = getOrCallWith n "child" (box i)
-                        if not (isNullish child) then walk child
-                walk root
-                return Result.Ok(kinds |> Seq.sort |> Array.ofSeq)
-            with e ->
-                return Result.Error $"parse failed: {e.Message}"
-    }
 
 let internal detectLanguage (pack: obj) (content: string) (filePath: string) : string =
     let probePath () : string option =

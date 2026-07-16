@@ -34,14 +34,20 @@ let defaultStyleLimits: StyleLimits =
       maxFunctionLines = 60
       functionKinds =
         Set.ofList
-            [ "function"
+            [ // General tree-sitter grammar names
+              "function"
               "function_definition"
               "function_declaration"
               "method_definition"
               "method_declaration"
               "arrow_function"
               "let_binding"
-              "value_declaration" ] }
+              "value_declaration"
+              // F# tree-sitter grammar names
+              "function_or_value_defn"
+              "function_expression"
+              "fun_expression"
+              "value_declaration_left" ] }
 
 let warningFunctionLines = 50
 
