@@ -29,13 +29,19 @@ let stopAndSave () =
         session?post (
             "Profiler.stop",
             fun err (res: obj) ->
-                if isNull err then
+                if not (isNull err) then
+                    JS.console.error ("Profiler.stop error:", err)
+                else
                     writeFile "/tmp/wanxiangshu.cpuprofile" res?profile
 
+                // HeapProfiler may not be available on Bun (JSC vs V8).
+                // Try independently; failure won't block CPU profile save.
                 session?post (
                     "HeapProfiler.stopSampling",
                     fun err2 (res2: obj) ->
-                        if isNull err2 then
+                        if not (isNull err2) then
+                            JS.console.error ("HeapProfiler.stopSampling error:", err2)
+                        else
                             writeFile "/tmp/wanxiangshu.heapprofile" res2?profile
 
                         session?post ("Profiler.disable")
