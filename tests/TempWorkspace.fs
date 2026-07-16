@@ -24,3 +24,12 @@ let rmAsync (path: string) : JS.Promise<unit> =
 
 let writeFileAsync (path: string) (content: string) : JS.Promise<unit> =
     unbox (fsAsync?writeFile (path, content))
+
+let tryReadFileAsync (path: string) : JS.Promise<string option> =
+    promise {
+        try
+            let! content = unbox<JS.Promise<string>> (fsAsync?readFile (path, box "utf8"))
+            return Some content
+        with _ ->
+            return None
+    }

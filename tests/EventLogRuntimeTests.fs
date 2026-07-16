@@ -247,6 +247,20 @@ let testReadAllEventsIdempotent () : JS.Promise<unit> =
         do! rmAsync dir
     }
 
+let appendWithEmptyWorkspaceRootWritesNothing () =
+    promise {
+        let cwdLogPath = eventPath ""
+        let! before = tryReadFileAsync cwdLogPath
+        do! appendLoopActivatedOrFail "" "s-empty-root" "task"
+
+        let! claimed =
+            tryClaimNudgeDispatch "" "s-empty-root" Wanxiangshu.Kernel.Nudge.NudgeTodo "anchor" "" "" 0 0 "" 1
+
+        check "claim disabled without workspace" (not claimed)
+        let! after = tryReadFileAsync cwdLogPath
+        equal "empty workspace root leaves cwd log untouched" before after
+    }
+
 let run () =
     promise {
         do! appendThenReadAll ()
@@ -263,4 +277,5 @@ let run () =
         do! testMemoryCachingAndNoRepeatedFileReads ()
         do! testGetSquadEventsCache ()
         do! testReadAllEventsIdempotent ()
+        do! appendWithEmptyWorkspaceRootWritesNothing ()
     }

@@ -23,6 +23,14 @@ let lockFileName = ".wanxiangshu.ndjson.lock"
 type EventLogStore(workspaceRoot: string, ?appendLineOverride: string -> WanEvent -> JS.Promise<unit>) =
     let queue = SerialQueue()
     let eventFilePath = eventPath workspaceRoot
+    let writesDisabled = workspaceRoot = ""
+
+    let enqueueWrite (noopValue: 'T) (work: unit -> JS.Promise<'T>) : JS.Promise<'T> =
+        if writesDisabled then
+            Promise.lift noopValue
+        else
+            queue.Enqueue work
+
     let appendLineFn = defaultArg appendLineOverride appendLine
     let cache = ProjectionCache()
     let mutable initDone = false
@@ -168,7 +176,7 @@ type EventLogStore(workspaceRoot: string, ?appendLineOverride: string -> WanEven
     member _.EnsureInitialized() : JS.Promise<unit> = ensureInitialized ()
 
     member _.AppendEvent(e: WanEvent) : JS.Promise<Result<unit, string>> =
-        queue.Enqueue(fun () ->
+        enqueueWrite (Ok()) (fun () ->
             promise {
                 do! ensureInitialized ()
 
@@ -191,7 +199,7 @@ type EventLogStore(workspaceRoot: string, ?appendLineOverride: string -> WanEven
             })
 
     member _.AppendEventOrFail(e: WanEvent) : JS.Promise<unit> =
-        queue.Enqueue(fun () ->
+        enqueueWrite () (fun () ->
             promise {
                 do! ensureInitialized ()
 
@@ -214,7 +222,7 @@ type EventLogStore(workspaceRoot: string, ?appendLineOverride: string -> WanEven
         if List.isEmpty events then
             Promise.lift ()
         else
-            queue.Enqueue(fun () ->
+            enqueueWrite () (fun () ->
                 promise {
                     do! ensureInitialized ()
 
@@ -270,7 +278,7 @@ type EventLogStore(workspaceRoot: string, ?appendLineOverride: string -> WanEven
         (nudgeOrdinal: int)
         (isBlocked: NudgeDedupState -> string -> bool)
         : JS.Promise<bool> =
-        queue.Enqueue(fun () ->
+        enqueueWrite false (fun () ->
             promise {
                 do! ensureInitialized ()
                 let trimmedAnchor = anchor.Trim()
