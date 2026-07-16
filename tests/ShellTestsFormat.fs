@@ -31,7 +31,7 @@ let summarizerInputCap () =
         if s.Length <= maxBytes then s else s.[.. maxBytes - 1]
 
     let opts: ExecuteOptions =
-        { program = "echo x"
+        { command = "echo x"
           language = Shell
           dependencies = []
           timeoutType = Long
@@ -62,7 +62,7 @@ let safetyWarning () =
     let warnForExecution program =
         prependSafetyWarningForExecution
             "OUT"
-            { program = program
+            { command = program
               language = Shell
               dependencies = []
               timeoutType = Short

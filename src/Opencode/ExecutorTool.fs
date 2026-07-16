@@ -42,7 +42,7 @@ let executorTool
         executor
         (box
             {| language = enumOptWithDefault [| "shell"; "python"; "javascript" |] "shell" Params.executorLanguage
-               program = strReq Params.executorProgram
+               command = strReq Params.executorCommand
                dependencies = strArrayOpt Params.executorDeps
                timeout_type = enumReq [| "short"; "long" |] Params.executorTimeout
                mode = enumReq [| "ro"; "rw" |] Params.executorMode
@@ -81,7 +81,7 @@ let executorTool
                                             (ExecutorSummary(
                                                 output,
                                                 langStr,
-                                                options.program,
+                                                options.command,
                                                 options.dependencies,
                                                 timeoutStr,
                                                 options.mode,

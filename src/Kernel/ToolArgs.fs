@@ -27,7 +27,7 @@ type WebfetchArgs =
 
 type ExecutorArgs =
     { Language: ExecutorLanguage
-      Program: string
+      Command: string
       Dependencies: string list
       TimeoutType: ExecutorTimeoutType
       Mode: string

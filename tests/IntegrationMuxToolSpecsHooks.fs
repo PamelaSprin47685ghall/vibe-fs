@@ -221,7 +221,7 @@ let muxToolExecuteAfterBlocksRepeatedIdenticalCallSpec () =
 
         let after = get reg "tool.execute.after"
         check "mux registration exposes tool.execute.after" (not (isNullish after))
-        let args = createObj [ "language", box "shell"; "program", box "echo hi" ]
+        let args = createObj [ "language", box "shell"; "command", box "echo hi" ]
 
         let input =
             createObj [ "tool", box "executor"; "sessionID", box sessionID; "args", box args ]
@@ -255,7 +255,7 @@ let muxToolExecuteAfterBlocksRepeatedCallIgnoringControlsSpec () =
         check "mux registration exposes tool.execute.after for controls test" (not (isNullish after))
 
         // 1st call: normal args
-        let args1 = createObj [ "language", box "shell"; "program", box "echo hi" ]
+        let args1 = createObj [ "language", box "shell"; "command", box "echo hi" ]
 
         let input1 =
             createObj [ "tool", box "executor"; "sessionID", box sessionID; "args", box args1 ]
@@ -268,7 +268,7 @@ let muxToolExecuteAfterBlocksRepeatedCallIgnoringControlsSpec () =
         let args2 =
             createObj
                 [ "language", box "shell"
-                  "program", box "echo hi"
+                  "command", box "echo hi"
                   "warn", box "some-warn-val" ]
 
         let input2 =
@@ -282,7 +282,7 @@ let muxToolExecuteAfterBlocksRepeatedCallIgnoringControlsSpec () =
         let args3 =
             createObj
                 [ "language", box "shell"
-                  "program", box "echo hi"
+                  "command", box "echo hi"
                   "warn_tdd", box "some-tdd-val"
                   "warn_reuse", box "some-reuse-val" ]
 

@@ -35,7 +35,7 @@ let private mapWebfetch (w: WebToolsCodec.WebfetchArgs) : Wanxiangshu.Kernel.Too
 
 let private mapExecutor (e: ExecutorToolsCodec.ExecutorArgs) : Wanxiangshu.Kernel.ToolArgs.ExecutorArgs =
     { Language = e.Language
-      Program = e.Program
+      Command = e.Command
       Dependencies = e.Dependencies
       TimeoutType = e.TimeoutType
       Mode = e.Mode

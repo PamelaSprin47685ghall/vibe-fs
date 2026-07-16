@@ -178,7 +178,7 @@ let runAll (args: string array) : JS.Promise<int> =
                         "executor"
                         (box
                             {| language = "shell"
-                               program = "echo hi" |})
+                               command = "echo hi" |})
                         "run echo hi"
 
                 chk "e2e.executor.tool-called" (containsTool harness "executor")

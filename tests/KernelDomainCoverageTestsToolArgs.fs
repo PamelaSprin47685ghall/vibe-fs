@@ -74,14 +74,14 @@ let taExecutor () =
     let a =
         Executor
             { Language = Shell
-              Program = "p"
+              Command = "p"
               Dependencies = []
               TimeoutType = Short
               Mode = "rw"
               WhatToSummarize = "s" }
 
     match a with
-    | Executor e -> equal "Executor.Program" "p" e.Program
+    | Executor e -> equal "Executor.Command" "p" e.Command
     | _ -> check "Executor case" false
 
 let taTodoWrite () =

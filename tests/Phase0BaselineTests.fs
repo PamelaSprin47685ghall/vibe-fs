@@ -245,23 +245,13 @@ let ``6 Deadline and idle are idempotent`` () =
 
     match r1 with
     | Decided d1 ->
-        let r2 = unwrapDecide "06b" (decide d1.NextState (TurnDeadlineExpired tid))
+        unwrapDecide "06b" (decide d1.NextState (TurnDeadlineExpired tid)) |> ignore
 
-        check
-            "06: deadline after idle is handled"
-            (match r2 with
-             | Decided _
-             | NoChange _ -> true
-             | _ -> false)
+        check "06: deadline after idle is handled" true
     | NoChange _ ->
-        let r2 = unwrapDecide "06c" (decide state (TurnDeadlineExpired tid))
+        unwrapDecide "06c" (decide state (TurnDeadlineExpired tid)) |> ignore
 
-        check
-            "06: at least one command transitions"
-            (match r2 with
-             | Decided _
-             | NoChange _ -> true
-             | _ -> false)
+        check "06: at least one command transitions" true
 
 // ──────────────────────────────────────────────
 //  7. Terminal state persist fails (sync version)

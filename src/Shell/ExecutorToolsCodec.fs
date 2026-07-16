@@ -6,7 +6,7 @@ open Wanxiangshu.Shell.DynField
 
 type ExecutorArgs =
     { Language: ExecutorLanguage
-      Program: string
+      Command: string
       Dependencies: string list
       TimeoutType: ExecutorTimeoutType
       Mode: string
@@ -35,10 +35,10 @@ let decodeExecutorArgs (args: obj) : Result<ExecutorArgs, DomainError> =
         | None -> Ok Shell
         | Some langStr -> parseLanguageField langStr
 
-    let programResult =
-        match strField args "program" with
-        | None -> Error(InvalidIntent("executor", "program", "required"))
-        | Some p when System.String.IsNullOrWhiteSpace p -> Error(InvalidIntent("executor", "program", "required"))
+    let commandResult =
+        match strField args "command" with
+        | None -> Error(InvalidIntent("executor", "command", "required"))
+        | Some p when System.String.IsNullOrWhiteSpace p -> Error(InvalidIntent("executor", "command", "required"))
         | Some p -> Ok p
 
     let modeResult =
@@ -60,8 +60,8 @@ let decodeExecutorArgs (args: obj) : Result<ExecutorArgs, DomainError> =
 
     languageResult
     |> Result.bind (fun language ->
-        programResult
-        |> Result.bind (fun program ->
+        commandResult
+        |> Result.bind (fun command ->
             modeResult
             |> Result.bind (fun mode ->
                 whatResult
@@ -69,7 +69,7 @@ let decodeExecutorArgs (args: obj) : Result<ExecutorArgs, DomainError> =
                     maxBytesResult
                     |> Result.map (fun maxBytes ->
                         { Language = language
-                          Program = program
+                          Command = command
                           Dependencies = defaultArg (strListField args "dependencies") []
                           TimeoutType = parseTimeout (defaultArg (strField args "timeout_type") "")
                           Mode = mode
@@ -77,7 +77,7 @@ let decodeExecutorArgs (args: obj) : Result<ExecutorArgs, DomainError> =
                           MaxBytes = maxBytes })))))
 
 let toExecuteOptions (cwd: string option) (decoded: ExecutorArgs) : ExecuteOptions =
-    { program = decoded.Program
+    { command = decoded.Command
       language = decoded.Language
       dependencies = decoded.Dependencies
       timeoutType = decoded.TimeoutType

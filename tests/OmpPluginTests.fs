@@ -180,7 +180,7 @@ let executorToolSchemaFourFields () =
 
         for field in
             [| "language"
-               "program"
+               "command"
                "dependencies"
                "timeout_type"
                "mode"

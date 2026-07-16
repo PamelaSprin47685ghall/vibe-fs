@@ -121,7 +121,7 @@ let law6EffectCompletionViaPost () =
             persistBarrier (fun () -> promise { return () }) (fun () ->
                 // \"Decide\" produces an effect. Effect completion
                 // MUST go through the inbox, not a sync call.
-                effectComplete "effect1_done"
+                effectComplete "effect1_done" |> ignore
                 42)
 
         // Effect completion should have been posted after commit

@@ -130,7 +130,7 @@ let executorParameters (tb: obj) : obj =
             [| ("language",
                 optWithDefault Params.executorLanguage tb "shell" (fun desc tb ->
                     enumOf [| "shell"; "python"; "javascript" |] desc tb))
-               ("program", str Params.executorProgram tb)
+               ("command", str Params.executorCommand tb)
                ("dependencies", opt Params.executorDeps tb (fun desc tb -> strArray desc tb))
                ("timeout_type", enumOf [| "short"; "long" |] Params.executorTimeout tb)
                ("mode", enumOf [| "ro"; "rw" |] Params.executorMode tb)

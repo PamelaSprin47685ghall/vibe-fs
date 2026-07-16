@@ -66,7 +66,7 @@ let webApiKeyValidation () =
 
 let executorMapping () =
     let opts: ExecuteOptions =
-        { program = "echo x"
+        { command = "echo x"
           language = Shell
           dependencies = []
           timeoutType = Long

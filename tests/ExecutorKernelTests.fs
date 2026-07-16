@@ -124,7 +124,7 @@ let shouldSummarizeThreshold () =
 let decodeExecutorArgsMissingMaxBytes () =
     let args =
         createObj
-            [ "program", box "echo hi"
+            [ "command", box "echo hi"
               "mode", box "ro"
               "what_to_summarize", box "files"
               "timeout_type", box "short" ]
@@ -138,7 +138,7 @@ let decodeExecutorArgsMissingMaxBytes () =
 let decodeExecutorArgsValidMaxBytes () =
     let args =
         createObj
-            [ "program", box "echo hi"
+            [ "command", box "echo hi"
               "mode", box "ro"
               "what_to_summarize", box "files"
               "max_bytes", box 4096
@@ -209,7 +209,7 @@ let buildSummaryPromptSmall () =
         if s.Length <= max then s else s.Substring(0, max)
 
     let opts =
-        { program = "echo x"
+        { command = "echo x"
           language = Shell
           dependencies = []
           timeoutType = Short
@@ -228,7 +228,7 @@ let buildSummaryPromptLarge () =
     let byteLength (s: string) = utf8ByteLength s
 
     let opts =
-        { program = "echo x"
+        { command = "echo x"
           language = Shell
           dependencies = []
           timeoutType = Short
@@ -245,7 +245,7 @@ let buildSummaryPromptUtf8Boundary () =
     let byteLength (s: string) = utf8ByteLength s
 
     let opts =
-        { program = "echo x"
+        { command = "echo x"
           language = Shell
           dependencies = []
           timeoutType = Short

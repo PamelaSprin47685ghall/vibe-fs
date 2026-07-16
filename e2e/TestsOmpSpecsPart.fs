@@ -90,7 +90,7 @@ let runOmpExecutorTools (h: OmpHarness) (chk: string -> bool -> unit) (sessionId
                     "executor"
                     (box
                         {| language = "shell"
-                           program = "echo hello"
+                           command = "echo hello"
                            timeout_type = "short"
                            mode = "ro"
                            what_to_summarize = "stdout"

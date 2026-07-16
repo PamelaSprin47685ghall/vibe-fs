@@ -179,7 +179,7 @@ let runRest
                 "executor"
                 (box
                     {| language = "javascript"
-                       program = "console.log('js test')" |})
+                       command = "console.log('js test')" |})
                 "run javascript"
 
         chk "e2e.executor-javascript.tool-called" (containsTool harness "executor")

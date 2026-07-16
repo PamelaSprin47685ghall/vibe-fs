@@ -30,7 +30,7 @@ let muxExecutorRoCatPrependsWarningSpec () =
             let args =
                 createObj
                     [ "language", box "shell"
-                      "program", box "cat /etc/passwd"
+                      "command", box "cat /etc/passwd"
                       "timeout_type", box "short"
                       "mode", box "ro"
                       "what_to_summarize", box "summarize exit codes"

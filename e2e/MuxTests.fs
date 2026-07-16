@@ -145,12 +145,12 @@ let runAll (args: string array) : JS.Promise<int> =
         chk "mux.schema.read.requiredPath" (toolSchemaRequiredArray harness "read" |> Array.contains "path")
 
         let propsExec = toolSchemaProperties harness "executor"
-        chk "mux.schema.executor.hasProgram" (not (dynIsNull (dynGet propsExec "program")))
+        chk "mux.schema.executor.hasCommand" (not (dynIsNull (dynGet propsExec "command")))
         chk "mux.schema.executor.hasLanguage" (not (dynIsNull (dynGet propsExec "language")))
 
         chk
-            "mux.schema.executor.requiredProgram"
-            (toolSchemaRequiredArray harness "executor" |> Array.contains "program")
+            "mux.schema.executor.requiredCommand"
+            (toolSchemaRequiredArray harness "executor" |> Array.contains "command")
 
         let propsFuzzy = toolSchemaProperties harness "fuzzy_find"
         chk "mux.schema.fuzzyFind.hasPattern" (not (dynIsNull (dynGet propsFuzzy "pattern")))
@@ -184,7 +184,7 @@ let runAll (args: string array) : JS.Promise<int> =
             runTool
                 "executor"
                 (createObj
-                    [ "program", box "echo hello-executor"
+                    [ "command", box "echo hello-executor"
                       "language", box "shell"
                       "mode", box "ro"
                       "max_bytes", box 8192

@@ -65,7 +65,7 @@ let private summarizeWhenNeeded
                     (ExecutorSummary(
                         output,
                         langStr,
-                        options.program,
+                        options.command,
                         options.dependencies,
                         timeoutStr,
                         options.mode,
@@ -136,12 +136,12 @@ let executorTool
             (createObj
                 [ "language",
                   box (strEnumPropWithDefault Params.executorLanguage [| "shell"; "python"; "javascript" |] "shell")
-                  "program", box (strProp Params.executorProgram)
+                  "command", box (strProp Params.executorCommand)
                   "dependencies", box (strArrayProp Params.executorDeps)
                   "timeout_type", box (strEnumProp Params.executorTimeout [| "short"; "long" |])
                   "mode", box (strEnumProp Params.executorMode [| "ro"; "rw" |])
                   "what_to_summarize", box (strProp Params.executorWhatToSummarize) ])
-            [| "program"; "timeout_type"; "mode"; "what_to_summarize" |]
+            [| "command"; "timeout_type"; "mode"; "what_to_summarize" |]
       execute =
         fun config args ->
             match fromMuxConfig config with

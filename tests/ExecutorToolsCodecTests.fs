@@ -11,7 +11,7 @@ let decodeExecutorInvalidLanguage () =
     let args =
         createObj
             [ "language", box "ruby"
-              "program", box "echo hi"
+              "command", box "echo hi"
               "timeout_type", box "short"
               "mode", box "ro"
               "warn",
@@ -33,14 +33,14 @@ let decodeExecutorMissingProgram () =
                   "it-is-not-possible-to-do-it-using-other-tools-and-only-run-tests-when-static-analysis-cannot-handle-it" ]
 
     match decodeExecutorArgs args with
-    | Error(InvalidIntent("executor", "program", "required")) -> check "executor missing program" true
+    | Error(InvalidIntent("executor", "command", "required")) -> check "executor missing program" true
     | _ -> check "executor missing program" false
 
 let decodeExecutorOkShell () =
     let args =
         createObj
             [ "language", box "shell"
-              "program", box "echo ok"
+              "command", box "echo ok"
               "dependencies", box [| "dep-a" |]
               "timeout_type", box "long"
               "mode", box "rw"
@@ -50,7 +50,7 @@ let decodeExecutorOkShell () =
     match decodeExecutorArgs args with
     | Ok ex ->
         check "executor ok language" (ex.Language = Shell)
-        check "executor ok program" (ex.Program = "echo ok")
+        check "executor ok program" (ex.Command = "echo ok")
         equal "executor ok deps count" 1 ex.Dependencies.Length
         check "executor ok timeout" (ex.TimeoutType = Long)
         check "executor ok mode" (ex.Mode = "rw")
@@ -64,7 +64,7 @@ let decodeExecutorMissingWhatToSummarize () =
     let args =
         createObj
             [ "language", box "shell"
-              "program", box "echo ok"
+              "command", box "echo ok"
               "timeout_type", box "long"
               "mode", box "rw" ]
 
@@ -77,7 +77,7 @@ let decodeExecutorMissingMode () =
     let args =
         createObj
             [ "language", box "shell"
-              "program", box "echo ok"
+              "command", box "echo ok"
               "timeout_type", box "short" ]
 
     match decodeExecutorArgs args with

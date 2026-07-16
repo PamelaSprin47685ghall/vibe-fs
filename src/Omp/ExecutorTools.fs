@@ -36,7 +36,7 @@ let private sessionExecutor = createForScope ompScope
 
 let private parseExecutorParams (params': obj) (ctx: obj) =
     let lang = let l = Dyn.str params' "language" in if l = "" then "shell" else l
-    let program = Dyn.str params' "program"
+    let command = Dyn.str params' "command"
     let what = Dyn.str params' "what_to_summarize"
     let timeoutType = parseTimeout (Dyn.str params' "timeout_type")
     let mode = let m = Dyn.str params' "mode" in if m = "" then "rw" else m
@@ -56,7 +56,7 @@ let private parseExecutorParams (params': obj) (ctx: obj) =
         | Some mb -> mb
         | None -> 8192
 
-    (lang, program, what, timeoutType, mode, deps, cwd, maxBytes)
+    (lang, command, what, timeoutType, mode, deps, cwd, maxBytes)
 
 let private runExecutorJob (options: ExecuteOptions) (signal: obj) (childId: string) =
     promise {
@@ -83,14 +83,14 @@ let private summarizeOutput
     (childSession: obj)
     (output: string)
     (lang: string)
-    (program: string)
+    (command: string)
     (deps: string list)
     (mode: string)
     (what: string)
     =
     promise {
         let summaryPrompt =
-            executorSummarizerPrompt what output lang program deps "executor" mode
+            executorSummarizerPrompt what output lang command deps "executor" mode
 
         do! childSession?prompt (summaryPrompt) |> unbox<JS.Promise<unit>>
         do! childSession?waitForIdle () |> unbox<JS.Promise<unit>>
@@ -101,7 +101,7 @@ let private summarizeOutput
 
 let private executeExecutor (pi: obj) (_id: string) (params': obj) (signal: obj) (_onUpdate: obj) (ctx: obj) =
     promise {
-        let (lang, program, what, timeoutType, mode, deps, cwd, maxBytes) =
+        let (lang, command, what, timeoutType, mode, deps, cwd, maxBytes) =
             parseExecutorParams params' ctx
 
         let mutable childHolder: ChildSession option = None
@@ -140,7 +140,7 @@ let private executeExecutor (pi: obj) (_id: string) (params': obj) (signal: obj)
                     return errorResult "Executor child session unavailable"
                 else
                     let options =
-                        { program = program
+                        { command = command
                           language = parseLanguage lang
                           dependencies = deps
                           timeoutType = timeoutType
@@ -156,7 +156,7 @@ let private executeExecutor (pi: obj) (_id: string) (params': obj) (signal: obj)
                         finishJob ()
                         return textResult output
                     else
-                        let! text = summarizeOutput pi childSession output lang program deps mode what
+                        let! text = summarizeOutput pi childSession output lang command deps mode what
                         finishJob ()
                         return text
             with ex ->

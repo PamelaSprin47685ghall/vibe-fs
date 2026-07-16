@@ -106,7 +106,7 @@ let runPart2
             harness.runToolExecuteHooks "coder" (createObj [ "intents", box [||]; "tdd", box "green" ]) "success"
 
         chk "op.coder.before.missingWarnTdd" (not (dynIsNull (dynGet coderBeforeRes "error")))
-        let! execBeforeRes = harness.runToolExecuteHooks "executor" (createObj [ "program", box "echo" ]) "success"
+        let! execBeforeRes = harness.runToolExecuteHooks "executor" (createObj [ "command", box "echo" ]) "success"
         chk "op.executor.before.missingWarn" (not (dynIsNull (dynGet execBeforeRes "error")))
 
         // --- 7. tool.execute.after boundaries --------------------------------
@@ -115,7 +115,7 @@ let runPart2
 
         let execArgs2 =
             createObj
-                [ "program", box "echo hello-executor"
+                [ "command", box "echo hello-executor"
                   "language", box "shell"
                   "mode", box "ro"
                   "timeout_type", box "short"

@@ -40,7 +40,7 @@ type ResourceScope(callback: ResourceId -> unit) =
         let key = timerKey id
 
         // Compute remaining time (allow for clock skew with floor of 0)
-        let nowMs = int64 (JS.Date.now ())
+        let nowMs = int64 (JS.Constructors.Date.now ())
         let remaining = max 0L (deadlineAtMs - nowMs)
 
         let handle =

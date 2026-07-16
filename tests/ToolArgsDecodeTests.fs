@@ -70,7 +70,7 @@ let decodeExecutorOkShell () =
     let args =
         createObj
             [ "language", box "shell"
-              "program", box "echo ok"
+              "command", box "echo ok"
               "dependencies", box [| "dep-a" |]
               "timeout_type", box "long"
               "mode", box "rw"
@@ -83,7 +83,7 @@ let decodeExecutorOkShell () =
     match decodeToolInvocation "executor" args with
     | Ok(Typed(Executor ex)) ->
         check "executor ok language" (ex.Language = Shell)
-        check "executor ok program" (ex.Program = "echo ok")
+        check "executor ok program" (ex.Command = "echo ok")
         equal "executor ok deps count" 1 ex.Dependencies.Length
         check "executor ok timeout" (ex.TimeoutType = Long)
         check "executor ok mode" (ex.Mode = "rw")
@@ -94,7 +94,7 @@ let decodeExecutorMissingWhatToSummarize () =
     let args =
         createObj
             [ "language", box "shell"
-              "program", box "echo ok"
+              "command", box "echo ok"
               "timeout_type", box "long"
               "mode", box "rw"
               "warn",
@@ -173,7 +173,7 @@ let decodeSubmitReviewOk () =
 let testSanitizeNullArgs () =
     let args =
         createObj
-            [ "program", box "echo"
+            [ "command", box "echo"
               "dependencies", box null
               "timeout_type", box "long"
               "mode", box "rw"
@@ -187,7 +187,7 @@ let testSanitizeNullArgs () =
     let keys = Dyn.keys args
     check "dependencies deleted" (not (Array.contains "dependencies" keys))
     check "empty_obj deleted" (not (Array.contains "empty_obj" keys))
-    check "program kept" (Array.contains "program" keys)
+    check "command kept" (Array.contains "command" keys)
     check "timeout_type kept" (Array.contains "timeout_type" keys)
     check "mode kept" (Array.contains "mode" keys)
     check "what_to_summarize kept" (Array.contains "what_to_summarize" keys)

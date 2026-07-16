@@ -151,7 +151,7 @@ let runMimoExecutor (h: Harness) (chk: string -> bool -> unit) =
     promise {
         let execArgs =
             createObj
-                [ "program", box "echo hello-mimo"
+                [ "command", box "echo hello-mimo"
                   "language", box "shell"
                   "mode", box "ro"
                   "timeout_type", box "short"

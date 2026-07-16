@@ -32,7 +32,7 @@ let timeoutMs =
     | Long -> 100_000
 
 type ExecuteOptions =
-    { program: string
+    { command: string
       language: ExecutorLanguage
       dependencies: string list
       timeoutType: ExecutorTimeoutType
@@ -90,10 +90,10 @@ let readOnlyReadCommands: Set<string> =
           "ls"
           "tree" ]
 
-let shouldAppendReadOnlyWarning (program: string) (language: ExecutorLanguage) : bool =
+let shouldAppendReadOnlyWarning (command: string) (language: ExecutorLanguage) : bool =
     match language with
     | Shell ->
-        let stripped = (strip program).script
+        let stripped = (strip command).script
 
         let words =
             stripped.Split([| ' '; '\t'; '\n'; '|'; '&'; ';' |], StringSplitOptions.RemoveEmptyEntries)
@@ -104,8 +104,8 @@ let shouldAppendReadOnlyWarning (program: string) (language: ExecutorLanguage) :
             Set.contains bare readOnlyReadCommands)
     | _ -> false
 
-let prependSafetyWarning (output: string) (program: string) (language: ExecutorLanguage) : string =
-    if not (shouldAppendReadOnlyWarning program language) then
+let prependSafetyWarning (output: string) (command: string) (language: ExecutorLanguage) : string =
+    if not (shouldAppendReadOnlyWarning command language) then
         output
     else
         match tryParse output with
@@ -118,12 +118,12 @@ let prependSafetyWarning (output: string) (program: string) (language: ExecutorL
 
 let shouldSummarize (byteLength: string -> int) (maxBytes: int) (output: string) : bool = byteLength output > maxBytes
 
-let prepareShellProgram (program: string) : string = (strip program).script
+let prepareShellProgram (command: string) : string = (strip command).script
 
 let prepareProgramForExecution (options: ExecuteOptions) : string =
     match options.language with
-    | Shell -> prepareShellProgram options.program
-    | _ -> options.program
+    | Shell -> prepareShellProgram options.command
+    | _ -> options.command
 
 let prependSafetyWarningForExecution (output: string) (options: ExecuteOptions) : string =
     prependSafetyWarning output (prepareProgramForExecution options) options.language
@@ -169,7 +169,7 @@ let buildSummaryPrompt
         options.whatToSummarize
         capped
         langStr
-        options.program
+        options.command
         options.dependencies
         timeoutStr
         options.mode
