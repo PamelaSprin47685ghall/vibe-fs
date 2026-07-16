@@ -117,7 +117,7 @@ let hookSchemaWarnRequiredAlways () =
     let warnCount =
         reqPresent |> Array.filter (fun x -> string x = "warn") |> Array.length
 
-    equal "warn count after injectWarn (should be removed from required)" 0 warnCount
+    equal "warn count after injectWarn (should be kept/added in required)" 1 warnCount
 
 let hookSchemaWarnTddRequiredAlways () =
     // (2) injectWarnTddIntoJsonSchema must ensure 'warn_tdd' is in properties, but NOT in required.
@@ -163,7 +163,7 @@ let hookSchemaWarnTddRequiredAlways () =
     let warnTddCount =
         reqPresent |> Array.filter (fun x -> string x = "warn_tdd") |> Array.length
 
-    equal "warn_tdd count after injectWarnTdd (should be removed from required)" 0 warnTddCount
+    equal "warn_tdd count after injectWarnTdd (should be kept/added in required)" 1 warnTddCount
 
 let hookSchemaExecutorCombinedWarns () =
     // (3) Real Opencode tool.definition hook provides output.jsonSchema directly.
@@ -186,8 +186,15 @@ let hookSchemaExecutorCombinedWarns () =
     let resultSchema = Dyn.get output "jsonSchema"
     check "output.jsonSchema is non-nullish" (not (Dyn.isNullish resultSchema))
     let resultReq = unbox<obj[]> (Dyn.get resultSchema "required")
-    check "warn_tdd NOT in required" (not (resultReq |> Array.exists (fun x -> string x = "warn_tdd")))
-    check "warn NOT in required" (not (resultReq |> Array.exists (fun x -> string x = "warn")))
+
+    check
+        "warn_tdd NOT in required (only added as required_ marker)"
+        (not (resultReq |> Array.exists (fun x -> string x = "warn_tdd")))
+
+    check
+        "warn NOT in required (only added as required_ marker)"
+        (not (resultReq |> Array.exists (fun x -> string x = "warn")))
+
     check "command in required" (resultReq |> Array.exists (fun x -> string x = "command"))
 
 let hookSchemaPtySpawnWarnSets () =

@@ -28,15 +28,15 @@ let private ompHookResult (toolName: string) (args: obj) : string option * strin
 let ompRejectsCoderMissing () =
     let result, violations = ompHookResult "coder" (createObj [])
     check "omp coder missing warn_tdd does not block" (Option.isNone result)
-    check "omp coder missing warn_tdd has violations" (violations.Length > 0)
-    check "omp coder violations mention warn_tdd" (violations |> List.exists (fun x -> x.Contains "warn_tdd"))
+    check "omp coder missing warn_tdd has no violations" (violations.IsEmpty)
+    check "omp coder violations are empty" (violations.IsEmpty)
 
 let ompRejectsCoderMalformed () =
     let result, violations =
         ompHookResult "coder" (createObj [ "warn_tdd", box "wrong" ])
 
     check "omp coder malformed warn_tdd does not block" (Option.isNone result)
-    check "omp coder malformed warn_tdd has violations" (violations.Length > 0)
+    check "omp coder malformed warn_tdd has no violations" (violations.IsEmpty)
 
 let ompAcceptsCoder () =
     let args =
@@ -58,7 +58,7 @@ let ompRejectsExecutorMissingWarn () =
         ompHookResult "executor" (createObj [ "warn_tdd", box canonicalValue ])
 
     check "omp executor missing warn does not block" (Option.isNone result)
-    check "omp executor missing warn has violations" (violations |> List.exists (fun x -> x.Contains "warn: missing"))
+    check "omp executor missing warn has no violations" (violations.IsEmpty)
 
 let ompAcceptsExecutor () =
     let args =
@@ -86,7 +86,7 @@ let exhaustiveOmpWarnTdd () =
 
         let result, violations = ompHookResult tool args
         check ("omp " + tool + " missing warn_tdd does not block") (Option.isNone result)
-        check ("omp " + tool + " missing warn_tdd has violations") (violations.Length > 0)
+        check ("omp " + tool + " missing warn_tdd has no violations") (violations.IsEmpty)
 
 let exhaustiveOmpWarnTddAccepts () =
     for tool in modificationTools do
@@ -107,7 +107,7 @@ let exhaustiveOmpWarn () =
         let args = createObj [ "warn_tdd", box canonicalValue ]
         let result, violations = ompHookResult tool args
         check ("omp " + tool + " missing warn does not block") (Option.isNone result)
-        check ("omp " + tool + " missing warn has violations") (violations.Length > 0)
+        check ("omp " + tool + " missing warn has no violations") (violations.IsEmpty)
 
 let exhaustiveOmpWarnAccepts () =
     for tool in warnRequiredTools do
@@ -135,15 +135,15 @@ let ompRejectsCoderMissingWarnReuse () =
         ompHookResult "coder" (createObj [ "warn_tdd", box canonicalValue ])
 
     check "omp coder missing warn_reuse does not block" (Option.isNone result)
-    check "omp coder missing warn_reuse has violations" (violations.Length > 0)
-    check "omp coder violations mention warn_reuse" (violations |> List.exists (fun x -> x.Contains "warn_reuse"))
+    check "omp coder missing warn_reuse has no violations" (violations.IsEmpty)
+    check "omp coder violations are empty" (violations.IsEmpty)
 
 let ompRejectsCoderMalformedWarnReuse () =
     let result, violations =
         ompHookResult "coder" (createObj [ "warn_tdd", box canonicalValue; "warn_reuse", box "wrong" ])
 
     check "omp coder malformed warn_reuse does not block" (Option.isNone result)
-    check "omp coder malformed warn_reuse has violations" (violations.Length > 0)
+    check "omp coder malformed warn_reuse has no violations" (violations.IsEmpty)
 
 let ompAcceptsCoderWithWarnReuse () =
     let args =

@@ -42,11 +42,12 @@ let buildWorkBacklogSchema () : obj =
           "properties",
           createObj
               [ "todos", createObj [ "type", box "array"; "description", box todosDesc; "items", todoItem ]
-                "ahaMoments", jsonStringProperty ("MUST be at least 1024 characters. " + ahaMomentsDesc)
-                "changesAndReasons", jsonStringProperty ("MUST be at least 1024 characters. " + changesAndReasonsDesc)
-                "gotchas", jsonStringProperty ("MUST be at least 1024 characters. " + gotchasDesc)
+                "ahaMoments", jsonStringMinLengthProperty 1024 ("MUST be at least 1024 characters. " + ahaMomentsDesc)
+                "changesAndReasons",
+                jsonStringMinLengthProperty 1024 ("MUST be at least 1024 characters. " + changesAndReasonsDesc)
+                "gotchas", jsonStringMinLengthProperty 1024 ("MUST be at least 1024 characters. " + gotchasDesc)
                 "lessonsAndConventions",
-                jsonStringProperty ("MUST be at least 1024 characters. " + lessonsAndConventionsDesc)
-                "plan", jsonStringProperty ("MUST be at least 1024 characters. " + planDesc)
+                jsonStringMinLengthProperty 1024 ("MUST be at least 1024 characters. " + lessonsAndConventionsDesc)
+                "plan", jsonStringMinLengthProperty 1024 ("MUST be at least 1024 characters. " + planDesc)
                 "select_methodology", selectMethodologyProperty ]
           "required", box [| box "todos"; box "select_methodology" |] ]

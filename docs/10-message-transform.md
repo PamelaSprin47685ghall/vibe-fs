@@ -85,7 +85,7 @@ OpenCode：**原地 mutate** hook 字段（`AGENTS.md`）。
 
 | 阶段 | 动作 | 模块 |
 | :--- | :--- | :--- |
-| Schema 注册 | 注入 `x-wanxiangshu-soft-required` 元数据，不放入 Host 强制 `required`/`minLength` | `ToolHookRuntime.decorateAndValidateSchema` |
+| Schema 注册 | 注入 `required_` 元数据，不放入 Host 强制 `required`/`minLength` | `ToolHookRuntime.decorateAndValidateSchema` |
 | Before hook | 提取并原地删除字段，构造 `ControlEnvelope` 存入 `ToolComplianceStore` | `executeBeforeGateway` + `saveCompliance` |
 | 真实执行 | 工具收到净化后的业务参数 | Host execute |
 | After hook | 追加违例批评（`WANXIANGSHU_COMPLIANCE_REPRIMAND`），调用 `restoreWarnToArgs` 将原始字段恢复到历史可见 args | `tryGetCompliance` → `appendCriticism` → `restoreWarnToArgs` → `removeCompliance` |

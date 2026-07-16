@@ -123,8 +123,11 @@ let todoWriteWrapperDecodeFailureSpec (reg: obj) =
         do! afterHook $ (afterInput, r1) |> unbox<JS.Promise<unit>>
 
         let out1 = str r1 "output"
-        check "todo_write missing ahaMoments output has criticism" (out1.Contains "严重协议违例")
-        check "todo_write missing ahaMoments mentions missing field" (out1.Contains "ahaMoments: missing")
+        check "todo_write missing ahaMoments output has no criticism (optimistic)" (not (out1.Contains "严重协议违例"))
+
+        check
+            "todo_write missing ahaMoments no longer mentions missing field"
+            (not (out1.Contains "ahaMoments: missing"))
 
         let validArgs =
             createObj

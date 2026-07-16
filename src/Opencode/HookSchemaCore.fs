@@ -167,25 +167,25 @@ let warnTddProperty: obj =
     createObj
         [ "type", box "string"
           "description", box Params.warnTddDesc
-          "x-wanxiangshu-soft-required", box true ]
+          "required_", box true ]
 
 let inlineJsonWarnTddProperty: obj =
     createObj
         [ "type", box "string"
           "description", box Params.warnTddDesc
-          "x-wanxiangshu-soft-required", box true ]
+          "required_", box true ]
 
 let inlineJsonWarnProperty: obj =
     createObj
         [ "type", box "string"
           "description", box WarnTdd.warnDescription
-          "x-wanxiangshu-soft-required", box true ]
+          "required_", box true ]
 
 let inlineJsonWarnReuseProperty: obj =
     createObj
         [ "type", box "string"
           "description", box WarnTdd.warnReuseDescription
-          "x-wanxiangshu-soft-required", box true ]
+          "required_", box true ]
 
 let buildWorkBacklogSchema () : obj =
     WorkBacklogSchema.buildWorkBacklogSchema ()

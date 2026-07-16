@@ -159,7 +159,7 @@ let opencodeHookSchemaInjectWarnTddIntoEmptySchema () =
     let props = get schema "properties"
     check "warn_tdd property injected" (not (Dyn.isNullish (get props "warn_tdd")))
     let prop = get props "warn_tdd"
-    check "warn_tdd has soft-required metadata" (Dyn.truthy (get prop "x-wanxiangshu-soft-required"))
+    check "warn_tdd has soft-required metadata" (Dyn.truthy (get prop "required_"))
     let required = get schema "required"
 
     check
@@ -236,12 +236,14 @@ let opencodeHookSchemaMergeWorkBacklogReportSoftenExistingFields () =
     let resultRequired = get result "required"
     let planProp = get resultProps "plan"
 
-    check "minLength removed from plan" (Dyn.isNullish (get planProp "minLength"))
-    check "soft min length added to plan" (unbox<int> (get planProp "x-wanxiangshu-soft-min-length") = 1024)
-    check "plan description softened" ((Dyn.str planProp "description").Contains("MUST be at least 1024 characters"))
+    check "minLength kept on plan" (unbox<int> (get planProp "minLength") = 1024)
+
+    check
+        "plan description has min length hint"
+        ((Dyn.str planProp "description").Contains("MUST be at least 1024 characters"))
 
     let required = resultRequired :?> obj array
-    check "plan removed from required" (not (required |> Array.exists (fun x -> string x = "plan")))
+    check "plan still in required" (required |> Array.exists (fun x -> string x = "plan"))
     check "description still in required" (required |> Array.exists (fun x -> string x = "description"))
 
 // ── buildWorkBacklogSchema ────────────────────────────────────────────────────

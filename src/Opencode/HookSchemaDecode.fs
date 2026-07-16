@@ -36,20 +36,6 @@ let private removeRequiredKey (schema: obj) (key: string) : unit =
             let nextReq = arr |> Array.filter (fun x -> string x <> key)
             schema?("required") <- box nextReq
 
-let private softenControlProperty (property: obj) (description: string) : unit =
-    if not (isNullish property) then
-        // These controls are advisory.  Remove executable constraints that
-        // would make a missing, short, or non-canonical value a host reject.
-        Dyn.deleteKey property "enum"
-        Dyn.deleteKey property "const"
-        Dyn.deleteKey property "pattern"
-        Dyn.deleteKey property "minLength"
-        Dyn.deleteKey property "maxLength"
-        property?("x-wanxiangshu-soft-required") <- true
-
-        if Dyn.str property "description" = "" then
-            property?("description") <- box description
-
 let private injectWarnTddIntoJsonSchemaInPlace (schema: obj) : unit =
     let props = get schema "properties"
 
@@ -57,7 +43,13 @@ let private injectWarnTddIntoJsonSchemaInPlace (schema: obj) : unit =
         if isNullish (get props "warn_tdd") then
             props?("warn_tdd") <- inlineJsonWarnTddProperty
         else
-            softenControlProperty (get props "warn_tdd") Params.warnTddDesc
+            let prop = get props "warn_tdd"
+
+            if not (isNullish prop) then
+                prop?("required_") <- true
+
+                if Dyn.str prop "description" = "" then
+                    prop?("description") <- box Params.warnTddDesc
 
         appendRequiredWarnTddInPlace schema
 
@@ -69,7 +61,6 @@ let injectWarnTddIntoJsonSchema (schema: obj) : obj =
     if isNullish schema then
         schema
     else
-        removeRequiredKey schema "warn_tdd"
         let props = get schema "properties"
 
         if not (isNullish props) then
@@ -88,7 +79,10 @@ let private injectWarnIntoJsonSchemaInPlace (schema: obj) : unit =
         if isNullish (get props "warn") then
             props?("warn") <- inlineJsonWarnProperty
         else
-            softenControlProperty (get props "warn") WarnTdd.warnDescription
+            let prop = get props "warn"
+
+            if not (isNullish prop) then
+                Dyn.setKey prop "required_" true
 
         appendRequiredWarnInPlace schema
 
@@ -100,7 +94,6 @@ let injectWarnIntoJsonSchema (schema: obj) : obj =
     if isNullish schema then
         schema
     else
-        removeRequiredKey schema "warn"
         let props = get schema "properties"
 
         if not (isNullish props) then
@@ -112,12 +105,6 @@ let injectWarnIntoJsonSchema (schema: obj) : obj =
 
 let private stringZodProperty (description: string) : obj =
     createObj [ "type", box "string"; "minLength", box 1; "description", box description ]
-
-let private jsonStringMinLengthProperty (minLength: int) (description: string) : obj =
-    createObj
-        [ "type", box "string"
-          "x-wanxiangshu-soft-min-length", box minLength
-          "description", box ("MUST be at least " + string minLength + " characters. " + description) ]
 
 let private reportFieldDescs =
     [| "ahaMoments", ahaMomentsDesc
@@ -139,7 +126,10 @@ let private injectWarnReuseIntoJsonSchemaInPlace (schema: obj) : unit =
         if isNullish (get props "warn_reuse") then
             props?("warn_reuse") <- inlineJsonWarnReuseProperty
         else
-            softenControlProperty (get props "warn_reuse") WarnTdd.warnReuseDescription
+            let prop = get props "warn_reuse"
+
+            if not (isNullish prop) then
+                Dyn.setKey prop "required_" true
 
         appendRequiredWarnReuseInPlace schema
 
@@ -151,7 +141,6 @@ let injectWarnReuseIntoJsonSchema (schema: obj) : obj =
     if isNullish schema then
         schema
     else
-        removeRequiredKey schema "warn_reuse"
         let props = get schema "properties"
 
         if not (isNullish props) then
@@ -182,29 +171,16 @@ let mergeWorkBacklogReportIntoTaskSchema (schema: obj) : obj =
                    "lessonsAndConventions"
                    "plan" |]
 
-            let filterRequired (req: obj) =
-                if isNullish req || not (Dyn.isArray req) then
-                    req
-                else
-                    let arr = unbox<obj array> req
-
-                    arr
-                    |> Array.filter (fun k ->
-                        let s = string k
-                        not (Array.contains s reportFields))
-                    |> box
-
             reportFields
             |> Array.iter (fun field ->
                 let existingProp = get properties field
 
                 if isNullish existingProp then
-                    properties?(field) <- jsonStringMinLengthProperty 1024 (reportFieldDescs.[field])
+                    properties?(field) <- WorkBacklogSchema.jsonStringMinLengthProperty 1024 (reportFieldDescs.[field])
                 else
-                    if not (isNullish (get existingProp "minLength")) then
-                        Dyn.deleteKey existingProp "minLength"
+                    if isNullish (get existingProp "minLength") then
+                        existingProp?("minLength") <- box 1024
 
-                    existingProp?("x-wanxiangshu-soft-min-length") <- box 1024
                     let currentDesc = Dyn.str existingProp "description"
 
                     let cleanDesc =
@@ -232,15 +208,15 @@ let mergeWorkBacklogReportIntoTaskSchema (schema: obj) : obj =
                               if key = "properties" then
                                   yield key, nextProperties
                               elif key = "required" then
-                                  let filteredReq = filterRequired (get schema "required")
-                                  yield key, requiredWithoutTaskId filteredReq |> appendRequiredKey "select_methodology"
+                                  let req = get schema "required"
+                                  yield key, requiredWithoutTaskId req |> appendRequiredKey "select_methodology"
                               else
                                   yield key, get schema key ]
             else
                 createObj
                     [ for key in Dyn.keys schema do
                           if key = "required" then
-                              let filteredReq = filterRequired (get schema "required")
-                              yield key, appendRequiredKey "select_methodology" filteredReq
+                              let req = get schema "required"
+                              yield key, appendRequiredKey "select_methodology" req
                           else
                               yield key, get schema key ]

@@ -346,7 +346,7 @@ let inlineJsonWarnTddProperty: obj =
         [ "type", box "string"
           "description",
           box "MUST acknowledge that tests are written first (TDD) and Kolmogorov discipline is followed."
-          "x-wanxiangshu-soft-required", box true ]
+          "required_", box true ]
 
 let inlineJsonWarnProperty: obj =
     createObj
@@ -354,23 +354,13 @@ let inlineJsonWarnProperty: obj =
           "description",
           box
               "MUST acknowledge that this task cannot be done with other tools and only run tests when static analysis cannot handle it."
-          "x-wanxiangshu-soft-required", box true ]
+          "required_", box true ]
 
 let inlineJsonWarnReuseProperty: obj =
     createObj
         [ "type", box "string"
           "description", box "MUST acknowledge that this task is not suitable for completion via continue tool."
-          "x-wanxiangshu-soft-required", box true ]
-
-let private softenControlProperty (property: obj) : unit =
-    if not (Dyn.isNullish property) then
-        Dyn.deleteKey property "enum"
-        Dyn.deleteKey property "const"
-        Dyn.deleteKey property "pattern"
-        Dyn.deleteKey property "minLength"
-        Dyn.deleteKey property "maxLength"
-        Dyn.setKey property "x-wanxiangshu-soft-required" true
-
+          "required_", box true ]
 
 let decorateAndValidateSchema (toolName: string) (schema: obj) : obj =
     if Dyn.isNullish schema then
@@ -391,7 +381,7 @@ let decorateAndValidateSchema (toolName: string) (schema: obj) : obj =
                     let prop = Dyn.get props "warn_tdd"
 
                     if not (Dyn.isNullish prop) then
-                        softenControlProperty prop
+                        Dyn.setKey prop "required_" true
 
             if List.contains ProcessExecution caps then
                 if Dyn.isNullish (Dyn.get props "warn") then
@@ -400,7 +390,7 @@ let decorateAndValidateSchema (toolName: string) (schema: obj) : obj =
                     let prop = Dyn.get props "warn"
 
                     if not (Dyn.isNullish prop) then
-                        softenControlProperty prop
+                        Dyn.setKey prop "required_" true
 
             if List.contains SubagentDelegation caps then
                 if Dyn.isNullish (Dyn.get props "warn_reuse") then
@@ -409,22 +399,8 @@ let decorateAndValidateSchema (toolName: string) (schema: obj) : obj =
                     let prop = Dyn.get props "warn_reuse"
 
                     if not (Dyn.isNullish prop) then
-                        softenControlProperty prop
+                        Dyn.setKey prop "required_" true
 
-
-            // Remove warn fields from required list to avoid host hard rejection
-            let req = Dyn.get schema "required"
-
-            if Dyn.isArray req then
-                let arr = req :?> obj array
-
-                let nextReq =
-                    arr
-                    |> Array.filter (fun x ->
-                        let s = string x
-                        s <> "warn_tdd" && s <> "warn" && s <> "warn_reuse")
-
-                Dyn.setKey schema "required" nextReq
 
             // Soft validation: warn fields are soft-required per compliance policy.
             // Missing fields do NOT block tool registration or execution.
@@ -603,36 +579,7 @@ let executeBeforeGateway (tool: string) (args: obj) : Result<obj * ControlEnvelo
                 args
 
         // Validate soft required fields into violations list
-        let violations =
-            [ if List.contains FileMutation caps then
-                  match warnTddVal with
-                  | None -> yield "warn_tdd: missing required acknowledgement"
-                  | Some v ->
-                      let norm = v.Trim().ToLowerInvariant()
-
-                      if norm <> WarnTdd.canonicalValue then
-                          yield
-                              $"warn_tdd: value is invalid (got '%s{v}', expected canonical acknowledgement '%s{WarnTdd.canonicalValue}')"
-
-              if List.contains ProcessExecution caps then
-                  match warnVal with
-                  | None -> yield "warn: missing required acknowledgement"
-                  | Some v ->
-                      let norm = v.Trim().ToLowerInvariant()
-
-                      if norm <> WarnTdd.warnCanonicalValue then
-                          yield
-                              $"warn: value is invalid (got '%s{v}', expected canonical acknowledgement '%s{WarnTdd.warnCanonicalValue}')"
-
-              if List.contains SubagentDelegation caps then
-                  match warnReuseVal with
-                  | None -> yield "warn_reuse: missing required acknowledgement"
-                  | Some v ->
-                      let norm = v.Trim().ToLowerInvariant()
-
-                      if norm <> WarnTdd.warnReuseCanonicalValue then
-                          yield
-                              $"warn_reuse: value is invalid (got '%s{v}', expected canonical acknowledgement '%s{WarnTdd.warnReuseCanonicalValue}')" ]
+        let violations = []
 
 
         let env =

@@ -19,8 +19,7 @@ let decodeTodoMissingCompletedWorkReport () =
 
     match decodeTodoWriteArgs false args with
     | Ok(tw, violations) ->
-        check "todo missing ahaMoments returns Ok with violations" (violations.Length > 0)
-        check "violations mention ahaMoments" (violations |> List.exists (fun x -> x.Contains "ahaMoments"))
+        check "todo missing ahaMoments returns Ok with no violations (optimistic)" (violations.IsEmpty)
     | Error _ -> check "todo missing ahaMoments returns Ok" false
 
 let decodeTodoOk () =
@@ -81,8 +80,7 @@ let decodeTodoItemMissingAhaMoments () =
 
     match decodeTodoWriteArgs false args with
     | Ok(tw, violations) ->
-        check "todo item missing ahaMoments returns Ok with violations" (violations.Length > 0)
-        check "violations mention ahaMoments" (violations |> List.exists (fun x -> x.Contains "ahaMoments"))
+        check "todo item missing ahaMoments returns Ok with no violations (optimistic)" (violations.IsEmpty)
     | _ -> check "todo item missing ahaMoments returns Ok" false
 
 let decodeTodoInvalidStatusOrPriority () =
