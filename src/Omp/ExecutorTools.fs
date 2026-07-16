@@ -95,7 +95,12 @@ let private summarizeOutput
         do! childSession?prompt (summaryPrompt) |> unbox<JS.Promise<unit>>
         do! childSession?waitForIdle () |> unbox<JS.Promise<unit>>
         let sm = unbox<ISessionManager> (Dyn.get childSession "sessionManager")
-        let text = readAssistantText sm 0 "\n\n" |> Option.defaultValue noOutputText
+
+        let text =
+            match readAssistantText sm 0 "\n\n" with
+            | Some t -> t
+            | None -> output // fall back to raw output when AI summarization fails
+
         return textResult text
     }
 

@@ -136,14 +136,16 @@ let tailCoreTestEntries () : (string * TestBody) list =
       TestBody.Async testAmendSkippedWhenSembleInjectEnabled
       "ExecutorKernelTests.run", TestBody.Sync(sync ExecutorKernelTests.run)
       "ToolExecuteTests.run", TestBody.Sync(sync ToolExecuteTests.run)
-      "TreeSitterKernelTests.run", TestBody.Sync(sync TreeSitterKernelTests.run)
-      "ConfigTests.run", TestBody.Sync(sync ConfigTests.run)
-      "JsonSchemaBuildersTests.run", TestBody.Sync(sync JsonSchemaBuildersTests.run)
-      "ExecutorStripTests.run", TestBody.Sync(sync ExecutorStripTests.run)
-      "ExecutorTests.run", TestBody.Async(fun () -> ExecutorTests.run ())
-      "WarnTddKernelFactsTests.run", TestBody.Sync(sync WarnTddKernelFactsTests.run)
-      "WarnTddOpencodeEnforcementTests.run", TestBody.Async WarnTddOpencodeEnforcementTests.run
-      "WarnTddMuxEnforcementTests.run", TestBody.Async WarnTddMuxEnforcementTests.run
-      "WarnTddOmpEnforcementTests.run", TestBody.Sync(sync WarnTddOmpEnforcementTests.run)
-      "EventDrivenHarnessDemo.run", TestBody.Async(fun () -> EventDrivenHarnessDemo.run ())
-      "ProductionDebugOutputTests.run", TestBody.Sync(sync Wanxiangshu.Tests.ProductionDebugOutputTests.run) ]
+      "TreeSitterKernelTests.run", TestBody.Sync(sync TreeSitterKernelTests.run) ]
+    @ (TreeSitterKernelTests.generateSelfCheckBodies ()
+       |> List.map (fun (l, f) -> l, TestBody.Async f))
+    @ [ "ConfigTests.run", TestBody.Sync(sync ConfigTests.run)
+        "JsonSchemaBuildersTests.run", TestBody.Sync(sync JsonSchemaBuildersTests.run)
+        "ExecutorStripTests.run", TestBody.Sync(sync ExecutorStripTests.run)
+        "ExecutorTests.run", TestBody.Async(fun () -> ExecutorTests.run ())
+        "WarnTddKernelFactsTests.run", TestBody.Sync(sync WarnTddKernelFactsTests.run)
+        "WarnTddOpencodeEnforcementTests.run", TestBody.Async WarnTddOpencodeEnforcementTests.run
+        "WarnTddMuxEnforcementTests.run", TestBody.Async WarnTddMuxEnforcementTests.run
+        "WarnTddOmpEnforcementTests.run", TestBody.Sync(sync WarnTddOmpEnforcementTests.run)
+        "EventDrivenHarnessDemo.run", TestBody.Async(fun () -> EventDrivenHarnessDemo.run ())
+        "ProductionDebugOutputTests.run", TestBody.Sync(sync Wanxiangshu.Tests.ProductionDebugOutputTests.run) ]

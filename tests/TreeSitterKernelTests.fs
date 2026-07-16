@@ -1,9 +1,110 @@
 module Wanxiangshu.Tests.TreeSitterKernelTests
 
+open Fable.Core
+open Fable.Core.JsInterop
 open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Kernel.TreeSitterKernel
 open Wanxiangshu.Kernel.ToolOutputInfo
 open Wanxiangshu.Shell.ToolExecute
+open Wanxiangshu.Shell.TreeSitterShell
+open Wanxiangshu.Shell.Dyn
+
+[<Import("createRequire", "node:module")>]
+let private createRequire: string -> (string -> obj) = jsNative
+
+[<Global("import.meta")>]
+let private importMeta: obj = jsNative
+
+let private nodeReq: string -> obj = createRequire (string importMeta?url)
+let private fsMod: obj = nodeReq "fs"
+
+[<Import("readFileSync", "node:fs")>]
+let private readFileSync (path: string) (encoding: string) : string = jsNative
+
+[<Import("readdirSync", "node:fs")>]
+let private readdirSync (path: string) : string array = jsNative
+
+[<Import("statSync", "node:fs")>]
+let private statSyncRaw (path: string) : obj = jsNative
+
+let private isDirectory (path: string) : bool =
+    try
+        let s = statSyncRaw path
+        unbox<bool> (s?isDirectory ())
+    with _ ->
+        false
+
+let rec private collectFsFilesSync (dir: string) : string list =
+    try
+        let entries = readdirSync dir
+
+        entries
+        |> Array.toList
+        |> List.collect (fun name ->
+            if
+                name = "node_modules"
+                || name = "build"
+                || name = ".git"
+                || name = "bin"
+                || name = "obj"
+            then
+                []
+            else
+                let full = dir + "/" + name
+
+                if isDirectory full then
+                    collectFsFilesSync full
+                elif name.EndsWith ".fs" || name.EndsWith ".fsi" then
+                    [ full ]
+                else
+                    [])
+    with _ ->
+        []
+
+/// Check a single .fs file via tree-sitter + direct line count, report violations.
+let private checkSingleFile (filePath: string) (label: string) : JS.Promise<unit> =
+    promise {
+        let content =
+            try
+                readFileSync filePath "utf-8"
+            with _ ->
+                ""
+
+        if content = "" then
+            check (sprintf "%s: cannot read" label) false
+        else
+            let! syntaxResult = checkSyntax content filePath
+
+            let allStyleDiags =
+                match syntaxResult with
+                | Ok(lang, diags) when lang <> "" ->
+                    // tree-sitter parsed the file; style checks (file+function) are in diags
+                    diags
+                    |> Array.filter (fun d ->
+                        d.message.Contains "File exceeds" || d.message.Contains "Function exceeds")
+                | _ ->
+                    // tree-sitter unavailable or can't detect language; run file line count directly
+                    checkFileLineCount defaultStyleLimits content
+
+            if Array.isEmpty allStyleDiags then
+                check (sprintf "%s: ok" label) true
+            else
+                for d in allStyleDiags do
+                    check (sprintf "%s L%d: [%s] %s" label d.line d.severity d.message) false
+    }
+
+/// Generate per-file self-check test bodies (label + async function).
+/// Each calls checkSyntax (tree-sitter) on one .fs file and reports
+/// style violations (function length + file line count) as test failures.
+let generateSelfCheckBodies () : (string * (unit -> JS.Promise<unit>)) list =
+    let srcFiles = collectFsFilesSync "src" |> List.sort
+    let testFiles = collectFsFilesSync "tests" |> List.sort
+    let allFiles = srcFiles @ testFiles
+
+    allFiles
+    |> List.map (fun filePath ->
+        let label = "TreeSitterSelfCheck." + filePath
+        label, (fun () -> checkSingleFile filePath label))
 
 let isFileEditToolTrueForEdit () = check "edit" (isFileEditTool "edit")
 
@@ -121,9 +222,7 @@ let testCheckFileLineCount () =
     let lines201 = String.concat "\n" (Array.create 201 "a")
     let lines300 = String.concat "\n" (Array.create 300 "a")
     let lines301 = String.concat "\n" (Array.create 301 "a")
-
     equal "200 lines" 0 (checkFileLineCount limits lines200).Length
-
     let diags201 = checkFileLineCount limits lines201
     equal "201 lines count" 1 diags201.Length
     equal "201 lines severity" "warning" diags201.[0].severity
@@ -136,7 +235,6 @@ let testCheckFileLineCount () =
     let diags300 = checkFileLineCount limits lines300
     equal "300 lines count" 1 diags300.Length
     equal "300 lines severity" "warning" diags300.[0].severity
-
     let diags301 = checkFileLineCount limits lines301
     equal "301 lines count" 1 diags301.Length
     equal "301 lines severity" "error" diags301.[0].severity
@@ -190,7 +288,6 @@ let testCheckFunctionLengthsErrorThreshold () =
     let diags = checkFunctionLengths limits nodes
     equal "error diags length" 1 diags.Length
     equal "severity error" "error" diags.[0].severity
-
     check "error message" (diags.[0].message.Contains "Function exceeds 60 lines")
 
 let run () =
