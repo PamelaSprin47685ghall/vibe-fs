@@ -249,7 +249,7 @@ let runSubagentWithCleanup
     (sessionID: string)
     (context: obj)
     : JS.Promise<Result<string, DomainError>> =
-    runSubagentCoreResult runtime registry client agent title prompt directory sessionID context (box null) true None
+    runSubagentCoreResult runtime registry client agent title prompt directory sessionID context (box null) false None
 
 let runSubagent
     (runtime: FallbackRuntimeState)
