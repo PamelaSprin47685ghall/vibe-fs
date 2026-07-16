@@ -10,6 +10,7 @@ open Wanxiangshu.Runtime.OpencodeHookInputCodec
 open Wanxiangshu.Runtime.ToolRuntimeContext
 open Wanxiangshu.Runtime.Fallback.RuntimeStore
 open Wanxiangshu.Runtime.Fallback.GateTransitions
+open Wanxiangshu.Runtime.Fallback.ModelInjection
 open Wanxiangshu.Hosts.Opencode.ProgressObserver
 open Wanxiangshu.Hosts.Opencode.Fallback.Coordinator
 open Wanxiangshu.Hosts.Opencode.NudgeTrigger

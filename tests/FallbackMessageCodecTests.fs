@@ -8,6 +8,7 @@ open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Runtime.Fallback.FallbackMessageCodec
 open Wanxiangshu.Runtime.Fallback.FallbackMessageParser
 open Wanxiangshu.Runtime.Fallback.GateTransitions
+open Wanxiangshu.Runtime.Fallback.ModelInjection
 
 module Dyn = Wanxiangshu.Runtime.Dyn
 

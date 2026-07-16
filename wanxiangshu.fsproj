@@ -183,6 +183,7 @@
     <Compile Include="src/Runtime/Fallback/SessionRuntime.fs"/>
     <Compile Include="src/Runtime/Fallback/RuntimeStore.fs"/>
     <Compile Include="src/Runtime/Fallback/GateTransitions.fs"/>
+    <Compile Include="src/Runtime/Fallback/ModelInjection.fs"/>
     <Compile Include="src/Runtime/Fallback/LeaseTransitions.fs"/>
     <Compile Include="src/Runtime/Fallback/FallbackGateObservation.fs"/>
     <Compile Include="src/Runtime/Fallback/FallbackMessageParser.fs"/>
@@ -291,6 +292,7 @@
     <Compile Include="src/Runtime/Fallback/FallbackBridgeContinuation.fs"/>
     <Compile Include="src/Runtime/Fallback/FallbackBridgeScanToolText.fs"/>
     <Compile Include="src/Runtime/Fallback/FallbackEventBridge.fs"/>
+    <Compile Include="src/Runtime/Fallback/FallbackEventBridgeCoordinator.fs"/>
     <Compile Include="src/Runtime/PatchToolsCodec.fs"/>
     <Compile Include="src/Runtime/ToolArgsDecode.fs"/>
     <Compile Include="src/Runtime/ToolExecute.fs"/>

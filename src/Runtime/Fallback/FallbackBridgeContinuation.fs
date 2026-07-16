@@ -7,6 +7,7 @@ open Wanxiangshu.Runtime.Fallback.RuntimeStore
 open Wanxiangshu.Runtime.Fallback.LeaseTransitions
 open Wanxiangshu.Runtime.Fallback.SessionRuntime
 open Wanxiangshu.Runtime.Fallback.GateTransitions
+open Wanxiangshu.Runtime.Fallback.ModelInjection
 open Wanxiangshu.Runtime.Fallback.FallbackBridgePorts
 open Wanxiangshu.Runtime.EventLogAppendSession
 open Wanxiangshu.Runtime.Fallback.FallbackBridgeLease

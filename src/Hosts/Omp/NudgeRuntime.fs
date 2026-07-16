@@ -1,4 +1,5 @@
 module Wanxiangshu.Hosts.Omp.NudgeRuntime
+
 open Wanxiangshu.Runtime.Fallback.RuntimeStore
 
 open Wanxiangshu.Kernel.HostTools
@@ -6,15 +7,13 @@ open Wanxiangshu.Kernel.Nudge
 open Wanxiangshu.Runtime.Nudge.NudgeDerivation
 open Wanxiangshu.Runtime.PromptFragments
 open Wanxiangshu.Runtime.Fallback.GateTransitions
+open Wanxiangshu.Runtime.Fallback.ModelInjection
 
-let mutable private fallbackRuntimeInstance: FallbackRuntimeStore option =
-    None
+let mutable private fallbackRuntimeInstance: FallbackRuntimeStore option = None
 
-let setFallbackRuntime (rt: FallbackRuntimeStore) : unit =
-    fallbackRuntimeInstance <- Some rt
+let setFallbackRuntime (rt: FallbackRuntimeStore) : unit = fallbackRuntimeInstance <- Some rt
 
-let private getFallbackRuntime () : FallbackRuntimeStore option =
-    fallbackRuntimeInstance
+let private getFallbackRuntime () : FallbackRuntimeStore option = fallbackRuntimeInstance
 
 let markSessionForceStopped (sessionId: string) : unit =
     match getFallbackRuntime () with

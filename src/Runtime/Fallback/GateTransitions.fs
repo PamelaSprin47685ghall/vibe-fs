@@ -318,32 +318,3 @@ type FallbackRuntimeStore with
 
     member this.ClearActiveNudgeNonce(sessionID: string) : unit =
         this.UpdateSession(sessionID, (fun s -> { s with ActiveNudgeNonce = "" }))
-
-    member this.ClearInjected(sessionID: string) : unit =
-        this.UpdateSession(
-            sessionID,
-            fun s ->
-                { s with
-                    InjectedModel = None
-                    InjectedAt = None }
-        )
-
-    member this.IsInjectedSince(sessionID: string, sinceTimestamp: int64) : bool =
-        let s = this.GetSession sessionID
-
-        match s.InjectedAt with
-        | Some t -> t >= sinceTimestamp
-        | None -> false
-
-    member this.GetInjectedModel(sessionID: string) : FallbackModel option =
-        (this.GetSession sessionID).InjectedModel
-
-    member this.GetInjectedAt(sessionID: string) : int64 option = (this.GetSession sessionID).InjectedAt
-
-    member this.SetInjectedAt (sessionID: string) (ts: int64) : unit =
-        this.UpdateSession(sessionID, (fun s -> { s with InjectedAt = Some ts }))
-
-    member this.SetInjectedModel (sessionID: string) (model: FallbackModel) : unit =
-        this.UpdateSession(sessionID, (fun s -> { s with InjectedModel = Some model }))
-
-    member this.SetTaskComplete (sessionID: string) (value: bool) : unit = this.SetCompacted(sessionID, value)

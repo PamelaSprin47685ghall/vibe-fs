@@ -13,6 +13,7 @@ open Wanxiangshu.Runtime.Fallback.RuntimeStore
 open Wanxiangshu.Runtime.Fallback.LeaseTransitions
 open Wanxiangshu.Runtime.Fallback.SessionRuntime
 open Wanxiangshu.Runtime.Fallback.GateTransitions
+open Wanxiangshu.Runtime.Fallback.ModelInjection
 open Wanxiangshu.Kernel.FallbackKernel.Types
 open Wanxiangshu.Kernel.Nudge.TodoStatus
 open Wanxiangshu.Runtime.NudgeMessageClassifier

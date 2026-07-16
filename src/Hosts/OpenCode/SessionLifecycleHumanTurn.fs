@@ -8,6 +8,7 @@ open Wanxiangshu.Runtime.ToolRuntimeContext
 open Wanxiangshu.Runtime.Fallback.RuntimeStore
 open Wanxiangshu.Runtime.Fallback.LeaseTransitions
 open Wanxiangshu.Runtime.Fallback.GateTransitions
+open Wanxiangshu.Runtime.Fallback.ModelInjection
 open Wanxiangshu.Runtime.Fallback.FallbackBridgeContinuation
 open Wanxiangshu.Runtime.EventLogRuntime
 open Wanxiangshu.Runtime.ToolHookRuntime

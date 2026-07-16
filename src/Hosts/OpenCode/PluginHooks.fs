@@ -26,6 +26,7 @@ open Wanxiangshu.Hosts.Opencode.PluginServices
 open Wanxiangshu.Runtime.SubsessionActorRegistry
 open Wanxiangshu.Runtime
 open Wanxiangshu.Kernel.Subsession.Types
+open Wanxiangshu.Runtime.SubsessionEventRouter
 
 let private twoArgHook (f: obj -> obj -> JS.Promise<unit>) =
     box (System.Func<obj, obj, JS.Promise<unit>>(f))
@@ -151,11 +152,25 @@ let private registerEventHooks (result: obj) (ctx: obj) (services: CoreServices)
             | None -> promise { return () }
             | Some env when not (isPluginObservedHostEvent env.EventType) -> promise { return () }
             | Some env ->
-                promise {
-                    do! EventHooks.eventHandler services.ReviewStore services.RuntimeScope ctx input
-                    do! handleSessionCleanup services env
-                    do! services.SessionLifecycleObserver.handleEvent input
-                }))
+                // Filter: discard assistant streaming events for non-child (main) sessions.
+                // The fallback FSM has no use for incremental token updates — it only
+                // needs the terminal session.idle / stream-end / session.error signals.
+                let isAssistantStream =
+                    env.EventType = "message.updated"
+                    && (let info = Dyn.get env.Props "info"
+                        not (Dyn.isNullish info) && Dyn.str info "role" = "assistant")
+
+                let sessionId = getSessionID env.EventType env.Props
+                let isChild = isChildSession services.Directory sessionId
+
+                if isAssistantStream && not isChild then
+                    promise { return () }
+                else
+                    promise {
+                        do! EventHooks.eventHandler services.ReviewStore services.RuntimeScope ctx input
+                        do! handleSessionCleanup services env
+                        do! services.SessionLifecycleObserver.handleEvent input
+                    }))
 
 let private handleSessionPostError
     (services: CoreServices)

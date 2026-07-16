@@ -17,6 +17,7 @@ open Wanxiangshu.Runtime.Fallback.FallbackBridgePorts
 open Wanxiangshu.Runtime.Fallback.FallbackMessageCodec
 open Wanxiangshu.Runtime.Fallback.RuntimeStore
 open Wanxiangshu.Runtime.Fallback.GateTransitions
+open Wanxiangshu.Runtime.Fallback.ModelInjection
 open Wanxiangshu.Runtime.SubsessionEventRouter
 open Wanxiangshu.Runtime.SubsessionChildObserver
 

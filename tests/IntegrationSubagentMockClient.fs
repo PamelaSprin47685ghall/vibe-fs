@@ -5,6 +5,7 @@ open Fable.Core.JsInterop
 open Wanxiangshu.Runtime
 open Wanxiangshu.Runtime.Fallback.RuntimeStore
 open Wanxiangshu.Runtime.Fallback.GateTransitions
+open Wanxiangshu.Runtime.Fallback.ModelInjection
 open Wanxiangshu.Hosts.Opencode.SubsessionHostAdapter
 open Wanxiangshu.Kernel.Subsession.Types
 
@@ -39,7 +40,7 @@ let makeMockClient (pObjRef: obj ref) (parentId: string) (responseText: string) 
                                         let runtime = pObjRef.Value?__fallbackRuntime |> unbox<FallbackRuntimeStore>
 
                                         let childId = Dyn.str (Dyn.get arg "path") "id"
-                                        runtime.SetTaskComplete childId true
+                                        runtime.SetTaskComplete childId
 
                                         let nonce =
                                             let body = Dyn.get arg "body"

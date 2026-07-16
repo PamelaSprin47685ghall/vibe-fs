@@ -28,6 +28,7 @@ open Wanxiangshu.Runtime.Fallback.FallbackEventBridge
 open Wanxiangshu.Runtime.Fallback.FallbackConfigCodec
 open Wanxiangshu.Kernel.FallbackKernel.Types
 open Wanxiangshu.Hosts.Omp.Fallback.Hook
+open Wanxiangshu.Hosts.Omp.ChildSession
 open Wanxiangshu.Runtime.ToolHookRuntime
 open Wanxiangshu.Runtime.CommandProcessor
 open Wanxiangshu.Runtime.SubsessionPorts
@@ -140,60 +141,44 @@ let registerAbortHandler
                 | None -> ()
                 | Some sid ->
                     if sessionEndEventTypes.Contains evtType then
-                        match fallbackHandler with
-                        | None ->
-                            let root = Dyn.str ctx "cwd"
+                        let root = Dyn.str ctx "cwd"
 
-                            if root <> "" then
-                                do! appendLoopCancelledOrFail root sid
-                                do! syncReviewFromEventLogDedicated reviewStore root sid
+                        if root <> "" then
+                            do! appendLoopCancelledOrFail root sid
+                            do! syncReviewFromEventLogDedicated reviewStore root sid
 
-                            Wanxiangshu.Hosts.Omp.NudgeRuntime.markSessionForceStopped sid
+                        Wanxiangshu.Hosts.Omp.NudgeRuntime.markSessionForceStopped sid
 
-                            Wanxiangshu.Runtime.RunnerBackground.abortRunnerJobCore
-                                Wanxiangshu.Hosts.Omp.ExecutorTools.ompScope
-                                sid
-                        | Some handler ->
-                            let rawEvent =
-                                createObj [ "event", box event; "props", box (createObj [ "sessionID", box sid ]) ]
-
-                            if sid <> "" then
-                                fallbackRuntime.SetEventHandlingActive sid true
-
-                            try
-                                let! r = handler rawEvent
-
-                                if not r.Consumed then
-                                    let root = Dyn.str ctx "cwd"
-
-                                    if root <> "" then
-                                        do! appendLoopCancelledOrFail root sid
-                                        do! syncReviewFromEventLogDedicated reviewStore root sid
-
-                                    Wanxiangshu.Hosts.Omp.NudgeRuntime.markSessionForceStopped sid
-
-                                    Wanxiangshu.Runtime.RunnerBackground.abortRunnerJobCore
-                                        Wanxiangshu.Hosts.Omp.ExecutorTools.ompScope
-                                        sid
-                            finally
-                                if sid <> "" then
-                                    fallbackRuntime.SetEventHandlingActive sid false
+                        Wanxiangshu.Runtime.RunnerBackground.abortRunnerJobCore
+                            Wanxiangshu.Hosts.Omp.ExecutorTools.ompScope
+                            sid
                     elif fallbackEventTypes.Contains evtType then
-                        match fallbackHandler with
-                        | Some handler ->
-                            let rawEvent =
-                                createObj [ "event", box event; "props", box (createObj [ "sessionID", box sid ]) ]
+                        // Filter: discard assistant streaming events for main (non-child) sessions
+                        let isAssistantStream =
+                            evtType = "message.updated"
+                            && (let info = Dyn.get event "info"
+                                not (Dyn.isNullish info) && Dyn.str info "role" = "assistant")
 
-                            if sid <> "" then
-                                fallbackRuntime.SetEventHandlingActive sid true
+                        let isChild = isChildSession Wanxiangshu.Hosts.Omp.ExecutorTools.ompScope sid
 
-                            try
-                                let! _ = handler rawEvent
-                                ()
-                            finally
+                        if isAssistantStream && not isChild then
+                            ()
+                        else
+                            match fallbackHandler with
+                            | Some handler ->
+                                let rawEvent =
+                                    createObj [ "event", box event; "props", box (createObj [ "sessionID", box sid ]) ]
+
                                 if sid <> "" then
-                                    fallbackRuntime.SetEventHandlingActive sid false
-                        | None -> ()
+                                    fallbackRuntime.SetEventHandlingActive sid true
+
+                                try
+                                    let! _ = handler rawEvent
+                                    ()
+                                finally
+                                    if sid <> "" then
+                                        fallbackRuntime.SetEventHandlingActive sid false
+                            | None -> ()
             })
     )
 
