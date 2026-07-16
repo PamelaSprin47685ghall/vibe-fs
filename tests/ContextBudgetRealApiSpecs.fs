@@ -4,8 +4,8 @@ open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Kernel.Messaging
-open Wanxiangshu.Shell
-open Wanxiangshu.Shell.OpencodeContextBudgetObservation
+open Wanxiangshu.Runtime
+open Wanxiangshu.Runtime.OpencodeContextBudgetObservation
 
 let private mockUserMessage (modelObj: obj) : Message<obj> =
     { info =

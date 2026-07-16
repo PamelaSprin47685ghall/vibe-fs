@@ -3,8 +3,8 @@ module Wanxiangshu.Tests.IntegrationEventTestsMuxWrappers
 open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Tests.Assert
-open Wanxiangshu.Kernel.ToolOutputInfo
-open Wanxiangshu.Shell.Dyn
+open Wanxiangshu.Runtime.ToolOutputInfo
+open Wanxiangshu.Runtime.Dyn
 
 let syntaxWrapperSpec (reg: obj) =
     promise {

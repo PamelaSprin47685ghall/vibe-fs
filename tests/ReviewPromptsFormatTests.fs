@@ -1,9 +1,9 @@
 module Wanxiangshu.Tests.ReviewPromptsFormatTests
 
 open Wanxiangshu.Tests.Assert
-open Wanxiangshu.Kernel.ReviewPrompts.Format
+open Wanxiangshu.Runtime.ReviewPrompts.Format
 open Wanxiangshu.Kernel.ReviewSession.Types
-open Wanxiangshu.Kernel.PromptFrontMatter
+open Wanxiangshu.Runtime.PromptFrontMatter
 open Fable.Core.JsInterop
 
 // ── submitReviewIsWip ────────────────────────────────────────────────────────

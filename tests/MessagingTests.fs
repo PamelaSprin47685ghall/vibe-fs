@@ -2,6 +2,7 @@ module Wanxiangshu.Tests.MessagingTests
 
 open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Kernel.Messaging
+open Wanxiangshu.Runtime.MessageSourceClassify
 open Wanxiangshu.Kernel.ToolExecutionStatusModule
 
 let classifySourceEmptyIsNative () =

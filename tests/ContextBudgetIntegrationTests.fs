@@ -6,11 +6,11 @@ open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Kernel.HostTools
 open Wanxiangshu.Kernel.Messaging
 open Wanxiangshu.Kernel.ContextBudget
-open Wanxiangshu.Shell
-open Wanxiangshu.Shell.Dyn
-open Wanxiangshu.Shell.MessageTransformCore
-open Wanxiangshu.Shell.MessageTransformPipeline
-open Wanxiangshu.Shell.ContextBudgetUsageCodec
+open Wanxiangshu.Runtime
+open Wanxiangshu.Runtime.Dyn
+open Wanxiangshu.Runtime.MessageTransform.Plan
+open Wanxiangshu.Runtime.MessageTransform.Pipeline
+open Wanxiangshu.Runtime.ContextBudgetUsageCodec
 open Wanxiangshu.Tests.ContextBudgetRealApiSpecs
 
 let spec_runMessageTransformPipeline_nudge () =

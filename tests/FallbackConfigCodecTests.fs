@@ -3,8 +3,8 @@ module Wanxiangshu.Tests.FallbackConfigCodecTests
 open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Tests.Assert
-open Wanxiangshu.Shell.FallbackConfigCodec
-open Wanxiangshu.Opencode.FallbackConfigLoader
+open Wanxiangshu.Runtime.Fallback.FallbackConfigCodec
+open Wanxiangshu.Hosts.Opencode.Fallback.ConfigLoader
 open Wanxiangshu.Kernel.FallbackKernel.Types
 open Wanxiangshu.Kernel.Subsession.Types
 
@@ -157,7 +157,7 @@ let defaultPreferredModel_emptyChain () =
     equal "empty chain → None" None (defaultPreferredModel cfg)
 
 let applyOverride_matchesSpacedAgentName () =
-    // Simulates PluginCore.applyFallbackModelOverrides: AGENTS.md key is
+    // Simulates PluginComposition.applyFallbackModelOverrides: AGENTS.md key is
     // normalized, opencode.json keeps original display name. The match must
     // work through normalizeAgentName on both sides.
     let fm: obj =

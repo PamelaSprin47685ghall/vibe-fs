@@ -1,12 +1,14 @@
 module Wanxiangshu.Tests.NudgeEventSourcingTests
 
 open Wanxiangshu.Tests.Assert
-open Wanxiangshu.Kernel.EventLog.Types
-open Wanxiangshu.Kernel.EventLog.Fold
-open Wanxiangshu.Kernel.EventLog.NudgeProjection
+open Wanxiangshu.Kernel.EventSourcing.EventEnvelope
+open Wanxiangshu.Kernel.EventSourcing.EventKind
+open Wanxiangshu.Kernel.EventSourcing.Fold
 open Wanxiangshu.Kernel.Nudge
-open Wanxiangshu.Kernel.NudgeDerivation
-open Wanxiangshu.Kernel.EventLog.ReviewLoopFold
+open Wanxiangshu.Kernel.Review
+open Wanxiangshu.Kernel.Nudge.NudgeProjection
+open Wanxiangshu.Runtime.Nudge.NudgeDerivation
+open Wanxiangshu.Kernel.Review.ReviewLoopFold
 open Wanxiangshu.Kernel.Nudge.Types
 
 let private ev session kind payload =
@@ -32,7 +34,7 @@ let private toSessionSnapshot (s: NudgeSnapshotState) : SessionSnapshot =
       lastAssistantMessage = s.lastAssistantText
       workState = s.workState
       blockStatus = NudgeBlockStatus.Allowed
-      nudgeAnchorKey = nudgeAnchorKey s.turnId s.lastAssistantText
+      nudgeAnchorKey = Wanxiangshu.Kernel.Nudge.NudgeProjection.nudgeAnchorKey s.turnId s.lastAssistantText
       agentFromMessage = s.agentFromMessage
       modelFromMessage = s.modelFromMessage
       reviewLoop = reviewLoopInfo
@@ -40,7 +42,7 @@ let private toSessionSnapshot (s: NudgeSnapshotState) : SessionSnapshot =
 
 /// No events → all fields empty/default.
 let foldNudgeSnapshotEmpty () =
-    let s = foldNudgeSnapshot "s1" []
+    let s = Wanxiangshu.Kernel.Nudge.NudgeProjection.foldSnapshotStream "s1" []
     check "empty: no todos" (s.openTodos = [])
     check "empty: no text" (s.lastAssistantText = "")
     check "empty: no agent" (s.agentFromMessage = None)
@@ -62,7 +64,7 @@ let foldNudgeSnapshotAssistantCompleted () =
                     "model", "anthropic/claude-sonnet"
                     "turnId", "t1" ]) ]
 
-    let s = foldNudgeSnapshot "s1" events
+    let s = Wanxiangshu.Kernel.Nudge.NudgeProjection.foldSnapshotStream "s1" events
     equal "assistant text" "implemented feature" s.lastAssistantText
     equal "agent from message" (Some "bookkeeper") s.agentFromMessage
     equal "model from message" (Some "anthropic/claude-sonnet") s.modelFromMessage
@@ -71,7 +73,7 @@ let foldNudgeSnapshotAssistantCompleted () =
 /// loop_activated sets isLoopActive=true.
 let foldNudgeSnapshotLoopActivated () =
     let events = [ ev "s1" eventKindLoopActivated (Map [ "task", "ship it" ]) ]
-    let s = foldNudgeSnapshot "s1" events
+    let s = Wanxiangshu.Kernel.Nudge.NudgeProjection.foldSnapshotStream "s1" events
 
     check "loop active after activate" (isLoopActive s.reviewLoop)
     check "no todos" (s.openTodos = [])
@@ -85,7 +87,7 @@ let foldNudgeSnapshotLoopCancelled () =
         [ ev "s1" eventKindLoopActivated (Map [ "task", "ship it" ])
           ev "s1" eventKindLoopCancelled Map.empty ]
 
-    let s = foldNudgeSnapshot "s1" events
+    let s = Wanxiangshu.Kernel.Nudge.NudgeProjection.foldSnapshotStream "s1" events
     check "not loop active after cancel" (not (isLoopActive s.reviewLoop))
     check "no todos" (s.openTodos = [])
     check "no text" (s.lastAssistantText = "")
@@ -98,7 +100,7 @@ let foldNudgeSnapshotAcceptedClears () =
         [ ev "s1" eventKindLoopActivated (Map [ "task", "ship it" ])
           ev "s1" eventKindReviewVerdict (Map [ "verdict", verdictAccepted ]) ]
 
-    let s = foldNudgeSnapshot "s1" events
+    let s = Wanxiangshu.Kernel.Nudge.NudgeProjection.foldSnapshotStream "s1" events
     check "not loop active after accept" (not (isLoopActive s.reviewLoop))
 
 /// review_verdict needs_revision keeps isLoopActive.
@@ -107,7 +109,7 @@ let foldNudgeSnapshotNeedsRevisionKeeps () =
         [ ev "s1" eventKindLoopActivated (Map [ "task", "ship it" ])
           ev "s1" eventKindReviewVerdict (Map [ "verdict", verdictNeedsRevision ]) ]
 
-    let s = foldNudgeSnapshot "s1" events
+    let s = Wanxiangshu.Kernel.Nudge.NudgeProjection.foldSnapshotStream "s1" events
     check "loop active after needs_revision" (isLoopActive s.reviewLoop)
 
 /// nudge_dispatched sets lastDispatchedAnchor to the latest anchor.
@@ -116,7 +118,7 @@ let foldNudgeSnapshotNudgeDispatched () =
         [ ev "s1" eventKindNudgeDispatched (Map [ "anchor", "t1\u001emsg body" ])
           ev "s1" eventKindNudgeDispatched (Map [ "anchor", "t2\u001emsg body" ]) ]
 
-    let s = foldNudgeSnapshot "s1" events
+    let s = Wanxiangshu.Kernel.Nudge.NudgeProjection.foldSnapshotStream "s1" events
     equal "dispatched contains anchor 2" (Some "t2\u001emsg body") s.lastDispatchedAnchor
 
 /// submit_review_wip_recorded clears lastDispatchedAnchor.
@@ -125,7 +127,7 @@ let foldNudgeSnapshotDedupCleared () =
         [ ev "s1" eventKindNudgeDispatched (Map [ "anchor", "t1\u001emsg body" ])
           ev "s1" eventKindSubmitReviewWipRecorded Map.empty ]
 
-    let s = foldNudgeSnapshot "s1" events
+    let s = Wanxiangshu.Kernel.Nudge.NudgeProjection.foldSnapshotStream "s1" events
     check "dispatched anchors cleared" s.lastDispatchedAnchor.IsNone
 
 /// work_backlog_committed updates openTodos.
@@ -133,12 +135,12 @@ let foldNudgeSnapshotWorkBacklogUpdatesTodos () =
     let events =
         [ ev "s1" eventKindWorkBacklogCommitted (Map [ "todosJson", "[\"a\",\"b\"]" ]) ]
 
-    let s = foldNudgeSnapshot "s1" events
+    let s = Wanxiangshu.Kernel.Nudge.NudgeProjection.foldSnapshotStream "s1" events
     equal "open todos from work backlog" [ "a"; "b" ] s.openTodos
 
 /// Cold start (no events) → deriveAction returns NudgeNone.
 let foldNudgeSnapshotColdStartNudgeNone () =
-    let s = foldNudgeSnapshot "s1" []
+    let s = Wanxiangshu.Kernel.Nudge.NudgeProjection.foldSnapshotStream "s1" []
 
     match deriveAction (toSessionSnapshot s) with
     | NudgeNone -> check "cold start -> NudgeNone" true
@@ -157,7 +159,7 @@ let foldNudgeSnapshotIntegrated () =
                     "model", "openai/gpt-4o"
                     "turnId", "t42" ]) ]
 
-    let s = foldNudgeSnapshot "s1" events
+    let s = Wanxiangshu.Kernel.Nudge.NudgeProjection.foldSnapshotStream "s1" events
     check "integrated: has todos" (s.openTodos = [ "ship feature" ])
     check "integrated: has assistant text" (s.lastAssistantText = "working on it")
 

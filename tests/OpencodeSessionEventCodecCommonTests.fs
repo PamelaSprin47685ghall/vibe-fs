@@ -2,7 +2,7 @@ module Wanxiangshu.Tests.OpencodeSessionEventCodecCommonTests
 
 open Fable.Core.JsInterop
 open Wanxiangshu.Tests.Assert
-open Wanxiangshu.Shell.OpencodeSessionEventCodecCommon
+open Wanxiangshu.Runtime.OpencodeHostEvent
 
 let sessionEventTypesContainsCreated () =
     check "session.created" (Set.contains "session.created" sessionEventTypes)

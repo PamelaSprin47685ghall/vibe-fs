@@ -3,24 +3,29 @@ module Wanxiangshu.Tests.FallbackAgentAndModelTests
 open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Tests.Assert
-open Wanxiangshu.Kernel.Domain
+open Wanxiangshu.Kernel.Primitives.Identity
+open Wanxiangshu.Kernel.Errors.DomainError
+open Wanxiangshu.Kernel.Session.Causality
 open Wanxiangshu.Kernel.FallbackKernel.Types
 open Wanxiangshu.Kernel.HostTools
-open Wanxiangshu.Shell.FallbackRuntimeState
-open Wanxiangshu.Shell.ChildAgentRegistry
-open Wanxiangshu.Shell.ReviewRuntime
-open Wanxiangshu.Shell.RuntimeScope
-open Wanxiangshu.Opencode.BacklogSession
-open Wanxiangshu.Opencode.SessionLifecycleObserver
-open Wanxiangshu.Omp.FallbackHooks
-open Wanxiangshu.Opencode.FallbackHooks
-open Wanxiangshu.Shell.Dyn
+open Wanxiangshu.Runtime.Fallback.RuntimeStore
+open Wanxiangshu.Runtime.Fallback.GateTransitions
+open Wanxiangshu.Runtime.ChildAgentRegistry
+open Wanxiangshu.Runtime.ReviewRuntime
+open Wanxiangshu.Runtime.RuntimeScope
+open Wanxiangshu.Hosts.Omp.Fallback.ActionExecutor
+open Wanxiangshu.Hosts.Opencode.Fallback.ActionExecutor
+open Wanxiangshu.Hosts.Opencode.BacklogSession
+open Wanxiangshu.Hosts.Opencode.SessionLifecycleObserver
+open Wanxiangshu.Hosts.Omp.Fallback.Hook
+open Wanxiangshu.Hosts.Opencode.Fallback.Hook
+open Wanxiangshu.Runtime.Dyn
 
-module Dyn = Wanxiangshu.Shell.Dyn
+module Dyn = Wanxiangshu.Runtime.Dyn
 
 let ompFallbackHooksPreservesAgentAndModelSpec () =
     promise {
-        let rt = FallbackRuntimeState()
+        let rt = FallbackRuntimeStore()
         let sid = "omp-subagent-sess"
         rt.SetAgentName sid "coder"
 
@@ -57,13 +62,13 @@ let ompFallbackHooksPreservesAgentAndModelSpec () =
 
 let ompCaptureCurrentModelReturnsModelWhenSessionHasModelSpec () =
     promise {
-        let rt = FallbackRuntimeState()
+        let rt = FallbackRuntimeStore()
         let sid = "omp-sess-with-model"
 
         let mockSession =
             createObj [ "model", box (createObj [ "provider", box "anthropic"; "id", box "claude-4" ]) ]
 
-        Wanxiangshu.Omp.ExecutorTools.ompScope.Add("omp_session_" + sid, mockSession)
+        Wanxiangshu.Hosts.Omp.ExecutorTools.ompScope.Add("omp_session_" + sid, mockSession)
 
         let executor = ompActionExecutor rt null
         let! modelOpt = executor.CaptureCurrentModel sid
@@ -73,12 +78,12 @@ let ompCaptureCurrentModelReturnsModelWhenSessionHasModelSpec () =
         equal "provider is anthropic" "anthropic" m.ProviderID
         equal "modelId is claude-4" "claude-4" m.ModelID
 
-        Wanxiangshu.Omp.ExecutorTools.ompScope.Remove("omp_session_" + sid)
+        Wanxiangshu.Hosts.Omp.ExecutorTools.ompScope.Remove("omp_session_" + sid)
     }
 
 let opencodeExecutorUsesRuntimeAgentWhenNoAssistantMessageSpec () =
     promise {
-        let rt = FallbackRuntimeState()
+        let rt = FallbackRuntimeStore()
         let sid = "opencode-no-assistant"
         rt.SetAgentName sid "investigator"
 
@@ -119,7 +124,7 @@ let opencodeExecutorUsesRuntimeAgentWhenNoAssistantMessageSpec () =
 
 let opencodeExecutorRespectsUserSelectedModelAndAgentSpec () =
     promise {
-        let rt = FallbackRuntimeState()
+        let rt = FallbackRuntimeStore()
         let sid = "opencode-user-selected"
         rt.SetAgentName sid "investigator"
 
@@ -163,7 +168,7 @@ let opencodeExecutorRespectsUserSelectedModelAndAgentSpec () =
 
 let ompExecutorRespectsUserSelectedModelAndAgentSpec () =
     promise {
-        let rt = FallbackRuntimeState()
+        let rt = FallbackRuntimeStore()
         let sid = "omp-user-selected"
         rt.SetAgentName sid "coder"
 
@@ -172,7 +177,7 @@ let ompExecutorRespectsUserSelectedModelAndAgentSpec () =
                 [ "model", box (createObj [ "provider", box "google"; "id", box "gemini-2" ])
                   "agent", box "reviewer" ]
 
-        Wanxiangshu.Omp.ExecutorTools.ompScope.Add("omp_session_" + sid, mockSession)
+        Wanxiangshu.Hosts.Omp.ExecutorTools.ompScope.Add("omp_session_" + sid, mockSession)
 
         let mutable lastPromptArg = null
 
@@ -203,7 +208,7 @@ let ompExecutorRespectsUserSelectedModelAndAgentSpec () =
         equal "prompt has user selected agent reviewer" "reviewer" (Dyn.str prompt "agent")
         equal "prompt has fallback model" "openai/gpt-5" (Dyn.str prompt "model")
 
-        Wanxiangshu.Omp.ExecutorTools.ompScope.Remove("omp_session_" + sid)
+        Wanxiangshu.Hosts.Omp.ExecutorTools.ompScope.Remove("omp_session_" + sid)
     }
 
 let run () =

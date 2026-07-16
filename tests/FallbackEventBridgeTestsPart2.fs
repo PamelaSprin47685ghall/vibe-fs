@@ -3,14 +3,20 @@ module Wanxiangshu.Tests.FallbackEventBridgeTestsPart2
 open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Tests.Assert
-open Wanxiangshu.Kernel.Domain
+open Wanxiangshu.Kernel.Primitives.Identity
+open Wanxiangshu.Kernel.Errors.DomainError
+open Wanxiangshu.Kernel.Session.Causality
 open Wanxiangshu.Kernel.FallbackKernel.Types
 open Wanxiangshu.Kernel.Subsession.Types
-open Wanxiangshu.Shell.FallbackRuntimeState
-open Wanxiangshu.Shell.FallbackEventBridge
-open Wanxiangshu.Shell
+open Wanxiangshu.Runtime.Fallback.RuntimeStore
+open Wanxiangshu.Runtime.Fallback.LeaseTransitions
+open Wanxiangshu.Runtime.Fallback.GateTransitions
+open Wanxiangshu.Runtime.Fallback.FallbackEventBridge
+open Wanxiangshu.Runtime.Fallback.FallbackBridgePorts
+open Wanxiangshu.Runtime.Fallback.FallbackBridgeContinuation
+open Wanxiangshu.Runtime
 
-module Dyn = Wanxiangshu.Shell.Dyn
+module Dyn = Wanxiangshu.Runtime.Dyn
 open Wanxiangshu.Tests.TempWorkspace
 
 
@@ -182,7 +188,7 @@ let handleEvent_sessionIdle_idle_emitsScanToolCallAsText () =
         let model = mkModel "oai" "gpt-5"
         let chain = [ model ]
         let cfg = mkConfig ()
-        let rt = FallbackRuntimeState()
+        let rt = FallbackRuntimeStore()
         let sid = "sess-1"
         rt.SetChain sid chain
         rt.SetAgentName sid "reviewer"
@@ -204,7 +210,7 @@ let handleEvent_sessionIdle_idle_toolText_sendsPrompt () =
         let model = mkModel "oai" "gpt-5"
         let chain = [ model ]
         let cfg = mkConfig ()
-        let rt = FallbackRuntimeState()
+        let rt = FallbackRuntimeStore()
         let sid = "sess-1"
         rt.SetChain sid chain
         rt.SetAgentName sid "reviewer"
@@ -239,7 +245,7 @@ let handleEvent_sessionIdle_idle_todosComplete_setsTaskComplete () =
         let model = mkModel "oai" "gpt-5"
         let chain = [ model ]
         let cfg = mkConfig ()
-        let rt = FallbackRuntimeState()
+        let rt = FallbackRuntimeStore()
         let sid = "sess-1"
         rt.SetChain sid chain
         rt.SetAgentName sid "reviewer"
@@ -271,7 +277,7 @@ let handleEvent_sessionIdle_retryToIdle_emitsScanToolCallAsText () =
         let model = mkModel "oai" "gpt-5"
         let chain = [ model ]
         let cfg = mkConfig ()
-        let rt = FallbackRuntimeState()
+        let rt = FallbackRuntimeStore()
         let sid = "sess-1"
         rt.SetChain sid chain
         rt.SetAgentName sid "reviewer"
@@ -305,7 +311,7 @@ let handleEvent_sessionIdle_retryToIdle_emitsScanToolCallAsText () =
 let handleEvent_sessionBusy_duringRetrying_consumedTrue () =
     promise {
         let model = mkModel "oai" "gpt-5"
-        let rt = FallbackRuntimeState()
+        let rt = FallbackRuntimeStore()
         let sid = "sess-busy-retrying"
         rt.SetChain sid [ model ]
         rt.SetAgentName sid "reviewer"
@@ -326,7 +332,7 @@ let handleEvent_sessionBusy_duringRetrying_consumedTrue () =
 
 let handleEvent_chainPrependsCurrentModel () =
     promise {
-        let rt = FallbackRuntimeState()
+        let rt = FallbackRuntimeStore()
         let sid = "sess-prepend"
         rt.SetAgentName sid "coder"
 
@@ -352,7 +358,7 @@ let handleEvent_chainPrependsCurrentModel () =
         equal "second is m1" m1 chain.[1]
         equal "third is m2" m2 chain.[2]
 
-        let rt2 = FallbackRuntimeState()
+        let rt2 = FallbackRuntimeStore()
         let sid2 = "sess-prepend-exists"
         rt2.SetAgentName sid2 "coder"
         let executor2 = FakeExecutor(currentModel = m1)
@@ -372,7 +378,7 @@ let handleEvent_chainPrependsCurrentModel () =
 let handleEvent_userAbort_invalidatesLease () =
     promise {
         let model = mkModel "oai" "gpt-5"
-        let rt = FallbackRuntimeState()
+        let rt = FallbackRuntimeStore()
         let sid = "sess-abort"
         rt.SetChain sid [ model ]
         rt.SetAgentName sid "reviewer"
@@ -408,7 +414,7 @@ let handleEvent_userAbort_invalidatesLease () =
 let handleEvent_newUserMessage_doesNotClearMainContinuationAwaitingStart () =
     promise {
         let model = mkModel "oai" "gpt-5"
-        let rt = FallbackRuntimeState()
+        let rt = FallbackRuntimeStore()
         let sid = "sess-new-user-test"
         rt.SetChain sid [ model ]
         rt.SetAgentName sid "reviewer"
@@ -434,7 +440,7 @@ let handleEvent_newUserMessage_doesNotClearMainContinuationAwaitingStart () =
 
 let handleEvent_emptyFallbackChain_isNotBypassed () =
     promise {
-        let rt = FallbackRuntimeState()
+        let rt = FallbackRuntimeStore()
         let sid = "sess-empty-chain-test"
         rt.SetAgentName sid "reviewer"
         rt.SetChain sid []
@@ -450,8 +456,10 @@ let handleEvent_emptyFallbackChain_isNotBypassed () =
 
 let ompEventTranslator_correctlyExtractsContinuationIdAndOrdinal () =
     promise {
-        let rt = FallbackRuntimeState()
-        let translator = Wanxiangshu.Omp.FallbackHooks.ompEventTranslator rt
+        let rt = FallbackRuntimeStore()
+
+        let translator =
+            Wanxiangshu.Hosts.Omp.Fallback.EventTranslator.ompEventTranslator rt
 
         let props =
             createObj [ "continuationID", box "cont-omp-1"; "continuationOrdinal", box 3 ]

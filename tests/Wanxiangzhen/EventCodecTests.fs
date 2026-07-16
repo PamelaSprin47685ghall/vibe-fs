@@ -1,7 +1,7 @@
 module Wanxiangshu.Tests.Wanxiangzhen.EventCodecTests
 
 open Wanxiangshu.Kernel.Wanxiangzhen.SquadEvent
-open Wanxiangshu.Shell.Wanxiangzhen.SquadEventDisplayCodec
+open Wanxiangshu.Runtime.Wanxiangzhen.SquadEventDisplayCodec
 open Wanxiangshu.Tests.Wanxiangzhen.AssertCompat
 
 let entries () : (string * (unit -> unit)) list =

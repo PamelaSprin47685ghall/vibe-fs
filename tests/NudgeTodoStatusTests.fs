@@ -2,7 +2,7 @@ module Wanxiangshu.Tests.NudgeTodoStatusTests
 
 open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Kernel.Nudge.TodoStatus
-open Wanxiangshu.Kernel.PromptFragments
+open Wanxiangshu.Runtime.PromptFragments
 
 let run () =
     // --- todoStatusOfString: 6 string mappings ---

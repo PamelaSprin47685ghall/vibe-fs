@@ -7,18 +7,18 @@ open Wanxiangshu.Tests.TempWorkspace
 open Wanxiangshu.Tests.IntegrationToolSetup
 
 open Wanxiangshu.Kernel.CapsSynthPolicy
-open Wanxiangshu.Kernel.Message
-open Wanxiangshu.Mux.Plugin
-open Wanxiangshu.Opencode.Plugin
-open Wanxiangshu.Mux.AiSettings
-open Wanxiangshu.Shell.ChildAgentRegistry
-open Wanxiangshu.Shell.ReviewRuntime
-open Wanxiangshu.Shell.Dyn
+open Wanxiangshu.Kernel.Messaging
+open Wanxiangshu.Hosts.Mux.Plugin
+open Wanxiangshu.Hosts.Opencode.Plugin
+open Wanxiangshu.Hosts.Mux.AiSettings
+open Wanxiangshu.Runtime.ChildAgentRegistry
+open Wanxiangshu.Runtime.ReviewRuntime
+open Wanxiangshu.Runtime.Dyn
 
-module Dyn = Wanxiangshu.Shell.Dyn
+module Dyn = Wanxiangshu.Runtime.Dyn
 
-open Wanxiangshu.Omp
-open Wanxiangshu.Omp.MessageTransform
+open Wanxiangshu.Hosts.Omp
+open Wanxiangshu.Hosts.Omp.MessageTransform
 
 let buildCapsFileReadDataSpec () =
     promise {
@@ -190,33 +190,33 @@ let capsAndBacklogOrderSpec () =
                          todoMsg "m3" "c3" "R3" 791 792 |] ]
 
         let todoInput report content status priority =
-            { Wanxiangshu.Shell.WorkBacklogToolsCodec.TodoWriteArgs.AhaMoments = report
-              Wanxiangshu.Shell.WorkBacklogToolsCodec.TodoWriteArgs.ChangesAndReasons = report + "_changes"
-              Wanxiangshu.Shell.WorkBacklogToolsCodec.TodoWriteArgs.Gotchas = report + "_gotchas"
-              Wanxiangshu.Shell.WorkBacklogToolsCodec.TodoWriteArgs.LessonsAndConventions = report + "_lessons"
-              Wanxiangshu.Shell.WorkBacklogToolsCodec.TodoWriteArgs.Plan = report + "_plan"
-              Wanxiangshu.Shell.WorkBacklogToolsCodec.TodoWriteArgs.Todos =
-                [| { Wanxiangshu.Shell.WorkBacklogToolsCodec.TodoItem.Content = content
-                     Wanxiangshu.Shell.WorkBacklogToolsCodec.TodoItem.Status =
+            { Wanxiangshu.Runtime.WorkBacklogToolsCodec.TodoWriteArgs.AhaMoments = report
+              Wanxiangshu.Runtime.WorkBacklogToolsCodec.TodoWriteArgs.ChangesAndReasons = report + "_changes"
+              Wanxiangshu.Runtime.WorkBacklogToolsCodec.TodoWriteArgs.Gotchas = report + "_gotchas"
+              Wanxiangshu.Runtime.WorkBacklogToolsCodec.TodoWriteArgs.LessonsAndConventions = report + "_lessons"
+              Wanxiangshu.Runtime.WorkBacklogToolsCodec.TodoWriteArgs.Plan = report + "_plan"
+              Wanxiangshu.Runtime.WorkBacklogToolsCodec.TodoWriteArgs.Todos =
+                [| { Wanxiangshu.Runtime.WorkBacklogToolsCodec.TodoItem.Content = content
+                     Wanxiangshu.Runtime.WorkBacklogToolsCodec.TodoItem.Status =
                        Wanxiangshu.Kernel.ToolArgs.TodoItemStatus.Completed
-                     Wanxiangshu.Shell.WorkBacklogToolsCodec.TodoItem.Priority =
+                     Wanxiangshu.Runtime.WorkBacklogToolsCodec.TodoItem.Priority =
                        Wanxiangshu.Kernel.ToolArgs.TodoItemPriority.High } |]
-              Wanxiangshu.Shell.WorkBacklogToolsCodec.TodoWriteArgs.SelectMethodology = [] }
+              Wanxiangshu.Runtime.WorkBacklogToolsCodec.TodoWriteArgs.SelectMethodology = [] }
 
         do!
-            Wanxiangshu.Shell.EventLogRuntime.appendWorkBacklogCommittedOrFail
+            Wanxiangshu.Runtime.EventLogRuntime.appendWorkBacklogCommittedOrFail
                 workspaceDir
                 "test"
                 (todoInput "R1" "t1" "completed" "high")
 
         do!
-            Wanxiangshu.Shell.EventLogRuntime.appendWorkBacklogCommittedOrFail
+            Wanxiangshu.Runtime.EventLogRuntime.appendWorkBacklogCommittedOrFail
                 workspaceDir
                 "test"
                 (todoInput "R2" "t2" "completed" "high")
 
         do!
-            Wanxiangshu.Shell.EventLogRuntime.appendWorkBacklogCommittedOrFail
+            Wanxiangshu.Runtime.EventLogRuntime.appendWorkBacklogCommittedOrFail
                 workspaceDir
                 "test"
                 (todoInput "R3" "t3" "completed" "high")

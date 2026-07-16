@@ -6,17 +6,19 @@ open System
 open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Tests.TempWorkspace
 open Wanxiangshu.Tests.IntegrationToolSetup
-open Wanxiangshu.Opencode.Plugin
-open Wanxiangshu.Kernel.Domain
+open Wanxiangshu.Hosts.Opencode.Plugin
+open Wanxiangshu.Kernel.Primitives.Identity
+open Wanxiangshu.Kernel.Errors.DomainError
+open Wanxiangshu.Kernel.Session.Causality
 open Wanxiangshu.Kernel.ToolResult
-open Wanxiangshu.Kernel.ToolOutputInfo
-open Wanxiangshu.Shell.Dyn
+open Wanxiangshu.Runtime.ToolOutputInfo
+open Wanxiangshu.Runtime.Dyn
 open Wanxiangshu.Kernel
 
 let mimoApplyPatchExecuteBeforeSpec () =
     promise {
         let! workspaceDir = mkdtempAsync "mimo-apply-patch-before-"
-        let! p = Wanxiangshu.Opencode.PluginMimo.plugin (box {| directory = workspaceDir |})
+        let! p = Wanxiangshu.Hosts.Opencode.PluginMimo.plugin (box {| directory = workspaceDir |})
         let teb = get p "tool.execute.before"
         let stringArgsOut = createObj [ "args", box "*** Begin Patch\n*** End Patch" ]
 
@@ -89,7 +91,7 @@ let mimoApplyPatchExecuteBeforeSpec () =
 let mimoTaskExecuteRoundTripSpec () =
     promise {
         let! workspaceDir = mkdtempAsync "mimo-task-before-after-"
-        let! p = Wanxiangshu.Opencode.PluginMimo.plugin (box {| directory = workspaceDir |})
+        let! p = Wanxiangshu.Hosts.Opencode.PluginMimo.plugin (box {| directory = workspaceDir |})
         let taskTool = get (get p "tool") "task"
 
         let args =
@@ -118,7 +120,7 @@ let mimoTaskExecuteRoundTripSpec () =
 let mimoTaskExecuteNestedReportSpec () =
     promise {
         let! workspaceDir = mkdtempAsync "mimo-task-nested-report-"
-        let! p = Wanxiangshu.Opencode.PluginMimo.plugin (box {| directory = workspaceDir |})
+        let! p = Wanxiangshu.Hosts.Opencode.PluginMimo.plugin (box {| directory = workspaceDir |})
         let taskTool = get (get p "tool") "task"
 
         let args =
@@ -150,7 +152,7 @@ let mimoTaskExecuteNestedReportSpec () =
 let mimoTaskExecuteInPlaceStripSpec () =
     promise {
         let! workspaceDir = mkdtempAsync "mimo-task-inplace-"
-        let! p = Wanxiangshu.Opencode.PluginMimo.plugin (box {| directory = workspaceDir |})
+        let! p = Wanxiangshu.Hosts.Opencode.PluginMimo.plugin (box {| directory = workspaceDir |})
         let teb = get p "tool.execute.before"
 
         let originalArgs =
@@ -179,7 +181,7 @@ let mimoTaskExecuteInPlaceStripSpec () =
 let mimoTaskExecuteStripsTaskIdSpec () =
     promise {
         let! workspaceDir = mkdtempAsync "mimo-task-strip-task-id-"
-        let! p = Wanxiangshu.Opencode.PluginMimo.plugin (box {| directory = workspaceDir |})
+        let! p = Wanxiangshu.Hosts.Opencode.PluginMimo.plugin (box {| directory = workspaceDir |})
         let taskTool = get (get p "tool") "task"
 
         let args =
@@ -209,7 +211,7 @@ let mimoTaskExecuteStripsTaskIdSpec () =
 let mimoTaskDefinitionHandlesZodLikeParametersSpec () =
     promise {
         let! workspaceDir = mkdtempAsync "mimo-task-zod-params-"
-        let! p = Wanxiangshu.Opencode.PluginMimo.plugin (box {| directory = workspaceDir |})
+        let! p = Wanxiangshu.Hosts.Opencode.PluginMimo.plugin (box {| directory = workspaceDir |})
         let td = get p "tool.definition"
         let extendCalls = ResizeArray<obj>()
         let arrayCalls = ResizeArray<string>()
@@ -289,7 +291,7 @@ let mimoTaskDefinitionHandlesZodLikeParametersSpec () =
         check
             "mimo task.definition describes methodology field"
             (describeCalls.Count = 1
-             && describeCalls.[0] = Wanxiangshu.Opencode.HookSchema.selectMethodologyFieldDescription)
+             && describeCalls.[0] = Wanxiangshu.Hosts.Opencode.HookSchema.selectMethodologyFieldDescription)
 
         check "mimo task.definition makes methodology required" (optionalCalls.Count = 0)
         do! rmAsync workspaceDir
@@ -298,7 +300,7 @@ let mimoTaskDefinitionHandlesZodLikeParametersSpec () =
 let mimoTaskDefinitionRoutesEffectSchemaShapedParametersToJsonSchemaSpec () =
     promise {
         let! workspaceDir = mkdtempAsync "mimo-task-effect-params-"
-        let! p = Wanxiangshu.Opencode.PluginMimo.plugin (box {| directory = workspaceDir |})
+        let! p = Wanxiangshu.Hosts.Opencode.PluginMimo.plugin (box {| directory = workspaceDir |})
         let td = get p "tool.definition"
 
         let effectLikeParams =

@@ -7,17 +7,18 @@ open Wanxiangshu.Kernel.ReviewSession
 open Wanxiangshu.Kernel.ReviewSession.Types
 open Wanxiangshu.Kernel.FallbackKernel.Types
 open Wanxiangshu.Kernel.Subsession.Types
-open Wanxiangshu.Shell.Dyn
+open Wanxiangshu.Runtime.Dyn
 
-module Dyn = Wanxiangshu.Shell.Dyn
+module Dyn = Wanxiangshu.Runtime.Dyn
 
-open Wanxiangshu.Shell.FallbackRuntimeState
-open Wanxiangshu.Shell.FallbackEventBridge
-open Wanxiangshu.Shell.ReviewRuntime
-open Wanxiangshu.Omp.PluginCore
+open Wanxiangshu.Runtime.Fallback.RuntimeStore
+open Wanxiangshu.Runtime.Fallback.GateTransitions
+open Wanxiangshu.Runtime.Fallback.FallbackEventBridge
+open Wanxiangshu.Runtime.ReviewRuntime
+open Wanxiangshu.Hosts.Omp.PluginComposition
 open Wanxiangshu.Tests.AsyncFlush
 open Wanxiangshu.Tests.TempWorkspace
-open Wanxiangshu.Shell.SubsessionActorRegistry
+open Wanxiangshu.Runtime.SubsessionActorRegistry
 
 /// Verify the reviewStore singleton is wired into the CoreServices so the
 /// registered tools see the same instance that tests manipulate.
@@ -61,7 +62,7 @@ let private capturePi () : obj * (unit -> obj array) =
 
     pi, getHandlers
 
-let private makeFakeRuntime () : FallbackRuntimeState = FallbackRuntimeState()
+let private makeFakeRuntime () : FallbackRuntimeStore = FallbackRuntimeStore()
 
 let private makeFakeConfig () : FallbackConfig =
     { DefaultChain =
@@ -97,7 +98,7 @@ let private driveAbort
         let ctx = createObj [ "sessionManager", box sessionMgr; "cwd", box root ]
         let event = createObj [ "type", box evtType ]
         let pi, getHandlers = capturePi ()
-        let runtime = FallbackRuntimeState()
+        let runtime = FallbackRuntimeStore()
         registerAbortHandler pi store runtime None
         let handlers = getHandlers ()
         check $"{evtType} captured exactly one handler" (handlers.Length = 1)
@@ -120,17 +121,24 @@ let abortHookDeactivatesReview () =
         let sid = "abort-hook-sid-1"
         localStore.applyReviewTaskProjection (sid, Some "task")
         check "precondition: review active" (localStore.getReviewTask sid = Some "task")
-        Wanxiangshu.Shell.RunnerBackground.registerActiveRunnerSession Wanxiangshu.Omp.ExecutorTools.ompScope sid
+
+        Wanxiangshu.Runtime.RunnerBackground.registerActiveRunnerSession
+            Wanxiangshu.Hosts.Omp.ExecutorTools.ompScope
+            sid
 
         check
             "precondition: has running runner job"
-            (Wanxiangshu.Shell.RunnerBackground.hasRunningRunnerJob Wanxiangshu.Omp.ExecutorTools.ompScope sid)
+            (Wanxiangshu.Runtime.RunnerBackground.hasRunningRunnerJob Wanxiangshu.Hosts.Omp.ExecutorTools.ompScope sid)
 
         do! driveAbort localStore "session.abort" sid false
 
         check
             "postcondition: runner job was aborted"
-            (not (Wanxiangshu.Shell.RunnerBackground.hasRunningRunnerJob Wanxiangshu.Omp.ExecutorTools.ompScope sid))
+            (not (
+                Wanxiangshu.Runtime.RunnerBackground.hasRunningRunnerJob
+                    Wanxiangshu.Hosts.Omp.ExecutorTools.ompScope
+                    sid
+            ))
     }
 
 /// `stream.abort` must mirror the session.abort path: review state clears.
@@ -140,17 +148,24 @@ let streamAbortHookDeactivatesReview () =
         let sid = "stream-abort-hook-sid-1"
         localStore.applyReviewTaskProjection (sid, Some "task")
         check "precondition: review active" (localStore.getReviewTask sid = Some "task")
-        Wanxiangshu.Shell.RunnerBackground.registerActiveRunnerSession Wanxiangshu.Omp.ExecutorTools.ompScope sid
+
+        Wanxiangshu.Runtime.RunnerBackground.registerActiveRunnerSession
+            Wanxiangshu.Hosts.Omp.ExecutorTools.ompScope
+            sid
 
         check
             "precondition: has running runner job"
-            (Wanxiangshu.Shell.RunnerBackground.hasRunningRunnerJob Wanxiangshu.Omp.ExecutorTools.ompScope sid)
+            (Wanxiangshu.Runtime.RunnerBackground.hasRunningRunnerJob Wanxiangshu.Hosts.Omp.ExecutorTools.ompScope sid)
 
         do! driveAbort localStore "stream.abort" sid false
 
         check
             "postcondition: runner job was aborted"
-            (not (Wanxiangshu.Shell.RunnerBackground.hasRunningRunnerJob Wanxiangshu.Omp.ExecutorTools.ompScope sid))
+            (not (
+                Wanxiangshu.Runtime.RunnerBackground.hasRunningRunnerJob
+                    Wanxiangshu.Hosts.Omp.ExecutorTools.ompScope
+                    sid
+            ))
     }
 
 /// `session.error` collapses to the same outcome as aborts.
@@ -242,7 +257,7 @@ let ompReconciliationClosesZombieSessions () =
         let parent = SessionId.create "parent-sid"
         let rid = RunId.create "run-zombie-1"
 
-        let eventStore = Wanxiangshu.Shell.SubsessionEventStore.create root
+        let eventStore = Wanxiangshu.Runtime.SubsessionEventStore.create root
 
         let runStartedData =
             { SessionId = sid
@@ -265,15 +280,15 @@ let ompReconciliationClosesZombieSessions () =
         let pi = createObj [ "directory", box root; "session", box sessionApi ]
 
         let hostFactory (s: string) =
-            Wanxiangshu.Omp.SubsessionHostAdapter.createHost null "" pi
+            Wanxiangshu.Hosts.Omp.SubsessionHostAdapter.createHost null "" pi
 
-        let! _ = Wanxiangshu.Shell.SubsessionReconcile.reconcileUnfinishedRuns root (Some hostFactory)
+        let! _ = Wanxiangshu.Runtime.SubsessionReconcile.reconcileUnfinishedRuns root (Some hostFactory)
 
         check "sessionDelete was called" sessionDeleteCalled
         check "sessionDelete called with correct sessionId" (calledSessionId = "omp-zombie-sid-1")
 
         let actor =
-            Wanxiangshu.Shell.SubsessionActorRegistry.SubsessionActorRegistry.GetOrCreate
+            Wanxiangshu.Runtime.SubsessionActorRegistry.SubsessionActorRegistry.GetOrCreate
                 root
                 "omp-zombie-sid-1"
                 (hostFactory "omp-zombie-sid-1")

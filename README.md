@@ -39,11 +39,11 @@
 
 | 用途 | npm 子路径 | 构建产物 |
 | :--- | :--- | :--- |
-| **Mux**（包默认 main） | `wanxiangshu` | `build/src/Mux/Plugin.js` |
-| **oh-my-pi 扩展** | `wanxiangshu/omp` | `build/src/Omp/Plugin.js` |
-| **万象阵**（协调器，需 OpenCode 系） | `wanxiangshu/wanxiangzhen` | `build/src/Opencode/PluginWanxiangzhen.js` |
+| **Mux**（包默认 main） | `wanxiangshu` | `build/src/Hosts/Mux/Plugin.js` |
+| **oh-my-pi 扩展** | `wanxiangshu/omp` | `build/src/Hosts/Omp/Plugin.js` |
+| **万象阵**（协调器，需 OpenCode 系） | `wanxiangshu/wanxiangzhen` | `build/src/Hosts/OpenCode/PluginWanxiangzhen.js` |
 
-OpenCode / Mimocode 插件入口在包内构建结果中（`Opencode/Plugin.js`、`PluginMimo.js` 等），按你所用宿主的插件加载方式配置即可。
+OpenCode / Mimocode 插件入口在包内构建结果中（`Hosts/OpenCode/Plugin.js`、`PluginMimo.js` 等），按你所用宿主的插件加载方式配置即可。
 
 **万象阵**：与万象术**独立插件、互不 import**；建议先装万象术再装万象阵。协调器用 `/squad` 拆任务；slave 在独立 worktree 里开发，并依赖万象术的 `/loop` 做审查，不重复实现 review。
 

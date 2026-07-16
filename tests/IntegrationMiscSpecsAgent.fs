@@ -5,9 +5,9 @@ open Fable.Core.JsInterop
 open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Tests.TempWorkspace
 open Wanxiangshu.Tests.IntegrationToolSetup
-open Wanxiangshu.Opencode.Plugin
-open Wanxiangshu.Opencode.AgentConfig
-open Wanxiangshu.Shell.Dyn
+open Wanxiangshu.Hosts.Opencode.Plugin
+open Wanxiangshu.Hosts.Opencode.AgentConfig
+open Wanxiangshu.Runtime.Dyn
 
 let agentConfigSpec () =
     promise {

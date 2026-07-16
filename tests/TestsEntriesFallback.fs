@@ -3,7 +3,7 @@ module Wanxiangshu.Tests.TestsEntriesFallback
 open Wanxiangshu.Tests.TestsTestBody
 open Wanxiangshu.Tests.FallbackKernelTests
 open Wanxiangshu.Tests.FallbackConfigCodecTests
-open Wanxiangshu.Tests.FallbackRuntimeStateTests
+open Wanxiangshu.Tests.FallbackRuntimeStoreTests
 open Wanxiangshu.Tests.FallbackEventBridgeTests
 open Wanxiangshu.Tests.FallbackMessageCodecTests
 open Wanxiangshu.Tests.FallbackIntegrationTests
@@ -19,10 +19,10 @@ open Wanxiangshu.Tests.SubsessionDecisionTests
 open Wanxiangshu.Tests.OpencodeSubsessionHostAdapterModelTests
 open Wanxiangshu.Tests.SubsessionScenarioTests
 open Wanxiangshu.Tests.SubsessionActorPumpTests
-open Wanxiangshu.Tests.SubsessionV36HardTests
-open Wanxiangshu.Tests.SubsessionV37HardTests
-open Wanxiangshu.Tests.SubsessionV38DecisionTests
-open Wanxiangshu.Tests.SubsessionV40HardTests
+open Wanxiangshu.Tests.SubsessionDispatchFailureTests
+open Wanxiangshu.Tests.SubsessionConcurrentCancelTests
+open Wanxiangshu.Tests.SubsessionTranscriptBoundaryTests
+open Wanxiangshu.Tests.SubsessionPhysicalIsolationTests
 open Wanxiangshu.Tests.SubsessionEvidenceRaceTests
 open Wanxiangshu.Tests.OpencodeFallbackChildIdleTests
 open Wanxiangshu.Tests.FallbackHooksHelperAgentModelTests
@@ -32,7 +32,7 @@ open Wanxiangshu.Tests.SubsessionEmptyOutputContinueTests
 let fallbackTestEntries () : (string * TestBody) list =
     [ "FallbackKernelTests.run", Sync(sync FallbackKernelTests.run)
       "FallbackConfigCodecTests.run", Sync(sync FallbackConfigCodecTests.run)
-      "FallbackRuntimeStateTests.run", Sync(sync FallbackRuntimeStateTests.run)
+      "FallbackRuntimeStoreTests.run", Sync(sync FallbackRuntimeStoreTests.run)
       "FallbackEventBridgeTests.run", Async FallbackEventBridgeTests.run
       "FallbackAgentAndModelTests.run", Async FallbackAgentAndModelTests.run
       "FallbackAgentAndModelPart2Tests.run", Async FallbackAgentAndModelPart2Tests.run
@@ -44,10 +44,10 @@ let fallbackTestEntries () : (string * TestBody) list =
       "OpencodeSubsessionHostAdapterModelTests.run", Sync(sync OpencodeSubsessionHostAdapterModelTests.run)
       "SubsessionScenarioTests.run", Sync(sync SubsessionScenarioTests.run)
       "SubsessionActorPumpTests.run", Async SubsessionActorPumpTests.run
-      "SubsessionV36HardTests.run", Async SubsessionV36HardTests.run
-      "SubsessionV37HardTests.run", Async SubsessionV37HardTests.run
-      "SubsessionV38DecisionTests.run", Sync(sync SubsessionV38DecisionTests.run)
-      "SubsessionV40HardTests.run", Async SubsessionV40HardTests.run
+      "SubsessionDispatchFailureTests.run", Async SubsessionDispatchFailureTests.run
+      "SubsessionConcurrentCancelTests.run", Async SubsessionConcurrentCancelTests.run
+      "SubsessionTranscriptBoundaryTests.run", Sync(sync SubsessionTranscriptBoundaryTests.run)
+      "SubsessionPhysicalIsolationTests.run", Async SubsessionPhysicalIsolationTests.run
       "SubsessionEvidenceRaceTests.run", Sync(sync SubsessionEvidenceRaceTests.run)
       "OpencodeFallbackChildIdleTests.run", Async OpencodeFallbackChildIdleTests.run
       "FallbackHooksHelperAgentModelTests.run", Async FallbackHooksHelperAgentModelTests.run

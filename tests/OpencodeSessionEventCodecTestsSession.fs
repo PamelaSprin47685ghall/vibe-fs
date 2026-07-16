@@ -3,9 +3,9 @@ module Wanxiangshu.Tests.OpencodeSessionEventCodecTestsSession
 open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Tests.Assert
-open Wanxiangshu.Shell.OpencodeSessionEventCodec
+open Wanxiangshu.Runtime.OpencodeSessionEventCodec
 
-module Dyn = Wanxiangshu.Shell.Dyn
+module Dyn = Wanxiangshu.Runtime.Dyn
 
 let private part (text: string) : obj =
     box {| ``type`` = "text"; text = text |}
@@ -35,6 +35,20 @@ let getSessionIDLifecycleUsesInfoId () =
     equal "getSessionID uses info.id for lifecycle events" "from-info-id" (getSessionID "session.deleted" props)
     equal "getSessionID uses info.id for session.created" "from-info-id" (getSessionID "session.created" props)
 
+let getSessionIDLifecycleDeletionPrefersInfoIdOverSessionID () =
+    let props =
+        box
+            {| sessionID = "parent-session"
+               info = box {| id = "deleted-child" |} |}
+
+    equal "getSessionID session.deleted prefers info.id" "deleted-child" (getSessionID "session.deleted" props)
+
+    equal "getSessionID session.delete prefers info.id" "deleted-child" (getSessionID "session.delete" props)
+
+    equal "getSessionID session.remove prefers info.id" "deleted-child" (getSessionID "session.remove" props)
+
+    equal "getSessionID session.close prefers info.id" "deleted-child" (getSessionID "session.close" props)
+
 let getSessionIDUsesTopLevelIdForSessionError () =
     let props = box {| id = "sid-top-level" |}
     equal "getSessionID session.error uses props.id" "sid-top-level" (getSessionID "session.error" props)
@@ -49,7 +63,7 @@ let getSessionIDNonLifecycleSkipsInfoId () =
 
 let getPartsTextEmptyOnNonArray () =
     equal "getPartsText empty on null" "" (getPartsText null)
-    equal "getPartsText empty on undefined" "" (getPartsText Wanxiangshu.Shell.Dyn.undefinedValue)
+    equal "getPartsText empty on undefined" "" (getPartsText Wanxiangshu.Runtime.Dyn.undefinedValue)
 
 let getPartsTextEmptyOnEmptyArray () =
     equal "getPartsText empty on []" "" (getPartsText [||])
@@ -64,7 +78,7 @@ let getPartsTextSkipsNonStringText () =
     let parts =
         [| box
                {| ``type`` = "text"
-                  text = Wanxiangshu.Shell.Dyn.undefinedValue |} |]
+                  text = Wanxiangshu.Runtime.Dyn.undefinedValue |} |]
 
     equal "getPartsText skips non-string text payloads" "" (getPartsText (box parts))
 
@@ -114,7 +128,7 @@ let isCompletedAssistantMessageToolFinishWithTimeCompleted () =
 
 let decodeTodosEmptyOnNonArray () =
     equal "decodeTodos empty on null" [] (decodeTodos null)
-    equal "decodeTodos empty on undefined" [] (decodeTodos Wanxiangshu.Shell.Dyn.undefinedValue)
+    equal "decodeTodos empty on undefined" [] (decodeTodos Wanxiangshu.Runtime.Dyn.undefinedValue)
 
 let decodeTodosDropsTerminalStatus () =
     let todos =

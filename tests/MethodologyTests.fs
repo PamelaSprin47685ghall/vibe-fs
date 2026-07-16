@@ -4,9 +4,10 @@ open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Kernel.Methodology
-open Wanxiangshu.Kernel.ToolOutputInfo
-open Wanxiangshu.Methodology.Registry
-open Wanxiangshu.Methodology.SchemaCommon
+open Wanxiangshu.Runtime.ToolOutputInfo
+open Wanxiangshu.Kernel.ToolOutputInfoTypes
+open Wanxiangshu.Kernel.Methodology.Registry
+open Wanxiangshu.Kernel.Methodology.Schema
 
 let private hintFromTodoOutput (methodologies: string list) =
     match tryParse (todoWriteOutput methodologies) with

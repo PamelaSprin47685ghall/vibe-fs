@@ -5,13 +5,13 @@ open Fable.Core.JsInterop
 open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Tests.AsyncFlush
 open Wanxiangshu.Tests.TempWorkspace
-open Wanxiangshu.Kernel.LoopMessages
-open Wanxiangshu.Kernel.PromptFragments
-open Wanxiangshu.Kernel.ToolOutputInfo
+open Wanxiangshu.Runtime.LoopMessages
+open Wanxiangshu.Runtime.PromptFragments
+open Wanxiangshu.Runtime.ToolOutputInfo
 open Wanxiangshu.Tests.IntegrationMuxSetup
-open Wanxiangshu.Opencode.Plugin
-open Wanxiangshu.Shell.Dyn
-open Wanxiangshu.Shell.OpencodeSessionEventCodec
+open Wanxiangshu.Hosts.Opencode.Plugin
+open Wanxiangshu.Runtime.Dyn
+open Wanxiangshu.Runtime.OpencodeSessionEventCodec
 
 let private promptText (arg: obj) =
     getPartsText (get (get arg "body") "parts")

@@ -6,10 +6,10 @@ open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Tests.BacklogMessageBuilders
 open Wanxiangshu.Kernel.HostTools
 open Wanxiangshu.Kernel.Messaging
-open Wanxiangshu.Kernel.BacklogProjectionCore
-open Wanxiangshu.Kernel.BacklogProjection
-open Wanxiangshu.Opencode.BacklogSession
-open Wanxiangshu.Shell.RuntimeScope
+open Wanxiangshu.Runtime.BacklogProjectionBuild
+open Wanxiangshu.Runtime.BacklogProjection
+open Wanxiangshu.Hosts.Opencode.BacklogSession
+open Wanxiangshu.Runtime.RuntimeScope
 
 open Wanxiangshu.Tests.BacklogReplaySpecsMimocode
 open Wanxiangshu.Tests.BacklogReplaySpecsFold

@@ -5,13 +5,15 @@ open Fable.Core.JsInterop
 open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Kernel.FallbackKernel.Types
 open Wanxiangshu.Kernel.Subsession.Types
-open Wanxiangshu.Shell.ChildAgentRegistry
-open Wanxiangshu.Shell.CommandProcessor
-open Wanxiangshu.Shell.FallbackRuntimeState
-open Wanxiangshu.Shell.ReviewRuntime
-open Wanxiangshu.Shell.SubsessionActorRegistry
-open Wanxiangshu.Shell.SubsessionEventStore
-open Wanxiangshu.Opencode.FallbackHooks
+open Wanxiangshu.Runtime.ChildAgentRegistry
+open Wanxiangshu.Runtime.CommandProcessor
+open Wanxiangshu.Runtime.SubsessionPorts
+open Wanxiangshu.Runtime.Fallback.RuntimeStore
+open Wanxiangshu.Runtime.Fallback.GateTransitions
+open Wanxiangshu.Runtime.ReviewRuntime
+open Wanxiangshu.Runtime.SubsessionActorRegistry
+open Wanxiangshu.Runtime.SubsessionEventStore
+open Wanxiangshu.Hosts.Opencode.Fallback.Hook
 
 let private fail message = check message false
 
@@ -145,7 +147,7 @@ let currentUserNonceAnchorsAssistantEvidenceBeforeIdle () =
             createObj
                 [ "session", box (createObj [ "messages", box (fun _ -> Promise.lift (box {| data = messages |})) ]) ]
 
-        let runtime = FallbackRuntimeState()
+        let runtime = FallbackRuntimeStore()
         let childRegistry = ChildAgentRegistry.Create()
         childRegistry.RegisterChildAgent(sessionId, "investigator", Some "parent-opencode-current-turn-evidence")
 

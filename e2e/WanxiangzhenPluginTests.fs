@@ -2,7 +2,7 @@ module Wanxiangshu.E2e.WanxiangzhenPluginTests
 
 open Fable.Core
 open Fable.Core.JsInterop
-open Wanxiangshu.Shell.Dyn
+open Wanxiangshu.Runtime.Dyn
 open Wanxiangshu.Tests.Assert
 open Wanxiangshu.E2e.HarnessTypes
 

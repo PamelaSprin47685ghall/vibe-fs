@@ -2,10 +2,11 @@ module Wanxiangshu.Tests.ShellTestsFormat
 
 open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Kernel.Executor
-open Wanxiangshu.Kernel.SearchPrompts
-open Wanxiangshu.Kernel.SubagentPrompts
-open Wanxiangshu.Kernel.ToolOutputInfo
-open Wanxiangshu.Shell
+open Wanxiangshu.Runtime.ExecutorFormat
+open Wanxiangshu.Runtime.SearchPrompts
+open Wanxiangshu.Runtime.SubagentPrompts
+open Wanxiangshu.Runtime.ToolOutputInfo
+open Wanxiangshu.Runtime
 
 let webApiSearchFormat () =
     let results =

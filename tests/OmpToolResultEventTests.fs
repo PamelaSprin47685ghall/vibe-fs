@@ -3,9 +3,9 @@ module Wanxiangshu.Tests.OmpToolResultEventTests
 open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Tests.Assert
-open Wanxiangshu.Omp.ToolResultEvent
+open Wanxiangshu.Hosts.Omp.ToolResultEvent
 
-module Dyn = Wanxiangshu.Shell.Dyn
+module Dyn = Wanxiangshu.Runtime.Dyn
 
 let getToolInputPrefersInputOverArgs () =
     let event = createObj [ "input", box "from-input"; "args", box "from-args" ]

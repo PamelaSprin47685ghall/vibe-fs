@@ -4,7 +4,7 @@ open Fable.Core
 open Fable.Core.JsInterop
 open Fable.Core.JS
 open Wanxiangshu.Tests.Assert
-open Wanxiangshu.Shell.OpencodeSessionPromptCodec
+open Wanxiangshu.Runtime.OpencodeSessionPromptCodec
 
 let private isNullish (o: obj) : bool = isNull o || jsTypeof o = "undefined"
 

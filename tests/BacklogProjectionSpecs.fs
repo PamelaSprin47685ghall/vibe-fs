@@ -6,13 +6,13 @@ open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Tests.BacklogMessageBuilders
 
 open Wanxiangshu.Kernel.HostTools
-open Wanxiangshu.Kernel.Message
-open Wanxiangshu.Kernel.BacklogProjectionCore
-open Wanxiangshu.Kernel.BacklogProjection
-open Wanxiangshu.Opencode.BacklogSession
-open Wanxiangshu.Opencode.MessagingCodec
-open Wanxiangshu.Shell.Dyn
-open Wanxiangshu.Shell.RuntimeScope
+open Wanxiangshu.Kernel.Messaging
+open Wanxiangshu.Runtime.BacklogProjectionBuild
+open Wanxiangshu.Runtime.BacklogProjection
+open Wanxiangshu.Hosts.Opencode.BacklogSession
+open Wanxiangshu.Hosts.Opencode.MessagingCodec
+open Wanxiangshu.Runtime.Dyn
+open Wanxiangshu.Runtime.RuntimeScope
 
 
 let projectBacklogFolds () =

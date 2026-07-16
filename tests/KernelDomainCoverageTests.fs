@@ -4,10 +4,13 @@ open Fable.Core
 open Fable.Core.JsInterop
 open System
 open Wanxiangshu.Tests.Assert
-open Wanxiangshu.Kernel.Domain
-open Wanxiangshu.Kernel.Domain.Id
+open Wanxiangshu.Kernel.Primitives.Identity
+open Wanxiangshu.Kernel.Errors.DomainError
+open Wanxiangshu.Kernel.Session.Causality
+open Wanxiangshu.Kernel.Primitives.Identity.Id
+open Wanxiangshu.Kernel.WorkspaceState
 open Wanxiangshu.Kernel.Methodology
-open Wanxiangshu.Methodology.Registry
+open Wanxiangshu.Kernel.Methodology.Registry
 
 // ── Kernel.Domain.Id ─────────────────────────────────────────────────────────
 

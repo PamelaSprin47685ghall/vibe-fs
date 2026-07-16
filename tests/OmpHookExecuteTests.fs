@@ -3,8 +3,8 @@ module Wanxiangshu.Tests.OmpHookExecuteTests
 open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Tests.Assert
-open Wanxiangshu.Shell.Dyn
-open Wanxiangshu.Omp.HookExecute
+open Wanxiangshu.Runtime.Dyn
+open Wanxiangshu.Hosts.Omp.HookExecute
 
 /// applyToolResultHook on a `coder` invocation must mirror the agent's intents
 /// onto `ui_` so the chat UI shows a one-line summary before the agent finishes.

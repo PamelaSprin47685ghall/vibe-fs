@@ -7,8 +7,8 @@ open Wanxiangshu.Tests.IntegrationMuxSetup
 open Wanxiangshu.Tests.AsyncFlush
 open Wanxiangshu.Tests.TempWorkspace
 
-open Wanxiangshu.Mux.Plugin
-open Wanxiangshu.Shell.Dyn
+open Wanxiangshu.Hosts.Mux.Plugin
+open Wanxiangshu.Runtime.Dyn
 
 let repeatedTodoNudgeSpec () =
     promise {

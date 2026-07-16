@@ -7,10 +7,11 @@ open Wanxiangshu.Tests.TempWorkspace
 open Wanxiangshu.Tests.IntegrationToolSetup
 open Wanxiangshu.Tests.IntegrationMuxSetup
 open Wanxiangshu.Kernel.Executor
-open Wanxiangshu.Kernel.ToolOutputInfo
+open Wanxiangshu.Runtime.ExecutorFormat
+open Wanxiangshu.Runtime.ToolOutputInfo
 open Wanxiangshu.Kernel.HostTools
-open Wanxiangshu.Mux.Plugin
-open Wanxiangshu.Shell.Dyn
+open Wanxiangshu.Hosts.Mux.Plugin
+open Wanxiangshu.Runtime.Dyn
 
 let muxExecutorRoCatPrependsWarningSpec () =
     promise {

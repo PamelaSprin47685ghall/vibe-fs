@@ -5,8 +5,9 @@ open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Kernel.CapsPrelude
 open Wanxiangshu.Kernel.CapsSynthPolicy
 open Wanxiangshu.Kernel.Messaging
-open Wanxiangshu.Shell.CapsSynthCommon
-open Wanxiangshu.Shell.Dyn
+open Wanxiangshu.Runtime.MessageSourceClassify
+open Wanxiangshu.Runtime.CapsSynth
+open Wanxiangshu.Runtime.Dyn
 
 let private msg (id: string) : obj = createObj [ "id", box id ]
 
@@ -48,9 +49,9 @@ let capsPreludeRequiresFormalTestsNotAdHoc () =
     check "llm: debug becomes tests" (llmText.Contains "调试过程永久化")
     check "llm: generic pipeline" (llmText.Contains "正式回归用例")
 
-let shellCapsPreludeReExportsKernel () =
-    equal "shell thinkWrapped" thinkWrapped Wanxiangshu.Shell.CapsPrelude.thinkWrapped
-    equal "shell llmText" llmText Wanxiangshu.Shell.CapsPrelude.llmText
+let kernelCapsPreludeExportsThinkWrapped () =
+    equal "kernel thinkWrapped" thinkWrapped Wanxiangshu.Kernel.CapsPrelude.thinkWrapped
+    equal "kernel llmText" llmText Wanxiangshu.Kernel.CapsPrelude.llmText
 
 let classifySourceCoversAck () =
     match classifySource $"{capsAcknowledgePrefix}xyz" None None with
@@ -63,5 +64,5 @@ let run () =
     userCapsTextPreludeAndDefault ()
     acknowledgeTextIsStable ()
     capsPreludeRequiresFormalTestsNotAdHoc ()
-    shellCapsPreludeReExportsKernel ()
+    kernelCapsPreludeExportsThinkWrapped ()
     classifySourceCoversAck ()

@@ -4,13 +4,13 @@ open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Tests.TempWorkspace
-open Wanxiangshu.Kernel.Message
-open Wanxiangshu.Shell.Dyn
+open Wanxiangshu.Kernel.Messaging
+open Wanxiangshu.Runtime.Dyn
 
 let mimoConfigSpec () =
     promise {
         let! workspaceDir = mkdtempAsync "mimo-plugin-config-"
-        let! p = Wanxiangshu.Opencode.PluginMimo.plugin (box {| directory = workspaceDir |})
+        let! p = Wanxiangshu.Hosts.Opencode.PluginMimo.plugin (box {| directory = workspaceDir |})
         Wanxiangshu.Tests.IntegrationPluginTestsCommon.pluginShape p
         let! cfg = (get p "config") $ (createObj []) |> unbox<JS.Promise<obj>>
         let agents = get cfg "agent"
@@ -144,31 +144,31 @@ let mimoConfigSpec () =
                 | "high" -> Wanxiangshu.Kernel.ToolArgs.TodoItemPriority.High
                 | _ -> Wanxiangshu.Kernel.ToolArgs.TodoItemPriority.Low
 
-            { Wanxiangshu.Shell.WorkBacklogToolsCodec.TodoWriteArgs.AhaMoments = report
-              Wanxiangshu.Shell.WorkBacklogToolsCodec.TodoWriteArgs.ChangesAndReasons = report + "_changes"
-              Wanxiangshu.Shell.WorkBacklogToolsCodec.TodoWriteArgs.Gotchas = report + "_gotchas"
-              Wanxiangshu.Shell.WorkBacklogToolsCodec.TodoWriteArgs.LessonsAndConventions = report + "_lessons"
-              Wanxiangshu.Shell.WorkBacklogToolsCodec.TodoWriteArgs.Plan = report + "_plan"
-              Wanxiangshu.Shell.WorkBacklogToolsCodec.TodoWriteArgs.Todos =
-                [| { Wanxiangshu.Shell.WorkBacklogToolsCodec.TodoItem.Content = content
-                     Wanxiangshu.Shell.WorkBacklogToolsCodec.TodoItem.Status = parsedStatus
-                     Wanxiangshu.Shell.WorkBacklogToolsCodec.TodoItem.Priority = parsedPriority } |]
-              Wanxiangshu.Shell.WorkBacklogToolsCodec.TodoWriteArgs.SelectMethodology = [] }
+            { Wanxiangshu.Runtime.WorkBacklogToolsCodec.TodoWriteArgs.AhaMoments = report
+              Wanxiangshu.Runtime.WorkBacklogToolsCodec.TodoWriteArgs.ChangesAndReasons = report + "_changes"
+              Wanxiangshu.Runtime.WorkBacklogToolsCodec.TodoWriteArgs.Gotchas = report + "_gotchas"
+              Wanxiangshu.Runtime.WorkBacklogToolsCodec.TodoWriteArgs.LessonsAndConventions = report + "_lessons"
+              Wanxiangshu.Runtime.WorkBacklogToolsCodec.TodoWriteArgs.Plan = report + "_plan"
+              Wanxiangshu.Runtime.WorkBacklogToolsCodec.TodoWriteArgs.Todos =
+                [| { Wanxiangshu.Runtime.WorkBacklogToolsCodec.TodoItem.Content = content
+                     Wanxiangshu.Runtime.WorkBacklogToolsCodec.TodoItem.Status = parsedStatus
+                     Wanxiangshu.Runtime.WorkBacklogToolsCodec.TodoItem.Priority = parsedPriority } |]
+              Wanxiangshu.Runtime.WorkBacklogToolsCodec.TodoWriteArgs.SelectMethodology = [] }
 
         do!
-            Wanxiangshu.Shell.EventLogRuntime.appendWorkBacklogCommittedOrFail
+            Wanxiangshu.Runtime.EventLogRuntime.appendWorkBacklogCommittedOrFail
                 workspaceDir
                 sessionID
                 (todoInput "First report from the first task." "t1" "completed" "high")
 
         do!
-            Wanxiangshu.Shell.EventLogRuntime.appendWorkBacklogCommittedOrFail
+            Wanxiangshu.Runtime.EventLogRuntime.appendWorkBacklogCommittedOrFail
                 workspaceDir
                 sessionID
                 (todoInput "Second report from the second task." "t2" "completed" "high")
 
         do!
-            Wanxiangshu.Shell.EventLogRuntime.appendWorkBacklogCommittedOrFail
+            Wanxiangshu.Runtime.EventLogRuntime.appendWorkBacklogCommittedOrFail
                 workspaceDir
                 sessionID
                 (todoInput "Third report from the final task." "t3" "completed" "high")
@@ -274,7 +274,7 @@ let mimoTuiTodoFallbackSpec () =
                   "command", box (createObj [ "register", box (System.Func<obj, obj>(fun _ -> box (fun () -> ()))) ])
                   "route", box (createObj [ "current", box routeCurrent ]) ]
 
-        let pluginObj = Wanxiangshu.Opencode.PluginMimoTui.plugin
+        let pluginObj = Wanxiangshu.Hosts.Opencode.PluginMimoTui.plugin
         do! (get pluginObj "tui") $ (api, null, null) |> unbox<JS.Promise<unit>>
 
         let todosAfterInstall =

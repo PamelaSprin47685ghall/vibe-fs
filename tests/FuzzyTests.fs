@@ -4,11 +4,11 @@ open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Kernel.FuzzyPath
 open Wanxiangshu.Kernel.FuzzyQuery
 open Wanxiangshu.Kernel.FuzzyFormat
-open Wanxiangshu.Shell.FuzzySearch
-open Wanxiangshu.Shell.FuzzyIteratorStore
+open Wanxiangshu.Runtime.FuzzySearch
+open Wanxiangshu.Runtime.FuzzyIteratorStore
 open Wanxiangshu.Kernel
-open Wanxiangshu.Shell.FuzzyFinderShell
-open Wanxiangshu.Shell
+open Wanxiangshu.Runtime.FuzzyFinderShell
+open Wanxiangshu.Runtime
 open Fable.Core
 open Fable.Core.JsInterop
 

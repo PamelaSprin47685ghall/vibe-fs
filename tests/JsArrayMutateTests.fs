@@ -1,7 +1,7 @@
 module Wanxiangshu.Tests.JsArrayMutateTests
 
 open Wanxiangshu.Tests.Assert
-open Wanxiangshu.Shell.JsArrayMutate
+open Wanxiangshu.Runtime.JsArrayMutate
 
 let replaceDifferentArray () =
     let target: obj array = [| box 1; box 2; box 3 |]

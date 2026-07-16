@@ -4,10 +4,11 @@ open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Kernel.TreeSitterKernel
-open Wanxiangshu.Kernel.ToolOutputInfo
-open Wanxiangshu.Shell.ToolExecute
-open Wanxiangshu.Shell.TreeSitterShell
-open Wanxiangshu.Shell.Dyn
+open Wanxiangshu.Runtime.TreeSitterFormat
+open Wanxiangshu.Runtime.ToolOutputInfo
+open Wanxiangshu.Runtime.ToolExecute
+open Wanxiangshu.Runtime.TreeSitterShell
+open Wanxiangshu.Runtime.Dyn
 
 [<Import("createRequire", "node:module")>]
 let private createRequire: string -> (string -> obj) = jsNative

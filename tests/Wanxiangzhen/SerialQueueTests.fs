@@ -2,7 +2,7 @@ module Wanxiangshu.Tests.Wanxiangzhen.SerialQueueTests
 
 open Fable.Core
 open Fable.Core.JsInterop
-open Wanxiangshu.Shell.PromiseQueue
+open Wanxiangshu.Runtime.PromiseQueue
 open Wanxiangshu.Tests.Wanxiangzhen.AssertCompat
 
 let private runAsync (p: JS.Promise<unit>) : unit = p |> Promise.map ignore |> ignore

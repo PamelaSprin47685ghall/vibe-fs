@@ -6,12 +6,12 @@ open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Tests.TempWorkspace
 open Wanxiangshu.Tests.EventLogTestSeed
 open Wanxiangshu.Tests.AsyncFlush
-open Wanxiangshu.Kernel.LoopMessages
-open Wanxiangshu.Kernel.PromptFragments
-open Wanxiangshu.Kernel.PromptFrontMatter
-open Wanxiangshu.Opencode.Plugin
-open Wanxiangshu.Shell.Dyn
-open Wanxiangshu.Shell.OpencodeSessionEventCodec
+open Wanxiangshu.Runtime.LoopMessages
+open Wanxiangshu.Runtime.PromptFragments
+open Wanxiangshu.Runtime.PromptFrontMatter
+open Wanxiangshu.Hosts.Opencode.Plugin
+open Wanxiangshu.Runtime.Dyn
+open Wanxiangshu.Runtime.OpencodeSessionEventCodec
 
 let private loopAnchor task =
     frontMatterPrompt [ yamlField taskField task ] "With-Review Mode is active."
@@ -189,7 +189,10 @@ let opencodeBrowserSubsessionHistoryDoesNotLoopNudgeSpec () =
                             box (
                                 System.Func<unit, JS.Promise<obj>>(fun () ->
                                     let reviewerPrompt =
-                                        Wanxiangshu.Kernel.ReviewPrompts.Submission.reviewerPrompt "ship feature" "" []
+                                        Wanxiangshu.Runtime.ReviewPrompts.Submission.reviewerPrompt
+                                            "ship feature"
+                                            ""
+                                            []
 
                                     promise {
                                         return box {| data = [| assistantMessage "browser" reviewerPrompt 1 |] |}

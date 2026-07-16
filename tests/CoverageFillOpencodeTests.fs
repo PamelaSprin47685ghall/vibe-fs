@@ -4,14 +4,16 @@ open Fable.Core
 open Fable.Core.JsInterop
 open System
 open Wanxiangshu.Tests.Assert
-open Wanxiangshu.Opencode.ToolHelpers
-open Wanxiangshu.Opencode.HookSchema
-open Wanxiangshu.Opencode.ToolSchema
-open Wanxiangshu.Kernel.Domain
+open Wanxiangshu.Hosts.Opencode.HostField
+open Wanxiangshu.Hosts.Opencode.HookSchema
+open Wanxiangshu.Hosts.Opencode.ToolSchema
+open Wanxiangshu.Kernel.Primitives.Identity
+open Wanxiangshu.Kernel.Errors.DomainError
+open Wanxiangshu.Kernel.Session.Causality
 open Wanxiangshu.Kernel.ToolCatalog
 
-module Dyn = Wanxiangshu.Shell.Dyn
-open Wanxiangshu.Shell.Dyn
+module Dyn = Wanxiangshu.Runtime.Dyn
+open Wanxiangshu.Runtime.Dyn
 
 // ── Opencode.ToolHelpers ───────────────────────────────────────────────────
 
@@ -19,7 +21,7 @@ let toolHelpers () =
     equal
         "formatDomainError"
         "ctx failed: session busy"
-        (Wanxiangshu.Opencode.ToolHelpers.formatDomainError "ctx" SessionBusy)
+        (Wanxiangshu.Hosts.Opencode.HostField.formatDomainError "ctx" SessionBusy)
 
     let o = createObj [ "a", box "hi"; "b", box 42; "c", box true; "d", box null ]
     equal "optStr some" (Some "hi") (optStr o "a")

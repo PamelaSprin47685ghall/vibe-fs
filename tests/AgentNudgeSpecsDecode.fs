@@ -2,7 +2,7 @@ module Wanxiangshu.Tests.AgentNudgeSpecsDecode
 
 open Fable.Core.JsInterop
 open Wanxiangshu.Tests.Assert
-open Wanxiangshu.Shell.OpencodeSessionEventCodec
+open Wanxiangshu.Runtime.OpencodeSessionEventCodec
 
 let decodeTodosOpenItems () =
     let todos =

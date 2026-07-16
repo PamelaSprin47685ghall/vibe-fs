@@ -2,17 +2,18 @@ module Wanxiangshu.Tests.AgentNudgeSpecs
 
 open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Kernel.Nudge
-open Wanxiangshu.Kernel.NudgeDerivation
+open Wanxiangshu.Runtime.Nudge.NudgeDerivation
 open Wanxiangshu.Kernel.HostTools
-open Wanxiangshu.Opencode.NudgeTrigger
+open Wanxiangshu.Hosts.Opencode.NudgeTrigger
 open Wanxiangshu.Kernel.Nudge.Types
 open Fable.Core
 open Fable.Core.JsInterop
-open Wanxiangshu.Shell
-open Wanxiangshu.Shell.Dyn
-open Wanxiangshu.Shell.EventLogRuntime
-open Wanxiangshu.Shell.FallbackRuntimeState
-open Wanxiangshu.Opencode.NudgeEffect
+open Wanxiangshu.Runtime
+open Wanxiangshu.Runtime.Dyn
+open Wanxiangshu.Runtime.EventLogRuntime
+open Wanxiangshu.Runtime.Fallback.RuntimeStore
+open Wanxiangshu.Runtime.Fallback.GateTransitions
+open Wanxiangshu.Hosts.Opencode.NudgeEffect
 open Wanxiangshu.Tests.TempWorkspace
 
 let private snap todos msg blocked agent isLoop : Wanxiangshu.Kernel.Nudge.Types.SessionSnapshot =
@@ -46,27 +47,30 @@ let private snap' todos msg blocked agent isLoop hasActiveRunner : Wanxiangshu.K
       humanTurnId = None }
 
 let test_isNaturalStop () =
-    equal "session.idle → true" true (Wanxiangshu.Opencode.NudgeTrigger.NudgeTrigger.isNaturalStop "session.idle" null)
+    equal
+        "session.idle → true"
+        true
+        (Wanxiangshu.Hosts.Opencode.NudgeTrigger.NudgeTrigger.isNaturalStop "session.idle" null)
 
     equal
         "session.interrupted → false"
         false
-        (Wanxiangshu.Opencode.NudgeTrigger.NudgeTrigger.isNaturalStop "session.interrupted" null)
+        (Wanxiangshu.Hosts.Opencode.NudgeTrigger.NudgeTrigger.isNaturalStop "session.interrupted" null)
 
     equal
         "session.error → true"
         true
-        (Wanxiangshu.Opencode.NudgeTrigger.NudgeTrigger.isNaturalStop "session.error" null)
+        (Wanxiangshu.Hosts.Opencode.NudgeTrigger.NudgeTrigger.isNaturalStop "session.error" null)
 
     equal
         "session.status with string idle → true"
         true
-        (Wanxiangshu.Opencode.NudgeTrigger.NudgeTrigger.isNaturalStop "session.status" (box {| status = "idle" |}))
+        (Wanxiangshu.Hosts.Opencode.NudgeTrigger.NudgeTrigger.isNaturalStop "session.status" (box {| status = "idle" |}))
 
     equal
         "session.status with string busy → false"
         false
-        (Wanxiangshu.Opencode.NudgeTrigger.NudgeTrigger.isNaturalStop "session.status" (box {| status = "busy" |}))
+        (Wanxiangshu.Hosts.Opencode.NudgeTrigger.NudgeTrigger.isNaturalStop "session.status" (box {| status = "busy" |}))
 
 let decision () =
     equal "todos -> NudgeTodo" NudgeTodo (deriveAction (snap [ "a" ] "working" false None false))
@@ -181,7 +185,9 @@ let test_dispatchPostStopFromHistory () : JS.Promise<unit> =
     promise {
         let! dir = mkdtempAsync "nudge-integration-test-"
         let sessionIDStr = "s-dispatch-nudge-test"
-        let sessionID = Wanxiangshu.Kernel.Domain.Id.sessionIdQuick sessionIDStr
+
+        let sessionID =
+            Wanxiangshu.Kernel.Primitives.Identity.Id.sessionIdQuick sessionIDStr
 
         let mutable promptCalled = false
         let mutable promptText = ""
@@ -217,7 +223,7 @@ let test_dispatchPostStopFromHistory () : JS.Promise<unit> =
         let mockPluginCtx =
             createObj [ "client" ==> mockClient; "directory" ==> dir; "sessionID" ==> sessionIDStr ]
 
-        let rt = FallbackRuntimeState()
+        let rt = FallbackRuntimeStore()
 
         try
             let ndjsonFile = System.IO.Path.Combine(dir, ".wanxiangshu.ndjson")

@@ -3,9 +3,9 @@ module Wanxiangshu.Tests.OmpTitleFetchGuardTests
 open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Tests.Assert
-open Wanxiangshu.Shell.Dyn
+open Wanxiangshu.Runtime.Dyn
 
-open Wanxiangshu.Shell.TitleFetchGuardCommon
+open Wanxiangshu.Runtime.TitleFetchGuard
 
 let signature () =
     equal "omp title probe signature pinned" "Generate a title for this conversation" titleRequestSignature

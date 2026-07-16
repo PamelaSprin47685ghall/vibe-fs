@@ -1,15 +1,17 @@
 module Wanxiangshu.Tests.KernelPromptSpecsReview
 
 open Wanxiangshu.Tests.Assert
-open Wanxiangshu.Kernel.LoopMessages
-open Wanxiangshu.Kernel.PromptFrontMatter
-open Wanxiangshu.Kernel.ReviewPrompts
-open Wanxiangshu.Kernel.ReviewPrompts.Instructions
+open Wanxiangshu.Runtime.LoopMessages
+open Wanxiangshu.Runtime.PromptFrontMatter
+open Wanxiangshu.Runtime.ReviewPrompts
+open Wanxiangshu.Runtime.ReviewPrompts.Instructions
 open Wanxiangshu.Kernel.ReviewSession
 open Wanxiangshu.Kernel.ReviewSession.Types
 open Wanxiangshu.Kernel.ReviewVerdict
-open Wanxiangshu.Kernel.SubagentPrompts
-open Wanxiangshu.Kernel.Domain
+open Wanxiangshu.Runtime.SubagentPrompts
+open Wanxiangshu.Kernel.Primitives.Identity
+open Wanxiangshu.Kernel.Errors.DomainError
+open Wanxiangshu.Kernel.Session.Causality
 
 let loopMessagesShared () =
     let task = "ship S1 refactor"

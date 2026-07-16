@@ -46,7 +46,7 @@ open Wanxiangshu.Tests.WarnTddOmpEnforcementTests
 open Wanxiangshu.Tests.EventDrivenHarnessDemo
 open Wanxiangshu.Tests.TestsTestBody
 
-let tailCoreTestEntries () : (string * TestBody) list =
+let tailCoreTestEntriesPart1 () : (string * TestBody) list =
     [ "FuzzyTests.grepDetect", TestBody.Sync(sync FuzzyTests.grepDetect)
       "FuzzyTests.iteratorRoundTrip", TestBody.Sync(sync FuzzyTests.iteratorRoundTrip)
       "FuzzyTests.finderConversion", TestBody.Sync(sync FuzzyTests.finderConversion)
@@ -93,8 +93,10 @@ let tailCoreTestEntries () : (string * TestBody) list =
       TestBody.Sync(sync ShellTestsFormat.formatFetchResponseOnlyContent)
       "ShellTestsFormat.formatFetchResponseAllNone", TestBody.Sync(sync ShellTestsFormat.formatFetchResponseAllNone)
       "ShellTestsFormat.formatFetchResponseEmptyTitleOmitted",
-      TestBody.Sync(sync ShellTestsFormat.formatFetchResponseEmptyTitleOmitted)
-      "ShellTests.readDirectoryListing", TestBody.Async ShellTests.readDirectoryListing
+      TestBody.Sync(sync ShellTestsFormat.formatFetchResponseEmptyTitleOmitted) ]
+
+let tailCoreTestEntriesPart2 () : (string * TestBody) list =
+    [ "ShellTests.readDirectoryListing", TestBody.Async ShellTests.readDirectoryListing
       "ShellTests.ensureJavascriptProjectRepairsModuleType",
       TestBody.Async ShellTests.ensureJavascriptProjectRepairsModuleType
       "ShellTests.rewriteJavascriptRelativeImports", TestBody.Async ShellTests.rewriteJavascriptRelativeImports
@@ -122,8 +124,10 @@ let tailCoreTestEntries () : (string * TestBody) list =
       "TitleFetchGuardTests.tryWrapString", TestBody.Sync(sync TitleFetchGuardTests.tryWrapString)
       "TitleFetchGuardTests.rewriteStringContent", TestBody.Sync(sync TitleFetchGuardTests.rewriteStringContent)
       "TitleFetchGuardTests.rewriteArrayContent", TestBody.Sync(sync TitleFetchGuardTests.rewriteArrayContent)
-      "TitleFetchGuardTests.skipProbeMessage", TestBody.Sync(sync TitleFetchGuardTests.skipProbeMessage)
-      "ToolCatalogClassificationTests.run", TestBody.Sync(sync ToolCatalogClassificationTests.run)
+      "TitleFetchGuardTests.skipProbeMessage", TestBody.Sync(sync TitleFetchGuardTests.skipProbeMessage) ]
+
+let tailCoreTestEntriesPart3 () : (string * TestBody) list =
+    [ "ToolCatalogClassificationTests.run", TestBody.Sync(sync ToolCatalogClassificationTests.run)
       "ToolOutputInfoTests.run", TestBody.Sync(sync ToolOutputInfoTests.run)
       "MessageTransformPolicyTests.run", TestBody.Async MessageTransformPolicyTests.run
       "MessageTransformStackTests.run", TestBody.Async MessageTransformStackTests.run
@@ -142,10 +146,18 @@ let tailCoreTestEntries () : (string * TestBody) list =
     @ [ "ConfigTests.run", TestBody.Sync(sync ConfigTests.run)
         "JsonSchemaBuildersTests.run", TestBody.Sync(sync JsonSchemaBuildersTests.run)
         "ExecutorStripTests.run", TestBody.Sync(sync ExecutorStripTests.run)
-        "ExecutorTests.run", TestBody.Async(fun () -> ExecutorTests.run ())
+        "ExecutorTests.infiniteStdoutBounded", TestBody.Async ExecutorTests.infiniteStdoutBounded
+        "ExecutorTests.infiniteStderrBounded", TestBody.Async ExecutorTests.infiniteStderrBounded
+        "ExecutorTests.smallOutputUnchanged", TestBody.Async ExecutorTests.smallOutputUnchanged
         "WarnTddKernelFactsTests.run", TestBody.Sync(sync WarnTddKernelFactsTests.run)
         "WarnTddOpencodeEnforcementTests.run", TestBody.Async WarnTddOpencodeEnforcementTests.run
         "WarnTddMuxEnforcementTests.run", TestBody.Async WarnTddMuxEnforcementTests.run
         "WarnTddOmpEnforcementTests.run", TestBody.Sync(sync WarnTddOmpEnforcementTests.run)
         "EventDrivenHarnessDemo.run", TestBody.Async(fun () -> EventDrivenHarnessDemo.run ())
-        "ProductionDebugOutputTests.run", TestBody.Sync(sync Wanxiangshu.Tests.ProductionDebugOutputTests.run) ]
+        "ProductionDebugOutputTests.run", TestBody.Sync(sync Wanxiangshu.Tests.ProductionDebugOutputTests.run)
+        "ArchitectureGatesTests.run", TestBody.Sync(sync Wanxiangshu.Tests.ArchitectureGatesTests.run) ]
+
+let tailCoreTestEntries () : (string * TestBody) list =
+    tailCoreTestEntriesPart1 ()
+    @ tailCoreTestEntriesPart2 ()
+    @ tailCoreTestEntriesPart3 ()

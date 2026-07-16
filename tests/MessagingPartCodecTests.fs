@@ -4,7 +4,7 @@ open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Kernel.ToolExecutionStatusModule
-open Wanxiangshu.Shell.MessagingPartCodec
+open Wanxiangshu.Runtime.MessagingPartCodec
 
 let muxPartStateToKernelStatusMaps () =
     check

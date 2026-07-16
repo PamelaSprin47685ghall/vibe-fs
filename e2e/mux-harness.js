@@ -16,13 +16,12 @@ global.fetch = async (url, options) => {
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-// In build/ the plugin lives at ../build/src/Mux/Plugin.js; in source layout the
-// harness runs against build/ so the relative path resolves there.
+// In build/ the plugin lives at ../build/src/Hosts/Mux/Plugin.js.
 let WANXIANG_ROOT = path.resolve(__dirname, '..');
-let PLUGIN_JS = path.resolve(WANXIANG_ROOT, 'build/src/Mux/Plugin.js');
+let PLUGIN_JS = path.resolve(WANXIANG_ROOT, 'build/src/Hosts/Mux/Plugin.js');
 if (!fs.existsSync(PLUGIN_JS)) {
   WANXIANG_ROOT = path.resolve(__dirname, '../..');
-  PLUGIN_JS = path.resolve(WANXIANG_ROOT, 'build/src/Mux/Plugin.js');
+  PLUGIN_JS = path.resolve(WANXIANG_ROOT, 'build/src/Hosts/Mux/Plugin.js');
 }
 const PLUGIN_URL = pathToFileURL(PLUGIN_JS).href;
 

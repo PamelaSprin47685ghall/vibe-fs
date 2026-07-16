@@ -1,9 +1,10 @@
 module Wanxiangshu.Tests.FallbackInjectionFoldTests
 
 open Wanxiangshu.Tests.Assert
-open Wanxiangshu.Kernel.EventLog.Types
-open Wanxiangshu.Kernel.EventLog.FallbackInjectionFold
-open Wanxiangshu.Kernel.EventLog.Fold
+open Wanxiangshu.Kernel.EventSourcing.EventEnvelope
+open Wanxiangshu.Kernel.EventSourcing.EventKind
+open Wanxiangshu.Kernel.Fallback.FallbackInjectionFold
+open Wanxiangshu.Kernel.EventSourcing.Fold
 
 let private ev (session: string) (kind: string) (payload: Map<string, string>) =
     { V = 1

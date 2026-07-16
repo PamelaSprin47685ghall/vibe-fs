@@ -3,10 +3,10 @@ module Wanxiangshu.Tests.OmpSessionLifecycleTests
 open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Tests.Assert
-open Wanxiangshu.Omp.ChildSession
-open Wanxiangshu.Shell.RuntimeScope
-open Wanxiangshu.Omp.SessionLifecycle
-open Wanxiangshu.Omp.SessionLifecycleHooks
+open Wanxiangshu.Hosts.Omp.ChildSession
+open Wanxiangshu.Runtime.RuntimeScope
+open Wanxiangshu.Hosts.Omp.SessionLifecycle
+open Wanxiangshu.Hosts.Omp.SessionLifecycleHooks
 
 let private testScope = RuntimeScope()
 

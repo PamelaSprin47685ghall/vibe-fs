@@ -3,10 +3,10 @@ module Wanxiangshu.Tests.Wanxiangzhen.ExtendedCoordinatorOpsTests
 open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Kernel.Wanxiangzhen.Dag
-open Wanxiangshu.Shell.Wanxiangzhen.CoordinatorRuntime
-open Wanxiangshu.Shell.PromiseQueue
-open Wanxiangshu.Shell.Wanxiangzhen.CoordinatorOps
-open Wanxiangshu.Shell.Wanxiangzhen.CoordinatorRoutes
+open Wanxiangshu.Runtime.Wanxiangzhen.CoordinatorRuntime
+open Wanxiangshu.Runtime.PromiseQueue
+open Wanxiangshu.Runtime.Wanxiangzhen.CoordinatorOps
+open Wanxiangshu.Runtime.Wanxiangzhen.CoordinatorRoutes
 open Wanxiangshu.Tests.Wanxiangzhen.AssertCompat
 open Wanxiangshu.Tests.Wanxiangzhen.TestFixtures
 

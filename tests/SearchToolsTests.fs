@@ -3,11 +3,11 @@ module Wanxiangshu.Tests.SearchToolsTests
 open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Tests.Assert
-open Wanxiangshu.Opencode.SearchTools
-open Wanxiangshu.Shell.FuzzyFinderShell
-open Wanxiangshu.Shell.FuzzyIteratorStore
-open Wanxiangshu.Shell.ToolRuntimeContext
-open Wanxiangshu.Shell.Dyn
+open Wanxiangshu.Hosts.Opencode.SearchTools
+open Wanxiangshu.Runtime.FuzzyFinderShell
+open Wanxiangshu.Runtime.FuzzyIteratorStore
+open Wanxiangshu.Runtime.ToolRuntimeContext
+open Wanxiangshu.Runtime.Dyn
 
 [<Emit("$0.execute($1,$2)")>]
 let private callExecute (tool: obj) (args: obj) (context: obj) : JS.Promise<string> = jsNative

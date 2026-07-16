@@ -1,7 +1,7 @@
 module Wanxiangshu.Tests.SubagentIteratorStoreTests
 
 open Wanxiangshu.Tests.Assert
-open Wanxiangshu.Shell.SubagentIteratorStore
+open Wanxiangshu.Runtime.SubagentIteratorStore
 
 let testStoreAndConsume () =
     let store = createSubagentIteratorStore 3

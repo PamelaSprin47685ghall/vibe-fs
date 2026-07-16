@@ -13,10 +13,10 @@ function getPluginPath(variant) {
   if (variant === 'mimocode') file = 'PluginMimo.js';
   if (variant === 'mimotui') file = 'PluginMimoTui.js';
   
-  let p = path.resolve(WANXIANG_ROOT, `build/src/Opencode/${file}`);
+  let p = path.resolve(WANXIANG_ROOT, `build/src/Hosts/OpenCode/${file}`);
   if (!fs.existsSync(p)) {
     let altRoot = path.resolve(__dirname, '../..');
-    p = path.resolve(altRoot, `build/src/Opencode/${file}`);
+    p = path.resolve(altRoot, `build/src/Hosts/OpenCode/${file}`);
   }
   return p;
 }

@@ -3,7 +3,7 @@ module Wanxiangshu.E2e.MimocodePluginSpecSections
 open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.E2e.MimocodePluginSpecsPart
-open Wanxiangshu.Shell.Dyn
+open Wanxiangshu.Runtime.Dyn
 
 let runMimoPluginIdentity (h: Harness) (chk: string -> bool -> unit) =
     let plugin = h.getPlugin ()

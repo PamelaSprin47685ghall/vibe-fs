@@ -2,7 +2,7 @@ module Wanxiangshu.Tests.FlowKernelTests
 
 open Fable.Core
 open Wanxiangshu.Tests.Assert
-open Wanxiangshu.Kernel.Flow
+open Wanxiangshu.Runtime.Flow
 
 // ── Law 1: Order Law — aggregate-internal serial ──
 

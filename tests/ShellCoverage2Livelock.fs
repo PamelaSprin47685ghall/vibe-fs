@@ -3,9 +3,9 @@ module Wanxiangshu.Tests.ShellCoverage2Livelock
 open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Tests.Assert
-open Wanxiangshu.Shell.RuntimeScope
+open Wanxiangshu.Runtime.RuntimeScope
 
-module Livelock = Wanxiangshu.Shell.LivelockGuard
+module Livelock = Wanxiangshu.Runtime.LivelockGuard
 
 // ── LivelockGuard ─────────────────────────────────────────────────────────────
 let livelockGuardFirstCall () =

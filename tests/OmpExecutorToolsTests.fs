@@ -4,12 +4,12 @@ open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Tests.OmpPluginTestsHarness
-open Wanxiangshu.Omp
-open Wanxiangshu.Shell
-open Wanxiangshu.Shell.RuntimeScope
-open Wanxiangshu.Shell.Dyn
+open Wanxiangshu.Hosts.Omp
+open Wanxiangshu.Runtime
+open Wanxiangshu.Runtime.RuntimeScope
+open Wanxiangshu.Runtime.Dyn
 
-module Dyn = Wanxiangshu.Shell.Dyn
+module Dyn = Wanxiangshu.Runtime.Dyn
 
 let private reset () =
     RunnerBackground.clearRunnerLogsForTest ExecutorTools.ompScope

@@ -3,9 +3,9 @@ module Wanxiangshu.Tests.DelegateTests
 open Fable.Core.JsInterop
 open Wanxiangshu.Tests.Assert
 
-open Wanxiangshu.Mux.AiSettings
-open Wanxiangshu.Shell.Dyn
-open Wanxiangshu.Shell.MuxAiSettingsCodec
+open Wanxiangshu.Hosts.Mux.AiSettings
+open Wanxiangshu.Runtime.Dyn
+open Wanxiangshu.Runtime.MuxAiSettingsCodec
 
 let private muxEnv (pairs: (string * string) list) : obj =
     createObj [ for k, v in pairs -> k, box v ]

@@ -4,26 +4,26 @@
   "private": true,
   "type": "module",
   "description": "wanxiangshu: multi-agent plugin runtime in F#→JS via Fable",
-  "main": "build/src/Mux/Plugin.js",
+  "main": "build/src/Hosts/Mux/Plugin.js",
   "types": "index.d.ts",
   "exports": {
     ".": {
       "types": "./index.d.ts",
-      "import": "./build/src/Mux/Plugin.js",
-      "require": "./build/src/Mux/Plugin.js",
-      "default": "./build/src/Mux/Plugin.js"
+      "import": "./build/src/Hosts/Mux/Plugin.js",
+      "require": "./build/src/Hosts/Mux/Plugin.js",
+      "default": "./build/src/Hosts/Mux/Plugin.js"
     },
     "./omp": {
       "types": "./index.d.ts",
-      "import": "./build/src/Omp/Plugin.js",
-      "require": "./build/src/Omp/Plugin.js",
-      "default": "./build/src/Omp/Plugin.js"
+      "import": "./build/src/Hosts/Omp/Plugin.js",
+      "require": "./build/src/Hosts/Omp/Plugin.js",
+      "default": "./build/src/Hosts/Omp/Plugin.js"
     },
     "./wanxiangzhen": {
       "types": "./index.d.ts",
-      "import": "./build/src/Opencode/PluginWanxiangzhen.js",
-      "require": "./build/src/Opencode/PluginWanxiangzhen.js",
-      "default": "./build/src/Opencode/PluginWanxiangzhen.js"
+      "import": "./build/src/Hosts/OpenCode/PluginWanxiangzhen.js",
+      "require": "./build/src/Hosts/OpenCode/PluginWanxiangzhen.js",
+      "default": "./build/src/Hosts/OpenCode/PluginWanxiangzhen.js"
     }
   },
   "files": [

@@ -1,7 +1,7 @@
 module Wanxiangshu.Tests.OpencodeClientCodecTests
 
 open Fable.Core.JsInterop
-open Wanxiangshu.Shell.OpencodeClientCodec
+open Wanxiangshu.Runtime.OpencodeClientCodec
 open Wanxiangshu.Tests.Assert
 
 /// getConfigApiFromClient must mirror getSessionApiFromClient's shape:

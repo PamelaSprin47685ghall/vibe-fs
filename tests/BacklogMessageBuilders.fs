@@ -4,7 +4,7 @@ open Fable.Core
 open Fable.Core.JsInterop
 
 open Wanxiangshu.Kernel.Messaging
-open Wanxiangshu.Kernel.BacklogProjectionCore
+open Wanxiangshu.Runtime.BacklogProjectionBuild
 open Wanxiangshu.Kernel.ToolExecutionStatusModule
 
 

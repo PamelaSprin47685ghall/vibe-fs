@@ -4,10 +4,10 @@ open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Kernel.WarnTdd
-open Wanxiangshu.Shell.Dyn
-open Wanxiangshu.Opencode.HookSchema
+open Wanxiangshu.Runtime.Dyn
+open Wanxiangshu.Hosts.Opencode.HookSchema
 
-module Dyn = Wanxiangshu.Shell.Dyn
+module Dyn = Wanxiangshu.Runtime.Dyn
 
 // `requireWarnTdd` and `requireWarn` in src/Opencode/HookExecute.fs must
 // call `setHookError` whenever a modification tool (resp. warn-required tool)
@@ -27,12 +27,12 @@ let private runOpencodeHook (tool: string) (args: obj) : JS.Promise<string * str
 
     promise {
         try
-            Wanxiangshu.Shell.ToolHookRuntime.clearSessionCompliance "s-warn-enforce"
-            do! Wanxiangshu.Opencode.HookExecute.toolExecuteBefore input output
+            Wanxiangshu.Runtime.ToolHookRuntime.clearSessionCompliance "s-warn-enforce"
+            do! Wanxiangshu.Hosts.Opencode.HookExecute.toolExecuteBefore input output
             let err = str output "error"
 
             let violations =
-                match Wanxiangshu.Shell.ToolHookRuntime.tryGetCompliance "s-warn-enforce" "c-warn-enforce" with
+                match Wanxiangshu.Runtime.ToolHookRuntime.tryGetCompliance "s-warn-enforce" "c-warn-enforce" with
                 | Some env -> env.Violations
                 | None -> []
 
@@ -101,12 +101,12 @@ let opencodeRejectsCoderWhenOutputArgsAbsent () =
         let mutable violations = []
 
         try
-            Wanxiangshu.Shell.ToolHookRuntime.clearSessionCompliance "s-warn-enforce"
-            do! Wanxiangshu.Opencode.HookExecute.toolExecuteBefore input output
+            Wanxiangshu.Runtime.ToolHookRuntime.clearSessionCompliance "s-warn-enforce"
+            do! Wanxiangshu.Hosts.Opencode.HookExecute.toolExecuteBefore input output
             err <- str output "error"
 
             violations <-
-                match Wanxiangshu.Shell.ToolHookRuntime.tryGetCompliance "s-warn-enforce" "c-warn-enforce" with
+                match Wanxiangshu.Runtime.ToolHookRuntime.tryGetCompliance "s-warn-enforce" "c-warn-enforce" with
                 | Some env -> env.Violations
                 | None -> []
         with ex ->
@@ -132,12 +132,12 @@ let opencodeRejectsCoderMissingWarnWhenOutputArgsAbsent () =
         let mutable violations = []
 
         try
-            Wanxiangshu.Shell.ToolHookRuntime.clearSessionCompliance "s-warn-enforce"
-            do! Wanxiangshu.Opencode.HookExecute.toolExecuteBefore input output
+            Wanxiangshu.Runtime.ToolHookRuntime.clearSessionCompliance "s-warn-enforce"
+            do! Wanxiangshu.Hosts.Opencode.HookExecute.toolExecuteBefore input output
             err <- str output "error"
 
             violations <-
-                match Wanxiangshu.Shell.ToolHookRuntime.tryGetCompliance "s-warn-enforce" "c-warn-enforce" with
+                match Wanxiangshu.Runtime.ToolHookRuntime.tryGetCompliance "s-warn-enforce" "c-warn-enforce" with
                 | Some env -> env.Violations
                 | None -> []
         with ex ->

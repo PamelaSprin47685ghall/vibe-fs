@@ -4,10 +4,10 @@ open Fable.Core
 open Fable.Core.JsInterop
 open System
 open Wanxiangshu.Tests.Assert
-open Wanxiangshu.Methodology.Args
-open Wanxiangshu.Methodology.SchemaCommon
-open Wanxiangshu.Opencode.HookSchema
-open Wanxiangshu.Shell.Dyn
+open Wanxiangshu.Runtime.MethodologyArgs
+open Wanxiangshu.Kernel.Methodology.Schema
+open Wanxiangshu.Hosts.Opencode.HookSchema
+open Wanxiangshu.Runtime.Dyn
 
 // ── Methodology.Args ───────────────────────────────────────────────────────
 

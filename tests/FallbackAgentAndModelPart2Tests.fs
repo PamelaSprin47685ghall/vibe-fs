@@ -3,22 +3,27 @@ module Wanxiangshu.Tests.FallbackAgentAndModelPart2Tests
 open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Tests.Assert
-open Wanxiangshu.Kernel.Domain
+open Wanxiangshu.Kernel.Primitives.Identity
+open Wanxiangshu.Kernel.Errors.DomainError
+open Wanxiangshu.Kernel.Session.Causality
 open Wanxiangshu.Kernel.FallbackKernel.Types
 open Wanxiangshu.Kernel.HostTools
-open Wanxiangshu.Shell.FallbackRuntimeState
-open Wanxiangshu.Shell.ChildAgentRegistry
-open Wanxiangshu.Shell.ReviewRuntime
-open Wanxiangshu.Shell.RuntimeScope
-open Wanxiangshu.Opencode.BacklogSession
-open Wanxiangshu.Opencode.SessionLifecycleObserver
-open Wanxiangshu.Omp.FallbackHooks
-open Wanxiangshu.Opencode.FallbackHooks
-open Wanxiangshu.Shell.Dyn
+open Wanxiangshu.Runtime.Fallback.RuntimeStore
+open Wanxiangshu.Runtime.Fallback.GateTransitions
+open Wanxiangshu.Runtime.ChildAgentRegistry
+open Wanxiangshu.Runtime.ReviewRuntime
+open Wanxiangshu.Hosts.Omp.Fallback.ActionExecutor
+open Wanxiangshu.Hosts.Opencode.Fallback.ActionExecutor
+open Wanxiangshu.Runtime.RuntimeScope
+open Wanxiangshu.Hosts.Opencode.BacklogSession
+open Wanxiangshu.Hosts.Opencode.SessionLifecycleObserver
+open Wanxiangshu.Hosts.Omp.Fallback.Hook
+open Wanxiangshu.Hosts.Opencode.Fallback.Hook
+open Wanxiangshu.Runtime.Dyn
 
 let opencodeCaptureCurrentModelDecodesStringModelSpec () =
     promise {
-        let rt = FallbackRuntimeState()
+        let rt = FallbackRuntimeStore()
 
         let mockClient =
             createObj [ "session", box (createObj [ "model", box "openai/gpt-4o" ]) ]
@@ -32,21 +37,21 @@ let opencodeCaptureCurrentModelDecodesStringModelSpec () =
 
 let ompCaptureCurrentModelDecodesStringModelSpec () =
     promise {
-        let rt = FallbackRuntimeState()
+        let rt = FallbackRuntimeStore()
         let sid = "omp-string-model"
         let mockSession = createObj [ "model", box "anthropic/claude-3-5" ]
-        Wanxiangshu.Omp.ExecutorTools.ompScope.Add("omp_session_" + sid, mockSession)
+        Wanxiangshu.Hosts.Omp.ExecutorTools.ompScope.Add("omp_session_" + sid, mockSession)
         let executor = ompActionExecutor rt null
         let! modelOpt = executor.CaptureCurrentModel sid
         check "model is captured" modelOpt.IsSome
         equal "provider is anthropic" "anthropic" modelOpt.Value.ProviderID
         equal "modelId is claude-3-5" "claude-3-5" modelOpt.Value.ModelID
-        Wanxiangshu.Omp.ExecutorTools.ompScope.Remove("omp_session_" + sid)
+        Wanxiangshu.Hosts.Omp.ExecutorTools.ompScope.Remove("omp_session_" + sid)
     }
 
 let opencodeCaptureCurrentModelDecodesFromUserMessageSpec () =
     promise {
-        let rt = FallbackRuntimeState()
+        let rt = FallbackRuntimeStore()
 
         let mockClient =
             createObj
@@ -79,7 +84,7 @@ let opencodeCaptureCurrentModelDecodesFromUserMessageSpec () =
 
 let opencodeSessionStatusCapturesActiveModelSpec () =
     promise {
-        let rt = FallbackRuntimeState()
+        let rt = FallbackRuntimeStore()
         let sid = "session-status-model"
 
         let statusObj =
@@ -120,7 +125,7 @@ let opencodeSessionStatusCapturesActiveModelSpec () =
 
 let opencodeCaptureCurrentModelPrioritizesLatestUserMessageModelSpec () =
     promise {
-        let rt = FallbackRuntimeState()
+        let rt = FallbackRuntimeStore()
         let sid = "priority-user-model"
 
         rt.SetModel
@@ -165,7 +170,7 @@ let opencodeCaptureCurrentModelPrioritizesLatestUserMessageModelSpec () =
 
 let opencodeNewUserMessageResetsChainAndModelSpec () =
     promise {
-        let rt = FallbackRuntimeState()
+        let rt = FallbackRuntimeStore()
         let sid = "reset-chain-model"
 
         let testModel =
@@ -228,7 +233,7 @@ let opencodeNewUserMessageResetsChainAndModelSpec () =
 
 let opencodeCaptureCurrentModelPrioritizesSessionGetAsyncSpec () =
     promise {
-        let rt = FallbackRuntimeState()
+        let rt = FallbackRuntimeStore()
         let sid = "manual-model-async-priority"
 
         // Mock client: client.session.get({ sessionID }) returns { data: { model: "openai/gpt-4o" } }

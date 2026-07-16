@@ -1,8 +1,9 @@
 module Wanxiangshu.Tests.EventLogCodecTests
 
 open Wanxiangshu.Tests.Assert
-open Wanxiangshu.Kernel.EventLog.Types
-open Wanxiangshu.Shell.EventLogCodec
+open Wanxiangshu.Kernel.EventSourcing.EventEnvelope
+open Wanxiangshu.Kernel.EventSourcing.EventKind
+open Wanxiangshu.Runtime.EventLogCodec
 
 let roundtripLine () =
     let e =

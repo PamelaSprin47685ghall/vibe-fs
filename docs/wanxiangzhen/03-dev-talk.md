@@ -192,7 +192,7 @@
 
 ## 轮次 5：源码核实与技术修正
 
-撰写"事无巨细"PRD 前，对照 opencode 本体（`packages/opencode`、`packages/plugin`、`packages/sdk`）与 万象术（`src/Kernel`、`src/Shell`、`src/Opencode`）实际源码逐条核实 PRD 的技术假设。发现多处假设与真实 API 不符，逐一修正。本轮所有结论均有源码出处。
+撰写"事无巨细"PRD 前，对照 opencode 本体（`packages/opencode`、`packages/plugin`、`packages/sdk`）与 万象术（`src/Kernel`、`src/Runtime`、`src/Hosts/OpenCode`）实际源码逐条核实 PRD 的技术假设。发现多处假设与真实 API 不符，逐一修正。本轮所有结论均有源码出处。
 
 ### 核实 5.1：opencode 插件入口与 PluginInput 真实能力
 
@@ -213,7 +213,7 @@ type PluginInput = {
 type Plugin = (input: PluginInput, options?: PluginOptions) => Promise<Hooks>
 ```
 
-万象术 入口 `src/Opencode/Plugin.fs` 证实：`pluginFor (host) (ctx) : Promise<obj>` 返回 hook 字典，`ctx.client` 即 SDK client。
+万象术 入口 `src/Hosts/OpenCode/Plugin.fs` 证实：`pluginFor (host) (ctx) : Promise<obj>` 返回 hook 字典，`ctx.client` 即 SDK client。
 
 **结论**：
 - coordinator **仍需自起独立 HTTP server**（Node `http.createServer` + `listen(0)`）。opencode 的 `serverUrl` 是 Effect 架构的内部 server，无法挂自定义路由给 slave 调用。万象阵 的 server 与 opencode server 是两个独立 server，各司其职。
@@ -239,7 +239,7 @@ type Plugin = (input: PluginInput, options?: PluginOptions) => Promise<Hooks>
 
 源码 `packages/opencode/src/cli/cmd/run.ts:776` 证实 `client.session.command({ sessionID, command, arguments })` 可程序化触发 slash command。但 slash command 本质是用户输入路径（`command.execute.before` hook 拦截），**LLM 在对话中无法自己打 `/loop`**。
 
-万象术 `src/Opencode/CommandHooks.fs` 证实 `/loop` 的实现：拦截命令 → `reviewStore.activateReview` → 注入 `buildLoopMessage` 文本。而 `src/Opencode/MessageTransform.fs` + `src/Kernel/LoopMessages.fs:inferReviewTaskFromTexts` 证实：**任何带 `task:` frontmatter 锚点的消息**都会在 `messages.transform` 重放时被识别为 With-Review 激活——不依赖 slash command 本身。
+万象术 `src/Hosts/OpenCode/CommandHooks.fs` 证实 `/loop` 的实现：拦截命令 → `reviewStore.activateReview` → 注入 `buildLoopMessage` 文本。而 `src/Hosts/OpenCode/MessageTransform.fs` + `src/Kernel/LoopMessages.fs:inferReviewTaskFromTexts` 证实：**任何带 `task:` frontmatter 锚点的消息**都会在 `messages.transform` 重放时被识别为 With-Review 激活——不依赖 slash command 本身。
 
 **修正**：slave 进入 /loop 的两条可行路径，PRD 采用前者为主：
 - **路径主**：coordinator 构造 slave 初始 prompt 时，若检测到 万象术，直接把任务包成 万象术 的 `/loop` 输出格式（`task:` frontmatter + loopFooter），经 `opencode tui --prompt` 注入。slave LLM 自然进入 With-Review Mode，完成后调 `submit_review`。
@@ -276,8 +276,8 @@ type Plugin = (input: PluginInput, options?: PluginOptions) => Promise<Hooks>
 
 **修正**：
 - 万象阵 是独立插件，自带事件 codec，不复用 万象术 的标量解析器。
-- 万象阵 的事件 frontmatter 编解码放在 **Shell 层**（`src/Shell/Wanxiangzhen/EventCodec.fs`，模块 `SquadEventDisplayCodec`），但**仅用于可选展示**（`output.parts` / 诊断文本），不参与 durable 重放。
-- durable 编解码走 `src/Shell/Wanxiangzhen/SquadEventWanCodec.fs`（`SquadEvent ↔ WanEvent`，payload 字段含 `tasksJson`），NDJSON 行格式为 `v/session/kind/at/payload`。
+- 万象阵 的事件 frontmatter 编解码放在 **Shell 层**（`src/Runtime/Wanxiangzhen/EventCodec.fs`，模块 `SquadEventDisplayCodec`），但**仅用于可选展示**（`output.parts` / 诊断文本），不参与 durable 重放。
+- durable 编解码走 `src/Runtime/Wanxiangzhen/SquadEventWanCodec.fs`（`SquadEvent ↔ WanEvent`，payload 字段含 `tasksJson`），NDJSON 行格式为 `v/session/kind/at/payload`。
 - `depends_on` 在 durable payload 里以 JSON 字符串编码（`tasksJson`），不依赖 YAML 序列解析。
 
 ### 核实 5.6：opencode tui --prompt 解决 slave 自动开工（决策选 B 的落地）

@@ -1,0 +1,160 @@
+module Wanxiangshu.Runtime.ReviewRuntime
+
+open Wanxiangshu.Kernel.ReviewSession
+open Wanxiangshu.Kernel.ReviewSession.Types
+open Wanxiangshu.Runtime.Clock
+
+/// The full host-facing review store: pure registry kernel plus effect side-table.
+type ReviewStore =
+    abstract member applyReviewTaskProjection: sessionID: string * task: string option -> unit
+    abstract member clearReviewSessions: unit -> unit
+    abstract member tryLockReview: sessionID: string -> bool
+    abstract member unlockReview: sessionID: string -> unit
+    abstract member setPendingReview: sessionID: string * resolve: (ReviewResult -> unit) -> unit
+    abstract member setAbortSuppressor: sessionID: string * suppress: (unit -> unit) -> unit
+    abstract member getPendingReviewIds: unit -> string list
+    abstract member getActiveSessionIds: unit -> string list
+    abstract member resolvePendingReview: sessionID: string * result: ReviewResult -> bool
+    abstract member getReviewTask: sessionID: string -> string option
+    abstract member getReviewState: sessionID: string -> ReviewState option
+    abstract member addChild: parentID: string * childID: string -> unit
+
+/// Single atomic state cell: the pure registry projection plus the effect
+/// side-table fold together so every store method is one `state <- { ... }`
+/// transition, eliminating the prior split `mutable registry`/`mutable effects`
+/// pair that could interleave mid-update.
+type private ReviewStoreState =
+    { Registry: Registry
+      Effects: SessionEffects }
+
+let createReviewStore () : ReviewStore =
+    let mutable state: ReviewStoreState =
+        { Registry = emptyRegistry
+          Effects = emptyEffects }
+
+    let allDescendantIds sessionId =
+        let rec collect id =
+            match Map.tryFind id state.Registry with
+            | None -> [ id ]
+            | Some session -> id :: (session.childIds |> List.collect collect)
+
+        collect sessionId
+
+    let applyTaskProjection sessionID task =
+        if sessionID = "" then
+            ()
+        else
+            let normalizedTask =
+                task
+                |> Option.bind (fun value ->
+                    if System.String.IsNullOrWhiteSpace value then
+                        None
+                    else
+                        Some value)
+
+            match normalizedTask with
+            | Some nextTask ->
+                if
+                    taskOf state.Registry sessionID <> Some nextTask
+                    || stateOf state.Registry sessionID |> Option.isNone
+                then
+                    if stateOf state.Registry sessionID |> Option.isSome then
+                        let nextEffects = disposeSessionTree state.Effects [ sessionID ]
+
+                        state <-
+                            { state with
+                                Effects = nextEffects
+                                Registry = reduce state.Registry (RegistryAction.Deactivate sessionID) }
+
+                    state <-
+                        { state with
+                            Registry =
+                                reduce state.Registry (RegistryAction.Activate(sessionID, nextTask, getTimestampMs ())) }
+            | None ->
+                if stateOf state.Registry sessionID |> Option.isSome then
+                    let nextEffects = disposeSessionTree state.Effects [ sessionID ]
+
+                    state <-
+                        { state with
+                            Effects = nextEffects
+                            Registry = reduce state.Registry (RegistryAction.Deactivate sessionID) }
+
+    { new ReviewStore with
+        member _.applyReviewTaskProjection(sessionID, task) = applyTaskProjection sessionID task
+
+        member _.clearReviewSessions() =
+            let nextEffects =
+                disposeSessionTree state.Effects (Map.keys state.Effects.pendingResolutions |> List.ofSeq)
+
+            state <-
+                { state with
+                    Effects = nextEffects
+                    Registry = emptyRegistry }
+
+        member _.tryLockReview(sessionID) =
+            if not (canTransition state.Registry sessionID (ReviewCommand.Lock sessionID)) then
+                false
+            else
+                state <-
+                    { state with
+                        Registry = reduce state.Registry (RegistryAction.Lock(sessionID, sessionID)) }
+
+                true
+
+        member _.unlockReview(sessionID) =
+            state <-
+                { state with
+                    Registry = reduce state.Registry (RegistryAction.Unlock sessionID) }
+
+        member _.setPendingReview(sessionID, resolve) =
+            state <-
+                { state with
+                    Effects = setPending state.Effects sessionID resolve }
+
+        member _.setAbortSuppressor(sessionID, suppress) =
+            state <-
+                { state with
+                    Effects =
+                        { state.Effects with
+                            abortSuppressors = Map.add sessionID suppress state.Effects.abortSuppressors } }
+
+        member _.resolvePendingReview(sessionID, result) =
+            let targetID =
+                if Map.containsKey sessionID state.Effects.pendingResolutions then
+                    sessionID
+                else
+                    let descendants = allDescendantIds sessionID
+
+                    descendants
+                    |> List.tryFind (fun id -> Map.containsKey id state.Effects.pendingResolutions)
+                    |> Option.defaultValue sessionID
+
+            let nextRegistry = reduce state.Registry (actionFor targetID result)
+            let nextEffects, fired = resolvePending state.Effects targetID result
+
+            state <-
+                { state with
+                    Registry = nextRegistry
+                    Effects = nextEffects }
+
+            fired
+
+        member _.getReviewTask(sessionID) = taskOf state.Registry sessionID
+        member _.getReviewState(sessionID) = stateOf state.Registry sessionID
+
+        member _.addChild(parentID, childID) =
+            state <-
+                { state with
+                    Registry = reduce state.Registry (RegistryAction.AddChild(parentID, childID)) }
+
+        member _.getPendingReviewIds() =
+            Map.keys state.Effects.pendingResolutions |> List.ofSeq
+
+        member _.getActiveSessionIds() =
+            state.Registry
+            |> Map.filter (fun _ s -> Wanxiangshu.Kernel.ReviewSession.StateMachine.isActive s.state)
+            |> Map.keys
+            |> List.ofSeq }
+
+let syncReviewProjection (store: ReviewStore) (sessionID: string) (task: string option) : unit =
+    store.applyReviewTaskProjection (sessionID, task)

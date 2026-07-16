@@ -2,7 +2,7 @@ module Wanxiangshu.Tests.FallbackHooksHelperAgentModelTests
 
 open Fable.Core
 open Fable.Core.JsInterop
-open Wanxiangshu.Opencode.FallbackHooksHelper
+open Wanxiangshu.Hosts.Opencode.Fallback.HostEventInspection
 open Wanxiangshu.Tests.Assert
 
 /// Mock client shaped like a real OpenCode SDK client's config sub-API:

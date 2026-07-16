@@ -5,9 +5,9 @@ open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Kernel.HostTools
 open Wanxiangshu.Kernel.Messaging
 open Wanxiangshu.Kernel.ContextBudget
-open Wanxiangshu.Shell
-open Wanxiangshu.Shell.MessageTransformCore
-open Wanxiangshu.Shell.MessageTransformPipeline
+open Wanxiangshu.Runtime
+open Wanxiangshu.Runtime.MessageTransform.Plan
+open Wanxiangshu.Runtime.MessageTransform.Pipeline
 
 let spec_applyContextBudget_injectsNudge () =
     promise {

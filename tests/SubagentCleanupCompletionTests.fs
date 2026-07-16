@@ -3,14 +3,15 @@ module Wanxiangshu.Tests.SubagentCleanupCompletionTests
 open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Tests.Assert
-open Wanxiangshu.Shell.ChildAgentRegistry
-open Wanxiangshu.Shell.FallbackRuntimeState
-open Wanxiangshu.Shell.SubsessionActorRegistry
-open Wanxiangshu.Opencode.SubagentIo
+open Wanxiangshu.Runtime.ChildAgentRegistry
+open Wanxiangshu.Runtime.Fallback.RuntimeStore
+open Wanxiangshu.Runtime.Fallback.GateTransitions
+open Wanxiangshu.Runtime.SubsessionActorRegistry
+open Wanxiangshu.Hosts.Opencode.SubagentIo
 open Wanxiangshu.Tests.TempWorkspace
 open Wanxiangshu.Kernel.Subsession.Types
 
-module Dyn = Wanxiangshu.Shell.Dyn
+module Dyn = Wanxiangshu.Runtime.Dyn
 
 let private makePromptMock (promptCalled: bool ref) (promptNonce: string ref) childId workspaceDir expectedText =
     box (
@@ -30,7 +31,9 @@ let private makePromptMock (promptCalled: bool ref) (promptNonce: string ref) ch
                 if promptNonce.Value <> "" then
                     let receipt = UserMessageObserved(childId + "-msg")
 
-                    Wanxiangshu.Opencode.SubsessionHostAdapter.PendingTurnReceipt.tryResolve promptNonce.Value receipt
+                    Wanxiangshu.Hosts.Opencode.SubsessionDispatch.PendingTurnReceipt.tryResolve
+                        promptNonce.Value
+                        receipt
                     |> ignore
 
                     JS.setTimeout
@@ -115,7 +118,7 @@ let executeOpencodeCleanupSuccessAfterRealCompletionSpec () =
     promise {
         let! workspaceDir = mkdtempAsync "opencode-cleanup-real-completion-"
         let registry = ChildAgentRegistry.Create()
-        let runtime = FallbackRuntimeState()
+        let runtime = FallbackRuntimeStore()
         let deleted = ref false
         let promptCalled = ref false
         let promptNonce = ref ""

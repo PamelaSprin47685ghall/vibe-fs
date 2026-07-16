@@ -3,16 +3,17 @@ module Wanxiangshu.E2e.OpencodePluginContinueRecoveryTests
 open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.E2e.OpencodePluginTestsPart2
-open Wanxiangshu.Kernel.ToolOutputInfo
+open Wanxiangshu.Runtime.ToolOutputInfo
 open Wanxiangshu.Kernel.ToolOutputInfoTypes
 open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Tests.AsyncFlush
 open Wanxiangshu.Kernel.FallbackKernel.Types
-open Wanxiangshu.Shell.FallbackRuntimeState
+open Wanxiangshu.Runtime.Fallback.RuntimeStore
+open Wanxiangshu.Runtime.Fallback.GateTransitions
 
-module Dyn = Wanxiangshu.Shell.Dyn
+module Dyn = Wanxiangshu.Runtime.Dyn
 
-open Wanxiangshu.Kernel.PromptFrontMatter
+open Wanxiangshu.Runtime.PromptFrontMatter
 
 let private deferred (name: string) : JS.Promise<unit> * (unit -> unit) =
     let resolver = ref (fun () -> ())
@@ -79,7 +80,7 @@ let run
                   box (fun _ ->
                       let isComplete =
                           if not (Dyn.isNullish runtimeRef.Value) then
-                              let rt: FallbackRuntimeState = unbox runtimeRef.Value
+                              let rt: FallbackRuntimeStore = unbox runtimeRef.Value
                               rt.GetOrCreateState(childID).Lifecycle = FallbackLifecycle.TaskComplete
                           else
                               false

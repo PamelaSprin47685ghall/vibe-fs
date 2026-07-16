@@ -3,15 +3,16 @@ module Wanxiangshu.Tests.ShellTests
 open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Tests.Assert
-open Wanxiangshu.Shell.ExecutorSpawn
+open Wanxiangshu.Runtime.ExecutorSpawn
 open Wanxiangshu.Tests.TempWorkspace
 open Wanxiangshu.Kernel.Executor
-open Wanxiangshu.Kernel.ToolOutputInfo
-open Wanxiangshu.Kernel.SubagentPrompts
-open Wanxiangshu.Kernel.SearchPrompts
-open Wanxiangshu.Shell
-open Wanxiangshu.Shell.Dyn
-open Wanxiangshu.Kernel.PromptFrontMatter
+open Wanxiangshu.Runtime.ExecutorFormat
+open Wanxiangshu.Runtime.ToolOutputInfo
+open Wanxiangshu.Runtime.SubagentPrompts
+open Wanxiangshu.Runtime.SearchPrompts
+open Wanxiangshu.Runtime
+open Wanxiangshu.Runtime.Dyn
+open Wanxiangshu.Runtime.PromptFrontMatter
 
 [<Import("createRequire", "node:module")>]
 let private createRequire': string -> (string -> obj) = jsNative
@@ -23,19 +24,21 @@ let private requireFn: string -> obj = createRequire' (string importMeta?url)
 let private pathModule: obj = requireFn "path"
 
 let webApiFetchInit () =
-    let init = Wanxiangshu.Shell.WebSearchApi.postInit "KEY123" "{\"a\":1}" None
-    equal "init method POST" "POST" (Wanxiangshu.Shell.Dyn.str init "method")
-    let headers = Wanxiangshu.Shell.Dyn.get init "headers"
-    equal "init Content-Type" "application/json" (Wanxiangshu.Shell.Dyn.str headers "Content-Type")
-    let auth = Wanxiangshu.Shell.Dyn.str headers "Authorization"
+    let init = Wanxiangshu.Runtime.WebSearchApi.postInit "KEY123" "{\"a\":1}" None
+    equal "init method POST" "POST" (Wanxiangshu.Runtime.Dyn.str init "method")
+    let headers = Wanxiangshu.Runtime.Dyn.get init "headers"
+    equal "init Content-Type" "application/json" (Wanxiangshu.Runtime.Dyn.str headers "Content-Type")
+    let auth = Wanxiangshu.Runtime.Dyn.str headers "Authorization"
     check "init Authorization key" (auth.Contains "KEY123")
-    equal "init body json" "{\"a\":1}" (Wanxiangshu.Shell.Dyn.str init "body")
-    check "init no signal when None" (Wanxiangshu.Shell.Dyn.isNullish (Wanxiangshu.Shell.Dyn.get init "signal"))
-    let withSignal = Wanxiangshu.Shell.WebSearchApi.postInit "K" "b" (Some(box "ABORT"))
+    equal "init body json" "{\"a\":1}" (Wanxiangshu.Runtime.Dyn.str init "body")
+    check "init no signal when None" (Wanxiangshu.Runtime.Dyn.isNullish (Wanxiangshu.Runtime.Dyn.get init "signal"))
+
+    let withSignal =
+        Wanxiangshu.Runtime.WebSearchApi.postInit "K" "b" (Some(box "ABORT"))
 
     check
         "init signal when Some"
-        (not (Wanxiangshu.Shell.Dyn.isNullish (Wanxiangshu.Shell.Dyn.get withSignal "signal")))
+        (not (Wanxiangshu.Runtime.Dyn.isNullish (Wanxiangshu.Runtime.Dyn.get withSignal "signal")))
 
 let webApiResponseMethodCall () =
     let response =
@@ -46,23 +49,23 @@ let webApiResponseMethodCall () =
     equal
         "response.text() invoked"
         "body"
-        (unbox<string> (Wanxiangshu.Shell.WebSearchApi.responseMethod0 response "text"))
+        (unbox<string> (Wanxiangshu.Runtime.WebSearchApi.responseMethod0 response "text"))
 
-    let json = Wanxiangshu.Shell.WebSearchApi.responseMethod0 response "json"
-    equal "response.json() invoked" "yes" (Wanxiangshu.Shell.Dyn.str json "ok")
+    let json = Wanxiangshu.Runtime.WebSearchApi.responseMethod0 response "json"
+    equal "response.json() invoked" "yes" (Wanxiangshu.Runtime.Dyn.str json "ok")
 
 let webApiKeyValidation () =
-    equal "requireWebApiKey trims" (Ok "KEY123") (Wanxiangshu.Shell.WebSearchApi.requireWebApiKey "  KEY123  ")
+    equal "requireWebApiKey trims" (Ok "KEY123") (Wanxiangshu.Runtime.WebSearchApi.requireWebApiKey "  KEY123  ")
 
     equal
         "requireWebApiKey rejects missing"
         (Error "Missing OLLAMA_API_KEY environment variable.")
-        (Wanxiangshu.Shell.WebSearchApi.requireWebApiKey "")
+        (Wanxiangshu.Runtime.WebSearchApi.requireWebApiKey "")
 
     equal
         "requireWebApiKey rejects empty"
         (Error "Missing OLLAMA_API_KEY environment variable.")
-        (Wanxiangshu.Shell.WebSearchApi.requireWebApiKey "   ")
+        (Wanxiangshu.Runtime.WebSearchApi.requireWebApiKey "   ")
 
 let executorMapping () =
     let opts: ExecuteOptions =
@@ -76,7 +79,7 @@ let executorMapping () =
           maxBytes = 8192 }
 
     let run o =
-        Wanxiangshu.Shell.Executor.mapOutcome opts 10000 "out" o
+        Wanxiangshu.Runtime.Executor.mapOutcome opts 10000 "out" o
 
     check
         "exit0→Completed"
@@ -104,20 +107,20 @@ let executorMapping () =
 
     check
         "spawnFail→MissingExecutable"
-        (match run (SpawnFailed(Wanxiangshu.Kernel.Domain.ExecutorExecutableMissing "bash")) with
+        (match run (SpawnFailed(Wanxiangshu.Kernel.Errors.DomainError.ExecutorExecutableMissing "bash")) with
          | MissingExecutable("bash", _) -> true
          | _ -> false)
 
     check
         "spawnFail(other)→Failed"
-        (match run (SpawnFailed(Wanxiangshu.Kernel.Domain.SystemPanic "boom")) with
+        (match run (SpawnFailed(Wanxiangshu.Kernel.Errors.DomainError.SystemPanic "boom")) with
          | Failed _ -> true
          | _ -> false)
 
-    equal "python exe uvx" "uvx" (Wanxiangshu.Shell.Executor.missingExecutableFor Python)
+    equal "python exe uvx" "uvx" (Wanxiangshu.Runtime.Executor.missingExecutableFor Python)
 
 let capsFileShape () =
-    let f: Wanxiangshu.Kernel.CapsFormat.CapsFile =
+    let f: Wanxiangshu.Runtime.CapsFormat.CapsFile =
         { filePath = "/abs/HERE.md"
           label = "HERE.md"
           content = "x" }
@@ -126,7 +129,7 @@ let capsFileShape () =
     equal "capsFile label" "HERE.md" f.label
 
 let capsFileSizeLimit () =
-    equal "caps file size limit 4MB" (4 * 1_048_576) Wanxiangshu.Shell.WorkspaceFiles.maxFileSize
+    equal "caps file size limit 4MB" (4 * 1_048_576) Wanxiangshu.Runtime.WorkspaceFiles.maxFileSize
 
 let stripHeadTailPipesOutsideQuotes () =
     let r = strip "cat f | head -n 5"
@@ -144,7 +147,7 @@ let readDirectoryListing () =
         do! writeFileAsync filePath "hello"
         let fsAsync: obj = get (requireFn "fs") "promises"
         do! unbox<JS.Promise<unit>> (fsAsync?mkdir (nestedDir))
-        let! listing = Wanxiangshu.Shell.FileSys.read None workspaceDir None None
+        let! listing = Wanxiangshu.Runtime.FileSys.read None workspaceDir None None
         check "directory listing contains file" (listing.Contains "note.txt")
         check "directory listing contains directory" (listing.Contains "nested")
         check "directory listing has total header" (listing.Contains "total 2")
@@ -156,7 +159,7 @@ let ensureJavascriptProjectRepairsModuleType () =
         let! projectDir = mkdtempAsync "executor-js-project-"
         let packageJsonPath = unbox<string> (pathModule?join (projectDir, "package.json"))
         do! writeFileAsync packageJsonPath "{\n  \"dependencies\": {\n    \"tsx\": \"*\"\n  }\n}\n"
-        do! Wanxiangshu.Shell.ExecutorJavascript.ensureJavascriptProject projectDir []
+        do! Wanxiangshu.Runtime.ExecutorJavascript.ensureJavascriptProject projectDir []
         let fsAsync: obj = get (requireFn "fs") "promises"
         let! packageJson = unbox<JS.Promise<string>> (fsAsync?readFile (packageJsonPath, "utf-8"))
         check "ensureJavascriptProject writes type module" (packageJson.Contains "\"type\": \"module\"")
@@ -176,7 +179,7 @@ let rewriteJavascriptRelativeImports () =
             ()
         else
             let program = "import { x } from \"./foo.js\";\nconsole.log(x);\n"
-            let! rewritten = Wanxiangshu.Shell.ExecutorJavascript.rewriteJavascriptModuleSpecifiers program "/abs/cwd"
+            let! rewritten = Wanxiangshu.Runtime.ExecutorJavascript.rewriteJavascriptModuleSpecifiers program "/abs/cwd"
             check "relative import rewritten to file URL" (rewritten.Contains "file:///")
             check "relative specifier consumed" (not (rewritten.Contains "\"./foo.js\""))
             check "non-relative body preserved" (rewritten.Contains "console.log(x)")

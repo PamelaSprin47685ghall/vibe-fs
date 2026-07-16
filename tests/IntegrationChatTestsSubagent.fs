@@ -1,13 +1,15 @@
 module Wanxiangshu.Tests.IntegrationChatTestsSubagent
 
+open Wanxiangshu.Runtime.Fallback.RuntimeStore
+
 open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Tests.TempWorkspace
-open Wanxiangshu.Opencode.Plugin
-open Wanxiangshu.Shell.ChildAgentRegistry
-open Wanxiangshu.Opencode.SessionIo
-open Wanxiangshu.Shell.Dyn
+open Wanxiangshu.Hosts.Opencode.Plugin
+open Wanxiangshu.Runtime.ChildAgentRegistry
+open Wanxiangshu.Hosts.Opencode.SessionIo
+open Wanxiangshu.Runtime.Dyn
 
 let websearchBoundariesSpec () =
     promise {
@@ -79,7 +81,7 @@ let subagentParentAlreadyAbortedSpec () =
 
         let! result =
             runSubagent
-                (Wanxiangshu.Shell.FallbackRuntimeState.FallbackRuntimeState())
+                (FallbackRuntimeStore())
                 registry
                 mockClient
                 "investigator"

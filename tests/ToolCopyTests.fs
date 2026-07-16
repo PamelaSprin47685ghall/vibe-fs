@@ -2,7 +2,9 @@ module Wanxiangshu.Tests.ToolCopyTests
 
 open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Kernel.ToolCopy
-open Wanxiangshu.Kernel.Domain
+open Wanxiangshu.Kernel.Primitives.Identity
+open Wanxiangshu.Kernel.Errors.DomainError
+open Wanxiangshu.Kernel.Session.Causality
 
 let muxToolRequiresWorkspaceIdX () =
     equal "muxToolRequiresWorkspaceId x" "x requires workspaceId" (muxToolRequiresWorkspaceId "x")

@@ -5,8 +5,8 @@ open Fable.Core.JsInterop
 open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Tests.AsyncFlush
 open Wanxiangshu.Tests.TempWorkspace
-open Wanxiangshu.Opencode.Plugin
-open Wanxiangshu.Shell.Dyn
+open Wanxiangshu.Hosts.Opencode.Plugin
+open Wanxiangshu.Runtime.Dyn
 
 let sessionInterruptedEventSpec () =
     promise {

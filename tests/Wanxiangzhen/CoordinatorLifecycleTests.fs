@@ -5,13 +5,13 @@ open Fable.Core.JsInterop
 open Wanxiangshu.Kernel.Wanxiangzhen.SquadTask
 open Wanxiangshu.Kernel.Wanxiangzhen.Dag
 open Wanxiangshu.Kernel.Wanxiangzhen.SquadEvent
-open Wanxiangshu.Shell.Dyn
-open Wanxiangshu.Shell.Wanxiangzhen.CoordinatorRuntime
-open Wanxiangshu.Shell.PromiseQueue
-open Wanxiangshu.Shell.Wanxiangzhen.CoordinatorLifecycle
-open Wanxiangshu.Shell.Wanxiangzhen.CoordinatorReplay
-open Wanxiangshu.Shell.Wanxiangzhen.CoordinatorSquadUpdate
-open Wanxiangshu.Shell.Wanxiangzhen.SquadEventWanCodec
+open Wanxiangshu.Runtime.Dyn
+open Wanxiangshu.Runtime.Wanxiangzhen.CoordinatorRuntime
+open Wanxiangshu.Runtime.PromiseQueue
+open Wanxiangshu.Runtime.Wanxiangzhen.CoordinatorLifecycle
+open Wanxiangshu.Runtime.Wanxiangzhen.CoordinatorReplay
+open Wanxiangshu.Runtime.Wanxiangzhen.CoordinatorSquadUpdate
+open Wanxiangshu.Runtime.Wanxiangzhen.SquadEventWanCodec
 open Wanxiangshu.Tests.Wanxiangzhen.AssertCompat
 open Wanxiangshu.Tests.Wanxiangzhen.TestFixtures
 

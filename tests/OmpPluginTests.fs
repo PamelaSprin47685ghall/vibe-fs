@@ -4,17 +4,17 @@ open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Tests.OmpPluginTestsHarness
-open Wanxiangshu.Omp.Plugin
+open Wanxiangshu.Hosts.Omp.Plugin
 open Wanxiangshu.Kernel.FuzzyQuery
-open Wanxiangshu.Omp.Codec
-open Wanxiangshu.Omp.MessagingCodec
+open Wanxiangshu.Hosts.Omp.Codec
+open Wanxiangshu.Hosts.Omp.MessagingCodec
 open Wanxiangshu.Kernel.OmpSessionTools
-open Wanxiangshu.Kernel.ReviewPrompts
-open Wanxiangshu.Kernel.SubagentPrompts
+open Wanxiangshu.Runtime.ReviewPrompts
+open Wanxiangshu.Runtime.SubagentPrompts
 open Wanxiangshu.Kernel.SubagentIntents
-open Wanxiangshu.Shell.Dyn
+open Wanxiangshu.Runtime.Dyn
 
-module Dyn = Wanxiangshu.Shell.Dyn
+module Dyn = Wanxiangshu.Runtime.Dyn
 
 let registersCoreToolsIdempotent () =
     promise {

@@ -1,7 +1,7 @@
 module Wanxiangshu.Tests.OpencodeSubsessionHostAdapterModelTests
 
 open Wanxiangshu.Kernel.FallbackKernel.Types
-open Wanxiangshu.Opencode.SubsessionHostAdapter
+open Wanxiangshu.Hosts.Opencode.SubsessionHostAdapter
 open Wanxiangshu.Tests.Assert
 
 let private model0: FallbackModel =

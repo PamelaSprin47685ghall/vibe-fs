@@ -4,9 +4,9 @@ open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Kernel.OmpSessionTools
-open Wanxiangshu.Shell.RunnerBackground
-open Wanxiangshu.Shell.SessionExecutor
-open Wanxiangshu.Shell.RuntimeScope
+open Wanxiangshu.Runtime.RunnerBackground
+open Wanxiangshu.Runtime.SessionExecutor
+open Wanxiangshu.Runtime.RuntimeScope
 
 let waitRunnerJobAfterAppendLog () =
     promise {

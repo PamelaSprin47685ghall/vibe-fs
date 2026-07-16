@@ -1,9 +1,9 @@
 module Wanxiangshu.Tests.MethodologyRegistryTests
 
 open Wanxiangshu.Tests.Assert
-open Wanxiangshu.Methodology.SchemaCommon
-open Wanxiangshu.Methodology
-open Wanxiangshu.Methodology.Registry
+open Wanxiangshu.Kernel.Methodology.Schema
+open Wanxiangshu.Kernel.Methodology
+open Wanxiangshu.Kernel.Methodology.Registry
 
 let allEntriesCountIs54 () =
     equal "count" 54 allEntries.Value.Length

@@ -1,7 +1,7 @@
 module Wanxiangshu.Tests.NudgeSnapshotSourceTests
 
 open Wanxiangshu.Tests.Assert
-open Wanxiangshu.Kernel.EventLog.ReviewLoopFold
+open Wanxiangshu.Kernel.Review.ReviewLoopFold
 open Wanxiangshu.Kernel.Nudge.NudgeSnapshotSource
 open Wanxiangshu.Kernel.Nudge.Types
 

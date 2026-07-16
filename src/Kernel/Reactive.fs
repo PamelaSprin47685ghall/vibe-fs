@@ -1,7 +1,7 @@
 module Wanxiangshu.Kernel.Reactive
 
 // ──────────────────────────────────────────────
-//  Phase 5: Reactive Edges — Dual-Track
+//  Reactive Edges — Dual-Track
 //  Observable Interfaces
 //
 //  REF.md §4.3 "Reactive Edges":

@@ -4,10 +4,10 @@ open Fable.Core
 open Fable.Core.JsInterop
 open System
 open Wanxiangshu.Tests.Assert
-open Wanxiangshu.Shell.FuzzySearchHelpers
-open Wanxiangshu.Shell.FuzzySearchFind
-open Wanxiangshu.Shell.FuzzySearchGrep
-open Wanxiangshu.Shell.FuzzyIteratorStore
+open Wanxiangshu.Runtime.FuzzySearchSupport
+open Wanxiangshu.Runtime.FuzzySearchFind
+open Wanxiangshu.Runtime.FuzzySearchGrep
+open Wanxiangshu.Runtime.FuzzyIteratorStore
 open Wanxiangshu.Kernel.FuzzyQuery
 
 // ── Shell.FuzzySearchHelpers ───────────────────────────────────────────────

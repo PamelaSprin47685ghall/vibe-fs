@@ -2,8 +2,10 @@ module Wanxiangshu.Tests.FuzzyToolsCodecTests
 
 open Fable.Core.JsInterop
 open Wanxiangshu.Tests.Assert
-open Wanxiangshu.Kernel.Domain
-open Wanxiangshu.Shell.FuzzyToolsCodec
+open Wanxiangshu.Kernel.Primitives.Identity
+open Wanxiangshu.Kernel.Errors.DomainError
+open Wanxiangshu.Kernel.Session.Causality
+open Wanxiangshu.Runtime.FuzzyToolsCodec
 
 let private okFind args =
     match decodeFuzzyFindArgs args with

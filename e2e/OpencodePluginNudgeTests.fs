@@ -7,8 +7,8 @@ open Wanxiangshu.Tests.AsyncFlush
 open Wanxiangshu.E2e.OpencodePluginTestsPart2
 open Wanxiangshu.E2e.OpencodePluginContinueRecoveryTests
 
-module Dyn = Wanxiangshu.Shell.Dyn
-open Wanxiangshu.Shell.Dyn
+module Dyn = Wanxiangshu.Runtime.Dyn
+open Wanxiangshu.Runtime.Dyn
 
 let private deferred (name: string) : JS.Promise<unit> * (unit -> unit) =
     let resolver = ref (fun () -> ())

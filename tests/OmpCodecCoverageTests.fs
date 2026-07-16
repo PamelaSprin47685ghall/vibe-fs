@@ -6,12 +6,12 @@ open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Tests.OmpPluginTestsHarness
 open Wanxiangshu.Kernel.Messaging
 open Wanxiangshu.Kernel.ToolExecutionStatusModule
-open Wanxiangshu.Omp.MessagingCodec
-open Wanxiangshu.Omp.Codec
-open Wanxiangshu.Omp.MessagingCodecEncode
-open Wanxiangshu.Shell.Dyn
+open Wanxiangshu.Hosts.Omp.MessagingCodec
+open Wanxiangshu.Hosts.Omp.Codec
+open Wanxiangshu.Hosts.Omp.MessagingCodecEncode
+open Wanxiangshu.Runtime.Dyn
 
-module Dyn = Wanxiangshu.Shell.Dyn
+module Dyn = Wanxiangshu.Runtime.Dyn
 
 let mi () : MessageInfo<obj> =
     { id = "m1"

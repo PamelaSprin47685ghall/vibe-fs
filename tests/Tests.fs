@@ -103,10 +103,10 @@ open Wanxiangshu.Tests.FlowKernelTests
 open Wanxiangshu.Tests.ReactiveTests
 open Wanxiangshu.Tests.ResourcePlanTests
 open Wanxiangshu.Tests.SessionOverviewTests
-open Wanxiangshu.Omp
-open Wanxiangshu.Omp.Plugin
-open Wanxiangshu.Omp.PluginCore
-open Wanxiangshu.Shell
+open Wanxiangshu.Hosts.Omp
+open Wanxiangshu.Hosts.Omp.Plugin
+open Wanxiangshu.Hosts.Omp.PluginComposition
+open Wanxiangshu.Runtime
 
 [<Import("appendFileSync", "node:fs")>]
 let private appendFile (path: string) (content: string) (encoding: string) : unit = jsNative
@@ -185,7 +185,7 @@ let runAll (args: string array) : JS.Promise<int> =
         Assert.setSilent false
         let selectors = args
         initVerboseLog ()
-        PluginCore.reviewStore.clearReviewSessions ()
+        PluginComposition.reviewStore.clearReviewSessions ()
         RunnerBackground.clearRunnerLogsForTest ExecutorTools.ompScope
 
         let runnableTests = selectedTests selectors
@@ -197,7 +197,6 @@ let runAll (args: string array) : JS.Promise<int> =
             let isIntegrationSuiteRun (label: string) =
                 (label.StartsWith "Integration" && label.EndsWith ".run")
                 || (label = "OmpExecutorToolsTests.run")
-                || (label = "ExecutorTests.run")
 
             for (label, body) in runnableTests do
                 match body with

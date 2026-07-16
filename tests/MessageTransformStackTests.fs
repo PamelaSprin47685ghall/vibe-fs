@@ -6,13 +6,14 @@ open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Kernel.MessageTransformPolicy
 open Wanxiangshu.Kernel.HostTools
 open Wanxiangshu.Kernel.Messaging
-open Wanxiangshu.Kernel.CapsFormat
-open Wanxiangshu.Kernel.BacklogProjectionCore
-open Wanxiangshu.Shell.MessageTransformCore
-open Wanxiangshu.Shell.MessageTransformPipeline
-open Wanxiangshu.Shell.MessageTransformHostEntry
-open Wanxiangshu.Shell.MessageTransformStack
-open Wanxiangshu.Shell.ReviewRuntime
+open Wanxiangshu.Runtime.CapsFormat
+open Wanxiangshu.Runtime.BacklogProjectionBuild
+open Wanxiangshu.Kernel.Backlog.BacklogTypes
+open Wanxiangshu.Runtime.MessageTransform.Plan
+open Wanxiangshu.Runtime.MessageTransform.Pipeline
+open Wanxiangshu.Runtime.MessageTransform.HostEntry
+open Wanxiangshu.Runtime.MessageTransform.Stack
+open Wanxiangshu.Runtime.ReviewRuntime
 
 /// Invariant 1: "caps 建过一次后引用不变" — the CapsSlot stores the encoded
 /// caps prefix on first build and every subsequent turn in the same
@@ -20,7 +21,7 @@ open Wanxiangshu.Shell.ReviewRuntime
 let capsBuiltOnceReferenceStable () =
     promise {
         let reviewStore = createReviewStore ()
-        let scope = Wanxiangshu.Shell.RuntimeScope.create ()
+        let scope = Wanxiangshu.Runtime.RuntimeScope.create ()
 
         let capsObj =
             box (
@@ -122,7 +123,7 @@ let capsBuiltOnceReferenceStable () =
 let backlogSlotSegmentReuseWhenCountStable () =
     promise {
         let reviewStore = createReviewStore ()
-        let scope = Wanxiangshu.Shell.RuntimeScope.create ()
+        let scope = Wanxiangshu.Runtime.RuntimeScope.create ()
 
         // Mutable backlog that we control to simulate count changes
         let currentBacklog = ref []

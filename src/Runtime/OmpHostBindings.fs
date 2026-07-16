@@ -1,0 +1,18 @@
+module Wanxiangshu.Runtime.OmpHostBindings
+
+open Fable.Core
+open Wanxiangshu.Runtime.Dyn
+
+let getCreateAgentSession (pi: obj) : obj =
+    Dyn.get (Dyn.get pi "pi") "createAgentSession"
+
+let createSessionManager (sessionManagerType: obj) (cwd: string) : obj =
+    Dyn.call1 (Dyn.get sessionManagerType "create") (box cwd)
+
+let sessionPrompt (session: obj) (prompt: string) : JS.Promise<unit> =
+    unbox<JS.Promise<unit>> (Dyn.callMethod1 session "prompt" (box prompt))
+
+let sessionWaitForIdle (session: obj) : JS.Promise<unit> =
+    unbox<JS.Promise<unit>> (Dyn.callMethod0 session "waitForIdle")
+
+let sessionAbort (session: obj) : obj = Dyn.get session "abort"

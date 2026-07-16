@@ -3,9 +3,9 @@ module Wanxiangshu.Tests.IntegrationToolSetup
 open Fable.Core
 open Fable.Core.JsInterop
 
-open Wanxiangshu.Mux.Plugin
+open Wanxiangshu.Hosts.Mux.Plugin
 open Wanxiangshu.Tests.TempWorkspace
-open Wanxiangshu.Shell.Dyn
+open Wanxiangshu.Runtime.Dyn
 
 [<Import("createRequire", "node:module")>]
 let private createRequire': string -> (string -> obj) = jsNative

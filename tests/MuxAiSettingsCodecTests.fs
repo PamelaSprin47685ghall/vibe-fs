@@ -3,10 +3,12 @@ module Wanxiangshu.Tests.MuxAiSettingsCodecTests
 open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Tests.Assert
-open Wanxiangshu.Kernel.Domain
-open Wanxiangshu.Shell.DelegatedAiSettings
-open Wanxiangshu.Shell.Dyn
-open Wanxiangshu.Shell.MuxAiSettingsCodec
+open Wanxiangshu.Kernel.Primitives.Identity
+open Wanxiangshu.Kernel.Errors.DomainError
+open Wanxiangshu.Kernel.Session.Causality
+open Wanxiangshu.Runtime.DelegatedAiSettings
+open Wanxiangshu.Runtime.Dyn
+open Wanxiangshu.Runtime.MuxAiSettingsCodec
 
 let decodeMuxDelegateConfigOk () =
     let runtime = createObj [ "x", box 1 ]

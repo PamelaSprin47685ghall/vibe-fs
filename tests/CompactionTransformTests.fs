@@ -6,18 +6,20 @@ open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.HostTools
 open Wanxiangshu.Kernel.Messaging
-open Wanxiangshu.Kernel.Message
-open Wanxiangshu.Kernel.BacklogProjectionCore
-open Wanxiangshu.Shell.MessageTransformCore
-open Wanxiangshu.Shell.MessageTransformPipeline
-open Wanxiangshu.Shell.ReviewRuntime
-open Wanxiangshu.Shell.EventLogRuntime
-open Wanxiangshu.Shell.EventLogRuntimeStore
-open Wanxiangshu.Kernel.EventLog.Types
-open Wanxiangshu.Shell.WorkBacklogToolsCodec
-open Wanxiangshu.Opencode.BacklogSession
+open Wanxiangshu.Kernel.Messaging
+open Wanxiangshu.Runtime.BacklogProjectionBuild
+open Wanxiangshu.Kernel.Backlog.BacklogTypes
+open Wanxiangshu.Runtime.MessageTransform.Plan
+open Wanxiangshu.Runtime.MessageTransform.Pipeline
+open Wanxiangshu.Runtime.ReviewRuntime
+open Wanxiangshu.Runtime.EventLogRuntime
+open Wanxiangshu.Runtime.EventLogRuntimeStore
+open Wanxiangshu.Kernel.EventSourcing.EventEnvelope
+open Wanxiangshu.Kernel.EventSourcing.EventKind
+open Wanxiangshu.Runtime.WorkBacklogToolsCodec
+open Wanxiangshu.Hosts.Opencode.BacklogSession
 
-module Dyn = Wanxiangshu.Shell.Dyn
+module Dyn = Wanxiangshu.Runtime.Dyn
 
 [<Import("mkdtempSync", "node:fs")>]
 let private mkdtemp (prefix: string) : string = jsNative
@@ -62,7 +64,7 @@ let testCompactionThresholdAndTransform () =
         let guidGen () = fixedGuid
 
         let compacted =
-            Wanxiangshu.Kernel.BacklogProjectionCore.compactingTransform msgs backlog guidGen
+            Wanxiangshu.Runtime.BacklogProjectionBuild.compactingTransform msgs backlog guidGen
 
         equal "Compacted should contain exactly 1 message" 1 compacted.Length
         let first = compacted.[0]
@@ -104,7 +106,7 @@ let testApplyContextBudgetShortCircuit () =
               Cleaned = []
               RawArray = None
               SembleInjectEnabled = false
-              Scope = Wanxiangshu.Shell.RuntimeScope.create ()
+              Scope = Wanxiangshu.Runtime.RuntimeScope.create ()
               MaxInputTokens = 100000
               GetContextUsage = (fun _ -> Promise.lift (Some 10000)) }
 
@@ -121,8 +123,10 @@ let testApplyContextBudgetShortCircuit () =
 
 let testMuxCompactionTransform () =
     promise {
-        let runtimeScope = Wanxiangshu.Shell.RuntimeScope.create ()
-        let backlogSession = Wanxiangshu.Mux.BacklogSession.BacklogSession(runtimeScope)
+        let runtimeScope = Wanxiangshu.Runtime.RuntimeScope.create ()
+
+        let backlogSession =
+            Wanxiangshu.Hosts.Mux.BacklogSession.BacklogSession(runtimeScope)
 
         let deps =
             createObj
@@ -145,20 +149,20 @@ let testMuxCompactionTransform () =
 
         let output = createObj []
 
-        do! Wanxiangshu.Mux.MessageTransform.compactingTransform deps runtimeScope backlogSession input output
+        do! Wanxiangshu.Hosts.Mux.MessageTransform.compactingTransform deps runtimeScope backlogSession input output
 
-        let messages = Wanxiangshu.Shell.Dyn.get output "context" :?> obj array
+        let messages = Wanxiangshu.Runtime.Dyn.get output "context" :?> obj array
         equal "Mux compacted length should be 1" 1 messages.Length
         let first = messages.[0]
-        let role = Wanxiangshu.Shell.Dyn.str first "role"
+        let role = Wanxiangshu.Runtime.Dyn.str first "role"
         equal "Mux compacted role should be user" "user" role
-        let parts = Wanxiangshu.Shell.Dyn.get first "parts" :?> obj array
+        let parts = Wanxiangshu.Runtime.Dyn.get first "parts" :?> obj array
         let firstPart = parts.[0]
-        let content = Wanxiangshu.Shell.Dyn.str firstPart "text"
+        let content = Wanxiangshu.Runtime.Dyn.str firstPart "text"
         check "Mux compacted content contains <do-not-exec>" (content.Contains("<do-not-exec>"))
         check "Mux compacted content contains 'hello mux'" (content.Contains("hello mux"))
-        let prompt = Wanxiangshu.Shell.Dyn.get output "prompt"
-        check "Mux compacted prompt is not null" (not (Wanxiangshu.Shell.Dyn.isNullish prompt))
+        let prompt = Wanxiangshu.Runtime.Dyn.get output "prompt"
+        check "Mux compacted prompt is not null" (not (Wanxiangshu.Runtime.Dyn.isNullish prompt))
     }
 
 let testTryGetRealContextUsage () =
@@ -183,7 +187,7 @@ let testTryGetRealContextUsage () =
         let mockClient = createObj [ "session", mockSession ]
 
         let getUsageOpt =
-            Wanxiangshu.Shell.ContextBudgetUsageCodec.tryGetRealContextUsage mockClient "s-test-real-api" ""
+            Wanxiangshu.Runtime.ContextBudgetUsageCodec.tryGetRealContextUsage mockClient "s-test-real-api" ""
 
         check "tryGetRealContextUsage should return Some" getUsageOpt.IsSome
         let getUsage = getUsageOpt.Value
@@ -193,7 +197,7 @@ let testTryGetRealContextUsage () =
 
 let testApplyContextBudgetBacklogContentChange () =
     promise {
-        let scope = Wanxiangshu.Shell.RuntimeScope.create ()
+        let scope = Wanxiangshu.Runtime.RuntimeScope.create ()
         let sessionID = "s-budget-backlog-change"
 
         let plan =
@@ -238,14 +242,14 @@ let testApplyContextBudgetBacklogContentChange () =
         let encoded = [| box "msg" |]
 
         let! _ = applyContextBudget plan backlogOps messages encoded encodeMessages
-        let storeAfter1 = Wanxiangshu.Shell.ContextBudgetStore.get scope sessionID
+        let storeAfter1 = Wanxiangshu.Runtime.ContextBudgetStore.get scope sessionID
         equal "LastBacklog length should be 1" 1 storeAfter1.LastBacklog.Length
         equal "LastBacklog plan should be plan1" "plan1" storeAfter1.LastBacklog.[0].plan
 
         currentBacklog <- backlog2
 
         let! _ = applyContextBudget plan backlogOps messages encoded encodeMessages
-        let storeAfter2 = Wanxiangshu.Shell.ContextBudgetStore.get scope sessionID
+        let storeAfter2 = Wanxiangshu.Runtime.ContextBudgetStore.get scope sessionID
         equal "LastBacklog plan after change should be plan2" "plan2" storeAfter2.LastBacklog.[0].plan
     }
 
@@ -255,7 +259,7 @@ let testBacklogSessionRecoversFromEventLogOnCompaction () =
 
         try
             let sessionID = "s-compaction-eventlog"
-            let scope = Wanxiangshu.Shell.RuntimeScope.create ()
+            let scope = Wanxiangshu.Runtime.RuntimeScope.create ()
             scope.WorkspaceRoot <- tempDir
             scope.TriggerInit(tempDir)
             do! scope.WaitInit()

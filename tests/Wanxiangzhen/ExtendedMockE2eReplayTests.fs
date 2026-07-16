@@ -5,8 +5,8 @@ open Fable.Core.JsInterop
 open Wanxiangshu.Kernel.Wanxiangzhen.SquadTask
 open Wanxiangshu.Kernel.Wanxiangzhen.Dag
 open Wanxiangshu.Kernel.Wanxiangzhen.SquadEvent
-open Wanxiangshu.Shell.Wanxiangzhen.CoordinatorRuntime
-open Wanxiangshu.Shell.Wanxiangzhen.CoordinatorReplay
+open Wanxiangshu.Runtime.Wanxiangzhen.CoordinatorRuntime
+open Wanxiangshu.Runtime.Wanxiangzhen.CoordinatorReplay
 open Wanxiangshu.Tests.Wanxiangzhen.AssertCompat
 open Wanxiangshu.Tests.Wanxiangzhen.TestDoubles
 open Wanxiangshu.Tests.Wanxiangzhen.ExtendedMockE2eHelpers

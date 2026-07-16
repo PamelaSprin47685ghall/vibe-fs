@@ -2,7 +2,7 @@ module Wanxiangshu.Tests.Wanxiangzhen.PidMonitorTests
 
 open Fable.Core
 open Fable.Core.JsInterop
-open Wanxiangshu.Shell.Wanxiangzhen.PidMonitor
+open Wanxiangshu.Runtime.Wanxiangzhen.PidMonitor
 open Wanxiangshu.Tests.Wanxiangzhen.AssertCompat
 
 [<Emit("process.pid")>]

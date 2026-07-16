@@ -1,0 +1,277 @@
+module Wanxiangshu.Hosts.Opencode.NudgeEffect
+
+open Fable.Core
+open Fable.Core.JsInterop
+open Wanxiangshu.Kernel.Nudge
+open Wanxiangshu.Runtime.Nudge.NudgeDerivation
+open Wanxiangshu.Kernel.Nudge.NudgeSnapshotSource
+open Wanxiangshu.Kernel.Nudge.TodoStatus
+open Wanxiangshu.Kernel.Nudge.Types
+open Wanxiangshu.Kernel.EventSourcing.Fold
+open Wanxiangshu.Kernel.Review.ReviewLoopFold
+open Wanxiangshu.Runtime.EventLogRuntime
+open Wanxiangshu.Runtime.ToolRuntimeContext
+open Wanxiangshu.Kernel.Primitives.Identity
+open Wanxiangshu.Kernel.Errors.DomainError
+open Wanxiangshu.Kernel.Session.Causality
+open Wanxiangshu.Runtime.Dyn
+
+module Dyn = Wanxiangshu.Runtime.Dyn
+
+open Wanxiangshu.Runtime.OpencodeClientCodec
+open Wanxiangshu.Runtime.OpencodeSessionEventCodec
+open Wanxiangshu.Runtime.ErrorClassify
+open Wanxiangshu.Kernel.HostTools
+open Wanxiangshu.Runtime.NudgeRuntime
+open Wanxiangshu.Runtime.Fallback.RuntimeStore
+open Wanxiangshu.Runtime.Fallback.GateTransitions
+
+let private invoke1 (arg: obj) (method: string) (target: obj) : JS.Promise<obj> = unbox (target?(method) (arg))
+
+let private invokeClient (client: obj) (method_: string) (arg: obj) : JS.Promise<obj> =
+    if Dyn.isNullish client then
+        Promise.lift (unbox null)
+    else
+        match getSessionApiFromClient client with
+        | Error _ -> Promise.lift (unbox null)
+        | Ok session ->
+            let api: obj = Dyn.get session method_
+
+            if Dyn.isNullish api then
+                Promise.lift (unbox null)
+            else
+                unbox<JS.Promise<obj>> (Dyn.callMethod1 session method_ arg)
+
+let private collectSnapshot
+    (fallbackRuntime: FallbackRuntimeStore)
+    (client: obj)
+    (pluginCtx: obj)
+    (sessionID: SessionId)
+    (isForceStopped: string -> bool)
+    : JS.Promise<SessionSnapshot option> =
+    promise {
+        try
+            let sessionIDStr = Id.sessionIdValue sessionID
+
+            if isForceStopped sessionIDStr then
+                return None
+            else
+                match getSessionApiFromClient client with
+                | Error _ -> return None
+                | Ok session when not (Dyn.has session "todo") || not (Dyn.has session "messages") -> return None
+                | Ok session ->
+                    let! todoResp = invoke1 (box {| path = {| id = sessionIDStr |} |}) "todo" session
+                    let openTodosFromApi = decodeTodos (Dyn.get todoResp "data")
+                    let! messagesResp = invoke1 (box {| path = {| id = sessionIDStr |} |}) "messages" session
+                    let messagesData = Dyn.get messagesResp "data"
+
+                    if not (Dyn.isArray messagesData) then
+                        return None
+                    else
+                        let messagesArr = messagesData :?> obj array
+
+                        let openTodos =
+                            if not (List.isEmpty openTodosFromApi) then
+                                openTodosFromApi
+                            else
+                                recoverOpenTodosFromMessages messagesData
+
+                        let shouldSkip = shouldSkipNudge messagesData
+
+                        if shouldSkip then
+                            return None
+                        else
+                            let lastAssistantIdx = tryFindLastAssistantIdx messagesArr
+
+                            match lastAssistantIdx with
+                            | None -> return None
+                            | Some idx ->
+                                let msg = messagesArr.[idx]
+                                let info = Dyn.get msg "info"
+                                let agentVal = Dyn.get info "agent"
+
+                                let agent =
+                                    if Dyn.isNullish agentVal then
+                                        None
+                                    else
+                                        Some(string agentVal)
+
+                                let text = getPartsText (Dyn.get msg "parts")
+                                let time = Dyn.get info "time"
+                                let completed = Dyn.str time "completed"
+
+                                let tid =
+                                    if completed <> "" then
+                                        completed
+                                    else
+                                        let msgId = Dyn.str info "id"
+
+                                        if msgId <> "" then
+                                            msgId
+                                        else
+                                            sprintf "nudge-fallback-anchor-%d" idx
+
+                                let modelVal = Dyn.get info "model"
+
+                                let model =
+                                    if Dyn.isNullish modelVal then
+                                        None
+                                    elif Dyn.typeIs modelVal "string" then
+                                        let s = string modelVal
+                                        if s = "" then None else Some s
+                                    else
+                                        let providerID = Dyn.str modelVal "providerID"
+                                        let modelID = Dyn.str modelVal "modelID"
+                                        let variant = Dyn.str modelVal "variant"
+                                        let suffix = if variant <> "" then ":" + variant else ""
+
+                                        if providerID = "" || modelID = "" then
+                                            let idVal = Dyn.str modelVal "id"
+                                            if idVal <> "" then Some(idVal + suffix) else None
+                                        else
+                                            Some(sprintf "%s/%s%s" providerID modelID suffix)
+
+                                let resolvedModel =
+                                    Wanxiangshu.Runtime.NudgeRuntimeTypes.resolveNudgeModel
+                                        messagesArr
+                                        fallbackRuntime
+                                        sessionIDStr
+                                        model
+
+                                let lastAssistantText = text
+                                let turnId = tid
+                                let agentFromMessage = agent
+                                let modelFromMessage = resolvedModel
+
+                                let directory = pluginDirectoryFromCtx pluginCtx
+
+                                do!
+                                    appendAssistantCompletedOrFail
+                                        directory
+                                        sessionIDStr
+                                        lastAssistantText
+                                        agentFromMessage
+                                        modelFromMessage
+                                        turnId
+                                        openTodos
+
+                                let! snap = getNudgeSnapshotFromEventLog directory sessionIDStr
+
+                                if isForceStopped sessionIDStr then
+                                    return None
+                                else
+                                    let anchor = Wanxiangshu.Kernel.Nudge.NudgeProjection.nudgeAnchorKey snap.turnId snap.lastAssistantText
+
+                                    let blockStatus =
+                                        if
+                                            Wanxiangshu.Kernel.Nudge.NudgeProjection.isBlocked
+                                                { PendingNudge = snap.pendingNudge
+                                                  LastDispatchedAnchor = snap.lastDispatchedAnchor }
+                                                anchor
+                                        then
+                                            NudgeBlockStatus.Blocked
+                                        else
+                                            NudgeBlockStatus.Allowed
+
+                                    return Some(sessionSnapshotFromFold snap RunnerPresence.Absent blockStatus)
+        with _ ->
+            return None
+    }
+
+let private sendNudge
+    (fallbackRuntime: FallbackRuntimeStore)
+    (client: obj)
+    (sessionID: SessionId)
+    (agentOpt: string option)
+    (modelOpt: string option)
+    (promptText: string)
+    (nudgeId: string)
+    (nonce: string)
+    : JS.Promise<unit> =
+    promise {
+        let sidStr = Id.sessionIdValue sessionID
+        fallbackRuntime.SetActiveNudgeNonce sidStr nonce
+
+        let body =
+            createPromptBodyWithModelAndNonce agentOpt modelOpt promptText (Some nonce)
+
+        let promptArg =
+            box
+                {| path = box {| id = sidStr |}
+                   body = body |}
+
+        match getSessionApiFromClient client with
+        | Error _ -> ()
+        | Ok session ->
+            try
+                do! invoke1 promptArg "prompt" session |> Promise.map ignore
+            finally
+                fallbackRuntime.ClearActiveNudgeNonce sidStr
+    }
+
+let private sendNudgeOutcome
+    (fallbackRuntime: FallbackRuntimeStore)
+    (client: obj)
+    (sessionID: SessionId)
+    (promptText: string)
+    (agentOpt: string option)
+    (modelOpt: string option)
+    (nudgeId: string)
+    (nonce: string)
+    : JS.Promise<SendOutcome> =
+    promise {
+        let! caught =
+            sendNudge fallbackRuntime client sessionID agentOpt modelOpt promptText nudgeId nonce
+            |> Promise.result
+
+        return
+            match caught with
+            | Ok() -> Delivered
+            | Error error ->
+                match translateJsError error with
+                | MessageAborted -> Aborted
+                | SessionBusy -> Busy
+                | _ -> Failed
+    }
+
+let startNudgeFlow
+    (host: Host)
+    (fallbackRuntime: FallbackRuntimeStore)
+    (runtimeState: NudgeRuntimeState)
+    (client: obj)
+    (pluginCtx: obj)
+    (sessionID: SessionId)
+    (isForceStopped: string -> bool)
+    : JS.Promise<NudgeRuntimeState> =
+    let sid = Id.sessionIdValue sessionID
+    let root = pluginDirectoryFromCtx pluginCtx
+
+    let abortRun sessionIDStr =
+        promise {
+            let arg = box {| path = box {| id = sessionIDStr |} |}
+            do! invokeClient client "abort" arg |> Promise.map ignore
+        }
+
+    runNudgeFlowCore
+        host
+        root
+        fallbackRuntime
+        runtimeState
+        sid
+        (fun () -> collectSnapshot fallbackRuntime client pluginCtx sessionID isForceStopped)
+        (fun promptText agentOpt modelOpt nudgeId nonce ->
+            sendNudgeOutcome fallbackRuntime client sessionID promptText agentOpt modelOpt nudgeId nonce)
+        abortRun
+
+let dispatchPostStopFromHistory
+    (host: Host)
+    (fallbackRuntime: FallbackRuntimeStore)
+    (client: obj)
+    (pluginCtx: obj)
+    (sessionID: SessionId)
+    (isForceStopped: string -> bool)
+    : JS.Promise<unit> =
+    promise {
+        let! _ = startNudgeFlow host fallbackRuntime emptyRuntimeState client pluginCtx sessionID isForceStopped
+        return ()
+    }

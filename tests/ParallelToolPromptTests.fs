@@ -5,15 +5,15 @@ open Fable.Core.JsInterop
 open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Kernel.Messaging
 open Wanxiangshu.Kernel.ToolExecutionStatusModule
-open Wanxiangshu.Kernel.CapsFormat
-open Wanxiangshu.Kernel.BacklogProjectionCore
+open Wanxiangshu.Runtime.CapsFormat
+open Wanxiangshu.Runtime.BacklogProjectionBuild
 open Wanxiangshu.Kernel.HostTools
-open Wanxiangshu.Shell.MessageTransformCore
-open Wanxiangshu.Shell.MessageTransformPipeline
-open Wanxiangshu.Shell.MessageTransformHostEntry
-open Wanxiangshu.Shell.ReviewRuntime
+open Wanxiangshu.Runtime.MessageTransform.Plan
+open Wanxiangshu.Runtime.MessageTransform.Pipeline
+open Wanxiangshu.Runtime.MessageTransform.HostEntry
+open Wanxiangshu.Runtime.ReviewRuntime
 
-module Dyn = Wanxiangshu.Shell.Dyn
+module Dyn = Wanxiangshu.Runtime.Dyn
 
 let mkMsg id role parts =
     { info =
@@ -72,7 +72,7 @@ let testHostNativeToolsTrigger () =
                   Cleaned = msgs
                   RawArray = None
                   SembleInjectEnabled = false
-                  Scope = Wanxiangshu.Shell.RuntimeScope.create ()
+                  Scope = Wanxiangshu.Runtime.RuntimeScope.create ()
                   MaxInputTokens = 200000
                   GetContextUsage = (fun _ -> Promise.lift None) }
 
@@ -174,7 +174,7 @@ let testSynthCallIdExcluded () =
                   Cleaned = msgs
                   RawArray = None
                   SembleInjectEnabled = false
-                  Scope = Wanxiangshu.Shell.RuntimeScope.create ()
+                  Scope = Wanxiangshu.Runtime.RuntimeScope.create ()
                   MaxInputTokens = 200000
                   GetContextUsage = (fun _ -> Promise.lift None) }
 
@@ -226,7 +226,7 @@ let testCompletedToolPartInAssistantTriggers () =
                   Cleaned = msgs
                   RawArray = None
                   SembleInjectEnabled = false
-                  Scope = Wanxiangshu.Shell.RuntimeScope.create ()
+                  Scope = Wanxiangshu.Runtime.RuntimeScope.create ()
                   MaxInputTokens = 200000
                   GetContextUsage = (fun _ -> Promise.lift None) }
 

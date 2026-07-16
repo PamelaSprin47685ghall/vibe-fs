@@ -5,8 +5,8 @@ open Fable.Core.JsInterop
 open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Kernel.HostTools
 open Wanxiangshu.Kernel.FallbackKernel.Types
-open Wanxiangshu.Opencode.AgentConfig
-open Wanxiangshu.Shell.Dyn
+open Wanxiangshu.Hosts.Opencode.AgentConfig
+open Wanxiangshu.Runtime.Dyn
 
 let applyAgentConfigForNullCoderEntryUsesDefaults () =
     let cfg = createObj [ "agent", box (createObj [ "coder", null ]) ]
@@ -53,7 +53,7 @@ let applyFallbackModelOverridesSplitsModelAndVariant () =
           LoopMaxContinues = 3
           MaxRecoveries = 5 }
 
-    Wanxiangshu.Opencode.PluginCoreServices.applyFallbackModelOverrides cfg (Some fbCfg)
+    Wanxiangshu.Hosts.Opencode.PluginServices.applyFallbackModelOverrides cfg (Some fbCfg)
 
     let agentObj = get cfg "agent"
     let buildObj = get agentObj "build"

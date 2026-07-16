@@ -1,11 +1,12 @@
 module Wanxiangshu.Tests.SessionOverviewTests
 
 open Wanxiangshu.Tests.Assert
-open Wanxiangshu.Kernel.EventLog.Types
-open Wanxiangshu.Kernel.EventLog.Fold
+open Wanxiangshu.Kernel.EventSourcing.EventEnvelope
+open Wanxiangshu.Kernel.EventSourcing.EventKind
+open Wanxiangshu.Kernel.EventSourcing.Fold
 open Wanxiangshu.Kernel.SessionOverview
-open Wanxiangshu.Kernel.EventLog.ReviewLoopFold
-open Wanxiangshu.Kernel.EventLog.NudgeProjection
+open Wanxiangshu.Kernel.Review.ReviewLoopFold
+open Wanxiangshu.Kernel.Nudge.NudgeProjection
 open Wanxiangshu.Kernel.FallbackKernel.Types
 
 let private ev session kind payload =

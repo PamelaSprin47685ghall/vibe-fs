@@ -5,10 +5,10 @@ open Fable.Core.JsInterop
 open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Tests.AsyncFlush
 open Wanxiangshu.Tests.TempWorkspace
-open Wanxiangshu.Shell.Dyn
+open Wanxiangshu.Runtime.Dyn
 
-module Dyn = Wanxiangshu.Shell.Dyn
-open Wanxiangshu.Mux.Plugin
+module Dyn = Wanxiangshu.Runtime.Dyn
+open Wanxiangshu.Hosts.Mux.Plugin
 
 /// Build Mux plugin deps with `directory`, `getChatHistory`, and a `nudge` that
 /// captures dispatch text into a caller-owned ResizeArray.  Used by fallback

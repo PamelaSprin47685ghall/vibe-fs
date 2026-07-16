@@ -1,9 +1,9 @@
 module Wanxiangshu.Tests.JsonSchemaBuildersTests
 
 open Wanxiangshu.Tests.Assert
-open Wanxiangshu.Shell.JsonSchemaBuilders
+open Wanxiangshu.Runtime.JsonSchemaBuilders
 open Fable.Core.JsInterop
-open Wanxiangshu.Shell.Dyn
+open Wanxiangshu.Runtime.Dyn
 
 let jsonStrPropTypeAndDescription () =
     let s = jsonStrProp "a string"

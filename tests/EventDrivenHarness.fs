@@ -4,8 +4,8 @@ module Wanxiangshu.Tests.EventDrivenHarness
 open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Tests.Assert
-open Wanxiangshu.Opencode.Plugin
-open Wanxiangshu.Shell.Dyn
+open Wanxiangshu.Hosts.Opencode.Plugin
+open Wanxiangshu.Runtime.Dyn
 
 let yieldMicrotask () : JS.Promise<unit> = Promise.lift ()
 

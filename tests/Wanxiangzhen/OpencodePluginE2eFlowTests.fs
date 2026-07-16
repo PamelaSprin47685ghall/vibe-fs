@@ -2,13 +2,13 @@ module Wanxiangshu.Tests.Wanxiangzhen.OpencodePluginE2eFlowTests
 
 open Fable.Core
 open Fable.Core.JsInterop
-open Wanxiangshu.Shell.Dyn
-open Wanxiangshu.Opencode.PluginWanxiangzhenDeps
-open Wanxiangshu.Opencode.PluginWanxiangzhenDeps
-open Wanxiangshu.Opencode.PluginWanxiangzhenHooks
-open Wanxiangshu.Shell.Wanxiangzhen.CoordinatorOps
-open Wanxiangshu.Shell.Wanxiangzhen.CoordinatorRoutes
-open Wanxiangshu.Shell.Wanxiangzhen.CoordinatorLifecycle
+open Wanxiangshu.Runtime.Dyn
+open Wanxiangshu.Hosts.Opencode.PluginWanxiangzhenDeps
+open Wanxiangshu.Hosts.Opencode.PluginWanxiangzhenDeps
+open Wanxiangshu.Hosts.Opencode.PluginWanxiangzhenHooks
+open Wanxiangshu.Runtime.Wanxiangzhen.CoordinatorOps
+open Wanxiangshu.Runtime.Wanxiangzhen.CoordinatorRoutes
+open Wanxiangshu.Runtime.Wanxiangzhen.CoordinatorLifecycle
 open Wanxiangshu.Kernel.Wanxiangzhen.SquadTask
 open Wanxiangshu.Kernel.Wanxiangzhen.SquadEvent
 open Wanxiangshu.Tests.Wanxiangzhen.AssertCompat

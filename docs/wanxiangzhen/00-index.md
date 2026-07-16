@@ -21,8 +21,8 @@
 ## 源码锚点
 
 - `src/Kernel/Wanxiangzhen/`
-- `src/Shell/Wanxiangzhen/`
-- `src/Opencode/PluginWanxiangzhen.fs`
+- `src/Runtime/Wanxiangzhen/`
+- `src/Hosts/OpenCode/PluginWanxiangzhen.fs`
 - `tests/EventLog*`、`EventReplayTests`、`wanxiangzhenTestEntries`
 
 ## 与万象术

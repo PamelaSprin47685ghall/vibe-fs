@@ -1,7 +1,9 @@
 module Wanxiangshu.Tests.FallbackKernelTests
 
 open Wanxiangshu.Tests.Assert
-open Wanxiangshu.Kernel.Domain
+open Wanxiangshu.Kernel.Primitives.Identity
+open Wanxiangshu.Kernel.Errors.DomainError
+open Wanxiangshu.Kernel.Session.Causality
 open Wanxiangshu.Kernel.FallbackKernel.Types
 open Wanxiangshu.Kernel.FallbackKernel.Decision
 open Wanxiangshu.Kernel.FallbackKernel.Recovery

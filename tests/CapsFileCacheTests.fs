@@ -2,8 +2,8 @@ module Wanxiangshu.Tests.CapsFileCacheTests
 
 open Fable.Core
 open Wanxiangshu.Tests.Assert
-open Wanxiangshu.Shell.CapsFileCache
-open Wanxiangshu.Shell.RuntimeScope
+open Wanxiangshu.Runtime.CapsFileCache
+open Wanxiangshu.Runtime.RuntimeScope
 
 let private uid = ref 0
 

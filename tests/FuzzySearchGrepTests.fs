@@ -4,9 +4,9 @@ open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Kernel.FuzzyQuery
 open Wanxiangshu.Tests.Assert
-open Wanxiangshu.Shell.FuzzySearchHelpers
-open Wanxiangshu.Shell.FuzzySearchGrep
-open Wanxiangshu.Shell.FuzzyIteratorStore
+open Wanxiangshu.Runtime.FuzzySearchSupport
+open Wanxiangshu.Runtime.FuzzySearchGrep
+open Wanxiangshu.Runtime.FuzzyIteratorStore
 
 let private fakeStore () = createTypedIteratorStore 100
 

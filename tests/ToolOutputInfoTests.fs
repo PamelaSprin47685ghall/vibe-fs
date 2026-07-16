@@ -3,7 +3,7 @@ module Wanxiangshu.Tests.ToolOutputInfoTests
 open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Tests.Assert
-open Wanxiangshu.Kernel.ToolOutputInfo
+open Wanxiangshu.Runtime.ToolOutputInfo
 open Wanxiangshu.Kernel.ToolOutputInfoTypes
 
 let private hint s = InfoItem.Hint s

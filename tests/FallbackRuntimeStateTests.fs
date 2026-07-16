@@ -1,8 +1,10 @@
-module Wanxiangshu.Tests.FallbackRuntimeStateTests
+module Wanxiangshu.Tests.FallbackRuntimeStoreTests
 
 open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Kernel.FallbackKernel.Types
-open Wanxiangshu.Shell.FallbackRuntimeState
+open Wanxiangshu.Runtime.Fallback.RuntimeStore
+open Wanxiangshu.Runtime.Fallback.LeaseTransitions
+open Wanxiangshu.Runtime.Fallback.GateTransitions
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -25,14 +27,14 @@ let mkModel (pid: string) (mid: string) : FallbackModel =
 // ---------------------------------------------------------------------------
 
 let getOrCreate_returnsFreshForNewSession () =
-    let rt = FallbackRuntimeState()
+    let rt = FallbackRuntimeStore()
     let s = rt.GetOrCreateState "sess-1"
     equal "phase is Idle" FallbackPhase.Idle s.Phase
     equal "failureCount is 0" 0 s.FailureCount
     equal "lifecycle is Active" FallbackLifecycle.Active s.Lifecycle
 
 let getOrCreate_returnsSameStateOnSecondCall () =
-    let rt = FallbackRuntimeState()
+    let rt = FallbackRuntimeStore()
     let s1 = rt.GetOrCreateState "sess-1"
     let s2 = rt.GetOrCreateState "sess-1"
     equal "same reference" true (obj.ReferenceEquals(s1, s2))
@@ -42,7 +44,7 @@ let getOrCreate_returnsSameStateOnSecondCall () =
 // ---------------------------------------------------------------------------
 
 let updateState_persistsChange () =
-    let rt = FallbackRuntimeState()
+    let rt = FallbackRuntimeStore()
     let s = rt.GetOrCreateState "sess-1"
 
     let s2 =
@@ -60,7 +62,7 @@ let updateState_persistsChange () =
 // ---------------------------------------------------------------------------
 
 let chain_setThenGet () =
-    let rt = FallbackRuntimeState()
+    let rt = FallbackRuntimeStore()
     let ch = [ mkModel "oai" "gpt-5" ]
     rt.SetChain "sess-1" ch
     let got = rt.GetChain "sess-1"
@@ -68,7 +70,7 @@ let chain_setThenGet () =
     equal "provider" "oai" got.[0].ProviderID
 
 let chain_emptyByDefault () =
-    let rt = FallbackRuntimeState()
+    let rt = FallbackRuntimeStore()
     equal "empty chain by default" [] (rt.GetChain "unknown-session")
 
 // ---------------------------------------------------------------------------
@@ -76,12 +78,12 @@ let chain_emptyByDefault () =
 // ---------------------------------------------------------------------------
 
 let agentName_setThenGet () =
-    let rt = FallbackRuntimeState()
+    let rt = FallbackRuntimeStore()
     rt.SetAgentName "sess-1" "Sisyphus - Ultraworker"
     equal "agent name" "Sisyphus - Ultraworker" (rt.GetAgentName "sess-1")
 
 let agentName_emptyByDefault () =
-    let rt = FallbackRuntimeState()
+    let rt = FallbackRuntimeStore()
     equal "empty agent by default" "" (rt.GetAgentName "unknown-session")
 
 // ---------------------------------------------------------------------------
@@ -89,7 +91,7 @@ let agentName_emptyByDefault () =
 // ---------------------------------------------------------------------------
 
 let cleanupSession_removesAllState () =
-    let rt = FallbackRuntimeState()
+    let rt = FallbackRuntimeStore()
     rt.SetChain "sess-1" [ mkModel "oai" "gpt-5" ]
     rt.SetAgentName "sess-1" "reviewer"
     let s = rt.GetOrCreateState "sess-1"
@@ -102,7 +104,7 @@ let cleanupSession_removesAllState () =
     equal "state reset" 0 s2.FailureCount
 
 let cleanupSession_doesNotAffectOtherSessions () =
-    let rt = FallbackRuntimeState()
+    let rt = FallbackRuntimeStore()
     rt.SetChain "sess-1" [ mkModel "oai" "m1" ]
     rt.SetChain "sess-2" [ mkModel "oai" "m2" ]
     rt.CleanupSession "sess-1"

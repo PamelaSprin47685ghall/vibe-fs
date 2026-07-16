@@ -2,15 +2,15 @@ module Wanxiangshu.Tests.OmpPluginTestsHarness
 
 open Fable.Core
 open Fable.Core.JsInterop
-open Wanxiangshu.Shell.Dyn
+open Wanxiangshu.Runtime.Dyn
 
-module Dyn = Wanxiangshu.Shell.Dyn
+module Dyn = Wanxiangshu.Runtime.Dyn
 
-open Wanxiangshu.Omp
-open Wanxiangshu.Omp.Plugin
-open Wanxiangshu.Omp.PluginCore
-open Wanxiangshu.Shell
-open Wanxiangshu.Shell.RuntimeScope
+open Wanxiangshu.Hosts.Omp
+open Wanxiangshu.Hosts.Omp.Plugin
+open Wanxiangshu.Hosts.Omp.PluginComposition
+open Wanxiangshu.Runtime
+open Wanxiangshu.Runtime.RuntimeScope
 
 let testScope = RuntimeScope()
 
@@ -142,7 +142,7 @@ let toolNames (h: PiHarness) =
     |> Set.ofList
 
 let resetPluginState () =
-    PluginCore.reviewStore.clearReviewSessions ()
+    PluginComposition.reviewStore.clearReviewSessions ()
     RunnerBackground.clearRunnerLogsForTest ExecutorTools.ompScope
 
 let lastMessageCustomType (h: PiHarness) : string =

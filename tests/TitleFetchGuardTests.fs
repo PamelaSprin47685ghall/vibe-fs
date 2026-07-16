@@ -4,8 +4,8 @@ open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Tests.Assert
 
-open Wanxiangshu.Shell.TitleFetchGuardCommon
-open Wanxiangshu.Shell.Dyn
+open Wanxiangshu.Runtime.TitleFetchGuard
+open Wanxiangshu.Runtime.Dyn
 
 let signature () =
     equal

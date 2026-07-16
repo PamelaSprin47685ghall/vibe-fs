@@ -3,8 +3,8 @@ module Wanxiangshu.Tests.ReviewTestsReplay
 open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Kernel.ReviewSession
 open Wanxiangshu.Kernel.ReviewSession.Types
-open Wanxiangshu.Kernel.LoopMessages
-open Wanxiangshu.Kernel.PromptFrontMatter
+open Wanxiangshu.Runtime.LoopMessages
+open Wanxiangshu.Runtime.PromptFrontMatter
 
 let disposeSessionTreeTerminatesAll () =
     let mutable verdicts: (string * ReviewResult) list = []
@@ -42,13 +42,13 @@ let inferReviewTaskFromTexts' () =
     let activate task =
         buildLoopMessage task [ "With-Review Mode is active. Complete the task above, then call submit_review with:" ]
 
-    let accept = Wanxiangshu.Kernel.ReviewPrompts.formatReviewResult (Accepted "")
+    let accept = Wanxiangshu.Runtime.ReviewPrompts.formatReviewResult (Accepted "")
     let cancel = loopCancelledMessage
 
     let needsRevisionMsg =
-        Wanxiangshu.Kernel.ReviewPrompts.formatReviewResult (NeedsRevision "fix the tests")
+        Wanxiangshu.Runtime.ReviewPrompts.formatReviewResult (NeedsRevision "fix the tests")
 
-    let terminated = Wanxiangshu.Kernel.ReviewPrompts.formatReviewResult Terminated
+    let terminated = Wanxiangshu.Runtime.ReviewPrompts.formatReviewResult Terminated
     equal "empty -> None" None (inferReviewTaskFromTexts [])
     equal "only activate -> Some task" (Some "ship S1") (inferReviewTaskFromTexts [ activate "ship S1" ])
     equal "activate + accept -> None" None (inferReviewTaskFromTexts [ activate "ship S1"; accept ])
@@ -89,7 +89,10 @@ let inferReviewTaskFromTexts' () =
         (inferReviewTaskFromTexts [ "Here is my plan:\ntask: refactor everything\nlet's go" ])
 
     let reviewerChildPrompt =
-        Wanxiangshu.Kernel.ReviewPrompts.reviewerPrompt "worker task from parent" "self-reported changes" [ "src/a.fs" ]
+        Wanxiangshu.Runtime.ReviewPrompts.reviewerPrompt
+            "worker task from parent"
+            "self-reported changes"
+            [ "src/a.fs" ]
 
     equal
         "reviewerPrompt task must not activate worker With-Review"
@@ -97,7 +100,7 @@ let inferReviewTaskFromTexts' () =
         (inferReviewTaskFromTexts [ reviewerChildPrompt ])
 
     let reviewerVerdictPrompt =
-        Wanxiangshu.Kernel.ReviewPrompts.reviewSubmissionVerdictPrompt "worker task" "report body" [ "b.fs" ]
+        Wanxiangshu.Runtime.ReviewPrompts.reviewSubmissionVerdictPrompt "worker task" "report body" [ "b.fs" ]
 
     equal
         "front matter task: original_task must not activate worker loop"

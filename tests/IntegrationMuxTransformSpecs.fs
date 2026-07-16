@@ -4,12 +4,12 @@ open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Tests.IntegrationMuxSetup
-open Wanxiangshu.Shell.Dyn
-open Wanxiangshu.Mux.Plugin
-open Wanxiangshu.Mux.BuiltinTools
-open Wanxiangshu.Mux.SubagentTools
+open Wanxiangshu.Runtime.Dyn
+open Wanxiangshu.Hosts.Mux.Plugin
+open Wanxiangshu.Hosts.Mux.BuiltinTools
+open Wanxiangshu.Hosts.Mux.SubagentTools
 open Wanxiangshu.Tests.IntegrationToolSetup
-open Wanxiangshu.Kernel.ReviewPrompts.Format
+open Wanxiangshu.Runtime.ReviewPrompts.Format
 
 
 let muxTopLevelPolicySpec () =

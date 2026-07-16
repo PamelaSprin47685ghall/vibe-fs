@@ -3,7 +3,7 @@ module Wanxiangshu.Tests.HostMessagePartCodecTests
 open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Tests.Assert
-open Wanxiangshu.Shell.HostMessagePartCodec
+open Wanxiangshu.Runtime.HostMessagePartCodec
 
 let getMessagePartsEmptyWhenNull () =
     let parts = getMessageParts null

@@ -4,8 +4,8 @@ open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Kernel.Wanxiangzhen.FfDecision
 open Wanxiangshu.Kernel.Wanxiangzhen.SquadTask
-open Wanxiangshu.Shell.Dyn
-open Wanxiangshu.Shell.Wanxiangzhen.HttpCodec
+open Wanxiangshu.Runtime.Dyn
+open Wanxiangshu.Runtime.Wanxiangzhen.HttpCodec
 open Wanxiangshu.Tests.Wanxiangzhen.AssertCompat
 
 let private taskA: SquadTask =

@@ -2,7 +2,7 @@ module Wanxiangshu.Tests.DynFieldTests
 
 open Fable.Core.JsInterop
 open Wanxiangshu.Tests.Assert
-open Wanxiangshu.Shell.DynField
+open Wanxiangshu.Runtime.DynField
 
 let hasFieldTrue () =
     let obj = unbox (createObj [ "key", box 42 ])

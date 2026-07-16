@@ -25,8 +25,8 @@
 
 ## 入口与代码
 
-- npm：`wanxiangshu/wanxiangzhen` → `build/src/Opencode/PluginWanxiangzhen.js`
-- `src/Kernel/Wanxiangzhen/`、`src/Shell/Wanxiangzhen/`
+- npm：`wanxiangshu/wanxiangzhen` → `build/src/Hosts/OpenCode/PluginWanxiangzhen.js`
+- `src/Kernel/Wanxiangzhen/`、`src/Runtime/Wanxiangzhen/`
 
 ## 相关
 

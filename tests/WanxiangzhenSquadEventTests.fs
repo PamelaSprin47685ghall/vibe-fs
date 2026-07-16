@@ -7,7 +7,7 @@ open Wanxiangshu.Kernel.Wanxiangzhen.SquadTask
 open Wanxiangshu.Kernel.Wanxiangzhen.Dag
 open Wanxiangshu.Kernel.Wanxiangzhen.SquadEvent
 open Wanxiangshu.Kernel.Wanxiangzhen.SquadUpdateIdAssign
-open Wanxiangshu.Shell.Wanxiangzhen.CoordinatorSquadUpdate
+open Wanxiangshu.Runtime.Wanxiangzhen.CoordinatorSquadUpdate
 
 let foldEventsMergedChain () =
     let events =

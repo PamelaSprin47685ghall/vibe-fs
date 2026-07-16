@@ -3,14 +3,20 @@ module Wanxiangshu.Tests.FallbackEventBridgeTests
 open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Tests.Assert
-open Wanxiangshu.Kernel.Domain
+open Wanxiangshu.Kernel.Primitives.Identity
+open Wanxiangshu.Kernel.Errors.DomainError
+open Wanxiangshu.Kernel.Session.Causality
 open Wanxiangshu.Kernel.FallbackKernel.Types
 open Wanxiangshu.Kernel.Subsession.Types
-open Wanxiangshu.Shell.FallbackRuntimeState
-open Wanxiangshu.Shell.FallbackEventBridge
-open Wanxiangshu.Shell
+open Wanxiangshu.Runtime.Fallback.RuntimeStore
+open Wanxiangshu.Runtime.Fallback.LeaseTransitions
+open Wanxiangshu.Runtime.Fallback.GateTransitions
+open Wanxiangshu.Runtime.Fallback.FallbackEventBridge
+open Wanxiangshu.Runtime.Fallback.FallbackBridgePorts
+open Wanxiangshu.Runtime.Fallback.FallbackBridgeContinuation
+open Wanxiangshu.Runtime
 
-module Dyn = Wanxiangshu.Shell.Dyn
+module Dyn = Wanxiangshu.Runtime.Dyn
 
 open Wanxiangshu.Tests.FallbackEventBridgeTestsPart2
 open Wanxiangshu.Tests.FallbackEventBridgeTestsPendingReview
@@ -185,7 +191,7 @@ let handleEvent_retrySame_consumedAndSendContinue () =
         let model = mkModel "oai" "gpt-5"
         let chain = [ model ]
         let cfg = mkConfig ()
-        let rt = FallbackRuntimeState()
+        let rt = FallbackRuntimeStore()
         let sid = "sess-1"
         rt.SetChain sid chain
         rt.SetAgentName sid "reviewer"
@@ -211,7 +217,7 @@ let handleEvent_exhausted_notConsumed () =
     promise {
         let model = mkModel "oai" "gpt-5"
         let chain = [ model ]
-        let rt = FallbackRuntimeState()
+        let rt = FallbackRuntimeStore()
         let sid = "sess-1"
         rt.SetChain sid chain
         rt.SetAgentName sid "reviewer"
@@ -235,7 +241,7 @@ let handleEvent_exhausted_notConsumed () =
 
 let handleEvent_noChain_notConsumed () =
     promise {
-        let rt = FallbackRuntimeState()
+        let rt = FallbackRuntimeStore()
         let sid = "sess-1"
         rt.SetAgentName sid "reviewer"
 
@@ -254,7 +260,7 @@ let handleEvent_sessionAborted_setsCancelled () =
         let model = mkModel "oai" "gpt-5"
         let chain = [ model ]
         let cfg = mkConfig ()
-        let rt = FallbackRuntimeState()
+        let rt = FallbackRuntimeStore()
         let sid = "sess-1"
         rt.SetChain sid chain
         rt.SetAgentName sid "reviewer"
@@ -275,7 +281,7 @@ let handleEvent_newUserMessage_resetsState () =
         let model = mkModel "oai" "gpt-5"
         let chain = [ model ]
         let cfg = mkConfig ()
-        let rt = FallbackRuntimeState()
+        let rt = FallbackRuntimeStore()
         let sid = "sess-1"
         rt.SetChain sid chain
         rt.SetAgentName sid "reviewer"
@@ -308,7 +314,7 @@ let createHandler_returnsCallable () =
         let model = mkModel "oai" "gpt-5"
         let chain = [ model ]
         let cfg = mkConfig ()
-        let rt = FallbackRuntimeState()
+        let rt = FallbackRuntimeStore()
         let sid = "sess-1"
         rt.SetChain sid chain
         rt.SetAgentName sid "reviewer"
@@ -328,8 +334,8 @@ let createHandler_twoSessionsIndependent () =
         let chain = [ model ]
         let cfg = mkConfig ()
 
-        let rt1 = FallbackRuntimeState()
-        let rt2 = FallbackRuntimeState()
+        let rt1 = FallbackRuntimeStore()
+        let rt2 = FallbackRuntimeStore()
         let sid1 = "sess-1"
         let sid2 = "sess-2"
         rt1.SetChain sid1 chain

@@ -3,16 +3,16 @@ module Wanxiangshu.Tests.ShellCoverage2Tests
 open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Tests.Assert
-open Wanxiangshu.Shell.FuzzyFinderShell
-open Wanxiangshu.Shell.FuzzySearchGrep
-open Wanxiangshu.Shell.FuzzySearchHelpers
-open Wanxiangshu.Shell.FuzzyIteratorStore
+open Wanxiangshu.Runtime.FuzzyFinderShell
+open Wanxiangshu.Runtime.FuzzySearchGrep
+open Wanxiangshu.Runtime.FuzzySearchSupport
+open Wanxiangshu.Runtime.FuzzyIteratorStore
 open Wanxiangshu.Kernel.FuzzyQuery
 open Wanxiangshu.Kernel.FuzzyPath
-open Wanxiangshu.Shell.RuntimeScope
+open Wanxiangshu.Runtime.RuntimeScope
 
-module Livelock = Wanxiangshu.Shell.LivelockGuard
-module Dyn = Wanxiangshu.Shell.Dyn
+module Livelock = Wanxiangshu.Runtime.LivelockGuard
+module Dyn = Wanxiangshu.Runtime.Dyn
 
 // ── FuzzyFinderShell.resultFromRaw ──────────────────────────────────────────
 

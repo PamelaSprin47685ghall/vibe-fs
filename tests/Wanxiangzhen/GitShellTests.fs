@@ -2,7 +2,7 @@ module Wanxiangshu.Tests.Wanxiangzhen.GitShellTests
 
 open Fable.Core
 open Fable.Core.JsInterop
-open Wanxiangshu.Shell.Wanxiangzhen.GitShell
+open Wanxiangshu.Runtime.Wanxiangzhen.GitShell
 open Wanxiangshu.Tests.Wanxiangzhen.AssertCompat
 
 let private uid = ref 0

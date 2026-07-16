@@ -6,11 +6,11 @@ open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Tests.TempWorkspace
 open Wanxiangshu.Tests.IntegrationPluginTestsCommon
 open Wanxiangshu.Tests.IntegrationPluginTestsMimo
-open Wanxiangshu.Mux.Plugin
-open Wanxiangshu.Opencode.Plugin
-open Wanxiangshu.Shell.TreeSitterShell
+open Wanxiangshu.Hosts.Mux.Plugin
+open Wanxiangshu.Hosts.Opencode.Plugin
+open Wanxiangshu.Runtime.TreeSitterShell
 open Wanxiangshu.Kernel.TreeSitterKernel
-open Wanxiangshu.Shell.Dyn
+open Wanxiangshu.Runtime.Dyn
 
 let syntaxSpec () =
     promise {

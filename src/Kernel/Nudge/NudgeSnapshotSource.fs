@@ -1,6 +1,6 @@
 module Wanxiangshu.Kernel.Nudge.NudgeSnapshotSource
 
-open Wanxiangshu.Kernel.EventLog.ReviewLoopFold
+open Wanxiangshu.Kernel.Review.ReviewLoopFold
 open Wanxiangshu.Kernel.Nudge.Types
 
 [<RequireQualifiedAccess>]

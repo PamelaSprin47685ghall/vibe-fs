@@ -3,8 +3,10 @@ module Wanxiangshu.Tests.DelegateToolsCodecTests
 open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Tests.Assert
-open Wanxiangshu.Kernel.Domain
-open Wanxiangshu.Shell.DelegateToolsCodec
+open Wanxiangshu.Kernel.Primitives.Identity
+open Wanxiangshu.Kernel.Errors.DomainError
+open Wanxiangshu.Kernel.Session.Causality
+open Wanxiangshu.Runtime.DelegateToolsCodec
 
 let decodeTaskCreateResultSuccessFalse () =
     let createResult = createObj [ "success", box false; "error", box "quota exceeded" ]

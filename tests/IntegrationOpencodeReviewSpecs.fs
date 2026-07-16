@@ -5,12 +5,12 @@ open Fable.Core.JsInterop
 open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Tests.IntegrationToolSetup
 open Wanxiangshu.Tests.TempWorkspace
-open Wanxiangshu.Kernel.LoopMessages
+open Wanxiangshu.Runtime.LoopMessages
 open Wanxiangshu.Kernel.ReviewSession
 open Wanxiangshu.Kernel.ReviewSession.Types
-open Wanxiangshu.Opencode.ReviewTools
-open Wanxiangshu.Shell.ReviewRuntime
-open Wanxiangshu.Shell.Dyn
+open Wanxiangshu.Hosts.Opencode.ReviewTools
+open Wanxiangshu.Runtime.ReviewRuntime
+open Wanxiangshu.Runtime.Dyn
 
 let private opencodeTextMessage (sessionID: string) (id: string) (text: string) : obj =
     box
@@ -33,7 +33,7 @@ let private mockClient (messages: obj array) : obj =
 
 let private returnReviewerTool workspaceDir messages store : obj =
     let ctx = createObj [ "directory", box workspaceDir; "client", mockClient messages ]
-    let scope = Wanxiangshu.Shell.RuntimeScope.create ()
+    let scope = Wanxiangshu.Runtime.RuntimeScope.create ()
     submitReviewResultTool ctx store scope
 
 let private reviewerContext workspaceDir sessionID : obj =

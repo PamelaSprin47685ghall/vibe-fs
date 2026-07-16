@@ -1,7 +1,8 @@
 module Wanxiangshu.Tests.EventLogReviewLoopFoldTests
 
-open Wanxiangshu.Kernel.EventLog.ReviewLoopFold
-open Wanxiangshu.Kernel.EventLog.Types
+open Wanxiangshu.Kernel.Review.ReviewLoopFold
+open Wanxiangshu.Kernel.EventSourcing.EventEnvelope
+open Wanxiangshu.Kernel.EventSourcing.EventKind
 open Wanxiangshu.Tests.Assert
 
 let private ev kind payload =

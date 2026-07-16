@@ -4,19 +4,20 @@ open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Tests.OmpPluginTestsHarness
-open Wanxiangshu.Shell.Dyn
-open Wanxiangshu.Shell.RuntimeScope
+open Wanxiangshu.Runtime.Dyn
+open Wanxiangshu.Runtime.RuntimeScope
 
-module Dyn = Wanxiangshu.Shell.Dyn
+module Dyn = Wanxiangshu.Runtime.Dyn
 
-open Wanxiangshu.Shell.ReviewRuntime
-open Wanxiangshu.Omp.SessionLifecycleHooks
-open Wanxiangshu.Omp.NudgeHooks
+open Wanxiangshu.Runtime.ReviewRuntime
+open Wanxiangshu.Hosts.Omp.SessionLifecycleHooks
+open Wanxiangshu.Hosts.Omp.NudgeHooks
 open Wanxiangshu.Kernel.OmpSessionTools
-open Wanxiangshu.Omp.NudgeRuntime
+open Wanxiangshu.Hosts.Omp.NudgeRuntime
 open Wanxiangshu.Kernel.HostTools
-open Wanxiangshu.Omp.MagicTodo
-open Wanxiangshu.Shell.FallbackRuntimeState
+open Wanxiangshu.Hosts.Omp.MagicTodo
+open Wanxiangshu.Runtime.Fallback.RuntimeStore
+open Wanxiangshu.Runtime.Fallback.GateTransitions
 
 let fakeCtx (sessionId: string) (cwd: string) : obj =
     createObj
@@ -62,10 +63,10 @@ let toolCallHandler_missingWarnTddBlocks () =
     let event = fakeEvent "coder" (createObj [])
 
     promise {
-        Wanxiangshu.Shell.ToolHookRuntime.clearSessionCompliance "s1"
+        Wanxiangshu.Runtime.ToolHookRuntime.clearSessionCompliance "s1"
         let! result = toolCallHandler pi store event (fakeCtx "s1" "/tmp")
         check "missing warn_tdd does not block" (Dyn.isNullish result)
-        let comp = Wanxiangshu.Shell.ToolHookRuntime.tryGetCompliance "s1" "c1"
+        let comp = Wanxiangshu.Runtime.ToolHookRuntime.tryGetCompliance "s1" "c1"
         check "missing warn_tdd has compliance entry" comp.IsSome
         check "compliance entry has no violations (optimistic)" (comp.Value.Violations.IsEmpty)
     }
@@ -102,49 +103,49 @@ let toolCallHandler_normalToolReturnsNone () =
 
 let toolCallHandler_childSessionCoderMissingWarnTddBlocked () =
     let scope = RuntimeScope()
-    Wanxiangshu.Omp.ChildSession.clearChildSessionsForTest scope ()
+    Wanxiangshu.Hosts.Omp.ChildSession.clearChildSessionsForTest scope ()
     let childId = "child-coder-1"
-    Wanxiangshu.Omp.ChildSession.markChildSession scope childId
+    Wanxiangshu.Hosts.Omp.ChildSession.markChildSession scope childId
     let h = createPiHarness ()
     let pi = piObject h
     let store = createReviewStore ()
     let event = fakeEvent "coder" (createObj [])
 
     promise {
-        Wanxiangshu.Shell.ToolHookRuntime.clearSessionCompliance childId
+        Wanxiangshu.Runtime.ToolHookRuntime.clearSessionCompliance childId
         let! result = toolCallHandler pi store event (fakeCtx childId "/tmp")
         check "child session coder without warn_tdd does not block" (Dyn.isNullish result)
-        let comp = Wanxiangshu.Shell.ToolHookRuntime.tryGetCompliance childId "c1"
+        let comp = Wanxiangshu.Runtime.ToolHookRuntime.tryGetCompliance childId "c1"
         check "missing warn_tdd child session has compliance entry" comp.IsSome
         check "compliance entry child session has no violations (optimistic)" (comp.Value.Violations.IsEmpty)
-        Wanxiangshu.Omp.ChildSession.unmarkChildSession scope childId
+        Wanxiangshu.Hosts.Omp.ChildSession.unmarkChildSession scope childId
     }
 
 let toolCallHandler_childSessionExecutorMissingWarnBlocked () =
     let scope = RuntimeScope()
-    Wanxiangshu.Omp.ChildSession.clearChildSessionsForTest scope ()
+    Wanxiangshu.Hosts.Omp.ChildSession.clearChildSessionsForTest scope ()
     let childId = "child-exec-1"
-    Wanxiangshu.Omp.ChildSession.markChildSession scope childId
+    Wanxiangshu.Hosts.Omp.ChildSession.markChildSession scope childId
     let h = createPiHarness ()
     let pi = piObject h
     let store = createReviewStore ()
     let event = fakeEvent "executor" (createObj [])
 
     promise {
-        Wanxiangshu.Shell.ToolHookRuntime.clearSessionCompliance childId
+        Wanxiangshu.Runtime.ToolHookRuntime.clearSessionCompliance childId
         let! result = toolCallHandler pi store event (fakeCtx childId "/tmp")
         check "child session executor without warn does not block" (Dyn.isNullish result)
-        let comp = Wanxiangshu.Shell.ToolHookRuntime.tryGetCompliance childId "c1"
+        let comp = Wanxiangshu.Runtime.ToolHookRuntime.tryGetCompliance childId "c1"
         check "missing warn child session has compliance entry" comp.IsSome
         check "compliance entry child session executor has no violations (optimistic)" (comp.Value.Violations.IsEmpty)
-        Wanxiangshu.Omp.ChildSession.unmarkChildSession scope childId
+        Wanxiangshu.Hosts.Omp.ChildSession.unmarkChildSession scope childId
     }
 
 let toolCallHandler_childSessionReadPasses () =
     let scope = RuntimeScope()
-    Wanxiangshu.Omp.ChildSession.clearChildSessionsForTest scope ()
+    Wanxiangshu.Hosts.Omp.ChildSession.clearChildSessionsForTest scope ()
     let childId = "child-read-1"
-    Wanxiangshu.Omp.ChildSession.markChildSession scope childId
+    Wanxiangshu.Hosts.Omp.ChildSession.markChildSession scope childId
     let h = createPiHarness ()
     let pi = piObject h
     let store = createReviewStore ()
@@ -153,7 +154,7 @@ let toolCallHandler_childSessionReadPasses () =
     promise {
         let! result = toolCallHandler pi store event (fakeCtx childId "/tmp")
         check "child session read (non-modification) passes" (Dyn.isNullish result)
-        Wanxiangshu.Omp.ChildSession.unmarkChildSession scope childId
+        Wanxiangshu.Hosts.Omp.ChildSession.unmarkChildSession scope childId
     }
 
 let turnStartHandler_filtersChildOnlyTools () =
@@ -161,7 +162,7 @@ let turnStartHandler_filtersChildOnlyTools () =
     let pi = piObject h
     // harness activeTools already contains "coder" so isMainSession = true in filterOmpMainSessionActiveTools
     promise {
-        let rt = FallbackRuntimeState()
+        let rt = FallbackRuntimeStore()
         do! turnStartHandler pi (createObj []) (fakeCtx "main-1" "/tmp") rt
         let filtered = unbox<string array> (Dyn.get h.hookStore "activeTools")
 
@@ -212,7 +213,7 @@ let sessionShutdownHandler_clearsState () =
     promise {
         do! sessionShutdownHandler store ctx
         // nudge state cleared
-        Wanxiangshu.Omp.NudgeRuntime.clearNudgeSession "sh1" |> ignore
+        Wanxiangshu.Hosts.Omp.NudgeRuntime.clearNudgeSession "sh1" |> ignore
     }
 
 let run () : JS.Promise<unit> =

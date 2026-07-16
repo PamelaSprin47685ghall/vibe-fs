@@ -4,10 +4,10 @@ open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Tests.OmpPluginTestsHarness
-open Wanxiangshu.Omp.Plugin
-open Wanxiangshu.Shell.Dyn
+open Wanxiangshu.Hosts.Omp.Plugin
+open Wanxiangshu.Runtime.Dyn
 
-module Dyn = Wanxiangshu.Shell.Dyn
+module Dyn = Wanxiangshu.Runtime.Dyn
 
 let extensionRegistersLifecycleHooks () =
     promise {

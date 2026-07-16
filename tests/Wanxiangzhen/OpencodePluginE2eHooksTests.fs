@@ -2,9 +2,9 @@ module Wanxiangshu.Tests.Wanxiangzhen.OpencodePluginE2eHooksTests
 
 open Fable.Core
 open Fable.Core.JsInterop
-open Wanxiangshu.Shell.Dyn
-open Wanxiangshu.Opencode.PluginWanxiangzhenDeps
-open Wanxiangshu.Opencode.PluginWanxiangzhenHooks
+open Wanxiangshu.Runtime.Dyn
+open Wanxiangshu.Hosts.Opencode.PluginWanxiangzhenDeps
+open Wanxiangshu.Hosts.Opencode.PluginWanxiangzhenHooks
 open Wanxiangshu.Tests.Wanxiangzhen.AssertCompat
 open Wanxiangshu.Tests.Wanxiangzhen.OpencodePluginE2eHelpers
 

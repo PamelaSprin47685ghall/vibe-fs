@@ -5,13 +5,13 @@ open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Tests.TempWorkspace
-open Wanxiangshu.Omp.MessageTransform
+open Wanxiangshu.Hosts.Omp.MessageTransform
 
-module Dyn = Wanxiangshu.Shell.Dyn
+module Dyn = Wanxiangshu.Runtime.Dyn
 
-open Wanxiangshu.Shell.ReviewRuntime
-open Wanxiangshu.Kernel.LoopMessages
-open Wanxiangshu.Kernel.PromptFrontMatter
+open Wanxiangshu.Runtime.ReviewRuntime
+open Wanxiangshu.Runtime.LoopMessages
+open Wanxiangshu.Runtime.PromptFrontMatter
 
 [<Import("createRequire", "node:module")>]
 let private createRequire': string -> (string -> obj) = jsNative
@@ -180,9 +180,9 @@ let testInvestigatorCrashWithUndefinedCaps () =
                                 [ "type", box "text"
                                   "text", box "---\nobjective: hello objective\n---\nhello text" ] |] ] |]
 
-        Wanxiangshu.Omp.ChildSession.markChildSession Wanxiangshu.Omp.ExecutorTools.ompScope "sess-test"
+        Wanxiangshu.Hosts.Omp.ChildSession.markChildSession Wanxiangshu.Hosts.Omp.ExecutorTools.ompScope "sess-test"
 
-        Wanxiangshu.Omp.ExecutorTools.ompScope.RegisterTempFiles(
+        Wanxiangshu.Hosts.Omp.ExecutorTools.ompScope.RegisterTempFiles(
             "sess-test\u0000hello objective",
             [ "valid-cap.md"; "polluted-cap.md" ]
         )
@@ -250,11 +250,18 @@ let testInvestigatorCrashWithUndefinedCaps () =
             check "has valid-cap tool part" hasGood
             check "does not have polluted-cap tool part" (not hasBad)
 
-            Wanxiangshu.Omp.ChildSession.unmarkChildSession Wanxiangshu.Omp.ExecutorTools.ompScope "sess-test"
+            Wanxiangshu.Hosts.Omp.ChildSession.unmarkChildSession
+                Wanxiangshu.Hosts.Omp.ExecutorTools.ompScope
+                "sess-test"
+
             do! rmAsync root
         with e ->
             mockedPaths.Remove(root) |> ignore
-            Wanxiangshu.Omp.ChildSession.unmarkChildSession Wanxiangshu.Omp.ExecutorTools.ompScope "sess-test"
+
+            Wanxiangshu.Hosts.Omp.ChildSession.unmarkChildSession
+                Wanxiangshu.Hosts.Omp.ExecutorTools.ompScope
+                "sess-test"
+
             do! rmAsync root
             raise e
     }

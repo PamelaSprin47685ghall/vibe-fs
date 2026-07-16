@@ -5,10 +5,11 @@ open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Kernel.HostTools
 open Wanxiangshu.Kernel.Messaging
 open Wanxiangshu.Kernel.ContextBudget
-open Wanxiangshu.Kernel.BacklogProjectionCore
-open Wanxiangshu.Shell
-open Wanxiangshu.Shell.MessageTransformCore
-open Wanxiangshu.Shell.MessageTransformPipeline
+open Wanxiangshu.Runtime.BacklogProjectionBuild
+open Wanxiangshu.Kernel.Backlog.BacklogTypes
+open Wanxiangshu.Runtime
+open Wanxiangshu.Runtime.MessageTransform.Plan
+open Wanxiangshu.Runtime.MessageTransform.Pipeline
 
 let spec_applyContextBudget_afterTodoResets () =
     promise {

@@ -3,10 +3,10 @@ module Wanxiangshu.Tests.PluginMimoTuiTests
 open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Tests.Assert
-open Wanxiangshu.Shell.Dyn
+open Wanxiangshu.Runtime.Dyn
 
-module Dyn = Wanxiangshu.Shell.Dyn
-open Wanxiangshu.Opencode.PluginMimoTui
+module Dyn = Wanxiangshu.Runtime.Dyn
+open Wanxiangshu.Hosts.Opencode.PluginMimoTui
 
 let private childRow (id: string) (title: string) (updated: float) : obj =
     box (

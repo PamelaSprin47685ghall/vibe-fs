@@ -3,16 +3,16 @@ module Wanxiangshu.Tests.SembleReviewerInjectionTests
 open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Tests.Assert
-open Wanxiangshu.Shell
-open Wanxiangshu.Shell.SembleSearch
-open Wanxiangshu.Shell.SembleSearchClient
-open Wanxiangshu.Opencode.MessageTransform
-open Wanxiangshu.Shell.MessageTransformPipeline
-open Wanxiangshu.Shell.MessageTransformHostEntry
-open Wanxiangshu.Shell.MessageTransformCore
+open Wanxiangshu.Runtime
+open Wanxiangshu.Runtime.SembleSearch
+open Wanxiangshu.Runtime.SembleSearchClient
+open Wanxiangshu.Hosts.Opencode.MessageTransform
+open Wanxiangshu.Runtime.MessageTransform.Pipeline
+open Wanxiangshu.Runtime.MessageTransform.HostEntry
+open Wanxiangshu.Runtime.MessageTransform.Plan
 open Wanxiangshu.Kernel.Messaging
 open Wanxiangshu.Kernel.HostTools
-open Wanxiangshu.Shell.ReviewRuntime
+open Wanxiangshu.Runtime.ReviewRuntime
 
 let testSembleInjectsForReviewer () =
     promise {
@@ -113,7 +113,7 @@ let testAmendSkippedWhenSembleInjectEnabled () =
               Cleaned = msgs
               RawArray = None
               SembleInjectEnabled = true
-              Scope = Wanxiangshu.Shell.RuntimeScope.create ()
+              Scope = Wanxiangshu.Runtime.RuntimeScope.create ()
               MaxInputTokens = 200000
               GetContextUsage = (fun _ -> Promise.lift None) }
 

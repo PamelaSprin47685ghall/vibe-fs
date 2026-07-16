@@ -1,8 +1,10 @@
 module Wanxiangshu.Tests.ToolExecuteTests
 
 open Wanxiangshu.Tests.Assert
-open Wanxiangshu.Shell.ToolExecute
-open Wanxiangshu.Kernel.Domain
+open Wanxiangshu.Runtime.ToolExecute
+open Wanxiangshu.Kernel.Primitives.Identity
+open Wanxiangshu.Kernel.Errors.DomainError
+open Wanxiangshu.Kernel.Session.Causality
 open Wanxiangshu.Kernel.SubagentIntents
 open Wanxiangshu.Kernel.ToolArgs
 

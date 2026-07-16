@@ -8,10 +8,10 @@ open Wanxiangshu.Tests.EventLogTestSeed
 open Wanxiangshu.Tests.IntegrationToolSetup
 open Wanxiangshu.Tests.IntegrationMuxSetup
 
-open Wanxiangshu.Kernel.LoopMessages
-open Wanxiangshu.Kernel.ReviewPrompts
-open Wanxiangshu.Mux.Plugin
-open Wanxiangshu.Shell.Dyn
+open Wanxiangshu.Runtime.LoopMessages
+open Wanxiangshu.Runtime.ReviewPrompts
+open Wanxiangshu.Hosts.Mux.Plugin
+open Wanxiangshu.Runtime.Dyn
 
 
 let muxSubmitReviewNoActiveReviewSpec () =

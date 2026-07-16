@@ -2,7 +2,7 @@ module Wanxiangshu.Kernel.WorkBacklog
 
 open Wanxiangshu.Kernel.HostTools
 open Wanxiangshu.Kernel.Messaging
-open Wanxiangshu.Kernel.BacklogProjectionCore
+open Wanxiangshu.Kernel.Backlog.BacklogTypes
 
 let private toolDescriptionHeader =
     "Manage a structured todo list and preserve a compact append-only work backlog. "

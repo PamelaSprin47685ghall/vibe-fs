@@ -9,7 +9,7 @@
 ## 隔离纪律
 
 - **仅**依赖 `Kernel` + `Shell`
-- 禁止 `open` `Wanxiangshu.Opencode`、`Wanxiangshu.Mux`、`engine/`（架构测试 `ompBoundary`、`ompNoEngineRef`）
+- 禁止 `open` `Wanxiangshu.Hosts.Opencode`、`Wanxiangshu.Mux`、`engine/`（架构测试 `ompBoundary`、`ompNoEngineRef`）
 
 ## 工具
 

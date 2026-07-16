@@ -1,19 +1,19 @@
 module Wanxiangshu.Tests.ReviewTestsPrompts
 
 open Wanxiangshu.Tests.Assert
-open Wanxiangshu.Kernel.LoopMessages
-open Wanxiangshu.Kernel.PromptFrontMatter
+open Wanxiangshu.Runtime.LoopMessages
+open Wanxiangshu.Runtime.PromptFrontMatter
 
 let doubleCheckAnchorReplay () =
     check "empty history -> no anchor" (not (hasDoubleCheckAnchor []))
     check "plain prose -> no anchor" (not (hasDoubleCheckAnchor [ "just a message"; "another" ]))
-    let prompt = Wanxiangshu.Kernel.ReviewPrompts.doubleCheckPrompt "ship feature X"
+    let prompt = Wanxiangshu.Runtime.ReviewPrompts.doubleCheckPrompt "ship feature X"
     check "double-check prompt carries anchor" (hasDoubleCheckAnchor [ prompt ])
     check "anchor survives mixed history" (hasDoubleCheckAnchor [ "earlier msg"; prompt; "later msg" ])
 
 let doubleCheckPromptFormat () =
     let prompt =
-        Wanxiangshu.Kernel.ReviewPrompts.doubleCheckPrompt "build the login page"
+        Wanxiangshu.Runtime.ReviewPrompts.doubleCheckPrompt "build the login page"
 
     check "has front-matter fence" (prompt.Contains "---")
     check "has double-check field" (prompt.Contains "double-check:")
@@ -21,7 +21,7 @@ let doubleCheckPromptFormat () =
     check "asks for re-submission" (prompt.Contains "REVISE with detailed feedback")
 
     let multiline =
-        Wanxiangshu.Kernel.ReviewPrompts.doubleCheckPrompt "task with\nnewline and ### markdown"
+        Wanxiangshu.Runtime.ReviewPrompts.doubleCheckPrompt "task with\nnewline and ### markdown"
 
     check "multiline original_task uses block field" (multiline.Contains "original_task: |")
     let parsed = parseFrontMatterScalars multiline
@@ -33,7 +33,7 @@ let doubleCheckPromptFormat () =
 
 let reviewerPromptFormat () =
     let prompt =
-        Wanxiangshu.Kernel.ReviewPrompts.reviewerPrompt "ship S1" "changed A and B" [ "a.fs"; "b.fs" ]
+        Wanxiangshu.Runtime.ReviewPrompts.reviewerPrompt "ship S1" "changed A and B" [ "a.fs"; "b.fs" ]
 
     check "has front-matter fence" (prompt.Contains "---")
     check "embeds original_task in front matter" (prompt.Contains "original_task:" && prompt.Contains "ship S1")
@@ -45,12 +45,12 @@ let reviewerPromptFormat () =
     check "no ugly Task header" (not (prompt.Contains "=== Task ==="))
     check "no ugly Change Report header" (not (prompt.Contains "=== Change Report ==="))
     check "no change_report front-matter field" (not (prompt.Contains "change_report:"))
-    let minimal = Wanxiangshu.Kernel.ReviewPrompts.reviewerPrompt "only task" "" []
+    let minimal = Wanxiangshu.Runtime.ReviewPrompts.reviewerPrompt "only task" "" []
     check "minimal prompt embeds task" (minimal.Contains "only task")
     check "minimal prompt has no worker report section" (not (minimal.Contains "# Worker Report"))
     check "minimal prompt omits affected_files when empty" (not (minimal.Contains "affected_files:"))
     let multilineTask = "Line one of task\nLine two with ### markdown\nLine three"
-    let mp = Wanxiangshu.Kernel.ReviewPrompts.reviewerPrompt multilineTask "" []
+    let mp = Wanxiangshu.Runtime.ReviewPrompts.reviewerPrompt multilineTask "" []
     let parsed = parseFrontMatterScalars mp
 
     equal
@@ -60,7 +60,7 @@ let reviewerPromptFormat () =
 
 let muxReviewerVerdictPromptFormat () =
     let prompt =
-        Wanxiangshu.Kernel.ReviewPrompts.reviewSubmissionVerdictPrompt "ship S1" "changed A and B" [ "a.fs"; "b.fs" ]
+        Wanxiangshu.Runtime.ReviewPrompts.reviewSubmissionVerdictPrompt "ship S1" "changed A and B" [ "a.fs"; "b.fs" ]
 
     check "mux prompt starts with front-matter" (prompt.StartsWith "---")
     check "mux prompt has no role field" (not (prompt.Contains "role:"))
@@ -75,7 +75,7 @@ let muxReviewerVerdictPromptFormat () =
 
 let muxPreReviewVerdictPromptFormat () =
     let prompt =
-        Wanxiangshu.Kernel.ReviewPrompts.preReviewVerdictPrompt "clarify rollout"
+        Wanxiangshu.Runtime.ReviewPrompts.preReviewVerdictPrompt "clarify rollout"
 
     check "pre-review prompt starts with front-matter" (prompt.StartsWith "---")
     check "pre-review prompt has no role field" (not (prompt.Contains "role:"))
@@ -90,7 +90,7 @@ let muxPreReviewVerdictPromptFormat () =
     check "pre-review prompt has no legacy divider" (not (prompt.Contains "==="))
 
 let reviewInstructionsFrontMatter () =
-    let instr = Wanxiangshu.Kernel.ReviewPrompts.reviewInstructions
+    let instr = Wanxiangshu.Runtime.ReviewPrompts.reviewInstructions
     check "instructions are review prose" (instr.Contains "You are a code reviewer performing")
     check "instructions carry review criteria" (instr.Contains "# Evaluation Criteria")
     check "instructions mention return_reviewer" (instr.Contains "return_reviewer")

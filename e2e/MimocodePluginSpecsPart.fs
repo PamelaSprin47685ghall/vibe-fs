@@ -2,7 +2,7 @@ module Wanxiangshu.E2e.MimocodePluginSpecsPart
 
 open Fable.Core
 open Fable.Core.JsInterop
-open Wanxiangshu.Shell.Dyn
+open Wanxiangshu.Runtime.Dyn
 
 type Harness =
     abstract plugin: obj

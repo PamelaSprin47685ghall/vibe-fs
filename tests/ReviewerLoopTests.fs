@@ -5,11 +5,11 @@ open Fable.Core.JsInterop
 open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Tests.AsyncFlush
 open Wanxiangshu.Kernel.ReviewSession.Types
-open Wanxiangshu.Shell.ReviewRuntime
-open Wanxiangshu.Shell.ChildAgentRegistry
-open Wanxiangshu.Opencode.ReviewerLoop
+open Wanxiangshu.Runtime.ReviewRuntime
+open Wanxiangshu.Runtime.ChildAgentRegistry
+open Wanxiangshu.Hosts.Opencode.ReviewerLoop
 
-let makeFakeClient (store: Wanxiangshu.Shell.ReviewRuntime.ReviewStore) (childID: string) : obj =
+let makeFakeClient (store: Wanxiangshu.Runtime.ReviewRuntime.ReviewStore) (childID: string) : obj =
     let session =
         createObj
             [ "create", box (fun (arg: obj) -> Promise.lift (box {| data = box {| id = childID |} |}))

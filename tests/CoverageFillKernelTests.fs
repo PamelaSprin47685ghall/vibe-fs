@@ -4,9 +4,13 @@ open Fable.Core
 open Fable.Core.JsInterop
 open System
 open Wanxiangshu.Tests.Assert
-open Wanxiangshu.Kernel.Domain
-open Wanxiangshu.Kernel.Domain.Id
+open Wanxiangshu.Kernel.Primitives.Identity
+open Wanxiangshu.Kernel.Errors.DomainError
+open Wanxiangshu.Kernel.Session.Causality
+open Wanxiangshu.Kernel.Primitives.Identity.Id
+open Wanxiangshu.Kernel.WorkspaceState
 open Wanxiangshu.Kernel.Messaging
+open Wanxiangshu.Runtime.MessageSourceClassify
 open Wanxiangshu.Kernel.ToolExecutionStatusModule
 open Wanxiangshu.Kernel.HostTools
 
@@ -107,11 +111,11 @@ let domainReduce () =
         | Error msg -> failwith ("childId failed: " + msg)
 
     let s =
-        reduce Wanxiangshu.Kernel.Domain.empty (ChildRegistered(cid1, { agent = "a"; parentSessionId = None }))
+        reduce Wanxiangshu.Kernel.WorkspaceState.empty (ChildRegistered(cid1, { agent = "a"; parentSessionId = None }))
 
     check "reduce adds child" (Map.count s.childSessions = 1)
     let s2 = reduce s (ChildUnregistered cid1)
-    equal "reduce unregister idempotent to empty" Wanxiangshu.Kernel.Domain.empty s2
+    equal "reduce unregister idempotent to empty" Wanxiangshu.Kernel.WorkspaceState.empty s2
 
 // ── Kernel.Messaging ───────────────────────────────────────────────────────
 

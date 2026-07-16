@@ -3,8 +3,8 @@ module Wanxiangshu.Tests.ResolveAiSettingsTests
 open Fable.Core.JsInterop
 open Wanxiangshu.Tests.Assert
 
-open Wanxiangshu.Mux.AiSettings
-open Wanxiangshu.Shell.MuxAiSettingsCodec
+open Wanxiangshu.Hosts.Mux.AiSettings
+open Wanxiangshu.Runtime.MuxAiSettingsCodec
 
 let private settingsEqual
     (label: string)

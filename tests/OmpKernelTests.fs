@@ -2,8 +2,8 @@ module Wanxiangshu.Tests.OmpKernelTests
 
 open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Kernel.OmpSessionTools
-open Wanxiangshu.Kernel.ReviewPrompts
-open Wanxiangshu.Kernel.SubagentPrompts
+open Wanxiangshu.Runtime.ReviewPrompts
+open Wanxiangshu.Runtime.SubagentPrompts
 open Wanxiangshu.Kernel.WebFetchGuard
 
 let private mainSessionActive =

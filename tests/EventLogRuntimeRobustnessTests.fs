@@ -4,12 +4,15 @@ open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Tests.TempWorkspace
-open Wanxiangshu.Kernel.EventLog.Types
-open Wanxiangshu.Kernel.EventLog.Fold
+open Wanxiangshu.Kernel.EventSourcing.EventEnvelope
+open Wanxiangshu.Kernel.EventSourcing.EventKind
+open Wanxiangshu.Kernel.EventSourcing.Fold
 open Wanxiangshu.Kernel.Nudge
-open Wanxiangshu.Shell.EventLogCodec
-open Wanxiangshu.Shell.EventLogFiles
-open Wanxiangshu.Shell.EventLogRuntime
+open Wanxiangshu.Kernel.Review
+open Wanxiangshu.Kernel.Backlog
+open Wanxiangshu.Runtime.EventLogCodec
+open Wanxiangshu.Runtime.EventLogFiles
+open Wanxiangshu.Runtime.EventLogRuntime
 
 let testAppendEventFailsMemoryNotPolluted () =
     promise {
@@ -69,7 +72,7 @@ let testTryClaimNudgeDispatchFailsMemoryNotPolluted () =
         let mockAppend (_: string) (_: WanEvent) : JS.Promise<unit> = Promise.reject (exn "mock disk full")
         let store = EventLogStore(dir, appendLineOverride = mockAppend)
         let sessionId = "s-claim-fail"
-        let anchor = nudgeAnchorKey "" ""
+        let anchor = Wanxiangshu.Kernel.Nudge.NudgeProjection.nudgeAnchorKey "" ""
         let isBlocked _ _ = false
 
         let! claimRes =

@@ -2,8 +2,8 @@ module Wanxiangshu.Tests.Wanxiangzhen.CommandHookTests
 
 open Fable.Core
 open Fable.Core.JsInterop
-open Wanxiangshu.Opencode.PluginWanxiangzhenHooks
-open Wanxiangshu.Shell.Dyn
+open Wanxiangshu.Hosts.Opencode.PluginWanxiangzhenHooks
+open Wanxiangshu.Runtime.Dyn
 open Wanxiangshu.Tests.Wanxiangzhen.AssertCompat
 
 let entries () : (string * (unit -> unit)) list =

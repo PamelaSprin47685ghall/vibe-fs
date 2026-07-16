@@ -5,9 +5,9 @@ open Fable.Core.JsInterop
 open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Kernel.Messaging
 open Wanxiangshu.Kernel.ToolExecutionStatusModule
-open Wanxiangshu.Shell.Dyn
-open Wanxiangshu.Kernel.CapsFormat
-open Wanxiangshu.Shell.SembleSearch
+open Wanxiangshu.Runtime.Dyn
+open Wanxiangshu.Runtime.CapsFormat
+open Wanxiangshu.Runtime.SembleSearch
 
 [<Global("process")>]
 let private procEnv: obj = jsNative

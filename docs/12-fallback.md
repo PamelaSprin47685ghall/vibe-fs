@@ -263,4 +263,4 @@ IdempotencyKey
 - [05-event-sourcing.md](./05-event-sourcing.md) § 续命事件
 - [10-message-transform.md](./10-message-transform.md) § 空输出处理
 - [11-subagents.md](./11-subagents.md) § 子会话 Actor 与 Fallback 协作
-- [04-shell.md](./04-shell.md)
+- [04-runtime.md](./04-runtime.md)

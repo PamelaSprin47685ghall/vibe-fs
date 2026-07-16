@@ -4,9 +4,10 @@ open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Kernel.Executor
+open Wanxiangshu.Runtime.ExecutorFormat
 open Wanxiangshu.Kernel.TreeSitterKernel
-open Wanxiangshu.Shell.ToolExecute
-open Wanxiangshu.Shell.TreeSitterShell
+open Wanxiangshu.Runtime.ToolExecute
+open Wanxiangshu.Runtime.TreeSitterShell
 
 let checkSyntaxBadJson () =
     promise {

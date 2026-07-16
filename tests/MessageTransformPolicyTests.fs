@@ -6,14 +6,14 @@ open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Kernel.MessageTransformPolicy
 open Wanxiangshu.Kernel.HostTools
 open Wanxiangshu.Kernel.Messaging
-open Wanxiangshu.Kernel.CapsFormat
-open Wanxiangshu.Shell.MessageTransformCore
-open Wanxiangshu.Shell.MessageTransformPipeline
-open Wanxiangshu.Shell.MessageTransformHostEntry
-open Wanxiangshu.Shell.ReviewRuntime
-open Wanxiangshu.Kernel.BacklogProjectionCore
+open Wanxiangshu.Runtime.CapsFormat
+open Wanxiangshu.Runtime.MessageTransform.Plan
+open Wanxiangshu.Runtime.MessageTransform.Pipeline
+open Wanxiangshu.Runtime.MessageTransform.HostEntry
+open Wanxiangshu.Runtime.ReviewRuntime
+open Wanxiangshu.Runtime.BacklogProjectionBuild
 
-module Dyn = Wanxiangshu.Shell.Dyn
+module Dyn = Wanxiangshu.Runtime.Dyn
 
 let defaultExcludedTrue () =
     let agents = [ "browser"; "investigator"; "executor"; "title"; "compaction" ]
@@ -60,7 +60,7 @@ let testCapsSlotReuse () =
     promise {
         let reviewStore = createReviewStore ()
 
-        let scope = Wanxiangshu.Shell.RuntimeScope.create ()
+        let scope = Wanxiangshu.Runtime.RuntimeScope.create ()
 
         let capsObj =
             box (
@@ -205,7 +205,7 @@ let testSingleToolCallPromptInjection () =
                   Cleaned = msgs
                   RawArray = None
                   SembleInjectEnabled = false
-                  Scope = Wanxiangshu.Shell.RuntimeScope.create ()
+                  Scope = Wanxiangshu.Runtime.RuntimeScope.create ()
                   MaxInputTokens = 200000
                   GetContextUsage = (fun _ -> Promise.lift None) }
 

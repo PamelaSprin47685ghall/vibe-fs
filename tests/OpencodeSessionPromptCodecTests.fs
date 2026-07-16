@@ -3,7 +3,7 @@ module Wanxiangshu.Tests.OpencodeSessionPromptCodecTests
 open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Tests.Assert
-open Wanxiangshu.Shell.OpencodeSessionPromptCodec
+open Wanxiangshu.Runtime.OpencodeSessionPromptCodec
 
 let private providerId (m: obj) = unbox<string> m?providerID
 let private modelId (m: obj) = unbox<string> m?modelID

@@ -7,23 +7,23 @@ open Wanxiangshu.Tests.TempWorkspace
 open Wanxiangshu.Tests.IntegrationToolSetup
 
 open Wanxiangshu.Kernel.CapsSynthPolicy
-open Wanxiangshu.Kernel.Message
-open Wanxiangshu.Mux.Plugin
-open Wanxiangshu.Opencode.Plugin
-open Wanxiangshu.Mux.AiSettings
-open Wanxiangshu.Mux.BacklogSession
-open Wanxiangshu.Mux.MessageTransform
-open Wanxiangshu.Shell.ChildAgentRegistry
-open Wanxiangshu.Shell.ReviewRuntime
-open Wanxiangshu.Shell.Dyn
-open Wanxiangshu.Shell.MuxWorkspaceCodec
+open Wanxiangshu.Kernel.Messaging
+open Wanxiangshu.Hosts.Mux.Plugin
+open Wanxiangshu.Hosts.Opencode.Plugin
+open Wanxiangshu.Hosts.Mux.AiSettings
+open Wanxiangshu.Hosts.Mux.BacklogSession
+open Wanxiangshu.Hosts.Mux.MessageTransform
+open Wanxiangshu.Runtime.ChildAgentRegistry
+open Wanxiangshu.Runtime.ReviewRuntime
+open Wanxiangshu.Runtime.Dyn
+open Wanxiangshu.Runtime.MuxWorkspaceCodec
 
-module Dyn = Wanxiangshu.Shell.Dyn
+module Dyn = Wanxiangshu.Runtime.Dyn
 
-open Wanxiangshu.Omp
-open Wanxiangshu.Omp.MessageTransform
-open Wanxiangshu.Omp.ChildSession
-open Wanxiangshu.Shell.RuntimeScope
+open Wanxiangshu.Hosts.Omp
+open Wanxiangshu.Hosts.Omp.MessageTransform
+open Wanxiangshu.Hosts.Omp.ChildSession
+open Wanxiangshu.Runtime.RuntimeScope
 
 let private mockMuxUserMsg (id: string) (prompt: string) : obj =
     let parts =
@@ -57,12 +57,12 @@ let muxSubsessionParentIDSpec () =
                   "findWorkspaceEntry", box findWorkspaceEntryFn ]
 
         let parentOpt =
-            Wanxiangshu.Shell.MuxWorkspaceCodec.tryGetParentWorkspaceId mockDeps childSessionID
+            Wanxiangshu.Runtime.MuxWorkspaceCodec.tryGetParentWorkspaceId mockDeps childSessionID
 
         check "parent workspace is parent-ws-A" (parentOpt = Some parentSessionID)
 
         let isChild =
-            Wanxiangshu.Shell.MuxWorkspaceCodec.isChildWorkspace mockDeps childSessionID
+            Wanxiangshu.Runtime.MuxWorkspaceCodec.isChildWorkspace mockDeps childSessionID
 
         check "is child workspace" isChild
 
@@ -76,9 +76,17 @@ let muxSubsessionParentIDSpec () =
                   "sessionID", box childSessionID
                   "workspacePath", box workspaceDir ]
 
-        let backlogSession = Wanxiangshu.Mux.BacklogSession.BacklogSession(scope)
+        let backlogSession = Wanxiangshu.Hosts.Mux.BacklogSession.BacklogSession(scope)
         let reviewStore = createReviewStore ()
-        do! Wanxiangshu.Mux.MessageTransform.messagesTransform mockDeps scope backlogSession reviewStore input output
+
+        do!
+            Wanxiangshu.Hosts.Mux.MessageTransform.messagesTransform
+                mockDeps
+                scope
+                backlogSession
+                reviewStore
+                input
+                output
 
         let msgs = unbox<obj[]> (get output "messages")
         let mutable foundMuxParentRead = false

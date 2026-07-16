@@ -2,7 +2,7 @@ module Wanxiangshu.Tests.SubagentPromptsTests
 
 open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Kernel.SubagentIntents
-open Wanxiangshu.Kernel.SubagentPrompts
+open Wanxiangshu.Runtime.SubagentPrompts
 
 let private sampleCoderIntent: CoderIntent =
     { objective = "Add auth"
@@ -56,7 +56,7 @@ let browserPromptContainsStealth () =
     check "contains stealth" (p.Contains "stealth-browser")
 
 let meditatorPromptContainsQuestion () =
-    let dummyEntry: Wanxiangshu.Methodology.SchemaCommon.MethodologyEntry =
+    let dummyEntry: Wanxiangshu.Kernel.Methodology.Schema.MethodologyEntry =
         { methodologyId = "test_methodology"
           shortDefinition = "test def"
           triggerWhen = "test trigger"
@@ -65,7 +65,7 @@ let meditatorPromptContainsQuestion () =
           outputSections = [] }
 
     let p =
-        Wanxiangshu.Methodology.SchemaCommon.renderMeditatorIntent
+        Wanxiangshu.Kernel.Methodology.Schema.renderMeditatorIntent
             dummyEntry
             "Analyze auth"
             "JWT background"

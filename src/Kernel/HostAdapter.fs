@@ -1,7 +1,8 @@
 module Wanxiangshu.Kernel.HostAdapter
 
-open Fable.Core
-open Wanxiangshu.Kernel.Domain
+open Wanxiangshu.Kernel.Primitives.Identity
+open Wanxiangshu.Kernel.Errors.DomainError
+open Wanxiangshu.Kernel.Session.Causality
 
 /// Subagent role discriminant. One case per logical agent type.
 type SubagentRole =
@@ -25,13 +26,3 @@ type SubagentResponse =
     | Spawned of childID: string * report: string
     | Failure of DomainError
     | Aborted
-
-/// Host adapter abstracts per-host child-session spawning and session lookup.
-/// Implementations live in Shell/Opencode, Shell/Mux, Shell/Omp.
-type IHostAdapter =
-    abstract WorkspaceRoot: string
-    abstract SessionId: string
-    abstract SpawnSubagent: request: SubagentRequest -> JS.Promise<SubagentResponse>
-    abstract ContinueSubagent: childID: string * agent: string * prompt: string -> JS.Promise<SubagentResponse>
-    abstract RegisterTempFiles: prompt: string * files: string list -> unit
-    abstract TryGetTempFiles: prompt: string -> string list option

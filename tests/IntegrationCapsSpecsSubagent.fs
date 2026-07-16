@@ -7,20 +7,20 @@ open Wanxiangshu.Tests.TempWorkspace
 open Wanxiangshu.Tests.IntegrationToolSetup
 
 open Wanxiangshu.Kernel.CapsSynthPolicy
-open Wanxiangshu.Kernel.Message
-open Wanxiangshu.Mux.Plugin
-open Wanxiangshu.Opencode.Plugin
-open Wanxiangshu.Mux.AiSettings
-open Wanxiangshu.Shell.ChildAgentRegistry
-open Wanxiangshu.Shell.ReviewRuntime
-open Wanxiangshu.Shell.Dyn
+open Wanxiangshu.Kernel.Messaging
+open Wanxiangshu.Hosts.Mux.Plugin
+open Wanxiangshu.Hosts.Opencode.Plugin
+open Wanxiangshu.Hosts.Mux.AiSettings
+open Wanxiangshu.Runtime.ChildAgentRegistry
+open Wanxiangshu.Runtime.ReviewRuntime
+open Wanxiangshu.Runtime.Dyn
 
-module Dyn = Wanxiangshu.Shell.Dyn
+module Dyn = Wanxiangshu.Runtime.Dyn
 
-open Wanxiangshu.Omp
-open Wanxiangshu.Omp.MessageTransform
-open Wanxiangshu.Omp.ChildSession
-open Wanxiangshu.Shell.RuntimeScope
+open Wanxiangshu.Hosts.Omp
+open Wanxiangshu.Hosts.Omp.MessageTransform
+open Wanxiangshu.Hosts.Omp.ChildSession
+open Wanxiangshu.Runtime.RuntimeScope
 
 let private mockUserMsg (id: string) (sessionID: string) (prompt: string) : obj =
     let info =
@@ -150,12 +150,12 @@ let opencodeSubsessionParentIDSpec () =
         let input = createObj [ "agent", box "coder"; "sessionID", box childSessionID ]
 
         let backlogSession =
-            Wanxiangshu.Opencode.BacklogSession.BacklogSession(Wanxiangshu.Kernel.HostTools.Host.Mimocode, scope)
+            Wanxiangshu.Hosts.Opencode.BacklogSession.BacklogSession(Wanxiangshu.Kernel.HostTools.Host.Mimocode, scope)
 
         let reviewStore = createReviewStore ()
 
         do!
-            Wanxiangshu.Opencode.MessageTransform.messagesTransform
+            Wanxiangshu.Hosts.Opencode.MessageTransform.messagesTransform
                 registry
                 workspaceDir
                 scope

@@ -5,12 +5,12 @@ open Fable.Core.JsInterop
 open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Tests.IntegrationToolSetup
 open Wanxiangshu.Tests.IntegrationMuxSetup
-open Wanxiangshu.Kernel.BacklogProjectionCore
+open Wanxiangshu.Runtime.BacklogProjectionBuild
 open Wanxiangshu.Kernel.HostTools
-open Wanxiangshu.Kernel.ToolOutputInfo
-open Wanxiangshu.Mux.Plugin
-open Wanxiangshu.Shell.RuntimeScope
-open Wanxiangshu.Shell.Dyn
+open Wanxiangshu.Runtime.ToolOutputInfo
+open Wanxiangshu.Hosts.Mux.Plugin
+open Wanxiangshu.Runtime.RuntimeScope
+open Wanxiangshu.Runtime.Dyn
 open Wanxiangshu.Tests.TempWorkspace
 
 let muxTodoWriteWrapperSchemaSpec () =
@@ -183,31 +183,31 @@ let muxBacklogProjectionSpec () =
                     | "high" -> Wanxiangshu.Kernel.ToolArgs.TodoItemPriority.High
                     | _ -> Wanxiangshu.Kernel.ToolArgs.TodoItemPriority.Low
 
-                { Wanxiangshu.Shell.WorkBacklogToolsCodec.TodoWriteArgs.AhaMoments = report
-                  Wanxiangshu.Shell.WorkBacklogToolsCodec.TodoWriteArgs.ChangesAndReasons = report + "_changes"
-                  Wanxiangshu.Shell.WorkBacklogToolsCodec.TodoWriteArgs.Gotchas = report + "_gotchas"
-                  Wanxiangshu.Shell.WorkBacklogToolsCodec.TodoWriteArgs.LessonsAndConventions = report + "_lessons"
-                  Wanxiangshu.Shell.WorkBacklogToolsCodec.TodoWriteArgs.Plan = report + "_plan"
-                  Wanxiangshu.Shell.WorkBacklogToolsCodec.TodoWriteArgs.Todos =
-                    [| { Wanxiangshu.Shell.WorkBacklogToolsCodec.TodoItem.Content = content
-                         Wanxiangshu.Shell.WorkBacklogToolsCodec.TodoItem.Status = parsedStatus
-                         Wanxiangshu.Shell.WorkBacklogToolsCodec.TodoItem.Priority = parsedPriority } |]
-                  Wanxiangshu.Shell.WorkBacklogToolsCodec.TodoWriteArgs.SelectMethodology = [] }
+                { Wanxiangshu.Runtime.WorkBacklogToolsCodec.TodoWriteArgs.AhaMoments = report
+                  Wanxiangshu.Runtime.WorkBacklogToolsCodec.TodoWriteArgs.ChangesAndReasons = report + "_changes"
+                  Wanxiangshu.Runtime.WorkBacklogToolsCodec.TodoWriteArgs.Gotchas = report + "_gotchas"
+                  Wanxiangshu.Runtime.WorkBacklogToolsCodec.TodoWriteArgs.LessonsAndConventions = report + "_lessons"
+                  Wanxiangshu.Runtime.WorkBacklogToolsCodec.TodoWriteArgs.Plan = report + "_plan"
+                  Wanxiangshu.Runtime.WorkBacklogToolsCodec.TodoWriteArgs.Todos =
+                    [| { Wanxiangshu.Runtime.WorkBacklogToolsCodec.TodoItem.Content = content
+                         Wanxiangshu.Runtime.WorkBacklogToolsCodec.TodoItem.Status = parsedStatus
+                         Wanxiangshu.Runtime.WorkBacklogToolsCodec.TodoItem.Priority = parsedPriority } |]
+                  Wanxiangshu.Runtime.WorkBacklogToolsCodec.TodoWriteArgs.SelectMethodology = [] }
 
             do!
-                Wanxiangshu.Shell.EventLogRuntime.appendWorkBacklogCommittedOrFail
+                Wanxiangshu.Runtime.EventLogRuntime.appendWorkBacklogCommittedOrFail
                     workspaceDir
                     "mux-magic-todo-session"
                     (todoEvent "planned phase" "Plan change" "in_progress" "high")
 
             do!
-                Wanxiangshu.Shell.EventLogRuntime.appendWorkBacklogCommittedOrFail
+                Wanxiangshu.Runtime.EventLogRuntime.appendWorkBacklogCommittedOrFail
                     workspaceDir
                     "mux-magic-todo-session"
                     (todoEvent "implemented phase" "Implement change" "completed" "high")
 
             do!
-                Wanxiangshu.Shell.EventLogRuntime.appendWorkBacklogCommittedOrFail
+                Wanxiangshu.Runtime.EventLogRuntime.appendWorkBacklogCommittedOrFail
                     workspaceDir
                     "mux-magic-todo-session"
                     (todoEvent "verified phase" "Verify change" "completed" "medium")

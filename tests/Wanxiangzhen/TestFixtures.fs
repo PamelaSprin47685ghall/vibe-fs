@@ -4,8 +4,8 @@ open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Kernel.Wanxiangzhen.Dag
 open Wanxiangshu.Kernel.Wanxiangzhen.SquadConfig
-open Wanxiangshu.Shell.PromiseQueue
-open Wanxiangshu.Shell.Wanxiangzhen.CoordinatorRuntime
+open Wanxiangshu.Runtime.PromiseQueue
+open Wanxiangshu.Runtime.Wanxiangzhen.CoordinatorRuntime
 
 // ══════════════════════════════════════════════════════════════════════════════
 // Shared no-op CoordinatorDeps (20 fields, all stubs)

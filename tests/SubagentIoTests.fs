@@ -3,8 +3,8 @@ module Wanxiangshu.Tests.SubagentIoTests
 open Fable.Core.JsInterop
 open Wanxiangshu.Tests.Assert
 
-module DynModule = Wanxiangshu.Shell.Dyn
-open Wanxiangshu.Shell.SubagentIo
+module DynModule = Wanxiangshu.Runtime.Dyn
+open Wanxiangshu.Runtime.SubagentIo
 
 let noOutputMessageIsNoOutputText () =
     equal "no output" noOutputText (noOutputMessage ())

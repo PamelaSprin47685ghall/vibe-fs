@@ -7,7 +7,7 @@ open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Kernel.HostTools
 open Wanxiangshu.Kernel.Messaging
 open Wanxiangshu.Kernel.ToolExecutionStatusModule
-open Wanxiangshu.Kernel.BacklogProjectionCore
+open Wanxiangshu.Runtime.BacklogProjectionBuild
 open Wanxiangshu.Kernel.ReviewSession.Types
 
 // ── Kernel.ReviewSession.Types ─────────────────────────────────────────────

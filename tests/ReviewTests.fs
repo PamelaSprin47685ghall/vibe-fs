@@ -3,7 +3,7 @@ module Wanxiangshu.Tests.ReviewTests
 open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Kernel.ReviewSession
 open Wanxiangshu.Kernel.ReviewSession.Types
-open Wanxiangshu.Shell.ReviewRuntime
+open Wanxiangshu.Runtime.ReviewRuntime
 
 open Wanxiangshu.Tests.ReviewTestsReplay
 open Wanxiangshu.Tests.ReviewTestsPrompts

@@ -5,7 +5,7 @@ open Fable.Core.JsInterop
 open System
 open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Kernel.Methodology
-open Wanxiangshu.Methodology.Registry
+open Wanxiangshu.Kernel.Methodology.Registry
 open Wanxiangshu.Kernel.OmpPrompts
 open Wanxiangshu.Kernel.ToolArgs
 open Wanxiangshu.Kernel.ToolResult
@@ -13,6 +13,7 @@ open Wanxiangshu.Kernel.ReviewReplayPolicy
 open Wanxiangshu.Kernel.ReviewSession.Types
 open Wanxiangshu.Kernel.Config
 open Wanxiangshu.Kernel.Executor
+open Wanxiangshu.Runtime.ExecutorFormat
 open Wanxiangshu.Kernel.Messaging
 open Wanxiangshu.Kernel.ToolExecutionStatusModule
 
@@ -160,7 +161,7 @@ let trWireEncodeResultOk () =
 
 let trWireEncodeResultError () =
     let text =
-        wireEncodeResult (Error(Wanxiangshu.Kernel.Domain.ToolNotPermitted("a", "t")))
+        wireEncodeResult (Error(Wanxiangshu.Kernel.Errors.DomainError.ToolNotPermitted("a", "t")))
 
     check "error contains failed" (text.Contains "failed")
     check "error contains not permitted" (text.Contains "not permitted")

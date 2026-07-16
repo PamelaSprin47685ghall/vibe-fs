@@ -3,8 +3,8 @@ module Wanxiangshu.Tests.KernelPromptSpecsSubagent
 open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Kernel.HostTools
 open Wanxiangshu.Kernel.SubagentIntents
-open Wanxiangshu.Kernel.Subagent
-open Wanxiangshu.Kernel.SubagentPrompts
+open Wanxiangshu.Runtime.Subagent
+open Wanxiangshu.Runtime.SubagentPrompts
 
 let subagentDispatch () =
     let host = opencode
@@ -92,7 +92,7 @@ let mimocodeFormatPromptAppendsAgentReportTail () =
         (not (opencodeBody.Contains "MUST call the agent_report"))
 
 let meditatorMentionsReadCapability () =
-    let dummyEntry: Wanxiangshu.Methodology.SchemaCommon.MethodologyEntry =
+    let dummyEntry: Wanxiangshu.Kernel.Methodology.Schema.MethodologyEntry =
         { methodologyId = "test_methodology"
           shortDefinition = "test def"
           triggerWhen = "test trigger"
@@ -101,7 +101,7 @@ let meditatorMentionsReadCapability () =
           outputSections = [] }
 
     let body =
-        Wanxiangshu.Methodology.SchemaCommon.renderMeditatorIntent
+        Wanxiangshu.Kernel.Methodology.Schema.renderMeditatorIntent
             dummyEntry
             "what is the core abstraction?"
             "my background"

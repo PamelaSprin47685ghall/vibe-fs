@@ -2,8 +2,10 @@ module Wanxiangshu.Tests.ErrorClassifyTests
 
 open Fable.Core.JsInterop
 open Wanxiangshu.Tests.Assert
-open Wanxiangshu.Shell.ErrorClassify
-open Wanxiangshu.Kernel.Domain
+open Wanxiangshu.Runtime.ErrorClassify
+open Wanxiangshu.Kernel.Primitives.Identity
+open Wanxiangshu.Kernel.Errors.DomainError
+open Wanxiangshu.Kernel.Session.Causality
 
 let translateAbortSignalByCode () =
     let e = unbox (createObj [ "code", box "ABORT_ERR" ])

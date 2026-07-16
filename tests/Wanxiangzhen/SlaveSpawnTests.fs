@@ -1,6 +1,6 @@
 module Wanxiangshu.Tests.Wanxiangzhen.SlaveSpawnTests
 
-open Wanxiangshu.Shell.Wanxiangzhen.SlaveSpawn
+open Wanxiangshu.Runtime.Wanxiangzhen.SlaveSpawn
 open Wanxiangshu.Tests.Wanxiangzhen.AssertCompat
 
 let wt = "/home/user/project/../worktree-squad-a1b2"

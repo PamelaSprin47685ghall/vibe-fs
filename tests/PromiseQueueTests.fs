@@ -3,7 +3,7 @@ module Wanxiangshu.Tests.PromiseQueueTests
 open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Tests.Assert
-open Wanxiangshu.Shell.PromiseQueue
+open Wanxiangshu.Runtime.PromiseQueue
 
 type TestObserver() =
     let messages = ResizeArray<string>()

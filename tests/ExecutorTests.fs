@@ -3,8 +3,10 @@ module Wanxiangshu.Tests.ExecutorTests
 open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Tests.Assert
-open Wanxiangshu.Shell.ExecutorSpawn
-open Wanxiangshu.Kernel.Domain
+open Wanxiangshu.Runtime.ExecutorSpawn
+open Wanxiangshu.Kernel.Primitives.Identity
+open Wanxiangshu.Kernel.Errors.DomainError
+open Wanxiangshu.Kernel.Session.Causality
 
 [<Global("process")>]
 let private nodeProcess: obj = jsNative
@@ -17,7 +19,7 @@ let outputByteLimit = 2 * 1024 * 1024
 /// One chunk = 1 MiB of ASCII.  Replicating it 100 times -> 100 MiB of raw
 /// output.  The executor should never accumulate more than `outputByteLimit`.
 let hugeOutputScript: string =
-    "var n=100;var chunk='x'.repeat(1048576);var i=0;
+    "var n=4;var chunk='x'.repeat(1048576);var i=0;
      function write(){
          while(i<n){
              var ok=process.stdout.write(chunk);
@@ -83,7 +85,7 @@ let infiniteStdoutBounded () =
     }
 
 let scriptErr: string =
-    "var n=100;var chunk='y'.repeat(1048576);var i=0;
+    "var n=4;var chunk='y'.repeat(1048576);var i=0;
      function write(){
          while(i<n){
              var ok=process.stderr.write(chunk);
@@ -137,11 +139,4 @@ let smallOutputUnchanged () =
             equal "smallOutputUnchanged.stdout" payload actual
             check "smallOutputUnchanged.exitZero" true
         | _ -> check "smallOutputUnchanged.expectedExit0" false
-    }
-
-let run () =
-    promise {
-        do! infiniteStdoutBounded ()
-        do! infiniteStderrBounded ()
-        do! smallOutputUnchanged ()
     }

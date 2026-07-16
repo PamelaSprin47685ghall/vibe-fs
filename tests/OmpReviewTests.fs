@@ -7,18 +7,18 @@ open Wanxiangshu.Tests.OmpPluginTestsHarness
 open Wanxiangshu.Kernel.OmpSessionTools
 open Wanxiangshu.Kernel.ReviewSession
 open Wanxiangshu.Kernel.ReviewSession.Types
-open Wanxiangshu.Omp.ChildSession
-open Wanxiangshu.Omp.ReviewLoop
-open Wanxiangshu.Omp.ReviewTools
-open Wanxiangshu.Omp
-open Wanxiangshu.Shell.ReviewRuntime
-open Wanxiangshu.Shell
-open Wanxiangshu.Shell.RuntimeScope
-open Wanxiangshu.Shell.Dyn
+open Wanxiangshu.Hosts.Omp.ChildSession
+open Wanxiangshu.Hosts.Omp.ReviewLoop
+open Wanxiangshu.Hosts.Omp.ReviewToolsRegister
+open Wanxiangshu.Hosts.Omp
+open Wanxiangshu.Runtime.ReviewRuntime
+open Wanxiangshu.Runtime
+open Wanxiangshu.Runtime.RuntimeScope
+open Wanxiangshu.Runtime.Dyn
 
-module Dyn = Wanxiangshu.Shell.Dyn
+module Dyn = Wanxiangshu.Runtime.Dyn
 
-let private reviewStore = PluginCore.reviewStore
+let private reviewStore = PluginComposition.reviewStore
 
 let private testScope = RuntimeScope()
 

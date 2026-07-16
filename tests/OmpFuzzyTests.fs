@@ -3,12 +3,12 @@ module Wanxiangshu.Tests.OmpFuzzyTests
 open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Tests.Assert
-open Wanxiangshu.Shell.Dyn
+open Wanxiangshu.Runtime.Dyn
 
-module Dyn = Wanxiangshu.Shell.Dyn
+module Dyn = Wanxiangshu.Runtime.Dyn
 
-open Wanxiangshu.Omp.Plugin
-open Wanxiangshu.Shell.FuzzyIteratorStore
+open Wanxiangshu.Hosts.Omp.Plugin
+open Wanxiangshu.Runtime.FuzzyIteratorStore
 open Wanxiangshu.Kernel.FuzzyQuery
 
 let private createPiHarness () =

@@ -4,15 +4,17 @@ open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Kernel.FallbackKernel.Types
-open Wanxiangshu.Shell.FallbackRuntimeState
-open Wanxiangshu.Shell.FallbackEventBridge
+open Wanxiangshu.Runtime.Fallback.RuntimeStore
+open Wanxiangshu.Runtime.Fallback.GateTransitions
+open Wanxiangshu.Runtime.Fallback.FallbackEventBridge
+open Wanxiangshu.Runtime.Fallback.FallbackBridgePorts
 open Wanxiangshu.Tests.FallbackEventBridgeTestsPart2
 
 let handleEvent_sessionIdle_emptyOutput_pendingReview_skipsContinue () =
     promise {
         let model = mkModel "oai" "gpt-5"
         let chain = [ model ]
-        let rt = FallbackRuntimeState()
+        let rt = FallbackRuntimeStore()
         let sid = "reviewer-child"
         rt.SetChain sid chain
         rt.SetAgentName sid "reviewer"

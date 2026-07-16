@@ -4,8 +4,8 @@ open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Kernel.Messaging
 open Wanxiangshu.Kernel.ToolExecutionStatusModule
 open Wanxiangshu.Kernel.ReviewReplayPolicy
-open Wanxiangshu.Kernel.LoopMessages
-open Wanxiangshu.Kernel.PromptFrontMatter
+open Wanxiangshu.Runtime.LoopMessages
+open Wanxiangshu.Runtime.PromptFrontMatter
 open Wanxiangshu.Kernel.ReviewSession
 open Wanxiangshu.Kernel.ReviewSession.Types
 
@@ -50,7 +50,7 @@ let fullTextsRecoverAnchor () =
 
 let reviewerOnlyHistoryDoesNotActivateLoop () =
     let texts =
-        [ Wanxiangshu.Kernel.ReviewPrompts.Submission.reviewerPrompt "ship feature" "" [] ]
+        [ Wanxiangshu.Runtime.ReviewPrompts.Submission.reviewerPrompt "ship feature" "" [] ]
 
     equal "reviewer original_task only must not activate worker loop" None (inferReviewTaskFromTexts texts)
 

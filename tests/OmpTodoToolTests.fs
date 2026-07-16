@@ -4,10 +4,10 @@ open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Tests.OmpPluginTestsHarness
-open Wanxiangshu.Shell.Dyn
+open Wanxiangshu.Runtime.Dyn
 
-module Dyn = Wanxiangshu.Shell.Dyn
-open Wanxiangshu.Omp.TodoTool
+module Dyn = Wanxiangshu.Runtime.Dyn
+open Wanxiangshu.Hosts.Omp.TodoTool
 
 let private findTodoTool (h: PiHarness) : obj =
     h.tools |> Seq.find (fun t -> Dyn.str t "name" = "todowrite")

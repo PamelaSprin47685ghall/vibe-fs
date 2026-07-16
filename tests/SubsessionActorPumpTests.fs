@@ -3,9 +3,10 @@ module Wanxiangshu.Tests.SubsessionActorPumpTests
 open Fable.Core
 open Wanxiangshu.Kernel.FallbackKernel.Types
 open Wanxiangshu.Kernel.Subsession.Types
-open Wanxiangshu.Shell.CommandProcessor
-open Wanxiangshu.Shell.SubsessionActor
-open Wanxiangshu.Shell.SubsessionEventStore
+open Wanxiangshu.Runtime.CommandProcessor
+open Wanxiangshu.Runtime.SubsessionPorts
+open Wanxiangshu.Runtime.SubsessionActor
+open Wanxiangshu.Runtime.SubsessionEventStore
 open Wanxiangshu.Tests.Assert
 
 let private fail (msg: string) = check msg false

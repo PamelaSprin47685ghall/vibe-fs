@@ -3,9 +3,9 @@ module Wanxiangshu.Tests.Wanxiangzhen.SquadEventLogFsTests
 open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Kernel.Wanxiangzhen.SquadEvent
-open Wanxiangshu.Shell.EventLogFiles
-open Wanxiangshu.Shell.EventLogRuntime
-open Wanxiangshu.Shell.Wanxiangzhen.SquadEventLogRuntime
+open Wanxiangshu.Runtime.EventLogFiles
+open Wanxiangshu.Runtime.EventLogRuntime
+open Wanxiangshu.Runtime.Wanxiangzhen.SquadEventLogRuntime
 open Wanxiangshu.Tests.Wanxiangzhen.AssertCompat
 
 [<Import("mkdtempSync", "node:fs")>]
@@ -68,7 +68,7 @@ let entriesAsync () : (string * (unit -> JS.Promise<unit>)) list =
                                    dependsOn = [] } ]
                            ))
 
-                   let path = Wanxiangshu.Shell.EventLogCodec.eventPath dir
+                   let path = Wanxiangshu.Runtime.EventLogCodec.eventPath dir
                    writeFileSync path (readFileSync path "utf-8" + "\n{not-json\n")
                    let! events = readAllSquadEvents dir
                    equal 1 events.Length

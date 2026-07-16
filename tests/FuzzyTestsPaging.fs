@@ -3,11 +3,12 @@ module Wanxiangshu.Tests.FuzzyTestsPaging
 open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Kernel.FuzzyPath
 open Wanxiangshu.Kernel.FuzzyQuery
+open Wanxiangshu.Runtime.ToolOutputInfo
 open Wanxiangshu.Kernel.FuzzyFormat
-open Wanxiangshu.Shell.FuzzySearch
-open Wanxiangshu.Shell.FuzzyIteratorStore
+open Wanxiangshu.Runtime.FuzzySearch
+open Wanxiangshu.Runtime.FuzzyIteratorStore
 open Wanxiangshu.Kernel
-open Wanxiangshu.Shell.FuzzyFinderShell
+open Wanxiangshu.Runtime.FuzzyFinderShell
 
 let findPagingDefault () =
     let store = createTypedIteratorStore 10
@@ -29,13 +30,14 @@ let findPagingDefault () =
     check "many matches → iterator stored" (id <> "")
 
 let emptyIteratorNotRendered () =
-    equal "empty iterator omitted" "body" (buildGrepOutput "body" None "")
+    equal "empty iterator omitted" "body" (buildGrepBody "body" None)
 
 let grepOutputNotices () =
-    let combined = buildGrepOutput "body" (Some "bad regex") "iter1"
+    let bodyOnly = buildGrepBody "body" (Some "bad regex")
+    let combined = Wanxiangshu.Runtime.ToolOutputInfo.withIterator bodyOnly "iter1"
     check "combined regex notice in body" (combined.Contains "Invalid regex: bad regex")
     check "combined iterator in front matter" (combined.Contains "iterator: iter1")
-    let regexOnly = buildGrepOutput "body" (Some "bad regex") ""
+    let regexOnly = buildGrepBody "body" (Some "bad regex")
     check "regex-only notice in body" (regexOnly.Contains "Invalid regex: bad regex")
     check "regex-only no iterator key" (not (regexOnly.Contains "iterator:"))
 
@@ -121,11 +123,11 @@ let totalMatchedSemantics () =
     equal "find None header" "1 matching file (5 total indexed)" findNone
 
 let iteratorNamespaceConstants () =
-    equal "find namespace constant" "ffi_f" Wanxiangshu.Shell.FuzzyIteratorStore.findIteratorNamespace
-    equal "grep namespace constant" "ffi_i" Wanxiangshu.Shell.FuzzyIteratorStore.grepIteratorNamespace
+    equal "find namespace constant" "ffi_f" Wanxiangshu.Runtime.FuzzyIteratorStore.findIteratorNamespace
+    equal "grep namespace constant" "ffi_i" Wanxiangshu.Runtime.FuzzyIteratorStore.grepIteratorNamespace
 
 let iteratorStoreStronglyTyped () =
-    let store = Wanxiangshu.Shell.FuzzyIteratorStore.createTypedIteratorStore 10
+    let store = Wanxiangshu.Runtime.FuzzyIteratorStore.createTypedIteratorStore 10
 
     let findState: FuzzyFindState =
         { query = "q"
@@ -145,37 +147,42 @@ let iteratorStoreStronglyTyped () =
     let grepState = { core = grepCore; cursor = None }
 
     let findId =
-        Wanxiangshu.Shell.FuzzyIteratorStore.storeFindIterator store "scope" findState
+        Wanxiangshu.Runtime.FuzzyIteratorStore.storeFindIterator store "scope" findState
 
     check "find id carries scope" (findId.Contains "scope")
-    check "find id carries namespace" (findId.Contains Wanxiangshu.Shell.FuzzyIteratorStore.findIteratorNamespace)
+    check "find id carries namespace" (findId.Contains Wanxiangshu.Runtime.FuzzyIteratorStore.findIteratorNamespace)
 
     let grepId =
-        Wanxiangshu.Shell.FuzzyIteratorStore.storeGrepIterator store "scope" grepState
+        Wanxiangshu.Runtime.FuzzyIteratorStore.storeGrepIterator store "scope" grepState
 
-    check "grep id carries namespace" (grepId.Contains Wanxiangshu.Shell.FuzzyIteratorStore.grepIteratorNamespace)
-    let resumed = Wanxiangshu.Shell.FuzzyIteratorStore.consumeFindIterator store findId
+    check "grep id carries namespace" (grepId.Contains Wanxiangshu.Runtime.FuzzyIteratorStore.grepIteratorNamespace)
+
+    let resumed =
+        Wanxiangshu.Runtime.FuzzyIteratorStore.consumeFindIterator store findId
+
     check "find resume" resumed.IsSome
 
     check
         "find single-use after typed consume"
-        ((Wanxiangshu.Shell.FuzzyIteratorStore.consumeFindIterator store findId).IsNone)
+        ((Wanxiangshu.Runtime.FuzzyIteratorStore.consumeFindIterator store findId).IsNone)
 
-    let crossed = Wanxiangshu.Shell.FuzzyIteratorStore.consumeFindIterator store grepId
+    let crossed =
+        Wanxiangshu.Runtime.FuzzyIteratorStore.consumeFindIterator store grepId
+
     check "cross-namespace consume returns None" crossed.IsNone
 
 let runWithFinderSharedPipeline () =
     let mutable released = 0
 
     let fakeFinder =
-        { new Wanxiangshu.Shell.FuzzyFinderShell.FinderLike with
+        { new Wanxiangshu.Runtime.FuzzyFinderShell.FinderLike with
             member _.fileSearch(_, _) = box null
             member _.grep(_, _) = box null
             member _.destroy() = released <- released + 1
             member _.isDestroyed = false }
 
     let outcome =
-        Wanxiangshu.Shell.FuzzySearch.runWithFinder (Ok fakeFinder) (Some "/external/path") (fun _ ->
+        Wanxiangshu.Runtime.FuzzySearch.runWithFinder (Ok fakeFinder) (Some "/external/path") (fun _ ->
             { output = "ok"; isError = false })
 
     equal "outcome propagated" "ok" outcome.output
@@ -183,7 +190,7 @@ let runWithFinderSharedPipeline () =
     let mutable releasedOnError = 0
 
     let fakeFinder2 =
-        { new Wanxiangshu.Shell.FuzzyFinderShell.FinderLike with
+        { new Wanxiangshu.Runtime.FuzzyFinderShell.FinderLike with
             member _.fileSearch(_, _) = box null
             member _.grep(_, _) = box null
             member _.destroy() = releasedOnError <- releasedOnError + 1
@@ -192,7 +199,8 @@ let runWithFinderSharedPipeline () =
     let mutable raised = false
 
     try
-        Wanxiangshu.Shell.FuzzySearch.runWithFinder (Ok fakeFinder2) (Some "/external/path") (fun _ -> failwith "boom")
+        Wanxiangshu.Runtime.FuzzySearch.runWithFinder (Ok fakeFinder2) (Some "/external/path") (fun _ ->
+            failwith "boom")
         |> ignore
     with _ ->
         raised <- true
@@ -212,7 +220,7 @@ let resolveStoreRequiresInjection () =
     | Ok _ -> check "None store must not fall back to global default" false
 
 let emptyIteratorTreatedAsAbsent () =
-    let store = Wanxiangshu.Shell.FuzzyIteratorStore.createTypedIteratorStore 10
+    let store = Wanxiangshu.Runtime.FuzzyIteratorStore.createTypedIteratorStore 10
 
     let opts: SearchOptions =
         { cwd = "."
@@ -230,7 +238,7 @@ let emptyIteratorTreatedAsAbsent () =
     | Error msg -> check ("fresh search must not error: " + msg) false
 
     let storedId =
-        Wanxiangshu.Shell.FuzzyIteratorStore.storeFindIterator
+        Wanxiangshu.Runtime.FuzzyIteratorStore.storeFindIterator
             store
             "scope"
             { query = "q"
@@ -238,10 +246,10 @@ let emptyIteratorTreatedAsAbsent () =
               pageIndex = 0
               externalBasePath = None }
 
-    match Wanxiangshu.Shell.FuzzyIteratorStore.consumeFindIterator store storedId with
+    match Wanxiangshu.Runtime.FuzzyIteratorStore.consumeFindIterator store storedId with
     | Some _ -> check "stored iterator resumes" true
     | None -> check "stored iterator resumes" false
 
-    match Wanxiangshu.Shell.FuzzyIteratorStore.consumeFindIterator store "nope" with
+    match Wanxiangshu.Runtime.FuzzyIteratorStore.consumeFindIterator store "nope" with
     | None -> check "unknown iterator returns None" true
     | Some _ -> check "unknown iterator returns None" false

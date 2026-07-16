@@ -3,8 +3,8 @@ module Wanxiangshu.Tests.Wanxiangzhen.SlaveRuntimeTests
 open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Kernel.Wanxiangzhen.FfDecision
-open Wanxiangshu.Shell.Dyn
-open Wanxiangshu.Shell.Wanxiangzhen.SlaveRuntime
+open Wanxiangshu.Runtime.Dyn
+open Wanxiangshu.Runtime.Wanxiangzhen.SlaveRuntime
 open Wanxiangshu.Tests.Wanxiangzhen.AssertCompat
 
 let private testConfig =

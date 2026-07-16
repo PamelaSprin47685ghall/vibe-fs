@@ -15,8 +15,9 @@
 module Wanxiangshu.Tests.Phase0BaselineTests
 
 open Wanxiangshu.Tests.Assert
-open Wanxiangshu.Kernel.EventLog.Types
-open Wanxiangshu.Kernel.EventLog.Fold
+open Wanxiangshu.Kernel.EventSourcing.EventEnvelope
+open Wanxiangshu.Kernel.EventSourcing.EventKind
+open Wanxiangshu.Kernel.EventSourcing.Fold
 open Wanxiangshu.Kernel.Subsession.Types
 open Wanxiangshu.Kernel.Subsession.Decision
 open Wanxiangshu.Kernel.FallbackKernel.Types
@@ -284,7 +285,7 @@ let ``7 Terminal persist failure skips commit`` () =
 
 let ``8 Non-terminal failure leaves state unchanged`` () =
     let events = [ ev "s1" eventKindLoopActivated (Map [ "task", "wont-persist" ]) ]
-    let review = foldReviewTask "s1" events
+    let review = Wanxiangshu.Kernel.Review.ReviewProjection.foldReviewTask "s1" events
     check "08: fold succeeds even if persist fails" (review = Some "wont-persist")
 
 // ──────────────────────────────────────────────

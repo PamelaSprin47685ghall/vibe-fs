@@ -7,12 +7,12 @@ open Wanxiangshu.Tests.TempWorkspace
 open Wanxiangshu.Tests.IntegrationToolSetup
 open Wanxiangshu.Tests.IntegrationSubagentMockClient
 
-open Wanxiangshu.Mux.Plugin
-open Wanxiangshu.Opencode.Plugin
-open Wanxiangshu.Kernel.LoopMessages
-open Wanxiangshu.Mux.AiSettings
-open Wanxiangshu.Shell.ChildAgentRegistry
-open Wanxiangshu.Shell.Dyn
+open Wanxiangshu.Hosts.Mux.Plugin
+open Wanxiangshu.Hosts.Opencode.Plugin
+open Wanxiangshu.Runtime.LoopMessages
+open Wanxiangshu.Hosts.Mux.AiSettings
+open Wanxiangshu.Runtime.ChildAgentRegistry
+open Wanxiangshu.Runtime.Dyn
 
 
 let investigatorToolSpec () =

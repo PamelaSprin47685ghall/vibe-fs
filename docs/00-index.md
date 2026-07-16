@@ -11,7 +11,7 @@
 | 01′ | [01-first-principles.md](./01-first-principles.md) | 七条公理展开（设计动机与纪律） |
 | 02 | [02-architecture.md](./02-architecture.md) | 三层架构、依赖纪律、子系统概要 |
 | 03 | [03-kernel.md](./03-kernel.md) | 纯内核模块族 |
-| 04 | [04-shell.md](./04-shell.md) | IO、codec、运行时 |
+| 04 | [04-runtime.md](./04-runtime.md) | IO、codec、运行时 |
 | 05 | [05-event-sourcing.md](./05-event-sourcing.md) | `.wanxiangshu.ndjson`、事件种类全集 |
 | 06 | [06-review-and-nudge.md](./06-review-and-nudge.md) | `/loop`、reviewer、nudge 三层架构 |
 | 07 | [07-work-backlog.md](./07-work-backlog.md) | todowrite / 五报告 |

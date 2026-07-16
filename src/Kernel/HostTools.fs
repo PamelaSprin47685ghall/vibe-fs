@@ -1,22 +1,11 @@
 module Wanxiangshu.Kernel.HostTools
 
-open Fable.Core
-open Fable.Core.JsInterop
+/// Injected by Runtime/Hosts at process start. Kernel never reads process.env.
+let mutable private e2eSandbox = false
 
-[<Emit("$0 === undefined || $0 === null")>]
-let private isNullish (v: obj) : bool = jsNative
+let setE2eSandbox (value: bool) : unit = e2eSandbox <- value
 
-[<Global("globalThis.process")>]
-let private nodeProcess: obj = jsNative
-
-let private envVar (key: string) : string =
-    let e = nodeProcess?("env")
-
-    if isNullish e then
-        ""
-    else
-        let v = e?(key)
-        if isNullish v then "" else string v
+let isE2eSandbox () : bool = e2eSandbox
 
 type Host =
     | Opencode
@@ -30,7 +19,7 @@ let mux = Mux
 let omp = Omp
 
 let todoWriteToolName (host: Host) : string =
-    if envVar "WANXIANG_E2E_SANDBOX" = "1" then
+    if e2eSandbox then
         "todowrite"
     else
         match host with
@@ -40,7 +29,7 @@ let todoWriteToolName (host: Host) : string =
         | Omp -> "todowrite"
 
 let todoWritePromptName (host: Host) : string =
-    if envVar "WANXIANG_E2E_SANDBOX" = "1" then
+    if e2eSandbox then
         "todo_write"
     else
         match host with
@@ -50,7 +39,7 @@ let todoWritePromptName (host: Host) : string =
         | Omp -> "todo_write"
 
 let taskToolName (host: Host) : string =
-    if envVar "WANXIANG_E2E_SANDBOX" = "1" then
+    if e2eSandbox then
         "task"
     else
         match host with
@@ -64,8 +53,8 @@ let private mimoAliases = [ "task" ]
 let private muxAliases = [ "todo_write"; "todo_read" ]
 let private ompAliases = [ "todo_write" ]
 
-/// Pre-built lookup set for O(log N) contains check (F# Set = AVL tree).
-let private todoWriteLookup: Set<string> =
+/// Recomputed so setE2eSandbox after process start still affects membership.
+let private todoWriteLookup () : Set<string> =
     Set.ofList
         [ todoWriteToolName Opencode
           todoWriteToolName Mimocode
@@ -108,7 +97,8 @@ let normalizeToolName (host: Host) (toolName: string) : string =
     | Omp, "todo_write" -> "todowrite"
     | _ -> toolName
 
-let isTodoWriteToolName (toolName: string) : bool = Set.contains toolName todoWriteLookup
+let isTodoWriteToolName (toolName: string) : bool =
+    Set.contains toolName (todoWriteLookup ())
 
 /// Mux child-workspace spawn tool universe for `toolPolicy.disabledTools`.
 let muxSpawnToolUniverse =

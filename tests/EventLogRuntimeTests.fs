@@ -4,12 +4,17 @@ open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Tests.TempWorkspace
-open Wanxiangshu.Kernel.EventLog.Types
-open Wanxiangshu.Shell.EventLogCodec
-open Wanxiangshu.Shell.EventLogFiles
-open Wanxiangshu.Shell.EventLogRuntime
-open Wanxiangshu.Shell.ReviewRuntime
-open Wanxiangshu.Kernel.EventLog.Fold
+open Wanxiangshu.Kernel.EventSourcing.EventEnvelope
+open Wanxiangshu.Kernel.EventSourcing.EventKind
+open Wanxiangshu.Runtime.EventLogCodec
+open Wanxiangshu.Runtime.EventLogFiles
+open Wanxiangshu.Runtime.EventLogRuntime
+open Wanxiangshu.Runtime.ReviewRuntime
+open Wanxiangshu.Kernel.EventSourcing.Fold
+open Wanxiangshu.Kernel.Review
+open Wanxiangshu.Kernel.Backlog
+open Wanxiangshu.Kernel.Nudge
+open Wanxiangshu.Kernel.Subsession
 open Wanxiangshu.Kernel.Wanxiangzhen.SquadEvent
 
 let appendThenReadAll () =
@@ -169,10 +174,10 @@ let tryClaimNudgeDispatchPreventsOutdatedAnchor () =
         let! dir = mkdtempAsync "eventlog-claim-outdated-"
         let sessionID = "s-claim"
         do! appendAssistantCompletedOrFail dir sessionID "task 1" (Some "agent1") (Some "provider/model-a") "t1" []
-        let anchorA = nudgeAnchorKey "t1" "task 1"
+        let anchorA = Wanxiangshu.Kernel.Nudge.NudgeProjection.nudgeAnchorKey "t1" "task 1"
 
         do! appendAssistantCompletedOrFail dir sessionID "task 2" (Some "agent1") (Some "provider/model-b") "t2" []
-        let anchorB = nudgeAnchorKey "t2" "task 2"
+        let anchorB = Wanxiangshu.Kernel.Nudge.NudgeProjection.nudgeAnchorKey "t2" "task 2"
 
         let! claimA = tryClaimNudgeDispatch dir sessionID Wanxiangshu.Kernel.Nudge.NudgeTodo anchorA "" "" 0 0 "" 1
         check "claim never-claimed outdated anchor A" (not claimA)

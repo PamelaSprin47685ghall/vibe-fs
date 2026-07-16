@@ -3,13 +3,16 @@ module Wanxiangshu.Tests.KernelTests
 open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Tests.Assert
-open Wanxiangshu.Kernel.ToolOutputInfo
+open Wanxiangshu.Runtime.ToolOutputInfo
 open Wanxiangshu.Kernel.Executor
-open Wanxiangshu.Kernel.Domain
+open Wanxiangshu.Runtime.ExecutorFormat
+open Wanxiangshu.Kernel.Primitives.Identity
+open Wanxiangshu.Kernel.Errors.DomainError
+open Wanxiangshu.Kernel.Session.Causality
 open Wanxiangshu.Kernel.Messaging
 open Wanxiangshu.Kernel
-open Wanxiangshu.Shell.ErrorClassify
-open Wanxiangshu.Shell.Dyn
+open Wanxiangshu.Runtime.ErrorClassify
+open Wanxiangshu.Runtime.Dyn
 
 
 let headTail' () =
@@ -94,7 +97,7 @@ let stripLexer' () =
 let jsBoundary' () =
     check
         "abort message classified"
-        (translateJsError (createObj [ "message", box "Aborted" ]) = Wanxiangshu.Kernel.Domain.ClientCancellation
+        (translateJsError (createObj [ "message", box "Aborted" ]) = Wanxiangshu.Kernel.Errors.DomainError.ClientCancellation
                                                                          "abort-text")
 
     let nestedCause: obj =
@@ -105,7 +108,7 @@ let jsBoundary' () =
 
     check
         "abort nested via cause"
-        (translateJsError nestedCause = Wanxiangshu.Kernel.Domain.ClientCancellation "AbortError")
+        (translateJsError nestedCause = Wanxiangshu.Kernel.Errors.DomainError.ClientCancellation "AbortError")
 
     let nestedError: obj =
         createObj
@@ -114,14 +117,14 @@ let jsBoundary' () =
 
     check
         "abort nested via error"
-        (translateJsError nestedError = Wanxiangshu.Kernel.Domain.ClientCancellation "AbortError")
+        (translateJsError nestedError = Wanxiangshu.Kernel.Errors.DomainError.ClientCancellation "AbortError")
 
     let nonAbort: obj =
         createObj [ "name", box "RangeError"; "message", box "out of range" ]
 
     check
         "non-abort stays unknown"
-        (translateJsError nonAbort = Wanxiangshu.Kernel.Domain.UnknownJsError "out of range")
+        (translateJsError nonAbort = Wanxiangshu.Kernel.Errors.DomainError.UnknownJsError "out of range")
 
     let msgs: Message<obj> list =
         [ { info =

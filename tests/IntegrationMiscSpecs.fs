@@ -5,8 +5,8 @@ open Fable.Core.JsInterop
 open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Tests.TempWorkspace
 open Wanxiangshu.Tests.IntegrationToolSetup
-open Wanxiangshu.Mux.Plugin
-open Wanxiangshu.Shell.Dyn
+open Wanxiangshu.Hosts.Mux.Plugin
+open Wanxiangshu.Runtime.Dyn
 
 let writeToolSpec (reg: obj) =
     promise {

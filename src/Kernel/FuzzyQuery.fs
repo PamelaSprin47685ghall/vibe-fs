@@ -1,7 +1,6 @@
 module Wanxiangshu.Kernel.FuzzyQuery
 
 open System.Text.RegularExpressions
-open Wanxiangshu.Kernel.ToolOutputInfo
 
 let private escapeRegex (pattern: string) : string =
     let escapeChar (m: Match) = "\\" + m.Value
@@ -80,13 +79,8 @@ let fuzzyGrepDescriptionOmpPrefix =
 let fuzzyGrepDescriptionOmp =
     fuzzyGrepDescriptionOmpPrefix + fuzzyIteratorDescriptionHint
 
-let buildGrepOutput (body: string) (regexError: string option) (nextIterator: string) : string =
-    let body' =
-        match regexError with
-        | Some error -> body + "\n\nInvalid regex: " + error + ", used literal match"
-        | None -> body
-
-    if nextIterator = "" then
-        body'
-    else
-        withIterator body' nextIterator
+/// Body text only. Runtime wraps withIterator when nextIterator is non-empty.
+let buildGrepBody (body: string) (regexError: string option) : string =
+    match regexError with
+    | Some error -> body + "\n\nInvalid regex: " + error + ", used literal match"
+    | None -> body

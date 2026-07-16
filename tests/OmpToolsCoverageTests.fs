@@ -5,10 +5,10 @@ open Fable.Core.JsInterop
 open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Tests.OmpPluginTestsHarness
 open Wanxiangshu.Tests.TempWorkspace
-open Wanxiangshu.Shell.ReviewRuntime
-open Wanxiangshu.Shell.FallbackRuntimeState
+open Wanxiangshu.Runtime.ReviewRuntime
+open Wanxiangshu.Runtime.Fallback.RuntimeStore
 
-module Dyn = Wanxiangshu.Shell.Dyn
+module Dyn = Wanxiangshu.Runtime.Dyn
 
 let toolNames (h: PiHarness) =
     h.tools |> Seq.map (fun t -> Dyn.str t "name") |> Seq.toList |> List.rev
@@ -22,7 +22,7 @@ let run () =
         resetPluginState ()
         let h = createPiHarness ()
         let pi = piObject h
-        Wanxiangshu.Omp.ExecutorTools.registerExecutorTools pi
+        Wanxiangshu.Hosts.Omp.ExecutorTools.registerExecutorTools pi
         let names = toolNames h |> Set.ofList
         check "executor tool registered" (names.Contains "executor")
         check "executor_wait tool not registered" (not (names.Contains "executor_wait"))
@@ -35,7 +35,7 @@ let run () =
         resetPluginState ()
         let h2 = createPiHarness ()
         let pi2 = piObject h2
-        Wanxiangshu.Omp.WebTools.registerWebTools pi2 (FallbackRuntimeState()) None
+        Wanxiangshu.Hosts.Omp.WebTools.registerWebTools pi2 (FallbackRuntimeStore()) None
         let names2 = toolNames h2 |> Set.ofList
         check "websearch tool registered" (names2.Contains "websearch")
         check "webfetch tool registered" (names2.Contains "webfetch")
@@ -51,7 +51,7 @@ let run () =
         let h3 = createPiHarness ()
         let pi3 = piObject h3
         let store = createReviewStore ()
-        Wanxiangshu.Omp.ReviewToolsRegister.registerLoopFeatures pi3 store
+        Wanxiangshu.Hosts.Omp.ReviewToolsRegister.registerLoopFeatures pi3 store
         let names3 = toolNames h3 |> Set.ofList
         check "submit_review tool registered" (names3.Contains "submit_review")
         check "return_reviewer tool registered" (names3.Contains "return_reviewer")
@@ -64,7 +64,7 @@ let run () =
         let h4 = createPiHarness ()
         let pi4 = piObject h4
         let store4 = createReviewStore ()
-        Wanxiangshu.Omp.ReviewToolsRegister.registerInputHandler pi4 store4
+        Wanxiangshu.Hosts.Omp.ReviewToolsRegister.registerInputHandler pi4 store4
         let events = Dyn.get (Dyn.get h4.hookStore "events") "input"
         check "input handler registered" (Dyn.isArray events && (unbox<obj array> events).Length > 0)
 
@@ -81,7 +81,7 @@ let run () =
                   "ui", box (createObj [ "notify", box (fun (_: string) (_: string) -> ()) ])
                   "cwd", box workspaceDir ]
         // active review → activates loop, should call sendMessage
-        do! Wanxiangshu.Omp.ReviewToolsLoop.handleLoopCommand pi5 store5 "fix login flow" ctx
+        do! Wanxiangshu.Hosts.Omp.ReviewToolsLoop.handleLoopCommand pi5 store5 "fix login flow" ctx
         check "loop activated without error" true
         let msgs = Dyn.get h5.hookStore "messages"
         check "sendMessage captured after activate" (Dyn.isArray msgs && (unbox<obj array> msgs).Length = 1)
@@ -91,7 +91,7 @@ let run () =
             "message customType is wanxiangshu-loop-activate"
             (Dyn.str (Dyn.get msg "message") "customType" = "wanxiangshu-loop-activate")
         // cancel the loop
-        do! Wanxiangshu.Omp.ReviewToolsLoop.handleLoopCommand pi5 store5 "" ctx
+        do! Wanxiangshu.Hosts.Omp.ReviewToolsLoop.handleLoopCommand pi5 store5 "" ctx
         check "loop cancelled without error" true
         do! rmAsync workspaceDir
     }

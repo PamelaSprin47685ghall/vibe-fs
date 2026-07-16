@@ -5,14 +5,18 @@ open Fable.Core.JsInterop
 open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Tests.TempWorkspace
 open Wanxiangshu.Kernel.HostAdapter
-open Wanxiangshu.Kernel.Domain
+open Wanxiangshu.Runtime.HostAdapter
+open Wanxiangshu.Kernel.Primitives.Identity
+open Wanxiangshu.Kernel.Errors.DomainError
+open Wanxiangshu.Kernel.Session.Causality
 open Wanxiangshu.Kernel.HostTools
-open Wanxiangshu.Kernel.EventLog.Types
-open Wanxiangshu.Shell.EventLogRuntime
-open Wanxiangshu.Shell.SubagentDispatcher
-open Wanxiangshu.Shell.ChildAgentRegistry
-open Wanxiangshu.Shell.RuntimeScope
-open Wanxiangshu.Shell.Dyn
+open Wanxiangshu.Kernel.EventSourcing.EventEnvelope
+open Wanxiangshu.Kernel.EventSourcing.EventKind
+open Wanxiangshu.Runtime.EventLogRuntime
+open Wanxiangshu.Runtime.SubagentDispatcher
+open Wanxiangshu.Runtime.ChildAgentRegistry
+open Wanxiangshu.Runtime.RuntimeScope
+open Wanxiangshu.Runtime.Dyn
 
 let fakeAdapter (workspaceRoot: string) (response: SubagentResponse) : IHostAdapter =
     { new IHostAdapter with
@@ -108,7 +112,7 @@ let testContinueFlow () =
                 check "spawned has iterator" hasIter1
 
                 let nextIter =
-                    let parsed = Wanxiangshu.Kernel.PromptFrontMatter.parseFrontMatter result
+                    let parsed = Wanxiangshu.Runtime.PromptFrontMatter.parseFrontMatter result
 
                     if isNullish parsed || isNullish parsed?iterators then
                         "failed"

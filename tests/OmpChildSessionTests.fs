@@ -4,11 +4,11 @@ open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Kernel.OmpSessionTools
-open Wanxiangshu.Omp.ChildSession
-open Wanxiangshu.Shell.Dyn
-open Wanxiangshu.Shell.RuntimeScope
+open Wanxiangshu.Hosts.Omp.ChildSession
+open Wanxiangshu.Runtime.Dyn
+open Wanxiangshu.Runtime.RuntimeScope
 
-module Dyn = Wanxiangshu.Shell.Dyn
+module Dyn = Wanxiangshu.Runtime.Dyn
 
 let private testScope = RuntimeScope()
 

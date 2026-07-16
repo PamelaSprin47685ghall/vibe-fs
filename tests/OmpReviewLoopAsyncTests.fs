@@ -4,10 +4,10 @@ open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Tests.AsyncFlush
-open Wanxiangshu.Omp.ReviewLoop
+open Wanxiangshu.Hosts.Omp.ReviewLoop
 open Wanxiangshu.Kernel.ReviewSession.Types
-open Wanxiangshu.Shell.ReviewRuntime
-open Wanxiangshu.Shell.RuntimeScope
+open Wanxiangshu.Runtime.ReviewRuntime
+open Wanxiangshu.Runtime.RuntimeScope
 
 let private testScope = RuntimeScope()
 

@@ -4,9 +4,9 @@ open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Kernel.WarnTdd
-open Wanxiangshu.Shell.Dyn
+open Wanxiangshu.Runtime.Dyn
 
-module Dyn = Wanxiangshu.Shell.Dyn
+module Dyn = Wanxiangshu.Runtime.Dyn
 
 // `requireWarnTddMux` and `requireWarnMux` in src/Mux/PluginCatalog.fs must
 // call `setHookErrorMux` whenever a modification tool (resp. warn-required
@@ -23,12 +23,12 @@ let private runMuxHook (tool: string) (args: obj) : JS.Promise<string * string l
     let output = createObj [ "args", box args ]
 
     promise {
-        Wanxiangshu.Shell.ToolHookRuntime.clearSessionCompliance "s-warn-enforce-mux"
-        do! Wanxiangshu.Mux.PluginCatalog.toolExecuteBefore input output
+        Wanxiangshu.Runtime.ToolHookRuntime.clearSessionCompliance "s-warn-enforce-mux"
+        do! Wanxiangshu.Hosts.Mux.PluginCatalog.toolExecuteBefore input output
         let err = str output "error"
 
         let violations =
-            match Wanxiangshu.Shell.ToolHookRuntime.tryGetCompliance "s-warn-enforce-mux" "c-warn-enforce-mux" with
+            match Wanxiangshu.Runtime.ToolHookRuntime.tryGetCompliance "s-warn-enforce-mux" "c-warn-enforce-mux" with
             | Some env -> env.Violations
             | None -> []
 

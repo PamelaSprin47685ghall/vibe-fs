@@ -3,8 +3,8 @@ module Wanxiangshu.Tests.SessionExecutorScopeTests
 open Fable.Core
 open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Tests.AsyncFlush
-open Wanxiangshu.Shell.RuntimeScope
-open Wanxiangshu.Shell.SessionExecutor
+open Wanxiangshu.Runtime.RuntimeScope
+open Wanxiangshu.Runtime.SessionExecutor
 
 let twoScopesSameSessionIdQueuesIsolate () =
     promise {

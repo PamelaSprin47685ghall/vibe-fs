@@ -1,7 +1,7 @@
 module Wanxiangshu.Kernel.Nudge.TodoStatus
 
 open Wanxiangshu.Kernel.Nudge
-open Wanxiangshu.Kernel.PromptFragments
+open Wanxiangshu.Kernel.Nudge.NudgePromptText
 open Wanxiangshu.Kernel
 
 /// Terminal todo statuses that should NOT count as open work.

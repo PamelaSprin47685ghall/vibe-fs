@@ -53,7 +53,6 @@ let hasOpenTodos (s: SessionWorkState) : bool =
     | SessionWorkState.AllAxes -> true
     | _ -> false
 
-/// Back-compat name for call sites migrating off bool triples.
 let getSessionWorkState = workStateFromAxes
 
 type ReviewLoopSnapshotInfo =

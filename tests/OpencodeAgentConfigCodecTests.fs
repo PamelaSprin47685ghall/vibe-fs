@@ -3,8 +3,8 @@ module Wanxiangshu.Tests.OpencodeAgentConfigCodecTests
 open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Tests.Assert
-open Wanxiangshu.Shell.Dyn
-open Wanxiangshu.Shell.OpencodeAgentConfigCodec
+open Wanxiangshu.Runtime.Dyn
+open Wanxiangshu.Runtime.OpencodeAgentConfigCodec
 
 let decodeScalarsEmptyPromptAndMode () =
     let userAgent = createObj []

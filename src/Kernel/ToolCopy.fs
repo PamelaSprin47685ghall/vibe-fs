@@ -1,6 +1,8 @@
 module Wanxiangshu.Kernel.ToolCopy
 
-open Wanxiangshu.Kernel.Domain
+open Wanxiangshu.Kernel.Primitives.Identity
+open Wanxiangshu.Kernel.Errors.DomainError
+open Wanxiangshu.Kernel.Session.Causality
 open Wanxiangshu.Kernel.ToolResult
 
 let muxToolRequiresWorkspaceId (title: string) : string = $"{title} requires workspaceId"

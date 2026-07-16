@@ -2,7 +2,7 @@
 
 ## 入口
 
-- `Mux/Plugin.fs`：npm 包默认 **`wanxiangshu`** main → `build/src/Mux/Plugin.js`
+- `Hosts/Mux/Plugin.fs`：npm 包默认 **`wanxiangshu`** main → `build/src/Hosts/Mux/Plugin.js`
 - `Mux/PluginRegistration.fs`、`PluginCatalog.fs`：注册表与 catalog
 
 ## 工具与 Wrapper

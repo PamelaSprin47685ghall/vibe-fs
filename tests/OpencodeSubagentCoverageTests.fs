@@ -3,11 +3,11 @@ module Wanxiangshu.Tests.OpencodeSubagentCoverageTests
 open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Tests.Assert
-open Wanxiangshu.Opencode.SessionIoSubagent
-open Wanxiangshu.Opencode.SubagentTypes
-open Wanxiangshu.Shell.Dyn
+open Wanxiangshu.Hosts.Opencode.SubagentSpawn
+open Wanxiangshu.Hosts.Opencode.SubagentTypes
+open Wanxiangshu.Runtime.Dyn
 
-module Dyn = Wanxiangshu.Shell.Dyn
+module Dyn = Wanxiangshu.Runtime.Dyn
 
 let sessionIoSubagentBuildPromptBodyMinimal () =
     let options =

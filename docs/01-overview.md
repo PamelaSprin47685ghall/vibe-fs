@@ -30,7 +30,7 @@
 | :---: | :--- | :--- |
 | 1 | 稳定资产是领域规则 | `src/Kernel/`，非宿主 API |
 | 2 | 事件流是事实 | `[workspace]/.wanxiangshu.ndjson` |
-| 3 | 副作用压到边界 | `src/Shell/` + 各宿主薄适配 |
+| 3 | 副作用压到边界 | `src/Runtime/` + 各宿主薄适配 |
 | 4 | 边界强类型 | `obj` → DU/record，内核只吃强类型 |
 | 5 | 进度不靠 compaction 锚点 | backlog 靠 `work_backlog_committed` |
 | 6 | 并发 = 共享可变状态 | `PromiseQueue` / 按 session 串行域 |
@@ -41,7 +41,7 @@
 - **万象术**：单工作区内多代理工具、review；durable 事件 SSOT = `.wanxiangshu.ndjson`（`loop_*`、`work_backlog_*`、`nudge_*` 等 kind）。
 - **万象阵**：独立协调器插件，DAG + worktree + ff-only 合并；durable 事件与万象术**共用** `.wanxiangshu.ndjson`（`squad_*`/`task_*` 行，见 [19-wanxiangzhen.md](./19-wanxiangzhen.md)）。
 - 两插件**互不 import**；协同靠 slash / prompt front-matter（如 slave 侧触发 `/loop`）。
-- npm 子路径 `wanxiangshu/wanxiangzhen` → `build/src/Opencode/PluginWanxiangzhen.js`，与默认 Mux 入口不同。
+- npm 子路径 `wanxiangshu/wanxiangzhen` → `build/src/Hosts/OpenCode/PluginWanxiangzhen.js`，与默认 Mux 入口不同。
 
 ## 用户可见主流程（概念）
 

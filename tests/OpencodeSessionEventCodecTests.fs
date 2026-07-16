@@ -8,6 +8,7 @@ let run () =
     getSessionIDFallsBackToInfo ()
     getSessionIDUsesTopLevelIdForSessionError ()
     getSessionIDLifecycleUsesInfoId ()
+    getSessionIDLifecycleDeletionPrefersInfoIdOverSessionID ()
     getSessionIDReturnsEmptyWhenAbsent ()
     getSessionIDNonLifecycleSkipsInfoId ()
     getPartsTextEmptyOnNonArray ()

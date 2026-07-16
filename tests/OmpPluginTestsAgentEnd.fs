@@ -5,14 +5,14 @@ open Fable.Core.JsInterop
 open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Tests.OmpPluginTestsHarness
 open Wanxiangshu.Tests.TempWorkspace
-open Wanxiangshu.Omp
-open Wanxiangshu.Omp.Plugin
-open Wanxiangshu.Shell
-open Wanxiangshu.Shell.Dyn
-open Wanxiangshu.Kernel.LoopMessages
-open Wanxiangshu.Kernel.PromptFrontMatter
+open Wanxiangshu.Hosts.Omp
+open Wanxiangshu.Hosts.Omp.Plugin
+open Wanxiangshu.Runtime
+open Wanxiangshu.Runtime.Dyn
+open Wanxiangshu.Runtime.LoopMessages
+open Wanxiangshu.Runtime.PromptFrontMatter
 
-module Dyn = Wanxiangshu.Shell.Dyn
+module Dyn = Wanxiangshu.Runtime.Dyn
 
 let agentEndRunnerNudgeBeforeLoop () =
     promise {
@@ -112,7 +112,7 @@ let agentEndSkipsLoopNudgeWithoutWorkerTaskAnchor () =
         do! wanxiangshuExtension pi
 
         let reviewerOnly =
-            Wanxiangshu.Kernel.ReviewPrompts.Submission.reviewerPrompt "do task" "" []
+            Wanxiangshu.Runtime.ReviewPrompts.Submission.reviewerPrompt "do task" "" []
 
         let! workspaceDir = mkdtempAsync "omp-agent-end-skips-"
 

@@ -8,9 +8,9 @@ open Wanxiangshu.Tests.IntegrationToolSetup
 open Wanxiangshu.Tests.IntegrationMuxSetup
 
 open Wanxiangshu.Kernel.Methodology
-open Wanxiangshu.Methodology.Registry
-open Wanxiangshu.Mux.Plugin
-open Wanxiangshu.Shell.Dyn
+open Wanxiangshu.Kernel.Methodology.Registry
+open Wanxiangshu.Hosts.Mux.Plugin
+open Wanxiangshu.Runtime.Dyn
 
 let muxTodoWriteMethodologySchemaSpec () =
     promise {

@@ -6,8 +6,8 @@ open Wanxiangshu.Kernel.Wanxiangzhen.SquadTask
 open Wanxiangshu.Kernel.Wanxiangzhen.Dag
 open Wanxiangshu.Kernel.Wanxiangzhen.SquadConfig
 open Wanxiangshu.Kernel.Wanxiangzhen.SquadEvent
-open Wanxiangshu.Shell.Wanxiangzhen.CoordinatorRuntime
-open Wanxiangshu.Shell.PromiseQueue
+open Wanxiangshu.Runtime.Wanxiangzhen.CoordinatorRuntime
+open Wanxiangshu.Runtime.PromiseQueue
 open Wanxiangshu.Tests.Wanxiangzhen.TestTypes
 
 let mkFake = Wanxiangshu.Tests.Wanxiangzhen.TestTypes.mkFake

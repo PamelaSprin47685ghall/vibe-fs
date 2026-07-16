@@ -1,18 +1,18 @@
 module Wanxiangshu.Kernel.SessionOverview
 
-/// Phase 7: Pure query composition layer for Session overview.
 /// Combines all independent projections into a clean query interface.
 /// Process Managers should read only the projections they need.
 
-open Wanxiangshu.Kernel.EventLog.ReviewLoopFold
-open Wanxiangshu.Kernel.BacklogProjectionCore
-open Wanxiangshu.Kernel.EventLog.BacklogProjection
-open Wanxiangshu.Kernel.EventLog.NudgeProjection
-open Wanxiangshu.Kernel.EventLog.SubsessionProjection
-open Wanxiangshu.Kernel.EventLog.HumanTurnProjection
-open Wanxiangshu.Kernel.EventLog.ContinuationProjection
-open Wanxiangshu.Kernel.EventLog.FallbackInjectionFold
-open Wanxiangshu.Kernel.EventLog.Fold
+open Wanxiangshu.Kernel.Review.ReviewLoopFold
+open Wanxiangshu.Kernel.Backlog.BacklogTypes
+open Wanxiangshu.Kernel.Backlog.BacklogProjection
+open Wanxiangshu.Kernel.Nudge.NudgeProjection
+open Wanxiangshu.Kernel.Subsession.SubsessionProjection
+open Wanxiangshu.Kernel.SessionControl.HumanTurn
+open Wanxiangshu.Kernel.SessionControl.Projection
+open Wanxiangshu.Kernel.SessionControl.State
+open Wanxiangshu.Kernel.Fallback.FallbackInjectionFold
+open Wanxiangshu.Kernel.EventSourcing.Fold
 open Wanxiangshu.Kernel.FallbackKernel.Types
 
 type SessionOverview =

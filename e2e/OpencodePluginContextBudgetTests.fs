@@ -2,13 +2,13 @@ module Wanxiangshu.E2e.OpencodePluginContextBudgetTests
 
 open Fable.Core
 open Fable.Core.JsInterop
-open Wanxiangshu.Shell.Dyn
+open Wanxiangshu.Runtime.Dyn
 open Wanxiangshu.Tests.Assert
 open Wanxiangshu.E2e.HarnessTypes
-open Wanxiangshu.Shell.ContextBudgetLimitResolver
-open Wanxiangshu.Shell.ContextBudgetUsageCodec
+open Wanxiangshu.Runtime.ContextBudgetLimitResolver
+open Wanxiangshu.Runtime.ContextBudgetUsageCodec
 
-module Dyn = Wanxiangshu.Shell.Dyn
+module Dyn = Wanxiangshu.Runtime.Dyn
 
 let private createEmpty () = createObj []
 

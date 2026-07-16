@@ -15,9 +15,9 @@ open Wanxiangshu.Tests.IntegrationEventTestsOpencodeLoop
 open Wanxiangshu.Tests.IntegrationEventTestsOpencodeFallback
 open Wanxiangshu.Tests.IntegrationEventTestsOpencodeFallbackInterrupted
 open Wanxiangshu.Tests.TempWorkspace
-open Wanxiangshu.Mux.Plugin
-open Wanxiangshu.Opencode.Plugin
-open Wanxiangshu.Shell.Dyn
+open Wanxiangshu.Hosts.Mux.Plugin
+open Wanxiangshu.Hosts.Opencode.Plugin
+open Wanxiangshu.Runtime.Dyn
 
 let eventHookSpec (reg: obj) (workspaceId: string) =
     promise {

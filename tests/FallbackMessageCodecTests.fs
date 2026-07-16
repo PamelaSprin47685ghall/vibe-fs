@@ -1,15 +1,18 @@
 module Wanxiangshu.Tests.FallbackMessageCodecTests
 
+open Wanxiangshu.Runtime.Fallback.RuntimeStore
+
 open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Tests.Assert
-open Wanxiangshu.Shell.FallbackMessageCodec
-open Wanxiangshu.Shell.FallbackMessageParser
+open Wanxiangshu.Runtime.Fallback.FallbackMessageCodec
+open Wanxiangshu.Runtime.Fallback.FallbackMessageParser
+open Wanxiangshu.Runtime.Fallback.GateTransitions
 
-module Dyn = Wanxiangshu.Shell.Dyn
+module Dyn = Wanxiangshu.Runtime.Dyn
 
 open Wanxiangshu.Kernel.FallbackKernel.Types
-open Wanxiangshu.Shell.NudgeRuntimeTypes
+open Wanxiangshu.Runtime.NudgeRuntimeTypes
 
 let private mkTodoPart (todos: obj array) : obj =
     createObj
@@ -200,7 +203,7 @@ let testResolveNudgeModel () =
     let sid = "session-test-nudge-model"
 
     // Test case 1: Real user prompt with model specified
-    let runtime1 = Wanxiangshu.Shell.FallbackRuntimeState.FallbackRuntimeState()
+    let runtime1 = FallbackRuntimeStore()
 
     let msgs1 =
         [| mkMsg "user" "some query" (Some "openai/gpt-4")
@@ -210,7 +213,7 @@ let testResolveNudgeModel () =
     equal "use last user model when real user prompt" (Some "openai/gpt-4") res1
 
     // Test case 2: Real user prompt without model specified -> fallback to lastAssistantModel
-    let runtime2 = Wanxiangshu.Shell.FallbackRuntimeState.FallbackRuntimeState()
+    let runtime2 = FallbackRuntimeStore()
 
     let msgs2 =
         [| mkMsg "user" "some query" None
@@ -220,7 +223,7 @@ let testResolveNudgeModel () =
     equal "fallback to assistant model when user msg has no model" (Some "openai/gpt-4") res2
 
     // Test case 3: Fallback-injected user message -> use injected model
-    let runtime3 = Wanxiangshu.Shell.FallbackRuntimeState.FallbackRuntimeState()
+    let runtime3 = FallbackRuntimeStore()
 
     let msgs3 =
         [| mkMsg "user" "​" (Some "openai/gpt-4")
@@ -241,7 +244,7 @@ let testResolveNudgeModel () =
     equal "use injected model from runtime state" (Some "openai/gpt-4") res3
 
     // Test case 4: Nudge message -> use same model
-    let runtime4 = Wanxiangshu.Shell.FallbackRuntimeState.FallbackRuntimeState()
+    let runtime4 = FallbackRuntimeStore()
 
     let msgs4 =
         [| mkMsg

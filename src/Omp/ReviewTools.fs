@@ -1,6 +1,0 @@
-module Wanxiangshu.Omp.ReviewTools
-
-open Wanxiangshu.Omp.ReviewToolsRegister
-
-let registerLoopFeatures = ReviewToolsRegister.registerLoopFeatures
-let registerInputHandler = ReviewToolsRegister.registerInputHandler

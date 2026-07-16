@@ -20,11 +20,12 @@ module Wanxiangshu.Tests.CommandProcessorE2ETests
 
 open Fable.Core
 open Wanxiangshu.Tests.Assert
-open Wanxiangshu.Kernel.EventLog.Types
-open Wanxiangshu.Kernel.EventLog.Fold
-open Wanxiangshu.Kernel.EventLog.ReviewLoopFold
+open Wanxiangshu.Kernel.EventSourcing.EventEnvelope
+open Wanxiangshu.Kernel.EventSourcing.EventKind
+open Wanxiangshu.Kernel.EventSourcing.Fold
+open Wanxiangshu.Kernel.Review.ReviewLoopFold
 open Wanxiangshu.Kernel.SessionOverview
-open Wanxiangshu.Kernel.Flow
+open Wanxiangshu.Runtime.Flow
 open Wanxiangshu.Kernel.Subsession.Types
 open Wanxiangshu.Kernel.FallbackKernel.Types
 open Wanxiangshu.Kernel.Reactive

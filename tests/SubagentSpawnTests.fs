@@ -2,8 +2,8 @@ module Wanxiangshu.Tests.SubagentSpawnTests
 
 open Fable.Core
 open Wanxiangshu.Tests.Assert
-open Wanxiangshu.Kernel.Subagent
-open Wanxiangshu.Shell.SubagentSpawn
+open Wanxiangshu.Runtime.Subagent
+open Wanxiangshu.Runtime.SubagentSpawn
 
 let joinReportsEmptyList () =
     equal "joinReports empty" "" (joinReports [])

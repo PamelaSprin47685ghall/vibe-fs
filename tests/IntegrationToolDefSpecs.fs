@@ -6,8 +6,8 @@ open System
 open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Tests.TempWorkspace
 open Wanxiangshu.Tests.IntegrationToolSetup
-open Wanxiangshu.Opencode.Plugin
-open Wanxiangshu.Shell.Dyn
+open Wanxiangshu.Hosts.Opencode.Plugin
+open Wanxiangshu.Runtime.Dyn
 
 open Wanxiangshu.Tests.IntegrationToolDefSpecsMimo
 
@@ -163,7 +163,7 @@ let toolDefinitionSpec () =
         check "tool.definition injects executor warn_tdd schema" (not (isNullish (get executorProps "warn_tdd")))
         check "tool.definition injects executor warn schema" (not (isNullish (get executorProps "warn")))
         check "tool.definition does not replace executor with backlog schema" (isNullish (get executorProps "todos"))
-        let! mimoP = Wanxiangshu.Opencode.PluginMimo.plugin (box {| directory = workspaceDir |})
+        let! mimoP = Wanxiangshu.Hosts.Opencode.PluginMimo.plugin (box {| directory = workspaceDir |})
         let mimoTd = get mimoP "tool.definition"
 
         let taskParams =

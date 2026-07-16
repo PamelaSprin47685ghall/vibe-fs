@@ -3,15 +3,15 @@ module Wanxiangshu.Tests.OmpPluginCoreIntegrationTests
 open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Tests.Assert
-open Wanxiangshu.Shell.Dyn
-open Wanxiangshu.Omp
-open Wanxiangshu.Omp.Plugin
-open Wanxiangshu.Omp.PluginCore
-open Wanxiangshu.Shell
+open Wanxiangshu.Runtime.Dyn
+open Wanxiangshu.Hosts.Omp
+open Wanxiangshu.Hosts.Omp.Plugin
+open Wanxiangshu.Hosts.Omp.PluginComposition
+open Wanxiangshu.Runtime
 
-module Dyn = Wanxiangshu.Shell.Dyn
+module Dyn = Wanxiangshu.Runtime.Dyn
 
-let private reviewStore = PluginCore.reviewStore
+let private reviewStore = PluginComposition.reviewStore
 
 type private PiHarness =
     { hookStore: obj

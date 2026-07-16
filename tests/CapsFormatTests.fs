@@ -1,7 +1,7 @@
 module Wanxiangshu.Tests.CapsFormatTests
 
 open Wanxiangshu.Tests.Assert
-open Wanxiangshu.Kernel.CapsFormat
+open Wanxiangshu.Runtime.CapsFormat
 
 let stableFingerprintEmptyList () =
     let h (s: string) = s

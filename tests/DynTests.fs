@@ -1,6 +1,6 @@
 module Wanxiangshu.Tests.DynTests
 
-open Wanxiangshu.Shell.Dyn
+open Wanxiangshu.Runtime.Dyn
 open Wanxiangshu.Tests.Assert
 
 

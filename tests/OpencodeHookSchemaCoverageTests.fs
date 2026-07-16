@@ -3,12 +3,12 @@ module Wanxiangshu.Tests.OpencodeHookSchemaCoverageTests
 open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Tests.Assert
-open Wanxiangshu.Opencode.HookSchema
-open Wanxiangshu.Shell.WorkBacklogSchema
+open Wanxiangshu.Hosts.Opencode.HookSchema
+open Wanxiangshu.Runtime.WorkBacklogSchema
 open Wanxiangshu.Kernel.WarnTdd
-open Wanxiangshu.Shell.Dyn
+open Wanxiangshu.Runtime.Dyn
 
-module Dyn = Wanxiangshu.Shell.Dyn
+module Dyn = Wanxiangshu.Runtime.Dyn
 
 [<Import("Schema", "effect")>]
 let private effectSchemaNs: obj = jsNative
@@ -263,7 +263,7 @@ let opencodeHookSchemaTryBuildJsonSchemaFromEffectSchemaDefs () =
     let parentSchema = effectStruct (createObj [ "questions", arrayType ])
 
     let schema =
-        Wanxiangshu.Opencode.HookSchemaCore.tryBuildJsonSchemaFromEffectSchema parentSchema
+        Wanxiangshu.Hosts.Opencode.HookSchemaDecoration.tryBuildJsonSchemaFromEffectSchema parentSchema
 
     check "schema built successfully" (not (isNullish schema))
 

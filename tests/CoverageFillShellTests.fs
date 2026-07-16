@@ -3,15 +3,15 @@ module Wanxiangshu.Tests.CoverageFillShellTests
 open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Tests.Assert
-open Wanxiangshu.Shell.SubagentIo
-open Wanxiangshu.Shell.WorkspaceFiles
-open Wanxiangshu.Shell.RunnerBackground
-open Wanxiangshu.Shell.ChildAgentRegistry
-open Wanxiangshu.Shell.NudgeRuntime
-open Wanxiangshu.Shell.TreeSitterPlatform
-open Wanxiangshu.Shell.FuzzyFinderShell
+open Wanxiangshu.Runtime.SubagentIo
+open Wanxiangshu.Runtime.WorkspaceFiles
+open Wanxiangshu.Runtime.RunnerBackground
+open Wanxiangshu.Runtime.ChildAgentRegistry
+open Wanxiangshu.Runtime.NudgeRuntime
+open Wanxiangshu.Runtime.TreeSitterPlatform
+open Wanxiangshu.Runtime.FuzzyFinderShell
 
-module Dyn = Wanxiangshu.Shell.Dyn
+module Dyn = Wanxiangshu.Runtime.Dyn
 
 open Wanxiangshu.Kernel.Nudge
 open Wanxiangshu.Kernel.Nudge.TodoStatus

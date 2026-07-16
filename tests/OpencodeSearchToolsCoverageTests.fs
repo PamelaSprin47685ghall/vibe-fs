@@ -3,14 +3,14 @@ module Wanxiangshu.Tests.OpencodeSearchToolsCoverageTests
 open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Tests.Assert
-open Wanxiangshu.Opencode.SearchTools
-open Wanxiangshu.Shell.FuzzyIteratorStore
-open Wanxiangshu.Shell.FuzzyFinderShell
-open Wanxiangshu.Shell.ChildAgentRegistry
-open Wanxiangshu.Shell.FallbackRuntimeState
+open Wanxiangshu.Hosts.Opencode.SearchTools
+open Wanxiangshu.Runtime.FuzzyIteratorStore
+open Wanxiangshu.Runtime.FuzzyFinderShell
+open Wanxiangshu.Runtime.ChildAgentRegistry
+open Wanxiangshu.Runtime.Fallback.RuntimeStore
 open Wanxiangshu.Kernel.ToolCatalog
 open Wanxiangshu.Kernel.HostTools
-open Wanxiangshu.Shell.WebToolsCodec
+open Wanxiangshu.Runtime.WebToolsCodec
 
 let private specOf (name: string) =
     match Wanxiangshu.Kernel.ToolCatalog.specOf name with
@@ -32,7 +32,7 @@ let searchToolsFuzzyGrepTool () =
 let searchToolsWebsearchTool () =
     let registry = ChildAgentRegistry.Create()
     let ctx = createObj []
-    let tool = websearchTool Opencode registry ctx (FallbackRuntimeState())
+    let tool = websearchTool Opencode registry ctx (FallbackRuntimeStore())
     check "websearch tool non-null" (not (isNull tool))
 
 let searchToolsWebfetchTool () =

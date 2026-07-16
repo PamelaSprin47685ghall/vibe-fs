@@ -4,8 +4,8 @@ open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Kernel.Wanxiangzhen.SquadTask
 open Wanxiangshu.Kernel.Wanxiangzhen.SquadEvent
-open Wanxiangshu.Shell.Dyn
-open Wanxiangshu.Shell.Wanxiangzhen.CoordinatorRuntime
+open Wanxiangshu.Runtime.Dyn
+open Wanxiangshu.Runtime.Wanxiangzhen.CoordinatorRuntime
 open Wanxiangshu.Tests.Wanxiangzhen.AssertCompat
 open Wanxiangshu.Tests.Wanxiangzhen.TestDoubles
 open Wanxiangshu.Tests.Wanxiangzhen.TestFixtures

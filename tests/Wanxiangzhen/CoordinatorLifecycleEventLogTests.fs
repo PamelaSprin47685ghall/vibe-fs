@@ -4,9 +4,9 @@ open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Kernel.Wanxiangzhen.SquadTask
 open Wanxiangshu.Kernel.Wanxiangzhen.Dag
-open Wanxiangshu.Shell.Wanxiangzhen.CoordinatorRuntime
-open Wanxiangshu.Shell.Wanxiangzhen.CoordinatorLifecycle
-open Wanxiangshu.Shell.Wanxiangzhen.CoordinatorSquadUpdate
+open Wanxiangshu.Runtime.Wanxiangzhen.CoordinatorRuntime
+open Wanxiangshu.Runtime.Wanxiangzhen.CoordinatorLifecycle
+open Wanxiangshu.Runtime.Wanxiangzhen.CoordinatorSquadUpdate
 open Wanxiangshu.Tests.Wanxiangzhen.AssertCompat
 open Wanxiangshu.Tests.Wanxiangzhen.TestFixtures
 

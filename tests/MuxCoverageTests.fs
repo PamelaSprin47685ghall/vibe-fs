@@ -4,14 +4,14 @@ open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Tests.TempWorkspace
-open Wanxiangshu.Shell.Dyn
-open Wanxiangshu.Mux.Wrappers
-open Wanxiangshu.Mux.WebTools
-open Wanxiangshu.Kernel.CapsFormat
-open Wanxiangshu.Mux.CapsCodec
-open Wanxiangshu.Mux.BuiltinTools
-open Wanxiangshu.Mux.WrappersReview
-open Wanxiangshu.Shell.RuntimeScope
+open Wanxiangshu.Runtime.Dyn
+open Wanxiangshu.Hosts.Mux.Wrappers
+open Wanxiangshu.Hosts.Mux.WebTools
+open Wanxiangshu.Runtime.CapsFormat
+open Wanxiangshu.Hosts.Mux.CapsCodec
+open Wanxiangshu.Hosts.Mux.BuiltinTools
+open Wanxiangshu.Hosts.Mux.WrappersReview
+open Wanxiangshu.Runtime.RuntimeScope
 
 [<Import("createRequire", "node:module")>]
 let private createRequire': string -> (string -> obj) = jsNative
@@ -24,7 +24,7 @@ let private pathModule: obj = requireFn "path"
 
 let private join (a: string) (b: string) = unbox<string> (pathModule?join (a, b))
 
-module Dyn = Wanxiangshu.Shell.Dyn
+module Dyn = Wanxiangshu.Runtime.Dyn
 
 // ── Mux.Wrappers ──────────────────────────────────────────────────────────────
 

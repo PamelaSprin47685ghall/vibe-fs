@@ -3,8 +3,8 @@ module Wanxiangshu.Tests.OmpAgentConfigTests
 open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Tests.Assert
-open Wanxiangshu.Shell.Dyn
-open Wanxiangshu.Omp.AgentConfig
+open Wanxiangshu.Runtime.Dyn
+open Wanxiangshu.Hosts.Omp.AgentConfig
 
 /// applyAgentConfigFor must hand back a config with the canonical 9 Omp agents
 /// registered, each carrying the right `mode` (primary for manager/build/plan,

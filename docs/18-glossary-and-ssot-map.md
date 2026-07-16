@@ -5,7 +5,7 @@
 | 术语 | 含义 |
 | :--- | :--- |
 | Kernel | 纯 F# 领域层，`src/Kernel/` |
-| Shell | IO 与 codec，`src/Shell/` |
+| Runtime | IO 与 codec，`src/Runtime/` |
 | Host | `Opencode \| Mimocode \| Mux \| Omp` |
 | SSOT | Single Source of Truth；此处多指 NDJSON 或指定模块 |
 | Fold | 对事件列表的纯 reduce，得当前投影 |
@@ -58,8 +58,8 @@
 | :--- | :--- |
 | `[workspace]/.wanxiangshu.ndjson` | 万象术事件日志（含万象阵 `squad_*`/`task_*` 行和 `subsession_*` 行） |
 | `[workspace]/.wanxiangshu.ndjson.lock` | 追加锁 |
-| `build/src/Mux/Plugin.js` | 默认包入口 |
-| `build/src/Omp/Plugin.js` | OMP 入口 |
+| `build/src/Hosts/Mux/Plugin.js` | 默认包入口 |
+| `build/src/Hosts/Omp/Plugin.js` | OMP 入口 |
 | `tests/logs/*.verbose.log` | 测试详细日志 |
 | `REF.md` | 架构演进总纲（三位一体哲学、九条语义法律、9 阶段路线图） |
 

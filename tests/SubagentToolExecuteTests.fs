@@ -3,22 +3,25 @@ module Wanxiangshu.Tests.SubagentToolExecuteTests
 open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Tests.Assert
-open Wanxiangshu.Kernel.Domain
-open Wanxiangshu.Shell.ChildAgentRegistry
-open Wanxiangshu.Shell.MuxSubagentToolExecute
+open Wanxiangshu.Kernel.Primitives.Identity
+open Wanxiangshu.Kernel.Errors.DomainError
+open Wanxiangshu.Kernel.Session.Causality
+open Wanxiangshu.Runtime.ChildAgentRegistry
+open Wanxiangshu.Runtime.MuxSubagentToolExecute
 open Wanxiangshu.Tests.IntegrationToolSetup
-open Wanxiangshu.Shell.ToolRuntimeContext
-open Wanxiangshu.Kernel.ToolOutputInfo
+open Wanxiangshu.Runtime.ToolRuntimeContext
+open Wanxiangshu.Runtime.ToolOutputInfo
 open Wanxiangshu.Kernel.ToolOutputInfoTypes
-open Wanxiangshu.Shell.SubagentIteratorStore
-open Wanxiangshu.Shell.FallbackRuntimeState
-open Wanxiangshu.Shell.SubsessionActorRegistry
-open Wanxiangshu.Shell.SubsessionEventStore
-open Wanxiangshu.Opencode.SubagentIo
+open Wanxiangshu.Runtime.SubagentIteratorStore
+open Wanxiangshu.Runtime.Fallback.RuntimeStore
+open Wanxiangshu.Runtime.Fallback.GateTransitions
+open Wanxiangshu.Runtime.SubsessionActorRegistry
+open Wanxiangshu.Runtime.SubsessionEventStore
+open Wanxiangshu.Hosts.Opencode.SubagentIo
 open Wanxiangshu.Tests.TempWorkspace
 open Wanxiangshu.Kernel.Subsession.Types
 
-module Dyn = Wanxiangshu.Shell.Dyn
+module Dyn = Wanxiangshu.Runtime.Dyn
 
 let private stubMuxSpawn role =
     { ToolNames = [||]
@@ -52,7 +55,7 @@ let executeMuxDecodeFailureNeverCallsRunMux () =
                 (stubMuxSpawn "coder")
                 args
                 (validMuxConfig ())
-                (Wanxiangshu.Shell.RuntimeScope.create ())
+                (Wanxiangshu.Runtime.RuntimeScope.create ())
 
         check "mux empty intents rejects before runMux" (runMuxCalls = 0)
         check "mux decode failure mentions non-empty" (out.Contains "non-empty")
@@ -83,7 +86,7 @@ let executeMuxInvalidConfigNeverCallsRunMux () =
                 (stubMuxSpawn "coder")
                 args
                 badConfig
-                (Wanxiangshu.Shell.RuntimeScope.create ())
+                (Wanxiangshu.Runtime.RuntimeScope.create ())
 
         check "mux missing workspaceId rejects before runMux" (runMuxCalls = 0)
         check "mux config failure mentions workspaceId" (out.Contains "workspaceId")
@@ -112,7 +115,7 @@ let executeMuxDecodeInvalidIntentNeverCallsRunMux () =
                 (stubMuxSpawn "coder")
                 args
                 (validMuxConfig ())
-                (Wanxiangshu.Shell.RuntimeScope.create ())
+                (Wanxiangshu.Runtime.RuntimeScope.create ())
 
         check "mux invalid intent shape rejects before runMux" (runMuxCalls = 0)
         check "mux invalid intent uses subagentToolFailed" (out.Contains "coder failed:")
@@ -132,7 +135,7 @@ let executeMuxSubagentSpawnPreservesPhysicalTaskId () =
 
         let config = validMuxConfig ()
 
-        let sessionScope = Wanxiangshu.Shell.RuntimeScope.create ()
+        let sessionScope = Wanxiangshu.Runtime.RuntimeScope.create ()
 
         let! out =
             executeMuxSubagentTool
@@ -180,11 +183,11 @@ let executeMuxContinuationUsesPhysicalTaskId () =
                 stubMuxSpawn "coder",
                 ".",
                 "parent-session",
-                Wanxiangshu.Shell.RuntimeScope.create ()
+                Wanxiangshu.Runtime.RuntimeScope.create ()
             )
 
         let! _ =
-            (adapter :> Wanxiangshu.Kernel.HostAdapter.IHostAdapter)
+            (adapter :> Wanxiangshu.Runtime.HostAdapter.IHostAdapter)
                 .ContinueSubagent("task-physical-2", "coder", "continue")
 
         equal "Mux continuation preserves physical child id" "task-physical-2" continuedId
@@ -197,7 +200,7 @@ let executeOpencodeCleanupSuccessSpec () =
     promise {
         let! workspaceDir = mkdtempAsync "opencode-cleanup-success-"
         let registry = ChildAgentRegistry.Create()
-        let runtime = FallbackRuntimeState()
+        let runtime = FallbackRuntimeStore()
 
         let sequence = ResizeArray<string>()
 
@@ -237,9 +240,9 @@ let executeOpencodeCleanupSuccessSpec () =
 
         // Pre-create actor in registry to verify its deletion
         let dummyHost =
-            Wanxiangshu.Opencode.SubsessionHostAdapter.createHost mockClient "coder" workspaceDir
+            Wanxiangshu.Hosts.Opencode.SubsessionHostAdapter.createHost mockClient "coder" workspaceDir
 
-        let dummyStore = Wanxiangshu.Shell.SubsessionEventStore.create workspaceDir
+        let dummyStore = Wanxiangshu.Runtime.SubsessionEventStore.create workspaceDir
 
         let actor =
             SubsessionActorRegistry.GetOrCreate workspaceDir "child-session-1" dummyHost dummyStore
@@ -282,7 +285,7 @@ let executeOpencodeCleanupFailureSpec () =
     promise {
         let! workspaceDir = mkdtempAsync "opencode-cleanup-failure-"
         let registry = ChildAgentRegistry.Create()
-        let runtime = FallbackRuntimeState()
+        let runtime = FallbackRuntimeStore()
 
         let sequence = ResizeArray<string>()
 
@@ -323,9 +326,9 @@ let executeOpencodeCleanupFailureSpec () =
 
         // Pre-create actor in registry to verify it is NOT deleted
         let dummyHost =
-            Wanxiangshu.Opencode.SubsessionHostAdapter.createHost mockClient "coder" workspaceDir
+            Wanxiangshu.Hosts.Opencode.SubsessionHostAdapter.createHost mockClient "coder" workspaceDir
 
-        let dummyStore = Wanxiangshu.Shell.SubsessionEventStore.create workspaceDir
+        let dummyStore = Wanxiangshu.Runtime.SubsessionEventStore.create workspaceDir
 
         let actor =
             SubsessionActorRegistry.GetOrCreate workspaceDir "child-session-2" dummyHost dummyStore

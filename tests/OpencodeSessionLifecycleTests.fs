@@ -4,13 +4,13 @@ open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Kernel.HostTools
-open Wanxiangshu.Shell.ChildAgentRegistry
-open Wanxiangshu.Shell.FallbackRuntimeState
-open Wanxiangshu.Shell.RuntimeScope
-open Wanxiangshu.Shell.ReviewRuntime
-open Wanxiangshu.Opencode.BacklogSession
-open Wanxiangshu.Opencode.SessionLifecycleObserver
-open Wanxiangshu.Shell.Dyn
+open Wanxiangshu.Runtime.ChildAgentRegistry
+open Wanxiangshu.Runtime.Fallback.RuntimeStore
+open Wanxiangshu.Runtime.RuntimeScope
+open Wanxiangshu.Runtime.ReviewRuntime
+open Wanxiangshu.Hosts.Opencode.BacklogSession
+open Wanxiangshu.Hosts.Opencode.SessionLifecycleObserver
+open Wanxiangshu.Runtime.Dyn
 
 let childIdleDoesNotAbortParent () =
     promise {
@@ -34,7 +34,7 @@ let childIdleDoesNotAbortParent () =
                 createReviewStore (),
                 registry,
                 None,
-                FallbackRuntimeState(),
+                FallbackRuntimeStore(),
                 BacklogSession(opencode, create ())
             )
 

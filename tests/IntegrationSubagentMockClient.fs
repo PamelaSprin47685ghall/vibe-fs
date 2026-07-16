@@ -2,9 +2,10 @@ module Wanxiangshu.Tests.IntegrationSubagentMockClient
 
 open Fable.Core
 open Fable.Core.JsInterop
-open Wanxiangshu.Shell
-open Wanxiangshu.Shell.FallbackRuntimeState
-open Wanxiangshu.Opencode.SubsessionHostAdapter
+open Wanxiangshu.Runtime
+open Wanxiangshu.Runtime.Fallback.RuntimeStore
+open Wanxiangshu.Runtime.Fallback.GateTransitions
+open Wanxiangshu.Hosts.Opencode.SubsessionHostAdapter
 open Wanxiangshu.Kernel.Subsession.Types
 
 let makeMockClient (pObjRef: obj ref) (parentId: string) (responseText: string) =
@@ -35,7 +36,7 @@ let makeMockClient (pObjRef: obj ref) (parentId: string) (responseText: string) 
                                     promptCalls.Add(arg)
 
                                     if not (isNull pObjRef.Value) then
-                                        let runtime = pObjRef.Value?__fallbackRuntime |> unbox<FallbackRuntimeState>
+                                        let runtime = pObjRef.Value?__fallbackRuntime |> unbox<FallbackRuntimeStore>
 
                                         let childId = Dyn.str (Dyn.get arg "path") "id"
                                         runtime.SetTaskComplete childId true
@@ -63,7 +64,12 @@ let makeMockClient (pObjRef: obj ref) (parentId: string) (responseText: string) 
                                             sessionNonces <- Map.add childId nonce sessionNonces
                                             let msgId = childId + "-msg"
                                             let receipt = UserMessageObserved msgId
-                                            let _ = PendingTurnReceipt.tryResolve nonce receipt
+
+                                            let _ =
+                                                Wanxiangshu.Hosts.Opencode.SubsessionDispatch.PendingTurnReceipt.tryResolve
+                                                    nonce
+                                                    receipt
+
                                             ()
                                         else
                                             sessionNonces <- Map.remove childId sessionNonces

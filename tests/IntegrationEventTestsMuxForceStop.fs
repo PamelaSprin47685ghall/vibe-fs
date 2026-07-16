@@ -8,12 +8,12 @@ open Wanxiangshu.Tests.EventLogTestSeed
 open Wanxiangshu.Tests.AsyncFlush
 open Wanxiangshu.Tests.TempWorkspace
 
-open Wanxiangshu.Kernel.LoopMessages
-open Wanxiangshu.Kernel.ReviewPrompts
-open Wanxiangshu.Kernel.PromptFragments
-open Wanxiangshu.Kernel.PromptFrontMatter
-open Wanxiangshu.Mux.Plugin
-open Wanxiangshu.Shell.Dyn
+open Wanxiangshu.Runtime.LoopMessages
+open Wanxiangshu.Runtime.ReviewPrompts
+open Wanxiangshu.Runtime.PromptFragments
+open Wanxiangshu.Runtime.PromptFrontMatter
+open Wanxiangshu.Hosts.Mux.Plugin
+open Wanxiangshu.Runtime.Dyn
 
 [<Emit("process.cwd()")>]
 let private processCwd () : string = jsNative

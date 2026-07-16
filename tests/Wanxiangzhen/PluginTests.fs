@@ -4,10 +4,10 @@ open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Kernel.Wanxiangzhen.SquadTask
 open Wanxiangshu.Kernel.Wanxiangzhen.Dag
-open Wanxiangshu.Shell.Dyn
-open Wanxiangshu.Shell.PromiseQueue
-open Wanxiangshu.Shell.Wanxiangzhen.CoordinatorRuntime
-open Wanxiangshu.Opencode.PluginWanxiangzhenHooks
+open Wanxiangshu.Runtime.Dyn
+open Wanxiangshu.Runtime.PromiseQueue
+open Wanxiangshu.Runtime.Wanxiangzhen.CoordinatorRuntime
+open Wanxiangshu.Hosts.Opencode.PluginWanxiangzhenHooks
 open Wanxiangshu.Tests.Wanxiangzhen.AssertCompat
 
 let entries () : (string * (unit -> unit)) list =

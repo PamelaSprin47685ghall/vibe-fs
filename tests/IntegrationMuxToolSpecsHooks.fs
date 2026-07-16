@@ -6,12 +6,13 @@ open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Tests.TempWorkspace
 open Wanxiangshu.Tests.IntegrationToolSetup
 open Wanxiangshu.Tests.IntegrationMuxSetup
-open Wanxiangshu.Mux.Plugin
-open Wanxiangshu.Kernel.EventLog.Types
-open Wanxiangshu.Shell.EventLogCodec
-open Wanxiangshu.Shell.Dyn
+open Wanxiangshu.Hosts.Mux.Plugin
+open Wanxiangshu.Kernel.EventSourcing.EventEnvelope
+open Wanxiangshu.Kernel.EventSourcing.EventKind
+open Wanxiangshu.Runtime.EventLogCodec
+open Wanxiangshu.Runtime.Dyn
 
-module Dyn = Wanxiangshu.Shell.Dyn
+module Dyn = Wanxiangshu.Runtime.Dyn
 
 let muxEventHookAbortDeactivatesReviewSpec () =
     promise {
@@ -105,7 +106,7 @@ let muxToolSchemasAreCleanStaticallyButInjectedDynamicallySpec () =
                     Dyn.get params_ "properties"
         // coder: no warn_tdd in raw static BuiltinTools schema
         let staticCoder =
-            Wanxiangshu.Mux.SubagentTools.coderTool (createObj []) [| "coder" |]
+            Wanxiangshu.Hosts.Mux.SubagentTools.coderTool (createObj []) [| "coder" |]
 
         let staticCoderProps = staticProperties (box staticCoder)
         check "coder static BuiltinTools schema has no warn_tdd" (isNullish (Dyn.get staticCoderProps "warn_tdd"))
@@ -121,10 +122,10 @@ let muxToolSchemasAreCleanStaticallyButInjectedDynamicallySpec () =
             (Dyn.truthy (Dyn.get (Dyn.get coderProps "warn_tdd") "required_"))
         // executor: no warn or warn_tdd in raw static BuiltinTools schema
         let staticExec =
-            Wanxiangshu.Mux.BuiltinTools.executorTool
+            Wanxiangshu.Hosts.Mux.BuiltinTools.executorTool
                 (createObj [])
                 [| "executor" |]
-                (Wanxiangshu.Shell.RuntimeScope.create ())
+                (Wanxiangshu.Runtime.RuntimeScope.create ())
 
         let staticExecProps = staticProperties (box staticExec)
         check "executor static BuiltinTools schema has no warn" (isNullish (Dyn.get staticExecProps "warn"))
@@ -147,7 +148,7 @@ let muxToolSchemasAreCleanStaticallyButInjectedDynamicallySpec () =
             "registered executor warn_tdd is soft-required"
             (Dyn.truthy (Dyn.get (Dyn.get execProps "warn_tdd") "required_"))
         // write (staticWrite): no warn_tdd in raw BuiltinTools.writeTool schema
-        let staticWrite = Wanxiangshu.Mux.BuiltinTools.writeTool (createObj [])
+        let staticWrite = Wanxiangshu.Hosts.Mux.BuiltinTools.writeTool (createObj [])
         let staticWriteProps = staticProperties (box staticWrite)
         check "staticWrite has no warn_tdd" (isNullish (Dyn.get staticWriteProps "warn_tdd"))
         // registered write: warn_tdd injected into schema properties and required
@@ -212,10 +213,10 @@ let muxToolExecuteAfterBlocksRepeatedIdenticalCallSpec () =
         let reg = sharedMuxRegistration ()
 
         let scope =
-            unbox<Wanxiangshu.Shell.RuntimeScope.RuntimeScope> (Dyn.get reg "__runtimeScope")
+            unbox<Wanxiangshu.Runtime.RuntimeScope.RuntimeScope> (Dyn.get reg "__runtimeScope")
 
         let sessionID = "mux-livelock-blocks-" + System.Guid.NewGuid().ToString("N")
-        Wanxiangshu.Shell.LivelockGuard.cleanup scope sessionID
+        Wanxiangshu.Runtime.LivelockGuard.cleanup scope sessionID
 
         let after = get reg "tool.execute.after"
         check "mux registration exposes tool.execute.after" (not (isNullish after))
@@ -242,12 +243,12 @@ let muxToolExecuteAfterBlocksRepeatedCallIgnoringControlsSpec () =
         let reg = sharedMuxRegistration ()
 
         let scope =
-            unbox<Wanxiangshu.Shell.RuntimeScope.RuntimeScope> (Dyn.get reg "__runtimeScope")
+            unbox<Wanxiangshu.Runtime.RuntimeScope.RuntimeScope> (Dyn.get reg "__runtimeScope")
 
         let sessionID =
             "mux-livelock-ignore-controls-" + System.Guid.NewGuid().ToString("N")
 
-        Wanxiangshu.Shell.LivelockGuard.cleanup scope sessionID
+        Wanxiangshu.Runtime.LivelockGuard.cleanup scope sessionID
 
         let after = get reg "tool.execute.after"
         check "mux registration exposes tool.execute.after for controls test" (not (isNullish after))

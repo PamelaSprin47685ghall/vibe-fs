@@ -1,0 +1,189 @@
+module Wanxiangshu.Runtime.RuntimeScope
+
+open Fable.Core
+open Wanxiangshu.Runtime.CapsFormat
+open Wanxiangshu.Runtime.SessionProjectionStore
+open Wanxiangshu.Runtime.FuzzyIteratorStore
+open Wanxiangshu.Runtime.SubagentIteratorStore
+open Wanxiangshu.Runtime.PromiseQueue
+
+type SessionReaderWriterLock() =
+    let queue = SerialQueue()
+    let mutable activeReaders = 0
+    let mutable readerZeroPromises: (unit -> unit) list = []
+
+    let awaitNoReaders () : JS.Promise<unit> =
+        if activeReaders = 0 then
+            Promise.lift ()
+        else
+            Promise.create (fun resolve _ -> readerZeroPromises <- resolve :: readerZeroPromises)
+
+    let releaseReader () =
+        activeReaders <- activeReaders - 1
+
+        if activeReaders = 0 then
+            let temp = readerZeroPromises
+            readerZeroPromises <- []
+
+            for resolve in temp do
+                resolve ()
+
+    member _.EnqueueRead(work: unit -> JS.Promise<'T>) : JS.Promise<'T> =
+        Promise.create (fun resolve reject ->
+            queue.Enqueue(fun () ->
+                activeReaders <- activeReaders + 1
+                let p = work ()
+
+                p
+                |> Promise.map (fun res ->
+                    releaseReader ()
+                    resolve res)
+                |> Promise.catch (fun ex ->
+                    releaseReader ()
+                    reject ex)
+                |> Promise.start
+
+                Promise.lift ())
+            |> Promise.catch (fun ex -> reject ex)
+            |> ignore)
+
+    member _.EnqueueWrite(work: unit -> JS.Promise<'T>) : JS.Promise<'T> =
+        queue.Enqueue(fun () ->
+            promise {
+                do! awaitNoReaders ()
+                return! work ()
+            })
+
+type RuntimeScope() =
+    let projection = ProjectionStore()
+    let mutable initPromise: JS.Promise<unit> option = None
+    let mutable onInit: (string -> JS.Promise<unit>) option = None
+    let mutable randomGen: unit -> float = fun () -> JS.Math.random ()
+    let mutable capsFiles = Map.empty<string, CapsFile list>
+    let mutable capsInflight = Map.empty<string, JS.Promise<CapsFile list>>
+    let iteratorStore = createTypedIteratorStore 200
+    let subagentIteratorStore = createSubagentIteratorStore 50
+    let mutable sessionLocks = Map.empty<string, SessionReaderWriterLock>
+    let mutable extState = Map.empty<string, obj>
+    let mutable tempFilesByPrompt = Map.empty<string, string list>
+    let mutable childSessionCounter = 0
+    let mutable workspaceRoot = ""
+
+    member _.RandomGen
+        with get () = randomGen
+        and set (v) = randomGen <- v
+
+    member _.NextChildSessionId() : int =
+        childSessionCounter <- childSessionCounter + 1
+        childSessionCounter
+
+    member _.Projection = projection
+
+    member _.IteratorStore = iteratorStore
+
+    member _.SubagentIteratorStore = subagentIteratorStore
+
+    member _.RegisterTempFiles(prompt: string, files: string list) : unit =
+        let key = if isNull prompt then "" else prompt.Trim()
+
+        if key <> "" then
+            tempFilesByPrompt <- Map.add key files tempFilesByPrompt
+
+    member _.TryGetTempFiles(prompt: string) : string list option =
+        let key = if isNull prompt then "" else prompt.Trim()
+        if key = "" then None else Map.tryFind key tempFilesByPrompt
+
+    member _.TryGetCapsFiles(key: string) : CapsFile list option = Map.tryFind key capsFiles
+
+    member _.AddCapsFilesIfAbsent(key: string, files: CapsFile list) : unit =
+        if not (Map.containsKey key capsFiles) then
+            capsFiles <- Map.add key files capsFiles
+
+    member _.ClearCapsFiles() : unit =
+        capsFiles <- Map.empty
+        capsInflight <- Map.empty
+
+    member _.GetOrLoadCapsInflight(key: string, load: unit -> JS.Promise<CapsFile list>) : JS.Promise<CapsFile list> =
+        match Map.tryFind key capsInflight with
+        | Some p -> p
+        | None ->
+            let p =
+                load ()
+                |> Promise.map (fun files ->
+                    capsInflight <- Map.remove key capsInflight
+                    files)
+                |> Promise.catch (fun ex ->
+                    capsInflight <- Map.remove key capsInflight
+                    raise ex)
+
+            capsInflight <- Map.add key p capsInflight
+            p
+
+    member _.ClearIterators() : unit =
+        clearTypedIteratorStore iteratorStore
+        clearSubagentIteratorStore subagentIteratorStore
+
+    member _.ClearSessionQueues() : unit = sessionLocks <- Map.empty
+
+    member _.EnqueuePerSession(sessionId: string, work: unit -> JS.Promise<'T>) : JS.Promise<'T> =
+        let lock =
+            match Map.tryFind sessionId sessionLocks with
+            | Some l -> l
+            | None ->
+                let l = SessionReaderWriterLock()
+                sessionLocks <- Map.add sessionId l sessionLocks
+                l
+
+        lock.EnqueueWrite(work)
+
+    member _.EnqueueExecutor(sessionId: string, mode: string, work: unit -> JS.Promise<'T>) : JS.Promise<'T> =
+        let lock =
+            match Map.tryFind sessionId sessionLocks with
+            | Some l -> l
+            | None ->
+                let l = SessionReaderWriterLock()
+                sessionLocks <- Map.add sessionId l sessionLocks
+                l
+
+        if mode = "ro" then
+            lock.EnqueueRead(work)
+        else
+            lock.EnqueueWrite(work)
+
+    member _.TryFindKey(key: string) : obj option = Map.tryFind key extState
+
+    member _.Add(key: string, value: obj) : unit = extState <- Map.add key value extState
+
+    member _.Remove(key: string) : unit = extState <- Map.remove key extState
+
+    member _.InitPromise
+        with get () = initPromise
+        and set (v) = initPromise <- v
+
+    member _.OnInit
+        with get () = onInit
+        and set (v) = onInit <- v
+
+    member _.WorkspaceRoot
+        with get () = workspaceRoot
+        and set (v) = workspaceRoot <- v
+
+    member _.TriggerInit(workspaceRootStr: string) : unit =
+        if workspaceRootStr <> "" then
+            workspaceRoot <- workspaceRootStr
+
+        if workspaceRootStr <> "" && Option.isNone initPromise then
+            match onInit with
+            | Some f ->
+                let initP = f workspaceRootStr
+                initPromise <- Some initP
+            | None -> ()
+
+    member _.WaitInit() : JS.Promise<unit> =
+        match initPromise with
+        | Some p -> p
+        | None -> Promise.lift ()
+
+let create () : RuntimeScope =
+    Wanxiangshu.Runtime.Profiler.initGlobal ()
+    RuntimeScope()

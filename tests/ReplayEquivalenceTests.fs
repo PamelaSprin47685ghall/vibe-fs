@@ -15,9 +15,15 @@
 module Wanxiangshu.Tests.ReplayEquivalenceTests
 
 open Wanxiangshu.Tests.Assert
-open Wanxiangshu.Kernel.EventLog.Types
-open Wanxiangshu.Kernel.EventLog.Fold
-open Wanxiangshu.Kernel.EventLog.NudgeProjection
+open Wanxiangshu.Kernel.EventSourcing.EventEnvelope
+open Wanxiangshu.Kernel.EventSourcing.EventKind
+open Wanxiangshu.Kernel.EventSourcing.Fold
+open Wanxiangshu.Kernel.Review
+open Wanxiangshu.Kernel.Nudge
+open Wanxiangshu.Kernel.Subsession
+open Wanxiangshu.Kernel.Review.ReviewProjection
+open Wanxiangshu.Kernel.Nudge.NudgeProjection
+open Wanxiangshu.Kernel.Subsession.SubsessionProjection
 open Wanxiangshu.Kernel.SessionOverview
 open Wanxiangshu.Kernel.Subsession.Types
 open Wanxiangshu.Kernel.FallbackKernel.Types
@@ -132,10 +138,10 @@ let ``Replay: standalone projection matches composite`` () =
 
     let st = List.fold applyEvent (emptySessionState ()) events
 
-    // Use composite wrappers from Fold.fs
-    let reviewLoop = foldReviewLoop "s1" events
-    let subagents = foldSubagents "s1" events
-    let nudgeDedup = foldNudgeDedup "s1" events
+    // Use standalone projections
+    let reviewLoop = ReviewProjection.foldReviewLoopStream "s1" events
+    let subagents = SubsessionProjection.foldSubagents "s1" events
+    let nudgeDedup = NudgeProjection.foldDedupStream "s1" events
 
     check "composite review loop matches standalone" (st.ReviewLoop = reviewLoop)
     check "composite subagents match standalone" (st.Subagents = subagents)

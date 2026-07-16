@@ -6,12 +6,12 @@ open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Kernel.MessageTransformPolicy
 open Wanxiangshu.Kernel.HostTools
 open Wanxiangshu.Kernel.Messaging
-open Wanxiangshu.Shell.MessageTransformCore
-open Wanxiangshu.Shell.MessageTransformPipeline
-open Wanxiangshu.Shell.MessageTransformHostEntry
-open Wanxiangshu.Shell.ReviewRuntime
+open Wanxiangshu.Runtime.MessageTransform.Plan
+open Wanxiangshu.Runtime.MessageTransform.Pipeline
+open Wanxiangshu.Runtime.MessageTransform.HostEntry
+open Wanxiangshu.Runtime.ReviewRuntime
 
-module Dyn = Wanxiangshu.Shell.Dyn
+module Dyn = Wanxiangshu.Runtime.Dyn
 
 let private zeroWidth = "\u200B"
 
@@ -70,7 +70,7 @@ let testMessageSanitization () =
                   Cleaned = msgs
                   RawArray = None
                   SembleInjectEnabled = false
-                  Scope = Wanxiangshu.Shell.RuntimeScope.create ()
+                  Scope = Wanxiangshu.Runtime.RuntimeScope.create ()
                   MaxInputTokens = 200000
                   GetContextUsage = (fun _ -> Promise.lift None) }
 
@@ -151,7 +151,7 @@ let testEmptyArrayAndMissingContentSanitization () =
               Cleaned = []
               RawArray = Some raw
               SembleInjectEnabled = false
-              Scope = Wanxiangshu.Shell.RuntimeScope.create ()
+              Scope = Wanxiangshu.Runtime.RuntimeScope.create ()
               MaxInputTokens = 200000
               GetContextUsage = (fun _ -> Promise.lift None) }
 

@@ -2,13 +2,15 @@ module Wanxiangshu.Tests.SubagentPromptBuildTests
 
 open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Kernel.HostTools
-open Wanxiangshu.Kernel.Subagent
+open Wanxiangshu.Runtime.Subagent
 open Wanxiangshu.Kernel.SubagentIntents
-open Wanxiangshu.Kernel.SubagentPrompts
-open Wanxiangshu.Kernel.Domain
-open Wanxiangshu.Shell.SubagentIntentsCodec
-open Wanxiangshu.Shell.SubagentPromptBuild
-open Wanxiangshu.Shell.WorkspaceFiles
+open Wanxiangshu.Runtime.SubagentPrompts
+open Wanxiangshu.Kernel.Primitives.Identity
+open Wanxiangshu.Kernel.Errors.DomainError
+open Wanxiangshu.Kernel.Session.Causality
+open Wanxiangshu.Runtime.SubagentIntentsCodec
+open Wanxiangshu.Runtime.SubagentPromptBuild
+open Wanxiangshu.Runtime.WorkspaceFiles
 
 let private coderSample: CoderIntent =
     { objective = "fix bug"
@@ -36,7 +38,7 @@ let promptsForParallelIntentsMatchesFormatPrompt () =
         equal $"investigator prompts match formatPrompt host={host}" invFormat invHelper
 
 let buildMeditatorSectionsMatchesManualZip () =
-    let dummyEntry: Wanxiangshu.Methodology.SchemaCommon.MethodologyEntry =
+    let dummyEntry: Wanxiangshu.Kernel.Methodology.Schema.MethodologyEntry =
         { methodologyId = "test_methodology"
           shortDefinition = "test def"
           triggerWhen = "test trigger"
@@ -45,7 +47,7 @@ let buildMeditatorSectionsMatchesManualZip () =
           outputSections = [] }
 
     let viaText =
-        Wanxiangshu.Methodology.SchemaCommon.renderMeditatorIntent dummyEntry "why?" "my background" "note detail"
+        Wanxiangshu.Kernel.Methodology.Schema.renderMeditatorIntent dummyEntry "why?" "my background" "note detail"
 
     for host in [| opencode; mimocode |] do
         let viaFormat = formatPrompt host (Meditator viaText) |> List.head

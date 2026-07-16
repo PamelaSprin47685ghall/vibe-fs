@@ -1,8 +1,11 @@
 module Wanxiangshu.Tests.DomainTests
 
 open Wanxiangshu.Tests.Assert
-open Wanxiangshu.Kernel.Domain
-open Wanxiangshu.Kernel.Domain.Id
+open Wanxiangshu.Kernel.Primitives.Identity
+open Wanxiangshu.Kernel.Errors.DomainError
+open Wanxiangshu.Kernel.Session.Causality
+open Wanxiangshu.Kernel.Primitives.Identity.Id
+open Wanxiangshu.Kernel.WorkspaceState
 
 // --- formatDomainError ---
 

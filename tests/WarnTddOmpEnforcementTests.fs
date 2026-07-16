@@ -4,22 +4,26 @@ open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Kernel.WarnTdd
-open Wanxiangshu.Shell.Dyn
+open Wanxiangshu.Runtime.Dyn
 
-module Dyn = Wanxiangshu.Shell.Dyn
+module Dyn = Wanxiangshu.Runtime.Dyn
 
 // `applyToolCallHook` in src/Omp/HookExecute.fs returns `Some err` on
 // rejection (string form, not setHookError). Tests below pin that contract
 // for every modification / warn-required tool name.
 
 let private ompHookResult (toolName: string) (args: obj) : string option * string list =
-    Wanxiangshu.Shell.ToolHookRuntime.clearSessionCompliance "s-warn-enforce-omp"
+    Wanxiangshu.Runtime.ToolHookRuntime.clearSessionCompliance "s-warn-enforce-omp"
 
     let result =
-        Wanxiangshu.Omp.HookExecute.applyToolCallHookWithIds toolName args "s-warn-enforce-omp" "c-warn-enforce-omp"
+        Wanxiangshu.Hosts.Omp.HookExecute.applyToolCallHookWithIds
+            toolName
+            args
+            "s-warn-enforce-omp"
+            "c-warn-enforce-omp"
 
     let violations =
-        match Wanxiangshu.Shell.ToolHookRuntime.tryGetCompliance "s-warn-enforce-omp" "c-warn-enforce-omp" with
+        match Wanxiangshu.Runtime.ToolHookRuntime.tryGetCompliance "s-warn-enforce-omp" "c-warn-enforce-omp" with
         | Some env -> env.Violations
         | None -> []
 

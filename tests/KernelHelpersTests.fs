@@ -1,10 +1,12 @@
 module Wanxiangshu.Tests.KernelHelpersTests
 
 open Wanxiangshu.Tests.Assert
-open Wanxiangshu.Kernel.Domain
+open Wanxiangshu.Kernel.Primitives.Identity
+open Wanxiangshu.Kernel.Errors.DomainError
+open Wanxiangshu.Kernel.Session.Causality
 open Wanxiangshu.Kernel.ToolResult
 open Wanxiangshu.Kernel.MessageTransformPolicy
-open Wanxiangshu.Kernel.Message
+open Wanxiangshu.Kernel.Messaging
 open Wanxiangshu.Kernel.CapsSynthPolicy
 open Wanxiangshu.Kernel.WarnTdd
 

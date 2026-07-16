@@ -1,11 +1,10 @@
 module Wanxiangshu.Kernel.Nudge.SubmitReviewHooks
 
 open Wanxiangshu.Kernel.Nudge.TodoStatus
-open Wanxiangshu.Kernel.ReviewPrompts
-open Wanxiangshu.Kernel.PromptFrontMatter
+open Wanxiangshu.Kernel.Nudge.NudgePromptText
 
 let isSubmitReviewWipProgressOutput (text: string) : bool =
-    (bodyAfterFrontMatter text).Trim() = submitReviewWipAcknowledgment
+    not (isNull text) && text.Contains(submitReviewWipAcknowledgment)
 
 let isSubmitReviewToolName (name: string) : bool =
     name.Trim().Equals("submit_review", System.StringComparison.OrdinalIgnoreCase)

@@ -6,20 +6,20 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 let WANXIANG_ROOT = path.resolve(__dirname, '..');
-let PLUGIN_JS = path.resolve(WANXIANG_ROOT, 'build/src/Opencode/Plugin.js');
+let PLUGIN_JS = path.resolve(WANXIANG_ROOT, 'build/src/Hosts/OpenCode/Plugin.js');
 if (!fs.existsSync(PLUGIN_JS)) {
   WANXIANG_ROOT = path.resolve(__dirname, '../..');
-  PLUGIN_JS = path.resolve(WANXIANG_ROOT, 'build/src/Opencode/Plugin.js');
+  PLUGIN_JS = path.resolve(WANXIANG_ROOT, 'build/src/Hosts/OpenCode/Plugin.js');
 }
 
 function getPluginUrl(variant) {
   let file = 'Plugin.js';
   if (variant === 'mimocode') file = 'PluginMimo.js';
   if (variant === 'mimotui') file = 'PluginMimoTui.js';
-  let p = path.resolve(WANXIANG_ROOT, `build/src/Opencode/${file}`);
+  let p = path.resolve(WANXIANG_ROOT, `build/src/Hosts/OpenCode/${file}`);
   if (!fs.existsSync(p)) {
     let altRoot = path.resolve(__dirname, '../..');
-    p = path.resolve(altRoot, `build/src/Opencode/${file}`);
+    p = path.resolve(altRoot, `build/src/Hosts/OpenCode/${file}`);
   }
   return p;
 }

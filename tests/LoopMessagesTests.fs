@@ -1,7 +1,7 @@
 module Wanxiangshu.Tests.LoopMessagesTests
 
 open Wanxiangshu.Tests.Assert
-open Wanxiangshu.Kernel.LoopMessages
+open Wanxiangshu.Runtime.LoopMessages
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 

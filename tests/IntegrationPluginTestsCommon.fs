@@ -2,7 +2,7 @@ module Wanxiangshu.Tests.IntegrationPluginTestsCommon
 
 open Fable.Core.JsInterop
 open Wanxiangshu.Tests.Assert
-open Wanxiangshu.Shell.Dyn
+open Wanxiangshu.Runtime.Dyn
 
 let pluginShape (p: obj) =
     check "plugin.name" (str p "name" = "wanxiangshu")

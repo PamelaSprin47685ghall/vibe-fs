@@ -3,7 +3,7 @@ module Wanxiangshu.Tests.Wanxiangzhen.DynTests
 open Fable.Core
 open Fable.Core.JsInterop
 open Fable.Core.JS
-open Wanxiangshu.Shell.Dyn
+open Wanxiangshu.Runtime.Dyn
 open Wanxiangshu.Tests.Wanxiangzhen.AssertCompat
 
 [<Emit("[1, 2, 3]")>]

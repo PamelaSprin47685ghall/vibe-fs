@@ -4,9 +4,12 @@ open Fable.Core
 open Fable.Core.JsInterop
 open System
 open Wanxiangshu.Tests.Assert
-open Wanxiangshu.Kernel.Domain
-open Wanxiangshu.Kernel.Domain.Id
+open Wanxiangshu.Kernel.Primitives.Identity
+open Wanxiangshu.Kernel.Errors.DomainError
+open Wanxiangshu.Kernel.Session.Causality
+open Wanxiangshu.Kernel.Primitives.Identity.Id
 open Wanxiangshu.Kernel.Executor
+open Wanxiangshu.Runtime.ExecutorFormat
 open Wanxiangshu.Kernel.Messaging
 
 // ── Kernel.Domain.Id ─────────────────────────────────────────────────────────

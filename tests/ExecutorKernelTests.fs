@@ -3,9 +3,12 @@ module Wanxiangshu.Tests.ExecutorKernelTests
 open System.Text
 open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Kernel.Executor
-open Wanxiangshu.Kernel.SubagentPrompts
-open Wanxiangshu.Kernel.Domain
-open Wanxiangshu.Shell.ExecutorToolsCodec
+open Wanxiangshu.Runtime.ExecutorFormat
+open Wanxiangshu.Runtime.SubagentPrompts
+open Wanxiangshu.Kernel.Primitives.Identity
+open Wanxiangshu.Kernel.Errors.DomainError
+open Wanxiangshu.Kernel.Session.Causality
+open Wanxiangshu.Runtime.ExecutorToolsCodec
 open Fable.Core.JsInterop
 
 let private truncateUtf8 (s: string) (max: int) = truncateUtf8ByBytes s max

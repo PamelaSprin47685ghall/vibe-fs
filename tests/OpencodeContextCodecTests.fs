@@ -3,9 +3,9 @@ module Wanxiangshu.Tests.OpencodeContextCodecTests
 open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Tests.Assert
-open Wanxiangshu.Shell.Dyn
-open Wanxiangshu.Shell.OpencodeContextCodec
-open Wanxiangshu.Shell.ToolRuntimeContext
+open Wanxiangshu.Runtime.Dyn
+open Wanxiangshu.Runtime.OpencodeContextCodec
+open Wanxiangshu.Runtime.ToolRuntimeContext
 
 [<Global("process")>]
 let private nodeProcess: obj = jsNative

@@ -2,7 +2,7 @@ module Wanxiangshu.Tests.IntegrationMuxSetup
 
 open Fable.Core
 open Fable.Core.JsInterop
-open Wanxiangshu.Shell.Dyn
+open Wanxiangshu.Runtime.Dyn
 
 
 let muxToolConfig (directory: string) (sessionID: string) : obj =

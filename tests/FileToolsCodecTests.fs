@@ -3,9 +3,11 @@ module Wanxiangshu.Tests.FileToolsCodecTests
 open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Tests.Assert
-open Wanxiangshu.Kernel.Domain
-open Wanxiangshu.Shell.Dyn
-open Wanxiangshu.Shell.FileToolsCodec
+open Wanxiangshu.Kernel.Primitives.Identity
+open Wanxiangshu.Kernel.Errors.DomainError
+open Wanxiangshu.Kernel.Session.Causality
+open Wanxiangshu.Runtime.Dyn
+open Wanxiangshu.Runtime.FileToolsCodec
 
 let decodeReadMissingPath () =
     let args = createObj [ "offset", box 1; "limit", box 10 ]

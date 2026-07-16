@@ -4,8 +4,8 @@ open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Tests.BacklogMessageBuilders
 open Wanxiangshu.Kernel.HostTools
 open Wanxiangshu.Kernel.Messaging
-open Wanxiangshu.Kernel.BacklogProjectionCore
-open Wanxiangshu.Kernel.BacklogProjection
+open Wanxiangshu.Runtime.BacklogProjectionBuild
+open Wanxiangshu.Runtime.BacklogProjection
 
 let findFoldRangeTest () =
     let flat =

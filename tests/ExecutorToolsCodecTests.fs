@@ -3,9 +3,12 @@ module Wanxiangshu.Tests.ExecutorToolsCodecTests
 open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Tests.Assert
-open Wanxiangshu.Kernel.Domain
+open Wanxiangshu.Kernel.Primitives.Identity
+open Wanxiangshu.Kernel.Errors.DomainError
+open Wanxiangshu.Kernel.Session.Causality
 open Wanxiangshu.Kernel.Executor
-open Wanxiangshu.Shell.ExecutorToolsCodec
+open Wanxiangshu.Runtime.ExecutorFormat
+open Wanxiangshu.Runtime.ExecutorToolsCodec
 
 let decodeExecutorInvalidLanguage () =
     let args =

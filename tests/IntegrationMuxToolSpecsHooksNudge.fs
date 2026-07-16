@@ -6,10 +6,10 @@ open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Tests.TempWorkspace
 open Wanxiangshu.Tests.IntegrationMuxSetup
 open Wanxiangshu.Tests.AsyncFlush
-open Wanxiangshu.Mux.Plugin
-open Wanxiangshu.Shell.Dyn
+open Wanxiangshu.Hosts.Mux.Plugin
+open Wanxiangshu.Runtime.Dyn
 
-module Dyn = Wanxiangshu.Shell.Dyn
+module Dyn = Wanxiangshu.Runtime.Dyn
 
 /// `stream-end` with `metadata.muxStopReason = "tool_use_error"` must flow through
 /// the Mux `eventHook` → `NudgeRuntime.HandleEvent` chain: when the session has

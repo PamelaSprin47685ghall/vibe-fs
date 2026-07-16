@@ -2,8 +2,8 @@ module Wanxiangshu.Tests.Wanxiangzhen.SessionIoTests
 
 open Fable.Core
 open Fable.Core.JsInterop
-open Wanxiangshu.Shell.Dyn
-open Wanxiangshu.Shell.Wanxiangzhen.SessionIo
+open Wanxiangshu.Runtime.Dyn
+open Wanxiangshu.Runtime.Wanxiangzhen.SessionIo
 open Wanxiangshu.Tests.Wanxiangzhen.AssertCompat
 
 let entries () : (string * (unit -> unit)) list =

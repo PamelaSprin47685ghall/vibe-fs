@@ -40,83 +40,52 @@ let rec private getFsFiles (dir: string) : string list =
               elif fullPath.EndsWith(".fs") then
                   yield fullPath ]
 
-let run () : unit =
-    let cwd = unbox<string> (nodeProcess?cwd ())
+let private resolvePath (cwd: string) (rel: string) =
+    let path1 = pathJoin cwd rel
 
-    let resolvePath (rel: string) =
-        let path1 = pathJoin cwd rel
+    if existsSync path1 then path1
+    else if existsSync rel then rel
+    else failwithf "File not found: %s (cwd: %s)" rel cwd
 
-        if existsSync path1 then path1
-        else if existsSync rel then rel
-        else failwithf "File not found: %s (cwd: %s)" rel cwd
+let private assertNoDebugPrintf (label: string) (content: string) =
+    if content.Contains("printfn") && content.Contains("DEBUG") then
+        failwithf "Bare DEBUG printfn found in: %s" label
 
-    let fileFallbackEventBridge = "src/Shell/FallbackEventBridge.fs"
-    let fileFallbackRuntimeState = "src/Shell/FallbackRuntimeState.fs"
-    let fileToolHookRuntime = "src/Shell/ToolHookRuntime.fs"
-    let fileProgressObserver = "src/Opencode/ProgressObserver.fs"
-    let filePluginWanxiangzhen = "src/Opencode/PluginWanxiangzhenE2eMeta.fs"
+let private assertNoToken (token: string) (label: string) (content: string) =
+    if content.Contains token then
+        failwithf "Forbidden %s found in: %s" token label
 
-    // 1. Explicit check for FallbackEventBridge.fs
-    let pathBridge = resolvePath fileFallbackEventBridge
-    let contentBridge = readFileSync pathBridge "utf8"
+let private checkExplicitFiles (cwd: string) =
+    let files =
+        [ "src/Runtime/Fallback/FallbackEventBridge.fs"
+          "src/Runtime/Fallback/FallbackRuntimeStore.fs"
+          "src/Runtime/ToolHookRuntime.fs"
+          "src/Hosts/OpenCode/ProgressObserver.fs"
+          "src/Hosts/OpenCode/PluginWanxiangzhenE2eMeta.fs" ]
 
-    if contentBridge.Contains("printfn") && contentBridge.Contains("DEBUG") then
-        failwithf "Bare DEBUG printfn found in: %s" fileFallbackEventBridge
+    for rel in files do
+        let content = readFileSync (resolvePath cwd rel) "utf8"
+        assertNoDebugPrintf rel content
+        assertNoToken "debug-mimocode.txt" rel content
+        assertNoToken "DEBUG PROGRESS_OBSERVER" rel content
+        assertNoToken "JS.console.log" rel content
 
-    // 2. Explicit check for FallbackRuntimeState.fs
-    let pathState = resolvePath fileFallbackRuntimeState
-    let contentState = readFileSync pathState "utf8"
-
-    if contentState.Contains("printfn") && contentState.Contains("DEBUG") then
-        failwithf "Bare DEBUG printfn found in: %s" fileFallbackRuntimeState
-
-    // 3. Explicit check for ToolHookRuntime.fs
-    let pathToolHook = resolvePath fileToolHookRuntime
-    let contentToolHook = readFileSync pathToolHook "utf8"
-
-    if contentToolHook.Contains("printfn") && contentToolHook.Contains("DEBUG") then
-        failwithf "Bare DEBUG printfn found in: %s" fileToolHookRuntime
-
-    // 4. Explicit check for ProgressObserver.fs
-    let pathObserver = resolvePath fileProgressObserver
-    let contentObserver = readFileSync pathObserver "utf8"
-
-    if contentObserver.Contains("debug-mimocode.txt") then
-        failwithf "Forbidden debug-mimocode.txt found in: %s" fileProgressObserver
-
-    if contentObserver.Contains("DEBUG PROGRESS_OBSERVER") then
-        failwithf "Forbidden DEBUG PROGRESS_OBSERVER found in: %s" fileProgressObserver
-
-    // 5. Explicit check for PluginWanxiangzhenE2eMeta.fs
-    let pathMeta = resolvePath filePluginWanxiangzhen
-    let contentMeta = readFileSync pathMeta "utf8"
-
-    if contentMeta.Contains("JS.console.log") then
-        failwithf "Forbidden JS.console.log found in: %s" filePluginWanxiangzhen
-
-    // 6. Generic scan of src/**/*.fs excluding Semble/semble files
-    let srcDir = resolvePath "src"
-    let allFsFiles = getFsFiles srcDir
+let private scanProductionSources (cwd: string) =
+    let allFsFiles = getFsFiles (resolvePath cwd "src")
 
     for filePath in allFsFiles do
         let isSembleFile = filePath.Contains("Semble") || filePath.Contains("semble")
 
         if not isSembleFile then
             let content = readFileSync filePath "utf8"
+            assertNoToken "debug-mimocode.txt" filePath content
+            assertNoToken "debug-wanxiangzhen.txt" filePath content
+            assertNoToken "DEBUG PROGRESS_OBSERVER" filePath content
+            assertNoToken "JS.console.log" filePath content
+            assertNoDebugPrintf filePath content
 
-            if content.Contains("debug-mimocode.txt") then
-                failwithf "Forbidden debug-mimocode.txt found in scanned file: %s" filePath
-
-            if content.Contains("debug-wanxiangzhen.txt") then
-                failwithf "Forbidden debug-wanxiangzhen.txt found in scanned file: %s" filePath
-
-            if content.Contains("DEBUG PROGRESS_OBSERVER") then
-                failwithf "Forbidden DEBUG PROGRESS_OBSERVER found in scanned file: %s" filePath
-
-            if content.Contains("JS.console.log") then
-                failwithf "Forbidden JS.console.log found in scanned file: %s" filePath
-
-            if content.Contains("printfn") && content.Contains("DEBUG") then
-                failwithf "Bare DEBUG printfn found in scanned file: %s" filePath
-
+let run () : unit =
+    let cwd = unbox<string> (nodeProcess?cwd ())
+    checkExplicitFiles cwd
+    scanProductionSources cwd
     check "production sources contain no unguarded debug output" true

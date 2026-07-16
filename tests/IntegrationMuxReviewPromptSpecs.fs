@@ -8,9 +8,9 @@ open Wanxiangshu.Tests.EventLogTestSeed
 open Wanxiangshu.Tests.IntegrationToolSetup
 open Wanxiangshu.Tests.IntegrationMuxSetup
 
-open Wanxiangshu.Kernel.LoopMessages
-open Wanxiangshu.Mux.Plugin
-open Wanxiangshu.Shell.Dyn
+open Wanxiangshu.Runtime.LoopMessages
+open Wanxiangshu.Hosts.Mux.Plugin
+open Wanxiangshu.Runtime.Dyn
 
 
 let muxSubmitReviewPromptFormatSpec () =

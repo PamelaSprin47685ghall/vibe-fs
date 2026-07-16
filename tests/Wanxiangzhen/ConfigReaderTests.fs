@@ -3,7 +3,7 @@ module Wanxiangshu.Tests.Wanxiangzhen.ConfigReaderTests
 open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Kernel.Wanxiangzhen.SquadConfig
-open Wanxiangshu.Shell.Wanxiangzhen.ConfigReader
+open Wanxiangshu.Runtime.Wanxiangzhen.ConfigReader
 open Wanxiangshu.Tests.Wanxiangzhen.AssertCompat
 
 [<Import("mkdtempSync", "node:fs")>]

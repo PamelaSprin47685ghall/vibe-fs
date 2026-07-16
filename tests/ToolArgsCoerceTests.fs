@@ -3,12 +3,14 @@ module Wanxiangshu.Tests.ToolArgsCoerceTests
 open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Tests.Assert
-open Wanxiangshu.Kernel.Domain
+open Wanxiangshu.Kernel.Primitives.Identity
+open Wanxiangshu.Kernel.Errors.DomainError
+open Wanxiangshu.Kernel.Session.Causality
 open Wanxiangshu.Kernel.ToolArgs
-open Wanxiangshu.Shell.ToolArgsDecode
-open Wanxiangshu.Shell.ToolHookRuntime
+open Wanxiangshu.Runtime.ToolArgsDecode
+open Wanxiangshu.Runtime.ToolHookRuntime
 
-module Dyn = Wanxiangshu.Shell.Dyn
+module Dyn = Wanxiangshu.Runtime.Dyn
 
 let testCoerceUnknownToolArgsOk () =
     registerToolParameterTypes

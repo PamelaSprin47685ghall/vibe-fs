@@ -43,14 +43,14 @@
 
 | 入口文件 | npm 路径 | 宿主 |
 | :--- | :--- | :--- |
-| `src/Mux/Plugin.fs` | `wanxiangshu` → `.` | Mux（默认 main） |
-| `src/Omp/Plugin.fs` | `wanxiangshu/omp` | oh-my-pi |
-| `src/Opencode/Plugin.fs` | （包内构建产物） | OpenCode |
-| `src/Opencode/PluginMimo.fs` | （包内构建产物） | Mimocode |
-| `src/Opencode/PluginMimoTui.fs` | TUI 辅助 | Mimocode sidebar todo |
-| `src/Opencode/PluginWanxiangzhen.fs` | `wanxiangshu/wanxiangzhen` | 万象阵 |
+| `src/Hosts/Mux/Plugin.fs` | `wanxiangshu` → `.` | Mux（默认 main） |
+| `src/Hosts/Omp/Plugin.fs` | `wanxiangshu/omp` | oh-my-pi |
+| `src/Hosts/OpenCode/Plugin.fs` | （包内构建产物） | OpenCode |
+| `src/Hosts/OpenCode/PluginMimo.fs` | （包内构建产物） | Mimocode |
+| `src/Hosts/OpenCode/PluginMimoTui.fs` | TUI 辅助 | Mimocode sidebar todo |
+| `src/Hosts/OpenCode/PluginWanxiangzhen.fs` | `wanxiangshu/wanxiangzhen` | 万象阵 |
 
-共享装配逻辑：**OpenCode 系** → `Opencode/PluginCore.fs`；**OMP** → `Omp/PluginCore.fs`。
+共享装配逻辑：**OpenCode 系** → `Hosts/OpenCode/PluginCore.fs`；**OMP** → `Hosts/Omp/PluginCore.fs`。
 
 ## Host 枚举与工具命名
 
@@ -155,5 +155,5 @@
 ## 相关文档
 
 - Kernel 模块族：[03-kernel.md](./03-kernel.md)
-- Shell 边界：[04-shell.md](./04-shell.md)
+- Shell 边界：[04-runtime.md](./04-runtime.md)
 - SSOT 总表：[18-glossary-and-ssot-map.md](./18-glossary-and-ssot-map.md)

@@ -1,7 +1,5 @@
 module Wanxiangshu.Kernel.Messaging
 
-open Fable.Core
-open Fable.Core.JsInterop
 open Wanxiangshu.Kernel.ToolExecutionStatusModule
 
 /// Host-agnostic message model. `'raw` carries the original host object reference
@@ -58,7 +56,7 @@ type FlatPart<'raw> =
 
 let backlogPrefixIdPrefix = "backlog-prefix-"
 
-let private synthPrefixes =
+let synthPrefixes =
     [ "caps-synth-user-"
       "caps-synth-assistant-"
       "caps-synth-ack-"
@@ -70,87 +68,6 @@ let private synthPrefixes =
       "semble-synth-"
       "context-budget-nudge-"
       "parallel-tool-synth-" ]
-
-[<Emit("typeof $0")>]
-let private jsTypeOf (o: obj) : string = Fable.Core.JS.undefined
-
-let classifySource (id: string) (parts: Part<obj> list option) (raw: obj option) : Source =
-    let isSynth =
-        if id <> "" then
-            synthPrefixes |> List.exists id.StartsWith
-        else
-            false
-
-    let hasCapsTextOrMeta =
-        let checkText (t: string) =
-            t <> null && t.Contains("<wanxiangshu-caps")
-
-        let checkMeta (t: string) =
-            t <> null
-            && (t.Contains("caps-synth-")
-                || t.Contains("caps-call-")
-                || t.Contains("caps-fr-")
-                || t.Contains("caps-tool-"))
-
-        let checkObj (r: obj) =
-            if box r = null then
-                false
-            else
-                let checkVal (v: obj) =
-                    if box v = null then
-                        false
-                    else
-                        let s = string v
-                        checkText s || checkMeta s
-
-                if jsTypeOf r = "object" then
-                    let rid = r?id
-                    let rcallID = r?callID
-                    let rtoolCallId = r?toolCallId
-                    let rmetadata = r?metadata
-                    let rkind = if box rmetadata <> null then rmetadata?kind else null
-                    let rtext = r?text
-
-                    checkVal rid
-                    || checkVal rcallID
-                    || checkVal rtoolCallId
-                    || checkVal rkind
-                    || checkVal rtext
-                else
-                    let rStr = string r
-                    checkText rStr || checkMeta rStr
-
-        let partsContain =
-            match parts with
-            | Some pts ->
-                pts
-                |> List.exists (fun p ->
-                    match p with
-                    | TextPart t -> checkText t
-                    | ToolPart(tool, callID, stateOpt, _) ->
-                        checkText tool
-                        || checkText callID
-                        || checkMeta callID
-                        || (match stateOpt with
-                            | Some st -> checkText st.output || checkText st.error
-                            | None -> false)
-                    | RawPart r -> checkObj r)
-            | None -> false
-
-        let rawContain =
-            match raw with
-            | Some r -> checkObj r
-            | None -> false
-
-        partsContain || rawContain
-
-    if isSynth then
-        let prefix = synthPrefixes |> List.find id.StartsWith
-        Synthetic prefix
-    elif hasCapsTextOrMeta then
-        Synthetic "caps"
-    else
-        Native
 
 let private roleMap =
     Map.ofList
@@ -232,51 +149,38 @@ let readAssistantText (messages: Message<'raw> list) (startIndex: int) (joiner: 
         else
             Some(String.concat joiner chunks)
 
-/// Drop synthetic messages, keeping only Native-sourced ones. Pure.
+let private textHasCaps (t: string) =
+    t <> null && t.Contains("<wanxiangshu-caps")
+
+let private idHasCapsPrefix (id: string) =
+    id <> null
+    && (id.StartsWith("caps-synth-")
+        || id.StartsWith("caps-call-")
+        || id.StartsWith("caps-fr-")
+        || id.StartsWith("caps-tool-"))
+
+let private partLooksCaps (p: Part<'raw>) : bool =
+    match p with
+    | TextPart t -> textHasCaps t
+    | ToolPart(_, callID, stateOpt, _) ->
+        idHasCapsPrefix callID
+        || (match stateOpt with
+            | Some st -> textHasCaps st.output
+            | None -> false)
+    | _ -> false
+
+/// Drop synthetic messages, keeping only Native-sourced ones. Pure string checks only.
 let stripSyntheticBySource (messages: Message<'raw> list) : Message<'raw> list =
     messages
     |> List.filter (fun m ->
-        let containsCaps =
-            m.parts
-            |> List.exists (fun p ->
-                match p with
-                | TextPart t -> t <> null && t.Contains("<wanxiangshu-caps")
-                | ToolPart(_, _, Some st, _) -> st.output <> null && st.output.Contains("<wanxiangshu-caps")
-                | _ -> false)
-
-        if containsCaps then
+        if m.parts |> List.exists partLooksCaps then
             false
         else
             match m.source with
             | Synthetic _ -> false
             | Native ->
-                let id = m.info.id
                 let rawStr = if box m.raw <> null then string m.raw else ""
-
-                let isCaps =
-                    (id <> null
-                     && (id.StartsWith("caps-synth-")
-                         || id.StartsWith("caps-call-")
-                         || id.StartsWith("caps-fr-")
-                         || id.StartsWith("caps-tool-")
-                         || id.StartsWith("caps-tool-")))
-                    || (rawStr <> null && rawStr.Contains("<wanxiangshu-caps"))
-                    || (m.parts
-                        |> List.exists (fun p ->
-                            match p with
-                            | TextPart t -> t <> null && t.Contains("<wanxiangshu-caps")
-                            | ToolPart(_, callID, stateOpt, _) ->
-                                (callID <> null
-                                 && (callID.StartsWith("caps-synth-")
-                                     || callID.StartsWith("caps-call-")
-                                     || callID.StartsWith("caps-fr-")
-                                     || callID.StartsWith("caps-tool-")))
-                                || (match stateOpt with
-                                    | Some st -> st.output <> null && st.output.Contains("<wanxiangshu-caps")
-                                    | None -> false)
-                            | _ -> false))
-
-                not isCaps)
+                not (idHasCapsPrefix m.info.id || textHasCaps rawStr))
 
 /// Extract the first non-empty session ID from a list of messages. Pure.
 let extractSessionID (messages: Message<'raw> list) : string =
@@ -290,3 +194,7 @@ let extractSessionID (messages: Message<'raw> list) : string =
     with
     | Some sid -> sid
     | None -> ""
+
+let capsSynthUserPrefix = "caps-synth-user-"
+let capsSynthAssistantPrefix = "caps-synth-assistant-"
+let backlogProjectionIdPrefix = "backlog-projection-"

@@ -4,20 +4,22 @@ open Fable.Core
 open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Tests.AsyncFlush
 open Wanxiangshu.Kernel.FallbackKernel.Types
-open Wanxiangshu.Shell.FallbackRuntimeState
-open Wanxiangshu.Shell.FallbackRecoveryWait
+open Wanxiangshu.Runtime.Fallback.RuntimeStore
+open Wanxiangshu.Runtime.Fallback.LeaseTransitions
+open Wanxiangshu.Runtime.Fallback.GateTransitions
+open Wanxiangshu.Runtime.Fallback.FallbackRecoveryWait
 
 let isSettled_falseWhenFresh () =
-    let rt = FallbackRuntimeState()
+    let rt = FallbackRuntimeStore()
     check "fresh session not settled" (not (isRecoverySettled rt "s1"))
 
 let isSettled_trueWhenConsumed () =
-    let rt = FallbackRuntimeState()
+    let rt = FallbackRuntimeStore()
     rt.SetConsumed "s1" true
     check "consumed true settled" (isRecoverySettled rt "s1")
 
 let isSettled_trueWhenExhausted () =
-    let rt = FallbackRuntimeState()
+    let rt = FallbackRuntimeStore()
     let s0 = rt.GetOrCreateState "s1"
 
     rt.UpdateState
@@ -28,7 +30,7 @@ let isSettled_trueWhenExhausted () =
     check "exhausted settled" (isRecoverySettled rt "s1")
 
 let isSettled_trueWhenCancelled () =
-    let rt = FallbackRuntimeState()
+    let rt = FallbackRuntimeStore()
     let s0 = rt.GetOrCreateState "s1"
 
     rt.UpdateState
@@ -39,7 +41,7 @@ let isSettled_trueWhenCancelled () =
     check "cancelled settled" (isRecoverySettled rt "s1")
 
 let isSettled_trueWhenTaskComplete () =
-    let rt = FallbackRuntimeState()
+    let rt = FallbackRuntimeStore()
     let s0 = rt.GetOrCreateState "s1"
 
     rt.UpdateState
@@ -51,7 +53,7 @@ let isSettled_trueWhenTaskComplete () =
 
 let waitCompletesAfterConsumedSetAsync () =
     promise {
-        let rt = FallbackRuntimeState()
+        let rt = FallbackRuntimeStore()
         let sid = "wait-sid"
         let waitP = waitForRecovery rt sid 32
         do! yieldMicrotask ()
@@ -61,7 +63,7 @@ let waitCompletesAfterConsumedSetAsync () =
     }
 
 let isToolCallTextRecovery_inProgressWhenScanning () =
-    let rt = FallbackRuntimeState()
+    let rt = FallbackRuntimeStore()
     let s0 = rt.GetOrCreateState "s1"
 
     rt.UpdateState
@@ -72,7 +74,7 @@ let isToolCallTextRecovery_inProgressWhenScanning () =
     check "ScanningToolCallText in progress" (isToolCallTextRecoveryInProgress rt "s1")
 
 let isToolCallTextRecovery_inProgressWhenRecovering () =
-    let rt = FallbackRuntimeState()
+    let rt = FallbackRuntimeStore()
     let s0 = rt.GetOrCreateState "s1"
 
     rt.UpdateState
@@ -83,12 +85,12 @@ let isToolCallTextRecovery_inProgressWhenRecovering () =
     check "RecoveringToolCallText in progress" (isToolCallTextRecoveryInProgress rt "s1")
 
 let isToolCallTextRecovery_notInProgressWhenIdle () =
-    let rt = FallbackRuntimeState()
+    let rt = FallbackRuntimeStore()
     check "Idle not in progress" (not (isToolCallTextRecoveryInProgress rt "s1"))
 
 let waitForToolCallTextRecovery_completesWhenPhaseClears () =
     promise {
-        let rt = FallbackRuntimeState()
+        let rt = FallbackRuntimeStore()
         let sid = "wait-tct"
         let s0 = rt.GetOrCreateState sid
 
@@ -116,7 +118,7 @@ let waitForToolCallTextRecovery_completesWhenPhaseClears () =
 
 let waitForToolCallTextRecovery_returnsImmediatelyWhenIdle () =
     promise {
-        let rt = FallbackRuntimeState()
+        let rt = FallbackRuntimeStore()
         do! waitForToolCallTextRecovery rt "idle-sess"
         check "returned immediately" true
     }

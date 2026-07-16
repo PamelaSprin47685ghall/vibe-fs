@@ -1,6 +1,8 @@
 module Wanxiangshu.Kernel.FallbackKernel.Types
 
-open Wanxiangshu.Kernel.Domain
+open Wanxiangshu.Kernel.Primitives.Identity
+open Wanxiangshu.Kernel.Errors.DomainError
+open Wanxiangshu.Kernel.Session.Causality
 
 /// Model variant qualifier (e.g. "high", "medium", "low").
 type ModelVariant = string

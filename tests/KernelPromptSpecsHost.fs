@@ -2,11 +2,11 @@ module Wanxiangshu.Tests.KernelPromptSpecsHost
 
 open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Kernel.HostTools
-open Wanxiangshu.Kernel.SubagentPrompts
+open Wanxiangshu.Runtime.SubagentPrompts
 open Wanxiangshu.Kernel.SubagentIntents
 open Wanxiangshu.Kernel.ToolCatalog
-open Wanxiangshu.Kernel.ReviewPrompts
-open Wanxiangshu.Kernel.ReviewPrompts.Instructions
+open Wanxiangshu.Runtime.ReviewPrompts
+open Wanxiangshu.Runtime.ReviewPrompts.Instructions
 
 let private specOf (name: string) =
     match Wanxiangshu.Kernel.ToolCatalog.specOf name with
@@ -31,7 +31,7 @@ let hostKernel' () =
     check "coder has objective" (intent.IndexOf("fix bug") >= 0)
     check "coder has do_not_touch" (intent.IndexOf("shared.ts") >= 0)
 
-    let dummyEntry: Wanxiangshu.Methodology.SchemaCommon.MethodologyEntry =
+    let dummyEntry: Wanxiangshu.Kernel.Methodology.Schema.MethodologyEntry =
         { methodologyId = "test_methodology"
           shortDefinition = "test def"
           triggerWhen = "test trigger"
@@ -40,7 +40,7 @@ let hostKernel' () =
           outputSections = [] }
 
     let prompt =
-        Wanxiangshu.Methodology.SchemaCommon.renderMeditatorIntent dummyEntry "why?" "my background" "note detail"
+        Wanxiangshu.Kernel.Methodology.Schema.renderMeditatorIntent dummyEntry "why?" "my background" "note detail"
 
     check "meditator has question" (prompt.IndexOf("why?") >= 0)
     check "meditator read-only" (prompt.IndexOf("quiet room") >= 0)
