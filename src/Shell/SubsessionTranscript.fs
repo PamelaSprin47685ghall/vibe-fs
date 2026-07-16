@@ -89,7 +89,7 @@ let buildTurnEvidence (msgs: obj array) (anchor: TurnAnchor) : Result<CurrentTur
                                     None)
                             |> String.concat "\n"
 
-                    if text = "" && not (isLastAssistantToolFinish slice) then
+                    if text = "" then
                         EmptyAssistant
                     else
                         let toolFinish = isLastAssistantToolFinish slice

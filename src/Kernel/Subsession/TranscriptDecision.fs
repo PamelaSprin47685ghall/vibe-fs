@@ -18,7 +18,11 @@ let classifyTurnEvidence (evidence: CurrentTurnEvidence) : TranscriptDecision =
     | FailureObserved err -> IncompleteWithoutRecovery err.Message
     | NoOutcome ->
         match evidence.Todos with
-        | TodosCompleted -> CompleteNaturally ""
+        | TodosCompleted ->
+            match evidence.Assistant with
+            | AssistantSnapshot(_, _, text, _)
+            | AssistantDelta(_, _, text, _) when not (System.String.IsNullOrWhiteSpace text) -> CompleteNaturally text
+            | _ -> CompleteNaturally ""
         | TodosNotCompleted
         | NoTodoInfo ->
             match evidence.Recovery with

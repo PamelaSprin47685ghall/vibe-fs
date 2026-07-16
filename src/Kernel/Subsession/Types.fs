@@ -152,7 +152,10 @@ module CurrentTurnEvidence =
                 else
                     AssistantSnapshot(id1, rev1, t1, f1)
             elif id1 = "" && id2 = "" then
-                AssistantSnapshot("", 0L, t2, f2)
+                if t2 <> "" then
+                    AssistantSnapshot("", 0L, t2, f2)
+                else
+                    AssistantSnapshot("", 0L, t1, f1)
             elif rev2 > rev1 then
                 AssistantSnapshot(id2, rev2, t2, f2)
             else
