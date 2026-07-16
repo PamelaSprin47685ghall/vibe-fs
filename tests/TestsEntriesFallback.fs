@@ -27,6 +27,7 @@ open Wanxiangshu.Tests.SubsessionEvidenceRaceTests
 open Wanxiangshu.Tests.OpencodeFallbackChildIdleTests
 open Wanxiangshu.Tests.FallbackHooksHelperAgentModelTests
 open Wanxiangshu.Tests.SubagentOutputTests
+open Wanxiangshu.Tests.SubsessionEmptyOutputContinueTests
 
 let fallbackTestEntries () : (string * TestBody) list =
     [ "FallbackKernelTests.run", Sync(sync FallbackKernelTests.run)
@@ -50,7 +51,8 @@ let fallbackTestEntries () : (string * TestBody) list =
       "SubsessionEvidenceRaceTests.run", Sync(sync SubsessionEvidenceRaceTests.run)
       "OpencodeFallbackChildIdleTests.run", Async OpencodeFallbackChildIdleTests.run
       "FallbackHooksHelperAgentModelTests.run", Async FallbackHooksHelperAgentModelTests.run
-      "SubagentOutputTests.run", Sync(sync SubagentOutputTests.run) ]
+      "SubagentOutputTests.run", Sync(sync SubagentOutputTests.run)
+      "SubsessionEmptyOutputContinueTests.run", Sync(sync SubsessionEmptyOutputContinueTests.run) ]
 
 let tailTestEntries () : (string * TestBody) list =
     [ "WebFetchGuardTests.run", Sync(sync WebFetchGuardTests.run)

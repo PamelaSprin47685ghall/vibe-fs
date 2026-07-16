@@ -10,6 +10,10 @@ type TranscriptDecision =
     | ContinueNormally of prompt: string
     | IncompleteWithoutRecovery of reason: string
 
+/// Zero-width prompt injected when the assistant produced no usable output,
+/// mirroring the main-session `isIdleNoContentAndNoTools → SendContinue` path.
+let private emptyTurnPrompt = "\u200B"
+
 /// Pure function: classify CurrentTurnEvidence (turn-sliced) into a decision.
 /// This is the primary path — only analyzes messages from the current turn.
 let classifyTurnEvidence (evidence: CurrentTurnEvidence) : TranscriptDecision =
@@ -30,12 +34,12 @@ let classifyTurnEvidence (evidence: CurrentTurnEvidence) : TranscriptDecision =
             | RecoveryPrompt prompt -> RecoverWithPrompt prompt
             | NoRecoveryPrompt ->
                 match evidence.Assistant with
-                | NoAssistant -> IncompleteWithoutRecovery "No assistant message in current turn"
-                | EmptyAssistant -> IncompleteWithoutRecovery "Assistant message in current turn has no content"
+                | NoAssistant -> ContinueNormally emptyTurnPrompt
+                | EmptyAssistant -> ContinueNormally emptyTurnPrompt
                 | AssistantSnapshot(_, _, text, finish)
                 | AssistantDelta(_, _, text, finish) ->
                     if System.String.IsNullOrWhiteSpace text then
-                        IncompleteWithoutRecovery "Assistant message in current turn has no content"
+                        ContinueNormally emptyTurnPrompt
                     else
                         let toolFinish =
                             match finish with
@@ -52,4 +56,4 @@ let classifyTurnEvidence (evidence: CurrentTurnEvidence) : TranscriptDecision =
                         if taskComplete then
                             CompleteNaturally text
                         else
-                            IncompleteWithoutRecovery "Session idle without task completion and no recovery available"
+                            ContinueNormally emptyTurnPrompt
