@@ -318,6 +318,7 @@
     <Compile Include="src/Runtime/Fallback/Ports.fs"/>
     <Compile Include="src/Runtime/Fallback/LeaseValidation.fs"/>
     <Compile Include="src/Runtime/Fallback/RetryDispatchGovernor.fs"/>
+    <Compile Include="src/Runtime/Fallback/ContinuationDispatchHelpers.fs"/>
     <Compile Include="src/Runtime/Fallback/ContinuationExecution.fs"/>
     <Compile Include="src/Runtime/Fallback/NudgeHandler.fs"/>
     <Compile Include="src/Runtime/Fallback/CompactionHandler.fs"/>
