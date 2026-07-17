@@ -14,6 +14,8 @@ open Wanxiangshu.Runtime.Fallback.GateTransitions
 open Wanxiangshu.Runtime.Fallback.FallbackEventBridge
 open Wanxiangshu.Runtime.Fallback.FallbackBridgePorts
 open Wanxiangshu.Runtime.Fallback.FallbackBridgeContinuation
+open Wanxiangshu.Runtime.Fallback.FallbackBridgeLease
+open Wanxiangshu.Runtime.Fallback.SessionRuntime
 open Wanxiangshu.Runtime
 
 module Dyn = Wanxiangshu.Runtime.Dyn
@@ -181,16 +183,20 @@ let mkConfig () : FallbackConfig =
       AgentChains = Map.empty
       MaxRetries = 2
       LoopMaxContinues = 3
-      MaxRecoveries = 5 }
+      MaxRecoveries = 5
+      LegacyZeroWidthContinue = false }
 
 let defaultCfgLookup (_agent: string) : FallbackConfig = mkConfig ()
 
 
-let handleEvent_retrySame_consumedAndSendContinue () =
+let legacyCfgLookup (_agent: string) : FallbackConfig =
+    { mkConfig () with
+        LegacyZeroWidthContinue = true }
+
+let handleEvent_retrySame_legacyContinueTrue_executesSendContinue () =
     promise {
         let model = mkModel "oai" "gpt-5"
         let chain = [ model ]
-        let cfg = mkConfig ()
         let rt = FallbackRuntimeStore()
         let sid = "sess-1"
         rt.SetChain sid chain
@@ -201,7 +207,7 @@ let handleEvent_retrySame_consumedAndSendContinue () =
 
         let executor = FakeExecutor()
 
-        let! result, intentOpt = handleEvent translator rt defaultCfgLookup executor "" (box ()) None
+        let! result, intentOpt = handleEvent translator rt legacyCfgLookup executor "" (box ()) None
 
         match intentOpt with
         | Some intent -> do! executeContinuationIntent rt executor "" sid intent
@@ -238,6 +244,56 @@ let handleEvent_exhausted_notConsumed () =
 
         equal "not consumed when exhausted" false result.Consumed
     }
+
+let handleEvent_retrySame_legacyContinueFalse_gatesSendContinue () =
+    promise {
+        let model = mkModel "oai" "gpt-5"
+        let chain = [ model ]
+        let cfg = mkConfig ()
+        let rt = FallbackRuntimeStore()
+        let sid = "sess-1"
+        rt.SetChain sid chain
+        rt.SetAgentName sid "reviewer"
+
+        let translator =
+            FakeTranslator(sid, FallbackEvent.SessionError(mkRetryableErr ())) :> IEventTranslator
+
+        let executor = FakeExecutor()
+
+        let! result, _ = handleEvent translator rt defaultCfgLookup executor "" (box ()) None
+
+        equal "consumed" true result.Consumed
+        equal "phase Retrying 1" (FallbackPhase.Retrying 1) result.State.Phase
+        equal "continueCount 1" 1 result.State.ContinueCount
+        equal "executor not called" 0 (executor.ContinueCalls.Length)
+    }
+
+let checkContinuationMatches_emptyContinuationId_matchesActiveLease () =
+    let rt = FallbackRuntimeStore()
+    let sid = "sess-empty-cont"
+    let model = mkModel "oai" "gpt-5"
+    let turnId = rt.IncrementHumanTurnId sid
+    let gen = rt.GetSessionGeneration sid
+    let cancelGen = rt.GetCancelGeneration sid
+    rt.SetActiveContinuationGeneration sid gen
+    rt.SetActiveContinuationCancelGeneration sid cancelGen
+
+    let lease =
+        { ContinuationID = "lease-1"
+          ContinuationOrdinal = 1
+          SessionGeneration = gen
+          HumanTurnID = turnId
+          CancelGeneration = cancelGen
+          Owner = SessionOwner.Fallback
+          Model = model
+          PromptText = None
+          Status = LeaseStatus.Requested }
+
+    rt.SetPendingLease(sid, lease)
+
+    let isMatched, isEventMatch = checkContinuationMatches rt sid ""
+    equal "empty continuationId matches active lease" true isMatched
+    equal "empty continuationId is event match" true isEventMatch
 
 let handleEvent_noChain_notConsumed () =
     promise {
@@ -366,7 +422,9 @@ let createHandler_twoSessionsIndependent () =
 
 let run () =
     promise {
-        do! handleEvent_retrySame_consumedAndSendContinue ()
+        do! handleEvent_retrySame_legacyContinueTrue_executesSendContinue ()
+        do! handleEvent_retrySame_legacyContinueFalse_gatesSendContinue ()
+        do! Promise.lift (checkContinuationMatches_emptyContinuationId_matchesActiveLease ())
         do! handleEvent_exhausted_notConsumed ()
         do! handleEvent_noChain_notConsumed ()
         do! handleEvent_sessionAborted_setsCancelled ()

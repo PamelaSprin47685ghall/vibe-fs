@@ -71,7 +71,7 @@ models:
 | 可重试 / 429/5xx | RetrySame |
 | 其他（安全网） | RetrySame |
 
-## 续命六阶段生命周期
+## 续命六阶段生命周期（v1 旧版，逐步退役）
 
 每个 `SendContinue` / `RecoverWithPrompt` 经历完整生命周期并通过 NDJSON 事件持久化：
 
@@ -127,9 +127,27 @@ requested → dispatch_started → dispatched → [failed | cancelled | settled]
 
 ## 注入事件 SSOT
 
+### v1 旧版（逐步退役）
+
 `FallbackEventBridge.handleEvent` 先 `appendContinuationRequestedOrFail`（NDJSON 持久化），再 `TryTransitionPendingLease` 原子验证，最后 `IActionExecutor.SendContinue` 执行。
 
 消费端（`resolveNudgeModel` / `tryGetLatestUserModel` / 哨兵 `IsNewUserMessage`）**不**嗅探消息文本，**只**读 `runtime.GetInjectedModel` + `runtime.IsInjectedSince` 内存投影（由事件 fold 回填）。重启时 `EventLogStore.ReadAllEvents` → `foldFallbackInjection` + `ownerAndLeaseFolder` 重建 `SessionState.FallbackInjection` 和 `PendingLease`。
+
+### v2 Durable Outbox（新架构）
+
+`ContinuationCommandProcessor` 接收 `ContinuationCommand` → 决策 → 持久化 `ContinuationEvent` → 产生 `ContinuationEffect`（Outbox Intent）。`ContinuationSupervisor` 消费 Outbox Effect → 调用 `IContinuationHost`（`Dispatch` / `TryAbortOwned` / `Reconcile`）→ 结果映射为 Command 回流至 Processor。
+
+| 组件 | 路径 | 职责 |
+| :--- | :--- | :--- |
+| `ContinuationCommandProcessor` | `Runtime/Fallback/ContinuationCommandProcessor.fs` | 串行提交器：Dequeue → Validate → Decide → Persist → Commit → Reconcile |
+| `ContinuationSupervisor` | `Runtime/Fallback/ContinuationSupervisor.fs` | 消费 Outbox Effect，调用宿主 API，回流 Command |
+| `IContinuationHost` | `Runtime/Fallback/ContinuationHost.fs` | 宿主适配器接口：Dispatch / TryAbortOwned / Reconcile |
+| `ContinuationEventCodec` | `Runtime/Fallback/ContinuationEventCodec.fs` | v2 续命事件编解码 |
+| `ContinuationProjection` | `Kernel/Fallback/ContinuationProjection.fs` | 纯 fold 投影 |
+| `ContinuationDecision` | `Kernel/Fallback/ContinuationDecision.fs` | 命令决策逻辑 |
+| `ContinuationHost` (OpenCode) | `Hosts/OpenCode/Fallback/ContinuationHost.fs` | OpenCode 宿主实现 |
+
+`continuationPayload`（`"\u200B"`）定义于 `ContinuationHost` 中，作为 `createFallbackContinuationPromptBody` 的文本参数。各 `ActionExecutor` 不再定义自己的 `zwsChar` 私有常量。
 
 ## IEventTranslator 接口（宿主需实现）
 
@@ -148,12 +166,14 @@ requested → dispatch_started → dispatched → [failed | cancelled | settled]
 
 | 方法 | 用途 |
 | :--- | :--- |
-| `SendContinue(sessionID, model, continuationID)` | 注入零宽 U+200B 文本，触发续命 |
+| `SendContinue(sessionID, model, continuationID)` | 注入 U+200B 文本（`continuationPayload`），触发续命 |
 | `RecoverWithPrompt(sessionID, model, promptText, continuationID)` | 注入恢复提示文本 |
 | `FetchMessages(sessionID)` | 获取全量消息，用于 `ScanToolCallAsText` / `allTodosCompleted` / `tryGetLastAssistantAbortInfo` |
 | `PropagateFailure(sessionID)` | 外环可见失败 |
 | `CaptureCurrentModel(sessionID)` | 获取当前模型 |
 | `AbortRun(sessionID)` | 终止当前运行 |
+
+`SendContinue` 的 payload 文本由 `ContinuationHost` 中的 `continuationPayload` 常量（`"\u200B"`）提供，不再使用各 `ActionExecutor` 中的 `zwsChar` 私有定义。
 
 ## 子会话 Fallback 路由
 
@@ -202,9 +222,17 @@ models:
 | 层 | 路径 | 核心类型 |
 | :--- | :--- | :--- |
 | FSM | `Kernel/FallbackKernel/` | `SessionFallbackState`、`FallbackAction`、`FallbackPhase` |
-| 续命事件 fold | `Kernel/EventLog/FallbackInjectionFold.fs` | `FallbackInjectionState`、`foldFallbackInjection` |
+| 续命事件 fold (v1 旧版) | `Kernel/EventLog/FallbackInjectionFold.fs` | `FallbackInjectionState`、`foldFallbackInjection`（read-only） |
 | 续命事件 fold | `Kernel/EventLog/Fold.fs` | `ownerAndLeaseFolder`、`EpisodeStage` |
 | 续命事件 fold | `Kernel/EventLog/Types.fs` | `eventKindContinuationRequested` 等 6 种 |
+| v2 续命 | `Kernel/Fallback/Continuation.fs` | `ContinuationRequest`、`ContinuationState`、`ContinuationCommand`、`ContinuationEvent`、`ContinuationEffect` |
+| v2 续命决策 | `Kernel/Fallback/ContinuationDecision.fs` | `decide` 纯函数 |
+| v2 续命投影 | `Kernel/Fallback/ContinuationProjection.fs` | `ContinuationProjection`、`fromWanEvents` |
+| v2 续命事件 codec | `Runtime/Fallback/ContinuationEventCodec.fs` | v2 事件编解码 |
+| v2 续命命令处理器 | `Runtime/Fallback/ContinuationCommandProcessor.fs` | 串行提交器 |
+| v2 续命监督器 | `Runtime/Fallback/ContinuationSupervisor.fs` | Outbox Effect 消费 |
+| v2 续命宿主接口 | `Runtime/Fallback/ContinuationHost.fs` | `IContinuationHost` |
+| v2 续命宿主实现 | `Hosts/OpenCode/Fallback/ContinuationHost.fs` | OpenCode 实现 |
 | 运行时 | `Shell/FallbackRuntimeState` | `FallbackRuntimeState`、`PendingLease`、`NudgeLease` |
 | 运行时桥 | `Shell/FallbackEventBridge` | `handleEvent`、`createHandler`、`verifyLease`、`executeContinuationIntent` |
 | 运行时门闩 | `Shell/FallbackRuntimeStateGates` | `setGateActive`、`isGateActive` |

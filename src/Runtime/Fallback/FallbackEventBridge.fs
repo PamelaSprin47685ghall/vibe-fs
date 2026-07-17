@@ -211,7 +211,17 @@ let handleFallbackTransition
                 else
                     action
 
-            let! finalState2, intentOpt = executeAction runtime executor workspaceRoot sessionID actionFiltered ns chain
+            let actionGated =
+                match actionFiltered with
+                | FallbackAction.SendContinue _ when not cfg.LegacyZeroWidthContinue ->
+                    JS.console.warn (
+                        $"[Fallback] SendContinue gated for session {sessionID}: legacyZeroWidthContinue is disabled; continuation prompt will not be sent"
+                    )
+
+                    FallbackAction.DoNothing
+                | _ -> actionFiltered
+
+            let! finalState2, intentOpt = executeAction runtime executor workspaceRoot sessionID actionGated ns chain
             do! handleTerminalPostSettlement runtime workspaceRoot sessionID evt finalState2 intentOpt
 
             let consumed = calculateConsumed evt state.Phase finalState2.Phase

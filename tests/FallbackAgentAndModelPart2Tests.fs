@@ -204,7 +204,8 @@ let opencodeNewUserMessageResetsChainAndModelSpec () =
                   MaxRetries = 3
                   MaxRecoveries = 3
                   AgentChains = Map.empty
-                  DefaultChain = [] }
+                  DefaultChain = []
+                  LegacyZeroWidthContinue = false }
 
         let mockClient =
             createObj [ "session", box (createObj [ "messages", box (fun _ -> Promise.lift (box {| data = [||] |})) ]) ]

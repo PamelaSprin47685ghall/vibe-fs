@@ -105,6 +105,9 @@
     <Compile Include="src/Kernel/Review/ReviewLoopFold.fs"/>
     <Compile Include="src/Kernel/Fallback/FallbackInjectionFold.fs"/>
     <Compile Include="src/Kernel/Nudge/Types.fs"/>
+    <Compile Include="src/Kernel/Fallback/Continuation.fs"/>
+    <Compile Include="src/Kernel/Fallback/ContinuationProjection.fs"/>
+    <Compile Include="src/Kernel/Fallback/ContinuationDecision.fs"/>
     <Compile Include="src/Kernel/Nudge/NudgeSnapshotSource.fs"/>
     <Compile Include="src/Kernel/Review/ReviewProjection.fs"/>
     <Compile Include="src/Kernel/Backlog/BacklogProjection.fs"/>
@@ -294,6 +297,10 @@
     <Compile Include="src/Runtime/Fallback/FallbackEventBridge.fs"/>
     <Compile Include="src/Runtime/Fallback/FallbackEventBridgeCoordinator.fs"/>
     <Compile Include="src/Runtime/PatchToolsCodec.fs"/>
+    <Compile Include="src/Runtime/Fallback/ContinuationEventCodec.fs"/>
+    <Compile Include="src/Runtime/Fallback/ContinuationHost.fs"/>
+    <Compile Include="src/Runtime/Fallback/ContinuationCommandProcessor.fs"/>
+    <Compile Include="src/Runtime/Fallback/ContinuationSupervisor.fs"/>
     <Compile Include="src/Runtime/ToolArgsDecode.fs"/>
     <Compile Include="src/Runtime/ToolExecute.fs"/>
     <Compile Include="src/Runtime/HostAdapter.fs"/>
@@ -371,6 +378,7 @@
     <Compile Include="src/Hosts/OpenCode/Fallback/EventTranslator.fs"/>
     <Compile Include="src/Hosts/OpenCode/Fallback/ActionExecutor.fs"/>
     <Compile Include="src/Hosts/OpenCode/Fallback/Hook.fs"/>
+    <Compile Include="src/Hosts/OpenCode/Fallback/ContinuationHost.fs"/>
     <Compile Include="src/Hosts/OpenCode/SubagentTypes.fs"/>
     <Compile Include="src/Hosts/OpenCode/SubagentSpawn.fs"/>
     <Compile Include="src/Hosts/OpenCode/SubsessionDispatch.fs"/>

@@ -49,7 +49,7 @@ let muxSessionErrorTriggersFallbackContinueSpec () =
         do!
             writeFileAsync
                 (tmpDir + "/AGENTS.md")
-                "---\nmodels:\n  default:\n    - openai/gpt-5\n    - anthropic/claude-4\n---\n"
+                "---\nmodels:\n  default:\n    - openai/gpt-5\n    - anthropic/claude-4\nfallback:\n  legacyZeroWidthContinue: true\n---\n"
 
         let sessionID = "mux-fb-error-ws"
         let nudges = ResizeArray<string>()
@@ -112,7 +112,7 @@ let muxStreamEndToolCallAsTextTriggersFallbackSpec () =
         do!
             writeFileAsync
                 (tmpDir + "/AGENTS.md")
-                "---\nmodels:\n  default:\n    - openai/gpt-5\n    - anthropic/claude-4\n---\n"
+                "---\nmodels:\n  default:\n    - openai/gpt-5\n    - anthropic/claude-4\nfallback:\n  legacyZeroWidthContinue: true\n---\n"
 
         let sessionID = "mux-fb-toolcall-ws"
         let nudges = ResizeArray<string>()

@@ -28,7 +28,8 @@ let private fallbackConfig: FallbackConfig =
       AgentChains = Map.empty
       MaxRetries = 3
       LoopMaxContinues = 5
-      MaxRecoveries = 3 }
+      MaxRecoveries = 3
+      LegacyZeroWidthContinue = false }
 
 let private policy: FallbackPolicyState =
     { Selection = StableAt 0

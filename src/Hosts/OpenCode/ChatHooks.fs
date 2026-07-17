@@ -1,4 +1,5 @@
 module Wanxiangshu.Hosts.Opencode.ChatHooks
+
 open Wanxiangshu.Runtime.Fallback.RuntimeStore
 open Wanxiangshu.Runtime.Fallback.LeaseTransitions
 
@@ -12,7 +13,11 @@ open Wanxiangshu.Hosts.Opencode.SubsessionDispatch
 
 open Wanxiangshu.Kernel.Config
 open Wanxiangshu.Kernel.HostTools
+open Wanxiangshu.Kernel.EventSourcing.EventEnvelope
+open Wanxiangshu.Kernel.EventSourcing.EventKind
 open Wanxiangshu.Runtime.ChildAgentRegistry
+open Wanxiangshu.Runtime.Clock
+open Wanxiangshu.Runtime.EventLogRuntimeStore
 open Wanxiangshu.Runtime.OpencodeHookInputCodec
 open Wanxiangshu.Runtime.ChatHookOutputCodec
 open Wanxiangshu.Runtime.OpencodeAgentConfigWire
@@ -73,6 +78,61 @@ let tryGetNonceFromParts (parts: obj) : string option =
                 let nonce = Dyn.str metadata "nonce"
                 if nonce <> "" then Some nonce else None)
 
+/// Provenance extracted from wanxiangshu metadata in a message part.
+type WanxiangshuProvenance =
+    { Kind: string; ContinuationId: string }
+
+/// Extract wanxiangshu provenance from message parts metadata.
+/// Returns None when no wanxiangshu metadata is found or parts are invalid.
+let tryDecodeWanxiangshuProvenance (parts: obj) : WanxiangshuProvenance option =
+    if Dyn.isNullish parts || not (Dyn.isArray parts) then
+        None
+    else
+        let arr = parts :?> obj array
+
+        arr
+        |> Array.tryPick (fun part ->
+            let metadata = Dyn.get part "metadata"
+
+            if Dyn.isNullish metadata then
+                None
+            else
+                let ws = Dyn.get metadata "wanxiangshu"
+
+                if Dyn.isNullish ws then
+                    None
+                else
+                    let kind = Dyn.str ws "kind"
+                    let continuationId = Dyn.str ws "continuationId"
+
+                    if kind <> "" && continuationId <> "" then
+                        Some
+                            { Kind = kind
+                              ContinuationId = continuationId }
+                    else
+                        None)
+
+/// Append a continuation_host_accepted event recording that a user message
+/// was observed for the given continuation. Does not modify memory state.
+let recordContinuationUserMessage
+    (workspaceRoot: string)
+    (sessionId: string)
+    (messageId: string)
+    (continuationId: string)
+    : JS.Promise<unit> =
+    promise {
+        let at = getTimestampMs().ToString()
+
+        let wanEvent: WanEvent =
+            { V = 2
+              Session = sessionId
+              Kind = eventKindContinuationHostAccepted
+              At = at
+              Payload = Map [ "continuationId", continuationId; "userMessageId", messageId ] }
+
+        do! appendEventsAndCacheOrFail workspaceRoot [ wanEvent ]
+    }
+
 let chatMessageFor
     (host: Host)
     (registry: ChildAgentRegistry)
@@ -91,7 +151,10 @@ let chatMessageFor
 
         let msgObj = Dyn.get output "message"
         let msgId = if Dyn.isNullish msgObj then "" else Dyn.str msgObj "id"
-        let sessionIDStr = Wanxiangshu.Kernel.Primitives.Identity.Id.sessionIdValue sessionID
+
+        let sessionIDStr =
+            Wanxiangshu.Kernel.Primitives.Identity.Id.sessionIdValue sessionID
+
         let fr = lifecycleObserver.FallbackRuntime
 
         let isSystem =
@@ -126,6 +189,15 @@ let chatMessageFor
         if not isSystem then
             let modelOpt = tryGetModelStringFromHook input output
             do! lifecycleObserver.OnNewHumanMessage(sessionIDStr, agent, modelOpt, msgId)
+
+        // Record wanxiangshu provenance when present in message parts.
+        // This binds the user message to a continuation for durable tracking.
+        if msgId <> "" then
+            match tryDecodeWanxiangshuProvenance parts with
+            | Some provenance ->
+                let workspaceRoot = lifecycleObserver.WorkspaceRoot
+                do! recordContinuationUserMessage workspaceRoot sessionIDStr msgId provenance.ContinuationId
+            | None -> ()
 
         match chatMessageFromHookOutput output with
         | None -> ()

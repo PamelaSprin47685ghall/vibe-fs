@@ -13,8 +13,6 @@ open Wanxiangshu.Runtime.Fallback.FallbackBridgePorts
 open Wanxiangshu.Runtime.Fallback.GateTransitions
 open Wanxiangshu.Runtime.Fallback.RuntimeStore
 
-let private zwsChar = "​"
-
 let private tryGetSession (sessionID: string) (sessionApi: obj) : obj option =
     match Wanxiangshu.Hosts.Omp.ExecutorTools.ompScope.TryFindKey("omp_session_" + sessionID) with
     | Some s -> Some s
@@ -71,7 +69,7 @@ type OmpActionExecutorClass(runtime: FallbackRuntimeStore, sessionApi: obj) =
 
                 let pObj =
                     let p =
-                        {| text = zwsChar
+                        {| text = "\u200B"
                            model = modelStr
                            continuationID = continuationID |}
 

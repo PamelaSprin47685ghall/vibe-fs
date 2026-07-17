@@ -35,7 +35,8 @@ let private cfg: FallbackConfig =
       AgentChains = Map.empty
       MaxRetries = 1
       LoopMaxContinues = 10
-      MaxRecoveries = 3 }
+      MaxRecoveries = 3
+      LegacyZeroWidthContinue = false }
 
 let private sleep (ms: int) : JS.Promise<unit> =
     Promise.create (fun resolve _ -> JS.setTimeout (fun () -> resolve ()) ms |> ignore)

@@ -36,7 +36,8 @@ let private cfg: FallbackConfig =
       AgentChains = Map.empty
       MaxRetries = 1
       LoopMaxContinues = 10
-      MaxRecoveries = 3 }
+      MaxRecoveries = 3
+      LegacyZeroWidthContinue = false }
 
 let private sleep (ms: int) : JS.Promise<unit> =
     Promise.create (fun resolve _ -> JS.setTimeout (fun () -> resolve ()) ms |> ignore)
@@ -90,7 +91,9 @@ let private opencodeReceiptWaitsForObservation () =
         let dispatchP = host.Dispatch(sid, plan)
         do! sleep 5
         // Transport (prompt) may have resolved, but the receipt must not resolve until observed.
-        Wanxiangshu.Hosts.Opencode.SubsessionDispatch.PendingTurnReceipt.tryResolve (TurnId.value turnId) (UserMessageObserved "msg-1")
+        Wanxiangshu.Hosts.Opencode.SubsessionDispatch.PendingTurnReceipt.tryResolve
+            (TurnId.value turnId)
+            (UserMessageObserved "msg-1")
         |> ignore
 
         let! result = dispatchP
@@ -133,7 +136,11 @@ let private opencodeRejectedBeforeSendRejectsLateReceipt () =
 
         check
             "late receipt after pre-send rejection is ignored"
-            (not (Wanxiangshu.Hosts.Opencode.SubsessionDispatch.PendingTurnReceipt.tryResolve (TurnId.value turnId) (UserMessageObserved "late")))
+            (not (
+                Wanxiangshu.Hosts.Opencode.SubsessionDispatch.PendingTurnReceipt.tryResolve
+                    (TurnId.value turnId)
+                    (UserMessageObserved "late")
+            ))
     }
 
 let private opencodeQueryDispatchStatusFailedAfterUnknown () =
@@ -165,7 +172,9 @@ let private opencodeCancelPendingDispatchKeepsReceiptCorrelation () =
         do! sleep 5
         host.CancelPendingDispatch turnId
 
-        Wanxiangshu.Hosts.Opencode.SubsessionDispatch.PendingTurnReceipt.tryResolve (TurnId.value turnId) (UserMessageObserved "msg-1")
+        Wanxiangshu.Hosts.Opencode.SubsessionDispatch.PendingTurnReceipt.tryResolve
+            (TurnId.value turnId)
+            (UserMessageObserved "msg-1")
         |> ignore
 
         let! result = dispatchP

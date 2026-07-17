@@ -83,7 +83,10 @@ let runPart4
 
         let continueOpts =
             createObj
-                [ "messages", box [||]
+                [ "agentsContent",
+                  box
+                      "---\nmodels:\n  default:\n    - anthropic/claude-3-5\nfallback:\n  legacyZeroWidthContinue: true\n---\n"
+                  "messages", box [||]
                   "mockSessionClient",
                   box (
                       createObj

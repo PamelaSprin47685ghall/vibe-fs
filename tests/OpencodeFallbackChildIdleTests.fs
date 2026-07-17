@@ -32,7 +32,8 @@ let private config: FallbackConfig =
       AgentChains = Map.empty
       MaxRetries = 0
       LoopMaxContinues = 0
-      MaxRecoveries = 0 }
+      MaxRecoveries = 0
+      LegacyZeroWidthContinue = false }
 
 type private ImmediateHost() =
     interface ISubsessionHost with

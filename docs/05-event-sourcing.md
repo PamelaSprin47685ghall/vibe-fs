@@ -59,6 +59,8 @@
 
 ### 模型降级（Fallback）续命事件
 
+#### v1 六阶段生命周期（旧版，逐步退役）
+
 | `Kind` 含义 | 触发时机 |
 | :--- | :--- |
 | `continuation_requested` | 降级决策选好模型，即将发起续命（payload：`continuationId` / `model` / `agent` / `at` / `generation` / `cancelGeneration` / `humanTurnId` / `owner` / `continuationOrdinal`） |
@@ -69,6 +71,18 @@
 | `continuation_settled` | 续命终局（payload：`continuationId` / `humanTurnId` / `generation` / `status` / `continuationOrdinal`） |
 
 `fallback_continue_injected`（旧版，payload：`model` / `agent` / `at`）仍保留但已逐步被上述六阶段续命事件取代。
+
+#### v2 Durable Outbox 续命事件（新架构）
+
+| `Kind` 含义 | 触发时机 |
+| :--- | :--- |
+| `continuation_dispatch_claimed` | Effect Supervisor 已从 Outbox 消费 Dispatch 意图，即将调用宿主（payload：`continuationId` / `attempt` / `effectId`） |
+| `continuation_host_accepted` | 宿主已接受续命请求，返回用户消息 ID 或 run ID（payload：`continuationId` / `userMessageId` 或 `runId` 或 `receiptId`） |
+| `continuation_run_started` | 续命 run 已开始（payload：`continuationId`） |
+| `continuation_assistant_observed` | 观察到续命产生的 assistant 消息（payload：`continuationId` / `assistantMessageId`） |
+| `continuation_superseded` | 续命被新用户消息或新续命取代（payload：`continuationId` / `reason`） |
+
+v2 事件由 `ContinuationCommandProcessor` 产生，经 `ContinuationProjection` 投影，由 `ContinuationSupervisor` 消费 Outbox Effect 并调用宿主。
 
 ### 上下文压缩（Compaction）事件
 
@@ -121,7 +135,8 @@
 - **`foldNudgeDedup`**：记录已派发 anchor；WIP / dedup_cleared 重置策略。
 - **`foldNudgeSnapshot`**：供 nudge 决策的聚合视图（open todos、loop 是否活跃等）。
 - **`foldSubagents`** / `SessionState.Subagents`：`subagent_spawned` / `subagent_continued` 投影。
-- **`foldFallbackInjection`** / `SessionState.FallbackInjection`：`fallback_continue_injected`（见 [12-fallback.md](./12-fallback.md)）。
+- **`foldFallbackInjection`** / `SessionState.FallbackInjection`：`fallback_continue_injected`（旧版，见 [12-fallback.md](./12-fallback.md)）。
+- **`ContinuationProjection`** / `SessionState.Continuation`：v2 续命投影，由 `ContinuationCommandProcessor` 维护（见 [12-fallback.md](./12-fallback.md)）。
 - **万象阵**：`EventLogSquadProjection.applyWanEvent` 与 `CoordinatorReplay`（读同一 NDJSON）。
 
 `SessionState`（Shell 缓存）聚合上述投影，供 `EventLogRuntimeNudge` / `Sync` 读取。
@@ -173,12 +188,14 @@ Attempt
 
 ### Outbox 模式
 
-当前 `appendAndCache` 先写盘后通知的链（`appendLine → foldWan`）已具备 Outbox 雏形。演进方向是：
+`appendAndCache` 先写盘后通知的链（`appendLine → foldWan`）已具备 Outbox 雏形。当前实现：
 
-1. 将 Effect 意图（如 `SendContinue`、`AbortRun`、`DispatchPrompt`）编码为持久化事件，与领域事件同批提交
-2. 引入 Effect Supervisor 消费这些事件，调用宿主 API
-3. Effect 完成后写入确认事件（如 `continuation_dispatched`、`abort_completed`）
+1. **`ContinuationCommandProcessor`**：接收 `ContinuationCommand` → 决策 → 持久化 `ContinuationEvent` → 产生 `ContinuationEffect`（Outbox Intent）
+2. **`ContinuationSupervisor`**：消费 Outbox Effect → 调用宿主 API（`IContinuationHost.Dispatch` / `TryAbortOwned` / `Reconcile`）→ 结果映射为 Command 回流至 Processor
+3. Effect 完成后写入确认事件（`continuation_host_accepted`、`continuation_run_started` 等）
 4. 重启时 Supervisor 从尚未确认的 Effect 事件恢复，重新发起或查询宿主动作
+
+演进方向：将更多 Effect 类型（如 `SendContinue`、`AbortRun`、`DispatchPrompt`）纳入同一 Outbox 模式。
 
 ### 资源身份与 Deadline 持久化
 

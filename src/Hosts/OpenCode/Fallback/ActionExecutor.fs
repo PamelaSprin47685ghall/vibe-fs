@@ -17,13 +17,6 @@ open Wanxiangshu.Runtime.Fallback.RuntimeStore
 open Wanxiangshu.Runtime.Fallback.FallbackBridgePorts
 open Wanxiangshu.Hosts.Opencode.Fallback.HostEventInspection
 
-/// Zero-width space character used as the fallback `SendContinue` prompt
-/// text. It is invisible in any UI but still parsed by LLMs as a non-empty
-/// text, so it triggers the protocol-driven "continue" loop without leaving
-/// a "continue" footprint in the LLM history that the consumer side could
-/// mistake for a real user message.
-let private zwsChar = "​"
-
 let private resolveModelAndAgent
     (runtime: FallbackRuntimeStore)
     (liveAgentOpt: string option)
@@ -82,7 +75,7 @@ let private sendContinueImpl
             resolveModelAndAgent runtime liveAgentOpt model sessionID infoOpt
 
         let body =
-            createPromptBodyWithModelAndNonce agent (Some modelStr) zwsChar (Some continuationID)
+            createPromptBodyWithModelAndNonce agent (Some modelStr) "\u200B" (Some continuationID)
 
         let arg =
             box

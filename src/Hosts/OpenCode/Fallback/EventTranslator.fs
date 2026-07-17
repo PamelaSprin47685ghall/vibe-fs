@@ -22,16 +22,6 @@ open Wanxiangshu.Runtime.Fallback.RuntimeStore
 open Wanxiangshu.Runtime.Fallback.FallbackBridgePorts
 open Wanxiangshu.Hosts.Opencode.Fallback.HostEventInspection
 
-let private isSyntheticText (text: string) : bool =
-    let t = text.Trim()
-
-    t = "\u200b"
-    || t.Contains("There are still incomplete todos")
-    || t.Contains("You are in loop mode. You must call the submit_review")
-    || t.Contains("A background runner task is still active")
-    || t.Contains("the system context is about to be suspended")
-    || t.Contains("You must immediately force an emergency stop")
-
 let private tryExtractTurnIdFromEvent (rawEvent: obj) : TurnId option =
     let props = getProps rawEvent
     let info = Dyn.get props "info"
@@ -79,7 +69,7 @@ let isNewUserMessageImpl (runtime: FallbackRuntimeStore) (sessionID: string) (ra
                 let synthetic = Dyn.get part "synthetic"
                 not (Dyn.isNullish synthetic) && unbox<bool> synthetic)
 
-        not hasSyntheticMarker && not (isSyntheticText text)
+        not hasSyntheticMarker
 
 let private translateErrorImpl (rawEvent: obj) : FallbackEvent option =
     let eventType = getEventType rawEvent
@@ -323,3 +313,25 @@ let opencodeEventTranslator (runtime: FallbackRuntimeStore) : IEventTranslator =
 
         member _.ExtractHostRunId rawEvent = extractHostRunIdImpl rawEvent
         member _.ExtractTurnObservation rawEvent = extractTurnObservationImpl rawEvent }
+
+type HostEventIdentity =
+    { SessionId: string
+      UserMessageId: string option
+      AssistantMessageId: string option
+      ParentMessageId: string option }
+
+let extractHostEventIdentity (rawEvent: obj) : HostEventIdentity =
+    let sessionId = getSessionID (getEventType rawEvent) (getProps rawEvent)
+
+    let props = getProps rawEvent
+    let info = Dyn.get props "info" |> fun x -> if Dyn.isNullish x then props else x
+    let msgId = Dyn.str info "id"
+    let messageId = if msgId = "" then None else Some msgId
+
+    let assistantMessageId = extractAssistantMessageIdImpl rawEvent
+    let parentMessageId = extractAssistantParentIdImpl rawEvent
+
+    { SessionId = sessionId
+      UserMessageId = messageId
+      AssistantMessageId = assistantMessageId
+      ParentMessageId = parentMessageId }

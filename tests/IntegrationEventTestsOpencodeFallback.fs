@@ -46,6 +46,11 @@ let fallbackRetryWithoutFrontmatterSpec () =
 
         let! workspaceDir = mkdtempAsync "fallback-retry-no-frontmatter-"
 
+        do!
+            writeFileAsync
+                (workspaceDir + "/AGENTS.md")
+                "---\nmodels:\n  default:\n    - openai/gpt-5\nfallback:\n  legacyZeroWidthContinue: true\n---\n"
+
         let! p =
             plugin (
                 box
@@ -135,6 +140,11 @@ let sessionPostErrorSpec () =
 
         let! workspaceDir = mkdtempAsync "fallback-session-post-error-"
 
+        do!
+            writeFileAsync
+                (workspaceDir + "/AGENTS.md")
+                "---\nmodels:\n  default:\n    - openai/gpt-5\nfallback:\n  legacyZeroWidthContinue: true\n---\n"
+
         let! p =
             plugin (
                 box
@@ -196,6 +206,11 @@ let sessionUserQueryPostErrorSpec () =
                   ) ]
 
         let! workspaceDir = mkdtempAsync "fallback-query-post-error-"
+
+        do!
+            writeFileAsync
+                (workspaceDir + "/AGENTS.md")
+                "---\nmodels:\n  default:\n    - openai/gpt-5\nfallback:\n  legacyZeroWidthContinue: true\n---\n"
 
         let! p =
             plugin (

@@ -1,4 +1,5 @@
 module Wanxiangshu.Runtime.Fallback.FallbackConfigCodec
+
 open Wanxiangshu.Runtime
 
 open Fable.Core
@@ -111,7 +112,8 @@ let emptyConfig: FallbackConfig =
       AgentChains = Map.ofList []
       MaxRetries = 2
       LoopMaxContinues = 3
-      MaxRecoveries = 5 }
+      MaxRecoveries = 5
+      LegacyZeroWidthContinue = false }
 
 /// True when two models share the same provider/model identity (variant ignored).
 let sameModelIdentity (a: FallbackModel) (b: FallbackModel) : bool =
@@ -224,12 +226,21 @@ let extractFallbackConfig (frontmatter: obj) : FallbackConfig option =
                         Map.empty
                 | _ -> Map.empty
 
+            let legacyZeroWidthContinue =
+                match Dyn.opt frontmatter "fallback" with
+                | None -> false
+                | Some fallbackObj ->
+                    match Dyn.opt fallbackObj "legacyZeroWidthContinue" with
+                    | Some v -> Dyn.truthy v
+                    | None -> false
+
             Some
                 { DefaultChain = defaultChain
                   AgentChains = agentChains
                   MaxRetries = 2
                   LoopMaxContinues = 3
-                  MaxRecoveries = 5 }
+                  MaxRecoveries = 5
+                  LegacyZeroWidthContinue = legacyZeroWidthContinue }
 
 let loadFallbackConfig (directory: string) : FallbackConfig option =
     try
