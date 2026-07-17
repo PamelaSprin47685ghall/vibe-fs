@@ -37,6 +37,16 @@ let private iteratorFromOutput (output: string) : string option =
             let arr: string array = unbox iters
             if arr.Length > 0 then Some arr.[0] else None
 
+let private completedMessages () : obj =
+    let model = createObj [ "providerID", box "test"; "modelID", box "test-model" ]
+
+    let info =
+        createObj [ "role", box "assistant"; "agent", box "investigator"; "model", box model ]
+
+    let part = createObj [ "type", box "text"; "text", box "continue final output" ]
+    let message = createObj [ "info", box info; "parts", box [| box part |] ]
+    box (createObj [ "data", box [| box message |] ])
+
 let run
     (startHarness: obj -> JS.Promise<obj>)
     (check: string -> bool -> unit)
@@ -86,26 +96,10 @@ let run
 
                       if isComplete then
                           finalExtractionCalls.Value <- finalExtractionCalls.Value + 1
+                          Promise.lift (completedMessages ())
                       else
                           messagesCalls.Value <- messagesCalls.Value + 1
-
-                      Promise.lift (
-                          box
-                              {| data =
-                                  [| box
-                                         {| info =
-                                             box
-                                                 {| role = "assistant"
-                                                    agent = "investigator"
-                                                    model =
-                                                     box
-                                                         {| providerID = "test"
-                                                            modelID = "test-model" |} |}
-                                            parts =
-                                             [| box
-                                                    {| ``type`` = "text"
-                                                       text = "continue final output" |} |] |} |] |}
-                      ))
+                          Promise.lift (box {| data = [||] |}))
                   "abort", box (fun _ -> Promise.lift ()) ]
 
         let opts =

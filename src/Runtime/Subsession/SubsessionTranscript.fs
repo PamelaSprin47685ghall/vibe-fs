@@ -19,7 +19,13 @@ let private lastUserMessageIndex (msgs: obj array) : int option =
 let private findAnchorIndex (msgs: obj array) (anchor: TurnAnchor) : Result<int, TranscriptReadFailure> =
     match anchor with
     | AnchorByUserMessageId messageId ->
-        msgs
+        // Derive search domain from last-user boundary.
+        let searchDomain =
+            match lastUserMessageIndex msgs with
+            | Some idx -> msgs.[idx..]
+            | None -> msgs
+
+        searchDomain
         |> Array.tryFindIndexBack (fun msg ->
             let info = Dyn.get msg "info"
             let id = Dyn.str msg "id"
@@ -47,10 +53,10 @@ let private findAnchorIndex (msgs: obj array) (anchor: TurnAnchor) : Result<int,
         | Some idx -> Ok idx
         | None -> Error { TranscriptReadFailure.Message = "No user message found to anchor turn marker" }
 
-/// Fallback: build evidence from the latest assistant message when no anchor
-/// is available (e.g. idle refresh on a session whose messages lack the
-/// current-turn nonce / user anchor). Returns None when the messages array is
-/// empty or the last assistant has no non-empty text.
+/// Fallback: build evidence from the latest assistant message after the last
+/// user message (or full-history when no user exists). Returns None when the
+/// messages array is empty, no assistant follows the last user, or the
+/// trailing assistant has no non-empty text.
 let tryBuildLatestAssistantEvidence (msgs: obj array) : CurrentTurnEvidence option =
     if isNull msgs || msgs.Length = 0 then
         None

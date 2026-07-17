@@ -82,7 +82,7 @@ let mergeAssistantSnapshotNonEmptyOverwritesStreaming () =
 
     match merged.Assistant with
     | AssistantSnapshot(_, _, text, _) -> equal "refresh non-empty text wins" "full final text" text
-    | other -> fail ("expected AssistantSnapshot, got " + string other)
+    | other -> fail ("expected AssistantSnapshot with text, got " + string other)
 
 // ── classifyTurnEvidence: CompletionRequested must yield to non-empty assistant text ──
 

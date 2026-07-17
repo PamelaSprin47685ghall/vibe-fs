@@ -759,6 +759,8 @@
     <Compile Include="tests/OpencodeFallbackChildIdleTests.fs"/>
     <Compile Include="tests/FallbackHooksHelperAgentModelTests.fs"/>
     <Compile Include="tests/SubagentOutputTests.fs"/>
+    <Compile Include="tests/SubagentOutputTranscriptTests.fs"/>
+    <Compile Include="tests/SubagentDrainingTests.fs"/>
     <Compile Include="tests/FallbackMessageCodecTests.fs"/>
     <Compile Include="tests/FallbackRecoveryWaitTests.fs"/>
     <Compile Include="tests/FallbackIntegrationTests.fs"/>

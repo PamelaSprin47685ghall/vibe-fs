@@ -134,26 +134,37 @@ let private handleDrainingIdle
     (error: ErrorInput)
     (evidence: CurrentTurnEvidence)
     =
-    match evidence.Outcome with
-    | CompletionRequested output when not (System.String.IsNullOrWhiteSpace output) ->
-        succeedRun ctx output started.Plan.TurnId
-    | _ ->
-        let policyDec = afterError ctx.FallbackConfig ctx.Chain ctx.Policy error
+    // Priority 1: non-empty assistant text wins (mirrors classifyTurnEvidence).
+    let assistantText =
+        match evidence.Assistant with
+        | AssistantSnapshot(_, _, text, _)
+        | AssistantDelta(_, _, text, _) when not (System.String.IsNullOrWhiteSpace text) -> Some text
+        | _ -> None
 
-        match nextTurnFromPolicy ctx policyDec with
-        | Some(ctx2, plan2) ->
-            let events =
-                [ TurnFinished(started.Plan.TurnId, TurnFailed error)
-                  TurnDispatchRequested(makeTurnData ctx2 plan2) ]
+    match assistantText with
+    | Some text -> succeedRun ctx text started.Plan.TurnId
+    | None ->
+        // Priority 2: non-empty CompletionRequested output as fallback.
+        match evidence.Outcome with
+        | CompletionRequested output when not (System.String.IsNullOrWhiteSpace output) ->
+            succeedRun ctx output started.Plan.TurnId
+        | _ ->
+            let policyDec = afterError ctx.FallbackConfig ctx.Chain ctx.Policy error
 
-            decided (Dispatching(ctx2, plan2, CurrentTurnEvidence.empty)) events [ DispatchPrompt plan2 ]
-        | None ->
-            let failure' =
-                match policyDec with
-                | StopWithFailure f -> f
-                | _ -> FallbackExhausted error
+            match nextTurnFromPolicy ctx policyDec with
+            | Some(ctx2, plan2) ->
+                let events =
+                    [ TurnFinished(started.Plan.TurnId, TurnFailed error)
+                      TurnDispatchRequested(makeTurnData ctx2 plan2) ]
 
-            failRun ctx failure' [ TurnFinished(started.Plan.TurnId, TurnFailed error) ]
+                decided (Dispatching(ctx2, plan2, CurrentTurnEvidence.empty)) events [ DispatchPrompt plan2 ]
+            | None ->
+                let failure' =
+                    match policyDec with
+                    | StopWithFailure f -> f
+                    | _ -> FallbackExhausted error
+
+                failRun ctx failure' [ TurnFinished(started.Plan.TurnId, TurnFailed error) ]
 
 let private decideDispatching (state: SubsessionState) (cmd: Command) =
     match state, cmd with

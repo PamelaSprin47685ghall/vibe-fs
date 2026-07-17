@@ -135,8 +135,4 @@ type ProgressObserver
                         sid
                         { st with
                             Lifecycle = FallbackLifecycle.TaskComplete }
-            elif tool = "submit_review" then
-                match hookOutputString output with
-                | Some text when isSubmitReviewWipProgressOutput text -> ()
-                | _ -> ()
         }

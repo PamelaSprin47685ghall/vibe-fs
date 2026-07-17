@@ -44,6 +44,8 @@ open Wanxiangshu.Tests.WarnTddOpencodeEnforcementTests
 open Wanxiangshu.Tests.WarnTddMuxEnforcementTests
 open Wanxiangshu.Tests.WarnTddOmpEnforcementTests
 open Wanxiangshu.Tests.EventDrivenHarnessDemo
+open Wanxiangshu.Tests.SubagentOutputTranscriptTests
+open Wanxiangshu.Tests.SubagentDrainingTests
 open Wanxiangshu.Tests.TestsTestBody
 
 let tailCoreTestEntriesPart1 () : (string * TestBody) list =
@@ -140,7 +142,9 @@ let tailCoreTestEntriesPart3 () : (string * TestBody) list =
       TestBody.Async testAmendSkippedWhenSembleInjectEnabled
       "ExecutorKernelTests.run", TestBody.Sync(sync ExecutorKernelTests.run)
       "ToolExecuteTests.run", TestBody.Sync(sync ToolExecuteTests.run)
-      "TreeSitterKernelTests.run", TestBody.Sync(sync TreeSitterKernelTests.run) ]
+      "TreeSitterKernelTests.run", TestBody.Sync(sync TreeSitterKernelTests.run)
+      "SubagentOutputTranscriptTests.run", TestBody.Sync(sync SubagentOutputTranscriptTests.run)
+      "SubagentDrainingTests.run", TestBody.Sync(sync SubagentDrainingTests.run) ]
     @ (TreeSitterKernelTests.generateSelfCheckBodies ()
        |> List.map (fun (l, f) -> l, TestBody.Async f))
     @ [ "ConfigTests.run", TestBody.Sync(sync ConfigTests.run)
