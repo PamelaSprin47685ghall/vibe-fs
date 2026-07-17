@@ -30,6 +30,12 @@
 - `Shell/OpencodeSessionEventCodec.fs`、`OpencodeSessionEventNudge.fs`
 - `Opencode/NudgeEffect.fs`
 
+## Fallback 续命
+
+- `Opencode/Fallback/ContinuationHost.fs`：`IContinuationHost` 的 OpenCode 实现，使用 `continuationPayload`（`"\u200B"`）作为 `createFallbackContinuationPromptBody` 的文本参数
+- `Opencode/Fallback/ActionExecutor.fs`：`IActionExecutor` 实现，`SendContinue` 使用内联 `"\u200B"` 替代旧 `zwsChar` 私有常量
+- `Opencode/Fallback/EventTranslator.fs`：`IEventTranslator` 实现，`isNewUserMessageImpl` 不再依赖 `isSyntheticText` 嗅探（由 `ContinuationHost` 的 metadata 机制替代）
+
 ## Mimocode 命名差异
 
 经 `HostTools`：`task` = todowrite，`actor` = task 子代理工具。
@@ -43,3 +49,4 @@
 - [02-architecture.md](./02-architecture.md)
 - [10-message-transform.md](./10-message-transform.md)
 - [08-tools-and-permissions.md](./08-tools-and-permissions.md)
+- [12-fallback.md](./12-fallback.md)

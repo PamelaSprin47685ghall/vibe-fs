@@ -27,7 +27,8 @@ let private mkCfg () =
       AgentChains = Map.ofList []
       MaxRetries = 2
       LoopMaxContinues = 3
-      MaxRecoveries = 5 }
+      MaxRecoveries = 5
+      LegacyZeroWidthContinue = false }
 
 let private retryErr =
     { ErrorName = "err"

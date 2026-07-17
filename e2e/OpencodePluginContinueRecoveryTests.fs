@@ -111,7 +111,9 @@ let run
 
         let opts =
             createObj
-                [ "agentsContent", box "---\nmodels:\n  default:\n    - test/test-model\n---\n"
+                [ "agentsContent",
+                  box
+                      "---\nmodels:\n  default:\n    - test/test-model\nfallback:\n  legacyZeroWidthContinue: true\n---\n"
                   "mockSessionClient", box mockSessionClient ]
 
         let! harnessObject = withTimeoutCustom 30000 (startHarness opts)

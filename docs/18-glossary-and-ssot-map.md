@@ -14,7 +14,7 @@
 | WIP | `submit_review` 部分完成标记 |
 | Iterator | fuzzy_continue / continue 的翻页或子会话句柄 |
 | Subsession | 轻量 Actor 消息泵，隔离子代理的错误与状态 |
-| Fallback 续命 | 模型降级后的 `SendContinue` 六阶段生命周期 |
+| Fallback 续命 | 模型降级后的 `SendContinue` 六阶段生命周期（v1 旧版）或 v2 Durable Outbox 续命 |
 | 门闩 (Gate) | `FallbackRuntimeState` 中的互斥标志位，防并发 |
 | Flow Kernel | 基于 `IAsyncEnumerable` 的最小流程代数，与九条语义法律配套的领域级流程算子集 |
 | RAII Resource Scope | 由 `CommittedState → ResourceSpec` 投影驱动的资源管理范式，根据状态 Diff 自动 Acquire/Dispose 层级 Scope |
@@ -46,11 +46,13 @@
 | Subsession Agent 状态 | `Kernel/Subsession/Decision.fs` 纯函数 + NDJSON 决策信封 | 宿主 session 消息历史 |
 | 万象阵 DAG | **物理**：`[workspace]/.wanxiangshu.ndjson` + `.wanxiangshu.ndjson.lock`（与万象术共用）；**逻辑**：`squad_*`/`task_*` 行 + `Kernel/Wanxiangzhen` fold + `CoordinatorReplay` / `EventLogSquadProjection` | 宿主 session 历史、已废止的独立 `.wanxiangzhen.ndjson` 文件名 |
 | 子代理 durable 投影 | `subagent_spawned` / `subagent_continued` + `foldSubagents` | 仅 `SubagentIteratorStore` 内存 |
-| Fallback 续命租约 | `.wanxiangshu.ndjson` + `continuation_*` 事件 + `ownerAndLeaseFolder` | `FallbackRuntimeState` 内存 alone |
-| Fallback 注入记忆 | `fallback_continue_injected` + `FallbackInjectionFold` | 嗅探消息零宽字符 |
+| Fallback 续命租约 (v1 旧版) | `.wanxiangshu.ndjson` + `continuation_*` 事件 + `ownerAndLeaseFolder` | `FallbackRuntimeState` 内存 alone |
+| Fallback 注入记忆 (v1 旧版) | `fallback_continue_injected` + `FallbackInjectionFold`（read-only） | 嗅探消息零宽字符 |
+| 续命 v2 Outbox | `.wanxiangshu.ndjson` + `continuation_dispatch_claimed` / `continuation_host_accepted` / `continuation_run_started` / `continuation_assistant_observed` / `continuation_superseded` 事件 + `ContinuationProjection` | 仅内存的 CommittedDecision 通知 |
 | 上下文预算 phase | `ContextBudgetStore` 内存（重启后从 NDJSON fold backlog 重建） | 仅 `maxInputTokens` 静态值 |
 | 会话拥有者 | `continuation_*` / `human_turn_started` 事件 + `SessionOwner` fold | 内存 `FallbackRuntimeState` |
 | Effect Outbox | `.wanxiangshu.ndjson`（持久化 Outbox 事件）+ `continuation_*` / `subsession_*` Effect 事件 | 仅内存的 CommittedDecision 通知 |
+| 续命 payload 文本 | `ContinuationHost.continuationPayload`（`"\u200B"`） | 各 `ActionExecutor.zwsChar` 私有定义 |
 
 ## 文件路径速查
 

@@ -102,29 +102,14 @@ let checkContinuationMatches
     : bool * bool =
     let pending = runtime.TryGetPendingLease sessionID
 
-    let activeMatch () =
-        let activeGen = runtime.GetActiveContinuationGeneration sessionID
-        let activeCancel = runtime.GetActiveContinuationCancelGeneration sessionID
-
-        activeGen = runtime.GetSessionGeneration sessionID
-        && activeCancel = runtime.GetCancelGeneration sessionID
-
     let isMatched =
         match pending with
-        | Some lease ->
-            if continuationId = "" then
-                activeMatch ()
-            else
-                continuationId = lease.ContinuationID
+        | Some lease -> continuationId = lease.ContinuationID
         | None -> false
 
     let isContIdMatch =
         match pending with
-        | Some lease ->
-            if continuationId = "" then
-                activeMatch ()
-            else
-                continuationId = lease.ContinuationID
+        | Some lease -> continuationId = lease.ContinuationID
         | None -> true
 
     isMatched, isContIdMatch

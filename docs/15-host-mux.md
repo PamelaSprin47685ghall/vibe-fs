@@ -24,8 +24,15 @@
 
 允许改 **binding**；mux 核心最小改动（`AGENTS.md`）。真正实现优先本仓库。
 
+## Fallback
+
+- `Mux/FallbackHooks.fs` → `createMuxFallbackHandler`
+- `Mux/Fallback/EventTranslator.fs`：`muxEventTranslator`
+- `Mux/Fallback/ActionExecutor.fs`：`IActionExecutor` 实现
+
 ## 相关文档
 
 - [02-architecture.md](./02-architecture.md)
 - [08-tools-and-permissions.md](./08-tools-and-permissions.md)
 - [11-subagents.md](./11-subagents.md)
+- [12-fallback.md](./12-fallback.md)

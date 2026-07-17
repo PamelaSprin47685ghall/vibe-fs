@@ -1,5 +1,12 @@
 module Wanxiangshu.Kernel.Fallback.FallbackInjectionFold
 
+/// LEGACY — read-only projection for backward compatibility.
+/// New continuation lifecycle uses the six-phase event protocol
+/// (continuation_requested → dispatch_started → dispatched → settled/failed/cancelled)
+/// and the `ownerAndLeaseFolder` in Kernel/EventLog/Fold.fs.
+/// This fold is kept for existing consumers that still read `fallback_continue_injected`
+/// events; no new consumers should depend on it.
+
 open Wanxiangshu.Kernel.EventSourcing.EventEnvelope
 open Wanxiangshu.Kernel.EventSourcing.EventKind
 

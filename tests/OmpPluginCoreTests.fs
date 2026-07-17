@@ -77,7 +77,8 @@ let private makeFakeConfig () : FallbackConfig =
       AgentChains = Map.ofList []
       MaxRetries = 2
       LoopMaxContinues = 3
-      MaxRecoveries = 5 }
+      MaxRecoveries = 5
+      LegacyZeroWidthContinue = false }
 
 let private invokeFallbackHandler (handler: obj) (event: obj) (ctx: obj) : unit =
     emitJsExpr (handler, event, ctx) "(($0)($1, $2))" |> ignore

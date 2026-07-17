@@ -33,6 +33,12 @@
 - `Omp/MagicTodo.fs`
 - Review：`ReviewToolsRegister` + `ReviewRuntime`
 
+## Fallback
+
+- `Omp/FallbackHooks.fs` → `createOmpFallbackHandler`
+- `Omp/Fallback/EventTranslator.fs`：`ompEventTranslator`
+- `Omp/Fallback/ActionExecutor.fs`：`IActionExecutor` 实现，`SendContinue` 使用内联 `"\u200B"` 替代旧 `zwsChar` 私有常量
+
 ## 上游
 
 **禁止**修改 `../oh-my-pi`；可参考其行为在本仓库实现。
@@ -42,3 +48,4 @@
 - [02-architecture.md](./02-architecture.md)
 - [09-methodology.md](./09-methodology.md)
 - [06-review-and-nudge.md](./06-review-and-nudge.md)
+- [12-fallback.md](./12-fallback.md)

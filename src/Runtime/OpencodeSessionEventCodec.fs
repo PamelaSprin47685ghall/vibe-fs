@@ -9,6 +9,7 @@ open Wanxiangshu.Kernel.Nudge.TodoStatus
 open Wanxiangshu.Runtime.Dyn
 open Wanxiangshu.Runtime.OpencodeSessionPromptCodec
 open Wanxiangshu.Runtime.OpencodeHostEvent
+open Wanxiangshu.Kernel.Fallback.Continuation
 
 /// Host wire → typed nudge state transition boundary.
 ///
@@ -26,8 +27,7 @@ open Wanxiangshu.Runtime.OpencodeHostEvent
 let getSessionID = OpencodeHostEvent.getSessionID
 let getPartsText = OpencodeHostEvent.getPartsText
 
-let isCompletedAssistantMessage =
-    OpencodeHostEvent.isCompletedAssistantMessage
+let isCompletedAssistantMessage = OpencodeHostEvent.isCompletedAssistantMessage
 
 /// Decode a todo list payload into the *open* todo contents, dropping items
 /// with terminal status. The returned strings are the raw `content` strings
@@ -238,3 +238,48 @@ let createPromptBodyWithModelAndNonce
 
 let createPromptBodyWithModel (agent: string option) (model: string option) (text: string) : obj =
     createPromptBodyWithModelAndNonce agent model text None
+
+/// Build a continuation prompt body with namespaced metadata.
+/// The payload is U+200B text plus `metadata.wanxiangshu` carrying the
+/// continuation identity. The model and agent come from the frozen request.
+let createFallbackContinuationPromptBody
+    (agent: string option)
+    (continuationPayload: string)
+    (request: ContinuationRequest)
+    : obj =
+    let variantVal: obj =
+        match request.Model.Variant with
+        | Some v -> box v
+        | None -> null
+
+    let modelObj =
+        {| providerID = request.Model.ProviderID
+           modelID = request.Model.ModelID
+           variant = variantVal |}
+
+    let metadata =
+        {| wanxiangshu =
+            {| kind = "fallback_continuation"
+               schema = 2
+               continuationId = request.ContinuationId
+               continuationOrdinal = request.ContinuationOrdinal
+               attempt = request.Attempt
+               humanTurnId = request.HumanTurnId
+               contextGeneration = request.ContextGeneration
+               cancelGeneration = request.CancelGeneration |} |}
+
+    let textPart =
+        box
+            {| ``type`` = "text"
+               text = continuationPayload
+               metadata = metadata |}
+
+    let parts: obj array = [| textPart |]
+
+    match agent with
+    | Some a when a <> "" ->
+        box
+            {| agent = a
+               parts = parts
+               model = modelObj |}
+    | _ -> box {| parts = parts; model = modelObj |}
