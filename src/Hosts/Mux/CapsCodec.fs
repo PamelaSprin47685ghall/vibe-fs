@@ -27,11 +27,13 @@ let private buildUserMessage (userId: string) (preludeText: string option) (epoc
     buildMuxMessage userId "user" [| buildTextPart wrappedText |]
 
 let private buildMuxToolPart (epochId: string) (fp: string) (index: int) (cap: CapsFile) : obj =
-    let formattedOutput = formatReadOutput cap.filePath cap.content 1 None
-    let callId = capsToolCallId "caps-fr-" epochId fp index
+    let lines = cap.content.Split('\n')
+    let numbered = Wanxiangshu.Runtime.NativeReadTranscript.formatNumberedLines 1 lines
 
     let wrappedOutput =
-        $"<wanxiangshu-caps-tools>\n{formattedOutput}\n</wanxiangshu-caps-tools>"
+        $"{cap.filePath}\n{numbered}\n(End of file - total {lines.Length} lines)"
+
+    let callId = capsToolCallId "caps-fr-" epochId fp index
 
     createObj
         [ "type", box "dynamic-tool"

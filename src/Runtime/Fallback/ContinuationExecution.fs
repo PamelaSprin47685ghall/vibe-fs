@@ -11,6 +11,7 @@ open Wanxiangshu.Runtime.Fallback.Ports
 open Wanxiangshu.Runtime.Fallback.LeaseValidation
 open Wanxiangshu.Runtime.ContinuationEventWriter
 open Wanxiangshu.Runtime.Clock
+open Wanxiangshu.Runtime.Fallback.ContinuationDispatchHelpers
 
 type ContinuationIntent =
     | SendContinueIntent of
@@ -32,68 +33,6 @@ type ContinuationIntent =
         continuationOrdinal: int
     | PropagateFailureIntent
 
-let private cancelAfterDispatch
-    (runtime: FallbackRuntimeStore)
-    (executor: IActionExecutor)
-    (workspaceRoot: string)
-    (sessionID: string)
-    (lease: PendingLease)
-    (reason: string)
-    : JS.Promise<unit> =
-    promise {
-        do! executor.AbortRun sessionID
-        do! finishContinuation runtime workspaceRoot sessionID lease ContinuationOutcome.Cancelled reason
-    }
-
-let handleDispatchComplete
-    (runtime: FallbackRuntimeStore)
-    (executor: IActionExecutor)
-    (workspaceRoot: string)
-    (sessionID: string)
-    (lease: PendingLease)
-    (model: FallbackModel)
-    (agent: string)
-    : JS.Promise<unit> =
-    promise {
-        let isValid =
-            verifyLeaseWithStatus LeaseStatus.DispatchStarted runtime sessionID lease
-
-        if not isValid then
-            do! cancelAfterDispatch runtime executor workspaceRoot sessionID lease "Cancelled after dispatch"
-        else
-            let modelStr =
-                match model.Variant with
-                | Some v -> model.ProviderID + "/" + model.ModelID + ":" + v
-                | None -> model.ProviderID + "/" + model.ModelID
-
-            let atMs = getTimestampMs ()
-
-            do!
-                appendContinuationDispatchedOrFail
-                    workspaceRoot
-                    sessionID
-                    lease.ContinuationID
-                    modelStr
-                    agent
-                    atMs
-                    lease.ContinuationOrdinal
-
-            if
-                not (
-                    runtime.TryTransitionPendingLease(
-                        sessionID,
-                        lease.ContinuationID,
-                        LeaseStatus.DispatchStarted,
-                        LeaseStatus.Dispatched
-                    )
-                )
-            then
-                do! cancelAfterDispatch runtime executor workspaceRoot sessionID lease "Cancelled after dispatch"
-            else
-                runtime.SetInjectedAt sessionID atMs
-                runtime.SetInjectedModel sessionID model
-    }
-
 let executeContinuation
     (runtime: FallbackRuntimeStore)
     (executor: IActionExecutor)
@@ -109,29 +48,7 @@ let executeContinuation
             verifyLease runtime sessionID lease
             && ensureActiveAndOwner runtime sessionID lease
         then
-            try
-                do!
-                    appendContinuationDispatchStartedOrFail
-                        workspaceRoot
-                        sessionID
-                        lease.ContinuationID
-                        lease.ContinuationOrdinal
-
-                let isLeaseStillValid =
-                    runtime.TryTransitionPendingLease(
-                        sessionID,
-                        lease.ContinuationID,
-                        LeaseStatus.Requested,
-                        LeaseStatus.DispatchStarted
-                    )
-
-                if not isLeaseStillValid then
-                    do! cancelAfterDispatch runtime executor workspaceRoot sessionID lease "Lease invalid at dispatch"
-                else
-                    do! dispatchAction ()
-                    do! handleDispatchComplete runtime executor workspaceRoot sessionID lease model agent
-            with ex ->
-                do! finishContinuation runtime workspaceRoot sessionID lease ContinuationOutcome.Failed ex.Message
+            do! runWithRetryGovernor runtime executor workspaceRoot sessionID lease model agent dispatchAction
         else
             do!
                 finishContinuation
@@ -222,8 +139,8 @@ let handleContinuationAction
 
         let modelStr =
             match model.Variant with
-            | Some v -> model.ProviderID + "/" + model.ModelID + ":" + v
-            | None -> model.ProviderID + "/" + model.ModelID
+            | Some v -> $"{model.ProviderID}/{model.ModelID}:{v}"
+            | None -> $"{model.ProviderID}/{model.ModelID}"
 
         let atMs = getTimestampMs ()
 

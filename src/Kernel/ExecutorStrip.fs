@@ -1,9 +1,13 @@
 module Wanxiangshu.Kernel.ExecutorStrip
 
+/// A pipe that was stripped from a command. Supports two kinds:
+///   - CountPipe: head/tail with a numeric count argument
+///   - FilterPipe: grep/egrep with filter arguments
 type StrippedPipe =
-    { pipe: string
+    { raw: string
       name: string
-      count: int }
+      arguments: string
+      count: int option }
 
 type StripResult =
     { script: string
@@ -32,7 +36,9 @@ let private takeWhile pred (s: string) i =
 
 let private allowedPipeCommands: Set<string> = Set.ofList [ "head"; "tail" ]
 
-let private parsePipe (s: string) (index: int) : (int * StrippedPipe) option =
+let private allowedGrepCommands: Set<string> = Set.ofList [ "grep"; "egrep" ]
+
+let private parseCountPipe (s: string) (index: int) : (int * StrippedPipe) option =
     let afterSpace = skipWhile isWhitespace s (index + 1)
     let nameEnd, name = takeWhile isLetter s afterSpace
 
@@ -61,12 +67,62 @@ let private parsePipe (s: string) (index: int) : (int * StrippedPipe) option =
             if afterCount >= s.Length || isTerminator s.[afterCount] then
                 Some(
                     countEnd,
-                    { pipe = s.[index .. countEnd - 1].Trim()
+                    { raw = s.[index .. countEnd - 1].Trim()
                       name = name
-                      count = int countStr }
+                      arguments = s.[nameEnd .. countEnd - 1].Trim()
+                      count = Some(int countStr) }
                 )
             else
                 None
+
+/// Scan grep arguments from `| grep` until a terminator or end of string.
+/// Handles quoted strings so `| grep -E 'a|b'` does not confuse the `|` inside quotes.
+let private parseGrepPipe (s: string) (index: int) : (int * StrippedPipe) option =
+    let afterPipe = skipWhile isWhitespace s (index + 1)
+    let nameEnd, name = takeWhile isLetter s afterPipe
+
+    if
+        not (Set.contains name allowedGrepCommands)
+        || not (nameEnd < s.Length && (isWhitespace s.[nameEnd] || isTerminator s.[nameEnd]))
+    then
+        None
+    else
+        // Scan the rest of the pipe segment until a terminator
+        let rec scanArgs i =
+            if i >= s.Length then
+                s.Length
+            elif isTerminator s.[i] then
+                i
+            elif s.[i] = '\'' then
+                match s.IndexOf("'", i + 1) with
+                | -1 -> s.Length
+                | finish -> scanArgs (finish + 1)
+            elif s.[i] = '"' then
+                let rec closeQuote j =
+                    if j >= s.Length then s.Length
+                    elif s.[j] = '"' then j + 1
+                    elif s.[j] = '\\' then closeQuote (j + 2)
+                    else closeQuote (j + 1)
+
+                scanArgs (closeQuote (i + 1))
+            else
+                scanArgs (i + 1)
+
+        let argsEnd = scanArgs nameEnd
+        let argsStr = s.[nameEnd .. argsEnd - 1].Trim()
+
+        Some(
+            argsEnd,
+            { raw = s.[index .. argsEnd - 1].Trim()
+              name = name
+              arguments = argsStr
+              count = None }
+        )
+
+let private parsePipe (s: string) (index: int) : (int * StrippedPipe) option =
+    match parseCountPipe s index with
+    | Some result -> Some result
+    | None -> parseGrepPipe s index
 
 let private trimTrailingWhitespaceRev (bufferedRev: char list) = List.skipWhile isWhitespace bufferedRev
 

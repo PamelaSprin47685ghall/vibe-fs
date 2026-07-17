@@ -40,9 +40,8 @@ let formatReviewResultAcceptedWithFeedback () =
     check "accepted with feedback contains verdict" (text.Contains "accepted")
     check "accepted with feedback contains feedback text" (text.Contains feedback)
 
-    check
-        "accepted with feedback contains Review passed with feedback"
-        (text.Contains "Review passed with the following feedback")
+    check "accepted with feedback contains accepted" (text.Contains "accepted")
+    check "accepted with feedback contains feedback text" (text.Contains feedback)
 
 let formatReviewResultNeedsRevision () =
     let feedback = "Fix the boundary checks."
@@ -50,14 +49,14 @@ let formatReviewResultNeedsRevision () =
     let text = formatReviewResult result
     check "needs_revision contains verdict" (text.Contains "needs_revision")
     check "needs_revision contains feedback" (text.Contains feedback)
-    check "needs_revision keeps With-Review Mode active" (text.Contains "With-Review Mode is still active")
+    check "needs_revision keeps With-Review Mode active" (text.Contains "With-Review Mode remains active")
 
 let formatReviewResultTerminated () =
     let result = Terminated
     let text = formatReviewResult result
     check "terminated contains verdict" (text.Contains "terminated")
-    check "terminated no verdict label in prose" (text.Contains "Review terminated without verdict")
-    check "terminated keeps With-Review Mode active" (text.Contains "With-Review Mode is still active")
+    check "terminated no verdict label in prose" (text.Contains "ended without a verdict")
+    check "terminated keeps With-Review Mode active" (text.Contains "With-Review Mode remains active")
 
 // ── parseFrontMatter / multi-frontmatter ──────────────────────────────────────
 
@@ -125,11 +124,11 @@ let formatWipAcknowledgmentProducesFrontMatter () =
     check "output is non-empty" (text <> "")
     check "output contains frontmatter delimiter" (text.Contains "---")
     check "output mentions With-Review Mode" (text.Contains "With-Review Mode")
-    check "output mentions submit_review" (text.Contains "submit_review")
+    check "output mentions todowrite" (text.Contains "todowrite")
+    check "output mentions continue working" (text.Contains "continue working")
     let parsed = parseFrontMatter text
     check "parsed task field equals input" (parsed?("task") = box task)
-    let body = bodyAfterFrontMatter text
-    check "body equals original acknowledgment" (body.Trim() = submitReviewWipAcknowledgment)
+    check "parsed review_progress field equals recorded" (parsed?("review_progress") = box "recorded")
 
 let run () =
     submitReviewIsWipNoneDefaultsTrue ()

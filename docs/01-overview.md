@@ -72,7 +72,6 @@ flowchart LR
 | 命令 | 作用 |
 | :--- | :--- |
 | `/loop <task>` | 激活 With-Review；空 task 取消 |
-| `/loop-review <task>` | 先预审查子会话，再决定是否激活 loop |
 
 状态与事件见 [06-review-and-nudge.md](./06-review-and-nudge.md)。
 

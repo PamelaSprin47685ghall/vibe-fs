@@ -41,18 +41,13 @@ let private emptyInfo id role =
 
 let formatReadOutputPrefixesLines () =
     let out =
-        formatReadOutput
-            sampleResult.filePath
-            sampleResult.content
+        Wanxiangshu.Runtime.NativeReadTranscript.formatNumberedLines
             sampleResult.startLine
-            (Some sampleResult.totalLines)
+            (sampleResult.content.Split('\n'))
 
-    check "has path tag" (out.Contains "<path>src/auth.py</path>")
-    check "has type tag" (out.Contains "<type>file</type>")
-    check "has content tag" (out.Contains "<content>")
-    check "has 127 line" (out.Contains "127: def save_pretrained")
-    check "has EOF footer" (out.Contains "(End of file - total 300 lines)")
-    check "has closing content tag" (out.Contains "</content>")
+    check "has 127| prefix" (out.Contains " 127|def save_pretrained")
+    check "has piped format" (out.Contains "|")
+    check "starts with proper spacing" (out.StartsWith "   127|")
 
 let buildReadToolPartsProducesOnePartPerResult () =
     let parts = buildReadToolParts "msg-1" "session-1" [ sampleResult; sampleResult2 ]
@@ -72,8 +67,8 @@ let buildReadToolPartsStructureMatchesCaps () =
     equal "input filePath" "src/auth.py" (str input "filePath")
     equal "input offset" 127 (getValue<int> input "offset")
     equal "input limit" 2000 (getValue<int> input "limit")
-    check "output has path" ((str state "output").Contains "<path>src/auth.py</path>")
-    check "output has 127:" ((str state "output").Contains "127:")
+    check "output has file path" ((str state "output").Contains "src/auth.py")
+    check "output has 127|" ((str state "output").Contains "127|")
     let metadata = get state "metadata"
     check "metadata has preview" (has metadata "preview")
     check "metadata has truncated" (has metadata "truncated")

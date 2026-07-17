@@ -73,7 +73,7 @@ let private processReviewToolResponse
 
                 try
                     if submitReviewIsWip decoded.Wip then
-                        do! appendSubmitReviewWipRecordedOrFail runtime.Execution.Directory sessionID
+                        do! appendSubmitReviewWipRecordedOrFail runtime.Execution.Directory sessionID decoded.Report
                         return formatWipAcknowledgment task
                     else
                         let! result =

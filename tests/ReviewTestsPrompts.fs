@@ -73,22 +73,6 @@ let muxReviewerVerdictPromptFormat () =
     check "mux prompt does not mention return_reviewer" (not (prompt.Contains "return_reviewer"))
     check "mux prompt has no legacy divider" (not (prompt.Contains "==="))
 
-let muxPreReviewVerdictPromptFormat () =
-    let prompt =
-        Wanxiangshu.Runtime.ReviewPrompts.preReviewVerdictPrompt "clarify rollout"
-
-    check "pre-review prompt starts with front-matter" (prompt.StartsWith "---")
-    check "pre-review prompt has no role field" (not (prompt.Contains "role:"))
-    check "pre-review prompt has no call_id field" (not (prompt.Contains "call_id:"))
-
-    check
-        "pre-review prompt carries original_task"
-        (prompt.Contains "original_task:" && prompt.Contains "clarify rollout")
-
-    check "pre-review prompt reuses review criteria" (prompt.Contains "# Evaluation Criteria")
-    check "pre-review prompt names agent_report" (prompt.Contains "agent_report")
-    check "pre-review prompt has no legacy divider" (not (prompt.Contains "==="))
-
 let reviewInstructionsFrontMatter () =
     let instr = Wanxiangshu.Runtime.ReviewPrompts.reviewInstructions
     check "instructions are review prose" (instr.Contains "You are a code reviewer performing")

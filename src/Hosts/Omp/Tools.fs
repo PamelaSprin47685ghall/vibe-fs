@@ -8,6 +8,7 @@ open Wanxiangshu.Hosts.Omp.SubagentTools
 open Wanxiangshu.Hosts.Omp.TodoTool
 open Wanxiangshu.Hosts.Omp.WebTools
 open Wanxiangshu.Hosts.Omp.OmpTools
+open Wanxiangshu.Hosts.Omp.SwapTool
 open Wanxiangshu.Runtime.FuzzyFinderShell
 open Wanxiangshu.Runtime.ReviewRuntime
 open Wanxiangshu.Runtime.Fallback.RuntimeStore
@@ -27,5 +28,6 @@ let registerAllTools
     registerSubagentTools pi fallbackRuntime fallbackConfigOpt
     registerTodoTool pi
     registerMeditatorTools pi fallbackRuntime fallbackConfigOpt
+    registerSwapTool pi
     registerLoopFeatures pi reviewStore
     registerContextTransform pi reviewStore

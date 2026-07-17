@@ -106,20 +106,20 @@ let stripHeadTailPipes () =
     equal "head-tail stripped" "cat file" r.script
     equal "head-tail count" 2 r.stripped.Length
     equal "first name" "head" r.stripped.[0].name
-    equal "first count" 5 r.stripped.[0].count
+    equal "first count" (Some 5) r.stripped.[0].count
     equal "second name" "tail" r.stripped.[1].name
-    equal "second count" 2 r.stripped.[1].count
+    equal "second count" (Some 2) r.stripped.[1].count
 
 let stripSingleQuotes () =
     let r = strip "echo 'hello world' | head -n 3"
     equal "single-quote preserved" "echo 'hello world'" r.script
     equal "head extracted" 1 r.stripped.Length
-    equal "head count" 3 r.stripped.[0].count
+    equal "head count" (Some 3) r.stripped.[0].count
 
 let stripDoubleQuotes () =
     let r = strip """echo "pipe|here" | tail -n 1"""
     check "double-quote preserved" (r.script.Contains "\"pipe|here\"")
-    equal "tail count" 1 r.stripped.[0].count
+    equal "tail count" (Some 1) r.stripped.[0].count
 
 let stripComment () =
     let r = strip "cat file | head -n 5 # skip rest"
@@ -131,10 +131,11 @@ let stripNoPipe () =
     equal "no change" "cat file" r.script
     check "no stripped" (List.isEmpty r.stripped)
 
-let stripUnsupportedCommand () =
+let stripGrepCommand () =
     let r = strip "cat file | grep 5"
-    equal "unsupported unchanged" "cat file | grep 5" r.script
-    check "no stripped" (List.isEmpty r.stripped)
+    equal "grep stripped" "cat file" r.script
+    check "one stripped" (r.stripped.Length = 1)
+    equal "grep name" "grep" r.stripped.[0].name
 
 let run () =
     fpNormalizePathConstraint ()
@@ -148,4 +149,4 @@ let run () =
     stripDoubleQuotes ()
     stripComment ()
     stripNoPipe ()
-    stripUnsupportedCommand ()
+    stripGrepCommand ()

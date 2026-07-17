@@ -28,7 +28,8 @@ let modificationTools: Set<string> =
           "pty_write"
           "pty_read"
           "pty_list"
-          "pty_kill" ]
+          "pty_kill"
+          "swap" ]
 
 let isModificationTool (tool: string) : bool =
     Set.contains (tool.ToLowerInvariant()) modificationTools

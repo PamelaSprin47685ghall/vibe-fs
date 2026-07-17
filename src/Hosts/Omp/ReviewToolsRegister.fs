@@ -94,7 +94,8 @@ let executeSubmitReview
             | None -> return errorResult "Loop review is not active for this session."
             | Some activeTask ->
                 if isWorkInProgress params' then
-                    do! appendSubmitReviewWipRecorded root sessionId |> Promise.map ignore
+                    let report = Dyn.str params' "report"
+                    do! appendSubmitReviewWipRecorded root sessionId report |> Promise.map ignore
                     return textResult (formatWipAcknowledgment activeTask)
                 elif not (store.tryLockReview sessionId) then
                     return errorResult "A review is already in progress."
@@ -169,14 +170,6 @@ let registerLoopFeatures (pi: obj) (store: ReviewStore) : unit =
         createObj
             [ "description", box "Enable loop review mode for the current session"
               "handler", box (fun (args: string) (ctx: obj) -> handleLoopCommand pi store args ctx) ]
-    )
-
-    pi?registerCommand (
-        "loop-review",
-        createObj
-            [ "description",
-              box "Pre-check a task before activating loop mode (mirrors Opencode's command.execute.before)."
-              "handler", box (fun (args: string) (ctx: obj) -> handleLoopReviewCommand pi store args ctx) ]
     )
 
     pi?registerTool (

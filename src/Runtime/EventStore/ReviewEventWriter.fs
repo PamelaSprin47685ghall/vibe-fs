@@ -33,15 +33,50 @@ let appendReviewVerdictOrFail
         workspaceRoot
         (buildEvent sessionID eventKindReviewVerdict (verdictPayload verdict feedback) (getTimestampMs().ToString()))
 
-let appendSubmitReviewWipRecorded (workspaceRoot: string) (sessionID: string) : JS.Promise<Result<unit, string>> =
+let appendSubmitReviewWipRecorded
+    (workspaceRoot: string)
+    (sessionID: string)
+    (report: string)
+    : JS.Promise<Result<unit, string>> =
+    let payload =
+        if report.Trim() <> "" then
+            Map [ "report", report.Trim() ]
+        else
+            Map.empty
+
     appendAndCache
         workspaceRoot
-        (buildEvent sessionID eventKindSubmitReviewWipRecorded Map.empty (getTimestampMs().ToString()))
+        (buildEvent sessionID eventKindSubmitReviewWipRecorded payload (getTimestampMs().ToString()))
 
-let appendSubmitReviewWipRecordedOrFail (workspaceRoot: string) (sessionID: string) : JS.Promise<unit> =
+let appendSubmitReviewWipRecordedOrFail
+    (workspaceRoot: string)
+    (sessionID: string)
+    (report: string)
+    : JS.Promise<unit> =
+    let payload =
+        if report.Trim() <> "" then
+            Map [ "report", report.Trim() ]
+        else
+            Map.empty
+
     appendAndCacheOrFail
         workspaceRoot
-        (buildEvent sessionID eventKindSubmitReviewWipRecorded Map.empty (getTimestampMs().ToString()))
+        (buildEvent sessionID eventKindSubmitReviewWipRecorded payload (getTimestampMs().ToString()))
+
+/// Append submit_review_reports_consumed event to signal that accumulated
+/// WIP reports have been consumed in a final submission.
+let appendSubmitReviewReportsConsumedOrFail
+    (workspaceRoot: string)
+    (sessionID: string)
+    (count: int)
+    : JS.Promise<unit> =
+    appendAndCacheOrFail
+        workspaceRoot
+        (buildEvent
+            sessionID
+            eventKindSubmitReviewReportsConsumed
+            (Map [ "count", string count ])
+            (getTimestampMs().ToString()))
 
 let appendLoopActivated (workspaceRoot: string) (sessionID: string) (task: string) : JS.Promise<Result<unit, string>> =
     appendAndCache

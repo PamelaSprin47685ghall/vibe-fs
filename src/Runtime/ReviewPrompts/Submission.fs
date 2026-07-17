@@ -74,14 +74,5 @@ let reviewSubmissionDoubleCheckPrompt (task: string) (report: string) (affectedF
 
     frontMatterPrompt fields reviewSubmissionVerdictBody
 
-let preReviewVerdictPrompt (task: string) : string =
-    let taskLine =
-        if task <> "" then
-            [ yamlField originalTaskField task ]
-        else
-            []
-
-    frontMatterPrompt taskLine preReviewVerdictBody
-
 let returnReviewerVerdictSubmittedMessage: string =
     "Verdict submitted.\n\nPlease stop the session immediately."

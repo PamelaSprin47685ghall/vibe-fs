@@ -46,28 +46,12 @@ let loopMessagesShared () =
     check "loop template mentions submit_review" (loopTemplate.Contains "submit_review")
     check "loop template forbids finishing early" (loopTemplate.Contains "Do not end the conversation")
 
-    let precheckTemplate = withReviewPrecheckCommandTemplate
-    check "precheck template carries command front-matter" (precheckTemplate.Contains "command: with-review-precheck")
-
-    check
-        "precheck template carries task placeholder"
-        (precheckTemplate.Contains "task:" && precheckTemplate.Contains "$ARGUMENTS")
-
-    check "precheck template reuses review criteria" (precheckTemplate.Contains "# Evaluation Criteria")
-    check "precheck template does not repeat task in body tail" (not (precheckTemplate.EndsWith "$ARGUMENTS"))
-
 let reviewerVerdictPromptsShared () =
     let verdict = ReviewerVerdictPrompts.reviewerVerdictInstructions
     check "reviewer verdict mentions agent_report" (verdict.Contains "agent_report")
     check "reviewer verdict mentions PERFECT" (verdict.Contains "PERFECT")
     check "reviewer verdict mentions REVISE" (verdict.Contains "REVISE")
     check "reviewer verdict mentions feedback" (verdict.Contains "feedback")
-
-    let preReview = ReviewerVerdictPrompts.loopReviewVerdictInstructions
-    check "loop-review verdict mentions agent_report" (preReview.Contains "agent_report")
-    check "loop-review verdict mentions PERFECT" (preReview.Contains "PERFECT")
-    check "loop-review verdict mentions REVISE" (preReview.Contains "REVISE")
-    check "loop-review verdict mentions actionable" (preReview.Contains "actionable")
 
 let reviewResultFormattingShared () =
     let accepted = formatReviewResult (ReviewResult.Accepted "")
@@ -80,7 +64,7 @@ let reviewResultFormattingShared () =
 
     let needsRevision = formatReviewResult (ReviewResult.NeedsRevision "missing tests")
     check "needs_revision text embeds feedback" (needsRevision.Contains "missing tests")
-    check "needs_revision text instructs to retry" (needsRevision.Contains "submit_review")
+    check "needs_revision text instructs to continue" (needsRevision.Contains "continue")
 
     let terminated = formatReviewResult ReviewResult.Terminated
     check "terminated text mentions terminated" (terminated.ToLower().Contains "terminat")

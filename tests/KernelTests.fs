@@ -33,20 +33,20 @@ let stripLexer' () =
     check "strip head eof script" (r2.script = "printf hi")
     check "strip head eof one stripped" (r2.stripped.Length = 1)
     check "strip head eof name" (r2.stripped.[0].name = "head")
-    check "strip head eof count" (r2.stripped.[0].count = 1)
-    check "strip head eof pipe" (r2.stripped.[0].pipe = "| head -n 1")
+    check "strip head eof count" (r2.stripped.[0].count = Some 1)
+    check "strip head eof pipe" (r2.stripped.[0].raw = "| head -n 1")
 
     // 3. tail at EOF
     let r3 = strip "data | tail -n 2"
     check "strip tail eof script" (r3.script = "data")
     check "strip tail eof name" (r3.stripped.[0].name = "tail")
-    check "strip tail eof count" (r3.stripped.[0].count = 2)
+    check "strip tail eof count" (r3.stripped.[0].count = Some 2)
 
     // 4. bare dash no -n
     let r4 = strip "data | head -1"
     check "strip bare dash script" (r4.script = "data")
     check "strip bare dash name" (r4.stripped.[0].name = "head")
-    check "strip bare dash count" (r4.stripped.[0].count = 1)
+    check "strip bare dash count" (r4.stripped.[0].count = Some 1)
 
     // 5. head followed by \n
     let r5 = strip "printf hi | head -n 1\necho done"
@@ -68,19 +68,20 @@ let stripLexer' () =
     check "strip double quote unchanged" (r8.script = "echo \"foo | head -n 1\"")
     check "strip double quote empty" (List.isEmpty r8.stripped)
 
-    // 9. non-head/tail pipe
+    // 9. grep pipe is now stripped (grep is an allowed filtering pipe)
     let r9 = strip "a | grep foo"
-    check "strip grep unchanged" (r9.script = "a | grep foo")
-    check "strip grep empty" (List.isEmpty r9.stripped)
+    check "strip grep removed" (r9.script = "a")
+    check "strip grep one stripped" (r9.stripped.Length = 1)
+    check "strip grep name" (r9.stripped.[0].name = "grep")
 
     // 10. two chained head/tail pipes: strip's outer multi-pass loop strips tail first (reducing to "a | head -n 1"), then head (now at EOF)
     let r10 = strip "a | head -n 1 | tail -n 2"
     check "strip chained two stripped" (r10.stripped.Length = 2)
     check "strip chained script fully reduced" (r10.script = "a")
     check "strip chained head name" (r10.stripped.[0].name = "head")
-    check "strip chained head count" (r10.stripped.[0].count = 1)
+    check "strip chained head count" (r10.stripped.[0].count = Some 1)
     check "strip chained tail name" (r10.stripped.[1].name = "tail")
-    check "strip chained tail count" (r10.stripped.[1].count = 2)
+    check "strip chained tail count" (r10.stripped.[1].count = Some 2)
 
     // 11. pipe in hash comment
     let r11 = strip "echo hi\n# noisy | head -n 1"
@@ -92,7 +93,7 @@ let stripLexer' () =
     check "strip pipe after quote script" (r12.script = "echo \"x\"")
     check "strip pipe after quote one stripped" (r12.stripped.Length = 1)
     check "strip pipe after quote head name" (r12.stripped.[0].name = "head")
-    check "strip pipe after quote head count" (r12.stripped.[0].count = 1)
+    check "strip pipe after quote head count" (r12.stripped.[0].count = Some 1)
 
 let jsBoundary' () =
     check

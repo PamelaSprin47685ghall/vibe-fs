@@ -60,7 +60,15 @@ let buildReadToolParts (assistantId: string) (sessionID: string) (results: Sembl
                             box (
                                 createObj [ "filePath", box r.filePath; "offset", box r.startLine; "limit", box 2000 ]
                             )
-                            "output", box (formatReadOutput r.filePath r.content r.startLine (Some r.totalLines))
+                            "output",
+                            box (
+                                let lines = r.content.Split('\n')
+
+                                let numbered =
+                                    Wanxiangshu.Runtime.NativeReadTranscript.formatNumberedLines r.startLine lines
+
+                                $"{r.filePath}\n{numbered}\n(End of file - total {r.totalLines} lines)"
+                            )
                             "title", box $"Read {r.filePath}"
                             "metadata",
                             box (

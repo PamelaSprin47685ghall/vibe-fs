@@ -45,11 +45,13 @@ let private buildToolParts
     : obj array =
     capsFiles
     |> List.mapi (fun index cap ->
-        let formattedOutput = formatReadOutput cap.filePath cap.content 1 None
-        let callId = capsToolCallId "caps-call-" epochId fp index
+        let lines = cap.content.Split('\n')
+        let numbered = Wanxiangshu.Runtime.NativeReadTranscript.formatNumberedLines 1 lines
 
         let wrappedOutput =
-            $"<wanxiangshu-caps-tools>\n{formattedOutput}\n</wanxiangshu-caps-tools>"
+            $"{cap.filePath}\n{numbered}\n(End of file - total {lines.Length} lines)"
+
+        let callId = capsToolCallId "caps-call-" epochId fp index
 
         box (
             createObj

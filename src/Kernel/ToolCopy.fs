@@ -45,13 +45,6 @@ let webToolFailed (label: string) (error: DomainError) : string =
 let reviewAlreadyActiveMessage: string =
     "With-Review Mode is already active. Submit your work via submit_review."
 
-let preReviewPassedMessage (task: string) : string =
-    $"Pre-review passed. Task \"{task}\" already meets all criteria — no changes needed."
-
-let preReviewCouldNotComplete: string = "Pre-review could not complete."
-
-let withReviewPreReviewFeedbackHeader: string = "=== Pre-review Feedback ==="
-
 let subagentToolFailed (context: string) (error: DomainError) : string = wireEncodeToolError context error
 
 let subagentIntentsMustBeNonEmpty: string =

@@ -200,16 +200,10 @@ let ensureCommandTemplate (cfg: obj) (name: string) (template: string) (descript
 
     setKey cfg "command" cmdObj
 
-/// Register /loop and /loop-review command templates from ReviewPrompts constants.
-let registerLoopReviewCommands (cfg: obj) : unit =
+/// Register /loop command template from ReviewPrompts constants.
+let registerLoopCommand (cfg: obj) : unit =
     ensureCommandTemplate
         cfg
         "loop"
         withReviewCommandTemplate
         "Enable With-Review Mode — the next submission must pass through a reviewer before being accepted"
-
-    ensureCommandTemplate
-        cfg
-        "loop-review"
-        withReviewPrecheckCommandTemplate
-        "Enable With-Review Mode with pre-review — the task is pre-reviewed immediately, and reviewer feedback is prepended to your prompt before any work begins"

@@ -11,6 +11,7 @@ let eventKindNudgeFailed = "nudge_failed"
 let eventKindNudgeCancelled = "nudge_cancelled"
 let eventKindNudgeSettled = "nudge_settled"
 let eventKindSubmitReviewWipRecorded = "submit_review_wip_recorded"
+let eventKindSubmitReviewReportsConsumed = "submit_review_reports_consumed"
 let eventKindNudgeDedupCleared = "nudge_dedup_cleared"
 let eventKindFallbackContinueInjected = "fallback_continue_injected"
 

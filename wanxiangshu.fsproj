@@ -107,6 +107,9 @@
     <Compile Include="src/Kernel/EventSourcing/EventEnvelope.fs"/>
     <Compile Include="src/Kernel/EventSourcing/EventKind.fs"/>
     <Compile Include="src/Kernel/EventSourcing/EventPayload.fs"/>
+    <Compile Include="src/Kernel/ToolPolling/PtyReadPolicy.fs"/>
+    <Compile Include="src/Kernel/Review/ReviewReportBuffer.fs"/>
+    <Compile Include="src/Kernel/Review/ReviewEncouragement.fs"/>
     <Compile Include="src/Kernel/Review/ReviewLoopFold.fs"/>
     <Compile Include="src/Kernel/Fallback/FallbackInjectionFold.fs"/>
     <Compile Include="src/Kernel/Nudge/Types.fs"/>
@@ -128,6 +131,7 @@
     <Compile Include="src/Kernel/EventSourcing/Fold.fs"/>
     <Compile Include="src/Kernel/SessionOverview.fs"/>
     <Compile Include="src/Kernel/WorkBacklog.fs"/>
+    <Compile Include="src/Kernel/FileSwap.fs"/>
     <Compile Include="src/Kernel/ToolResult.fs"/>
     <Compile Include="src/Kernel/ToolCopy.fs"/>
     <Compile Include="src/Kernel/ToolContext.fs"/>
@@ -149,6 +153,7 @@
     <Compile Include="src/Runtime/Execution/LoopMessages.fs"/>
     <Compile Include="src/Runtime/PromptFragments.fs"/>
     <Compile Include="src/Runtime/Tooling/CapsFormat.fs"/>
+    <Compile Include="src/Runtime/Tooling/NativeReadTranscript.fs"/>
     <Compile Include="src/Runtime/SubagentPrompts.fs"/>
     <Compile Include="src/Runtime/Subsession/Subagent.fs"/>
     <Compile Include="src/Runtime/Execution/BacklogProjectionBuild.fs"/>
@@ -292,10 +297,13 @@
     <Compile Include="src/Runtime/Execution/ExecutorToolsCodec.fs"/>
     <Compile Include="src/Runtime/Messaging/MuxHookInputCodec.fs"/>
     <Compile Include="src/Runtime/Tooling/FileToolsCodec.fs"/>
+    <Compile Include="src/Runtime/Tooling/FileSwap.fs"/>
     <Compile Include="src/Runtime/Tooling/WorkBacklogToolsCodec.fs"/>
     <Compile Include="src/Runtime/EventStore/EventLogRuntimeStore.fs"/>
     <Compile Include="src/Runtime/EventStore/EventLogRuntimeSync.fs"/>
     <Compile Include="src/Runtime/EventStore/ReviewEventWriter.fs"/>
+    <Compile Include="src/Runtime/EventStore/ReviewReportSubmission.fs"/>
+    <Compile Include="src/Runtime/EventStore/ToolSequenceThrottle.fs"/>
     <Compile Include="src/Runtime/EventStore/NudgeEventWriter.fs"/>
     <Compile Include="src/Runtime/EventStore/BacklogEventWriter.fs"/>
     <Compile Include="src/Runtime/EventStore/SessionEventWriter.fs"/>
@@ -309,6 +317,8 @@
     <Compile Include="src/Runtime/EventStore/EventLogRuntime.fs"/>
     <Compile Include="src/Runtime/Fallback/Ports.fs"/>
     <Compile Include="src/Runtime/Fallback/LeaseValidation.fs"/>
+    <Compile Include="src/Runtime/Fallback/RetryDispatchGovernor.fs"/>
+    <Compile Include="src/Runtime/Fallback/ContinuationDispatchHelpers.fs"/>
     <Compile Include="src/Runtime/Fallback/ContinuationExecution.fs"/>
     <Compile Include="src/Runtime/Fallback/NudgeHandler.fs"/>
     <Compile Include="src/Runtime/Fallback/CompactionHandler.fs"/>
@@ -383,6 +393,7 @@
     <Compile Include="src/Hosts/Mux/ReviewToolsMux.fs"/>
     <Compile Include="src/Hosts/Mux/BuiltinToolsFuzzy.fs"/>
     <Compile Include="src/Hosts/Mux/BuiltinTools.fs"/>
+    <Compile Include="src/Hosts/Mux/SwapTool.fs"/>
     <Compile Include="src/Hosts/Mux/WebTools.fs"/>
     <Compile Include="src/Hosts/Mux/MessagingCodec.fs"/>
     <Compile Include="src/Hosts/Mux/CapsCodec.fs"/>
@@ -433,6 +444,7 @@
     <Compile Include="src/Hosts/OpenCode/PtyIo.fs"/>
     <Compile Include="src/Hosts/OpenCode/SearchTools.fs"/>
     <Compile Include="src/Hosts/OpenCode/ReviewTools.fs"/>
+    <Compile Include="src/Hosts/OpenCode/SwapTool.fs"/>
     <Compile Include="src/Hosts/OpenCode/Tools.fs"/>
     <Compile Include="src/Hosts/OpenCode/HookExecute.fs"/>
     <Compile Include="src/Hosts/OpenCode/HookTransform.fs"/>
@@ -464,6 +476,7 @@
     <Compile Include="src/Hosts/Omp/ExecutorTools.fs"/>
     <Compile Include="src/Hosts/Omp/MessageTransform.fs"/>
     <Compile Include="src/Hosts/Omp/WebTools.fs"/>
+    <Compile Include="src/Hosts/Omp/SwapTool.fs"/>
     <Compile Include="src/Hosts/Omp/OmpTools.fs"/>
     <Compile Include="src/Hosts/Omp/TodoTool.fs"/>
     <Compile Include="src/Hosts/Omp/SubagentTools.fs"/>
@@ -533,6 +546,7 @@
     <Compile Include="tests/ReviewTestsReplay.fs"/>
     <Compile Include="tests/ReviewTestsPrompts.fs"/>
     <Compile Include="tests/ReviewTests.fs"/>
+    <Compile Include="tests/ReviewReportBufferTests.fs"/>
     <Compile Include="tests/AgentTests.fs"/>
     <Compile Include="tests/AgentNudgeSpecs.fs"/>
     <Compile Include="tests/AgentNudgeSpecsWip.fs"/>

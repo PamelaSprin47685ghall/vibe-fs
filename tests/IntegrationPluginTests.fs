@@ -32,7 +32,7 @@ let webfetchSchemaSpec (reg: obj) =
 
 let slashCommandsSpec (reg: obj) =
     let cmds = unbox<obj[]> (get reg "slashCommands")
-    check "slash commands count" (cmds.Length = 2)
+    check "slash commands count" (cmds.Length = 1)
     let loopCmd = cmds |> Array.find (fun c -> str c "key" = "loop")
     check "loop command has execute" (typeIs (get loopCmd "execute") "function")
 
@@ -41,7 +41,7 @@ let countsSpec (reg: obj) =
     let tools = unbox<obj[]> (get reg "tools")
     let names = tools |> Array.map (fun t -> str t "name")
     check "wrapper count" (wrappers.Length = 5)
-    equal "tool count" 14 tools.Length
+    equal "tool count" 15 tools.Length
     check "mux has meditator tool" (names |> Array.contains "meditator")
     check "mux has submit_review tool" (names |> Array.contains "submit_review")
     check "mux does not expose return_reviewer tool" (not (names |> Array.contains "return_reviewer"))
