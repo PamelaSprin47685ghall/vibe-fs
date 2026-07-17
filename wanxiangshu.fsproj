@@ -547,6 +547,7 @@
     <Compile Include="tests/ReviewTestsPrompts.fs"/>
     <Compile Include="tests/ReviewTests.fs"/>
     <Compile Include="tests/ReviewReportBufferTests.fs"/>
+    <Compile Include="tests/PtyReadThrottleTests.fs"/>
     <Compile Include="tests/AgentTests.fs"/>
     <Compile Include="tests/AgentNudgeSpecs.fs"/>
     <Compile Include="tests/AgentNudgeSpecsWip.fs"/>

@@ -11,6 +11,7 @@ open Wanxiangshu.Tests.AgentTests
 open Wanxiangshu.Tests.AgentNudgeSpecs
 open Wanxiangshu.Tests.AgentNudgeSpecsWip
 open Wanxiangshu.Tests.AgentNudgeSpecsDecode
+open Wanxiangshu.Tests.PtyReadThrottleTests
 open Wanxiangshu.Tests.KernelTests
 open Wanxiangshu.Tests.DynFieldTests
 open Wanxiangshu.Tests.KernelPromptSpecs
@@ -43,6 +44,7 @@ let coreTestEntries () : (string * TestBody) list =
       "ReviewTests.reviewerLoop", TestBody.Sync(sync ReviewTests.reviewerLoop)
       "ReviewTests.runtime", TestBody.Sync(sync ReviewTests.runtime)
       "ReviewReportBufferTests.run", TestBody.Sync(sync ReviewReportBufferTests.run)
+      "PtyReadThrottleTests.run", TestBody.Async PtyReadThrottleTests.run
       "ReviewTests.deactivateParentPreservesChildPending",
       TestBody.Sync(sync ReviewTests.deactivateParentPreservesChildPending)
       "ReviewTests.promptPartsBranches", TestBody.Sync(sync ReviewTests.promptPartsBranches)
