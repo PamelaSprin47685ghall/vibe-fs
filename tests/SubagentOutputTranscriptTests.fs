@@ -12,13 +12,15 @@ let private fail (msg: string) = check msg false
 
 /// Build a raw transcript message object with the given role and optional text parts.
 /// Uses Wanxiangshu.Runtime.Dyn so the shape matches what SubsessionTranscript.Dyn.get expects.
-let private makeMsg (role: string) (textParts: string list) : obj =
+let private makeMsgWithId (id: string) (role: string) (textParts: string list) : obj =
     let parts =
         textParts
         |> List.map (fun t -> createObj [ "type", box "text"; "text", box t ])
         |> Array.ofList
 
-    createObj [ "info", createObj [ "role", box role ]; "parts", box parts ]
+    createObj [ "id", box id; "info", createObj [ "role", box role ]; "parts", box parts ]
+
+let private makeMsg (role: string) (textParts: string list) : obj = makeMsgWithId "" role textParts
 
 /// (a) User message exists but no assistant after the last user → None.
 /// Bug: tryBuildLatestAssistantEvidence scans the full transcript and returns the
@@ -65,7 +67,50 @@ let noUserReturnsLatestAssistant () =
         | AssistantSnapshot(_, _, text, _) -> equal "latest assistant when no user boundary" "second reply" text
         | other -> fail ("expected AssistantSnapshot, got " + string other)
 
+let anchorUsesAbsoluteIndex () =
+    let msgs =
+        [| makeMsgWithId "u1" "user" [ "first question" ]
+           makeMsg "assistant" [ "stale answer" ]
+           makeMsgWithId "u2" "user" [ "second question" ] |]
+        |> Array.map box
+
+    match buildTurnEvidence msgs (AnchorByUserMessageId "u2") with
+    | Ok evidence ->
+        match evidence.Assistant with
+        | NoAssistant -> check "current user anchor excludes stale assistant" true
+        | other -> fail ("expected NoAssistant, got " + string other)
+    | Error err -> fail err.Message
+
+let anchorIncludesOnlyCurrentAssistant () =
+    let msgs =
+        [| makeMsgWithId "u1" "user" [ "first question" ]
+           makeMsg "assistant" [ "stale answer" ]
+           makeMsgWithId "u2" "user" [ "second question" ]
+           makeMsg "assistant" [ "fresh answer" ] |]
+        |> Array.map box
+
+    match buildTurnEvidence msgs (AnchorByUserMessageId "u2") with
+    | Ok evidence ->
+        match evidence.Assistant with
+        | AssistantSnapshot(_, _, text, _) -> equal "current user anchor includes fresh assistant" "fresh answer" text
+        | other -> fail ("expected AssistantSnapshot, got " + string other)
+    | Error err -> fail err.Message
+
+let oldUserAnchorIsRejected () =
+    let msgs =
+        [| makeMsgWithId "u1" "user" [ "first question" ]
+           makeMsg "assistant" [ "stale answer" ]
+           makeMsgWithId "u2" "user" [ "second question" ] |]
+        |> Array.map box
+
+    match buildTurnEvidence msgs (AnchorByUserMessageId "u1") with
+    | Error _ -> check "old user anchor is rejected" true
+    | Ok _ -> fail "expected old user anchor to be rejected"
+
 let run () =
     userThenNoAssistantReturnsNone ()
     newAssistantAfterUserReturnsNewText ()
     noUserReturnsLatestAssistant ()
+    anchorUsesAbsoluteIndex ()
+    anchorIncludesOnlyCurrentAssistant ()
+    oldUserAnchorIsRejected ()
