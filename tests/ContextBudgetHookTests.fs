@@ -28,7 +28,15 @@ let spec_applyContextBudget_injectsNudge () =
               SembleInjectEnabled = false
               Scope = scope
               MaxInputTokens = 200000
-              GetContextUsage = (fun _ -> Promise.lift (Some 120000)) }
+              ModelKey = "openai/gpt-4o:default"
+              LimitSource = "openai-session-model"
+              ObserveLatestUsage =
+                fun () ->
+                    Promise.lift (
+                        Some
+                            { AssistantMessageID = "test"
+                              InputTokens = 120000L }
+                    ) }
 
         let backlogOps =
             { Host = opencode
@@ -53,7 +61,7 @@ let spec_applyContextBudget_injectsNudge () =
                 source = Native
                 raw = null } ]
 
-        let! res = applyContextBudget plan backlogOps messages [||] (fun _ -> [||])
+        let! res = applyContextBudget plan backlogOps messages [||]
         equal "should inject nudge" 2 res.Length
         let lastMsg = List.last res
         equal "last msg source" (Synthetic "context-budget-nudge-") lastMsg.source

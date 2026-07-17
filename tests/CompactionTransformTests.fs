@@ -108,7 +108,15 @@ let testApplyContextBudgetShortCircuit () =
               SembleInjectEnabled = false
               Scope = Wanxiangshu.Runtime.RuntimeScope.create ()
               MaxInputTokens = 100000
-              GetContextUsage = (fun _ -> Promise.lift (Some 10000)) }
+              ModelKey = "openai/gpt-4o:default"
+              LimitSource = "openai-session-model"
+              ObserveLatestUsage =
+                fun () ->
+                    Promise.lift (
+                        Some
+                            { AssistantMessageID = "test-10000"
+                              InputTokens = 10000L }
+                    ) }
 
         let backlogOps =
             { Host = opencode
@@ -117,7 +125,7 @@ let testApplyContextBudgetShortCircuit () =
         let msgs = [ mkMsg "msg1" User [] ]
         let encodeMessages (msgs: Message<obj> list) = msgs |> List.map box |> List.toArray
 
-        let! result = applyContextBudget plan backlogOps msgs [||] encodeMessages
+        let! result = applyContextBudget plan backlogOps msgs [||]
         equal "applyContextBudget result length (should not have nudge)" 1 result.Length
     }
 
@@ -149,7 +157,7 @@ let testMuxCompactionTransform () =
 
         let output = createObj []
 
-        do! Wanxiangshu.Hosts.Mux.MessageTransform.compactingTransform deps runtimeScope backlogSession input output
+        do! Wanxiangshu.Hosts.Mux.CompactionTransform.compactingTransform deps runtimeScope backlogSession input output
 
         let messages = Wanxiangshu.Runtime.Dyn.get output "context" :?> obj array
         equal "Mux compacted length should be 1" 1 messages.Length
@@ -191,8 +199,13 @@ let testTryGetRealContextUsage () =
 
         check "tryGetRealContextUsage should return Some" getUsageOpt.IsSome
         let getUsage = getUsageOpt.Value
-        let! tokens = getUsage [||]
-        equal "tokens = input + cache.read = 54321" (Some 54321) tokens
+        let! tokens = getUsage ()
+
+        equal
+            "tokens = input + cache.read = 54321"
+            (Some "s-test-real-api", Some 54321L)
+            (tokens |> Option.map (fun observation -> observation.AssistantMessageID),
+             tokens |> Option.map (fun observation -> observation.InputTokens))
     }
 
 let testApplyContextBudgetBacklogContentChange () =
@@ -215,7 +228,15 @@ let testApplyContextBudgetBacklogContentChange () =
               SembleInjectEnabled = false
               Scope = scope
               MaxInputTokens = 100000
-              GetContextUsage = (fun _ -> Promise.lift (Some 35000)) }
+              ModelKey = "openai/gpt-4o:default"
+              LimitSource = "openai-session-model"
+              ObserveLatestUsage =
+                fun () ->
+                    Promise.lift (
+                        Some
+                            { AssistantMessageID = "test-35000"
+                              InputTokens = 35000L }
+                    ) }
 
         let backlog1 =
             [ { ahaMoments = "aha1"
@@ -241,14 +262,14 @@ let testApplyContextBudgetBacklogContentChange () =
         let messages = [ mkMsg "msg1" User [] ]
         let encoded = [| box "msg" |]
 
-        let! _ = applyContextBudget plan backlogOps messages encoded encodeMessages
+        let! _ = applyContextBudget plan backlogOps messages encoded
         let storeAfter1 = Wanxiangshu.Runtime.ContextBudgetStore.get scope sessionID
         equal "LastBacklog length should be 1" 1 storeAfter1.LastBacklog.Length
         equal "LastBacklog plan should be plan1" "plan1" storeAfter1.LastBacklog.[0].plan
 
         currentBacklog <- backlog2
 
-        let! _ = applyContextBudget plan backlogOps messages encoded encodeMessages
+        let! _ = applyContextBudget plan backlogOps messages encoded
         let storeAfter2 = Wanxiangshu.Runtime.ContextBudgetStore.get scope sessionID
         equal "LastBacklog plan after change should be plan2" "plan2" storeAfter2.LastBacklog.[0].plan
     }

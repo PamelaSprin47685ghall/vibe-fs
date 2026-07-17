@@ -5,6 +5,7 @@ open Fable.Core.JsInterop
 open Wanxiangshu.Kernel.HostTools
 open Wanxiangshu.Kernel.Messaging
 open Wanxiangshu.Runtime.Dyn
+open Wanxiangshu.Kernel.ContextBudget
 
 let utf8JsonBytes (value: obj) : int =
     emitJsExpr value "new TextEncoder().encode(JSON.stringify($0)).length"
@@ -133,7 +134,7 @@ let tryGetRealContextUsage
     (target: obj)
     (sessionID: string)
     (directory: string)
-    : (obj array -> JS.Promise<int option>) option =
+    : (unit -> JS.Promise<UsageObservation option>) option =
     if isNullish target then
         None
     else
@@ -145,8 +146,16 @@ let tryGetRealContextUsage
             if isNullish sessionApi || isNullish (get sessionApi "get") then
                 None
             else
-                Some(fun (_encoded: obj array) ->
-                    tryGetUsageFromSessionApi sessionApi sessionID directory)
+                Some(fun () ->
+                    promise {
+                        let! tokens = tryGetUsageFromSessionApi sessionApi sessionID directory
+
+                        return
+                            tokens
+                            |> Option.map (fun value ->
+                                { AssistantMessageID = sessionID
+                                  InputTokens = int64 value })
+                    })
 
 let resolveMaxInputTokens (targets: obj list) (sessionID: string) (directory: string) : JS.Promise<int> =
     ContextBudgetResolve.resolveMaxInputTokens targets sessionID directory

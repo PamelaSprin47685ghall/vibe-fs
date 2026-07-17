@@ -6,6 +6,53 @@ type UsageConfidence =
     | CalibratedEstimate
     | BootstrapEstimate
 
+type PendingOutbound = { Fingerprint: string; Bytes: int }
+
+type UsageCalibration =
+    { AssistantMessageID: string
+      InputTokens: int64
+      OutboundBytes: int }
+
+type UsageObservation =
+    { AssistantMessageID: string
+      InputTokens: int64 }
+
+let calibrateUsage (observation: UsageObservation) (outbound: PendingOutbound) : UsageCalibration option =
+    if observation.InputTokens > 0L && outbound.Bytes > 0 then
+        Some
+            { AssistantMessageID = observation.AssistantMessageID
+              InputTokens = observation.InputTokens
+              OutboundBytes = outbound.Bytes }
+    else
+        None
+
+let tryCalibrateFromObservation
+    (observation: UsageObservation)
+    (maybePriorID: string option)
+    (pendingOutbound: PendingOutbound option)
+    : UsageCalibration option =
+    // Accept only when observation has a non-empty ID that differs from prior,
+    // and both token count and outbound bytes are positive.
+    if
+        observation.AssistantMessageID = ""
+        || maybePriorID = Some observation.AssistantMessageID
+        || observation.InputTokens <= 0L
+    then
+        None
+    else
+        match pendingOutbound with
+        | Some po when po.Bytes > 0 -> calibrateUsage observation po
+        | _ -> None
+
+let estimateTokensFromCalibration (calibration: UsageCalibration) (bytes: int) : int64 option =
+    if calibration.OutboundBytes <= 0 || bytes <= 0 || calibration.InputTokens <= 0L then
+        None
+    else
+        Some(calibration.InputTokens * int64 bytes / int64 calibration.OutboundBytes)
+
+let bootstrapHardSafety (tokens: int64) (effectiveLimit: int64) : bool =
+    effectiveLimit > 0L && tokens * 4L >= effectiveLimit * 3L
+
 /// Nudge 触发所需的 todo anchor 数。foldAfterFirst=true 需 2 个 anchor
 /// 才缩减投影，foldAfterFirst=false 需 3 个。每次 anchor = 一次 todowrite
 /// 调用。Nudge 触发后 LLM 需连续 N 次 todowrite 才能让投影缩减上下文，

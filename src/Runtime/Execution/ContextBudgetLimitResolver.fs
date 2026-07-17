@@ -131,91 +131,7 @@ let tryGetSessionModelRef (target: obj) (sessionID: string) : JS.Promise<(string
                         return None
     }
 
-let tryGetModelLimitFromProviderListDetailed
-    (target: obj)
-    (modelId: string)
-    (providerId: string)
-    (directory: string)
-    : JS.Promise<LimitResolution option> =
-    promise {
-        if isNullish target then
-            return None
-        else
-            let providerApi = get target "provider"
 
-            if isNullish providerApi then
-                return None
-            else
-                let listFn = get providerApi "list"
-
-                if isNullish listFn || not (typeIs listFn "function") then
-                    return None
-                else
-                    try
-                        let listArg = createObj [ "directory", box directory ]
-
-                        let! res = unbox<JS.Promise<obj>> (providerApi?list (listArg))
-
-                        if isNullish res then
-                            return None
-                        else
-                            let data = get res "data"
-
-                            if isNullish data then
-                                return None
-                            else
-                                let allArr = get data "all"
-
-                                if isNullish allArr || not (isArray allArr) then
-                                    return None
-                                else
-                                    let providers = unbox<obj array> allArr
-
-                                    let provider =
-                                        providers |> Array.tryFind (fun p -> string (get p "id") = providerId)
-
-                                    match provider with
-                                    | None -> return None
-                                    | Some prov ->
-                                        let modelsObj = get prov "models"
-
-                                        if isNullish modelsObj then
-                                            return None
-                                        else
-                                            return extractLimitFromModelDetailed (get modelsObj modelId)
-                    with _ ->
-                        return None
-    }
-
-let tryGetModelLimitFromProviderList
-    (target: obj)
-    (modelId: string)
-    (providerId: string)
-    (directory: string)
-    : JS.Promise<int option> =
-    promise {
-        let! res = tryGetModelLimitFromProviderListDetailed target modelId providerId directory
-        return res |> Option.map valueOf
-    }
-
-let tryGetModelLimitFromProviderListForSession
-    (target: obj)
-    (modelObj: obj)
-    (sessionID: string)
-    (directory: string)
-    : JS.Promise<LimitResolution option> =
-    promise {
-        if isNullish modelObj then
-            return None
-        else
-            let mId = string (get modelObj "id")
-            let pId = string (get modelObj "providerID")
-
-            if mId = "" || pId = "" then
-                return None
-            else
-                return! tryGetModelLimitFromProviderListDetailed target mId pId directory
-    }
 
 let tryGetMaxInputTokensAsyncDetailed
     (target: obj)
@@ -253,8 +169,7 @@ let tryGetMaxInputTokensAsyncDetailed
 
                                 match extractLimitFromModelDetailed modelObj with
                                 | Some limit -> return Some limit
-                                | None ->
-                                    return! tryGetModelLimitFromProviderListForSession target modelObj sessionID directory
+                                | None -> return None
                     with _ ->
                         return None
     }

@@ -29,7 +29,9 @@ let spec_applyContextBudget_estimatesFromLastUsageWhenApiMissing () =
               SembleInjectEnabled = false
               Scope = scope
               MaxInputTokens = 150000
-              GetContextUsage = fun _ -> Promise.lift None }
+              ModelKey = "openai/gpt-4o:default"
+              LimitSource = "openai-session-model"
+              ObserveLatestUsage = fun () -> Promise.lift None }
 
         let backlogOps =
             { Host = opencode
@@ -67,7 +69,7 @@ let spec_applyContextBudget_estimatesFromLastUsageWhenApiMissing () =
 
         let encodeMessages (msgs: Message<obj> list) = msgs |> List.map box |> List.toArray
 
-        let! res = applyContextBudget plan backlogOps messages encoded encodeMessages
+        let! res = applyContextBudget plan backlogOps messages encoded
         equal "estimate path should inject nudge" 2 res.Length
         equal "nudge source" (Synthetic "context-budget-nudge-") (List.last res).source
     }
@@ -100,7 +102,21 @@ let spec_applyContextBudget_seedsLastUsageAfterLiveRead () =
               SembleInjectEnabled = false
               Scope = scope
               MaxInputTokens = 150000
-              GetContextUsage = getUsage }
+              ModelKey = "openai/gpt-4o:default"
+              LimitSource = "openai-session-model"
+              ObserveLatestUsage =
+                (fun () ->
+                    promise {
+                        getCalls <- getCalls + 1
+
+                        if getCalls = 1 then
+                            return
+                                Some
+                                    { AssistantMessageID = "test"
+                                      InputTokens = 80000L }
+                        else
+                            return None
+                    }) }
 
         let backlogOps =
             { Host = opencode
@@ -128,14 +144,14 @@ let spec_applyContextBudget_seedsLastUsageAfterLiveRead () =
 
         let encodeMessages (msgs: Message<obj> list) = msgs |> List.map box |> List.toArray
         let encoded1 = [| box "small" |]
-        let! _ = applyContextBudget plan backlogOps messages encoded1 encodeMessages
+        let! _ = applyContextBudget plan backlogOps messages encoded1
 
         let storeAfterLive = ContextBudgetStore.get scope sessionID
         check "LastUsage seeded after live read" storeAfterLive.LastUsage.IsSome
 
         let bigPayload = String.replicate 20000 "y"
         let encoded2 = [| box bigPayload |]
-        let! res2 = applyContextBudget plan backlogOps messages encoded2 encodeMessages
+        let! res2 = applyContextBudget plan backlogOps messages encoded2
         equal "second pass estimates from seeded ratio and may nudge" 2 res2.Length
     }
 
@@ -159,7 +175,15 @@ let spec_applyContextBudget_emptyBacklogInitialPhase_injects () =
               SembleInjectEnabled = false
               Scope = scope
               MaxInputTokens = 150000
-              GetContextUsage = fun _ -> Promise.lift (Some 120000) }
+              ModelKey = "openai/gpt-4o:default"
+              LimitSource = "openai-session-model"
+              ObserveLatestUsage =
+                fun () ->
+                    Promise.lift (
+                        Some
+                            { AssistantMessageID = "test"
+                              InputTokens = 120000L }
+                    ) }
 
         let backlogOps =
             { Host = opencode
@@ -184,7 +208,7 @@ let spec_applyContextBudget_emptyBacklogInitialPhase_injects () =
         let encoded = [| box "payload" |]
         let encodeMessages (msgs: Message<obj> list) = msgs |> List.map box |> List.toArray
 
-        let! res = applyContextBudget plan backlogOps messages encoded encodeMessages
+        let! res = applyContextBudget plan backlogOps messages encoded
         equal "empty backlog initial phase injects nudge at high usage" 1 res.Length
     }
 

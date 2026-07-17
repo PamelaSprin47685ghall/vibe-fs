@@ -5,9 +5,12 @@ open Fable.Core.JsInterop
 open Wanxiangshu.Kernel.ContextBudget
 open Wanxiangshu.Runtime.RuntimeScope
 open Wanxiangshu.Runtime.SerialStateHolder
+open Wanxiangshu.Runtime.ContextBudgetTrace
 
 type ContextBudgetEntry =
     { State: ContextState option
+      PendingOutbound: PendingOutbound option
+      LastCalibration: UsageCalibration option
       LastUsage:
           {| tokenCount: int
              textBytes: int
@@ -19,12 +22,16 @@ type ContextBudgetEntry =
       NudgeCount: int
       SignalTodoOrdinal: int option
       SignalTokens: int64 option
-      StableSyntheticNudgeID: string option }
+      StableSyntheticNudgeID: string option
+      LastObservedAssistantID: string option
+      LastTrace: DecisionTrace option }
 
 let private keyFor (sessionID: string) = "contextbudget_" + sessionID
 
 let private defaultEntry: ContextBudgetEntry =
     { State = None
+      PendingOutbound = None
+      LastCalibration = None
       LastUsage = None
       LastBacklog = []
       NudgeTrack = Idle
@@ -33,7 +40,9 @@ let private defaultEntry: ContextBudgetEntry =
       NudgeCount = 0
       SignalTodoOrdinal = None
       SignalTokens = None
-      StableSyntheticNudgeID = None }
+      StableSyntheticNudgeID = None
+      LastObservedAssistantID = None
+      LastTrace = None }
 
 let private getHolder (scope: RuntimeScope) (sessionID: string) : StateHolder<ContextBudgetEntry> =
     let key = keyFor sessionID

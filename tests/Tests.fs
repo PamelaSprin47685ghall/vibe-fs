@@ -156,7 +156,8 @@ let private allOtherTests: (string * TestBody) list =
         "ContextBudgetAfterTodoTests.run", TestBody.Async ContextBudgetAfterTodoTests.run
         "ContextBudgetIntegrationTests.run", TestBody.Async ContextBudgetIntegrationTests.run
         "ContextBudgetRealApiSpecs.run", TestBody.Async ContextBudgetRealApiSpecs.run
-        "ContextBudgetEstimateTests.run", TestBody.Async ContextBudgetEstimateTests.run ]
+        "ContextBudgetEstimateTests.run", TestBody.Async ContextBudgetEstimateTests.run
+        "ContextBudgetCalibrationTests.run", TestBody.Sync(sync ContextBudgetCalibrationTests.run) ]
     @ [ "IntegrationOpenCodeContractTests.run", TestBody.Async(fun () -> IntegrationOpencodeContractTests.runAll [||]) ]
     @ integrationToolFlatTests
 

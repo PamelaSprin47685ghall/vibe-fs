@@ -15,6 +15,7 @@ open Wanxiangshu.Hosts.Mux.WrappersReview
 open Wanxiangshu.Hosts.Mux.Wrappers
 open Wanxiangshu.Hosts.Mux.EventHook
 open Wanxiangshu.Hosts.Mux.SlashCommands
+open Wanxiangshu.Hosts.Mux.CompactionTransform
 open Wanxiangshu.Hosts.Mux.MessageTransform
 
 let createWrapperExecution (toolsObj: obj) (hostReadExec: HostFunctionCapture) (scope: RuntimeScope) : obj =

@@ -30,7 +30,15 @@ let spec_applyContextBudget_afterTodoResets () =
               SembleInjectEnabled = false
               Scope = scope
               MaxInputTokens = 200000
-              GetContextUsage = (fun _ -> Promise.lift (Some 20000)) }
+              ModelKey = "openai/gpt-4o:default"
+              LimitSource = "openai-session-model"
+              ObserveLatestUsage =
+                fun () ->
+                    Promise.lift (
+                        Some
+                            { AssistantMessageID = "test-20000"
+                              InputTokens = 20000L }
+                    ) }
 
         let backlogRef = ref ([]: BacklogEntry list)
 
@@ -71,7 +79,7 @@ let spec_applyContextBudget_afterTodoResets () =
                 source = Native
                 raw = null } ]
 
-        let! _res = applyContextBudget plan backlogOps messages [||] (fun _ -> [||])
+        let! _res = applyContextBudget plan backlogOps messages [||]
         let updatedStore = ContextBudgetStore.get scope "sess-after-todo"
         equal "last todo count updated" 1 updatedStore.LastBacklog.Length
         equal "nudge track reset after backlog change" Idle updatedStore.NudgeTrack
@@ -98,7 +106,15 @@ let spec_applyContextBudget_fiveConsecutiveTodos () =
               SembleInjectEnabled = false
               Scope = scope
               MaxInputTokens = int maxTokens
-              GetContextUsage = (fun _ -> Promise.lift (Some 120000)) }
+              ModelKey = "openai/gpt-4o:default"
+              LimitSource = "openai-session-model"
+              ObserveLatestUsage =
+                fun () ->
+                    Promise.lift (
+                        Some
+                            { AssistantMessageID = "test"
+                              InputTokens = 120000L }
+                    ) }
 
         let backlogRef = ref ([]: BacklogEntry list)
 
@@ -124,7 +140,13 @@ let spec_applyContextBudget_fiveConsecutiveTodos () =
 
             let planBelow =
                 { plan with
-                    GetContextUsage = (fun _ -> Promise.lift (Some(int belowTokens))) }
+                    ObserveLatestUsage =
+                        fun () ->
+                            Promise.lift (
+                                Some
+                                    { AssistantMessageID = "test"
+                                      InputTokens = belowTokens }
+                            ) }
 
             let messages =
                 [ { info =
@@ -140,7 +162,7 @@ let spec_applyContextBudget_fiveConsecutiveTodos () =
                     source = Native
                     raw = null } ]
 
-            let! resBelow = applyContextBudget planBelow backlogOps messages [||] (fun _ -> [||])
+            let! resBelow = applyContextBudget planBelow backlogOps messages [||]
             equal "no nudge below threshold" 1 resBelow.Length
 
             let triggerTokens = boundary + 5000L
@@ -148,9 +170,15 @@ let spec_applyContextBudget_fiveConsecutiveTodos () =
 
             let planTrigger =
                 { plan with
-                    GetContextUsage = (fun _ -> Promise.lift (Some(int triggerTokens))) }
+                    ObserveLatestUsage =
+                        fun () ->
+                            Promise.lift (
+                                Some
+                                    { AssistantMessageID = "test"
+                                      InputTokens = triggerTokens }
+                            ) }
 
-            let! resTrigger = applyContextBudget planTrigger backlogOps messages [||] (fun _ -> [||])
+            let! resTrigger = applyContextBudget planTrigger backlogOps messages [||]
             equal "nudge injected at threshold" 2 resTrigger.Length
 
             let newTodoEntry =
@@ -164,9 +192,15 @@ let spec_applyContextBudget_fiveConsecutiveTodos () =
 
             let lowPlan =
                 { plan with
-                    GetContextUsage = (fun _ -> Promise.lift (Some(int belowTokens))) }
+                    ObserveLatestUsage =
+                        fun () ->
+                            Promise.lift (
+                                Some
+                                    { AssistantMessageID = "test"
+                                      InputTokens = belowTokens }
+                            ) }
 
-            let! _resTodo = applyContextBudget lowPlan backlogOps messages [||] (fun _ -> [||])
+            let! _resTodo = applyContextBudget lowPlan backlogOps messages [||]
 
             let updatedStore = ContextBudgetStore.get scope sessionID
             equal "LastTodoCount updated" i updatedStore.LastBacklog.Length

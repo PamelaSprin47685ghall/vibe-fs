@@ -13,6 +13,7 @@ open Wanxiangshu.Runtime.MessageTransform.Pipeline
 open Wanxiangshu.Kernel.Messaging
 open Wanxiangshu.Kernel.HostTools
 open Wanxiangshu.Kernel.Methodology
+open Wanxiangshu.Kernel.ContextBudget
 open Wanxiangshu.Kernel.MessageTransformPolicy
 open Wanxiangshu.Runtime.PromptFrontMatter
 open Wanxiangshu.Hosts.Mux.MessagingCodec
@@ -33,9 +34,6 @@ open Wanxiangshu.Runtime.Dyn
 open Wanxiangshu.Runtime.ContextBudgetUsageCodec
 open Wanxiangshu.Hosts.Mux.MessageTransformCompaction
 
-let private maxInputTokensCache =
-    System.Collections.Generic.Dictionary<string, int>()
-
 let resolvePolicies (agent: string) (isChild: bool) =
     let bp =
         Wanxiangshu.Kernel.MessageTransformPolicy.getBacklogProjectionPolicy agent isChild
@@ -51,20 +49,10 @@ let resolvePolicies (agent: string) (isChild: bool) =
 
     bp, cp, pp, cb
 
-let fetchMaxInputTokens (sessionID: string) (deps: obj) (input: obj) (directory: string) =
-    promise {
-        match maxInputTokensCache.TryGetValue(sessionID) with
-        | true, limit -> return limit
-        | _ ->
-            let! limit = resolveMaxInputTokens [ deps; input ] sessionID directory
-            maxInputTokensCache.[sessionID] <- limit
-            return limit
-    }
-
 let resolveContextUsage (deps: obj) (sessionID: string) (directory: string) =
     match ContextBudgetUsageCodec.tryGetRealContextUsage deps sessionID directory with
     | Some f -> f
-    | None -> fun (_: obj array) -> Promise.lift None
+    | None -> fun () -> Promise.lift None
 
 let sanitizeMuxMessages (sessionID: string) (messagesArr: obj[]) = decodeMessages sessionID messagesArr
 
@@ -102,7 +90,7 @@ let private buildPlan
     (cleanedMessages: Message<obj> list)
     (backlogOps: BacklogSessionOps)
     (maxInputTokens: int)
-    (getContextUsage: obj array -> JS.Promise<int option>)
+    (observeUsage: unit -> JS.Promise<UsageObservation option>)
     : MessageTransformPlan =
     { SessionID = sessionID
       Agent = agent
@@ -122,7 +110,9 @@ let private buildPlan
       SembleInjectEnabled = false
       Scope = runtimeScope
       MaxInputTokens = maxInputTokens
-      GetContextUsage = getContextUsage }
+      ModelKey = "mux:host-unknown"
+      LimitSource = "mux:no-model-client"
+      ObserveLatestUsage = observeUsage }
 
 let applyTransformPipeline
     (deps: obj)
@@ -147,8 +137,8 @@ let applyTransformPipeline
         let backlogOps =
             backlogSessionOpsFrom backlogSession.Host (fun sid msgs -> backlogSession.GetOrRebuildBacklog(sid, msgs))
 
-        let! maxInputTokens = fetchMaxInputTokens sessionID deps input directory
-        let getContextUsage = resolveContextUsage deps sessionID directory
+        let! maxInputTokens = resolveMaxInputTokens [ deps; input ] sessionID directory
+        let observeUsage = resolveContextUsage deps sessionID directory
 
         let plan =
             buildPlan
@@ -165,7 +155,7 @@ let applyTransformPipeline
                 cleanedMessages
                 backlogOps
                 maxInputTokens
-                getContextUsage
+                observeUsage
 
         let buildCaps encoded capsFiles prelude =
             buildCapsMessages sessionID encoded capsFiles prelude
@@ -204,34 +194,4 @@ let messagesTransform
         | Some messagesArr ->
             let sessionID = decoded.SessionID
             do! applyTransformPipeline deps runtimeScope backlogSession reviewStore input decoded messagesArr sessionID
-    }
-
-let buildGuid = MessageTransformCompaction.buildGuid
-let readCompactionMetadata = MessageTransformCompaction.readCompactionMetadata
-let compactMessageBatch = MessageTransformCompaction.compactMessageBatch
-let buildCompactedResult = MessageTransformCompaction.buildCompactedResult
-
-let buildCompactedResultOutput =
-    MessageTransformCompaction.buildCompactedResultOutput
-
-let compactingTransform
-    (deps: obj)
-    (runtimeScope: Wanxiangshu.Runtime.RuntimeScope.RuntimeScope)
-    (backlogSession: BacklogSession)
-    (input: obj)
-    (output: obj)
-    : JS.Promise<unit> =
-    promise {
-        let decoded = decodeMuxMessagesTransformInput input deps
-        let directory = decoded.Directory
-        runtimeScope.TriggerInit(directory)
-        do! runtimeScope.WaitInit()
-        let messagesArr = compactMessageBatch input output
-
-        if messagesArr.Length > 0 then
-            let sessionID = decoded.SessionID
-            let cleaned = sanitizeMuxMessages sessionID messagesArr
-            let backlog = backlogSession.GetOrRebuildBacklog(sessionID, cleaned)
-            let! result = buildCompactedResult deps runtimeScope directory sessionID cleaned backlog
-            buildCompactedResultOutput result output
     }

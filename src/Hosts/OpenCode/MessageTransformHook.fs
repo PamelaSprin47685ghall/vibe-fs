@@ -28,12 +28,10 @@ open Wanxiangshu.Runtime.ChatTransformOutputCodec
 open Wanxiangshu.Runtime.HostMessageCodec
 open Wanxiangshu.Kernel.FallbackKernel.Types
 
+open Wanxiangshu.Hosts.Opencode.ModelKeyResolver
 open Wanxiangshu.Runtime.JsArrayMutate
 open Wanxiangshu.Hosts.Opencode.SembleInjection
 open Wanxiangshu.Hosts.Opencode.CompactionHook
-
-let private maxInputTokensCache =
-    System.Collections.Generic.Dictionary<string, int>()
 
 let private resolveSessionID (input: obj) (messagesList: Message<obj> list) : string =
     let sid1 = Dyn.str input "sessionID"
@@ -50,16 +48,7 @@ let private resolveSessionID (input: obj) (messagesList: Message<obj> list) : st
             if sid3 <> "" then sid3 else extractSessionID messagesList
 
 let private resolveMaxInputTokens (sessionID: string) (client: obj) (directory: string) : JS.Promise<int> =
-    match maxInputTokensCache.TryGetValue(sessionID) with
-    | true, limit -> Promise.lift limit
-    | _ ->
-        promise {
-            let! limit =
-                Wanxiangshu.Runtime.ContextBudgetUsageCodec.resolveMaxInputTokens [ client ] sessionID directory
-
-            maxInputTokensCache.[sessionID] <- limit
-            return limit
-        }
+    Wanxiangshu.Runtime.ContextBudgetUsageCodec.resolveMaxInputTokens [ client ] sessionID directory
 
 /// Build the BacklogSessionOps value for a host-messages-transform run.
 let private buildBacklogOps (backlogSession: BacklogSession) : BacklogSessionOps =
@@ -169,15 +158,21 @@ let private buildTransformPlan
     (runtimeScope: Wanxiangshu.Runtime.RuntimeScope.RuntimeScope)
     (maxInputTokens: int)
     (client: obj)
+    (modelKey: string)
+    (limitSource: string)
     : MessageTransformPlan =
+    let observeUsage () =
+        Wanxiangshu.Runtime.OpencodeContextBudgetObservation.tryObserveLatestUsage client sessionID directory
+        |> Promise.map (Option.map (fun observation -> observation))
+
     { SessionID = sessionID
       Agent = agent
       Directory = directory
       ProjectionPolicy =
-        (if p = BacklogProjectionPolicy.Include then
-             ProjectionPolicy.IncludeProjection
-         else
-             ProjectionPolicy.ExcludeProjection)
+        if p = BacklogProjectionPolicy.Include then
+            ProjectionPolicy.IncludeProjection
+        else
+            ProjectionPolicy.ExcludeProjection
       BacklogProjectionPolicy = p
       CapsInjectionPolicy = caps
       ParallelHintPolicy = par
@@ -188,8 +183,9 @@ let private buildTransformPlan
       SembleInjectEnabled = sembleInjectEnabled
       Scope = runtimeScope
       MaxInputTokens = maxInputTokens
-      GetContextUsage =
-        (fun encoded -> Wanxiangshu.Runtime.OpencodeContextBudgetObservation.tryCurrentUsage client sessionID encoded) }
+      ModelKey = modelKey
+      LimitSource = limitSource
+      ObserveLatestUsage = observeUsage }
 
 /// Resolve all transform parameters from raw input and return the plan,
 /// capsEpoch, and isSub flag.
@@ -214,6 +210,8 @@ let private resolveTransformParams
         let budget = getContextBudgetPolicy agent isSub
 
         let! maxInputTokens = resolveMaxInputTokens sessionID client directory
+        let! modelKey = resolveModelKey client sessionID
+        let limitSource = resolveLimitSource ()
 
         let sembleInjectEnabled =
             p = BacklogProjectionPolicy.Include
@@ -235,6 +233,8 @@ let private resolveTransformParams
                 runtimeScope
                 maxInputTokens
                 client
+                modelKey
+                limitSource
 
         return (plan, capsEpoch, isSub)
     }

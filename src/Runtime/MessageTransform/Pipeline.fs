@@ -62,7 +62,7 @@ let private encodeAndApplyBacklog
             |> List.takeWhile (fun message -> message.source <> Native)
             |> List.length
 
-        applyBacklogSlot (get scope sessionID) eventCount backlogSegmentLength encoded
+        encoded, get scope sessionID
     else
         encoded, get scope sessionID
 
@@ -89,13 +89,11 @@ let runMessageTransformPipeline
             let encodedBacklogSlot =
                 applyBacklogAndSave plan.Scope plan.SessionID eventCount afterBacklog encodedBacklog
 
-            let! afterBudget = applyContextBudget plan backlogOps afterBacklog encodedBacklogSlot encodeMessages
-
             let afterPrompt =
                 match plan.ParallelHintPolicy with
-                | Wanxiangshu.Kernel.MessageTransformPolicy.ParallelHintPolicy.Exclude -> afterBudget
+                | Wanxiangshu.Kernel.MessageTransformPolicy.ParallelHintPolicy.Exclude -> afterBacklog
                 | Wanxiangshu.Kernel.MessageTransformPolicy.ParallelHintPolicy.Include ->
-                    tryInjectParallelToolPrompt plan.SessionID afterBudget
+                    tryInjectParallelToolPrompt plan.SessionID afterBacklog
 
             let encodedAfterBacklogSlot, stateAfterReencode =
                 encodeAndApplyBacklog
@@ -107,7 +105,7 @@ let runMessageTransformPipeline
                     afterPrompt
                     encodeMessages
 
-            let topKey = computeTopSlotKey plan afterBacklog afterBudget afterPrompt
+            let topKey = computeTopSlotKey plan afterBacklog afterBacklog afterPrompt
 
             let encodedWithTopSlot, stateAfterTop =
                 applyTopSlot stateAfterReencode topKey encodedAfterBacklogSlot
@@ -115,5 +113,14 @@ let runMessageTransformPipeline
             set plan.Scope plan.SessionID stateAfterTop
 
             let! injected = injectFn plan.BacklogProjectionPolicy encodedWithTopSlot
-            return! prependCapsWithState plan.Scope plan.SessionID plan injected loadCaps buildCaps
+            let! withoutBudgetNudge = prependCapsWithState plan.Scope plan.SessionID plan injected loadCaps buildCaps
+            let! budgetedMessages = applyContextBudget plan backlogOps afterPrompt withoutBudgetNudge
+
+            let budgetNudge =
+                if budgetedMessages.Length > afterPrompt.Length then
+                    budgetedMessages |> List.skip afterPrompt.Length |> encodeMessages
+                else
+                    [||]
+
+            return Array.append withoutBudgetNudge budgetNudge
     }

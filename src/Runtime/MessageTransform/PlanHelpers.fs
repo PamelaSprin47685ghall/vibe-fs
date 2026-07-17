@@ -2,35 +2,17 @@ module Wanxiangshu.Runtime.MessageTransform.PlanHelpers
 
 open Wanxiangshu.Runtime
 open Wanxiangshu.Runtime.RuntimeScope
-open Wanxiangshu.Runtime.ContextBudgetStore
 open Wanxiangshu.Runtime.ContextBudgetUsageCodec
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Messaging
 open Wanxiangshu.Kernel.ContextBudget
-open Wanxiangshu.Kernel.HostTools
 open Wanxiangshu.Kernel.WorkBacklog
+open Wanxiangshu.Runtime.ContextBudgetStore
+open Wanxiangshu.Kernel.HostTools
+open Wanxiangshu.Kernel.Backlog.BacklogTypes
 open Wanxiangshu.Runtime.BacklogProjectionBuild
 open Wanxiangshu.Runtime.BacklogProjection
 open Fable.Core
-
-let contextBudgetNudgeText =
-    "Attention: the system context is about to be suspended. "
-    + "You must immediately force an emergency stop to all work "
-    + "and call the todowrite tool."
-
-let buildContextBudgetNudgeMessage (sessionID: string) (id: string) : Message<obj> =
-    { info =
-        { id = id
-          sessionID = sessionID
-          role = User
-          agent = "orchestrator"
-          isError = false
-          toolName = ""
-          details = null
-          time = null }
-      parts = [ TextPart contextBudgetNudgeText ]
-      source = Synthetic "context-budget-nudge-"
-      raw = null }
 
 let resolveCurrentTokens
     (totalBytes: int)
@@ -56,9 +38,34 @@ let resolveCurrentTokens
             let estimate = totalBytes / 2
             (max 1 estimate, UsageConfidence.BootstrapEstimate)
 
+let resolveCurrentTokensFromCalibration
+    (totalBytes: int)
+    (tokenCountOpt: int option)
+    (storeEntry: ContextBudgetEntry)
+    : int * UsageConfidence =
+    match storeEntry.LastCalibration with
+    | Some calibration ->
+        match estimateTokensFromCalibration calibration totalBytes with
+        | Some tokens when tokens > 0L -> int tokens, UsageConfidence.CalibratedEstimate
+        | _ ->
+            let estimate = max 1 (totalBytes / 2)
+            estimate, UsageConfidence.BootstrapEstimate
+    | None -> resolveCurrentTokens totalBytes tokenCountOpt storeEntry
+
+let stableProjectionBytes
+    (cleaned: Message<obj> list)
+    (backlogOpsHost: Host)
+    (backlogSessionID: string)
+    (backlog: BacklogEntry list)
+    (encodeMessages: Message<obj> list -> obj array)
+    : int =
+    projectBacklogFor backlogOpsHost cleaned backlog FoldStrategy.FoldAfterFirst backlogSessionID
+    |> encodeMessages
+    |> box
+    |> utf8JsonBytes
+
 let computeStableTokensAndPhaseState
     (sessionID: string)
-    (getContextUsage: obj array -> JS.Promise<int option>)
     (cleaned: Message<obj> list)
     (host: Host)
     (backlogOpsHost: Host)
@@ -75,21 +82,13 @@ let computeStableTokensAndPhaseState
 
         let stableEncoded = encodeMessages stableMessages
         let stableBytes = utf8JsonBytes (box stableEncoded)
-        let! stableTokensOpt = getContextUsage stableEncoded
-
-        let currentLastUsage =
-            (ContextBudgetStore.get scope sessionID).LastUsage
-            |> Option.map (fun u ->
-                {| tokenCount = u.tokenCount
-                   textBytes = u.textBytes |})
 
         let stableTokens =
-            match stableTokensOpt with
-            | Some t -> int64 t
-            | None ->
-                match estimateTokens stableBytes currentLastUsage with
-                | Some t -> int64 t
-                | None -> int64 currentTokens
+            match currentStore.LastCalibration with
+            | Some calibration ->
+                estimateTokensFromCalibration calibration stableBytes
+                |> Option.defaultValue (int64 (max 1 (stableBytes / 2)))
+            | None -> int64 currentTokens
 
         let backlogBytes =
             ContextBudgetUsageCodec.backlogBytesFromEncoded backlogOpsHost stableEncoded
@@ -115,7 +114,6 @@ let computeStableTokensAndPhaseState
 
 let rebuildPhaseState
     (sessionID: string)
-    (getContextUsage: obj array -> JS.Promise<int option>)
     (cleaned: Message<obj> list)
     (host: Host)
     (backlogOpsHost: Host)
@@ -135,7 +133,6 @@ let rebuildPhaseState
             let! stableTokens, newState =
                 computeStableTokensAndPhaseState
                     sessionID
-                    getContextUsage
                     cleaned
                     host
                     backlogOpsHost
@@ -163,61 +160,3 @@ let rebuildPhaseState
         else
             return currentStore.State.Value, false
     }
-
-let checkAndInjectNudge
-    (sessionID: string)
-    (maxInputTokens: int)
-    (contextBudgetPolicy: Wanxiangshu.Kernel.MessageTransformPolicy.ContextBudgetPolicy)
-    (scope: RuntimeScope)
-    (currentTokens: int)
-    (confidence: UsageConfidence)
-    (state: ContextState)
-    (messages: Message<obj> list)
-    (host: Host)
-    (storeEntry: ContextBudgetEntry)
-    : Message<obj> list =
-    if confidence = UsageConfidence.BootstrapEstimate then
-        messages
-    elif int64 currentTokens <= state.phaseBaseTokens then
-        messages
-    else
-        let completedTodoCount =
-            flatten messages
-            |> List.filter (fun fp -> isTodoResultFor host fp.part)
-            |> List.length
-
-        match classifyPressure maxInputTokens false (int64 currentTokens) state completedTodoCount with
-        | RequireTodoWriteEmergency when
-            contextBudgetPolicy = Wanxiangshu.Kernel.MessageTransformPolicy.ContextBudgetPolicy.Include
-            ->
-            let isSameEpisode =
-                storeEntry.NudgeTrack = EmergencySignaled
-                && storeEntry.SignalTodoOrdinal = Some completedTodoCount
-
-            if isSameEpisode then
-                let nudgeId =
-                    match storeEntry.StableSyntheticNudgeID with
-                    | Some id -> id
-                    | None -> "context-budget-nudge-" + System.Guid.NewGuid().ToString()
-
-                let nudgeMsg = buildContextBudgetNudgeMessage sessionID nudgeId
-                List.append messages [ nudgeMsg ]
-            else
-                let isMaxReached = storeEntry.NudgeCount >= 2
-
-                if isMaxReached then
-                    messages
-                else
-                    let stableId = "context-budget-nudge-" + System.Guid.NewGuid().ToString()
-
-                    ContextBudgetStore.update scope sessionID (fun entry ->
-                        { entry with
-                            NudgeTrack = EmergencySignaled
-                            NudgeCount = entry.NudgeCount + 1
-                            SignalTodoOrdinal = Some completedTodoCount
-                            SignalTokens = Some(int64 currentTokens)
-                            StableSyntheticNudgeID = Some stableId })
-
-                    let nudgeMsg = buildContextBudgetNudgeMessage sessionID stableId
-                    List.append messages [ nudgeMsg ]
-        | _ -> messages

@@ -89,6 +89,45 @@ let private sessionInputTokens (payload: obj) : int option =
     else
         Some(int (unbox<float> input))
 
+let private assertRound1 (sessionID: string) (cbHarness: Harness) (createEmptyFn: unit -> obj) : JS.Promise<unit> =
+    promise {
+        let! round1Session = withTimeout (cbHarness.getSession sessionID createEmptyFn)
+        let round1Input = sessionInputTokens (unbox<obj> round1Session)
+        chk "cb.round1.realTokenUsage" (round1Input |> Option.exists (fun tokens -> tokens > 0))
+        chk "cb.round1.tokenUsageAboveBudgetThreshold" (round1Input |> Option.exists (fun tokens -> tokens > 7500))
+
+        let! sessionResponse = withTimeout (cbHarness.getSession sessionID createEmptyFn)
+        let sessionBody = Dyn.get (unbox<obj> sessionResponse) "data"
+        let sessionModel = Dyn.get sessionBody "model"
+        equal "cb.sessionModelId" "test-model" (Dyn.str sessionModel "id")
+        equal "cb.sessionProviderId" "test" (Dyn.str sessionModel "providerID")
+
+        let! resolvedLimit =
+            withTimeout (resolveMaxInputTokens [ cbHarness.contextBudgetClient () ] sessionID cbHarness.workDir)
+
+        equal "cb.realContextInputLimitResolved" 20000 resolvedLimit
+    }
+
+let private assertRound2Usage (sessionID: string) (cbHarness: Harness) (createEmptyFn: unit -> obj) : JS.Promise<unit> =
+    promise {
+        let! beforeRound2Session = withTimeout (cbHarness.getSession sessionID createEmptyFn)
+        let beforeRound2Input = sessionInputTokens (unbox<obj> beforeRound2Session)
+        chk "cb.round2.realTokenUsageAboveThreshold" (beforeRound2Input |> Option.exists (fun tokens -> tokens > 7500))
+
+        let usageReader =
+            tryGetRealContextUsage (cbHarness.contextBudgetClient ()) sessionID cbHarness.workDir
+
+        let! resolvedUsage =
+            match usageReader with
+            | Some reader -> withTimeout (reader ())
+            | None -> Promise.lift None
+
+        chk
+            "cb.round2.contextUsageReaderAboveThreshold"
+            (resolvedUsage
+             |> Option.exists (fun observation -> observation.InputTokens > 7500L))
+    }
+
 /// Real-link e2e: opencode serve + wanxiangshu plugin + mock-llm.
 /// Event-driven: sendPrompt blocks until [DONE]; waitForNdjson is
 /// event-driven with 1000ms fail-fast. Every short await races 1s.
@@ -114,6 +153,9 @@ let run
         // --- Round 1: LLM calls official todowrite with full 5-report
         // payload -> ProgressObserver appends work_backlog_committed.
         cbHarness.mockLLM.expectTool "todowrite" (todowriteArgs [| todoItem "phase-reset repro" "in_progress" |])
+        cbHarness.mockLLM.expectText "ok"
+        cbHarness.mockLLM.expectText "ok"
+        cbHarness.mockLLM.expectText "ok"
 
         let! _prompt1 = withTimeout (cbHarness.sendPrompt sessionID "commit the first todo" createEmptyFn)
 
@@ -123,46 +165,9 @@ let run
         let! ndjson1 = withTimeout (cbHarness.readNdjson ())
         chk "cb.round1.eventKindPresent" (ndjson1.Contains "work_backlog_committed")
 
-        let! round1Session = withTimeout (cbHarness.getSession sessionID createEmptyFn)
-        let round1Input = sessionInputTokens (unbox<obj> round1Session)
-        chk "cb.round1.realTokenUsage" (round1Input |> Option.exists (fun tokens -> tokens > 0))
-        chk "cb.round1.tokenUsageAboveBudgetThreshold" (round1Input |> Option.exists (fun tokens -> tokens > 7500))
+        do! assertRound1 sessionID cbHarness createEmptyFn
 
-        let! sessionResponse = withTimeout (cbHarness.getSession sessionID createEmptyFn)
-        let sessionBody = Dyn.get (unbox<obj> sessionResponse) "data"
-        let sessionModel = Dyn.get sessionBody "model"
-        equal "cb.sessionModelId" "test-model" (Dyn.str sessionModel "id")
-        equal "cb.sessionProviderId" "test" (Dyn.str sessionModel "providerID")
-
-        let! resolvedLimit =
-            withTimeout (resolveMaxInputTokens [ cbHarness.contextBudgetClient () ] sessionID cbHarness.workDir)
-
-        equal "cb.realContextInputLimitResolved" 20000 resolvedLimit
-
-        let! directLimit =
-            withTimeout (
-                tryGetModelLimitFromProviderListDetailed
-                    (cbHarness.contextBudgetClient ())
-                    "test-model"
-                    "test"
-                    cbHarness.workDir
-            )
-
-        equal "cb.providerModelLimitResolved" (Some(InputLimit 20000)) directLimit
-
-        let! beforeRound2Session = withTimeout (cbHarness.getSession sessionID createEmptyFn)
-        let beforeRound2Input = sessionInputTokens (unbox<obj> beforeRound2Session)
-        chk "cb.round2.realTokenUsageAboveThreshold" (beforeRound2Input |> Option.exists (fun tokens -> tokens > 7500))
-
-        let usageReader =
-            tryGetRealContextUsage (cbHarness.contextBudgetClient ()) sessionID cbHarness.workDir
-
-        let! resolvedUsage =
-            match usageReader with
-            | Some reader -> withTimeout (reader [||])
-            | None -> Promise.lift None
-
-        chk "cb.round2.contextUsageReaderAboveThreshold" (resolvedUsage |> Option.exists (fun tokens -> tokens > 7500))
+        do! assertRound2Usage sessionID cbHarness createEmptyFn
 
         // --- Round 2: LLM plain text. Only change = new backlog entry.
         // rebuildPhaseState triggers phase reset. Bug: phaseBaseTokens was

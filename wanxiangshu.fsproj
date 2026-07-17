@@ -261,8 +261,10 @@
     <Compile Include="src/Runtime/Execution/ContextBudgetLimitResolver.fs"/>
     <Compile Include="src/Runtime/Execution/ContextBudgetResolve.fs"/>
     <Compile Include="src/Runtime/Execution/ContextBudgetUsageCodec.fs"/>
+    <Compile Include="src/Runtime/Execution/ContextBudgetTrace.fs"/>
     <Compile Include="src/Runtime/Messaging/OpencodeContextBudgetObservation.fs"/>
     <Compile Include="src/Runtime/Execution/ContextBudgetStore.fs"/>
+    <Compile Include="src/Runtime/MessageTransform/NudgeInject.fs"/>
     <Compile Include="src/Runtime/MessageTransform/PlanHelpers.fs"/>
     <Compile Include="src/Runtime/MessageTransform/Plan.fs"/>
     <Compile Include="src/Runtime/MessageTransform/Stack.fs"/>
@@ -401,6 +403,7 @@
     <Compile Include="src/Hosts/Mux/BacklogSession.fs"/>
     <Compile Include="src/Hosts/Mux/MessageTransformCompaction.fs"/>
     <Compile Include="src/Hosts/Mux/MessageTransform.fs"/>
+    <Compile Include="src/Hosts/Mux/CompactionTransform.fs"/>
     <Compile Include="src/Hosts/Mux/Fallback/Hook.fs"/>
     <Compile Include="src/Hosts/Mux/EventHook.fs"/>
     <Compile Include="src/Hosts/Mux/SlashCommands.fs"/>
@@ -436,6 +439,7 @@
     <Compile Include="src/Hosts/OpenCode/CompactionTransform.fs"/>
     <Compile Include="src/Hosts/OpenCode/SystemTransform.fs"/>
     <Compile Include="src/Hosts/OpenCode/CompactionHook.fs"/>
+    <Compile Include="src/Hosts/OpenCode/ModelKeyResolver.fs"/>
     <Compile Include="src/Hosts/OpenCode/SembleInjection.fs"/>
     <Compile Include="src/Hosts/OpenCode/MessageTransformHook.fs"/>
     <Compile Include="src/Hosts/OpenCode/HostField.fs"/>
@@ -840,10 +844,12 @@
     <Compile Include="tests/ContextBudgetSpecs.fs"/>
     <Compile Include="tests/ContextBudgetHookTests.fs"/>
     <Compile Include="tests/ContextBudgetEstimateTests.fs"/>
+    <Compile Include="tests/ContextBudgetCalibrationTests.fs"/>
     <Compile Include="tests/ContextBudgetNoReinjectTests.fs"/>
     <Compile Include="tests/ContextBudgetAfterTodoTests.fs"/>
     <Compile Include="tests/ContextBudgetRealApiSpecs.fs"/>
     <Compile Include="tests/ContextBudgetIntegrationTests.fs"/>
+    <Compile Include="tests/ContextBudgetPipelineNudgeTests.fs"/>
     <Compile Include="tests/TestRunnerBehaviorTests.fs"/>
     <Compile Include="tests/Tests.fs"/>
     <Compile Include="e2e/HarnessTypes.fs"/>

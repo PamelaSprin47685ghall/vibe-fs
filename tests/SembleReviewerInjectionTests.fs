@@ -115,7 +115,9 @@ let testAmendSkippedWhenSembleInjectEnabled () =
               SembleInjectEnabled = true
               Scope = Wanxiangshu.Runtime.RuntimeScope.create ()
               MaxInputTokens = 200000
-              GetContextUsage = (fun _ -> Promise.lift None) }
+              ModelKey = "openai/gpt-4o:default"
+              LimitSource = "openai-session-model"
+              ObserveLatestUsage = (fun () -> Promise.lift None) }
 
         let! res =
             runHostMessagesTransform
