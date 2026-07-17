@@ -84,7 +84,9 @@ let testCapsSlotReuse () =
               SembleInjectEnabled = false
               Scope = scope
               MaxInputTokens = 200000
-              GetContextUsage = (fun _ -> Promise.lift None) }
+              ModelKey = "openai/gpt-4o:default"
+              LimitSource = "openai-session-model"
+              ObserveLatestUsage = (fun () -> Promise.lift None) }
 
         let backlogOps =
             { Host = opencode
@@ -207,7 +209,9 @@ let testSingleToolCallPromptInjection () =
                   SembleInjectEnabled = false
                   Scope = Wanxiangshu.Runtime.RuntimeScope.create ()
                   MaxInputTokens = 200000
-                  GetContextUsage = (fun _ -> Promise.lift None) }
+                  ModelKey = "openai/gpt-4o:default"
+                  LimitSource = "openai-session-model"
+                  ObserveLatestUsage = (fun () -> Promise.lift None) }
 
             runHostMessagesTransform reviewStore sessionID plan backlogOps encodeMessages injectFn loadCaps buildCaps
 

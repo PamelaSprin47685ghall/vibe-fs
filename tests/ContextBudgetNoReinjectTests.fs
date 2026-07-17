@@ -28,7 +28,15 @@ let spec_applyContextBudget_reinjectWhenBudgetStillHot () =
               SembleInjectEnabled = false
               Scope = scope
               MaxInputTokens = 200000
-              GetContextUsage = (fun _ -> Promise.lift (Some 120000)) }
+              ModelKey = "openai/gpt-4o:default"
+              LimitSource = "openai-session-model"
+              ObserveLatestUsage =
+                fun () ->
+                    Promise.lift (
+                        Some
+                            { AssistantMessageID = "test"
+                              InputTokens = 120000L }
+                    ) }
 
         let backlogOps =
             { Host = opencode
@@ -57,7 +65,7 @@ let spec_applyContextBudget_reinjectWhenBudgetStillHot () =
                 source = Native
                 raw = null } ]
 
-        let! res = applyContextBudget plan backlogOps messages [||] (fun _ -> [||])
+        let! res = applyContextBudget plan backlogOps messages [||]
         equal "must reinject after prior round stripped synthetic nudge" 2 res.Length
         equal "nudge source" (Synthetic "context-budget-nudge-") (List.last res).source
     }

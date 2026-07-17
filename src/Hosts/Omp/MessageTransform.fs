@@ -24,13 +24,11 @@ open Wanxiangshu.Runtime.OmpCaps
 open Wanxiangshu.Runtime.ReviewRuntime
 open Wanxiangshu.Runtime.TreeSitterShell
 open Wanxiangshu.Runtime.RuntimeScope
+open Wanxiangshu.Kernel.ContextBudget
 
 module Dyn = Wanxiangshu.Runtime.Dyn
 
 let private defaultBacklogSession = BacklogSession omp
-
-let private maxInputTokensCache =
-    System.Collections.Generic.Dictionary<string, int>()
 
 let private resolveAgent (ctx: obj) : string =
     let sm = Dyn.get ctx "sessionManager"
@@ -42,15 +40,7 @@ let private resolveAgent (ctx: obj) : string =
         if name <> "" then name else "manager"
 
 let private resolveMaxInputTokens (sessionId: string) (cwd: string) (ctx: obj) : JS.Promise<int> =
-    match maxInputTokensCache.TryGetValue(sessionId) with
-    | true, limit -> Promise.lift limit
-    | _ ->
-        promise {
-            let! limit = Wanxiangshu.Runtime.ContextBudgetUsageCodec.resolveMaxInputTokens [ ctx ] sessionId cwd
-
-            maxInputTokensCache.[sessionId] <- limit
-            return limit
-        }
+    Wanxiangshu.Runtime.ContextBudgetUsageCodec.resolveMaxInputTokens [ ctx ] sessionId cwd
 
 let private createMessageTransformPlan
     (sessionId: string)
@@ -64,7 +54,7 @@ let private createMessageTransformPlan
     (messagesList: Message<obj> list)
     (entriesArr: obj array)
     (maxInputTokens: int)
-    (getContextUsage: obj array -> JS.Promise<int option>)
+    (observeUsage: unit -> JS.Promise<UsageObservation option>)
     : MessageTransformPlan =
     { SessionID = sessionId
       Agent = agent
@@ -84,7 +74,9 @@ let private createMessageTransformPlan
       SembleInjectEnabled = false
       Scope = ExecutorTools.ompScope
       MaxInputTokens = maxInputTokens
-      GetContextUsage = getContextUsage }
+      ObserveLatestUsage = observeUsage
+      ModelKey = "omp:host-unknown"
+      LimitSource = "omp:no-model-client" }
 
 let private buildLoadCapsFn (plan: MessageTransformPlan) (cwd: string) : unit -> JS.Promise<CapsFile list> =
     fun () ->
@@ -133,7 +125,7 @@ let private buildAndRunTransform
     (sessionId: string)
     (entriesArr: obj array)
     (agent: string)
-    (getContextUsage: obj array -> JS.Promise<int option>)
+    (observeUsage: unit -> JS.Promise<UsageObservation option>)
     (ctx: obj)
     : JS.Promise<obj array> =
     promise {
@@ -166,7 +158,7 @@ let private buildAndRunTransform
                 messagesList
                 entriesArr
                 maxInputTokens
-                getContextUsage
+                observeUsage
 
         let injectFn _ encoded = Promise.lift encoded
         let loadCaps = buildLoadCapsFn plan cwd
@@ -182,7 +174,7 @@ let transformEntriesAsyncWithAgent
     (sessionId: string)
     (entriesObj: obj)
     (agent: string)
-    (getContextUsage: obj array -> JS.Promise<int option>)
+    (observeUsage: unit -> JS.Promise<UsageObservation option>)
     (ctx: obj)
     : JS.Promise<obj array> =
     promise {
@@ -194,7 +186,7 @@ let transformEntriesAsyncWithAgent
             if entriesArr.Length = 0 then
                 return entriesArr
             else
-                return! buildAndRunTransform reviewStore cwd sessionId entriesArr agent getContextUsage ctx
+                return! buildAndRunTransform reviewStore cwd sessionId entriesArr agent observeUsage ctx
     }
 
 
@@ -210,7 +202,7 @@ let transformEntriesAsync
         sessionId
         entriesObj
         "manager"
-        (fun _ -> Promise.lift None)
+        (fun () -> Promise.lift None)
         (box null)
 
 let beforeAgentStart (_cwd: string) (systemPrompt: obj) : JS.Promise<obj> =
@@ -251,13 +243,13 @@ let registerContextTransform (pi: obj) (reviewStore: ReviewStore) : unit =
             if Dyn.isNullish entries then
                 return event
             else
-                let getContextUsage =
+                let observeUsage =
                     match Wanxiangshu.Runtime.ContextBudgetUsageCodec.tryGetRealContextUsage ctx sessionId cwd with
                     | Some f -> f
-                    | None -> fun _ -> Promise.lift None
+                    | None -> fun () -> Promise.lift None
 
                 let! transformed =
-                    transformEntriesAsyncWithAgent reviewStore cwd sessionId entries agent getContextUsage ctx
+                    transformEntriesAsyncWithAgent reviewStore cwd sessionId entries agent observeUsage ctx
 
                 event?entries <- transformed
                 return event
