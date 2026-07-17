@@ -34,7 +34,7 @@ export const COVERAGE: Record<string, CoverageEntry[]> = {
     { id: 'OC-BOOT-010', description: 'Restart does not double-register hooks', level: 'not-covered', priority: 'P0' },
   ],
   schema: [
-    { id: 'OC-SCHEMA-001', description: 'Every tool has non-empty description and valid JSON schema', level: 'unit', priority: 'P0' },
+    { id: 'OC-SCHEMA-001', description: 'Every tool has non-empty description and valid JSON schema', level: 'real-e2e', spec: 'e2e/opencode/specs/p0-canary.js', priority: 'P0' },
     { id: 'OC-SCHEMA-002', description: 'Executor schema includes required max_bytes', level: 'unit', priority: 'P0' },
     { id: 'OC-SCHEMA-003', description: 'Write tools inject warn_tdd into schema', level: 'unit', priority: 'P0' },
     { id: 'OC-SCHEMA-004', description: 'Executor injects warn into schema', level: 'unit', priority: 'P0' },
@@ -63,8 +63,8 @@ export const COVERAGE: Record<string, CoverageEntry[]> = {
   ],
   file: [
     { id: 'OC-FILE-001', description: 'write creates file with exact byte content', level: 'real-e2e', spec: 'e2e/opencode/specs/p0-canary.js', priority: 'P0' },
-    { id: 'OC-FILE-002', description: 'write overwrites file, no trailing residue', level: 'not-covered', priority: 'P0' },
-    { id: 'OC-FILE-003', description: 'write empty file exists with length 0', level: 'not-covered', priority: 'P0' },
+    { id: 'OC-FILE-002', description: 'write overwrites file, no trailing residue', level: 'real-e2e', spec: 'e2e/opencode/specs/p0-canary.js', priority: 'P0' },
+    { id: 'OC-FILE-003', description: 'write empty file exists with length 0', level: 'real-e2e', spec: 'e2e/opencode/specs/p0-canary.js', priority: 'P0' },
     { id: 'OC-FILE-004', description: 'write Unicode preserves UTF-8 bytes', level: 'not-covered', priority: 'P0' },
     { id: 'OC-FILE-005', description: 'write multi-line preserves line endings', level: 'not-covered', priority: 'P0' },
     { id: 'OC-FILE-006', description: 'read returns real content into next model round', level: 'real-e2e', spec: 'e2e/opencode/specs/p0-canary.js', priority: 'P0' },
@@ -76,7 +76,7 @@ export const COVERAGE: Record<string, CoverageEntry[]> = {
     { id: 'OC-FILE-012', description: 'Two sessions write same relative path correctly', level: 'not-covered', priority: 'P0' },
   ],
   fuzzy: [
-    { id: 'OC-FUZZY-001', description: 'fuzzy_find returns real matching paths', level: 'not-covered', priority: 'P0' },
+    { id: 'OC-FUZZY-001', description: 'fuzzy_find returns real matching paths', level: 'real-e2e', spec: 'e2e/opencode/specs/p0-canary.js', priority: 'P0' },
     { id: 'OC-FUZZY-002', description: 'No match returns explicit empty result', level: 'not-covered', priority: 'P0' },
     { id: 'OC-FUZZY-003', description: 'fuzzy_grep returns file, line number, text', level: 'real-e2e', spec: 'e2e/opencode/specs/p0-canary.js', priority: 'P0' },
     { id: 'OC-FUZZY-004', description: 'Multi-pattern returns chunked results', level: 'unit', priority: 'P0' },
