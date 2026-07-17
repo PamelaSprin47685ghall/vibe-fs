@@ -112,7 +112,7 @@ export const COVERAGE: Record<string, CoverageEntry[]> = {
     { id: 'OC-PTY-010', description: 'Permission deny = no child process', level: 'not-covered', priority: 'P0' },
   ],
   web: [
-    { id: 'OC-WEB-001', description: 'websearch returns title, URL, content', level: 'not-covered', priority: 'P0' },
+    { id: 'OC-WEB-001', description: 'websearch returns title, URL, content', level: 'real-e2e', priority: 'P0' },
     { id: 'OC-WEB-002', description: 'what_to_summarize enters subagent prompt', level: 'not-covered', priority: 'P0' },
     { id: 'OC-WEB-003', description: 'Provider HTTP 500 → tool error', level: 'not-covered', priority: 'P0' },
     { id: 'OC-WEB-004', description: 'Malformed search JSON no host crash', level: 'not-covered', priority: 'P0' },

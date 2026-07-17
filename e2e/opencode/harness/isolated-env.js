@@ -141,7 +141,7 @@ export function createIsolatedEnv(opts) {
     OPENCODE_DISABLE_MODELS_FETCH: '1',
     OPENCODE_AUTH_CONTENT: '{}',
     OPENCODE_EXPERIMENTAL_EVENT_SYSTEM: 'true',
-    OPENCODE_EXPERIMENTAL: 'true',
+    OPENCODE_ENABLE_EXA: 'true',
     OPENCODE_CONFIG_CONTENT: JSON.stringify(config),
     OPENCODE_PERMISSION: JSON.stringify({ '*': 'allow' }),
 
