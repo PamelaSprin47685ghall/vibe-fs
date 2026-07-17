@@ -26,6 +26,23 @@ open Wanxiangshu.Kernel.Primitives.Identity
 open Wanxiangshu.Kernel.Errors.DomainError
 open Wanxiangshu.Kernel.Session.Causality
 open Wanxiangshu.Runtime.Dyn
+open Wanxiangshu.Runtime.ToolSequenceThrottle
+
+/// Shared per-process tool sequence throttle for PTY read delay.
+let private toolSequenceThrottle = ToolSequenceThrottle()
+
+/// Apply PTY read throttle before executing the tool.
+let private applyPtyReadThrottle (tool: string) (nextArgs: obj) (sessionID: string) : JS.Promise<unit> =
+    promise {
+        let terminalId =
+            if tool = "pty_read" then
+                let id = Dyn.str nextArgs "id"
+                if id = "" then None else Some id
+            else
+                None
+
+        do! toolSequenceThrottle.BeforeExecution(sessionID, tool, terminalId)
+    }
 
 let private rewriteMimocodeApplyPatchArgsForExecute (output: obj) (input: obj) (args: obj) : unit =
     if toolNameFromHookInput input <> "apply_patch" then
@@ -117,6 +134,7 @@ let toolExecuteBeforeFor (host: Host) (input: obj) (output: obj) : JS.Promise<un
 
             ToolHookRuntime.saveCompliance sessionID toolCallID env
 
+            do! applyPtyReadThrottle tool nextArgs sessionID
 
             HookSchema.setUiLabel args tool
             HookSchema.setUiLabel nextArgs tool
