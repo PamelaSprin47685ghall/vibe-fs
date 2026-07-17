@@ -26,6 +26,7 @@ open Wanxiangshu.Tests.SubagentIteratorStoreTests
 open Wanxiangshu.Tests.NudgeRetryProgressTests
 open Wanxiangshu.Tests.NudgeTodoStatusTests
 open Wanxiangshu.Tests.NudgeEventSourcingTests
+open Wanxiangshu.Tests.OpencodeNudgeLifecycleTests
 open Wanxiangshu.Tests.ReviewSessionRegistryTests
 open Wanxiangshu.Tests.ReviewSessionQueryTests
 open Wanxiangshu.Tests.ReviewPromptsFormatTests
@@ -37,7 +38,7 @@ open Wanxiangshu.Tests.EventLogRuntimeTests
 open Wanxiangshu.Tests.EventLogRuntimeRobustnessTests
 open Wanxiangshu.Tests.TestsEntriesSessionLoop
 
-let coreTestEntries () : (string * TestBody) list =
+let private reviewBlock () : (string * TestBody) list =
     [ "ReviewTests.transition'", TestBody.Sync(sync ReviewTests.transition')
       "ReviewTests.registry", TestBody.Sync(sync ReviewTests.registry)
       "ReviewTests.resultMapping", TestBody.Sync(sync ReviewTests.resultMapping)
@@ -48,8 +49,10 @@ let coreTestEntries () : (string * TestBody) list =
       "ReviewTests.deactivateParentPreservesChildPending",
       TestBody.Sync(sync ReviewTests.deactivateParentPreservesChildPending)
       "ReviewTests.promptPartsBranches", TestBody.Sync(sync ReviewTests.promptPartsBranches)
-      "ReviewTests.resolvePendingClearsSuppressor", TestBody.Sync(sync ReviewTests.resolvePendingClearsSuppressor)
-      "ReviewSessionEffectsTests.emptyEffectsHasEmptyMaps",
+      "ReviewTests.resolvePendingClearsSuppressor", TestBody.Sync(sync ReviewTests.resolvePendingClearsSuppressor) ]
+
+let private reviewSessionBlock () : (string * TestBody) list =
+    [ "ReviewSessionEffectsTests.emptyEffectsHasEmptyMaps",
       TestBody.Sync(sync ReviewSessionEffectsTests.emptyEffectsHasEmptyMaps)
       "ReviewSessionEffectsTests.setPendingAddsEntry", TestBody.Sync(sync ReviewSessionEffectsTests.setPendingAddsEntry)
       "ReviewSessionEffectsTests.resolvePendingFiresCallback",
@@ -63,7 +66,10 @@ let coreTestEntries () : (string * TestBody) list =
       "ReviewSessionRegistryTests.run", TestBody.Sync(sync ReviewSessionRegistryTests.run)
       "ReviewSessionQueryTests.run", TestBody.Sync(sync ReviewSessionQueryTests.run)
       "ReviewPromptsFormatTests.run", TestBody.Sync(sync ReviewPromptsFormatTests.run)
-      "ReviewTests.disposeSessionTreeTerminatesAll",
+      "ReviewSessionStateMachineTests.run", TestBody.Sync(sync ReviewSessionStateMachineTests.run) ]
+
+let private replayBlock () : (string * TestBody) list =
+    [ "ReviewTests.disposeSessionTreeTerminatesAll",
       TestBody.Sync(sync ReviewTestsReplay.disposeSessionTreeTerminatesAll)
       "EventLogFoldTests.run", TestBody.Sync(sync EventLogFoldTests.run)
       "EventLogReviewLoopFoldTests.run", TestBody.Sync(sync EventLogReviewLoopFoldTests.run)
@@ -72,16 +78,20 @@ let coreTestEntries () : (string * TestBody) list =
       "EventLogRuntimeTests.run", TestBody.Async EventLogRuntimeTests.run
       "EventLogRuntimeRobustnessTests.run", TestBody.Async EventLogRuntimeRobustnessTests.run
       "ReviewTests.inferReviewTaskFromTexts'", TestBody.Sync(sync ReviewTestsReplay.inferReviewTaskFromTexts')
-      "ReviewTests.parseFrontMatterScalars'", TestBody.Sync(sync ReviewTestsReplay.parseFrontMatterScalars')
-      "KernelPromptSpecsReview.yamlFrontMatterRoundTrip",
+      "ReviewTests.parseFrontMatterScalars'", TestBody.Sync(sync ReviewTestsReplay.parseFrontMatterScalars') ]
+
+let private reviewPromptsBlock () : (string * TestBody) list =
+    [ "KernelPromptSpecsReview.yamlFrontMatterRoundTrip",
       TestBody.Sync(sync KernelPromptSpecsReview.yamlFrontMatterRoundTrip)
       "ReviewTests.doubleCheckAnchorReplay", TestBody.Sync(sync ReviewTestsPrompts.doubleCheckAnchorReplay)
       "ReviewTests.doubleCheckPromptFormat", TestBody.Sync(sync ReviewTestsPrompts.doubleCheckPromptFormat)
       "ReviewTests.reviewerPromptFormat", TestBody.Sync(sync ReviewTestsPrompts.reviewerPromptFormat)
       "ReviewTests.muxReviewerVerdictPromptFormat",
       TestBody.Sync(sync ReviewTestsPrompts.muxReviewerVerdictPromptFormat)
-      "ReviewTests.reviewInstructionsFrontMatter", TestBody.Sync(sync ReviewTestsPrompts.reviewInstructionsFrontMatter)
-      "AgentTests.canUse'", TestBody.Sync(sync AgentTests.canUse')
+      "ReviewTests.reviewInstructionsFrontMatter", TestBody.Sync(sync ReviewTestsPrompts.reviewInstructionsFrontMatter) ]
+
+let private agentAndNudgeBlock () : (string * TestBody) list =
+    [ "AgentTests.canUse'", TestBody.Sync(sync AgentTests.canUse')
       "AgentTests.canUseMatrix", TestBody.Sync(sync AgentTests.canUseMatrix)
       "AgentTests.deniedTools'", TestBody.Sync(sync AgentTests.deniedTools')
       "AgentNudgeSpecs.decision", TestBody.Sync(sync AgentNudgeSpecs.decision)
@@ -93,19 +103,24 @@ let coreTestEntries () : (string * TestBody) list =
       "AgentNudgeSpecs.submitReviewWipNudgeDedup", TestBody.Sync(sync AgentNudgeSpecsWip.submitReviewWipNudgeDedup)
       "AgentNudgeSpecs.decodeTodosOpenItems", TestBody.Sync(sync AgentNudgeSpecsDecode.decodeTodosOpenItems)
       "AgentNudgeSpecsWip.submitReviewWipNudgeDedup", TestBody.Sync(sync AgentNudgeSpecsWip.submitReviewWipNudgeDedup)
-      "AgentNudgeSpecsDecode.decodeTodosOpenItems", TestBody.Sync(sync AgentNudgeSpecsDecode.decodeTodosOpenItems)
-      "NudgeRetryProgressTests.run", TestBody.Sync(sync NudgeRetryProgressTests.run)
+      "AgentNudgeSpecsDecode.decodeTodosOpenItems", TestBody.Sync(sync AgentNudgeSpecsDecode.decodeTodosOpenItems) ]
+
+let private nudgeLifecycleBlock () : (string * TestBody) list =
+    [ "NudgeRetryProgressTests.run", TestBody.Sync(sync NudgeRetryProgressTests.run)
       "NudgeTodoStatusTests.run", TestBody.Sync(sync NudgeTodoStatusTests.run)
       "NudgeEventSourcingTests.run", TestBody.Sync(sync NudgeEventSourcingTests.run)
+      "OpencodeNudgeLifecycleTests.run", TestBody.Sync(sync OpencodeNudgeLifecycleTests.run)
+      "OpencodeNudgeLifecycleTests.runAsync", TestBody.Async OpencodeNudgeLifecycleTests.runAsync
       "KernelHelpersTests.run", TestBody.Sync(sync KernelHelpersTests.run)
-      "ReviewSessionStateMachineTests.run", TestBody.Sync(sync ReviewSessionStateMachineTests.run)
       "HostToolsTests.run", TestBody.Sync(sync HostToolsTests.run)
       "ToolPermissionTests.run", TestBody.Sync(sync ToolPermissionTests.run)
       "SubagentPromptsTests.run", TestBody.Sync(sync SubagentPromptsTests.run)
       "SubagentIntentsTests.run", TestBody.Sync(sync SubagentIntentsTests.run)
       "SubagentIteratorStoreTests.run", TestBody.Sync(sync SubagentIteratorStoreTests.run)
-      "SubagentDispatcherTests.run", TestBody.Async SubagentDispatcherTests.run
-      "KernelTests.headTail'", TestBody.Sync(sync KernelTests.headTail')
+      "SubagentDispatcherTests.run", TestBody.Async SubagentDispatcherTests.run ]
+
+let private kernelBlock () : (string * TestBody) list =
+    [ "KernelTests.headTail'", TestBody.Sync(sync KernelTests.headTail')
       "KernelTests.stripLexer'", TestBody.Sync(sync KernelTests.stripLexer')
       "KernelTests.jsBoundary'", TestBody.Sync(sync KernelTests.jsBoundary')
       "KernelTests.finishReason'", TestBody.Sync(sync KernelTests.finishReason')
@@ -130,6 +145,15 @@ let coreTestEntries () : (string * TestBody) list =
       "KernelPromptSpecs.executorSummarizerNoExitStatus",
       TestBody.Sync(sync KernelPromptSpecs.executorSummarizerNoExitStatus)
       "KernelPromptSpecs.domainErrorsShared", TestBody.Sync(sync KernelPromptSpecs.domainErrorsShared) ]
+
+let coreTestEntries () : (string * TestBody) list =
+    reviewBlock ()
+    @ reviewSessionBlock ()
+    @ replayBlock ()
+    @ reviewPromptsBlock ()
+    @ agentAndNudgeBlock ()
+    @ nudgeLifecycleBlock ()
+    @ kernelBlock ()
     @ sessionLoopTestEntries ()
     @ TestsEntriesCoreTail.tailCoreTestEntries ()
     @ TestsEntriesFallback.tailTestEntries ()

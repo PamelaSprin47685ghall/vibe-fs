@@ -200,6 +200,15 @@ let private sendNudge
     : JS.Promise<unit> =
     promise {
         let sidStr = Id.sessionIdValue sessionID
+        // The nonce must outlive the prompt() Promise: OpenCode's
+        // session.prompt is async and the actual chat.message hook fires
+        // after this function returns. Clearing in a finally would race
+        // with the hook and cause chat.message to misclassify the nudge
+        // as a new human turn. Consumption is deferred to the chat.message
+        // hook via FallbackRuntimeStore.TryConsumeActiveNudgeNonce, or
+        // to the next OnNewHumanMessage whose `beginHumanTurn` transition
+        // (SessionRuntime.fs) clears the field as part of the per-turn
+        // reset.
         fallbackRuntime.SetActiveNudgeNonce sidStr nonce
 
         let body =
@@ -212,11 +221,7 @@ let private sendNudge
 
         match getSessionApiFromClient client with
         | Error _ -> ()
-        | Ok session ->
-            try
-                do! invoke1 promptArg "prompt" session |> Promise.map ignore
-            finally
-                fallbackRuntime.ClearActiveNudgeNonce sidStr
+        | Ok session -> do! invoke1 promptArg "prompt" session |> Promise.map ignore
     }
 
 let private sendNudgeOutcome
