@@ -424,6 +424,7 @@
     <Compile Include="src/Hosts/OpenCode/Fallback/Coordinator.fs"/>
     <Compile Include="src/Hosts/OpenCode/Fallback/HostEventInspection.fs"/>
     <Compile Include="src/Hosts/OpenCode/NudgeTrigger.fs"/>
+    <Compile Include="src/Hosts/OpenCode/ChatHooksMessageIdDedup.fs"/>
     <Compile Include="src/Hosts/OpenCode/SessionLifecycleHumanTurn.fs"/>
     <Compile Include="src/Hosts/OpenCode/SessionLifecycleEvents.fs"/>
     <Compile Include="src/Hosts/OpenCode/SessionLifecycleObserver.fs"/>
@@ -444,7 +445,6 @@
     <Compile Include="src/Hosts/OpenCode/MimoTodoTool.fs"/>
     <Compile Include="src/Hosts/OpenCode/CommandHooks.fs"/>
     <Compile Include="src/Hosts/OpenCode/ChatHooksDecoders.fs"/>
-    <Compile Include="src/Hosts/OpenCode/ChatHooksMessageIdDedup.fs"/>
     <Compile Include="src/Hosts/OpenCode/ChatHooks.fs"/>
     <Compile Include="src/Hosts/OpenCode/ToolDefinitionHooks.fs"/>
     <Compile Include="src/Hosts/OpenCode/EventHooks.fs"/>

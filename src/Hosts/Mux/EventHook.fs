@@ -20,6 +20,7 @@ open Wanxiangshu.Runtime.SubsessionChildObserver
 open Wanxiangshu.Kernel.Subsession.Types
 open Wanxiangshu.Runtime.SubsessionActorRegistry
 open Wanxiangshu.Runtime.SubsessionEventStore
+open Wanxiangshu.Runtime.Dispatch
 
 type private DecodedHookEvent =
     { eventType: string
@@ -103,6 +104,19 @@ let private handleSessionClosed (directory: string) (workspaceId: string) (event
         do! eventStore.Append(sid, [ PhysicalSessionClosed sid ]) |> Promise.map ignore
         SubsessionActorRegistry.ClearPoison directory workspaceId
         SubsessionActorRegistry.Remove directory workspaceId
+
+        // S-07 fix: also tear down the per-session dispatch mailbox.
+        // Mux does not own its own mailbox yet (Phase 7: capacity
+        // downgrade to a single in-flight per physical session), so
+        // NotifySessionClosed is a best-effort no-op until the Mux
+        // per-session registry is wired in.
+        try
+            let ws =
+                Wanxiangshu.Kernel.Primitives.Identity.Id.workspaceIdQuick ("mux:" + workspaceId)
+
+            DispatchRegistry().NotifySessionClosed ws workspaceId
+        with _ ->
+            ()
     }
 
 // ---------------------------------------------------------------------------

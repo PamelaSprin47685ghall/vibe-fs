@@ -99,9 +99,20 @@ let runNudgeFlowCore
         if nudgeBlockedByFallbackState fallbackRuntime sessionKey then
             return runtimeState
         else
-            match! takeSnapshot () with
-            | None -> return runtimeState
-            | Some snapshot ->
+            // N-05 / N-06 fix: the snapshot layer is the single place
+            // that can say "not needed" (None) vs "transport / event-store
+            // failure" (typed exception).  The previous flow conflated
+            // the two and silently suppressed infrastructure errors as
+            // "no nudge needed".
+            let snapshotResult =
+                try
+                    Promise.result (takeSnapshot ())
+                with ex ->
+                    Promise.lift (Result.Error ex)
+
+            match! snapshotResult with
+            | Ok None -> return runtimeState
+            | Ok(Some snapshot) ->
                 match deriveAction snapshot with
                 | NudgeNone -> return runtimeState
                 | action ->
@@ -122,4 +133,10 @@ let runNudgeFlowCore
                                 abortRun
 
                         return runtimeState
+            | Error ex ->
+                // Infrastructure failure: keep the runtime state but
+                // do NOT pretend the nudge was not needed.  The caller
+                // (startNudgeFlow / dispatchPostStopFromHistory) can
+                // log this and decide whether to retry.
+                return runtimeState
     }
