@@ -85,7 +85,10 @@ let private refreshChildTurnEvidence
                             match buildTurnEvidence msgs (AnchorByUserMessageId messageId) with
                             | Ok evidence -> do! routeEvidence workspaceRoot sessionID evidence |> Promise.map ignore
                             | Error _ -> ()
-                        | None -> ()
+                        | None ->
+                            match tryBuildLatestAssistantEvidence msgs with
+                            | Some evidence -> do! routeEvidence workspaceRoot sessionID evidence |> Promise.map ignore
+                            | None -> ()
                     | None -> ()
                 | None -> ()
         with _ ->

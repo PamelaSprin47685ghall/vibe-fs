@@ -399,6 +399,7 @@
     <Compile Include="src/Hosts/Mux/MessagingCodec.fs"/>
     <Compile Include="src/Hosts/Mux/CapsCodec.fs"/>
     <Compile Include="src/Hosts/Mux/BacklogSession.fs"/>
+    <Compile Include="src/Hosts/Mux/MessageTransformCompaction.fs"/>
     <Compile Include="src/Hosts/Mux/MessageTransform.fs"/>
     <Compile Include="src/Hosts/Mux/Fallback/Hook.fs"/>
     <Compile Include="src/Hosts/Mux/EventHook.fs"/>

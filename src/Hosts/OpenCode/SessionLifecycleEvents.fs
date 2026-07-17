@@ -3,8 +3,9 @@ module Wanxiangshu.Hosts.Opencode.SessionLifecycleEvents
 open Fable.Core
 open Wanxiangshu.Kernel.FallbackKernel.Types
 open Wanxiangshu.Runtime.Dyn
-open Wanxiangshu.Runtime.OpencodeHookInputCodec
+open Wanxiangshu.Runtime.SubsessionEventRouter
 open Wanxiangshu.Runtime.OpencodeHostEvent
+open Wanxiangshu.Runtime.OpencodeHookInputCodec
 open Wanxiangshu.Runtime.ToolRuntimeContext
 open Wanxiangshu.Runtime.Fallback.RuntimeStore
 open Wanxiangshu.Runtime.Fallback.GateFlagTransitions
@@ -85,6 +86,69 @@ let private handleMessageUpdated (fallbackRuntime: FallbackRuntimeStore) (sid: s
                 if currentOwner = SessionOwner.Compaction && fallbackRuntime.IsCompacted sid then
                     fallbackRuntime.SetCompactionContinuationObserved(sid, true)
 
+/// Process the event-envelope match body: route idle + keep existing handlers.
+let private processEventEnvelope
+    (ctx: obj)
+    (fallbackRuntime: FallbackRuntimeStore)
+    (sid: string)
+    (eventEnvelope: HostEventEnvelope option)
+    : JS.Promise<unit> =
+    promise {
+        match eventEnvelope with
+        | Some { EventType = "session.status"
+                 Props = props } ->
+            let statusObj = get props "status"
+            let agentName = str statusObj "agent"
+            let sid2 = getSessionID "session.status" props
+
+            if sid2 <> "" then
+                handleSessionStatus fallbackRuntime sid2 statusObj agentName
+
+                let statusVal = resolveStatusValue statusObj
+
+                if statusVal = "busy" then
+                    let state = fallbackRuntime.GetOrCreateState sid2
+
+                    if state.Lifecycle = FallbackLifecycle.TaskComplete then
+                        fallbackRuntime.Update(
+                            sid2,
+                            fun session ->
+                                { session with
+                                    Core =
+                                        { session.Core with
+                                            Lifecycle = FallbackLifecycle.Active } }
+                        )
+
+        | Some { EventType = "session.idle"
+                 Props = _props } -> ()
+
+        | Some { EventType = "session.compacted"
+                 Props = props } ->
+            let sid2 = getSessionID "session.compacted" props
+
+            if sid2 <> "" then
+                do! handleSessionCompacted ctx fallbackRuntime sid2
+
+        | Some { EventType = "message.updated"
+                 Props = props } ->
+            let sid2 = getSessionID "message.updated" props
+
+            if sid2 <> "" then
+                handleMessageUpdated fallbackRuntime sid2 props
+
+        | _ -> ()
+    }
+
+/// True when the envelope is a session.idle or a session.status whose value is "idle".
+let private isIdleEnvelope (env: HostEventEnvelope) =
+    if env.EventType = "session.idle" then
+        true
+    elif env.EventType = "session.status" then
+        let statusObj = get env.Props "status"
+        not (isNullish statusObj) && resolveStatusValue statusObj = "idle"
+    else
+        false
+
 /// Host event fan-out: session.status / compacted / message.updated + fallback/nudge.
 let handleEvent
     (ctx: obj)
@@ -105,31 +169,7 @@ let handleEvent
             fallbackRuntime.SetEventHandlingActive sid true
 
         try
-            match eventEnvelope with
-            | Some { EventType = "session.status"
-                     Props = props } ->
-                let statusObj = get props "status"
-                let agentName = str statusObj "agent"
-                let sid = getSessionID "session.status" props
-
-                if sid <> "" then
-                    handleSessionStatus fallbackRuntime sid statusObj agentName
-
-            | Some { EventType = "session.compacted"
-                     Props = props } ->
-                let sid = getSessionID "session.compacted" props
-
-                if sid <> "" then
-                    do! handleSessionCompacted ctx fallbackRuntime sid
-
-            | Some { EventType = "message.updated"
-                     Props = props } ->
-                let sid = getSessionID "message.updated" props
-
-                if sid <> "" then
-                    handleMessageUpdated fallbackRuntime sid props
-
-            | _ -> ()
+            do! processEventEnvelope ctx fallbackRuntime sid eventEnvelope
 
             fallback.UpdateBusyCount eventEnvelope
             do! nudge.TrackLifetimeEvents eventEnvelope
@@ -140,6 +180,9 @@ let handleEvent
                 return ()
             else
                 do! nudge.HandleNaturalStop eventEnvelope
+
+                if Option.exists isIdleEnvelope eventEnvelope then
+                    do! tryIdle (pluginDirectoryFromCtx ctx) sid |> Promise.map ignore
         finally
             if sid <> "" then
                 fallbackRuntime.SetEventHandlingActive sid false

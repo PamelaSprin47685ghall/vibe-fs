@@ -127,15 +127,14 @@ type ProgressObserver
                     let directory =
                         (fromOpencode input (pluginDirectoryFromCtx ctx)).Execution.Directory
 
-                    let! routed = SubsessionEventRouter.routeEvidence directory sid evidence
+                    let! _ = SubsessionEventRouter.routeEvidence directory sid evidence
 
-                    if not routed then
-                        let st = fallbackRuntime.GetOrCreateState sid
+                    let st = fallbackRuntime.GetOrCreateState sid
 
-                        fallbackRuntime.UpdateState
-                            sid
-                            { st with
-                                Lifecycle = FallbackLifecycle.TaskComplete }
+                    fallbackRuntime.UpdateState
+                        sid
+                        { st with
+                            Lifecycle = FallbackLifecycle.TaskComplete }
             elif tool = "submit_review" then
                 match hookOutputString output with
                 | Some text when isSubmitReviewWipProgressOutput text -> ()

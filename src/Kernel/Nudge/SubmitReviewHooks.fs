@@ -33,11 +33,11 @@ let private parseFrontMatterScalars (text: string) : Map<string, string> =
         result
 
 /// The YAML key used to mark WIP acknowledgment.
-/// Must match Wanxiangshu.Runtime.ReviewPrompts.Format.wipAcknowledgmentAnchor.
+/// Must match the corresponding field in the Runtime prompt builder.
 let private wipAcknowledgmentAnchor = "review_progress"
 
 /// The expected value for WIP acknowledgment.
-/// Must match Wanxiangshu.Runtime.ReviewPrompts.Format.wipAcknowledgmentRecorded.
+/// Must match the corresponding field in the Runtime prompt builder.
 let private wipAcknowledgmentRecorded = "recorded"
 
 let isSubmitReviewWipProgressOutput (text: string) : bool =

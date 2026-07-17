@@ -115,7 +115,7 @@ class OpencodePluginHarness {
     if (!entry.execute) throw new Error(`tool ${name} has no execute function`);
     const sess = extraCtx.sessionID || this.sessionId;
     const ctx = {
-      directory: this.getSandboxDir(sess),
+      directory: this.workDir,
       sessionID: sess,
       agent: 'build',
       ...extraCtx,

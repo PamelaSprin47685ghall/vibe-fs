@@ -131,21 +131,14 @@ let run
 
         let spawnP = harness.executePluginTool "investigator" spawnArgs (createEmpty ())
         do! withTimeout firstPromptSeen
+        do! yieldMicrotask ()
+        do! sleep 20
 
         let taskCompleteInput =
             createObj
                 [ "tool", box "task_complete"
                   "sessionID", box childID
-                  "args", box (createObj []) ]
-
-        let! _ =
-            withTimeout (
-                harness.runLifecycleHook "tool.execute.after" taskCompleteInput (createObj [ "output", box "done" ])
-            )
-
-        let! spawnOutput = withTimeout spawnP
-        let iterator = iteratorFromOutput spawnOutput
-        check "continue e2e spawn returns iterator" iterator.IsSome
+                  "args", box (createObj [ "output", box "done" ]) ]
 
         let statusEvent =
             createObj
@@ -167,7 +160,16 @@ let run
                             ) ]
                   ) ]
 
+        let! _ =
+            withTimeout (
+                harness.runLifecycleHook "tool.execute.after" taskCompleteInput (createObj [ "output", box "done" ])
+            )
+
         let! _ = withTimeout (harness.fireEvent statusEvent)
+
+        let! spawnOutput = withTimeout spawnP
+        let iterator = iteratorFromOutput spawnOutput
+        check "continue e2e spawn returns iterator" iterator.IsSome
 
         match iterator with
         | None -> failwith "spawn did not return an iterator"
@@ -213,17 +215,26 @@ let run
 
             let! _ = withTimeout (harness.fireEvent errorEvent)
 
+            let! _ = withTimeout (harness.fireEvent statusEvent)
+
             do! withTimeout recoveryPromptSeen
-            check "continue does not extract before task completion" (finalExtractionCalls.Value = 0)
+            do! yieldMicrotask ()
+            do! sleep 20
+            equal "continue does not extract before task completion" 0 finalExtractionCalls.Value
 
             let! _ =
                 withTimeout (
                     harness.runLifecycleHook "tool.execute.after" taskCompleteInput (createObj [ "output", box "done" ])
                 )
 
+            do! yieldMicrotask ()
+            do! sleep 20
+
+            let! _ = withTimeout (harness.fireEvent statusEvent)
+
             let! continueOutput = withTimeout continueP
             check "continue extracts after task completion" (finalExtractionCalls.Value > 0)
-            check "continue returns final child output" (continueOutput.Contains "continue final output")
+            equal "continue returns final child output" true (continueOutput.Contains "continue final output")
 
         do! withTimeoutCustom 4900 (harness.dispose ())
     }

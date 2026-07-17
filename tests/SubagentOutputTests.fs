@@ -84,9 +84,44 @@ let mergeAssistantSnapshotNonEmptyOverwritesStreaming () =
     | AssistantSnapshot(_, _, text, _) -> equal "refresh non-empty text wins" "full final text" text
     | other -> fail ("expected AssistantSnapshot, got " + string other)
 
+// ── classifyTurnEvidence: CompletionRequested must yield to non-empty assistant text ──
+
+/// When task_complete fires CompletionRequested "tool marker" but the session
+/// idle refresh already captured a real assistant snapshot, the final output must
+/// be the assistant text — not the tool marker.  This is the root cause of
+/// `continue returns final child output` failures: classifyTurnEvidence matches
+/// CompletionRequested first and discards the assistant text unconditionally.
+let completionRequestedWithAssistantTextReturnsAssistantText () =
+    let evidence =
+        { CurrentTurnEvidence.empty with
+            Outcome = CompletionRequested "tool marker"
+            Assistant = AssistantSnapshot("", 0L, "final assistant output", Some NormalFinish)
+            Todos = TodosNotCompleted }
+
+    match classifyTurnEvidence evidence with
+    | CompleteNaturally output ->
+        check "CompletionRequested must yield to assistant text" (output <> "tool marker")
+        equal "output is assistant text, not tool marker" "final assistant output" output
+    | other -> fail ("expected CompleteNaturally from assistant text, got " + string other)
+
+/// When CompletionRequested fires with no assistant text, the original tool
+/// marker is the correct fallback.
+let completionRequestedWithoutAssistantTextReturnsMarker () =
+    let evidence =
+        { CurrentTurnEvidence.empty with
+            Outcome = CompletionRequested "tool marker"
+            Assistant = NoAssistant
+            Todos = TodosNotCompleted }
+
+    match classifyTurnEvidence evidence with
+    | CompleteNaturally output -> equal "fallback to tool marker" "tool marker" output
+    | other -> fail ("expected CompleteNaturally fallback, got " + string other)
+
 let run () =
     todosCompletedWithAssistantTextReturnsText ()
     todosCompletedWithoutAssistantTextReturnsEmpty ()
     todosCompletedWithEmptyAssistantReturnsEmpty ()
+    completionRequestedWithAssistantTextReturnsAssistantText ()
+    completionRequestedWithoutAssistantTextReturnsMarker ()
     mergeAssistantSnapshotEmptyDoesNotOverwriteRealText ()
     mergeAssistantSnapshotNonEmptyOverwritesStreaming ()

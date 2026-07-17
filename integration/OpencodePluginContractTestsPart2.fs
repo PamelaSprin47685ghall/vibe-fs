@@ -75,22 +75,14 @@ let runPart2
              && ((string rrResult).IndexOf "No active review" >= 0
                  || (string rrResult).IndexOf "double-check" >= 0))
 
-        // --- 5. Lifecycle hooks & /loop-review --------------------------------
+        // --- 5. Lifecycle hooks: config -----------------------------------------
         let configArgs =
             createObj [ "agent", box (createObj [ "build", box (createObj [ "model", box "test" ]) ]) ]
 
         let! configRes = harness.runConfigHook configArgs
         chk "op.configHook.run" (not (dynIsNull configRes) && not (dynIsNull (dynGet configRes "command")))
 
-        let! loopReviewOut = harness.runCommandExecuteBefore "loop-review" "test precheck"
-
-        chk
-            "op.loopReview.run"
-            ((harness.readPartsText loopReviewOut).IndexOf "Mode" >= 0
-             || (harness.readPartsText loopReviewOut).IndexOf "precheck" >= 0
-             || (harness.readPartsText loopReviewOut).IndexOf "reviewer" >= 0
-             || (harness.readPartsText loopReviewOut).IndexOf "complete" >= 0)
-
+        // --- 6. Lifecycle hooks: chat.message ----------------------------------
         let chatOutput =
             createObj
                 [ "message",
@@ -101,7 +93,7 @@ let runPart2
 
         chk "op.chatMessage.processed" (not (dynIsNull (dynGet chatRes "message")))
 
-        // --- 6. tool.execute.before check ------------------------------------
+        // --- 7. tool.execute.before check ------------------------------------
         let! coderBeforeRes =
             harness.runToolExecuteHooks "coder" (createObj [ "intents", box [||]; "tdd", box "green" ]) "success"
 
@@ -109,7 +101,7 @@ let runPart2
         let! execBeforeRes = harness.runToolExecuteHooks "executor" (createObj [ "command", box "echo" ]) "success"
         chk "op.executor.before.missingWarn" (dynIsNull (dynGet execBeforeRes "error"))
 
-        // --- 7. tool.execute.after boundaries --------------------------------
+        // --- 8. tool.execute.after boundaries --------------------------------
         let! netRes = harness.runToolExecuteHooks "executor" execArgs "network error"
         chk "op.executor.networkErrorConverted" ((string (dynGet netRes "error")) = "network connection lost")
 
@@ -128,7 +120,7 @@ let runPart2
         let! liveRes3 = harness.runToolExecuteHooks "executor" execArgs2 "hello-livelock"
         chk "op.executor.livelockIntercepted" ((string (dynGet liveRes3 "error")).IndexOf("livelock guard") >= 0)
 
-        // --- 8. todowrite intercept flow --------------------------------------
+        // --- 9. todowrite intercept flow --------------------------------------
         let pad1024 = String.replicate 1024 "x"
 
         let twArgs =

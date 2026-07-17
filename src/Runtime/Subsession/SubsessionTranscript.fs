@@ -47,6 +47,41 @@ let private findAnchorIndex (msgs: obj array) (anchor: TurnAnchor) : Result<int,
         | Some idx -> Ok idx
         | None -> Error { TranscriptReadFailure.Message = "No user message found to anchor turn marker" }
 
+/// Fallback: build evidence from the latest assistant message when no anchor
+/// is available (e.g. idle refresh on a session whose messages lack the
+/// current-turn nonce / user anchor). Returns None when the messages array is
+/// empty or the last assistant has no non-empty text.
+let tryBuildLatestAssistantEvidence (msgs: obj array) : CurrentTurnEvidence option =
+    if isNull msgs || msgs.Length = 0 then
+        None
+    else
+        msgs
+        |> Array.tryFindBack (fun msg ->
+            let info = Dyn.get msg "info"
+            not (Dyn.isNullish info) && Dyn.str info "role" = "assistant")
+        |> Option.bind (fun assistantMsg ->
+            let parts = Dyn.get assistantMsg "parts"
+
+            if not (Dyn.isArray parts) then
+                None
+            else
+                let text =
+                    (parts :?> obj array)
+                    |> Array.choose (fun p ->
+                        if Dyn.str p "type" = "text" then
+                            let t = Dyn.str p "text"
+                            if t <> "" then Some t else None
+                        else
+                            None)
+                    |> String.concat "\n"
+
+                if text = "" then
+                    None
+                else
+                    Some
+                        { CurrentTurnEvidence.empty with
+                            Assistant = AssistantSnapshot("", 0L, text, Some NormalFinish) })
+
 /// Build CurrentTurnEvidence from messages sliced after the anchor.
 /// Only analyzes messages at or after the anchor index.
 let buildTurnEvidence (msgs: obj array) (anchor: TurnAnchor) : Result<CurrentTurnEvidence, TranscriptReadFailure> =

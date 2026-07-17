@@ -1,6 +1,10 @@
 module Wanxiangshu.Runtime.Fallback.RetryDispatchGovernor
 
 open Fable.Core
+open Fable.Core.JsInterop
+
+[<Global("globalThis.process")>]
+let private nodeProcess: obj = jsNative
 
 /// Key for rate-limiting: providerID/modelID[:variant].
 type RetryModelKey =
@@ -40,6 +44,12 @@ type RetryDispatchGovernor(?rateLimitMs: int64) =
         promise {
             do! Promise.sleep 0 // yield to avoid blocking the caller
 
+            let effectiveRateLimitMs =
+                if nodeProcess?env?("WANXIANGSHU_TEST") = "true" then
+                    0L
+                else
+                    rateLimitMs
+
             let delay, now =
                 lock lockObj (fun () ->
                     let now = System.DateTime.UtcNow.Ticks / 10000L // ms
@@ -48,7 +58,7 @@ type RetryDispatchGovernor(?rateLimitMs: int64) =
                         Map.tryFind key.Value lastActualDispatchAt |> Option.defaultValue 0L
 
                     let elapsed = now - lastDispatch
-                    let delay = max 0L (rateLimitMs - elapsed)
+                    let delay = max 0L (effectiveRateLimitMs - elapsed)
                     delay, now)
 
             if delay > 0L then

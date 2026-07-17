@@ -18,7 +18,11 @@ let private emptyTurnPrompt = "\u200B"
 /// This is the primary path — only analyzes messages from the current turn.
 let classifyTurnEvidence (evidence: CurrentTurnEvidence) : TranscriptDecision =
     match evidence.Outcome with
-    | CompletionRequested output -> CompleteNaturally output
+    | CompletionRequested output ->
+        match evidence.Assistant with
+        | AssistantSnapshot(_, _, text, _)
+        | AssistantDelta(_, _, text, _) when not (System.String.IsNullOrWhiteSpace text) -> CompleteNaturally text
+        | _ -> CompleteNaturally output
     | FailureObserved err -> IncompleteWithoutRecovery err.Message
     | NoOutcome ->
         match evidence.Todos with

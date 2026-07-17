@@ -37,11 +37,11 @@ let private tryGetCurrentTurnId (workspaceRoot: string) (sessionId: string) : Tu
     | None -> None
 
 /// Translate a host-level fact into a Command and post it to the child actor.
-/// Returns true if the event was routed to a child (caller should NOT also
-/// feed it into the main fallback coordinator).
-/// If the command is an EvidenceUpdated observation with TurnId of None, we do
-/// not post it to the actor to avoid cross-turn contamination, but we still
-/// consider it routed if the child exists in the registry.
+/// Always returns true if the actor is registered — the caller must NOT also
+/// feed the event into the main fallback coordinator.
+/// The caller awaits `actor.Post` so that event-store append errors propagate
+/// to the caller and persistent-event ordering is guaranteed end-to-end.
+/// EvidenceUpdated with TurnId=None is never posted; routing still counts as true.
 let routeToChild (workspaceRoot: string) (sessionId: string) (cmd: Command) : JS.Promise<bool> =
     promise {
         match SubsessionActorRegistry.TryGet workspaceRoot sessionId with
