@@ -23,8 +23,11 @@ open Wanxiangshu.Runtime.OpencodeSessionEventCodec
 open Wanxiangshu.Runtime.ErrorClassify
 open Wanxiangshu.Kernel.HostTools
 open Wanxiangshu.Runtime.NudgeRuntime
+open Wanxiangshu.Runtime.NudgeRuntimeState
+open Wanxiangshu.Runtime.NudgeFlow
+open Wanxiangshu.Runtime.NudgeModelResolver
 open Wanxiangshu.Runtime.Fallback.RuntimeStore
-open Wanxiangshu.Runtime.Fallback.GateTransitions
+open Wanxiangshu.Runtime.Fallback.SessionPropertyTransitions
 
 let private invoke1 (arg: obj) (method: string) (target: obj) : JS.Promise<obj> = unbox (target?(method) (arg))
 
@@ -42,6 +45,7 @@ let private invokeClient (client: obj) (method_: string) (arg: obj) : JS.Promise
             else
                 unbox<JS.Promise<obj>> (Dyn.callMethod1 session method_ arg)
 
+// ARCHITECTURE_EXEMPT: split this 133-line function later
 let private collectSnapshot
     (fallbackRuntime: FallbackRuntimeStore)
     (client: obj)
@@ -131,12 +135,7 @@ let private collectSnapshot
                                         else
                                             Some(sprintf "%s/%s%s" providerID modelID suffix)
 
-                                let resolvedModel =
-                                    Wanxiangshu.Runtime.NudgeRuntimeTypes.resolveNudgeModel
-                                        messagesArr
-                                        fallbackRuntime
-                                        sessionIDStr
-                                        model
+                                let resolvedModel = resolveNudgeModel messagesArr fallbackRuntime sessionIDStr model
 
                                 let lastAssistantText = text
                                 let turnId = tid
@@ -160,7 +159,10 @@ let private collectSnapshot
                                 if isForceStopped sessionIDStr then
                                     return None
                                 else
-                                    let anchor = Wanxiangshu.Kernel.Nudge.NudgeProjection.nudgeAnchorKey snap.turnId snap.lastAssistantText
+                                    let anchor =
+                                        Wanxiangshu.Kernel.Nudge.NudgeProjection.nudgeAnchorKey
+                                            snap.turnId
+                                            snap.lastAssistantText
 
                                     let blockStatus =
                                         if

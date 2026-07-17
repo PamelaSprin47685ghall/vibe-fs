@@ -1,24 +1,20 @@
-module Wanxiangshu.Runtime.EventLogFiles
+module Wanxiangshu.Runtime.EventStore
 
 open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Kernel.Nudge
-open Wanxiangshu.Kernel.Nudge.Types
+open Wanxiangshu.Kernel.Nudge.NudgeProjection
 open Wanxiangshu.Kernel.EventSourcing.EventEnvelope
 open Wanxiangshu.Kernel.EventSourcing.EventKind
 open Wanxiangshu.Kernel.EventSourcing.Fold
-open Wanxiangshu.Kernel.Nudge.NudgeProjection
 open Wanxiangshu.Kernel.SessionOverview
-open Wanxiangshu.Kernel.Wanxiangzhen.Dag
-open Wanxiangshu.Kernel.Wanxiangzhen.SquadEvent
 open Wanxiangshu.Runtime.EventLogCodec
+open Wanxiangshu.Runtime.EventLogFile
 open Wanxiangshu.Runtime.EventLogIo
 open Wanxiangshu.Runtime.Clock
 open Wanxiangshu.Runtime.PromiseQueue
-open Wanxiangshu.Runtime.EventLogProjectionCache
-open Wanxiangshu.Runtime.Wanxiangzhen.SquadEventWanCodec
-
-let lockFileName = ".wanxiangshu.ndjson.lock"
+open Wanxiangshu.Runtime.ProjectionCache
+open Wanxiangshu.Runtime.NudgeDispatchClaim
 
 type EventLogStore(workspaceRoot: string, ?appendLineOverride: string -> WanEvent -> JS.Promise<unit>) =
     let queue = SerialQueue()
@@ -146,6 +142,9 @@ type EventLogStore(workspaceRoot: string, ?appendLineOverride: string -> WanEven
                 ()
         }
 
+    member this.EnsureSynced() : JS.Promise<unit> = ensureSynced ()
+    member _.ProjectionCache = cache
+
     member _.ReadAllEvents() : JS.Promise<WanEvent list> =
         promise {
             do! ensureSynced ()
@@ -245,27 +244,6 @@ type EventLogStore(workspaceRoot: string, ?appendLineOverride: string -> WanEven
                         eventCountRead <- eventCountRead + 1
                 })
 
-    member _.GetSquadDag(sessionId: string) : JS.Promise<Dag> =
-        promise {
-            do! ensureSynced ()
-            return cache.GetSquadDag(sessionId)
-        }
-
-    member _.GetLatestSquadSessionId() : JS.Promise<string option> =
-        promise {
-            do! ensureSynced ()
-            return cache.GetLatestSquadSessionId()
-        }
-
-    member _.GetSquadSessions() : JS.Promise<Map<string, Dag>> =
-        promise {
-            do! ensureSynced ()
-            return cache.GetSquadSessions()
-        }
-
-    member this.AppendSquadEvent (at: string) (e: SquadEvent) : JS.Promise<Result<unit, string>> =
-        this.AppendEvent(squadEventToWanEvent at e)
-
     member _.TryClaimNudgeDispatch
         (sessionId: string)
         (action: NudgeAction)
@@ -289,31 +267,23 @@ type EventLogStore(workspaceRoot: string, ?appendLineOverride: string -> WanEven
                         promise {
                             do! syncNewEvents ()
 
-                            let canClaim =
-                                cache.CanClaimNudgeDispatch
+                            match
+                                NudgeDispatchClaim.tryClaim
+                                    cache
                                     sessionId
+                                    action
                                     trimmedAnchor
+                                    nudgeId
+                                    nonce
                                     sessionGen
                                     cancelGen
                                     humanTurnId
                                     nudgeOrdinal
                                     isBlocked
-
-                            if canClaim then
-                                let payload =
-                                    Map
-                                        [ "action", Wanxiangshu.Kernel.Nudge.toString action
-                                          "anchor", trimmedAnchor
-                                          "nudgeId", nudgeId
-                                          "nonce", nonce
-                                          "generation", sessionGen.ToString()
-                                          "cancelGeneration", cancelGen.ToString()
-                                          "humanTurnId", humanTurnId
-                                          "nudgeOrdinal", nudgeOrdinal.ToString() ]
-
-                                let ev =
-                                    buildEvent sessionId eventKindNudgeRequested payload (getTimestampMs().ToString())
-
+                                    (getTimestampMs().ToString())
+                            with
+                            | None -> ()
+                            | Some ev ->
                                 do! appendLineFn eventFilePath ev
                                 let! stats = statAsync eventFilePath
                                 lastKnownSize <- unbox<int64> (stats?size)

@@ -73,7 +73,8 @@ let mimoTodoTool (_pluginCtx: obj) : obj =
                   "priority", strReq todoPriorityDesc ]
         )
 
-    let enumVals = Wanxiangshu.Kernel.Methodology.Registry.enumValues.Value |> List.toArray
+    let enumVals =
+        Wanxiangshu.Kernel.Methodology.Registry.enumValues.Value |> List.toArray
 
     define
         (toolDescriptionFor Mimocode)
@@ -85,7 +86,7 @@ let mimoTodoTool (_pluginCtx: obj) : obj =
                lessonsAndConventions = strOpt lessonsAndConventionsDesc
                plan = strOpt planDesc
                select_methodology =
-                enumArrayMin enumVals 1 Wanxiangshu.Kernel.Methodology.selectMethodologyFieldDescription |})
+                enumArrayMin enumVals 1 Wanxiangshu.Kernel.Methodology.Api.selectMethodologyFieldDescription |})
         (fun args context ->
             let sessionID = str context "sessionID" |> fun value -> value.Trim()
             let methodologies = decodeMethodologies args

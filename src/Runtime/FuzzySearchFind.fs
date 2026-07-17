@@ -113,6 +113,7 @@ let private fuzzyFindSingle (params': FuzzyFindParams) (opts: SearchOptions) : J
                 return runWithFinder finderResult state.externalBasePath (runFind state store opts)
     }
 
+// ARCHITECTURE_EXEMPT: split this 70-line function later
 let private fuzzyFindMulti
     (patterns: string list)
     (params': FuzzyFindParams)

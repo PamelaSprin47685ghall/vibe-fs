@@ -27,8 +27,10 @@ open Wanxiangshu.Runtime.EventLogRuntime
 open Wanxiangshu.Runtime.OpencodeClientCodec
 open Wanxiangshu.Runtime.RuntimeScope
 
-let private formatReviewResult = Wanxiangshu.Runtime.ReviewPrompts.formatReviewResult
+let private formatReviewResult =
+    Wanxiangshu.Runtime.ReviewPrompts.formatReviewResult
 
+// ARCHITECTURE_EXEMPT: split this 68-line function later
 let submitReviewTool
     (registry: ChildAgentRegistry)
     (ctx: obj)
@@ -98,7 +100,11 @@ let submitReviewTool
                                     store.unlockReview sessionID
                     })
 
-let submitReviewResultTool (ctx: obj) (store: Wanxiangshu.Runtime.ReviewRuntime.ReviewStore) (scope: RuntimeScope) : obj =
+let submitReviewResultTool
+    (ctx: obj)
+    (store: Wanxiangshu.Runtime.ReviewRuntime.ReviewStore)
+    (scope: RuntimeScope)
+    : obj =
     define
         submitReviewResult
         (box
@@ -108,7 +114,9 @@ let submitReviewResultTool (ctx: obj) (store: Wanxiangshu.Runtime.ReviewRuntime.
             let runtime = fromOpencode context (pluginDirectoryFromCtx ctx)
 
             let sessionID =
-                let id = Wanxiangshu.Kernel.Primitives.Identity.Id.sessionIdValue runtime.Execution.SessionId
+                let id =
+                    Wanxiangshu.Kernel.Primitives.Identity.Id.sessionIdValue runtime.Execution.SessionId
+
                 if id = "" then "loop" else id
 
             let directory = runtime.Execution.Directory

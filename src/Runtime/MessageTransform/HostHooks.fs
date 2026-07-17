@@ -1,4 +1,5 @@
 module Wanxiangshu.Runtime.MessageTransform.HostHooks
+
 open Wanxiangshu.Runtime
 
 open Fable.Core
@@ -15,6 +16,7 @@ open Wanxiangshu.Runtime.WorkspaceFiles
 [<Import("relative", "node:path")>]
 let private pathRelative (a: string) (b: string) : string = jsNative
 
+// ARCHITECTURE_EXEMPT: split this 65-line function later
 let injectSubagentFilesIfAny
     (scope: RuntimeScope)
     (plan: MessageTransformPlan)

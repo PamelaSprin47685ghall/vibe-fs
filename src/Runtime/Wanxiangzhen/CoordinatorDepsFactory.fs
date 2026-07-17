@@ -11,6 +11,7 @@ open Wanxiangshu.Runtime.Wanxiangzhen.SlaveSpawn
 open Wanxiangshu.Runtime.Wanxiangzhen.PidMonitor
 open Wanxiangshu.Runtime.Wanxiangzhen.SymlinkShell
 open Wanxiangshu.Runtime.Wanxiangzhen.SessionIo
+open Wanxiangshu.Runtime.SquadEventStore
 
 let resolveMasterBranch (directory: string) (config: SquadConfig) (deps: CoordinatorDeps) : string * string option =
     match config.MasterBranch with

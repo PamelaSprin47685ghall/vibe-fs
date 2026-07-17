@@ -68,6 +68,7 @@ let tryExtractMaxInputTokens (target: obj) : int option =
 let tryGetMaxInputTokensAsync (target: obj) (sessionID: string) (directory: string) : JS.Promise<int option> =
     ContextBudgetLimitResolver.tryGetMaxInputTokensAsync target sessionID directory
 
+// ARCHITECTURE_EXEMPT: split this 70-line function later
 let tryGetRealContextUsage
     (target: obj)
     (sessionID: string)

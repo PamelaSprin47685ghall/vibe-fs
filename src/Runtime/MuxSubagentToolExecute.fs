@@ -3,7 +3,6 @@ module Wanxiangshu.Runtime.MuxSubagentToolExecute
 open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Runtime.Fallback.RuntimeStore
-open Wanxiangshu.Runtime.Fallback.GateTransitions
 open Wanxiangshu.Kernel.Primitives.Identity
 open Wanxiangshu.Kernel.Errors.DomainError
 open Wanxiangshu.Kernel.Session.Causality

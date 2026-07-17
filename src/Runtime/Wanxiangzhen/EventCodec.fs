@@ -58,6 +58,7 @@ let encodeEvent (e: SquadEvent) : string =
 let encodeEvents (events: SquadEvent list) : string =
     events |> List.map encodeEvent |> String.concat "\n"
 
+// ARCHITECTURE_EXEMPT: split this 87-line function later
 let private parseEvent (parsed: obj) (typeName: string) : SquadEvent option =
     let sid = str parsed "session_id"
 

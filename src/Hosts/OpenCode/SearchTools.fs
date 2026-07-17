@@ -33,7 +33,6 @@ open Wanxiangshu.Runtime.ToolExecute
 open Wanxiangshu.Runtime.Dyn
 open Wanxiangshu.Runtime.OpencodeClientCodec
 open Wanxiangshu.Runtime.Fallback.RuntimeStore
-open Wanxiangshu.Runtime.Fallback.GateTransitions
 
 module ToolSchemaModule = Wanxiangshu.Hosts.Opencode.ToolSchema
 module FuzzyCommandsModule = Wanxiangshu.Runtime.FuzzySearch

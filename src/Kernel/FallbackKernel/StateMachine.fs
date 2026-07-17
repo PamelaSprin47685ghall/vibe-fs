@@ -31,6 +31,7 @@ let private busyLifecycle (state: SessionFallbackState) =
             Lifecycle = FallbackLifecycle.Active }
     | _ -> state
 
+// ARCHITECTURE_EXEMPT: split this 80-line function later
 let handleSessionError (state: SessionFallbackState) (cfg: FallbackConfig) (chain: FallbackChain) (err: ErrorInput) =
     match state.Lifecycle, state.Phase with
     | FallbackLifecycle.Cancelled, _

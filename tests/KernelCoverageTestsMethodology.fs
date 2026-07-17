@@ -4,7 +4,7 @@ open Fable.Core
 open Fable.Core.JsInterop
 open System
 open Wanxiangshu.Tests.Assert
-open Wanxiangshu.Kernel.Methodology
+open Wanxiangshu.Kernel.Methodology.Api
 open Wanxiangshu.Kernel.Methodology.Registry
 open Wanxiangshu.Kernel.OmpPrompts
 open Wanxiangshu.Kernel.ToolArgs

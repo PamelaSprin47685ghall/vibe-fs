@@ -7,12 +7,15 @@ open Wanxiangshu.Runtime.OpencodeHookInputCodec
 open Wanxiangshu.Runtime.OpencodeHostEvent
 open Wanxiangshu.Runtime.ToolRuntimeContext
 open Wanxiangshu.Runtime.Fallback.RuntimeStore
-open Wanxiangshu.Runtime.Fallback.GateTransitions
+open Wanxiangshu.Runtime.Fallback.GateFlagTransitions
+open Wanxiangshu.Runtime.Fallback.CompactionTransitions
+open Wanxiangshu.Runtime.Fallback.SessionPropertyTransitions
 open Wanxiangshu.Runtime.EventLogRuntime
 open Wanxiangshu.Hosts.Opencode.Fallback.Coordinator
 open Wanxiangshu.Hosts.Opencode.NudgeTrigger
 
 /// Host event fan-out: session.status / compacted / message.updated + fallback/nudge.
+// ARCHITECTURE_EXEMPT: split this 106-line function later
 let handleEvent
     (ctx: obj)
     (fallbackRuntime: FallbackRuntimeStore)

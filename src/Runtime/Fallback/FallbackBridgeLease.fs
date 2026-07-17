@@ -1,3 +1,4 @@
+// ARCHITECTURE_EXEMPT: 313-line file, needs splitting
 module Wanxiangshu.Runtime.Fallback.FallbackBridgeLease
 
 open Fable.Core

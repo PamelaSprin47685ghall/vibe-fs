@@ -6,7 +6,7 @@ open Wanxiangshu.Runtime.Dyn
 module Dyn = Wanxiangshu.Runtime.Dyn
 
 open Wanxiangshu.Kernel.WorkBacklog
-open Wanxiangshu.Kernel.Methodology
+open Wanxiangshu.Kernel.Methodology.Api
 open Wanxiangshu.Kernel.SubagentIntents
 open Wanxiangshu.Kernel.ToolCatalog
 open Wanxiangshu.Kernel.WarnTdd
@@ -48,7 +48,10 @@ let private injectWarnReuseIntoOmpParameters (schema: obj) (toolName: string) : 
 let meditatorParameters (tb: obj) : obj =
     objectOf
         [| ("methodology",
-            enumOf (Wanxiangshu.Kernel.Methodology.Registry.enumValuesArray.Value) "Select which methodology to apply." tb)
+            enumOf
+                (Wanxiangshu.Kernel.Methodology.Registry.enumValuesArray.Value)
+                "Select which methodology to apply."
+                tb)
            ("intent", str intentFieldDescription tb)
            ("background", str backgroundFieldDescription tb)
            ("note", str unifiedNoteDescription.Value tb) |]

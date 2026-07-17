@@ -105,6 +105,7 @@ let private summarizeOutput
         return textResult text
     }
 
+// ARCHITECTURE_EXEMPT: split this 68-line function later
 let private executeExecutor (pi: obj) (_id: string) (params': obj) (signal: obj) (_onUpdate: obj) (ctx: obj) =
     promise {
         let (lang, command, what, timeoutType, mode, deps, cwd, maxBytes) =

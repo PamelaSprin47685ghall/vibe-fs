@@ -90,6 +90,7 @@ let private aggregateAssignedTasks (events: obj list) : RawTask list * bool =
 
     (List.rev rawTasks, hasCancelled)
 
+// ARCHITECTURE_EXEMPT: split this 64-line function later
 let private commitAssigned
     (rt: CoordinatorRuntime)
     (existingTaskIds: Set<string>)

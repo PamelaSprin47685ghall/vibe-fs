@@ -11,12 +11,12 @@ open Wanxiangshu.Kernel.Session.Causality
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.FallbackKernel.Types
 open Wanxiangshu.Kernel.Subsession.Types
-open Wanxiangshu.Kernel.Subsession.PartTypeClassify
-open Wanxiangshu.Runtime.Fallback.FallbackEventBridge
-open Wanxiangshu.Runtime.Fallback.FallbackBridgePorts
+open Wanxiangshu.Kernel.Subsession.TypeClassify
+open Wanxiangshu.Runtime.Fallback.Coordinator
+open Wanxiangshu.Runtime.Fallback.Ports
 open Wanxiangshu.Runtime.Fallback.FallbackMessageCodec
 open Wanxiangshu.Runtime.Fallback.RuntimeStore
-open Wanxiangshu.Runtime.Fallback.GateTransitions
+open Wanxiangshu.Runtime.Fallback.SessionPropertyTransitions
 open Wanxiangshu.Runtime.SubsessionEventRouter
 open Wanxiangshu.Runtime.SubsessionChildObserver
 open Wanxiangshu.Hosts.Omp.Fallback.EventTranslator

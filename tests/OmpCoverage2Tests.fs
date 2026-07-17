@@ -17,7 +17,6 @@ open Wanxiangshu.Hosts.Omp.NudgeRuntime
 open Wanxiangshu.Kernel.HostTools
 open Wanxiangshu.Hosts.Omp.MagicTodo
 open Wanxiangshu.Runtime.Fallback.RuntimeStore
-open Wanxiangshu.Runtime.Fallback.GateTransitions
 
 let fakeCtx (sessionId: string) (cwd: string) : obj =
     createObj

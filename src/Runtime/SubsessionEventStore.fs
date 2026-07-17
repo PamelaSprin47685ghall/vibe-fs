@@ -6,7 +6,7 @@ open Wanxiangshu.Kernel.EventSourcing.EventEnvelope
 open Wanxiangshu.Kernel.EventSourcing.EventKind
 open Wanxiangshu.Kernel.FallbackKernel.Types
 open Wanxiangshu.Kernel.Subsession.Types
-open Wanxiangshu.Runtime.EventLogRuntimeAppend
+open Wanxiangshu.Runtime.SubsessionEventWriter
 open Wanxiangshu.Runtime.CommandProcessor
 open Wanxiangshu.Runtime.SubsessionPorts
 

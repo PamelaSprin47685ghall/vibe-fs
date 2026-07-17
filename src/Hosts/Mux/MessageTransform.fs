@@ -1,4 +1,5 @@
 module Wanxiangshu.Hosts.Mux.MessageTransform
+
 open Wanxiangshu.Runtime.Fallback.RuntimeStore
 
 open Fable.Core
@@ -20,9 +21,12 @@ open Wanxiangshu.Hosts.Mux.MessagingCodec
 open Wanxiangshu.Hosts.Mux.BacklogSession
 open Wanxiangshu.Hosts.Mux.CapsCodec
 open Wanxiangshu.Runtime.JsArrayMutate
-open Wanxiangshu.Runtime.Fallback.GateTransitions
+open Wanxiangshu.Runtime.Fallback.HumanTurnTransitions
+open Wanxiangshu.Runtime.Fallback.OrdinalTransitions
+open Wanxiangshu.Runtime.Fallback.CompactionTransitions
+open Wanxiangshu.Runtime.Fallback.SessionPropertyTransitions
 open Wanxiangshu.Runtime.ReviewRuntime
-open Wanxiangshu.Runtime.HostMessagePartCodec
+open Wanxiangshu.Runtime.HostMessageCodec
 open Wanxiangshu.Kernel.FallbackKernel.Types
 open Wanxiangshu.Runtime.MuxHookInputCodec
 open Wanxiangshu.Runtime.MuxWorkspaceCodec
@@ -33,6 +37,7 @@ open Wanxiangshu.Runtime.ContextBudgetUsageCodec
 let private maxInputTokensCache =
     System.Collections.Generic.Dictionary<string, int>()
 
+// ARCHITECTURE_EXEMPT: split this 111-line function later
 let messagesTransform
     (deps: obj)
     (runtimeScope: Wanxiangshu.Runtime.RuntimeScope.RuntimeScope)
@@ -145,6 +150,7 @@ let messagesTransform
                 replaceArrayInPlace messagesArr final
     }
 
+// ARCHITECTURE_EXEMPT: split this 86-line function later
 let compactingTransform
     (deps: obj)
     (runtimeScope: Wanxiangshu.Runtime.RuntimeScope.RuntimeScope)

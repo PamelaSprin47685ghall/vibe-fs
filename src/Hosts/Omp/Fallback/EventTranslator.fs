@@ -1,172 +1,15 @@
 module Wanxiangshu.Hosts.Omp.Fallback.EventTranslator
 
 open Fable.Core
-open Fable.Core.JsInterop
 open Wanxiangshu.Runtime
-open Wanxiangshu.Runtime.ErrorClassify
 open Wanxiangshu.Runtime.Dyn
-open Wanxiangshu.Kernel.Primitives.Identity
 open Wanxiangshu.Kernel.Errors.DomainError
-open Wanxiangshu.Kernel.Session.Causality
-open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.FallbackKernel.Types
 open Wanxiangshu.Kernel.Subsession.Types
-open Wanxiangshu.Kernel.Subsession.PartTypeClassify
-open Wanxiangshu.Runtime.Fallback.FallbackEventBridge
-open Wanxiangshu.Runtime.Fallback.FallbackBridgePorts
-open Wanxiangshu.Runtime.Fallback.FallbackMessageCodec
+open Wanxiangshu.Runtime.Fallback.Ports
 open Wanxiangshu.Runtime.Fallback.RuntimeStore
-open Wanxiangshu.Runtime.Fallback.GateTransitions
-open Wanxiangshu.Runtime.Fallback.ModelInjection
-open Wanxiangshu.Runtime.SubsessionEventRouter
-open Wanxiangshu.Runtime.SubsessionChildObserver
-
-let ompErrorInput (err: obj) : ErrorInput =
-    let getOpt key =
-        let s = Dyn.str err key in if s <> "" then Some s else None
-
-    { ErrorName = Dyn.str err "name"
-      DomainError = Some(translateJsError err)
-      Message = Dyn.str err "message"
-      StatusCode = getOpt "statusCode" |> Option.map int
-      IsRetryable = getOpt "isRetryable" |> Option.map ((=) "true") }
-
-let ompIsNewUserMessageImpl (runtime: FallbackRuntimeStore) (sessionID: string) (rawEvent: obj) : bool =
-    let eventObj = Dyn.get rawEvent "event"
-
-    if
-        Dyn.str eventObj "type" <> "message.updated"
-        || Dyn.str (Dyn.get eventObj "info") "role" <> "user"
-    then
-        false
-    else
-        let parts = Dyn.get eventObj "parts"
-
-        let text =
-            if Dyn.isArray parts then
-                (parts :?> obj array)
-                |> Array.choose (fun p ->
-                    if Dyn.str p "type" = "text" then
-                        Some(string p?text)
-                    else
-                        None)
-                |> String.concat "\n"
-            else
-                ""
-
-        if text = "" then
-            false
-        else
-            let time = Dyn.get (Dyn.get eventObj "info") "time"
-
-            let completed =
-                if Dyn.isNullish time then
-                    null
-                else
-                    Dyn.get time "completed"
-
-            let msgTime =
-                match completed with
-                | :? int64 as i -> i
-                | :? float as f -> int64 f
-                | :? int as i32 -> int64 i32
-                | _ -> 0L
-
-            not (runtime.IsInjectedSince(sessionID, msgTime))
-
-let private findProperty (targets: obj array) (keys: string array) : string =
-    targets
-    |> Array.tryPick (fun target ->
-        keys
-        |> Array.tryPick (fun key -> let s = Dyn.str target key in if s <> "" then Some s else None))
-    |> Option.defaultValue ""
-
-let private tryExtractTurnIdFromEvent (rawEvent: obj) : TurnId option =
-    let getOpt target =
-        if Dyn.isNullish target then rawEvent else target
-
-    let ev = getOpt (Dyn.get rawEvent "event")
-    let info = getOpt (Dyn.get ev "info")
-    let props = getOpt (Dyn.get rawEvent "props")
-    let targets = [| info; ev; props; rawEvent |]
-    let keys = [| "turnId"; "turnID"; "runId"; "runID" |]
-    let tid = findProperty targets keys
-    if tid <> "" then Some(TurnId.create tid) else None
-
-let private tryGetModelStringFromInfo (info: obj) : string option =
-    if Dyn.isNullish info then
-        None
-    else
-        let mv = Dyn.get info "model"
-
-        if Dyn.isNullish mv then
-            None
-        elif Dyn.typeIs mv "string" then
-            let s = string mv in if s = "" then None else Some s
-        else
-            let pID, mID, variant =
-                Dyn.str mv "providerID", Dyn.str mv "modelID", Dyn.str mv "variant"
-
-            let suffix = if variant <> "" then ":" + variant else ""
-
-            if pID = "" || mID = "" then
-                let idVal = Dyn.str mv "id" in if idVal <> "" then Some(idVal + suffix) else None
-            else
-                Some(sprintf "%s/%s%s" pID mID suffix)
-
-let private extractTurnObsFromMessage (t: string) (info: obj) (rawEvent: obj) =
-    if Dyn.isNullish info then
-        None
-    else
-        let role = Dyn.str info "role"
-
-        if role = "assistant" then
-            let parts = Dyn.get info "parts"
-
-            let text =
-                if Dyn.isArray parts then
-                    (parts :?> obj array)
-                    |> Array.choose (fun p ->
-                        let pt = Dyn.str p "type" in
-
-                        if pt = "text" || pt = "signed" then
-                            Some(string p?text)
-                        else
-                            None)
-                    |> String.concat "\n"
-                else
-                    ""
-
-            let finishVal = Dyn.str info "finish"
-
-            let hasToolCall =
-                FinishReason.isToolFinish (FinishReason.fromString finishVal)
-                || (if Dyn.isArray parts then
-                        (parts :?> obj array)
-                        |> Array.exists (fun p -> isToolCallPartType (Dyn.str p "type"))
-                    else
-                        false)
-
-            let f = Some(if hasToolCall then ToolFinish else NormalFinish)
-
-            Some
-                { TurnId = tryExtractTurnIdFromEvent rawEvent
-                  Evidence =
-                    { CurrentTurnEvidence.empty with
-                        Assistant =
-                            (if t.StartsWith("message.part.") then
-                                 AssistantDelta("", 0L, text, f)
-                             else
-                                 AssistantSnapshot("", 0L, text, f))
-                        Recovery = NoRecoveryPrompt } }
-        elif role = "toolResult" then
-            Some
-                { TurnId = tryExtractTurnIdFromEvent rawEvent
-                  Evidence =
-                    { CurrentTurnEvidence.empty with
-                        Tool = HasToolResult } }
-        else
-            None
+open Wanxiangshu.Runtime.Fallback.HostEventInspection
+open Wanxiangshu.Hosts.Omp.Fallback.MessageInspection
 
 type OmpEventTranslatorClass(runtime: FallbackRuntimeStore) =
     interface IEventTranslator with
@@ -175,7 +18,7 @@ type OmpEventTranslatorClass(runtime: FallbackRuntimeStore) =
             let t = Dyn.str ev "type"
 
             if t = "session.error" then
-                let err = Dyn.get ev "error" in
+                let err = Dyn.get ev "error"
 
                 if Dyn.isNullish err then
                     None
@@ -197,7 +40,7 @@ type OmpEventTranslatorClass(runtime: FallbackRuntimeStore) =
             Dyn.str (Dyn.get rawEvent "props") "sessionID"
 
         member _.IsSessionError(rawEvent: obj) =
-            let t = Dyn.str (Dyn.get rawEvent "event") "type" in
+            let t = Dyn.str (Dyn.get rawEvent "event") "type"
             t = "session.error" || t = "session.abort" || t = "session.interrupted"
 
         member _.IsSessionIdle(rawEvent: obj) =
@@ -242,7 +85,7 @@ type OmpEventTranslatorClass(runtime: FallbackRuntimeStore) =
             else
                 let info = Dyn.get ev "info"
                 let info = if Dyn.isNullish info then ev else info
-                let id = Dyn.str info "id" in
+                let id = Dyn.str info "id"
                 if id <> "" then Some id else None
 
         member _.ExtractAssistantParentId(rawEvent: obj) =
@@ -265,7 +108,8 @@ type OmpEventTranslatorClass(runtime: FallbackRuntimeStore) =
             let info = getOpt (Dyn.get ev "info")
             let props = getOpt (Dyn.get rawEvent "props")
             let targets = [| info; ev; props; rawEvent |]
-            let cid = findProperty targets [| "continuationId"; "continuationID" |]
+
+            let cid = findFirstStringValue targets [| "continuationId"; "continuationID" |]
 
             let findOrdinal () =
                 targets
@@ -285,9 +129,7 @@ type OmpEventTranslatorClass(runtime: FallbackRuntimeStore) =
             let info = getOpt (Dyn.get ev "info")
             let props = getOpt (Dyn.get rawEvent "props")
             let targets = [| info; ev; props; rawEvent |]
-            let keys = [| "turnId"; "turnID"; "runId"; "runID" |]
-            let tid = findProperty targets keys
-            if tid <> "" then Some tid else None
+            tryFindFirstStringValue targets [| "turnId"; "turnID"; "runId"; "runID" |]
 
         member _.ExtractTurnObservation(rawEvent: obj) : TurnObservation option =
             let eventObj = Dyn.get rawEvent "event"
@@ -301,7 +143,8 @@ type OmpEventTranslatorClass(runtime: FallbackRuntimeStore) =
                     extractTurnObsFromMessage t (Dyn.get eventObj "info") rawEvent
                 elif t = "tool_result" then
                     Some
-                        { TurnId = tryExtractTurnIdFromEvent rawEvent
+                        { TurnId =
+                            tryFindTurnId [| Dyn.get eventObj "info"; eventObj; Dyn.get rawEvent "props"; rawEvent |]
                           Evidence =
                             { CurrentTurnEvidence.empty with
                                 Tool = HasToolResult } }

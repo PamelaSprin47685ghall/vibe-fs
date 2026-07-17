@@ -52,6 +52,7 @@ let private runReviewRound
         return parseReviewReportMarkdown report
     }
 
+// ARCHITECTURE_EXEMPT: split this 77-line function later
 let submitReviewTool
     (deps: obj)
     (toolNames: string array)

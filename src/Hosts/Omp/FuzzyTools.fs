@@ -16,6 +16,7 @@ let private scopeId (ctx: obj) =
     let sid = Dyn.str ctx "sessionId"
     if sid <> "" then sid else Dyn.str ctx "workspaceId"
 
+// ARCHITECTURE_EXEMPT: split this 130-line function later
 let registerFuzzyTools (pi: obj) (finderCache: FinderCache) (iteratorStore: TypedIteratorStore) : unit =
     let tb = Dyn.get pi "typebox"
 

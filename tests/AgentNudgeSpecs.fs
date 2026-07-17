@@ -12,7 +12,6 @@ open Wanxiangshu.Runtime
 open Wanxiangshu.Runtime.Dyn
 open Wanxiangshu.Runtime.EventLogRuntime
 open Wanxiangshu.Runtime.Fallback.RuntimeStore
-open Wanxiangshu.Runtime.Fallback.GateTransitions
 open Wanxiangshu.Hosts.Opencode.NudgeEffect
 open Wanxiangshu.Tests.TempWorkspace
 

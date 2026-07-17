@@ -6,7 +6,7 @@ open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Runtime
 open Wanxiangshu.Runtime.SembleSearch
 open Wanxiangshu.Runtime.SembleSearchClient
-open Wanxiangshu.Hosts.Opencode.MessageTransform
+open Wanxiangshu.Hosts.Opencode.SembleInjection
 open Wanxiangshu.Runtime.MessageTransform.Pipeline
 open Wanxiangshu.Runtime.MessageTransform.HostEntry
 open Wanxiangshu.Runtime.MessageTransform.Plan

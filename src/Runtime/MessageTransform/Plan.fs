@@ -1,4 +1,5 @@
 module Wanxiangshu.Runtime.MessageTransform.Plan
+
 open Wanxiangshu.Runtime
 
 open Wanxiangshu.Kernel
@@ -101,6 +102,7 @@ let private resolveCurrentTokens
             let estimate = totalBytes / 2
             (max 1 estimate, UsageConfidence.BootstrapEstimate)
 
+// ARCHITECTURE_EXEMPT: split this 71-line function later
 let private rebuildPhaseState
     (plan: MessageTransformPlan)
     (backlogOps: BacklogSessionOps)

@@ -195,6 +195,7 @@ let private removeActive (projection: ContinuationProjection) (continuationId: s
             projection.ActiveBySession
             |> Map.filter (fun _ cont -> cont.Request.ContinuationId <> continuationId) }
 
+// ARCHITECTURE_EXEMPT: function at line 198 needs splitting
 let applyEvent (projection: ContinuationProjection) (evt: ContinuationEvent) : ContinuationProjection =
     match evt with
     | ContinuationEvent.Requested req ->

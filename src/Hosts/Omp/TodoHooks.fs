@@ -44,6 +44,7 @@ let private backlogSession = BacklogSession omp
 /// tools join the set via `isFileEditTool`; subagent and IO tools are listed
 /// explicitly. Pure lookups (fuzzy_find/fuzzy_grep), the review tools themselves,
 /// and host read tools never record.
+// ARCHITECTURE_EXEMPT: split this 151-line function later
 let toolResultHandler (_pi: obj) (_reviewStore: ReviewStore) (event: obj) (ctx: obj) : JS.Promise<unit> =
     promise {
         let toolName = Dyn.str event "toolName"

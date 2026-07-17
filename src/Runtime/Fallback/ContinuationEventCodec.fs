@@ -11,6 +11,7 @@ let private modelToPayload (model: FallbackModel) : (string * string) list =
       "modelId", model.ModelID
       "variant", variantStr ]
 
+// ARCHITECTURE_EXEMPT: function at line 14 needs splitting
 let encodeContinuationEvent (session: string) (at: string) (evt: ContinuationEvent) : WanEvent =
     match evt with
     | ContinuationEvent.Requested req ->

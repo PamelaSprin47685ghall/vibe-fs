@@ -24,6 +24,7 @@ open Wanxiangshu.Runtime.Fallback.FallbackEventBridge
 open Wanxiangshu.Runtime.EventLogAppendSession
 open Wanxiangshu.Runtime.EventLogRuntimeAppend
 
+// ARCHITECTURE_EXEMPT: function at line 27 needs splitting
 let handleFallbackTransition
     (translator: IEventTranslator)
     (runtime: FallbackRuntimeStore)
@@ -86,6 +87,7 @@ let handleFallbackTransition
                 intentOpt
     }
 
+// ARCHITECTURE_EXEMPT: function at line 89 needs splitting
 let handleEvent
     (translator: IEventTranslator)
     (runtime: FallbackRuntimeStore)

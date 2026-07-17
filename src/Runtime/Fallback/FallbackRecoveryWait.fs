@@ -3,7 +3,7 @@ module Wanxiangshu.Runtime.Fallback.FallbackRecoveryWait
 open Fable.Core
 open Wanxiangshu.Kernel.FallbackKernel.Types
 open Wanxiangshu.Runtime.Fallback.RuntimeStore
-open Wanxiangshu.Runtime.Fallback.GateTransitions
+open Wanxiangshu.Runtime.Fallback.SessionPropertyTransitions
 
 // ── Recovery settlement (with TaskComplete prioritizing terminal state) ──
 

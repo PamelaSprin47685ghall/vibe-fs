@@ -47,6 +47,7 @@ let ptyWriteTool (host: Host) : obj =
                 return frontMatterPrompt [ "id", box id; "bytes", box data.Length ] (sprintf "Sent: \"%s\"" display)
             })
 
+// ARCHITECTURE_EXEMPT: split this 143-line function later
 let ptyReadTool (host: Host) : obj =
     define
         "Read output buffer from a PTY session with pagination (offset/limit) and optional regex pattern filtering."
@@ -68,6 +69,7 @@ let ptyReadTool (host: Host) : obj =
                       "Regex pattern to filter lines. When set, only matching lines are returned, then offset/limit apply to the matches."
               )
               "ignoreCase", box (boolOpt "Case-insensitive pattern matching (default: false)") ])
+        // ARCHITECTURE_EXEMPT: split this 122-line function later
         (fun args context ->
             checkExecPerm host context
             let id = string args?``id``

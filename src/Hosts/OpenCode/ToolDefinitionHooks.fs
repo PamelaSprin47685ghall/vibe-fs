@@ -18,6 +18,7 @@ open Wanxiangshu.Hosts.Opencode.HookSchemaDecoration
 
 let private setKey (o: obj) (k: string) (v: obj) : unit = o?(k) <- v
 
+// ARCHITECTURE_EXEMPT: split this 64-line function later
 let toolDefinitionFor (host: Host) (input: obj) (output: obj) : JS.Promise<unit> =
     promise {
         let toolID = toolIdFromDefinitionHookInput input

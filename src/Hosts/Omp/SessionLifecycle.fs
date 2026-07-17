@@ -6,7 +6,7 @@ open Wanxiangshu.Hosts.Omp.TodoHooks
 open Wanxiangshu.Hosts.Omp.Codec
 open Wanxiangshu.Runtime.ReviewRuntime
 open Wanxiangshu.Runtime.Fallback.RuntimeStore
-open Wanxiangshu.Runtime.Fallback.GateTransitions
+open Wanxiangshu.Runtime.Fallback.GateFlagTransitions
 
 let registerSessionLifecycle (pi: obj) (reviewStore: ReviewStore) (fallbackRuntime: FallbackRuntimeStore) : unit =
     pi?on (

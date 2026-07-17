@@ -4,8 +4,7 @@ open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Runtime
 open Wanxiangshu.Runtime.Fallback.RuntimeStore
-open Wanxiangshu.Runtime.Fallback.GateTransitions
-open Wanxiangshu.Runtime.Fallback.ModelInjection
+open Wanxiangshu.Runtime.Fallback.CompactionTransitions
 open Wanxiangshu.Hosts.Opencode.SubsessionHostAdapter
 open Wanxiangshu.Kernel.Subsession.Types
 

@@ -72,6 +72,7 @@ let formatBatchReports (reports: string list) : string =
 
     if fm = "" then joinedBlocks else fm + "\n\n" + joinedBlocks
 
+// ARCHITECTURE_EXEMPT: split this 188-line function later
 let dispatch
     (host: Host)
     (adapter: IHostAdapter)

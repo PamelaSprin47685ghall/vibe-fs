@@ -5,9 +5,9 @@ open Fable.Core.JsInterop
 open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Kernel.FallbackKernel.Types
 open Wanxiangshu.Runtime.Fallback.RuntimeStore
-open Wanxiangshu.Runtime.Fallback.GateTransitions
-open Wanxiangshu.Runtime.Fallback.FallbackEventBridge
-open Wanxiangshu.Runtime.Fallback.FallbackBridgePorts
+open Wanxiangshu.Runtime.Fallback.SessionPropertyTransitions
+open Wanxiangshu.Runtime.Fallback.Coordinator
+open Wanxiangshu.Runtime.Fallback.Ports
 open Wanxiangshu.Tests.FallbackEventBridgeTestsPart2
 
 let handleEvent_sessionIdle_emptyOutput_pendingReview_skipsContinue () =

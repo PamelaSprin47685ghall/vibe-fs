@@ -10,6 +10,7 @@ open Wanxiangshu.Hosts.Mux.Plugin
 open Wanxiangshu.Kernel.EventSourcing.EventEnvelope
 open Wanxiangshu.Kernel.EventSourcing.EventKind
 open Wanxiangshu.Runtime.EventLogCodec
+open Wanxiangshu.Runtime.EventLogFile
 open Wanxiangshu.Runtime.Dyn
 
 module Dyn = Wanxiangshu.Runtime.Dyn

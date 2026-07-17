@@ -13,7 +13,6 @@ open Wanxiangshu.Hosts.Opencode.MessagingCodec
 open Wanxiangshu.Runtime.ChildAgentRegistry
 open Wanxiangshu.Runtime.DelegatedAiSettings
 open Wanxiangshu.Runtime.Fallback.RuntimeStore
-open Wanxiangshu.Runtime.Fallback.GateTransitions
 
 module Dyn = Wanxiangshu.Runtime.Dyn
 

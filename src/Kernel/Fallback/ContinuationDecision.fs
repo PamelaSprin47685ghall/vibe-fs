@@ -38,6 +38,7 @@ let private findActiveById (projection: ContinuationProjection) (continuationId:
 let private dispatchEffectId (req: ContinuationRequest) : string =
     sprintf "continuation:%s:attempt:%d" req.ContinuationId req.Attempt
 
+// ARCHITECTURE_EXEMPT: function at line 41 needs splitting
 let decide (projection: ContinuationProjection) (cmd: ContinuationCommand) : ContinuationDecision =
     match cmd with
     | ContinuationCommand.Request req ->

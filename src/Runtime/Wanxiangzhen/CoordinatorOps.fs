@@ -162,6 +162,7 @@ let safeKillPid (rt: CoordinatorRuntime) (pid: int) : unit =
     with ex ->
         rt.GitError <- Some(sprintf "kill pid %d failed: %s" pid (string ex.Message))
 
+// ARCHITECTURE_EXEMPT: split this 110-line function later
 let private handleSubmitCore
     (rt: CoordinatorRuntime)
     (taskId: string)

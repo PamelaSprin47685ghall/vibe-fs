@@ -10,7 +10,7 @@ open Wanxiangshu.Hosts.Opencode.ToolDefinitionHooks
 open Wanxiangshu.Hosts.Opencode.HookExecute
 open Wanxiangshu.Hosts.Opencode.CommandHooks
 open Wanxiangshu.Hosts.Opencode.EventHooks
-open Wanxiangshu.Hosts.Opencode.MessageTransform
+open Wanxiangshu.Hosts.Opencode.CompactionHook
 open Wanxiangshu.Hosts.Opencode.HookTransform
 open Wanxiangshu.Hosts.Opencode.CompactionTransform
 open Wanxiangshu.Hosts.Opencode.SessionLifecycleObserver
@@ -112,9 +112,7 @@ let private handleSessionCleanup (services: CoreServices) (env: HostEventEnvelop
             Wanxiangshu.Runtime.ToolHookRuntime.clearSessionCompliance ptyCleanupSessionId
             Wanxiangshu.Runtime.ToolHookRuntime.closeSession ptyCleanupSessionId
 
-            Wanxiangshu.Hosts.Opencode.MessageTransform.cleanupCapsEpochBySession
-                services.RuntimeScope
-                ptyCleanupSessionId
+            cleanupCapsEpochBySession services.RuntimeScope ptyCleanupSessionId
 
             services.RuntimeScope.RemoveSessionQueue ptyCleanupSessionId
             services.RuntimeScope.RemoveTempFiles ptyCleanupSessionId

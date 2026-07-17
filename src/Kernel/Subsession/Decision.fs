@@ -28,7 +28,7 @@ let decide (state: SubsessionState) (cmd: Command) : Result<DecisionResult, Deci
     | EvidenceUpdated _
     | SessionIdleObserved
     | TurnErrorObserved _ -> DecisionObserve.decide state cmd
-    | _ -> DecisionCancellation.decide state cmd
+    | _ -> Cancellation.decide state cmd
 
 /// Given an active subsession state discovered on restart, produce the Decision
 /// that must be persisted to NDJSON so the run is durably closed.

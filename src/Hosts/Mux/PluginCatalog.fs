@@ -125,6 +125,7 @@ let toolExecuteBefore (input: obj) (output: obj) : JS.Promise<unit> =
                 | _ -> ()
     }
 
+// ARCHITECTURE_EXEMPT: split this 64-line function later
 let toolExecuteAfter (scope: RuntimeScope) (input: obj) (output: obj) : JS.Promise<unit> =
     promise {
         let decoded = decodeMuxToolExecuteAfterInput input (box null)

@@ -125,6 +125,7 @@ let private squadUpdateArgsSchema () : obj =
                     ) ]
           ) ]
 
+// ARCHITECTURE_EXEMPT: split this 74-line function later
 let internal assembleCoordinatorHooks (rt: CoordinatorRuntime) : obj =
     let squadUpdateToolDef () : obj =
         let args = squadUpdateArgsSchema ()

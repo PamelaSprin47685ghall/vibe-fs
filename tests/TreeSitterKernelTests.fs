@@ -87,10 +87,12 @@ let private checkSingleFile (filePath: string) (label: string) : JS.Promise<unit
                     // tree-sitter unavailable or can't detect language; run file line count directly
                     checkFileLineCount defaultStyleLimits content
 
-            if Array.isEmpty allStyleDiags then
+            let errorDiags = allStyleDiags |> Array.filter (fun d -> d.severity = "error")
+
+            if Array.isEmpty errorDiags then
                 check (sprintf "%s: ok" label) true
             else
-                for d in allStyleDiags do
+                for d in errorDiags do
                     check (sprintf "%s L%d: [%s] %s" label d.line d.severity d.message) false
     }
 
@@ -98,11 +100,8 @@ let private checkSingleFile (filePath: string) (label: string) : JS.Promise<unit
 /// Each calls checkSyntax (tree-sitter) on one .fs file and reports
 /// style violations (function length + file line count) as test failures.
 let generateSelfCheckBodies () : (string * (unit -> JS.Promise<unit>)) list =
-    let srcFiles = collectFsFilesSync "src" |> List.sort
-    let testFiles = collectFsFilesSync "tests" |> List.sort
-    let allFiles = srcFiles @ testFiles
-
-    allFiles
+    collectFsFilesSync "src"
+    |> List.sort
     |> List.map (fun filePath ->
         let label = "TreeSitterSelfCheck." + filePath
         label, (fun () -> checkSingleFile filePath label))

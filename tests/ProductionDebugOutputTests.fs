@@ -57,7 +57,7 @@ let private assertNoToken (token: string) (label: string) (content: string) =
 
 let private checkExplicitFiles (cwd: string) =
     let files =
-        [ "src/Runtime/Fallback/FallbackEventBridge.fs"
+        [ "src/Runtime/Fallback/Coordinator.fs"
           "src/Runtime/Fallback/RuntimeStore.fs"
           "src/Runtime/ToolHookRuntime.fs"
           "src/Hosts/OpenCode/ProgressObserver.fs"

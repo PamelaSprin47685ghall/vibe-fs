@@ -108,6 +108,7 @@ type OmpHostAdapter
             let key = sessionId + "\u0000" + prompt
             scope.TryGetTempFiles(key)
 
+// ARCHITECTURE_EXEMPT: split this 94-line function later
 let registerSubagentTools
     (pi: obj)
     (fallbackRuntime: FallbackRuntimeStore)

@@ -126,7 +126,13 @@ let private runGrepWithFinder
 
         let nextIterator = grepNextIterator state store opts resolved.cursor
 
-        { output = (let b = buildGrepBody body resolved.regexError in if nextIterator = "" then b else Wanxiangshu.Runtime.ToolOutputInfo.withIterator b nextIterator)
+        { output =
+            (let b = buildGrepBody body resolved.regexError in
+
+             if nextIterator = "" then
+                 b
+             else
+                 Wanxiangshu.Runtime.ToolOutputInfo.withIterator b nextIterator)
           isError = false }
 
 let private fuzzyGrepSingle (params': FuzzyGrepParams) (opts: SearchOptions) : JS.Promise<SearchOutcome> =
@@ -146,6 +152,7 @@ let private fuzzyGrepSingle (params': FuzzyGrepParams) (opts: SearchOptions) : J
                         (runGrepWithFinder iteratorState.core iteratorState.cursor store opts)
     }
 
+// ARCHITECTURE_EXEMPT: split this 69-line function later
 let private fuzzyGrepMulti
     (patterns: string list)
     (params': FuzzyGrepParams)

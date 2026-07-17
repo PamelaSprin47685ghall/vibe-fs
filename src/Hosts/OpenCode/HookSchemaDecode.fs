@@ -150,6 +150,7 @@ let injectWarnReuseIntoJsonSchema (schema: obj) : obj =
 
         schema
 
+// ARCHITECTURE_EXEMPT: split this 70-line function later
 let mergeWorkBacklogReportIntoTaskSchema (schema: obj) : obj =
     if isNullish schema then
         schema

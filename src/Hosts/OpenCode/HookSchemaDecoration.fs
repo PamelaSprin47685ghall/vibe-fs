@@ -16,7 +16,7 @@ open Wanxiangshu.Runtime.Dyn
 open Wanxiangshu.Runtime.WorkBacklogSchema
 
 let selectMethodologyFieldDescription =
-    Wanxiangshu.Kernel.Methodology.selectMethodologyFieldDescription
+    Wanxiangshu.Kernel.Methodology.Api.selectMethodologyFieldDescription
 
 [<Import("Schema", "effect")>]
 let private effectSchemaNs: obj = jsNative

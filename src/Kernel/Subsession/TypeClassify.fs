@@ -1,4 +1,4 @@
-module Wanxiangshu.Kernel.Subsession.PartTypeClassify
+module Wanxiangshu.Kernel.Subsession.TypeClassify
 
 /// Cross-host, normalized set of message-part `type` string variants known
 /// to represent a tool call. This is the union of every string literal that

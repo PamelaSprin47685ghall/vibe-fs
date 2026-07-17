@@ -3,7 +3,7 @@ module Wanxiangshu.Runtime.EventLogRuntimeStore
 open Fable.Core
 open Wanxiangshu.Kernel.EventSourcing.EventEnvelope
 open Wanxiangshu.Kernel.EventSourcing.EventKind
-open Wanxiangshu.Runtime.EventLogFiles
+open Wanxiangshu.Runtime.EventStore
 open Thoth.Json
 
 [<Import("stat", "node:fs/promises")>]

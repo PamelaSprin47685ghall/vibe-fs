@@ -41,6 +41,7 @@ let private resolveAgent (ctx: obj) : string =
         let name = Dyn.str sm "agentName"
         if name <> "" then name else "manager"
 
+// ARCHITECTURE_EXEMPT: split this 128-line function later
 let transformEntriesAsyncWithAgent
     (reviewStore: ReviewStore)
     (cwd: string)

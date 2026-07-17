@@ -14,7 +14,6 @@ open Wanxiangshu.Runtime.ToolOutputInfo
 open Wanxiangshu.Kernel.ToolOutputInfoTypes
 open Wanxiangshu.Runtime.SubagentIteratorStore
 open Wanxiangshu.Runtime.Fallback.RuntimeStore
-open Wanxiangshu.Runtime.Fallback.GateTransitions
 open Wanxiangshu.Runtime.SubsessionActorRegistry
 open Wanxiangshu.Runtime.SubsessionEventStore
 open Wanxiangshu.Hosts.Opencode.SubagentIo
