@@ -310,6 +310,8 @@ export async function runSuite(opts, tests) {
     } catch (err) {
       failed++;
       await dumpDiagnostics(suite, err);
+    } finally {
+      suite.provider.reset();
     }
   }
 

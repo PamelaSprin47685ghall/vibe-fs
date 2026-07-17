@@ -138,7 +138,7 @@ type NudgeTrigger
                                             let info = Dyn.get lastMsg "info"
                                             let role = Dyn.str info "role"
 
-                                            if role = "assistant" then
+                                            if role = "assistant" || role = "toolResult" then
                                                 return SessionOwner.Human
                                             else
                                                 return SessionOwner.NoOwner

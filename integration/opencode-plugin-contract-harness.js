@@ -3,10 +3,10 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { createMockLLM } from '../../mock-llm.js';
+import { createMockLLM } from '../e2e/mock-llm.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const PROJECT_ROOT = path.resolve(__dirname, '../../..');
+const PROJECT_ROOT = path.resolve(__dirname, '..');
 
 function getPluginPath(variant) {
   let file = 'Plugin.js';
@@ -36,15 +36,33 @@ async function loadPlugin(variant) {
   return import(pluginUrl);
 }
 
-function buildMockClient(messages = [], opts = {}) {
+function buildMockClient(messages = [], opts = {}, hookRef) {
   const messagesFn = async () => ({ data: messages });
   return {
     session: {
       messages: messagesFn,
       create: async () => ({ data: { id: 'mock-child-session' } }),
-      prompt: async () => undefined,
-      abort: async () => ({}),
       ...(opts.mockSessionClient || {}),
+      prompt: async (body) => {
+        const promptBody = (body && body.body) || {};
+        const hook = (hookRef || {}).hook;
+        if (hook) {
+          const parts = (promptBody && promptBody.parts) || [];
+          const nonce = (parts[0] && parts[0].metadata && parts[0].metadata.nonce) || ('mock-' + Date.now());
+          const input = {
+            sessionID: (body && body.path && body.path.id) || '',
+            agent: (promptBody && promptBody.agent) || 'build',
+          };
+          const output = {
+            parts: parts,
+            message: { id: nonce, role: 'assistant', agent: (promptBody && promptBody.agent) || 'build' },
+          };
+          try { await hook(input, output); } catch (_) {}
+        }
+        const result = (opts.mockSessionClient || {}).prompt ? await opts.mockSessionClient.prompt(body) : undefined;
+        return result;
+      },
+      abort: async () => ({}),
     },
     ...(opts.mockClientExtra || {}),
   };
@@ -255,11 +273,11 @@ class OpencodePluginHarness {
   resetMock() { this.mockLLM.reset(); }
 
   readFile(relPath) {
-    return fs.readFileSync(path.join(this.getSandboxDir(this.sessionId), relPath), 'utf8');
+    return fs.readFileSync(path.join(this.workDir, relPath), 'utf8');
   }
 
   fileExists(relPath) {
-    return fs.existsSync(path.join(this.getSandboxDir(this.sessionId), relPath));
+    return fs.existsSync(path.join(this.workDir, relPath));
   }
 
   async waitForFile(relPath, timeoutMs = 1000) {
@@ -285,6 +303,8 @@ class OpencodePluginHarness {
 export async function start(opts = {}) {
   const llm = createMockLLM();
   const llmHandle = await llm.start();
+  delete process.env.OLLAMA_API_KEY;
+  delete process.env.OLLAMA_API_BASE;
 
   const home = fs.mkdtempSync(path.join(os.tmpdir(), 'opencode-e2e-'));
   const workDir = path.join(home, 'workspace');
@@ -292,15 +312,18 @@ export async function start(opts = {}) {
   gitInit(workDir, opts.agentsContent);
 
   const messages = opts.messages || [];
-  const client = buildMockClient(messages, opts);
+  const hookRef = { hook: null };
+  const client = buildMockClient(messages, opts, hookRef);
 
   const plugin = await loadPlugin(opts.variant);
-  const result = await plugin.default({
+  const result = await (plugin.default.server || plugin.default.setup || plugin.default)({
     directory: workDir,
     client,
     workdir: workDir,
     ...(opts.pluginCtxExtra || {}),
   });
+
+  hookRef.hook = result['chat.message'] || result['experimental.chat.messages.transform'] || null;
 
   const sessionId = opts.sessionId || 'opencode-e2e-session';
   return new OpencodePluginHarness(workDir, home, sessionId, result, llmHandle);

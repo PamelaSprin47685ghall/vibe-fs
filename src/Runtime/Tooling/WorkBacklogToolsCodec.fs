@@ -105,7 +105,14 @@ let decodeTodoWriteArgs (isTask: bool) (args: obj) : Result<TodoWriteArgs * stri
         | None -> ("", None)
         | Some v ->
             let trimmed = v.Trim()
-            (trimmed, None)
+
+            let viol =
+                if trimmed.Length < reportMinLength then
+                    Some(sprintf "%s must be at least %d characters" k reportMinLength)
+                else
+                    None
+
+            (trimmed, viol)
 
     let ahaMoments, ahaViol = decodeReportField "ahaMoments"
     let changesAndReasons, changesViol = decodeReportField "changesAndReasons"

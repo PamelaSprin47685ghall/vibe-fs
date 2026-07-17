@@ -28,6 +28,7 @@ if (fs.existsSync(pkgSrc)) {
 // This handles harnesses, fixtures, and runner scripts
 function syncAssets(sourceDir, targetDir) {
   if (!fs.existsSync(sourceDir)) return;
+  fs.mkdirSync(targetDir, { recursive: true });
   
   const entries = fs.readdirSync(sourceDir, { withFileTypes: true });
   for (const entry of entries) {
@@ -46,6 +47,10 @@ function syncAssets(sourceDir, targetDir) {
 }
 
 log('Syncing assets...');
+syncAssets(
+  path.join(root, 'integration'),
+  path.join(buildDir, 'integration')
+);
 syncAssets(
   path.join(root, 'tests'),
   path.join(buildDir, 'tests')

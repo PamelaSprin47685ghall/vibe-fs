@@ -1,11 +1,11 @@
-module Wanxiangshu.E2e.OpencodePluginTestsPart3
+module Wanxiangshu.Integration.OpencodePluginContractTestsPart3
 
 open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Runtime.Dyn
 open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Tests.AsyncFlush
-open Wanxiangshu.E2e.OpencodePluginTestsPart2
+open Wanxiangshu.Integration.OpencodePluginContractTestsPart2
 
 module Dyn = Wanxiangshu.Runtime.Dyn
 

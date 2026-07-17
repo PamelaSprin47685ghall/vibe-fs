@@ -190,6 +190,7 @@
     <Compile Include="src/Runtime/Execution/EffectSupervisor.fs"/>
     <Compile Include="src/Runtime/Subsession/SubsessionActor.fs"/>
     <Compile Include="src/Runtime/Subsession/SubsessionActorRegistry.fs"/>
+    <Compile Include="src/Runtime/Subsession/SubsessionPendingEvidence.fs"/>
     <Compile Include="src/Runtime/Subsession/SubsessionEventRouter.fs"/>
     <Compile Include="src/Runtime/Fallback/FallbackConfigCodec.fs"/>
     <Compile Include="src/Runtime/Fallback/GateState.fs"/>
@@ -530,6 +531,12 @@
     <Compile Include="tests/IntegrationSubagentMockClient.fs"/>
     <Compile Include="tests/IntegrationSubagentSpecs.fs"/>
     <Compile Include="tests/IntegrationOpencodeReviewSpecs.fs"/>
+    <Compile Include="integration/OpencodePluginContractTestsPart2.fs"/>
+    <Compile Include="integration/OpencodePluginContractTestsPart3.fs"/>
+    <Compile Include="integration/OpencodePluginContractTestsPart4.fs"/>
+    <Compile Include="integration/OpencodeContinueContractTests.fs"/>
+    <Compile Include="integration/OpencodeNudgeHostIntegrationTests.fs"/>
+    <Compile Include="tests/IntegrationOpenCodeContractTests.fs"/>
     <Compile Include="tests/IntegrationMuxReviewSpecs.fs"/>
     <Compile Include="tests/IntegrationMuxReviewPromptSpecs.fs"/>
     <Compile Include="tests/IntegrationMiscSpecsAgent.fs"/>

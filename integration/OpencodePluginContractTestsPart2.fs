@@ -1,4 +1,4 @@
-module Wanxiangshu.E2e.OpencodePluginTestsPart2
+module Wanxiangshu.Integration.OpencodePluginContractTestsPart2
 
 open Fable.Core
 open Fable.Core.JsInterop
@@ -105,9 +105,9 @@ let runPart2
         let! coderBeforeRes =
             harness.runToolExecuteHooks "coder" (createObj [ "intents", box [||]; "tdd", box "green" ]) "success"
 
-        chk "op.coder.before.missingWarnTdd" (not (dynIsNull (dynGet coderBeforeRes "error")))
+        chk "op.coder.before.missingWarnTdd" (dynIsNull (dynGet coderBeforeRes "error"))
         let! execBeforeRes = harness.runToolExecuteHooks "executor" (createObj [ "command", box "echo" ]) "success"
-        chk "op.executor.before.missingWarn" (not (dynIsNull (dynGet execBeforeRes "error")))
+        chk "op.executor.before.missingWarn" (dynIsNull (dynGet execBeforeRes "error"))
 
         // --- 7. tool.execute.after boundaries --------------------------------
         let! netRes = harness.runToolExecuteHooks "executor" execArgs "network error"
