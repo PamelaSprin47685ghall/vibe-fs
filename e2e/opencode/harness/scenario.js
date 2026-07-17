@@ -134,19 +134,22 @@ class FsOracle {
 // ─── HTTP Client ─────────────────────────────────────────────────────────────
 
 class HttpClient {
-  constructor(baseUrl) {
+  constructor(baseUrl, workDir) {
     this._baseUrl = baseUrl;
+    this._workDir = workDir;
   }
 
   async request(method, urlPath, opts = {}) {
     const qs = opts.query ? '?' + new URLSearchParams(opts.query).toString() : '';
     const url = this._baseUrl + urlPath + qs;
+    const headers = {
+      'Content-Type': 'application/json',
+      'x-opencode-directory': this._workDir,
+      ...(opts.headers || {}),
+    };
     const res = await fetch(url, {
       method,
-      headers: {
-        'Content-Type': 'application/json',
-        ...(opts.headers || {}),
-      },
+      headers,
       body: opts.body ? JSON.stringify(opts.body) : undefined,
     });
     const text = await res.text();
@@ -167,6 +170,7 @@ class HttpClient {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'x-opencode-directory': this._workDir,
         },
         body: JSON.stringify({
           parts: [{ type: 'text', text }],
@@ -174,8 +178,8 @@ class HttpClient {
         }),
         signal: ac.signal,
       });
-      const text = await res.text();
-      return { status: res.status, ok: res.ok, data: text };
+      const bodyText = await res.text();
+      return { status: res.status, ok: res.ok, data: bodyText };
     } catch (err) {
       return { status: 0, ok: false, data: err.message };
     } finally {
@@ -264,6 +268,9 @@ class ScenarioContext {
       pluginPaths,
       contextLimit: opts.contextLimit,
     });
+
+    // Create HTTP client
+    this._client = new HttpClient(this._host.baseUrl, this._host.workDir);
 
     // Connect event probe
     this._events = new EventProbe(this._host.baseUrl, this._host.workDir);
@@ -416,6 +423,8 @@ export async function runScenarios(scenarios) {
     const ok = await scenario(name, fn, opts);
     if (ok) passed++;
     else failed++;
+    // Small delay between scenarios for port release
+    await new Promise(r => setTimeout(r, 1000));
   }
   console.log(`\n${passed} passed, ${failed} failed`);
   return failed === 0 ? 0 : 1;
