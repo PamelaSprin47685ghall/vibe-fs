@@ -54,11 +54,13 @@ let private buildUserEntry (userId: string) (sessionId: string) (preludeText: st
     createObj [ "info", box info; "parts", box [| buildTextPart text |] ]
 
 let private buildReadToolPart (cap: CapsFile) (epochId: string) (fp: string) (index: int) : obj =
-    let formattedOutput = formatReadOutput cap.filePath cap.content 1 None
-    let callId = capsToolCallId "caps-call-" epochId fp index
+    let lines = cap.content.Split('\n')
+    let numbered = Wanxiangshu.Runtime.NativeReadTranscript.formatNumberedLines 1 lines
 
     let wrappedOutput =
-        $"<wanxiangshu-caps-tools>\n{formattedOutput}\n</wanxiangshu-caps-tools>"
+        $"{cap.filePath}\n{numbered}\n(End of file - total {lines.Length} lines)"
+
+    let callId = capsToolCallId "caps-call-" epochId fp index
 
     createObj
         [ "type", box "tool"
