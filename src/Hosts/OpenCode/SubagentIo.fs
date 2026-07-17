@@ -171,6 +171,48 @@ let private extractRunDirective
                 parentLiveModel
     }
 
+let private executeSubagentRun
+    (runtime: FallbackRuntimeStore)
+    (registry: ChildAgentRegistry)
+    (client: obj)
+    (agent: string)
+    (directory: string)
+    (sessionID: string)
+    (childID: string)
+    (prompt: string)
+    (signal: obj)
+    (cleanup: bool)
+    : JS.Promise<Result<string, DomainError>> =
+    promise {
+        let! cfg, directive = extractRunDirective registry runtime client agent directory sessionID childID
+
+        match directive with
+        | RetryChain chain ->
+            runtime.SetChain childID chain
+            runtime.SetModel childID (List.head chain)
+        | DelegateToHost -> runtime.SetChain childID []
+
+        let svc =
+            SubsessionService(
+                directory,
+                (fun _ -> createHost client agent directory),
+                fun _ -> create (if directory = "" then "" else directory)
+            )
+
+        try
+            let! runRes = svc.StartRun(childID, sessionID, prompt, cfg, directive, abortSignal = signal)
+            do! cleanupChildIfRequested registry cleanup client directory childID
+
+            return
+                match runRes with
+                | Succeeded output -> Ok(formatSubagentReport noOutputText abortedPrefix output false)
+                | Cancelled -> Ok abortedPrefix
+                | Failed reason -> Error(DomainError.InvalidIntent("subagent", "run", formatRunFailure reason))
+        with err ->
+            do! cleanupChildIfRequested registry cleanup client directory childID
+            return Error(translateJsError err)
+    }
+
 let runSubagentCoreResult
     (runtime: FallbackRuntimeStore)
     (registry: ChildAgentRegistry)
@@ -207,34 +249,20 @@ let runSubagentCoreResult
                     do! abortAndUnregister registry client directory childID
                     return Ok abortedPrefix
                 else
-                    let! cfg, directive = extractRunDirective registry runtime client agent directory sessionID childID
+                    let! result =
+                        executeSubagentRun
+                            runtime
+                            registry
+                            client
+                            agent
+                            directory
+                            sessionID
+                            childID
+                            prompt
+                            signal
+                            cleanup
 
-                    match directive with
-                    | RetryChain chain ->
-                        runtime.SetChain childID chain
-                        runtime.SetModel childID (List.head chain)
-                    | DelegateToHost -> runtime.SetChain childID []
-
-                    let svc =
-                        SubsessionService(
-                            directory,
-                            (fun _ -> createHost client agent directory),
-                            fun _ -> create (if directory = "" then "" else directory)
-                        )
-
-                    try
-                        let! runRes = svc.StartRun(childID, sessionID, prompt, cfg, directive, abortSignal = signal)
-                        do! cleanupChildIfRequested registry cleanup client directory childID
-
-                        return
-                            match runRes with
-                            | Succeeded output -> Ok(formatSubagentReport noOutputText abortedPrefix output false)
-                            | Cancelled -> Ok abortedPrefix
-                            | Failed reason ->
-                                Error(DomainError.InvalidIntent("subagent", "run", formatRunFailure reason))
-                    with err ->
-                        do! cleanupChildIfRequested registry cleanup client directory childID
-                        return Error(translateJsError err)
+                    return result
         with err ->
             return Error(translateJsError err)
     }

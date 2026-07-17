@@ -101,6 +101,16 @@ let private decideRunStarted
         withEvents projection events []
     | _ -> noChange projection
 
+let private buildAbortEffect
+    (projection: ContinuationProjection)
+    (cont: ContinuationState)
+    (event: ContinuationEvent)
+    : ContinuationDecision =
+    let effect =
+        ContinuationEffect.AbortContinuation(cont.Request, cont.HostIdentity, event)
+
+    withEvents projection [] [ effect ]
+
 let private decideLifecycle (projection: ContinuationProjection) (cmd: ContinuationCommand) : ContinuationDecision =
     match cmd with
     | ContinuationCommand.AssistantMessageObserved(continuationId, assistantMessageId) ->
@@ -121,26 +131,12 @@ let private decideLifecycle (projection: ContinuationProjection) (cmd: Continuat
     | ContinuationCommand.Cancel(continuationId, reason) ->
         match Map.tryFind continuationId projection.ByContinuationId with
         | Some cont when isActiveStatus cont.Status ->
-            let effect =
-                ContinuationEffect.AbortContinuation(
-                    cont.Request,
-                    cont.HostIdentity,
-                    ContinuationEvent.Cancelled(continuationId, reason)
-                )
-
-            withEvents projection [] [ effect ]
+            buildAbortEffect projection cont (ContinuationEvent.Cancelled(continuationId, reason))
         | _ -> noChange projection
     | ContinuationCommand.Supersede(continuationId, reason) ->
         match Map.tryFind continuationId projection.ByContinuationId with
         | Some cont when isActiveStatus cont.Status ->
-            let effect =
-                ContinuationEffect.AbortContinuation(
-                    cont.Request,
-                    cont.HostIdentity,
-                    ContinuationEvent.Superseded(continuationId, reason)
-                )
-
-            withEvents projection [] [ effect ]
+            buildAbortEffect projection cont (ContinuationEvent.Superseded(continuationId, reason))
         | _ -> noChange projection
     | ContinuationCommand.HostAbortConfirmed(continuationId, terminalEvent) ->
         match Map.tryFind continuationId projection.ByContinuationId with

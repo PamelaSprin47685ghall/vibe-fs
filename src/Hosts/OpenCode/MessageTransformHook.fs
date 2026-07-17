@@ -191,6 +191,54 @@ let private buildTransformPlan
       GetContextUsage =
         (fun encoded -> Wanxiangshu.Runtime.OpencodeContextBudgetObservation.tryCurrentUsage client sessionID encoded) }
 
+/// Resolve all transform parameters from raw input and return the plan,
+/// capsEpoch, and isSub flag.
+let private resolveTransformParams
+    (registry: ChildAgentRegistry)
+    (directory: string)
+    (runtimeScope: Wanxiangshu.Runtime.RuntimeScope.RuntimeScope)
+    (client: obj)
+    (input: obj)
+    (messagesArr: obj array)
+    : JS.Promise<MessageTransformPlan * string * bool> =
+    promise {
+        let messagesList = MessagingCodec.decodeMessages messagesArr
+        let agent = resolveMessagesTransformAgent registry input messagesList "build"
+        let sessionID = resolveSessionID input messagesList
+        let capsEpoch = resolveCapsEpoch messagesList sessionID runtimeScope
+        let isSub = registry.ResolveSubsessionParentID(Some sessionID) |> Option.isSome
+
+        let p = getBacklogProjectionPolicy agent isSub
+        let caps = getCapsInjectionPolicy agent isSub
+        let par = getParallelHintPolicy agent isSub
+        let budget = getContextBudgetPolicy agent isSub
+
+        let! maxInputTokens = resolveMaxInputTokens sessionID client directory
+
+        let sembleInjectEnabled =
+            p = BacklogProjectionPolicy.Include
+            && (agent = "investigator" || agent = "reviewer")
+
+        let plan =
+            buildTransformPlan
+                sessionID
+                agent
+                directory
+                p
+                caps
+                par
+                budget
+                isSub
+                messagesList
+                messagesArr
+                sembleInjectEnabled
+                runtimeScope
+                maxInputTokens
+                client
+
+        return (plan, capsEpoch, isSub)
+    }
+
 /// Transform the messages array in-place: resolve session context, build the
 /// transform plan, and run the host-messages transform pipeline.
 let messagesTransform
@@ -210,46 +258,14 @@ let messagesTransform
         match tryGetMessagesArrayFromOutput output with
         | None -> ()
         | Some messagesArr ->
-            let messagesList = MessagingCodec.decodeMessages messagesArr
-            let agent = resolveMessagesTransformAgent registry input messagesList "build"
-            let sessionID = resolveSessionID input messagesList
-            let capsEpoch = resolveCapsEpoch messagesList sessionID runtimeScope
-            let isSub = registry.ResolveSubsessionParentID(Some sessionID) |> Option.isSome
+            let! (plan, capsEpoch, isSub) =
+                resolveTransformParams registry directory runtimeScope client input messagesArr
 
-            let p =
-                Wanxiangshu.Kernel.MessageTransformPolicy.getBacklogProjectionPolicy agent isSub
-
-            let caps =
-                Wanxiangshu.Kernel.MessageTransformPolicy.getCapsInjectionPolicy agent isSub
-
-            let par =
-                Wanxiangshu.Kernel.MessageTransformPolicy.getParallelHintPolicy agent isSub
-
-            let budget =
-                Wanxiangshu.Kernel.MessageTransformPolicy.getContextBudgetPolicy agent isSub
-
-            let! maxInputTokens = resolveMaxInputTokens sessionID client directory
-
-            let sembleInjectEnabled =
-                p = BacklogProjectionPolicy.Include
-                && (agent = "investigator" || agent = "reviewer")
-
-            let plan =
-                buildTransformPlan
-                    sessionID
-                    agent
-                    directory
-                    p
-                    caps
-                    par
-                    budget
-                    isSub
-                    messagesList
-                    messagesArr
-                    sembleInjectEnabled
-                    runtimeScope
-                    maxInputTokens
-                    client
+            let agent = plan.Agent
+            let sessionID = plan.SessionID
+            let messagesList = plan.Cleaned
+            let sembleInjectEnabled = plan.SembleInjectEnabled
+            let maxInputTokens = plan.MaxInputTokens
 
             do!
                 runHostMessagesTransformExecution

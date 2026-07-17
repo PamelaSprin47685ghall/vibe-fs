@@ -103,6 +103,57 @@ let readUnfiltered (mgr: obj) (id: string) (session: obj) (offset: int) (limit: 
         return frontMatterPrompt fields (String.concat "\n" sb)
     }
 
+let private formatFilteredResult
+    (id: string)
+    (session: obj)
+    (pattern: string)
+    (offset: int)
+    (matches: obj array)
+    (totalLines: int)
+    (totalMatches: int)
+    (hasMore: bool)
+    : string =
+    let fields =
+        [ "id", box id
+          "status", box (string session?status)
+          "pattern", box pattern
+          "offset", box offset
+          "returned", box matches.Length
+          "total_matches", box totalMatches
+          "total_lines", box totalLines
+          "has_more", box hasMore ]
+
+    let sb = ResizeArray<string>()
+
+    if matches.Length = 0 then
+        sb.Add(sprintf "No lines matched the pattern '%s'." pattern)
+        sb.Add(sprintf "Total lines in buffer: %d" totalLines)
+    else
+        for i in 0 .. matches.Length - 1 do
+            let m = matches.[i]
+            sb.Add(string m?text)
+
+        sb.Add("")
+
+        if hasMore then
+            sb.Add(
+                sprintf
+                    "(%d of %d matches shown. Use offset=%d to see more.)"
+                    matches.Length
+                    totalMatches
+                    (offset + matches.Length)
+            )
+        else
+            sb.Add(
+                sprintf
+                    "(%d match%s from %d total lines)"
+                    totalMatches
+                    (if totalMatches = 1 then "" else "es")
+                    totalLines
+            )
+
+    frontMatterPrompt fields (String.concat "\n" sb)
+
 let readFiltered
     (mgr: obj)
     (id: string)
@@ -125,46 +176,7 @@ let readFiltered
         let totalMatches = unbox<int> result?totalMatches
         let hasMore = unbox<bool> result?hasMore
 
-        let fields =
-            [ "id", box id
-              "status", box (string session?status)
-              "pattern", box pattern
-              "offset", box offset
-              "returned", box matches.Length
-              "total_matches", box totalMatches
-              "total_lines", box totalLines
-              "has_more", box hasMore ]
-
-        let sb = ResizeArray<string>()
-
-        if matches.Length = 0 then
-            sb.Add(sprintf "No lines matched the pattern '%s'." pattern)
-            sb.Add(sprintf "Total lines in buffer: %d" totalLines)
-        else
-            for i in 0 .. matches.Length - 1 do
-                let m = matches.[i]
-                sb.Add(string m?text)
-
-            sb.Add("")
-
-            if hasMore then
-                sb.Add(
-                    sprintf
-                        "(%d of %d matches shown. Use offset=%d to see more.)"
-                        matches.Length
-                        totalMatches
-                        (offset + matches.Length)
-                )
-            else
-                sb.Add(
-                    sprintf
-                        "(%d match%s from %d total lines)"
-                        totalMatches
-                        (if totalMatches = 1 then "" else "es")
-                        totalLines
-                )
-
-        return frontMatterPrompt fields (String.concat "\n" sb)
+        return formatFilteredResult id session pattern offset matches totalLines totalMatches hasMore
     }
 
 let ptyReadTool (host: Host) : obj =

@@ -63,7 +63,7 @@ let private parseTodos (params': obj) (parseError: string option ref) : TodoItem
                 match Wanxiangshu.Runtime.WorkBacklogToolsCodec.parseTodoItemStatus statusStr with
                 | Ok s -> s
                 | Error _ ->
-                    parseError := Some $"Invalid todo status: %s{statusStr}"
+                    parseError.Value <- Some $"Invalid todo status: %s{statusStr}"
                     Wanxiangshu.Kernel.ToolArgs.Todo
 
             let priority =
@@ -73,7 +73,7 @@ let private parseTodos (params': obj) (parseError: string option ref) : TodoItem
                     match Wanxiangshu.Runtime.WorkBacklogToolsCodec.parseTodoItemPriority priorityStr with
                     | Ok p -> p
                     | Error _ ->
-                        parseError := Some $"Invalid todo priority: %s{priorityStr}"
+                        parseError.Value <- Some $"Invalid todo priority: %s{priorityStr}"
                         Wanxiangshu.Kernel.ToolArgs.Low
 
             { Content = Dyn.str item "content"
@@ -144,7 +144,7 @@ let registerTodoTool (pi: obj) : unit =
 
                               let todos = parseTodos params' parseError
 
-                              match !parseError with
+                              match parseError.Value with
                               | Some err -> return errorResult err
                               | None ->
                                   let args =
