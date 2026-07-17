@@ -11,6 +11,10 @@ open Wanxiangshu.Runtime.Fallback.Ports
 open Wanxiangshu.Runtime.Fallback.LeaseValidation
 open Wanxiangshu.Runtime.ContinuationEventWriter
 open Wanxiangshu.Runtime.Clock
+open Wanxiangshu.Runtime.Fallback.RetryDispatchGovernor
+
+/// Shared per-process retry dispatch governor.
+let private retryGovernor = RetryDispatchGovernor()
 
 type ContinuationIntent =
     | SendContinueIntent of
@@ -91,7 +95,42 @@ let handleDispatchComplete
                 do! cancelAfterDispatch runtime executor workspaceRoot sessionID lease "Cancelled after dispatch"
             else
                 runtime.SetInjectedAt sessionID atMs
-                runtime.SetInjectedModel sessionID model
+
+            runtime.SetInjectedModel sessionID model
+    }
+
+/// Inner dispatch: write dispatch_started, transition lease, call action.
+let private dispatchWithLeaseTransition
+    (runtime: FallbackRuntimeStore)
+    (executor: IActionExecutor)
+    (workspaceRoot: string)
+    (sessionID: string)
+    (lease: PendingLease)
+    (model: FallbackModel)
+    (agent: string)
+    (dispatchAction: unit -> JS.Promise<unit>)
+    : JS.Promise<unit> =
+    promise {
+        do!
+            appendContinuationDispatchStartedOrFail
+                workspaceRoot
+                sessionID
+                lease.ContinuationID
+                lease.ContinuationOrdinal
+
+        let isValid =
+            runtime.TryTransitionPendingLease(
+                sessionID,
+                lease.ContinuationID,
+                LeaseStatus.Requested,
+                LeaseStatus.DispatchStarted
+            )
+
+        if not isValid then
+            do! cancelAfterDispatch runtime executor workspaceRoot sessionID lease "Lease invalid at dispatch"
+        else
+            do! dispatchAction ()
+            do! handleDispatchComplete runtime executor workspaceRoot sessionID lease model agent
     }
 
 let executeContinuation
@@ -109,27 +148,31 @@ let executeContinuation
             verifyLease runtime sessionID lease
             && ensureActiveAndOwner runtime sessionID lease
         then
+            // Build model key for rate-limiting
+            let modelKey =
+                RetryModelKey.Create(model.ProviderID, model.ModelID, ?variant = model.Variant)
+
+            let stillValid () =
+                verifyLease runtime sessionID lease
+                && ensureActiveAndOwner runtime sessionID lease
+
+            let dispatchWithLease () =
+                dispatchWithLeaseTransition runtime executor workspaceRoot sessionID lease model agent dispatchAction
+
             try
-                do!
-                    appendContinuationDispatchStartedOrFail
-                        workspaceRoot
-                        sessionID
-                        lease.ContinuationID
-                        lease.ContinuationOrdinal
+                let! dispatchResult = retryGovernor.RunWhenAllowed(modelKey, stillValid, dispatchWithLease)
 
-                let isLeaseStillValid =
-                    runtime.TryTransitionPendingLease(
-                        sessionID,
-                        lease.ContinuationID,
-                        LeaseStatus.Requested,
-                        LeaseStatus.DispatchStarted
-                    )
-
-                if not isLeaseStillValid then
-                    do! cancelAfterDispatch runtime executor workspaceRoot sessionID lease "Lease invalid at dispatch"
-                else
-                    do! dispatchAction ()
-                    do! handleDispatchComplete runtime executor workspaceRoot sessionID lease model agent
+                match dispatchResult with
+                | Dispatched -> ()
+                | CancelledBeforeDispatch ->
+                    do!
+                        finishContinuation
+                            runtime
+                            workspaceRoot
+                            sessionID
+                            lease
+                            ContinuationOutcome.Cancelled
+                            "Cancelled before dispatch (rate-limited)"
             with ex ->
                 do! finishContinuation runtime workspaceRoot sessionID lease ContinuationOutcome.Failed ex.Message
         else
@@ -190,7 +233,6 @@ let executeContinuationIntent
                   Status = LeaseStatus.Requested }
 
             do! executeSendContinue runtime executor workspaceRoot sessionID lease model agent
-
         | RecoverWithPromptIntent(model, promptText, agent, turnId, gen, cancelGen, continuationID, continuationOrdinal) ->
             let lease =
                 { ContinuationID = continuationID
@@ -204,7 +246,6 @@ let executeContinuationIntent
                   Status = LeaseStatus.Requested }
 
             do! executeRecoverWithPrompt runtime executor workspaceRoot sessionID lease model promptText agent
-
         | PropagateFailureIntent -> do! executor.PropagateFailure sessionID
     }
 
