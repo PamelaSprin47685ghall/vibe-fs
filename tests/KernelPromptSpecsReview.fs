@@ -64,7 +64,7 @@ let reviewResultFormattingShared () =
 
     let needsRevision = formatReviewResult (ReviewResult.NeedsRevision "missing tests")
     check "needs_revision text embeds feedback" (needsRevision.Contains "missing tests")
-    check "needs_revision text instructs to retry" (needsRevision.Contains "submit_review")
+    check "needs_revision text instructs to continue" (needsRevision.Contains "continue")
 
     let terminated = formatReviewResult ReviewResult.Terminated
     check "terminated text mentions terminated" (terminated.ToLower().Contains "terminat")

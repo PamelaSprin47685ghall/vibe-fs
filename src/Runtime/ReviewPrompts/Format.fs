@@ -3,15 +3,26 @@ module Wanxiangshu.Runtime.ReviewPrompts.Format
 open Wanxiangshu.Runtime.LoopMessages
 open Wanxiangshu.Kernel.ReviewSession
 open Wanxiangshu.Kernel.ReviewSession.Types
+open Wanxiangshu.Kernel.Review.ReviewEncouragement
 open Wanxiangshu.Runtime.PromptFrontMatter
+
+/// Backward-compatible alias for the WIP acknowledgment body.
+let submitReviewWipAcknowledgment: string = wipAcknowledgment
 
 let submitReviewIsWip (wip: bool option) : bool = defaultArg wip true
 
-let submitReviewWipAcknowledgment: string =
-    Wanxiangshu.Kernel.Nudge.NudgePromptText.submitReviewWipAcknowledgment
+/// Structured YAML anchor for WIP acknowledgment detection.
+/// Used by isSubmitReviewWipProgressOutput instead of scanning prose.
+let wipAcknowledgmentAnchor = "review_progress"
+
+/// Value of the anchor when a WIP was recorded.
+let wipAcknowledgmentRecorded = "recorded"
 
 let formatWipAcknowledgment (task: string) : string =
-    frontMatterPrompt [ yamlField "task" task ] submitReviewWipAcknowledgment
+    frontMatterPrompt
+        [ yamlField "task" task
+          yamlField wipAcknowledgmentAnchor wipAcknowledgmentRecorded ]
+        wipAcknowledgment
 
 let formatReviewResult (result: ReviewResult) : string =
     match result with
@@ -20,18 +31,13 @@ let formatReviewResult (result: ReviewResult) : string =
 
         let body =
             if trimmed = "" then
-                "Review passed. Your changes have been accepted. With-Review Mode has ended."
+                acceptedVerdict
             else
-                "Review passed with the following feedback:\n\n"
-                + trimmed
-                + "\n\nYour changes have been accepted. With-Review Mode has ended."
+                acceptedVerdict + "\n\n" + trimmed
 
         frontMatterPrompt [ yamlField verdictField verdictAccepted ] body
-    | ReviewResult.Terminated ->
-        frontMatterPrompt
-            [ yamlField verdictField verdictTerminated ]
-            "Review terminated without verdict. With-Review Mode is still active; fix the issues and call submit_review again."
+    | ReviewResult.Terminated -> frontMatterPrompt [ yamlField verdictField verdictTerminated ] terminatedVerdict
     | ReviewResult.NeedsRevision feedback ->
         frontMatterPrompt
             [ yamlField verdictField verdictNeedsRevision; yamlField "feedback" feedback ]
-            "Address the feedback above. With-Review Mode is still active — fix the issues and call submit_review again."
+            needsRevisionVerdict
