@@ -392,6 +392,7 @@
     <Compile Include="src/Hosts/Mux/ReviewToolsMux.fs"/>
     <Compile Include="src/Hosts/Mux/BuiltinToolsFuzzy.fs"/>
     <Compile Include="src/Hosts/Mux/BuiltinTools.fs"/>
+    <Compile Include="src/Hosts/Mux/SwapTool.fs"/>
     <Compile Include="src/Hosts/Mux/WebTools.fs"/>
     <Compile Include="src/Hosts/Mux/MessagingCodec.fs"/>
     <Compile Include="src/Hosts/Mux/CapsCodec.fs"/>
@@ -442,6 +443,7 @@
     <Compile Include="src/Hosts/OpenCode/PtyIo.fs"/>
     <Compile Include="src/Hosts/OpenCode/SearchTools.fs"/>
     <Compile Include="src/Hosts/OpenCode/ReviewTools.fs"/>
+    <Compile Include="src/Hosts/OpenCode/SwapTool.fs"/>
     <Compile Include="src/Hosts/OpenCode/Tools.fs"/>
     <Compile Include="src/Hosts/OpenCode/HookExecute.fs"/>
     <Compile Include="src/Hosts/OpenCode/HookTransform.fs"/>
@@ -473,6 +475,7 @@
     <Compile Include="src/Hosts/Omp/ExecutorTools.fs"/>
     <Compile Include="src/Hosts/Omp/MessageTransform.fs"/>
     <Compile Include="src/Hosts/Omp/WebTools.fs"/>
+    <Compile Include="src/Hosts/Omp/SwapTool.fs"/>
     <Compile Include="src/Hosts/Omp/OmpTools.fs"/>
     <Compile Include="src/Hosts/Omp/TodoTool.fs"/>
     <Compile Include="src/Hosts/Omp/SubagentTools.fs"/>

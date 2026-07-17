@@ -13,6 +13,7 @@ open Wanxiangshu.Hosts.Opencode.SearchTools
 open Wanxiangshu.Hosts.Opencode.ReviewTools
 open Wanxiangshu.Hosts.Opencode.MimoTodoTool
 open Wanxiangshu.Hosts.Opencode.OpencodeTools
+open Wanxiangshu.Hosts.Opencode.SwapTool
 open Wanxiangshu.Runtime.ChildAgentRegistry
 open Wanxiangshu.Runtime.FuzzyFinderShell
 open Wanxiangshu.Runtime.RuntimeScope
@@ -48,6 +49,7 @@ let createTools
               yield "webfetch", box (webfetchTool ctx)
               yield "submit_review", box (submitReviewTool registry ctx reviewStore sessionScope)
               yield "return_reviewer", box (submitReviewResultTool ctx reviewStore sessionScope)
+              yield "swap", box (swapTool ())
               if host = Mimocode then
                   yield todoWriteToolName host, box (mimoTodoTool ctx) ]
 

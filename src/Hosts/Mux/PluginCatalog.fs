@@ -19,6 +19,7 @@ open Wanxiangshu.Hosts.Mux.ReviewToolsMux
 open Wanxiangshu.Hosts.Mux.BuiltinTools
 open Wanxiangshu.Hosts.Mux.WebTools
 open Wanxiangshu.Hosts.Mux.MuxTools
+open Wanxiangshu.Hosts.Mux.SwapTool
 open Wanxiangshu.Runtime.RuntimeScope
 open Wanxiangshu.Runtime.Dyn
 open Wanxiangshu.Runtime.MuxHookInputCodec
@@ -43,7 +44,8 @@ let muxToolNames =
            "fuzzy_find"
            "fuzzy_continue"
            "write"
-           "read" |]
+           "read"
+           "swap" |]
         meditatorToolNames
 
 let private canUseMuxTopLevel (agent: string) (toolName: string) : bool = canUseForHost mux agent toolName
@@ -77,7 +79,8 @@ let createToolCatalog
            yield fuzzyContinueTool finderCache iteratorStore
            yield injectWarnWarnTddIntoMuxSchema (writeTool deps)
            yield readTool deps hostReadExec
-           yield meditatorTool deps toolNames |]
+           yield meditatorTool deps toolNames
+           yield swapToolDef () |]
         |> Array.map injectWarnReuseIntoMuxSchema
 
     for t in catalog do
