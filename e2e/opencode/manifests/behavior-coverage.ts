@@ -100,11 +100,11 @@ export const COVERAGE: Record<string, CoverageEntry[]> = {
     { id: 'OC-EXEC-012', description: 'Session abort terminates long command', level: 'not-covered', priority: 'P0' },
   ],
   pty: [
-    { id: 'OC-PTY-001', description: 'pty_spawn starts process, returns real session ID', level: 'not-covered', priority: 'P0' },
+    { id: 'OC-PTY-001', description: 'pty_spawn starts process, returns real session ID', level: 'real-e2e', spec: 'e2e/opencode/specs/p0-canary.js', priority: 'P0' },
     { id: 'OC-PTY-002', description: 'pty_list shows newly created PTY', level: 'not-covered', priority: 'P0' },
     { id: 'OC-PTY-003', description: 'pty_read reads initial output', level: 'not-covered', priority: 'P0' },
     { id: 'OC-PTY-004', description: 'pty_write writes stdin, reads response', level: 'not-covered', priority: 'P0' },
-    { id: 'OC-PTY-005', description: 'pty_kill = PID no longer alive', level: 'not-covered', priority: 'P0' },
+    { id: 'OC-PTY-005', description: 'pty_kill = PID no longer alive', level: 'real-e2e', spec: 'e2e/opencode/specs/p0-canary.js', priority: 'P0' },
     { id: 'OC-PTY-006', description: 'After kill, list no longer reports running', level: 'not-covered', priority: 'P0' },
     { id: 'OC-PTY-007', description: 'Invalid PTY ID returns error, others unaffected', level: 'not-covered', priority: 'P0' },
     { id: 'OC-PTY-008', description: 'Session deleted cleans up its PTYs', level: 'not-covered', priority: 'P0' },

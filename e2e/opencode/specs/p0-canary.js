@@ -223,6 +223,53 @@ const tests = [
   }
 },
 
+{
+  name: 'OC-PTY-001 pty_spawn starts process and returns session ID',
+  fn: async (t) => {
+    const sess = await t.client.createSession();
+    const sid = getSessionId(sess);
+    t.provider.expectToolCall({ id: 'pty-spawn', tool: 'pty_spawn', args: { command: 'echo', args: ['hello-pty'], description: 'test pty spawn' } });
+    t.provider.expectText({ id: 'pty-done', text: 'spawned' });
+    await t.client.prompt(sid, 'run "echo hello-pty" in a PTY session and confirm it started');
+    if (!await waitForSessionIdle(t.client, t.events, sid)) throw new Error('Not idle');
+    const msgsStr = JSON.stringify((await t.client.messages(sid)).data);
+    if (!msgsStr.includes('pty_')) { throw new Error('PTY session ID not found in messages'); }
+    t.events.expectCount({ type: 'session.error', sessionID: sid, count: 0 });
+    t.provider.expectSatisfied();
+    t.provider.reset();
+  }
+},
+
+{
+  name: 'OC-PTY-005 pty_kill terminates process',
+  fn: async (t) => {
+    const sess = await t.client.createSession();
+    const sid = getSessionId(sess);
+    // Dynamic args: extract PTY ID from conversation (tool result from pty_spawn)
+    const ptyKillArgs = (reqBody) => {
+      const msgs = reqBody.messages || [];
+      const allText = JSON.stringify(msgs);
+      // Find PTY session ID (not tool names like pty_spawn/kill/list/read/write)
+      const allPty = allText.match(/pty_[a-zA-Z0-9]+/g) || [];
+      const knownTools = new Set(['pty_spawn','pty_kill','pty_list','pty_read','pty_write']);
+      const realId = allPty.find(id => !knownTools.has(id));
+      return { id: realId || 'unknown-pty', cleanup: true };
+    };
+    t.provider.expectToolCall({ id: 'pty-spawn2', tool: 'pty_spawn', args: { command: 'echo', args: ['hello-kill'], description: 'test pty kill' } });
+    t.provider.expectToolCall({ id: 'pty-kill', tool: 'pty_kill', args: ptyKillArgs });
+    t.provider.expectText({ id: 'kill-done', text: 'done' });
+    await t.client.prompt(sid, 'start a PTY with "echo hello-kill", then kill it with cleanup');
+    if (!await waitForSessionIdle(t.client, t.events, sid)) throw new Error('Not idle');
+    const msgsStr = JSON.stringify((await t.client.messages(sid)).data);
+    if (!msgsStr.includes('killed') && !msgsStr.includes('cleaned_up')) {
+      throw new Error('PTY kill result not found');
+    }
+    t.events.expectCount({ type: 'session.error', sessionID: sid, count: 0 });
+    t.provider.expectSatisfied();
+    t.provider.reset();
+  }
+},
+
 ];
 
 const exitCode = await runSuite({ plugin: true, timeoutMs: 90000 }, tests);

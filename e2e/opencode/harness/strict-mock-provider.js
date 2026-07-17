@@ -315,7 +315,12 @@ export class StrictMockProvider {
 
       switch (exp.respond.type) {
         case 'tool-call': {
-          const args = { ...exp.respond.args };
+          let args;
+          if (typeof exp.respond.args === 'function') {
+            args = exp.respond.args(parsed);
+          } else {
+            args = { ...exp.respond.args };
+          }
           if (args.warn_tdd === null) delete args.warn_tdd;
           else if (!('warn_tdd' in args)) args.warn_tdd = 'i-am-sure-i-have-followed-tdd-and-kolmogorov-principles-and-kept-todo-updated';
           if (args.warn === null) delete args.warn;
