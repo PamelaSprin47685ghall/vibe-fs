@@ -94,7 +94,8 @@ let executeSubmitReview
             | None -> return errorResult "Loop review is not active for this session."
             | Some activeTask ->
                 if isWorkInProgress params' then
-                    do! appendSubmitReviewWipRecorded root sessionId |> Promise.map ignore
+                    let report = Dyn.str params' "report"
+                    do! appendSubmitReviewWipRecorded root sessionId report |> Promise.map ignore
                     return textResult (formatWipAcknowledgment activeTask)
                 elif not (store.tryLockReview sessionId) then
                     return errorResult "A review is already in progress."

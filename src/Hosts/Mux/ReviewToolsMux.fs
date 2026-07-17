@@ -144,7 +144,7 @@ let submitReviewTool
                         | Ready originalTask ->
                             try
                                 if submitReviewIsWip decoded.Wip then
-                                    do! appendSubmitReviewWipRecordedOrFail root workspaceId
+                                    do! appendSubmitReviewWipRecordedOrFail root workspaceId decoded.Report
                                     return formatWipAcknowledgment originalTask
                                 else
                                     let! result =
