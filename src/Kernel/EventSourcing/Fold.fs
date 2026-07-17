@@ -204,7 +204,7 @@ let applyEvent (st: SessionState) (e: WanEvent) : SessionState =
                      st.CancelGeneration,
                      st.ActiveContinuationGen,
                      st.ActiveContinuationCancelGen,
-                     nextHumanTurn)
+                     st.LatestHumanTurn)
                     ev
             | None ->
                 st.SessionGeneration, st.CancelGeneration, st.ActiveContinuationGen, st.ActiveContinuationCancelGen
