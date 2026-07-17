@@ -30,6 +30,22 @@ import path from 'node:path';
  * Generate the OpenCode config for a mock provider.
  */
 function makeConfig(llmUrl, pluginPaths = [], opts = {}) {
+  const modelDef = {
+    id: 'test-model',
+    name: 'Test Model',
+    attachment: false,
+    reasoning: false,
+    temperature: false,
+    tool_call: true,
+    release_date: '2025-01-01',
+    limit: {
+      context: opts.contextLimit ?? 100000,
+      input: opts.contextLimit ?? 100000,
+      output: 10000,
+    },
+    cost: { input: 0, output: 0 },
+    options: {},
+  };
   return {
     formatter: false,
     lsp: false,
@@ -41,25 +57,16 @@ function makeConfig(llmUrl, pluginPaths = [], opts = {}) {
         id: 'test',
         env: [],
         npm: '@ai-sdk/openai-compatible',
-        models: {
-          'test-model': {
-            id: 'test-model',
-            name: 'Test Model',
-            attachment: false,
-            reasoning: false,
-            temperature: false,
-            tool_call: true,
-            release_date: '2025-01-01',
-            limit: {
-              context: opts.contextLimit ?? 100000,
-              input: opts.contextLimit ?? 100000,
-              output: 10000,
-            },
-            cost: { input: 0, output: 0 },
-            options: {},
-          },
-        },
-        options: { apiKey: opts.apiKey || 'test-key', baseURL: llmUrl },
+        models: { 'test-model': { ...modelDef } },
+        options: { apiKey: opts.apiKey || 'test-key', baseURL: `${llmUrl}` },
+      },
+      opencode: {
+        name: 'OpenCode',
+        id: 'opencode',
+        env: [],
+        npm: '@ai-sdk/openai-compatible',
+        models: { 'test-model': { ...modelDef } },
+        options: { apiKey: opts.apiKey || 'test-key', baseURL: `${llmUrl}` },
       },
     },
     plugin: pluginPaths,
@@ -134,6 +141,7 @@ export function createIsolatedEnv(opts) {
     OPENCODE_DISABLE_MODELS_FETCH: '1',
     OPENCODE_AUTH_CONTENT: '{}',
     OPENCODE_EXPERIMENTAL_EVENT_SYSTEM: 'true',
+    OPENCODE_EXPERIMENTAL: 'true',
     OPENCODE_CONFIG_CONTENT: JSON.stringify(config),
     OPENCODE_PERMISSION: JSON.stringify({ '*': 'allow' }),
 

@@ -98,17 +98,21 @@ export class HttpClient {
     const text = await res.text();
     try { return { status: res.status, ok: res.ok, data: JSON.parse(text) }; } catch { return { status: res.status, ok: res.ok, data: text }; }
   }
-  async createSession(body = { model: { id: 'test-model', providerID: 'test' } }) {
+  async createSession(model = { id: 'test-model', providerID: 'test' }) {
+    const body = typeof model === 'object' && model !== null && (model.model || model.providerID)
+      ? { model }
+      : { model: { id: 'test-model', providerID: 'test' } };
     return this.request('POST', '/api/session', { body });
   }
-  async prompt(sessionID, text, timeoutMs = 120000) {
+  async prompt(sessionID, text, model, timeoutMs = 120000) {
     const ac = new AbortController();
+    const promptModel = model || { providerID: 'test', modelID: 'test-model' };
     const timer = setTimeout(() => ac.abort(), timeoutMs);
     try {
       const res = await fetch(`${this._baseUrl}/session/${sessionID}/prompt_async`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'x-opencode-directory': this._workDir },
-        body: JSON.stringify({ parts: [{ type: 'text', text }], model: { providerID: 'test', modelID: 'test-model' } }),
+        body: JSON.stringify({ parts: [{ type: 'text', text }], model: promptModel }),
         signal: ac.signal,
       });
       const bodyText = await res.text();

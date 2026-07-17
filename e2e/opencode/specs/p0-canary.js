@@ -187,8 +187,39 @@ const tests = [
     }
   },
 
-  // NOTE: OC-WEB-001 (websearch) is blocked by websearch not being registered
-  // as an available tool in the current build. Existing E2E tests also fail.
+  // ── OC-WEB-001: websearch returns results (needs OPENCODE_EXPERIMENTAL) ───
+  // websearch is enabled via the OPENCODE_EXPERIMENTAL env var in isolated-env.
+  {
+    name: 'OC-WEB-001 websearch returns title, URL, content',
+    fn: async (t) => {
+      const sess = await t.client.createSession();
+      const sid = getSessionId(sess);
+
+      // websearch spawns an executor subagent: tool call + subagent summary + main-agent text
+      t.provider.expectToolCall({
+        id: 'web-search', tool: 'websearch',
+        args: { query: 'e2e test', numResults: 3, what_to_summarize: 'summarize results' },
+      });
+      t.provider.expectText({ id: 'web-subagent', text: 'search results summary' });
+      t.provider.expectText({ id: 'web-final', text: 'search complete' });
+
+      await t.client.prompt(sid, 'search the web for e2e test');
+      await waitForSessionIdle(t.client, t.events, sid, 60000);
+
+      const reqs = t.provider.requests;
+      const allReqsText = JSON.stringify(reqs);
+      if (!allReqsText.includes('Test Search Title')) {
+        const msgsStr = JSON.stringify((await t.client.messages(sid)).data);
+        if (!msgsStr.includes('Test Search Title')) {
+          throw new Error('Search results not found in LLM requests or messages');
+        }
+      }
+
+      t.events.expectCount({ type: 'session.error', sessionID: sid, count: 0 });
+      t.provider.expectSatisfied();
+      t.provider.reset();
+    }
+  },
 ];
 
 const exitCode = await runSuite({ plugin: true, timeoutMs: 60000 }, tests);
