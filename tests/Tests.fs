@@ -18,6 +18,7 @@ open Wanxiangshu.Tests.IntegrationPluginTests
 open Wanxiangshu.Tests.IntegrationEventTests
 open Wanxiangshu.Tests.IntegrationToolSpecCatalog
 open Wanxiangshu.Tests.IntegrationOpencodeReviewSpecs
+open Wanxiangshu.Tests.IntegrationOpencodeContractTests
 open Wanxiangshu.Tests.IntegrationChatTests
 open Wanxiangshu.Tests.WorkBacklogTests
 open Wanxiangshu.Tests.MethodologyTests
@@ -156,6 +157,7 @@ let private allOtherTests: (string * TestBody) list =
         "ContextBudgetIntegrationTests.run", TestBody.Async ContextBudgetIntegrationTests.run
         "ContextBudgetRealApiSpecs.run", TestBody.Async ContextBudgetRealApiSpecs.run
         "ContextBudgetEstimateTests.run", TestBody.Async ContextBudgetEstimateTests.run ]
+    @ [ "IntegrationOpenCodeContractTests.run", TestBody.Async(fun () -> IntegrationOpencodeContractTests.runAll [||]) ]
     @ integrationToolFlatTests
 
 let private tests: (string * TestBody) list =

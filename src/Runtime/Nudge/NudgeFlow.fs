@@ -19,9 +19,9 @@ open Wanxiangshu.Runtime.Fallback.CompactionTransitions
 /// as a terminal gate prevents the callback from manufacturing a second
 /// synthetic turn.
 let private nudgeBlockedByFallbackState (runtime: FallbackRuntimeStore) (sessionKey: string) : bool =
-    let lifecycleTerminal =
+    let lifecycleCancelled =
         match runtime.TryGetState sessionKey with
-        | Some state -> state.Lifecycle <> FallbackLifecycle.Active
+        | Some state -> state.Lifecycle = FallbackLifecycle.Cancelled
         | None -> false
 
     let owner = runtime.GetSessionOwner sessionKey
@@ -36,7 +36,7 @@ let private nudgeBlockedByFallbackState (runtime: FallbackRuntimeStore) (session
         | Some lease -> lease.Status = LeaseStatus.Settled || lease.Status = LeaseStatus.Cancelled
         | None -> false
 
-    lifecycleTerminal
+    lifecycleCancelled
     || fallbackOwnerActive
     || settledFallbackLease
     || runtime.IsCompacted sessionKey
@@ -57,12 +57,12 @@ let private dispatchNudge
         match! tryClaimAndRegisterLease workspaceRoot fallbackRuntime sessionKey action nudgeAnchorKey with
         | None -> ()
         | Some lease ->
-            let isLifecycleActive =
+            let isLifecycleNotCancelled =
                 match fallbackRuntime.TryGetState sessionKey with
-                | Some state -> state.Lifecycle = FallbackLifecycle.Active
+                | Some state -> state.Lifecycle <> FallbackLifecycle.Cancelled
                 | None -> true
 
-            if fallbackRuntime.IsForceStopped sessionKey || not isLifecycleActive then
+            if fallbackRuntime.IsForceStopped sessionKey || not isLifecycleNotCancelled then
                 let reason =
                     if fallbackRuntime.IsForceStopped sessionKey then
                         "Force stopped"

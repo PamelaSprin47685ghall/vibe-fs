@@ -2,7 +2,7 @@ import { execSync, spawn } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { createMockLLM } from './mock-llm.js';
+import { StrictMockProvider } from './opencode/harness/strict-mock-provider.js';
 import {
   E2E_LOCK,
   releaseE2eLock,
@@ -12,36 +12,56 @@ import {
   hostSingletonManager,
 } from './harness-bootstrap.js';
 
-async function warmupOpencode(baseUrl, workDir, llmHandle) {
-  try {
-    const warmSession = await fetch(`${baseUrl}/api/session`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-opencode-directory': workDir },
-      body: JSON.stringify({ model: { id: 'test-model', providerID: 'test' } }),
-    }).then((r) => r.json()).then((r) => {
-      return r.data?.data?.id || r.data?.id || r.data?.data?.data?.id;
-    });
-    if (warmSession) {
-      llmHandle.expectText('warmup');
-      const url = `${baseUrl}/session/${warmSession}/message`;
-      const body = { parts: [{ type: 'text', text: 'warmup' }], model: { providerID: 'test', modelID: 'test-model' } };
-      const res = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-opencode-directory': workDir },
-        body: JSON.stringify(body),
-      });
-      if (!res.ok) {
-        const text = await res.text();
-        throw new Error(`warmup sendPrompt failed: status=${res.status} body=${text}`);
-      }
-      llmHandle.reset();
-      return warmSession;
-    }
-  } catch (e) {
-    console.error('warmup failed:', e);
+// ─── MockLLMAdapter — wraps StrictMockProvider to match existing harness API ──
+// F# tests call: mockLLM.expectTool(tool, args), mockLLM.expectText(text),
+//                mockLLM.calls, mockLLM.reset(), mockLLM.getRemainingExpectations()
+
+class MockLLMAdapter {
+  constructor(provider) {
+    this._provider = provider;
   }
-  return null;
+
+  // accept both string form (existing callers) and {text} object form
+  expectText(text) {
+    if (typeof text === 'string') {
+      this._provider.expectText({ text });
+    } else {
+      this._provider.expectText(text);
+    }
+  }
+
+  // map legacy expectTool(toolName, args) → expectToolCall({tool, args})
+  expectTool(tool, args) {
+    this._provider.expectToolCall({ tool, args: args ?? {} });
+  }
+
+  reset() {
+    this._provider.reset();
+  }
+
+  getRemainingExpectations() {
+    return this._provider.remainingExpectations;
+  }
+
+  // expose StrictMockProvider._requests mapped to {body: r} shape
+  get calls() {
+    return (this._provider.requests || []).map((r) => ({ body: r }));
+  }
+
+  get url() {
+    return this._provider.url;
+  }
+
+  async start() {
+    return await this._provider.start();
+  }
+
+  async stop() {
+    return await this._provider.stop();
+  }
 }
+
+// ─── Permission SSE helper ───────────────────────────────────────────────────
 
 async function replyToPermission(baseUrl, workDir, sessionID, id) {
   const url = `${baseUrl}/session/${sessionID}/permissions/${id}`;
@@ -108,6 +128,20 @@ async function readSseStream(body, baseUrl, workDir, abortSignal, hostObj) {
   }
 }
 
+// ─── Stderr ring-buffer helper ───────────────────────────────────────────────
+
+class StderrRingBuffer {
+  constructor(maxLines = 200) {
+    this._lines = [];
+    this._maxLines = maxLines;
+  }
+  push(line) {
+    this._lines.push(line);
+    if (this._lines.length > this._maxLines) this._lines.shift();
+  }
+  get log() { return this._lines.join('\n'); }
+}
+
 function initHostDirAndSpawn(llmHandle, opts) {
   const home = fs.mkdtempSync(path.join(os.tmpdir(), 'wanxiang-e2e-'));
   const workDir = path.join(home, 'workspace');
@@ -125,13 +159,19 @@ function initHostDirAndSpawn(llmHandle, opts) {
   }
 
   const env = isolatedEnv(home, `${llmHandle.url}/v1`, opts);
+  const stderrBuffer = new StderrRingBuffer();
   const child = spawn('opencode', ['serve', '--port', '0', '--hostname', '127.0.0.1'], {
     cwd: workDir,
     env: { ...process.env, ...env },
-    stdio: ['pipe', 'pipe', 'ignore'],
+    stdio: ['pipe', 'pipe', 'pipe'],
     windowsHide: true,
   });
-  return { home, workDir, child };
+  child.stderr.on('data', (chunk) => {
+    for (const line of chunk.toString().split('\n')) {
+      if (line.trim()) stderrBuffer.push(line.trim());
+    }
+  });
+  return { home, workDir, child, stderrBuffer };
 }
 
 async function connectPermissionResponder(hostObj) {
@@ -162,14 +202,15 @@ async function connectPermissionResponder(hostObj) {
 }
 
 async function spawnOpencodeHost(variant, opts) {
-  const llm = createMockLLM();
-  const llmHandle = await llm.start();
-  const { home, workDir, child } = initHostDirAndSpawn(llmHandle, opts);
+  const provider = new StrictMockProvider();
+  const llmHandle = new MockLLMAdapter(provider);
+  const url = await provider.start();
+  const { home, workDir, child, stderrBuffer } = initHostDirAndSpawn(llmHandle, opts);
 
   let listenLine = await waitForListening(child.stdout, child);
   if (!listenLine) {
     child.kill('SIGKILL');
-    await llmHandle.stop().catch(() => {});
+    await provider.stop().catch(() => {});
     throw new Error('waitForListening returned empty/undefined');
   }
 
@@ -188,16 +229,11 @@ async function spawnOpencodeHost(variant, opts) {
     permissionAbort,
     permissionPromise: null,
     permissionError: null,
-    warmSession: null
+    warmSession: null,
+    stderrBuffer,
   };
 
   await connectPermissionResponder(hostObj);
-
-  let warmSession = null;
-  // if (opts.plugin) {
-  //   warmSession = await warmupOpencode(baseUrl, workDir, llmHandle);
-  // }
-  hostObj.warmSession = warmSession;
 
   return hostObj;
 }
@@ -210,6 +246,16 @@ class OpencodeHarness {
     this.workDir = sharedHost.workDir;
     this.home = sharedHost.home;
     this.activeSessionId = null;
+    this._trackedSessionIds = [];
+    this._permissionAbort = sharedHost.permissionAbort || null;
+    this._permissionPromise = sharedHost.permissionPromise || null;
+    this._child = sharedHost.child || null;
+    this._stderrBuffer = sharedHost.stderrBuffer || null;
+  }
+
+  // expose stderr ring buffer for diagnostics
+  get stderrLog() {
+    return this._stderrBuffer ? this._stderrBuffer.log : '';
   }
 
   async request(method, urlPath, { query, body, headers } = {}) {
@@ -220,7 +266,7 @@ class OpencodeHarness {
       method,
       headers: {
         'Content-Type': 'application/json',
-        'x-opencode-directory': this.workDir, // 全程使用共享根工作目录，防死锁
+        'x-opencode-directory': this.workDir,
         ...(headers || {}),
       },
     };
@@ -234,6 +280,9 @@ class OpencodeHarness {
       const newSessId = data?.data?.data?.id || data?.data?.id;
       if (newSessId) {
         this.activeSessionId = newSessId;
+        if (!this._trackedSessionIds.includes(newSessId)) {
+          this._trackedSessionIds.push(newSessId);
+        }
       }
     }
 
@@ -255,7 +304,7 @@ class OpencodeHarness {
     try {
       const res = await fetch(url, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-opencode-directory': this.workDir }, // 全程使用共享根工作目录
+        headers: { 'Content-Type': 'application/json', 'x-opencode-directory': this.workDir },
         body: JSON.stringify(body),
         signal: ac.signal,
       });
@@ -346,17 +395,24 @@ class OpencodeHarness {
 
   async waitForIdle(sessionID, timeoutMs = 1000) {
     const deadline = Date.now() + timeoutMs;
+    let sawNonIdle = false;
     while (Date.now() < deadline) {
       const res = await this.request('GET', '/session/status', {});
       if (res.ok && res.data) {
         const statusMap = res.data.data || res.data;
         const status = statusMap[sessionID];
-        // If the session status is not present, or is explicitly 'idle', the session is idle
-        if (!status || status.type === 'idle') {
+        if (status) {
+          if (status.type === 'idle') {
+            if (sawNonIdle) return true;
+          } else {
+            sawNonIdle = true;
+          }
+        } else if (sawNonIdle) {
+          // session was observed as non-idle and has now disappeared — treat as idle
           return true;
         }
       }
-      await new Promise((r) => setTimeout(r, 50));
+      await new Promise((r) => setTimeout(r, 100));
     }
     return false;
   }
@@ -432,12 +488,55 @@ class OpencodeHarness {
   }
 
   async dispose() {
-    // 顺序用例不需要物理销毁，保持共享工作区
+    // 1. Stop mock LLM
+    if (this.mockLLM?.stop) {
+      await this.mockLLM.stop().catch(() => {});
+    }
+
+    // 2. Abort SSE permission responder
+    if (this._permissionAbort) this._permissionAbort.abort();
+    if (this._permissionPromise) await this._permissionPromise.catch(() => {});
+
+    // 3. Abort tracked sessions
+    for (const sid of this._trackedSessionIds) {
+      try { await this.abortSession(sid); } catch {}
+    }
+
+    // 4. SIGTERM → wait → SIGKILL
+    if (this._child) {
+      try { this._child.kill('SIGTERM'); } catch {}
+      try {
+        await new Promise((resolve) => {
+          const timeout = setTimeout(() => {
+            this._child.kill('SIGKILL');
+            resolve();
+          }, 5000);
+          this._child.on('exit', () => {
+            clearTimeout(timeout);
+            resolve();
+          });
+        });
+      } catch {}
+    }
+
+    // 5. Delete temp dir
+    if (this.home) {
+      try { fs.rmSync(this.home, { recursive: true, force: true }); } catch {}
+    }
   }
 }
 
 export async function start(opts = {}) {
   const variant = opts.variant || 'opencode';
-  const sharedHost = await hostSingletonManager.getHost(variant, () => spawnOpencodeHost(variant, opts));
+  // When cleanEnv / freshHost / fresh is set, always spawn a fresh host instead of
+  // using the singleton.  cleanEnv defaults to true in isolatedEnv(), so a plain call
+  // with no opts also gets a fresh host.
+  const forceFresh = (opts.cleanEnv ?? true) || opts.freshHost || opts.fresh;
+  let sharedHost;
+  if (forceFresh) {
+    sharedHost = await spawnOpencodeHost(variant, opts);
+  } else {
+    sharedHost = await hostSingletonManager.getHost(variant, () => spawnOpencodeHost(variant, opts));
+  }
   return new OpencodeHarness(sharedHost);
 }

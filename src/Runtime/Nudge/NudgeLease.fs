@@ -62,9 +62,9 @@ let isLeaseValid (runtime: FallbackRuntimeStore) (sessionKey: string) (lease: Nu
     let currentTurnId = runtime.GetHumanTurnId sessionKey
     let currentOwner = runtime.GetSessionOwner sessionKey
 
-    let isLifecycleActive =
+    let isLifecycleNotCancelled =
         match runtime.TryGetState sessionKey with
-        | Some state -> state.Lifecycle = FallbackLifecycle.Active
+        | Some state -> state.Lifecycle <> FallbackLifecycle.Cancelled
         | None -> true
 
     lease.SessionGeneration = currentGen
@@ -73,7 +73,7 @@ let isLeaseValid (runtime: FallbackRuntimeStore) (sessionKey: string) (lease: Nu
     && lease.Owner = SessionOwner.Nudge
     && currentOwner = SessionOwner.Nudge
     && not (runtime.IsForceStopped sessionKey)
-    && isLifecycleActive
+    && isLifecycleNotCancelled
 
 let tryClaimAndRegisterLease
     (workspaceRoot: string)
@@ -204,7 +204,15 @@ let validateAndFinalizeOutcome
         else
             match outcome with
             | Delivered ->
-                do! processDeliveredOutcome fallbackRuntime workspaceRoot sessionKey lease action nudgeAnchorKey abortRun
+                do!
+                    processDeliveredOutcome
+                        fallbackRuntime
+                        workspaceRoot
+                        sessionKey
+                        lease
+                        action
+                        nudgeAnchorKey
+                        abortRun
             | Busy ->
                 do! finishNudge fallbackRuntime workspaceRoot sessionKey lease NudgeOutcome.Failed "Session busy" "" ""
             | Aborted ->

@@ -287,6 +287,7 @@ const tests = [
     t.events.expectCount({ type: 'session.error', sessionID: sid, count: 0 });
     t.provider.expectSatisfied();
     t.provider.reset();
+    await t.client.abort(sid);
   }
 },
 
@@ -317,6 +318,104 @@ const tests = [
     t.events.expectCount({ type: 'session.error', sessionID: sid, count: 0 });
     t.provider.expectSatisfied();
     t.provider.reset();
+  }
+},
+
+// ── OC-NUDGE-001 ────────────────────────────────────────────────────────────
+// A completed human turn followed by idle must fire exactly ONE nudge prompt.
+// A second idle event after the nudge reply must NOT fire another nudge.
+// Precondition: there must be pending todos, otherwise deriveAction returns NudgeNone.
+// Evidence: provider.syntheticRequests has length 1 with marker 'todo-nudge'.
+
+{
+  name: 'OC-NUDGE-001 nudge fires exactly once after human turn completed',
+  fn: async (t) => {
+    const sess = await t.client.createSession();
+    const sid = getSessionId(sess);
+
+    // Step 1: create a real pending todo via todowrite (copies OC-CB-005 pattern).
+    // Without this, deriveAction sees no todos and returns NudgeNone — no nudge fires.
+    const pad = 'x'.repeat(300);
+    t.provider.expectToolCall({ id: 'nudge-todo', tool: 'todowrite', args: {
+      ahaMoments: pad, changesAndReasons: pad, gotchas: pad,
+      lessonsAndConventions: pad, plan: pad,
+      todos: [{ content: 'pending nudge task', status: 'pending', priority: 'high' }],
+      select_methodology: ['first_principles'],
+    } });
+    t.provider.expectText({ id: 'nudge-todo-ack', text: 'continue' });
+    await t.client.prompt(sid, 'write a todo and say continue');
+    if (!await waitForSessionIdle(t.client, t.events, sid)) throw new Error('Idle not reached after todo');
+
+    // Step 2: poll syntheticRequests — the idle event triggers async nudge dispatch.
+    const idleToNudgeDeadline = Date.now() + 5000;
+    while (t.provider.syntheticRequests.length === 0) {
+      if (Date.now() > idleToNudgeDeadline) throw new Error('Nudge did not fire within 5s of idle');
+      await new Promise(r => setTimeout(r, 200));
+    }
+
+    // Step 3: exactly one todo-nudge request.
+    const nudgeReqs = t.provider.syntheticRequests.filter(r => r.marker === 'todo-nudge');
+    if (nudgeReqs.length !== 1) throw new Error(`Expected 1 todo-nudge, got ${nudgeReqs.length}`);
+
+    // Step 4: one bypass happened.
+    if (t.provider.nudgeBypassed < 1) throw new Error('nudgeBypassed should be ≥ 1');
+
+    // Step 5: after the nudge reply, no additional synthetic requests for 3s.
+    await new Promise(r => setTimeout(r, 3000));
+    if (t.provider.syntheticRequests.length !== 1) {
+      throw new Error(`Nudge fired ${t.provider.syntheticRequests.length - 1} extra time(s)`);
+    }
+
+    // Step 6: no session errors.
+    t.events.expectCount({ type: 'session.error', sessionID: sid, count: 0 });
+
+    t.provider.expectSatisfied();
+    t.provider.reset();
+    await t.client.abort(sid);
+  }
+},
+
+// ── OC-SUB-001 / OC-SUB-005 ─────────────────────────────────────────────────
+// OC-SUB-001: calling coder tool creates a real child session.
+//   Evidence: first LLM request after prompt is a tool-call with name 'coder'.
+// OC-SUB-005: coder result arrives as tool result containing the final output.
+//   Evidence: messages include tool-result content with the coder output.
+
+{
+  name: 'OC-SUB-001 OC-SUB-005 coder child session round-trip',
+  fn: async (t) => {
+    const sess = await t.client.createSession();
+    const sid = getSessionId(sess);
+
+    const coderResultText = 'coder mock execution output';
+
+    t.provider.expectToolCall({
+      id: 'coder-call',
+      tool: 'coder',
+      args: { intents: [], tdd: 'green' },
+    });
+    // Child session text result — consumed when the coder subagent replies.
+    // The parent continuation is not a separate LLM request through the mock;
+    // the coder tool result appearing in session messages is the observable evidence.
+    t.provider.expectText({ id: 'coder-child-result', text: coderResultText });
+
+    await t.client.prompt(sid, 'run coder to implement a feature');
+    if (!await waitForSessionIdle(t.client, t.events, sid)) throw new Error('Not idle after coder');
+
+    // OC-SUB-001: the tool call was a 'coder' tool call
+    const firstReq = t.provider.requests[0];
+    if (!firstReq) throw new Error('No LLM request recorded');
+    const toolNames = (firstReq.tools || []).map(t => t.function?.name || t.name);
+    if (!toolNames.includes('coder')) throw new Error('coder tool not called');
+
+    // OC-SUB-005: tool result with final output appears in messages
+    const msgsStr = JSON.stringify((await t.client.messages(sid)).data);
+    if (!msgsStr.includes(coderResultText)) throw new Error('Coder tool result not in messages');
+
+    t.events.expectCount({ type: 'session.error', sessionID: sid, count: 0 });
+    t.provider.expectSatisfied();
+    t.provider.reset();
+    await t.client.abort(sid);
   }
 },
 

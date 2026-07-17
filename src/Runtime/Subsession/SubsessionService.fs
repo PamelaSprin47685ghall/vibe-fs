@@ -8,6 +8,7 @@ open Wanxiangshu.Runtime.Dyn
 open Wanxiangshu.Runtime.CommandProcessor
 open Wanxiangshu.Runtime.SubsessionPorts
 open Wanxiangshu.Runtime.SubsessionActor
+open Wanxiangshu.Runtime.SubsessionPendingEvidence
 open Wanxiangshu.Runtime.SubsessionActorRegistry
 open Wanxiangshu.Runtime.SubsessionEventStore
 
@@ -70,6 +71,19 @@ type SubsessionService
 
             // 1. Atomic BeginRun enqueued first.
             let runPromise = actor.BeginRun request
+
+            // Drain any evidence/idle that arrived before the actor had an active turn
+            // (e.g. task_complete + session.status idle arriving between mock prompt()
+            // and BeginRun).  Posts go behind StartRun in the queue so DecisionObserve
+            // processes them with the run active: CompletionRequested via Running branch,
+            // then SessionIdleObserved via handleRunningIdle → succeedRun.
+            let buffered, idleSeen = SubsessionPendingEvidence.TakeAll childSessionId
+
+            for ev in buffered do
+                actor.Post(EvidenceUpdated { TurnId = None; Evidence = ev }) |> ignore
+
+            if idleSeen then
+                actor.Post SessionIdleObserved |> ignore
 
             // 2. Bind AbortSignal AFTER BeginRun so CancelRequested is ordered after StartRun.
             let mutable onAbort: System.Action<obj> option = None

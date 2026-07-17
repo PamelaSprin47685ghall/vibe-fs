@@ -54,10 +54,10 @@ function buildTextChunks(id, text, promptTokens) {
   ];
 }
 
-function extractToolNames(body) {
+export function extractToolNames(body) {
   const tools = body?.tools;
   if (Array.isArray(tools)) {
-    return tools.flatMap((t) => {
+    return tools.flatMap(t => {
       const name = t?.function?.name ?? t?.name;
       return typeof name === 'string' ? [name] : [];
     });
@@ -65,8 +65,104 @@ function extractToolNames(body) {
   return [];
 }
 
+export function extractLastUserMsg(body) {
+  const msgs = body?.messages || [];
+  const last = [...msgs].reverse().find(m => m?.role === 'user');
+  if (!last) return null;
+  const c = last.content;
+  if (typeof c === 'string') return c.slice(0, 300);
+  if (Array.isArray(c)) return JSON.stringify(c[0]).slice(0, 300);
+  return null;
+}
+
 function estimatePromptTokens(body) {
   return Math.max(1, Math.ceil(JSON.stringify(body?.messages || []).length / 2));
+}
+
+// ─── Nudge detection ─────────────────────────────────────────────────────────
+// Matches the three nudge prose markers from src/Kernel/Nudge/NudgePromptText.fs
+// against the LAST user-role message in the request body.  Scope is intentionally
+// narrow: only the most-recent message, not body-wide, so already-history nudge
+// turns don't fire on every subsequent request in the same session.
+
+const NUDGE_MARKERS = [
+  // todoNudgePromptProse
+  'There are still incomplete todos. Continue working through the remaining items.',
+  // loopNudgePromptProse (unique fragment)
+  'You are in loop mode. You must call the submit_review tool',
+  // runnerNudgePrompt
+  'A background runner task is still active',
+  // with-review command prompt (Runtime/ReviewPrompts/Commands.fs)
+  // OC-REV-001 fires /loop which injects this; it's a plugin command, not model traffic.
+  'command: with-review',
+  // context-budget nudge (PlanHelpers.fs:contextBudgetNudgeText)
+  // Injected by checkAndInjectNudge when token budget is near-exhausted.
+  'the system context is about to be suspended',
+  'You must immediately force an emergency stop to all work',
+];
+
+function isSyntheticContinuation(body) {
+  // Mirrors src/Hosts/OpenCode/Fallback/MessageInspection.fs:isSyntheticText
+  const msgs = body?.messages || [];
+  if (msgs.length === 0) return false;
+  const lastMsg = msgs[msgs.length - 1];
+  if (lastMsg?.role !== 'user') return false;
+  const content = lastMsg.content;
+
+// ZWSP continuation (ContinuationHost.fs: continuationPayload = "\u200B")
+  // NOTE: \u200B is Unicode Cf (format char), NOT White_Space — trim() does NOT remove it.
+  if (typeof content === 'string' && content === '\u200B') return true;
+  if (typeof content === 'string' && content.replace(/[\u200B\u200C\u200D\uFEFF]/g, '').trim() === '') return true;
+
+  // Nudge markers (todo / loop / runner)
+  if (typeof content === 'string') {
+    return NUDGE_MARKERS.some(m => content.includes(m));
+  }
+  if (Array.isArray(content)) {
+    return content.some(p => {
+      if (typeof p?.text !== 'string') return false;
+      const t = p.text;
+      if (t === '\u200B') return true;
+      if (t.replace(/[\u200B\u200C\u200D\uFEFF]/g, '').trim() === '') return true;
+      return NUDGE_MARKERS.some(m => t.includes(m));
+    });
+  }
+  return false;
+}
+
+function detectSyntheticMarker(body) {
+  // Returns which synthetic marker matched the last user message.
+  // Called only after isSyntheticContinuation returned true.
+  const msgs = body?.messages || [];
+  if (msgs.length === 0) return 'unknown';
+  const lastMsg = msgs[msgs.length - 1];
+  if (lastMsg?.role !== 'user') return 'unknown';
+  const content = lastMsg.content;
+
+  function matchMarker(text) {
+    if (text === '\u200B' || text.replace(/[\u200B\u200C\u200D\uFEFF]/g, '').trim() === '') return 'zwsp';
+    if (text.includes('There are still incomplete todos')) return 'todo-nudge';
+    if (text.includes('You are in loop mode. You must call the submit_review tool')) return 'loop-nudge';
+    if (text.includes('A background runner task is still active')) return 'runner-nudge';
+    if (text.includes('command: with-review')) return 'with-review';
+    if (text.includes('the system context is about to be suspended')) return 'budget-nudge';
+    if (text.includes('You must immediately force an emergency stop to all work')) return 'budget-nudge';
+    return null;
+  }
+
+  if (typeof content === 'string') {
+    const m = matchMarker(content);
+    if (m) return m;
+  }
+  if (Array.isArray(content)) {
+    for (const p of content) {
+      if (typeof p?.text === 'string') {
+        const m = matchMarker(p.text);
+        if (m) return m;
+      }
+    }
+  }
+  return 'unknown';
 }
 
 const TITLE_GENERATION_MARKER = 'Generate a title for this conversation:';
@@ -134,6 +230,8 @@ export class StrictMockProvider {
     this._expectations = [];
     this._unexpected = [];
     this._requests = [];
+    this._syntheticRequests = [];  // bypassed synthetic continuations (ZWSP + nudges)
+    this._nudgeBypassed = 0;   // nudge-continuation requests auto-replied before FIFO
     this._server = null;
     this._port = null;
     this._url = null;
@@ -201,7 +299,7 @@ export class StrictMockProvider {
 
     if (unexpected > 0) {
       const detail = this._unexpected.slice(0, 5).map(u =>
-        `  tools=${JSON.stringify(extractToolNames(u.body))} messages=${u.body?.messages?.length || 0}`
+        `  session=${u.sessId || '?'} tools=${JSON.stringify(extractToolNames(u.body))} msgs=${u.body?.messages?.length || 0} toolResults=${u.hasToolResults || false} lastUser=${extractLastUserMsg(u.body) || '(none)'}`
       ).join('\n');
       errors.push(`${unexpected} unexpected LLM request(s):\n${detail}`);
     }
@@ -215,6 +313,7 @@ export class StrictMockProvider {
     this._expectations = [];
     this._unexpected = [];
     this._requests = [];
+    this._syntheticRequests = [];
   }
 
   get requests() { return this._requests; }
@@ -252,6 +351,8 @@ export class StrictMockProvider {
   get port() { return this._port; }
   get unexpectedRequests() { return this._unexpected; }
   get remainingExpectations() { return this._expectations.length; }
+  get nudgeBypassed() { return this._nudgeBypassed; }
+  get syntheticRequests() { return this._syntheticRequests; }
 
   // ── Request handler ──
 
@@ -284,9 +385,29 @@ export class StrictMockProvider {
         return sendSSE(res, buildTextChunks(id, 'E2E Test Session', 1));
       }
 
+      // Pre-FIFO bypass: synthetic continuations from the plugin's fallback/nudge machinery.
+      // Covers: ZWSP continuations (ContinuationHost), todo/loop/runner nudges (NudgeTrigger).
+      // Auto-reply 'done' so the turn terminates cleanly without re-nudging.
+      // TODO: future nudge-behavior specs need an opt-out flag (e.g. allowSyntheticContinuations).
+      if (isSyntheticContinuation(parsed)) {
+        const marker = detectSyntheticMarker(parsed);
+        this._nudgeBypassed++;
+        this._syntheticRequests.push({ body: parsed, marker, time: Date.now() });
+        const id = `synth_${Date.now()}`;
+        console.error(`[MOCK-SYNTH] session=${parsed?.sessionId || '?'} marker=${marker} #${this._nudgeBypassed}`);
+        return sendSSE(res, buildTextChunks(id, 'done', 1));
+      }
+
       // Strict FIFO matching
       if (this._expectations.length === 0) {
-        this._unexpected.push({ body: parsed, rawBody });
+        const sessId = parsed?.sessionId || '(no-session-id)';
+        const msgs = parsed?.messages || [];
+        const hasToolResults = msgs.some(m => m?.role === 'tool' || m?.role === 'toolResult');
+        const lastUser = extractLastUserMsg(parsed);
+        // Last message of ANY role for nudge detection
+        const lastMsgAnyRole = msgs.length > 0 ? JSON.stringify(msgs[msgs.length - 1]).slice(0, 300) : '(empty)';
+        this._unexpected.push({ body: parsed, rawBody, sessId, hasToolResults });
+        console.error(`[MOCK-500] session=${sessId} msgs=${msgs.length} toolResults=${hasToolResults} lastUser=${lastUser || '(none)'} lastMsgAny=${lastMsgAnyRole} tools=${JSON.stringify(extractToolNames(parsed))}`);
         return sendJSON(res, 500, {
           error: 'unexpected_llm_request',
           detail: `No expectations queued. Request tools: ${JSON.stringify(extractToolNames(parsed))}`,
@@ -295,7 +416,13 @@ export class StrictMockProvider {
 
       const exp = this._expectations[0];
       if (!matchesExpectation(parsed, exp)) {
-        this._unexpected.push({ body: parsed, rawBody });
+        const sessId2 = parsed?.sessionId || '(no-session-id)';
+        const msgs2 = parsed?.messages || [];
+        const hasToolResults2 = msgs2.some(m => m?.role === 'tool' || m?.role === 'toolResult');
+        const lastUser2 = extractLastUserMsg(parsed);
+        const lastMsgAny2 = msgs2.length > 0 ? JSON.stringify(msgs2[msgs2.length - 1]).slice(0, 300) : '(empty)';
+        this._unexpected.push({ body: parsed, rawBody, sessId: sessId2, hasToolResults: hasToolResults2 });
+        console.error(`[MOCK-MISMATCH] session=${sessId2} msgs=${msgs2.length} toolResults=${hasToolResults2} lastUser=${lastUser2 || '(none)'} lastMsgAny=${lastMsgAny2} expected=${exp.id}`);
         this._expectations.shift(); // consume to prevent infinite loop on mismatched
         return sendJSON(res, 500, {
           error: 'expectation_mismatch',

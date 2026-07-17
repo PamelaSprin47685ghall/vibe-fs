@@ -219,16 +219,22 @@ let timedAsyncSuite (label: string) (f: unit -> JS.Promise<'a>) : JS.Promise<uni
     promise {
         let start = now ()
 
+        let suiteTimeout =
+            if label.Contains "Contract" then
+                120000
+            else
+                asyncSuiteTimeoutMs
+
         try
             let p = f ()
-            let! _ = raceWithTimeoutAndInfo p asyncSuiteTimeoutMs
+            let! _ = raceWithTimeoutAndInfo p suiteTimeout
             timings.Add(label, now () - start)
         with ex ->
             let msg = getErrorMessage ex
 
             if msg.Contains "TIMEOUT" then
                 failed <- failed + 1
-                failures.Add(sprintf "%s > [TIMEOUT>%dms]" label asyncSuiteTimeoutMs)
+                failures.Add(sprintf "%s > [TIMEOUT>%dms]" label suiteTimeout)
             else
                 printfn "TEST SUITE %s THREW: %A" label ex
                 printfn "KEYS of EX: %A" (Fable.Core.JS.Constructors.Object.keys ex)

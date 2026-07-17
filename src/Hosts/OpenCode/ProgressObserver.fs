@@ -95,7 +95,7 @@ type ProgressObserver
 
                     if not (Dyn.isNullish args) && not isError then
                         match decodeTodoWriteArgs (host = Mimocode) args with
-                        | Ok(decodedArgs, _) when sid <> "" ->
+                        | Ok(decodedArgs, []) when sid <> "" ->
                             do! appendWorkBacklogCommittedOrFail directory sid decodedArgs
 
                             let allCompleted =

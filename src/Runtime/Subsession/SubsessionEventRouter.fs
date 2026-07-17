@@ -5,6 +5,7 @@ open Wanxiangshu.Kernel.Subsession.Types
 open Wanxiangshu.Runtime.CommandProcessor
 open Wanxiangshu.Runtime.SubsessionPorts
 open Wanxiangshu.Runtime.SubsessionActor
+open Wanxiangshu.Runtime.SubsessionPendingEvidence
 open Wanxiangshu.Runtime.SubsessionActorRegistry
 
 /// Routing decision for a raw host event.
@@ -71,12 +72,25 @@ let routeEvidence (workspaceRoot: string) (sessionId: string) (evidence: Current
                     (EvidenceUpdated
                         { TurnId = Some turnId
                           Evidence = evidence })
-        | None -> return false
+        | None ->
+            // No actor has an active turn — buffer the evidence so
+            // SubsessionService.StartRun can drain it once the turn is established.
+            SubsessionPendingEvidence.Buffer sessionId evidence
+            return false
     }
 
 /// Convenience: post SessionIdleObserved to a child if it exists.
 let tryIdle (workspaceRoot: string) (sessionId: string) : JS.Promise<bool> =
-    routeToChild workspaceRoot sessionId SessionIdleObserved
+    promise {
+        match tryGetCurrentTurnId workspaceRoot sessionId with
+        | Some _ ->
+            // Actor has an active turn — route normally.
+            return! routeToChild workspaceRoot sessionId SessionIdleObserved
+        | None ->
+            // No active turn — buffer idle so StartRun drain can post it.
+            SubsessionPendingEvidence.MarkIdle sessionId
+            return false
+    }
 
 /// Convenience: post TurnErrorObserved.
 let tryError

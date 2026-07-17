@@ -1,8 +1,8 @@
-module Wanxiangshu.E2e.OpencodePluginContinueRecoveryTests
+module Wanxiangshu.Integration.OpencodeContinueContractTests
 
 open Fable.Core
 open Fable.Core.JsInterop
-open Wanxiangshu.E2e.OpencodePluginTestsPart2
+open Wanxiangshu.Integration.OpencodePluginContractTestsPart2
 open Wanxiangshu.Runtime.ToolOutputInfo
 open Wanxiangshu.Kernel.ToolOutputInfoTypes
 open Wanxiangshu.Tests.Assert

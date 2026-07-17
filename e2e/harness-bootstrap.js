@@ -94,11 +94,10 @@ export function isolatedEnv(home, llmUrl, opts = {}) {
   const fixtureUvxDir = createFixtureUvx(home);
   const config = makeConfig(llmUrl, opts);
   const mockApiBase = llmUrl.replace(/\/v1$/, '') + '/api';
-  return {
-    OPENCODE_TEST_HOME: home,
-    HOME: process.env.HOME || process.env.USERPROFILE || home,
+  const env = {
+    HOME: home,
     XDG_DATA_HOME: xdg,
-    XDG_CACHE_HOME: E2E_CACHE_HOME,
+    XDG_CACHE_HOME: path.join(home, 'cache'),
     XDG_CONFIG_HOME: xdg,
     XDG_STATE_HOME: xdg,
     OPENCODE_DISABLE_AUTOUPDATE: '1',
@@ -113,6 +112,10 @@ export function isolatedEnv(home, llmUrl, opts = {}) {
     PATH: `${fixtureUvxDir}${path.delimiter}${process.env.PATH ?? ''}`,
     STEALTH_BROWSER_MCP_FIXTURE: FIXTURE_MCP,
   };
+  if (opts.cleanEnv ?? true) {
+    return env;
+  }
+  return { ...process.env, ...env };
 }
 
 export async function waitForListening(stdout, child, timeoutMs = 30000) {
@@ -157,7 +160,7 @@ export async function waitForListening(stdout, child, timeoutMs = 30000) {
   });
 }
 
-class HostSingletonManager {
+export class HostSingletonManager {
   constructor() {
     this.hosts = new Map();
     this.e2eLockAcquired = false;
@@ -174,12 +177,7 @@ class HostSingletonManager {
     if (this.isTeardown) {
       throw new Error('HostSingletonManager already teared down');
     }
-    if (this.hosts.has(type)) {
-      return this.hosts.get(type);
-    }
-    const hostInstance = await spawnFn();
-    this.hosts.set(type, hostInstance);
-    return hostInstance;
+    return spawnFn();
   }
 
   async teardownAll() {
@@ -210,23 +208,4 @@ class HostSingletonManager {
   }
 }
 
-if (!globalThis.__hostSingletonManager) {
-  const manager = new HostSingletonManager();
-  globalThis.__hostSingletonManager = manager;
-
-  const clean = () => {
-    for (const [type, host] of manager.hosts.entries()) {
-      if (host.permissionAbort) {
-        host.permissionAbort.abort();
-      }
-      if (host.child) {
-        try { process.kill(host.child.pid, 'SIGKILL'); } catch {}
-      }
-    }
-  };
-  process.once('exit', clean);
-  process.once('SIGINT', () => { clean(); process.exit(130); });
-  process.once('SIGTERM', () => { clean(); process.exit(143); });
-}
-
-export const hostSingletonManager = globalThis.__hostSingletonManager;
+export const hostSingletonManager = new HostSingletonManager();
