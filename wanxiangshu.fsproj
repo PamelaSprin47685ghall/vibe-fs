@@ -444,6 +444,7 @@
     <Compile Include="src/Hosts/OpenCode/MimoTodoTool.fs"/>
     <Compile Include="src/Hosts/OpenCode/CommandHooks.fs"/>
     <Compile Include="src/Hosts/OpenCode/ChatHooksDecoders.fs"/>
+    <Compile Include="src/Hosts/OpenCode/ChatHooksMessageIdDedup.fs"/>
     <Compile Include="src/Hosts/OpenCode/ChatHooks.fs"/>
     <Compile Include="src/Hosts/OpenCode/ToolDefinitionHooks.fs"/>
     <Compile Include="src/Hosts/OpenCode/EventHooks.fs"/>

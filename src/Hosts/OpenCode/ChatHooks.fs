@@ -24,6 +24,7 @@ open Wanxiangshu.Runtime.OpencodeHookInputCodec
 open Wanxiangshu.Runtime.ChatHookOutputCodec
 open Wanxiangshu.Runtime.OpencodeAgentConfigWire
 open Wanxiangshu.Hosts.Opencode.SubsessionHostAdapter
+open Wanxiangshu.Hosts.Opencode.ChatHooksMessageIdDedup
 
 /// Append a continuation_host_accepted event recording that a user message
 /// was observed for the given continuation. Does not modify memory state.
@@ -129,8 +130,6 @@ let chatMessageFor
             Wanxiangshu.Kernel.Primitives.Identity.Id.sessionIdQuick (sessionIdFromHookInput input "")
 
         let parts = partsFromHookOutput output
-        do! lifecycleObserver.handleChatMessage (sessionID, agent, parts)
-
         let msgObj = Dyn.get output "message"
         let msgId = if Dyn.isNullish msgObj then "" else Dyn.str msgObj "id"
 
@@ -139,19 +138,39 @@ let chatMessageFor
 
         let fr = lifecycleObserver.FallbackRuntime
 
+        // F-03: message-id dedup MUST happen before any side-effect that
+        // could cancel an active fallback lease (OnNewHumanMessage does
+        // exactly that). The previous ordering was:
+        //   1. handleChatMessage (progress)
+        //   2. isSystemMessage (may call TryConsumeActiveNudgeNonce)
+        //   3. OnNewHumanMessage (cancels active leases)
+        //   4. recordProvenanceIfPresent
+        // which meant a duplicate chat.message hook (the same message
+        // observed twice) would re-enter the human-turn machinery and
+        // trigger a second cancel of a fallback that may already have
+        // settled in the meantime.
+        //
+        // The new contract is: classify -> dedup -> bind dispatch ->
+        // record provenance -> tool overrides. The progress hook
+        // (handleChatMessage) is preserved at the top because it only
+        // touches the ProgressObserver stream, never the leases.
+        do! lifecycleObserver.handleChatMessage (sessionID, agent, parts)
+
+        // Step 1: classify
         let isSystem = isSystemMessage parts fr sessionIDStr msgId
         let messageRole = tryGetChatMessageRole output
 
-        // Per OpenCode's `chat.message` hook contract, the hook fires once
-        // for the inbound user prompt whose parts we are about to inspect
-        // (see packages/opencode/src/session/prompt.ts — the trigger is
-        // `plugin.trigger("chat.message", ..., { message: info, parts })`
-        // around the resolved user message). The role gate is defensive:
-        // if a future host ever broadcasts other roles here, assistant
-        // responses must not reset the human turn.
-        if not isSystem && messageRole = "user" then
-            let modelOpt = tryGetModelStringFromHook input output
-            do! lifecycleObserver.OnNewHumanMessage(sessionIDStr, agent, modelOpt, msgId)
+        // Step 2: dedup — drop the hook entirely if the host has already
+        // surfaced this exact message id. We still record provenance so
+        // a retry of a continuation does not lose the binding, but we
+        // never call OnNewHumanMessage twice.
+        let isDuplicate = msgId <> "" && markSeen sessionIDStr msgId
+
+        if not isDuplicate then
+            // Step 3: bind dispatch (only when this is a real user turn)
+            if not isSystem && messageRole = "user" then
+                let modelOpt = tryGetModelStringFromHook input output
+                do! lifecycleObserver.OnNewHumanMessage(sessionIDStr, agent, modelOpt, msgId)
 
         do! recordProvenanceIfPresent parts msgId lifecycleObserver.WorkspaceRoot sessionIDStr
 
