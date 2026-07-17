@@ -3,19 +3,19 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { createMockLLM } from './mock-llm.js';
+import { createMockLLM } from '../../mock-llm.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const PROJECT_ROOT = path.resolve(__dirname, '../../..');
 
-let WANXIANG_ROOT = path.resolve(__dirname, '..');
 function getPluginPath(variant) {
   let file = 'Plugin.js';
   if (variant === 'mimocode') file = 'PluginMimo.js';
   if (variant === 'mimotui') file = 'PluginMimoTui.js';
   
-  let p = path.resolve(WANXIANG_ROOT, `build/src/Hosts/OpenCode/${file}`);
+  let p = path.resolve(PROJECT_ROOT, `build/src/Hosts/OpenCode/${file}`);
   if (!fs.existsSync(p)) {
-    let altRoot = path.resolve(__dirname, '../..');
+    let altRoot = path.resolve(PROJECT_ROOT, '..');
     p = path.resolve(altRoot, `build/src/Hosts/OpenCode/${file}`);
   }
   return p;
