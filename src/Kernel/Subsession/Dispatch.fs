@@ -5,10 +5,84 @@ open Wanxiangshu.Kernel.Subsession.Types
 open Wanxiangshu.Kernel.Subsession.Policy
 open Wanxiangshu.Kernel.Subsession.Rules
 
-// ARCHITECTURE_EXEMPT: split this 130-line function later
-let decide state cmd =
-    match state, cmd with
-    | Dispatching(ctx, plan, bufferedEvidence), DispatchAccepted(tid, receipt) when tid = plan.TurnId ->
+let private handleDispatchingHostRejected (ctx: RunContext) (plan: TurnPlan) (error: ErrorInput) =
+    match nextTurnFromPolicy ctx (afterError ctx.FallbackConfig ctx.Chain ctx.Policy error) with
+    | Some(ctx2, plan2) ->
+        Ok(
+            decided
+                (Dispatching(ctx2, plan2, CurrentTurnEvidence.empty))
+                [ TurnDispatchRequested(makeTurnData ctx2 plan2) ]
+                [ CancelPendingDispatch plan.TurnId; DispatchPrompt plan2 ]
+        )
+    | None ->
+        Ok(
+            failRun
+                ctx
+                (match afterError ctx.FallbackConfig ctx.Chain ctx.Policy error with
+                 | StopWithFailure f -> f
+                 | _ -> FallbackExhausted error)
+                [ TurnFinished(plan.TurnId, TurnFailed error) ]
+        )
+
+let private handleDispatchingHostAcceptanceUnknown (ctx: RunContext) (plan: TurnPlan) (error: ErrorInput) =
+    let cancelCtx =
+        { Reason = AcceptanceUnknownAfterDispatch
+          AfterStop = RetryAfterSafeStop error }
+
+    Ok(
+        decided
+            (ReconcilingUnknownDispatch(ctx, plan, cancelCtx, 0))
+            []
+            [ QueryDispatchStatus(ctx.SessionId, plan.TurnId) ]
+    )
+
+let private handleCancellingDispatchAccepted (ctx: RunContext) (plan: TurnPlan) cancelCtx tid receipt =
+    let events =
+        [ TurnStarted
+              { RunId = ctx.RunId
+                TurnId = tid
+                Receipt = receipt }
+          AbortRequested(ctx.RunId, tid) ]
+
+    Ok(
+        decided
+            (IssuingAbort(
+                ctx,
+                Started { Plan = plan; StartReceipt = receipt },
+                { Reason = cancelCtx.Reason
+                  AfterStop = cancelCtx.AfterStop },
+                false
+            ))
+            events
+            [ AbortHostSession(ctx.SessionId, tid) ]
+    )
+
+let private handleCancellingRejected (ctx: RunContext) (plan: TurnPlan) cancelCtx failure =
+    match failure with
+    | HostRejected _ ->
+        let res =
+            match cancelCtx.AfterStop with
+            | FinishCancelled -> Cancelled
+            | FinishFailed f -> Failed f
+            | RetryAfterSafeStop _ -> Cancelled
+
+        Ok(
+            decided
+                (Available { SessionId = ctx.SessionId })
+                [ TurnFinished(plan.TurnId, TurnCancelled); RunFinished(ctx.RunId, res) ]
+                [ CompleteCaller(ctx.RunId, res) ]
+        )
+    | HostAcceptanceUnknown _ ->
+        Ok(
+            decided
+                (ReconcilingUnknownDispatch(ctx, plan, cancelCtx, 0))
+                []
+                [ QueryDispatchStatus(ctx.SessionId, plan.TurnId) ]
+        )
+
+let private handleDispatching (ctx: RunContext) (plan: TurnPlan) bufferedEvidence cmd =
+    match cmd with
+    | DispatchAccepted(tid, receipt) when tid = plan.TurnId ->
         Ok(
             decided
                 (Running(ctx, { Plan = plan; StartReceipt = receipt }, bufferedEvidence))
@@ -18,40 +92,13 @@ let decide state cmd =
                         Receipt = receipt } ]
                 []
         )
-    | Dispatching _, DispatchAccepted _ -> Ok(noChange StaleTurnMarker)
-    | Dispatching(ctx, plan, _), DispatchRejected(tid, failure) when tid = plan.TurnId ->
+    | DispatchAccepted _ -> Ok(noChange StaleTurnMarker)
+    | DispatchRejected(tid, failure) when tid = plan.TurnId ->
         match failure with
-        | HostRejected error ->
-            match nextTurnFromPolicy ctx (afterError ctx.FallbackConfig ctx.Chain ctx.Policy error) with
-            | Some(ctx2, plan2) ->
-                Ok(
-                    decided
-                        (Dispatching(ctx2, plan2, CurrentTurnEvidence.empty))
-                        [ TurnDispatchRequested(makeTurnData ctx2 plan2) ]
-                        [ CancelPendingDispatch plan.TurnId; DispatchPrompt plan2 ]
-                )
-            | None ->
-                Ok(
-                    failRun
-                        ctx
-                        (match afterError ctx.FallbackConfig ctx.Chain ctx.Policy error with
-                         | StopWithFailure f -> f
-                         | _ -> FallbackExhausted error)
-                        [ TurnFinished(plan.TurnId, TurnFailed error) ]
-                )
-        | HostAcceptanceUnknown error ->
-            let cancelCtx =
-                { Reason = AcceptanceUnknownAfterDispatch
-                  AfterStop = RetryAfterSafeStop error }
-
-            Ok(
-                decided
-                    (ReconcilingUnknownDispatch(ctx, plan, cancelCtx, 0))
-                    []
-                    [ QueryDispatchStatus(ctx.SessionId, plan.TurnId) ]
-            )
-    | Dispatching _, DispatchRejected _ -> Ok(noChange StaleTurnMarker)
-    | Dispatching(ctx, plan, _), CancelRequested ->
+        | HostRejected error -> handleDispatchingHostRejected ctx plan error
+        | HostAcceptanceUnknown error -> handleDispatchingHostAcceptanceUnknown ctx plan error
+    | DispatchRejected _ -> Ok(noChange StaleTurnMarker)
+    | CancelRequested ->
         Ok(
             decided
                 (CancellingDispatch(
@@ -63,7 +110,7 @@ let decide state cmd =
                 []
                 [ CancelPendingDispatch plan.TurnId ]
         )
-    | Dispatching(ctx, plan, _), TurnDeadlineExpired tid when tid = plan.TurnId ->
+    | TurnDeadlineExpired tid when tid = plan.TurnId ->
         Ok(
             decided
                 (CancellingDispatch(
@@ -75,64 +122,36 @@ let decide state cmd =
                 []
                 [ CancelPendingDispatch plan.TurnId ]
         )
-    | Dispatching _, TurnDeadlineExpired _ -> Ok(noChange StaleTimer)
-    | Dispatching(ctx, plan, _), SessionClosed -> Ok(closeActive ctx plan.TurnId)
-    | Dispatching _, cmd when isIllegalWhenDispatching cmd -> illegal (stateName state) (cmdName cmd)
+    | TurnDeadlineExpired _ -> Ok(noChange StaleTimer)
+    | SessionClosed -> Ok(closeActive ctx plan.TurnId)
+    | cmd when isIllegalWhenDispatching cmd ->
+        illegal (stateName (Dispatching(ctx, plan, bufferedEvidence))) (cmdName cmd)
+    | _ -> illegal (stateName (Dispatching(ctx, plan, bufferedEvidence))) (cmdName cmd)
 
-    | CancellingDispatch(ctx, plan, cancelCtx), DispatchAccepted(tid, receipt) when tid = plan.TurnId ->
-        let events =
-            [ TurnStarted
-                  { RunId = ctx.RunId
-                    TurnId = tid
-                    Receipt = receipt }
-              AbortRequested(ctx.RunId, tid) ]
-
-        Ok(
-            decided
-                (IssuingAbort(
-                    ctx,
-                    Started { Plan = plan; StartReceipt = receipt },
-                    { Reason = cancelCtx.Reason
-                      AfterStop = cancelCtx.AfterStop },
-                    false
-                ))
-                events
-                [ AbortHostSession(ctx.SessionId, tid) ]
-        )
-    | CancellingDispatch _, DispatchAccepted _ -> Ok(noChange StaleTurnMarker)
-    | CancellingDispatch(ctx, plan, cancelCtx), DispatchRejected(tid, failure) when tid = plan.TurnId ->
-        match failure with
-        | HostRejected _ ->
-            let res =
-                match cancelCtx.AfterStop with
-                | FinishCancelled -> Cancelled
-                | FinishFailed f -> Failed f
-                | RetryAfterSafeStop _ -> Cancelled
-
-            Ok(
-                decided
-                    (Available { SessionId = ctx.SessionId })
-                    [ TurnFinished(plan.TurnId, TurnCancelled); RunFinished(ctx.RunId, res) ]
-                    [ CompleteCaller(ctx.RunId, res) ]
-            )
-        | HostAcceptanceUnknown _ ->
-            Ok(
-                decided
-                    (ReconcilingUnknownDispatch(ctx, plan, cancelCtx, 0))
-                    []
-                    [ QueryDispatchStatus(ctx.SessionId, plan.TurnId) ]
-            )
-    | CancellingDispatch _, DispatchRejected _ -> Ok(noChange StaleTurnMarker)
-    | CancellingDispatch _, CancelRequested -> Ok(noChange StaleTimer)
-    | CancellingDispatch(ctx, plan, cancelCtx), TurnDeadlineExpired tid when tid = plan.TurnId ->
+let private handleCancellingDispatch (ctx: RunContext) (plan: TurnPlan) cancelCtx cmd =
+    match cmd with
+    | DispatchAccepted(tid, receipt) when tid = plan.TurnId ->
+        handleCancellingDispatchAccepted ctx plan cancelCtx tid receipt
+    | DispatchAccepted _ -> Ok(noChange StaleTurnMarker)
+    | DispatchRejected(tid, failure) when tid = plan.TurnId -> handleCancellingRejected ctx plan cancelCtx failure
+    | DispatchRejected _ -> Ok(noChange StaleTurnMarker)
+    | CancelRequested -> Ok(noChange StaleTimer)
+    | TurnDeadlineExpired tid when tid = plan.TurnId ->
         Ok(
             decided
                 (ReconcilingUnknownDispatch(ctx, plan, cancelCtx, 0))
                 []
                 [ QueryDispatchStatus(ctx.SessionId, plan.TurnId) ]
         )
-    | CancellingDispatch _, TurnDeadlineExpired _
-    | CancellingDispatch _, AbortDeadlineExpired _ -> Ok(noChange StaleTimer)
-    | CancellingDispatch(ctx, plan, _), SessionClosed -> Ok(closeActive ctx plan.TurnId)
-    | CancellingDispatch _, cmd when isIllegalWhenCancelling cmd -> illegal (stateName state) (cmdName cmd)
+    | TurnDeadlineExpired _
+    | AbortDeadlineExpired _ -> Ok(noChange StaleTimer)
+    | SessionClosed -> Ok(closeActive ctx plan.TurnId)
+    | cmd when isIllegalWhenCancelling cmd ->
+        illegal (stateName (CancellingDispatch(ctx, plan, cancelCtx))) (cmdName cmd)
+    | _ -> illegal (stateName (CancellingDispatch(ctx, plan, cancelCtx))) (cmdName cmd)
+
+let decide state cmd =
+    match state, cmd with
+    | Dispatching(ctx, plan, bufferedEvidence), _ -> handleDispatching ctx plan bufferedEvidence cmd
+    | CancellingDispatch(ctx, plan, cancelCtx), _ -> handleCancellingDispatch ctx plan cancelCtx cmd
     | _ -> illegal (stateName state) (cmdName cmd)

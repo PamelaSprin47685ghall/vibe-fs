@@ -105,11 +105,46 @@ let private summarizeOutput
         return textResult text
     }
 
-// ARCHITECTURE_EXEMPT: split this 68-line function later
+let private buildExecutorRequest (params': obj) (ctx: obj) =
+    let (lang, command, what, timeoutType, mode, deps, cwd, maxBytes) =
+        parseExecutorParams params' ctx
+
+    let options =
+        { command = command
+          language = parseLanguage lang
+          dependencies = deps
+          timeoutType = timeoutType
+          mode = mode
+          cwd = Some cwd
+          whatToSummarize = what
+          maxBytes = maxBytes }
+
+    (lang, what, options)
+
+let private parseExecutorResponse
+    (pi: obj)
+    (childSession: obj)
+    (childHolder: ChildSession option)
+    (result: ExecuteResult)
+    (options: ExecuteOptions)
+    (lang: string)
+    (what: string)
+    =
+    promise {
+        let output = outputFromResult result
+
+        if not (shouldSummarize byteLength options.maxBytes output) then
+            return textResult output
+        else
+            let! text =
+                summarizeOutput pi childSession output lang options.command options.dependencies options.mode what
+
+            return text
+    }
+
 let private executeExecutor (pi: obj) (_id: string) (params': obj) (signal: obj) (_onUpdate: obj) (ctx: obj) =
     promise {
-        let (lang, command, what, timeoutType, mode, deps, cwd, maxBytes) =
-            parseExecutorParams params' ctx
+        let (lang, what, options) = buildExecutorRequest params' ctx
 
         let mutable childHolder: ChildSession option = None
 
@@ -146,26 +181,10 @@ let private executeExecutor (pi: obj) (_id: string) (params': obj) (signal: obj)
                     finishJob ()
                     return errorResult "Executor child session unavailable"
                 else
-                    let options =
-                        { command = command
-                          language = parseLanguage lang
-                          dependencies = deps
-                          timeoutType = timeoutType
-                          mode = mode
-                          cwd = Some cwd
-                          whatToSummarize = what
-                          maxBytes = maxBytes }
-
                     let! result = runExecutorJob options signal childId
-                    let output = outputFromResult result
-
-                    if not (shouldSummarize byteLength options.maxBytes output) then
-                        finishJob ()
-                        return textResult output
-                    else
-                        let! text = summarizeOutput pi childSession output lang command deps mode what
-                        finishJob ()
-                        return text
+                    let! response = parseExecutorResponse pi childSession childHolder result options lang what
+                    finishJob ()
+                    return response
             with ex ->
                 finishJob ()
 

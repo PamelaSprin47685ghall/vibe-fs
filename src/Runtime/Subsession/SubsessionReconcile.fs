@@ -39,10 +39,21 @@ type private ReconcileHost() =
 
         member _.ClosePhysicalSession(_) = Promise.lift StopUnknown
 
+let private createPoisonEvents
+    (sessionId: SessionId)
+    (tid: TurnId)
+    (runProj: ActiveRunProjection)
+    : SubsessionEvent list =
+    [ SessionPoisoned(sessionId, SessionStateUnknownAfterRestart)
+      TurnFinished(tid, TurnInfrastructureFailed "session state unknown after restart")
+      RunFinished(
+          runProj.RunId,
+          Failed(InfrastructureFailure "session state unknown after restart")
+      ) ]
+
 /// Load NDJSON, find RunStarted without RunFinished, and ensure those physical
 /// sessions cannot accept a new StartRun until SessionClosed dispose.
 /// Persists SessionPoisoned + TurnFinished + RunFinished so the decision is durable.
-// ARCHITECTURE_EXEMPT: split this 64-line function later
 let reconcileUnfinishedRuns
     (workspaceRoot: string)
     (hostFactory: (string -> ISubsessionHost) option)
@@ -74,13 +85,7 @@ let reconcileUnfinishedRuns
 
                     let! stopStatus = host.ClosePhysicalSession sessionId
 
-                    let poisonEvents: SubsessionEvent list =
-                        [ SessionPoisoned(sessionId, SessionStateUnknownAfterRestart)
-                          TurnFinished(tid, TurnInfrastructureFailed "session state unknown after restart")
-                          RunFinished(
-                              runProj.RunId,
-                              Failed(InfrastructureFailure "session state unknown after restart")
-                          ) ]
+                    let poisonEvents = createPoisonEvents sessionId tid runProj
 
                     match actor.GetState(), stopStatus with
                     | _, Stopped ->

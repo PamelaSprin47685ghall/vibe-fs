@@ -124,7 +124,12 @@ let private tryParseKind (kind: string) (e: WanEvent) : ContinuationEvent option
         then
             let effectId =
                 Map.tryFind "effectId" p
-                |> Option.defaultValue (sprintf "legacy:%s:dispatch" cid)
+                |> Option.defaultValue (
+                    sprintf
+                        "continuation:%s:attempt:%d"
+                        cid
+                        (Map.tryFind "attempt" p |> Option.bind parseInt |> Option.defaultValue 1)
+                )
 
             Some(
                 ContinuationEvent.DispatchClaimed(
@@ -195,92 +200,97 @@ let private removeActive (projection: ContinuationProjection) (continuationId: s
             projection.ActiveBySession
             |> Map.filter (fun _ cont -> cont.Request.ContinuationId <> continuationId) }
 
-// ARCHITECTURE_EXEMPT: function at line 198 needs splitting
+let private applyRequestedEvent
+    (projection: ContinuationProjection)
+    (req: ContinuationRequest)
+    : ContinuationProjection =
+    let cont =
+        { Request = req
+          Status = ContinuationStatus.Committed
+          HostIdentity = ContinuationHostIdentity.AwaitingUserMessage
+          HostAssistantMessageId = None
+          Failure = None }
+
+    let priorActiveCid =
+        projection.ActiveBySession
+        |> Map.tryFind req.SessionId
+        |> Option.map (fun c -> c.Request.ContinuationId)
+
+    let withSuperseded =
+        match priorActiveCid with
+        | Some oldCid when oldCid <> req.ContinuationId ->
+            updateById projection oldCid (fun c ->
+                { c with
+                    Status = ContinuationStatus.Superseded })
+        | _ -> projection
+
+    { withSuperseded with
+        ActiveBySession = Map.add req.SessionId cont withSuperseded.ActiveBySession
+        ByContinuationId = Map.add req.ContinuationId cont withSuperseded.ByContinuationId }
+
+let private applyDispatchEvent
+    (projection: ContinuationProjection)
+    (continuationId: string)
+    (f: ContinuationState -> ContinuationState)
+    : ContinuationProjection =
+    updateById projection continuationId f
+
+let private applyTerminalEvent
+    (projection: ContinuationProjection)
+    (continuationId: string)
+    (finalise: ContinuationState -> ContinuationState)
+    : ContinuationProjection =
+    let next = updateById projection continuationId finalise
+    removeActive next continuationId
+
+let private applySettledEvent
+    (projection: ContinuationProjection)
+    (continuationId: string)
+    (reason: string)
+    : ContinuationProjection =
+    applyTerminalEvent projection continuationId (fun cont ->
+        { cont with
+            Status = ContinuationStatus.Settled })
+
 let applyEvent (projection: ContinuationProjection) (evt: ContinuationEvent) : ContinuationProjection =
     match evt with
-    | ContinuationEvent.Requested req ->
-        let cont =
-            { Request = req
-              Status = ContinuationStatus.Committed
-              HostIdentity = ContinuationHostIdentity.AwaitingUserMessage
-              HostAssistantMessageId = None
-              Failure = None }
-
-        let priorActiveCid =
-            projection.ActiveBySession
-            |> Map.tryFind req.SessionId
-            |> Option.map (fun c -> c.Request.ContinuationId)
-
-        let withSuperseded =
-            match priorActiveCid with
-            | Some oldCid when oldCid <> req.ContinuationId ->
-                updateById projection oldCid (fun c ->
-                    { c with
-                        Status = ContinuationStatus.Superseded })
-            | _ -> projection
-
-        { withSuperseded with
-            ActiveBySession = Map.add req.SessionId cont withSuperseded.ActiveBySession
-            ByContinuationId = Map.add req.ContinuationId cont withSuperseded.ByContinuationId }
-
+    | ContinuationEvent.Requested req -> applyRequestedEvent projection req
     | ContinuationEvent.DispatchClaimed(continuationId, attempt, effectId) ->
         let next =
-            updateById projection continuationId (fun cont ->
+            applyDispatchEvent projection continuationId (fun cont ->
                 { cont with
                     Status = ContinuationStatus.DispatchClaimed })
 
         { next with
             ProcessedEffectIds = Set.add effectId next.ProcessedEffectIds }
-
     | ContinuationEvent.HostAccepted(continuationId, identity) ->
-        updateById projection continuationId (fun cont ->
+        applyDispatchEvent projection continuationId (fun cont ->
             { cont with
                 Status = ContinuationStatus.HostMessageAccepted
                 HostIdentity = identity })
-
     | ContinuationEvent.RunStarted continuationId ->
-        updateById projection continuationId (fun cont ->
+        applyDispatchEvent projection continuationId (fun cont ->
             { cont with
                 Status = ContinuationStatus.Running })
-
     | ContinuationEvent.AssistantMessageObserved(continuationId, assistantMessageId) ->
-        updateById projection continuationId (fun cont ->
+        applyDispatchEvent projection continuationId (fun cont ->
             { cont with
                 Status = ContinuationStatus.Running
                 HostAssistantMessageId = Some assistantMessageId })
-
-    | ContinuationEvent.Settled(continuationId, _reason) ->
-        let next =
-            updateById projection continuationId (fun cont ->
-                { cont with
-                    Status = ContinuationStatus.Settled })
-
-        removeActive next continuationId
-
+    | ContinuationEvent.Settled(continuationId, reason) -> applySettledEvent projection continuationId reason
     | ContinuationEvent.Failed(continuationId, reason) ->
-        let next =
-            updateById projection continuationId (fun cont ->
-                { cont with
-                    Status = ContinuationStatus.Failed
-                    Failure = Some reason })
-
-        removeActive next continuationId
-
+        applyTerminalEvent projection continuationId (fun cont ->
+            { cont with
+                Status = ContinuationStatus.Failed
+                Failure = Some reason })
     | ContinuationEvent.Cancelled(continuationId, _reason) ->
-        let next =
-            updateById projection continuationId (fun cont ->
-                { cont with
-                    Status = ContinuationStatus.Cancelled })
-
-        removeActive next continuationId
-
+        applyTerminalEvent projection continuationId (fun cont ->
+            { cont with
+                Status = ContinuationStatus.Cancelled })
     | ContinuationEvent.Superseded(continuationId, _reason) ->
-        let next =
-            updateById projection continuationId (fun cont ->
-                { cont with
-                    Status = ContinuationStatus.Superseded })
-
-        removeActive next continuationId
+        applyTerminalEvent projection continuationId (fun cont ->
+            { cont with
+                Status = ContinuationStatus.Superseded })
 
 let foldEvents (events: ContinuationEvent list) : ContinuationProjection =
     events |> List.fold applyEvent emptyProjection

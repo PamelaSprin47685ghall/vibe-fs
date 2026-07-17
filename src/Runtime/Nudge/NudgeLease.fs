@@ -128,7 +128,55 @@ let tryClaimAndRegisterLease
             return Some lease
     }
 
-// ARCHITECTURE_EXEMPT: split this 80-line function later
+let private processDeliveredOutcome
+    (runtime: FallbackRuntimeStore)
+    (workspaceRoot: string)
+    (sessionKey: string)
+    (lease: NudgeLease)
+    (action: NudgeAction)
+    (nudgeAnchorKey: string)
+    (abortRun: string -> JS.Promise<unit>)
+    : JS.Promise<unit> =
+    promise {
+        let dispatchedLease =
+            { lease with
+                Status = LeaseStatus.Dispatched }
+
+        do!
+            finishNudge
+                runtime
+                workspaceRoot
+                sessionKey
+                dispatchedLease
+                NudgeOutcome.Dispatched
+                ""
+                (toString action)
+                nudgeAnchorKey
+
+        if
+            not (
+                runtime.TryTransitionPendingNudgeLease(
+                    sessionKey,
+                    lease.NudgeID,
+                    LeaseStatus.DispatchStarted,
+                    LeaseStatus.Dispatched
+                )
+            )
+        then
+            do! abortRun sessionKey
+
+            do!
+                finishNudge
+                    runtime
+                    workspaceRoot
+                    sessionKey
+                    lease
+                    NudgeOutcome.Cancelled
+                    "Cancelled after dispatch"
+                    ""
+                    ""
+    }
+
 let validateAndFinalizeOutcome
     (workspaceRoot: string)
     (fallbackRuntime: FallbackRuntimeStore)
@@ -156,43 +204,7 @@ let validateAndFinalizeOutcome
         else
             match outcome with
             | Delivered ->
-                let dispatchedLease =
-                    { lease with
-                        Status = LeaseStatus.Dispatched }
-
-                do!
-                    finishNudge
-                        fallbackRuntime
-                        workspaceRoot
-                        sessionKey
-                        dispatchedLease
-                        NudgeOutcome.Dispatched
-                        ""
-                        (toString action)
-                        nudgeAnchorKey
-
-                if
-                    not (
-                        fallbackRuntime.TryTransitionPendingNudgeLease(
-                            sessionKey,
-                            lease.NudgeID,
-                            LeaseStatus.DispatchStarted,
-                            LeaseStatus.Dispatched
-                        )
-                    )
-                then
-                    do! abortRun sessionKey
-
-                    do!
-                        finishNudge
-                            fallbackRuntime
-                            workspaceRoot
-                            sessionKey
-                            lease
-                            NudgeOutcome.Cancelled
-                            "Cancelled after dispatch"
-                            ""
-                            ""
+                do! processDeliveredOutcome fallbackRuntime workspaceRoot sessionKey lease action nudgeAnchorKey abortRun
             | Busy ->
                 do! finishNudge fallbackRuntime workspaceRoot sessionKey lease NudgeOutcome.Failed "Session busy" "" ""
             | Aborted ->

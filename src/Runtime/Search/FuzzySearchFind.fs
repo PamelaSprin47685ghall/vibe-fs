@@ -51,6 +51,26 @@ let findNextIterator
     else
         ""
 
+let private processRawFindResponse
+    (value: obj)
+    : string * FindResult =
+    let matches = itemsOf value |> Array.map toFindMatch |> List.ofArray
+    let totalOpt = optInt value "totalMatched"
+    let totalFiles = optInt value "totalFiles" |> Option.defaultValue 0
+
+    let result =
+        Some
+            { items = matches
+              totalMatched = totalOpt
+              totalFiles = totalFiles }
+
+    let output = formatFindOutput result
+
+    output,
+    { items = matches
+      totalMatched = totalOpt
+      totalFiles = totalFiles }
+
 let private runFind
     (state: FuzzyFindState)
     (store: TypedIteratorStore)
@@ -70,26 +90,16 @@ let private runFind
           isError = true }
     else
         let value = Dyn.get raw "value"
-        let matches = itemsOf value |> Array.map toFindMatch |> List.ofArray
-        let totalOpt = optInt value "totalMatched"
-        let totalFiles = optInt value "totalFiles" |> Option.defaultValue 0
+        let body, result = processRawFindResponse value
 
         let totalForPaging =
-            match totalOpt with
+            match result.totalMatched with
             | Some total -> total
             | None ->
-                if matches.Length >= state.pageSize then
+                if result.items.Length >= state.pageSize then
                     (state.pageIndex + 2) * state.pageSize
                 else
                     0
-
-        let body =
-            formatFindOutput (
-                Some
-                    { items = matches
-                      totalMatched = totalOpt
-                      totalFiles = totalFiles }
-            )
 
         let nextIterator = findNextIterator state store opts totalForPaging
 
@@ -113,7 +123,39 @@ let private fuzzyFindSingle (params': FuzzyFindParams) (opts: SearchOptions) : J
                 return runWithFinder finderResult state.externalBasePath (runFind state store opts)
     }
 
-// ARCHITECTURE_EXEMPT: split this 70-line function later
+let private runFindForPattern
+    (finder: FinderLike)
+    (params': FuzzyFindParams)
+    (opts: SearchOptions)
+    (pat: string)
+    : JS.Promise<string * SearchOutcome> =
+    promise {
+        match resolveFindSearchStateForPattern pat params' opts with
+        | Error msg -> return (pat, { output = msg; isError = true })
+        | Ok state ->
+            let raw =
+                finder.fileSearch (
+                    state.query,
+                    box
+                        {| pageIndex = 0
+                           pageSize = state.pageSize |}
+                )
+
+            if not (Dyn.truthy (Dyn.get raw "ok")) then
+                return
+                    (pat,
+                     { output = errorMsg raw "fuzzy_find failed"
+                       isError = true })
+            else
+                let value = Dyn.get raw "value"
+                let body, _ = processRawFindResponse value
+
+                return
+                    (pat,
+                     { output = body
+                       isError = false })
+    }
+
 let private fuzzyFindMulti
     (patterns: string list)
     (params': FuzzyFindParams)
@@ -134,43 +176,7 @@ let private fuzzyFindMulti
         | Error msg -> return { output = msg; isError = true }
         | Ok finder ->
             try
-                let runOne pat =
-                    promise {
-                        match resolveFindSearchStateForPattern pat params' opts with
-                        | Error msg -> return (pat, { output = msg; isError = true })
-                        | Ok state ->
-                            let raw =
-                                finder.fileSearch (
-                                    state.query,
-                                    box
-                                        {| pageIndex = 0
-                                           pageSize = state.pageSize |}
-                                )
-
-                            if not (Dyn.truthy (Dyn.get raw "ok")) then
-                                return
-                                    (pat,
-                                     { output = errorMsg raw "fuzzy_find failed"
-                                       isError = true })
-                            else
-                                let value = Dyn.get raw "value"
-                                let matches = itemsOf value |> Array.map toFindMatch |> List.ofArray
-                                let totalOpt = optInt value "totalMatched"
-                                let totalFiles = optInt value "totalFiles" |> Option.defaultValue 0
-
-                                let result =
-                                    Some
-                                        { items = matches
-                                          totalMatched = totalOpt
-                                          totalFiles = totalFiles }
-
-                                return
-                                    (pat,
-                                     { output = formatFindOutput result
-                                       isError = false })
-                    }
-
-                let promises = patterns |> List.map runOne |> List.toArray
+                let promises = patterns |> List.map (runFindForPattern finder params' opts) |> List.toArray
                 let! outcomes = Promise.all promises
 
                 let body =

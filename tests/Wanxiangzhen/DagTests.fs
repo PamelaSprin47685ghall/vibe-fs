@@ -143,7 +143,7 @@ let entries () : (string * (unit -> unit)) list =
       ("formatSquadUpdateOutcome CycleDetected",
        fun () ->
            let s = formatSquadUpdateOutcome (CycleDetected [ "squad-x"; "squad-y"; "squad-x" ])
-           equal "Dependency cycle detected: squad-x → squad-y → squad-x. Please re-decompose without cycles." s)
+           equal "Dependency cycle detected: squad-x -> squad-y -> squad-x. Please re-decompose without cycles." s)
 
       ("formatSquadUpdateOutcome IdExhausted",
        fun () ->

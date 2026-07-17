@@ -125,7 +125,116 @@ let toolExecuteBeforeFor (host: Host) (input: obj) (output: obj) : JS.Promise<un
 let toolExecuteBefore (input: obj) (output: obj) : JS.Promise<unit> =
     toolExecuteBeforeFor opencode input output
 
-// ARCHITECTURE_EXEMPT: split this 93-line function later
+/// Collect todo-write violations for a tool-execute-after hook call.
+/// Returns (isDecodeError, violations). On decode error the hook output
+/// error string is set as a side-effect.
+let private collectTodoWriteViolations (host: Host) (output: obj) (input: obj) (decodedArgs: obj) : bool * string list =
+    if
+        toolNameFromHookInput input <> todoWriteToolName host
+        || Dyn.isNullish decodedArgs
+    then
+        false, []
+    else
+        match Wanxiangshu.Runtime.WorkBacklogToolsCodec.decodeTodoWriteArgs (host = Mimocode) decodedArgs with
+        | Ok(_, viols) -> false, viols
+        | Error err ->
+            let errStr = $"DECODE_FAILED: %A{err}"
+            setHookError output errStr
+            true, []
+
+/// Evaluate the compliance entry for this tool call and apply violations and
+/// warn-field restoration.
+let private processHookResult
+    (decodedArgs: obj)
+    (currentOutput: string)
+    (isError: bool)
+    (toolCallID: string)
+    (sessionID: string)
+    (todoViolations: string list)
+    (setOutputString: string -> unit)
+    : unit =
+    match ToolHookRuntime.tryGetCompliance sessionID toolCallID with
+    | Some env ->
+        let status =
+            if env.Cancelled then
+                ToolHookRuntime.ExecutionStatus.Cancelled
+            elif isError then
+                ToolHookRuntime.ExecutionStatus.Failure
+            else
+                ToolHookRuntime.ExecutionStatus.Success
+
+        let allViolations = env.Violations @ todoViolations |> List.distinct
+
+        if not allViolations.IsEmpty then
+            let criticism = ToolHookRuntime.appendCriticism currentOutput allViolations status
+            setOutputString criticism
+
+        // Restore warn fields so the LLM can see what it submitted.
+        if not (Dyn.isNullish decodedArgs) then
+            ToolHookRuntime.restoreWarnToArgs decodedArgs env
+
+        ToolHookRuntime.removeCompliance sessionID toolCallID
+    | None ->
+        let status =
+            if isError then
+                ToolHookRuntime.ExecutionStatus.Failure
+            else
+                ToolHookRuntime.ExecutionStatus.Success
+
+        if not todoViolations.IsEmpty then
+            let criticism = ToolHookRuntime.appendCriticism currentOutput todoViolations status
+            setOutputString criticism
+
+/// Core hook-after logic: syntax diagnostics, compliance/violation processing,
+/// and network-error / livelock-guard post-processing.
+let private executeHookAfter
+    (host: Host)
+    (pluginDirectory: string)
+    (scope: RuntimeScope)
+    (input: obj)
+    (output: obj)
+    : JS.Promise<unit> =
+    promise {
+        do! appendSyntaxDiagnostics pluginDirectory input output
+        let decodedArgs = argsFromHookInput input
+
+        let sessionID =
+            Id.sessionIdValue (fromOpencode input pluginDirectory).Execution.SessionId
+
+        let toolCallID =
+            ToolHookRuntime.tryExtractToolCallId input |> Option.defaultValue ""
+
+        let currentOutput = hookOutputText output
+
+        let isDecodeError, todoViolations =
+            collectTodoWriteViolations host output input decodedArgs
+
+        let isError =
+            isDecodeError
+            || hookOutputError output <> ""
+            || isNetworkErrorText currentOutput
+
+        processHookResult
+            decodedArgs
+            currentOutput
+            isError
+            toolCallID
+            sessionID
+            todoViolations
+            (setHookOutputString output)
+
+        // Network-error and livelock-guard post-processing.
+        let argsJson = LivelockGuard.cleanArgsJson (argsFromHookInput input)
+        let finalOutput = hookOutputText output
+
+        if isNetworkErrorText finalOutput then
+            setHookError output "network connection lost"
+
+        if hookOutputError output = "" then
+            if LivelockGuard.check scope sessionID (toolNameFromHookInput input) argsJson finalOutput then
+                setHookError output "livelock guard: repeated identical tool call with identical result"
+    }
+
 let toolExecuteAfterFor
     (host: Host)
     (pluginDirectory: string)
@@ -136,86 +245,6 @@ let toolExecuteAfterFor
     (output: obj)
     : JS.Promise<unit> =
     promise {
-        do! appendSyntaxDiagnostics pluginDirectory input output
-        let tool = toolNameFromHookInput input
-
-        let sessionID =
-            Id.sessionIdValue (fromOpencode input pluginDirectory).Execution.SessionId
-
-        let originalOutput = hookOutputText output
-
-        let decodedArgs = argsFromHookInput input
-
-
-        let todoViolationsResult =
-            if tool = todoWriteToolName host && not (Dyn.isNullish decodedArgs) then
-                match Wanxiangshu.Runtime.WorkBacklogToolsCodec.decodeTodoWriteArgs (host = Mimocode) decodedArgs with
-                | Ok(_, viols) -> Ok viols
-                | Error err -> Error err
-            else
-                Ok []
-
-        let isDecodeError, todoViolations =
-            match todoViolationsResult with
-            | Ok viols -> false, viols
-            | Error err ->
-                let errStr = $"DECODE_FAILED: %A{err}"
-                setHookError output errStr
-                true, []
-
-        let currentOutput = hookOutputText output
-
-        let isError =
-            isDecodeError
-            || hookOutputError output <> ""
-            || isNetworkErrorText currentOutput
-
-        let toolCallID =
-            ToolHookRuntime.tryExtractToolCallId input |> Option.defaultValue ""
-
-        match ToolHookRuntime.tryGetCompliance sessionID toolCallID with
-        | Some env ->
-            let status =
-                if env.Cancelled then
-                    ToolHookRuntime.ExecutionStatus.Cancelled
-                elif isError then
-                    ToolHookRuntime.ExecutionStatus.Failure
-                else
-                    ToolHookRuntime.ExecutionStatus.Success
-
-            let allViolations = env.Violations @ todoViolations |> List.distinct
-
-            if not allViolations.IsEmpty then
-                let criticism = ToolHookRuntime.appendCriticism currentOutput allViolations status
-                setHookOutputString output criticism
-
-            // Restore warn fields to all visible args so the LLM can see
-            // what it submitted in subsequent turns.
-            if not (Dyn.isNullish decodedArgs) then
-                ToolHookRuntime.restoreWarnToArgs decodedArgs env
-
-            ToolHookRuntime.removeCompliance sessionID toolCallID
-        | None ->
-            let status =
-                if isError then
-                    ToolHookRuntime.ExecutionStatus.Failure
-                else
-                    ToolHookRuntime.ExecutionStatus.Success
-
-            if not todoViolations.IsEmpty then
-                let criticism = ToolHookRuntime.appendCriticism currentOutput todoViolations status
-                setHookOutputString output criticism
-
-        let argsJson = LivelockGuard.cleanArgsJson (argsFromHookInput input)
-
-        let finalOutput = hookOutputText output
-
-        if isNetworkErrorText finalOutput then
-            setHookError output "network connection lost"
-
-        if hookOutputError output = "" then
-            if LivelockGuard.check scope sessionID tool argsJson currentOutput then
-                setHookError output "livelock guard: repeated identical tool call with identical result"
-
+        do! executeHookAfter host pluginDirectory scope input output
         do! lifecycleObserver.handleToolExecuteAfter input output
     }

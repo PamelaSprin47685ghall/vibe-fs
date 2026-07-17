@@ -90,7 +90,82 @@ let private aggregateAssignedTasks (events: obj list) : RawTask list * bool =
 
     (List.rev rawTasks, hasCancelled)
 
-// ARCHITECTURE_EXEMPT: split this 64-line function later
+let private computeSquadUpdate
+    (rt: CoordinatorRuntime)
+    (existingTaskIds: Set<string>)
+    (assigned: TaskItem list)
+    : SquadUpdateOutcome option =
+    let newIds = assigned |> List.map (fun item -> item.taskId) |> Set.ofList
+    let allIds = Set.union existingTaskIds newIds
+
+    let dangling =
+        assigned
+        |> List.collect (fun item ->
+            item.dependsOn
+            |> List.filter (fun d -> not (Set.contains d allIds))
+            |> List.map (fun d -> item.taskId, d))
+
+    if dangling <> [] then
+        DependencyErrors dangling |> Some
+    else
+        let depsList = assigned |> List.map (fun item -> item.taskId, item.dependsOn)
+
+        let existingDeps =
+            rt.Dag.Tasks |> Map.toList |> List.map (fun (id, t) -> id, t.DependsOn)
+
+        match detectCycle (existingDeps @ depsList) with
+        | Some cycle -> CycleDetected cycle |> Some
+        | None -> None
+
+let private commitTasksEvent
+    (rt: CoordinatorRuntime)
+    (assigned: TaskItem list)
+    : JS.Promise<Result<unit, SquadUpdateOutcome>> =
+    promise {
+        if assigned = [] then
+            return Ok()
+        else
+            let! appendOk = commitEvent rt (TasksCreated(rt.Dag.SessionId, assigned))
+
+            match appendOk with
+            | Error err ->
+                rt.InjectError <- Some(sprintf "TasksCreated append failed: %s" err)
+                return Error(InvalidInput "event log append failed.")
+            | Ok() -> return Ok()
+    }
+
+let private applySquadUpdate
+    (rt: CoordinatorRuntime)
+    (assigned: TaskItem list)
+    (hasCancelled: bool)
+    : JS.Promise<string> =
+    promise {
+        if assigned <> [] then
+            let now = rt.Deps.Now()
+
+            let updatedDag =
+                assigned
+                |> List.fold
+                    (fun dag item ->
+                        let t = create item.taskId item.title item.description item.dependsOn now
+                        addTask t dag)
+                    rt.Dag
+
+            rt.Dag <- updatedDag
+
+        if hasCancelled then
+            do! handleSquadKillCore rt None
+
+        let resultText =
+            if hasCancelled && assigned = [] then
+                sprintf "Squad session %s cancelled." rt.Dag.SessionId
+            else
+                sprintf "%d task(s) created, scheduler notified." (List.length assigned)
+
+        schedulerTick rt |> Promise.start |> ignore
+        return resultText
+    }
+
 let private commitAssigned
     (rt: CoordinatorRuntime)
     (existingTaskIds: Set<string>)
@@ -98,63 +173,32 @@ let private commitAssigned
     (hasCancelled: bool)
     : JS.Promise<Result<string, SquadUpdateOutcome>> =
     promise {
-        let newIds = assigned |> List.map (fun item -> item.taskId) |> Set.ofList
-        let allIds = Set.union existingTaskIds newIds
+        match computeSquadUpdate rt existingTaskIds assigned with
+        | Some o -> return Error o
+        | None ->
+            let! commitOk = commitTasksEvent rt assigned
 
-        let dangling =
-            assigned
-            |> List.collect (fun item ->
-                item.dependsOn
-                |> List.filter (fun d -> not (Set.contains d allIds))
-                |> List.map (fun d -> item.taskId, d))
-
-        if dangling <> [] then
-            return Error(DependencyErrors dangling)
-        else
-            let depsList = assigned |> List.map (fun item -> item.taskId, item.dependsOn)
-
-            let existingDeps =
-                rt.Dag.Tasks |> Map.toList |> List.map (fun (id, t) -> id, t.DependsOn)
-
-            match detectCycle (existingDeps @ depsList) with
-            | Some cycle -> return Error(CycleDetected cycle)
-            | None ->
-                let! appendOk =
-                    if assigned = [] then
-                        Promise.lift (Ok())
-                    else
-                        commitEvent rt (TasksCreated(rt.Dag.SessionId, assigned))
-
-                match appendOk with
-                | Error err ->
-                    rt.InjectError <- Some(sprintf "TasksCreated append failed: %s" err)
-                    return Error(InvalidInput "event log append failed.")
-                | Ok() ->
-                    if assigned <> [] then
-                        let now = rt.Deps.Now()
-
-                        let updatedDag =
-                            assigned
-                            |> List.fold
-                                (fun dag item ->
-                                    let t = create item.taskId item.title item.description item.dependsOn now
-                                    addTask t dag)
-                                rt.Dag
-
-                        rt.Dag <- updatedDag
-
-                    if hasCancelled then
-                        do! handleSquadKillCore rt None
-
-                    let resultText =
-                        if hasCancelled && assigned = [] then
-                            sprintf "Squad session %s cancelled." rt.Dag.SessionId
-                        else
-                            sprintf "%d task(s) created, scheduler notified." (List.length assigned)
-
-                    schedulerTick rt |> Promise.start |> ignore
-                    return Ok resultText
+            match commitOk with
+            | Error o -> return Error o
+            | Ok() ->
+                let! text = applySquadUpdate rt assigned hasCancelled
+                return Ok text
     }
+
+let private aggregateAndAssignTasks
+    (rt: CoordinatorRuntime)
+    (existingTaskIds: Set<string>)
+    (events: obj list)
+    : Result<TaskItem list * bool, SquadUpdateOutcome> =
+    let allRawTasks, hasCancelled = aggregateAssignedTasks events
+
+    let idGen =
+        { Generate = fun () -> generateTaskIdWith rt.Deps.RandomGen
+          RefExists = fun cand -> rt.Deps.ShowRefExists rt.ProjectRoot cand }
+
+    match assignTaskIds existingTaskIds allRawTasks idGen with
+    | Error() -> Error IdExhausted
+    | Ok assigned -> Ok(assigned, hasCancelled)
 
 let private handleSquadUpdateCore (rt: CoordinatorRuntime) (args: obj) : JS.Promise<string> =
     promise {
@@ -170,16 +214,11 @@ let private handleSquadUpdateCore (rt: CoordinatorRuntime) (args: obj) : JS.Prom
                     match validateTaskFields events with
                     | Some o -> return formatSquadUpdateOutcome o
                     | None ->
-                        let allRawTasks, hasCancelled = aggregateAssignedTasks events
                         let existingTaskIds = rt.Dag.Tasks |> Map.toList |> List.map fst |> Set.ofList
 
-                        let idGen =
-                            { Generate = fun () -> generateTaskIdWith rt.Deps.RandomGen
-                              RefExists = fun cand -> rt.Deps.ShowRefExists rt.ProjectRoot cand }
-
-                        match assignTaskIds existingTaskIds allRawTasks idGen with
-                        | Error() -> return formatSquadUpdateOutcome IdExhausted
-                        | Ok assigned ->
+                        match aggregateAndAssignTasks rt existingTaskIds events with
+                        | Error o -> return formatSquadUpdateOutcome o
+                        | Ok(assigned, hasCancelled) ->
                             match! commitAssigned rt existingTaskIds assigned hasCancelled with
                             | Error o -> return formatSquadUpdateOutcome o
                             | Ok text -> return text

@@ -40,17 +40,83 @@ type CoreServices =
       FallbackConfig: FallbackConfig option
       FallbackRuntime: FallbackRuntimeStore }
 
-// ARCHITECTURE_EXEMPT: split this 99-line function later
-let createCoreServices (host: Host) (ctx: obj) =
+type private PluginServiceParts =
+    { ReviewStore: Wanxiangshu.Runtime.ReviewRuntime.ReviewStore
+      ChildAgentRegistry: ChildAgentRegistry
+      FinderCache: Wanxiangshu.Runtime.FuzzyFinderShell.FinderCache
+      Directory: string
+      FallbackConfigOpt: FallbackConfig option
+      FallbackRuntime: FallbackRuntimeStore
+      FallbackConfigLookup: Wanxiangshu.Runtime.Fallback.Ports.ConfigLookup
+      FallbackHandler: (obj -> JS.Promise<FallbackHookResult>) option
+      Scope: RuntimeScope
+      BacklogSession: BacklogSession
+      LifecycleObserver: SessionLifecycleObserver
+      Tools: obj }
+
+let private buildScopeInit
+    (host: Host)
+    (ctx: obj)
+    (reviewStore: Wanxiangshu.Runtime.ReviewRuntime.ReviewStore)
+    (scope: RuntimeScope)
+    =
+    fun dir ->
+        promise {
+            // Initialization barrier: reconcile unfinished subsession runs before anything else.
+            do!
+                Wanxiangshu.Runtime.SubsessionReconcile.reconcileUnfinishedRuns
+                    dir
+                    (Some(fun _ ->
+                        match getClientFromPluginCtx ctx with
+                        | Ok client -> createHost client "" dir
+                        | Error _ -> createHost (box null) "" dir))
+                |> FablePromise.map ignore
+
+            return! Wanxiangshu.Runtime.EventLogRuntime.syncAllSessionsFromEventLogDedicated host reviewStore scope dir
+        }
+
+let private buildMcpMap () : obj =
+    let mcps =
+        box
+            {| ``type`` = "local"
+               command =
+                Wanxiangshu.Kernel.Config
+                    .getStealthBrowserMcpLocalConfig(envVar "STEALTH_BROWSER_MCP_REF")
+                    .command |}
+
+    box {| ``stealth-browser-mcp`` = mcps |}
+
+let private getClient (ctx: obj) =
+    match getClientFromPluginCtx ctx with
+    | Ok c -> c
+    | Error _ -> box null
+
+let private buildFallbackHandler
+    (client: obj)
+    (fallbackRuntime: FallbackRuntimeStore)
+    (fallbackConfigLookup: Wanxiangshu.Runtime.Fallback.Ports.ConfigLookup)
+    (directory: string)
+    (childAgentRegistry: ChildAgentRegistry)
+    (reviewStore: Wanxiangshu.Runtime.ReviewRuntime.ReviewStore)
+    (ctx: obj)
+    =
+    Some(
+        Wanxiangshu.Hosts.Opencode.Fallback.Hook.createOpencodeFallbackHandler
+            client
+            fallbackRuntime
+            fallbackConfigLookup
+            directory
+            childAgentRegistry
+            reviewStore
+            (Some ctx)
+    )
+
+let private loadPluginServices (host: Host) (ctx: obj) : PluginServiceParts =
     let reviewStore = Wanxiangshu.Runtime.ReviewRuntime.createReviewStore ()
     let childAgentRegistry = ChildAgentRegistry.Create()
     let finderCache = FinderCache()
 
-    let client =
-        match getClientFromPluginCtx ctx with
-        | Ok c -> c
-        | Error _ -> box null
-
+    let client = getClient ctx
     let directory = pluginDirectoryFromCtx ctx
 
     let fallbackConfigOpt =
@@ -64,16 +130,7 @@ let createCoreServices (host: Host) (ctx: obj) =
         | None -> (fun _ -> Wanxiangshu.Runtime.Fallback.FallbackConfigCodec.emptyConfig)
 
     let fallbackHandler =
-        Some(
-            Wanxiangshu.Hosts.Opencode.Fallback.Hook.createOpencodeFallbackHandler
-                client
-                fallbackRuntime
-                fallbackConfigLookup
-                directory
-                childAgentRegistry
-                reviewStore
-                (Some ctx)
-        )
+        buildFallbackHandler client fallbackRuntime fallbackConfigLookup directory childAgentRegistry reviewStore ctx
 
     let scope = create ()
     scope.Add("fallbackRuntime", box fallbackRuntime)
@@ -93,24 +150,25 @@ let createCoreServices (host: Host) (ctx: obj) =
     let tools =
         createTools host childAgentRegistry finderCache ctx reviewStore scope fallbackRuntime
 
-    scope.OnInit <-
-        Some(fun dir ->
-            promise {
-                // Initialization barrier: reconcile unfinished subsession runs before anything else.
-                do!
-                    Wanxiangshu.Runtime.SubsessionReconcile.reconcileUnfinishedRuns
-                        dir
-                        (Some(fun _ ->
-                            match getClientFromPluginCtx ctx with
-                            | Ok client -> createHost client "" dir
-                            | Error _ -> createHost (box null) "" dir))
-                    |> FablePromise.map ignore
+    { ReviewStore = reviewStore
+      ChildAgentRegistry = childAgentRegistry
+      FinderCache = finderCache
+      Directory = directory
+      FallbackConfigOpt = fallbackConfigOpt
+      FallbackRuntime = fallbackRuntime
+      FallbackConfigLookup = fallbackConfigLookup
+      FallbackHandler = fallbackHandler
+      Scope = scope
+      BacklogSession = backlogSession
+      LifecycleObserver = lifecycleObserver
+      Tools = tools }
 
-                return!
-                    Wanxiangshu.Runtime.EventLogRuntime.syncAllSessionsFromEventLogDedicated host reviewStore scope dir
-            })
+let private registerPluginHooks (host: Host) (ctx: obj) (parts: PluginServiceParts) : CoreServices =
+    let scope = parts.Scope
+    let reviewStore = parts.ReviewStore
 
-    scope.TriggerInit(directory)
+    scope.OnInit <- Some(buildScopeInit host ctx reviewStore scope)
+    scope.TriggerInit(parts.Directory)
 
     let client =
         match getClientFromPluginCtx ctx with
@@ -120,26 +178,20 @@ let createCoreServices (host: Host) (ctx: obj) =
     if not (Dyn.isNullish client) then
         storePtyClient client
 
-    let mcps =
-        box
-            {| ``type`` = "local"
-               command =
-                Wanxiangshu.Kernel.Config
-                    .getStealthBrowserMcpLocalConfig(envVar "STEALTH_BROWSER_MCP_REF")
-                    .command |}
+    { ReviewStore = parts.ReviewStore
+      ChildAgentRegistry = parts.ChildAgentRegistry
+      SessionLifecycleObserver = parts.LifecycleObserver
+      Directory = parts.Directory
+      RuntimeScope = parts.Scope
+      BacklogSession = parts.BacklogSession
+      Tools = parts.Tools
+      McpMap = buildMcpMap ()
+      FallbackConfig = parts.FallbackConfigOpt
+      FallbackRuntime = parts.FallbackRuntime }
 
-    let mcpMap = box {| ``stealth-browser-mcp`` = mcps |}
-
-    { ReviewStore = reviewStore
-      ChildAgentRegistry = childAgentRegistry
-      SessionLifecycleObserver = lifecycleObserver
-      Directory = directory
-      RuntimeScope = scope
-      BacklogSession = backlogSession
-      Tools = tools
-      McpMap = mcpMap
-      FallbackConfig = fallbackConfigOpt
-      FallbackRuntime = fallbackRuntime }
+let createCoreServices (host: Host) (ctx: obj) =
+    let parts = loadPluginServices host ctx
+    registerPluginHooks host ctx parts
 
 let createReviewTestSurface (reviewStore: Wanxiangshu.Runtime.ReviewRuntime.ReviewStore) : obj =
     createObj

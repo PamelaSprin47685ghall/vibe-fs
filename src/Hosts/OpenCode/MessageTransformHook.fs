@@ -61,7 +61,61 @@ let private resolveMaxInputTokens (sessionID: string) (client: obj) (directory: 
             return limit
         }
 
-// ARCHITECTURE_EXEMPT: split this 64-line function later
+/// Build the BacklogSessionOps value for a host-messages-transform run.
+let private buildBacklogOps (backlogSession: BacklogSession) : BacklogSessionOps =
+    backlogSessionOpsFrom backlogSession.Host (fun sid msgs -> backlogSession.GetOrRebuildBacklog(sid, msgs))
+
+/// Build the injection function: takes a policy and encoded messages, either
+/// passes messages through or injects Semble annotations.
+let private buildInjectionFn
+    (directory: string)
+    (agent: string)
+    (sessionID: string)
+    : (BacklogProjectionPolicy -> obj array -> JS.Promise<obj array>) =
+    fun policy encoded ->
+        match policy with
+        | BacklogProjectionPolicy.Exclude -> Promise.lift encoded
+        | BacklogProjectionPolicy.Include -> injectSembleIntoEncoded directory agent sessionID encoded
+
+/// Build the load-caps async function for the transform pipeline.
+let private buildLoadCaps
+    (registry: ChildAgentRegistry)
+    (runtimeScope: Wanxiangshu.Runtime.RuntimeScope.RuntimeScope)
+    (sessionID: string)
+    (plan: MessageTransformPlan)
+    : unit -> JS.Promise<CapsFile list> =
+    fun () ->
+        promise {
+            let parentSessionID =
+                registry.ResolveSubsessionParentID(Some sessionID)
+                |> Option.defaultValue sessionID
+
+            let! caps =
+                loadCapsForScope
+                    runtimeScope
+                    AllowEmptyDirectory
+                    { plan with
+                        SessionID = parentSessionID }
+
+            return caps |> List.sortBy (fun cf -> cf.label, cf.filePath)
+        }
+
+/// Build the build-caps callback passed to runHostMessagesTransform.
+let private buildCapsFn
+    (capsEpoch: string)
+    (directory: string)
+    : (obj array -> CapsFile list -> string option -> obj array) =
+    fun encoded capsFiles preludeOpt ->
+        buildCapsMessages
+            Wanxiangshu.Runtime.FileSys.sha256HexTruncated
+            capsEpoch
+            encoded
+            directory
+            capsFiles
+            preludeOpt
+
+/// Run the host-messages transform pipeline and replace the messages array
+/// in-place with the final result.
 let private runHostMessagesTransformExecution
     (registry: ChildAgentRegistry)
     (directory: string)
@@ -80,38 +134,10 @@ let private runHostMessagesTransformExecution
     (plan: MessageTransformPlan)
     : JS.Promise<unit> =
     promise {
-        let backlogOps =
-            backlogSessionOpsFrom backlogSession.Host (fun sid msgs -> backlogSession.GetOrRebuildBacklog(sid, msgs))
-
-        let injectFn policy encoded =
-            match policy with
-            | BacklogProjectionPolicy.Exclude -> Promise.lift encoded
-            | BacklogProjectionPolicy.Include -> injectSembleIntoEncoded directory agent sessionID encoded
-
-        let loadCaps () =
-            promise {
-                let parentSessionID =
-                    registry.ResolveSubsessionParentID(Some sessionID)
-                    |> Option.defaultValue sessionID
-
-                let! caps =
-                    loadCapsForScope
-                        runtimeScope
-                        AllowEmptyDirectory
-                        { plan with
-                            SessionID = parentSessionID }
-
-                return caps |> List.sortBy (fun cf -> cf.label, cf.filePath)
-            }
-
-        let buildCaps encoded capsFiles prelude =
-            buildCapsMessages
-                Wanxiangshu.Runtime.FileSys.sha256HexTruncated
-                capsEpoch
-                encoded
-                directory
-                capsFiles
-                prelude
+        let backlogOps = buildBacklogOps backlogSession
+        let injectFn = buildInjectionFn directory agent sessionID
+        let loadCaps = buildLoadCaps registry runtimeScope sessionID plan
+        let buildCaps = buildCapsFn capsEpoch directory
 
         let! final =
             runHostMessagesTransform
@@ -127,7 +153,46 @@ let private runHostMessagesTransformExecution
         replaceArrayInPlace messagesArr final
     }
 
-// ARCHITECTURE_EXEMPT: split this 81-line function later
+/// Build the MessageTransformPlan from resolved session parameters.
+let private buildTransformPlan
+    (sessionID: string)
+    (agent: string)
+    (directory: string)
+    (p: BacklogProjectionPolicy)
+    (caps: CapsInjectionPolicy)
+    (par: ParallelHintPolicy)
+    (budget: ContextBudgetPolicy)
+    (isSub: bool)
+    (messagesList: Message<obj> list)
+    (messagesArr: obj array)
+    (sembleInjectEnabled: bool)
+    (runtimeScope: Wanxiangshu.Runtime.RuntimeScope.RuntimeScope)
+    (maxInputTokens: int)
+    (client: obj)
+    : MessageTransformPlan =
+    { SessionID = sessionID
+      Agent = agent
+      Directory = directory
+      ProjectionPolicy =
+        (if p = BacklogProjectionPolicy.Include then
+             ProjectionPolicy.IncludeProjection
+         else
+             ProjectionPolicy.ExcludeProjection)
+      BacklogProjectionPolicy = p
+      CapsInjectionPolicy = caps
+      ParallelHintPolicy = par
+      ContextBudgetPolicy = budget
+      IsSubagentSession = isSub
+      Cleaned = messagesList
+      RawArray = Some messagesArr
+      SembleInjectEnabled = sembleInjectEnabled
+      Scope = runtimeScope
+      MaxInputTokens = maxInputTokens
+      GetContextUsage =
+        (fun encoded -> Wanxiangshu.Runtime.OpencodeContextBudgetObservation.tryCurrentUsage client sessionID encoded) }
+
+/// Transform the messages array in-place: resolve session context, build the
+/// transform plan, and run the host-messages transform pipeline.
 let messagesTransform
     (registry: ChildAgentRegistry)
     (directory: string)
@@ -165,30 +230,26 @@ let messagesTransform
 
             let! maxInputTokens = resolveMaxInputTokens sessionID client directory
 
+            let sembleInjectEnabled =
+                p = BacklogProjectionPolicy.Include
+                && (agent = "investigator" || agent = "reviewer")
+
             let plan =
-                { SessionID = sessionID
-                  Agent = agent
-                  Directory = directory
-                  ProjectionPolicy =
-                    (if p = BacklogProjectionPolicy.Include then
-                         ProjectionPolicy.IncludeProjection
-                     else
-                         ProjectionPolicy.ExcludeProjection)
-                  BacklogProjectionPolicy = p
-                  CapsInjectionPolicy = caps
-                  ParallelHintPolicy = par
-                  ContextBudgetPolicy = budget
-                  IsSubagentSession = isSub
-                  Cleaned = messagesList
-                  RawArray = Some messagesArr
-                  SembleInjectEnabled =
-                    (p = BacklogProjectionPolicy.Include
-                     && (agent = "investigator" || agent = "reviewer"))
-                  Scope = runtimeScope
-                  MaxInputTokens = maxInputTokens
-                  GetContextUsage =
-                    (fun encoded ->
-                        Wanxiangshu.Runtime.OpencodeContextBudgetObservation.tryCurrentUsage client sessionID encoded) }
+                buildTransformPlan
+                    sessionID
+                    agent
+                    directory
+                    p
+                    caps
+                    par
+                    budget
+                    isSub
+                    messagesList
+                    messagesArr
+                    sembleInjectEnabled
+                    runtimeScope
+                    maxInputTokens
+                    client
 
             do!
                 runHostMessagesTransformExecution
@@ -202,8 +263,7 @@ let messagesTransform
                     isSub
                     messagesList
                     messagesArr
-                    (p = BacklogProjectionPolicy.Include
-                     && (agent = "investigator" || agent = "reviewer"))
+                    sembleInjectEnabled
                     maxInputTokens
                     client
                     capsEpoch

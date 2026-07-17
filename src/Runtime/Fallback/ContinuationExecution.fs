@@ -32,7 +32,19 @@ type ContinuationIntent =
         continuationOrdinal: int
     | PropagateFailureIntent
 
-// ARCHITECTURE_EXEMPT: split this 66-line function later
+let private cancelAfterDispatch
+    (runtime: FallbackRuntimeStore)
+    (executor: IActionExecutor)
+    (workspaceRoot: string)
+    (sessionID: string)
+    (lease: PendingLease)
+    (reason: string)
+    : JS.Promise<unit> =
+    promise {
+        do! executor.AbortRun sessionID
+        do! finishContinuation runtime workspaceRoot sessionID lease ContinuationOutcome.Cancelled reason
+    }
+
 let handleDispatchComplete
     (runtime: FallbackRuntimeStore)
     (executor: IActionExecutor)
@@ -47,16 +59,7 @@ let handleDispatchComplete
             verifyLeaseWithStatus LeaseStatus.DispatchStarted runtime sessionID lease
 
         if not isValid then
-            do! executor.AbortRun sessionID
-
-            do!
-                finishContinuation
-                    runtime
-                    workspaceRoot
-                    sessionID
-                    lease
-                    ContinuationOutcome.Cancelled
-                    "Cancelled after dispatch"
+            do! cancelAfterDispatch runtime executor workspaceRoot sessionID lease "Cancelled after dispatch"
         else
             let modelStr =
                 match model.Variant with
@@ -85,16 +88,7 @@ let handleDispatchComplete
                     )
                 )
             then
-                do! executor.AbortRun sessionID
-
-                do!
-                    finishContinuation
-                        runtime
-                        workspaceRoot
-                        sessionID
-                        lease
-                        ContinuationOutcome.Cancelled
-                        "Cancelled after dispatch"
+                do! cancelAfterDispatch runtime executor workspaceRoot sessionID lease "Cancelled after dispatch"
             else
                 runtime.SetInjectedAt sessionID atMs
                 runtime.SetInjectedModel sessionID model
@@ -132,16 +126,7 @@ let executeContinuation
                     )
 
                 if not isLeaseStillValid then
-                    do! executor.AbortRun sessionID
-
-                    do!
-                        finishContinuation
-                            runtime
-                            workspaceRoot
-                            sessionID
-                            lease
-                            ContinuationOutcome.Cancelled
-                            "Lease invalid at dispatch"
+                    do! cancelAfterDispatch runtime executor workspaceRoot sessionID lease "Lease invalid at dispatch"
                 else
                     do! dispatchAction ()
                     do! handleDispatchComplete runtime executor workspaceRoot sessionID lease model agent

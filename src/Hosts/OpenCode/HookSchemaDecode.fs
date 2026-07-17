@@ -150,7 +150,71 @@ let injectWarnReuseIntoJsonSchema (schema: obj) : obj =
 
         schema
 
-// ARCHITECTURE_EXEMPT: split this 70-line function later
+/// Add or upgrade the five work-backlog report fields in the schema
+/// properties object so every field has minLength 1024 and a proper description.
+let private mergeBacklogFields (properties: obj) : unit =
+    let reportFields =
+        [| "ahaMoments"
+           "changesAndReasons"
+           "gotchas"
+           "lessonsAndConventions"
+           "plan" |]
+
+    reportFields
+    |> Array.iter (fun field ->
+        let existingProp = get properties field
+
+        if isNullish existingProp then
+            properties?(field) <- WorkBacklogSchema.jsonStringMinLengthProperty 1024 (reportFieldDescs.[field])
+        else
+            if isNullish (get existingProp "minLength") then
+                existingProp?("minLength") <- box 1024
+
+            let currentDesc = Dyn.str existingProp "description"
+
+            let cleanDesc =
+                if currentDesc.Contains("MUST be at least") then
+                    currentDesc
+                else
+                    "MUST be at least 1024 characters. "
+                    + currentDesc
+                    + " "
+                    + reportFieldDescs.[field]
+
+            existingProp?("description") <- box (cleanDesc.Trim()))
+
+    if isNullish (get properties "select_methodology") then
+        properties?("select_methodology") <- selectMethodologyProperty
+
+/// Rebuild a plain-object schema ensuring task_id is excluded from properties
+/// and select_methodology is in the required list.
+let private buildMergedSchema (schema: obj) (properties: obj) : obj =
+    if not (isNullish (get properties "task_id")) then
+        Dyn.keys properties
+        |> Array.filter (fun key -> key <> "task_id")
+        |> Array.map (fun key -> key, get properties key)
+        |> createObj
+        |> fun nextProperties ->
+            createObj
+                [ for key in Dyn.keys schema do
+                      if key = "properties" then
+                          yield key, nextProperties
+                      elif key = "required" then
+                          let req = get schema "required"
+                          yield key, requiredWithoutTaskId req |> appendRequiredKey "select_methodology"
+                      else
+                          yield key, get schema key ]
+    else
+        createObj
+            [ for key in Dyn.keys schema do
+                  if key = "required" then
+                      let req = get schema "required"
+                      yield key, appendRequiredKey "select_methodology" req
+                  else
+                      yield key, get schema key ]
+
+/// Merge work-backlog report fields (ahaMoments, plan, …) into a task
+/// schema so that submit_review / report endpoints validate the full payload.
 let mergeWorkBacklogReportIntoTaskSchema (schema: obj) : obj =
     if isNullish schema then
         schema
@@ -165,59 +229,5 @@ let mergeWorkBacklogReportIntoTaskSchema (schema: obj) : obj =
         if isNullish properties then
             schema
         else
-            let reportFields =
-                [| "ahaMoments"
-                   "changesAndReasons"
-                   "gotchas"
-                   "lessonsAndConventions"
-                   "plan" |]
-
-            reportFields
-            |> Array.iter (fun field ->
-                let existingProp = get properties field
-
-                if isNullish existingProp then
-                    properties?(field) <- WorkBacklogSchema.jsonStringMinLengthProperty 1024 (reportFieldDescs.[field])
-                else
-                    if isNullish (get existingProp "minLength") then
-                        existingProp?("minLength") <- box 1024
-
-                    let currentDesc = Dyn.str existingProp "description"
-
-                    let cleanDesc =
-                        if currentDesc.Contains("MUST be at least") then
-                            currentDesc
-                        else
-                            "MUST be at least 1024 characters. "
-                            + currentDesc
-                            + " "
-                            + reportFieldDescs.[field]
-
-                    existingProp?("description") <- box (cleanDesc.Trim()))
-
-            if isNullish (get properties "select_methodology") then
-                properties?("select_methodology") <- selectMethodologyProperty
-
-            if not (isNullish (get properties "task_id")) then
-                Dyn.keys properties
-                |> Array.filter (fun key -> key <> "task_id")
-                |> Array.map (fun key -> key, get properties key)
-                |> createObj
-                |> fun nextProperties ->
-                    createObj
-                        [ for key in Dyn.keys schema do
-                              if key = "properties" then
-                                  yield key, nextProperties
-                              elif key = "required" then
-                                  let req = get schema "required"
-                                  yield key, requiredWithoutTaskId req |> appendRequiredKey "select_methodology"
-                              else
-                                  yield key, get schema key ]
-            else
-                createObj
-                    [ for key in Dyn.keys schema do
-                          if key = "required" then
-                              let req = get schema "required"
-                              yield key, appendRequiredKey "select_methodology" req
-                          else
-                              yield key, get schema key ]
+            mergeBacklogFields properties
+            buildMergedSchema schema properties

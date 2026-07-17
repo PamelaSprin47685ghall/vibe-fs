@@ -14,8 +14,78 @@ open Wanxiangshu.Runtime.EventLogRuntime
 open Wanxiangshu.Hosts.Opencode.Fallback.Coordinator
 open Wanxiangshu.Hosts.Opencode.NudgeTrigger
 
+/// Apply mutations from a session.status event (agent name + model).
+let private handleSessionStatus
+    (fallbackRuntime: FallbackRuntimeStore)
+    (sid: string)
+    (statusObj: obj)
+    (agentName: string)
+    =
+    if agentName <> "" then
+        fallbackRuntime.SetAgentName sid agentName
+
+    let modelObj = get statusObj "model"
+
+    match Wanxiangshu.Runtime.Fallback.FallbackMessageCodec.decodeModelFromObj modelObj with
+    | Some m -> fallbackRuntime.SetModel sid m
+    | None -> ()
+
+/// Apply mutations from a session.compacted event. Async because it writes
+/// to disk via appendCompactionContextGenerationChangedOrFail.
+let private handleSessionCompacted (ctx: obj) (fallbackRuntime: FallbackRuntimeStore) (sid: string) : JS.Promise<unit> =
+    promise {
+        let currentOwner = fallbackRuntime.GetSessionOwner sid
+        let compactionGen = fallbackRuntime.GetCompactionGeneration sid
+        let compactionId = fallbackRuntime.GetActiveCompactionId sid
+        let compactionOrdinal = fallbackRuntime.GetActiveCompactionOrdinal sid
+
+        if
+            currentOwner = SessionOwner.Compaction
+            && compactionId <> ""
+            && not (fallbackRuntime.IsCompacted sid)
+        then
+            let nextContextGen = compactionGen + 1
+            fallbackRuntime.SetCompactionGeneration(sid, nextContextGen)
+            let directory = pluginDirectoryFromCtx ctx
+
+            do!
+                appendCompactionContextGenerationChangedOrFail
+                    directory
+                    sid
+                    nextContextGen
+                    compactionId
+                    compactionOrdinal
+
+            fallbackRuntime.SetCompacted(sid, true)
+    }
+
+/// Apply mutations from a message.updated event (compaction continuation detection).
+let private handleMessageUpdated (fallbackRuntime: FallbackRuntimeStore) (sid: string) (props: obj) =
+    let info = get props "info"
+    let role = str info "role"
+
+    if role = "user" then
+        let parts = get props "parts"
+
+        if not (isNullish parts) && isArray parts then
+            let partsArr = parts :?> obj array
+
+            let isCompactionContinue =
+                partsArr
+                |> Array.exists (fun part ->
+                    let isSynth = get part "synthetic"
+                    let meta = get part "metadata"
+
+                    (not (isNullish isSynth) && unbox<bool> isSynth)
+                    && (not (isNullish meta) && (get meta "compaction_continue" |> unbox<bool>)))
+
+            if isCompactionContinue then
+                let currentOwner = fallbackRuntime.GetSessionOwner sid
+
+                if currentOwner = SessionOwner.Compaction && fallbackRuntime.IsCompacted sid then
+                    fallbackRuntime.SetCompactionContinuationObserved(sid, true)
+
 /// Host event fan-out: session.status / compacted / message.updated + fallback/nudge.
-// ARCHITECTURE_EXEMPT: split this 106-line function later
 let handleEvent
     (ctx: obj)
     (fallbackRuntime: FallbackRuntimeStore)
@@ -43,70 +113,22 @@ let handleEvent
                 let sid = getSessionID "session.status" props
 
                 if sid <> "" then
-                    if agentName <> "" then
-                        fallbackRuntime.SetAgentName sid agentName
+                    handleSessionStatus fallbackRuntime sid statusObj agentName
 
-                    let modelObj = get statusObj "model"
-
-                    match Wanxiangshu.Runtime.Fallback.FallbackMessageCodec.decodeModelFromObj modelObj with
-                    | Some m -> fallbackRuntime.SetModel sid m
-                    | None -> ()
             | Some { EventType = "session.compacted"
                      Props = props } ->
                 let sid = getSessionID "session.compacted" props
 
                 if sid <> "" then
-                    let currentOwner = fallbackRuntime.GetSessionOwner sid
-                    let compactionGen = fallbackRuntime.GetCompactionGeneration sid
-                    let compactionId = fallbackRuntime.GetActiveCompactionId sid
-                    let compactionOrdinal = fallbackRuntime.GetActiveCompactionOrdinal sid
+                    do! handleSessionCompacted ctx fallbackRuntime sid
 
-                    if
-                        currentOwner = SessionOwner.Compaction
-                        && compactionId <> ""
-                        && not (fallbackRuntime.IsCompacted sid)
-                    then
-                        let nextContextGen = compactionGen + 1
-                        fallbackRuntime.SetCompactionGeneration(sid, nextContextGen)
-                        let directory = pluginDirectoryFromCtx ctx
-
-                        do!
-                            appendCompactionContextGenerationChangedOrFail
-                                directory
-                                sid
-                                nextContextGen
-                                compactionId
-                                compactionOrdinal
-
-                        fallbackRuntime.SetCompacted(sid, true)
             | Some { EventType = "message.updated"
                      Props = props } ->
                 let sid = getSessionID "message.updated" props
 
                 if sid <> "" then
-                    let info = get props "info"
-                    let role = str info "role"
+                    handleMessageUpdated fallbackRuntime sid props
 
-                    if role = "user" then
-                        let parts = get props "parts"
-
-                        if not (isNullish parts) && isArray parts then
-                            let partsArr = parts :?> obj array
-
-                            let isCompactionContinue =
-                                partsArr
-                                |> Array.exists (fun part ->
-                                    let isSynth = get part "synthetic"
-                                    let meta = get part "metadata"
-
-                                    (not (isNullish isSynth) && unbox<bool> isSynth)
-                                    && (not (isNullish meta) && (get meta "compaction_continue" |> unbox<bool>)))
-
-                            if isCompactionContinue then
-                                let currentOwner = fallbackRuntime.GetSessionOwner sid
-
-                                if currentOwner = SessionOwner.Compaction && fallbackRuntime.IsCompacted sid then
-                                    fallbackRuntime.SetCompactionContinuationObserved(sid, true)
             | _ -> ()
 
             fallback.UpdateBusyCount eventEnvelope

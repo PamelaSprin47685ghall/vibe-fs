@@ -82,34 +82,36 @@ let afterSuccessfulTurn (policy: FallbackPolicyState) : FallbackPolicyState =
             ContinueCount = 0 }
     | StableAt _ -> { policy with ContinueCount = 0 }
 
-// ARCHITECTURE_EXEMPT: split this 64-line function later
-let afterError
+let private handleErrorIgnore (err: ErrorInput) : PolicyDecision = StopWithFailure(FallbackExhausted err)
+
+let private handleErrorScanning
     (cfg: FallbackConfig)
     (chain: FallbackChain)
-    (policy: FallbackPolicyState)
     (err: ErrorInput)
+    (policy: FallbackPolicyState)
+    (scanIdx: int)
+    (origIdx: int)
     : PolicyDecision =
-    let shim = stateForClassification policy
-    let errorClass = classifyError err shim cfg
+    let nextIdx = scanIdx + 1
 
+    match selectModel chain nextIdx with
+    | Some model ->
+        trySendContinue
+            cfg
+            err
+            { policy with
+                Selection = Scanning(nextIdx, origIdx) }
+            model
+    | None -> StopWithFailure(FallbackExhausted err)
+
+let private handleErrorRetry
+    (cfg: FallbackConfig)
+    (chain: FallbackChain)
+    (err: ErrorInput)
+    (policy: FallbackPolicyState)
+    (errorClass: ErrorClass)
+    : PolicyDecision =
     match policy.Selection, errorClass with
-    | _, ErrorClass.Ignore -> StopWithFailure(FallbackExhausted err)
-
-    // Already scanning: always advance candidate (original Scanning phase behavior).
-    | Scanning(scanIdx, origIdx), _ ->
-        let nextIdx = scanIdx + 1
-
-        match selectModel chain nextIdx with
-        | Some model ->
-            trySendContinue
-                cfg
-                err
-                { policy with
-                    Selection = Scanning(nextIdx, origIdx) }
-                model
-        | None -> StopWithFailure(FallbackExhausted err)
-
-    // Stable / retrying with same-model retry budget.
     | StableAt i, ErrorClass.RetrySame when 0 < cfg.MaxRetries ->
         match selectModel chain i with
         | Some model ->
@@ -120,7 +122,6 @@ let afterError
                     Selection = RetryingAt(i, 1) }
                 model
         | None -> StopWithFailure(FallbackExhausted err)
-
     | RetryingAt(i, count), ErrorClass.RetrySame when count < cfg.MaxRetries ->
         match selectModel chain i with
         | Some model ->
@@ -131,8 +132,6 @@ let afterError
                     Selection = RetryingAt(i, count + 1) }
                 model
         | None -> StopWithFailure(FallbackExhausted err)
-
-    // Retries exhausted / immediate fallback / non-retryable → enter Scanning.
     | (StableAt i | RetryingAt(i, _)), (ErrorClass.RetrySame | ErrorClass.ImmediateFallback | ErrorClass.Exhausted) ->
         let k = policy.FailureCount + 1
         let start = scanStartIndex k i
@@ -147,6 +146,21 @@ let afterError
                     FailureCount = k }
                 model
         | None -> StopWithFailure(FallbackExhausted err)
+    | _ -> StopWithFailure(FallbackExhausted err)
+
+let afterError
+    (cfg: FallbackConfig)
+    (chain: FallbackChain)
+    (policy: FallbackPolicyState)
+    (err: ErrorInput)
+    : PolicyDecision =
+    let shim = stateForClassification policy
+    let errorClass = classifyError err shim cfg
+
+    match policy.Selection, errorClass with
+    | _, ErrorClass.Ignore -> handleErrorIgnore err
+    | Scanning(scanIdx, origIdx), _ -> handleErrorScanning cfg chain err policy scanIdx origIdx
+    | _, _ -> handleErrorRetry cfg chain err policy errorClass
 
 let afterTranscript
     (cfg: FallbackConfig)
@@ -156,7 +170,6 @@ let afterTranscript
     : PolicyDecision =
     match decision with
     | CompleteNaturally _ -> StopWithFailure(ProtocolViolation "CompleteNaturally should not reach afterTranscript")
-
     | RecoverWithPrompt prompt ->
         if policy.RecoveryCount >= cfg.MaxRecoveries then
             StopWithFailure(RecoveryExhausted "max recoveries exceeded")
@@ -173,9 +186,7 @@ let afterTranscript
 
             match selectModel chain idx with
             | Some model -> NextTurn(policy2, model, prompt)
-            // Empty chain (DelegateToHost mode) — delegate model selection to the host.
             | None -> NextTurn(policy2, delegateToHostSentinel, prompt)
-
     | ContinueNormally prompt ->
         if policy.ContinueCount >= cfg.LoopMaxContinues then
             StopWithFailure(RecoveryExhausted "max continues exceeded")
@@ -188,7 +199,5 @@ let afterTranscript
 
             match selectModel chain idx with
             | Some model -> NextTurn(policy2, model, prompt)
-            // Empty chain (DelegateToHost mode) — delegate model selection to the host.
             | None -> NextTurn(policy2, delegateToHostSentinel, prompt)
-
     | IncompleteWithoutRecovery reason -> StopWithFailure(RecoveryExhausted reason)

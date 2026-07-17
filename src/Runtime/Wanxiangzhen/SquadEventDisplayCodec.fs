@@ -58,91 +58,90 @@ let encodeEvent (e: SquadEvent) : string =
 let encodeEvents (events: SquadEvent list) : string =
     events |> List.map encodeEvent |> String.concat "\n"
 
-// ARCHITECTURE_EXEMPT: split this 87-line function later
+let private strField (parsed: obj) k =
+    let v = get parsed k
+    if isNullish v then None else Some(string v)
+
+let private intField (parsed: obj) k =
+    let v = get parsed k
+    if isNullish v then None else Some(unbox<int> v)
+
+let private boolField (parsed: obj) k =
+    let v = get parsed k
+    if isNullish v then None else Some(unbox<bool> v)
+
+let private arrField (parsed: obj) k =
+    let v = get parsed k
+
+    if isNullish v || not (isArray v) then
+        None
+    else
+        Some((v :?> obj array) |> Array.map string |> Array.toList)
+
+let private optStr (parsed: obj) k = strField parsed k |> Option.defaultValue ""
+
+let private optBool (parsed: obj) k = boolField parsed k |> Option.defaultValue false
+
+let private parseTaskDef (o: obj) : TaskItem option =
+    let tid = str o "task_id"
+
+    if tid = "" then
+        None
+    else
+        let title = str o "title"
+        let desc = str o "description"
+        let depsArr = get o "depends_on"
+
+        let deps =
+            if isNullish depsArr || not (isArray depsArr) then
+                []
+            else
+                (depsArr :?> obj array) |> Array.map string |> Array.toList
+
+        Some
+            { taskId = tid
+              title = title
+              description = desc
+              dependsOn = deps }
+
+let private parseTasks (parsed: obj) : TaskItem list =
+    let tasksRaw = get parsed "tasks"
+
+    if isNullish tasksRaw || not (isArray tasksRaw) then
+        []
+    else
+        (tasksRaw :?> obj array)
+        |> Array.toList
+        |> List.choose parseTaskDef
+
 let private parseEvent (parsed: obj) (typeName: string) : SquadEvent option =
     let sid = str parsed "session_id"
 
-    let strField k =
-        let v = get parsed k
-        if isNullish v then None else Some(string v)
-
-    let intField k =
-        let v = get parsed k
-        if isNullish v then None else Some(unbox<int> v)
-
-    let boolField k =
-        let v = get parsed k
-        if isNullish v then None else Some(unbox<bool> v)
-
-    let arrField k =
-        let v = get parsed k
-
-        if isNullish v || not (isArray v) then
-            None
-        else
-            Some((v :?> obj array) |> Array.map string |> Array.toList)
-
-    let optStr k = strField k |> Option.defaultValue ""
-
-    let optBool k =
-        boolField k |> Option.defaultValue false
-
     match typeName with
     | "squad_created" ->
-        let req = strField "requirement" |> Option.defaultValue ""
+        let req = optStr parsed "requirement"
         Some(SquadCreated(sid, req))
-    | "tasks_created" ->
-        let tasksRaw = get parsed "tasks"
-
-        let tasks =
-            if isNullish tasksRaw || not (isArray tasksRaw) then
-                []
-            else
-                (tasksRaw :?> obj array)
-                |> Array.toList
-                |> List.choose (fun o ->
-                    let tid = str o "task_id"
-
-                    if tid = "" then
-                        None
-                    else
-                        let title = str o "title"
-                        let desc = str o "description"
-                        let depsArr = get o "depends_on"
-
-                        let deps =
-                            if isNullish depsArr || not (isArray depsArr) then
-                                []
-                            else
-                                (depsArr :?> obj array) |> Array.map string |> Array.toList
-
-                        Some
-                            { taskId = tid
-                              title = title
-                              description = desc
-                              dependsOn = deps })
-
-        Some(TasksCreated(sid, tasks))
+    | "tasks_created" -> Some(TasksCreated(sid, parseTasks parsed))
     | "task_started" ->
-        let tid = optStr "task_id"
-        let wt = optStr "worktree_path"
-        let branch = optStr "branch_name"
+        let tid = optStr parsed "task_id"
+        let wt = optStr parsed "worktree_path"
+        let branch = optStr parsed "branch_name"
         Some(TaskStarted(sid, tid, wt, branch))
     | "task_submitted" ->
-        let tid = optStr "task_id"
-        let sha = optStr "commit_sha"
+        let tid = optStr parsed "task_id"
+        let sha = optStr parsed "commit_sha"
         Some(TaskSubmitted(sid, tid, sha))
     | "task_merged" ->
-        let tid = optStr "task_id"
-        let sha = optStr "master_sha"
+        let tid = optStr parsed "task_id"
+        let sha = optStr parsed "master_sha"
         Some(TaskMerged(sid, tid, sha))
     | "task_done" ->
-        let tid = optStr "task_id"
-        let merged = optBool "merged"
+        let tid = optStr parsed "task_id"
+        let merged = optBool parsed "merged"
         Some(TaskDone(sid, tid, merged))
     | "task_error" ->
-        let tid = optStr "task_id"
-        let err = optStr "error"
+        let tid = optStr parsed "task_id"
+        let err = optStr parsed "error"
         Some(TaskError(sid, tid, err))
     | "squad_cancelled" -> Some(SquadCancelled sid)
     | _ -> None

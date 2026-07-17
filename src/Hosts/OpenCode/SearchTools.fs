@@ -26,6 +26,7 @@ open Wanxiangshu.Hosts.Opencode.SessionIo
 open Wanxiangshu.Hosts.Opencode.HostField
 open Wanxiangshu.Runtime.ChildAgentRegistry
 open Wanxiangshu.Runtime.SubagentDispatcher
+open Wanxiangshu.Runtime.SubagentDispatchHelpers
 open Wanxiangshu.Runtime.FuzzyFinderShell
 open Wanxiangshu.Runtime.FuzzySearch
 open Wanxiangshu.Runtime.FuzzyToolsCodec

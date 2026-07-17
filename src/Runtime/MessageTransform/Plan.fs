@@ -12,7 +12,12 @@ open Wanxiangshu.Kernel.ContextBudget
 open Wanxiangshu.Runtime.RuntimeScope
 open Wanxiangshu.Runtime.ContextBudgetStore
 open Wanxiangshu.Runtime.ContextBudgetUsageCodec
+open Wanxiangshu.Runtime.MessageTransform.PlanHelpers
 open Fable.Core
+
+let contextBudgetNudgeText = PlanHelpers.contextBudgetNudgeText
+
+let buildContextBudgetNudgeMessage = PlanHelpers.buildContextBudgetNudgeMessage
 
 [<RequireQualifiedAccess>]
 type ProjectionPolicy =
@@ -59,176 +64,55 @@ let applyBacklogProjection
         let backlog = backlogSession.GetOrRebuildBacklog sessionID cleaned
         projectBacklogFor backlogSession.Host cleaned backlog FoldStrategy.FoldAfterSecond sessionID
 
-let contextBudgetNudgeText =
-    "Attention: the system context is about to be suspended. "
-    + "You must immediately force an emergency stop to all work "
-    + "and call the todowrite tool."
-
-let buildContextBudgetNudgeMessage (sessionID: string) (id: string) : Message<obj> =
-    { info =
-        { id = id
-          sessionID = sessionID
-          role = User
-          agent = "orchestrator"
-          isError = false
-          toolName = ""
-          details = null
-          time = null }
-      parts = [ TextPart contextBudgetNudgeText ]
-      source = Synthetic "context-budget-nudge-"
-      raw = null }
-
-let private resolveCurrentTokens
-    (totalBytes: int)
-    (tokenCountOpt: int option)
-    (storeEntry: ContextBudgetEntry)
-    : int * UsageConfidence =
-    match tokenCountOpt with
-    | Some t when t > 0 -> (t, UsageConfidence.Observed)
-    | _ ->
-        match storeEntry.LastUsage with
-        | Some u when u.confidence <> UsageConfidence.BootstrapEstimate ->
-            let simplified =
-                Some
-                    {| tokenCount = u.tokenCount
-                       textBytes = u.textBytes |}
-
-            match estimateTokens totalBytes simplified with
-            | Some t when t > 0 -> (t, UsageConfidence.CalibratedEstimate)
-            | _ ->
-                let estimate = totalBytes / 2
-                (max 1 estimate, UsageConfidence.BootstrapEstimate)
-        | _ ->
-            let estimate = totalBytes / 2
-            (max 1 estimate, UsageConfidence.BootstrapEstimate)
-
-// ARCHITECTURE_EXEMPT: split this 71-line function later
-let private rebuildPhaseState
+let private computeBudgetState
     (plan: MessageTransformPlan)
     (backlogOps: BacklogSessionOps)
-    (backlog: BacklogEntry list)
-    (currentStore: ContextBudgetEntry)
-    (encodeMessages: Message<obj> list -> obj array)
-    (currentTokens: int)
     (totalBytes: int)
-    (forceRebuild: bool)
-    : JS.Promise<ContextState * bool> =
+    (encodeMessages: Message<obj> list -> obj array)
+    : JS.Promise<ContextState * bool * ContextBudgetEntry * int * UsageConfidence * bool> =
     promise {
-        let isJustInitialized = currentStore.State.IsNone
+        let! tokenCountOpt = plan.GetContextUsage(encodeMessages plan.Cleaned)
+        let storeEntry = ContextBudgetStore.get plan.Scope plan.SessionID
 
-        if backlog <> currentStore.LastBacklog || isJustInitialized || forceRebuild then
-            let stableMessages =
-                projectBacklogFor backlogOps.Host plan.Cleaned backlog FoldStrategy.FoldAfterFirst plan.SessionID
+        let currentTokens, confidence =
+            resolveCurrentTokens totalBytes tokenCountOpt storeEntry
 
-            let stableEncoded = encodeMessages stableMessages
-            let stableBytes = utf8JsonBytes (box stableEncoded)
-            let! stableTokensOpt = plan.GetContextUsage stableEncoded
+        let prevConfidence = storeEntry.LastUsage |> Option.map (fun u -> u.confidence)
 
-            let stableTokens =
-                match stableTokensOpt with
-                | Some t -> int64 t
-                | None ->
-                    let currentLastUsage =
-                        (ContextBudgetStore.get plan.Scope plan.SessionID).LastUsage
-                        |> Option.map (fun u ->
-                            {| tokenCount = u.tokenCount
-                               textBytes = u.textBytes |})
+        let transitioned =
+            prevConfidence = Some UsageConfidence.BootstrapEstimate
+            && confidence = UsageConfidence.Observed
 
-                    match estimateTokens stableBytes currentLastUsage with
-                    | Some t -> int64 t
-                    | None -> int64 currentTokens
+        ContextBudgetStore.update plan.Scope plan.SessionID (fun entry ->
+            { entry with
+                LastUsage =
+                    Some
+                        {| tokenCount = currentTokens
+                           textBytes = totalBytes
+                           confidence = confidence |} })
 
-            let backlogBytes =
-                ContextBudgetUsageCodec.backlogBytesFromEncoded backlogOps.Host stableEncoded
+        let backlog = backlogOps.GetOrRebuildBacklog plan.SessionID plan.Cleaned
+        let currentStore = ContextBudgetStore.get plan.Scope plan.SessionID
 
-            let backlogTokens =
-                if int64 stableBytes <= 0L then
-                    0L
-                else
-                    stableTokens * int64 backlogBytes / int64 stableBytes
+        let! state, isJustInitialized =
+            rebuildPhaseState
+                plan.SessionID
+                plan.GetContextUsage
+                plan.Cleaned
+                backlogOps.Host
+                backlogOps.Host
+                plan.SessionID
+                plan.Scope
+                backlog
+                currentStore
+                encodeMessages
+                currentTokens
+                totalBytes
+                transitioned
 
-            let currentOrdinal =
-                flatten plan.Cleaned
-                |> List.filter (fun fp -> isTodoResultFor backlogOps.Host fp.part)
-                |> List.length
-
-            let newState =
-                { phaseBaseTokens = stableTokens
-                  backlogTokensAtPhaseStart = backlogTokens
-                  phaseStartTodoOrdinal = currentOrdinal }
-
-            let nextEpisode = System.Guid.NewGuid().ToString("N")
-
-            ContextBudgetStore.update plan.Scope plan.SessionID (fun entry ->
-                { entry with
-                    State = Some newState
-                    LastBacklog = backlog
-                    NudgeTrack = afterPhaseBoundaryReset entry.NudgeTrack
-                    EpisodeID = nextEpisode
-                    NudgeCount = 0
-                    SignalTodoOrdinal = None
-                    SignalTokens = None
-                    StableSyntheticNudgeID = None })
-
-            return newState, isJustInitialized
-        else
-            return currentStore.State.Value, false
+        let finalStore = ContextBudgetStore.get plan.Scope plan.SessionID
+        return state, isJustInitialized, finalStore, currentTokens, confidence, transitioned
     }
-
-let private checkAndInjectNudge
-    (plan: MessageTransformPlan)
-    (currentTokens: int)
-    (confidence: UsageConfidence)
-    (state: ContextState)
-    (messages: Message<obj> list)
-    (host: Host)
-    (storeEntry: ContextBudgetEntry)
-    : Message<obj> list =
-    if confidence = UsageConfidence.BootstrapEstimate then
-        messages
-    elif int64 currentTokens <= state.phaseBaseTokens then
-        messages
-    else
-        let completedTodoCount =
-            flatten messages
-            |> List.filter (fun fp -> isTodoResultFor host fp.part)
-            |> List.length
-
-        match classifyPressure plan.MaxInputTokens false (int64 currentTokens) state completedTodoCount with
-        | RequireTodoWriteEmergency when
-            plan.ContextBudgetPolicy = Wanxiangshu.Kernel.MessageTransformPolicy.ContextBudgetPolicy.Include
-            ->
-            let isSameEpisode =
-                storeEntry.NudgeTrack = EmergencySignaled
-                && storeEntry.SignalTodoOrdinal = Some completedTodoCount
-
-            if isSameEpisode then
-                let nudgeId =
-                    match storeEntry.StableSyntheticNudgeID with
-                    | Some id -> id
-                    | None -> "context-budget-nudge-" + System.Guid.NewGuid().ToString()
-
-                let nudgeMsg = buildContextBudgetNudgeMessage plan.SessionID nudgeId
-                List.append messages [ nudgeMsg ]
-            else
-                let isMaxReached = storeEntry.NudgeCount >= 2
-
-                if isMaxReached then
-                    messages
-                else
-                    let stableId = "context-budget-nudge-" + System.Guid.NewGuid().ToString()
-
-                    ContextBudgetStore.update plan.Scope plan.SessionID (fun entry ->
-                        { entry with
-                            NudgeTrack = EmergencySignaled
-                            NudgeCount = entry.NudgeCount + 1
-                            SignalTodoOrdinal = Some completedTodoCount
-                            SignalTokens = Some(int64 currentTokens)
-                            StableSyntheticNudgeID = Some stableId })
-
-                    let nudgeMsg = buildContextBudgetNudgeMessage plan.SessionID stableId
-                    List.append messages [ nudgeMsg ]
-        | _ -> messages
 
 let applyContextBudget
     (plan: MessageTransformPlan)
@@ -246,46 +130,23 @@ let applyContextBudget
             return messages
         else
             let totalBytes = utf8JsonBytes (box encodedAll)
-            let! tokenCountOpt = plan.GetContextUsage encodedAll
-            let storeEntry = ContextBudgetStore.get plan.Scope plan.SessionID
 
-            let currentTokens, confidence =
-                resolveCurrentTokens totalBytes tokenCountOpt storeEntry
-
-            let prevConfidence =
-                match storeEntry.LastUsage with
-                | Some u -> Some u.confidence
-                | None -> None
-
-            let transitioned =
-                prevConfidence = Some UsageConfidence.BootstrapEstimate
-                && confidence = UsageConfidence.Observed
-
-            ContextBudgetStore.update plan.Scope plan.SessionID (fun entry ->
-                { entry with
-                    LastUsage =
-                        Some
-                            {| tokenCount = currentTokens
-                               textBytes = totalBytes
-                               confidence = confidence |} })
-
-            let backlog = backlogOps.GetOrRebuildBacklog plan.SessionID plan.Cleaned
-            let currentStore = ContextBudgetStore.get plan.Scope plan.SessionID
-
-            let! state, isJustInitialized =
-                rebuildPhaseState
-                    plan
-                    backlogOps
-                    backlog
-                    currentStore
-                    encodeMessages
-                    currentTokens
-                    totalBytes
-                    transitioned
+            let! state, isJustInitialized, finalStoreEntry, currentTokens, confidence, transitioned =
+                computeBudgetState plan backlogOps totalBytes encodeMessages
 
             if isJustInitialized || transitioned then
                 return messages
             else
-                let finalStoreEntry = ContextBudgetStore.get plan.Scope plan.SessionID
-                return checkAndInjectNudge plan currentTokens confidence state messages backlogOps.Host finalStoreEntry
+                return
+                    checkAndInjectNudge
+                        plan.SessionID
+                        plan.MaxInputTokens
+                        plan.ContextBudgetPolicy
+                        plan.Scope
+                        currentTokens
+                        confidence
+                        state
+                        messages
+                        backlogOps.Host
+                        finalStoreEntry
     }

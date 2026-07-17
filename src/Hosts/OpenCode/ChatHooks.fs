@@ -133,7 +133,56 @@ let recordContinuationUserMessage
         do! appendEventsAndCacheOrFail workspaceRoot [ wanEvent ]
     }
 
-// ARCHITECTURE_EXEMPT: split this 64-line function later
+let private isSystemMessage (parts: obj) (fr: FallbackRuntimeStore) (sessionIDStr: string) (msgId: string) : bool =
+    match tryGetNonceFromParts parts with
+    | Some nonce ->
+        // Child subsession turn marker: ChatHooks resolves the host
+        // receipt for SubsessionActor. Never forges TurnStarted from
+        // the prompt Promise alone.
+        if PendingTurnReceipt.tryResolve nonce (Wanxiangshu.Kernel.Subsession.Types.UserMessageObserved msgId) then
+            true
+        else
+            let activeNudgeNonce = fr.GetActiveNudgeNonce sessionIDStr
+
+            if activeNudgeNonce <> "" && nonce = activeNudgeNonce then
+                true
+            else
+                match fr.TryGetPendingLease sessionIDStr with
+                | Some lease when
+                    (lease.Status = LeaseStatus.DispatchStarted
+                     || lease.Status = LeaseStatus.Dispatched
+                     || lease.Status = LeaseStatus.Running)
+                    && lease.ContinuationID = nonce
+                    ->
+                    true
+                | _ -> false
+    | None -> false
+
+let private recordProvenanceIfPresent
+    (parts: obj)
+    (msgId: string)
+    (workspaceRoot: string)
+    (sessionIDStr: string)
+    : JS.Promise<unit> =
+    promise {
+        if msgId <> "" then
+            match tryDecodeWanxiangshuProvenance parts with
+            | Some provenance ->
+                do! recordContinuationUserMessage workspaceRoot sessionIDStr msgId provenance.ContinuationId
+            | None -> ()
+    }
+
+let private applyToolOverrides (host: Host) (agent: string) (output: obj) : unit =
+    match chatMessageFromHookOutput output with
+    | None -> ()
+    | Some message ->
+        match chatMessageToolsFromOutput output with
+        | None -> ()
+        | Some tools ->
+            match filterChatToolsForAgent host agent (Some tools) with
+            | None -> ()
+            | Some filtered -> setKey message "tools" (encodeToolsOverridesToMessage filtered)
+
 let chatMessageFor
     (host: Host)
     (registry: ChildAgentRegistry)
@@ -158,57 +207,15 @@ let chatMessageFor
 
         let fr = lifecycleObserver.FallbackRuntime
 
-        let isSystem =
-            let nonceOpt = tryGetNonceFromParts parts
-
-            match nonceOpt with
-            | Some nonce ->
-                // Child subsession turn marker: ChatHooks resolves the host
-                // receipt for SubsessionActor. Never forges TurnStarted from
-                // the prompt Promise alone.
-                if
-                    PendingTurnReceipt.tryResolve nonce (Wanxiangshu.Kernel.Subsession.Types.UserMessageObserved msgId)
-                then
-                    true
-                else
-                    let activeNudgeNonce = fr.GetActiveNudgeNonce sessionIDStr
-
-                    if activeNudgeNonce <> "" && nonce = activeNudgeNonce then
-                        true
-                    else
-                        match fr.TryGetPendingLease sessionIDStr with
-                        | Some lease when
-                            (lease.Status = LeaseStatus.DispatchStarted
-                             || lease.Status = LeaseStatus.Dispatched
-                             || lease.Status = LeaseStatus.Running)
-                            && lease.ContinuationID = nonce
-                            ->
-                            true
-                        | _ -> false
-            | None -> false
+        let isSystem = isSystemMessage parts fr sessionIDStr msgId
 
         if not isSystem then
             let modelOpt = tryGetModelStringFromHook input output
             do! lifecycleObserver.OnNewHumanMessage(sessionIDStr, agent, modelOpt, msgId)
 
-        // Record wanxiangshu provenance when present in message parts.
-        // This binds the user message to a continuation for durable tracking.
-        if msgId <> "" then
-            match tryDecodeWanxiangshuProvenance parts with
-            | Some provenance ->
-                let workspaceRoot = lifecycleObserver.WorkspaceRoot
-                do! recordContinuationUserMessage workspaceRoot sessionIDStr msgId provenance.ContinuationId
-            | None -> ()
+        do! recordProvenanceIfPresent parts msgId lifecycleObserver.WorkspaceRoot sessionIDStr
 
-        match chatMessageFromHookOutput output with
-        | None -> ()
-        | Some message ->
-            match chatMessageToolsFromOutput output with
-            | None -> ()
-            | Some tools ->
-                match filterChatToolsForAgent host agent (Some tools) with
-                | None -> ()
-                | Some filtered -> setKey message "tools" (encodeToolsOverridesToMessage filtered)
+        applyToolOverrides host agent output
     }
 
 let chatMessage

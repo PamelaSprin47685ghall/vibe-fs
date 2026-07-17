@@ -17,19 +17,13 @@ open Wanxiangshu.Runtime.SessionEventWriter
 open Wanxiangshu.Runtime.NudgeEventWriter
 open Wanxiangshu.Runtime.ToolHookRuntime
 
-/// Reset session runtime for a new human turn (or no-op on duplicate message id).
-// ARCHITECTURE_EXEMPT: split this 117-line function later
-let onNewHumanMessage
-    (ctx: obj)
+/// Cancel an in-flight pending lease for the session.
+let private finishPendingLease
+    (directory: string)
     (fallbackRuntime: FallbackRuntimeStore)
     (sessionID: string)
-    (agent: string)
-    (modelOpt: string option)
-    (messageId: string)
     : JS.Promise<unit> =
     promise {
-        let directory = if isNullish ctx then "" else pluginDirectoryFromCtx ctx
-
         match fallbackRuntime.TryGetPendingLease sessionID with
         | Some lease ->
             do!
@@ -41,6 +35,111 @@ let onNewHumanMessage
                     ContinuationOutcome.Cancelled
                     "new_human_turn"
         | None -> ()
+    }
+
+/// Cancel any active nudge lease and settle any active compaction for the session.
+let private cancelNudgeAndCompaction
+    (directory: string)
+    (fallbackRuntime: FallbackRuntimeStore)
+    (sessionID: string)
+    : JS.Promise<unit> =
+    promise {
+        match fallbackRuntime.TryGetPendingNudgeLease sessionID with
+        | Some nudgeLease ->
+            do!
+                appendNudgeCancelledOrFail
+                    directory
+                    sessionID
+                    nudgeLease.NudgeID
+                    "new_human_turn"
+                    nudgeLease.NudgeOrdinal
+
+            let _ = fallbackRuntime.ApplyCancelNudgeLease(sessionID, nudgeLease.NudgeID)
+            ()
+        | None -> ()
+
+        let activeComp = fallbackRuntime.GetActiveCompactionId sessionID
+        let settleInfo = fallbackRuntime.TryGetSettleInfo(sessionID, activeComp)
+
+        match settleInfo with
+        | Some(_, ordinal) ->
+            do! appendCompactionSettledOrFail directory sessionID activeComp "cancelled" ordinal
+            let _ = fallbackRuntime.ApplySettle(sessionID, activeComp)
+            ()
+        | None -> ()
+    }
+
+/// Decode provider/model/variant from an optional model string.
+let private decodeModelInfo (modelOpt: string option) : string * string * string =
+    match modelOpt with
+    | Some m ->
+        match Wanxiangshu.Runtime.Fallback.FallbackMessageCodec.decodeModelFromObj (box m) with
+        | Some modelObj -> modelObj.ProviderID, modelObj.ModelID, (modelObj.Variant |> Option.defaultValue "")
+        | None -> "", m, ""
+    | None -> "", "", ""
+
+/// Reset core session state for the new human turn and return the turn identifiers.
+let private resetSessionState
+    (directory: string)
+    (fallbackRuntime: FallbackRuntimeStore)
+    (sessionID: string)
+    (agent: string)
+    (msgId: string)
+    (modelOpt: string option)
+    =
+    fallbackRuntime.SetChain sessionID []
+    fallbackRuntime.ClearModel sessionID
+    fallbackRuntime.ClearInjected sessionID
+    Wanxiangshu.Runtime.ToolHookRuntime.clearSessionCompliance sessionID
+    fallbackRuntime.SetSessionOwner sessionID SessionOwner.Human
+    let turnId = fallbackRuntime.IncrementHumanTurnId sessionID
+    let humanTurnOrdinal = fallbackRuntime.GetHumanTurnOrdinal sessionID
+    fallbackRuntime.SetLastHumanMessageId sessionID msgId
+    fallbackRuntime.RemoveForceStopped sessionID
+
+    let currentGen = fallbackRuntime.GetSessionGeneration sessionID
+    let currentCancelGen = fallbackRuntime.GetCancelGeneration sessionID
+    fallbackRuntime.SetActiveContinuationGeneration sessionID currentGen
+    fallbackRuntime.SetActiveContinuationCancelGeneration sessionID currentCancelGen
+
+    match modelOpt with
+    | Some m -> fallbackRuntime.SetLatestHumanModel sessionID m
+    | None -> fallbackRuntime.ClearLatestHumanModel sessionID
+
+    if agent <> "" then
+        fallbackRuntime.SetAgentName sessionID agent
+
+    turnId, humanTurnOrdinal
+
+/// Initialise the FallbackPhase.Idle state and consumed flags for the session.
+let private initializeFallbackState (fallbackRuntime: FallbackRuntimeStore) (sessionID: string) : unit =
+    let state = fallbackRuntime.GetOrCreateState sessionID
+
+    let ns =
+        { state with
+            Phase = FallbackPhase.Idle
+            ContinueCount = 0
+            FailureCount = 0
+            Lifecycle = FallbackLifecycle.Active
+            RecoveryCount = 0 }
+
+    fallbackRuntime.UpdateState sessionID ns
+    fallbackRuntime.SetConsumed sessionID false
+    fallbackRuntime.ClearConsumed sessionID
+
+/// Reset session runtime for a new human turn (or no-op on duplicate message id).
+let onNewHumanMessage
+    (ctx: obj)
+    (fallbackRuntime: FallbackRuntimeStore)
+    (sessionID: string)
+    (agent: string)
+    (modelOpt: string option)
+    (messageId: string)
+    : JS.Promise<unit> =
+    promise {
+        let directory = if isNullish ctx then "" else pluginDirectoryFromCtx ctx
+
+        do! finishPendingLease directory fallbackRuntime sessionID
 
         let msgId =
             if messageId = "" then
@@ -52,60 +151,12 @@ let onNewHumanMessage
 
         if msgId <> lastMsgId then
             if directory <> "" then
-                match fallbackRuntime.TryGetPendingNudgeLease sessionID with
-                | Some nudgeLease ->
-                    do!
-                        appendNudgeCancelledOrFail
-                            directory
-                            sessionID
-                            nudgeLease.NudgeID
-                            "new_human_turn"
-                            nudgeLease.NudgeOrdinal
+                do! cancelNudgeAndCompaction directory fallbackRuntime sessionID
 
-                    let _ = fallbackRuntime.ApplyCancelNudgeLease(sessionID, nudgeLease.NudgeID)
-                    ()
-                | None -> ()
+            let provider, model, variant = decodeModelInfo modelOpt
 
-                let activeComp = fallbackRuntime.GetActiveCompactionId sessionID
-                let settleInfo = fallbackRuntime.TryGetSettleInfo(sessionID, activeComp)
-
-                match settleInfo with
-                | Some(_, ordinal) ->
-                    do! appendCompactionSettledOrFail directory sessionID activeComp "cancelled" ordinal
-                    let _ = fallbackRuntime.ApplySettle(sessionID, activeComp)
-                    ()
-                | None -> ()
-
-            fallbackRuntime.SetChain sessionID []
-            fallbackRuntime.ClearModel sessionID
-            fallbackRuntime.ClearInjected sessionID
-            Wanxiangshu.Runtime.ToolHookRuntime.clearSessionCompliance sessionID
-            fallbackRuntime.SetSessionOwner sessionID SessionOwner.Human
-            let turnId = fallbackRuntime.IncrementHumanTurnId sessionID
-            let humanTurnOrdinal = fallbackRuntime.GetHumanTurnOrdinal sessionID
-            fallbackRuntime.SetLastHumanMessageId sessionID msgId
-            fallbackRuntime.RemoveForceStopped sessionID
-
-            let currentGen = fallbackRuntime.GetSessionGeneration sessionID
-            let currentCancelGen = fallbackRuntime.GetCancelGeneration sessionID
-            fallbackRuntime.SetActiveContinuationGeneration sessionID currentGen
-            fallbackRuntime.SetActiveContinuationCancelGeneration sessionID currentCancelGen
-
-            match modelOpt with
-            | Some m -> fallbackRuntime.SetLatestHumanModel sessionID m
-            | None -> fallbackRuntime.ClearLatestHumanModel sessionID
-
-            if agent <> "" then
-                fallbackRuntime.SetAgentName sessionID agent
-
-            let provider, model, variant =
-                match modelOpt with
-                | Some m ->
-                    match Wanxiangshu.Runtime.Fallback.FallbackMessageCodec.decodeModelFromObj (box m) with
-                    | Some modelObj ->
-                        modelObj.ProviderID, modelObj.ModelID, (modelObj.Variant |> Option.defaultValue "")
-                    | None -> "", m, ""
-                | None -> "", "", ""
+            let turnId, humanTurnOrdinal =
+                resetSessionState directory fallbackRuntime sessionID agent msgId modelOpt
 
             if directory <> "" then
                 do!
@@ -120,19 +171,7 @@ let onNewHumanMessage
                         humanTurnOrdinal
                         msgId
 
-            let state = fallbackRuntime.GetOrCreateState sessionID
-
-            let ns =
-                { state with
-                    Phase = FallbackPhase.Idle
-                    ContinueCount = 0
-                    FailureCount = 0
-                    Lifecycle = FallbackLifecycle.Active
-                    RecoveryCount = 0 }
-
-            fallbackRuntime.UpdateState sessionID ns
-            fallbackRuntime.SetConsumed sessionID false
-            fallbackRuntime.ClearConsumed sessionID
+            initializeFallbackState fallbackRuntime sessionID
         else
             ()
     }

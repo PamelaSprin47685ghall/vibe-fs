@@ -102,32 +102,8 @@ let checkFunctionLengths (limits: StyleLimits) (nodes: AstNodeInfo[]) : SyntaxDi
         else
             None)
 
-/// The marker string placed on the line immediately before a function or value
-/// binding to exempt it from architecture gate length checks.
-let architectureExemptionMarker = "ARCHITECTURE_EXEMPT"
-
-/// Filter out diagnostics whose source line is preceded by an exemption
-/// comment marker. The marker must appear on the line before the diagnostic's
-/// start line (1-indexed), possibly preceded by whitespace + //.
-let filterExemptedDiagnostics (content: string) (diags: SyntaxDiagnostic[]) : SyntaxDiagnostic[] =
-    if System.String.IsNullOrEmpty content || Array.isEmpty diags then
-        diags
-    else
-        let lines = content.Split('\n')
-
-        let hasExemption (lineIndex: int) =
-            lineIndex >= 0
-            && lineIndex < lines.Length
-            && lines.[lineIndex].Contains architectureExemptionMarker
-
-        diags
-        |> Array.filter (fun d ->
-            let precedingLineIndex = d.line - 2
-            let sameLineIndex = d.line - 1
-            not (hasExemption precedingLineIndex || hasExemption sameLineIndex))
-
 /// Pure parser over a patchText blob: extracts every `*** Add File|Update
-/// File|Move to: <path>` target, de-duplicated, order-preserved.
+/// File|Move to: <path>` target, de-duplicated, order-preserving.
 let private patchPathRe = Regex(@"^\*\*\* (?:Add File|Update File|Move to): (.+)$")
 
 let pathsFromPatchText (patchText: string) : string list =

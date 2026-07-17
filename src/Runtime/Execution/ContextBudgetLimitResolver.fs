@@ -70,21 +70,23 @@ let tryExtractMaxInputTokensDetailed (target: obj) : LimitResolution option =
 let tryExtractMaxInputTokens (target: obj) : int option =
     tryExtractMaxInputTokensDetailed target |> Option.map valueOf
 
+let tryGetClient (target: obj) : obj =
+    if not (isNullish (get target "session")) then
+        target
+    else
+        let c = get target "client"
+
+        if not (isNullish c) && not (isNullish (get c "session")) then
+            c
+        else
+            box null
+
 let tryGetSessionModelRef (target: obj) (sessionID: string) : JS.Promise<(string * string) option> =
     promise {
         if isNullish target then
             return None
         else
-            let client =
-                if not (isNullish (get target "session")) then
-                    target
-                else
-                    let c = get target "client"
-
-                    if not (isNullish c) && not (isNullish (get c "session")) then
-                        c
-                    else
-                        box null
+            let client = tryGetClient target
 
             if isNullish client then
                 return None
@@ -196,7 +198,25 @@ let tryGetModelLimitFromProviderList
         return res |> Option.map valueOf
     }
 
-// ARCHITECTURE_EXEMPT: split this 62-line function later
+let tryGetModelLimitFromProviderListForSession
+    (target: obj)
+    (modelObj: obj)
+    (sessionID: string)
+    (directory: string)
+    : JS.Promise<LimitResolution option> =
+    promise {
+        if isNullish modelObj then
+            return None
+        else
+            let mId = string (get modelObj "id")
+            let pId = string (get modelObj "providerID")
+
+            if mId = "" || pId = "" then
+                return None
+            else
+                return! tryGetModelLimitFromProviderListDetailed target mId pId directory
+    }
+
 let tryGetMaxInputTokensAsyncDetailed
     (target: obj)
     (sessionID: string)
@@ -206,16 +226,7 @@ let tryGetMaxInputTokensAsyncDetailed
         if isNullish target then
             return None
         else
-            let client =
-                if not (isNullish (get target "session")) then
-                    target
-                else
-                    let c = get target "client"
-
-                    if not (isNullish c) && not (isNullish (get c "session")) then
-                        c
-                    else
-                        box null
+            let client = tryGetClient target
 
             if isNullish client then
                 return None
@@ -243,19 +254,7 @@ let tryGetMaxInputTokensAsyncDetailed
                                 match extractLimitFromModelDetailed modelObj with
                                 | Some limit -> return Some limit
                                 | None ->
-                                    if isNullish modelObj then
-                                        return None
-                                    else
-                                        let mId = string (get modelObj "id")
-                                        let pId = string (get modelObj "providerID")
-
-                                        if mId = "" || pId = "" then
-                                            return None
-                                        else
-                                            let! limit =
-                                                tryGetModelLimitFromProviderListDetailed target mId pId directory
-
-                                            return limit
+                                    return! tryGetModelLimitFromProviderListForSession target modelObj sessionID directory
                     with _ ->
                         return None
     }

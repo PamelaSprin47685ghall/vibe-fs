@@ -31,7 +31,62 @@ let private busyLifecycle (state: SessionFallbackState) =
             Lifecycle = FallbackLifecycle.Active }
     | _ -> state
 
-// ARCHITECTURE_EXEMPT: split this 80-line function later
+let private handleScanningError
+    (state: SessionFallbackState)
+    (cfg: FallbackConfig)
+    (chain: FallbackChain)
+    (scanIdx: int)
+    (origIdx: int)
+    =
+    let nextIdx = scanIdx + 1
+
+    match selectModel chain nextIdx with
+    | Some m ->
+        sendOrContinue
+            cfg
+            m
+            { state with
+                Phase = FallbackPhase.Scanning(nextIdx, origIdx) }
+    | None ->
+        { state with
+            Phase = FallbackPhase.Exhausted },
+        FallbackAction.PropagateFailure
+
+let private handleRetryingError
+    (state: SessionFallbackState)
+    (cfg: FallbackConfig)
+    (chain: FallbackChain)
+    (nextCount: int)
+    =
+    match selectModel chain state.CurrentIndex with
+    | Some m ->
+        sendOrContinue
+            cfg
+            m
+            { state with
+                Phase = FallbackPhase.Retrying nextCount }
+    | None ->
+        { state with
+            Phase = FallbackPhase.Exhausted },
+        FallbackAction.PropagateFailure
+
+let private handleExhaustedError (state: SessionFallbackState) (cfg: FallbackConfig) (chain: FallbackChain) =
+    let k = state.FailureCount + 1
+    let start = scanStartIndex k state.CurrentIndex
+
+    match selectModel chain start with
+    | Some m ->
+        sendOrContinue
+            cfg
+            m
+            { state with
+                Phase = FallbackPhase.Scanning(start, state.CurrentIndex)
+                FailureCount = k }
+    | None ->
+        { state with
+            Phase = FallbackPhase.Exhausted },
+        FallbackAction.PropagateFailure
+
 let handleSessionError (state: SessionFallbackState) (cfg: FallbackConfig) (chain: FallbackChain) (err: ErrorInput) =
     match state.Lifecycle, state.Phase with
     | FallbackLifecycle.Cancelled, _
@@ -49,69 +104,15 @@ let handleSessionError (state: SessionFallbackState) (cfg: FallbackConfig) (chai
                     state
 
             ns, FallbackAction.DoNothing
-
         | FallbackPhase.Exhausted, _ -> state, FallbackAction.DoNothing
-
-        | FallbackPhase.Scanning(scanIdx, origIdx), _ ->
-            let nextIdx = scanIdx + 1
-
-            match selectModel chain nextIdx with
-            | Some m ->
-                sendOrContinue
-                    cfg
-                    m
-                    { state with
-                        Phase = FallbackPhase.Scanning(nextIdx, origIdx) }
-            | None ->
-                { state with
-                    Phase = FallbackPhase.Exhausted },
-                FallbackAction.PropagateFailure
-
+        | FallbackPhase.Scanning(scanIdx, origIdx), _ -> handleScanningError state cfg chain scanIdx origIdx
         | (FallbackPhase.Idle | FallbackPhase.ScanningToolCallText | FallbackPhase.RecoveringToolCallText),
-          ErrorClass.RetrySame ->
-            match selectModel chain state.CurrentIndex with
-            | Some m ->
-                sendOrContinue
-                    cfg
-                    m
-                    { state with
-                        Phase = FallbackPhase.Retrying 1 }
-            | None ->
-                { state with
-                    Phase = FallbackPhase.Exhausted },
-                FallbackAction.PropagateFailure
-
+          ErrorClass.RetrySame -> handleRetryingError state cfg chain 1
         | FallbackPhase.Retrying count, ErrorClass.RetrySame when count < cfg.MaxRetries ->
-            match selectModel chain state.CurrentIndex with
-            | Some m ->
-                sendOrContinue
-                    cfg
-                    m
-                    { state with
-                        Phase = FallbackPhase.Retrying(count + 1) }
-            | None ->
-                { state with
-                    Phase = FallbackPhase.Exhausted },
-                FallbackAction.PropagateFailure
-
+            handleRetryingError state cfg chain (count + 1)
         | _, ErrorClass.ImmediateFallback
         | _, ErrorClass.Exhausted
-        | FallbackPhase.Retrying _, ErrorClass.RetrySame ->
-            let k = state.FailureCount + 1
-            let start = scanStartIndex k state.CurrentIndex
-
-            match selectModel chain start with
-            | Some m ->
-                sendOrContinue
-                    cfg
-                    m
-                    { state with
-                        Phase = FallbackPhase.Scanning(start, state.CurrentIndex)
-                        FailureCount = k }
-            | None ->
-                { state with
-                    Phase = FallbackPhase.Exhausted },
-                FallbackAction.PropagateFailure
+        | FallbackPhase.Retrying _, ErrorClass.RetrySame -> handleExhaustedError state cfg chain
 
 let private handleSessionBusy (state: SessionFallbackState) =
     match state.Lifecycle with

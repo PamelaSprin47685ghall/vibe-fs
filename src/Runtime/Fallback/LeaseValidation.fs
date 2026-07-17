@@ -151,29 +151,13 @@ let setupContinuationLease
     (model: FallbackModel)
     (promptTextOpt: string option)
     : PendingLease =
-    runtime.SetSessionOwner sessionID SessionOwner.Fallback
-    runtime.SetMainContinuationAwaitingStart sessionID true
-    let currentGen = runtime.GetSessionGeneration sessionID
-    let currentCancelGen = runtime.GetCancelGeneration sessionID
-    runtime.SetActiveContinuationGeneration sessionID currentGen
-    runtime.SetActiveContinuationCancelGeneration sessionID currentCancelGen
+    // Atomically set owner, gate, generations, and create the pending lease.
+    runtime.Update(sessionID, startDispatch model promptTextOpt)
+    let pending = runtime.GetSession sessionID
 
-    let continuationID = System.Guid.NewGuid().ToString("N")
-    let continuationOrdinal = runtime.IncrementContinuationOrdinal sessionID
-
-    let lease =
-        { ContinuationID = continuationID
-          ContinuationOrdinal = continuationOrdinal
-          SessionGeneration = currentGen
-          HumanTurnID = runtime.GetHumanTurnId sessionID
-          CancelGeneration = currentCancelGen
-          Owner = SessionOwner.Fallback
-          Model = model
-          PromptText = promptTextOpt
-          Status = LeaseStatus.Requested }
-
-    runtime.SetPendingLease(sessionID, lease)
-    lease
+    match pending.PendingLease with
+    | Some lease -> lease
+    | None -> failwith "Invariant violated: startDispatch must set PendingLease"
 
 let cancelPendingMainLease
     (runtime: FallbackRuntimeStore)

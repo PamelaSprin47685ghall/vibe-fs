@@ -32,16 +32,56 @@ let private optBool (o: obj) (key: string) : bool option =
     let v = Dyn.get o key
     if Dyn.isNullish v then None else Some(unbox<bool> v)
 
-// ARCHITECTURE_EXEMPT: split this 74-line function later
+let private tryGetSessionId (ctx: obj) (store: ReviewStore) : string option =
+    if not (Dyn.isNullish ctx) then
+        getSessionIdFromContext ctx
+    else
+        store.getActiveSessionIds () |> List.tryHead
+
+let private isWorkInProgress (params': obj) : bool =
+    let v = Dyn.get params' "wip"
+    if Dyn.isNullish v then true else Dyn.truthy v
+
+let private parseAffectedFiles (params': obj) : string array =
+    let a = Dyn.get params' "affectedFiles"
+
+    if Dyn.isNullish a || not (Dyn.isArray a) then
+        [||]
+    else
+        unbox<obj array> a |> Array.map string
+
+let private handleReviewResult
+    (root: string)
+    (store: ReviewStore)
+    (sessionId: string)
+    (r: ReviewResult)
+    : JS.Promise<ToolResult> =
+    promise {
+        let verdict, feedback =
+            match r with
+            | Accepted fb ->
+                Wanxiangshu.Kernel.EventSourcing.EventKind.verdictAccepted, (if fb = "" then None else Some fb)
+            | NeedsRevision fb -> Wanxiangshu.Kernel.EventSourcing.EventKind.verdictNeedsRevision, Some fb
+            | Terminated -> Wanxiangshu.Kernel.EventSourcing.EventKind.verdictTerminated, None
+
+        do! appendReviewVerdictOrFail root sessionId verdict feedback
+        do! syncReviewFromEventLogDedicated store root sessionId
+
+        match r with
+        | Accepted fb ->
+            if fb = "" then
+                return textResult "Review passed. Loop mode ended."
+            else
+                return errorResult ("Review feedback:\n\n" + fb)
+        | NeedsRevision fb -> return errorResult ("Review feedback:\n\n" + fb)
+        | Terminated -> return errorResult "Review terminated."
+    }
+
 let executeSubmitReview
     (store: ReviewStore, pi: obj, ctx: obj, id: string, params': obj, signal: obj, onUpdate: obj)
     : JS.Promise<ToolResult> =
     promise {
-        let sessionIdOpt =
-            if not (Dyn.isNullish ctx) then
-                getSessionIdFromContext ctx
-            else
-                store.getActiveSessionIds () |> List.tryHead
+        let sessionIdOpt = tryGetSessionId ctx store
 
         match sessionIdOpt with
         | None -> return errorResult "Loop review is not active for this session."
@@ -53,25 +93,14 @@ let executeSubmitReview
             match activeTask with
             | None -> return errorResult "Loop review is not active for this session."
             | Some activeTask ->
-                let isWip =
-                    let v = Dyn.get params' "wip"
-                    if Dyn.isNullish v then true else Dyn.truthy v
-
-                if isWip then
+                if isWorkInProgress params' then
                     do! appendSubmitReviewWipRecorded root sessionId |> Promise.map ignore
                     return textResult (formatWipAcknowledgment activeTask)
                 elif not (store.tryLockReview sessionId) then
                     return errorResult "A review is already in progress."
                 else
                     let report = Dyn.str params' "report"
-
-                    let files =
-                        let a = Dyn.get params' "affectedFiles"
-
-                        if Dyn.isNullish a || not (Dyn.isArray a) then
-                            [||]
-                        else
-                            unbox<obj array> a |> Array.map string
+                    let files = parseAffectedFiles params'
 
                     let mutable loopError: exn option = None
                     let mutable result: ReviewResult option = None
@@ -87,27 +116,7 @@ let executeSubmitReview
                     match loopError, result with
                     | Some ex, _ -> return asErrorResult ex
                     | None, None -> return errorResult "Review loop returned no result."
-                    | None, Some r ->
-                        let verdict, feedback =
-                            match r with
-                            | Accepted fb ->
-                                Wanxiangshu.Kernel.EventSourcing.EventKind.verdictAccepted,
-                                (if fb = "" then None else Some fb)
-                            | NeedsRevision fb ->
-                                Wanxiangshu.Kernel.EventSourcing.EventKind.verdictNeedsRevision, Some fb
-                            | Terminated -> Wanxiangshu.Kernel.EventSourcing.EventKind.verdictTerminated, None
-
-                        do! appendReviewVerdictOrFail root sessionId verdict feedback
-                        do! syncReviewFromEventLogDedicated store root sessionId
-
-                        match r with
-                        | Accepted fb ->
-                            if fb = "" then
-                                return textResult "Review passed. Loop mode ended."
-                            else
-                                return errorResult ("Review feedback:\n\n" + fb)
-                        | NeedsRevision fb -> return errorResult ("Review feedback:\n\n" + fb)
-                        | Terminated -> return errorResult "Review terminated."
+                    | None, Some r -> return! handleReviewResult root store sessionId r
     }
 
 let executeReturnReviewer

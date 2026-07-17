@@ -66,7 +66,111 @@ let private resolveParentLiveModel
                                 parentSessionID
     }
 
-// ARCHITECTURE_EXEMPT: split this 177-line function later
+let private buildSubagentOptions
+    (agent: string)
+    (title: string)
+    (prompt: string)
+    (directory: string)
+    (sessionID: string)
+    (tools: obj)
+    : SubagentLaunchOptions =
+    { agent = agent
+      title = title
+      prompt = prompt
+      directory = directory
+      sessionID = sessionID
+      tools = tools
+      aiSettings =
+        { modelString = None
+          thinkingLevel = None } }
+
+let private abortAndUnregister
+    (registry: ChildAgentRegistry)
+    (client: obj)
+    (directory: string)
+    (childID: string)
+    : JS.Promise<unit> =
+    promise {
+        match getSessionApiFromClient client with
+        | Ok session ->
+            try
+                let! _ = invoke1 (box {| path = box {| id = childID |} |}) "abort" session
+                ()
+            with _ ->
+                ()
+
+            try
+                let arg = box {| path = box {| id = childID |} |}
+                let! _ = invoke1 arg "delete" session
+
+                let sid = SessionId.create childID
+                let eventStore = create directory
+                do! eventStore.Append(sid, [ PhysicalSessionClosed sid ])
+
+                Wanxiangshu.Runtime.SubsessionActorRegistry.SubsessionActorRegistry.ClearPoison directory childID
+
+                Wanxiangshu.Runtime.SubsessionActorRegistry.SubsessionActorRegistry.Remove directory childID
+
+                registry.UnregisterChildAgent(childID)
+            with _ ->
+                ()
+        | Error _ -> ()
+    }
+
+let private cleanupChildIfRequested
+    (registry: ChildAgentRegistry)
+    (cleanup: bool)
+    (client: obj)
+    (directory: string)
+    (childID: string)
+    : JS.Promise<unit> =
+    promise {
+        if cleanup then
+            do! abortAndUnregister registry client directory childID
+    }
+
+let private extractRunDirective
+    (registry: ChildAgentRegistry)
+    (runtime: FallbackRuntimeStore)
+    (client: obj)
+    (agent: string)
+    (directory: string)
+    (sessionID: string)
+    (childID: string)
+    : JS.Promise<FallbackConfig * ModelDirective> =
+    promise {
+        let dir = if directory = "" then "." else directory
+
+        let cfg =
+            match Wanxiangshu.Runtime.Fallback.FallbackConfigCodec.loadFallbackConfig dir with
+            | Some c -> c
+            | None -> Wanxiangshu.Runtime.Fallback.FallbackConfigCodec.emptyConfig
+
+        let parentSessionID =
+            if sessionID = "" then
+                ""
+            else
+                registry.ResolveSubsessionParentID(Some sessionID)
+                |> Option.defaultValue sessionID
+
+        let! parentLiveModel = resolveParentLiveModel runtime client parentSessionID
+
+        let! hostExplicitModelOpt =
+            Wanxiangshu.Hosts.Opencode.Fallback.HostEventInspection.tryGetAgentExplicitModel client agent
+
+        let hostConfigured = Option.isSome hostExplicitModelOpt
+
+        return
+            cfg,
+            Wanxiangshu.Runtime.Fallback.FallbackConfigCodec.resolveModelDirective
+                cfg
+                agent
+                hostConfigured
+                (runtime.GetChain childID)
+                (runtime.GetChain parentSessionID)
+                parentLiveModel
+    }
+
 let runSubagentCoreResult
     (runtime: FallbackRuntimeStore)
     (registry: ChildAgentRegistry)
@@ -83,17 +187,7 @@ let runSubagentCoreResult
     : JS.Promise<Result<string, DomainError>> =
     promise {
         let signal = getAbortSignal context
-
-        let options =
-            { agent = agent
-              title = title
-              prompt = prompt
-              directory = directory
-              sessionID = sessionID
-              tools = tools
-              aiSettings =
-                { modelString = None
-                  thinkingLevel = None } }
+        let options = buildSubagentOptions agent title prompt directory sessionID tools
 
         try
             let! childResult =
@@ -109,140 +203,38 @@ let runSubagentCoreResult
             match childResult with
             | Error err -> return Error err
             | Ok childID ->
-                let abortAndUnregister () =
-                    promise {
-                        match getSessionApiFromClient client with
-                        | Ok session ->
-                            try
-                                let! _ = invoke1 (box {| path = box {| id = childID |} |}) "abort" session
-                                ()
-                            with _ ->
-                                ()
-
-                            try
-                                let arg = box {| path = box {| id = childID |} |}
-                                let! _ = invoke1 arg "delete" session
-
-                                let sid = SessionId.create childID
-                                let eventStore = create directory
-                                do! eventStore.Append(sid, [ PhysicalSessionClosed sid ])
-
-                                Wanxiangshu.Runtime.SubsessionActorRegistry.SubsessionActorRegistry.ClearPoison
-                                    directory
-                                    childID
-
-                                Wanxiangshu.Runtime.SubsessionActorRegistry.SubsessionActorRegistry.Remove
-                                    directory
-                                    childID
-
-                                registry.UnregisterChildAgent(childID)
-                            with _ ->
-                                ()
-                        | Error _ -> ()
-                    }
-
-                let cleanupChildIfRequested () =
-                    promise {
-                        if cleanup then
-                            do! abortAndUnregister ()
-                    }
-
-                let! abortedResult =
-                    promise {
-                        if not (isNull signal) && Dyn.truthy (Dyn.get signal "aborted") then
-                            do! abortAndUnregister ()
-                            return Some(Ok abortedPrefix)
-                        else
-                            return None
-                    }
-
-                match abortedResult with
-                | Some res -> return res
-                | None ->
-                    let! currentMessages =
-                        match getSessionApiFromClient client with
-                        | Ok session ->
-                            let msgPromise: JS.Promise<obj> =
-                                invoke1 (box {| path = box {| id = childID |} |}) "messages" session
-
-                            msgPromise |> Promise.map (fun r -> unbox<obj[]> (Dyn.get r "data"))
-                        | Error _ -> Promise.lift [||]
-
-                    let startCount = currentMessages.Length
-
-                    let cfg =
-                        let dir = if directory = "" then "." else directory
-
-                        let fallbackConfigOpt =
-                            Wanxiangshu.Runtime.Fallback.FallbackConfigCodec.loadFallbackConfig dir
-
-                        match fallbackConfigOpt with
-                        | Some c -> c
-                        | None -> Wanxiangshu.Runtime.Fallback.FallbackConfigCodec.emptyConfig
-
-                    let parentSessionID =
-                        if sessionID = "" then
-                            ""
-                        else
-                            registry.ResolveSubsessionParentID(Some sessionID)
-                            |> Option.defaultValue sessionID
-
-                    let! parentLiveModel = resolveParentLiveModel runtime client parentSessionID
-
-                    let! hostExplicitModelOpt =
-                        Wanxiangshu.Hosts.Opencode.Fallback.HostEventInspection.tryGetAgentExplicitModel client agent
-
-                    let hostConfigured = Option.isSome hostExplicitModelOpt
-
-                    let directive =
-                        Wanxiangshu.Runtime.Fallback.FallbackConfigCodec.resolveModelDirective
-                            cfg
-                            agent
-                            hostConfigured
-                            (runtime.GetChain childID)
-                            (runtime.GetChain parentSessionID)
-                            parentLiveModel
+                if not (isNull signal) && Dyn.truthy (Dyn.get signal "aborted") then
+                    do! abortAndUnregister registry client directory childID
+                    return Ok abortedPrefix
+                else
+                    let! cfg, directive = extractRunDirective registry runtime client agent directory sessionID childID
 
                     match directive with
                     | RetryChain chain ->
                         runtime.SetChain childID chain
-
-                        match List.tryHead chain with
-                        | Some first -> runtime.SetModel childID first
-                        | None -> ()
+                        runtime.SetModel childID (List.head chain)
                     | DelegateToHost -> runtime.SetChain childID []
 
-                    let hostFactory (_sid: string) = createHost client agent directory
-
-                    let eventStoreFactory (_sid: string) =
-                        create (if directory = "" then "" else directory)
-
-                    let service = SubsessionService(directory, hostFactory, eventStoreFactory)
-
-                    let mutable runErrorOpt = None
-                    let mutable runResultOpt = None
+                    let svc =
+                        SubsessionService(
+                            directory,
+                            (fun _ -> createHost client agent directory),
+                            fun _ -> create (if directory = "" then "" else directory)
+                        )
 
                     try
-                        let! runResult =
-                            service.StartRun(childID, sessionID, prompt, cfg, directive, abortSignal = signal)
+                        let! runRes = svc.StartRun(childID, sessionID, prompt, cfg, directive, abortSignal = signal)
+                        do! cleanupChildIfRequested registry cleanup client directory childID
 
-                        runResultOpt <- Some runResult
+                        return
+                            match runRes with
+                            | Succeeded output -> Ok(formatSubagentReport noOutputText abortedPrefix output false)
+                            | Cancelled -> Ok abortedPrefix
+                            | Failed reason ->
+                                Error(DomainError.InvalidIntent("subagent", "run", formatRunFailure reason))
                     with err ->
-                        runErrorOpt <- Some err
-
-                    do! cleanupChildIfRequested ()
-
-                    match runErrorOpt with
-                    | Some err -> return Error(translateJsError err)
-                    | None ->
-                        match runResultOpt with
-                        | Some(Succeeded output) ->
-                            return Ok(formatSubagentReport noOutputText abortedPrefix output false)
-                        | Some Cancelled -> return Ok abortedPrefix
-                        | Some(Failed reason) ->
-                            return Error(DomainError.InvalidIntent("subagent", "run", formatRunFailure reason))
-                        | None ->
-                            return Error(DomainError.InvalidIntent("subagent", "run", "Unknown start run outcome"))
+                        do! cleanupChildIfRequested registry cleanup client directory childID
+                        return Error(translateJsError err)
         with err ->
             return Error(translateJsError err)
     }

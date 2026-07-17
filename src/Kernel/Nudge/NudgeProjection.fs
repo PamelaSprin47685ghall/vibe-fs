@@ -130,36 +130,29 @@ let private strOrEmpty (o: string option) : string =
     | Some s -> s
     | None -> ""
 
-// ARCHITECTURE_EXEMPT: split this 67-line function later
-let private snapshotFolder (st: NudgeSnapshotState) (e: WanEvent) : NudgeSnapshotState =
+let private snapshotFromAssistantCompleted (st: NudgeSnapshotState) (e: WanEvent) : NudgeSnapshotState =
+    let msg = payloadField "assistantMessage" e |> strOrEmpty
+
+    let agent =
+        payloadField "agent" e |> Option.bind (fun a -> if a = "" then None else Some a)
+
+    let model =
+        payloadField "model" e |> Option.bind (fun m -> if m = "" then None else Some m)
+
+    let tid = payloadField "turnId" e |> strOrEmpty
+    let todosFromPayload = payloadField "openTodosJson" e |> Option.map parseTodosJson
+    let openTodos = todosFromPayload |> Option.defaultValue st.openTodos
+
+    syncWorkState
+        { st with
+            lastAssistantText = msg
+            agentFromMessage = agent
+            modelFromMessage = model
+            turnId = tid
+            openTodos = openTodos }
+
+let private snapshotFromNudgeEvent (st: NudgeSnapshotState) (e: WanEvent) : NudgeSnapshotState =
     match e.Kind with
-    | k when k = eventKindAssistantCompleted ->
-        let msg = payloadField "assistantMessage" e |> strOrEmpty
-
-        let agent =
-            payloadField "agent" e |> Option.bind (fun a -> if a = "" then None else Some a)
-
-        let model =
-            payloadField "model" e |> Option.bind (fun m -> if m = "" then None else Some m)
-
-        let tid = payloadField "turnId" e |> strOrEmpty
-        let todosFromPayload = payloadField "openTodosJson" e |> Option.map parseTodosJson
-        let openTodos = todosFromPayload |> Option.defaultValue st.openTodos
-
-        syncWorkState
-            { st with
-                lastAssistantText = msg
-                agentFromMessage = agent
-                modelFromMessage = model
-                turnId = tid
-                openTodos = openTodos }
-    | k when
-        k = eventKindLoopActivated
-        || k = eventKindLoopCancelled
-        || k = eventKindReviewVerdict
-        ->
-        let reviewLoop = ReviewLoopFold.foldEvent st.reviewLoop e
-        syncWorkState { st with reviewLoop = reviewLoop }
     | k when k = eventKindNudgeRequested ->
         match payloadAnchor e, payloadField "nudgeId" e with
         | Some anchor, Some nid ->
@@ -180,6 +173,32 @@ let private snapshotFolder (st: NudgeSnapshotState) (e: WanEvent) : NudgeSnapsho
             | Some(_, pendingNid) when pendingNid = nid -> { st with pendingNudge = None }
             | _ -> st
         | None -> st
+    | _ -> st
+
+let private snapshotFromWorkEvent (st: NudgeSnapshotState) (e: WanEvent) : NudgeSnapshotState =
+    let todosOpt = payloadField "todosJson" e |> Option.map parseTodosJson
+
+    syncWorkState
+        { st with
+            openTodos = todosOpt |> Option.defaultValue st.openTodos }
+
+let private snapshotFolder (st: NudgeSnapshotState) (e: WanEvent) : NudgeSnapshotState =
+    match e.Kind with
+    | k when k = eventKindAssistantCompleted -> snapshotFromAssistantCompleted st e
+    | k when
+        k = eventKindLoopActivated
+        || k = eventKindLoopCancelled
+        || k = eventKindReviewVerdict
+        ->
+        let reviewLoop = ReviewLoopFold.foldEvent st.reviewLoop e
+        syncWorkState { st with reviewLoop = reviewLoop }
+    | k when
+        k = eventKindNudgeRequested
+        || k = eventKindNudgeDispatched
+        || k = eventKindNudgeFailed
+        || k = eventKindNudgeCancelled
+        ->
+        snapshotFromNudgeEvent st e
     | k when
         k = eventKindSubmitReviewWipRecorded
         || k = eventKindNudgeDedupCleared
@@ -189,12 +208,7 @@ let private snapshotFolder (st: NudgeSnapshotState) (e: WanEvent) : NudgeSnapsho
         { st with
             lastDispatchedAnchor = None
             pendingNudge = None }
-    | k when k = eventKindWorkBacklogCommitted ->
-        let todosOpt = payloadField "todosJson" e |> Option.map parseTodosJson
-
-        syncWorkState
-            { st with
-                openTodos = todosOpt |> Option.defaultValue st.openTodos }
+    | k when k = eventKindWorkBacklogCommitted -> snapshotFromWorkEvent st e
     | _ -> st
 
 /// Fold a single snapshot event (public for composite projection).

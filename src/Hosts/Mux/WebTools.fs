@@ -70,7 +70,55 @@ let websearchTool (deps: obj) (toolNames: string array) : ToolDefinition =
                     }
       condition = None }
 
-// ARCHITECTURE_EXEMPT: split this 65-line function later
+let private parseWebToolRequest (wf: Wanxiangshu.Runtime.WebToolsCodec.WebfetchArgs) : (string * obj) list =
+    let bodyEntries = ResizeArray<(string * obj)>()
+    bodyEntries.Add("url", box wf.Url)
+    addIfSome bodyEntries "extract_main" wf.ExtractMain
+    addIfSome bodyEntries "prefer_llms_txt" wf.PreferLlmsTxt
+    addIfSome bodyEntries "prompt" wf.Prompt
+    addIfSome bodyEntries "timeout" wf.Timeout
+    Seq.toList bodyEntries
+
+let private executeWebToolCall (runtime: IToolRuntimeContext) (bodyEntries: (string * obj) list) : JS.Promise<string> =
+    promise {
+        let body = createObj bodyEntries
+        let! result = webApiPost "web_fetch" body runtime.AbortSignal
+
+        match result with
+        | Error e -> return webToolFailed "fetch" e
+        | Ok data ->
+            let title =
+                if Dyn.isNullish (Dyn.get data "title") then
+                    None
+                else
+                    Some(Dyn.str data "title")
+
+            let byline =
+                if Dyn.isNullish (Dyn.get data "byline") then
+                    None
+                else
+                    Some(Dyn.str data "byline")
+
+            let length_ =
+                if Dyn.isNullish (Dyn.get data "length") then
+                    None
+                else
+                    Some(unbox<int> (Dyn.get data "length"))
+
+            let content =
+                if Dyn.isNullish (Dyn.get data "content") then
+                    None
+                else
+                    Some(Dyn.str data "content")
+
+            return
+                formatFetchResponse
+                    { title = title
+                      byline = byline
+                      length = length_
+                      content = content }
+    }
+
 let webfetchTool: ToolDefinition =
     { name = "webfetch"
       description = description "webfetch"
@@ -91,48 +139,6 @@ let webfetchTool: ToolDefinition =
                 match decodeWebfetchArgs args with
                 | Error e -> Promise.lift (wireDecodeFailure "webfetch" e)
                 | Ok wf ->
-                    promise {
-                        let bodyEntries = ResizeArray<(string * obj)>()
-                        bodyEntries.Add("url", box wf.Url)
-                        addIfSome bodyEntries "extract_main" wf.ExtractMain
-                        addIfSome bodyEntries "prefer_llms_txt" wf.PreferLlmsTxt
-                        addIfSome bodyEntries "prompt" wf.Prompt
-                        addIfSome bodyEntries "timeout" wf.Timeout
-                        let body = createObj (Seq.toList bodyEntries)
-                        let! result = webApiPost "web_fetch" body runtime.AbortSignal
-
-                        match result with
-                        | Error e -> return webToolFailed "fetch" e
-                        | Ok data ->
-                            let title =
-                                if Dyn.isNullish (Dyn.get data "title") then
-                                    None
-                                else
-                                    Some(Dyn.str data "title")
-
-                            let byline =
-                                if Dyn.isNullish (Dyn.get data "byline") then
-                                    None
-                                else
-                                    Some(Dyn.str data "byline")
-
-                            let length_ =
-                                if Dyn.isNullish (Dyn.get data "length") then
-                                    None
-                                else
-                                    Some(unbox<int> (Dyn.get data "length"))
-
-                            let content =
-                                if Dyn.isNullish (Dyn.get data "content") then
-                                    None
-                                else
-                                    Some(Dyn.str data "content")
-
-                            return
-                                formatFetchResponse
-                                    { title = title
-                                      byline = byline
-                                      length = length_
-                                      content = content }
-                    }
+                    let bodyEntries = parseWebToolRequest wf
+                    executeWebToolCall runtime bodyEntries
       condition = None }

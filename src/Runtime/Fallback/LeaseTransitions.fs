@@ -7,7 +7,6 @@ module Wanxiangshu.Runtime.Fallback.LeaseTransitions
 open Wanxiangshu.Kernel.FallbackKernel.Types
 open Wanxiangshu.Kernel.FallbackRuntimeFlags
 open Wanxiangshu.Kernel.FallbackRuntimeLifecycle
-open Wanxiangshu.Runtime.Fallback.GateState
 open Wanxiangshu.Runtime.Fallback.SessionRuntime
 open Wanxiangshu.Runtime.Fallback.RuntimeStore
 
@@ -127,10 +126,10 @@ type FallbackRuntimeStore with
                 fun s ->
                     { s with
                         PendingNudgeLease = None
-                        ActiveNudgeNonce = "" }
+                        ActiveNudgeNonce = ""
+                        ActiveGates = Set.remove FallbackSessionGateFlag.NudgeActive s.ActiveGates }
             )
 
-            this.ActiveGates <- setGateActive this.ActiveGates sessionID FallbackSessionGateFlag.NudgeActive false
             this.TriggerStateChanged sessionID
 
             if s.Owner = SessionOwner.Nudge then
@@ -139,29 +138,8 @@ type FallbackRuntimeStore with
             true
         | _ -> false
 
+    /// The episode is ending — delegate to the unified domain transition which
+    /// atomically resets state and clears all gate flags via the record field.
     member this.CancelEpisode(sessionID: string) : unit =
-        this.ActiveGates <-
-            setGateActive this.ActiveGates sessionID FallbackSessionGateFlag.MainContinuationAwaitingStart false
-
-        this.ActiveGates <- setGateActive this.ActiveGates sessionID FallbackSessionGateFlag.EventHandlingActive false
-        this.ActiveGates <- setGateActive this.ActiveGates sessionID FallbackSessionGateFlag.NudgeActive false
-
-        this.UpdateSession(
-            sessionID,
-            fun s ->
-                { freshSessionState with
-                    SessionGeneration = s.SessionGeneration
-                    CancelGeneration = s.CancelGeneration
-                    HumanTurnOrdinal = s.HumanTurnOrdinal
-                    ContinuationOrdinal = s.ContinuationOrdinal
-                    NudgeOrdinal = s.NudgeOrdinal
-                    CompactionOrdinal = s.CompactionOrdinal
-                    HumanTurnId = s.HumanTurnId
-                    LastHumanMessageId = s.LastHumanMessageId
-                    LatestHumanModel = s.LatestHumanModel
-                    Chain = s.Chain
-                    AgentName = s.AgentName
-                    Model = s.Model }
-        )
-
+        this.UpdateSession(sessionID, cancelEpisode)
         this.TriggerStateChanged sessionID

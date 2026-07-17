@@ -9,6 +9,67 @@ open Wanxiangshu.Runtime.Dyn
 let utf8JsonBytes (value: obj) : int =
     emitJsExpr value "new TextEncoder().encode(JSON.stringify($0)).length"
 
+let tryResolveClient (target: obj) : obj option =
+    if isNullish target then
+        None
+    else
+        let client =
+            if not (isNullish (get target "session")) then
+                target
+            else
+                let c = get target "client"
+
+                if not (isNullish c) && not (isNullish (get c "session")) then
+                    c
+                else
+                    box null
+
+        if isNullish client then None else Some client
+
+let tryGetUsageFromSessionApi (sessionApi: obj) (sessionID: string) (directory: string) : JS.Promise<int option> =
+    promise {
+        try
+            let arg = createObj [ "sessionID", box sessionID; "directory", box directory ]
+
+            let! res = unbox<JS.Promise<obj>> (sessionApi?get (arg))
+
+            if isNullish res then
+                return None
+            else
+                let data = get res "data"
+
+                if isNullish data then
+                    return None
+                else
+                    let tokens = get data "tokens"
+
+                    if isNullish tokens then
+                        return None
+                    else
+                        let inputVal = get tokens "input"
+                        let cacheObj = get tokens "cache"
+
+                        let cacheRead =
+                            if isNullish cacheObj then
+                                0.0
+                            else
+                                let r = get cacheObj "read"
+
+                                if isNullish r || not (typeIs r "number") then
+                                    0.0
+                                else
+                                    unbox<float> r
+
+                        if isNullish inputVal || not (typeIs inputVal "number") then
+                            return None
+                        else
+                            let inputNum = int (unbox<float> inputVal)
+                            let cacheNum = int cacheRead
+                            return Some(inputNum + cacheNum)
+        with _ ->
+            return None
+    }
+
 let isBacklogEncodedMessage (host: Host) (msg: obj) : bool =
     if isNullish msg then
         false
@@ -68,7 +129,6 @@ let tryExtractMaxInputTokens (target: obj) : int option =
 let tryGetMaxInputTokensAsync (target: obj) (sessionID: string) (directory: string) : JS.Promise<int option> =
     ContextBudgetLimitResolver.tryGetMaxInputTokensAsync target sessionID directory
 
-// ARCHITECTURE_EXEMPT: split this 70-line function later
 let tryGetRealContextUsage
     (target: obj)
     (sessionID: string)
@@ -77,68 +137,16 @@ let tryGetRealContextUsage
     if isNullish target then
         None
     else
-        let client =
-            if not (isNullish (get target "session")) then
-                target
-            else
-                let c = get target "client"
-
-                if not (isNullish c) && not (isNullish (get c "session")) then
-                    c
-                else
-                    box null
-
-        if isNullish client then
-            None
-        else
+        match tryResolveClient target with
+        | None -> None
+        | Some client ->
             let sessionApi = get client "session"
 
             if isNullish sessionApi || isNullish (get sessionApi "get") then
                 None
             else
                 Some(fun (_encoded: obj array) ->
-                    promise {
-                        try
-                            let arg = createObj [ "sessionID", box sessionID; "directory", box directory ]
-
-                            let! res = unbox<JS.Promise<obj>> (sessionApi?get (arg))
-
-                            if isNullish res then
-                                return None
-                            else
-                                let data = get res "data"
-
-                                if isNullish data then
-                                    return None
-                                else
-                                    let tokens = get data "tokens"
-
-                                    if isNullish tokens then
-                                        return None
-                                    else
-                                        let inputVal = get tokens "input"
-                                        let cacheObj = get tokens "cache"
-
-                                        let cacheRead =
-                                            if isNullish cacheObj then
-                                                0.0
-                                            else
-                                                let r = get cacheObj "read"
-
-                                                if isNullish r || not (typeIs r "number") then
-                                                    0.0
-                                                else
-                                                    unbox<float> r
-
-                                        if isNullish inputVal || not (typeIs inputVal "number") then
-                                            return None
-                                        else
-                                            let inputNum = int (unbox<float> inputVal)
-                                            let cacheNum = int cacheRead
-                                            return Some(inputNum + cacheNum)
-                        with _ ->
-                            return None
-                    })
+                    tryGetUsageFromSessionApi sessionApi sessionID directory)
 
 let resolveMaxInputTokens (targets: obj list) (sessionID: string) (directory: string) : JS.Promise<int> =
     ContextBudgetResolve.resolveMaxInputTokens targets sessionID directory

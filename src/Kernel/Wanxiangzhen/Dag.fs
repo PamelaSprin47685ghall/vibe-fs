@@ -20,7 +20,7 @@ let formatSquadUpdateOutcome (o: SquadUpdateOutcome) : string =
         let msgs = errs |> List.map (fun (tid, dep) -> tid + " dependsOn unknown " + dep)
         sprintf "Dependency error: %s. Fix dependencies." (String.concat "; " msgs)
     | CycleDetected cycle ->
-        sprintf "Dependency cycle detected: %s. Please re-decompose without cycles." (String.concat " → " cycle)
+        sprintf "Dependency cycle detected: %s. Please re-decompose without cycles." (String.concat " -> " cycle)
     | InvalidInput msg -> sprintf "Error: %s" msg
     | IdExhausted -> "Error: Could not allocate a unique task id after 10 attempts."
 
@@ -75,57 +75,64 @@ type private VisitState =
       Result: string list
       Path: string list }
 
-// ARCHITECTURE_EXEMPT: split this 62-line function later
+let rec private visitNode
+    (depMap: Map<string, string list>)
+    (state: VisitState)
+    (id: string)
+    : Result<VisitState, string list> =
+    if state.Visiting.Contains id then
+        let path = List.rev state.Path
+
+        let cycle =
+            List.foldBack (fun x acc -> x :: acc) (path |> List.skipWhile (fun x -> x <> id)) [ id ]
+
+        Error cycle
+    elif state.Visited.Contains id then
+        Ok state
+    else
+        let visiting' = state.Visiting.Add id
+        let deps = Map.tryFind id depMap |> Option.defaultValue []
+
+        let st' =
+            { state with
+                Visiting = visiting'
+                Path = id :: state.Path }
+
+        let rec processDeps (st: VisitState) (remaining: string list) : Result<VisitState, string list> =
+            match remaining with
+            | [] -> Ok st
+            | dep :: rest ->
+                match visitNode depMap st dep with
+                | Error _ as e -> e
+                | Ok stNext -> processDeps stNext rest
+
+        match processDeps st' deps with
+        | Error _ as e -> e
+        | Ok stDep ->
+            let stOut =
+                { stDep with
+                    Visiting = stDep.Visiting.Remove id
+                    Visited = stDep.Visited.Add id
+                    Result = id :: stDep.Result
+                    Path = state.Path }
+
+            Ok stOut
+
+let rec private processAllNodes
+    (depMap: Map<string, string list>)
+    (st: VisitState)
+    (ids: string list)
+    : Result<VisitState, string list> =
+    match ids with
+    | [] -> Ok st
+    | id :: rest ->
+        match visitNode depMap st id with
+        | Error _ as e -> e
+        | Ok stNext -> processAllNodes depMap stNext rest
+
 let topologicalOrder (tasks: (string * string list) list) : Result<string list, string list> =
     let depMap = tasks |> Map.ofList
     let idSet = tasks |> List.map fst |> Set.ofList
-
-    let rec visit (state: VisitState) (id: string) : Result<VisitState, string list> =
-        if state.Visiting.Contains id then
-            let path = List.rev state.Path
-
-            let cycle =
-                List.foldBack (fun x acc -> x :: acc) (path |> List.skipWhile (fun x -> x <> id)) [ id ]
-
-            Error cycle
-        elif state.Visited.Contains id then
-            Ok state
-        else
-            let visiting' = state.Visiting.Add id
-            let deps = Map.tryFind id depMap |> Option.defaultValue []
-
-            let st' =
-                { state with
-                    Visiting = visiting'
-                    Path = id :: state.Path }
-
-            let rec processDeps (st: VisitState) (remaining: string list) : Result<VisitState, string list> =
-                match remaining with
-                | [] -> Ok st
-                | dep :: rest ->
-                    match visit st dep with
-                    | Error _ as e -> e
-                    | Ok stNext -> processDeps stNext rest
-
-            match processDeps st' deps with
-            | Error _ as e -> e
-            | Ok stDep ->
-                let stOut =
-                    { stDep with
-                        Visiting = stDep.Visiting.Remove id
-                        Visited = stDep.Visited.Add id
-                        Result = id :: stDep.Result
-                        Path = state.Path }
-
-                Ok stOut
-
-    let rec processAll (st: VisitState) (ids: string list) : Result<VisitState, string list> =
-        match ids with
-        | [] -> Ok st
-        | id :: rest ->
-            match visit st id with
-            | Error _ as e -> e
-            | Ok stNext -> processAll stNext rest
 
     let initialState =
         { Visited = Set.empty
@@ -135,7 +142,7 @@ let topologicalOrder (tasks: (string * string list) list) : Result<string list, 
 
     let orderedIds = idSet |> Set.toList |> List.sort
 
-    match processAll initialState orderedIds with
+    match processAllNodes depMap initialState orderedIds with
     | Ok finalState -> Ok(List.rev finalState.Result)
     | Error cycle -> Error cycle
 

@@ -47,7 +47,126 @@ let ptyWriteTool (host: Host) : obj =
                 return frontMatterPrompt [ "id", box id; "bytes", box data.Length ] (sprintf "Sent: \"%s\"" display)
             })
 
-// ARCHITECTURE_EXEMPT: split this 143-line function later
+let formatSessionList (sessions: obj array) : string =
+    let sb = ResizeArray<string>()
+
+    for s in sessions do
+        sb.Add(sprintf "### %s" (string s?``id``))
+        sb.Add(sprintf "title: %s" (string s?title))
+
+        sb.Add(sprintf "command: %s %s" (string s?command) (String.concat " " (unbox<string array> s?args)))
+
+        sb.Add(sprintf "status: %s" (string s?status))
+        sb.Add(sprintf "pid: %d" (unbox<int> s?pid))
+        sb.Add(sprintf "lines: %d" (unbox<int> s?lineCount))
+        sb.Add("")
+
+    String.concat "\n" sb
+
+let readUnfiltered (mgr: obj) (id: string) (session: obj) (offset: int) (limit: int) : JS.Promise<string> =
+    promise {
+        let result = mgr?read (id, offset, limit)
+
+        if Dyn.isNullish result then
+            failwithf "PTY session not found: %s" id
+
+        let lines: string array = unbox (result?lines)
+        let totalLines = unbox<int> result?totalLines
+        let hasMore = unbox<bool> result?hasMore
+        let resultOffset = unbox<int> result?offset
+
+        let fields =
+            [ "id", box id
+              "status", box (string session?status)
+              "offset", box resultOffset
+              "returned", box lines.Length
+              "total_lines", box totalLines
+              "has_more", box hasMore ]
+
+        let sb = ResizeArray<string>()
+
+        for i in 0 .. lines.Length - 1 do
+            sb.Add(lines.[i])
+
+        sb.Add("")
+
+        if hasMore then
+            sb.Add(
+                sprintf
+                    "(Buffer has more lines. Use offset=%d to read beyond line %d)"
+                    (resultOffset + lines.Length)
+                    (resultOffset + lines.Length)
+            )
+        else
+            sb.Add(sprintf "(End of buffer - total %d lines)" totalLines)
+
+        return frontMatterPrompt fields (String.concat "\n" sb)
+    }
+
+let readFiltered
+    (mgr: obj)
+    (id: string)
+    (session: obj)
+    (pattern: string)
+    (offset: int)
+    (limit: int)
+    (ignoreCase: bool)
+    : JS.Promise<string> =
+    promise {
+        let flags = if ignoreCase then "i" else ""
+        let regex = newRegex pattern flags
+        let result = mgr?search (id, regex, offset, limit)
+
+        if Dyn.isNullish result then
+            failwithf "PTY session not found: %s" id
+
+        let matches: obj array = unbox (result?matches)
+        let totalLines = unbox<int> result?totalLines
+        let totalMatches = unbox<int> result?totalMatches
+        let hasMore = unbox<bool> result?hasMore
+
+        let fields =
+            [ "id", box id
+              "status", box (string session?status)
+              "pattern", box pattern
+              "offset", box offset
+              "returned", box matches.Length
+              "total_matches", box totalMatches
+              "total_lines", box totalLines
+              "has_more", box hasMore ]
+
+        let sb = ResizeArray<string>()
+
+        if matches.Length = 0 then
+            sb.Add(sprintf "No lines matched the pattern '%s'." pattern)
+            sb.Add(sprintf "Total lines in buffer: %d" totalLines)
+        else
+            for i in 0 .. matches.Length - 1 do
+                let m = matches.[i]
+                sb.Add(string m?text)
+
+            sb.Add("")
+
+            if hasMore then
+                sb.Add(
+                    sprintf
+                        "(%d of %d matches shown. Use offset=%d to see more.)"
+                        matches.Length
+                        totalMatches
+                        (offset + matches.Length)
+                )
+            else
+                sb.Add(
+                    sprintf
+                        "(%d match%s from %d total lines)"
+                        totalMatches
+                        (if totalMatches = 1 then "" else "es")
+                        totalLines
+                )
+
+        return frontMatterPrompt fields (String.concat "\n" sb)
+    }
+
 let ptyReadTool (host: Host) : obj =
     define
         "Read output buffer from a PTY session with pagination (offset/limit) and optional regex pattern filtering."
@@ -69,7 +188,6 @@ let ptyReadTool (host: Host) : obj =
                       "Regex pattern to filter lines. When set, only matching lines are returned, then offset/limit apply to the matches."
               )
               "ignoreCase", box (boolOpt "Case-insensitive pattern matching (default: false)") ])
-        // ARCHITECTURE_EXEMPT: split this 122-line function later
         (fun args context ->
             checkExecPerm host context
             let id = string args?``id``
@@ -96,42 +214,7 @@ let ptyReadTool (host: Host) : obj =
                     failwithf "PTY session not found: %s" id
 
                 if pattern = "" then
-                    let result = mgr?read (id, offset', limit')
-
-                    if Dyn.isNullish result then
-                        failwithf "PTY session not found: %s" id
-
-                    let lines: string array = unbox (result?lines)
-                    let totalLines = unbox<int> result?totalLines
-                    let hasMore = unbox<bool> result?hasMore
-                    let resultOffset = unbox<int> result?offset
-
-                    let fields =
-                        [ "id", box id
-                          "status", box (string session?status)
-                          "offset", box resultOffset
-                          "returned", box lines.Length
-                          "total_lines", box totalLines
-                          "has_more", box hasMore ]
-
-                    let sb = ResizeArray<string>()
-
-                    for i in 0 .. lines.Length - 1 do
-                        sb.Add(lines.[i])
-
-                    sb.Add("")
-
-                    if hasMore then
-                        sb.Add(
-                            sprintf
-                                "(Buffer has more lines. Use offset=%d to read beyond line %d)"
-                                (resultOffset + lines.Length)
-                                (resultOffset + lines.Length)
-                        )
-                    else
-                        sb.Add(sprintf "(End of buffer - total %d lines)" totalLines)
-
-                    return frontMatterPrompt fields (String.concat "\n" sb)
+                    return! readUnfiltered mgr id session offset' limit'
                 else
                     let ignoreCaseBool =
                         if Dyn.isNullish (Dyn.get args "ignoreCase") then
@@ -139,58 +222,7 @@ let ptyReadTool (host: Host) : obj =
                         else
                             unbox<bool> args?ignoreCase
 
-                    let flags = if ignoreCaseBool then "i" else ""
-                    let regex = newRegex pattern flags
-                    let result = mgr?search (id, regex, offset', limit')
-
-                    if Dyn.isNullish result then
-                        failwithf "PTY session not found: %s" id
-
-                    let matches: obj array = unbox (result?matches)
-                    let totalLines = unbox<int> result?totalLines
-                    let totalMatches = unbox<int> result?totalMatches
-                    let hasMore = unbox<bool> result?hasMore
-
-                    let fields =
-                        [ "id", box id
-                          "status", box (string session?status)
-                          "pattern", box pattern
-                          "offset", box offset'
-                          "returned", box matches.Length
-                          "total_matches", box totalMatches
-                          "total_lines", box totalLines
-                          "has_more", box hasMore ]
-
-                    let sb = ResizeArray<string>()
-
-                    if matches.Length = 0 then
-                        sb.Add(sprintf "No lines matched the pattern '%s'." pattern)
-                        sb.Add(sprintf "Total lines in buffer: %d" totalLines)
-                    else
-                        for i in 0 .. matches.Length - 1 do
-                            let m = matches.[i]
-                            sb.Add(string m?text)
-
-                        sb.Add("")
-
-                        if hasMore then
-                            sb.Add(
-                                sprintf
-                                    "(%d of %d matches shown. Use offset=%d to see more.)"
-                                    matches.Length
-                                    totalMatches
-                                    (offset' + matches.Length)
-                            )
-                        else
-                            sb.Add(
-                                sprintf
-                                    "(%d match%s from %d total lines)"
-                                    totalMatches
-                                    (if totalMatches = 1 then "" else "es")
-                                    totalLines
-                            )
-
-                    return frontMatterPrompt fields (String.concat "\n" sb)
+                    return! readFiltered mgr id session pattern offset' limit' ignoreCaseBool
             })
 
 let ptyListTool (host: Host) : obj =
@@ -207,23 +239,6 @@ let ptyListTool (host: Host) : obj =
                 if sessions.Length = 0 then
                     return frontMatterPrompt [ "session_count", box 0 ] "No active PTY sessions."
                 else
-                    let sb = ResizeArray<string>()
-
-                    for s in sessions do
-                        sb.Add(sprintf "### %s" (string s?``id``))
-                        sb.Add(sprintf "title: %s" (string s?title))
-
-                        sb.Add(
-                            sprintf
-                                "command: %s %s"
-                                (string s?command)
-                                (String.concat " " (unbox<string array> s?args))
-                        )
-
-                        sb.Add(sprintf "status: %s" (string s?status))
-                        sb.Add(sprintf "pid: %d" (unbox<int> s?pid))
-                        sb.Add(sprintf "lines: %d" (unbox<int> s?lineCount))
-                        sb.Add("")
-
-                    return frontMatterPrompt [ "session_count", box sessions.Length ] (String.concat "\n" sb)
+                    let body = formatSessionList sessions
+                    return frontMatterPrompt [ "session_count", box sessions.Length ] body
             })

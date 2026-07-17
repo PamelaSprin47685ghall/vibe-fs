@@ -98,10 +98,55 @@ let private buildWebsearch
                               return textResult summary
               }) ]
 
-// ARCHITECTURE_EXEMPT: split this 65-line function later
 let private buildWebfetch (pi: obj) : obj =
     let tb = Dyn.get pi "typebox"
 
+    // ---- helpers extracted from the long execute block ----
+    let buildWebToolRequest (params': obj) : (string * obj) list =
+        let url = Dyn.str params' "url"
+        let body = ResizeArray<(string * obj)>()
+        body.Add("url", box url)
+
+        let em = optBool params' "extract_main"
+
+        if em.IsSome then
+            body.Add("extract_main", box em.Value)
+
+        let pl = optStr params' "prefer_llms_txt"
+
+        if pl.IsSome then
+            body.Add("prefer_llms_txt", box pl.Value)
+
+        let pr = optStr params' "prompt"
+
+        if pr.IsSome then
+            body.Add("prompt", box pr.Value)
+
+        let to_ = optInt params' "timeout"
+
+        if to_.IsSome then
+            body.Add("timeout", box to_.Value)
+
+        body |> Seq.toList
+
+    let handleWebToolResponse (result: Result<obj, DomainError>) =
+        match result with
+        | Error e -> asErrorResult (box (formatDomainError e))
+        | Ok data ->
+            let title = optStr data "title"
+            let byline = optStr data "byline"
+            let length_ = optInt data "length"
+            let content = optStr data "content"
+
+            textResult (
+                formatFetchResponse
+                    { title = title
+                      byline = byline
+                      length = length_
+                      content = content }
+            )
+
+    // ---- tool definition ----
     createObj
         [ "name", box "webfetch"
           "label", box "Web Fetch"
@@ -115,54 +160,14 @@ let private buildWebfetch (pi: obj) : obj =
                  ("timeout", opt Params.webfetchTimeout tb num) |]
               tb
           "execute",
-          box (fun (_id: string) (params': obj) (signal: obj) (_onUpdate: obj) (ctx: obj) ->
+          box (fun (_id: string) (params': obj) (signal: obj) (_onUpdate: obj) (_ctx: obj) ->
               promise {
-                  let url = Dyn.str params' "url"
-
-                  match validateFetchUrl url with
+                  match validateFetchUrl (Dyn.str params' "url") with
                   | Error msg -> return errorResult msg
                   | Ok() ->
-                      let body = ResizeArray<(string * obj)>()
-                      body.Add("url", box url)
-                      let em = optBool params' "extract_main"
-
-                      if em.IsSome then
-                          body.Add("extract_main", box em.Value)
-
-                      let pl = optStr params' "prefer_llms_txt"
-
-                      if pl.IsSome then
-                          body.Add("prefer_llms_txt", box pl.Value)
-
-                      let pr = optStr params' "prompt"
-
-                      if pr.IsSome then
-                          body.Add("prompt", box pr.Value)
-
-                      let to_ = optInt params' "timeout"
-
-                      if to_.IsSome then
-                          body.Add("timeout", box to_.Value)
-
                       let abort = if Dyn.isNullish signal then None else Some signal
-                      let! result = ollamaPost "web_fetch" (createObj (body |> Seq.toList)) abort
-
-                      match result with
-                      | Error e -> return asErrorResult (box (formatDomainError e))
-                      | Ok data ->
-                          let title = optStr data "title"
-                          let byline = optStr data "byline"
-                          let length_ = optInt data "length"
-                          let content = optStr data "content"
-
-                          return
-                              textResult (
-                                  formatFetchResponse
-                                      { title = title
-                                        byline = byline
-                                        length = length_
-                                        content = content }
-                              )
+                      let! result = ollamaPost "web_fetch" (createObj (buildWebToolRequest params')) abort
+                      return handleWebToolResponse result
               }) ]
 
 let registerWebTools

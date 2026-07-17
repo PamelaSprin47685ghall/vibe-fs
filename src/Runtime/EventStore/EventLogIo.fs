@@ -101,7 +101,48 @@ let fileExists (filePath: string) : JS.Promise<bool> =
             return false
     }
 
-// ARCHITECTURE_EXEMPT: split this 80-line function later
+let private ensureFileExists (filePath: string) : JS.Promise<unit> =
+    promise {
+        let! exists = fileExists filePath
+
+        if not exists then
+            try
+                do! writeFileFlagAsync filePath "" (createObj [ "flag", box "wx" ])
+            with _ ->
+                ()
+    }
+
+let private cleanupStaleLockFile (lockPath: string) : JS.Promise<unit> =
+    promise {
+        try
+            let! stats = statAsync lockPath
+            let isDir = unbox<bool> (stats?isDirectory ())
+
+            if not isDir then
+                do! unlinkAsync lockPath
+        with _ ->
+            ()
+    }
+
+let private acquireFileLock (filePath: string) : JS.Promise<unit -> JS.Promise<unit>> =
+    promise {
+        let mutable releaseVal = None
+        let mutable lockError = None
+
+        try
+            let! rel = lockfileLock filePath (lockfileOptions ())
+            releaseVal <- Some rel
+        with ex ->
+            lockError <- Some ex
+
+        match lockError with
+        | Some ex -> return raise ex
+        | _ -> ()
+
+        let release = releaseVal.Value
+        return release
+    }
+
 let withWorkspaceLock<'T> (filePath: string) (action: unit -> JS.Promise<'T>) : JS.Promise<'T> =
     let prev =
         match fileQueues.TryGetValue(filePath) with
@@ -110,7 +151,6 @@ let withWorkspaceLock<'T> (filePath: string) (action: unit -> JS.Promise<'T>) : 
 
     let mutable selfPromise = None
 
-    // ARCHITECTURE_EXEMPT: split this 64-line function later
     let next =
         promise {
             try
@@ -119,39 +159,12 @@ let withWorkspaceLock<'T> (filePath: string) (action: unit -> JS.Promise<'T>) : 
             with _ ->
                 ()
 
-            let! exists = fileExists filePath
-
-            if not exists then
-                try
-                    do! writeFileFlagAsync filePath "" (createObj [ "flag", box "wx" ])
-                with _ ->
-                    ()
-
             let lockPath = filePath + ".lock"
 
-            try
-                let! stats = statAsync lockPath
-                let isDir = unbox<bool> (stats?isDirectory ())
+            do! ensureFileExists filePath
+            do! cleanupStaleLockFile lockPath
 
-                if not isDir then
-                    do! unlinkAsync lockPath
-            with _ ->
-                ()
-
-            let mutable releaseVal = None
-            let mutable lockError = None
-
-            try
-                let! rel = lockfileLock filePath (lockfileOptions ())
-                releaseVal <- Some rel
-            with ex ->
-                lockError <- Some ex
-
-            match lockError with
-            | Some ex -> return raise ex
-            | _ -> ()
-
-            let release = releaseVal.Value
+            let! release = acquireFileLock filePath
 
             let mutable caught = None
             let mutable resOpt = None

@@ -7,6 +7,7 @@ open Wanxiangshu.Kernel.Nudge
 open Wanxiangshu.Kernel.Nudge.TodoStatus
 open Wanxiangshu.Runtime.Nudge.NudgeDerivation
 open Wanxiangshu.Kernel.Nudge.NudgeSnapshotSource
+open Wanxiangshu.Kernel.Nudge.NudgeProjection
 open Wanxiangshu.Kernel.Nudge.Types
 open Wanxiangshu.Kernel.HostTools
 open Wanxiangshu.Runtime.OpencodeHookInputCodec
@@ -73,7 +74,76 @@ let messageTexts (message: obj) : string list =
                 if output = "" then None else Some output
             | _ -> None)
 
-// ARCHITECTURE_EXEMPT: split this 87-line function later
+let getRootDirectory (workspaceDirectory: string) : string =
+    if workspaceDirectory <> "" then
+        workspaceDirectory
+    else
+        unbox<string> (nodeProcess?cwd ())
+
+let parseAssistantMessageInfo (assistantMsg: obj) : string option * string * string option =
+    let info = Dyn.get assistantMsg "info"
+    let agentVal = Dyn.str info "agent"
+    let agent = if agentVal = "" then None else Some agentVal
+    let time = Dyn.get info "time"
+    let completed = Dyn.str time "completed"
+    let tid = if completed <> "" then completed else Dyn.str info "id"
+    let modelVal = Dyn.get info "model"
+    let model =
+        if Dyn.isNullish modelVal then
+            None
+        else
+            let providerID = Dyn.str modelVal "providerID"
+            let modelID = Dyn.str modelVal "modelID"
+            let variant = Dyn.str modelVal "variant"
+            let suffix = if variant <> "" then ":" + variant else ""
+
+            if providerID = "" || modelID = "" then
+                None
+            else
+                Some(sprintf "%s/%s%s" providerID modelID suffix)
+    agent, tid, model
+
+let tryGetLastAssistantDetails
+    (getChatHistory: (string -> JS.Promise<obj array>) option)
+    (fallbackRuntime: FallbackRuntimeStore)
+    (workspaceId: string)
+    (lastMsgFromEvent: string)
+    : JS.Promise<string * string option * string * string option> =
+    promise {
+        match getChatHistory with
+        | None -> return lastMsgFromEvent, None, "", None
+        | Some getHistory ->
+            try
+                let! messages = getHistory workspaceId
+
+                let lastAssistantIdx =
+                    messages
+                    |> Array.tryFindIndexBack (fun m ->
+                        let role = Dyn.str m "role"
+                        role = "assistant" && not (isSyntheticAssistantAgent (Dyn.str m "agent")))
+
+                match lastAssistantIdx with
+                | None -> return lastMsgFromEvent, None, "", None
+                | Some idx ->
+                    let assistantMsg = messages.[idx]
+                    let text = messageTexts assistantMsg |> String.concat "\n"
+                    let agent, tid, model = parseAssistantMessageInfo assistantMsg
+                    let resolvedModel = resolveNudgeModel messages fallbackRuntime workspaceId model
+                    let finalText = if text = "" then lastMsgFromEvent else text
+                    return finalText, agent, tid, resolvedModel
+            with _ ->
+                return lastMsgFromEvent, None, "", None
+    }
+
+let private getBlockStatus (snapshot: NudgeSnapshotState) (currentAnchor: string) : NudgeBlockStatus =
+    let dedup: NudgeDedupState =
+        { PendingNudge = snapshot.pendingNudge
+          LastDispatchedAnchor = snapshot.lastDispatchedAnchor }
+    if NudgeProjection.isBlocked dedup currentAnchor then
+        NudgeBlockStatus.Blocked
+    else
+        NudgeBlockStatus.Allowed
+
 let collectSnapshotMux
     (fallbackRuntime: FallbackRuntimeStore)
     (getChatHistory: (string -> JS.Promise<obj array>) option)
@@ -86,60 +156,10 @@ let collectSnapshotMux
     promise {
         let! todos = tryGetTodos helpers workspaceId
 
-        let root =
-            if workspaceDirectory <> "" then
-                workspaceDirectory
-            else
-                unbox<string> (nodeProcess?cwd ())
+        let root = getRootDirectory workspaceDirectory
 
         let! lastAssistantText, agent, turnId, model =
-            match getChatHistory with
-            | None -> promise { return lastMsgFromEvent, None, "", None }
-            | Some getHistory ->
-                promise {
-                    try
-                        let! messages = getHistory workspaceId
-
-                        let lastAssistantIdx =
-                            messages
-                            |> Array.tryFindIndexBack (fun m ->
-                                let role = Dyn.str m "role"
-                                role = "assistant" && not (isSyntheticAssistantAgent (Dyn.str m "agent")))
-
-                        match lastAssistantIdx with
-                        | None -> return lastMsgFromEvent, None, "", None
-                        | Some idx ->
-                            let assistantMsg = messages.[idx]
-                            let text = messageTexts assistantMsg |> String.concat "\n"
-                            let info = Dyn.get assistantMsg "info"
-                            let agentVal = Dyn.str info "agent"
-                            let agent = if agentVal = "" then None else Some agentVal
-                            let time = Dyn.get info "time"
-                            let completed = Dyn.str time "completed"
-                            let tid = if completed <> "" then completed else Dyn.str info "id"
-                            let modelVal = Dyn.get info "model"
-
-                            let model =
-                                if Dyn.isNullish modelVal then
-                                    None
-                                else
-                                    let providerID = Dyn.str modelVal "providerID"
-                                    let modelID = Dyn.str modelVal "modelID"
-                                    let variant = Dyn.str modelVal "variant"
-                                    let suffix = if variant <> "" then ":" + variant else ""
-
-                                    if providerID = "" || modelID = "" then
-                                        None
-                                    else
-                                        Some(sprintf "%s/%s%s" providerID modelID suffix)
-
-                            let resolvedModel = resolveNudgeModel messages fallbackRuntime workspaceId model
-
-                            let finalText = if text = "" then lastMsgFromEvent else text
-                            return finalText, agent, tid, resolvedModel
-                    with _ ->
-                        return lastMsgFromEvent, None, "", None
-                }
+            tryGetLastAssistantDetails getChatHistory fallbackRuntime workspaceId lastMsgFromEvent
 
         do! appendAssistantCompletedOrFail root workspaceId lastAssistantText agent model turnId todos
 
@@ -148,16 +168,7 @@ let collectSnapshotMux
         let currentAnchor =
             Wanxiangshu.Kernel.Nudge.NudgeProjection.nudgeAnchorKey snapshot.turnId snapshot.lastAssistantText
 
-        let blockStatus =
-            if
-                Wanxiangshu.Kernel.Nudge.NudgeProjection.isBlocked
-                    { PendingNudge = snapshot.pendingNudge
-                      LastDispatchedAnchor = snapshot.lastDispatchedAnchor }
-                    currentAnchor
-            then
-                NudgeBlockStatus.Blocked
-            else
-                NudgeBlockStatus.Allowed
+        let blockStatus = getBlockStatus snapshot currentAnchor
 
         return Some(sessionSnapshotFromFold snapshot RunnerPresence.Absent blockStatus)
     }

@@ -159,82 +159,102 @@ let private captureTodoReportFromDecoded
 
         projection.CaptureBacklogEntry(host, o.ToolCallId, entry)
 
-// ARCHITECTURE_EXEMPT: split this 78-line function later
+let private isErrorResult (result: obj) : bool =
+    not (Dyn.isNullish result) && not (truthy (Dyn.get result "success"))
+
+let private buildTodoWriteOutput (result: obj) (methodologies: string list) : string =
+    if isErrorResult result then
+        let errOut = Dyn.str result "output"
+        if errOut = "" then Dyn.str result "error" else errOut
+    else
+        todoWriteOutput methodologies
+
+let private persistTodoWriteSideEffects
+    (host: Host)
+    (projection: ProjectionStore)
+    (tw: TodoWriteArgs)
+    (o: TodoToolOpts)
+    (opts: obj)
+    : JS.Promise<unit> =
+    captureTodoReportFromDecoded host projection tw o
+
+    let sid =
+        match fromMuxConfig opts with
+        | Ok runtime -> workspaceIdString runtime
+        | _ -> ""
+
+    if sid = "" then
+        Promise.lift ()
+    else
+        match fromMuxConfig opts with
+        | Ok runtime ->
+            let root = runtime.Execution.Directory
+
+            if root = "" then
+                Promise.lift ()
+            else
+                promise {
+                    do! appendWorkBacklogCommitted root sid tw |> Promise.map ignore
+
+                    let allCompleted =
+                        tw.Todos
+                        |> Array.forall (fun t ->
+                            match t.Status with
+                            | Wanxiangshu.Kernel.ToolArgs.TodoItemStatus.Completed
+                            | Wanxiangshu.Kernel.ToolArgs.TodoItemStatus.Cancelled -> true
+                            | _ -> false)
+
+                    let ev =
+                        { CurrentTurnEvidence.empty with
+                            Todos = if allCompleted then TodosCompleted else TodosNotCompleted }
+
+                    do! SubsessionEventRouter.routeEvidence root sid ev |> Promise.map ignore
+                }
+        | _ -> Promise.lift ()
+
+let private wrapTodoWriteResult (result: obj) (output: string) (isError: bool) : obj =
+    if Dyn.typeIs result "object" then
+        Dyn.withKey result "output" (box output)
+    else
+        createObj [ "success", box (not isError); "output", box output ]
+
+let private execRunTodoWrite
+    (tool: obj)
+    (args: obj)
+    (opts: obj)
+    (host: Host)
+    (projection: ProjectionStore)
+    : JS.Promise<obj> =
+    promise {
+        match decodeTodoWriteArgs false args, decodeTodoToolOpts opts with
+        | Error e, _
+        | _, Error e -> return createObj [ "success", box false; "output", box (wireDecodeFailure "todowrite" e) ]
+        | Ok(tw, violations), Ok o ->
+            let methodologies = tw.SelectMethodology
+            let nativeArgs = createObj [ "todos", todoArrayForNativeWrite tw ]
+            let raw = invokeToolExecute tool nativeArgs opts
+
+            let! result =
+                if isThenable raw then
+                    unbox<JS.Promise<obj>> raw
+                else
+                    Promise.lift raw
+
+            let output = buildTodoWriteOutput result methodologies
+            let isError = isErrorResult result
+
+            if not isError then
+                do! persistTodoWriteSideEffects host projection tw o opts
+
+            return wrapTodoWriteResult result output isError
+    }
+
 let private mkTodoWriteWrapper (host: Host) (projection: ProjectionStore) : obj =
-    // ARCHITECTURE_EXEMPT: split this 75-line function later
     let wrapperFn =
-        // ARCHITECTURE_EXEMPT: split this 74-line function later
         System.Func<obj, obj, obj>(fun (tool: obj) (_config: obj) ->
-            // ARCHITECTURE_EXEMPT: split this 68-line function later
             let execFn =
-                // ARCHITECTURE_EXEMPT: split this 67-line function later
                 System.Func<obj, obj, JS.Promise<obj>>(fun (args: obj) (opts: obj) ->
-                    promise {
-                        match decodeTodoWriteArgs false args, decodeTodoToolOpts opts with
-                        | Error e, _
-                        | _, Error e ->
-                            return createObj [ "success", box false; "output", box (wireDecodeFailure "todowrite" e) ]
-                        | Ok(tw, violations), Ok o ->
-                            let methodologies = tw.SelectMethodology
-                            let nativeArgs = createObj [ "todos", todoArrayForNativeWrite tw ]
-                            let raw = invokeToolExecute tool nativeArgs opts
-
-                            let! result =
-                                if isThenable raw then
-                                    unbox<JS.Promise<obj>> raw
-                                else
-                                    Promise.lift raw
-
-                            let isError = not (Dyn.isNullish result) && not (truthy (Dyn.get result "success"))
-
-                            let output =
-                                if isError then
-                                    let errOut = Dyn.str result "output"
-                                    if errOut = "" then Dyn.str result "error" else errOut
-                                else
-                                    todoWriteOutput methodologies
-
-                            let sid =
-                                match fromMuxConfig opts with
-                                | Ok runtime -> workspaceIdString runtime
-                                | _ -> ""
-
-                            let toolCallID = o.ToolCallId
-
-                            if not isError then
-                                captureTodoReportFromDecoded host projection tw o
-
-                                if sid <> "" then
-                                    match fromMuxConfig opts with
-                                    | Ok runtime ->
-                                        let root = runtime.Execution.Directory
-
-                                        if root <> "" then
-                                            do! appendWorkBacklogCommitted root sid tw |> Promise.map ignore
-
-                                            let allCompleted =
-                                                tw.Todos
-                                                |> Array.forall (fun t ->
-                                                    match t.Status with
-                                                    | Wanxiangshu.Kernel.ToolArgs.TodoItemStatus.Completed
-                                                    | Wanxiangshu.Kernel.ToolArgs.TodoItemStatus.Cancelled -> true
-                                                    | _ -> false)
-
-                                            let ev =
-                                                { CurrentTurnEvidence.empty with
-                                                    Todos = if allCompleted then TodosCompleted else TodosNotCompleted }
-
-                                            do! SubsessionEventRouter.routeEvidence root sid ev |> Promise.map ignore
-                                    | _ -> ()
-
-                            let nextResult =
-                                if Dyn.typeIs result "object" then
-                                    Dyn.withKey result "output" (box output)
-                                else
-                                    createObj [ "success", box (not isError); "output", box output ]
-
-                            return nextResult
-                    })
+                    execRunTodoWrite tool args opts host projection)
 
             createObj
                 [ "description", box (toolDescriptionFor host)

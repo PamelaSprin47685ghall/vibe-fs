@@ -1,20 +1,19 @@
 module Wanxiangshu.Runtime.Fallback.RuntimeStore
 
-/// Authoritative per-session fallback runtime: one aggregate map plus gate
-/// flags and change listeners. All state mutation flows through Update /
-/// UpdateSession; listeners fire via TriggerStateChanged.
+/// Authoritative per-session fallback runtime: one aggregate map plus change
+/// listeners. All state mutation flows through Update / UpdateSession; listeners
+/// fire via TriggerStateChanged. Gate flags live on the session record itself
+/// (FallbackSessionRuntime.ActiveGates) — there is no separate mutable map.
 
 open Fable.Core.JsInterop
 open Wanxiangshu.Kernel.FallbackKernel.Types
 open Wanxiangshu.Kernel.FallbackRuntimeFlags
 open Wanxiangshu.Kernel.FallbackRuntimeLifecycle
-open Wanxiangshu.Runtime.Fallback.GateState
 open Wanxiangshu.Runtime.Fallback.SessionRuntime
 
 type FallbackRuntimeStore() =
     let mutable sessionStates = Map.empty<string, FallbackSessionRuntime>
     let mutable listeners = Map.empty<string, ResizeArray<unit -> unit>>
-    let mutable activeGates = Map.empty<string, Set<FallbackSessionGateFlag>>
 
     let triggerStateChanged (sessionID: string) : unit =
         match Map.tryFind sessionID listeners with
@@ -34,10 +33,6 @@ type FallbackRuntimeStore() =
 
     let updateSession (sessionID: string) (f: FallbackSessionRuntime -> FallbackSessionRuntime) : unit =
         sessionStates <- Map.add sessionID (f (getSession sessionID)) sessionStates
-
-    member _.ActiveGates
-        with get () = activeGates
-        and set (v) = activeGates <- v
 
     member _.TriggerStateChanged(sessionID: string) : unit = triggerStateChanged sessionID
 
@@ -77,6 +72,5 @@ type FallbackRuntimeStore() =
 
     member _.CleanupSession(sessionID: string) : unit =
         sessionStates <- Map.remove sessionID sessionStates
-        activeGates <- removeSessionGates activeGates sessionID
         listeners <- Map.remove sessionID listeners // release registered callbacks
         triggerStateChanged sessionID

@@ -125,78 +125,69 @@ let private squadUpdateArgsSchema () : obj =
                     ) ]
           ) ]
 
-// ARCHITECTURE_EXEMPT: split this 74-line function later
+let private squadUpdateToolDef (rt: CoordinatorRuntime) : obj =
+    let args = squadUpdateArgsSchema ()
+
+    let executeDef =
+        createObj
+            [ "description", box "Submit task decomposition or status update for the current squad session."
+              "args", box args
+              "execute", box (System.Func<obj, obj, JS.Promise<string>>(fun a _ -> handleSquadUpdate rt a)) ]
+
+    createObj [ "squad_update", box executeDef ]
+
+let private configHook (cfg: obj) (rt: CoordinatorRuntime) : JS.Promise<obj> =
+    promise {
+        let commands = get cfg "command"
+
+        if not (isNullish commands) then
+            setKey
+                commands
+                "squad"
+                (box
+                    {| template = "/squad <requirement>"
+                       description = "Decompose requirement into parallel task DAG" |})
+
+            setKey
+                commands
+                "squad-kill"
+                (box
+                    {| template = "/squad-kill [session_id]"
+                       description = "Kill squad slave processes" |})
+
+            setKey
+                commands
+                "squad-status"
+                (box
+                    {| template = "/squad-status"
+                       description = "Show current squad DAG status" |})
+
+        return cfg
+    }
+
+let private handleChatMessage (rt: CoordinatorRuntime) (input: obj) (_output: obj) : JS.Promise<unit> =
+    promise {
+        if rt.MasterSessionId = "" then
+            let sid = str input "sessionID"
+
+            if sid <> "" then
+                rt.MasterSessionId <- sid
+                do! replayFromEventLog rt
+    }
+
+let private handleDispose (rt: CoordinatorRuntime) () : JS.Promise<unit> =
+    promise {
+        rt.Server.Close()
+        rt.PidPollHandle |> Option.iter rt.Deps.StopPolling
+    }
+
 let internal assembleCoordinatorHooks (rt: CoordinatorRuntime) : obj =
-    let squadUpdateToolDef () : obj =
-        let args = squadUpdateArgsSchema ()
-
-        let executeDef =
-            createObj
-                [ "description", box "Submit task decomposition or status update for the current squad session."
-                  "args", box args
-                  "execute", box (System.Func<obj, obj, JS.Promise<string>>(fun a _ -> handleSquadUpdate rt a)) ]
-
-        createObj [ "squad_update", box executeDef ]
-
     let result = createObj []
     setKey result "id" (box "wanxiangzhen")
     setKey result "name" (box "wanxiangzhen")
-    setKey result "tool" (squadUpdateToolDef ())
-
-    setKey
-        result
-        "config"
-        (box (fun (cfg: obj) ->
-            promise {
-                let commands = get cfg "command"
-
-                if not (isNullish commands) then
-                    setKey
-                        commands
-                        "squad"
-                        (box
-                            {| template = "/squad <requirement>"
-                               description = "Decompose requirement into parallel task DAG" |})
-
-                    setKey
-                        commands
-                        "squad-kill"
-                        (box
-                            {| template = "/squad-kill [session_id]"
-                               description = "Kill squad slave processes" |})
-
-                    setKey
-                        commands
-                        "squad-status"
-                        (box
-                            {| template = "/squad-status"
-                               description = "Show current squad DAG status" |})
-
-                return cfg
-            }))
-
+    setKey result "tool" (squadUpdateToolDef rt)
+    setKey result "config" (box (fun (cfg: obj) -> configHook cfg rt))
     setKey result "command.execute.before" (twoArgHook (handleCommandExecuteBefore rt))
-
-    setKey
-        result
-        "chat.message"
-        (twoArgHook (fun input _output ->
-            promise {
-                if rt.MasterSessionId = "" then
-                    let sid = str input "sessionID"
-
-                    if sid <> "" then
-                        rt.MasterSessionId <- sid
-                        do! replayFromEventLog rt
-            }))
-
-    setKey
-        result
-        "dispose"
-        (box (fun () ->
-            promise {
-                rt.Server.Close()
-                rt.PidPollHandle |> Option.iter rt.Deps.StopPolling
-            }))
-
+    setKey result "chat.message" (twoArgHook (handleChatMessage rt))
+    setKey result "dispose" (box (handleDispose rt))
     result

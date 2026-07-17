@@ -30,7 +30,73 @@ open Wanxiangshu.Runtime.RuntimeScope
 let private formatReviewResult =
     Wanxiangshu.Runtime.ReviewPrompts.formatReviewResult
 
-// ARCHITECTURE_EXEMPT: split this 68-line function later
+let private buildReviewToolRequest
+    (ctx: obj)
+    (args: obj)
+    (context: obj)
+    : Result<obj * IToolRuntimeContext * SubmitReviewArgs, string> =
+    match getClientFromPluginCtx ctx with
+    | Error e -> Error(wireEncodeToolError "OpencodeClient" e)
+    | Ok client ->
+        match decodeSubmitReviewArgs args with
+        | Error e -> Error(wireDecodeFailure "submit_review" e)
+        | Ok decoded ->
+            let runtime = fromOpencode context (pluginDirectoryFromCtx ctx)
+            Ok(client, runtime, decoded)
+
+let private processReviewToolResponse
+    (registry: ChildAgentRegistry)
+    (client: obj)
+    (store: Wanxiangshu.Runtime.ReviewRuntime.ReviewStore)
+    (scope: RuntimeScope)
+    (sessionID: string)
+    (runtime: IToolRuntimeContext)
+    (decoded: SubmitReviewArgs)
+    : JS.Promise<string> =
+    promise {
+        scope.TriggerInit(runtime.Execution.Directory)
+        do! scope.WaitInit()
+
+        if sessionID = "" then
+            return submitReviewNotNeeded
+        else
+            let activeTask = store.getReviewTask sessionID
+
+            match activeTask with
+            | None -> return submitReviewNotNeeded
+            | Some task when not (store.tryLockReview sessionID) -> return opencodeSubmitReviewInProgress
+            | Some task ->
+                let abort =
+                    match runtime.AbortSignal with
+                    | Some s -> s
+                    | None -> null
+
+                try
+                    if submitReviewIsWip decoded.Wip then
+                        do! appendSubmitReviewWipRecordedOrFail runtime.Execution.Directory sessionID
+                        return formatWipAcknowledgment task
+                    else
+                        let! result =
+                            runSubmitReview
+                                registry
+                                client
+                                store
+                                runtime.Execution.Directory
+                                sessionID
+                                decoded.Report
+                                decoded.AffectedFiles
+                                task
+                                abort
+
+                        let verdict, fb = verdictStringFromReviewResult result
+                        do! appendReviewVerdictOrFail runtime.Execution.Directory sessionID verdict fb
+                        do! syncReviewFromEventLogDedicated store runtime.Execution.Directory sessionID
+
+                        return formatReviewResult result
+                finally
+                    store.unlockReview sessionID
+    }
+
 let submitReviewTool
     (registry: ChildAgentRegistry)
     (ctx: obj)
@@ -44,61 +110,13 @@ let submitReviewTool
                affectedFiles = strArrayOpt Params.submitReviewAffectedFiles
                wip = boolOptional Params.submitReviewWip |})
         (fun args context ->
-            match decodeSubmitReviewArgs args with
-            | Error e -> Promise.lift (wireDecodeFailure "submit_review" e)
-            | Ok decoded ->
-                match getClientFromPluginCtx ctx with
-                | Error e -> Promise.lift (wireEncodeToolError "OpencodeClient" e)
-                | Ok client ->
-                    let runtime = fromOpencode context (pluginDirectoryFromCtx ctx)
+            match buildReviewToolRequest ctx args context with
+            | Error e -> Promise.lift e
+            | Ok(client, runtime, decoded) ->
+                let sessionID =
+                    Wanxiangshu.Kernel.Primitives.Identity.Id.sessionIdValue runtime.Execution.SessionId
 
-                    let sessionID =
-                        Wanxiangshu.Kernel.Primitives.Identity.Id.sessionIdValue runtime.Execution.SessionId
-
-                    promise {
-                        scope.TriggerInit(runtime.Execution.Directory)
-                        do! scope.WaitInit()
-
-                        if sessionID = "" then
-                            return submitReviewNotNeeded
-                        else
-                            let activeTask = store.getReviewTask sessionID
-
-                            match activeTask with
-                            | None -> return submitReviewNotNeeded
-                            | Some task when not (store.tryLockReview sessionID) ->
-                                return opencodeSubmitReviewInProgress
-                            | Some task ->
-                                let abort =
-                                    match runtime.AbortSignal with
-                                    | Some s -> s
-                                    | None -> null
-
-                                try
-                                    if submitReviewIsWip decoded.Wip then
-                                        do! appendSubmitReviewWipRecordedOrFail runtime.Execution.Directory sessionID
-                                        return formatWipAcknowledgment task
-                                    else
-                                        let! result =
-                                            runSubmitReview
-                                                registry
-                                                client
-                                                store
-                                                runtime.Execution.Directory
-                                                sessionID
-                                                decoded.Report
-                                                decoded.AffectedFiles
-                                                task
-                                                abort
-
-                                        let verdict, fb = verdictStringFromReviewResult result
-                                        do! appendReviewVerdictOrFail runtime.Execution.Directory sessionID verdict fb
-                                        do! syncReviewFromEventLogDedicated store runtime.Execution.Directory sessionID
-
-                                        return formatReviewResult result
-                                finally
-                                    store.unlockReview sessionID
-                    })
+                processReviewToolResponse registry client store scope sessionID runtime decoded)
 
 let submitReviewResultTool
     (ctx: obj)

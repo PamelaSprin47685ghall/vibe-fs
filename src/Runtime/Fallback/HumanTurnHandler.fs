@@ -3,20 +3,18 @@ module Wanxiangshu.Runtime.Fallback.HumanTurnHandler
 open Fable.Core
 open Wanxiangshu.Kernel.FallbackKernel.Types
 open Wanxiangshu.Kernel.FallbackKernel.StateMachine
-open Wanxiangshu.Runtime.Fallback.RuntimeStore
 open Wanxiangshu.Runtime.Fallback.SessionRuntime
+open Wanxiangshu.Runtime.Fallback.RuntimeStore
 open Wanxiangshu.Runtime.Fallback.LeaseTransitions
 open Wanxiangshu.Runtime.Fallback.SessionPropertyTransitions
 open Wanxiangshu.Runtime.Fallback.HumanTurnTransitions
-open Wanxiangshu.Runtime.Fallback.OrdinalTransitions
+open Wanxiangshu.Runtime.Fallback.NudgeHandler
+open Wanxiangshu.Runtime.Fallback.CompactionHandler
 open Wanxiangshu.Runtime.Fallback.CompactionTransitions
-open Wanxiangshu.Runtime.Fallback.ModelInjection
+open Wanxiangshu.Runtime.Fallback.FallbackMessageCodec
 open Wanxiangshu.Runtime.Fallback.Ports
 open Wanxiangshu.Runtime.Fallback.ContinuationExecution
 open Wanxiangshu.Runtime.Fallback.LeaseValidation
-open Wanxiangshu.Runtime.Fallback.NudgeHandler
-open Wanxiangshu.Runtime.Fallback.CompactionHandler
-open Wanxiangshu.Runtime.Fallback.FallbackMessageCodec
 open Wanxiangshu.Runtime.SessionEventWriter
 open Wanxiangshu.Runtime.Clock
 
@@ -32,15 +30,13 @@ let initializeNewTurn
         do! cancelPendingMainLease runtime workspaceRoot sessionID "New user message"
         do! cancelPendingNudge runtime workspaceRoot sessionID "New user message"
 
-        runtime.SetChain sessionID []
-        runtime.ClearModel sessionID
-        runtime.ClearInjected sessionID
-        runtime.SetSessionOwner sessionID SessionOwner.Human
-        runtime.SetLastHumanMessageId sessionID msgId
-        runtime.RemoveForceStopped sessionID
-        let turnId = runtime.IncrementHumanTurnId sessionID
-        runtime.SetActiveContinuationGeneration sessionID (runtime.GetSessionGeneration sessionID)
-        runtime.SetActiveContinuationCancelGeneration sessionID (runtime.GetCancelGeneration sessionID)
+        // Atomically reset per-turn state, set owner, clear lease gates,
+        // and increment turn ordinal + generate new turn ID.
+        runtime.Update(sessionID, beginHumanTurn msgId)
+
+        let s = runtime.GetSession sessionID
+        let turnId = s.HumanTurnId
+        let humanTurnOrdinal = s.HumanTurnOrdinal
 
         let modelOpt, agentOpt = translator.ExtractRoutingContext rawEvent
         modelOpt |> Option.iter (runtime.SetLatestHumanModel sessionID)
@@ -59,7 +55,6 @@ let initializeNewTurn
                 | None -> "", m, ""
 
         let agent = agentOpt |> Option.defaultValue ""
-        let humanTurnOrdinal = runtime.GetHumanTurnOrdinal sessionID
 
         do!
             appendHumanTurnStartedOrFail

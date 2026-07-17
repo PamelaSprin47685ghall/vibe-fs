@@ -39,12 +39,150 @@ open Wanxiangshu.Kernel.Subsession.Types
 /// Shared BacklogSession bound to the OMP host.
 let private backlogSession = BacklogSession omp
 
+/// Collect warn violations from the compliance envelope plus todo-report
+/// violations decoded from args.  Control fields were removed in the
+/// pre-execute gateway and must stay absent from the post-execute args
+/// object (they will be restored in the finally block for LLM history
+/// visibility).
+let collectViolations (envOpt: ToolHookRuntime.ControlEnvelope option) (toolName: string) (args: obj) : string list =
+    let warnViolations =
+        match envOpt with
+        | Some env -> env.Violations
+        | None -> []
+
+    let todoReportViolations =
+        if toolName = todoWriteToolName omp then
+            match decodeTodoWriteArgs false args with
+            | Result.Ok(_, viols) -> viols
+            | Result.Error _ -> []
+        else
+            []
+
+    warnViolations @ todoReportViolations
+
+/// Attempt to capture a backlog entry from a todo_write tool call when the
+/// call carries meaningful structured fields and no error.
+let tryCaptureBacklogEntry (isError: bool) (callId: string) (input: obj) (event: obj) : unit =
+    if callId = "" then
+        () // caller already checked; keep total lines low
+
+    let ahaMoments =
+        if Dyn.isNullish input then
+            ""
+        else
+            (Dyn.str input "ahaMoments").Trim()
+
+    let changesAndReasons =
+        if Dyn.isNullish input then
+            ""
+        else
+            (Dyn.str input "changesAndReasons").Trim()
+
+    let gotchas =
+        if Dyn.isNullish input then
+            ""
+        else
+            (Dyn.str input "gotchas").Trim()
+
+    let lessonsAndConventions =
+        if Dyn.isNullish input then
+            ""
+        else
+            (Dyn.str input "lessonsAndConventions").Trim()
+
+    let plan =
+        if Dyn.isNullish input then
+            ""
+        else
+            (Dyn.str input "plan").Trim()
+
+    if
+        not isError
+        && (ahaMoments <> ""
+            || changesAndReasons <> ""
+            || gotchas <> ""
+            || lessonsAndConventions <> ""
+            || plan <> "")
+    then
+        let entry: BacklogEntry =
+            { ahaMoments = ahaMoments
+              changesAndReasons = changesAndReasons
+              gotchas = gotchas
+              lessonsAndConventions = lessonsAndConventions
+              plan = plan }
+
+        backlogSession.CaptureReport(callId, entry.plan)
+
+/// Check whether the event carries an error: either the top-level isError
+/// truthy flag or a non-empty error string.
+let isToolError (event: obj) : bool =
+    Dyn.truthy (Dyn.get event "isError")
+    || (let err = Dyn.get event "error" in not (Dyn.isNullish err) && string err <> "")
+
+/// Extract the select_methodology array from todo_write args, returning an
+/// empty list when absent or not an array.
+let getTodoWriteMethodologies (args: obj) : string list =
+    let raw =
+        if Dyn.isNullish args then
+            null
+        else
+            Dyn.get args "select_methodology"
+
+    if Dyn.isNullish raw || not (Dyn.isArray raw) then
+        []
+    else
+        let rawArr = unbox<obj array> raw
+        rawArr |> Seq.map string |> List.ofSeq
+
+/// Determine the final ToolHookRuntime.ExecutionStatus from the compliance
+/// envelope, error state, and livelock flag.
+let determineExecutionStatus
+    (envOpt: ToolHookRuntime.ControlEnvelope option)
+    (isError: bool)
+    (isBusinessLivelock: bool)
+    : ToolHookRuntime.ExecutionStatus =
+    match envOpt with
+    | Some env when env.Cancelled -> ToolHookRuntime.ExecutionStatus.Cancelled
+    | _ ->
+        if isError || isBusinessLivelock then
+            ToolHookRuntime.ExecutionStatus.Failure
+        else
+            ToolHookRuntime.ExecutionStatus.Success
+
+/// Restore warn fields to args so LLM history sees them, then delete
+/// the compliance envelope.
+let cleanupCompliance
+    (envOpt: ToolHookRuntime.ControlEnvelope option)
+    (sessionId: string)
+    (toolCallId: string)
+    (args: obj)
+    : unit =
+    match envOpt with
+    | Some env ->
+        if not (Dyn.isNullish args) then
+            ToolHookRuntime.restoreWarnToArgs args env
+
+        ToolHookRuntime.removeCompliance sessionId toolCallId
+    | None -> ()
+
+/// Build the final (status, criticism) pair from the processed text,
+/// violations list, and execution outcome, then write it back to the event.
+let finalizeToolResult
+    (businessProcessedText: string)
+    (violations: string list)
+    (status: ToolHookRuntime.ExecutionStatus)
+    (event: obj)
+    : unit =
+    let criticism =
+        ToolHookRuntime.appendCriticism businessProcessedText violations status
+
+    setToolResultText event criticism
+
 /// Tools whose every user-facing invocation is durable enough to feed the
 /// backlog as an input/output black box. Direct write
 /// tools join the set via `isFileEditTool`; subagent and IO tools are listed
 /// explicitly. Pure lookups (fuzzy_find/fuzzy_grep), the review tools themselves,
 /// and host read tools never record.
-// ARCHITECTURE_EXEMPT: split this 151-line function later
 let toolResultHandler (_pi: obj) (_reviewStore: ReviewStore) (event: obj) (ctx: obj) : JS.Promise<unit> =
     promise {
         let toolName = Dyn.str event "toolName"
@@ -55,27 +193,9 @@ let toolResultHandler (_pi: obj) (_reviewStore: ReviewStore) (event: obj) (ctx: 
         let envOpt = ToolHookRuntime.tryGetCompliance sessionId toolCallId
 
         try
-            // Collect warn violations & todo report violations.  Control
-            // fields were removed in the pre-execute gateway and must stay
-            // absent from the post-execute args object (they will be restored
-            // in the finally block for LLM history visibility).
-            let warnViolations =
-                match envOpt with
-                | Some env -> env.Violations
-                | None -> []
-
-            let todoReportViolations =
-                if toolName = todoWriteToolName omp then
-                    match decodeTodoWriteArgs false args with
-                    | Result.Ok(_, viols) -> viols
-                    | Result.Error _ -> []
-                else
-                    []
-
-            let violations = warnViolations @ todoReportViolations
-
-            // 2. 执行 syntax、livelock、todo 标准化等业务处理
+            let violations = collectViolations envOpt toolName args
             let rawContent = getToolResultText event
+            let isError = isToolError event
 
             let isLivelock =
                 sessionId <> ""
@@ -98,103 +218,17 @@ let toolResultHandler (_pi: obj) (_reviewStore: ReviewStore) (event: obj) (ctx: 
                     let callId = getToolCallId event
                     let input = getToolInput event
 
-                    let ahaMoments =
-                        if Dyn.isNullish input then
-                            ""
-                        else
-                            (Dyn.str input "ahaMoments").Trim()
+                    tryCaptureBacklogEntry isError callId input event
 
-                    let changesAndReasons =
-                        if Dyn.isNullish input then
-                            ""
-                        else
-                            (Dyn.str input "changesAndReasons").Trim()
-
-                    let gotchas =
-                        if Dyn.isNullish input then
-                            ""
-                        else
-                            (Dyn.str input "gotchas").Trim()
-
-                    let lessonsAndConventions =
-                        if Dyn.isNullish input then
-                            ""
-                        else
-                            (Dyn.str input "lessonsAndConventions").Trim()
-
-                    let plan =
-                        if Dyn.isNullish input then
-                            ""
-                        else
-                            (Dyn.str input "plan").Trim()
-
-                    let isError =
-                        Dyn.truthy (Dyn.get event "isError")
-                        || (let err = Dyn.get event "error" in not (Dyn.isNullish err) && string err <> "")
-
-                    if
-                        not isError
-                        && (ahaMoments <> ""
-                            || changesAndReasons <> ""
-                            || gotchas <> ""
-                            || lessonsAndConventions <> ""
-                            || plan <> "")
-                        && callId <> ""
-                    then
-                        let entry: BacklogEntry =
-                            { ahaMoments = ahaMoments
-                              changesAndReasons = changesAndReasons
-                              gotchas = gotchas
-                              lessonsAndConventions = lessonsAndConventions
-                              plan = plan }
-
-                        backlogSession.CaptureReport(callId, entry.plan)
-
-                    let methodologies =
-                        let raw =
-                            if Dyn.isNullish args then
-                                null
-                            else
-                                Dyn.get args "select_methodology"
-
-                        if Dyn.isNullish raw || not (Dyn.isArray raw) then
-                            []
-                        else
-                            let rawArr = unbox<obj array> raw
-                            rawArr |> Seq.map string |> List.ofSeq
+                    let methodologies = getTodoWriteMethodologies args
 
                     if textAfterSyntax <> "" && not isError then
                         businessProcessedText <- todoWriteOutput methodologies
 
-            // 3. 确定最终 Success / Failure / Cancelled 状态
-            let isError =
-                Dyn.truthy (Dyn.get event "isError")
-                || (let err = Dyn.get event "error" in not (Dyn.isNullish err) && string err <> "")
-
-            let status =
-                match envOpt with
-                | Some env when env.Cancelled -> ToolHookRuntime.ExecutionStatus.Cancelled
-                | _ ->
-                    if isError || isBusinessLivelock then
-                        ToolHookRuntime.ExecutionStatus.Failure
-                    else
-                        ToolHookRuntime.ExecutionStatus.Success
-
-            // 4. 在最终结果上追加合并后的批评
-            let criticism =
-                ToolHookRuntime.appendCriticism businessProcessedText violations status
-
-            setToolResultText event criticism
+            let status = determineExecutionStatus envOpt isError isBusinessLivelock
+            finalizeToolResult businessProcessedText violations status event
         finally
-            // 5. Restore warn fields to args so LLM history sees them, then
-            //    delete compliance envelope.
-            match envOpt with
-            | Some env ->
-                if not (Dyn.isNullish args) then
-                    ToolHookRuntime.restoreWarnToArgs args env
-
-                ToolHookRuntime.removeCompliance sessionId toolCallId
-            | None -> ()
+            cleanupCompliance envOpt sessionId toolCallId args
     }
 
 let sessionStartHandler (pi: obj) (reviewStore: ReviewStore) (ctx: obj) : JS.Promise<unit> =

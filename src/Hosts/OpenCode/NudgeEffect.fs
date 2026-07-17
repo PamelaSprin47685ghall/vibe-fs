@@ -45,7 +45,89 @@ let private invokeClient (client: obj) (method_: string) (arg: obj) : JS.Promise
             else
                 unbox<JS.Promise<obj>> (Dyn.callMethod1 session method_ arg)
 
-// ARCHITECTURE_EXEMPT: split this 133-line function later
+let private parseModelVal (modelVal: obj) : string option =
+    if Dyn.isNullish modelVal then
+        None
+    elif Dyn.typeIs modelVal "string" then
+        let s = string modelVal
+        if s = "" then None else Some s
+    else
+        let providerID = Dyn.str modelVal "providerID"
+        let modelID = Dyn.str modelVal "modelID"
+        let variant = Dyn.str modelVal "variant"
+        let suffix = if variant <> "" then ":" + variant else ""
+
+        if providerID = "" || modelID = "" then
+            let idVal = Dyn.str modelVal "id"
+            if idVal <> "" then Some(idVal + suffix) else None
+        else
+            Some(sprintf "%s/%s%s" providerID modelID suffix)
+
+let private getTurnId (info: obj) (idx: int) : string =
+    let time = Dyn.get info "time"
+    let completed = Dyn.str time "completed"
+
+    if completed <> "" then
+        completed
+    else
+        let msgId = Dyn.str info "id"
+
+        if msgId <> "" then
+            msgId
+        else
+            sprintf "nudge-fallback-anchor-%d" idx
+
+let private buildSnapshotResult (snap: Wanxiangshu.Kernel.Nudge.NudgeProjection.NudgeSnapshotState) : SessionSnapshot =
+    let anchor =
+        Wanxiangshu.Kernel.Nudge.NudgeProjection.nudgeAnchorKey snap.turnId snap.lastAssistantText
+
+    let blockStatus =
+        if
+            Wanxiangshu.Kernel.Nudge.NudgeProjection.isBlocked
+                { PendingNudge = snap.pendingNudge
+                  LastDispatchedAnchor = snap.lastDispatchedAnchor }
+                anchor
+        then
+            NudgeBlockStatus.Blocked
+        else
+            NudgeBlockStatus.Allowed
+
+    sessionSnapshotFromFold snap RunnerPresence.Absent blockStatus
+
+let private assembleMessageInfo
+    (messagesArr: obj array)
+    (idx: int)
+    (fallbackRuntime: FallbackRuntimeStore)
+    (sessionIDStr: string)
+    (pluginCtx: obj)
+    (openTodos: string list)
+    (isForceStopped: string -> bool)
+    : JS.Promise<SessionSnapshot option> =
+    let msg = messagesArr.[idx]
+    let info = Dyn.get msg "info"
+    let agentVal = Dyn.get info "agent"
+
+    let agent =
+        if Dyn.isNullish agentVal then
+            None
+        else
+            Some(string agentVal)
+
+    let text = getPartsText (Dyn.get msg "parts")
+    let modelVal = Dyn.get info "model"
+    let model = parseModelVal modelVal
+    let resolvedModel = resolveNudgeModel messagesArr fallbackRuntime sessionIDStr model
+    let directory = pluginDirectoryFromCtx pluginCtx
+
+    // side-effect: persists completed-assistant turn into the event log
+    appendAssistantCompletedOrFail directory sessionIDStr text agent resolvedModel (getTurnId info idx) openTodos
+    |> Promise.bind (fun () -> getNudgeSnapshotFromEventLog directory sessionIDStr)
+    |> Promise.map (fun snap ->
+        if isForceStopped sessionIDStr then
+            None
+        else
+            Some(buildSnapshotResult snap))
+
 let private collectSnapshot
     (fallbackRuntime: FallbackRuntimeStore)
     (client: obj)
@@ -89,93 +171,19 @@ let private collectSnapshot
 
                             match lastAssistantIdx with
                             | None -> return None
+                            | Some idx when isForceStopped sessionIDStr -> return None
                             | Some idx ->
-                                let msg = messagesArr.[idx]
-                                let info = Dyn.get msg "info"
-                                let agentVal = Dyn.get info "agent"
-
-                                let agent =
-                                    if Dyn.isNullish agentVal then
-                                        None
-                                    else
-                                        Some(string agentVal)
-
-                                let text = getPartsText (Dyn.get msg "parts")
-                                let time = Dyn.get info "time"
-                                let completed = Dyn.str time "completed"
-
-                                let tid =
-                                    if completed <> "" then
-                                        completed
-                                    else
-                                        let msgId = Dyn.str info "id"
-
-                                        if msgId <> "" then
-                                            msgId
-                                        else
-                                            sprintf "nudge-fallback-anchor-%d" idx
-
-                                let modelVal = Dyn.get info "model"
-
-                                let model =
-                                    if Dyn.isNullish modelVal then
-                                        None
-                                    elif Dyn.typeIs modelVal "string" then
-                                        let s = string modelVal
-                                        if s = "" then None else Some s
-                                    else
-                                        let providerID = Dyn.str modelVal "providerID"
-                                        let modelID = Dyn.str modelVal "modelID"
-                                        let variant = Dyn.str modelVal "variant"
-                                        let suffix = if variant <> "" then ":" + variant else ""
-
-                                        if providerID = "" || modelID = "" then
-                                            let idVal = Dyn.str modelVal "id"
-                                            if idVal <> "" then Some(idVal + suffix) else None
-                                        else
-                                            Some(sprintf "%s/%s%s" providerID modelID suffix)
-
-                                let resolvedModel = resolveNudgeModel messagesArr fallbackRuntime sessionIDStr model
-
-                                let lastAssistantText = text
-                                let turnId = tid
-                                let agentFromMessage = agent
-                                let modelFromMessage = resolvedModel
-
-                                let directory = pluginDirectoryFromCtx pluginCtx
-
-                                do!
-                                    appendAssistantCompletedOrFail
-                                        directory
+                                let! result =
+                                    assembleMessageInfo
+                                        messagesArr
+                                        idx
+                                        fallbackRuntime
                                         sessionIDStr
-                                        lastAssistantText
-                                        agentFromMessage
-                                        modelFromMessage
-                                        turnId
+                                        pluginCtx
                                         openTodos
+                                        isForceStopped
 
-                                let! snap = getNudgeSnapshotFromEventLog directory sessionIDStr
-
-                                if isForceStopped sessionIDStr then
-                                    return None
-                                else
-                                    let anchor =
-                                        Wanxiangshu.Kernel.Nudge.NudgeProjection.nudgeAnchorKey
-                                            snap.turnId
-                                            snap.lastAssistantText
-
-                                    let blockStatus =
-                                        if
-                                            Wanxiangshu.Kernel.Nudge.NudgeProjection.isBlocked
-                                                { PendingNudge = snap.pendingNudge
-                                                  LastDispatchedAnchor = snap.lastDispatchedAnchor }
-                                                anchor
-                                        then
-                                            NudgeBlockStatus.Blocked
-                                        else
-                                            NudgeBlockStatus.Allowed
-
-                                    return Some(sessionSnapshotFromFold snap RunnerPresence.Absent blockStatus)
+                                return result
         with _ ->
             return None
     }

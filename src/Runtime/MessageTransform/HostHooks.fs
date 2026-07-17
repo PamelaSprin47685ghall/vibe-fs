@@ -16,7 +16,38 @@ open Wanxiangshu.Runtime.WorkspaceFiles
 [<Import("relative", "node:path")>]
 let private pathRelative (a: string) (b: string) : string = jsNative
 
-// ARCHITECTURE_EXEMPT: split this 65-line function later
+let extractObjectives (plan: MessageTransformPlan) : string list =
+    plan.Cleaned
+    |> List.collect (fun m ->
+        m.parts
+        |> List.choose (fun p ->
+            match p with
+            | TextPart text when not (System.String.IsNullOrWhiteSpace text) ->
+                let scalars = Wanxiangshu.Runtime.PromptFrontMatter.parseFrontMatterScalars text
+
+                match Map.tryFind "objective" scalars with
+                | Some objVal when not (System.String.IsNullOrWhiteSpace objVal) -> Some(objVal.Trim())
+                | _ -> Some(text.Trim())
+            | _ -> None))
+
+let buildCapsFileFromResult (baseDir: string) (r) : CapsFile option =
+    match r.content with
+    | Some content ->
+        Some
+            { filePath = r.filePath
+              label = pathRelative baseDir r.filePath
+              content = content }
+    | _ -> None
+
+let deduplicateCapsFiles (files: CapsFile list) : CapsFile list =
+    let folder (seen: Set<string>, acc: CapsFile list) (file: CapsFile) =
+        if seen.Contains file.filePath then
+            (seen, acc)
+        else
+            (seen.Add file.filePath, file :: acc)
+
+    files |> List.fold folder (Set.empty, []) |> snd |> List.rev
+
 let injectSubagentFilesIfAny
     (scope: RuntimeScope)
     (plan: MessageTransformPlan)
@@ -31,19 +62,7 @@ let injectSubagentFilesIfAny
         if isExcluded || not plan.IsSubagentSession then
             return baseFiles
         else
-            let objectivesAndTexts =
-                plan.Cleaned
-                |> List.collect (fun m ->
-                    m.parts
-                    |> List.choose (fun p ->
-                        match p with
-                        | TextPart text when not (System.String.IsNullOrWhiteSpace text) ->
-                            let scalars = Wanxiangshu.Runtime.PromptFrontMatter.parseFrontMatterScalars text
-
-                            match Map.tryFind "objective" scalars with
-                            | Some objVal when not (System.String.IsNullOrWhiteSpace objVal) -> Some(objVal.Trim())
-                            | _ -> Some(text.Trim())
-                        | _ -> None))
+            let objectivesAndTexts = extractObjectives plan
 
             let tempFiles =
                 objectivesAndTexts
@@ -58,27 +77,11 @@ let injectSubagentFilesIfAny
             else
                 let! results = readReverieFiles plan.Directory tempFiles
 
-                let loaded =
-                    results
-                    |> List.choose (fun r ->
-                        match r.content with
-                        | Some content ->
-                            Some
-                                { filePath = r.filePath
-                                  label = pathRelative plan.Directory r.filePath
-                                  content = content }
-                        | _ -> None)
+                let loaded = results |> List.choose (buildCapsFileFromResult plan.Directory)
 
                 let merged = baseFiles @ loaded
 
-                let deduped =
-                    let folder (seen: Set<string>, acc: CapsFile list) (file: CapsFile) =
-                        if seen.Contains file.filePath then
-                            (seen, acc)
-                        else
-                            (seen.Add file.filePath, file :: acc)
-
-                    merged |> List.fold folder (Set.empty, []) |> snd |> List.rev
+                let deduped = deduplicateCapsFiles merged
 
                 return deduped
     }

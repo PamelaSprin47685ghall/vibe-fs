@@ -41,7 +41,92 @@ let private resolveAgent (ctx: obj) : string =
         let name = Dyn.str sm "agentName"
         if name <> "" then name else "manager"
 
-// ARCHITECTURE_EXEMPT: split this 128-line function later
+let private resolveMaxInputTokens (sessionId: string) (cwd: string) (ctx: obj) : JS.Promise<int> =
+    match maxInputTokensCache.TryGetValue(sessionId) with
+    | true, limit -> Promise.lift limit
+    | _ ->
+        promise {
+            let! limit = Wanxiangshu.Runtime.ContextBudgetUsageCodec.resolveMaxInputTokens [ ctx ] sessionId cwd
+
+            maxInputTokensCache.[sessionId] <- limit
+            return limit
+        }
+
+let private createMessageTransformPlan
+    (sessionId: string)
+    (agent: string)
+    (cwd: string)
+    (backlogPolicy: Wanxiangshu.Kernel.MessageTransformPolicy.BacklogProjectionPolicy)
+    (capsPolicy: Wanxiangshu.Kernel.MessageTransformPolicy.CapsInjectionPolicy)
+    (parallelHintPolicy: Wanxiangshu.Kernel.MessageTransformPolicy.ParallelHintPolicy)
+    (contextBudgetPolicy: Wanxiangshu.Kernel.MessageTransformPolicy.ContextBudgetPolicy)
+    (isChild: bool)
+    (messagesList: Message<obj> list)
+    (entriesArr: obj array)
+    (maxInputTokens: int)
+    (getContextUsage: obj array -> JS.Promise<int option>)
+    : MessageTransformPlan =
+    { SessionID = sessionId
+      Agent = agent
+      Directory = cwd
+      ProjectionPolicy =
+        (if backlogPolicy = Wanxiangshu.Kernel.MessageTransformPolicy.BacklogProjectionPolicy.Include then
+             ProjectionPolicy.IncludeProjection
+         else
+             ProjectionPolicy.ExcludeProjection)
+      BacklogProjectionPolicy = backlogPolicy
+      CapsInjectionPolicy = capsPolicy
+      ParallelHintPolicy = parallelHintPolicy
+      ContextBudgetPolicy = contextBudgetPolicy
+      IsSubagentSession = isChild
+      Cleaned = messagesList
+      RawArray = Some entriesArr
+      SembleInjectEnabled = false
+      Scope = ExecutorTools.ompScope
+      MaxInputTokens = maxInputTokens
+      GetContextUsage = getContextUsage }
+
+let private buildLoadCapsFn (plan: MessageTransformPlan) (cwd: string) : unit -> JS.Promise<CapsFile list> =
+    fun () ->
+        promise {
+            let isExcluded =
+                match plan.CapsInjectionPolicy with
+                | Wanxiangshu.Kernel.MessageTransformPolicy.CapsInjectionPolicy.Exclude -> true
+                | Wanxiangshu.Kernel.MessageTransformPolicy.CapsInjectionPolicy.Include -> false
+
+            if isExcluded || cwd = "" then
+                return ([]: CapsFile list)
+            else
+                let! ompFiles = findOmpCapsFiles cwd
+
+                let baseFiles =
+                    ompFiles
+                    |> List.map (fun f ->
+                        ({ filePath = f.filePath
+                           label = f.label
+                           content = f.content }
+                        : CapsFile))
+
+                let! injected =
+                    Wanxiangshu.Runtime.MessageTransform.HostHooks.injectSubagentFilesIfAny
+                        ExecutorTools.ompScope
+                        plan
+                        baseFiles
+
+                return injected |> List.sortBy (fun cf -> cf.label, cf.filePath)
+        }
+
+let private buildCapsFn (plan: MessageTransformPlan) (sessionId: string) (cwd: string) =
+    fun encoded (capsFiles: CapsFile list) prelude ->
+        let ompCaps =
+            capsFiles
+            |> List.map (fun f ->
+                { filePath = f.filePath
+                  label = f.label
+                  content = f.content })
+
+        buildCapsEntries sha256HexTruncated sessionId encoded cwd ompCaps prelude
+
 let transformEntriesAsyncWithAgent
     (reviewStore: ReviewStore)
     (cwd: string)
@@ -61,7 +146,6 @@ let transformEntriesAsyncWithAgent
                 return entriesArr
             else
                 let messagesList = decodeEntries sessionId entriesArr
-
                 let isChild = isChildSession ExecutorTools.ompScope sessionId
 
                 let backlogPolicy =
@@ -82,82 +166,28 @@ let transformEntriesAsyncWithAgent
                     backlogSessionOpsFrom defaultBacklogSession.Host (fun sid msgs ->
                         defaultBacklogSession.GetOrRebuildBacklog(sid, msgs))
 
-                let! maxInputTokens =
-                    match maxInputTokensCache.TryGetValue(sessionId) with
-                    | true, limit -> Promise.lift limit
-                    | _ ->
-                        promise {
-                            let! limit =
-                                Wanxiangshu.Runtime.ContextBudgetUsageCodec.resolveMaxInputTokens [ ctx ] sessionId cwd
-
-                            maxInputTokensCache.[sessionId] <- limit
-                            return limit
-                        }
+                let! maxInputTokens = resolveMaxInputTokens sessionId cwd ctx
 
                 let plan =
-                    { SessionID = sessionId
-                      Agent = agent
-                      Directory = cwd
-                      ProjectionPolicy =
-                        (if
-                             backlogPolicy = Wanxiangshu.Kernel.MessageTransformPolicy.BacklogProjectionPolicy.Include
-                         then
-                             ProjectionPolicy.IncludeProjection
-                         else
-                             ProjectionPolicy.ExcludeProjection)
-                      BacklogProjectionPolicy = backlogPolicy
-                      CapsInjectionPolicy = capsPolicy
-                      ParallelHintPolicy = parallelHintPolicy
-                      ContextBudgetPolicy = contextBudgetPolicy
-                      IsSubagentSession = isChild
-                      Cleaned = messagesList
-                      RawArray = Some entriesArr
-                      SembleInjectEnabled = false
-                      Scope = ExecutorTools.ompScope
-                      MaxInputTokens = maxInputTokens
-                      GetContextUsage = getContextUsage }
-
+                    createMessageTransformPlan
+                        sessionId
+                        agent
+                        cwd
+                        backlogPolicy
+                        capsPolicy
+                        parallelHintPolicy
+                        contextBudgetPolicy
+                        isChild
+                        messagesList
+                        entriesArr
+                        maxInputTokens
+                        getContextUsage
 
                 let injectFn _ encoded = Promise.lift encoded
 
-                let loadCaps () : JS.Promise<CapsFile list> =
-                    promise {
-                        let isExcluded =
-                            match plan.CapsInjectionPolicy with
-                            | Wanxiangshu.Kernel.MessageTransformPolicy.CapsInjectionPolicy.Exclude -> true
-                            | Wanxiangshu.Kernel.MessageTransformPolicy.CapsInjectionPolicy.Include -> false
+                let loadCaps = buildLoadCapsFn plan cwd
 
-                        if isExcluded || cwd = "" then
-                            return ([]: CapsFile list)
-                        else
-                            let! ompFiles = findOmpCapsFiles cwd
-
-                            let baseFiles =
-                                ompFiles
-                                |> List.map (fun f ->
-                                    ({ filePath = f.filePath
-                                       label = f.label
-                                       content = f.content }
-                                    : CapsFile))
-
-                            let! injected =
-                                Wanxiangshu.Runtime.MessageTransform.HostHooks.injectSubagentFilesIfAny
-                                    ExecutorTools.ompScope
-                                    plan
-                                    baseFiles
-
-                            return injected |> List.sortBy (fun cf -> cf.label, cf.filePath)
-                    }
-
-                let buildCaps encoded (capsFiles: CapsFile list) prelude =
-                    let ompCaps =
-                        capsFiles
-                        |> List.map (fun f ->
-                            { filePath = f.filePath
-                              label = f.label
-                              content = f.content })
-
-                    buildCapsEntries sha256HexTruncated sessionId encoded cwd ompCaps prelude
+                let buildCaps = buildCapsFn plan sessionId cwd
 
                 return!
                     runHostMessagesTransform
@@ -170,6 +200,7 @@ let transformEntriesAsyncWithAgent
                         loadCaps
                         buildCaps
     }
+
 
 let transformEntriesAsync
     (reviewStore: ReviewStore)

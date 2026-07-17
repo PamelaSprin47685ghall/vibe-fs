@@ -108,7 +108,53 @@ type OmpHostAdapter
             let key = sessionId + "\u0000" + prompt
             scope.TryGetTempFiles(key)
 
-// ARCHITECTURE_EXEMPT: split this 94-line function later
+let private dispatchSubagent
+    (toolName: string)
+    (params': obj)
+    (pi: obj)
+    (ctx: obj)
+    (signal: obj)
+    (fallbackRuntime: FallbackRuntimeStore)
+    (fallbackConfigOpt: FallbackConfig option)
+    =
+    promise {
+        try
+            let adapter =
+                OmpHostAdapter(ompScope, pi, ctx, Some signal, fallbackRuntime, fallbackConfigOpt)
+
+            let! text = dispatch omp adapter toolName params' ompScope None
+            return textResult text
+        with ex ->
+            return asErrorResult ex
+    }
+
+let private buildSubagentInvocation
+    (toolName: string)
+    (label: string)
+    (desc: string)
+    (paramsBuilder: obj -> obj)
+    (pi: obj)
+    (fallbackRuntime: FallbackRuntimeStore)
+    (fallbackConfigOpt: FallbackConfig option)
+    =
+    let tb = Dyn.get pi "typebox"
+
+    let execute =
+        box (fun (_id: string) (params': obj) (signal: obj) (_u: obj) (ctx: obj) ->
+            dispatchSubagent toolName params' pi ctx signal fallbackRuntime fallbackConfigOpt)
+
+    createObj
+        [ "name", box toolName
+          "label", box label
+          "description", box desc
+          "parameters", paramsBuilder tb
+          "execute", execute ]
+
+let private hasBuiltinBrowser (pi: obj) =
+    not (Dyn.isNullish (Dyn.get pi "getAllTools"))
+    && (unbox<obj array> (Dyn.callMethod0 pi "getAllTools")
+        |> Array.exists (fun t -> string t = "browser"))
+
 let registerSubagentTools
     (pi: obj)
     (fallbackRuntime: FallbackRuntimeStore)
@@ -117,43 +163,25 @@ let registerSubagentTools
     let tb = Dyn.get pi "typebox"
 
     pi?registerTool (
-        createObj
-            [ "name", box "coder"
-              "label", box "Coder"
-              "description", box (description "coder")
-              "parameters", coderParameters tb
-              "execute",
-              box (fun (_id: string) (params': obj) (signal: obj) (_u: obj) (ctx: obj) ->
-                  promise {
-                      try
-                          let adapter =
-                              OmpHostAdapter(ompScope, pi, ctx, Some signal, fallbackRuntime, fallbackConfigOpt)
-
-                          let! text = dispatch omp adapter "coder" params' ompScope None
-                          return textResult text
-                      with ex ->
-                          return asErrorResult ex
-                  }) ]
+        buildSubagentInvocation
+            "coder"
+            "Coder"
+            (description "coder")
+            coderParameters
+            pi
+            fallbackRuntime
+            fallbackConfigOpt
     )
 
     pi?registerTool (
-        createObj
-            [ "name", box "investigator"
-              "label", box "Investigator"
-              "description", box (description "investigator")
-              "parameters", investigatorParameters tb
-              "execute",
-              box (fun (_id: string) (params': obj) (signal: obj) (_u: obj) (ctx: obj) ->
-                  promise {
-                      try
-                          let adapter =
-                              OmpHostAdapter(ompScope, pi, ctx, Some signal, fallbackRuntime, fallbackConfigOpt)
-
-                          let! text = dispatch omp adapter "investigator" params' ompScope None
-                          return textResult text
-                      with ex ->
-                          return asErrorResult ex
-                  }) ]
+        buildSubagentInvocation
+            "investigator"
+            "Investigator"
+            (description "investigator")
+            investigatorParameters
+            pi
+            fallbackRuntime
+            fallbackConfigOpt
     )
 
     pi?registerTool (
@@ -166,40 +194,23 @@ let registerSubagentTools
               box (fun (_id: string) (params': obj) (signal: obj) (_u: obj) (ctx: obj) ->
                   promise {
                       try
-                          let hasBrowser =
-                              not (Dyn.isNullish (Dyn.get pi "getAllTools"))
-                              && (unbox<obj array> (Dyn.callMethod0 pi "getAllTools")
-                                  |> Array.exists (fun t -> string t = "browser"))
-
-                          if not hasBrowser then
+                          if not (hasBuiltinBrowser pi) then
                               return errorResult "Built-in browser tool is unavailable in this session."
                           else
-                              let adapter =
-                                  OmpHostAdapter(ompScope, pi, ctx, Some signal, fallbackRuntime, fallbackConfigOpt)
-
-                              let! text = dispatch omp adapter "browser" params' ompScope None
-                              return textResult text
+                              return!
+                                  dispatchSubagent "browser" params' pi ctx signal fallbackRuntime fallbackConfigOpt
                       with ex ->
                           return asErrorResult ex
                   }) ]
     )
 
     pi?registerTool (
-        createObj
-            [ "name", box "continue"
-              "label", box "Continue"
-              "description", box (description "continue")
-              "parameters", continueParameters tb
-              "execute",
-              box (fun (_id: string) (params': obj) (signal: obj) (_u: obj) (ctx: obj) ->
-                  promise {
-                      try
-                          let adapter =
-                              OmpHostAdapter(ompScope, pi, ctx, Some signal, fallbackRuntime, fallbackConfigOpt)
-
-                          let! text = dispatch omp adapter "continue" params' ompScope None
-                          return textResult text
-                      with ex ->
-                          return asErrorResult ex
-                  }) ]
+        buildSubagentInvocation
+            "continue"
+            "Continue"
+            (description "continue")
+            continueParameters
+            pi
+            fallbackRuntime
+            fallbackConfigOpt
     )

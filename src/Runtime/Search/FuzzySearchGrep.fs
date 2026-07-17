@@ -152,7 +152,45 @@ let private fuzzyGrepSingle (params': FuzzyGrepParams) (opts: SearchOptions) : J
                         (runGrepWithFinder iteratorState.core iteratorState.cursor store opts)
     }
 
-// ARCHITECTURE_EXEMPT: split this 69-line function later
+let private runGrepPattern
+    (finder: FinderLike)
+    (params': FuzzyGrepParams)
+    (opts: SearchOptions)
+    (pat: string)
+    : JS.Promise<string * SearchOutcome * string option> =
+    promise {
+        try
+            match resolveGrepIteratorStateForPattern pat params' opts with
+            | Error msg -> return (pat, { output = msg; isError = true }, None)
+            | Ok state ->
+                let raw = runGrep finder state.core None None
+
+                if not (Dyn.truthy (Dyn.get raw "ok")) then
+                    return
+                        (pat,
+                         { output = errorMsg raw "fuzzy_grep failed"
+                           isError = true },
+                         None)
+                else
+                    let resolved = resolveResult raw
+
+                    let body =
+                        formatGrepOutput (
+                            Some
+                                { items = resolved.matches
+                                  totalMatched = resolved.total
+                                  regexFallbackError = resolved.regexError }
+                        )
+
+                    return
+                        (pat,
+                         { output = buildGrepBody body resolved.regexError
+                           isError = false },
+                         resolved.regexError)
+        with ex ->
+            return (pat, { output = ex.Message; isError = true }, None)
+    }
+
 let private fuzzyGrepMulti
     (patterns: string list)
     (params': FuzzyGrepParams)
@@ -173,39 +211,7 @@ let private fuzzyGrepMulti
         | Error msg -> return { output = msg; isError = true }
         | Ok finder ->
             try
-                let runOne pat =
-                    promise {
-                        try
-                            match resolveGrepIteratorStateForPattern pat params' opts with
-                            | Error msg -> return (pat, { output = msg; isError = true }, None)
-                            | Ok state ->
-                                let raw = runGrep finder state.core None None
-
-                                if not (Dyn.truthy (Dyn.get raw "ok")) then
-                                    return
-                                        (pat,
-                                         { output = errorMsg raw "fuzzy_grep failed"
-                                           isError = true },
-                                         None)
-                                else
-                                    let resolved = resolveResult raw
-
-                                    let body =
-                                        formatGrepOutput (
-                                            Some
-                                                { items = resolved.matches
-                                                  totalMatched = resolved.total
-                                                  regexFallbackError = resolved.regexError }
-                                        )
-
-                                    return
-                                        (pat,
-                                         { output = buildGrepBody body resolved.regexError
-                                           isError = false },
-                                         resolved.regexError)
-                        with ex ->
-                            return (pat, { output = ex.Message; isError = true }, None)
-                    }
+                let runOne pat = runGrepPattern finder params' opts pat
 
                 let promises = patterns |> List.map runOne |> List.toArray
                 let! outcomes = Promise.all promises

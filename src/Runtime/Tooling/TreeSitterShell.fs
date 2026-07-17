@@ -116,20 +116,20 @@ let rec private collectAstNodes (node: obj) (acc: AstNodeInfo list) : AstNodeInf
 
 let private runGeneralStyleChecks (content: string) : SyntaxDiagnostic[] = [||]
 
-// ARCHITECTURE_EXEMPT: split this 63-line function later
+let private isExcludedPath (filePath: string) : bool =
+    let lowerPath =
+        if System.String.IsNullOrEmpty filePath then
+            ""
+        else
+            filePath.ToLowerInvariant()
+
+    lowerPath.EndsWith(".md")
+    || lowerPath.EndsWith(".markdown")
+    || lowerPath.EndsWith(".txt")
+
 let checkSyntax (content: string) (filePath: string) : JS.Promise<SyntaxCheckResult> =
     promise {
-        let lowerPath =
-            if System.String.IsNullOrEmpty filePath then
-                ""
-            else
-                filePath.ToLowerInvariant()
-
-        if
-            lowerPath.EndsWith(".md")
-            || lowerPath.EndsWith(".markdown")
-            || lowerPath.EndsWith(".txt")
-        then
+        if isExcludedPath filePath then
             return Ok("", [||])
         else
             match tryGetPack () with
@@ -171,12 +171,10 @@ let checkSyntax (content: string) (filePath: string) : JS.Promise<SyntaxCheckRes
                             let astErrors = errors |> List.rev |> Array.ofList
                             let astNodes = collectAstNodes rootNode [] |> Array.ofList
 
-                            let styleErrorsRaw =
+                            let styleErrors =
                                 let funcErrors = checkFunctionLengths defaultStyleLimits astNodes
                                 let fileErrors = checkFileLineCount defaultStyleLimits content
                                 Array.append funcErrors fileErrors
-
-                            let styleErrors = filterExemptedDiagnostics content styleErrorsRaw
 
                             return Ok(lang, Array.append astErrors styleErrors)
     }

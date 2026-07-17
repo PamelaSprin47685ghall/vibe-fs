@@ -59,7 +59,7 @@ let private checkExplicitFiles (cwd: string) =
     let files =
         [ "src/Runtime/Fallback/Coordinator.fs"
           "src/Runtime/Fallback/RuntimeStore.fs"
-          "src/Runtime/ToolHookRuntime.fs"
+          "src/Runtime/Tooling/ToolHookRuntime.fs"
           "src/Hosts/OpenCode/ProgressObserver.fs"
           "src/Hosts/OpenCode/PluginWanxiangzhenE2eMeta.fs" ]
 

@@ -125,7 +125,60 @@ let toolExecuteBefore (input: obj) (output: obj) : JS.Promise<unit> =
                 | _ -> ()
     }
 
-// ARCHITECTURE_EXEMPT: split this 64-line function later
+let private computeTodoViolations (tool: string) (args: obj) : string list =
+    if tool = todoWriteToolName Mux && not (Dyn.isNullish args) then
+        match Wanxiangshu.Runtime.WorkBacklogToolsCodec.decodeTodoWriteArgs false args with
+        | Ok(_, viols) -> viols
+        | Error _ -> []
+    else
+        []
+
+let private appendCriticismIfNeeded
+    (output: obj)
+    (currentOutput: string)
+    (violations: string list)
+    (status: ToolHookRuntime.ExecutionStatus)
+    : unit =
+    if not violations.IsEmpty then
+        let criticism = ToolHookRuntime.appendCriticism currentOutput violations status
+        setHookOutputStringMux output criticism
+
+let private processComplianceResult
+    (output: obj)
+    (sessionID: string)
+    (toolCallID: string)
+    (tool: string)
+    (isError: bool)
+    (todoViolations: string list)
+    (args: obj)
+    : unit =
+    match ToolHookRuntime.tryGetCompliance sessionID toolCallID with
+    | Some env ->
+        let status =
+            if env.Cancelled then
+                ToolHookRuntime.ExecutionStatus.Cancelled
+            elif isError then
+                ToolHookRuntime.ExecutionStatus.Failure
+            else
+                ToolHookRuntime.ExecutionStatus.Success
+
+        let allViolations = env.Violations @ todoViolations |> List.distinct
+        appendCriticismIfNeeded output (hookOutputTextMux output) allViolations status
+
+        // Restore warn fields to decoded args so LLM history sees them.
+        if not (Dyn.isNullish args) then
+            ToolHookRuntime.restoreWarnToArgs args env
+
+        ToolHookRuntime.removeCompliance sessionID toolCallID
+    | None ->
+        let status =
+            if isError then
+                ToolHookRuntime.ExecutionStatus.Failure
+            else
+                ToolHookRuntime.ExecutionStatus.Success
+
+        appendCriticismIfNeeded output (hookOutputTextMux output) todoViolations status
+
 let toolExecuteAfter (scope: RuntimeScope) (input: obj) (output: obj) : JS.Promise<unit> =
     promise {
         let decoded = decodeMuxToolExecuteAfterInput input (box null)
@@ -133,14 +186,7 @@ let toolExecuteAfter (scope: RuntimeScope) (input: obj) (output: obj) : JS.Promi
         let sessionID = decoded.SessionID
         let originalOutput = hookOutputTextMux output
 
-
-        let todoViolations =
-            if tool = todoWriteToolName Mux && not (Dyn.isNullish decoded.Args) then
-                match Wanxiangshu.Runtime.WorkBacklogToolsCodec.decodeTodoWriteArgs false decoded.Args with
-                | Ok(_, viols) -> viols
-                | Error _ -> []
-            else
-                []
+        let todoViolations = computeTodoViolations tool decoded.Args
 
         let currentOutput = hookOutputTextMux output
         let isError = hookOutputErrorMux output <> "" || isNetworkErrorText currentOutput
@@ -148,37 +194,7 @@ let toolExecuteAfter (scope: RuntimeScope) (input: obj) (output: obj) : JS.Promi
         let toolCallID =
             ToolHookRuntime.tryExtractToolCallId input |> Option.defaultValue ""
 
-        match ToolHookRuntime.tryGetCompliance sessionID toolCallID with
-        | Some env ->
-            let status =
-                if env.Cancelled then
-                    ToolHookRuntime.ExecutionStatus.Cancelled
-                elif isError then
-                    ToolHookRuntime.ExecutionStatus.Failure
-                else
-                    ToolHookRuntime.ExecutionStatus.Success
-
-            let allViolations = env.Violations @ todoViolations |> List.distinct
-
-            if not allViolations.IsEmpty then
-                let criticism = ToolHookRuntime.appendCriticism currentOutput allViolations status
-                setHookOutputStringMux output criticism
-
-            // Restore warn fields to decoded args so LLM history sees them.
-            if not (Dyn.isNullish decoded.Args) then
-                ToolHookRuntime.restoreWarnToArgs decoded.Args env
-
-            ToolHookRuntime.removeCompliance sessionID toolCallID
-        | None ->
-            let status =
-                if isError then
-                    ToolHookRuntime.ExecutionStatus.Failure
-                else
-                    ToolHookRuntime.ExecutionStatus.Success
-
-            if not todoViolations.IsEmpty then
-                let criticism = ToolHookRuntime.appendCriticism currentOutput todoViolations status
-                setHookOutputStringMux output criticism
+        processComplianceResult output sessionID toolCallID tool isError todoViolations decoded.Args
 
         let argsJson = LivelockGuard.cleanArgsJson decoded.Args
 

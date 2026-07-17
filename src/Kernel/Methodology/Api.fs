@@ -16,8 +16,7 @@ let todoResultText (methodologies: string list) : string =
         let joined = String.concat ", " methodologies
         $"Great! Please apply [{joined}] to the subsequent steps. If all work has been fully completed and this is purely a summary/handover, you do NOT need to call the methodology tool. Otherwise, for any remaining tasks, the more difficult/complex the problem is, the more critical it is to think over and call the methodology tool with [{joined}] selected to guide your next work step."
 
-// ARCHITECTURE_EXEMPT: large string data catalog
-let methodologyCatalog =
+let private catalogPart1 =
     """Select the reasoning methodologies that should guide the next work step. Use this before continuing when the task benefits from explicit structure, search-space control, proof discipline, design reasoning, decomposition, verification, or risk control. Choose all useful methodologies by their definitions, not by keyword vibes.
 
 Methodology catalog:
@@ -49,8 +48,10 @@ Common methods can be selected with their short definitions. Uncommon methods in
 - debugging_trace: reproduce, isolate, instrument, and verify the fault chain.
 - security_review: reason adversarially about trust boundaries and abuse paths.
 - performance_analysis: locate bottlenecks, asymptotics, and resource constraints.
-- user_intent_clarification: resolve ambiguous goals before optimizing the wrong target.
+- user_intent_clarification: resolve ambiguous goals before optimizing the wrong target."""
 
+let private catalogPart2 =
+    """
 - axiomatization: use when hidden assumptions or drifting definitions make reasoning unstable. State primitive terms, allowed operations, invariants, forbidden states, and derivation rules explicitly; then solve only inside that declared system.
 - abduction: use when debugging, diagnosing, investigating, or explaining surprising evidence. Generate the best causal hypothesis: if X were true, observed Y would be expected; then seek discriminating tests rather than treating the hypothesis as proven.
 - analysis_synthesis: use when a goal is clear but the path is not. First analyze backward from the desired result until reaching known facts or constructible conditions; then synthesize forward into the actual proof, algorithm, or implementation plan.
@@ -61,7 +62,10 @@ Common methods can be selected with their short definitions. Uncommon methods in
 - symmetry_analysis: use when many cases appear distinct but may be equivalent. Exploit symmetry to collapse cases; inspect symmetry breaking when bugs or edge cases arise from one side no longer matching the other.
 - dimensional_reduction: use when the full state space is too large. Project to a lower-dimensional view, summary statistic, slice, trace, minimal reproduction, or quotient; reason there, then lift the conclusion back cautiously.
 - perturbation_continuity: use when a hard case is near an easy case. Change one variable slightly, vary load, remove one constraint, or move along a continuous path to see which properties survive and where the phase change occurs.
-- pigeonhole_principle: use when exact placement is unknown but counts, capacities, or partitions are known. Prove that collision, overflow, repetition, or coverage must occur because there are more items than distinguishable slots.
+- pigeonhole_principle: use when exact placement is unknown but counts, capacities, or partitions are known. Prove that collision, overflow, repetition, or coverage must occur because there are more items than distinguishable slots."""
+
+let private catalogPart3 =
+    """
 - duality: use when the direct problem is hard but a mirrored constraint or optimization problem is easier. Solve the shadow problem: producer/consumer, read/write, syntax/semantics, primal/dual, local/global, command/event.
 - quotient_space: use when too many objects differ only in irrelevant detail. Define an equivalence relation, collapse each class to one representative, solve on classes, then map results back to concrete cases.
 - category_mapping: use when structure matters more than object internals. Preserve relationships and transformations while moving the problem into a domain with stronger tools, such as graphs, types, events, algebra, or state machines.
@@ -77,7 +81,12 @@ Common methods can be selected with their short definitions. Uncommon methods in
 - dialectical_analysis: use when opposing forces both shape the outcome. Identify thesis, antithesis, tension, dependency, and resolution path instead of flattening the system into one-sided causality.
 - hermeneutic_circle: use when local meaning depends on global context and global meaning depends on local details. Iterate between part and whole until both stabilize, especially for codebase understanding and document interpretation.
 - deconstruction: use when a design or text relies on hidden binaries or authority. Inspect what the framing excludes, which hierarchy it assumes, and where internal tensions make the apparent center unstable.
- - renormalization: use when micro-detail overwhelms macro behavior. Coarse-grain details, preserve only scale-relevant variables, and identify the universal structure that remains stable across levels."""
+- renormalization: use when micro-detail overwhelms macro behavior. Coarse-grain details, preserve only scale-relevant variables, and identify the universal structure that remains stable across levels."""
+
+let private methodologyCatalogText =
+    catalogPart1 + "\n" + catalogPart2 + "\n" + catalogPart3
+
+let methodologyCatalog = methodologyCatalogText
 
 let selectMethodologyFieldDescription =
     "Required when calling this tool: record `select_methodology` with one or more methodology names that must guide the next work step. Choose by definitions, not by keyword vibes.\n\n"

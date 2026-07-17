@@ -7,9 +7,34 @@ open Wanxiangshu.Runtime.Wanxiangzhen.HttpServer
 open Wanxiangshu.Runtime.Wanxiangzhen.CoordinatorRuntime
 open Wanxiangshu.Runtime.Wanxiangzhen.CoordinatorOps
 
-// ARCHITECTURE_EXEMPT: split this 67-line function later
+let private handleRegisterRequest (rt: CoordinatorRuntime) (tid: string) (body: obj) =
+    promise {
+        match decodeRegisterBody body with
+        | Some pid ->
+            do!
+                rt.DagQueue.Enqueue(fun () ->
+                    rt.Dag <- rt.Dag |> updateTask tid (fun (t: SquadTask) -> { t with SlavePid = Some pid })
+                    Promise.lift ())
+
+            return
+                { StatusCode = 200
+                  Body = encodeResult "registered" }
+        | None ->
+            return
+                { StatusCode = 400
+                  Body = encodeResult "bad_request" }
+    }
+
+let private handleLogRequest (tid: string) (body: obj) =
+    match decodeLogBody body with
+    | Some _msg ->
+        { StatusCode = 200
+          Body = encodeResult "logged" }
+    | None ->
+        { StatusCode = 400
+          Body = encodeResult "bad_request" }
+
 let routeHandler (rt: CoordinatorRuntime) : RouteHandler =
-    // ARCHITECTURE_EXEMPT: split this 66-line function later
     fun method path body ->
         promise {
             let p = path.Split('?').[0]
@@ -21,21 +46,7 @@ let routeHandler (rt: CoordinatorRuntime) : RouteHandler =
                 return! handleSubmit rt tid sha
             | "POST", p when p.EndsWith "/register" ->
                 let tid = extractTaskId p "register"
-
-                match decodeRegisterBody body with
-                | Some pid ->
-                    do!
-                        rt.DagQueue.Enqueue(fun () ->
-                            rt.Dag <- rt.Dag |> updateTask tid (fun (t: SquadTask) -> { t with SlavePid = Some pid })
-                            Promise.lift ())
-
-                    return
-                        { StatusCode = 200
-                          Body = encodeResult "registered" }
-                | None ->
-                    return
-                        { StatusCode = 400
-                          Body = encodeResult "bad_request" }
+                return! handleRegisterRequest rt tid body
             | "POST", p when p.EndsWith "/done" ->
                 let tid = extractTaskId p "done"
                 do! handleSlaveExit rt tid
@@ -45,16 +56,7 @@ let routeHandler (rt: CoordinatorRuntime) : RouteHandler =
                       Body = encodeResult "acknowledged" }
             | "POST", p when p.EndsWith "/log" ->
                 let tid = extractTaskId p "log"
-
-                match decodeLogBody body with
-                | Some _msg ->
-                    return
-                        { StatusCode = 200
-                          Body = encodeResult "logged" }
-                | None ->
-                    return
-                        { StatusCode = 400
-                          Body = encodeResult "bad_request" }
+                return handleLogRequest tid body
             | "GET", "/state" ->
                 return
                     { StatusCode = 200

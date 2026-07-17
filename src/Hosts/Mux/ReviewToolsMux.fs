@@ -52,7 +52,57 @@ let private runReviewRound
         return parseReviewReportMarkdown report
     }
 
-// ARCHITECTURE_EXEMPT: split this 77-line function later
+type private ReviewCandidate =
+    | NoTask
+    | InProgress
+    | Ready of string
+
+/// Look up the review task for the workspace and attempt to acquire the review
+/// lock.  Returns the candidate status so the caller can decide whether to
+/// proceed, short-circuit, or report an in-progress review.
+let private collectReviewCandidates (reviewStore: ReviewStore) (workspaceId: string) : ReviewCandidate =
+    match reviewStore.getReviewTask workspaceId with
+    | None -> NoTask
+    | Some originalTask ->
+        if not (reviewStore.tryLockReview workspaceId) then
+            InProgress
+        else
+            Ready originalTask
+
+/// Execute the two-round review (verdict then double-check) and persist the
+/// resulting verdict back to the event log.
+let private applyReviewResult
+    (deps: obj)
+    (config: obj)
+    (toolNames: string array)
+    (reviewStore: ReviewStore)
+    (root: string)
+    (workspaceId: string)
+    (originalTask: string)
+    (report: string)
+    (affectedFiles: string list)
+    : JS.Promise<string> =
+    promise {
+        let! round1 =
+            runReviewRound deps config toolNames (reviewSubmissionVerdictPrompt originalTask report affectedFiles)
+
+        let! verdict =
+            match round1 with
+            | Accepted _ ->
+                runReviewRound
+                    deps
+                    config
+                    toolNames
+                    (reviewSubmissionDoubleCheckPrompt originalTask report affectedFiles)
+            | other -> Promise.lift other
+
+        let vStr, fb = verdictStringFromReviewResult verdict
+        do! appendReviewVerdictOrFail root workspaceId vStr fb
+        do! syncReviewFromEventLogDedicated reviewStore root workspaceId
+
+        return formatReviewResult verdict
+    }
+
 let submitReviewTool
     (deps: obj)
     (toolNames: string array)
@@ -88,45 +138,29 @@ let submitReviewTool
                     match decodeSubmitReviewArgs args with
                     | Error e -> return wireDecodeFailure "submit_review" e
                     | Ok decoded ->
-                        let originalTask = reviewStore.getReviewTask workspaceId
+                        match collectReviewCandidates reviewStore workspaceId with
+                        | NoTask -> return submitReviewNotNeeded
+                        | InProgress -> return submitReviewInProgress
+                        | Ready originalTask ->
+                            try
+                                if submitReviewIsWip decoded.Wip then
+                                    do! appendSubmitReviewWipRecordedOrFail root workspaceId
+                                    return formatWipAcknowledgment originalTask
+                                else
+                                    let! result =
+                                        applyReviewResult
+                                            deps
+                                            config
+                                            toolNames
+                                            reviewStore
+                                            root
+                                            workspaceId
+                                            originalTask
+                                            decoded.Report
+                                            decoded.AffectedFiles
 
-                        match originalTask with
-                        | None -> return submitReviewNotNeeded
-                        | Some originalTask ->
-                            if not (reviewStore.tryLockReview workspaceId) then
-                                return submitReviewInProgress
-                            else
-                                try
-                                    if submitReviewIsWip decoded.Wip then
-                                        do! appendSubmitReviewWipRecordedOrFail root workspaceId
-                                        return formatWipAcknowledgment originalTask
-                                    else
-                                        let report = decoded.Report
-                                        let affectedFiles = decoded.AffectedFiles
-
-                                        let! round1 =
-                                            runReviewRound
-                                                deps
-                                                config
-                                                toolNames
-                                                (reviewSubmissionVerdictPrompt originalTask report affectedFiles)
-
-                                        let! verdict =
-                                            match round1 with
-                                            | Accepted _ ->
-                                                runReviewRound
-                                                    deps
-                                                    config
-                                                    toolNames
-                                                    (reviewSubmissionDoubleCheckPrompt originalTask report affectedFiles)
-                                            | other -> Promise.lift other
-
-                                        let vStr, fb = verdictStringFromReviewResult verdict
-                                        do! appendReviewVerdictOrFail root workspaceId vStr fb
-                                        do! syncReviewFromEventLogDedicated reviewStore root workspaceId
-
-                                        return formatReviewResult verdict
-                                finally
-                                    reviewStore.unlockReview workspaceId
+                                    return result
+                            finally
+                                reviewStore.unlockReview workspaceId
                 }
       condition = None }

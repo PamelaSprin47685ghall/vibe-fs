@@ -1,14 +1,15 @@
 module Wanxiangshu.Hosts.Omp.TodoTool
 
+open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Kernel.HostTools
 open Wanxiangshu.Kernel.WorkBacklog
+open Wanxiangshu.Runtime.WorkBacklogToolsCodec
 open Wanxiangshu.Kernel.Methodology
 open Wanxiangshu.Runtime.ToolOutputInfo
 open Wanxiangshu.Hosts.Omp.Codec
 open Wanxiangshu.Hosts.Omp.OmpToolSchema
 open Wanxiangshu.Runtime.EventLogRuntime
-open Wanxiangshu.Runtime.WorkBacklogToolsCodec
 open Wanxiangshu.Kernel.Subsession.Types
 open Wanxiangshu.Runtime
 
@@ -39,7 +40,81 @@ let private validateTodos (params': obj) : Result<unit, string> =
             | Some i -> Error $"todowrite todos[{i}] requires content and status"
             | None -> Ok()
 
-// ARCHITECTURE_EXEMPT: split this 112-line function later
+let private isAllCompleted (todos: TodoItem array) : bool =
+    todos
+    |> Array.forall (fun t ->
+        match t.Status with
+        | Wanxiangshu.Kernel.ToolArgs.Completed
+        | Wanxiangshu.Kernel.ToolArgs.Cancelled -> true
+        | _ -> false)
+
+let private parseTodos (params': obj) (parseError: string option ref) : TodoItem array =
+    let raw = Dyn.get params' "todos"
+
+    if Dyn.isNullish raw || not (Dyn.isArray raw) then
+        [||]
+    else
+        unbox<obj array> raw
+        |> Array.map (fun item ->
+            let statusStr = Dyn.str item "status"
+            let priorityStr = Dyn.str item "priority"
+
+            let status =
+                match Wanxiangshu.Runtime.WorkBacklogToolsCodec.parseTodoItemStatus statusStr with
+                | Ok s -> s
+                | Error _ ->
+                    parseError := Some $"Invalid todo status: %s{statusStr}"
+                    Wanxiangshu.Kernel.ToolArgs.Todo
+
+            let priority =
+                if System.String.IsNullOrWhiteSpace priorityStr then
+                    Wanxiangshu.Kernel.ToolArgs.Low
+                else
+                    match Wanxiangshu.Runtime.WorkBacklogToolsCodec.parseTodoItemPriority priorityStr with
+                    | Ok p -> p
+                    | Error _ ->
+                        parseError := Some $"Invalid todo priority: %s{priorityStr}"
+                        Wanxiangshu.Kernel.ToolArgs.Low
+
+            { Content = Dyn.str item "content"
+              Status = status
+              Priority = priority })
+
+let private handleTodoCommit (ctx: obj) (args: TodoWriteArgs) : JS.Promise<unit> =
+    promise {
+        match getSessionIdFromContext ctx with
+        | Some sid ->
+            let root = Dyn.str ctx "cwd"
+
+            if root <> "" then
+                do! appendWorkBacklogCommittedOrFail root sid args
+
+                let allCompleted = isAllCompleted args.Todos
+
+                let ev =
+                    { CurrentTurnEvidence.empty with
+                        Todos = if allCompleted then TodosCompleted else TodosNotCompleted }
+
+                do! SubsessionEventRouter.routeEvidence root sid ev |> Promise.map ignore
+        | None -> ()
+    }
+
+let private generateOutput (params': obj) (methodologies: string list) : string =
+    let baseOutput = todoWriteOutput methodologies
+
+    let violations =
+        match Wanxiangshu.Runtime.WorkBacklogToolsCodec.decodeTodoWriteArgs false params' with
+        | Ok(_, viols) -> viols
+        | Error _ -> []
+
+    if not violations.IsEmpty then
+        Wanxiangshu.Runtime.ToolHookRuntime.appendCriticism
+            baseOutput
+            violations
+            Wanxiangshu.Runtime.ToolHookRuntime.ExecutionStatus.Success
+    else
+        baseOutput
+
 let registerTodoTool (pi: obj) : unit =
     let tb = Dyn.get pi "typebox"
 
@@ -50,7 +125,6 @@ let registerTodoTool (pi: obj) : unit =
               "description", box (toolDescriptionFor omp)
               "parameters", todowriteParameters tb
               "execute",
-              // ARCHITECTURE_EXEMPT: split this 101-line function later
               box (fun (_id: string) (params': obj) (_s: obj) (_u: obj) (ctx: obj) ->
                   promise {
                       let ahaMoments = (Dyn.str params' "ahaMoments").Trim()
@@ -66,41 +140,11 @@ let registerTodoTool (pi: obj) : unit =
                           match validateTodos params' with
                           | Error msg -> return errorResult msg
                           | Ok() ->
-                              let mutable parseError = None
+                              let parseError = ref None
 
-                              let todos =
-                                  let raw = Dyn.get params' "todos"
+                              let todos = parseTodos params' parseError
 
-                                  if Dyn.isNullish raw || not (Dyn.isArray raw) then
-                                      [||]
-                                  else
-                                      unbox<obj array> raw
-                                      |> Array.map (fun item ->
-                                          let statusStr = Dyn.str item "status"
-                                          let priorityStr = Dyn.str item "priority"
-
-                                          let status =
-                                              match parseTodoItemStatus statusStr with
-                                              | Ok s -> s
-                                              | Error _ ->
-                                                  parseError <- Some $"Invalid todo status: %s{statusStr}"
-                                                  Wanxiangshu.Kernel.ToolArgs.TodoItemStatus.Todo
-
-                                          let priority =
-                                              if System.String.IsNullOrWhiteSpace priorityStr then
-                                                  Wanxiangshu.Kernel.ToolArgs.TodoItemPriority.Low
-                                              else
-                                                  match parseTodoItemPriority priorityStr with
-                                                  | Ok p -> p
-                                                  | Error _ ->
-                                                      parseError <- Some $"Invalid todo priority: %s{priorityStr}"
-                                                      Wanxiangshu.Kernel.ToolArgs.TodoItemPriority.Low
-
-                                          { Content = Dyn.str item "content"
-                                            Status = status
-                                            Priority = priority })
-
-                              match parseError with
+                              match !parseError with
                               | Some err -> return errorResult err
                               | None ->
                                   let args =
@@ -112,44 +156,8 @@ let registerTodoTool (pi: obj) : unit =
                                         Todos = todos
                                         SelectMethodology = methodologies }
 
-                                  match getSessionIdFromContext ctx with
-                                  | Some sid ->
-                                      let root = Dyn.str ctx "cwd"
+                                  do! handleTodoCommit ctx args
 
-                                      if root <> "" then
-                                          do! appendWorkBacklogCommittedOrFail root sid args
-
-                                          let allCompleted =
-                                              args.Todos
-                                              |> Array.forall (fun t ->
-                                                  match t.Status with
-                                                  | Wanxiangshu.Kernel.ToolArgs.TodoItemStatus.Completed
-                                                  | Wanxiangshu.Kernel.ToolArgs.TodoItemStatus.Cancelled -> true
-                                                  | _ -> false)
-
-                                          let ev =
-                                              { CurrentTurnEvidence.empty with
-                                                  Todos = if allCompleted then TodosCompleted else TodosNotCompleted }
-
-                                          do! SubsessionEventRouter.routeEvidence root sid ev |> Promise.map ignore
-                                  | None -> ()
-
-                                  let baseOutput = todoWriteOutput methodologies
-
-                                  let violations =
-                                      match decodeTodoWriteArgs false params' with
-                                      | Ok(_, viols) -> viols
-                                      | Error _ -> []
-
-                                  let finalOutput =
-                                      if not violations.IsEmpty then
-                                          Wanxiangshu.Runtime.ToolHookRuntime.appendCriticism
-                                              baseOutput
-                                              violations
-                                              Wanxiangshu.Runtime.ToolHookRuntime.ExecutionStatus.Success
-                                      else
-                                          baseOutput
-
-                                  return textResult finalOutput
+                                  return textResult (generateOutput params' methodologies)
                   }) ]
     )
