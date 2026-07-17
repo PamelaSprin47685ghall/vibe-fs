@@ -17,6 +17,7 @@ import path from 'node:path';
 import { StrictMockProvider } from './strict-mock-provider.js';
 import { ProcessHost } from './process-host.js';
 import { EventProbe } from './event-probe.js';
+import { dumpDiagnostics } from './diagnostics.js';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -87,6 +88,7 @@ export class HttpClient {
   constructor(baseUrl, workDir) {
     this._baseUrl = baseUrl;
     this._workDir = workDir;
+    this.onSessionCreated = null; // callback(sessionId) for tracking
   }
   async request(method, urlPath, opts = {}) {
     const qs = opts.query ? '?' + new URLSearchParams(opts.query).toString() : '';
@@ -102,7 +104,12 @@ export class HttpClient {
     const body = typeof model === 'object' && model !== null && (model.model || model.providerID)
       ? { model }
       : { model: { id: 'test-model', providerID: 'test' } };
-    return this.request('POST', '/api/session', { body });
+    const res = await this.request('POST', '/api/session', { body });
+    if (res.ok && this.onSessionCreated) {
+      const sid = res.data?.data?.data?.id || res.data?.data?.id;
+      if (sid) this.onSessionCreated(sid);
+    }
+    return res;
   }
   async prompt(sessionID, text, model, timeoutMs = 120000) {
     const ac = new AbortController();
@@ -208,6 +215,12 @@ export async function startSuite(opts = {}) {
   await events.connect();
 
   const suite = new Suite(scenarioDir, host, provider, client, events);
+
+  // Auto-track sessions created via this client
+  client.onSessionCreated = (sid) => {
+    if (!suite.sessionIds.includes(sid)) suite.sessionIds.push(sid);
+  };
+
   return suite;
 }
 
@@ -296,11 +309,7 @@ export async function runSuite(opts, tests) {
       console.log(`  ✓ ${name} (${Date.now() - startTime}ms)`);
     } catch (err) {
       failed++;
-      console.error(`  ✗ ${name}: ${err.message}`);
-      console.error(`\n  ── Last 30 events ──`);
-      console.error(suite.events.dump(30));
-      const stderr = suite.host.stderrLog;
-      if (stderr.trim()) console.error(`\n  ── opencode stderr ──\n${stderr.slice(-2000)}`);
+      await dumpDiagnostics(suite, err);
     }
   }
 
