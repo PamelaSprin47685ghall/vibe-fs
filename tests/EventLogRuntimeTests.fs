@@ -7,7 +7,9 @@ open Wanxiangshu.Tests.TempWorkspace
 open Wanxiangshu.Kernel.EventSourcing.EventEnvelope
 open Wanxiangshu.Kernel.EventSourcing.EventKind
 open Wanxiangshu.Runtime.EventLogCodec
-open Wanxiangshu.Runtime.EventLogFiles
+open Wanxiangshu.Runtime.EventStore
+open Wanxiangshu.Runtime.EventLogFile
+open Wanxiangshu.Runtime.SquadEventStore
 open Wanxiangshu.Runtime.EventLogRuntime
 open Wanxiangshu.Runtime.ReviewRuntime
 open Wanxiangshu.Kernel.EventSourcing.Fold

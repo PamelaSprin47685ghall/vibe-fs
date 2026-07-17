@@ -1,7 +1,7 @@
 module Wanxiangshu.Runtime.WorkBacklogSchema
 
 open Fable.Core.JsInterop
-open Wanxiangshu.Kernel.Methodology
+open Wanxiangshu.Kernel.Methodology.Api
 open Wanxiangshu.Kernel.WorkBacklog
 open Wanxiangshu.Runtime.Dyn
 

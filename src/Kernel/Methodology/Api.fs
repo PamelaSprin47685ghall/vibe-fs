@@ -1,5 +1,22 @@
-module Wanxiangshu.Kernel.MethodologyCatalog
+module Wanxiangshu.Kernel.Methodology.Api
 
+let selectMethodologyToolName = "select_methodology"
+
+let methodologyToolResultText (methodologies: string list) =
+    match methodologies with
+    | [] -> invalidArg "methodologies" "methodologyToolResultText requires at least one methodology"
+    | _ ->
+        let joined = String.concat ", " methodologies
+        $"Great! Now please explain how to apply [{joined}] to the work step."
+
+let todoResultText (methodologies: string list) : string =
+    match methodologies with
+    | [] -> "Todos updated."
+    | _ ->
+        let joined = String.concat ", " methodologies
+        $"Great! Please apply [{joined}] to the subsequent steps. If all work has been fully completed and this is purely a summary/handover, you do NOT need to call the methodology tool. Otherwise, for any remaining tasks, the more difficult/complex the problem is, the more critical it is to think over and call the methodology tool with [{joined}] selected to guide your next work step."
+
+// ARCHITECTURE_EXEMPT: large string data catalog
 let methodologyCatalog =
     """Select the reasoning methodologies that should guide the next work step. Use this before continuing when the task benefits from explicit structure, search-space control, proof discipline, design reasoning, decomposition, verification, or risk control. Choose all useful methodologies by their definitions, not by keyword vibes.
 
@@ -61,3 +78,7 @@ Common methods can be selected with their short definitions. Uncommon methods in
 - hermeneutic_circle: use when local meaning depends on global context and global meaning depends on local details. Iterate between part and whole until both stabilize, especially for codebase understanding and document interpretation.
 - deconstruction: use when a design or text relies on hidden binaries or authority. Inspect what the framing excludes, which hierarchy it assumes, and where internal tensions make the apparent center unstable.
  - renormalization: use when micro-detail overwhelms macro behavior. Coarse-grain details, preserve only scale-relevant variables, and identify the universal structure that remains stable across levels."""
+
+let selectMethodologyFieldDescription =
+    "Required when calling this tool: record `select_methodology` with one or more methodology names that must guide the next work step. Choose by definitions, not by keyword vibes.\n\n"
+    + methodologyCatalog

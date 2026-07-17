@@ -1,4 +1,4 @@
-module Wanxiangshu.Runtime.EventLogProjectionCache
+module Wanxiangshu.Runtime.ProjectionCache
 
 open Fable.Core
 open Wanxiangshu.Kernel.EventSourcing.EventEnvelope

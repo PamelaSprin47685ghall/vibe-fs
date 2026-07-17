@@ -158,7 +158,7 @@ let private buildAckMessage (ackId: string) (parentID: string) (sessionID: strin
 /// ("好的，我将遵守规则。"), followed by optional caps-file tool reads. The
 /// caller decides suppression by passing an empty `capsFiles` (no file reads)
 /// and/or `None` prelude; this keeps a single decision point in
-/// `MessageTransform`. The only guard here is structural: nothing to anchor
+/// `MessageTransformHook`. The only guard here is structural: nothing to anchor
 /// onto when there is no real message.
 let buildCapsMessages
     (hashFn: string -> string)

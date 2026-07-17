@@ -15,8 +15,11 @@ open Wanxiangshu.Kernel.EventSourcing.Fold
 open Wanxiangshu.Kernel.Review.ReviewLoopFold
 open Wanxiangshu.Runtime.EventLogRuntime
 open Wanxiangshu.Runtime.Fallback.RuntimeStore
-open Wanxiangshu.Runtime.Fallback.GateTransitions
-open Wanxiangshu.Runtime.NudgeRuntimeTypes
+open Wanxiangshu.Runtime.Fallback.GateFlagTransitions
+open Wanxiangshu.Runtime.NudgeRuntimeState
+open Wanxiangshu.Runtime.NudgeRuntimeEvent
+open Wanxiangshu.Runtime.NudgeFlow
+open Wanxiangshu.Runtime.NudgeModelResolver
 
 [<Global("globalThis.process")>]
 let private nodeProcess: obj = jsNative
@@ -70,6 +73,7 @@ let messageTexts (message: obj) : string list =
                 if output = "" then None else Some output
             | _ -> None)
 
+// ARCHITECTURE_EXEMPT: split this 87-line function later
 let collectSnapshotMux
     (fallbackRuntime: FallbackRuntimeStore)
     (getChatHistory: (string -> JS.Promise<obj array>) option)
@@ -129,12 +133,7 @@ let collectSnapshotMux
                                     else
                                         Some(sprintf "%s/%s%s" providerID modelID suffix)
 
-                            let resolvedModel =
-                                Wanxiangshu.Runtime.NudgeRuntimeTypes.resolveNudgeModel
-                                    messages
-                                    fallbackRuntime
-                                    workspaceId
-                                    model
+                            let resolvedModel = resolveNudgeModel messages fallbackRuntime workspaceId model
 
                             let finalText = if text = "" then lastMsgFromEvent else text
                             return finalText, agent, tid, resolvedModel
@@ -146,7 +145,8 @@ let collectSnapshotMux
 
         let! snapshot = getNudgeSnapshotFromEventLog root workspaceId
 
-        let currentAnchor = Wanxiangshu.Kernel.Nudge.NudgeProjection.nudgeAnchorKey snapshot.turnId snapshot.lastAssistantText
+        let currentAnchor =
+            Wanxiangshu.Kernel.Nudge.NudgeProjection.nudgeAnchorKey snapshot.turnId snapshot.lastAssistantText
 
         let blockStatus =
             if

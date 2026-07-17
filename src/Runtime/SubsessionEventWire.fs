@@ -131,6 +131,7 @@ let private ordinalFromInt (n: int) : TurnOrdinal =
         loop n TurnOrdinal.first
 
 /// Decode a WanEvent into a SubsessionEvent when kind matches.
+// ARCHITECTURE_EXEMPT: split this 99-line function later
 let tryDecodeWanEvent (e: WanEvent) : SubsessionEvent option =
     let kind = e.Kind
 

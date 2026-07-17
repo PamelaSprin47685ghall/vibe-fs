@@ -9,7 +9,6 @@ open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Tests.AsyncFlush
 open Wanxiangshu.Kernel.FallbackKernel.Types
 open Wanxiangshu.Runtime.Fallback.RuntimeStore
-open Wanxiangshu.Runtime.Fallback.GateTransitions
 
 module Dyn = Wanxiangshu.Runtime.Dyn
 

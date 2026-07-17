@@ -8,7 +8,10 @@ open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Messaging
 open Wanxiangshu.Kernel.FallbackKernel.Types
 open Wanxiangshu.Hosts.Opencode.BacklogSession
-open Wanxiangshu.Runtime.Fallback.GateTransitions
+open Wanxiangshu.Runtime.Fallback.HumanTurnTransitions
+open Wanxiangshu.Runtime.Fallback.OrdinalTransitions
+open Wanxiangshu.Runtime.Fallback.CompactionTransitions
+open Wanxiangshu.Runtime.Fallback.SessionPropertyTransitions
 open Wanxiangshu.Hosts.Opencode.MessagingCodec
 open Wanxiangshu.Runtime
 open Wanxiangshu.Runtime.Dyn

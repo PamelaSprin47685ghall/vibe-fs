@@ -1,4 +1,5 @@
 module Wanxiangshu.Runtime.EventLogRuntimeSync
+
 open Wanxiangshu.Runtime.Fallback.SessionRuntime
 open Wanxiangshu.Runtime.Fallback.RuntimeStore
 open Wanxiangshu.Runtime.Fallback.LeaseTransitions
@@ -11,8 +12,12 @@ open Wanxiangshu.Runtime.ReviewRuntime
 open Wanxiangshu.Runtime.SessionProjectionStore
 open Wanxiangshu.Runtime.RuntimeScope
 open Wanxiangshu.Kernel.FallbackKernel.Types
-open Wanxiangshu.Runtime.Fallback.GateTransitions
+open Wanxiangshu.Runtime.Fallback.HumanTurnTransitions
+open Wanxiangshu.Runtime.Fallback.OrdinalTransitions
+open Wanxiangshu.Runtime.Fallback.CompactionTransitions
+open Wanxiangshu.Runtime.Fallback.SessionPropertyTransitions
 
+// ARCHITECTURE_EXEMPT: split this 172-line function later
 let restoreFallbackRuntimeStore
     (scope: RuntimeScope)
     (sid: string)

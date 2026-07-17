@@ -9,7 +9,7 @@ open Wanxiangshu.Kernel.Errors.DomainError
 open Wanxiangshu.Kernel.Session.Causality
 open Wanxiangshu.Kernel.Primitives.Identity.Id
 open Wanxiangshu.Kernel.WorkspaceState
-open Wanxiangshu.Kernel.Methodology
+open Wanxiangshu.Kernel.Methodology.Api
 open Wanxiangshu.Kernel.Methodology.Registry
 
 // ── Kernel.Domain.Id ─────────────────────────────────────────────────────────

@@ -3,7 +3,7 @@ module Wanxiangshu.Hosts.Opencode.MessagingCodec
 open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Runtime
-open Wanxiangshu.Runtime.MessagingPartCodec
+open Wanxiangshu.Runtime.MessagingCodec
 open Wanxiangshu.Runtime.MessagingEncode
 open Wanxiangshu.Runtime.MessagingDecode
 

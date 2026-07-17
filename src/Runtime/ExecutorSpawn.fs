@@ -18,6 +18,7 @@ type RunOutcome =
     | Signaled of signal: string * stdout: string * stderr: string
     | SpawnFailed of reason: DomainError
 
+// ARCHITECTURE_EXEMPT: split this 131-line function later
 let private awaitChild
     (child: SpawnedChild)
     (executable: string)
@@ -26,6 +27,7 @@ let private awaitChild
     (sessionId: string option)
     (onKillRegistered: ((unit -> unit) -> unit) option)
     : JS.Promise<RunOutcome> =
+    // ARCHITECTURE_EXEMPT: split this 123-line function later
     Promise.create (fun resolve _reject ->
         let stdout = ResizeArray<string>()
         let stderr = ResizeArray<string>()

@@ -7,7 +7,7 @@ open Wanxiangshu.Kernel.HostTools
 open Wanxiangshu.Kernel.Messaging
 open Wanxiangshu.Runtime
 open Wanxiangshu.Runtime.Dyn
-open Wanxiangshu.Runtime.MessagingPartCodec
+open Wanxiangshu.Runtime.MessagingCodec
 open Wanxiangshu.Runtime.MessagingEncode
 open Wanxiangshu.Runtime.MessagingDecode
 

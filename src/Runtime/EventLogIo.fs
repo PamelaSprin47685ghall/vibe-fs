@@ -74,8 +74,6 @@ let readEventsFile (path: string) : JS.Promise<WanEvent list> =
         return readEventsFromText text
     }
 
-let lockFileName = ".wanxiangshu.ndjson.lock"
-
 [<Import("lock", "proper-lockfile")>]
 let private lockfileLock (path: string) (options: obj) : JS.Promise<unit -> JS.Promise<unit>> = jsNative
 
@@ -103,6 +101,7 @@ let fileExists (filePath: string) : JS.Promise<bool> =
             return false
     }
 
+// ARCHITECTURE_EXEMPT: split this 80-line function later
 let withWorkspaceLock<'T> (filePath: string) (action: unit -> JS.Promise<'T>) : JS.Promise<'T> =
     let prev =
         match fileQueues.TryGetValue(filePath) with
@@ -111,6 +110,7 @@ let withWorkspaceLock<'T> (filePath: string) (action: unit -> JS.Promise<'T>) : 
 
     let mutable selfPromise = None
 
+    // ARCHITECTURE_EXEMPT: split this 64-line function later
     let next =
         promise {
             try

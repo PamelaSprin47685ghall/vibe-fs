@@ -11,7 +11,6 @@ open Wanxiangshu.Hosts.Omp.OmpTools
 open Wanxiangshu.Runtime.FuzzyFinderShell
 open Wanxiangshu.Runtime.ReviewRuntime
 open Wanxiangshu.Runtime.Fallback.RuntimeStore
-open Wanxiangshu.Runtime.Fallback.GateTransitions
 open Wanxiangshu.Kernel.FallbackKernel.Types
 
 let registerAllTools

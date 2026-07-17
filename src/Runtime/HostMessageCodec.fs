@@ -1,5 +1,5 @@
-// msg.parts text / read-dedup projection; full Part decode → MessagingPartCodec.
-module Wanxiangshu.Runtime.HostMessagePartCodec
+// msg.parts text / read-dedup projection; full Part decode → MessagingCodec.
+module Wanxiangshu.Runtime.HostMessageCodec
 
 open Wanxiangshu.Runtime.Dyn
 

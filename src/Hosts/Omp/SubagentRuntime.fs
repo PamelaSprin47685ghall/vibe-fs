@@ -8,7 +8,7 @@ open Wanxiangshu.Hosts.Omp.PiResolve
 open Wanxiangshu.Runtime.Dyn
 open Wanxiangshu.Runtime.OmpHostBindings
 open Wanxiangshu.Runtime.Fallback.RuntimeStore
-open Wanxiangshu.Runtime.Fallback.GateTransitions
+open Wanxiangshu.Runtime.Fallback.SessionPropertyTransitions
 open Wanxiangshu.Runtime.SubsessionService
 open Wanxiangshu.Runtime.SubsessionEventStore
 open Wanxiangshu.Runtime.ErrorClassify
@@ -37,6 +37,7 @@ let private formatRunFailure (f: RunFailure) : string =
     | ProtocolViolation reason -> reason
     | InfrastructureFailure reason -> reason
 
+// ARCHITECTURE_EXEMPT: split this 94-line function later
 let runOmpSubagentCore
     (fallbackRuntime: FallbackRuntimeStore)
     (fallbackConfigOpt: FallbackConfig option)

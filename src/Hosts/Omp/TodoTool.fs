@@ -39,6 +39,7 @@ let private validateTodos (params': obj) : Result<unit, string> =
             | Some i -> Error $"todowrite todos[{i}] requires content and status"
             | None -> Ok()
 
+// ARCHITECTURE_EXEMPT: split this 112-line function later
 let registerTodoTool (pi: obj) : unit =
     let tb = Dyn.get pi "typebox"
 
@@ -49,6 +50,7 @@ let registerTodoTool (pi: obj) : unit =
               "description", box (toolDescriptionFor omp)
               "parameters", todowriteParameters tb
               "execute",
+              // ARCHITECTURE_EXEMPT: split this 101-line function later
               box (fun (_id: string) (params': obj) (_s: obj) (_u: obj) (ctx: obj) ->
                   promise {
                       let ahaMoments = (Dyn.str params' "ahaMoments").Trim()

@@ -34,8 +34,6 @@ open Wanxiangshu.Runtime.Dyn
 open Wanxiangshu.Runtime.Fallback.RuntimeStore
 open Wanxiangshu.Runtime.Fallback.LeaseTransitions
 open Wanxiangshu.Runtime.Fallback.SessionRuntime
-open Wanxiangshu.Runtime.Fallback.GateTransitions
-open Wanxiangshu.Runtime.NudgeRuntimeTypes
 open Wanxiangshu.Kernel.FallbackKernel.Types
 open Wanxiangshu.Runtime.FuzzyIteratorStore
 open Wanxiangshu.Runtime.ReviewRuntime

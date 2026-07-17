@@ -1,4 +1,4 @@
-module Wanxiangshu.Runtime.Fallback.FallbackBridgePorts
+module Wanxiangshu.Runtime.Fallback.Ports
 
 open Wanxiangshu.Runtime
 

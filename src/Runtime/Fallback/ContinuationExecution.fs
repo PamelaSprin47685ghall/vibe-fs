@@ -1,17 +1,15 @@
-module Wanxiangshu.Runtime.Fallback.FallbackBridgeContinuation
+module Wanxiangshu.Runtime.Fallback.ContinuationExecution
 
 open Fable.Core
 open Wanxiangshu.Kernel.FallbackKernel.Types
-open Wanxiangshu.Kernel.Subsession.Types
 open Wanxiangshu.Runtime.Fallback.RuntimeStore
-open Wanxiangshu.Runtime.Fallback.LeaseTransitions
 open Wanxiangshu.Runtime.Fallback.SessionRuntime
-open Wanxiangshu.Runtime.Fallback.GateTransitions
+open Wanxiangshu.Runtime.Fallback.LeaseTransitions
+open Wanxiangshu.Runtime.Fallback.SessionPropertyTransitions
 open Wanxiangshu.Runtime.Fallback.ModelInjection
-open Wanxiangshu.Runtime.Fallback.FallbackBridgePorts
-open Wanxiangshu.Runtime.EventLogAppendSession
-open Wanxiangshu.Runtime.Fallback.FallbackBridgeLease
-open Wanxiangshu.Runtime.EventLogRuntimeAppend
+open Wanxiangshu.Runtime.Fallback.Ports
+open Wanxiangshu.Runtime.Fallback.LeaseValidation
+open Wanxiangshu.Runtime.ContinuationEventWriter
 open Wanxiangshu.Runtime.Clock
 
 type ContinuationIntent =
@@ -34,71 +32,7 @@ type ContinuationIntent =
         continuationOrdinal: int
     | PropagateFailureIntent
 
-let appendOutcomeIfNeeded
-    (workspaceRoot: string)
-    (sessionID: string)
-    (lease: PendingLease)
-    (outcome: ContinuationOutcome)
-    (errorOrReason: string)
-    : JS.Promise<unit> =
-    promise {
-        match outcome with
-        | ContinuationOutcome.Failed ->
-            do!
-                appendContinuationFailedOrFail
-                    workspaceRoot
-                    sessionID
-                    lease.ContinuationID
-                    errorOrReason
-                    lease.ContinuationOrdinal
-        | ContinuationOutcome.Cancelled ->
-            do!
-                appendContinuationCancelledOrFail
-                    workspaceRoot
-                    sessionID
-                    lease.ContinuationID
-                    errorOrReason
-                    lease.ContinuationOrdinal
-        | ContinuationOutcome.Settled ->
-            do!
-                appendContinuationSettledOrFail
-                    workspaceRoot
-                    sessionID
-                    lease.ContinuationID
-                    lease.HumanTurnID
-                    lease.SessionGeneration
-                    errorOrReason
-                    lease.ContinuationOrdinal
-    }
-
-let finishContinuation
-    (runtime: FallbackRuntimeStore)
-    (workspaceRoot: string)
-    (sessionID: string)
-    (lease: PendingLease)
-    (outcome: ContinuationOutcome)
-    (errorOrReason: string)
-    : JS.Promise<unit> =
-    promise {
-        let isLeaseStillActive =
-            match runtime.TryGetPendingLease sessionID with
-            | Some pending when pending.ContinuationID = lease.ContinuationID -> true
-            | _ -> false
-
-        if isLeaseStillActive then
-            do! appendOutcomeIfNeeded workspaceRoot sessionID lease outcome errorOrReason
-
-        let cleared = runtime.TryClearPendingLease(sessionID, lease.ContinuationID)
-
-        if cleared then
-            if runtime.GetSessionOwner sessionID = SessionOwner.Fallback then
-                runtime.SetSessionOwner sessionID SessionOwner.NoOwner
-
-            runtime.SetMainContinuationAwaitingStart sessionID false
-
-        runtime.UpdateState sessionID (runtime.GetOrCreateState sessionID)
-    }
-
+// ARCHITECTURE_EXEMPT: split this 66-line function later
 let handleDispatchComplete
     (runtime: FallbackRuntimeStore)
     (executor: IActionExecutor)
@@ -288,36 +222,6 @@ let executeContinuationIntent
 
         | PropagateFailureIntent -> do! executor.PropagateFailure sessionID
     }
-
-let setupContinuationLease
-    (runtime: FallbackRuntimeStore)
-    (sessionID: string)
-    (model: FallbackModel)
-    (promptTextOpt: string option)
-    : PendingLease =
-    runtime.SetSessionOwner sessionID SessionOwner.Fallback
-    runtime.SetMainContinuationAwaitingStart sessionID true
-    let currentGen = runtime.GetSessionGeneration sessionID
-    let currentCancelGen = runtime.GetCancelGeneration sessionID
-    runtime.SetActiveContinuationGeneration sessionID currentGen
-    runtime.SetActiveContinuationCancelGeneration sessionID currentCancelGen
-
-    let continuationID = System.Guid.NewGuid().ToString("N")
-    let continuationOrdinal = runtime.IncrementContinuationOrdinal sessionID
-
-    let lease =
-        { ContinuationID = continuationID
-          ContinuationOrdinal = continuationOrdinal
-          SessionGeneration = currentGen
-          HumanTurnID = runtime.GetHumanTurnId sessionID
-          CancelGeneration = currentCancelGen
-          Owner = SessionOwner.Fallback
-          Model = model
-          PromptText = promptTextOpt
-          Status = LeaseStatus.Requested }
-
-    runtime.SetPendingLease(sessionID, lease)
-    lease
 
 let handleContinuationAction
     (runtime: FallbackRuntimeStore)

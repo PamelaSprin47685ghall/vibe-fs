@@ -30,7 +30,7 @@ open Wanxiangshu.Runtime.Dyn
 open Wanxiangshu.Runtime.OpencodeHookInputCodec
 open Wanxiangshu.Runtime.Fallback.RuntimeStore
 open Wanxiangshu.Runtime.Fallback.LeaseTransitions
-open Wanxiangshu.Runtime.Fallback.GateTransitions
+open Wanxiangshu.Runtime.Fallback.SessionPropertyTransitions
 open Wanxiangshu.Runtime.SubsessionEventRouter
 open Wanxiangshu.Runtime.EventLogRuntime
 open Wanxiangshu.Runtime.WorkBacklogToolsCodec

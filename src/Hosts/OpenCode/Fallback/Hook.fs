@@ -15,17 +15,18 @@ open Wanxiangshu.Kernel.Errors.DomainError
 open Wanxiangshu.Kernel.Session.Causality
 open Wanxiangshu.Kernel.FallbackKernel.Types
 open Wanxiangshu.Kernel.Subsession.Types
-open Wanxiangshu.Kernel.Subsession.PartTypeClassify
-open Wanxiangshu.Runtime.Fallback.FallbackEventBridge
+open Wanxiangshu.Kernel.Subsession.TypeClassify
+open Wanxiangshu.Runtime.Fallback.Coordinator
 open Wanxiangshu.Runtime.Fallback.RuntimeStore
-open Wanxiangshu.Runtime.Fallback.GateTransitions
+open Wanxiangshu.Runtime.Fallback.SessionPropertyTransitions
 open Wanxiangshu.Runtime.SubsessionActorRegistry
-open Wanxiangshu.Runtime.Fallback.FallbackBridgePorts
+open Wanxiangshu.Runtime.Fallback.Ports
 open Wanxiangshu.Runtime.SubsessionEventRouter
 open Wanxiangshu.Runtime.SubsessionChildObserver
 open Wanxiangshu.Runtime.SubsessionTranscript
 open Wanxiangshu.Hosts.Opencode.Fallback.HostEventInspection
 open Wanxiangshu.Hosts.Opencode.Fallback.EventTranslator
+open Wanxiangshu.Hosts.Opencode.Fallback.MessageInspection
 open Wanxiangshu.Hosts.Opencode.Fallback.ActionExecutor
 
 let private setConsumedFromResult

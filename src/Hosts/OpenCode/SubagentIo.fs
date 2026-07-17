@@ -12,7 +12,7 @@ open Wanxiangshu.Kernel.ToolResult
 open Wanxiangshu.Runtime.ErrorClassify
 open Wanxiangshu.Runtime.ChildAgentRegistry
 open Wanxiangshu.Runtime.Fallback.RuntimeStore
-open Wanxiangshu.Runtime.Fallback.GateTransitions
+open Wanxiangshu.Runtime.Fallback.SessionPropertyTransitions
 open Wanxiangshu.Runtime.DelegatedAiSettings
 open Wanxiangshu.Runtime.OpencodeClientCodec
 open Wanxiangshu.Runtime.SessionIoSpawn
@@ -60,9 +60,13 @@ let private resolveParentLiveModel
                     match Wanxiangshu.Runtime.Fallback.FallbackMessageCodec.tryGetLatestUserModel msgs with
                     | Some m -> return Some m
                     | None ->
-                        return! Wanxiangshu.Hosts.Opencode.Fallback.HostEventInspection.tryReadCurrentModel client parentSessionID
+                        return!
+                            Wanxiangshu.Hosts.Opencode.Fallback.HostEventInspection.tryReadCurrentModel
+                                client
+                                parentSessionID
     }
 
+// ARCHITECTURE_EXEMPT: split this 177-line function later
 let runSubagentCoreResult
     (runtime: FallbackRuntimeStore)
     (registry: ChildAgentRegistry)
@@ -168,7 +172,9 @@ let runSubagentCoreResult
 
                     let cfg =
                         let dir = if directory = "" then "." else directory
-                        let fallbackConfigOpt = Wanxiangshu.Runtime.Fallback.FallbackConfigCodec.loadFallbackConfig dir
+
+                        let fallbackConfigOpt =
+                            Wanxiangshu.Runtime.Fallback.FallbackConfigCodec.loadFallbackConfig dir
 
                         match fallbackConfigOpt with
                         | Some c -> c
@@ -252,7 +258,7 @@ let runSubagentWithCleanup
     (sessionID: string)
     (context: obj)
     : JS.Promise<Result<string, DomainError>> =
-    runSubagentCoreResult runtime registry client agent title prompt directory sessionID context (box null) false None
+    runSubagentCoreResult runtime registry client agent title prompt directory sessionID context (box null) true None
 
 let runSubagent
     (runtime: FallbackRuntimeStore)

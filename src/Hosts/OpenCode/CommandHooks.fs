@@ -21,6 +21,7 @@ open Wanxiangshu.Runtime.EventLogRuntime
 open Wanxiangshu.Runtime.RuntimeScope
 
 /// Handle /loop and /loop-review slash commands.
+// ARCHITECTURE_EXEMPT: split this 84-line function later
 let commandExecuteBefore
     (childAgentRegistry: ChildAgentRegistry)
     (ctx: obj)

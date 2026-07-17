@@ -11,7 +11,9 @@ open Wanxiangshu.Kernel.Nudge
 open Wanxiangshu.Kernel.Nudge.Types
 open Wanxiangshu.Kernel.HostTools
 open Wanxiangshu.Runtime
-open Wanxiangshu.Runtime.Fallback.GateTransitions
+open Wanxiangshu.Runtime.Fallback.GateFlagTransitions
+open Wanxiangshu.Runtime.Fallback.CompactionTransitions
+open Wanxiangshu.Runtime.Fallback.SessionPropertyTransitions
 open Wanxiangshu.Runtime.Fallback.RuntimeStore
 open Wanxiangshu.Runtime.Fallback.LeaseTransitions
 open Wanxiangshu.Runtime.Dyn
@@ -20,7 +22,7 @@ open Wanxiangshu.Runtime.OpencodeHostEvent
 open Wanxiangshu.Runtime.OpencodeHookInputCodec
 open Wanxiangshu.Runtime.ToolRuntimeContext
 open Wanxiangshu.Runtime.EventLogRuntime
-open Wanxiangshu.Runtime.NudgeRuntimeTypes
+open Wanxiangshu.Runtime.NudgeLease
 open Wanxiangshu.Hosts.Opencode.NudgeEffect
 open Wanxiangshu.Hosts.Opencode.Fallback.HostEventInspection
 

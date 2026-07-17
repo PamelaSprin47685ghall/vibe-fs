@@ -155,7 +155,7 @@ let opencodeSubsessionParentIDSpec () =
         let reviewStore = createReviewStore ()
 
         do!
-            Wanxiangshu.Hosts.Opencode.MessageTransform.messagesTransform
+            Wanxiangshu.Hosts.Opencode.MessageTransformHook.messagesTransform
                 registry
                 workspaceDir
                 scope

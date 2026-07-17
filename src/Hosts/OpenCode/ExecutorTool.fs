@@ -27,7 +27,6 @@ open Wanxiangshu.Runtime.OpencodeClientCodec
 open Wanxiangshu.Runtime.ToolExecute
 open Wanxiangshu.Runtime.SubagentDispatcher
 open Wanxiangshu.Runtime.Fallback.RuntimeStore
-open Wanxiangshu.Runtime.Fallback.GateTransitions
 
 [<Global("Buffer")>]
 let private nodeBuffer: obj = jsNative
@@ -35,6 +34,7 @@ let private nodeBuffer: obj = jsNative
 let private byteLength (s: string) : int = nodeBuffer?byteLength (s, "utf-8")
 let private resolveStr (text: string) : JS.Promise<string> = Promise.lift text
 
+// ARCHITECTURE_EXEMPT: split this 77-line function later
 let executorTool
     (host: Host)
     (registry: ChildAgentRegistry)

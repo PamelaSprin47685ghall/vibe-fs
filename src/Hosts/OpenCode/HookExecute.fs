@@ -125,6 +125,7 @@ let toolExecuteBeforeFor (host: Host) (input: obj) (output: obj) : JS.Promise<un
 let toolExecuteBefore (input: obj) (output: obj) : JS.Promise<unit> =
     toolExecuteBeforeFor opencode input output
 
+// ARCHITECTURE_EXEMPT: split this 93-line function later
 let toolExecuteAfterFor
     (host: Host)
     (pluginDirectory: string)

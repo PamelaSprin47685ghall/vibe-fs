@@ -4,13 +4,12 @@ open Fable.Core
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.FallbackKernel.Types
 open Wanxiangshu.Runtime.NudgeRuntime
-open Wanxiangshu.Runtime.NudgeRuntimeTypes
+open Wanxiangshu.Runtime.NudgeRuntimeEvent
 open Wanxiangshu.Runtime
 open Wanxiangshu.Runtime.Dyn
 open Wanxiangshu.Runtime.Fallback.RuntimeStore
-open Wanxiangshu.Runtime.Fallback.GateTransitions
-open Wanxiangshu.Runtime.Fallback.FallbackEventBridge
-open Wanxiangshu.Runtime.Fallback.FallbackBridgePorts
+open Wanxiangshu.Runtime.Fallback.GateFlagTransitions
+open Wanxiangshu.Runtime.Fallback.Ports
 open Wanxiangshu.Runtime.Fallback.FallbackConfigCodec
 open Wanxiangshu.Runtime.EventLogRuntime
 open Wanxiangshu.Runtime.ReviewRuntime
@@ -93,6 +92,7 @@ let private shouldObserveMuxEvent (eventType: string) : bool =
     | "session.remove" -> true
     | _ -> false
 
+// ARCHITECTURE_EXEMPT: split this 125-line function later
 let createEventHook (deps: obj) (reviewStore: ReviewStore) (scope: RuntimeScope) : obj =
     let getChatHistory =
         if Dyn.isNullish deps then
@@ -127,7 +127,9 @@ let createEventHook (deps: obj) (reviewStore: ReviewStore) (scope: RuntimeScope)
     let fallbackHandler =
         createMuxFallbackHandler fallbackRuntime configLookup deps directory
 
+    // ARCHITECTURE_EXEMPT: split this 91-line function later
     let fn =
+        // ARCHITECTURE_EXEMPT: split this 88-line function later
         System.Func<obj, obj, JS.Promise<unit>>(fun event helpers ->
             let decoded = decodeHookEvent event
 

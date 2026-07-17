@@ -1,4 +1,5 @@
 module Wanxiangshu.Runtime.MessageTransform.HostEntry
+
 open Wanxiangshu.Runtime
 
 open Fable.Core
@@ -13,6 +14,7 @@ open Wanxiangshu.Runtime.JsArrayMutate
 
 let emptyTextPlaceholder = "\u200B"
 
+// ARCHITECTURE_EXEMPT: split this 136-line function later
 let rec private sanitizeEmptyStrings (visited: System.Collections.Generic.HashSet<obj>) (v: obj) : unit =
     if not (isNullish v) then
         if isArray v then

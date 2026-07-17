@@ -3,7 +3,7 @@ module Wanxiangshu.Tests.MethodologyTests
 open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Tests.Assert
-open Wanxiangshu.Kernel.Methodology
+open Wanxiangshu.Kernel.Methodology.Api
 open Wanxiangshu.Runtime.ToolOutputInfo
 open Wanxiangshu.Kernel.ToolOutputInfoTypes
 open Wanxiangshu.Kernel.Methodology.Registry

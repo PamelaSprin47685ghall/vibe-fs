@@ -75,6 +75,7 @@ type private VisitState =
       Result: string list
       Path: string list }
 
+// ARCHITECTURE_EXEMPT: split this 62-line function later
 let topologicalOrder (tasks: (string * string list) list) : Result<string list, string list> =
     let depMap = tasks |> Map.ofList
     let idSet = tasks |> List.map fst |> Set.ofList

@@ -37,7 +37,7 @@ let private tryGetCurrentTurnId (workspaceRoot: string) (sessionId: string) : Tu
 
 /// Translate a host-level fact into a Command and post it to the child actor.
 /// Returns true if the event was routed to a child (caller should NOT also
-/// feed it into the main FallbackEventBridge).
+/// feed it into the main fallback coordinator).
 /// If the command is an EvidenceUpdated observation with TurnId of None, we do
 /// not post it to the actor to avoid cross-turn contamination, but we still
 /// consider it routed if the child exists in the registry.

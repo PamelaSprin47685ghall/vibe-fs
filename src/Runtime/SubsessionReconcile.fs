@@ -42,6 +42,7 @@ type private ReconcileHost() =
 /// Load NDJSON, find RunStarted without RunFinished, and ensure those physical
 /// sessions cannot accept a new StartRun until SessionClosed dispose.
 /// Persists SessionPoisoned + TurnFinished + RunFinished so the decision is durable.
+// ARCHITECTURE_EXEMPT: split this 64-line function later
 let reconcileUnfinishedRuns
     (workspaceRoot: string)
     (hostFactory: (string -> ISubsessionHost) option)

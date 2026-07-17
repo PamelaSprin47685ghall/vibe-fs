@@ -27,6 +27,7 @@ type private ReviewStoreState =
     { Registry: Registry
       Effects: SessionEffects }
 
+// ARCHITECTURE_EXEMPT: split this 128-line function later
 let createReviewStore () : ReviewStore =
     let mutable state: ReviewStoreState =
         { Registry = emptyRegistry

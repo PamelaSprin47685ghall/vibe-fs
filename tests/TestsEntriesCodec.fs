@@ -38,8 +38,8 @@ open Wanxiangshu.Tests.FileToolsCodecTests
 open Wanxiangshu.Tests.FuzzyToolsCodecTests
 open Wanxiangshu.Tests.WorkBacklogToolsCodecTests
 open Wanxiangshu.Tests.PatchToolsCodecTests
-open Wanxiangshu.Tests.HostMessagePartCodecTests
-open Wanxiangshu.Tests.MessagingPartCodecTests
+open Wanxiangshu.Tests.HostMessageCodecTests
+open Wanxiangshu.Tests.MessagingCodecTests
 open Wanxiangshu.Tests.ToolContextCodecTests
 open Wanxiangshu.Tests.OpencodeContextCodecTests
 open Wanxiangshu.Tests.OpencodeSessionPromptCodecTests
@@ -90,8 +90,8 @@ let codecTestEntries () : (string * TestBody) list =
       "FuzzyToolsCodecTests.run", Sync(sync FuzzyToolsCodecTests.run)
       "WorkBacklogToolsCodecTests.run", Sync(sync WorkBacklogToolsCodecTests.run)
       "PatchToolsCodecTests.run", Sync(sync PatchToolsCodecTests.run)
-      "HostMessagePartCodecTests.run", Sync(sync HostMessagePartCodecTests.run)
-      "MessagingPartCodecTests.run", Sync(sync MessagingPartCodecTests.run)
+      "HostMessageCodecTests.run", Sync(sync HostMessageCodecTests.run)
+      "MessagingCodecTests.run", Sync(sync MessagingCodecTests.run)
       "ExecutorToolsCodecTests.run", Sync(sync ExecutorToolsCodecTests.run)
       "ToolContextCodecTests.run", Sync(sync ToolContextCodecTests.run)
       "OpencodeContextCodecTests.run", Sync(sync OpencodeContextCodecTests.run)

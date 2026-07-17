@@ -12,8 +12,7 @@ open Wanxiangshu.Runtime.Dyn
 module Dyn = Wanxiangshu.Runtime.Dyn
 
 open Wanxiangshu.Runtime.Fallback.RuntimeStore
-open Wanxiangshu.Runtime.Fallback.GateTransitions
-open Wanxiangshu.Runtime.Fallback.FallbackEventBridge
+open Wanxiangshu.Runtime.Fallback.Coordinator
 open Wanxiangshu.Runtime.ReviewRuntime
 open Wanxiangshu.Hosts.Omp.PluginComposition
 open Wanxiangshu.Tests.AsyncFlush

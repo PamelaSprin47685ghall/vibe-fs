@@ -3,13 +3,7 @@ module Wanxiangshu.Runtime.EventLogCodec
 open Fable.Core
 open Wanxiangshu.Kernel.EventSourcing.EventEnvelope
 open Wanxiangshu.Kernel.EventSourcing.EventKind
-open Wanxiangshu.Runtime.FileSys
-open FileSys
 open Thoth.Json
-
-let eventLogFileName = ".wanxiangshu.ndjson"
-
-let eventPath (workspaceRoot: string) : string = resolve workspaceRoot eventLogFileName
 
 let wanEventToLine (e: WanEvent) : string = Encode.Auto.toString (0, e)
 

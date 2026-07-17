@@ -9,7 +9,7 @@ open Wanxiangshu.Runtime.Dyn
 open Wanxiangshu.Runtime.RuntimeScope
 open Wanxiangshu.Runtime.OmpHostBindings
 open Wanxiangshu.Runtime.Fallback.RuntimeStore
-open Wanxiangshu.Runtime.Fallback.GateTransitions
+open Wanxiangshu.Runtime.Fallback.SessionPropertyTransitions
 open Wanxiangshu.Runtime.Fallback.FallbackRecoveryWait
 open Wanxiangshu.Runtime.SubagentIo
 open Wanxiangshu.Runtime.ErrorClassify
@@ -51,6 +51,7 @@ let callOpt (ctx: obj) (key: string) : obj =
     let g = Dyn.get ctx key
     if Dyn.typeIs g "function" then Dyn.call0 g else box null
 
+// ARCHITECTURE_EXEMPT: split this 111-line function later
 let createChildSession
     (scope: RuntimeScope)
     (pi: obj)
@@ -163,6 +164,7 @@ let createChildSession
                   dispose = dispose }
     }
 
+// ARCHITECTURE_EXEMPT: split this 71-line function later
 let runSubagentWithId
     (scope: RuntimeScope)
     (pi: obj)

@@ -176,7 +176,7 @@ let buildExtensionProperties
                     tryCallSchemaMethod
                         minArrZod
                         "describe"
-                        (box Wanxiangshu.Kernel.Methodology.selectMethodologyFieldDescription)
+                        (box Wanxiangshu.Kernel.Methodology.Api.selectMethodologyFieldDescription)
                 with
                 | Some descArr -> extProps <- ("select_methodology", descArr) :: extProps
                 | None -> ()

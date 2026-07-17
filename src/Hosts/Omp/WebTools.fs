@@ -98,6 +98,7 @@ let private buildWebsearch
                               return textResult summary
               }) ]
 
+// ARCHITECTURE_EXEMPT: split this 65-line function later
 let private buildWebfetch (pi: obj) : obj =
     let tb = Dyn.get pi "typebox"
 

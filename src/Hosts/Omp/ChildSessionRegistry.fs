@@ -9,7 +9,6 @@ open Wanxiangshu.Runtime.Dyn
 open Wanxiangshu.Runtime.RuntimeScope
 open Wanxiangshu.Runtime.OmpHostBindings
 open Wanxiangshu.Runtime.Fallback.RuntimeStore
-open Wanxiangshu.Runtime.Fallback.GateTransitions
 open Wanxiangshu.Hosts.Omp.SubagentRuntime
 open Wanxiangshu.Kernel.FallbackKernel.Types
 

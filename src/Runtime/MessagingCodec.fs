@@ -1,6 +1,6 @@
 // Kernel Messaging tree decode (tool state, text parts, host wire shapes).
-// For dedup / text projection on msg.parts only, use HostMessagePartCodec.
-module Wanxiangshu.Runtime.MessagingPartCodec
+// For dedup / text projection on msg.parts only, use HostMessageCodec.
+module Wanxiangshu.Runtime.MessagingCodec
 
 open Wanxiangshu.Kernel.Messaging
 open Wanxiangshu.Kernel.ToolExecutionStatusModule

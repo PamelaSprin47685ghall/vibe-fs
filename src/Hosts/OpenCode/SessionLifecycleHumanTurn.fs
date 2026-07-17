@@ -7,13 +7,18 @@ open Wanxiangshu.Runtime.OpencodeHookInputCodec
 open Wanxiangshu.Runtime.ToolRuntimeContext
 open Wanxiangshu.Runtime.Fallback.RuntimeStore
 open Wanxiangshu.Runtime.Fallback.LeaseTransitions
-open Wanxiangshu.Runtime.Fallback.GateTransitions
+open Wanxiangshu.Runtime.Fallback.HumanTurnTransitions
+open Wanxiangshu.Runtime.Fallback.OrdinalTransitions
+open Wanxiangshu.Runtime.Fallback.CompactionTransitions
+open Wanxiangshu.Runtime.Fallback.SessionPropertyTransitions
 open Wanxiangshu.Runtime.Fallback.ModelInjection
-open Wanxiangshu.Runtime.Fallback.FallbackBridgeContinuation
-open Wanxiangshu.Runtime.EventLogRuntime
+open Wanxiangshu.Runtime.Fallback.LeaseValidation
+open Wanxiangshu.Runtime.SessionEventWriter
+open Wanxiangshu.Runtime.NudgeEventWriter
 open Wanxiangshu.Runtime.ToolHookRuntime
 
 /// Reset session runtime for a new human turn (or no-op on duplicate message id).
+// ARCHITECTURE_EXEMPT: split this 117-line function later
 let onNewHumanMessage
     (ctx: obj)
     (fallbackRuntime: FallbackRuntimeStore)

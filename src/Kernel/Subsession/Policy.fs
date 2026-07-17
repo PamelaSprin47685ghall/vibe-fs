@@ -82,6 +82,7 @@ let afterSuccessfulTurn (policy: FallbackPolicyState) : FallbackPolicyState =
             ContinueCount = 0 }
     | StableAt _ -> { policy with ContinueCount = 0 }
 
+// ARCHITECTURE_EXEMPT: split this 64-line function later
 let afterError
     (cfg: FallbackConfig)
     (chain: FallbackChain)

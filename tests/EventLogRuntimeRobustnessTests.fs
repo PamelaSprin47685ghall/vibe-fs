@@ -11,7 +11,7 @@ open Wanxiangshu.Kernel.Nudge
 open Wanxiangshu.Kernel.Review
 open Wanxiangshu.Kernel.Backlog
 open Wanxiangshu.Runtime.EventLogCodec
-open Wanxiangshu.Runtime.EventLogFiles
+open Wanxiangshu.Runtime.EventStore
 open Wanxiangshu.Runtime.EventLogRuntime
 
 let testAppendEventFailsMemoryNotPolluted () =

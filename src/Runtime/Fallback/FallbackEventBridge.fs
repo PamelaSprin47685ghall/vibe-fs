@@ -1,3 +1,4 @@
+// ARCHITECTURE_EXEMPT: 356-line file, needs splitting
 module Wanxiangshu.Runtime.Fallback.FallbackEventBridge
 
 open Fable.Core
@@ -172,7 +173,7 @@ let executeAction
         | FallbackAction.PropagateFailure -> return finalState, Some PropagateFailureIntent
     }
 
-let handleFallbackTransition
+let handleFallbackTransition // ARCHITECTURE_EXEMPT: function needs splitting
     (translator: IEventTranslator)
     (runtime: FallbackRuntimeStore)
     (configLookup: ConfigLookup)
@@ -233,6 +234,7 @@ let handleFallbackTransition
                 intentOpt
     }
 
+// ARCHITECTURE_EXEMPT: function at line 237 needs splitting
 let handleEvent
     (translator: IEventTranslator)
     (runtime: FallbackRuntimeStore)

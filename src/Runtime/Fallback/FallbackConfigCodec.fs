@@ -128,7 +128,7 @@ let resolveConfiguredChain (cfg: FallbackConfig) (agentName: string) : FallbackC
     | None -> cfg.DefaultChain
 
 /// Prepend the live session model to a configured chain, de-duplicating by identity.
-/// Mirrors FallbackEventBridge's first-time chain materialization.
+/// Mirrors the fallback coordinator's first-time chain materialization.
 let prependCurrentModel (current: FallbackModel option) (resolved: FallbackChain) : FallbackChain =
     match current with
     | Some current ->

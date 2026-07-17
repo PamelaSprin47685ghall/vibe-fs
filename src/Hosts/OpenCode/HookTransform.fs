@@ -3,7 +3,7 @@ module Wanxiangshu.Hosts.Opencode.HookTransform
 open Fable.Core
 open Wanxiangshu.Kernel.HostTools
 open Wanxiangshu.Hosts.Opencode.ChatHooks
-open Wanxiangshu.Hosts.Opencode.MessageTransform
+open Wanxiangshu.Hosts.Opencode.MessageTransformHook
 open Wanxiangshu.Hosts.Opencode.SystemTransform
 open Wanxiangshu.Hosts.Opencode.CompactionTransform
 open Wanxiangshu.Hosts.Opencode.ToolDefinitionHooks
@@ -37,7 +37,15 @@ let messagesTransform
     (input: obj)
     (output: obj)
     : JS.Promise<unit> =
-    MessageTransform.messagesTransform registry directory runtimeScope backlogSession reviewStore client input output
+    MessageTransformHook.messagesTransform
+        registry
+        directory
+        runtimeScope
+        backlogSession
+        reviewStore
+        client
+        input
+        output
 
 let systemTransform (directory: string) (input: obj) (output: obj) : JS.Promise<unit> =
     SystemTransform.systemTransform directory input output

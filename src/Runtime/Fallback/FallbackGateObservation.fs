@@ -5,7 +5,8 @@ open Wanxiangshu.Kernel.FallbackRuntimeFlags
 open Wanxiangshu.Kernel.FallbackSubagentGate
 open Wanxiangshu.Kernel.Nudge.Types
 open Wanxiangshu.Runtime.Fallback.RuntimeStore
-open Wanxiangshu.Runtime.Fallback.GateTransitions
+open Wanxiangshu.Runtime.Fallback.GateFlagTransitions
+open Wanxiangshu.Runtime.Fallback.SessionPropertyTransitions
 open Wanxiangshu.Runtime.Fallback.GateState
 
 let observe (runtime: FallbackRuntimeStore) (sessionID: string) : FallbackGateObservation =

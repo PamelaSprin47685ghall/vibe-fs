@@ -21,9 +21,7 @@ open Wanxiangshu.Runtime.ChildAgentRegistry
 open Wanxiangshu.Runtime
 open Wanxiangshu.Runtime.Fallback.FallbackConfigCodec
 open Wanxiangshu.Runtime.Fallback.RuntimeStore
-open Wanxiangshu.Runtime.Fallback.GateTransitions
-open Wanxiangshu.Runtime.Fallback.FallbackEventBridge
-open Wanxiangshu.Runtime.Fallback.FallbackBridgePorts
+open Wanxiangshu.Runtime.Fallback.Ports
 open Wanxiangshu.Runtime.Dyn
 open Wanxiangshu.Runtime.OpencodeClientCodec
 open Wanxiangshu.Runtime.ToolRuntimeContext
@@ -42,6 +40,7 @@ type CoreServices =
       FallbackConfig: FallbackConfig option
       FallbackRuntime: FallbackRuntimeStore }
 
+// ARCHITECTURE_EXEMPT: split this 99-line function later
 let createCoreServices (host: Host) (ctx: obj) =
     let reviewStore = Wanxiangshu.Runtime.ReviewRuntime.createReviewStore ()
     let childAgentRegistry = ChildAgentRegistry.Create()
@@ -59,7 +58,7 @@ let createCoreServices (host: Host) (ctx: obj) =
 
     let fallbackRuntime = FallbackRuntimeStore()
 
-    let fallbackConfigLookup: Wanxiangshu.Runtime.Fallback.FallbackBridgePorts.ConfigLookup =
+    let fallbackConfigLookup: Wanxiangshu.Runtime.Fallback.Ports.ConfigLookup =
         match fallbackConfigOpt with
         | Some cfg -> (fun _ -> cfg)
         | None -> (fun _ -> Wanxiangshu.Runtime.Fallback.FallbackConfigCodec.emptyConfig)

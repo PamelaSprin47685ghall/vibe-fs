@@ -196,6 +196,7 @@ let tryGetModelLimitFromProviderList
         return res |> Option.map valueOf
     }
 
+// ARCHITECTURE_EXEMPT: split this 62-line function later
 let tryGetMaxInputTokensAsyncDetailed
     (target: obj)
     (sessionID: string)

@@ -7,7 +7,9 @@ open Wanxiangshu.Runtime.Wanxiangzhen.HttpServer
 open Wanxiangshu.Runtime.Wanxiangzhen.CoordinatorRuntime
 open Wanxiangshu.Runtime.Wanxiangzhen.CoordinatorOps
 
+// ARCHITECTURE_EXEMPT: split this 67-line function later
 let routeHandler (rt: CoordinatorRuntime) : RouteHandler =
+    // ARCHITECTURE_EXEMPT: split this 66-line function later
     fun method path body ->
         promise {
             let p = path.Split('?').[0]

@@ -54,8 +54,8 @@ open Wanxiangshu.Tests.FileToolsCodecTests
 open Wanxiangshu.Tests.FuzzyToolsCodecTests
 open Wanxiangshu.Tests.WorkBacklogToolsCodecTests
 open Wanxiangshu.Tests.PatchToolsCodecTests
-open Wanxiangshu.Tests.HostMessagePartCodecTests
-open Wanxiangshu.Tests.MessagingPartCodecTests
+open Wanxiangshu.Tests.HostMessageCodecTests
+open Wanxiangshu.Tests.MessagingCodecTests
 open Wanxiangshu.Tests.ToolContextCodecTests
 open Wanxiangshu.Tests.OpencodeContextCodecTests
 open Wanxiangshu.Tests.OpencodeSessionPromptCodecTests

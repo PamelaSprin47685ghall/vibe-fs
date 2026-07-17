@@ -25,7 +25,7 @@ let toolDescriptionFor (host: Host) =
     + "\n- Always provide the full todos list. Partial updates are not supported.\n\n"
     + toolDescriptionTail
     + "\n\n"
-    + Wanxiangshu.Kernel.Methodology.selectMethodologyFieldDescription
+    + Wanxiangshu.Kernel.Methodology.Api.selectMethodologyFieldDescription
 
 let toolDescription = toolDescriptionFor opencode
 

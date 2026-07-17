@@ -18,13 +18,12 @@ open Wanxiangshu.Hosts.Omp.MessageTransform
 open Wanxiangshu.Runtime.OmpCaps
 open Wanxiangshu.Runtime.ReviewRuntime
 open Wanxiangshu.Runtime.EventLogRuntime
-open Wanxiangshu.Runtime.Fallback.FallbackBridgePorts
+open Wanxiangshu.Runtime.Fallback.Ports
 open Wanxiangshu.Runtime.RunnerBackground
 open Wanxiangshu.Runtime.SessionExecutor
 open Wanxiangshu.Runtime.TreeSitterShell
 open Wanxiangshu.Runtime.Fallback.RuntimeStore
-open Wanxiangshu.Runtime.Fallback.GateTransitions
-open Wanxiangshu.Runtime.Fallback.FallbackEventBridge
+open Wanxiangshu.Runtime.Fallback.GateFlagTransitions
 open Wanxiangshu.Runtime.Fallback.FallbackConfigCodec
 open Wanxiangshu.Kernel.FallbackKernel.Types
 open Wanxiangshu.Hosts.Omp.Fallback.Hook

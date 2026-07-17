@@ -30,27 +30,3 @@ type FallbackRuntimeStore with
 
     member this.SetInjectedModel (sessionID: string) (model: FallbackModel) : unit =
         this.UpdateSession(sessionID, (fun s -> { s with InjectedModel = Some model }))
-
-    member this.MarkForceStopped(sessionID: string) : unit =
-        this.UpdateSession(sessionID, (fun s -> { s with CompactionForceStopped = true }))
-
-    member this.RemoveForceStopped(sessionID: string) : unit =
-        this.UpdateSession(
-            sessionID,
-            fun s ->
-                { s with
-                    CompactionForceStopped = false }
-        )
-
-    member this.IsForceStopped(sessionID: string) : bool =
-        (this.GetSession sessionID).CompactionForceStopped
-
-    member this.SetTaskComplete(sessionID: string) : unit =
-        this.UpdateSession(
-            sessionID,
-            fun s ->
-                { s with
-                    Core =
-                        { s.Core with
-                            Lifecycle = FallbackLifecycle.TaskComplete } }
-        )

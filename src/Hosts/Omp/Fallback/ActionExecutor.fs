@@ -9,8 +9,8 @@ open Wanxiangshu.Kernel.Errors.DomainError
 open Wanxiangshu.Kernel.Session.Causality
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.FallbackKernel.Types
-open Wanxiangshu.Runtime.Fallback.FallbackBridgePorts
-open Wanxiangshu.Runtime.Fallback.GateTransitions
+open Wanxiangshu.Runtime.Fallback.Ports
+open Wanxiangshu.Runtime.Fallback.SessionPropertyTransitions
 open Wanxiangshu.Runtime.Fallback.RuntimeStore
 
 let private tryGetSession (sessionID: string) (sessionApi: obj) : obj option =

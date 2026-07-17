@@ -130,6 +130,7 @@ let private strOrEmpty (o: string option) : string =
     | Some s -> s
     | None -> ""
 
+// ARCHITECTURE_EXEMPT: split this 67-line function later
 let private snapshotFolder (st: NudgeSnapshotState) (e: WanEvent) : NudgeSnapshotState =
     match e.Kind with
     | k when k = eventKindAssistantCompleted ->

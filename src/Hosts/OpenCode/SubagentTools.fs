@@ -19,7 +19,6 @@ open Wanxiangshu.Runtime.ChildAgentRegistry
 open Wanxiangshu.Runtime.OpencodeClientCodec
 open Wanxiangshu.Runtime.SubagentDispatcher
 open Wanxiangshu.Runtime.Fallback.RuntimeStore
-open Wanxiangshu.Runtime.Fallback.GateTransitions
 open Wanxiangshu.Runtime.ToolRuntimeContext
 open Wanxiangshu.Runtime.RuntimeScope
 

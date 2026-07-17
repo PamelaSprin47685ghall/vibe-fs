@@ -43,6 +43,7 @@ let tryGetHostConfigDefault (target: obj) : int option =
             else
                 None
 
+// ARCHITECTURE_EXEMPT: split this 63-line function later
 let resolveMaxInputTokens (targets: obj list) (sessionID: string) (directory: string) : JS.Promise<int> =
     promise {
         let syncRes = targets |> List.map tryExtractMaxInputTokensDetailed |> List.choose id

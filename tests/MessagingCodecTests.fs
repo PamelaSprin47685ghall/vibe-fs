@@ -1,10 +1,10 @@
-module Wanxiangshu.Tests.MessagingPartCodecTests
+module Wanxiangshu.Tests.MessagingCodecTests
 
 open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Kernel.ToolExecutionStatusModule
-open Wanxiangshu.Runtime.MessagingPartCodec
+open Wanxiangshu.Runtime.MessagingCodec
 
 let muxPartStateToKernelStatusMaps () =
     check

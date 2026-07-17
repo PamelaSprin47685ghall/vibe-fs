@@ -32,6 +32,7 @@ let private optBool (o: obj) (key: string) : bool option =
     let v = Dyn.get o key
     if Dyn.isNullish v then None else Some(unbox<bool> v)
 
+// ARCHITECTURE_EXEMPT: split this 74-line function later
 let executeSubmitReview
     (store: ReviewStore, pi: obj, ctx: obj, id: string, params': obj, signal: obj, onUpdate: obj)
     : JS.Promise<ToolResult> =
@@ -90,8 +91,10 @@ let executeSubmitReview
                         let verdict, feedback =
                             match r with
                             | Accepted fb ->
-                                Wanxiangshu.Kernel.EventSourcing.EventKind.verdictAccepted, (if fb = "" then None else Some fb)
-                            | NeedsRevision fb -> Wanxiangshu.Kernel.EventSourcing.EventKind.verdictNeedsRevision, Some fb
+                                Wanxiangshu.Kernel.EventSourcing.EventKind.verdictAccepted,
+                                (if fb = "" then None else Some fb)
+                            | NeedsRevision fb ->
+                                Wanxiangshu.Kernel.EventSourcing.EventKind.verdictNeedsRevision, Some fb
                             | Terminated -> Wanxiangshu.Kernel.EventSourcing.EventKind.verdictTerminated, None
 
                         do! appendReviewVerdictOrFail root sessionId verdict feedback

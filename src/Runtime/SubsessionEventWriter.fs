@@ -1,67 +1,11 @@
-module Wanxiangshu.Runtime.EventLogRuntimeAppend
+module Wanxiangshu.Runtime.SubsessionEventWriter
 
 open Fable.Core
 open Wanxiangshu.Kernel.EventSourcing.EventEnvelope
 open Wanxiangshu.Kernel.EventSourcing.EventKind
-open Wanxiangshu.Kernel
 open Wanxiangshu.Runtime.EventLogCodec
 open Wanxiangshu.Runtime.EventLogRuntimeStore
 open Wanxiangshu.Runtime.Clock
-open Wanxiangshu.Runtime.WorkBacklogToolsCodec
-open Thoth.Json
-
-let private statusToString =
-    function
-    | ToolArgs.Todo -> "pending"
-    | ToolArgs.InProgress -> "in_progress"
-    | ToolArgs.Completed -> "completed"
-    | ToolArgs.Cancelled -> "cancelled"
-
-let private priorityToString =
-    function
-    | ToolArgs.Low -> "low"
-    | ToolArgs.Medium -> "medium"
-    | ToolArgs.High -> "high"
-
-let private backlogPayload (args: TodoWriteArgs) =
-    let mappedTodos =
-        args.Todos
-        |> Array.map (fun t ->
-            {| Content = t.Content
-               Status = statusToString t.Status
-               Priority = priorityToString t.Priority |})
-
-    Map
-        [ "ahaMoments", args.AhaMoments
-          "changesAndReasons", args.ChangesAndReasons
-          "gotchas", args.Gotchas
-          "lessonsAndConventions", args.LessonsAndConventions
-          "plan", args.Plan
-          "todosJson", Encode.Auto.toString (0, mappedTodos)
-          "selectMethodologyJson", Encode.Auto.toString (0, args.SelectMethodology) ]
-
-let private append (workspaceRoot: string) (e: WanEvent) : JS.Promise<Result<unit, string>> =
-    appendAndCache workspaceRoot e
-
-let private appendOrFail (workspaceRoot: string) (e: WanEvent) : JS.Promise<unit> = appendAndCacheOrFail workspaceRoot e
-
-let appendWorkBacklogCommitted
-    (workspaceRoot: string)
-    (sessionID: string)
-    (args: TodoWriteArgs)
-    : JS.Promise<Result<unit, string>> =
-    append
-        workspaceRoot
-        (buildEvent sessionID eventKindWorkBacklogCommitted (backlogPayload args) (getTimestampMs().ToString()))
-
-let appendWorkBacklogCommittedOrFail
-    (workspaceRoot: string)
-    (sessionID: string)
-    (args: TodoWriteArgs)
-    : JS.Promise<unit> =
-    appendOrFail
-        workspaceRoot
-        (buildEvent sessionID eventKindWorkBacklogCommitted (backlogPayload args) (getTimestampMs().ToString()))
 
 let appendSubagentSpawned
     (workspaceRoot: string)
@@ -70,7 +14,7 @@ let appendSubagentSpawned
     (agent: string)
     (title: string)
     : JS.Promise<Result<unit, string>> =
-    append
+    appendAndCache
         workspaceRoot
         (buildEvent
             sessionID
@@ -85,7 +29,7 @@ let appendSubagentSpawnedOrFail
     (agent: string)
     (title: string)
     : JS.Promise<unit> =
-    appendOrFail
+    appendAndCacheOrFail
         workspaceRoot
         (buildEvent
             sessionID
@@ -99,7 +43,7 @@ let appendSubagentContinued
     (childId: string)
     (prompt: string)
     : JS.Promise<Result<unit, string>> =
-    append
+    appendAndCache
         workspaceRoot
         (buildEvent
             sessionID
@@ -113,7 +57,7 @@ let appendSubagentContinuedOrFail
     (childId: string)
     (prompt: string)
     : JS.Promise<unit> =
-    appendOrFail
+    appendAndCacheOrFail
         workspaceRoot
         (buildEvent
             sessionID
@@ -131,7 +75,7 @@ let appendSubsessionRunStartedOrFail
     let payload =
         Map [ "childId", childId; "parentSessionId", parentSessionId; "runId", runId ]
 
-    appendOrFail
+    appendAndCacheOrFail
         workspaceRoot
         (buildEvent sessionID eventKindSubsessionRunStarted payload (getTimestampMs().ToString()))
 
@@ -144,7 +88,7 @@ let appendSubsessionRunSettledOrFail
     : JS.Promise<unit> =
     let payload = Map [ "childId", childId; "runId", runId; "status", status ]
 
-    appendOrFail
+    appendAndCacheOrFail
         workspaceRoot
         (buildEvent sessionID eventKindSubsessionRunSettled payload (getTimestampMs().ToString()))
 
@@ -154,7 +98,7 @@ let appendSubsessionDomainEventOrFail
     (kind: string)
     (payload: Map<string, string>)
     : JS.Promise<unit> =
-    appendOrFail workspaceRoot (buildEvent sessionID kind payload (getTimestampMs().ToString()))
+    appendAndCacheOrFail workspaceRoot (buildEvent sessionID kind payload (getTimestampMs().ToString()))
 
 /// Atomic multi-event append for one Subsession Decision.
 let appendSubsessionDomainEventsOrFail

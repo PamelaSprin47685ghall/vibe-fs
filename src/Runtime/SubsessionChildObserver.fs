@@ -6,7 +6,7 @@ open Wanxiangshu.Runtime.SubsessionPorts
 open Wanxiangshu.Runtime.Dyn
 open Wanxiangshu.Runtime.Fallback.FallbackMessageCodec
 open Wanxiangshu.Runtime.Fallback.RuntimeStore
-open Wanxiangshu.Runtime.Fallback.GateTransitions
+open Wanxiangshu.Runtime.Fallback.SessionPropertyTransitions
 open Wanxiangshu.Runtime.SubsessionActorRegistry
 open Wanxiangshu.Runtime.SubsessionEventRouter
 
@@ -58,7 +58,7 @@ let observeChildMetadata (runtime: FallbackRuntimeStore) (sessionId: string) (ra
                     | Some m -> runtime.SetModel sessionId m
                     | None -> ()
 
-/// Consume a non-control child event: observe metadata, never enter Main FallbackEventBridge.
+/// Consume a non-control child event: observe metadata, never enter the main fallback coordinator.
 let absorbChildMetadata
     (workspaceRoot: string)
     (runtime: FallbackRuntimeStore)

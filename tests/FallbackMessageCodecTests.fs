@@ -7,13 +7,12 @@ open Fable.Core.JsInterop
 open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Runtime.Fallback.FallbackMessageCodec
 open Wanxiangshu.Runtime.Fallback.FallbackMessageParser
-open Wanxiangshu.Runtime.Fallback.GateTransitions
 open Wanxiangshu.Runtime.Fallback.ModelInjection
 
 module Dyn = Wanxiangshu.Runtime.Dyn
 
 open Wanxiangshu.Kernel.FallbackKernel.Types
-open Wanxiangshu.Runtime.NudgeRuntimeTypes
+open Wanxiangshu.Runtime.NudgeModelResolver
 
 let private mkTodoPart (todos: obj array) : obj =
     createObj

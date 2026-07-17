@@ -7,13 +7,14 @@ module Wanxiangshu.Runtime.Fallback.FallbackBridgeScanToolText
 open Fable.Core
 open Wanxiangshu.Kernel.FallbackKernel.Types
 open Wanxiangshu.Runtime.Fallback.RuntimeStore
-open Wanxiangshu.Runtime.Fallback.LeaseTransitions
 open Wanxiangshu.Runtime.Fallback.SessionRuntime
-open Wanxiangshu.Runtime.Fallback.GateTransitions
-open Wanxiangshu.Runtime.Fallback.FallbackBridgePorts
+open Wanxiangshu.Runtime.Fallback.LeaseTransitions
+open Wanxiangshu.Runtime.Fallback.Ports
+open Wanxiangshu.Runtime.Fallback.LeaseValidation
+open Wanxiangshu.Runtime.Fallback.ContinuationExecution
+open Wanxiangshu.Runtime.Fallback.SessionPropertyTransitions
 open Wanxiangshu.Runtime.Fallback.FallbackMessageCodec
-open Wanxiangshu.Runtime.Fallback.FallbackBridgeContinuation
-open Wanxiangshu.Runtime.EventLogAppendSession
+open Wanxiangshu.Runtime.ContinuationEventWriter
 open Wanxiangshu.Runtime.Clock
 
 let private completeAsTaskDone (runtime: FallbackRuntimeStore) (sessionID: string) (finalState: SessionFallbackState) =
@@ -78,6 +79,8 @@ let private dispatchRecovery
             | Some v -> model.ProviderID + "/" + model.ModelID + ":" + v
             | None -> model.ProviderID + "/" + model.ModelID
 
+        let atMs = getTimestampMs ()
+
         do!
             appendContinuationRequestedOrFail
                 workspaceRoot
@@ -85,7 +88,7 @@ let private dispatchRecovery
                 lease.ContinuationID
                 modelStr
                 agent
-                (getTimestampMs ())
+                atMs
                 lease.SessionGeneration
                 lease.CancelGeneration
                 lease.HumanTurnID

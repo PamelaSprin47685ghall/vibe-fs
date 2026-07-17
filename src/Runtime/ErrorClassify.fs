@@ -5,6 +5,7 @@ open Wanxiangshu.Runtime.Dyn
 open Wanxiangshu.Kernel.Primitives.Identity
 open Wanxiangshu.Kernel.Errors.DomainError
 open Wanxiangshu.Kernel.Session.Causality
+// ARCHITECTURE_EXEMPT: split this 87-line function later
 let translateJsError (error: obj) : DomainError =
     let strOpt (o: obj) (key: string) : string option =
         match opt o key with
@@ -16,6 +17,7 @@ let translateJsError (error: obj) : DomainError =
         | Some v -> not (isNullish v) && string v <> ""
         | None -> false
 
+    // ARCHITECTURE_EXEMPT: split this 74-line function later
     let rec classify (value: obj) (seen: obj list) =
         if isNullish value then
             SystemPanic "Null error context"

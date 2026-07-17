@@ -8,7 +8,7 @@ open Fable.Core.JsInterop
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.FallbackKernel.Types
 open Wanxiangshu.Runtime
-open Wanxiangshu.Runtime.Fallback.GateTransitions
+open Wanxiangshu.Runtime.Fallback.SessionPropertyTransitions
 open Wanxiangshu.Hosts.Opencode.SubsessionDispatch
 
 open Wanxiangshu.Kernel.Config
@@ -133,6 +133,7 @@ let recordContinuationUserMessage
         do! appendEventsAndCacheOrFail workspaceRoot [ wanEvent ]
     }
 
+// ARCHITECTURE_EXEMPT: split this 64-line function later
 let chatMessageFor
     (host: Host)
     (registry: ChildAgentRegistry)

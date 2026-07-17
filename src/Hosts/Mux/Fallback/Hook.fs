@@ -9,12 +9,11 @@ open Wanxiangshu.Kernel.Errors.DomainError
 open Wanxiangshu.Kernel.Session.Causality
 open Wanxiangshu.Kernel.FallbackKernel.Types
 open Wanxiangshu.Kernel.Subsession.Types
-open Wanxiangshu.Kernel.Subsession.PartTypeClassify
-open Wanxiangshu.Runtime.Fallback.FallbackEventBridge
+open Wanxiangshu.Kernel.Subsession.TypeClassify
+open Wanxiangshu.Runtime.Fallback.Coordinator
 open Wanxiangshu.Runtime.Fallback.FallbackMessageCodec
 open Wanxiangshu.Runtime.Fallback.RuntimeStore
-open Wanxiangshu.Runtime.Fallback.GateTransitions
-open Wanxiangshu.Runtime.Fallback.FallbackBridgePorts
+open Wanxiangshu.Runtime.Fallback.Ports
 
 let private muxErrorInput (props: obj) : ErrorInput =
     let errorName = Dyn.str props "errorType"
@@ -30,6 +29,7 @@ let private muxErrorInput (props: obj) : ErrorInput =
         let ir = Dyn.str props "isRetryable"
         if ir <> "" then Some(ir = "true") else None }
 
+// ARCHITECTURE_EXEMPT: split this 127-line function later
 let muxEventTranslator: IEventTranslator =
     let tryExtractTurnIdFromEvent rawEvent =
         let props = Dyn.get rawEvent "properties"

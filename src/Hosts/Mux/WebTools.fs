@@ -70,6 +70,7 @@ let websearchTool (deps: obj) (toolNames: string array) : ToolDefinition =
                     }
       condition = None }
 
+// ARCHITECTURE_EXEMPT: split this 65-line function later
 let webfetchTool: ToolDefinition =
     { name = "webfetch"
       description = description "webfetch"

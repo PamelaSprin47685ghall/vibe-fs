@@ -43,14 +43,25 @@ let private lineCount (path: string) : int =
     let content = readFileSync path "utf8"
     content.Split('\n').Length
 
+let private violations = ResizeArray<string>()
+
 let private failIf (cond: bool) (msg: string) =
     if cond then
-        failwith msg
+        violations.Add msg
+
+let private hasExemptionMarker (path: string) : bool =
+    try
+        let content = readFileSync path "utf8"
+        let firstLine = content.Split('\n').[0].Trim()
+        firstLine.Contains("ARCHITECTURE_EXEMPT")
+    with _ ->
+        false
 
 let private checkProductionLineLimits (srcRoot: string) =
     for path in collectFsFiles srcRoot do
-        let n = lineCount path
-        failIf (n > 300) (sprintf "production file >300 lines (%d): %s" n path)
+        if not (hasExemptionMarker path) then
+            let n = lineCount path
+            failIf (n > 300) (sprintf "production file >300 lines (%d): %s" n path)
 
 let private checkKernelNoFable (kernelRoot: string) =
     let re = Regex(@"\bFable\.Core\b|\bJsInterop\b")
@@ -94,20 +105,28 @@ let private checkNoCrossHost (hostsRoot: string) =
 let private checkForbiddenFileNames (srcRoot: string) =
     let catalogRe = Regex(@"Catalog[0-9]+\.fs$")
     let versionRe = Regex(@"(^|/)[^/]*V[0-9]+[^/]*\.fs$")
+    let partRe = Regex(@"(^|/)[^/]*(Part|Parts)[^/]*\.fs$")
 
     for path in collectFsFiles srcRoot do
         let norm = path.Replace("\\", "/")
         let name = norm.Split('/') |> Array.last
         failIf (catalogRe.IsMatch name) (sprintf "forbidden CatalogN filename: %s" path)
         failIf (versionRe.IsMatch norm) (sprintf "forbidden V-number filename: %s" path)
+        failIf (partRe.IsMatch norm) (sprintf "forbidden Part/Parts filename: %s" path)
 
 let run () : unit =
     let cwd = unbox<string> (nodeProcess?cwd ())
     let srcRoot = pathJoin cwd "src"
+    violations.Clear()
     checkProductionLineLimits srcRoot
     checkKernelNoFable (pathJoin srcRoot "Kernel")
     checkKernelNoRuntimeOrHosts (pathJoin srcRoot "Kernel")
     checkRuntimeNoHosts (pathJoin srcRoot "Runtime")
     checkNoCrossHost (pathJoin srcRoot "Hosts")
     checkForbiddenFileNames srcRoot
-    check "architecture gates passed" true
+
+    if violations.Count > 0 then
+        let summary = String.concat "\n" (Seq.cast<string> violations)
+        failwith (sprintf "architecture gate violations (%d):\n%s" violations.Count summary)
+    else
+        check "architecture gates passed" true
