@@ -87,7 +87,7 @@ export const COVERAGE: Record<string, CoverageEntry[]> = {
   ],
   executor: [
     { id: 'OC-EXEC-001', description: 'Shell command stdout correct', level: 'real-e2e', spec: 'e2e/opencode/specs/p0-canary.js', priority: 'P0' },
-    { id: 'OC-EXEC-002', description: 'JavaScript command stdout correct', level: 'not-covered', priority: 'P0' },
+    { id: 'OC-EXEC-002', description: 'JavaScript command stdout correct', level: 'real-e2e', spec: 'e2e/opencode/specs/p0-canary.js', priority: 'P0' },
     { id: 'OC-EXEC-003', description: 'Non-zero exit code structured return', level: 'unit', priority: 'P0' },
     { id: 'OC-EXEC-004', description: 'stderr visible, not conflated with success', level: 'unit', priority: 'P0' },
     { id: 'OC-EXEC-005', description: 'cwd points to target workspace', level: 'not-covered', priority: 'P0' },
@@ -224,7 +224,7 @@ export const COVERAGE: Record<string, CoverageEntry[]> = {
     { id: 'OC-CB-002', description: 'Session model/provider from session API', level: 'real-e2e', priority: 'P0' },
     { id: 'OC-CB-003', description: 'Usage from real session token data', level: 'real-e2e', priority: 'P0' },
     { id: 'OC-CB-004', description: 'Below threshold = no budget nudge', level: 'real-e2e', priority: 'P0' },
-    { id: 'OC-CB-005', description: 'Above threshold = one nudge injected', level: 'real-e2e', priority: 'P0' },
+    { id: 'OC-CB-005', description: 'Above threshold = one nudge injected', level: 'real-e2e', spec: 'e2e/opencode/specs/p0-canary.js', priority: 'P0' },
     { id: 'OC-CB-006', description: 'Same phase no repeat nudge', level: 'unit', priority: 'P0' },
     { id: 'OC-CB-007', description: 'Backlog commit resets phase baseline', level: 'not-covered', priority: 'P0' },
     { id: 'OC-CB-008', description: 'After phase reset, condition met → nudge again', level: 'not-covered', priority: 'P0' },

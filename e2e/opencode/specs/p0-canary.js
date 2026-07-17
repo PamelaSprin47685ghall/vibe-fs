@@ -224,6 +224,23 @@ const tests = [
 },
 
 {
+  name: 'OC-EXEC-002 JavaScript command stdout correct',
+  fn: async (t) => {
+    const sess = await t.client.createSession();
+    const sid = getSessionId(sess);
+    t.provider.expectToolCall({ id: 'exec-js', tool: 'executor', args: { language: 'javascript', command: 'console.log("hello-js-e2e")' } });
+    t.provider.expectText({ id: 'exec-js-done', text: 'done' });
+    await t.client.prompt(sid, 'run JavaScript: console.log("hello-js-e2e")');
+    if (!await waitForSessionIdle(t.client, t.events, sid)) throw new Error('Not idle');
+    const msgsStr = JSON.stringify((await t.client.messages(sid)).data);
+    if (!msgsStr.includes('hello-js-e2e')) throw new Error('JS executor output not found');
+    t.events.expectCount({ type: 'session.error', sessionID: sid, count: 0 });
+    t.provider.expectSatisfied();
+    t.provider.reset();
+  }
+},
+
+{
   name: 'OC-PTY-001 pty_spawn starts process and returns session ID',
   fn: async (t) => {
     const sess = await t.client.createSession();
@@ -234,6 +251,39 @@ const tests = [
     if (!await waitForSessionIdle(t.client, t.events, sid)) throw new Error('Not idle');
     const msgsStr = JSON.stringify((await t.client.messages(sid)).data);
     if (!msgsStr.includes('pty_')) { throw new Error('PTY session ID not found in messages'); }
+    t.events.expectCount({ type: 'session.error', sessionID: sid, count: 0 });
+    t.provider.expectSatisfied();
+    t.provider.reset();
+  }
+},
+
+{
+  name: 'OC-CB-005 context budget nudge appears after threshold',
+  fn: async (t) => {
+    const sess = await t.client.createSession();
+    const sid = getSessionId(sess);
+    // Generate enough token usage via partial todowrite to trigger budget nudge
+    const pad = 'x'.repeat(1200);
+    t.provider.expectToolCall({ id: 'cb-todo', tool: 'todowrite', args: {
+      ahaMoments: pad, changesAndReasons: pad, gotchas: pad,
+      lessonsAndConventions: pad, plan: pad,
+      todos: [{ content: 'budget test', status: 'completed', priority: 'high' }],
+      select_methodology: ['first_principles'],
+    } });
+    t.provider.expectText({ id: 'cb-text', text: 'continue' });
+    await t.client.prompt(sid, 'commit a detailed report via todowrite and say continue');
+    if (!await waitForSessionIdle(t.client, t.events, sid)) throw new Error('Not idle');
+    // Verify token usage is significant
+    const s = await t.client.sessionStatus(sid);
+    const tokens = s.data?.data?.tokens || s.data?.tokens || {};
+    if ((tokens.input || 0) < 200) throw new Error('Too few input tokens: ' + tokens.input);
+    // Verify budget nudge in the second LLM request
+    const req1 = t.provider.requests[1];
+    if (!req1) throw new Error('No second LLM request for budget nudge check');
+    const reqStr = JSON.stringify(req1);
+    if (!reqStr.includes('context') && !reqStr.includes('budget') && !reqStr.includes('suspend') && !reqStr.includes('about to be')) {
+      throw new Error('Budget nudge not found in second LLM request (expected context/budget/suspend keywords)');
+    }
     t.events.expectCount({ type: 'session.error', sessionID: sid, count: 0 });
     t.provider.expectSatisfied();
     t.provider.reset();
@@ -272,5 +322,5 @@ const tests = [
 
 ];
 
-const exitCode = await runSuite({ plugin: true, timeoutMs: 90000 }, tests);
+const exitCode = await runSuite({ plugin: true, timeoutMs: 90000, contextLimit: 20000 }, tests);
 process.exit(exitCode);
