@@ -61,7 +61,12 @@ let tryBuildLatestAssistantEvidence (msgs: obj array) : CurrentTurnEvidence opti
     if isNull msgs || msgs.Length = 0 then
         None
     else
-        msgs
+        let searchDomain =
+            match lastUserMessageIndex msgs with
+            | Some idx -> msgs.[idx..]
+            | None -> msgs
+
+        searchDomain
         |> Array.tryFindBack (fun msg ->
             let info = Dyn.get msg "info"
             not (Dyn.isNullish info) && Dyn.str info "role" = "assistant")
@@ -90,6 +95,32 @@ let tryBuildLatestAssistantEvidence (msgs: obj array) : CurrentTurnEvidence opti
 
 /// Build CurrentTurnEvidence from messages sliced after the anchor.
 /// Only analyzes messages at or after the anchor index.
+let private buildAssistantEvidence (slice: obj array) : AssistantEvidence =
+    match lastAssistantIndex slice with
+    | None -> NoAssistant
+    | Some idx ->
+        let assistantMsg = slice.[idx]
+        let parts = Dyn.get assistantMsg "parts"
+
+        let text =
+            if not (Dyn.isArray parts) then
+                ""
+            else
+                (parts :?> obj array)
+                |> Array.choose (fun p ->
+                    if Dyn.str p "type" = "text" then
+                        let t = Dyn.str p "text"
+                        if t <> "" then Some t else None
+                    else
+                        None)
+                |> String.concat "\n"
+
+        if text = "" then
+            EmptyAssistant
+        else
+            let toolFinish = isLastAssistantToolFinish slice
+            AssistantSnapshot("", 0L, text, Some(if toolFinish then ToolFinish else NormalFinish))
+
 let buildTurnEvidence (msgs: obj array) (anchor: TurnAnchor) : Result<CurrentTurnEvidence, TranscriptReadFailure> =
     if isNull msgs || msgs.Length = 0 then
         Ok CurrentTurnEvidence.empty
@@ -110,31 +141,7 @@ let buildTurnEvidence (msgs: obj array) (anchor: TurnAnchor) : Result<CurrentTur
                 | Some prompt -> RecoveryPrompt prompt
                 | None -> NoRecoveryPrompt
 
-            let assistant =
-                match lastAssistantIndex slice with
-                | None -> NoAssistant
-                | Some idx ->
-                    let assistantMsg = slice.[idx]
-                    let parts = Dyn.get assistantMsg "parts"
-
-                    let text =
-                        if not (Dyn.isArray parts) then
-                            ""
-                        else
-                            (parts :?> obj array)
-                            |> Array.choose (fun p ->
-                                if Dyn.str p "type" = "text" then
-                                    let t = Dyn.str p "text"
-                                    if t <> "" then Some t else None
-                                else
-                                    None)
-                            |> String.concat "\n"
-
-                    if text = "" then
-                        EmptyAssistant
-                    else
-                        let toolFinish = isLastAssistantToolFinish slice
-                        AssistantSnapshot("", 0L, text, Some(if toolFinish then ToolFinish else NormalFinish))
+            let assistant = buildAssistantEvidence slice
 
             let tool =
                 if hasToolResultAfter slice then
