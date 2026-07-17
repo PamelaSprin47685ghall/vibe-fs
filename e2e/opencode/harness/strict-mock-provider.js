@@ -133,6 +133,7 @@ export class StrictMockProvider {
   constructor() {
     this._expectations = [];
     this._unexpected = [];
+    this._requests = [];
     this._server = null;
     this._port = null;
     this._url = null;
@@ -213,7 +214,10 @@ export class StrictMockProvider {
   reset() {
     this._expectations = [];
     this._unexpected = [];
+    this._requests = [];
   }
+
+  get requests() { return this._requests; }
 
   // ── Server lifecycle ──
 
@@ -300,6 +304,9 @@ export class StrictMockProvider {
           actualTools: extractToolNames(parsed),
         });
       }
+
+      // Log request for test inspection
+      this._requests.push(parsed);
 
       // Consume the matched expectation
       this._expectations.shift();

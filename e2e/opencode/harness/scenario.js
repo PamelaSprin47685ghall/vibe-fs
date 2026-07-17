@@ -1,29 +1,14 @@
 /**
  * scenario.js — Orchestration helper for OpenCode E2E tests.
  *
- * Provides the `scenario()` function that ties together:
- * - Isolated temp directory
- * - Mock LLM provider (strict)
- * - opencode serve process
- * - Event probe
- * - HTTP client
- * - Cleanup with leak detection
+ * Two modes:
+ * 1. `scenario()` — standalone, creates its own host per test (isolated)
+ * 2. `startSuite()` + `suiteScenario()` + `endSuite()` — shared host for 一条龙
  *
- * Usage:
- *   import { scenario } from './harness/scenario.js';
- *
- *   await scenario('OC-FILE-001 writes exact bytes', async (t) => {
- *     await t.host.start({ plugin: true });
- *     const session = await t.client.createSession();
- *     t.provider.expectToolCall({ id: 'write-call', tool: 'write', args: ... });
- *     t.provider.expectText({ id: 'final-answer', text: 'done' });
- *     await t.client.prompt(session.id, 'Write hello.txt');
- *     await t.events.awaitEvent(e => e.type === 'session.idle' && e.sessionID === session.id);
- *     t.fs.expectFile('hello.txt', Buffer.from('hello'));
- *     t.fs.expectFileContent('hello.txt', 'hello');
- *     t.provider.expectSatisfied();
- *     await t.cleanup();
- *   });
+ * Suite mode is preferred because opencode serve starts slowly.
+ * Per the goal: "一个 Scenario = 一个临时 HOME + 一个临时 XDG + 一个临时工作区
+ *                + 一个 mock provider + 一个 opencode serve 进程"
+ * Suite mode gives each test its own session but shares the process.
  */
 
 import fs from 'node:fs';
@@ -35,7 +20,7 @@ import { EventProbe } from './event-probe.js';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-function tmpScenarioDir() {
+function tmpDir() {
   return fs.mkdtempSync(path.join(os.tmpdir(), 'oc-e2e-'));
 }
 
@@ -67,365 +52,349 @@ function resolvePluginPath(variant) {
 
 // ─── FS Oracle ───────────────────────────────────────────────────────────────
 
-class FsOracle {
+export class FsOracle {
   constructor(workDir) {
     this._workDir = workDir;
   }
-
-  /**
-   * Assert a file exists at the given relative path.
-   */
   expectFile(relPath) {
-    const abs = path.join(this._workDir, relPath);
-    if (!fs.existsSync(abs)) {
-      throw new Error(`FS Oracle: expected file does not exist: ${relPath}`);
-    }
+    if (!fs.existsSync(path.join(this._workDir, relPath)))
+      throw new Error(`FS: expected file missing: ${relPath}`);
   }
-
-  /**
-   * Assert a file does not exist.
-   */
   expectNoFile(relPath) {
-    const abs = path.join(this._workDir, relPath);
-    if (fs.existsSync(abs)) {
-      throw new Error(`FS Oracle: unexpected file exists: ${relPath}`);
-    }
+    if (fs.existsSync(path.join(this._workDir, relPath)))
+      throw new Error(`FS: unexpected file exists: ${relPath}`);
   }
-
-  /**
-   * Assert file content matches expected buffer/string.
-   */
   expectFileContent(relPath, expected) {
     const abs = path.join(this._workDir, relPath);
-    if (!fs.existsSync(abs)) {
-      throw new Error(`FS Oracle: file does not exist for content check: ${relPath}`);
-    }
+    if (!fs.existsSync(abs)) throw new Error(`FS: file not found: ${relPath}`);
     const actual = fs.readFileSync(abs);
-    const expectedBuf = typeof expected === 'string' ? Buffer.from(expected, 'utf8') : expected;
-
-    if (!actual.equals(expectedBuf)) {
-      // Show diff for diagnostics
-      const actualStr = actual.toString('utf8');
-      const expectedStr = expectedBuf.toString('utf8');
-      const maxShow = 200;
-      throw new Error(
-        `FS Oracle: file content mismatch: ${relPath}\n` +
-        `  expected (${expectedBuf.length} bytes): ${JSON.stringify(expectedStr.slice(0, maxShow))}\n` +
-        `  actual   (${actual.length} bytes): ${JSON.stringify(actualStr.slice(0, maxShow))}`
-      );
+    const expBuf = typeof expected === 'string' ? Buffer.from(expected, 'utf8') : expected;
+    if (!actual.equals(expBuf)) {
+      const a = actual.toString('utf8').slice(0, 200);
+      const e = expBuf.toString('utf8').slice(0, 200);
+      throw new Error(`FS: content mismatch: ${relPath}\n  exp: ${JSON.stringify(e)}\n  got: ${JSON.stringify(a)}`);
     }
   }
-
-  /**
-   * Assert file content contains substring.
-   */
-  expectFileContains(relPath, substring) {
-    const abs = path.join(this._workDir, relPath);
-    if (!fs.existsSync(abs)) {
-      throw new Error(`FS Oracle: file does not exist: ${relPath}`);
-    }
-    const content = fs.readFileSync(abs, 'utf8');
-    if (!content.includes(substring)) {
-      throw new Error(`FS Oracle: file ${relPath} does not contain: ${substring}`);
-    }
+  expectFileContains(relPath, substr) {
+    const content = fs.readFileSync(path.join(this._workDir, relPath), 'utf8');
+    if (!content.includes(substr)) throw new Error(`FS: ${relPath} does not contain: ${substr}`);
   }
 }
 
 // ─── HTTP Client ─────────────────────────────────────────────────────────────
 
-class HttpClient {
+export class HttpClient {
   constructor(baseUrl, workDir) {
     this._baseUrl = baseUrl;
     this._workDir = workDir;
   }
-
   async request(method, urlPath, opts = {}) {
     const qs = opts.query ? '?' + new URLSearchParams(opts.query).toString() : '';
-    const url = this._baseUrl + urlPath + qs;
-    const headers = {
-      'Content-Type': 'application/json',
-      'x-opencode-directory': this._workDir,
-      ...(opts.headers || {}),
-    };
-    const res = await fetch(url, {
+    const res = await fetch(this._baseUrl + urlPath + qs, {
       method,
-      headers,
+      headers: { 'Content-Type': 'application/json', 'x-opencode-directory': this._workDir, ...(opts.headers || {}) },
       body: opts.body ? JSON.stringify(opts.body) : undefined,
     });
     const text = await res.text();
-    let data;
-    try { data = JSON.parse(text); } catch { data = text; }
-    return { status: res.status, ok: res.ok, data };
+    try { return { status: res.status, ok: res.ok, data: JSON.parse(text) }; } catch { return { status: res.status, ok: res.ok, data: text }; }
   }
-
   async createSession(body = { model: { id: 'test-model', providerID: 'test' } }) {
     return this.request('POST', '/api/session', { body });
   }
-
   async prompt(sessionID, text, timeoutMs = 120000) {
     const ac = new AbortController();
     const timer = setTimeout(() => ac.abort(), timeoutMs);
     try {
       const res = await fetch(`${this._baseUrl}/session/${sessionID}/prompt_async`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-opencode-directory': this._workDir,
-        },
-        body: JSON.stringify({
-          parts: [{ type: 'text', text }],
-          model: { providerID: 'test', modelID: 'test-model' },
-        }),
+        headers: { 'Content-Type': 'application/json', 'x-opencode-directory': this._workDir },
+        body: JSON.stringify({ parts: [{ type: 'text', text }], model: { providerID: 'test', modelID: 'test-model' } }),
         signal: ac.signal,
       });
       const bodyText = await res.text();
       return { status: res.status, ok: res.ok, data: bodyText };
     } catch (err) {
       return { status: 0, ok: false, data: err.message };
-    } finally {
-      clearTimeout(timer);
+    } finally { clearTimeout(timer); }
+  }
+  async messages(sessionID) { return this.request('GET', `/session/${sessionID}/message`); }
+  async sessionStatus(sessionID) { return this.request('GET', `/session/${sessionID}`); }
+  async runCommand(sessionID, command, args = '', timeoutMs = 10000) {
+    const ac = new AbortController();
+    const timer = setTimeout(() => ac.abort(), timeoutMs);
+    try {
+      return await this.requestWithSignal('POST', `/session/${sessionID}/command`, { body: { command, arguments: args } }, ac.signal);
+    } finally { clearTimeout(timer); }
+  }
+  async requestWithSignal(method, urlPath, opts, signal) {
+    const qs = opts.query ? '?' + new URLSearchParams(opts.query).toString() : '';
+    try {
+      const res = await fetch(this._baseUrl + urlPath + qs, {
+        method, signal,
+        headers: { 'Content-Type': 'application/json', 'x-opencode-directory': this._workDir, ...(opts.headers || {}) },
+        body: opts.body ? JSON.stringify(opts.body) : undefined,
+      });
+      const text = await res.text();
+      try { return { status: res.status, ok: res.ok, data: JSON.parse(text) }; } catch { return { status: res.status, ok: res.ok, data: text }; }
+    } catch (err) {
+      return { status: 0, ok: false, data: err.message };
     }
   }
-
-  async messages(sessionID) {
-    return this.request('GET', `/session/${sessionID}/message`);
-  }
-
-  async sessionStatus(sessionID) {
-    return this.request('GET', `/session/${sessionID}`);
-  }
-
-  async runCommand(sessionID, command, args = '') {
-    return this.request('POST', `/session/${sessionID}/command`, {
-      body: { command, arguments: args },
-    });
-  }
-
-  async abort(sessionID) {
-    return this.request('POST', `/session/${sessionID}/abort`, { body: {} });
-  }
+  async abort(sessionID) { return this.request('POST', `/session/${sessionID}/abort`, { body: {} }); }
 }
 
-// ─── Context Object ──────────────────────────────────────────────────────────
+// ─── Suite ───────────────────────────────────────────────────────────────────
 
 /**
- * Context object passed to each scenario function.
+ * Shared test suite: one host, one provider, all tests share them.
  */
-class ScenarioContext {
-  constructor() {
-    this._scenarioDir = null;
-    this._provider = null;
-    this._host = null;
-    this._events = null;
-    this._client = null;
-    this._fs = null;
-    this._sessionIds = [];
+export class Suite {
+  constructor(scenarioDir, host, provider, client, events) {
+    this.scenarioDir = scenarioDir;
+    this.host = host;
+    this.provider = provider;
+    this.client = client;
+    this.events = events;
+    this.sessionIds = [];
+    this.result = { passed: 0, failed: 0 };
   }
 
-  get provider() { return this._provider; }
-  get host() { return this._host; }
-  get events() { return this._events; }
-  get client() { return this._client; }
-  get fs() { return new FsOracle(this._host?.workDir || ''); }
+  get fs() { return new FsOracle(this.host.workDir); }
+}
 
-  get scenarioDir() { return this._scenarioDir; }
+/**
+ * Start a shared E2E suite (one opencode process, all tests share it).
+ * 一条龙模式。
+ */
+export async function startSuite(opts = {}) {
+  const scenarioDir = tmpDir();
+  const workDir = path.join(scenarioDir, 'workspace');
+  fs.mkdirSync(workDir, { recursive: true });
 
-  /**
-   * Must be called by scenario runner to initialize.
-   */
-  async _init(opts = {}) {
-    this._scenarioDir = tmpScenarioDir();
-
-    // Create workspace
-    const workDir = path.join(this._scenarioDir, 'workspace');
-    fs.mkdirSync(workDir, { recursive: true });
-
-    // Setup initial project files
-    if (opts.project) {
-      for (const [file, content] of Object.entries(opts.project)) {
-        const absPath = path.join(workDir, file);
-        fs.mkdirSync(path.dirname(absPath), { recursive: true });
-        fs.writeFileSync(absPath, content);
-      }
-    }
-
-    // Init git
-    await gitInit(workDir);
-
-    // Start mock provider
-    this._provider = new StrictMockProvider();
-    const providerUrl = await this._provider.start();
-    const llmUrl = `${providerUrl}/v1`;
-
-    // Start opencode host
-    this._host = new ProcessHost();
-    const pluginPaths = opts.plugin
-      ? [resolvePluginPath(opts.variant || 'opencode')]
-      : [];
-    await this._host.start({
-      scenarioDir: this._scenarioDir,
-      providerUrl: llmUrl,
-      pluginPaths,
-      contextLimit: opts.contextLimit,
-    });
-
-    // Create HTTP client
-    this._client = new HttpClient(this._host.baseUrl, this._host.workDir);
-
-    // Connect event probe
-    this._events = new EventProbe(this._host.baseUrl, this._host.workDir);
-    await this._events.connect();
-  }
-
-  /**
-   * Cleanup: stop host, provider, remove temp dir.
-   */
-  async _cleanup(keepOnFailure = false) {
-    const errors = [];
-
-    // Close event probe
-    try {
-      if (this._events) this._events.close();
-    } catch (e) {
-      errors.push(`EventProbe close: ${e.message}`);
-    }
-
-    // Abort any remaining sessions
-    for (const sid of this._sessionIds) {
-      try {
-        await this._client?.abort(sid);
-      } catch {}
-    }
-
-    // Stop host
-    try {
-      if (this._host) await this._host.stop();
-    } catch (e) {
-      errors.push(`Host stop: ${e.message}`);
-    }
-
-    // Stop provider
-    try {
-      if (this._provider) await this._provider.stop();
-    } catch (e) {
-      errors.push(`Provider stop: ${e.message}`);
-    }
-
-    // Check socket leak
-    if (this._host && this._host.port) {
-      const closed = await this._host.checkSocketClosed(1000);
-      if (!closed) {
-        errors.push(`Port ${this._host.port} still listening after stop`);
-      }
-    }
-
-    // Remove temp dir (unless keeping for failure analysis)
-    if (!keepOnFailure && this._scenarioDir) {
-      try {
-        fs.rmSync(this._scenarioDir, { recursive: true, force: true });
-      } catch (e) {
-        errors.push(`Temp dir cleanup: ${e.message}`);
-      }
-    }
-
-    if (errors.length > 0) {
-      throw new Error(`Cleanup errors:\n${errors.map(e => `  - ${e}`).join('\n')}`);
+  if (opts.project) {
+    for (const [file, content] of Object.entries(opts.project)) {
+      const absPath = path.join(workDir, file);
+      fs.mkdirSync(path.dirname(absPath), { recursive: true });
+      fs.writeFileSync(absPath, content);
     }
   }
 
-  /**
-   * Register a session for automatic cleanup.
-   */
-  _trackSession(sessionID) {
-    this._sessionIds.push(sessionID);
+  await gitInit(workDir);
+
+  // Provider
+  const provider = new StrictMockProvider();
+  const providerUrl = await provider.start();
+  const llmUrl = `${providerUrl}/v1`;
+
+  // Host
+  const host = new ProcessHost();
+  const pluginPaths = opts.plugin !== false ? [resolvePluginPath(opts.variant || 'opencode')] : [];
+  await host.start({
+    scenarioDir,
+    providerUrl: llmUrl,
+    pluginPaths,
+    contextLimit: opts.contextLimit,
+  });
+
+  // Client
+  const client = new HttpClient(host.baseUrl, host.workDir);
+
+  // Events
+  const events = new EventProbe(host.baseUrl, host.workDir);
+  await events.connect();
+
+  const suite = new Suite(scenarioDir, host, provider, client, events);
+  return suite;
+}
+
+/**
+ * End a shared suite: cleanup host, provider, temp dirs.
+ */
+export async function endSuite(suite, keepOnFailure = false) {
+  const errors = [];
+
+  try { suite.events.close(); } catch (e) { errors.push(`EventProbe: ${e.message}`); }
+
+  for (const sid of suite.sessionIds) {
+    try { await suite.client.abort(sid); } catch {}
+  }
+
+  try { await suite.host.stop(); } catch (e) { errors.push(`Host: ${e.message}`); }
+  try { await suite.provider.stop(); } catch (e) { errors.push(`Provider: ${e.message}`); }
+
+  try {
+    const closed = await suite.host.checkSocketClosed(1000);
+    if (!closed) errors.push(`Port ${suite.host.port} leak`);
+  } catch {}
+
+  if (!keepOnFailure) {
+    try { fs.rmSync(suite.scenarioDir, { recursive: true, force: true }); } catch (e) { errors.push(`Cleanup: ${e.message}`); }
+  }
+
+  if (errors.length > 0) {
+    console.error(`\n  ⚠ Cleanup warnings:\n${errors.map(e => `    ${e}`).join('\n')}`);
   }
 }
 
-// ─── Scenario Runner ─────────────────────────────────────────────────────────
+/**
+ * Run a single scenario within a shared suite.
+ */
+export async function suiteScenario(suite, name, timeoutMs = 120000) {
+  const startTime = Date.now();
+  console.log(`\n  ▶ ${name}`);
+  try {
+    await Promise.race([
+      suite.fn(suite),
+      new Promise((_, reject) => setTimeout(() => reject(new Error(`Timed out after ${timeoutMs}ms`)), timeoutMs)),
+    ]);
+    suite.result.passed++;
+    console.log(`  ✓ ${name} (${Date.now() - startTime}ms)`);
+  } catch (err) {
+    suite.result.failed++;
+    console.error(`  ✗ ${name}: ${err.message}`);
+    console.error(`\n  ── Last 30 events ──`);
+    console.error(suite.events.dump(30));
+    const stderr = suite.host.stderrLog;
+    if (stderr.trim()) console.error(`\n  ── opencode stderr ──\n${stderr.slice(-2000)}`);
+  }
+}
 
 /**
- * Run an E2E test scenario.
+ * Run multiple scenarios as one suite (一条龙).
  *
- * @param {string} name - Test name / spec ID
- * @param {function(ScenarioContext): Promise<void>} fn - Test function
- * @param {object} [opts]
- * @param {boolean} [opts.plugin=true] - Load plugin
- * @param {string} [opts.variant] - Plugin variant (opencode/mimocode/mimotui)
- * @param {number} [opts.timeoutMs=60000] - Overall test timeout
- * @param {number} [opts.contextLimit] - Provider context limit
- * @param {object} [opts.project] - Initial project files { "path": "content" }
+ * @param {object} opts - Suite options (plugin, variant, contextLimit, project)
+ * @param {Array<{name:string, fn:(suite:Suite)=>Promise<void>}>} tests
+ */
+export async function runSuite(opts, tests) {
+  const suite = await startSuite(opts);
+  console.log(`Suite started: ${suite.host.baseUrl}`);
+
+  let passed = 0;
+  let failed = 0;
+
+  for (const { name, fn } of tests) {
+    const startTime = Date.now();
+    console.log(`\n  ▶ ${name}`);
+    try {
+      suite.fn = fn; // HACK: store fn for suiteScenario's access
+      await Promise.race([
+        fn({
+          host: suite.host,
+          provider: suite.provider,
+          events: suite.events,
+          client: suite.client,
+          fs: suite.fs,
+          scenarioDir: suite.scenarioDir,
+        }),
+        new Promise((_, reject) => setTimeout(() => reject(new Error(`Timed out`)), opts.timeoutMs || 120000)),
+      ]);
+      passed++;
+      console.log(`  ✓ ${name} (${Date.now() - startTime}ms)`);
+    } catch (err) {
+      failed++;
+      console.error(`  ✗ ${name}: ${err.message}`);
+      console.error(`\n  ── Last 30 events ──`);
+      console.error(suite.events.dump(30));
+      const stderr = suite.host.stderrLog;
+      if (stderr.trim()) console.error(`\n  ── opencode stderr ──\n${stderr.slice(-2000)}`);
+    }
+  }
+
+  await endSuite(suite, failed > 0);
+  console.log(`\n${passed} passed, ${failed} failed`);
+  return failed === 0 ? 0 : 1;
+}
+
+// ── Legacy helpers ──
+
+async function waitForSessionIdle(client, probe, sessionID, timeoutMs = 60000) {
+  const deadline = Date.now() + timeoutMs;
+  let sawNonIdle = false; // track if we ever observed a non-idle state
+  while (Date.now() < deadline) {
+    // Primary: event-based detection
+    if (probe.bySession(sessionID).find(e => e.type === 'session.idle')) return true;
+
+    // Secondary: HTTP status map
+    const status = await client.request('GET', '/session/status');
+    if (status.ok) {
+      const smap = status.data?.data || status.data;
+      const item = smap?.[sessionID];
+      if (item) {
+        if (item.type === 'idle') return true;
+        sawNonIdle = true;
+      } else if (sawNonIdle) {
+        // Session disappeared from status map after being observed = idle
+        return true;
+      }
+    }
+    await new Promise(r => setTimeout(r, 100));
+  }
+  return false;
+}
+
+function getSessionId(sess) {
+  return sess.data?.data?.data?.id || sess.data?.data?.id;
+}
+
+// ── Standalone Scenario (one host per test) ──
+
+/**
+ * Standalone scenario (creates its own host). Use only for isolation tests.
+ * For most tests, use `runSuite()` instead.
  */
 export async function scenario(name, fn, opts = {}) {
   const startTime = Date.now();
-  const timeoutMs = opts.timeoutMs || 60000;
-  const ctx = new ScenarioContext();
+  const scenarioDir = tmpDir();
+  const workDir = path.join(scenarioDir, 'workspace');
+  fs.mkdirSync(workDir, { recursive: true });
 
-  console.log(`\n  ▶ ${name}`);
+  if (opts.project) {
+    for (const [file, content] of Object.entries(opts.project)) {
+      fs.mkdirSync(path.dirname(path.join(workDir, file)), { recursive: true });
+      fs.writeFileSync(path.join(workDir, file), content);
+    }
+  }
+
+  await gitInit(workDir);
+
+  const provider = new StrictMockProvider();
+  const providerUrl = await provider.start();
+  const host = new ProcessHost();
+  const pluginPaths = opts.plugin !== false ? [resolvePluginPath(opts.variant || 'opencode')] : [];
 
   try {
-    await ctx._init({
-      plugin: opts.plugin !== false,
-      variant: opts.variant || 'opencode',
-      contextLimit: opts.contextLimit,
-      project: opts.project,
-    });
+    await host.start({ scenarioDir, providerUrl: `${providerUrl}/v1`, pluginPaths, contextLimit: opts.contextLimit });
 
-    // Wrap fn to track sessions from createSession
-    const originalCreateSession = ctx.client.createSession.bind(ctx.client);
-    ctx.client.createSession = async (body) => {
-      const result = await originalCreateSession(body);
-      if (result.ok && result.data?.data?.data?.id) {
-        ctx._trackSession(result.data.data.data.id);
-      } else if (result.ok && result.data?.data?.id) {
-        ctx._trackSession(result.data.data.id);
-      }
-      return result;
+    const client = new HttpClient(host.baseUrl, host.workDir);
+    const events = new EventProbe(host.baseUrl, host.workDir);
+    await events.connect();
+
+    const ctx = {
+      host, provider, events, client,
+      fs: new FsOracle(host.workDir),
+      scenarioDir,
+      _sessionIds: [],
     };
 
-    // Run with timeout
+    const timeoutMs = opts.timeoutMs || 60000;
     await Promise.race([
       fn(ctx),
-      new Promise((_, reject) =>
-        setTimeout(() => reject(new Error(`Scenario timed out after ${timeoutMs}ms`)), timeoutMs)
-      ),
+      new Promise((_, reject) => setTimeout(() => reject(new Error(`Timed out after ${timeoutMs}ms`)), timeoutMs)),
     ]);
 
-    await ctx._cleanup(false);
+    events.close();
+    await host.stop();
+    await provider.stop();
+    fs.rmSync(scenarioDir, { recursive: true, force: true });
     console.log(`  ✓ ${name} (${Date.now() - startTime}ms)`);
     return true;
   } catch (err) {
-    // Dump diagnostics on failure
     console.error(`  ✗ ${name}: ${err.message}`);
-    if (ctx.events) {
-      console.error(`\n  ── Last ${30} events ──`);
-      console.error(ctx.events.dump(30));
-    }
-    if (ctx.host && ctx.host.stderrLog) {
-      const stderr = ctx.host.stderrLog;
-      if (stderr.trim()) {
-        console.error(`\n  ── opencode stderr (last 2000 chars) ──`);
-        console.error(stderr.slice(-2000));
-      }
-    }
-
-    try { await ctx._cleanup(true); } catch {}
+    try { await host.stop(); } catch {}
+    try { await provider.stop(); } catch {}
+    try { fs.rmSync(scenarioDir, { recursive: true, force: true }); } catch {}
     return false;
   }
 }
 
-/**
- * Run multiple scenarios sequentially.
- */
-export async function runScenarios(scenarios) {
-  let passed = 0;
-  let failed = 0;
-  for (const { name, fn, opts } of scenarios) {
-    const ok = await scenario(name, fn, opts);
-    if (ok) passed++;
-    else failed++;
-    // Small delay between scenarios for port release
-    await new Promise(r => setTimeout(r, 1000));
-  }
-  console.log(`\n${passed} passed, ${failed} failed`);
-  return failed === 0 ? 0 : 1;
-}
+export { waitForSessionIdle, getSessionId };

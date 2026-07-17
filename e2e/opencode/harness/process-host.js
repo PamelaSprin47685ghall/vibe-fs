@@ -131,6 +131,23 @@ export class ProcessHost {
       || listenLine.match(/:(\d+)/);
     this._port = m ? Number(m[1]) : 0;
     this._baseUrl = `http://127.0.0.1:${this._port}`;
+
+    // Health-check: wait until the HTTP server responds
+    await this._waitForHealth(startTimeout);
+  }
+
+  async _waitForHealth(timeoutMs) {
+    const deadline = Date.now() + timeoutMs;
+    for (let i = 0; i < 50; i++) {
+      try {
+        const res = await fetch(`${this._baseUrl}/api/session`, { method: 'GET' });
+        if (res.ok || res.status === 200) return;
+      } catch {}
+      if (Date.now() > deadline) {
+        throw new Error('Health-check failed: server not responding');
+      }
+      await new Promise(r => setTimeout(r, 100));
+    }
   }
 
   /**
@@ -220,31 +237,37 @@ export class ProcessHost {
       const deadline = Date.now() + timeoutMs;
       let buf = '';
 
-      const check = () => {
-        const idx = buf.indexOf('\n');
-        if (idx !== -1) {
-          const line = buf.slice(0, idx).trim();
-          if (line.includes('opencode server listening on http://')) {
-            this._child.stdout.removeListener('data', handler);
-            resolve(line);
-            return;
-          }
-          buf = buf.slice(idx + 1);
+      const handler = (chunk) => {
+        buf += chunk.toString();
+        // Check full buffer immediately on each data event
+        if (buf.includes('opencode server listening on http://')) {
+          this._child.stdout.removeListener('data', handler);
+          // Extract the listening line from the buffer
+          const lines = buf.split('\n');
+          const listenLine = lines.find(l => l.includes('opencode server listening on http://'));
+          resolve(listenLine ? listenLine.trim() : buf.trim());
+        }
+      };
+
+      this._child.stdout.on('data', handler);
+
+      // Fallback polling for edge cases
+      const poll = () => {
+        if (buf.includes('opencode server listening on http://')) {
+          this._child.stdout.removeListener('data', handler);
+          const lines = buf.split('\n');
+          const listenLine = lines.find(l => l.includes('opencode server listening on http://'));
+          resolve(listenLine ? listenLine.trim() : buf.trim());
+          return;
         }
         if (Date.now() > deadline) {
           this._child.stdout.removeListener('data', handler);
           resolve(null);
           return;
         }
-        setTimeout(check, 20);
+        setTimeout(poll, 50);
       };
-
-      const handler = (chunk) => {
-        buf += chunk.toString();
-      };
-
-      this._child.stdout.on('data', handler);
-      check();
+      setTimeout(poll, 100);
     });
   }
 }

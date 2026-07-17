@@ -22,8 +22,8 @@ export interface CoverageEntry {
 
 export const COVERAGE: Record<string, CoverageEntry[]> = {
   bootstrap: [
-    { id: 'OC-BOOT-001', description: 'opencode serve starts with plugin loaded', level: 'not-covered', priority: 'P0' },
-    { id: 'OC-BOOT-002', description: '/command lists loop, loop-review', level: 'not-covered', priority: 'P0' },
+    { id: 'OC-BOOT-001', description: 'opencode serve starts with plugin loaded', level: 'real-e2e', spec: 'e2e/opencode/specs/p0-canary.js', priority: 'P0' },
+    { id: 'OC-BOOT-002', description: '/command lists loop, loop-review', level: 'real-e2e', spec: 'e2e/opencode/specs/p0-canary.js', priority: 'P0' },
     { id: 'OC-BOOT-003', description: 'LLM request includes all registered tools', level: 'not-covered', priority: 'P0' },
     { id: 'OC-BOOT-004', description: 'No plugin = baseline with no custom tools/commands', level: 'not-covered', priority: 'P0' },
     { id: 'OC-BOOT-005', description: 'Bad plugin path = stderr diagnostic', level: 'not-covered', priority: 'P0' },
@@ -62,12 +62,12 @@ export const COVERAGE: Record<string, CoverageEntry[]> = {
     { id: 'OC-MSG-010', description: 'Agent tool filtering scoped per session', level: 'not-covered', priority: 'P0' },
   ],
   file: [
-    { id: 'OC-FILE-001', description: 'write creates file with exact byte content', level: 'not-covered', priority: 'P0' },
+    { id: 'OC-FILE-001', description: 'write creates file with exact byte content', level: 'real-e2e', spec: 'e2e/opencode/specs/p0-canary.js', priority: 'P0' },
     { id: 'OC-FILE-002', description: 'write overwrites file, no trailing residue', level: 'not-covered', priority: 'P0' },
     { id: 'OC-FILE-003', description: 'write empty file exists with length 0', level: 'not-covered', priority: 'P0' },
     { id: 'OC-FILE-004', description: 'write Unicode preserves UTF-8 bytes', level: 'not-covered', priority: 'P0' },
     { id: 'OC-FILE-005', description: 'write multi-line preserves line endings', level: 'not-covered', priority: 'P0' },
-    { id: 'OC-FILE-006', description: 'read returns real content into next model round', level: 'not-covered', priority: 'P0' },
+    { id: 'OC-FILE-006', description: 'read returns real content into next model round', level: 'real-e2e', spec: 'e2e/opencode/specs/p0-canary.js', priority: 'P0' },
     { id: 'OC-FILE-007', description: 'read missing file produces error part, session continues', level: 'not-covered', priority: 'P0' },
     { id: 'OC-FILE-008', description: 'write-then-read proves cross-round consistency', level: 'not-covered', priority: 'P0' },
     { id: 'OC-FILE-009', description: 'Missing warn_tdd executes but produces criticism', level: 'real-e2e', priority: 'P0' },
@@ -78,7 +78,7 @@ export const COVERAGE: Record<string, CoverageEntry[]> = {
   fuzzy: [
     { id: 'OC-FUZZY-001', description: 'fuzzy_find returns real matching paths', level: 'not-covered', priority: 'P0' },
     { id: 'OC-FUZZY-002', description: 'No match returns explicit empty result', level: 'not-covered', priority: 'P0' },
-    { id: 'OC-FUZZY-003', description: 'fuzzy_grep returns file, line number, text', level: 'not-covered', priority: 'P0' },
+    { id: 'OC-FUZZY-003', description: 'fuzzy_grep returns file, line number, text', level: 'real-e2e', spec: 'e2e/opencode/specs/p0-canary.js', priority: 'P0' },
     { id: 'OC-FUZZY-004', description: 'Multi-pattern returns chunked results', level: 'unit', priority: 'P0' },
     { id: 'OC-FUZZY-005', description: 'fuzzy_continue gets next page, no duplicates', level: 'not-covered', priority: 'P0' },
     { id: 'OC-FUZZY-006', description: 'Iterator exhausted returns completion state', level: 'unit', priority: 'P0' },
@@ -86,7 +86,7 @@ export const COVERAGE: Record<string, CoverageEntry[]> = {
     { id: 'OC-FUZZY-008', description: 'Session deleted cleans up iterator', level: 'not-covered', priority: 'P0' },
   ],
   executor: [
-    { id: 'OC-EXEC-001', description: 'Shell command stdout correct', level: 'not-covered', priority: 'P0' },
+    { id: 'OC-EXEC-001', description: 'Shell command stdout correct', level: 'real-e2e', spec: 'e2e/opencode/specs/p0-canary.js', priority: 'P0' },
     { id: 'OC-EXEC-002', description: 'JavaScript command stdout correct', level: 'not-covered', priority: 'P0' },
     { id: 'OC-EXEC-003', description: 'Non-zero exit code structured return', level: 'unit', priority: 'P0' },
     { id: 'OC-EXEC-004', description: 'stderr visible, not conflated with success', level: 'unit', priority: 'P0' },
@@ -155,7 +155,7 @@ export const COVERAGE: Record<string, CoverageEntry[]> = {
     { id: 'OC-CONT-010', description: 'Host restart recovery of continuation', level: 'not-covered', priority: 'P0' },
   ],
   review: [
-    { id: 'OC-REV-001', description: '/loop task returns With-Review activated', level: 'real-e2e', priority: 'P0' },
+    { id: 'OC-REV-001', description: '/loop task returns With-Review activated', level: 'real-e2e', spec: 'e2e/opencode/specs/p0-canary.js', priority: 'P0' },
     { id: 'OC-REV-002', description: 'loop_activated appended once', level: 'real-e2e', priority: 'P0' },
     { id: 'OC-REV-003', description: 'Event sessionID, task, generation correct', level: 'real-e2e', priority: 'P0' },
     { id: 'OC-REV-004', description: 'Second /loop returns already active', level: 'real-e2e', priority: 'P0' },
