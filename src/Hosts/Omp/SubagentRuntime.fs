@@ -78,8 +78,8 @@ let runOmpSubagentCore
                 (fallbackRuntime.GetChain parentSessionId)
                 parentLiveModel
 
-        if chain.IsEmpty then
-            return! Promise.reject (failwith (formatRunFailure NoModelConfigured))
+        // Determine directive: non-empty chain → wanxiangshu owns retry; empty → delegate to host.
+        let directive = if chain.IsEmpty then DelegateToHost else RetryChain chain
 
         // Cache the resolved chain so continue/recovery reuse it.
         fallbackRuntime.SetChain childId chain
@@ -97,9 +97,8 @@ let runOmpSubagentCore
         try
             let! runResult =
                 match abortSignal with
-                | Some sig_ ->
-                    service.StartRun(childId, parentSessionId, prompt, cfg, RetryChain chain, abortSignal = sig_)
-                | None -> service.StartRun(childId, parentSessionId, prompt, cfg, RetryChain chain)
+                | Some sig_ -> service.StartRun(childId, parentSessionId, prompt, cfg, directive, abortSignal = sig_)
+                | None -> service.StartRun(childId, parentSessionId, prompt, cfg, directive)
 
             match runResult with
             | Succeeded _output ->

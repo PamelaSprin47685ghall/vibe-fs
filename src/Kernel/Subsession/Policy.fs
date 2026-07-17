@@ -12,6 +12,17 @@ type PolicyDecision =
 
 let private continuationPrompt = "\u200B"
 
+/// Sentinel model with empty IDs — signals "delegate model selection to host".
+let private delegateToHostSentinel: FallbackModel =
+    { ProviderID = ""
+      ModelID = ""
+      Variant = None
+      Temperature = None
+      TopP = None
+      MaxTokens = None
+      ReasoningEffort = None
+      Thinking = false }
+
 let initialPolicy (_cfg: FallbackConfig) (_chain: FallbackChain) : FallbackPolicyState =
     { Selection = StableAt 0
       FailureCount = 0
@@ -161,7 +172,8 @@ let afterTranscript
 
             match selectModel chain idx with
             | Some model -> NextTurn(policy2, model, prompt)
-            | None -> StopWithFailure NoModelConfigured
+            // Empty chain (DelegateToHost mode) — delegate model selection to the host.
+            | None -> NextTurn(policy2, delegateToHostSentinel, prompt)
 
     | ContinueNormally prompt ->
         if policy.ContinueCount >= cfg.LoopMaxContinues then
@@ -175,6 +187,7 @@ let afterTranscript
 
             match selectModel chain idx with
             | Some model -> NextTurn(policy2, model, prompt)
-            | None -> StopWithFailure NoModelConfigured
+            // Empty chain (DelegateToHost mode) — delegate model selection to the host.
+            | None -> NextTurn(policy2, delegateToHostSentinel, prompt)
 
     | IncompleteWithoutRecovery reason -> StopWithFailure(RecoveryExhausted reason)
