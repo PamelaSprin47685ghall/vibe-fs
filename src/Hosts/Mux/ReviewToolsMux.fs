@@ -103,6 +103,50 @@ let private applyReviewResult
         return formatReviewResult verdict
     }
 
+let private handleReviewSubmission
+    (deps: obj)
+    (config: obj)
+    (reviewStore: ReviewStore)
+    (toolNames: string array)
+    (workspaceId: string)
+    (root: string)
+    (scope: RuntimeScope)
+    (args: obj)
+    : JS.Promise<string> =
+    promise {
+        scope.TriggerInit(root)
+        do! scope.WaitInit()
+
+        match decodeSubmitReviewArgs args with
+        | Error e -> return wireDecodeFailure "submit_review" e
+        | Ok decoded ->
+            match collectReviewCandidates reviewStore workspaceId with
+            | NoTask -> return submitReviewNotNeeded
+            | InProgress -> return submitReviewInProgress
+            | Ready originalTask ->
+                try
+                    if submitReviewIsWip decoded.Wip then
+                        do! appendSubmitReviewWipRecordedOrFail root workspaceId
+                        return formatWipAcknowledgment originalTask
+                    else
+                        let! result =
+                            applyReviewResult
+                                deps
+                                config
+                                toolNames
+                                reviewStore
+                                root
+                                workspaceId
+                                originalTask
+                                decoded.Report
+                                decoded.AffectedFiles
+
+                        return result
+                finally
+                    reviewStore.unlockReview workspaceId
+    }
+
+
 let submitReviewTool
     (deps: obj)
     (toolNames: string array)
@@ -131,36 +175,5 @@ let submitReviewTool
 
                 let root = runtime.Execution.Directory
 
-                promise {
-                    scope.TriggerInit(root)
-                    do! scope.WaitInit()
-
-                    match decodeSubmitReviewArgs args with
-                    | Error e -> return wireDecodeFailure "submit_review" e
-                    | Ok decoded ->
-                        match collectReviewCandidates reviewStore workspaceId with
-                        | NoTask -> return submitReviewNotNeeded
-                        | InProgress -> return submitReviewInProgress
-                        | Ready originalTask ->
-                            try
-                                if submitReviewIsWip decoded.Wip then
-                                    do! appendSubmitReviewWipRecordedOrFail root workspaceId
-                                    return formatWipAcknowledgment originalTask
-                                else
-                                    let! result =
-                                        applyReviewResult
-                                            deps
-                                            config
-                                            toolNames
-                                            reviewStore
-                                            root
-                                            workspaceId
-                                            originalTask
-                                            decoded.Report
-                                            decoded.AffectedFiles
-
-                                    return result
-                            finally
-                                reviewStore.unlockReview workspaceId
-                }
+                handleReviewSubmission deps config reviewStore toolNames workspaceId root scope args
       condition = None }

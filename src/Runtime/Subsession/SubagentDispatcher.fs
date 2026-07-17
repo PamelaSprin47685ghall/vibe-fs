@@ -25,8 +25,48 @@ open Wanxiangshu.Runtime.ToolExecute
 open Wanxiangshu.Runtime.PromptFrontMatter
 open Wanxiangshu.Runtime.ToolOutputInfo
 open Wanxiangshu.Kernel.ToolOutputInfoTypes
+open Wanxiangshu.Runtime.EventLogRuntime
 
 module HostAdapter = Wanxiangshu.Kernel.HostAdapter
+
+let private handleContinue
+    (adapter: IHostAdapter)
+    (host: Host)
+    (scope: Wanxiangshu.Runtime.RuntimeScope.RuntimeScope)
+    (toolName: string)
+    (c: ContinueArgs)
+    : JS.Promise<string> =
+    promise {
+        let cleanIter = c.Iterator.Trim()
+
+        match consumeSubagentIterator scope.SubagentIteratorStore cleanIter with
+        | None ->
+            let err =
+                InvalidIntent("continue", "iterator", "unknown, expired, or already consumed iterator")
+
+            return wireDecodeFailure "continue" err
+        | Some item ->
+            let! response = adapter.ContinueSubagent(item.childID, item.agent, c.Prompt)
+
+            let! textResult =
+                promise {
+                    match response with
+                    | Success text
+                    | Spawned(_, text) ->
+                        let root = adapter.WorkspaceRoot
+                        let parentSid = adapter.SessionId
+
+                        if root <> "" && parentSid <> "" then
+                            do! appendSubagentContinuedOrFail root parentSid item.childID c.Prompt
+
+                        preserveSubagentIterator scope.SubagentIteratorStore cleanIter item
+                        return withIterator text cleanIter
+                    | Failure err -> return subagentToolFailed "continue" err
+                    | Aborted -> return subagentToolFailed "continue" MessageAborted
+                }
+
+            return textResult
+    }
 
 let dispatch
     (host: Host)
@@ -50,41 +90,7 @@ let dispatch
                     HostAdapter.Browser
                     "Browser"
                     (browserPromptText host b.Intent)
-        | Ok(Typed(Continue c)) ->
-            let cleanIter = c.Iterator.Trim()
-
-            match consumeSubagentIterator scope.SubagentIteratorStore cleanIter with
-            | None ->
-                let err =
-                    InvalidIntent("continue", "iterator", "unknown, expired, or already consumed iterator")
-
-                return wireDecodeFailure "continue" err
-            | Some item ->
-                let! response = adapter.ContinueSubagent(item.childID, item.agent, c.Prompt)
-
-                let! textResult =
-                    promise {
-                        match response with
-                        | Success text
-                        | Spawned(_, text) ->
-                            let root = adapter.WorkspaceRoot
-                            let parentSid = adapter.SessionId
-
-                            if root <> "" && parentSid <> "" then
-                                do!
-                                    Wanxiangshu.Runtime.EventLogRuntime.appendSubagentContinuedOrFail
-                                        root
-                                        parentSid
-                                        item.childID
-                                        c.Prompt
-
-                            preserveSubagentIterator scope.SubagentIteratorStore cleanIter item
-                            return Wanxiangshu.Runtime.ToolOutputInfo.withIterator text cleanIter
-                        | Failure err -> return subagentToolFailed "continue" err
-                        | Aborted -> return subagentToolFailed "continue" MessageAborted
-                    }
-
-                return textResult
+        | Ok(Typed(Continue c)) -> return! handleContinue adapter host scope toolName c
         | Ok(CoderBatch intents) -> return! runCoderBatch adapter host scope registry toolName intents
         | Ok(InvestigatorBatch intents) -> return! runInvestigatorBatch adapter host scope registry toolName intents
         | Ok(Typed _) ->

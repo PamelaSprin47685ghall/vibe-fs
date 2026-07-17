@@ -452,6 +452,7 @@
     <Compile Include="src/Hosts/Omp/SubsessionDispatch.fs"/>
     <Compile Include="src/Hosts/Omp/SubsessionHostAdapter.fs"/>
     <Compile Include="src/Hosts/Omp/SubagentRuntime.fs"/>
+    <Compile Include="src/Hosts/Omp/ChildSessionCreate.fs"/>
     <Compile Include="src/Hosts/Omp/ChildSession.fs"/>
     <Compile Include="src/Hosts/Omp/ChildSessionRegistry.fs"/>
     <Compile Include="src/Hosts/Omp/ToolResultEvent.fs"/>

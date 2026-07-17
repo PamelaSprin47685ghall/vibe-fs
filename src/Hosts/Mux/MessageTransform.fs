@@ -87,6 +87,42 @@ let loadCapsForSession
         return caps |> List.sortBy (fun cf -> cf.label, cf.filePath)
     }
 
+let private buildPlan
+    (sessionID: string)
+    (agent: string)
+    (directory: string)
+    (isChild: bool)
+    (runtimeScope: Wanxiangshu.Runtime.RuntimeScope.RuntimeScope)
+    (messagesArr: obj[])
+    (backlogPolicy: Wanxiangshu.Kernel.MessageTransformPolicy.BacklogProjectionPolicy)
+    (capsPolicy: Wanxiangshu.Kernel.MessageTransformPolicy.CapsInjectionPolicy)
+    (parallelHintPolicy: Wanxiangshu.Kernel.MessageTransformPolicy.ParallelHintPolicy)
+    (contextBudgetPolicy: Wanxiangshu.Kernel.MessageTransformPolicy.ContextBudgetPolicy)
+    (cleanedMessages: Message<obj> list)
+    (backlogOps: BacklogSessionOps)
+    (maxInputTokens: int)
+    (getContextUsage: obj array -> JS.Promise<int option>)
+    : MessageTransformPlan =
+    { SessionID = sessionID
+      Agent = agent
+      Directory = directory
+      ProjectionPolicy =
+        if backlogPolicy = Wanxiangshu.Kernel.MessageTransformPolicy.BacklogProjectionPolicy.Include then
+            ProjectionPolicy.IncludeProjection
+        else
+            ProjectionPolicy.ExcludeProjection
+      BacklogProjectionPolicy = backlogPolicy
+      CapsInjectionPolicy = capsPolicy
+      ParallelHintPolicy = parallelHintPolicy
+      ContextBudgetPolicy = contextBudgetPolicy
+      IsSubagentSession = isChild
+      Cleaned = cleanedMessages
+      RawArray = Some messagesArr
+      SembleInjectEnabled = false
+      Scope = runtimeScope
+      MaxInputTokens = maxInputTokens
+      GetContextUsage = getContextUsage }
+
 let applyTransformPipeline
     (deps: obj)
     (runtimeScope: Wanxiangshu.Runtime.RuntimeScope.RuntimeScope)
@@ -114,25 +150,21 @@ let applyTransformPipeline
         let getContextUsage = resolveContextUsage deps sessionID directory
 
         let plan =
-            { SessionID = sessionID
-              Agent = agent
-              Directory = directory
-              ProjectionPolicy =
-                if backlogPolicy = Wanxiangshu.Kernel.MessageTransformPolicy.BacklogProjectionPolicy.Include then
-                    ProjectionPolicy.IncludeProjection
-                else
-                    ProjectionPolicy.ExcludeProjection
-              BacklogProjectionPolicy = backlogPolicy
-              CapsInjectionPolicy = capsPolicy
-              ParallelHintPolicy = parallelHintPolicy
-              ContextBudgetPolicy = contextBudgetPolicy
-              IsSubagentSession = isChild
-              Cleaned = cleanedMessages
-              RawArray = Some messagesArr
-              SembleInjectEnabled = false
-              Scope = runtimeScope
-              MaxInputTokens = maxInputTokens
-              GetContextUsage = getContextUsage }
+            buildPlan
+                sessionID
+                agent
+                directory
+                isChild
+                runtimeScope
+                messagesArr
+                backlogPolicy
+                capsPolicy
+                parallelHintPolicy
+                contextBudgetPolicy
+                cleanedMessages
+                backlogOps
+                maxInputTokens
+                getContextUsage
 
         let buildCaps encoded capsFiles prelude =
             buildCapsMessages sessionID encoded capsFiles prelude

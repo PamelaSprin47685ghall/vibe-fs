@@ -127,6 +127,55 @@ let private buildCapsFn (plan: MessageTransformPlan) (sessionId: string) (cwd: s
 
         buildCapsEntries sha256HexTruncated sessionId encoded cwd ompCaps prelude
 
+let private buildAndRunTransform
+    (reviewStore: ReviewStore)
+    (cwd: string)
+    (sessionId: string)
+    (entriesArr: obj array)
+    (agent: string)
+    (getContextUsage: obj array -> JS.Promise<int option>)
+    (ctx: obj)
+    : JS.Promise<obj array> =
+    promise {
+        let messagesList = decodeEntries sessionId entriesArr
+        let isChild = isChildSession ExecutorTools.ompScope sessionId
+
+        let backlogPolicy = getBacklogProjectionPolicy agent isChild
+        let capsPolicy = getCapsInjectionPolicy agent isChild
+        let parallelHintPolicy = getParallelHintPolicy agent isChild
+        let contextBudgetPolicy = getContextBudgetPolicy agent isChild
+
+        defaultBacklogSession.WorkspaceRoot <- cwd
+
+        let backlogOps =
+            backlogSessionOpsFrom defaultBacklogSession.Host (fun sid msgs ->
+                defaultBacklogSession.GetOrRebuildBacklog(sid, msgs))
+
+        let! maxInputTokens = resolveMaxInputTokens sessionId cwd ctx
+
+        let plan =
+            createMessageTransformPlan
+                sessionId
+                agent
+                cwd
+                backlogPolicy
+                capsPolicy
+                parallelHintPolicy
+                contextBudgetPolicy
+                isChild
+                messagesList
+                entriesArr
+                maxInputTokens
+                getContextUsage
+
+        let injectFn _ encoded = Promise.lift encoded
+        let loadCaps = buildLoadCapsFn plan cwd
+        let buildCaps = buildCapsFn plan sessionId cwd
+
+        return!
+            runHostMessagesTransform reviewStore sessionId plan backlogOps encodeMessages injectFn loadCaps buildCaps
+    }
+
 let transformEntriesAsyncWithAgent
     (reviewStore: ReviewStore)
     (cwd: string)
@@ -145,60 +194,7 @@ let transformEntriesAsyncWithAgent
             if entriesArr.Length = 0 then
                 return entriesArr
             else
-                let messagesList = decodeEntries sessionId entriesArr
-                let isChild = isChildSession ExecutorTools.ompScope sessionId
-
-                let backlogPolicy =
-                    Wanxiangshu.Kernel.MessageTransformPolicy.getBacklogProjectionPolicy agent isChild
-
-                let capsPolicy =
-                    Wanxiangshu.Kernel.MessageTransformPolicy.getCapsInjectionPolicy agent isChild
-
-                let parallelHintPolicy =
-                    Wanxiangshu.Kernel.MessageTransformPolicy.getParallelHintPolicy agent isChild
-
-                let contextBudgetPolicy =
-                    Wanxiangshu.Kernel.MessageTransformPolicy.getContextBudgetPolicy agent isChild
-
-                defaultBacklogSession.WorkspaceRoot <- cwd
-
-                let backlogOps =
-                    backlogSessionOpsFrom defaultBacklogSession.Host (fun sid msgs ->
-                        defaultBacklogSession.GetOrRebuildBacklog(sid, msgs))
-
-                let! maxInputTokens = resolveMaxInputTokens sessionId cwd ctx
-
-                let plan =
-                    createMessageTransformPlan
-                        sessionId
-                        agent
-                        cwd
-                        backlogPolicy
-                        capsPolicy
-                        parallelHintPolicy
-                        contextBudgetPolicy
-                        isChild
-                        messagesList
-                        entriesArr
-                        maxInputTokens
-                        getContextUsage
-
-                let injectFn _ encoded = Promise.lift encoded
-
-                let loadCaps = buildLoadCapsFn plan cwd
-
-                let buildCaps = buildCapsFn plan sessionId cwd
-
-                return!
-                    runHostMessagesTransform
-                        reviewStore
-                        sessionId
-                        plan
-                        backlogOps
-                        encodeMessages
-                        injectFn
-                        loadCaps
-                        buildCaps
+                return! buildAndRunTransform reviewStore cwd sessionId entriesArr agent getContextUsage ctx
     }
 
 
