@@ -32,6 +32,18 @@ if (target === 'mux') {
     };
 } else if (target === 'core') {
     runAll = (await import('../build/e2e/Tests.js')).runAll;
+} else if (target === 'opencode-e2e-p0') {
+    runAll = async (args) => {
+        console.log('\n--- Running opencode e2e P0 canary suite ---');
+        const { spawnSync } = await import('node:child_process');
+        const result = spawnSync('node', [new URL('../e2e/opencode/specs/p0-canary.js', import.meta.url).pathname], {
+            stdio: 'inherit',
+            cwd: new URL('..', import.meta.url).pathname,
+        });
+        const code = result.status ?? 1;
+        console.log(`opencode e2e P0 canary suite exited with code ${code}`);
+        return code;
+    };
 } else if (target === 'git-hooks') {
     runAll = async (args) => {
         console.log('\nRunning GitHookFormatterTests...');
@@ -69,6 +81,15 @@ if (target === 'mux') {
             const { runAll: suiteRun } = await import(suite);
             totalFailed += await suiteRun(args);
         }
+
+        console.log('\n--- Running opencode e2e P0 canary suite ---');
+        const { spawnSync } = await import('node:child_process');
+        const p0result = spawnSync('node', [new URL('../e2e/opencode/specs/p0-canary.js', import.meta.url).pathname], {
+            stdio: 'inherit',
+            cwd: new URL('..', import.meta.url).pathname,
+        });
+        totalFailed += p0result.status ?? 1;
+        console.log(`opencode e2e P0 canary suite exited with code ${p0result.status}`);
 
         console.log('\n--- Running GitHookFormatterTests ---');
         try {
