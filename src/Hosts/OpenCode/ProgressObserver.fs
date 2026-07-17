@@ -1,13 +1,3 @@
-namespace Wanxiangshu.Kernel
-
-module TodoArgs =
-    module TodoItemStatus =
-        let (|Completed|Cancelled|Other|) (x: Wanxiangshu.Kernel.ToolArgs.TodoItemStatus) =
-            match x with
-            | Wanxiangshu.Kernel.ToolArgs.TodoItemStatus.Completed -> Completed
-            | Wanxiangshu.Kernel.ToolArgs.TodoItemStatus.Cancelled -> Cancelled
-            | _ -> Other
-
 namespace Wanxiangshu.Hosts.Opencode.ProgressObserver
 
 open Fable.Core
@@ -101,10 +91,7 @@ type ProgressObserver
                             let allCompleted =
                                 decodedArgs.Todos
                                 |> Array.forall (fun t ->
-                                    match t.Status with
-                                    | Wanxiangshu.Kernel.ToolArgs.TodoItemStatus.Completed
-                                    | Wanxiangshu.Kernel.ToolArgs.TodoItemStatus.Cancelled -> true
-                                    | _ -> false)
+                                    Wanxiangshu.Kernel.ToolArgs.TodoItemStatus.isTerminal t.Status)
 
                             let ev =
                                 { CurrentTurnEvidence.empty with
