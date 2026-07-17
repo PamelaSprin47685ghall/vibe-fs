@@ -42,6 +42,7 @@ let coreTestEntries () : (string * TestBody) list =
       "ReviewTests.resultMapping", TestBody.Sync(sync ReviewTests.resultMapping)
       "ReviewTests.reviewerLoop", TestBody.Sync(sync ReviewTests.reviewerLoop)
       "ReviewTests.runtime", TestBody.Sync(sync ReviewTests.runtime)
+      "ReviewReportBufferTests.run", TestBody.Sync(sync ReviewReportBufferTests.run)
       "ReviewTests.deactivateParentPreservesChildPending",
       TestBody.Sync(sync ReviewTests.deactivateParentPreservesChildPending)
       "ReviewTests.promptPartsBranches", TestBody.Sync(sync ReviewTests.promptPartsBranches)
@@ -77,8 +78,6 @@ let coreTestEntries () : (string * TestBody) list =
       "ReviewTests.reviewerPromptFormat", TestBody.Sync(sync ReviewTestsPrompts.reviewerPromptFormat)
       "ReviewTests.muxReviewerVerdictPromptFormat",
       TestBody.Sync(sync ReviewTestsPrompts.muxReviewerVerdictPromptFormat)
-      "ReviewTests.muxPreReviewVerdictPromptFormat",
-      TestBody.Sync(sync ReviewTestsPrompts.muxPreReviewVerdictPromptFormat)
       "ReviewTests.reviewInstructionsFrontMatter", TestBody.Sync(sync ReviewTestsPrompts.reviewInstructionsFrontMatter)
       "AgentTests.canUse'", TestBody.Sync(sync AgentTests.canUse')
       "AgentTests.canUseMatrix", TestBody.Sync(sync AgentTests.canUseMatrix)

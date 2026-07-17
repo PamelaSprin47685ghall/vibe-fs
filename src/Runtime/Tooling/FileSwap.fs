@@ -54,29 +54,112 @@ type NodeFileSwapIO() =
                     ()
             }
 
-/// In-process file mutation lock per canonical path to prevent concurrent
-/// swap operations on the same file. Locks are acquired in canonical-path
-/// order to avoid deadlocks.
-type SwapLock() =
-    let locks = System.Collections.Generic.Dictionary<string, obj>()
+/// Swap two different files transactionally.
+let private swapDifferentFiles
+    (io: IFileSwapIO)
+    (canon0: string)
+    (canon1: string)
+    (doc0: TextDocument)
+    (doc1: TextDocument)
+    (request: SwapRequest)
+    (slice0: string array)
+    (slice1: string array)
+    (original0: string)
+    : JS.Promise<Result<string, string>> =
+    promise {
+        let newLines0 =
+            [| yield! doc0.Lines.[0 .. request.Range0.Begin - 2]
+               yield! slice1
+               yield! doc0.Lines.[request.Range0.EndExclusive - 1 ..] |]
 
-    member _.Acquire(path: string) : System.IDisposable =
-        let lockObj =
-            lock locks (fun () ->
-                if not (locks.ContainsKey(path)) then
-                    locks.[path] <- obj ()
+        let newLines1 =
+            [| yield! doc1.Lines.[0 .. request.Range1.Begin - 2]
+               yield! slice0
+               yield! doc1.Lines.[request.Range1.EndExclusive - 1 ..] |]
 
-                locks.[path])
+        let newContent0 = renderTextDocument { doc0 with Lines = newLines0 }
+        let newContent1 = renderTextDocument { doc1 with Lines = newLines1 }
 
-        System.Threading.Monitor.Enter(lockObj)
+        let! temp0 = io.WriteTemp(canon0, newContent0)
+        let! temp1 = io.WriteTemp(canon1, newContent1)
 
-        { new System.IDisposable with
-            member _.Dispose() =
-                System.Threading.Monitor.Exit(lockObj)
+        let mutable replaceError: string option = None
 
-                lock locks (fun () ->
-                    if locks.ContainsKey(path) then
-                        locks.Remove(path) |> ignore) }
+        try
+            do! io.Replace(temp0, canon0)
+        with ex ->
+            do! io.DeleteIfExists temp0
+            do! io.DeleteIfExists temp1
+            replaceError <- Some $"Failed to write {canon0}: {ex.Message}"
+
+        if replaceError.IsNone then
+            try
+                do! io.Replace(temp1, canon1)
+            with ex ->
+                do! io.Restore(canon0, original0)
+                do! io.DeleteIfExists temp0
+                do! io.DeleteIfExists temp1
+                replaceError <- Some $"Failed to write {canon1}: {ex.Message}. {canon0} was restored."
+
+        if replaceError.IsNone then
+            do! io.DeleteIfExists temp0
+            do! io.DeleteIfExists temp1
+
+            let msg =
+                $"Swapped {canon0} [{request.Range0.Begin}, {request.Range0.EndExclusive}) <-> {canon1} [{request.Range1.Begin}, {request.Range1.EndExclusive})"
+
+            return Ok msg
+        else
+            return Error replaceError.Value
+    }
+
+/// Swap two ranges within the same file.
+let private swapSameFile
+    (io: IFileSwapIO)
+    (canon0: string)
+    (doc0: TextDocument)
+    (request: SwapRequest)
+    (slice0: string array)
+    (slice1: string array)
+    (original0: string)
+    : JS.Promise<Result<string, string>> =
+    promise {
+        let lower, upper =
+            if request.Range0.Begin < request.Range1.Begin then
+                request.Range0, request.Range1
+            else
+                request.Range1, request.Range0
+
+        let lowerSlice, upperSlice =
+            if request.Range0.Begin < request.Range1.Begin then
+                slice0, slice1
+            else
+                slice1, slice0
+
+        let newLines =
+            [| yield! doc0.Lines.[0 .. lower.Begin - 2]
+               yield! upperSlice
+               yield! doc0.Lines.[lower.EndExclusive - 1 .. upper.Begin - 2]
+               yield! lowerSlice
+               yield! doc0.Lines.[upper.EndExclusive - 1 ..] |]
+
+        let newContent = renderTextDocument { doc0 with Lines = newLines }
+        let! temp = io.WriteTemp(canon0, newContent)
+        let mutable replaceError: string option = None
+
+        try
+            do! io.Replace(temp, canon0)
+        with ex ->
+            do! io.DeleteIfExists temp
+            do! io.Restore(canon0, original0)
+            replaceError <- Some $"Failed to write {canon0}: {ex.Message}. Original was restored."
+
+        if replaceError.IsNone then
+            do! io.DeleteIfExists temp
+            return Ok $"Swapped ranges within {canon0}"
+        else
+            return Error replaceError.Value
+    }
 
 /// Perform a transactional swap between two line ranges.
 let swap (io: IFileSwapIO) (request: SwapRequest) : JS.Promise<Result<string, string>> =
@@ -100,16 +183,13 @@ let swap (io: IFileSwapIO) (request: SwapRequest) : JS.Promise<Result<string, st
             else
                 doc0
 
-        let lineCount0 = doc0.Lines.Length
-        let lineCount1 = doc1.Lines.Length
-
-        match validate canon0 request.Range0 canon1 request.Range1 lineCount0 lineCount1 with
+        match validate canon0 request.Range0 canon1 request.Range1 doc0.Lines.Length doc1.Lines.Length with
         | Error e ->
             let msg =
                 match e with
                 | EmptyPath f -> $"Empty path: {f}"
                 | InvalidRange f -> $"Invalid range: {f}"
-                | OutOfBounds(p, r, lc) -> $"Range out of bounds: {p} [{r.Begin}, {r.EndExclusive}) has {lc} lines"
+                | OutOfBounds(p, r, lc) -> $"Out of bounds: {p} [{r.Begin}, {r.EndExclusive}) has {lc} lines"
                 | OverlappingRanges -> "Ranges overlap in the same file"
 
             return Error msg
@@ -121,89 +201,7 @@ let swap (io: IFileSwapIO) (request: SwapRequest) : JS.Promise<Result<string, st
                 doc1.Lines.[request.Range1.Begin - 1 .. request.Range1.EndExclusive - 2]
 
             if canon0 <> canon1 then
-                let newLines0 =
-                    [| yield! doc0.Lines.[0 .. request.Range0.Begin - 2]
-                       yield! slice1
-                       yield! doc0.Lines.[request.Range0.EndExclusive - 1 ..] |]
-
-                let newLines1 =
-                    [| yield! doc1.Lines.[0 .. request.Range1.Begin - 2]
-                       yield! slice0
-                       yield! doc1.Lines.[request.Range1.EndExclusive - 1 ..] |]
-
-                let newDoc0 = { doc0 with Lines = newLines0 }
-                let newDoc1 = { doc1 with Lines = newLines1 }
-
-                let newContent0 = renderTextDocument newDoc0
-                let newContent1 = renderTextDocument newDoc1
-
-                let! temp0 = io.WriteTemp(canon0, newContent0)
-                let! temp1 = io.WriteTemp(canon1, newContent1)
-
-                let mutable replaceResult: Result<string, string> = Ok ""
-
-                try
-                    do! io.Replace(temp0, canon0)
-                with ex ->
-                    do! io.DeleteIfExists temp0
-                    do! io.DeleteIfExists temp1
-                    replaceResult <- Error $"Failed to write {canon0}: {ex.Message}"
-
-                if replaceResult |> Result.isOk then
-                    try
-                        do! io.Replace(temp1, canon1)
-                    with ex ->
-                        do! io.Restore(canon0, content0)
-                        do! io.DeleteIfExists temp0
-                        do! io.DeleteIfExists temp1
-                        replaceResult <- Error $"Failed to write {canon1}: {ex.Message}. {canon0} was restored."
-
-                if replaceResult |> Result.isOk then
-                    do! io.DeleteIfExists temp0
-                    do! io.DeleteIfExists temp1
-
-                    let msg =
-                        $"Swapped {canon0} [{request.Range0.Begin}, {request.Range0.EndExclusive}) <-> {canon1} [{request.Range1.Begin}, {request.Range1.EndExclusive})"
-
-                    return Ok msg
-                else
-                    return replaceResult
+                return! swapDifferentFiles io canon0 canon1 doc0 doc1 request slice0 slice1 content0
             else
-                let lower, upper =
-                    if request.Range0.Begin < request.Range1.Begin then
-                        request.Range0, request.Range1
-                    else
-                        request.Range1, request.Range0
-
-                let lowerSlice, upperSlice =
-                    if request.Range0.Begin < request.Range1.Begin then
-                        slice0, slice1
-                    else
-                        slice1, slice0
-
-                let newLines =
-                    [| yield! doc0.Lines.[0 .. lower.Begin - 2]
-                       yield! upperSlice
-                       yield! doc0.Lines.[lower.EndExclusive - 1 .. upper.Begin - 2]
-                       yield! lowerSlice
-                       yield! doc0.Lines.[upper.EndExclusive - 1 ..] |]
-
-                let newDoc = { doc0 with Lines = newLines }
-                let newContent = renderTextDocument newDoc
-                let! temp = io.WriteTemp(canon0, newContent)
-
-                let mutable replaceResult: Result<string, string> = Ok ""
-
-                try
-                    do! io.Replace(temp, canon0)
-                with ex ->
-                    do! io.DeleteIfExists temp
-                    do! io.Restore(canon0, content0)
-                    replaceResult <- Error $"Failed to write {canon0}: {ex.Message}. Original was restored."
-
-                if replaceResult |> Result.isOk then
-                    do! io.DeleteIfExists temp
-                    return Ok $"Swapped ranges within {canon0}"
-                else
-                    return replaceResult
+                return! swapSameFile io canon0 doc0 request slice0 slice1 content0
     }

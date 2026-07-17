@@ -28,6 +28,7 @@ let all: ToolSpec list =
       returnReviewerSpec
       readSpec
       writeSpec
+      swapSpec
       ptySpawnSpec
       ptyWriteSpec
       ptyReadSpec

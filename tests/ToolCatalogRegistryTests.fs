@@ -3,7 +3,7 @@ module Wanxiangshu.Tests.ToolCatalogRegistryTests
 open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Kernel.ToolCatalog
 
-let allCountIs19 () = equal "19 tools" 19 all.Length
+let allCountIs20 () = equal "20 tools" 20 all.Length
 
 let allNamesAreNonEmpty () =
     for spec in all do
@@ -103,7 +103,7 @@ let executorMaxBytesDocHasHint () =
     | Error e -> check ("paramDoc failed: " + e) false
 
 let run () =
-    allCountIs19 ()
+    allCountIs20 ()
     allNamesAreNonEmpty ()
     allDescriptionsAreNonEmpty ()
     allNamesAreUnique ()

@@ -71,18 +71,6 @@ let reviewAlreadyActive () =
         "With-Review Mode is already active. Submit your work via submit_review."
         reviewAlreadyActiveMessage
 
-let preReviewPassed () =
-    equal
-        "preReviewPassedMessage exact"
-        "Pre-review passed. Task \"task\" already meets all criteria — no changes needed."
-        (preReviewPassedMessage "task")
-
-let preReviewCouldNotComplete () =
-    equal "preReviewCouldNotComplete exact" "Pre-review could not complete." preReviewCouldNotComplete
-
-let withReviewPreReviewFeedbackHeader () =
-    equal "feedback header exact" "=== Pre-review Feedback ===" withReviewPreReviewFeedbackHeader
-
 let subagentToolFailed () =
     let r = subagentToolFailed "ctx" MessageAborted
     check "contains ctx" (r.Contains "ctx")
@@ -106,8 +94,5 @@ let run () : unit =
     executorInvalidLang ()
     webToolFailed ()
     reviewAlreadyActive ()
-    preReviewPassed ()
-    preReviewCouldNotComplete ()
-    withReviewPreReviewFeedbackHeader ()
     subagentToolFailed ()
     subagentIntentsMustBeNonEmpty ()

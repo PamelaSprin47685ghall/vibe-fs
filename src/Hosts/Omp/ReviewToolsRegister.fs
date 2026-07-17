@@ -172,14 +172,6 @@ let registerLoopFeatures (pi: obj) (store: ReviewStore) : unit =
               "handler", box (fun (args: string) (ctx: obj) -> handleLoopCommand pi store args ctx) ]
     )
 
-    pi?registerCommand (
-        "loop-review",
-        createObj
-            [ "description",
-              box "Pre-check a task before activating loop mode (mirrors Opencode's command.execute.before)."
-              "handler", box (fun (args: string) (ctx: obj) -> handleLoopReviewCommand pi store args ctx) ]
-    )
-
     pi?registerTool (
         createObj
             [ "name", box "submit_review"

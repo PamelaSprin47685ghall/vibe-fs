@@ -41,7 +41,7 @@ let buildLoopCommandTemplateContainsCommand () =
     check "buildLoopCommandTemplate contains command field" (tpl.Contains "command: with-review")
 
 let buildLoopCommandTemplateContainsBody () =
-    let tpl = buildLoopCommandTemplate "with-review-precheck" [ "body line" ]
+    let tpl = buildLoopCommandTemplate "loop" [ "body line" ]
     check "buildLoopCommandTemplate contains body line" (tpl.Contains "body line")
 
 // ── inferReviewTaskFromTexts ──────────────────────────────────────────────────

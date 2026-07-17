@@ -182,36 +182,3 @@ let muxSubmitReviewUsesRolledBackHistoryTaskSpec () =
 
         do! rmAsync workspaceDir
     }
-
-let muxLoopReviewPromptUsesFrontMatterSpec () =
-    promise {
-        let! workspaceDir = mkdtempAsync "mux-loop-review-prompt-"
-        let prompts = ResizeArray<string>()
-        let deps = minimalMuxDeps ()
-        deps?("taskService") <- mockMuxTaskServiceReturningVerdicts prompts [ "PERFECT" ]
-        deps?("directory") <- workspaceDir
-        let reg = createRegistration deps
-        let commands = unbox<obj[]> (get reg "slashCommands")
-
-        let loopReview =
-            commands |> Array.find (fun command -> str command "key" = "loop-review")
-
-        let! result =
-            (get loopReview "execute") $ ("mux-loop-review-prompt", "Clarify rollout plan")
-            |> unbox<JS.Promise<string>>
-
-        let promptText = if prompts.Count > 0 then prompts.[0] else ""
-        check "loop-review prompt uses front-matter" (promptText.StartsWith "---")
-        check "loop-review prompt drops call_id field" (not (promptText.Contains "call_id"))
-        check "loop-review prompt does not ask for tool-level callId" (not (promptText.Contains "callId"))
-
-        check
-            "loop-review prompt carries task"
-            (promptText.Contains "task:" && promptText.Contains "Clarify rollout plan")
-
-        check "loop-review prompt reuses review criteria" (promptText.Contains "# Evaluation Criteria")
-        check "loop-review prompt uses agent_report protocol" (promptText.Contains "agent_report")
-        check "loop-review prompt drops legacy divider" (not (promptText.Contains "==="))
-        check "loop-review activates review after pass" (result.Contains "With-Review Mode is active")
-        do! rmAsync workspaceDir
-    }

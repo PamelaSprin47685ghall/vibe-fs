@@ -77,7 +77,6 @@ let integrationToolSpecs () : (string * (unit -> JS.Promise<unit>)) list =
       "muxSubmitReviewPromptFormat", muxSubmitReviewPromptFormatSpec
       "muxAgentReportWrapperFormatsVerdict", muxAgentReportWrapperFormatsVerdictSpec
       "muxSubmitReviewUsesRolledBackHistoryTask", muxSubmitReviewUsesRolledBackHistoryTaskSpec
-      "muxLoopReviewPromptUsesFrontMatter", muxLoopReviewPromptUsesFrontMatterSpec
       "muxSubmitReviewTwoRoundPassAccepts", muxSubmitReviewTwoRoundPassAcceptsSpec
       "muxSubmitReviewReviseKeepsReviewActive", muxSubmitReviewReviseKeepsReviewActiveSpec
       "muxSubmitReviewDoubleCheckRevise", muxSubmitReviewDoubleCheckReviseSpec

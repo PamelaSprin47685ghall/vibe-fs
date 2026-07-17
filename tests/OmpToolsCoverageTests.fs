@@ -57,7 +57,6 @@ let run () =
         check "return_reviewer tool registered" (names3.Contains "return_reviewer")
         let cmds = commandNames h3 |> Set.ofList
         check "loop command registered" (cmds.Contains "loop")
-        check "loop-review command registered" (cmds.Contains "loop-review")
 
         // ---- ReviewToolsRegister: registerInputHandler ----
         resetPluginState ()
@@ -88,8 +87,8 @@ let run () =
         let msg = (unbox<obj array> msgs).[0]
 
         check
-            "message customType is wanxiangshu-loop-activate"
-            (Dyn.str (Dyn.get msg "message") "customType" = "wanxiangshu-loop-activate")
+            "message customType is wanxiangshu-loop-activated"
+            (Dyn.str (Dyn.get msg "message") "customType" = "wanxiangshu-loop-activated")
         // cancel the loop
         do! Wanxiangshu.Hosts.Omp.ReviewToolsLoop.handleLoopCommand pi5 store5 "" ctx
         check "loop cancelled without error" true

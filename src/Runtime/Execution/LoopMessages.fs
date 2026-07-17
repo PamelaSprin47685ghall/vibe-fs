@@ -22,7 +22,6 @@ let verdictTerminated = "terminated"
 let verdictCancelled = "cancelled"
 let commandField = "command"
 let commandWithReview = "with-review"
-let commandWithReviewPrecheck = "with-review-precheck"
 
 /// Verdicts that END With-Review Mode. needs_revision/terminate keep it active (the work
 /// continues), so they are deliberately excluded.

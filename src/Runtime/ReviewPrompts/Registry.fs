@@ -27,14 +27,8 @@ let reviewSubmissionVerdictPrompt =
 let reviewSubmissionDoubleCheckPrompt =
     Wanxiangshu.Runtime.ReviewPrompts.Submission.reviewSubmissionDoubleCheckPrompt
 
-let preReviewVerdictPrompt =
-    Wanxiangshu.Runtime.ReviewPrompts.Submission.preReviewVerdictPrompt
-
 let withReviewCommandTemplate =
     Wanxiangshu.Runtime.ReviewPrompts.Commands.withReviewCommandTemplate
-
-let withReviewPrecheckCommandTemplate =
-    Wanxiangshu.Runtime.ReviewPrompts.Commands.withReviewPrecheckCommandTemplate
 
 let reviewerNudgePrompt =
     Wanxiangshu.Runtime.ReviewPrompts.OmpVariant.reviewerNudgePrompt

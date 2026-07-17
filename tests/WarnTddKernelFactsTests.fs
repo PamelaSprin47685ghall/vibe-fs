@@ -24,7 +24,8 @@ let kernelWarnTddSet () =
               "pty_write"
               "pty_read"
               "pty_list"
-              "pty_kill" ]
+              "pty_kill"
+              "swap" ]
 
     equal "modificationTools set" expected modificationTools
 

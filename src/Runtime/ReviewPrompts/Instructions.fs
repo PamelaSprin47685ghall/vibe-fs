@@ -38,15 +38,6 @@ let reviewSubmissionVerdictBody =
     + "# Submitting Your Verdict\n\n"
     + agentReportVerdictInstructions "current implementation is already complete and correct."
 
-let preReviewVerdictBody =
-    readOnlyWorkspaceConstraint
-    + "\n\n"
-    + "You are a code reviewer evaluating whether the proposed task is already finished before beginning work.\n\n"
-    + reviewCriteria
-    + "Use REVISE when the task needs real work, otherwise PERFECT.\n\n"
-    + "# Submitting Your Verdict\n\n"
-    + agentReportVerdictInstructions "the task is clear, specific, and actionable enough to begin work"
-
 let agentReportReviewInstructions =
     readOnlyWorkspaceConstraint
     + "\n\n"

@@ -16,6 +16,7 @@ open Wanxiangshu.Runtime.ErrorClassify
 open Wanxiangshu.Kernel.Primitives.Identity
 open Wanxiangshu.Kernel.Errors.DomainError
 open Wanxiangshu.Kernel.Session.Causality
+
 let private maxNudges = 3
 
 /// Create a reviewer child session under the given parent, register it, and
@@ -119,8 +120,8 @@ let runReviewerLoop
         return result
     }
 
-/// Run a pre-review session (used by /loop-review): create a reviewer child,
-/// prompt it with review instructions + task, wait for the verdict.
+/// Run a reviewer session: create a reviewer child, prompt it with review
+/// instructions + task, wait for the verdict.
 let runReviewerSession
     (registry: ChildAgentRegistry)
     (client: obj)
