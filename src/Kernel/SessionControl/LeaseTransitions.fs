@@ -39,8 +39,7 @@ let private handleHumanTurn (st: OwnerEpisodeState) (ordinal: int option) (turn:
     else
         { st with
             HumanTurnOrdinal = newOrdinal
-            LastHumanTurnMessageId = msgId
-            CancelGeneration = st.CancelGeneration + 1 }
+            LastHumanTurnMessageId = msgId }
         |> clearEpisodeState
 
 let private handleUserAbort (st: OwnerEpisodeState) : OwnerEpisodeState =
