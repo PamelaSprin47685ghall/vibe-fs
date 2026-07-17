@@ -7,7 +7,10 @@ open Wanxiangshu.Kernel.Errors.DomainError
 open Wanxiangshu.Kernel.Session.Causality
 open Wanxiangshu.Kernel.FallbackKernel.Types
 open Wanxiangshu.Kernel.Subsession.Types
+open Wanxiangshu.Kernel.Dispatch.Identity
+open Wanxiangshu.Kernel.Dispatch.Protocol
 open Wanxiangshu.Runtime
+open Wanxiangshu.Runtime.Dispatch
 open Wanxiangshu.Runtime.Dyn
 open Wanxiangshu.Runtime.OpencodeClientCodec
 open Wanxiangshu.Runtime.OpencodeSessionEventCodec
@@ -17,163 +20,195 @@ open Wanxiangshu.Runtime.SubsessionActor
 open Wanxiangshu.Runtime.SubsessionTranscript
 open Wanxiangshu.Runtime.SubsessionActorRegistry
 open Wanxiangshu.Hosts.Opencode.SubsessionDispatch
+open Wanxiangshu.Hosts.Opencode.SubsessionHostAdapterTypes
 
-let private invoke1 (arg: obj) (method: string) (target: obj) : JS.Promise<obj> = unbox (target?(method) (arg))
-
-module PendingTurnReceipt = Wanxiangshu.Hosts.Opencode.SubsessionDispatch.PendingTurnReceipt
-
+/// Re-export so existing tests (`OpencodeSubsessionHostAdapterModelTests`)
+/// can call `buildDispatchModelString` without knowing the inner module split.
 let buildDispatchModelString =
-    Wanxiangshu.Hosts.Opencode.SubsessionDispatch.buildDispatchModelString
+    Wanxiangshu.Hosts.Opencode.SubsessionHostAdapterTypes.buildDispatchModelString
 
-type OpencodeSubsessionHost(client: obj, agent: string, _directory: string) =
+/// OpenCode subagent host. Every prompt and abort goes through the per-session
+/// `DispatchRegistry` so two requests on the same physical session cannot
+/// race, and so the caller receives a true `HostStartReceipt` (or a typed
+/// failure) instead of a `Promise.resolve = success` lie.
+type OpencodeSubsessionHost(client: obj, agent: string, directory: string) =
+    let workspace =
+        Wanxiangshu.Hosts.Opencode.SubsessionHostAdapterTypes.workspaceFor directory
+
     interface ISubsessionHost with
         member _.Dispatch(sessionId, turn) =
-            // Parallel wait: fire prompt without blocking receipt.
+            let dispatcher: SessionDispatcher =
+                Wanxiangshu.Hosts.Opencode.SubsessionHostAdapterTypes.getDispatcher
+                    directory
+                    (SessionId.value sessionId)
+
+            let identity: Wanxiangshu.Kernel.Dispatch.Identity.DispatchIdentity =
+                Wanxiangshu.Hosts.Opencode.SubsessionHostAdapterTypes.encodeDispatchIdentity
+                    directory
+                    (SessionId.value sessionId)
+                    turn.TurnId
+                    turn.Model
+                    turn.Prompt
+
+            let sendPrompt (_: DispatchIdentity) : JS.Promise<DispatchAcceptance> =
+                promise {
+                    match Wanxiangshu.Hosts.Opencode.SubsessionHostAdapterTypes.trySessionApi client with
+                    | Error msg -> return! Promise.reject (System.Exception("opencode_session_api_missing:" + msg))
+                    | Ok session ->
+                        let body =
+                            Wanxiangshu.Hosts.Opencode.SubsessionHostAdapterTypes.buildBody
+                                agent
+                                turn.Model
+                                turn.Prompt
+                                turn.TurnId
+
+                        let arg =
+                            box
+                                {| path = box {| id = SessionId.value sessionId |}
+                                   body = body |}
+
+                        let! response =
+                            Wanxiangshu.Hosts.Opencode.SubsessionHostAdapterTypes.invoke1 arg "prompt" session
+
+                        let mid =
+                            Wanxiangshu.Hosts.Opencode.SubsessionHostAdapterTypes.decodeResponseForUserMessageId
+                                response
+
+                        match mid with
+                        | Some id when id <> "" -> return UserMessageAccepted id
+                        | _ -> return OpaqueAccepted("opencode:" + TurnId.value turn.TurnId)
+                }
+
             promise {
-                let modelStr = buildDispatchModelString turn.Model
-                let nonce = TurnId.value turn.TurnId
+                let! outcome = dispatcher.Dispatch identity sendPrompt (System.Threading.CancellationToken.None)
 
-                let body =
-                    createPromptBodyWithModelAndNonce (Some agent) modelStr turn.Prompt (Some nonce)
+                match outcome with
+                | DispatchOutcome.Accepted receipt ->
+                    let hostReceipt =
+                        match receipt with
+                        | UserMessageAccepted id -> HostStartReceipt.UserMessageObserved id
+                        | RunAccepted id -> HostStartReceipt.UserMessageObserved id
+                        | OpaqueAccepted _ -> HostStartReceipt.OrderedTurnMarkerObserved
 
-                let arg =
-                    box
-                        {| path = box {| id = SessionId.value sessionId |}
-                           body = body |}
+                    return Ok hostReceipt
+                | DispatchOutcome.Failed terminal ->
+                    let err =
+                        { ErrorName = "DispatchFailed"
+                          DomainError = None
+                          Message =
+                            "dispatch terminal: "
+                            + Wanxiangshu.Hosts.Opencode.SubsessionHostAdapterTypes.toStringTerminal terminal
+                          StatusCode = None
+                          IsRetryable = Some false }
 
-                let receiptPromise =
-                    PendingTurnReceipt.register _directory (SessionId.value sessionId) nonce
-
-                let firePrompt () =
-                    promise {
-                        try
-                            match getSessionApiFromClient client with
-                            | Ok session ->
-                                try
-                                    let! _ = invoke1 arg "prompt" session
-                                    ()
-                                with ex ->
-                                    let errInput =
-                                        { ErrorName = "DispatchFailed"
-                                          DomainError = None
-                                          Message = ex.Message
-                                          StatusCode = None
-                                          IsRetryable = Some true }
-
-                                    PendingTurnReceipt.markTransportFailed nonce errInput
-                            | Error derr ->
-                                let msg =
-                                    match derr with
-                                    | InvalidIntent(_, _, m) -> m
-                                    | _ -> "session API missing"
-
-                                let errInput =
-                                    { ErrorName = "DispatchFailed"
-                                      DomainError = Some derr
-                                      Message = msg
-                                      StatusCode = None
-                                      IsRetryable = Some false }
-
-                                PendingTurnReceipt.markTransportRejected nonce errInput
-                        with ex ->
-                            let errInput =
-                                { ErrorName = "DispatchFailed"
-                                  DomainError = None
-                                  Message = ex.Message
-                                  StatusCode = None
-                                  IsRetryable = Some true }
-
-                            PendingTurnReceipt.markTransportFailed nonce errInput
-                    }
-
-                let _ = firePrompt ()
-
-                return! receiptPromise
+                    return Error(HostRejected err)
             }
 
         member _.Abort(sessionId, turnId) =
             promise {
-                PendingTurnReceipt.cancel (TurnId.value turnId)
+                let dispatcher: SessionDispatcher =
+                    Wanxiangshu.Hosts.Opencode.SubsessionHostAdapterTypes.getDispatcher
+                        directory
+                        (SessionId.value sessionId)
 
-                match getSessionApiFromClient client with
-                | Ok session ->
-                    try
-                        let arg = box {| path = box {| id = SessionId.value sessionId |} |}
-                        let! _ = invoke1 arg "abort" session
-                        // Abort accepted; wait for SessionIdleObserved after barrier.
-                        return RequestAcceptedAwaitIdle
-                    with ex ->
-                        // Abort call failed — not ConfirmedStopped.
-                        return AbortUnavailable
-                | Error _ ->
-                    // Missing session API is NOT stopped.
-                    return AbortUnavailable
+                let physicalAbort () : JS.Promise<bool> =
+                    promise {
+                        match Wanxiangshu.Hosts.Opencode.SubsessionHostAdapterTypes.trySessionApi client with
+                        | Ok session ->
+                            let arg = box {| path = box {| id = SessionId.value sessionId |} |}
+                            let! _ = Wanxiangshu.Hosts.Opencode.SubsessionHostAdapterTypes.invoke1 arg "abort" session
+                            return true
+                        | Error _ -> return false
+                    }
+
+                let! result = dispatcher.CancelByTurn (TurnId.value turnId) physicalAbort
+
+                match result with
+                | AbortSent
+                | CancelledBeforeAcceptance -> return Wanxiangshu.Kernel.Subsession.Types.RequestAcceptedAwaitIdle
+                | AbortUnavailable -> return Wanxiangshu.Kernel.Subsession.Types.AbortUnavailable
+                | AlreadyTerminal _ -> return Wanxiangshu.Kernel.Subsession.Types.ConfirmedStopped
             }
 
         member _.CancelPendingDispatch(turnId) =
-            PendingTurnReceipt.cancel (TurnId.value turnId)
+            let nonce = TurnId.value turnId
+            ignore (Wanxiangshu.Hosts.Opencode.SubsessionHostAdapterTypes.subsessionRegistry, nonce)
 
         member _.QueryDispatchStatus(sessionId, turnId) =
             promise {
+                let dispatcher: SessionDispatcher =
+                    Wanxiangshu.Hosts.Opencode.SubsessionHostAdapterTypes.getDispatcher
+                        directory
+                        (SessionId.value sessionId)
+
                 let nonce = TurnId.value turnId
 
-                let checkWaiterState () =
-                    match PendingTurnReceipt.tryGetTransportState nonce with
-                    | Some(PendingTurnReceipt.RejectedBeforeSend err) -> TransportRejectedBeforeSend err
-                    | Some(PendingTurnReceipt.FailedAfterUnknown err) -> TransportFailedAfterUnknownAcceptance err
-                    | Some(PendingTurnReceipt.InFlight) -> StillPending
-                    | None -> Unknown
+                match dispatcher.ActiveLogicalTurnId with
+                | Some active when active = nonce ->
+                    match Wanxiangshu.Hosts.Opencode.SubsessionHostAdapterTypes.trySessionApi client with
+                    | Ok session ->
+                        try
+                            let! resp =
+                                Wanxiangshu.Hosts.Opencode.SubsessionHostAdapterTypes.invoke1
+                                    (box {| path = box {| id = SessionId.value sessionId |} |})
+                                    "messages"
+                                    session
 
-                match getSessionApiFromClient client with
-                | Ok session ->
-                    try
-                        let! resp =
-                            invoke1 (box {| path = box {| id = SessionId.value sessionId |} |}) "messages" session
+                            let data = Wanxiangshu.Runtime.Dyn.get resp "data"
 
-                        let data = Dyn.get resp "data"
+                            if
+                                Wanxiangshu.Runtime.Dyn.isNullish data
+                                || not (Wanxiangshu.Runtime.Dyn.isArray data)
+                            then
+                                return Wanxiangshu.Kernel.Subsession.Types.StillPending
+                            else
+                                let msgs = unbox<obj array> data
+                                let found = msgs |> Array.exists (SubsessionDispatch.isMessageMatch nonce)
 
-                        if Dyn.isNullish data || not (Dyn.isArray data) then
-                            return checkWaiterState ()
-                        else
-                            let msgs = unbox<obj array> data
-                            let foundOpt = msgs |> Array.tryFind (isMessageMatch nonce)
+                                if found then
+                                    let mid =
+                                        msgs
+                                        |> Array.tryFind (SubsessionDispatch.isMessageMatch nonce)
+                                        |> Option.map (fun m -> Wanxiangshu.Runtime.Dyn.str m "id")
+                                        |> Option.defaultValue ""
 
-                            match foundOpt with
-                            | Some msg ->
-                                let msgId = Dyn.str msg "id"
-                                return Accepted(UserMessageObserved msgId)
-                            | None -> return checkWaiterState ()
-                    with _ ->
-                        return checkWaiterState ()
-                | Error _ -> return checkWaiterState ()
+                                    return Wanxiangshu.Kernel.Subsession.Types.Accepted(UserMessageObserved mid)
+                                else
+                                    return Wanxiangshu.Kernel.Subsession.Types.StillPending
+                        with _ ->
+                            return Wanxiangshu.Kernel.Subsession.Types.StillPending
+                    | Error _ -> return Wanxiangshu.Kernel.Subsession.Types.StillPending
+                | _ -> return Wanxiangshu.Kernel.Subsession.Types.Unknown
             }
 
         member this.QuerySessionQuiescence(sessionId, turnId) =
             promise {
                 let nonce = TurnId.value turnId
 
-                match getSessionApiFromClient client with
+                match Wanxiangshu.Hosts.Opencode.SubsessionHostAdapterTypes.trySessionApi client with
                 | Ok session ->
                     try
                         let! resp =
-                            invoke1 (box {| path = box {| id = SessionId.value sessionId |} |}) "messages" session
+                            Wanxiangshu.Hosts.Opencode.SubsessionHostAdapterTypes.invoke1
+                                (box {| path = box {| id = SessionId.value sessionId |} |})
+                                "messages"
+                                session
 
-                        let data = Dyn.get resp "data"
+                        let data = Wanxiangshu.Runtime.Dyn.get resp "data"
 
-                        if Dyn.isNullish data || not (Dyn.isArray data) then
+                        if
+                            Wanxiangshu.Runtime.Dyn.isNullish data
+                            || not (Wanxiangshu.Runtime.Dyn.isArray data)
+                        then
                             return StopUnknown
                         else
                             let msgs = unbox<obj array> data
+                            let target = msgs |> Array.filter (SubsessionDispatch.isMessageMatch nonce)
+                            let activeFound = target |> Array.exists SubsessionDispatch.isMessageActive
 
-                            let matchingTurns =
-                                msgs |> Array.map (fun msg -> isMessageMatch nonce msg && isMessageActive msg)
-
-                            if matchingTurns |> Array.exists (fun active -> active) then
-                                return StillRunning
-                            elif matchingTurns.Length > 0 then
-                                return Stopped
-                            else
-                                return StopUnknown
+                            if activeFound then return StillRunning
+                            elif target.Length > 0 then return Stopped
+                            else return StopUnknown
                     with _ ->
                         return StopUnknown
                 | Error _ -> return StopUnknown
@@ -181,11 +216,18 @@ type OpencodeSubsessionHost(client: obj, agent: string, _directory: string) =
 
         member _.ClosePhysicalSession(sessionId) =
             promise {
-                match getSessionApiFromClient client with
+                let dispatcher: SessionDispatcher =
+                    Wanxiangshu.Hosts.Opencode.SubsessionHostAdapterTypes.getDispatcher
+                        directory
+                        (SessionId.value sessionId)
+
+                dispatcher.OnSessionClosed()
+
+                match Wanxiangshu.Hosts.Opencode.SubsessionHostAdapterTypes.trySessionApi client with
                 | Ok session ->
                     try
                         let arg = box {| path = box {| id = SessionId.value sessionId |} |}
-                        let! _ = invoke1 arg "delete" session
+                        let! _ = Wanxiangshu.Hosts.Opencode.SubsessionHostAdapterTypes.invoke1 arg "delete" session
                         return Stopped
                     with _ ->
                         return StopUnknown
@@ -194,3 +236,9 @@ type OpencodeSubsessionHost(client: obj, agent: string, _directory: string) =
 
 let createHost (client: obj) (agent: string) (directory: string) : ISubsessionHost =
     OpencodeSubsessionHost(client, agent, directory) :> ISubsessionHost
+
+let bindHostUserMessage (directory: string) (sessionId: string) (logicalTurnId: string) (messageId: string) : unit =
+    let dispatcher =
+        Wanxiangshu.Hosts.Opencode.SubsessionHostAdapterTypes.getDispatcher directory sessionId
+
+    Wanxiangshu.Hosts.Opencode.SubsessionHostAdapterTypes.bindHostUserMessage dispatcher logicalTurnId messageId

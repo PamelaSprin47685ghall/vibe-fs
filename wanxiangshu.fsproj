@@ -41,6 +41,9 @@
     <Compile Include="src/Kernel/Subsession/Cancellation.fs"/>
     <Compile Include="src/Kernel/Subsession/Decision.fs"/>
     <Compile Include="src/Kernel/Subsession/Fold.fs"/>
+    <Compile Include="src/Kernel/Dispatch/Identity.fs"/>
+    <Compile Include="src/Kernel/Dispatch/Protocol.fs"/>
+    <Compile Include="src/Kernel/Dispatch/Events.fs"/>
     <Compile Include="src/Kernel/Reactive.fs"/>
     <Compile Include="src/Kernel/ToolOutputInfoTypes.fs"/>
     <Compile Include="src/Kernel/ReviewSession/Types.fs"/>
@@ -316,6 +319,11 @@
     <Compile Include="src/Runtime/Subsession/SubsessionEventWire.fs"/>
     <Compile Include="src/Runtime/Subsession/SubsessionReconcile.fs"/>
     <Compile Include="src/Runtime/Subsession/SubsessionService.fs"/>
+    <Compile Include="src/Runtime/Dispatch/Types.fs"/>
+    <Compile Include="src/Runtime/Dispatch/SessionDispatcherOps.fs"/>
+    <Compile Include="src/Runtime/Dispatch/SessionDispatcher.fs"/>
+    <Compile Include="src/Runtime/Dispatch/SessionDispatcherLifecycle.fs"/>
+    <Compile Include="src/Runtime/Dispatch/Registry.fs"/>
     <Compile Include="src/Runtime/EventStore/EventLogRuntimeNudge.fs"/>
     <Compile Include="src/Runtime/EventStore/EventLogRuntime.fs"/>
     <Compile Include="src/Runtime/Fallback/Ports.fs"/>
@@ -426,6 +434,7 @@
     <Compile Include="src/Hosts/OpenCode/SubagentTypes.fs"/>
     <Compile Include="src/Hosts/OpenCode/SubagentSpawn.fs"/>
     <Compile Include="src/Hosts/OpenCode/SubsessionDispatch.fs"/>
+    <Compile Include="src/Hosts/OpenCode/SubsessionHostAdapterTypes.fs"/>
     <Compile Include="src/Hosts/OpenCode/SubsessionHostAdapter.fs"/>
     <Compile Include="src/Hosts/OpenCode/SubagentIo.fs"/>
     <Compile Include="src/Hosts/OpenCode/SessionIo.fs"/>
