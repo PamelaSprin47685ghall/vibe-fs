@@ -1,4 +1,4 @@
-module Wanxiangshu.Tests.OmpHelpersTests
+module Wanxiangshu.Tests.OmpToolingTests
 
 open Fable.Core
 open Fable.Core.JsInterop

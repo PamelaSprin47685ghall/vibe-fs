@@ -36,7 +36,9 @@ let loopFooter =
       "A reviewer will examine your submission. If accepted, you are done. If revision is requested, you will receive specific feedback to address." ]
 
 let buildLoopMessage (task: string) (bodyLines: string list) : string =
-    frontMatterPrompt [ yamlField taskField task ] (String.concat "\n" (bodyLines @ loopFooter))
+    frontMatterPrompt
+        [ yamlField commandField commandWithReview; yamlField taskField task ]
+        (String.concat "\n" (bodyLines @ loopFooter))
 
 let buildLoopCommandTemplate (commandName: string) (bodyLines: string list) : string =
     frontMatterPrompt [ yamlField commandField commandName ] (String.concat "\n" bodyLines)

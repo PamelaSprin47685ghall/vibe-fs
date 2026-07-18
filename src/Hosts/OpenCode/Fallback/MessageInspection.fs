@@ -27,6 +27,7 @@ let private isSyntheticText (text: string) : bool =
 
     t = "\u200b"
     || t.Contains("There are still incomplete todos")
+    || t.Contains("command: with-review")
     || t.Contains("You are in loop mode. You must call the submit_review")
     || t.Contains("A background runner task is still active")
     || t.Contains("the system context is about to be suspended")

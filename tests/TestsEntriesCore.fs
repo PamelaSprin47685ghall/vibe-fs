@@ -16,7 +16,7 @@ open Wanxiangshu.Tests.KernelTests
 open Wanxiangshu.Tests.DynFieldTests
 open Wanxiangshu.Tests.KernelPromptSpecs
 open Wanxiangshu.Tests.SubagentDispatcherTests
-open Wanxiangshu.Tests.KernelHelpersTests
+open Wanxiangshu.Tests.KernelPolicyTests
 open Wanxiangshu.Tests.ReviewSessionStateMachineTests
 open Wanxiangshu.Tests.HostToolsTests
 open Wanxiangshu.Tests.ToolPermissionTests
@@ -112,7 +112,7 @@ let private nudgeLifecycleBlock () : (string * TestBody) list =
       "NudgeEventSourcingTests.run", TestBody.Sync(sync NudgeEventSourcingTests.run)
       "OpencodeNudgeLifecycleTests.run", TestBody.Sync(sync OpencodeNudgeLifecycleTests.run)
       "OpencodeNudgeLifecycleTests.runAsync", TestBody.Async OpencodeNudgeLifecycleTests.runAsync
-      "KernelHelpersTests.run", TestBody.Sync(sync KernelHelpersTests.run)
+      "KernelPolicyTests.run", TestBody.Sync(sync KernelPolicyTests.run)
       "HostToolsTests.run", TestBody.Sync(sync HostToolsTests.run)
       "ToolPermissionTests.run", TestBody.Sync(sync ToolPermissionTests.run)
       "SubagentPromptsTests.run", TestBody.Sync(sync SubagentPromptsTests.run)

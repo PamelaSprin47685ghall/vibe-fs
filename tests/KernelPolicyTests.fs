@@ -1,4 +1,4 @@
-module Wanxiangshu.Tests.KernelHelpersTests
+module Wanxiangshu.Tests.KernelPolicyTests
 
 open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Kernel.Primitives.Identity

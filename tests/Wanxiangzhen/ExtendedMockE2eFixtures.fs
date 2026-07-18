@@ -1,4 +1,4 @@
-module Wanxiangshu.Tests.Wanxiangzhen.ExtendedMockE2eHelpers
+module Wanxiangshu.Tests.Wanxiangzhen.ExtendedMockE2eFixtures
 
 open Fable.Core
 open Fable.Core.JsInterop

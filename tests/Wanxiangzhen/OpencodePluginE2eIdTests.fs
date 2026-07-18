@@ -8,7 +8,7 @@ open Wanxiangshu.Hosts.Opencode.PluginWanxiangzhenHooks
 open Wanxiangshu.Runtime.Wanxiangzhen.CoordinatorOps
 open Wanxiangshu.Tests.Wanxiangzhen.AssertCompat
 open Wanxiangshu.Tests.Wanxiangzhen.TestDoubles
-open Wanxiangshu.Tests.Wanxiangzhen.OpencodePluginE2eHelpers
+open Wanxiangshu.Tests.Wanxiangzhen.OpencodePluginE2eMocks
 
 // Test 9 — squad_update without taskId generates two distinct squad- IDs
 let testSquadUpdateGeneratesUniqueIds () : JS.Promise<unit> =

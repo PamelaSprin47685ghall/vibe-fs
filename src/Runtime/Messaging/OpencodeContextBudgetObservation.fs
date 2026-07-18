@@ -68,6 +68,13 @@ let private lastAssistantTokenUsage (data: obj) : UsageObservation option =
                                     { AssistantMessageID = str info "id"
                                       InputTokens = totalInput })
 
+let private sessionMessagesArg (sessionID: string) (directory: string) : obj =
+    createObj
+        [ "sessionID", box sessionID
+          "directory", box directory
+          "path", box (createObj [ "id", box sessionID; "sessionID", box sessionID ])
+          "query", box (createObj [ "directory", box directory; "limit", box 50 ]) ]
+
 let tryObserveLatestUsage (client: obj) sessionID (directory: string) : JS.Promise<UsageObservation option> =
     promise {
         let session = get client "session"
@@ -76,11 +83,7 @@ let tryObserveLatestUsage (client: obj) sessionID (directory: string) : JS.Promi
             return None
         else
             try
-                let arg =
-                    createObj
-                        [ "path", box (createObj [ "id", box sessionID ])
-                          "query", box (createObj [ "directory", box directory ]) ]
-
+                let arg = sessionMessagesArg sessionID directory
                 let! response = unbox<JS.Promise<obj>> (session?messages arg)
 
                 if isNullish response then

@@ -10,6 +10,7 @@ export const NUDGE_MARKERS = [
   'command: with-review',
   'the system context is about to be suspended',
   'You must immediately force an emergency stop to all work',
+  'Hint: if your next response can perform several independent tool calls',
 ];
 
 const TITLE_GENERATION_MARKER = 'Generate a title for this conversation:';
@@ -23,11 +24,12 @@ function isZWSPContent(text) {
 function matchMarker(text) {
   if (isZWSPContent(text)) return 'zwsp';
   if (text.includes('There are still incomplete todos')) return 'todo-nudge';
+  if (text.includes('command: with-review')) return 'loop-nudge';
   if (text.includes('You are in loop mode. You must call the submit_review tool')) return 'loop-nudge';
   if (text.includes('A background runner task is still active')) return 'runner-nudge';
-  if (text.includes('command: with-review')) return 'with-review';
   if (text.includes('the system context is about to be suspended')) return 'budget-nudge';
   if (text.includes('You must immediately force an emergency stop to all work')) return 'budget-nudge';
+  if (text.includes('Hint: if your next response can perform several independent tool calls')) return 'parallel-hint';
   return null;
 }
 
@@ -42,8 +44,9 @@ function extractTextsFromContent(content) {
 export function isSyntheticContinuation(body) {
   const msgs = body?.messages || [];
   if (msgs.length === 0) return false;
-  const last = msgs[msgs.length - 1];
-  if (last?.role !== 'user') return false;
+  const lastUserIndex = msgs.map((m) => m?.role).lastIndexOf('user');
+  if (lastUserIndex === -1 || lastUserIndex < msgs.length - 2) return false;
+  const last = msgs[lastUserIndex];
   const texts = extractTextsFromContent(last.content);
   if (texts.length === 0) return false;
   return texts.some((t) => matchMarker(t) !== null);
@@ -52,8 +55,9 @@ export function isSyntheticContinuation(body) {
 export function detectSyntheticMarker(body) {
   const msgs = body?.messages || [];
   if (msgs.length === 0) return 'unknown';
-  const last = msgs[msgs.length - 1];
-  if (last?.role !== 'user') return 'unknown';
+  const lastUserIndex = msgs.map((m) => m?.role).lastIndexOf('user');
+  if (lastUserIndex === -1 || lastUserIndex < msgs.length - 2) return 'unknown';
+  const last = msgs[lastUserIndex];
   const texts = extractTextsFromContent(last.content);
   for (const t of texts) {
     const m = matchMarker(t);

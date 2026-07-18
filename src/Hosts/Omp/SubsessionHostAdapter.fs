@@ -14,7 +14,6 @@ open Wanxiangshu.Hosts.Omp.Codec
 open Wanxiangshu.Hosts.Omp.SubsessionDispatch
 open Wanxiangshu.Hosts.Omp.MessagingCodec
 open Wanxiangshu.Hosts.Omp.OmpSubsessionHostAdapterPrompts
-open Wanxiangshu.Kernel.Subsession.Types
 
 /// OMP serial prompt API: resolve means prompt entered the ordered stream
 /// (host-guaranteed barrier). Receipt is OrderedTurnMarkerObserved.
@@ -108,121 +107,13 @@ type OmpSubsessionHost(session: obj, agent: string, pi: obj, workspaceRoot: stri
             ignore nonce
 
         member _.QueryDispatchStatus(sessionId, turnId) =
-            promise {
-                try
-                    let sessionApi = Dyn.get pi "session"
-
-                    let! dataOpt =
-                        promise {
-                            if not (Dyn.isNullish sessionApi) then
-                                let arg = box {| sessionId = SessionId.value sessionId |}
-                                let! resp = unbox<JS.Promise<obj>> (sessionApi?sessionMessages (arg))
-                                return Some(Dyn.get resp "data")
-                            else
-                                let sm = Dyn.get session "sessionManager"
-
-                                if Dyn.isNullish sm then
-                                    return None
-                                else
-                                    let getEntries = Dyn.get sm "getEntries"
-
-                                    let raw =
-                                        if Dyn.typeIs getEntries "function" then
-                                            Dyn.callMethod0 sm "getEntries"
-                                        else
-                                            Dyn.get sm "messages"
-
-                                    if Dyn.isArray raw then
-                                        return Some raw
-                                    else
-                                        return None
-                        }
-
-                    match dataOpt with
-                    | Some data when not (Dyn.isNullish data) && Dyn.isArray data ->
-                        let msgs = unbox<obj array> data
-                        let target = TurnId.value turnId
-                        let mutable found = false
-                        let mutable anyUser = false
-
-                        for msg in msgs do
-                            let info = Dyn.get msg "info"
-
-                            if not (Dyn.isNullish info) then
-                                let cId1 = Dyn.str info "continuationId"
-                                let cId2 = Dyn.str info "continuationID"
-
-                                if cId1 = target || cId2 = target then
-                                    found <- true
-
-                            let roleTarget =
-                                if Dyn.str msg "role" <> "" then
-                                    msg
-                                else
-                                    let m = Dyn.get msg "message"
-                                    if not (Dyn.isNullish m) then m else info
-
-                            if not (Dyn.isNullish roleTarget) then
-                                let role = (Dyn.str roleTarget "role").ToLowerInvariant()
-
-                                if role = "user" then
-                                    anyUser <- true
-
-                        if found || anyUser then
-                            return DispatchStatus.Accepted OrderedTurnMarkerObserved
-                        else
-                            return DispatchStatus.Unknown
-                    | _ -> return DispatchStatus.Unknown
-                with _ ->
-                    return DispatchStatus.Unknown
-            }
+            SubsessionDispatch.queryDispatchStatus session (Dyn.get pi "session") sessionId turnId
 
         member _.QuerySessionQuiescence(sessionId, _turnId) =
-            promise {
-                match detectStatus session with
-                | Some status -> return status
-                | None ->
-                    let sm = Dyn.get session "sessionManager"
-
-                    match detectStatus sm with
-                    | Some status -> return status
-                    | None ->
-                        let sessionApi = Dyn.get pi "session"
-
-                        if not (Dyn.isNullish sessionApi) then
-                            let! piStatus = checkPiSessionStatus sessionApi sessionId
-
-                            match piStatus with
-                            | Some status -> return status
-                            | None -> return StopUnknown
-                        else
-                            return StopUnknown
-            }
+            OmpSubsessionHostAdapterPrompts.querySessionQuiescence session (Dyn.get pi "session") sessionId _turnId
 
         member _.ClosePhysicalSession(sessionId) =
-            promise {
-                let! localClose = tryCloseSessionObj session
-
-                match localClose with
-                | Some status -> return status
-                | None ->
-                    let sm = Dyn.get session "sessionManager"
-                    let! smClose = tryCloseSessionObj sm
-
-                    match smClose with
-                    | Some status -> return status
-                    | None ->
-                        let sessionApi = Dyn.get pi "session"
-
-                        if not (Dyn.isNullish sessionApi) then
-                            let! piClose = tryClosePiSession sessionApi sessionId
-
-                            match piClose with
-                            | Some status -> return status
-                            | None -> return StopUnknown
-                        else
-                            return StopUnknown
-            }
+            OmpSubsessionHostAdapterPrompts.closePhysicalSession session (Dyn.get pi "session") sessionId
 
 let createHost (session: obj) (agent: string) (pi: obj) (workspaceRoot: string) : ISubsessionHost =
     OmpSubsessionHost(session, agent, pi, workspaceRoot) :> ISubsessionHost

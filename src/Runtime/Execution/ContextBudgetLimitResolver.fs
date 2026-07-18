@@ -70,6 +70,22 @@ let tryExtractMaxInputTokensDetailed (target: obj) : LimitResolution option =
 let tryExtractMaxInputTokens (target: obj) : int option =
     tryExtractMaxInputTokensDetailed target |> Option.map valueOf
 
+let private sessionGetArg (sessionID: string) (directory: string) : obj =
+    createObj
+        [ "sessionID", box sessionID
+          "id", box sessionID
+          "directory", box directory
+          "path", box (createObj [ "id", box sessionID; "sessionID", box sessionID ])
+          "query", box (createObj [ "directory", box directory; "workspace", box "" ]) ]
+
+let private sessionModelOf (data: obj) : obj =
+    if isNullish data then
+        data
+    else
+        let data2 = get data "data"
+        let sessionBody = if isNullish data2 then data else data2
+        get sessionBody "model"
+
 let tryGetClient (target: obj) : obj =
     if not (isNullish (get target "session")) then
         target
@@ -103,30 +119,36 @@ let tryGetSessionModelRef (target: obj) (sessionID: string) : JS.Promise<(string
                     return None
                 else
                     try
-                        let arg = createObj [ "sessionID", box sessionID; "directory", box "" ]
+                        let arg = sessionGetArg sessionID ""
+                        let raw = Wanxiangshu.Runtime.Dyn.callWithThis1 getFn sessionApi arg
 
-                        let! res = unbox<JS.Promise<obj>> (sessionApi?get (arg))
+                        let! res =
+                            if Wanxiangshu.Runtime.Dyn.typeIs (Wanxiangshu.Runtime.Dyn.get raw "then") "function" then
+                                unbox<JS.Promise<obj>> raw
+                            else
+                                Promise.lift raw
 
                         if isNullish res then
                             return None
                         else
                             let data = get res "data"
+                            let modelObj = sessionModelOf data
 
-                            if isNullish data then
+                            if isNullish modelObj then
                                 return None
                             else
-                                let modelObj = get data "model"
+                                let mId =
+                                    let v = string (get modelObj "modelID")
+                                    if v <> "" then v else string (get modelObj "id")
 
-                                if isNullish modelObj then
+                                let pId =
+                                    let v = string (get modelObj "providerID")
+                                    if v <> "" then v else string (get modelObj "provider")
+
+                                if mId = "" || pId = "" then
                                     return None
                                 else
-                                    let mId = string (get modelObj "id")
-                                    let pId = string (get modelObj "providerID")
-
-                                    if mId = "" || pId = "" then
-                                        return None
-                                    else
-                                        return Some(mId, pId)
+                                    return Some(mId, pId)
                     with _ ->
                         return None
     }
@@ -148,28 +170,30 @@ let tryGetMaxInputTokensAsyncDetailed
                 return None
             else
                 let sessionApi = get client "session"
+                let getFn = get sessionApi "get"
 
-                if isNullish sessionApi || isNullish (get sessionApi "get") then
+                if isNullish sessionApi || isNullish getFn then
                     return None
                 else
                     try
-                        let arg = createObj [ "sessionID", box sessionID; "directory", box directory ]
+                        let arg = sessionGetArg sessionID directory
+                        let raw = Wanxiangshu.Runtime.Dyn.callWithThis1 getFn sessionApi arg
 
-                        let! res = unbox<JS.Promise<obj>> (sessionApi?get (arg))
+                        let! res =
+                            if Wanxiangshu.Runtime.Dyn.typeIs (Wanxiangshu.Runtime.Dyn.get raw "then") "function" then
+                                unbox<JS.Promise<obj>> raw
+                            else
+                                Promise.lift raw
 
                         if isNullish res then
                             return None
                         else
                             let data = get res "data"
+                            let modelObj = sessionModelOf data
 
-                            if isNullish data then
-                                return None
-                            else
-                                let modelObj = get data "model"
-
-                                match extractLimitFromModelDetailed modelObj with
-                                | Some limit -> return Some limit
-                                | None -> return None
+                            match extractLimitFromModelDetailed modelObj with
+                            | Some limit -> return Some limit
+                            | None -> return None
                     with _ ->
                         return None
     }

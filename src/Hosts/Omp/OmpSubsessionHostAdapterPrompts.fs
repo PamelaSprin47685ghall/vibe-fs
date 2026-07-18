@@ -105,3 +105,55 @@ let internal tryClosePiSession (sessionApi: obj) (sessionId: SessionId) : JS.Pro
 
         if success then return Some Stopped else return None
     }
+
+/// Resolve quiescence for an OMP physical session, consulting the session object,
+/// its manager, and the PI session API in order.
+let querySessionQuiescence
+    (session: obj)
+    (sessionApi: obj)
+    (sessionId: SessionId)
+    (_turnId: TurnId)
+    : JS.Promise<QuiescenceStatus> =
+    promise {
+        match detectStatus session with
+        | Some status -> return status
+        | None ->
+            let sm = Dyn.get session "sessionManager"
+
+            match detectStatus sm with
+            | Some status -> return status
+            | None ->
+                if not (Dyn.isNullish sessionApi) then
+                    let! piStatus = checkPiSessionStatus sessionApi sessionId
+
+                    match piStatus with
+                    | Some status -> return status
+                    | None -> return StopUnknown
+                else
+                    return StopUnknown
+    }
+
+/// Close an OMP physical session by trying the session object, then the session
+/// manager, then the PI session API.
+let closePhysicalSession (session: obj) (sessionApi: obj) (sessionId: SessionId) : JS.Promise<QuiescenceStatus> =
+    promise {
+        let! localClose = tryCloseSessionObj session
+
+        match localClose with
+        | Some status -> return status
+        | None ->
+            let sm = Dyn.get session "sessionManager"
+            let! smClose = tryCloseSessionObj sm
+
+            match smClose with
+            | Some status -> return status
+            | None ->
+                if not (Dyn.isNullish sessionApi) then
+                    let! piClose = tryClosePiSession sessionApi sessionId
+
+                    match piClose with
+                    | Some status -> return status
+                    | None -> return StopUnknown
+                else
+                    return StopUnknown
+    }

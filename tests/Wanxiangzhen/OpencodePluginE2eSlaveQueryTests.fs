@@ -10,7 +10,7 @@ open Wanxiangshu.Runtime.Wanxiangzhen.CoordinatorOps
 open Wanxiangshu.Kernel.Wanxiangzhen.SquadTask
 open Wanxiangshu.Tests.Wanxiangzhen.AssertCompat
 open Wanxiangshu.Tests.Wanxiangzhen.TestDoubles
-open Wanxiangshu.Tests.Wanxiangzhen.OpencodePluginE2eHelpers
+open Wanxiangshu.Tests.Wanxiangzhen.OpencodePluginE2eMocks
 
 // Test 8 — slave mode: plugin returns submit_to_squad + query_squad tools;
 //           query_squad "state" hits coordinator HTTP server and returns DAG

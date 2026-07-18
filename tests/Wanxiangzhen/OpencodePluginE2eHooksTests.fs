@@ -6,7 +6,7 @@ open Wanxiangshu.Runtime.Dyn
 open Wanxiangshu.Hosts.Opencode.PluginWanxiangzhenDeps
 open Wanxiangshu.Hosts.Opencode.PluginWanxiangzhenHooks
 open Wanxiangshu.Tests.Wanxiangzhen.AssertCompat
-open Wanxiangshu.Tests.Wanxiangzhen.OpencodePluginE2eHelpers
+open Wanxiangshu.Tests.Wanxiangzhen.OpencodePluginE2eMocks
 
 // Test 1 — plugin_with_deps returns hooks containing expected keys
 let testPluginHooksShape () : JS.Promise<unit> =

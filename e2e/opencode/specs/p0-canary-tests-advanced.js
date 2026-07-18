@@ -94,7 +94,7 @@ const tests = [
     fn: async (t) => {
       const sess = await t.client.createSession();
       const sid = getSessionId(sess);
-      const pad = 'x'.repeat(1200);
+      const pad = 'x'.repeat(9500);
       t.provider.expectToolCall({ id: 'cb-todo', tool: 'todowrite', args: {
         ahaMoments: pad, changesAndReasons: pad, gotchas: pad,
         lessonsAndConventions: pad, plan: pad,

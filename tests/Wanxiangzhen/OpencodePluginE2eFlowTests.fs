@@ -13,7 +13,7 @@ open Wanxiangshu.Kernel.Wanxiangzhen.SquadTask
 open Wanxiangshu.Kernel.Wanxiangzhen.SquadEvent
 open Wanxiangshu.Tests.Wanxiangzhen.AssertCompat
 open Wanxiangshu.Tests.Wanxiangzhen.TestDoubles
-open Wanxiangshu.Tests.Wanxiangzhen.OpencodePluginE2eHelpers
+open Wanxiangshu.Tests.Wanxiangzhen.OpencodePluginE2eMocks
 
 // Test 4 — /squad command writes a squad_created frontmatter event
 let testSquadCommandCreatesSession () : JS.Promise<unit> =

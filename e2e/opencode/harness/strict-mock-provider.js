@@ -26,6 +26,7 @@ import {
   extractToolNames,
   matchesExpectation,
   estimatePromptTokens,
+  extractLastUserMsg,
 } from './strict-mock-matches.js';
 import { decorateLegacyArgs } from './strict-mock-decorate.js';
 import {
@@ -141,7 +142,13 @@ export class StrictMockProvider {
     s.nudgeBypassed++;
     s.syntheticRequests.push({ body: parsed, marker, time: Date.now() });
     console.error(`[MOCK-SYNTH] session=${parsed?.sessionId || '?'} marker=${marker} #${s.nudgeBypassed}`);
-    return sendSSE(res, buildTextChunks(`synth_${Date.now()}`, 'done', 1));
+    const text =
+      marker === 'todo-nudge'
+        ? 'done\n<skip-todo-check />'
+        : marker === 'loop-nudge'
+          ? 'done\n<skip-review-check />'
+          : 'done';
+    return sendSSE(res, buildTextChunks(`synth_${Date.now()}`, text, 1));
   }
 
   _dispatchFifo(res, parsed) {
@@ -188,7 +195,8 @@ export class StrictMockProvider {
     const msgs = parsed?.messages || [];
     const hasToolResults = msgs.some((m) => m?.role === 'tool' || m?.role === 'toolResult');
     this._state.unexpected.push({ body: parsed, sessId, hasToolResults, reason });
-    console.error(`[MOCK-500] reason=${reason} session=${sessId} tools=${JSON.stringify(extractToolNames(parsed))} msgs=${msgs.length}`);
+    const lastUser = JSON.stringify(extractLastUserMsg(parsed));
+    console.error(`[MOCK-500] reason=${reason} session=${sessId} tools=${JSON.stringify(extractToolNames(parsed))} msgs=${msgs.length} lastUser=${lastUser.slice(0, 400)}`);
     return sendJSON(res, 500, { error: reason, sessionId: sessId, tools: extractToolNames(parsed) });
   }
 

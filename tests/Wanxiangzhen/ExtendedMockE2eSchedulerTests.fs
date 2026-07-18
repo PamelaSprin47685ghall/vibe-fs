@@ -14,7 +14,7 @@ open Wanxiangshu.Runtime.Wanxiangzhen.CoordinatorRoutes
 open Wanxiangshu.Runtime.Wanxiangzhen.CoordinatorSquadUpdate
 open Wanxiangshu.Tests.Wanxiangzhen.AssertCompat
 open Wanxiangshu.Tests.Wanxiangzhen.TestDoubles
-open Wanxiangshu.Tests.Wanxiangzhen.ExtendedMockE2eHelpers
+open Wanxiangshu.Tests.Wanxiangzhen.ExtendedMockE2eFixtures
 
 let testMaxConcurrentLimitsReadyTasks () : JS.Promise<unit> =
     promise {

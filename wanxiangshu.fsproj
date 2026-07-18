@@ -478,6 +478,7 @@
     <Compile Include="src/Hosts/OpenCode/CompactionHook.fs"/>
     <Compile Include="src/Hosts/OpenCode/ModelKeyResolver.fs"/>
     <Compile Include="src/Hosts/OpenCode/SembleInjection.fs"/>
+    <Compile Include="src/Hosts/OpenCode/ModelResolutionHelpers.fs"/>
     <Compile Include="src/Hosts/OpenCode/OpenCodeModelResolutionProviders.fs"/>
     <Compile Include="src/Hosts/OpenCode/OpenCodeModelResolution.fs"/>
     <Compile Include="src/Hosts/OpenCode/MessageTransformPipeline.fs"/>
@@ -622,7 +623,7 @@
     <Compile Include="tests/AgentNudgeSpecsWip.fs"/>
     <Compile Include="tests/AgentNudgeSpecsDecode.fs"/>
     <Compile Include="tests/KernelTests.fs"/>
-    <Compile Include="tests/KernelHelpersTests.fs"/>
+    <Compile Include="tests/KernelPolicyTests.fs"/>
     <Compile Include="tests/KernelPromptSpecsHost.fs"/>
     <Compile Include="tests/KernelPromptSpecsSubagent.fs"/>
     <Compile Include="tests/KernelPromptSpecsReview.fs"/>
@@ -682,7 +683,7 @@
     <Compile Include="tests/OmpContextTransformTests.fs"/>
     <Compile Include="tests/OmpReviewTests.fs"/>
     <Compile Include="tests/OmpChildSessionTests.fs"/>
-    <Compile Include="tests/OmpHelpersTests.fs"/>
+    <Compile Include="tests/OmpToolingTests.fs"/>
     <Compile Include="tests/OmpRunnerTests.fs"/>
     <Compile Include="tests/OmpPluginCoreTests.fs"/>
     <Compile Include="tests/OmpMagicTodoTests.fs"/>
@@ -853,7 +854,7 @@
     <Compile Include="tests/Wanxiangzhen/EventReplayTests.fs"/>
     <Compile Include="tests/Wanxiangzhen/ExtendedCoordinatorOpsTests.fs"/>
     <Compile Include="tests/Wanxiangzhen/ExtendedFfDecisionTests.fs"/>
-    <Compile Include="tests/Wanxiangzhen/ExtendedMockE2eHelpers.fs"/>
+    <Compile Include="tests/Wanxiangzhen/ExtendedMockE2eFixtures.fs"/>
     <Compile Include="tests/Wanxiangzhen/ExtendedMockE2ePluginTests.fs"/>
     <Compile Include="tests/Wanxiangzhen/ExtendedMockE2eReplayTests.fs"/>
     <Compile Include="tests/Wanxiangzhen/ExtendedMockE2eSchedulerTests.fs"/>
@@ -864,7 +865,7 @@
     <Compile Include="tests/Wanxiangzhen/HttpCodecTests.fs"/>
     <Compile Include="tests/Wanxiangzhen/MockE2eHttpTests.fs"/>
     <Compile Include="tests/Wanxiangzhen/MockE2eTests.fs"/>
-    <Compile Include="tests/Wanxiangzhen/OpencodePluginE2eHelpers.fs"/>
+    <Compile Include="tests/Wanxiangzhen/OpencodePluginE2eMocks.fs"/>
     <Compile Include="tests/Wanxiangzhen/OpencodePluginE2eCancelKillTests.fs"/>
     <Compile Include="tests/Wanxiangzhen/OpencodePluginE2eFlowTests.fs"/>
     <Compile Include="tests/Wanxiangzhen/OpencodePluginE2eHooksTests.fs"/>

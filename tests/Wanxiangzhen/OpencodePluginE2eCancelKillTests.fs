@@ -13,7 +13,7 @@ open Wanxiangshu.Kernel.Wanxiangzhen.SquadTask
 open Wanxiangshu.Kernel.Wanxiangzhen.SquadEvent
 open Wanxiangshu.Tests.Wanxiangzhen.AssertCompat
 open Wanxiangshu.Tests.Wanxiangzhen.TestDoubles
-open Wanxiangshu.Tests.Wanxiangzhen.OpencodePluginE2eHelpers
+open Wanxiangshu.Tests.Wanxiangzhen.OpencodePluginE2eMocks
 
 // Test 6 — squad_update with squad_cancelled cancels a running task,
 //           KillPid called, exactly one squad_cancelled event in prompts

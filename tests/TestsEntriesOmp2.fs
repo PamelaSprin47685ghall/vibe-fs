@@ -7,7 +7,7 @@ open Wanxiangshu.Tests.OmpReviewTests
 open Wanxiangshu.Tests.OmpReviewLoopAsyncTests
 open Wanxiangshu.Tests.OmpChildSessionTests
 open Wanxiangshu.Tests.OmpRunnerTests
-open Wanxiangshu.Tests.OmpHelpersTests
+open Wanxiangshu.Tests.OmpToolingTests
 open Wanxiangshu.Tests.OmpTitleFetchGuardTests
 open Wanxiangshu.Tests.SubagentIoTests
 open Wanxiangshu.Tests.OmpPluginCoreTests
@@ -48,14 +48,14 @@ let entries2 () : (string * TestBody) list =
       "OmpRunnerTests.abortExecutorRunClearsActive", Sync(sync OmpRunnerTests.abortExecutorRunClearsActive)
       "OmpRunnerTests.executorChildToolNamesMatchOmpSessionTools",
       Sync(sync OmpRunnerTests.executorChildToolNamesMatchOmpSessionTools)
-      "OmpHelpersTests.checkSyntaxBadJson", Async OmpHelpersTests.checkSyntaxBadJson
-      "OmpHelpersTests.checkSyntaxValidJson", Async OmpHelpersTests.checkSyntaxValidJson
-      "OmpHelpersTests.checkSyntaxBrokenJsonReports_intentionalWarningFork",
-      Async OmpHelpersTests.checkSyntaxBrokenJsonReports_intentionalWarningFork
-      "OmpHelpersTests.checkSyntaxMarkdownExempt", Async OmpHelpersTests.checkSyntaxMarkdownExempt
-      "OmpHelpersTests.supportsSyntaxDiagnosticsGrepFalse",
-      Sync(sync OmpHelpersTests.supportsSyntaxDiagnosticsGrepFalse)
-      "OmpHelpersTests.stripHeadTailViaKernel", Sync(sync OmpHelpersTests.stripHeadTailViaKernel)
+      "OmpToolingTests.checkSyntaxBadJson", Async OmpToolingTests.checkSyntaxBadJson
+      "OmpToolingTests.checkSyntaxValidJson", Async OmpToolingTests.checkSyntaxValidJson
+      "OmpToolingTests.checkSyntaxBrokenJsonReports_intentionalWarningFork",
+      Async OmpToolingTests.checkSyntaxBrokenJsonReports_intentionalWarningFork
+      "OmpToolingTests.checkSyntaxMarkdownExempt", Async OmpToolingTests.checkSyntaxMarkdownExempt
+      "OmpToolingTests.supportsSyntaxDiagnosticsGrepFalse",
+      Sync(sync OmpToolingTests.supportsSyntaxDiagnosticsGrepFalse)
+      "OmpToolingTests.stripHeadTailViaKernel", Sync(sync OmpToolingTests.stripHeadTailViaKernel)
       "OmpTitleFetchGuardTests.signature", Sync(sync OmpTitleFetchGuardTests.signature)
       "OmpTitleFetchGuardTests.wrapText", Sync(sync OmpTitleFetchGuardTests.wrapText)
       "OmpTitleFetchGuardTests.detectProbeUserContent", Sync(sync OmpTitleFetchGuardTests.detectProbeUserContent)

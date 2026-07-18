@@ -61,7 +61,7 @@ open Wanxiangshu.Tests.OmpFuzzyTests
 open Wanxiangshu.Tests.OmpPluginTests
 open Wanxiangshu.Tests.OmpPluginTestsAgentEnd
 open Wanxiangshu.Tests.OmpReviewTests
-open Wanxiangshu.Tests.OmpHelpersTests
+open Wanxiangshu.Tests.OmpToolingTests
 open Wanxiangshu.Tests.OmpRunnerTests
 open Wanxiangshu.Tests.OmpContextTransformTests
 open Wanxiangshu.Tests.OmpAgentConfigTests

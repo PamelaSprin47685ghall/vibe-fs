@@ -9,7 +9,7 @@ open Wanxiangshu.Runtime.Wanxiangzhen.CoordinatorRuntime
 open Wanxiangshu.Runtime.Wanxiangzhen.CoordinatorReplay
 open Wanxiangshu.Tests.Wanxiangzhen.AssertCompat
 open Wanxiangshu.Tests.Wanxiangzhen.TestDoubles
-open Wanxiangshu.Tests.Wanxiangzhen.ExtendedMockE2eHelpers
+open Wanxiangshu.Tests.Wanxiangzhen.ExtendedMockE2eFixtures
 
 let testChatMessageCapturesSessionIdAndReplays () : JS.Promise<unit> =
     promise {

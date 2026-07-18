@@ -91,7 +91,7 @@ function nextItemFor(body, queue) {
       args: { verdict: 'accepted', feedback: 'everything looks perfectly clean' }
     };
   }
-  if (names.size === 0 && !hasToolResult(body)) return undefined;
+  if (names.size === 0 && !hasToolResult(body) && queue.length === 0) return undefined;
   if (queue[0]?.tool && names.size > 0 && !names.has(queue[0].tool)) {
     const toolIndex = queue.findIndex((item) => item?.tool && names.has(item.tool));
     if (toolIndex >= 0) return queue.splice(toolIndex, 1)[0];

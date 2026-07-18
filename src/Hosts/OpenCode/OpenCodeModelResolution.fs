@@ -6,20 +6,43 @@ open Wanxiangshu.Kernel
 open Wanxiangshu.Runtime
 open Wanxiangshu.Runtime.ContextBudgetUsageCodec
 open Wanxiangshu.Runtime.Dyn
-open Wanxiangshu.Runtime.FileSys
+open Wanxiangshu.Hosts.Opencode.ModelResolutionHelpers
 
 module ProviderHelpers = Wanxiangshu.Hosts.Opencode.OpenCodeModelResolutionProviders
-
-let private logDebug (_fmt: string) (_args: obj[]) : unit = ()
 let private fallbackMaxInputTokens = ProviderHelpers.fallbackMaxInputTokens
 
 /// Strongly-typed model resolution result.
 type ModelResolutionResult = ProviderHelpers.ModelResolutionResult
 
-let extractLimitFromCatalogEntry = ProviderHelpers.extractLimitFromCatalogEntry
-let findModelInCatalog = ProviderHelpers.findModelInCatalog
-let computeUsableInputTokens = ProviderHelpers.computeUsableInputTokens
+let extractLimitFromCatalogEntry =
+    ModelResolutionHelpers.extractLimitFromCatalogEntry
+
+let findModelInCatalog = ModelResolutionHelpers.findModelInCatalog
+let computeUsableInputTokens = ModelResolutionHelpers.computeUsableInputTokens
 let resolveModelResolution = ProviderHelpers.resolveModelResolution
+
+let private sessionGetArg (sessionID: string) (directory: string) : obj =
+    createObj
+        [ "sessionID", box sessionID
+          "id", box sessionID
+          "directory", box directory
+          "path", box (createObj [ "id", box sessionID; "sessionID", box sessionID ])
+          "query", box (createObj [ "directory", box directory; "workspace", box "" ]) ]
+
+/// Locate a session API on either the root client or client.v2.
+let private trySessionGet (client: obj) : (obj * obj) option =
+    let rec tryPath (parts: string list) (current: obj) (parent: obj) : (obj * obj) option =
+        match parts with
+        | [] ->
+            let getFn = get current "get"
+            if isNullish getFn then None else Some(current, getFn)
+        | head :: tail ->
+            let child = get current head
+
+            if isNullish child then None else tryPath tail child current
+
+    [ [ "session" ]; [ "v2"; "session" ] ]
+    |> List.tryPick (fun parts -> tryPath parts client client)
 
 /// Extract {providerID, modelID} from the session's last user message model ref.
 let private extractModelFromSession
@@ -28,43 +51,55 @@ let private extractModelFromSession
     (directory: string)
     : JS.Promise<string * string> =
     promise {
-        let sessionApi = get client "session"
-        let getFn = if isNullish sessionApi then null else get sessionApi "get"
+        let sessionApiOpt = trySessionGet client
 
-        if isNullish getFn || not (typeIs getFn "function") then
-            return ("", "")
-        else
-            let sessionArg =
-                createObj
-                    [ "path", box (createObj [ "id", box sessionID ])
-                      "query", box (createObj [ "directory", box directory ]) ]
+        match sessionApiOpt with
+        | None -> return ("", "")
+        | Some(sessionApi, getFn) ->
+            if not (typeIs getFn "function") then
+                return ("", "")
+            else
+                let arg = sessionGetArg sessionID directory
 
-            try
-                let! sessionRes = unbox<JS.Promise<obj>> (sessionApi?get (sessionArg))
+                try
+                    let raw = Wanxiangshu.Runtime.Dyn.callWithThis1 getFn sessionApi arg
 
-                if isNullish sessionRes then
-                    return ("", "")
-                else
-                    let data = get sessionRes "data"
+                    let! sessionRes =
+                        if Wanxiangshu.Runtime.Dyn.typeIs (Wanxiangshu.Runtime.Dyn.get raw "then") "function" then
+                            unbox<JS.Promise<obj>> raw
+                        else
+                            Promise.lift raw
 
-                    if isNullish data then
+                    if isNullish sessionRes then
                         return ("", "")
                     else
-                        let modelObj = get data "model"
+                        let data = get sessionRes "data"
 
-                        if isNullish modelObj then
+                        if isNullish data then
                             return ("", "")
                         else
-                            let pId = str modelObj "providerID"
-                            let mId = str modelObj "modelID"
+                            let data2 = get data "data"
+                            let sessionBody = if isNullish data2 then data else data2
+                            let modelObj = get sessionBody "model"
 
-                            if pId <> "" && mId <> "" then
-                                return (pId, mId)
+                            if isNullish modelObj then
+                                return ("", "")
                             else
-                                let idVal = str modelObj "id"
-                                return (if idVal <> "" then ("", idVal) else ("", ""))
-            with _ ->
-                return ("", "")
+                                let pId =
+                                    let v = str modelObj "providerID"
+                                    if v <> "" then v else str modelObj "provider"
+
+                                let mId =
+                                    let v = str modelObj "modelID"
+                                    if v <> "" then v else str modelObj "id"
+
+                                if pId <> "" && mId <> "" then
+                                    return (pId, mId)
+                                else
+                                    let idVal = str modelObj "id"
+                                    return (if idVal <> "" then ("", idVal) else ("", ""))
+                with _ ->
+                    return ("", "")
     }
 
 let resolveMaxInputTokens (sessionID: string) (client: obj) (directory: string) : JS.Promise<int> =
@@ -75,7 +110,10 @@ let resolveMaxInputTokens (sessionID: string) (client: obj) (directory: string) 
             let! (providerID, modelID) = extractModelFromSession client sessionID directory
 
             if providerID = "" && modelID = "" then
-                return! Wanxiangshu.Runtime.ContextBudgetUsageCodec.resolveMaxInputTokens [ client ] sessionID directory
+                let! fallback =
+                    Wanxiangshu.Runtime.ContextBudgetUsageCodec.resolveMaxInputTokens [ client ] sessionID directory
+
+                return fallback
             else
                 let! result = resolveModelResolution client providerID modelID directory
 

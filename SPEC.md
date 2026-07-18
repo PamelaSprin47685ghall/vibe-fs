@@ -50,7 +50,7 @@
 
 `ArchitectureGatesTests` 已禁止 `CatalogN`、`VN`、`PartN/PartsN` 等历史命名进入 `src`、`tests`、`integration`、`e2e`。
 
-测试代码中仍残留 `KernelHelpersTests.fs`、`OmpHelpersTests.fs`、`ExtendedMockE2eHelpers.fs` 等 helper 模块名，待后续随模块职责重命名。
+测试代码中 helper 模块名已按职责重命名：`KernelHelpersTests.fs` → `KernelPolicyTests.fs`、`OmpHelpersTests.fs` → `OmpToolingTests.fs`、`ExtendedMockE2eHelpers.fs` → `ExtendedMockE2eFixtures.fs`、`OpencodePluginE2eHelpers.fs` → `OpencodePluginE2eMocks.fs`。
 
 ## 五、测试代码也必须像一次写成 ✅ 已完成
 

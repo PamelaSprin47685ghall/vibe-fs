@@ -6,7 +6,7 @@ open Wanxiangshu.Kernel
 open Wanxiangshu.Runtime
 open Wanxiangshu.Runtime.ContextBudgetUsageCodec
 open Wanxiangshu.Runtime.Dyn
-open Wanxiangshu.Runtime.FileSys
+open Wanxiangshu.Hosts.Opencode.ModelResolutionHelpers
 
 /// Strongly-typed model resolution result.
 type ModelResolutionResult =
@@ -16,101 +16,61 @@ type ModelResolutionResult =
       Source: string }
 
 let internal fallbackMaxInputTokens = 8192
-let private defaultOutputReserve = 32000
 
-/// Call provider.list({query:{directory}}) to get the full model catalog.
-let private tryProviderList (client: obj) (directory: string) : JS.Promise<obj option> =
+/// Try v2 model.list({location:{directory}}), then model.list, then provider.list.
+let private tryListApi (apiName: string) (client: obj) (directory: string) : JS.Promise<obj option> =
     promise {
-        let providerApi = get client "provider"
+        let parts = apiName.Split([| '.' |])
 
-        let listFn =
-            if isNullish providerApi then
-                null
-            else
-                get providerApi "list"
+        let rec navigate (obj: obj) (parts: string list) (parent: obj) : (obj * obj) option =
+            match parts with
+            | [] -> Some(parent, obj)
+            | head :: tail ->
+                let child = get obj head
 
-        if isNullish listFn || not (typeIs listFn "function") then
-            return None
-        else
-            let listArg = createObj [ "query", box (createObj [ "directory", box directory ]) ]
+                if isNullish child then None else navigate child tail obj
 
-            try
-                let! res = unbox<JS.Promise<obj>> (providerApi?list (listArg))
-                return Some res
-            with _ ->
+        match navigate client (Array.toList parts) client with
+        | None -> return None
+        | Some(parent, listFn) ->
+            if not (typeIs listFn "function") then
                 return None
+            else
+                let listArg =
+                    if apiName.Contains "v2" then
+                        createObj [ "location", box (createObj [ "directory", box directory ]) ]
+                    else
+                        createObj [ "query", box (createObj [ "directory", box directory ]) ]
+
+                try
+                    let raw = Wanxiangshu.Runtime.Dyn.callWithThis1 listFn parent listArg
+
+                    let! res =
+                        if Wanxiangshu.Runtime.Dyn.typeIs (Wanxiangshu.Runtime.Dyn.get raw "then") "function" then
+                            unbox<JS.Promise<obj>> raw
+                        else
+                            Promise.lift raw
+
+                    return Some res
+                with _ ->
+                    return None
     }
 
-/// Extract {context, output} limit from a model definition in the provider catalog.
-let extractLimitFromCatalogEntry (modelDef: obj) : (int * int) option =
-    if isNullish modelDef then
-        None
-    else
-        let limitObj = get modelDef "limit"
+let private tryModelList (client: obj) (directory: string) : JS.Promise<obj option> =
+    promise {
+        let! v2 = tryListApi "v2.model.list" client directory
 
-        if isNullish limitObj then
-            None
-        else
-            let ctxVal = get limitObj "context"
-            let outVal = get limitObj "output"
-            let inputVal = get limitObj "input"
+        match v2 with
+        | Some _ -> return v2
+        | None ->
+            let! legacy = tryListApi "model.list" client directory
 
-            // Prefer explicit input if available (newer SDK), otherwise use context
-            let contextTokens =
-                if not (isNullish inputVal) && typeIs inputVal "number" then
-                    int (unbox<float> inputVal)
-                elif not (isNullish ctxVal) && typeIs ctxVal "number" then
-                    int (unbox<float> ctxVal)
-                else
-                    0
-
-            let outputTokens =
-                if not (isNullish outVal) && typeIs outVal "number" then
-                    int (unbox<float> outVal)
-                else
-                    0
-
-            if contextTokens > 0 then
-                Some(contextTokens, outputTokens)
-            else
-                None
-
-/// Find a model definition in the provider catalog by providerID and modelID.
-let findModelInCatalog (catalogData: obj) (providerID: string) (modelID: string) : obj option =
-    if isNullish catalogData then
-        None
-    else
-        let data =
-            if isArray catalogData then
-                catalogData :?> obj array
-            else
-                let inner = get catalogData "data"
-
-                if not (isNullish inner) && isArray inner then
-                    inner :?> obj array
-                else
-                    [||]
-
-        data
-        |> Array.tryPick (fun entry ->
-            let pId = str entry "providerID"
-            let mId = str entry "id"
-
-            if pId = providerID && mId = modelID then
-                Some entry
-            else
-                None)
-
-/// Compute usable input tokens from context and output limits.
-/// Formula: max(0, context - min(nonzero output, 32000))
-let computeUsableInputTokens (contextTokens: int) (outputTokens: int) : int =
-    let outputReserve =
-        if outputTokens > 0 then
-            min outputTokens defaultOutputReserve
-        else
-            defaultOutputReserve
-
-    max 0 (contextTokens - outputReserve)
+            match legacy with
+            | Some _ -> return legacy
+            | None ->
+                let! provider = tryListApi "provider.list" client directory
+                return provider
+    }
 
 /// Resolve model key and usable input tokens from the provider catalog.
 let resolveModelResolution
@@ -120,40 +80,27 @@ let resolveModelResolution
     (directory: string)
     : JS.Promise<ModelResolutionResult> =
     promise {
+        let fallback =
+            { ProviderID = providerID
+              ModelID = modelID
+              UsableInputTokens = fallbackMaxInputTokens
+              Source = "fallback-8192" }
+
         if isNullish client || providerID = "" || modelID = "" then
-            return
-                { ProviderID = providerID
-                  ModelID = modelID
-                  UsableInputTokens = fallbackMaxInputTokens
-                  Source = "fallback-8192" }
+            return fallback
         else
-            let! catalogOpt = tryProviderList client directory
+            let! catalogOpt = tryModelList client directory
 
             match catalogOpt with
-            | None ->
-                return
-                    { ProviderID = providerID
-                      ModelID = modelID
-                      UsableInputTokens = fallbackMaxInputTokens
-                      Source = "fallback-8192" }
+            | None -> return fallback
             | Some catalogRes ->
                 let catalogData = get catalogRes "data"
 
                 match findModelInCatalog catalogData providerID modelID with
-                | None ->
-                    return
-                        { ProviderID = providerID
-                          ModelID = modelID
-                          UsableInputTokens = fallbackMaxInputTokens
-                          Source = "fallback-8192" }
+                | None -> return fallback
                 | Some modelDef ->
                     match extractLimitFromCatalogEntry modelDef with
-                    | None ->
-                        return
-                            { ProviderID = providerID
-                              ModelID = modelID
-                              UsableInputTokens = fallbackMaxInputTokens
-                              Source = "fallback-8192" }
+                    | None -> return fallback
                     | Some(contextTokens, outputTokens) ->
                         let usable = computeUsableInputTokens contextTokens outputTokens
 
