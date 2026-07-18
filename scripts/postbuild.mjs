@@ -53,7 +53,6 @@ const staleE2eTests = [
   'OpencodePluginTests.js',
   'MimocodePluginTests.js',
   'MimoTuiPluginTests.js',
-  'TestsServePlugin.js',
 ];
 for (const name of staleE2eTests) {
   const p = path.join(buildDir, 'e2e', name);

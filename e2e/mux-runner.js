@@ -260,7 +260,7 @@ export async function start(opts = {}) {
     buildConfig(mockLlm.url, tempHome);
 
     const muxRepo = process.env.WANXIANGSHU_MUX_REPO || path.resolve(__dirname, '..', '..', 'mux');
-    const pluginPath = path.resolve(__dirname, '..', 'build', 'src', 'Mux', 'Plugin.js');
+    const pluginPath = path.resolve(__dirname, '..', 'build', 'src', 'Hosts', 'Mux', 'Plugin.js');
     const child = startDriverProcess(muxRepo, pluginPath, mockLlm.url);
     const queue = buildCommandQueue(child);
     const workdir = await queue.workdirPromise;

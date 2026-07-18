@@ -186,7 +186,7 @@ async function spawnOmpHost(opts) {
   writeAgentConfigs(agentDir, mockLlm);
 
   const ompRepo = process.env.WANXIANGSHU_OMP_REPO || path.resolve(__dirname, '..', '..', 'oh-my-pi');
-  const pluginPath = path.resolve(__dirname, '..', 'build', 'src', 'Omp', 'Plugin.js');
+  const pluginPath = path.resolve(__dirname, '..', 'build', 'src', 'Hosts', 'Omp', 'Plugin.js');
   const child = spawnProcess(ompRepo, pluginPath, mockLlm, agentDir);
   child.stderr.on('data', (chunk) => process.stderr.write(`[omp-driver] ${chunk}`));
 
