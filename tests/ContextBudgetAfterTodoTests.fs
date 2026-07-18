@@ -47,7 +47,7 @@ let spec_applyContextBudget_afterTodoResets () =
             { Host = opencode
               GetOrRebuildBacklog = (fun _ _ -> backlogRef.Value) }
 
-        let state = beginPhase 30000L 100L 0L
+        let state = beginCycle 30000L 0 3
 
         ContextBudgetStore.update scope "sess-after-todo" (fun entry ->
             { entry with
@@ -124,7 +124,7 @@ let spec_applyContextBudget_fiveConsecutiveTodos () =
               GetOrRebuildBacklog = (fun _ _ -> backlogRef.Value) }
 
         let mutable phaseBase = 30000L
-        let state = beginPhase phaseBase 100L 0L
+        let state = beginCycle phaseBase 0 3
 
         ContextBudgetStore.update scope sessionID (fun entry ->
             { entry with
@@ -206,7 +206,7 @@ let spec_applyContextBudget_fiveConsecutiveTodos () =
             let updatedStore = ContextBudgetStore.get scope sessionID
             equal "LastTodoCount updated" i updatedStore.LastBacklog.Length
             equal "NudgeTrack reset after todo" Idle updatedStore.NudgeTrack
-            phaseBase <- updatedStore.State.Value.phaseBaseTokens
+            phaseBase <- updatedStore.State.Value.BaselineTokens
     }
 
 let run () : JS.Promise<unit> =

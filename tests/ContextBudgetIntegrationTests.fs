@@ -46,7 +46,7 @@ let private mkBacklogOps =
       GetOrRebuildBacklog = fun _ _ -> [] }
 
 let private mkTestState scope sessionID =
-    let s = beginPhase 30000L 100L 0L
+    let s = beginCycle 30000L 0 3
     ContextBudgetStore.update scope sessionID (fun e -> { e with State = Some s })
     s
 

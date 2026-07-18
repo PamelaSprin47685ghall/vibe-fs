@@ -57,4 +57,6 @@ let applyBacklogProjection
     | Wanxiangshu.Kernel.MessageTransformPolicy.BacklogProjectionPolicy.Exclude -> cleaned
     | Wanxiangshu.Kernel.MessageTransformPolicy.BacklogProjectionPolicy.Include ->
         let backlog = backlogSession.GetOrRebuildBacklog sessionID cleaned
+
         projectBacklogFor backlogSession.Host cleaned backlog FoldStrategy.FoldAfterSecond sessionID
+        |> fun result -> result.Messages

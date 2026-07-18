@@ -75,6 +75,13 @@ let private recordCompactionStart
             fr.SetCompacted(sessionID, false)
             fr.SetCompactionContinuationObserved(sessionID, false)
             fr.SetCompactionGeneration(sessionID, currentGen)
+            // Arm the compaction summary transform bypass flag
+            fr.UpdateSession(
+                sessionID,
+                fun s ->
+                    { s with
+                        CompactionSummaryTransformPending = true }
+            )
         | None -> ()
     }
 
@@ -150,6 +157,9 @@ let private handleCompactionError
                 let _ = fr.ApplySettle(sessionID, compactionId)
                 ()
             | None -> ()
+
+            // Clear the compaction summary transform bypass flag on error
+            fr.ClearCompactionSummaryTransformPending(sessionID)
         | _ -> ()
 
         return! Promise.reject ex

@@ -34,15 +34,39 @@ let private lastAssistantTokenUsage (data: obj) : UsageObservation option =
                 else
                     let inputOpt = positiveInt64 (get tokens "input")
                     let cacheReadOpt = positiveInt64 (get (get tokens "cache") "read")
+                    let cacheWriteOpt = positiveInt64 (get (get tokens "cache") "write")
 
                     match inputOpt with
                     | None -> None
                     | Some input ->
                         let cacheRead = cacheReadOpt |> Option.defaultValue 0L
+                        let cacheWrite = cacheWriteOpt |> Option.defaultValue 0L
+                        let totalInput = input + cacheRead + cacheWrite
 
-                        Some
-                            { AssistantMessageID = str info "id"
-                              InputTokens = input + cacheRead })
+                        // Skip zero-token assistants (current in-progress step)
+                        if totalInput <= 0L then
+                            None
+                        else
+                            // Skip compaction summary assistants
+                            let isCompaction =
+                                let agent = str info "agent"
+                                let details = get info "details"
+
+                                let summaryFlag =
+                                    if isNullish details then
+                                        false
+                                    else
+                                        let s = get details "summary"
+                                        not (isNullish s) && (s :?> bool)
+
+                                agent = "compaction" || summaryFlag
+
+                            if isCompaction then
+                                None
+                            else
+                                Some
+                                    { AssistantMessageID = str info "id"
+                                      InputTokens = totalInput })
 
 let tryObserveLatestUsage (client: obj) sessionID (directory: string) : JS.Promise<UsageObservation option> =
     promise {

@@ -43,7 +43,7 @@ let spec_applyContextBudget_reinjectWhenBudgetStillHot () =
             { Host = opencode
               GetOrRebuildBacklog = (fun _ _ -> []) }
 
-        let state = beginPhase 30000L 100L 0L
+        let state = beginCycle 30000L 0 3
 
         ContextBudgetStore.update scope "sess-nudge-reinject" (fun entry ->
             { entry with

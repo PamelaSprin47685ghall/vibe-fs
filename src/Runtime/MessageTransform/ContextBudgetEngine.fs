@@ -53,18 +53,12 @@ let private computeBudgetState
     (plan: MessageTransformPlan)
     (backlogOps: BacklogSessionOps)
     (totalBytes: int)
-    : JS.Promise<ContextState * bool * ContextBudgetEntry * int * UsageConfidence * bool * int> =
+    : JS.Promise<ContextState * bool * ContextBudgetEntry * int * UsageConfidence * BacklogProjectionResult<obj>> =
     promise {
         let storeEntry = ContextBudgetStore.get plan.Scope plan.SessionID
 
         let! currentTokens, confidence, calibration, newObservedID =
             resolveTokensAndCalibration plan storeEntry totalBytes
-
-        let prevConfidence = storeEntry.LastUsage |> Option.map (fun u -> u.confidence)
-
-        let transitioned =
-            prevConfidence = Some UsageConfidence.BootstrapEstimate
-            && confidence = UsageConfidence.Observed
 
         ContextBudgetStore.update plan.Scope plan.SessionID (fun entry ->
             { entry with
@@ -83,28 +77,27 @@ let private computeBudgetState
         let backlog = backlogOps.GetOrRebuildBacklog plan.SessionID plan.Cleaned
         let currentStore = ContextBudgetStore.get plan.Scope plan.SessionID
 
-        let! state, isJustInitialized =
-            rebuildPhaseState
-                plan.SessionID
-                plan.Cleaned
-                backlogOps.Host
-                backlogOps.Host
-                plan.SessionID
+        let projection, projectedBytes =
+            projectedMessagesBytes plan.Cleaned backlogOps.Host plan.SessionID backlog (fun _ ->
+                plan.RawArray |> Option.defaultValue [||])
+
+        let transition =
+            classifyTransition currentStore.State projection currentStore.LastBacklog backlog
+
+        let state, isJustInitialized =
+            applyTransition
                 plan.Scope
-                backlog
-                currentStore
-                (fun _ -> plan.RawArray |> Option.defaultValue [||])
+                plan.SessionID
+                transition
+                projection
+                projectedBytes
                 currentTokens
-                totalBytes
-                transitioned
+                currentStore
+                backlog
 
         let finalStore = ContextBudgetStore.get plan.Scope plan.SessionID
 
-        let stableBytes =
-            stableProjectionBytes plan.Cleaned backlogOps.Host plan.SessionID backlog (fun _ ->
-                plan.RawArray |> Option.defaultValue [||])
-
-        return state, isJustInitialized, finalStore, currentTokens, confidence, transitioned, stableBytes
+        return state, isJustInitialized, finalStore, currentTokens, confidence, projection
     }
 
 let private buildLastTrace
@@ -128,7 +121,7 @@ let private buildLastTrace
       FinalOutboundBytes = totalBytes
       EstimatedTokens = int64 currentTokens
       StableBytes = stableBytes
-      PhaseBaseTokens = state.phaseBaseTokens
+      PhaseBaseTokens = state.BaselineTokens
       Confidence = confidence
       Pressure = pressure
       Action = action }
@@ -152,7 +145,7 @@ let applyContextBudget
         else
             let totalBytes = utf8JsonBytes (box encodedAll)
 
-            let! state, isJustInitialized, finalStoreEntry, currentTokens, confidence, transitioned, stableBytes =
+            let! state, isJustInitialized, finalStoreEntry, currentTokens, confidence, projection =
                 computeBudgetState plan backlogOps totalBytes
 
             let hardSafetyRequired =
@@ -171,11 +164,11 @@ let applyContextBudget
                         confidence
                         BelowThreshold
                         "bootstrap-suppressed"
-                        stableBytes)
+                        0)
 
                 return messages
             else
-                let result =
+                let result, pressure, _nudgeAction =
                     checkAndInjectNudge
                         plan.SessionID
                         plan.MaxInputTokens
@@ -185,31 +178,14 @@ let applyContextBudget
                         confidence
                         state
                         messages
-                        backlogOps.Host
+                        projection.TotalTodoOrdinal
                         finalStoreEntry
-
-                let pressure =
-                    classifyPressure
-                        plan.MaxInputTokens
-                        false
-                        (int64 currentTokens)
-                        state
-                        (completedTodoCount backlogOps.Host messages)
 
                 let action = actionForDecision pressure finalStoreEntry.NudgeTrack
 
                 writeLastTrace
                     plan
-                    (buildLastTrace
-                        plan
-                        totalBytes
-                        state
-                        finalStoreEntry
-                        currentTokens
-                        confidence
-                        pressure
-                        action
-                        stableBytes)
+                    (buildLastTrace plan totalBytes state finalStoreEntry currentTokens confidence pressure action 0)
 
                 return result
     }

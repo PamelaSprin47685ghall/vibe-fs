@@ -52,111 +52,138 @@ let resolveCurrentTokensFromCalibration
             estimate, UsageConfidence.BootstrapEstimate
     | None -> resolveCurrentTokens totalBytes tokenCountOpt storeEntry
 
-let stableProjectionBytes
-    (cleaned: Message<obj> list)
-    (backlogOpsHost: Host)
-    (backlogSessionID: string)
-    (backlog: BacklogEntry list)
-    (encodeMessages: Message<obj> list -> obj array)
-    : int =
-    projectBacklogFor backlogOpsHost cleaned backlog FoldStrategy.FoldAfterFirst backlogSessionID
-    |> encodeMessages
-    |> box
-    |> utf8JsonBytes
+let private estimateBytesAsTokens (calibration: UsageCalibration option) (bytes: int) (fallbackTokens: int) : int64 =
+    match calibration with
+    | Some cal ->
+        estimateTokensFromCalibration cal bytes
+        |> Option.defaultValue (int64 (max 1 (bytes / 2)))
+    | None -> int64 fallbackTokens
 
-let computeStableTokensAndPhaseState
-    (sessionID: string)
-    (cleaned: Message<obj> list)
-    (host: Host)
-    (backlogOpsHost: Host)
-    (scope: RuntimeScope)
-    (backlogSessionID: string)
-    (backlog: BacklogEntry list)
-    (currentStore: ContextBudgetEntry)
-    (encodeMessages: Message<obj> list -> obj array)
-    (currentTokens: int)
-    : JS.Promise<int64 * ContextState> =
-    promise {
-        let stableMessages =
-            projectBacklogFor backlogOpsHost cleaned backlog FoldStrategy.FoldAfterFirst backlogSessionID
+type ProjectionMetadata =
+    { TotalTodoOrdinal: int
+      FoldFrontierOrdinal: int
+      RemainingTodoWritesUntilFold: int
+      DidAdvanceFoldFrontier: bool }
 
-        let stableEncoded = encodeMessages stableMessages
-        let stableBytes = utf8JsonBytes (box stableEncoded)
+type PhaseTransition =
+    | ColdStart
+    | TodoAcknowledged
+    | FoldFrontierAdvanced
+    | BacklogOnlyChange
+    | NoChange
 
-        let stableTokens =
-            match currentStore.LastCalibration with
-            | Some calibration ->
-                estimateTokensFromCalibration calibration stableBytes
-                |> Option.defaultValue (int64 (max 1 (stableBytes / 2)))
-            | None -> int64 currentTokens
-
-        let backlogBytes =
-            ContextBudgetUsageCodec.backlogBytesFromEncoded backlogOpsHost stableEncoded
-
-        let backlogTokens =
-            if int64 stableBytes <= 0L then
-                0L
-            else
-                stableTokens * int64 backlogBytes / int64 stableBytes
-
-        let currentOrdinal =
-            flatten cleaned
-            |> List.filter (fun fp -> isTodoResultFor host fp.part)
-            |> List.length
-
-        let newState =
-            { phaseBaseTokens = stableTokens
-              backlogTokensAtPhaseStart = backlogTokens
-              phaseStartTodoOrdinal = currentOrdinal }
-
-        return stableTokens, newState
-    }
-
-let rebuildPhaseState
-    (sessionID: string)
-    (cleaned: Message<obj> list)
-    (host: Host)
-    (backlogOpsHost: Host)
-    (backlogSessionID: string)
-    (scope: RuntimeScope)
-    (backlog: BacklogEntry list)
-    (currentStore: ContextBudgetEntry)
-    (encodeMessages: Message<obj> list -> obj array)
-    (currentTokens: int)
-    (totalBytes: int)
-    (forceRebuild: bool)
-    : JS.Promise<ContextState * bool> =
-    promise {
-        let isJustInitialized = currentStore.State.IsNone
-
-        if backlog <> currentStore.LastBacklog || isJustInitialized || forceRebuild then
-            let! stableTokens, newState =
-                computeStableTokensAndPhaseState
-                    sessionID
-                    cleaned
-                    host
-                    backlogOpsHost
-                    scope
-                    backlogSessionID
-                    backlog
-                    currentStore
-                    encodeMessages
-                    currentTokens
-
-            let nextEpisode = System.Guid.NewGuid().ToString("N")
-
-            ContextBudgetStore.update scope sessionID (fun entry ->
-                { entry with
-                    State = Some newState
-                    LastBacklog = backlog
-                    NudgeTrack = afterPhaseBoundaryReset entry.NudgeTrack
-                    EpisodeID = nextEpisode
-                    NudgeCount = 0
-                    SignalTodoOrdinal = None
-                    SignalTokens = None
-                    StableSyntheticNudgeID = None })
-
-            return newState, isJustInitialized
+let classifyTransition
+    (existingState: ContextState option)
+    (projection: BacklogProjectionResult<obj>)
+    (lastBacklog: BacklogEntry list)
+    (currentBacklog: BacklogEntry list)
+    : PhaseTransition =
+    match existingState with
+    | None -> ColdStart
+    | Some state ->
+        if
+            projection.DidAdvanceFoldFrontier
+            && projection.FoldFrontierOrdinal > state.FoldFrontierOrdinal
+        then
+            FoldFrontierAdvanced
+        elif projection.TotalTodoOrdinal > state.BaselineTodoOrdinal then
+            TodoAcknowledged
+        elif currentBacklog <> lastBacklog then
+            BacklogOnlyChange
         else
-            return currentStore.State.Value, false
-    }
+            NoChange
+
+let projectedMessagesBytes
+    (cleaned: Message<obj> list)
+    (backlogOpsHost: Host)
+    (backlogSessionID: string)
+    (backlog: BacklogEntry list)
+    (encodeMessages: Message<obj> list -> obj array)
+    : BacklogProjectionResult<obj> * int =
+    let result =
+        projectBacklogFor backlogOpsHost cleaned backlog FoldStrategy.FoldAfterSecond backlogSessionID
+
+    let encoded = encodeMessages result.Messages
+    let bytes = utf8JsonBytes (box encoded)
+    result, bytes
+
+let applyTransition
+    (scope: RuntimeScope)
+    (sessionID: string)
+    (transition: PhaseTransition)
+    (projection: BacklogProjectionResult<obj>)
+    (projectedBytes: int)
+    (currentTokens: int)
+    (currentStore: ContextBudgetEntry)
+    (backlog: BacklogEntry list)
+    : ContextState * bool =
+    let isJustInitialized = currentStore.State.IsNone
+
+    match transition with
+    | ColdStart ->
+        let baseline =
+            estimateBytesAsTokens currentStore.LastCalibration projectedBytes currentTokens
+
+        let cycle =
+            beginCycle baseline projection.TotalTodoOrdinal projection.RemainingTodoWritesUntilFold
+
+        ContextBudgetStore.update scope sessionID (fun entry ->
+            { entry with
+                State = Some cycle
+                LastBacklog = backlog
+                NudgeTrack = Idle
+                EpisodeID = System.Guid.NewGuid().ToString("N")
+                NudgeCount = 0
+                SignalTodoOrdinal = None
+                SignalTokens = None
+                StableSyntheticNudgeID = None })
+
+        cycle, true
+
+    | FoldFrontierAdvanced ->
+        let baseline =
+            estimateBytesAsTokens currentStore.LastCalibration projectedBytes currentTokens
+
+        let cycle =
+            rebuildCycleAtFold
+                baseline
+                projection.TotalTodoOrdinal
+                projection.FoldFrontierOrdinal
+                projection.RemainingTodoWritesUntilFold
+
+        ContextBudgetStore.update scope sessionID (fun entry ->
+            { entry with
+                State = Some cycle
+                LastBacklog = backlog
+                NudgeTrack = Idle
+                EpisodeID = System.Guid.NewGuid().ToString("N")
+                NudgeCount = 0
+                SignalTodoOrdinal = None
+                SignalTokens = None
+                StableSyntheticNudgeID = None })
+
+        cycle, false
+
+    | TodoAcknowledged ->
+        let cycle =
+            match currentStore.State with
+            | Some existing -> advanceSegment existing projection.TotalTodoOrdinal
+            | None ->
+                let baseline =
+                    estimateBytesAsTokens currentStore.LastCalibration projectedBytes currentTokens
+
+                beginCycle baseline projection.TotalTodoOrdinal projection.RemainingTodoWritesUntilFold
+
+        ContextBudgetStore.update scope sessionID (fun entry ->
+            { entry with
+                State = Some cycle
+                LastBacklog = backlog })
+
+        cycle, false
+
+    | BacklogOnlyChange ->
+        ContextBudgetStore.update scope sessionID (fun entry -> { entry with LastBacklog = backlog })
+
+        currentStore.State.Value, false
+
+    | NoChange -> currentStore.State.Value, false

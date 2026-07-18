@@ -53,6 +53,7 @@ type FallbackSessionRuntime =
       CompactionCompacted: bool
       CompactionContinuationObserved: bool
       CompactionGeneration: int
+      CompactionSummaryTransformPending: bool
       ActiveContinuationGen: int
       ActiveContinuationCancelGen: int
       ActiveGates: Set<FallbackSessionGateFlag> }
@@ -96,6 +97,7 @@ let freshSessionState: FallbackSessionRuntime =
       CompactionCompacted = false
       CompactionContinuationObserved = false
       CompactionGeneration = 0
+      CompactionSummaryTransformPending = false
       ActiveContinuationGen = 0
       ActiveContinuationCancelGen = 0
       ActiveGates = emptyActiveGates }
@@ -188,7 +190,7 @@ let cancelEpisode (s: FallbackSessionRuntime) : FallbackSessionRuntime =
         Model = s.Model
         ActiveGates = emptyActiveGates }
 
-/// A compaction run is starting — claim ownership and track its identity.
+/// A compaction run is starting — claim ownership, track its identity, and arm the summary-transform bypass.
 let beginCompaction
     (compactionId: string)
     (compactionOrdinal: int)
@@ -198,6 +200,7 @@ let beginCompaction
         CompactionActiveId = compactionId
         CompactionActiveOrdinal = compactionOrdinal
         CompactionGeneration = s.CompactionGeneration + 1
+        CompactionSummaryTransformPending = true
         Owner = SessionOwner.Compaction }
 
 /// A compaction run has settled — release ownership if compaction owned the session.
@@ -208,6 +211,7 @@ let settleCompaction (s: FallbackSessionRuntime) : FallbackSessionRuntime =
         CompactionGeneration = 0
         CompactionCompacted = false
         CompactionContinuationObserved = false
+        CompactionSummaryTransformPending = false
         Owner =
             if s.Owner = SessionOwner.Compaction then
                 SessionOwner.NoOwner

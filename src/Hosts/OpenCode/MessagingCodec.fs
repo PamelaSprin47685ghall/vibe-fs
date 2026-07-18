@@ -46,13 +46,32 @@ let decodeMessage msg =
 let decodeMessages msgs =
     Wanxiangshu.Runtime.MessagingDecode.decodeMessages opencodeAdapters "" msgs
 
-/// Encode a Part back to a host object. Text parts are rebuilt via
-/// MessagingEncode.encodeTextPartBasic; Tool parts delegate to
-/// encodeOpencodeToolPart which preserves raw reference identity when state
-/// matches and rebuilds state otherwise. Raw parts pass through.
+/// Encode a TextPart, preserving the raw host reference when text is unchanged.
+/// Only creates a new object for synthetic parts or when text actually changed.
+let private encodeTextPartPreservingRaw (text: string) (rawPartOpt: obj option) : obj =
+    match rawPartOpt with
+    | Some rawPart when not (isNullish rawPart) ->
+        let rawText = str rawPart "text"
+
+        if rawText = text then
+            rawPart
+        else
+            Wanxiangshu.Runtime.Dyn.withKey rawPart "text" (box text)
+    | _ -> encodeTextPartBasic text
+
+/// Encode a Part back to a host object. Text parts preserve raw reference identity
+/// when text is unchanged (preserving ignored/metadata/synthetic/id/... fields).
+/// Tool parts delegate to encodeOpencodeToolPart. Raw parts pass through.
 let encodePart (part: Part<obj>) : obj =
     match part with
     | TextPart text -> encodeTextPartBasic text
+    | ToolPart(toolName, callID, stateOpt, raw) -> encodeOpencodeToolPart toolName callID stateOpt raw
+    | RawPart raw -> raw
+
+/// Encode a Part with awareness of the corresponding raw part for field preservation.
+let private encodePartWithRaw (part: Part<obj>) (rawPartOpt: obj option) : obj =
+    match part with
+    | TextPart text -> encodeTextPartPreservingRaw text rawPartOpt
     | ToolPart(toolName, callID, stateOpt, raw) -> encodeOpencodeToolPart toolName callID stateOpt raw
     | RawPart raw -> raw
 
@@ -86,21 +105,36 @@ let private encodeMessageInfo (info: MessageInfo<obj>) : obj =
 /// mutated (preserving object identity for "preserves original" contracts);
 /// only messages whose parts were rebuilt by a pure typed update get a shallow
 /// copy with `parts` replaced. Synthetic messages (raw = null) build fresh.
+/// TextParts from native messages preserve host fields (ignored/metadata/synthetic/id/...).
 let encodeMessage (msg: Message<obj>) : obj =
     if isNull msg.raw then
         let partsObj = msg.parts |> List.map encodePart |> List.toArray
         box (createObj [ "info", box (encodeMessageInfo msg.info); "parts", box partsObj ])
     else
         let rawParts = get msg.raw "parts"
-        let encodedParts = msg.parts |> List.map encodePart |> List.toArray
+
+        let rawPartsArray =
+            if not (isNullish rawParts) && isArray rawParts then
+                rawParts :?> obj array
+            else
+                [||]
+
+        let encodedParts =
+            msg.parts
+            |> List.indexed
+            |> List.map (fun (i, part) ->
+                let rawPartOpt =
+                    if i < rawPartsArray.Length then
+                        Some rawPartsArray.[i]
+                    else
+                        None
+
+                encodePartWithRaw part rawPartOpt)
+            |> List.toArray
 
         let partsUnchanged =
-            not (isNullish rawParts)
-            && isArray rawParts
-            && (let arr = rawParts :?> obj array
-
-                arr.Length = encodedParts.Length
-                && Array.forall2 (fun a b -> obj.ReferenceEquals(a, b)) arr encodedParts)
+            rawPartsArray.Length = encodedParts.Length
+            && Array.forall2 (fun a b -> obj.ReferenceEquals(a, b)) rawPartsArray encodedParts
 
         if partsUnchanged then
             msg.raw

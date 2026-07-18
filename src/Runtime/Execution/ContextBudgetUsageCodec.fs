@@ -61,12 +61,24 @@ let tryGetUsageFromSessionApi (sessionApi: obj) (sessionID: string) (directory: 
                                 else
                                     unbox<float> r
 
+                        let cacheWrite =
+                            if isNullish cacheObj then
+                                0.0
+                            else
+                                let w = get cacheObj "write"
+
+                                if isNullish w || not (typeIs w "number") then
+                                    0.0
+                                else
+                                    unbox<float> w
+
                         if isNullish inputVal || not (typeIs inputVal "number") then
                             return None
                         else
                             let inputNum = int (unbox<float> inputVal)
                             let cacheNum = int cacheRead
-                            return Some(inputNum + cacheNum)
+                            let cacheWriteNum = int cacheWrite
+                            return Some(inputNum + cacheNum + cacheWriteNum)
         with _ ->
             return None
     }

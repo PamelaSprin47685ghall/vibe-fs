@@ -22,7 +22,10 @@ let resolveModelKey (client: obj) (sessionID: string) : JS.Promise<string> =
                     return sessionID + "@" + "" // honest: no session.get RPC
                 else
                     try
-                        let arg = createObj [ "sessionID", box sessionID; "directory", box "" ]
+                        let arg =
+                            createObj
+                                [ "path", box (createObj [ "id", box sessionID ])
+                                  "query", box (createObj [ "directory", box "" ]) ]
 
                         let! res = unbox<JS.Promise<obj>> (session?get (arg))
 
@@ -58,4 +61,5 @@ let resolveModelKey (client: obj) (sessionID: string) : JS.Promise<string> =
     }
 
 /// Build a truthful source label for the OpenCode session model resolver.
-let resolveLimitSource () : string = "openai-session-model"
+/// Uses provider.list catalog when available, falls back to session model.
+let resolveLimitSource () : string = "provider-catalog"

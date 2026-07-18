@@ -757,6 +757,8 @@
     <Compile Include="tests/MessageTransformStackTests.fs"/>
     <Compile Include="tests/ParallelToolPromptTests.fs"/>
     <Compile Include="tests/CompactionTransformTests.fs"/>
+    <Compile Include="tests/CompactionIsolationTests.fs"/>
+    <Compile Include="tests/ModelResolutionTests.fs"/>
     <Compile Include="tests/MessageSanitizationTests.fs"/>
     <Compile Include="tests/ToolCatalogClassificationTests.fs"/>
     <Compile Include="tests/ToolOutputInfoTests.fs"/>

@@ -126,20 +126,39 @@ let private rebuildVisibleOnly (messages: Message<'raw> list) (visible: FlatPart
             else
                 Some { msg with parts = newParts })
 
+type BacklogProjectionResult<'raw> =
+    { Messages: Message<'raw> list
+      TotalTodoOrdinal: int
+      FoldFrontierOrdinal: int
+      RemainingTodoWritesUntilFold: int
+      DidAdvanceFoldFrontier: bool }
+
 let projectBacklogFor
     (host: Host)
     (messages: Message<'raw> list)
     (backlog: BacklogEntry list)
     (strategy: FoldStrategy)
     (sessionID: string)
-    : Message<'raw> list =
+    : BacklogProjectionResult<'raw> =
     if messages.IsEmpty then
-        messages
+        { Messages = messages
+          TotalTodoOrdinal = 0
+          FoldFrontierOrdinal = 0
+          RemainingTodoWritesUntilFold = requiredFoldAnchorCount strategy
+          DidAdvanceFoldFrontier = false }
     else
         let flat = flatten messages
+        let todoIdxs = foldTodoAnchorsFor host flat
+        let totalOrdinal = todoIdxs.Length
+        let minResults = requiredFoldAnchorCount strategy
 
         match findFoldRangeFor host flat strategy with
-        | None -> messages
+        | None ->
+            { Messages = messages
+              TotalTodoOrdinal = totalOrdinal
+              FoldFrontierOrdinal = 0
+              RemainingTodoWritesUntilFold = max 0 (minResults - totalOrdinal)
+              DidAdvanceFoldFrontier = false }
         | Some range ->
             let foldedBacklog =
                 if backlog.Length > 0 then
@@ -177,15 +196,25 @@ let projectBacklogFor
 
             let rebuilt = rebuildVisibleOnly messages visible
 
-            if syntheticPrefixMessages.IsEmpty then
-                rebuilt
-            else
-                syntheticPrefixMessages @ rebuilt
+            let projectedMessages =
+                if syntheticPrefixMessages.IsEmpty then
+                    rebuilt
+                else
+                    syntheticPrefixMessages @ rebuilt
+
+            let foldFrontierOrdinal = range.secondToLast + 1
+            let remainingUntilFold = max 0 (minResults - (totalOrdinal - foldFrontierOrdinal))
+
+            { Messages = projectedMessages
+              TotalTodoOrdinal = totalOrdinal
+              FoldFrontierOrdinal = foldFrontierOrdinal
+              RemainingTodoWritesUntilFold = remainingUntilFold
+              DidAdvanceFoldFrontier = foldFrontierOrdinal > 0 }
 
 let projectBacklog
     (messages: Message<'raw> list)
     (backlog: BacklogEntry list)
     (strategy: FoldStrategy)
     (sessionID: string)
-    : Message<'raw> list =
+    : BacklogProjectionResult<'raw> =
     projectBacklogFor opencode messages backlog strategy sessionID

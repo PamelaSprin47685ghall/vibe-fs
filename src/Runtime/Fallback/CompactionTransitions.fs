@@ -130,3 +130,32 @@ type FallbackRuntimeStore with
                         { s.Core with
                             Lifecycle = FallbackLifecycle.TaskComplete } }
         )
+
+    /// Atomically check and consume the compaction summary transform bypass flag.
+    /// Returns true if the flag was set (meaning this messages.transform is the compaction summary request).
+    member this.TryConsumeCompactionSummaryTransform(sessionID: string) : bool =
+        let s = this.GetSession sessionID
+
+        if s.CompactionSummaryTransformPending then
+            this.UpdateSession(
+                sessionID,
+                (fun s ->
+                    { s with
+                        CompactionSummaryTransformPending = false })
+            )
+
+            true
+        else
+            false
+
+    /// Idempotently clear the compaction summary transform bypass flag.
+    member this.ClearCompactionSummaryTransformPending(sessionID: string) : unit =
+        this.UpdateSession(
+            sessionID,
+            (fun s ->
+                { s with
+                    CompactionSummaryTransformPending = false })
+        )
+
+    member this.IsCompactionSummaryTransformPending(sessionID: string) : bool =
+        (this.GetSession sessionID).CompactionSummaryTransformPending

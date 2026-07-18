@@ -38,7 +38,7 @@ let spec_applyContextBudget_estimatesFromLastUsageWhenApiMissing () =
             { Host = opencode
               GetOrRebuildBacklog = fun _ _ -> [] }
 
-        let state = beginPhase 30000L 100L 0L
+        let state = beginCycle 30000L 0 3
 
         ContextBudgetStore.update scope sessionID (fun entry ->
             { entry with
@@ -123,7 +123,7 @@ let spec_applyContextBudget_seedsLastUsageAfterLiveRead () =
             { Host = opencode
               GetOrRebuildBacklog = fun _ _ -> [] }
 
-        let state = beginPhase 30000L 100L 0L
+        let state = beginCycle 30000L 0 3
 
         ContextBudgetStore.update scope sessionID (fun entry -> { entry with State = Some state })
 
