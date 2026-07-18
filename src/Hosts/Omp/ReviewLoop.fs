@@ -14,6 +14,8 @@ open Wanxiangshu.Runtime.ReviewRuntime
 
 module Dyn = Wanxiangshu.Runtime.Dyn
 
+open Wanxiangshu.Hosts.Omp.ChildCleanup
+
 let private createDeferred () : JS.Promise<ReviewResult> * (ReviewResult -> unit) =
     let d = emitJsExpr () "Promise.withResolvers()"
     unbox (Dyn.get d "promise"), unbox (Dyn.get d "resolve")
@@ -94,23 +96,10 @@ let runReviewLoop
 
         let cleanupChild () =
             detachReviewChild store parentId childId
-
-            if not (Dyn.isNullish (Dyn.get childSession "abort")) then
-                try
-                    Dyn.callMethod0 childSession "abort" |> ignore
-                with _ ->
-                    ()
-
-            child.dispose |> Option.iter (fun dispose -> dispose ())
+            CleanupChildSession childSession child.dispose
 
         if childId = "" then
-            if not (Dyn.isNullish (Dyn.get childSession "abort")) then
-                try
-                    Dyn.callMethod0 childSession "abort" |> ignore
-                with _ ->
-                    ()
-
-            child.dispose |> Option.iter (fun dispose -> dispose ())
+            cleanupChild ()
             return Terminated
         else
             attachReviewChild store parentId childId (fun r -> resolveReview r) childSession
@@ -148,14 +137,7 @@ let runPreReviewerSession
 
                 let cleanupChild () =
                     detachReviewChild store parentId childId
-
-                    if not (Dyn.isNullish (Dyn.get childSession "abort")) then
-                        try
-                            Dyn.callMethod0 childSession "abort" |> ignore
-                        with _ ->
-                            ()
-
-                    child.dispose |> Option.iter (fun dispose -> dispose ())
+                    CleanupChildSession childSession child.dispose
 
                 if childId = "" then
                     cleanupChild ()

@@ -486,6 +486,7 @@
     <Compile Include="src/Hosts/Omp/ChildSessionCreate.fs"/>
     <Compile Include="src/Hosts/Omp/ChildSession.fs"/>
     <Compile Include="src/Hosts/Omp/ChildSessionRegistry.fs"/>
+    <Compile Include="src/Hosts/Omp/ChildCleanup.fs"/>
     <Compile Include="src/Hosts/Omp/ToolResultEvent.fs"/>
     <Compile Include="src/Hosts/Omp/PruneGuard.fs"/>
     <Compile Include="src/Hosts/Omp/NudgeRuntime.fs"/>
