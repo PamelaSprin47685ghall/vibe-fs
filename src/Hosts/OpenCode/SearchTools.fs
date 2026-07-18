@@ -24,6 +24,7 @@ open Wanxiangshu.Runtime.WebSearchApi
 open Wanxiangshu.Hosts.Opencode.ToolSchema
 open Wanxiangshu.Hosts.Opencode.SessionIo
 open Wanxiangshu.Hosts.Opencode.HostField
+open Wanxiangshu.Hosts.Opencode.SubagentIoRun
 open Wanxiangshu.Runtime.ChildAgentRegistry
 open Wanxiangshu.Runtime.SubagentDispatcher
 open Wanxiangshu.Runtime.SubagentBatchSpawn

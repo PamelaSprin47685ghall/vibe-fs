@@ -32,6 +32,7 @@ open Wanxiangshu.Hosts.Opencode.ModelKeyResolver
 open Wanxiangshu.Runtime.JsArrayMutate
 open Wanxiangshu.Hosts.Opencode.SembleInjection
 open Wanxiangshu.Hosts.Opencode.CompactionHook
+open Wanxiangshu.Runtime.Dyn
 
 let private resolveSessionID (input: obj) (messagesList: Message<obj> list) : string =
     let sid1 = Dyn.str input "sessionID"
@@ -47,8 +48,192 @@ let private resolveSessionID (input: obj) (messagesList: Message<obj> list) : st
             let sid3 = Dyn.str input "session_id"
             if sid3 <> "" then sid3 else extractSessionID messagesList
 
+let private tryModelLimitFromClientConfig
+    (client: obj)
+    (sessionID: string)
+    (directory: string)
+    : JS.Promise<int option> =
+    promise {
+        if isNullish client then
+            printfn "[OpenCode limit] client is null"
+            return None
+        else
+            let configApi = get client "config"
+            let configGet = if isNullish configApi then null else get configApi "get"
+
+            if isNullish configGet || not (typeIs configGet "function") then
+                printfn "[OpenCode limit] client.config.get missing or not function"
+                return None
+            else
+                try
+                    let configArg =
+                        createObj [ "query", box (createObj [ "directory", box directory ]) ]
+
+                    printfn "[OpenCode limit] calling client.config.get with directory %s" directory
+                    let! configRes = unbox<JS.Promise<obj>> (configApi?get (configArg))
+
+                    printfn
+                        "[OpenCode limit] configRes keys: %A"
+                        (if isNullish configRes then
+                             "null"
+                         else
+                             String.concat "," (Dyn.keys configRes))
+
+                    let configData = get configRes "data"
+                    printfn "[OpenCode limit] configData has provider? %b" (not (isNullish (get configData "provider")))
+
+                    let sessionApi = get client "session"
+                    let sessionGet = if isNullish sessionApi then null else get sessionApi "get"
+
+                    if isNullish sessionGet || not (typeIs sessionGet "function") then
+                        printfn "[OpenCode limit] client.session.get missing or not function"
+                        return None
+                    else
+                        let sessionArg =
+                            createObj
+                                [ "path", box (createObj [ "id", box sessionID ])
+                                  "query", box (createObj [ "directory", box directory ]) ]
+
+                        printfn "[OpenCode limit] calling client.session.get for %s" sessionID
+                        let! sessionRes = unbox<JS.Promise<obj>> (sessionApi?get (sessionArg))
+                        printfn "[OpenCode limit] sessionRes ok? %b" (not (isNullish sessionRes))
+
+                        printfn
+                            "[OpenCode limit] sessionRes keys: %A"
+                            (if isNullish sessionRes then
+                                 "null"
+                             else
+                                 String.concat "," (Dyn.keys sessionRes))
+
+                        let sessionData = get sessionRes "data"
+
+                        printfn
+                            "[OpenCode limit] sessionData keys: %A"
+                            (if isNullish sessionData then
+                                 "null"
+                             else
+                                 String.concat "," (Dyn.keys sessionData))
+
+                        let modelObj = get sessionData "model"
+
+                        printfn
+                            "[OpenCode limit] modelObj keys: %A"
+                            (if isNullish modelObj then
+                                 "null"
+                             else
+                                 String.concat "," (Dyn.keys modelObj))
+
+                        let providerID = str modelObj "providerID"
+                        let modelID = str modelObj "id"
+                        printfn "[OpenCode limit] providerID=%s modelID=%s" providerID modelID
+
+                        let providers = get configData "provider"
+
+                        let providerObj =
+                            if isNullish providers then
+                                null
+                            else
+                                get providers providerID
+
+                        let models = get providerObj "models"
+                        let modelDef = if isNullish models then null else get models modelID
+
+                        printfn
+                            "[OpenCode limit] providerObj null? %b; modelDef null? %b"
+                            (isNullish providerObj)
+                            (isNullish modelDef)
+
+                        let limitObj = get modelDef "limit"
+
+                        if isNullish limitObj then
+                            printfn "[OpenCode limit] modelDef.limit is null"
+                            return None
+                        else
+                            let inputVal = get limitObj "input"
+                            let ctxVal = get limitObj "context"
+                            let raw = if isNullish inputVal then ctxVal else inputVal
+
+                            if isNullish raw || not (typeIs raw "number") then
+                                printfn "[OpenCode limit] raw limit is null or not number: %A" raw
+                                return None
+                            else
+                                let limit = int (unbox<float> raw)
+                                printfn "[OpenCode limit] found limit %d" limit
+                                return Some limit
+                with ex ->
+                    printfn "[OpenCode limit] exception: %s" (string ex.Message)
+                    return None
+    }
+
 let private resolveMaxInputTokens (sessionID: string) (client: obj) (directory: string) : JS.Promise<int> =
-    Wanxiangshu.Runtime.ContextBudgetUsageCodec.resolveMaxInputTokens [ client ] sessionID directory
+    promise {
+        let! limitOpt = tryModelLimitFromClientConfig client sessionID directory
+
+        match limitOpt with
+        | Some limit ->
+            printfn "[OpenCode limit] resolved from config: %d" limit
+
+            let limitTarget =
+                createObj [ "model", box (createObj [ "limit", box (createObj [ "input", box limit ]) ]) ]
+
+            return!
+                Wanxiangshu.Runtime.ContextBudgetUsageCodec.resolveMaxInputTokens
+                    [ limitTarget; client ]
+                    sessionID
+                    directory
+        | None ->
+            printfn "[OpenCode limit] no config limit; using fallback"
+            return! Wanxiangshu.Runtime.ContextBudgetUsageCodec.resolveMaxInputTokens [ client ] sessionID directory
+    }
+
+/// Build the injection function: takes a policy and encoded messages, either
+/// passes messages through or injects Semble annotations.
+let private buildInjectionFn
+    (directory: string)
+    (agent: string)
+    (sessionID: string)
+    : (BacklogProjectionPolicy -> obj array -> JS.Promise<obj array>) =
+    fun policy encoded ->
+        match policy with
+        | BacklogProjectionPolicy.Exclude -> Promise.lift encoded
+        | BacklogProjectionPolicy.Include -> injectSembleIntoEncoded directory agent sessionID encoded
+
+/// Build the load-caps async function for the transform pipeline.
+let private buildLoadCaps
+    (registry: ChildAgentRegistry)
+    (runtimeScope: Wanxiangshu.Runtime.RuntimeScope.RuntimeScope)
+    (sessionID: string)
+    (plan: MessageTransformPlan)
+    : unit -> JS.Promise<CapsFile list> =
+    fun () ->
+        promise {
+            let parentSessionID =
+                registry.ResolveSubsessionParentID(Some sessionID)
+                |> Option.defaultValue sessionID
+
+            let! caps =
+                loadCapsForScope
+                    runtimeScope
+                    AllowEmptyDirectory
+                    { plan with
+                        SessionID = parentSessionID }
+
+            return caps |> List.sortBy (fun cf -> cf.label, cf.filePath)
+        }
+
+/// Build the build-caps callback passed to runHostMessagesTransform.
+let private buildCapsFn
+    (capsEpoch: string)
+    (directory: string)
+    : (obj array -> CapsFile list -> string option -> obj array) =
+    fun encoded capsFiles preludeOpt ->
+        buildCapsMessages
+            Wanxiangshu.Runtime.FileSys.sha256HexTruncated
+            capsEpoch
+            encoded
+            directory
+            capsFiles
+            preludeOpt
 
 let runHostMessagesTransformExecution
     (registry: ChildAgentRegistry)
@@ -67,19 +252,22 @@ let runHostMessagesTransformExecution
         let backlogOps =
             backlogSessionOpsFrom backlogSession.Host (fun sid msgs -> backlogSession.GetOrRebuildBacklog(sid, msgs))
 
-        let injectFn =
-            buildInjectionFn directory agent sessionID
+        let injectFn = buildInjectionFn directory agent sessionID
 
-        let loadCaps =
-            buildLoadCaps registry runtimeScope sessionID plan
+        let loadCaps = buildLoadCaps registry runtimeScope sessionID plan
 
-        let buildCaps =
-            buildCapsFn capsEpoch directory
+        let buildCaps = buildCapsFn capsEpoch directory
 
         let! final =
             runHostMessagesTransform
-                reviewStore sessionID plan backlogOps
-                MessagingCodec.encodeMessages injectFn loadCaps buildCaps
+                reviewStore
+                sessionID
+                plan
+                backlogOps
+                MessagingCodec.encodeMessages
+                injectFn
+                loadCaps
+                buildCaps
 
         replaceArrayInPlace messagesArr final
     }

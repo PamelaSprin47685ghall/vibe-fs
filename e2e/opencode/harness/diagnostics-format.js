@@ -123,6 +123,8 @@ function formatEvents(diag) {
 }
 
 export function formatDiagnostics(diag) {
+  if (!diag) return 'No diagnostic data available.';
+  if (diag.error) return `Diagnostic collection failed: ${diag.error}`;
   return [
     '══════════════════════ E2E DIAGNOSTICS ══════════════════════',
     ...formatEvents(diag),

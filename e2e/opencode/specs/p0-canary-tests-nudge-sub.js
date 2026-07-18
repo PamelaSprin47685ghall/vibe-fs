@@ -21,34 +21,37 @@ const tests = [
   {
     name: 'OC-NUDGE-001 nudge fires exactly once after human turn completed',
     fn: async (t) => {
-      const sess = await t.client.createSession();
+      const sess = await t.client.createSession({
+        id: 'test-model', providerID: 'test', limit: { input: 100000, context: 100000 },
+      });
       const sid = getSessionId(sess);
-      const pad = 'x'.repeat(300);
+      const pad = 'x'.repeat(1024);
       t.provider.expectToolCall({ id: 'nudge-todo', tool: 'todowrite', args: {
         ahaMoments: pad, changesAndReasons: pad, gotchas: pad,
         lessonsAndConventions: pad, plan: pad,
         todos: [{ content: 'pending nudge task', status: 'pending', priority: 'high' }],
         select_methodology: ['first_principles'],
       } });
-      // The todowrite result is followed by a todo-nudge synthetic continuation;
-      // no separate assistant text request occurs in this turn.
+      t.provider.expectText({ id: 'nudge-todo-text', text: 'continue' });
+      t.provider.expectNoMoreRequests();
       const turn = await t.turn.start(sid);
       await t.client.prompt(sid, 'write a todo and say continue');
       await turn.awaitTerminal({ timeoutMs: TIMEOUTS.prompt });
+
       const deadline = Date.now() + TIMEOUTS.idleNudge;
       while (!t.provider.syntheticRequests.some((r) => r.marker === 'todo-nudge')) {
-        if (Date.now() > deadline) throw new Error('Nudge did not fire within timeout of idle');
+        if (Date.now() > deadline) throw new Error('Todo-nudge did not fire within timeout');
         await sleep(200);
       }
       const nudgeReqs = t.provider.syntheticRequests.filter((r) => r.marker === 'todo-nudge');
       if (nudgeReqs.length !== 1) throw new Error(`Expected 1 todo-nudge, got ${nudgeReqs.length}`);
-      if (t.provider.nudgeBypassed < 1) throw new Error('nudgeBypassed should be >= 1');
-      const beforePost = t.provider.syntheticRequests.filter((r) => r.marker === 'todo-nudge').length;
-      await sleep(TIMEOUTS.postNudgeObserve);
-      const afterPost = t.provider.syntheticRequests.filter((r) => r.marker === 'todo-nudge').length;
-      if (afterPost !== beforePost) {
-        throw new Error(`Todo-nudge fired ${afterPost - beforePost} extra time(s)`);
+      const nudge = nudgeReqs[0];
+      const nudgeMsg = nudge.body?.messages?.[nudge.body.messages.length - 1];
+      const nudgeText = typeof nudgeMsg?.content === 'string' ? nudgeMsg.content : JSON.stringify(nudgeMsg?.content);
+      if (!nudgeText.includes('There are still incomplete todos')) {
+        throw new Error('Todo-nudge marker text not found: ' + nudgeText);
       }
+      if (t.provider.nudgeBypassed < 1) throw new Error('nudgeBypassed should be >= 1');
       expectNoSessionError(t, sid);
     },
   },

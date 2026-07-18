@@ -19,7 +19,6 @@ import {
   parseListenPort,
   ringPush,
   terminateChild,
-  initGitWorkspace,
   spawnOpencodeServe,
 } from './process-host-utils.js';
 import {
@@ -66,7 +65,6 @@ export class ProcessHost {
     this._started = true;
     this._scenarioDir = opts.scenarioDir;
     this._workDir = ensureWorkspace(opts.scenarioDir);
-    await initGitWorkspace(this._workDir);
     this._env = buildEnv(opts);
     this._child = spawnOpencodeServe(this._workDir, this._env, {
       onStdoutChunk: this._onStdout.bind(this),
@@ -77,7 +75,11 @@ export class ProcessHost {
     const listenLine = await this._waitForListening(startTimeout);
     if (!listenLine) {
       try { this._child.kill('SIGKILL'); } catch {}
-      throw new Error('opencode serve did not output listening line within timeout');
+      throw new Error(
+        'opencode serve did not output listening line within timeout\n' +
+        `stdout tail:\n${this._stdoutBuffer.slice(-20).join('\n')}\n` +
+        `stderr tail:\n${this._stderrBuffer.slice(-20).join('\n')}`,
+      );
     }
     this._pid = this._child.pid;
     this._port = parseListenPort(listenLine);
@@ -93,7 +95,11 @@ export class ProcessHost {
         if (res.ok || res.status === 200) return;
       } catch {}
       if (Date.now() > deadline) {
-        throw new Error('Health-check failed: server not responding');
+        throw new Error(
+          'Health-check failed: server not responding\n' +
+          `stdout tail:\n${this._stdoutBuffer.slice(-20).join('\n')}\n` +
+          `stderr tail:\n${this._stderrBuffer.slice(-20).join('\n')}`,
+        );
       }
       await new Promise((r) => setTimeout(r, READY_POLL_INTERVAL_MS));
     }

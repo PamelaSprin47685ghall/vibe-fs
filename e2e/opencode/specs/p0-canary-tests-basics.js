@@ -3,8 +3,8 @@
  * Kept under the 300-line Kolmogorov line budget.
  */
 
-import { getSessionId } from '../harness/scenario.js';
-import { content, writeWorkFile, extractToolNames, TIMEOUTS } from './p0-canary-utils.js';
+import { getSessionId, setupScenario, teardownScenario } from '../harness/scenario.js';
+import { content, writeWorkFile, extractToolNames, validateToolSchema, findToolPart, assertFuzzyGrepResult, TIMEOUTS } from './p0-canary-utils.js';
 
 function expectNoSessionError(t, sid) {
   t.events.expectCount({ type: 'session.error', sessionID: sid, count: 0 });
@@ -14,9 +14,14 @@ const tests = [
   {
     name: 'OC-BOOT-001 opencode serve starts with plugin loaded',
     fn: async (t) => {
+      // Exact command list oracle.
       const cmds = await t.client.request('GET', '/command');
       if (!cmds.ok) throw new Error(`GET /command failed: ${cmds.status}`);
-      if (!JSON.stringify(cmds.data).includes('loop')) throw new Error('loop command not found');
+      if (!Array.isArray(cmds.data)) throw new Error('/command did not return an array');
+      const names = cmds.data.map((c) => c.name);
+      if (!names.includes('loop')) throw new Error(`loop command missing; got: ${names.join(', ')}`);
+
+      // Plugin tool registration oracle: first LLM request must contain plugin tools.
       const sess = await t.client.createSession();
       const sid = getSessionId(sess);
       if (!sid) throw new Error('No session ID');
@@ -24,9 +29,36 @@ const tests = [
       const turn = await t.turn.start(sid);
       await t.client.prompt(sid, 'say ready');
       await turn.awaitTerminal({ timeoutMs: TIMEOUTS.prompt });
-      const s = await t.client.sessionStatus(sid);
-      const tokens = s.data?.data?.tokens || s.data?.tokens || {};
-      if ((tokens.input || 0) === 0) throw new Error('No token usage');
+      const firstReq = t.provider.requests[0];
+      if (!firstReq) throw new Error('No LLM request captured');
+      const tools = firstReq.tools || [];
+      const toolNames = extractToolNames(tools);
+      const unique = new Set(toolNames);
+      if (unique.size !== toolNames.length) throw new Error(`duplicate tool names: ${toolNames.join(', ')}`);
+      const required = ['write', 'executor', 'fuzzy_find', 'fuzzy_grep', 'coder'];
+      for (const name of required) {
+        if (!unique.has(name)) throw new Error(`plugin tool missing: ${name} in ${toolNames.join(', ')}`);
+      }
+
+      // Plugin load failure must be observable in stderr if it ever occurs.
+      const stderr = t.host.stderrLog || '';
+      if (/plugin.*(error|fail|cannot load)/i.test(stderr)) {
+        throw new Error(`plugin load error in stderr: ${stderr.slice(-500)}`);
+      }
+
+      // No-plugin baseline: loop should not appear when plugin is disabled.
+      const baseline = await setupScenario({ plugin: false, contextLimit: 20000 });
+      try {
+        const baselineCmds = await baseline.client.request('GET', '/command');
+        if (!baselineCmds.ok) throw new Error(`baseline GET /command failed: ${baselineCmds.status}`);
+        const baselineNames = (baselineCmds.data || []).map((c) => c.name);
+        if (baselineNames.includes('loop')) {
+          throw new Error(`baseline /command unexpectedly contains loop: ${baselineNames.join(', ')}`);
+        }
+      } finally {
+        await teardownScenario(baseline);
+      }
+
       expectNoSessionError(t, sid);
     },
   },
@@ -43,8 +75,16 @@ const tests = [
       await turn.awaitTerminal({ timeoutMs: TIMEOUTS.prompt });
       t.fs.expectFile('hello.txt');
       t.fs.expectFileContent('hello.txt', content('Hello World'));
-      const msgsStr = JSON.stringify((await t.client.messages(sid)).data);
-      if (!msgsStr.includes('Hello World')) throw new Error('Tool result not in messages');
+      const messages = (await t.client.messages(sid)).data || [];
+      const part = findToolPart(messages, 'write', (p) => p.state?.input?.filePath === 'hello.txt');
+      if (!part) throw new Error('write tool part not found in messages');
+      if (part.state?.status !== 'completed') throw new Error(`write tool state: ${part.state?.status}`);
+      if (part.state?.input?.content !== content('Hello World')) {
+        throw new Error(`write tool input content mismatch: ${JSON.stringify(part.state?.input?.content)}`);
+      }
+      if (typeof part.state?.output !== 'string' || part.state.output.length === 0) {
+        throw new Error('write tool completed but produced no output');
+      }
       expectNoSessionError(t, sid);
     },
   },
@@ -93,8 +133,15 @@ const tests = [
       const turn = await t.turn.start(sid);
       await t.client.prompt(sid, 'search for unique-pattern-xyz');
       await turn.awaitTerminal({ timeoutMs: TIMEOUTS.prompt });
-      const msgsStr = JSON.stringify((await t.client.messages(sid)).data);
-      if (!msgsStr.includes('unique-pattern-xyz')) throw new Error('Grep results not found');
+      const messages = (await t.client.messages(sid)).data || [];
+      const part = findToolPart(messages, 'fuzzy_grep');
+      if (!part) throw new Error('fuzzy_grep tool part not found');
+      if (part.state?.status !== 'completed') throw new Error(`fuzzy_grep state: ${part.state?.status}`);
+      assertFuzzyGrepResult(part.state.output, {
+        expectedFile: 'grep_target.txt',
+        expectedPattern: 'unique-pattern-xyz',
+        minMatches: 2,
+      });
       expectNoSessionError(t, sid);
     },
   },
@@ -163,11 +210,7 @@ const tests = [
       if (!firstReq) throw new Error('No LLM request');
       const tools = firstReq.tools || [];
       if (tools.length === 0) throw new Error('No tools in request');
-      const writeTool = tools.find((tool) => (tool.function?.name || tool.name) === 'write');
-      if (!writeTool) throw new Error('write tool missing');
-      const fn = writeTool.function || writeTool;
-      if (!fn.description || fn.description.length < 5) throw new Error('write tool missing description');
-      if (!fn.parameters) throw new Error('write tool missing parameters');
+      validateToolSchema(tools);
       expectNoSessionError(t, sid);
     },
   },

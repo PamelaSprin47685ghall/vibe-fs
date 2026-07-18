@@ -288,6 +288,16 @@ let runSubagentWithCleanup
     : JS.Promise<Result<string, DomainError>> =
     runSubagentCoreResult runtime registry client agent title prompt directory sessionID context (box null) true None
 
+let resolveSubagentPromise (context: string) (work: JS.Promise<Result<string, DomainError>>) : JS.Promise<string> =
+    promise {
+        let! result = work
+
+        return
+            match result with
+            | Ok text -> text
+            | Error err -> wireEncodeToolError context err
+    }
+
 let runSubagent
     (runtime: FallbackRuntimeStore)
     (registry: ChildAgentRegistry)

@@ -18,18 +18,19 @@ import ptyTests from './p0-canary-tests-pty.js';
 import advancedTests from './p0-canary-tests-advanced.js';
 import nudgeSubTests from './p0-canary-tests-nudge-sub.js';
 
-const tests = [
+const common = {
+  plugin: true,
+  timeoutMs: 90000,
+  allowSynthetic: true,
+  allowTitleGen: true,
+};
+
+const exitCode1 = await runScenario({ ...common, contextLimit: 20000 }, [
   ...basicTests,
   ...ptyTests,
   ...advancedTests,
-  ...nudgeSubTests,
-];
+]);
 
-const exitCode = await runScenario({
-  plugin: true,
-  timeoutMs: 90000,
-  contextLimit: 20000,
-  allowSynthetic: true,
-  allowTitleGen: true,
-}, tests);
-process.exit(exitCode);
+const exitCode2 = await runScenario({ ...common, contextLimit: 100000 }, nudgeSubTests);
+
+process.exit(exitCode1 || exitCode2);

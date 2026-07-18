@@ -40,12 +40,7 @@ let trySessionApi (client: obj) : Result<obj, string> =
     | Error _ -> Error "session API missing"
 
 let promptDigest (prompt: string) : string =
-    let mutable h = 0x811c9dc5u
-
-    for i = 0 to prompt.Length - 1 do
-        h <- (h ^^^ uint32 prompt.[i]) * 0x01000193u
-
-    h.ToString("x8")
+    Wanxiangshu.Runtime.FileSys.sha256HexTruncated prompt
 
 let encodeDispatchIdentity
     (directory: string)

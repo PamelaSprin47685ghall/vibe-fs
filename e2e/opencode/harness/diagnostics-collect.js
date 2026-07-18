@@ -18,6 +18,9 @@ const MAX_UNEXPECTED_PREVIEW = 8;
 const MAX_WORKSPACE_FILES = 30;
 
 export async function gatherDiagnostics(scenario) {
+  if (!scenario) {
+    return { error: 'no scenario available for diagnostics' };
+  }
   const diag = {
     timestamp: new Date().toISOString(),
     baseUrl: scenario.host?.baseUrl,

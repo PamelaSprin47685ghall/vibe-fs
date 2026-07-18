@@ -188,3 +188,26 @@ let ptyKillTool (host: Host) : obj =
 
                 return frontMatterPrompt fields (sprintf "%s %s (%s)." action id retainedNote)
             })
+
+let ptyListTool (host: Host) : obj =
+    define "List all active PTY sessions." (createObj []) (fun _ context ->
+        checkExecPerm host context
+
+        promise {
+            let! mgr = getManager ()
+            let sessionsRaw = mgr?list ()
+
+            let sessions =
+                if Dyn.isNullish sessionsRaw then
+                    [||]
+                else
+                    unbox<obj array> sessionsRaw
+
+            let body =
+                if sessions.Length = 0 then
+                    "No active PTY sessions."
+                else
+                    formatSessionList sessions
+
+            return frontMatterPrompt [ "count", box sessions.Length ] body
+        })

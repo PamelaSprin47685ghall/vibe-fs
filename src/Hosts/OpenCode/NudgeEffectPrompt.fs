@@ -12,6 +12,7 @@ open Wanxiangshu.Runtime.Fallback.RuntimeStore
 open Wanxiangshu.Runtime.NudgeRuntimeState
 open Wanxiangshu.Runtime.NudgeFlow
 open Wanxiangshu.Runtime.NudgeModelResolver
+open Wanxiangshu.Runtime.Nudge.NudgeDerivation
 open Wanxiangshu.Runtime.OpencodeClientCodec
 open Wanxiangshu.Runtime.ErrorClassify
 
@@ -56,8 +57,14 @@ let private buildSnapshotResult (snap: NudgeSnapshotState) : SessionSnapshot =
     let anchor = nudgeAnchorKey snap.turnId snap.lastAssistantText
 
     let blockStatus =
-        if isBlocked { PendingNudge = snap.pendingNudge; LastDispatchedAnchor = snap.lastDispatchedAnchor } anchor
-        then NudgeBlockStatus.Blocked
-        else NudgeBlockStatus.Allowed
+        if
+            isBlocked
+                { PendingNudge = snap.pendingNudge
+                  LastDispatchedAnchor = snap.lastDispatchedAnchor }
+                anchor
+        then
+            NudgeBlockStatus.Blocked
+        else
+            NudgeBlockStatus.Allowed
 
     sessionSnapshotFromFold snap RunnerPresence.Absent blockStatus

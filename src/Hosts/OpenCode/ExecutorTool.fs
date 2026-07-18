@@ -17,6 +17,7 @@ open Wanxiangshu.Kernel.ToolCatalog
 open Wanxiangshu.Kernel.ToolCopy
 open Wanxiangshu.Hosts.Opencode.ToolSchema
 open Wanxiangshu.Hosts.Opencode.SessionIo
+open Wanxiangshu.Hosts.Opencode.SubagentIoRun
 open Wanxiangshu.Kernel.ToolResult
 open Wanxiangshu.Runtime.ChildAgentRegistry
 open Wanxiangshu.Runtime.ExecutorToolsCodec

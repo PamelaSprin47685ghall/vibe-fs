@@ -60,6 +60,7 @@ export class EventProbe {
       this._readPromise = this._readLoop(reader, decoder);
     } catch (err) {
       if (err.name === 'AbortError') return;
+      console.error(`[EventProbe] connect failed: ${err.message}`, err.cause ? `cause: ${err.cause}` : '');
       throw err;
     }
   }

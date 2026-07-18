@@ -21,6 +21,7 @@ open Wanxiangshu.Runtime.SubagentDispatcher
 open Wanxiangshu.Runtime.Fallback.RuntimeStore
 open Wanxiangshu.Runtime.ToolRuntimeContext
 open Wanxiangshu.Runtime.RuntimeScope
+open Wanxiangshu.Hosts.Opencode.SubagentIoRun
 
 let private subagentRequiredKeys (toolName: string) : string array =
     match Wanxiangshu.Kernel.ToolCatalog.subagentRequiredKeys toolName with
