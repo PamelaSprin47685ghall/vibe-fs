@@ -152,7 +152,6 @@ type NudgeTrigger
             if
                 (fallbackRuntime.GetSession sessionIDStr).Owner = SessionOwner.Compaction
                 && (fallbackRuntime.GetSession sessionIDStr).CompactionCompacted
-                && (fallbackRuntime.GetSession sessionIDStr).CompactionContinuationObserved
             then
                 do! NudgeTriggerOps.settleCompaction_ ctx fallbackRuntime sessionIDStr
         }
