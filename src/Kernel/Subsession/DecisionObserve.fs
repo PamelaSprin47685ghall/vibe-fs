@@ -241,6 +241,7 @@ let decide (state: SubsessionState) (cmd: Command) : Result<DecisionResult, Deci
     | Available _ ->
         match cmd with
         | EvidenceUpdated _ -> Ok(noChange StaleTimer)
+        | SessionIdleObserved -> Ok(noChange StaleTimer)
         | _ -> illegal (stateName state) (cmdName cmd)
     | Dispatching _
     | CancellingDispatch _

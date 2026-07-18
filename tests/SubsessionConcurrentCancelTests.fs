@@ -19,6 +19,7 @@ open Wanxiangshu.Runtime.SubsessionEventStore
 open Wanxiangshu.Runtime.SubsessionEventRouter
 open Wanxiangshu.Runtime.SubsessionChildObserver
 open Wanxiangshu.Runtime.SubsessionEventWire
+open Wanxiangshu.Runtime.SubsessionPendingEvidence
 open Wanxiangshu.Tests.Assert
 
 let private fail (msg: string) = check msg false
@@ -430,6 +431,23 @@ let richerWireRoundTrip () =
     | RunFinished(_, Succeeded "hello-out") -> check "run detail preserved" true
     | other -> fail ("expected succeeded detail, got " + string other)
 
+let idleWithoutActiveTurnIsNotBuffered () =
+    promise {
+        SubsessionActorRegistry.Clear()
+        let sid = "child-idle-without-turn"
+        let host = ScriptedHost()
+        let store = MemorySubsessionEventStore()
+        let _ = SubsessionActorRegistry.GetOrCreate "" sid host store
+        let _ = SubsessionPendingEvidence.TakeAll sid
+
+        let! routed = tryIdle "" sid
+        check "idle without active turn is not routed" (not routed)
+
+        let evidence = SubsessionPendingEvidence.TakeAll sid
+        check "idle without active turn has no evidence" (List.isEmpty evidence)
+        SubsessionActorRegistry.Clear()
+    }
+
 let run () : JS.Promise<unit> =
     promise {
         do! beginRunAtomicWithCancelRace ()
@@ -441,4 +459,5 @@ let run () : JS.Promise<unit> =
         do! removeKeepsClosingActor ()
         childMetadataUpdatesModel ()
         richerWireRoundTrip ()
+        do! idleWithoutActiveTurnIsNotBuffered ()
     }
