@@ -7,9 +7,9 @@ open Wanxiangshu.Kernel.Subsession.Types
 open Wanxiangshu.Kernel.Subsession.Fold
 open Wanxiangshu.Runtime.Fallback.FallbackConfigCodec
 
-let private payload (e: WanEvent) (k: string) : string = defaultArg (Map.tryFind k e.Payload) ""
+let payload (e: WanEvent) (k: string) : string = defaultArg (Map.tryFind k e.Payload) ""
 
-let private emptyModel: FallbackModel =
+let emptyModel: FallbackModel =
     { ProviderID = ""
       ModelID = ""
       Variant = None
@@ -19,7 +19,7 @@ let private emptyModel: FallbackModel =
       ReasoningEffort = None
       Thinking = false }
 
-let private tryParseModel (s: string) : FallbackModel option =
+let tryParseModel (s: string) : FallbackModel option =
     if s = "" then
         None
     else
@@ -38,7 +38,7 @@ let private tryParseModel (s: string) : FallbackModel option =
                   ReasoningEffort = None
                   Thinking = false }
 
-let private tryParseReceipt (s: string) : HostStartReceipt option =
+let tryParseReceipt (s: string) : HostStartReceipt option =
     if s = "ordered_marker" then
         Some OrderedTurnMarkerObserved
     elif s.StartsWith("user_message:") then
@@ -48,7 +48,7 @@ let private tryParseReceipt (s: string) : HostStartReceipt option =
     else
         None
 
-let private tryParseFinish (e: WanEvent) : TurnFinishOutcome option =
+let tryParseFinish (e: WanEvent) : TurnFinishOutcome option =
     let finish = payload e "finish"
 
     if finish = "completed" then
@@ -78,7 +78,7 @@ let private tryParseFinish (e: WanEvent) : TurnFinishOutcome option =
     else
         None
 
-let private tryParsePoison (s: string) : PoisonReason option =
+let tryParsePoison (s: string) : PoisonReason option =
     if s = "unknown_after_restart" then
         Some SessionStateUnknownAfterRestart
     elif s = "session_closed" then
@@ -94,7 +94,7 @@ let private tryParsePoison (s: string) : PoisonReason option =
     else
         Some(HostProtocolBroken s)
 
-let private tryParseRunResult (status: string) (detail: string) : RunResult =
+let tryParseRunResult (status: string) (detail: string) : RunResult =
     match status with
     | "succeeded" -> Succeeded detail
     | "cancelled" -> Cancelled
@@ -120,7 +120,7 @@ let private tryParseRunResult (status: string) (detail: string) : RunResult =
             Failed(InfrastructureFailure(if detail = "" then status else detail))
     | _ -> Failed(InfrastructureFailure(if detail = "" then status else detail))
 
-let private ordinalFromInt (n: int) : TurnOrdinal =
+let ordinalFromInt (n: int) : TurnOrdinal =
     let rec loop i acc =
         if i <= 0 then acc else loop (i - 1) (TurnOrdinal.next acc)
 

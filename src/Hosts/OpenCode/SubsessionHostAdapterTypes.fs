@@ -12,6 +12,7 @@ open Wanxiangshu.Runtime.Dyn
 open Wanxiangshu.Runtime.OpencodeClientCodec
 open Wanxiangshu.Runtime.OpencodeSessionEventCodec
 open Wanxiangshu.Hosts.Opencode.SubsessionDispatch
+open Wanxiangshu.Runtime.OpencodeSessionPromptBuilder
 
 let invoke1 (arg: obj) (method: string) (target: obj) : JS.Promise<obj> = unbox (target?(method) (arg))
 

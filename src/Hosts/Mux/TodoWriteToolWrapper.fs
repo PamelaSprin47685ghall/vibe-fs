@@ -20,7 +20,9 @@ open Wanxiangshu.Runtime.MuxHostBindings
 open Wanxiangshu.Runtime.WorkBacklogToolsCodec
 open Wanxiangshu.Runtime.EventLogRuntime
 open Wanxiangshu.Runtime.ToolExecute
+open Wanxiangshu.Runtime.ToolRuntimeContext
 open Wanxiangshu.Runtime.SubsessionEventRouter
+open Wanxiangshu.Kernel.Subsession.Types
 
 let private todoItemForNativeWrite (item: TodoItem) : obj =
     let statusStr =
@@ -57,6 +59,11 @@ let private captureTodoReportFromDecoded
               plan = tw.Plan }
 
         projection.CaptureBacklogEntry(host, o.ToolCallId, entry)
+
+let private isThenable (value: obj) : bool =
+    not (Dyn.isNullish value)
+    && Dyn.typeIs value "object"
+    && not (Dyn.isNullish (Dyn.get value "then"))
 
 let private isErrorResult (result: obj) : bool =
     not (Dyn.isNullish result) && not (truthy (Dyn.get result "success"))

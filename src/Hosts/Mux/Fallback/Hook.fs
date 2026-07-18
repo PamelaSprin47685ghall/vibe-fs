@@ -14,6 +14,7 @@ open Wanxiangshu.Runtime.Fallback.Coordinator
 open Wanxiangshu.Runtime.Fallback.FallbackMessageCodec
 open Wanxiangshu.Runtime.Fallback.RuntimeStore
 open Wanxiangshu.Runtime.Fallback.Ports
+open Wanxiangshu.Runtime.Fallback.FallbackMessageDetection
 
 let private muxErrorInput (props: obj) : ErrorInput =
     let errorName = Dyn.str props "errorType"

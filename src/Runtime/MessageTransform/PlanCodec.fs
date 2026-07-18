@@ -3,6 +3,7 @@ module Wanxiangshu.Runtime.MessageTransform.PlanCodec
 open Wanxiangshu.Runtime
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Messaging
+open Wanxiangshu.Runtime.MessageTransform.Plan
 open Fable.Core
 
 /// Wire-format serialization for MessageTransformPlan.
@@ -45,10 +46,18 @@ let decodePlan (wire: PlanWire) : MessageTransformPlan =
       Agent = wire.Agent
       Directory = wire.Directory
       ProjectionPolicy = LanguagePrimitives.ValueToEnum<ProjectionPolicy> wire.ProjectionPolicy
-      BacklogProjectionPolicy = LanguagePrimitives.ValueToEnum<Wanxiangshu.Kernel.MessageTransformPolicy.BacklogProjectionPolicy> wire.BacklogProjectionPolicy
-      CapsInjectionPolicy = LanguagePrimitives.ValueToEnum<Wanxiangshu.Kernel.MessageTransformPolicy.CapsInjectionPolicy> wire.CapsInjectionPolicy
-      ParallelHintPolicy = LanguagePrimitives.ValueToEnum<Wanxiangshu.Kernel.MessageTransformPolicy.ParallelHintPolicy> wire.ParallelHintPolicy
-      ContextBudgetPolicy = LanguagePrimitives.ValueToEnum<Wanxiangshu.Kernel.MessageTransformPolicy.ContextBudgetPolicy> wire.ContextBudgetPolicy
+      BacklogProjectionPolicy =
+        LanguagePrimitives.ValueToEnum<Wanxiangshu.Kernel.MessageTransformPolicy.BacklogProjectionPolicy>
+            wire.BacklogProjectionPolicy
+      CapsInjectionPolicy =
+        LanguagePrimitives.ValueToEnum<Wanxiangshu.Kernel.MessageTransformPolicy.CapsInjectionPolicy>
+            wire.CapsInjectionPolicy
+      ParallelHintPolicy =
+        LanguagePrimitives.ValueToEnum<Wanxiangshu.Kernel.MessageTransformPolicy.ParallelHintPolicy>
+            wire.ParallelHintPolicy
+      ContextBudgetPolicy =
+        LanguagePrimitives.ValueToEnum<Wanxiangshu.Kernel.MessageTransformPolicy.ContextBudgetPolicy>
+            wire.ContextBudgetPolicy
       IsSubagentSession = wire.IsSubagentSession
       SembleInjectEnabled = wire.SembleInjectEnabled
       Scope = wire.Scope

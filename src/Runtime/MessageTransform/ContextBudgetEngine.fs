@@ -5,6 +5,7 @@ open Wanxiangshu.Runtime
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.HostTools
 open Wanxiangshu.Kernel.Messaging
+open Wanxiangshu.Runtime.MessageTransform.Plan
 open Wanxiangshu.Runtime.BacklogProjectionBuild
 open Wanxiangshu.Runtime.BacklogProjection
 open Wanxiangshu.Kernel.WorkBacklog

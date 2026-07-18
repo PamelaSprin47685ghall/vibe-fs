@@ -3,7 +3,6 @@ module Wanxiangshu.Runtime.Fallback.FallbackMessageDetection
 
 open Fable.Core
 open Fable.Core.JsInterop
-open Wanxiangshu.Runtime.Dyn
 open Wanxiangshu.Kernel.Primitives.Identity
 open Wanxiangshu.Kernel.Errors.DomainError
 open Wanxiangshu.Kernel.Session.Causality
@@ -12,6 +11,8 @@ open Wanxiangshu.Kernel.FallbackKernel.Types
 open Wanxiangshu.Runtime.Fallback.FallbackMessageParser
 open Wanxiangshu.Kernel.Messaging
 open Wanxiangshu.Kernel
+
+module Dyn = Wanxiangshu.Runtime.Dyn
 
 /// Find the index of the last assistant message.
 let lastAssistantIndex (msgs: obj array) : int option =

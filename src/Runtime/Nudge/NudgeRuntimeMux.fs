@@ -10,7 +10,7 @@ open Wanxiangshu.Kernel.Nudge.NudgeSnapshotSource
 open Wanxiangshu.Kernel.Nudge.NudgeProjection
 open Wanxiangshu.Kernel.Nudge.Types
 open Wanxiangshu.Kernel.HostTools
-open Wanxiangshu.Runtime.Nudge.MuxNudgeEventParse
+open Wanxiangshu.Runtime.MuxNudgeEventParse
 open Wanxiangshu.Runtime.OpencodeHookInputCodec
 open Wanxiangshu.Runtime.OpencodeHostEvent
 open Wanxiangshu.Kernel.EventSourcing.Fold
@@ -54,6 +54,7 @@ let private getBlockStatus (snapshot: NudgeSnapshotState) (currentAnchor: string
     let dedup: NudgeDedupState =
         { PendingNudge = snapshot.pendingNudge
           LastDispatchedAnchor = snapshot.lastDispatchedAnchor }
+
     if NudgeProjection.isBlocked dedup currentAnchor then
         NudgeBlockStatus.Blocked
     else

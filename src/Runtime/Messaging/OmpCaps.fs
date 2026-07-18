@@ -1,7 +1,12 @@
 module Wanxiangshu.Runtime.OmpCaps
 
+open Fable.Core
+open Fable.Core.JsInterop
+open System.Text.RegularExpressions
 open Wanxiangshu.Runtime.OmpFileScanner
 open Wanxiangshu.Runtime.OmpPromptContext
+
+module Dyn = Wanxiangshu.Runtime.Dyn
 
 type OmpCapsFile = Wanxiangshu.Runtime.OmpFileScanner.OmpCapsFile
 
@@ -23,7 +28,7 @@ let private normalizeSystemPrompt (systemPrompt: obj) : string array =
         [| string systemPrompt |]
 
 let private hasCapsContext (parts: string array) =
-    parts |> Array.exists (fun s -> s.Contains capsMarker)
+    parts |> Array.exists (fun s -> s.Contains OmpPromptContext.capsMarker)
 
 let appendCapsContext (systemPrompt: obj) (projectRoot: string) : JS.Promise<string array> =
     promise {

@@ -1,6 +1,6 @@
 module Wanxiangshu.Runtime.FuzzyGrepTypes
 
-open Wanxiangshu.Runtime.FuzzySearchSupport
+open Wanxiangshu.Kernel.FuzzyFormat
 
 type ResolvedGrep =
     { matches: GrepMatch list

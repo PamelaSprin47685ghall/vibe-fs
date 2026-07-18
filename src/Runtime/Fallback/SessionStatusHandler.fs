@@ -10,6 +10,7 @@ open Wanxiangshu.Runtime.Fallback.LeaseValidation
 open Wanxiangshu.Runtime.Fallback.NudgeHandler
 open Wanxiangshu.Runtime.Fallback.Ports
 open Wanxiangshu.Runtime.Fallback.FallbackMessageCodec
+open Wanxiangshu.Runtime.Fallback.FallbackMessageDetection
 open Wanxiangshu.Runtime.SessionEventWriter
 
 let emptyOutputError =

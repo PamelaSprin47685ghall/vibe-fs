@@ -3,11 +3,13 @@ module Wanxiangshu.Hosts.Opencode.SubagentIoCleanup
 open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Kernel.Primitives.Identity
+open Wanxiangshu.Kernel.Subsession.Types
 open Wanxiangshu.Runtime.ChildAgentRegistry
 open Wanxiangshu.Runtime.SubsessionEventStore
 open Wanxiangshu.Runtime.SubsessionActorRegistry
 
 open Wanxiangshu.Hosts.Opencode.SubagentTypes
+open Wanxiangshu.Hosts.Opencode.NudgeEffectHelpers
 open Wanxiangshu.Runtime.OpencodeClientCodec
 
 let abortedPrefix = "(aborted)"

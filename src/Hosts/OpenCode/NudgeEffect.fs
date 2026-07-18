@@ -22,6 +22,7 @@ open Wanxiangshu.Kernel.HostTools
 open Wanxiangshu.Runtime.NudgeRuntime
 open Wanxiangshu.Runtime.NudgeRuntimeState
 open Wanxiangshu.Hosts.Opencode.NudgeEffectPrompt
+open Wanxiangshu.Runtime.OpencodeSessionPromptBuilder
 open Wanxiangshu.Runtime.NudgeFlow
 open Wanxiangshu.Runtime.NudgeModelResolver
 open Wanxiangshu.Runtime.Fallback.RuntimeStore
@@ -42,7 +43,7 @@ let private invokeClient (client: obj) (method_: string) (arg: obj) : JS.Promise
             if Dyn.isNullish api then
                 Promise.lift (unbox null)
             else
-                 unbox<JS.Promise<obj>> (Dyn.callMethod1 session method_ arg)
+                unbox<JS.Promise<obj>> (Dyn.callMethod1 session method_ arg)
 
 let buildSnapshotResult (snap: Wanxiangshu.Kernel.Nudge.NudgeProjection.NudgeSnapshotState) : SessionSnapshot =
     let anchor =

@@ -1,8 +1,9 @@
 module Wanxiangshu.Runtime.OmpPromptContext
 
+open System.Text.RegularExpressions
 open Wanxiangshu.Runtime.Dyn
 
-let private capsMarker = "<caps-context"
+let capsMarker = "<caps-context"
 
 let escapeXmlAttr (value: string) : string =
     value

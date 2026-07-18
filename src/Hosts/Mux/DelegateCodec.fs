@@ -3,7 +3,8 @@ module Wanxiangshu.Hosts.Mux.DelegateCodec
 open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Kernel.Primitives.Identity
-open Wanxiangshu.Runtime.Dyn
+
+module Dyn = Wanxiangshu.Runtime.Dyn
 
 /// Task service input payload. Owned by DelegateCodec so that the wire shape
 /// lives in one place and Delegate.fs never touches field-name strings.

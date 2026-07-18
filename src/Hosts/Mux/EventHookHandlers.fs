@@ -15,15 +15,18 @@ open Wanxiangshu.Runtime.SubsessionChildObserver
 open Wanxiangshu.Kernel.Subsession.Types
 open Wanxiangshu.Runtime.SubsessionActorRegistry
 open Wanxiangshu.Runtime.SubsessionEventStore
+open Wanxiangshu.Runtime.NudgeRuntimeEvent
+open Wanxiangshu.Runtime.NudgeRuntime
+open Wanxiangshu.Kernel.FallbackKernel.Types
 
-type private DecodedHookEvent =
+type DecodedHookEvent =
     { eventType: string
       workspaceId: string
       properties: obj
       stopReason: string
       errorType: string }
 
-let private decodeHookEvent (event: obj) : DecodedHookEvent =
+let decodeHookEvent (event: obj) : DecodedHookEvent =
     let props = Dyn.get event "properties"
 
     let meta =
@@ -75,7 +78,7 @@ let private parseHookEvent (event: obj) : NudgeRuntimeEvent =
 /// Only terminal / lifecycle events should enter the Promise machinery.
 /// Every streaming chunk (message.updated, message.part.*, stream-* mid-flow)
 /// is discarded synchronously here so the closure never captures a rawEvent.
-let private shouldObserveMuxEvent (eventType: string) : bool =
+let shouldObserveMuxEvent (eventType: string) : bool =
     match eventType with
     | "stream-end"
     | "stream-abort"
@@ -91,7 +94,7 @@ let private shouldObserveMuxEvent (eventType: string) : bool =
 // Extracted helpers for session-closed lifecycle events
 // ---------------------------------------------------------------------------
 
-let private handleSessionClosed (directory: string) (workspaceId: string) (event: obj) : JS.Promise<unit> =
+let handleSessionClosed (directory: string) (workspaceId: string) (event: obj) : JS.Promise<unit> =
     promise {
         let sid = SessionId.create workspaceId
         let eventStore = SubsessionEventStore.create directory
@@ -104,7 +107,7 @@ let private handleSessionClosed (directory: string) (workspaceId: string) (event
 // Extracted helpers for child-session routing
 // ---------------------------------------------------------------------------
 
-let private handleChildSession
+let handleChildSession
     (directory: string)
     (workspaceId: string)
     (fallbackRuntime: FallbackRuntimeStore)
@@ -141,7 +144,7 @@ let private handleChildSession
 // Extracted helpers for parent-session abort/error lifecycle
 // ---------------------------------------------------------------------------
 
-let private handleParentSession
+let handleParentSession
     (scope: RuntimeScope)
     (directory: string)
     (reviewStore: ReviewStore)
@@ -164,7 +167,7 @@ let private handleParentSession
 // Extracted helper for unconsumed fallback result
 // ---------------------------------------------------------------------------
 
-let private handleUnconsumedEvent
+let handleUnconsumedEvent
     (directory: string)
     (workspaceId: string)
     (runtime: NudgeRuntime)
@@ -187,7 +190,7 @@ let private handleUnconsumedEvent
 // Top-level extracted event-processing body (replaces inline fn lambda)
 // ---------------------------------------------------------------------------
 
-let private processMuxEvent
+let processMuxEvent
     (decoded: DecodedHookEvent)
     (fallbackRuntime: FallbackRuntimeStore)
     (directory: string)

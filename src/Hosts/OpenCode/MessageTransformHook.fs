@@ -9,6 +9,8 @@ open Wanxiangshu.Runtime.RuntimeScope
 open Wanxiangshu.Hosts.Opencode.BacklogSession
 open Wanxiangshu.Runtime.ReviewRuntime
 open Wanxiangshu.Hosts.Opencode.MessageTransformPipeline
+open Wanxiangshu.Runtime.ChildAgentRegistry
+open Wanxiangshu.Runtime.ChatTransformOutputCodec
 
 /// Transform the messages array in-place: resolve session context, build the
 /// transform plan, and run the host-messages transform pipeline.

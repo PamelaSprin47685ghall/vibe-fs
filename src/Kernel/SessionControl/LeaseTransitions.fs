@@ -115,7 +115,11 @@ let private handleContinuationTerminal (st: OwnerEpisodeState) (ev: EpisodeStage
     if eventOrdinal <> st.ContinuationOrdinal || st.ContinuationStage = Terminal then
         st
     elif st.ContinuationLease |> Option.exists (fun l -> l.ContinuationID = ev.Id) then
-        releaseOwnerIf "Fallback" { st with ContinuationLease = None; ContinuationStage = Terminal }
+        releaseOwnerIf
+            "Fallback"
+            { st with
+                ContinuationLease = None
+                ContinuationStage = Terminal }
     else
         st
 
@@ -150,14 +154,23 @@ let private handleNudgeTerminal (st: OwnerEpisodeState) (ev: EpisodeStageEvent) 
     if eventOrdinal <> st.NudgeOrdinal || st.NudgeStage = Terminal then
         st
     elif st.NudgeLease |> Option.exists (fun nl -> nl.NudgeID = ev.Id) then
-        releaseOwnerIf "Nudge" { st with NudgeLease = None; NudgeStage = Terminal }
+        releaseOwnerIf
+            "Nudge"
+            { st with
+                NudgeLease = None
+                NudgeStage = Terminal }
     else
         st
 
 // ── Terminal helpers ──────────────────────────────────────────────────────────
 
-let private handleAssistantCompleted (st: OwnerEpisodeState) : OwnerEpisodeState =
-    releaseOwnerIf "Nudge" st
+let private handleAssistantCompleted (st: OwnerEpisodeState) : OwnerEpisodeState = releaseOwnerIf "Nudge" st
+
+let private handleNudgeDedupClearedOrWip (st: OwnerEpisodeState) : OwnerEpisodeState =
+    { st with
+        Owner = Some "None"
+        NudgeLease = None
+        NudgeStage = NoEpisode }
 
 // ── Dispatcher ───────────────────────────────────────────────────────────────
 

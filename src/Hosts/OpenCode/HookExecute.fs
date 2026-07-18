@@ -17,6 +17,7 @@ open Wanxiangshu.Runtime.LivelockGuard
 open Wanxiangshu.Runtime.RuntimeScope
 open Wanxiangshu.Kernel.Session.Causality
 open Wanxiangshu.Runtime.ToolSequenceThrottle
+open Wanxiangshu.Kernel.ToolResult
 
 /// Shared per-process tool sequence throttle for PTY read delay.
 let private toolSequenceThrottle = ToolSequenceThrottle()

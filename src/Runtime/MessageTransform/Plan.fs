@@ -3,10 +3,14 @@ module Wanxiangshu.Runtime.MessageTransform.Plan
 open Wanxiangshu.Runtime
 
 open Wanxiangshu.Kernel
+open Wanxiangshu.Kernel.ContextBudget
 open Wanxiangshu.Kernel.Messaging
 open Wanxiangshu.Runtime.BacklogProjectionBuild
 open Wanxiangshu.Runtime.BacklogProjection
 open Wanxiangshu.Kernel.WorkBacklog
+open Fable.Core
+open Wanxiangshu.Runtime.RuntimeScope
+open Wanxiangshu.Kernel.HostTools
 
 [<RequireQualifiedAccess>]
 type ProjectionPolicy =

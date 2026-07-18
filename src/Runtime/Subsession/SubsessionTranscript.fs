@@ -3,6 +3,7 @@ module Wanxiangshu.Runtime.SubsessionTranscript
 open Wanxiangshu.Kernel.Subsession.Types
 open Wanxiangshu.Runtime.Dyn
 open Wanxiangshu.Runtime.Fallback.FallbackMessageCodec
+open Wanxiangshu.Runtime.Fallback.FallbackMessageDetection
 
 /// Find the index of the last user message (turn boundary heuristic).
 let private lastUserMessageIndex (msgs: obj array) : int option =

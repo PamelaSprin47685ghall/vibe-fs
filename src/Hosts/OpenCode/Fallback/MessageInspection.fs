@@ -20,6 +20,7 @@ open Wanxiangshu.Kernel.Subsession.TypeClassify
 open Wanxiangshu.Runtime.Fallback.RuntimeStore
 open Wanxiangshu.Runtime.Fallback.Ports
 open Wanxiangshu.Hosts.Opencode.Fallback.HostEventInspection
+open Wanxiangshu.Runtime.Fallback.FallbackMessageDetection
 
 let private isSyntheticText (text: string) : bool =
     let t = text.Trim()

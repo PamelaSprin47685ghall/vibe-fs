@@ -4,6 +4,11 @@ open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Runtime.WorkspacePathResolution
 
+module Dyn = Wanxiangshu.Runtime.Dyn
+
+[<Import("promises", "node:fs")>]
+let private fsPromises: obj = jsNative
+
 let maxReverieFileBytes = 1_048_576
 
 type ReverieFileResult =
@@ -23,9 +28,6 @@ let private statIsDirectory (s: obj) : bool = s?isDirectory ()
 let private entryName (entry: obj) : string = entry?name
 let private entryIsFile (entry: obj) : bool = entry?isFile ()
 let private entryIsDirectory (entry: obj) : bool = entry?isDirectory ()
-
-[<Import("promises", "node:fs")>]
-let private fsPromises: obj = jsNative
 
 let readOne (cwd: string) (file: string) : JS.Promise<ReverieFileResult> =
     promise {
@@ -47,7 +49,7 @@ let readOne (cwd: string) (file: string) : JS.Promise<ReverieFileResult> =
             else
                 let! content = readFile absolute
 
-                if isNullish content || not (typeIs content "string") then
+                if Dyn.isNullish content || not (Dyn.typeIs content "string") then
                     return
                         { filePath = file
                           content = None

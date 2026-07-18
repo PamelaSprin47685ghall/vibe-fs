@@ -2,6 +2,7 @@ module Wanxiangshu.Runtime.SubagentDispatcher
 
 open Wanxiangshu.Runtime.SubagentBatchSpawn
 open Wanxiangshu.Runtime.SubagentBatchArgs
+open Wanxiangshu.Runtime.SubagentBatchSpawnCore
 
 open Fable.Core
 open Fable.Core.JsInterop
@@ -102,5 +103,5 @@ let dispatch
             | Ok intents -> return! runInvestigatorBatch adapter host scope registry toolName intents
         | Ok(Typed _) ->
             let err = InvalidIntent(toolName, "tool", "not a subagent tool")
-            return! resolveSubagentPromise toolName (Promise.lift (Error err))
+            return! Promise.lift (wireDecodeFailure toolName err)
     }

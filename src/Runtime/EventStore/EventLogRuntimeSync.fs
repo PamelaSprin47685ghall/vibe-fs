@@ -2,7 +2,14 @@ module Wanxiangshu.Runtime.EventLogRuntimeSync
 
 open Fable.Core
 open Wanxiangshu.Runtime.Fallback.RuntimeStore
-open Wanxiangshu.Runtime.EventStore.EventLogRuntimeStore
+open Wanxiangshu.Runtime.Fallback.OrdinalTransitions
+open Wanxiangshu.Runtime.Fallback.CompactionTransitions
+open Wanxiangshu.Runtime.Fallback.SessionPropertyTransitions
+open Wanxiangshu.Runtime.Fallback.LeaseTransitions
+open Wanxiangshu.Runtime.Fallback.HumanTurnTransitions
+open Wanxiangshu.Runtime.EventLogRuntimeStore
+open Wanxiangshu.Kernel.HostTools
+open Wanxiangshu.Kernel.FallbackKernel.Types
 open Wanxiangshu.Runtime.ReviewRuntime
 open Wanxiangshu.Runtime.SessionProjectionStore
 open Wanxiangshu.Runtime.RuntimeScope
@@ -37,12 +44,8 @@ let restoreFallbackRuntimeStore
 
         let updatedFallbackState =
             { fallbackState with
-                Lifecycle =
-                    state.FallbackLifecycle
-                    |> Option.defaultValue FallbackLifecycle.Active
-                Phase =
-                    state.FallbackPhase
-                    |> Option.defaultValue FallbackPhase.Idle }
+                Lifecycle = state.FallbackLifecycle |> Option.defaultValue FallbackLifecycle.Active
+                Phase = state.FallbackPhase |> Option.defaultValue FallbackPhase.Idle }
 
         rt.UpdateState sid updatedFallbackState
 

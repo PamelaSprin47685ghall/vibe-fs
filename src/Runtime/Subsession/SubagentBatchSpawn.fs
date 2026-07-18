@@ -6,6 +6,7 @@ open Wanxiangshu.Kernel.Primitives.Identity
 open Wanxiangshu.Kernel.Errors.DomainError
 open Wanxiangshu.Kernel.Session.Causality
 open Wanxiangshu.Kernel.HostAdapter
+open Wanxiangshu.Kernel.SubagentIntents
 open Wanxiangshu.Runtime.HostAdapter
 open Wanxiangshu.Kernel.HostTools
 open Wanxiangshu.Runtime.Subagent
@@ -15,10 +16,13 @@ open Wanxiangshu.Kernel.ToolResult
 open Wanxiangshu.Runtime.SubagentPromptBuild
 open Wanxiangshu.Runtime.SubagentBatchArgs
 open Wanxiangshu.Runtime.SubagentBatchSpawnCore
+open Wanxiangshu.Runtime.SubagentSpawn
 open Wanxiangshu.Runtime.ChildAgentRegistry
 open Wanxiangshu.Runtime.SubagentIteratorStore
 open Wanxiangshu.Runtime.ToolOutputInfo
 open Wanxiangshu.Kernel.ToolOutputInfoTypes
+
+module HostAdapter = Wanxiangshu.Kernel.HostAdapter
 
 let private _satisfyArchTestForRunParallelSpawns = runParallelSpawns
 
@@ -57,8 +61,7 @@ let runInvestigatorBatch
         let prompts = promptsFromInvestigatorIntents host intents
 
         List.zip prompts intents
-        |> List.iter (fun (prompt, intent) ->
-            adapter.RegisterTempFiles(intent.objective, Array.toList intent.entries))
+        |> List.iter (fun (prompt, intent) -> adapter.RegisterTempFiles(intent.objective, Array.toList intent.entries))
 
         let! reports =
             prompts

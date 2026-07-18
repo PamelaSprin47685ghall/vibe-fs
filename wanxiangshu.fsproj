@@ -276,9 +276,8 @@
     <Compile Include="src/Runtime/Execution/ContextBudgetStore.fs"/>
     <Compile Include="src/Runtime/MessageTransform/NudgeInject.fs"/>
     <Compile Include="src/Runtime/MessageTransform/ContextBudgetPhase.fs"/>
-    <Compile Include="src/Runtime/MessageTransform/PlanCodec.fs"/>
-    <Compile Include="src/Runtime/MessageTransform/ContextBudgetEngine.fs"/>
     <Compile Include="src/Runtime/MessageTransform/Plan.fs"/>
+    <Compile Include="src/Runtime/MessageTransform/ContextBudgetEngine.fs"/>
     <Compile Include="src/Runtime/MessageTransform/Stack.fs"/>
     <Compile Include="src/Runtime/MessageTransform/ToolCallIntegrity.fs"/>
     <Compile Include="src/Runtime/MessageTransform/ParallelHintStage.fs"/>
@@ -418,8 +417,8 @@
     <Compile Include="src/Hosts/Mux/TodoWriteToolWrapper.fs"/>
     <Compile Include="src/Hosts/Mux/Wrappers.fs"/>
     <Compile Include="src/Hosts/Mux/DelegateCodec.fs"/>
-    <Compile Include="src/Hosts/Mux/Delegate.fs"/>
     <Compile Include="src/Hosts/Mux/DelegateTimeout.fs"/>
+    <Compile Include="src/Hosts/Mux/Delegate.fs"/>
     <Compile Include="src/Hosts/Mux/SubagentTools.fs"/>
     <Compile Include="src/Hosts/Mux/MuxTools.fs"/>
     <Compile Include="src/Hosts/Mux/ReviewToolsMux.fs"/>
@@ -442,6 +441,7 @@
     <Compile Include="src/Hosts/Mux/PluginRegistration.fs"/>
     <Compile Include="src/Hosts/Mux/Plugin.fs"/>
     <Compile Include="src/Hosts/OpenCode/NudgeEffectHelpers.fs"/>
+    <Compile Include="src/Hosts/OpenCode/NudgeEffectPrompt.fs"/>
     <Compile Include="src/Hosts/OpenCode/NudgeEffect.fs"/>
     <Compile Include="src/Hosts/OpenCode/ProgressObserver.fs"/>
     <Compile Include="src/Hosts/OpenCode/Fallback/Coordinator.fs"/>

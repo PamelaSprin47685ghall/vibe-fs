@@ -28,7 +28,7 @@ open Wanxiangshu.Runtime.ToolRuntimeContext
 open Wanxiangshu.Hosts.Opencode.PtySpawn
 open Wanxiangshu.Hosts.Opencode.SubsessionHostAdapter
 
-type private PluginServiceParts =
+type PluginServiceParts =
     { ReviewStore: Wanxiangshu.Runtime.ReviewRuntime.ReviewStore
       ChildAgentRegistry: ChildAgentRegistry
       FinderCache: Wanxiangshu.Runtime.FuzzyFinderShell.FinderCache
@@ -42,7 +42,7 @@ type private PluginServiceParts =
       LifecycleObserver: SessionLifecycleObserver
       Tools: obj }
 
-let private buildScopeInit
+let buildScopeInit
     (host: Host)
     (ctx: obj)
     (reviewStore: Wanxiangshu.Runtime.ReviewRuntime.ReviewStore)
@@ -62,7 +62,7 @@ let private buildScopeInit
             return! Wanxiangshu.Runtime.EventLogRuntime.syncAllSessionsFromEventLogDedicated host reviewStore scope dir
         }
 
-let private buildMcpMap () : obj =
+let buildMcpMap () : obj =
     let mcps =
         box
             {| ``type`` = "local"
@@ -78,7 +78,7 @@ let private getClient (ctx: obj) =
     | Ok c -> c
     | Error _ -> box null
 
-let private buildFallbackHandler
+let buildFallbackHandler
     (client: obj)
     (fallbackRuntime: FallbackRuntimeStore)
     (fallbackConfigLookup: Wanxiangshu.Runtime.Fallback.Ports.ConfigLookup)

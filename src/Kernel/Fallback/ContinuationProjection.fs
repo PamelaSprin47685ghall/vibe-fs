@@ -3,6 +3,7 @@ module Wanxiangshu.Kernel.Fallback.ContinuationProjection
 open Wanxiangshu.Kernel.Fallback.ContinuationEventParse
 open Wanxiangshu.Kernel.Fallback.Continuation
 open Wanxiangshu.Kernel.FallbackKernel.Types
+open Wanxiangshu.Kernel.EventSourcing.EventEnvelope
 
 let private isActiveStatus (status: ContinuationStatus) : bool =
     match status with

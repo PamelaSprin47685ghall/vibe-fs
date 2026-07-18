@@ -7,6 +7,7 @@ open Wanxiangshu.Runtime.Dyn
 open Wanxiangshu.Runtime.Fallback.ContinuationHost
 open Wanxiangshu.Runtime.OpencodeSessionEventCodec
 open Wanxiangshu.Hosts.Opencode.Fallback.HostEventInspection
+open Wanxiangshu.Runtime.OpencodeSessionPromptBuilder
 
 /// Model-facing payload for a semantic-free continuation.
 /// This is not a correlation key; identity comes from metadata and host receipts.

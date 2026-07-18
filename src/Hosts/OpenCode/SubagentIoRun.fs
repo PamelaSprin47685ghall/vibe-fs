@@ -11,6 +11,8 @@ open Wanxiangshu.Kernel.ToolResult
 open Wanxiangshu.Runtime.ErrorClassify
 open Wanxiangshu.Runtime.ChildAgentRegistry
 open Wanxiangshu.Runtime.Fallback.RuntimeStore
+open Wanxiangshu.Runtime.Fallback.SessionPropertyTransitions
+open Wanxiangshu.Runtime.Fallback.GateFlagTransitions
 open Wanxiangshu.Runtime.DelegatedAiSettings
 open Wanxiangshu.Runtime.OpencodeClientCodec
 open Wanxiangshu.Runtime.SessionIoSpawn
@@ -50,6 +52,7 @@ let private resolveParentLiveModel
                     let! msgsResp = invoke1 (box {| path = box {| id = parentSessionID |} |}) "messages" session
                     let data = Dyn.get msgsResp "data"
                     let msgs = if Dyn.isArray data then unbox<obj[]> data else [||]
+
                     match Wanxiangshu.Runtime.Fallback.FallbackMessageCodec.tryGetLatestUserModel msgs with
                     | Some m -> return Some m
                     | None ->
@@ -59,20 +62,14 @@ let private resolveParentLiveModel
                                 parentSessionID
     }
 
-let private applyDirective
-    (runtime: FallbackRuntimeStore)
-    (childID: string)
-    (directive: ModelDirective)
-    : unit =
+let private applyDirective (runtime: FallbackRuntimeStore) (childID: string) (directive: ModelDirective) : unit =
     match directive with
     | RetryChain chain ->
         runtime.SetChain childID chain
         runtime.SetModel childID (List.head chain)
     | DelegateToHost -> runtime.SetChain childID []
 
-let private mapRunResult
-    (runRes: RunResult)
-    : Result<string, DomainError> =
+let private mapRunResult (runRes: RunResult) : Result<string, DomainError> =
     match runRes with
     | Succeeded output -> Ok(formatSubagentReport noOutputText abortedPrefix output false)
     | Cancelled -> Ok abortedPrefix
@@ -89,20 +86,26 @@ let private extractRunDirective
     : JS.Promise<FallbackConfig * ModelDirective> =
     promise {
         let dir = if directory = "" then "." else directory
+
         let cfg =
             match Wanxiangshu.Runtime.Fallback.FallbackConfigCodec.loadFallbackConfig dir with
             | Some c -> c
             | None -> Wanxiangshu.Runtime.Fallback.FallbackConfigCodec.emptyConfig
+
         let parentSessionID =
             if sessionID = "" then
                 ""
             else
                 registry.ResolveSubsessionParentID(Some sessionID)
                 |> Option.defaultValue sessionID
+
         let! parentLiveModel = resolveParentLiveModel runtime client parentSessionID
+
         let! hostExplicitModelOpt =
             Wanxiangshu.Hosts.Opencode.Fallback.HostEventInspection.tryGetAgentExplicitModel client agent
+
         let hostConfigured = Option.isSome hostExplicitModelOpt
+
         return
             cfg,
             Wanxiangshu.Runtime.Fallback.FallbackConfigCodec.resolveModelDirective
@@ -135,6 +138,7 @@ let private runSubagentInternal
                 (fun _ -> createHost client agent directory),
                 fun _ -> create (if directory = "" then "" else directory)
             )
+
         try
             let! runRes = svc.StartRun(childID, sessionID, prompt, cfg, directive, abortSignal = signal)
             do! cleanupChildIfRequested registry cleanup client directory childID
@@ -159,11 +163,26 @@ let executeSubagentRun
     promise {
         let! cfg, directive = extractRunDirective registry runtime client agent directory sessionID childID
         applyDirective runtime childID directive
-        return! runSubagentInternal registry runtime client agent directory sessionID childID prompt signal cleanup cfg directive
+
+        return!
+            runSubagentInternal
+                registry
+                runtime
+                client
+                agent
+                directory
+                sessionID
+                childID
+                prompt
+                signal
+                cleanup
+                cfg
+                directive
     }
 
 let private resolveOrCreateChild
     (registry: ChildAgentRegistry)
+    (client: obj)
     (sessionID: string)
     (agent: string)
     (existingChildID: string option)
@@ -174,9 +193,10 @@ let private resolveOrCreateChild
         | Some cid ->
             let parentID =
                 registry.ResolveSubsessionParentID(if sessionID = "" then None else Some sessionID)
+
             registry.RegisterChildAgent(cid, agent, parentID)
             return Ok cid
-        | None -> return! startSubagentSession registry options
+        | None -> return! startSubagentSession registry client options
     }
 
 let private handleAborted
@@ -207,17 +227,8 @@ let private dispatchSubagentRun
             return! handleAborted registry client directory childID
         else
             let! result =
-                executeSubagentRun
-                    runtime
-                    registry
-                    client
-                    agent
-                    directory
-                    sessionID
-                    childID
-                    prompt
-                    signal
-                    cleanup
+                executeSubagentRun runtime registry client agent directory sessionID childID prompt signal cleanup
+
             return result
     }
 
@@ -238,13 +249,26 @@ let runSubagentCoreResult
     promise {
         let signal = getAbortSignal context
         let options = buildSubagentOptions agent title prompt directory sessionID tools
+
         try
-            let! childResult = resolveOrCreateChild registry sessionID agent existingChildID options
+            let! childResult = resolveOrCreateChild registry client sessionID agent existingChildID options
+
             match childResult with
             | Error err -> return Error err
             | Ok childID ->
                 try
-                    return! dispatchSubagentRun runtime registry client agent directory sessionID childID prompt signal cleanup
+                    return!
+                        dispatchSubagentRun
+                            runtime
+                            registry
+                            client
+                            agent
+                            directory
+                            sessionID
+                            childID
+                            prompt
+                            signal
+                            cleanup
                 with err ->
                     return Error(translateJsError err)
         with err ->

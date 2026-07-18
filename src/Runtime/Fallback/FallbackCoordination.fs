@@ -16,6 +16,7 @@ open Wanxiangshu.Runtime.Fallback.SessionStatusHandler
 open Wanxiangshu.Runtime.Fallback.CompactionHandler
 open Wanxiangshu.Runtime.Fallback.FallbackBridgeScanToolText
 open Wanxiangshu.Runtime.Fallback.FallbackConfigCodec
+open Wanxiangshu.Runtime.Fallback.FallbackChainResolution
 open Wanxiangshu.Runtime.ContinuationEventWriter
 
 let resolveChain
