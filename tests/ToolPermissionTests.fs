@@ -99,8 +99,8 @@ let canUseSemanticTodoCoder () =
 let canUseSemanticMethodologyBrowser () =
     check "browser denied methodology" (not (canUseSemantic "browser" MethodologyFamily "methodology"))
 
-let canUseSemanticMethodologyInvestigator () =
-    check "investigator denied methodology" (not (canUseSemantic "investigator" MethodologyFamily "methodology"))
+let canUseSemanticMethodologyInspector () =
+    check "inspector denied methodology" (not (canUseSemantic "inspector" MethodologyFamily "methodology"))
 
 let canUseSemanticMethodologyExecutor () =
     check "executor denied methodology" (not (canUseSemantic "executor" MethodologyFamily "methodology"))
@@ -117,8 +117,8 @@ let canUseSemanticMethodologyCoder () =
 let canUseSemanticMethodologyManager () =
     check "manager can methodology" (canUseSemantic "manager" MethodologyFamily "methodology")
 
-let canUseSemanticWriteInvestigator () =
-    check "investigator denied write" (not (canUseSemantic "investigator" WritePatchFamily "write"))
+let canUseSemanticWriteInspector () =
+    check "inspector denied write" (not (canUseSemantic "inspector" WritePatchFamily "write"))
 
 let canUseSemanticWriteManager () =
     check "manager denied write" (not (canUseSemantic "manager" WritePatchFamily "write"))
@@ -126,13 +126,13 @@ let canUseSemanticWriteManager () =
 let canUseSemanticWriteCoder () =
     check "coder can write" (canUseSemantic "coder" WritePatchFamily "write")
 
-let canUseSemanticSubagentInvestigatorCoder () =
+let canUseSemanticSubagentInspectorCoder () =
     check
-        "investigator cannot use coder subagent (only executor)"
-        (not (canUseSemantic "investigator" SubagentWebSkillOrSubmit "coder"))
+        "inspector cannot use coder subagent (only executor)"
+        (not (canUseSemantic "inspector" SubagentWebSkillOrSubmit "coder"))
 
-let canUseSemanticSubagentInvestigatorExecutor () =
-    check "investigator can use executor" (canUseSemantic "investigator" SubagentWebSkillOrSubmit "executor")
+let canUseSemanticSubagentInspectorExecutor () =
+    check "inspector can use executor" (canUseSemantic "inspector" SubagentWebSkillOrSubmit "executor")
 
 let canUseSemanticSubagentCoder () =
     check "coder cannot use coder subagent" (not (canUseSemantic "coder" SubagentWebSkillOrSubmit "coder"))
@@ -173,7 +173,7 @@ let deniedToolsFilters () =
 
 let canUseForHostMethodologyDenied () =
     check "browser denied methodology via host" (not (canUseForHost Opencode "browser" "methodology"))
-    check "investigator denied methodology via host" (not (canUseForHost Opencode "investigator" "methodology"))
+    check "inspector denied methodology via host" (not (canUseForHost Opencode "inspector" "methodology"))
     check "executor denied methodology via host" (not (canUseForHost Omp "executor" "methodology"))
     check "meditator denied methodology via host" (not (canUseForHost Opencode "meditator" "methodology"))
 
@@ -196,8 +196,8 @@ let testReviewerCanUseFuzzyGrep () =
 let testReviewerCanUseFuzzyFind () =
     check "reviewer can use fuzzy_find" (canUse "reviewer" "fuzzy_find")
 
-let testReviewerCanSpawnInvestigatorButNotExecutor () =
-    check "reviewer can spawn investigator" (canUse "reviewer" "investigator")
+let testReviewerCanSpawnInspectorButNotExecutor () =
+    check "reviewer can spawn inspector" (canUse "reviewer" "inspector")
     check "reviewer cannot spawn executor" (not (canUse "reviewer" "executor"))
     check "reviewer cannot spawn coder" (not (canUse "reviewer" "coder"))
 
@@ -235,17 +235,17 @@ let run () =
     canUseSemanticTodoBrowser ()
     canUseSemanticTodoCoder ()
     canUseSemanticMethodologyBrowser ()
-    canUseSemanticMethodologyInvestigator ()
+    canUseSemanticMethodologyInspector ()
     canUseSemanticMethodologyExecutor ()
     canUseSemanticMethodologyMeditator ()
     canUseSemanticMethodologyReviewer ()
     canUseSemanticMethodologyCoder ()
     canUseSemanticMethodologyManager ()
-    canUseSemanticWriteInvestigator ()
+    canUseSemanticWriteInspector ()
     canUseSemanticWriteManager ()
     canUseSemanticWriteCoder ()
-    canUseSemanticSubagentInvestigatorCoder ()
-    canUseSemanticSubagentInvestigatorExecutor ()
+    canUseSemanticSubagentInspectorCoder ()
+    canUseSemanticSubagentInspectorExecutor ()
     canUseSemanticSubagentCoder ()
     canUseSemanticSubagentManager ()
     canUseSemanticFuzzyGrepManager ()
@@ -261,5 +261,5 @@ let run () =
     deniedToolsForHostMethodology ()
     testReviewerCanUseFuzzyGrep ()
     testReviewerCanUseFuzzyFind ()
-    testReviewerCanSpawnInvestigatorButNotExecutor ()
+    testReviewerCanSpawnInspectorButNotExecutor ()
     testReviewerCannotWrite ()

@@ -92,8 +92,8 @@ let hookSchemaSetUiLabel () =
               "entries", box [||] ]
 
     let argsInv = createObj [ "intents", box [| intentInv |] ]
-    setUiLabel argsInv "investigator"
-    check "investigator label set" (string argsInv?("ui_") = "inv")
+    setUiLabel argsInv "inspector"
+    check "inspector label set" (string argsInv?("ui_") = "inv")
     let argsOther = createObj []
     setUiLabel argsOther "other"
     check "other label not set" (isNullish (get argsOther "ui_"))

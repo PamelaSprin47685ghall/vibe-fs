@@ -192,19 +192,19 @@ let runAll (args: string array) : JS.Promise<int> =
                 do! toolRound harness sessionID "fuzzy_grep" (box {| pattern = [| "test" |] |}) "grep for test"
                 chk "e2e.fuzzy-grep.tool-called" (containsTool harness "fuzzy_grep")
 
-                // 7. investigator
+                // 7. inspector
                 do!
                     toolRound
                         harness
                         sessionID
-                        "investigator"
+                        "inspector"
                         (box
                             {| objective = "find README"
                                background = "looking for readme"
                                questions = ResizeArray([ "where is README?" ]) |})
-                        "investigate README location"
+                        "inspect README location"
 
-                chk "e2e.investigator.tool-called" (containsTool harness "investigator")
+                chk "e2e.inspector.tool-called" (containsTool harness "inspector")
 
                 // 8. coder
                 do!

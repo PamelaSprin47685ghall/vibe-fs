@@ -25,7 +25,7 @@ let private effectSchemaNs: obj = jsNative
 let private zodToJsonSchema (schema: obj) (opts: obj) : obj = jsNative
 
 /// Write `ui_` directly onto the host's args reference when the tool exposes a
-/// UI label (coder/investigator). The host keeps the same args object it passed
+/// UI label (coder/inspector). The host keeps the same args object it passed
 /// in, so the label survives into the message history the UI reads. Replacing
 /// the reference dropped `ui_` — the host never saw the new object.
 let setUiLabel (args: obj) (tool: string) : unit =
@@ -34,7 +34,7 @@ let setUiLabel (args: obj) (tool: string) : unit =
     let labelResult =
         match tool with
         | "coder" -> joinCoderUiLabel raw
-        | "investigator" -> joinInvestigatorUiLabel raw
+        | "inspector" -> joinInspectorUiLabel raw
         | _ -> Result.Error ""
 
     match labelResult with

@@ -42,7 +42,7 @@ let muxStreamEndToolUseErrorTriggersNudgeSpec () =
                 [ "getTodos",
                   box (
                       System.Func<obj, JS.Promise<obj>>(fun _ ->
-                          promise { return box [| "investigate tool_use_error and resume work" |] })
+                          promise { return box [| "inspect tool_use_error and resume work" |] })
                   )
                   "nudge",
                   box (
@@ -104,7 +104,7 @@ let muxStreamEndToolCallsDoesNotTriggerNudgeSpec () =
                 [ "getTodos",
                   box (
                       System.Func<obj, JS.Promise<obj>>(fun _ ->
-                          promise { return box [| "investigate tool_use_error and resume work" |] })
+                          promise { return box [| "inspect tool_use_error and resume work" |] })
                   )
                   "nudge",
                   box (

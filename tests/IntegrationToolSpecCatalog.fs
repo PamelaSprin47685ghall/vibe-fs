@@ -51,10 +51,10 @@ let integrationToolSpecs () : (string * (unit -> JS.Promise<unit>)) list =
       "mimoTaskDefinitionRoutesEffectSchemaShapedParametersToJsonSchema",
       mimoTaskDefinitionRoutesEffectSchemaShapedParametersToJsonSchemaSpec
       "coderTool", coderToolSpec
-      "investigatorTool", investigatorToolSpec
+      "inspectorTool", inspectorToolSpec
       "muxCoderInvalidIntents", muxCoderInvalidIntentsSpec
-      "investigatorToolLateClientInjection", investigatorToolLateClientInjectionSpec
-      "investigatorToolWithHostConfiguredModel", investigatorToolWithHostConfiguredModelSpec
+      "inspectorToolLateClientInjection", inspectorToolLateClientInjectionSpec
+      "inspectorToolWithHostConfiguredModel", inspectorToolWithHostConfiguredModelSpec
       "writeTool", (fun () -> writeToolSpec reg)
       "loopCommand", (fun () -> loopCommandSpec reg)
       "agentConfig", agentConfigSpec

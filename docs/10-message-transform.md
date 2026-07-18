@@ -13,7 +13,7 @@
 | `Shell/MessageTransformStack.fs` | TransformState 三段状态（Caps、Backlog、Top slot） |
 | `Shell/ToolHookRuntime.fs` | 控制字段软校验、净化、after 还原、违例批评 |
 | `Kernel/MessageTransformPolicy.fs` | 策略（Backlog/Caps/ParallelHint/ContextBudget 四分） |
-| `Shell/SembleSearch.fs` | investigator 断点注入 |
+| `Shell/SembleSearch.fs` | inspector 断点注入 |
 
 架构测试：三宿主须 `UsesProjectionPolicy` + Shell caps cache；`noQuadraticListAppend`。
 
@@ -25,7 +25,7 @@
 2. Backlog 投影（事件 fold，非历史 tool SSOT；`BacklogRevision` 驱动）
 3. **applyContextBudget**（`BudgetRevision` + `TopSlotKey` 驱动，见 [13](./13-context-budget.md)）
 4. **tryInjectParallelToolPrompt**（与 budget nudge 互斥，`ParallelHintTop` key）
-5. Semble（investigator + 开关）
+5. Semble（inspector + 开关）
 6. **replaceArrayInPlace** 原地替换宿主数组
 
 管线不再剥离 synthetic 段：host 每轮从 DB 重读数组，上一轮 synthetic 自然消失；`TransformState` 维护三段引用，revision/key 未变时复用对象引用以减少分配。发送前以 canonical outbound bytes/prefix equality 验证 prompt-cache 可命中。
@@ -54,7 +54,7 @@
 | 伪装 | 每条结果 → `assistant` read call + `toolResult`，id 前缀 `semble-synth-` |
 | 格式 | 行 `%6d|content`（对齐 `FileSys` read） |
 
-仅 **investigator** agent 路径启用。测试：`tests/SembleInjectionTests.fs`。
+仅 **inspector** agent 路径启用。测试：`tests/SembleInjectionTests.fs`。
 
 ## 空输出 → Fallback（与 [12](./12-fallback.md)）
 

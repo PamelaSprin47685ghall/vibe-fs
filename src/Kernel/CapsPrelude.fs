@@ -52,8 +52,8 @@ let llmTextPart1 =
 - 并行工具执行顺序≠线性(系统不保证顺序)→∃依赖时禁止高并发调用。
 - 拒绝频繁全量重写文件→精准修改=核心。
 - executor(=bash) 工具使用偏好：复杂脚本≻琐碎命令多轮交互。
-- 绝对禁止使用 executor 仅用于查找+读写文件→必须用 read/investigator/coder 代替！
-- 绝对禁止使用 investigator 仅用于读文件原文→必须用 read 代替！
+- 绝对禁止使用 executor 仅用于查找+读写文件→必须用 read/inspector/coder 代替！
+- 绝对禁止使用 inspector 仅用于读文件原文→必须用 read 代替！
 - 对 coder(=apply_path|edit|write) 仅需说明意图。coder 具自理解力→避免重复现有内容+提供大段新增代码。
 - 鼓励多意图并发→拆分独立元素+对每个意图提供完备背景知识(上下文互隔离)。
 - 诉求拆细→细粒度并发。拒绝大块意图→规避长时延迟。

@@ -30,15 +30,15 @@ let subagentDispatch () =
     check "mux coder mentions objective" (muxBody.Contains "fix bug")
     check "mux coder ends in agent_report tail" (muxBody.Contains "agent_report")
 
-    let investigatorIntent: InvestigatorIntent =
+    let inspectorIntent: InspectorIntent =
         { objective = "find auth"
           background = "need entry points"
           questions = [| "Where is auth configured?" |]
           entries = [||] }
 
-    let invPrompts = formatPrompt host (Investigator [ investigatorIntent ])
-    check "investigator prompt count" (invPrompts |> List.length = 1)
-    check "investigator prompt mentions objective" ((invPrompts |> List.head).Contains "find auth")
+    let invPrompts = formatPrompt host (Inspector [ inspectorIntent ])
+    check "inspector prompt count" (invPrompts |> List.length = 1)
+    check "inspector prompt mentions objective" ((invPrompts |> List.head).Contains "find auth")
 
     let browserPrompts = formatPrompt host (Browser "open google.com")
     check "browser prompt count is one" (browserPrompts |> List.length = 1)

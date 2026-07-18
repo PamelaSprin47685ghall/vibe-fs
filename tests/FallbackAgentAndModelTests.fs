@@ -85,7 +85,7 @@ let opencodeExecutorUsesRuntimeAgentWhenNoAssistantMessageSpec () =
     promise {
         let rt = FallbackRuntimeStore()
         let sid = "opencode-no-assistant"
-        rt.SetAgentName sid "investigator"
+        rt.SetAgentName sid "inspector"
 
         let mutable lastPromptArg = null
 
@@ -117,7 +117,7 @@ let opencodeExecutorUsesRuntimeAgentWhenNoAssistantMessageSpec () =
 
         check "prompt was called" (not (isNull lastPromptArg))
         let body = Dyn.get lastPromptArg "body"
-        equal "body has agent investigator" "investigator" (Dyn.str body "agent")
+        equal "body has agent inspector" "inspector" (Dyn.str body "agent")
         let parts = unbox<obj array> (Dyn.get body "parts")
         equal "body prompt text is zero-width" "​" (Dyn.str parts.[0] "text")
     }
@@ -126,7 +126,7 @@ let opencodeExecutorRespectsUserSelectedModelAndAgentSpec () =
     promise {
         let rt = FallbackRuntimeStore()
         let sid = "opencode-user-selected"
-        rt.SetAgentName sid "investigator"
+        rt.SetAgentName sid "inspector"
 
         let mutable lastPromptArg = null
 

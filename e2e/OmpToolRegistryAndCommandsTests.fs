@@ -22,7 +22,7 @@ let runOmpToolRegistry (h: OmpHarness) (chk: string -> bool -> unit) =
               "websearch"
               "webfetch"
               "coder"
-              "investigator"
+              "inspector"
               "meditator"
               "browser" ] do
             chk ("e2e-omp.tools." + t) (toolNames.Contains t)
@@ -195,22 +195,20 @@ let runOmpMethodology (h: OmpHarness) (chk: string -> bool -> unit) (sessionId: 
             chk ("e2e-omp.meditator." + m + ".prompt-contains-background") (callsStr.Contains expectedBackground)
     }
 
-let runOmpInvestigator (h: OmpHarness) (chk: string -> bool -> unit) (sessionId: string) =
+let runOmpInspector (h: OmpHarness) (chk: string -> bool -> unit) (sessionId: string) =
     promise {
-        let investigatorIntents =
+        let inspectorIntents =
             [| box
-                   {| objective = "Test investigator e2e"
+                   {| objective = "Test inspector e2e"
                       background = "Ensure no f.content crashes"
                       questions = [| "Did it crash?" |]
                       entries = [| "README.md"; "DOES_NOT_EXIST_AT_ALL.md" |] |} |]
 
-        do! h.expectText "investigator e2e verification output: mock text content"
+        do! h.expectText "inspector e2e verification output: mock text content"
 
-        let! investigatorResult =
-            withTimeout (
-                h.triggerTool "investigator" (box {| intents = investigatorIntents |}) sessionId (createObj [])
-            )
+        let! inspectorResult =
+            withTimeout (h.triggerTool "inspector" (box {| intents = inspectorIntents |}) sessionId (createObj []))
 
-        let invStr = jsonStringify investigatorResult
-        chk "e2e-omp.investigator.ran" (invStr.Contains "mock text content")
+        let invStr = jsonStringify inspectorResult
+        chk "e2e-omp.inspector.ran" (invStr.Contains "mock text content")
     }

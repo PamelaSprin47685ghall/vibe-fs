@@ -135,7 +135,7 @@ let entries4 () : (string * TestBody) list =
       "OmpAgentConfigTests.disableNativeAgentsReplacesCheckpointSection",
       Sync(sync OmpAgentConfigTests.disableNativeAgentsReplacesCheckpointSection)
       "OmpHookExecuteTests.hookCoderInjectUiLabel", Sync(sync OmpHookExecuteTests.hookCoderInjectUiLabel)
-      "OmpHookExecuteTests.hookInvestigatorInjectUiLabel", Sync(sync OmpHookExecuteTests.hookInvestigatorInjectUiLabel)
+      "OmpHookExecuteTests.hookInspectorInjectUiLabel", Sync(sync OmpHookExecuteTests.hookInspectorInjectUiLabel)
       "OmpHookExecuteTests.hookNonSubagentDoesNotInjectUiLabel",
       Sync(sync OmpHookExecuteTests.hookNonSubagentDoesNotInjectUiLabel)
       "OmpHookExecuteTests.hookApplyPatchNormalisesPatchToPatchText",

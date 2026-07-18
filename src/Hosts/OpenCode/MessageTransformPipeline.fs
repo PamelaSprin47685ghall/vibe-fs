@@ -211,7 +211,7 @@ let resolveTransformParams
 
         let sembleInjectEnabled =
             p = BacklogProjectionPolicy.Include
-            && (agent = "investigator" || agent = "reviewer")
+            && (agent = "inspector" || agent = "reviewer")
 
         let plan =
             buildTransformPlan

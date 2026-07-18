@@ -21,7 +21,7 @@ let private coderSample: CoderIntent =
             draft = None } ]
       doNotTouch = [||] }
 
-let private investigatorSample: InvestigatorIntent =
+let private inspectorSample: InspectorIntent =
     { objective = "find auth"
       background = "need entry points"
       questions = [| "Where is auth configured?" |]
@@ -33,9 +33,9 @@ let promptsForParallelIntentsMatchesFormatPrompt () =
         let viaFormat = formatPrompt host (Coder [ coderSample ])
         equal $"coder prompts match formatPrompt host={host}" viaFormat viaHelper
 
-        let invHelper = promptsForParallelIntents host Investigator [ investigatorSample ]
-        let invFormat = formatPrompt host (Investigator [ investigatorSample ])
-        equal $"investigator prompts match formatPrompt host={host}" invFormat invHelper
+        let invHelper = promptsForParallelIntents host Inspector [ inspectorSample ]
+        let invFormat = formatPrompt host (Inspector [ inspectorSample ])
+        equal $"inspector prompts match formatPrompt host={host}" invFormat invHelper
 
 let buildMeditatorSectionsMatchesManualZip () =
     let dummyEntry: Wanxiangshu.Kernel.Methodology.Schema.MethodologyEntry =

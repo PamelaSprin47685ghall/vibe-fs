@@ -34,19 +34,19 @@ let opencodeHookSchemaSetUiLabelCoder () =
     setUiLabel args "coder"
     check "coder ui_ set" (not (Dyn.isNullish (Dyn.get args "ui_")))
 
-let opencodeHookSchemaSetUiLabelInvestigator () =
+let opencodeHookSchemaSetUiLabelInspector () =
     let args =
         createObj
             [ "intents",
               box
                   [| box
-                         {| objective = "Investigate"
+                         {| objective = "Inspect"
                             background = "reason"
                             questions = [| "Q1" |]
                             entries = [||] |} |] ]
 
-    setUiLabel args "investigator"
-    check "investigator ui_ set" (not (Dyn.isNullish (Dyn.get args "ui_")))
+    setUiLabel args "inspector"
+    check "inspector ui_ set" (not (Dyn.isNullish (Dyn.get args "ui_")))
 
 let opencodeHookSchemaSetUiLabelOther () =
     let args =
@@ -290,7 +290,7 @@ let opencodeHookSchemaBuildWorkBacklogSchema () =
 let run () =
     promise {
         opencodeHookSchemaSetUiLabelCoder ()
-        opencodeHookSchemaSetUiLabelInvestigator ()
+        opencodeHookSchemaSetUiLabelInspector ()
         opencodeHookSchemaSetUiLabelOther ()
         opencodeHookSchemaStripUiFromJsonSchemaWithUi ()
         opencodeHookSchemaStripUiFromJsonSchemaNoUi ()

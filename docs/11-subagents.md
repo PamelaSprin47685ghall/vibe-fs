@@ -2,7 +2,7 @@
 
 ## 模型
 
-子代理 = 独立会话（OMP 可为子 workspace）。委派工具：`coder`、`investigator`、`browser`、`meditator` 等；参数 `intents[]` 可多项并发。
+子代理 = 独立会话（OMP 可为子 workspace）。委派工具：`coder`、`inspector`、`browser`、`meditator` 等；参数 `intents[]` 可多项并发。
 
 子代理的运行有两种路径：
 
@@ -13,12 +13,12 @@
 
 ### 动机
 
-子代理（Coder、Investigator、Browser、Meditator）的错误不应直接穿透到父 session。`session.prompt` 的网络错误、模型降级超时、非法回复等需要在一个受控的沙箱中处理，沙箱拥有自己的 Fallback 状态机、事件溯源和超时机制。
+子代理（Coder、Inspector、Browser、Meditator）的错误不应直接穿透到父 session。`session.prompt` 的网络错误、模型降级超时、非法回复等需要在一个受控的沙箱中处理，沙箱拥有自己的 Fallback 状态机、事件溯源和超时机制。
 
 ### 架构
 
 ```
-父工具（coder/investigator 等）
+父工具（coder/inspector 等）
   → SubsessionService.StartRun
     → SubsessionActorRegistry.GetOrCreate(childID, host, eventStore)
       → SubsessionActor (SerialQueue 串行消息泵)
@@ -156,11 +156,11 @@ Available → Dispatching → Running → [Draining →] [IssuingAbort → Await
 
 ## SubagentDispatcher（多意图编排）
 
-`Shell/SubagentDispatcher.fs` 统一处理 `coder` 和 `investigator` 工具的多意图并发：
+`Shell/SubagentDispatcher.fs` 统一处理 `coder` 和 `inspector` 工具的多意图并发：
 
 - `dispatch(host, adapter, toolName, args, scope, registry)`：
-  1. `decodeToolInvocation` → `CoderBatch` / `InvestigatorBatch` / `Typed`
-  2. 多意图 → `promptsFromCoderIntents` / `promptsFromInvestigatorIntents` 生成并行 prompt
+   1. `decodeToolInvocation` → `CoderBatch` / `InspectorBatch` / `Typed`
+   2. 多意图 → `promptsFromCoderIntents` / `promptsFromInspectorIntents` 生成并行 prompt
   3. `adapter.SpawnSubagent` 并行执行（`Promise.all`）
   4. `formatBatchReports` 合并结果
   5. `storeSubagentIterator` 写入 iterator 供后续 `continue` 使用
@@ -226,7 +226,7 @@ Fold：`Kernel/EventLog/Fold.fs` → `foldSubagents`；与 iterator 内存态互
 
 `session.prompt` 网络错误（`ECONNREFUSED`、`network connection lost` 等）是**可恢复中间事实**，不等于子会话终态。Fallback 系统可能已启动重试（`FallbackPhase.Retrying`），但子会话本身可能已完成工作（`TaskComplete=true`）。
 
-**完成协议**：父工具（`continue`、`coder`、`investigator` 等）返回必须发生在终态之后：
+**完成协议**：父工具（`continue`、`coder`、`inspector` 等）返回必须发生在终态之后：
 - `TaskComplete=true`（子会话明确完成）
 - `FallbackPhase.Exhausted`（重试链耗尽）
 - 明确不可恢复失败（如 `MessageAborted`、`ClientCancellation`）

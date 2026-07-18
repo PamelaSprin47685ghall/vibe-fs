@@ -49,23 +49,23 @@ let runCoderBatch
         return formatBatchReports (List.ofArray reports)
     }
 
-let runInvestigatorBatch
+let runInspectorBatch
     (adapter: IHostAdapter)
     (host: Host)
     (scope: Wanxiangshu.Runtime.RuntimeScope.RuntimeScope)
     (registry: ChildAgentRegistry option)
     (toolName: string)
-    (intents: InvestigatorIntent list)
+    (intents: InspectorIntent list)
     : JS.Promise<string> =
     promise {
-        let prompts = promptsFromInvestigatorIntents host intents
+        let prompts = promptsFromInspectorIntents host intents
 
         List.zip prompts intents
         |> List.iter (fun (prompt, intent) -> adapter.RegisterTempFiles(intent.objective, Array.toList intent.entries))
 
         let! reports =
             prompts
-            |> List.map (spawnOne adapter host scope registry toolName HostAdapter.Investigator "Investigator")
+            |> List.map (spawnOne adapter host scope registry toolName HostAdapter.Inspector "Inspector")
             |> List.toArray
             |> Promise.all
 

@@ -44,7 +44,7 @@ let private createHarness () : PiHarness =
                      "glob"
                      "bash"
                      "coder"
-                     "investigator"
+                     "inspector"
                      "meditator"
                      "browser"
                      "executor"

@@ -1,6 +1,6 @@
 module Wanxiangshu.Kernel.OmpSessionTools
 
-let ompSubagentToolNames = [| "coder"; "investigator"; "meditator"; "browser" |]
+let ompSubagentToolNames = [| "coder"; "inspector"; "meditator"; "browser" |]
 
 let ompReviewChildToolNames = [| "read"; "return_reviewer" |]
 

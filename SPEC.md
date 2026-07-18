@@ -2049,7 +2049,7 @@ e2e/opencode/
 
 ## B. 工具注册、Schema 与权限
 
-OpenCode 当前注册的自定义工具包括 coder、investigator、browser、continue、executor、五个 PTY 工具、fuzzy 系列、web 系列、review 工具以及 meditator。现有真实 E2E 没有覆盖完整工具表，尤其缺少 PTY 和 `fuzzy_continue`。
+OpenCode 当前注册的自定义工具包括 coder、inspector、browser、continue、executor、五个 PTY 工具、fuzzy 系列、web 系列、review 工具以及 meditator。现有真实 E2E 没有覆盖完整工具表，尤其缺少 PTY 和 `fuzzy_continue`。
 
 ### P0
 
@@ -2062,7 +2062,7 @@ OpenCode 当前注册的自定义工具包括 coder、investigator、browser、c
 * [ ] **OC-SCHEMA-007** 缺少必填业务参数时由 OpenCode/AI SDK 拒绝，execute 不得运行。
 * [ ] **OC-SCHEMA-008** 控制字段在 before hook 中原地删除，宿主实际 execute 收不到控制字段。
 * [ ] **OC-SCHEMA-009** after hook 看到的 args 与实际执行参数关联正确。
-* [ ] **OC-PERM-001** manager、coder、investigator、browser、reviewer、meditator 的工具可见性符合权限矩阵。
+* [ ] **OC-PERM-001** manager、coder、inspector、browser、reviewer、meditator 的工具可见性符合权限矩阵。
 * [ ] **OC-PERM-002** 禁止工具不仅不执行，而且不出现在发给对应 agent 的 tools 中。
 * [ ] **OC-PERM-003** permission=deny 时外部副作用为零。
 * [ ] **OC-PERM-004** permission=once 时仅本次执行。
@@ -2230,7 +2230,7 @@ OpenCode 当前注册的自定义工具包括 coder、investigator、browser、c
 
 ## I. 子代理与物理子 Session
 
-当前 coder、investigator、meditator 大多只验证工具出现在模型调用中。真正需要验证的是 OpenCode `session.create → session.prompt → child events → result extraction → cleanup`。
+当前 coder、inspector、meditator 大多只验证工具出现在模型调用中。真正需要验证的是 OpenCode `session.create → session.prompt → child events → result extraction → cleanup`。
 
 ### P0
 
@@ -2239,7 +2239,7 @@ OpenCode 当前注册的自定义工具包括 coder、investigator、browser、c
 * [ ] **OC-SUB-003** child 使用 coder agent。
 * [ ] **OC-SUB-004** coder prompt 含用户 intent 和工作目录。
 * [ ] **OC-SUB-005** coder 完成后父 tool result 收到最终输出。
-* [ ] **OC-SUB-006** investigator 同样完成真实 child 链路。
+* [ ] **OC-SUB-006** inspector 同样完成真实 child 链路。
 * [ ] **OC-SUB-007** meditator 使用指定 methodology 内容。
 * [ ] **OC-SUB-008** child 的工具权限符合对应角色。
 * [ ] **OC-SUB-009** child 空输出触发规定的 continuation/fallback。

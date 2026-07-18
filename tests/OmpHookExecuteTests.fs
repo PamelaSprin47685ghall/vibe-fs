@@ -36,10 +36,10 @@ let hookCoderInjectUiLabel () =
     check "ui label contains second objective" (text.Contains "Wire HookExecute in SessionLifecycle")
     check "ui label joins with semicolon space" (text.Contains "; ")
 
-/// applyToolResultHook on an `investigator` invocation must produce a single
+/// applyToolResultHook on an `inspector` invocation must produce a single
 /// joined label of all its entries. Without `ui_` injection the chat UI is
 /// stuck waiting for a verbose tool call.
-let hookInvestigatorInjectUiLabel () =
+let hookInspectorInjectUiLabel () =
     let args =
         createObj
             [ "intents",
@@ -49,11 +49,11 @@ let hookInvestigatorInjectUiLabel () =
                             background = "Per-workspace queues keep sessions from blocking each other."
                             questions = [| "Is the queue map keyed by workspaceRoot?" |] |} |] ]
 
-    applyToolResultHook "investigator" args
+    applyToolResultHook "inspector" args
     let label = get args "ui_"
-    check "investigator ui label present" (not (isNullish label))
+    check "inspector ui label present" (not (isNullish label))
     let text = string label
-    check "investigator label text" (text.Contains "Confirm per-workspace writeQueues contract")
+    check "inspector label text" (text.Contains "Confirm per-workspace writeQueues contract")
 
 /// For tools that do not declare intents, applyToolResultHook must not invent
 /// a UI label. `ui_` is opt-in, never fabricated.

@@ -125,7 +125,7 @@ let getToolCapabilities (toolName: string) : ToolCapability list =
           yield FileMutation
       if t = "executor" || t.StartsWith "pty_" then
           yield ProcessExecution
-      if t = "coder" || t = "investigator" || t = "meditator" || t = "browser" then
+      if t = "coder" || t = "inspector" || t = "meditator" || t = "browser" then
           yield SubagentDelegation ]
 
 let inlineJsonWarnTddProperty: obj =

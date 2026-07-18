@@ -13,7 +13,7 @@ let private sampleCoderIntent: CoderIntent =
             draft = None } ]
       doNotTouch = [| "tests/" |] }
 
-let private sampleInvestigatorIntent: InvestigatorIntent =
+let private sampleInspectorIntent: InspectorIntent =
     { objective = "Find auth"
       background = "Where is login"
       questions = [| "Where is auth.handler?" |]
@@ -39,12 +39,12 @@ let coderPromptEmptyDoNotTouchOmitsField () =
     let p = coderPrompt intent
     check "omits do_not_touch when empty" (not (p.Contains "do_not_touch"))
 
-let investigatorPromptContainsQuestions () =
-    let p = investigatorPrompt sampleInvestigatorIntent
+let inspectorPromptContainsQuestions () =
+    let p = inspectorPrompt sampleInspectorIntent
     check "contains questions" (p.Contains "Where is auth.handler?")
 
-let investigatorPromptContainsYaml () =
-    let p = investigatorPrompt sampleInvestigatorIntent
+let inspectorPromptContainsYaml () =
+    let p = inspectorPrompt sampleInspectorIntent
     check "contains yaml" (p.Contains "objective:")
 
 let browserPromptContainsTask () =
@@ -103,8 +103,8 @@ let run () =
     coderPromptContainsDoNotTouch ()
     coderPromptContainsYaml ()
     coderPromptEmptyDoNotTouchOmitsField ()
-    investigatorPromptContainsQuestions ()
-    investigatorPromptContainsYaml ()
+    inspectorPromptContainsQuestions ()
+    inspectorPromptContainsYaml ()
     browserPromptContainsTask ()
     browserPromptContainsStealth ()
     meditatorPromptContainsQuestion ()

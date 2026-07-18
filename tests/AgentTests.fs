@@ -12,10 +12,10 @@ let canUse' () =
     check "return_reviewer denied for manager" (not (canUse "manager" "return_reviewer"))
     check "submit_review for manager" (canUse "manager" "submit_review")
     check "submit_review denied for coder" (not (canUse "coder" "submit_review"))
-    check "submit_review denied for investigator" (not (canUse "investigator" "submit_review"))
+    check "submit_review denied for inspector" (not (canUse "inspector" "submit_review"))
 
     check "meditator can read" (canUse "meditator" "read")
-    check "meditator can investigator dispatch" (canUse "meditator" "investigator")
+    check "meditator can inspector dispatch" (canUse "meditator" "inspector")
     check "executor denied read" (not (canUse "executor" "read"))
     check "meditator agent_report ok" (canUse "meditator" "agent_report")
 
@@ -26,27 +26,27 @@ let canUse' () =
     check "browser can read" (canUse "browser" "read")
     check "browser denied coder" (not (canUse "browser" "coder"))
 
-    check "investigator can read" (canUse "investigator" "read")
-    check "investigator can executor" (canUse "investigator" "executor")
-    check "investigator can fuzzy_find" (canUse "investigator" "fuzzy_find")
-    check "investigator can fuzzy_grep" (canUse "investigator" "fuzzy_grep")
-    check "investigator denied write" (not (canUse "investigator" "write"))
-    check "investigator denied coder dispatch" (not (canUse "investigator" "coder"))
-    check "investigator denied todo" (not (canUse "investigator" "todowrite"))
+    check "inspector can read" (canUse "inspector" "read")
+    check "inspector can executor" (canUse "inspector" "executor")
+    check "inspector can fuzzy_find" (canUse "inspector" "fuzzy_find")
+    check "inspector can fuzzy_grep" (canUse "inspector" "fuzzy_grep")
+    check "inspector denied write" (not (canUse "inspector" "write"))
+    check "inspector denied coder dispatch" (not (canUse "inspector" "coder"))
+    check "inspector denied todo" (not (canUse "inspector" "todowrite"))
 
     check "coder can read" (canUse "coder" "read")
     check "coder can write" (canUse "coder" "write")
     check "coder can edit" (canUse "coder" "edit")
     check "coder can fuzzy_find" (canUse "coder" "fuzzy_find")
     check "coder can fuzzy_grep" (canUse "coder" "fuzzy_grep")
-    check "coder allowed investigator dispatch" (canUse "coder" "investigator")
+    check "coder allowed inspector dispatch" (canUse "coder" "inspector")
     check "coder allowed todo" (canUse "coder" "todowrite")
 
     check "meditator denied todo" (not (canUse "meditator" "todowrite"))
 
     check "manager can read" (canUse "manager" "read")
     check "manager can coder dispatch" (canUse "manager" "coder")
-    check "manager can investigator dispatch" (canUse "manager" "investigator")
+    check "manager can inspector dispatch" (canUse "manager" "inspector")
     check "manager can meditator dispatch" (canUse "manager" "meditator")
     check "manager can manage_todo_list" (canUse "manager" "manage_todo_list")
     check "manager allowed todowrite" (canUse "manager" "todowrite")
@@ -58,7 +58,7 @@ let canUse' () =
     check "unknown agent can read" (canUse "build" "read")
     check "unknown agent can write" (canUse "build" "write")
     check "unknown agent can coder dispatch" (canUse "build" "coder")
-    check "unknown agent can investigator dispatch" (canUse "build" "investigator")
+    check "unknown agent can inspector dispatch" (canUse "build" "inspector")
     check "unknown agent can fuzzy_find" (canUse "build" "fuzzy_find")
     check "unknown agent can pty_spawn" (canUse "build" "pty_spawn")
     check "unknown agent can pty_write" (canUse "build" "pty_write")
@@ -67,7 +67,7 @@ let canUse' () =
 let deniedTools' () =
     let tools =
         [ "coder"
-          "investigator"
+          "inspector"
           "read"
           "write"
           "bash"
@@ -75,14 +75,14 @@ let deniedTools' () =
           "fuzzy_grep"
           "agent_report" ]
 
-    let denied = deniedTools "investigator" tools |> Set.ofList
-    check "investigator denied write" (Set.contains "write" denied)
-    check "investigator denied bash" (Set.contains "bash" denied)
-    check "investigator denied coder dispatch" (Set.contains "coder" denied)
-    check "investigator keeps read" (not (Set.contains "read" denied))
-    check "investigator keeps fuzzy_find" (not (Set.contains "fuzzy_find" denied))
-    check "investigator keeps fuzzy_grep" (not (Set.contains "fuzzy_grep" denied))
-    check "investigator keeps agent_report" (not (Set.contains "agent_report" denied))
+    let denied = deniedTools "inspector" tools |> Set.ofList
+    check "inspector denied write" (Set.contains "write" denied)
+    check "inspector denied bash" (Set.contains "bash" denied)
+    check "inspector denied coder dispatch" (Set.contains "coder" denied)
+    check "inspector keeps read" (not (Set.contains "read" denied))
+    check "inspector keeps fuzzy_find" (not (Set.contains "fuzzy_find" denied))
+    check "inspector keeps fuzzy_grep" (not (Set.contains "fuzzy_grep" denied))
+    check "inspector keeps agent_report" (not (Set.contains "agent_report" denied))
 
 /// Full permission characterization: snapshot `canUse agent tool` for every
 /// known agent across a tool set that exercises each permission rule (reserved
@@ -93,7 +93,7 @@ let deniedTools' () =
 let canUseMatrix () =
     let agents =
         [ "manager"
-          "investigator"
+          "inspector"
           "coder"
           "reviewer"
           "browser"
@@ -128,7 +128,7 @@ let canUseMatrix () =
           "ask_user_question", [ true; false; false; false; false; false; false ]
           "skill", [ true; false; false; false; false; false; false ]
           "coder", [ true; false; false; false; false; false; false ]
-          "investigator", [ true; false; true; true; false; true; false ]
+          "inspector", [ true; false; true; true; false; true; false ]
           "meditator", [ true; false; false; false; false; false; false ]
           "browser", [ true; false; false; false; false; false; false ]
           "manager", [ true; false; false; false; false; false; false ]

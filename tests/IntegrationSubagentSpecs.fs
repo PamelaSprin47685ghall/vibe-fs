@@ -15,14 +15,14 @@ open Wanxiangshu.Runtime.ChildAgentRegistry
 open Wanxiangshu.Runtime.Dyn
 
 
-let investigatorToolSpec () =
+let inspectorToolSpec () =
     promise {
         let pObjRef = ref null
 
         let createCalls, promptCalls, mockClient =
-            makeMockClient pObjRef "investigator-parent" "Found src/Opencode/Tools.fs"
+            makeMockClient pObjRef "inspector-parent" "Found src/Opencode/Tools.fs"
 
-        let! workspaceDir = mkdtempAsync "investigator-tool-"
+        let! workspaceDir = mkdtempAsync "inspector-tool-"
 
         let! p =
             plugin (
@@ -33,26 +33,24 @@ let investigatorToolSpec () =
 
         pObjRef.Value <- p
 
-        let investigator = get (get p "tool") "investigator"
+        let inspector = get (get p "tool") "inspector"
 
         let! result =
-            (get investigator "execute")
-            $ (createObj [ "intents", box [| sampleInvestigatorIntent "find investigator registration" |] ],
+            (get inspector "execute")
+            $ (createObj [ "intents", box [| sampleInspectorIntent "find inspector registration" |] ],
                createObj
                    [ "directory", box workspaceDir
-                     "sessionID", box "investigator-parent"
+                     "sessionID", box "inspector-parent"
                      "abort", box null ])
             |> unbox<JS.Promise<string>>
 
-        check "investigator tool returns subagent output" (result.Contains("src/Opencode/Tools.fs"))
+        check "inspector tool returns subagent output" (result.Contains("src/Opencode/Tools.fs"))
 
         check
-            "investigator tool creates child session under parent"
-            (str (get createCalls.[0] "body") "parentID" = "investigator-parent")
+            "inspector tool creates child session under parent"
+            (str (get createCalls.[0] "body") "parentID" = "inspector-parent")
 
-        check
-            "investigator tool prompts child investigator agent"
-            (str (get promptCalls.[0] "body") "agent" = "investigator")
+        check "inspector tool prompts child inspector agent" (str (get promptCalls.[0] "body") "agent" = "inspector")
 
         do! rmAsync workspaceDir
     }
@@ -116,45 +114,43 @@ let coderToolSpec () =
         do! rmAsync workspaceDir
     }
 
-let investigatorToolLateClientInjectionSpec () =
+let inspectorToolLateClientInjectionSpec () =
     promise {
         let pObjRef = ref null
 
         let createCalls, promptCalls, mockClient =
-            makeMockClient pObjRef "investigator-parent-late" "Late client injection worked"
+            makeMockClient pObjRef "inspector-parent-late" "Late client injection worked"
 
-        let! workspaceDir = mkdtempAsync "investigator-tool-late-client-"
+        let! workspaceDir = mkdtempAsync "inspector-tool-late-client-"
         let ctx = createObj [ "directory", box workspaceDir ]
         let! p = plugin ctx
         pObjRef.Value <- p
         ctx?("client") <- mockClient
-        let investigator = get (get p "tool") "investigator"
+        let inspector = get (get p "tool") "inspector"
 
         let! result =
-            (get investigator "execute")
-            $ (createObj [ "intents", box [| sampleInvestigatorIntent "find investigator registration" |] ],
+            (get inspector "execute")
+            $ (createObj [ "intents", box [| sampleInspectorIntent "find inspector registration" |] ],
                createObj
                    [ "directory", box workspaceDir
-                     "sessionID", box "investigator-parent-late"
+                     "sessionID", box "inspector-parent-late"
                      "abort", box null ])
             |> unbox<JS.Promise<string>>
 
-        check
-            "investigator tool sees client injected after plugin init"
-            (result.Contains("Late client injection worked"))
+        check "inspector tool sees client injected after plugin init" (result.Contains("Late client injection worked"))
 
         check
-            "investigator tool late injection creates child session under parent"
-            (str (get createCalls.[0] "body") "parentID" = "investigator-parent-late")
+            "inspector tool late injection creates child session under parent"
+            (str (get createCalls.[0] "body") "parentID" = "inspector-parent-late")
 
         check
-            "investigator tool late injection prompts child investigator agent"
-            (str (get promptCalls.[0] "body") "agent" = "investigator")
+            "inspector tool late injection prompts child inspector agent"
+            (str (get promptCalls.[0] "body") "agent" = "inspector")
 
         do! rmAsync workspaceDir
     }
 
-let investigatorToolWithHostConfiguredModelSpec () =
+let inspectorToolWithHostConfiguredModelSpec () =
     promise {
         let pObjRef = ref null
 
@@ -169,14 +165,14 @@ let investigatorToolWithHostConfiguredModelSpec () =
                                       box
                                           {| agent =
                                               createObj
-                                                  [ "investigator", box (createObj [ "model", box "openai/gpt-4o" ]) ] |} |}
+                                                  [ "inspector", box (createObj [ "model", box "openai/gpt-4o" ]) ] |} |}
                       }) ]
 
         let createCalls, promptCalls, mockClient =
-            makeMockClient pObjRef "investigator-parent-config" "Found src/Opencode/Tools.fs"
+            makeMockClient pObjRef "inspector-parent-config" "Found src/Opencode/Tools.fs"
 
         setKey mockClient "config" configApi
-        let! workspaceDir = mkdtempAsync "investigator-tool-config-"
+        let! workspaceDir = mkdtempAsync "inspector-tool-config-"
 
         let! p =
             plugin (
@@ -186,18 +182,18 @@ let investigatorToolWithHostConfiguredModelSpec () =
             )
 
         pObjRef.Value <- p
-        let investigator = get (get p "tool") "investigator"
+        let inspector = get (get p "tool") "inspector"
 
         let! result =
-            (get investigator "execute")
-            $ (createObj [ "intents", box [| sampleInvestigatorIntent "find investigator registration" |] ],
+            (get inspector "execute")
+            $ (createObj [ "intents", box [| sampleInspectorIntent "find inspector registration" |] ],
                createObj
                    [ "directory", box workspaceDir
-                     "sessionID", box "investigator-parent-config"
+                     "sessionID", box "inspector-parent-config"
                      "abort", box null ])
             |> unbox<JS.Promise<string>>
 
-        check "investigator tool returns subagent output" (result.Contains("src/Opencode/Tools.fs"))
+        check "inspector tool returns subagent output" (result.Contains("src/Opencode/Tools.fs"))
         let promptBody = get promptCalls.[0] "body"
         check "prompt body does not contain model" (isNullish (get promptBody "model"))
         do! rmAsync workspaceDir

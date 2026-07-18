@@ -16,7 +16,7 @@ let private policyDenied (extraNames: string array) (role: string) : Set<string>
     disabledToolNamesForRole mux extraNames role muxSpawnToolUniverse |> Set.ofArray
 
 let disabledMatchesManualDeniedForHost () =
-    for role in [| "coder"; "investigator"; "reviewer"; "manager"; "browser" |] do
+    for role in [| "coder"; "inspector"; "reviewer"; "manager"; "browser" |] do
         for extra in [| [||]; [| "custom_plugin_tool" |]; [| "fuzzy_find"; "write" |] |] do
             let manual = manualDeniedForMux extra role
             let policy = policyDenied extra role

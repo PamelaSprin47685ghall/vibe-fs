@@ -13,7 +13,7 @@
 
 非穷举，以 `src/Kernel/ToolCatalog/Registry.fs` 为准：
 
-- **子代理**：`coder`、`investigator`、`browser`、`continue`
+- **子代理**：`coder`、`inspector`、`browser`、`continue`
 - **审查**：`submit_review`、`return_reviewer`
 - **文件**：`read`、`write`（及 edit/patch 族在 Classification）
 - **搜索**：`fuzzy_find`、`fuzzy_grep`、`fuzzy_continue`
@@ -31,7 +31,7 @@
 | :--- | :--- | :--- |
 | Manager | todowrite/task、子代理、submit_review | 直接 fuzzy_grep、随意 shell |
 | Coder | read/write/edit、patch、executor | 委派 web/submit |
-| Investigator | read、fuzzy_*、executor(RO) | 写族工具 |
+| Inspector | read、fuzzy_*、executor(RO) | 写族工具 |
 | Meditator | read、methodology_* | 写族 |
 | Browser | browser、websearch | 改文件 |
 | Reviewer | read、return_reviewer | 改文件 |

@@ -31,7 +31,7 @@ let registersCoreToolsIdempotent () =
             [ "fuzzy_find"
               "fuzzy_grep"
               "coder"
-              "investigator"
+              "inspector"
               "meditator"
               "browser"
               "websearch"
@@ -124,16 +124,16 @@ let subagentPromptsContainKernelFragments () =
     check "coder implementation agent" (coder.Contains "implementation agent")
     check "coder static verify" (coder.Contains "Do NOT run tests or execute code")
 
-    let investigator =
-        investigatorPrompt
+    let inspector =
+        inspectorPrompt
             { objective = "find auth"
               background = "test"
               questions = [||]
               entries = [||] }
 
-    check "investigator fuzzy_find" (investigator.Contains "fuzzy_find")
-    check "investigator no glob tool" (not (investigator.Contains "glob tool"))
-    check "investigator no executor tool name" (not (investigator.Contains "executor("))
+    check "inspector fuzzy_find" (inspector.Contains "fuzzy_find")
+    check "inspector no glob tool" (not (inspector.Contains "glob tool"))
+    check "inspector no executor tool name" (not (inspector.Contains "executor("))
     let browser = browserPrompt "open example.com"
     check "browser stealth" (browser.Contains "stealth-browser-mcp")
 

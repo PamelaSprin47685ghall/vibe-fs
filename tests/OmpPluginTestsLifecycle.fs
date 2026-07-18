@@ -80,7 +80,7 @@ let turnStartRestoresMainSessionTools () =
                    "edit"
                    "write"
                    "coder"
-                   "investigator"
+                   "inspector"
                    "meditator"
                    "executor"
                    "submit_review"

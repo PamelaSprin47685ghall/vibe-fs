@@ -23,7 +23,7 @@ let isFileEditTool_caseInsensitive () =
         check ("isFileEditTool case insensitive: " + name) (isFileEditTool name = expected))
 
 let isFileEditTool_false () =
-    let falseCases = [ "read"; "grep"; "glob"; "run"; "browser"; "investigator" ]
+    let falseCases = [ "read"; "grep"; "glob"; "run"; "browser"; "inspector" ]
 
     falseCases
     |> List.iter (fun name -> check ("isFileEditTool false: " + name) (isFileEditTool name = false))

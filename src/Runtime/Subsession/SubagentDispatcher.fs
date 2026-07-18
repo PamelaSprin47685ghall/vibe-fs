@@ -97,10 +97,10 @@ let dispatch
             match validateCoderBatchArgs toolName args with
             | Error err -> return wireDecodeFailure toolName err
             | Ok intents -> return! runCoderBatch adapter host scope registry toolName intents
-        | Ok(InvestigatorBatch rawIntents) ->
-            match validateInvestigatorBatchArgs toolName args with
+        | Ok(InspectorBatch rawIntents) ->
+            match validateInspectorBatchArgs toolName args with
             | Error err -> return wireDecodeFailure toolName err
-            | Ok intents -> return! runInvestigatorBatch adapter host scope registry toolName intents
+            | Ok intents -> return! runInspectorBatch adapter host scope registry toolName intents
         | Ok(Typed _) ->
             let err = InvalidIntent(toolName, "tool", "not a subagent tool")
             return! Promise.lift (wireDecodeFailure toolName err)

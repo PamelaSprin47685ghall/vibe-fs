@@ -17,7 +17,7 @@ let mainSessionStripsChildOnlyAndBash () =
            "glob"
            "bash"
            "coder"
-           "investigator"
+           "inspector"
            "meditator"
            "browser"
            "executor"

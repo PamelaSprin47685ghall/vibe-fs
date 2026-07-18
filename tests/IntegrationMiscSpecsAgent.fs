@@ -119,7 +119,7 @@ let applyAgentConfigForMimoDisablesWorkflowSpec () =
                "build"
                "plan"
                "coder"
-               "investigator"
+               "inspector"
                "meditator"
                "reviewer"
                "browser"

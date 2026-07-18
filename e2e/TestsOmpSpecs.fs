@@ -27,7 +27,7 @@ let testSpecs (h: OmpHarness) (ok: int ref) : JS.Promise<unit> =
         do! runOmpWebTools h chk sessionId
         do! runOmpAgentTools h chk sessionId
         do! runOmpMethodology h chk sessionId
-        do! runOmpInvestigator h chk sessionId
+        do! runOmpInspector h chk sessionId
         do! runOmpTodowrite h chk sessionId
         do! runOmpLoopCommand h chk sessionId
         do! runOmpReview h chk sessionId

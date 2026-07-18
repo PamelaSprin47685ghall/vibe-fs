@@ -57,7 +57,7 @@ let kernelIsModificationToolMatrix () =
           "fuzzy_find", false
           "webfetch", false
           "websearch", false
-          "investigator", false
+          "inspector", false
           "meditator", false
           "browser", false
           "submit_review", false
@@ -147,7 +147,7 @@ let kernelWarnDescriptionsDiffer () =
 let kernelIsSubagentToolMatrix () =
     let cases =
         [ "coder", true
-          "investigator", true
+          "inspector", true
           "meditator", true
           "browser", true
           "read", false

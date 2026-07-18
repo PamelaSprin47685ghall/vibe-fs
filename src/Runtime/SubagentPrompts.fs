@@ -97,7 +97,7 @@ let coderPrompt (intent: CoderIntent) : string =
           "Static verification only (read and think using logic). Do NOT run tests or execute code."
           "Return a detailed summary of changes and/or your difficulties." ]
 
-let investigatorPrompt (intent: InvestigatorIntent) : string =
+let inspectorPrompt (intent: InspectorIntent) : string =
     agentPrompt
         [ yamlField "objective" intent.objective
           yamlField "background" intent.background

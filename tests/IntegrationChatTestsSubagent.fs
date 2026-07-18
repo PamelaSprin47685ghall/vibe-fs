@@ -84,8 +84,8 @@ let subagentParentAlreadyAbortedSpec () =
                 (FallbackRuntimeStore())
                 registry
                 mockClient
-                "investigator"
-                "Investigator"
+                "inspector"
+                "Inspector"
                 "trace the fault"
                 workspaceDir
                 "parent-aborted-session"

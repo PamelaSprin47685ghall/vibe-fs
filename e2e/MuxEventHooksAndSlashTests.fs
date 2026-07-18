@@ -52,26 +52,26 @@ let runRest
     (createEmpty: unit -> obj)
     : JS.Promise<unit> =
     promise {
-        let investigatorIntents =
+        let inspectorIntents =
             [| box
                    {| objective = "Test"
                       background = "none"
                       questions = [| "ok?" |]
                       entries = [| "mux-e2e-test.md" |] |} |]
 
-        harness.setMockReportMarkdown "investigator output mock text"
-        harness.mockLLM.expectText "investigator output mock text"
+        harness.setMockReportMarkdown "inspector output mock text"
+        harness.mockLLM.expectText "inspector output mock text"
 
         do!
             runTool
-                "investigator"
+                "inspector"
                 (createObj
-                    [ "intents", box investigatorIntents
+                    [ "intents", box inspectorIntents
                       "tdd", box "green"
                       "warn_tdd", box warnTddValue
                       "warn_reuse", box "this-task-is-not-suitable-to-be-completed-via-continue-tool" ])
-                (fun r -> r.Contains "investigator output mock text")
-                "mux.execute.investigator.success"
+                (fun r -> r.Contains "inspector output mock text")
+                "mux.execute.inspector.success"
 
         harness.setMockReportMarkdown "browser mock debug view text"
         harness.mockLLM.expectText "browser mock debug view text"

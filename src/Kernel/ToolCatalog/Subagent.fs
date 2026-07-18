@@ -18,15 +18,15 @@ let internal coderSpec: ToolSpec =
               + "You SHOULD issue a tdd=red coder call before any tdd=green coder call for the same work; a green call with no preceding red in the session is usually a violation and tends to be turned down. Declare the phase truthfully." ]
       requiredFields = [ "intents"; "tdd" ] }
 
-let internal investigatorSpec: ToolSpec =
-    { name = "investigator"
+let internal inspectorSpec: ToolSpec =
+    { name = "inspector"
       description =
         "Search the codebase from structured intents. Each intents[] element is dispatched to a parallel search pipeline that processes the query automatically. Every element must include objective, background, and questions[]; entries[] is optional. "
         + "IMPORTANT: Each item is processed independently with no shared state. Pack context into background and list concrete questions the report must answer. Reports must include file paths."
       paramDocs =
         map
             [ "intents",
-              "Non-empty array of investigator intents. Each item is dispatched to its own processing pipeline, all running concurrently." ]
+              "Non-empty array of inspector intents. Each item is dispatched to its own processing pipeline, all running concurrently." ]
       requiredFields = [ "intents" ] }
 
 let internal browserSpec: ToolSpec =
@@ -44,7 +44,7 @@ let internal continueSpec: ToolSpec =
     { name = "continue"
       description =
         "Continue a previously running subagent session with a new prompt. "
-        + "If an automated tool (like coder, investigator, meditator, browser) finishes execution but you have follow-up questions, need clarifications, or want to continue the work on that session, it is highly recommended to call this continue tool! "
+        + "If an automated tool (like coder, inspector, meditator, browser) finishes execution but you have follow-up questions, need clarifications, or want to continue the work on that session, it is highly recommended to call this continue tool! "
         + "This avoids losing the context of the child session and allows incremental progress."
       paramDocs =
         map

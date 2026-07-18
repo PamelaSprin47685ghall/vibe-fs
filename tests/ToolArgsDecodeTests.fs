@@ -25,12 +25,12 @@ let decodeCoderBatchOk () =
         check "coder target file" (one.targets.Head.file = "a.ts")
     | _ -> check "coder batch ok" false
 
-let decodeInvestigatorBatchOk () =
-    let args = createObj [ "intents", box [| sampleInvestigatorIntent "trace flow" |] ]
+let decodeInspectorBatchOk () =
+    let args = createObj [ "intents", box [| sampleInspectorIntent "trace flow" |] ]
 
-    match decodeToolInvocation "investigator" args with
-    | Ok(InvestigatorBatch [ one ]) -> check "investigator objective" (one.objective = "trace flow")
-    | _ -> check "investigator batch ok" false
+    match decodeToolInvocation "inspector" args with
+    | Ok(InspectorBatch [ one ]) -> check "inspector objective" (one.objective = "trace flow")
+    | _ -> check "inspector batch ok" false
 
 let decodeCoderMissingIntents () =
     let args = createObj []
@@ -198,7 +198,7 @@ let testSanitizeNullArgs () =
 
 let run () =
     decodeCoderBatchOk ()
-    decodeInvestigatorBatchOk ()
+    decodeInspectorBatchOk ()
     decodeCoderMissingIntents ()
     decodeCoderInvalidIntentShape ()
     decodeCoderEmptyIntentsArray ()

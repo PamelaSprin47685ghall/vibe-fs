@@ -133,7 +133,7 @@ export const COVERAGE: Record<string, CoverageEntry[]> = {
     { id: "OC-SUB-003", description: "Child uses coder agent", level: "not-covered", priority: "P0" },
     { id: "OC-SUB-004", description: "Coder prompt includes intent and workdir", level: "not-covered", priority: "P0" },
     { id: "OC-SUB-005", description: "Coder complete = tool result with final output", level: "real-e2e", priority: "P0", spec: "e2e/opencode/specs/p0-canary-tests-nudge-sub.js", test: "OC-SUB-001 OC-SUB-005 coder child session round-trip", note: "covered by OC-SUB-001 test" },
-    { id: "OC-SUB-006", description: "Investigator complete real child chain", level: "not-covered", priority: "P0" },
+    { id: "OC-SUB-006", description: "Inspector complete real child chain", level: "not-covered", priority: "P0" },
     { id: "OC-SUB-007", description: "Meditator uses specified methodology", level: "not-covered", priority: "P0" },
     { id: "OC-SUB-008", description: "Child tool permissions match role", level: "unit", priority: "P0" },
     { id: "OC-SUB-009", description: "Child empty output triggers continuation/fallback", level: "not-covered", priority: "P0" },
