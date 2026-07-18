@@ -827,6 +827,7 @@
     <Compile Include="tests/FallbackMessageCodecTests.fs"/>
     <Compile Include="tests/FallbackRecoveryWaitTests.fs"/>
     <Compile Include="tests/FallbackIntegrationTests.fs"/>
+    <Compile Include="tests/SubagentCompactionRegressionTests.fs"/>
     <Compile Include="tests/TestsEntriesFallback.fs"/>
     <Compile Include="tests/SembleInjectionTests.fs"/>
     <Compile Include="tests/OpencodeSessionLifecycleTests.fs"/>
