@@ -8,7 +8,6 @@ open Wanxiangshu.Runtime.EventLogRuntime
 open Wanxiangshu.Runtime.Fallback.RuntimeStore
 open Wanxiangshu.Runtime.Fallback.SessionRuntime
 open Wanxiangshu.Runtime.Fallback.LeaseTransitions
-open Wanxiangshu.Runtime.Fallback.OrdinalTransitions
 open Wanxiangshu.Runtime.Fallback.SessionPropertyTransitions
 open Wanxiangshu.Runtime.Fallback.CompactionTransitions
 open Wanxiangshu.Runtime.Fallback.SessionRuntimePropertyPure
@@ -56,8 +55,8 @@ let finishNudge
     }
 
 let isLeaseValid (runtime: FallbackRuntimeStore) (sessionKey: string) (lease: NudgeLease) : bool =
-    let currentGen = runtime.GetSessionGeneration sessionKey
-    let currentCancelGen = runtime.GetCancelGeneration sessionKey
+    let currentGen = (runtime.GetSession sessionKey).SessionGeneration
+    let currentCancelGen = (runtime.GetSession sessionKey).CancelGeneration
     let currentTurnId = (runtime.GetSession sessionKey).HumanTurnId
     let currentOwner = runtime.GetSessionOwner sessionKey
 
@@ -82,10 +81,13 @@ let tryClaimAndRegisterLease
     (nudgeAnchorKey: string)
     : JS.Promise<NudgeLease option> =
     promise {
-        let sessionGen = fallbackRuntime.GetSessionGeneration sessionKey
-        let cancelGen = fallbackRuntime.GetCancelGeneration sessionKey
+        let sessionGen = (fallbackRuntime.GetSession sessionKey).SessionGeneration
+        let cancelGen = (fallbackRuntime.GetSession sessionKey).CancelGeneration
         let humanTurnId = (fallbackRuntime.GetSession sessionKey).HumanTurnId
-        let nudgeOrdinal = fallbackRuntime.IncrementNudgeOrdinal sessionKey
+
+        let nudgeOrdinal =
+            fallbackRuntime.UpdateSessionReturning(sessionKey, incrementNudgeOrdinal)
+
         let nudgeId = "nudge-" + System.Guid.NewGuid().ToString("N")
         let nonce = "nudge_" + System.Guid.NewGuid().ToString("N")
 

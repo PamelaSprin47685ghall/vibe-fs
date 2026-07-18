@@ -26,7 +26,7 @@ open Wanxiangshu.Runtime.Dyn
 open Wanxiangshu.Runtime.Fallback.RuntimeStore
 open Wanxiangshu.Runtime.Fallback.LeaseTransitions
 open Wanxiangshu.Runtime.Fallback.SessionRuntime
-open Wanxiangshu.Runtime.Fallback.OrdinalTransitions
+open Wanxiangshu.Runtime.Fallback.SessionRuntimePropertyPure
 open Wanxiangshu.Runtime.Fallback.SessionPropertyTransitions
 open Wanxiangshu.Kernel.FallbackKernel.Types
 open Wanxiangshu.Runtime.NudgeLease
@@ -57,10 +57,12 @@ let dispatchNudgeAction
     promise {
         let nudgeId = "nudge-" + System.Guid.NewGuid().ToString("N")
         let nonce = "nudge_" + System.Guid.NewGuid().ToString("N")
-        let sessionGen = fallbackRuntime.GetSessionGeneration sessionId
-        let cancelGen = fallbackRuntime.GetCancelGeneration sessionId
+        let sessionGen = (fallbackRuntime.GetSession sessionId).SessionGeneration
+        let cancelGen = (fallbackRuntime.GetSession sessionId).CancelGeneration
         let humanTurnId = (fallbackRuntime.GetSession sessionId).HumanTurnId
-        let nudgeOrdinal = fallbackRuntime.IncrementNudgeOrdinal sessionId
+
+        let nudgeOrdinal =
+            fallbackRuntime.UpdateSessionReturning(sessionId, incrementNudgeOrdinal)
 
         let! claimed =
             tryClaimNudgeDispatch

@@ -5,7 +5,7 @@ open Wanxiangshu.Kernel.FallbackKernel.Types
 open Wanxiangshu.Runtime.Fallback.RuntimeStore
 open Wanxiangshu.Runtime.Fallback.SessionRuntime
 open Wanxiangshu.Runtime.Fallback.LeaseTransitions
-open Wanxiangshu.Runtime.Fallback.OrdinalTransitions
+open Wanxiangshu.Runtime.Fallback.SessionRuntimePropertyPure
 open Wanxiangshu.Runtime.Fallback.LeaseValidation
 open Wanxiangshu.Runtime.Fallback.NudgeHandler
 open Wanxiangshu.Runtime.Fallback.Ports
@@ -62,7 +62,7 @@ let translateEvent
 let handleUserAbort (runtime: FallbackRuntimeStore) (workspaceRoot: string) (sessionID: string) : JS.Promise<unit> =
     promise {
         do! appendUserAbortObservedOrFail workspaceRoot sessionID
-        let _ = runtime.IncrementCancelGeneration sessionID
+        let _ = runtime.UpdateSessionReturning(sessionID, incrementCancelGeneration)
         do! cancelPendingMainLease runtime workspaceRoot sessionID "User aborted"
         do! cancelPendingNudge runtime workspaceRoot sessionID "User aborted"
     }

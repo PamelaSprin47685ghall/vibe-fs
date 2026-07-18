@@ -6,7 +6,7 @@ open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Kernel.FallbackKernel.Types
 open Wanxiangshu.Hosts.Opencode.BacklogSession
-open Wanxiangshu.Runtime.Fallback.OrdinalTransitions
+open Wanxiangshu.Runtime.Fallback.SessionRuntimePropertyPure
 open Wanxiangshu.Runtime.Fallback.CompactionTransitions
 open Wanxiangshu.Runtime.Fallback.SessionPropertyTransitions
 open Wanxiangshu.Runtime
@@ -23,7 +23,7 @@ let private recordCompactionStart
     promise {
         let currentGen =
             match fallbackRuntime with
-            | Some fr -> fr.GetSessionGeneration sessionID
+            | Some fr -> (fr.GetSession sessionID).SessionGeneration
             | None -> 0
 
         let humanTurnId =
@@ -33,7 +33,7 @@ let private recordCompactionStart
 
         let compactionOrdinal =
             match fallbackRuntime with
-            | Some fr -> fr.IncrementCompactionOrdinal sessionID
+            | Some fr -> fr.UpdateSessionReturning(sessionID, incrementCompactionOrdinal)
             | None -> 0
 
         do!

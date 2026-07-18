@@ -5,7 +5,6 @@ open Wanxiangshu.Runtime.Fallback.RuntimeStore
 open Wanxiangshu.Runtime.Fallback.SessionRuntime
 open Wanxiangshu.Runtime.Fallback.LeaseTransitions
 open Wanxiangshu.Runtime.Fallback.SessionPropertyTransitions
-open Wanxiangshu.Runtime.Fallback.OrdinalTransitions
 open Wanxiangshu.Runtime.Fallback.CompactionTransitions
 
 let verifyLeaseWithStatus
@@ -17,9 +16,9 @@ let verifyLeaseWithStatus
     let stateOpt = runtime.TryGetState sessionID
     let pending = runtime.TryGetPendingLease sessionID
 
-    lease.SessionGeneration = runtime.GetSessionGeneration sessionID
+    lease.SessionGeneration = (runtime.GetSession sessionID).SessionGeneration
     && lease.HumanTurnID = (runtime.GetSession sessionID).HumanTurnId
-    && lease.CancelGeneration = runtime.GetCancelGeneration sessionID
+    && lease.CancelGeneration = (runtime.GetSession sessionID).CancelGeneration
     && lease.Owner = SessionOwner.Fallback
     && runtime.GetSessionOwner sessionID = SessionOwner.Fallback
     && not (runtime.IsForceStopped sessionID)
@@ -45,8 +44,8 @@ let ensureActiveAndOwner (runtime: FallbackRuntimeStore) (sessionID: string) (le
     && runtime.GetActiveCompactionId sessionID = ""
     && not (runtime.IsCompacted sessionID)
     && (runtime.GetSession sessionID).HumanTurnId = lease.HumanTurnID
-    && runtime.GetSessionGeneration sessionID = lease.SessionGeneration
-    && runtime.GetCancelGeneration sessionID = lease.CancelGeneration
+    && (runtime.GetSession sessionID).SessionGeneration = lease.SessionGeneration
+    && (runtime.GetSession sessionID).CancelGeneration = lease.CancelGeneration
 
 let checkIsStale
     (isEventContIdMatch: bool)
@@ -77,8 +76,8 @@ let checkIsStale
                     let activeGen = runtime.GetActiveContinuationGeneration sessionID
                     let activeCancel = runtime.GetActiveContinuationCancelGeneration sessionID
 
-                    activeGen < runtime.GetSessionGeneration sessionID
-                    || activeCancel < runtime.GetCancelGeneration sessionID
+                    activeGen < (runtime.GetSession sessionID).SessionGeneration
+                    || activeCancel < (runtime.GetSession sessionID).CancelGeneration
             else
                 let state = runtime.GetOrCreateState sessionID
 
@@ -86,8 +85,8 @@ let checkIsStale
                 || (let activeGen = runtime.GetActiveContinuationGeneration sessionID
                     let activeCancel = runtime.GetActiveContinuationCancelGeneration sessionID
 
-                    activeGen < runtime.GetSessionGeneration sessionID
-                    || activeCancel < runtime.GetCancelGeneration sessionID)
+                    activeGen < (runtime.GetSession sessionID).SessionGeneration
+                    || activeCancel < (runtime.GetSession sessionID).CancelGeneration)
 
 let checkContinuationMatches
     (runtime: FallbackRuntimeStore)
@@ -100,8 +99,8 @@ let checkContinuationMatches
         let activeGen = runtime.GetActiveContinuationGeneration sessionID
         let activeCancel = runtime.GetActiveContinuationCancelGeneration sessionID
 
-        activeGen = runtime.GetSessionGeneration sessionID
-        && activeCancel = runtime.GetCancelGeneration sessionID
+        activeGen = (runtime.GetSession sessionID).SessionGeneration
+        && activeCancel = (runtime.GetSession sessionID).CancelGeneration
 
     let isMatched =
         match pending with

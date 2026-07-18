@@ -11,7 +11,6 @@ open Wanxiangshu.Kernel.Subsession.Types
 open Wanxiangshu.Runtime.Fallback.RuntimeStore
 open Wanxiangshu.Runtime.Fallback.LeaseTransitions
 open Wanxiangshu.Runtime.Fallback.SessionRuntimePropertyPure
-open Wanxiangshu.Runtime.Fallback.OrdinalTransitions
 open Wanxiangshu.Runtime.Fallback.CompactionTransitions
 open Wanxiangshu.Runtime.Fallback.SessionPropertyTransitions
 open Wanxiangshu.Runtime.Fallback.Coordinator
@@ -389,8 +388,8 @@ let handleEvent_userAbort_invalidatesLease () =
 
         // Setup initial state
         let turnId = rt.UpdateSessionReturning(sid, advanceHumanTurn)
-        let gen = rt.GetSessionGeneration sid
-        let cancelGen = rt.GetCancelGeneration sid
+        let gen = (rt.GetSession sid).SessionGeneration
+        let cancelGen = (rt.GetSession sid).CancelGeneration
         rt.SetActiveContinuationGeneration sid gen
         rt.SetActiveContinuationCancelGeneration sid cancelGen
         let continuationID = "cont-1"
