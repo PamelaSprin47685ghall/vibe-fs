@@ -11,7 +11,6 @@ open Wanxiangshu.Kernel.FallbackKernel.Types
 open Wanxiangshu.Runtime.Fallback.RuntimeStore
 open Wanxiangshu.Runtime.Fallback.LeaseTransitions
 open Wanxiangshu.Runtime.Fallback.SessionPropertyTransitions
-open Wanxiangshu.Runtime.Fallback.CompactionTransitions
 
 /// Nudge dispatch is lower priority than fallback and compaction.  In
 /// particular, a settled fallback lease may still be visible to a concurrent
@@ -39,7 +38,7 @@ let private nudgeBlockedByFallbackState (runtime: FallbackRuntimeStore) (session
     lifecycleCancelled
     || fallbackOwnerActive
     || settledFallbackLease
-    || runtime.IsCompacted sessionKey
+    || (runtime.GetSession sessionKey).CompactionCompacted
 
 let private dispatchNudge
     (workspaceRoot: string)
@@ -62,9 +61,12 @@ let private dispatchNudge
                 | Some state -> state.Lifecycle <> FallbackLifecycle.Cancelled
                 | None -> true
 
-            if fallbackRuntime.IsForceStopped sessionKey || not isLifecycleNotCancelled then
+            if
+                (fallbackRuntime.GetSession sessionKey).CompactionForceStopped
+                || not isLifecycleNotCancelled
+            then
                 let reason =
-                    if fallbackRuntime.IsForceStopped sessionKey then
+                    if (fallbackRuntime.GetSession sessionKey).CompactionForceStopped then
                         "Force stopped"
                     else
                         "Session is not active"

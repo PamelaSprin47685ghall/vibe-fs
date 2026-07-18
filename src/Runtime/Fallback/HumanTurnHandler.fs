@@ -10,7 +10,6 @@ open Wanxiangshu.Runtime.Fallback.SessionPropertyTransitions
 open Wanxiangshu.Runtime.Fallback.SessionRuntimePropertyPure
 open Wanxiangshu.Runtime.Fallback.NudgeHandler
 open Wanxiangshu.Runtime.Fallback.CompactionHandler
-open Wanxiangshu.Runtime.Fallback.CompactionTransitions
 open Wanxiangshu.Runtime.Fallback.FallbackMessageCodec
 open Wanxiangshu.Runtime.Fallback.Ports
 open Wanxiangshu.Runtime.Fallback.ContinuationExecution
@@ -84,7 +83,7 @@ let handleNewUserMessage
 
         let msgId = translator.ExtractNewUserMessageId rawEvent |> Option.defaultValue ""
 
-        if msgId = "" || msgId <> runtime.GetLastHumanMessageId sessionID then
+        if msgId = "" || msgId <> (runtime.GetSession sessionID).LastHumanMessageId then
             do! initializeNewTurn translator runtime workspaceRoot sessionID msgId rawEvent
 
         let state = runtime.GetOrCreateState sessionID

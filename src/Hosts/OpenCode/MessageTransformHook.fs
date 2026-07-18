@@ -12,7 +12,7 @@ open Wanxiangshu.Hosts.Opencode.MessageTransformPipeline
 open Wanxiangshu.Runtime.ChildAgentRegistry
 open Wanxiangshu.Runtime.ChatTransformOutputCodec
 open Wanxiangshu.Runtime.Fallback.RuntimeStore
-open Wanxiangshu.Runtime.Fallback.CompactionTransitions
+open Wanxiangshu.Runtime.Fallback.SessionRuntimeLeasePure
 open Wanxiangshu.Runtime.Dyn
 
 let private extractSessionID (input: obj) =
@@ -34,7 +34,7 @@ let private isCompactionSummaryRequest (runtimeScope: RuntimeScope) (sessionID: 
         match runtimeScope.TryFindKey("fallbackRuntime") with
         | Some obj ->
             let fr = unbox<FallbackRuntimeStore> obj
-            fr.TryConsumeCompactionSummaryTransform(sessionID)
+            fr.UpdateSessionReturning(sessionID, tryConsumeCompactionSummaryTransformReturning)
         | None -> false
     else
         false

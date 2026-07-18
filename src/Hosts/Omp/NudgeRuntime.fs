@@ -6,7 +6,7 @@ open Wanxiangshu.Kernel.HostTools
 open Wanxiangshu.Kernel.Nudge
 open Wanxiangshu.Runtime.Nudge.NudgeDerivation
 open Wanxiangshu.Runtime.PromptFragments
-open Wanxiangshu.Runtime.Fallback.CompactionTransitions
+open Wanxiangshu.Runtime.Fallback.SessionRuntimeLeasePure
 
 let mutable private fallbackRuntimeInstance: FallbackRuntimeStore option = None
 
@@ -16,17 +16,17 @@ let private getFallbackRuntime () : FallbackRuntimeStore option = fallbackRuntim
 
 let markSessionForceStopped (sessionId: string) : unit =
     match getFallbackRuntime () with
-    | Some rt -> rt.MarkForceStopped sessionId
+    | Some rt -> rt.UpdateSession(sessionId, markForceStopped)
     | None -> ()
 
 let clearNudgeSession (sessionId: string) : unit =
     match getFallbackRuntime () with
-    | Some rt -> rt.RemoveForceStopped sessionId
+    | Some rt -> rt.UpdateSession(sessionId, removeForceStopped)
     | None -> ()
 
 let isSessionForceStopped (sessionId: string) : bool =
     match getFallbackRuntime () with
-    | Some rt -> rt.IsForceStopped sessionId
+    | Some rt -> (rt.GetSession sessionId).CompactionForceStopped
     | None -> false
 
 let todoReminderContent (todos: string list) = todoNudgePromptFor todos

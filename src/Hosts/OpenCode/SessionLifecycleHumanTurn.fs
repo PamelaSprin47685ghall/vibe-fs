@@ -9,7 +9,7 @@ open Wanxiangshu.Runtime.Fallback.RuntimeStore
 open Wanxiangshu.Runtime.Fallback.SessionRuntime
 open Wanxiangshu.Runtime.Fallback.SessionRuntimePropertyPure
 open Wanxiangshu.Runtime.Fallback.LeaseTransitions
-open Wanxiangshu.Runtime.Fallback.CompactionTransitions
+open Wanxiangshu.Runtime.Fallback.SessionRuntimeLeasePure
 open Wanxiangshu.Runtime.Fallback.SessionPropertyTransitions
 open Wanxiangshu.Runtime.Fallback.LeaseValidation
 open Wanxiangshu.Runtime.SessionEventWriter
@@ -57,13 +57,16 @@ let private cancelNudgeAndCompaction
             ()
         | None -> ()
 
-        let activeComp = fallbackRuntime.GetActiveCompactionId sessionID
-        let settleInfo = fallbackRuntime.TryGetSettleInfo(sessionID, activeComp)
+        let activeComp = (fallbackRuntime.GetSession sessionID).CompactionActiveId
+        let settleInfo = tryGetSettleInfo activeComp (fallbackRuntime.GetSession sessionID)
 
         match settleInfo with
         | Some(_, ordinal) ->
             do! appendCompactionSettledOrFail directory sessionID activeComp "cancelled" ordinal
-            let _ = fallbackRuntime.ApplySettle(sessionID, activeComp)
+
+            let _ =
+                fallbackRuntime.UpdateSessionReturning(sessionID, applySettleReturning activeComp)
+
             ()
         | None -> ()
     }
@@ -139,7 +142,7 @@ let onNewHumanMessage
             else
                 messageId
 
-        let lastMsgId = fallbackRuntime.GetLastHumanMessageId sessionID
+        let lastMsgId = (fallbackRuntime.GetSession sessionID).LastHumanMessageId
 
         if msgId <> lastMsgId then
             if directory <> "" then

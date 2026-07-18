@@ -9,7 +9,7 @@ open Wanxiangshu.Runtime.OpencodeHookInputCodec
 open Wanxiangshu.Runtime.ToolRuntimeContext
 open Wanxiangshu.Runtime.Fallback.RuntimeStore
 open Wanxiangshu.Runtime.Fallback.SessionRuntimePropertyPure
-open Wanxiangshu.Runtime.Fallback.CompactionTransitions
+open Wanxiangshu.Runtime.Fallback.SessionRuntimeLeasePure
 open Wanxiangshu.Runtime.Fallback.SessionPropertyTransitions
 open Wanxiangshu.Runtime.EventLogRuntime
 open Wanxiangshu.Hosts.Opencode.Fallback.Coordinator
@@ -38,17 +38,18 @@ let private handleSessionStatus
 let private handleSessionCompacted (ctx: obj) (fallbackRuntime: FallbackRuntimeStore) (sid: string) : JS.Promise<unit> =
     promise {
         let currentOwner = fallbackRuntime.GetSessionOwner sid
-        let compactionGen = fallbackRuntime.GetCompactionGeneration sid
-        let compactionId = fallbackRuntime.GetActiveCompactionId sid
-        let compactionOrdinal = fallbackRuntime.GetActiveCompactionOrdinal sid
+        let session = fallbackRuntime.GetSession sid
+        let compactionGen = session.CompactionGeneration
+        let compactionId = session.CompactionActiveId
+        let compactionOrdinal = session.CompactionActiveOrdinal
 
         if
             currentOwner = SessionOwner.Compaction
             && compactionId <> ""
-            && not (fallbackRuntime.IsCompacted sid)
+            && not session.CompactionCompacted
         then
             let nextContextGen = compactionGen + 1
-            fallbackRuntime.SetCompactionGeneration(sid, nextContextGen)
+            fallbackRuntime.UpdateSession(sid, setCompactionGeneration nextContextGen)
             let directory = pluginDirectoryFromCtx ctx
 
             do!
@@ -59,7 +60,7 @@ let private handleSessionCompacted (ctx: obj) (fallbackRuntime: FallbackRuntimeS
                     compactionId
                     compactionOrdinal
 
-            fallbackRuntime.SetCompacted(sid, true)
+            fallbackRuntime.Update(sid, setCompacted true)
     }
 
 /// Apply mutations from a message.updated event (compaction continuation detection).
@@ -85,8 +86,11 @@ let private handleMessageUpdated (fallbackRuntime: FallbackRuntimeStore) (sid: s
             if isCompactionContinue then
                 let currentOwner = fallbackRuntime.GetSessionOwner sid
 
-                if currentOwner = SessionOwner.Compaction && fallbackRuntime.IsCompacted sid then
-                    fallbackRuntime.SetCompactionContinuationObserved(sid, true)
+                if
+                    currentOwner = SessionOwner.Compaction
+                    && (fallbackRuntime.GetSession sid).CompactionCompacted
+                then
+                    fallbackRuntime.Update(sid, setCompactionContinuationObserved true)
 
 /// Process the event-envelope match body: route idle + keep existing handlers.
 let private processEventEnvelope

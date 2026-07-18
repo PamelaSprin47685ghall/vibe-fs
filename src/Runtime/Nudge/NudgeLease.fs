@@ -9,7 +9,6 @@ open Wanxiangshu.Runtime.Fallback.RuntimeStore
 open Wanxiangshu.Runtime.Fallback.SessionRuntime
 open Wanxiangshu.Runtime.Fallback.LeaseTransitions
 open Wanxiangshu.Runtime.Fallback.SessionPropertyTransitions
-open Wanxiangshu.Runtime.Fallback.CompactionTransitions
 open Wanxiangshu.Runtime.Fallback.SessionRuntimePropertyPure
 open Wanxiangshu.Kernel.FallbackKernel.Types
 
@@ -70,7 +69,7 @@ let isLeaseValid (runtime: FallbackRuntimeStore) (sessionKey: string) (lease: Nu
     && lease.CancelGeneration = currentCancelGen
     && lease.Owner = SessionOwner.Nudge
     && currentOwner = SessionOwner.Nudge
-    && not (runtime.IsForceStopped sessionKey)
+    && not ((runtime.GetSession sessionKey).CompactionForceStopped)
     && isLifecycleNotCancelled
 
 let tryClaimAndRegisterLease

@@ -14,7 +14,6 @@ open Wanxiangshu.Runtime.Fallback.LeaseTransitions
 open Wanxiangshu.Runtime.Fallback.RuntimeStore
 open Wanxiangshu.Runtime.Fallback.SessionRuntimePropertyPure
 open Wanxiangshu.Runtime.Fallback.SessionPropertyTransitions
-open Wanxiangshu.Runtime.Fallback.CompactionTransitions
 open Wanxiangshu.Runtime.Dyn
 open Wanxiangshu.Runtime.OpencodeClientCodec
 open Wanxiangshu.Runtime.OpencodeHostEvent
@@ -154,8 +153,8 @@ type NudgeTrigger
         promise {
             if
                 fallbackRuntime.GetSessionOwner sessionIDStr = SessionOwner.Compaction
-                && fallbackRuntime.IsCompacted sessionIDStr
-                && fallbackRuntime.IsCompactionContinuationObserved sessionIDStr
+                && (fallbackRuntime.GetSession sessionIDStr).CompactionCompacted
+                && (fallbackRuntime.GetSession sessionIDStr).CompactionContinuationObserved
             then
                 do! NudgeTriggerOps.settleCompaction_ ctx fallbackRuntime sessionIDStr
         }

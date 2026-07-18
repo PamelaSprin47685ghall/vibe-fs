@@ -7,7 +7,7 @@ open Wanxiangshu.Kernel.HostTools
 open Wanxiangshu.Kernel.FallbackKernel.Types
 open Wanxiangshu.Runtime.ChildAgentRegistry
 open Wanxiangshu.Runtime.Fallback.RuntimeStore
-open Wanxiangshu.Runtime.Fallback.CompactionTransitions
+open Wanxiangshu.Runtime.Fallback.SessionRuntimeLeasePure
 open Wanxiangshu.Runtime.Fallback.SessionPropertyTransitions
 open Wanxiangshu.Runtime.RuntimeScope
 open Wanxiangshu.Runtime.ReviewRuntime
@@ -68,9 +68,9 @@ let childCompactionIdleSettlesAfterFallbackConsumes () =
         let sessionID = "child-compaction-1"
         let runtime = FallbackRuntimeStore()
         runtime.SetSessionOwner sessionID SessionOwner.Compaction
-        runtime.SetActiveCompactionId(sessionID, "compact-1", 1)
-        runtime.SetCompacted(sessionID, true)
-        runtime.SetCompactionContinuationObserved(sessionID, true)
+        runtime.UpdateSession(sessionID, setActiveCompactionId "compact-1" 1)
+        runtime.Update(sessionID, setCompacted true)
+        runtime.Update(sessionID, setCompactionContinuationObserved true)
 
         let fallbackHandler (_: obj) : JS.Promise<FallbackHookResult> =
             Promise.lift
@@ -104,7 +104,7 @@ let childCompactionIdleSettlesAfterFallbackConsumes () =
             )
 
         equal "child compaction owner is released" SessionOwner.NoOwner (runtime.GetSessionOwner sessionID)
-        check "compaction identity is cleared" (runtime.GetActiveCompactionId sessionID = "")
+        check "compaction identity is cleared" ((runtime.GetSession sessionID).CompactionActiveId = "")
         do! rmAsync directory
     }
 

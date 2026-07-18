@@ -131,6 +131,11 @@ let applySettle expectedCompactionID (s: FallbackSessionRuntime) =
     else
         None
 
+let applySettleReturning expectedCompactionID (s: FallbackSessionRuntime) : FallbackSessionRuntime * bool =
+    match applySettle expectedCompactionID s with
+    | Some s' -> s', true
+    | None -> s, false
+
 let setCompacted value (s: FallbackSessionRuntime) = { s with CompactionCompacted = value }
 
 let setCompactionContinuationObserved value (s: FallbackSessionRuntime) =
@@ -159,6 +164,11 @@ let tryConsumeCompactionSummaryTransform (s: FallbackSessionRuntime) =
                 CompactionSummaryTransformPending = false }
     else
         None
+
+let tryConsumeCompactionSummaryTransformReturning (s: FallbackSessionRuntime) : FallbackSessionRuntime * bool =
+    match tryConsumeCompactionSummaryTransform s with
+    | Some s' -> s', true
+    | None -> s, false
 
 let clearCompactionSummaryTransformPending (s: FallbackSessionRuntime) =
     { s with

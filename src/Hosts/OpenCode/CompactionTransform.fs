@@ -7,7 +7,7 @@ open Fable.Core.JsInterop
 open Wanxiangshu.Kernel.FallbackKernel.Types
 open Wanxiangshu.Hosts.Opencode.BacklogSession
 open Wanxiangshu.Runtime.Fallback.SessionRuntimePropertyPure
-open Wanxiangshu.Runtime.Fallback.CompactionTransitions
+open Wanxiangshu.Runtime.Fallback.SessionRuntimeLeasePure
 open Wanxiangshu.Runtime.Fallback.SessionPropertyTransitions
 open Wanxiangshu.Runtime
 open Wanxiangshu.Runtime.Dyn
@@ -48,10 +48,10 @@ let private recordCompactionStart
         match fallbackRuntime with
         | Some fr ->
             fr.SetSessionOwner sessionID SessionOwner.Compaction
-            fr.SetActiveCompactionId(sessionID, compactionId, compactionOrdinal)
-            fr.SetCompacted(sessionID, false)
-            fr.SetCompactionContinuationObserved(sessionID, false)
-            fr.SetCompactionGeneration(sessionID, currentGen)
+            fr.UpdateSession(sessionID, setActiveCompactionId compactionId compactionOrdinal)
+            fr.Update(sessionID, setCompacted false)
+            fr.Update(sessionID, setCompactionContinuationObserved false)
+            fr.UpdateSession(sessionID, setCompactionGeneration currentGen)
             // Arm the compaction summary transform bypass flag
             fr.UpdateSession(
                 sessionID,
@@ -87,8 +87,8 @@ let private handleCompactionError
     : JS.Promise<unit> =
     promise {
         match fallbackRuntime with
-        | Some fr when fr.GetActiveCompactionId sessionID = compactionId ->
-            let settleInfo = fr.TryGetSettleInfo(sessionID, compactionId)
+        | Some fr when (fr.GetSession sessionID).CompactionActiveId = compactionId ->
+            let settleInfo = tryGetSettleInfo compactionId (fr.GetSession sessionID)
 
             match settleInfo with
             | Some(_, ordinal) ->
@@ -100,12 +100,12 @@ let private handleCompactionError
                         "failed"
                         ordinal
 
-                let _ = fr.ApplySettle(sessionID, compactionId)
+                let _ = fr.UpdateSessionReturning(sessionID, applySettleReturning compactionId)
                 ()
             | None -> ()
 
             // Clear the compaction summary transform bypass flag on error
-            fr.ClearCompactionSummaryTransformPending(sessionID)
+            fr.UpdateSession(sessionID, clearCompactionSummaryTransformPending)
         | _ -> ()
 
         return! Promise.reject ex

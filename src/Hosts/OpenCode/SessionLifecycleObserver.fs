@@ -9,7 +9,7 @@ open Wanxiangshu.Runtime.Dyn
 open Wanxiangshu.Runtime.OpencodeHookInputCodec
 open Wanxiangshu.Runtime.ToolRuntimeContext
 open Wanxiangshu.Runtime.Fallback.RuntimeStore
-open Wanxiangshu.Runtime.Fallback.CompactionTransitions
+open Wanxiangshu.Runtime.Fallback.SessionRuntimeLeasePure
 open Wanxiangshu.Hosts.Opencode.ProgressObserver
 open Wanxiangshu.Hosts.Opencode.Fallback.Coordinator
 open Wanxiangshu.Hosts.Opencode.NudgeTrigger
@@ -39,9 +39,9 @@ type SessionLifecycleObserver
             ctx
             fallbackRuntime
             reviewStore
-            (fun sid -> fallbackRuntime.MarkForceStopped sid)
-            (fun sid -> fallbackRuntime.RemoveForceStopped sid)
-            (fun sid -> fallbackRuntime.IsForceStopped sid)
+            (fun sid -> fallbackRuntime.UpdateSession(sid, markForceStopped))
+            (fun sid -> fallbackRuntime.UpdateSession(sid, removeForceStopped))
+            (fun sid -> (fallbackRuntime.GetSession sid).CompactionForceStopped)
 
     member _.handleChatMessage(sessionID: SessionId, agent: string, parts: obj) : JS.Promise<unit> =
         progress.OnChatMessage(sessionID, agent, parts)

@@ -9,7 +9,7 @@ open Wanxiangshu.Kernel.Nudge
 open Wanxiangshu.Kernel.Nudge.Types
 open Wanxiangshu.Kernel.HostTools
 open Wanxiangshu.Runtime
-open Wanxiangshu.Runtime.Fallback.CompactionTransitions
+open Wanxiangshu.Runtime.Fallback.SessionRuntimeLeasePure
 open Wanxiangshu.Runtime.Fallback.LeaseTransitions
 open Wanxiangshu.Runtime.Fallback.RuntimeStore
 open Wanxiangshu.Runtime.Fallback.SessionPropertyTransitions
@@ -80,10 +80,10 @@ let resolveOrigin
     | SessionOwner.NoOwner -> TerminalOrigin.Unknown
     | SessionOwner.Fallback -> TerminalOrigin.FallbackContinuationCompleted
     | SessionOwner.Compaction ->
-        let isCompacted = fallbackRuntime.IsCompacted sessionIDStr
+        let session = fallbackRuntime.GetSession sessionIDStr
+        let isCompacted = session.CompactionCompacted
 
-        let continuationObserved =
-            fallbackRuntime.IsCompactionContinuationObserved sessionIDStr
+        let continuationObserved = session.CompactionContinuationObserved
 
         if isCompacted && continuationObserved then
             TerminalOrigin.CompactionContinuationCompleted
@@ -112,24 +112,27 @@ let finishNudgeLease (ctx: obj) (fallbackRuntime: FallbackRuntimeStore) (session
 /// Settle a compaction run that has produced its continuation, if any.
 let settleCompaction_ (ctx: obj) (fallbackRuntime: FallbackRuntimeStore) (sessionIDStr: string) : JS.Promise<unit> =
     promise {
-        let activeComp = fallbackRuntime.GetActiveCompactionId sessionIDStr
+        let activeComp = (fallbackRuntime.GetSession sessionIDStr).CompactionActiveId
 
         if activeComp <> "" then
             let directory = pluginDirectoryFromCtx ctx
 
             if directory <> "" then
-                let settleInfo = fallbackRuntime.TryGetSettleInfo(sessionIDStr, activeComp)
+                let settleInfo =
+                    tryGetSettleInfo activeComp (fallbackRuntime.GetSession sessionIDStr)
 
                 match settleInfo with
                 | Some(_, ordinal) ->
                     do! appendCompactionSettledOrFail directory sessionIDStr activeComp "completed" ordinal
 
-                    let _ = fallbackRuntime.ApplySettle(sessionIDStr, activeComp)
+                    let _ =
+                        fallbackRuntime.UpdateSessionReturning(sessionIDStr, applySettleReturning activeComp)
+
                     ()
                 | None -> ()
 
-            fallbackRuntime.SetCompacted(sessionIDStr, false)
-            fallbackRuntime.SetCompactionContinuationObserved(sessionIDStr, false)
+            fallbackRuntime.Update(sessionIDStr, setCompacted false)
+            fallbackRuntime.Update(sessionIDStr, setCompactionContinuationObserved false)
     }
 
 /// Apply the post-terminal cleanup required for the current owner: free
@@ -145,7 +148,10 @@ let applyPostTerminalCleanup
             clearOwnerSlot fallbackRuntime owner sessionIDStr
         elif owner = SessionOwner.Nudge then
             do! finishNudgeLease ctx fallbackRuntime sessionIDStr
-        elif owner = SessionOwner.Compaction && fallbackRuntime.IsCompacted sessionIDStr then
+        elif
+            owner = SessionOwner.Compaction
+            && (fallbackRuntime.GetSession sessionIDStr).CompactionCompacted
+        then
             do! settleCompaction_ ctx fallbackRuntime sessionIDStr
     }
 
