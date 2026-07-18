@@ -101,16 +101,16 @@ let coderIntentsSchema (desc: string) : obj =
 
     arrayMin inner 1 desc
 
-let investigatorIntentsSchema (desc: string) : obj =
-    let questionItem = strMin 1 investigatorQuestionItemDesc
-    let questionsField = arrayMin questionItem 1 investigatorQuestionsDesc
-    let entryItem = strMin 1 investigatorEntryItemDesc
+let inspectorIntentsSchema (desc: string) : obj =
+    let questionItem = strMin 1 inspectorQuestionItemDesc
+    let questionsField = arrayMin questionItem 1 inspectorQuestionsDesc
+    let entryItem = strMin 1 inspectorEntryItemDesc
 
     let entriesField =
-        call1 (call0 (arr entryItem) "optional") "describe" (box investigatorEntriesDesc)
+        call1 (call0 (arr entryItem) "optional") "describe" (box inspectorEntriesDesc)
 
-    let objectiveField = strMin 1 investigatorObjectiveDesc
-    let backgroundField = strMin 1 investigatorBackgroundDesc
+    let objectiveField = strMin 1 inspectorObjectiveDesc
+    let backgroundField = strMin 1 inspectorBackgroundDesc
 
     let inner =
         strictObject (
@@ -180,7 +180,7 @@ let private toolDescription (name: string) : string =
 
 let coder = toolDescription "coder"
 
-let investigator = toolDescription "investigator"
+let inspector = toolDescription "inspector"
 
 let browser = toolDescription "browser"
 

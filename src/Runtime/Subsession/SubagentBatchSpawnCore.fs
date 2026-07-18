@@ -38,7 +38,7 @@ let private getChildIDForSpawn
             let agentName =
                 match role with
                 | HostAdapter.Coder -> "coder"
-                | HostAdapter.Investigator -> "investigator"
+                | HostAdapter.Inspector -> "inspector"
                 | HostAdapter.Meditator -> "meditator"
                 | HostAdapter.Browser -> "browser"
 
@@ -101,7 +101,7 @@ let private wrapWithIterator
             let roleStr =
                 match role with
                 | HostAdapter.Coder -> "coder"
-                | HostAdapter.Investigator -> "investigator"
+                | HostAdapter.Inspector -> "inspector"
                 | HostAdapter.Meditator -> "meditator"
                 | HostAdapter.Browser -> "browser"
 

@@ -14,8 +14,8 @@ open Wanxiangshu.Runtime.WorkspaceFiles
 let promptsFromCoderIntents (host: Host) (intents: CoderIntent list) : string list =
     promptsForParallelIntents host Coder intents
 
-let promptsFromInvestigatorIntents (host: Host) (intents: InvestigatorIntent list) : string list =
-    promptsForParallelIntents host Investigator intents
+let promptsFromInspectorIntents (host: Host) (intents: InspectorIntent list) : string list =
+    promptsForParallelIntents host Inspector intents
 
 let parallelPromptsFromIntents
     (host: Host)

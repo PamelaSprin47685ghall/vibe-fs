@@ -99,7 +99,7 @@ Payload 在 Kernel 层多为 `Map<string,string>`（与 Shell codec 解耦）。
 
 ## ToolCatalog
 
-`ToolCatalog.Registry.all` 列出核心工具 spec（coder、investigator、read、write、fuzzy_*、web*、submit_review、return_reviewer、executor*、continue、pty_* 等）。  
+`ToolCatalog.Registry.all` 列出核心工具 spec（coder、inspector、read、write、fuzzy_*、web*、submit_review、return_reviewer、executor*、continue、pty_* 等）。
 **description、paramDocs、requiredFields** 为各宿主生成 schema 的 SSOT；宿主层禁止复制一份描述文案（架构测试 guard）。
 
 ## WorkBacklog 与 Kernel

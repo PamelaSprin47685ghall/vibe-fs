@@ -12,7 +12,7 @@ type CoderIntent =
       targets: CoderTarget list
       doNotTouch: string array }
 
-type InvestigatorIntent =
+type InspectorIntent =
     { objective: string
       background: string
       questions: string array
@@ -35,20 +35,19 @@ let coderDoNotTouchItemDesc = "Do-not-touch path, symbol, or constraint."
 let coderDoNotTouchDesc =
     "Optional list of files, directories, symbols, or constraints this item must not modify."
 
-let investigatorQuestionItemDesc = "Question the report must answer."
+let inspectorQuestionItemDesc = "Question the report must answer."
 
-let investigatorQuestionsDesc =
+let inspectorQuestionsDesc =
     "Non-empty list of questions the report must answer explicitly."
 
-let investigatorEntryItemDesc = "Optional entry path, symbol, or file."
+let inspectorEntryItemDesc = "Optional entry path, symbol, or file."
 
-let investigatorEntriesDesc =
-    "Optional entry paths, symbols, or files to start from."
+let inspectorEntriesDesc = "Optional entry paths, symbols, or files to start from."
 
-let investigatorObjectiveDesc = "What to investigate in the codebase."
+let inspectorObjectiveDesc = "What to inspect in the codebase."
 
-let investigatorBackgroundDesc =
-    "Why this investigation is needed; blockers and prior context."
+let inspectorBackgroundDesc =
+    "Why this inspection is needed; blockers and prior context."
 
 let coderTargetFiles (intent: CoderIntent) : string list =
     intent.targets |> List.map (fun t -> t.file)

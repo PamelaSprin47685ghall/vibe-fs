@@ -7,7 +7,7 @@ open Wanxiangshu.Kernel.Session.Causality
 /// Subagent role discriminant. One case per logical agent type.
 type SubagentRole =
     | Coder
-    | Investigator
+    | Inspector
     | Meditator
     | Browser
 

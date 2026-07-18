@@ -33,7 +33,7 @@ let private emptyInfo id role =
     { id = id
       sessionID = "session-1"
       role = role
-      agent = "investigator"
+      agent = "inspector"
       isError = false
       toolName = ""
       details = null
@@ -208,7 +208,7 @@ let debugEnabledViaEnv () =
         procEnv?env?SEMBLE_INJECT_DEBUG <- prev
 
 let dumpInjectionNoThrowWhenDisabled () =
-    dumpInjection "s" "investigator" "ctx" [ sampleResult ] 2
+    dumpInjection "s" "inspector" "ctx" [ sampleResult ] 2
     check "dumpInjection disabled no throw" true
 
 let run () =

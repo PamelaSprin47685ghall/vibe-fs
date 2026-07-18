@@ -477,7 +477,7 @@ let private routeNoneTurnIdEvidenceAttributedToCurrentTurn () =
 
         let targetEvidence =
             { CurrentTurnEvidence.empty with
-                Assistant = AssistantSnapshot("", 0L, "investigator-report", Some NormalFinish) }
+                Assistant = AssistantSnapshot("", 0L, "inspector-report", Some NormalFinish) }
 
         let obs =
             { TurnId = None
@@ -493,7 +493,7 @@ let private routeNoneTurnIdEvidenceAttributedToCurrentTurn () =
             | AssistantSnapshot(_, _, text, _) ->
                 equal
                     "EvidenceUpdated with TurnId = None is attributed to current turn and merged"
-                    "investigator-report"
+                    "inspector-report"
                     text
             | NoAssistant ->
                 fail "TurnId=None evidence was dropped — host without nonce propagation loses all assistant content"

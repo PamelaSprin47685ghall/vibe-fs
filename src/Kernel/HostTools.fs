@@ -158,7 +158,7 @@ let isSynthCallId (callID: string) : bool =
 
 let allToolNames (host: Host) : string array =
     [| "coder"
-       "investigator"
+       "inspector"
        "meditator"
        "browser"
        "executor"

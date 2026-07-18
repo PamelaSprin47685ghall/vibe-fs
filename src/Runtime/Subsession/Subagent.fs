@@ -5,11 +5,11 @@ open Wanxiangshu.Kernel.SubagentIntents
 open Wanxiangshu.Runtime.SubagentPrompts
 
 /// Every kind of subagent task that needs prompt construction. One union case
-/// per logical task; coder/investigator carry many intents because each intent
+/// per logical task; coder/inspector carry many intents because each intent
 /// becomes its own parallel prompt.
 type SubagentTaskKind =
     | Coder of CoderIntent list
-    | Investigator of InvestigatorIntent list
+    | Inspector of InspectorIntent list
     | Meditator of intent: string
     | Browser of intent: string
     | Continue of iterator: string * prompt: string
@@ -35,7 +35,7 @@ let private withReportTail (host: Host) (body: string) : string =
     | Mimocode -> body + agentReportTail
     | Omp -> body
 
-/// Produce one prompt per parallel intent for coder/investigator, exactly one
+/// Produce one prompt per parallel intent for coder/inspector, exactly one
 /// prompt for the singleton task kinds.  Host decides whether to append the
 /// agent_report tail; otherwise prompt body is identical between hosts.
 let formatPrompt (host: Host) (kind: SubagentTaskKind) : string list =
@@ -43,7 +43,7 @@ let formatPrompt (host: Host) (kind: SubagentTaskKind) : string list =
 
     match kind with
     | Coder intents -> intents |> List.map (coderPrompt >> wrap)
-    | Investigator intents -> intents |> List.map (investigatorPrompt >> wrap)
+    | Inspector intents -> intents |> List.map (inspectorPrompt >> wrap)
     | Meditator intent -> [ intent |> wrap ]
     | Browser intent -> [ browserPrompt intent |> wrap ]
     | Continue(iterator, prompt) -> [ prompt ]

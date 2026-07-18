@@ -8,7 +8,7 @@
 
 ### 对外能力
 
-- 子代理委派（coder / investigator / browser / meditator / reviewer 等）
+- 子代理委派（coder / inspector / browser / meditator / reviewer 等）
 - 文件读写、模糊搜索、执行器、审查循环、`submit_review` / `return_reviewer`
 - Nudge（todo / loop / runner）
 - 54 个结构化方法论笔记本工具（`methodology_<id>`）
@@ -62,7 +62,7 @@ flowchart LR
 
 - **Manager**：`todowrite`/`task`、子代理、`submit_review`
 - **Coder**：读写改、patch、executor（写模式）
-- **Investigator**：read、fuzzy_*、executor（只读）
+- **Inspector**：read、fuzzy_*、executor（只读）
 - **Reviewer**：read、`return_reviewer`
 
 细节见 [08-tools-and-permissions.md](./08-tools-and-permissions.md)。

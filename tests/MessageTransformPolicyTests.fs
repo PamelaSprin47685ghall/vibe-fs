@@ -16,7 +16,7 @@ open Wanxiangshu.Runtime.BacklogProjectionBuild
 module Dyn = Wanxiangshu.Runtime.Dyn
 
 let defaultExcludedTrue () =
-    let agents = [ "browser"; "investigator"; "executor"; "title"; "compaction" ]
+    let agents = [ "browser"; "inspector"; "executor"; "title"; "compaction" ]
 
     agents
     |> List.iter (fun a -> check (sprintf "default excluded: %s" a) (shouldExcludeAgentFromProjection a false))
@@ -34,7 +34,7 @@ let childWorkspaceExtraExcluded () =
     |> List.iter (fun a -> check (sprintf "child excluded: %s" a) (shouldExcludeAgentFromProjection a true))
 
 let childWorkspaceNotExcluded () =
-    let agents = [ "browser"; "investigator"; "executor"; "title"; "compaction" ]
+    let agents = [ "browser"; "inspector"; "executor"; "title"; "compaction" ]
 
     agents
     |> List.iter (fun a -> check (sprintf "child still excluded: %s" a) (shouldExcludeAgentFromProjection a true))
@@ -43,16 +43,16 @@ let childWorkspaceNotExcluded () =
     check "agent still not excluded even in child workspace" (not (shouldExcludeAgentFromProjection "agent" true))
 
 let agentNormalizationTest () =
-    check "Investigator (caps)" (getCapsInjectionPolicy "Investigator" false = CapsInjectionPolicy.Include)
-    check "investigator  (caps)" (getCapsInjectionPolicy "investigator " false = CapsInjectionPolicy.Include)
+    check "Inspector (caps)" (getCapsInjectionPolicy "Inspector" false = CapsInjectionPolicy.Include)
+    check "inspector  (caps)" (getCapsInjectionPolicy "inspector " false = CapsInjectionPolicy.Include)
 
     check
-        "Investigator (context budget)"
-        (getContextBudgetPolicy "Investigator" false = ContextBudgetPolicy.DisableTodoEmergency)
+        "Inspector (context budget)"
+        (getContextBudgetPolicy "Inspector" false = ContextBudgetPolicy.DisableTodoEmergency)
 
     check
-        "investigator  (context budget)"
-        (getContextBudgetPolicy "investigator " false = ContextBudgetPolicy.DisableTodoEmergency)
+        "inspector  (context budget)"
+        (getContextBudgetPolicy "inspector " false = ContextBudgetPolicy.DisableTodoEmergency)
 
     check "EXec (caps)" (getCapsInjectionPolicy "EXec" false = CapsInjectionPolicy.Exclude)
 

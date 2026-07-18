@@ -11,7 +11,7 @@ Shell（约 **139** 个 `.fs`）是 Kernel 与 Node/宿主之间的**唯一**常
 | 文件系统 | `FileSys`、`WorkspaceFiles` | 读写工作区 |
 | 事件日志 | `EventLogCodec`、`EventLogIo`、`EventLogFiles`、`EventLogRuntime*`、`EventLogSquadProjection` | NDJSON（含万象阵行、subsession 行）、锁、缓存、sync |
 | 搜索 | `FuzzyFinderShell`、`FuzzySearch/*`、`FuzzyIteratorStore` | fff 后端、iterator 状态 |
-| Semble | `SembleMcp`、`SembleSearch`、`SembleSearchClient`、`SembleSearchTypes` | MCP 客户端与 investigator 断点注入 |
+| Semble | `SembleMcp`、`SembleSearch`、`SembleSearchClient`、`SembleSearchTypes` | MCP 客户端与 inspector 断点注入 |
 | 执行器 | `Executor*`、`SessionExecutor` | shell/python/js、spawn、会话级执行 |
 | Tree-sitter | `TreeSitterShell`、`TreeSitterPlatform` | 可选语法能力 |
 | 网络 | `WebSearchApi`、`WebFetch`、`WebSearchCodec`、`TitleFetchGuardCommon` | 搜索与抓取守卫 |
@@ -61,7 +61,7 @@ Opencode/Mux 经 `SubagentToolExecute` / `MuxSubagentToolExecute`；OMP 在 `Omp
 ## Subsession Actor 运行时链
 
 ```text
-父工具（coder/investigator/browser/meditator）
+父工具（coder/inspector/browser/meditator）
   → SubagentDispatcher.dispatch
     → IHostAdapter.SpawnSubagent
       → SubsessionService.StartRun

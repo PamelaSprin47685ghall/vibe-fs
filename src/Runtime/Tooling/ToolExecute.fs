@@ -46,12 +46,12 @@ let runDecodedToWire
     (decoded: Result<DecodedToolInvocation, DomainError>)
     (onTyped: ToolArgs -> JS.Promise<string>)
     (onCoder: CoderIntent list -> JS.Promise<string>)
-    (onInvestigator: InvestigatorIntent list -> JS.Promise<string>)
+    (onInspector: InspectorIntent list -> JS.Promise<string>)
     : JS.Promise<string> =
     promise {
         match decoded with
         | Error err -> return wireDecodeFailure toolName err
         | Ok(Typed ta) -> return! onTyped ta
         | Ok(CoderBatch intents) -> return! onCoder intents
-        | Ok(InvestigatorBatch intents) -> return! onInvestigator intents
+        | Ok(InspectorBatch intents) -> return! onInspector intents
     }

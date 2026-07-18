@@ -77,7 +77,7 @@ type private CoderSpecific =
     { targets: CoderTarget list
       doNotTouch: string array }
 
-type private InvestigatorSpecific =
+type private InspectorSpecific =
     { questions: string array
       entries: string array }
 
@@ -104,12 +104,12 @@ let private decodeCoderSpecific (item: obj) : Result<CoderSpecific, string> =
           doNotTouch = doNotTouch })
     <*> targets
 
-let private decodeInvestigatorSpecific (item: obj) : Result<InvestigatorSpecific, string> =
+let private decodeInspectorSpecific (item: obj) : Result<InspectorSpecific, string> =
     let questions = optionalStrArray item "questions"
     let entries = optionalStrArray item "entries"
 
     if questions.Length = 0 then
-        Result.Error "Invalid LLM input for investigator: questions must be a non-empty string array"
+        Result.Error "Invalid LLM input for inspector: questions must be a non-empty string array"
     else
         Ok(fun es -> { questions = questions; entries = es }) <*> Ok entries
 
@@ -120,8 +120,8 @@ let parseCoderIntent (item: obj) : Result<CoderIntent, string> =
           targets = s.targets
           doNotTouch = s.doNotTouch })
 
-let parseInvestigatorIntent (item: obj) : Result<InvestigatorIntent, string> =
-    parseIntentCore "investigator" item decodeInvestigatorSpecific (fun o b s ->
+let parseInspectorIntent (item: obj) : Result<InspectorIntent, string> =
+    parseIntentCore "inspector" item decodeInspectorSpecific (fun o b s ->
         { objective = o
           background = b
           questions = s.questions
@@ -145,8 +145,8 @@ let private parseIntentList<'T>
 let parseCoderIntents (intents: obj) : Result<CoderIntent list, string> =
     parseIntentList parseCoderIntent "coder" intents
 
-let parseInvestigatorIntents (intents: obj) : Result<InvestigatorIntent list, string> =
-    parseIntentList parseInvestigatorIntent "investigator" intents
+let parseInspectorIntents (intents: obj) : Result<InspectorIntent list, string> =
+    parseIntentList parseInspectorIntent "inspector" intents
 
 let private joinIntentUiLabel<'T>
     (parser: obj -> Result<'T list, string>)
@@ -159,7 +159,7 @@ let private joinIntentUiLabel<'T>
 let joinCoderUiLabel (intents: obj) : Result<string, string> =
     joinIntentUiLabel parseCoderIntents (fun i -> i.objective) intents
 
-let joinInvestigatorUiLabel (intents: obj) : Result<string, string> =
-    joinIntentUiLabel parseInvestigatorIntents (fun i -> i.objective) intents
+let joinInspectorUiLabel (intents: obj) : Result<string, string> =
+    joinIntentUiLabel parseInspectorIntents (fun i -> i.objective) intents
 
 let intentsRawFromArgs (args: obj) : obj = Dyn.get args "intents"

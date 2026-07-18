@@ -177,7 +177,7 @@ requested → dispatch_started → dispatched → [failed | cancelled | settled]
 
 ## 子会话 Fallback 路由
 
-子代理（Coder、Investigator 等）通过 `SubsessionActor` 运行，其 Fallback 处理方式不同：
+子代理（Coder、Inspector 等）通过 `SubsessionActor` 运行，其 Fallback 处理方式不同：
 
 - 子会话的错误事件不进入主 session 的 `FallbackEventBridge`，而是通过 `SubsessionEventRouter` 路由到子 `SubsessionActor`
 - `SubsessionActor` 内部使用 `SubsessionService.StartRun` 启动，接受 `FallbackConfig` 和 `ModelDirective`

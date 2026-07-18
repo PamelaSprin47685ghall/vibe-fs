@@ -39,14 +39,14 @@ let muxCoderIntentsSchema (intentsDesc: string) : obj =
           "items", intentItem
           "description", box intentsDesc ]
 
-let muxInvestigatorIntentsSchema (intentsDesc: string) : obj =
+let muxInspectorIntentsSchema (intentsDesc: string) : obj =
     let intentItem =
         muxObjectSchema
             (createObj
-                [ "objective", muxStrReq investigatorObjectiveDesc
-                  "background", muxStrReq investigatorBackgroundDesc
-                  "questions", muxStrArrayReq investigatorQuestionsDesc
-                  "entries", muxStrArrayOpt investigatorEntriesDesc ])
+                [ "objective", muxStrReq inspectorObjectiveDesc
+                  "background", muxStrReq inspectorBackgroundDesc
+                  "questions", muxStrArrayReq inspectorQuestionsDesc
+                  "entries", muxStrArrayOpt inspectorEntriesDesc ])
             [| "objective"; "background"; "questions" |]
 
     createObj

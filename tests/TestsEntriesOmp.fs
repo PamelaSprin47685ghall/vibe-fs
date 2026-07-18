@@ -38,8 +38,8 @@ let private entries1 () : (string * TestBody) list =
       "OmpContextTransformTests.capsSynthUserPrepended", Async OmpContextTransformTests.capsSynthUserPrepended
       "OmpContextTransformTests.capsReadToolsInContextTransform",
       Async OmpContextTransformTests.capsReadToolsInContextTransform
-      "OmpContextTransformTests.testInvestigatorCrashWithUndefinedCaps",
-      Async OmpContextTransformTests.testInvestigatorCrashWithUndefinedCaps
+      "OmpContextTransformTests.testInspectorCrashWithUndefinedCaps",
+      Async OmpContextTransformTests.testInspectorCrashWithUndefinedCaps
       "OmpContextTransformTests.beforeAgentStartOmitsCapsXml",
       Async OmpContextTransformTests.beforeAgentStartOmitsCapsXml
       "OmpContextTransformTests.reviewReplayIfStoreEmptyOnTransform",

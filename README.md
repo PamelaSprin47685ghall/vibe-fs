@@ -19,7 +19,7 @@
 
 | 能力 | 说明 |
 | :--- | :--- |
-| 子代理 | `coder`、`investigator`、`browser`、`meditator`；支持 `continue` 对同一会话追问 |
+| 子代理 | `coder`、`inspector`、`browser`、`meditator`；支持 `continue` 对同一会话追问 |
 | 审查 | `/loop <任务>` 进入 With-Review；`submit_review` / `return_reviewer` |
 | 待办与交接 | `todowrite`（Mux / OpenCode / OMP）或 Mimocode 的 `task`；须带完整待办列表与五份工作报告 + `select_methodology` |
 | 方法论 | `meditator` 单一工具，内部枚举 54 种方法论；与待办里的 `select_methodology` 联动 |

@@ -41,7 +41,7 @@ let private completedMessages () : obj =
     let model = createObj [ "providerID", box "test"; "modelID", box "test-model" ]
 
     let info =
-        createObj [ "role", box "assistant"; "agent", box "investigator"; "model", box model ]
+        createObj [ "role", box "assistant"; "agent", box "inspector"; "model", box model ]
 
     let part = createObj [ "type", box "text"; "text", box "continue final output" ]
     let message = createObj [ "info", box info; "parts", box [| box part |] ]
@@ -68,7 +68,7 @@ let run
                   box
                       {| providerID = "test"
                          modelID = "test-model" |}
-                  "agent", box "investigator"
+                  "agent", box "inspector"
                   "create", box (fun _ -> Promise.lift (box {| data = {| id = childID |} |}))
                   "prompt",
                   box (fun _ ->
@@ -123,7 +123,7 @@ let run
                                 questions = [| "what happened?" |]
                                 entries = [||] |} |] ]
 
-        let spawnP = harness.executePluginTool "investigator" spawnArgs (createEmpty ())
+        let spawnP = harness.executePluginTool "inspector" spawnArgs (createEmpty ())
         do! withTimeout firstPromptSeen
         do! yieldMicrotask ()
         do! sleep 20
@@ -147,7 +147,7 @@ let run
                                       "status",
                                       box
                                           {| ``type`` = "idle"
-                                             agent = "investigator"
+                                             agent = "inspector"
                                              model =
                                               {| providerID = "test"
                                                  modelID = "test-model" |} |} ]

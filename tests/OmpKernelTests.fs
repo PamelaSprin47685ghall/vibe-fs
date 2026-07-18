@@ -21,7 +21,7 @@ let private mainSessionActive =
        "ast_grep"
        "bash"
        "coder"
-       "investigator"
+       "inspector"
        "meditator"
        "browser"
        "executor"
@@ -38,7 +38,7 @@ let filterOmpMainSessionTools () =
     for name in
         [| "read"
            "coder"
-           "investigator"
+           "inspector"
            "meditator"
            "executor"
            "submit_review"

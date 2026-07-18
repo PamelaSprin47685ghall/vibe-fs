@@ -98,18 +98,18 @@ let coderParameters (tb: obj) : obj =
 
     injectWarnReuseIntoOmpParameters schema "coder"
 
-let private investigatorIntentItem (tb: obj) : obj =
+let private inspectorIntentItem (tb: obj) : obj =
     objectOf
-        [| ("objective", str investigatorObjectiveDesc tb)
-           ("background", str investigatorBackgroundDesc tb)
-           ("questions", strArray investigatorQuestionsDesc tb)
-           ("entries", opt investigatorEntriesDesc tb (fun _ tb -> strArray investigatorEntryItemDesc tb)) |]
+        [| ("objective", str inspectorObjectiveDesc tb)
+           ("background", str inspectorBackgroundDesc tb)
+           ("questions", strArray inspectorQuestionsDesc tb)
+           ("entries", opt inspectorEntriesDesc tb (fun _ tb -> strArray inspectorEntryItemDesc tb)) |]
         tb
 
-let investigatorParameters (tb: obj) : obj =
+let inspectorParameters (tb: obj) : obj =
     injectWarnReuseIntoOmpParameters
-        (objectOf [| ("intents", arrayOf (investigatorIntentItem tb) Params.investigatorIntents tb) |] tb)
-        "investigator"
+        (objectOf [| ("intents", arrayOf (inspectorIntentItem tb) Params.inspectorIntents tb) |] tb)
+        "inspector"
 
 let browserParameters (tb: obj) : obj =
     injectWarnReuseIntoOmpParameters (objectOf [| ("intent", str Params.browserIntent tb) |] tb) "browser"

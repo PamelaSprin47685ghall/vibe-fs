@@ -16,7 +16,7 @@ let applyAgentConfigForRegistersBuiltinAgents () =
     let primaryNames = [| "manager"; "build"; "plan" |]
 
     let subagentNames =
-        [| "coder"; "investigator"; "meditator"; "reviewer"; "browser"; "executor" |]
+        [| "coder"; "inspector"; "meditator"; "reviewer"; "browser"; "executor" |]
 
     for name in primaryNames do
         let a = get agents name

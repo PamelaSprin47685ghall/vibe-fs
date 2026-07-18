@@ -18,7 +18,7 @@ let private fail message = check message false
 
 let private model: FallbackModel =
     { ProviderID = "test"
-      ModelID = "investigator"
+      ModelID = "inspector"
       Variant = None
       Temperature = None
       TopP = None
@@ -75,7 +75,7 @@ let currentUserNonceAnchorsAssistantEvidenceBeforeIdle () =
         let turnId = TurnId.create (RunId.value runId + "-t0")
 
         let expectedReport =
-            "investigator report: the current turn found src/Opencode/FallbackHooks.fs"
+            "inspector report: the current turn found src/Opencode/FallbackHooks.fs"
 
         let store = TurnStartedStore()
 
@@ -90,7 +90,7 @@ let currentUserNonceAnchorsAssistantEvidenceBeforeIdle () =
             { RunId = runId
               SessionId = SessionId.create sessionId
               ParentSessionId = SessionId.create "parent-opencode-current-turn-evidence"
-              Prompt = "investigate"
+              Prompt = "inspect"
               FallbackConfig = config
               Directive = RetryChain [ model ]
               InitiallyCancelled = false }
@@ -133,7 +133,7 @@ let currentUserNonceAnchorsAssistantEvidenceBeforeIdle () =
                       parts =
                        [| box
                               {| ``type`` = "text"
-                                 text = "investigate current turn"
+                                 text = "inspect current turn"
                                  metadata = box {| nonce = TurnId.value turnId |} |} |] |}
                box
                    {| id = "current-assistant-message"
@@ -149,7 +149,7 @@ let currentUserNonceAnchorsAssistantEvidenceBeforeIdle () =
 
         let runtime = FallbackRuntimeStore()
         let childRegistry = ChildAgentRegistry.Create()
-        childRegistry.RegisterChildAgent(sessionId, "investigator", Some "parent-opencode-current-turn-evidence")
+        childRegistry.RegisterChildAgent(sessionId, "inspector", Some "parent-opencode-current-turn-evidence")
 
         let handler =
             createOpencodeFallbackHandler
@@ -178,7 +178,7 @@ let currentUserNonceAnchorsAssistantEvidenceBeforeIdle () =
         match result with
         | Succeeded report -> equal "caller receives only the current assistant report" expectedReport report
         | Failed(RecoveryExhausted reason) -> fail ("current assistant evidence was lost: " + reason)
-        | other -> fail ("expected Succeeded with the investigator report, got " + string other)
+        | other -> fail ("expected Succeeded with the inspector report, got " + string other)
 
         SubsessionActorRegistry.Remove workspaceRoot sessionId
     }

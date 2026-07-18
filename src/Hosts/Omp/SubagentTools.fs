@@ -32,9 +32,9 @@ let private coderChildTools =
        "fuzzy_grep"
        "fuzzy_continue"
        "lsp"
-       "investigator" |]
+       "inspector" |]
 
-let private investigatorChildTools =
+let private inspectorChildTools =
     [| "read"; "find"; "fuzzy_find"; "fuzzy_grep"; "fuzzy_continue" |]
 
 type OmpHostAdapter
@@ -57,7 +57,7 @@ type OmpHostAdapter
             let toolNames =
                 match request.Role with
                 | Coder -> coderChildTools
-                | Investigator -> investigatorChildTools
+                | Inspector -> inspectorChildTools
                 | Meditator -> [||]
                 | Browser -> [| "browser" |]
 
@@ -175,10 +175,10 @@ let registerSubagentTools
 
     pi?registerTool (
         buildSubagentInvocation
-            "investigator"
-            "Investigator"
-            (description "investigator")
-            investigatorParameters
+            "inspector"
+            "Inspector"
+            (description "inspector")
+            inspectorParameters
             pi
             fallbackRuntime
             fallbackConfigOpt

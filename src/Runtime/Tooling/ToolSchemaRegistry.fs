@@ -167,7 +167,7 @@ do
           ("websearch", "numResults", SNumber)
           ("webfetch", "timeout", SNumber)
           ("coder", "intents", SArray)
-          ("investigator", "intents", SArray)
+          ("inspector", "intents", SArray)
           ("executor", "dependencies", SObject)
           ("todowrite", "todos", SArray)
           ("todowrite", "select_methodology", SArray)

@@ -34,16 +34,16 @@ let private mkClientWithNoModelConfigured (agentName: string) : obj =
 /// Agent has an explicit model in opencode.jsonc — must return Some.
 let agentWithExplicitModelReturnsSome () =
     promise {
-        let client = mkClientWithAgentModel "investigator" "openai/gpt-5"
-        let! result = tryGetAgentExplicitModel client "investigator"
+        let client = mkClientWithAgentModel "inspector" "openai/gpt-5"
+        let! result = tryGetAgentExplicitModel client "inspector"
         equal "explicit model found" (Some "openai/gpt-5") result
     }
 
 /// Agent entry exists but has no model field — must return None, not throw.
 let agentWithoutModelFieldReturnsNone () =
     promise {
-        let client = mkClientWithNoModelConfigured "investigator"
-        let! result = tryGetAgentExplicitModel client "investigator"
+        let client = mkClientWithNoModelConfigured "inspector"
+        let! result = tryGetAgentExplicitModel client "inspector"
         equal "no model configured" None result
     }
 
@@ -52,14 +52,14 @@ let agentWithoutModelFieldReturnsNone () =
 let clientWithoutConfigApiReturnsNone () =
     promise {
         let client = createObj [ "session", box (createObj []) ]
-        let! result = tryGetAgentExplicitModel client "investigator"
+        let! result = tryGetAgentExplicitModel client "inspector"
         equal "missing config api degrades to None" None result
     }
 
 /// Nullish client must degrade to None, never throw.
 let nullClientReturnsNone () =
     promise {
-        let! result = tryGetAgentExplicitModel null "investigator"
+        let! result = tryGetAgentExplicitModel null "inspector"
         equal "null client degrades to None" None result
     }
 

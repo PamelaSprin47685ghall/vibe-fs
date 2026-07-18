@@ -9,7 +9,7 @@ open Wanxiangshu.Runtime.SembleMcp
 open Wanxiangshu.Runtime.SembleSearch
 
 let private getBreakpointState (agent: string) (sessionID: string) (messages: Message<obj> list) (encodedLen: int) =
-    if agent <> "investigator" && agent <> "reviewer" then
+    if agent <> "inspector" && agent <> "reviewer" then
         SembleSearch.markBreakpoint sessionID encodedLen
         Error encodedLen
     else

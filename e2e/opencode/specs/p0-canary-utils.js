@@ -47,7 +47,7 @@ const EXPECTED_CONTROL_FIELDS = {
     'ast_grep_replace', 'file_edit_replace_string', 'file_edit_insert',
     'pty_spawn', 'pty_write', 'pty_read', 'pty_list', 'pty_kill', 'swap']),
   warn: new Set(['executor', 'pty_spawn', 'pty_write', 'pty_read', 'pty_list', 'pty_kill']),
-  warn_reuse: new Set(['coder', 'investigator', 'meditator', 'browser']),
+  warn_reuse: new Set(['coder', 'inspector', 'meditator', 'browser']),
 };
 
 function validateSchema(toolName, schema, errors) {
@@ -178,7 +178,7 @@ export function validateToolSchema(tools) {
   }
 
   // Agent tools (subagent dispatchers) should be present and carry warn_reuse.
-  const agentTools = ['browser', 'coder', 'investigator', 'meditator'];
+  const agentTools = ['browser', 'coder', 'inspector', 'meditator'];
   for (const name of agentTools) {
     if (!seen.has(name)) {
       errors.push(`agent tool missing: ${name}`);

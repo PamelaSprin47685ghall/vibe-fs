@@ -60,7 +60,7 @@ let private mapTodoWrite (tw: WorkBacklogToolsCodec.TodoWriteArgs) : Wanxiangshu
 type DecodedToolInvocation =
     | Typed of ToolArgs
     | CoderBatch of CoderIntent list
-    | InvestigatorBatch of InvestigatorIntent list
+    | InspectorBatch of InspectorIntent list
 
 let private intentsField (toolName: string) (args: obj) : Result<obj, DomainError> =
     let v = intentsRawFromArgs args
@@ -85,12 +85,12 @@ let private decodeCoder args =
         |> Result.mapError (fun msg -> ParseError("intents", msg))
         |> Result.map CoderBatch)
 
-let private decodeInvestigator args =
-    intentsField "investigator" args
+let private decodeInspector args =
+    intentsField "inspector" args
     |> Result.bind (fun raw ->
-        parseInvestigatorIntents raw
+        parseInspectorIntents raw
         |> Result.mapError (fun msg -> ParseError("intents", msg))
-        |> Result.map InvestigatorBatch)
+        |> Result.map InspectorBatch)
 
 let private decodeBrowser args =
     decodeBrowserArgs args
@@ -141,7 +141,7 @@ let decodeToolInvocation (toolName: string) (args: obj) : Result<DecodedToolInvo
     | "read" -> decodeRead args
     | "write" -> decodeWrite args
     | "coder" -> decodeCoder args
-    | "investigator" -> decodeInvestigator args
+    | "inspector" -> decodeInspector args
     | "browser" -> decodeBrowser args
     | "continue" -> decodeContinue args
     | "websearch" -> decodeWebsearch args
@@ -157,4 +157,4 @@ let decodeToolArgs (toolName: string) (args: obj) : Result<ToolArgs, DomainError
     | Error e -> Error e
     | Ok(Typed ta) -> Ok ta
     | Ok(CoderBatch _)
-    | Ok(InvestigatorBatch _) -> Error(InvalidIntent(toolName, "tool", "subagent intents are not ToolArgs"))
+    | Ok(InspectorBatch _) -> Error(InvalidIntent(toolName, "tool", "subagent intents are not ToolArgs"))

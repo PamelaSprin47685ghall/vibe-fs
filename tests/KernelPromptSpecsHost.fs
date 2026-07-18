@@ -51,9 +51,9 @@ let hostKernel' () =
           questions = [| "Where is auth configured?" |]
           entries = [||] }
 
-    let investigatorPromptText = investigatorPrompt inv
-    check "investigator has objective" (investigatorPromptText.IndexOf("find auth") >= 0)
-    check "investigator read-only" (investigatorPromptText.IndexOf("READ-ONLY") >= 0)
+    let inspectorPromptText = inspectorPrompt inv
+    check "inspector has objective" (inspectorPromptText.IndexOf("find auth") >= 0)
+    check "inspector read-only" (inspectorPromptText.IndexOf("READ-ONLY") >= 0)
 
 let toolCatalogCentralized () =
     let coderSpec = specOf "coder"
@@ -66,9 +66,9 @@ let toolCatalogCentralized () =
     check "coder param doc for intents" (Map.containsKey "intents" coderSpec.paramDocs)
     check "coder param doc for tdd" (Map.containsKey "tdd" coderSpec.paramDocs)
 
-    let investigatorSpec = specOf "investigator"
-    check "investigator spec carries description" (investigatorSpec.description.Length > 0)
-    check "investigator requires intents only" (investigatorSpec.requiredFields = [ "intents" ])
+    let inspectorSpec = specOf "inspector"
+    check "inspector spec carries description" (inspectorSpec.description.Length > 0)
+    check "inspector requires intents only" (inspectorSpec.requiredFields = [ "intents" ])
 
     let executorSpec = specOf "executor"
     check "executor describes timeout budgets" (executorSpec.description.Contains "timeout")
@@ -94,7 +94,7 @@ let toolCatalogCentralized () =
     let allSpecs = all
     let names = allSpecs |> List.map (fun spec -> spec.name) |> Set.ofList
     check "catalog covers coder" (Set.contains "coder" names)
-    check "catalog covers investigator" (Set.contains "investigator" names)
+    check "catalog covers inspector" (Set.contains "inspector" names)
     check "catalog covers browser" (Set.contains "browser" names)
     check "catalog covers executor" (Set.contains "executor" names)
     check "catalog covers submit_review" (Set.contains "submit_review" names)

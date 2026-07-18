@@ -158,7 +158,7 @@ let reviewReplayIfStoreEmptyOnTransform () =
         do! rmAsync root
     }
 
-let testInvestigatorCrashWithUndefinedCaps () =
+let testInspectorCrashWithUndefinedCaps () =
     promise {
         let! root = mkdtempAsync "omp-caps-inject-crash-"
         let badFilePath = join root "polluted-cap.md"

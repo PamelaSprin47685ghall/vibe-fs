@@ -130,9 +130,9 @@ let testHostNativeToolsTrigger () =
         let! res17 = singleCallTriggers "coder" "s17"
         equal "coder triggers" 4 res17.Length
 
-        // investigator
-        let! res18 = singleCallTriggers "investigator" "s18"
-        equal "investigator triggers" 4 res18.Length
+        // inspector
+        let! res18 = singleCallTriggers "inspector" "s18"
+        equal "inspector triggers" 4 res18.Length
 
         // task
         let! res19 = singleCallTriggers "task" "s19"

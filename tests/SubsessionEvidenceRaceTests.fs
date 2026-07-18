@@ -34,7 +34,7 @@ let private request: StartRunRequest =
     { RunId = runId
       SessionId = sid
       ParentSessionId = parent
-      Prompt = "investigate README"
+      Prompt = "inspect README"
       FallbackConfig = cfg
       Directive = RetryChain [ model0 ]
       InitiallyCancelled = false }
@@ -46,7 +46,7 @@ let private mustDecide state cmd =
     | Error e -> failwith ("decision error: " + string e)
 
 /// Reproduces the real-world race behind "invalid run for tool 'subagent':
-/// No assistant message in current turn" for investigator/coder/browser/meditator.
+/// No assistant message in current turn" for inspector/coder/browser/meditator.
 ///
 /// Host truth: `session.prompt` resolving (→ DispatchAccepted) and the host's
 /// event bus delivering `message.updated` (role=assistant) (→ EvidenceUpdated)
@@ -69,7 +69,7 @@ let evidenceDuringDispatchingMustSurviveIntoRunning () =
     | Dispatching(_, plan, _) ->
         let earlyEvidence =
             { CurrentTurnEvidence.empty with
-                Assistant = AssistantSnapshot("", 0L, "investigator report: README found at docs/", Some NormalFinish) }
+                Assistant = AssistantSnapshot("", 0L, "inspector report: README found at docs/", Some NormalFinish) }
 
         // The assistant's full reply lands via message.updated BEFORE the host
         // has confirmed acceptance of our own prompt call.
@@ -95,7 +95,7 @@ let evidenceDuringDispatchingMustSurviveIntoRunning () =
                     | AssistantSnapshot(_, _, text, _) ->
                         equal
                             "assistant evidence collected before acceptance is preserved into Running"
-                            "investigator report: README found at docs/"
+                            "inspector report: README found at docs/"
                             text
                     | NoAssistant -> fail "premature evidence was destroyed on the Dispatching→Running transition"
                     | EmptyAssistant -> fail "premature evidence was replaced with EmptyAssistant"
@@ -113,7 +113,7 @@ let evidenceDuringDispatchingMustSurviveIntoRunning () =
                             d3.Effects
                             |> List.exists (function
                                 | CompleteCaller(_, Succeeded text) ->
-                                    text.Contains "investigator report: README found at docs/"
+                                    text.Contains "inspector report: README found at docs/"
                                 | _ -> false)
 
                         check "subagent run succeeds naturally instead of RecoveryExhausted" succeededWithReport
@@ -197,7 +197,7 @@ let unattributedEvidenceInRunningIsAccepted () =
             | Running _ ->
                 let unattributed =
                     { CurrentTurnEvidence.empty with
-                        Assistant = AssistantSnapshot("", 0L, "investigator report found", Some NormalFinish) }
+                        Assistant = AssistantSnapshot("", 0L, "inspector report found", Some NormalFinish) }
 
                 match
                     decide
@@ -211,7 +211,7 @@ let unattributedEvidenceInRunningIsAccepted () =
                     | Running(_, _, evidence) ->
                         match evidence.Assistant with
                         | AssistantSnapshot(_, _, text, _) ->
-                            equal "unattributed evidence accepted in Running" "investigator report found" text
+                            equal "unattributed evidence accepted in Running" "inspector report found" text
                         | NoAssistant -> fail "unattributed evidence was dropped in Running"
                         | other -> fail ("unexpected assistant evidence: " + string other)
                     | other -> fail ("expected Running, got " + string other)

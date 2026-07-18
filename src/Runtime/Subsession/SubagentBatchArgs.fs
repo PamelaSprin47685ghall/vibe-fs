@@ -15,10 +15,10 @@ let validateCoderBatchArgs (toolName: string) (args: obj) : Result<CoderIntent l
     let raw = intentsRawFromArgs args
     validateCoderIntents toolName raw
 
-let validateInvestigatorBatchArgs (toolName: string) (args: obj) : Result<InvestigatorIntent list, DomainError> =
+let validateInspectorBatchArgs (toolName: string) (args: obj) : Result<InspectorIntent list, DomainError> =
     let raw = intentsRawFromArgs args
 
-    match parseInvestigatorIntents raw with
+    match parseInspectorIntents raw with
     | Error msg -> Error(ParseError("intents", msg))
     | Ok [] -> Error(InvalidIntent(toolName, "intents", "must be a non-empty array"))
     | Ok intents -> Ok intents

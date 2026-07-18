@@ -68,7 +68,7 @@ type OpencodeHostAdapter
             let agent =
                 match request.Role with
                 | Coder -> "coder"
-                | Investigator -> "investigator"
+                | Inspector -> "inspector"
                 | Meditator -> "meditator"
                 | Browser -> "browser"
 
@@ -162,23 +162,21 @@ let coderTool
                   "ui_", uiParam ]))
         (fun args context -> executeSubagent host registry ctx "coder" args context runtime sessionScope)
 
-let investigatorTool
+let inspectorTool
     (host: Host)
     (registry: ChildAgentRegistry)
     (ctx: obj)
     (runtime: FallbackRuntimeStore)
     (sessionScope: RuntimeScope)
     : obj =
-    let investigatorRequiredKeys = subagentRequiredKeys "investigator"
+    let inspectorRequiredKeys = subagentRequiredKeys "inspector"
 
     define
-        investigator
+        inspector
         (subagentZodShape
-            investigatorRequiredKeys
-            (createObj
-                [ "intents", investigatorIntentsSchema Params.investigatorIntents
-                  "ui_", uiParam ]))
-        (fun args context -> executeSubagent host registry ctx "investigator" args context runtime sessionScope)
+            inspectorRequiredKeys
+            (createObj [ "intents", inspectorIntentsSchema Params.inspectorIntents; "ui_", uiParam ]))
+        (fun args context -> executeSubagent host registry ctx "inspector" args context runtime sessionScope)
 
 let browserTool
     (host: Host)

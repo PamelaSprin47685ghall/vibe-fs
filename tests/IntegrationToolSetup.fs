@@ -136,7 +136,7 @@ let sampleCoderIntentWithDoNotTouch (objective: string) (file: string) (doNotTou
           "do_not_touch", box doNotTouch
           "targets", box [| createObj [ "file", box file; "guide", box "test guide" ] |] ]
 
-let sampleInvestigatorIntent (objective: string) : obj =
+let sampleInspectorIntent (objective: string) : obj =
     createObj
         [ "objective", box objective
           "background", box "test background"

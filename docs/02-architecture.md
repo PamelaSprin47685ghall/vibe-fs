@@ -85,7 +85,7 @@
 
 ### Subsession Actor（子会话隔离）
 
-子代理（Coder、Investigator、Browser、Meditator）通过 `SubsessionActor` 轻量 Actor 消息泵运行，提供完整的错误隔离、降级恢复和超时保护。每个子会话拥有独立的 `SerialQueue`、Fallback 状态机、事件溯源和 NDJSON 持久化。
+子代理（Coder、Inspector、Browser、Meditator）通过 `SubsessionActor` 轻量 Actor 消息泵运行，提供完整的错误隔离、降级恢复和超时保护。每个子会话拥有独立的 `SerialQueue`、Fallback 状态机、事件溯源和 NDJSON 持久化。
 
 详见 [11-subagents.md](./11-subagents.md) § SubsessionActor。
 

@@ -200,7 +200,7 @@ sidecar_binding:
 | --------------------- | ---------: | -------: | -------------------------- |
 | 顶层 main/build         |          是 |        是 | 核心目标                       |
 | coder/editor          |          是 |        是 | 文件读取和规则纠偏价值最高              |
-| investigator          |       暂不启用 |       可选 | 本身就是检索 agent，容易与 Semble 重复 |
+| inspector          |       暂不启用 |       可选 | 本身就是检索 agent，容易与 Semble 重复 |
 | reviewer              |         可选 |       可选 | 可在移除 Semble 后评估            |
 | meditator             |          否 |   可选但默认否 | 主要做推理，文件预读收益小              |
 | browser               |          否 |        否 | 本地文件 prefetch 通常无价值        |
@@ -216,7 +216,7 @@ sidecar_binding:
 1. main 的 prefetcher；
 2. coder 的 prefetcher；
 3. main/coder 的 enforcer；
-4. reviewer/investigator shadow 模式；
+4. reviewer/inspector shadow 模式；
 5. 根据实际命中率决定是否开启。
 
 ---
@@ -1421,7 +1421,7 @@ sidecars:
 ## 阶段二：非 reviewer/main 小范围注入
 
 * 先对 coder 开启；
-* Semble 保留在 investigator/reviewer；
+* Semble 保留在 inspector/reviewer；
 * synthetic 前缀完全区分。
 
 ## 阶段三：替代 Semble
@@ -1623,7 +1623,7 @@ sidecars:
 
 ## 第七阶段：扩大 session allowlist
 
-根据数据决定 reviewer/investigator 是否开启，不要默认扩展到所有 subsession。
+根据数据决定 reviewer/inspector 是否开启，不要默认扩展到所有 subsession。
 
 ---
 

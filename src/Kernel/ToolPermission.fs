@@ -24,7 +24,7 @@ type ToolSemantic =
 let private knownAgentSet =
     Set.ofList
         [ "manager"
-          "investigator"
+          "inspector"
           "coder"
           "reviewer"
           "browser"
@@ -103,24 +103,24 @@ let canUseSemantic (agent: Agent) (semantic: ToolSemantic) (tool: Tool) : bool =
     | _, ReturnRoleEcho -> tool = sprintf "return_%s" agent
     | _, PtyFamily ->
         not (Set.contains agent knownAgentSet)
-        || agent = "investigator"
+        || agent = "inspector"
         || agent = "manager"
     | "meditator", Read -> true
-    | "meditator", SubagentWebSkillOrSubmit when tool = "investigator" -> true
+    | "meditator", SubagentWebSkillOrSubmit when tool = "inspector" -> true
     | "meditator", _
     | "executor", _ -> false
     | _, TodoFamily
     | _, MethodologyFamily -> not (shouldExcludeAgentFromProjection agent false)
     | _, Read -> true
     | "browser", _ -> false
-    | "reviewer", SubagentWebSkillOrSubmit when tool = "investigator" -> true
+    | "reviewer", SubagentWebSkillOrSubmit when tool = "inspector" -> true
     | "reviewer", SubagentWebSkillOrSubmit -> false
     | "reviewer", WritePatchFamily -> false
     | "reviewer", _ -> true
-    | "investigator", SubagentWebSkillOrSubmit when tool = "executor" -> true
-    | "coder", SubagentWebSkillOrSubmit when tool = "investigator" -> true
-    | _, SubagentWebSkillOrSubmit -> agent <> "investigator" && agent <> "coder" && agent <> "reviewer"
-    | _, WritePatchFamily -> agent <> "investigator" && agent <> "manager" && agent <> "reviewer"
+    | "inspector", SubagentWebSkillOrSubmit when tool = "executor" -> true
+    | "coder", SubagentWebSkillOrSubmit when tool = "inspector" -> true
+    | _, SubagentWebSkillOrSubmit -> agent <> "inspector" && agent <> "coder" && agent <> "reviewer"
+    | _, WritePatchFamily -> agent <> "inspector" && agent <> "manager" && agent <> "reviewer"
     | "manager", FuzzyGrep -> false
     | _, FuzzyGrep -> agent <> "manager"
     | _, SearchFamily -> agent <> "browser" && agent <> "meditator" && agent <> "executor"

@@ -40,12 +40,12 @@ let muxSummarizationSpec () =
 /// Locks the permission shape of the summary child workspace. Mirrors opencode's
 /// `executor` agent: only `agent_report` survives — every other surface
 /// (sub-agents, mutating tools, fuzzy, write, etc.) must be stripped so
-/// the child cannot re-enter the host tool surface (no `investigator`/`coder`/
+/// the child cannot re-enter the host tool surface (no `inspector`/`coder`/
 /// `browser`/`meditator` re-spawn, no file edits, no further fetches).
 let muxSummarizationToolPolicySpec () =
     let toolNames =
         [| "coder"
-           "investigator"
+           "inspector"
            "meditator"
            "browser"
            "executor"
@@ -69,7 +69,7 @@ let muxSummarizationToolPolicySpec () =
 
     for removed in
         [ "coder"
-          "investigator"
+          "inspector"
           "meditator"
           "browser"
           "executor"

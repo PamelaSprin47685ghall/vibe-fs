@@ -121,7 +121,7 @@ type SubsessionState =
     /// full assistant reply while we are still Dispatching. This evidence
     /// MUST survive into Running (see Decision.fs Dispatching+DispatchAccepted),
     /// not be silently destroyed — that was the root cause of subagent runs
-    /// (investigator/coder/browser/meditator) spuriously failing with
+    /// (inspector/coder/browser/meditator) spuriously failing with
     /// "No assistant message in current turn".
     | Dispatching of RunContext * TurnPlan * CurrentTurnEvidence
     | CancellingDispatch of RunContext * TurnPlan * CancelContext

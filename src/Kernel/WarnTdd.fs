@@ -67,7 +67,7 @@ let parseWarnReuse (s: string) : bool =
     not (System.String.IsNullOrWhiteSpace s)
 
 let subagentTools: Set<string> =
-    Set.ofList [ "coder"; "investigator"; "meditator"; "browser" ]
+    Set.ofList [ "coder"; "inspector"; "meditator"; "browser" ]
 
 let isSubagentTool (tool: string) : bool =
     Set.contains (tool.ToLowerInvariant()) subagentTools

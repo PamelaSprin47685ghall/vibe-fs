@@ -205,9 +205,9 @@ let buildCompactionAnchorPromptEmptyReturnsEmpty () =
 
 let buildCompactionAnchorPromptWithoutBacklogSkipsEmptyArrayBlock () =
     let prompt =
-        buildCompactionAnchorPrompt [] (fun () -> [ "---\ntask: investigate-loop\n---" ])
+        buildCompactionAnchorPrompt [] (fun () -> [ "---\ntask: inspect-loop\n---" ])
 
-    check "anchor-only prompt starts with real anchor block" (prompt.StartsWith "---\ntask: investigate-loop")
+    check "anchor-only prompt starts with real anchor block" (prompt.StartsWith "---\ntask: inspect-loop")
     check "anchor-only prompt does not prepend empty array block" (not (prompt.Contains "---\n[]\n---"))
 
 let buildCompactionAnchorPromptOrdersHistoryAnchorsBeforeBacklog () =

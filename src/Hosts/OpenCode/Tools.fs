@@ -34,7 +34,7 @@ let createTools
     let tools =
         createObj
             [ yield "coder", box (coderTool host registry ctx fallbackRuntime sessionScope)
-              yield "investigator", box (investigatorTool host registry ctx fallbackRuntime sessionScope)
+              yield "inspector", box (inspectorTool host registry ctx fallbackRuntime sessionScope)
               yield "browser", box (browserTool host registry ctx fallbackRuntime sessionScope)
               yield "continue", box (continueTool host registry ctx fallbackRuntime sessionScope)
               yield "executor", box (executorTool host registry ctx sessionScope fallbackRuntime)

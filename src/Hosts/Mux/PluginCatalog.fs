@@ -33,7 +33,7 @@ open Wanxiangshu.Runtime.SubagentIntentsCodec
 let muxToolNames =
     Array.append
         [| "coder"
-           "investigator"
+           "inspector"
            "browser"
            "continue"
            "executor"
@@ -67,7 +67,7 @@ let createToolCatalog
 
     let catalog =
         [| yield injectWarnWarnTddIntoMuxSchema (coderTool deps toolNames sessionScope)
-           yield investigatorTool deps toolNames sessionScope
+           yield inspectorTool deps toolNames sessionScope
            yield browserTool deps toolNames sessionScope
            yield continueTool deps toolNames sessionScope
            yield injectWarnWarnTddIntoMuxSchema (executorTool deps toolNames sessionScope)
@@ -115,9 +115,9 @@ let toolExecuteBefore (input: obj) (output: obj) : JS.Promise<unit> =
                         match rawOpt with
                         | Some r -> joinCoderUiLabel r
                         | None -> Result.Error ""
-                    | "investigator" ->
+                    | "inspector" ->
                         match rawOpt with
-                        | Some r -> joinInvestigatorUiLabel r
+                        | Some r -> joinInspectorUiLabel r
                         | None -> Result.Error ""
                     | _ -> Result.Error ""
 

@@ -95,16 +95,15 @@ let coderTool (deps: obj) (toolNames: string array) (sessionScope: RuntimeScope)
       execute = fun config args -> execute deps toolNames sessionScope "exec" "Coder" "exec" "coder" config args
       condition = None }
 
-let investigatorTool (deps: obj) (toolNames: string array) (sessionScope: RuntimeScope) : ToolDefinition =
-    { name = "investigator"
-      description = description "investigator"
+let inspectorTool (deps: obj) (toolNames: string array) (sessionScope: RuntimeScope) : ToolDefinition =
+    { name = "inspector"
+      description = description "inspector"
       parameters =
         mkSchema
-            (createObj [ "intents", box (muxInvestigatorIntentsSchema Params.investigatorIntents) ])
-            (subagentRequiredKeys "investigator")
+            (createObj [ "intents", box (muxInspectorIntentsSchema Params.inspectorIntents) ])
+            (subagentRequiredKeys "inspector")
       execute =
-        fun config args ->
-            execute deps toolNames sessionScope "explore" "Investigator" "explore" "investigator" config args
+        fun config args -> execute deps toolNames sessionScope "explore" "Inspector" "explore" "inspector" config args
       condition = None }
 
 let browserTool (deps: obj) (toolNames: string array) (sessionScope: RuntimeScope) : ToolDefinition =

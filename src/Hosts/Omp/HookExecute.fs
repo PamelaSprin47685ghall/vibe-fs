@@ -14,7 +14,7 @@ let private setUiLabel (args: obj) (toolName: string) : unit =
     let labelResult =
         match toolName with
         | "coder" -> joinCoderUiLabel (Dyn.get args "intents")
-        | "investigator" -> joinInvestigatorUiLabel (Dyn.get args "intents")
+        | "inspector" -> joinInspectorUiLabel (Dyn.get args "intents")
         | _ -> Result.Error ""
 
     match labelResult with
