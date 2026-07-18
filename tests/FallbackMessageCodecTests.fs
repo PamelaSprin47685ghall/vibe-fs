@@ -1,5 +1,6 @@
 module Wanxiangshu.Tests.FallbackMessageCodecTests
 
+open Wanxiangshu.Runtime.Fallback.FallbackMessageDetection
 open Wanxiangshu.Runtime.Fallback.RuntimeStore
 
 open Fable.Core

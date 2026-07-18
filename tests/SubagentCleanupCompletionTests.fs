@@ -1,5 +1,6 @@
 module Wanxiangshu.Tests.SubagentCleanupCompletionTests
 
+open Wanxiangshu.Hosts.Opencode.SubagentIoRun
 open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Tests.Assert

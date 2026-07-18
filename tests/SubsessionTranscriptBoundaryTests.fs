@@ -1,5 +1,6 @@
 module Wanxiangshu.Tests.SubsessionTranscriptBoundaryTests
 
+open Wanxiangshu.Runtime.Subsession.SubsessionEventPayload
 open Fable.Core.JsInterop
 open Wanxiangshu.Kernel.FallbackKernel.Types
 open Wanxiangshu.Kernel.Subsession.Types

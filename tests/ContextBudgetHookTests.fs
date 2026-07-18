@@ -1,5 +1,6 @@
 module Wanxiangshu.Tests.ContextBudgetHookTests
 
+open Wanxiangshu.Runtime.MessageTransform.ContextBudgetEngine
 open Fable.Core
 open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Kernel.HostTools

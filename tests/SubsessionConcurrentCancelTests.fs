@@ -1,5 +1,6 @@
 module Wanxiangshu.Tests.SubsessionConcurrentCancelTests
 
+open Wanxiangshu.Runtime.Subsession.SubsessionEventPayload
 open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Kernel.EventSourcing.EventEnvelope

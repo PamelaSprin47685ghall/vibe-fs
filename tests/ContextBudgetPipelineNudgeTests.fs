@@ -1,5 +1,6 @@
 module Wanxiangshu.Tests.ContextBudgetPipelineNudgeTests
 
+open Wanxiangshu.Runtime.MessageTransform.ContextBudgetEngine
 open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Tests.Assert

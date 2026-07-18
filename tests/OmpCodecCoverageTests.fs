@@ -1,5 +1,6 @@
 module Wanxiangshu.Tests.OmpCodecCoverageTests
 
+open Wanxiangshu.Hosts.Omp.MessagingCodecDecode
 open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Tests.Assert

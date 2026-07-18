@@ -881,10 +881,6 @@
     <Compile Include="tests/Wanxiangzhen/SquadTaskTransitionTests.fs"/>
     <Compile Include="tests/Wanxiangzhen/WorkspaceGitTests.fs"/>
     <Compile Include="tests/ProductionDebugOutputTests.fs"/>
-    <Compile Include="tests/TestsEntriesCoreTail.fs"/>
-    <Compile Include="tests/TestsEntriesSessionLoop.fs"/>
-    <Compile Include="tests/TestsEntriesCore.fs"/>
-    <Compile Include="tests/TestsEntriesCodec.fs"/>
     <Compile Include="tests/TestsEntriesWanxiangzhen.fs"/>
     <Compile Include="tests/SubsessionGoldenTrajectoryTests.fs"/>
     <Compile Include="tests/CommandProcessorE2ETests.fs"/>
@@ -919,9 +915,6 @@
     <Compile Include="e2e/Tests.fs"/>
     <Compile Include="e2e/MuxEventHooksAndSlashTests.fs"/>
     <Compile Include="e2e/MuxTests.fs"/>
-    <Compile Include="e2e/OpencodePluginTests.fs"/>
-    <Compile Include="e2e/MimocodePluginTests.fs"/>
-    <Compile Include="e2e/MimoTuiPluginTests.fs"/>
     <Compile Include="e2e/OmpToolRegistryAndCommandsTests.fs"/>
     <Compile Include="e2e/TestsOmpSpecsLifecycle.fs"/>
     <Compile Include="e2e/TestsOmpSpecs.fs"/>

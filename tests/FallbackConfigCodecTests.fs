@@ -1,5 +1,6 @@
 module Wanxiangshu.Tests.FallbackConfigCodecTests
 
+open Wanxiangshu.Runtime.Fallback.FallbackChainResolution
 open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Tests.Assert

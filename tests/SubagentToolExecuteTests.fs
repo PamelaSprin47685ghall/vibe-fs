@@ -1,5 +1,6 @@
 module Wanxiangshu.Tests.SubagentToolExecuteTests
 
+open Wanxiangshu.Hosts.Opencode.SubagentIoRun
 open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Tests.Assert
