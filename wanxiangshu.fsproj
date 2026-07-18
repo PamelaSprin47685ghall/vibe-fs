@@ -516,6 +516,7 @@
     <Compile Include="src/Hosts/Omp/Fallback/EventTranslator.fs"/>
     <Compile Include="src/Hosts/Omp/Fallback/ActionExecutor.fs"/>
     <Compile Include="src/Hosts/Omp/Fallback/Hook.fs"/>
+    <Compile Include="src/Hosts/Omp/SessionAbortHandler.fs"/>
     <Compile Include="src/Hosts/Omp/PluginComposition.fs"/>
     <Compile Include="src/Hosts/Omp/Plugin.fs"/>
     <Compile Include="src/Hosts/OpenCode/PluginWanxiangzhenE2eMeta.fs"/>
@@ -654,6 +655,7 @@
     <Compile Include="tests/OpencodeHookSchemaCoverageTests.fs"/>
     <Compile Include="tests/OpencodeSearchToolsCoverageTests.fs"/>
     <Compile Include="tests/OpencodeSubagentCoverageTests.fs"/>
+    <Compile Include="tests/OmpReconcileTests.fs"/>
     <Compile Include="tests/OmpSessionLifecycleTests.fs"/>
     <Compile Include="tests/MethodologyTests.fs"/>
     <Compile Include="tests/ReviewReplaySyncTests.fs"/>
@@ -769,6 +771,7 @@
     <Compile Include="tests/OpencodeSubsessionHostAdapterModelTests.fs"/>
     <Compile Include="tests/SubsessionScenarioTests.fs"/>
     <Compile Include="tests/SubsessionActorPumpTests.fs"/>
+    <Compile Include="tests/DispatchRegistryTests.fs"/>
     <Compile Include="tests/SubsessionDispatchFailureTests.fs"/>
     <Compile Include="tests/SubsessionConcurrentCancelTests.fs"/>
     <Compile Include="tests/SubsessionTranscriptBoundaryTests.fs"/>
@@ -855,6 +858,7 @@
     <Compile Include="tests/TestsEntriesCore.fs"/>
     <Compile Include="tests/TestsEntriesCodec.fs"/>
     <Compile Include="tests/OmpReviewLoopAsyncTests.fs"/>
+    <Compile Include="tests/TestsEntriesOmp2.fs"/>
     <Compile Include="tests/TestsEntriesOmp.fs"/>
     <Compile Include="tests/ContextBudgetSpecs.fs"/>
     <Compile Include="tests/ContextBudgetHookTests.fs"/>

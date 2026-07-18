@@ -38,5 +38,13 @@ type DispatchRegistry() =
         let opt: SessionDispatcher option = Map.tryFind key dispatchers
 
         match opt with
-        | Some d -> d.OnSessionClosed()
+        | Some d ->
+            d.OnSessionClosed()
+            dispatchers <- Map.remove key dispatchers
         | None -> ()
+
+[<AutoOpen>]
+module DispatchRegistryInstance =
+    /// Process-wide singleton.  All dispatchers live here; every call site
+    /// MUST use `shared` rather than constructing a new `DispatchRegistry()`.
+    let sharedDispatchRegistry = DispatchRegistry()

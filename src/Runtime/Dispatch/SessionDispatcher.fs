@@ -71,10 +71,18 @@ type SessionDispatcher(workspace: WorkspaceId, physicalSessionId: string, eventL
                       CancelRequested = false
                       AbortSent = false
                       Terminal = None
-                      CancelToken = new System.Threading.CancellationTokenSource() }
+                      CancelToken = new System.Threading.CancellationTokenSource()
+                      OnResolve = ignore
+                      CancelWaiter = None }
 
                 let resultPromise: JS.Promise<DispatchOutcome> =
                     Promise.create (fun resolve _ -> r.Waiter <- Some(fun o -> resolve o))
+
+                r.OnResolve <-
+                    (fun () ->
+                        match state.Active with
+                        | Some active when obj.ReferenceEquals(active, r) -> state.Active <- None
+                        | _ -> ())
 
                 do! this.Reserve r
                 do! this.RunTransport r sendPrompt cancellation
@@ -130,6 +138,6 @@ type SessionDispatcher(workspace: WorkspaceId, physicalSessionId: string, eventL
                     match awaitedOpt with
                     | None -> DispatchOps.rejectUnknown r "TransportThrew" "sendPrompt threw synchronously"
                     | Some awaited ->
-                        let! receipt = SessionDispatcherOps.awaitReceipt awaited
+                        let! receipt = SessionDispatcherOps.awaitReceipt awaited r
                         SessionDispatcherOps.applyReceipt r receipt eventLogger
             })

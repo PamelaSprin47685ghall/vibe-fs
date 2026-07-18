@@ -210,6 +210,6 @@ let handleEvent
                             "opencode:" + (pluginDirectoryFromCtx ctx)
                         )
 
-                    DispatchRegistry().NotifySessionClosed ws sid
+                    sharedDispatchRegistry.NotifySessionClosed ws sid
                     ChatHooksMessageIdDedup.forget sid
     }

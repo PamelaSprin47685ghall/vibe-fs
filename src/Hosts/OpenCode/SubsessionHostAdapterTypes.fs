@@ -18,7 +18,7 @@ let invoke1 (arg: obj) (method: string) (target: obj) : JS.Promise<obj> = unbox 
 let buildDispatchModelString =
     Wanxiangshu.Hosts.Opencode.SubsessionDispatch.buildDispatchModelString
 
-let subsessionRegistry = DispatchRegistry()
+let subsessionRegistry = sharedDispatchRegistry
 
 let workspaceFor (directory: string) : WorkspaceId =
     if directory = "" then
@@ -39,9 +39,12 @@ let trySessionApi (client: obj) : Result<obj, string> =
     | Error _ -> Error "session API missing"
 
 let promptDigest (prompt: string) : string =
-    let bytes = System.Text.Encoding.UTF8.GetBytes(prompt)
-    let hash = System.Security.Cryptography.SHA256.Create().ComputeHash(bytes)
-    System.Convert.ToBase64String(hash)
+    let mutable h = 0x811c9dc5u
+
+    for i = 0 to prompt.Length - 1 do
+        h <- (h ^^^ uint32 prompt.[i]) * 0x01000193u
+
+    h.ToString("x8")
 
 let encodeDispatchIdentity
     (directory: string)

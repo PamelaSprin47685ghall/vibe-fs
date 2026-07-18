@@ -13,6 +13,8 @@ open Wanxiangshu.Hosts.Omp.Tools
 open Wanxiangshu.Hosts.Omp.PruneGuard
 open Wanxiangshu.Hosts.Omp.ReviewToolsRegister
 open Wanxiangshu.Hosts.Omp.SessionLifecycle
+open Wanxiangshu.Runtime.Dispatch
+open Wanxiangshu.Kernel.Primitives.Identity
 open Wanxiangshu.Runtime.TitleFetchGuard
 open Wanxiangshu.Hosts.Omp.MessageTransform
 open Wanxiangshu.Runtime.OmpCaps
@@ -106,86 +108,11 @@ let private applyAgentConfigIfSupported (pi: obj) : unit =
         with _ ->
             ()
 
-/// `session.abort` / `stream.abort` / `session.error` all collapse to the
-/// same outcome: in-flight review state must clear. Without this hook,
-/// review state survives host-driven aborts and leaks across sessions.
-let private sessionEndEventTypes =
-    Set
-        [ "session.abort"
-          "stream.abort"
-          "session.error"
-          "session.delete"
-          "session.close"
-          "session.remove"
-          "session.deleted"
-          "session.interrupted" ]
-
-let registerAbortHandler
-    (pi: obj)
-    (reviewStore: ReviewStore)
-    (fallbackRuntime: FallbackRuntimeStore)
-    (fallbackHandler: (obj -> JS.Promise<FallbackHookResult>) option)
-    : unit =
-    let fallbackEventTypes =
-        Set [ "session.busy"; "session.idle"; "message.updated"; "session.updated" ]
-
-    pi?on (
-        "event",
-        box (fun (event: obj) (ctx: obj) ->
-            promise {
-                let evtType = Dyn.str event "type"
-                let sidOpt = getSessionIdFromContext ctx
-
-                match sidOpt with
-                | None -> ()
-                | Some sid ->
-                    if sessionEndEventTypes.Contains evtType then
-                        let root = Dyn.str ctx "cwd"
-
-                        if root <> "" then
-                            do! appendLoopCancelledOrFail root sid
-                            do! syncReviewFromEventLogDedicated reviewStore root sid
-
-                        Wanxiangshu.Hosts.Omp.NudgeRuntime.markSessionForceStopped sid
-
-                        Wanxiangshu.Runtime.RunnerBackground.abortRunnerJobCore
-                            Wanxiangshu.Hosts.Omp.ExecutorTools.ompScope
-                            sid
-                    elif fallbackEventTypes.Contains evtType then
-                        // Filter: discard assistant streaming events for main (non-child) sessions
-                        let isAssistantStream =
-                            evtType = "message.updated"
-                            && (let info = Dyn.get event "info"
-                                not (Dyn.isNullish info) && Dyn.str info "role" = "assistant")
-
-                        let isChild = isChildSession Wanxiangshu.Hosts.Omp.ExecutorTools.ompScope sid
-
-                        if isAssistantStream && not isChild then
-                            ()
-                        else
-                            match fallbackHandler with
-                            | Some handler ->
-                                let rawEvent =
-                                    createObj [ "event", box event; "props", box (createObj [ "sessionID", box sid ]) ]
-
-                                if sid <> "" then
-                                    fallbackRuntime.SetEventHandlingActive sid true
-
-                                try
-                                    let! _ = handler rawEvent
-                                    ()
-                                finally
-                                    if sid <> "" then
-                                        fallbackRuntime.SetEventHandlingActive sid false
-                            | None -> ()
-            })
-    )
-
 let private registerHooks (pi: obj) (services: CoreServices) : unit =
     registerAllTools pi services.ReviewStore services.FallbackRuntime services.FallbackConfig
     registerInputHandler pi services.ReviewStore
     registerSessionLifecycle pi services.ReviewStore services.FallbackRuntime
-    registerAbortHandler pi services.ReviewStore services.FallbackRuntime services.FallbackHandler
+    SessionAbortHandler.registerAbortHandler pi services.ReviewStore services.FallbackRuntime services.FallbackHandler
 
 let pluginFor (pi: obj) : JS.Promise<unit> =
     promise {

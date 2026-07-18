@@ -34,6 +34,10 @@ module SessionDispatcherExtensions =
             |> ignore
 
         /// Try to cancel a dispatch by logical turn id.
+        /// Mark CancelRequested and trigger CancelWaiter immediately so the
+        /// in-flight transport promise is unblocked.  The physical abort is
+        /// fire-and-forget: its result is recorded on the record but does
+        /// not block the serial queue.
         member this.CancelByTurn
             (logicalTurnId: string)
             (physicalAbort: unit -> JS.Promise<bool>)
@@ -48,6 +52,10 @@ module SessionDispatcherExtensions =
                             r.CancelRequested <- true
                             r.CancelToken.Cancel()
 
+                            match r.CancelWaiter with
+                            | Some w -> w ()
+                            | None -> ()
+
                             match r.Phase with
                             | Requested
                             | TransportStarted ->
@@ -55,22 +63,15 @@ module SessionDispatcherExtensions =
                                 return CancelledBeforeAcceptance
                             | HostAccepted
                             | RunObserved ->
-                                let! ok = physicalAbort ()
-                                r.AbortSent <- ok
+                                // Fire-and-forget physical abort; do not await
+                                // inside the serial queue.
+                                physicalAbort ()
+                                |> Promise.map (fun ok ->
+                                    r.AbortSent <- ok
+                                    DispatchOps.resolveRecord r Cancelled)
+                                |> ignore
 
-                                if ok then
-                                    DispatchOps.resolveRecord r Cancelled
-                                    return AbortSent
-                                else
-                                    let err =
-                                        { ErrorName = "AbortUnavailable"
-                                          DomainError = None
-                                          Message = "physical session abort API missing or refused"
-                                          StatusCode = None
-                                          IsRetryable = Some false }
-
-                                    DispatchOps.resolveRecord r (AbortUnknown err)
-                                    return AbortUnavailable
+                                return CancelledBeforeAcceptance
                             | Terminal t -> return AlreadyTerminal t
                     | _ -> return AlreadyTerminal Superseded
                 })
@@ -79,13 +80,7 @@ module SessionDispatcherExtensions =
         member this.CompleteByTurn(logicalTurnId: string) : bool =
             match this.State.Active with
             | Some r when r.Identity.LogicalTurnId = logicalTurnId && r.Terminal.IsNone ->
-                this.State.Queue.Enqueue(fun () ->
-                    promise {
-                        DispatchOps.resolveRecord r Completed
-                        return ()
-                    })
-                |> ignore
-
+                DispatchOps.resolveRecord r Completed
                 true
             | _ -> false
 
@@ -93,24 +88,22 @@ module SessionDispatcherExtensions =
         member this.FailByTurn (logicalTurnId: string) (err: ErrorInput) : bool =
             match this.State.Active with
             | Some r when r.Identity.LogicalTurnId = logicalTurnId && r.Terminal.IsNone ->
-                this.State.Queue.Enqueue(fun () ->
-                    promise {
-                        DispatchOps.resolveRecord r (Failed err)
-                        return ()
-                    })
-                |> ignore
-
+                DispatchOps.resolveRecord r (Failed err)
                 true
             | _ -> false
 
         /// Force-clear the active dispatch and cancel any in-flight waiter.
+        /// Runs outside the SerialQueue: terminal resolution is a synchronous
+        /// field assignment + waiter resolve.  The in-flight transport task
+        /// is unblocked via CancelWaiter (Promise.race in awaitReceipt).
         member this.OnSessionClosed() : unit =
-            this.State.Queue.Enqueue(fun () ->
-                promise {
-                    match this.State.Active with
-                    | Some r when r.Terminal.IsNone ->
-                        r.CancelToken.Cancel()
-                        DispatchOps.resolveRecord r SessionClosed
-                    | _ -> ()
-                })
-            |> ignore
+            match this.State.Active with
+            | Some r when r.Terminal.IsNone ->
+                r.CancelToken.Cancel()
+
+                match r.CancelWaiter with
+                | Some w -> w ()
+                | None -> ()
+
+                DispatchOps.resolveRecord r SessionClosed
+            | _ -> ()

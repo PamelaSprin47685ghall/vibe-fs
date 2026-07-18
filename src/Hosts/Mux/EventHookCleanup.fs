@@ -28,7 +28,10 @@ let handleSessionClosed (directory: string) (workspaceId: string) : JS.Promise<u
         // per-session registry is wired in.
         try
             let ws = Id.workspaceIdQuick ("mux:" + workspaceId)
-            Wanxiangshu.Runtime.Dispatch.DispatchRegistry().NotifySessionClosed ws workspaceId
+
+            Wanxiangshu.Runtime.Dispatch.DispatchRegistryInstance.sharedDispatchRegistry.NotifySessionClosed
+                ws
+                workspaceId
         with _ ->
             ()
 

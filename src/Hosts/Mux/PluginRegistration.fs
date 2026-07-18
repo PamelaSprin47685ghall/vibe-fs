@@ -121,6 +121,27 @@ let private registerTestHooks (registration: obj) (deps: obj) : unit =
                 systemTransform directory input output)
         ))
 
+let private buildInitHandler
+    (scope: RuntimeScope)
+    (reviewStore: Wanxiangshu.Runtime.ReviewRuntime.ReviewStore)
+    : (string -> JS.Promise<unit>) =
+    fun dir ->
+        promise {
+            // Initialization barrier: reconcile unfinished subsession runs before anything else.
+            // Mux has no SubsessionHostAdapter; pass None to use the internal ReconcileHost no-op,
+            // which is sufficient for poisoning orphaned actors.
+            do!
+                Wanxiangshu.Runtime.SubsessionReconcile.reconcileUnfinishedRuns dir None
+                |> Promise.map ignore
+
+            return!
+                Wanxiangshu.Runtime.EventLogRuntime.syncAllSessionsFromEventLogDedicated
+                    Wanxiangshu.Kernel.HostTools.mux
+                    reviewStore
+                    scope
+                    dir
+        }
+
 let createRegistration (deps: obj) : obj =
     Wanxiangshu.Runtime.E2eSandbox.applyFromProcessEnv ()
 
@@ -153,13 +174,7 @@ let createRegistration (deps: obj) : obj =
 
     registerTestHooks registration deps
 
-    scope.OnInit <-
-        Some(fun dir ->
-            Wanxiangshu.Runtime.EventLogRuntime.syncAllSessionsFromEventLogDedicated
-                Wanxiangshu.Kernel.HostTools.mux
-                reviewStore
-                scope
-                dir)
+    scope.OnInit <- Some(buildInitHandler scope reviewStore)
 
     let directory = if Dyn.isNullish deps then "" else Dyn.str deps "directory"
 

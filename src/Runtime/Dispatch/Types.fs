@@ -38,19 +38,21 @@ type DispatchRecord =
       mutable CancelRequested: bool
       mutable AbortSent: bool
       mutable Terminal: DispatchTerminal option
-      CancelToken: System.Threading.CancellationTokenSource }
+      CancelToken: System.Threading.CancellationTokenSource
+      mutable OnResolve: unit -> unit
+      mutable CancelWaiter: (unit -> unit) option }
 
 module DispatchOps =
     let getNowMs () : int64 = int64 (JS.Constructors.Date.now ())
 
     let digestForPrompt (identity: DispatchIdentity) : string =
-        let h = System.Security.Cryptography.SHA256.Create()
+        let input = identity.LogicalTurnId + "|" + identity.PhysicalSessionId
+        let mutable h = 0x811c9dc5u
 
-        let bytes =
-            System.Text.Encoding.UTF8.GetBytes(identity.LogicalTurnId + "|" + identity.PhysicalSessionId)
+        for i = 0 to input.Length - 1 do
+            h <- (h ^^^ uint32 input.[i]) * 0x01000193u
 
-        let hash = h.ComputeHash(bytes)
-        System.Convert.ToBase64String(hash).[..7]
+        h.ToString("x8")
 
     let resolveRecord (r: DispatchRecord) (terminal: DispatchTerminal) : unit =
         if r.Terminal.IsNone then
@@ -64,27 +66,35 @@ module DispatchOps =
                 w outcome
             | None -> ()
 
+            r.OnResolve()
+
     let acceptRecord
         (r: DispatchRecord)
         (acceptance: DispatchAcceptance)
         (atMs: int64)
         (logger: IDispatchEventLogger)
         : unit =
-        r.Phase <- HostAccepted
+        if r.Terminal.IsSome then
+            ()
+        else
+            r.Phase <- HostAccepted
 
-        match acceptance with
-        | UserMessageAccepted mid -> r.AcceptedMessageId <- mid
-        | RunAccepted rid -> r.AcceptedRunId <- rid
-        | OpaqueAccepted _ -> ()
+            match acceptance with
+            | UserMessageAccepted mid -> r.AcceptedMessageId <- mid
+            | RunAccepted rid -> r.AcceptedRunId <- rid
+            | OpaqueAccepted _ -> ()
 
-        logger.Log(DispatchHostAccepted(r.Identity.DispatchId, acceptance, atMs))
+            logger.Log(DispatchHostAccepted(r.Identity.DispatchId, acceptance, atMs))
 
     let observeRun (r: DispatchRecord) (hostUserMessageId: string) (atMs: int64) (logger: IDispatchEventLogger) : unit =
-        if r.AcceptedMessageId = "" then
-            r.AcceptedMessageId <- hostUserMessageId
+        if r.Terminal.IsSome then
+            ()
+        else
+            if r.AcceptedMessageId = "" then
+                r.AcceptedMessageId <- hostUserMessageId
 
-        r.Phase <- RunObserved
-        logger.Log(DispatchRunObserved(r.Identity.DispatchId, hostUserMessageId, atMs))
+            r.Phase <- RunObserved
+            logger.Log(DispatchRunObserved(r.Identity.DispatchId, hostUserMessageId, atMs))
 
     let rejectUnknown (r: DispatchRecord) (errName: string) (message: string) : unit =
         resolveRecord

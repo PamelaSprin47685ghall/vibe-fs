@@ -131,7 +131,7 @@ let private handleSessionCleanup (services: CoreServices) (env: HostEventEnvelop
             let ws =
                 Wanxiangshu.Kernel.Primitives.Identity.Id.workspaceIdQuick ("opencode:" + services.Directory)
 
-            DispatchRegistry().NotifySessionClosed ws ptyCleanupSessionId
+            sharedDispatchRegistry.NotifySessionClosed ws ptyCleanupSessionId
             Wanxiangshu.Hosts.Opencode.ChatHooksMessageIdDedup.forget ptyCleanupSessionId
     }
 

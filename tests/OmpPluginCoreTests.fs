@@ -6,16 +6,14 @@ open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Kernel.ReviewSession
 open Wanxiangshu.Kernel.ReviewSession.Types
 open Wanxiangshu.Kernel.FallbackKernel.Types
-open Wanxiangshu.Kernel.Subsession.Types
 open Wanxiangshu.Runtime.Dyn
 
 module Dyn = Wanxiangshu.Runtime.Dyn
 
 open Wanxiangshu.Runtime.Fallback.RuntimeStore
-open Wanxiangshu.Runtime.Fallback.Coordinator
 open Wanxiangshu.Runtime.ReviewRuntime
+open Wanxiangshu.Hosts.Omp.SessionAbortHandler
 open Wanxiangshu.Hosts.Omp.PluginComposition
-open Wanxiangshu.Tests.AsyncFlush
 open Wanxiangshu.Tests.TempWorkspace
 open Wanxiangshu.Runtime.SubsessionActorRegistry
 
@@ -62,25 +60,6 @@ let private capturePi () : obj * (unit -> obj array) =
     pi, getHandlers
 
 let private makeFakeRuntime () : FallbackRuntimeStore = FallbackRuntimeStore()
-
-let private makeFakeConfig () : FallbackConfig =
-    { DefaultChain =
-        [ { ProviderID = "oai"
-            ModelID = "gpt5"
-            Variant = None
-            Temperature = None
-            TopP = None
-            MaxTokens = None
-            ReasoningEffort = None
-            Thinking = false } ]
-      AgentChains = Map.ofList []
-      MaxRetries = 2
-      LoopMaxContinues = 3
-      MaxRecoveries = 5
-      LegacyZeroWidthContinue = false }
-
-let private invokeFallbackHandler (handler: obj) (event: obj) (ctx: obj) : unit =
-    emitJsExpr (handler, event, ctx) "(($0)($1, $2))" |> ignore
 
 /// Drive the registered abort handler with `evtType` against a sessionId
 /// resolved through a `sessionManager.getSessionId` ctx, and assert review
@@ -186,126 +165,4 @@ let unrelatedEventLeavesReviewActive () =
         localStore.applyReviewTaskProjection (sid, Some "task")
         check "precondition: review active" (localStore.getReviewTask sid = Some "task")
         do! driveAbort localStore "session.idle" sid true
-    }
-
-/// OMP session.error must be routed through the fallback handler before
-/// review cleanup. Previously the translator looked for `props.error`, which
-/// was never set, so the event bypassed fallback entirely.
-let ompErrorEventRoutesToFallback () =
-    let sessionMgr =
-        createObj [ "getSessionId", box (fun () -> box "omp-fb-error-sid") ]
-
-    let ctx = createObj [ "sessionManager", box sessionMgr ]
-
-    let event =
-        createObj
-            [ "type", box "session.error"
-              "error",
-              box (
-                  createObj
-                      [ "name", box "APIError"
-                        "message", box "rate limit"
-                        "statusCode", box "429"
-                        "isRetryable", box "true" ]
-              ) ]
-
-    let pi, getHandlers = capturePi ()
-    let mutable handlerCalled = false
-    let runtime = makeFakeRuntime ()
-
-    let fakeHandler (rawEvent: obj) : JS.Promise<FallbackHookResult> =
-        handlerCalled <- true
-
-        Promise.lift
-            { Consumed = false
-              State = runtime.GetOrCreateState "omp-fb-error-sid" }
-
-    registerAbortHandler pi reviewStore runtime (Some fakeHandler)
-    let handlers: obj array = getHandlers ()
-    check "exactly one handler registered" (handlers.Length = 1)
-    invokeFallbackHandler handlers.[0] event ctx
-    check "fallback handler saw session.error" handlerCalled
-
-/// Non-terminal OMP events (session.idle) must also reach the fallback
-/// handler so scan completion / CheckTodoState can fire.
-let ompIdleEventRoutesToFallback () =
-    let sessionMgr = createObj [ "getSessionId", box (fun () -> box "omp-fb-idle-sid") ]
-    let ctx = createObj [ "sessionManager", box sessionMgr ]
-    let event = createObj [ "type", box "session.idle" ]
-    let pi, getHandlers = capturePi ()
-    let mutable handlerCalled = false
-    let runtime = makeFakeRuntime ()
-
-    let fakeHandler (rawEvent: obj) : JS.Promise<FallbackHookResult> =
-        handlerCalled <- true
-
-        Promise.lift
-            { Consumed = false
-              State = runtime.GetOrCreateState "omp-fb-idle-sid" }
-
-    registerAbortHandler pi reviewStore runtime (Some fakeHandler)
-    let handlers: obj array = getHandlers ()
-    invokeFallbackHandler handlers.[0] event ctx
-    check "fallback handler saw session.idle" handlerCalled
-
-/// Verify that when reconcileUnfinishedRuns runs on startup, it constructs a real hostFactory
-/// and triggers physical close (sessionDelete) on zombie sessions.
-let ompReconciliationClosesZombieSessions () =
-    promise {
-        let! root = mkdtempAsync "omp-reconcile-test-"
-        let sid = SessionId.create "omp-zombie-sid-1"
-        let parent = SessionId.create "parent-sid"
-        let rid = RunId.create "run-zombie-1"
-
-        let eventStore = Wanxiangshu.Runtime.SubsessionEventStore.create root
-
-        let runStartedData =
-            { SessionId = sid
-              ParentSessionId = parent
-              RunId = rid }
-
-        do! eventStore.Append(sid, [ RunStarted runStartedData ])
-
-        let mutable sessionDeleteCalled = false
-        let mutable calledSessionId = ""
-
-        let sessionApi =
-            createObj
-                [ "sessionDelete",
-                  box (fun (arg: obj) ->
-                      sessionDeleteCalled <- true
-                      calledSessionId <- Dyn.str arg "sessionId"
-                      Promise.lift (box null)) ]
-
-        let pi = createObj [ "directory", box root; "session", box sessionApi ]
-
-        let hostFactory (s: string) =
-            Wanxiangshu.Hosts.Omp.SubsessionHostAdapter.createHost null "" pi
-
-        let! _ = Wanxiangshu.Runtime.SubsessionReconcile.reconcileUnfinishedRuns root (Some hostFactory)
-
-        check "sessionDelete was called" sessionDeleteCalled
-        check "sessionDelete called with correct sessionId" (calledSessionId = "omp-zombie-sid-1")
-
-        let actor =
-            Wanxiangshu.Runtime.SubsessionActorRegistry.SubsessionActorRegistry.GetOrCreate
-                root
-                "omp-zombie-sid-1"
-                (hostFactory "omp-zombie-sid-1")
-                eventStore
-
-        check "actor state is poisoned after reconcile" actor.IsPoisoned
-    }
-
-let run () =
-    promise {
-        reviewStoreIsSharedSingleton ()
-        clearReviewStatesNoError ()
-        do! abortHookDeactivatesReview ()
-        do! streamAbortHookDeactivatesReview ()
-        do! sessionErrorHookDeactivatesReview ()
-        do! unrelatedEventLeavesReviewActive ()
-        ompErrorEventRoutesToFallback ()
-        ompIdleEventRoutesToFallback ()
-        do! ompReconciliationClosesZombieSessions ()
     }
