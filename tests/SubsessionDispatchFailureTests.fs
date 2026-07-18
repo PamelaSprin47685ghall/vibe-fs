@@ -1,6 +1,6 @@
 module Wanxiangshu.Tests.SubsessionDispatchFailureTests
 
-open Wanxiangshu.Runtime.Subsession.SubsessionEventPayload
+open Wanxiangshu.Runtime.SubsessionEventPayload
 open Fable.Core
 open Wanxiangshu.Kernel.EventSourcing.EventEnvelope
 open Wanxiangshu.Kernel.EventSourcing.EventKind

@@ -110,8 +110,9 @@ let buildCapsFn (plan: MessageTransformPlan) (sessionId: string) (cwd: string) =
         let ompCaps =
             capsFiles
             |> List.map (fun f ->
-                { filePath = f.filePath
-                  label = f.label
-                  content = f.content })
+                ({ filePath = f.filePath
+                   label = f.label
+                   content = f.content }
+                : OmpCapsFile))
 
         buildCapsEntries sha256HexTruncated sessionId encoded cwd ompCaps prelude

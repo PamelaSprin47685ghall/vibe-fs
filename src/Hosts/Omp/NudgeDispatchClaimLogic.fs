@@ -2,21 +2,19 @@ module Wanxiangshu.Hosts.Omp.NudgeDispatchClaimLogic
 
 open Fable.Core
 open Fable.Core.JsInterop
-open Wanxiangshu.Runtime.NudgeDispatchClaim
 open Wanxiangshu.Runtime.NudgeLease
 open Wanxiangshu.Runtime.Fallback.RuntimeStore
 open Wanxiangshu.Runtime.Fallback.SessionRuntime
 open Wanxiangshu.Kernel.Nudge.NudgeProjection
+open Wanxiangshu.Kernel.Nudge.Types
 open Wanxiangshu.Kernel.Nudge
 open Wanxiangshu.Hosts.Omp.NudgeReminderDispatch
-open Wanxiangshu.Runtime.ProjectionCache
 open Wanxiangshu.Kernel.FallbackKernel.Types
 open Wanxiangshu.Hosts.Omp.NudgeRuntime
 open Wanxiangshu.Hosts.Omp.Codec
 open Wanxiangshu.Runtime.Fallback.LeaseTransitions
 open Wanxiangshu.Runtime.Fallback.SessionPropertyTransitions
-
-let now () = System.DateTime.UtcNow
+open Wanxiangshu.Runtime.Fallback.GateFlagTransitions
 
 let tryClaimNudgeDispatch
     (root: string)
@@ -30,31 +28,17 @@ let tryClaimNudgeDispatch
     (humanTurnId: string)
     (nudgeOrdinal: int)
     : JS.Promise<bool> =
-    promise {
-        let cache = ProjectionCache(root)
-        use! _ = cache.OpenAsync()
-
-        let! evt =
-            tryClaim
-                cache
-                sessionId
-                action
-                nudgeAnchorKey
-                nudgeId
-                nonce
-                sessionGen
-                cancelGen
-                humanTurnId
-                nudgeOrdinal
-                (fun isBlocked anchor ->
-                    isBlocked
-                        { PendingNudge = None
-                          LastDispatchedAnchor = None }
-                        anchor)
-                (now ())
-
-        return evt.IsSome
-    }
+    Wanxiangshu.Runtime.EventLogRuntime.tryClaimNudgeDispatch
+        root
+        sessionId
+        action
+        nudgeAnchorKey
+        nudgeId
+        nonce
+        sessionGen
+        cancelGen
+        humanTurnId
+        nudgeOrdinal
 
 let private makeNudgeLease
     (nudgeId: string)

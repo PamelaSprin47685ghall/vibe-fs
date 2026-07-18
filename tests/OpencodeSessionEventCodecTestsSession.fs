@@ -1,6 +1,6 @@
 module Wanxiangshu.Tests.OpencodeSessionEventCodecTestsSession
 
-open Wanxiangshu.Runtime.Messaging.OpencodeSessionPromptBuilder
+open Wanxiangshu.Runtime.OpencodeSessionPromptBuilder
 open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Tests.Assert
