@@ -116,7 +116,6 @@
     <Compile Include="src/Kernel/Review/ReviewReportBuffer.fs"/>
     <Compile Include="src/Kernel/Review/ReviewEncouragement.fs"/>
     <Compile Include="src/Kernel/Review/ReviewLoopFold.fs"/>
-    <Compile Include="src/Kernel/Fallback/FallbackInjectionFold.fs"/>
     <Compile Include="src/Kernel/Nudge/Types.fs"/>
     <Compile Include="src/Kernel/Fallback/Continuation.fs"/>
     <Compile Include="src/Kernel/Fallback/ContinuationEventParse.fs"/>
@@ -824,7 +823,6 @@
     <Compile Include="tests/FallbackEventBridgeTests.fs"/>
     <Compile Include="tests/FallbackAgentAndModelTests.fs"/>
     <Compile Include="tests/FallbackAgentAndModelInjectionTests.fs"/>
-    <Compile Include="tests/FallbackInjectionFoldTests.fs"/>
     <Compile Include="tests/SubsessionDecisionTests.fs"/>
     <Compile Include="tests/SubsessionEmptyOutputContinueTests.fs"/>
     <Compile Include="tests/OpencodeSubsessionHostAdapterModelTests.fs"/>

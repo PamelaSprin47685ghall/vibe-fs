@@ -64,20 +64,23 @@
 
 
 
-## 六、Fallback 不能停留在“文件拆完了”
+## 六、Fallback 不能停留在“文件拆完了” ✅ 部分完成
 
 Fallback 已经有了更清楚的目录，但接下来要验证的是状态一致性，而不是文件数量。
 
-要求：
+本轮已推进：
+
+* `LEGACY` fallback projection `FallbackInjectionFold` 已删除，并从 `SessionState` / `SessionOverview` / `Fold` / `FoldApply` 中移除 `FallbackInjection` 字段；
+* `SessionStateRestore` 与 `EventLogRuntimeSync` 已收敛为单个纯函数 `restoreFromEventLogState : SessionState -> FallbackSessionRuntime -> FallbackSessionRuntime`，由 `rt.Update` 原子提交；
+* 事件日志恢复路径现在满足“transition 是纯函数，runtime store 只负责读取/提交”。
+
+仍待继续：
 
 * session 的全部权威状态只能存在于一个 aggregate；
 * gate、lease、generation、ordinal、owner、compaction 不允许有旁路状态；
-* 逐字段的 `GetX/SetX/IncrementX` 应逐步收口为领域操作；
+* 其它 `*Transitions.fs` 中逐字段的 `GetX/SetX/IncrementX` 应继续收口为领域操作；
 * 调用方不能自由组合多个 setter 来维护不变量；
-* transition 必须是纯函数；
-* runtime store 只负责原子读取和提交 transition；
-* continuation、nudge、compaction 必须共享统一的 episode 身份与迟到事件规则；
-* `LEGACY` fallback projection 要么迁入明确的版本迁移边界，要么删除，不能继续停留在当前领域主路径。
+* continuation、nudge、compaction 必须共享统一的 episode 身份与迟到事件规则。
 
 验收时不再接受“这个字段比较特殊，所以单独保存”。
 

@@ -21,7 +21,6 @@ open Wanxiangshu.Kernel.Review
 open Wanxiangshu.Kernel.Backlog
 open Wanxiangshu.Kernel.SessionControl
 open Wanxiangshu.Kernel.Subsession
-open Wanxiangshu.Kernel.Fallback.FallbackInjectionFold
 open Wanxiangshu.Kernel.Review.ReviewLoopFold
 open Wanxiangshu.Kernel.Review.ReviewProjection
 open Wanxiangshu.Kernel.Backlog.BacklogProjection
@@ -65,9 +64,6 @@ let applyEvent (st: SessionState) (e: WanEvent) : SessionState =
 
         let nextEpisode = foldEpisode st nextHumanTurn nextSessionGen nextCancelGen e
 
-        let nextFallbackInjection =
-            fallbackInjectionFolder st.ContinuationOrdinal st.ContinuationStage st.FallbackInjection e
-
         let shouldUpdateNudge = not (Projection.isEpisodeEvent e) || not (isLateEvent st e)
         let nextBacklog = computeNextBacklog st e
         let nextBacklogSnapshot = BacklogProjection.foldSingleEvent st.BacklogSnapshot e
@@ -95,7 +91,6 @@ let applyEvent (st: SessionState) (e: WanEvent) : SessionState =
             nextNudgeDedup
             nextNudgeSnapshot
             nextSubagents
-            nextFallbackInjection
             nextHumanTurn
             nextSessionGen
             nextCancelGen

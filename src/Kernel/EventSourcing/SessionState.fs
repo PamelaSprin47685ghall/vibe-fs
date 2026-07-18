@@ -7,7 +7,6 @@ open Wanxiangshu.Kernel.Review
 open Wanxiangshu.Kernel.Backlog
 open Wanxiangshu.Kernel.SessionControl
 open Wanxiangshu.Kernel.Subsession
-open Wanxiangshu.Kernel.Fallback.FallbackInjectionFold
 open Wanxiangshu.Kernel.Review.ReviewLoopFold
 open Wanxiangshu.Kernel.Review.ReviewProjection
 open Wanxiangshu.Kernel.Backlog.BacklogProjection
@@ -30,7 +29,6 @@ type SessionState =
       NudgeDedup: NudgeDedupState
       NudgeSnapshot: NudgeSnapshotState
       Subagents: Map<string, SubagentState>
-      FallbackInjection: FallbackInjectionState
       LatestHumanTurn: HumanTurnState option
       SessionGeneration: int
       CancelGeneration: int
@@ -63,7 +61,6 @@ let emptySessionState () : SessionState =
       NudgeDedup = NudgeProjection.emptyDedupState
       NudgeSnapshot = NudgeProjection.emptySnapshotState
       Subagents = Map.empty
-      FallbackInjection = emptyFallbackInjectionState
       LatestHumanTurn = None
       SessionGeneration = 0
       CancelGeneration = 0

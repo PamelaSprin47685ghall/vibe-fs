@@ -1,21 +1,15 @@
 module Wanxiangshu.Runtime.SessionStateRestore
 
 open Wanxiangshu.Runtime.Fallback.SessionRuntime
-open Wanxiangshu.Runtime.Fallback.RuntimeStore
-open Wanxiangshu.Runtime.Fallback.LeaseTransitions
-open Wanxiangshu.Runtime.Fallback.HumanTurnTransitions
-open Wanxiangshu.Runtime.Fallback.OrdinalTransitions
-open Wanxiangshu.Runtime.Fallback.CompactionTransitions
-open Wanxiangshu.Runtime.Fallback.SessionPropertyTransitions
 open Wanxiangshu.Runtime.Fallback.FallbackMessageCodec
-
 open Wanxiangshu.Kernel.FallbackKernel.Types
 open Wanxiangshu.Kernel.EventSourcing.Fold
+open Wanxiangshu.Kernel.SessionControl.State
 
 // ── Decoders ──────────────────────────────────────────────────────────
 
 /// Decode a SessionOwner from its string representation.
-let decodeOwner (owner: string) : SessionOwner =
+let private decodeOwner (owner: string) : SessionOwner =
     match owner with
     | "NoOwner"
     | "None" -> SessionOwner.NoOwner
@@ -27,7 +21,7 @@ let decodeOwner (owner: string) : SessionOwner =
     | _ -> SessionOwner.NoOwner
 
 /// Decode a LeaseStatus from its string representation.
-let decodeLeaseStatus (status: string) : LeaseStatus =
+let private decodeLeaseStatus (status: string) : LeaseStatus =
     match status with
     | "requested"
     | "Requested" -> LeaseStatus.Requested
@@ -44,7 +38,7 @@ let decodeLeaseStatus (status: string) : LeaseStatus =
 /// Decode the model stored in a ReplayLeaseState (a plain string) to a
 /// FallbackModel via the shared codec, falling back to a minimal record on
 /// failure.
-let decodeFallbackModel (lease: Wanxiangshu.Kernel.SessionControl.State.ReplayLeaseState) : FallbackModel =
+let private decodeFallbackModel (lease: ReplayLeaseState) : FallbackModel =
     match decodeModelFromObj (box lease.Model) with
     | Some m -> m
     | None ->
@@ -57,11 +51,12 @@ let decodeFallbackModel (lease: Wanxiangshu.Kernel.SessionControl.State.ReplayLe
           ReasoningEffort = None
           Thinking = false }
 
-// ── Restore helpers ────────────────────────────────────────────────────
+// ── Local restore helpers ─────────────────────────────────────────────
 
-/// Restore human-turn derived fields (LatestHumanModel, HumanTurnId,
-/// AgentName) from SessionState into the FallbackRuntimeStore.
-let restoreHumanTurnInfo (state: SessionState) (rt: FallbackRuntimeStore) (sid: string) : unit =
+let private restoreHumanTurnDerived
+    (state: SessionState)
+    (s: FallbackSessionRuntime)
+    : string * string option * string =
     match state.LatestHumanTurn with
     | Some turn ->
         let modelStr =
@@ -70,90 +65,106 @@ let restoreHumanTurnInfo (state: SessionState) (rt: FallbackRuntimeStore) (sid: 
             + turn.Model
             + (if turn.Variant <> "" then ":" + turn.Variant else "")
 
-        rt.SetLatestHumanModel sid modelStr
-        rt.SetHumanTurnId sid turn.TurnId
+        let agent = if turn.Agent <> "" then turn.Agent else s.AgentName
+        agent, Some modelStr, turn.TurnId
+    | None -> s.AgentName, s.LatestHumanModel, s.HumanTurnId
 
-        if turn.Agent <> "" then
-            rt.SetAgentName sid turn.Agent
-    | None -> ()
+let private restoreOrdinals (state: SessionState) (s: FallbackSessionRuntime) : int * int * int * int =
+    max s.HumanTurnOrdinal state.HumanTurnOrdinal,
+    max s.ContinuationOrdinal state.ContinuationOrdinal,
+    max s.NudgeOrdinal state.NudgeOrdinal,
+    max s.CompactionOrdinal state.CompactionOrdinal
 
-/// Restore all ordinal fields (HumanTurnOrdinal, ContinuationOrdinal,
-/// NudgeOrdinal, CompactionOrdinal) from SessionState into the
-/// FallbackRuntimeStore, using monotonic-max semantics.
-let restoreOrdinals (state: SessionState) (rt: FallbackRuntimeStore) (sid: string) : unit =
-    let curHuman = rt.GetHumanTurnOrdinal sid
+let private decodePendingLease (lease: ReplayLeaseState) : PendingLease =
+    { ContinuationID = lease.ContinuationID
+      ContinuationOrdinal = lease.ContinuationOrdinal
+      SessionGeneration = lease.SessionGeneration
+      HumanTurnID = lease.HumanTurnID
+      CancelGeneration = lease.CancelGeneration
+      Owner = decodeOwner lease.Owner
+      Model = decodeFallbackModel lease
+      PromptText = lease.PromptText
+      Status = decodeLeaseStatus lease.Status }
 
-    if state.HumanTurnOrdinal > curHuman then
-        rt.SetHumanTurnOrdinal sid state.HumanTurnOrdinal
+let private decodeNudgeLease (nl: ReplayNudgeLeaseState) : NudgeLease =
+    { NudgeID = nl.NudgeID
+      NudgeOrdinal = nl.NudgeOrdinal
+      Nonce = nl.Nonce
+      HumanTurnID = nl.HumanTurnID
+      SessionGeneration = nl.SessionGeneration
+      CancelGeneration = nl.CancelGeneration
+      Owner = SessionOwner.Nudge
+      Status = decodeLeaseStatus nl.Status }
 
-    let curCont = rt.GetContinuationOrdinal sid
-
-    if state.ContinuationOrdinal > curCont then
-        rt.SetContinuationOrdinal sid state.ContinuationOrdinal
-
-    let curNudge = rt.GetNudgeOrdinal sid
-
-    if state.NudgeOrdinal > curNudge then
-        rt.SetNudgeOrdinal sid state.NudgeOrdinal
-
-    let curComp = rt.GetCompactionOrdinal sid
-
-    if state.CompactionOrdinal > curComp then
-        rt.SetCompactionOrdinal sid state.CompactionOrdinal
-
-/// Restore the pending continuation lease from SessionState into the
-/// FallbackRuntimeStore.  Decodes Owner, Status, and Model via the shared
-/// helpers above.
-let restorePendingLease (state: SessionState) (rt: FallbackRuntimeStore) (sid: string) : unit =
-    match state.PendingLease with
-    | Some lease ->
-        let modelObj = decodeFallbackModel lease
-
-        let leaseOwner = decodeOwner lease.Owner
-
-        let leaseStatus = decodeLeaseStatus lease.Status
-
-        let pendingLease: PendingLease =
-            { ContinuationID = lease.ContinuationID
-              ContinuationOrdinal = lease.ContinuationOrdinal
-              SessionGeneration = lease.SessionGeneration
-              HumanTurnID = lease.HumanTurnID
-              CancelGeneration = lease.CancelGeneration
-              Owner = leaseOwner
-              Model = modelObj
-              PromptText = lease.PromptText
-              Status = leaseStatus }
-
-        rt.SetPendingLease(sid, pendingLease)
-    | None -> rt.ClearPendingLease sid
-
-/// Restore compaction fields (active id + ordinal, IsCompacted,
-/// CompactionGeneration) from SessionState into the FallbackRuntimeStore.
-let restoreCompaction (state: SessionState) (rt: FallbackRuntimeStore) (sid: string) : unit =
+let private restoreCompactionIdentity (state: SessionState) : string * int =
     match state.ActiveCompaction, state.ActiveCompactionId with
-    | Some comp, _ -> rt.SetActiveCompactionId(sid, comp.CompactionID, comp.CompactionOrdinal)
-    | None, Some cid -> rt.SetActiveCompactionId(sid, cid, state.CompactionOrdinal)
-    | None, None -> ()
+    | Some comp, _ -> comp.CompactionID, comp.CompactionOrdinal
+    | None, Some cid -> cid, state.CompactionOrdinal
+    | None, None -> "", 0
 
-    rt.SetCompacted(sid, state.IsCompacted)
-    rt.SetCompactionGeneration(sid, state.CompactionGeneration)
+let private nextCoreFromState (state: SessionState) (core: SessionFallbackState) : SessionFallbackState =
+    { core with
+        Lifecycle = state.FallbackLifecycle |> Option.defaultValue FallbackLifecycle.Active
+        Phase = state.FallbackPhase |> Option.defaultValue FallbackPhase.Idle }
 
-/// Restore the pending nudge lease from SessionState into the
-/// FallbackRuntimeStore.  Decodes Status via decodeLeaseStatus.
-let restorePendingNudgeLease (state: SessionState) (rt: FallbackRuntimeStore) (sid: string) : unit =
-    match state.PendingNudgeLease with
-    | Some nl ->
-        let nudgeStatus = decodeLeaseStatus nl.Status
+let private applyOwner (state: SessionState) (afterLifecycle: FallbackSessionRuntime) : SessionOwner =
+    state.SessionOwner
+    |> Option.map decodeOwner
+    |> Option.defaultValue afterLifecycle.Owner
 
-        let lease: NudgeLease =
-            { NudgeID = nl.NudgeID
-              NudgeOrdinal = nl.NudgeOrdinal
-              Nonce = nl.Nonce
-              HumanTurnID = nl.HumanTurnID
-              SessionGeneration = nl.SessionGeneration
-              CancelGeneration = nl.CancelGeneration
-              Owner = SessionOwner.Nudge
-              Status = nudgeStatus }
+let private buildBaseState
+    (s: FallbackSessionRuntime)
+    (agentName: string, latestHumanModel: string option, humanTurnId: string)
+    (ordinals: int * int * int * int)
+    (state: SessionState)
+    (nextCore: SessionFallbackState)
+    : FallbackSessionRuntime =
+    let h, c, n, co = ordinals
 
-        rt.SetPendingNudgeLease(sid, lease)
-    | None -> rt.ClearPendingNudgeLease sid
+    { s with
+        AgentName = agentName
+        LatestHumanModel = latestHumanModel
+        HumanTurnId = humanTurnId
+        LastHumanMessageId = state.LastHumanTurnMessageId |> Option.defaultValue ""
+        SessionGeneration = state.SessionGeneration
+        CancelGeneration = state.CancelGeneration
+        ActiveContinuationGen = state.ActiveContinuationGen
+        ActiveContinuationCancelGen = state.ActiveContinuationCancelGen
+        HumanTurnOrdinal = h
+        ContinuationOrdinal = c
+        NudgeOrdinal = n
+        CompactionOrdinal = co
+        Core = nextCore }
+
+let private applyLifecycleReset (baseState: FallbackSessionRuntime) (nextCore: SessionFallbackState) =
+    if nextCore.Lifecycle = FallbackLifecycle.Cancelled then
+        let reset = cancelEpisode baseState
+        { reset with Core = nextCore }
+    else
+        baseState
+
+// ── Pure restoration transition ───────────────────────────────────────
+
+/// Restore the in-memory FallbackSessionRuntime from a durable SessionState.
+/// This is a single pure transition: the runtime store is responsible for
+/// atomically reading the current snapshot and committing the returned state.
+let restoreFromEventLogState (state: SessionState) (s: FallbackSessionRuntime) : FallbackSessionRuntime =
+    let human = restoreHumanTurnDerived state s
+    let ordinals = restoreOrdinals state s
+    let nextCore = nextCoreFromState state s.Core
+
+    let pendingLease = state.PendingLease |> Option.map decodePendingLease
+    let pendingNudgeLease = state.PendingNudgeLease |> Option.map decodeNudgeLease
+    let compactionId, compactionOrdinal = restoreCompactionIdentity state
+
+    let baseState = buildBaseState s human ordinals state nextCore
+    let afterLifecycle = applyLifecycleReset baseState nextCore
+
+    { afterLifecycle with
+        Owner = applyOwner state afterLifecycle
+        PendingLease = pendingLease
+        PendingNudgeLease = pendingNudgeLease
+        CompactionActiveId = compactionId
+        CompactionActiveOrdinal = compactionOrdinal
+        CompactionGeneration = state.CompactionGeneration
+        CompactionCompacted = state.IsCompacted }

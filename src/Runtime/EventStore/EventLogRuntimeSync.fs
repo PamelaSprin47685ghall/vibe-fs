@@ -2,11 +2,6 @@ module Wanxiangshu.Runtime.EventLogRuntimeSync
 
 open Fable.Core
 open Wanxiangshu.Runtime.Fallback.RuntimeStore
-open Wanxiangshu.Runtime.Fallback.OrdinalTransitions
-open Wanxiangshu.Runtime.Fallback.CompactionTransitions
-open Wanxiangshu.Runtime.Fallback.SessionPropertyTransitions
-open Wanxiangshu.Runtime.Fallback.LeaseTransitions
-open Wanxiangshu.Runtime.Fallback.HumanTurnTransitions
 open Wanxiangshu.Runtime.EventLogRuntimeStore
 open Wanxiangshu.Kernel.HostTools
 open Wanxiangshu.Kernel.FallbackKernel.Types
@@ -26,38 +21,7 @@ let restoreFallbackRuntimeStore
     match scope.TryFindKey("fallbackRuntime") with
     | Some obj ->
         let rt = unbox<FallbackRuntimeStore> obj
-
-        restoreHumanTurnInfo state rt sid
-
-        rt.SetSessionGeneration sid state.SessionGeneration
-        rt.SetCancelGeneration sid state.CancelGeneration
-        rt.SetActiveContinuationGeneration sid state.ActiveContinuationGen
-        rt.SetActiveContinuationCancelGeneration sid state.ActiveContinuationCancelGen
-
-        restoreOrdinals state rt sid
-
-        match state.LastHumanTurnMessageId with
-        | Some id -> rt.SetLastHumanMessageId sid id
-        | None -> rt.ClearLastHumanMessageId sid
-
-        let fallbackState = rt.GetOrCreateState sid
-
-        let updatedFallbackState =
-            { fallbackState with
-                Lifecycle = state.FallbackLifecycle |> Option.defaultValue FallbackLifecycle.Active
-                Phase = state.FallbackPhase |> Option.defaultValue FallbackPhase.Idle }
-
-        rt.UpdateState sid updatedFallbackState
-
-        match state.SessionOwner with
-        | Some o -> rt.SetSessionOwner sid (decodeOwner o)
-        | None -> ()
-
-        restorePendingLease state rt sid
-
-        restoreCompaction state rt sid
-
-        restorePendingNudgeLease state rt sid
+        rt.Update(sid, SessionStateRestore.restoreFromEventLogState state)
     | None -> ()
 
 // ── Sync loop entry points ─────────────────────────────────────────────

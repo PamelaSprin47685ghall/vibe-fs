@@ -11,7 +11,6 @@ open Wanxiangshu.Kernel.Review
 open Wanxiangshu.Kernel.Backlog
 open Wanxiangshu.Kernel.SessionControl
 open Wanxiangshu.Kernel.Subsession
-open Wanxiangshu.Kernel.Fallback.FallbackInjectionFold
 open Wanxiangshu.Kernel.Review.ReviewLoopFold
 open Wanxiangshu.Kernel.Review.ReviewProjection
 open Wanxiangshu.Kernel.Backlog.BacklogProjection
@@ -135,7 +134,6 @@ let createNextSessionState
     (nextNudgeDedup: NudgeDedupState)
     (nextNudgeSnapshot: NudgeSnapshotState)
     (nextSubagents: Map<string, SubagentState>)
-    (nextFallbackInjection: FallbackInjectionState)
     (nextHumanTurn: HumanTurnState option)
     (nextSessionGen: int)
     (nextCancelGen: int)
@@ -150,7 +148,6 @@ let createNextSessionState
       NudgeDedup = nextNudgeDedup
       NudgeSnapshot = nextNudgeSnapshot
       Subagents = nextSubagents
-      FallbackInjection = nextFallbackInjection
       LatestHumanTurn = nextHumanTurn
       SessionGeneration = nextSessionGen
       CancelGeneration = nextCancelGen

@@ -11,7 +11,6 @@ open Wanxiangshu.Kernel.Subsession.SubsessionProjection
 open Wanxiangshu.Kernel.SessionControl.HumanTurn
 open Wanxiangshu.Kernel.SessionControl.Projection
 open Wanxiangshu.Kernel.SessionControl.State
-open Wanxiangshu.Kernel.Fallback.FallbackInjectionFold
 open Wanxiangshu.Kernel.EventSourcing.Fold
 open Wanxiangshu.Kernel.FallbackKernel.Types
 
@@ -23,7 +22,6 @@ type SessionOverview =
       NudgeDedup: NudgeDedupState
       NudgeSnapshot: NudgeSnapshotState
       Subagents: Map<string, SubagentState>
-      FallbackInjection: FallbackInjectionState
       LatestHumanTurn: HumanTurnState option
       SessionGeneration: int
       CancelGeneration: int
@@ -47,7 +45,6 @@ let fromSessionState (st: SessionState) : SessionOverview =
       NudgeDedup = st.NudgeDedup
       NudgeSnapshot = st.NudgeSnapshot
       Subagents = st.Subagents
-      FallbackInjection = st.FallbackInjection
       LatestHumanTurn = st.LatestHumanTurn
       SessionGeneration = st.SessionGeneration
       CancelGeneration = st.CancelGeneration
@@ -71,7 +68,6 @@ let emptyOverviewDirect: SessionOverview =
       NudgeDedup = emptyDedupState
       NudgeSnapshot = emptySnapshotState
       Subagents = Map.empty
-      FallbackInjection = emptyFallbackInjectionState
       LatestHumanTurn = None
       SessionGeneration = 0
       CancelGeneration = 0
