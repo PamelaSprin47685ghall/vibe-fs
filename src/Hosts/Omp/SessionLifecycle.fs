@@ -3,6 +3,7 @@ module Wanxiangshu.Hosts.Omp.SessionLifecycle
 open Fable.Core.JsInterop
 open Wanxiangshu.Hosts.Omp.NudgeHooks
 open Wanxiangshu.Hosts.Omp.TodoHooks
+open Wanxiangshu.Hosts.Omp.SessionLifecycleHooks
 open Wanxiangshu.Hosts.Omp.Codec
 open Wanxiangshu.Runtime.ReviewRuntime
 open Wanxiangshu.Runtime.Fallback.RuntimeStore

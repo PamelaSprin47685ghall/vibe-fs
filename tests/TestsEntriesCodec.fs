@@ -7,7 +7,7 @@ open Wanxiangshu.Tests.AgentNudgeSpecs
 open Wanxiangshu.Tests.KernelTests
 open Wanxiangshu.Tests.KernelPromptSpecs
 open Wanxiangshu.Tests.FuzzyTests
-open Wanxiangshu.Tests.ShellTests
+open Wanxiangshu.Tests.ExecutorSpawnPathTests
 open Wanxiangshu.Tests.DynTests
 open Wanxiangshu.Tests.DelegateTests
 open Wanxiangshu.Tests.DelegateToolsCodecTests

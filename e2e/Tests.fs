@@ -4,6 +4,7 @@ open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Tests.Assert
 open Wanxiangshu.E2e.HarnessTypes
+open Wanxiangshu.E2e.TestsEdgeCaseScenarios
 
 [<Import("start", "./harness.js")>]
 let start: obj -> JS.Promise<obj> = jsNative
@@ -284,7 +285,7 @@ let runAll (args: string array) : JS.Promise<int> =
                 chk "e2e.tool-result-backfill.body" (b3.Contains "README")
 
                 return!
-                    Wanxiangshu.E2e.TestsPart2.runRest
+                    Wanxiangshu.E2e.TestsEdgeCaseScenarios.runRest
                         harness
                         sessionID
                         chk

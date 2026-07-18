@@ -9,6 +9,7 @@ open Wanxiangshu.Kernel.FuzzyFormat
 open Wanxiangshu.Runtime.FuzzyIteratorStore
 open Wanxiangshu.Runtime.FuzzyFinderShell
 open Wanxiangshu.Runtime.FuzzySearchSupport
+open Wanxiangshu.Runtime.FuzzyGrepTypes
 
 let resolveGrepIteratorStateForPattern
     (pattern: string)

@@ -16,6 +16,7 @@ open Wanxiangshu.Runtime.DelegateToolsCodec
 open Wanxiangshu.Runtime.ToolExecute
 open Wanxiangshu.Runtime.ToolContextCodec
 open Wanxiangshu.Hosts.Mux.DelegateTimeout
+open Wanxiangshu.Hosts.Mux.DelegateCodec
 
 let private taskCreate (taskService: obj) (input: obj) : JS.Promise<obj> =
     unbox<JS.Promise<obj>> (taskService?create (input))
@@ -23,51 +24,12 @@ let private taskCreate (taskService: obj) (input: obj) : JS.Promise<obj> =
 let private taskWait (taskService: obj) (taskId: string) (opts: obj) : JS.Promise<obj> =
     unbox<JS.Promise<obj>> (taskService?waitForAgentReport (taskId, opts))
 
-let private createInput
-    (workspaceId: WorkspaceId)
-    (agentId: string)
-    (prompt: string)
-    (title: string)
-    (modelString: string option)
-    (thinkingLevel: string option)
-    (parentRuntimeAiSettings: obj)
-    (experiments: obj)
-    : obj =
-    let o = createObj []
-    o?("parentWorkspaceId") <- Id.workspaceIdValue workspaceId
-    o?("kind") <- "agent"
-    o?("agentId") <- agentId
-    o?("prompt") <- prompt
-    o?("title") <- title
-    o?("experiments") <- experiments
-
-    match modelString with
-    | Some m when m.Trim() <> "" -> o?("modelString") <- m
-    | _ -> ()
-
-    match thinkingLevel with
-    | Some t when t.Trim() <> "" -> o?("thinkingLevel") <- t
-    | _ -> ()
-
-    if not (Dyn.isNullish parentRuntimeAiSettings) then
-        o?("parentRuntimeAiSettings") <- parentRuntimeAiSettings
-
-    o
-
-type private DelegationContext =
-    { workspaceId: WorkspaceId
-      taskService: obj
-      aiSettings: DelegatedAiSettings
-      experiments: obj
-      parentRuntimeAiSettings: obj
-      abortSignal: obj }
-
 let private resolveDelegationContext
     (deps: obj)
     (config: obj)
     (title: string)
     (options: obj option)
-    : JS.Promise<Result<DelegationContext, string>> =
+    : JS.Promise<Result<DelegateCodec.DelegationContext, string>> =
     promise {
         match decodeDelegateConfig config with
         | Error e -> return Error(wireDomainFailure "delegate" e)
@@ -105,14 +67,14 @@ let private translateTaskWaitError
     | other -> Promise.lift (Error other)
 
 let private createAndWaitTaskCore
-    (ctx: DelegationContext)
+    (ctx: DelegateCodec.DelegationContext)
     (agentId: string)
     (prompt: string)
     (title: string)
     : JS.Promise<Result<string * string, DomainError>> =
     promise {
         let input =
-            createInput
+            DelegateCodec.buildCreateInput
                 ctx.workspaceId
                 agentId
                 prompt
@@ -148,7 +110,7 @@ let private createAndWaitTaskCore
     }
 
 let private createAndWaitTask
-    (ctx: DelegationContext)
+    (ctx: DelegateCodec.DelegationContext)
     (agentId: string)
     (prompt: string)
     (title: string)
@@ -212,7 +174,7 @@ let private taskContinue (taskService: obj) (taskId: string) (prompt: string) (o
     unbox<JS.Promise<obj>> (taskService?continueAgentTask (taskId, prompt, opts))
 
 let private continueAndWaitTask
-    (ctx: DelegationContext)
+    (ctx: DelegateCodec.DelegationContext)
     (childTaskId: string)
     (prompt: string)
     (title: string)

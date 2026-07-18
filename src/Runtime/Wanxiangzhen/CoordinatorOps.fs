@@ -21,7 +21,7 @@ open Wanxiangshu.Runtime.Wanxiangzhen.PidMonitor
 open Wanxiangshu.Runtime.Wanxiangzhen.SymlinkShell
 open Wanxiangshu.Runtime.Yaml
 open Wanxiangshu.Runtime.Wanxiangzhen.CoordinatorRuntime
-open Wanxiangshu.Runtime.Wanxiangzhen.CoordinatorOpsHelpers
+open Wanxiangshu.Runtime.Wanxiangzhen.SquadTaskLifecycle
 
 [<Import("dirname", "node:path")>]
 let private pathDirname (p: string) : string = jsNative
@@ -88,13 +88,13 @@ let handleSubmitCore (rt: CoordinatorRuntime) (taskId: string) (reportedSha: str
 let handleSubmit (rt: CoordinatorRuntime) (taskId: string) (reportedSha: string) : JS.Promise<HttpResponse> =
     rt.DagQueue.Enqueue(fun () -> handleSubmitCore rt taskId reportedSha)
 
-let schedulerTick rt = CoordinatorOpsHelpers.schedulerTick rt
+let schedulerTick rt = SquadTaskLifecycle.schedulerTick rt
 
 let handleSlaveExit rt taskId =
-    CoordinatorOpsHelpers.handleSlaveExit rt taskId
+    SquadTaskLifecycle.handleSlaveExit rt taskId
 
 let handleSlaveExitCore rt taskId =
-    CoordinatorOpsHelpers.handleSlaveExitCore rt taskId
+    SquadTaskLifecycle.handleSlaveExitCore rt taskId
 
 let safeKillPid rt pid =
-    CoordinatorOpsHelpers.safeKillPid rt pid
+    SquadTaskLifecycle.safeKillPid rt pid

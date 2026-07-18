@@ -3,9 +3,9 @@ module Wanxiangshu.Tests.IntegrationOpencodeContractTests
 open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Tests.Assert
-open Wanxiangshu.Integration.OpencodePluginContractTestsPart2
-open Wanxiangshu.Integration.OpencodePluginContractTestsPart3
-open Wanxiangshu.Integration.OpencodePluginContractTestsPart4
+open Wanxiangshu.Integration.OpencodePluginToolLifecycleContractTests
+open Wanxiangshu.Integration.OpencodePluginNudgeForceStopContractTests
+open Wanxiangshu.Integration.OpencodePluginStreamAbortContractTests
 open Wanxiangshu.Integration.OpencodeContinueContractTests
 open Wanxiangshu.Integration.OpencodeNudgeHostIntegrationTests
 
@@ -62,7 +62,7 @@ let runAll (args: string array) : JS.Promise<unit> =
         let! h2obj = withTimeoutCustom 30000 (startHarness part2opts)
 
         let harness2 =
-            unbox<Wanxiangshu.Integration.OpencodePluginContractTestsPart2.Harness> h2obj
+            unbox<Wanxiangshu.Integration.OpencodePluginToolLifecycleContractTests.Harness> h2obj
 
         do! runPart2 harness2 chk warnTddValue warnValue execArgs createEmpty dynGet dynIsNull dynStr
         do! withTimeoutCustom 4000 (harness2.dispose ())
@@ -103,7 +103,7 @@ let runAll (args: string array) : JS.Promise<unit> =
         let! h3obj = withTimeoutCustom 30000 (startHarness part3opts)
 
         let harness3 =
-            unbox<Wanxiangshu.Integration.OpencodePluginContractTestsPart2.Harness> h3obj
+            unbox<Wanxiangshu.Integration.OpencodePluginToolLifecycleContractTests.Harness> h3obj
 
         do! runPart3 harness3 chk startHarness jsonStringify createEmpty
         do! withTimeoutCustom 4000 (harness3.dispose ())
@@ -126,7 +126,7 @@ let runAll (args: string array) : JS.Promise<unit> =
         let! h4obj = withTimeoutCustom 30000 (startHarness part4opts)
 
         let harness4 =
-            unbox<Wanxiangshu.Integration.OpencodePluginContractTestsPart2.Harness> h4obj
+            unbox<Wanxiangshu.Integration.OpencodePluginToolLifecycleContractTests.Harness> h4obj
 
         do! runPart4 harness4 chk startHarness jsonStringify createEmpty
         do! withTimeoutCustom 4000 (harness4.dispose ())

@@ -1,0 +1,51 @@
+module Wanxiangshu.Tests.KernelAndSupportCoverageEntries
+
+open Wanxiangshu.Tests.TestsTestBody
+open Wanxiangshu.Tests.SearchToolsTests
+open Wanxiangshu.Tests.KernelDomainIdentityTests
+open Wanxiangshu.Tests.KernelFuzzyPathConstraintTests
+open Wanxiangshu.Tests.KernelReviewSessionCoverageTests
+open Wanxiangshu.Tests.RuntimeBacklogAndSubagentTests
+open Wanxiangshu.Tests.FuzzySearchSupportCoverageTests
+open Wanxiangshu.Tests.MethodologyArgsCoverageTests
+open Wanxiangshu.Tests.FuzzySearchGrepTests
+open Wanxiangshu.Tests.OpencodeToolSchemaCoverageTests
+open Wanxiangshu.Tests.KernelDomainCoverageTests
+open Wanxiangshu.Tests.KernelDomainCoverageTestsToolArgs
+open Wanxiangshu.Tests.KernelReviewCoverageTests
+open Wanxiangshu.Tests.KernelCoverageTestsMethodology
+open Wanxiangshu.Tests.OmpToolsCoverageTests
+open Wanxiangshu.Tests.OmpCodecCoverageTests
+open Wanxiangshu.Tests.PluginMimoTuiTests
+open Wanxiangshu.Tests.FuzzySearchAndLivelockGuardTests
+open Wanxiangshu.Tests.LivelockGuardScopeTests
+open Wanxiangshu.Tests.OpencodeHookSchemaCoverageTests
+open Wanxiangshu.Tests.OpencodeSearchToolsCoverageTests
+open Wanxiangshu.Tests.OpencodeSubagentCoverageTests
+open Wanxiangshu.Tests.ReviewerLoopTests
+open Wanxiangshu.Tests.MuxCoverageTests
+
+let kernelSupportCoverageTestEntries () : (string * TestBody) list =
+    [ "KernelDomainIdentityTests.run", Sync(sync KernelDomainIdentityTests.run)
+      "KernelFuzzyPathConstraintTests.run", Sync(sync KernelFuzzyPathConstraintTests.run)
+      "KernelReviewSessionCoverageTests.run", Sync(sync KernelReviewSessionCoverageTests.run)
+      "RuntimeBacklogAndSubagentTests.run", Async RuntimeBacklogAndSubagentTests.run
+      "FuzzySearchSupportCoverageTests.run", Sync(sync FuzzySearchSupportCoverageTests.run)
+      "FuzzySearchGrepTests.run", Sync(sync FuzzySearchGrepTests.run)
+      "MethodologyArgsCoverageTests.run", Sync(sync MethodologyArgsCoverageTests.run)
+      "OpencodeToolSchemaCoverageTests.run", Sync(sync OpencodeToolSchemaCoverageTests.run)
+      "KernelDomainCoverageTests.run", Sync(sync KernelDomainCoverageTests.run)
+      "KernelDomainCoverageTestsToolArgs.run", Sync(sync KernelDomainCoverageTestsToolArgs.run)
+      "KernelReviewCoverageTests.run", Sync(sync KernelReviewCoverageTests.run)
+      "KernelCoverageTestsMethodology.run", Sync(sync KernelCoverageTestsMethodology.run)
+      "OmpToolsCoverageTests.run", Async OmpToolsCoverageTests.run
+      "OmpCodecCoverageTests.run", Async OmpCodecCoverageTests.run
+      "SearchToolsTests.run", Async SearchToolsTests.run
+      "PluginMimoTuiTests.run", Sync(sync PluginMimoTuiTests.run)
+      "MuxCoverageTests.run", Sync(sync MuxCoverageTests.run)
+      "OpencodeHookSchemaCoverageTests.run", Async OpencodeHookSchemaCoverageTests.run
+      "OpencodeSearchToolsCoverageTests.run", Async OpencodeSearchToolsCoverageTests.run
+      "OpencodeSubagentCoverageTests.run", Async OpencodeSubagentCoverageTests.run
+      "ReviewerLoopTests.run", Async ReviewerLoopTests.run
+      "FuzzySearchAndLivelockGuardTests.run", Sync(sync FuzzySearchAndLivelockGuardTests.run)
+      "LivelockGuardScopeTests.run", Sync(sync LivelockGuardScopeTests.run) ]

@@ -1,5 +1,5 @@
 process.on('unhandledRejection', (reason, promise) => {
-  console.error('UNHANDLED REJECTION AT:', promise, 'REASON:', reason);
+    console.error('UNHANDLED REJECTION AT:', promise, 'REASON:', reason);
 });
 
 const target = process.argv[2];
@@ -11,27 +11,6 @@ if (target === 'mux') {
     runAll = (await import('../build/e2e/TestsOmp.js')).runAll;
 } else if (target === 'wanxiangzhen') {
     runAll = (await import('../build/e2e/WanxiangzhenPluginTests.js')).runAll;
-} else if (target === 'opencode-plugin') {
-    runAll = async (args) => {
-        const suites = [
-            '../build/e2e/OpencodePluginTests.js',
-            '../build/e2e/MimocodePluginTests.js',
-            '../build/e2e/MimoTuiPluginTests.js',
-        ];
-        let totalFailed = 0;
-        for (const suite of suites) {
-            const { runAll: suiteRun } = await import(suite);
-            totalFailed += await suiteRun(args);
-        }
-        if (totalFailed > 0) {
-            console.error(`\n✗ ${totalFailed} total failures across opencode-family e2e suites`);
-        } else {
-            console.log('\n✓ All opencode-family e2e suites passed');
-        }
-        return totalFailed;
-    };
-} else if (target === 'core') {
-    runAll = (await import('../build/e2e/Tests.js')).runAll;
 } else if (target === 'opencode-e2e-p0') {
     runAll = async (args) => {
         console.log('\n--- Running opencode e2e P0 canary suite ---');
@@ -44,6 +23,22 @@ if (target === 'mux') {
         console.log(`opencode e2e P0 canary suite exited with code ${code}`);
         return code;
     };
+} else if (target === 'opencode-e2e-full') {
+    // Full OpenCode E2E currently runs the same P0 canary path; expand here
+    // as more real-E2E suites land.
+    runAll = async (args) => {
+        console.log('\n--- Running opencode e2e full suite ---');
+        const { spawnSync } = await import('node:child_process');
+        const result = spawnSync('node', [new URL('../e2e/opencode/specs/p0-canary.js', import.meta.url).pathname], {
+            stdio: 'inherit',
+            cwd: new URL('..', import.meta.url).pathname,
+        });
+        const code = result.status ?? 1;
+        console.log(`opencode e2e full suite exited with code ${code}`);
+        return code;
+    };
+} else if (target === 'core') {
+    runAll = (await import('../build/e2e/Tests.js')).runAll;
 } else if (target === 'git-hooks') {
     runAll = async (args) => {
         console.log('\nRunning GitHookFormatterTests...');
@@ -56,10 +51,13 @@ if (target === 'mux') {
         }
     };
 } else {
-    // Run everything by default if no target
+    // Default E2E run: the old OpencodePluginTests/MimocodePluginTests/MimoTuiPluginTests
+    // pseudo-E2E suites have been removed from E2E statistics. They remain as
+    // integration-level contract tests and should be run under the integration
+    // runner once that separation is fully wired.
     runAll = async (args) => {
         let totalFailed = 0;
-        
+
         console.log('\n--- Running e2e core ---');
         const { runAll: coreRun } = await import('../build/e2e/Tests.js');
         totalFailed += await coreRun(args);
@@ -75,12 +73,6 @@ if (target === 'mux') {
         console.log('\n--- Running e2e wanxiangzhen ---');
         const { runAll: wanRun } = await import('../build/e2e/WanxiangzhenPluginTests.js');
         totalFailed += await wanRun(args);
-
-        console.log('\n--- Running e2e opencode-family ---');
-        for (const suite of ['../build/e2e/OpencodePluginTests.js', '../build/e2e/MimocodePluginTests.js', '../build/e2e/MimoTuiPluginTests.js']) {
-            const { runAll: suiteRun } = await import(suite);
-            totalFailed += await suiteRun(args);
-        }
 
         console.log('\n--- Running opencode e2e P0 canary suite ---');
         const { spawnSync } = await import('node:child_process');

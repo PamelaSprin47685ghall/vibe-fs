@@ -11,6 +11,7 @@ open Wanxiangshu.Kernel.Messaging
 open Wanxiangshu.Kernel.ToolExecutionStatusModule
 open Wanxiangshu.Runtime.Dyn
 open Wanxiangshu.Runtime.MessageTransform.Plan
+open Wanxiangshu.Runtime.MessageTransform.ContextBudgetEngine
 open Wanxiangshu.Runtime.MessageTransform.Stack
 open Wanxiangshu.Runtime.RuntimeScope
 

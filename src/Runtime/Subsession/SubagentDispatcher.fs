@@ -1,6 +1,8 @@
 module Wanxiangshu.Runtime.SubagentDispatcher
 
-open Wanxiangshu.Runtime.SubagentDispatchHelpers
+open Wanxiangshu.Runtime.SubagentBatchSpawn
+open Wanxiangshu.Runtime.SubagentBatchArgs
+open Wanxiangshu.Runtime.SubagentBatchSpawnCore
 
 open Fable.Core
 open Fable.Core.JsInterop
@@ -91,9 +93,15 @@ let dispatch
                     "Browser"
                     (browserPromptText host b.Intent)
         | Ok(Typed(Continue c)) -> return! handleContinue adapter host scope toolName c
-        | Ok(CoderBatch intents) -> return! runCoderBatch adapter host scope registry toolName intents
-        | Ok(InvestigatorBatch intents) -> return! runInvestigatorBatch adapter host scope registry toolName intents
+        | Ok(CoderBatch rawIntents) ->
+            match validateCoderBatchArgs toolName args with
+            | Error err -> return wireDecodeFailure toolName err
+            | Ok intents -> return! runCoderBatch adapter host scope registry toolName intents
+        | Ok(InvestigatorBatch rawIntents) ->
+            match validateInvestigatorBatchArgs toolName args with
+            | Error err -> return wireDecodeFailure toolName err
+            | Ok intents -> return! runInvestigatorBatch adapter host scope registry toolName intents
         | Ok(Typed _) ->
             let err = InvalidIntent(toolName, "tool", "not a subagent tool")
-            return! resolveSubagentPromise toolName (Promise.lift (Error err))
+            return! Promise.lift (wireDecodeFailure toolName err)
     }

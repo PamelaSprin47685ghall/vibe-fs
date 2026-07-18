@@ -8,7 +8,8 @@ open Wanxiangshu.Hosts.Opencode.ToolSchema
 open Wanxiangshu.Hosts.Opencode.SubagentTools
 open Wanxiangshu.Hosts.Opencode.ExecutorTool
 open Wanxiangshu.Hosts.Opencode.PtySpawn
-open Wanxiangshu.Hosts.Opencode.PtyIo
+open Wanxiangshu.Hosts.Opencode.PtyWriteTool
+open Wanxiangshu.Hosts.Opencode.PtyReadTool
 open Wanxiangshu.Hosts.Opencode.SearchTools
 open Wanxiangshu.Hosts.Opencode.ReviewTools
 open Wanxiangshu.Hosts.Opencode.MimoTodoTool

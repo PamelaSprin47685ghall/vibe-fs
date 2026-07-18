@@ -21,6 +21,8 @@ open Wanxiangshu.Runtime.ErrorClassify
 open Wanxiangshu.Kernel.HostTools
 open Wanxiangshu.Runtime.NudgeRuntime
 open Wanxiangshu.Runtime.NudgeRuntimeState
+open Wanxiangshu.Hosts.Opencode.NudgeEffectPrompt
+open Wanxiangshu.Runtime.OpencodeSessionPromptBuilder
 open Wanxiangshu.Runtime.NudgeFlow
 open Wanxiangshu.Runtime.NudgeModelResolver
 open Wanxiangshu.Runtime.Fallback.RuntimeStore
@@ -28,6 +30,20 @@ open Wanxiangshu.Runtime.Fallback.SessionPropertyTransitions
 open Wanxiangshu.Hosts.Opencode.NudgeEffectHelpers
 
 module Dyn = Wanxiangshu.Runtime.Dyn
+
+let private invokeClient (client: obj) (method_: string) (arg: obj) : JS.Promise<obj> =
+    if Dyn.isNullish client then
+        Promise.lift (unbox null)
+    else
+        match getSessionApiFromClient client with
+        | Error _ -> Promise.lift (unbox null)
+        | Ok session ->
+            let api: obj = Dyn.get session method_
+
+            if Dyn.isNullish api then
+                Promise.lift (unbox null)
+            else
+                unbox<JS.Promise<obj>> (Dyn.callMethod1 session method_ arg)
 
 let buildSnapshotResult (snap: Wanxiangshu.Kernel.Nudge.NudgeProjection.NudgeSnapshotState) : SessionSnapshot =
     let anchor =

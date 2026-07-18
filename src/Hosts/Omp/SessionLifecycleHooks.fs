@@ -2,6 +2,7 @@ module Wanxiangshu.Hosts.Omp.SessionLifecycleHooks
 
 open Wanxiangshu.Hosts.Omp.NudgeToolFilter
 open Wanxiangshu.Hosts.Omp.NudgeHooks
+open Wanxiangshu.Hosts.Omp.TodoHooks
 
 let applyActiveToolFilterForMainSession =
     NudgeToolFilter.applyActiveToolFilterForMainSession

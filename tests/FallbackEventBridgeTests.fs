@@ -21,8 +21,8 @@ open Wanxiangshu.Runtime
 
 module Dyn = Wanxiangshu.Runtime.Dyn
 
-open Wanxiangshu.Tests.FallbackEventBridgeTestsPart2
-open Wanxiangshu.Tests.FallbackEventBridgeTestsPendingReview
+open Wanxiangshu.Tests.FallbackEventBridgeStateTests
+open Wanxiangshu.Tests.FallbackEventBridgeReviewInProgressTests
 
 
 type FakeExecutor(?messages: obj array) =
@@ -377,6 +377,6 @@ let run () =
         do! handleEvent_newUserMessage_resetsState ()
         do! createHandler_returnsCallable ()
         do! createHandler_twoSessionsIndependent ()
-        do! FallbackEventBridgeTestsPart2.run ()
-        do! FallbackEventBridgeTestsPendingReview.run ()
+        do! FallbackEventBridgeStateTests.run ()
+        do! FallbackEventBridgeReviewInProgressTests.run ()
     }

@@ -2,6 +2,7 @@ module Wanxiangshu.Hosts.Omp.NudgeHooks
 
 open Fable.Core
 open Fable.Core.JsInterop
+open Wanxiangshu.Hosts.Omp.NudgeDispatchLogic
 open Wanxiangshu.Hosts.Omp.NudgeToolFilter
 open Wanxiangshu.Kernel.OmpSessionTools
 open Wanxiangshu.Runtime.PromptFragments
@@ -35,19 +36,13 @@ open Wanxiangshu.Runtime.Fallback.GateFlagTransitions
 open Wanxiangshu.Runtime.Fallback.HumanTurnTransitions
 open Wanxiangshu.Runtime.Fallback.OrdinalTransitions
 open Wanxiangshu.Runtime.Fallback.SessionPropertyTransitions
-open Wanxiangshu.Runtime.NudgeLease
 open Wanxiangshu.Kernel.FallbackKernel.Types
-
-module Dyn = Wanxiangshu.Runtime.Dyn
-
+open Wanxiangshu.Runtime.Nudge.NudgeLease
 open Wanxiangshu.Runtime.FuzzyIteratorStore
 open Wanxiangshu.Runtime.ReviewRuntime
 open Wanxiangshu.Kernel.EventSourcing.Fold
 open Wanxiangshu.Runtime.EventLogRuntime
-open Wanxiangshu.Hosts.Omp.NudgeHooksHelpers
-
-let sendNudgeReminder = NudgeHooksHelpers.sendNudgeReminder
-let resolveAgentLocal = NudgeHooksHelpers.resolveAgentLocal
+open Wanxiangshu.Hosts.Omp.NudgeReminderDispatch
 
 let beforeAgentStartHandler
     (piObj: obj)
@@ -101,194 +96,3 @@ let turnStartHandler
     | None -> ()
 
     applyActiveToolFilterForMainSession piObj ctxObj
-
-let performNudgeDispatch
-    (pi: IPi)
-    (fallbackRuntime: FallbackRuntimeStore)
-    (root: string)
-    (sessionId: string)
-    (action: NudgeAction)
-    (snapshot: SessionSnapshot)
-    (lease: NudgeLease)
-    : JS.Promise<unit> =
-    promise {
-        try
-            do! sendNudgeReminder pi action snapshot
-
-            if
-                not (
-                    fallbackRuntime.TryTransitionPendingNudgeLease(
-                        sessionId,
-                        lease.NudgeID,
-                        LeaseStatus.DispatchStarted,
-                        LeaseStatus.Dispatched
-                    )
-                )
-            then
-                do!
-                    finishNudge
-                        fallbackRuntime
-                        root
-                        sessionId
-                        lease
-                        NudgeOutcome.Cancelled
-                        "Cancelled after dispatch"
-                        ""
-                        ""
-            else
-                let dispatchedLease =
-                    { lease with
-                        Status = LeaseStatus.Dispatched }
-
-                do!
-                    finishNudge
-                        fallbackRuntime
-                        root
-                        sessionId
-                        dispatchedLease
-                        NudgeOutcome.Dispatched
-                        ""
-                        (Wanxiangshu.Kernel.Nudge.toString action)
-                        snapshot.nudgeAnchorKey
-        with _ ->
-            do! finishNudge fallbackRuntime root sessionId lease NudgeOutcome.Failed "Send failed" "" ""
-    }
-
-let dispatchNudgeAction
-    (pi: IPi)
-    (fallbackRuntime: FallbackRuntimeStore)
-    (sessionId: string)
-    (root: string)
-    (action: NudgeAction)
-    (snapshot: SessionSnapshot)
-    : JS.Promise<unit> =
-    promise {
-        let nudgeId = "nudge-" + System.Guid.NewGuid().ToString("N")
-        let nonce = "nudge_" + System.Guid.NewGuid().ToString("N")
-        let sessionGen = fallbackRuntime.GetSessionGeneration sessionId
-        let cancelGen = fallbackRuntime.GetCancelGeneration sessionId
-        let humanTurnId = fallbackRuntime.GetHumanTurnId sessionId
-        let nudgeOrdinal = fallbackRuntime.IncrementNudgeOrdinal sessionId
-
-        let! claimed =
-            tryClaimNudgeDispatch
-                root
-                sessionId
-                action
-                snapshot.nudgeAnchorKey
-                nudgeId
-                nonce
-                sessionGen
-                cancelGen
-                humanTurnId
-                nudgeOrdinal
-
-        if claimed then
-            let lease: NudgeLease =
-                { NudgeID = nudgeId
-                  NudgeOrdinal = nudgeOrdinal
-                  Nonce = nonce
-                  HumanTurnID = humanTurnId
-                  SessionGeneration = sessionGen
-                  CancelGeneration = cancelGen
-                  Owner = SessionOwner.Nudge
-                  Status = LeaseStatus.DispatchStarted }
-
-            fallbackRuntime.SetPendingNudgeLease(sessionId, lease)
-            fallbackRuntime.SetSessionOwner sessionId SessionOwner.Nudge
-            fallbackRuntime.SetActiveNudgeNonce sessionId nonce
-            fallbackRuntime.SetMainContinuationAwaitingStart sessionId true
-
-            if isSessionForceStopped sessionId then
-                do! finishNudge fallbackRuntime root sessionId lease NudgeOutcome.Cancelled "Force stopped" "" ""
-            else
-                do! performNudgeDispatch pi fallbackRuntime root sessionId action snapshot lease
-    }
-
-let handleAgentEndNudge
-    (pi: IPi)
-    (fallbackRuntime: FallbackRuntimeStore)
-    (ctx: INudgeHooksContext)
-    (sessionId: string)
-    (sm: ISessionManager)
-    : JS.Promise<unit> =
-    let hasPending =
-        match ctx.hasPendingMessages with
-        | Some fn -> Dyn.truthy (fn ())
-        | None -> false
-
-    if hasPending then
-        Promise.lift ()
-    else
-        promise {
-            if not (isSessionForceStopped sessionId) then
-                let openTodos = openTodoStatuses sm
-                let last = lastAssistantMessage sm
-                let root = ctx.cwd |> Option.defaultValue ""
-                let turnId = lastAssistantTurnId sm
-                let model = lastAssistantModel sm
-                do! appendAssistantCompletedOrFail root sessionId last None model turnId openTodos
-                let! snap = getNudgeSnapshotFromEventLog root sessionId
-
-                let runner =
-                    if hasRunningRunnerJob ompScope sessionId then
-                        RunnerPresence.Active
-                    else
-                        RunnerPresence.Absent
-
-                let anchor =
-                    Wanxiangshu.Kernel.Nudge.NudgeProjection.nudgeAnchorKey snap.turnId snap.lastAssistantText
-
-                let blockStatus =
-                    if
-                        Wanxiangshu.Kernel.Nudge.NudgeProjection.isBlocked
-                            { PendingNudge = snap.pendingNudge
-                              LastDispatchedAnchor = snap.lastDispatchedAnchor }
-                            anchor
-                    then
-                        NudgeBlockStatus.Blocked
-                    else
-                        NudgeBlockStatus.Allowed
-
-                let snapshot = sessionSnapshotFromFold snap runner blockStatus
-
-                match deriveAction snapshot with
-                | NudgeNone -> ()
-                | action -> do! dispatchNudgeAction pi fallbackRuntime sessionId root action snapshot
-        }
-
-let agentEndHandler
-    (piObj: obj)
-    (_reviewStore: ReviewStore)
-    (fallbackRuntime: FallbackRuntimeStore)
-    (ctxObj: obj)
-    : JS.Promise<unit> =
-    let pi = unbox<IPi> piObj
-    let ctx = unbox<INudgeHooksContext> ctxObj
-
-    match getSessionIdFromContext ctxObj with
-    | None -> Promise.lift ()
-    | Some sessionId ->
-        let owner = fallbackRuntime.GetSessionOwner sessionId
-        let currentAgent = resolveAgentLocal ctxObj
-
-        if isSyntheticAssistantAgent currentAgent then
-            Promise.lift ()
-        elif owner = SessionOwner.Nudge then
-            let root = ctx.cwd |> Option.defaultValue ""
-
-            promise {
-                match fallbackRuntime.TryGetPendingNudgeLease sessionId with
-                | Some lease ->
-                    if root <> "" then
-                        do! finishNudge fallbackRuntime root sessionId lease NudgeOutcome.Settled "completed" "" ""
-                | None -> fallbackRuntime.SetSessionOwner sessionId SessionOwner.NoOwner
-            }
-        elif owner <> SessionOwner.NoOwner && owner <> SessionOwner.Human then
-            Promise.lift ()
-        elif isSessionForceStopped sessionId then
-            Promise.lift ()
-        else
-            match ctx.sessionManager with
-            | None -> Promise.lift ()
-            | Some sm -> handleAgentEndNudge pi fallbackRuntime ctx sessionId sm

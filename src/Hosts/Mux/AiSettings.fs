@@ -13,6 +13,7 @@ open Wanxiangshu.Runtime.MuxAiSettingsCodec
 open Wanxiangshu.Runtime.Fallback.FallbackConfigCodec
 open Wanxiangshu.Kernel.FallbackKernel.Types
 open Wanxiangshu.Kernel.FallbackKernel.Recovery
+open Wanxiangshu.Runtime.Fallback.FallbackChainResolution
 
 type DelegatedAiSettings = Wanxiangshu.Runtime.DelegatedAiSettings.DelegatedAiSettings
 let emptySettings = Wanxiangshu.Runtime.DelegatedAiSettings.emptySettings

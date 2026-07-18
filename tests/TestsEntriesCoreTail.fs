@@ -3,13 +3,14 @@ module Wanxiangshu.Tests.TestsEntriesCoreTail
 open Wanxiangshu.Tests.FuzzyTests
 open Wanxiangshu.Tests.FuzzyTestsPromise
 open Wanxiangshu.Tests.FuzzyTestsPaging
-open Wanxiangshu.Tests.ShellTests
-open Wanxiangshu.Tests.ShellTestsFormat
+open Wanxiangshu.Tests.ExecutorSpawnPathTests
+open Wanxiangshu.Tests.ExecutorFormatCoverageTests
 open Wanxiangshu.Tests.DynTests
 open Wanxiangshu.Tests.DelegateTests
 open Wanxiangshu.Tests.DelegateToolsCodecTests
 open Wanxiangshu.Tests.PatchParserTests
 open Wanxiangshu.Tests.ResolveAiSettingsTests
+open Wanxiangshu.Tests.ProductionDebugOutputTests
 open Wanxiangshu.Tests.IntegrationPluginTests
 open Wanxiangshu.Tests.IntegrationEventTests
 open Wanxiangshu.Tests.IntegrationOpencodeReviewSpecs
@@ -47,7 +48,6 @@ open Wanxiangshu.Tests.EventDrivenHarnessDemo
 open Wanxiangshu.Tests.SubagentOutputTranscriptTests
 open Wanxiangshu.Tests.SubagentDrainingTests
 open Wanxiangshu.Tests.TestsTestBody
-
 let tailCoreTestEntriesPart1 () : (string * TestBody) list =
     [ "FuzzyTests.grepDetect", TestBody.Sync(sync FuzzyTests.grepDetect)
       "FuzzyTests.iteratorRoundTrip", TestBody.Sync(sync FuzzyTests.iteratorRoundTrip)
@@ -73,35 +73,34 @@ let tailCoreTestEntriesPart1 () : (string * TestBody) list =
       "FuzzyTestsPaging.resolveStoreRequiresInjection",
       TestBody.Sync(sync FuzzyTestsPaging.resolveStoreRequiresInjection)
       "FuzzyTestsPaging.emptyIteratorTreatedAsAbsent", TestBody.Sync(sync FuzzyTestsPaging.emptyIteratorTreatedAsAbsent)
-      "ShellTests.webApiFetchInit", TestBody.Sync(sync ShellTests.webApiFetchInit)
-      "ShellTests.webApiResponseMethodCall", TestBody.Sync(sync ShellTests.webApiResponseMethodCall)
-      "ShellTests.webApiKeyValidation", TestBody.Sync(sync ShellTests.webApiKeyValidation)
-      "ShellTests.executorMapping", TestBody.Sync(sync ShellTests.executorMapping)
-      "ShellTestsFormat.safetyWarning", TestBody.Sync(sync ShellTestsFormat.safetyWarning)
-      "ShellTests.capsFileShape", TestBody.Sync(sync ShellTests.capsFileShape)
-      "ShellTests.capsFileSizeLimit", TestBody.Sync(sync ShellTests.capsFileSizeLimit)
-      "ShellTests.stripHeadTailPipesOutsideQuotes", TestBody.Sync(sync ShellTests.stripHeadTailPipesOutsideQuotes)
-      "ShellTests.stripHeadTailPipesHeadTailChain", TestBody.Sync(sync ShellTests.stripHeadTailPipesHeadTailChain)
-      "ShellTestsFormat.ollamaFormat", TestBody.Sync(sync ShellTestsFormat.ollamaFormat)
-      "ShellTestsFormat.webApiSearchFormat", TestBody.Sync(sync ShellTestsFormat.webApiSearchFormat)
-      "ShellTestsFormat.summarizerInputCap", TestBody.Sync(sync ShellTestsFormat.summarizerInputCap)
-      "ShellTestsFormat.executorToolResponseFormatting",
-      TestBody.Sync(sync ShellTestsFormat.executorToolResponseFormatting)
-      "ShellTestsFormat.summarizerPromptOmitsReturnValue",
-      TestBody.Sync(sync ShellTestsFormat.summarizerPromptOmitsReturnValue)
-      "ShellTestsFormat.formatFetchResponseAllFields", TestBody.Sync(sync ShellTestsFormat.formatFetchResponseAllFields)
-      "ShellTestsFormat.formatFetchResponseOnlyTitle", TestBody.Sync(sync ShellTestsFormat.formatFetchResponseOnlyTitle)
-      "ShellTestsFormat.formatFetchResponseOnlyContent",
-      TestBody.Sync(sync ShellTestsFormat.formatFetchResponseOnlyContent)
-      "ShellTestsFormat.formatFetchResponseAllNone", TestBody.Sync(sync ShellTestsFormat.formatFetchResponseAllNone)
-      "ShellTestsFormat.formatFetchResponseEmptyTitleOmitted",
-      TestBody.Sync(sync ShellTestsFormat.formatFetchResponseEmptyTitleOmitted) ]
-
+      "ExecutorSpawnPathTests.webApiFetchInit", TestBody.Sync(sync ExecutorSpawnPathTests.webApiFetchInit)
+      "ExecutorSpawnPathTests.webApiResponseMethodCall", TestBody.Sync(sync ExecutorSpawnPathTests.webApiResponseMethodCall)
+      "ExecutorSpawnPathTests.webApiKeyValidation", TestBody.Sync(sync ExecutorSpawnPathTests.webApiKeyValidation)
+      "ExecutorSpawnPathTests.executorMapping", TestBody.Sync(sync ExecutorSpawnPathTests.executorMapping)
+      "ExecutorFormatCoverageTests.safetyWarning", TestBody.Sync(sync ExecutorFormatCoverageTests.safetyWarning)
+      "ExecutorSpawnPathTests.capsFileShape", TestBody.Sync(sync ExecutorSpawnPathTests.capsFileShape)
+      "ExecutorSpawnPathTests.capsFileSizeLimit", TestBody.Sync(sync ExecutorSpawnPathTests.capsFileSizeLimit)
+      "ExecutorSpawnPathTests.stripHeadTailPipesOutsideQuotes", TestBody.Sync(sync ExecutorSpawnPathTests.stripHeadTailPipesOutsideQuotes)
+      "ExecutorSpawnPathTests.stripHeadTailPipesHeadTailChain", TestBody.Sync(sync ExecutorSpawnPathTests.stripHeadTailPipesHeadTailChain)
+      "ExecutorFormatCoverageTests.ollamaFormat", TestBody.Sync(sync ExecutorFormatCoverageTests.ollamaFormat)
+      "ExecutorFormatCoverageTests.webApiSearchFormat", TestBody.Sync(sync ExecutorFormatCoverageTests.webApiSearchFormat)
+      "ExecutorFormatCoverageTests.summarizerInputCap", TestBody.Sync(sync ExecutorFormatCoverageTests.summarizerInputCap)
+      "ExecutorFormatCoverageTests.executorToolResponseFormatting",
+      TestBody.Sync(sync ExecutorFormatCoverageTests.executorToolResponseFormatting)
+      "ExecutorFormatCoverageTests.summarizerPromptOmitsReturnValue",
+      TestBody.Sync(sync ExecutorFormatCoverageTests.summarizerPromptOmitsReturnValue)
+      "ExecutorFormatCoverageTests.formatFetchResponseAllFields", TestBody.Sync(sync ExecutorFormatCoverageTests.formatFetchResponseAllFields)
+      "ExecutorFormatCoverageTests.formatFetchResponseOnlyTitle", TestBody.Sync(sync ExecutorFormatCoverageTests.formatFetchResponseOnlyTitle)
+      "ExecutorFormatCoverageTests.formatFetchResponseOnlyContent",
+      TestBody.Sync(sync ExecutorFormatCoverageTests.formatFetchResponseOnlyContent)
+      "ExecutorFormatCoverageTests.formatFetchResponseAllNone", TestBody.Sync(sync ExecutorFormatCoverageTests.formatFetchResponseAllNone)
+      "ExecutorFormatCoverageTests.formatFetchResponseEmptyTitleOmitted",
+      TestBody.Sync(sync ExecutorFormatCoverageTests.formatFetchResponseEmptyTitleOmitted) ]
 let tailCoreTestEntriesPart2 () : (string * TestBody) list =
-    [ "ShellTests.readDirectoryListing", TestBody.Async ShellTests.readDirectoryListing
-      "ShellTests.ensureJavascriptProjectRepairsModuleType",
-      TestBody.Async ShellTests.ensureJavascriptProjectRepairsModuleType
-      "ShellTests.rewriteJavascriptRelativeImports", TestBody.Async ShellTests.rewriteJavascriptRelativeImports
+    [ "ExecutorSpawnPathTests.readDirectoryListing", TestBody.Async ExecutorSpawnPathTests.readDirectoryListing
+      "ExecutorSpawnPathTests.ensureJavascriptProjectRepairsModuleType",
+      TestBody.Async ExecutorSpawnPathTests.ensureJavascriptProjectRepairsModuleType
+      "ExecutorSpawnPathTests.rewriteJavascriptRelativeImports", TestBody.Async ExecutorSpawnPathTests.rewriteJavascriptRelativeImports
       "DynTests.nullish", TestBody.Sync(sync DynTests.nullish)
       "DelegateTests.run", TestBody.Sync(sync DelegateTests.run)
       "DelegateToolsCodecTests.run", TestBody.Sync(sync DelegateToolsCodecTests.run)
@@ -127,7 +126,6 @@ let tailCoreTestEntriesPart2 () : (string * TestBody) list =
       "TitleFetchGuardTests.rewriteStringContent", TestBody.Sync(sync TitleFetchGuardTests.rewriteStringContent)
       "TitleFetchGuardTests.rewriteArrayContent", TestBody.Sync(sync TitleFetchGuardTests.rewriteArrayContent)
       "TitleFetchGuardTests.skipProbeMessage", TestBody.Sync(sync TitleFetchGuardTests.skipProbeMessage) ]
-
 let tailCoreTestEntriesPart3 () : (string * TestBody) list =
     [ "ToolCatalogClassificationTests.run", TestBody.Sync(sync ToolCatalogClassificationTests.run)
       "ToolOutputInfoTests.run", TestBody.Sync(sync ToolOutputInfoTests.run)
@@ -160,7 +158,6 @@ let tailCoreTestEntriesPart3 () : (string * TestBody) list =
         "EventDrivenHarnessDemo.run", TestBody.Async(fun () -> EventDrivenHarnessDemo.run ())
         "ProductionDebugOutputTests.run", TestBody.Sync(sync Wanxiangshu.Tests.ProductionDebugOutputTests.run)
         "ArchitectureGatesTests.run", TestBody.Sync(sync Wanxiangshu.Tests.ArchitectureGatesTests.run) ]
-
 let tailCoreTestEntries () : (string * TestBody) list =
     tailCoreTestEntriesPart1 ()
     @ tailCoreTestEntriesPart2 ()

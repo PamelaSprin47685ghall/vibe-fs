@@ -119,6 +119,22 @@ let ptySpawnTool (host: Host) : obj =
                 return frontMatterPrompt fields "PTY session spawned."
             })
 
+let formatSessionList (sessions: obj array) : string =
+    let sb = ResizeArray<string>()
+
+    for s in sessions do
+        sb.Add(sprintf "### %s" (string s?``id``))
+        sb.Add(sprintf "title: %s" (string s?title))
+
+        sb.Add(sprintf "command: %s %s" (string s?command) (String.concat " " (unbox<string array> s?args)))
+
+        sb.Add(sprintf "status: %s" (string s?status))
+        sb.Add(sprintf "pid: %d" (unbox<int> s?pid))
+        sb.Add(sprintf "lines: %d" (unbox<int> s?lineCount))
+        sb.Add("")
+
+    String.concat "\n" sb
+
 let ptyKillTool (host: Host) : obj =
     define
         "Terminate a PTY session and optionally remove it from the session list (cleanup)."

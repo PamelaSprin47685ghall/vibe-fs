@@ -15,7 +15,7 @@ open Wanxiangshu.Runtime.OpencodeClientCodec
 open Wanxiangshu.Hosts.Opencode.MessagingCodec
 open Wanxiangshu.Hosts.Opencode.SubagentTypes
 open Wanxiangshu.Hosts.Opencode.SubagentSpawn
-open Wanxiangshu.Hosts.Opencode.SubagentIo
+open Wanxiangshu.Hosts.Opencode.SubagentIoRun
 open Wanxiangshu.Runtime.ChildAgentRegistry
 open Wanxiangshu.Runtime.Fallback.RuntimeStore
 
@@ -79,26 +79,6 @@ let startSubagentSession = startSubagentSession
 
 let promptWithAbort = promptWithAbort
 
-let runSubagentCoreResult =
-    fun runtime registry client agent title prompt directory sessionID context tools cleanup existingChildID ->
-        runSubagentCoreResult
-            runtime
-            registry
-            client
-            agent
-            title
-            prompt
-            directory
-            sessionID
-            context
-            tools
-            cleanup
-            existingChildID
-
-let runSubagentWithCleanup =
-    fun runtime registry client agent title prompt directory sessionID context ->
-        runSubagentWithCleanup runtime registry client agent title prompt directory sessionID context
-
 let runSubagent
     (runtime: FallbackRuntimeStore)
     (registry: ChildAgentRegistry)
@@ -111,16 +91,4 @@ let runSubagent
     (context: obj)
     (tools: obj)
     : JS.Promise<Result<string, DomainError>> =
-    runSubagentCoreResult
-        runtime
-        registry
-        client
-        agent
-        title
-        prompt
-        directory
-        sessionID
-        context
-        tools
-        false
-        None
+    runSubagentCoreResult runtime registry client agent title prompt directory sessionID context tools false None

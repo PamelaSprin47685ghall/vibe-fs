@@ -3,7 +3,7 @@ module Wanxiangshu.E2e.MimocodePluginSpecs
 open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Tests.Assert
-open Wanxiangshu.E2e.MimocodePluginSpecsPart
+open Wanxiangshu.E2e.MimocodePluginTaskAndArgsTests
 open Wanxiangshu.E2e.MimocodePluginSpecSections
 
 let testSpecs (harness: Harness) (ok: int ref) : JS.Promise<unit> =

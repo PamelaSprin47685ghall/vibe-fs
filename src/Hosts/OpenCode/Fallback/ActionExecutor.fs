@@ -16,6 +16,7 @@ open Wanxiangshu.Kernel.FallbackKernel.Types
 open Wanxiangshu.Runtime.Fallback.RuntimeStore
 open Wanxiangshu.Runtime.Fallback.Ports
 open Wanxiangshu.Hosts.Opencode.Fallback.HostEventInspection
+open Wanxiangshu.Runtime.OpencodeSessionPromptBuilder
 
 let private resolveModelAndAgent
     (runtime: FallbackRuntimeStore)

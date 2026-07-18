@@ -10,7 +10,7 @@ open Wanxiangshu.Kernel.FuzzyQuery
 open Wanxiangshu.Runtime.FuzzyIteratorStore
 
 type SearchOptions = FuzzySearchSupport.SearchOptions
-type ResolvedGrep = FuzzySearchSupport.ResolvedGrep
+type ResolvedGrep = FuzzyGrepTypes.ResolvedGrep
 type FuzzyContinueParams = Wanxiangshu.Kernel.FuzzyQuery.FuzzyContinueParams
 
 let fuzzyFind = FuzzySearchFind.fuzzyFind
