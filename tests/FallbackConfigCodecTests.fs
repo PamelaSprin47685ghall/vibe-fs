@@ -127,8 +127,7 @@ let buildAgentModelOverrides_producesFirstModel () =
           AgentChains = Map.ofList [ "sisyphus", [ mkModel "oai" "gpt5" (Some "high") ] ]
           MaxRetries = 2
           LoopMaxContinues = 3
-          MaxRecoveries = 5
-          LegacyZeroWidthContinue = false }
+          MaxRecoveries = 5 }
 
     let overrides = buildAgentModelOverrides cfg
 
@@ -142,8 +141,7 @@ let defaultPreferredModel_returnsFirst () =
           AgentChains = Map.ofList []
           MaxRetries = 2
           LoopMaxContinues = 3
-          MaxRecoveries = 5
-          LegacyZeroWidthContinue = false }
+          MaxRecoveries = 5 }
 
     match defaultPreferredModel cfg with
     | Some m -> equal "default model" "a/m1" m
@@ -155,8 +153,7 @@ let defaultPreferredModel_emptyChain () =
           AgentChains = Map.ofList []
           MaxRetries = 2
           LoopMaxContinues = 3
-          MaxRecoveries = 5
-          LegacyZeroWidthContinue = false }
+          MaxRecoveries = 5 }
 
     equal "empty chain → None" None (defaultPreferredModel cfg)
 
@@ -309,49 +306,6 @@ let resolveModelDirective_configuredChainStillWinsOverParentWhenNotHostConfigure
         equal "config chain follows" "oai" chain.[1].ProviderID
     | _ -> check "expected RetryChain" false
 
-let extractFallbackConfig_legacyZeroWidthContinue_true () =
-    let fm: obj =
-        createObj
-            [ "models"
-              ==> box (createObj [ "default" ==> box ([ "openai/gpt-5" ]: obj list) ])
-              "fallback" ==> box (createObj [ "legacyZeroWidthContinue" ==> box true ]) ]
-
-    match extractFallbackConfig fm with
-    | Some cfg -> equal "legacy true from bool" true cfg.LegacyZeroWidthContinue
-    | None -> check "config extracted" false
-
-let extractFallbackConfig_legacyZeroWidthContinue_stringTrue () =
-    let fm: obj =
-        createObj
-            [ "models"
-              ==> box (createObj [ "default" ==> box ([ "openai/gpt-5" ]: obj list) ])
-              "fallback" ==> box (createObj [ "legacyZeroWidthContinue" ==> box "true" ]) ]
-
-    match extractFallbackConfig fm with
-    | Some cfg -> equal "legacy true from string" true cfg.LegacyZeroWidthContinue
-    | None -> check "config extracted" false
-
-let extractFallbackConfig_legacyZeroWidthContinue_defaultFalse () =
-    let fm: obj =
-        createObj
-            [ "models"
-              ==> box (createObj [ "default" ==> box ([ "openai/gpt-5" ]: obj list) ]) ]
-
-    match extractFallbackConfig fm with
-    | Some cfg -> equal "legacy defaults to false" false cfg.LegacyZeroWidthContinue
-    | None -> check "config extracted" false
-
-let extractFallbackConfig_legacyZeroWidthContinue_false () =
-    let fm: obj =
-        createObj
-            [ "models"
-              ==> box (createObj [ "default" ==> box ([ "openai/gpt-5" ]: obj list) ])
-              "fallback" ==> box (createObj [ "legacyZeroWidthContinue" ==> box false ]) ]
-
-    match extractFallbackConfig fm with
-    | Some cfg -> equal "legacy false explicit" false cfg.LegacyZeroWidthContinue
-    | None -> check "config extracted" false
-
 // ---------------------------------------------------------------------------
 // Suite entry
 // ---------------------------------------------------------------------------
@@ -383,7 +337,3 @@ let run () =
     resolveModelDirective_notHostConfiguredWithNonEmptyChainRetries ()
     resolveModelDirective_notHostConfiguredWithEmptyEverythingDelegatesInsteadOfRejecting ()
     resolveModelDirective_configuredChainStillWinsOverParentWhenNotHostConfigured ()
-    extractFallbackConfig_legacyZeroWidthContinue_true ()
-    extractFallbackConfig_legacyZeroWidthContinue_stringTrue ()
-    extractFallbackConfig_legacyZeroWidthContinue_defaultFalse ()
-    extractFallbackConfig_legacyZeroWidthContinue_false ()

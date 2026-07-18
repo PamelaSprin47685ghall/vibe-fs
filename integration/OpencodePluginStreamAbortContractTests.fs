@@ -22,9 +22,7 @@ let runStreamAbort
 
         let errNudgeOpts =
             createObj
-                [ "agentsContent",
-                  box
-                      "---\nmodels:\n  default:\n    - test/test-model\nfallback:\n  legacyZeroWidthContinue: true\n---\n"
+                [ "agentsContent", box "---\nmodels:\n  default:\n    - test/test-model\n---\n"
                   "messages",
                   box
                       [| box (
@@ -91,9 +89,7 @@ let runStreamAbort
 
         let continueOpts =
             createObj
-                [ "agentsContent",
-                  box
-                      "---\nmodels:\n  default:\n    - anthropic/claude-3-5\nfallback:\n  legacyZeroWidthContinue: true\n---\n"
+                [ "agentsContent", box "---\nmodels:\n  default:\n    - anthropic/claude-3-5\n---\n"
                   "messages", box [||]
                   "mockSessionClient",
                   box (

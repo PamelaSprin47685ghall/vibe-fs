@@ -804,6 +804,7 @@
     <Compile Include="tests/FallbackKernelCancelAndRecoveryTests.fs"/>
     <Compile Include="tests/FallbackKernelTests.fs"/>
     <Compile Include="tests/FallbackConfigCodecTests.fs"/>
+    <Compile Include="tests/FallbackConfigShapeTests.fs"/>
     <Compile Include="tests/FallbackRuntimeStateTests.fs"/>
     <Compile Include="tests/FallbackEventBridgeStateTests.fs"/>
     <Compile Include="tests/FallbackEventBridgeReviewInProgressTests.fs"/>

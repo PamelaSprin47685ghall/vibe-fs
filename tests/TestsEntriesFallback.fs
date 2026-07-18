@@ -3,6 +3,7 @@ module Wanxiangshu.Tests.TestsEntriesFallback
 open Wanxiangshu.Tests.TestsTestBody
 open Wanxiangshu.Tests.FallbackKernelTests
 open Wanxiangshu.Tests.FallbackConfigCodecTests
+open Wanxiangshu.Tests.FallbackConfigShapeTests
 open Wanxiangshu.Tests.FallbackRuntimeStoreTests
 open Wanxiangshu.Tests.FallbackEventBridgeTests
 open Wanxiangshu.Tests.FallbackMessageCodecTests
@@ -33,6 +34,7 @@ open Wanxiangshu.Tests.DispatchRegistryTests
 let fallbackTestEntries () : (string * TestBody) list =
     [ "FallbackKernelTests.run", Sync(sync FallbackKernelTests.run)
       "FallbackConfigCodecTests.run", Sync(sync FallbackConfigCodecTests.run)
+      "FallbackConfigShapeTests.run", Sync(sync FallbackConfigShapeTests.run)
       "FallbackRuntimeStoreTests.run", Sync(sync FallbackRuntimeStoreTests.run)
       "FallbackEventBridgeTests.run", Async FallbackEventBridgeTests.run
       "FallbackAgentAndModelTests.run", Async FallbackAgentAndModelTests.run

@@ -102,8 +102,7 @@ let emptyConfig: FallbackConfig =
       AgentChains = Map.ofList []
       MaxRetries = 2
       LoopMaxContinues = 3
-      MaxRecoveries = 5
-      LegacyZeroWidthContinue = false }
+      MaxRecoveries = 5 }
 
 // ---- Re-exported from FallbackChainResolution for backward compatibility ----
 
@@ -158,21 +157,12 @@ let extractFallbackConfig (frontmatter: obj) : FallbackConfig option =
                         Map.empty
                 | _ -> Map.empty
 
-            let legacyZeroWidthContinue =
-                match Dyn.opt frontmatter "fallback" with
-                | None -> false
-                | Some fallbackObj ->
-                    match Dyn.opt fallbackObj "legacyZeroWidthContinue" with
-                    | Some v -> Dyn.truthy v
-                    | None -> false
-
             Some
                 { DefaultChain = defaultChain
                   AgentChains = agentChains
                   MaxRetries = 2
                   LoopMaxContinues = 3
-                  MaxRecoveries = 5
-                  LegacyZeroWidthContinue = legacyZeroWidthContinue }
+                  MaxRecoveries = 5 }
 
 let loadFallbackConfig (directory: string) : FallbackConfig option =
     try

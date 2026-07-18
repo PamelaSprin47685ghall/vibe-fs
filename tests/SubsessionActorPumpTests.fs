@@ -26,8 +26,7 @@ let private cfg: FallbackConfig =
       AgentChains = Map.empty
       MaxRetries = 1
       LoopMaxContinues = 10
-      MaxRecoveries = 3
-      LegacyZeroWidthContinue = false }
+      MaxRecoveries = 3 }
 
 type FakeHost
     (

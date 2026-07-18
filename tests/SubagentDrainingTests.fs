@@ -35,8 +35,7 @@ let private makeRunContext () : RunContext =
           AgentChains = Map.empty
           MaxRetries = 3
           LoopMaxContinues = 3
-          MaxRecoveries = 3
-          LegacyZeroWidthContinue = false }
+          MaxRecoveries = 3 }
       Chain = []
       NextTurnOrdinal = TurnOrdinal.first }
 

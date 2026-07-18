@@ -52,8 +52,7 @@ let mkConfig (maxRetries: int) (loopMax: int) (maxRecoveries: int) =
       AgentChains = Map.empty
       MaxRetries = maxRetries
       LoopMaxContinues = loopMax
-      MaxRecoveries = maxRecoveries
-      LegacyZeroWidthContinue = false }
+      MaxRecoveries = maxRecoveries }
 
 let mkError (name: string) (msg: string) (sc: int option) (ret: bool option) (domainErr: DomainError option) =
     { ErrorName = name

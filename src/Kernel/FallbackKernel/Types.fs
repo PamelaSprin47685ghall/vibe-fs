@@ -62,8 +62,7 @@ type FallbackConfig =
       AgentChains: Map<string, FallbackChain>
       MaxRetries: int
       LoopMaxContinues: int
-      MaxRecoveries: int
-      LegacyZeroWidthContinue: bool }
+      MaxRecoveries: int }
 
 /// Structured error extracted from a session.error or status event.
 type ErrorInput =

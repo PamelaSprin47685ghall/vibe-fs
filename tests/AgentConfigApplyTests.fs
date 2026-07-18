@@ -51,8 +51,7 @@ let applyFallbackModelOverridesSplitsModelAndVariant () =
                       Thinking = false } ] ]
           MaxRetries = 2
           LoopMaxContinues = 3
-          MaxRecoveries = 5
-          LegacyZeroWidthContinue = false }
+          MaxRecoveries = 5 }
 
     Wanxiangshu.Hosts.Opencode.PluginServices.applyFallbackModelOverrides cfg (Some fbCfg)
 

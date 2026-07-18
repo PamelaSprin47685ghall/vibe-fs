@@ -130,9 +130,7 @@ let runNudgeTests
                                 {| id = "test-model"
                                    providerID = "test" |} ]
                   )
-                  "agentsContent",
-                  box
-                      "---\nmodels:\n  default:\n    - test/test-model\nfallback:\n  legacyZeroWidthContinue: true\n---\n" ]
+                  "agentsContent", box "---\nmodels:\n  default:\n    - test/test-model\n---\n" ]
 
         let! fbHarnessObj = withTimeoutCustom 30000 (startHarness fbOpts)
         let fbHarness = unbox<Harness> fbHarnessObj

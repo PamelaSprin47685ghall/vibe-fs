@@ -29,8 +29,7 @@ let private cfg: FallbackConfig =
       AgentChains = Map.empty
       MaxRetries = 0
       LoopMaxContinues = 10
-      MaxRecoveries = 3
-      LegacyZeroWidthContinue = false }
+      MaxRecoveries = 3 }
 
 let private sid = SessionId.create "child-1"
 let private parent = SessionId.create "parent-1"

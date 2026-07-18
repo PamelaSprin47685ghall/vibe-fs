@@ -136,9 +136,7 @@ let runAll (args: string array) : JS.Promise<unit> =
         // --- Nudge: fallback-continue, bug1, bug2, abort suppression ---
         let nudgeopts =
             createObj
-                [ "agentsContent",
-                  box
-                      "---\nmodels:\n  default:\n    - test/test-model\nfallback:\n  legacyZeroWidthContinue: true\n---\n"
+                [ "agentsContent", box "---\nmodels:\n  default:\n    - test/test-model\n---\n"
                   "mockSessionClient",
                   box (
                       createObj
