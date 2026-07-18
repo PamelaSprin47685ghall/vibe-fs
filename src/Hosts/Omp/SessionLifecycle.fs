@@ -16,7 +16,7 @@ let registerSessionLifecycle (pi: obj) (reviewStore: ReviewStore) (fallbackRunti
     )
 
     pi?on ("tool_call", box (fun (event: obj) (ctx: obj) -> toolCallHandler pi reviewStore event ctx))
-    pi?on ("tool_result", box (fun (event: obj) (ctx: obj) -> TodoHooks.toolResultHandler pi reviewStore event ctx))
+    pi?on ("tool_result", box (fun (event: obj) (ctx: obj) -> toolResultHandler pi reviewStore event ctx))
 
     pi?on (
         "agent_end",
@@ -36,7 +36,7 @@ let registerSessionLifecycle (pi: obj) (reviewStore: ReviewStore) (fallbackRunti
             })
     )
 
-    pi?on ("session_start", box (fun (_event: obj) (ctx: obj) -> TodoHooks.sessionStartHandler pi reviewStore ctx))
-    pi?on ("session_prompt", box (fun (_event: obj) (ctx: obj) -> TodoHooks.sessionPromptHandler pi reviewStore ctx))
+    pi?on ("session_start", box (fun (_event: obj) (ctx: obj) -> sessionStartHandler pi reviewStore ctx))
+    pi?on ("session_prompt", box (fun (_event: obj) (ctx: obj) -> sessionPromptHandler pi reviewStore ctx))
     pi?on ("turn_start", box (fun (event: obj) (ctx: obj) -> turnStartHandler pi event ctx fallbackRuntime))
-    pi?on ("session_shutdown", box (fun (_event: obj) (ctx: obj) -> TodoHooks.sessionShutdownHandler reviewStore ctx))
+    pi?on ("session_shutdown", box (fun (_event: obj) (ctx: obj) -> sessionShutdownHandler reviewStore ctx))

@@ -5,8 +5,8 @@ open Fable.Core.JsInterop
 open Wanxiangshu.Runtime.Fallback.RuntimeStore
 open Wanxiangshu.Runtime.Fallback.SessionRuntime
 open Wanxiangshu.Kernel.FallbackKernel.Types
-open Wanxiangshu.Runtime.Nudge.NudgeLease
-open Wanxiangshu.Runtime.Nudge.NudgeDispatchClaim
+open Wanxiangshu.Runtime.NudgeLease
+open Wanxiangshu.Runtime.NudgeDispatchClaim
 open Wanxiangshu.Runtime.Fallback.LeaseTransitions
 open Wanxiangshu.Runtime.EventLogRuntime
 open Wanxiangshu.Kernel.Nudge
@@ -55,15 +55,7 @@ let registerLeaseAndMaybeDispatch
     fallbackRuntime.SetMainContinuationAwaitingStart sessionId true
 
     if isSessionForceStopped sessionId then
-        finishNudge
-            fallbackRuntime
-            root
-            sessionId
-            lease
-            NudgeOutcome.Cancelled
-            "Force stopped"
-            ""
-            ""
+        finishNudge fallbackRuntime root sessionId lease NudgeOutcome.Cancelled "Force stopped" "" ""
     else
         performNudgeDispatch pi fallbackRuntime root sessionId action snapshot lease
 
@@ -81,5 +73,7 @@ let claimLeaseAndDispatch
     (humanTurnId: string)
     (nudgeOrdinal: int)
     : JS.Promise<unit> =
-    let lease = makeNudgeLease nudgeId nudgeOrdinal nonce humanTurnId sessionGen cancelGen
+    let lease =
+        makeNudgeLease nudgeId nudgeOrdinal nonce humanTurnId sessionGen cancelGen
+
     registerLeaseAndMaybeDispatch fallbackRuntime sessionId lease nonce pi root action snapshot

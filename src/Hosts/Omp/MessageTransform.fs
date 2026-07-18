@@ -1,5 +1,7 @@
 module Wanxiangshu.Hosts.Omp.MessageTransform
 
+open Fable.Core
+open Fable.Core.JsInterop
 open Wanxiangshu.Kernel.Config
 open Wanxiangshu.Kernel.HostTools
 open Wanxiangshu.Hosts.Omp
@@ -12,6 +14,7 @@ open Wanxiangshu.Hosts.Omp.CapsCodec
 open Wanxiangshu.Hosts.Omp.ChildSession
 open Wanxiangshu.Hosts.Omp.MagicTodo
 open Wanxiangshu.Hosts.Omp.MessagingCodec
+open Wanxiangshu.Hosts.Omp.MessagingCodecDecode
 open Wanxiangshu.Hosts.Omp.ToolResultEvent
 open Wanxiangshu.Runtime.Dyn
 open Wanxiangshu.Runtime.FileSys

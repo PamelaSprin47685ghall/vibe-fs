@@ -15,6 +15,9 @@ open Wanxiangshu.Kernel.ContextBudget
 open Wanxiangshu.Runtime.ContextBudgetUsageCodec
 open Wanxiangshu.Runtime.MessageTransform.HostEntry
 open Wanxiangshu.Hosts.Omp.Codec
+open Wanxiangshu.Hosts.Omp.MagicTodo
+open Wanxiangshu.Hosts.Omp.CapsCodec
+open Wanxiangshu.Runtime.FileSys
 open Wanxiangshu.Runtime.Dyn
 
 module Dyn = Wanxiangshu.Runtime.Dyn
@@ -24,7 +27,7 @@ let defaultBacklogSession = BacklogSession omp
 let configureBacklogSession (cwd: string) : unit =
     defaultBacklogSession.WorkspaceRoot <- cwd
 
-let private resolveAgent (ctx: obj) : string =
+let resolveAgent (ctx: obj) : string =
     let sm = Dyn.get ctx "sessionManager"
 
     if Dyn.isNullish sm then
@@ -33,10 +36,10 @@ let private resolveAgent (ctx: obj) : string =
         let name = Dyn.str sm "agentName"
         if name <> "" then name else "manager"
 
-let private resolveMaxInputTokens (sessionId: string) (cwd: string) (ctx: obj) : JS.Promise<int> =
+let resolveMaxInputTokens (sessionId: string) (cwd: string) (ctx: obj) : JS.Promise<int> =
     Wanxiangshu.Runtime.ContextBudgetUsageCodec.resolveMaxInputTokens [ ctx ] sessionId cwd
 
-let private createMessageTransformPlan
+let createMessageTransformPlan
     (sessionId: string)
     (agent: string)
     (cwd: string)
@@ -72,7 +75,7 @@ let private createMessageTransformPlan
       ModelKey = "omp:host-unknown"
       LimitSource = "omp:no-model-client" }
 
-let private buildLoadCapsFn (plan: MessageTransformPlan) (cwd: string) : unit -> JS.Promise<CapsFile list> =
+let buildLoadCapsFn (plan: MessageTransformPlan) (cwd: string) : unit -> JS.Promise<CapsFile list> =
     fun () ->
         promise {
             let isExcluded =
@@ -102,7 +105,7 @@ let private buildLoadCapsFn (plan: MessageTransformPlan) (cwd: string) : unit ->
                 return injected |> List.sortBy (fun cf -> cf.label, cf.filePath)
         }
 
-let private buildCapsFn (plan: MessageTransformPlan) (sessionId: string) (cwd: string) =
+let buildCapsFn (plan: MessageTransformPlan) (sessionId: string) (cwd: string) =
     fun encoded (capsFiles: CapsFile list) prelude ->
         let ompCaps =
             capsFiles

@@ -31,7 +31,7 @@ open Wanxiangshu.Runtime.Fallback.HumanTurnTransitions
 open Wanxiangshu.Runtime.Fallback.OrdinalTransitions
 open Wanxiangshu.Runtime.Fallback.SessionPropertyTransitions
 open Wanxiangshu.Kernel.FallbackKernel.Types
-open Wanxiangshu.Runtime.Nudge.NudgeLease
+open Wanxiangshu.Runtime.NudgeLease
 open Wanxiangshu.Runtime.FuzzyIteratorStore
 open Wanxiangshu.Runtime.ReviewRuntime
 open Wanxiangshu.Kernel.EventSourcing.Fold
@@ -41,6 +41,8 @@ open Wanxiangshu.Kernel.TreeSitterKernel
 open Wanxiangshu.Hosts.Omp.ChildSession
 open Wanxiangshu.Hosts.Omp.ExecutorTools
 open Wanxiangshu.Hosts.Omp.PruneGuard
+
+module Dyn = Wanxiangshu.Runtime.Dyn
 
 let sendNudgeReminder = NudgeReminderDispatch.sendNudgeReminder
 

@@ -2,12 +2,19 @@ module Wanxiangshu.Hosts.Omp.NudgeDispatchClaimLogic
 
 open Fable.Core
 open Fable.Core.JsInterop
-open Wanxiangshu.Runtime.Nudge.NudgeDispatchClaim
-open Wanxiangshu.Runtime.Nudge.NudgeLease
+open Wanxiangshu.Runtime.NudgeDispatchClaim
+open Wanxiangshu.Runtime.NudgeLease
 open Wanxiangshu.Runtime.Fallback.RuntimeStore
-open Wanxiangshu.Kernel.Nudge.NudgeProjection
-open Wanxiangshu.Hosts.Omp.NudgeReminderDispatch
 open Wanxiangshu.Runtime.Fallback.SessionRuntime
+open Wanxiangshu.Kernel.Nudge.NudgeProjection
+open Wanxiangshu.Kernel.Nudge
+open Wanxiangshu.Hosts.Omp.NudgeReminderDispatch
+open Wanxiangshu.Runtime.ProjectionCache
+open Wanxiangshu.Kernel.FallbackKernel.Types
+open Wanxiangshu.Hosts.Omp.NudgeRuntime
+open Wanxiangshu.Hosts.Omp.Codec
+open Wanxiangshu.Runtime.Fallback.LeaseTransitions
+open Wanxiangshu.Runtime.Fallback.SessionPropertyTransitions
 
 let now () = System.DateTime.UtcNow
 
@@ -26,6 +33,7 @@ let tryClaimNudgeDispatch
     promise {
         let cache = ProjectionCache(root)
         use! _ = cache.OpenAsync()
+
         let! evt =
             tryClaim
                 cache
@@ -38,8 +46,13 @@ let tryClaimNudgeDispatch
                 cancelGen
                 humanTurnId
                 nudgeOrdinal
-                (fun isBlocked anchor -> isBlocked { PendingNudge = None; LastDispatchedAnchor = None } anchor)
-                (now())
+                (fun isBlocked anchor ->
+                    isBlocked
+                        { PendingNudge = None
+                          LastDispatchedAnchor = None }
+                        anchor)
+                (now ())
+
         return evt.IsSome
     }
 
@@ -68,7 +81,10 @@ let private finalizeDispatchedLease
     (action: NudgeAction)
     (snapshot: SessionSnapshot)
     : JS.Promise<unit> =
-    let dispatchedLease = { lease with Status = LeaseStatus.Dispatched }
+    let dispatchedLease =
+        { lease with
+            Status = LeaseStatus.Dispatched }
+
     finishNudge
         fallbackRuntime
         root
@@ -97,15 +113,7 @@ let private attemptTransitionThenFinalize
             )
         )
     then
-        finishNudge
-            fallbackRuntime
-            root
-            sessionId
-            lease
-            NudgeOutcome.Cancelled
-            "Cancelled after dispatch"
-            ""
-            ""
+        finishNudge fallbackRuntime root sessionId lease NudgeOutcome.Cancelled "Cancelled after dispatch" "" ""
     else
         finalizeDispatchedLease fallbackRuntime root sessionId lease action snapshot
 
@@ -142,15 +150,7 @@ let private registerLeaseAndMaybeDispatch
     fallbackRuntime.SetMainContinuationAwaitingStart sessionId true
 
     if isSessionForceStopped sessionId then
-        finishNudge
-            fallbackRuntime
-            root
-            sessionId
-            lease
-            NudgeOutcome.Cancelled
-            "Force stopped"
-            ""
-            ""
+        finishNudge fallbackRuntime root sessionId lease NudgeOutcome.Cancelled "Force stopped" "" ""
     else
         performNudgeDispatch pi fallbackRuntime root sessionId action snapshot lease
 
@@ -168,5 +168,7 @@ let claimLeaseAndDispatch
     (humanTurnId: string)
     (nudgeOrdinal: int)
     : JS.Promise<unit> =
-    let lease = makeNudgeLease nudgeId nudgeOrdinal nonce humanTurnId sessionGen cancelGen
+    let lease =
+        makeNudgeLease nudgeId nudgeOrdinal nonce humanTurnId sessionGen cancelGen
+
     registerLeaseAndMaybeDispatch fallbackRuntime sessionId lease nonce pi root action snapshot
