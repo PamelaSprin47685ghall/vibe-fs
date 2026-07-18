@@ -27,7 +27,6 @@ open Wanxiangshu.Runtime.Fallback.RuntimeStore
 open Wanxiangshu.Runtime.Fallback.LeaseTransitions
 open Wanxiangshu.Runtime.Fallback.SessionRuntime
 open Wanxiangshu.Runtime.Fallback.GateFlagTransitions
-open Wanxiangshu.Runtime.Fallback.HumanTurnTransitions
 open Wanxiangshu.Runtime.Fallback.OrdinalTransitions
 open Wanxiangshu.Runtime.Fallback.SessionPropertyTransitions
 open Wanxiangshu.Kernel.FallbackKernel.Types
@@ -61,7 +60,7 @@ let dispatchNudgeAction
         let nonce = "nudge_" + System.Guid.NewGuid().ToString("N")
         let sessionGen = fallbackRuntime.GetSessionGeneration sessionId
         let cancelGen = fallbackRuntime.GetCancelGeneration sessionId
-        let humanTurnId = fallbackRuntime.GetHumanTurnId sessionId
+        let humanTurnId = (fallbackRuntime.GetSession sessionId).HumanTurnId
         let nudgeOrdinal = fallbackRuntime.IncrementNudgeOrdinal sessionId
 
         let! claimed =

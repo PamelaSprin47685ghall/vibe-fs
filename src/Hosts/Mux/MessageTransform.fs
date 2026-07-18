@@ -20,7 +20,6 @@ open Wanxiangshu.Hosts.Mux.MessagingCodec
 open Wanxiangshu.Hosts.Mux.BacklogSession
 open Wanxiangshu.Hosts.Mux.CapsCodec
 open Wanxiangshu.Runtime.JsArrayMutate
-open Wanxiangshu.Runtime.Fallback.HumanTurnTransitions
 open Wanxiangshu.Runtime.Fallback.OrdinalTransitions
 open Wanxiangshu.Runtime.Fallback.CompactionTransitions
 open Wanxiangshu.Runtime.Fallback.SessionPropertyTransitions

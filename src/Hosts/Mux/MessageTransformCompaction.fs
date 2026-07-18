@@ -10,7 +10,6 @@ open Wanxiangshu.Runtime.EventLogRuntime
 open Wanxiangshu.Runtime.SessionEventWriter
 open Wanxiangshu.Runtime.BacklogProjectionBuild
 open Wanxiangshu.Runtime.Fallback.RuntimeStore
-open Wanxiangshu.Runtime.Fallback.HumanTurnTransitions
 open Wanxiangshu.Runtime.Fallback.OrdinalTransitions
 open Wanxiangshu.Runtime.Fallback.CompactionTransitions
 open Wanxiangshu.Runtime.Fallback.SessionPropertyTransitions
@@ -51,7 +50,7 @@ let readCompactionMetadata (runtimeScope: RuntimeScope) (sessionID: string) =
 
     let turnId =
         match fallbackRuntime with
-        | Some fr -> fr.GetHumanTurnId sessionID
+        | Some fr -> (fr.GetSession sessionID).HumanTurnId
         | None -> ""
 
     let compactionOrdinal =

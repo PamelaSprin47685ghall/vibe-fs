@@ -14,7 +14,6 @@ open Wanxiangshu.Runtime.MuxHookInputCodec
 open Wanxiangshu.Hosts.Mux.MessagingCodec
 open Wanxiangshu.Hosts.Mux.BacklogSession
 open Wanxiangshu.Runtime.Dyn
-open Wanxiangshu.Runtime.Fallback.HumanTurnTransitions
 open Wanxiangshu.Runtime.Fallback.OrdinalTransitions
 open Wanxiangshu.Runtime.Fallback.CompactionTransitions
 open Wanxiangshu.Runtime.Fallback.SessionPropertyTransitions
@@ -55,7 +54,7 @@ let readCompactionMetadata (runtimeScope: Wanxiangshu.Runtime.RuntimeScope.Runti
 
     let turnId =
         match fallbackRuntime with
-        | Some fr -> fr.GetHumanTurnId sessionID
+        | Some fr -> (fr.GetSession sessionID).HumanTurnId
         | None -> ""
 
     let compactionOrdinal =

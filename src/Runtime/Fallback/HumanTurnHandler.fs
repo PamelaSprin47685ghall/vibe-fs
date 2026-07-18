@@ -7,7 +7,7 @@ open Wanxiangshu.Runtime.Fallback.SessionRuntime
 open Wanxiangshu.Runtime.Fallback.RuntimeStore
 open Wanxiangshu.Runtime.Fallback.LeaseTransitions
 open Wanxiangshu.Runtime.Fallback.SessionPropertyTransitions
-open Wanxiangshu.Runtime.Fallback.HumanTurnTransitions
+open Wanxiangshu.Runtime.Fallback.SessionRuntimePropertyPure
 open Wanxiangshu.Runtime.Fallback.NudgeHandler
 open Wanxiangshu.Runtime.Fallback.CompactionHandler
 open Wanxiangshu.Runtime.Fallback.CompactionTransitions
@@ -39,10 +39,12 @@ let initializeNewTurn
         let humanTurnOrdinal = s.HumanTurnOrdinal
 
         let modelOpt, agentOpt = translator.ExtractRoutingContext rawEvent
-        modelOpt |> Option.iter (runtime.SetLatestHumanModel sessionID)
+
+        modelOpt
+        |> Option.iter (fun m -> runtime.UpdateSession(sessionID, recordLatestHumanModel m))
 
         if modelOpt.IsNone then
-            runtime.ClearLatestHumanModel sessionID
+            runtime.UpdateSession(sessionID, clearLatestHumanModel)
 
         agentOpt |> Option.iter (runtime.SetAgentName sessionID)
 

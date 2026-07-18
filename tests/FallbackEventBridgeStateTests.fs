@@ -11,7 +11,7 @@ open Wanxiangshu.Kernel.Subsession.Types
 open Wanxiangshu.Runtime.Fallback.RuntimeStore
 open Wanxiangshu.Runtime.Fallback.LeaseTransitions
 open Wanxiangshu.Runtime.Fallback.GateFlagTransitions
-open Wanxiangshu.Runtime.Fallback.HumanTurnTransitions
+open Wanxiangshu.Runtime.Fallback.SessionRuntimePropertyPure
 open Wanxiangshu.Runtime.Fallback.OrdinalTransitions
 open Wanxiangshu.Runtime.Fallback.CompactionTransitions
 open Wanxiangshu.Runtime.Fallback.SessionPropertyTransitions
@@ -389,7 +389,7 @@ let handleEvent_userAbort_invalidatesLease () =
         rt.SetAgentName sid "reviewer"
 
         // Setup initial state
-        let turnId = rt.IncrementHumanTurnId sid
+        let turnId = rt.UpdateSessionReturning(sid, advanceHumanTurn)
         let gen = rt.GetSessionGeneration sid
         let cancelGen = rt.GetCancelGeneration sid
         rt.SetActiveContinuationGeneration sid gen

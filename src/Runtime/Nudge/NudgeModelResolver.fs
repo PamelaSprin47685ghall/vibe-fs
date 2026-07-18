@@ -6,7 +6,6 @@ open Wanxiangshu.Runtime.Dyn
 open Wanxiangshu.Runtime.NudgeMessageClassifier
 open Wanxiangshu.Runtime.Fallback.RuntimeStore
 open Wanxiangshu.Kernel.FallbackKernel.Types
-open Wanxiangshu.Runtime.Fallback.HumanTurnTransitions
 open Wanxiangshu.Runtime.Fallback.SessionPropertyTransitions
 open Wanxiangshu.Kernel.Nudge.TodoStatus
 
@@ -52,7 +51,7 @@ let resolveNudgeModel
     // 3. Last real user message from message history (non-nudge, non-synthetic).
     // 4. Last non-synthetic assistant model.
     // 5. `lastAssistantModel` parameter (caller-provided fallback).
-    match fallbackRuntime.GetLatestHumanModel sessionID with
+    match (fallbackRuntime.GetSession sessionID).LatestHumanModel with
     | Some m -> Some m
     | None ->
         match fallbackRuntime.GetModel sessionID with

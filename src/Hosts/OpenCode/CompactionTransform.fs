@@ -6,7 +6,6 @@ open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Kernel.FallbackKernel.Types
 open Wanxiangshu.Hosts.Opencode.BacklogSession
-open Wanxiangshu.Runtime.Fallback.HumanTurnTransitions
 open Wanxiangshu.Runtime.Fallback.OrdinalTransitions
 open Wanxiangshu.Runtime.Fallback.CompactionTransitions
 open Wanxiangshu.Runtime.Fallback.SessionPropertyTransitions
@@ -29,7 +28,7 @@ let private recordCompactionStart
 
         let humanTurnId =
             match fallbackRuntime with
-            | Some fr -> fr.GetHumanTurnId sessionID
+            | Some fr -> (fr.GetSession sessionID).HumanTurnId
             | None -> ""
 
         let compactionOrdinal =

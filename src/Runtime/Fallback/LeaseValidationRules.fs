@@ -5,7 +5,6 @@ open Wanxiangshu.Runtime.Fallback.RuntimeStore
 open Wanxiangshu.Runtime.Fallback.SessionRuntime
 open Wanxiangshu.Runtime.Fallback.LeaseTransitions
 open Wanxiangshu.Runtime.Fallback.SessionPropertyTransitions
-open Wanxiangshu.Runtime.Fallback.HumanTurnTransitions
 open Wanxiangshu.Runtime.Fallback.OrdinalTransitions
 open Wanxiangshu.Runtime.Fallback.CompactionTransitions
 open Wanxiangshu.Runtime.Fallback.GateFlagTransitions
@@ -20,7 +19,7 @@ let verifyLeaseWithStatus
     let pending = runtime.TryGetPendingLease sessionID
 
     lease.SessionGeneration = runtime.GetSessionGeneration sessionID
-    && lease.HumanTurnID = runtime.GetHumanTurnId sessionID
+    && lease.HumanTurnID = (runtime.GetSession sessionID).HumanTurnId
     && lease.CancelGeneration = runtime.GetCancelGeneration sessionID
     && lease.Owner = SessionOwner.Fallback
     && runtime.GetSessionOwner sessionID = SessionOwner.Fallback
@@ -46,7 +45,7 @@ let ensureActiveAndOwner (runtime: FallbackRuntimeStore) (sessionID: string) (le
     && not (runtime.IsForceStopped sessionID)
     && runtime.GetActiveCompactionId sessionID = ""
     && not (runtime.IsCompacted sessionID)
-    && runtime.GetHumanTurnId sessionID = lease.HumanTurnID
+    && (runtime.GetSession sessionID).HumanTurnId = lease.HumanTurnID
     && runtime.GetSessionGeneration sessionID = lease.SessionGeneration
     && runtime.GetCancelGeneration sessionID = lease.CancelGeneration
 
@@ -73,7 +72,7 @@ let checkIsStale
             if isAbortError then
                 let eventTurnId = eventTurnIdOpt |> Option.defaultValue ""
 
-                if eventTurnId <> "" && eventTurnId <> runtime.GetHumanTurnId sessionID then
+                if eventTurnId <> "" && eventTurnId <> (runtime.GetSession sessionID).HumanTurnId then
                     true
                 else
                     let activeGen = runtime.GetActiveContinuationGeneration sessionID

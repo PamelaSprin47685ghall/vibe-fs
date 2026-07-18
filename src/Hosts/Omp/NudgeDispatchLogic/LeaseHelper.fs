@@ -14,7 +14,6 @@ open Wanxiangshu.Kernel.Nudge.Types
 open Wanxiangshu.Hosts.Omp.NudgeRuntime
 open Wanxiangshu.Kernel.EventSourcing.Fold
 open Wanxiangshu.Runtime.Fallback.GateFlagTransitions
-open Wanxiangshu.Runtime.Fallback.HumanTurnTransitions
 open Wanxiangshu.Runtime.Fallback.OrdinalTransitions
 open Wanxiangshu.Runtime.Fallback.SessionPropertyTransitions
 open Wanxiangshu.Runtime.PromptFragments
