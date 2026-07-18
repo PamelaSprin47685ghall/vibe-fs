@@ -132,6 +132,7 @@
     <Compile Include="src/Kernel/SessionControl/EventOrder.fs"/>
     <Compile Include="src/Kernel/SessionControl/Event.fs"/>
     <Compile Include="src/Kernel/SessionControl/LeaseIdentity.fs"/>
+    <Compile Include="src/Kernel/SessionControl/LeaseIdentityOps.fs"/>
     <Compile Include="src/Kernel/SessionControl/LeaseTransitions.fs"/>
     <Compile Include="src/Kernel/SessionControl/Projection.fs"/>
     <Compile Include="src/Kernel/EventSourcing/SessionState.fs"/>

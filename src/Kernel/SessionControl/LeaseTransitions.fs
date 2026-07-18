@@ -8,6 +8,7 @@ open Wanxiangshu.Kernel.SessionControl.HumanTurn
 open Wanxiangshu.Kernel.SessionControl.State
 open Wanxiangshu.Kernel.SessionControl.Event
 open Wanxiangshu.Kernel.SessionControl.LeaseIdentity
+open Wanxiangshu.Kernel.SessionControl.LeaseIdentityOps
 
 // ── Human turn ───────────────────────────────────────────────────────────────
 
