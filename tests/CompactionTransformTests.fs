@@ -18,7 +18,7 @@ open Wanxiangshu.Runtime.EventLogRuntimeStore
 open Wanxiangshu.Kernel.EventSourcing.EventEnvelope
 open Wanxiangshu.Kernel.EventSourcing.EventKind
 open Wanxiangshu.Runtime.WorkBacklogToolsCodec
-open Wanxiangshu.Hosts.Opencode.BacklogSession
+open Wanxiangshu.Runtime.BacklogSession
 
 module Dyn = Wanxiangshu.Runtime.Dyn
 
@@ -135,7 +135,7 @@ let testMuxCompactionTransform () =
         let runtimeScope = Wanxiangshu.Runtime.RuntimeScope.create ()
 
         let backlogSession =
-            Wanxiangshu.Hosts.Mux.BacklogSession.BacklogSession(runtimeScope)
+            Wanxiangshu.Runtime.BacklogSession.BacklogSession(mux, runtimeScope)
 
         let deps =
             createObj

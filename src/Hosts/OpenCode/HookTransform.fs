@@ -31,7 +31,7 @@ let messagesTransform
     (registry: ChildAgentRegistry)
     (directory: string)
     (runtimeScope: Wanxiangshu.Runtime.RuntimeScope.RuntimeScope)
-    (backlogSession: Wanxiangshu.Hosts.Opencode.BacklogSession.BacklogSession)
+    (backlogSession: Wanxiangshu.Runtime.BacklogSession.BacklogSession)
     (reviewStore: Wanxiangshu.Runtime.ReviewRuntime.ReviewStore)
     (client: obj)
     (input: obj)

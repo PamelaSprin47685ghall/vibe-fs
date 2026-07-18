@@ -18,7 +18,7 @@ open Wanxiangshu.Runtime.Fallback.RuntimeStore
 open Wanxiangshu.Runtime.RuntimeScope
 open Wanxiangshu.Runtime.ChildAgentRegistry
 open Wanxiangshu.Hosts.Opencode.SessionLifecycleObserver
-open Wanxiangshu.Hosts.Opencode.BacklogSession
+open Wanxiangshu.Runtime.BacklogSession
 open Wanxiangshu.Runtime.OpencodeClientCodec
 open Wanxiangshu.Hosts.Opencode.PluginServiceLoader
 open Wanxiangshu.Hosts.Opencode.PtySpawn

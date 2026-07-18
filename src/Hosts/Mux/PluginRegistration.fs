@@ -4,10 +4,11 @@ open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Config
+open Wanxiangshu.Kernel.HostTools
 open Wanxiangshu.Runtime
 open Wanxiangshu.Runtime.MuxPluginCatalogShell
 open Wanxiangshu.Hosts.Mux.PluginCatalog
-open Wanxiangshu.Hosts.Mux.BacklogSession
+open Wanxiangshu.Runtime.BacklogSession
 open Wanxiangshu.Runtime.RuntimeScope
 open Wanxiangshu.Runtime.FuzzyFinderShell
 open Wanxiangshu.Runtime.Dyn
@@ -95,7 +96,7 @@ let assembleRegistrationObject
 
 let private createScope (deps: obj) =
     let scope = create ()
-    let backlogSession = BacklogSession(scope)
+    let backlogSession = BacklogSession(mux, scope)
     let reviewStore = Wanxiangshu.Runtime.ReviewRuntime.createReviewStore ()
     let hostReadExec = HostFunctionCapture()
     let finderCache = FinderCache()

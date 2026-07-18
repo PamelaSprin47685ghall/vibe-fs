@@ -13,7 +13,7 @@ open Wanxiangshu.Hosts.Opencode.AgentConfig
 open Wanxiangshu.Hosts.Opencode.Tools
 open Wanxiangshu.Hosts.Opencode.Fallback.Hook
 open Wanxiangshu.Hosts.Opencode.SessionLifecycleObserver
-open Wanxiangshu.Hosts.Opencode.BacklogSession
+open Wanxiangshu.Runtime.BacklogSession
 open Wanxiangshu.Hosts.Opencode.Fallback.ConfigLoader
 open Wanxiangshu.Runtime.RuntimeScope
 open Wanxiangshu.Runtime.FuzzyFinderShell

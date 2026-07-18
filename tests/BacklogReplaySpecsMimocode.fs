@@ -4,7 +4,7 @@ open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Tests.BacklogMessageBuilders
 open Wanxiangshu.Kernel.HostTools
 open Wanxiangshu.Runtime.BacklogProjection
-open Wanxiangshu.Hosts.Opencode.BacklogSession
+open Wanxiangshu.Runtime.BacklogSession
 open Wanxiangshu.Runtime.RuntimeScope
 
 let private scope () = create ()

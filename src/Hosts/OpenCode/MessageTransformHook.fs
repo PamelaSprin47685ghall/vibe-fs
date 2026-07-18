@@ -6,7 +6,7 @@ open Wanxiangshu.Kernel
 open Wanxiangshu.Runtime
 
 open Wanxiangshu.Runtime.RuntimeScope
-open Wanxiangshu.Hosts.Opencode.BacklogSession
+open Wanxiangshu.Runtime.BacklogSession
 open Wanxiangshu.Runtime.ReviewRuntime
 open Wanxiangshu.Hosts.Opencode.MessageTransformPipeline
 open Wanxiangshu.Runtime.ChildAgentRegistry

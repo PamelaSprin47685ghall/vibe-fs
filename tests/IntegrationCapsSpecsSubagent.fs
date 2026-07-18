@@ -150,7 +150,7 @@ let opencodeSubsessionParentIDSpec () =
         let input = createObj [ "agent", box "coder"; "sessionID", box childSessionID ]
 
         let backlogSession =
-            Wanxiangshu.Hosts.Opencode.BacklogSession.BacklogSession(Wanxiangshu.Kernel.HostTools.Host.Mimocode, scope)
+            Wanxiangshu.Runtime.BacklogSession.BacklogSession(Wanxiangshu.Kernel.HostTools.Host.Mimocode, scope)
 
         let reviewStore = createReviewStore ()
 

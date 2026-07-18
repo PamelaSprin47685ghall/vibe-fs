@@ -26,13 +26,13 @@ open Wanxiangshu.Runtime.EventLogRuntime
 open Wanxiangshu.Runtime.WorkBacklogToolsCodec
 open Wanxiangshu.Runtime.ToolRuntimeContext
 open Wanxiangshu.Runtime.OpencodeHostEvent
-open Wanxiangshu.Hosts.Opencode.BacklogSession
+open Wanxiangshu.Runtime.BacklogSession
 
 type ProgressObserver
     (
         host: Host,
         ctx: obj,
-        backlogSession: Wanxiangshu.Hosts.Opencode.BacklogSession.BacklogSession,
+        backlogSession: Wanxiangshu.Runtime.BacklogSession.BacklogSession,
         fallbackRuntime: FallbackRuntimeStore
     ) =
 

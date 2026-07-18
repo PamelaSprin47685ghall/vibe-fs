@@ -5,7 +5,7 @@ open Fable.Core.JsInterop
 open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.HostTools
-open Wanxiangshu.Hosts.Opencode.BacklogSession
+open Wanxiangshu.Runtime.BacklogSession
 open Wanxiangshu.Runtime.EventLogRuntime
 open Wanxiangshu.Runtime.WorkBacklogToolsCodec
 

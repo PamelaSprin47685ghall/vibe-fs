@@ -16,6 +16,8 @@ let run () : unit =
         [ "Hosts/OpenCode/SubagentIo.fs"
           "Hosts/OpenCode/PtyIo.fs"
           "Hosts/Mux/MessageTransformCompaction.fs"
+          "Hosts/Mux/BacklogSession.fs"
+          "Hosts/OpenCode/BacklogSession.fs"
           "Hosts/Omp/NudgeDispatchLogic/ClaimHelper.fs"
           "Hosts/Omp/NudgeDispatchLogic/LeaseHelper.fs"
           "Hosts/Omp/NudgeDispatchLogic/SnapshotHelper.fs" ]

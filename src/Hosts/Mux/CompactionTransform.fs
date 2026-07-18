@@ -12,7 +12,7 @@ open Wanxiangshu.Runtime.EventLogRuntime
 open Wanxiangshu.Runtime.JsArrayMutate
 open Wanxiangshu.Runtime.MuxHookInputCodec
 open Wanxiangshu.Hosts.Mux.MessagingCodec
-open Wanxiangshu.Hosts.Mux.BacklogSession
+open Wanxiangshu.Runtime.BacklogSession
 open Wanxiangshu.Runtime.Dyn
 open Wanxiangshu.Runtime.Fallback.SessionRuntimePropertyPure
 open Wanxiangshu.Runtime.Fallback.SessionRuntimeLeasePure

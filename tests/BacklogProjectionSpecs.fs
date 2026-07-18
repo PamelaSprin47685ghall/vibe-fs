@@ -9,7 +9,7 @@ open Wanxiangshu.Kernel.HostTools
 open Wanxiangshu.Kernel.Messaging
 open Wanxiangshu.Runtime.BacklogProjectionBuild
 open Wanxiangshu.Runtime.BacklogProjection
-open Wanxiangshu.Hosts.Opencode.BacklogSession
+open Wanxiangshu.Runtime.BacklogSession
 open Wanxiangshu.Hosts.Opencode.MessagingCodec
 open Wanxiangshu.Runtime.Dyn
 open Wanxiangshu.Runtime.RuntimeScope

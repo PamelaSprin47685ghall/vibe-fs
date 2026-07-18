@@ -407,7 +407,6 @@
     <Compile Include="src/Hosts/Mux/AiSettings.fs"/>
     <Compile Include="src/Hosts/OpenCode/MessagingCodec.fs"/>
     <Compile Include="src/Hosts/OpenCode/CapsCodec.fs"/>
-    <Compile Include="src/Hosts/OpenCode/BacklogSession.fs"/>
     <Compile Include="src/Hosts/OpenCode/ToolSchema.fs"/>
     <Compile Include="src/Hosts/OpenCode/HookSchemaDecoration.fs"/>
     <Compile Include="src/Hosts/OpenCode/HookSchemaZod.fs"/>
@@ -428,7 +427,6 @@
     <Compile Include="src/Hosts/Mux/WebTools.fs"/>
     <Compile Include="src/Hosts/Mux/MessagingCodec.fs"/>
     <Compile Include="src/Hosts/Mux/CapsCodec.fs"/>
-    <Compile Include="src/Hosts/Mux/BacklogSession.fs"/>
     <Compile Include="src/Hosts/Mux/CompactionTransform.fs"/>
     <Compile Include="src/Hosts/Mux/MessageTransform.fs"/>
     <Compile Include="src/Hosts/Mux/Fallback/Hook.fs"/>

@@ -17,7 +17,7 @@ open Wanxiangshu.Runtime.CapsFormat
 open Wanxiangshu.Kernel.Methodology
 open Wanxiangshu.Runtime.PromptFrontMatter
 open Wanxiangshu.Hosts.Opencode.AgentConfig
-open Wanxiangshu.Hosts.Opencode.BacklogSession
+open Wanxiangshu.Runtime.BacklogSession
 open Wanxiangshu.Hosts.Opencode.MessagingCodec
 open Wanxiangshu.Hosts.Opencode.CapsCodec
 open Wanxiangshu.Runtime.OpencodeSessionEventCodec

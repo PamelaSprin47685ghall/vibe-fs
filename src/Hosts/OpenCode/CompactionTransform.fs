@@ -5,7 +5,7 @@ open Wanxiangshu.Runtime.Fallback.RuntimeStore
 open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Kernel.FallbackKernel.Types
-open Wanxiangshu.Hosts.Opencode.BacklogSession
+open Wanxiangshu.Runtime.BacklogSession
 open Wanxiangshu.Runtime.Fallback.SessionRuntimePropertyPure
 open Wanxiangshu.Runtime.Fallback.SessionRuntimeLeasePure
 open Wanxiangshu.Runtime

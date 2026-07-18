@@ -10,7 +10,7 @@ open Wanxiangshu.Runtime.BacklogProjectionBuild
 open Wanxiangshu.Kernel.WorkBacklog
 open Wanxiangshu.Hosts.Opencode.AgentConfig
 open Wanxiangshu.Hosts.Opencode.HookSchema
-open Wanxiangshu.Hosts.Opencode.BacklogSession
+open Wanxiangshu.Runtime.BacklogSession
 open Wanxiangshu.Runtime.Dyn
 open Wanxiangshu.Runtime.OpencodeHookInputCodec
 open Wanxiangshu.Runtime.ToolHookRuntime

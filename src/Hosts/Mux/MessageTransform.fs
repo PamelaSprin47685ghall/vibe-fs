@@ -17,7 +17,7 @@ open Wanxiangshu.Kernel.ContextBudget
 open Wanxiangshu.Kernel.MessageTransformPolicy
 open Wanxiangshu.Runtime.PromptFrontMatter
 open Wanxiangshu.Hosts.Mux.MessagingCodec
-open Wanxiangshu.Hosts.Mux.BacklogSession
+open Wanxiangshu.Runtime.BacklogSession
 open Wanxiangshu.Hosts.Mux.CapsCodec
 open Wanxiangshu.Runtime.JsArrayMutate
 open Wanxiangshu.Runtime.ReviewRuntime
