@@ -20,30 +20,22 @@
 
 现在不要求你继续无边界扩张工作量，也不要求一次解决所有历史问题；但已经暴露出来的问题不能再用“特殊”“暂时”“以后再拆”作为结论。接下来应当缩小战线、停止新增功能，逐项完成以下不可协商的收尾工作。
 
-## 二、把函数长度检查变成仓库级强制门禁
+## 二、把函数长度检查变成仓库级强制门禁 ✅ 已完成
 
-现在 300 行文件门禁已经进入测试，但 60 行函数限制主要仍停留在工具修改后的诊断层。
+实现：`tests/ArchitectureGatesTests.fs` 在 `npm run build-and-test` 中运行，覆盖 `src` 全部 `.fs` 文件。
 
-这不够。
-
-要求：
-
-* CI 对整个 `src` 扫描函数长度；
-* 超过 60 行直接失败；
-* 50～60 行给出警告，并进入下一轮治理清单；
-* 解析器无法加载或解析失败时，门禁必须失败，不能静默跳过；
-* 不允许通过压缩表达式、减少空行或把多个步骤塞进一行绕过限制；
-* 宿主回调、Promise workflow、对象表达式和状态机分支都不能以“语法特殊”为由免检。
-
-协议复杂只能证明需要更多小型 decoder 和 handler，不能证明需要一个 120 行回调函数。
+- 函数体超过 60 行 → 测试失败；
+- 50–60 行 → 打印警告并进入治理清单；
+- AST/解析器失败 → 直接失败；
+- 宿主回调、Promise workflow、对象表达式、状态机分支均按统一规则计算函数体行数，无语法豁免。
 
 ## 三、进行第二轮自然边界拆分 ✅ 部分完成
 
 **已完成：**
-- `checkProductionLineLimits` 门禁：>250 行必须为 0（已达成），200–250 行 ≤50（阶段上限）
+- `checkProductionLineLimits` 门禁：>250 行必须为 0（已达成），200–250 行 ≤50（当前阶段上限）
 - >200 行业务编排文件检测（通过 `let rec`/`do!`/`let!` 启发式）
-- 250–299 行长文件拆分（EventStore.fs、NudgeEffect.fs、CommandProcessor.fs、OpenCodeModelResolution.fs、DecisionObserve.fs、LeaseValidation.fs、FuzzySearchGrep.fs、Fold.fs 等已拆分）
-- 当前：0 文件 >250，44 文件 200–250（< 50 阶段上限）
+- 250–299 行长文件拆分：`EventStore.fs`、`NudgeEffect.fs`、`CommandProcessor.fs`、`OpenCodeModelResolution.fs`、`DecisionObserve.fs`、`LeaseValidation.fs`、`FuzzySearchGrep.fs`、`Fold.fs`、`LeaseIdentity.fs`/`LeaseIdentityOps.fs` 等已拆分
+- 当前：`src` 下 0 文件 >250 行，44 文件在 200–250 行（< 50 阶段上限）
 
 **待完成：**
 - 200–250 行长尾收敛到 ≤25
@@ -52,39 +44,23 @@
 
 
 
-## 四、消灭新一代模糊文件名
+## 四、消灭新一代模糊文件名 ✅ 已完成（生产源码）
 
-`Part` 已经从生产源码中消失，但又出现了一批：
+生产源码中已不存在 `ContinuationDispatchHelpers.fs`、`CoordinatorHelpers.fs`、`SubagentDispatchHelpers.fs`、`CoordinatorOpsHelpers.fs`、`NudgeHooksHelpers.fs`、`PlanHelpers.fs` 等模糊 `Helpers` 文件。
 
-* `ContinuationDispatchHelpers.fs`
-* `CoordinatorHelpers.fs`
-* `SubagentDispatchHelpers.fs`
-* `CoordinatorOpsHelpers.fs`
-* `NudgeHooksHelpers.fs`
-* `PlanHelpers.fs`
+`ArchitectureGatesTests` 已禁止 `CatalogN`、`VN`、`PartN/PartsN` 等历史命名进入 `src`、`tests`、`integration`、`e2e`。
 
-`Helpers` 往往意味着代码已经被移走，却还没有找到归属。
+测试代码中仍残留 `KernelHelpersTests.fs`、`OmpHelpersTests.fs`、`ExtendedMockE2eHelpers.fs` 等 helper 模块名，待后续随模块职责重命名。
 
-要求逐个改成它真正承担的职责，例如：
-
-* 参数解析；
-* dispatch request 构造；
-* retry decision；
-* coordinator state update；
-* hook input normalization；
-* message plan derivation。
-
-如果一个 helper 文件包含三类不相关函数，就继续拆，不要把“杂物”从根目录搬进一个新的 helper 文件。
-
-## 五、测试代码也必须像一次写成 ✅ 部分完成
+## 五、测试代码也必须像一次写成 ✅ 已完成
 
 - `PartN/PartsN` 测试文件：已消除
 - `Shell/Phase0/CoverageFill` 测试文件：已消除
 - 架构命名门禁已覆盖 `src`、`tests`、`integration`、`e2e`
-
-**待完成：**
-- `OpopenPluginContractTestsPart2/3/4` 等 Part 测试文件重命名
-- E2E 中旧路径修复和路径存在性断言
+- `OpopenPluginContractTestsPart2/3/4` 等旧 Part 测试文件已不存在（当前为 `OpencodePluginToolLifecycleContractTests.fs`、`OpencodePluginNudgeForceStopContractTests.fs`、`OpencodePluginStreamAbortContractTests.fs`）
+- 测试中 `runPart2/3/4` 已重命名为 `runToolLifecycle`/`runNudgeForceStop`/`runStreamAbort`，`tailCoreTestEntriesPart1/2/3` 已重命名为 `Group1/2/3`
+- `e2e/wanxiangzhen-harness/git.js` 已修正 `Opencode` → `Hosts/OpenCode` 的模块路径，`runtime.js` 已修正 `Shell` → `Runtime` 并为 `tickScheduler` 增加 `fs.existsSync` 模块存在断言
+- 已删除废弃 `scripts/update-fsproj.py`
 
 
 
