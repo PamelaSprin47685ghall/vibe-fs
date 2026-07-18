@@ -11,8 +11,7 @@ import:
 - Opencode 的大部分 hook 需要原地修改字段而不是换引用，否则不工作
 - 本项目配置了自动格式化工具，所有企图压缩行数而逃避拆文件的尝试都一定会破产的！
 - 严禁 SIGKILL opencode，只允许 SIGKILL "opencode serve"
-- low-effort mode = 偏好大规模并发 subagent 而不是自己做，绝对不是说少做事，是少自己做事！
-- low-effort mode is ok, but IN THIS PROJECT make largest change instead!
+- low-effort mode is lazy-ok, but IN THIS PROJECT make largest change instead!
 
 # Kolmogorov 宝典
 - 从最重要的开始。构建软件设计有两种方法：一种是使其足够简单，以至于明显没有缺陷；另一种是使其足够复杂，以至于没有明显的缺陷：请思考你想要哪种。取法于上，仅得其中；取法于中，不免为下。记住：君子不立危墙之下。当你写下勉强工作的代码时，透支的是未来的可控性，你在完全清醒的状态下，看着自己的逻辑链条一环扣一环地走向疯狂。毁灭你，或者拯救你，取决于你是否愿意写出明显正确的代码。
