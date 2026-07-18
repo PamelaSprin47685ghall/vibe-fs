@@ -126,7 +126,10 @@ type NudgeTrigger
 
                     let! owner = NudgeTriggerOps.resolveOwner ctx fallbackRuntime sessionIDStr isTest
                     let isForce = isForceStopped sessionIDStr
-                    let origin = NudgeTriggerOps.resolveOrigin fallbackRuntime owner isForce sessionIDStr
+
+                    let origin =
+                        NudgeTriggerOps.resolveOrigin fallbackRuntime owner isForce sessionIDStr
+
                     do! NudgeTriggerOps.applyPostTerminalCleanup ctx fallbackRuntime owner sessionIDStr
                     let isEligible = NudgeTriggerOps.isNudgeEligible origin eventType
 
@@ -134,16 +137,16 @@ type NudgeTrigger
                         NudgeTrigger.isNaturalStop eventType envelope.Props
                         && isEligible
                         && not (reviewStore.getPendingReviewIds () |> List.contains sessionIDStr)
-                        && (match getClientFromPluginCtx ctx with
-                            | Ok client ->
-                                fallbackRuntime.SetNudgeActive sessionIDStr true
-                                let result =
-                                    dispatchPostStopFromHistory host fallbackRuntime client ctx sessionID isForceStopped
-                                fallbackRuntime.SetNudgeActive sessionIDStr false
-                                true
-                            | Error _ -> false)
                     then
-                        ()
+                        match getClientFromPluginCtx ctx with
+                        | Ok client ->
+                            fallbackRuntime.SetNudgeActive sessionIDStr true
+
+                            let! _ignored =
+                                dispatchPostStopFromHistory host fallbackRuntime client ctx sessionID isForceStopped
+
+                            fallbackRuntime.SetNudgeActive sessionIDStr false
+                        | Error _ -> ()
         }
 
 let createNudgeTrigger

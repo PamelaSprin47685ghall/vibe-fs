@@ -23,9 +23,40 @@ let private lineCount (path: string) : int =
     content.Split('\n').Length
 
 let private checkProductionLineLimits (srcRoot: string) =
+    let mutable over250 = 0
+    let mutable in200to250 = 0
+    let over200Orchestration = ResizeArray<string>()
+
     for path in collectFsFiles srcRoot do
         let n = lineCount path
         failIf (n > 300) (sprintf "production file >300 lines (%d): %s" n path)
+
+        if n > 250 then
+            over250 <- over250 + 1
+        elif n > 200 then
+            in200to250 <- in200to250 + 1
+            // Remaining >200-line files must be data/protocol, not business orchestration
+            let content = readFileSync path "utf8"
+
+            let hasOrchestration =
+                Regex(@"(\blet\s+rec\b|\band\s+\w+\s+->|\bdo!\b|\blet!\b)", RegexOptions.Multiline)
+                    .IsMatch
+                    content
+
+            if hasOrchestration then
+                over200Orchestration.Add path
+
+    failIf (over250 > 0) (sprintf "production files >250 lines: %d (must be 0)" over250)
+    failIf (in200to250 > 25) (sprintf "production files 200-250 lines: %d (limit 25)" in200to250)
+
+    if over200Orchestration.Count > 0 then
+        let listed = String.concat ", " (Seq.cast<string> over200Orchestration)
+
+        failIf
+            true
+            (sprintf
+                "production files >200 lines that look like business orchestration (must be data/protocol): %s"
+                listed)
 
 // Data directory files may only contain types / literal tables. They must
 // not define member-bound functions or `let rec` (no business orchestration).
@@ -95,7 +126,12 @@ let private checkFunctionLengths (root: string) (failLimit: int) =
     for path in collectFsFiles root do
         try
             for (start, bodyLen) in findFunctionBodies path do
-                failIf (bodyLen > failLimit) (sprintf "function body >%d lines (%d) at %s:%d" failLimit bodyLen path (start + 1))
+                if bodyLen > failLimit then
+                    failIf
+                        (bodyLen > failLimit)
+                        (sprintf "function body >%d lines (%d) at %s:%d" failLimit bodyLen path (start + 1))
+                elif bodyLen >= 50 then
+                    printfn "[function-length warning] %d lines (50-60 warning zone) at %s:%d" bodyLen path (start + 1)
         with ex ->
             failIf true (sprintf "function-length parse failed for %s: %s" path ex.Message)
 
@@ -151,7 +187,9 @@ let private checkForbiddenFileNames (root: string) =
 
 let private checkForbiddenTestNames (root: string) =
     let forbiddenModules = [ "Phase0"; "CoverageFill"; "Shell" ]
-    let re = Regex("(^|/)[^/]*(" + (String.concat "|" forbiddenModules) + ")[^/]*\\.fs$")
+
+    let re =
+        Regex("(^|/)[^/]*(" + (String.concat "|" forbiddenModules) + ")[^/]*\\.fs$")
 
     for path in collectFsFiles root do
         let norm = path.Replace("\\", "/")
