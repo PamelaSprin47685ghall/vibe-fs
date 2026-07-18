@@ -31,7 +31,7 @@ type Harness =
     abstract fileExists: string -> bool
     abstract dispose: unit -> JS.Promise<unit>
 
-let runPart2
+let runToolLifecycle
     (harness: Harness)
     (chk: string -> bool -> unit)
     (warnTddValue: string)

@@ -31,7 +31,7 @@ let runAll (args: string array) : JS.Promise<unit> =
             if not cond then
                 totalFailed <- totalFailed + 1
 
-        // --- Part2: plugin tools, system transform, lifecycle hooks, tool.execute.before/after ---
+        // --- plugin tools, system transform, lifecycle hooks, tool.execute.before/after ---
         let warnTddValue = "test-warn-tdd"
         let warnValue = "test-warn"
 
@@ -44,7 +44,7 @@ let runAll (args: string array) : JS.Promise<unit> =
                   "warn_tdd", box warnTddValue
                   "warn", box warnValue ]
 
-        let part2opts =
+        let toolLifecycleOpts =
             createObj
                 [ "agentsContent", box "---\nmodels:\n  default:\n    - test/test-model\n---\n"
                   "mockSessionClient",
@@ -58,16 +58,16 @@ let runAll (args: string array) : JS.Promise<unit> =
                                    providerID = "test" |} ]
                   ) ]
 
-        let! h2obj = withTimeoutCustom 30000 (startHarness part2opts)
+        let! h2obj = withTimeoutCustom 30000 (startHarness toolLifecycleOpts)
 
         let harness2 =
             unbox<Wanxiangshu.Integration.OpencodePluginToolLifecycleContractTests.Harness> h2obj
 
-        do! runPart2 harness2 chk warnTddValue warnValue execArgs createEmpty dynGet dynIsNull dynStr
+        do! runToolLifecycle harness2 chk warnTddValue warnValue execArgs createEmpty dynGet dynIsNull dynStr
         do! withTimeoutCustom 4000 (harness2.dispose ())
 
-        // --- Part3: nudge & force-stop ---
-        let part3opts =
+        // --- nudge & force-stop ---
+        let nudgeForceStopOpts =
             createObj
                 [ "agentsContent", box "---\nmodels:\n  default:\n    - test/test-model\n---\n"
                   "messages",
@@ -99,16 +99,16 @@ let runAll (args: string array) : JS.Promise<unit> =
                                    providerID = "test" |} ]
                   ) ]
 
-        let! h3obj = withTimeoutCustom 30000 (startHarness part3opts)
+        let! h3obj = withTimeoutCustom 30000 (startHarness nudgeForceStopOpts)
 
         let harness3 =
             unbox<Wanxiangshu.Integration.OpencodePluginToolLifecycleContractTests.Harness> h3obj
 
-        do! runPart3 harness3 chk startHarness jsonStringify createEmpty
+        do! runNudgeForceStop harness3 chk startHarness jsonStringify createEmpty
         do! withTimeoutCustom 4000 (harness3.dispose ())
 
-        // --- Part4: stream-abort + lifecycle ---
-        let part4opts =
+        // --- stream-abort + lifecycle ---
+        let streamAbortOpts =
             createObj
                 [ "agentsContent", box "---\nmodels:\n  default:\n    - test/test-model\n---\n"
                   "mockSessionClient",
@@ -122,12 +122,12 @@ let runAll (args: string array) : JS.Promise<unit> =
                                    providerID = "test" |} ]
                   ) ]
 
-        let! h4obj = withTimeoutCustom 30000 (startHarness part4opts)
+        let! h4obj = withTimeoutCustom 30000 (startHarness streamAbortOpts)
 
         let harness4 =
             unbox<Wanxiangshu.Integration.OpencodePluginToolLifecycleContractTests.Harness> h4obj
 
-        do! runPart4 harness4 chk startHarness jsonStringify createEmpty
+        do! runStreamAbort harness4 chk startHarness jsonStringify createEmpty
         do! withTimeoutCustom 4000 (harness4.dispose ())
 
         // --- Continue: continuation after tool-complete + network error ---

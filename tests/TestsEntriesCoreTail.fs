@@ -51,7 +51,7 @@ open Wanxiangshu.Tests.SubagentOutputTranscriptTests
 open Wanxiangshu.Tests.SubagentDrainingTests
 open Wanxiangshu.Tests.TestsTestBody
 
-let tailCoreTestEntriesPart1 () : (string * TestBody) list =
+let tailCoreTestEntriesGroup1 () : (string * TestBody) list =
     [ "FuzzyTests.grepDetect", TestBody.Sync(sync FuzzyTests.grepDetect)
       "FuzzyTests.iteratorRoundTrip", TestBody.Sync(sync FuzzyTests.iteratorRoundTrip)
       "FuzzyTests.finderConversion", TestBody.Sync(sync FuzzyTests.finderConversion)
@@ -108,7 +108,7 @@ let tailCoreTestEntriesPart1 () : (string * TestBody) list =
       "ExecutorFormatCoverageTests.formatFetchResponseEmptyTitleOmitted",
       TestBody.Sync(sync ExecutorFormatCoverageTests.formatFetchResponseEmptyTitleOmitted) ]
 
-let tailCoreTestEntriesPart2 () : (string * TestBody) list =
+let tailCoreTestEntriesGroup2 () : (string * TestBody) list =
     [ "ExecutorSpawnPathTests.readDirectoryListing", TestBody.Async ExecutorSpawnPathTests.readDirectoryListing
       "ExecutorSpawnPathTests.ensureJavascriptProjectRepairsModuleType",
       TestBody.Async ExecutorSpawnPathTests.ensureJavascriptProjectRepairsModuleType
@@ -140,7 +140,7 @@ let tailCoreTestEntriesPart2 () : (string * TestBody) list =
       "TitleFetchGuardTests.rewriteArrayContent", TestBody.Sync(sync TitleFetchGuardTests.rewriteArrayContent)
       "TitleFetchGuardTests.skipProbeMessage", TestBody.Sync(sync TitleFetchGuardTests.skipProbeMessage) ]
 
-let tailCoreTestEntriesPart3 () : (string * TestBody) list =
+let tailCoreTestEntriesGroup3 () : (string * TestBody) list =
     [ "ToolCatalogClassificationTests.run", TestBody.Sync(sync ToolCatalogClassificationTests.run)
       "ToolOutputInfoTests.run", TestBody.Sync(sync ToolOutputInfoTests.run)
       "MessageTransformPolicyTests.run", TestBody.Async MessageTransformPolicyTests.run
@@ -177,6 +177,6 @@ let tailCoreTestEntriesPart3 () : (string * TestBody) list =
         "ArchitectureGatesTests.run", TestBody.Sync(sync Wanxiangshu.Tests.ArchitectureGatesTests.run) ]
 
 let tailCoreTestEntries () : (string * TestBody) list =
-    tailCoreTestEntriesPart1 ()
-    @ tailCoreTestEntriesPart2 ()
-    @ tailCoreTestEntriesPart3 ()
+    tailCoreTestEntriesGroup1 ()
+    @ tailCoreTestEntriesGroup2 ()
+    @ tailCoreTestEntriesGroup3 ()

@@ -9,7 +9,7 @@ open Wanxiangshu.Integration.OpencodePluginToolLifecycleContractTests
 
 module Dyn = Wanxiangshu.Runtime.Dyn
 
-let runPart3
+let runNudgeForceStop
     (harness: Harness)
     (chk: string -> bool -> unit)
     (startHarness: obj -> JS.Promise<obj>)
