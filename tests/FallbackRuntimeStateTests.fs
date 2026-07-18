@@ -3,7 +3,7 @@ module Wanxiangshu.Tests.FallbackRuntimeStoreTests
 open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Kernel.FallbackKernel.Types
 open Wanxiangshu.Runtime.Fallback.RuntimeStore
-open Wanxiangshu.Runtime.Fallback.LeaseTransitions
+open Wanxiangshu.Runtime.Fallback.SessionRuntimeLeasePure
 open Wanxiangshu.Runtime.Fallback.SessionRuntimePropertyPure
 
 // ---------------------------------------------------------------------------
@@ -40,7 +40,7 @@ let getOrCreate_returnsSameStateOnSecondCall () =
     equal "same reference" true (obj.ReferenceEquals(s1, s2))
 
 // ---------------------------------------------------------------------------
-// UpdateState
+// Update (setCore)
 // ---------------------------------------------------------------------------
 
 let updateState_persistsChange () =
@@ -52,7 +52,7 @@ let updateState_persistsChange () =
             FailureCount = 5
             Phase = FallbackPhase.Retrying 1 }
 
-    rt.UpdateState "sess-1" s2
+    rt.Update("sess-1", setCore s2)
     let s3 = rt.GetOrCreateState "sess-1"
     equal "failureCount updated" 5 s3.FailureCount
     equal "phase updated" (FallbackPhase.Retrying 1) s3.Phase
@@ -95,7 +95,7 @@ let cleanupSession_removesAllState () =
     rt.UpdateSession("sess-1", selectChain [ mkModel "oai" "gpt-5" ])
     rt.UpdateSession("sess-1", recordAgentName "reviewer")
     let s = rt.GetOrCreateState "sess-1"
-    rt.UpdateState "sess-1" { s with FailureCount = 7 }
+    rt.Update("sess-1", setCore { s with FailureCount = 7 })
     rt.CleanupSession "sess-1"
     equal "chain gone" [] ((rt.GetSession "sess-1").Chain)
     equal "agent gone" "" ((rt.GetSession "sess-1").AgentName)

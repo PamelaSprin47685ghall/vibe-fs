@@ -9,7 +9,7 @@ open Wanxiangshu.Kernel.Session.Causality
 open Wanxiangshu.Kernel.FallbackKernel.Types
 open Wanxiangshu.Kernel.Subsession.Types
 open Wanxiangshu.Runtime.Fallback.RuntimeStore
-open Wanxiangshu.Runtime.Fallback.LeaseTransitions
+open Wanxiangshu.Runtime.Fallback.SessionRuntimeLeasePure
 
 open Wanxiangshu.Runtime.Fallback.Coordinator
 open Wanxiangshu.Runtime.Fallback.Ports
@@ -228,10 +228,12 @@ let handleEvent_exhausted_notConsumed () =
 
         let s0 = rt.GetOrCreateState sid
 
-        rt.UpdateState
-            sid
-            { s0 with
-                Phase = FallbackPhase.Exhausted }
+        rt.Update(
+            sid,
+            setCore
+                { s0 with
+                    Phase = FallbackPhase.Exhausted }
+        )
 
         let translator =
             FakeTranslator(sid, FallbackEvent.SessionError(mkRetryableErr ())) :> IEventTranslator
@@ -292,12 +294,13 @@ let handleEvent_newUserMessage_resetsState () =
 
         let s0 = rt.GetOrCreateState sid
 
-        rt.UpdateState
-            sid
+        let updated =
             { s0 with
                 Phase = FallbackPhase.Retrying 3
                 ContinueCount = 3
                 FailureCount = 5 }
+
+        rt.Update(sid, setCore updated)
 
         let translator =
             FakeTranslator(sid, FallbackEvent.NewUserMessage) :> IEventTranslator

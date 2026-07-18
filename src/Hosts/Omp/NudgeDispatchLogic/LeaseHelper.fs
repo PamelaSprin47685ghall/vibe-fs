@@ -7,7 +7,7 @@ open Wanxiangshu.Runtime.Fallback.SessionRuntime
 open Wanxiangshu.Kernel.FallbackKernel.Types
 open Wanxiangshu.Runtime.NudgeLease
 open Wanxiangshu.Runtime.NudgeDispatchClaim
-open Wanxiangshu.Runtime.Fallback.LeaseTransitions
+open Wanxiangshu.Runtime.Fallback.SessionRuntimeLeasePure
 open Wanxiangshu.Runtime.EventLogRuntime
 open Wanxiangshu.Kernel.Nudge
 open Wanxiangshu.Kernel.Nudge.Types
@@ -46,7 +46,7 @@ let registerLeaseAndMaybeDispatch
     (action: NudgeAction)
     (snapshot: SessionSnapshot)
     : JS.Promise<unit> =
-    fallbackRuntime.SetPendingNudgeLease(sessionId, lease)
+    fallbackRuntime.UpdateSession(sessionId, setPendingNudgeLease lease)
     fallbackRuntime.UpdateSession(sessionId, transferOwnership SessionOwner.Nudge)
     fallbackRuntime.UpdateSession(sessionId, armNudgeNonce nonce)
     fallbackRuntime.Update(sessionId, setMainContinuationAwaitingStart true)

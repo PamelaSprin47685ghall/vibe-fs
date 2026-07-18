@@ -5,7 +5,7 @@ open Wanxiangshu.Kernel.FallbackKernel.Types
 open Wanxiangshu.Kernel.FallbackKernel.StateMachine
 open Wanxiangshu.Runtime.PromiseQueue
 open Wanxiangshu.Runtime.Fallback.RuntimeStore
-open Wanxiangshu.Runtime.Fallback.LeaseTransitions
+open Wanxiangshu.Runtime.Fallback.SessionRuntimeLeasePure
 open Wanxiangshu.Runtime.Fallback.SessionRuntimePropertyPure
 open Wanxiangshu.Runtime.Fallback.Ports
 open Wanxiangshu.Runtime.Fallback.LeaseValidation
@@ -65,7 +65,7 @@ let handleFallbackTransition
             if isAborting then
                 do! handleUserAbort runtime workspaceRoot sessionID
 
-            runtime.UpdateState sessionID ns
+            runtime.Update(sessionID, setCore ns)
 
             if evt = FallbackEvent.SessionBusy then
                 updateBusyLeases runtime sessionID

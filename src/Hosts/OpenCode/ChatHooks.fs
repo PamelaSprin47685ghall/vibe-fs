@@ -1,7 +1,6 @@
 module Wanxiangshu.Hosts.Opencode.ChatHooks
 
 open Wanxiangshu.Runtime.Fallback.RuntimeStore
-open Wanxiangshu.Runtime.Fallback.LeaseTransitions
 
 open Fable.Core
 open Fable.Core.JsInterop
@@ -68,7 +67,7 @@ let internal isSystemMessage (parts: obj) (fr: FallbackRuntimeStore) (sessionIDS
                 let _ = fr.UpdateSessionReturning(sessionIDStr, tryConsumeNudgeNonce nonce)
                 true
             else
-                match fr.TryGetPendingLease sessionIDStr with
+                match (fr.GetSession sessionIDStr).PendingLease with
                 | Some lease when
                     (lease.Status = LeaseStatus.DispatchStarted
                      || lease.Status = LeaseStatus.Dispatched

@@ -10,7 +10,6 @@ open Wanxiangshu.Kernel.Nudge
 open Wanxiangshu.Kernel.Nudge.Types
 open Wanxiangshu.Kernel.HostTools
 open Wanxiangshu.Runtime
-open Wanxiangshu.Runtime.Fallback.LeaseTransitions
 open Wanxiangshu.Runtime.Fallback.RuntimeStore
 open Wanxiangshu.Runtime.Fallback.SessionRuntimePropertyPure
 open Wanxiangshu.Runtime.Dyn

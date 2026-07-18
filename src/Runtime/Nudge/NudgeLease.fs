@@ -7,7 +7,7 @@ open Wanxiangshu.Kernel.Nudge.Types
 open Wanxiangshu.Runtime.EventLogRuntime
 open Wanxiangshu.Runtime.Fallback.RuntimeStore
 open Wanxiangshu.Runtime.Fallback.SessionRuntime
-open Wanxiangshu.Runtime.Fallback.LeaseTransitions
+open Wanxiangshu.Runtime.Fallback.SessionRuntimeLeasePure
 open Wanxiangshu.Runtime.Fallback.SessionRuntimePropertyPure
 open Wanxiangshu.Kernel.FallbackKernel.Types
 
@@ -22,7 +22,7 @@ let finishNudge
     (anchor: string)
     : JS.Promise<unit> =
     promise {
-        match runtime.TryGetPendingNudgeLease sessionKey with
+        match (runtime.GetSession sessionKey).PendingNudgeLease with
         | Some nl when nl.NudgeID = lease.NudgeID ->
             match outcome with
             | NudgeOutcome.Failed ->
@@ -42,7 +42,7 @@ let finishNudge
                 do! appendNudgeSettledOrFail workspaceRoot sessionKey lease.NudgeID errorOrReason lease.NudgeOrdinal
 
             if outcome <> NudgeOutcome.Dispatched then
-                if runtime.TryClearPendingNudgeLease(sessionKey, lease.NudgeID) then
+                if runtime.UpdateSessionReturning(sessionKey, tryClearPendingNudgeLeaseReturning lease.NudgeID) then
                     runtime.UpdateSession(sessionKey, disarmNudgeNonce)
 
                     if (runtime.GetSession sessionKey).Owner = SessionOwner.Nudge then
@@ -121,7 +121,7 @@ let tryClaimAndRegisterLease
                   Owner = SessionOwner.Nudge
                   Status = LeaseStatus.DispatchStarted }
 
-            fallbackRuntime.SetPendingNudgeLease(sessionKey, lease)
+            fallbackRuntime.UpdateSession(sessionKey, setPendingNudgeLease lease)
             fallbackRuntime.UpdateSession(sessionKey, transferOwnership SessionOwner.Nudge)
             fallbackRuntime.UpdateSession(sessionKey, armNudgeNonce nonce)
             return Some lease
@@ -154,11 +154,12 @@ let private processDeliveredOutcome
 
         if
             not (
-                runtime.TryTransitionPendingNudgeLease(
+                runtime.UpdateSessionReturning(
                     sessionKey,
-                    lease.NudgeID,
-                    LeaseStatus.DispatchStarted,
-                    LeaseStatus.Dispatched
+                    tryTransitionPendingNudgeLeaseReturning
+                        lease.NudgeID
+                        LeaseStatus.DispatchStarted
+                        LeaseStatus.Dispatched
                 )
             )
         then

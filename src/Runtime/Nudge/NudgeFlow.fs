@@ -9,7 +9,7 @@ open Wanxiangshu.Runtime.NudgeLease
 open Wanxiangshu.Runtime.NudgeRuntimeState
 open Wanxiangshu.Kernel.FallbackKernel.Types
 open Wanxiangshu.Runtime.Fallback.RuntimeStore
-open Wanxiangshu.Runtime.Fallback.LeaseTransitions
+open Wanxiangshu.Runtime.Fallback.SessionRuntimeLeasePure
 
 /// Nudge dispatch is lower priority than fallback and compaction.  In
 /// particular, a settled fallback lease may still be visible to a concurrent
@@ -30,7 +30,7 @@ let private nudgeBlockedByFallbackState (runtime: FallbackRuntimeStore) (session
         || owner = SessionOwner.Nudge
 
     let settledFallbackLease =
-        match runtime.TryGetPendingLease sessionKey with
+        match (runtime.GetSession sessionKey).PendingLease with
         | Some lease -> lease.Status = LeaseStatus.Settled || lease.Status = LeaseStatus.Cancelled
         | None -> false
 

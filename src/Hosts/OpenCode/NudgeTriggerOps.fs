@@ -10,7 +10,6 @@ open Wanxiangshu.Kernel.Nudge.Types
 open Wanxiangshu.Kernel.HostTools
 open Wanxiangshu.Runtime
 open Wanxiangshu.Runtime.Fallback.SessionRuntimeLeasePure
-open Wanxiangshu.Runtime.Fallback.LeaseTransitions
 open Wanxiangshu.Runtime.Fallback.RuntimeStore
 open Wanxiangshu.Runtime.Fallback.SessionRuntimePropertyPure
 open Wanxiangshu.Runtime.Dyn
@@ -100,7 +99,7 @@ let clearOwnerSlot (fallbackRuntime: FallbackRuntimeStore) (owner: SessionOwner)
 /// Finish an outstanding nudge lease, if any, and clear the owner.
 let finishNudgeLease (ctx: obj) (fallbackRuntime: FallbackRuntimeStore) (sessionIDStr: string) : JS.Promise<unit> =
     promise {
-        match fallbackRuntime.TryGetPendingNudgeLease sessionIDStr with
+        match (fallbackRuntime.GetSession sessionIDStr).PendingNudgeLease with
         | Some lease ->
             let directory = pluginDirectoryFromCtx ctx
 

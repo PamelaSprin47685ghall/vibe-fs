@@ -5,7 +5,7 @@ open Wanxiangshu.Kernel.FallbackKernel.Types
 open Wanxiangshu.Kernel.FallbackKernel.StateMachine
 open Wanxiangshu.Runtime.Fallback.SessionRuntime
 open Wanxiangshu.Runtime.Fallback.RuntimeStore
-open Wanxiangshu.Runtime.Fallback.LeaseTransitions
+open Wanxiangshu.Runtime.Fallback.SessionRuntimeLeasePure
 open Wanxiangshu.Runtime.Fallback.SessionRuntimePropertyPure
 open Wanxiangshu.Runtime.Fallback.NudgeHandler
 open Wanxiangshu.Runtime.Fallback.CompactionHandler
@@ -91,7 +91,7 @@ let handleNewUserMessage
         let ns, _ =
             transition state FallbackEvent.NewUserMessage (configLookup ((runtime.GetSession sessionID).AgentName)) []
 
-        runtime.UpdateState sessionID ns
+        runtime.Update(sessionID, setCore ns)
         runtime.Update(sessionID, recordConsumed false)
         return { Consumed = false; State = ns }, None
     }

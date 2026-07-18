@@ -24,7 +24,6 @@ open Wanxiangshu.Runtime.LivelockGuard
 open Wanxiangshu.Runtime.RuntimeScope
 open Wanxiangshu.Runtime.Dyn
 open Wanxiangshu.Runtime.Fallback.RuntimeStore
-open Wanxiangshu.Runtime.Fallback.LeaseTransitions
 open Wanxiangshu.Runtime.Fallback.SessionRuntime
 open Wanxiangshu.Runtime.Fallback.SessionRuntimePropertyPure
 open Wanxiangshu.Kernel.FallbackKernel.Types
@@ -176,7 +175,7 @@ let agentEndHandler
             let root = ctx.cwd |> Option.defaultValue ""
 
             promise {
-                match fallbackRuntime.TryGetPendingNudgeLease sessionId with
+                match (fallbackRuntime.GetSession sessionId).PendingNudgeLease with
                 | Some lease ->
                     if root <> "" then
                         do! finishNudge fallbackRuntime root sessionId lease NudgeOutcome.Settled "completed" "" ""

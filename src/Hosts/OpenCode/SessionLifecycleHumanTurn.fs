@@ -8,7 +8,6 @@ open Wanxiangshu.Runtime.ToolRuntimeContext
 open Wanxiangshu.Runtime.Fallback.RuntimeStore
 open Wanxiangshu.Runtime.Fallback.SessionRuntime
 open Wanxiangshu.Runtime.Fallback.SessionRuntimePropertyPure
-open Wanxiangshu.Runtime.Fallback.LeaseTransitions
 open Wanxiangshu.Runtime.Fallback.SessionRuntimeLeasePure
 open Wanxiangshu.Runtime.Fallback.LeaseValidation
 open Wanxiangshu.Runtime.SessionEventWriter
@@ -22,7 +21,7 @@ let private finishPendingLease
     (sessionID: string)
     : JS.Promise<unit> =
     promise {
-        match fallbackRuntime.TryGetPendingLease sessionID with
+        match (fallbackRuntime.GetSession sessionID).PendingLease with
         | Some lease ->
             do!
                 finishContinuation
@@ -42,7 +41,7 @@ let private cancelNudgeAndCompaction
     (sessionID: string)
     : JS.Promise<unit> =
     promise {
-        match fallbackRuntime.TryGetPendingNudgeLease sessionID with
+        match (fallbackRuntime.GetSession sessionID).PendingNudgeLease with
         | Some nudgeLease ->
             do!
                 appendNudgeCancelledOrFail
@@ -52,8 +51,11 @@ let private cancelNudgeAndCompaction
                     "new_human_turn"
                     nudgeLease.NudgeOrdinal
 
-            let _ = fallbackRuntime.ApplyCancelNudgeLease(sessionID, nudgeLease.NudgeID)
-            ()
+            let applied =
+                fallbackRuntime.UpdateSessionReturning(sessionID, applyCancelNudgeLeaseReturning nudgeLease.NudgeID)
+
+            if applied then
+                fallbackRuntime.TriggerStateChanged sessionID
         | None -> ()
 
         let activeComp = (fallbackRuntime.GetSession sessionID).CompactionActiveId
@@ -117,7 +119,7 @@ let private initializeFallbackState (fallbackRuntime: FallbackRuntimeStore) (ses
             Lifecycle = FallbackLifecycle.Active
             RecoveryCount = 0 }
 
-    fallbackRuntime.UpdateState sessionID ns
+    fallbackRuntime.Update(sessionID, setCore ns)
     fallbackRuntime.Update(sessionID, recordConsumed false)
     fallbackRuntime.Update(sessionID, clearConsumption)
 

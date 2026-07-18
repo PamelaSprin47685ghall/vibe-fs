@@ -5,7 +5,7 @@ open Wanxiangshu.Kernel.FallbackKernel.Types
 open Wanxiangshu.Kernel.FallbackKernel.StateMachine
 open Wanxiangshu.Runtime.PromiseQueue
 open Wanxiangshu.Runtime.Fallback.RuntimeStore
-open Wanxiangshu.Runtime.Fallback.LeaseTransitions
+open Wanxiangshu.Runtime.Fallback.SessionRuntimeLeasePure
 open Wanxiangshu.Runtime.Fallback.SessionRuntimePropertyPure
 open Wanxiangshu.Runtime.Fallback.Ports
 open Wanxiangshu.Runtime.Fallback.LeaseValidation
@@ -84,7 +84,7 @@ let handleTerminalPostSettlement
                 || (finalState2.Phase = FallbackPhase.Idle && intentOpt.IsNone))
 
         if isPostTerminal then
-            match runtime.TryGetPendingLease sessionID with
+            match (runtime.GetSession sessionID).PendingLease with
             | Some lease ->
                 if lease.Status <> LeaseStatus.Cancelled then
                     do!
@@ -97,7 +97,7 @@ let handleTerminalPostSettlement
                             "completed"
                             lease.ContinuationOrdinal
 
-                if runtime.TryClearPendingLease(sessionID, lease.ContinuationID) then
+                if runtime.UpdateSessionReturning(sessionID, tryClearPendingLeaseReturning lease.ContinuationID) then
                     if (runtime.GetSession sessionID).Owner = SessionOwner.Fallback then
                         runtime.UpdateSession(sessionID, transferOwnership SessionOwner.NoOwner)
 

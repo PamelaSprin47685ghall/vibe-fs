@@ -11,7 +11,7 @@ open Wanxiangshu.Runtime.NudgeRuntimeEvent
 open Wanxiangshu.Runtime.NudgeLease
 open Wanxiangshu.Runtime.EventLogRuntime
 open Wanxiangshu.Runtime.Fallback.RuntimeStore
-open Wanxiangshu.Runtime.Fallback.LeaseTransitions
+open Wanxiangshu.Runtime.Fallback.SessionRuntimeLeasePure
 open Wanxiangshu.Runtime.Fallback.SessionRuntimePropertyPure
 open Wanxiangshu.Kernel.FallbackKernel.Types
 
@@ -43,7 +43,7 @@ type NudgeRuntime
                     && (isTerminalAssistantFinish stopReason || reason = FinishReason.ToolUseError)
                 then
                     if isNudgeOwner then
-                        match fallbackRuntime.TryGetPendingNudgeLease workspaceId with
+                        match (fallbackRuntime.GetSession workspaceId).PendingNudgeLease with
                         | Some lease ->
                             do!
                                 finishNudge

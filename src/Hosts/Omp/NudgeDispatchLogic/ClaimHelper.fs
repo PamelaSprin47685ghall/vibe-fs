@@ -5,7 +5,7 @@ open Fable.Core.JsInterop
 open Wanxiangshu.Runtime.Nudge.NudgeDispatchClaim
 open Wanxiangshu.Runtime.Fallback.RuntimeStore
 open Wanxiangshu.Runtime.Fallback.SessionRuntime
-open Wanxiangshu.Runtime.Fallback.LeaseTransitions
+open Wanxiangshu.Runtime.Fallback.SessionRuntimeLeasePure
 open Wanxiangshu.Kernel.FallbackKernel.Types
 open Wanxiangshu.Kernel.EventSourcing.Fold
 open Wanxiangshu.Runtime.EventLogRuntime
@@ -91,11 +91,9 @@ let attemptTransitionThenFinalize
     : JS.Promise<unit> =
     if
         not (
-            fallbackRuntime.TryTransitionPendingNudgeLease(
+            fallbackRuntime.UpdateSessionReturning(
                 sessionId,
-                lease.NudgeID,
-                LeaseStatus.DispatchStarted,
-                LeaseStatus.Dispatched
+                tryTransitionPendingNudgeLeaseReturning lease.NudgeID LeaseStatus.DispatchStarted LeaseStatus.Dispatched
             )
         )
     then

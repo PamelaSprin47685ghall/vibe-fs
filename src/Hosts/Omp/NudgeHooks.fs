@@ -30,7 +30,6 @@ open Wanxiangshu.Runtime.LivelockGuard
 open Wanxiangshu.Runtime.RuntimeScope
 open Wanxiangshu.Runtime.Dyn
 open Wanxiangshu.Runtime.Fallback.RuntimeStore
-open Wanxiangshu.Runtime.Fallback.LeaseTransitions
 open Wanxiangshu.Runtime.Fallback.SessionRuntime
 open Wanxiangshu.Runtime.Fallback.SessionRuntimePropertyPure
 open Wanxiangshu.Kernel.FallbackKernel.Types

@@ -12,7 +12,7 @@ open Wanxiangshu.Hosts.Omp.NudgeReminderDispatch
 open Wanxiangshu.Kernel.FallbackKernel.Types
 open Wanxiangshu.Hosts.Omp.NudgeRuntime
 open Wanxiangshu.Hosts.Omp.Codec
-open Wanxiangshu.Runtime.Fallback.LeaseTransitions
+open Wanxiangshu.Runtime.Fallback.SessionRuntimeLeasePure
 open Wanxiangshu.Runtime.Fallback.SessionRuntimePropertyPure
 
 let tryClaimNudgeDispatch
@@ -88,11 +88,9 @@ let private attemptTransitionThenFinalize
     : JS.Promise<unit> =
     if
         not (
-            fallbackRuntime.TryTransitionPendingNudgeLease(
+            fallbackRuntime.UpdateSessionReturning(
                 sessionId,
-                lease.NudgeID,
-                LeaseStatus.DispatchStarted,
-                LeaseStatus.Dispatched
+                tryTransitionPendingNudgeLeaseReturning lease.NudgeID LeaseStatus.DispatchStarted LeaseStatus.Dispatched
             )
         )
     then
@@ -127,7 +125,7 @@ let private registerLeaseAndMaybeDispatch
     (action: NudgeAction)
     (snapshot: SessionSnapshot)
     : JS.Promise<unit> =
-    fallbackRuntime.SetPendingNudgeLease(sessionId, lease)
+    fallbackRuntime.UpdateSession(sessionId, setPendingNudgeLease lease)
     fallbackRuntime.UpdateSession(sessionId, transferOwnership SessionOwner.Nudge)
     fallbackRuntime.UpdateSession(sessionId, armNudgeNonce nonce)
     fallbackRuntime.Update(sessionId, setMainContinuationAwaitingStart true)

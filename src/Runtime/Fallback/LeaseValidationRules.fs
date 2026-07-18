@@ -3,7 +3,7 @@ module Wanxiangshu.Runtime.Fallback.LeaseValidationRules
 open Wanxiangshu.Kernel.FallbackKernel.Types
 open Wanxiangshu.Runtime.Fallback.RuntimeStore
 open Wanxiangshu.Runtime.Fallback.SessionRuntime
-open Wanxiangshu.Runtime.Fallback.LeaseTransitions
+
 
 let verifyLeaseWithStatus
     (expectedStatus: LeaseStatus)
@@ -12,7 +12,7 @@ let verifyLeaseWithStatus
     (lease: PendingLease)
     : bool =
     let stateOpt = runtime.TryGetState sessionID
-    let pending = runtime.TryGetPendingLease sessionID
+    let pending = (runtime.GetSession sessionID).PendingLease
 
     lease.SessionGeneration = (runtime.GetSession sessionID).SessionGeneration
     && lease.HumanTurnID = (runtime.GetSession sessionID).HumanTurnId
@@ -91,7 +91,7 @@ let checkContinuationMatches
     (sessionID: string)
     (continuationId: string)
     : bool * bool =
-    let pending = runtime.TryGetPendingLease sessionID
+    let pending = (runtime.GetSession sessionID).PendingLease
 
     let activeMatch () =
         let activeGen = (runtime.GetSession sessionID).ActiveContinuationGen
@@ -131,7 +131,7 @@ let isTerminalOrSettled
         || currentState.Lifecycle = FallbackLifecycle.TaskComplete
 
     let settledFallbackLease =
-        match runtime.TryGetPendingLease sessionID with
+        match (runtime.GetSession sessionID).PendingLease with
         | Some lease -> lease.Status = LeaseStatus.Settled || lease.Status = LeaseStatus.Cancelled
         | None -> false
 

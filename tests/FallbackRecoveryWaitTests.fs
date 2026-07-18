@@ -5,7 +5,7 @@ open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Tests.AsyncFlush
 open Wanxiangshu.Kernel.FallbackKernel.Types
 open Wanxiangshu.Runtime.Fallback.RuntimeStore
-open Wanxiangshu.Runtime.Fallback.LeaseTransitions
+open Wanxiangshu.Runtime.Fallback.SessionRuntimeLeasePure
 open Wanxiangshu.Runtime.Fallback.SessionRuntimePropertyPure
 open Wanxiangshu.Runtime.Fallback.FallbackRecoveryWait
 
@@ -22,10 +22,12 @@ let isSettled_trueWhenExhausted () =
     let rt = FallbackRuntimeStore()
     let s0 = rt.GetOrCreateState "s1"
 
-    rt.UpdateState
-        "s1"
-        { s0 with
-            Phase = FallbackPhase.Exhausted }
+    rt.Update(
+        "s1",
+        setCore
+            { s0 with
+                Phase = FallbackPhase.Exhausted }
+    )
 
     check "exhausted settled" (isRecoverySettled rt "s1")
 
@@ -33,10 +35,12 @@ let isSettled_trueWhenCancelled () =
     let rt = FallbackRuntimeStore()
     let s0 = rt.GetOrCreateState "s1"
 
-    rt.UpdateState
-        "s1"
-        { s0 with
-            Lifecycle = FallbackLifecycle.Cancelled }
+    rt.Update(
+        "s1",
+        setCore
+            { s0 with
+                Lifecycle = FallbackLifecycle.Cancelled }
+    )
 
     check "cancelled settled" (isRecoverySettled rt "s1")
 
@@ -44,10 +48,12 @@ let isSettled_trueWhenTaskComplete () =
     let rt = FallbackRuntimeStore()
     let s0 = rt.GetOrCreateState "s1"
 
-    rt.UpdateState
-        "s1"
-        { s0 with
-            Lifecycle = FallbackLifecycle.TaskComplete }
+    rt.Update(
+        "s1",
+        setCore
+            { s0 with
+                Lifecycle = FallbackLifecycle.TaskComplete }
+    )
 
     check "task complete settled" (isRecoverySettled rt "s1")
 
@@ -66,10 +72,12 @@ let isToolCallTextRecovery_inProgressWhenScanning () =
     let rt = FallbackRuntimeStore()
     let s0 = rt.GetOrCreateState "s1"
 
-    rt.UpdateState
-        "s1"
-        { s0 with
-            Phase = FallbackPhase.ScanningToolCallText }
+    rt.Update(
+        "s1",
+        setCore
+            { s0 with
+                Phase = FallbackPhase.ScanningToolCallText }
+    )
 
     check "ScanningToolCallText in progress" (isToolCallTextRecoveryInProgress rt "s1")
 
@@ -77,10 +85,12 @@ let isToolCallTextRecovery_inProgressWhenRecovering () =
     let rt = FallbackRuntimeStore()
     let s0 = rt.GetOrCreateState "s1"
 
-    rt.UpdateState
-        "s1"
-        { s0 with
-            Phase = FallbackPhase.RecoveringToolCallText }
+    rt.Update(
+        "s1",
+        setCore
+            { s0 with
+                Phase = FallbackPhase.RecoveringToolCallText }
+    )
 
     check "RecoveringToolCallText in progress" (isToolCallTextRecoveryInProgress rt "s1")
 
@@ -94,10 +104,12 @@ let waitForToolCallTextRecovery_completesWhenPhaseClears () =
         let sid = "wait-tct"
         let s0 = rt.GetOrCreateState sid
 
-        rt.UpdateState
-            sid
-            { s0 with
-                Phase = FallbackPhase.RecoveringToolCallText }
+        rt.Update(
+            sid,
+            setCore
+                { s0 with
+                    Phase = FallbackPhase.RecoveringToolCallText }
+        )
 
         let resolved = ref false
 
@@ -110,7 +122,7 @@ let waitForToolCallTextRecovery_completesWhenPhaseClears () =
         do! yieldMicrotask ()
         check "wait is pending" (not resolved.Value)
 
-        rt.UpdateState sid { s0 with Phase = FallbackPhase.Idle }
+        rt.Update(sid, setCore { s0 with Phase = FallbackPhase.Idle })
 
         do! waitP
         check "wait finished after phase cleared" true

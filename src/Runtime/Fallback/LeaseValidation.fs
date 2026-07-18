@@ -4,7 +4,7 @@ open Fable.Core
 open Wanxiangshu.Kernel.FallbackKernel.Types
 open Wanxiangshu.Runtime.Fallback.RuntimeStore
 open Wanxiangshu.Runtime.Fallback.SessionRuntime
-open Wanxiangshu.Runtime.Fallback.LeaseTransitions
+open Wanxiangshu.Runtime.Fallback.SessionRuntimeLeasePure
 open Wanxiangshu.Runtime.Fallback.SessionRuntimePropertyPure
 open Wanxiangshu.Runtime.ContinuationEventWriter
 open Wanxiangshu.Runtime.Fallback.LeaseValidationRules
@@ -37,7 +37,7 @@ let cancelPendingMainLease
     (reason: string)
     : JS.Promise<unit> =
     promise {
-        match runtime.TryGetPendingLease sessionID with
+        match (runtime.GetSession sessionID).PendingLease with
         | Some lease ->
             do!
                 appendContinuationCancelledOrFail
@@ -47,7 +47,8 @@ let cancelPendingMainLease
                     reason
                     lease.ContinuationOrdinal
 
-            let cleared = runtime.TryClearPendingLease(sessionID, lease.ContinuationID)
+            let cleared =
+                runtime.UpdateSessionReturning(sessionID, tryClearPendingLeaseReturning lease.ContinuationID)
 
             if cleared then
                 if (runtime.GetSession sessionID).Owner = SessionOwner.Fallback then
@@ -104,14 +105,15 @@ let finishContinuation
     : JS.Promise<unit> =
     promise {
         let isLeaseStillActive =
-            match runtime.TryGetPendingLease sessionID with
+            match (runtime.GetSession sessionID).PendingLease with
             | Some pending when pending.ContinuationID = lease.ContinuationID -> true
             | _ -> false
 
         if isLeaseStillActive then
             do! appendOutcomeIfNeeded workspaceRoot sessionID lease outcome errorOrReason
 
-        let cleared = runtime.TryClearPendingLease(sessionID, lease.ContinuationID)
+        let cleared =
+            runtime.UpdateSessionReturning(sessionID, tryClearPendingLeaseReturning lease.ContinuationID)
 
         if cleared then
             if (runtime.GetSession sessionID).Owner = SessionOwner.Fallback then
@@ -119,5 +121,5 @@ let finishContinuation
 
             runtime.Update(sessionID, setMainContinuationAwaitingStart false)
 
-        runtime.UpdateState sessionID (runtime.GetOrCreateState sessionID)
+        runtime.Update(sessionID, setCore (runtime.GetOrCreateState sessionID))
     }

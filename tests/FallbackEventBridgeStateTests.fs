@@ -9,7 +9,6 @@ open Wanxiangshu.Kernel.Session.Causality
 open Wanxiangshu.Kernel.FallbackKernel.Types
 open Wanxiangshu.Kernel.Subsession.Types
 open Wanxiangshu.Runtime.Fallback.RuntimeStore
-open Wanxiangshu.Runtime.Fallback.LeaseTransitions
 open Wanxiangshu.Runtime.Fallback.SessionRuntimePropertyPure
 open Wanxiangshu.Runtime.Fallback.SessionRuntimeLeasePure
 open Wanxiangshu.Runtime.Fallback.Coordinator
@@ -286,10 +285,12 @@ let handleEvent_sessionIdle_retryToIdle_emitsScanToolCallAsText () =
 
         let s0 = rt.GetOrCreateState sid
 
-        rt.UpdateState
-            sid
-            { s0 with
-                Phase = FallbackPhase.Retrying 1 }
+        rt.Update(
+            sid,
+            setCore
+                { s0 with
+                    Phase = FallbackPhase.Retrying 1 }
+        )
 
         let toolMsg =
             createObj
@@ -319,10 +320,12 @@ let handleEvent_sessionBusy_duringRetrying_consumedTrue () =
         rt.UpdateSession(sid, recordAgentName "reviewer")
         let s0 = rt.GetOrCreateState sid
 
-        rt.UpdateState
-            sid
-            { s0 with
-                Phase = FallbackPhase.Retrying 1 }
+        rt.Update(
+            sid,
+            setCore
+                { s0 with
+                    Phase = FallbackPhase.Retrying 1 }
+        )
 
         rt.Update(sid, recordConsumed true)
         let tr = FakeTranslator(sid, FallbackEvent.SessionBusy) :> IEventTranslator

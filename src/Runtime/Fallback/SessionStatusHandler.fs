@@ -4,7 +4,7 @@ open Fable.Core
 open Wanxiangshu.Kernel.FallbackKernel.Types
 open Wanxiangshu.Runtime.Fallback.RuntimeStore
 open Wanxiangshu.Runtime.Fallback.SessionRuntime
-open Wanxiangshu.Runtime.Fallback.LeaseTransitions
+open Wanxiangshu.Runtime.Fallback.SessionRuntimeLeasePure
 open Wanxiangshu.Runtime.Fallback.SessionRuntimePropertyPure
 open Wanxiangshu.Runtime.Fallback.LeaseValidation
 open Wanxiangshu.Runtime.Fallback.NudgeHandler
@@ -72,10 +72,11 @@ let updateBusyLeases (runtime: FallbackRuntimeStore) (sessionID: string) : unit 
         { lease with
             Status = LeaseStatus.Running }
 
-    runtime.TryGetPendingLease sessionID
+    (runtime.GetSession sessionID).PendingLease
     |> Option.filter (fun l -> l.Status = LeaseStatus.DispatchStarted || l.Status = LeaseStatus.Dispatched)
-    |> Option.iter (fun l -> runtime.SetPendingLease(sessionID, { l with Status = LeaseStatus.Running }))
+    |> Option.iter (fun l -> runtime.UpdateSession(sessionID, setPendingLease { l with Status = LeaseStatus.Running }))
 
-    runtime.TryGetPendingNudgeLease sessionID
+    (runtime.GetSession sessionID).PendingNudgeLease
     |> Option.filter (fun l -> l.Status = LeaseStatus.DispatchStarted || l.Status = LeaseStatus.Dispatched)
-    |> Option.iter (fun l -> runtime.SetPendingNudgeLease(sessionID, { l with Status = LeaseStatus.Running }))
+    |> Option.iter (fun l ->
+        runtime.UpdateSession(sessionID, setPendingNudgeLease { l with Status = LeaseStatus.Running }))

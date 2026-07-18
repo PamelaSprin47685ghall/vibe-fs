@@ -8,7 +8,7 @@ open Fable.Core
 open Wanxiangshu.Kernel.FallbackKernel.Types
 open Wanxiangshu.Runtime.Fallback.RuntimeStore
 open Wanxiangshu.Runtime.Fallback.SessionRuntime
-open Wanxiangshu.Runtime.Fallback.LeaseTransitions
+open Wanxiangshu.Runtime.Fallback.SessionRuntimeLeasePure
 open Wanxiangshu.Runtime.Fallback.Ports
 open Wanxiangshu.Runtime.Fallback.LeaseValidation
 open Wanxiangshu.Runtime.Fallback.ContinuationExecution
@@ -23,7 +23,7 @@ let private completeAsTaskDone (runtime: FallbackRuntimeStore) (sessionID: strin
             Phase = FallbackPhase.Idle
             Lifecycle = FallbackLifecycle.TaskComplete }
 
-    runtime.UpdateState sessionID updated
+    runtime.Update(sessionID, setCore updated)
     updated, None
 
 let private settleIdle (runtime: FallbackRuntimeStore) (sessionID: string) (finalState: SessionFallbackState) =
@@ -31,7 +31,7 @@ let private settleIdle (runtime: FallbackRuntimeStore) (sessionID: string) (fina
         { finalState with
             Phase = FallbackPhase.Idle }
 
-    runtime.UpdateState sessionID updated
+    runtime.Update(sessionID, setCore updated)
     updated, None
 
 let private settleByTranscript
@@ -53,7 +53,7 @@ let private settleByTranscript
                  else
                      FallbackLifecycle.Active) }
 
-    runtime.UpdateState sessionID updated
+    runtime.Update(sessionID, setCore updated)
     updated, None
 
 let private dispatchRecovery
@@ -69,7 +69,7 @@ let private dispatchRecovery
             { finalState with
                 Phase = FallbackPhase.RecoveringToolCallText }
 
-        runtime.UpdateState sessionID updated
+        runtime.Update(sessionID, setCore updated)
 
         let lease = setupContinuationLease runtime sessionID model (Some promptText)
         let agent = (runtime.GetSession sessionID).AgentName

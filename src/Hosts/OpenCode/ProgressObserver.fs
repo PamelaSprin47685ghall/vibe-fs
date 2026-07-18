@@ -19,7 +19,7 @@ open Wanxiangshu.Runtime
 open Wanxiangshu.Runtime.Dyn
 open Wanxiangshu.Runtime.OpencodeHookInputCodec
 open Wanxiangshu.Runtime.Fallback.RuntimeStore
-open Wanxiangshu.Runtime.Fallback.LeaseTransitions
+open Wanxiangshu.Runtime.Fallback.SessionRuntimeLeasePure
 open Wanxiangshu.Runtime.Fallback.SessionRuntimePropertyPure
 open Wanxiangshu.Runtime.SubsessionEventRouter
 open Wanxiangshu.Runtime.EventLogRuntime
@@ -118,8 +118,10 @@ type ProgressObserver
 
                     let st = fallbackRuntime.GetOrCreateState sid
 
-                    fallbackRuntime.UpdateState
-                        sid
-                        { st with
-                            Lifecycle = FallbackLifecycle.TaskComplete }
+                    fallbackRuntime.Update(
+                        sid,
+                        setCore
+                            { st with
+                                Lifecycle = FallbackLifecycle.TaskComplete }
+                    )
         }

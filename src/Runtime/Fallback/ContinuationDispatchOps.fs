@@ -4,7 +4,7 @@ open Fable.Core
 open Wanxiangshu.Kernel.FallbackKernel.Types
 open Wanxiangshu.Runtime.Fallback.RuntimeStore
 open Wanxiangshu.Runtime.Fallback.SessionRuntime
-open Wanxiangshu.Runtime.Fallback.LeaseTransitions
+open Wanxiangshu.Runtime.Fallback.SessionRuntimeLeasePure
 open Wanxiangshu.Runtime.Fallback.SessionRuntimePropertyPure
 open Wanxiangshu.Runtime.Fallback.Ports
 open Wanxiangshu.Runtime.Fallback.LeaseValidation
@@ -64,11 +64,12 @@ let handleDispatchComplete
                     lease.ContinuationOrdinal
 
             let canTransition =
-                runtime.TryTransitionPendingLease(
+                runtime.UpdateSessionReturning(
                     sessionID,
-                    lease.ContinuationID,
-                    LeaseStatus.DispatchStarted,
-                    LeaseStatus.Dispatched
+                    tryTransitionPendingLeaseReturning
+                        lease.ContinuationID
+                        LeaseStatus.DispatchStarted
+                        LeaseStatus.Dispatched
                 )
 
             if not canTransition then
@@ -97,11 +98,12 @@ let dispatchWithLeaseTransition
                 lease.ContinuationOrdinal
 
         let isValid =
-            runtime.TryTransitionPendingLease(
+            runtime.UpdateSessionReturning(
                 sessionID,
-                lease.ContinuationID,
-                LeaseStatus.Requested,
-                LeaseStatus.DispatchStarted
+                tryTransitionPendingLeaseReturning
+                    lease.ContinuationID
+                    LeaseStatus.Requested
+                    LeaseStatus.DispatchStarted
             )
 
         if not isValid then

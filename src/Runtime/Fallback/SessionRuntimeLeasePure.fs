@@ -89,6 +89,41 @@ let applyCancelNudgeLease expectedNudgeID (s: FallbackSessionRuntime) =
                         s.Owner }
     | _ -> None
 
+let applyCancelNudgeLeaseReturning expectedNudgeID (s: FallbackSessionRuntime) : FallbackSessionRuntime * bool =
+    match applyCancelNudgeLease expectedNudgeID s with
+    | Some s' -> s', true
+    | None -> s, false
+
+let tryClearPendingLeaseReturning expectedContinuationID (s: FallbackSessionRuntime) : FallbackSessionRuntime * bool =
+    match tryClearPendingLease expectedContinuationID s with
+    | Some s' -> s', true
+    | None -> s, false
+
+let tryTransitionPendingLeaseReturning
+    expectedID
+    expectedStatus
+    nextStatus
+    (s: FallbackSessionRuntime)
+    : FallbackSessionRuntime * bool =
+    match tryTransitionPendingLease expectedID expectedStatus nextStatus s with
+    | Some s' -> s', true
+    | None -> s, false
+
+let tryClearPendingNudgeLeaseReturning expectedNudgeID (s: FallbackSessionRuntime) : FallbackSessionRuntime * bool =
+    match tryClearPendingNudgeLease expectedNudgeID s with
+    | Some s' -> s', true
+    | None -> s, false
+
+let tryTransitionPendingNudgeLeaseReturning
+    expectedID
+    expectedStatus
+    nextStatus
+    (s: FallbackSessionRuntime)
+    : FallbackSessionRuntime * bool =
+    match tryTransitionPendingNudgeLease expectedID expectedStatus nextStatus s with
+    | Some s' -> s', true
+    | None -> s, false
+
 // ----- Compaction transitions -----
 
 let setLastHumanMessageId messageId (s: FallbackSessionRuntime) =
