@@ -24,6 +24,19 @@ open Wanxiangshu.Hosts.Opencode.Fallback.HostEventInspection
 open Wanxiangshu.Hosts.Opencode.NudgeEffect
 open Wanxiangshu.Hosts.Opencode.NudgeTriggerOps
 
+/// Decide whether a natural-stop event should re-evaluate the nudge
+/// state machine. Internal so regression tests can bind to the real
+/// gate instead of re-encoding the rule. The dedup anchor, max-retry
+/// count and `PendingNudge` state inside the nudge kernel remain the
+/// authority on whether a nudge is actually emitted; this gate is
+/// only the "should we look again?" question.
+let internal isNudgeEvaluationEligible (origin: TerminalOrigin) (eventType: string) : bool =
+    match origin with
+    | TerminalOrigin.HumanTurnCompleted
+    | TerminalOrigin.NudgeCompleted
+    | TerminalOrigin.FallbackContinuationCompleted -> eventType <> "session.error"
+    | _ -> false
+
 type NudgeTrigger
     (
         host: Host,

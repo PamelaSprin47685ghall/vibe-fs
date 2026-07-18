@@ -101,6 +101,21 @@ let extractSessionText (client: obj) (sessionId: string) (directory: string) (st
             return noOutputText
     }
 
+/// R-01 fix: when the abort signal wins, the local race stops waiting
+/// but the physical OpenCode session keeps running.  Force the host
+/// to abort the prompt so the model does not keep consuming tokens
+/// after the parent declared it stopped.
+let physicalAbort (session: obj) : JS.Promise<unit> =
+    promise {
+        if Dyn.isNullish (Dyn.get session "abort") then
+            ()
+        else
+            try
+                do! Dyn.callMethod0 session "abort" |> unbox<JS.Promise<obj>> |> Promise.map ignore
+            with _ ->
+                ()
+    }
+
 let promptWithAbort (client: obj) (args: obj) (signal: obj) : JS.Promise<unit> =
     promise {
         match getSessionApiFromClient client with
@@ -109,6 +124,7 @@ let promptWithAbort (client: obj) (args: obj) (signal: obj) : JS.Promise<unit> =
             if Dyn.isNullish signal then
                 do! session?prompt (args)
             elif Dyn.truthy (Dyn.get signal "aborted") then
+                do! physicalAbort session
                 return! Promise.reject (DOMException("Aborted", "AbortError"))
             else
                 let settled = ref false
@@ -144,16 +160,11 @@ let promptWithAbort (client: obj) (args: obj) (signal: obj) : JS.Promise<unit> =
                         return "ok"
                     }
 
-                try
-                    let! winner = Promise.race [ promptAsync; abortAsync ]
+                let! winner = Promise.race [ promptAsync; abortAsync ]
 
-                    if winner = "aborted" then
-                        return! Promise.reject (DOMException("Aborted", "AbortError"))
-                with err ->
-                    match translateJsError err with
-                    | MessageAborted
-                    | ClientCancellation _ -> return! Promise.reject (DOMException("Aborted", "AbortError"))
-                    | _ -> return! Promise.reject err
+                if winner = "aborted" then
+                    do! physicalAbort session
+                    return! Promise.reject (DOMException("Aborted", "AbortError"))
     }
 
 let startSubagentSession

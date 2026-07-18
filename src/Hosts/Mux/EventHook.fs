@@ -16,11 +16,14 @@ open Wanxiangshu.Runtime.EventLogRuntime
 open Wanxiangshu.Runtime.ReviewRuntime
 open Wanxiangshu.Runtime.RuntimeScope
 open Wanxiangshu.Hosts.Mux.Fallback.Hook
+open Wanxiangshu.Hosts.Mux.EventHookCleanup
 open Wanxiangshu.Runtime.SubsessionEventRouter
 open Wanxiangshu.Runtime.SubsessionChildObserver
 open Wanxiangshu.Runtime.SubsessionActorRegistry
 open Wanxiangshu.Runtime.SubsessionEventStore
 open Wanxiangshu.Hosts.Mux.EventHookHandlers
+open Wanxiangshu.Runtime.Dispatch
+open Wanxiangshu.Runtime.SubsessionPendingEvidence
 
 let createEventHook (deps: obj) (reviewStore: ReviewStore) (scope: RuntimeScope) : obj =
     let getChatHistory =

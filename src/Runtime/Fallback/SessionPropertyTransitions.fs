@@ -51,3 +51,21 @@ type FallbackRuntimeStore with
 
     member this.ClearActiveNudgeNonce(sessionID: string) : unit =
         this.UpdateSession(sessionID, (fun s -> { s with ActiveNudgeNonce = "" }))
+
+    /// Atomically check whether the stored active nudge nonce matches the
+    /// observed nonce, and if so, clear it. Returns true on a successful
+    /// match-and-consume. Used by the chat.message hook to decouple the
+    /// nonce lifetime from the prompt() Promise: the nonce persists across
+    /// the async dispatch gap and is only consumed when the matching
+    /// message is actually observed by chat.message.
+    member this.TryConsumeActiveNudgeNonce(sessionID: string, observedNonce: string) : bool =
+        if observedNonce = "" then
+            false
+        else
+            let s = this.GetSession sessionID
+
+            if s.ActiveNudgeNonce <> "" && s.ActiveNudgeNonce = observedNonce then
+                this.UpdateSession(sessionID, (fun s -> { s with ActiveNudgeNonce = "" }))
+                true
+            else
+                false

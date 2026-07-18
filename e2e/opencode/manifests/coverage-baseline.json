@@ -1,0 +1,732 @@
+{
+  "notCoveredCount": 133,
+  "entries": {
+    "OC-BOOT-001": {
+      "level": "real-e2e"
+    },
+    "OC-BOOT-002": {
+      "level": "not-covered",
+      "note": "demoted from real-e2e: no matching spec/test yet"
+    },
+    "OC-BOOT-003": {
+      "level": "not-covered"
+    },
+    "OC-BOOT-004": {
+      "level": "not-covered"
+    },
+    "OC-BOOT-005": {
+      "level": "not-covered"
+    },
+    "OC-BOOT-006": {
+      "level": "not-covered"
+    },
+    "OC-BOOT-007": {
+      "level": "not-covered"
+    },
+    "OC-BOOT-008": {
+      "level": "not-covered"
+    },
+    "OC-BOOT-009": {
+      "level": "not-covered"
+    },
+    "OC-BOOT-010": {
+      "level": "not-covered"
+    },
+    "OC-SCHEMA-001": {
+      "level": "real-e2e"
+    },
+    "OC-SCHEMA-002": {
+      "level": "unit"
+    },
+    "OC-SCHEMA-003": {
+      "level": "unit"
+    },
+    "OC-SCHEMA-004": {
+      "level": "unit"
+    },
+    "OC-SCHEMA-005": {
+      "level": "unit"
+    },
+    "OC-SCHEMA-006": {
+      "level": "unit"
+    },
+    "OC-SCHEMA-007": {
+      "level": "not-covered"
+    },
+    "OC-SCHEMA-008": {
+      "level": "integration"
+    },
+    "OC-SCHEMA-009": {
+      "level": "integration"
+    },
+    "OC-PERM-001": {
+      "level": "unit"
+    },
+    "OC-PERM-002": {
+      "level": "unit"
+    },
+    "OC-PERM-003": {
+      "level": "not-covered"
+    },
+    "OC-PERM-004": {
+      "level": "not-covered"
+    },
+    "OC-PERM-005": {
+      "level": "not-covered"
+    },
+    "OC-MSG-001": {
+      "level": "integration"
+    },
+    "OC-MSG-002": {
+      "level": "not-covered",
+      "note": "demoted from real-e2e: no matching spec/test yet"
+    },
+    "OC-MSG-003": {
+      "level": "unit"
+    },
+    "OC-MSG-004": {
+      "level": "not-covered"
+    },
+    "OC-MSG-005": {
+      "level": "not-covered",
+      "note": "demoted from real-e2e: no matching spec/test yet"
+    },
+    "OC-MSG-006": {
+      "level": "not-covered"
+    },
+    "OC-MSG-007": {
+      "level": "not-covered"
+    },
+    "OC-MSG-008": {
+      "level": "unit"
+    },
+    "OC-MSG-009": {
+      "level": "unit"
+    },
+    "OC-MSG-010": {
+      "level": "not-covered"
+    },
+    "OC-FILE-001": {
+      "level": "real-e2e"
+    },
+    "OC-FILE-002": {
+      "level": "real-e2e"
+    },
+    "OC-FILE-003": {
+      "level": "real-e2e"
+    },
+    "OC-FILE-004": {
+      "level": "not-covered"
+    },
+    "OC-FILE-005": {
+      "level": "not-covered"
+    },
+    "OC-FILE-006": {
+      "level": "real-e2e"
+    },
+    "OC-FILE-007": {
+      "level": "not-covered"
+    },
+    "OC-FILE-008": {
+      "level": "not-covered"
+    },
+    "OC-FILE-009": {
+      "level": "not-covered",
+      "note": "demoted from real-e2e: no matching spec/test yet"
+    },
+    "OC-FILE-010": {
+      "level": "not-covered"
+    },
+    "OC-FILE-011": {
+      "level": "not-covered"
+    },
+    "OC-FILE-012": {
+      "level": "not-covered"
+    },
+    "OC-FUZZY-001": {
+      "level": "real-e2e"
+    },
+    "OC-FUZZY-002": {
+      "level": "not-covered"
+    },
+    "OC-FUZZY-003": {
+      "level": "real-e2e"
+    },
+    "OC-FUZZY-004": {
+      "level": "unit"
+    },
+    "OC-FUZZY-005": {
+      "level": "not-covered"
+    },
+    "OC-FUZZY-006": {
+      "level": "unit"
+    },
+    "OC-FUZZY-007": {
+      "level": "unit"
+    },
+    "OC-FUZZY-008": {
+      "level": "not-covered"
+    },
+    "OC-EXEC-001": {
+      "level": "real-e2e"
+    },
+    "OC-EXEC-002": {
+      "level": "real-e2e"
+    },
+    "OC-EXEC-003": {
+      "level": "unit"
+    },
+    "OC-EXEC-004": {
+      "level": "unit"
+    },
+    "OC-EXEC-005": {
+      "level": "not-covered"
+    },
+    "OC-EXEC-006": {
+      "level": "unit"
+    },
+    "OC-EXEC-007": {
+      "level": "unit"
+    },
+    "OC-EXEC-008": {
+      "level": "integration"
+    },
+    "OC-EXEC-009": {
+      "level": "unit"
+    },
+    "OC-EXEC-010": {
+      "level": "integration"
+    },
+    "OC-EXEC-011": {
+      "level": "not-covered"
+    },
+    "OC-EXEC-012": {
+      "level": "not-covered"
+    },
+    "OC-PTY-001": {
+      "level": "real-e2e"
+    },
+    "OC-PTY-002": {
+      "level": "not-covered"
+    },
+    "OC-PTY-003": {
+      "level": "not-covered"
+    },
+    "OC-PTY-004": {
+      "level": "not-covered"
+    },
+    "OC-PTY-005": {
+      "level": "real-e2e"
+    },
+    "OC-PTY-006": {
+      "level": "not-covered"
+    },
+    "OC-PTY-007": {
+      "level": "not-covered"
+    },
+    "OC-PTY-008": {
+      "level": "not-covered"
+    },
+    "OC-PTY-009": {
+      "level": "not-covered"
+    },
+    "OC-PTY-010": {
+      "level": "not-covered"
+    },
+    "OC-WEB-001": {
+      "level": "real-e2e"
+    },
+    "OC-WEB-002": {
+      "level": "not-covered"
+    },
+    "OC-WEB-003": {
+      "level": "not-covered"
+    },
+    "OC-WEB-004": {
+      "level": "not-covered"
+    },
+    "OC-WEB-005": {
+      "level": "not-covered"
+    },
+    "OC-WEB-006": {
+      "level": "unit"
+    },
+    "OC-WEB-007": {
+      "level": "unit"
+    },
+    "OC-WEB-008": {
+      "level": "not-covered"
+    },
+    "OC-WEB-009": {
+      "level": "not-covered"
+    },
+    "OC-WEB-010": {
+      "level": "not-covered"
+    },
+    "OC-WEB-011": {
+      "level": "not-covered"
+    },
+    "OC-WEB-012": {
+      "level": "not-covered"
+    },
+    "OC-SUB-001": {
+      "level": "real-e2e"
+    },
+    "OC-SUB-002": {
+      "level": "not-covered"
+    },
+    "OC-SUB-003": {
+      "level": "not-covered"
+    },
+    "OC-SUB-004": {
+      "level": "not-covered"
+    },
+    "OC-SUB-005": {
+      "level": "real-e2e",
+      "note": "covered by OC-SUB-001 test"
+    },
+    "OC-SUB-006": {
+      "level": "not-covered"
+    },
+    "OC-SUB-007": {
+      "level": "not-covered"
+    },
+    "OC-SUB-008": {
+      "level": "unit"
+    },
+    "OC-SUB-009": {
+      "level": "not-covered"
+    },
+    "OC-SUB-010": {
+      "level": "not-covered"
+    },
+    "OC-SUB-011": {
+      "level": "not-covered"
+    },
+    "OC-SUB-012": {
+      "level": "not-covered"
+    },
+    "OC-SUB-013": {
+      "level": "unit"
+    },
+    "OC-SUB-014": {
+      "level": "unit"
+    },
+    "OC-SUB-015": {
+      "level": "unit"
+    },
+    "OC-CONT-001": {
+      "level": "integration"
+    },
+    "OC-CONT-002": {
+      "level": "integration"
+    },
+    "OC-CONT-003": {
+      "level": "integration"
+    },
+    "OC-CONT-004": {
+      "level": "integration"
+    },
+    "OC-CONT-005": {
+      "level": "unit"
+    },
+    "OC-CONT-006": {
+      "level": "unit"
+    },
+    "OC-CONT-007": {
+      "level": "unit"
+    },
+    "OC-CONT-008": {
+      "level": "not-covered"
+    },
+    "OC-CONT-009": {
+      "level": "not-covered"
+    },
+    "OC-CONT-010": {
+      "level": "not-covered"
+    },
+    "OC-REV-001": {
+      "level": "real-e2e"
+    },
+    "OC-REV-002": {
+      "level": "not-covered",
+      "note": "demoted from real-e2e: no matching spec/test yet"
+    },
+    "OC-REV-003": {
+      "level": "not-covered",
+      "note": "demoted from real-e2e: no matching spec/test yet"
+    },
+    "OC-REV-004": {
+      "level": "not-covered",
+      "note": "demoted from real-e2e: no matching spec/test yet"
+    },
+    "OC-REV-005": {
+      "level": "not-covered",
+      "note": "demoted from real-e2e: no matching spec/test yet"
+    },
+    "OC-REV-006": {
+      "level": "not-covered"
+    },
+    "OC-REV-007": {
+      "level": "not-covered"
+    },
+    "OC-REV-008": {
+      "level": "unit"
+    },
+    "OC-REV-009": {
+      "level": "unit"
+    },
+    "OC-REV-010": {
+      "level": "unit"
+    },
+    "OC-REV-011": {
+      "level": "unit"
+    },
+    "OC-REV-012": {
+      "level": "unit"
+    },
+    "OC-REV-013": {
+      "level": "unit"
+    },
+    "OC-REV-014": {
+      "level": "not-covered"
+    },
+    "OC-REV-015": {
+      "level": "not-covered"
+    },
+    "OC-REV-016": {
+      "level": "not-covered"
+    },
+    "OC-REV-017": {
+      "level": "unit"
+    },
+    "OC-REV-018": {
+      "level": "not-covered"
+    },
+    "OC-REV-019": {
+      "level": "not-covered"
+    },
+    "OC-REV-020": {
+      "level": "unit"
+    },
+    "OC-NUDGE-001": {
+      "level": "real-e2e"
+    },
+    "OC-NUDGE-002": {
+      "level": "integration"
+    },
+    "OC-NUDGE-003": {
+      "level": "integration"
+    },
+    "OC-NUDGE-004": {
+      "level": "integration"
+    },
+    "OC-NUDGE-005": {
+      "level": "not-covered"
+    },
+    "OC-NUDGE-006": {
+      "level": "integration"
+    },
+    "OC-NUDGE-007": {
+      "level": "integration"
+    },
+    "OC-NUDGE-008": {
+      "level": "unit"
+    },
+    "OC-NUDGE-009": {
+      "level": "integration"
+    },
+    "OC-NUDGE-010": {
+      "level": "not-covered"
+    },
+    "OC-NUDGE-011": {
+      "level": "not-covered"
+    },
+    "OC-NUDGE-012": {
+      "level": "not-covered"
+    },
+    "OC-NUDGE-013": {
+      "level": "not-covered"
+    },
+    "OC-NUDGE-014": {
+      "level": "unit"
+    },
+    "OC-NUDGE-015": {
+      "level": "unit"
+    },
+    "OC-FB-001": {
+      "level": "integration"
+    },
+    "OC-FB-002": {
+      "level": "integration"
+    },
+    "OC-FB-003": {
+      "level": "unit"
+    },
+    "OC-FB-004": {
+      "level": "unit"
+    },
+    "OC-FB-005": {
+      "level": "integration"
+    },
+    "OC-FB-006": {
+      "level": "unit"
+    },
+    "OC-FB-007": {
+      "level": "unit"
+    },
+    "OC-FB-008": {
+      "level": "unit"
+    },
+    "OC-FB-009": {
+      "level": "unit"
+    },
+    "OC-FB-010": {
+      "level": "unit"
+    },
+    "OC-FB-011": {
+      "level": "unit"
+    },
+    "OC-FB-012": {
+      "level": "unit"
+    },
+    "OC-FB-013": {
+      "level": "unit"
+    },
+    "OC-FB-014": {
+      "level": "unit"
+    },
+    "OC-FB-015": {
+      "level": "unit"
+    },
+    "OC-FB-016": {
+      "level": "unit"
+    },
+    "OC-FB-017": {
+      "level": "unit"
+    },
+    "OC-FB-018": {
+      "level": "unit"
+    },
+    "OC-FB-019": {
+      "level": "unit"
+    },
+    "OC-FB-020": {
+      "level": "unit"
+    },
+    "OC-FB-021": {
+      "level": "not-covered"
+    },
+    "OC-FB-022": {
+      "level": "unit"
+    },
+    "OC-FB-023": {
+      "level": "unit"
+    },
+    "OC-FB-024": {
+      "level": "unit"
+    },
+    "OC-CB-001": {
+      "level": "not-covered",
+      "note": "demoted from real-e2e: no matching spec/test yet"
+    },
+    "OC-CB-002": {
+      "level": "not-covered",
+      "note": "demoted from real-e2e: no matching spec/test yet"
+    },
+    "OC-CB-003": {
+      "level": "not-covered",
+      "note": "demoted from real-e2e: no matching spec/test yet"
+    },
+    "OC-CB-004": {
+      "level": "not-covered",
+      "note": "demoted from real-e2e: no matching spec/test yet"
+    },
+    "OC-CB-005": {
+      "level": "real-e2e"
+    },
+    "OC-CB-006": {
+      "level": "unit"
+    },
+    "OC-CB-007": {
+      "level": "not-covered"
+    },
+    "OC-CB-008": {
+      "level": "not-covered"
+    },
+    "OC-CB-009": {
+      "level": "not-covered"
+    },
+    "OC-CB-010": {
+      "level": "unit"
+    },
+    "OC-CB-011": {
+      "level": "unit"
+    },
+    "OC-CB-012": {
+      "level": "not-covered"
+    },
+    "OC-COMP-001": {
+      "level": "not-covered"
+    },
+    "OC-COMP-002": {
+      "level": "not-covered"
+    },
+    "OC-COMP-003": {
+      "level": "not-covered"
+    },
+    "OC-COMP-004": {
+      "level": "not-covered"
+    },
+    "OC-COMP-005": {
+      "level": "not-covered"
+    },
+    "OC-COMP-006": {
+      "level": "not-covered"
+    },
+    "OC-COMP-007": {
+      "level": "not-covered"
+    },
+    "OC-COMP-008": {
+      "level": "not-covered"
+    },
+    "OC-COMP-009": {
+      "level": "not-covered"
+    },
+    "OC-COMP-010": {
+      "level": "not-covered"
+    },
+    "OC-COMP-011": {
+      "level": "not-covered"
+    },
+    "OC-COMP-012": {
+      "level": "not-covered"
+    },
+    "OC-ES-001": {
+      "level": "not-covered"
+    },
+    "OC-ES-002": {
+      "level": "not-covered"
+    },
+    "OC-ES-003": {
+      "level": "not-covered"
+    },
+    "OC-ES-004": {
+      "level": "not-covered"
+    },
+    "OC-ES-005": {
+      "level": "not-covered"
+    },
+    "OC-ES-006": {
+      "level": "not-covered"
+    },
+    "OC-ES-007": {
+      "level": "not-covered"
+    },
+    "OC-ES-008": {
+      "level": "not-covered"
+    },
+    "OC-ES-009": {
+      "level": "not-covered"
+    },
+    "OC-ES-010": {
+      "level": "not-covered"
+    },
+    "OC-ES-011": {
+      "level": "not-covered"
+    },
+    "OC-ES-012": {
+      "level": "not-covered"
+    },
+    "OC-ES-013": {
+      "level": "not-covered"
+    },
+    "OC-ES-014": {
+      "level": "not-covered"
+    },
+    "OC-ES-015": {
+      "level": "not-covered"
+    },
+    "OC-LIFE-001": {
+      "level": "unit"
+    },
+    "OC-LIFE-002": {
+      "level": "unit"
+    },
+    "OC-LIFE-003": {
+      "level": "unit"
+    },
+    "OC-LIFE-004": {
+      "level": "not-covered"
+    },
+    "OC-LIFE-005": {
+      "level": "not-covered"
+    },
+    "OC-LIFE-006": {
+      "level": "not-covered"
+    },
+    "OC-LIFE-007": {
+      "level": "not-covered"
+    },
+    "OC-LIFE-008": {
+      "level": "not-covered"
+    },
+    "OC-LIFE-009": {
+      "level": "unit"
+    },
+    "OC-LIFE-010": {
+      "level": "unit"
+    },
+    "OC-LIFE-011": {
+      "level": "not-covered"
+    },
+    "OC-LIFE-012": {
+      "level": "not-covered"
+    },
+    "OC-LIFE-013": {
+      "level": "not-covered"
+    },
+    "OC-LIFE-014": {
+      "level": "unit"
+    },
+    "OC-LIFE-015": {
+      "level": "not-covered"
+    },
+    "OC-CONC-001": {
+      "level": "not-covered"
+    },
+    "OC-CONC-002": {
+      "level": "not-covered"
+    },
+    "OC-CONC-003": {
+      "level": "not-covered"
+    },
+    "OC-CONC-004": {
+      "level": "not-covered"
+    },
+    "OC-CONC-005": {
+      "level": "not-covered"
+    },
+    "OC-CONC-006": {
+      "level": "not-covered"
+    },
+    "OC-CONC-007": {
+      "level": "unit"
+    },
+    "OC-CONC-008": {
+      "level": "unit"
+    },
+    "OC-CONC-009": {
+      "level": "not-covered"
+    },
+    "OC-CONC-010": {
+      "level": "not-covered"
+    },
+    "OC-CONC-011": {
+      "level": "not-covered"
+    },
+    "OC-CONC-012": {
+      "level": "not-covered"
+    }
+  }
+}

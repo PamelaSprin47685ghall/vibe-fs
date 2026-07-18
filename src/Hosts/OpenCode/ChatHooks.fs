@@ -8,7 +8,9 @@ open Fable.Core.JsInterop
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.FallbackKernel.Types
 open Wanxiangshu.Runtime
+open Wanxiangshu.Runtime.Dyn
 open Wanxiangshu.Runtime.Fallback.SessionPropertyTransitions
+open Wanxiangshu.Hosts.Opencode.ChatHooksDecoders
 open Wanxiangshu.Hosts.Opencode.SubsessionDispatch
 
 open Wanxiangshu.Kernel.Config
@@ -22,95 +24,7 @@ open Wanxiangshu.Runtime.OpencodeHookInputCodec
 open Wanxiangshu.Runtime.ChatHookOutputCodec
 open Wanxiangshu.Runtime.OpencodeAgentConfigWire
 open Wanxiangshu.Hosts.Opencode.SubsessionHostAdapter
-
-let private resolveAgent (registry: ChildAgentRegistry) (input: obj) (output: obj) : string =
-    resolveHookAgent registry input (Some output) "manager"
-
-let tryGetModelStringFromHook (input: obj) (output: obj) : string option =
-    let candidates =
-        [ Dyn.get input "model"
-          (let msg = Dyn.get input "message" in
-
-           if not (Dyn.isNullish msg) then
-               Dyn.get msg "model"
-           else
-               null)
-          (let info = Dyn.get input "info" in
-
-           if not (Dyn.isNullish info) then
-               Dyn.get info "model"
-           else
-               null)
-          (let msg = chatMessageFromHookOutput output in if msg.IsSome then Dyn.get msg.Value "model" else null) ]
-
-    candidates
-    |> List.tryPick (fun mVal ->
-        if Dyn.isNullish mVal then
-            None
-        elif Dyn.typeIs mVal "string" then
-            let s = mVal :?> string
-            if s <> "" then Some s else None
-        else
-            let providerID = Dyn.str mVal "providerID"
-            let modelID = Dyn.str mVal "modelID"
-            let variant = Dyn.str mVal "variant"
-            let suffix = if variant <> "" then ":" + variant else ""
-
-            if providerID = "" || modelID = "" then
-                let idVal = Dyn.str mVal "id"
-                if idVal <> "" then Some(idVal + suffix) else None
-            else
-                Some(sprintf "%s/%s%s" providerID modelID suffix))
-
-let tryGetNonceFromParts (parts: obj) : string option =
-    if Dyn.isNullish parts || not (Dyn.isArray parts) then
-        None
-    else
-        let arr = parts :?> obj array
-
-        arr
-        |> Array.tryPick (fun part ->
-            let metadata = Dyn.get part "metadata"
-
-            if Dyn.isNullish metadata then
-                None
-            else
-                let nonce = Dyn.str metadata "nonce"
-                if nonce <> "" then Some nonce else None)
-
-/// Provenance extracted from wanxiangshu metadata in a message part.
-type WanxiangshuProvenance =
-    { Kind: string; ContinuationId: string }
-
-/// Extract wanxiangshu provenance from message parts metadata.
-/// Returns None when no wanxiangshu metadata is found or parts are invalid.
-let tryDecodeWanxiangshuProvenance (parts: obj) : WanxiangshuProvenance option =
-    if Dyn.isNullish parts || not (Dyn.isArray parts) then
-        None
-    else
-        let arr = parts :?> obj array
-
-        arr
-        |> Array.tryPick (fun part ->
-            let metadata = Dyn.get part "metadata"
-
-            if Dyn.isNullish metadata then
-                None
-            else
-                let ws = Dyn.get metadata "wanxiangshu"
-
-                if Dyn.isNullish ws then
-                    None
-                else
-                    let kind = Dyn.str ws "kind"
-                    let continuationId = Dyn.str ws "continuationId"
-
-                    if kind <> "" && continuationId <> "" then
-                        Some
-                            { Kind = kind
-                              ContinuationId = continuationId }
-                    else
-                        None)
+open Wanxiangshu.Hosts.Opencode.ChatHooksMessageIdDedup
 
 /// Append a continuation_host_accepted event recording that a user message
 /// was observed for the given continuation. Does not modify memory state.
@@ -133,9 +47,12 @@ let recordContinuationUserMessage
         do! appendEventsAndCacheOrFail workspaceRoot [ wanEvent ]
     }
 
-let private isSystemMessage (parts: obj) (fr: FallbackRuntimeStore) (sessionIDStr: string) (msgId: string) : bool =
-    match tryGetNonceFromParts parts with
-    | Some nonce ->
+/// Classify whether a chat.message hook payload is system-synthesised.
+/// Internal so the regression suite can bind directly to this entry
+/// point (mirroring the `static member internal isNaturalStop` pattern
+/// in NudgeTrigger) instead of re-encoding the rule in test fixtures.
+let internal isSystemMessage (parts: obj) (fr: FallbackRuntimeStore) (sessionIDStr: string) (msgId: string) : bool =
+    let consumeNudgeIfMatched (nonce: string) : bool =
         // Child subsession turn marker: ChatHooks resolves the host
         // receipt for SubsessionActor. Never forges TurnStarted from
         // the prompt Promise alone.
@@ -145,6 +62,10 @@ let private isSystemMessage (parts: obj) (fr: FallbackRuntimeStore) (sessionIDSt
             let activeNudgeNonce = fr.GetActiveNudgeNonce sessionIDStr
 
             if activeNudgeNonce <> "" && nonce = activeNudgeNonce then
+                // Consume the nonce now that the matching message has
+                // been observed. This decouples the nonce lifetime from
+                // the prompt() Promise in NudgeEffect.sendNudge.
+                let _ = fr.TryConsumeActiveNudgeNonce(sessionIDStr, nonce)
                 true
             else
                 match fr.TryGetPendingLease sessionIDStr with
@@ -156,7 +77,19 @@ let private isSystemMessage (parts: obj) (fr: FallbackRuntimeStore) (sessionIDSt
                     ->
                     true
                 | _ -> false
-    | None -> false
+
+    match tryGetNonceFromParts parts with
+    | Some nonce -> consumeNudgeIfMatched nonce
+    // Fallback continuation prompts carry namespaced provenance
+    // (`metadata.wanxiangshu.kind = "fallback_continuation"`) rather
+    // than a flat nonce. They must be recognised as system messages
+    // so they do not reset the human turn id or overwrite the
+    // SessionOwner (which must stay SessionOwner.Fallback until the
+    // continuation's terminal event fires).
+    | None ->
+        match tryGetWanxiangshuKind parts with
+        | Some kind when kind = "fallback_continuation" -> true
+        | _ -> false
 
 let private recordProvenanceIfPresent
     (parts: obj)
@@ -197,8 +130,6 @@ let chatMessageFor
             Wanxiangshu.Kernel.Primitives.Identity.Id.sessionIdQuick (sessionIdFromHookInput input "")
 
         let parts = partsFromHookOutput output
-        do! lifecycleObserver.handleChatMessage (sessionID, agent, parts)
-
         let msgObj = Dyn.get output "message"
         let msgId = if Dyn.isNullish msgObj then "" else Dyn.str msgObj "id"
 
@@ -207,11 +138,39 @@ let chatMessageFor
 
         let fr = lifecycleObserver.FallbackRuntime
 
-        let isSystem = isSystemMessage parts fr sessionIDStr msgId
+        // F-03: message-id dedup MUST happen before any side-effect that
+        // could cancel an active fallback lease (OnNewHumanMessage does
+        // exactly that). The previous ordering was:
+        //   1. handleChatMessage (progress)
+        //   2. isSystemMessage (may call TryConsumeActiveNudgeNonce)
+        //   3. OnNewHumanMessage (cancels active leases)
+        //   4. recordProvenanceIfPresent
+        // which meant a duplicate chat.message hook (the same message
+        // observed twice) would re-enter the human-turn machinery and
+        // trigger a second cancel of a fallback that may already have
+        // settled in the meantime.
+        //
+        // The new contract is: classify -> dedup -> bind dispatch ->
+        // record provenance -> tool overrides. The progress hook
+        // (handleChatMessage) is preserved at the top because it only
+        // touches the ProgressObserver stream, never the leases.
+        do! lifecycleObserver.handleChatMessage (sessionID, agent, parts)
 
-        if not isSystem then
-            let modelOpt = tryGetModelStringFromHook input output
-            do! lifecycleObserver.OnNewHumanMessage(sessionIDStr, agent, modelOpt, msgId)
+        // Step 1: classify
+        let isSystem = isSystemMessage parts fr sessionIDStr msgId
+        let messageRole = tryGetChatMessageRole output
+
+        // Step 2: dedup — drop the hook entirely if the host has already
+        // surfaced this exact message id. We still record provenance so
+        // a retry of a continuation does not lose the binding, but we
+        // never call OnNewHumanMessage twice.
+        let isDuplicate = msgId <> "" && markSeen sessionIDStr msgId
+
+        if not isDuplicate then
+            // Step 3: bind dispatch (only when this is a real user turn)
+            if not isSystem && messageRole = "user" then
+                let modelOpt = tryGetModelStringFromHook input output
+                do! lifecycleObserver.OnNewHumanMessage(sessionIDStr, agent, modelOpt, msgId)
 
         do! recordProvenanceIfPresent parts msgId lifecycleObserver.WorkspaceRoot sessionIDStr
 

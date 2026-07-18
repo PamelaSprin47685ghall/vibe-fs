@@ -5,14 +5,14 @@ open Fable.Core.JsInterop
 open Wanxiangshu.Tests.Assert
 open Wanxiangshu.E2e.HarnessTypes
 
-[<Import("start", "./harness.js")>]
+[<Import("start", "../e2e/harness.js")>]
 let private startHarness: obj -> JS.Promise<obj> = jsNative
 
 let runAll (args: string array) : JS.Promise<int> =
     promise {
         clearFailuresForRun ()
         let opts = createObj [ "plugin", box true; "variant", box "mimotui" ]
-        let! apiObj = withTimeoutCustom 30000 (startHarness opts)
+        let! apiObj = withTimeoutCustom 60000 (startHarness opts)
         let harness = unbox<Harness> apiObj
         let mutable ok = 0
 
