@@ -163,8 +163,21 @@ let createHandler
                     queue.Enqueue(fun () ->
                         handleEvent translator runtime configLookup executor workspaceRoot rawEvent pendingReview)
 
+                // F-01 fix: continuation intent execution MUST also be
+                // ordered through the same per-session SerialQueue so a
+                // late human message cannot interleave with the side
+                // effect of an intent decided one tick earlier.  The
+                // previous path ran executeContinuationIntent outside
+                // the queue, which is exactly the race the audit
+                // catalogues: the actor decides "send prompt" inside
+                // the queue, returns the intent, and then a fresh
+                // human message cancels the intent while the prompt is
+                // still being dispatched.
                 match intentOpt with
-                | Some intent -> do! executeContinuationIntent runtime executor workspaceRoot sessionID intent
+                | Some intent ->
+                    do!
+                        queue.Enqueue(fun () ->
+                            executeContinuationIntent runtime executor workspaceRoot sessionID intent)
                 | None -> ()
 
                 return result
