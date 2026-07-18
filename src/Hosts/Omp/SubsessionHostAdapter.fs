@@ -9,18 +9,61 @@ open Wanxiangshu.Runtime.Dyn
 open Wanxiangshu.Runtime.CommandProcessor
 open Wanxiangshu.Runtime.SubsessionPorts
 open Wanxiangshu.Runtime.SubsessionActor
+open Wanxiangshu.Runtime.SubsessionEventRouter
+open Wanxiangshu.Hosts.Omp.Codec
 open Wanxiangshu.Hosts.Omp.SubsessionDispatch
+open Wanxiangshu.Hosts.Omp.MessagingCodec
 open Wanxiangshu.Hosts.Omp.OmpSubsessionHostAdapterPrompts
+open Wanxiangshu.Kernel.Subsession.Types
 
 /// OMP serial prompt API: resolve means prompt entered the ordered stream
 /// (host-guaranteed barrier). Receipt is OrderedTurnMarkerObserved.
 ///
 /// Contract: current turn error/idle events NEVER arrive before session.prompt resolves.
 
-type OmpSubsessionHost(session: obj, agent: string, pi: obj) =
+type OmpSubsessionHost(session: obj, agent: string, pi: obj, workspaceRoot: string) =
     interface ISubsessionHost with
         member _.Dispatch(sessionId, turn) =
-            SubsessionDispatch.dispatch session agent sessionId turn
+            promise {
+                let! result = SubsessionDispatch.dispatch session agent sessionId turn
+
+                // OMP child session events are isolated; once prompt() resolves the
+                // turn is already finished.  Defer an evidence update and idle event
+                // so the supervisor's DispatchAccepted is queued first.
+                JS.setTimeout
+                    (fun () ->
+                        promise {
+                            let sm = Dyn.get session "sessionManager"
+
+                            if not (Dyn.isNullish sm) then
+                                let text =
+                                    match readAssistantText (unbox<ISessionManager> sm) 0 "\n\n" with
+                                    | Some t -> t
+                                    | None -> ""
+
+                                if text <> "" then
+                                    let evidence =
+                                        { CurrentTurnEvidence.empty with
+                                            Assistant = AssistantSnapshot("", 0L, text, Some NormalFinish)
+                                            Outcome = CompletionRequested text }
+
+                                    do!
+                                        SubsessionEventRouter.routeEvidence
+                                            workspaceRoot
+                                            (SessionId.value sessionId)
+                                            evidence
+                                        |> Promise.map ignore
+
+                            do!
+                                SubsessionEventRouter.tryIdle workspaceRoot (SessionId.value sessionId)
+                                |> Promise.map ignore
+                        }
+                        |> Promise.start)
+                    50
+                |> ignore
+
+                return result
+            }
 
         member _.Abort(sessionId, _turnId) =
             promise {
@@ -78,10 +121,21 @@ type OmpSubsessionHost(session: obj, agent: string, pi: obj) =
                             else
                                 let sm = Dyn.get session "sessionManager"
 
-                                if not (Dyn.isNullish sm) then
-                                    return Some(Dyn.get sm "messages")
-                                else
+                                if Dyn.isNullish sm then
                                     return None
+                                else
+                                    let getEntries = Dyn.get sm "getEntries"
+
+                                    let raw =
+                                        if Dyn.typeIs getEntries "function" then
+                                            Dyn.callMethod0 sm "getEntries"
+                                        else
+                                            Dyn.get sm "messages"
+
+                                    if Dyn.isArray raw then
+                                        return Some raw
+                                    else
+                                        return None
                         }
 
                     match dataOpt with
@@ -89,6 +143,7 @@ type OmpSubsessionHost(session: obj, agent: string, pi: obj) =
                         let msgs = unbox<obj array> data
                         let target = TurnId.value turnId
                         let mutable found = false
+                        let mutable anyUser = false
 
                         for msg in msgs do
                             let info = Dyn.get msg "info"
@@ -100,7 +155,20 @@ type OmpSubsessionHost(session: obj, agent: string, pi: obj) =
                                 if cId1 = target || cId2 = target then
                                     found <- true
 
-                        if found then
+                            let roleTarget =
+                                if Dyn.str msg "role" <> "" then
+                                    msg
+                                else
+                                    let m = Dyn.get msg "message"
+                                    if not (Dyn.isNullish m) then m else info
+
+                            if not (Dyn.isNullish roleTarget) then
+                                let role = (Dyn.str roleTarget "role").ToLowerInvariant()
+
+                                if role = "user" then
+                                    anyUser <- true
+
+                        if found || anyUser then
                             return DispatchStatus.Accepted OrderedTurnMarkerObserved
                         else
                             return DispatchStatus.Unknown
@@ -156,5 +224,5 @@ type OmpSubsessionHost(session: obj, agent: string, pi: obj) =
                             return StopUnknown
             }
 
-let createHost (session: obj) (agent: string) (pi: obj) : ISubsessionHost =
-    OmpSubsessionHost(session, agent, pi) :> ISubsessionHost
+let createHost (session: obj) (agent: string) (pi: obj) (workspaceRoot: string) : ISubsessionHost =
+    OmpSubsessionHost(session, agent, pi, workspaceRoot) :> ISubsessionHost

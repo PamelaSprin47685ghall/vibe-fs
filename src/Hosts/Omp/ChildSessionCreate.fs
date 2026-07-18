@@ -40,20 +40,16 @@ let buildCustomTools (pi: obj) (toolNames: string array) (customTools: obj array
         for t in customTools do
             myCustomTools.Add(t)
 
-    if Array.contains "return_reviewer" toolNames then
-        let parentExtension = Dyn.get pi "extension"
+    let registeredTools = Dyn.get pi "toolDefinitions"
 
-        if not (Dyn.isNullish parentExtension) then
-            let parentTools = Dyn.get parentExtension "tools"
+    if not (Dyn.isNullish registeredTools) && Dyn.isArray registeredTools then
+        let arr = unbox<obj array> registeredTools
 
-            if not (Dyn.isNullish parentTools) then
-                let entry = Dyn.callMethod1 parentTools "get" "return_reviewer"
+        for t in arr do
+            let name = Dyn.str t "name"
 
-                if not (Dyn.isNullish entry) then
-                    let def = Dyn.get entry "definition"
-
-                    if not (Dyn.isNullish def) then
-                        myCustomTools.Add(def)
+            if name <> "" && Array.contains name toolNames then
+                myCustomTools.Add(t)
 
     myCustomTools.ToArray()
 

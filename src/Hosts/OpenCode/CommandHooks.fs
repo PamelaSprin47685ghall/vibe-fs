@@ -74,14 +74,13 @@ let commandExecuteBefore
         if command = "loop" then
             let sessionID = sessionIdFromHookInput input ""
             let task = (commandArgumentsFromHookInput input).Trim()
-            let parts = ResizeArray<obj>()
+            let parts = unbox<ResizeArray<obj>>(partsFromHookOutput output)
+            parts.Clear()
             let directory = pluginDirectoryFromCtx ctx
             scope.TriggerInit(directory)
             do! scope.WaitInit()
 
             do! handleLoopCommand childAgentRegistry ctx reviewStore directory sessionID task parts
-
-            setHookParts output (box parts)
     }
 
 /// Register /loop command template in the opencode config.

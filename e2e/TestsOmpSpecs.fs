@@ -31,6 +31,5 @@ let testSpecs (h: OmpHarness) (ok: int ref) : JS.Promise<unit> =
         do! runOmpTodowrite h chk sessionId
         do! runOmpLoopCommand h chk sessionId
         do! runOmpReview h chk sessionId
-        do! runOmpLoopReview h chk sessionId
         do! runOmpShutdown h chk sessionId
     }

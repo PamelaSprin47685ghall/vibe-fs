@@ -50,6 +50,9 @@ let private wrapRegisterToolForSchema (pi: obj) : unit =
     if Dyn.isNullish original || not (Dyn.typeIs original "function") then
         ()
     else
+        let defs = ResizeArray<obj>()
+        pi?toolDefinitions <- box defs
+
         pi?registerTool <-
             box (fun (toolDef: obj) ->
                 let name = Dyn.str toolDef "name"
@@ -59,6 +62,9 @@ let private wrapRegisterToolForSchema (pi: obj) : unit =
 
                     if not (Dyn.isNullish parameters) then
                         registerSchemaTypes name parameters
+
+                    if not (Dyn.isNullish toolDef) then
+                        defs.Add(toolDef)
 
                 Dyn.callWithThis1 original pi toolDef)
 
@@ -126,7 +132,7 @@ let pluginFor (pi: obj) : JS.Promise<unit> =
         let directory = Dyn.str pi "directory"
 
         let hostFactory (_sid: string) : ISubsessionHost =
-            Wanxiangshu.Hosts.Omp.SubsessionHostAdapter.createHost null "" pi
+            Wanxiangshu.Hosts.Omp.SubsessionHostAdapter.createHost null "" pi directory
 
         do!
             Wanxiangshu.Runtime.SubsessionReconcile.reconcileUnfinishedRuns directory (Some hostFactory)

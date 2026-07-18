@@ -91,8 +91,7 @@ let runReviewLoop
         let resolvedPromise, resolveReview = createDeferred ()
         let! child = createChildSession scope pi ctx ompReviewChildToolNames None [||] None
         let childSession = child.session
-        let childCtx = createObj [ "sessionManager", Dyn.get childSession "sessionManager" ]
-        let childId = getSessionIdFromContext childCtx |> Option.defaultValue ""
+        let childId = child.childId
 
         let cleanupChild () =
             detachReviewChild store parentId childId
@@ -132,8 +131,7 @@ let runPreReviewerSession
                 let resolvedPromise, resolveReview = createDeferred ()
                 let! child = createChildSession scope pi ctx ompReviewChildToolNames None [||] None
                 let childSession = child.session
-                let childCtx = createObj [ "sessionManager", Dyn.get childSession "sessionManager" ]
-                let childId = getSessionIdFromContext childCtx |> Option.defaultValue ""
+                let childId = child.childId
 
                 let cleanupChild () =
                     detachReviewChild store parentId childId

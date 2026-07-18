@@ -93,13 +93,18 @@ let runServePluginChecks
             (historyLoop.Contains "With-Review Mode is active"
              || ndLoopText.Contains "loop_activated")
 
-        let! cancelRes = withTimeout (harness.runSessionCommand sessionID "loop" "" emptyObj)
+        let! cancelRes =
+            withTimeoutL
+                "serve loop cancel"
+                10000
+                (harness.runSessionCommand sessionID "loop" "" emptyObj)
 
         let cancelData = unbox<obj> cancelRes
         chk "e2e.serve.loop.cancel.ok" (cancelData?ok = true)
-        let! ndAfterCancel = withTimeout (harness.readNdjson ())
+        let! ndAfterCancel = withTimeoutL "serve loop cancel ndjson" 5000 (harness.readNdjson ())
         chk "e2e.serve.loop.cancel.ndjson" (ndAfterCancel.Contains "loop_cancelled")
-        let! msgsAfterCancel = withTimeout (harness.getMessages sessionID emptyObj)
+        let! msgsAfterCancel =
+            withTimeoutL "serve loop cancel messages" 5000 (harness.getMessages sessionID emptyObj)
         let historyCancel = harness.allMessagesText (unbox<obj> msgsAfterCancel)
 
         chk
@@ -152,12 +157,12 @@ let runServePluginChecks
         chk "e2e.serve.todowrite.tool-called" (containsTool harness todoToolName)
 
         for c in 1..2 do
-            let! _ = withTimeout (harness.waitForNdjson c 1000)
+            let! _ = withTimeoutL "serve todowrite ndjson" 5000 (harness.waitForNdjson c 1000)
             ()
 
         let! ndTodo = Promise.lift true
         chk "e2e.serve.todowrite.ndjson" ndTodo
-        let! ndTodoText = withTimeout (harness.readNdjson ())
+        let! ndTodoText = withTimeoutL "serve todowrite ndjson read" 5000 (harness.readNdjson ())
         chk "e2e.serve.todowrite.work-backlog" (ndTodoText.Contains "work_backlog_committed")
 
         // --- E2E Test: Todo soft-required validation (short fields should not be rejected, but trigger criticism) ---

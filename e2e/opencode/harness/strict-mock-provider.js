@@ -157,6 +157,8 @@ export class StrictMockProvider {
       }
       // Legacy non-strict mode: auto-respond with plain text so old F#
       // integration suites that do not queue every request can still run.
+      // Record the request so assertions can inspect tool results.
+      s.requests.push(parsed);
       return sendSSE(res, buildTextChunks(`auto_${Date.now()}`, 'ok', 1));
     }
     const exp = s.expectations[0];
@@ -165,11 +167,14 @@ export class StrictMockProvider {
       if (s.strict) {
         return this._recordUnexpected(res, parsed, 'request-after-no-more-requests-boundary');
       }
+      // Record the request so assertions can inspect tool results.
+      s.requests.push(parsed);
       return sendSSE(res, buildTextChunks(`auto_${Date.now()}`, 'ok', 1));
     }
     if (!matchesExpectation(parsed, exp)) {
       if (s.strict) return this._recordUnexpected(res, parsed, `expectation-mismatch:${exp.id}`);
       console.error(`[MOCK-MISMATCH] expected=${exp.id} tools=${JSON.stringify(extractToolNames(parsed))}`);
+      s.requests.push(parsed);
       s.expectations.shift();
       return this._respond(res, exp, parsed);
     }

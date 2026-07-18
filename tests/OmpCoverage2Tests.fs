@@ -67,7 +67,7 @@ let toolCallHandler_missingWarnTddBlocks () =
         check "missing warn_tdd does not block" (Dyn.isNullish result)
         let comp = Wanxiangshu.Runtime.ToolHookRuntime.tryGetCompliance "s1" "c1"
         check "missing warn_tdd has compliance entry" comp.IsSome
-        check "compliance entry has no violations (optimistic)" (comp.Value.Violations.IsEmpty)
+        check "compliance entry has violations" (not comp.Value.Violations.IsEmpty)
     }
 
 let toolCallHandler_childOnlyToolBlockedInMainSession () =
@@ -116,7 +116,7 @@ let toolCallHandler_childSessionCoderMissingWarnTddBlocked () =
         check "child session coder without warn_tdd does not block" (Dyn.isNullish result)
         let comp = Wanxiangshu.Runtime.ToolHookRuntime.tryGetCompliance childId "c1"
         check "missing warn_tdd child session has compliance entry" comp.IsSome
-        check "compliance entry child session has no violations (optimistic)" (comp.Value.Violations.IsEmpty)
+        check "compliance entry child session has violations" (not comp.Value.Violations.IsEmpty)
         Wanxiangshu.Hosts.Omp.ChildSession.unmarkChildSession scope childId
     }
 
@@ -136,7 +136,7 @@ let toolCallHandler_childSessionExecutorMissingWarnBlocked () =
         check "child session executor without warn does not block" (Dyn.isNullish result)
         let comp = Wanxiangshu.Runtime.ToolHookRuntime.tryGetCompliance childId "c1"
         check "missing warn child session has compliance entry" comp.IsSome
-        check "compliance entry child session executor has no violations (optimistic)" (comp.Value.Violations.IsEmpty)
+        check "compliance entry child session executor has violations" (not comp.Value.Violations.IsEmpty)
         Wanxiangshu.Hosts.Omp.ChildSession.unmarkChildSession scope childId
     }
 

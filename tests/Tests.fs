@@ -202,6 +202,8 @@ let runAll (args: string array) : JS.Promise<int> =
                 || (label = "OmpExecutorToolsTests.run")
 
             for (label, body) in runnableTests do
+                printfn "[RUN] %s" label
+
                 match body with
                 | Sync f -> timed label f
                 | Async f ->

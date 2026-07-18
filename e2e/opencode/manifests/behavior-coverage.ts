@@ -25,7 +25,7 @@ export interface CoverageEntry {
 export const COVERAGE: Record<string, CoverageEntry[]> = {
   bootstrap: [
     { id: "OC-BOOT-001", description: "opencode serve starts with plugin loaded", level: "real-e2e", spec: "e2e/opencode/specs/p0-canary-tests-basics.js", priority: "P0", test: "OC-BOOT-001 opencode serve starts with plugin loaded" },
-    { id: "OC-BOOT-002", description: "/command lists loop, loop-review", level: "not-covered", priority: "P0", note: "demoted from real-e2e: no matching spec/test yet" },
+    { id: "OC-BOOT-002", description: "/command lists loop", level: "not-covered", priority: "P0", note: "demoted from real-e2e: no matching spec/test yet" },
     { id: "OC-BOOT-003", description: "LLM request includes all registered tools", level: "not-covered", priority: "P0" },
     { id: "OC-BOOT-004", description: "No plugin = baseline with no custom tools/commands", level: "not-covered", priority: "P0" },
     { id: "OC-BOOT-005", description: "Bad plugin path = stderr diagnostic", level: "not-covered", priority: "P0" },

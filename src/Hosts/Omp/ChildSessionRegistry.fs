@@ -34,10 +34,13 @@ let runSubagentOnExistingSession
                 let s = Dyn.get ctx "sessionId"
                 if Dyn.isNullish s then "" else string s
 
+            let root = Dyn.str ctx "cwd"
+
             let! text =
                 Wanxiangshu.Hosts.Omp.SubagentRuntime.runOmpSubagentCore
                     fallbackRuntime
                     fallbackConfigOpt
+                    root
                     childId
                     session
                     prompt

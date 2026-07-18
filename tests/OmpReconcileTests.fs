@@ -40,7 +40,7 @@ let ompReconciliationClosesZombieSessions () =
         let pi = createObj [ "directory", box root; "session", box sessionApi ]
 
         let hostFactory (_sid: string) =
-            Wanxiangshu.Hosts.Omp.SubsessionHostAdapter.createHost null "" pi
+            Wanxiangshu.Hosts.Omp.SubsessionHostAdapter.createHost null "" pi root
 
         let! _ = Wanxiangshu.Runtime.SubsessionReconcile.reconcileUnfinishedRuns root (Some hostFactory)
 

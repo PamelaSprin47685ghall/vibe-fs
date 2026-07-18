@@ -110,6 +110,7 @@ let private readSuccessText (sm: ISessionManager) (startCount: int) : string =
 let runOmpSubagentCore
     (fallbackRuntime: FallbackRuntimeStore)
     (fallbackConfigOpt: FallbackConfig option)
+    (root: string)
     (childId: string)
     (session: obj)
     (prompt: string)
@@ -124,11 +125,22 @@ let runOmpSubagentCore
         let (cfg, agentName, _, directive) =
             resolveChainAndDirective fallbackRuntime fallbackConfigOpt childId parentSessionId
 
-        let hostFactory (_sid: string) = createHost session agentName pi
+        let workspaceRoot =
+            if root <> "" then
+                root
+            else
+                let fromSession = Dyn.str session "cwd"
 
-        let root = Wanxiangshu.Hosts.Omp.MagicTodo.workspaceRoot
-        let eventStoreFactory (_sid: string) = create root
-        let service = SubsessionService(root, hostFactory, eventStoreFactory)
+                if fromSession <> "" then
+                    fromSession
+                else
+                    let fromPi = Dyn.str pi "workspaceRoot"
+                    if fromPi <> "" then fromPi else Dyn.str pi "cwd"
+
+        let hostFactory (_sid: string) = createHost session agentName pi workspaceRoot
+
+        let eventStoreFactory (_sid: string) = create workspaceRoot
+        let service = SubsessionService(workspaceRoot, hostFactory, eventStoreFactory)
 
         try
             let! runResult =

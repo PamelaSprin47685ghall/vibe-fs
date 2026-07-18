@@ -5,8 +5,11 @@ type WarnTdd = | IAmSureIHaveFollowedTddAndKolmogorovPrinciples
 let canonicalValue =
     "i-am-sure-i-have-followed-tdd-and-kolmogorov-principles-and-kept-todo-updated"
 
+let private matchesCanonical (canonical: string) (s: string) : bool =
+    if isNull s then false else s.Trim().ToLowerInvariant() = canonical
+
 let parseWarnTdd (s: string) : WarnTdd option =
-    if not (System.String.IsNullOrWhiteSpace s) then
+    if matchesCanonical canonicalValue s then
         Some IAmSureIHaveFollowedTddAndKolmogorovPrinciples
     else
         None
@@ -40,7 +43,7 @@ let warnCanonicalValue =
     "it-is-not-possible-to-do-it-using-other-tools-and-only-run-tests-when-static-analysis-cannot-handle-it"
 
 let parseWarn (s: string) : bool =
-    not (System.String.IsNullOrWhiteSpace s)
+    matchesCanonical warnCanonicalValue s
 
 let warnRequiredTools: Set<string> =
     Set.ofList [ "executor"; "pty_spawn"; "pty_write"; "pty_read"; "pty_list"; "pty_kill" ]
@@ -64,7 +67,7 @@ let warnReuseCanonicalValue =
     "this-task-is-not-suitable-to-be-completed-via-continue-tool"
 
 let parseWarnReuse (s: string) : bool =
-    not (System.String.IsNullOrWhiteSpace s)
+    matchesCanonical warnReuseCanonicalValue s
 
 let subagentTools: Set<string> =
     Set.ofList [ "coder"; "inspector"; "meditator"; "browser" ]

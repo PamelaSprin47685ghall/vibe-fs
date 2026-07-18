@@ -84,7 +84,7 @@ async function executeOmpTool(ex: any, workdir: string, cmd: any) {
 	const toolCallId = cmd.toolCallId ?? 'call-' + Date.now();
 	const sessionId = cmd.sessionId || 'omp-e2e-session';
 	const finalWorkdir = ensureSandbox(workdir, sessionId);
-	const toolCtx = createStubExtensionContext(finalWorkdir, sessionId);
+	const toolCtx = createOmpContext(workdir, sessionId);
 	let result: unknown, threw = true;
 	try {
 		const callArgs = [toolCallId, cmd.params, undefined, onUpdate, toolCtx];

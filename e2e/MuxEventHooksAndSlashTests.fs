@@ -251,21 +251,8 @@ let runRest
                     [ "report", box "final description"
                       "affectedFiles", box [||]
                       "wip", box false ])
-                (fun r -> r.Contains "With-Review Mode is still active")
+                (fun r -> r.Contains "With-Review Mode remains active")
                 "mux.execute.submit_review.wip_false.needs_revision"
-
-        let! _ = withTimeout (harness.runSlashCommand "loop" "mux-e2e-session" "") // deactivate
-
-        // --- 6b. Slash command: /loop-review --------------------------------
-        harness.setMockReportMarkdown "PERFECT: precheck passed without revisions"
-        let! loopRevRes1 = withTimeout (harness.runSlashCommand "loop-review" "mux-e2e-session" "implement task Alpha")
-        chk "mux.slash.loop-review.accepted" (loopRevRes1.Contains "Pre-review passed")
-
-        let! _ = withTimeout (harness.runSlashCommand "loop" "mux-e2e-session" "") // deactivate
-
-        harness.setMockReportMarkdown "REVISE: precheck requires clarifying objectives"
-        let! loopRevRes2 = withTimeout (harness.runSlashCommand "loop-review" "mux-e2e-session" "implement task Beta")
-        chk "mux.slash.loop-review.needs_revision" (loopRevRes2.Contains "Pre-review feedback")
 
         let! _ = withTimeout (harness.runSlashCommand "loop" "mux-e2e-session" "") // deactivate
 

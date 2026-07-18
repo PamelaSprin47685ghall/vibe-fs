@@ -108,7 +108,7 @@ let decodeTodoWriteArgs (isTask: bool) (args: obj) : Result<TodoWriteArgs * stri
 
             let viol =
                 if trimmed.Length < reportMinLength then
-                    Some(sprintf "%s must be at least %d characters" k reportMinLength)
+                    Some(sprintf "%s: expected at least %d characters" k reportMinLength)
                 else
                     None
 

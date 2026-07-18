@@ -86,9 +86,13 @@ let setupChildEnvironment
         let wrapper = unbox<IAgentSessionWrapper> wrapperObj
         let session = wrapper.session
 
+        let activeSM =
+            let childSM = Dyn.get session "sessionManager"
+            if not (Dyn.isNullish childSM) then childSM else sessionManager
+
         let childId =
-            if Dyn.typeIs (Dyn.get sessionManager "getSessionId") "function" then
-                let id: obj = sessionManager?getSessionId ()
+            if Dyn.typeIs (Dyn.get activeSM "getSessionId") "function" then
+                let id: obj = activeSM?getSessionId ()
                 if Dyn.isNullish id then "" else string id
             else
                 ""
@@ -152,6 +156,7 @@ let runSubagentWithId
         let! child = createChildSession scope pi ctx toolNames None [||] modelOverride
         let session = child.session
         let childId = child.childId
+        let root = Dyn.str ctx "cwd"
 
         if childId <> "" then
             setupSubagentSession scope sessionId childId session prompt defaultChain fallbackRuntime
@@ -160,6 +165,7 @@ let runSubagentWithId
             runOmpSubagentCore
                 fallbackRuntime
                 fallbackConfigOpt
+                root
                 childId
                 session
                 prompt

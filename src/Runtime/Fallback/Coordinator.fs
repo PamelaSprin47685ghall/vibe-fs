@@ -38,24 +38,13 @@ let handleFallbackTransition
     promise {
         let state = runtime.GetOrCreateState sessionID
 
-        printfn
-            "[FBT] %s event %A lifecycle %A phase %A matched %b"
-            sessionID
-            evt
-            state.Lifecycle
-            state.Phase
-            isMatchedContinuation
-
         let cfg = configLookup ((runtime.GetSession sessionID).AgentName)
         let! chain = resolveChain runtime executor cfg sessionID ((runtime.GetSession sessionID).AgentName)
-        printfn "[FBT] %s chain len %d" sessionID (List.length chain)
 
         if List.isEmpty chain && not isMatchedContinuation then
-            printfn "[FBT] %s no chain/match -> no op" sessionID
             return { Consumed = false; State = state }, None
         else
             let ns, action = transition state evt cfg chain
-            printfn "[FBT] %s action %A ns lifecycle %A phase %A" sessionID action ns.Lifecycle ns.Phase
 
             let isAborting =
                 match evt with
@@ -98,8 +87,6 @@ let handleEvent
 
         let! eventOpt, eventTurnIdOpt, isMatchedContinuation =
             extractEventContext translator executor runtime sessionID rawEvent pendingReview
-
-        printfn "[HE] %s eventOpt %A turn %A matched %b" sessionID eventOpt eventTurnIdOpt isMatchedContinuation
 
         match eventOpt with
         | None ->
@@ -180,7 +167,7 @@ let createHandler
                 | Some intent ->
                     executeContinuationIntent runtime executor workspaceRoot sessionID intent
                     |> Promise.catch (fun ex ->
-                        printfn "fallback continuation effect failed for %s: %s" sessionID ex.Message)
+                        JS.console.error ("fallback continuation effect failed for " + sessionID + ": " + ex.Message))
                     |> Promise.start
                     |> ignore
                 | None -> ()

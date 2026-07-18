@@ -66,17 +66,10 @@ let runOmpReview (h: OmpHarness) (chk: string -> bool -> unit) (sessionId: strin
 
         chk
             "e2e-omp.submit_review.wip_true.success"
-            (wipStr.Contains "Your progress report was recorded"
+            (wipStr.Contains "Your progress report was saved successfully"
              && not (wipStr.Contains "error"))
 
         do! h.expectTool "return_reviewer" (box {| verdict = "PERFECT"; feedback = "" |})
-
-        do!
-            h.expectTool
-                "return_reviewer"
-                (box
-                    {| verdict = "REVISE"
-                       feedback = "precheck requires details" |})
 
         let! submitFinalRes =
             withTimeout (
@@ -98,18 +91,6 @@ let runOmpReview (h: OmpHarness) (chk: string -> bool -> unit) (sessionId: strin
              && not (finalStr.Contains "error"))
 
         do! yieldMicrotask ()
-    }
-
-let runOmpLoopReview (h: OmpHarness) (chk: string -> bool -> unit) (sessionId: string) =
-    promise {
-        let! _ = withTimeout (h.runCommand "loop-review" "implement task Y" sessionId)
-
-        for c in 1..5 do
-            let! _ = withTimeout (h.waitForNdjson c 1000)
-            ()
-
-        let! ndLines = withTimeout (h.readNdjson ())
-        chk "e2e-omp.cmd.loop-review.success" (ndLines.Contains "implement task Y")
     }
 
 let runOmpShutdown (h: OmpHarness) (chk: string -> bool -> unit) (sessionId: string) =

@@ -129,10 +129,7 @@ let runAll (args: string array) : JS.Promise<int> =
             "mux.reg.slashCommands.hasLoop"
             (let cmds: obj[] = unbox<obj[]> slashCommands in cmds |> Array.exists (fun c -> dynStr c "key" = "loop"))
 
-        chk
-            "mux.reg.slashCommands.hasLoopReview"
-            (let cmds: obj[] = unbox<obj[]> slashCommands in
-             cmds |> Array.exists (fun c -> dynStr c "key" = "loop-review"))
+
 
         // --- 2. Tool schemas -------------------------------------------------
         let propsWrite = toolSchemaProperties harness "write"

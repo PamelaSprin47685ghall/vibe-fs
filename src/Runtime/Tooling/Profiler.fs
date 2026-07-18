@@ -14,7 +14,18 @@ let start () =
 
         session?connect ()
         session?post ("Profiler.enable", (fun () -> session?post ("Profiler.start")))
-        session?post ("HeapProfiler.enable", (fun () -> session?post ("HeapProfiler.startSampling")))
+
+        try
+            session?post (
+                "HeapProfiler.enable",
+                (fun () ->
+                    try
+                        session?post ("HeapProfiler.startSampling")
+                    with _ ->
+                        ())
+            )
+        with _ ->
+            JS.console.warn ("HeapProfiler not available; skipping heap profile")
 
         activeSession <- Some session
 

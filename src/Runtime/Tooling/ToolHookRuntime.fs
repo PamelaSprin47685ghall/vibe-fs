@@ -210,6 +210,23 @@ let executeBeforeGateway (tool: string) (args: obj) : Result<obj * ControlEnvelo
         let warnTddVal, warnVal, warnReuseVal = extractControlFields args
         let hasControlFields = warnTddVal.IsSome || warnVal.IsSome || warnReuseVal.IsSome
 
+        let validWarnTdd =
+            warnTddVal |> Option.bind parseWarnTdd |> Option.isSome
+
+        let validWarn =
+            warnVal |> Option.map parseWarn |> Option.defaultValue false
+
+        let validWarnReuse =
+            warnReuseVal |> Option.map parseWarnReuse |> Option.defaultValue false
+
+        let violations =
+            [ if List.contains ToolArgumentCoercion.ToolCapability.FileMutation caps && not validWarnTdd then
+                  "warn_tdd: missing required acknowledgement"
+              if List.contains ToolArgumentCoercion.ToolCapability.ProcessExecution caps && not validWarn then
+                  "warn: missing required acknowledgement"
+              if List.contains ToolArgumentCoercion.ToolCapability.SubagentDelegation caps && not validWarnReuse then
+                  "warn_reuse: missing required acknowledgement" ]
+
         let nextArgs =
             if not caps.IsEmpty || hasControlFields then
                 Dyn.cloneShallow args
@@ -220,7 +237,7 @@ let executeBeforeGateway (tool: string) (args: obj) : Result<obj * ControlEnvelo
             { WarnTdd = warnTddVal
               Warn = warnVal
               WarnReuse = warnReuseVal
-              Violations = []
+              Violations = violations
               GenerationAtStart = 0
               SessionId = "" }
 

@@ -230,7 +230,7 @@ let private opencodeQuiescenceStopped () =
 
 let private ompQuiescenceHonestUnknown () =
     promise {
-        let host = OmpHost.createHost (createEmpty ()) "" (createEmpty ())
+        let host = OmpHost.createHost (createEmpty ()) "" (createEmpty ()) ""
         let! status = host.QuerySessionQuiescence(SessionId.create "s", TurnId.create "t")
         equal "OMP quiescence is StopUnknown" StopUnknown status
     }

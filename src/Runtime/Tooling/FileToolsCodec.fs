@@ -15,7 +15,9 @@ type ReadArgs =
 type WriteArgs = { FilePath: string; Content: string }
 
 let decodeReadArgs (args: obj) : Result<ReadArgs, DomainError> =
-    match strField args "path" with
+    let path = strField args "path" |> Option.orElse (strField args "filePath")
+
+    match path with
     | None -> Error(InvalidIntent("read", "path", "read path required"))
     | Some path when System.String.IsNullOrWhiteSpace path -> Error(InvalidIntent("read", "path", "read path required"))
     | Some path ->
@@ -31,12 +33,14 @@ let readArgsForHost (decoded: ReadArgs) : obj =
     createObj (fields.ToArray())
 
 let decodeWriteArgs (args: obj) : Result<WriteArgs, DomainError> =
-    if not (hasField args "file_path") then
+    let filePathOpt = strField args "file_path" |> Option.orElse (strField args "filePath")
+
+    if filePathOpt.IsNone then
         Error(InvalidIntent("write", "file_path", "missing required parameter"))
     elif not (hasField args "content") then
         Error(InvalidIntent("write", "content", "missing required parameter"))
     else
-        let filePath = defaultArg (strField args "file_path") ""
+        let filePath = defaultArg filePathOpt ""
         let content = defaultArg (strField args "content") ""
 
         if System.String.IsNullOrWhiteSpace filePath then
