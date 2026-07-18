@@ -38,6 +38,80 @@ type ProgressObserver
 
     let resolvedUnitPromise () : JS.Promise<unit> = Promise.lift ()
 
+    let handleTodoWriteAfter (input: obj) (output: obj) : JS.Promise<unit> =
+        promise {
+            let methodologies = selectMethodologiesFromHookArgs (argsFromHookInput input)
+
+            let isError =
+                hookOutputError output <> ""
+                || ToolExecute.isNetworkErrorText (hookOutputText output)
+
+            match hookOutputString output with
+            | Some oldText ->
+                if not isError then
+                    let newBase = todoWriteOutput methodologies
+
+                    let finalOutput =
+                        let markerIdx = oldText.IndexOf(ToolHookRuntime.reprimandMarker)
+
+                        if markerIdx >= 0 then
+                            newBase + oldText.Substring(markerIdx)
+                        else
+                            newBase
+
+                    setHookOutputString output finalOutput
+
+                let directory =
+                    (fromOpencode input (pluginDirectoryFromCtx ctx)).Execution.Directory
+
+                let sid = sessionIdFromHookInput input ""
+                let args = argsFromHookInput input
+
+                if not (Dyn.isNullish args) && not isError then
+                    match decodeTodoWriteArgs (host = Mimocode) args with
+                    | Ok(decodedArgs, []) when sid <> "" ->
+                        do! appendWorkBacklogCommittedOrFail directory sid decodedArgs
+
+                        let allCompleted =
+                            decodedArgs.Todos
+                            |> Array.forall (fun t -> Wanxiangshu.Kernel.ToolArgs.TodoItemStatus.isTerminal t.Status)
+
+                        let ev =
+                            { CurrentTurnEvidence.empty with
+                                Todos = if allCompleted then TodosCompleted else TodosNotCompleted }
+
+                        do! SubsessionEventRouter.routeEvidence directory sid ev |> Promise.map ignore
+                    | _ -> ()
+            | None -> ()
+        }
+
+    let handleTaskCompleteAfter (input: obj) : JS.Promise<unit> =
+        promise {
+            let sid = sessionIdFromHookInput input ""
+
+            if sid <> "" then
+                let args = argsFromHookInput input
+                let output = if Dyn.isNullish args then "" else Dyn.str args "output"
+
+                let evidence =
+                    { CurrentTurnEvidence.empty with
+                        Outcome = CompletionRequested output }
+
+                let directory =
+                    (fromOpencode input (pluginDirectoryFromCtx ctx)).Execution.Directory
+
+                let! _ = SubsessionEventRouter.routeEvidence directory sid evidence
+
+                let st = fallbackRuntime.GetOrCreateState sid
+
+                fallbackRuntime.Update(
+                    sid,
+                    setCore
+                        { st with
+                            Lifecycle = FallbackLifecycle.TaskComplete }
+                )
+        }
+
     member _.OnChatMessage
         (sessionID: Wanxiangshu.Kernel.Primitives.Identity.SessionId, agent: string, parts: obj)
         : JS.Promise<unit> =
@@ -51,77 +125,10 @@ type ProgressObserver
 
     member _.HandleToolExecuteAfter (input: obj) (output: obj) : JS.Promise<unit> =
         promise {
-            let sessionIDStr = sessionIdFromHookInput input ""
             let tool = normalizeToolName host (toolNameFromHookInput input)
 
             if tool = todoWriteToolName host then
-                let methodologies = selectMethodologiesFromHookArgs (argsFromHookInput input)
-
-                let isError =
-                    hookOutputError output <> ""
-                    || ToolExecute.isNetworkErrorText (hookOutputText output)
-
-                match hookOutputString output with
-                | Some oldText ->
-                    if not isError then
-                        let newBase = todoWriteOutput methodologies
-
-                        let finalOutput =
-                            let markerIdx = oldText.IndexOf(ToolHookRuntime.reprimandMarker)
-
-                            if markerIdx >= 0 then
-                                newBase + oldText.Substring(markerIdx)
-                            else
-                                newBase
-
-                        setHookOutputString output finalOutput
-
-                    let directory =
-                        (fromOpencode input (pluginDirectoryFromCtx ctx)).Execution.Directory
-
-                    let sid = sessionIdFromHookInput input ""
-
-                    let args = argsFromHookInput input
-
-                    if not (Dyn.isNullish args) && not isError then
-                        match decodeTodoWriteArgs (host = Mimocode) args with
-                        | Ok(decodedArgs, []) when sid <> "" ->
-                            do! appendWorkBacklogCommittedOrFail directory sid decodedArgs
-
-                            let allCompleted =
-                                decodedArgs.Todos
-                                |> Array.forall (fun t ->
-                                    Wanxiangshu.Kernel.ToolArgs.TodoItemStatus.isTerminal t.Status)
-
-                            let ev =
-                                { CurrentTurnEvidence.empty with
-                                    Todos = if allCompleted then TodosCompleted else TodosNotCompleted }
-
-                            do! SubsessionEventRouter.routeEvidence directory sid ev |> Promise.map ignore
-                        | _ -> ()
-                | None -> ()
+                do! handleTodoWriteAfter input output
             elif tool = "task_complete" then
-                let sid = sessionIdFromHookInput input ""
-
-                if sid <> "" then
-                    let args = argsFromHookInput input
-                    let output = if Dyn.isNullish args then "" else Dyn.str args "output"
-
-                    let evidence =
-                        { CurrentTurnEvidence.empty with
-                            Outcome = CompletionRequested output }
-
-                    let directory =
-                        (fromOpencode input (pluginDirectoryFromCtx ctx)).Execution.Directory
-
-                    let! _ = SubsessionEventRouter.routeEvidence directory sid evidence
-
-                    let st = fallbackRuntime.GetOrCreateState sid
-
-                    fallbackRuntime.Update(
-                        sid,
-                        setCore
-                            { st with
-                                Lifecycle = FallbackLifecycle.TaskComplete }
-                    )
+                do! handleTaskCompleteAfter input
         }
