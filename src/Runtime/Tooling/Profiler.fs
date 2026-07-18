@@ -61,14 +61,3 @@ let stopAndSave () =
                 )
         )
     | None -> ()
-
-let mutable private initialized = false
-
-let initGlobal () =
-    if not initialized then
-        initialized <- true
-
-        start ()
-
-        // exit handler cannot run async inspector callbacks; save on a fixed timer instead
-        JS.setTimeout stopAndSave (5 * 60 * 1000) |> ignore
