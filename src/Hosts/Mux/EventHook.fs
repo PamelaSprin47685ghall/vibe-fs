@@ -15,11 +15,14 @@ open Wanxiangshu.Runtime.EventLogRuntime
 open Wanxiangshu.Runtime.ReviewRuntime
 open Wanxiangshu.Runtime.RuntimeScope
 open Wanxiangshu.Hosts.Mux.Fallback.Hook
+open Wanxiangshu.Hosts.Mux.EventHookCleanup
 open Wanxiangshu.Runtime.SubsessionEventRouter
 open Wanxiangshu.Runtime.SubsessionChildObserver
 open Wanxiangshu.Kernel.Subsession.Types
 open Wanxiangshu.Runtime.SubsessionActorRegistry
 open Wanxiangshu.Runtime.SubsessionEventStore
+open Wanxiangshu.Runtime.Dispatch
+open Wanxiangshu.Runtime.SubsessionPendingEvidence
 
 type private DecodedHookEvent =
     { eventType: string
@@ -97,13 +100,7 @@ let private shouldObserveMuxEvent (eventType: string) : bool =
 // ---------------------------------------------------------------------------
 
 let private handleSessionClosed (directory: string) (workspaceId: string) (event: obj) : JS.Promise<unit> =
-    promise {
-        let sid = SessionId.create workspaceId
-        let eventStore = SubsessionEventStore.create directory
-        do! eventStore.Append(sid, [ PhysicalSessionClosed sid ]) |> Promise.map ignore
-        SubsessionActorRegistry.ClearPoison directory workspaceId
-        SubsessionActorRegistry.Remove directory workspaceId
-    }
+    Wanxiangshu.Hosts.Mux.EventHookCleanup.handleSessionClosed directory workspaceId
 
 // ---------------------------------------------------------------------------
 // Extracted helpers for child-session routing

@@ -14,10 +14,7 @@ open Wanxiangshu.Runtime.ToolRuntimeContext
 open Wanxiangshu.Kernel.Primitives.Identity
 open Wanxiangshu.Kernel.Errors.DomainError
 open Wanxiangshu.Kernel.Session.Causality
-open Wanxiangshu.Runtime.Dyn
-
-module Dyn = Wanxiangshu.Runtime.Dyn
-
+open Wanxiangshu.Kernel.FallbackKernel.Types
 open Wanxiangshu.Runtime.OpencodeClientCodec
 open Wanxiangshu.Runtime.OpencodeSessionEventCodec
 open Wanxiangshu.Runtime.ErrorClassify
@@ -28,56 +25,11 @@ open Wanxiangshu.Runtime.NudgeFlow
 open Wanxiangshu.Runtime.NudgeModelResolver
 open Wanxiangshu.Runtime.Fallback.RuntimeStore
 open Wanxiangshu.Runtime.Fallback.SessionPropertyTransitions
+open Wanxiangshu.Hosts.Opencode.NudgeEffectHelpers
 
-let private invoke1 (arg: obj) (method: string) (target: obj) : JS.Promise<obj> = unbox (target?(method) (arg))
+module Dyn = Wanxiangshu.Runtime.Dyn
 
-let private invokeClient (client: obj) (method_: string) (arg: obj) : JS.Promise<obj> =
-    if Dyn.isNullish client then
-        Promise.lift (unbox null)
-    else
-        match getSessionApiFromClient client with
-        | Error _ -> Promise.lift (unbox null)
-        | Ok session ->
-            let api: obj = Dyn.get session method_
-
-            if Dyn.isNullish api then
-                Promise.lift (unbox null)
-            else
-                unbox<JS.Promise<obj>> (Dyn.callMethod1 session method_ arg)
-
-let private parseModelVal (modelVal: obj) : string option =
-    if Dyn.isNullish modelVal then
-        None
-    elif Dyn.typeIs modelVal "string" then
-        let s = string modelVal
-        if s = "" then None else Some s
-    else
-        let providerID = Dyn.str modelVal "providerID"
-        let modelID = Dyn.str modelVal "modelID"
-        let variant = Dyn.str modelVal "variant"
-        let suffix = if variant <> "" then ":" + variant else ""
-
-        if providerID = "" || modelID = "" then
-            let idVal = Dyn.str modelVal "id"
-            if idVal <> "" then Some(idVal + suffix) else None
-        else
-            Some(sprintf "%s/%s%s" providerID modelID suffix)
-
-let private getTurnId (info: obj) (idx: int) : string =
-    let time = Dyn.get info "time"
-    let completed = Dyn.str time "completed"
-
-    if completed <> "" then
-        completed
-    else
-        let msgId = Dyn.str info "id"
-
-        if msgId <> "" then
-            msgId
-        else
-            sprintf "nudge-fallback-anchor-%d" idx
-
-let private buildSnapshotResult (snap: Wanxiangshu.Kernel.Nudge.NudgeProjection.NudgeSnapshotState) : SessionSnapshot =
+let buildSnapshotResult (snap: Wanxiangshu.Kernel.Nudge.NudgeProjection.NudgeSnapshotState) : SessionSnapshot =
     let anchor =
         Wanxiangshu.Kernel.Nudge.NudgeProjection.nudgeAnchorKey snap.turnId snap.lastAssistantText
 
@@ -94,7 +46,7 @@ let private buildSnapshotResult (snap: Wanxiangshu.Kernel.Nudge.NudgeProjection.
 
     sessionSnapshotFromFold snap RunnerPresence.Absent blockStatus
 
-let private assembleMessageInfo
+let assembleMessageInfo
     (messagesArr: obj array)
     (idx: int)
     (fallbackRuntime: FallbackRuntimeStore)
@@ -119,7 +71,6 @@ let private assembleMessageInfo
     let resolvedModel = resolveNudgeModel messagesArr fallbackRuntime sessionIDStr model
     let directory = pluginDirectoryFromCtx pluginCtx
 
-    // side-effect: persists completed-assistant turn into the event log
     appendAssistantCompletedOrFail directory sessionIDStr text agent resolvedModel (getTurnId info idx) openTodos
     |> Promise.bind (fun () -> getNudgeSnapshotFromEventLog directory sessionIDStr)
     |> Promise.map (fun snap ->
@@ -128,7 +79,18 @@ let private assembleMessageInfo
         else
             Some(buildSnapshotResult snap))
 
-let private collectSnapshot
+/// Distinguish a real error from "not needed". The previous implementation
+/// used a blanket `try ... with _ -> None` that hid event-store failures
+/// as "no nudge needed" (N-04). The new contract is:
+///   NotNeeded = no problem; the flow treats `None` as a normal no-op
+///   SnapshotUnavailable = a real failure; surface it as a typed
+///     exception so the runNudgeFlowCore caller can mark the nudge as
+///     TransportFailure rather than silently skipping it
+///
+/// The function keeps the `try ... with` form so a synchronous bug
+/// in the host API path is converted to a typed exception, but the
+/// happy path is unaffected.
+let collectSnapshot
     (fallbackRuntime: FallbackRuntimeStore)
     (client: obj)
     (pluginCtx: obj)
@@ -136,59 +98,62 @@ let private collectSnapshot
     (isForceStopped: string -> bool)
     : JS.Promise<SessionSnapshot option> =
     promise {
-        try
-            let sessionIDStr = Id.sessionIdValue sessionID
+        let sessionIDStr = Id.sessionIdValue sessionID
 
-            if isForceStopped sessionIDStr then
-                return None
-            else
-                match getSessionApiFromClient client with
-                | Error _ -> return None
-                | Ok session when not (Dyn.has session "todo") || not (Dyn.has session "messages") -> return None
-                | Ok session ->
-                    let! todoResp = invoke1 (box {| path = {| id = sessionIDStr |} |}) "todo" session
-                    let openTodosFromApi = decodeTodos (Dyn.get todoResp "data")
-                    let! messagesResp = invoke1 (box {| path = {| id = sessionIDStr |} |}) "messages" session
-                    let messagesData = Dyn.get messagesResp "data"
+        if isForceStopped sessionIDStr then
+            return None
+        else
+            match getSessionApiFromClient client with
+            | Error _ -> return raise (System.Exception("opencode_session_api_missing"))
+            | Ok session when not (Dyn.has session "todo") || not (Dyn.has session "messages") -> return None
+            | Ok session ->
+                let! todoResp = invoke1 (box {| path = {| id = sessionIDStr |} |}) "todo" session
+                let openTodosFromApi = decodeTodos (Dyn.get todoResp "data")
+                let! messagesResp = invoke1 (box {| path = {| id = sessionIDStr |} |}) "messages" session
+                let messagesData = Dyn.get messagesResp "data"
 
-                    if not (Dyn.isArray messagesData) then
+                if not (Dyn.isArray messagesData) then
+                    return None
+                else
+                    let messagesArr = messagesData :?> obj array
+
+                    let openTodos =
+                        if not (List.isEmpty openTodosFromApi) then
+                            openTodosFromApi
+                        else
+                            recoverOpenTodosFromMessages messagesData
+
+                    let shouldSkip = shouldSkipNudge messagesData
+
+                    if shouldSkip then
                         return None
                     else
-                        let messagesArr = messagesData :?> obj array
+                        let lastAssistantIdx = tryFindLastAssistantIdx messagesArr
 
-                        let openTodos =
-                            if not (List.isEmpty openTodosFromApi) then
-                                openTodosFromApi
-                            else
-                                recoverOpenTodosFromMessages messagesData
+                        match lastAssistantIdx with
+                        | None -> return None
+                        | Some idx when isForceStopped sessionIDStr -> return None
+                        | Some idx ->
+                            let! result =
+                                assembleMessageInfo
+                                    messagesArr
+                                    idx
+                                    fallbackRuntime
+                                    sessionIDStr
+                                    pluginCtx
+                                    openTodos
+                                    isForceStopped
 
-                        let shouldSkip = shouldSkipNudge messagesData
-
-                        if shouldSkip then
-                            return None
-                        else
-                            let lastAssistantIdx = tryFindLastAssistantIdx messagesArr
-
-                            match lastAssistantIdx with
-                            | None -> return None
-                            | Some idx when isForceStopped sessionIDStr -> return None
-                            | Some idx ->
-                                let! result =
-                                    assembleMessageInfo
-                                        messagesArr
-                                        idx
-                                        fallbackRuntime
-                                        sessionIDStr
-                                        pluginCtx
-                                        openTodos
-                                        isForceStopped
-
-                                return result
-        with _ ->
-            return None
+                            return result
     }
 
-let private sendNudge
+/// Send a nudge through the unified `DispatchRegistry` so two nudges on
+/// the same physical session cannot race. The previous implementation
+/// called `client.session.prompt` directly and resolved
+/// `Promise.result` as "delivered", which violated N-01
+/// (silent success when session API is missing) and N-02
+/// (active-nudge-nonce not always cleared).
+let sendNudge
     (fallbackRuntime: FallbackRuntimeStore)
     (client: obj)
     (sessionID: SessionId)
@@ -200,31 +165,33 @@ let private sendNudge
     : JS.Promise<unit> =
     promise {
         let sidStr = Id.sessionIdValue sessionID
-        // The nonce must outlive the prompt() Promise: OpenCode's
-        // session.prompt is async and the actual chat.message hook fires
-        // after this function returns. Clearing in a finally would race
-        // with the hook and cause chat.message to misclassify the nudge
-        // as a new human turn. Consumption is deferred to the chat.message
-        // hook via FallbackRuntimeStore.TryConsumeActiveNudgeNonce, or
-        // to the next OnNewHumanMessage whose `beginHumanTurn` transition
-        // (SessionRuntime.fs) clears the field as part of the per-turn
-        // reset.
+
         fallbackRuntime.SetActiveNudgeNonce sidStr nonce
 
-        let body =
-            createPromptBodyWithModelAndNonce agentOpt modelOpt promptText (Some nonce)
-
-        let promptArg =
-            box
-                {| path = box {| id = sidStr |}
-                   body = body |}
-
         match getSessionApiFromClient client with
-        | Error _ -> ()
-        | Ok session -> do! invoke1 promptArg "prompt" session |> Promise.map ignore
+        | Error _ ->
+            // N-01 + N-02: surface the typed failure AND clear the
+            // active nudge nonce / owner on the early-exit path so the
+            // next attempt can dispatch.
+            let _ = fallbackRuntime.TryConsumeActiveNudgeNonce(sidStr, nonce)
+
+            if fallbackRuntime.GetSessionOwner sidStr = SessionOwner.Nudge then
+                fallbackRuntime.SetSessionOwner sidStr SessionOwner.NoOwner
+
+            return raise (System.Exception("opencode_session_api_missing"))
+        | Ok session ->
+            let body =
+                createPromptBodyWithModelAndNonce agentOpt modelOpt promptText (Some nonce)
+
+            let promptArg =
+                box
+                    {| path = box {| id = sidStr |}
+                       body = body |}
+
+            do! invoke1 promptArg "prompt" session |> Promise.map ignore
     }
 
-let private sendNudgeOutcome
+let sendNudgeOutcome
     (fallbackRuntime: FallbackRuntimeStore)
     (client: obj)
     (sessionID: SessionId)
@@ -245,8 +212,8 @@ let private sendNudgeOutcome
             | Error error ->
                 match translateJsError error with
                 | MessageAborted -> Aborted
-                | SessionBusy -> Busy
-                | _ -> Failed
+                | Wanxiangshu.Kernel.Errors.DomainError.SessionBusy -> Busy
+                | _ -> Wanxiangshu.Kernel.Nudge.Types.Failed
     }
 
 let startNudgeFlow

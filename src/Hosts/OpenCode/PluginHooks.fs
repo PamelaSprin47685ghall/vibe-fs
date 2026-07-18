@@ -27,6 +27,8 @@ open Wanxiangshu.Runtime.SubsessionActorRegistry
 open Wanxiangshu.Runtime
 open Wanxiangshu.Kernel.Subsession.Types
 open Wanxiangshu.Runtime.SubsessionEventRouter
+open Wanxiangshu.Runtime.Dispatch
+open Wanxiangshu.Hosts.Opencode.ChatHooksMessageIdDedup
 
 let private twoArgHook (f: obj -> obj -> JS.Promise<unit>) =
     box (System.Func<obj, obj, JS.Promise<unit>>(f))
@@ -122,6 +124,15 @@ let private handleSessionCleanup (services: CoreServices) (env: HostEventEnvelop
             do! eventStore.Append(sid, [ PhysicalSessionClosed sid ])
             SubsessionActorRegistry.ClearPoison services.Directory ptyCleanupSessionId
             SubsessionActorRegistry.Remove services.Directory ptyCleanupSessionId
+
+            // S-07 fix: tear down the per-session dispatch mailbox in
+            // one place.  NotifySessionClosed is idempotent: it is a
+            // no-op if no dispatcher is registered for the session.
+            let ws =
+                Wanxiangshu.Kernel.Primitives.Identity.Id.workspaceIdQuick ("opencode:" + services.Directory)
+
+            DispatchRegistry().NotifySessionClosed ws ptyCleanupSessionId
+            Wanxiangshu.Hosts.Opencode.ChatHooksMessageIdDedup.forget ptyCleanupSessionId
     }
 
 let private registerEventHooks (result: obj) (ctx: obj) (services: CoreServices) =

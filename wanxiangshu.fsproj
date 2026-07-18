@@ -41,6 +41,9 @@
     <Compile Include="src/Kernel/Subsession/Cancellation.fs"/>
     <Compile Include="src/Kernel/Subsession/Decision.fs"/>
     <Compile Include="src/Kernel/Subsession/Fold.fs"/>
+    <Compile Include="src/Kernel/Dispatch/Identity.fs"/>
+    <Compile Include="src/Kernel/Dispatch/Protocol.fs"/>
+    <Compile Include="src/Kernel/Dispatch/Events.fs"/>
     <Compile Include="src/Kernel/Reactive.fs"/>
     <Compile Include="src/Kernel/ToolOutputInfoTypes.fs"/>
     <Compile Include="src/Kernel/ReviewSession/Types.fs"/>
@@ -316,6 +319,11 @@
     <Compile Include="src/Runtime/Subsession/SubsessionEventWire.fs"/>
     <Compile Include="src/Runtime/Subsession/SubsessionReconcile.fs"/>
     <Compile Include="src/Runtime/Subsession/SubsessionService.fs"/>
+    <Compile Include="src/Runtime/Dispatch/Types.fs"/>
+    <Compile Include="src/Runtime/Dispatch/SessionDispatcherOps.fs"/>
+    <Compile Include="src/Runtime/Dispatch/SessionDispatcher.fs"/>
+    <Compile Include="src/Runtime/Dispatch/SessionDispatcherLifecycle.fs"/>
+    <Compile Include="src/Runtime/Dispatch/Registry.fs"/>
     <Compile Include="src/Runtime/EventStore/EventLogRuntimeNudge.fs"/>
     <Compile Include="src/Runtime/EventStore/EventLogRuntime.fs"/>
     <Compile Include="src/Runtime/Fallback/Ports.fs"/>
@@ -405,16 +413,19 @@
     <Compile Include="src/Hosts/Mux/MessageTransform.fs"/>
     <Compile Include="src/Hosts/Mux/CompactionTransform.fs"/>
     <Compile Include="src/Hosts/Mux/Fallback/Hook.fs"/>
+    <Compile Include="src/Hosts/Mux/EventHookCleanup.fs"/>
     <Compile Include="src/Hosts/Mux/EventHook.fs"/>
     <Compile Include="src/Hosts/Mux/SlashCommands.fs"/>
     <Compile Include="src/Hosts/Mux/PluginCatalog.fs"/>
     <Compile Include="src/Hosts/Mux/PluginRegistration.fs"/>
     <Compile Include="src/Hosts/Mux/Plugin.fs"/>
+    <Compile Include="src/Hosts/OpenCode/NudgeEffectHelpers.fs"/>
     <Compile Include="src/Hosts/OpenCode/NudgeEffect.fs"/>
     <Compile Include="src/Hosts/OpenCode/ProgressObserver.fs"/>
     <Compile Include="src/Hosts/OpenCode/Fallback/Coordinator.fs"/>
     <Compile Include="src/Hosts/OpenCode/Fallback/HostEventInspection.fs"/>
     <Compile Include="src/Hosts/OpenCode/NudgeTrigger.fs"/>
+    <Compile Include="src/Hosts/OpenCode/ChatHooksMessageIdDedup.fs"/>
     <Compile Include="src/Hosts/OpenCode/SessionLifecycleHumanTurn.fs"/>
     <Compile Include="src/Hosts/OpenCode/SessionLifecycleEvents.fs"/>
     <Compile Include="src/Hosts/OpenCode/SessionLifecycleObserver.fs"/>
@@ -426,6 +437,7 @@
     <Compile Include="src/Hosts/OpenCode/SubagentTypes.fs"/>
     <Compile Include="src/Hosts/OpenCode/SubagentSpawn.fs"/>
     <Compile Include="src/Hosts/OpenCode/SubsessionDispatch.fs"/>
+    <Compile Include="src/Hosts/OpenCode/SubsessionHostAdapterTypes.fs"/>
     <Compile Include="src/Hosts/OpenCode/SubsessionHostAdapter.fs"/>
     <Compile Include="src/Hosts/OpenCode/SubagentIo.fs"/>
     <Compile Include="src/Hosts/OpenCode/SessionIo.fs"/>
@@ -474,6 +486,7 @@
     <Compile Include="src/Hosts/Omp/ChildSessionCreate.fs"/>
     <Compile Include="src/Hosts/Omp/ChildSession.fs"/>
     <Compile Include="src/Hosts/Omp/ChildSessionRegistry.fs"/>
+    <Compile Include="src/Hosts/Omp/ChildCleanup.fs"/>
     <Compile Include="src/Hosts/Omp/ToolResultEvent.fs"/>
     <Compile Include="src/Hosts/Omp/PruneGuard.fs"/>
     <Compile Include="src/Hosts/Omp/NudgeRuntime.fs"/>

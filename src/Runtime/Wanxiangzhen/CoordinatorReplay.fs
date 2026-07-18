@@ -62,7 +62,11 @@ let replayFromEventLog (rt: CoordinatorRuntime) : JS.Promise<unit> =
                 let warning =
                     sprintf "WARNING: Orphan running tasks without PID: %s. Use /squad-kill or ignore." names
 
+                // Best-effort: catch and log.  We never let a missing
+                // host API or a prompt Promise rejection crash the
+                // replay path; the warning is non-essential.
                 rt.Deps.PromptSession rt.Client rt.MasterSessionId warning
+                |> Promise.catch (fun _ -> ())
                 |> Promise.start
                 |> ignore
     }

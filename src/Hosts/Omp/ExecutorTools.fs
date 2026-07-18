@@ -8,6 +8,7 @@ open Wanxiangshu.Kernel.OmpSessionTools
 open Wanxiangshu.Runtime.SubagentPrompts
 open Wanxiangshu.Kernel.ToolCatalog
 open Wanxiangshu.Hosts.Omp.ChildSession
+open Wanxiangshu.Hosts.Omp.ChildCleanup
 open Wanxiangshu.Hosts.Omp.Codec
 open Wanxiangshu.Hosts.Omp.MessagingCodec
 open Wanxiangshu.Hosts.Omp.OmpToolSchema
@@ -152,17 +153,7 @@ let private executeExecutor (pi: obj) (_id: string) (params': obj) (signal: obj)
             match childHolder with
             | None -> ()
             | Some child ->
-                try
-                    if not (Dyn.isNullish (Dyn.get child.session "abort")) then
-                        try
-                            Dyn.callMethod0 child.session "abort" |> ignore
-                        with _ ->
-                            ()
-
-                    child.dispose |> Option.iter (fun dispose -> dispose ())
-                with _ ->
-                    ()
-
+                CleanupChildSession child.session child.dispose
                 childHolder <- None
 
         let finishJob () = disposeChild ()
