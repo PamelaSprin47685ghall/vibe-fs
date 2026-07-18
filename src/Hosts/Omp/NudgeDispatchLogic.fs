@@ -14,7 +14,6 @@ open Wanxiangshu.Hosts.Omp.NudgeToolFilter
 open Wanxiangshu.Hosts.Omp.HookExecute
 open Wanxiangshu.Hosts.Omp.MessageTransform
 open Wanxiangshu.Hosts.Omp.ToolResultEvent
-open Wanxiangshu.Hosts.Omp.MagicTodo
 open Wanxiangshu.Hosts.Omp.MessagingCodec
 open Wanxiangshu.Kernel.HostTools
 open Wanxiangshu.Kernel.WorkBacklog

@@ -12,7 +12,6 @@ open Wanxiangshu.Kernel.Messaging
 open Wanxiangshu.Kernel.MessageTransformPolicy
 open Wanxiangshu.Hosts.Omp.CapsCodec
 open Wanxiangshu.Hosts.Omp.ChildSession
-open Wanxiangshu.Hosts.Omp.MagicTodo
 open Wanxiangshu.Hosts.Omp.MessagingCodec
 open Wanxiangshu.Hosts.Omp.MessagingCodecDecode
 open Wanxiangshu.Hosts.Omp.ToolResultEvent

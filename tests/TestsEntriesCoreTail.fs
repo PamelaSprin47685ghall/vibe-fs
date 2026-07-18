@@ -179,7 +179,8 @@ let tailCoreTestEntriesGroup3 () : (string * TestBody) list =
         "RemovedProductionFilesTests.run", TestBody.Sync(sync Wanxiangshu.Tests.RemovedProductionFilesTests.run)
         "ProfilerDefaultTests.run", TestBody.Sync(sync Wanxiangshu.Tests.ProfilerDefaultTests.run)
         "PendingEvidenceEpochTests.run", TestBody.Sync(sync Wanxiangshu.Tests.PendingEvidenceEpochTests.run)
-        "ContinuationCleanupTests.run", TestBody.Sync(sync Wanxiangshu.Tests.ContinuationCleanupTests.run) ]
+        "ContinuationCleanupTests.run", TestBody.Sync(sync Wanxiangshu.Tests.ContinuationCleanupTests.run)
+        "BacklogSessionRuntimeTests.run", TestBody.Sync(sync Wanxiangshu.Tests.BacklogSessionRuntimeTests.run) ]
 
 let tailCoreTestEntries () : (string * TestBody) list =
     tailCoreTestEntriesGroup1 ()

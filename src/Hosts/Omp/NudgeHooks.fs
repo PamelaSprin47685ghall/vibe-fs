@@ -19,7 +19,6 @@ open Wanxiangshu.Hosts.Omp.ExecutorTools
 open Wanxiangshu.Hosts.Omp.HookExecute
 open Wanxiangshu.Hosts.Omp.MessageTransform
 open Wanxiangshu.Hosts.Omp.ToolResultEvent
-open Wanxiangshu.Hosts.Omp.MagicTodo
 open Wanxiangshu.Hosts.Omp.MessagingCodec
 open Wanxiangshu.Hosts.Omp.NudgeRuntime
 open Wanxiangshu.Kernel.HostTools

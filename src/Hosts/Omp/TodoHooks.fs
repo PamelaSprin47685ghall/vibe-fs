@@ -12,7 +12,7 @@ open Wanxiangshu.Hosts.Omp.Codec
 open Wanxiangshu.Hosts.Omp.HookExecute
 open Wanxiangshu.Hosts.Omp.MessageTransform
 open Wanxiangshu.Hosts.Omp.ToolResultEvent
-open Wanxiangshu.Hosts.Omp.MagicTodo
+open Wanxiangshu.Runtime.BacklogSession
 open Wanxiangshu.Hosts.Omp.MessagingCodec
 open Wanxiangshu.Hosts.Omp.NudgeRuntime
 open Wanxiangshu.Hosts.Omp.TodoStateManagement
@@ -38,7 +38,7 @@ open Wanxiangshu.Runtime.SubsessionActorRegistry
 open Wanxiangshu.Kernel.Subsession.Types
 
 /// Shared BacklogSession bound to the OMP host.
-let private backlogSession = BacklogSession omp
+let private backlogSession = BacklogSession(omp, ExecutorTools.ompScope)
 
 let sessionStartHandler (pi: obj) (reviewStore: ReviewStore) (ctx: obj) : JS.Promise<unit> =
     promise {

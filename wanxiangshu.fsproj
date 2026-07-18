@@ -318,6 +318,7 @@
     <Compile Include="src/Runtime/Tooling/FileSwap.fs"/>
     <Compile Include="src/Runtime/Tooling/WorkBacklogToolsCodec.fs"/>
     <Compile Include="src/Runtime/EventStore/EventLogRuntimeStore.fs"/>
+    <Compile Include="src/Runtime/Execution/BacklogSession.fs"/>
     <Compile Include="src/Runtime/EventStore/SessionStateRestore.fs"/>
     <Compile Include="src/Runtime/EventStore/EventLogRuntimeSync.fs"/>
     <Compile Include="src/Runtime/EventStore/ReviewEventWriter.fs"/>
@@ -511,7 +512,6 @@
     <Compile Include="src/Hosts/Omp/MessagingCodecEncode.fs"/>
     <Compile Include="src/Hosts/Omp/MessagingCodecDecode.fs"/>
     <Compile Include="src/Hosts/Omp/MessagingCodec.fs"/>
-    <Compile Include="src/Hosts/Omp/MagicTodo.fs"/>
     <Compile Include="src/Hosts/Omp/SubsessionDispatch.fs"/>
     <Compile Include="src/Hosts/Omp/OmpSubsessionHostAdapterPrompts.fs"/>
     <Compile Include="src/Hosts/Omp/SubsessionHostAdapter.fs"/>
@@ -567,6 +567,7 @@
     <Compile Include="tests/ProfilerDefaultTests.fs"/>
     <Compile Include="tests/PendingEvidenceEpochTests.fs"/>
     <Compile Include="tests/ContinuationCleanupTests.fs"/>
+    <Compile Include="tests/BacklogSessionRuntimeTests.fs"/>
     <Compile Include="tests/SessionLoopTests.fs"/>
     <Compile Include="tests/ToolExecutionStatusTests.fs"/>
     <Compile Include="tests/SessionGateDemandTests.fs"/>

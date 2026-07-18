@@ -15,7 +15,8 @@ open Wanxiangshu.Hosts.Omp.NudgeHooks
 open Wanxiangshu.Kernel.OmpSessionTools
 open Wanxiangshu.Hosts.Omp.NudgeRuntime
 open Wanxiangshu.Kernel.HostTools
-open Wanxiangshu.Hosts.Omp.MagicTodo
+open Wanxiangshu.Runtime.BacklogSession
+open Wanxiangshu.Hosts.Omp.ExecutorTools
 open Wanxiangshu.Runtime.Fallback.RuntimeStore
 
 let fakeCtx (sessionId: string) (cwd: string) : obj =
@@ -196,10 +197,10 @@ let toolResultHandler_todowriteCapturesReport () =
     promise {
         do! toolResultHandler pi store event (fakeCtx "s1" "/tmp")
         // CaptureReport must have stored the report in the BacklogSession.
-        let captured = BacklogSession(omp).TakeReport("call-1")
+        let captured = BacklogSession(omp, ompScope).TakeReport("call-1")
         check "report captured in BacklogSession" (captured = "")
         // TakeReport consumes the entry; a second take returns empty.
-        let again = BacklogSession(omp).TakeReport("call-1")
+        let again = BacklogSession(omp, ompScope).TakeReport("call-1")
         check "report consumed after take" (again = "")
     }
 

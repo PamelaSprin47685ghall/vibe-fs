@@ -6,7 +6,8 @@ open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Kernel.HostTools
 open Wanxiangshu.Kernel.Messaging
 open Wanxiangshu.Runtime.BacklogSessionCodec
-open Wanxiangshu.Hosts.Omp.MagicTodo
+open Wanxiangshu.Runtime.BacklogSession
+open Wanxiangshu.Runtime.RuntimeScope
 open Wanxiangshu.Tests.BacklogMessageBuilders
 open Wanxiangshu.Runtime.BacklogProjectionBuild
 
@@ -14,8 +15,9 @@ module Dyn = Wanxiangshu.Runtime.Dyn
 
 /// Two `BacklogSession(omp)` instances must share the same backing store.
 let sharedSessionStoreByHost () =
-    let s1 = BacklogSession(omp)
-    let s2 = BacklogSession(omp)
+    let scope = RuntimeScope()
+    let s1 = BacklogSession(omp, scope)
+    let s2 = BacklogSession(omp, scope)
     let callID = "omp-call-1"
     let report = "omp report body"
     s1.CaptureReport(callID, report)
@@ -24,8 +26,9 @@ let sharedSessionStoreByHost () =
 
 /// CaptureReport by Omp host must not collide with capture by the Opencode host.
 let hostPartitionedReports () =
-    let sOmp = BacklogSession(omp)
-    let sOc = BacklogSession(Opencode)
+    let scope = RuntimeScope()
+    let sOmp = BacklogSession(omp, scope)
+    let sOc = BacklogSession(Opencode, scope)
     let callID = "shared-call-id"
     sOmp.CaptureReport(callID, "omp only")
     sOc.CaptureReport(callID, "opencode only")
@@ -64,7 +67,8 @@ let inputOfPartNonTool () =
 /// Mirror BacklogReplaySpecs.opencode: CaptureReport on BacklogSession(omp), replay
 /// with empty ahaMoments in input, captured report is returned.
 let replayBacklogOmpFallsBackToCapturedReport () =
-    let session = Wanxiangshu.Hosts.Omp.MagicTodo.BacklogSession omp
+    let scope = RuntimeScope()
+    let session = BacklogSession(omp, scope)
     let callID = "omp-fallback-c1"
     session.CaptureReport(callID, "captured omp report")
 
@@ -86,6 +90,6 @@ let replayBacklogOmpFallsBackToCapturedReport () =
             source = Native
             raw = null } ]
 
-    let backlog = Wanxiangshu.Hosts.Omp.MagicTodo.replayBacklogFor omp msgs
+    let backlog = replayBacklogFor omp scope msgs
     check "omp replay: one entry" (backlog.Length = 1)
     equal "omp replay: captured report preserved" "captured omp report" backlog.[0].ahaMoments

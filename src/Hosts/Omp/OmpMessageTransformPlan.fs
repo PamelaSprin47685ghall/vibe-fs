@@ -15,17 +15,17 @@ open Wanxiangshu.Kernel.ContextBudget
 open Wanxiangshu.Runtime.ContextBudgetUsageCodec
 open Wanxiangshu.Runtime.MessageTransform.HostEntry
 open Wanxiangshu.Hosts.Omp.Codec
-open Wanxiangshu.Hosts.Omp.MagicTodo
+open Wanxiangshu.Runtime.BacklogSession
 open Wanxiangshu.Hosts.Omp.CapsCodec
 open Wanxiangshu.Runtime.FileSys
 open Wanxiangshu.Runtime.Dyn
 
 module Dyn = Wanxiangshu.Runtime.Dyn
 
-let defaultBacklogSession = BacklogSession omp
+let defaultBacklogSession = BacklogSession(omp, ExecutorTools.ompScope)
 
 let configureBacklogSession (cwd: string) : unit =
-    defaultBacklogSession.WorkspaceRoot <- cwd
+    ExecutorTools.ompScope.WorkspaceRoot <- cwd
 
 let resolveAgent (ctx: obj) : string =
     let sm = Dyn.get ctx "sessionManager"
