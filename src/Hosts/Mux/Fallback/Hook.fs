@@ -197,7 +197,7 @@ let muxActionExecutor (helpers: obj) : IActionExecutor =
             let modelStr =
                 match model.Variant with
                 | Some v -> sprintf "%s/%s:%s" model.ProviderID model.ModelID v
-                | None -> sprintf "%s/%s" model.ProviderID model.ModelID
+                | _ -> sprintf "%s/%s" model.ProviderID model.ModelID
 
             invokeNudge sessionID ("continue " + modelStr)
 
@@ -205,7 +205,7 @@ let muxActionExecutor (helpers: obj) : IActionExecutor =
             let modelStr =
                 match model.Variant with
                 | Some v -> sprintf "%s/%s:%s" model.ProviderID model.ModelID v
-                | None -> sprintf "%s/%s" model.ProviderID model.ModelID
+                | _ -> sprintf "%s/%s" model.ProviderID model.ModelID
 
             invokeNudge sessionID (promptText + " " + modelStr)
 
@@ -215,9 +215,13 @@ let muxActionExecutor (helpers: obj) : IActionExecutor =
 
         member _.CaptureCurrentModel(_sessionID: string) = Promise.lift None
 
-        member _.AbortRun(_sessionID: string) = Promise.lift ()
-
-    }
+        // Mux capacity downgrade: abort is not supported by the host
+        // adapter, so we surface the typed failure rather than silently
+        // returning Promise.lift ().
+        member _.AbortRun(_sessionID: string) =
+            Promise.reject (
+                System.Exception("mux_abort_unsupported: Mux host adapter does not expose a session-level abort API")
+            ) }
 
 let createMuxFallbackHandler
     (runtime: FallbackRuntimeStore)
