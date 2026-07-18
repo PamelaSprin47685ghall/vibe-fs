@@ -6,6 +6,7 @@ open Wanxiangshu.Runtime
 open Wanxiangshu.Runtime.Dyn
 open Wanxiangshu.Runtime.Fallback.ContinuationHost
 open Wanxiangshu.Runtime.OpencodeSessionEventCodec
+open Wanxiangshu.Runtime.OpencodeClientCodec
 open Wanxiangshu.Hosts.Opencode.Fallback.HostEventInspection
 open Wanxiangshu.Runtime.OpencodeSessionPromptBuilder
 

@@ -189,7 +189,12 @@ let applyContextBudget
                         finalStoreEntry
 
                 let pressure =
-                    classifyPressure plan.MaxInputTokens false (int64 currentTokens) state 0
+                    classifyPressure
+                        plan.MaxInputTokens
+                        false
+                        (int64 currentTokens)
+                        state
+                        (completedTodoCount backlogOps.Host messages)
 
                 let action = actionForDecision pressure finalStoreEntry.NudgeTrack
 

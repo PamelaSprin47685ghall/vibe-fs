@@ -62,6 +62,8 @@ module DispatchOps =
             | None -> ()
 
             r.OnResolve()
+        else
+            ()
 
     let acceptRecord
         (r: DispatchRecord)

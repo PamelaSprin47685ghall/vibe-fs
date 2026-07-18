@@ -27,7 +27,6 @@ open Wanxiangshu.Runtime.NudgeFlow
 open Wanxiangshu.Runtime.NudgeModelResolver
 open Wanxiangshu.Runtime.Fallback.RuntimeStore
 open Wanxiangshu.Runtime.Fallback.SessionPropertyTransitions
-open Wanxiangshu.Hosts.Opencode.NudgeEffectHelpers
 
 module Dyn = Wanxiangshu.Runtime.Dyn
 

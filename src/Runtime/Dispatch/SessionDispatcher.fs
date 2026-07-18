@@ -94,6 +94,16 @@ type SessionDispatcher(workspace: WorkspaceId, physicalSessionId: string, eventL
         state.Queue.Enqueue(fun () ->
             promise {
                 match state.Active with
+                | Some existing when existing.Identity.LogicalTurnId <> r.Identity.LogicalTurnId ->
+                    // Different logical turn: the previous dispatch was accepted at
+                    // the host but state.Active was never cleared.  Resolve it as
+                    // Completed so the slot is free for the new dispatch.
+                    DispatchOps.resolveRecord existing Completed
+                    state.Active <- Some r
+
+                    eventLogger.Log(
+                        DispatchRequested(r.Identity, "host_prompt", DispatchOps.digestForPrompt r.Identity)
+                    )
                 | Some existing ->
                     DispatchOps.resolveRecord
                         r

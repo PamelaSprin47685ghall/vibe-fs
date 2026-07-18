@@ -25,9 +25,17 @@ let private tryExtractActiveForReconcile (s: SubsessionState) : (RunContext * Ac
 let decide (state: SubsessionState) (cmd: Command) : Result<DecisionResult, DecisionError> =
     match cmd with
     | StartRun req -> DecisionStart.decide state req
-    | EvidenceUpdated _
-    | SessionIdleObserved
-    | TurnErrorObserved _ -> DecisionObserve.decide state cmd
+    | EvidenceUpdated _ -> DecisionObserve.decide state cmd
+    | SessionIdleObserved ->
+        match state with
+        | ReconcilingUnknownDispatch _
+        | ClosingUnknownDispatch _ -> Cancellation.decide state cmd
+        | _ -> DecisionObserve.decide state cmd
+    | TurnErrorObserved _ ->
+        match state with
+        | ReconcilingUnknownDispatch _
+        | ClosingUnknownDispatch _ -> Cancellation.decide state cmd
+        | _ -> DecisionObserve.decide state cmd
     | _ -> Cancellation.decide state cmd
 
 /// Given an active subsession state discovered on restart, produce the Decision

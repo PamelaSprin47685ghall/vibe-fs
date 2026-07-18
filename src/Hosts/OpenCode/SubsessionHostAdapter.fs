@@ -22,7 +22,7 @@ open Wanxiangshu.Runtime.SubsessionActorRegistry
 open Wanxiangshu.Hosts.Opencode.SubsessionDispatch
 open Wanxiangshu.Hosts.Opencode.SubsessionHostAdapterTypes
 
-/// Re-export so existing tests (`OpencodeSubsessionHostAdapterModelTests`)
+/// Re-export so existing tests (`OpopenSubsessionHostAdapterModelTests`)
 /// can call `buildDispatchModelString` without knowing the inner module split.
 let buildDispatchModelString =
     Wanxiangshu.Hosts.Opencode.SubsessionHostAdapterTypes.buildDispatchModelString
@@ -50,58 +50,92 @@ type OpencodeSubsessionHost(client: obj, agent: string, directory: string) =
                     turn.Model
                     turn.Prompt
 
-            let sendPrompt (_: DispatchIdentity) : JS.Promise<DispatchAcceptance> =
-                promise {
-                    match Wanxiangshu.Hosts.Opencode.SubsessionHostAdapterTypes.trySessionApi client with
-                    | Error msg -> return! Promise.reject (System.Exception("opencode_session_api_missing:" + msg))
-                    | Ok session ->
-                        let body =
-                            Wanxiangshu.Hosts.Opencode.SubsessionHostAdapterTypes.buildBody
-                                agent
-                                turn.Model
-                                turn.Prompt
-                                turn.TurnId
+            let sendPrompt =
+                Wanxiangshu.Hosts.Opencode.SubsessionHostAdapterTypes.buildSendPrompt
+                    client
+                    agent
+                    directory
+                    sessionId
+                    turn
 
-                        let arg =
-                            box
-                                {| path = box {| id = SessionId.value sessionId |}
-                                   body = body |}
-
-                        let! response =
-                            Wanxiangshu.Hosts.Opencode.SubsessionHostAdapterTypes.invoke1 arg "prompt" session
-
-                        let mid =
-                            Wanxiangshu.Hosts.Opencode.SubsessionHostAdapterTypes.decodeResponseForUserMessageId
-                                response
-
-                        match mid with
-                        | Some id when id <> "" -> return UserMessageAccepted id
-                        | _ -> return OpaqueAccepted("opencode:" + TurnId.value turn.TurnId)
-                }
+            /// Register a PendingTurnReceipt waiter BEFORE dispatching so the
+            /// actor can await the real host user-message identity rather than
+            /// the dispatcher's internal waiter (which resolves too early).
+            let pendingReceipt =
+                PendingTurnReceipt.register directory (SessionId.value sessionId) (TurnId.value turn.TurnId)
 
             promise {
-                let! outcome = dispatcher.Dispatch identity sendPrompt (System.Threading.CancellationToken.None)
+                // Step 1: await the dispatcher slot.  If it fails (e.g.
+                // RejectedBeforeSend because another dispatch is in flight),
+                // mark the receipt as transport-rejected so the waiter does
+                // not hang.
+                let! dispatchOutcome = dispatcher.Dispatch identity sendPrompt (System.Threading.CancellationToken.None)
 
-                match outcome with
-                | DispatchOutcome.Accepted receipt ->
-                    let hostReceipt =
-                        match receipt with
-                        | UserMessageAccepted id -> HostStartReceipt.UserMessageObserved id
-                        | RunAccepted id -> HostStartReceipt.UserMessageObserved id
-                        | OpaqueAccepted _ -> HostStartReceipt.OrderedTurnMarkerObserved
-
-                    return Ok hostReceipt
+                match dispatchOutcome with
                 | DispatchOutcome.Failed terminal ->
                     let err =
-                        { ErrorName = "DispatchFailed"
-                          DomainError = None
-                          Message =
-                            "dispatch terminal: "
-                            + Wanxiangshu.Hosts.Opencode.SubsessionHostAdapterTypes.toStringTerminal terminal
-                          StatusCode = None
-                          IsRetryable = Some false }
+                        match terminal with
+                        | RejectedBeforeSend e
+                        | TransportUnavailable e ->
+                            { ErrorName = e.ErrorName
+                              DomainError = e.DomainError
+                              Message = e.Message
+                              StatusCode = e.StatusCode
+                              IsRetryable = e.IsRetryable }
+                        | DispatchTerminal.Failed e
+                        | DispatchTerminal.AcceptanceUnknown e
+                        | DispatchTerminal.AbortUnknown e
+                        | DispatchTerminal.TimedOut e ->
+                            { ErrorName = e.ErrorName
+                              DomainError = e.DomainError
+                              Message = e.Message
+                              StatusCode = e.StatusCode
+                              IsRetryable = e.IsRetryable }
+                        | _ ->
+                            { ErrorName = "DispatchFailed"
+                              DomainError = None
+                              Message =
+                                "dispatch terminal: "
+                                + Wanxiangshu.Hosts.Opencode.SubsessionHostAdapterTypes.toStringTerminal terminal
+                              StatusCode = None
+                              IsRetryable = Some false }
 
-                    return Error(HostRejected err)
+                    match terminal with
+                    | RejectedBeforeSend _
+                    | TransportUnavailable _ ->
+                        PendingTurnReceipt.markTransportRejected (TurnId.value turn.TurnId) err
+                        return Error(HostRejected err)
+                    | _ ->
+                        PendingTurnReceipt.markTransportFailed (TurnId.value turn.TurnId) err
+                        return Error(HostAcceptanceUnknown err)
+
+                | DispatchOutcome.Accepted _ ->
+                    // Step 2: dispatcher accepted — now await the real host
+                    // user-message identity from PendingTurnReceipt (resolved
+                    // by ChatHooks on chat.message, or by sendPrompt above for
+                    // OpaqueAccepted).
+                    let! receiptResult = pendingReceipt
+
+                    match receiptResult with
+                    | Ok hostReceipt -> return Ok hostReceipt
+                    | Error(HostRejected err) ->
+                        let err2 =
+                            { ErrorName = err.ErrorName
+                              DomainError = err.DomainError
+                              Message = err.Message
+                              StatusCode = err.StatusCode
+                              IsRetryable = err.IsRetryable }
+
+                        return Error(HostRejected err2)
+                    | Error(HostAcceptanceUnknown err) ->
+                        let err2 =
+                            { ErrorName = err.ErrorName
+                              DomainError = err.DomainError
+                              Message = err.Message
+                              StatusCode = err.StatusCode
+                              IsRetryable = err.IsRetryable }
+
+                        return Error(HostRejected err2)
             }
 
         member _.Abort(sessionId, turnId) =
@@ -135,84 +169,15 @@ type OpencodeSubsessionHost(client: obj, agent: string, directory: string) =
             ignore (Wanxiangshu.Hosts.Opencode.SubsessionHostAdapterTypes.subsessionRegistry, nonce)
 
         member _.QueryDispatchStatus(sessionId, turnId) =
-            promise {
-                let dispatcher: SessionDispatcher =
-                    Wanxiangshu.Hosts.Opencode.SubsessionHostAdapterTypes.getDispatcher
-                        directory
-                        (SessionId.value sessionId)
-
-                let nonce = TurnId.value turnId
-
-                match dispatcher.ActiveLogicalTurnId with
-                | Some active when active = nonce ->
-                    match Wanxiangshu.Hosts.Opencode.SubsessionHostAdapterTypes.trySessionApi client with
-                    | Ok session ->
-                        try
-                            let! resp =
-                                Wanxiangshu.Hosts.Opencode.SubsessionHostAdapterTypes.invoke1
-                                    (box {| path = box {| id = SessionId.value sessionId |} |})
-                                    "messages"
-                                    session
-
-                            let data = Wanxiangshu.Runtime.Dyn.get resp "data"
-
-                            if
-                                Wanxiangshu.Runtime.Dyn.isNullish data
-                                || not (Wanxiangshu.Runtime.Dyn.isArray data)
-                            then
-                                return Wanxiangshu.Kernel.Subsession.Types.StillPending
-                            else
-                                let msgs = unbox<obj array> data
-                                let found = msgs |> Array.exists (SubsessionDispatch.isMessageMatch nonce)
-
-                                if found then
-                                    let mid =
-                                        msgs
-                                        |> Array.tryFind (SubsessionDispatch.isMessageMatch nonce)
-                                        |> Option.map (fun m -> Wanxiangshu.Runtime.Dyn.str m "id")
-                                        |> Option.defaultValue ""
-
-                                    return Wanxiangshu.Kernel.Subsession.Types.Accepted(UserMessageObserved mid)
-                                else
-                                    return Wanxiangshu.Kernel.Subsession.Types.StillPending
-                        with _ ->
-                            return Wanxiangshu.Kernel.Subsession.Types.StillPending
-                    | Error _ -> return Wanxiangshu.Kernel.Subsession.Types.StillPending
-                | _ -> return Wanxiangshu.Kernel.Subsession.Types.Unknown
-            }
+            Wanxiangshu.Hosts.Opencode.SubsessionHostAdapterTypes.buildQueryDispatchStatus
+                client
+                directory
+                sessionId
+                turnId
+                ()
 
         member this.QuerySessionQuiescence(sessionId, turnId) =
-            promise {
-                let nonce = TurnId.value turnId
-
-                match Wanxiangshu.Hosts.Opencode.SubsessionHostAdapterTypes.trySessionApi client with
-                | Ok session ->
-                    try
-                        let! resp =
-                            Wanxiangshu.Hosts.Opencode.SubsessionHostAdapterTypes.invoke1
-                                (box {| path = box {| id = SessionId.value sessionId |} |})
-                                "messages"
-                                session
-
-                        let data = Wanxiangshu.Runtime.Dyn.get resp "data"
-
-                        if
-                            Wanxiangshu.Runtime.Dyn.isNullish data
-                            || not (Wanxiangshu.Runtime.Dyn.isArray data)
-                        then
-                            return StopUnknown
-                        else
-                            let msgs = unbox<obj array> data
-                            let target = msgs |> Array.filter (SubsessionDispatch.isMessageMatch nonce)
-                            let activeFound = target |> Array.exists SubsessionDispatch.isMessageActive
-
-                            if activeFound then return StillRunning
-                            elif target.Length > 0 then return Stopped
-                            else return StopUnknown
-                    with _ ->
-                        return StopUnknown
-                | Error _ -> return StopUnknown
-            }
+            Wanxiangshu.Hosts.Opencode.SubsessionHostAdapterTypes.buildQuerySessionQuiescence client sessionId turnId ()
 
         member _.ClosePhysicalSession(sessionId) =
             promise {

@@ -75,7 +75,7 @@ let anchorUsesAbsoluteIndex () =
         |> Array.map box
 
     match buildTurnEvidence msgs (AnchorByUserMessageId "u2") with
-    | Ok evidence ->
+    | Ok(evidence: CurrentTurnEvidence) ->
         match evidence.Assistant with
         | NoAssistant -> check "current user anchor excludes stale assistant" true
         | other -> fail ("expected NoAssistant, got " + string other)
@@ -90,7 +90,7 @@ let anchorIncludesOnlyCurrentAssistant () =
         |> Array.map box
 
     match buildTurnEvidence msgs (AnchorByUserMessageId "u2") with
-    | Ok evidence ->
+    | Ok(evidence: CurrentTurnEvidence) ->
         match evidence.Assistant with
         | AssistantSnapshot(_, _, text, _) -> equal "current user anchor includes fresh assistant" "fresh answer" text
         | other -> fail ("expected AssistantSnapshot, got " + string other)

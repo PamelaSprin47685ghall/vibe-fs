@@ -5,6 +5,7 @@
 
 import { getSessionId, setupScenario, teardownScenario } from '../harness/scenario.js';
 import { content, writeWorkFile, extractToolNames, validateToolSchema, findToolPart, assertFuzzyGrepResult, TIMEOUTS } from './p0-canary-utils.js';
+import fs from 'node:fs';
 
 function expectNoSessionError(t, sid) {
   t.events.expectCount({ type: 'session.error', sessionID: sid, count: 0 });
@@ -230,7 +231,64 @@ const tests = [
       expectNoSessionError(t, sid);
     },
   },
+
+  {
+    name: 'OC-FILE-004 Unicode UTF-8 content survives round-trip',
+    fn: async (t) => {
+      const sess = await t.client.createSession();
+      const sid = getSessionId(sess);
+      const unicodeContent = '\u4f60\u597d\u4e16\u754c \ud83c\udf0d \u65e5\u672c\u8a9e\u30c6\u30b9\u30c8';
+      t.provider.expectToolCall({ id: 'uni-file', tool: 'write', args: { filePath: 'unicode.txt', content: content(unicodeContent) } });
+      t.provider.expectText({ id: 'uni-done', text: 'done' });
+      const turn = await t.turn.start(sid);
+      await t.client.prompt(sid, 'Write unicode.txt with multilingual content');
+      await turn.awaitTerminal({ timeoutMs: TIMEOUTS.prompt });
+      t.fs.expectFile('unicode.txt');
+      t.fs.expectFileContent('unicode.txt', content(unicodeContent));
+      const msgsStr = JSON.stringify((await t.client.messages(sid)).data);
+      if (!msgsStr.includes(unicodeContent)) throw new Error('Unicode content not found in messages');
+      expectNoSessionError(t, sid);
+    },
+  },
+
+  {
+    name: 'OC-FILE-005 multi-line content preserves every line',
+    fn: async (t) => {
+      const sess = await t.client.createSession();
+      const sid = getSessionId(sess);
+      const multiLine = ['line one', 'line two', 'line three'].join('\n');
+      t.provider.expectToolCall({ id: 'ml-file', tool: 'write', args: { filePath: 'multiline.txt', content: content(multiLine) } });
+      t.provider.expectText({ id: 'ml-done', text: 'done' });
+      const turn = await t.turn.start(sid);
+      await t.client.prompt(sid, 'Write multiline.txt with three lines');
+      await turn.awaitTerminal({ timeoutMs: TIMEOUTS.prompt });
+      t.fs.expectFile('multiline.txt');
+      const actual = fs.readFileSync(t.host.workDir + '/multiline.txt', 'utf8');
+      if (actual !== content(multiLine)) throw new Error(`multi-line mismatch:\n  expected: ${JSON.stringify(content(multiLine))}\n  got: ${JSON.stringify(actual)}`);
+      expectNoSessionError(t, sid);
+    },
+  },
+
+  {
+    name: 'OC-FILE-008 write-then-read returns identical content',
+    fn: async (t) => {
+      const sess = await t.client.createSession();
+      const sid = getSessionId(sess);
+      const roundTrip = 'round-trip consistency check 42';
+      t.provider.expectToolCall({ id: 'rt-write', tool: 'write', args: { filePath: 'roundtrip.txt', content: content(roundTrip) } });
+      t.provider.expectToolCall({ id: 'rt-read', tool: 'read', args: { filePath: 'roundtrip.txt' } });
+      t.provider.expectText({ id: 'rt-done', text: 'read complete' });
+      const turn = await t.turn.start(sid);
+      await t.client.prompt(sid, 'Write roundtrip.txt then read it back');
+      await turn.awaitTerminal({ timeoutMs: TIMEOUTS.prompt });
+      const messages = (await t.client.messages(sid)).data || [];
+      const msgsStr = JSON.stringify(messages);
+      if (!msgsStr.includes(roundTrip)) throw new Error('Round-trip content missing from session messages');
+      t.fs.expectFile('roundtrip.txt');
+      t.fs.expectFileContent('roundtrip.txt', content(roundTrip));
+      expectNoSessionError(t, sid);
+    },
+  },
 ];
 
-import fs from 'node:fs';
 export default tests;

@@ -30,7 +30,7 @@ let rec private rmRetry (path: string) (attempt: int) : JS.Promise<unit> =
         with ex ->
             let code = Dyn.str (box ex) "code"
 
-            if (code = "ENOTEMPTY" || code = "EBUSY") && attempt < 10 then
+            if (code = "ENOTEMPTY" || code = "EBUSY" || code = "EPERM") && attempt < 10 then
                 do! Promise.sleep 100
                 return! rmRetry path (attempt + 1)
             else

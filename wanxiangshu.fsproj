@@ -440,7 +440,6 @@
     <Compile Include="src/Hosts/Mux/PluginCatalog.fs"/>
     <Compile Include="src/Hosts/Mux/PluginRegistration.fs"/>
     <Compile Include="src/Hosts/Mux/Plugin.fs"/>
-    <Compile Include="src/Hosts/OpenCode/NudgeEffectHelpers.fs"/>
     <Compile Include="src/Hosts/OpenCode/NudgeEffectPrompt.fs"/>
     <Compile Include="src/Hosts/OpenCode/NudgeEffect.fs"/>
     <Compile Include="src/Hosts/OpenCode/ProgressObserver.fs"/>

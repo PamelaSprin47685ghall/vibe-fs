@@ -124,8 +124,8 @@ let decide state cmd =
         match status with
         | DispatchStatus.Accepted receipt -> Ok(beginAbortAfterDispatchAccepted ctx plan receipt cancelCtx)
         | DispatchStatus.TransportRejectedBeforeSend _ -> handleTransportRejectedBeforeSend ctx plan cancelCtx
-        | DispatchStatus.StillPending
-        | DispatchStatus.TransportFailedAfterUnknownAcceptance _ ->
+        | DispatchStatus.TransportFailedAfterUnknownAcceptance _ -> handleTransportRejectedBeforeSend ctx plan cancelCtx
+        | DispatchStatus.StillPending ->
             Ok(decided (ReconcilingUnknownDispatch(ctx, plan, cancelCtx, retryCount)) [] [])
         | DispatchStatus.Unknown ->
             Ok(
@@ -151,8 +151,12 @@ let decide state cmd =
     | ReconcilingUnknownDispatch(ctx, plan, cancelCtx, _), DispatchRejected(tid, HostRejected _) when tid = plan.TurnId ->
         Ok(handleDispatchRejected ctx plan cancelCtx)
     | ReconcilingUnknownDispatch _, DispatchRejected _ -> Ok(noChange StaleTurnMarker)
-    | ReconcilingUnknownDispatch(ctx, plan, _, _), SessionClosed -> Ok(closeActive ctx plan.TurnId)
+    | ReconcilingUnknownDispatch(ctx, plan, cancelCtx, _), SessionClosed -> Ok(closeActive ctx plan.TurnId)
+    | ReconcilingUnknownDispatch(ctx, plan, cancelCtx, _), SessionIdleObserved ->
+        Ok(applyAfterAbort ctx (NotYetStarted plan) cancelCtx)
     | ReconcilingUnknownDispatch _, CancelRequested
+    | ReconcilingUnknownDispatch _, TurnErrorObserved _
+    | ReconcilingUnknownDispatch _, EvidenceUpdated _
     | ReconcilingUnknownDispatch _, TurnDeadlineExpired _
     | ReconcilingUnknownDispatch _, AbortDeadlineExpired _ -> Ok(noChange StaleTimer)
     | ReconcilingUnknownDispatch _,

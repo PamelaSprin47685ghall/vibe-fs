@@ -34,20 +34,6 @@ let opencodeErrorInput (errorObj: obj) : ErrorInput =
         let ir = Dyn.str errorObj "isRetryable"
         if ir <> "" then Some(ir = "true") else None }
 
-let invokeClient (client: obj) (method_: string) (arg: obj) : JS.Promise<obj> =
-    if Dyn.isNullish client then
-        Promise.lift (unbox null)
-    else
-        match getSessionApiFromClient client with
-        | Error _ -> Promise.lift (unbox null)
-        | Ok session ->
-            let api: obj = Dyn.get session method_
-
-            if Dyn.isNullish api then
-                Promise.lift (unbox null)
-            else
-                unbox<JS.Promise<obj>> (Dyn.callMethod1 session method_ arg)
-
 let tryReadLatestMessageInfo (client: obj) (sessionID: string) : JS.Promise<obj option> =
     promise {
         let arg = box {| path = box {| id = sessionID |} |}

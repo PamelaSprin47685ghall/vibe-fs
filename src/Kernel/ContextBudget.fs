@@ -173,8 +173,7 @@ let classifyPressure
             Compacting
         else
             let N = requiredFoldAnchorCount foldAfterFirst
-            let currentR = completedTodoCount - state.phaseStartTodoOrdinal
-            let R = max 0 (min currentR (N - 1))
+            let R = max 0 (min completedTodoCount (N - 1))
 
             if F currentTokens bEff state.phaseBaseTokens N R then
                 RequireTodoWriteEmergency

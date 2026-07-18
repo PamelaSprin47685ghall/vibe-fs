@@ -4,12 +4,6 @@ open Wanxiangshu.Kernel.FallbackKernel.Types
 
 // ── Transcript evidence ──
 
-/// Anchor for slicing transcript to current turn only.
-type TurnAnchor =
-    | AnchorByUserMessageId of messageId: string
-    | AnchorByHostRunId of runId: string
-    | AnchorByTurnMarkerOnly
-
 type TranscriptReadFailure = { Message: string }
 
 /// Evidence about the current turn, accumulated from transcript slice.
