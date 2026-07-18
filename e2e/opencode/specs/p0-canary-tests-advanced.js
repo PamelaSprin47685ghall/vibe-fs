@@ -5,7 +5,7 @@
 
 import fs from 'node:fs';
 import { getSessionId } from '../harness/scenario.js';
-import { extractToolNames, TIMEOUTS } from './p0-canary-utils.js';
+import { extractToolNames, findToolPart, readNdjsonLines, TIMEOUTS } from './p0-canary-utils.js';
 
 function expectNoSessionError(t, sid) {
   t.events.expectCount({ type: 'session.error', sessionID: sid, count: 0 });
@@ -27,30 +27,64 @@ const tests = [
       // PR2 will add an explicit provider.expectLoopNudge() expectation.
       const cmdTurn = await t.turn.start(sid);
       const cmdRes = await t.client.runCommand(sid, 'loop', 'implement feature X', 10000);
-      if (!cmdRes.ok) throw new Error(`loop command failed: ${cmdRes.status} ${cmdRes.data}`);
-      await cmdTurn.awaitTerminal({ timeoutMs: TIMEOUTS.quick });
-      const ndjsonPath = t.host.workDir + '/.wanxiangshu.ndjson';
-      let found = false;
-      if (fs.existsSync(ndjsonPath)) found = fs.readFileSync(ndjsonPath, 'utf8').includes('loop_activated');
-      if (!found) found = t.events.allEvents.some((e) => e.type === 'loop_activated' || e.properties?.type === 'loop_activated');
-      if (!found) throw new Error('loop_activated not found');
+      if (!cmdRes.ok) throw new Error(`loop command failed: ${cmdRes.status} ${JSON.stringify(cmdRes.data)}`);
+      await cmdTurn.awaitTerminal({ timeoutMs: TIMEOUTS.quick, requireAssistantTerminal: false });
+
+      const loopEntries = readNdjsonLines(t.host.workDir).filter(
+        (line) => line.Kind === 'loop_activated' && line.Session === sid,
+      );
+      if (loopEntries.length === 0) throw new Error('loop_activated NDJSON entry not found');
+      if (loopEntries.length > 1) throw new Error(`expected exactly one loop_activated, got ${loopEntries.length}`);
+      const entry = loopEntries[0];
+      if (entry.Payload?.task !== 'implement feature X') {
+        throw new Error(`loop_activated payload mismatch: ${JSON.stringify(entry.Payload)}`);
+      }
       expectNoSessionError(t, sid);
     },
   },
 
   {
-    name: 'OC-WEB-001 websearch is listed in available tools',
+    name: 'OC-WEB-001 websearch calls mock endpoint and backfills result',
     fn: async (t) => {
       const sess = await t.client.createSession();
       const sid = getSessionId(sess);
-      t.provider.expectText({ id: 'web-avail', text: 'tools listed' });
+      t.provider.expectToolCall({ id: 'web-search', tool: 'websearch', args: { query: 'E2E websearch test', what_to_summarize: 'E2E websearch result', numResults: 1 } });
+      t.provider.expectText({ id: 'web-summary', text: 'Test search content for E2E.' });
+      t.provider.expectText({ id: 'web-done', text: 'done' });
       const turn = await t.turn.start(sid);
-      await t.client.prompt(sid, 'list your available tools');
-      await turn.awaitTerminal({ timeoutMs: TIMEOUTS.quick });
-      const firstReq = t.provider.requests[0];
-      if (!firstReq) throw new Error('No LLM request made');
-      const names = extractToolNames(firstReq.tools);
-      if (!names.includes('websearch')) throw new Error('websearch not in tool list');
+      await t.client.prompt(sid, 'search the web for E2E websearch test');
+      await turn.awaitTerminal({ timeoutMs: TIMEOUTS.prompt });
+
+      // The executor subagent must receive the raw mock search result.
+      const subagentReq = t.provider.requests[1];
+      if (!subagentReq) throw new Error('websearch executor subagent request missing');
+      const last = subagentReq.messages?.[subagentReq.messages.length - 1];
+      const lastText = typeof last?.content === 'string' ? last.content : JSON.stringify(last?.content);
+      if (!lastText.includes('Test Search Title')) throw new Error('websearch raw result title not in subagent prompt');
+      if (!lastText.includes('http://example.com')) throw new Error('websearch raw result url not in subagent prompt');
+      if (!lastText.includes('Test search content for E2E.')) throw new Error('websearch raw result content not in subagent prompt');
+
+      // The main session must see the summarized tool result in messages.
+      const messages = (await t.client.messages(sid)).data || [];
+      const part = findToolPart(messages, 'websearch');
+      if (!part) throw new Error('websearch tool part not found in messages');
+      if (part.state?.status !== 'completed') throw new Error(`websearch state: ${part.state?.status}`);
+      if (!part.state?.input?.query?.includes('E2E websearch test')) {
+        throw new Error(`websearch query mismatch: ${part.state?.input?.query}`);
+      }
+      if (!part.state?.output?.includes('Test search content for E2E.')) {
+        throw new Error(`websearch output mismatch: ${part.state?.output}`);
+      }
+
+      // A final assistant response must exist after the tool result.
+      const assistantTexts = messages
+        .filter((m) => m.info?.role === 'assistant')
+        .flatMap((m) => m.parts || [])
+        .filter((p) => p.type === 'text' && typeof p.text === 'string')
+        .map((p) => p.text);
+      if (!assistantTexts.some((text) => text.includes('done'))) {
+        throw new Error('websearch did not produce final assistant response: ' + JSON.stringify(assistantTexts));
+      }
       expectNoSessionError(t, sid);
     },
   },
@@ -67,6 +101,7 @@ const tests = [
         todos: [{ content: 'budget test', status: 'completed', priority: 'high' }],
         select_methodology: ['first_principles'],
       } });
+      t.provider.expectNoMoreRequests();
       // The todowrite tool result is followed by a budget-nudge synthetic
       // continuation; no separate assistant text request occurs in this turn.
       const turn = await t.turn.start(sid);
@@ -75,11 +110,23 @@ const tests = [
       const s = await t.client.sessionStatus(sid);
       const tokens = s.data?.data?.tokens || s.data?.tokens || {};
       if ((tokens.input || 0) < 200) throw new Error('Too few input tokens: ' + tokens.input);
+
       const nudges = t.provider.syntheticRequests.filter((r) => r.marker === 'budget-nudge');
       if (nudges.length === 0) throw new Error('Budget nudge synthetic not found');
       if (nudges.length > 1) throw new Error(`Expected one budget nudge, got ${nudges.length}`);
-      const nudgeBody = JSON.stringify(nudges[0].body);
-      if (!nudgeBody.includes('about to be')) throw new Error('Budget nudge marker text not found');
+
+      const nudge = nudges[0];
+      const nudgeMsg = nudge.body?.messages?.[nudge.body.messages.length - 1];
+      const nudgeText = typeof nudgeMsg?.content === 'string' ? nudgeMsg.content : JSON.stringify(nudgeMsg?.content);
+      if (!nudgeText.includes('the system context is about to be suspended')) {
+        throw new Error('Budget nudge missing marker text: ' + nudgeText);
+      }
+      if (!nudgeText.includes('emergency stop to all work')) {
+        throw new Error('Budget nudge missing emergency stop text: ' + nudgeText);
+      }
+
+      // Threshold: input tokens must be high enough to trigger the nudge.
+      if ((tokens.input || 0) < 2000) throw new Error('Input tokens too low to credibly trigger budget nudge: ' + tokens.input);
       expectNoSessionError(t, sid);
     },
   },

@@ -1,22 +1,16 @@
 /**
  * scenario-parallel.js — Parallel setup helpers.
  *
- * Setup has three independent branches that can run concurrently:
+ * Setup has two independent branches that can run concurrently:
  *   1. Mock provider start (HTTP server, ~10ms).
- *   2. Scenario dir + git init + project files (sync, <50ms).
- *   3. ProcessHost start (opencode spawn + wait-for-listening + health).
+ *   2. Scenario dir + project files + git init + AGENTS.md.
  *
- * Branches (1) and (2)/(3) can fully overlap. The host branch (3)
- * internally needs the provider URL — we therefore pre-resolve the
- * provider URL first (it does not depend on the host), then start the
- * host in parallel with the remaining project work.
+ * The host branch (3) must start after the workspace is fully prepared,
+ * because `opencode serve` reads AGENTS.md/git state at startup and
+ * concurrent `git init`/`git commit` calls from the old parallel layout
+ * caused intermittent `fetch failed` setup errors.
  *
- * Wall-clock saving: provider + project overlap with the host spawn
- * (~900ms+ cold start). Total per-test setup drops from ~1100ms to
- * ~900ms.
- *
- * Kept in its own module so scenario.js stays under the 200-line
- * Kolmogorov line budget.
+ * Kept in its own module so scenario.js stays under the 200-line budget.
  */
 
 import fs from 'node:fs';
@@ -58,6 +52,13 @@ async function writeProjectFiles(workDir, project) {
   }
 }
 
+async function prepareWorkspace(workDir, project) {
+  if (project) {
+    await writeProjectFiles(workDir, project);
+  }
+  await initGitWorkspace(workDir);
+}
+
 export async function setupScenarioParallel(opts, tmpDir) {
   const scenarioDir = tmpDir();
   const workDir = path.join(scenarioDir, 'workspace');
@@ -67,32 +68,41 @@ export async function setupScenarioParallel(opts, tmpDir) {
   const host = new ProcessHost();
   const pluginPaths = opts.plugin !== false ? [resolvePluginPath(opts.variant || 'opencode')] : [];
 
-  const providerUrl = await provider.start();
-  const projectP = opts.project
-    ? writeProjectFiles(workDir, opts.project).then(() => initGitWorkspace(workDir))
-    : initGitWorkspace(workDir);
-  const hostP = host.start({
-    scenarioDir,
-    providerUrl: `${providerUrl}/v1`,
-    pluginPaths,
-    contextLimit: opts.contextLimit,
-  });
-  await Promise.all([projectP, hostP]);
+  try {
+    const providerUrl = await provider.start();
+    // Prepare workspace before starting opencode; it reads AGENTS.md at startup.
+    await prepareWorkspace(workDir, opts.project);
+    await host.start({
+      scenarioDir,
+      providerUrl: `${providerUrl}/v1`,
+      pluginPaths,
+      contextLimit: opts.contextLimit,
+    });
 
-  const client = new HttpClient(host.baseUrl, host.workDir);
-  const events = new EventProbe(host.baseUrl, host.workDir);
-  await events.connect();
+    const client = new HttpClient(host.baseUrl, host.workDir);
+    const events = new EventProbe(host.baseUrl, host.workDir);
+    await events.connect();
 
-  const scenario = new Scenario({
-    host,
-    provider,
-    events,
-    client,
-    fs: new FsOracle(host.workDir),
-    scenarioDir,
-  });
-  client.onSessionCreated = (sid) => {
-    if (!scenario.sessionIds.includes(sid)) scenario.sessionIds.push(sid);
-  };
-  return scenario;
+    const scenario = new Scenario({
+      host,
+      provider,
+      events,
+      client,
+      fs: new FsOracle(host.workDir),
+      scenarioDir,
+    });
+    client.onSessionCreated = (sid) => {
+      if (!scenario.sessionIds.includes(sid)) scenario.sessionIds.push(sid);
+    };
+    return scenario;
+  } catch (err) {
+    if (host.stdoutLog || host.stderrLog) {
+      console.error(`\n── setup failed host logs ──`);
+      if (host.stdoutLog) console.error(host.stdoutLog.slice(-2000));
+      if (host.stderrLog) console.error(host.stderrLog.slice(-3000));
+    }
+    try { await host.stop({ assert: false }); } catch {}
+    try { await provider.stop(); } catch {}
+    throw err;
+  }
 }

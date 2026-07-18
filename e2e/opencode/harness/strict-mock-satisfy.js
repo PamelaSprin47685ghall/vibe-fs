@@ -9,7 +9,7 @@ import { extractToolNames, extractLastUserMsg } from './strict-mock-matches.js';
 const PREVIEW_LIMIT = 5;
 
 export function checkSatisfied(expectations, unexpected) {
-  const remaining = expectations.length;
+  const remaining = expectations.filter((e) => e.respond?.type !== 'no-more-requests-boundary').length;
   const unexpectedCount = unexpected.length;
   const errors = [];
   if (remaining > 0) {

@@ -39,9 +39,7 @@ let trySessionApi (client: obj) : Result<obj, string> =
     | Error _ -> Error "session API missing"
 
 let promptDigest (prompt: string) : string =
-    let bytes = System.Text.Encoding.UTF8.GetBytes(prompt)
-    let hash = System.Security.Cryptography.SHA256.Create().ComputeHash(bytes)
-    System.Convert.ToBase64String(hash)
+    Wanxiangshu.Runtime.FileSys.sha256HexTruncated prompt
 
 let encodeDispatchIdentity
     (directory: string)

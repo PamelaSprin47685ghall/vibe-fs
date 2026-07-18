@@ -66,7 +66,7 @@ class Turn {
     const o = {
       timeoutMs: opts.timeoutMs || 60000,
       requireActivity: opts.requireActivity !== false,
-      requireAssistantTerminal: opts.requireAssistantTerminal === true,
+      requireAssistantTerminal: opts.requireAssistantTerminal !== false,
       requireIdleAfterActivity: opts.requireIdleAfterActivity !== false,
     };
     if (o.requireActivity) {
@@ -108,7 +108,7 @@ class Turn {
   async _awaitAssistantTerminal(timeoutMs) {
     try {
       await this._scenario.events.awaitEvent(
-        (e) => e.type === 'session.message' && Boolean(e.finishReason) && e.seq > this._eventSeqBefore && this._matchesSession(e),
+        (e) => e.type === 'message.updated' && Boolean(e.finishReason) && e.seq > this._eventSeqBefore && this._matchesSession(e),
         timeoutMs,
       );
     } catch (err) {

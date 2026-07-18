@@ -65,6 +65,19 @@ export class StrictMockProvider {
 
   allowSyntheticContinuations() { this._state.allowSyntheticContinuations = true; }
   allowTitleGeneration() { this._state.allowTitleGeneration = true; }
+
+  expectSyntheticTodoNudge(opts = {}) {
+    this.expectText({ id: opts.id || 'synthetic-todo-nudge', text: 'done', match: { containsText: ['There are still incomplete todos. Continue working through the remaining items.'] } });
+  }
+
+  expectLoopNudge(opts = {}) {
+    this.expectText({ id: opts.id || 'synthetic-loop-nudge', text: 'done', match: { containsText: ['You are in loop mode. You must call the submit_review tool'] } });
+  }
+
+  expectSyntheticBudgetNudge(opts = {}) {
+    this.expectText({ id: opts.id || 'synthetic-budget-nudge', text: 'done', match: { containsText: ['the system context is about to be suspended'] } });
+  }
+
   expectNoMoreRequests() { pushNoMoreRequests(this._state); }
 
   expectSatisfied() { checkSatisfied(this._state.expectations, this._state.unexpected); }
@@ -114,18 +127,11 @@ export class StrictMockProvider {
 
   _dispatchChat(res, parsed) {
     const s = this._state;
-    if (isTitleGenerationRequest(parsed)) {
-      if (s.strict && !s.allowTitleGeneration) {
-        return this._recordUnexpected(res, parsed, 'title-generation-not-allowed');
-      }
+    if (isTitleGenerationRequest(parsed) && (!s.strict || s.allowTitleGeneration)) {
       return sendSSE(res, buildTextChunks(`title_${Date.now()}`, 'E2E Test Session', 1));
     }
-    if (isSyntheticContinuation(parsed)) {
-      const marker = detectSyntheticMarker(parsed);
-      if (s.strict && !s.allowSyntheticContinuations) {
-        return this._recordUnexpected(res, parsed, `synthetic-${marker}-not-allowed`);
-      }
-      return this._bypassSynthetic(res, parsed, marker);
+    if (isSyntheticContinuation(parsed) && (!s.strict || s.allowSyntheticContinuations)) {
+      return this._bypassSynthetic(res, parsed, detectSyntheticMarker(parsed));
     }
     this._dispatchFifo(res, parsed);
   }
@@ -140,6 +146,11 @@ export class StrictMockProvider {
 
   _dispatchFifo(res, parsed) {
     const s = this._state;
+    if (isSyntheticContinuation(parsed)) {
+      const marker = detectSyntheticMarker(parsed);
+      s.syntheticRequests.push({ body: parsed, marker, time: Date.now() });
+      console.error(`[MOCK-SYNTH-FIFO] session=${parsed?.sessionId || '?'} marker=${marker}`);
+    }
     if (s.expectations.length === 0) {
       if (s.strict) {
         return this._recordUnexpected(res, parsed, 'no-expectations-queued');
@@ -150,6 +161,7 @@ export class StrictMockProvider {
     }
     const exp = s.expectations[0];
     if (exp.respond.type === 'no-more-requests-boundary') {
+      s.expectations.shift();
       if (s.strict) {
         return this._recordUnexpected(res, parsed, 'request-after-no-more-requests-boundary');
       }

@@ -28,7 +28,10 @@ function pickError(parsed) {
 }
 
 function pickFinishReason(parsed) {
-  return parsed?.properties?.finishReason;
+  return parsed?.properties?.finishReason
+    || parsed?.properties?.info?.finish
+    || parsed?.properties?.info?.finishReason
+    || parsed?.properties?.part?.reason;
 }
 
 function pickStatus(parsed) {

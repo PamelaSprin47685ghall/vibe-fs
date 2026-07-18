@@ -44,13 +44,8 @@ module DispatchOps =
     let getNowMs () : int64 = int64 (JS.Constructors.Date.now ())
 
     let digestForPrompt (identity: DispatchIdentity) : string =
-        let h = System.Security.Cryptography.SHA256.Create()
-
-        let bytes =
-            System.Text.Encoding.UTF8.GetBytes(identity.LogicalTurnId + "|" + identity.PhysicalSessionId)
-
-        let hash = h.ComputeHash(bytes)
-        System.Convert.ToBase64String(hash).[..7]
+        let key = identity.LogicalTurnId + "|" + identity.PhysicalSessionId
+        (Wanxiangshu.Runtime.FileSys.sha256HexTruncated key).[..7]
 
     let resolveRecord (r: DispatchRecord) (terminal: DispatchTerminal) : unit =
         if r.Terminal.IsNone then
