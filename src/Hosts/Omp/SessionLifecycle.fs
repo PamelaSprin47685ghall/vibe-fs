@@ -7,7 +7,7 @@ open Wanxiangshu.Hosts.Omp.SessionLifecycleHooks
 open Wanxiangshu.Hosts.Omp.Codec
 open Wanxiangshu.Runtime.ReviewRuntime
 open Wanxiangshu.Runtime.Fallback.RuntimeStore
-open Wanxiangshu.Runtime.Fallback.GateFlagTransitions
+open Wanxiangshu.Runtime.Fallback.SessionRuntimePropertyPure
 
 let registerSessionLifecycle (pi: obj) (reviewStore: ReviewStore) (fallbackRuntime: FallbackRuntimeStore) : unit =
     pi?on (
@@ -26,12 +26,12 @@ let registerSessionLifecycle (pi: obj) (reviewStore: ReviewStore) (fallbackRunti
 
                 match sidOpt with
                 | Some sid when sid <> "" ->
-                    fallbackRuntime.SetEventHandlingActive sid true
+                    fallbackRuntime.Update(sid, setEventHandlingActive true)
 
                     try
                         do! agentEndHandler pi reviewStore fallbackRuntime ctx
                     finally
-                        fallbackRuntime.SetEventHandlingActive sid false
+                        fallbackRuntime.Update(sid, setEventHandlingActive false)
                 | _ -> do! agentEndHandler pi reviewStore fallbackRuntime ctx
             })
     )

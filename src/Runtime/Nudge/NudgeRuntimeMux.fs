@@ -17,7 +17,7 @@ open Wanxiangshu.Kernel.EventSourcing.Fold
 open Wanxiangshu.Kernel.Review.ReviewLoopFold
 open Wanxiangshu.Runtime.EventLogRuntime
 open Wanxiangshu.Runtime.Fallback.RuntimeStore
-open Wanxiangshu.Runtime.Fallback.GateFlagTransitions
+open Wanxiangshu.Runtime.Fallback.SessionRuntimePropertyPure
 open Wanxiangshu.Runtime.NudgeRuntimeState
 open Wanxiangshu.Runtime.NudgeRuntimeEvent
 open Wanxiangshu.Runtime.NudgeFlow
@@ -113,7 +113,7 @@ let sendNudgeMux
                 | Some m -> box m
                 | None -> null
 
-            fallbackRuntime.SetMainContinuationAwaitingStart workspaceId true
+            fallbackRuntime.Update(workspaceId, setMainContinuationAwaitingStart true)
             let! delivered = unbox<JS.Promise<bool>> (Dyn.call4 nudgeFn workspaceId promptText modelVal agentVal)
             return if delivered then Delivered else Busy
         with _ ->

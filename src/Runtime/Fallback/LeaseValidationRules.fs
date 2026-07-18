@@ -7,7 +7,6 @@ open Wanxiangshu.Runtime.Fallback.LeaseTransitions
 open Wanxiangshu.Runtime.Fallback.SessionPropertyTransitions
 open Wanxiangshu.Runtime.Fallback.OrdinalTransitions
 open Wanxiangshu.Runtime.Fallback.CompactionTransitions
-open Wanxiangshu.Runtime.Fallback.GateFlagTransitions
 
 let verifyLeaseWithStatus
     (expectedStatus: LeaseStatus)

@@ -10,7 +10,6 @@ open Wanxiangshu.Kernel.FallbackKernel.Types
 open Wanxiangshu.Kernel.Subsession.Types
 open Wanxiangshu.Runtime.Fallback.RuntimeStore
 open Wanxiangshu.Runtime.Fallback.LeaseTransitions
-open Wanxiangshu.Runtime.Fallback.GateFlagTransitions
 open Wanxiangshu.Runtime.Fallback.SessionRuntimePropertyPure
 open Wanxiangshu.Runtime.Fallback.OrdinalTransitions
 open Wanxiangshu.Runtime.Fallback.CompactionTransitions
@@ -423,7 +422,7 @@ let handleEvent_newUserMessage_doesNotClearMainContinuationAwaitingStart () =
         let sid = "sess-new-user-test"
         rt.SetChain sid [ model ]
         rt.SetAgentName sid "reviewer"
-        rt.SetMainContinuationAwaitingStart sid true
+        rt.Update(sid, setMainContinuationAwaitingStart true)
 
         let rawEvent =
             createObj
@@ -440,7 +439,7 @@ let handleEvent_newUserMessage_doesNotClearMainContinuationAwaitingStart () =
         equal
             "MainContinuationAwaitingStart is still true on new user message"
             true
-            (rt.IsMainContinuationAwaitingStart sid)
+            (isMainContinuationAwaitingStart (rt.GetSession sid))
     }
 
 let handleEvent_emptyFallbackChain_isNotBypassed () =

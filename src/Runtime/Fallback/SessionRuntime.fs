@@ -105,7 +105,7 @@ let freshSessionState: FallbackSessionRuntime =
 // --- Unified domain transitions ---
 // Each function captures a complete lifecycle transition atomically.
 // These are the preferred mutation surface; individual field setters
-// (in SessionPropertyTransitions, GateFlagTransitions, …) delegate here.
+// (in SessionPropertyTransitions, etc.) delegate here.
 
 /// A human turn has begun — reset per-turn state, set owner, clear lease gates,
 /// and atomically increment the turn ordinal with a new turn ID.

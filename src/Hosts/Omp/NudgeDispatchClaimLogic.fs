@@ -14,7 +14,7 @@ open Wanxiangshu.Hosts.Omp.NudgeRuntime
 open Wanxiangshu.Hosts.Omp.Codec
 open Wanxiangshu.Runtime.Fallback.LeaseTransitions
 open Wanxiangshu.Runtime.Fallback.SessionPropertyTransitions
-open Wanxiangshu.Runtime.Fallback.GateFlagTransitions
+open Wanxiangshu.Runtime.Fallback.SessionRuntimePropertyPure
 
 let tryClaimNudgeDispatch
     (root: string)
@@ -131,7 +131,7 @@ let private registerLeaseAndMaybeDispatch
     fallbackRuntime.SetPendingNudgeLease(sessionId, lease)
     fallbackRuntime.SetSessionOwner sessionId SessionOwner.Nudge
     fallbackRuntime.SetActiveNudgeNonce sessionId nonce
-    fallbackRuntime.SetMainContinuationAwaitingStart sessionId true
+    fallbackRuntime.Update(sessionId, setMainContinuationAwaitingStart true)
 
     if isSessionForceStopped sessionId then
         finishNudge fallbackRuntime root sessionId lease NudgeOutcome.Cancelled "Force stopped" "" ""

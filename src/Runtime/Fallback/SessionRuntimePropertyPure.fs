@@ -114,6 +114,19 @@ let setMainContinuationAwaitingStart value (s: FallbackSessionRuntime) =
             else
                 Set.remove FallbackSessionGateFlag.MainContinuationAwaitingStart s.ActiveGates }
 
+// ----- Gate flag queries -----
+
+let isNudgeActive (s: FallbackSessionRuntime) : bool =
+    Set.contains FallbackSessionGateFlag.NudgeActive s.ActiveGates
+
+let isEventHandlingActive (s: FallbackSessionRuntime) : bool =
+    Set.contains FallbackSessionGateFlag.EventHandlingActive s.ActiveGates
+
+let isMainContinuationAwaitingStart (s: FallbackSessionRuntime) : bool =
+    Set.contains FallbackSessionGateFlag.MainContinuationAwaitingStart s.ActiveGates
+
+let getActiveGates (s: FallbackSessionRuntime) : Set<FallbackSessionGateFlag> = s.ActiveGates
+
 // ----- Model injection transitions -----
 
 let clearInjected (s: FallbackSessionRuntime) =

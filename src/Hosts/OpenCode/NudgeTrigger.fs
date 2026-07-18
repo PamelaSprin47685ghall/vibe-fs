@@ -10,9 +10,9 @@ open Wanxiangshu.Kernel.Nudge
 open Wanxiangshu.Kernel.Nudge.Types
 open Wanxiangshu.Kernel.HostTools
 open Wanxiangshu.Runtime
-open Wanxiangshu.Runtime.Fallback.GateFlagTransitions
 open Wanxiangshu.Runtime.Fallback.LeaseTransitions
 open Wanxiangshu.Runtime.Fallback.RuntimeStore
+open Wanxiangshu.Runtime.Fallback.SessionRuntimePropertyPure
 open Wanxiangshu.Runtime.Fallback.SessionPropertyTransitions
 open Wanxiangshu.Runtime.Fallback.CompactionTransitions
 open Wanxiangshu.Runtime.Dyn
@@ -141,12 +141,12 @@ type NudgeTrigger
                     then
                         match getClientFromPluginCtx ctx with
                         | Ok client ->
-                            fallbackRuntime.SetNudgeActive sessionIDStr true
+                            fallbackRuntime.Update(sessionIDStr, setNudgeActive true)
 
                             let! _ignored =
                                 dispatchPostStopFromHistory host fallbackRuntime client ctx sessionID isForceStopped
 
-                            fallbackRuntime.SetNudgeActive sessionIDStr false
+                            fallbackRuntime.Update(sessionIDStr, setNudgeActive false)
                         | Error _ -> ()
         }
 

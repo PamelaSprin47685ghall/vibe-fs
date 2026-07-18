@@ -25,7 +25,6 @@ open Wanxiangshu.Runtime.RunnerBackground
 open Wanxiangshu.Runtime.SessionExecutor
 open Wanxiangshu.Runtime.TreeSitterShell
 open Wanxiangshu.Runtime.Fallback.RuntimeStore
-open Wanxiangshu.Runtime.Fallback.GateFlagTransitions
 open Wanxiangshu.Runtime.Fallback.FallbackConfigCodec
 open Wanxiangshu.Kernel.FallbackKernel.Types
 open Wanxiangshu.Hosts.Omp.Fallback.Hook

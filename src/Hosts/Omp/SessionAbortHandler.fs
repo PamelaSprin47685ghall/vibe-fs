@@ -9,7 +9,7 @@ open Wanxiangshu.Runtime.Dispatch
 open Wanxiangshu.Kernel.Primitives.Identity
 open Wanxiangshu.Runtime.ReviewRuntime
 open Wanxiangshu.Runtime.Fallback.RuntimeStore
-open Wanxiangshu.Runtime.Fallback.GateFlagTransitions
+open Wanxiangshu.Runtime.Fallback.SessionRuntimePropertyPure
 open Wanxiangshu.Kernel.FallbackKernel.Types
 open Wanxiangshu.Runtime.Fallback.Ports
 open Wanxiangshu.Runtime.EventLogRuntime
@@ -68,14 +68,14 @@ let private handleFallbackEvent
                     createObj [ "event", box event; "props", box (createObj [ "sessionID", box sid ]) ]
 
                 if sid <> "" then
-                    fallbackRuntime.SetEventHandlingActive sid true
+                    fallbackRuntime.Update(sid, setEventHandlingActive true)
 
                 try
                     let! _ = handler rawEvent
                     ()
                 finally
                     if sid <> "" then
-                        fallbackRuntime.SetEventHandlingActive sid false
+                        fallbackRuntime.Update(sid, setEventHandlingActive false)
             | None -> ()
     }
 

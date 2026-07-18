@@ -8,7 +8,7 @@ open Wanxiangshu.Runtime.Fallback.LeaseTransitions
 open Wanxiangshu.Runtime.Fallback.SessionPropertyTransitions
 open Wanxiangshu.Runtime.Fallback.OrdinalTransitions
 open Wanxiangshu.Runtime.Fallback.CompactionTransitions
-open Wanxiangshu.Runtime.Fallback.GateFlagTransitions
+open Wanxiangshu.Runtime.Fallback.SessionRuntimePropertyPure
 open Wanxiangshu.Runtime.ContinuationEventWriter
 open Wanxiangshu.Runtime.Fallback.LeaseValidationRules
 
@@ -56,7 +56,7 @@ let cancelPendingMainLease
                 if runtime.GetSessionOwner sessionID = SessionOwner.Fallback then
                     runtime.SetSessionOwner sessionID SessionOwner.NoOwner
 
-                runtime.SetMainContinuationAwaitingStart sessionID false
+                runtime.Update(sessionID, setMainContinuationAwaitingStart false)
         | None -> ()
     }
 
@@ -120,7 +120,7 @@ let finishContinuation
             if runtime.GetSessionOwner sessionID = SessionOwner.Fallback then
                 runtime.SetSessionOwner sessionID SessionOwner.NoOwner
 
-            runtime.SetMainContinuationAwaitingStart sessionID false
+            runtime.Update(sessionID, setMainContinuationAwaitingStart false)
 
         runtime.UpdateState sessionID (runtime.GetOrCreateState sessionID)
     }

@@ -9,7 +9,6 @@ open Wanxiangshu.Runtime.NudgeRuntimeEvent
 open Wanxiangshu.Runtime
 open Wanxiangshu.Runtime.Dyn
 open Wanxiangshu.Runtime.Fallback.RuntimeStore
-open Wanxiangshu.Runtime.Fallback.GateFlagTransitions
 open Wanxiangshu.Runtime.Fallback.Ports
 open Wanxiangshu.Runtime.Fallback.FallbackConfigCodec
 open Wanxiangshu.Runtime.EventLogRuntime

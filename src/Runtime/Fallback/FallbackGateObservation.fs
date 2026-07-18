@@ -5,7 +5,7 @@ open Wanxiangshu.Kernel.FallbackRuntimeFlags
 open Wanxiangshu.Kernel.FallbackSubagentGate
 open Wanxiangshu.Kernel.Nudge.Types
 open Wanxiangshu.Runtime.Fallback.RuntimeStore
-open Wanxiangshu.Runtime.Fallback.GateFlagTransitions
+open Wanxiangshu.Runtime.Fallback.SessionRuntimePropertyPure
 open Wanxiangshu.Runtime.Fallback.SessionPropertyTransitions
 
 let observe (runtime: FallbackRuntimeStore) (sessionID: string) : FallbackGateObservation =
@@ -40,5 +40,5 @@ let observe (runtime: FallbackRuntimeStore) (sessionID: string) : FallbackGateOb
       Phase = phase
       Consumed = consumed
       BusyCount = runtime.GetBusyCount sessionID
-      ActiveGates = runtime.GetActiveGates sessionID
+      ActiveGates = getActiveGates (runtime.GetSession sessionID)
       TerminalOrigin = terminalOrigin }

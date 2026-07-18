@@ -7,7 +7,7 @@ open Wanxiangshu.Runtime.PromiseQueue
 open Wanxiangshu.Runtime.Fallback.RuntimeStore
 open Wanxiangshu.Runtime.Fallback.LeaseTransitions
 open Wanxiangshu.Runtime.Fallback.SessionPropertyTransitions
-open Wanxiangshu.Runtime.Fallback.GateFlagTransitions
+open Wanxiangshu.Runtime.Fallback.SessionRuntimePropertyPure
 open Wanxiangshu.Runtime.Fallback.Ports
 open Wanxiangshu.Runtime.Fallback.LeaseValidation
 open Wanxiangshu.Runtime.Fallback.ContinuationExecution
@@ -102,7 +102,7 @@ let handleTerminalPostSettlement
                     if runtime.GetSessionOwner sessionID = SessionOwner.Fallback then
                         runtime.SetSessionOwner sessionID SessionOwner.NoOwner
 
-                    runtime.SetMainContinuationAwaitingStart sessionID false
+                    runtime.Update(sessionID, setMainContinuationAwaitingStart false)
             | None -> ()
     }
 
@@ -153,7 +153,7 @@ let extractEventContext
                 || translator.IsSessionIdle rawEvent
                 || translator.IsSessionError rawEvent)
         then
-            runtime.SetMainContinuationAwaitingStart sessionID false
+            runtime.Update(sessionID, setMainContinuationAwaitingStart false)
 
         let! eventOpt = translateEvent translator executor runtime sessionID rawEvent pendingReview
         let eventTurnIdOpt = translator.ExtractHostRunId rawEvent

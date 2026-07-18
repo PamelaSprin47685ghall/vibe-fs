@@ -8,7 +8,7 @@ open Wanxiangshu.Runtime.OpencodeHostEvent
 open Wanxiangshu.Runtime.OpencodeHookInputCodec
 open Wanxiangshu.Runtime.ToolRuntimeContext
 open Wanxiangshu.Runtime.Fallback.RuntimeStore
-open Wanxiangshu.Runtime.Fallback.GateFlagTransitions
+open Wanxiangshu.Runtime.Fallback.SessionRuntimePropertyPure
 open Wanxiangshu.Runtime.Fallback.CompactionTransitions
 open Wanxiangshu.Runtime.Fallback.SessionPropertyTransitions
 open Wanxiangshu.Runtime.EventLogRuntime
@@ -191,7 +191,7 @@ let handleEvent
             | None -> ""
 
         if sid <> "" then
-            fallbackRuntime.SetEventHandlingActive sid true
+            fallbackRuntime.Update(sid, setEventHandlingActive true)
 
         try
             do! processEventEnvelope ctx fallbackRuntime sid eventEnvelope
@@ -212,6 +212,6 @@ let handleEvent
                     do! tryIdle (pluginDirectoryFromCtx ctx) sid |> Promise.map ignore
         finally
             if sid <> "" then
-                fallbackRuntime.SetEventHandlingActive sid false
+                fallbackRuntime.Update(sid, setEventHandlingActive false)
                 handleSessionClosed ctx sid eventEnvelope
     }

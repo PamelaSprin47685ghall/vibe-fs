@@ -32,7 +32,7 @@ open Wanxiangshu.Runtime.Dyn
 open Wanxiangshu.Runtime.Fallback.RuntimeStore
 open Wanxiangshu.Runtime.Fallback.LeaseTransitions
 open Wanxiangshu.Runtime.Fallback.SessionRuntime
-open Wanxiangshu.Runtime.Fallback.GateFlagTransitions
+open Wanxiangshu.Runtime.Fallback.SessionRuntimePropertyPure
 open Wanxiangshu.Runtime.Fallback.OrdinalTransitions
 open Wanxiangshu.Runtime.Fallback.SessionPropertyTransitions
 open Wanxiangshu.Kernel.FallbackKernel.Types
@@ -56,7 +56,7 @@ let beforeAgentStartHandler
         let sp = Dyn.get event "systemPrompt"
 
         match getSessionIdFromContext ctxObj with
-        | Some sid -> fallbackRuntime.SetMainContinuationAwaitingStart sid false
+        | Some sid -> fallbackRuntime.Update(sid, setMainContinuationAwaitingStart false)
         | None -> ()
 
         let! patch = beforeAgentStart cwd sp
@@ -92,7 +92,7 @@ let turnStartHandler
     match getSessionIdFromContext ctxObj with
     | Some sid ->
         clearNudgeSession sid
-        fallbackRuntime.SetMainContinuationAwaitingStart sid false
+        fallbackRuntime.Update(sid, setMainContinuationAwaitingStart false)
         Wanxiangshu.Runtime.ToolHookRuntime.clearSessionCompliance sid
     | None -> ()
 

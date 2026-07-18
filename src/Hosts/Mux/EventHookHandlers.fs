@@ -4,7 +4,7 @@ open Fable.Core
 open Wanxiangshu.Runtime
 open Wanxiangshu.Runtime.Dyn
 open Wanxiangshu.Runtime.Fallback.RuntimeStore
-open Wanxiangshu.Runtime.Fallback.GateFlagTransitions
+open Wanxiangshu.Runtime.Fallback.SessionRuntimePropertyPure
 open Wanxiangshu.Runtime.Fallback.Ports
 open Wanxiangshu.Runtime.EventLogRuntime
 open Wanxiangshu.Runtime.ReviewRuntime
@@ -205,7 +205,7 @@ let processMuxEvent
         let workspaceId = decoded.workspaceId
 
         if workspaceId <> "" then
-            fallbackRuntime.SetEventHandlingActive workspaceId true
+            fallbackRuntime.Update(workspaceId, setEventHandlingActive true)
 
         try
             if workspaceId <> "" then
@@ -235,5 +235,5 @@ let processMuxEvent
                     do! handleUnconsumedEvent directory workspaceId runtime event helpers
         finally
             if workspaceId <> "" then
-                fallbackRuntime.SetEventHandlingActive workspaceId false
+                fallbackRuntime.Update(workspaceId, setEventHandlingActive false)
     }

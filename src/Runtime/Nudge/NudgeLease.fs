@@ -11,7 +11,7 @@ open Wanxiangshu.Runtime.Fallback.LeaseTransitions
 open Wanxiangshu.Runtime.Fallback.OrdinalTransitions
 open Wanxiangshu.Runtime.Fallback.SessionPropertyTransitions
 open Wanxiangshu.Runtime.Fallback.CompactionTransitions
-open Wanxiangshu.Runtime.Fallback.GateFlagTransitions
+open Wanxiangshu.Runtime.Fallback.SessionRuntimePropertyPure
 open Wanxiangshu.Kernel.FallbackKernel.Types
 
 let finishNudge
@@ -51,7 +51,7 @@ let finishNudge
                     if runtime.GetSessionOwner sessionKey = SessionOwner.Nudge then
                         runtime.SetSessionOwner sessionKey SessionOwner.NoOwner
 
-                    runtime.SetNudgeActive sessionKey false
+                    runtime.Update(sessionKey, setNudgeActive false)
         | _ -> ()
     }
 

@@ -7,7 +7,6 @@ open Wanxiangshu.Runtime.PromiseQueue
 open Wanxiangshu.Runtime.Fallback.RuntimeStore
 open Wanxiangshu.Runtime.Fallback.LeaseTransitions
 open Wanxiangshu.Runtime.Fallback.SessionPropertyTransitions
-open Wanxiangshu.Runtime.Fallback.GateFlagTransitions
 open Wanxiangshu.Runtime.Fallback.Ports
 open Wanxiangshu.Runtime.Fallback.LeaseValidation
 open Wanxiangshu.Runtime.Fallback.ContinuationExecution
