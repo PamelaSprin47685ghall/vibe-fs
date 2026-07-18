@@ -14,6 +14,7 @@ open Wanxiangshu.Runtime.Fallback.GateFlagTransitions
 open Wanxiangshu.Runtime.Fallback.LeaseTransitions
 open Wanxiangshu.Runtime.Fallback.RuntimeStore
 open Wanxiangshu.Runtime.Fallback.SessionPropertyTransitions
+open Wanxiangshu.Runtime.Fallback.CompactionTransitions
 open Wanxiangshu.Runtime.Dyn
 open Wanxiangshu.Runtime.OpencodeClientCodec
 open Wanxiangshu.Runtime.OpencodeHostEvent
@@ -147,6 +148,16 @@ type NudgeTrigger
 
                             fallbackRuntime.SetNudgeActive sessionIDStr false
                         | Error _ -> ()
+        }
+
+    member _.SettleCompactionIfCompleted(sessionIDStr: string) : JS.Promise<unit> =
+        promise {
+            if
+                fallbackRuntime.GetSessionOwner sessionIDStr = SessionOwner.Compaction
+                && fallbackRuntime.IsCompacted sessionIDStr
+                && fallbackRuntime.IsCompactionContinuationObserved sessionIDStr
+            then
+                do! NudgeTriggerOps.settleCompaction_ ctx fallbackRuntime sessionIDStr
         }
 
 let createNudgeTrigger

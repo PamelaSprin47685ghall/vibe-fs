@@ -179,7 +179,9 @@ let handleEvent
             let! fbConsumed = fallback.TryConsumeEvent input
 
             if fbConsumed then
-                return ()
+                if Option.exists isIdleEnvelope eventEnvelope then
+                    do! nudge.SettleCompactionIfCompleted sid
+                    do! tryIdle (pluginDirectoryFromCtx ctx) sid |> Promise.map ignore
             else
                 do! nudge.HandleNaturalStop eventEnvelope
 

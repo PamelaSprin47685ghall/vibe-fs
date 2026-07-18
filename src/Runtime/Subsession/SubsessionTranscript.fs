@@ -20,19 +20,13 @@ let private lastUserMessageIndex (msgs: obj array) : int option =
 let private findAnchorIndex (msgs: obj array) (anchor: TurnAnchor) : Result<int, TranscriptReadFailure> =
     match anchor with
     | AnchorByUserMessageId messageId ->
-        // Derive search domain from last-user boundary.
-        let baseIndex, searchDomain =
-            match lastUserMessageIndex msgs with
-            | Some idx -> idx, msgs.[idx..]
-            | None -> 0, msgs
-
-        searchDomain
+        msgs
         |> Array.tryFindIndexBack (fun msg ->
             let info = Dyn.get msg "info"
             let id = Dyn.str msg "id"
             let role = if Dyn.isNullish info then "" else Dyn.str info "role"
             (id = messageId || Dyn.str info "id" = messageId) && role = "user")
-        |> Option.map (fun relativeIndex -> Ok(baseIndex + relativeIndex))
+        |> Option.map Ok
         |> Option.defaultValue (
             Error { TranscriptReadFailure.Message = sprintf "Anchor user message %s not found in transcript" messageId }
         )
