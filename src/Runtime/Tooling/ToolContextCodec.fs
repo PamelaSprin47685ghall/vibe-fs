@@ -12,6 +12,9 @@ open Wanxiangshu.Runtime.ChildAgentRegistry
 [<Global("globalThis.process")>]
 let private nodeProcess: obj = jsNative
 
+[<Import("resolve", "node:path")>]
+let private pathResolve (cwd: string) (path: string) : string = jsNative
+
 let private envVar (name: string) : string =
     let v = nodeProcess?env?(name)
     if Wanxiangshu.Runtime.Dyn.isNullish v then "" else string v
@@ -62,7 +65,7 @@ let decodeOpencodeToolContext (context: IOpenCodeToolContext) (fallbackDir: stri
         | Some s -> s
         | None -> ""
 
-    let finalDir = directory
+    let finalDir = pathResolve (unbox<string> (nodeProcess?cwd ())) directory
 
     { Directory = finalDir
       SessionId = Id.sessionIdQuick sessionId

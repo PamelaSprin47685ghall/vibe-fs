@@ -5,6 +5,7 @@ open Fable.Core.JsInterop
 open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Runtime.Dyn
 open Wanxiangshu.Runtime.OpencodeContextCodec
+open Wanxiangshu.Runtime.ToolContextCodec
 open Wanxiangshu.Runtime.ToolRuntimeContext
 
 [<Global("process")>]
@@ -38,9 +39,18 @@ let pluginDirectoryFallbackToCwd () =
     let dir = pluginDirectoryFromCtx context
     equal "pluginDirectoryFromCtx falls back to CWD" (getCwd ()) dir
 
+let relativeAndAbsoluteDirectoryDecodeToSameExecutionDir () =
+    let cwd = getCwd ()
+    let ctxRelative = createObj [ "directory", box "." ]
+    let ctxAbsolute = createObj [ "directory", box cwd ]
+    let dirRelative = (decodeOpencodeToolContext (unbox ctxRelative) "").Directory
+    let dirAbsolute = (decodeOpencodeToolContext (unbox ctxAbsolute) "").Directory
+    check "relative '.' and absolute cwd decode to same execution dir" (dirRelative = dirAbsolute)
+
 let run () =
     abortNullWhenContextNull ()
     abortNullWhenContextUndefined ()
     abortNullWhenAbortMissing ()
     abortReturnsPresentAbortObject ()
     pluginDirectoryFallbackToCwd ()
+    relativeAndAbsoluteDirectoryDecodeToSameExecutionDir ()

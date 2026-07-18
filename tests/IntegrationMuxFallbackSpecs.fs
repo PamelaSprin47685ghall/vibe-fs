@@ -10,20 +10,26 @@ open Wanxiangshu.Runtime.Dyn
 module Dyn = Wanxiangshu.Runtime.Dyn
 open Wanxiangshu.Hosts.Mux.Plugin
 
-/// Build Mux plugin deps with `directory`, `getChatHistory`, and a `nudge` that
-/// captures dispatch text into a caller-owned ResizeArray.  Used by fallback
-/// integration specs that need the fallback action executor (closed over `deps`)
-/// to fire a `SendContinue` / `RecoverWithPrompt` nudge.
-let private muxDepsWithNudgeCapture
+/// One-shot deferred signal resolved after the first nudge text is recorded.
+let private buildNudgeSignal () : (JS.Promise<unit> * (unit -> unit)) =
+    let resolver = ref (fun () -> ())
+    let p = Promise.create (fun resolve _ -> resolver.Value <- resolve)
+    p, (fun () -> resolver.Value())
+
+/// Build Mux deps whose nudge resolves the one-shot signal after recording.
+let private buildMuxDeps
     (sessionID: string)
     (directory: string)
     (getChatHistory: string -> JS.Promise<obj array>)
     (nudges: ResizeArray<string>)
+    (resolveSignal: unit -> unit)
     : obj =
+
     let nudgeFn =
         System.Func<obj, obj, JS.Promise<bool>>(fun _ msg ->
             promise {
                 nudges.Add(string msg)
+                resolveSignal ()
                 return true
             })
 
@@ -36,12 +42,7 @@ let private muxDepsWithNudgeCapture
           "nudge", box nudgeFn
           "directory", box directory ]
 
-/// `session.error` with `errorType=APIError` / `statusCode=429` / `isRetryable=true`
-/// must route through the Mux fallback event bridge: `muxEventTranslator` decodes
-/// it as `SessionError`, `classifyError` returns `RetrySame`, and the state machine
-/// fires `SendContinue` against the first model in the chain parsed from AGENTS.md.
-/// Because `FallbackHookResult.Consumed = true`, NudgeRuntime is short-circuited
-/// and exactly one nudge (the fallback's "continue openai/gpt-5") is dispatched.
+/// Fallback from retryable 429 error fires exactly one nudge.
 let muxSessionErrorTriggersFallbackContinueSpec () =
     promise {
         let! tmpDir = mkdtempAsync "mux-fb-error-"
@@ -53,13 +54,15 @@ let muxSessionErrorTriggersFallbackContinueSpec () =
 
         let sessionID = "mux-fb-error-ws"
         let nudges = ResizeArray<string>()
+        let nudgeObserved, resolveSignal = buildNudgeSignal ()
 
         let deps =
-            muxDepsWithNudgeCapture
+            buildMuxDeps
                 sessionID
                 tmpDir
                 (fun sid -> promise { return if sid = sessionID then [||] else [||] })
                 nudges
+                resolveSignal
 
         let reg = createRegistration deps
         let eventHook = get reg "eventHook"
@@ -80,31 +83,13 @@ let muxSessionErrorTriggersFallbackContinueSpec () =
                   ) ]
 
         do! (eventHook $ (ev, helpers)) |> unbox<JS.Promise<unit>>
-        do! yieldMicrotask ()
-
-        check
-            "Fallback consumed the error and dispatched one continue nudge via the fallback action executor"
-            (nudges.Count = 1)
-
-        let prompt = nudges.[0]
-
-        check
-            "Nudge text carries 'continue openai/gpt-5' (SendContinue against chain[0])"
-            (prompt.Contains "continue openai/gpt-5")
-
+        do! withTimeout nudgeObserved
+        check "exactly one nudge dispatched" (nudges.Count = 1)
+        check "nudge text contains 'continue openai/gpt-5'" (nudges.[0].Contains "continue openai/gpt-5")
         do! rmAsync tmpDir
     }
 
-/// `stream-end` with `muxStopReason=tool_use_error` whose assistant text contains
-/// an XML-call-as-text pattern must route through two layers:
-///   1. `muxEventTranslator.IsSessionIdle` → `SessionIdle` fallback event.
-///   2. State machine: `FallbackPhase.Idle + not TaskComplete` → `ScanToolCallAsText`.
-///   3. `FetchMessages` (via deps.getChatHistory) yields assistant text containing
-///      the tool call → `scanToolCallAsText` returns `Some recoveryPrompt`.
-///   4. `RecoverWithPrompt(chain[0], recoveryPrompt)` → `invokeNudge`.
-/// The test asserts exactly one nudge fires (the fallback recovery prompt), and
-/// its text contains the `FallbackMessageCodec` recovery string "You produced the
-/// tool call as raw text".
+/// Fallback from tool-call-as-text recovery fires exactly one nudge.
 let muxStreamEndToolCallAsTextTriggersFallbackSpec () =
     promise {
         let! tmpDir = mkdtempAsync "mux-fb-toolcall-"
@@ -116,10 +101,8 @@ let muxStreamEndToolCallAsTextTriggersFallbackSpec () =
 
         let sessionID = "mux-fb-toolcall-ws"
         let nudges = ResizeArray<string>()
+        let nudgeObserved, resolveSignal = buildNudgeSignal ()
 
-        // Chat history: one assistant message whose text contains an XML tool call
-        // emitted as raw text.  `info.role = "assistant"` satisfies the
-        // `scanToolCallAsText` discriminator.
         let assistantMsg =
             createObj
                 [ "info", box (createObj [ "role", box "assistant" ])
@@ -127,21 +110,15 @@ let muxStreamEndToolCallAsTextTriggersFallbackSpec () =
                   box
                       [| box
                              {| ``type`` = "text"
-                                text = "<tool_call><name>read</name></tool_call>" |} |] ]
+                                text = "<tool_call><name>read</name> 后续" |} |] ]
 
-        let deps =
-            muxDepsWithNudgeCapture
-                sessionID
-                tmpDir
-                (fun sid -> promise { return if sid = sessionID then [| assistantMsg |] else [||] })
-                nudges
+        let getHistory sid =
+            promise { return if sid = sessionID then [| assistantMsg |] else [||] }
 
+        let deps = buildMuxDeps sessionID tmpDir getHistory nudges resolveSignal
         let reg = createRegistration deps
         let eventHook = get reg "eventHook"
 
-        // Invocation helpers intentionally omit `nudge` so the NudgeRuntime path
-        // (which runs only when fallback returns Consumed=false) cannot dispatch a
-        // second nudge even if it reaches `sendNudgeMux`.
         let helpers =
             createObj [ "getTodos", box (System.Func<obj, JS.Promise<obj>>(fun _ -> promise { return box [||] })) ]
 
@@ -161,12 +138,11 @@ let muxStreamEndToolCallAsTextTriggersFallbackSpec () =
                   ) ]
 
         do! (eventHook $ (ev, helpers)) |> unbox<JS.Promise<unit>>
-        do! yieldMicrotask ()
-
-        check "Exactly one nudge fires (fallback RecoverWithPrompt), not a second from NudgeRuntime" (nudges.Count = 1)
+        do! withTimeout nudgeObserved
+        check "exactly one nudge fires" (nudges.Count = 1)
 
         check
-            "Nudge carries the FallbackMessageCodec recovery prompt ('You produced the tool call as raw text')"
+            "nudge contains FallbackMessageCodec recovery prompt"
             (nudges.[0].Contains "You produced the tool call as raw text")
 
         do! rmAsync tmpDir

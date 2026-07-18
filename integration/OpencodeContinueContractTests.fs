@@ -207,7 +207,9 @@ let run
                                 ) ]
                       ) ]
 
-            let! _ = withTimeout (harness.fireEvent errorEvent)
+            // Regression: a pending continuation transport must not block the
+            // per-session event boundary from accepting a host error fact.
+            let! _ = withTimeoutCustom 1000 (harness.fireEvent errorEvent)
 
             let! _ = withTimeout (harness.fireEvent statusEvent)
 
