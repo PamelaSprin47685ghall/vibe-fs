@@ -2,8 +2,8 @@
 
 ## 入口
 
-- `Omp/Plugin.fs` → npm **`wanxiangshu/omp`**
-- `Omp/PluginCore.fs`：扩展装配
+- `src/Hosts/Omp/Plugin.fs` → npm **`wanxiangshu/omp`**
+- `src/Hosts/Omp/PluginComposition.fs`：扩展装配
 - 导出符号：`wanxiangshuExtension`（见 `README.md`）
 
 ## 隔离纪律
@@ -13,31 +13,28 @@
 
 ## 工具
 
-- 分模块：`FuzzyTools`、`ExecutorTools`、`WebTools`、`ReviewToolsRegister`、`TodoTool`、`SubagentTools` 等
+- 分模块：`src/Hosts/Omp/FuzzyTools.fs`、`ExecutorTools.fs`、`WebTools.fs`、`ReviewToolsRegister.fs`、`TodoTool.fs`、`SubagentTools.fs` 等
 - **Executor**：同步语义；**不**注册 `executor_wait` / `executor_abort`（与 OpenCode 异步执行器模型对齐方式不同）
 - Schema：**TypeBox** via `OmpToolSchema.fs`（`executor` 含 `max_bytes`）
 - `pi?registerTool` 动态注册
 
 ## 子 workspace
 
-- `Omp/ChildSession.fs`、`ChildSessionRegistry.fs`：子代理隔离目录
+- `src/Hosts/Omp/ChildSession.fs`、`ChildSessionRegistry.fs`：子代理隔离目录
 
 ## Caps 与消息
 
-- `Omp/CapsCodec.fs`、`Shell/OmpCaps`
-- `Omp/MessageTransform.fs`：经 Shell caps + `MessagingCodec`
+- `src/Hosts/Omp/CapsCodec.fs`、`src/Hosts/Omp/MessageTransform.fs`：经 Runtime caps + `MessagingCodec`
 
 ## Review / Nudge / Magic
 
-- `Omp/NudgeHooks.fs`、`Shell/NudgeRuntime`
-- `Omp/MagicTodo.fs`
+- `src/Hosts/Omp/NudgeHooks.fs`、`src/Hosts/Omp/NudgeRuntime.fs`
+- `src/Hosts/Omp/MagicTodo.fs`
 - Review：`ReviewToolsRegister` + `ReviewRuntime`
 
 ## Fallback
 
-- `Omp/FallbackHooks.fs` → `createOmpFallbackHandler`
-- `Omp/Fallback/EventTranslator.fs`：`ompEventTranslator`
-- `Omp/Fallback/ActionExecutor.fs`：`IActionExecutor` 实现，`SendContinue` 使用内联 `"\u200B"` 替代旧 `zwsChar` 私有常量
+- `src/Hosts/Omp/Fallback/`：OMP Fallback adapter、事件翻译与执行
 
 ## 上游
 

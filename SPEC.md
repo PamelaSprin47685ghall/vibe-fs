@@ -2000,7 +2000,7 @@ e2e/opencode/
 ### P0
 
 * [ ] **OC-BOOT-001** 启动 `opencode serve`，插件从配置路径成功加载。
-* [ ] **OC-BOOT-002** `/command` 中存在 `loop`、`loop-review`。
+* [ ] **OC-BOOT-002** `/command` 中存在 `loop`。
 * [ ] **OC-BOOT-003** LLM 请求中出现所有应注册的自定义工具。
 * [ ] **OC-BOOT-004** 插件缺失时建立 baseline，确认相关工具、命令、prompt 均不存在。
 * [ ] **OC-BOOT-005** 插件路径错误时宿主启动或 plugin load 明确失败，stderr 可诊断。

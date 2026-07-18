@@ -1,6 +1,8 @@
 # 万象术文档索引
 
-`docs/` 为**唯一**系统化技术文档目录，与 `src/`、`tests/` 对齐。**权威顺序：实现 > docs。**
+`docs/` 为系统化技术文档目录，与 `src/`、`tests/` 对齐。**权威顺序：实现与测试 > docs。**
+
+源码当前按三块组织：`src/Hosts/` 是宿主绑定，`src/Kernel/` 是纯规则，`src/Runtime/` 是 IO、事件日志、codec 与运行时编排。文档路径均以这三个真实目录为准；旧的 `Shell/`、`Kernel/EventLog/`、`Opencode/` 仅在历史文字中出现时视为过时称呼。
 
 ## 文档地图
 
@@ -9,14 +11,14 @@
 | 00 | [00-index.md](./00-index.md) | 本索引 |
 | 01 | [01-overview.md](./01-overview.md) | 产品、公理速查、万象阵边界 |
 | 01′ | [01-first-principles.md](./01-first-principles.md) | 七条公理展开（设计动机与纪律） |
-| 02 | [02-architecture.md](./02-architecture.md) | 三层架构、依赖纪律、子系统概要 |
-| 03 | [03-kernel.md](./03-kernel.md) | 纯内核模块族 |
-| 04 | [04-runtime.md](./04-runtime.md) | IO、codec、运行时 |
+| 02 | [02-architecture.md](./02-architecture.md) | Hosts / Kernel / Runtime 三层、依赖纪律、子系统概要 |
+| 03 | [03-kernel.md](./03-kernel.md) | `src/Kernel/` 纯内核模块族 |
+| 04 | [04-runtime.md](./04-runtime.md) | `src/Runtime/` IO、codec、事件日志与运行时 |
 | 05 | [05-event-sourcing.md](./05-event-sourcing.md) | `.wanxiangshu.ndjson`、事件种类全集 |
 | 06 | [06-review-and-nudge.md](./06-review-and-nudge.md) | `/loop`、reviewer、nudge 三层架构 |
 | 07 | [07-work-backlog.md](./07-work-backlog.md) | todowrite / 五报告 |
 | 08 | [08-tools-and-permissions.md](./08-tools-and-permissions.md) | ToolCatalog、权限 |
-| 09 | [09-methodology.md](./09-methodology.md) | 54× `methodology_*` |
+| 09 | [09-methodology.md](./09-methodology.md) | `methodology_*` schema 与注册 |
 | 10 | [10-message-transform.md](./10-message-transform.md) | 管线、Semble、并行提示 |
 | 11 | [11-subagents.md](./11-subagents.md) | spawn、SubsessionActor、continue、iterator |
 | 12 | [12-fallback.md](./12-fallback.md) | 模型降级运行时、续命六阶段、门闩 |
@@ -66,15 +68,14 @@
 | architecture-refactoring | 02 § 演进路线 |
 | Wanxiangshu/* | `wanxiangzhen/01`–`03` + [19](./19-wanxiangzhen.md) |
 
-## 源码体量
+## 当前源码入口
 
-| 目录 | 约 .fs |
-| :--- | ---: |
-| Shell | 139 |
-| Kernel | 92 |
-| Opencode | 49 |
-| Omp | 33 |
-| Mux | 21 |
-| Methodology | 11 |
+| 能力 | 源码入口 | npm/build 入口 |
+| :--- | :--- | :--- |
+| Mux | `src/Hosts/Mux/Plugin.fs` | `wanxiangshu` / `build/src/Hosts/Mux/Plugin.js` |
+| OMP | `src/Hosts/Omp/Plugin.fs` | `wanxiangshu/omp` / `build/src/Hosts/Omp/Plugin.js` |
+| OpenCode | `src/Hosts/OpenCode/Plugin.fs` | 构建产物中的 OpenCode 插件入口 |
+| Mimocode | `src/Hosts/OpenCode/PluginMimo.fs`、`PluginMimoTui.fs` | 无独立 npm export |
+| 万象阵 | `src/Hosts/OpenCode/PluginWanxiangzhen.fs` | `wanxiangshu/wanxiangzhen` / `build/src/Hosts/OpenCode/PluginWanxiangzhen.js` |
 
-npm：`"."` Mux；`./omp`；`./wanxiangzhen`。
+构建、单元/集成测试与 OpenCode E2E 命令见 [17-build-test-verify.md](./17-build-test-verify.md)。

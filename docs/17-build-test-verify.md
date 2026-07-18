@@ -11,24 +11,29 @@
 | 命令 | 作用 |
 | :--- | :--- |
 | `npm run build` | Fable → `build/`，`postbuild.mjs` 整理 package |
-| `npm test` | `node tests/runner.js` |
-| `npm run build-and-test` | 构建 + 全量测试（约 20s，见 `AGENTS.md`） |
-| `npm run build-and-test-e2e` | 含 e2e |
+| `npm test` / `npm run test:unit` | `node tests/runner.js` |
+| `npm run test:integration` | `node tests/integration.js` |
+| `npm run test:e2e:opencode:p0` | `node tests/e2e.js opencode-e2e-p0` |
+| `npm run test:e2e:opencode:full` | `node tests/e2e.js opencode-e2e-full` |
+| `npm run validate:coverage` | 运行 `e2e/opencode/scripts/validate-manifest.mjs`，校验 `behavior-coverage.ts` |
+| `npm run build-and-test` | 构建 + `tests/runner.js` 全量测试（见 `AGENTS.md`） |
+| `npm run build-and-test-e2e` | 构建 + E2E 编排脚本 |
 | `npm run format` | 预提交格式化 |
 
-产物：`build/src/**/*.js`；测试加载 `build/tests/Tests.js`。
+产物为 `build/src/**/*.js`；F# 测试编译为 `build/tests/Tests.js`，由 `tests/runner.js` 加载。
 
 ## 测试分层
 
 | 层 | 位置 | 说明 |
 | :--- | :--- | :--- |
 | 纯内核 | `tests/*Tests.fs` | 无 IO，时间无关 |
-| Shell / Codec | `tests/` codec 条目 | 边界解析 |
+| Runtime / Codec | `tests/` codec 条目 | 边界解析 |
 | 行为/契约 | `*Tests.fs`、`Integration*`、`e2e/` | 公共输入、输出与状态事实 |
 | 集成 | `Integration*`、`IntegrationToolSpecCatalog` | 工具契约 |
 | OMP 专项 | `ompTestEntries` | 扩展边界 |
 | 万象阵 | `wanxiangzhenTestEntries` | 协调器（若启用） |
-| E2E | `e2e/` | harness + mock LLM |
+| OpenCode E2E | `e2e/opencode/` | `opencode serve`、HTTP、事件探针与 strict mock；通过 `tests/e2e.js` 选择 P0/full |
+| 兼容/契约 harness | `integration/`、`e2e/Tests*.fs`、`e2e/*-harness.js` | 按各测试入口运行，不等同于真实 OpenCode E2E |
 
 `tests/runner.js` 调用 `runAll(selectors)`；可传前缀过滤用例。
 
@@ -36,8 +41,10 @@
 
 ## E2E
 
-- `e2e/wanxiangzhen-harness/` 等
-- 时间无关：轮询状态而非固定 sleep（见 [01-first-principles.md](./01-first-principles.md) §7）
+- OpenCode P0/full：`e2e/opencode/` + `tests/e2e.js`
+- 万象阵：`e2e/wanxiangzhen-harness/`
+- Mux/OMP：`e2e/mux-harness.js`、`e2e/omp-harness.js`
+- 时间无关：轮询事件与状态，不用固定 sleep（见 [01-first-principles.md](./01-first-principles.md) §7）
 
 ## 非功能需求与架构不变量
 

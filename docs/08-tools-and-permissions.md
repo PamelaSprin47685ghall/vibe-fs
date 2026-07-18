@@ -84,11 +84,15 @@
 
 `it-is-not-possible-to-do-it-using-other-tools-and-only-run-tests-when-static-analysis-cannot-handle-it`
 
-SSOT：`Kernel/WarnTdd.fs`、`ToolCatalog`；测试 `WarnTddKernelFactsTests`。
+**子代理委派**（`coder`、`inspector`、`meditator`、`browser`）另须 `warn_reuse`：
+
+`this-task-is-not-suitable-to-be-completed-via-continue-tool`
+
+三个字段均为软协议：schema 注入 `required_` 元数据但不加入宿主强制 `required`；before hook 提取并移除，after hook 恢复到历史可见 args 并追加批评。SSOT：`src/Kernel/WarnTdd.fs`、`src/Runtime/Tooling/ToolArgumentCoercion.fs`、`src/Runtime/Tooling/ToolHookRuntime.fs`；测试 `WarnTddKernelFactsTests` 与三宿主 enforcement tests。
 
 ## Mux 特有包装
 
-`Mux/Wrappers.fs`、`HostTools.fs`、`HostToolsFuzzy.fs`：将 Mux 原生工具名映射到万象术执行链。
+`src/Hosts/Mux/Wrappers.fs`、`src/Kernel/HostTools.fs`、`src/Hosts/Mux/BuiltinToolsFuzzy.fs`：将 Mux 原生工具名映射到万象术执行链。
 
 ## OMP 注册
 

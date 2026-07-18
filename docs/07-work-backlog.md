@@ -41,14 +41,14 @@
 | `lessonsAndConventions` | 惯例与教训 |
 | `plan` | 计划或下一步 |
 
-文案 SSOT 片段在 `Kernel.Methodology` / `CapsPrelude` 相关 todowrite 说明；schema 在 Shell `WorkBacklogToolsCodec`、`WorkBacklogSchema`。
+文案 SSOT 片段在 `src/Kernel/Methodology/` / `src/Kernel/CapsPrelude.fs`；schema 与执行边界在 `src/Runtime/Tooling/WorkBacklogToolsCodec.fs`、各宿主工具 schema。
 
 ## 事件：`work_backlog_committed`
 
 - **触发**：工具执行成功且参数通过 Kernel/codec 校验
-- **写入**：`EventLogRuntimeAppend.appendWorkBacklogCommitted`
+- **写入**：`src/Runtime/EventStore/BacklogEventWriter.fs` 与 EventStore append 链
 - **Fold**：`foldWorkBacklogSnapshot` 取**最后一条** committed 为当前快照
-- **展示**：`BacklogProjection` / MessageTransform 将 fold 结果格式化为 caps 或 Magic todo UI（**非**再从历史 tool 消息 fold SSOT）
+- **展示**：`src/Kernel/Backlog/BacklogProjection.fs` 与 MessageTransform 格式化 fold 结果（**非**再从历史 tool 消息 fold SSOT）
 
 ## 与 compaction / context budget 的关系
 
@@ -66,7 +66,7 @@
 
 ## OMP
 
-`Omp/TodoTool.fs`、`TodoHooks.fs`：TypeBox schema + tool_result 后处理；`select_methodology` 与 OpenCode 同源枚举。
+`src/Hosts/Omp/TodoTool.fs`、`TodoHooks.fs`：TypeBox schema + tool_result 后处理；`select_methodology` 与 OpenCode 同源枚举。
 
 ## 测试与验收
 
@@ -77,10 +77,10 @@
 
 | 模块 | 路径 |
 | :--- | :--- |
-| 投影核心 | `Kernel/BacklogProjectionCore.fs`、`BacklogProjection.fs`、`WorkBacklog.fs` |
-| Append | `Shell/EventLogRuntimeAppend.fs` |
-| Sync | `Shell/EventLogRuntimeSync.fs` |
-| 工具 codec | `Shell/WorkBacklogToolsCodec.fs` |
+| 投影核心 | `src/Kernel/Backlog/BacklogProjection.fs`、`src/Kernel/WorkBacklog.fs` |
+| Append | `src/Runtime/EventStore/BacklogEventWriter.fs`、`EventStore.fs` |
+| Sync | `src/Runtime/EventStore/EventLogRuntimeSync.fs`、`SessionProjectionStore.fs` |
+| 工具 codec | `src/Runtime/Tooling/WorkBacklogToolsCodec.fs` |
 
 ## 相关文档
 

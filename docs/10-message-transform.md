@@ -2,18 +2,18 @@
 
 ## 目的
 
-在宿主将消息数组交给 LLM **之前**，插入 caps、backlog、review replay、Semble、parallel 提示、context budget 等。共享逻辑在 **Shell**；宿主只挂 hook 与 `RuntimeScope`。`
+在宿主将消息数组交给 LLM **之前**，插入 caps、backlog、review replay、Semble、parallel 提示、context budget 等。共享逻辑在 `src/Runtime/MessageTransform/`；宿主只挂 hook 与 `RuntimeScope`。
 
 ## 核心模块
 
 | 模块 | 职责 |
 | :--- | :--- |
-| `Shell/MessageTransformPipeline.fs` | 主编排、`applyContextBudget`、`tryInjectParallelToolPrompt` |
-| `Shell/MessageTransformCore.fs` | 纯变换步骤 |
-| `Shell/MessageTransformStack.fs` | TransformState 三段状态（Caps、Backlog、Top slot） |
-| `Shell/ToolHookRuntime.fs` | 控制字段软校验、净化、after 还原、违例批评 |
-| `Kernel/MessageTransformPolicy.fs` | 策略（Backlog/Caps/ParallelHint/ContextBudget 四分） |
-| `Shell/SembleSearch.fs` | inspector 断点注入 |
+| `src/Runtime/MessageTransform/Pipeline.fs` | 主编排、`applyContextBudget`、阶段组合 |
+| `src/Runtime/MessageTransform/Stack.fs` | TransformState 三段状态（Caps、Backlog、Top slot） |
+| `src/Runtime/Tooling/ToolHookRuntime.fs` | 控制字段软校验、净化、after 还原、违例批评 |
+| `src/Kernel/MessageTransformPolicy.fs` | 策略（Backlog/Caps/ParallelHint/ContextBudget 四分） |
+| `src/Runtime/MessageTransform/ParallelHintStage.fs` | 并行提示阶段 |
+| `src/Runtime/Search/SembleSearch.fs` | inspector 断点注入 |
 
 架构测试：三宿主须 `UsesProjectionPolicy` + Shell caps cache；`noQuadraticListAppend`。
 
@@ -58,7 +58,7 @@
 
 ## 空输出 → Fallback（与 [12](./12-fallback.md)）
 
-`SessionIdle` 时若最后 assistant 无 tool、无可见 text → 译为 `EmptyOutputError`，Fallback `SendContinue`，`Consumed=true` **短路 nudge**。实现：`FallbackMessageCodec`、`FallbackEventBridge`。
+`SessionIdle` 时若最后 assistant 无 tool、无可见 text → 译为 `EmptyOutputError`，Fallback `SendContinue`，`Consumed=true` **短路 nudge**。实现：`src/Runtime/Fallback/FallbackMessageCodec.fs`、`Coordinator.fs`。
 
 ## Hook 复杂度纪律
 
@@ -75,7 +75,7 @@
 
 ## 宿主入口
 
-`Opencode/MessageTransform.fs`、`Mux/MessageTransform.fs`、`Omp/MessageTransform.fs`。
+`src/Hosts/OpenCode/MessageTransformPipeline.fs`、`src/Hosts/Mux/MessageTransform.fs`、`src/Hosts/Omp/MessageTransform.fs`。
 
 OpenCode：**原地 mutate** hook 字段（`AGENTS.md`）。
 

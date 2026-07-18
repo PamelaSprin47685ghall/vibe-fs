@@ -18,11 +18,11 @@
 3. **内存 = fold**：`ReviewStore`、backlog 投影、nudge 表 = 对 NDJSON 的纯 fold + 可选进程缓存。
 4. **先盘后内存**：append 成功后才更新缓存投影；失败 = 命令未发生。
 5. **一行一事件**：每行自包含 JSON（Shell 解析为 `WanEvent`）。
-6. **按 session 分区**：每行含 `session` 字段；fold 过滤 `sessionId`。
+6. **按 session 分区**：每行含 `session` 字段；fold 按 `sessionId` 过滤。
 
 ## 事件种类（Kernel SSOT）
 
-定义于 `src/Kernel/EventLog/Types.fs`。**所有事件种类均在此处以 `eventKind*` 常量定义**，Shell 层 codec 引用这些常量，宿主层不复制字符串。
+定义于 `src/Kernel/EventSourcing/EventKind.fs`。**所有事件种类均在此处以 `eventKind*` 常量定义**，`src/Runtime/EventStore/` codec 引用这些常量，宿主层不复制字符串。
 
 ### 核心业务事件
 
@@ -59,7 +59,7 @@
 
 ### 模型降级（Fallback）续命事件
 
-#### v1 六阶段生命周期（旧版，逐步退役）
+#### v1 六阶段生命周期（现有遗留事件）
 
 | `Kind` 含义 | 触发时机 |
 | :--- | :--- |
@@ -72,7 +72,7 @@
 
 `fallback_continue_injected`（旧版，payload：`model` / `agent` / `at`）仍保留但已逐步被上述六阶段续命事件取代。
 
-#### v2 Durable Outbox 续命事件（新架构）
+#### v2 continuation 事件
 
 | `Kind` 含义 | 触发时机 |
 | :--- | :--- |
@@ -82,7 +82,7 @@
 | `continuation_assistant_observed` | 观察到续命产生的 assistant 消息（payload：`continuationId` / `assistantMessageId`） |
 | `continuation_superseded` | 续命被新用户消息或新续命取代（payload：`continuationId` / `reason`） |
 
-v2 事件由 `ContinuationCommandProcessor` 产生，经 `ContinuationProjection` 投影，由 `ContinuationSupervisor` 消费 Outbox Effect 并调用宿主。
+v2 事件由 `Runtime/Fallback/ContinuationCommandProcessor.fs` 产生，经 `Kernel/Fallback/ContinuationProjection.fs` 投影，由 `Runtime/Fallback/ContinuationSupervisor.fs` 消费 effect 并调用宿主。该组件已存在，但各宿主是否将它作为唯一生产入口须以调用链为准。
 
 ### 上下文压缩（Compaction）事件
 
@@ -120,30 +120,30 @@ v2 事件由 `ContinuationCommandProcessor` 产生，经 `ContinuationProjection
 | `task_error` | git/worktree 操作失败 |
 | `squad_cancelled` | /squad-kill 触发 |
 
-**万象阵** kind（同文件、`session` = 万象阵 session id）：`squad_created`、`tasks_created`、`task_started`、`task_submitted`、`task_merged`、`task_done`、`task_error`、`squad_cancelled`。运行时经 `AppendSquadEvent` **追加到同一文件** `[workspace]/.wanxiangshu.ndjson`（与万象术事件共用锁与 `EventLogStore`）；DAG fold 在 `Kernel/Wanxiangzhen` + `Shell/EventLogSquadProjection`。规格叙事见 [wanxiangzhen/02-event-sourcing.md](./wanxiangzhen/02-event-sourcing.md)（物理路径以 `EventLogCodec.eventLogFileName` 为准）。
+**万象阵** kind（同文件、`session` = 万象阵 session id）：`squad_created`、`tasks_created`、`task_started`、`task_submitted`、`task_merged`、`task_done`、`task_error`、`squad_cancelled`。运行时经 `AppendSquadEvent` **追加到同一文件** `[workspace]/.wanxiangshu.ndjson`（与万象术事件共用锁与 EventStore）；DAG fold 在 `src/Kernel/Wanxiangzhen/` + `src/Runtime/EventStore/EventLogSquadProjection.fs`。规格叙事见 [wanxiangzhen/02-event-sourcing.md](./wanxiangzhen/02-event-sourcing.md)。
 
 ## 信封字段（概念）
 
-与 PRD-02 一致：`v`、`session`、`kind`、`at`、`payload`、`id`、`host` 等由 Shell codec 序列化；Kernel `WanEvent` 使用 `Map<string,string>` payload 参与 fold。
+事件信封中的 `v`、`session`、`kind`、`at`、`payload`、`id`、`host` 等由 `src/Runtime/EventStore/` codec 序列化；Kernel `WanEvent` 使用 `Map<string,string>` payload 参与 fold。
 
 ## Fold 函数
 
-见 `src/Kernel/EventLog/Fold.fs`：
+见 `src/Kernel/EventSourcing/Fold.fs`：
 
 - **`foldReviewTask`**：`loop_activated` 设 task；`review_verdict` 终局 verdict 清空；`loop_cancelled` 清空。
 - **`foldWorkBacklogSnapshot`**：取最后一次 `work_backlog_committed`。
 - **`foldNudgeDedup`**：记录已派发 anchor；WIP / dedup_cleared 重置策略。
 - **`foldNudgeSnapshot`**：供 nudge 决策的聚合视图（open todos、loop 是否活跃等）。
 - **`foldSubagents`** / `SessionState.Subagents`：`subagent_spawned` / `subagent_continued` 投影。
-- **`foldFallbackInjection`** / `SessionState.FallbackInjection`：`fallback_continue_injected`（旧版，见 [12-fallback.md](./12-fallback.md)）。
-- **`ContinuationProjection`** / `SessionState.Continuation`：v2 续命投影，由 `ContinuationCommandProcessor` 维护（见 [12-fallback.md](./12-fallback.md)）。
+- **SessionControl projection**：当前 fold 维护 generation、cancel generation、human turn 与 episode/owner 状态；不再有 `SessionState.FallbackInjection` 或 `FallbackInjectionFold`。
+- **`ContinuationProjection`**：v2 continuation 的独立 projection，来源为 `Kernel/Fallback/ContinuationProjection.fs`，不属于 `SessionState` 主 fold。
 - **万象阵**：`EventLogSquadProjection.applyWanEvent` 与 `CoordinatorReplay`（读同一 NDJSON）。
 
-`SessionState`（Shell 缓存）聚合上述投影，供 `EventLogRuntimeNudge` / `Sync` 读取。
+`SessionState`（Runtime 缓存）聚合上述投影，供 `EventLogRuntimeNudge` / `EventLogRuntimeSync` 读取。
 
-## 写入 API（Shell）
+## 写入 API（Runtime）
 
-`EventLogRuntimeAppend.fs` 暴露业务级 `appendLoopActivated`、`appendWorkBacklogCommitted`、`appendReviewVerdict` 等；内部统一 `appendAndCache`。
+`src/Runtime/EventStore/` 的 `SessionEventWriter`、`BacklogEventWriter`、`ReviewEventWriter`、`NudgeEventWriter`、`ContinuationEventWriter` 等暴露业务级写入；内部由 `EventStore` / `EventLogRuntimeStore` 统一追加与缓存。
 
 **`work_backlog_committed`**：在 `todowrite`/`task` 工具校验通过后调用，payload 由 `TodoWriteArgs` 构造。
 
@@ -190,8 +190,8 @@ Attempt
 
 `appendAndCache` 先写盘后通知的链（`appendLine → foldWan`）已具备 Outbox 雏形。当前实现：
 
-1. **`ContinuationCommandProcessor`**：接收 `ContinuationCommand` → 决策 → 持久化 `ContinuationEvent` → 产生 `ContinuationEffect`（Outbox Intent）
-2. **`ContinuationSupervisor`**：消费 Outbox Effect → 调用宿主 API（`IContinuationHost.Dispatch` / `TryAbortOwned` / `Reconcile`）→ 结果映射为 Command 回流至 Processor
+1. **`ContinuationCommandProcessor`**：接收 `ContinuationCommand` → 决策 → 持久化 `ContinuationEvent` → 产生 `ContinuationEffect`
+2. **`ContinuationSupervisor`**：消费 effect → 调用 `IContinuationHost.Dispatch` / `TryAbortOwned` / `Reconcile` → 结果映射为 Command 回流至 Processor
 3. Effect 完成后写入确认事件（`continuation_host_accepted`、`continuation_run_started` 等）
 4. 重启时 Supervisor 从尚未确认的 Effect 事件恢复，重新发起或查询宿主动作
 
@@ -217,11 +217,11 @@ Stable Resource Identity：资源是否复用由稳定 Key（`TurnDeadline(turnI
 
 ## 损坏行处理
 
-读盘时遇到截断/非法行：**在该行截断**，丢弃该行及之后字节，不跳过坏行继续 fold（避免建在错误基线上的状态）。
+读盘时遇到截断/非法行：按 `EventLogIo` 与 codec 的当前实现处理；文档不把未被测试锁定的损坏行策略写成额外协议。已确认的安全原则是：不得跳过无法解码的中间事件后继续构造看似完整的状态。
 
 ## 启动与恢复
 
-1. 打开 workspace → `EventLogStore` 读 NDJSON → 构建 `SessionState` 缓存  
+1. 打开 workspace → `EventStore` 读 NDJSON → 构建 `SessionState` 缓存
 2. `syncAllSessionsFromEventLog` / 单 session `syncReviewFromEventLog`、`syncBacklogFromEventLog`  
 3. 再注册宿主 hook  
 

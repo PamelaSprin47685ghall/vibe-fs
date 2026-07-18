@@ -2,30 +2,29 @@
 ## 三层模型
 ```text
 ┌──────────────────────────────────────────────────────────────────┐
-│  Host Adapters (volatile)                                         │
-│  Opencode/  Mimocode/  Mux/  Omp/                                  │
+│  Hosts (volatile adapters)                                         │
+│  src/Hosts/OpenCode/  src/Hosts/Mux/  src/Hosts/Omp/               │
 │  — hook 注册、schema 生成、宿主对象原地写字段纪律                   │
 │  — SubsessionHostAdapter（ISubsessionHost 实现）                    │
 └──────────────────────────────┬───────────────────────────────────┘
                                │ obj ↔ codec
 ┌──────────────────────────────▼───────────────────────────────────┐
-│  Shell (side effects)                                             │
-│  FS / 网络 / 子进程 / MCP / EventLog / MessageTransform           │
-│  ToolExecute / SubagentSpawn / RuntimeScope                       │
-│  SubsessionActor / SubsessionService / SubsessionEventRouter       │
-│  FallbackRuntimeState / FallbackEventBridge / NudgeRuntime         │
+│  Runtime (side effects)                                           │
+│  FS / 网络 / 子进程 / MCP / EventStore / MessageTransform          │
+│  Tooling / Subsession / Workspace / Dispatch                       │
+│  Fallback / Nudge / ReviewPrompts / Wanxiangzhen                   │
 └──────────────────────────────┬───────────────────────────────────┘
                                │ 强类型命令/事件
 ┌──────────────────────────────▼───────────────────────────────────┐
 │  Kernel (pure rules)                                              │
-│  ReviewSession / Nudge / EventLog.Fold / WorkBacklog              │
+│  ReviewSession / Nudge / EventSourcing / WorkBacklog              │
 │  Subsession/（Decision、Types、Policy、Fold、TranscriptDecision）  │
 │  FallbackKernel/（StateMachine、Decision、Recovery）               │
 │  ToolCatalog / ToolPermission / Methodology 元数据                │
 └──────────────────────────────────────────────────────────────────┘
 ```
 
-**判定法则**：去掉 Node 与宿主 `obj` 后仍成立的逻辑 → Kernel；否则 → Shell 或 Host。
+**判定法则**：去掉 Node 与宿主 `obj` 后仍成立的逻辑 → Kernel；否则 → Runtime 或 Host。
 
 ## 模块依赖纪律（架构测试强制执行）
 
@@ -45,12 +44,12 @@
 | :--- | :--- | :--- |
 | `src/Hosts/Mux/Plugin.fs` | `wanxiangshu` → `.` | Mux（默认 main） |
 | `src/Hosts/Omp/Plugin.fs` | `wanxiangshu/omp` | oh-my-pi |
-| `src/Hosts/OpenCode/Plugin.fs` | （包内构建产物） | OpenCode |
-| `src/Hosts/OpenCode/PluginMimo.fs` | （包内构建产物） | Mimocode |
+| `src/Hosts/OpenCode/Plugin.fs` | 构建产物中的 OpenCode 插件 | OpenCode |
+| `src/Hosts/OpenCode/PluginMimo.fs` | 无独立 npm export | Mimocode |
 | `src/Hosts/OpenCode/PluginMimoTui.fs` | TUI 辅助 | Mimocode sidebar todo |
 | `src/Hosts/OpenCode/PluginWanxiangzhen.fs` | `wanxiangshu/wanxiangzhen` | 万象阵 |
 
-共享装配逻辑：**OpenCode 系** → `Hosts/OpenCode/PluginCore.fs`；**OMP** → `Hosts/Omp/PluginCore.fs`。
+共享装配逻辑：**OpenCode 系** → `src/Hosts/OpenCode/PluginComposition.fs`；**OMP** → `src/Hosts/Omp/PluginComposition.fs`。
 
 ## Host 枚举与工具命名
 
@@ -65,11 +64,11 @@
 
 ## 可变状态安放
 
-- **允许**：`Shell.RuntimeScope` 派生实例（iterator store、scope 级队列等）
-- **允许**：`Shell.SubsessionActorRegistry` 模块级 actor 注册表
-- **允许**：`Shell.FallbackRuntimeState` 每个 session 的可变状态
+- **允许**：`Runtime.Workspace.RuntimeScope` 派生实例（iterator store、scope 级队列等）
+- **允许**：`Runtime.Subsession.SubsessionActorRegistry` 模块级 actor 注册表
+- **允许**：`Runtime.Fallback.RuntimeStore` 每个 session 的可变状态
 - **禁止**：Kernel 模块级可变；跨 session 裸全局（架构测试 `noDuplicateStateHolder`）
-- **事件日志**：`EventLogStore` 进程内缓存 = fold 投影，**非**第二 SSOT；磁盘 NDJSON 为先
+- **事件日志**：`Runtime.EventStore` 进程内缓存 = fold 投影，**非**第二 SSOT；磁盘 NDJSON 为先
 
 ## 数据平面 vs 控制平面
 
@@ -85,19 +84,19 @@
 
 ### Subsession Actor（子会话隔离）
 
-子代理（Coder、Inspector、Browser、Meditator）通过 `SubsessionActor` 轻量 Actor 消息泵运行，提供完整的错误隔离、降级恢复和超时保护。每个子会话拥有独立的 `SerialQueue`、Fallback 状态机、事件溯源和 NDJSON 持久化。
+子代理（Coder、Inspector、Browser、Meditator）可通过 `Runtime/Subsession/SubsessionActor.fs` 的轻量 Actor 消息泵运行，提供错误隔离、降级恢复和超时保护。子会话事件由 `SubsessionEventStore` 写入共享 NDJSON；是否走 Actor 由宿主装配与调用路径决定，不能把所有委派路径概括成单一实现。
 
 详见 [11-subagents.md](./11-subagents.md) § SubsessionActor。
 
 ### Fallback 运行时（模型降级）
 
-`FallbackEventBridge` 编排模型降级全流程：宿主事件翻译 → FSM 转移 → 续命六阶段生命周期 → 门闩防并发。`FallbackRuntimeState` 维护每个 session 的降级状态、续命租约、门闩标志。
+当前 Fallback 运行时由 `src/Runtime/Fallback/Coordinator.fs`、`FallbackCoordination.fs`、`ContinuationExecution.fs` 等模块编排，通用错误规则在 `src/Kernel/FallbackKernel/`；v2 continuation 的数据、投影和 supervisor 位于 `src/Kernel/Fallback/` 与 `src/Runtime/Fallback/`，仍需按实际宿主调用链判断是否接入。
 
 详见 [12-fallback.md](./12-fallback.md)。
 
 ### Nudge 运行时
 
-`NudgeRuntime` 通过 `tryClaimNudgeDispatch` 在 `EventLogStore` 锁内执行原子 Claim，防止多路并发重复派发 nudge。`NudgeSnapshotState` 从事件流 fold 出决策所需快照。
+`Runtime/Nudge/NudgeDispatchClaim.fs` 与 `NudgeFlow.fs` 负责 nudge claim、去重和发送；`Kernel/EventSourcing/Fold.fs` 通过 Nudge projection 从事件流构造决策快照。
 
 详见 [06-review-and-nudge.md](./06-review-and-nudge.md) § Nudge。
 
@@ -155,5 +154,5 @@
 ## 相关文档
 
 - Kernel 模块族：[03-kernel.md](./03-kernel.md)
-- Shell 边界：[04-runtime.md](./04-runtime.md)
+- Runtime 边界：[04-runtime.md](./04-runtime.md)
 - SSOT 总表：[18-glossary-and-ssot-map.md](./18-glossary-and-ssot-map.md)

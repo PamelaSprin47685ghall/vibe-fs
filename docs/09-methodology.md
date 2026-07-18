@@ -2,23 +2,24 @@
 
 ## 概述
 
-**54** 个结构化方法论工具，对外名 **`methodology_<id>`**（如 `methodology_first_principles`）。供 LLM 在复杂推理时写入「方法论笔记本」字段，与 `todowrite` 的 `select_methodology` 联动。
+结构化方法论工具对外名为 **`methodology_<id>`**（如 `methodology_first_principles`）。数量与 `src/Kernel/Methodology/Catalog.fs` 的条目同步，不在文档中硬编码数量；工具供 LLM 在复杂推理时写入「方法论笔记本」字段，与 `todowrite` 的 `select_methodology` 联动。
 
 ## 数据驱动 Schema
 
 | 模块 | 职责 |
 | :--- | :--- |
-| `Methodology/SchemaCommon.fs` | 共享 schema 构建块 |
-| `Methodology/Args.fs` | 参数 DU / 记录 |
-| `Methodology/Catalog1.fs`–`Catalog4.fs` | 各方法论 `buildSchema` 数据 |
-| `Methodology/Catalog.fs` | 聚合 |
-| `Methodology/Registry.fs` | `allSchemas`、`enumValues` |
+| `src/Kernel/Methodology/Schema.fs` | 方法论条目与 schema 类型 |
+| `src/Kernel/Methodology/Logic.fs`、`ProblemTransformation.fs` | 逻辑与问题转换条目 |
+| `src/Kernel/Methodology/MathematicalReasoning.fs`、`Optimization.fs` | 数学推理与优化条目 |
+| `src/Kernel/Methodology/SystemsEngineering.fs`、`CriticalInquiry.fs` | 系统工程与批判探究条目 |
+| `src/Kernel/Methodology/Catalog.fs` | 聚合六个条目模块 |
+| `src/Kernel/Methodology/Registry.fs` | 对外 schema 与 enum 派生 |
 
 **单一派生**：`select_methodology` 枚举从 `allSchemas` 派生，避免 Catalog / Kernel / 宿主三处复制（架构测试 `hookSchemaNoDuplicateMethodologySchema`）。
 
 ## Kernel 元数据
 
-`Kernel/Methodology.fs`、`MethodologyCatalog.fs`：
+`src/Kernel/Methodology/` 与 `src/Kernel/CapsPrelude.fs`：
 
 - 方法论 id 列表
 - `todowrite` / `task` 必填字段说明（`background`、`intent`、`note`、`methodology` 等 meditator 工具字段）
@@ -27,9 +28,9 @@
 
 | 宿主 | 模块 |
 | :--- | :--- |
-| OpenCode / Mimocode | `Methodology/OpencodeTools.fs` → `Opencode/Tools.fs` |
-| Mux | `Methodology/MuxTools.fs` → `Mux/HostTools.fs` / `PluginCatalog` |
-| OMP | `Methodology/OmpTools.fs` → `OmpToolSchema.methodologyParameters` |
+| OpenCode / Mimocode | `src/Hosts/OpenCode/Tools.fs`、`OpencodeTools.fs` 等注册路径 |
+| Mux | `src/Hosts/Mux/PluginCatalog.fs`、工具注册模块 |
+| OMP | `src/Hosts/Omp/OmpToolSchema.fs`、`Tools.fs` |
 
 OMP 使用 **TypeBox**；OpenCode 系使用 **Zod**（经 Shell `JsonSchemaBuilders`）；Mux 使用 `MuxJsonSchema`。
 
@@ -51,7 +52,7 @@ OMP 使用 **TypeBox**；OpenCode 系使用 **Zod**（经 Shell `JsonSchemaBuild
 
 ## 扩展新方法论的步骤
 
-1. 在 `CatalogN.fs` 增加 `buildSchema` 数据条目
+1. 在职责对应的 `Logic.fs`、`Optimization.fs` 等条目模块增加数据
 2. 确认 `Registry.allSchemas` 聚合包含
 3. 重跑 schema 生成测试；枚举自动反映到 `todowrite`
 4. **禁止**在宿主 hand-write 重复 enum 列表

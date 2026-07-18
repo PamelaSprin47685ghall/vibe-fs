@@ -1,8 +1,8 @@
 # 万象阵：工作区事件溯源
 
 > **权威顺序**：实现 > 本目录 > `03-dev-talk` 历史叙述。  
-> **物理文件**：`[workspace]/.wanxiangshu.ndjson` + `.wanxiangshu.ndjson.lock`（`Shell/EventLogCodec.eventLogFileName`），与万象术 review/backlog/nudge 等**共用**；万象阵行以 `kind` ∈ `squad_*`/`task_*` 区分，`session` = 万象阵 session id。  
-> **逻辑 SSOT**：`Kernel/Wanxiangzhen` 的 `foldEvent` / 先盘后内存。历史规格中的独立文件名 `.wanxiangzhen.ndjson` 已废止，仅作迁移对照。
+> **物理文件**：`[workspace]/.wanxiangshu.ndjson` + `.wanxiangshu.ndjson.lock`（`src/Runtime/EventStore/EventLogFile.fs`），与万象术 review/backlog/nudge 等**共用**；万象阵行以 `kind` ∈ `squad_*`/`task_*` 区分，`session` = 万象阵 session id。
+> **逻辑 SSOT**：`src/Kernel/Wanxiangzhen/` 的 fold 与 `src/Runtime/Wanxiangzhen/CoordinatorReplay.fs`；先盘后内存。历史规格中的独立文件名 `.wanxiangzhen.ndjson` 已废止，仅作迁移对照。
 
 ## 0. 动机
 

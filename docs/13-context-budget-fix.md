@@ -1,4 +1,6 @@
-# 修复 todowrite emergency 过度触发
+# todowrite emergency 过度触发：审计与实现决策
+
+> 本文记录预算修复的根因、决策和回归要求。实现事实以 `src/Kernel/ContextBudget.fs`、`src/Runtime/MessageTransform/`、`src/Runtime/Execution/` 与测试为准；本文中的“修改”清单是决策记录，不表示当前仍未实施。
 
 ## 已验证根因
 

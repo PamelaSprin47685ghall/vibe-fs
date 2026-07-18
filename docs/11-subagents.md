@@ -4,10 +4,7 @@
 
 子代理 = 独立会话（OMP 可为子 workspace）。委派工具：`coder`、`inspector`、`browser`、`meditator` 等；参数 `intents[]` 可多项并发。
 
-子代理的运行有两种路径：
-
-1. **旧路径**：直接通过宿主 `session.prompt` 在子 session 中执行，由 `SubagentDispatcher` 编排
-2. **新路径（生产路径）**：通过 `SubsessionActor` 轻量 Actor 消息泵运行，提供完整的错误隔离、降级恢复、安全性保障
+子代理由 `src/Runtime/Subsession/SubagentDispatcher.fs` 编排；若宿主适配器选择 Actor 路径，则进入 `SubsessionActor`。文档不把两者宣称为全局“旧/新生产路径”，实际入口以宿主装配和调用链为准。
 
 ## SubsessionActor 子系统
 
@@ -40,17 +37,17 @@
 | Kernel | `Subsession/TranscriptDecision.fs` | `classifyTurnEvidence`：从 `CurrentTurnEvidence` 分类为 `CompleteNaturally` / `RecoverWithPrompt` / `ContinueNormally` / `IncompleteWithoutRecovery` |
 | Kernel | `Subsession/Fold.fs` | `SessionSafetyProjection`：从 `SubsessionEvent` 列表 fold 出活跃 run 和持久中毒状态 |
 | Kernel | `Subsession/PartTypeClassify.fs` | 跨宿主的 tool-call / tool-result part type 标准化集合 |
-| Shell | `SubsessionActor.fs` | Actor 消息泵（~447 行）：`Post`、`BeginRun`、`GetState`、MarkUnknownAfterRestart |
-| Shell | `SubsessionActorRegistry.fs` | sessionID → SubsessionActor 注册表，`GetOrCreate`、`Remove`、`ClearPoison` |
-| Shell | `SubsessionEventRouter.fs` | `routeToChild`、`tryIdle`、`tryError`、`isChildSession` |
-| Shell | `SubsessionEventStore.fs` | `NdjsonSubsessionEventStore`（生产）+ `MemorySubsessionEventStore`（测试） |
-| Shell | `SubsessionEventWire.fs` | `tryDecodeWanEvent`、`tryDecodeWanEventBatch`、`projectFromWanEvents`（NDJSON 行 → SubsessionEvent） |
-| Shell | `SubsessionReconcile.fs` | `reconcileUnfinishedRuns`：启动时扫描 NDJSON，发现 RunStarted 无 RunFinished → 持久化 Poison + 内存中毒 |
-| Shell | `SubsessionService.fs` | 顶层 Service：`StartRun`（原子 BeginRun + AbortSignal 绑定）、`TryPost`、`RemoveSession` |
-| Shell | `SubsessionTranscript.fs` | `buildTurnEvidence`：从消息数组切片构建 `CurrentTurnEvidence` |
-| Shell | `SubsessionChildObserver.fs` | 非控制路径观察：更新 agent/model 元数据，不进入主 Fallback 桥 |
-| 宿主 | `Opencode/SubsessionHostAdapter.fs` | OpenCode 的 `ISubsessionHost` 实现 |
-| 宿主 | `Omp/SubsessionHostAdapter.fs` | OMP 的 `ISubsessionHost` 实现 |
+| Runtime | `src/Runtime/Subsession/SubsessionActor.fs` | Actor 消息泵：`Post`、`BeginRun`、`GetState`、重启标记 |
+| Runtime | `src/Runtime/Subsession/SubsessionActorRegistry.fs` | sessionID → SubsessionActor 注册表 |
+| Runtime | `src/Runtime/Subsession/SubsessionEventRouter.fs` | `routeToChild`、`tryIdle`、`tryError`、`isChildSession` |
+| Runtime | `src/Runtime/Subsession/SubsessionEventStore.fs` | NDJSON 与内存测试 event store |
+| Runtime | `src/Runtime/Subsession/SubsessionEventWire.fs` | NDJSON 行/批次 → SubsessionEvent |
+| Runtime | `src/Runtime/Subsession/SubsessionReconcile.fs` | 启动扫描未完成 run 并建立安全投影 |
+| Runtime | `src/Runtime/Subsession/SubsessionService.fs` | `StartRun`、`TryPost`、`RemoveSession` |
+| Runtime | `src/Runtime/Subsession/SubsessionTranscript.fs` | 从消息切片构建 `CurrentTurnEvidence` |
+| Runtime | `src/Runtime/Subsession/SubsessionChildObserver.fs` | 观察 agent/model 元数据 |
+| 宿主 | `src/Hosts/OpenCode/SubsessionHostAdapter.fs` | OpenCode 的 `ISubsessionHost` 实现 |
+| 宿主 | `src/Hosts/Omp/SubsessionHostAdapter.fs` | OMP 的 `ISubsessionHost` 实现 |
 
 ### SubsessionState 状态机（9 种状态）
 
@@ -156,7 +153,7 @@ Available → Dispatching → Running → [Draining →] [IssuingAbort → Await
 
 ## SubagentDispatcher（多意图编排）
 
-`Shell/SubagentDispatcher.fs` 统一处理 `coder` 和 `inspector` 工具的多意图并发：
+`src/Runtime/Subsession/SubagentDispatcher.fs` 统一处理 `coder` 和 `inspector` 工具的多意图并发：
 
 - `dispatch(host, adapter, toolName, args, scope, registry)`：
    1. `decodeToolInvocation` → `CoderBatch` / `InspectorBatch` / `Typed`
@@ -179,7 +176,7 @@ Available → Dispatching → Running → [Draining →] [IssuingAbort → Await
 
 - id 形如 `sci_s:<childID>:<agent>:<host>`（自包含迭代器，不依赖内存存储）
 - 绑定 `{ childID; agent; host }`
-- 存储：`Shell` 侧 `SubagentIteratorStore`（scope 内 LRU，默认上限约 50）
+- 存储：`src/Runtime/Subsession/SubagentIteratorStore.fs`（scope 内状态，容量策略以实现为准）
 - scope 清理时 `clearTypedIteratorScope` 一并回收
 
 **首次 spawn**：子代理返回后注册 iterator；工具输出 YAML front matter 含 `iterator`（`ToolOutputInfo.withIterator`）。
@@ -198,10 +195,10 @@ Available → Dispatching → Running → [Draining →] [IssuingAbort → Await
 | 宿主 | 路径 |
 | :--- | :--- |
 | OpenCode | `SubagentIo.continueSubagentCoreResult`、`SubagentTools.fs` |
-| Mux | `MuxSubagentToolExecute`、delegate |
-| OMP | `Omp/SubagentTools.fs`、`ChildSession.fs` |
+| Mux | `src/Hosts/Mux/SubagentTools.fs`、`Delegate.fs` |
+| OMP | `src/Hosts/Omp/SubagentTools.fs`、`ChildSession.fs` |
 
-共用：`SubagentPromptBuild`、`SubagentIntentsCodec`。**Omp 禁止**引用 Opencode/Mux。
+共用：`src/Runtime/Subsession/SubagentPromptBuild.fs`、`SubagentIntentsCodec.fs`。**OMP 禁止**引用 OpenCode/Mux 宿主实现。
 
 ## 事件溯源（子代理）
 
@@ -212,7 +209,7 @@ Available → Dispatching → Running → [Draining →] [IssuingAbort → Await
 | `subagent_spawned` | 子代理首次委派成功 |
 | `subagent_continued` | `continue` 续跑成功 |
 
-Fold：`Kernel/EventLog/Fold.fs` → `foldSubagents`；与 iterator 内存态互补，重启后可从 NDJSON 重建子代理投影（见 [05-event-sourcing.md](./05-event-sourcing.md)）。
+Fold：`src/Kernel/EventSourcing/Fold.fs` → Subsession projection；与 iterator 内存态互补，重启后可从 NDJSON 重建子代理投影（见 [05-event-sourcing.md](./05-event-sourcing.md)）。
 
 ## Reviewer
 

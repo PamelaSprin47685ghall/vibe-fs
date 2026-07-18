@@ -54,7 +54,6 @@ OpenCode / Mimocode 插件入口在包内构建结果中（`Hosts/OpenCode/Plugi
 | 命令 / 工具 | 作用 |
 | :--- | :--- |
 | `/loop <任务描述>` | 开启 With-Review；空任务可取消循环 |
-| `/loop-review <任务>` | 先预审查再决定是否进入 loop |
 | `todowrite` / `task` | 提交全量待办 + 五份工作报告（各不少于约定字数）+ 至少一种方法论 |
 | `submit_review` | 向审查者提交本轮工作（可标记 WIP） |
 | `return_reviewer` | 审查者提交 verdict（PERFECT / REVISE）；仅子会话可用 |

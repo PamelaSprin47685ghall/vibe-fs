@@ -15,19 +15,19 @@
 | `Recovery.fs` | 完美平方启发式：`isPerfectSquare`、`scanStartIndex`、`selectModel`、`updateFailureCount` |
 | `StateMachine.fs` | `transition(state, evt, cfg, chain)` → `(newState, action)`。处理 Idle/Retrying/Scanning/ScanningToolCallText/RecoveringToolCallText/Exhausted 各阶段 |
 
-### Shell 运行时（`Shell/FallbackRuntime*`）
+### Runtime 运行时（`src/Runtime/Fallback/`）
 
 | 模块 | 职责 |
 | :--- | :--- |
-| `FallbackRuntimeState.fs` | 每次 session 的 fallback 可变状态：Phase、Chain、Model、AgentName、BusyCount、Consumed、ActiveGates、InjectedModel/At、SessionOwner、PendingLease、PendingNudgeLease、SessionGeneration、CancelGeneration、ActiveContinuationGen/CancelGen、forceStopped、compacted 等 |
-| `FallbackRuntimeStateGates.fs` | 门闩标志位操作：`setGateActive`、`isGateActive`、`removeSessionGates`。四类门闩：`NudgeActive`、`EventHandlingActive`、`MainContinuationAwaitingStart`、`Inactive` |
-| `FallbackEventBridge.fs` | 核心编排器（~1062 行）：`handleEvent` 接收宿主原始事件 → 翻译为 `FallbackEvent` → 驱动 FSM → 产生 `ContinuationIntent` → `executeContinuationIntent` 执行。`createHandler` 工厂为每个 session 创建独立 `SerialQueue` |
+| `RuntimeStore.fs`、`SessionRuntime.fs` | 每次 session 的 fallback 可变状态与原子更新 |
+| `GateState.fs` | 门闩标志位操作与 session gate 状态。四类门闩：`NudgeActive`、`EventHandlingActive`、`MainContinuationAwaitingStart`、`Inactive` |
+| `Coordinator.fs`、`FallbackCoordination.fs` | `handleEvent` 接收标准化事件 → 驱动 FSM → 执行动作；每 session handler 通过 `SerialQueue` 排序相关事件 |
 | `FallbackMessageCodec.fs` | `decodeModelFromObj`、`scanToolCallAsText`、`allTodosCompleted`、`isIdleNoContentAndNoTools`、`tryGetLastAssistantAbortInfo`、`tryGetLatestUserModel`、`isLastAssistantToolFinish`、`hasToolResultAfter` |
 | `FallbackMessageParser.fs` | `containsToolCallAsText`：检测 XML/JSON 格式的 tool call 文本（未使用函数调用协议） |
-| `FallbackConfigCodec.fs` | 从 `AGENTS.md` frontmatter 解析 `models:` 节；`resolveSubagentChain`、`resolveModelDirective`（三态：HostConfigured→DelegateToHost、有链→RetryChain、空→DelegateToHost） |
+| `FallbackConfigCodec.fs` | 从 `AGENTS.md` frontmatter 解析 `models:` 节；解析子代理链与模型 directive |
 | `FallbackRecoveryWait.fs` | `waitForRecovery`、`waitForToolCallTextRecovery`：基于 `OnStateChanged` 回调的事件驱动等待（非定时轮询） |
-| `FallbackRuntimeLifecycle.fs` | `FallbackContinueMode`、`FallbackTaskCompletion`、`phaseForContinue`、`lifecycleForTask` |
-| `FallbackRuntimeFlags.fs` | `FallbackConsumedStatus`（Unknown、ConsumedByHost、PropagatedToOuter）、`FallbackSessionGateFlag`（Inactive、NudgeActive、EventHandlingActive、MainContinuationAwaitingStart） |
+| `src/Kernel/FallbackRuntimeLifecycle.fs` | `FallbackContinueMode`、`FallbackTaskCompletion`、`phaseForContinue`、`lifecycleForTask` |
+| `src/Kernel/FallbackRuntimeFlags.fs` | `FallbackConsumedStatus`（Unknown、ConsumedByHost、PropagatedToOuter）、`FallbackSessionGateFlag`（Inactive、NudgeActive、EventHandlingActive、MainContinuationAwaitingStart） |
 | `FallbackSubagentGate.fs` | `FallbackGateObservation` → `needFallbackContinue`、`gateDemandFromObservation`、`isSubagentSettledFromObservation`；用于子会话 `waitForSubagentSettle` 决策 |
 | `FallbackGateObservation.fs` | `observe(runtime, sessionID)`：从 `FallbackRuntimeState` 构建 `FallbackGateObservation` |
 
@@ -35,9 +35,9 @@
 
 | 宿主 | 桥接器 | 探测器 |
 | :--- | :--- | :--- |
-| OpenCode | `Opencode/FallbackHooks.fs` → `createOpencodeFallbackHandler` | `opencodeEventTranslator` |
-| Mux | `Mux/FallbackHooks.fs` → `createMuxFallbackHandler` | `muxEventTranslator` |
-| OMP | `Omp/FallbackHooks.fs` → `createOmpFallbackHandler` | `ompEventTranslator` |
+| OpenCode | `src/Hosts/OpenCode/Fallback/` | `EventTranslator.fs` |
+| Mux | `src/Hosts/Mux/Fallback/` | 宿主事件翻译模块 |
+| OMP | `src/Hosts/Omp/Fallback/` | 宿主事件翻译模块 |
 
 ## 公理
 
@@ -114,7 +114,7 @@ requested → dispatch_started → dispatched → [failed | cancelled | settled]
 
 ## 空输出 Idle
 
-最后 assistant 无 tool、text 为空 → `EmptyOutputError`：`FallbackEventBridge` 在 `SessionIdle` 时调用 `isIdleNoContentAndNoTools` 检测，构造 `FallbackEvent.SessionError` 而非 `SessionIdle`，触发 fallback continue，**同时阻止 nudge**（见 [10](./10-message-transform.md)）。
+最后 assistant 无 tool、text 为空 → `EmptyOutputError`：`Coordinator` 在 `SessionIdle` 时调用 `isIdleNoContentAndNoTools` 检测，构造 `FallbackEvent.SessionError` 而非 `SessionIdle`，触发 fallback continue，**同时阻止 nudge**（见 [10](./10-message-transform.md)）。
 
 ## 扫描工具调用文本（Tool-Call-as-Text Recovery）
 
@@ -129,25 +129,25 @@ requested → dispatch_started → dispatched → [failed | cancelled | settled]
 
 ### v1 旧版（逐步退役）
 
-`FallbackEventBridge.handleEvent` 先 `appendContinuationRequestedOrFail`（NDJSON 持久化），再 `TryTransitionPendingLease` 原子验证，最后 `IActionExecutor.SendContinue` 执行。
+遗留 v1 路径由 Coordinator/ContinuationExecution 先追加 continuation 事实，再校验 lease 并调用 `IActionExecutor.SendContinue`；该描述只适用于 v1 兼容路径，不是 v2 `ContinuationCommandProcessor` 的调用协议。
 
-消费端（`resolveNudgeModel` / `tryGetLatestUserModel` / 哨兵 `IsNewUserMessage`）**不**嗅探消息文本，**只**读 `runtime.GetInjectedModel` + `runtime.IsInjectedSince` 内存投影（由事件 fold 回填）。重启时 `EventLogStore.ReadAllEvents` → `foldFallbackInjection` + `ownerAndLeaseFolder` 重建 `SessionState.FallbackInjection` 和 `PendingLease`。
+消费端（`resolveNudgeModel` / `tryGetLatestUserModel` / 哨兵 `IsNewUserMessage`）**不**嗅探消息文本；当前运行时从 `RuntimeStore` 与 session-control projection 读取 lease、generation、owner 等状态。v1 `fallback_continue_injected` 仍是历史事件，不再作为独立 `SessionState.FallbackInjection` 模型描述。
 
-### v2 Durable Outbox（新架构）
+### v2 continuation supervisor（已实现组件，非全宿主切换宣告）
 
 `ContinuationCommandProcessor` 接收 `ContinuationCommand` → 决策 → 持久化 `ContinuationEvent` → 产生 `ContinuationEffect`（Outbox Intent）。`ContinuationSupervisor` 消费 Outbox Effect → 调用 `IContinuationHost`（`Dispatch` / `TryAbortOwned` / `Reconcile`）→ 结果映射为 Command 回流至 Processor。
 
 | 组件 | 路径 | 职责 |
 | :--- | :--- | :--- |
-| `ContinuationCommandProcessor` | `Runtime/Fallback/ContinuationCommandProcessor.fs` | 串行提交器：Dequeue → Validate → Decide → Persist → Commit → Reconcile |
-| `ContinuationSupervisor` | `Runtime/Fallback/ContinuationSupervisor.fs` | 消费 Outbox Effect，调用宿主 API，回流 Command |
-| `IContinuationHost` | `Runtime/Fallback/ContinuationHost.fs` | 宿主适配器接口：Dispatch / TryAbortOwned / Reconcile |
-| `ContinuationEventCodec` | `Runtime/Fallback/ContinuationEventCodec.fs` | v2 续命事件编解码 |
-| `ContinuationProjection` | `Kernel/Fallback/ContinuationProjection.fs` | 纯 fold 投影 |
-| `ContinuationDecision` | `Kernel/Fallback/ContinuationDecision.fs` | 命令决策逻辑 |
-| `ContinuationHost` (OpenCode) | `Hosts/OpenCode/Fallback/ContinuationHost.fs` | OpenCode 宿主实现 |
+| `ContinuationCommandProcessor` | `src/Runtime/Fallback/ContinuationCommandProcessor.fs` | 串行提交器：decide → append → emit effect |
+| `ContinuationSupervisor` | `src/Runtime/Fallback/ContinuationSupervisor.fs` | 消费 effect，调用宿主 API，回流 Command |
+| `IContinuationHost` | `src/Runtime/Fallback/ContinuationHost.fs` | 宿主适配器接口：Dispatch / TryAbortOwned / Reconcile |
+| `ContinuationEventCodec` | `src/Runtime/Fallback/ContinuationEventCodec.fs` | v2 续命事件编解码 |
+| `ContinuationProjection` | `src/Kernel/Fallback/ContinuationProjection.fs` | 纯 fold 投影 |
+| `ContinuationDecision` | `src/Kernel/Fallback/ContinuationDecision.fs` | 命令决策逻辑 |
+| `ContinuationHost` (OpenCode) | `src/Hosts/OpenCode/Fallback/ContinuationHost.fs` | OpenCode 宿主实现 |
 
-`continuationPayload`（`"\u200B"`）定义于 `ContinuationHost` 中，作为 `createFallbackContinuationPromptBody` 的文本参数。各 `ActionExecutor` 不再定义自己的 `zwsChar` 私有常量。
+`continuationPayload`（`"\u200B"`）定义于 `src/Hosts/OpenCode/Fallback/ContinuationHost.fs`，作为 OpenCode continuation prompt 的文本参数；其他宿主的发送实现仍以各自 adapter 为准。
 
 ## IEventTranslator 接口（宿主需实现）
 
@@ -179,7 +179,7 @@ requested → dispatch_started → dispatched → [failed | cancelled | settled]
 
 子代理（Coder、Inspector 等）通过 `SubsessionActor` 运行，其 Fallback 处理方式不同：
 
-- 子会话的错误事件不进入主 session 的 `FallbackEventBridge`，而是通过 `SubsessionEventRouter` 路由到子 `SubsessionActor`
+- 子会话的错误事件不进入主 session 的 Fallback Coordinator，而是通过 `SubsessionEventRouter` 路由到子 `SubsessionActor`
 - `SubsessionActor` 内部使用 `SubsessionService.StartRun` 启动，接受 `FallbackConfig` 和 `ModelDirective`
 - 子会话的降级策略复用 `FallbackConfigCodec.resolveSubagentChain` 和 `resolveModelDirective`
 - 子会话生命周期的 NDJSON 事件使用 `subsession_*` kind（见 [05](./05-event-sourcing.md)）
@@ -222,38 +222,29 @@ models:
 | 层 | 路径 | 核心类型 |
 | :--- | :--- | :--- |
 | FSM | `Kernel/FallbackKernel/` | `SessionFallbackState`、`FallbackAction`、`FallbackPhase` |
-| 续命事件 fold (v1 旧版) | `Kernel/EventLog/FallbackInjectionFold.fs` | `FallbackInjectionState`、`foldFallbackInjection`（read-only） |
-| 续命事件 fold | `Kernel/EventLog/Fold.fs` | `ownerAndLeaseFolder`、`EpisodeStage` |
-| 续命事件 fold | `Kernel/EventLog/Types.fs` | `eventKindContinuationRequested` 等 6 种 |
-| v2 续命 | `Kernel/Fallback/Continuation.fs` | `ContinuationRequest`、`ContinuationState`、`ContinuationCommand`、`ContinuationEvent`、`ContinuationEffect` |
-| v2 续命决策 | `Kernel/Fallback/ContinuationDecision.fs` | `decide` 纯函数 |
-| v2 续命投影 | `Kernel/Fallback/ContinuationProjection.fs` | `ContinuationProjection`、`fromWanEvents` |
-| v2 续命事件 codec | `Runtime/Fallback/ContinuationEventCodec.fs` | v2 事件编解码 |
-| v2 续命命令处理器 | `Runtime/Fallback/ContinuationCommandProcessor.fs` | 串行提交器 |
-| v2 续命监督器 | `Runtime/Fallback/ContinuationSupervisor.fs` | Outbox Effect 消费 |
-| v2 续命宿主接口 | `Runtime/Fallback/ContinuationHost.fs` | `IContinuationHost` |
-| v2 续命宿主实现 | `Hosts/OpenCode/Fallback/ContinuationHost.fs` | OpenCode 实现 |
-| 运行时 | `Shell/FallbackRuntimeState` | `FallbackRuntimeState`、`PendingLease`、`NudgeLease` |
-| 运行时桥 | `Shell/FallbackEventBridge` | `handleEvent`、`createHandler`、`verifyLease`、`executeContinuationIntent` |
-| 运行时门闩 | `Shell/FallbackRuntimeStateGates` | `setGateActive`、`isGateActive` |
-| 运行时消息 | `Shell/FallbackMessageCodec` | `decodeModelFromObj`、`scanToolCallAsText`、`isIdleNoContentAndNoTools` |
-| 运行时消息解析 | `Shell/FallbackMessageParser` | `containsToolCallAsText` |
-| 运行时配置 | `Shell/FallbackConfigCodec` | `loadFallbackConfig`、`resolveSubagentChain`、`resolveModelDirective` |
-| 运行时等待 | `Shell/FallbackRecoveryWait` | `waitForRecovery`、`waitForToolCallTextRecovery` |
-| 运行时观测 | `Shell/FallbackGateObservation` | `observe` |
+| 事件 kind | `src/Kernel/EventSourcing/EventKind.fs` | v1/v2 continuation kind 常量 |
+| 事件 fold | `src/Kernel/EventSourcing/Fold.fs` | session generation、episode、owner/lease 投影 |
+| v2 续命类型 | `src/Kernel/Fallback/Continuation.fs` | request、state、command、event、effect |
+| v2 续命决策 | `src/Kernel/Fallback/ContinuationDecision.fs` | `decide` 纯函数 |
+| v2 续命投影 | `src/Kernel/Fallback/ContinuationProjection.fs` | projection 与事件映射 |
+| v2 事件 codec | `src/Runtime/Fallback/ContinuationEventCodec.fs` | 事件编解码 |
+| v2 命令处理器 | `src/Runtime/Fallback/ContinuationCommandProcessor.fs` | 串行提交与 effect 产生 |
+| v2 监督器 | `src/Runtime/Fallback/ContinuationSupervisor.fs` | 宿主 effect 执行与 command 回流 |
+| v2 宿主接口 | `src/Runtime/Fallback/ContinuationHost.fs` | `IContinuationHost` |
+| 运行时编排 | `src/Runtime/Fallback/Coordinator.fs`、`FallbackCoordination.fs` | 当前 Fallback 事件入口与动作执行 |
 | 运行时门闩决策 | `Kernel/FallbackSubagentGate` | `needFallbackContinue`、`isSubagentSettledFromObservation` |
 | 运行时生命周期 | `Kernel/FallbackRuntimeLifecycle` | `FallbackContinueMode`、`FallbackTaskCompletion` |
 | 运行时标志 | `Kernel/FallbackRuntimeFlags` | `FallbackConsumedStatus`、`FallbackSessionGateFlag` |
 
 ## 测试
 
-`FallbackKernelTests`、`FallbackConfigCodecTests`、`FallbackIntegrationTests`、`FallbackEventBridgeTests`、`FallbackSubagentGateTests`。
+Fallback Kernel、配置、集成与 Subagent Gate 测试；具体入口以 `tests/runner.js` 的已注册条目为准。
 
 ## REF 架构演进方向
 
 ### Effect Supervisor 整合
 
-当前 Fallback 续命（continuation）通过 `FallbackEventBridge.handleEvent` 直接调用 `IActionExecutor.SendContinue`。REF 架构将此演化为 Effect Supervisor 模式：
+当前仍存在 v1 直接执行路径；v2 已提供 `ContinuationCommandProcessor` + `ContinuationSupervisor`。REF 方向要求宿主 effect 全部收敛到持久化意图与 command 回流：
 
 1. FSM 决策后，Continuation Intent 作为持久化 Outbox 事件写入（与领域事件同批提交）
 2. Effect Supervisor 从持久化存储消费该 Intent，而非仅凭内存通知
