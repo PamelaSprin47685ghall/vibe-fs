@@ -2,6 +2,7 @@ module Wanxiangshu.Kernel.Subsession.Decision
 
 open Wanxiangshu.Kernel.FallbackKernel.Types
 open Wanxiangshu.Kernel.Subsession.Types
+open Wanxiangshu.Kernel.Subsession.Rules
 
 let private activeTurnId (turn: ActiveTurn) : TurnId =
     match turn with
@@ -22,7 +23,7 @@ let private tryExtractActiveForReconcile (s: SubsessionState) : (RunContext * Ac
     | Available _
     | Poisoned _ -> None
 
-let decide (state: SubsessionState) (cmd: Command) : Result<DecisionResult, DecisionError> =
+let private decideCore (state: SubsessionState) (cmd: Command) : Result<DecisionResult, DecisionError> =
     match cmd with
     | StartRun req -> DecisionStart.decide state req
     | EvidenceUpdated _ -> DecisionObserve.decide state cmd
@@ -37,6 +38,25 @@ let decide (state: SubsessionState) (cmd: Command) : Result<DecisionResult, Deci
         | ClosingUnknownDispatch _ -> Cancellation.decide state cmd
         | _ -> DecisionObserve.decide state cmd
     | _ -> Cancellation.decide state cmd
+
+let decide (state: SubsessionState) (cmd: Command) : Result<DecisionResult, DecisionError> =
+    let isReconcilingAbortSettle =
+        match state with
+        | ReconcilingAbortSettle _ -> true
+        | _ -> false
+
+    let isDispatchStatusResolved =
+        match cmd with
+        | DispatchStatusResolved _ -> true
+        | _ -> false
+
+    match decideCore state cmd with
+    | Error(IllegalTransition _) as err when isStaleTimerCommand cmd ->
+        if isReconcilingAbortSettle || isDispatchStatusResolved then
+            err
+        else
+            Ok(noChange StaleTimer)
+    | result -> result
 
 /// Given an active subsession state discovered on restart, produce the Decision
 /// that must be persisted to NDJSON so the run is durably closed.

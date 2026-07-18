@@ -89,8 +89,8 @@ let testContextBudgetF () =
     let P = 20000L
     let N = 3
     let threshold = (bEff + int64 N * P) / int64 (N + 1)
-    check "F should be true above threshold" (Wanxiangshu.Kernel.ContextBudget.F (threshold + 1000L) bEff P N 0)
-    check "F should be false below threshold" (not (Wanxiangshu.Kernel.ContextBudget.F (threshold - 1000L) bEff P N 0))
+    check "F should be true above threshold" (Wanxiangshu.Kernel.ContextBudget.F (threshold + 1000L) bEff P 0 N)
+    check "F should be false below threshold" (not (Wanxiangshu.Kernel.ContextBudget.F (threshold - 1000L) bEff P 0 N))
 
 let testApplyContextBudgetShortCircuit () =
     promise {

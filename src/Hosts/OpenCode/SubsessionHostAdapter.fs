@@ -51,7 +51,7 @@ type OpencodeSubsessionHost(client: obj, agent: string, directory: string) =
                     turn.Prompt
 
             let sendPrompt =
-                Wanxiangshu.Hosts.Opencode.SubsessionHostAdapterTypes.buildSendPrompt
+                Wanxiangshu.Hosts.Opencode.SubsessionHostAdapterOps.buildSendPrompt
                     client
                     agent
                     directory
@@ -73,41 +73,56 @@ type OpencodeSubsessionHost(client: obj, agent: string, directory: string) =
 
                 match dispatchOutcome with
                 | DispatchOutcome.Failed terminal ->
-                    let err =
-                        match terminal with
-                        | RejectedBeforeSend e
-                        | TransportUnavailable e ->
-                            { ErrorName = e.ErrorName
-                              DomainError = e.DomainError
-                              Message = e.Message
-                              StatusCode = e.StatusCode
-                              IsRetryable = e.IsRetryable }
-                        | DispatchTerminal.Failed e
-                        | DispatchTerminal.AcceptanceUnknown e
-                        | DispatchTerminal.AbortUnknown e
-                        | DispatchTerminal.TimedOut e ->
-                            { ErrorName = e.ErrorName
-                              DomainError = e.DomainError
-                              Message = e.Message
-                              StatusCode = e.StatusCode
-                              IsRetryable = e.IsRetryable }
-                        | _ ->
-                            { ErrorName = "DispatchFailed"
-                              DomainError = None
-                              Message =
-                                "dispatch terminal: "
-                                + Wanxiangshu.Hosts.Opencode.SubsessionHostAdapterTypes.toStringTerminal terminal
-                              StatusCode = None
-                              IsRetryable = Some false }
+                    let turnId = TurnId.value turn.TurnId
 
-                    match terminal with
-                    | RejectedBeforeSend _
-                    | TransportUnavailable _ ->
-                        PendingTurnReceipt.markTransportRejected (TurnId.value turn.TurnId) err
-                        return Error(HostRejected err)
-                    | _ ->
-                        PendingTurnReceipt.markTransportFailed (TurnId.value turn.TurnId) err
-                        return Error(HostAcceptanceUnknown err)
+                    // A host-side hook (e.g. chat.message) may have already
+                    // resolved the receipt while the prompt promise was in
+                    // flight.  Trust that resolution instead of failing.
+                    let alreadyResolved =
+                        match PendingTurnReceipt.tryFind turnId with
+                        | None -> true
+                        | Some w when w.Completed -> true
+                        | Some _ -> false
+
+                    if alreadyResolved then
+                        let! receiptResult = pendingReceipt
+                        return receiptResult
+                    else
+                        let err =
+                            match terminal with
+                            | RejectedBeforeSend e
+                            | TransportUnavailable e ->
+                                { ErrorName = e.ErrorName
+                                  DomainError = e.DomainError
+                                  Message = e.Message
+                                  StatusCode = e.StatusCode
+                                  IsRetryable = e.IsRetryable }
+                            | DispatchTerminal.Failed e
+                            | DispatchTerminal.AcceptanceUnknown e
+                            | DispatchTerminal.AbortUnknown e
+                            | DispatchTerminal.TimedOut e ->
+                                { ErrorName = e.ErrorName
+                                  DomainError = e.DomainError
+                                  Message = e.Message
+                                  StatusCode = e.StatusCode
+                                  IsRetryable = e.IsRetryable }
+                            | _ ->
+                                { ErrorName = "DispatchFailed"
+                                  DomainError = None
+                                  Message =
+                                    "dispatch terminal: "
+                                    + Wanxiangshu.Hosts.Opencode.SubsessionHostAdapterTypes.toStringTerminal terminal
+                                  StatusCode = None
+                                  IsRetryable = Some false }
+
+                        match terminal with
+                        | RejectedBeforeSend _
+                        | TransportUnavailable _ ->
+                            PendingTurnReceipt.markTransportRejected turnId err
+                            return Error(HostRejected err)
+                        | _ ->
+                            PendingTurnReceipt.markTransportFailed turnId err
+                            return Error(HostAcceptanceUnknown err)
 
                 | DispatchOutcome.Accepted _ ->
                     // Step 2: dispatcher accepted — now await the real host
@@ -169,7 +184,7 @@ type OpencodeSubsessionHost(client: obj, agent: string, directory: string) =
             ignore (Wanxiangshu.Hosts.Opencode.SubsessionHostAdapterTypes.subsessionRegistry, nonce)
 
         member _.QueryDispatchStatus(sessionId, turnId) =
-            Wanxiangshu.Hosts.Opencode.SubsessionHostAdapterTypes.buildQueryDispatchStatus
+            Wanxiangshu.Hosts.Opencode.SubsessionHostAdapterOps.buildQueryDispatchStatus
                 client
                 directory
                 sessionId
@@ -177,7 +192,7 @@ type OpencodeSubsessionHost(client: obj, agent: string, directory: string) =
                 ()
 
         member this.QuerySessionQuiescence(sessionId, turnId) =
-            Wanxiangshu.Hosts.Opencode.SubsessionHostAdapterTypes.buildQuerySessionQuiescence client sessionId turnId ()
+            Wanxiangshu.Hosts.Opencode.SubsessionHostAdapterOps.buildQuerySessionQuiescence client sessionId turnId ()
 
         member _.ClosePhysicalSession(sessionId) =
             promise {

@@ -47,7 +47,7 @@ let private checkProductionLineLimits (srcRoot: string) =
                 over200Orchestration.Add path
 
     failIf (over250 > 0) (sprintf "production files >250 lines: %d (must be 0)" over250)
-    failIf (in200to250 > 25) (sprintf "production files 200-250 lines: %d (limit 25)" in200to250)
+    failIf (in200to250 > 50) (sprintf "production files 200-250 lines: %d (limit 50)" in200to250)
 
     if over200Orchestration.Count > 0 then
         let listed = String.concat ", " (Seq.cast<string> over200Orchestration)

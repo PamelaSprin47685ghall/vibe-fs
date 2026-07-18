@@ -145,7 +145,9 @@ let isStaleTimerCommand =
     | AbortRequestFailed _
     | EvidenceUpdated _
     | ReconciliationDeadlineExpired _
-    | SessionQuiescenceResolved _ -> true
+    | SessionQuiescenceResolved _
+    | DispatchStatusResolved _
+    | PhysicalCloseResolved _ -> true
     | _ -> false
 
 let isIllegalWhenDispatching =

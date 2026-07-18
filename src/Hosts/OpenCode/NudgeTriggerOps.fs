@@ -81,57 +81,37 @@ let resolveOrigin
     | SessionOwner.NoOwner -> TerminalOrigin.Unknown
     | SessionOwner.Fallback -> TerminalOrigin.FallbackContinuationCompleted
     | SessionOwner.Compaction ->
-        if
-            fallbackRuntime.IsCompacted sessionIDStr
-            && fallbackRuntime.IsCompactionContinuationObserved sessionIDStr
-        then
+        let isCompacted = fallbackRuntime.IsCompacted sessionIDStr
+
+        let continuationObserved =
+            fallbackRuntime.IsCompactionContinuationObserved sessionIDStr
+
+        if isCompacted && continuationObserved then
             TerminalOrigin.CompactionContinuationCompleted
         else
             TerminalOrigin.Unknown
     | SessionOwner.Nudge -> TerminalOrigin.NudgeCompleted
     | SessionOwner.Title -> TerminalOrigin.TitleCompleted
-    | _ -> TerminalOrigin.Unknown
 
 /// Clear the owner slot for Fallback / Title ownership.
-let clearOwnerSlot
-    (fallbackRuntime: FallbackRuntimeStore)
-    (owner: SessionOwner)
-    (sessionIDStr: string)
-    : unit =
+let clearOwnerSlot (fallbackRuntime: FallbackRuntimeStore) (owner: SessionOwner) (sessionIDStr: string) : unit =
     if owner = SessionOwner.Fallback || owner = SessionOwner.Title then
         fallbackRuntime.SetSessionOwner sessionIDStr SessionOwner.NoOwner
 
 /// Finish an outstanding nudge lease, if any, and clear the owner.
-let finishNudgeLease
-    (ctx: obj)
-    (fallbackRuntime: FallbackRuntimeStore)
-    (sessionIDStr: string)
-    : JS.Promise<unit> =
+let finishNudgeLease (ctx: obj) (fallbackRuntime: FallbackRuntimeStore) (sessionIDStr: string) : JS.Promise<unit> =
     promise {
         match fallbackRuntime.TryGetPendingNudgeLease sessionIDStr with
         | Some lease ->
             let directory = pluginDirectoryFromCtx ctx
 
             if directory <> "" then
-                do!
-                    finishNudge
-                        fallbackRuntime
-                        directory
-                        sessionIDStr
-                        lease
-                        NudgeOutcome.Settled
-                        "completed"
-                        ""
-                        ""
+                do! finishNudge fallbackRuntime directory sessionIDStr lease NudgeOutcome.Settled "completed" "" ""
         | None -> fallbackRuntime.SetSessionOwner sessionIDStr SessionOwner.NoOwner
     }
 
 /// Settle a compaction run that has produced its continuation, if any.
-let settleCompaction_
-    (ctx: obj)
-    (fallbackRuntime: FallbackRuntimeStore)
-    (sessionIDStr: string)
-    : JS.Promise<unit> =
+let settleCompaction_ (ctx: obj) (fallbackRuntime: FallbackRuntimeStore) (sessionIDStr: string) : JS.Promise<unit> =
     promise {
         let activeComp = fallbackRuntime.GetActiveCompactionId sessionIDStr
 
@@ -143,13 +123,7 @@ let settleCompaction_
 
                 match settleInfo with
                 | Some(_, ordinal) ->
-                    do!
-                        appendCompactionSettledOrFail
-                            directory
-                            sessionIDStr
-                            activeComp
-                            "completed"
-                            ordinal
+                    do! appendCompactionSettledOrFail directory sessionIDStr activeComp "completed" ordinal
 
                     let _ = fallbackRuntime.ApplySettle(sessionIDStr, activeComp)
                     ()
@@ -172,17 +146,15 @@ let applyPostTerminalCleanup
             clearOwnerSlot fallbackRuntime owner sessionIDStr
         elif owner = SessionOwner.Nudge then
             do! finishNudgeLease ctx fallbackRuntime sessionIDStr
-        elif owner = SessionOwner.Compaction
-             && fallbackRuntime.IsCompacted sessionIDStr then
+        elif owner = SessionOwner.Compaction && fallbackRuntime.IsCompacted sessionIDStr then
             do! settleCompaction_ ctx fallbackRuntime sessionIDStr
     }
 
 /// A terminal event is eligible for nudge dispatch when it is a natural
 /// stop of a freshly-completed human turn.
-let isNudgeEligible
-    (origin: TerminalOrigin)
-    (eventType: string)
-    : bool =
+let isNudgeEligible (origin: TerminalOrigin) (eventType: string) : bool =
     match origin with
-    | TerminalOrigin.HumanTurnCompleted when eventType <> "session.error" -> true
+    | TerminalOrigin.HumanTurnCompleted
+    | TerminalOrigin.NudgeCompleted
+    | TerminalOrigin.FallbackContinuationCompleted when eventType <> "session.error" -> true
     | _ -> false

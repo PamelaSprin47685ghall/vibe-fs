@@ -5,13 +5,37 @@ open Wanxiangshu.Runtime.Dyn
 open Wanxiangshu.Runtime.Fallback.FallbackMessageCodec
 open Wanxiangshu.Runtime.Fallback.FallbackMessageDetection
 
-/// Find the index of the last user message (turn boundary heuristic).
+let private isSyntheticUserMessage (msg: obj) : bool =
+    let info = Dyn.get msg "info"
+
+    let infoSynthetic =
+        if Dyn.isNullish info then
+            false
+        else
+            let v = Dyn.get info "synthetic"
+            not (Dyn.isNullish v) && unbox<bool> v
+
+    if infoSynthetic then
+        true
+    else
+        let parts = Dyn.get msg "parts"
+
+        if not (Dyn.isNullish parts) && Dyn.isArray parts then
+            (parts :?> obj array)
+            |> Array.exists (fun part ->
+                let v = Dyn.get part "synthetic"
+                not (Dyn.isNullish v) && unbox<bool> v)
+        else
+            false
+
+/// Find the index of the last human user message (turn boundary heuristic).
+/// Synthetic user messages are ignored because they are not human turns.
 let private lastUserMessageIndex (msgs: obj array) : int option =
     msgs
     |> Array.tryFindIndexBack (fun msg ->
         let info = Dyn.get msg "info"
 
-        if Dyn.isNullish info then
+        if Dyn.isNullish info || isSyntheticUserMessage msg then
             false
         else
             Dyn.str info "role" = "user")
@@ -20,16 +44,21 @@ let private lastUserMessageIndex (msgs: obj array) : int option =
 let private findAnchorIndex (msgs: obj array) (anchor: TurnAnchor) : Result<int, TranscriptReadFailure> =
     match anchor with
     | AnchorByUserMessageId messageId ->
-        msgs
-        |> Array.tryFindIndexBack (fun msg ->
-            let info = Dyn.get msg "info"
-            let id = Dyn.str msg "id"
-            let role = if Dyn.isNullish info then "" else Dyn.str info "role"
-            (id = messageId || Dyn.str info "id" = messageId) && role = "user")
-        |> Option.map Ok
-        |> Option.defaultValue (
+        match
+            msgs
+            |> Array.tryFindIndexBack (fun msg ->
+                let info = Dyn.get msg "info"
+                let id = Dyn.str msg "id"
+                let role = if Dyn.isNullish info then "" else Dyn.str info "role"
+                (id = messageId || Dyn.str info "id" = messageId) && role = "user")
+        with
+        | Some idx ->
+            match lastUserMessageIndex msgs with
+            | Some lastIdx when idx < lastIdx ->
+                Error { TranscriptReadFailure.Message = sprintf "Anchor user message %s is stale" messageId }
+            | _ -> Ok idx
+        | None ->
             Error { TranscriptReadFailure.Message = sprintf "Anchor user message %s not found in transcript" messageId }
-        )
     | AnchorByHostRunId runId ->
         msgs
         |> Array.tryFindIndexBack (fun msg ->

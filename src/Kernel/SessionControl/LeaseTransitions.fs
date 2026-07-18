@@ -164,7 +164,14 @@ let private handleNudgeTerminal (st: OwnerEpisodeState) (ev: EpisodeStageEvent) 
 
 // ── Terminal helpers ──────────────────────────────────────────────────────────
 
-let private handleAssistantCompleted (st: OwnerEpisodeState) : OwnerEpisodeState = releaseOwnerIf "Nudge" st
+let private handleAssistantCompleted (st: OwnerEpisodeState) : OwnerEpisodeState =
+    if st.Owner = Some "Nudge" then
+        { st with
+            Owner = Some "None"
+            NudgeLease = None
+            NudgeStage = NoEpisode }
+    else
+        st
 
 let private handleNudgeDedupClearedOrWip (st: OwnerEpisodeState) : OwnerEpisodeState =
     { st with

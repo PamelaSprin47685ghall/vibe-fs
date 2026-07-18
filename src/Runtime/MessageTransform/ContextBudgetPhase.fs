@@ -107,6 +107,43 @@ let projectedMessagesBytes
     let bytes = utf8JsonBytes (box encoded)
     result, bytes
 
+let private freshEpisodeId () = System.Guid.NewGuid().ToString("N")
+
+let private estimateBaseline (store: ContextBudgetEntry) (projectedBytes: int) (currentTokens: int) : int64 =
+    estimateBytesAsTokens store.LastCalibration projectedBytes currentTokens
+
+let private resetNudgeFields (entry: ContextBudgetEntry) : ContextBudgetEntry =
+    { entry with
+        NudgeTrack = Idle
+        NudgeCount = 0
+        SignalTodoOrdinal = None
+        SignalTokens = None
+        StableSyntheticNudgeID = None }
+
+let private withActiveCycle
+    (cycle: ContextState)
+    (backlog: BacklogEntry list)
+    (episodeId: string)
+    (entry: ContextBudgetEntry)
+    : ContextBudgetEntry =
+    { resetNudgeFields entry with
+        State = Some cycle
+        LastBacklog = backlog
+        EpisodeID = episodeId }
+
+let private withRefreshedCycle
+    (cycle: ContextState)
+    (backlog: BacklogEntry list)
+    (entry: ContextBudgetEntry)
+    : ContextBudgetEntry =
+    { resetNudgeFields entry with
+        State = Some cycle
+        LastBacklog = backlog }
+
+let private withBacklogOnly (backlog: BacklogEntry list) (entry: ContextBudgetEntry) : ContextBudgetEntry =
+    { resetNudgeFields entry with
+        LastBacklog = backlog }
+
 let applyTransition
     (scope: RuntimeScope)
     (sessionID: string)
@@ -117,32 +154,18 @@ let applyTransition
     (currentStore: ContextBudgetEntry)
     (backlog: BacklogEntry list)
     : ContextState * bool =
-    let isJustInitialized = currentStore.State.IsNone
-
     match transition with
     | ColdStart ->
-        let baseline =
-            estimateBytesAsTokens currentStore.LastCalibration projectedBytes currentTokens
+        let baseline = estimateBaseline currentStore projectedBytes currentTokens
 
         let cycle =
             beginCycle baseline projection.TotalTodoOrdinal projection.RemainingTodoWritesUntilFold
 
-        ContextBudgetStore.update scope sessionID (fun entry ->
-            { entry with
-                State = Some cycle
-                LastBacklog = backlog
-                NudgeTrack = Idle
-                EpisodeID = System.Guid.NewGuid().ToString("N")
-                NudgeCount = 0
-                SignalTodoOrdinal = None
-                SignalTokens = None
-                StableSyntheticNudgeID = None })
-
+        ContextBudgetStore.update scope sessionID (withActiveCycle cycle backlog (freshEpisodeId ()))
         cycle, true
 
     | FoldFrontierAdvanced ->
-        let baseline =
-            estimateBytesAsTokens currentStore.LastCalibration projectedBytes currentTokens
+        let baseline = estimateBaseline currentStore projectedBytes currentTokens
 
         let cycle =
             rebuildCycleAtFold
@@ -151,17 +174,7 @@ let applyTransition
                 projection.FoldFrontierOrdinal
                 projection.RemainingTodoWritesUntilFold
 
-        ContextBudgetStore.update scope sessionID (fun entry ->
-            { entry with
-                State = Some cycle
-                LastBacklog = backlog
-                NudgeTrack = Idle
-                EpisodeID = System.Guid.NewGuid().ToString("N")
-                NudgeCount = 0
-                SignalTodoOrdinal = None
-                SignalTokens = None
-                StableSyntheticNudgeID = None })
-
+        ContextBudgetStore.update scope sessionID (withActiveCycle cycle backlog (freshEpisodeId ()))
         cycle, false
 
     | TodoAcknowledged ->
@@ -169,21 +182,14 @@ let applyTransition
             match currentStore.State with
             | Some existing -> advanceSegment existing projection.TotalTodoOrdinal
             | None ->
-                let baseline =
-                    estimateBytesAsTokens currentStore.LastCalibration projectedBytes currentTokens
-
+                let baseline = estimateBaseline currentStore projectedBytes currentTokens
                 beginCycle baseline projection.TotalTodoOrdinal projection.RemainingTodoWritesUntilFold
 
-        ContextBudgetStore.update scope sessionID (fun entry ->
-            { entry with
-                State = Some cycle
-                LastBacklog = backlog })
-
+        ContextBudgetStore.update scope sessionID (withRefreshedCycle cycle backlog)
         cycle, false
 
     | BacklogOnlyChange ->
-        ContextBudgetStore.update scope sessionID (fun entry -> { entry with LastBacklog = backlog })
-
+        ContextBudgetStore.update scope sessionID (withBacklogOnly backlog)
         currentStore.State.Value, false
 
     | NoChange -> currentStore.State.Value, false

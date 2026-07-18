@@ -8,6 +8,20 @@ open Wanxiangshu.Tests.TempWorkspace
 open Wanxiangshu.Hosts.Opencode.Plugin
 open Wanxiangshu.Runtime.Dyn
 
+let private waitForPrompt (promptCalls: ResizeArray<obj>) (expected: int) : JS.Promise<unit> =
+    let rec loop remaining =
+        promise {
+            if promptCalls.Count >= expected then
+                ()
+            elif remaining <= 0 then
+                raise (exn (sprintf "waitForPrompt timeout: expected %d, got %d" expected promptCalls.Count))
+            else
+                do! Promise.sleep 20
+                return! loop (remaining - 20)
+        }
+
+    loop 1000
+
 let fallbackRetryWithoutFrontmatterSpec () =
     promise {
         let promptCalls = ResizeArray<obj>()
@@ -92,8 +106,7 @@ let fallbackRetryWithoutFrontmatterSpec () =
                                            isRetryable = true |} |} |} |})
             |> unbox<JS.Promise<unit>>
 
-        do! yieldMicrotask ()
-        equal "fallback without frontmatter retries once" 1 promptCalls.Count
+        do! waitForPrompt promptCalls 1
         let call = promptCalls.[0]
         equal "retry path targets same session" sid (str (get call "path") "id")
         equal "retry body keeps current agent" "reviewer" (str (get call "body") "agent")
@@ -164,7 +177,7 @@ let sessionPostErrorSpec () =
 
         let output = createObj []
         do! sessionPostHook $ (input, output) |> unbox<JS.Promise<unit>>
-        do! yieldMicrotask ()
+        do! waitForPrompt promptCalls 1
         equal "session.post with error retries once" 1 promptCalls.Count
         do! rmAsync workspaceDir
     }
@@ -231,7 +244,7 @@ let sessionUserQueryPostErrorSpec () =
 
         let output = createObj []
         do! sessionUserQueryPostHook $ (input, output) |> unbox<JS.Promise<unit>>
-        do! yieldMicrotask ()
+        do! waitForPrompt promptCalls 1
         equal "session.userQuery.post with error retries once" 1 promptCalls.Count
         do! rmAsync workspaceDir
     }

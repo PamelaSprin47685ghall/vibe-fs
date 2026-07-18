@@ -76,11 +76,9 @@ let private registerTransformHooks (result: obj) (client: obj) (services: CoreSe
         "experimental.session.compacting"
         (twoArgHook (fun input output ->
             CompactionTransform.compactingTransform
-                services.ChildAgentRegistry
                 services.Directory
                 services.RuntimeScope
                 services.BacklogSession
-                client
                 input
                 output))
 

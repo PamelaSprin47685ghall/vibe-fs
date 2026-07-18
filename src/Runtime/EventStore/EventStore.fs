@@ -5,7 +5,6 @@ open Fable.Core.JsInterop
 open Wanxiangshu.Kernel.Nudge
 open Wanxiangshu.Kernel.Nudge.NudgeProjection
 open Wanxiangshu.Kernel.EventSourcing.EventEnvelope
-open Wanxiangshu.Kernel.EventSourcing.EventKind
 open Wanxiangshu.Kernel.EventSourcing.Fold
 open Wanxiangshu.Kernel.SessionOverview
 open Wanxiangshu.Runtime.EventLogCodec
@@ -13,13 +12,15 @@ open Wanxiangshu.Runtime.EventLogFile
 open Wanxiangshu.Runtime.EventLogIo
 open Wanxiangshu.Runtime.Clock
 open Wanxiangshu.Runtime.PromiseQueue
-open Wanxiangshu.Runtime.ProjectionCache
 open Wanxiangshu.Runtime.NudgeDispatchClaim
+open Wanxiangshu.Runtime.EventStoreIo
 
 type EventLogStore(workspaceRoot: string, ?appendLineOverride: string -> WanEvent -> JS.Promise<unit>) =
     let queue = SerialQueue()
     let eventFilePath = eventPath workspaceRoot
     let writesDisabled = workspaceRoot = ""
+    let appendLineFn = defaultArg appendLineOverride appendLine
+    let state = EventStoreState(eventFilePath)
 
     let enqueueWrite (noopValue: 'T) (work: unit -> JS.Promise<'T>) : JS.Promise<'T> =
         if writesDisabled then
@@ -27,138 +28,24 @@ type EventLogStore(workspaceRoot: string, ?appendLineOverride: string -> WanEven
         else
             queue.Enqueue work
 
-    let appendLineFn = defaultArg appendLineOverride appendLine
-    let cache = ProjectionCache()
-    let mutable initDone = false
-    let mutable initPromise: JS.Promise<unit> option = None
-    let mutable readCalled = false
-    let mutable eventCountRead = 0
-    let mutable lastKnownSize = 0L
-    let mutable lastReadByteOffset = 0L
-    let mutable partialLineBuffer = ""
-
-    let processLines (lines: string[]) =
-        let mutable stop = false
-
-        for line in lines do
-            if not stop && line.Trim() <> "" then
-                match tryParseEventLine line with
-                | Some e ->
-                    cache.FoldWan e
-                    eventCountRead <- eventCountRead + 1
-                | None -> stop <- true
-
-    let ensureInitializedInternal () : JS.Promise<unit> =
-        promise {
-            if not initDone && not readCalled then
-                let! exists = fileExists eventFilePath
-
-                if not exists then
-                    initDone <- true
-                else
-                    readCalled <- true
-
-                    do!
-                        withWorkspaceLock eventFilePath (fun () ->
-                            promise {
-                                let! events = readEventsFile eventFilePath
-
-                                for e in events do
-                                    cache.FoldWan e
-
-                                initDone <- true
-                                eventCountRead <- events.Length
-                                let! stats = statAsync eventFilePath
-                                lastKnownSize <- unbox<int64> (stats?size)
-                                lastReadByteOffset <- lastKnownSize
-                                partialLineBuffer <- ""
-                            })
-        }
-
-    let ensureInitialized () : JS.Promise<unit> =
-        match initPromise with
-        | Some p -> p
-        | None ->
-            let p = ensureInitializedInternal ()
-            initPromise <- Some p
-            p
-
-    let syncNewEvents () : JS.Promise<unit> =
-        promise {
-            try
-                let! stats = statAsync eventFilePath
-                let size = unbox<int64> (stats?size)
-
-                if size < lastReadByteOffset then
-                    cache.Clear()
-                    eventCountRead <- 0
-                    let! events = readEventsFile eventFilePath
-
-                    for e in events do
-                        cache.FoldWan e
-
-                    let! newStats = statAsync eventFilePath
-                    lastReadByteOffset <- unbox<int64> (newStats?size)
-                    lastKnownSize <- lastReadByteOffset
-                    partialLineBuffer <- ""
-                elif size > lastReadByteOffset then
-                    let offset = lastReadByteOffset
-                    let length = int (size - offset)
-                    let! newText = readChunkAsync eventFilePath (float offset) length
-                    let combinedText = partialLineBuffer + newText
-                    let lines = combinedText.Split('\n')
-
-                    let completeLines =
-                        if lines.Length > 1 then
-                            lines.[0 .. lines.Length - 2]
-                        else
-                            [||]
-
-                    let newPartialLineBuffer =
-                        if combinedText.EndsWith("\n") then
-                            ""
-                        else
-                            lines.[lines.Length - 1]
-
-                    processLines completeLines
-                    partialLineBuffer <- newPartialLineBuffer
-                    lastReadByteOffset <- size
-                    lastKnownSize <- size
-            with _ ->
-                ()
-        }
-
-    let ensureSynced () : JS.Promise<unit> =
-        promise {
-            do! ensureInitialized ()
-
-            try
-                let! stats = statAsync eventFilePath
-                let size = unbox<int64> (stats?size)
-
-                if size <> lastKnownSize then
-                    do! withWorkspaceLock eventFilePath (fun () -> syncNewEvents ())
-            with _ ->
-                ()
-        }
-
-    member this.EnsureSynced() : JS.Promise<unit> = ensureSynced ()
-    member _.ProjectionCache = cache
+    member this.EnsureSynced() : JS.Promise<unit> = state.EnsureSynced()
+    member _.ProjectionCache = state.Cache
 
     member _.ReadAllEvents() : JS.Promise<WanEvent list> =
         promise {
-            do! ensureSynced ()
+            do! state.EnsureSynced()
             let! events = withWorkspaceLock eventFilePath (fun () -> readEventsFile eventFilePath)
             return events
         }
 
-    member _.GetRevision() : int = cache.Revision
+    member _.GetRevision() : int = state.Cache.Revision
 
-    member _.GetSessionStateSync(sessionId: string) : SessionState = cache.GetSessionStateSync(sessionId)
+    member _.GetSessionStateSync(sessionId: string) : SessionState =
+        state.Cache.GetSessionStateSync(sessionId)
 
     member this.GetSessionState(sessionId: string) : JS.Promise<SessionState> =
         promise {
-            do! ensureSynced ()
+            do! state.EnsureSynced()
             return this.GetSessionStateSync(sessionId)
         }
 
@@ -168,30 +55,30 @@ type EventLogStore(workspaceRoot: string, ?appendLineOverride: string -> WanEven
 
     member _.GetAllSessionStates() : JS.Promise<Map<string, SessionState>> =
         promise {
-            do! ensureSynced ()
-            return cache.GetAllSessionStates()
+            do! state.EnsureSynced()
+            return state.Cache.GetAllSessionStates()
         }
 
-    member _.EnsureInitialized() : JS.Promise<unit> = ensureInitialized ()
+    member _.EnsureInitialized() : JS.Promise<unit> = state.EnsureInitialized()
 
     member _.AppendEvent(e: WanEvent) : JS.Promise<Result<unit, string>> =
         enqueueWrite (Ok()) (fun () ->
             promise {
-                do! ensureInitialized ()
+                do! state.EnsureInitialized()
 
                 try
                     do!
                         withWorkspaceLock eventFilePath (fun () ->
                             promise {
-                                do! syncNewEvents ()
+                                do! state.SyncNewEvents()
                                 do! appendLineFn eventFilePath e
                                 let! stats = statAsync eventFilePath
-                                lastKnownSize <- unbox<int64> (stats?size)
-                                lastReadByteOffset <- lastKnownSize
+                                state.LastKnownSize <- unbox<int64> (stats?size)
+                                state.LastReadByteOffset <- state.LastKnownSize
                             })
 
-                    cache.FoldWan e
-                    eventCountRead <- eventCountRead + 1
+                    state.Cache.FoldWan e
+                    state.EventCountRead <- state.EventCountRead + 1
                     return Ok()
                 with ex ->
                     return Error ex.Message
@@ -200,20 +87,20 @@ type EventLogStore(workspaceRoot: string, ?appendLineOverride: string -> WanEven
     member _.AppendEventOrFail(e: WanEvent) : JS.Promise<unit> =
         enqueueWrite () (fun () ->
             promise {
-                do! ensureInitialized ()
+                do! state.EnsureInitialized()
 
                 do!
                     withWorkspaceLock eventFilePath (fun () ->
                         promise {
-                            do! syncNewEvents ()
+                            do! state.SyncNewEvents()
                             do! appendLineFn eventFilePath e
                             let! stats = statAsync eventFilePath
-                            lastKnownSize <- unbox<int64> (stats?size)
-                            lastReadByteOffset <- lastKnownSize
+                            state.LastKnownSize <- unbox<int64> (stats?size)
+                            state.LastReadByteOffset <- state.LastKnownSize
                         })
 
-                cache.FoldWan e
-                eventCountRead <- eventCountRead + 1
+                state.Cache.FoldWan e
+                state.EventCountRead <- state.EventCountRead + 1
             })
 
     /// Atomic multi-event append: one lock, one contiguous write of all lines.
@@ -223,25 +110,25 @@ type EventLogStore(workspaceRoot: string, ?appendLineOverride: string -> WanEven
         else
             enqueueWrite () (fun () ->
                 promise {
-                    do! ensureInitialized ()
+                    do! state.EnsureInitialized()
 
                     do!
                         withWorkspaceLock eventFilePath (fun () ->
                             promise {
-                                do! syncNewEvents ()
+                                do! state.SyncNewEvents()
 
                                 let block =
                                     events |> List.map (fun e -> wanEventToLine e + "\n") |> String.concat ""
 
                                 do! appendFileAsync eventFilePath block
                                 let! stats = statAsync eventFilePath
-                                lastKnownSize <- unbox<int64> (stats?size)
-                                lastReadByteOffset <- lastKnownSize
+                                state.LastKnownSize <- unbox<int64> (stats?size)
+                                state.LastReadByteOffset <- state.LastKnownSize
                             })
 
                     for e in events do
-                        cache.FoldWan e
-                        eventCountRead <- eventCountRead + 1
+                        state.Cache.FoldWan e
+                        state.EventCountRead <- state.EventCountRead + 1
                 })
 
     member _.TryClaimNudgeDispatch
@@ -258,18 +145,18 @@ type EventLogStore(workspaceRoot: string, ?appendLineOverride: string -> WanEven
         : JS.Promise<bool> =
         enqueueWrite false (fun () ->
             promise {
-                do! ensureInitialized ()
+                do! state.EnsureInitialized()
                 let trimmedAnchor = anchor.Trim()
                 let mutable claimed = false
 
                 do!
                     withWorkspaceLock eventFilePath (fun () ->
                         promise {
-                            do! syncNewEvents ()
+                            do! state.SyncNewEvents()
 
                             match
                                 NudgeDispatchClaim.tryClaim
-                                    cache
+                                    state.Cache
                                     sessionId
                                     action
                                     trimmedAnchor
@@ -286,10 +173,10 @@ type EventLogStore(workspaceRoot: string, ?appendLineOverride: string -> WanEven
                             | Some ev ->
                                 do! appendLineFn eventFilePath ev
                                 let! stats = statAsync eventFilePath
-                                lastKnownSize <- unbox<int64> (stats?size)
-                                lastReadByteOffset <- lastKnownSize
-                                cache.FoldWan ev
-                                eventCountRead <- eventCountRead + 1
+                                state.LastKnownSize <- unbox<int64> (stats?size)
+                                state.LastReadByteOffset <- state.LastKnownSize
+                                state.Cache.FoldWan ev
+                                state.EventCountRead <- state.EventCountRead + 1
                                 claimed <- true
                         })
 

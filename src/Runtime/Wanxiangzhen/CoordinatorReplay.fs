@@ -7,6 +7,50 @@ open Wanxiangshu.Kernel.Wanxiangzhen.Dag
 open Wanxiangshu.Kernel.Wanxiangzhen.SquadTaskTransition
 open Wanxiangshu.Runtime.Wanxiangzhen.CoordinatorRuntime
 
+let private reconcileTask (rt: CoordinatorRuntime) hasCommits now (_id: string) (t: SquadTask) =
+    if t.Status = Submitted || t.Status = Running then
+        match rt.GitError with
+        | Some _ ->
+            if t.Status = Submitted then
+                applyStatus ReplayFact t Running now
+            else
+                t
+        | None ->
+            match t.BranchName with
+            | Some b when hasCommits && rt.Deps.MergeBaseIsAncestor rt.ProjectRoot rt.MasterBranch b ->
+                let sha = rt.Deps.RevParseRef rt.ProjectRoot rt.MasterBranch
+
+                { (applyStatus ReplayFact t Merged now) with
+                    MergedSha = Some sha }
+            | _ ->
+                if t.Status = Submitted then
+                    applyStatus ReplayFact t Running now
+                else
+                    t
+    else
+        t
+
+let private warnOrphans (rt: CoordinatorRuntime) =
+    let orphans =
+        rt.Dag.Tasks
+        |> Map.toList
+        |> List.map snd
+        |> List.filter (fun (t: SquadTask) -> t.Status = Running && t.SlavePid.IsNone)
+
+    if orphans <> [] then
+        let names = orphans |> List.map (fun (t: SquadTask) -> t.Id) |> String.concat ", "
+
+        let warning =
+            sprintf "WARNING: Orphan running tasks without PID: %s. Use /squad-kill or ignore." names
+
+        // Best-effort: catch and log.  We never let a missing
+        // host API or a prompt Promise rejection crash the
+        // replay path; the warning is non-essential.
+        rt.Deps.PromptSession rt.Client rt.MasterSessionId warning
+        |> Promise.catch (fun _ -> ())
+        |> Promise.start
+        |> ignore
+
 let replayFromEventLog (rt: CoordinatorRuntime) : JS.Promise<unit> =
     promise {
         let! latestSidOpt = rt.Deps.GetLatestSquadSessionId()
@@ -18,30 +62,7 @@ let replayFromEventLog (rt: CoordinatorRuntime) : JS.Promise<unit> =
         let hasCommits = rt.Deps.HasCommits rt.ProjectRoot
         let now = rt.Deps.Now()
 
-        let reconciledTasks =
-            currentDag.Tasks
-            |> Map.map (fun _ t ->
-                if t.Status = Submitted || t.Status = Running then
-                    match rt.GitError with
-                    | Some _ ->
-                        if t.Status = Submitted then
-                            applyStatus ReplayFact t Running now
-                        else
-                            t
-                    | None ->
-                        match t.BranchName with
-                        | Some b when hasCommits && rt.Deps.MergeBaseIsAncestor rt.ProjectRoot rt.MasterBranch b ->
-                            let sha = rt.Deps.RevParseRef rt.ProjectRoot rt.MasterBranch
-
-                            { (applyStatus ReplayFact t Merged now) with
-                                MergedSha = Some sha }
-                        | _ ->
-                            if t.Status = Submitted then
-                                applyStatus ReplayFact t Running now
-                            else
-                                t
-                else
-                    t)
+        let reconciledTasks = currentDag.Tasks |> Map.map (reconcileTask rt hasCommits now)
 
         rt.Dag <-
             { currentDag with
@@ -50,23 +71,5 @@ let replayFromEventLog (rt: CoordinatorRuntime) : JS.Promise<unit> =
         rt.Sessions <- sessions
 
         if rt.MasterSessionId <> "" then
-            let orphans =
-                rt.Dag.Tasks
-                |> Map.toList
-                |> List.map snd
-                |> List.filter (fun (t: SquadTask) -> t.Status = Running && t.SlavePid.IsNone)
-
-            if orphans <> [] then
-                let names = orphans |> List.map (fun (t: SquadTask) -> t.Id) |> String.concat ", "
-
-                let warning =
-                    sprintf "WARNING: Orphan running tasks without PID: %s. Use /squad-kill or ignore." names
-
-                // Best-effort: catch and log.  We never let a missing
-                // host API or a prompt Promise rejection crash the
-                // replay path; the warning is non-essential.
-                rt.Deps.PromptSession rt.Client rt.MasterSessionId warning
-                |> Promise.catch (fun _ -> ())
-                |> Promise.start
-                |> ignore
+            warnOrphans rt
     }

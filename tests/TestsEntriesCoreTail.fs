@@ -147,6 +147,7 @@ let tailCoreTestEntriesPart3 () : (string * TestBody) list =
       "MessageTransformStackTests.run", TestBody.Async MessageTransformStackTests.run
       "ParallelToolPromptTests.run", TestBody.Async ParallelToolPromptTests.run
       "CompactionTransformTests.run", TestBody.Async CompactionTransformTests.run
+      "CompactionHookOpenCodeTests.run", TestBody.Async CompactionHookOpenCodeTests.run
       "CompactionIsolationTests.run", TestBody.Async CompactionIsolationTests.run
       "ModelResolutionTests.run", TestBody.Async ModelResolutionTests.run
       "MessageSanitizationTests.run", TestBody.Async MessageSanitizationTests.run

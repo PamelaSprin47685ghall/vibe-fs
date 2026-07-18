@@ -150,7 +150,7 @@ let private mkSessionGetFn (response: obj) : System.Func<obj, JS.Promise<obj>> =
 
 let private mkProviderListFn (called: bool ref) : System.Func<obj, JS.Promise<obj>> =
     System.Func<obj, JS.Promise<obj>>(fun _ ->
-        called := true
+        called.Value <- true
         promise { return raise (System.Exception "provider.list must not be called") })
 
 let private mkTarget
@@ -183,7 +183,7 @@ let spec_resolveMaxInputTokens_usesSessionModelLimit_withoutProviderList () =
         let target = mkTarget sessionGetFn providerListFn
         let! result = resolveMaxInputTokens [ target ] "sess-1" ""
         equal "returns session model limit.input (128000)" 128000 result
-        check "provider.list was never called (legacy seam removed)" (not !providerListCalled)
+        check "provider.list was never called (legacy seam removed)" (not providerListCalled.Value)
     }
 
 let run () : JS.Promise<unit> =

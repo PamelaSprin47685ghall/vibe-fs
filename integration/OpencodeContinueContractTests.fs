@@ -237,5 +237,6 @@ let run
             check "continue extracts after task completion" (finalExtractionCalls.Value > 0)
             equal "continue returns final child output" true (continueOutput.Contains "continue final output")
 
+        do! sleep 200
         do! withTimeoutCustom 4900 (harness.dispose ())
     }

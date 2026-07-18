@@ -23,7 +23,6 @@ let private dynStr (o: obj) (k: string) : string = Wanxiangshu.Runtime.Dyn.str o
 
 let runAll (args: string array) : JS.Promise<unit> =
     promise {
-        clearFailuresForRun ()
         let mutable totalFailed = 0
 
         let chk label cond =
@@ -164,6 +163,5 @@ let runAll (args: string array) : JS.Promise<unit> =
                     (fun () -> totalFailed)
                     createEmpty)
 
-        let _failed = summary ()
         return ()
     }

@@ -133,6 +133,85 @@ type BacklogProjectionResult<'raw> =
       RemainingTodoWritesUntilFold: int
       DidAdvanceFoldFrontier: bool }
 
+let private noFoldResult
+    (messages: Message<'raw> list)
+    (totalOrdinal: int)
+    (minResults: int)
+    : BacklogProjectionResult<'raw> =
+    { Messages = messages
+      TotalTodoOrdinal = totalOrdinal
+      FoldFrontierOrdinal = 0
+      RemainingTodoWritesUntilFold = max 0 (minResults - totalOrdinal)
+      DidAdvanceFoldFrontier = false }
+
+let private buildVisibleParts
+    (host: Host)
+    (flat: FlatPart<'raw> list)
+    (range: FoldRange)
+    (projectionPart: Part<'raw>)
+    : FlatPart<'raw> list =
+    flat
+    |> List.indexed
+    |> List.choose (fun (i, fp) ->
+        if i < range.firstResult then
+            None
+        elif i = range.firstResult then
+            Some { fp with part = projectionPart }
+        elif i < range.secondToLast then
+            if isReviewTool fp.part then Some fp else None
+        elif isTodoErrorFor host fp.part then
+            None
+        else
+            Some fp)
+
+let private projectWithFold
+    (host: Host)
+    (messages: Message<'raw> list)
+    (flat: FlatPart<'raw> list)
+    (backlog: BacklogEntry list)
+    (range: FoldRange)
+    (sessionID: string)
+    (totalOrdinal: int)
+    (minResults: int)
+    : BacklogProjectionResult<'raw> =
+    let foldedBacklog =
+        if backlog.Length > 0 then
+            backlog.[.. backlog.Length - 2]
+        else
+            []
+
+    let middleUserText =
+        collectUserText flat (range.firstResult + 1) (range.secondToLast - 1)
+
+    let projectionText = buildBacklogText foldedBacklog middleUserText
+    let projectionPart = setPartOutputTyped flat.[range.firstResult].part projectionText
+    let errorNotice = lastTodoErrorTextFor host flat
+
+    let syntheticPrefixMessages =
+        if foldedBacklog.IsEmpty then
+            []
+        else
+            buildSyntheticPrefixMessages host messages flat foldedBacklog sessionID errorNotice
+
+    let visible = buildVisibleParts host flat range projectionPart
+
+    let rebuilt = rebuildVisibleOnly messages visible
+
+    let projectedMessages =
+        if syntheticPrefixMessages.IsEmpty then
+            rebuilt
+        else
+            syntheticPrefixMessages @ rebuilt
+
+    let foldFrontierOrdinal = range.secondToLast + 1
+    let remainingUntilFold = max 0 (minResults - (totalOrdinal - foldFrontierOrdinal))
+
+    { Messages = projectedMessages
+      TotalTodoOrdinal = totalOrdinal
+      FoldFrontierOrdinal = foldFrontierOrdinal
+      RemainingTodoWritesUntilFold = remainingUntilFold
+      DidAdvanceFoldFrontier = foldFrontierOrdinal > 0 }
+
 let projectBacklogFor
     (host: Host)
     (messages: Message<'raw> list)
@@ -140,76 +219,18 @@ let projectBacklogFor
     (strategy: FoldStrategy)
     (sessionID: string)
     : BacklogProjectionResult<'raw> =
+    let minResults = requiredFoldAnchorCount strategy
+
     if messages.IsEmpty then
-        { Messages = messages
-          TotalTodoOrdinal = 0
-          FoldFrontierOrdinal = 0
-          RemainingTodoWritesUntilFold = requiredFoldAnchorCount strategy
-          DidAdvanceFoldFrontier = false }
+        noFoldResult messages 0 minResults
     else
         let flat = flatten messages
         let todoIdxs = foldTodoAnchorsFor host flat
         let totalOrdinal = todoIdxs.Length
-        let minResults = requiredFoldAnchorCount strategy
 
         match findFoldRangeFor host flat strategy with
-        | None ->
-            { Messages = messages
-              TotalTodoOrdinal = totalOrdinal
-              FoldFrontierOrdinal = 0
-              RemainingTodoWritesUntilFold = max 0 (minResults - totalOrdinal)
-              DidAdvanceFoldFrontier = false }
-        | Some range ->
-            let foldedBacklog =
-                if backlog.Length > 0 then
-                    backlog.[.. backlog.Length - 2]
-                else
-                    []
-
-            let middleUserText =
-                collectUserText flat (range.firstResult + 1) (range.secondToLast - 1)
-
-            let projectionText = buildBacklogText foldedBacklog middleUserText
-            let projectionPart = setPartOutputTyped flat.[range.firstResult].part projectionText
-            let errorNotice = lastTodoErrorTextFor host flat
-
-            let syntheticPrefixMessages =
-                if foldedBacklog.IsEmpty then
-                    []
-                else
-                    buildSyntheticPrefixMessages host messages flat foldedBacklog sessionID errorNotice
-
-            let visible =
-                flat
-                |> List.indexed
-                |> List.choose (fun (i, fp) ->
-                    if i < range.firstResult then
-                        None
-                    elif i = range.firstResult then
-                        Some { fp with part = projectionPart }
-                    elif i < range.secondToLast then
-                        if isReviewTool fp.part then Some fp else None
-                    elif isTodoErrorFor host fp.part then
-                        None
-                    else
-                        Some fp)
-
-            let rebuilt = rebuildVisibleOnly messages visible
-
-            let projectedMessages =
-                if syntheticPrefixMessages.IsEmpty then
-                    rebuilt
-                else
-                    syntheticPrefixMessages @ rebuilt
-
-            let foldFrontierOrdinal = range.secondToLast + 1
-            let remainingUntilFold = max 0 (minResults - (totalOrdinal - foldFrontierOrdinal))
-
-            { Messages = projectedMessages
-              TotalTodoOrdinal = totalOrdinal
-              FoldFrontierOrdinal = foldFrontierOrdinal
-              RemainingTodoWritesUntilFold = remainingUntilFold
-              DidAdvanceFoldFrontier = foldFrontierOrdinal > 0 }
+        | None -> noFoldResult messages totalOrdinal minResults
+        | Some range -> projectWithFold host messages flat backlog range sessionID totalOrdinal minResults
 
 let projectBacklog
     (messages: Message<'raw> list)

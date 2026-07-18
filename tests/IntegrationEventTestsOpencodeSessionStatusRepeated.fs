@@ -195,7 +195,7 @@ let repeatedAssistantSpec () =
             |> unbox<JS.Promise<unit>>
 
         do! yieldMicrotask ()
-        check "same text new assistant turn nudges again" (promptCalls.Count = 1)
+        check "same text new assistant turn nudges again" (promptCalls.Count = 2)
         do! rmAsync workspaceDir
     }
 

@@ -8,8 +8,9 @@ open Wanxiangshu.Kernel.Subsession.Decision
 open Wanxiangshu.Kernel.ResourcePlan
 open Wanxiangshu.Runtime.PromiseQueue
 open Wanxiangshu.Runtime.SubsessionPorts
-let private createDeferred<'T> () : Deferred<'T> =
-    SubsessionPorts.createDeferred<'T>()
+open Wanxiangshu.Runtime.CommandProcessorBuild
+
+let private createDeferred<'T> () : Deferred<'T> = SubsessionPorts.createDeferred<'T> ()
 
 // ── CommandProcessor ──
 
@@ -64,102 +65,15 @@ type CommandProcessor
                 cb ()
         | _ -> ()
 
-    // ── Apply decision (steps 4-7) ──
-
-    let handleApplyException (priorState: SubsessionState) (decision: Decision) (hasComplete: bool) (reject: StartRunError option) (ex: exn) =
-        if hasComplete then
-            let poison = EventStoreCorrupt("terminal append failed: " + ex.Message)
-            state <- Poisoned poison
-            for e in decision.Effects do
-                match e with
-                | CompleteCaller(runId, _) ->
-                    applyLocalEffect (
-                        CompleteCaller(
-                            runId,
-                            Failed(InfrastructureFailure("event store append failed: " + ex.Message))
-                        )
-                    )
-                | CancelPendingDispatch _
-                | DisposeActor -> applyLocalEffect e
-                | _ -> ()
-            [], reject
-        else
-            match buildFailSafe priorState ex.Message with
-            | Some recovery ->
-                state <- recovery.NextState
-                for e in recovery.Effects do
-                    applyLocalEffect e
-                filterHostEffects recovery.Effects, None
-            | None ->
-                state <- Poisoned(HostProtocolBroken("event append failed: " + ex.Message))
-                resolveAll (Failed(InfrastructureFailure("event append failed: " + ex.Message)))
-                [], None
-
-    let applyDecision
-        (priorState: SubsessionState)
-        (decision: Decision)
-        : JS.Promise<Effect list * StartRunError option> =
-        promise {
-            let reject = rejectOpt decision.Effects
-            let hasComplete = hasCompleteCaller decision.Effects
-
-            try
-                // Step 4: Persist events
-                if not (List.isEmpty decision.Events) then
-                    do! eventStore.Append(sessionId, decision.Events)
-
-                // Step 5: Commit state
-                state <- decision.NextState
-
-                // Step 6: Reconcile durable resources
-                reconcileResources state
-
-                // Step 7: Local handlers
-                for e in decision.Effects do
-                    applyLocalEffect e
-
-                // Step 8: Emit committed progress (fire-and-forget, never blocks)
-                let progress = CommittedProgress.fromEvents decision.Events
-
-                if not (List.isEmpty progress) then
-                    react.OnCommitted progress
-
-                // Return host effects for async dispatch
-                return filterHostEffects decision.Effects, reject
-
-            with ex ->
-                return handleApplyException priorState decision hasComplete reject ex
-        }
-
-    // ── Handle illegal transition ──
-
-    let handleIllegal
-        (priorState: SubsessionState)
-        (s: string)
-        (c: string)
-        : JS.Promise<Effect list * StartRunError option> =
-        promise {
-            match tryExtract priorState with
-            | Some(ctx, turn) ->
-                let tid = activeTid turn
-
-                let abortCtx =
-                    { Reason = IllegalTransitionFailSafe(s + " + " + c)
-                      AfterStop = FinishFailed(InfrastructureFailure("illegal transition: " + s + " + " + c)) }
-
-                state <- IssuingAbort(ctx, turn, abortCtx, false)
-                reconcileResources state
-                let effects = [ AbortHostSession(ctx.SessionId, tid); CancelPendingDispatch tid ]
-
-                for e in effects do
-                    applyLocalEffect e
-
-                return filterHostEffects effects, None
-            | None ->
-                state <- Poisoned(HostProtocolBroken("illegal: " + s + " + " + c))
-                resolveAll (Failed(InfrastructureFailure("illegal transition: " + s + " + " + c)))
-                return [], None
-        }
+    let applier: DecisionApplier =
+        { SessionId = sessionId
+          EventStore = eventStore
+          ReconcileResources = reconcileResources
+          React = react
+          GetState = fun () -> state
+          SetState = fun s -> state <- s
+          ApplyLocalEffect = applyLocalEffect
+          ResolveAll = resolveAll }
 
     // ── Commit command ──
 
@@ -172,9 +86,9 @@ type CommandProcessor
                     let priorState = state
 
                     match decide state cmd with
-                    | Ok(Decided decision) -> return! applyDecision priorState decision
+                    | Ok(Decided decision) -> return! applyDecision applier priorState decision
                     | Ok(NoChange _) -> return [], None
-                    | Error(IllegalTransition(s, c)) -> return! handleIllegal priorState s c
+                    | Error(IllegalTransition(s, c)) -> return! handleIllegal applier priorState s c
                     | Error(StaleTurnCommand _) -> return [], None
             })
 
@@ -189,24 +103,9 @@ type CommandProcessor
 
     member _.IsDisposed: bool = disposed
 
-    member _.IsPoisoned: bool =
-        match state with
-        | Poisoned _ -> true
-        | _ -> false
+    member _.IsPoisoned: bool = isPoisonedState state
 
-    member _.GetCurrentTurn() : TurnId option =
-        match state with
-        | Dispatching(_, plan, _) -> Some plan.TurnId
-        | CancellingDispatch(_, plan, _) -> Some plan.TurnId
-        | ReconcilingUnknownDispatch(_, plan, _, _) -> Some plan.TurnId
-        | ClosingUnknownDispatch(_, plan, _) -> Some plan.TurnId
-        | Running(_, started, _) -> Some started.Plan.TurnId
-        | Draining(_, started, _, _) -> Some started.Plan.TurnId
-        | IssuingAbort(_, turn, _, _) -> Some(activeTid turn)
-        | AwaitingAbortSettle(_, turn, _) -> Some(activeTid turn)
-        | ReconcilingAbortSettle(_, turn, _) -> Some(activeTid turn)
-        | Available _
-        | Poisoned _ -> None
+    member _.GetCurrentTurn() : TurnId option = getCurrentTurnId state
 
     member _.Post(cmd: Command) : JS.Promise<Effect list * StartRunError option> = commitCommand cmd
 
@@ -226,7 +125,7 @@ type CommandProcessor
                             let priorState = state
 
                             match decide state (StartRun request) with
-                            | Ok(Decided decision) -> return! applyDecision priorState decision
+                            | Ok(Decided decision) -> return! applyDecision applier priorState decision
                             | Ok(NoChange _) ->
                                 pendingReplies <- Map.remove request.RunId pendingReplies
                                 return [], None
@@ -248,12 +147,7 @@ type CommandProcessor
             | Some err ->
                 pendingReplies <- Map.remove request.RunId pendingReplies
 
-                let result =
-                    match err with
-                    | AlreadyRunning -> Failed(ProtocolViolation "subagent session already running")
-                    | StartRunError.SessionPoisoned reason ->
-                        Failed(InfrastructureFailure("session poisoned: " + string reason))
-                    | NoModelAvailable -> Failed NoModelConfigured
+                let result = buildStartRunErrorResult err
 
                 deferred.Resolve result
                 return deferred.Promise, []

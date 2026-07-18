@@ -15,6 +15,30 @@ open Wanxiangshu.Runtime.Fallback.RuntimeStore
 open Wanxiangshu.Runtime.Fallback.CompactionTransitions
 open Wanxiangshu.Runtime.Dyn
 
+let private extractSessionID (input: obj) =
+    let sid1 = Dyn.str input "sessionID"
+
+    if sid1 <> "" then
+        sid1
+    else
+        let sid2 = Dyn.str input "sessionId"
+
+        if sid2 <> "" then
+            sid2
+        else
+            let sid3 = Dyn.str input "session_id"
+            if sid3 <> "" then sid3 else ""
+
+let private isCompactionSummaryRequest (runtimeScope: RuntimeScope) (sessionID: string) =
+    if sessionID <> "" then
+        match runtimeScope.TryFindKey("fallbackRuntime") with
+        | Some obj ->
+            let fr = unbox<FallbackRuntimeStore> obj
+            fr.TryConsumeCompactionSummaryTransform(sessionID)
+        | None -> false
+    else
+        false
+
 /// Transform the messages array in-place: resolve session context, build the
 /// transform plan, and run the host-messages transform pipeline.
 /// Compaction summary requests are detected via the pending flag and bypassed.
@@ -35,34 +59,10 @@ let messagesTransform
         match tryGetMessagesArrayFromOutput output with
         | None -> ()
         | Some messagesArr ->
-            // Extract sessionID early to check compaction bypass flag
-            let sessionID =
-                let sid1 = Dyn.str input "sessionID"
-
-                if sid1 <> "" then
-                    sid1
-                else
-                    let sid2 = Dyn.str input "sessionId"
-
-                    if sid2 <> "" then
-                        sid2
-                    else
-                        let sid3 = Dyn.str input "session_id"
-                        if sid3 <> "" then sid3 else ""
-
-            // Check if this is a compaction summary transform request
-            let isCompactionSummary =
-                if sessionID <> "" then
-                    match runtimeScope.TryFindKey("fallbackRuntime") with
-                    | Some obj ->
-                        let fr = unbox<FallbackRuntimeStore> obj
-                        fr.TryConsumeCompactionSummaryTransform(sessionID)
-                    | None -> false
-                else
-                    false
+            let sessionID = extractSessionID input
+            let isCompactionSummary = isCompactionSummaryRequest runtimeScope sessionID
 
             if isCompactionSummary then
-                // Bypass: preserve host array and part references, no budget/projection/CAPS/nudge
                 ()
             else
                 let! (plan, capsEpoch, isSub) =

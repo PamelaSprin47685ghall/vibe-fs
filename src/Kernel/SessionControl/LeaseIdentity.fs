@@ -37,15 +37,28 @@ type LeaseGuard =
     | StageMismatch
     | Ok
 
+let private isValidStageTransition (expectedStage: EpisodeStage) (currentStage: EpisodeStage) : bool =
+    if expectedStage = currentStage then
+        true
+    else
+        match expectedStage, currentStage with
+        | DispatchStarted, Requested -> true
+        | Dispatched, Requested -> true
+        | Dispatched, DispatchStarted -> true
+        | _ -> false
+
 let guardContinuationStage
     (ordinal: int)
     (expectedStage: EpisodeStage)
     (currentOrdinal: int)
     (currentStage: EpisodeStage)
     : LeaseGuard =
-    if ordinal <> currentOrdinal then OrdinalStale
-    elif currentStage <> expectedStage then StageMismatch
-    else Ok
+    if ordinal <> currentOrdinal then
+        OrdinalStale
+    elif isValidStageTransition expectedStage currentStage then
+        Ok
+    else
+        StageMismatch
 
 let guardNudgeStage
     (ordinal: int)
@@ -53,9 +66,12 @@ let guardNudgeStage
     (currentOrdinal: int)
     (currentStage: EpisodeStage)
     : LeaseGuard =
-    if ordinal <> currentOrdinal then OrdinalStale
-    elif currentStage <> expectedStage then StageMismatch
-    else Ok
+    if ordinal <> currentOrdinal then
+        OrdinalStale
+    elif isValidStageTransition expectedStage currentStage then
+        Ok
+    else
+        StageMismatch
 
 let guardCompactionMatch
     (compactionId: string)
@@ -129,7 +145,12 @@ let advanceLease
     let currentOrdinal = ordinalOf field st
     let currentStage = stageOf field st
 
-    match guardContinuationStage eventOrdinal nextStage currentOrdinal currentStage with
+    let guardResult =
+        match field with
+        | ContinuationField -> guardContinuationStage eventOrdinal nextStage currentOrdinal currentStage
+        | NudgeField -> guardNudgeStage eventOrdinal nextStage currentOrdinal currentStage
+
+    match guardResult with
     | Ok ->
         match leaseIdOf field st with
         | Some l when idOfLeaseUnion l = ev.Id ->

@@ -32,6 +32,7 @@
     <Compile Include="src/Kernel/Subsession/TypeClassify.fs"/>
     <Compile Include="src/Kernel/Subsession/Policy.fs"/>
     <Compile Include="src/Kernel/Subsession/DecisionStart.fs"/>
+    <Compile Include="src/Kernel/Subsession/DecisionObservePredicates.fs"/>
     <Compile Include="src/Kernel/Subsession/DecisionObserve.fs"/>
     <Compile Include="src/Kernel/Subsession/Rules.fs"/>
     <Compile Include="src/Kernel/Subsession/Dispatch.fs"/>
@@ -134,6 +135,7 @@
     <Compile Include="src/Kernel/SessionControl/LeaseTransitions.fs"/>
     <Compile Include="src/Kernel/SessionControl/Projection.fs"/>
     <Compile Include="src/Kernel/EventSourcing/SessionState.fs"/>
+    <Compile Include="src/Kernel/EventSourcing/FoldApply.fs"/>
     <Compile Include="src/Kernel/EventSourcing/Fold.fs"/>
     <Compile Include="src/Kernel/SessionOverview.fs"/>
     <Compile Include="src/Kernel/WorkBacklog.fs"/>
@@ -152,6 +154,7 @@
     <Compile Include="src/Kernel/SessionLoop.fs"/>
     <Compile Include="src/Kernel/FallbackSubagentGate.fs"/>
     <Compile Include="src/Runtime/Workspace/Yaml.fs"/>
+    <Compile Include="src/Runtime/PromptFrontMatterParse.fs"/>
     <Compile Include="src/Runtime/PromptFrontMatter.fs"/>
     <Compile Include="src/Runtime/Search/SearchPrompts.fs"/>
     <Compile Include="src/Runtime/Tooling/ToolOutputInfoParse.fs"/>
@@ -192,6 +195,7 @@
     <Compile Include="src/Runtime/Tooling/CapsSynth.fs"/>
     <Compile Include="src/Runtime/Subsession/ResourceScope.fs"/>
     <Compile Include="src/Runtime/Subsession/SubsessionPorts.fs"/>
+    <Compile Include="src/Runtime/Execution/CommandProcessorBuild.fs"/>
     <Compile Include="src/Runtime/Execution/CommandProcessor.fs"/>
     <Compile Include="src/Runtime/Execution/EffectSupervisor.fs"/>
     <Compile Include="src/Runtime/Subsession/SubsessionActor.fs"/>
@@ -239,6 +243,7 @@
     <Compile Include="src/Runtime/Tooling/WebSearchApi.fs"/>
     <Compile Include="src/Runtime/Subsession/SubagentIo.fs"/>
     <Compile Include="src/Runtime/Tooling/TreeSitterPlatform.fs"/>
+    <Compile Include="src/Runtime/Tooling/TreeSitterDiagnostics.fs"/>
     <Compile Include="src/Runtime/Tooling/TreeSitterShell.fs"/>
     <Compile Include="src/Runtime/Tooling/FuzzyFinderShell.fs"/>
     <Compile Include="src/Runtime/Tooling/WebSearchCodec.fs"/>
@@ -253,6 +258,7 @@
     <Compile Include="src/Runtime/EventStore/EventLogFile.fs"/>
     <Compile Include="src/Runtime/EventStore/ProjectionCache.fs"/>
     <Compile Include="src/Runtime/Nudge/NudgeDispatchClaim.fs"/>
+    <Compile Include="src/Runtime/EventStore/EventStoreIo.fs"/>
     <Compile Include="src/Runtime/EventStore/EventStore.fs"/>
     <Compile Include="src/Runtime/EventStore/SquadEventStore.fs"/>
     <Compile Include="src/Runtime/Search/SembleMcp.fs"/>
@@ -261,6 +267,7 @@
     <Compile Include="src/Runtime/Search/SembleSearch.fs"/>
     <Compile Include="src/Runtime/Workspace/WorkspacePathResolution.fs"/>
     <Compile Include="src/Runtime/Workspace/WorkspaceReverieFiles.fs"/>
+    <Compile Include="src/Runtime/Workspace/WorkspaceFilesCollect.fs"/>
     <Compile Include="src/Runtime/Workspace/WorkspaceFiles.fs"/>
     <Compile Include="src/Runtime/Messaging/HostMessageCodec.fs"/>
     <Compile Include="src/Runtime/Messaging/MessagingEncode.fs"/>
@@ -295,6 +302,7 @@
     <Compile Include="src/Runtime/Messaging/MuxJsonSchema.fs"/>
     <Compile Include="src/Runtime/Tooling/WebFetch.fs"/>
     <Compile Include="src/Runtime/Execution/RunnerBackground.fs"/>
+    <Compile Include="src/Runtime/Messaging/OmpFileScannerDiscovery.fs"/>
     <Compile Include="src/Runtime/Messaging/OmpFileScanner.fs"/>
     <Compile Include="src/Runtime/Messaging/OmpPromptContext.fs"/>
     <Compile Include="src/Runtime/Messaging/OmpCaps.fs"/>
@@ -306,6 +314,7 @@
     <Compile Include="src/Runtime/Search/FuzzySearchSupport.fs"/>
     <Compile Include="src/Runtime/Search/FuzzySearchFind.fs"/>
     <Compile Include="src/Runtime/Search/FuzzyGrepTypes.fs"/>
+    <Compile Include="src/Runtime/Search/FuzzySearchGrepMatch.fs"/>
     <Compile Include="src/Runtime/Search/FuzzySearchGrep.fs"/>
     <Compile Include="src/Runtime/Search/FuzzySearch.fs"/>
     <Compile Include="src/Runtime/Search/FuzzyToolsCodec.fs"/>
@@ -341,6 +350,7 @@
     <Compile Include="src/Runtime/EventStore/EventLogRuntimeNudge.fs"/>
     <Compile Include="src/Runtime/EventStore/EventLogRuntime.fs"/>
     <Compile Include="src/Runtime/Fallback/Ports.fs"/>
+    <Compile Include="src/Runtime/Fallback/LeaseValidationRules.fs"/>
     <Compile Include="src/Runtime/Fallback/LeaseValidation.fs"/>
     <Compile Include="src/Runtime/Fallback/RetryDispatchGovernor.fs"/>
     <Compile Include="src/Runtime/Fallback/ContinuationDispatchOps.fs"/>
@@ -395,6 +405,7 @@
     <Compile Include="src/Runtime/Wanxiangzhen/SquadEventLogRuntime.fs"/>
     <Compile Include="src/Runtime/Wanxiangzhen/SquadEventDisplayCodec.fs"/>
     <Compile Include="src/Runtime/Wanxiangzhen/CoordinatorRuntime.fs"/>
+    <Compile Include="src/Runtime/Wanxiangzhen/SquadTaskLifecycleStart.fs"/>
     <Compile Include="src/Runtime/Wanxiangzhen/SquadTaskLifecycle.fs"/>
     <Compile Include="src/Runtime/Wanxiangzhen/CoordinatorOps.fs"/>
     <Compile Include="src/Runtime/Wanxiangzhen/CoordinatorRoutes.fs"/>
@@ -441,6 +452,7 @@
     <Compile Include="src/Hosts/Mux/PluginRegistration.fs"/>
     <Compile Include="src/Hosts/Mux/Plugin.fs"/>
     <Compile Include="src/Hosts/OpenCode/NudgeEffectPrompt.fs"/>
+    <Compile Include="src/Hosts/OpenCode/NudgeEffectSnapshot.fs"/>
     <Compile Include="src/Hosts/OpenCode/NudgeEffect.fs"/>
     <Compile Include="src/Hosts/OpenCode/ProgressObserver.fs"/>
     <Compile Include="src/Hosts/OpenCode/Fallback/Coordinator.fs"/>
@@ -460,6 +472,7 @@
     <Compile Include="src/Hosts/OpenCode/SubagentSpawn.fs"/>
     <Compile Include="src/Hosts/OpenCode/SubsessionDispatch.fs"/>
     <Compile Include="src/Hosts/OpenCode/SubsessionHostAdapterTypes.fs"/>
+    <Compile Include="src/Hosts/OpenCode/SubsessionHostAdapterOps.fs"/>
     <Compile Include="src/Hosts/OpenCode/SubsessionHostAdapter.fs"/>
     <Compile Include="src/Hosts/OpenCode/SubagentIoArgs.fs"/>
     <Compile Include="src/Hosts/OpenCode/SubagentIoCleanup.fs"/>
@@ -481,6 +494,7 @@
     <Compile Include="src/Hosts/OpenCode/CompactionHook.fs"/>
     <Compile Include="src/Hosts/OpenCode/ModelKeyResolver.fs"/>
     <Compile Include="src/Hosts/OpenCode/SembleInjection.fs"/>
+    <Compile Include="src/Hosts/OpenCode/OpenCodeModelResolutionProviders.fs"/>
     <Compile Include="src/Hosts/OpenCode/OpenCodeModelResolution.fs"/>
     <Compile Include="src/Hosts/OpenCode/MessageTransformPipeline.fs"/>
     <Compile Include="src/Hosts/OpenCode/MessageTransformHook.fs"/>
@@ -515,6 +529,7 @@
     <Compile Include="src/Hosts/Omp/MessagingCodec.fs"/>
     <Compile Include="src/Hosts/Omp/MagicTodo.fs"/>
     <Compile Include="src/Hosts/Omp/SubsessionDispatch.fs"/>
+    <Compile Include="src/Hosts/Omp/OmpSubsessionHostAdapterPrompts.fs"/>
     <Compile Include="src/Hosts/Omp/SubsessionHostAdapter.fs"/>
     <Compile Include="src/Hosts/Omp/SubagentRuntime.fs"/>
     <Compile Include="src/Hosts/Omp/ChildSessionCreate.fs"/>
@@ -757,6 +772,7 @@
     <Compile Include="tests/MessageTransformStackTests.fs"/>
     <Compile Include="tests/ParallelToolPromptTests.fs"/>
     <Compile Include="tests/CompactionTransformTests.fs"/>
+    <Compile Include="tests/CompactionHookOpenCodeTests.fs"/>
     <Compile Include="tests/CompactionIsolationTests.fs"/>
     <Compile Include="tests/ModelResolutionTests.fs"/>
     <Compile Include="tests/MessageSanitizationTests.fs"/>

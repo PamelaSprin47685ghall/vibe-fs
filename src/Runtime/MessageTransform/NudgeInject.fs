@@ -57,6 +57,44 @@ let private persistStableNudgeId
 let shouldIncludeNudge (contextBudgetPolicy: Wanxiangshu.Kernel.MessageTransformPolicy.ContextBudgetPolicy) : bool =
     contextBudgetPolicy = Wanxiangshu.Kernel.MessageTransformPolicy.ContextBudgetPolicy.Include
 
+let private resolveStableNudgeId
+    (scope: RuntimeScope)
+    (sessionID: string)
+    (currentTokens: int)
+    (storeEntry: ContextBudgetEntry)
+    (currentTodoOrdinal: int)
+    (action: NudgeAction)
+    : string =
+    match action with
+    | InjectFirstSignal ->
+        let id = "context-budget-nudge-" + System.Guid.NewGuid().ToString()
+
+        persistStableNudgeId scope sessionID id EmergencySignaled currentTodoOrdinal
+
+        ContextBudgetStore.update scope sessionID (fun entry ->
+            { entry with
+                NudgeCount = entry.NudgeCount + 1
+                SignalTokens = Some(int64 currentTokens) })
+
+        id
+    | InjectSameEpisode ->
+        ensureStableNudgeId scope sessionID storeEntry.StableSyntheticNudgeID (fun id ->
+            persistStableNudgeId scope sessionID id EmergencySignaled currentTodoOrdinal)
+    | InjectCatchUp ->
+        let id =
+            storeEntry.StableSyntheticNudgeID
+            |> Option.defaultValue ("context-budget-nudge-" + System.Guid.NewGuid().ToString())
+
+        persistStableNudgeId scope sessionID id EmergencySignaled currentTodoOrdinal
+
+        ContextBudgetStore.update scope sessionID (fun entry ->
+            { entry with
+                NudgeCount = entry.NudgeCount + 1
+                SignalTokens = Some(int64 currentTokens) })
+
+        id
+    | NoNudge -> ""
+
 let checkAndInjectNudge
     (sessionID: string)
     (maxInputTokens: int)
@@ -91,35 +129,7 @@ let checkAndInjectNudge
             messages, pressure, action
         else
             let stableId =
-                match action with
-                | InjectFirstSignal ->
-                    let id = "context-budget-nudge-" + System.Guid.NewGuid().ToString()
-
-                    persistStableNudgeId scope sessionID id EmergencySignaled currentTodoOrdinal
-
-                    ContextBudgetStore.update scope sessionID (fun entry ->
-                        { entry with
-                            NudgeCount = entry.NudgeCount + 1
-                            SignalTokens = Some(int64 currentTokens) })
-
-                    id
-                | InjectSameEpisode ->
-                    ensureStableNudgeId scope sessionID storeEntry.StableSyntheticNudgeID (fun id ->
-                        persistStableNudgeId scope sessionID id EmergencySignaled currentTodoOrdinal)
-                | InjectCatchUp ->
-                    let id =
-                        storeEntry.StableSyntheticNudgeID
-                        |> Option.defaultValue ("context-budget-nudge-" + System.Guid.NewGuid().ToString())
-
-                    persistStableNudgeId scope sessionID id EmergencySignaled currentTodoOrdinal
-
-                    ContextBudgetStore.update scope sessionID (fun entry ->
-                        { entry with
-                            NudgeCount = entry.NudgeCount + 1
-                            SignalTokens = Some(int64 currentTokens) })
-
-                    id
-                | NoNudge -> ""
+                resolveStableNudgeId scope sessionID currentTokens storeEntry currentTodoOrdinal action
 
             let nudgeMsg = buildContextBudgetNudgeMessage sessionID stableId
             List.append messages [ nudgeMsg ], pressure, action
