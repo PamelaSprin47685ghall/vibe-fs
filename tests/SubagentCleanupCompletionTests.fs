@@ -7,7 +7,6 @@ open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Runtime.ChildAgentRegistry
 open Wanxiangshu.Runtime.Fallback.RuntimeStore
 open Wanxiangshu.Runtime.SubsessionActorRegistry
-open Wanxiangshu.Hosts.Opencode.SubagentIo
 open Wanxiangshu.Tests.TempWorkspace
 open Wanxiangshu.Kernel.Subsession.Types
 

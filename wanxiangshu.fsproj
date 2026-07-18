@@ -435,9 +435,8 @@
     <Compile Include="src/Hosts/Mux/MessagingCodec.fs"/>
     <Compile Include="src/Hosts/Mux/CapsCodec.fs"/>
     <Compile Include="src/Hosts/Mux/BacklogSession.fs"/>
-    <Compile Include="src/Hosts/Mux/MessageTransformCompaction.fs"/>
-    <Compile Include="src/Hosts/Mux/MessageTransform.fs"/>
     <Compile Include="src/Hosts/Mux/CompactionTransform.fs"/>
+    <Compile Include="src/Hosts/Mux/MessageTransform.fs"/>
     <Compile Include="src/Hosts/Mux/Fallback/Hook.fs"/>
     <Compile Include="src/Hosts/Mux/EventHookHandlers.fs"/>
     <Compile Include="src/Hosts/Mux/EventHookCleanup.fs"/>
@@ -474,7 +473,6 @@
     <Compile Include="src/Hosts/OpenCode/SubagentRunDirective.fs"/>
     <Compile Include="src/Hosts/OpenCode/SubagentRunExec.fs"/>
     <Compile Include="src/Hosts/OpenCode/SubagentIoRun.fs"/>
-    <Compile Include="src/Hosts/OpenCode/SubagentIo.fs"/>
     <Compile Include="src/Hosts/OpenCode/SessionIo.fs"/>
     <Compile Include="src/Hosts/OpenCode/ReviewerLoop.fs"/>
     <Compile Include="src/Hosts/OpenCode/AgentConfig.fs"/>
@@ -500,7 +498,6 @@
     <Compile Include="src/Hosts/OpenCode/PtySpawn.fs"/>
     <Compile Include="src/Hosts/OpenCode/PtyWriteTool.fs"/>
     <Compile Include="src/Hosts/OpenCode/PtyReadTool.fs"/>
-    <Compile Include="src/Hosts/OpenCode/PtyIo.fs"/>
     <Compile Include="src/Hosts/OpenCode/SearchTools.fs"/>
     <Compile Include="src/Hosts/OpenCode/ReviewTools.fs"/>
     <Compile Include="src/Hosts/OpenCode/SwapTool.fs"/>
@@ -574,6 +571,7 @@
     <Compile Include="tests/Assert.fs"/>
     <Compile Include="tests/ArchitectureGatesFs.fs"/>
     <Compile Include="tests/ArchitectureGatesTests.fs"/>
+    <Compile Include="tests/RemovedProductionFilesTests.fs"/>
     <Compile Include="tests/SessionLoopTests.fs"/>
     <Compile Include="tests/ToolExecutionStatusTests.fs"/>
     <Compile Include="tests/SessionGateDemandTests.fs"/>

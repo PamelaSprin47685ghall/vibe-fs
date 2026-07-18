@@ -28,7 +28,7 @@ open Wanxiangshu.Runtime.MuxWorkspaceCodec
 open Wanxiangshu.Runtime.ChatTransformOutputCodec
 open Wanxiangshu.Runtime.Dyn
 open Wanxiangshu.Runtime.ContextBudgetUsageCodec
-open Wanxiangshu.Hosts.Mux.MessageTransformCompaction
+open Wanxiangshu.Hosts.Mux.CompactionTransform
 
 let resolvePolicies (agent: string) (isChild: bool) =
     let bp =

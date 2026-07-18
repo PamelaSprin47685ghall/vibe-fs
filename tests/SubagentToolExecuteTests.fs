@@ -17,7 +17,6 @@ open Wanxiangshu.Runtime.SubagentIteratorStore
 open Wanxiangshu.Runtime.Fallback.RuntimeStore
 open Wanxiangshu.Runtime.SubsessionActorRegistry
 open Wanxiangshu.Runtime.SubsessionEventStore
-open Wanxiangshu.Hosts.Opencode.SubagentIo
 open Wanxiangshu.Tests.TempWorkspace
 open Wanxiangshu.Kernel.Subsession.Types
 
