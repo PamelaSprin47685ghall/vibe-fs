@@ -1,3 +1,4 @@
+import fs from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { BUILD_SRC } from './git.js';
@@ -13,15 +14,23 @@ export async function spinUntil(predicate, maxSteps = 200) {
   }
 }
 
+function requireModuleUrl(segments) {
+  const p = path.join(BUILD_SRC, 'src', ...segments);
+  if (!fs.existsSync(p)) {
+    throw new Error(`Missing module file: ${p}`);
+  }
+  return pathToFileURL(p).href;
+}
+
 export async function runningCount(runtime) {
-  const url = pathToFileURL(path.join(BUILD_SRC, 'src', 'Kernel', 'Wanxiangzhen', 'Dag.js')).href;
+  const url = requireModuleUrl(['Kernel', 'Wanxiangzhen', 'Dag.js']);
   const dag = await import(url);
   return dag.runningCount(runtime.Dag);
 }
 
 export async function tickScheduler(runtime, log) {
   try {
-    const url = pathToFileURL(path.join(BUILD_SRC, 'src', 'Shell', 'Wanxiangzhen', 'CoordinatorOps.js')).href;
+    const url = requireModuleUrl(['Runtime', 'Wanxiangzhen', 'CoordinatorOps.js']);
     const ops = await import(url);
     runtime.Scheduling = false;
     await ops.schedulerTick(runtime);
@@ -31,7 +40,7 @@ export async function tickScheduler(runtime, log) {
 }
 
 export async function findTaskInDag(runtime, taskId) {
-  const url = pathToFileURL(path.join(BUILD_SRC, 'src', 'Kernel', 'Wanxiangzhen', 'Dag.js')).href;
+  const url = requireModuleUrl(['Kernel', 'Wanxiangzhen', 'Dag.js']);
   const dag = await import(url);
   return dag.findTask(taskId, runtime.Dag);
 }

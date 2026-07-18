@@ -5,15 +5,21 @@ import { fileURLToPath } from 'node:url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-export function resolvePluginJs() {
+function resolveRepoRoot() {
   let cur = __dirname;
   while (cur && cur !== '/' && !fs.existsSync(path.join(cur, 'package.json'))) {
     cur = path.dirname(cur);
   }
+  return cur;
+}
+
+export const REPO_ROOT = resolveRepoRoot();
+
+export function resolvePluginJs() {
   const candidates = [
-    path.join(cur, 'build', 'src', 'Opencode', 'PluginWanxiangzhen.js'),
-    path.join(cur, '..', '..', 'build', 'src', 'Opencode', 'PluginWanxiangzhen.js'),
-    path.join(cur, '..', 'build', 'src', 'Opencode', 'PluginWanxiangzhen.js'),
+    path.join(REPO_ROOT, 'build', 'src', 'Hosts', 'OpenCode', 'PluginWanxiangzhen.js'),
+    path.join(REPO_ROOT, '..', '..', 'build', 'src', 'Hosts', 'OpenCode', 'PluginWanxiangzhen.js'),
+    path.join(REPO_ROOT, '..', 'build', 'src', 'Hosts', 'OpenCode', 'PluginWanxiangzhen.js'),
   ];
   for (const c of candidates) {
     if (fs.existsSync(c)) return c;
@@ -22,7 +28,7 @@ export function resolvePluginJs() {
 }
 
 export const PLUGIN_JS = resolvePluginJs();
-export const BUILD_SRC = path.join(path.dirname(PLUGIN_JS), '..', '..');
+export const BUILD_SRC = path.join(REPO_ROOT, 'build');
 
 export function gitInit(tmpDir, opts = {}) {
   const masterBranch = opts.masterBranch || 'main';
