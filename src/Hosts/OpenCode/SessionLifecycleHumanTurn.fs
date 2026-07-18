@@ -6,12 +6,11 @@ open Wanxiangshu.Runtime.Dyn
 open Wanxiangshu.Runtime.OpencodeHookInputCodec
 open Wanxiangshu.Runtime.ToolRuntimeContext
 open Wanxiangshu.Runtime.Fallback.RuntimeStore
+open Wanxiangshu.Runtime.Fallback.SessionRuntime
+open Wanxiangshu.Runtime.Fallback.SessionRuntimePropertyPure
 open Wanxiangshu.Runtime.Fallback.LeaseTransitions
-open Wanxiangshu.Runtime.Fallback.HumanTurnTransitions
-open Wanxiangshu.Runtime.Fallback.OrdinalTransitions
 open Wanxiangshu.Runtime.Fallback.CompactionTransitions
 open Wanxiangshu.Runtime.Fallback.SessionPropertyTransitions
-open Wanxiangshu.Runtime.Fallback.ModelInjection
 open Wanxiangshu.Runtime.Fallback.LeaseValidation
 open Wanxiangshu.Runtime.SessionEventWriter
 open Wanxiangshu.Runtime.NudgeEventWriter
@@ -80,36 +79,29 @@ let private decodeModelInfo (modelOpt: string option) : string * string * string
 
 /// Reset core session state for the new human turn and return the turn identifiers.
 let private resetSessionState
-    (directory: string)
+    (_directory: string)
     (fallbackRuntime: FallbackRuntimeStore)
     (sessionID: string)
     (agent: string)
     (msgId: string)
     (modelOpt: string option)
     =
-    fallbackRuntime.SetChain sessionID []
-    fallbackRuntime.ClearModel sessionID
-    fallbackRuntime.ClearInjected sessionID
     Wanxiangshu.Runtime.ToolHookRuntime.clearSessionCompliance sessionID
-    fallbackRuntime.SetSessionOwner sessionID SessionOwner.Human
-    let turnId = fallbackRuntime.IncrementHumanTurnId sessionID
-    let humanTurnOrdinal = fallbackRuntime.GetHumanTurnOrdinal sessionID
-    fallbackRuntime.SetLastHumanMessageId sessionID msgId
-    fallbackRuntime.RemoveForceStopped sessionID
 
-    let currentGen = fallbackRuntime.GetSessionGeneration sessionID
-    let currentCancelGen = fallbackRuntime.GetCancelGeneration sessionID
-    fallbackRuntime.SetActiveContinuationGeneration sessionID currentGen
-    fallbackRuntime.SetActiveContinuationCancelGeneration sessionID currentCancelGen
+    let applyTurn (s: FallbackSessionRuntime) =
+        let s' = beginHumanTurn msgId s
 
-    match modelOpt with
-    | Some m -> fallbackRuntime.SetLatestHumanModel sessionID m
-    | None -> fallbackRuntime.ClearLatestHumanModel sessionID
+        let s'' =
+            match modelOpt with
+            | Some m -> recordLatestHumanModel m s'
+            | None -> clearLatestHumanModel s'
 
-    if agent <> "" then
-        fallbackRuntime.SetAgentName sessionID agent
+        if agent <> "" then recordAgentName agent s'' else s''
 
-    turnId, humanTurnOrdinal
+    fallbackRuntime.Update(sessionID, applyTurn)
+
+    let s = fallbackRuntime.GetSession sessionID
+    s.HumanTurnId, s.HumanTurnOrdinal
 
 /// Initialise the FallbackPhase.Idle state and consumed flags for the session.
 let private initializeFallbackState (fallbackRuntime: FallbackRuntimeStore) (sessionID: string) : unit =

@@ -214,7 +214,6 @@
     <Compile Include="src/Runtime/Fallback/OrdinalTransitions.fs"/>
     <Compile Include="src/Runtime/Fallback/CompactionTransitions.fs"/>
     <Compile Include="src/Runtime/Fallback/SessionPropertyTransitions.fs"/>
-    <Compile Include="src/Runtime/Fallback/ModelInjection.fs"/>
     <Compile Include="src/Runtime/Fallback/LeaseTransitions.fs"/>
     <Compile Include="src/Runtime/Fallback/FallbackGateObservation.fs"/>
     <Compile Include="src/Runtime/Fallback/FallbackMessageParser.fs"/>

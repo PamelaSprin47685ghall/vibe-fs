@@ -7,7 +7,6 @@ open Wanxiangshu.Kernel.Nudge
 open Wanxiangshu.Runtime.Nudge.NudgeDerivation
 open Wanxiangshu.Runtime.PromptFragments
 open Wanxiangshu.Runtime.Fallback.CompactionTransitions
-open Wanxiangshu.Runtime.Fallback.ModelInjection
 
 let mutable private fallbackRuntimeInstance: FallbackRuntimeStore option = None
 

@@ -11,7 +11,7 @@ open Wanxiangshu.Kernel.Subsession.TypeClassify
 open Wanxiangshu.Runtime.Fallback.RuntimeStore
 open Wanxiangshu.Runtime.Fallback
 open Wanxiangshu.Runtime.Fallback.HostEventInspection
-open Wanxiangshu.Runtime.Fallback.ModelInjection
+open Wanxiangshu.Runtime.Fallback.SessionRuntimePropertyPure
 
 let ompErrorInput (err: obj) : ErrorInput =
     let getOpt key =
@@ -64,7 +64,7 @@ let ompIsNewUserMessageImpl (runtime: FallbackRuntimeStore) (sessionID: string) 
                 | :? int as i32 -> int64 i32
                 | _ -> 0L
 
-            not (runtime.IsInjectedSince(sessionID, msgTime))
+            not (isInjectedSince msgTime (runtime.GetSession sessionID))
 
 let private tryExtractTurnIdFromEvent (rawEvent: obj) : TurnId option =
     let getOpt target =

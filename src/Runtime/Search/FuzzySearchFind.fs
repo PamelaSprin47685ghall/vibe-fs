@@ -51,9 +51,7 @@ let findNextIterator
     else
         ""
 
-let private processRawFindResponse
-    (value: obj)
-    : string * FindResult =
+let private processRawFindResponse (value: obj) : string * FindResult =
     let matches = itemsOf value |> Array.map toFindMatch |> List.ofArray
     let totalOpt = optInt value "totalMatched"
     let totalFiles = optInt value "totalFiles" |> Option.defaultValue 0
@@ -150,10 +148,7 @@ let private runFindForPattern
                 let value = Dyn.get raw "value"
                 let body, _ = processRawFindResponse value
 
-                return
-                    (pat,
-                     { output = body
-                       isError = false })
+                return (pat, { output = body; isError = false })
     }
 
 let private fuzzyFindMulti
@@ -176,7 +171,9 @@ let private fuzzyFindMulti
         | Error msg -> return { output = msg; isError = true }
         | Ok finder ->
             try
-                let promises = patterns |> List.map (runFindForPattern finder params' opts) |> List.toArray
+                let promises =
+                    patterns |> List.map (runFindForPattern finder params' opts) |> List.toArray
+
                 let! outcomes = Promise.all promises
 
                 let body =

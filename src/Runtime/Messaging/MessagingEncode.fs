@@ -132,5 +132,5 @@ let encodeMuxToolPart (toolName: string) (callID: string) (stateOpt: ToolState<o
         else
             raw
 
-let replacePartsOnRawMessage (rawMsg: obj) (encodedParts: obj array) : obj = Wanxiangshu.Runtime.Dyn.withKey rawMsg "parts" (box encodedParts)
-
+let replacePartsOnRawMessage (rawMsg: obj) (encodedParts: obj array) : obj =
+    Wanxiangshu.Runtime.Dyn.withKey rawMsg "parts" (box encodedParts)

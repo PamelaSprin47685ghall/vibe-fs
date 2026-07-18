@@ -6,7 +6,7 @@ open Wanxiangshu.Runtime.Fallback.RuntimeStore
 open Wanxiangshu.Runtime.Fallback.SessionRuntime
 open Wanxiangshu.Runtime.Fallback.LeaseTransitions
 open Wanxiangshu.Runtime.Fallback.SessionPropertyTransitions
-open Wanxiangshu.Runtime.Fallback.ModelInjection
+open Wanxiangshu.Runtime.Fallback.SessionRuntimePropertyPure
 open Wanxiangshu.Runtime.Fallback.Ports
 open Wanxiangshu.Runtime.Fallback.LeaseValidation
 open Wanxiangshu.Runtime.ContinuationEventWriter
@@ -75,8 +75,7 @@ let handleDispatchComplete
             if not canTransition then
                 do! cancelAfterDispatch runtime executor workspaceRoot sessionID lease "Cancelled after dispatch"
             else
-                runtime.SetInjectedAt sessionID atMs
-                runtime.SetInjectedModel sessionID model
+                runtime.UpdateSession(sessionID, setInjected model atMs)
     }
 
 /// Inner dispatch: write dispatch_started, transition lease, call action.

@@ -28,6 +28,7 @@ let tryClaimNudgeDispatch
     promise {
         let cache = ProjectionCache(root)
         use! _ = cache.OpenAsync()
+
         let! evt =
             tryClaim
                 cache
@@ -40,8 +41,13 @@ let tryClaimNudgeDispatch
                 cancelGen
                 humanTurnId
                 nudgeOrdinal
-                (fun isBlocked anchor -> isBlocked { PendingNudge = None; LastDispatchedAnchor = None } anchor)
-                (now())
+                (fun isBlocked anchor ->
+                    isBlocked
+                        { PendingNudge = None
+                          LastDispatchedAnchor = None }
+                        anchor)
+                (now ())
+
         return evt.IsSome
     }
 
@@ -53,7 +59,10 @@ let finalizeDispatchedLease
     (action: NudgeAction)
     (snapshot: SessionSnapshot)
     : JS.Promise<unit> =
-    let dispatchedLease = { lease with Status = LeaseStatus.Dispatched }
+    let dispatchedLease =
+        { lease with
+            Status = LeaseStatus.Dispatched }
+
     finishNudge
         fallbackRuntime
         root
@@ -70,15 +79,7 @@ let handleTransitionFailure
     (sessionId: string)
     (lease: NudgeLease)
     : JS.Promise<unit> =
-    finishNudge
-        fallbackRuntime
-        root
-        sessionId
-        lease
-        NudgeOutcome.Cancelled
-        "Cancelled after dispatch"
-        ""
-        ""
+    finishNudge fallbackRuntime root sessionId lease NudgeOutcome.Cancelled "Cancelled after dispatch" "" ""
 
 let attemptTransitionThenFinalize
     (fallbackRuntime: FallbackRuntimeStore)
@@ -98,14 +99,6 @@ let attemptTransitionThenFinalize
             )
         )
     then
-        finishNudge
-            fallbackRuntime
-            root
-            sessionId
-            lease
-            NudgeOutcome.Cancelled
-            "Cancelled after dispatch"
-            ""
-            ""
+        finishNudge fallbackRuntime root sessionId lease NudgeOutcome.Cancelled "Cancelled after dispatch" "" ""
     else
         finalizeDispatchedLease fallbackRuntime root sessionId lease action snapshot

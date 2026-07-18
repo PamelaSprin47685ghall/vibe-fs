@@ -57,21 +57,43 @@ let tryCaptureBacklogEntry (isError: bool) (callId: string) (input: obj) (event:
         ()
 
     let ahaMoments =
-        if Dyn.isNullish input then "" else (Dyn.str input "ahaMoments").Trim()
+        if Dyn.isNullish input then
+            ""
+        else
+            (Dyn.str input "ahaMoments").Trim()
 
     let changesAndReasons =
-        if Dyn.isNullish input then "" else (Dyn.str input "changesAndReasons").Trim()
+        if Dyn.isNullish input then
+            ""
+        else
+            (Dyn.str input "changesAndReasons").Trim()
 
     let gotchas =
-        if Dyn.isNullish input then "" else (Dyn.str input "gotchas").Trim()
+        if Dyn.isNullish input then
+            ""
+        else
+            (Dyn.str input "gotchas").Trim()
 
     let lessonsAndConventions =
-        if Dyn.isNullish input then "" else (Dyn.str input "lessonsAndConventions").Trim()
+        if Dyn.isNullish input then
+            ""
+        else
+            (Dyn.str input "lessonsAndConventions").Trim()
 
     let plan =
-        if Dyn.isNullish input then "" else (Dyn.str input "plan").Trim()
+        if Dyn.isNullish input then
+            ""
+        else
+            (Dyn.str input "plan").Trim()
 
-    if not isError && (ahaMoments <> "" || changesAndReasons <> "" || gotchas <> "" || lessonsAndConventions <> "" || plan <> "") then
+    if
+        not isError
+        && (ahaMoments <> ""
+            || changesAndReasons <> ""
+            || gotchas <> ""
+            || lessonsAndConventions <> ""
+            || plan <> "")
+    then
         let entry: BacklogEntry =
             { ahaMoments = ahaMoments
               changesAndReasons = changesAndReasons
@@ -86,7 +108,11 @@ let isToolError (event: obj) : bool =
     || (let err = Dyn.get event "error" in not (Dyn.isNullish err) && string err <> "")
 
 let getTodoWriteMethodologies (args: obj) : string list =
-    let raw = if Dyn.isNullish args then null else Dyn.get args "select_methodology"
+    let raw =
+        if Dyn.isNullish args then
+            null
+        else
+            Dyn.get args "select_methodology"
 
     if Dyn.isNullish raw || not (Dyn.isArray raw) then
         []
@@ -127,7 +153,9 @@ let finalizeToolResult
     (status: ToolHookRuntime.ExecutionStatus)
     (event: obj)
     : unit =
-    let criticism = ToolHookRuntime.appendCriticism businessProcessedText violations status
+    let criticism =
+        ToolHookRuntime.appendCriticism businessProcessedText violations status
+
     setToolResultText event criticism
 
 let toolResultHandler (_pi: obj) (_reviewStore: ReviewStore) (event: obj) (ctx: obj) : JS.Promise<unit> =

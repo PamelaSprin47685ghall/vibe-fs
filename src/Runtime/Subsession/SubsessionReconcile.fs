@@ -46,10 +46,7 @@ let private createPoisonEvents
     : SubsessionEvent list =
     [ SessionPoisoned(sessionId, SessionStateUnknownAfterRestart)
       TurnFinished(tid, TurnInfrastructureFailed "session state unknown after restart")
-      RunFinished(
-          runProj.RunId,
-          Failed(InfrastructureFailure "session state unknown after restart")
-      ) ]
+      RunFinished(runProj.RunId, Failed(InfrastructureFailure "session state unknown after restart")) ]
 
 /// Load NDJSON, find RunStarted without RunFinished, and ensure those physical
 /// sessions cannot accept a new StartRun until SessionClosed dispose.

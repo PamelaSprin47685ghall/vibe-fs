@@ -22,7 +22,8 @@ let private coordinatorPlugin (ctx: obj) : JS.Promise<obj> =
         let options = Wanxiangshu.Runtime.Dyn.get ctx "options"
 
         let isE2e =
-            not (isNullish options) && unbox<bool> (Wanxiangshu.Runtime.Dyn.get options "e2e")
+            not (isNullish options)
+            && unbox<bool> (Wanxiangshu.Runtime.Dyn.get options "e2e")
 
         if isE2e then
             result.runtime.IsE2e <- true

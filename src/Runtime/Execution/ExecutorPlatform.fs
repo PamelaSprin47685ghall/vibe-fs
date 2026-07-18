@@ -6,6 +6,7 @@ open System.Text.RegularExpressions
 open Wanxiangshu.Kernel.Primitives.Identity
 open Wanxiangshu.Kernel.Errors.DomainError
 open Wanxiangshu.Kernel.Session.Causality
+
 [<Global("globalThis.process")>]
 let private nodeProcess: obj = jsNative
 

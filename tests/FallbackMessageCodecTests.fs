@@ -8,7 +8,7 @@ open Fable.Core.JsInterop
 open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Runtime.Fallback.FallbackMessageCodec
 open Wanxiangshu.Runtime.Fallback.FallbackMessageParser
-open Wanxiangshu.Runtime.Fallback.ModelInjection
+open Wanxiangshu.Runtime.Fallback.SessionRuntimePropertyPure
 
 module Dyn = Wanxiangshu.Runtime.Dyn
 
@@ -230,16 +230,18 @@ let testResolveNudgeModel () =
         [| mkMsg "user" "​" (Some "openai/gpt-4")
            mkMsg "assistant" "thinking..." (Some "openai/gpt-4") |]
 
-    runtime3.SetInjectedModel
-        sid
-        { ProviderID = "anthropic"
-          ModelID = "claude-3-sonnet"
-          Variant = None
-          Temperature = None
-          TopP = None
-          MaxTokens = None
-          ReasoningEffort = None
-          Thinking = false }
+    runtime3.UpdateSession(
+        sid,
+        setInjectedModel
+            { ProviderID = "anthropic"
+              ModelID = "claude-3-sonnet"
+              Variant = None
+              Temperature = None
+              TopP = None
+              MaxTokens = None
+              ReasoningEffort = None
+              Thinking = false }
+    )
 
     let res3 = resolveNudgeModel msgs3 runtime3 sid (Some "openai/gpt-4")
     equal "use injected model from runtime state" (Some "openai/gpt-4") res3

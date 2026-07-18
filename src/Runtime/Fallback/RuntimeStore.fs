@@ -46,6 +46,19 @@ type FallbackRuntimeStore() =
         this.UpdateSession(sessionID, f)
         this.TriggerStateChanged sessionID
 
+    /// Update session and return a value produced by the transition, without notifying listeners.
+    member _.UpdateSessionReturning(sessionID: string, f: FallbackSessionRuntime -> FallbackSessionRuntime * 'a) : 'a =
+        let s = getSession sessionID
+        let s', result = f s
+        sessionStates <- Map.add sessionID s' sessionStates
+        result
+
+    /// Update session and return a value produced by the transition, then notify listeners.
+    member this.UpdateReturning(sessionID: string, f: FallbackSessionRuntime -> FallbackSessionRuntime * 'a) : 'a =
+        let result = this.UpdateSessionReturning(sessionID, f)
+        this.TriggerStateChanged sessionID
+        result
+
     member _.OnStateChanged (sessionID: string) (callback: unit -> unit) : unit =
         let list =
             match Map.tryFind sessionID listeners with

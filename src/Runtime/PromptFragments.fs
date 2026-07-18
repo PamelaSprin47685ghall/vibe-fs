@@ -4,8 +4,11 @@ open Wanxiangshu.Kernel.HostTools
 open Wanxiangshu.Kernel.Nudge.NudgePromptText
 open Wanxiangshu.Runtime.PromptFrontMatter
 
-let todoNudgePromptProse = Wanxiangshu.Kernel.Nudge.NudgePromptText.todoNudgePromptProse
-let loopNudgePromptProse = Wanxiangshu.Kernel.Nudge.NudgePromptText.loopNudgePromptProse
+let todoNudgePromptProse =
+    Wanxiangshu.Kernel.Nudge.NudgePromptText.todoNudgePromptProse
+
+let loopNudgePromptProse =
+    Wanxiangshu.Kernel.Nudge.NudgePromptText.loopNudgePromptProse
 
 let readOnlyRulesFor (host: Host) =
     "READ-ONLY: You must NOT write, edit, patch, or create files. "

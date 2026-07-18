@@ -78,9 +78,11 @@ let private arrField (parsed: obj) k =
     else
         Some((v :?> obj array) |> Array.map string |> Array.toList)
 
-let private optStr (parsed: obj) k = strField parsed k |> Option.defaultValue ""
+let private optStr (parsed: obj) k =
+    strField parsed k |> Option.defaultValue ""
 
-let private optBool (parsed: obj) k = boolField parsed k |> Option.defaultValue false
+let private optBool (parsed: obj) k =
+    boolField parsed k |> Option.defaultValue false
 
 let private parseTaskDef (o: obj) : TaskItem option =
     let tid = str o "task_id"
@@ -110,9 +112,7 @@ let private parseTasks (parsed: obj) : TaskItem list =
     if isNullish tasksRaw || not (isArray tasksRaw) then
         []
     else
-        (tasksRaw :?> obj array)
-        |> Array.toList
-        |> List.choose parseTaskDef
+        (tasksRaw :?> obj array) |> Array.toList |> List.choose parseTaskDef
 
 let private parseEvent (parsed: obj) (typeName: string) : SquadEvent option =
     let sid = str parsed "session_id"

@@ -96,5 +96,4 @@ let handleSlaveExit rt taskId =
 let handleSlaveExitCore rt taskId =
     SquadTaskLifecycle.handleSlaveExitCore rt taskId
 
-let safeKillPid rt pid =
-    SquadTaskLifecycle.safeKillPid rt pid
+let safeKillPid rt pid = SquadTaskLifecycle.safeKillPid rt pid
