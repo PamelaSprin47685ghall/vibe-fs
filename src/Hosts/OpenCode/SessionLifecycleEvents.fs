@@ -13,6 +13,7 @@ open Wanxiangshu.Runtime.Fallback.SessionRuntimeLeasePure
 open Wanxiangshu.Runtime.EventLogRuntime
 open Wanxiangshu.Hosts.Opencode.Fallback.Coordinator
 open Wanxiangshu.Hosts.Opencode.NudgeTrigger
+open Wanxiangshu.Hosts.Opencode.NudgeTriggerOps
 open Wanxiangshu.Hosts.Opencode.ChatHooksMessageIdDedup
 open Wanxiangshu.Runtime.Dispatch
 
@@ -60,6 +61,7 @@ let private handleSessionCompacted (ctx: obj) (fallbackRuntime: FallbackRuntimeS
                     compactionOrdinal
 
             fallbackRuntime.Update(sid, setCompacted true)
+            do! settleCompaction_ ctx fallbackRuntime sid
     }
 
 /// Apply mutations from a message.updated event (compaction continuation detection).
@@ -85,10 +87,7 @@ let private handleMessageUpdated (fallbackRuntime: FallbackRuntimeStore) (sid: s
             if isCompactionContinue then
                 let currentOwner = (fallbackRuntime.GetSession sid).Owner
 
-                if
-                    currentOwner = SessionOwner.Compaction
-                    && (fallbackRuntime.GetSession sid).CompactionCompacted
-                then
+                if currentOwner = SessionOwner.Compaction then
                     fallbackRuntime.Update(sid, setCompactionContinuationObserved true)
 
 /// Process the event-envelope match body: route idle + keep existing handlers.
