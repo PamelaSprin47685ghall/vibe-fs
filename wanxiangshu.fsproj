@@ -118,9 +118,6 @@
     <Compile Include="src/Kernel/Review/ReviewLoopFold.fs"/>
     <Compile Include="src/Kernel/Nudge/Types.fs"/>
     <Compile Include="src/Kernel/Fallback/Continuation.fs"/>
-    <Compile Include="src/Kernel/Fallback/ContinuationEventParse.fs"/>
-    <Compile Include="src/Kernel/Fallback/ContinuationProjection.fs"/>
-    <Compile Include="src/Kernel/Fallback/ContinuationDecision.fs"/>
     <Compile Include="src/Kernel/Nudge/NudgeSnapshotSource.fs"/>
     <Compile Include="src/Kernel/Review/ReviewProjection.fs"/>
     <Compile Include="src/Kernel/Backlog/BacklogProjection.fs"/>
@@ -358,10 +355,6 @@
     <Compile Include="src/Runtime/Fallback/FallbackCoordination.fs"/>
     <Compile Include="src/Runtime/Fallback/Coordinator.fs"/>
     <Compile Include="src/Runtime/Tooling/PatchToolsCodec.fs"/>
-    <Compile Include="src/Runtime/Fallback/ContinuationEventCodec.fs"/>
-    <Compile Include="src/Runtime/Fallback/ContinuationHost.fs"/>
-    <Compile Include="src/Runtime/Fallback/ContinuationCommandProcessor.fs"/>
-    <Compile Include="src/Runtime/Fallback/ContinuationSupervisor.fs"/>
     <Compile Include="src/Runtime/Tooling/ToolArgsDecode.fs"/>
     <Compile Include="src/Runtime/Tooling/ToolExecute.fs"/>
     <Compile Include="src/Runtime/Messaging/HostAdapter.fs"/>
@@ -461,7 +454,6 @@
     <Compile Include="src/Hosts/OpenCode/Fallback/EventTranslator.fs"/>
     <Compile Include="src/Hosts/OpenCode/Fallback/ActionExecutor.fs"/>
     <Compile Include="src/Hosts/OpenCode/Fallback/Hook.fs"/>
-    <Compile Include="src/Hosts/OpenCode/Fallback/ContinuationHost.fs"/>
     <Compile Include="src/Hosts/OpenCode/SubagentTypes.fs"/>
     <Compile Include="src/Hosts/OpenCode/SubagentSpawn.fs"/>
     <Compile Include="src/Hosts/OpenCode/SubsessionDispatch.fs"/>
@@ -574,6 +566,7 @@
     <Compile Include="tests/RemovedProductionFilesTests.fs"/>
     <Compile Include="tests/ProfilerDefaultTests.fs"/>
     <Compile Include="tests/PendingEvidenceEpochTests.fs"/>
+    <Compile Include="tests/ContinuationCleanupTests.fs"/>
     <Compile Include="tests/SessionLoopTests.fs"/>
     <Compile Include="tests/ToolExecutionStatusTests.fs"/>
     <Compile Include="tests/SessionGateDemandTests.fs"/>
