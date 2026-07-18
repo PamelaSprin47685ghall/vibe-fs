@@ -234,9 +234,15 @@ type OpencodeSubsessionHost(client: obj, agent: string, directory: string) =
                 | Error _ -> return StopUnknown
             }
 
+
+/// Factory: construct a new OpenCode subsession host backed by the given
+/// client.  All callers (SubagentRunExec, PluginServiceLoader, tests) go
+/// through this function — they never call the ctor directly.
 let createHost (client: obj) (agent: string) (directory: string) : ISubsessionHost =
     OpencodeSubsessionHost(client, agent, directory) :> ISubsessionHost
 
+/// Bind a host-side user message to an in-flight logical turn so the
+/// dispatcher can prove round-trip attribution.
 let bindHostUserMessage (directory: string) (sessionId: string) (logicalTurnId: string) (messageId: string) : unit =
     let dispatcher =
         Wanxiangshu.Hosts.Opencode.SubsessionHostAdapterTypes.getDispatcher directory sessionId

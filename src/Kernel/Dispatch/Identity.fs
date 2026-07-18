@@ -1,8 +1,7 @@
 module Wanxiangshu.Kernel.Dispatch.Identity
 
+open System
 open Wanxiangshu.Kernel.Primitives.Identity
-open Fable.Core
-open Fable.Core.JsInterop
 
 /// Unique identity for one logical prompt dispatch request, scoped to a workspace
 /// so multiple plugin instances in the same Node process cannot collide.
@@ -22,9 +21,6 @@ module DispatchId =
 
     let tryParse (s: string) : DispatchId option =
         if s = "" then None else Some(DispatchId s)
-
-let private nowMs () : int64 =
-    int64 (Fable.Core.JsInterop.emitJsExpr () "Date.now()")
 
 /// What kind of owner produced the dispatch. One concrete case per code path
 /// that sends a plugin-originated prompt. Used to attribute receipts, late
@@ -101,6 +97,6 @@ module DispatchIdentity =
           Attempt = attempt
           LogicalTurnId = logicalTurnId
           HumanTurnId = humanTurnId
-          RequestedAtMs = nowMs ()
+          RequestedAtMs = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()
           ExpectedParentId = expectedParentId
           Metadata = Map.empty }

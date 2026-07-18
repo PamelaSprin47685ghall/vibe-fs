@@ -90,6 +90,7 @@ let muxStreamEndToolCallsDoesNotTriggerNudgeSpec () =
         let chatHistory =
             [| box
                    {| role = "assistant"
+                      info = {| finish = "tool_calls" |}
                       parts = [| textPart assistantText |] |} |]
 
         let! tmpDir = mkdtempAsync "mux-toolcalls-nudge-"

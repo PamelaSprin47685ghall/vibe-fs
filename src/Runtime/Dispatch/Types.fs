@@ -81,6 +81,12 @@ module DispatchOps =
 
             logger.Log(DispatchHostAccepted(r.Identity.DispatchId, acceptance, atMs))
 
+            match r.Waiter with
+            | Some w ->
+                r.Waiter <- None
+                w (Accepted acceptance)
+            | None -> ()
+
     let observeRun (r: DispatchRecord) (hostUserMessageId: string) (atMs: int64) (logger: IDispatchEventLogger) : unit =
         if r.Terminal.IsSome then
             ()

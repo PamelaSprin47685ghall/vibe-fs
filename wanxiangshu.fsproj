@@ -464,6 +464,8 @@
     <Compile Include="src/Hosts/OpenCode/SubsessionHostAdapter.fs"/>
     <Compile Include="src/Hosts/OpenCode/SubagentIoArgs.fs"/>
     <Compile Include="src/Hosts/OpenCode/SubagentIoCleanup.fs"/>
+    <Compile Include="src/Hosts/OpenCode/SubagentRunDirective.fs"/>
+    <Compile Include="src/Hosts/OpenCode/SubagentRunExec.fs"/>
     <Compile Include="src/Hosts/OpenCode/SubagentIoRun.fs"/>
     <Compile Include="src/Hosts/OpenCode/SubagentIo.fs"/>
     <Compile Include="src/Hosts/OpenCode/SessionIo.fs"/>
@@ -480,6 +482,7 @@
     <Compile Include="src/Hosts/OpenCode/CompactionHook.fs"/>
     <Compile Include="src/Hosts/OpenCode/ModelKeyResolver.fs"/>
     <Compile Include="src/Hosts/OpenCode/SembleInjection.fs"/>
+    <Compile Include="src/Hosts/OpenCode/OpenCodeModelResolution.fs"/>
     <Compile Include="src/Hosts/OpenCode/MessageTransformPipeline.fs"/>
     <Compile Include="src/Hosts/OpenCode/MessageTransformHook.fs"/>
     <Compile Include="src/Hosts/OpenCode/HostField.fs"/>
