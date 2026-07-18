@@ -9,7 +9,7 @@ open Wanxiangshu.Tests.AgentNudgeSpecs
 open Wanxiangshu.Tests.KernelTests
 open Wanxiangshu.Tests.KernelPromptSpecs
 open Wanxiangshu.Tests.FuzzyTests
-open Wanxiangshu.Tests.ShellTests
+open Wanxiangshu.Tests.ExecutorSpawnPathTests
 open Wanxiangshu.Tests.DynTests
 open Wanxiangshu.Tests.DelegateTests
 open Wanxiangshu.Tests.DelegateToolsCodecTests
@@ -97,7 +97,7 @@ open Wanxiangshu.Tests.ToolOutputInfoTests
 open Wanxiangshu.Tests.KernelHelpersTests
 
 open Wanxiangshu.Tests.ReviewPromptsFormatTests
-open Wanxiangshu.Tests.Phase0BaselineTests
+open Wanxiangshu.Tests.SubsessionGoldenTrajectoryTests
 open Wanxiangshu.Tests.CommandProcessorE2ETests
 open Wanxiangshu.Tests.ReplayEquivalenceTests
 open Wanxiangshu.Tests.FlowKernelTests
@@ -143,7 +143,7 @@ let private allOtherTests: (string * TestBody) list =
     @ wanxiangzhenTestEntries ()
     @ codecTestEntries ()
     @ ompTestEntries ()
-    @ [ "Phase0BaselineTests.run", TestBody.Sync Phase0BaselineTests.run
+    @ [ "SubsessionGoldenTrajectoryTests.run", TestBody.Sync SubsessionGoldenTrajectoryTests.run
         "CommandProcessorE2ETests.run", TestBody.Async CommandProcessorE2ETests.run
         "ReplayEquivalenceTests.run", TestBody.Sync ReplayEquivalenceTests.run
         "FlowKernelTests.run", TestBody.Async FlowKernelTests.run

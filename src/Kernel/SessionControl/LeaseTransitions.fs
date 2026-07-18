@@ -7,26 +7,12 @@ open Wanxiangshu.Kernel.EventSourcing.EventEnvelope
 open Wanxiangshu.Kernel.SessionControl.HumanTurn
 open Wanxiangshu.Kernel.SessionControl.State
 open Wanxiangshu.Kernel.SessionControl.Event
+open Wanxiangshu.Kernel.SessionControl.LeaseIdentity
 
-let private clearEpisodeState (st: OwnerEpisodeState) : OwnerEpisodeState =
-    { st with
-        Owner = Some "Human"
-        ContinuationLease = None
-        ContinuationStage = NoEpisode
-        NudgeLease = None
-        NudgeStage = NoEpisode
-        Compaction = None
-        CompactionStage = NoEpisode
-        IsCompacted = false
-        CompactionGeneration = 0 }
-
-let private humanTurnIdOr (fallback: HumanTurnState option) (explicitId: string option) : string =
-    explicitId
-    |> Option.orElse (fallback |> Option.map (fun t -> t.TurnId))
-    |> Option.defaultValue ""
+// ── Human turn ───────────────────────────────────────────────────────────────
 
 let private handleHumanTurn (st: OwnerEpisodeState) (ordinal: int option) (turn: HumanTurnState) : OwnerEpisodeState =
-    let newOrdinal = ordinal |> Option.defaultValue (st.HumanTurnOrdinal + 1)
+    let newOrdinal = defaultOrdinal st.HumanTurnOrdinal ordinal
     let msgId = turn.MessageId
 
     if
@@ -40,27 +26,17 @@ let private handleHumanTurn (st: OwnerEpisodeState) (ordinal: int option) (turn:
         { st with
             HumanTurnOrdinal = newOrdinal
             LastHumanTurnMessageId = msgId }
-        |> clearEpisodeState
+        |> userAbortState
 
-let private handleUserAbort (st: OwnerEpisodeState) : OwnerEpisodeState =
-    { st with
-        Owner = Some "None"
-        ContinuationLease = None
-        ContinuationStage = NoEpisode
-        NudgeLease = None
-        NudgeStage = NoEpisode
-        Compaction = None
-        CompactionStage = NoEpisode
-        IsCompacted = false
-        CompactionGeneration = 0 }
+// ── Compaction ───────────────────────────────────────────────────────────────
 
 let private handleCompactionStarted (st: OwnerEpisodeState) (ev: CompactionStartEvent) : OwnerEpisodeState =
-    let newOrdinal = ev.Ordinal |> Option.defaultValue (st.CompactionOrdinal + 1)
+    let newOrdinal = defaultOrdinal st.CompactionOrdinal ev.Ordinal
 
     if newOrdinal <= st.CompactionOrdinal then
         st
     else
-        let genVal = ev.GenerationAtStart |> Option.defaultValue st.SessionGeneration
+        let genVal = defaultGeneration st.SessionGeneration ev.GenerationAtStart
 
         { st with
             Owner = Some "Compaction"
@@ -73,19 +49,13 @@ let private handleCompactionStarted (st: OwnerEpisodeState) (ev: CompactionStart
                     { CompactionID = ev.CompactionId
                       CompactionOrdinal = newOrdinal
                       SessionGeneration = genVal
-                      HumanTurnID = humanTurnIdOr st.HumanTurn ev.HumanTurnId
+                      HumanTurnID = deriveHumanTurnId st.HumanTurn ev.HumanTurnId
                       Status = "started" } }
 
 let private handleContextGenerationChanged (st: OwnerEpisodeState) (ev: CompactionStageEvent) : OwnerEpisodeState =
-    let contextGeneration = ev.Generation |> Option.defaultValue st.CompactionGeneration
+    let contextGeneration = defaultGeneration st.CompactionGeneration ev.Generation
 
-    let isMatch =
-        ev.CompactionId = ""
-        || ev.Ordinal.IsNone
-        || (st.Compaction
-            |> Option.exists (fun c -> c.CompactionID = ev.CompactionId && c.CompactionOrdinal = ev.Ordinal.Value))
-
-    if isMatch then
+    if guardCompactionMatch ev.CompactionId ev.Ordinal st.Compaction then
         { st with
             IsCompacted = true
             CompactionGeneration =
@@ -97,21 +67,15 @@ let private handleContextGenerationChanged (st: OwnerEpisodeState) (ev: Compacti
         st
 
 let private handleCompactionSettled (st: OwnerEpisodeState) (ev: EpisodeStageEvent) : OwnerEpisodeState =
-    let eventOrdinal = ev.Ordinal |> Option.defaultValue st.CompactionOrdinal
+    let eventOrdinal = defaultOrdinal st.CompactionOrdinal ev.Ordinal
 
     if
         eventOrdinal = st.CompactionOrdinal
         && st.CompactionStage <> Terminal
         && st.Compaction |> Option.exists (fun c -> c.CompactionID = ev.Id)
     then
-        let nextOwner =
-            if st.Owner = Some "Compaction" then
-                Some "None"
-            else
-                st.Owner
-
         { st with
-            Owner = nextOwner
+            Owner = Some "None"
             CompactionStage = Terminal
             Compaction = None
             IsCompacted = false
@@ -119,18 +83,21 @@ let private handleCompactionSettled (st: OwnerEpisodeState) (ev: EpisodeStageEve
     else
         st
 
-let private handleContinuationRequested (st: OwnerEpisodeState) (ev: ContinuationRequestEvent) : OwnerEpisodeState =
-    let newOrdinal = ev.Ordinal |> Option.defaultValue (st.ContinuationOrdinal + 1)
+// ── Continuation ─────────────────────────────────────────────────────────────
 
-    if newOrdinal <= st.ContinuationOrdinal then
+let private handleContinuationRequested (st: OwnerEpisodeState) (ev: ContinuationRequestEvent) : OwnerEpisodeState =
+    let currentOrdinal = st.ContinuationOrdinal
+    let newOrdinal = defaultOrdinal currentOrdinal ev.Ordinal
+
+    if newOrdinal <= currentOrdinal then
         st
     else
         let nextLease =
             { ContinuationID = ev.ContinuationId
               ContinuationOrdinal = newOrdinal
-              SessionGeneration = ev.Generation |> Option.defaultValue st.SessionGeneration
-              HumanTurnID = humanTurnIdOr st.HumanTurn ev.HumanTurnId
-              CancelGeneration = ev.CancelGeneration |> Option.defaultValue st.CancelGeneration
+              SessionGeneration = defaultGeneration st.SessionGeneration ev.Generation
+              HumanTurnID = deriveHumanTurnId st.HumanTurn ev.HumanTurnId
+              CancelGeneration = defaultCancelGeneration st.CancelGeneration ev.CancelGeneration
               Owner = ev.Owner
               Model = ev.Model
               PromptText = None
@@ -142,51 +109,23 @@ let private handleContinuationRequested (st: OwnerEpisodeState) (ev: Continuatio
             ContinuationStage = Requested
             ContinuationLease = Some nextLease }
 
-let private transitionLease
-    (status: string)
-    (expected: EpisodeStage)
-    (next: EpisodeStage)
-    (st: OwnerEpisodeState)
-    (ev: EpisodeStageEvent)
-    : OwnerEpisodeState =
-    let eventOrdinal = ev.Ordinal |> Option.defaultValue st.ContinuationOrdinal
-
-    if eventOrdinal <> st.ContinuationOrdinal || st.ContinuationStage <> expected then
-        st
-    else
-        match
-            st.ContinuationLease
-            |> Option.bind (fun l ->
-                if l.ContinuationID = ev.Id then
-                    Some { l with Status = status }
-                else
-                    None)
-        with
-        | Some l ->
-            { st with
-                ContinuationLease = Some l
-                ContinuationStage = next }
-        | None -> st
-
 let private handleContinuationTerminal (st: OwnerEpisodeState) (ev: EpisodeStageEvent) : OwnerEpisodeState =
-    let eventOrdinal = ev.Ordinal |> Option.defaultValue st.ContinuationOrdinal
+    let eventOrdinal = defaultOrdinal st.ContinuationOrdinal ev.Ordinal
 
     if eventOrdinal <> st.ContinuationOrdinal || st.ContinuationStage = Terminal then
         st
     elif st.ContinuationLease |> Option.exists (fun l -> l.ContinuationID = ev.Id) then
-        let nextOwner = if st.Owner = Some "Fallback" then Some "None" else st.Owner
-
-        { st with
-            Owner = nextOwner
-            ContinuationLease = None
-            ContinuationStage = Terminal }
+        releaseOwnerIf "Fallback" { st with ContinuationLease = None; ContinuationStage = Terminal }
     else
         st
 
-let private handleNudgeRequested (st: OwnerEpisodeState) (ev: NudgeRequestEvent) : OwnerEpisodeState =
-    let newOrdinal = ev.Ordinal |> Option.defaultValue (st.NudgeOrdinal + 1)
+// ── Nudge ────────────────────────────────────────────────────────────────────
 
-    if newOrdinal <= st.NudgeOrdinal then
+let private handleNudgeRequested (st: OwnerEpisodeState) (ev: NudgeRequestEvent) : OwnerEpisodeState =
+    let currentOrdinal = st.NudgeOrdinal
+    let newOrdinal = defaultOrdinal currentOrdinal ev.Ordinal
+
+    if newOrdinal <= currentOrdinal then
         st
     else
         let nextLease =
@@ -194,9 +133,9 @@ let private handleNudgeRequested (st: OwnerEpisodeState) (ev: NudgeRequestEvent)
               NudgeOrdinal = newOrdinal
               Nonce = ev.Nonce
               Anchor = ev.Anchor
-              HumanTurnID = humanTurnIdOr st.HumanTurn ev.HumanTurnId
-              SessionGeneration = ev.Generation |> Option.defaultValue st.SessionGeneration
-              CancelGeneration = ev.CancelGeneration |> Option.defaultValue st.CancelGeneration
+              HumanTurnID = deriveHumanTurnId st.HumanTurn ev.HumanTurnId
+              SessionGeneration = defaultGeneration st.SessionGeneration ev.Generation
+              CancelGeneration = defaultCancelGeneration st.CancelGeneration ev.CancelGeneration
               Status = "requested" }
 
         { st with
@@ -205,64 +144,36 @@ let private handleNudgeRequested (st: OwnerEpisodeState) (ev: NudgeRequestEvent)
             NudgeStage = Requested
             NudgeLease = Some nextLease }
 
-let private handleNudgeDispatched (st: OwnerEpisodeState) (ev: EpisodeStageEvent) : OwnerEpisodeState =
-    let eventOrdinal = ev.Ordinal |> Option.defaultValue st.NudgeOrdinal
-
-    if eventOrdinal <> st.NudgeOrdinal || st.NudgeStage <> Requested then
-        st
-    else
-        match
-            st.NudgeLease
-            |> Option.bind (fun nl ->
-                if nl.NudgeID = ev.Id then
-                    Some { nl with Status = "dispatched" }
-                else
-                    None)
-        with
-        | Some l ->
-            { st with
-                NudgeLease = Some l
-                NudgeStage = Dispatched }
-        | None -> st
-
 let private handleNudgeTerminal (st: OwnerEpisodeState) (ev: EpisodeStageEvent) : OwnerEpisodeState =
-    let eventOrdinal = ev.Ordinal |> Option.defaultValue st.NudgeOrdinal
+    let eventOrdinal = defaultOrdinal st.NudgeOrdinal ev.Ordinal
 
     if eventOrdinal <> st.NudgeOrdinal || st.NudgeStage = Terminal then
         st
     elif st.NudgeLease |> Option.exists (fun nl -> nl.NudgeID = ev.Id) then
-        let nextOwner = if st.Owner = Some "Nudge" then Some "None" else st.Owner
-
-        { st with
-            Owner = nextOwner
-            NudgeLease = None
-            NudgeStage = Terminal }
+        releaseOwnerIf "Nudge" { st with NudgeLease = None; NudgeStage = Terminal }
     else
         st
 
-let private handleAssistantCompleted (st: OwnerEpisodeState) : OwnerEpisodeState =
-    let nextOwner = if st.Owner = Some "Nudge" then Some "None" else st.Owner
-    { st with Owner = nextOwner }
+// ── Terminal helpers ──────────────────────────────────────────────────────────
 
-let private handleNudgeDedupClearedOrWip (st: OwnerEpisodeState) : OwnerEpisodeState =
-    { st with
-        Owner = Some "None"
-        NudgeLease = None
-        NudgeStage = NoEpisode }
+let private handleAssistantCompleted (st: OwnerEpisodeState) : OwnerEpisodeState =
+    releaseOwnerIf "Nudge" st
+
+// ── Dispatcher ───────────────────────────────────────────────────────────────
 
 let foldOwnerAndLeaseEvent (st: OwnerEpisodeState) (ev: SessionControlEvent) : OwnerEpisodeState =
     match ev with
     | HumanTurn(ordinal, turn) -> handleHumanTurn st ordinal turn
-    | UserAbort -> handleUserAbort st
+    | UserAbort -> userAbortState st
     | CompactionStarted ev -> handleCompactionStarted st ev
     | ContextGenerationChanged ev -> handleContextGenerationChanged st ev
     | CompactionSettled ev -> handleCompactionSettled st ev
     | ContinuationRequested ev -> handleContinuationRequested st ev
-    | ContinuationDispatchStarted ev -> transitionLease "dispatch_started" Requested DispatchStarted st ev
-    | ContinuationDispatched ev -> transitionLease "dispatched" DispatchStarted Dispatched st ev
+    | ContinuationDispatchStarted ev -> advanceLease ContinuationField "dispatch_started" DispatchStarted st ev
+    | ContinuationDispatched ev -> advanceLease ContinuationField "dispatched" Dispatched st ev
     | ContinuationTerminal ev -> handleContinuationTerminal st ev
     | NudgeRequested ev -> handleNudgeRequested st ev
-    | NudgeDispatched ev -> handleNudgeDispatched st ev
+    | NudgeDispatched ev -> advanceLease NudgeField "dispatched" Dispatched st ev
     | NudgeTerminal ev -> handleNudgeTerminal st ev
     | AssistantCompleted -> handleAssistantCompleted st
     | NudgeDedupClearedOrWip -> handleNudgeDedupClearedOrWip st

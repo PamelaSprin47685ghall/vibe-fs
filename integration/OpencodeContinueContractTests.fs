@@ -2,7 +2,7 @@ module Wanxiangshu.Integration.OpencodeContinueContractTests
 
 open Fable.Core
 open Fable.Core.JsInterop
-open Wanxiangshu.Integration.OpencodePluginContractTestsPart2
+open Wanxiangshu.Integration.OpencodePluginToolLifecycleContractTests
 open Wanxiangshu.Runtime.ToolOutputInfo
 open Wanxiangshu.Kernel.ToolOutputInfoTypes
 open Wanxiangshu.Tests.Assert

@@ -4,6 +4,7 @@ open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Runtime.Dyn
 open Wanxiangshu.Tests.Assert
+open Wanxiangshu.E2e.MuxEventHooksAndSlashTests
 
 [<Import("start", "./mux-runner.js")>]
 let private startMux: obj -> JS.Promise<obj> = jsNative
@@ -14,7 +15,7 @@ let private readFileSync (path: string) (encoding: string) : string = jsNative
 [<Import("existsSync", "node:fs")>]
 let private fileExists (path: string) : bool = jsNative
 
-open Wanxiangshu.E2e.MuxTestsPart2
+open Wanxiangshu.E2e.MuxEventHooksAndSlashTests
 
 let private harnessFromObj (o: obj) : Harness = unbox o
 let private createEmpty () = createObj []
@@ -212,7 +213,7 @@ let runAll (args: string array) : JS.Promise<int> =
                 "mux.execute.fuzzyGrep.success"
 
         do!
-            MuxTestsPart2.runRest
+            MuxEventHooksAndSlashTests.runRest
                 harness
                 chk
                 runTool

@@ -4,7 +4,7 @@ open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Tests.AsyncFlush
-open Wanxiangshu.Integration.OpencodePluginContractTestsPart2
+open Wanxiangshu.Integration.OpencodePluginToolLifecycleContractTests
 open Wanxiangshu.Integration.OpencodeContinueContractTests
 
 module Dyn = Wanxiangshu.Runtime.Dyn

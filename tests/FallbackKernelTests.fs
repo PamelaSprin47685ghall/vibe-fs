@@ -8,7 +8,7 @@ open Wanxiangshu.Kernel.FallbackKernel.Types
 open Wanxiangshu.Kernel.FallbackKernel.Decision
 open Wanxiangshu.Kernel.FallbackKernel.Recovery
 open Wanxiangshu.Kernel.FallbackKernel.StateMachine
-open Wanxiangshu.Tests.FallbackKernelTestsPart2
+open Wanxiangshu.Tests.FallbackKernelCancelAndRecoveryTests
 
 
 let mkModel
@@ -240,4 +240,4 @@ let run () =
     transitionScanningToolCallText_busy_doNothing ()
     transitionRecoveringToolCallText_busy_doNothing ()
     transitionSessionBusyResetsTaskComplete ()
-    FallbackKernelTestsPart2.run ()
+    FallbackKernelCancelAndRecoveryTests.run ()

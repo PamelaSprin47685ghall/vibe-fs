@@ -12,6 +12,7 @@ open Wanxiangshu.Runtime.MessageTransform.Plan
 open Wanxiangshu.Runtime.MessageTransform.Pipeline
 open Wanxiangshu.Runtime.RuntimeScope
 open Wanxiangshu.Runtime.WorkspaceFiles
+open Wanxiangshu.Runtime.WorkspaceReverieFiles
 
 [<Import("relative", "node:path")>]
 let private pathRelative (a: string) (b: string) : string = jsNative

@@ -41,12 +41,6 @@ let parseExcludeField (args: obj) : string list =
     let v = Dyn.get args "exclude"
     parseJsonArrayOrString v
 
-type ResolvedGrep =
-    { matches: GrepMatch list
-      total: int option
-      regexError: string option
-      cursor: obj }
-
 type SearchOptions =
     { cwd: string
       scopeId: string

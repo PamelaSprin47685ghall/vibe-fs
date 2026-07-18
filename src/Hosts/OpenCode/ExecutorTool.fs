@@ -26,7 +26,7 @@ open Wanxiangshu.Runtime.Dyn
 open Wanxiangshu.Runtime.OpencodeClientCodec
 open Wanxiangshu.Runtime.ToolExecute
 open Wanxiangshu.Runtime.SubagentDispatcher
-open Wanxiangshu.Runtime.SubagentDispatchHelpers
+open Wanxiangshu.Runtime.SubagentBatchSpawn
 open Wanxiangshu.Runtime.Fallback.RuntimeStore
 
 [<Global("Buffer")>]

@@ -1,6 +1,7 @@
 module Wanxiangshu.Tests.TestsEntriesWanxiangzhen
 
 open Fable.Core
+open Wanxiangshu.Tests.Wanxiangzhen.WorkspaceGitTests
 open Wanxiangshu.Tests.TestsTestBody
 
 let private prefix (pairs: (string * (unit -> unit)) list) =
@@ -24,7 +25,7 @@ let wanxiangzhenTestEntries () : (string * TestBody) list =
     @ prefix (Wanxiangshu.Tests.Wanxiangzhen.ExtendedCoordinatorOpsTests.entries ())
     @ prefix (Wanxiangshu.Tests.Wanxiangzhen.ExtendedFfDecisionTests.entries ())
     @ prefix (Wanxiangshu.Tests.Wanxiangzhen.FfDecisionTests.entries ())
-    @ prefix (Wanxiangshu.Tests.Wanxiangzhen.GitShellTests.entries ())
+    @ prefix (Wanxiangshu.Tests.Wanxiangzhen.WorkspaceGitTests.entries ())
     @ prefix (Wanxiangshu.Tests.Wanxiangzhen.HttpCodecTests.entries ())
     @ prefix (Wanxiangshu.Tests.Wanxiangzhen.PidMonitorTests.entries ())
     @ prefix (Wanxiangshu.Tests.Wanxiangzhen.PluginTests.entries ())

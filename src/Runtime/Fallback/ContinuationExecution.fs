@@ -11,7 +11,7 @@ open Wanxiangshu.Runtime.Fallback.Ports
 open Wanxiangshu.Runtime.Fallback.LeaseValidation
 open Wanxiangshu.Runtime.ContinuationEventWriter
 open Wanxiangshu.Runtime.Clock
-open Wanxiangshu.Runtime.Fallback.ContinuationDispatchHelpers
+open Wanxiangshu.Runtime.Fallback.ContinuationDispatchOps
 
 type ContinuationIntent =
     | SendContinueIntent of

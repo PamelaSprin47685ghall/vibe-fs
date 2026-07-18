@@ -18,13 +18,13 @@ open Wanxiangshu.Runtime.Fallback.FallbackBridgeScanToolText
 open Wanxiangshu.Runtime.Fallback.FallbackConfigCodec
 open Wanxiangshu.Runtime.ContinuationEventWriter
 
-open Wanxiangshu.Runtime.Fallback.CoordinatorHelpers
+open Wanxiangshu.Runtime.Fallback.FallbackCoordination
 
-let resolveChain = CoordinatorHelpers.resolveChain
-let calculateConsumed = CoordinatorHelpers.calculateConsumed
-let handleTerminalPostSettlement = CoordinatorHelpers.handleTerminalPostSettlement
-let executeAction = CoordinatorHelpers.executeAction
-let extractEventContext = CoordinatorHelpers.extractEventContext
+let resolveChain = FallbackCoordination.resolveChain
+let calculateConsumed = FallbackCoordination.calculateConsumed
+let handleTerminalPostSettlement = FallbackCoordination.handleTerminalPostSettlement
+let executeAction = FallbackCoordination.executeAction
+let extractEventContext = FallbackCoordination.extractEventContext
 
 let handleFallbackTransition
     (translator: IEventTranslator)

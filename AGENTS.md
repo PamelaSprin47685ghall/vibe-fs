@@ -9,3 +9,4 @@ import:
 - 本项目编译测试需要 60s 尽量减少无谓的测试，纯静态分析最好 npm run build-and-test
 - Opencode 的大部分 hook 需要原地修改字段而不是换引用，否则不工作
 - 本项目配置了自动格式化工具，所有企图压缩行数而逃避拆文件的尝试都一定会破产的！
+- 严禁 SIGKILL opencode，只允许 SIGKILL "opencode serve"

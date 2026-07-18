@@ -35,6 +35,7 @@ open Wanxiangshu.Tests.WanxiangzhenSquadEventTests
 open Wanxiangshu.Tests.EventLogCodecTests
 open Wanxiangshu.Tests.EventLogRuntimeTests
 open Wanxiangshu.Tests.EventLogRuntimeRobustnessTests
+open Wanxiangshu.Tests.KernelAndSupportCoverageEntries
 open Wanxiangshu.Tests.TestsEntriesSessionLoop
 
 let coreTestEntries () : (string * TestBody) list =
@@ -136,4 +137,4 @@ let coreTestEntries () : (string * TestBody) list =
     @ fallbackTestEntries ()
     @ TestsEntriesFuzzy.fuzzyTestEntries ()
     @ TestsEntriesDomain.domainTestEntries ()
-    @ TestsEntriesCoverage.coverageTestEntries ()
+    @ KernelAndSupportCoverageEntries.kernelSupportCoverageTestEntries ()

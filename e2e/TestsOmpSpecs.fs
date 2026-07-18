@@ -4,7 +4,7 @@ open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Tests.Assert
 open Wanxiangshu.E2e.HarnessTypes
-open Wanxiangshu.E2e.TestsOmpSpecsPart
+open Wanxiangshu.E2e.OmpToolRegistryAndCommandsTests
 open Wanxiangshu.E2e.TestsOmpSpecsLifecycle
 
 let testSpecs (h: OmpHarness) (ok: int ref) : JS.Promise<unit> =
