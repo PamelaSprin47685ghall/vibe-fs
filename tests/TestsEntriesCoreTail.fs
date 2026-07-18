@@ -175,7 +175,8 @@ let tailCoreTestEntriesGroup3 () : (string * TestBody) list =
         "EventDrivenHarnessDemo.run", TestBody.Async(fun () -> EventDrivenHarnessDemo.run ())
         "ProductionDebugOutputTests.run", TestBody.Sync(sync Wanxiangshu.Tests.ProductionDebugOutputTests.run)
         "ArchitectureGatesTests.run", TestBody.Sync(sync Wanxiangshu.Tests.ArchitectureGatesTests.run)
-        "RemovedProductionFilesTests.run", TestBody.Sync(sync Wanxiangshu.Tests.RemovedProductionFilesTests.run) ]
+        "RemovedProductionFilesTests.run", TestBody.Sync(sync Wanxiangshu.Tests.RemovedProductionFilesTests.run)
+        "ProfilerDefaultTests.run", TestBody.Sync(sync Wanxiangshu.Tests.ProfilerDefaultTests.run) ]
 
 let tailCoreTestEntries () : (string * TestBody) list =
     tailCoreTestEntriesGroup1 ()

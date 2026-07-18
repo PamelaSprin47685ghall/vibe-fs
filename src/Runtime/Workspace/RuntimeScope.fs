@@ -192,6 +192,4 @@ type RuntimeScope() =
         | Some p -> p
         | None -> Promise.lift ()
 
-let create () : RuntimeScope =
-    Wanxiangshu.Runtime.Profiler.initGlobal ()
-    RuntimeScope()
+let create () : RuntimeScope = RuntimeScope()
