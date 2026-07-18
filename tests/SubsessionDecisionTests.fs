@@ -543,6 +543,11 @@ let initiallyCancelledNoDispatch () =
                 d.Effects)
     | other -> fail ("unexpected: " + string other)
 
+let staleIdleOnAvailableIgnored () =
+    match decide avail SessionIdleObserved with
+    | Ok(NoChange _) -> ()
+    | other -> fail ("expected NoChange on stale idle, got " + string other)
+
 let acceptanceUnknownRetriesAfterAbortConfirmed () =
     let ctx = mkCtx policy0 (TurnOrdinal.next TurnOrdinal.first)
     let plan = mkPlan turn0 TurnOrdinal.first model0 "do work"
@@ -706,3 +711,4 @@ let run () =
     startRunWithDelegateToHostProducesNoneModel ()
     startRunWithEmptyRetryChainRejectsNoModel ()
     startRunWithRetryChainProducesSomeModel ()
+    staleIdleOnAvailableIgnored ()

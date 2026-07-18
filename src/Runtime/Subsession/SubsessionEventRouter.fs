@@ -86,10 +86,7 @@ let tryIdle (workspaceRoot: string) (sessionId: string) : JS.Promise<bool> =
         | Some _ ->
             // Actor has an active turn — route normally.
             return! routeToChild workspaceRoot sessionId SessionIdleObserved
-        | None ->
-            // No active turn — buffer idle so StartRun drain can post it.
-            SubsessionPendingEvidence.MarkIdle sessionId
-            return false
+        | None -> return false
     }
 
 /// Convenience: post TurnErrorObserved.

@@ -6,11 +6,8 @@ open Wanxiangshu.Kernel.Subsession.Types
 /// In-memory buffer for evidence that arrives before an actor has an
 /// active turn.
 ///
-/// S-06 fix: legacy callers used a single `Key = string` that mapped
-/// 1:1 to a physical session id, which leaked a late `session.idle`
-/// from the previous turn into the new turn.  The buffer now exposes
-/// epoch-aware overloads.  Old callers continue to work (epoch 0 by
-/// default); the new ones pass the turn epoch explicitly.
+/// The buffer stores only evidence that can be attached to a future turn.
+/// Session-level idle observations have no turn identity and are never stored.
 module SubsessionPendingEvidence =
 
     /// Composite key: physical session id (string) + turn epoch (int).
@@ -18,7 +15,6 @@ module SubsessionPendingEvidence =
 
     type Pending =
         { Evidence: CurrentTurnEvidence list
-          IdleSeen: bool
           mutable TurnEpoch: int }
 
     /// Default epoch used by the legacy single-argument API.  Actors
@@ -51,7 +47,6 @@ module SubsessionPendingEvidence =
         | false, _ ->
             buffer.[key] <-
                 { Evidence = trim [ evidence ]
-                  IdleSeen = false
                   TurnEpoch = defaultEpoch }
 
     /// Epoch-aware append.  Callers that drive their own actor epoch
@@ -68,44 +63,23 @@ module SubsessionPendingEvidence =
         | false, _ ->
             buffer.[k] <-
                 { Evidence = trim [ evidence ]
-                  IdleSeen = false
                   TurnEpoch = turnEpoch }
 
-    let MarkIdle (key: Key) : unit =
-        match buffer.TryGetValue key with
-        | true, existing -> buffer.[key] <- { existing with IdleSeen = true }
-        | false, _ ->
-            buffer.[key] <-
-                { Evidence = []
-                  IdleSeen = true
-                  TurnEpoch = defaultEpoch }
-
-    let MarkIdleEpoch (physicalSessionId: string) (turnEpoch: int) : unit =
-        let k = keyFor physicalSessionId turnEpoch
-
-        match buffer.TryGetValue k with
-        | true, existing -> buffer.[k] <- { existing with IdleSeen = true }
-        | false, _ ->
-            buffer.[k] <-
-                { Evidence = []
-                  IdleSeen = true
-                  TurnEpoch = turnEpoch }
-
-    let TakeAll (key: Key) : CurrentTurnEvidence list * bool =
+    let TakeAll (key: Key) : CurrentTurnEvidence list =
         match buffer.TryGetValue key with
         | true, pending ->
             buffer.Remove key |> ignore
-            pending.Evidence, pending.IdleSeen
-        | false, _ -> [], false
+            pending.Evidence
+        | false, _ -> []
 
-    let TakeAllEpoch (physicalSessionId: string) (turnEpoch: int) : CurrentTurnEvidence list * bool =
+    let TakeAllEpoch (physicalSessionId: string) (turnEpoch: int) : CurrentTurnEvidence list =
         let k = keyFor physicalSessionId turnEpoch
 
         match buffer.TryGetValue k with
         | true, pending ->
             buffer.Remove k |> ignore
-            pending.Evidence, pending.IdleSeen
-        | false, _ -> [], false
+            pending.Evidence
+        | false, _ -> []
 
     /// Drop the entry for a (session, epoch).  Called from the
     /// SessionClosed domain command so a deleted session cannot leak.
