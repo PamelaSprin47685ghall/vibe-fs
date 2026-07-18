@@ -63,6 +63,7 @@ let createDispose
             finally
                 if childId <> "" then
                     Wanxiangshu.Runtime.SubsessionActorRegistry.SubsessionActorRegistry.Remove cwd childId
+                    Wanxiangshu.Runtime.SubsessionPendingEvidence.SubsessionPendingEvidence.ForgetSession childId
 
                 unmarkChildSession scope childId
 
@@ -73,6 +74,7 @@ let createDispose
         else
             Some(fun () ->
                 Wanxiangshu.Runtime.SubsessionActorRegistry.SubsessionActorRegistry.Remove cwd childId
+                Wanxiangshu.Runtime.SubsessionPendingEvidence.SubsessionPendingEvidence.ForgetSession childId
                 unmarkChildSession scope childId)
 
 let setupChildEnvironment
@@ -88,7 +90,11 @@ let setupChildEnvironment
 
         let activeSM =
             let childSM = Dyn.get session "sessionManager"
-            if not (Dyn.isNullish childSM) then childSM else sessionManager
+
+            if not (Dyn.isNullish childSM) then
+                childSM
+            else
+                sessionManager
 
         let childId =
             if Dyn.typeIs (Dyn.get activeSM "getSessionId") "function" then

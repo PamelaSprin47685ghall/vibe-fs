@@ -11,6 +11,7 @@ open Wanxiangshu.Tests.DelegateToolsCodecTests
 open Wanxiangshu.Tests.PatchParserTests
 open Wanxiangshu.Tests.ResolveAiSettingsTests
 open Wanxiangshu.Tests.ProductionDebugOutputTests
+open Wanxiangshu.Tests.PendingEvidenceEpochTests
 open Wanxiangshu.Tests.IntegrationPluginTests
 open Wanxiangshu.Tests.IntegrationEventTests
 open Wanxiangshu.Tests.IntegrationOpencodeReviewSpecs
@@ -176,7 +177,8 @@ let tailCoreTestEntriesGroup3 () : (string * TestBody) list =
         "ProductionDebugOutputTests.run", TestBody.Sync(sync Wanxiangshu.Tests.ProductionDebugOutputTests.run)
         "ArchitectureGatesTests.run", TestBody.Sync(sync Wanxiangshu.Tests.ArchitectureGatesTests.run)
         "RemovedProductionFilesTests.run", TestBody.Sync(sync Wanxiangshu.Tests.RemovedProductionFilesTests.run)
-        "ProfilerDefaultTests.run", TestBody.Sync(sync Wanxiangshu.Tests.ProfilerDefaultTests.run) ]
+        "ProfilerDefaultTests.run", TestBody.Sync(sync Wanxiangshu.Tests.ProfilerDefaultTests.run)
+        "PendingEvidenceEpochTests.run", TestBody.Sync(sync Wanxiangshu.Tests.PendingEvidenceEpochTests.run) ]
 
 let tailCoreTestEntries () : (string * TestBody) list =
     tailCoreTestEntriesGroup1 ()

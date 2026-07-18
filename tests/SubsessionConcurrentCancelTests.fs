@@ -438,12 +438,12 @@ let idleWithoutActiveTurnIsNotBuffered () =
         let host = ScriptedHost()
         let store = MemorySubsessionEventStore()
         let _ = SubsessionActorRegistry.GetOrCreate "" sid host store
-        let _ = SubsessionPendingEvidence.TakeAll sid
+        SubsessionPendingEvidence.ForgetSession sid
 
         let! routed = tryIdle "" sid
         check "idle without active turn is not routed" (not routed)
 
-        let evidence = SubsessionPendingEvidence.TakeAll sid
+        let evidence = SubsessionPendingEvidence.TakeAllEpoch sid 0
         check "idle without active turn has no evidence" (List.isEmpty evidence)
         SubsessionActorRegistry.Clear()
     }

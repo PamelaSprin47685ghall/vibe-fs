@@ -41,6 +41,7 @@ let abortAndUnregister
                 SubsessionActorRegistry.ClearPoison directory childID
 
                 SubsessionActorRegistry.Remove directory childID
+                Wanxiangshu.Runtime.SubsessionPendingEvidence.SubsessionPendingEvidence.ForgetSession childID
 
                 registry.UnregisterChildAgent(childID)
             with _ ->

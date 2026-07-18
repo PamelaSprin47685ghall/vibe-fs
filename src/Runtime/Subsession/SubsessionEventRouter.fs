@@ -55,7 +55,8 @@ let routeToChild (workspaceRoot: string) (sessionId: string) (cmd: Command) : JS
                 return true
             | _ ->
                 actor.Post cmd
-                |> Promise.catch (fun ex -> JS.console.error ("subsession event rejected for " + sessionId + ": " + ex.Message))
+                |> Promise.catch (fun ex ->
+                    JS.console.error ("subsession event rejected for " + sessionId + ": " + ex.Message))
                 |> Promise.start
                 |> ignore
 
@@ -79,7 +80,7 @@ let routeEvidence (workspaceRoot: string) (sessionId: string) (evidence: Current
         | None ->
             // No actor has an active turn — buffer the evidence so
             // SubsessionService.StartRun can drain it once the turn is established.
-            SubsessionPendingEvidence.Buffer sessionId evidence
+            SubsessionPendingEvidence.BufferPreRun sessionId evidence
             return false
     }
 

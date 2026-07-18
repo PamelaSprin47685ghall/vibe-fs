@@ -1,6 +1,5 @@
 module Wanxiangshu.Runtime.SubsessionPendingEvidence
 
-open System.Collections.Generic
 open Wanxiangshu.Kernel.Subsession.Types
 
 /// In-memory buffer for evidence that arrives before an actor has an
@@ -10,23 +9,21 @@ open Wanxiangshu.Kernel.Subsession.Types
 /// Session-level idle observations have no turn identity and are never stored.
 module SubsessionPendingEvidence =
 
-    /// Composite key: physical session id (string) + turn epoch (int).
-    type Key = string
-
-    type Pending =
-        { Evidence: CurrentTurnEvidence list
-          mutable TurnEpoch: int }
-
-    /// Default epoch used by the legacy single-argument API.  Actors
-    /// that have not been migrated yet still drain under epoch 0.
-    let private defaultEpoch = 0
+    type private PendingSession =
+        { NextEpoch: int
+          ActiveEpoch: int option
+          PreRunEvidence: CurrentTurnEvidence list
+          EpochEvidence: Map<int, CurrentTurnEvidence list> }
 
     let private capacity = 256
 
-    let mutable private buffer = Dictionary<Key, Pending>()
+    let mutable private sessions: Map<string, PendingSession> = Map.empty
 
-    let private keyFor (physicalSessionId: string) (turnEpoch: int) : Key =
-        physicalSessionId + "|" + string turnEpoch
+    let private emptySession =
+        { NextEpoch = 0
+          ActiveEpoch = None
+          PreRunEvidence = []
+          EpochEvidence = Map.empty }
 
     let private trim (existing: CurrentTurnEvidence list) : CurrentTurnEvidence list =
         if List.length existing < capacity then
@@ -34,55 +31,76 @@ module SubsessionPendingEvidence =
         else
             List.skip (List.length existing - capacity) existing
 
-    /// Legacy single-argument append.  Uses epoch 0.
-    let Buffer (key: Key) (evidence: CurrentTurnEvidence) : unit =
-        match buffer.TryGetValue key with
-        | true, existing ->
-            let next = trim (List.append existing.Evidence [ evidence ])
+    let BufferPreRun (physicalSessionId: string) (evidence: CurrentTurnEvidence) : unit =
+        let existing =
+            Map.tryFind physicalSessionId sessions |> Option.defaultValue emptySession
 
-            buffer.[key] <-
+        let updated =
+            match existing.ActiveEpoch with
+            | Some epoch ->
+                let current = Map.tryFind epoch existing.EpochEvidence |> Option.defaultValue []
+
                 { existing with
-                    Evidence = next
-                    TurnEpoch = defaultEpoch }
-        | false, _ ->
-            buffer.[key] <-
-                { Evidence = trim [ evidence ]
-                  TurnEpoch = defaultEpoch }
+                    EpochEvidence = Map.add epoch (trim (List.append current [ evidence ])) existing.EpochEvidence }
+            | None ->
+                { existing with
+                    PreRunEvidence = trim (List.append existing.PreRunEvidence [ evidence ]) }
 
-    /// Epoch-aware append.  Callers that drive their own actor epoch
-    /// (e.g. SubsessionService on BeginRun) MUST use this overload so
-    /// the buffer key matches the new turn's epoch.
+        sessions <- Map.add physicalSessionId updated sessions
+
+    let BeginRun (physicalSessionId: string) : int =
+        let existing =
+            Map.tryFind physicalSessionId sessions |> Option.defaultValue emptySession
+
+        let epoch = existing.NextEpoch
+
+        sessions <-
+            Map.add
+                physicalSessionId
+                { NextEpoch = epoch + 1
+                  ActiveEpoch = Some epoch
+                  PreRunEvidence = []
+                  EpochEvidence = Map.add epoch (trim existing.PreRunEvidence) existing.EpochEvidence }
+                sessions
+
+        epoch
+
     let BufferEpoch (physicalSessionId: string) (turnEpoch: int) (evidence: CurrentTurnEvidence) : unit =
-        let k = keyFor physicalSessionId turnEpoch
+        let existing =
+            Map.tryFind physicalSessionId sessions |> Option.defaultValue emptySession
 
-        match buffer.TryGetValue k with
-        | true, existing ->
-            let next = trim (List.append existing.Evidence [ evidence ])
+        let current = Map.tryFind turnEpoch existing.EpochEvidence |> Option.defaultValue []
+        let nextEpoch = max existing.NextEpoch (turnEpoch + 1)
 
-            buffer.[k] <- { existing with Evidence = next }
-        | false, _ ->
-            buffer.[k] <-
-                { Evidence = trim [ evidence ]
-                  TurnEpoch = turnEpoch }
-
-    let TakeAll (key: Key) : CurrentTurnEvidence list =
-        match buffer.TryGetValue key with
-        | true, pending ->
-            buffer.Remove key |> ignore
-            pending.Evidence
-        | false, _ -> []
+        sessions <-
+            Map.add
+                physicalSessionId
+                { existing with
+                    NextEpoch = nextEpoch
+                    EpochEvidence = Map.add turnEpoch (trim (List.append current [ evidence ])) existing.EpochEvidence }
+                sessions
 
     let TakeAllEpoch (physicalSessionId: string) (turnEpoch: int) : CurrentTurnEvidence list =
-        let k = keyFor physicalSessionId turnEpoch
+        match Map.tryFind physicalSessionId sessions with
+        | Some existing ->
+            let evidence =
+                Map.tryFind turnEpoch existing.EpochEvidence |> Option.defaultValue []
 
-        match buffer.TryGetValue k with
-        | true, pending ->
-            buffer.Remove k |> ignore
-            pending.Evidence
-        | false, _ -> []
+            sessions <-
+                Map.add
+                    physicalSessionId
+                    { existing with
+                        EpochEvidence = Map.remove turnEpoch existing.EpochEvidence }
+                    sessions
 
-    /// Drop the entry for a (session, epoch).  Called from the
-    /// SessionClosed domain command so a deleted session cannot leak.
-    let Forget (physicalSessionId: string) (turnEpoch: int) : unit =
-        let k = keyFor physicalSessionId turnEpoch
-        buffer.Remove k |> ignore
+            evidence
+        | None -> []
+
+    let ForgetSession (physicalSessionId: string) : unit =
+        sessions <- Map.remove physicalSessionId sessions
+
+    let EndRun (physicalSessionId: string) (turnEpoch: int) : unit =
+        match Map.tryFind physicalSessionId sessions with
+        | Some existing when existing.ActiveEpoch = Some turnEpoch ->
+            sessions <- Map.add physicalSessionId { existing with ActiveEpoch = None } sessions
+        | _ -> ()

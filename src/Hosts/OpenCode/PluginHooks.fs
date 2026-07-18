@@ -122,6 +122,7 @@ let private handleSessionCleanup (services: CoreServices) (env: HostEventEnvelop
             do! eventStore.Append(sid, [ PhysicalSessionClosed sid ])
             SubsessionActorRegistry.ClearPoison services.Directory ptyCleanupSessionId
             SubsessionActorRegistry.Remove services.Directory ptyCleanupSessionId
+            Wanxiangshu.Runtime.SubsessionPendingEvidence.SubsessionPendingEvidence.ForgetSession ptyCleanupSessionId
 
             // S-07 fix: tear down the per-session dispatch mailbox in
             // one place.  NotifySessionClosed is idempotent: it is a

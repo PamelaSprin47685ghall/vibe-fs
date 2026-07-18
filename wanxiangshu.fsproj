@@ -573,6 +573,7 @@
     <Compile Include="tests/ArchitectureGatesTests.fs"/>
     <Compile Include="tests/RemovedProductionFilesTests.fs"/>
     <Compile Include="tests/ProfilerDefaultTests.fs"/>
+    <Compile Include="tests/PendingEvidenceEpochTests.fs"/>
     <Compile Include="tests/SessionLoopTests.fs"/>
     <Compile Include="tests/ToolExecutionStatusTests.fs"/>
     <Compile Include="tests/SessionGateDemandTests.fs"/>

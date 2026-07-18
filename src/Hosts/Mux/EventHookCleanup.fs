@@ -10,9 +10,7 @@ open Wanxiangshu.Runtime.SubsessionPendingEvidence
 /// session.deleted / session.delete / session.remove / session.close for
 /// a Mux workspace.  Tears down every per-session side-effect in one
 /// place: the subsession event store append, the actor registry
-/// removal, the per-session dispatch mailbox (best-effort until the
-/// Mux per-session registry lands), and any buffered evidence under
-/// any turn epoch up to a small upper bound.
+/// removal, the per-session dispatch mailbox, and all buffered evidence.
 let handleSessionClosed (directory: string) (workspaceId: string) : JS.Promise<unit> =
     promise {
         let sid = SessionId.create workspaceId
@@ -21,11 +19,6 @@ let handleSessionClosed (directory: string) (workspaceId: string) : JS.Promise<u
         SubsessionActorRegistry.ClearPoison directory workspaceId
         SubsessionActorRegistry.Remove directory workspaceId
 
-        // S-07 fix: also tear down the per-session dispatch mailbox.
-        // Mux does not own its own mailbox yet (Phase 7: capacity
-        // downgrade to a single in-flight per physical session), so
-        // NotifySessionClosed is a best-effort no-op until the Mux
-        // per-session registry is wired in.
         try
             let ws = Id.workspaceIdQuick ("mux:" + workspaceId)
 
@@ -35,11 +28,5 @@ let handleSessionClosed (directory: string) (workspaceId: string) : JS.Promise<u
         with _ ->
             ()
 
-        // Phase 8: also forget any evidence still buffered under
-        // (workspaceId, _).  The turn-epoch form is keyed by an int we
-        // do not know here, so we sweep every epoch from 0 to a small
-        // upper bound.  In practice sessions rarely exceed a handful
-        // of turns before delete, so 32 is enough.
-        for epoch in 0..32 do
-            SubsessionPendingEvidence.Forget workspaceId epoch
+        SubsessionPendingEvidence.ForgetSession workspaceId
     }

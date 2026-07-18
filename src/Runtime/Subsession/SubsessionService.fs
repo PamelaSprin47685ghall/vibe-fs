@@ -69,11 +69,13 @@ type SubsessionService
                   Directive = directive
                   InitiallyCancelled = initiallyCancelled }
 
+            let turnEpoch = SubsessionPendingEvidence.BeginRun childSessionId
+
             // 1. Atomic BeginRun enqueued first.
             let runPromise = actor.BeginRun request
 
             // Drain evidence that arrived before the actor had an active turn.
-            let buffered = SubsessionPendingEvidence.TakeAll childSessionId
+            let buffered = SubsessionPendingEvidence.TakeAllEpoch childSessionId turnEpoch
 
             for ev in buffered do
                 actor.Post(EvidenceUpdated { TurnId = None; Evidence = ev }) |> ignore
@@ -117,6 +119,8 @@ type SubsessionService
                         with _ ->
                             ()
                 | _ -> ()
+
+                SubsessionPendingEvidence.EndRun childSessionId turnEpoch
         }
 
     member _.TryPost (childSessionId: string) (cmd: Command) : JS.Promise<unit> =
@@ -126,3 +130,4 @@ type SubsessionService
 
     member _.RemoveSession(childSessionId: string) : unit =
         SubsessionActorRegistry.Remove workspaceRoot childSessionId
+        SubsessionPendingEvidence.ForgetSession childSessionId

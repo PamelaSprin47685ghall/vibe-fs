@@ -101,6 +101,7 @@ let handleSessionClosed (directory: string) (workspaceId: string) (event: obj) :
         do! eventStore.Append(sid, [ PhysicalSessionClosed sid ]) |> Promise.map ignore
         SubsessionActorRegistry.ClearPoison directory workspaceId
         SubsessionActorRegistry.Remove directory workspaceId
+        Wanxiangshu.Runtime.SubsessionPendingEvidence.SubsessionPendingEvidence.ForgetSession workspaceId
     }
 
 // ---------------------------------------------------------------------------
