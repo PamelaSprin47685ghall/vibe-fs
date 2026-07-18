@@ -100,12 +100,25 @@ export class ProcessHost {
   async stop({ assert = true } = {}) {
     if (this._stopped) return;
     this._stopped = true;
-    if (!this._child) return;
+    if (!this._child) {
+      // Already stopped, but reset flags so a fresh host can be started.
+      this._started = false;
+      this._stopped = false;
+      return;
+    }
     await terminateChild(this._child, SIGTERM_GRACE_MS, SIGKILL_GRACE_MS);
     try { this._child.stdout.destroy(); } catch {}
     try { this._child.stderr.destroy(); } catch {}
     try { this._child.stdin.destroy(); } catch {}
     this._child = null;
+    // Allow the same ProcessHost instance to be re-used in a future
+    // scenario. New scenarios must always get a fresh instance via
+    // `new ProcessHost()`, but resetting here keeps the API forgiving.
+    this._started = false;
+    this._stopped = false;
+    this._baseUrl = null;
+    this._port = null;
+    this._exitInfo = null;
     if (!assert) return;
     await this.assertNoLeak();
   }
