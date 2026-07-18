@@ -9,6 +9,7 @@ open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Tests.AsyncFlush
 open Wanxiangshu.Kernel.FallbackKernel.Types
 open Wanxiangshu.Runtime.Fallback.RuntimeStore
+open Wanxiangshu.Runtime.SubsessionActorRegistry
 
 module Dyn = Wanxiangshu.Runtime.Dyn
 
@@ -164,6 +165,10 @@ let run
         let! spawnOutput = withTimeout spawnP
         let iterator = iteratorFromOutput spawnOutput
         check "continue e2e spawn returns iterator" iterator.IsSome
+
+        check
+            "continue child actor remains registered after initial run"
+            (SubsessionActorRegistry.TryGet harness.workDir childID |> Option.isSome)
 
         match iterator with
         | None -> failwith "spawn did not return an iterator"

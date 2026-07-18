@@ -54,7 +54,11 @@ let routeToChild (workspaceRoot: string) (sessionId: string) (cmd: Command) : JS
 
                 return true
             | _ ->
-                do! actor.Post cmd
+                actor.Post cmd
+                |> Promise.catch (fun ex -> printfn "subsession event rejected for %s: %s" sessionId ex.Message)
+                |> Promise.start
+                |> ignore
+
                 return true
         | None -> return false
     }
