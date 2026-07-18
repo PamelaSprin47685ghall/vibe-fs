@@ -22,7 +22,7 @@ export function resolvePluginPath(variant) {
   const file = PLUGIN_FILE_BY_VARIANT[variant] || 'Plugin.js';
   const cwd = process.cwd();
   for (const make of PLUGIN_SEARCH_ROOTS) {
-    const candidate = make(cwd, file) || path.join(make(cwd), file);
+    const candidate = path.join(make(cwd), file);
     if (fs.existsSync(candidate)) return candidate;
   }
   return path.resolve(`build/src/Hosts/OpenCode/${file}`);

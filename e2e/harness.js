@@ -203,6 +203,7 @@ async function connectPermissionResponder(hostObj) {
 
 async function spawnOpencodeHost(variant, opts) {
   const provider = new StrictMockProvider();
+  provider.strict = false;
   const llmHandle = new MockLLMAdapter(provider);
   const url = await provider.start();
   const { home, workDir, child, stderrBuffer } = initHostDirAndSpawn(llmHandle, opts);

@@ -861,9 +861,9 @@
     <Compile Include="e2e/Tests.fs"/>
     <Compile Include="e2e/MuxTestsPart2.fs"/>
     <Compile Include="e2e/MuxTests.fs"/>
-    <Compile Include="e2e/OpencodePluginTests.fs"/>
-    <Compile Include="e2e/MimocodePluginTests.fs"/>
-    <Compile Include="e2e/MimoTuiPluginTests.fs"/>
+    <Compile Include="integration/OpencodePluginTests.fs"/>
+    <Compile Include="integration/MimocodePluginTests.fs"/>
+    <Compile Include="integration/MimoTuiPluginTests.fs"/>
     <Compile Include="e2e/TestsOmpSpecsPart.fs"/>
     <Compile Include="e2e/TestsOmpSpecsLifecycle.fs"/>
     <Compile Include="e2e/TestsOmpSpecs.fs"/>

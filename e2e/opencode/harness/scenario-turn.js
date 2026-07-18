@@ -28,16 +28,23 @@ const IDLE_TYPES = ['session.idle'];
 
 export function createScenarioTurn(scenario) {
   return {
-    start: (_ctx = {}) => new Turn(scenario, _ctx),
+    start: (sessionID) => new Turn(scenario, sessionID),
   };
 }
 
 class Turn {
-  constructor(scenario, _ctx) {
+  constructor(scenario, sessionID) {
     this._scenario = scenario;
+    this._sessionID = sessionID || null;
     this._startedAt = Date.now();
     this._eventSeqBefore = scenario.events.lastSeq;
     this._activitySeq = null;
+  }
+
+  _matchesSession(e) {
+    if (!this._sessionID) return true;
+    const es = e.sessionID ?? e.properties?.sessionID;
+    return es === this._sessionID;
   }
 
   get eventSeqBefore() { return this._eventSeqBefore; }
@@ -79,7 +86,7 @@ class Turn {
   async _awaitActivity(timeoutMs) {
     try {
       return await this._scenario.events.awaitEvent(
-        (e) => e.seq > this._eventSeqBefore,
+        (e) => e.seq > this._eventSeqBefore && this._matchesSession(e),
         timeoutMs,
       );
     } catch (err) {
@@ -90,7 +97,7 @@ class Turn {
   async _awaitIdleAfterActivity(timeoutMs) {
     try {
       await this._scenario.events.awaitEvent(
-        (e) => IDLE_TYPES.includes(e.type) && e.seq > this._activitySeq,
+        (e) => IDLE_TYPES.includes(e.type) && e.seq > this._activitySeq && this._matchesSession(e),
         timeoutMs,
       );
     } catch (err) {
@@ -101,7 +108,7 @@ class Turn {
   async _awaitAssistantTerminal(timeoutMs) {
     try {
       await this._scenario.events.awaitEvent(
-        (e) => e.type === 'session.message' && Boolean(e.finishReason) && e.seq > this._eventSeqBefore,
+        (e) => e.type === 'session.message' && Boolean(e.finishReason) && e.seq > this._eventSeqBefore && this._matchesSession(e),
         timeoutMs,
       );
     } catch (err) {

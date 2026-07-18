@@ -30,20 +30,24 @@ const tests = [
         todos: [{ content: 'pending nudge task', status: 'pending', priority: 'high' }],
         select_methodology: ['first_principles'],
       } });
-      t.provider.expectText({ id: 'nudge-todo-ack', text: 'continue' });
+      // The todowrite result is followed by a todo-nudge synthetic continuation;
+      // no separate assistant text request occurs in this turn.
+      const turn = await t.turn.start(sid);
       await t.client.prompt(sid, 'write a todo and say continue');
-      await t.turn.start().awaitTerminal({ timeoutMs: TIMEOUTS.prompt });
+      await turn.awaitTerminal({ timeoutMs: TIMEOUTS.prompt });
       const deadline = Date.now() + TIMEOUTS.idleNudge;
-      while (t.provider.syntheticRequests.length === 0) {
-        if (Date.now() > deadline) throw new Error('Nudge did not fire within 5s of idle');
+      while (!t.provider.syntheticRequests.some((r) => r.marker === 'todo-nudge')) {
+        if (Date.now() > deadline) throw new Error('Nudge did not fire within timeout of idle');
         await sleep(200);
       }
       const nudgeReqs = t.provider.syntheticRequests.filter((r) => r.marker === 'todo-nudge');
       if (nudgeReqs.length !== 1) throw new Error(`Expected 1 todo-nudge, got ${nudgeReqs.length}`);
       if (t.provider.nudgeBypassed < 1) throw new Error('nudgeBypassed should be >= 1');
+      const beforePost = t.provider.syntheticRequests.filter((r) => r.marker === 'todo-nudge').length;
       await sleep(TIMEOUTS.postNudgeObserve);
-      if (t.provider.syntheticRequests.length !== 1) {
-        throw new Error(`Nudge fired ${t.provider.syntheticRequests.length - 1} extra time(s)`);
+      const afterPost = t.provider.syntheticRequests.filter((r) => r.marker === 'todo-nudge').length;
+      if (afterPost !== beforePost) {
+        throw new Error(`Todo-nudge fired ${afterPost - beforePost} extra time(s)`);
       }
       expectNoSessionError(t, sid);
     },
@@ -62,8 +66,9 @@ const tests = [
       const coderResultText = 'coder mock execution output';
       t.provider.expectToolCall({ id: 'coder-call', tool: 'coder', args: { intents: [], tdd: 'green' } });
       t.provider.expectText({ id: 'coder-child-result', text: coderResultText });
+      const turn = await t.turn.start(sid);
       await t.client.prompt(sid, 'run coder to implement a feature');
-      await t.turn.start().awaitTerminal({ timeoutMs: TIMEOUTS.prompt });
+      await turn.awaitTerminal({ timeoutMs: TIMEOUTS.prompt });
       const firstReq = t.provider.requests[0];
       if (!firstReq) throw new Error('No LLM request recorded');
       const toolNames = extractToolNames(firstReq.tools);

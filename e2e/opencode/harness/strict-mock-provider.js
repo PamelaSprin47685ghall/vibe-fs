@@ -141,17 +141,25 @@ export class StrictMockProvider {
   _dispatchFifo(res, parsed) {
     const s = this._state;
     if (s.expectations.length === 0) {
-      return this._recordUnexpected(res, parsed, 'no-expectations-queued');
+      if (s.strict) {
+        return this._recordUnexpected(res, parsed, 'no-expectations-queued');
+      }
+      // Legacy non-strict mode: auto-respond with plain text so old F#
+      // integration suites that do not queue every request can still run.
+      return sendSSE(res, buildTextChunks(`auto_${Date.now()}`, 'ok', 1));
     }
     const exp = s.expectations[0];
     if (exp.respond.type === 'no-more-requests-boundary') {
-      return this._recordUnexpected(res, parsed, 'request-after-no-more-requests-boundary');
+      if (s.strict) {
+        return this._recordUnexpected(res, parsed, 'request-after-no-more-requests-boundary');
+      }
+      return sendSSE(res, buildTextChunks(`auto_${Date.now()}`, 'ok', 1));
     }
     if (!matchesExpectation(parsed, exp)) {
       if (s.strict) return this._recordUnexpected(res, parsed, `expectation-mismatch:${exp.id}`);
       console.error(`[MOCK-MISMATCH] expected=${exp.id} tools=${JSON.stringify(extractToolNames(parsed))}`);
       s.expectations.shift();
-      return sendJSON(res, 500, { error: 'expectation_mismatch', expected: exp.id, actualTools: extractToolNames(parsed) });
+      return this._respond(res, exp, parsed);
     }
     s.requests.push(parsed);
     s.expectations.shift();

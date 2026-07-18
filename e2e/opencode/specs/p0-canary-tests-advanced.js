@@ -19,12 +19,16 @@ const tests = [
       const sess = await t.client.createSession();
       const sid = getSessionId(sess);
       t.provider.expectText({ id: 'rev-warm', text: 'ok' });
+      const turn = await t.turn.start(sid);
       await t.client.prompt(sid, 'hello');
-      await t.turn.start().awaitTerminal({ timeoutMs: TIMEOUTS.quick });
-      t.provider.expectText({ id: 'rev-text', text: 'ok' });
+      await turn.awaitTerminal({ timeoutMs: TIMEOUTS.quick });
+      // The /loop command injects a loop-nudge synthetic continuation; in
+      // PR1 it is allowed via allowSyntheticContinuations() and bypassed.
+      // PR2 will add an explicit provider.expectLoopNudge() expectation.
+      const cmdTurn = await t.turn.start(sid);
       const cmdRes = await t.client.runCommand(sid, 'loop', 'implement feature X', 10000);
       if (!cmdRes.ok) throw new Error(`loop command failed: ${cmdRes.status} ${cmdRes.data}`);
-      await t.turn.start().awaitTerminal({ timeoutMs: TIMEOUTS.quick });
+      await cmdTurn.awaitTerminal({ timeoutMs: TIMEOUTS.quick });
       const ndjsonPath = t.host.workDir + '/.wanxiangshu.ndjson';
       let found = false;
       if (fs.existsSync(ndjsonPath)) found = fs.readFileSync(ndjsonPath, 'utf8').includes('loop_activated');
@@ -40,8 +44,9 @@ const tests = [
       const sess = await t.client.createSession();
       const sid = getSessionId(sess);
       t.provider.expectText({ id: 'web-avail', text: 'tools listed' });
+      const turn = await t.turn.start(sid);
       await t.client.prompt(sid, 'list your available tools');
-      await t.turn.start().awaitTerminal({ timeoutMs: TIMEOUTS.quick });
+      await turn.awaitTerminal({ timeoutMs: TIMEOUTS.quick });
       const firstReq = t.provider.requests[0];
       if (!firstReq) throw new Error('No LLM request made');
       const names = extractToolNames(firstReq.tools);
@@ -62,17 +67,19 @@ const tests = [
         todos: [{ content: 'budget test', status: 'completed', priority: 'high' }],
         select_methodology: ['first_principles'],
       } });
-      t.provider.expectText({ id: 'cb-text', text: 'continue' });
+      // The todowrite tool result is followed by a budget-nudge synthetic
+      // continuation; no separate assistant text request occurs in this turn.
+      const turn = await t.turn.start(sid);
       await t.client.prompt(sid, 'commit a detailed report via todowrite and say continue');
-      await t.turn.start().awaitTerminal({ timeoutMs: TIMEOUTS.prompt });
+      await turn.awaitTerminal({ timeoutMs: TIMEOUTS.prompt });
       const s = await t.client.sessionStatus(sid);
       const tokens = s.data?.data?.tokens || s.data?.tokens || {};
       if ((tokens.input || 0) < 200) throw new Error('Too few input tokens: ' + tokens.input);
-      const req1 = t.provider.requests[1];
-      if (!req1) throw new Error('No second LLM request for budget nudge check');
-      const reqStr = JSON.stringify(req1);
-      const hasKeyword = ['context', 'budget', 'suspend', 'about to be'].some((k) => reqStr.includes(k));
-      if (!hasKeyword) throw new Error('Budget nudge not found in second LLM request (expected context/budget/suspend keywords)');
+      const nudges = t.provider.syntheticRequests.filter((r) => r.marker === 'budget-nudge');
+      if (nudges.length === 0) throw new Error('Budget nudge synthetic not found');
+      if (nudges.length > 1) throw new Error(`Expected one budget nudge, got ${nudges.length}`);
+      const nudgeBody = JSON.stringify(nudges[0].body);
+      if (!nudgeBody.includes('about to be')) throw new Error('Budget nudge marker text not found');
       expectNoSessionError(t, sid);
     },
   },

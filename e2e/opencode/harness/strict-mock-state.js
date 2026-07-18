@@ -14,7 +14,7 @@ export function createState() {
     syntheticRequests: [],
     nudgeBypassed: 0,
     idCounter: 0,
-    strict: false,
+    strict: true,
     allowSyntheticContinuations: false,
     allowTitleGeneration: false,
   };

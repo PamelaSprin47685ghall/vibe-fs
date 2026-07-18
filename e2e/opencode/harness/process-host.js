@@ -39,6 +39,7 @@ const PROCESS_TREE_TIMEOUT_MS = 2000;
 export class ProcessHost {
   constructor() {
     this._child = null;
+    this._pid = null;
     this._baseUrl = null;
     this._port = null;
     this._stderrBuffer = [];
@@ -78,6 +79,7 @@ export class ProcessHost {
       try { this._child.kill('SIGKILL'); } catch {}
       throw new Error('opencode serve did not output listening line within timeout');
     }
+    this._pid = this._child.pid;
     this._port = parseListenPort(listenLine);
     this._baseUrl = `http://127.0.0.1:${this._port}`;
     await this._waitForHealth(startTimeout);
@@ -111,6 +113,14 @@ export class ProcessHost {
     try { this._child.stderr.destroy(); } catch {}
     try { this._child.stdin.destroy(); } catch {}
     this._child = null;
+    if (!assert) {
+      // Clean up state for reuse but keep _pid/_port until the caller
+      // explicitly asserts or re-starts.
+      this._started = false;
+      this._stopped = false;
+      return;
+    }
+    await this.assertNoLeak();
     // Allow the same ProcessHost instance to be re-used in a future
     // scenario. New scenarios must always get a fresh instance via
     // `new ProcessHost()`, but resetting here keeps the API forgiving.
@@ -118,19 +128,18 @@ export class ProcessHost {
     this._stopped = false;
     this._baseUrl = null;
     this._port = null;
+    this._pid = null;
     this._exitInfo = null;
-    if (!assert) return;
-    await this.assertNoLeak();
   }
 
   async assertNoLeak() {
     const errors = [];
+    const pid = this._pid;
     if (this._port && !(await checkSocketClosed(this._port, SOCKET_CHECK_TIMEOUT_MS))) {
       errors.push(`port ${this._port} still listening`);
     }
-    const livePid = this._exitInfo ? null : this.pid;
-    if (isPidAlive(livePid)) errors.push(`pid ${livePid} still alive`);
-    const tree = await checkProcessTree(this.pid, PROCESS_TREE_TIMEOUT_MS);
+    if (pid && isPidAlive(pid) && !this._exitInfo) errors.push(`pid ${pid} still alive`);
+    const tree = await checkProcessTree(pid, PROCESS_TREE_TIMEOUT_MS);
     if (tree) errors.push(`process tree leaked: ${tree}`);
     if (errors.length > 0) {
       throw new Error(`ProcessHost leak detected: ${errors.join('; ')}`);

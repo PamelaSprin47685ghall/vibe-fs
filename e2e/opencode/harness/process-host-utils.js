@@ -42,13 +42,24 @@ export function ringPush(buffer, s) {
 }
 
 export async function terminateChild(child, termMs, killMs) {
-  try { child.kill('SIGTERM'); } catch {}
+  const pgid = child.pid;
+  if (pgid) {
+    // SIGTERM the whole process group so opencode-spawned children
+    // (e.g. the stealth MCP fixture) are also asked to exit.
+    try { process.kill(-pgid, 'SIGTERM'); } catch {}
+  } else {
+    try { child.kill('SIGTERM'); } catch {}
+  }
   const exited = await new Promise((resolve) => {
     const timer = setTimeout(() => resolve(false), termMs);
     child.once('exit', () => { clearTimeout(timer); resolve(true); });
   });
   if (exited) return;
-  try { child.kill('SIGKILL'); } catch {}
+  if (pgid) {
+    try { process.kill(-pgid, 'SIGKILL'); } catch {}
+  } else {
+    try { child.kill('SIGKILL'); } catch {}
+  }
   await new Promise((resolve) => {
     const timer = setTimeout(resolve, killMs);
     child.once('exit', () => { clearTimeout(timer); resolve(); });
@@ -80,6 +91,7 @@ export function spawnOpencodeServe(workDir, env, hooks) {
       env,
       stdio: ['pipe', 'pipe', 'pipe'],
       windowsHide: true,
+      detached: process.platform !== 'win32',
     },
   );
   child.stdout.on('data', (chunk) => hooks.onStdoutChunk(chunk.toString()));

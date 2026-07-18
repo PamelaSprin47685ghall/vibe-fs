@@ -47,6 +47,21 @@ function syncAssets(sourceDir, targetDir) {
 }
 
 log('Syncing assets...');
+// Remove stale F# plugin-test outputs that moved from e2e/ to integration/.
+// Fable does not delete old build artifacts when source files move.
+const staleE2eTests = [
+  'OpencodePluginTests.js',
+  'MimocodePluginTests.js',
+  'MimoTuiPluginTests.js',
+  'TestsServePlugin.js',
+];
+for (const name of staleE2eTests) {
+  const p = path.join(buildDir, 'e2e', name);
+  if (fs.existsSync(p)) {
+    fs.rmSync(p);
+    log(`  removed stale ${p}`);
+  }
+}
 syncAssets(
   path.join(root, 'integration'),
   path.join(buildDir, 'integration')

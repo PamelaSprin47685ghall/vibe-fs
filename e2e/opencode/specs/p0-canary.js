@@ -29,7 +29,6 @@ const exitCode = await runScenario({
   plugin: true,
   timeoutMs: 90000,
   contextLimit: 20000,
-  strict: false,
   allowSynthetic: true,
   allowTitleGen: true,
 }, tests);

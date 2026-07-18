@@ -21,8 +21,9 @@ const tests = [
       const sid = getSessionId(sess);
       if (!sid) throw new Error('No session ID');
       t.provider.expectText({ id: 'warmup', text: 'ready' });
+      const turn = await t.turn.start(sid);
       await t.client.prompt(sid, 'say ready');
-      await t.turn.start().awaitTerminal({ timeoutMs: TIMEOUTS.prompt });
+      await turn.awaitTerminal({ timeoutMs: TIMEOUTS.prompt });
       const s = await t.client.sessionStatus(sid);
       const tokens = s.data?.data?.tokens || s.data?.tokens || {};
       if ((tokens.input || 0) === 0) throw new Error('No token usage');
@@ -37,8 +38,9 @@ const tests = [
       const sid = getSessionId(sess);
       t.provider.expectToolCall({ id: 'write-file', tool: 'write', args: { filePath: 'hello.txt', content: content('Hello World') } });
       t.provider.expectText({ id: 'write-done', text: 'done' });
+      const turn = await t.turn.start(sid);
       await t.client.prompt(sid, 'Write hello.txt with content "Hello World\\\\n"');
-      await t.turn.start().awaitTerminal({ timeoutMs: TIMEOUTS.prompt });
+      await turn.awaitTerminal({ timeoutMs: TIMEOUTS.prompt });
       t.fs.expectFile('hello.txt');
       t.fs.expectFileContent('hello.txt', content('Hello World'));
       const msgsStr = JSON.stringify((await t.client.messages(sid)).data);
@@ -55,8 +57,9 @@ const tests = [
       const sid = getSessionId(sess);
       t.provider.expectToolCall({ id: 'read-file', tool: 'read', args: { filePath: 'readme.txt' } });
       t.provider.expectText({ id: 'read-done', text: 'file content read' });
+      const turn = await t.turn.start(sid);
       await t.client.prompt(sid, 'read readme.txt and summarize it');
-      await t.turn.start().awaitTerminal({ timeoutMs: TIMEOUTS.prompt });
+      await turn.awaitTerminal({ timeoutMs: TIMEOUTS.prompt });
       const msgsStr = JSON.stringify((await t.client.messages(sid)).data);
       if (!msgsStr.includes('Read test content')) throw new Error('Read content not found');
       expectNoSessionError(t, sid);
@@ -70,8 +73,9 @@ const tests = [
       const sid = getSessionId(sess);
       t.provider.expectToolCall({ id: 'exec-echo', tool: 'executor', args: { language: 'shell', command: 'echo hello-e2e' } });
       t.provider.expectText({ id: 'exec-done', text: 'done' });
+      const turn = await t.turn.start(sid);
       await t.client.prompt(sid, 'run "echo hello-e2e" in shell');
-      await t.turn.start().awaitTerminal({ timeoutMs: TIMEOUTS.prompt });
+      await turn.awaitTerminal({ timeoutMs: TIMEOUTS.prompt });
       const msgsStr = JSON.stringify((await t.client.messages(sid)).data);
       if (!msgsStr.includes('hello-e2e')) throw new Error('Executor output not found');
       expectNoSessionError(t, sid);
@@ -86,8 +90,9 @@ const tests = [
       const sid = getSessionId(sess);
       t.provider.expectToolCall({ id: 'fuzzy-grep', tool: 'fuzzy_grep', args: { pattern: ['unique-pattern-xyz'] } });
       t.provider.expectText({ id: 'grep-done', text: 'found matches' });
+      const turn = await t.turn.start(sid);
       await t.client.prompt(sid, 'search for unique-pattern-xyz');
-      await t.turn.start().awaitTerminal({ timeoutMs: TIMEOUTS.prompt });
+      await turn.awaitTerminal({ timeoutMs: TIMEOUTS.prompt });
       const msgsStr = JSON.stringify((await t.client.messages(sid)).data);
       if (!msgsStr.includes('unique-pattern-xyz')) throw new Error('Grep results not found');
       expectNoSessionError(t, sid);
@@ -102,8 +107,9 @@ const tests = [
       const sid = getSessionId(sess);
       t.provider.expectToolCall({ id: 'ow-file', tool: 'write', args: { filePath: 'overwrite.txt', content: content('new content only') } });
       t.provider.expectText({ id: 'ow-done', text: 'done' });
+      const turn = await t.turn.start(sid);
       await t.client.prompt(sid, 'Write overwrite.txt with content "new content only\\\\n"');
-      await t.turn.start().awaitTerminal({ timeoutMs: TIMEOUTS.prompt });
+      await turn.awaitTerminal({ timeoutMs: TIMEOUTS.prompt });
       t.fs.expectFileContent('overwrite.txt', content('new content only'));
       expectNoSessionError(t, sid);
     },
@@ -116,8 +122,9 @@ const tests = [
       const sid = getSessionId(sess);
       t.provider.expectToolCall({ id: 'empty-file', tool: 'write', args: { filePath: 'empty.txt', content: '' } });
       t.provider.expectText({ id: 'empty-done', text: 'done' });
+      const turn = await t.turn.start(sid);
       await t.client.prompt(sid, 'Write an empty file called empty.txt');
-      await t.turn.start().awaitTerminal({ timeoutMs: TIMEOUTS.prompt });
+      await turn.awaitTerminal({ timeoutMs: TIMEOUTS.prompt });
       t.fs.expectFile('empty.txt');
       const stat = fs.statSync(t.host.workDir + '/empty.txt');
       if (stat.size !== 0) throw new Error('Empty file has non-zero size: ' + stat.size);
@@ -134,8 +141,9 @@ const tests = [
       const sid = getSessionId(sess);
       t.provider.expectToolCall({ id: 'fuzzy-find', tool: 'fuzzy_find', args: { pattern: ['unique_target'] } });
       t.provider.expectText({ id: 'find-done', text: 'done' });
+      const turn = await t.turn.start(sid);
       await t.client.prompt(sid, 'find files named unique_target');
-      await t.turn.start().awaitTerminal({ timeoutMs: TIMEOUTS.prompt });
+      await turn.awaitTerminal({ timeoutMs: TIMEOUTS.prompt });
       const msgsStr = JSON.stringify((await t.client.messages(sid)).data);
       if (!msgsStr.includes('unique_target_a.py')) throw new Error('fuzzy_find results not found');
       expectNoSessionError(t, sid);
@@ -148,8 +156,9 @@ const tests = [
       const sess = await t.client.createSession();
       const sid = getSessionId(sess);
       t.provider.expectText({ id: 'schema-warm', text: 'ok' });
+      const turn = await t.turn.start(sid);
       await t.client.prompt(sid, 'list your tools');
-      await t.turn.start().awaitTerminal({ timeoutMs: TIMEOUTS.quick });
+      await turn.awaitTerminal({ timeoutMs: TIMEOUTS.quick });
       const firstReq = t.provider.requests[0];
       if (!firstReq) throw new Error('No LLM request');
       const tools = firstReq.tools || [];
@@ -170,8 +179,9 @@ const tests = [
       const sid = getSessionId(sess);
       t.provider.expectToolCall({ id: 'exec-js', tool: 'executor', args: { language: 'javascript', command: 'console.log("hello-js-e2e")' } });
       t.provider.expectText({ id: 'exec-js-done', text: 'done' });
+      const turn = await t.turn.start(sid);
       await t.client.prompt(sid, 'run JavaScript: console.log("hello-js-e2e")');
-      await t.turn.start().awaitTerminal({ timeoutMs: TIMEOUTS.prompt });
+      await turn.awaitTerminal({ timeoutMs: TIMEOUTS.prompt });
       const msgsStr = JSON.stringify((await t.client.messages(sid)).data);
       if (!msgsStr.includes('hello-js-e2e')) throw new Error('JS executor output not found');
       expectNoSessionError(t, sid);

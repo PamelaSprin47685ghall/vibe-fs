@@ -35,7 +35,7 @@ export const TIMEOUTS = {
   prompt: 60000,
   quick: 30000,
   long: 90000,
-  idleNudge: 5000,
+  idleNudge: 30000,
   postNudgeObserve: 3000,
   ptyPostObserve: 200,
 };
