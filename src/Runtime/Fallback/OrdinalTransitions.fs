@@ -1,20 +1,20 @@
 module Wanxiangshu.Runtime.Fallback.OrdinalTransitions
 
 open Wanxiangshu.Runtime.Fallback.RuntimeStore
+open Wanxiangshu.Runtime.Fallback.SessionRuntimePropertyPure
 
 type FallbackRuntimeStore with
-
     member this.GetSessionGeneration(sessionID: string) : int =
         (this.GetSession sessionID).SessionGeneration
 
     member this.SetSessionGeneration (sessionID: string) (gen: int) : unit =
-        this.UpdateSession(sessionID, (fun s -> { s with SessionGeneration = gen }))
+        this.UpdateSession(sessionID, setSessionGeneration gen)
 
     member this.GetCancelGeneration(sessionID: string) : int =
         (this.GetSession sessionID).CancelGeneration
 
     member this.SetCancelGeneration (sessionID: string) (gen: int) : unit =
-        this.UpdateSession(sessionID, (fun s -> { s with CancelGeneration = gen }))
+        this.UpdateSession(sessionID, setCancelGeneration gen)
 
     member this.IncrementCancelGeneration(sessionID: string) : int =
         let mutable next = 0
@@ -22,8 +22,9 @@ type FallbackRuntimeStore with
         this.UpdateSession(
             sessionID,
             fun s ->
-                next <- s.CancelGeneration + 1
-                { s with CancelGeneration = next }
+                let s', n = incrementCancelGeneration s
+                next <- n
+                s'
         )
 
         next
@@ -32,7 +33,7 @@ type FallbackRuntimeStore with
         (this.GetSession sessionID).HumanTurnOrdinal
 
     member this.SetHumanTurnOrdinal (sessionID: string) (ordinal: int) : unit =
-        this.UpdateSession(sessionID, (fun s -> { s with HumanTurnOrdinal = ordinal }))
+        this.UpdateSession(sessionID, setHumanTurnOrdinal ordinal)
 
     member this.IncrementHumanTurnOrdinal(sessionID: string) : int =
         let mutable next = 0
@@ -40,8 +41,9 @@ type FallbackRuntimeStore with
         this.UpdateSession(
             sessionID,
             fun s ->
-                next <- s.HumanTurnOrdinal + 1
-                { s with HumanTurnOrdinal = next }
+                let s', n = incrementHumanTurnOrdinal s
+                next <- n
+                s'
         )
 
         next
@@ -50,7 +52,7 @@ type FallbackRuntimeStore with
         (this.GetSession sessionID).ContinuationOrdinal
 
     member this.SetContinuationOrdinal (sessionID: string) (ordinal: int) : unit =
-        this.UpdateSession(sessionID, (fun s -> { s with ContinuationOrdinal = ordinal }))
+        this.UpdateSession(sessionID, setContinuationOrdinal ordinal)
 
     member this.IncrementContinuationOrdinal(sessionID: string) : int =
         let mutable next = 0
@@ -58,8 +60,9 @@ type FallbackRuntimeStore with
         this.UpdateSession(
             sessionID,
             fun s ->
-                next <- s.ContinuationOrdinal + 1
-                { s with ContinuationOrdinal = next }
+                let s', n = incrementContinuationOrdinal s
+                next <- n
+                s'
         )
 
         next
@@ -68,7 +71,7 @@ type FallbackRuntimeStore with
         (this.GetSession sessionID).NudgeOrdinal
 
     member this.SetNudgeOrdinal (sessionID: string) (ordinal: int) : unit =
-        this.UpdateSession(sessionID, (fun s -> { s with NudgeOrdinal = ordinal }))
+        this.UpdateSession(sessionID, setNudgeOrdinal ordinal)
 
     member this.IncrementNudgeOrdinal(sessionID: string) : int =
         let mutable next = 0
@@ -76,8 +79,9 @@ type FallbackRuntimeStore with
         this.UpdateSession(
             sessionID,
             fun s ->
-                next <- s.NudgeOrdinal + 1
-                { s with NudgeOrdinal = next }
+                let s', n = incrementNudgeOrdinal s
+                next <- n
+                s'
         )
 
         next
@@ -86,7 +90,7 @@ type FallbackRuntimeStore with
         (this.GetSession sessionID).CompactionOrdinal
 
     member this.SetCompactionOrdinal (sessionID: string) (ordinal: int) : unit =
-        this.UpdateSession(sessionID, (fun s -> { s with CompactionOrdinal = ordinal }))
+        this.UpdateSession(sessionID, setCompactionOrdinal ordinal)
 
     member this.IncrementCompactionOrdinal(sessionID: string) : int =
         let mutable next = 0
@@ -94,8 +98,9 @@ type FallbackRuntimeStore with
         this.UpdateSession(
             sessionID,
             fun s ->
-                next <- s.CompactionOrdinal + 1
-                { s with CompactionOrdinal = next }
+                let s', n = incrementCompactionOrdinal s
+                next <- n
+                s'
         )
 
         next

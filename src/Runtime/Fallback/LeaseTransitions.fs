@@ -1,145 +1,113 @@
 module Wanxiangshu.Runtime.Fallback.LeaseTransitions
 
-/// Lease lifecycle transitions over the fallback runtime store: pending
-/// continuation/nudge leases, status CAS, cancel/episode reset. All mutations
-/// route through the store's UpdateSession aggregate surface.
-
 open Wanxiangshu.Kernel.FallbackKernel.Types
 open Wanxiangshu.Kernel.FallbackRuntimeFlags
-open Wanxiangshu.Kernel.FallbackRuntimeLifecycle
-open Wanxiangshu.Runtime.Fallback.SessionRuntime
 open Wanxiangshu.Runtime.Fallback.RuntimeStore
+open Wanxiangshu.Runtime.Fallback.SessionRuntime
+open Wanxiangshu.Runtime.Fallback.SessionRuntimeLeasePure
 
 type FallbackRuntimeStore with
-
     member this.UpdateState (sessionID: string) (state: SessionFallbackState) : unit =
-        if state.Lifecycle = FallbackLifecycle.Cancelled then
-            this.CancelEpisode sessionID
-
-        this.UpdateSession(sessionID, (fun s -> { s with Core = state }))
-        this.TriggerStateChanged sessionID
+        this.Update(sessionID, setCore state)
 
     member this.SetPendingLease(sessionID: string, lease: PendingLease) : unit =
-        this.UpdateSession(sessionID, (fun s -> { s with PendingLease = Some lease }))
+        this.UpdateSession(sessionID, setPendingLease lease)
 
     member this.TryGetPendingLease(sessionID: string) : PendingLease option =
         (this.GetSession sessionID).PendingLease
 
     member this.TryClearPendingLease(sessionID: string, continuationID: string) : bool =
-        match (this.GetSession sessionID).PendingLease with
-        | Some lease when lease.ContinuationID = continuationID ->
-            this.UpdateSession(sessionID, (fun s -> { s with PendingLease = None }))
-            true
-        | _ -> false
+        let mutable cleared = false
+
+        this.UpdateSession(
+            sessionID,
+            fun s ->
+                match tryClearPendingLease continuationID s with
+                | Some s' ->
+                    cleared <- true
+                    s'
+                | None -> s
+        )
+
+        cleared
 
     member this.ClearPendingLease(sessionID: string) : unit =
-        this.UpdateSession(sessionID, (fun s -> { s with PendingLease = None }))
+        this.UpdateSession(sessionID, clearPendingLease)
 
     member this.TryTransitionPendingLease
         (sessionID: string, expectedID: string, expectedStatus: LeaseStatus, nextStatus: LeaseStatus)
         : bool =
-        let s = this.GetSession sessionID
+        let mutable transitioned = false
 
-        match s.PendingLease with
-        | Some lease ->
-            let isCurrent =
-                lease.ContinuationID = expectedID
-                && lease.Status = expectedStatus
-                && lease.SessionGeneration = s.SessionGeneration
-                && lease.HumanTurnID = s.HumanTurnId
-                && lease.CancelGeneration = s.CancelGeneration
-                && lease.Owner = SessionOwner.Fallback
-                && s.Owner = SessionOwner.Fallback
-                && s.Core.Lifecycle = FallbackLifecycle.Active
-
-            if isCurrent then
-                this.UpdateSession(
-                    sessionID,
-                    fun s ->
-                        { s with
-                            PendingLease = Some { lease with Status = nextStatus } }
-                )
-
-                true
-            else
-                false
-        | None -> false
-
-    member this.SetPendingNudgeLease(sessionID: string, lease: NudgeLease) : unit =
         this.UpdateSession(
             sessionID,
             fun s ->
-                { s with
-                    PendingNudgeLease = Some lease }
+                match tryTransitionPendingLease expectedID expectedStatus nextStatus s with
+                | Some s' ->
+                    transitioned <- true
+                    s'
+                | None -> s
         )
+
+        transitioned
+
+    member this.SetPendingNudgeLease(sessionID: string, lease: NudgeLease) : unit =
+        this.UpdateSession(sessionID, setPendingNudgeLease lease)
 
     member this.TryGetPendingNudgeLease(sessionID: string) : NudgeLease option =
         (this.GetSession sessionID).PendingNudgeLease
 
     member this.ClearPendingNudgeLease(sessionID: string) : unit =
-        this.UpdateSession(sessionID, (fun s -> { s with PendingNudgeLease = None }))
+        this.UpdateSession(sessionID, clearPendingNudgeLease)
 
     member this.TryClearPendingNudgeLease(sessionID: string, expectedNudgeID: string) : bool =
-        match (this.GetSession sessionID).PendingNudgeLease with
-        | Some lease when lease.NudgeID = expectedNudgeID ->
-            this.UpdateSession(sessionID, (fun s -> { s with PendingNudgeLease = None }))
-            true
-        | _ -> false
+        let mutable cleared = false
+
+        this.UpdateSession(
+            sessionID,
+            fun s ->
+                match tryClearPendingNudgeLease expectedNudgeID s with
+                | Some s' ->
+                    cleared <- true
+                    s'
+                | None -> s
+        )
+
+        cleared
 
     member this.TryTransitionPendingNudgeLease
         (sessionID: string, expectedID: string, expectedStatus: LeaseStatus, nextStatus: LeaseStatus)
         : bool =
-        let s = this.GetSession sessionID
+        let mutable transitioned = false
 
-        match s.PendingNudgeLease with
-        | Some lease ->
-            let isCurrent =
-                lease.NudgeID = expectedID
-                && lease.Status = expectedStatus
-                && lease.SessionGeneration = s.SessionGeneration
-                && lease.HumanTurnID = s.HumanTurnId
-                && lease.CancelGeneration = s.CancelGeneration
-                && lease.Owner = SessionOwner.Nudge
-                && s.Owner = SessionOwner.Nudge
-                && s.Core.Lifecycle = FallbackLifecycle.Active
+        this.UpdateSession(
+            sessionID,
+            fun s ->
+                match tryTransitionPendingNudgeLease expectedID expectedStatus nextStatus s with
+                | Some s' ->
+                    transitioned <- true
+                    s'
+                | None -> s
+        )
 
-            if isCurrent then
-                this.UpdateSession(
-                    sessionID,
-                    fun s ->
-                        { s with
-                            PendingNudgeLease = Some { lease with Status = nextStatus } }
-                )
-
-                true
-            else
-                false
-        | None -> false
+        transitioned
 
     member this.ApplyCancelNudgeLease(sessionID: string, expectedNudgeID: string) : bool =
-        let s = this.GetSession sessionID
+        let mutable cancelled = false
 
-        match s.PendingNudgeLease with
-        | Some lease when lease.NudgeID = expectedNudgeID ->
-            this.UpdateSession(
-                sessionID,
-                fun s ->
-                    { s with
-                        PendingNudgeLease = None
-                        ActiveNudgeNonce = ""
-                        ActiveGates = Set.remove FallbackSessionGateFlag.NudgeActive s.ActiveGates }
-            )
+        this.UpdateSession(
+            sessionID,
+            fun s ->
+                match applyCancelNudgeLease expectedNudgeID s with
+                | Some s' ->
+                    cancelled <- true
+                    s'
+                | None -> s
+        )
 
+        if cancelled then
             this.TriggerStateChanged sessionID
 
-            if s.Owner = SessionOwner.Nudge then
-                this.UpdateSession(sessionID, (fun s -> { s with Owner = SessionOwner.NoOwner }))
+        cancelled
 
-            true
-        | _ -> false
-
-    /// The episode is ending — delegate to the unified domain transition which
-    /// atomically resets state and clears all gate flags via the record field.
-    member this.CancelEpisode(sessionID: string) : unit =
-        this.UpdateSession(sessionID, cancelEpisode)
-        this.TriggerStateChanged sessionID
+    member this.CancelEpisode(sessionID: string) : unit = this.Update(sessionID, cancelEpisode)

@@ -206,6 +206,8 @@
     <Compile Include="src/Runtime/Fallback/FallbackConfigCodec.fs"/>
     <Compile Include="src/Runtime/Fallback/GateState.fs"/>
     <Compile Include="src/Runtime/Fallback/SessionRuntime.fs"/>
+    <Compile Include="src/Runtime/Fallback/SessionRuntimePropertyPure.fs"/>
+    <Compile Include="src/Runtime/Fallback/SessionRuntimeLeasePure.fs"/>
     <Compile Include="src/Runtime/Fallback/RuntimeStore.fs"/>
     <Compile Include="src/Runtime/Fallback/GateFlagTransitions.fs"/>
     <Compile Include="src/Runtime/Fallback/HumanTurnTransitions.fs"/>
