@@ -9,7 +9,7 @@ open Wanxiangshu.Kernel.Session.Causality
 open Wanxiangshu.Kernel.FallbackKernel.Types
 open Wanxiangshu.Kernel.HostTools
 open Wanxiangshu.Runtime.Fallback.RuntimeStore
-open Wanxiangshu.Runtime.Fallback.SessionPropertyTransitions
+open Wanxiangshu.Runtime.Fallback.SessionRuntimePropertyPure
 open Wanxiangshu.Runtime.ChildAgentRegistry
 open Wanxiangshu.Runtime.ReviewRuntime
 open Wanxiangshu.Runtime.RuntimeScope
@@ -27,7 +27,7 @@ let ompFallbackHooksPreservesAgentAndModelSpec () =
     promise {
         let rt = FallbackRuntimeStore()
         let sid = "omp-subagent-sess"
-        rt.SetAgentName sid "coder"
+        rt.UpdateSession(sid, recordAgentName "coder")
 
         let mutable lastPromptArg = null
 
@@ -85,7 +85,7 @@ let opencodeExecutorUsesRuntimeAgentWhenNoAssistantMessageSpec () =
     promise {
         let rt = FallbackRuntimeStore()
         let sid = "opencode-no-assistant"
-        rt.SetAgentName sid "inspector"
+        rt.UpdateSession(sid, recordAgentName "inspector")
 
         let mutable lastPromptArg = null
 
@@ -126,7 +126,7 @@ let opencodeExecutorRespectsUserSelectedModelAndAgentSpec () =
     promise {
         let rt = FallbackRuntimeStore()
         let sid = "opencode-user-selected"
-        rt.SetAgentName sid "inspector"
+        rt.UpdateSession(sid, recordAgentName "inspector")
 
         let mutable lastPromptArg = null
 
@@ -170,7 +170,7 @@ let ompExecutorRespectsUserSelectedModelAndAgentSpec () =
     promise {
         let rt = FallbackRuntimeStore()
         let sid = "omp-user-selected"
-        rt.SetAgentName sid "coder"
+        rt.UpdateSession(sid, recordAgentName "coder")
 
         let mockSession =
             createObj

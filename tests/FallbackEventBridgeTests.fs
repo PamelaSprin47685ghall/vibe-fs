@@ -15,7 +15,7 @@ open Wanxiangshu.Runtime.Fallback.Coordinator
 open Wanxiangshu.Runtime.Fallback.Ports
 open Wanxiangshu.Runtime.Fallback.ContinuationExecution
 open Wanxiangshu.Runtime.Fallback.SessionRuntime
-open Wanxiangshu.Runtime.Fallback.SessionPropertyTransitions
+open Wanxiangshu.Runtime.Fallback.SessionRuntimePropertyPure
 open Wanxiangshu.Runtime.Fallback.LeaseValidation
 open Wanxiangshu.Runtime
 
@@ -197,8 +197,8 @@ let handleEvent_retrySame_consumedAndSendContinue () =
         let cfg = mkConfig ()
         let rt = FallbackRuntimeStore()
         let sid = "sess-1"
-        rt.SetChain sid chain
-        rt.SetAgentName sid "reviewer"
+        rt.UpdateSession(sid, selectChain chain)
+        rt.UpdateSession(sid, recordAgentName "reviewer")
 
         let translator =
             FakeTranslator(sid, FallbackEvent.SessionError(mkRetryableErr ())) :> IEventTranslator
@@ -223,8 +223,8 @@ let handleEvent_exhausted_notConsumed () =
         let chain = [ model ]
         let rt = FallbackRuntimeStore()
         let sid = "sess-1"
-        rt.SetChain sid chain
-        rt.SetAgentName sid "reviewer"
+        rt.UpdateSession(sid, selectChain chain)
+        rt.UpdateSession(sid, recordAgentName "reviewer")
 
         let s0 = rt.GetOrCreateState sid
 
@@ -247,7 +247,7 @@ let handleEvent_noChain_notConsumed () =
     promise {
         let rt = FallbackRuntimeStore()
         let sid = "sess-1"
-        rt.SetAgentName sid "reviewer"
+        rt.UpdateSession(sid, recordAgentName "reviewer")
 
         let translator =
             FakeTranslator(sid, FallbackEvent.SessionError(mkRetryableErr ())) :> IEventTranslator
@@ -266,8 +266,8 @@ let handleEvent_sessionAborted_setsCancelled () =
         let cfg = mkConfig ()
         let rt = FallbackRuntimeStore()
         let sid = "sess-1"
-        rt.SetChain sid chain
-        rt.SetAgentName sid "reviewer"
+        rt.UpdateSession(sid, selectChain chain)
+        rt.UpdateSession(sid, recordAgentName "reviewer")
 
         let translator =
             FakeTranslator(sid, FallbackEvent.SessionError(mkAbortErr ())) :> IEventTranslator
@@ -287,8 +287,8 @@ let handleEvent_newUserMessage_resetsState () =
         let cfg = mkConfig ()
         let rt = FallbackRuntimeStore()
         let sid = "sess-1"
-        rt.SetChain sid chain
-        rt.SetAgentName sid "reviewer"
+        rt.UpdateSession(sid, selectChain chain)
+        rt.UpdateSession(sid, recordAgentName "reviewer")
 
         let s0 = rt.GetOrCreateState sid
 
@@ -320,8 +320,8 @@ let createHandler_returnsCallable () =
         let cfg = mkConfig ()
         let rt = FallbackRuntimeStore()
         let sid = "sess-1"
-        rt.SetChain sid chain
-        rt.SetAgentName sid "reviewer"
+        rt.UpdateSession(sid, selectChain chain)
+        rt.UpdateSession(sid, recordAgentName "reviewer")
 
         let translator =
             FakeTranslator(sid, FallbackEvent.SessionError(mkRetryableErr ())) :> IEventTranslator
@@ -342,10 +342,10 @@ let createHandler_twoSessionsIndependent () =
         let rt2 = FallbackRuntimeStore()
         let sid1 = "sess-1"
         let sid2 = "sess-2"
-        rt1.SetChain sid1 chain
-        rt1.SetAgentName sid1 "r1"
-        rt2.SetChain sid2 chain
-        rt2.SetAgentName sid2 "r2"
+        rt1.UpdateSession(sid1, selectChain chain)
+        rt1.UpdateSession(sid1, recordAgentName "r1")
+        rt2.UpdateSession(sid2, selectChain chain)
+        rt2.UpdateSession(sid2, recordAgentName "r2")
 
         let tr1 =
             FakeTranslator(sid1, FallbackEvent.SessionError(mkRetryableErr ())) :> IEventTranslator

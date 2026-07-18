@@ -3,7 +3,6 @@ module Wanxiangshu.Runtime.Fallback.CompactionHandler
 open Fable.Core
 open Wanxiangshu.Kernel.FallbackKernel.Types
 open Wanxiangshu.Runtime.Fallback.RuntimeStore
-open Wanxiangshu.Runtime.Fallback.SessionPropertyTransitions
 open Wanxiangshu.Runtime.Fallback.SessionRuntimeLeasePure
 open Wanxiangshu.Runtime.SessionEventWriter
 
@@ -13,7 +12,7 @@ let settleActiveCompactionIfOwner
     (sessionID: string)
     : JS.Promise<unit> =
     promise {
-        if runtime.GetSessionOwner sessionID = SessionOwner.Compaction then
+        if (runtime.GetSession sessionID).Owner = SessionOwner.Compaction then
             let activeComp = (runtime.GetSession sessionID).CompactionActiveId
 
             match tryGetSettleInfo activeComp (runtime.GetSession sessionID) with

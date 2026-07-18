@@ -9,7 +9,7 @@ open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.FallbackKernel.Types
 open Wanxiangshu.Runtime
 open Wanxiangshu.Runtime.Dyn
-open Wanxiangshu.Runtime.Fallback.SessionPropertyTransitions
+open Wanxiangshu.Runtime.Fallback.SessionRuntimePropertyPure
 open Wanxiangshu.Hosts.Opencode.ChatHooksDecoders
 open Wanxiangshu.Hosts.Opencode.SubsessionDispatch
 
@@ -59,13 +59,13 @@ let internal isSystemMessage (parts: obj) (fr: FallbackRuntimeStore) (sessionIDS
         if PendingTurnReceipt.tryResolve nonce (Wanxiangshu.Kernel.Subsession.Types.UserMessageObserved msgId) then
             true
         else
-            let activeNudgeNonce = fr.GetActiveNudgeNonce sessionIDStr
+            let activeNudgeNonce = (fr.GetSession sessionIDStr).ActiveNudgeNonce
 
             if activeNudgeNonce <> "" && nonce = activeNudgeNonce then
                 // Consume the nonce now that the matching message has
                 // been observed. This decouples the nonce lifetime from
                 // the prompt() Promise in NudgeEffect.sendNudge.
-                let _ = fr.TryConsumeActiveNudgeNonce(sessionIDStr, nonce)
+                let _ = fr.UpdateSessionReturning(sessionIDStr, tryConsumeNudgeNonce nonce)
                 true
             else
                 match fr.TryGetPendingLease sessionIDStr with

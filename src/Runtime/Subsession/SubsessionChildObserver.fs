@@ -6,7 +6,7 @@ open Wanxiangshu.Runtime.SubsessionPorts
 open Wanxiangshu.Runtime.Dyn
 open Wanxiangshu.Runtime.Fallback.FallbackMessageCodec
 open Wanxiangshu.Runtime.Fallback.RuntimeStore
-open Wanxiangshu.Runtime.Fallback.SessionPropertyTransitions
+open Wanxiangshu.Runtime.Fallback.SessionRuntimePropertyPure
 open Wanxiangshu.Runtime.SubsessionActorRegistry
 open Wanxiangshu.Runtime.SubsessionEventRouter
 
@@ -34,12 +34,12 @@ let observeChildMetadata (runtime: FallbackRuntimeStore) (sessionId: string) (ra
                 let agent = Dyn.str info "agent"
 
                 if agent <> "" then
-                    runtime.SetAgentName sessionId agent
+                    runtime.UpdateSession(sessionId, recordAgentName agent)
 
                 let modelObj = Dyn.get info "model"
 
                 match decodeModelFromObj modelObj with
-                | Some m -> runtime.SetModel sessionId m
+                | Some m -> runtime.UpdateSession(sessionId, selectModel m)
                 | None -> ()
 
                 // Some hosts put model at top-level of message info as string fields.
@@ -55,7 +55,7 @@ let observeChildMetadata (runtime: FallbackRuntimeStore) (sessionId: string) (ra
                                    variant = Dyn.str info "variant" |}
                         )
                     with
-                    | Some m -> runtime.SetModel sessionId m
+                    | Some m -> runtime.UpdateSession(sessionId, selectModel m)
                     | None -> ()
 
 /// Consume a non-control child event: observe metadata, never enter the main fallback coordinator.

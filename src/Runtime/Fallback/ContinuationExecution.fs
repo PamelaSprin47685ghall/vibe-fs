@@ -5,7 +5,6 @@ open Wanxiangshu.Kernel.FallbackKernel.Types
 open Wanxiangshu.Runtime.Fallback.RuntimeStore
 open Wanxiangshu.Runtime.Fallback.SessionRuntime
 open Wanxiangshu.Runtime.Fallback.LeaseTransitions
-open Wanxiangshu.Runtime.Fallback.SessionPropertyTransitions
 open Wanxiangshu.Runtime.Fallback.Ports
 open Wanxiangshu.Runtime.Fallback.LeaseValidation
 open Wanxiangshu.Runtime.ContinuationEventWriter
@@ -134,7 +133,7 @@ let handleContinuationAction
     : JS.Promise<SessionFallbackState * ContinuationIntent option> =
     promise {
         let lease = setupContinuationLease runtime sessionID model promptTextOpt
-        let agent = runtime.GetAgentName sessionID
+        let agent = (runtime.GetSession sessionID).AgentName
 
         let modelStr =
             match model.Variant with

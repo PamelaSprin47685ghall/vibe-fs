@@ -15,7 +15,6 @@ open Wanxiangshu.Runtime.Fallback.FallbackConfigCodec
 open Wanxiangshu.Runtime.Dyn
 open Wanxiangshu.Runtime.Fallback.FallbackChainResolution
 open Wanxiangshu.Runtime.Fallback.RuntimeStore
-open Wanxiangshu.Runtime.Fallback.SessionPropertyTransitions
 open Wanxiangshu.Runtime.RuntimeScope
 open Wanxiangshu.Runtime.ChildAgentRegistry
 open Wanxiangshu.Hosts.Opencode.SessionLifecycleObserver

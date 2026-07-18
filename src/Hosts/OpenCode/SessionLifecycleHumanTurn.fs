@@ -10,7 +10,6 @@ open Wanxiangshu.Runtime.Fallback.SessionRuntime
 open Wanxiangshu.Runtime.Fallback.SessionRuntimePropertyPure
 open Wanxiangshu.Runtime.Fallback.LeaseTransitions
 open Wanxiangshu.Runtime.Fallback.SessionRuntimeLeasePure
-open Wanxiangshu.Runtime.Fallback.SessionPropertyTransitions
 open Wanxiangshu.Runtime.Fallback.LeaseValidation
 open Wanxiangshu.Runtime.SessionEventWriter
 open Wanxiangshu.Runtime.NudgeEventWriter
@@ -119,8 +118,8 @@ let private initializeFallbackState (fallbackRuntime: FallbackRuntimeStore) (ses
             RecoveryCount = 0 }
 
     fallbackRuntime.UpdateState sessionID ns
-    fallbackRuntime.SetConsumed sessionID false
-    fallbackRuntime.ClearConsumed sessionID
+    fallbackRuntime.Update(sessionID, recordConsumed false)
+    fallbackRuntime.Update(sessionID, clearConsumption)
 
 /// Reset session runtime for a new human turn (or no-op on duplicate message id).
 let onNewHumanMessage

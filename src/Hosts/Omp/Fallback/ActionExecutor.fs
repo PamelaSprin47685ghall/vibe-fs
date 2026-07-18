@@ -10,7 +10,6 @@ open Wanxiangshu.Kernel.Session.Causality
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.FallbackKernel.Types
 open Wanxiangshu.Runtime.Fallback.Ports
-open Wanxiangshu.Runtime.Fallback.SessionPropertyTransitions
 open Wanxiangshu.Runtime.Fallback.RuntimeStore
 
 let private tryGetSession (sessionID: string) (sessionApi: obj) : obj option =
@@ -50,7 +49,7 @@ type OmpActionExecutorClass(runtime: FallbackRuntimeStore, sessionApi: obj) =
         let agent =
             match sessionAgentOpt with
             | Some sa -> sa
-            | None -> runtime.GetAgentName sessionID
+            | None -> (runtime.GetSession sessionID).AgentName
 
         modelStr, agent
 
@@ -114,7 +113,7 @@ type OmpActionExecutorClass(runtime: FallbackRuntimeStore, sessionApi: obj) =
                 match Wanxiangshu.Runtime.Fallback.FallbackMessageCodec.tryGetLatestUserModel msgs with
                 | Some m -> return Some m
                 | None ->
-                    match runtime.GetModel sessionID with
+                    match (runtime.GetSession sessionID).Model with
                     | Some m -> return Some m
                     | None ->
                         match tryGetSession sessionID sessionApi with

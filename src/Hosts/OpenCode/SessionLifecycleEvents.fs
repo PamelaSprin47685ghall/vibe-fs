@@ -10,7 +10,6 @@ open Wanxiangshu.Runtime.ToolRuntimeContext
 open Wanxiangshu.Runtime.Fallback.RuntimeStore
 open Wanxiangshu.Runtime.Fallback.SessionRuntimePropertyPure
 open Wanxiangshu.Runtime.Fallback.SessionRuntimeLeasePure
-open Wanxiangshu.Runtime.Fallback.SessionPropertyTransitions
 open Wanxiangshu.Runtime.EventLogRuntime
 open Wanxiangshu.Hosts.Opencode.Fallback.Coordinator
 open Wanxiangshu.Hosts.Opencode.NudgeTrigger
@@ -25,19 +24,19 @@ let private handleSessionStatus
     (agentName: string)
     =
     if agentName <> "" then
-        fallbackRuntime.SetAgentName sid agentName
+        fallbackRuntime.UpdateSession(sid, recordAgentName agentName)
 
     let modelObj = get statusObj "model"
 
     match Wanxiangshu.Runtime.Fallback.FallbackMessageCodec.decodeModelFromObj modelObj with
-    | Some m -> fallbackRuntime.SetModel sid m
+    | Some m -> fallbackRuntime.UpdateSession(sid, selectModel m)
     | None -> ()
 
 /// Apply mutations from a session.compacted event. Async because it writes
 /// to disk via appendCompactionContextGenerationChangedOrFail.
 let private handleSessionCompacted (ctx: obj) (fallbackRuntime: FallbackRuntimeStore) (sid: string) : JS.Promise<unit> =
     promise {
-        let currentOwner = fallbackRuntime.GetSessionOwner sid
+        let currentOwner = (fallbackRuntime.GetSession sid).Owner
         let session = fallbackRuntime.GetSession sid
         let compactionGen = session.CompactionGeneration
         let compactionId = session.CompactionActiveId
@@ -84,7 +83,7 @@ let private handleMessageUpdated (fallbackRuntime: FallbackRuntimeStore) (sid: s
                     && (not (isNullish meta) && (get meta "compaction_continue" |> unbox<bool>)))
 
             if isCompactionContinue then
-                let currentOwner = fallbackRuntime.GetSessionOwner sid
+                let currentOwner = (fallbackRuntime.GetSession sid).Owner
 
                 if
                     currentOwner = SessionOwner.Compaction

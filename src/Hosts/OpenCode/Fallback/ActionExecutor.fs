@@ -7,7 +7,6 @@ open Wanxiangshu.Runtime.Dyn
 open Wanxiangshu.Runtime.OpencodeClientCodec
 open Wanxiangshu.Runtime.OpencodeSessionEventCodec
 open Wanxiangshu.Runtime.Fallback.RuntimeStore
-open Wanxiangshu.Runtime.Fallback.SessionPropertyTransitions
 open Wanxiangshu.Runtime.Fallback.FallbackMessageCodec
 open Wanxiangshu.Kernel.Primitives.Identity
 open Wanxiangshu.Kernel.Errors.DomainError
@@ -44,7 +43,7 @@ let private resolveModelAndAgent
             match fromMsg with
             | Some a -> Some a
             | None ->
-                let fromRuntime = runtime.GetAgentName sessionID
+                let fromRuntime = (runtime.GetSession sessionID).AgentName
                 if fromRuntime <> "" then Some fromRuntime else None
 
     modelStr, agent
@@ -97,7 +96,7 @@ let private captureCurrentModelImpl
         match Wanxiangshu.Runtime.Fallback.FallbackMessageCodec.tryGetLatestUserModel msgs with
         | Some m -> return Some m
         | None ->
-            match runtime.GetModel sessionID with
+            match (runtime.GetSession sessionID).Model with
             | Some m -> return Some m
             | None -> return! tryReadCurrentModel client sessionID
     }

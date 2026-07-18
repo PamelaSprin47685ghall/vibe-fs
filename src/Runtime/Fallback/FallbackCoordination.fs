@@ -6,7 +6,6 @@ open Wanxiangshu.Kernel.FallbackKernel.StateMachine
 open Wanxiangshu.Runtime.PromiseQueue
 open Wanxiangshu.Runtime.Fallback.RuntimeStore
 open Wanxiangshu.Runtime.Fallback.LeaseTransitions
-open Wanxiangshu.Runtime.Fallback.SessionPropertyTransitions
 open Wanxiangshu.Runtime.Fallback.SessionRuntimePropertyPure
 open Wanxiangshu.Runtime.Fallback.Ports
 open Wanxiangshu.Runtime.Fallback.LeaseValidation
@@ -27,7 +26,7 @@ let resolveChain
     (agentName: string)
     : JS.Promise<FallbackModel list> =
     promise {
-        let existing = runtime.GetChain sessionID
+        let existing = (runtime.GetSession sessionID).Chain
 
         if not (List.isEmpty existing) then
             return existing
@@ -50,7 +49,7 @@ let resolveChain
                 | None -> resolved
 
             if not (List.isEmpty finalChain) then
-                runtime.SetChain sessionID finalChain
+                runtime.UpdateSession(sessionID, selectChain finalChain)
 
             return finalChain
     }
@@ -99,8 +98,8 @@ let handleTerminalPostSettlement
                             lease.ContinuationOrdinal
 
                 if runtime.TryClearPendingLease(sessionID, lease.ContinuationID) then
-                    if runtime.GetSessionOwner sessionID = SessionOwner.Fallback then
-                        runtime.SetSessionOwner sessionID SessionOwner.NoOwner
+                    if (runtime.GetSession sessionID).Owner = SessionOwner.Fallback then
+                        runtime.UpdateSession(sessionID, transferOwnership SessionOwner.NoOwner)
 
                     runtime.Update(sessionID, setMainContinuationAwaitingStart false)
             | None -> ()

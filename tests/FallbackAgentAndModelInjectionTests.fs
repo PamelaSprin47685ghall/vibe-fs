@@ -9,7 +9,7 @@ open Wanxiangshu.Kernel.Session.Causality
 open Wanxiangshu.Kernel.FallbackKernel.Types
 open Wanxiangshu.Kernel.HostTools
 open Wanxiangshu.Runtime.Fallback.RuntimeStore
-open Wanxiangshu.Runtime.Fallback.SessionPropertyTransitions
+open Wanxiangshu.Runtime.Fallback.SessionRuntimePropertyPure
 open Wanxiangshu.Runtime.ChildAgentRegistry
 open Wanxiangshu.Runtime.ReviewRuntime
 open Wanxiangshu.Hosts.Omp.Fallback.ActionExecutor
@@ -116,8 +116,8 @@ let opencodeSessionStatusCapturesActiveModelSpec () =
             )
 
         do! observer.handleEvent rawEvent
-        equal "agent is captured" "reviewer" (rt.GetAgentName sid)
-        let modelOpt = rt.GetModel sid
+        equal "agent is captured" "reviewer" ((rt.GetSession sid).AgentName)
+        let modelOpt = (rt.GetSession sid).Model
         check "model is captured from runtime" modelOpt.IsSome
         equal "provider is openai" "openai" modelOpt.Value.ProviderID
         equal "modelId is gpt-4o" "gpt-4o" modelOpt.Value.ModelID
@@ -128,16 +128,18 @@ let opencodeCaptureCurrentModelPrioritizesLatestUserMessageModelSpec () =
         let rt = FallbackRuntimeStore()
         let sid = "priority-user-model"
 
-        rt.SetModel
-            sid
-            { ProviderID = "openai"
-              ModelID = "gpt-4-busy"
-              Variant = None
-              Temperature = None
-              TopP = None
-              MaxTokens = None
-              ReasoningEffort = None
-              Thinking = false }
+        rt.UpdateSession(
+            sid,
+            selectModel
+                { ProviderID = "openai"
+                  ModelID = "gpt-4-busy"
+                  Variant = None
+                  Temperature = None
+                  TopP = None
+                  MaxTokens = None
+                  ReasoningEffort = None
+                  Thinking = false }
+        )
 
         let mockClient =
             createObj
@@ -183,8 +185,8 @@ let opencodeNewUserMessageResetsChainAndModelSpec () =
               ReasoningEffort = None
               Thinking = false }
 
-        rt.SetChain sid [ testModel ]
-        rt.SetModel sid testModel
+        rt.UpdateSession(sid, selectChain [ testModel ])
+        rt.UpdateSession(sid, selectModel testModel)
 
         let rawEvent =
             createObj
@@ -226,8 +228,8 @@ let opencodeNewUserMessageResetsChainAndModelSpec () =
 
         do! observer.OnNewHumanMessage(sid, "manager", None, "msg-1")
 
-        let chain = rt.GetChain sid
-        let modelOpt = rt.GetModel sid
+        let chain = (rt.GetSession sid).Chain
+        let modelOpt = (rt.GetSession sid).Model
         equal "chain should be cleared" 0 chain.Length
         check "model should be cleared" modelOpt.IsNone
     }

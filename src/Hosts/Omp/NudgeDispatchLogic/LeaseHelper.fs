@@ -14,7 +14,6 @@ open Wanxiangshu.Kernel.Nudge.Types
 open Wanxiangshu.Hosts.Omp.NudgeRuntime
 open Wanxiangshu.Kernel.EventSourcing.Fold
 open Wanxiangshu.Runtime.Fallback.SessionRuntimePropertyPure
-open Wanxiangshu.Runtime.Fallback.SessionPropertyTransitions
 open Wanxiangshu.Runtime.PromptFragments
 open Wanxiangshu.Runtime.FuzzyIteratorStore
 open Wanxiangshu.Runtime.ReviewRuntime
@@ -48,8 +47,8 @@ let registerLeaseAndMaybeDispatch
     (snapshot: SessionSnapshot)
     : JS.Promise<unit> =
     fallbackRuntime.SetPendingNudgeLease(sessionId, lease)
-    fallbackRuntime.SetSessionOwner sessionId SessionOwner.Nudge
-    fallbackRuntime.SetActiveNudgeNonce sessionId nonce
+    fallbackRuntime.UpdateSession(sessionId, transferOwnership SessionOwner.Nudge)
+    fallbackRuntime.UpdateSession(sessionId, armNudgeNonce nonce)
     fallbackRuntime.Update(sessionId, setMainContinuationAwaitingStart true)
 
     if isSessionForceStopped sessionId then

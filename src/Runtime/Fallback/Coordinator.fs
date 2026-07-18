@@ -6,7 +6,7 @@ open Wanxiangshu.Kernel.FallbackKernel.StateMachine
 open Wanxiangshu.Runtime.PromiseQueue
 open Wanxiangshu.Runtime.Fallback.RuntimeStore
 open Wanxiangshu.Runtime.Fallback.LeaseTransitions
-open Wanxiangshu.Runtime.Fallback.SessionPropertyTransitions
+open Wanxiangshu.Runtime.Fallback.SessionRuntimePropertyPure
 open Wanxiangshu.Runtime.Fallback.Ports
 open Wanxiangshu.Runtime.Fallback.LeaseValidation
 open Wanxiangshu.Runtime.Fallback.ContinuationExecution
@@ -46,8 +46,8 @@ let handleFallbackTransition
             state.Phase
             isMatchedContinuation
 
-        let cfg = configLookup (runtime.GetAgentName sessionID)
-        let! chain = resolveChain runtime executor cfg sessionID (runtime.GetAgentName sessionID)
+        let cfg = configLookup ((runtime.GetSession sessionID).AgentName)
+        let! chain = resolveChain runtime executor cfg sessionID ((runtime.GetSession sessionID).AgentName)
         printfn "[FBT] %s chain len %d" sessionID (List.length chain)
 
         if List.isEmpty chain && not isMatchedContinuation then
@@ -76,7 +76,7 @@ let handleFallbackTransition
             do! handleTerminalPostSettlement runtime workspaceRoot sessionID evt finalState2 intentOpt
 
             let consumed = calculateConsumed evt state.Phase finalState2.Phase
-            runtime.SetConsumed sessionID consumed
+            runtime.Update(sessionID, recordConsumed consumed)
 
             return
                 { Consumed = consumed

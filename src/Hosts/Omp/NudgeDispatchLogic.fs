@@ -27,7 +27,6 @@ open Wanxiangshu.Runtime.Fallback.RuntimeStore
 open Wanxiangshu.Runtime.Fallback.LeaseTransitions
 open Wanxiangshu.Runtime.Fallback.SessionRuntime
 open Wanxiangshu.Runtime.Fallback.SessionRuntimePropertyPure
-open Wanxiangshu.Runtime.Fallback.SessionPropertyTransitions
 open Wanxiangshu.Kernel.FallbackKernel.Types
 open Wanxiangshu.Runtime.NudgeLease
 open Wanxiangshu.Runtime.FuzzyIteratorStore
@@ -168,7 +167,7 @@ let agentEndHandler
     match getSessionIdFromContext ctxObj with
     | None -> Promise.lift ()
     | Some sessionId ->
-        let owner = fallbackRuntime.GetSessionOwner sessionId
+        let owner = (fallbackRuntime.GetSession sessionId).Owner
         let currentAgent = resolveAgentLocal ctxObj
 
         if isSyntheticAssistantAgent currentAgent then
@@ -181,7 +180,7 @@ let agentEndHandler
                 | Some lease ->
                     if root <> "" then
                         do! finishNudge fallbackRuntime root sessionId lease NudgeOutcome.Settled "completed" "" ""
-                | None -> fallbackRuntime.SetSessionOwner sessionId SessionOwner.NoOwner
+                | None -> fallbackRuntime.UpdateSession(sessionId, transferOwnership SessionOwner.NoOwner)
             }
         elif owner <> SessionOwner.NoOwner && owner <> SessionOwner.Human then
             Promise.lift ()

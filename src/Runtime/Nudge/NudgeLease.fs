@@ -8,7 +8,6 @@ open Wanxiangshu.Runtime.EventLogRuntime
 open Wanxiangshu.Runtime.Fallback.RuntimeStore
 open Wanxiangshu.Runtime.Fallback.SessionRuntime
 open Wanxiangshu.Runtime.Fallback.LeaseTransitions
-open Wanxiangshu.Runtime.Fallback.SessionPropertyTransitions
 open Wanxiangshu.Runtime.Fallback.SessionRuntimePropertyPure
 open Wanxiangshu.Kernel.FallbackKernel.Types
 
@@ -44,10 +43,10 @@ let finishNudge
 
             if outcome <> NudgeOutcome.Dispatched then
                 if runtime.TryClearPendingNudgeLease(sessionKey, lease.NudgeID) then
-                    runtime.ClearActiveNudgeNonce sessionKey
+                    runtime.UpdateSession(sessionKey, disarmNudgeNonce)
 
-                    if runtime.GetSessionOwner sessionKey = SessionOwner.Nudge then
-                        runtime.SetSessionOwner sessionKey SessionOwner.NoOwner
+                    if (runtime.GetSession sessionKey).Owner = SessionOwner.Nudge then
+                        runtime.UpdateSession(sessionKey, transferOwnership SessionOwner.NoOwner)
 
                     runtime.Update(sessionKey, setNudgeActive false)
         | _ -> ()
@@ -57,7 +56,7 @@ let isLeaseValid (runtime: FallbackRuntimeStore) (sessionKey: string) (lease: Nu
     let currentGen = (runtime.GetSession sessionKey).SessionGeneration
     let currentCancelGen = (runtime.GetSession sessionKey).CancelGeneration
     let currentTurnId = (runtime.GetSession sessionKey).HumanTurnId
-    let currentOwner = runtime.GetSessionOwner sessionKey
+    let currentOwner = (runtime.GetSession sessionKey).Owner
 
     let isLifecycleNotCancelled =
         match runtime.TryGetState sessionKey with
@@ -123,8 +122,8 @@ let tryClaimAndRegisterLease
                   Status = LeaseStatus.DispatchStarted }
 
             fallbackRuntime.SetPendingNudgeLease(sessionKey, lease)
-            fallbackRuntime.SetSessionOwner sessionKey SessionOwner.Nudge
-            fallbackRuntime.SetActiveNudgeNonce sessionKey nonce
+            fallbackRuntime.UpdateSession(sessionKey, transferOwnership SessionOwner.Nudge)
+            fallbackRuntime.UpdateSession(sessionKey, armNudgeNonce nonce)
             return Some lease
     }
 

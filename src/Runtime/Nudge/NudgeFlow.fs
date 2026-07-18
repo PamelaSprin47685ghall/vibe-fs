@@ -10,7 +10,6 @@ open Wanxiangshu.Runtime.NudgeRuntimeState
 open Wanxiangshu.Kernel.FallbackKernel.Types
 open Wanxiangshu.Runtime.Fallback.RuntimeStore
 open Wanxiangshu.Runtime.Fallback.LeaseTransitions
-open Wanxiangshu.Runtime.Fallback.SessionPropertyTransitions
 
 /// Nudge dispatch is lower priority than fallback and compaction.  In
 /// particular, a settled fallback lease may still be visible to a concurrent
@@ -23,7 +22,7 @@ let private nudgeBlockedByFallbackState (runtime: FallbackRuntimeStore) (session
         | Some state -> state.Lifecycle = FallbackLifecycle.Cancelled
         | None -> false
 
-    let owner = runtime.GetSessionOwner sessionKey
+    let owner = (runtime.GetSession sessionKey).Owner
 
     let fallbackOwnerActive =
         owner = SessionOwner.Fallback

@@ -4,7 +4,6 @@ open Wanxiangshu.Kernel.FallbackKernel.Types
 open Wanxiangshu.Runtime.Fallback.RuntimeStore
 open Wanxiangshu.Runtime.Fallback.SessionRuntime
 open Wanxiangshu.Runtime.Fallback.LeaseTransitions
-open Wanxiangshu.Runtime.Fallback.SessionPropertyTransitions
 
 let verifyLeaseWithStatus
     (expectedStatus: LeaseStatus)
@@ -19,7 +18,7 @@ let verifyLeaseWithStatus
     && lease.HumanTurnID = (runtime.GetSession sessionID).HumanTurnId
     && lease.CancelGeneration = (runtime.GetSession sessionID).CancelGeneration
     && lease.Owner = SessionOwner.Fallback
-    && runtime.GetSessionOwner sessionID = SessionOwner.Fallback
+    && (runtime.GetSession sessionID).Owner = SessionOwner.Fallback
     && not ((runtime.GetSession sessionID).CompactionForceStopped)
     && (runtime.GetSession sessionID).CompactionActiveId = ""
     && not ((runtime.GetSession sessionID).CompactionCompacted)
@@ -37,7 +36,7 @@ let ensureActiveAndOwner (runtime: FallbackRuntimeStore) (sessionID: string) (le
     let state = runtime.GetOrCreateState sessionID
 
     state.Lifecycle = FallbackLifecycle.Active
-    && runtime.GetSessionOwner sessionID = SessionOwner.Fallback
+    && (runtime.GetSession sessionID).Owner = SessionOwner.Fallback
     && lease.Owner = SessionOwner.Fallback
     && not ((runtime.GetSession sessionID).CompactionForceStopped)
     && (runtime.GetSession sessionID).CompactionActiveId = ""

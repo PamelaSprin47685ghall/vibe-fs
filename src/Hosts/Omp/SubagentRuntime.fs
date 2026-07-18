@@ -8,7 +8,7 @@ open Wanxiangshu.Hosts.Omp.PiResolve
 open Wanxiangshu.Runtime.Dyn
 open Wanxiangshu.Runtime.OmpHostBindings
 open Wanxiangshu.Runtime.Fallback.RuntimeStore
-open Wanxiangshu.Runtime.Fallback.SessionPropertyTransitions
+open Wanxiangshu.Runtime.Fallback.SessionRuntimePropertyPure
 open Wanxiangshu.Runtime.SubsessionService
 open Wanxiangshu.Runtime.SubsessionEventStore
 open Wanxiangshu.Runtime.ErrorClassify
@@ -55,29 +55,29 @@ let private resolveChainAndDirective
         fallbackConfigOpt
         |> Option.defaultValue Wanxiangshu.Runtime.Fallback.FallbackConfigCodec.emptyConfig
 
-    let agentName = fallbackRuntime.GetAgentName childId
+    let agentName = (fallbackRuntime.GetSession childId).AgentName
 
     let parentLiveModel =
-        match fallbackRuntime.GetModel parentSessionId with
+        match (fallbackRuntime.GetSession parentSessionId).Model with
         | Some m -> Some m
-        | None -> fallbackRuntime.GetModel childId
+        | None -> (fallbackRuntime.GetSession childId).Model
 
     let chain =
         Wanxiangshu.Runtime.Fallback.FallbackConfigCodec.resolveSubagentChain
             cfg
             agentName
-            (fallbackRuntime.GetChain childId)
-            (fallbackRuntime.GetChain parentSessionId)
+            (fallbackRuntime.GetSession childId).Chain
+            (fallbackRuntime.GetSession parentSessionId).Chain
             parentLiveModel
 
     // Determine directive: non-empty chain → wanxiangshu owns retry; empty → delegate to host.
     let directive = if chain.IsEmpty then DelegateToHost else RetryChain chain
 
     // Cache the resolved chain so continue/recovery reuse it.
-    fallbackRuntime.SetChain childId chain
+    fallbackRuntime.UpdateSession(childId, selectChain chain)
 
     match List.tryHead chain with
-    | Some first -> fallbackRuntime.SetModel childId first
+    | Some first -> fallbackRuntime.UpdateSession(childId, selectModel first)
     | None -> ()
 
     cfg, agentName, chain, directive

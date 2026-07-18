@@ -12,7 +12,7 @@ open Wanxiangshu.Runtime
 open Wanxiangshu.Runtime.Fallback.SessionRuntimeLeasePure
 open Wanxiangshu.Runtime.Fallback.LeaseTransitions
 open Wanxiangshu.Runtime.Fallback.RuntimeStore
-open Wanxiangshu.Runtime.Fallback.SessionPropertyTransitions
+open Wanxiangshu.Runtime.Fallback.SessionRuntimePropertyPure
 open Wanxiangshu.Runtime.Dyn
 open Wanxiangshu.Runtime.OpencodeClientCodec
 open Wanxiangshu.Runtime.OpencodeHookInputCodec
@@ -31,7 +31,7 @@ let resolveOwner
     (isTest: bool)
     : JS.Promise<SessionOwner> =
     promise {
-        let current = fallbackRuntime.GetSessionOwner sessionIDStr
+        let current = (fallbackRuntime.GetSession sessionIDStr).Owner
 
         if current <> SessionOwner.NoOwner then
             return current
@@ -95,7 +95,7 @@ let resolveOrigin
 /// Clear the owner slot for Fallback / Title ownership.
 let clearOwnerSlot (fallbackRuntime: FallbackRuntimeStore) (owner: SessionOwner) (sessionIDStr: string) : unit =
     if owner = SessionOwner.Fallback || owner = SessionOwner.Title then
-        fallbackRuntime.SetSessionOwner sessionIDStr SessionOwner.NoOwner
+        fallbackRuntime.UpdateSession(sessionIDStr, transferOwnership SessionOwner.NoOwner)
 
 /// Finish an outstanding nudge lease, if any, and clear the owner.
 let finishNudgeLease (ctx: obj) (fallbackRuntime: FallbackRuntimeStore) (sessionIDStr: string) : JS.Promise<unit> =
@@ -106,7 +106,7 @@ let finishNudgeLease (ctx: obj) (fallbackRuntime: FallbackRuntimeStore) (session
 
             if directory <> "" then
                 do! finishNudge fallbackRuntime directory sessionIDStr lease NudgeOutcome.Settled "completed" "" ""
-        | None -> fallbackRuntime.SetSessionOwner sessionIDStr SessionOwner.NoOwner
+        | None -> fallbackRuntime.UpdateSession(sessionIDStr, transferOwnership SessionOwner.NoOwner)
     }
 
 /// Settle a compaction run that has produced its continuation, if any.

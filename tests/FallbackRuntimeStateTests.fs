@@ -4,7 +4,7 @@ open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Kernel.FallbackKernel.Types
 open Wanxiangshu.Runtime.Fallback.RuntimeStore
 open Wanxiangshu.Runtime.Fallback.LeaseTransitions
-open Wanxiangshu.Runtime.Fallback.SessionPropertyTransitions
+open Wanxiangshu.Runtime.Fallback.SessionRuntimePropertyPure
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -64,14 +64,14 @@ let updateState_persistsChange () =
 let chain_setThenGet () =
     let rt = FallbackRuntimeStore()
     let ch = [ mkModel "oai" "gpt-5" ]
-    rt.SetChain "sess-1" ch
-    let got = rt.GetChain "sess-1"
+    rt.UpdateSession("sess-1", selectChain ch)
+    let got = (rt.GetSession "sess-1").Chain
     equal "chain length" 1 got.Length
     equal "provider" "oai" got.[0].ProviderID
 
 let chain_emptyByDefault () =
     let rt = FallbackRuntimeStore()
-    equal "empty chain by default" [] (rt.GetChain "unknown-session")
+    equal "empty chain by default" [] ((rt.GetSession "unknown-session").Chain)
 
 // ---------------------------------------------------------------------------
 // SetAgentName / GetAgentName
@@ -79,12 +79,12 @@ let chain_emptyByDefault () =
 
 let agentName_setThenGet () =
     let rt = FallbackRuntimeStore()
-    rt.SetAgentName "sess-1" "Sisyphus - Ultraworker"
-    equal "agent name" "Sisyphus - Ultraworker" (rt.GetAgentName "sess-1")
+    rt.UpdateSession("sess-1", recordAgentName "Sisyphus - Ultraworker")
+    equal "agent name" "Sisyphus - Ultraworker" ((rt.GetSession "sess-1").AgentName)
 
 let agentName_emptyByDefault () =
     let rt = FallbackRuntimeStore()
-    equal "empty agent by default" "" (rt.GetAgentName "unknown-session")
+    equal "empty agent by default" "" ((rt.GetSession "unknown-session").AgentName)
 
 // ---------------------------------------------------------------------------
 // CleanupSession
@@ -92,23 +92,23 @@ let agentName_emptyByDefault () =
 
 let cleanupSession_removesAllState () =
     let rt = FallbackRuntimeStore()
-    rt.SetChain "sess-1" [ mkModel "oai" "gpt-5" ]
-    rt.SetAgentName "sess-1" "reviewer"
+    rt.UpdateSession("sess-1", selectChain [ mkModel "oai" "gpt-5" ])
+    rt.UpdateSession("sess-1", recordAgentName "reviewer")
     let s = rt.GetOrCreateState "sess-1"
     rt.UpdateState "sess-1" { s with FailureCount = 7 }
     rt.CleanupSession "sess-1"
-    equal "chain gone" [] (rt.GetChain "sess-1")
-    equal "agent gone" "" (rt.GetAgentName "sess-1")
+    equal "chain gone" [] ((rt.GetSession "sess-1").Chain)
+    equal "agent gone" "" ((rt.GetSession "sess-1").AgentName)
     // Re-creating after cleanup gives a fresh state
     let s2 = rt.GetOrCreateState "sess-1"
     equal "state reset" 0 s2.FailureCount
 
 let cleanupSession_doesNotAffectOtherSessions () =
     let rt = FallbackRuntimeStore()
-    rt.SetChain "sess-1" [ mkModel "oai" "m1" ]
-    rt.SetChain "sess-2" [ mkModel "oai" "m2" ]
+    rt.UpdateSession("sess-1", selectChain [ mkModel "oai" "m1" ])
+    rt.UpdateSession("sess-2", selectChain [ mkModel "oai" "m2" ])
     rt.CleanupSession "sess-1"
-    let ch2 = rt.GetChain "sess-2"
+    let ch2 = (rt.GetSession "sess-2").Chain
     equal "sess-2 chain intact" 1 ch2.Length
     equal "sess-2 model" "m2" ch2.[0].ModelID
 

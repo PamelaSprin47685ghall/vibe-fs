@@ -12,7 +12,6 @@ open Wanxiangshu.Runtime.Fallback.RuntimeStore
 open Wanxiangshu.Runtime.Fallback.LeaseTransitions
 open Wanxiangshu.Runtime.Fallback.SessionRuntimePropertyPure
 open Wanxiangshu.Runtime.Fallback.SessionRuntimeLeasePure
-open Wanxiangshu.Runtime.Fallback.SessionPropertyTransitions
 open Wanxiangshu.Runtime.Fallback.Coordinator
 open Wanxiangshu.Runtime.Fallback.Ports
 open Wanxiangshu.Runtime.Fallback.ContinuationExecution
@@ -193,8 +192,8 @@ let handleEvent_sessionIdle_idle_emitsScanToolCallAsText () =
         let cfg = mkConfig ()
         let rt = FallbackRuntimeStore()
         let sid = "sess-1"
-        rt.SetChain sid chain
-        rt.SetAgentName sid "reviewer"
+        rt.UpdateSession(sid, selectChain chain)
+        rt.UpdateSession(sid, recordAgentName "reviewer")
 
         let translator = FakeTranslator(sid, FallbackEvent.SessionIdle) :> IEventTranslator
         let executor = FakeExecutor()
@@ -215,8 +214,8 @@ let handleEvent_sessionIdle_idle_toolText_sendsPrompt () =
         let cfg = mkConfig ()
         let rt = FallbackRuntimeStore()
         let sid = "sess-1"
-        rt.SetChain sid chain
-        rt.SetAgentName sid "reviewer"
+        rt.UpdateSession(sid, selectChain chain)
+        rt.UpdateSession(sid, recordAgentName "reviewer")
 
         let toolMsg =
             createObj
@@ -250,8 +249,8 @@ let handleEvent_sessionIdle_idle_todosComplete_setsTaskComplete () =
         let cfg = mkConfig ()
         let rt = FallbackRuntimeStore()
         let sid = "sess-1"
-        rt.SetChain sid chain
-        rt.SetAgentName sid "reviewer"
+        rt.UpdateSession(sid, selectChain chain)
+        rt.UpdateSession(sid, recordAgentName "reviewer")
 
         let todoPart =
             createObj
@@ -282,8 +281,8 @@ let handleEvent_sessionIdle_retryToIdle_emitsScanToolCallAsText () =
         let cfg = mkConfig ()
         let rt = FallbackRuntimeStore()
         let sid = "sess-1"
-        rt.SetChain sid chain
-        rt.SetAgentName sid "reviewer"
+        rt.UpdateSession(sid, selectChain chain)
+        rt.UpdateSession(sid, recordAgentName "reviewer")
 
         let s0 = rt.GetOrCreateState sid
 
@@ -316,8 +315,8 @@ let handleEvent_sessionBusy_duringRetrying_consumedTrue () =
         let model = mkModel "oai" "gpt-5"
         let rt = FallbackRuntimeStore()
         let sid = "sess-busy-retrying"
-        rt.SetChain sid [ model ]
-        rt.SetAgentName sid "reviewer"
+        rt.UpdateSession(sid, selectChain [ model ])
+        rt.UpdateSession(sid, recordAgentName "reviewer")
         let s0 = rt.GetOrCreateState sid
 
         rt.UpdateState
@@ -325,7 +324,7 @@ let handleEvent_sessionBusy_duringRetrying_consumedTrue () =
             { s0 with
                 Phase = FallbackPhase.Retrying 1 }
 
-        rt.SetConsumed sid true
+        rt.Update(sid, recordConsumed true)
         let tr = FakeTranslator(sid, FallbackEvent.SessionBusy) :> IEventTranslator
         let! r, _ = handleEvent tr rt defaultCfgLookup (FakeExecutor()) "" (box ()) None
         equal "consumed true during retrying" true r.Consumed
@@ -337,7 +336,7 @@ let handleEvent_chainPrependsCurrentModel () =
     promise {
         let rt = FallbackRuntimeStore()
         let sid = "sess-prepend"
-        rt.SetAgentName sid "coder"
+        rt.UpdateSession(sid, recordAgentName "coder")
 
         let m0 = mkModel "anthropic" "claude-4"
         let m1 = mkModel "openai" "gpt-5"
@@ -355,7 +354,7 @@ let handleEvent_chainPrependsCurrentModel () =
         let handler = createHandler tr rt customLookup executor "" None
         let! res = handler (box ())
 
-        let chain = rt.GetChain sid
+        let chain = (rt.GetSession sid).Chain
         equal "chain has 3 models" 3 chain.Length
         equal "first is current model m0" m0 chain.[0]
         equal "second is m1" m1 chain.[1]
@@ -363,7 +362,7 @@ let handleEvent_chainPrependsCurrentModel () =
 
         let rt2 = FallbackRuntimeStore()
         let sid2 = "sess-prepend-exists"
-        rt2.SetAgentName sid2 "coder"
+        rt2.UpdateSession(sid2, recordAgentName "coder")
         let executor2 = FakeExecutor(currentModel = m1)
 
         let tr2 =
@@ -372,7 +371,7 @@ let handleEvent_chainPrependsCurrentModel () =
         let handler2 = createHandler tr2 rt2 customLookup executor2 "" None
         let! res2 = handler2 (box ())
 
-        let chain2 = rt2.GetChain sid2
+        let chain2 = (rt2.GetSession sid2).Chain
         equal "chain2 has 2 models" 2 chain2.Length
         equal "first is m1" m1 chain2.[0]
         equal "second is m2" m2 chain2.[1]
@@ -383,8 +382,8 @@ let handleEvent_userAbort_invalidatesLease () =
         let model = mkModel "oai" "gpt-5"
         let rt = FallbackRuntimeStore()
         let sid = "sess-abort"
-        rt.SetChain sid [ model ]
-        rt.SetAgentName sid "reviewer"
+        rt.UpdateSession(sid, selectChain [ model ])
+        rt.UpdateSession(sid, recordAgentName "reviewer")
 
         // Setup initial state
         let turnId = rt.UpdateSessionReturning(sid, advanceHumanTurn)
@@ -419,8 +418,8 @@ let handleEvent_newUserMessage_doesNotClearMainContinuationAwaitingStart () =
         let model = mkModel "oai" "gpt-5"
         let rt = FallbackRuntimeStore()
         let sid = "sess-new-user-test"
-        rt.SetChain sid [ model ]
-        rt.SetAgentName sid "reviewer"
+        rt.UpdateSession(sid, selectChain [ model ])
+        rt.UpdateSession(sid, recordAgentName "reviewer")
         rt.Update(sid, setMainContinuationAwaitingStart true)
 
         let rawEvent =
@@ -445,8 +444,8 @@ let handleEvent_emptyFallbackChain_isNotBypassed () =
     promise {
         let rt = FallbackRuntimeStore()
         let sid = "sess-empty-chain-test"
-        rt.SetAgentName sid "reviewer"
-        rt.SetChain sid []
+        rt.UpdateSession(sid, recordAgentName "reviewer")
+        rt.UpdateSession(sid, selectChain [])
 
         let translator =
             FakeTranslator(sid, FallbackEvent.SessionError(mkRetryableErr ())) :> IEventTranslator

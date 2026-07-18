@@ -12,7 +12,6 @@ open Wanxiangshu.Runtime.Fallback.LeaseTransitions
 open Wanxiangshu.Runtime.Fallback.Ports
 open Wanxiangshu.Runtime.Fallback.LeaseValidation
 open Wanxiangshu.Runtime.Fallback.ContinuationExecution
-open Wanxiangshu.Runtime.Fallback.SessionPropertyTransitions
 open Wanxiangshu.Runtime.Fallback.FallbackMessageCodec
 open Wanxiangshu.Runtime.Fallback.FallbackMessageDetection
 open Wanxiangshu.Runtime.ContinuationEventWriter
@@ -73,7 +72,7 @@ let private dispatchRecovery
         runtime.UpdateState sessionID updated
 
         let lease = setupContinuationLease runtime sessionID model (Some promptText)
-        let agent = runtime.GetAgentName sessionID
+        let agent = (runtime.GetSession sessionID).AgentName
 
         let modelStr =
             match model.Variant with

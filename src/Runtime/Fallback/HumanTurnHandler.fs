@@ -6,7 +6,6 @@ open Wanxiangshu.Kernel.FallbackKernel.StateMachine
 open Wanxiangshu.Runtime.Fallback.SessionRuntime
 open Wanxiangshu.Runtime.Fallback.RuntimeStore
 open Wanxiangshu.Runtime.Fallback.LeaseTransitions
-open Wanxiangshu.Runtime.Fallback.SessionPropertyTransitions
 open Wanxiangshu.Runtime.Fallback.SessionRuntimePropertyPure
 open Wanxiangshu.Runtime.Fallback.NudgeHandler
 open Wanxiangshu.Runtime.Fallback.CompactionHandler
@@ -45,7 +44,8 @@ let initializeNewTurn
         if modelOpt.IsNone then
             runtime.UpdateSession(sessionID, clearLatestHumanModel)
 
-        agentOpt |> Option.iter (runtime.SetAgentName sessionID)
+        agentOpt
+        |> Option.iter (fun a -> runtime.UpdateSession(sessionID, recordAgentName a))
 
         let provider, model, variant =
             match modelOpt with
@@ -89,9 +89,9 @@ let handleNewUserMessage
         let state = runtime.GetOrCreateState sessionID
 
         let ns, _ =
-            transition state FallbackEvent.NewUserMessage (configLookup (runtime.GetAgentName sessionID)) []
+            transition state FallbackEvent.NewUserMessage (configLookup ((runtime.GetSession sessionID).AgentName)) []
 
         runtime.UpdateState sessionID ns
-        runtime.SetConsumed sessionID false
+        runtime.Update(sessionID, recordConsumed false)
         return { Consumed = false; State = ns }, None
     }

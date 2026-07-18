@@ -7,7 +7,7 @@ open Wanxiangshu.Kernel.Errors.DomainError
 open Wanxiangshu.Kernel.FallbackKernel.Types
 open Wanxiangshu.Kernel.Subsession.Types
 open Wanxiangshu.Runtime.Fallback.RuntimeStore
-open Wanxiangshu.Runtime.Fallback.SessionPropertyTransitions
+open Wanxiangshu.Runtime.Fallback.SessionRuntimePropertyPure
 open Wanxiangshu.Runtime.Fallback.FallbackConfigCodec
 open Wanxiangshu.Runtime.Fallback.FallbackMessageCodec
 open Wanxiangshu.Runtime.DelegatedAiSettings
@@ -30,7 +30,7 @@ let resolveParentLiveModel
         if parentSessionID = "" then
             return None
         else
-            match runtime.GetModel parentSessionID with
+            match (runtime.GetSession parentSessionID).Model with
             | Some m -> return Some m
             | None ->
                 match getSessionApiFromClient client with
@@ -52,9 +52,9 @@ let resolveParentLiveModel
 let applyDirective (runtime: FallbackRuntimeStore) (childID: string) (directive: ModelDirective) : unit =
     match directive with
     | RetryChain chain ->
-        runtime.SetChain childID chain
-        runtime.SetModel childID (List.head chain)
-    | DelegateToHost -> runtime.SetChain childID []
+        runtime.UpdateSession(childID, selectChain chain)
+        runtime.UpdateSession(childID, selectModel (List.head chain))
+    | DelegateToHost -> runtime.UpdateSession(childID, selectChain [])
 
 let extractRunDirective
     (registry: ChildAgentRegistry)
@@ -93,7 +93,7 @@ let extractRunDirective
                 cfg
                 agent
                 hostConfigured
-                (runtime.GetChain childID)
-                (runtime.GetChain parentSessionID)
+                ((runtime.GetSession childID).Chain)
+                ((runtime.GetSession parentSessionID).Chain)
                 parentLiveModel
     }

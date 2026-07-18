@@ -9,7 +9,7 @@ open Wanxiangshu.Runtime.Dyn
 open Wanxiangshu.Runtime.RuntimeScope
 open Wanxiangshu.Runtime.OmpHostBindings
 open Wanxiangshu.Runtime.Fallback.RuntimeStore
-open Wanxiangshu.Runtime.Fallback.SessionPropertyTransitions
+open Wanxiangshu.Runtime.Fallback.SessionRuntimePropertyPure
 open Wanxiangshu.Kernel.Primitives.Identity
 open Wanxiangshu.Kernel.FallbackKernel.Types
 open Wanxiangshu.Runtime.PromptFrontMatter
@@ -133,4 +133,4 @@ let setupSubagentSession
     | _ -> ()
 
     defaultChain
-    |> Option.iter (fun chain -> fallbackRuntime.SetChain childId chain)
+    |> Option.iter (fun chain -> fallbackRuntime.UpdateSession(childId, selectChain chain))

@@ -5,7 +5,6 @@ open Wanxiangshu.Kernel.FallbackKernel.Types
 open Wanxiangshu.Runtime.Fallback.RuntimeStore
 open Wanxiangshu.Runtime.Fallback.SessionRuntime
 open Wanxiangshu.Runtime.Fallback.LeaseTransitions
-open Wanxiangshu.Runtime.Fallback.SessionPropertyTransitions
 open Wanxiangshu.Runtime.Fallback.SessionRuntimePropertyPure
 open Wanxiangshu.Runtime.ContinuationEventWriter
 open Wanxiangshu.Runtime.Fallback.LeaseValidationRules
@@ -51,8 +50,8 @@ let cancelPendingMainLease
             let cleared = runtime.TryClearPendingLease(sessionID, lease.ContinuationID)
 
             if cleared then
-                if runtime.GetSessionOwner sessionID = SessionOwner.Fallback then
-                    runtime.SetSessionOwner sessionID SessionOwner.NoOwner
+                if (runtime.GetSession sessionID).Owner = SessionOwner.Fallback then
+                    runtime.UpdateSession(sessionID, transferOwnership SessionOwner.NoOwner)
 
                 runtime.Update(sessionID, setMainContinuationAwaitingStart false)
         | None -> ()
@@ -115,8 +114,8 @@ let finishContinuation
         let cleared = runtime.TryClearPendingLease(sessionID, lease.ContinuationID)
 
         if cleared then
-            if runtime.GetSessionOwner sessionID = SessionOwner.Fallback then
-                runtime.SetSessionOwner sessionID SessionOwner.NoOwner
+            if (runtime.GetSession sessionID).Owner = SessionOwner.Fallback then
+                runtime.UpdateSession(sessionID, transferOwnership SessionOwner.NoOwner)
 
             runtime.Update(sessionID, setMainContinuationAwaitingStart false)
 

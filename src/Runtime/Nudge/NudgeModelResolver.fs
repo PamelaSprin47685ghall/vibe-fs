@@ -6,7 +6,6 @@ open Wanxiangshu.Runtime.Dyn
 open Wanxiangshu.Runtime.NudgeMessageClassifier
 open Wanxiangshu.Runtime.Fallback.RuntimeStore
 open Wanxiangshu.Kernel.FallbackKernel.Types
-open Wanxiangshu.Runtime.Fallback.SessionPropertyTransitions
 open Wanxiangshu.Kernel.Nudge.TodoStatus
 
 let private resolveModelFromMessages (msgs: obj array) (lastAssistantModel: string option) : string option =
@@ -54,6 +53,6 @@ let resolveNudgeModel
     match (fallbackRuntime.GetSession sessionID).LatestHumanModel with
     | Some m -> Some m
     | None ->
-        match fallbackRuntime.GetModel sessionID with
+        match (fallbackRuntime.GetSession sessionID).Model with
         | Some m -> Some(modelWithVariantString m)
         | None -> resolveModelFromMessages msgs lastAssistantModel

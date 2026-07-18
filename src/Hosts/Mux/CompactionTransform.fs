@@ -16,7 +16,6 @@ open Wanxiangshu.Hosts.Mux.BacklogSession
 open Wanxiangshu.Runtime.Dyn
 open Wanxiangshu.Runtime.Fallback.SessionRuntimePropertyPure
 open Wanxiangshu.Runtime.Fallback.SessionRuntimeLeasePure
-open Wanxiangshu.Runtime.Fallback.SessionPropertyTransitions
 
 let private sanitizeMuxMessages (sessionID: string) (messagesArr: obj array) = decodeMessages sessionID messagesArr
 
@@ -91,7 +90,7 @@ let buildCompactedResult
 
         match fallbackRuntime with
         | Some fr ->
-            fr.SetSessionOwner sessionID SessionOwner.Compaction
+            fr.UpdateSession(sessionID, transferOwnership SessionOwner.Compaction)
             fr.UpdateSession(sessionID, setActiveCompactionId compactionId compactionOrdinal)
         | None -> ()
 

@@ -8,7 +8,6 @@ open Wanxiangshu.Kernel.FallbackKernel.Types
 open Wanxiangshu.Hosts.Opencode.BacklogSession
 open Wanxiangshu.Runtime.Fallback.SessionRuntimePropertyPure
 open Wanxiangshu.Runtime.Fallback.SessionRuntimeLeasePure
-open Wanxiangshu.Runtime.Fallback.SessionPropertyTransitions
 open Wanxiangshu.Runtime
 open Wanxiangshu.Runtime.Dyn
 
@@ -47,7 +46,7 @@ let private recordCompactionStart
 
         match fallbackRuntime with
         | Some fr ->
-            fr.SetSessionOwner sessionID SessionOwner.Compaction
+            fr.UpdateSession(sessionID, transferOwnership SessionOwner.Compaction)
             fr.UpdateSession(sessionID, setActiveCompactionId compactionId compactionOrdinal)
             fr.Update(sessionID, setCompacted false)
             fr.Update(sessionID, setCompactionContinuationObserved false)

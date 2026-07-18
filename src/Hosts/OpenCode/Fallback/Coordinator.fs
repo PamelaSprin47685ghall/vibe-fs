@@ -6,7 +6,7 @@ open Wanxiangshu.Runtime.Dyn
 open Wanxiangshu.Runtime.OpencodeHookInputCodec
 open Wanxiangshu.Runtime.OpencodeHostEvent
 open Wanxiangshu.Runtime.Fallback.RuntimeStore
-open Wanxiangshu.Runtime.Fallback.SessionPropertyTransitions
+open Wanxiangshu.Runtime.Fallback.SessionRuntimePropertyPure
 
 module Dyn = Wanxiangshu.Runtime.Dyn
 
@@ -31,7 +31,7 @@ type FallbackCoordinator
             let sid = getSessionID "session.status" props
 
             if sid <> "" && status = "busy" then
-                fallbackRuntime.SetBusyCount sid (fallbackRuntime.GetBusyCount sid + 1)
+                fallbackRuntime.Update(sid, markBusy ((fallbackRuntime.GetSession sid).BusyCount + 1))
             elif sid <> "" && status = "idle" then
-                fallbackRuntime.SetBusyCount sid 0
+                fallbackRuntime.Update(sid, markBusy 0)
         | _ -> ()

@@ -16,7 +16,7 @@ open Wanxiangshu.Runtime.OpencodeSessionPromptBuilder
 open Wanxiangshu.Runtime.NudgeFlow
 open Wanxiangshu.Runtime.ToolRuntimeContext
 open Wanxiangshu.Runtime.Fallback.RuntimeStore
-open Wanxiangshu.Runtime.Fallback.SessionPropertyTransitions
+open Wanxiangshu.Runtime.Fallback.SessionRuntimePropertyPure
 open Wanxiangshu.Hosts.Opencode.NudgeEffectSnapshot
 
 module Dyn = Wanxiangshu.Runtime.Dyn
@@ -54,17 +54,17 @@ let sendNudge
     promise {
         let sidStr = Id.sessionIdValue sessionID
 
-        fallbackRuntime.SetActiveNudgeNonce sidStr nonce
+        fallbackRuntime.UpdateSession(sidStr, armNudgeNonce nonce)
 
         match getSessionApiFromClient client with
         | Error _ ->
             // N-01 + N-02: surface the typed failure AND clear the
             // active nudge nonce / owner on the early-exit path so the
             // next attempt can dispatch.
-            let _ = fallbackRuntime.TryConsumeActiveNudgeNonce(sidStr, nonce)
+            let _ = fallbackRuntime.UpdateSessionReturning(sidStr, tryConsumeNudgeNonce nonce)
 
-            if fallbackRuntime.GetSessionOwner sidStr = SessionOwner.Nudge then
-                fallbackRuntime.SetSessionOwner sidStr SessionOwner.NoOwner
+            if (fallbackRuntime.GetSession sidStr).Owner = SessionOwner.Nudge then
+                fallbackRuntime.UpdateSession(sidStr, transferOwnership SessionOwner.NoOwner)
 
             return raise (System.Exception("opencode_session_api_missing"))
         | Ok session ->

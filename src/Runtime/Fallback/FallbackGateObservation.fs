@@ -6,7 +6,6 @@ open Wanxiangshu.Kernel.FallbackSubagentGate
 open Wanxiangshu.Kernel.Nudge.Types
 open Wanxiangshu.Runtime.Fallback.RuntimeStore
 open Wanxiangshu.Runtime.Fallback.SessionRuntimePropertyPure
-open Wanxiangshu.Runtime.Fallback.SessionPropertyTransitions
 
 let observe (runtime: FallbackRuntimeStore) (sessionID: string) : FallbackGateObservation =
     let phase, lifecycle =
@@ -15,12 +14,12 @@ let observe (runtime: FallbackRuntimeStore) (sessionID: string) : FallbackGateOb
         | None -> None, None
 
     let consumed =
-        match runtime.GetConsumed sessionID with
+        match (runtime.GetSession sessionID).Consumed with
         | Some true -> Some FallbackConsumedStatus.ConsumedByHost
         | Some false -> Some FallbackConsumedStatus.PropagatedToOuter
         | None -> None
 
-    let owner = runtime.GetSessionOwner sessionID
+    let owner = (runtime.GetSession sessionID).Owner
 
     let terminalOrigin =
         let isNudgeOwner = owner = SessionOwner.Nudge
@@ -39,6 +38,6 @@ let observe (runtime: FallbackRuntimeStore) (sessionID: string) : FallbackGateOb
     { Lifecycle = lifecycle
       Phase = phase
       Consumed = consumed
-      BusyCount = runtime.GetBusyCount sessionID
+      BusyCount = (runtime.GetSession sessionID).BusyCount
       ActiveGates = getActiveGates (runtime.GetSession sessionID)
       TerminalOrigin = terminalOrigin }

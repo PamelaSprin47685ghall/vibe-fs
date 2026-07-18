@@ -12,7 +12,6 @@ open Wanxiangshu.Runtime.BacklogProjectionBuild
 open Wanxiangshu.Runtime.Fallback.RuntimeStore
 open Wanxiangshu.Runtime.Fallback.SessionRuntimePropertyPure
 open Wanxiangshu.Runtime.Fallback.SessionRuntimeLeasePure
-open Wanxiangshu.Runtime.Fallback.SessionPropertyTransitions
 open Wanxiangshu.Hosts.Mux.MessagingCodec
 open Wanxiangshu.Runtime.RuntimeScope
 
@@ -80,7 +79,7 @@ let buildCompactedResult
 
         match fallbackRuntime with
         | Some fr ->
-            fr.SetSessionOwner sessionID SessionOwner.Compaction
+            fr.UpdateSession(sessionID, transferOwnership SessionOwner.Compaction)
             fr.UpdateSession(sessionID, setActiveCompactionId compactionId compactionOrdinal)
         | None -> ()
 

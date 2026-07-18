@@ -8,7 +8,7 @@ open Wanxiangshu.Kernel.FallbackKernel.Types
 open Wanxiangshu.Runtime.ChildAgentRegistry
 open Wanxiangshu.Runtime.Fallback.RuntimeStore
 open Wanxiangshu.Runtime.Fallback.SessionRuntimeLeasePure
-open Wanxiangshu.Runtime.Fallback.SessionPropertyTransitions
+open Wanxiangshu.Runtime.Fallback.SessionRuntimePropertyPure
 open Wanxiangshu.Runtime.RuntimeScope
 open Wanxiangshu.Runtime.ReviewRuntime
 open Wanxiangshu.Tests.TempWorkspace
@@ -67,7 +67,7 @@ let childCompactionIdleSettlesAfterFallbackConsumes () =
         let! directory = mkdtempAsync "opencode-child-compaction-"
         let sessionID = "child-compaction-1"
         let runtime = FallbackRuntimeStore()
-        runtime.SetSessionOwner sessionID SessionOwner.Compaction
+        runtime.UpdateSession(sessionID, transferOwnership SessionOwner.Compaction)
         runtime.UpdateSession(sessionID, setActiveCompactionId "compact-1" 1)
         runtime.Update(sessionID, setCompacted true)
         runtime.Update(sessionID, setCompactionContinuationObserved true)
@@ -103,7 +103,7 @@ let childCompactionIdleSettlesAfterFallbackConsumes () =
                       ) ]
             )
 
-        equal "child compaction owner is released" SessionOwner.NoOwner (runtime.GetSessionOwner sessionID)
+        equal "child compaction owner is released" SessionOwner.NoOwner ((runtime.GetSession sessionID).Owner)
         check "compaction identity is cleared" ((runtime.GetSession sessionID).CompactionActiveId = "")
         do! rmAsync directory
     }

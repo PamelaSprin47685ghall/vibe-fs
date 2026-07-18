@@ -12,7 +12,7 @@ open Wanxiangshu.Runtime.NudgeLease
 open Wanxiangshu.Runtime.EventLogRuntime
 open Wanxiangshu.Runtime.Fallback.RuntimeStore
 open Wanxiangshu.Runtime.Fallback.LeaseTransitions
-open Wanxiangshu.Runtime.Fallback.SessionPropertyTransitions
+open Wanxiangshu.Runtime.Fallback.SessionRuntimePropertyPure
 open Wanxiangshu.Kernel.FallbackKernel.Types
 
 let private _eventLogNudgeIntegral = tryClaimNudgeDispatch
@@ -33,7 +33,9 @@ type NudgeRuntime
             | Ignore -> return ()
             | StreamEnd(workspaceId, stopReason, lastMsg) ->
                 let reason = FinishReason.fromString stopReason
-                let isNudgeOwner = fallbackRuntime.GetSessionOwner workspaceId = SessionOwner.Nudge
+
+                let isNudgeOwner =
+                    (fallbackRuntime.GetSession workspaceId).Owner = SessionOwner.Nudge
 
                 if
                     not (Dyn.isNullish helpers)
@@ -53,7 +55,7 @@ type NudgeRuntime
                                     "completed"
                                     ""
                                     ""
-                        | None -> fallbackRuntime.SetSessionOwner workspaceId SessionOwner.NoOwner
+                        | None -> fallbackRuntime.UpdateSession(workspaceId, transferOwnership SessionOwner.NoOwner)
 
                     if not isNudgeOwner || isReviewLoopActive workspaceId then
                         let! newState =

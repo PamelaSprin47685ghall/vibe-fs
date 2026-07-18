@@ -13,7 +13,6 @@ open Wanxiangshu.Runtime
 open Wanxiangshu.Runtime.Fallback.LeaseTransitions
 open Wanxiangshu.Runtime.Fallback.RuntimeStore
 open Wanxiangshu.Runtime.Fallback.SessionRuntimePropertyPure
-open Wanxiangshu.Runtime.Fallback.SessionPropertyTransitions
 open Wanxiangshu.Runtime.Dyn
 open Wanxiangshu.Runtime.OpencodeClientCodec
 open Wanxiangshu.Runtime.OpencodeHostEvent
@@ -152,7 +151,7 @@ type NudgeTrigger
     member _.SettleCompactionIfCompleted(sessionIDStr: string) : JS.Promise<unit> =
         promise {
             if
-                fallbackRuntime.GetSessionOwner sessionIDStr = SessionOwner.Compaction
+                (fallbackRuntime.GetSession sessionIDStr).Owner = SessionOwner.Compaction
                 && (fallbackRuntime.GetSession sessionIDStr).CompactionCompacted
                 && (fallbackRuntime.GetSession sessionIDStr).CompactionContinuationObserved
             then

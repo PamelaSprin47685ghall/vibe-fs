@@ -16,7 +16,7 @@ open Wanxiangshu.Runtime.Fallback.Coordinator
 open Wanxiangshu.Runtime.Fallback.Ports
 open Wanxiangshu.Runtime.Fallback.FallbackMessageCodec
 open Wanxiangshu.Runtime.Fallback.RuntimeStore
-open Wanxiangshu.Runtime.Fallback.SessionPropertyTransitions
+open Wanxiangshu.Runtime.Fallback.SessionRuntimePropertyPure
 open Wanxiangshu.Runtime.SubsessionEventRouter
 open Wanxiangshu.Runtime.SubsessionChildObserver
 open Wanxiangshu.Hosts.Omp.Fallback.EventTranslator
@@ -27,7 +27,7 @@ let private setConsumedFromResult
     (sessionID: string)
     (result: FallbackHookResult)
     : unit =
-    runtime.SetConsumed sessionID result.Consumed
+    runtime.Update(sessionID, recordConsumed result.Consumed)
 
 let private clearConsumedOnNewUserMessage
     (translator: IEventTranslator)
@@ -36,7 +36,7 @@ let private clearConsumedOnNewUserMessage
     (rawEvent: obj)
     : unit =
     if translator.IsNewUserMessage(sessionID, rawEvent) then
-        runtime.ClearConsumed sessionID
+        runtime.Update(sessionID, clearConsumption)
 
 let private bindAgentAndModel (runtime: FallbackRuntimeStore) (rawEvent: obj) : unit =
     let eventObj = Dyn.get rawEvent "event"
@@ -52,12 +52,12 @@ let private bindAgentAndModel (runtime: FallbackRuntimeStore) (rawEvent: obj) : 
                 let agent = Dyn.str info "agent"
 
                 if agent <> "" then
-                    runtime.SetAgentName sid agent
+                    runtime.UpdateSession(sid, recordAgentName agent)
 
                 let modelObj = Dyn.get info "model"
 
                 match Wanxiangshu.Runtime.Fallback.FallbackMessageCodec.decodeModelFromObj modelObj with
-                | Some m -> runtime.SetModel sid m
+                | Some m -> runtime.UpdateSession(sid, selectModel m)
                 | None -> ()
 
 let private routeEvent

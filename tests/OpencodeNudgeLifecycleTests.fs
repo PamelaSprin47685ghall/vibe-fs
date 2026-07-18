@@ -5,7 +5,7 @@ open Fable.Core.JsInterop
 open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Runtime.Dyn
 open Wanxiangshu.Runtime.Fallback.RuntimeStore
-open Wanxiangshu.Runtime.Fallback.SessionPropertyTransitions
+open Wanxiangshu.Runtime.Fallback.SessionRuntimePropertyPure
 open Wanxiangshu.Kernel.FallbackKernel.Types
 open Wanxiangshu.Kernel.Nudge.Types
 open Wanxiangshu.Hosts.Opencode.ChatHooks
@@ -59,8 +59,8 @@ let test_isSystemMessage_fallbackContinuationIsSystem () =
     let result = isSystemMessage parts fr "s-1" "msg-fc-1"
 
     check "fallback_continuation is classified as system" result
-    check "store owner untouched" (fr.GetSessionOwner "s-1" = SessionOwner.NoOwner)
-    check "store nonce untouched" (fr.GetActiveNudgeNonce "s-1" = "")
+    check "store owner untouched" ((fr.GetSession "s-1").Owner = SessionOwner.NoOwner)
+    check "store nonce untouched" ((fr.GetSession "s-1").ActiveNudgeNonce = "")
 
 let test_isSystemMessage_plainUserIsNotSystem () =
     let fr = FallbackRuntimeStore()
@@ -73,23 +73,23 @@ let test_isSystemMessage_plainUserIsNotSystem () =
 let test_isSystemMessage_activeNudgeNonceIsSystemAndConsumed () =
     let fr = FallbackRuntimeStore()
     let nonce = "nudge-nonce-42"
-    fr.SetActiveNudgeNonce "s-3" nonce
+    fr.UpdateSession("s-3", armNudgeNonce nonce)
 
     let parts = [| userPart "go" nonce |]
     let result = isSystemMessage parts fr "s-3" "msg-n-1"
 
     check "active nudge nonce is classified as system" result
-    check "nonce was atomically consumed" (fr.GetActiveNudgeNonce "s-3" = "")
+    check "nonce was atomically consumed" ((fr.GetSession "s-3").ActiveNudgeNonce = "")
 
 let test_isSystemMessage_nonMatchingNonceDoesNotConsume () =
     let fr = FallbackRuntimeStore()
-    fr.SetActiveNudgeNonce "s-4" "real-nonce"
+    fr.UpdateSession("s-4", armNudgeNonce "real-nonce")
 
     let parts = [| userPart "go" "fake-nonce" |]
     let result = isSystemMessage parts fr "s-4" "msg-n-2"
 
     check "non-matching nonce is NOT system" (not result)
-    check "real nonce preserved" (fr.GetActiveNudgeNonce "s-4" = "real-nonce")
+    check "real nonce preserved" ((fr.GetSession "s-4").ActiveNudgeNonce = "real-nonce")
 
 // --- 2. tryGetChatMessageRole: real implementation, production shape ---
 
@@ -149,32 +149,35 @@ let test_isNudgeEvaluationEligible_allOrigins () =
 
 let test_tryConsumeActiveNudgeNonce_matchClears () =
     let fr = FallbackRuntimeStore()
-    fr.SetActiveNudgeNonce "s-1" "nudge-nonce-1"
-    check "stored before consume" (fr.GetActiveNudgeNonce "s-1" = "nudge-nonce-1")
-    let consumed = fr.TryConsumeActiveNudgeNonce("s-1", "nudge-nonce-1")
+    fr.UpdateSession("s-1", armNudgeNonce "nudge-nonce-1")
+    check "stored before consume" ((fr.GetSession "s-1").ActiveNudgeNonce = "nudge-nonce-1")
+
+    let consumed =
+        fr.UpdateSessionReturning("s-1", tryConsumeNudgeNonce "nudge-nonce-1")
+
     check "consume returns true on match" consumed
-    check "nonce cleared after consume" (fr.GetActiveNudgeNonce "s-1" = "")
+    check "nonce cleared after consume" ((fr.GetSession "s-1").ActiveNudgeNonce = "")
 
 let test_tryConsumeActiveNudgeNonce_mismatchNoOp () =
     let fr = FallbackRuntimeStore()
-    fr.SetActiveNudgeNonce "s-2" "expected"
-    let consumed = fr.TryConsumeActiveNudgeNonce("s-2", "other-nonce")
+    fr.UpdateSession("s-2", armNudgeNonce "expected")
+    let consumed = fr.UpdateSessionReturning("s-2", tryConsumeNudgeNonce "other-nonce")
     check "consume returns false on mismatch" (not consumed)
-    check "nonce preserved on mismatch" (fr.GetActiveNudgeNonce "s-2" = "expected")
+    check "nonce preserved on mismatch" ((fr.GetSession "s-2").ActiveNudgeNonce = "expected")
 
 let test_tryConsumeActiveNudgeNonce_emptyNonceNoOp () =
     let fr = FallbackRuntimeStore()
-    fr.SetActiveNudgeNonce "s-3" "anything"
-    let consumed = fr.TryConsumeActiveNudgeNonce("s-3", "")
+    fr.UpdateSession("s-3", armNudgeNonce "anything")
+    let consumed = fr.UpdateSessionReturning("s-3", tryConsumeNudgeNonce "")
     check "consume returns false on empty observed" (not consumed)
-    check "nonce preserved on empty observed" (fr.GetActiveNudgeNonce "s-3" = "anything")
+    check "nonce preserved on empty observed" ((fr.GetSession "s-3").ActiveNudgeNonce = "anything")
 
 // --- 5. isSystemMessage ↔ TryConsumeActiveNudgeNonce integration ---
 
 let test_isSystemMessage_consumeIsNotLeaky () =
     let fr = FallbackRuntimeStore()
     let nonce = "nudge-nonce-77"
-    fr.SetActiveNudgeNonce "s-5" nonce
+    fr.UpdateSession("s-5", armNudgeNonce nonce)
 
     let firstResult = isSystemMessage [| userPart "first" nonce |] fr "s-5" "m-1"
     let secondResult = isSystemMessage [| userPart "second" nonce |] fr "s-5" "m-2"

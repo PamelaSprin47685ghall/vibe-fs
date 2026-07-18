@@ -13,7 +13,6 @@ open Wanxiangshu.Kernel.FallbackKernel.Types
 open Wanxiangshu.Hosts.Omp.NudgeRuntime
 open Wanxiangshu.Hosts.Omp.Codec
 open Wanxiangshu.Runtime.Fallback.LeaseTransitions
-open Wanxiangshu.Runtime.Fallback.SessionPropertyTransitions
 open Wanxiangshu.Runtime.Fallback.SessionRuntimePropertyPure
 
 let tryClaimNudgeDispatch
@@ -129,8 +128,8 @@ let private registerLeaseAndMaybeDispatch
     (snapshot: SessionSnapshot)
     : JS.Promise<unit> =
     fallbackRuntime.SetPendingNudgeLease(sessionId, lease)
-    fallbackRuntime.SetSessionOwner sessionId SessionOwner.Nudge
-    fallbackRuntime.SetActiveNudgeNonce sessionId nonce
+    fallbackRuntime.UpdateSession(sessionId, transferOwnership SessionOwner.Nudge)
+    fallbackRuntime.UpdateSession(sessionId, armNudgeNonce nonce)
     fallbackRuntime.Update(sessionId, setMainContinuationAwaitingStart true)
 
     if isSessionForceStopped sessionId then

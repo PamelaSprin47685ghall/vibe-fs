@@ -3,12 +3,11 @@ module Wanxiangshu.Runtime.Fallback.FallbackRecoveryWait
 open Fable.Core
 open Wanxiangshu.Kernel.FallbackKernel.Types
 open Wanxiangshu.Runtime.Fallback.RuntimeStore
-open Wanxiangshu.Runtime.Fallback.SessionPropertyTransitions
 
 // ── Recovery settlement (with TaskComplete prioritizing terminal state) ──
 
 let isRecoverySettled (runtime: FallbackRuntimeStore) (sessionID: string) : bool =
-    match runtime.GetConsumed sessionID with
+    match (runtime.GetSession sessionID).Consumed with
     | Some true -> true
     | _ ->
         match runtime.TryGetState sessionID with

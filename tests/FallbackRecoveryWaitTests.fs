@@ -6,7 +6,7 @@ open Wanxiangshu.Tests.AsyncFlush
 open Wanxiangshu.Kernel.FallbackKernel.Types
 open Wanxiangshu.Runtime.Fallback.RuntimeStore
 open Wanxiangshu.Runtime.Fallback.LeaseTransitions
-open Wanxiangshu.Runtime.Fallback.SessionPropertyTransitions
+open Wanxiangshu.Runtime.Fallback.SessionRuntimePropertyPure
 open Wanxiangshu.Runtime.Fallback.FallbackRecoveryWait
 
 let isSettled_falseWhenFresh () =
@@ -15,7 +15,7 @@ let isSettled_falseWhenFresh () =
 
 let isSettled_trueWhenConsumed () =
     let rt = FallbackRuntimeStore()
-    rt.SetConsumed "s1" true
+    rt.Update("s1", recordConsumed true)
     check "consumed true settled" (isRecoverySettled rt "s1")
 
 let isSettled_trueWhenExhausted () =
@@ -57,7 +57,7 @@ let waitCompletesAfterConsumedSetAsync () =
         let sid = "wait-sid"
         let waitP = waitForRecovery rt sid 32
         do! yieldMicrotask ()
-        rt.SetConsumed sid true
+        rt.Update(sid, recordConsumed true)
         do! waitP
         check "wait finished after consumed" true
     }

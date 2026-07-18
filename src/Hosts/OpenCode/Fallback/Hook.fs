@@ -18,7 +18,7 @@ open Wanxiangshu.Kernel.Subsession.Types
 open Wanxiangshu.Kernel.Subsession.TypeClassify
 open Wanxiangshu.Runtime.Fallback.Coordinator
 open Wanxiangshu.Runtime.Fallback.RuntimeStore
-open Wanxiangshu.Runtime.Fallback.SessionPropertyTransitions
+open Wanxiangshu.Runtime.Fallback.SessionRuntimePropertyPure
 open Wanxiangshu.Runtime.SubsessionActorRegistry
 open Wanxiangshu.Runtime.Fallback.Ports
 open Wanxiangshu.Runtime.SubsessionEventRouter
@@ -34,11 +34,11 @@ let private setConsumedFromResult
     (sessionID: string)
     (result: FallbackHookResult)
     : unit =
-    runtime.SetConsumed sessionID result.Consumed
+    runtime.Update(sessionID, recordConsumed result.Consumed)
 
 let private clearConsumedOnNewUserMessage (runtime: FallbackRuntimeStore) (sessionID: string) (rawEvent: obj) : unit =
     if isNewUserMessageImpl runtime sessionID rawEvent then
-        runtime.ClearConsumed sessionID
+        runtime.Update(sessionID, clearConsumption)
 
 let private findAnchorMessageId (msgs: obj array) (turnNonce: string) =
     msgs
