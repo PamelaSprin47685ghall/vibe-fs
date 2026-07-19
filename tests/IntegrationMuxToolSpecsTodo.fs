@@ -196,19 +196,19 @@ let muxBacklogProjectionSpec () =
                   Wanxiangshu.Runtime.WorkBacklogToolsCodec.TodoWriteArgs.SelectMethodology = [] }
 
             do!
-                Wanxiangshu.Runtime.EventLogRuntime.appendWorkBacklogCommittedOrFail
+                Wanxiangshu.Runtime.BacklogEventWriter.appendWorkBacklogCommittedOrFail
                     workspaceDir
                     "mux-magic-todo-session"
                     (todoEvent "planned phase" "Plan change" "in_progress" "high")
 
             do!
-                Wanxiangshu.Runtime.EventLogRuntime.appendWorkBacklogCommittedOrFail
+                Wanxiangshu.Runtime.BacklogEventWriter.appendWorkBacklogCommittedOrFail
                     workspaceDir
                     "mux-magic-todo-session"
                     (todoEvent "implemented phase" "Implement change" "completed" "high")
 
             do!
-                Wanxiangshu.Runtime.EventLogRuntime.appendWorkBacklogCommittedOrFail
+                Wanxiangshu.Runtime.BacklogEventWriter.appendWorkBacklogCommittedOrFail
                     workspaceDir
                     "mux-magic-todo-session"
                     (todoEvent "verified phase" "Verify change" "completed" "medium")

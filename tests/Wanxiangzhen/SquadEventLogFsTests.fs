@@ -4,7 +4,7 @@ open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Kernel.Wanxiangzhen.SquadEvent
 open Wanxiangshu.Runtime.EventStore
-open Wanxiangshu.Runtime.EventLogRuntime
+
 open Wanxiangshu.Runtime.Wanxiangzhen.SquadEventLogRuntime
 open Wanxiangshu.Tests.Wanxiangzhen.AssertCompat
 

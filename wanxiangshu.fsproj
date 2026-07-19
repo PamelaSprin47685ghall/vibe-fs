@@ -338,7 +338,6 @@
     <Compile Include="src/Runtime/Dispatch/SessionDispatcherLifecycle.fs"/>
     <Compile Include="src/Runtime/Dispatch/Registry.fs"/>
     <Compile Include="src/Runtime/EventStore/EventLogRuntimeNudge.fs"/>
-    <Compile Include="src/Runtime/EventStore/EventLogRuntime.fs"/>
     <Compile Include="src/Runtime/Fallback/Ports.fs"/>
     <Compile Include="src/Runtime/Fallback/LeaseValidationRules.fs"/>
     <Compile Include="src/Runtime/Fallback/LeaseValidation.fs"/>

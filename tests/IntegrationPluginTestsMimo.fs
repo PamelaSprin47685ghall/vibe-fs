@@ -156,19 +156,19 @@ let mimoConfigSpec () =
               Wanxiangshu.Runtime.WorkBacklogToolsCodec.TodoWriteArgs.SelectMethodology = [] }
 
         do!
-            Wanxiangshu.Runtime.EventLogRuntime.appendWorkBacklogCommittedOrFail
+            Wanxiangshu.Runtime.BacklogEventWriter.appendWorkBacklogCommittedOrFail
                 workspaceDir
                 sessionID
                 (todoInput "First report from the first task." "t1" "completed" "high")
 
         do!
-            Wanxiangshu.Runtime.EventLogRuntime.appendWorkBacklogCommittedOrFail
+            Wanxiangshu.Runtime.BacklogEventWriter.appendWorkBacklogCommittedOrFail
                 workspaceDir
                 sessionID
                 (todoInput "Second report from the second task." "t2" "completed" "high")
 
         do!
-            Wanxiangshu.Runtime.EventLogRuntime.appendWorkBacklogCommittedOrFail
+            Wanxiangshu.Runtime.BacklogEventWriter.appendWorkBacklogCommittedOrFail
                 workspaceDir
                 sessionID
                 (todoInput "Third report from the final task." "t3" "completed" "high")

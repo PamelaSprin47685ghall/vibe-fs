@@ -119,7 +119,13 @@ let private wrapWithIterator
             let parentSid = adapter.SessionId
 
             if root <> "" && parentSid <> "" then
-                do! Wanxiangshu.Runtime.EventLogRuntime.appendSubagentSpawnedOrFail root parentSid cid roleStr title
+                do!
+                    Wanxiangshu.Runtime.SubsessionEventWriter.appendSubagentSpawnedOrFail
+                        root
+                        parentSid
+                        cid
+                        roleStr
+                        title
 
             return Wanxiangshu.Runtime.ToolOutputInfo.withIterator text iter
     }

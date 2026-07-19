@@ -59,7 +59,8 @@ let buildScopeInit
                         | Error _ -> createHost (box null) "" dir))
                 |> FablePromise.map ignore
 
-            return! Wanxiangshu.Runtime.EventLogRuntime.syncAllSessionsFromEventLogDedicated host reviewStore scope dir
+            return!
+                Wanxiangshu.Runtime.EventLogRuntimeSync.syncAllSessionsFromEventLogDedicated host reviewStore scope dir
         }
 
 let buildMcpMap () : obj =

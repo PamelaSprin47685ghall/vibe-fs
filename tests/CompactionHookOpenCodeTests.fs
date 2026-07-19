@@ -6,7 +6,7 @@ open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.HostTools
 open Wanxiangshu.Runtime.BacklogSession
-open Wanxiangshu.Runtime.EventLogRuntime
+open Wanxiangshu.Runtime.BacklogEventWriter
 open Wanxiangshu.Runtime.WorkBacklogToolsCodec
 
 [<Import("mkdtempSync", "node:fs")>]

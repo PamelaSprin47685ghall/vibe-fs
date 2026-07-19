@@ -12,7 +12,7 @@ open Wanxiangshu.Kernel.Session.Causality
 open Wanxiangshu.Kernel.HostTools
 open Wanxiangshu.Kernel.EventSourcing.EventEnvelope
 open Wanxiangshu.Kernel.EventSourcing.EventKind
-open Wanxiangshu.Runtime.EventLogRuntime
+open Wanxiangshu.Runtime.EventLogRuntimeStore
 open Wanxiangshu.Runtime.SubagentDispatcher
 open Wanxiangshu.Runtime.ChildAgentRegistry
 open Wanxiangshu.Runtime.RuntimeScope

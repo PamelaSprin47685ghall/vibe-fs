@@ -131,7 +131,7 @@ let private buildInitHandler
                 |> Promise.map ignore
 
             return!
-                Wanxiangshu.Runtime.EventLogRuntime.syncAllSessionsFromEventLogDedicated
+                Wanxiangshu.Runtime.EventLogRuntimeSync.syncAllSessionsFromEventLogDedicated
                     Wanxiangshu.Kernel.HostTools.mux
                     reviewStore
                     scope

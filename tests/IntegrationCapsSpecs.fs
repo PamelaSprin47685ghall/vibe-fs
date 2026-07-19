@@ -204,19 +204,19 @@ let capsAndBacklogOrderSpec () =
               Wanxiangshu.Runtime.WorkBacklogToolsCodec.TodoWriteArgs.SelectMethodology = [] }
 
         do!
-            Wanxiangshu.Runtime.EventLogRuntime.appendWorkBacklogCommittedOrFail
+            Wanxiangshu.Runtime.BacklogEventWriter.appendWorkBacklogCommittedOrFail
                 workspaceDir
                 "test"
                 (todoInput "R1" "t1" "completed" "high")
 
         do!
-            Wanxiangshu.Runtime.EventLogRuntime.appendWorkBacklogCommittedOrFail
+            Wanxiangshu.Runtime.BacklogEventWriter.appendWorkBacklogCommittedOrFail
                 workspaceDir
                 "test"
                 (todoInput "R2" "t2" "completed" "high")
 
         do!
-            Wanxiangshu.Runtime.EventLogRuntime.appendWorkBacklogCommittedOrFail
+            Wanxiangshu.Runtime.BacklogEventWriter.appendWorkBacklogCommittedOrFail
                 workspaceDir
                 "test"
                 (todoInput "R3" "t3" "completed" "high")
