@@ -18,7 +18,7 @@ open Wanxiangshu.Runtime.Dyn
 open Wanxiangshu.Runtime.OpencodeHookInputCodec
 open Wanxiangshu.Runtime.OpencodeClientCodec
 open Wanxiangshu.Runtime.OpencodeSessionEventCodec
-open Wanxiangshu.Runtime.OpencodeHostEvent
+open Wanxiangshu.Hosts.Opencode.OpencodeHostEvent
 open Wanxiangshu.Runtime.LivelockGuard
 open Wanxiangshu.Runtime.ToolRuntimeContext
 open Wanxiangshu.Hosts.Opencode.PtySpawn

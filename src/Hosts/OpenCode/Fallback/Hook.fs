@@ -7,7 +7,7 @@ open Wanxiangshu.Runtime.ErrorClassify
 open Wanxiangshu.Runtime.Dyn
 open Wanxiangshu.Runtime.OpencodeClientCodec
 open Wanxiangshu.Runtime.OpencodeSessionEventCodec
-open Wanxiangshu.Runtime.OpencodeHostEvent
+open Wanxiangshu.Hosts.Opencode.OpencodeHostEvent
 open Wanxiangshu.Runtime.Fallback.FallbackMessageCodec
 open Wanxiangshu.Runtime.ChildAgentRegistry
 open Wanxiangshu.Kernel.Primitives.Identity

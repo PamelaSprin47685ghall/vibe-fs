@@ -1,4 +1,4 @@
-module Wanxiangshu.Runtime.OpencodeHostEvent
+module Wanxiangshu.Hosts.Opencode.OpencodeHostEvent
 
 open Wanxiangshu.Kernel.Nudge
 open Wanxiangshu.Kernel.Nudge.TodoStatus

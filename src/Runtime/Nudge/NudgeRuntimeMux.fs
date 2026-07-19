@@ -12,7 +12,7 @@ open Wanxiangshu.Kernel.Nudge.Types
 open Wanxiangshu.Kernel.HostTools
 open Wanxiangshu.Runtime.MuxNudgeEventParse
 open Wanxiangshu.Runtime.OpencodeHookInputCodec
-open Wanxiangshu.Runtime.OpencodeHostEvent
+open Wanxiangshu.Hosts.Opencode.OpencodeHostEvent
 open Wanxiangshu.Kernel.EventSourcing.Fold
 open Wanxiangshu.Kernel.Review.ReviewLoopFold
 open Wanxiangshu.Runtime.EventLogRuntime

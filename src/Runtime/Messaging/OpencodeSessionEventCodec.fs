@@ -8,7 +8,7 @@ open Wanxiangshu.Kernel.Nudge.TodoStatus
 
 open Wanxiangshu.Runtime.Dyn
 open Wanxiangshu.Runtime.OpencodeSessionPromptCodec
-open Wanxiangshu.Runtime.OpencodeHostEvent
+open Wanxiangshu.Hosts.Opencode.OpencodeHostEvent
 open Wanxiangshu.Runtime.OpencodeSessionPromptBuilder
 open Wanxiangshu.Kernel.Fallback.Continuation
 

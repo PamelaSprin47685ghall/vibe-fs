@@ -4,7 +4,7 @@ open Fable.Core
 open Wanxiangshu.Kernel.FallbackKernel.Types
 open Wanxiangshu.Runtime.Dyn
 open Wanxiangshu.Runtime.OpencodeHookInputCodec
-open Wanxiangshu.Runtime.OpencodeHostEvent
+open Wanxiangshu.Hosts.Opencode.OpencodeHostEvent
 open Wanxiangshu.Runtime.Fallback.RuntimeStore
 open Wanxiangshu.Runtime.Fallback.SessionRuntimePropertyPure
 
