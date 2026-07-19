@@ -88,7 +88,7 @@
 
 `this-task-is-not-suitable-to-be-completed-via-continue-tool`
 
-三个字段均为软协议：schema 注入 `required_` 元数据但不加入宿主强制 `required`；before hook 提取并移除，after hook 恢复到历史可见 args，不再追加批评。SSOT：`src/Kernel/WarnTdd.fs`、`src/Runtime/Tooling/ToolArgumentCoercion.fs`、`src/Runtime/Tooling/ToolHookRuntime.fs`；测试 `WarnTddKernelFactsTests` 与三宿主 enforcement tests。
+三个字段均为软协议：schema description 提示模型填写，但不加入宿主强制 `required`；before hook 提取并移除，after hook 恢复到历史可见 args，不再追加批评。SSOT：`src/Kernel/WarnTdd.fs`、`src/Runtime/Tooling/ToolArgumentCoercion.fs`、`src/Runtime/Tooling/ToolHookRuntime.fs`；测试 `WarnTddKernelFactsTests` 与三宿主 enforcement tests。
 
 ## Mux 特有包装
 

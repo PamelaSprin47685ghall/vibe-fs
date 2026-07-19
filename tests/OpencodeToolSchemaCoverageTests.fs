@@ -191,12 +191,10 @@ let hookSchemaExecutorCombinedWarns () =
     let resultReq = unbox<obj[]> (Dyn.get resultSchema "required")
 
     check
-        "warn_tdd NOT in required (only added as required_ marker)"
+        "warn_tdd NOT in required (prompt constraint only)"
         (not (resultReq |> Array.exists (fun x -> string x = "warn_tdd")))
 
-    check
-        "warn NOT in required (only added as required_ marker)"
-        (not (resultReq |> Array.exists (fun x -> string x = "warn")))
+    check "warn NOT in required (prompt constraint only)" (not (resultReq |> Array.exists (fun x -> string x = "warn")))
 
     check "command in required" (resultReq |> Array.exists (fun x -> string x = "command"))
 

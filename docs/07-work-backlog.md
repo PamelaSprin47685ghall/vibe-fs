@@ -5,7 +5,7 @@
 每次调用待办写入工具必须提交：
 
 1. **全量** `todos` 列表（禁止部分 diff 更新）
-2. 五份 **completedWorkReport** 字段（schema 标注 `minLength_` 1024，供 LLM 感知，不强制拦截）
+2. 五份 **completedWorkReport** 字段（description 要求每项至少 1024 字符，供 LLM 感知，不强制拦截）
 3. **`select_methodology`**：至少一个方法论 id（与 `methodology_*` 注册表一致）
 
 结构校验失败（缺失 `todos` / `select_methodology` 或 todo 项非法）→ **不** append `work_backlog_committed`。报告字段长度不足不阻塞执行，也不触发批评。

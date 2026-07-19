@@ -282,7 +282,7 @@ let opencodeHookSchemaInjectWarnReuseIntoEmptySchema () =
     let props = get schema "properties"
     check "warn_reuse property injected" (not (Dyn.isNullish (get props "warn_reuse")))
     let prop = get props "warn_reuse"
-    check "warn_reuse soft-required metadata set" (Dyn.truthy (get prop "required_"))
+    check "warn_reuse description is present" ((Dyn.str prop "description").Length > 0)
     let required = get schema "required"
 
     check

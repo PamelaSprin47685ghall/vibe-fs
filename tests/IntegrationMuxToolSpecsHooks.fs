@@ -120,8 +120,8 @@ let muxToolSchemasAreCleanStaticallyButInjectedDynamicallySpec () =
         check "registered coder required has NO warn_tdd" (not (staticRequired coder |> Array.contains "warn_tdd"))
 
         check
-            "registered coder warn_tdd is soft-required"
-            (Dyn.truthy (Dyn.get (Dyn.get coderProps "warn_tdd") "required_"))
+            "registered coder warn_tdd has prompt constraint only"
+            ((Dyn.str (Dyn.get coderProps "warn_tdd") "description").Length > 0)
         // executor: no warn or warn_tdd in raw static BuiltinTools schema
         let staticExec =
             Wanxiangshu.Hosts.Mux.BuiltinTools.executorTool
@@ -144,11 +144,13 @@ let muxToolSchemasAreCleanStaticallyButInjectedDynamicallySpec () =
             "registered executor required has NO warn_tdd"
             (not (staticRequired executor |> Array.contains "warn_tdd"))
 
-        check "registered executor warn is soft-required" (Dyn.truthy (Dyn.get (Dyn.get execProps "warn") "required_"))
+        check
+            "registered executor warn has prompt constraint"
+            ((Dyn.str (Dyn.get execProps "warn") "description").Length > 0)
 
         check
-            "registered executor warn_tdd is soft-required"
-            (Dyn.truthy (Dyn.get (Dyn.get execProps "warn_tdd") "required_"))
+            "registered executor warn_tdd has prompt constraint"
+            ((Dyn.str (Dyn.get execProps "warn_tdd") "description").Length > 0)
         // write (staticWrite): no warn_tdd in raw BuiltinTools.writeTool schema
         let staticWrite = Wanxiangshu.Hosts.Mux.BuiltinTools.writeTool (createObj [])
         let staticWriteProps = staticProperties (box staticWrite)
@@ -161,8 +163,8 @@ let muxToolSchemasAreCleanStaticallyButInjectedDynamicallySpec () =
         check "registered write required has NO warn_tdd" (not (staticRequired write |> Array.contains "warn_tdd"))
 
         check
-            "registered write warn_tdd is soft-required"
-            (Dyn.truthy (Dyn.get (Dyn.get writeProps "warn_tdd") "required_"))
+            "registered write warn_tdd has prompt constraint"
+            ((Dyn.str (Dyn.get writeProps "warn_tdd") "description").Length > 0)
         // dynamic injection hook must be present
         let hook = get reg "tool.execute.before"
         check "tool.execute.before hook is present for dynamic warn/warn_tdd injection" (not (isNullish hook))

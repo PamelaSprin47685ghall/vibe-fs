@@ -11,8 +11,7 @@ let jsonStringProperty (description: string) : obj =
 let jsonStringMinLengthProperty (minLength: int) (description: string) : obj =
     createObj
         [ "type", box "string"
-          "minLength_", box minLength
-          "description", box description ]
+          "description", box ("MUST be at least " + string minLength + " characters. " + description) ]
 
 let selectMethodologyProperty =
     createObj

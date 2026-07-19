@@ -164,28 +164,16 @@ let rewriteToolJsonSchema (setKey: obj -> string -> obj -> unit) (rewrite: obj -
                 ()
 
 let warnTddProperty: obj =
-    createObj
-        [ "type", box "string"
-          "description", box Params.warnTddDesc
-          "required_", box true ]
+    createObj [ "type", box "string"; "description", box Params.warnTddDesc ]
 
 let inlineJsonWarnTddProperty: obj =
-    createObj
-        [ "type", box "string"
-          "description", box Params.warnTddDesc
-          "required_", box true ]
+    createObj [ "type", box "string"; "description", box Params.warnTddDesc ]
 
 let inlineJsonWarnProperty: obj =
-    createObj
-        [ "type", box "string"
-          "description", box WarnTdd.warnDescription
-          "required_", box true ]
+    createObj [ "type", box "string"; "description", box WarnTdd.warnDescription ]
 
 let inlineJsonWarnReuseProperty: obj =
-    createObj
-        [ "type", box "string"
-          "description", box WarnTdd.warnReuseDescription
-          "required_", box true ]
+    createObj [ "type", box "string"; "description", box WarnTdd.warnReuseDescription ]
 
 let buildWorkBacklogSchema () : obj =
     WorkBacklogSchema.buildWorkBacklogSchema ()

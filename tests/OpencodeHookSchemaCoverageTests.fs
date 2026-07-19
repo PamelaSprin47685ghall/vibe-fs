@@ -160,7 +160,7 @@ let opencodeHookSchemaInjectWarnTddIntoEmptySchema () =
     let props = get schema "properties"
     check "warn_tdd property injected" (not (Dyn.isNullish (get props "warn_tdd")))
     let prop = get props "warn_tdd"
-    check "warn_tdd has soft-required metadata" (Dyn.truthy (get prop "required_"))
+    check "warn_tdd description is present" ((Dyn.str prop "description").Length > 0)
     let required = get schema "required"
 
     check
@@ -227,7 +227,7 @@ let opencodeHookSchemaMergeWorkBacklogReportSoftenExistingFields () =
                   [ "plan",
                     createObj
                         [ "type", box "string"
-                          "minLength_", box 1024
+                          "minLength", box 1024
                           "description", box "Original plan description" ]
                     "description", createObj [ "type", box "string" ] ]
               "required", box [| box "plan"; box "description" |] ]
@@ -237,7 +237,7 @@ let opencodeHookSchemaMergeWorkBacklogReportSoftenExistingFields () =
     let resultRequired = get result "required"
     let planProp = get resultProps "plan"
 
-    check "minLength_ kept on plan" (unbox<int> (get planProp "minLength_") = 1024)
+    check "minLength is removed from plan" (Dyn.isNullish (get planProp "minLength"))
 
     check
         "plan description has min length hint"

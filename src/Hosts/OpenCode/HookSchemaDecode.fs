@@ -25,17 +25,6 @@ let private inlineJsonWarnProperty =
 let private tryBuildJsonSchemaFromEffectSchema (parameters: obj) : obj =
     Wanxiangshu.Hosts.Opencode.HookSchemaDecoration.tryBuildJsonSchemaFromEffectSchema parameters
 
-let private appendRequiredWarnTddInPlace (schema: obj) : unit = ()
-
-let private removeRequiredKey (schema: obj) (key: string) : unit =
-    if not (isNullish schema) then
-        let existingRequired = get schema "required"
-
-        if isArray existingRequired then
-            let arr = unbox<obj[]> existingRequired
-            let nextReq = arr |> Array.filter (fun x -> string x <> key)
-            schema?("required") <- box nextReq
-
 let private injectWarnTddIntoJsonSchemaInPlace (schema: obj) : unit =
     let props = get schema "properties"
 
@@ -45,13 +34,8 @@ let private injectWarnTddIntoJsonSchemaInPlace (schema: obj) : unit =
         else
             let prop = get props "warn_tdd"
 
-            if not (isNullish prop) then
-                prop?("required_") <- true
-
-                if Dyn.str prop "description" = "" then
-                    prop?("description") <- box Params.warnTddDesc
-
-        appendRequiredWarnTddInPlace schema
+            if not (isNullish prop) && Dyn.str prop "description" = "" then
+                prop?("description") <- box Params.warnTddDesc
 
 let private injectWarnTddIntoArgsShapeInPlace (shape: obj) : unit =
     shape?("warn_tdd") <- strOpt Params.warnTddDesc
@@ -70,21 +54,12 @@ let injectWarnTddIntoJsonSchema (schema: obj) : obj =
 
         schema
 
-let private appendRequiredWarnInPlace (schema: obj) : unit = ()
-
 let private injectWarnIntoJsonSchemaInPlace (schema: obj) : unit =
     let props = get schema "properties"
 
     if not (isNullish props) then
         if isNullish (get props "warn") then
             props?("warn") <- inlineJsonWarnProperty
-        else
-            let prop = get props "warn"
-
-            if not (isNullish prop) then
-                Dyn.setKey prop "required_" true
-
-        appendRequiredWarnInPlace schema
 
 let private injectWarnIntoArgsShapeInPlace (shape: obj) : unit =
     shape?("warn") <- strOpt WarnTdd.warnDescription
@@ -103,9 +78,6 @@ let injectWarnIntoJsonSchema (schema: obj) : obj =
 
         schema
 
-let private stringZodProperty (description: string) : obj =
-    createObj [ "type", box "string"; "minLength_", box 1; "description", box description ]
-
 let private reportFieldDescs =
     [| "ahaMoments", ahaMomentsDesc
        "changesAndReasons", changesAndReasonsDesc
@@ -117,21 +89,12 @@ let private reportFieldDescs =
 let private inlineJsonWarnReuseProperty =
     Wanxiangshu.Hosts.Opencode.HookSchemaDecoration.inlineJsonWarnReuseProperty
 
-let private appendRequiredWarnReuseInPlace (schema: obj) : unit = ()
-
 let private injectWarnReuseIntoJsonSchemaInPlace (schema: obj) : unit =
     let props = get schema "properties"
 
     if not (isNullish props) then
         if isNullish (get props "warn_reuse") then
             props?("warn_reuse") <- inlineJsonWarnReuseProperty
-        else
-            let prop = get props "warn_reuse"
-
-            if not (isNullish prop) then
-                Dyn.setKey prop "required_" true
-
-        appendRequiredWarnReuseInPlace schema
 
 let private injectWarnReuseIntoArgsShapeInPlace (shape: obj) : unit =
     shape?("warn_reuse") <- strOpt WarnTdd.warnReuseDescription
@@ -150,9 +113,7 @@ let injectWarnReuseIntoJsonSchema (schema: obj) : obj =
 
         schema
 
-/// Add or upgrade the five work-backlog report fields in the schema
-/// properties object. The "minLength_" key is a soft hint to the LLM and is
-/// intentionally not a real JSON Schema constraint.
+/// Add or upgrade the five work-backlog report fields in the schema properties.
 let private mergeBacklogFields (properties: obj) : unit =
     let reportFields =
         [| "ahaMoments"
@@ -168,14 +129,7 @@ let private mergeBacklogFields (properties: obj) : unit =
         if isNullish existingProp then
             properties?(field) <- WorkBacklogSchema.jsonStringMinLengthProperty 1024 (reportFieldDescs.[field])
         else
-            let rawMin = get existingProp "minLength"
-
-            if not (isNullish rawMin) then
-                existingProp?("minLength_") <- rawMin
-                Dyn.deleteKey existingProp "minLength"
-
-            if isNullish (get existingProp "minLength_") then
-                existingProp?("minLength_") <- box 1024
+            Dyn.deleteKey existingProp "minLength"
 
             let currentDesc = Dyn.str existingProp "description"
 

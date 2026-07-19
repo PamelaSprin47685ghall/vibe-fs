@@ -125,7 +125,7 @@ let hookSchemaInjectWarnTdd () =
     let req = unbox<obj[]> (get schema "required")
     check "warn_tdd NOT in required" (not (Array.contains (box "warn_tdd") req))
     let prop = get props "warn_tdd"
-    check "warn_tdd soft-required" (truthy (get prop "required_"))
+    check "warn_tdd description is present" ((string (get prop "description")).Length > 0)
     let schema2 = createObj [ "warn_tdd", box "ignored" ]
     let r2 = injectWarnTddIntoJsonSchema schema2
     check "nullish returns non-null" (not (isNullish r2))

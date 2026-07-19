@@ -34,17 +34,7 @@ let injectWarnTddIntoMuxSchema (tool: ToolDefinition) : ToolDefinition =
 
         if isNullish (props?warn_tdd) then
             props?("warn_tdd") <-
-                box (
-                    createObj
-                        [| "type", box "string"
-                           "description", box WarnTdd.warnTddDescription
-                           "required_", box true |]
-                )
-        else
-            let prop = props?warn_tdd
-
-            if not (isNullish prop) then
-                prop?("required_") <- true
+                box (createObj [| "type", box "string"; "description", box WarnTdd.warnTddDescription |])
 
     tool
 
@@ -53,18 +43,7 @@ let injectWarnIntoMuxSchema (tool: ToolDefinition) : ToolDefinition =
         let props = tool.parameters.properties
 
         if isNullish (props?warn) then
-            props?("warn") <-
-                box (
-                    createObj
-                        [| "type", box "string"
-                           "description", box WarnTdd.warnDescription
-                           "required_", box true |]
-                )
-        else
-            let prop = props?warn
-
-            if not (isNullish prop) then
-                prop?("required_") <- true
+            props?("warn") <- box (createObj [| "type", box "string"; "description", box WarnTdd.warnDescription |])
 
     tool
 
@@ -78,16 +57,6 @@ let injectWarnReuseIntoMuxSchema (tool: ToolDefinition) : ToolDefinition =
 
         if isNullish (props?warn_reuse) then
             props?("warn_reuse") <-
-                box (
-                    createObj
-                        [| "type", box "string"
-                           "description", box WarnTdd.warnReuseDescription
-                           "required_", box true |]
-                )
-        else
-            let prop = props?warn_reuse
-
-            if not (isNullish prop) then
-                prop?("required_") <- true
+                box (createObj [| "type", box "string"; "description", box WarnTdd.warnReuseDescription |])
 
     tool

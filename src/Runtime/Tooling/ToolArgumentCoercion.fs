@@ -133,22 +133,19 @@ let inlineJsonWarnTddProperty: obj =
     createObj
         [ "type", box "string"
           "description",
-          box "MUST acknowledge that tests are written first (TDD) and Kolmogorov discipline is followed."
-          "required_", box true ]
+          box "MUST acknowledge that tests are written first (TDD) and Kolmogorov discipline is followed." ]
 
 let inlineJsonWarnProperty: obj =
     createObj
         [ "type", box "string"
           "description",
           box
-              "MUST acknowledge that this task cannot be done with other tools and only run tests when static analysis cannot handle it."
-          "required_", box true ]
+              "MUST acknowledge that this task cannot be done with other tools and only run tests when static analysis cannot handle it." ]
 
 let inlineJsonWarnReuseProperty: obj =
     createObj
         [ "type", box "string"
-          "description", box "MUST acknowledge that this task is not suitable for completion via continue tool."
-          "required_", box true ]
+          "description", box "MUST acknowledge that this task is not suitable for completion via continue tool." ]
 
 let private injectProp
     (props: obj)
@@ -160,13 +157,6 @@ let private injectProp
     if List.contains cap caps then
         if Dyn.isNullish (Dyn.get props propName) then
             Dyn.setKey props propName propVal
-        else
-            let prop = Dyn.get props propName
-
-            if not (Dyn.isNullish prop) then
-                Dyn.setKey prop "required_" true
-
-let private reportSoftWarnings (_toolName: string) (_props: obj) (_caps: ToolCapability list) (_schema: obj) = ()
 
 let decorateAndValidateSchema (toolName: string) (schema: obj) : obj =
     if Dyn.isNullish schema then
@@ -181,7 +171,6 @@ let decorateAndValidateSchema (toolName: string) (schema: obj) : obj =
             injectProp props caps FileMutation "warn_tdd" inlineJsonWarnTddProperty
             injectProp props caps ProcessExecution "warn" inlineJsonWarnProperty
             injectProp props caps SubagentDelegation "warn_reuse" inlineJsonWarnReuseProperty
-            reportSoftWarnings toolName props caps schema
             schema
 
 let registerSchemaTypes (toolName: string) (schema: obj) : unit =

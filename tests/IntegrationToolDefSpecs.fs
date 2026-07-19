@@ -92,7 +92,7 @@ let toolDefinitionSpec () =
 
         let patchProps = get (get patchDef "jsonSchema") "properties"
         let warnTddProp = get patchProps "warn_tdd"
-        check "warn_tdd soft-required in jsonSchema properties" (truthy (get warnTddProp "required_"))
+        check "warn_tdd description is present" ((str warnTddProp "description").Length > 0)
 
         let todoParams = createObj [ "__effectSchema", box true ]
 

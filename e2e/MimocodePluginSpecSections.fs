@@ -37,13 +37,13 @@ let runMimoTaskSchema (h: Harness) (chk: string -> bool -> unit) =
 
             let ahaField = dynGet taskProps "ahaMoments"
 
-            let ahaMin =
+            let ahaDescription =
                 if dynIsNull ahaField then
-                    0
+                    ""
                 else
-                    unbox<int> (dynGet ahaField "minLength_")
+                    string (dynGet ahaField "description")
 
-            chk "mimo.task.ahaMin1024" (ahaMin >= 1024)
+            chk "mimo.task.ahaDescriptionHasMinLengthHint" (ahaDescription.Contains("MUST be at least 1024 characters"))
 
             let req = dynGet taskSchema "required"
 

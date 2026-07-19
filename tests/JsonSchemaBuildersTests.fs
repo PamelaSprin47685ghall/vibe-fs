@@ -13,8 +13,7 @@ let jsonStrPropTypeAndDescription () =
 let jsonStrReqFields () =
     let s = jsonStrReq "required string"
     equal "type is string" "string" (string (s?("type")))
-    equal "minLength_ is 1" 1 (unbox<int> (s?("minLength_")))
-    check "description present" (has s "description")
+    check "description carries non-empty hint" ((string (s?("description"))).Contains("non-empty"))
 
 let jsonNumPropType () =
     let s = jsonNumProp "a number"
@@ -44,7 +43,7 @@ let jsonStrArrayReqShape () =
     equal "minItems is 1" 1 (unbox<int> (s?("minItems")))
     let items = s?("items")
     equal "items.type is string" "string" (string (items?("type")))
-    equal "items.minLength_ is 1" 1 (unbox<int> (items?("minLength_")))
+    check "items description carries non-empty hint" ((string (items?("description"))).Contains("non-empty"))
 
 let jsonStrArrayOptNoMinItems () =
     let s = jsonStrArrayOpt "optional strings"
@@ -52,7 +51,6 @@ let jsonStrArrayOptNoMinItems () =
     check "no minItems key" (not (has s "minItems"))
     let items = s?("items")
     equal "items.type is string" "string" (string (items?("type")))
-    equal "items.minLength_ is 1" 1 (unbox<int> (items?("minLength_")))
 
 let jsonObjectSchemaShape () =
     let props = createObj [ "name", box (jsonStrProp "name") ]
