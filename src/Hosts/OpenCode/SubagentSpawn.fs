@@ -105,13 +105,15 @@ let extractSessionText (client: obj) (sessionId: string) (directory: string) (st
 /// but the physical OpenCode session keeps running.  Force the host
 /// to abort the prompt so the model does not keep consuming tokens
 /// after the parent declared it stopped.
-let physicalAbort (session: obj) : JS.Promise<unit> =
+let physicalAbort (session: obj) (childID: string) : JS.Promise<unit> =
     promise {
         if Dyn.isNullish (Dyn.get session "abort") then
             ()
         else
             try
-                do! Dyn.callMethod0 session "abort" |> unbox<JS.Promise<obj>> |> Promise.map ignore
+                let arg = box {| path = box {| id = childID |} |}
+                let! _ = invoke1 arg "abort" session
+                ()
             with _ ->
                 ()
     }
@@ -121,10 +123,12 @@ let promptWithAbort (client: obj) (args: obj) (signal: obj) : JS.Promise<unit> =
         match getSessionApiFromClient client with
         | Error err -> return! Promise.reject (exn (wireEncodeToolError "OpencodeClient" err))
         | Ok session ->
+            let childID = Dyn.str (Dyn.get args "path") "id"
+
             if Dyn.isNullish signal then
                 do! session?prompt (args)
             elif Dyn.truthy (Dyn.get signal "aborted") then
-                do! physicalAbort session
+                do! physicalAbort session childID
                 return! Promise.reject (DOMException("Aborted", "AbortError"))
             else
                 let settled = ref false
@@ -163,7 +167,7 @@ let promptWithAbort (client: obj) (args: obj) (signal: obj) : JS.Promise<unit> =
                 let! winner = Promise.race [ promptAsync; abortAsync ]
 
                 if winner = "aborted" then
-                    do! physicalAbort session
+                    do! physicalAbort session childID
                     return! Promise.reject (DOMException("Aborted", "AbortError"))
     }
 

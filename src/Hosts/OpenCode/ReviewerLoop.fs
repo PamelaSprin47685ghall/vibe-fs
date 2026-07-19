@@ -66,8 +66,10 @@ let private textParts (parts: string list) : obj array =
 /// delegated to the pure `decideAfterRound` / `promptParts` primitives in
 /// `Kernel.ReviewSession`.
 let runReviewerLoop
+    (registry: ChildAgentRegistry)
     (client: obj)
     (reviewStore: Wanxiangshu.Runtime.ReviewRuntime.ReviewStore)
+    (directory: string)
     (childID: string)
     (initialParts: string list)
     (abortSignal: obj)
@@ -79,6 +81,16 @@ let runReviewerLoop
         reviewStore.setAbortSuppressor (childID, (fun () -> childAbort.abort ()))
         reviewStore.setPendingReview (childID, (fun r -> verdict.Value <- Some r))
         reviewStore.tryLockReview childID |> ignore
+
+        let parentAbortHandler = ref None
+
+        if not (Dyn.isNullish abortSignal) then
+            if Dyn.truthy (Dyn.get abortSignal "aborted") then
+                childAbort.abort ()
+            else
+                let handler = fun () -> childAbort.abort ()
+                parentAbortHandler.Value <- Some handler
+                abortSignal?addEventListener ("abort", handler) |> ignore
 
         let runRound (parts: string list) =
             promise {
@@ -100,6 +112,7 @@ let runReviewerLoop
                 with err ->
                     match verdict.Value, translateJsError err with
                     | Some v, (MessageAborted | ClientCancellation _) -> return Resolved v
+                    | _, (MessageAborted | ClientCancellation _) -> return! Promise.reject err
                     | _ -> return PromptFailed
             }
 
@@ -115,9 +128,34 @@ let runReviewerLoop
                 | Nudge next -> return! loop next
             }
 
-        let! result = loop 0
+        let mutable loopError = None
+        let mutable result = Terminated
+
+        try
+            let! r = loop 0
+            result <- r
+        with err ->
+            loopError <- Some err
+
+        match parentAbortHandler.Value with
+        | Some h ->
+            try
+                abortSignal?removeEventListener ("abort", h) |> ignore
+            with _ ->
+                ()
+        | None -> ()
+
         reviewStore.unlockReview childID
-        return result
+        reviewStore.CleanupSession childID
+
+        try
+            do! Wanxiangshu.Hosts.Opencode.SubagentIoCleanup.abortAndUnregister registry client directory childID
+        with _ ->
+            ()
+
+        match loopError with
+        | Some err -> return! Promise.reject err
+        | None -> return result
     }
 
 /// Run a reviewer session: create a reviewer child, prompt it with review
@@ -140,7 +178,7 @@ let runReviewerSession
             return Terminated
         else
             let parts = [ reviewerPrompt task "" [] ]
-            return! runReviewerLoop client reviewStore childID parts null
+            return! runReviewerLoop registry client reviewStore directory childID parts null
     }
 
 /// Run a submit-review (used by the submit_review tool): create a reviewer
@@ -165,5 +203,5 @@ let runSubmitReview
             return Terminated
         else
             let parts = [ reviewerPrompt task report affectedFiles ]
-            return! runReviewerLoop client reviewStore childID parts abortSignal
+            return! runReviewerLoop registry client reviewStore directory childID parts abortSignal
     }
