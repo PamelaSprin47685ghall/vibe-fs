@@ -351,31 +351,9 @@
 
 # 八、明确属于临时产物的运行时文件
 
-## 1. 自动 CPU/Heap Profiler
+## 1. 自动 CPU/Heap Profiler（已完成）
 
-`RuntimeScope.create()` 不再触发 profiler；`Profiler.fs` 已删除 `initGlobal`，仅保留显式 `start()` 入口。当前仍为默认关闭，未治理输出目录、文件名唯一性与清理策略，后续若保留 profiler 需继续完成。
-
-
-### 为什么严重
-
-* 显式 profiling 仍会产生额外 CPU、内存和 I/O 开销；
-* 多 workspace 或多 scope 的显式 profiling 行为难以判断；
-* `/tmp` 中残留诊断数据；
-* heap profile 可能包含敏感信息；
-* 生产性能测试会被污染。
-
-### 正确方案
-
-1. profiler 只能由明确入口启用：
-
-   * 开发命令；
-   * CLI 参数；
-   * 显式环境变量。
-2. 输出目录必须可配置。
-3. 文件名包含 PID、时间和随机标识。
-4. 明确覆盖、轮转和清理策略。
-5. 日志中提示 profiling 已启用。
-6. 生产包可考虑不包含 profiler 模块。
+`RuntimeScope.create()` 不再触发 profiler；`Profiler.initGlobal` 及固定 5 分钟定时器已删除。仅显式 `Profiler.start()` 可启用采集。`stopAndSave` 接收 `string option` 输出目录，或读取 `WANXIANGSHU_PROFILER_DIR` 环境变量，默认 `/tmp`。文件名格式 `<pid>-<timestamp>-<random>.{cpu,heap}.profile`，保证唯一且不覆盖。`activeSession` 为 `private ref`，保存后重置。`tests/ProfilerOutputTests.fs` 回归断言不再生成固定 `/tmp/wanxiangshu.*profile`。
 
 ---
 
@@ -709,7 +687,7 @@
 * [ ] 所有能力降级都通过显式 capability 表达。
 * [x] 生产插件不暴露 `__runtimeScope`、`__reviewStore` 等字段。
 * [x] profiler 默认完全关闭。
-* [ ] 正常运行不生成 `.cpuprofile`、`.heapprofile`。
+* [x] 正常运行不生成 `.cpuprofile`、`.heapprofile`。
 * [ ] E2E 元数据只存在于测试临时目录并自动清理。
 * [ ] file swap 不使用固定共享临时名。
 * [ ] session/workspace 相关 map 都有对称清理。
@@ -720,4 +698,4 @@
 * [ ] OpenCode 全链路 E2E 通过后，再分别验证 OMP 和 Mux。
 * [ ] 最终目录和文件名不依赖阅读重构历史才能理解。
 
-**最优先顺序不是整理文件名，而是：完成 profiler 输出治理，裁决 Continuation 双架构，统一 Backlog，再拆兼容层。** 这四件事完成以后，才可以说旧架构已经从运行路径中真正肃清，而不只是从文件名上消失。
+**最优先顺序不是整理文件名，而是：裁决 Continuation 双架构，统一 Backlog，再拆兼容层。** 这三件事完成以后，才可以说旧架构已经从运行路径中真正肃清，而不只是从文件名上消失。

@@ -182,6 +182,7 @@ let tailCoreTestEntriesGroup3 () : (string * TestBody) list =
         "ForbiddenSourceSymbolsTests.run", TestBody.Sync(sync Wanxiangshu.Tests.ForbiddenSourceSymbolsTests.run)
         "PluginObjectContractTests.run", TestBody.Sync(sync PluginObjectContractTests.run)
         "ProfilerDefaultTests.run", TestBody.Sync(sync Wanxiangshu.Tests.ProfilerDefaultTests.run)
+        "ProfilerOutputTests.run", TestBody.Sync(sync Wanxiangshu.Tests.ProfilerOutputTests.run)
         "PendingEvidenceEpochTests.run", TestBody.Sync(sync Wanxiangshu.Tests.PendingEvidenceEpochTests.run)
         "ContinuationCleanupTests.run", TestBody.Sync(sync Wanxiangshu.Tests.ContinuationCleanupTests.run)
         "BacklogSessionRuntimeTests.run", TestBody.Sync(sync Wanxiangshu.Tests.BacklogSessionRuntimeTests.run) ]
