@@ -486,44 +486,13 @@ generation 相同并不能证明这些事件属于 continuation。
 
 ## 4.3 Sub-session
 
-### S-01：`CancelPendingDispatch` 实际无效
+### S-01：`CancelPendingDispatch` 实际无效 ✅ 已完成
 
-OpenCode pending receipt 的 cancel 为 no-op。
+`HostReceiptWaiterRegistry.cancelByTurn` 现在对未完成的 waiter 调用 `HostReceiptWaiter.reject`，使其 Promise 以 `HostRejected cancel` 完成；预取消请求由 `create` 在新建 waiter 时立即拒绝；`Cleanup` 将其从 `waiters` 移入 `completedStates`，因此 late `tryResolve` 返回 `AlreadyCompleted`，不会复活已取消的 dispatch。
 
-这意味着：
+### S-02：失败或拒绝后 pending map 不一定删除 ✅ 已完成
 
-* actor 已经取消 turn；
-* 等待中的 prompt receipt 仍可能稍后到达；
-* late accepted 仍可能被投递回 actor；
-* 已取消运行可能被“复活”。
-
-**整改要求：**
-
-取消至少必须做到：
-
-* 标记 receipt generation 已取消；
-* waiter 立即完成为 Cancelled；
-* 从 pending registry 删除；
-* 后续 late resolve 只记录 LateReceipt，不得产生 DispatchAccepted；
-* 必要时对已确认启动的物理运行调用带 ownership 校验的 abort。
-
-### S-02：失败或拒绝后 pending map 不一定删除
-
-只 resolve promise 而不 remove，会造成内存泄漏和后续错误匹配。
-
-**整改要求：**
-
-每个 pending entry 必须满足 exactly-once 终结：
-
-* Accepted；
-* Rejected；
-* Failed；
-* Cancelled；
-* TimedOut；
-* SessionClosed；
-* ProcessShuttingDown。
-
-任一终态都必须从 registry 删除。
+`HostReceiptWaiter.resolve` 与 `reject` 在终端化后调用 `w.Cleanup()`；`Cleanup` 从 `waiters` 移除并保存到 `completedStates`，`removeSession` 与 `create` 会清理对应 `completedStates`。每个 pending entry 只完成一次，且 `QueryDispatchStatus` 仍可读取真实终态。
 
 ### S-03：重复 turn ID 注册可以覆盖旧 waiter ✅ 已完成
 

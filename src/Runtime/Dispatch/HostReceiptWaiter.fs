@@ -33,7 +33,8 @@ type HostReceiptWaiter =
       Promise: JS.Promise<Result<HostStartReceipt, DispatchFailure>>
       Resolve: Result<HostStartReceipt, DispatchFailure> -> unit
       mutable Completed: bool
-      mutable TransportState: HostReceiptWaiterTransportState }
+      mutable TransportState: HostReceiptWaiterTransportState
+      Cleanup: unit -> unit }
 
 module HostReceiptWaiter =
 
@@ -123,6 +124,7 @@ module HostReceiptWaiter =
             w.Completed <- true
             w.TransportState <- ReceiptResolved receipt
             w.Resolve(Ok receipt)
+            w.Cleanup()
             ResolvedNow
 
     let reject
@@ -136,6 +138,7 @@ module HostReceiptWaiter =
             w.Completed <- true
             w.TransportState <- transport
             w.Resolve(Error failure)
+            w.Cleanup()
             ResolvedNow
 
     /// Resolve from a dispatcher acceptance.

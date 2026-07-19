@@ -11,6 +11,7 @@ open Wanxiangshu.Runtime.Dispatch
 module HostReceiptWaiterRegistry =
 
     let mutable private waiters = Map.empty<string, HostReceiptWaiter>
+    let mutable private completedStates = Map.empty<string, HostReceiptWaiter>
     let mutable private pendingCancellations = Set.empty<string>
 
     let private key (workspace: WorkspaceId) (sessionId: string) (turnId: string) : string =
@@ -19,13 +20,18 @@ module HostReceiptWaiterRegistry =
     let private workspaceTurnKey (workspace: WorkspaceId) (turnId: string) : string =
         (Id.workspaceIdValue workspace) + "/" + turnId
 
-    let private markCancelled (w: HostReceiptWaiter) : unit =
-        if not w.Completed then
-            w.TransportState <- UserCancelled
-
     /// Return the waiter for a dispatch, if one has been registered.
+    /// Completed waiters are retained briefly so `QueryDispatchStatus` can
+    /// report an honest terminal status without leaking pending waiters.
     let tryFind (workspace: WorkspaceId) (sessionId: string) (turnId: string) : HostReceiptWaiter option =
-        Map.tryFind (key workspace sessionId turnId) waiters
+        let k = key workspace sessionId turnId
+
+        match Map.tryFind k waiters with
+        | Some w -> Some w
+        | None ->
+            match Map.tryFind k completedStates with
+            | Some w -> Some w
+            | None -> None
 
     /// Create a waiter and register it under its dispatch key. If a waiter
     /// already exists for the same key the existing waiter is returned so that
@@ -36,23 +42,32 @@ module HostReceiptWaiterRegistry =
         match Map.tryFind k waiters with
         | Some existing -> existing
         | None ->
+            completedStates <- Map.remove k completedStates
+
             let resolveRef = ref (fun (_: Result<HostStartReceipt, DispatchFailure>) -> ())
             let p = Promise.create (fun resolve _ -> resolveRef.Value <- resolve)
 
-            let w =
+            let rec w =
                 { WorkspaceId = workspace
                   PhysicalSessionId = sessionId
                   LogicalTurnId = turnId
                   Promise = p
                   Resolve = (fun r -> resolveRef.Value r)
                   Completed = false
-                  TransportState = InFlight }
+                  TransportState = InFlight
+                  Cleanup =
+                    (fun () ->
+                        completedStates <- Map.add k w completedStates
+                        waiters <- Map.remove k waiters) }
 
             waiters <- Map.add k w waiters
             let pendingKey = workspaceTurnKey workspace turnId
 
             if Set.contains pendingKey pendingCancellations then
-                markCancelled w
+                pendingCancellations <- Set.remove pendingKey pendingCancellations
+
+                HostReceiptWaiter.reject w (HostRejected HostReceiptWaiter.cancelError) UserCancelled
+                |> ignore
 
             w
 
@@ -85,6 +100,12 @@ module HostReceiptWaiterRegistry =
                 (Id.workspaceIdValue w.WorkspaceId) <> (Id.workspaceIdValue workspace)
                 || w.PhysicalSessionId <> sessionId)
 
+        completedStates <-
+            completedStates
+            |> Map.filter (fun _ w ->
+                (Id.workspaceIdValue w.WorkspaceId) <> (Id.workspaceIdValue workspace)
+                || w.PhysicalSessionId <> sessionId)
+
     /// Best-effort cancel for every waiter matching the logical turn in the
     /// workspace. Used by `ISubsessionHost.CancelPendingDispatch` which is not
     /// given the physical session id. This only marks the transport state; a
@@ -99,4 +120,6 @@ module HostReceiptWaiterRegistry =
             (Id.workspaceIdValue w.WorkspaceId) = (Id.workspaceIdValue workspace)
             && w.LogicalTurnId = turnId
             && not w.Completed)
-        |> Seq.iter (fun (_, w) -> markCancelled w)
+        |> Seq.iter (fun (_, w) ->
+            HostReceiptWaiter.reject w (HostRejected HostReceiptWaiter.cancelError) UserCancelled
+            |> ignore)

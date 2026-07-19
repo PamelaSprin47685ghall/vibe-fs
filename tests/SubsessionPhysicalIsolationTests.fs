@@ -163,7 +163,7 @@ let private opencodeQueryDispatchStatusFailedAfterUnknown () =
         | other -> fail ("expected TransportFailedAfterUnknownAcceptance, got " + string other)
     }
 
-let private opencodeCancelPendingDispatchKeepsReceiptCorrelation () =
+let private opencodeCancelPendingDispatchRejectsLateReceipt () =
     promise {
         let runId = RunId.create "run-v40-oc-cancel-receipt"
         let sid = SessionId.create "child-v40-oc-cancel-receipt"
@@ -177,6 +177,7 @@ let private opencodeCancelPendingDispatchKeepsReceiptCorrelation () =
         do! sleep 5
         host.CancelPendingDispatch turnId
 
+        // A late chat.message observation must not resurrect a cancelled turn.
         let resolveResult =
             HostReceiptWaiterRegistry.tryResolve
                 (workspaceFor "")
@@ -184,13 +185,14 @@ let private opencodeCancelPendingDispatchKeepsReceiptCorrelation () =
                 (TurnId.value turnId)
                 (UserMessageObserved "msg-1")
 
-        check "late receipt resolves after cancel" (resolveResult = ResolveAttemptResult.ResolvedNow)
+        check "late receipt after cancel is ignored" (resolveResult <> ResolveAttemptResult.ResolvedNow)
 
         let! result = dispatchP
 
         match result with
-        | Ok(UserMessageObserved "msg-1") -> check "receipt resolved after cancel" true
-        | other -> fail ("expected UserMessageObserved msg-1, got " + string other)
+        | Error(HostRejected e) when e.Message = HostReceiptWaiter.cancelError.Message ->
+            check "dispatch rejected after cancel" true
+        | other -> fail ("expected HostRejected cancel, got " + string other)
     }
 
 let private opencodeQuiescenceHonestUnknown () =
@@ -524,7 +526,7 @@ let run () =
         do! opencodeQueryDispatchStatusRejectedBeforeSend ()
         do! opencodeRejectedBeforeSendRejectsLateReceipt ()
         do! opencodeQueryDispatchStatusFailedAfterUnknown ()
-        do! opencodeCancelPendingDispatchKeepsReceiptCorrelation ()
+        do! opencodeCancelPendingDispatchRejectsLateReceipt ()
         do! opencodeQuiescenceHonestUnknown ()
         do! opencodeQuiescenceStillRunning ()
         do! opencodeQuiescenceStopped ()
