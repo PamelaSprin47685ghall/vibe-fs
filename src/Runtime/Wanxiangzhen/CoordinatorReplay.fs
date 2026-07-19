@@ -45,18 +45,27 @@ let private warnOrphans (rt: CoordinatorRuntime) =
 
         // Idempotency check / Dedup
         if not (rt.SentWarnings.Contains warning) then
-            rt.SentWarnings <- rt.SentWarnings.Add warning
+            if rt.MasterSessionId = "" then
+                let diagnostics =
+                    createObj
+                        [ "event", box "wanxiangzhen_orphan_tasks_diagnostic"
+                          "message", box "MasterSessionId is empty, cannot send prompt warning"
+                          "warning", box warning
+                          "orphans", box (orphans |> List.map (fun (t: SquadTask) -> t.Id) |> List.toArray) ]
 
-            rt.Deps.PromptSession rt.Client rt.MasterSessionId warning
-            |> Promise.catch (fun ex ->
-                JS.console.error (
-                    "CoordinatorReplay: Failed to send orphan warning to prompt session: "
-                    + ex.Message
-                )
+                JS.console.error (diagnostics)
+            else
+                rt.Deps.PromptSession rt.Client rt.MasterSessionId warning
+                |> Promise.map (fun () -> rt.SentWarnings <- rt.SentWarnings.Add warning)
+                |> Promise.catch (fun ex ->
+                    JS.console.error (
+                        "CoordinatorReplay: Failed to send orphan warning to prompt session: "
+                        + ex.Message
+                    )
 
-                ())
-            |> Promise.start
-            |> ignore
+                    ())
+                |> Promise.start
+                |> ignore
 
 let replayFromEventLog (rt: CoordinatorRuntime) : JS.Promise<unit> =
     promise {
@@ -77,6 +86,5 @@ let replayFromEventLog (rt: CoordinatorRuntime) : JS.Promise<unit> =
 
         rt.Sessions <- sessions
 
-        if rt.MasterSessionId <> "" then
-            warnOrphans rt
+        warnOrphans rt
     }

@@ -45,3 +45,92 @@ let entries () : (string * (unit -> unit)) list =
        fun () ->
            let input = createObj [ "sessionID", box "" ]
            equal "" (clientId input)) ]
+
+let entriesAsync () : (string * (unit -> JS.Promise<unit>)) list =
+    [ ("promptSession rejects with ArgumentNullException if client is null",
+       fun () ->
+           promise {
+               let mutable caught = false
+
+               try
+                   do! promptSession null "sid-1" "hello"
+               with ex ->
+                   caught <- true
+                   checkBare (ex.Message.Contains "client")
+
+               checkBare caught
+           })
+
+      ("promptSession rejects with ArgumentException if sessionId is empty",
+       fun () ->
+           promise {
+               let mutable caught = false
+               let client = createObj []
+
+               try
+                   do! promptSession client "" "hello"
+               with ex ->
+                   caught <- true
+                   checkBare (ex.Message.Contains "sessionId")
+
+               checkBare caught
+           })
+
+      ("promptSession rejects with ArgumentException if text is empty",
+       fun () ->
+           promise {
+               let mutable caught = false
+               let client = createObj []
+
+               try
+                   do! promptSession client "sid-1" ""
+               with ex ->
+                   caught <- true
+                   checkBare (ex.Message.Contains "text")
+
+               checkBare caught
+           })
+
+      ("promptSession rejects with SessionApiMissing if session prop missing",
+       fun () ->
+           promise {
+               let mutable caught = false
+               let client = createObj []
+
+               try
+                   do! promptSession client "sid-1" "hello"
+               with ex ->
+                   caught <- true
+                   checkBare (ex.Message.Contains "wanxiangzhen_session_api_missing")
+
+               checkBare caught
+           })
+
+      ("promptSession invokes session.prompt on happy path",
+       fun () ->
+           promise {
+               let mutable invokedWith = None
+
+               let fakePromptFn =
+                   System.Func<obj, JS.Promise<obj>>(fun arg ->
+                       invokedWith <- Some arg
+                       Promise.lift (createObj []))
+
+               let session = createObj [ "prompt", box fakePromptFn ]
+               let client = createObj [ "session", box session ]
+
+               do! promptSession client "sid-1" "hello"
+
+               match invokedWith with
+               | None -> checkBare false
+               | Some arg ->
+                   let p = get arg "path"
+                   let b = get arg "body"
+                   let id = get p "id"
+                   let parts = get b "parts" |> unbox<obj array>
+                   equal "sid-1" (string id)
+                   equal 1 (int parts.Length)
+                   let part = parts.[0]
+                   equal "text" (str part "type")
+                   equal "hello" (str part "text")
+           }) ]
