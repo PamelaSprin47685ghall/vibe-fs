@@ -26,6 +26,12 @@
 
 const IDLE_TYPES = ['session.idle'];
 
+function isIdleEvent(e) {
+  if (e.type === 'session.idle') return true;
+  if (e.type === 'session.status' && (e.status === 'idle' || e.properties?.status === 'idle')) return true;
+  return false;
+}
+
 export function createScenarioTurn(scenario) {
   return {
     start: (sessionID) => new Turn(scenario, sessionID),
@@ -86,7 +92,7 @@ class Turn {
   async _awaitActivity(timeoutMs) {
     try {
       return await this._scenario.events.awaitEvent(
-        (e) => e.seq > this._eventSeqBefore && this._matchesSession(e),
+        (e) => e.seq > this._eventSeqBefore && this._matchesSession(e) && !isIdleEvent(e),
         timeoutMs,
       );
     } catch (err) {
@@ -97,7 +103,7 @@ class Turn {
   async _awaitIdleAfterActivity(timeoutMs) {
     try {
       await this._scenario.events.awaitEvent(
-        (e) => IDLE_TYPES.includes(e.type) && e.seq > this._activitySeq && this._matchesSession(e),
+        (e) => isIdleEvent(e) && e.seq > this._activitySeq && this._matchesSession(e),
         timeoutMs,
       );
     } catch (err) {

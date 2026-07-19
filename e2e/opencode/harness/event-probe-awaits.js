@@ -78,6 +78,11 @@ export function attachEventProbeAwaits(proto) {
     const tail = this._events.slice(-n);
     return tail.map(e => formatDumpLine(e)).join('\n');
   };
+
+  proto.dumpOnFailure = function dumpOnFailure() {
+    console.error(`\n── Last ${this._events.length} OpenCode events ──`);
+    console.error(this.dump(100));
+  };
 }
 
 function formatDumpLine(e) {

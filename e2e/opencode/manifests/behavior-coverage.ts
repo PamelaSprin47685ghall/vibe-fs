@@ -299,6 +299,10 @@ export const COVERAGE: Record<string, CoverageEntry[]> = {
   ],
   stability: [
     { id: "OC-STAB-001", description: "Stability gate runner repeat-e2e-50 execution", level: "real-e2e", spec: "e2e/opencode/specs/p0-canary-tests-gate.js", priority: "P0", test: "OC-STAB-001 stability gate repeat execution" },
-    { id: "OC-STAB-002", description: "Static gate validation for sleep and containsTool", level: "real-e2e", spec: "e2e/opencode/specs/p0-canary-tests-gate.js", priority: "P0", test: "OC-STAB-002 static gate validation" }
+    { id: "OC-STAB-002", description: "Static gate validation for sleep and containsTool", level: "real-e2e", spec: "e2e/opencode/specs/p0-canary-tests-gate.js", priority: "P0", test: "OC-STAB-002 static gate validation" },
+    { id: "OC-STAB-003", description: "Isolated environment check", level: "real-e2e", spec: "e2e/opencode/specs/p0-canary-tests-gate.js", priority: "P0", test: "OC-STAB-003 isolated env check" },
+    { id: "OC-STAB-004", description: "Scenario host restart API check", level: "real-e2e", spec: "e2e/opencode/specs/p0-canary-tests-gate.js", priority: "P0", test: "OC-STAB-004 restart API check" },
+    { id: "OC-STAB-005", description: "Strict LLM failure modes check", level: "real-e2e", spec: "e2e/opencode/specs/p0-canary-tests-gate.js", priority: "P0", test: "OC-STAB-005 strict failure modes check" },
+    { id: "OC-STAB-006", description: "Cleanup resource leak detection check", level: "real-e2e", spec: "e2e/opencode/specs/p0-canary-tests-gate.js", priority: "P0", test: "OC-STAB-006 cleanup leak detection check" }
   ],
 };

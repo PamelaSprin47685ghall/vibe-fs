@@ -35,6 +35,15 @@ export class Scenario {
     this._tornDown = false;
     this.turn = createScenarioTurn(this);
   }
+
+  async restart() {
+    await this.host.stop({ assert: true });
+    await this.events.close();
+    await this.host.start(this.host._startOpts);
+    this.client._baseUrl = this.host.baseUrl;
+    this.events._baseUrl = this.host.baseUrl;
+    await this.events.connect();
+  }
 }
 
 export function configureProvider(provider, opts) {

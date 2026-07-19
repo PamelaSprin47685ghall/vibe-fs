@@ -62,6 +62,7 @@ export class ProcessHost {
 
   async start(opts = {}) {
     if (this._started) throw new Error('ProcessHost already started');
+    this._startOpts = { ...opts };
     this._started = true;
     this._scenarioDir = opts.scenarioDir;
     this._workDir = ensureWorkspace(opts.scenarioDir);
@@ -214,6 +215,29 @@ function ensureWorkspace(scenarioDir) {
 }
 
 function buildEnv(opts) {
+  const baseEnv = {};
+  const denylistPatterns = [
+    /^OPENCODE_CONFIG$/i,
+    /^OPENCODE_CONFIG_CONTENT$/i,
+    /^OPENCODE_AUTH_CONTENT$/i,
+    /^OPENCODE_PERMISSION$/i,
+    /^OPENAI_API_KEY$/i,
+    /^ANTHROPIC_API_KEY$/i,
+    /^OLLAMA_/i,
+    /^HTTP_PROXY$/i,
+    /^HTTPS_PROXY$/i,
+    /^NO_PROXY$/i,
+    /^SQUAD_/i,
+    /^WANXIANG/i,
+  ];
+
+  for (const [key, value] of Object.entries(process.env)) {
+    if (denylistPatterns.some((pattern) => pattern.test(key))) {
+      continue;
+    }
+    baseEnv[key] = value;
+  }
+
   const envOverrides = createIsolatedEnv({
     scenarioDir: opts.scenarioDir,
     llmUrl: opts.providerUrl,
@@ -221,5 +245,10 @@ function buildEnv(opts) {
     contextLimit: opts.contextLimit,
     extraEnv: opts.extraEnv,
   });
-  return { ...process.env, ...envOverrides };
+
+  const finalEnv = { ...baseEnv, ...envOverrides };
+  if (opts.extraEnv) {
+    Object.assign(finalEnv, opts.extraEnv);
+  }
+  return finalEnv;
 }

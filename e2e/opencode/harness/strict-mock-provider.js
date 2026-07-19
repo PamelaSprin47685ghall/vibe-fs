@@ -57,6 +57,7 @@ export class StrictMockProvider {
     this._server = null;
     this._port = null;
     this._url = null;
+    this._activeResponses = new Set();
   }
 
   expectToolCall(opts) { pushExpectation(this._state, { type: 'tool-call', tool: opts.tool, args: opts.args || {} }, opts); }
@@ -104,7 +105,16 @@ export class StrictMockProvider {
     return this._url;
   }
 
+  stopMocking() {
+    this._state.stopped = true;
+    for (const res of this._activeResponses) {
+      try { res.destroy(); } catch {}
+    }
+    this._activeResponses.clear();
+  }
+
   async stop() {
+    this.stopMocking();
     await stopHttpServer(this._server);
     this._server = null;
     this._port = null;
@@ -112,6 +122,13 @@ export class StrictMockProvider {
   }
 
   _handleRequest(req, res) {
+    if (this._state.stopped) {
+      sendJSON(res, 503, { error: 'mocking stopped' });
+      return;
+    }
+    this._activeResponses.add(res);
+    res.on('close', () => this._activeResponses.delete(res));
+
     const url = new URL(req.url, `http://${req.headers.host}`);
     if (url.pathname === '/api/web_search' && req.method === 'POST') return handleWebSearch(req, res);
     if (url.pathname === '/api/web_fetch' && req.method === 'POST') return handleWebFetch(req, res);
@@ -200,24 +217,144 @@ export class StrictMockProvider {
     return sendJSON(res, 500, { error: reason, sessionId: sessId, tools: extractToolNames(parsed) });
   }
 
-  _respond(res, exp, parsed) {
-    const id = `call_${Date.now()}`;
-    const promptTokens = estimatePromptTokens(parsed);
-    switch (exp.respond.type) {
-      case 'tool-call': return this._respondToolCall(res, id, exp, parsed, promptTokens);
-      case 'text': return sendSSE(res, buildTextChunks(id, exp.respond.text, promptTokens));
-      case 'error': return sendJSON(res, exp.respond.status || 500, exp.respond.body || { error: 'mock error' });
-      case 'disconnect': return this._respondDisconnect(res, id);
-      default: return sendJSON(res, 500, { error: 'unknown respond type' });
+  async _respondStream(res, chunks, exp) {
+    res.writeHead(200, {
+      'Content-Type': 'text/event-stream',
+      'Cache-Control': 'no-cache',
+      'Connection': 'keep-alive',
+      'X-Accel-Buffering': 'no',
+    });
+
+    if (exp.respond.missingUsage) {
+      for (const chunk of chunks) {
+        delete chunk.usage;
+      }
     }
+
+    const delayFirstToken = exp.respond.delayFirstToken || 0;
+    const delayDone = exp.respond.delayDone || 0;
+
+    for (let i = 0; i < chunks.length; i++) {
+      if (i === 0 && delayFirstToken > 0) {
+        await new Promise((r) => setTimeout(r, delayFirstToken));
+      }
+      if (exp.respond.disconnectMidSse && i === Math.floor(chunks.length / 2)) {
+        res.destroy();
+        return;
+      }
+      res.write(`data: ${JSON.stringify(chunks[i])}\n\n`);
+    }
+
+    if (exp.respond.neverEnd) {
+      // Wait indefinitely, keeping the connection open
+      return;
+    }
+
+    if (delayDone > 0) {
+      await new Promise((r) => setTimeout(r, delayDone));
+    }
+    res.write('data: [DONE]\n\n');
+    res.end();
   }
 
-  _respondToolCall(res, id, exp, parsed, promptTokens) {
-    let args;
-    if (typeof exp.respond.args === 'function') args = exp.respond.args(parsed);
-    else args = { ...exp.respond.args };
-    if (!this._state.strict) decorateLegacyArgs(args);
-    return sendSSE(res, buildToolCallChunks(id, exp.respond.tool, JSON.stringify(args), promptTokens));
+  async _respond(res, exp, parsed) {
+    const id = `call_${Date.now()}`;
+    const promptTokens = estimatePromptTokens(parsed);
+
+    if (exp.respond.type === 'error') {
+      return sendJSON(res, exp.respond.status || 500, exp.respond.body || { error: 'mock error' });
+    }
+
+    if (exp.respond.contextOverflow) {
+      return sendJSON(res, 400, {
+        error: {
+          message: "This model's maximum context length is 100000 tokens.",
+          type: "invalid_request_error",
+          code: "context_length_exceeded"
+        }
+      });
+    }
+
+    if (exp.respond.type === 'disconnect') {
+      return this._respondDisconnect(res, id);
+    }
+
+    let chunks;
+    if (exp.respond.type === 'tool-call') {
+      let args;
+      if (typeof exp.respond.args === 'function') args = exp.respond.args(parsed);
+      else args = { ...exp.respond.args };
+      if (!this._state.strict) decorateLegacyArgs(args);
+
+      const argsStr = exp.respond.malformedArgs ? '{malformed_json_arguments:' : JSON.stringify(args);
+
+      if (exp.respond.toolCallAsText) {
+        const text = `call tool ${exp.respond.tool} with args ${argsStr}`;
+        chunks = buildTextChunks(id, text, promptTokens);
+      } else if (exp.respond.fragmentArgs) {
+        chunks = [];
+        chunks.push({ id, object: 'chat.completion.chunk', created: 1, model: MOCK_MODEL, choices: [{ index: 0, delta: { role: 'assistant', content: null }, finish_reason: null }] });
+        const fragSize = exp.respond.fragmentSize || 3;
+        for (let i = 0; i < argsStr.length; i += fragSize) {
+          const part = argsStr.slice(i, i + fragSize);
+          chunks.push({
+            id,
+            object: 'chat.completion.chunk',
+            created: 1,
+            model: MOCK_MODEL,
+            choices: [{
+              index: 0,
+              delta: {
+                tool_calls: [{
+                  index: 0,
+                  id,
+                  type: 'function',
+                  function: { name: i === 0 ? exp.respond.tool : undefined, arguments: part }
+                }]
+              },
+              finish_reason: null
+            }]
+          });
+        }
+        chunks.push({ id, object: 'chat.completion.chunk', created: 1, model: MOCK_MODEL, choices: [{ index: 0, delta: {}, finish_reason: 'tool_calls' }], usage: { prompt_tokens: promptTokens, completion_tokens: 100, total_tokens: promptTokens + 100 } });
+      } else if (exp.respond.duplicateToolCallId) {
+        chunks = [
+          { id, object: 'chat.completion.chunk', created: 1, model: MOCK_MODEL, choices: [{ index: 0, delta: { role: 'assistant', content: null }, finish_reason: null }] },
+          { id, object: 'chat.completion.chunk', created: 1, model: MOCK_MODEL, choices: [{ index: 0, delta: { tool_calls: [{ index: 0, id: id, type: 'function', function: { name: exp.respond.tool, arguments: argsStr } }] }, finish_reason: null }] },
+          { id, object: 'chat.completion.chunk', created: 1, model: MOCK_MODEL, choices: [{ index: 0, delta: { tool_calls: [{ index: 0, id: id, type: 'function', function: { name: exp.respond.tool, arguments: argsStr } }] }, finish_reason: null }] },
+          { id, object: 'chat.completion.chunk', created: 1, model: MOCK_MODEL, choices: [{ index: 0, delta: {}, finish_reason: 'tool_calls' }], usage: { prompt_tokens: promptTokens, completion_tokens: 100, total_tokens: promptTokens + 100 } },
+        ];
+      } else {
+        chunks = buildToolCallChunks(id, exp.respond.tool, argsStr, promptTokens);
+      }
+    } else {
+      // type === 'text'
+      if (exp.respond.emptyAssistant) {
+        chunks = buildTextChunks(id, '', promptTokens);
+      } else if (exp.respond.reasoningOnly) {
+        const text = typeof exp.respond.reasoningOnly === 'string' ? exp.respond.reasoningOnly : 'thinking...';
+        chunks = [
+          { id, object: 'chat.completion.chunk', created: 1, model: MOCK_MODEL, choices: [{ index: 0, delta: { role: 'assistant', reasoning_content: text }, finish_reason: null }] },
+          { id, object: 'chat.completion.chunk', created: 1, model: MOCK_MODEL, choices: [{ index: 0, delta: {}, finish_reason: 'stop' }], usage: { prompt_tokens: promptTokens, completion_tokens: 100, total_tokens: promptTokens + 100 } },
+        ];
+      } else {
+        chunks = buildTextChunks(id, exp.respond.text, promptTokens);
+      }
+    }
+
+    if (exp.respond.errorAfterToolCall) {
+      res.writeHead(200, {
+        'Content-Type': 'text/event-stream',
+        'Cache-Control': 'no-cache',
+        'Connection': 'keep-alive',
+        'X-Accel-Buffering': 'no',
+      });
+      res.write(`data: ${JSON.stringify(chunks[0])}\n\n`);
+      res.destroy();
+      return;
+    }
+
+    return this._respondStream(res, chunks, exp);
   }
 
   _respondDisconnect(res, id) {

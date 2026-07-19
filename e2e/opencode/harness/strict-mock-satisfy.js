@@ -16,13 +16,13 @@ export function checkSatisfied(expectations, unexpected) {
     const detail = expectations.slice(0, PREVIEW_LIMIT).map((e) =>
       `  [${e.id}] respond=${e.respond.type} match=${JSON.stringify(e.match)}`,
     ).join('\n');
-    errors.push(`${remaining} unmatched expectation(s):\n${detail}`);
+    errors.push(`remaining expectations = ${remaining}:\n${detail}`);
   }
   if (unexpectedCount > 0) {
     const detail = unexpected.slice(0, PREVIEW_LIMIT).map((u) =>
       `  session=${u.sessId || '?'} tools=${JSON.stringify(extractToolNames(u.body))} msgs=${u.body?.messages?.length || 0} toolResults=${u.hasToolResults || false} lastUser=${extractLastUserMsg(u.body) || '(none)'} reason=${u.reason || '?'}`,
     ).join('\n');
-    errors.push(`${unexpectedCount} unexpected LLM request(s):\n${detail}`);
+    errors.push(`unexpected requests = ${unexpectedCount} (UnexpectedLlmRequest):\n${detail}`);
   }
   if (errors.length > 0) {
     throw new Error(`Mock provider assertions failed:\n${errors.join('\n')}`);

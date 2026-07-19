@@ -27,6 +27,13 @@ function pickError(parsed) {
   return parsed?.properties?.error;
 }
 
+function pickErrorName(parsed) {
+  return parsed?.properties?.errorName
+    || parsed?.properties?.error_name
+    || parsed?.properties?.error?.name
+    || parsed?.properties?.error?.type;
+}
+
 function pickFinishReason(parsed) {
   return parsed?.properties?.finishReason
     || parsed?.properties?.info?.finish
@@ -53,6 +60,7 @@ export function shapeFromParsed(parsed) {
       partID: pickPartID(parsed),
       toolCallID: pickToolCallID(parsed),
       error: pickError(parsed),
+      errorName: pickErrorName(parsed),
       finishReason: pickFinishReason(parsed),
       status: pickStatus(parsed),
     };

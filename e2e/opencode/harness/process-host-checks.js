@@ -47,3 +47,43 @@ export async function checkProcessTree(pid, timeoutMs = PROCESS_TREE_TIMEOUT_MS)
     return '';
   }
 }
+
+export async function getChildPids(pid) {
+  if (!pid) return [];
+  try {
+    const { execSync } = await import('node:child_process');
+    let cmd = '';
+    if (process.platform === 'linux') {
+      cmd = `ps --ppid ${pid} -o pid= 2>/dev/null || true`;
+    } else if (process.platform === 'darwin') {
+      cmd = `pgrep -P ${pid} 2>/dev/null || true`;
+    } else {
+      cmd = `wmic process where (ParentProcessId=${pid}) get ProcessId 2>/dev/null || true`;
+    }
+    const output = execSync(cmd).toString().trim();
+    return output
+      .split(/\r?\n/)
+      .map((p) => p.trim())
+      .filter((p) => p && !p.toLowerCase().includes('processid'))
+      .map((p) => parseInt(p, 10))
+      .filter((p) => !isNaN(p) && p > 0);
+  } catch {
+    return [];
+  }
+}
+
+export async function getDescendantPids(pid) {
+  const result = [];
+  const queue = [pid];
+  while (queue.length > 0) {
+    const current = queue.shift();
+    const children = await getChildPids(current);
+    for (const child of children) {
+      if (!result.includes(child)) {
+        result.push(child);
+        queue.push(child);
+      }
+    }
+  }
+  return result;
+}

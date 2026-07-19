@@ -33,16 +33,79 @@ export async function teardownScenario(scenario, { keepOnFailure = false } = {})
   if (scenario._tornDown) return;
   scenario._tornDown = true;
   const errors = [];
-  try { await scenario.events.close(); } catch (e) { errors.push(`EventProbe: ${e.message}`); }
+
+  // 1. 停止继续发送 mock 响应
+  try {
+    if (scenario.provider) {
+      scenario.provider.stopMocking();
+    }
+  } catch (e) {
+    errors.push(`stopMocking: ${e.message}`);
+  }
+
+  // 2. abort SSE reader
+  // 3. 等待 SSE reader 正常退出
+  try {
+    if (scenario.events) {
+      await scenario.events.close();
+    }
+  } catch (e) {
+    errors.push(`EventProbe: ${e.message}`);
+  }
+
+  // 4. 请求或触发 session abort
   for (const sid of scenario.sessionIds) {
     try { await scenario.client.abort(sid); } catch {}
   }
-  try { await scenario.host.stop({ assert: true }); } catch (e) { errors.push(`Host: ${e.message}`); }
-  try { await scenario.provider.stop(); } catch (e) { errors.push(`Provider: ${e.message}`); }
-  if (!keepOnFailure) {
-    try { fs.rmSync(scenario.scenarioDir, { recursive: true, force: true }); }
-    catch (e) { errors.push(`Cleanup: ${e.message}`); }
+
+  // 5. 等待 session idle / terminated
+  for (const sid of scenario.sessionIds) {
+    try {
+      await scenario.client.waitForSessionIdle(sid, 2000);
+    } catch {}
   }
+
+  // 6. kill 所有 PTY
+  // 7. SIGTERM opencode
+  // 8. 最多等待短 deadline
+  // 9. 未退出则 SIGKILL
+  // 10. await child exit
+  // 12. 检查无活跃 socket
+  // 13. 检查无已知子进程
+  try {
+    if (scenario.host) {
+      await scenario.host.stop({ assert: true });
+    }
+  } catch (e) {
+    errors.push(`Host: ${e.message}`);
+  }
+
+  // 11. 关闭 mock provider
+  try {
+    if (scenario.provider) {
+      await scenario.provider.stop();
+    }
+  } catch (e) {
+    errors.push(`Provider: ${e.message}`);
+  }
+
+  // 14. 删除 lock
+  if (scenario.host && scenario.host.workDir) {
+    const lockPath = path.join(scenario.host.workDir, '.lock');
+    if (fs.existsSync(lockPath)) {
+      try { fs.unlinkSync(lockPath); } catch {}
+    }
+  }
+
+  // 15. 删除临时 HOME 和工作区
+  if (!keepOnFailure) {
+    try {
+      fs.rmSync(scenario.scenarioDir, { recursive: true, force: true });
+    } catch (e) {
+      errors.push(`Cleanup: ${e.message}`);
+    }
+  }
+
   if (errors.length > 0) {
     throw new Error(`E2E cleanup failed: ${errors.join('; ')}`);
   }

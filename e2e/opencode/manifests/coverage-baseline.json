@@ -727,6 +727,24 @@
     },
     "OC-CONC-012": {
       "level": "not-covered"
+    },
+    "OC-STAB-001": {
+      "level": "real-e2e"
+    },
+    "OC-STAB-002": {
+      "level": "real-e2e"
+    },
+    "OC-STAB-003": {
+      "level": "real-e2e"
+    },
+    "OC-STAB-004": {
+      "level": "real-e2e"
+    },
+    "OC-STAB-005": {
+      "level": "real-e2e"
+    },
+    "OC-STAB-006": {
+      "level": "real-e2e"
     }
   }
 }

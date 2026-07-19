@@ -21,10 +21,22 @@ export function createState() {
 }
 
 export function pushExpectation(state, respond, opts) {
+  const flags = {};
+  const flagKeys = [
+    'delayFirstToken', 'delayDone', 'disconnectMidSse', 'contextOverflow',
+    'emptyAssistant', 'reasoningOnly', 'fragmentArgs', 'malformedArgs',
+    'toolCallAsText', 'duplicateToolCallId', 'errorAfterToolCall', 'neverEnd',
+    'missingUsage'
+  ];
+  for (const k of flagKeys) {
+    if (opts[k] !== undefined) {
+      flags[k] = opts[k];
+    }
+  }
   state.expectations.push({
     id: opts.id || `exp-${++state.idCounter}`,
     match: opts.match || {},
-    respond,
+    respond: { ...respond, ...flags },
   });
 }
 

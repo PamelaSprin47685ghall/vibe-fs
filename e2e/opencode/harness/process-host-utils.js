@@ -9,6 +9,7 @@
 import { spawn } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
+import { getDescendantPids } from './process-host-checks.js';
 
 const STDOUT_RING_MAX = 100;
 
@@ -42,24 +43,30 @@ export function ringPush(buffer, s) {
 }
 
 export async function terminateChild(child, termMs, killMs) {
-  const pgid = child.pid;
-  if (pgid) {
-    // SIGTERM the whole process group so opencode-spawned children
-    // (e.g. the stealth MCP fixture) are also asked to exit.
-    try { process.kill(-pgid, 'SIGTERM'); } catch {}
-  } else {
-    try { child.kill('SIGTERM'); } catch {}
+  const pid = child.pid;
+  if (!pid) return;
+
+  // 6. kill 所有测试创建的 PTY / Descendants
+  const descendants = await getDescendantPids(pid);
+  for (const dpid of descendants) {
+    try { process.kill(dpid, 'SIGKILL'); } catch {}
   }
+
+  // 7. SIGTERM opencode
+  try { child.kill('SIGTERM'); } catch {}
+
+  // 8. 最多等待一个短 deadline
   const exited = await new Promise((resolve) => {
-    const timer = setTimeout(() => resolve(false), termMs);
+    const timer = setTimeout(() => resolve(false), 500); // 500ms short deadline
     child.once('exit', () => { clearTimeout(timer); resolve(true); });
   });
+
   if (exited) return;
-  if (pgid) {
-    try { process.kill(-pgid, 'SIGKILL'); } catch {}
-  } else {
-    try { child.kill('SIGKILL'); } catch {}
-  }
+
+  // 9. 未退出则 SIGKILL
+  try { child.kill('SIGKILL'); } catch {}
+
+  // 10. await child exit
   await new Promise((resolve) => {
     const timer = setTimeout(resolve, killMs);
     child.once('exit', () => { clearTimeout(timer); resolve(); });
