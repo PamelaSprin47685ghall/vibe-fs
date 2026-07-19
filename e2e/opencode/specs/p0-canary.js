@@ -17,6 +17,7 @@ import basicTests from './p0-canary-tests-basics.js';
 import ptyTests from './p0-canary-tests-pty.js';
 import advancedTests from './p0-canary-tests-advanced.js';
 import fallbackTests from './p0-canary-tests-fallback.js';
+import fuzzyExecutorTests from './p0-canary-tests-fuzzy-executor.js';
 import nudgeSubTests from './p0-canary-tests-nudge-sub.js';
 import gateTests from './p0-canary-tests-gate.js';
 
@@ -36,4 +37,24 @@ const exitCode1 = await runScenario({ ...common, contextLimit: 20000 }, [
 
 const exitCode2 = await runScenario({ ...common, contextLimit: 100000 }, nudgeSubTests);
 
-process.exit(exitCode1 || exitCode2);
+const exitCode3 = await runScenario({
+  ...common,
+  contextLimit: 20000,
+  project: {
+    'page_file_1.txt': '1\n',
+    'page_file_2.txt': '2\n',
+    'page_file_3.txt': '3\n',
+    'page_file_4.txt': '4\n',
+    'exhaust_file_1.txt': '1\n',
+    'exhaust_file_2.txt': '2\n',
+    'exhaust_file_3.txt': '3\n',
+    'cleanup_file_1.txt': '1\n',
+    'cleanup_file_2.txt': '2\n',
+    'cleanup_file_3.txt': '3\n',
+    'multi_pat_file_a.txt': 'content_pat_x\n',
+    'multi_pat_file_b.txt': 'content_pat_y\n',
+    'work_cwd_marker.txt': 'cwd-correct\n',
+  }
+}, fuzzyExecutorTests);
+
+process.exit(exitCode1 || exitCode2 || exitCode3);

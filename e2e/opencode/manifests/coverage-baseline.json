@@ -1,5 +1,5 @@
 {
-  "notCoveredCount": 133,
+  "notCoveredCount": 129,
   "entries": {
     "OC-BOOT-001": {
       "level": "real-e2e"
@@ -147,25 +147,25 @@
       "level": "real-e2e"
     },
     "OC-FUZZY-002": {
-      "level": "not-covered"
+      "level": "real-e2e"
     },
     "OC-FUZZY-003": {
       "level": "real-e2e"
     },
     "OC-FUZZY-004": {
-      "level": "unit"
+      "level": "real-e2e"
     },
     "OC-FUZZY-005": {
-      "level": "not-covered"
+      "level": "real-e2e"
     },
     "OC-FUZZY-006": {
-      "level": "unit"
+      "level": "real-e2e"
     },
     "OC-FUZZY-007": {
-      "level": "unit"
+      "level": "real-e2e"
     },
     "OC-FUZZY-008": {
-      "level": "not-covered"
+      "level": "real-e2e"
     },
     "OC-EXEC-001": {
       "level": "real-e2e"
@@ -174,16 +174,16 @@
       "level": "real-e2e"
     },
     "OC-EXEC-003": {
-      "level": "unit"
+      "level": "real-e2e"
     },
     "OC-EXEC-004": {
-      "level": "unit"
+      "level": "real-e2e"
     },
     "OC-EXEC-005": {
-      "level": "not-covered"
+      "level": "real-e2e"
     },
     "OC-EXEC-006": {
-      "level": "unit"
+      "level": "real-e2e"
     },
     "OC-EXEC-007": {
       "level": "unit"
