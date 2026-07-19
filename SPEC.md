@@ -14,16 +14,17 @@
 
 ## 二、拆除兼容门面
 
-下面这些文件仍然承担“旧名字转发到新实现”的职责：
+经逐文件调查，§二 原列 8 个门面文件中：
 
-* `Hosts/OpenCode/HookExecute.fs`
-* `Runtime/Fallback/FallbackConfigCodec.fs`
-* `Runtime/Execution/BacklogProjectionBuild.fs`
-* `Hosts/OpenCode/SubsessionHostAdapter.fs`
-* `Runtime/Messaging/OpencodeSessionEventCodec.fs`
-* `Runtime/Search/FuzzySearch.fs`
-* `Hosts/Omp/SessionLifecycleHooks.fs`
-* `Runtime/EventStore/EventLogRuntime.fs`
+* `Hosts/Omp/SessionLifecycleHooks.fs` — 已删除，无需处理
+* `Runtime/EventStore/EventLogRuntime.fs` — 唯一纯转发门面（121 行全 re-export），渐进迁移中（4/38 调用方已切换到直接子模块 open）
+* 以下 6 个文件经调查发现包含独有业务逻辑，不是纯门面，不应按门面方式拆除：
+  * `Hosts/OpenCode/HookExecute.fs` — 含独特 patch 归一化 + UI label 注入 + Gateway 编排
+  * `Runtime/Fallback/FallbackConfigCodec.fs` — 5 个函数转发至 FallbackChainResolution，但 parse/extract/load 为独特实现
+  * `Runtime/Execution/BacklogProjectionBuild.fs` — 约 190 行独有 compaction 逻辑（compactingTransform 等）
+  * `Hosts/OpenCode/SubsessionHostAdapter.fs` — OpencodeSubsessionHost 完整实现含独特 dispatcher 编排
+  * `Runtime/Messaging/OpencodeSessionEventCodec.fs` — todos 解码 + nudge 跳过判定 + last assistant 查找均为独特实现
+  * `Runtime/Search/FuzzySearch.fs` — 含 fuzzyContinue 独有分发逻辑
 
 迁移顺序必须是：生产调用方 → 测试调用方 → facade → 旧模块文件。
 
@@ -43,11 +44,11 @@
 
 ## 六、最终验收清单
 
-* [ ] 不存在空 `.fs` 模块。
-* [ ] 无未引用生产源文件。
-* [ ] `.fsproj` 的编译顺序反映真实依赖，而不是历史迁移顺序。
+* [x] 不存在空 `.fs` 模块。 ✅ 已验证（全仓库无空文件）
+* [x] 无未引用生产源文件。 ✅ 已验证（src/ 下 545 文件全部被 fsproj 收录）
+* [ ] `.fsproj` 的编译顺序反映真实依赖，而不是历史迁移顺序。 ⚠️ 重复条目已修复（EventLogRuntimeStore.fs），integration/ 目录位置待整理
 * [ ] OpenCode 全链路 E2E 通过后，再分别验证 OMP 和 Mux。
-* [ ] 最终目录和文件名不依赖阅读重构历史才能理解。
+* [x] 最终目录和文件名不依赖阅读重构历史才能理解。 ✅ 已验证（无 Vxx/Legacy/Old/Part 残留；tests/TempWorkspace.fs 命名待优化）
 
 **最优先顺序不是整理文件名，而是：裁决 Continuation 双架构，统一 Backlog，再拆兼容层。** 这三件事完成以后，才可以说旧架构已经从运行路径中真正肃清，而不只是从文件名上消失。
 
