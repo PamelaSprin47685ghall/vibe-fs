@@ -4,9 +4,28 @@ open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Runtime.Fallback.RetryDispatchGovernor
+open Wanxiangshu.Runtime.ToolSequenceThrottle
 
 [<Global("globalThis.process")>]
 let private nodeProcess: obj = jsNative
+
+type MockClock(initialTime: float) =
+    let mutable current = initialTime
+    member _.Advance(ms: float) = current <- current + ms
+    member _.GetMonotonicTimeMs() = current
+
+    interface IClock with
+        member _.GetMonotonicTimeMs() = current
+
+type MockSleeper(clock: MockClock) =
+    let mutable totalSleptMs = 0.0
+    member _.TotalSleptMs = totalSleptMs
+
+    interface ISleeper with
+        member _.Sleep(ms: int) =
+            clock.Advance(float ms)
+            totalSleptMs <- totalSleptMs + float ms
+            Promise.lift ()
 
 let test_session_serialization () =
     promise {
@@ -81,55 +100,123 @@ let test_session_cancelled_before_dispatch () =
 
 let test_provider_rate_limiting () =
     promise {
-        // Temporarily clear WANXIANGSHU_TEST
-        let originalEnv = nodeProcess?env?("WANXIANGSHU_TEST")
-        nodeProcess?env?("WANXIANGSHU_TEST") <- "false"
+        let clock = MockClock(1000.0)
+        let sleeper = MockSleeper(clock)
 
-        try
-            // rate limit = 100ms
-            let governor = RetryDispatchGovernor(rateLimitMs = 100L)
+        let governor =
+            RetryDispatchGovernor(rateLimitMs = 100L, clock = clock, sleeper = sleeper)
 
-            // Two different physical sessions, but same provider/model
-            let key1 = RetryModelKey.Create("ws1", "sess1", "provider1", "model1")
-            let key2 = RetryModelKey.Create("ws1", "sess2", "provider1", "model1")
+        // Two different physical sessions, but same provider/model
+        let key1 = RetryModelKey.Create("ws1", "sess1", "provider1", "model1")
+        let key2 = RetryModelKey.Create("ws1", "sess2", "provider1", "model1")
 
-            let mutable d1Time = 0.0
-            let mutable d2Time = 0.0
+        let mutable d1Time = 0.0
+        let mutable d2Time = 0.0
 
-            let d1 () =
-                promise { d1Time <- JS.Constructors.Date.now () }
+        let d1 () =
+            promise { d1Time <- clock.GetMonotonicTimeMs() }
 
-            let d2 () =
-                promise { d2Time <- JS.Constructors.Date.now () }
+        let d2 () =
+            promise { d2Time <- clock.GetMonotonicTimeMs() }
 
-            let! r1 = governor.RunWhenAllowed(key1, (fun () -> true), d1)
-            let! r2 = governor.RunWhenAllowed(key2, (fun () -> true), d2)
+        let! r1 = governor.RunWhenAllowed(key1, (fun () -> true), d1)
+        let! r2 = governor.RunWhenAllowed(key2, (fun () -> true), d2)
 
-            equal "r1 Dispatched" Dispatched r1
-            equal "r2 Dispatched" Dispatched r2
+        equal "r1 Dispatched" Dispatched r1
+        equal "r2 Dispatched" Dispatched r2
 
-            let elapsed = d2Time - d1Time
-            // Since they are different sessions, they can start concurrently from a session perspective,
-            // but provider rate limiting forces the second one to delay by at least 100ms
-            check $"elapsed {elapsed} >= 80ms (with tolerance)" (elapsed >= 80.0)
-        finally
-            nodeProcess?env?("WANXIANGSHU_TEST") <- originalEnv
+        let elapsed = d2Time - d1Time
+        equal "elapsed matches rate limit exactly" 100.0 elapsed
+    }
+
+let test_concurrent_dispatches_no_overlap () =
+    promise {
+        let clock = MockClock(1000.0)
+        let sleeper = MockSleeper(clock)
+
+        let governor =
+            RetryDispatchGovernor(rateLimitMs = 100L, clock = clock, sleeper = sleeper)
+
+        let key = RetryModelKey.Create("ws1", "sess1", "provider1", "model1")
+        let mutable activeCount = 0
+        let mutable maxActiveCount = 0
+        let mutable runOrder = ResizeArray<int>()
+
+        let makeDispatch (id: int) () =
+            promise {
+                activeCount <- activeCount + 1
+
+                if activeCount > maxActiveCount then
+                    maxActiveCount <- activeCount
+
+                equal "active count <= 1" true (activeCount <= 1)
+
+                do! Promise.sleep 10 // allow yielding of microtasks
+
+                runOrder.Add(id)
+                activeCount <- activeCount - 1
+            }
+
+        let tasks =
+            [ 1..5 ]
+            |> List.map (fun id -> governor.RunWhenAllowed(key, (fun () -> true), makeDispatch id))
+
+        let! results = Promise.all tasks
+
+        for res in results do
+            equal "Dispatched" Dispatched res
+
+        equal "no overlapping dispatches" 1 maxActiveCount
+        equal "executed in order" [ 1; 2; 3; 4; 5 ] (List.ofSeq runOrder)
+        equal "slept 400ms across 5 tasks" 400.0 sleeper.TotalSleptMs
+    }
+
+let test_different_sessions_do_not_block_each_other () =
+    promise {
+        let clock = MockClock(1000.0)
+        let sleeper = MockSleeper(clock)
+
+        let governor =
+            RetryDispatchGovernor(rateLimitMs = 100L, clock = clock, sleeper = sleeper)
+
+        let key1 = RetryModelKey.Create("ws1", "sess1", "provider1", "model1")
+        let key2 = RetryModelKey.Create("ws1", "sess2", "provider2", "model2")
+
+        let completed = ResizeArray<string>()
+
+        let d1 () =
+            promise {
+                do! Promise.sleep 50
+                completed.Add("sess1")
+            }
+
+        let d2 () = promise { completed.Add("sess2") }
+
+        let p1 = governor.RunWhenAllowed(key1, (fun () -> true), d1)
+        let p2 = governor.RunWhenAllowed(key2, (fun () -> true), d2)
+
+        let! _ = Promise.all [ p1; p2 ]
+
+        equal "completed in non-blocking order" [ "sess2"; "sess1" ] (List.ofSeq completed)
     }
 
 let test_cleanup () =
     promise {
-        let governor = RetryDispatchGovernor(rateLimitMs = 10L)
+        let clock = MockClock(1000.0)
+        let sleeper = MockSleeper(clock)
+
+        let governor =
+            RetryDispatchGovernor(rateLimitMs = 10L, clock = clock, sleeper = sleeper)
+
         let key1 = RetryModelKey.Create("ws1", "sess1", "provider1", "model1")
 
         let! r1 = governor.RunWhenAllowed(key1, (fun () -> true), (fun () -> Promise.lift ()))
         equal "Dispatched" Dispatched r1
 
-        // Wait a bit, then cleanup with staleThresholdMs = 50ms (not stale yet)
-        do! Promise.sleep 10
+        clock.Advance(10.0)
         governor.Cleanup(50L)
 
-        // Wait more, then cleanup with staleThresholdMs = 10ms (should be stale)
-        do! Promise.sleep 50
+        clock.Advance(50.0)
         governor.Cleanup(10L)
 
         governor.Reset()
@@ -140,5 +227,7 @@ let run () =
         do! test_session_serialization ()
         do! test_session_cancelled_before_dispatch ()
         do! test_provider_rate_limiting ()
+        do! test_concurrent_dispatches_no_overlap ()
+        do! test_different_sessions_do_not_block_each_other ()
         do! test_cleanup ()
     }
