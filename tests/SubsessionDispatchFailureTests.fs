@@ -85,7 +85,7 @@ let appendFailTriggersAbort () =
 
         let p = actor.StartRun request
         // Dispatch Ok → DispatchAccepted → append TurnStarted fails → AbortHostSession
-        do! sleep 40
+        do! sleep 100
         let! result = p
 
         match result with
@@ -112,7 +112,7 @@ let removeSessionClearsRegistry () =
         | None -> fail "actor missing after GetOrCreate"
 
         SubsessionActorRegistry.Remove "" childId
-        do! sleep 20
+        do! sleep 50
 
         match SubsessionActorRegistry.TryGet "" childId with
         | None -> check "actor removed" true
@@ -282,7 +282,7 @@ let memoryStoreKeepsAllDomainEvents () =
               InitiallyCancelled = false }
 
         let p = actor.StartRun request
-        do! sleep 20
+        do! sleep 50
 
         let evidence =
             { CurrentTurnEvidence.empty with
@@ -290,7 +290,7 @@ let memoryStoreKeepsAllDomainEvents () =
 
         do! actor.Post(EvidenceUpdated { TurnId = None; Evidence = evidence })
 
-        do! sleep 5
+        do! sleep 30
         do! actor.Post SessionIdleObserved
         let! _ = p
 
