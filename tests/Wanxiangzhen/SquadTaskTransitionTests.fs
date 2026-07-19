@@ -1,7 +1,6 @@
 module Wanxiangshu.Tests.Wanxiangzhen.SquadTaskTransitionTests
 
 open Wanxiangshu.Kernel.Wanxiangzhen.SquadTask
-open Wanxiangshu.Kernel.Wanxiangzhen.SquadTaskTransition
 open Wanxiangshu.Tests.Wanxiangzhen.AssertCompat
 
 let entries () : (string * (unit -> unit)) list =

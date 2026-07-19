@@ -4,7 +4,6 @@ open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Kernel.Wanxiangzhen.SquadTask
 open Wanxiangshu.Kernel.Wanxiangzhen.Dag
-open Wanxiangshu.Kernel.Wanxiangzhen.SquadTaskTransition
 open Wanxiangshu.Runtime.Wanxiangzhen.CoordinatorRuntime
 
 let private reconcileTask (rt: CoordinatorRuntime) hasCommits now (_id: string) (t: SquadTask) =

@@ -99,7 +99,6 @@
     <Compile Include="src/Kernel/ToolPermission.fs"/>
     <Compile Include="src/Kernel/SubagentToolPolicy.fs"/>
     <Compile Include="src/Kernel/Wanxiangzhen/SquadTask.fs"/>
-    <Compile Include="src/Kernel/Wanxiangzhen/SquadTaskTransition.fs"/>
     <Compile Include="src/Kernel/Wanxiangzhen/SquadConfig.fs"/>
     <Compile Include="src/Kernel/Wanxiangzhen/Dag.fs"/>
     <Compile Include="src/Kernel/Wanxiangzhen/SquadEvent.fs"/>

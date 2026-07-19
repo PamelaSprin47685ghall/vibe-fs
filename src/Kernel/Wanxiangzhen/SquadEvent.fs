@@ -2,7 +2,6 @@ module Wanxiangshu.Kernel.Wanxiangzhen.SquadEvent
 
 open Wanxiangshu.Kernel.Wanxiangzhen.SquadTask
 open Wanxiangshu.Kernel.Wanxiangzhen.Dag
-open Wanxiangshu.Kernel.Wanxiangzhen.SquadTaskTransition
 
 type TaskItem =
     { taskId: string
