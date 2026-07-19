@@ -246,6 +246,126 @@ let private ompQuiescenceHonestUnknown () =
         equal "OMP quiescence is StopUnknown" StopUnknown status
     }
 
+let private makeOmpSessionAndPi (promptPromise: JS.Promise<obj>) (abortFn: unit -> unit) (piAbortFn: unit -> unit) =
+    let session =
+        createObj
+            [ "prompt", box (fun (_: string) -> promptPromise)
+              "abort",
+              box (fun () ->
+                  abortFn ()
+                  Promise.lift (box null)) ]
+
+    let piSession =
+        createObj
+            [ "sessionAbort",
+              box (fun (_: obj) ->
+                  piAbortFn ()
+                  Promise.lift (box null)) ]
+
+    let pi = createObj [ "session", box piSession ]
+    struct (session, pi)
+
+let private ompCancelPendingDispatchRejectsLateReceipt () =
+    promise {
+        let runId = RunId.create "run-omp-cancel-receipt"
+        let sid = SessionId.create "child-omp-cancel-receipt"
+        let turnId = TurnId.create (RunId.value runId + "-t0")
+        let plan = makePlan runId
+
+        let resolveRef = ref (fun (_: obj) -> ())
+        let promptP = Promise.create (fun resolve _ -> resolveRef.Value <- resolve)
+
+        let abortCalled = ref false
+        let piAbortCalled = ref false
+
+        let struct (session, pi) =
+            makeOmpSessionAndPi promptP (fun () -> abortCalled.Value <- true) (fun () -> piAbortCalled.Value <- true)
+
+        let host = OmpHost.createHost session "" pi "omp-test-ws"
+        let dispatchP = host.Dispatch(sid, plan)
+        do! sleep 5
+        host.CancelPendingDispatch turnId
+
+        // A late host receipt tryResolve must be rejected / ignored
+        let resolveResult =
+            HostReceiptWaiterRegistry.tryResolve
+                (Wanxiangshu.Kernel.Primitives.Identity.Id.workspaceIdQuick "omp:omp-test-ws")
+                (SessionId.value sid)
+                (TurnId.value turnId)
+                (UserMessageObserved "late-msg")
+
+        check "late receipt after cancel is ignored" (resolveResult <> ResolveAttemptResult.ResolvedNow)
+
+        let! result = dispatchP
+
+        match result with
+        | Error(HostRejected e) when e.Message = HostReceiptWaiter.cancelError.Message ->
+            check "omp dispatch rejected after cancel" true
+        | other -> fail ("expected HostRejected cancel, got " + string other)
+    }
+
+let private ompAbortWithScopedTurnOwnership () =
+    promise {
+        let runId = RunId.create "run-omp-abort"
+        let sid = SessionId.create "child-omp-abort"
+        let turnId = TurnId.create (RunId.value runId + "-t0")
+        let plan = makePlan runId
+
+        let promptP = Promise.lift (box null)
+        let abortCount = ref 0
+        let piAbortCount = ref 0
+
+        let struct (session, pi) =
+            makeOmpSessionAndPi promptP (fun () -> abortCount.Value <- abortCount.Value + 1) (fun () ->
+                piAbortCount.Value <- piAbortCount.Value + 1)
+
+        let host = OmpHost.createHost session "" pi "omp-test-ws"
+
+        // 1. Abort with no active turn should be ignored and return ConfirmedStopped
+        let! res1 = host.Abort(sid, turnId)
+        equal "stale abort with no active turn is ConfirmedStopped" ConfirmedStopped res1
+        equal "no abort called" 0 abortCount.Value
+        equal "no pi abort called" 0 piAbortCount.Value
+
+        // 2. Start a dispatch so there is an active turn
+        let _ = host.Dispatch(sid, plan)
+
+        // 3. Abort with a stale turnId (different from the active one)
+        let staleTurnId = TurnId.create "different-turn"
+        let! res2 = host.Abort(sid, staleTurnId)
+        equal "stale abort is ConfirmedStopped" ConfirmedStopped res2
+        equal "no abort called for stale turn" 0 abortCount.Value
+        equal "no pi abort called for stale turn" 0 piAbortCount.Value
+
+        // 4. Abort with the correct active turnId
+        let! res3 = host.Abort(sid, turnId)
+        equal "active abort is RequestAcceptedAwaitIdle" RequestAcceptedAwaitIdle res3
+        equal "abort called" 1 abortCount.Value
+        equal "pi abort called" 1 piAbortCount.Value
+
+        // 5. Abort again with the correct active turnId (should not call the physical APIs a second time)
+        let! res4 = host.Abort(sid, turnId)
+        equal "duplicate abort is ConfirmedStopped" ConfirmedStopped res4
+        equal "abort not called again" 1 abortCount.Value
+        equal "pi abort not called again" 1 piAbortCount.Value
+
+        // 6. Capability degradation: session with no abort APIs should return AbortUnavailable
+        let struct (sessionNoAbort, piNoAbort) =
+            let s = createObj [ "prompt", box (fun (_: string) -> Promise.lift (box null)) ]
+            let p = createObj [ "session", box (createObj []) ]
+            struct (s, p)
+
+        let hostNoAbort = OmpHost.createHost sessionNoAbort "" piNoAbort "omp-test-ws"
+        let _ = hostNoAbort.Dispatch(sid, plan)
+        let! res5 = hostNoAbort.Abort(sid, turnId)
+        equal "abort without API returns AbortUnavailable" AbortUnavailable res5
+
+        // 7. Session closed
+        let! _ = host.ClosePhysicalSession(sid)
+        let! res6 = host.Abort(sid, turnId)
+        equal "abort after close is ConfirmedStopped" ConfirmedStopped res6
+    }
+
 // ── Decision / evidence semantics ──
 
 let private evidenceMergeOutcomePriorityAndSnapshot () =
@@ -531,5 +651,7 @@ let run () =
         do! opencodeQuiescenceStillRunning ()
         do! opencodeQuiescenceStopped ()
         do! ompQuiescenceHonestUnknown ()
+        do! ompCancelPendingDispatchRejectsLateReceipt ()
+        do! ompAbortWithScopedTurnOwnership ()
         do! routeNoneTurnIdEvidenceAttributedToCurrentTurn ()
     }

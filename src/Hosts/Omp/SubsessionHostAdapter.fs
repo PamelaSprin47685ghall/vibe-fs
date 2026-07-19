@@ -14,6 +14,30 @@ open Wanxiangshu.Hosts.Omp.Codec
 open Wanxiangshu.Hosts.Omp.SubsessionDispatch
 open Wanxiangshu.Hosts.Omp.MessagingCodec
 open Wanxiangshu.Hosts.Omp.OmpSubsessionHostAdapterPrompts
+open Wanxiangshu.Runtime.Dispatch
+
+type private OmpSessionState =
+    { ActiveTurnId: TurnId
+      mutable AbortSent: bool }
+
+let mutable private sessionStates = Map.empty<string, OmpSessionState>
+
+let private workspaceFor (workspaceRoot: string) : Wanxiangshu.Kernel.Primitives.Identity.WorkspaceId =
+    if workspaceRoot = "" then
+        Wanxiangshu.Kernel.Primitives.Identity.Id.workspaceIdQuick "omp-default"
+    else
+        Wanxiangshu.Kernel.Primitives.Identity.Id.workspaceIdQuick ("omp:" + workspaceRoot)
+
+let private dispatchStatusOfWaiter (w: HostReceiptWaiter) : DispatchStatus =
+    match w.TransportState with
+    | HostReceiptWaiterTransportState.ReceiptResolved receipt -> DispatchStatus.Accepted receipt
+    | HostReceiptWaiterTransportState.BeforeSendRejected err -> TransportRejectedBeforeSend err
+    | HostReceiptWaiterTransportState.AfterSendUnknown err -> TransportFailedAfterUnknownAcceptance err
+    | HostReceiptWaiterTransportState.ReceiptRejected(HostRejected err) -> TransportRejectedBeforeSend err
+    | HostReceiptWaiterTransportState.UserCancelled -> TransportRejectedBeforeSend HostReceiptWaiter.cancelError
+    | HostReceiptWaiterTransportState.ReceiptRejected(HostAcceptanceUnknown err) ->
+        TransportFailedAfterUnknownAcceptance err
+    | HostReceiptWaiterTransportState.InFlight -> StillPending
 
 /// Fetch the raw message collection for an OMP session, trying the
 /// `session` API first and falling back to `sessionManager`.
@@ -84,107 +108,157 @@ type OmpSubsessionHost(session: obj, agent: string, pi: obj, workspaceRoot: stri
     interface ISubsessionHost with
         member _.Dispatch(sessionId, turn) =
             promise {
-                let! result = SubsessionDispatch.dispatch session agent sessionId turn
+                let ws = workspaceFor workspaceRoot
+                let sid = SessionId.value sessionId
+                let tid = TurnId.value turn.TurnId
 
-                // OMP child session events are isolated; once prompt() resolves the
-                // turn is already finished.  Defer an evidence update and idle event
-                // so the supervisor's DispatchAccepted is queued first.
-                JS.setTimeout
-                    (fun () ->
-                        promise {
-                            let sm = Dyn.get session "sessionManager"
+                let state =
+                    { ActiveTurnId = turn.TurnId
+                      AbortSent = false }
 
-                            if not (Dyn.isNullish sm) then
-                                let text =
-                                    match readAssistantText (unbox<ISessionManager> sm) 0 "\n\n" with
-                                    | Some t -> t
-                                    | None -> ""
+                sessionStates <- Map.add sid state sessionStates
 
-                                if text <> "" then
-                                    let evidence =
-                                        { CurrentTurnEvidence.empty with
-                                            Assistant = AssistantSnapshot("", 0L, text, Some NormalFinish)
-                                            Outcome = CompletionRequested text }
+                let waiter = HostReceiptWaiterRegistry.create ws sid tid
 
-                                    do!
-                                        SubsessionEventRouter.routeEvidence
-                                            workspaceRoot
-                                            (SessionId.value sessionId)
-                                            evidence
-                                        |> Promise.map ignore
+                SubsessionDispatch.dispatch session agent sessionId turn
+                |> Promise.map (fun result ->
+                    match result with
+                    | Ok receipt -> HostReceiptWaiterRegistry.tryResolve ws sid tid receipt |> ignore
+                    | Error fail ->
+                        HostReceiptWaiterRegistry.tryFind ws sid tid
+                        |> Option.iter (fun w -> HostReceiptWaiter.reject w fail (ReceiptRejected fail) |> ignore))
+                |> Promise.catch (fun ex ->
+                    let fail =
+                        DispatchFailure.HostAcceptanceUnknown
+                            { ErrorName = "DispatchFailed"
+                              DomainError = None
+                              Message = ex.Message
+                              StatusCode = None
+                              IsRetryable = Some true }
 
-                            do!
-                                SubsessionEventRouter.tryIdle workspaceRoot (SessionId.value sessionId)
-                                |> Promise.map ignore
-                        }
-                        |> Promise.start)
-                    50
-                |> ignore
+                    HostReceiptWaiterRegistry.tryFind ws sid tid
+                    |> Option.iter (fun w -> HostReceiptWaiter.reject w fail (ReceiptRejected fail) |> ignore))
+                |> Promise.start
+
+                let! result = waiter.Promise
+
+                match result with
+                | Ok receipt ->
+                    JS.setTimeout
+                        (fun () ->
+                            promise {
+                                let sm = Dyn.get session "sessionManager"
+
+                                if not (Dyn.isNullish sm) then
+                                    let text =
+                                        match readAssistantText (unbox<ISessionManager> sm) 0 "\n\n" with
+                                        | Some t -> t
+                                        | None -> ""
+
+                                    if text <> "" then
+                                        let evidence =
+                                            { CurrentTurnEvidence.empty with
+                                                Assistant = AssistantSnapshot("", 0L, text, Some NormalFinish)
+                                                Outcome = CompletionRequested text }
+
+                                        do!
+                                            SubsessionEventRouter.routeEvidence
+                                                workspaceRoot
+                                                (SessionId.value sessionId)
+                                                evidence
+                                            |> Promise.map ignore
+
+                                do!
+                                    SubsessionEventRouter.tryIdle workspaceRoot (SessionId.value sessionId)
+                                    |> Promise.map ignore
+                            }
+                            |> Promise.start)
+                        50
+                    |> ignore
+                | Error _ -> ()
 
                 return result
             }
 
-        member _.Abort(sessionId, _turnId) =
+        member _.Abort(sessionId, turnId) =
             promise {
-                let mutable requested = false
-                let mutable sawApi = false
+                let sid = SessionId.value sessionId
 
-                try
-                    let abortFn = Dyn.get session "abort"
+                match Map.tryFind sid sessionStates with
+                | Some state when state.ActiveTurnId = turnId ->
+                    if state.AbortSent then
+                        return ConfirmedStopped
+                    else
+                        state.AbortSent <- true
 
-                    if not (Dyn.isNullish abortFn) then
-                        sawApi <- true
-                        do! unbox<JS.Promise<obj>> (session?abort ()) |> Promise.map ignore
-                        requested <- true
-                with _ ->
-                    ()
+                        let mutable requested = false
+                        let mutable sawApi = false
 
-                try
-                    let sessionApi = Dyn.get pi "session"
+                        try
+                            let abortFn = Dyn.get session "abort"
 
-                    if not (Dyn.isNullish sessionApi) then
-                        sawApi <- true
-                        let arg = box {| sessionId = SessionId.value sessionId |}
-                        do! unbox<JS.Promise<obj>> (sessionApi?sessionAbort (arg)) |> Promise.map ignore
-                        requested <- true
-                with _ ->
-                    ()
+                            if not (Dyn.isNullish abortFn) then
+                                sawApi <- true
+                                do! unbox<JS.Promise<obj>> (session?abort ()) |> Promise.map ignore
+                                requested <- true
+                        with _ ->
+                            ()
 
-                if requested then return RequestAcceptedAwaitIdle
-                elif sawApi then return AbortUnavailable
-                else return AbortUnavailable
+                        try
+                            let sessionApi = Dyn.get pi "session"
+
+                            if not (Dyn.isNullish sessionApi) then
+                                sawApi <- true
+                                let arg = box {| sessionId = SessionId.value sessionId |}
+                                do! unbox<JS.Promise<obj>> (sessionApi?sessionAbort (arg)) |> Promise.map ignore
+                                requested <- true
+                        with _ ->
+                            ()
+
+                        if requested then return RequestAcceptedAwaitIdle
+                        elif sawApi then return AbortUnavailable
+                        else return AbortUnavailable
+                | _ -> return ConfirmedStopped
             }
 
         member _.CancelPendingDispatch(turnId) =
-            // The new unified DispatchRegistry does not
-            // yet own an OMP per-session mailbox (OMP path goes through
-            // the serial `session.prompt` Promise).  The previous
-            // implementation was a no-op; we now at least record a
-            // typed failure so the caller can distinguish "no-op"
-            // from "unknown dispatch".
-            let nonce = TurnId.value turnId
-            ignore nonce
+            HostReceiptWaiterRegistry.cancelByTurn (workspaceFor workspaceRoot) (TurnId.value turnId)
 
         member _.QueryDispatchStatus(sessionId, turnId) =
             promise {
-                try
-                    let! dataOpt = fetchSessionMessages pi session sessionId
-                    let target = TurnId.value turnId
+                let ws = workspaceFor workspaceRoot
+                let sid = SessionId.value sessionId
+                let target = TurnId.value turnId
 
-                    match dataOpt with
-                    | Some data when not (Dyn.isNullish data) && Dyn.isArray data ->
-                        let msgs = unbox<obj array> data
-                        return checkMessages msgs target
-                    | _ -> return DispatchStatus.Unknown
-                with _ ->
-                    return DispatchStatus.Unknown
+                match HostReceiptWaiterRegistry.tryFind ws sid target with
+                | Some w when w.Completed -> return dispatchStatusOfWaiter w
+                | Some _ -> return StillPending
+                | None ->
+                    try
+                        let! dataOpt = fetchSessionMessages pi session sessionId
+
+                        match dataOpt with
+                        | Some data when not (Dyn.isNullish data) && Dyn.isArray data ->
+                            let msgs = unbox<obj array> data
+                            return checkMessages msgs target
+                        | _ -> return DispatchStatus.Unknown
+                    with _ ->
+                        return DispatchStatus.Unknown
             }
 
         member _.QuerySessionQuiescence(sessionId, _turnId) =
             OmpSubsessionHostAdapterPrompts.querySessionQuiescence session (Dyn.get pi "session") sessionId _turnId
 
         member _.ClosePhysicalSession(sessionId) =
-            OmpSubsessionHostAdapterPrompts.closePhysicalSession session (Dyn.get pi "session") sessionId
+            promise {
+                let ws = workspaceFor workspaceRoot
+                let sid = SessionId.value sessionId
+
+                HostReceiptWaiterRegistry.removeSession ws sid
+                sessionStates <- Map.remove sid sessionStates
+
+                return! OmpSubsessionHostAdapterPrompts.closePhysicalSession session (Dyn.get pi "session") sessionId
+            }
 
 let createHost (session: obj) (agent: string) (pi: obj) (workspaceRoot: string) : ISubsessionHost =
     OmpSubsessionHost(session, agent, pi, workspaceRoot) :> ISubsessionHost

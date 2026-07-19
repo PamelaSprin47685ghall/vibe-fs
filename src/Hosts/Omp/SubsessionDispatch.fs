@@ -14,20 +14,44 @@ let dispatch
     (turn: TurnPlan)
     : JS.Promise<Result<HostStartReceipt, DispatchFailure>> =
     promise {
-        try
-            // OMP session.prompt accepts the raw prompt string.
-            let! _response = unbox<JS.Promise<obj>> (session?prompt (turn.Prompt))
-            return Ok OrderedTurnMarkerObserved
-        with ex ->
+        if Dyn.isNullish session then
             return
                 Error(
-                    DispatchFailure.HostAcceptanceUnknown
-                        { ErrorName = "DispatchFailed"
+                    DispatchFailure.HostRejected
+                        { ErrorName = "HostUnavailable"
                           DomainError = None
-                          Message = ex.Message
+                          Message = "OMP host session object is nullish"
                           StatusCode = None
-                          IsRetryable = Some true }
+                          IsRetryable = Some false }
                 )
+        else
+            let promptFn = Dyn.get session "prompt"
+
+            if Dyn.isNullish promptFn || not (Dyn.typeIs promptFn "function") then
+                return
+                    Error(
+                        DispatchFailure.HostRejected
+                            { ErrorName = "PromptUnavailable"
+                              DomainError = None
+                              Message = "OMP host session does not support prompt API"
+                              StatusCode = None
+                              IsRetryable = Some false }
+                    )
+            else
+                try
+                    // OMP session.prompt accepts the raw prompt string.
+                    let! _response = unbox<JS.Promise<obj>> (session?prompt (turn.Prompt))
+                    return Ok OrderedTurnMarkerObserved
+                with ex ->
+                    return
+                        Error(
+                            DispatchFailure.HostAcceptanceUnknown
+                                { ErrorName = "DispatchFailed"
+                                  DomainError = None
+                                  Message = ex.Message
+                                  StatusCode = None
+                                  IsRetryable = Some true }
+                        )
     }
 
 /// Inspect a raw JS object and classify it as quiescent / still-running /
