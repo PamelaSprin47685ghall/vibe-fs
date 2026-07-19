@@ -20,15 +20,6 @@
 
 现在不要求你继续无边界扩张工作量，也不要求一次解决所有历史问题；但已经暴露出来的问题不能再用“特殊”“暂时”“以后再拆”作为结论。接下来应当缩小战线、停止新增功能，逐项完成以下不可协商的收尾工作。
 
-## 二、把函数长度检查变成仓库级强制门禁 ✅ 已完成
-
-实现：`tests/ArchitectureGatesTests.fs` 在 `npm run build-and-test` 中运行，覆盖 `src` 全部 `.fs` 文件。
-
-- 函数体超过 60 行 → 测试失败；
-- 50–60 行 → 打印警告并进入治理清单；
-- AST/解析器失败 → 直接失败；
-- 宿主回调、Promise workflow、对象表达式、状态机分支均按统一规则计算函数体行数，无语法豁免。
-
 ## 三、进行第二轮自然边界拆分 ✅ 部分完成
 
 **已完成：**
@@ -43,24 +34,6 @@
 - Fallback 状态收口
 
 
-
-## 四、消灭新一代模糊文件名 ✅ 已完成（生产源码）
-
-生产源码中已不存在 `ContinuationDispatchHelpers.fs`、`CoordinatorHelpers.fs`、`SubagentDispatchHelpers.fs`、`CoordinatorOpsHelpers.fs`、`NudgeHooksHelpers.fs`、`PlanHelpers.fs` 等模糊 `Helpers` 文件。
-
-`ArchitectureGatesTests` 已禁止 `CatalogN`、`VN`、`PartN/PartsN` 等历史命名进入 `src`、`tests`、`integration`、`e2e`。
-
-测试代码中 helper 模块名已按职责重命名：`KernelHelpersTests.fs` → `KernelPolicyTests.fs`、`OmpHelpersTests.fs` → `OmpToolingTests.fs`、`ExtendedMockE2eHelpers.fs` → `ExtendedMockE2eFixtures.fs`、`OpencodePluginE2eHelpers.fs` → `OpencodePluginE2eMocks.fs`。
-
-## 五、测试代码也必须像一次写成 ✅ 已完成
-
-- `PartN/PartsN` 测试文件：已消除
-- `Shell/Phase0/CoverageFill` 测试文件：已消除
-- 架构命名门禁已覆盖 `src`、`tests`、`integration`、`e2e`
-- `OpopenPluginContractTestsPart2/3/4` 等旧 Part 测试文件已不存在（当前为 `OpencodePluginToolLifecycleContractTests.fs`、`OpencodePluginNudgeForceStopContractTests.fs`、`OpencodePluginStreamAbortContractTests.fs`）
-- 测试中 `runPart2/3/4` 已重命名为 `runToolLifecycle`/`runNudgeForceStop`/`runStreamAbort`，`tailCoreTestEntriesPart1/2/3` 已重命名为 `Group1/2/3`
-- `e2e/wanxiangzhen-harness/git.js` 已修正 `Opencode` → `Hosts/OpenCode` 的模块路径，`runtime.js` 已修正 `Shell` → `Runtime` 并为 `tickScheduler` 增加 `fs.existsSync` 模块存在断言
-- 已删除废弃 `scripts/update-fsproj.py`
 
 
 
