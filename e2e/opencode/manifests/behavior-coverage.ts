@@ -297,4 +297,8 @@ export const COVERAGE: Record<string, CoverageEntry[]> = {
     { id: "OC-CONC-011", description: "Mock provider delay, other sessions still run", level: "not-covered", priority: "P0" },
     { id: "OC-CONC-012", description: "Restart frees old port, SSE, provider socket", level: "not-covered", priority: "P0" },
   ],
+  stability: [
+    { id: "OC-STAB-001", description: "Stability gate runner repeat-e2e-50 execution", level: "real-e2e", spec: "e2e/opencode/specs/p0-canary-tests-gate.js", priority: "P0", test: "OC-STAB-001 stability gate repeat execution" },
+    { id: "OC-STAB-002", description: "Static gate validation for sleep and containsTool", level: "real-e2e", spec: "e2e/opencode/specs/p0-canary-tests-gate.js", priority: "P0", test: "OC-STAB-002 static gate validation" }
+  ],
 };

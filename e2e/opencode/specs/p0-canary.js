@@ -18,6 +18,7 @@ import ptyTests from './p0-canary-tests-pty.js';
 import advancedTests from './p0-canary-tests-advanced.js';
 import fallbackTests from './p0-canary-tests-fallback.js';
 import nudgeSubTests from './p0-canary-tests-nudge-sub.js';
+import gateTests from './p0-canary-tests-gate.js';
 
 const common = {
   plugin: true,
@@ -30,6 +31,7 @@ const exitCode1 = await runScenario({ ...common, contextLimit: 20000 }, [
   ...ptyTests,
   ...advancedTests,
   ...fallbackTests,
+  ...gateTests,
 ]);
 
 const exitCode2 = await runScenario({ ...common, contextLimit: 100000 }, nudgeSubTests);

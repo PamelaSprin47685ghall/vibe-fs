@@ -40,6 +40,8 @@
     "test:e2e:opencode:p0": "node tests/e2e.js opencode-e2e-p0",
     "test:e2e:opencode:full": "node tests/e2e.js opencode-e2e-full",
     "validate:coverage": "node --import tsx e2e/opencode/scripts/validate-manifest.mjs",
+    "test:stability-gate": "node --import tsx e2e/opencode/scripts/stability-gate.mjs",
+    "test:stability-gate:static": "node --import tsx e2e/opencode/scripts/stability-gate.mjs --static-only",
     "build-and-test": "node scripts/build-and-test.mjs",
     "build-and-test-e2e": "node scripts/build-and-test-e2e.mjs",
     "format": "node scripts/pre-commit-formatter.mjs"
