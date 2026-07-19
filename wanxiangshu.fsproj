@@ -835,6 +835,7 @@
     <Compile Include="tests/FallbackPropertyPureTests.fs"/>
     <Compile Include="tests/NudgeErrorClassificationTests.fs"/>
     <Compile Include="tests/RetryDispatchGovernorTests.fs"/>
+    <Compile Include="tests/NudgeOwnerDiagnosticTests.fs"/>
     <Compile Include="tests/TestsEntriesFallback.fs"/>
     <Compile Include="tests/SembleInjectionTests.fs"/>
     <Compile Include="tests/OpencodeSessionLifecycleTests.fs"/>

@@ -17,6 +17,7 @@ open Wanxiangshu.Runtime.OpencodeClientCodec
 open Wanxiangshu.Runtime.OpencodeHookInputCodec
 open Wanxiangshu.Runtime.ToolRuntimeContext
 open Wanxiangshu.Runtime.SessionEventWriter
+open Wanxiangshu.Runtime.NudgeEventWriter
 open Wanxiangshu.Runtime.NudgeLease
 open Wanxiangshu.Hosts.Opencode.NudgeEffect
 open Wanxiangshu.Hosts.Opencode.Fallback.HostEventInspection
@@ -35,6 +36,23 @@ let resolveOwner
         if current <> SessionOwner.NoOwner then
             return current
         elif not isTest then
+            let directory = pluginDirectoryFromCtx ctx
+
+            do!
+                appendNudgeOwnerUnknownOrFail
+                    directory
+                    sessionIDStr
+                    "No owner inferred from runtime state or host messages"
+                |> Promise.catch (fun ex ->
+                    JS.console.error (
+                        box
+                            {| feature = "nudge"
+                               session = sessionIDStr
+                               error = "Failed to append nudge_owner_unknown event: " + ex.Message |}
+                    )
+
+                    ())
+
             return SessionOwner.NoOwner
         else
             match getClientFromPluginCtx ctx with

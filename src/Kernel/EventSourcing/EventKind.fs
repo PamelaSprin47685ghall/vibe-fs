@@ -13,6 +13,7 @@ let eventKindNudgeSettled = "nudge_settled"
 let eventKindSubmitReviewWipRecorded = "submit_review_wip_recorded"
 let eventKindSubmitReviewReportsConsumed = "submit_review_reports_consumed"
 let eventKindNudgeDedupCleared = "nudge_dedup_cleared"
+let eventKindNudgeOwnerUnknown = "nudge_owner_unknown"
 let eventKindFallbackContinueInjected = "fallback_continue_injected"
 
 let eventKindHumanTurnStarted = "human_turn_started"

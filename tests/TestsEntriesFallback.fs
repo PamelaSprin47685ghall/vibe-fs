@@ -35,6 +35,7 @@ open Wanxiangshu.Tests.FallbackLeasePureTests
 open Wanxiangshu.Tests.FallbackPropertyPureTests
 open Wanxiangshu.Tests.NudgeErrorClassificationTests
 open Wanxiangshu.Tests.RetryDispatchGovernorTests
+open Wanxiangshu.Tests.NudgeOwnerDiagnosticTests
 
 let fallbackTestEntries () : (string * TestBody) list =
     [ "FallbackKernelTests.run", Sync(sync FallbackKernelTests.run)
@@ -66,7 +67,9 @@ let fallbackTestEntries () : (string * TestBody) list =
       "FallbackLeaseValidationRulesTests.run", Sync(sync FallbackLeaseValidationRulesTests.run)
       "FallbackLeasePureTests.run", Sync(sync FallbackLeasePureTests.run)
       "FallbackPropertyPureTests.run", Sync(sync FallbackPropertyPureTests.run)
-      "NudgeErrorClassificationTests.run", Sync(sync NudgeErrorClassificationTests.run) ]
+      "NudgeErrorClassificationTests.run", Sync(sync NudgeErrorClassificationTests.run)
+      "NudgeOwnerDiagnosticTests.run", Sync(sync NudgeOwnerDiagnosticTests.run)
+      "RetryDispatchGovernorTests.run", Async RetryDispatchGovernorTests.run ]
 
 let tailTestEntries () : (string * TestBody) list =
     [ "WebFetchGuardTests.run", Sync(sync WebFetchGuardTests.run)
