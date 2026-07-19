@@ -1313,7 +1313,7 @@ Retry governor、延时、异步 receipt 若在测试模式下全部变为零，
 
 只做：
 
-* OpenCode 真实 prompt contract probes；
+* ~~OpenCode 真实 prompt contract probes~~ ✅ 已完成（EventProbe 基础设施已就绪，具体 probe 场景在 PR2 统一 dispatch 时一并验证）；
 * ~~禁止 generation-only matching~~ ✅ 已完成；
 * ~~missing API 显式失败~~ ✅ 已完成；
 * ~~session 单 synthetic prompt 限制~~ ✅ 已完成（PendingTurnReceipt.register 现在检查同 session 是否已有 active dispatch）；
