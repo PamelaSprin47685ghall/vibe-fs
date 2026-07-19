@@ -476,32 +476,9 @@ generation 相同并不能证明这些事件属于 continuation。
 
 新增 `WanxiangshuMetadataCodec` 统一编解码：所有 OpenCode prompt/continuation 现在写入 `part.metadata.wanxiangshu`（带 `schema` 版本号），reconciliation、chat hook、query status 统一通过该 codec 读取，并兼容旧版 `metadata.nonce`。
 
-### S-06：pending idle/evidence 仅按 session ID 缓存
+### S-06：pending idle/evidence 仅按 session ID 缓存 ✅ 已完成
 
-idle 可以在 actor 尚未建立 active turn 时被缓存；下一轮开始后，该 idle 被取出并应用到新 turn。
-
-典型错误：
-
-1. 旧 turn 完成；
-2. 迟到 idle 被缓存；
-3. 新 turn 开始；
-4. 新 turn 读取缓存；
-5. 在 prompt 尚未启动时就被认为 idle；
-6. 子会话立即完成、失败或进入错误 reconciliation。
-
-**整改要求：**
-
-最安全方案是取消无来源 idle 的跨 turn 缓存。
-
-确有必要缓存时，key 至少必须包含：
-
-* workspace；
-* physical session ID；
-* actor epoch；
-* turn ID 或 dispatch generation；
-* host user message ID。
-
-无法归属的 idle 只能作为 session-level hint，不能作为某个 turn 的完成证据。
+`SubsessionPendingEvidence` 已删除 `PreRunEvidence` 字段：`BufferPreRun` 在无 `ActiveEpoch` 时直接丢弃，`BeginRun` 不再把上一 turn 的缓存移动到新 epoch。因此证据/idle 不再跨 turn 污染。
 
 ### S-07：session delete 没有清理所有旁路状态
 

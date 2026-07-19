@@ -16,8 +16,8 @@ let run () : unit =
     let preRunEpoch = SubsessionPendingEvidence.BeginRun preRunSession
 
     check
-        "evidence before BeginRun is bound to the new epoch"
-        (SubsessionPendingEvidence.TakeAllEpoch preRunSession preRunEpoch |> List.length = 1)
+        "evidence before BeginRun is discarded, not bound to the new epoch"
+        (SubsessionPendingEvidence.TakeAllEpoch preRunSession preRunEpoch |> List.isEmpty)
 
     SubsessionPendingEvidence.EndRun preRunSession preRunEpoch
 
@@ -50,13 +50,13 @@ let run () : unit =
         (SubsessionPendingEvidence.TakeAllEpoch activeSession epoch |> List.length = 1)
 
     SubsessionPendingEvidence.EndRun activeSession epoch
-    SubsessionPendingEvidence.BufferPreRun activeSession (evidence "next-run")
+    SubsessionPendingEvidence.BufferPreRun activeSession (evidence "stale-from-previous-run")
     let nextEpoch = SubsessionPendingEvidence.BeginRun activeSession
 
     check "next run receives a new epoch" (nextEpoch > epoch)
 
     check
-        "next run receives only its evidence"
-        (SubsessionPendingEvidence.TakeAllEpoch activeSession nextEpoch |> List.length = 1)
+        "next run does not receive cross-turn stale evidence"
+        (SubsessionPendingEvidence.TakeAllEpoch activeSession nextEpoch |> List.isEmpty)
 
     SubsessionPendingEvidence.EndRun activeSession nextEpoch

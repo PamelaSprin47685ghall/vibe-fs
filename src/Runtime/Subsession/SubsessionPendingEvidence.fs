@@ -2,17 +2,17 @@ module Wanxiangshu.Runtime.SubsessionPendingEvidence
 
 open Wanxiangshu.Kernel.Subsession.Types
 
-/// In-memory buffer for evidence that arrives before an actor has an
-/// active turn.
+/// In-memory buffer for evidence that arrives while a turn is active.
 ///
-/// The buffer stores only evidence that can be attached to a future turn.
+/// Evidence is NEVER cached across turns. When no epoch is active the buffer
+/// discards the evidence, because a host event for a new turn cannot arrive
+/// before StartRun has synchronously created the actor and begun the epoch.
 /// Session-level idle observations have no turn identity and are never stored.
 module SubsessionPendingEvidence =
 
     type private PendingSession =
         { NextEpoch: int
           ActiveEpoch: int option
-          PreRunEvidence: CurrentTurnEvidence list
           EpochEvidence: Map<int, CurrentTurnEvidence list> }
 
     let private capacity = 256
@@ -22,7 +22,6 @@ module SubsessionPendingEvidence =
     let private emptySession =
         { NextEpoch = 0
           ActiveEpoch = None
-          PreRunEvidence = []
           EpochEvidence = Map.empty }
 
     let private trim (existing: CurrentTurnEvidence list) : CurrentTurnEvidence list =
@@ -35,18 +34,17 @@ module SubsessionPendingEvidence =
         let existing =
             Map.tryFind physicalSessionId sessions |> Option.defaultValue emptySession
 
-        let updated =
-            match existing.ActiveEpoch with
-            | Some epoch ->
-                let current = Map.tryFind epoch existing.EpochEvidence |> Option.defaultValue []
+        match existing.ActiveEpoch with
+        | Some epoch ->
+            let current = Map.tryFind epoch existing.EpochEvidence |> Option.defaultValue []
 
-                { existing with
-                    EpochEvidence = Map.add epoch (trim (List.append current [ evidence ])) existing.EpochEvidence }
-            | None ->
-                { existing with
-                    PreRunEvidence = trim (List.append existing.PreRunEvidence [ evidence ]) }
-
-        sessions <- Map.add physicalSessionId updated sessions
+            sessions <-
+                Map.add
+                    physicalSessionId
+                    { existing with
+                        EpochEvidence = Map.add epoch (trim (List.append current [ evidence ])) existing.EpochEvidence }
+                    sessions
+        | None -> ()
 
     let BeginRun (physicalSessionId: string) : int =
         let existing =
@@ -59,8 +57,7 @@ module SubsessionPendingEvidence =
                 physicalSessionId
                 { NextEpoch = epoch + 1
                   ActiveEpoch = Some epoch
-                  PreRunEvidence = []
-                  EpochEvidence = Map.add epoch (trim existing.PreRunEvidence) existing.EpochEvidence }
+                  EpochEvidence = Map.add epoch [] existing.EpochEvidence }
                 sessions
 
         epoch
