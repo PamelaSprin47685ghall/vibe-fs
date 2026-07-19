@@ -13,6 +13,9 @@ let private envVar (name: string) : string =
 [<Import("appendFileSync", "node:fs")>]
 let private appendFileSync (path: string) (content: string) (encoding: string) : unit = jsNative
 
+[<Import("tmpdir", "node:os")>]
+let private tmpdir () : string = jsNative
+
 type SembleResult =
     { filePath: string
       startLine: int
@@ -23,11 +26,10 @@ type SembleResult =
 
 let private debugLogPath () : string =
     let dir = envVar "SEMBLE_INJECT_DEBUG_DIR"
-
-    if dir = "" then
-        "/tmp/wanxiangshu-semble-inject.log"
-    else
-        $"{dir}/wanxiangshu-semble-inject.log"
+    let baseDir = if dir = "" then tmpdir () else dir
+    let ts = System.DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()
+    let token = System.Guid.NewGuid().ToString("N").[..7]
+    $"{baseDir}/wanxiangshu-semble-{ts}-{token}.log"
 
 let debugEnabled () : bool = envVar "SEMBLE_INJECT_DEBUG" = "1"
 

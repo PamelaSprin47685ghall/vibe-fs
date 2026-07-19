@@ -253,7 +253,6 @@
     <Compile Include="src/Runtime/EventStore/EventStoreIo.fs"/>
     <Compile Include="src/Runtime/EventStore/EventStore.fs"/>
     <Compile Include="src/Runtime/EventStore/SquadEventStore.fs"/>
-    <Compile Include="src/Runtime/Search/SembleMcp.fs"/>
     <Compile Include="src/Runtime/Search/SembleSearchTypes.fs"/>
     <Compile Include="src/Runtime/Search/SembleSearchClient.fs"/>
     <Compile Include="src/Runtime/Search/SembleSearch.fs"/>

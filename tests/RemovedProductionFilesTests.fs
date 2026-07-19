@@ -20,7 +20,8 @@ let run () : unit =
           "Hosts/OpenCode/BacklogSession.fs"
           "Hosts/Omp/NudgeDispatchLogic/ClaimHelper.fs"
           "Hosts/Omp/NudgeDispatchLogic/LeaseHelper.fs"
-          "Hosts/Omp/NudgeDispatchLogic/SnapshotHelper.fs" ]
+          "Hosts/Omp/NudgeDispatchLogic/SnapshotHelper.fs"
+          "Runtime/Search/SembleMcp.fs" ]
 
     for relativePath in removedFiles do
         let mutable path = srcRoot

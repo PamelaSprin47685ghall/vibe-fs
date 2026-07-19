@@ -6,8 +6,8 @@ open Wanxiangshu.Kernel.Messaging
 open Wanxiangshu.Hosts.Opencode.MessagingCodec
 open Wanxiangshu.Runtime
 open Wanxiangshu.Runtime.RuntimeScope
-open Wanxiangshu.Runtime.SembleMcp
 open Wanxiangshu.Runtime.SembleSearch
+open Wanxiangshu.Runtime.SembleSearchTypes
 
 let private getBreakpointState
     (scope: RuntimeScope)
@@ -23,17 +23,25 @@ let private getBreakpointState
         match SembleSearch.breakpointStart scope sessionID with
         | None ->
             SembleSearch.markBreakpoint scope sessionID encodedLen
-            SembleMcp.trace "DECIDE" $"reseed: no prior breakpoint, skip this turn (agent={agent}, len={encodedLen})"
+
+            SembleSearchTypes.trace
+                "DECIDE"
+                $"reseed: no prior breakpoint, skip this turn (agent={agent}, len={encodedLen})"
+
             Error encodedLen
         | Some stored when stored > List.length messages ->
             SembleSearch.markBreakpoint scope sessionID encodedLen
-            SembleMcp.trace "DECIDE" $"reseed: breakpoint {stored} > len {List.length messages}, compaction reset"
+
+            SembleSearchTypes.trace
+                "DECIDE"
+                $"reseed: breakpoint {stored} > len {List.length messages}, compaction reset"
+
             Error encodedLen
         | Some startIndex ->
             let context = SembleSearch.extractContextFromMessages startIndex messages
 
             if context.Length = 0 then
-                SembleMcp.trace "DECIDE" $"skip: empty context (start={startIndex}, len={encodedLen})"
+                SembleSearchTypes.trace "DECIDE" $"skip: empty context (start={startIndex}, len={encodedLen})"
                 Error encodedLen
             else
                 Ok context
@@ -61,12 +69,12 @@ let private performSembleSearchAndAttach
         let! results = SembleSearch.search context directory 3
 
         if results.IsEmpty then
-            SembleMcp.trace "DECIDE" $"skip: no results (context len={context.Length}, len={encoded.Length})"
+            SembleSearchTypes.trace "DECIDE" $"skip: no results (context len={context.Length}, len={encoded.Length})"
             return encoded
         else
             match findLastAssistant encoded with
             | None ->
-                SembleMcp.trace "DECIDE" "skip: no assistant to attach reads"
+                SembleSearchTypes.trace "DECIDE" "skip: no assistant to attach reads"
                 return encoded
             | Some lastAssistant ->
                 let assistantId =
@@ -75,7 +83,7 @@ let private performSembleSearchAndAttach
                 let newToolParts = SembleSearch.buildReadToolParts assistantId sessionID results
 
                 if Array.isEmpty newToolParts then
-                    SembleMcp.trace "DECIDE" "skip: no tool parts"
+                    SembleSearchTypes.trace "DECIDE" "skip: no tool parts"
                     return encoded
                 else
                     let originalParts = Wanxiangshu.Runtime.Dyn.get lastAssistant "parts"

@@ -14,33 +14,9 @@
 
 # 一、可以优先肃清的明确临时文件
 
-## 1. `Runtime/Search/SembleMcp.fs`
+## 1. `Runtime/Search/SembleMcp.fs`（已完成）
 
-它和：
-
-* `Runtime/Search/SembleSearchClient.fs`
-
-存在高度重复的 MCP 连接、搜索和日志处理逻辑。
-
-目前实际搜索链路主要经由：
-
-* `SembleSearch`
-* `SembleSearchClient`
-
-而 `Hosts/OpenCode/SembleInjection.fs` 仍引用 `SembleMcp`，主要是为了使用旧的 trace 能力。
-
-这属于典型的：
-
-> 新客户端已经取代旧客户端，但某个边角功能仍挂在旧模块上，导致整个旧模块不能删除。
-
-### 清理步骤
-
-1. 列出 `SembleMcp.fs` 的所有公开成员。
-2. 将仍被使用的 trace 能力迁入统一日志设施，或者归入 `SembleSearchTypes`。
-3. 确认连接创建、请求发送、结果解析只剩一套。
-4. 删除 `SembleMcp.fs`。
-5. 禁止 `SembleInjection` 同时打开新旧两个 Semble 模块。
-6. 补连接失败、超时、空结果、重复初始化测试。
+已删除。`SembleMcp` 与 `SembleSearchClient` 高度重复的 MCP 连接、搜索和日志处理逻辑已统一到 `SembleSearchClient` + `SembleSearchTypes`。`SembleInjection.fs` 的 trace 调用已迁移到 `SembleSearchTypes.trace`。`tests/RemovedProductionFilesTests.fs` 断言该文件不回归。
 
 ---
 
@@ -357,32 +333,9 @@
 
 ---
 
-## 2. Semble 注入日志
+## 2. Semble 注入日志（已完成）
 
-可见路径：
-
-* `/tmp/wanxiangshu-semble-inject.log`
-
-相关逻辑同时存在于重复的 Semble 模块中。
-
-### 风险
-
-该日志可能包含：
-
-* 查询上下文；
-* 注入片段；
-* 文件路径；
-* session 关联信息。
-
-### 处理
-
-* 删除重复日志实现；
-* 默认关闭；
-* 接入统一 logger；
-* 对 prompt、路径、session 做脱敏；
-* 设置大小上限；
-* 不再固定写一个公共文件名；
-* session close 不应依赖此文件。
+`SembleMcp` 中的重复日志实现已随模块删除。唯一日志入口为 `SembleSearchTypes.trace`，受 `SEMBLE_INJECT_DEBUG=1` 环境变量门控（默认关闭）。目录可通过 `SEMBLE_INJECT_DEBUG_DIR` 配置，缺省使用 `node:os` `tmpdir()`。文件名格式 `wanxiangshu-semble-{unixTimestampMs}-{guid8}.log`，每次进程启动唯一，不再使用固定共享 `/tmp/wanxiangshu-semble-inject.log`。
 
 ---
 
@@ -688,6 +641,7 @@
 * [x] 生产插件不暴露 `__runtimeScope`、`__reviewStore` 等字段。
 * [x] profiler 默认完全关闭。
 * [x] 正常运行不生成 `.cpuprofile`、`.heapprofile`。
+* [x] Semble 注入日志不再使用固定 `/tmp/wanxiangshu-semble-inject.log` 文件名。
 * [ ] E2E 元数据只存在于测试临时目录并自动清理。
 * [ ] file swap 不使用固定共享临时名。
 * [ ] session/workspace 相关 map 都有对称清理。
