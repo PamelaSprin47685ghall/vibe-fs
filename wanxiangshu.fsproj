@@ -181,7 +181,6 @@
     <Compile Include="src/Runtime/Subsession/SubagentIteratorStore.fs"/>
     <Compile Include="src/Runtime/EventStore/SessionProjectionStore.fs"/>
     <Compile Include="src/Runtime/Workspace/RuntimeScope.fs"/>
-    <Compile Include="src/Runtime/Workspace/RuntimeScopeForgetSession.fs"/>
     <Compile Include="src/Runtime/Execution/BacklogSessionCodec.fs"/>
     <Compile Include="src/Runtime/Messaging/MethodologyArgs.fs"/>
     <Compile Include="src/Runtime/Execution/ErrorClassify.fs"/>
@@ -251,6 +250,8 @@
     <Compile Include="src/Runtime/EventStore/EventStoreIo.fs"/>
     <Compile Include="src/Runtime/EventStore/EventStore.fs"/>
     <Compile Include="src/Runtime/EventStore/SquadEventStore.fs"/>
+    <Compile Include="src/Runtime/EventStore/EventLogRuntimeStore.fs"/>
+    <Compile Include="src/Runtime/Workspace/RuntimeScopeForgetSession.fs"/>
     <Compile Include="src/Runtime/Search/SembleSearchTypes.fs"/>
     <Compile Include="src/Runtime/Search/SembleSearchClient.fs"/>
     <Compile Include="src/Runtime/Search/SembleSearch.fs"/>

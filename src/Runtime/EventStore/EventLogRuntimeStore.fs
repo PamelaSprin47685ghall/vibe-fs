@@ -34,9 +34,22 @@ let appendAndCache (workspaceRoot: string) (e: WanEvent) : JS.Promise<Result<uni
 let appendAndCacheOrFail (workspaceRoot: string) (e: WanEvent) : JS.Promise<unit> =
     getStore(workspaceRoot).AppendEventOrFail e
 
-/// One lock + one contiguous write for a Decision's event list.
 let appendEventsAndCacheOrFail (workspaceRoot: string) (events: WanEvent list) : JS.Promise<unit> =
     getStore(workspaceRoot).AppendEventsOrFail events
+
+let remove (workspaceRoot: string) : bool =
+    let found = Map.containsKey workspaceRoot stores
+    stores <- Map.remove workspaceRoot stores
+    found
+
+let tryRemove (workspaceRoot: string) : unit =
+    stores <- Map.remove workspaceRoot stores
+
+let clear () : unit = stores <- Map.empty
+
+let count () : int = Map.count stores
+
+let ids () : string list = stores |> Map.toList |> List.map fst
 
 let assistantPayload
     (assistantMessage: string)
