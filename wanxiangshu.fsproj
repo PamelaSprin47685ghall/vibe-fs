@@ -542,7 +542,6 @@
     <Compile Include="src/Hosts/Omp/NudgeHooks.fs"/>
     <Compile Include="src/Hosts/Omp/TodoStateManagement.fs"/>
     <Compile Include="src/Hosts/Omp/TodoHooks.fs"/>
-    <Compile Include="src/Hosts/Omp/SessionLifecycleHooks.fs"/>
     <Compile Include="src/Hosts/Omp/SessionLifecycle.fs"/>
     <Compile Include="src/Hosts/Omp/Tools.fs"/>
     <Compile Include="src/Hosts/Omp/Fallback/MessageInspection.fs"/>

@@ -172,7 +172,8 @@
 * `Hosts/OpenCode/SubsessionHostAdapter.fs`
 * `Runtime/Messaging/OpencodeSessionEventCodec.fs`
 * `Runtime/Search/FuzzySearch.fs`
-* `Kernel/ReviewSession/Facade.fs`
+* ~~`Kernel/ReviewSession/Facade.fs`~~ — removed
+* ~~`Hosts/Omp/SessionLifecycleHooks.fs`~~ — removed
 * `Hosts/Omp/SessionLifecycleHooks.fs`
 * `Runtime/EventStore/EventLogRuntime.fs`
 

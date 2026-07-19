@@ -10,8 +10,10 @@ open Wanxiangshu.Runtime.RuntimeScope
 module Dyn = Wanxiangshu.Runtime.Dyn
 
 open Wanxiangshu.Runtime.ReviewRuntime
-open Wanxiangshu.Hosts.Omp.SessionLifecycleHooks
+open Wanxiangshu.Hosts.Omp.NudgeToolFilter
 open Wanxiangshu.Hosts.Omp.NudgeHooks
+open Wanxiangshu.Hosts.Omp.TodoHooks
+open Wanxiangshu.Hosts.Omp.TodoStateManagement
 open Wanxiangshu.Kernel.OmpSessionTools
 open Wanxiangshu.Hosts.Omp.NudgeRuntime
 open Wanxiangshu.Kernel.HostTools

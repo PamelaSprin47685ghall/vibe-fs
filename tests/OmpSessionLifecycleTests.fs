@@ -6,7 +6,6 @@ open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Hosts.Omp.ChildSession
 open Wanxiangshu.Runtime.RuntimeScope
 open Wanxiangshu.Hosts.Omp.SessionLifecycle
-open Wanxiangshu.Hosts.Omp.SessionLifecycleHooks
 
 let private testScope = RuntimeScope()
 
