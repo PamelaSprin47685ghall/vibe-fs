@@ -97,7 +97,7 @@ let sendNudgeOutcome
             match caught with
             | Ok() -> Delivered
             | Error error ->
-                let msg = (error :?> System.Exception).Message
+                let msg = string error
 
                 if msg = "opencode_session_api_missing" then
                     TransportUnavailable msg
