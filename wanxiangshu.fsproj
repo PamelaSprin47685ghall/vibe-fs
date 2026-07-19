@@ -184,7 +184,6 @@
     <Compile Include="src/Runtime/Workspace/RuntimeScope.fs"/>
     <Compile Include="src/Runtime/Workspace/RuntimeScopeForgetSession.fs"/>
     <Compile Include="src/Runtime/Execution/BacklogSessionCodec.fs"/>
-    <Compile Include="src/Runtime/Subsession/Flow.fs"/>
     <Compile Include="src/Runtime/Messaging/MethodologyArgs.fs"/>
     <Compile Include="src/Runtime/Execution/ErrorClassify.fs"/>
     <Compile Include="src/Runtime/Execution/Clock.fs"/>
@@ -889,9 +888,6 @@
     <Compile Include="tests/ProductionDebugOutputTests.fs"/>
     <Compile Include="tests/TestsEntriesWanxiangzhen.fs"/>
     <Compile Include="tests/SubsessionGoldenTrajectoryTests.fs"/>
-    <Compile Include="tests/CommandProcessorE2ETests.fs"/>
-    <Compile Include="tests/ReplayEquivalenceTests.fs"/>
-    <Compile Include="tests/FlowKernelTests.fs"/>
     <Compile Include="tests/ReactiveTests.fs"/>
     <Compile Include="tests/ResourcePlanTests.fs"/>
     <Compile Include="tests/SessionOverviewTests.fs"/>

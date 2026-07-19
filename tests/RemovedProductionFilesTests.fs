@@ -29,7 +29,9 @@ let run () : unit =
           "Kernel/Nudge/RetryProgress.fs"
           "Kernel/Wanxiangzhen/EventLogParse.fs"
           "Kernel/ReviewReplayPolicy.fs"
-          "Runtime/Tooling/WebFetch.fs" ]
+          "Runtime/Tooling/WebFetch.fs"
+          "Runtime/Subsession/Flow.fs"
+          "Runtime/MessageTransform/PlanCodec.fs" ]
 
     for relativePath in removedFiles do
         let mutable path = srcRoot

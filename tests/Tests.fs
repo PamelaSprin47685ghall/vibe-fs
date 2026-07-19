@@ -97,9 +97,6 @@ open Wanxiangshu.Tests.KernelPolicyTests
 
 open Wanxiangshu.Tests.ReviewPromptsFormatTests
 open Wanxiangshu.Tests.SubsessionGoldenTrajectoryTests
-open Wanxiangshu.Tests.CommandProcessorE2ETests
-open Wanxiangshu.Tests.ReplayEquivalenceTests
-open Wanxiangshu.Tests.FlowKernelTests
 open Wanxiangshu.Tests.ReactiveTests
 open Wanxiangshu.Tests.ResourcePlanTests
 open Wanxiangshu.Tests.SessionOverviewTests
@@ -143,9 +140,6 @@ let private allOtherTests: (string * TestBody) list =
     @ codecTestEntries ()
     @ ompTestEntries ()
     @ [ "SubsessionGoldenTrajectoryTests.run", TestBody.Sync SubsessionGoldenTrajectoryTests.run
-        "CommandProcessorE2ETests.run", TestBody.Async CommandProcessorE2ETests.run
-        "ReplayEquivalenceTests.run", TestBody.Sync ReplayEquivalenceTests.run
-        "FlowKernelTests.run", TestBody.Async FlowKernelTests.run
         "ReactiveTests.run", TestBody.Sync ReactiveTests.run
         "ResourcePlanTests.run", TestBody.Sync ResourcePlanTests.run
         "SessionOverviewTests.run", TestBody.Sync SessionOverviewTests.run
