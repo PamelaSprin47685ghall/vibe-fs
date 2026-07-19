@@ -5,21 +5,28 @@ open Fable.Core.JsInterop
 open Wanxiangshu.Kernel.Messaging
 open Wanxiangshu.Hosts.Opencode.MessagingCodec
 open Wanxiangshu.Runtime
+open Wanxiangshu.Runtime.RuntimeScope
 open Wanxiangshu.Runtime.SembleMcp
 open Wanxiangshu.Runtime.SembleSearch
 
-let private getBreakpointState (agent: string) (sessionID: string) (messages: Message<obj> list) (encodedLen: int) =
+let private getBreakpointState
+    (scope: RuntimeScope)
+    (agent: string)
+    (sessionID: string)
+    (messages: Message<obj> list)
+    (encodedLen: int)
+    =
     if agent <> "inspector" && agent <> "reviewer" then
-        SembleSearch.markBreakpoint sessionID encodedLen
+        SembleSearch.markBreakpoint scope sessionID encodedLen
         Error encodedLen
     else
-        match SembleSearch.breakpointStart sessionID with
+        match SembleSearch.breakpointStart scope sessionID with
         | None ->
-            SembleSearch.markBreakpoint sessionID encodedLen
+            SembleSearch.markBreakpoint scope sessionID encodedLen
             SembleMcp.trace "DECIDE" $"reseed: no prior breakpoint, skip this turn (agent={agent}, len={encodedLen})"
             Error encodedLen
         | Some stored when stored > List.length messages ->
-            SembleSearch.markBreakpoint sessionID encodedLen
+            SembleSearch.markBreakpoint scope sessionID encodedLen
             SembleMcp.trace "DECIDE" $"reseed: breakpoint {stored} > len {List.length messages}, compaction reset"
             Error encodedLen
         | Some startIndex ->
@@ -43,6 +50,7 @@ let private findLastAssistant (encoded: obj array) =
     loop (encoded.Length - 1)
 
 let private performSembleSearchAndAttach
+    (scope: RuntimeScope)
     (directory: string)
     (agent: string)
     (sessionID: string)
@@ -84,12 +92,13 @@ let private performSembleSearchAndAttach
                                 not ((Wanxiangshu.Runtime.Dyn.str p "callID").StartsWith("semble-call-")))
 
                     lastAssistant?parts <- box (Array.append cleaned newToolParts)
-                    SembleSearch.markBreakpoint sessionID encoded.Length
+                    SembleSearch.markBreakpoint scope sessionID encoded.Length
                     SembleSearch.dumpInjection sessionID agent context results newToolParts.Length
                     return encoded
     }
 
 let injectSembleIntoEncoded
+    (scope: RuntimeScope)
     (directory: string)
     (agent: string)
     (sessionID: string)
@@ -98,7 +107,7 @@ let injectSembleIntoEncoded
     promise {
         let messages = MessagingCodec.decodeMessages encoded
 
-        match getBreakpointState agent sessionID messages encoded.Length with
+        match getBreakpointState scope agent sessionID messages encoded.Length with
         | Error _ -> return encoded
-        | Ok context -> return! performSembleSearchAndAttach directory agent sessionID encoded context
+        | Ok context -> return! performSembleSearchAndAttach scope directory agent sessionID encoded context
     }

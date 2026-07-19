@@ -4,6 +4,7 @@ open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Runtime
+open Wanxiangshu.Runtime.RuntimeScope
 open Wanxiangshu.Runtime.SembleSearch
 open Wanxiangshu.Runtime.SembleSearchClient
 open Wanxiangshu.Hosts.Opencode.SembleInjection
@@ -14,7 +15,7 @@ open Wanxiangshu.Kernel.Messaging
 open Wanxiangshu.Kernel.HostTools
 open Wanxiangshu.Runtime.ReviewRuntime
 
-let testSembleInjectsForReviewer () =
+let testSembleCoderBlocked () =
     promise {
         let mockClientObj =
             createObj
@@ -26,7 +27,7 @@ let testSembleInjectsForReviewer () =
         setClientForTest (Some(mockClientObj :?> Client))
 
         try
-            let sessionID = "session-test-reviewer-" + System.Guid.NewGuid().ToString("N")
+            let sessionID = "session-test-reviewer-coder-" + System.Guid.NewGuid().ToString("N")
 
             let encoded =
                 [| box (
@@ -41,16 +42,47 @@ let testSembleInjectsForReviewer () =
                              "parts", box [||] ]
                    ) |]
 
-            // Coder should be blocked -> breakpoint is updated to 2
-            markBreakpoint sessionID 0
-            let! _ = injectSembleIntoEncoded "dir" "coder" sessionID encoded
-            let bpAfterCoder = breakpointStart sessionID
+            let scope = create ()
+            markBreakpoint scope sessionID 0
+            let! _ = injectSembleIntoEncoded scope "dir" "coder" sessionID encoded
+            let bpAfterCoder = breakpointStart scope sessionID
             equal "coder breakpoint is updated" (Some 2) bpAfterCoder
+        finally
+            setClientForTest None
+    }
 
-            // Reviewer should be allowed -> breakpoint remains 0 (since no actual search results)
-            markBreakpoint sessionID 0
-            let! _ = injectSembleIntoEncoded "dir" "reviewer" sessionID encoded
-            let bpAfterReviewer = breakpointStart sessionID
+let testSembleReviewerAllows () =
+    promise {
+        let mockClientObj =
+            createObj
+                [ "callTool",
+                  box (fun req -> Promise.lift (box {| content = [| box {| text = "{\"results\": []}" |} |] |}))
+                  "connect", box (fun _ -> Promise.lift ())
+                  "close", box (fun () -> Promise.lift ()) ]
+
+        setClientForTest (Some(mockClientObj :?> Client))
+
+        try
+            let sessionID =
+                "session-test-reviewer-allows-" + System.Guid.NewGuid().ToString("N")
+
+            let encoded =
+                [| box (
+                       createObj
+                           [ "info", box (createObj [ "id", box "m0"; "role", box "user"; "sessionID", box sessionID ])
+                             "parts", box [| box (createObj [ "type", box "text"; "text", box "hello world" ]) |] ]
+                   )
+                   box (
+                       createObj
+                           [ "info",
+                             box (createObj [ "id", box "m1"; "role", box "assistant"; "sessionID", box sessionID ])
+                             "parts", box [||] ]
+                   ) |]
+
+            let scope = create ()
+            markBreakpoint scope sessionID 0
+            let! _ = injectSembleIntoEncoded scope "dir" "reviewer" sessionID encoded
+            let bpAfterReviewer = breakpointStart scope sessionID
             equal "reviewer breakpoint remains unchanged" (Some 0) bpAfterReviewer
         finally
             setClientForTest None
@@ -113,7 +145,7 @@ let testAmendSkippedWhenSembleInjectEnabled () =
               Cleaned = msgs
               RawArray = None
               SembleInjectEnabled = true
-              Scope = Wanxiangshu.Runtime.RuntimeScope.create ()
+              Scope = create ()
               MaxInputTokens = 200000
               ModelKey = "openai/gpt-4o:default"
               LimitSource = "openai-session-model"

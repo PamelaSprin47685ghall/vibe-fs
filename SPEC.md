@@ -267,8 +267,8 @@
 
 * `Runtime/Search/SembleSearch.fs`
 
-  * 全局 `lastBreakpoint`；
-  * 没有与 session close 对称的 forget。
+  * ~~全局 `lastBreakpoint`~~ → 已迁移到 `RuntimeScope` extState，由 `clearBreakpoint` 清理。
+  * 没有与 session close 对称的 forget → 已提供 `clearBreakpoint scope sessionID`，session close 路径可调用。
 
 * `Kernel/HostTools.fs`
 

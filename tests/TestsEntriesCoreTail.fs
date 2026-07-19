@@ -154,7 +154,8 @@ let tailCoreTestEntriesGroup3 () : (string * TestBody) list =
       "ModelResolutionTests.run", TestBody.Async ModelResolutionTests.run
       "MessageSanitizationTests.run", TestBody.Async MessageSanitizationTests.run
       "SembleInjectionTests.run", TestBody.Sync(sync SembleInjectionTests.run)
-      "SembleReviewerInjectionTests.testSembleInjectsForReviewer", TestBody.Async testSembleInjectsForReviewer
+      "SembleReviewerInjectionTests.testSembleCoderBlocked", TestBody.Async testSembleCoderBlocked
+      "SembleReviewerInjectionTests.testSembleReviewerAllows", TestBody.Async testSembleReviewerAllows
       "SembleReviewerInjectionTests.testAmendSkippedWhenSembleInjectEnabled",
       TestBody.Async testAmendSkippedWhenSembleInjectEnabled
       "ExecutorKernelTests.run", TestBody.Sync(sync ExecutorKernelTests.run)

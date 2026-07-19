@@ -32,6 +32,7 @@ open Wanxiangshu.Hosts.Opencode.OpenCodeModelResolution
 
 open Wanxiangshu.Hosts.Opencode.ModelKeyResolver
 open Wanxiangshu.Runtime.JsArrayMutate
+open Wanxiangshu.Runtime.RuntimeScope
 open Wanxiangshu.Hosts.Opencode.SembleInjection
 open Wanxiangshu.Hosts.Opencode.CompactionHook
 open Wanxiangshu.Runtime.Dyn
@@ -56,11 +57,12 @@ let private buildInjectionFn
     (directory: string)
     (agent: string)
     (sessionID: string)
+    (runtimeScope: RuntimeScope)
     : (BacklogProjectionPolicy -> obj array -> JS.Promise<obj array>) =
     fun policy encoded ->
         match policy with
         | BacklogProjectionPolicy.Exclude -> Promise.lift encoded
-        | BacklogProjectionPolicy.Include -> injectSembleIntoEncoded directory agent sessionID encoded
+        | BacklogProjectionPolicy.Include -> injectSembleIntoEncoded runtimeScope directory agent sessionID encoded
 
 /// Build the load-caps async function for the transform pipeline.
 let private buildLoadCaps
@@ -116,7 +118,7 @@ let runHostMessagesTransformExecution
         let backlogOps =
             backlogSessionOpsFrom backlogSession.Host (fun sid msgs -> backlogSession.GetOrRebuildBacklog(sid, msgs))
 
-        let injectFn = buildInjectionFn directory agent sessionID
+        let injectFn = buildInjectionFn directory agent sessionID runtimeScope
 
         let loadCaps = buildLoadCaps registry runtimeScope sessionID plan
 

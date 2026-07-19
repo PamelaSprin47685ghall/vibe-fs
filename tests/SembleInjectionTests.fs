@@ -7,6 +7,7 @@ open Wanxiangshu.Kernel.Messaging
 open Wanxiangshu.Kernel.ToolExecutionStatusModule
 open Wanxiangshu.Runtime.Dyn
 open Wanxiangshu.Runtime.CapsFormat
+open Wanxiangshu.Runtime.RuntimeScope
 open Wanxiangshu.Runtime.SembleSearch
 
 [<Global("process")>]
@@ -211,6 +212,21 @@ let dumpInjectionNoThrowWhenDisabled () =
     dumpInjection "s" "inspector" "ctx" [ sampleResult ] 2
     check "dumpInjection disabled no throw" true
 
+let breakpointsAreScopedByRuntimeScope () =
+    let scopeA = create ()
+    let scopeB = create ()
+    let sessionID = "semble-scope-test"
+
+    markBreakpoint scopeA sessionID 7
+    equal "scope A breakpoint" (Some 7) (breakpointStart scopeA sessionID)
+    equal "scope B no breakpoint" None (breakpointStart scopeB sessionID)
+
+    clearBreakpoint scopeA sessionID
+    equal "scope A cleared" None (breakpointStart scopeA sessionID)
+
+type SembleBreakpointScopeTests =
+    static member run() = breakpointsAreScopedByRuntimeScope ()
+
 let run () =
     formatReadOutputPrefixesLines ()
     buildReadToolPartsProducesOnePartPerResult ()
@@ -226,3 +242,4 @@ let run () =
     debugDisabledByDefault ()
     debugEnabledViaEnv ()
     dumpInjectionNoThrowWhenDisabled ()
+    SembleBreakpointScopeTests.run ()
