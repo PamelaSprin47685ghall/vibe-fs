@@ -2,7 +2,6 @@ module Wanxiangshu.Runtime.Fallback.SessionRuntime
 
 open Wanxiangshu.Kernel.FallbackKernel.Types
 open Wanxiangshu.Kernel.FallbackRuntimeFlags
-open Wanxiangshu.Runtime.Fallback.GateState
 
 type PendingLease =
     { ContinuationID: string

@@ -199,7 +199,6 @@
     <Compile Include="src/Runtime/Subsession/SubsessionEventRouter.fs"/>
     <Compile Include="src/Runtime/Fallback/FallbackChainResolution.fs"/>
     <Compile Include="src/Runtime/Fallback/FallbackConfigCodec.fs"/>
-    <Compile Include="src/Runtime/Fallback/GateState.fs"/>
     <Compile Include="src/Runtime/Fallback/SessionRuntime.fs"/>
     <Compile Include="src/Runtime/Fallback/SessionRuntimePropertyPure.fs"/>
     <Compile Include="src/Runtime/Fallback/SessionRuntimeLeasePure.fs"/>
