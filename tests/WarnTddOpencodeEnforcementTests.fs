@@ -5,7 +5,8 @@ open Fable.Core.JsInterop
 open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Kernel.WarnTdd
 open Wanxiangshu.Runtime.Dyn
-open Wanxiangshu.Hosts.Opencode.HookSchema
+open Wanxiangshu.Hosts.Opencode.HookSchemaDecoration
+open Wanxiangshu.Hosts.Opencode.HookSchemaDecode
 
 module Dyn = Wanxiangshu.Runtime.Dyn
 

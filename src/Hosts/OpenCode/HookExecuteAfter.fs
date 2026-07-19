@@ -19,7 +19,7 @@ open Wanxiangshu.Runtime.RuntimeScope
 open Wanxiangshu.Kernel.Session.Causality
 open Wanxiangshu.Runtime.TreeSitterShell
 open Wanxiangshu.Kernel.ToolCatalog
-open Wanxiangshu.Hosts.Opencode.HookSchema
+open Wanxiangshu.Hosts.Opencode.HookSchemaDecoration
 open Wanxiangshu.Runtime.ChildAgentRegistry
 open Wanxiangshu.Runtime.OpencodeHookInputCodec
 open Wanxiangshu.Runtime.PatchToolsCodec

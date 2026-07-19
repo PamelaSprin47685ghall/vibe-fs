@@ -165,7 +165,7 @@
 
 下面这些文件仍然承担“旧名字转发到新实现”的职责：
 
-* `Hosts/OpenCode/HookSchema.fs`
+* ~~`Hosts/OpenCode/HookSchema.fs`~~ → 已删除，调用方直接引用 `HookSchemaDecoration` / `HookSchemaDecode`。
 * `Hosts/OpenCode/HookExecute.fs`
 * `Runtime/Fallback/FallbackConfigCodec.fs`
 * `Runtime/Execution/BacklogProjectionBuild.fs`

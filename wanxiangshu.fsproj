@@ -410,7 +410,6 @@
     <Compile Include="src/Hosts/OpenCode/HookSchemaDecoration.fs"/>
     <Compile Include="src/Hosts/OpenCode/HookSchemaZod.fs"/>
     <Compile Include="src/Hosts/OpenCode/HookSchemaDecode.fs"/>
-    <Compile Include="src/Hosts/OpenCode/HookSchema.fs"/>
     <Compile Include="src/Hosts/Mux/WrappersReview.fs"/>
     <Compile Include="src/Hosts/Mux/TodoWriteToolWrapper.fs"/>
     <Compile Include="src/Hosts/Mux/Wrappers.fs"/>

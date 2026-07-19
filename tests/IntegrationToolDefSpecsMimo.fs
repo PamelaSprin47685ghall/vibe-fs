@@ -291,7 +291,7 @@ let mimoTaskDefinitionHandlesZodLikeParametersSpec () =
         check
             "mimo task.definition describes methodology field"
             (describeCalls.Count = 1
-             && describeCalls.[0] = Wanxiangshu.Hosts.Opencode.HookSchema.selectMethodologyFieldDescription)
+             && describeCalls.[0] = Wanxiangshu.Hosts.Opencode.HookSchemaDecoration.selectMethodologyFieldDescription)
 
         check "mimo task.definition makes methodology required" (optionalCalls.Count = 0)
         do! rmAsync workspaceDir

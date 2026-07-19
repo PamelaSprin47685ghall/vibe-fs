@@ -6,7 +6,8 @@ open System
 open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Runtime.MethodologyArgs
 open Wanxiangshu.Kernel.Methodology.Schema
-open Wanxiangshu.Hosts.Opencode.HookSchema
+open Wanxiangshu.Hosts.Opencode.HookSchemaDecoration
+open Wanxiangshu.Hosts.Opencode.HookSchemaDecode
 open Wanxiangshu.Runtime.Dyn
 
 // ── Methodology.Args ───────────────────────────────────────────────────────

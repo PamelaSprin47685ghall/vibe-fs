@@ -5,7 +5,8 @@ open Fable.Core.JsInterop
 open System
 open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Hosts.Opencode.HostField
-open Wanxiangshu.Hosts.Opencode.HookSchema
+open Wanxiangshu.Hosts.Opencode.HookSchemaDecoration
+open Wanxiangshu.Hosts.Opencode.HookSchemaDecode
 open Wanxiangshu.Hosts.Opencode.ToolSchema
 open Wanxiangshu.Kernel.Primitives.Identity
 open Wanxiangshu.Kernel.Errors.DomainError

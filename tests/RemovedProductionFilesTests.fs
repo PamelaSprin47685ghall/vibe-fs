@@ -21,6 +21,7 @@ let run () : unit =
           "Hosts/Omp/NudgeDispatchLogic/ClaimHelper.fs"
           "Hosts/Omp/NudgeDispatchLogic/LeaseHelper.fs"
           "Hosts/Omp/NudgeDispatchLogic/SnapshotHelper.fs"
+          "Hosts/OpenCode/HookSchema.fs"
           "Runtime/Search/SembleMcp.fs" ]
 
     for relativePath in removedFiles do

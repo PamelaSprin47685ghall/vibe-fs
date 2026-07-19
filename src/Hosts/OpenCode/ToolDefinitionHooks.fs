@@ -9,12 +9,12 @@ open Wanxiangshu.Kernel.HostTools
 open Wanxiangshu.Runtime.BacklogProjectionBuild
 open Wanxiangshu.Kernel.WorkBacklog
 open Wanxiangshu.Hosts.Opencode.AgentConfig
-open Wanxiangshu.Hosts.Opencode.HookSchema
 open Wanxiangshu.Runtime.BacklogSession
 open Wanxiangshu.Runtime.Dyn
 open Wanxiangshu.Runtime.OpencodeHookInputCodec
 open Wanxiangshu.Runtime.ToolHookRuntime
 open Wanxiangshu.Hosts.Opencode.HookSchemaDecoration
+open Wanxiangshu.Hosts.Opencode.HookSchemaDecode
 
 let private setKey (o: obj) (k: string) (v: obj) : unit = o?(k) <- v
 
