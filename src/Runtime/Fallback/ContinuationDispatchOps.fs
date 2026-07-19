@@ -126,7 +126,7 @@ let runWithRetryGovernor
     : JS.Promise<unit> =
     promise {
         let modelKey =
-            RetryModelKey.Create(model.ProviderID, model.ModelID, ?variant = model.Variant)
+            RetryModelKey.Create(workspaceRoot, sessionID, model.ProviderID, model.ModelID, ?variant = model.Variant)
 
         let stillValid () =
             verifyLease runtime sessionID lease

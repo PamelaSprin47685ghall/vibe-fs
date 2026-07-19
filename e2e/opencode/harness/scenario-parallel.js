@@ -54,7 +54,8 @@ async function writeProjectFiles(workDir, project) {
 
 async function prepareWorkspace(workDir, project) {
   if (project) {
-    await writeProjectFiles(workDir, project);
+    const files = project.files || project;
+    await writeProjectFiles(workDir, files);
   }
   await initGitWorkspace(workDir);
 }

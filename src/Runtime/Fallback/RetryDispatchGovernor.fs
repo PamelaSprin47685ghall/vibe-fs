@@ -6,18 +6,25 @@ open Fable.Core.JsInterop
 [<Global("globalThis.process")>]
 let private nodeProcess: obj = jsNative
 
-/// Key for rate-limiting: providerID/modelID[:variant].
+[<Emit("typeof performance !== 'undefined' ? performance.now() : Date.now()")>]
+let private getMonotonicTimeMs () : float = jsNative
+
+/// Key for rate-limiting and serialization: contains workspace, session, provider/model.
 type RetryModelKey =
-    | RetryModelKey of string
+    { Workspace: string
+      SessionID: string
+      ProviderID: string
+      ModelID: string
+      Variant: string option }
 
-    static member Create(providerId: string, modelId: string, ?variant: string) : RetryModelKey =
-        match variant with
-        | Some v when v <> "" -> RetryModelKey $"{providerId}/{modelId}:{v}"
-        | _ -> RetryModelKey $"{providerId}/{modelId}"
-
-    member this.Value: string =
-        let (RetryModelKey v) = this
-        v
+    static member Create
+        (workspace: string, sessionId: string, providerId: string, modelId: string, ?variant: string)
+        : RetryModelKey =
+        { Workspace = workspace
+          SessionID = sessionId
+          ProviderID = providerId
+          ModelID = modelId
+          Variant = variant }
 
 /// Result of a retry dispatch attempt.
 type RetryDispatchResult =
@@ -25,32 +32,36 @@ type RetryDispatchResult =
     | CancelledBeforeDispatch
 
 /// Per-key rate-limit gate: at most one dispatch per (provider, model,
-/// variant) tuple in the configured window.  A separate process-wide
-/// SerialQueue per key guarantees that two concurrent calls for the
-/// same key cannot both pass the stillValid check at the same instant
-/// and then both call the dispatch lambda.
-///
-/// The per-key queue is the rate limiter.  Without it, two concurrent
-/// calls could each see `elapsed > rateLimitMs`, both call the dispatch
-/// lambda, and the host would receive two prompts in the same window.
-/// With the per-key queue, the second call observes the first call's
-/// `lastActualDispatchAt` update and waits its turn.
+/// variant) tuple in the configured window.
+/// Per-session serialization queue: at most one active dispatch per physical session.
 type RetryDispatchGovernor(?rateLimitMs: int64) =
     let rateLimitMs = defaultArg rateLimitMs 10000L
 
-    let mutable lastActualDispatchAt: Map<string, int64> = Map.empty
+    let mutable lastActualDispatchAt: Map<string, float> = Map.empty
+    let mutable lastSessionUseAt: Map<string, float> = Map.empty
 
-    let mutable keyQueues: Map<string, Wanxiangshu.Runtime.PromiseQueue.SerialQueue> =
+    let mutable sessionQueues: Map<string, Wanxiangshu.Runtime.PromiseQueue.SerialQueue> =
+        Map.empty
+
+    let mutable providerQueues: Map<string, Wanxiangshu.Runtime.PromiseQueue.SerialQueue> =
         Map.empty
 
     let lockObj = obj ()
 
-    let getOrCreateQueue (key: string) : Wanxiangshu.Runtime.PromiseQueue.SerialQueue =
-        match Map.tryFind key keyQueues with
+    let getOrCreateSessionQueue (key: string) : Wanxiangshu.Runtime.PromiseQueue.SerialQueue =
+        match Map.tryFind key sessionQueues with
         | Some q -> q
         | None ->
             let q = Wanxiangshu.Runtime.PromiseQueue.SerialQueue()
-            keyQueues <- Map.add key q keyQueues
+            sessionQueues <- Map.add key q sessionQueues
+            q
+
+    let getOrCreateProviderQueue (key: string) : Wanxiangshu.Runtime.PromiseQueue.SerialQueue =
+        match Map.tryFind key providerQueues with
+        | Some q -> q
+        | None ->
+            let q = Wanxiangshu.Runtime.PromiseQueue.SerialQueue()
+            providerQueues <- Map.add key q providerQueues
             q
 
     /// Enqueue a dispatch for the given key. The dispatch function will run
@@ -60,59 +71,87 @@ type RetryDispatchGovernor(?rateLimitMs: int64) =
         (key: RetryModelKey, stillValid: unit -> bool, dispatch: unit -> JS.Promise<unit>)
         : JS.Promise<RetryDispatchResult> =
         promise {
-            let queue = lock lockObj (fun () -> getOrCreateQueue key.Value)
+            let sessionKey = $"{key.Workspace}/{key.SessionID}"
 
-            let body () : JS.Promise<RetryDispatchResult> =
-                promise {
-                    do! Promise.sleep 0 // yield to avoid blocking the caller
+            let providerKey =
+                match key.Variant with
+                | Some v when v <> "" -> $"{key.ProviderID}/{key.ModelID}:{v}"
+                | _ -> $"{key.ProviderID}/{key.ModelID}"
 
-                    let effectiveRateLimitMs =
-                        if nodeProcess?env?("WANXIANGSHU_TEST") = "true" then
-                            0L
+            let sessionQueue =
+                lock lockObj (fun () ->
+                    lastSessionUseAt <- Map.add sessionKey (getMonotonicTimeMs ()) lastSessionUseAt
+                    getOrCreateSessionQueue sessionKey)
+
+            // Outer enqueue: serialize per physical session (workspace + sessionId)
+            return!
+                sessionQueue.Enqueue(fun () ->
+                    promise {
+                        // Check if still valid after obtaining the session lock/queue slot
+                        if not (stillValid ()) then
+                            return CancelledBeforeDispatch
                         else
-                            rateLimitMs
+                            let providerQueue = lock lockObj (fun () -> getOrCreateProviderQueue providerKey)
 
-                    let delay, now =
-                        lock lockObj (fun () ->
-                            let now = System.DateTime.UtcNow.Ticks / 10000L // ms
+                            // Inner enqueue: rate limit per provider/model
+                            return!
+                                providerQueue.Enqueue(fun () ->
+                                    promise {
+                                        // Check stillValid again after obtaining the provider queue slot
+                                        if not (stillValid ()) then
+                                            return CancelledBeforeDispatch
+                                        else
+                                            let effectiveRateLimitMs =
+                                                if nodeProcess?env?("WANXIANGSHU_TEST") = "true" then
+                                                    0.0
+                                                else
+                                                    float rateLimitMs
 
-                            let lastDispatch =
-                                Map.tryFind key.Value lastActualDispatchAt |> Option.defaultValue 0L
+                                            let now = getMonotonicTimeMs ()
 
-                            let elapsed = now - lastDispatch
-                            let delay = max 0L (effectiveRateLimitMs - elapsed)
-                            delay, now)
+                                            let lastDispatch =
+                                                lock lockObj (fun () ->
+                                                    Map.tryFind providerKey lastActualDispatchAt
+                                                    |> Option.defaultValue 0.0)
 
-                    if delay > 0L then
-                        do! Promise.sleep (int delay)
+                                            let elapsed = now - lastDispatch
+                                            let delay = max 0.0 (effectiveRateLimitMs - elapsed)
 
-                    // Re-check after waiting
-                    if not (stillValid ()) then
-                        return CancelledBeforeDispatch
-                    else
-                        let actualNow = System.DateTime.UtcNow.Ticks / 10000L
+                                            if delay > 0.0 then
+                                                do! Promise.sleep (int delay)
 
-                        lock lockObj (fun () ->
-                            lastActualDispatchAt <- Map.add key.Value actualNow lastActualDispatchAt)
+                                            // Final validity check after waiting/delay
+                                            if not (stillValid ()) then
+                                                return CancelledBeforeDispatch
+                                            else
+                                                let actualNow = getMonotonicTimeMs ()
 
-                        do! dispatch ()
-                        return Dispatched
-                }
+                                                lock lockObj (fun () ->
+                                                    lastActualDispatchAt <-
+                                                        Map.add providerKey actualNow lastActualDispatchAt)
 
-            return! queue.Enqueue body
+                                                do! dispatch ()
+                                                return Dispatched
+                                    })
+                    })
         }
 
     /// Remove stale entries that haven't been used for a long time.
     member _.Cleanup(staleThresholdMs: int64) : unit =
-        let cutoff = System.DateTime.UtcNow.Ticks / 10000L - staleThresholdMs
+        let now = getMonotonicTimeMs ()
+        let cutoff = now - float staleThresholdMs
 
         lock lockObj (fun () ->
             lastActualDispatchAt <- lastActualDispatchAt |> Map.filter (fun _ last -> last >= cutoff)
+            lastSessionUseAt <- lastSessionUseAt |> Map.filter (fun _ last -> last >= cutoff)
 
-            keyQueues <- keyQueues |> Map.filter (fun k _ -> Map.containsKey k lastActualDispatchAt))
+            providerQueues <- providerQueues |> Map.filter (fun k _ -> Map.containsKey k lastActualDispatchAt)
+            sessionQueues <- sessionQueues |> Map.filter (fun k _ -> Map.containsKey k lastSessionUseAt))
 
     /// Reset all state (for testing).
     member _.Reset() : unit =
         lock lockObj (fun () ->
             lastActualDispatchAt <- Map.empty
-            keyQueues <- Map.empty)
+            lastSessionUseAt <- Map.empty
+            sessionQueues <- Map.empty
+            providerQueues <- Map.empty)
