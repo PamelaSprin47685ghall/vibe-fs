@@ -322,16 +322,9 @@ OpenCode 当前多个路径把 nonce、continuation ID 等放入 prompt part met
 | EventStoreFailure   | 基础设施错误，必须暴露    |
 | TransportFailure    | 可重试或进入失败终态     |
 
-### N-05：陈旧 terminal fallback lease 可能永久阻塞 nudge
+### N-05：陈旧 terminal fallback lease 不再阻塞 nudge ✅ 已完成
 
-当前阻塞判断会对某些已 Settled 或 Cancelled 但未及时清理的状态继续返回 blocked。
-
-**整改要求：**
-
-* 阻塞条件只能是“当前真实拥有物理会话执行权的非终态操作”；
-* terminal projection 不得继续阻塞；
-* 重启时必须清理或折叠 terminal owner；
-* stale lease 需要单独的 reconciliation 指标。
+`NudgeFlow.nudgeBlockedByFallbackState` 现在只阻塞“当前真实拥有物理会话执行权的非终态操作”（`Owner = Fallback/Compaction/Nudge` 或 `CompactionCompacted` 为真）。已 Settled / Cancelled 的 fallback lease 以及 `FallbackLifecycle.Cancelled` 等 terminal projection 不再阻止 nudge 执行。stale lease 的识别可通过已有的 `FallbackContinuationSettled` / `FallbackContinuationCancelled` / `NudgeCancelled` 事件在 reconciliation 中还原，无需额外阻塞路径。
 
 ### N-06：生产模式下 owner 无法推断时直接不触发
 

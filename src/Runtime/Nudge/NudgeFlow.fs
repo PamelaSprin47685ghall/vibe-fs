@@ -12,17 +12,11 @@ open Wanxiangshu.Kernel.FallbackKernel.Types
 open Wanxiangshu.Runtime.Fallback.RuntimeStore
 open Wanxiangshu.Runtime.Fallback.SessionRuntimeLeasePure
 
-/// Nudge dispatch is lower priority than fallback and compaction.  In
-/// particular, a settled fallback lease may still be visible to a concurrent
-/// idle callback until its event projection catches up; treating that lease
-/// as a terminal gate prevents the callback from manufacturing a second
-/// synthetic turn.
+/// Nudge dispatch is lower priority than fallback and compaction.
+/// Terminal fallback leases (Settled/Cancelled) must NOT keep nudging
+/// blocked: the projection may lag, and a stale lease should not
+/// permanently suppress a legitimate nudge request.
 let private nudgeBlockedByFallbackState (runtime: FallbackRuntimeStore) (sessionKey: string) : bool =
-    let lifecycleCancelled =
-        match runtime.TryGetState sessionKey with
-        | Some state -> state.Lifecycle = FallbackLifecycle.Cancelled
-        | None -> false
-
     let owner = (runtime.GetSession sessionKey).Owner
 
     let fallbackOwnerActive =
@@ -30,15 +24,7 @@ let private nudgeBlockedByFallbackState (runtime: FallbackRuntimeStore) (session
         || owner = SessionOwner.Compaction
         || owner = SessionOwner.Nudge
 
-    let settledFallbackLease =
-        match (runtime.GetSession sessionKey).PendingLease with
-        | Some lease -> lease.Status = LeaseStatus.Settled || lease.Status = LeaseStatus.Cancelled
-        | None -> false
-
-    lifecycleCancelled
-    || fallbackOwnerActive
-    || settledFallbackLease
-    || (runtime.GetSession sessionKey).CompactionCompacted
+    fallbackOwnerActive || (runtime.GetSession sessionKey).CompactionCompacted
 
 let private dispatchNudge
     (workspaceRoot: string)
