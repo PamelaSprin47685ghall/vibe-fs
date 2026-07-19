@@ -325,7 +325,6 @@
     <Compile Include="src/Runtime/EventStore/SessionStateRestore.fs"/>
     <Compile Include="src/Runtime/EventStore/EventLogRuntimeSync.fs"/>
     <Compile Include="src/Runtime/EventStore/ReviewEventWriter.fs"/>
-    <Compile Include="src/Runtime/EventStore/ReviewReportSubmission.fs"/>
     <Compile Include="src/Runtime/EventStore/ToolSequenceThrottle.fs"/>
     <Compile Include="src/Runtime/EventStore/NudgeEventWriter.fs"/>
     <Compile Include="src/Runtime/EventStore/BacklogEventWriter.fs"/>
