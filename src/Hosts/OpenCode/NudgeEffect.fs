@@ -55,27 +55,46 @@ let sendNudge
 
         fallbackRuntime.UpdateSession(sidStr, armNudgeNonce nonce)
 
-        match getSessionApiFromClient client with
-        | Error _ ->
-            // Surface the typed failure AND clear the
-            // active nudge nonce / owner on the early-exit path so the
-            // next attempt can dispatch.
+        try
+            match getSessionApiFromClient client with
+            | Error _ ->
+                // Surface the typed failure AND clear the
+                // active nudge nonce / owner on the early-exit path so the
+                // next attempt can dispatch.
+                let _ = fallbackRuntime.UpdateSessionReturning(sidStr, tryConsumeNudgeNonce nonce)
+
+                if (fallbackRuntime.GetSession sidStr).Owner = SessionOwner.Nudge then
+                    fallbackRuntime.UpdateSession(sidStr, transferOwnership SessionOwner.NoOwner)
+
+                return raise (System.Exception("opencode_session_api_missing"))
+            | Ok session ->
+                let body =
+                    createPromptBodyWithModelAndNonce agentOpt modelOpt promptText (Some nonce)
+
+                let promptArg =
+                    box
+                        {| path = box {| id = sidStr |}
+                           body = body |}
+
+                do! invoke1 promptArg "prompt" session |> Promise.map ignore
+        with ex ->
+            // Any failure before terminal resolution must clear the active
+            // nonce and release ownership so the session is not wedged.
             let _ = fallbackRuntime.UpdateSessionReturning(sidStr, tryConsumeNudgeNonce nonce)
 
             if (fallbackRuntime.GetSession sidStr).Owner = SessionOwner.Nudge then
                 fallbackRuntime.UpdateSession(sidStr, transferOwnership SessionOwner.NoOwner)
 
-            return raise (System.Exception("opencode_session_api_missing"))
-        | Ok session ->
-            let body =
-                createPromptBodyWithModelAndNonce agentOpt modelOpt promptText (Some nonce)
-
-            let promptArg =
+            JS.console.error (
                 box
-                    {| path = box {| id = sidStr |}
-                       body = body |}
+                    {| feature = "nudge"
+                       session = sidStr
+                       dispatchId = nonce
+                       hostVariant = "opencode"
+                       error = ex.Message |}
+            )
 
-            do! invoke1 promptArg "prompt" session |> Promise.map ignore
+            return raise ex
     }
 
 let sendNudgeOutcome

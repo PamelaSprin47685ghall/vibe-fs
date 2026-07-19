@@ -294,43 +294,13 @@ OpenCode 当前多个路径把 nonce、continuation ID 等放入 prompt part met
 
 ## 4.1 Nudge
 
-### N-01：宿主 session API 缺失时被报告为成功
+### N-01：宿主 session API 缺失时被报告为成功 ✅ 已完成
 
-`NudgeEffect.sendNudge` 在找不到 session API 时没有失败，而是直接结束；上层随后把结果映射为 Delivered。
+`NudgeEffect.sendNudge` 在 `getSessionApiFromClient` 失败时抛出 `opencode_session_api_missing`；`sendNudgeOutcome` 捕获后返回 `TransportUnavailable`；`NudgeOutcomeHandler` 将其结算为 `NudgeOutcome.Failed`，不会进入 `Dispatched`。异常路径会记录 `{ feature, session, dispatchId, hostVariant, error }`。
 
-结果是：
+### N-02：部分失败路径没有释放 active nudge nonce ✅ 已完成
 
-* 日志显示已发送；
-* 状态机可能等待永远不会到来的 busy/idle；
-* 上层无法区分“宿主不支持”和“发送成功”。
-
-**整改要求：**
-
-* 宿主 API 缺失必须产生明确的 `TransportUnavailable`；
-* 不能进入 Dispatched；
-* 不能吞掉异常；
-* 必须记录 feature、session、dispatch ID、host variant 和错误分类。
-
-### N-02：部分失败路径没有释放 active nudge nonce
-
-当前清理逻辑主要位于成功取得 session 对象后的 finally。API 缺失或更早失败时，nonce 可能继续残留。
-
-结果是：
-
-* 系统认为该会话已经存在活跃 nudge；
-* 后续 nudge 永远被抑制；
-* session owner 也可能永久停留在不正确状态。
-
-**整改要求：**
-
-清理必须围绕整个 dispatch 生命周期，而不是围绕某个成功分支。每个终态都要完成：
-
-* waiter resolve；
-* pending registry remove；
-* active nonce clear；
-* owner release 或转移；
-* timer cancel；
-* 持久化终态事件。
+`NudgeEffect.sendNudge` 已用 `try...with` 包裹完整 dispatch 体；`with` 分支会消费 active nonce、在 owner 为 Nudge 时转移回 `NoOwner`、记录五字段诊断日志并重新抛出。API 缺失或 `prompt` 异步失败都会进入同一条清理路径。
 
 ### N-03：在 prompt 返回后才标记 Dispatched
 
