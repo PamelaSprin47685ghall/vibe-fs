@@ -135,8 +135,6 @@ let onNewHumanMessage
     promise {
         let directory = if isNullish ctx then "" else pluginDirectoryFromCtx ctx
 
-        do! finishPendingLease directory fallbackRuntime sessionID
-
         let msgId =
             if messageId = "" then
                 "human-" + System.Guid.NewGuid().ToString("N")
@@ -145,7 +143,11 @@ let onNewHumanMessage
 
         let lastMsgId = (fallbackRuntime.GetSession sessionID).LastHumanMessageId
 
+        // Dedup before any side-effect that could cancel an active lease.
+        // A duplicate chat.message hook must not reset fallback/nudge state.
         if msgId <> lastMsgId then
+            do! finishPendingLease directory fallbackRuntime sessionID
+
             if directory <> "" then
                 do! cancelNudgeAndCompaction directory fallbackRuntime sessionID
 
