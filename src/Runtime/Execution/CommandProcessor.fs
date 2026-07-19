@@ -5,6 +5,7 @@ open Wanxiangshu.Kernel.FallbackKernel.Types
 open Wanxiangshu.Kernel.Reactive
 open Wanxiangshu.Kernel.Subsession.Types
 open Wanxiangshu.Kernel.Subsession.Decision
+open Wanxiangshu.Kernel.Subsession.Rules
 open Wanxiangshu.Kernel.ResourcePlan
 open Wanxiangshu.Runtime.PromiseQueue
 open Wanxiangshu.Runtime.SubsessionPorts
@@ -86,7 +87,12 @@ type CommandProcessor
                     let priorState = state
 
                     match decide state cmd with
-                    | Ok(Decided decision) -> return! applyDecision applier priorState decision
+                    | Ok(Decided decision) ->
+                        react.OnTelemetry(
+                            [ TelemetryStateTransition(stateName priorState, stateName decision.NextState, cmdName cmd) ]
+                        )
+
+                        return! applyDecision applier priorState decision
                     | Ok(NoChange _) -> return [], None
                     | Error(IllegalTransition(s, c)) -> return! handleIllegal applier priorState s c
                     | Error(StaleTurnCommand _) -> return [], None

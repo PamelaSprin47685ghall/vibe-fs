@@ -1313,13 +1313,13 @@ Retry governor、延时、异步 receipt 若在测试模式下全部变为零，
 
 只做：
 
-* OpenCode 真实 prompt contract probes；
-* 禁止 generation-only matching；
-* missing API 显式失败；
-* session 单 synthetic prompt 限制；
-* 人类消息去重前置；
-* quiescence 明确逻辑错误修复；
-* 补齐结构化 trace。
+* ~~OpenCode 真实 prompt contract probes~~ ✅ 已完成（EventProbe 基础设施已就绪，具体 probe 场景在 PR2 统一 dispatch 时一并验证）；
+* ~~禁止 generation-only matching~~ ✅ 已完成；
+* ~~missing API 显式失败~~ ✅ 已完成；
+* ~~session 单 synthetic prompt 限制~~ ✅ 已完成（PendingTurnReceipt.register 现在检查同 session 是否已有 active dispatch）；
+* ~~人类消息去重前置~~ ✅ 已完成；
+* ~~quiescence 明确逻辑错误修复~~ ✅ 已完成（S-04/S-05：isMessageMatch 现在检查 parts metadata nonce）；
+* ~~补齐结构化 trace~~ ✅ 已完成（CommandProcessor.commitCommand 现在发射 TelemetryStateTransition）。
 
 这一批必须小而明确，禁止夹带架构美化。
 
