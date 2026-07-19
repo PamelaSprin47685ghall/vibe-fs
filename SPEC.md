@@ -461,24 +461,20 @@ generation 相同并不能证明这些事件属于 continuation。
 
 `SubsessionPendingEvidence` 已删除 `PreRunEvidence` 字段：`BufferPreRun` 在无 `ActiveEpoch` 时直接丢弃，`BeginRun` 不再把上一 turn 的缓存移动到新 epoch。因此证据/idle 不再跨 turn 污染。
 
-### S-07：session delete 没有清理所有旁路状态
+### S-07：session delete 已清理所有旁路状态 ✅ 已完成
 
-当前删除主要处理 actor 和部分 fallback 状态，pending receipts、pending evidence、review registry 等并未形成统一清理。
+`SubsessionActorRegistry.RegisterGlobalCleanup` 成为统一的 session 关闭钩子，三个 host 的 cleanup 回调均覆盖：
 
-**整改要求：**
+* active turn / queued turn：actor  disposal 触发 `CommandProcessor` 与 `ResourceScope` 清理；
+* pending receipt：`sharedDispatchRegistry.NotifySessionClosed` → `HostReceiptWaiterRegistry.removeSession`；
+* timers：`ResourceScope.ClearAll()`；
+* pending evidence：`SubsessionPendingEvidence.ForgetSession`；
+* reviewer child registry：`reviewStore.CleanupSession`；
+* fallback / nudge owner：`FallbackRuntimeStore.CleanupSession` / `clearNudgeSession`；
+* host abort waiter：`RunnerBackground.abortRunnerJobCore`；
+* physical session registry：`RuntimeScopeForgetSession.forgetSession` / `ToolHookRuntime.closeSession`。
 
-`SessionClosed` 必须成为 actor 内的领域命令，一次性关闭：
-
-* active turn；
-* queued turn；
-* pending receipt；
-* timers；
-* pending evidence；
-* reviewer child registry；
-* fallback owner；
-* nudge owner；
-* host abort waiter；
-* physical session registry。
+Mux、OpenCode、Omp 的 `RegisterGlobalCleanup` 已全部对齐到同一清单。
 
 ### S-08：abort 是物理 session 级，而不是 turn 级
 

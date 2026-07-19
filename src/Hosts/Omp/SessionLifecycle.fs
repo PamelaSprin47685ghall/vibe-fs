@@ -25,7 +25,14 @@ let registerSessionLifecycle (pi: obj) (reviewStore: ReviewStore) (fallbackRunti
             ToolHookRuntime.clearSessionCompliance sessionId
             ToolHookRuntime.closeSession sessionId
             reviewStore.CleanupSession sessionId
-            SubsessionPendingEvidence.ForgetSession sessionId)
+            SubsessionPendingEvidence.ForgetSession sessionId
+
+            let ws =
+                Wanxiangshu.Kernel.Primitives.Identity.Id.workspaceIdQuick ("omp:" + workspaceRoot)
+
+            Wanxiangshu.Runtime.Dispatch.DispatchRegistryInstance.sharedDispatchRegistry.NotifySessionClosed
+                ws
+                sessionId)
 
     pi?on (
         "before_agent_start",
