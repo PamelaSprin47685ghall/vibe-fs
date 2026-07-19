@@ -410,41 +410,17 @@
 
 ## 3. `.wanxiangzhen-e2e-meta.json`
 
-来源：
+来源：`Hosts/OpenCode/PluginWanxiangzhenE2eMeta.fs`。
 
-* `Hosts/OpenCode/PluginWanxiangzhenE2eMeta.fs`
-
-它会在项目或工作区附近生成 E2E 元数据，但当前看不到完整、可靠的清理闭环。
-
-### 处理
-
-1. 确认只在测试模式生成。
-2. 改到测试独占临时目录。
-3. 测试 teardown 删除。
-4. 测试启动时清理上次崩溃遗留。
-5. 加入 `.gitignore`。
-6. 使用限制性文件权限。
-7. 正常生产插件绝不能创建该文件。
+已改为仅在 `WANXIANGZHEN_E2E=1` 或 `WANXIANGZHEN_E2E_INPROCESS=1` 时生成，并可通过 `WANXIANGZHEN_E2E_META_DIR` 指定目录；e2e harness 现在会创建独占临时目录并设置该环境变量，元数据不再写入项目根。`.gitignore` 也已加入该文件。
 
 ---
 
 ## 4. `<target>.swap-tmp`
 
-来源：
+来源：`Runtime/Tooling/FileSwap.fs`。
 
-* `Runtime/Tooling/FileSwap.fs`
-
-固定的相邻临时名在正常流程可能会删除，但进程崩溃时会残留，还可能产生并发冲突。
-
-### 正确方案
-
-* 临时名必须唯一；
-* 与目标文件处于同一文件系统，保证 rename 语义；
-* 写完后 flush；
-* 原子替换；
-* 异常路径 best-effort 删除；
-* 启动或下次操作时清理过期临时文件；
-* 明确 symlink 和权限语义。
+`NodeFileSwapIO.WriteTemp` 已不再使用固定相邻名 `path + ".swap-tmp"`，改为 `System.IO.Path.GetTempFileName()`，并移动到目标文件所在目录（保证 `rename` 跨同一文件系统），异常路径已调用 `DeleteIfExists`。剩余项：启动时清理过期 `.tmp` 残留与 `flush`/`symlink`/`权限` 语义可后续补充。
 
 ---
 

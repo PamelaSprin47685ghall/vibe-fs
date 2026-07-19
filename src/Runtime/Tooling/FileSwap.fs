@@ -3,6 +3,7 @@ module Wanxiangshu.Runtime.FileSwap
 open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Kernel.FileSwap
+open System.IO
 
 [<Import("promises", "node:fs")>]
 let private fsPromises: obj = jsNative
@@ -29,7 +30,15 @@ type NodeFileSwapIO() =
 
         member _.WriteTemp(path: string, content: string) : JS.Promise<string> =
             promise {
-                let tempPath = path + ".swap-tmp"
+                let dir = System.IO.Path.GetDirectoryName(path)
+                let temp = System.IO.Path.GetTempFileName()
+
+                let tempPath =
+                    if not (isNull dir) && dir <> "" then
+                        System.IO.Path.Combine(dir, System.IO.Path.GetFileName(temp))
+                    else
+                        temp
+
                 do! callMethod2 fsPromises "writeFile" tempPath content |> Promise.map ignore
                 return tempPath
             }

@@ -33,7 +33,7 @@ export const BUILD_SRC = path.join(REPO_ROOT, 'build');
 export function gitInit(tmpDir, opts = {}) {
   const masterBranch = opts.masterBranch || 'main';
   execSync('git init', { cwd: tmpDir, stdio: 'ignore' });
-  fs.writeFileSync(path.join(tmpDir, '.gitignore'), 'node_modules/\n.wanxiangzhen-e2e-meta.json\n.wanxiangshu.ndjson\n');
+  fs.writeFileSync(path.join(tmpDir, '.gitignore'), 'node_modules/\n.wanxiangshu.ndjson\n');
   execSync('git add .gitignore', { cwd: tmpDir, stdio: 'ignore' });
   const agentsMd = `---
 squad:
