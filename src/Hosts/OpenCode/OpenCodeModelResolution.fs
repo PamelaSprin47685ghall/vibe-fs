@@ -6,20 +6,20 @@ open Wanxiangshu.Kernel
 open Wanxiangshu.Runtime
 open Wanxiangshu.Runtime.ContextBudgetUsageCodec
 open Wanxiangshu.Runtime.Dyn
-open Wanxiangshu.Hosts.Opencode.ModelResolutionHelpers
+open Wanxiangshu.Hosts.Opencode.ModelResolutionCatalog
 
-module ProviderHelpers = Wanxiangshu.Hosts.Opencode.OpenCodeModelResolutionProviders
-let private fallbackMaxInputTokens = ProviderHelpers.fallbackMaxInputTokens
+module ProviderCatalog = Wanxiangshu.Hosts.Opencode.OpenCodeModelResolutionProviders
+let private fallbackMaxInputTokens = ProviderCatalog.fallbackMaxInputTokens
 
 /// Strongly-typed model resolution result.
-type ModelResolutionResult = ProviderHelpers.ModelResolutionResult
+type ModelResolutionResult = ProviderCatalog.ModelResolutionResult
 
 let extractLimitFromCatalogEntry =
-    ModelResolutionHelpers.extractLimitFromCatalogEntry
+    ModelResolutionCatalog.extractLimitFromCatalogEntry
 
-let findModelInCatalog = ModelResolutionHelpers.findModelInCatalog
-let computeUsableInputTokens = ModelResolutionHelpers.computeUsableInputTokens
-let resolveModelResolution = ProviderHelpers.resolveModelResolution
+let findModelInCatalog = ModelResolutionCatalog.findModelInCatalog
+let computeUsableInputTokens = ModelResolutionCatalog.computeUsableInputTokens
+let resolveModelResolution = ProviderCatalog.resolveModelResolution
 
 let private sessionGetArg (sessionID: string) (directory: string) : obj =
     createObj

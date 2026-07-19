@@ -131,6 +131,11 @@ let private applyToolOverrides (host: Host) (agent: string) (output: obj) : unit
             | None -> ()
             | Some filtered -> setKey message "tools" (encodeToolsOverridesToMessage filtered)
 
+/// Message-id dedup MUST happen before any side-effect that could cancel an
+/// active fallback lease (`OnNewHumanMessage` does exactly that). The contract
+/// is: classify -> dedup -> bind dispatch -> record provenance -> tool
+/// overrides. The progress hook is preserved at the top because it only touches
+/// the `ProgressObserver` stream, never the leases.
 let chatMessageFor
     (host: Host)
     (registry: ChildAgentRegistry)
@@ -153,22 +158,6 @@ let chatMessageFor
 
         let fr = lifecycleObserver.FallbackRuntime
 
-        // Message-id dedup MUST happen before any side-effect that
-        // could cancel an active fallback lease (OnNewHumanMessage does
-        // exactly that). The previous ordering was:
-        //   1. handleChatMessage (progress)
-        //   2. isSystemMessage (may call TryConsumeActiveNudgeNonce)
-        //   3. OnNewHumanMessage (cancels active leases)
-        //   4. recordProvenanceIfPresent
-        // which meant a duplicate chat.message hook (the same message
-        // observed twice) would re-enter the human-turn machinery and
-        // trigger a second cancel of a fallback that may already have
-        // settled in the meantime.
-        //
-        // The contract is: classify -> dedup -> bind dispatch ->
-        // record provenance -> tool overrides. The progress hook
-        // (handleChatMessage) is preserved at the top because it only
-        // touches the ProgressObserver stream, never the leases.
         do! lifecycleObserver.handleChatMessage (sessionID, agent, parts)
 
         // Step 1: classify
@@ -177,10 +166,7 @@ let chatMessageFor
 
         let messageRole = tryGetChatMessageRole output
 
-        // Step 2: dedup — drop the hook entirely if the host has already
-        // surfaced this exact message id. We still record provenance so
-        // a retry of a continuation does not lose the binding, but we
-        // never call OnNewHumanMessage twice.
+        // Step 2: dedup — drop the hook if the host already surfaced this id.
         let isDuplicate = msgId <> "" && markSeen sessionIDStr msgId
 
         if not isDuplicate then

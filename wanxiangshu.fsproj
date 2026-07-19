@@ -475,7 +475,7 @@
     <Compile Include="src/Hosts/OpenCode/CompactionHook.fs"/>
     <Compile Include="src/Hosts/OpenCode/ModelKeyResolver.fs"/>
     <Compile Include="src/Hosts/OpenCode/SembleInjection.fs"/>
-    <Compile Include="src/Hosts/OpenCode/ModelResolutionHelpers.fs"/>
+    <Compile Include="src/Hosts/OpenCode/ModelResolutionCatalog.fs"/>
     <Compile Include="src/Hosts/OpenCode/OpenCodeModelResolutionProviders.fs"/>
     <Compile Include="src/Hosts/OpenCode/OpenCodeModelResolution.fs"/>
     <Compile Include="src/Hosts/OpenCode/MessageTransformPipeline.fs"/>

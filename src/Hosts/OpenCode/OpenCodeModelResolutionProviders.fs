@@ -6,7 +6,7 @@ open Wanxiangshu.Kernel
 open Wanxiangshu.Runtime
 open Wanxiangshu.Runtime.ContextBudgetUsageCodec
 open Wanxiangshu.Runtime.Dyn
-open Wanxiangshu.Hosts.Opencode.ModelResolutionHelpers
+open Wanxiangshu.Hosts.Opencode.ModelResolutionCatalog
 
 /// Strongly-typed model resolution result.
 type ModelResolutionResult =

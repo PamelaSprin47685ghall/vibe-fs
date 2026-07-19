@@ -28,9 +28,12 @@
 - 250–299 行长文件拆分：`EventStore.fs`、`NudgeEffect.fs`、`CommandProcessor.fs`、`OpenCodeModelResolution.fs`、`DecisionObserve.fs`、`LeaseValidation.fs`、`FuzzySearchGrep.fs`、`Fold.fs`、`LeaseIdentity.fs`/`LeaseIdentityOps.fs` 等已拆分
 - 当前：`src` 下 0 文件 >250 行，44 文件在 200–250 行（< 50 阶段上限）
 
+**已完成：**
+- 生产源码 >250 行：0 个；200–250 行：46 个（阶段上限 50 内）。
+- `Helpers` 命名清理：`src/Hosts/OpenCode/ModelResolutionHelpers.fs` 已重命名为 `ModelResolutionCatalog.fs`。
+
 **待完成：**
 - 200–250 行长尾收敛到 ≤25
-- `Helpers` 命名清理
 - Fallback 状态收口
 
 ## 六、Fallback 不能停留在“文件拆完了” ✅ 部分完成
@@ -522,26 +525,13 @@ OpenCode pending receipt 的 cancel 为 no-op。
 
 任一终态都必须从 registry 删除。
 
-### S-03：重复 turn ID 注册可以覆盖旧 waiter
+### S-03：重复 turn ID 注册可以覆盖旧 waiter ✅ 已完成
 
-相同 turn ID 再次注册会让原 promise 永远无法完成。
+`HostReceiptWaiterRegistry.create` 现在返回同一个已存在的 waiter，不再覆盖。
 
-**整改要求：**
+### S-04：quiescence 查询存在确定性布尔逻辑错误 ✅ 已完成
 
-重复注册只能有两种合法语义：
-
-* 返回同一个已存在 receipt；
-* 明确拒绝 DuplicateTurn。
-
-不得覆盖。
-
-### S-04：quiescence 查询存在确定性布尔逻辑错误
-
-当前逻辑会构造消息匹配布尔数组，然后根据数组长度是否大于零判断。只要 session 有任何消息，即使没有一条属于目标 turn，也可能被认为目标 turn 已停止。
-
-**整改要求：**
-
-必须判断“是否存在严格匹配该 turn 的消息或运行”，而不是“session 是否有消息”。
+`SubsessionHostAdapterOps.buildQuerySessionQuiescence` 现在先按 nonce 过滤消息，再判断活跃状态。
 
 ### S-05：dispatch 写入 nonce 的位置和 reconciliation 查找位置不一致
 

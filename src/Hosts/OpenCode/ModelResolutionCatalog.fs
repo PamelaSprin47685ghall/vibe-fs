@@ -1,4 +1,4 @@
-module Wanxiangshu.Hosts.Opencode.ModelResolutionHelpers
+module Wanxiangshu.Hosts.Opencode.ModelResolutionCatalog
 
 open Fable.Core
 open Wanxiangshu.Runtime.Dyn
