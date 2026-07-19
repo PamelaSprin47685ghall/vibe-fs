@@ -2044,7 +2044,7 @@ OpenCode 当前注册的自定义工具包括 coder、inspector、browser、cont
 ### P0
 
 * [ ] **OC-FILE-007** read 不存在文件：tool part 为 error，session 仍可继续下一轮。
-* [ ] **OC-FILE-009** 缺少 `warn_tdd` 时按当前设计执行但产生批评消息。
+* [ ] **OC-FILE-009** 缺少 `warn_tdd` 时执行但不产生批评消息。
 * [ ] **OC-FILE-010** `warn_tdd` 不会写入文件工具真实参数。
 * [ ] **OC-FILE-011** permission deny 时文件绝对不存在。
 * [ ] **OC-FILE-012** 两个 session 写同名相对路径时，按设计验证共享或隔离语义。

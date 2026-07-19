@@ -88,10 +88,10 @@ OpenCode：**原地 mutate** hook 字段（`AGENTS.md`）。
 | Schema 注册 | 注入 `required_` 元数据，不放入 Host 强制 `required`/`minLength` | `ToolHookRuntime.decorateAndValidateSchema` |
 | Before hook | 提取并原地删除字段，构造 `ControlEnvelope` 存入 `ToolComplianceStore` | `executeBeforeGateway` + `saveCompliance` |
 | 真实执行 | 工具收到净化后的业务参数 | Host execute |
-| After hook | 追加违例批评（`WANXIANGSHU_COMPLIANCE_REPRIMAND`），调用 `restoreWarnToArgs` 将原始字段恢复到历史可见 args | `tryGetCompliance` → `appendCriticism` → `restoreWarnToArgs` → `removeCompliance` |
+| After hook | 调用 `restoreWarnToArgs` 将原始字段恢复到历史可见 args，不再追加违例批评 | `tryGetCompliance` → `restoreWarnToArgs` → `removeCompliance` |
 | Finally | 删除 compliance envelope | `removeCompliance` |
 
-缺失/空白/非规范值的字段不阻止工具执行，仅在 after 阶段追加一次严厉批评。硬拒绝只保留给 malformed business args、权限/安全拒绝、解析失败或净化后仍泄漏的控制字段。
+缺失/空白/非规范值的控制字段不阻止工具执行，也不在 after 阶段追加批评。`required_` 与 `minLength_` 是仅供 LLM 感知的软提示，宿主 JSON Schema 校验器不强制。硬拒绝只保留给 malformed business args、权限/安全拒绝、解析失败或净化后仍泄漏的控制字段。
 
 ## 相关
 

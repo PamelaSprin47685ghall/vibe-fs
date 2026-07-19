@@ -36,21 +36,8 @@ open Wanxiangshu.Kernel.Subsession.Types
 /// Shared BacklogSession bound to the OMP host.
 let private backlogSession = BacklogSession(omp, ExecutorTools.ompScope)
 
-let collectViolations (envOpt: ToolHookRuntime.ControlEnvelope option) (toolName: string) (args: obj) : string list =
-    let warnViolations =
-        match envOpt with
-        | Some env -> env.Violations
-        | None -> []
-
-    let todoReportViolations =
-        if toolName = todoWriteToolName omp then
-            match decodeTodoWriteArgs false args with
-            | Result.Ok(_, viols) -> viols
-            | Result.Error _ -> []
-        else
-            []
-
-    warnViolations @ todoReportViolations
+let collectViolations (_envOpt: ToolHookRuntime.ControlEnvelope option) (_toolName: string) (_args: obj) : string list =
+    []
 
 let tryCaptureBacklogEntry (isError: bool) (callId: string) (input: obj) (event: obj) : unit =
     if callId = "" then

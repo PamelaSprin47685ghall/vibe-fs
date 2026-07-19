@@ -44,14 +44,14 @@ let muxRejectsCoderMissing () =
     promise {
         let! err, violations = runRaw "coder"
         check "mux coder missing warn_tdd does not reject" (err = "")
-        check "mux coder missing warn_tdd has violations" (not violations.IsEmpty)
+        check "mux coder missing warn_tdd has no violations" (violations.IsEmpty)
     }
 
 let muxRejectsCoderMalformed () =
     promise {
         let! err, violations = runMuxHook "coder" (createObj [ "warn_tdd", box "wrong" ])
         check "mux coder malformed warn_tdd does not reject" (err = "")
-        check "mux coder malformed warn_tdd has violations" (not violations.IsEmpty)
+        check "mux coder malformed warn_tdd has no violations" (violations.IsEmpty)
     }
 
 let muxAcceptsCoder () =
@@ -77,7 +77,7 @@ let muxRejectsExecutorMissingWarn () =
     promise {
         let! err, violations = runWithWarnTdd "executor"
         check "mux executor missing warn does not reject" (err = "")
-        check "mux executor missing warn has violations" (not violations.IsEmpty)
+        check "mux executor missing warn has no violations" (violations.IsEmpty)
     }
 
 let muxAcceptsExecutor () =
@@ -109,7 +109,7 @@ let exhaustiveMuxWarnTdd () : JS.Promise<unit> =
 
             let! err, violations = runMuxHook tool args
             check ("mux " + tool + " missing warn_tdd does not reject") (err = "")
-            check ("mux " + tool + " missing warn_tdd has violations") (not violations.IsEmpty)
+            check ("mux " + tool + " missing warn_tdd has no violations") (violations.IsEmpty)
     }
 
 let exhaustiveMuxWarnTddAccepts () : JS.Promise<unit> =
@@ -134,7 +134,7 @@ let exhaustiveMuxWarn () : JS.Promise<unit> =
             let args = createObj [ "warn_tdd", box canonicalValue ]
             let! err, violations = runMuxHook tool args
             check ("mux " + tool + " missing warn does not reject") (err = "")
-            check ("mux " + tool + " missing warn has violations") (not violations.IsEmpty)
+            check ("mux " + tool + " missing warn has no violations") (violations.IsEmpty)
     }
 
 let exhaustiveMuxWarnAccepts () : JS.Promise<unit> =
@@ -154,7 +154,7 @@ let muxRejectsCoderMissingWarnReuse () =
     promise {
         let! err, violations = runMuxHook "coder" (createObj [ "warn_tdd", box canonicalValue ])
         check "mux coder missing warn_reuse does not reject" (err = "")
-        check "mux coder missing warn_reuse has violations" (not violations.IsEmpty)
+        check "mux coder missing warn_reuse has no violations" (violations.IsEmpty)
     }
 
 let muxRejectsCoderMalformedWarnReuse () =
@@ -163,7 +163,7 @@ let muxRejectsCoderMalformedWarnReuse () =
             runMuxHook "coder" (createObj [ "warn_tdd", box canonicalValue; "warn_reuse", box "wrong" ])
 
         check "mux coder malformed warn_reuse does not reject" (err = "")
-        check "mux coder malformed warn_reuse has violations" (not violations.IsEmpty)
+        check "mux coder malformed warn_reuse has no violations" (violations.IsEmpty)
     }
 
 let muxAcceptsCoderWithWarnReuse () =

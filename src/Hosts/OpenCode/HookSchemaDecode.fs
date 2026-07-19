@@ -104,7 +104,7 @@ let injectWarnIntoJsonSchema (schema: obj) : obj =
         schema
 
 let private stringZodProperty (description: string) : obj =
-    createObj [ "type", box "string"; "minLength", box 1; "description", box description ]
+    createObj [ "type", box "string"; "minLength_", box 1; "description", box description ]
 
 let private reportFieldDescs =
     [| "ahaMoments", ahaMomentsDesc
@@ -151,7 +151,8 @@ let injectWarnReuseIntoJsonSchema (schema: obj) : obj =
         schema
 
 /// Add or upgrade the five work-backlog report fields in the schema
-/// properties object so every field has minLength 1024 and a proper description.
+/// properties object. The "minLength_" key is a soft hint to the LLM and is
+/// intentionally not a real JSON Schema constraint.
 let private mergeBacklogFields (properties: obj) : unit =
     let reportFields =
         [| "ahaMoments"
@@ -167,8 +168,14 @@ let private mergeBacklogFields (properties: obj) : unit =
         if isNullish existingProp then
             properties?(field) <- WorkBacklogSchema.jsonStringMinLengthProperty 1024 (reportFieldDescs.[field])
         else
-            if isNullish (get existingProp "minLength") then
-                existingProp?("minLength") <- box 1024
+            let rawMin = get existingProp "minLength"
+
+            if not (isNullish rawMin) then
+                existingProp?("minLength_") <- rawMin
+                Dyn.deleteKey existingProp "minLength"
+
+            if isNullish (get existingProp "minLength_") then
+                existingProp?("minLength_") <- box 1024
 
             let currentDesc = Dyn.str existingProp "description"
 

@@ -6,7 +6,7 @@ let jsonStrProp (desc: string) : obj =
     createObj [ "type", box "string"; "description", box desc ]
 
 let jsonStrReq (desc: string) : obj =
-    createObj [ "type", box "string"; "minLength", box 1; "description", box desc ]
+    createObj [ "type", box "string"; "minLength_", box 1; "description", box desc ]
 
 let jsonNumProp (desc: string) : obj =
     createObj [ "type", box "number"; "description", box desc ]
@@ -27,7 +27,7 @@ let jsonStrEnumPropWithDefault (desc: string) (values: string array) (defaultVal
 let private jsonStrItem: obj = createObj [ "type", box "string" ]
 
 let private jsonStrItemReq: obj =
-    createObj [ "type", box "string"; "minLength", box 1 ]
+    createObj [ "type", box "string"; "minLength_", box 1 ]
 
 let jsonStrArrayProp (desc: string) : obj =
     createObj [ "type", box "array"; "items", box jsonStrItem; "description", box desc ]

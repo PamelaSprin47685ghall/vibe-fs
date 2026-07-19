@@ -47,19 +47,10 @@ type ProgressObserver
                 || ToolExecute.isNetworkErrorText (hookOutputText output)
 
             match hookOutputString output with
-            | Some oldText ->
+            | Some _ ->
                 if not isError then
                     let newBase = todoWriteOutput methodologies
-
-                    let finalOutput =
-                        let markerIdx = oldText.IndexOf(ToolHookRuntime.reprimandMarker)
-
-                        if markerIdx >= 0 then
-                            newBase + oldText.Substring(markerIdx)
-                        else
-                            newBase
-
-                    setHookOutputString output finalOutput
+                    setHookOutputString output newBase
 
                 let directory =
                     (fromOpencode input (pluginDirectoryFromCtx ctx)).Execution.Directory

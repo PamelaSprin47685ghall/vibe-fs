@@ -128,13 +128,7 @@ let toolExecuteBefore (input: obj) (output: obj) : JS.Promise<unit> =
                 | _ -> ()
     }
 
-let private computeTodoViolations (tool: string) (args: obj) : string list =
-    if tool = todoWriteToolName Mux && not (Dyn.isNullish args) then
-        match Wanxiangshu.Runtime.WorkBacklogToolsCodec.decodeTodoWriteArgs false args with
-        | Ok(_, viols) -> viols
-        | Error _ -> []
-    else
-        []
+let private computeTodoViolations (_tool: string) (_args: obj) : string list = []
 
 let private appendCriticismIfNeeded
     (output: obj)

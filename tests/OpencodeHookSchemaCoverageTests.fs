@@ -227,7 +227,7 @@ let opencodeHookSchemaMergeWorkBacklogReportSoftenExistingFields () =
                   [ "plan",
                     createObj
                         [ "type", box "string"
-                          "minLength", box 1024
+                          "minLength_", box 1024
                           "description", box "Original plan description" ]
                     "description", createObj [ "type", box "string" ] ]
               "required", box [| box "plan"; box "description" |] ]
@@ -237,7 +237,7 @@ let opencodeHookSchemaMergeWorkBacklogReportSoftenExistingFields () =
     let resultRequired = get result "required"
     let planProp = get resultProps "plan"
 
-    check "minLength kept on plan" (unbox<int> (get planProp "minLength") = 1024)
+    check "minLength_ kept on plan" (unbox<int> (get planProp "minLength_") = 1024)
 
     check
         "plan description has min length hint"
