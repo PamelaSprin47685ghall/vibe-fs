@@ -27,13 +27,21 @@ let private envVar (key: string) : string =
     let e = nodeProcess?("env")
     if isNullish e then "" else str e key
 
-let private e2eMetaDirectory (root: string) : string =
+let private e2eMetaDirectory () : string =
     match envVar "WANXIANGZHEN_E2E_META_DIR" with
-    | "" -> root
+    | "" -> mkdtempSync (pathJoin (tmpdir ()) "wanxiangzhen-e2e-")
     | dir -> dir
 
-let private e2eMetaPath (root: string) : string =
-    pathJoin (e2eMetaDirectory root) ".wanxiangzhen-e2e-meta.json"
+let private writeE2eMeta (rt: CoordinatorRuntime) (dir: string) : unit =
+    let fullPath = pathJoin dir ".wanxiangzhen-e2e-meta.json"
+
+    let meta =
+        {| coordinatorUrl = rt.CoordinatorUrl
+           token = rt.Token
+           masterSessionId = rt.MasterSessionId
+           sessionId = rt.Dag.SessionId |}
+
+    writeFileSync fullPath (string (JSON?stringify(meta)))
 
 let writeE2eMetaIfEnabled (rt: CoordinatorRuntime) : unit =
     let isE2e =
@@ -42,16 +50,7 @@ let writeE2eMetaIfEnabled (rt: CoordinatorRuntime) : unit =
         || envVar "WANXIANGZHEN_E2E_INPROCESS" = "1"
 
     if isE2e then
-        let dir = e2eMetaDirectory rt.ProjectRoot
-        let fullPath = pathJoin dir ".wanxiangzhen-e2e-meta.json"
-
-        let meta =
-            {| coordinatorUrl = rt.CoordinatorUrl
-               token = rt.Token
-               masterSessionId = rt.MasterSessionId
-               sessionId = rt.Dag.SessionId |}
-
-        writeFileSync fullPath (string (JSON?stringify(meta)))
+        writeE2eMeta rt (e2eMetaDirectory ())
 
 let createE2eMetaTempDirectory () : string =
     mkdtempSync (pathJoin (tmpdir ()) "wanxiangzhen-e2e-")
