@@ -432,8 +432,8 @@
     <Compile Include="src/Hosts/Mux/CompactionTransform.fs"/>
     <Compile Include="src/Hosts/Mux/MessageTransform.fs"/>
     <Compile Include="src/Hosts/Mux/Fallback/Hook.fs"/>
-    <Compile Include="src/Hosts/Mux/EventHookHandlers.fs"/>
     <Compile Include="src/Hosts/Mux/EventHookCleanup.fs"/>
+    <Compile Include="src/Hosts/Mux/EventHookHandlers.fs"/>
     <Compile Include="src/Hosts/Mux/EventHook.fs"/>
     <Compile Include="src/Hosts/Mux/SlashCommands.fs"/>
     <Compile Include="src/Hosts/Mux/PluginCatalog.fs"/>

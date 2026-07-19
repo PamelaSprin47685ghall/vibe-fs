@@ -10,6 +10,7 @@ open Wanxiangshu.Runtime.EventLogRuntime
 open Wanxiangshu.Runtime.ReviewRuntime
 open Wanxiangshu.Runtime.RuntimeScope
 open Wanxiangshu.Runtime.RuntimeScopeForgetSession
+open Wanxiangshu.Hosts.Mux.EventHookCleanup
 open Wanxiangshu.Hosts.Mux.Fallback.Hook
 open Wanxiangshu.Runtime.SubsessionEventRouter
 open Wanxiangshu.Runtime.SubsessionChildObserver
@@ -91,25 +92,6 @@ let shouldObserveMuxEvent (eventType: string) : bool =
     | "session.remove" -> true
     | _ -> false
 
-// ---------------------------------------------------------------------------
-// Extracted helpers for session-closed lifecycle events
-// ---------------------------------------------------------------------------
-
-let handleSessionClosed
-    (scope: RuntimeScope)
-    (directory: string)
-    (workspaceId: string)
-    (event: obj)
-    : JS.Promise<unit> =
-    promise {
-        forgetSession scope workspaceId
-        let sid = SessionId.create workspaceId
-        let eventStore = SubsessionEventStore.create directory
-        do! eventStore.Append(sid, [ PhysicalSessionClosed sid ]) |> Promise.map ignore
-        SubsessionActorRegistry.ClearPoison directory workspaceId
-        SubsessionActorRegistry.Remove directory workspaceId
-        Wanxiangshu.Runtime.SubsessionPendingEvidence.SubsessionPendingEvidence.ForgetSession workspaceId
-    }
 
 // ---------------------------------------------------------------------------
 // Extracted helpers for child-session routing
@@ -224,7 +206,7 @@ let processMuxEvent
                     || decoded.eventType = "session.delete"
                     || decoded.eventType = "session.remove"
                 then
-                    do! handleSessionClosed scope directory workspaceId event
+                    do! handleSessionClosed scope directory workspaceId
 
             let isChild =
                 workspaceId <> "" && SubsessionEventRouter.isChildSession directory workspaceId
