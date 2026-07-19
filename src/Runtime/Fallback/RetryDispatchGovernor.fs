@@ -30,11 +30,11 @@ type RetryDispatchResult =
 /// same key cannot both pass the stillValid check at the same instant
 /// and then both call the dispatch lambda.
 ///
-/// F-04 fix: the per-key queue is the rate limiter.  Without it, two
-/// concurrent calls could each see `elapsed > rateLimitMs`, both call
-/// the dispatch lambda, and the host would receive two prompts in the
-/// same window.  With the per-key queue, the second call observes the
-/// first call's `lastActualDispatchAt` update and waits its turn.
+/// The per-key queue is the rate limiter.  Without it, two concurrent
+/// calls could each see `elapsed > rateLimitMs`, both call the dispatch
+/// lambda, and the host would receive two prompts in the same window.
+/// With the per-key queue, the second call observes the first call's
+/// `lastActualDispatchAt` update and waits its turn.
 type RetryDispatchGovernor(?rateLimitMs: int64) =
     let rateLimitMs = defaultArg rateLimitMs 10000L
 

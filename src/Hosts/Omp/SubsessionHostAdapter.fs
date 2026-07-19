@@ -97,13 +97,12 @@ type OmpSubsessionHost(session: obj, agent: string, pi: obj, workspaceRoot: stri
             }
 
         member _.CancelPendingDispatch(turnId) =
-            // Best effort: the new unified DispatchRegistry does not
+            // The new unified DispatchRegistry does not
             // yet own an OMP per-session mailbox (OMP path goes through
             // the serial `session.prompt` Promise).  The previous
             // implementation was a no-op; we now at least record a
             // typed failure so the caller can distinguish "no-op"
-            // from "unknown dispatch".  When the OMP per-session
-            // mailbox lands, this becomes a registry call.
+            // from "unknown dispatch".
             let nonce = TurnId.value turnId
             ignore nonce
 
@@ -132,10 +131,7 @@ type OmpSubsessionHost(session: obj, agent: string, pi: obj, workspaceRoot: stri
                                         else
                                             Dyn.get sm "messages"
 
-                                    if Dyn.isArray raw then
-                                        return Some raw
-                                    else
-                                        return None
+                                    if Dyn.isArray raw then return Some raw else return None
                         }
 
                     match dataOpt with

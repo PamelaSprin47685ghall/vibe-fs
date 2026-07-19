@@ -137,7 +137,7 @@ let chatMessageFor
 
         let fr = lifecycleObserver.FallbackRuntime
 
-        // F-03: message-id dedup MUST happen before any side-effect that
+        // Message-id dedup MUST happen before any side-effect that
         // could cancel an active fallback lease (OnNewHumanMessage does
         // exactly that). The previous ordering was:
         //   1. handleChatMessage (progress)
@@ -149,7 +149,7 @@ let chatMessageFor
         // trigger a second cancel of a fallback that may already have
         // settled in the meantime.
         //
-        // The new contract is: classify -> dedup -> bind dispatch ->
+        // The contract is: classify -> dedup -> bind dispatch ->
         // record provenance -> tool overrides. The progress hook
         // (handleChatMessage) is preserved at the top because it only
         // touches the ProgressObserver stream, never the leases.

@@ -12,8 +12,8 @@ open Wanxiangshu.Runtime.MuxHostBindings
 open Wanxiangshu.Runtime.DelegateToolsCodec
 
 /// Encapsulates the host's native file_read execute function captured during
-/// wrapper registration. Replaces the old `obj option ref` pseudo-interface
-/// (REFACTOR.md §12): the mutable slot is private, callers go through methods.
+/// wrapper registration. Replaces the old `obj option ref` pseudo-interface:
+/// the mutable slot is private, callers go through methods.
 type HostFunctionCapture() =
     let mutable captured: obj option = None
     member _.Capture(fn: obj) : unit = captured <- Some fn

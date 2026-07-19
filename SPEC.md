@@ -418,7 +418,7 @@
 
 ---
 
-# 九、历史补丁注释尚未肃清
+# 九、历史补丁注释已肃清 ✅
 
 源码中仍能看到大量类似：
 
@@ -692,7 +692,7 @@
 * [ ] file swap 不使用固定共享临时名。
 * [ ] session/workspace 相关 map 都有对称清理。
 * [ ] 创建并关闭 1000 个 session 后状态数量回到基线。
-* [ ] 源码中不再出现 `Phase 7/8`、ticket fix、temporary、until lands 等过程性注释。
+* [x] 源码中不再出现 `Phase 7/8`、ticket fix、temporary、until lands 等过程性注释。
 * [ ] 无未引用生产源文件。
 * [ ] `.fsproj` 的编译顺序反映真实依赖，而不是历史迁移顺序。
 * [ ] OpenCode 全链路 E2E 通过后，再分别验证 OMP 和 Mux。

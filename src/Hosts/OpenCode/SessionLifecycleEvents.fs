@@ -153,8 +153,8 @@ let private isIdleEnvelope (env: HostEventEnvelope) =
     else
         false
 
-/// S-07 fix: SessionClosed is a single domain command
-/// that tears down EVERY per-session side-effect at once,
+/// SessionClosed is a single domain command
+/// that tears down every per-session side-effect at once,
 /// not a "leak one at a time" pattern.  It must be safe
 /// to call from the event handler's `finally` because the
 /// session is being torn down by the host.  We dispatch
