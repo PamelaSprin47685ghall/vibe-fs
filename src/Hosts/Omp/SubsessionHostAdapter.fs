@@ -15,6 +15,66 @@ open Wanxiangshu.Hosts.Omp.SubsessionDispatch
 open Wanxiangshu.Hosts.Omp.MessagingCodec
 open Wanxiangshu.Hosts.Omp.OmpSubsessionHostAdapterPrompts
 
+/// Fetch the raw message collection for an OMP session, trying the
+/// `session` API first and falling back to `sessionManager`.
+let private fetchSessionMessages (pi: obj) (session: obj) (sessionId: SessionId) =
+    promise {
+        let sessionApi = Dyn.get pi "session"
+
+        if not (Dyn.isNullish sessionApi) then
+            let arg = box {| sessionId = SessionId.value sessionId |}
+            let! resp = unbox<JS.Promise<obj>> (sessionApi?sessionMessages (arg))
+            return Some(Dyn.get resp "data")
+        else
+            let sm = Dyn.get session "sessionManager"
+
+            if Dyn.isNullish sm then
+                return None
+            else
+                let getEntries = Dyn.get sm "getEntries"
+
+                let raw =
+                    if Dyn.typeIs getEntries "function" then
+                        Dyn.callMethod0 sm "getEntries"
+                    else
+                        Dyn.get sm "messages"
+
+                if Dyn.isArray raw then return Some raw else return None
+    }
+
+/// Inspect the message array for a turn marker or any user message.
+let private checkMessages (msgs: obj array) (target: string) =
+    let mutable found = false
+    let mutable anyUser = false
+
+    for msg in msgs do
+        let info = Dyn.get msg "info"
+
+        if not (Dyn.isNullish info) then
+            let cId1 = Dyn.str info "continuationId"
+            let cId2 = Dyn.str info "continuationID"
+
+            if cId1 = target || cId2 = target then
+                found <- true
+
+        let roleTarget =
+            if Dyn.str msg "role" <> "" then
+                msg
+            else
+                let m = Dyn.get msg "message"
+                if not (Dyn.isNullish m) then m else info
+
+        if not (Dyn.isNullish roleTarget) then
+            let role = (Dyn.str roleTarget "role").ToLowerInvariant()
+
+            if role = "user" then
+                anyUser <- true
+
+    if found || anyUser then
+        DispatchStatus.Accepted OrderedTurnMarkerObserved
+    else
+        DispatchStatus.Unknown
+
 /// OMP serial prompt API: resolve means prompt entered the ordered stream
 /// (host-guaranteed barrier). Receipt is OrderedTurnMarkerObserved.
 ///
@@ -108,65 +168,13 @@ type OmpSubsessionHost(session: obj, agent: string, pi: obj, workspaceRoot: stri
         member _.QueryDispatchStatus(sessionId, turnId) =
             promise {
                 try
-                    let sessionApi = Dyn.get pi "session"
-
-                    let! dataOpt =
-                        promise {
-                            if not (Dyn.isNullish sessionApi) then
-                                let arg = box {| sessionId = SessionId.value sessionId |}
-                                let! resp = unbox<JS.Promise<obj>> (sessionApi?sessionMessages (arg))
-                                return Some(Dyn.get resp "data")
-                            else
-                                let sm = Dyn.get session "sessionManager"
-
-                                if Dyn.isNullish sm then
-                                    return None
-                                else
-                                    let getEntries = Dyn.get sm "getEntries"
-
-                                    let raw =
-                                        if Dyn.typeIs getEntries "function" then
-                                            Dyn.callMethod0 sm "getEntries"
-                                        else
-                                            Dyn.get sm "messages"
-
-                                    if Dyn.isArray raw then return Some raw else return None
-                        }
+                    let! dataOpt = fetchSessionMessages pi session sessionId
+                    let target = TurnId.value turnId
 
                     match dataOpt with
                     | Some data when not (Dyn.isNullish data) && Dyn.isArray data ->
                         let msgs = unbox<obj array> data
-                        let target = TurnId.value turnId
-                        let mutable found = false
-                        let mutable anyUser = false
-
-                        for msg in msgs do
-                            let info = Dyn.get msg "info"
-
-                            if not (Dyn.isNullish info) then
-                                let cId1 = Dyn.str info "continuationId"
-                                let cId2 = Dyn.str info "continuationID"
-
-                                if cId1 = target || cId2 = target then
-                                    found <- true
-
-                            let roleTarget =
-                                if Dyn.str msg "role" <> "" then
-                                    msg
-                                else
-                                    let m = Dyn.get msg "message"
-                                    if not (Dyn.isNullish m) then m else info
-
-                            if not (Dyn.isNullish roleTarget) then
-                                let role = (Dyn.str roleTarget "role").ToLowerInvariant()
-
-                                if role = "user" then
-                                    anyUser <- true
-
-                        if found || anyUser then
-                            return DispatchStatus.Accepted OrderedTurnMarkerObserved
-                        else
-                            return DispatchStatus.Unknown
+                        return checkMessages msgs target
                     | _ -> return DispatchStatus.Unknown
                 with _ ->
                     return DispatchStatus.Unknown
