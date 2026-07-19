@@ -30,3 +30,5 @@ let run () : unit =
         (containsKey keys "tool.execute.before")
 
     check "Mux registration must expose public runtime hook 'systemTransform'" (containsKey keys "systemTransform")
+
+    check "Mux registration must expose 'capabilities' key" (containsKey keys "capabilities")

@@ -13,6 +13,7 @@ open Wanxiangshu.Runtime.TitleFetchGuard
 open Wanxiangshu.Hosts.Opencode.PluginServices
 open Wanxiangshu.Hosts.Opencode.PluginHooks
 open Wanxiangshu.Runtime.Fallback.RuntimeStore
+open Wanxiangshu.Kernel.HostCapability
 
 let pluginForWithSeams
     (host: Host)
@@ -32,6 +33,7 @@ let pluginForWithSeams
         setKey result "name" (box "wanxiangshu")
         setKey result "mcp" services.McpMap
         setKey result "tool" services.Tools
+        setKey result "capabilities" (box (toStringArray allFull))
 
         setKey
             result

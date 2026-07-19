@@ -637,8 +637,8 @@
 * [ ] 不存在仅为旧测试保留的生产 re-export。
 * [x] 全仓只有一个 Semble MCP 客户端。
 * [x] 全仓只有一套 Continuation 状态机和 command processor。
-* [ ] Mux 不再有静默 reconcile/abort no-op。
-* [ ] 所有能力降级都通过显式 capability 表达。
+* [x] Mux 不再有静默 reconcile/abort no-op。
+* [x] 所有能力降级都通过显式 capability 表达。
 * [x] 生产插件不暴露 `__runtimeScope`、`__reviewStore` 等字段。
 * [x] profiler 默认完全关闭。
 * [x] 正常运行不生成 `.cpuprofile`、`.heapprofile`。

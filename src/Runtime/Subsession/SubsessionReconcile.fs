@@ -39,6 +39,8 @@ type private ReconcileHost() =
 
         member _.ClosePhysicalSession(_) = Promise.lift StopUnknown
 
+let createReconcileHost () : ISubsessionHost = ReconcileHost() :> ISubsessionHost
+
 let private createPoisonEvents
     (sessionId: SessionId)
     (tid: TurnId)

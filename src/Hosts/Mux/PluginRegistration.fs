@@ -18,6 +18,7 @@ open Wanxiangshu.Hosts.Mux.EventHook
 open Wanxiangshu.Hosts.Mux.SlashCommands
 open Wanxiangshu.Hosts.Mux.CompactionTransform
 open Wanxiangshu.Hosts.Mux.MessageTransform
+open Wanxiangshu.Kernel.HostCapability
 
 let createWrapperExecution (toolsObj: obj) (hostReadExec: HostFunctionCapture) (scope: RuntimeScope) : obj =
     createAllWrappers toolsObj hostReadExec scope
@@ -78,6 +79,8 @@ let assembleRegistrationObject
     : obj =
     let directory = if Dyn.isNullish deps then "" else Dyn.str deps "directory"
 
+    let muxCapabilities: obj = toStringArray muxDefault |> box
+
     createObj
         [ "toolNames", box muxToolNames
           "tools", box tools
@@ -88,6 +91,7 @@ let assembleRegistrationObject
           "messagesTransform", box messagesTransform
           "compactingTransform", box compactingTransform
           "getToolPolicy", box getToolPolicy
+          "capabilities", muxCapabilities
           "tool.execute.after",
           box (
               System.Func<obj, obj, JS.Promise<unit>>(fun input output ->
@@ -117,11 +121,13 @@ let private buildInitHandler
     : (string -> JS.Promise<unit>) =
     fun dir ->
         promise {
-            // Initialization barrier: reconcile unfinished subsession runs before anything else.
-            // Mux has no SubsessionHostAdapter; pass None to use the internal ReconcileHost no-op,
-            // which is sufficient for poisoning orphaned actors.
+            // Mux lacks SubsessionHostAdapter; use explicit no-op reconcile host
+            // that rejects all operations with typed errors instead of silent no-op.
+            let reconcileHostFactory _ =
+                Wanxiangshu.Runtime.SubsessionReconcile.createReconcileHost ()
+
             do!
-                Wanxiangshu.Runtime.SubsessionReconcile.reconcileUnfinishedRuns dir None
+                Wanxiangshu.Runtime.SubsessionReconcile.reconcileUnfinishedRuns dir (Some reconcileHostFactory)
                 |> Promise.map ignore
 
             return!
