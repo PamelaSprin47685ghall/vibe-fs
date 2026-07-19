@@ -207,31 +207,31 @@
       "level": "real-e2e"
     },
     "OC-PTY-002": {
-      "level": "not-covered"
+      "level": "real-e2e"
     },
     "OC-PTY-003": {
-      "level": "not-covered"
+      "level": "real-e2e"
     },
     "OC-PTY-004": {
-      "level": "not-covered"
+      "level": "real-e2e"
     },
     "OC-PTY-005": {
       "level": "real-e2e"
     },
     "OC-PTY-006": {
-      "level": "not-covered"
+      "level": "real-e2e"
     },
     "OC-PTY-007": {
-      "level": "not-covered"
+      "level": "real-e2e"
     },
     "OC-PTY-008": {
-      "level": "not-covered"
+      "level": "real-e2e"
     },
     "OC-PTY-009": {
-      "level": "not-covered"
+      "level": "real-e2e"
     },
     "OC-PTY-010": {
-      "level": "not-covered"
+      "level": "real-e2e"
     },
     "OC-WEB-001": {
       "level": "real-e2e"

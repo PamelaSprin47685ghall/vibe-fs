@@ -23,9 +23,16 @@ let ptyWriteTool (host: Host) : obj =
             checkExecPerm host context
             let id = string args?``id``
             let data = string args?data
+            let sessionId = Dyn.str context "sessionID"
 
             promise {
                 let! mgr = getManager ()
+                let lm = mgr?lifecycleManager
+                let sessionRaw = lm?getSession (id)
+
+                if Dyn.isNullish sessionRaw || string sessionRaw?parentSessionId <> sessionId then
+                    failwithf "PTY session not found: %s" id
+
                 let success = unbox<bool> (mgr?write (id, data))
 
                 if not success then

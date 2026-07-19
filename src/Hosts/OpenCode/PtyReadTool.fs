@@ -153,6 +153,7 @@ let ptyReadTool (host: Host) : obj =
         (fun args context ->
             checkExecPerm host context
             let id = string args?``id``
+            let sessionId = Dyn.str context "sessionID"
 
             let offset' =
                 if Dyn.isNullish (Dyn.get args "offset") then
@@ -170,10 +171,13 @@ let ptyReadTool (host: Host) : obj =
 
             promise {
                 let! mgr = getManager ()
-                let session = mgr?``get`` (id)
+                let lm = mgr?lifecycleManager
+                let sessionRaw = lm?getSession (id)
 
-                if Dyn.isNullish session then
+                if Dyn.isNullish sessionRaw || string sessionRaw?parentSessionId <> sessionId then
                     failwithf "PTY session not found: %s" id
+
+                let session = lm?toInfo (sessionRaw)
 
                 if pattern = "" then
                     return! readUnfiltered mgr id session offset' limit'

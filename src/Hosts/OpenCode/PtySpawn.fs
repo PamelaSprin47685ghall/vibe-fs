@@ -144,6 +144,7 @@ let ptyKillTool (host: Host) : obj =
         (fun args context ->
             checkExecPerm host context
             let id = string args?``id``
+            let sessionId = Dyn.str context "sessionID"
 
             let cleanup =
                 if Dyn.isNullish (Dyn.get args "cleanup") then
@@ -153,11 +154,13 @@ let ptyKillTool (host: Host) : obj =
 
             promise {
                 let! mgr = getManager ()
-                let session = mgr?``get`` (id)
+                let lm = mgr?lifecycleManager
+                let sessionRaw = lm?getSession (id)
 
-                if Dyn.isNullish session then
+                if Dyn.isNullish sessionRaw || string sessionRaw?parentSessionId <> sessionId then
                     failwithf "PTY session not found: %s" id
 
+                let session = lm?toInfo (sessionRaw)
                 let wasRunning = string session?status = "running"
                 let success = unbox<bool> (mgr?kill (id, cleanup))
 
@@ -192,16 +195,21 @@ let ptyKillTool (host: Host) : obj =
 let ptyListTool (host: Host) : obj =
     define "List all active PTY sessions." (createObj []) (fun _ context ->
         checkExecPerm host context
+        let sessionId = Dyn.str context "sessionID"
 
         promise {
             let! mgr = getManager ()
-            let sessionsRaw = mgr?list ()
+            let lm = mgr?lifecycleManager
+            let sessionsRaw = lm?listSessions ()
 
             let sessions =
                 if Dyn.isNullish sessionsRaw then
                     [||]
                 else
                     unbox<obj array> sessionsRaw
+                    |> Seq.filter (fun s -> string s?parentSessionId = sessionId)
+                    |> Seq.map (fun s -> lm?toInfo (s))
+                    |> Seq.toArray
 
             let body =
                 if sessions.Length = 0 then
