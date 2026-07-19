@@ -5,7 +5,6 @@ open Fable.Core.JsInterop
 open Wanxiangshu.Kernel
 open Wanxiangshu.Runtime.LoopMessages
 open Wanxiangshu.Runtime.ReviewPrompts
-open Wanxiangshu.Kernel.ReviewSession
 open Wanxiangshu.Kernel.ReviewSession.Types
 open Wanxiangshu.Kernel.ReviewVerdict
 open Wanxiangshu.Kernel.Primitives.Identity

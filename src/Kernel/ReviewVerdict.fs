@@ -1,6 +1,5 @@
 module Wanxiangshu.Kernel.ReviewVerdict
 
-open Wanxiangshu.Kernel.ReviewSession
 open Wanxiangshu.Kernel.ReviewSession.Types
 
 /// The reviewer's intent, decoded once at the LLM boundary. An explicit enum

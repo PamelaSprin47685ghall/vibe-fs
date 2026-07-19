@@ -54,7 +54,6 @@
     <Compile Include="src/Kernel/ReviewSession/Registry.fs"/>
     <Compile Include="src/Kernel/ReviewSession/Query.fs"/>
     <Compile Include="src/Kernel/ReviewSession/Effects.fs"/>
-    <Compile Include="src/Kernel/ReviewSession/Facade.fs"/>
     <Compile Include="src/Kernel/ReviewVerdict.fs"/>
     <Compile Include="src/Kernel/Review/ReviewVerdictWire.fs"/>
     <Compile Include="src/Kernel/OmpPrompts.fs"/>

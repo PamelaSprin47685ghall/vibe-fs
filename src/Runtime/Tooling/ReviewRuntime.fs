@@ -1,7 +1,10 @@
 module Wanxiangshu.Runtime.ReviewRuntime
 
-open Wanxiangshu.Kernel.ReviewSession
 open Wanxiangshu.Kernel.ReviewSession.Types
+open Wanxiangshu.Kernel.ReviewSession.StateMachine
+open Wanxiangshu.Kernel.ReviewSession.Registry
+open Wanxiangshu.Kernel.ReviewSession.Effects
+open Wanxiangshu.Kernel.ReviewSession.Query
 open Wanxiangshu.Runtime.Clock
 
 /// The full host-facing review store: pure registry kernel plus effect side-table.
@@ -188,7 +191,7 @@ let createReviewStore () : ReviewStore =
 
         member _.getActiveSessionIds() =
             state.Registry
-            |> Map.filter (fun _ s -> Wanxiangshu.Kernel.ReviewSession.StateMachine.isActive s.state)
+            |> Map.filter (fun _ s -> isActive s.state)
             |> Map.keys
             |> List.ofSeq }
 

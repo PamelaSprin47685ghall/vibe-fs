@@ -7,7 +7,6 @@ open Wanxiangshu.Runtime
 
 open Wanxiangshu.Runtime.LoopMessages
 open Wanxiangshu.Kernel.ToolCopy
-open Wanxiangshu.Kernel.ReviewSession
 open Wanxiangshu.Kernel.ReviewSession.Types
 open Wanxiangshu.Hosts.Opencode.AgentConfig
 open Wanxiangshu.Hosts.Opencode.ReviewerLoop
@@ -74,7 +73,7 @@ let commandExecuteBefore
         if command = "loop" then
             let sessionID = sessionIdFromHookInput input ""
             let task = (commandArgumentsFromHookInput input).Trim()
-            let parts = unbox<ResizeArray<obj>>(partsFromHookOutput output)
+            let parts = unbox<ResizeArray<obj>> (partsFromHookOutput output)
             parts.Clear()
             let directory = pluginDirectoryFromCtx ctx
             scope.TriggerInit(directory)

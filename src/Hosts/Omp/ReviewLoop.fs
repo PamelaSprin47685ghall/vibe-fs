@@ -4,7 +4,6 @@ open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Kernel.OmpSessionTools
 open Wanxiangshu.Runtime.ReviewPrompts
-open Wanxiangshu.Kernel.ReviewSession
 open Wanxiangshu.Kernel.ReviewSession.Types
 open Wanxiangshu.Hosts.Omp.ChildSession
 open Wanxiangshu.Hosts.Omp.Codec

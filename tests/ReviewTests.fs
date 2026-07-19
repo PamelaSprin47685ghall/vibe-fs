@@ -1,8 +1,11 @@
 module Wanxiangshu.Tests.ReviewTests
 
 open Wanxiangshu.Tests.Assert
-open Wanxiangshu.Kernel.ReviewSession
 open Wanxiangshu.Kernel.ReviewSession.Types
+open Wanxiangshu.Kernel.ReviewSession.StateMachine
+open Wanxiangshu.Kernel.ReviewSession.Registry
+open Wanxiangshu.Kernel.ReviewSession.Effects
+open Wanxiangshu.Kernel.ReviewSession.Query
 open Wanxiangshu.Runtime.ReviewRuntime
 
 open Wanxiangshu.Tests.ReviewTestsReplay

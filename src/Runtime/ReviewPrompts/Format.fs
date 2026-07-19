@@ -1,7 +1,6 @@
 module Wanxiangshu.Runtime.ReviewPrompts.Format
 
 open Wanxiangshu.Runtime.LoopMessages
-open Wanxiangshu.Kernel.ReviewSession
 open Wanxiangshu.Kernel.ReviewSession.Types
 open Wanxiangshu.Kernel.Review.ReviewEncouragement
 open Wanxiangshu.Runtime.PromptFrontMatter

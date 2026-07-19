@@ -3,7 +3,6 @@ module Wanxiangshu.Hosts.Omp.ReviewToolsRegister
 open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Runtime.ReviewPrompts
-open Wanxiangshu.Kernel.ReviewSession
 open Wanxiangshu.Kernel.ReviewSession.Types
 open Wanxiangshu.Kernel.ToolCatalog
 open Wanxiangshu.Hosts.Omp.Codec

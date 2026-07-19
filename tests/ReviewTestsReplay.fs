@@ -1,8 +1,8 @@
 module Wanxiangshu.Tests.ReviewTestsReplay
 
 open Wanxiangshu.Tests.Assert
-open Wanxiangshu.Kernel.ReviewSession
 open Wanxiangshu.Kernel.ReviewSession.Types
+open Wanxiangshu.Kernel.ReviewSession.Effects
 open Wanxiangshu.Runtime.LoopMessages
 open Wanxiangshu.Runtime.PromptFrontMatter
 

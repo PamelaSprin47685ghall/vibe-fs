@@ -95,7 +95,7 @@ let muxMessagesTransformAcceptedSubmitReviewEndsLoopSpec () =
             check "mux messagesTransform exposed for accepted review replay" false
         else
             let accepted =
-                formatReviewResult (Wanxiangshu.Kernel.ReviewSession.ReviewResult.Accepted "")
+                formatReviewResult (Wanxiangshu.Kernel.ReviewSession.Types.ReviewResult.Accepted "")
 
             let messages =
                 [| muxTextMessage "loop-task" "assistant" "---\ntask: Ship feature\n---\nWith-Review Mode is active."
