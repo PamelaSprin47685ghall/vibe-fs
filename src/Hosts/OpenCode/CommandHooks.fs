@@ -15,7 +15,7 @@ open Wanxiangshu.Runtime.ChildAgentRegistry
 open Wanxiangshu.Runtime.ToolRuntimeContext
 open Wanxiangshu.Runtime.OpencodeHookInputCodec
 open Wanxiangshu.Runtime.OpencodeClientCodec
-open Wanxiangshu.Runtime.OpencodeSessionEventCodec
+open Wanxiangshu.Hosts.OpenCode.OpencodeSessionEventCodec
 open Wanxiangshu.Runtime.EventLogRuntime
 open Wanxiangshu.Runtime.RuntimeScope
 

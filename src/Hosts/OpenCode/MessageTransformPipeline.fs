@@ -20,7 +20,7 @@ open Wanxiangshu.Hosts.Opencode.AgentConfig
 open Wanxiangshu.Runtime.BacklogSession
 open Wanxiangshu.Hosts.Opencode.MessagingCodec
 open Wanxiangshu.Hosts.Opencode.CapsCodec
-open Wanxiangshu.Runtime.OpencodeSessionEventCodec
+open Wanxiangshu.Hosts.OpenCode.OpencodeSessionEventCodec
 open Wanxiangshu.Runtime.OpencodeClientCodec
 open Wanxiangshu.Runtime.ChildAgentRegistry
 open Wanxiangshu.Runtime.OpencodeHookInputCodec

@@ -4,7 +4,7 @@ open Wanxiangshu.Runtime.OpencodeSessionPromptBuilder
 open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Tests.Assert
-open Wanxiangshu.Runtime.OpencodeSessionEventCodec
+open Wanxiangshu.Hosts.OpenCode.OpencodeSessionEventCodec
 
 module Dyn = Wanxiangshu.Runtime.Dyn
 

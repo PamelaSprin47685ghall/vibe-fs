@@ -10,7 +10,7 @@ open Wanxiangshu.Runtime.SubsessionActorRegistry
 
 open Wanxiangshu.Hosts.Opencode.SubagentTypes
 open Wanxiangshu.Runtime.OpencodeClientCodec
-open Wanxiangshu.Runtime.OpencodeSessionEventCodec
+open Wanxiangshu.Hosts.OpenCode.OpencodeSessionEventCodec
 
 let abortedPrefix = "(aborted)"
 let noOutputText = "(no output)"

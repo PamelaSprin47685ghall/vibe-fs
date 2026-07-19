@@ -11,7 +11,7 @@ open Wanxiangshu.Runtime.ToolOutputInfo
 open Wanxiangshu.Tests.IntegrationMuxSetup
 open Wanxiangshu.Hosts.Opencode.Plugin
 open Wanxiangshu.Runtime.Dyn
-open Wanxiangshu.Runtime.OpencodeSessionEventCodec
+open Wanxiangshu.Hosts.OpenCode.OpencodeSessionEventCodec
 
 let private promptText (arg: obj) =
     getPartsText (get (get arg "body") "parts")

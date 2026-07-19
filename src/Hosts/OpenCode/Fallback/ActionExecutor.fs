@@ -5,7 +5,7 @@ open Fable.Core.JsInterop
 open Wanxiangshu.Runtime
 open Wanxiangshu.Runtime.Dyn
 open Wanxiangshu.Runtime.OpencodeClientCodec
-open Wanxiangshu.Runtime.OpencodeSessionEventCodec
+open Wanxiangshu.Hosts.OpenCode.OpencodeSessionEventCodec
 open Wanxiangshu.Runtime.Fallback.RuntimeStore
 open Wanxiangshu.Runtime.Fallback.FallbackMessageCodec
 open Wanxiangshu.Kernel.Primitives.Identity

@@ -1,4 +1,4 @@
-module Wanxiangshu.Runtime.OpencodeSessionEventCodec
+module Wanxiangshu.Hosts.OpenCode.OpencodeSessionEventCodec
 
 open Fable.Core.JsInterop
 open Wanxiangshu.Kernel

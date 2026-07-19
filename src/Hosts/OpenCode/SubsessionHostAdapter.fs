@@ -13,7 +13,7 @@ open Wanxiangshu.Runtime
 open Wanxiangshu.Runtime.Dispatch
 open Wanxiangshu.Runtime.Dyn
 open Wanxiangshu.Runtime.OpencodeClientCodec
-open Wanxiangshu.Runtime.OpencodeSessionEventCodec
+open Wanxiangshu.Hosts.OpenCode.OpencodeSessionEventCodec
 open Wanxiangshu.Runtime.CommandProcessor
 open Wanxiangshu.Runtime.SubsessionPorts
 open Wanxiangshu.Runtime.SubsessionActor
