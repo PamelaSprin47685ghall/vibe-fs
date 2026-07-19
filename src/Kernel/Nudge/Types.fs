@@ -100,3 +100,4 @@ type SendOutcome =
     | SnapshotUnavailable of error: string
     | ClaimConflict
     | EventStoreFailure of error: string
+    | AcceptanceUnknown of error: string

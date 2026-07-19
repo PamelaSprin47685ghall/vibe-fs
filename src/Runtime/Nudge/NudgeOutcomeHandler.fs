@@ -110,6 +110,16 @@ let private handleSendOutcome
             ("EventStoreFailure: " + msg)
             ""
             ""
+    | SendOutcome.AcceptanceUnknown msg ->
+        finishNudge
+            fallbackRuntime
+            workspaceRoot
+            sessionKey
+            lease
+            NudgeOutcome.Failed
+            ("AcceptanceUnknown: " + msg)
+            ""
+            ""
 
 let validateAndFinalizeOutcome
     (workspaceRoot: string)

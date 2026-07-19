@@ -6,6 +6,11 @@ open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Tests.AsyncFlush
 open Wanxiangshu.Tests.TestWorkspace
 open Wanxiangshu.Runtime.Dyn
+open Wanxiangshu.Hosts.Mux.Fallback.Hook
+open Wanxiangshu.Runtime.NudgeRuntimeMux
+open Wanxiangshu.Runtime.Fallback.RuntimeStore
+open Wanxiangshu.Kernel.Nudge.Types
+open Wanxiangshu.Kernel.FallbackKernel.Types
 
 module Dyn = Wanxiangshu.Runtime.Dyn
 open Wanxiangshu.Hosts.Mux.Plugin
@@ -146,4 +151,151 @@ let muxStreamEndToolCallAsTextTriggersFallbackSpec () =
             (nudges.[0].Contains "You produced the tool call as raw text")
 
         do! rmAsync tmpDir
+    }
+
+let muxAbortRunThrowsAbortUnavailableSpec () =
+    promise {
+        let helpers = createObj []
+        let executor = muxActionExecutor helpers
+
+        let! caught = executor.AbortRun("session-abort-test") |> Promise.result
+
+        match caught with
+        | Error ex -> check "throws AbortUnavailable exception" (ex.Message.Contains("AbortUnavailable"))
+        | Ok _ -> failwith "expected AbortRun to fail"
+    }
+
+let muxNudgeBooleanTrueReturnsAcceptanceUnknownSpec () =
+    promise {
+        let helpers =
+            createObj
+                [ "nudge",
+                  box (
+                      System.Func<obj, obj, obj, obj, obj, obj, JS.Promise<bool>>(fun _ _ _ _ _ _ ->
+                          promise { return true })
+                  ) ]
+
+        let runtime = FallbackRuntimeStore()
+        let! outcome = sendNudgeMux runtime helpers "session-nudge-test" "nudge text" None None "n1" "nonce1"
+
+        match outcome with
+        | SendOutcome.AcceptanceUnknown msg -> check "returns AcceptanceUnknown" (msg.Contains("nudge resolved true"))
+        | other -> failwith ("expected AcceptanceUnknown, got " + string other)
+    }
+
+let muxNudgeValidReceiptReturnsDeliveredSpec () =
+    promise {
+        let helpers =
+            createObj
+                [ "nudge",
+                  box (
+                      System.Func<obj, obj, obj, obj, obj, obj, JS.Promise<obj>>(fun _ _ _ _ _ _ ->
+                          promise {
+                              return
+                                  box (
+                                      createObj
+                                          [ "messageId", box "msg-123"
+                                            "sessionId", box "session-nudge-test"
+                                            "dispatchId", box "nonce1" ]
+                                  )
+                          })
+                  ) ]
+
+        let runtime = FallbackRuntimeStore()
+        let! outcome = sendNudgeMux runtime helpers "session-nudge-test" "nudge text" None None "n1" "nonce1"
+
+        match outcome with
+        | SendOutcome.Delivered -> check "nudge with valid receipt returns Delivered" true
+        | other -> failwith ("expected Delivered, got " + string other)
+    }
+
+let muxNudgeMismatchedReceiptReturnsFailedSpec () =
+    promise {
+        let helpers =
+            createObj
+                [ "nudge",
+                  box (
+                      System.Func<obj, obj, obj, obj, obj, obj, JS.Promise<obj>>(fun _ _ _ _ _ _ ->
+                          promise {
+                              return
+                                  box (
+                                      createObj
+                                          [ "messageId", box "msg-123"
+                                            "sessionId", box "wrong-session"
+                                            "dispatchId", box "nonce1" ]
+                                  )
+                          })
+                  ) ]
+
+        let runtime = FallbackRuntimeStore()
+        let! outcome = sendNudgeMux runtime helpers "session-nudge-test" "nudge text" None None "n1" "nonce1"
+
+        match outcome with
+        | SendOutcome.Failed msg -> check "nudge with wrong session returns Failed" (msg.Contains("sessionId mismatch"))
+        | other -> failwith ("expected Failed, got " + string other)
+    }
+
+let muxContinueBooleanTrueRejectsAcceptanceUnknownSpec () =
+    promise {
+        let helpers =
+            createObj
+                [ "nudge",
+                  box (
+                      System.Func<obj, obj, obj, obj, obj, obj, JS.Promise<bool>>(fun _ _ _ _ _ _ ->
+                          promise { return true })
+                  ) ]
+
+        let executor = muxActionExecutor helpers
+
+        let model =
+            { ProviderID = "openai"
+              ModelID = "gpt-4"
+              Variant = None
+              Temperature = None
+              TopP = None
+              MaxTokens = None
+              ReasoningEffort = None
+              Thinking = false }
+
+        let! caught =
+            executor.SendContinue("session-continue-test", model, "continuation-id")
+            |> Promise.result
+
+        match caught with
+        | Error ex -> check "continue rejects with AcceptanceUnknown" (ex.Message.Contains("AcceptanceUnknown"))
+        | Ok _ -> failwith "expected SendContinue to reject"
+    }
+
+let muxContinueValidReceiptResolvesSpec () =
+    promise {
+        let helpers =
+            createObj
+                [ "nudge",
+                  box (
+                      System.Func<obj, obj, obj, obj, obj, obj, JS.Promise<obj>>(fun _ _ _ _ _ _ ->
+                          promise {
+                              return
+                                  box (
+                                      createObj
+                                          [ "messageId", box "msg-456"
+                                            "sessionId", box "session-continue-test"
+                                            "dispatchId", box "continuation-id" ]
+                                  )
+                          })
+                  ) ]
+
+        let executor = muxActionExecutor helpers
+
+        let model =
+            { ProviderID = "openai"
+              ModelID = "gpt-4"
+              Variant = None
+              Temperature = None
+              TopP = None
+              MaxTokens = None
+              ReasoningEffort = None
+              Thinking = false }
+
+        do! executor.SendContinue("session-continue-test", model, "continuation-id")
+        check "continue with valid receipt resolves successfully" true
     }

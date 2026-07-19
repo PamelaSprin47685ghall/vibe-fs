@@ -20,8 +20,13 @@ let sendOutcome_hasEventStoreFailureVariant () =
     let _ = SendOutcome.EventStoreFailure "err"
     chk "EventStoreFailure variant exists" true
 
+let sendOutcome_hasAcceptanceUnknownVariant () =
+    let _ = SendOutcome.AcceptanceUnknown "err"
+    chk "AcceptanceUnknown variant exists" true
+
 let run () =
     sendOutcome_hasNotNeededVariant ()
     sendOutcome_hasSnapshotUnavailableVariant ()
     sendOutcome_hasClaimConflictVariant ()
     sendOutcome_hasEventStoreFailureVariant ()
+    sendOutcome_hasAcceptanceUnknownVariant ()

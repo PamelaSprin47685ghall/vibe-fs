@@ -27,6 +27,58 @@ open Wanxiangshu.Runtime.NudgeModelResolver
 [<Global("globalThis.process")>]
 let private nodeProcess: obj = jsNative
 
+type private MuxReceiptValidationResult =
+    | ValidReceipt of messageId: string
+    | InvalidReceipt of error: string
+    | SimpleSuccess
+    | SimpleFailure
+
+let private validateMuxReceipt
+    (result: obj)
+    (expectedSessionId: string)
+    (expectedDispatchId1: string)
+    (expectedDispatchId2: string)
+    : MuxReceiptValidationResult =
+    if Dyn.isNullish result then
+        InvalidReceipt "nudge returned nullish value"
+    elif Dyn.typeIs result "boolean" then
+        if unbox<bool> result then SimpleSuccess else SimpleFailure
+    else
+        let msgId = Dyn.str result "messageId"
+        let msgId = if msgId <> "" then msgId else Dyn.str result "receiptId"
+        let sessId = Dyn.str result "sessionId"
+
+        let sessId =
+            if sessId <> "" then
+                sessId
+            else
+                Dyn.str result "workspaceId"
+
+        let dispId = Dyn.str result "dispatchId"
+        let dispId = if dispId <> "" then dispId else Dyn.str result "nonce"
+
+        let dispId =
+            if dispId <> "" then
+                dispId
+            else
+                Dyn.str result "continuationId"
+
+        let dispId =
+            if dispId <> "" then
+                dispId
+            else
+                Dyn.str result "continuationID"
+
+        if sessId <> expectedSessionId then
+            InvalidReceipt $"Receipt sessionId mismatch: expected {expectedSessionId}, got {sessId}"
+        elif dispId <> expectedDispatchId1 && dispId <> expectedDispatchId2 then
+            InvalidReceipt
+                $"Receipt dispatchId mismatch: expected {expectedDispatchId1} or {expectedDispatchId2}, got {dispId}"
+        elif msgId = "" then
+            InvalidReceipt "Receipt messageId is empty"
+        else
+            ValidReceipt msgId
+
 let tryGetTodos (helpers: obj) (workspaceId: string) : JS.Promise<string list> =
     promise {
         try
@@ -115,13 +167,20 @@ let sendNudgeMux
                 | None -> null
 
             fallbackRuntime.Update(workspaceId, setMainContinuationAwaitingStart true)
-            let! delivered = unbox<JS.Promise<bool>> (Dyn.call4 nudgeFn workspaceId promptText modelVal agentVal)
+
+            let! result =
+                (nudgeFn $ (workspaceId, promptText, modelVal, agentVal, nudgeId, nonce))
+                |> unbox<JS.Promise<obj>>
+
+            let validation = validateMuxReceipt result workspaceId nonce nudgeId
 
             return
-                if delivered then
-                    SendOutcome.Delivered
-                else
-                    SendOutcome.Busy
+                match validation with
+                | ValidReceipt _ -> SendOutcome.Delivered
+                | SimpleSuccess ->
+                    SendOutcome.AcceptanceUnknown "nudge resolved true, cannot verify delivery without receipt"
+                | SimpleFailure -> SendOutcome.Busy
+                | InvalidReceipt err -> SendOutcome.Failed err
         with ex ->
             JS.console.error (
                 box
@@ -154,6 +213,9 @@ let runNudgeFlowWithRetryCheck
             else
                 unbox<string> (nodeProcess?cwd ())
 
-        let abortRun (_: string) = Promise.lift ()
+        let abortRun (_: string) =
+            Promise.reject (
+                System.Exception("AbortUnavailable: Mux host adapter does not expose a session-level abort API")
+            )
 
         runNudgeFlowCore Mux root fallbackRuntime runtimeState sessionKey takeSnapshot sendNudge abortRun

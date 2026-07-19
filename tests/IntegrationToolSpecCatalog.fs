@@ -97,4 +97,10 @@ let integrationToolSpecs () : (string * (unit -> JS.Promise<unit>)) list =
       ("muxStreamEndToolUseErrorTriggersNudge", muxStreamEndToolUseErrorTriggersNudgeSpec)
       ("muxStreamEndToolCallsDoesNotTriggerNudge", muxStreamEndToolCallsDoesNotTriggerNudgeSpec)
       ("muxSessionErrorTriggersFallbackContinue", muxSessionErrorTriggersFallbackContinueSpec)
-      ("muxStreamEndToolCallAsTextTriggersFallback", muxStreamEndToolCallAsTextTriggersFallbackSpec) ]
+      ("muxStreamEndToolCallAsTextTriggersFallback", muxStreamEndToolCallAsTextTriggersFallbackSpec)
+      ("muxAbortRunThrowsAbortUnavailable", muxAbortRunThrowsAbortUnavailableSpec)
+      ("muxNudgeBooleanTrueReturnsAcceptanceUnknown", muxNudgeBooleanTrueReturnsAcceptanceUnknownSpec)
+      ("muxNudgeValidReceiptReturnsDelivered", muxNudgeValidReceiptReturnsDeliveredSpec)
+      ("muxNudgeMismatchedReceiptReturnsFailed", muxNudgeMismatchedReceiptReturnsFailedSpec)
+      ("muxContinueBooleanTrueRejectsAcceptanceUnknown", muxContinueBooleanTrueRejectsAcceptanceUnknownSpec)
+      ("muxContinueValidReceiptResolves", muxContinueValidReceiptResolvesSpec) ]
