@@ -142,16 +142,35 @@ module PendingTurnReceipt =
         (turnId: string)
         : JS.Promise<Result<HostStartReceipt, DispatchFailure>> =
         Promise.create (fun resolve reject ->
-            let w =
-                { SessionId = sessionId
-                  WorkspaceRoot = workspaceRoot
-                  Resolve = resolve
-                  Reject = reject
-                  Completed = false
-                  Cancelled = false
-                  TransportState = InFlight }
+            let existingForSession =
+                pending
+                |> Map.toSeq
+                |> Seq.tryFind (fun (_, w) -> w.SessionId = sessionId && not w.Completed && not w.Cancelled)
 
-            pending <- Map.add turnId w pending)
+            match existingForSession with
+            | Some(_, w) ->
+                resolve (
+                    Error(
+                        HostAcceptanceUnknown
+                            { ErrorName = "AnotherDispatchInFlight"
+                              DomainError = None
+                              Message =
+                                $"PendingTurnReceipt: session {sessionId} already has an active dispatch (turn={turnId})"
+                              StatusCode = None
+                              IsRetryable = Some false }
+                    )
+                )
+            | None ->
+                let waiter =
+                    { SessionId = sessionId
+                      WorkspaceRoot = workspaceRoot
+                      Resolve = resolve
+                      Reject = reject
+                      Completed = false
+                      Cancelled = false
+                      TransportState = InFlight }
+
+                pending <- Map.add turnId waiter pending)
 
     let tryResolve (turnId: string) (receipt: HostStartReceipt) : bool =
         match Map.tryFind turnId pending with
