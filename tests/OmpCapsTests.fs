@@ -3,7 +3,7 @@ module Wanxiangshu.Tests.OmpCapsTests
 open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Tests.Assert
-open Wanxiangshu.Tests.TempWorkspace
+open Wanxiangshu.Tests.TestWorkspace
 open Wanxiangshu.Runtime.CapsFormat
 open Wanxiangshu.Runtime.OmpCaps
 open Wanxiangshu.Runtime.SubagentPromptBuild

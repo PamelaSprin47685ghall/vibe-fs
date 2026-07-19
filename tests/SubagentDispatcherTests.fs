@@ -3,7 +3,7 @@ module Wanxiangshu.Tests.SubagentDispatcherTests
 open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Tests.Assert
-open Wanxiangshu.Tests.TempWorkspace
+open Wanxiangshu.Tests.TestWorkspace
 open Wanxiangshu.Kernel.HostAdapter
 open Wanxiangshu.Runtime.HostAdapter
 open Wanxiangshu.Kernel.Primitives.Identity

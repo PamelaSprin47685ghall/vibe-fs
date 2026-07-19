@@ -13,7 +13,7 @@ open Wanxiangshu.Runtime.Dyn
 open Wanxiangshu.Runtime.ReviewEventWriter
 open Wanxiangshu.Runtime.Fallback.RuntimeStore
 open Wanxiangshu.Hosts.Opencode.NudgeEffect
-open Wanxiangshu.Tests.TempWorkspace
+open Wanxiangshu.Tests.TestWorkspace
 
 let private snap todos msg blocked agent isLoop : Wanxiangshu.Kernel.Nudge.Types.SessionSnapshot =
     { todos = todos

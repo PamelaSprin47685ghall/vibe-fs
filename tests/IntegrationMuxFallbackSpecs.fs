@@ -4,7 +4,7 @@ open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Tests.AsyncFlush
-open Wanxiangshu.Tests.TempWorkspace
+open Wanxiangshu.Tests.TestWorkspace
 open Wanxiangshu.Runtime.Dyn
 
 module Dyn = Wanxiangshu.Runtime.Dyn

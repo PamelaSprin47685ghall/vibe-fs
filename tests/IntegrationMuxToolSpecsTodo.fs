@@ -11,7 +11,7 @@ open Wanxiangshu.Runtime.ToolOutputInfo
 open Wanxiangshu.Hosts.Mux.Plugin
 open Wanxiangshu.Runtime.RuntimeScope
 open Wanxiangshu.Runtime.Dyn
-open Wanxiangshu.Tests.TempWorkspace
+open Wanxiangshu.Tests.TestWorkspace
 
 let muxTodoWriteWrapperSchemaSpec () =
     promise {

@@ -3,7 +3,7 @@ module Wanxiangshu.Tests.IntegrationPluginTests
 open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Tests.Assert
-open Wanxiangshu.Tests.TempWorkspace
+open Wanxiangshu.Tests.TestWorkspace
 open Wanxiangshu.Tests.IntegrationPluginTestsCommon
 open Wanxiangshu.Tests.IntegrationPluginTestsMimo
 open Wanxiangshu.Hosts.Mux.Plugin

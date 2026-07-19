@@ -4,7 +4,7 @@ open Fable.Core
 open Fable.Core.JsInterop
 
 open Wanxiangshu.Hosts.Mux.Plugin
-open Wanxiangshu.Tests.TempWorkspace
+open Wanxiangshu.Tests.TestWorkspace
 open Wanxiangshu.Runtime.Dyn
 open Wanxiangshu.Runtime.RuntimeScope
 

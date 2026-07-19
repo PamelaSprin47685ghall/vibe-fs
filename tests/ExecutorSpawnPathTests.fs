@@ -4,7 +4,7 @@ open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Runtime.ExecutorSpawn
-open Wanxiangshu.Tests.TempWorkspace
+open Wanxiangshu.Tests.TestWorkspace
 open Wanxiangshu.Kernel.Executor
 open Wanxiangshu.Runtime.ExecutorFormat
 open Wanxiangshu.Runtime.ToolOutputInfo

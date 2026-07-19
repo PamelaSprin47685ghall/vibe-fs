@@ -14,7 +14,7 @@ open Wanxiangshu.Runtime.Fallback.RuntimeStore
 open Wanxiangshu.Runtime.ReviewRuntime
 open Wanxiangshu.Hosts.Omp.SessionAbortHandler
 open Wanxiangshu.Hosts.Omp.PluginComposition
-open Wanxiangshu.Tests.TempWorkspace
+open Wanxiangshu.Tests.TestWorkspace
 open Wanxiangshu.Runtime.SubsessionActorRegistry
 
 /// Verify the reviewStore singleton is wired into the CoreServices so the

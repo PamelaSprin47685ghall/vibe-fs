@@ -5,7 +5,7 @@ open Wanxiangshu.Runtime.Fallback.RuntimeStore
 open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Tests.Assert
-open Wanxiangshu.Tests.TempWorkspace
+open Wanxiangshu.Tests.TestWorkspace
 open Wanxiangshu.Hosts.Opencode.Plugin
 open Wanxiangshu.Runtime.ChildAgentRegistry
 open Wanxiangshu.Hosts.Opencode.SessionIo

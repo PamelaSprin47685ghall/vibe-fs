@@ -4,7 +4,7 @@ open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Tests.OmpPluginTestsHarness
-open Wanxiangshu.Tests.TempWorkspace
+open Wanxiangshu.Tests.TestWorkspace
 open Wanxiangshu.Hosts.Omp
 open Wanxiangshu.Hosts.Omp.Plugin
 open Wanxiangshu.Runtime

@@ -4,7 +4,7 @@ open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Tests.IntegrationToolSetup
-open Wanxiangshu.Tests.TempWorkspace
+open Wanxiangshu.Tests.TestWorkspace
 open Wanxiangshu.Runtime.LoopMessages
 open Wanxiangshu.Kernel.ReviewSession
 open Wanxiangshu.Kernel.ReviewSession.Types

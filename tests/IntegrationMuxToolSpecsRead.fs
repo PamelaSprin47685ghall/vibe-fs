@@ -3,7 +3,7 @@ module Wanxiangshu.Tests.IntegrationMuxToolSpecsRead
 open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Tests.Assert
-open Wanxiangshu.Tests.TempWorkspace
+open Wanxiangshu.Tests.TestWorkspace
 open Wanxiangshu.Tests.IntegrationToolSetup
 open Wanxiangshu.Tests.IntegrationMuxSetup
 open Wanxiangshu.Kernel.Executor

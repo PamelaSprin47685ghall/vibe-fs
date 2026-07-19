@@ -4,7 +4,7 @@ open System
 open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Tests.Assert
-open Wanxiangshu.Tests.TempWorkspace
+open Wanxiangshu.Tests.TestWorkspace
 open Wanxiangshu.Hosts.Omp.MessageTransform
 
 module Dyn = Wanxiangshu.Runtime.Dyn

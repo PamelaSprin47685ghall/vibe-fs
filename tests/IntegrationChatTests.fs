@@ -3,7 +3,7 @@ module Wanxiangshu.Tests.IntegrationChatTests
 open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Tests.Assert
-open Wanxiangshu.Tests.TempWorkspace
+open Wanxiangshu.Tests.TestWorkspace
 
 open Wanxiangshu.Hosts.Opencode.Plugin
 open Wanxiangshu.Runtime.Dyn

@@ -17,7 +17,7 @@ open Wanxiangshu.Runtime.Fallback.ContinuationExecution
 open Wanxiangshu.Runtime
 
 module Dyn = Wanxiangshu.Runtime.Dyn
-open Wanxiangshu.Tests.TempWorkspace
+open Wanxiangshu.Tests.TestWorkspace
 
 
 type FakeExecutor(?messages: obj array, ?currentModel: FallbackModel) =

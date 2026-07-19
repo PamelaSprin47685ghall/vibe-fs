@@ -579,7 +579,7 @@
     <Compile Include="tests/WanxiangzhenSquadEventTests.fs"/>
     <Compile Include="tests/EventLogCodecTests.fs"/>
     <Compile Include="tests/EventLogTestSeed.fs"/>
-    <Compile Include="tests/TempWorkspace.fs"/>
+    <Compile Include="tests/TestWorkspace.fs"/>
     <Compile Include="tests/EventLogRuntimeTests.fs"/>
     <Compile Include="tests/EventLogRuntimeRobustnessTests.fs"/>
     <Compile Include="tests/IntegrationToolSetup.fs"/>

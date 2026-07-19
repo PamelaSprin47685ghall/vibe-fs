@@ -14,7 +14,7 @@ open Wanxiangshu.Tests.IntegrationEventTestsOpencodeSessionStatusRepeated
 open Wanxiangshu.Tests.IntegrationEventTestsOpencodeLoop
 open Wanxiangshu.Tests.IntegrationEventTestsOpencodeFallback
 open Wanxiangshu.Tests.IntegrationEventTestsOpencodeFallbackInterrupted
-open Wanxiangshu.Tests.TempWorkspace
+open Wanxiangshu.Tests.TestWorkspace
 open Wanxiangshu.Hosts.Mux.Plugin
 open Wanxiangshu.Hosts.Opencode.Plugin
 open Wanxiangshu.Runtime.Dyn

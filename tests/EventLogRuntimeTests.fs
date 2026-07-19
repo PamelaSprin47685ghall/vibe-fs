@@ -3,7 +3,7 @@ module Wanxiangshu.Tests.EventLogRuntimeTests
 open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Tests.Assert
-open Wanxiangshu.Tests.TempWorkspace
+open Wanxiangshu.Tests.TestWorkspace
 open Wanxiangshu.Kernel.EventSourcing.EventEnvelope
 open Wanxiangshu.Kernel.EventSourcing.EventKind
 open Wanxiangshu.Runtime.EventLogCodec

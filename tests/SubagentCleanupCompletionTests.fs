@@ -8,7 +8,7 @@ open Wanxiangshu.Runtime.ChildAgentRegistry
 open Wanxiangshu.Runtime.Dispatch
 open Wanxiangshu.Runtime.Fallback.RuntimeStore
 open Wanxiangshu.Runtime.SubsessionActorRegistry
-open Wanxiangshu.Tests.TempWorkspace
+open Wanxiangshu.Tests.TestWorkspace
 open Wanxiangshu.Hosts.Opencode.SubsessionHostAdapterTypes
 open Wanxiangshu.Kernel.Subsession.Types
 

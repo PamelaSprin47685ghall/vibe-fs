@@ -5,7 +5,7 @@ open Fable.Core.JsInterop
 open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Tests.IntegrationMuxSetup
 open Wanxiangshu.Tests.AsyncFlush
-open Wanxiangshu.Tests.TempWorkspace
+open Wanxiangshu.Tests.TestWorkspace
 
 open Wanxiangshu.Hosts.Mux.Plugin
 open Wanxiangshu.Runtime.Dyn

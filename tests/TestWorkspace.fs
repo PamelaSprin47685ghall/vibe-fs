@@ -1,4 +1,4 @@
-module Wanxiangshu.Tests.TempWorkspace
+module Wanxiangshu.Tests.TestWorkspace
 
 open Fable.Core
 open Fable.Core.JsInterop

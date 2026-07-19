@@ -11,7 +11,7 @@ open Wanxiangshu.Runtime.Fallback.SessionRuntimeLeasePure
 open Wanxiangshu.Runtime.Fallback.SessionRuntimePropertyPure
 open Wanxiangshu.Runtime.RuntimeScope
 open Wanxiangshu.Runtime.ReviewRuntime
-open Wanxiangshu.Tests.TempWorkspace
+open Wanxiangshu.Tests.TestWorkspace
 open Wanxiangshu.Runtime.BacklogSession
 open Wanxiangshu.Hosts.Opencode.SessionLifecycleObserver
 open Wanxiangshu.Runtime.Dyn
