@@ -31,7 +31,7 @@ let private writeFile (path: string) (payload: obj) =
     fs?writeFileSync (path, JS.JSON.stringify payload)
 
 let start () =
-    if Option.isNone !activeSession then
+    if Option.isNone activeSession.Value then
         let session: obj = emitJsExpr inspector "new $0.Session()"
 
         session?connect ()
@@ -49,12 +49,12 @@ let start () =
         with _ ->
             JS.console.warn ("HeapProfiler not available; skipping heap profile")
 
-        activeSession := Some session
+        activeSession.Value <- Some session
 
 let stopAndSave (outputDir: string option) =
-    match !activeSession with
+    match activeSession.Value with
     | Some session ->
-        activeSession := None
+        activeSession.Value <- None
         let dir = resolveOutputDir outputDir
         let token = uniqueToken ()
 
