@@ -21,7 +21,8 @@ open Wanxiangshu.Kernel.WorkBacklog
 open Wanxiangshu.Runtime.ToolOutputInfo
 open Wanxiangshu.Runtime
 open Wanxiangshu.Runtime.RunnerBackground
-open Wanxiangshu.Runtime.EventLogRuntime
+open Wanxiangshu.Runtime.ReviewEventWriter
+open Wanxiangshu.Runtime.EventLogRuntimeSync
 open Wanxiangshu.Runtime.ReviewRuntime
 open Wanxiangshu.Runtime.Dyn
 
@@ -46,14 +47,9 @@ let sessionStartHandler (pi: obj) (reviewStore: ReviewStore) (ctx: obj) : JS.Pro
         let cwd = Dyn.str ctx "cwd"
 
         if sessionId <> "" && cwd <> "" then
-            do! Wanxiangshu.Runtime.EventLogRuntime.syncReviewFromEventLogDedicated reviewStore cwd sessionId
+            do! syncReviewFromEventLogDedicated reviewStore cwd sessionId
 
-            do!
-                Wanxiangshu.Runtime.EventLogRuntime.syncBacklogFromEventLogDedicated
-                    omp
-                    backlogSession.Projection
-                    cwd
-                    sessionId
+            do! syncBacklogFromEventLogDedicated omp backlogSession.Projection cwd sessionId
     }
 
 /// session_prompt: lightweight re-sync before each prompt to catch cross-session durable state changes.
@@ -63,14 +59,9 @@ let sessionPromptHandler (pi: obj) (reviewStore: ReviewStore) (ctx: obj) : JS.Pr
         let cwd = Dyn.str ctx "cwd"
 
         if sessionId <> "" && cwd <> "" then
-            do! Wanxiangshu.Runtime.EventLogRuntime.syncReviewFromEventLogDedicated reviewStore cwd sessionId
+            do! syncReviewFromEventLogDedicated reviewStore cwd sessionId
 
-            do!
-                Wanxiangshu.Runtime.EventLogRuntime.syncBacklogFromEventLogDedicated
-                    omp
-                    backlogSession.Projection
-                    cwd
-                    sessionId
+            do! syncBacklogFromEventLogDedicated omp backlogSession.Projection cwd sessionId
     }
 
 let sessionShutdownHandler

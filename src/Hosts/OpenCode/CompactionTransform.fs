@@ -10,6 +10,7 @@ open Wanxiangshu.Runtime.Fallback.SessionRuntimePropertyPure
 open Wanxiangshu.Runtime.Fallback.SessionRuntimeLeasePure
 open Wanxiangshu.Runtime
 open Wanxiangshu.Runtime.Dyn
+open Wanxiangshu.Runtime.SessionEventWriter
 
 let compactionAutocontinue (input: obj) (output: obj) : JS.Promise<unit> = promise { output?enabled <- true }
 
@@ -40,14 +41,7 @@ let private recordCompactionStart
             | Some fr -> fr.UpdateSessionReturning(sessionID, incrementCompactionOrdinal)
             | None -> 0
 
-        do!
-            Wanxiangshu.Runtime.EventLogRuntime.appendCompactionStartedOrFail
-                directory
-                sessionID
-                compactionId
-                currentGen
-                humanTurnId
-                compactionOrdinal
+        do! appendCompactionStartedOrFail directory sessionID compactionId currentGen humanTurnId compactionOrdinal
 
         match fallbackRuntime with
         | Some fr ->
@@ -96,13 +90,7 @@ let private handleCompactionError
 
             match settleInfo with
             | Some(_, ordinal) ->
-                do!
-                    Wanxiangshu.Runtime.EventLogRuntime.appendCompactionSettledOrFail
-                        directory
-                        sessionID
-                        compactionId
-                        "failed"
-                        ordinal
+                do! appendCompactionSettledOrFail directory sessionID compactionId "failed" ordinal
 
                 let _ = fr.UpdateSessionReturning(sessionID, applySettleReturning compactionId)
                 ()

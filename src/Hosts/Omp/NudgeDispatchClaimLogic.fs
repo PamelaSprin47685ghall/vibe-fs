@@ -3,6 +3,7 @@ module Wanxiangshu.Hosts.Omp.NudgeDispatchClaimLogic
 open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Runtime.NudgeLease
+open Wanxiangshu.Runtime.EventLogRuntimeNudge
 open Wanxiangshu.Runtime.Fallback.RuntimeStore
 open Wanxiangshu.Runtime.Fallback.SessionRuntime
 open Wanxiangshu.Kernel.Nudge.NudgeProjection
@@ -27,7 +28,7 @@ let tryClaimNudgeDispatch
     (humanTurnId: string)
     (nudgeOrdinal: int)
     : JS.Promise<bool> =
-    Wanxiangshu.Runtime.EventLogRuntime.tryClaimNudgeDispatch
+    tryClaimNudgeDispatch
         root
         sessionId
         action
