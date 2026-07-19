@@ -49,6 +49,8 @@ type FallbackSessionRuntime =
       LastHumanMessageId: string
       CompactionActiveId: string
       CompactionActiveOrdinal: int
+      CompactionHumanTurnId: string
+      CompactionCancelGeneration: int
       CompactionForceStopped: bool
       CompactionCompacted: bool
       CompactionContinuationObserved: bool
@@ -93,6 +95,8 @@ let freshSessionState: FallbackSessionRuntime =
       LastHumanMessageId = ""
       CompactionActiveId = ""
       CompactionActiveOrdinal = 0
+      CompactionHumanTurnId = ""
+      CompactionCancelGeneration = 0
       CompactionForceStopped = false
       CompactionCompacted = false
       CompactionContinuationObserved = false
@@ -202,6 +206,8 @@ let beginCompaction
     { s with
         CompactionActiveId = compactionId
         CompactionActiveOrdinal = compactionOrdinal
+        CompactionHumanTurnId = s.HumanTurnId
+        CompactionCancelGeneration = s.CancelGeneration
         CompactionGeneration = s.CompactionGeneration + 1
         CompactionSummaryTransformPending = true
         Owner = SessionOwner.Compaction }
@@ -211,6 +217,8 @@ let settleCompaction (s: FallbackSessionRuntime) : FallbackSessionRuntime =
     { s with
         CompactionActiveId = ""
         CompactionActiveOrdinal = 0
+        CompactionHumanTurnId = ""
+        CompactionCancelGeneration = 0
         CompactionGeneration = 0
         CompactionCompacted = false
         CompactionContinuationObserved = false

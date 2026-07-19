@@ -51,6 +51,7 @@ let private handleCompactionStarted (st: OwnerEpisodeState) (ev: CompactionStart
                       CompactionOrdinal = newOrdinal
                       SessionGeneration = genVal
                       HumanTurnID = deriveHumanTurnId st.HumanTurn ev.HumanTurnId
+                      CancelGeneration = st.CancelGeneration
                       Status = "started" } }
 
 let private handleContextGenerationChanged (st: OwnerEpisodeState) (ev: CompactionStageEvent) : OwnerEpisodeState =

@@ -138,10 +138,12 @@ let setActiveContinuationCancelGeneration gen (s: FallbackSessionRuntime) =
     { s with
         ActiveContinuationCancelGen = gen }
 
-let setActiveCompactionId id ordinal (s: FallbackSessionRuntime) =
+let setActiveCompactionId id ordinal humanTurnId cancelGeneration (s: FallbackSessionRuntime) =
     { s with
         CompactionActiveId = id
-        CompactionActiveOrdinal = ordinal }
+        CompactionActiveOrdinal = ordinal
+        CompactionHumanTurnId = humanTurnId
+        CompactionCancelGeneration = cancelGeneration }
 
 let tryGetSettleInfo expectedCompactionID (s: FallbackSessionRuntime) =
     if s.CompactionActiveId = expectedCompactionID then
@@ -155,6 +157,8 @@ let applySettle expectedCompactionID (s: FallbackSessionRuntime) =
             { s with
                 CompactionActiveId = ""
                 CompactionActiveOrdinal = 0
+                CompactionHumanTurnId = ""
+                CompactionCancelGeneration = 0
                 CompactionGeneration = 0
                 CompactionCompacted = false
                 CompactionContinuationObserved = false

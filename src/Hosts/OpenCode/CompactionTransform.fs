@@ -30,6 +30,11 @@ let private recordCompactionStart
             | Some fr -> (fr.GetSession sessionID).HumanTurnId
             | None -> ""
 
+        let cancelGen =
+            match fallbackRuntime with
+            | Some fr -> (fr.GetSession sessionID).CancelGeneration
+            | None -> 0
+
         let compactionOrdinal =
             match fallbackRuntime with
             | Some fr -> fr.UpdateSessionReturning(sessionID, incrementCompactionOrdinal)
@@ -47,7 +52,7 @@ let private recordCompactionStart
         match fallbackRuntime with
         | Some fr ->
             fr.UpdateSession(sessionID, transferOwnership SessionOwner.Compaction)
-            fr.UpdateSession(sessionID, setActiveCompactionId compactionId compactionOrdinal)
+            fr.UpdateSession(sessionID, setActiveCompactionId compactionId compactionOrdinal humanTurnId cancelGen)
             fr.Update(sessionID, setCompacted false)
             fr.Update(sessionID, setCompactionContinuationObserved false)
             fr.UpdateSession(sessionID, setCompactionGeneration currentGen)
