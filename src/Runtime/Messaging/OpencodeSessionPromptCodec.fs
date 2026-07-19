@@ -50,3 +50,123 @@ let tryDecodePromptModelFromPayload (payload: obj) : obj option =
         Some promptModel
     else
         tryDecodePromptModelFromModelString (Dyn.str payload "modelString")
+
+/// Versioned plugin metadata carried on an OpenCode text part.
+/// The host preserves `part.metadata` on `SessionV1.TextPart`, so all
+/// dispatch/reconciliation paths can share a single encode/decode pair.
+module WanxiangshuMetadataCodec =
+
+    [<NoComparison; NoEquality>]
+    type T =
+        { Schema: int
+          Kind: string
+          Nonce: string
+          ContinuationId: string
+          ContinuationOrdinal: int
+          Attempt: int
+          HumanTurnId: string
+          ContextGeneration: int
+          CancelGeneration: int }
+
+    let currentSchema = 2
+    let nudgeKind = "nudge"
+    let fallbackContinuationKind = "fallback_continuation"
+
+    let private empty =
+        { Schema = 0
+          Kind = ""
+          Nonce = ""
+          ContinuationId = ""
+          ContinuationOrdinal = 0
+          Attempt = 0
+          HumanTurnId = ""
+          ContextGeneration = 0
+          CancelGeneration = 0 }
+
+    let private tryInt (o: obj) (key: string) : int option =
+        match Dyn.opt o key with
+        | Some v when not (Dyn.isNullish v) ->
+            match System.Int32.TryParse(string v) with
+            | true, i -> Some i
+            | _ -> None
+        | _ -> None
+
+    /// Decode a single metadata record from a message part. Accepts the
+    /// versioned `metadata.wanxiangshu` object as well as the legacy flat
+    /// `metadata.nonce` used by older prompts.
+    let tryDecodeFromPart (part: obj) : T option =
+        if Dyn.isNullish part then
+            None
+        else
+            let metadata = Dyn.get part "metadata"
+
+            if Dyn.isNullish metadata then
+                None
+            else
+                let ws = Dyn.get metadata "wanxiangshu"
+
+                if not (Dyn.isNullish ws) then
+                    Some
+                        { Schema = tryInt ws "schema" |> Option.defaultValue 0
+                          Kind = Dyn.str ws "kind"
+                          Nonce = Dyn.str ws "nonce"
+                          ContinuationId = Dyn.str ws "continuationId"
+                          ContinuationOrdinal = tryInt ws "continuationOrdinal" |> Option.defaultValue 0
+                          Attempt = tryInt ws "attempt" |> Option.defaultValue 0
+                          HumanTurnId = Dyn.str ws "humanTurnId"
+                          ContextGeneration = tryInt ws "contextGeneration" |> Option.defaultValue 0
+                          CancelGeneration = tryInt ws "cancelGeneration" |> Option.defaultValue 0 }
+                else
+                    let legacy = Dyn.str metadata "nonce"
+
+                    if legacy <> "" then
+                        Some
+                            { empty with
+                                Schema = 1
+                                Kind = nudgeKind
+                                Nonce = legacy }
+                    else
+                        None
+
+    /// Scan a message `parts` array and return the first recognised
+    /// `Wanxiangshu` metadata record.
+    let tryDecodeFromParts (parts: obj) : T option =
+        if Dyn.isNullish parts || not (Dyn.isArray parts) then
+            None
+        else
+            (parts :?> obj array) |> Array.tryPick tryDecodeFromPart
+
+    /// Build a `part.metadata` object carrying versioned `wanxiangshu`
+    /// provenance. Optional continuation fields are omitted when empty/zero
+    /// so the wire shape stays minimal for nudge prompts.
+    let encodePartMetadata
+        (nonce: string)
+        (kind: string)
+        (continuationId: string option)
+        (continuationOrdinal: int)
+        (attempt: int)
+        (humanTurnId: string)
+        (contextGeneration: int)
+        (cancelGeneration: int)
+        : obj =
+        let ws = createObj []
+        Dyn.setKey ws "schema" (box currentSchema)
+        Dyn.setKey ws "kind" (box kind)
+        Dyn.setKey ws "nonce" (box nonce)
+
+        let setIfNonEmpty key value =
+            if value <> "" then
+                Dyn.setKey ws key (box value)
+
+        let setIfPositive key value =
+            if value > 0 then
+                Dyn.setKey ws key (box value)
+
+        continuationId |> Option.iter (setIfNonEmpty "continuationId")
+        setIfPositive "continuationOrdinal" continuationOrdinal
+        setIfPositive "attempt" attempt
+        setIfNonEmpty "humanTurnId" humanTurnId
+        setIfPositive "contextGeneration" contextGeneration
+        setIfPositive "cancelGeneration" cancelGeneration
+
+        box {| wanxiangshu = ws |}

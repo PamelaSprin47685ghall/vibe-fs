@@ -8,6 +8,10 @@ open Wanxiangshu.Runtime.Dyn
 open Wanxiangshu.Runtime.OpencodeClientCodec
 open Wanxiangshu.Runtime.Messaging.OpencodeSessionEventCodec
 open Wanxiangshu.Runtime.Messaging.OpencodeHostEvent
+open Wanxiangshu.Runtime.OpencodeSessionPromptCodec
+
+module Metadata = Wanxiangshu.Runtime.OpencodeSessionPromptCodec.WanxiangshuMetadataCodec
+
 open Wanxiangshu.Runtime.Fallback.FallbackMessageCodec
 open Wanxiangshu.Runtime.ChildAgentRegistry
 open Wanxiangshu.Kernel.Primitives.Identity
@@ -54,8 +58,12 @@ let private findAnchorMessageId (msgs: obj array) (turnNonce: string) =
             && Dyn.isArray parts
             && ((parts :?> obj array)
                 |> Array.exists (fun part ->
-                    Dyn.str part "type" = "text"
-                    && Dyn.str (Dyn.get part "metadata") "nonce" = turnNonce)))
+                    let isText = Dyn.str part "type" = "text"
+
+                    let hasNonce =
+                        Metadata.tryDecodeFromPart part |> Option.exists (fun m -> m.Nonce = turnNonce)
+
+                    isText && hasNonce)))
     |> Option.bind (fun msg ->
         let info = Dyn.get msg "info"
         let messageId = Dyn.str msg "id"

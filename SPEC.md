@@ -472,19 +472,9 @@ generation 相同并不能证明这些事件属于 continuation。
 
 `SubsessionHostAdapterOps.buildQuerySessionQuiescence` 现在先按 nonce 过滤消息，再判断活跃状态。
 
-### S-05：dispatch 写入 nonce 的位置和 reconciliation 查找位置不一致
+### S-05：dispatch 写入 nonce 的位置和 reconciliation 查找位置不一致 ✅ 已完成
 
-发送时 marker 位于 part metadata；查询时却搜索 message 顶层、props 或 info。
-
-结果是系统无法找到自己写入的标记。
-
-**整改要求：**
-
-* 先通过真实宿主契约测试确定 marker 最终落在哪里；
-* 只保留一个编码和一个解码实现；
-* dispatch、chat hook、event codec、query status、restart reconciliation 必须共享同一 schema；
-* schema 必须带版本号；
-* 无法证明宿主会持久化时，不得依赖该 marker。
+新增 `WanxiangshuMetadataCodec` 统一编解码：所有 OpenCode prompt/continuation 现在写入 `part.metadata.wanxiangshu`（带 `schema` 版本号），reconciliation、chat hook、query status 统一通过该 codec 读取，并兼容旧版 `metadata.nonce`。
 
 ### S-06：pending idle/evidence 仅按 session ID 缓存
 

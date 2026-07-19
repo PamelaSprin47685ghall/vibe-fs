@@ -5,6 +5,8 @@ open Fable.Core.JsInterop
 open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Runtime.OpencodeSessionPromptCodec
 
+module Metadata = Wanxiangshu.Runtime.OpencodeSessionPromptCodec.WanxiangshuMetadataCodec
+
 let private providerId (m: obj) = unbox<string> m?providerID
 let private modelId (m: obj) = unbox<string> m?modelID
 
@@ -83,6 +85,52 @@ let variantWithSpecialChars () =
         check "special providerID" (providerId m = "anthropic")
         check "special modelID stripped" (modelId m = "claude-3.5-sonnet")
 
+let nudgeMetadataCarriesVersionedSchema () =
+    let encoded = Metadata.encodePartMetadata "abc" Metadata.nudgeKind None 0 0 "" 0 0
+
+    let part =
+        createObj [ "type", box "text"; "text", box "hello"; "metadata", encoded ]
+
+    match Metadata.tryDecodeFromPart part with
+    | None -> check "nudge metadata carries versioned schema" false
+    | Some m ->
+        check "nudge metadata schema is 2" (m.Schema = 2)
+        check "nudge metadata kind is nudge" (m.Kind = "nudge")
+        check "nudge metadata nonce" (m.Nonce = "abc")
+
+let legacyFlatNonceStillDecodes () =
+    let part =
+        createObj
+            [ "type", box "text"
+              "text", box "hello"
+              "metadata", box (createObj [ "nonce", box "legacy" ]) ]
+
+    match Metadata.tryDecodeFromPart part with
+    | None -> check "legacy nonce decodes" false
+    | Some m ->
+        check "legacy schema is 1" (m.Schema = 1)
+        check "legacy kind is nudge" (m.Kind = "nudge")
+        check "legacy nonce value" (m.Nonce = "legacy")
+
+let continuationMetadataRoundTrips () =
+    let metadata =
+        Metadata.encodePartMetadata "cont-1" Metadata.fallbackContinuationKind (Some "cont-1") 7 2 "h-1" 5 3
+
+    let part = createObj [ "type", box "text"; "text", box "x"; "metadata", metadata ]
+
+    match Metadata.tryDecodeFromPart part with
+    | None -> check "continuation metadata round-trips" false
+    | Some m ->
+        check "continuation schema" (m.Schema = 2)
+        check "continuation kind" (m.Kind = "fallback_continuation")
+        check "continuation nonce" (m.Nonce = "cont-1")
+        check "continuation id" (m.ContinuationId = "cont-1")
+        check "continuation ordinal" (m.ContinuationOrdinal = 7)
+        check "continuation attempt" (m.Attempt = 2)
+        check "continuation humanTurnId" (m.HumanTurnId = "h-1")
+        check "continuation contextGeneration" (m.ContextGeneration = 5)
+        check "continuation cancelGeneration" (m.CancelGeneration = 3)
+
 let run () =
     modelObjectPassthroughFromPayload ()
     modelStringSlashDecodes ()
@@ -95,3 +143,6 @@ let run () =
     variantSuffixStrippedNested ()
     variantOnlyModelIdEmpty ()
     variantWithSpecialChars ()
+    nudgeMetadataCarriesVersionedSchema ()
+    legacyFlatNonceStillDecodes ()
+    continuationMetadataRoundTrips ()

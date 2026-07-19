@@ -93,18 +93,14 @@ let internal isSystemMessage
                     true
                 | _ -> false
 
-    match tryGetNonceFromParts parts with
-    | Some nonce -> consumeNudgeIfMatched nonce
-    // Fallback continuation prompts carry namespaced provenance
-    // (`metadata.wanxiangshu.kind = "fallback_continuation"`) rather
-    // than a flat nonce. They must be recognised as system messages
-    // so they do not reset the human turn id or overwrite the
-    // SessionOwner (which must stay SessionOwner.Fallback until the
-    // continuation's terminal event fires).
-    | None ->
-        match tryGetWanxiangshuKind parts with
-        | Some kind when kind = "fallback_continuation" -> true
-        | _ -> false
+    // Continuation prompts carry versioned provenance and should never
+    // be confused with nudges, so check the namespaced kind first.
+    match tryGetWanxiangshuKind parts with
+    | Some "fallback_continuation" -> true
+    | _ ->
+        match tryGetNonceFromParts parts with
+        | Some nonce -> consumeNudgeIfMatched nonce
+        | None -> false
 
 let private recordProvenanceIfPresent
     (parts: obj)

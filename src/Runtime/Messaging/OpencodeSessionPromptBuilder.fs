@@ -30,7 +30,8 @@ let createPromptBodyWithModelAndNonce
             box
                 {| ``type`` = "text"
                    text = text
-                   metadata = box {| nonce = n |} |}
+                   metadata =
+                    WanxiangshuMetadataCodec.encodePartMetadata n WanxiangshuMetadataCodec.nudgeKind None 0 0 "" 0 0 |}
         | None -> box {| ``type`` = "text"; text = text |}
 
     let parts: obj array = [| textPart |]
@@ -66,15 +67,15 @@ let createFallbackContinuationPromptBody
            variant = variantVal |}
 
     let metadata =
-        {| wanxiangshu =
-            {| kind = "fallback_continuation"
-               schema = 2
-               continuationId = request.ContinuationId
-               continuationOrdinal = request.ContinuationOrdinal
-               attempt = request.Attempt
-               humanTurnId = request.HumanTurnId
-               contextGeneration = request.ContextGeneration
-               cancelGeneration = request.CancelGeneration |} |}
+        WanxiangshuMetadataCodec.encodePartMetadata
+            request.ContinuationId
+            WanxiangshuMetadataCodec.fallbackContinuationKind
+            (Some request.ContinuationId)
+            request.ContinuationOrdinal
+            request.Attempt
+            request.HumanTurnId
+            request.ContextGeneration
+            request.CancelGeneration
 
     let textPart =
         box

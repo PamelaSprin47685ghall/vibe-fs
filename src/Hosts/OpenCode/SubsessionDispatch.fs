@@ -4,6 +4,9 @@ open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Kernel.FallbackKernel.Types
 open Wanxiangshu.Runtime
+open Wanxiangshu.Runtime.OpencodeSessionPromptCodec
+
+module Metadata = Wanxiangshu.Runtime.OpencodeSessionPromptCodec.WanxiangshuMetadataCodec
 
 /// Format a FallbackModel option into the string option shape expected by
 /// createPromptBodyWithModelAndNonce. None means ModelDirective.DelegateToHost:
@@ -32,44 +35,19 @@ let private checkActive (s: string) =
     ls = "busy" || ls = "running" || ls = "pending"
 
 let isMessageMatch (nonce: string) (msg: obj) : bool =
-    let id = Dyn.str msg "id"
-    let props = Dyn.get msg "props"
+    if Dyn.str msg "id" = nonce then
+        true
+    else
+        let parts = Dyn.get msg "parts"
 
-    let propsNonce =
-        if not (Dyn.isNullish props) then
-            Dyn.str props "nonce"
-        else
-            ""
-
-    let info = Dyn.get msg "info"
-
-    let infoNonce =
-        if not (Dyn.isNullish info) then
-            Dyn.str info "nonce"
-        else
-            ""
-
-    let parts = Dyn.get msg "parts"
-
-    let partsNonce =
         if not (Dyn.isNullish parts) && Dyn.isArray parts then
             let arr = unbox<obj array> parts
 
             arr
-            |> Array.tryPick (fun part ->
-                let metadata = Dyn.get part "metadata"
-
-                if Dyn.isNullish metadata then
-                    None
-                else
-                    let n = Dyn.str metadata "nonce"
-
-                    if n <> "" then Some n else None)
-            |> Option.defaultValue ""
+            |> Array.tryPick (fun part -> Metadata.tryDecodeFromPart part |> Option.filter (fun m -> m.Nonce = nonce))
+            |> Option.isSome
         else
-            ""
-
-    id = nonce || propsNonce = nonce || infoNonce = nonce || partsNonce = nonce
+            false
 
 let isMessageActive (msg: obj) : bool =
     let status = Dyn.str msg "status"

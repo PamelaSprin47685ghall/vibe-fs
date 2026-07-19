@@ -13,6 +13,8 @@ open Wanxiangshu.Hosts.Opencode.SubsessionHostAdapterTypes
 open Wanxiangshu.Kernel.Subsession.Types
 
 module Dyn = Wanxiangshu.Runtime.Dyn
+open Wanxiangshu.Runtime.OpencodeSessionPromptCodec
+module Metadata = Wanxiangshu.Runtime.OpencodeSessionPromptCodec.WanxiangshuMetadataCodec
 
 let private makePromptMock (promptCalled: bool ref) (promptNonce: string ref) childId workspaceDir expectedText =
     box (
@@ -24,10 +26,9 @@ let private makePromptMock (promptCalled: bool ref) (promptNonce: string ref) ch
                 let firstPart = if Dyn.isArray parts then Dyn.get parts "0" else null
 
                 if not (Dyn.isNullish firstPart) then
-                    let meta = Dyn.get firstPart "metadata"
-
-                    if not (Dyn.isNullish meta) then
-                        promptNonce.Value <- Dyn.str meta "nonce"
+                    match Metadata.tryDecodeFromPart firstPart with
+                    | Some m when m.Nonce <> "" -> promptNonce.Value <- m.Nonce
+                    | _ -> ()
 
                 if promptNonce.Value <> "" then
                     let receipt = UserMessageObserved(childId + "-msg")

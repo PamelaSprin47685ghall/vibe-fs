@@ -7,6 +7,9 @@ open Wanxiangshu.Runtime.Dyn
 open Wanxiangshu.Runtime.OpencodeHookInputCodec
 open Wanxiangshu.Runtime.ChatHookOutputCodec
 open Wanxiangshu.Runtime.ChildAgentRegistry
+open Wanxiangshu.Runtime.OpencodeSessionPromptCodec
+
+module Metadata = Wanxiangshu.Runtime.OpencodeSessionPromptCodec.WanxiangshuMetadataCodec
 
 /// Read the model identifier from any of the candidate hook payload
 /// locations. Mirrors the same fallback ladder OpenCode's `chat.message`
@@ -48,49 +51,15 @@ let tryGetModelStringFromHook (input: obj) (output: obj) : string option =
             else
                 Some(sprintf "%s/%s%s" providerID modelID suffix))
 
-/// Read the flat nonce from any part's metadata, if any. System
-/// messages authored by the nudge or subsession paths stamp a flat
-/// `metadata.nonce` on their text part.
+/// Read the dispatch nonce from any part's metadata, if any.
 let tryGetNonceFromParts (parts: obj) : string option =
-    if Dyn.isNullish parts || not (Dyn.isArray parts) then
-        None
-    else
-        let arr = parts :?> obj array
+    Metadata.tryDecodeFromParts parts
+    |> Option.bind (fun m -> if m.Nonce <> "" then Some m.Nonce else None)
 
-        arr
-        |> Array.tryPick (fun part ->
-            let metadata = Dyn.get part "metadata"
-
-            if Dyn.isNullish metadata then
-                None
-            else
-                let nonce = Dyn.str metadata "nonce"
-                if nonce <> "" then Some nonce else None)
-
-/// Read the wanxiangshu namespaced kind from any part's metadata, if
-/// any. Used to identify system-synthesised messages (e.g. fallback
-/// continuation prompts) that carry namespaced provenance instead of
-/// a flat nonce.
+/// Read the wanxiangshu namespaced kind from any part's metadata, if any.
 let tryGetWanxiangshuKind (parts: obj) : string option =
-    if Dyn.isNullish parts || not (Dyn.isArray parts) then
-        None
-    else
-        let arr = parts :?> obj array
-
-        arr
-        |> Array.tryPick (fun part ->
-            let metadata = Dyn.get part "metadata"
-
-            if Dyn.isNullish metadata then
-                None
-            else
-                let ws = Dyn.get metadata "wanxiangshu"
-
-                if Dyn.isNullish ws then
-                    None
-                else
-                    let kind = Dyn.str ws "kind"
-                    if kind <> "" then Some kind else None)
+    Metadata.tryDecodeFromParts parts
+    |> Option.bind (fun m -> if m.Kind <> "" then Some m.Kind else None)
 
 /// Extract the role of a chat message from the host hook output, or
 /// empty string when absent. Used to gate turn-boundary side effects
@@ -113,32 +82,14 @@ type WanxiangshuProvenance =
 /// Extract wanxiangshu provenance from message parts metadata.
 /// Returns None when no wanxiangshu metadata is found or parts are invalid.
 let tryDecodeWanxiangshuProvenance (parts: obj) : WanxiangshuProvenance option =
-    if Dyn.isNullish parts || not (Dyn.isArray parts) then
-        None
-    else
-        let arr = parts :?> obj array
-
-        arr
-        |> Array.tryPick (fun part ->
-            let metadata = Dyn.get part "metadata"
-
-            if Dyn.isNullish metadata then
-                None
-            else
-                let ws = Dyn.get metadata "wanxiangshu"
-
-                if Dyn.isNullish ws then
-                    None
-                else
-                    let kind = Dyn.str ws "kind"
-                    let continuationId = Dyn.str ws "continuationId"
-
-                    if kind <> "" && continuationId <> "" then
-                        Some
-                            { Kind = kind
-                              ContinuationId = continuationId }
-                    else
-                        None)
+    Metadata.tryDecodeFromParts parts
+    |> Option.bind (fun m ->
+        if m.Kind <> "" && m.ContinuationId <> "" then
+            Some
+                { Kind = m.Kind
+                  ContinuationId = m.ContinuationId }
+        else
+            None)
 
 let resolveAgent (registry: ChildAgentRegistry) (input: obj) (output: obj) : string =
     resolveHookAgent registry input (Some output) "manager"

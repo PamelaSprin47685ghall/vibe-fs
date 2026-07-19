@@ -9,6 +9,9 @@ open Wanxiangshu.Runtime.Fallback.SessionRuntimeLeasePure
 open Wanxiangshu.Hosts.Opencode.SubsessionHostAdapter
 open Wanxiangshu.Hosts.Opencode.SubsessionHostAdapterTypes
 open Wanxiangshu.Kernel.Subsession.Types
+open Wanxiangshu.Runtime.OpencodeSessionPromptCodec
+
+module Metadata = Wanxiangshu.Runtime.OpencodeSessionPromptCodec.WanxiangshuMetadataCodec
 
 let makeMockClient
     (pObjRef: obj ref)
@@ -65,8 +68,9 @@ let makeMockClient
                                                     if Dyn.isNullish firstPart then
                                                         ""
                                                     else
-                                                        let meta = Dyn.get firstPart "metadata"
-                                                        if Dyn.isNullish meta then "" else Dyn.str meta "nonce"
+                                                        match Metadata.tryDecodeFromPart firstPart with
+                                                        | Some m when m.Nonce <> "" -> m.Nonce
+                                                        | _ -> ""
 
                                         if nonce <> "" then
                                             sessionNonces <- Map.add childId nonce sessionNonces
@@ -90,11 +94,21 @@ let makeMockClient
                                                 (fun () ->
                                                     promise {
                                                         let messageUpdatedEvent =
-                                                            let infoObj =
+                                                            let partMetadata =
                                                                 match Map.tryFind childId sessionNonces with
                                                                 | Some n when n <> "" ->
-                                                                    box {| role = "assistant"; nonce = n |}
-                                                                | _ -> box {| role = "assistant" |}
+                                                                    Metadata.encodePartMetadata
+                                                                        n
+                                                                        Metadata.nudgeKind
+                                                                        None
+                                                                        0
+                                                                        0
+                                                                        ""
+                                                                        0
+                                                                        0
+                                                                | _ -> box null
+
+                                                            let infoObj = box {| role = "assistant" |}
 
                                                             box
                                                                 {| event =
@@ -107,7 +121,8 @@ let makeMockClient
                                                                                    parts =
                                                                                     [| box
                                                                                            {| ``type`` = "text"
-                                                                                              text = responseText |} |] |} |} |}
+                                                                                              text = responseText
+                                                                                              metadata = partMetadata |} |] |} |} |}
 
                                                         do!
                                                             (eventHook $ messageUpdatedEvent)
@@ -152,22 +167,26 @@ let makeMockClient
                                           "model",
                                           box (createObj [ "providerID", box "mock"; "modelID", box "mock-model" ]) ]
 
-                                    let infoListWithNonce =
+                                    let partMetadata =
                                         if childId <> "" then
                                             match Map.tryFind childId sessionNonces with
-                                            | Some n when n <> "" -> infoList @ [ "nonce", box n ]
-                                            | _ -> infoList
+                                            | Some n when n <> "" ->
+                                                Metadata.encodePartMetadata n Metadata.nudgeKind None 0 0 "" 0 0
+                                            | _ -> box null
                                         else
-                                            infoList
+                                            box null
 
                                     let assistantMessage =
                                         box (
                                             createObj
-                                                [ "info", box (createObj infoListWithNonce)
+                                                [ "info", box (createObj infoList)
                                                   "parts",
                                                   box
                                                       [| box (
-                                                             createObj [ "type", box "text"; "text", box responseText ]
+                                                             createObj
+                                                                 [ "type", box "text"
+                                                                   "text", box responseText
+                                                                   "metadata", partMetadata ]
                                                          ) |] ]
                                         )
 
