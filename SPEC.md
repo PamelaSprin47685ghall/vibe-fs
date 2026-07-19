@@ -48,7 +48,7 @@
 * [x] 无未引用生产源文件。 ✅ 已验证（src/ 下 545 文件全部被 fsproj 收录）
 * [ ] `.fsproj` 的编译顺序反映真实依赖，而不是历史迁移顺序。 ⚠️ 重复条目已修复（EventLogRuntimeStore.fs），integration/ 目录位置待整理
 * [ ] OpenCode 全链路 E2E 通过后，再分别验证 OMP 和 Mux。
-* [x] 最终目录和文件名不依赖阅读重构历史才能理解。 ✅ 已验证（无 Vxx/Legacy/Old/Part 残留；tests/TestWorkspace.fs 命名待优化）
+* [x] 最终目录和文件名不依赖阅读重构历史才能理解。 ✅ 已验证（无 Vxx/Legacy/Old/Part 残留；tests/TestWorkspace.fs 命名已优化）
 
 **最优先顺序不是整理文件名，而是：裁决 Continuation 双架构，统一 Backlog，再拆兼容层。** 这三件事完成以后，才可以说旧架构已经从运行路径中真正肃清，而不只是从文件名上消失。
 
