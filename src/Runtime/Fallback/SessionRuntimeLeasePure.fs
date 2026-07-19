@@ -145,6 +145,25 @@ let setActiveCompactionId id ordinal humanTurnId cancelGeneration (s: FallbackSe
         CompactionHumanTurnId = humanTurnId
         CompactionCancelGeneration = cancelGeneration }
 
+let startCompaction
+    (compactionId: string)
+    (compactionOrdinal: int)
+    (humanTurnId: string)
+    (cancelGeneration: int)
+    (currentGen: int)
+    (s: FallbackSessionRuntime)
+    : FallbackSessionRuntime =
+    { s with
+        CompactionActiveId = compactionId
+        CompactionActiveOrdinal = compactionOrdinal
+        CompactionHumanTurnId = humanTurnId
+        CompactionCancelGeneration = cancelGeneration
+        CompactionGeneration = currentGen
+        CompactionCompacted = false
+        CompactionContinuationObserved = false
+        CompactionSummaryTransformPending = true
+        Owner = SessionOwner.Compaction }
+
 let tryGetSettleInfo expectedCompactionID (s: FallbackSessionRuntime) =
     if s.CompactionActiveId = expectedCompactionID then
         Some(s.CompactionActiveId, s.CompactionActiveOrdinal)
@@ -162,6 +181,7 @@ let applySettle expectedCompactionID (s: FallbackSessionRuntime) =
                 CompactionGeneration = 0
                 CompactionCompacted = false
                 CompactionContinuationObserved = false
+                CompactionSummaryTransformPending = false
                 Owner =
                     if s.Owner = SessionOwner.Compaction then
                         SessionOwner.NoOwner

@@ -5,7 +5,7 @@ open Wanxiangshu.Kernel.ContextBudget
 let actionForDecision (pressure: ContextBudgetPressure) (nudgeTrack: BudgetNudgeTrack) : string =
     match pressure, nudgeTrack with
     | Compacting, _ -> "compacting"
-    | RequireTodoWriteEmergency, EmergencySignaled -> "nudge-injected"
+    | RequireTodoWriteEmergency, EmergencySignaled _ -> "nudge-injected"
     | RequireTodoWriteEmergency, Idle -> "episode-exhausted"
     | BelowThreshold, _ -> "below-threshold"
     | _ -> "no-action"

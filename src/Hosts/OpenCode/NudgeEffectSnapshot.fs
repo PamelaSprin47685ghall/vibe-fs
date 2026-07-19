@@ -10,7 +10,7 @@ open Wanxiangshu.Runtime.ToolRuntimeContext
 open Wanxiangshu.Kernel.Primitives.Identity
 open Wanxiangshu.Kernel.Session.Causality
 open Wanxiangshu.Runtime.OpencodeClientCodec
-open Wanxiangshu.Hosts.OpenCode.OpencodeSessionEventCodec
+open Wanxiangshu.Runtime.Messaging.OpencodeSessionEventCodec
 open Wanxiangshu.Runtime.Fallback.RuntimeStore
 
 module Dyn = Wanxiangshu.Runtime.Dyn

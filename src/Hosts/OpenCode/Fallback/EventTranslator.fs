@@ -8,8 +8,8 @@ open Wanxiangshu.Runtime
 open Wanxiangshu.Runtime.ErrorClassify
 open Wanxiangshu.Runtime.Dyn
 open Wanxiangshu.Runtime.OpencodeClientCodec
-open Wanxiangshu.Hosts.OpenCode.OpencodeSessionEventCodec
-open Wanxiangshu.Hosts.Opencode.OpencodeHostEvent
+open Wanxiangshu.Runtime.Messaging.OpencodeSessionEventCodec
+open Wanxiangshu.Runtime.Messaging.OpencodeHostEvent
 open Wanxiangshu.Runtime.Fallback.FallbackMessageCodec
 open Wanxiangshu.Kernel.Primitives.Identity
 open Wanxiangshu.Kernel.Errors.DomainError

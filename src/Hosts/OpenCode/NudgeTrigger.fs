@@ -14,7 +14,7 @@ open Wanxiangshu.Runtime.Fallback.RuntimeStore
 open Wanxiangshu.Runtime.Fallback.SessionRuntimePropertyPure
 open Wanxiangshu.Runtime.Dyn
 open Wanxiangshu.Runtime.OpencodeClientCodec
-open Wanxiangshu.Hosts.Opencode.OpencodeHostEvent
+open Wanxiangshu.Runtime.Messaging.OpencodeHostEvent
 open Wanxiangshu.Runtime.OpencodeHookInputCodec
 open Wanxiangshu.Runtime.ToolRuntimeContext
 open Wanxiangshu.Runtime.EventLogRuntime

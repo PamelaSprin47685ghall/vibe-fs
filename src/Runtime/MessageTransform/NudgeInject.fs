@@ -46,8 +46,12 @@ let private persistStableNudgeId
     (sessionID: string)
     (stableId: string)
     (track: BudgetNudgeTrack)
-    (signalOrdinal: int)
     : unit =
+    let signalOrdinal =
+        match track with
+        | EmergencySignaled ordinal -> ordinal
+        | Idle -> 0
+
     ContextBudgetStore.update scope sessionID (fun entry ->
         { entry with
             StableSyntheticNudgeID = Some stableId
@@ -69,7 +73,7 @@ let private resolveStableNudgeId
     | InjectFirstSignal ->
         let id = "context-budget-nudge-" + System.Guid.NewGuid().ToString()
 
-        persistStableNudgeId scope sessionID id EmergencySignaled currentTodoOrdinal
+        persistStableNudgeId scope sessionID id (EmergencySignaled currentTodoOrdinal)
 
         ContextBudgetStore.update scope sessionID (fun entry ->
             { entry with
@@ -79,13 +83,13 @@ let private resolveStableNudgeId
         id
     | InjectSameEpisode ->
         ensureStableNudgeId scope sessionID storeEntry.StableSyntheticNudgeID (fun id ->
-            persistStableNudgeId scope sessionID id EmergencySignaled currentTodoOrdinal)
+            persistStableNudgeId scope sessionID id (EmergencySignaled currentTodoOrdinal))
     | InjectCatchUp ->
         let id =
             storeEntry.StableSyntheticNudgeID
             |> Option.defaultValue ("context-budget-nudge-" + System.Guid.NewGuid().ToString())
 
-        persistStableNudgeId scope sessionID id EmergencySignaled currentTodoOrdinal
+        persistStableNudgeId scope sessionID id (EmergencySignaled currentTodoOrdinal)
 
         ContextBudgetStore.update scope sessionID (fun entry ->
             { entry with
@@ -121,9 +125,9 @@ let checkAndInjectNudge
             classifyNudgeAction
                 pressure
                 storeEntry.NudgeTrack
-                storeEntry.SignalTodoOrdinal
                 currentTodoOrdinal
                 storeEntry.NudgeCount
+                storeEntry.LastObservedTodoOrdinal
 
         if not (shouldIncludeNudge contextBudgetPolicy) || action = NoNudge then
             messages, pressure, action

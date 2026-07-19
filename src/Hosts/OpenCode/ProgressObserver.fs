@@ -25,7 +25,7 @@ open Wanxiangshu.Runtime.SubsessionEventRouter
 open Wanxiangshu.Runtime.EventLogRuntime
 open Wanxiangshu.Runtime.WorkBacklogToolsCodec
 open Wanxiangshu.Runtime.ToolRuntimeContext
-open Wanxiangshu.Hosts.Opencode.OpencodeHostEvent
+open Wanxiangshu.Runtime.Messaging.OpencodeHostEvent
 open Wanxiangshu.Runtime.BacklogSession
 
 type ProgressObserver

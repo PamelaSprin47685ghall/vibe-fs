@@ -17,8 +17,8 @@ open Wanxiangshu.Hosts.Opencode.SessionLifecycleObserver
 open Wanxiangshu.Runtime.Dyn
 open Wanxiangshu.Runtime.OpencodeHookInputCodec
 open Wanxiangshu.Runtime.OpencodeClientCodec
-open Wanxiangshu.Hosts.OpenCode.OpencodeSessionEventCodec
-open Wanxiangshu.Hosts.Opencode.OpencodeHostEvent
+open Wanxiangshu.Runtime.Messaging.OpencodeSessionEventCodec
+open Wanxiangshu.Runtime.Messaging.OpencodeHostEvent
 open Wanxiangshu.Runtime.LivelockGuard
 open Wanxiangshu.Runtime.ToolRuntimeContext
 open Wanxiangshu.Hosts.Opencode.PtySpawn

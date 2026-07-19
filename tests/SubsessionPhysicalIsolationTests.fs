@@ -510,17 +510,14 @@ let run () =
         reconciliationRetryPreservesAbortReason ()
         actorRegistryWorkspaceIsolation ()
 
-        do!
-            Promise.all
-                [ opencodeReceiptWaitsForObservation ()
-                  opencodeQueryDispatchStatusRejectedBeforeSend ()
-                  opencodeRejectedBeforeSendRejectsLateReceipt ()
-                  opencodeQueryDispatchStatusFailedAfterUnknown ()
-                  opencodeCancelPendingDispatchKeepsReceiptCorrelation ()
-                  opencodeQuiescenceHonestUnknown ()
-                  opencodeQuiescenceStillRunning ()
-                  opencodeQuiescenceStopped ()
-                  ompQuiescenceHonestUnknown ()
-                  routeNoneTurnIdEvidenceAttributedToCurrentTurn () ]
-            |> Promise.map ignore
+        do! opencodeReceiptWaitsForObservation ()
+        do! opencodeQueryDispatchStatusRejectedBeforeSend ()
+        do! opencodeRejectedBeforeSendRejectsLateReceipt ()
+        do! opencodeQueryDispatchStatusFailedAfterUnknown ()
+        do! opencodeCancelPendingDispatchKeepsReceiptCorrelation ()
+        do! opencodeQuiescenceHonestUnknown ()
+        do! opencodeQuiescenceStillRunning ()
+        do! opencodeQuiescenceStopped ()
+        do! ompQuiescenceHonestUnknown ()
+        do! routeNoneTurnIdEvidenceAttributedToCurrentTurn ()
     }

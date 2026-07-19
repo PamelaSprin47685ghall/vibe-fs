@@ -48,7 +48,8 @@ let spec_applyContextBudget_reinjectWhenBudgetStillHot () =
         ContextBudgetStore.update scope "sess-nudge-reinject" (fun entry ->
             { entry with
                 State = Some state
-                NudgeTrack = EmergencySignaled })
+                NudgeTrack = EmergencySignaled 0
+                PendingOutbound = Some { Fingerprint = "seed"; Bytes = 2000 } })
 
         let msgInfo: MessageInfo<obj> =
             { id = "user-1"
@@ -66,7 +67,9 @@ let spec_applyContextBudget_reinjectWhenBudgetStillHot () =
                 source = Native
                 raw = null } ]
 
-        let! res = applyContextBudget plan backlogOps messages [||]
+        let bigPayload = String.replicate 60000 "a"
+        let encoded = [| box bigPayload |]
+        let! res = applyContextBudget plan backlogOps messages encoded
         equal "must reinject after prior round stripped synthetic nudge" 2 res.Length
         equal "nudge source" (Synthetic "context-budget-nudge-") (List.last res).source
     }

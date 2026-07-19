@@ -47,7 +47,12 @@ let private mkBacklogOps =
 
 let private mkTestState scope sessionID =
     let s = beginCycle 30000L 0 3
-    ContextBudgetStore.update scope sessionID (fun e -> { e with State = Some s })
+
+    ContextBudgetStore.update scope sessionID (fun e ->
+        { e with
+            State = Some s
+            PendingOutbound = Some { Fingerprint = "seed"; Bytes = 500 } })
+
     s
 
 let private mkMsgInfo sessionID =

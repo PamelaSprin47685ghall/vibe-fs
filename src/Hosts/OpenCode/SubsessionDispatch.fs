@@ -10,7 +10,7 @@ open Wanxiangshu.Kernel.Subsession.Types
 open Wanxiangshu.Runtime
 open Wanxiangshu.Runtime.Dyn
 open Wanxiangshu.Runtime.OpencodeClientCodec
-open Wanxiangshu.Hosts.OpenCode.OpencodeSessionEventCodec
+open Wanxiangshu.Runtime.Messaging.OpencodeSessionEventCodec
 open Wanxiangshu.Runtime.CommandProcessor
 open Wanxiangshu.Runtime.SubsessionPorts
 open Wanxiangshu.Runtime.SubsessionActor
@@ -142,10 +142,19 @@ module PendingTurnReceipt =
         (turnId: string)
         : JS.Promise<Result<HostStartReceipt, DispatchFailure>> =
         Promise.create (fun resolve reject ->
-            let existingForSession =
+            // Clean stale entries: remove completed, cancelled, or disposed actors
+            pending <-
                 pending
-                |> Map.toSeq
-                |> Seq.tryFind (fun (_, w) -> w.SessionId = sessionId && not w.Completed && not w.Cancelled)
+                |> Map.filter (fun _ w ->
+                    if w.Completed || w.Cancelled then
+                        false
+                    else
+                        match SubsessionActorRegistry.TryGet w.WorkspaceRoot w.SessionId with
+                        | Some actor -> not actor.IsDisposed && not actor.IsPoisoned
+                        | None -> false)
+
+            let existingForSession =
+                pending |> Map.toSeq |> Seq.tryFind (fun (_, w) -> w.SessionId = sessionId)
 
             match existingForSession with
             | Some(_, w) ->

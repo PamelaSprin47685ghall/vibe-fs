@@ -53,7 +53,7 @@ let spec_applyContextBudget_afterTodoResets () =
             { entry with
                 State = Some state
                 LastBacklog = []
-                NudgeTrack = EmergencySignaled })
+                NudgeTrack = EmergencySignaled 0 })
 
         let newTodoEntry =
             { ahaMoments = "aha"
@@ -83,7 +83,7 @@ let spec_applyContextBudget_afterTodoResets () =
         let! _res = applyContextBudget plan backlogOps messages [||]
         let updatedStore = ContextBudgetStore.get scope "sess-after-todo"
         equal "last todo count updated" 1 updatedStore.LastBacklog.Length
-        equal "nudge track reset after backlog change" Idle updatedStore.NudgeTrack
+        equal "nudge track preserved after backlog change" (EmergencySignaled 0) updatedStore.NudgeTrack
     }
 
 let spec_applyContextBudget_fiveConsecutiveTodos () =
@@ -205,7 +205,7 @@ let spec_applyContextBudget_fiveConsecutiveTodos () =
 
             let updatedStore = ContextBudgetStore.get scope sessionID
             equal "LastTodoCount updated" i updatedStore.LastBacklog.Length
-            equal "NudgeTrack reset after todo" Idle updatedStore.NudgeTrack
+            equal "NudgeTrack preserved after todo" (EmergencySignaled 0) updatedStore.NudgeTrack
             phaseBase <- updatedStore.State.Value.BaselineTokens
     }
 

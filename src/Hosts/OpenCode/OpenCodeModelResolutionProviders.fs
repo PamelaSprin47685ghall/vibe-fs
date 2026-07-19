@@ -110,16 +110,22 @@ let resolveModelResolution
                             && typeIs inputVal "number"
                             && (unbox<float> inputVal) > 0.0
 
+                        let maxOutputTokens = if outputTokens > 0 then min outputTokens 32000 else 32000
+
                         let usable =
                             if hasInput then
-                                contextTokens
+                                let reserved = min 20000 maxOutputTokens
+                                max 0 (contextTokens - reserved)
                             else
                                 computeUsableInputTokens contextTokens outputTokens
 
                         let source =
-                            if hasInput then "provider-catalog-input"
-                            elif outputTokens > 0 then "provider-catalog-input-reserved"
-                            else "provider-catalog-context"
+                            if hasInput then
+                                "provider-catalog-input-reserved"
+                            elif outputTokens > 0 then
+                                "provider-catalog-context-reserved"
+                            else
+                                "provider-catalog-context"
 
                         return
                             { ProviderID = providerID

@@ -77,6 +77,7 @@ let classifyTransition
     (projection: BacklogProjectionResult<obj>)
     (lastBacklog: BacklogEntry list)
     (currentBacklog: BacklogEntry list)
+    (lastObservedTodoOrdinal: int option)
     : PhaseTransition =
     match existingState with
     | None -> ColdStart
@@ -86,7 +87,7 @@ let classifyTransition
             && projection.FoldFrontierOrdinal > state.FoldFrontierOrdinal
         then
             FoldFrontierAdvanced
-        elif projection.TotalTodoOrdinal > state.BaselineTodoOrdinal then
+        elif projection.TotalTodoOrdinal > (lastObservedTodoOrdinal |> Option.defaultValue 0) then
             TodoAcknowledged
         elif currentBacklog <> lastBacklog then
             BacklogOnlyChange
@@ -136,13 +137,12 @@ let private withRefreshedCycle
     (backlog: BacklogEntry list)
     (entry: ContextBudgetEntry)
     : ContextBudgetEntry =
-    { resetNudgeFields entry with
+    { entry with
         State = Some cycle
         LastBacklog = backlog }
 
 let private withBacklogOnly (backlog: BacklogEntry list) (entry: ContextBudgetEntry) : ContextBudgetEntry =
-    { resetNudgeFields entry with
-        LastBacklog = backlog }
+    { entry with LastBacklog = backlog }
 
 let applyTransition
     (scope: RuntimeScope)
@@ -185,7 +185,10 @@ let applyTransition
                 let baseline = estimateBaseline currentStore projectedBytes currentTokens
                 beginCycle baseline projection.TotalTodoOrdinal projection.RemainingTodoWritesUntilFold
 
-        ContextBudgetStore.update scope sessionID (withRefreshedCycle cycle backlog)
+        ContextBudgetStore.update scope sessionID (fun entry ->
+            { withRefreshedCycle cycle backlog entry with
+                LastObservedTodoOrdinal = Some projection.TotalTodoOrdinal })
+
         cycle, false
 
     | BacklogOnlyChange ->

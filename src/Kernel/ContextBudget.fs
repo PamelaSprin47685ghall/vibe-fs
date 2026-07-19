@@ -87,10 +87,12 @@ let beginCycle (baselineTokens: int64) (baselineTodoOrdinal: int) (remainingUnti
       RemainingTodoWritesUntilFold = remainingUntilFold }
 
 let advanceSegment (cycle: ProjectionBudgetCycle) (currentTodoOrdinal: int) : ProjectionBudgetCycle =
-    let completed = currentTodoOrdinal - cycle.BaselineTodoOrdinal
+    let completed = max 0 (currentTodoOrdinal - cycle.BaselineTodoOrdinal)
+    let remaining = max 0 (cycle.RemainingTodoWritesUntilFold - completed)
 
     { cycle with
-        CompletedSegments = max 0 completed }
+        CompletedSegments = completed
+        RemainingTodoWritesUntilFold = remaining }
 
 let rebuildCycleAtFold
     (newBaselineTokens: int64)
@@ -112,9 +114,11 @@ let estimateTokens (currentTextBytes: int) (lastUsage: {| tokenCount: int; textB
     | _ -> None
 
 /// Host strips synthetic nudge each transform round; reinject whenever pressure still holds.
+/// EmergencySignaled carries the todo ordinal at which the signal was emitted,
+/// so classifyNudgeAction can distinguish LLM spontaneous todo from signal response.
 type BudgetNudgeTrack =
     | Idle
-    | EmergencySignaled
+    | EmergencySignaled of signalTodoOrdinal: int
 
 /// Measurement quality indicator for context budget.
 type MeasurementQuality =
@@ -137,16 +141,33 @@ type NudgeAction =
 let classifyNudgeAction
     (pressure: ContextBudgetPressure)
     (track: BudgetNudgeTrack)
-    (signalTodoOrdinal: int option)
     (currentTodoOrdinal: int)
     (nudgeCount: int)
+    (lastObservedTodoOrdinal: int option)
     : NudgeAction =
     match pressure with
     | RequireTodoWriteEmergency ->
-        match track, signalTodoOrdinal with
-        | EmergencySignaled, Some signaled when signaled = currentTodoOrdinal -> InjectSameEpisode
-        | EmergencySignaled, _ -> InjectCatchUp
-        | Idle, _ -> if nudgeCount >= 2 then InjectCatchUp else InjectFirstSignal
+        let observed = lastObservedTodoOrdinal |> Option.defaultValue 0
+        let hasNewTodo = currentTodoOrdinal > observed
+
+        match track with
+        | EmergencySignaled signaled ->
+            if hasNewTodo && currentTodoOrdinal > signaled then
+                InjectCatchUp
+            elif hasNewTodo then
+                // LLM did a todo at or before the signal ordinal → spontaneous, give space
+                NoNudge
+            else
+                // No new todo, still hot → reinject same episode
+                InjectSameEpisode
+        | Idle ->
+            if hasNewTodo then
+                // LLM spontaneously did a todo without being nudged → no nudge
+                NoNudge
+            elif nudgeCount >= 2 then
+                InjectCatchUp
+            else
+                InjectFirstSignal
     | _ -> NoNudge
 
 /// Effective budget calculation.

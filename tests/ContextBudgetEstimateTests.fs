@@ -43,6 +43,7 @@ let spec_applyContextBudget_estimatesFromLastUsageWhenApiMissing () =
         ContextBudgetStore.update scope sessionID (fun entry ->
             { entry with
                 State = Some state
+                PendingOutbound = Some { Fingerprint = "seed"; Bytes = 2000 }
                 LastUsage =
                     Some
                         {| tokenCount = 60000
@@ -125,7 +126,10 @@ let spec_applyContextBudget_seedsLastUsageAfterLiveRead () =
 
         let state = beginCycle 30000L 0 3
 
-        ContextBudgetStore.update scope sessionID (fun entry -> { entry with State = Some state })
+        ContextBudgetStore.update scope sessionID (fun entry ->
+            { entry with
+                State = Some state
+                PendingOutbound = Some { Fingerprint = "seed"; Bytes = 2000 } })
 
         let msgInfo: MessageInfo<obj> =
             { id = "user-1"

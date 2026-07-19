@@ -44,7 +44,11 @@ let spec_applyContextBudget_injectsNudge () =
               GetOrRebuildBacklog = (fun _ _ -> []) }
 
         let state = beginCycle 30000L 0 3
-        ContextBudgetStore.update scope "sess-nudge" (fun entry -> { entry with State = Some state })
+
+        ContextBudgetStore.update scope "sess-nudge" (fun entry ->
+            { entry with
+                State = Some state
+                PendingOutbound = Some { Fingerprint = "seed"; Bytes = 2000 } })
 
         let msgInfo: MessageInfo<obj> =
             { id = "user-1"
@@ -62,7 +66,9 @@ let spec_applyContextBudget_injectsNudge () =
                 source = Native
                 raw = null } ]
 
-        let! res = applyContextBudget plan backlogOps messages [||]
+        let bigPayload = String.replicate 60000 "a"
+        let encoded = [| box bigPayload |]
+        let! res = applyContextBudget plan backlogOps messages encoded
         equal "should inject nudge" 2 res.Length
         let lastMsg = List.last res
         equal "last msg source" (Synthetic "context-budget-nudge-") lastMsg.source

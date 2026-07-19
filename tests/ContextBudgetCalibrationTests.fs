@@ -167,7 +167,7 @@ let spec_actionForDecision_episodeExhaustedPressureReturnsEpisodeExhausted () =
     equal "episode-exhausted pressure yields 'episode-exhausted'" "episode-exhausted" action
 
 let spec_actionForDecision_nudgeInjectedWhenEmergencySignaled () =
-    let action = actionForDecision RequireTodoWriteEmergency EmergencySignaled
+    let action = actionForDecision RequireTodoWriteEmergency (EmergencySignaled 0)
     equal "emergency signaled yields 'nudge-injected'" "nudge-injected" action
 
 let spec_actionForDecision_belowThresholdReturnsNoAction () =

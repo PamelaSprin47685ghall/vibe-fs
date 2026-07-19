@@ -68,6 +68,7 @@ let spec_advanceSegment () =
     let cycle = beginCycle 30000L 2 3
     let advanced = advanceSegment cycle 5
     equal "CompletedSegments after advance" 3 advanced.CompletedSegments
+    equal "RemainingTodoWritesUntilFold after advance" 0 advanced.RemainingTodoWritesUntilFold
     equal "BaselineTokens unchanged" 30000L advanced.BaselineTokens
 
 let spec_rebuildCycleAtFold () =
@@ -97,24 +98,29 @@ let spec_classifyPressure_disabled () =
     equal "pressure disabled" Disabled (classifyPressure 0 60000L state)
 
 let spec_classifyNudgeAction_firstSignal () =
-    let action = classifyNudgeAction RequireTodoWriteEmergency Idle None 0 0
+    let action = classifyNudgeAction RequireTodoWriteEmergency Idle 0 0 None
     equal "first signal" InjectFirstSignal action
 
 let spec_classifyNudgeAction_sameEpisode () =
     let action =
-        classifyNudgeAction RequireTodoWriteEmergency EmergencySignaled (Some 5) 5 1
+        classifyNudgeAction RequireTodoWriteEmergency (EmergencySignaled 5) 5 1 (Some 5)
 
     equal "same episode" InjectSameEpisode action
 
 let spec_classifyNudgeAction_catchUp () =
     let action =
-        classifyNudgeAction RequireTodoWriteEmergency EmergencySignaled (Some 3) 5 1
+        classifyNudgeAction RequireTodoWriteEmergency (EmergencySignaled 3) 5 1 (Some 3)
 
     equal "catch up on ordinal change" InjectCatchUp action
 
 let spec_classifyNudgeAction_noNudge () =
-    let action = classifyNudgeAction BelowThreshold Idle None 0 0
+    let action = classifyNudgeAction BelowThreshold Idle 0 0 None
     equal "no nudge below threshold" NoNudge action
+
+let spec_classifyNudgeAction_spontaneousTodo () =
+    let action = classifyNudgeAction RequireTodoWriteEmergency Idle 3 0 (Some 1)
+
+    equal "spontaneous todo suppresses nudge" NoNudge action
 
 let spec_bootstrapHardSafety () =
     check "hard safety at 75%" (bootstrapHardSafety 150000L 200000L)
@@ -151,5 +157,6 @@ let run () : unit =
     spec_classifyNudgeAction_sameEpisode ()
     spec_classifyNudgeAction_catchUp ()
     spec_classifyNudgeAction_noNudge ()
+    spec_classifyNudgeAction_spontaneousTodo ()
     spec_bootstrapHardSafety ()
     spec_progression_QM ()

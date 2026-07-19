@@ -1,4 +1,4 @@
-module Wanxiangshu.Hosts.OpenCode.OpencodeSessionEventCodec
+module Wanxiangshu.Runtime.Messaging.OpencodeSessionEventCodec
 
 open Fable.Core.JsInterop
 open Wanxiangshu.Kernel
@@ -6,9 +6,9 @@ open Wanxiangshu.Kernel.Messaging
 open Wanxiangshu.Kernel.Nudge
 open Wanxiangshu.Kernel.Nudge.TodoStatus
 
-open Wanxiangshu.Runtime.Dyn
+module Dyn = Wanxiangshu.Runtime.Dyn
 open Wanxiangshu.Runtime.OpencodeSessionPromptCodec
-open Wanxiangshu.Hosts.Opencode.OpencodeHostEvent
+module OpencodeHostEvent = Wanxiangshu.Runtime.Messaging.OpencodeHostEvent
 open Wanxiangshu.Runtime.OpencodeSessionPromptBuilder
 open Wanxiangshu.Kernel.Fallback.Continuation
 
@@ -25,10 +25,10 @@ open Wanxiangshu.Kernel.Fallback.Continuation
 /// payloads (e.g. `createPromptBody`) lives next to the decoders so the wire
 /// format stays a single read/write site.
 /// Re-export shared session event decoders for single-import convenience.
-let getSessionID = OpencodeHostEvent.getSessionID
-let getPartsText = OpencodeHostEvent.getPartsText
+let getSessionID eventType props = OpencodeHostEvent.getSessionID eventType props
+let getPartsText parts = OpencodeHostEvent.getPartsText parts
 
-let isCompletedAssistantMessage = OpencodeHostEvent.isCompletedAssistantMessage
+let isCompletedAssistantMessage info = OpencodeHostEvent.isCompletedAssistantMessage info
 
 /// Decode a todo list payload into the *open* todo contents, dropping items
 /// with terminal status. The returned strings are the raw `content` strings

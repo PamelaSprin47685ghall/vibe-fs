@@ -30,20 +30,21 @@ let private resolveTokensAndCalibration
             match maybeObservation, storeEntry.PendingOutbound with
             | Some obs, Some pending ->
                 tryCalibrateFromObservation obs storeEntry.LastObservedAssistantID (Some pending)
+                |> Option.orElse storeEntry.LastCalibration
             | _ -> storeEntry.LastCalibration
 
         let newObservedID =
             maybeObservation |> Option.map (fun obs -> obs.AssistantMessageID)
 
         let currentTokens, confidence =
-            match calibration, maybeObservation with
-            | Some _, _ ->
+            match calibration, maybeObservation, storeEntry.PendingOutbound with
+            | Some _, _, _ ->
                 resolveCurrentTokensFromCalibration
                     totalBytes
                     None
                     { storeEntry with
                         LastCalibration = calibration }
-            | None, Some obs ->
+            | None, Some obs, Some _ ->
                 let bootstrap = max 1 (totalBytes / 2)
                 let obsTokens = int obs.InputTokens
 
@@ -51,7 +52,7 @@ let private resolveTokensAndCalibration
                     bootstrap, UsageConfidence.BootstrapEstimate
                 else
                     obsTokens, UsageConfidence.Observed
-            | None, None -> resolveCurrentTokensFromCalibration totalBytes None storeEntry
+            | None, _, _ -> resolveCurrentTokensFromCalibration totalBytes None storeEntry
 
         return currentTokens, confidence, calibration, newObservedID
     }
@@ -89,7 +90,12 @@ let private computeBudgetState
                 plan.RawArray |> Option.defaultValue [||])
 
         let transition =
-            classifyTransition currentStore.State projection currentStore.LastBacklog backlog
+            classifyTransition
+                currentStore.State
+                projection
+                currentStore.LastBacklog
+                backlog
+                currentStore.LastObservedTodoOrdinal
 
         let state, isJustInitialized =
             applyTransition

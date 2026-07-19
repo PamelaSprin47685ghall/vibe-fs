@@ -114,7 +114,7 @@ let testResolveModelResolution () =
         equal "provider ID" "anthropic" result.ProviderID
         equal "model ID" "claude-3-opus" result.ModelID
         equal "usable input tokens" 112000 result.UsableInputTokens
-        equal "source" "provider-catalog-input-reserved" result.Source
+        equal "source" "provider-catalog-context-reserved" result.Source
     }
 
 let testResolveModelResolutionFallback () =

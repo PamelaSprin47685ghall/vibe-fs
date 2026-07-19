@@ -24,6 +24,7 @@ type ContextBudgetEntry =
       SignalTokens: int64 option
       StableSyntheticNudgeID: string option
       LastObservedAssistantID: string option
+      LastObservedTodoOrdinal: int option
       LastTrace: DecisionTrace option }
 
 let private keyFor (sessionID: string) = "contextbudget_" + sessionID
@@ -42,6 +43,7 @@ let private defaultEntry: ContextBudgetEntry =
       SignalTokens = None
       StableSyntheticNudgeID = None
       LastObservedAssistantID = None
+      LastObservedTodoOrdinal = None
       LastTrace = None }
 
 let private getHolder (scope: RuntimeScope) (sessionID: string) : StateHolder<ContextBudgetEntry> =

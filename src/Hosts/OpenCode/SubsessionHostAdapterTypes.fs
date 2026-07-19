@@ -10,7 +10,7 @@ open Wanxiangshu.Kernel.Dispatch.Protocol
 open Wanxiangshu.Runtime.Dispatch
 open Wanxiangshu.Runtime.Dyn
 open Wanxiangshu.Runtime.OpencodeClientCodec
-open Wanxiangshu.Hosts.OpenCode.OpencodeSessionEventCodec
+open Wanxiangshu.Runtime.Messaging.OpencodeSessionEventCodec
 open Wanxiangshu.Hosts.Opencode.SubsessionDispatch
 open Wanxiangshu.Runtime.OpencodeSessionPromptBuilder
 

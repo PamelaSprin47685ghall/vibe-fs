@@ -1,9 +1,9 @@
-module Wanxiangshu.Hosts.Opencode.OpencodeHostEvent
+module Wanxiangshu.Runtime.Messaging.OpencodeHostEvent
 
 open Wanxiangshu.Kernel.Nudge
 open Wanxiangshu.Kernel.Nudge.TodoStatus
 open Wanxiangshu.Kernel
-open Wanxiangshu.Runtime.Dyn
+module Dyn = Wanxiangshu.Runtime.Dyn
 
 /// Session lifecycle event types that carry `id` on `info` rather than `sessionID`.
 let sessionEventTypes =

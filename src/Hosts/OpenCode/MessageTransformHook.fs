@@ -15,7 +15,19 @@ open Wanxiangshu.Runtime.Fallback.RuntimeStore
 open Wanxiangshu.Runtime.Fallback.SessionRuntimeLeasePure
 open Wanxiangshu.Runtime.Dyn
 
-let private extractSessionID (input: obj) =
+let private extractSessionIDFromMessages (messagesArr: obj array) : string =
+    if messagesArr.Length > 0 then
+        let first = messagesArr.[0]
+        let info = Dyn.get first "info"
+
+        if not (Dyn.isNullish info) then
+            Dyn.str info "sessionID"
+        else
+            ""
+    else
+        ""
+
+let private extractSessionID (input: obj) (messagesArr: obj array option) =
     let sid1 = Dyn.str input "sessionID"
 
     if sid1 <> "" then
@@ -27,7 +39,13 @@ let private extractSessionID (input: obj) =
             sid2
         else
             let sid3 = Dyn.str input "session_id"
-            if sid3 <> "" then sid3 else ""
+
+            if sid3 <> "" then
+                sid3
+            else
+                match messagesArr with
+                | Some arr -> extractSessionIDFromMessages arr
+                | None -> ""
 
 let private isCompactionSummaryRequest (runtimeScope: RuntimeScope) (sessionID: string) =
     if sessionID <> "" then
@@ -59,7 +77,7 @@ let messagesTransform
         match tryGetMessagesArrayFromOutput output with
         | None -> ()
         | Some messagesArr ->
-            let sessionID = extractSessionID input
+            let sessionID = extractSessionID input (Some messagesArr)
             let isCompactionSummary = isCompactionSummaryRequest runtimeScope sessionID
 
             if isCompactionSummary then

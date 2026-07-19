@@ -10,7 +10,7 @@ open Wanxiangshu.Runtime.NudgeModelResolver
 open Wanxiangshu.Runtime.Fallback.RuntimeStore
 open Wanxiangshu.Kernel.HostTools
 open Wanxiangshu.Runtime.OpencodeHookInputCodec
-open Wanxiangshu.Hosts.Opencode.OpencodeHostEvent
+open Wanxiangshu.Runtime.Messaging.OpencodeHostEvent
 
 let messageTexts (message: obj) : string list =
     let parts = Dyn.get message "parts"

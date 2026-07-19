@@ -361,6 +361,8 @@
     <Compile Include="src/Runtime/Tooling/MuxSubagentToolExecute.fs"/>
     <Compile Include="src/Runtime/Messaging/DelegateToolsCodec.fs"/>
     <Compile Include="src/Runtime/Messaging/OpencodeSessionPromptBuilder.fs"/>
+    <Compile Include="src/Runtime/Messaging/OpencodeHostEvent.fs"/>
+    <Compile Include="src/Runtime/Messaging/OpencodeSessionEventCodec.fs"/>
     <Compile Include="src/Runtime/Messaging/OpencodeHookInputCodec.fs"/>
     <Compile Include="src/Runtime/Tooling/MuxToolDefinition.fs"/>
     <Compile Include="src/Runtime/Tooling/ToolSchemaRegistry.fs"/>
@@ -498,8 +500,6 @@
     <Compile Include="src/Hosts/OpenCode/Plugin.fs"/>
     <Compile Include="src/Hosts/OpenCode/PluginMimo.fs"/>
     <Compile Include="src/Hosts/OpenCode/PluginMimoTui.fs"/>
-    <Compile Include="src/Hosts/OpenCode/OpencodeHostEvent.fs"/>
-    <Compile Include="src/Hosts/OpenCode/OpencodeSessionEventCodec.fs"/>
     <Compile Include="src/Hosts/Omp/PiResolve.fs"/>
     <Compile Include="src/Hosts/Omp/Schema.fs"/>
     <Compile Include="src/Hosts/Omp/Codec.fs"/>

@@ -5,7 +5,7 @@ open Fable.Core.JsInterop
 open Wanxiangshu.Kernel
 open Wanxiangshu.Runtime
 open Wanxiangshu.Runtime.OpencodeHookInputCodec
-open Wanxiangshu.Hosts.OpenCode.OpencodeSessionEventCodec
+open Wanxiangshu.Runtime.Messaging.OpencodeSessionEventCodec
 open Wanxiangshu.Runtime.EventLogRuntime
 open Wanxiangshu.Runtime.ToolRuntimeContext
 

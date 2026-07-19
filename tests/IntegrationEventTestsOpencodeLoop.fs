@@ -11,7 +11,7 @@ open Wanxiangshu.Runtime.PromptFragments
 open Wanxiangshu.Runtime.PromptFrontMatter
 open Wanxiangshu.Hosts.Opencode.Plugin
 open Wanxiangshu.Runtime.Dyn
-open Wanxiangshu.Hosts.OpenCode.OpencodeSessionEventCodec
+open Wanxiangshu.Runtime.Messaging.OpencodeSessionEventCodec
 
 let private loopAnchor task =
     frontMatterPrompt [ yamlField taskField task ] "With-Review Mode is active."
