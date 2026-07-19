@@ -28,7 +28,7 @@ let notifySessionClosedReachesRegisteredDispatcher () =
         let outcomeP = dispatcher.Dispatch identity sendPrompt cancellation
         do! Promise.sleep 10
         sharedDispatchRegistry.NotifySessionClosed ws sid
-        let! outcome = outcomeP
+        let! (outcome, _waiter) = outcomeP
 
         check "registry removed after NotifySessionClosed" (sharedDispatchRegistry.TryGet ws sid |> Option.isNone)
 
@@ -60,7 +60,7 @@ let dispatchSlotReusableAfterSessionClosed () =
         let staleP = dispatcher.Dispatch identity1 sendPrompt1 cancellation
         do! Promise.sleep 10
         sharedDispatchRegistry.NotifySessionClosed ws sid
-        let! staleOutcome = staleP
+        let! (staleOutcome, _staleWaiter) = staleP
 
         check
             "first dispatch SessionClosed"
@@ -82,7 +82,7 @@ let dispatchSlotReusableAfterSessionClosed () =
                 return UserMessageAccepted "msg-2"
             }
 
-        let! outcome2 = dispatcher.Dispatch identity2 sendPrompt2 cancellation
+        let! (outcome2, _waiter2) = dispatcher.Dispatch identity2 sendPrompt2 cancellation
 
         let isAccepted =
             match outcome2 with
@@ -111,7 +111,7 @@ let sendPromptAsyncRejectionResolvesAsAcceptanceUnknown () =
         let sendPrompt (_: DispatchIdentity) : JS.Promise<DispatchAcceptance> = Promise.reject (exn "host exploded")
 
         let cancellation = System.Threading.CancellationToken.None
-        let! outcome = dispatcher.Dispatch identity sendPrompt cancellation
+        let! (outcome, _waiter) = dispatcher.Dispatch identity sendPrompt cancellation
 
         let isAcceptanceUnknown =
             match outcome with
@@ -154,7 +154,7 @@ let completeByTurnBeforeTransportResolve () =
         let completed = dispatcher.CompleteByTurn "turn-complete"
         check "CompleteByTurn returned true" completed
 
-        let! outcome = outcomeP
+        let! (outcome, _waiter) = outcomeP
 
         let isCompleted =
             match outcome with

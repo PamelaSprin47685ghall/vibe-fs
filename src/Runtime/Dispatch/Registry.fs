@@ -43,6 +43,8 @@ type DispatchRegistry() =
             dispatchers <- Map.remove key dispatchers
         | None -> ()
 
+        HostReceiptWaiterRegistry.removeSession workspace physicalSessionId
+
 [<AutoOpen>]
 module DispatchRegistryInstance =
     /// Process-wide singleton.  All dispatchers live here; every call site

@@ -128,5 +128,13 @@ let bindHostUserMessage
     (messageId: string)
     : unit =
     dispatcher.BindHostUserMessage logicalTurnId messageId
+    // Also resolve any waiter that is no longer the active record so late
+    // bind calls do not leave the HostReceiptWaiter hanging.
+    HostReceiptWaiterRegistry.tryResolve
+        dispatcher.Workspace
+        dispatcher.PhysicalSessionId
+        logicalTurnId
+        (UserMessageObserved messageId)
+    |> ignore
 
 let onSessionClosed (dispatcher: Wanxiangshu.Runtime.Dispatch.SessionDispatcher) : unit = dispatcher.OnSessionClosed()

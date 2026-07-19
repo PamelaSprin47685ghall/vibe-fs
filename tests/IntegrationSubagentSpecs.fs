@@ -21,8 +21,10 @@ let private withOpencodePlugin parentId responseText fn =
     promise {
         let pObjRef = ref null
         let frRef = ref null
-        let cc, pc, mc = makeMockClient pObjRef frRef parentId responseText
+        let workspaceRef = ref ""
+        let cc, pc, mc = makeMockClient pObjRef frRef workspaceRef parentId responseText
         let! dir = mkdtempAsync ("spec-" + parentId + "-")
+        workspaceRef.Value <- dir
         let! seams = pluginForWithSeams opencode (box {| directory = dir; client = mc |})
         pObjRef.Value <- seams.Plugin
         frRef.Value <- box seams.FallbackRuntime
@@ -104,11 +106,13 @@ let inspectorToolLateClientInjectionSpec () =
     promise {
         let pObjRef = ref null
         let frRef = ref null
+        let workspaceRef = ref ""
 
         let createCalls, promptCalls, mockClient =
-            makeMockClient pObjRef frRef "inspector-parent-late" "Late client injection worked"
+            makeMockClient pObjRef frRef workspaceRef "inspector-parent-late" "Late client injection worked"
 
         let! workspaceDir = mkdtempAsync "inspector-tool-late-client-"
+        workspaceRef.Value <- workspaceDir
         let ctx = createObj [ "directory", box workspaceDir ]
         let! seams = pluginForWithSeams opencode ctx
         pObjRef.Value <- seams.Plugin
@@ -143,6 +147,7 @@ let inspectorToolWithHostConfiguredModelSpec () =
     promise {
         let pObjRef = ref null
         let frRef = ref null
+        let workspaceRef = ref ""
 
         let configApi =
             createObj
@@ -159,10 +164,11 @@ let inspectorToolWithHostConfiguredModelSpec () =
                       }) ]
 
         let createCalls, promptCalls, mockClient =
-            makeMockClient pObjRef frRef "inspector-parent-config" "Found src/Opencode/Tools.fs"
+            makeMockClient pObjRef frRef workspaceRef "inspector-parent-config" "Found src/Opencode/Tools.fs"
 
         setKey mockClient "config" configApi
         let! workspaceDir = mkdtempAsync "inspector-tool-config-"
+        workspaceRef.Value <- workspaceDir
 
         let! seams =
             pluginForWithSeams

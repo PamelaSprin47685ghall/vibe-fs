@@ -7,6 +7,7 @@ open Fable.Core.JsInterop
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.FallbackKernel.Types
 open Wanxiangshu.Runtime
+open Wanxiangshu.Runtime.Dispatch
 open Wanxiangshu.Runtime.Dyn
 open Wanxiangshu.Runtime.Fallback.SessionRuntimePropertyPure
 open Wanxiangshu.Hosts.Opencode.ChatHooksDecoders
@@ -22,7 +23,7 @@ open Wanxiangshu.Runtime.EventLogRuntimeStore
 open Wanxiangshu.Runtime.OpencodeHookInputCodec
 open Wanxiangshu.Runtime.ChatHookOutputCodec
 open Wanxiangshu.Runtime.OpencodeAgentConfigWire
-open Wanxiangshu.Hosts.Opencode.SubsessionHostAdapter
+open Wanxiangshu.Hosts.Opencode.SubsessionHostAdapterTypes
 open Wanxiangshu.Hosts.Opencode.ChatHooksMessageIdDedup
 
 /// Append a continuation_host_accepted event recording that a user message
@@ -50,12 +51,27 @@ let recordContinuationUserMessage
 /// Internal so the regression suite can bind directly to this entry
 /// point (mirroring the `static member internal isNaturalStop` pattern
 /// in NudgeTrigger) instead of re-encoding the rule in test fixtures.
-let internal isSystemMessage (parts: obj) (fr: FallbackRuntimeStore) (sessionIDStr: string) (msgId: string) : bool =
+let internal isSystemMessage
+    (parts: obj)
+    (fr: FallbackRuntimeStore)
+    (workspaceRoot: string)
+    (sessionIDStr: string)
+    (msgId: string)
+    : bool =
     let consumeNudgeIfMatched (nonce: string) : bool =
         // Child subsession turn marker: ChatHooks resolves the host
         // receipt for SubsessionActor. Never forges TurnStarted from
         // the prompt Promise alone.
-        if PendingTurnReceipt.tryResolve nonce (Wanxiangshu.Kernel.Subsession.Types.UserMessageObserved msgId) then
+        let ws = workspaceFor workspaceRoot
+
+        let receiptResult =
+            HostReceiptWaiterRegistry.tryResolve
+                ws
+                sessionIDStr
+                nonce
+                (Wanxiangshu.Kernel.Subsession.Types.UserMessageObserved msgId)
+
+        if receiptResult <> ResolveAttemptResult.NotFound then
             true
         else
             let activeNudgeNonce = (fr.GetSession sessionIDStr).ActiveNudgeNonce
@@ -156,7 +172,9 @@ let chatMessageFor
         do! lifecycleObserver.handleChatMessage (sessionID, agent, parts)
 
         // Step 1: classify
-        let isSystem = isSystemMessage parts fr sessionIDStr msgId
+        let isSystem =
+            isSystemMessage parts fr lifecycleObserver.WorkspaceRoot sessionIDStr msgId
+
         let messageRole = tryGetChatMessageRole output
 
         // Step 2: dedup — drop the hook entirely if the host has already

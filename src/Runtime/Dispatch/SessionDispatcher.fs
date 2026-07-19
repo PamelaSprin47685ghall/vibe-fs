@@ -47,7 +47,7 @@ type SessionDispatcher(workspace: WorkspaceId, physicalSessionId: string, eventL
         (identity: DispatchIdentity)
         (sendPrompt: DispatchIdentity -> JS.Promise<DispatchAcceptance>)
         (cancellation: System.Threading.CancellationToken)
-        : JS.Promise<DispatchOutcome> =
+        : JS.Promise<DispatchOutcome * HostReceiptWaiter option> =
         promise {
             if identity.PhysicalSessionId <> this.PhysicalSessionId then
                 let outcome: DispatchOutcome =
@@ -60,7 +60,7 @@ type SessionDispatcher(workspace: WorkspaceId, physicalSessionId: string, eventL
                               IsRetryable = Some false }
                     )
 
-                return outcome
+                return (outcome, None)
             else
                 let r =
                     { Identity = identity
@@ -68,12 +68,18 @@ type SessionDispatcher(workspace: WorkspaceId, physicalSessionId: string, eventL
                       AcceptedMessageId = ""
                       AcceptedRunId = ""
                       Waiter = None
+                      ReceiptWaiter = None
                       CancelRequested = false
                       AbortSent = false
                       Terminal = None
                       CancelToken = new System.Threading.CancellationTokenSource()
                       OnResolve = ignore
                       CancelWaiter = None }
+
+                let receiptWaiter =
+                    HostReceiptWaiterRegistry.create state.Workspace this.PhysicalSessionId identity.LogicalTurnId
+
+                r.ReceiptWaiter <- Some receiptWaiter
 
                 let resultPromise: JS.Promise<DispatchOutcome> =
                     Promise.create (fun resolve _ -> r.Waiter <- Some(fun o -> resolve o))
@@ -86,7 +92,8 @@ type SessionDispatcher(workspace: WorkspaceId, physicalSessionId: string, eventL
 
                 do! this.Reserve r
                 do! this.RunTransport r sendPrompt cancellation
-                return! resultPromise
+                let! outcome = resultPromise
+                return (outcome, r.ReceiptWaiter)
         }
 
     /// Reserve the per-session slot. Refuses if another dispatch is in flight.

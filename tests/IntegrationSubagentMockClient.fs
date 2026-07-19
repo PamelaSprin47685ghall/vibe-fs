@@ -3,12 +3,20 @@ module Wanxiangshu.Tests.IntegrationSubagentMockClient
 open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Runtime
+open Wanxiangshu.Runtime.Dispatch
 open Wanxiangshu.Runtime.Fallback.RuntimeStore
 open Wanxiangshu.Runtime.Fallback.SessionRuntimeLeasePure
 open Wanxiangshu.Hosts.Opencode.SubsessionHostAdapter
+open Wanxiangshu.Hosts.Opencode.SubsessionHostAdapterTypes
 open Wanxiangshu.Kernel.Subsession.Types
 
-let makeMockClient (pObjRef: obj ref) (fallbackRuntimeRef: obj ref) (parentId: string) (responseText: string) =
+let makeMockClient
+    (pObjRef: obj ref)
+    (fallbackRuntimeRef: obj ref)
+    (workspaceRef: string ref)
+    (parentId: string)
+    (responseText: string)
+    =
     let createCalls = ResizeArray<obj>()
     let promptCalls = ResizeArray<obj>()
     let mutable sessionCounter = 0
@@ -64,11 +72,9 @@ let makeMockClient (pObjRef: obj ref) (fallbackRuntimeRef: obj ref) (parentId: s
                                             sessionNonces <- Map.add childId nonce sessionNonces
                                             let msgId = childId + "-msg"
                                             let receipt = UserMessageObserved msgId
+                                            let ws = workspaceFor workspaceRef.Value
 
-                                            let _ =
-                                                Wanxiangshu.Hosts.Opencode.SubsessionDispatch.PendingTurnReceipt.tryResolve
-                                                    nonce
-                                                    receipt
+                                            let _ = HostReceiptWaiterRegistry.tryResolve ws childId nonce receipt
 
                                             ()
                                         else

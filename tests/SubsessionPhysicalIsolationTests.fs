@@ -8,12 +8,13 @@ open Wanxiangshu.Kernel.Subsession.Decision
 open Wanxiangshu.Kernel.Subsession.Policy
 open Wanxiangshu.Kernel.Subsession.Fold
 open Wanxiangshu.Runtime.CommandProcessor
+open Wanxiangshu.Runtime.Dispatch
 open Wanxiangshu.Runtime.SubsessionPorts
 open Wanxiangshu.Runtime.SubsessionActor
 open Wanxiangshu.Runtime.SubsessionActorRegistry
 open Wanxiangshu.Runtime.SubsessionEventStore
 open Wanxiangshu.Tests.Assert
-open Wanxiangshu.Hosts.Opencode.SubsessionDispatch
+open Wanxiangshu.Hosts.Opencode.SubsessionHostAdapterTypes
 
 module OpencodeHost = Wanxiangshu.Hosts.Opencode.SubsessionHostAdapter
 module OmpHost = Wanxiangshu.Hosts.Omp.SubsessionHostAdapter
@@ -89,8 +90,10 @@ let private opencodeReceiptWaitsForObservation () =
         let host = OpencodeHost.createHost client "" ""
         let dispatchP = host.Dispatch(sid, plan)
         do! sleep 5
-        // Transport (prompt) may have resolved, but the receipt must not resolve until observed.
-        Wanxiangshu.Hosts.Opencode.SubsessionDispatch.PendingTurnReceipt.tryResolve
+        // Simulate a chat.message observation arriving slightly after dispatch.
+        HostReceiptWaiterRegistry.tryResolve
+            (workspaceFor "")
+            (SessionId.value sid)
             (TurnId.value turnId)
             (UserMessageObserved "msg-1")
         |> ignore
@@ -133,13 +136,14 @@ let private opencodeRejectedBeforeSendRejectsLateReceipt () =
         | Error(HostRejected _) -> check "pre-send rejection completes dispatch" true
         | other -> fail ("expected HostRejected, got " + string other)
 
-        check
-            "late receipt after pre-send rejection is ignored"
-            (not (
-                Wanxiangshu.Hosts.Opencode.SubsessionDispatch.PendingTurnReceipt.tryResolve
-                    (TurnId.value turnId)
-                    (UserMessageObserved "late")
-            ))
+        let resolveResult =
+            HostReceiptWaiterRegistry.tryResolve
+                (workspaceFor "")
+                (SessionId.value sid)
+                (TurnId.value turnId)
+                (UserMessageObserved "late")
+
+        check "late receipt after pre-send rejection is ignored" (resolveResult <> ResolveAttemptResult.ResolvedNow)
     }
 
 let private opencodeQueryDispatchStatusFailedAfterUnknown () =
@@ -165,16 +169,22 @@ let private opencodeCancelPendingDispatchKeepsReceiptCorrelation () =
         let sid = SessionId.create "child-v40-oc-cancel-receipt"
         let turnId = TurnId.create (RunId.value runId + "-t0")
         let plan = makePlan runId
-        let client = makeClient (Some(box {| id = "msg-1" |})) (box null)
+        // No prompt id in the response, so the receipt only resolves from a
+        // chat.message observation (or a manual tryResolve below).
+        let client = makeClient (Some(box {| data = box [||] |})) (box null)
         let host = OpencodeHost.createHost client "" ""
         let dispatchP = host.Dispatch(sid, plan)
         do! sleep 5
         host.CancelPendingDispatch turnId
 
-        Wanxiangshu.Hosts.Opencode.SubsessionDispatch.PendingTurnReceipt.tryResolve
-            (TurnId.value turnId)
-            (UserMessageObserved "msg-1")
-        |> ignore
+        let resolveResult =
+            HostReceiptWaiterRegistry.tryResolve
+                (workspaceFor "")
+                (SessionId.value sid)
+                (TurnId.value turnId)
+                (UserMessageObserved "msg-1")
+
+        check "late receipt resolves after cancel" (resolveResult = ResolveAttemptResult.ResolvedNow)
 
         let! result = dispatchP
 
@@ -332,7 +342,7 @@ let private reconcilingAbortSettleUsesQuiescenceNotDispatchStatus () =
 
     let state = ReconcilingAbortSettle(ctx, Started started, abortCtx)
 
-    match decide state (DispatchStatusResolved(Accepted OrderedTurnMarkerObserved)) with
+    match decide state (DispatchStatusResolved(DispatchStatus.Accepted OrderedTurnMarkerObserved)) with
     | Error(IllegalTransition _) -> check "ReconcilingAbortSettle rejects DispatchStatusResolved" true
     | other -> fail ("expected IllegalTransition, got " + string other)
 

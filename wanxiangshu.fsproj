@@ -330,6 +330,8 @@
     <Compile Include="src/Runtime/Subsession/SubsessionEventWire.fs"/>
     <Compile Include="src/Runtime/Subsession/SubsessionReconcile.fs"/>
     <Compile Include="src/Runtime/Subsession/SubsessionService.fs"/>
+    <Compile Include="src/Runtime/Dispatch/HostReceiptWaiter.fs"/>
+    <Compile Include="src/Runtime/Dispatch/HostReceiptWaiterRegistry.fs"/>
     <Compile Include="src/Runtime/Dispatch/Types.fs"/>
     <Compile Include="src/Runtime/Dispatch/SessionDispatcherOps.fs"/>
     <Compile Include="src/Runtime/Dispatch/SessionDispatcher.fs"/>

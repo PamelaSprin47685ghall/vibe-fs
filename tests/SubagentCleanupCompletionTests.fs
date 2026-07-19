@@ -5,9 +5,11 @@ open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Runtime.ChildAgentRegistry
+open Wanxiangshu.Runtime.Dispatch
 open Wanxiangshu.Runtime.Fallback.RuntimeStore
 open Wanxiangshu.Runtime.SubsessionActorRegistry
 open Wanxiangshu.Tests.TempWorkspace
+open Wanxiangshu.Hosts.Opencode.SubsessionHostAdapterTypes
 open Wanxiangshu.Kernel.Subsession.Types
 
 module Dyn = Wanxiangshu.Runtime.Dyn
@@ -30,10 +32,9 @@ let private makePromptMock (promptCalled: bool ref) (promptNonce: string ref) ch
                 if promptNonce.Value <> "" then
                     let receipt = UserMessageObserved(childId + "-msg")
 
-                    Wanxiangshu.Hosts.Opencode.SubsessionDispatch.PendingTurnReceipt.tryResolve
-                        promptNonce.Value
-                        receipt
-                    |> ignore
+                    let ws = workspaceFor workspaceDir
+                    let _ = HostReceiptWaiterRegistry.tryResolve ws childId promptNonce.Value receipt
+                    ()
 
                     JS.setTimeout
                         (fun () ->

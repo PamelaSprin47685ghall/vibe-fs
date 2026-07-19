@@ -8,6 +8,7 @@ open Wanxiangshu.Kernel.Dispatch.Identity
 open Wanxiangshu.Kernel.Dispatch.Protocol
 open Wanxiangshu.Kernel.FallbackKernel.Types
 open Wanxiangshu.Kernel.Primitives.Identity
+open Wanxiangshu.Kernel.Subsession.Types
 open Wanxiangshu.Runtime.PromiseQueue
 
 /// Stable, exhaustive return from `Dispatch`.
@@ -35,6 +36,7 @@ type DispatchRecord =
       mutable AcceptedMessageId: string
       mutable AcceptedRunId: string
       mutable Waiter: (DispatchOutcome -> unit) option
+      mutable ReceiptWaiter: HostReceiptWaiter option
       mutable CancelRequested: bool
       mutable AbortSent: bool
       mutable Terminal: DispatchTerminal option
@@ -60,6 +62,9 @@ module DispatchOps =
                 r.Waiter <- None
                 w outcome
             | None -> ()
+
+            r.ReceiptWaiter
+            |> Option.iter (fun w -> HostReceiptWaiter.resolveFromTerminal w terminal)
 
             r.OnResolve()
         else
@@ -89,6 +94,9 @@ module DispatchOps =
                 w (Accepted acceptance)
             | None -> ()
 
+            r.ReceiptWaiter
+            |> Option.iter (fun w -> HostReceiptWaiter.resolveFromAcceptance w acceptance)
+
     let observeRun (r: DispatchRecord) (hostUserMessageId: string) (atMs: int64) (logger: IDispatchEventLogger) : unit =
         if r.Terminal.IsSome then
             ()
@@ -98,6 +106,9 @@ module DispatchOps =
 
             r.Phase <- RunObserved
             logger.Log(DispatchRunObserved(r.Identity.DispatchId, hostUserMessageId, atMs))
+
+            r.ReceiptWaiter
+            |> Option.iter (fun w -> HostReceiptWaiter.resolveFromReceipt w (UserMessageObserved hostUserMessageId))
 
     let rejectUnknown (r: DispatchRecord) (errName: string) (message: string) : unit =
         resolveRecord

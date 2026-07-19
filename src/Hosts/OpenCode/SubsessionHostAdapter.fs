@@ -19,7 +19,6 @@ open Wanxiangshu.Runtime.SubsessionPorts
 open Wanxiangshu.Runtime.SubsessionActor
 open Wanxiangshu.Runtime.SubsessionTranscript
 open Wanxiangshu.Runtime.SubsessionActorRegistry
-open Wanxiangshu.Hosts.Opencode.SubsessionDispatch
 open Wanxiangshu.Hosts.Opencode.SubsessionHostAdapterTypes
 
 /// Re-export so existing tests (`OpopenSubsessionHostAdapterModelTests`)
@@ -28,144 +27,51 @@ let buildDispatchModelString =
     Wanxiangshu.Hosts.Opencode.SubsessionHostAdapterTypes.buildDispatchModelString
 
 /// OpenCode subagent host. Every prompt and abort goes through the per-session
-/// `DispatchRegistry` so two requests on the same physical session cannot
+/// `SessionDispatcher` so two requests on the same physical session cannot
 /// race, and so the caller receives a true `HostStartReceipt` (or a typed
 /// failure) instead of a `Promise.resolve = success` lie.
 type OpencodeSubsessionHost(client: obj, agent: string, directory: string) =
-    let workspace =
-        Wanxiangshu.Hosts.Opencode.SubsessionHostAdapterTypes.workspaceFor directory
-
     interface ISubsessionHost with
         member _.Dispatch(sessionId, turn) =
-            let dispatcher: SessionDispatcher =
-                Wanxiangshu.Hosts.Opencode.SubsessionHostAdapterTypes.getDispatcher
-                    directory
-                    (SessionId.value sessionId)
+            let dispatcher = getDispatcher directory (SessionId.value sessionId)
 
-            let identity: Wanxiangshu.Kernel.Dispatch.Identity.DispatchIdentity =
-                Wanxiangshu.Hosts.Opencode.SubsessionHostAdapterTypes.encodeDispatchIdentity
-                    directory
-                    (SessionId.value sessionId)
-                    turn.TurnId
-                    turn.Model
-                    turn.Prompt
+            let identity =
+                encodeDispatchIdentity directory (SessionId.value sessionId) turn.TurnId turn.Model turn.Prompt
 
             let sendPrompt =
-                Wanxiangshu.Hosts.Opencode.SubsessionHostAdapterOps.buildSendPrompt
-                    client
-                    agent
-                    directory
-                    sessionId
-                    turn
-
-            /// Register a PendingTurnReceipt waiter BEFORE dispatching so the
-            /// actor can await the real host user-message identity rather than
-            /// the dispatcher's internal waiter (which resolves too early).
-            let pendingReceipt =
-                PendingTurnReceipt.register directory (SessionId.value sessionId) (TurnId.value turn.TurnId)
+                SubsessionHostAdapterOps.buildSendPrompt client agent directory sessionId turn
 
             promise {
-                // Step 1: await the dispatcher slot.  If it fails (e.g.
-                // RejectedBeforeSend because another dispatch is in flight),
-                // mark the receipt as transport-rejected so the waiter does
-                // not hang.
-                let! dispatchOutcome = dispatcher.Dispatch identity sendPrompt (System.Threading.CancellationToken.None)
+                let! outcome, receiptWaiterOpt =
+                    dispatcher.Dispatch identity sendPrompt System.Threading.CancellationToken.None
 
-                match dispatchOutcome with
-                | DispatchOutcome.Failed terminal ->
-                    let turnId = TurnId.value turn.TurnId
+                match receiptWaiterOpt with
+                | Some waiter ->
+                    // Wait for the real host user-message identity.
+                    let! result = waiter.Promise
 
-                    // A host-side hook (e.g. chat.message) may have already
-                    // resolved the receipt while the prompt promise was in
-                    // flight.  Trust that resolution instead of failing.
-                    let alreadyResolved =
-                        match PendingTurnReceipt.tryFind turnId with
-                        | None -> true
-                        | Some w when w.Completed -> true
-                        | Some _ -> false
-
-                    if alreadyResolved then
-                        let! receiptResult = pendingReceipt
-                        return receiptResult
-                    else
-                        let err =
-                            match terminal with
-                            | RejectedBeforeSend e
-                            | TransportUnavailable e ->
-                                { ErrorName = e.ErrorName
-                                  DomainError = e.DomainError
-                                  Message = e.Message
-                                  StatusCode = e.StatusCode
-                                  IsRetryable = e.IsRetryable }
-                            | DispatchTerminal.Failed e
-                            | DispatchTerminal.AcceptanceUnknown e
-                            | DispatchTerminal.AbortUnknown e
-                            | DispatchTerminal.TimedOut e ->
-                                { ErrorName = e.ErrorName
-                                  DomainError = e.DomainError
-                                  Message = e.Message
-                                  StatusCode = e.StatusCode
-                                  IsRetryable = e.IsRetryable }
-                            | _ ->
-                                { ErrorName = "DispatchFailed"
-                                  DomainError = None
-                                  Message =
-                                    "dispatch terminal: "
-                                    + Wanxiangshu.Hosts.Opencode.SubsessionHostAdapterTypes.toStringTerminal terminal
-                                  StatusCode = None
-                                  IsRetryable = Some false }
-
-                        match terminal with
-                        | RejectedBeforeSend _
-                        | TransportUnavailable _ ->
-                            PendingTurnReceipt.markTransportRejected turnId err
-                            return Error(HostRejected err)
-                        | _ ->
-                            PendingTurnReceipt.markTransportFailed turnId err
-                            return Error(HostAcceptanceUnknown err)
-
-                | DispatchOutcome.Accepted _ ->
-                    // Step 2: dispatcher accepted — now await the real host
-                    // user-message identity from PendingTurnReceipt (resolved
-                    // by ChatHooks on chat.message, or by sendPrompt above for
-                    // OpaqueAccepted).
-                    let! receiptResult = pendingReceipt
-
-                    match receiptResult with
-                    | Ok hostReceipt -> return Ok hostReceipt
-                    | Error(HostRejected err) ->
-                        let err2 =
-                            { ErrorName = err.ErrorName
-                              DomainError = err.DomainError
-                              Message = err.Message
-                              StatusCode = err.StatusCode
-                              IsRetryable = err.IsRetryable }
-
-                        return Error(HostRejected err2)
-                    | Error(HostAcceptanceUnknown err) ->
-                        let err2 =
-                            { ErrorName = err.ErrorName
-                              DomainError = err.DomainError
-                              Message = err.Message
-                              StatusCode = err.StatusCode
-                              IsRetryable = err.IsRetryable }
-
-                        return Error(HostRejected err2)
+                    match result with
+                    | Ok receipt -> return Ok receipt
+                    | Error failure -> return Error failure
+                | None ->
+                    // Dispatcher failed before creating the waiter
+                    // (e.g. identity mismatch).
+                    match outcome with
+                    | DispatchOutcome.Accepted a -> return Ok(HostReceiptWaiter.dispatchAcceptanceToHostReceipt a)
+                    | DispatchOutcome.Failed terminal ->
+                        return Error(HostReceiptWaiter.dispatchFailureOfTerminal terminal)
             }
 
         member _.Abort(sessionId, turnId) =
             promise {
-                let dispatcher: SessionDispatcher =
-                    Wanxiangshu.Hosts.Opencode.SubsessionHostAdapterTypes.getDispatcher
-                        directory
-                        (SessionId.value sessionId)
+                let dispatcher = getDispatcher directory (SessionId.value sessionId)
 
                 let physicalAbort () : JS.Promise<bool> =
                     promise {
-                        match Wanxiangshu.Hosts.Opencode.SubsessionHostAdapterTypes.trySessionApi client with
+                        match trySessionApi client with
                         | Ok session ->
                             let arg = box {| path = box {| id = SessionId.value sessionId |} |}
-                            let! _ = Wanxiangshu.Hosts.Opencode.SubsessionHostAdapterTypes.invoke1 arg "abort" session
+                            let! _ = invoke1 arg "abort" session
                             return true
                         | Error _ -> return false
                     }
@@ -173,41 +79,37 @@ type OpencodeSubsessionHost(client: obj, agent: string, directory: string) =
                 let! result = dispatcher.CancelByTurn (TurnId.value turnId) physicalAbort
 
                 match result with
-                | AbortSent
-                | CancelledBeforeAcceptance -> return Wanxiangshu.Kernel.Subsession.Types.RequestAcceptedAwaitIdle
-                | AbortUnavailable -> return Wanxiangshu.Kernel.Subsession.Types.AbortUnavailable
-                | AlreadyTerminal _ -> return Wanxiangshu.Kernel.Subsession.Types.ConfirmedStopped
+                | DispatchCancelResult.AbortSent
+                | DispatchCancelResult.CancelledBeforeAcceptance ->
+                    return (Wanxiangshu.Kernel.Subsession.Types.AbortResult.RequestAcceptedAwaitIdle)
+                | DispatchCancelResult.AbortUnavailable ->
+                    return (Wanxiangshu.Kernel.Subsession.Types.AbortResult.AbortUnavailable)
+                | DispatchCancelResult.AlreadyTerminal _ ->
+                    return (Wanxiangshu.Kernel.Subsession.Types.AbortResult.ConfirmedStopped)
             }
 
         member _.CancelPendingDispatch(turnId) =
-            let nonce = TurnId.value turnId
-            Wanxiangshu.Hosts.Opencode.SubsessionDispatch.PendingTurnReceipt.cancel nonce
+            HostReceiptWaiterRegistry.cancelByTurn (workspaceFor directory) (TurnId.value turnId)
 
         member _.QueryDispatchStatus(sessionId, turnId) =
-            Wanxiangshu.Hosts.Opencode.SubsessionHostAdapterOps.buildQueryDispatchStatus
-                client
-                directory
-                sessionId
-                turnId
-                ()
+            SubsessionHostAdapterOps.buildQueryDispatchStatus client directory sessionId turnId ()
 
         member this.QuerySessionQuiescence(sessionId, turnId) =
-            Wanxiangshu.Hosts.Opencode.SubsessionHostAdapterOps.buildQuerySessionQuiescence client sessionId turnId ()
+            SubsessionHostAdapterOps.buildQuerySessionQuiescence client sessionId turnId ()
 
         member _.ClosePhysicalSession(sessionId) =
             promise {
-                let dispatcher: SessionDispatcher =
-                    Wanxiangshu.Hosts.Opencode.SubsessionHostAdapterTypes.getDispatcher
-                        directory
-                        (SessionId.value sessionId)
-
+                let sid = SessionId.value sessionId
+                let dispatcher = getDispatcher directory sid
                 dispatcher.OnSessionClosed()
 
-                match Wanxiangshu.Hosts.Opencode.SubsessionHostAdapterTypes.trySessionApi client with
+                HostReceiptWaiterRegistry.removeSession (workspaceFor directory) sid
+
+                match trySessionApi client with
                 | Ok session ->
                     try
-                        let arg = box {| path = box {| id = SessionId.value sessionId |} |}
-                        let! _ = Wanxiangshu.Hosts.Opencode.SubsessionHostAdapterTypes.invoke1 arg "delete" session
+                        let arg = box {| path = box {| id = sid |} |}
+                        let! _ = invoke1 arg "delete" session
                         return Stopped
                     with _ ->
                         return StopUnknown
@@ -224,7 +126,5 @@ let createHost (client: obj) (agent: string) (directory: string) : ISubsessionHo
 /// Bind a host-side user message to an in-flight logical turn so the
 /// dispatcher can prove round-trip attribution.
 let bindHostUserMessage (directory: string) (sessionId: string) (logicalTurnId: string) (messageId: string) : unit =
-    let dispatcher =
-        Wanxiangshu.Hosts.Opencode.SubsessionHostAdapterTypes.getDispatcher directory sessionId
-
-    Wanxiangshu.Hosts.Opencode.SubsessionHostAdapterTypes.bindHostUserMessage dispatcher logicalTurnId messageId
+    let dispatcher = getDispatcher directory sessionId
+    bindHostUserMessage dispatcher logicalTurnId messageId

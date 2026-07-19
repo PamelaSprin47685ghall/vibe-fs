@@ -56,7 +56,7 @@ let test_isSystemMessage_fallbackContinuationIsSystem () =
     let fr = FallbackRuntimeStore()
     let parts = [| fallbackContinuationPart |]
 
-    let result = isSystemMessage parts fr "s-1" "msg-fc-1"
+    let result = isSystemMessage parts fr "" "s-1" "msg-fc-1"
 
     check "fallback_continuation is classified as system" result
     check "store owner untouched" ((fr.GetSession "s-1").Owner = SessionOwner.NoOwner)
@@ -66,7 +66,7 @@ let test_isSystemMessage_plainUserIsNotSystem () =
     let fr = FallbackRuntimeStore()
     let parts = [| userPart "hello" "" |]
 
-    let result = isSystemMessage parts fr "s-2" "msg-u-1"
+    let result = isSystemMessage parts fr "" "s-2" "msg-u-1"
 
     check "plain user part without provenance is NOT system" (not result)
 
@@ -76,7 +76,7 @@ let test_isSystemMessage_activeNudgeNonceIsSystemAndConsumed () =
     fr.UpdateSession("s-3", armNudgeNonce nonce)
 
     let parts = [| userPart "go" nonce |]
-    let result = isSystemMessage parts fr "s-3" "msg-n-1"
+    let result = isSystemMessage parts fr "" "s-3" "msg-n-1"
 
     check "active nudge nonce is classified as system" result
     check "nonce was atomically consumed" ((fr.GetSession "s-3").ActiveNudgeNonce = "")
@@ -86,7 +86,7 @@ let test_isSystemMessage_nonMatchingNonceDoesNotConsume () =
     fr.UpdateSession("s-4", armNudgeNonce "real-nonce")
 
     let parts = [| userPart "go" "fake-nonce" |]
-    let result = isSystemMessage parts fr "s-4" "msg-n-2"
+    let result = isSystemMessage parts fr "" "s-4" "msg-n-2"
 
     check "non-matching nonce is NOT system" (not result)
     check "real nonce preserved" ((fr.GetSession "s-4").ActiveNudgeNonce = "real-nonce")
@@ -178,8 +178,8 @@ let test_isSystemMessage_consumeIsNotLeaky () =
     let nonce = "nudge-nonce-77"
     fr.UpdateSession("s-5", armNudgeNonce nonce)
 
-    let firstResult = isSystemMessage [| userPart "first" nonce |] fr "s-5" "m-1"
-    let secondResult = isSystemMessage [| userPart "second" nonce |] fr "s-5" "m-2"
+    let firstResult = isSystemMessage [| userPart "first" nonce |] fr "" "s-5" "m-1"
+    let secondResult = isSystemMessage [| userPart "second" nonce |] fr "" "s-5" "m-2"
 
     check "first match is system" firstResult
     check "after consume, second same-nonce message is NOT system" (not secondResult)
