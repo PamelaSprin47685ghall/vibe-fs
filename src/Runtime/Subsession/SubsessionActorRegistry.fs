@@ -12,6 +12,20 @@ module SubsessionActorRegistry =
     // in the same Node process cannot overwrite each other's durable poison state.
     let mutable private safetyProj = Map.empty<string, SessionSafetyProjection>
 
+    /// Process-level cleanup callbacks invoked whenever an actor is disposed or
+    /// removed without an actor. Hosts register their session-scoped teardown here.
+    let mutable private globalCleanups: (string -> string -> unit) list = []
+
+    let RegisterGlobalCleanup (cleanup: string -> string -> unit) : unit =
+        globalCleanups <- cleanup :: globalCleanups
+
+    let private runGlobalCleanups (workspaceRoot: string) (sessionId: string) : unit =
+        for c in globalCleanups do
+            try
+                c workspaceRoot sessionId
+            with _ ->
+                ()
+
     /// Replace the safety projection for the given workspace root.
     let SetSafetyProjection (workspaceRoot: string) (proj: SessionSafetyProjection) : unit =
         safetyProj <- Map.add workspaceRoot proj safetyProj
@@ -40,7 +54,7 @@ module SubsessionActorRegistry =
         | Some actor ->
             actors <- Map.remove key actors
             actor.Post SessionClosed |> ignore
-        | None -> ()
+        | None -> runGlobalCleanups workspaceRoot sessionId
 
     let TryGet (workspaceRoot: string) (sessionId: string) : SubsessionActor option =
         Map.tryFind (workspaceRoot, sessionId) actors
@@ -64,21 +78,18 @@ module SubsessionActorRegistry =
 
             let mutable actorOpt = None
 
+            let onDispose () =
+                match Map.tryFind key actors with
+                | Some currentActor ->
+                    match actorOpt with
+                    | Some a when obj.ReferenceEquals(currentActor, a) -> actors <- Map.remove key actors
+                    | _ -> ()
+                | None -> ()
+
+                runGlobalCleanups workspaceRoot sessionId
+
             let actor =
-                SubsessionActor(
-                    sid,
-                    host,
-                    eventStore,
-                    onDispose =
-                        (fun () ->
-                            match Map.tryFind key actors with
-                            | Some currentActor ->
-                                match actorOpt with
-                                | Some a when obj.ReferenceEquals(currentActor, a) -> actors <- Map.remove key actors
-                                | _ -> ()
-                            | None -> ()),
-                    ?initialState = initialState
-                )
+                SubsessionActor(sid, host, eventStore, onDispose = onDispose, ?initialState = initialState)
 
             actorOpt <- Some actor
             actors <- Map.add key actor actors
@@ -94,7 +105,7 @@ module SubsessionActorRegistry =
         | Some actor ->
             actors <- Map.remove key actors
             actor.Post SessionClosed |> ignore
-        | None -> ()
+        | None -> runGlobalCleanups workspaceRoot sessionId
 
     let Clear () : unit =
         actors <- Map.empty

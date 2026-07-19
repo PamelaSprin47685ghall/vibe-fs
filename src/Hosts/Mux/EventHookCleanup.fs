@@ -15,21 +15,9 @@ open Wanxiangshu.Runtime.RuntimeScopeForgetSession
 /// removal, the per-session dispatch mailbox, and all buffered evidence.
 let handleSessionClosed (scope: RuntimeScope) (directory: string) (workspaceId: string) : JS.Promise<unit> =
     promise {
-        forgetSession scope workspaceId
         let sid = SessionId.create workspaceId
         let eventStore = Wanxiangshu.Runtime.SubsessionEventStore.create directory
         do! eventStore.Append(sid, [ PhysicalSessionClosed sid ]) |> Promise.map ignore
         SubsessionActorRegistry.ClearPoison directory workspaceId
         SubsessionActorRegistry.Remove directory workspaceId
-
-        try
-            let ws = Id.workspaceIdQuick ("mux:" + workspaceId)
-
-            Wanxiangshu.Runtime.Dispatch.DispatchRegistryInstance.sharedDispatchRegistry.NotifySessionClosed
-                ws
-                workspaceId
-        with _ ->
-            ()
-
-        SubsessionPendingEvidence.ForgetSession workspaceId
     }

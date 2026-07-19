@@ -148,10 +148,8 @@ let handleParentSession
         do! appendLoopCancelledOrFail root workspaceId
         do! syncReviewFromEventLogDedicated reviewStore root workspaceId
 
-        Wanxiangshu.Runtime.ToolHookRuntime.clearSessionCompliance workspaceId
-        Wanxiangshu.Runtime.ToolHookRuntime.closeSession workspaceId
-        Wanxiangshu.Runtime.RunnerBackground.abortRunnerJobCore scope workspaceId
-        forgetSession scope workspaceId
+        SubsessionActorRegistry.ClearPoison directory workspaceId
+        SubsessionActorRegistry.Remove directory workspaceId
     }
 
 // ---------------------------------------------------------------------------

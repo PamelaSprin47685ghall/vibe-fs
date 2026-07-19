@@ -9,6 +9,7 @@ open Wanxiangshu.Runtime.SubsessionEventStore
 open Wanxiangshu.Runtime.SubsessionActorRegistry
 
 open Wanxiangshu.Hosts.Opencode.SubagentTypes
+open Wanxiangshu.Hosts.Opencode.SubsessionHostAdapterOps
 open Wanxiangshu.Runtime.OpencodeClientCodec
 open Wanxiangshu.Runtime.Messaging.OpencodeSessionEventCodec
 
@@ -31,8 +32,7 @@ let abortAndUnregister
                 ()
 
             try
-                let arg = box {| path = box {| id = childID |} |}
-                let! _ = invoke1 arg "delete" session
+                do! SubsessionHostAdapterOps.deleteSession client directory childID
 
                 let sid = SessionId.create childID
                 let eventStore = create directory
@@ -41,7 +41,6 @@ let abortAndUnregister
                 SubsessionActorRegistry.ClearPoison directory childID
 
                 SubsessionActorRegistry.Remove directory childID
-                Wanxiangshu.Runtime.SubsessionPendingEvidence.SubsessionPendingEvidence.ForgetSession childID
 
                 registry.UnregisterChildAgent(childID)
             with _ ->

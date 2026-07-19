@@ -42,11 +42,9 @@ let private handleSessionEnd
 
         Wanxiangshu.Hosts.Omp.NudgeRuntime.markSessionForceStopped fallbackRuntime sid
 
-        // OMP does not register dispatchers in the DispatchRegistry
-        // (no per-session mailbox yet), so there is nothing to tear down
-        // here.  When OMP gains its own registry, add NotifySessionClosed.
-
-        Wanxiangshu.Runtime.RunnerBackground.abortRunnerJobCore Wanxiangshu.Hosts.Omp.ExecutorTools.ompScope sid
+        if root <> "" then
+            Wanxiangshu.Runtime.SubsessionActorRegistry.SubsessionActorRegistry.ClearPoison root sid
+            Wanxiangshu.Runtime.SubsessionActorRegistry.SubsessionActorRegistry.Remove root sid
     }
 
 let private handleFallbackEvent

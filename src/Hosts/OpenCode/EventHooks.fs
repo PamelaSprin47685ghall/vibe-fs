@@ -4,6 +4,7 @@ open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Kernel
 open Wanxiangshu.Runtime
+open Wanxiangshu.Runtime.SubsessionActorRegistry
 open Wanxiangshu.Runtime.OpencodeHookInputCodec
 open Wanxiangshu.Runtime.Messaging.OpencodeSessionEventCodec
 open Wanxiangshu.Runtime.EventLogRuntime
@@ -29,5 +30,7 @@ let eventHandler
             do! appendLoopCancelledOrFail directory sessionID
             do! syncReviewFromEventLogDedicated reviewStore directory sessionID
             Wanxiangshu.Runtime.RunnerBackground.abortRunnerJobCore scope sessionID
+            SubsessionActorRegistry.ClearPoison directory sessionID
+            SubsessionActorRegistry.Remove directory sessionID
         | _ -> ()
     }

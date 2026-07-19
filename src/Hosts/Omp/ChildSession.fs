@@ -63,7 +63,6 @@ let createDispose
             finally
                 if childId <> "" then
                     Wanxiangshu.Runtime.SubsessionActorRegistry.SubsessionActorRegistry.Remove cwd childId
-                    Wanxiangshu.Runtime.SubsessionPendingEvidence.SubsessionPendingEvidence.ForgetSession childId
 
                 unmarkChildSession scope childId
 
@@ -74,7 +73,6 @@ let createDispose
         else
             Some(fun () ->
                 Wanxiangshu.Runtime.SubsessionActorRegistry.SubsessionActorRegistry.Remove cwd childId
-                Wanxiangshu.Runtime.SubsessionPendingEvidence.SubsessionPendingEvidence.ForgetSession childId
                 unmarkChildSession scope childId)
 
 let setupChildEnvironment

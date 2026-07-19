@@ -177,6 +177,22 @@ let createRegistrationWithSeams
 
     let directory = if Dyn.isNullish deps then "" else Dyn.str deps "directory"
 
+    SubsessionActorRegistry.SubsessionActorRegistry.RegisterGlobalCleanup(fun workspaceRoot sessionId ->
+        if workspaceRoot <> "" && sessionId <> "" then
+            let ws =
+                Wanxiangshu.Kernel.Primitives.Identity.Id.workspaceIdQuick ("mux:" + workspaceRoot)
+
+            Wanxiangshu.Runtime.RuntimeScopeForgetSession.forgetSession scope sessionId
+            Wanxiangshu.Runtime.RunnerBackground.abortRunnerJobCore scope sessionId
+            reviewStore.CleanupSession sessionId
+            Wanxiangshu.Runtime.ToolHookRuntime.clearSessionCompliance sessionId
+            Wanxiangshu.Runtime.ToolHookRuntime.closeSession sessionId
+            Wanxiangshu.Runtime.SubsessionPendingEvidence.SubsessionPendingEvidence.ForgetSession sessionId
+
+            Wanxiangshu.Runtime.Dispatch.DispatchRegistryInstance.sharedDispatchRegistry.NotifySessionClosed
+                ws
+                sessionId)
+
     if directory <> "" then
         scope.TriggerInit(directory)
 

@@ -105,15 +105,11 @@ type OpencodeSubsessionHost(client: obj, agent: string, directory: string) =
 
                 HostReceiptWaiterRegistry.removeSession (workspaceFor directory) sid
 
-                match trySessionApi client with
-                | Ok session ->
-                    try
-                        let arg = box {| path = box {| id = sid |} |}
-                        let! _ = invoke1 arg "delete" session
-                        return Stopped
-                    with _ ->
-                        return StopUnknown
-                | Error _ -> return StopUnknown
+                try
+                    do! SubsessionHostAdapterOps.deleteSession client directory sid
+                    return Stopped
+                with _ ->
+                    return StopUnknown
             }
 
 

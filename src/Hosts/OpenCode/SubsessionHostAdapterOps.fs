@@ -16,6 +16,35 @@ open Wanxiangshu.Hosts.Opencode.SubsessionHostAdapterTypes
 
 module Dyn = Wanxiangshu.Runtime.Dyn
 
+let private deletedSessions = System.Collections.Generic.HashSet<string>()
+
+let private sessionKey (directory: string) (sid: string) = directory + "/" + sid
+
+/// True if the physical session has already been deleted (or is in the process
+/// of being deleted). Used to prevent the same OpenCode session from being
+/// deleted twice when both the explicit cleanup path and the actor disposal
+/// path run for the same child.
+let isSessionDeleted (directory: string) (sid: string) : bool =
+    deletedSessions.Contains(sessionKey directory sid)
+
+/// Idempotent physical session delete. Marks the session deleted on success.
+/// Re-raises only when the host's delete call itself rejects, so callers that
+/// need to stop cleanup on a failed delete can catch the exception.
+let deleteSession (client: obj) (directory: string) (sid: string) : JS.Promise<unit> =
+    promise {
+        let key = sessionKey directory sid
+
+        if deletedSessions.Contains key then
+            return ()
+        else
+            match trySessionApi client with
+            | Ok session ->
+                let arg = box {| path = box {| id = sid |} |}
+                let! _ = invoke1 arg "delete" session
+                deletedSessions.Add key |> ignore
+            | Error _ -> ()
+    }
+
 /// Build the send-prompt function for a specific subsession turn.
 /// The returned function matches the `DispatchIdentity -> JS.Promise<...>`
 /// shape expected by `SessionDispatcher.Dispatch`.

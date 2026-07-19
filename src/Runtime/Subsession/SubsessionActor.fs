@@ -9,6 +9,7 @@ open Wanxiangshu.Runtime.ResourceScope
 open Wanxiangshu.Runtime.CommandProcessor
 open Wanxiangshu.Runtime.SubsessionPorts
 open Wanxiangshu.Runtime.EffectSupervisor
+open Wanxiangshu.Runtime.SubsessionPendingEvidence
 
 // ── Actor ──
 
@@ -61,9 +62,16 @@ type SubsessionActor
             ?initialState = initialState
         )
 
-    // Wire cleanup callback: DisposeActor → clear resource timers + call onDispose
+    // Wire cleanup callback: DisposeActor → close physical session, clear pending
+    // evidence, release timers and finally notify the registry.
     do
         processor.AddCleanupCallback(fun () ->
+            host.ClosePhysicalSession sessionId
+            |> Promise.catch (fun _ -> StopUnknown)
+            |> Promise.start
+            |> ignore
+
+            SubsessionPendingEvidence.ForgetSession(SessionId.value sessionId)
             resourceScope.ClearAll()
             onDispose |> Option.iter (fun f -> f ()))
 

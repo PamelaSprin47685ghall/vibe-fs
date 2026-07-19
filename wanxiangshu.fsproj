@@ -185,6 +185,7 @@
     <Compile Include="src/Runtime/Messaging/MethodologyArgs.fs"/>
     <Compile Include="src/Runtime/Execution/ErrorClassify.fs"/>
     <Compile Include="src/Runtime/Execution/Clock.fs"/>
+    <Compile Include="src/Runtime/Tooling/ReviewRuntimeState.fs"/>
     <Compile Include="src/Runtime/Tooling/ReviewRuntime.fs"/>
     <Compile Include="src/Runtime/Tooling/CapsSynth.fs"/>
     <Compile Include="src/Runtime/Subsession/ResourceScope.fs"/>
@@ -192,9 +193,9 @@
     <Compile Include="src/Runtime/Execution/CommandProcessorBuild.fs"/>
     <Compile Include="src/Runtime/Execution/CommandProcessor.fs"/>
     <Compile Include="src/Runtime/Execution/EffectSupervisor.fs"/>
+    <Compile Include="src/Runtime/Subsession/SubsessionPendingEvidence.fs"/>
     <Compile Include="src/Runtime/Subsession/SubsessionActor.fs"/>
     <Compile Include="src/Runtime/Subsession/SubsessionActorRegistry.fs"/>
-    <Compile Include="src/Runtime/Subsession/SubsessionPendingEvidence.fs"/>
     <Compile Include="src/Runtime/Subsession/SubsessionEventRouter.fs"/>
     <Compile Include="src/Runtime/Fallback/FallbackChainResolution.fs"/>
     <Compile Include="src/Runtime/Fallback/FallbackConfigCodec.fs"/>

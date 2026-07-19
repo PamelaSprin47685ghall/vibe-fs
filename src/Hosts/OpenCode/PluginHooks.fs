@@ -106,29 +106,11 @@ let private handleSessionCleanup (services: CoreServices) (env: HostEventEnvelop
                 ""
 
         if ptyCleanupSessionId <> "" then
-            cleanupPtyBySession ptyCleanupSessionId
-
-            Wanxiangshu.Runtime.RuntimeScopeForgetSession.forgetSession services.RuntimeScope ptyCleanupSessionId
-
-            services.FallbackRuntime.CleanupSession ptyCleanupSessionId
-            Wanxiangshu.Runtime.ToolHookRuntime.clearSessionCompliance ptyCleanupSessionId
-            Wanxiangshu.Runtime.ToolHookRuntime.closeSession ptyCleanupSessionId
-
             let sid = SessionId.create ptyCleanupSessionId
             let eventStore = SubsessionEventStore.create services.Directory
             do! eventStore.Append(sid, [ PhysicalSessionClosed sid ])
             SubsessionActorRegistry.ClearPoison services.Directory ptyCleanupSessionId
             SubsessionActorRegistry.Remove services.Directory ptyCleanupSessionId
-            Wanxiangshu.Runtime.SubsessionPendingEvidence.SubsessionPendingEvidence.ForgetSession ptyCleanupSessionId
-
-            // Tear down the per-session dispatch mailbox in
-            // one place.  NotifySessionClosed is idempotent: it is a
-            // no-op if no dispatcher is registered for the session.
-            let ws =
-                Wanxiangshu.Kernel.Primitives.Identity.Id.workspaceIdQuick ("opencode:" + services.Directory)
-
-            sharedDispatchRegistry.NotifySessionClosed ws ptyCleanupSessionId
-            Wanxiangshu.Hosts.Opencode.ChatHooksMessageIdDedup.forget ptyCleanupSessionId
     }
 
 let private registerEventHooks (result: obj) (ctx: obj) (services: CoreServices) =
@@ -236,6 +218,23 @@ let registerHooks (result: obj) (host: Host) (ctx: obj) (services: CoreServices)
         match getClientFromPluginCtx ctx with
         | Ok c -> c
         | Error _ -> box null
+
+    SubsessionActorRegistry.RegisterGlobalCleanup(fun workspaceRoot sessionId ->
+        if workspaceRoot = services.Directory && sessionId <> "" then
+            services.FallbackRuntime.CleanupSession sessionId
+            Wanxiangshu.Runtime.RuntimeScopeForgetSession.forgetSession services.RuntimeScope sessionId
+            Wanxiangshu.Runtime.RunnerBackground.abortRunnerJobCore services.RuntimeScope sessionId
+            Wanxiangshu.Runtime.ToolHookRuntime.clearSessionCompliance sessionId
+            Wanxiangshu.Runtime.ToolHookRuntime.closeSession sessionId
+            services.ReviewStore.CleanupSession sessionId
+            Wanxiangshu.Runtime.SubsessionPendingEvidence.SubsessionPendingEvidence.ForgetSession sessionId
+
+            let ws =
+                Wanxiangshu.Kernel.Primitives.Identity.Id.workspaceIdQuick ("opencode:" + services.Directory)
+
+            sharedDispatchRegistry.NotifySessionClosed ws sessionId
+            forget sessionId
+            cleanupPtyBySession sessionId)
 
     registerToolHooks result host services
     registerTransformHooks result client services

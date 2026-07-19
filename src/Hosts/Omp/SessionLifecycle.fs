@@ -10,8 +10,23 @@ open Wanxiangshu.Hosts.Omp.Codec
 open Wanxiangshu.Runtime.ReviewRuntime
 open Wanxiangshu.Runtime.Fallback.RuntimeStore
 open Wanxiangshu.Runtime.Fallback.SessionRuntimePropertyPure
+open Wanxiangshu.Hosts.Omp.ExecutorTools
+open Wanxiangshu.Hosts.Omp.NudgeRuntime
+open Wanxiangshu.Runtime.SubsessionActorRegistry
+open Wanxiangshu.Runtime.SubsessionPendingEvidence
+open Wanxiangshu.Runtime
 
 let registerSessionLifecycle (pi: obj) (reviewStore: ReviewStore) (fallbackRuntime: FallbackRuntimeStore) : unit =
+    SubsessionActorRegistry.RegisterGlobalCleanup(fun workspaceRoot sessionId ->
+        if workspaceRoot <> "" && sessionId <> "" then
+            clearNudgeSession fallbackRuntime sessionId
+            RuntimeScopeForgetSession.forgetSession ompScope sessionId
+            RunnerBackground.abortRunnerJobCore ompScope sessionId
+            ToolHookRuntime.clearSessionCompliance sessionId
+            ToolHookRuntime.closeSession sessionId
+            reviewStore.CleanupSession sessionId
+            SubsessionPendingEvidence.ForgetSession sessionId)
+
     pi?on (
         "before_agent_start",
         box (fun (event: obj) (ctx: obj) -> beforeAgentStartHandler pi event ctx fallbackRuntime)

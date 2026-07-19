@@ -75,15 +75,13 @@ let sessionPromptHandler (pi: obj) (reviewStore: ReviewStore) (ctx: obj) : JS.Pr
 
 let sessionShutdownHandler
     (reviewStore: ReviewStore)
-    (fallbackRuntime: FallbackRuntimeStore)
+    (_fallbackRuntime: FallbackRuntimeStore)
     (ctx: obj)
     : JS.Promise<unit> =
     promise {
         match getSessionIdFromContext ctx with
         | None -> ()
         | Some sessionId ->
-            clearNudgeSession fallbackRuntime sessionId
-            Wanxiangshu.Runtime.RuntimeScopeForgetSession.forgetSession ExecutorTools.ompScope sessionId
             let cwd = Dyn.str ctx "cwd"
 
             if cwd <> "" then
@@ -94,9 +92,6 @@ let sessionShutdownHandler
                 do! eventStore.Append(sid, [ PhysicalSessionClosed sid ])
                 SubsessionActorRegistry.ClearPoison cwd sessionId
                 SubsessionActorRegistry.Remove cwd sessionId
-                Wanxiangshu.Runtime.SubsessionPendingEvidence.SubsessionPendingEvidence.ForgetSession sessionId
 
             do! cleanupRunnerJob ExecutorTools.ompScope sessionId
-            Wanxiangshu.Runtime.ToolHookRuntime.clearSessionCompliance sessionId
-            Wanxiangshu.Runtime.ToolHookRuntime.closeSession sessionId
     }
