@@ -12,7 +12,7 @@ open Wanxiangshu.Runtime.Fallback.RuntimeStore
 open Wanxiangshu.Runtime.Fallback.SessionRuntimePropertyPure
 open Wanxiangshu.Kernel.FallbackKernel.Types
 open Wanxiangshu.Runtime.Fallback.Ports
-open Wanxiangshu.Runtime.EventLogRuntime
+open Wanxiangshu.Runtime.ReviewEventWriter
 open Wanxiangshu.Hosts.Omp.ChildSession
 
 /// `session.abort` / `stream.abort` / `session.error` all collapse to the

@@ -7,7 +7,7 @@ open Wanxiangshu.Runtime
 open Wanxiangshu.Runtime.SubsessionActorRegistry
 open Wanxiangshu.Runtime.OpencodeHookInputCodec
 open Wanxiangshu.Runtime.Messaging.OpencodeSessionEventCodec
-open Wanxiangshu.Runtime.EventLogRuntime
+open Wanxiangshu.Runtime.ReviewEventWriter
 open Wanxiangshu.Runtime.ToolRuntimeContext
 
 let eventHandler

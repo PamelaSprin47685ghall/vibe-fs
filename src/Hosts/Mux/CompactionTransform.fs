@@ -8,7 +8,7 @@ open Wanxiangshu.Kernel.Messaging
 open Wanxiangshu.Kernel.FallbackKernel.Types
 open Wanxiangshu.Runtime
 open Wanxiangshu.Runtime.BacklogProjectionBuild
-open Wanxiangshu.Runtime.EventLogRuntime
+open Wanxiangshu.Runtime.SessionEventWriter
 open Wanxiangshu.Runtime.JsArrayMutate
 open Wanxiangshu.Runtime.MuxHookInputCodec
 open Wanxiangshu.Hosts.Mux.MessagingCodec
@@ -84,14 +84,7 @@ let buildCompactedResult
 
         let compactionId = "compact-" + System.Guid.NewGuid().ToString("N")
 
-        do!
-            Wanxiangshu.Runtime.EventLogRuntime.appendCompactionStartedOrFail
-                directory
-                sessionID
-                compactionId
-                gen
-                turnId
-                compactionOrdinal
+        do! appendCompactionStartedOrFail directory sessionID compactionId gen turnId compactionOrdinal
 
         match fallbackRuntime with
         | Some fr ->

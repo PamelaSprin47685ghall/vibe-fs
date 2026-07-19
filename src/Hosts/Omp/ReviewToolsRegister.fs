@@ -14,7 +14,7 @@ open Wanxiangshu.Hosts.Omp.ReviewToolsLoop
 open Wanxiangshu.Hosts.Omp.Schema
 open Wanxiangshu.Runtime.DynField
 open Wanxiangshu.Runtime.RuntimeScope
-open Wanxiangshu.Runtime.EventLogRuntime
+open Wanxiangshu.Runtime.ReviewEventWriter
 open Wanxiangshu.Runtime.ReviewRuntime
 
 module Dyn = Wanxiangshu.Runtime.Dyn
@@ -25,7 +25,6 @@ let private description (name: string) : string =
     | Error e -> failwith e
 
 open Wanxiangshu.Runtime.ReviewRuntime
-open Wanxiangshu.Runtime.EventLogRuntime
 
 let private optBool (o: obj) (key: string) : bool option =
     let v = Dyn.get o key

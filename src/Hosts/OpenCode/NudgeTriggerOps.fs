@@ -16,7 +16,7 @@ open Wanxiangshu.Runtime.Dyn
 open Wanxiangshu.Runtime.OpencodeClientCodec
 open Wanxiangshu.Runtime.OpencodeHookInputCodec
 open Wanxiangshu.Runtime.ToolRuntimeContext
-open Wanxiangshu.Runtime.EventLogRuntime
+open Wanxiangshu.Runtime.SessionEventWriter
 open Wanxiangshu.Runtime.NudgeLease
 open Wanxiangshu.Hosts.Opencode.NudgeEffect
 open Wanxiangshu.Hosts.Opencode.Fallback.HostEventInspection

@@ -23,7 +23,7 @@ open Wanxiangshu.Hosts.Mux.Wrappers
 open Wanxiangshu.Hosts.Mux.SubagentTools
 open Wanxiangshu.Runtime
 open Wanxiangshu.Runtime.Dyn
-open Wanxiangshu.Runtime.EventLogRuntime
+open Wanxiangshu.Runtime.ReviewEventWriter
 
 let private description (name: string) : string =
     match Wanxiangshu.Kernel.ToolCatalog.description name with

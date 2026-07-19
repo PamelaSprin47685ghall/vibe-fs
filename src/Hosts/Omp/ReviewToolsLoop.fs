@@ -8,7 +8,7 @@ open Wanxiangshu.Hosts.Omp.Codec
 open Wanxiangshu.Hosts.Omp.MessagingCodec
 open Wanxiangshu.Runtime.RuntimeScope
 open Wanxiangshu.Runtime.ReviewRuntime
-open Wanxiangshu.Runtime.EventLogRuntime
+open Wanxiangshu.Runtime.ReviewEventWriter
 open Wanxiangshu.Runtime.Dyn
 
 let loopCommand = "loop"

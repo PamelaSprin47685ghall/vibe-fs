@@ -27,7 +27,7 @@ open Wanxiangshu.Runtime.ToolExecute
 open Wanxiangshu.Runtime.PromptFrontMatter
 open Wanxiangshu.Runtime.ToolOutputInfo
 open Wanxiangshu.Kernel.ToolOutputInfoTypes
-open Wanxiangshu.Runtime.EventLogRuntime
+open Wanxiangshu.Runtime.SubsessionEventWriter
 
 module HostAdapter = Wanxiangshu.Kernel.HostAdapter
 

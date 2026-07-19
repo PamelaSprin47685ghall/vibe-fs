@@ -15,7 +15,8 @@ open Wanxiangshu.Runtime.OpencodeHookInputCodec
 open Wanxiangshu.Runtime.Messaging.OpencodeHostEvent
 open Wanxiangshu.Kernel.EventSourcing.Fold
 open Wanxiangshu.Kernel.Review.ReviewLoopFold
-open Wanxiangshu.Runtime.EventLogRuntime
+open Wanxiangshu.Runtime.SessionEventWriter
+open Wanxiangshu.Runtime.EventLogRuntimeNudge
 open Wanxiangshu.Runtime.Fallback.RuntimeStore
 open Wanxiangshu.Runtime.Fallback.SessionRuntimePropertyPure
 open Wanxiangshu.Runtime.NudgeRuntimeState

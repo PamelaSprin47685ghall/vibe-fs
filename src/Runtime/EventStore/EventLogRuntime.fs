@@ -1,6 +1,5 @@
 module Wanxiangshu.Runtime.EventLogRuntime
 
-open Wanxiangshu.Runtime.LoopMessages
 open Wanxiangshu.Runtime.EventLogRuntimeStore
 open Wanxiangshu.Runtime.EventLogRuntimeSync
 open Wanxiangshu.Runtime.EventLogRuntimeNudge
@@ -111,11 +110,3 @@ let isLoopActiveFromEventLog = EventLogRuntimeNudge.isLoopActiveFromEventLog
 let nudgeBlockedForTurn = EventLogRuntimeNudge.nudgeBlockedForTurn
 let tryClaimNudgeDispatch = EventLogRuntimeNudge.tryClaimNudgeDispatch
 let getNudgeSnapshotFromEventLog = EventLogRuntimeNudge.getNudgeSnapshotFromEventLog
-
-let verdictStringFromReviewResult
-    (result: Wanxiangshu.Kernel.ReviewSession.Types.ReviewResult)
-    : string * string option =
-    match result with
-    | Wanxiangshu.Kernel.ReviewSession.Types.ReviewResult.Accepted fb -> (verdictAccepted, Some fb)
-    | Wanxiangshu.Kernel.ReviewSession.Types.ReviewResult.NeedsRevision fb -> (verdictNeedsRevision, Some fb)
-    | Wanxiangshu.Kernel.ReviewSession.Types.ReviewResult.Terminated -> (verdictTerminated, None)

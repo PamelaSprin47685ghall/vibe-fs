@@ -16,7 +16,7 @@ open Wanxiangshu.Runtime.ToolRuntimeContext
 open Wanxiangshu.Runtime.OpencodeHookInputCodec
 open Wanxiangshu.Runtime.OpencodeClientCodec
 open Wanxiangshu.Runtime.Messaging.OpencodeSessionEventCodec
-open Wanxiangshu.Runtime.EventLogRuntime
+open Wanxiangshu.Runtime.ReviewEventWriter
 open Wanxiangshu.Runtime.RuntimeScope
 
 /// Execute /loop (activate, cancel, or show active) given the shared setup

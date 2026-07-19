@@ -30,7 +30,8 @@ open Wanxiangshu.Runtime.NudgeLease
 open Wanxiangshu.Runtime.FuzzyIteratorStore
 open Wanxiangshu.Runtime.ReviewRuntime
 open Wanxiangshu.Kernel.EventSourcing.Fold
-open Wanxiangshu.Runtime.EventLogRuntime
+open Wanxiangshu.Runtime.SessionEventWriter
+open Wanxiangshu.Runtime.EventLogRuntimeNudge
 open Wanxiangshu.Hosts.Omp.NudgeReminderDispatch
 open Wanxiangshu.Kernel.TreeSitterKernel
 open Wanxiangshu.Hosts.Omp.ChildSession

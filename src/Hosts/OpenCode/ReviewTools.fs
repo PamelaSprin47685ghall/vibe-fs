@@ -18,11 +18,10 @@ open Wanxiangshu.Kernel.ToolResult
 open Wanxiangshu.Hosts.Opencode.ReviewerLoop
 open Wanxiangshu.Runtime.ReviewToolsCodec
 open Wanxiangshu.Runtime.ReviewRuntime
-open Wanxiangshu.Runtime.EventLogRuntime
+open Wanxiangshu.Runtime.ReviewEventWriter
 open Wanxiangshu.Runtime.ToolRuntimeContext
 open Wanxiangshu.Runtime.ChildAgentRegistry
 open Wanxiangshu.Runtime.Dyn
-open Wanxiangshu.Runtime.EventLogRuntime
 open Wanxiangshu.Runtime.OpencodeClientCodec
 open Wanxiangshu.Runtime.RuntimeScope
 

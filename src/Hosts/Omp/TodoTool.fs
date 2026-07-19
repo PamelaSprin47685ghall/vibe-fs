@@ -9,7 +9,7 @@ open Wanxiangshu.Kernel.Methodology
 open Wanxiangshu.Runtime.ToolOutputInfo
 open Wanxiangshu.Hosts.Omp.Codec
 open Wanxiangshu.Hosts.Omp.OmpToolSchema
-open Wanxiangshu.Runtime.EventLogRuntime
+open Wanxiangshu.Runtime.BacklogEventWriter
 open Wanxiangshu.Kernel.Subsession.Types
 open Wanxiangshu.Runtime
 

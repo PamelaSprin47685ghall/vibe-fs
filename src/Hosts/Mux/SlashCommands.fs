@@ -15,7 +15,7 @@ open Wanxiangshu.Hosts.Mux
 open Wanxiangshu.Runtime
 open Wanxiangshu.Runtime.Clock
 open Wanxiangshu.Runtime.Dyn
-open Wanxiangshu.Runtime.EventLogRuntime
+open Wanxiangshu.Runtime.ReviewEventWriter
 open Wanxiangshu.Runtime.RuntimeScope
 
 [<Global("globalThis.process")>]

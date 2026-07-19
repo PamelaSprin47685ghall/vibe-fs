@@ -5,7 +5,8 @@ open Wanxiangshu.Kernel.Nudge.Types
 open Wanxiangshu.Kernel.Nudge.NudgeSnapshotSource
 open Wanxiangshu.Runtime.Nudge.NudgeDerivation
 open Wanxiangshu.Runtime.NudgeModelResolver
-open Wanxiangshu.Runtime.EventLogRuntime
+open Wanxiangshu.Runtime.SessionEventWriter
+open Wanxiangshu.Runtime.EventLogRuntimeNudge
 open Wanxiangshu.Runtime.ToolRuntimeContext
 open Wanxiangshu.Kernel.Primitives.Identity
 open Wanxiangshu.Kernel.Session.Causality

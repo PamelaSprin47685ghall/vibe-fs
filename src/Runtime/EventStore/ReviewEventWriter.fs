@@ -114,3 +114,11 @@ let syncReviewFromEventLogDedicated
         with _ ->
             ()
     }
+
+let verdictStringFromReviewResult
+    (result: Wanxiangshu.Kernel.ReviewSession.Types.ReviewResult)
+    : string * string option =
+    match result with
+    | Wanxiangshu.Kernel.ReviewSession.Types.ReviewResult.Accepted fb -> (verdictAccepted, Some fb)
+    | Wanxiangshu.Kernel.ReviewSession.Types.ReviewResult.NeedsRevision fb -> (verdictNeedsRevision, Some fb)
+    | Wanxiangshu.Kernel.ReviewSession.Types.ReviewResult.Terminated -> (verdictTerminated, None)
