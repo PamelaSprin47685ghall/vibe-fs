@@ -1319,7 +1319,7 @@ Retry governor、延时、异步 receipt 若在测试模式下全部变为零，
 * ~~session 单 synthetic prompt 限制~~ ✅ 已完成（PendingTurnReceipt.register 现在检查同 session 是否已有 active dispatch）；
 * ~~人类消息去重前置~~ ✅ 已完成；
 * ~~quiescence 明确逻辑错误修复~~ ✅ 已完成（S-04/S-05：isMessageMatch 现在检查 parts metadata nonce）；
-* 补齐结构化 trace。
+* ~~补齐结构化 trace~~ ✅ 已完成（CommandProcessor.commitCommand 现在发射 TelemetryStateTransition）。
 
 这一批必须小而明确，禁止夹带架构美化。
 
