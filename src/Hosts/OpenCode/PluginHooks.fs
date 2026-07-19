@@ -124,7 +124,7 @@ let private handleSessionCleanup (services: CoreServices) (env: HostEventEnvelop
             SubsessionActorRegistry.Remove services.Directory ptyCleanupSessionId
             Wanxiangshu.Runtime.SubsessionPendingEvidence.SubsessionPendingEvidence.ForgetSession ptyCleanupSessionId
 
-            // S-07 fix: tear down the per-session dispatch mailbox in
+            // Tear down the per-session dispatch mailbox in
             // one place.  NotifySessionClosed is idempotent: it is a
             // no-op if no dispatcher is registered for the session.
             let ws =

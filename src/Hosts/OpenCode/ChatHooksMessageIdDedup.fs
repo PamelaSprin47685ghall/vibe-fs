@@ -6,7 +6,7 @@ module Wanxiangshu.Hosts.Opencode.ChatHooksMessageIdDedup
 /// hook invocations before any side-effect (in particular
 /// `OnNewHumanMessage`, which cancels active fallback leases).
 ///
-/// F-03 fix: dedup must run BEFORE the human-turn transition; the
+/// Dedup must run BEFORE the human-turn transition; the
 /// previous ordering deduped after cancel and could re-cancel a
 /// freshly-settled fallback.
 ///

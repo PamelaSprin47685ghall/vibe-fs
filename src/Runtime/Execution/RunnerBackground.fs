@@ -71,10 +71,10 @@ let appendRunnerLog (scope: RuntimeScope) (sessionId: string) (chunk: string) : 
 let private childActiveForParent (scope: RuntimeScope) (parentSessionId: string) : bool =
     match Map.tryFind parentSessionId (getState scope).ChildByParent with
     | None -> false
-    | Some childId -> hasActiveExecutorRun childId
+    | Some childId -> hasActiveExecutorRun scope childId
 
 let hasRunningRunnerJob (scope: RuntimeScope) (sessionId: string) : bool =
-    hasActiveExecutorRun sessionId
+    hasActiveExecutorRun scope sessionId
     || Set.contains sessionId (getState scope).ActiveSessions
     || childActiveForParent scope sessionId
 
@@ -98,8 +98,8 @@ let waitRunnerJob (scope: RuntimeScope) (sessionId: string) (ms: int) : JS.Promi
 
 let abortRunnerJobCore (scope: RuntimeScope) (sessionId: string) : unit =
     let childId = Map.tryFind sessionId (getState scope).ChildByParent
-    childId |> Option.iter abortExecutorRun
-    abortExecutorRun sessionId
+    childId |> Option.iter (abortExecutorRun scope)
+    abortExecutorRun scope sessionId
 
     match Map.tryFind sessionId (getState scope).ChildDispose with
     | None -> ()
@@ -125,4 +125,4 @@ let cleanupRunnerJob (scope: RuntimeScope) (sessionId: string) : JS.Promise<unit
 
 let clearRunnerLogsForTest (scope: RuntimeScope) : unit =
     setState scope emptyState
-    resetSessionExecutorForTesting ()
+    resetSessionExecutorForTesting scope

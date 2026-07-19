@@ -9,7 +9,7 @@ open Wanxiangshu.Runtime.SubagentIntentsCodec
 module Dyn = Wanxiangshu.Runtime.Dyn
 
 /// Inject a UI label into the host-side args object so the chat UI sees a one-line
-/// summary before the agent finishes. Mirrors `Opencode.HookSchema.setUiLabel`.
+/// summary before the agent finishes. Mirrors `Opencode.HookSchemaDecoration.setUiLabel`.
 let private setUiLabel (args: obj) (toolName: string) : unit =
     let labelResult =
         match toolName with

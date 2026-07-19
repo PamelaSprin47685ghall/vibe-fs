@@ -5,11 +5,33 @@ open Fable.Core.JsInterop
 
 let private inspector: obj = importAll "inspector"
 let private fs: obj = importAll "fs"
+let private nodeProcess: obj = importAll "node:process"
 
-let mutable private activeSession: obj option = None
+let private activeSession = ref<Option<obj>> None
+
+let private resolveOutputDir (fallback: string option) : string =
+    let envDir =
+        try
+            unbox<string> (nodeProcess?env?WANXIANGSHU_PROFILER_DIR)
+        with _ ->
+            null
+
+    match fallback, envDir with
+    | Some d, _ -> d
+    | _, d when not (isNull d) && d.Length > 0 -> d
+    | _ -> "/tmp"
+
+let private uniqueToken () =
+    let pid: int = unbox<int> (nodeProcess?pid)
+    let ts = System.DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() |> int
+    let rand = JS.Math.random () * 1e6 |> int
+    $"{pid}-{ts}-{rand}"
+
+let private writeFile (path: string) (payload: obj) =
+    fs?writeFileSync (path, JS.JSON.stringify payload)
 
 let start () =
-    if activeSession.IsNone then
+    if Option.isNone !activeSession then
         let session: obj = emitJsExpr inspector "new $0.Session()"
 
         session?connect ()
@@ -27,15 +49,14 @@ let start () =
         with _ ->
             JS.console.warn ("HeapProfiler not available; skipping heap profile")
 
-        activeSession <- Some session
+        activeSession := Some session
 
-let private writeFile (path: string) (payload: obj) =
-    fs?writeFileSync (path, JS.JSON.stringify payload)
-
-let stopAndSave () =
-    match activeSession with
+let stopAndSave (outputDir: string option) =
+    match !activeSession with
     | Some session ->
-        activeSession <- None
+        activeSession := None
+        let dir = resolveOutputDir outputDir
+        let token = uniqueToken ()
 
         session?post (
             "Profiler.stop",
@@ -43,17 +64,15 @@ let stopAndSave () =
                 if not (isNull err) then
                     JS.console.error ("Profiler.stop error:", err)
                 else
-                    writeFile "/tmp/wanxiangshu.cpuprofile" res?profile
+                    writeFile $"{dir}/{token}.cpu.profile" res?profile
 
-                // HeapProfiler may not be available on Bun (JSC vs V8).
-                // Try independently; failure won't block CPU profile save.
                 session?post (
                     "HeapProfiler.stopSampling",
                     fun err2 (res2: obj) ->
                         if not (isNull err2) then
                             JS.console.error ("HeapProfiler.stopSampling error:", err2)
                         else
-                            writeFile "/tmp/wanxiangshu.heapprofile" res2?profile
+                            writeFile $"{dir}/{token}.heap.profile" res2?profile
 
                         session?post ("Profiler.disable")
                         session?post ("HeapProfiler.disable")

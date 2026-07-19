@@ -3,15 +3,26 @@ module Wanxiangshu.Runtime.SessionExecutor
 open Fable.Core
 open Wanxiangshu.Runtime.RuntimeScope
 
-let mutable private activeRuns: Map<string, (unit -> unit) list> = Map.empty
+let private activeRunsKey = "wanxiangshu.session_executor.active_runs"
 
-let registerActiveRun (sessionId: string) (kill: unit -> unit) : unit =
+let private getActiveRuns (scope: RuntimeScope) : Map<string, (unit -> unit) list> =
+    match scope.TryFindKey activeRunsKey with
+    | Some v -> unbox<Map<string, (unit -> unit) list>> v
+    | None -> Map.empty
+
+let private setActiveRuns (scope: RuntimeScope) (runs: Map<string, (unit -> unit) list>) : unit =
+    scope.Add(activeRunsKey, box runs)
+
+let registerActiveRun (scope: RuntimeScope) (sessionId: string) (kill: unit -> unit) : unit =
     if sessionId <> "" then
+        let activeRuns = getActiveRuns scope
         let current = Map.tryFind sessionId activeRuns |> Option.defaultValue []
-        activeRuns <- Map.add sessionId (kill :: current) activeRuns
+        setActiveRuns scope (Map.add sessionId (kill :: current) activeRuns)
 
-let unregisterActiveRun (sessionId: string) (kill: unit -> unit) : unit =
+let unregisterActiveRun (scope: RuntimeScope) (sessionId: string) (kill: unit -> unit) : unit =
     if sessionId <> "" then
+        let activeRuns = getActiveRuns scope
+
         match Map.tryFind sessionId activeRuns with
         | None -> ()
         | Some current ->
@@ -19,15 +30,17 @@ let unregisterActiveRun (sessionId: string) (kill: unit -> unit) : unit =
                 current |> List.filter (fun k -> not (System.Object.ReferenceEquals(k, kill)))
 
             if List.isEmpty updated then
-                activeRuns <- Map.remove sessionId activeRuns
+                setActiveRuns scope (Map.remove sessionId activeRuns)
             else
-                activeRuns <- Map.add sessionId updated activeRuns
+                setActiveRuns scope (Map.add sessionId updated activeRuns)
 
-let hasActiveExecutorRun (sessionId: string) : bool =
-    sessionId <> "" && Map.containsKey sessionId activeRuns
+let hasActiveExecutorRun (scope: RuntimeScope) (sessionId: string) : bool =
+    sessionId <> "" && Map.containsKey sessionId (getActiveRuns scope)
 
-let abortExecutorRun (sessionId: string) : unit =
+let abortExecutorRun (scope: RuntimeScope) (sessionId: string) : unit =
     if sessionId <> "" then
+        let activeRuns = getActiveRuns scope
+
         match Map.tryFind sessionId activeRuns with
         | None -> ()
         | Some kills ->
@@ -37,9 +50,9 @@ let abortExecutorRun (sessionId: string) : unit =
                 with _ ->
                     ()
 
-            activeRuns <- Map.remove sessionId activeRuns
+            setActiveRuns scope (Map.remove sessionId activeRuns)
 
-let resetSessionExecutorForTesting () : unit = activeRuns <- Map.empty
+let resetSessionExecutorForTesting (scope: RuntimeScope) : unit = scope.Remove(activeRunsKey)
 
 /// Per-session serial executor bound to a registration [RuntimeScope].
 type SessionExecutor(scope: RuntimeScope) =

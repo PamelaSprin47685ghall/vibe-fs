@@ -8,7 +8,7 @@ open Wanxiangshu.Runtime.Fallback.SessionRuntimeLeasePure
 open Wanxiangshu.Hosts.Opencode.SubsessionHostAdapter
 open Wanxiangshu.Kernel.Subsession.Types
 
-let makeMockClient (pObjRef: obj ref) (parentId: string) (responseText: string) =
+let makeMockClient (pObjRef: obj ref) (fallbackRuntimeRef: obj ref) (parentId: string) (responseText: string) =
     let createCalls = ResizeArray<obj>()
     let promptCalls = ResizeArray<obj>()
     let mutable sessionCounter = 0
@@ -35,8 +35,8 @@ let makeMockClient (pObjRef: obj ref) (parentId: string) (responseText: string) 
                                 (promise {
                                     promptCalls.Add(arg)
 
-                                    if not (isNull pObjRef.Value) then
-                                        let runtime = pObjRef.Value?__fallbackRuntime |> unbox<FallbackRuntimeStore>
+                                    if not (isNull fallbackRuntimeRef.Value) then
+                                        let runtime = unbox<FallbackRuntimeStore> fallbackRuntimeRef.Value
 
                                         let childId = Dyn.str (Dyn.get arg "path") "id"
                                         runtime.UpdateSession(childId, setTaskComplete)

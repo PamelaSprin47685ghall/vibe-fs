@@ -70,6 +70,7 @@ let private buildExecutorSummaryPrompt (host: Host) (output: string) (options: E
 let private runExecutorWork
     (host: Host)
     (registry: ChildAgentRegistry)
+    (sessionScope: RuntimeScope)
     (fallbackRuntime: FallbackRuntimeStore)
     (directory: string)
     (options: ExecuteOptions)
@@ -78,7 +79,7 @@ let private runExecutorWork
     (context: obj)
     : JS.Promise<string> =
     promise {
-        let! result = Wanxiangshu.Runtime.Executor.execute options sessionID
+        let! result = Wanxiangshu.Runtime.Executor.execute sessionScope options sessionID
         let output = outputFromResult result
 
         if not (shouldSummarize byteLength options.maxBytes output) then
@@ -134,6 +135,7 @@ let private executeExecutorTool
                     runExecutorWork
                         host
                         registry
+                        sessionScope
                         fallbackRuntime
                         runtime.Execution.Directory
                         options

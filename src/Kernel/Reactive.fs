@@ -4,13 +4,11 @@ module Wanxiangshu.Kernel.Reactive
 //  Reactive Edges — Dual-Track
 //  Observable Interfaces
 //
-//  REF.md §4.3 "Reactive Edges":
-//
 //    IAsyncEnumerable<CommittedProgress>
 //      — durable, replayable from NDJSON
 //      — safe to use for business decisions
-//      — emitted AFTER step 5 (commit)
-//      — Law 2: never observable before persist
+//      — emitted AFTER commit
+//      — never observable before persist
 //
 //    IAsyncEnumerable<EphemeralTelemetry>
 //      — best-effort, latest-wins

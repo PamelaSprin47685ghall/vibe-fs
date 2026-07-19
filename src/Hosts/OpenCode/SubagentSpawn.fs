@@ -101,7 +101,7 @@ let extractSessionText (client: obj) (sessionId: string) (directory: string) (st
             return noOutputText
     }
 
-/// R-01 fix: when the abort signal wins, the local race stops waiting
+/// When the abort signal wins, the local race stops waiting
 /// but the physical OpenCode session keeps running.  Force the host
 /// to abort the prompt so the model does not keep consuming tokens
 /// after the parent declared it stopped.

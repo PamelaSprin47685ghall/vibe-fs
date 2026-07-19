@@ -36,11 +36,10 @@ let private invokeClient (client: obj) (method_: string) (arg: obj) : JS.Promise
                 unbox<JS.Promise<obj>> (Dyn.callMethod1 session method_ arg)
 
 /// Send a nudge through the unified `DispatchRegistry` so two nudges on
-/// the same physical session cannot race. The previous implementation
-/// called `client.session.prompt` directly and resolved
-/// `Promise.result` as "delivered", which violated N-01
-/// (silent success when session API is missing) and N-02
-/// (active-nudge-nonce not always cleared).
+/// the same physical session cannot race. Calling `client.session.prompt`
+/// directly and resolving `Promise.result` as "delivered" could silently
+/// succeed when the session API is missing and did not always clear the
+/// active nudge nonce.
 let sendNudge
     (fallbackRuntime: FallbackRuntimeStore)
     (client: obj)
@@ -58,7 +57,7 @@ let sendNudge
 
         match getSessionApiFromClient client with
         | Error _ ->
-            // N-01 + N-02: surface the typed failure AND clear the
+            // Surface the typed failure AND clear the
             // active nudge nonce / owner on the early-exit path so the
             // next attempt can dispatch.
             let _ = fallbackRuntime.UpdateSessionReturning(sidStr, tryConsumeNudgeNonce nonce)

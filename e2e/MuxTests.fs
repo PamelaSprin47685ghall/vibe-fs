@@ -215,7 +215,6 @@ let runAll (args: string array) : JS.Promise<int> =
                 chk
                 runTool
                 warnTddValue
-                reg
                 fileExists
                 readFileSync
                 dynGet

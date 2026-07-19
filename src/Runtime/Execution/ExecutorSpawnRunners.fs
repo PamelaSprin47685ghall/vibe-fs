@@ -9,8 +9,10 @@ open Wanxiangshu.Runtime.ExecutorFormat
 open Wanxiangshu.Runtime.ExecutorJavascript
 open Wanxiangshu.Runtime.ExecutorSpawn
 open Wanxiangshu.Runtime.ExecutorPlatform
+open Wanxiangshu.Runtime.RuntimeScope
 
 let private runShellProgram
+    (scope: RuntimeScope)
     (program: string)
     (cwd: string)
     (sessionId: string)
@@ -26,6 +28,7 @@ let private runShellProgram
 
     if isWindows () then
         runScript
+            scope
             "powershell.exe"
             [| "-ExecutionPolicy"; "Bypass"; "-File" |]
             cwd
@@ -34,9 +37,10 @@ let private runShellProgram
             sid
             onKillRegistered
     else
-        runScript "bash" [||] cwd scriptPath (Some timeoutMs) sid onKillRegistered
+        runScript scope "bash" [||] cwd scriptPath (Some timeoutMs) sid onKillRegistered
 
 let private runPythonProgram
+    (scope: RuntimeScope)
     (program: string)
     (dependencies: string list)
     (cwd: string)
@@ -55,7 +59,14 @@ let private runPythonProgram
     let sid = Some sessionId
 
     let warmup () =
-        spawnAndRun "uvx" (Array.append baseArgs [| "--from"; "python"; "python"; "-c"; "pass" |]) cwd None None None
+        spawnAndRun
+            scope
+            "uvx"
+            (Array.append baseArgs [| "--from"; "python"; "python"; "-c"; "pass" |])
+            cwd
+            None
+            None
+            None
 
     promise {
         if not dependencies.IsEmpty then
@@ -65,6 +76,7 @@ let private runPythonProgram
             | Exited(0, _, _) ->
                 return!
                     runScript
+                        scope
                         "uvx"
                         (Array.append baseArgs [| "--from"; "python"; "python" |])
                         cwd
@@ -76,6 +88,7 @@ let private runPythonProgram
         else
             return!
                 runScript
+                    scope
                     "uvx"
                     (Array.append baseArgs [| "--from"; "python"; "python" |])
                     cwd
@@ -86,6 +99,7 @@ let private runPythonProgram
     }
 
 let private runJavascriptProgram
+    (scope: RuntimeScope)
     (program: string)
     (dependencies: string list)
     (cwd: string)
@@ -102,6 +116,7 @@ let private runJavascriptProgram
 
         return!
             runScript
+                scope
                 "npx"
                 [| "--prefix"; projectDir; "--yes"; "--no-install"; "tsx" |]
                 cwd
@@ -113,7 +128,8 @@ let private runJavascriptProgram
 
 type ExecuteDeps =
     { runProgram:
-        string
+        RuntimeScope
+            -> string
             -> ExecutorLanguage
             -> string list
             -> string
@@ -123,6 +139,7 @@ type ExecuteDeps =
             -> JS.Promise<RunOutcome> }
 
 let defaultRunProgram
+    (scope: RuntimeScope)
     (program: string)
     (language: ExecutorLanguage)
     (dependencies: string list)
@@ -132,8 +149,8 @@ let defaultRunProgram
     (onKillRegistered: ((unit -> unit) -> unit) option)
     : JS.Promise<RunOutcome> =
     match language with
-    | Shell -> runShellProgram program cwd sessionId timeout onKillRegistered
-    | Python -> runPythonProgram program dependencies cwd sessionId timeout onKillRegistered
-    | Javascript -> runJavascriptProgram program dependencies cwd sessionId timeout onKillRegistered
+    | Shell -> runShellProgram scope program cwd sessionId timeout onKillRegistered
+    | Python -> runPythonProgram scope program dependencies cwd sessionId timeout onKillRegistered
+    | Javascript -> runJavascriptProgram scope program dependencies cwd sessionId timeout onKillRegistered
 
 let defaultExecuteDeps: ExecuteDeps = { runProgram = defaultRunProgram }

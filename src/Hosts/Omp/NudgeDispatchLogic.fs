@@ -144,7 +144,7 @@ let handleAgentEndNudge
         Promise.lift ()
     else
         promise {
-            if not (isSessionForceStopped sessionId) then
+            if not (isSessionForceStopped fallbackRuntime sessionId) then
                 let root = ctx.cwd |> Option.defaultValue ""
                 let! snapshot = buildNudgeSnapshot ctx sm sessionId root
 
@@ -182,7 +182,7 @@ let agentEndHandler
             }
         elif owner <> SessionOwner.NoOwner && owner <> SessionOwner.Human then
             Promise.lift ()
-        elif isSessionForceStopped sessionId then
+        elif isSessionForceStopped fallbackRuntime sessionId then
             Promise.lift ()
         else
             match ctx.sessionManager with

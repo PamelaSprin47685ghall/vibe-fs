@@ -11,6 +11,7 @@ open Wanxiangshu.Runtime.ExecutorFormat
 open Wanxiangshu.Runtime.ExecutorJavascript
 open Wanxiangshu.Runtime.SessionExecutor
 open Wanxiangshu.Runtime.ExecutorPlatform
+open Wanxiangshu.Runtime.RuntimeScope
 
 type RunOutcome =
     | Exited of code: int * stdout: string * stderr: string
@@ -21,7 +22,8 @@ type RunOutcome =
 // --- helpers for awaitChild -------------------------------------------------
 
 type private AwaitState =
-    { child: SpawnedChild
+    { scope: RuntimeScope
+      child: SpawnedChild
       sessionId: string
       resolve: RunOutcome -> unit
       mutable settled: bool
@@ -58,7 +60,7 @@ let private settleOutcome (state: AwaitState) (outcome: RunOutcome) =
         with _ ->
             ()
 
-        unregisterActiveRun state.sessionId (fun () -> killTree state.child)
+        unregisterActiveRun state.scope state.sessionId (fun () -> killTree state.child)
         state.resolve outcome
 
 let private makeDataHandler (state: AwaitState) (buf: ResizeArray<string>) (otherBuf: ResizeArray<string>) =
@@ -101,7 +103,7 @@ let private makeErrorHandler (state: AwaitState) (executable: string) =
 let private registerSessionRun (state: AwaitState) (onKillRegistered: ((unit -> unit) -> unit) option) =
     match state.sessionId with
     | sid when sid <> "" ->
-        registerActiveRun sid (fun () -> killTree state.child)
+        registerActiveRun state.scope sid (fun () -> killTree state.child)
 
         onKillRegistered
         |> Option.iter (fun register -> register (fun () -> killTree state.child))
@@ -110,6 +112,7 @@ let private registerSessionRun (state: AwaitState) (onKillRegistered: ((unit -> 
 // --- public API --------------------------------------------------------------
 
 let private awaitChild
+    (scope: RuntimeScope)
     (child: SpawnedChild)
     (executable: string)
     (kill: SpawnedChild -> unit)
@@ -119,7 +122,8 @@ let private awaitChild
     : JS.Promise<RunOutcome> =
     Promise.create (fun resolve _reject ->
         let state =
-            { child = child
+            { scope = scope
+              child = child
               sessionId = defaultArg sessionId ""
               resolve = resolve
               settled = false
@@ -157,6 +161,7 @@ let private awaitChild
             |> Promise.start)
 
 let spawnAndRun
+    (scope: RuntimeScope)
     (command: string)
     (args: string array)
     (cwd: string)
@@ -165,9 +170,10 @@ let spawnAndRun
     (onKillRegistered: ((unit -> unit) -> unit) option)
     : JS.Promise<RunOutcome> =
     let child = spawnChild command args cwd
-    awaitChild child command killTree timeoutMs sessionId onKillRegistered
+    awaitChild scope child command killTree timeoutMs sessionId onKillRegistered
 
 let runScript
+    (scope: RuntimeScope)
     (interpreter: string)
     (interpreterArgs: string array)
     (cwd: string)
@@ -176,7 +182,14 @@ let runScript
     (sessionId: string option)
     (onKillRegistered: ((unit -> unit) -> unit) option)
     : JS.Promise<RunOutcome> =
-    spawnAndRun interpreter (Array.append interpreterArgs [| scriptPath |]) cwd timeoutMs sessionId onKillRegistered
+    spawnAndRun
+        scope
+        interpreter
+        (Array.append interpreterArgs [| scriptPath |])
+        cwd
+        timeoutMs
+        sessionId
+        onKillRegistered
 
 let missingExecutableFor (language: ExecutorLanguage) : string =
     match language with

@@ -130,7 +130,7 @@ let private registerLeaseAndMaybeDispatch
     fallbackRuntime.UpdateSession(sessionId, armNudgeNonce nonce)
     fallbackRuntime.Update(sessionId, setMainContinuationAwaitingStart true)
 
-    if isSessionForceStopped sessionId then
+    if isSessionForceStopped fallbackRuntime sessionId then
         finishNudge fallbackRuntime root sessionId lease NudgeOutcome.Cancelled "Force stopped" "" ""
     else
         performNudgeDispatch pi fallbackRuntime root sessionId action snapshot lease

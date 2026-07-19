@@ -55,7 +55,7 @@ let private resolveDelegationContext
 
 /// Task-wait failures: backgrounding is a graceful outcome (returned as text on
 /// the Ok channel, never thrown); every other exception becomes a typed
-/// `Error` so callers stop using exceptions as control flow (TASK §5).
+/// `Error` so callers stop using exceptions as control flow.
 let private translateTaskWaitError
     (err: exn)
     (title: string)

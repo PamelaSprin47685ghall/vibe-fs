@@ -5,11 +5,22 @@ open Fable.Core.JsInterop
 open Wanxiangshu.Runtime.CapsFormat
 open Wanxiangshu.Kernel.Messaging
 open Wanxiangshu.Runtime.Dyn
+open Wanxiangshu.Runtime.RuntimeScope
 open Wanxiangshu.Runtime.SembleSearchTypes
 
 type SembleResult = SembleSearchTypes.SembleResult
 let debugEnabled = SembleSearchTypes.debugEnabled
 let trace = SembleSearchTypes.trace
+
+let private breakpointsKey = "wanxiangshu.semble_breakpoints"
+
+let private getBreakpoints (scope: RuntimeScope) : Map<string, int> =
+    match scope.TryFindKey breakpointsKey with
+    | Some v -> unbox<Map<string, int>> v
+    | None -> Map.empty
+
+let private setBreakpoints (scope: RuntimeScope) (breakpoints: Map<string, int>) : unit =
+    scope.Add(breakpointsKey, box breakpoints)
 
 let dumpInjection
     (sessionID: string)
@@ -95,12 +106,16 @@ let isBreakpoint (final: obj array) : bool =
         let info = Dyn.get last "info"
         Dyn.str info "role" = "toolResult"
 
-let mutable private lastBreakpoint: Map<string, int> = Map.empty
+let breakpointStart (scope: RuntimeScope) (sessionID: string) : int option =
+    Map.tryFind sessionID (getBreakpoints scope)
 
-let breakpointStart (sessionID: string) : int option = Map.tryFind sessionID lastBreakpoint
+let markBreakpoint (scope: RuntimeScope) (sessionID: string) (index: int) : unit =
+    let breakpoints = getBreakpoints scope
+    setBreakpoints scope (Map.add sessionID index breakpoints)
 
-let markBreakpoint (sessionID: string) (index: int) : unit =
-    lastBreakpoint <- Map.add sessionID index lastBreakpoint
+let clearBreakpoint (scope: RuntimeScope) (sessionID: string) : unit =
+    let breakpoints = getBreakpoints scope
+    setBreakpoints scope (Map.remove sessionID breakpoints)
 
 let extractContextFromMessages (startIndex: int) (messages: Message<'raw> list) : string =
     let rec safeSkip n xs =

@@ -11,7 +11,10 @@ let private cwd () : string = jsNative
 let run () : unit =
     let srcRoot = pathJoin (cwd ()) "src"
 
-    let forbidden = [ "_satisfyArchTest"; "_intentsRawFromArgsUsedInCore" ]
+    let forbidden =
+        [ "_satisfyArchTest"
+          "_intentsRawFromArgsUsedInCore"
+          "fallbackRuntimeInstance" ]
 
     let files = collectFsFiles srcRoot
 

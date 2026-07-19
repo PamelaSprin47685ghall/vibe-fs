@@ -43,29 +43,25 @@ let muxExecutorModeSchema (reg: obj) : obj =
         let props = get schema "properties"
         if isNullish props then null else get props "mode"
 
-let muxReviewStore (reg: obj) : obj = get reg "__reviewStore"
-
-let muxActivateReviewForTest (reg: obj) (sessionID: string) (task: string) : unit =
-    let store = muxReviewStore reg
-
+let muxActivateReviewForTest (reviewStoreSurface: obj) (sessionID: string) (task: string) : unit =
     let apply =
-        get store "applyReviewTaskProjection"
+        get reviewStoreSurface "applyReviewTaskProjection"
         |> unbox<System.Func<string, string option, unit>>
 
     apply.Invoke(sessionID, Some task)
 
-let muxReplayReviewTaskForTest (reg: obj) (sessionID: string) (task: string option) : unit =
-    let store = muxReviewStore reg
-
+let muxReplayReviewTaskForTest (reviewStoreSurface: obj) (sessionID: string) (task: string option) : unit =
     let apply =
-        get store "applyReviewTaskProjection"
+        get reviewStoreSurface "applyReviewTaskProjection"
         |> unbox<System.Func<string, string option, unit>>
 
     apply.Invoke(sessionID, task)
 
-let muxIsReviewActiveForTest (reg: obj) (sessionID: string) : bool =
-    let store = muxReviewStore reg
-    let fn = get store "getReviewTask" |> unbox<System.Func<string, string option>>
+let muxIsReviewActiveForTest (reviewStoreSurface: obj) (sessionID: string) : bool =
+    let fn =
+        get reviewStoreSurface "getReviewTask"
+        |> unbox<System.Func<string, string option>>
+
     fn.Invoke(sessionID).IsSome
 
 let minimalMuxDeps () : obj =

@@ -21,6 +21,9 @@ let private dynGet (o: obj) (k: string) : obj = Wanxiangshu.Runtime.Dyn.get o k
 let private dynIsNull (o: obj) : bool = Wanxiangshu.Runtime.Dyn.isNullish o
 let private dynStr (o: obj) (k: string) : string = Wanxiangshu.Runtime.Dyn.str o k
 
+let private objectKeys (o: obj) : string array =
+    JS.Constructors.Object.keys (o) |> unbox
+
 let runAll (args: string array) : JS.Promise<unit> =
     promise {
         let mutable totalFailed = 0
@@ -64,6 +67,11 @@ let runAll (args: string array) : JS.Promise<unit> =
             unbox<Wanxiangshu.Integration.OpencodePluginToolLifecycleContractTests.Harness> h2obj
 
         do! runToolLifecycle harness2 chk warnTddValue warnValue execArgs createEmpty dynGet dynIsNull dynStr
+
+        let pluginKeys = harness2.getPlugin () |> objectKeys
+        let forbiddenKeys = pluginKeys |> Array.filter (fun k -> k.StartsWith "__")
+        chk "opencode public plugin must not expose __-prefixed keys" (forbiddenKeys.Length = 0)
+
         do! withTimeoutCustom 4000 (harness2.dispose ())
 
         // --- nudge & force-stop ---

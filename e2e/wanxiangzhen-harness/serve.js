@@ -197,6 +197,8 @@ async function spawnWanxiangzhenHost(opts) {
   const llmHandle = await llm.start();
   const home = fs.mkdtempSync(path.join(os.tmpdir(), 'wxz-e2e-home-'));
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'wxz-e2e-'));
+  const metaDir = fs.mkdtempSync(path.join(os.tmpdir(), 'wxz-e2e-meta-'));
+  process.env.WANXIANGZHEN_E2E_META_DIR = metaDir;
   gitInit(tmpDir, opts);
 
   const nodeModulesSource = path.resolve('node_modules');
@@ -220,10 +222,10 @@ async function spawnWanxiangzhenHost(opts) {
     throw e;
   }
 
-  const metaPath = path.join(tmpDir, E2E_META);
-  let meta;
-  try {
-    meta = await waitForMetaFile(metaPath, child);
+    const metaPath = path.join(metaDir, E2E_META);
+    let meta;
+    try {
+      meta = await waitForMetaFile(metaPath, child);
   } catch (e) {
     await llmHandle.stop().catch(() => {});
     child.kill('SIGKILL');

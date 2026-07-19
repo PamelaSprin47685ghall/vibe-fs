@@ -29,13 +29,18 @@ let private sessionEndEventTypes =
           "session.deleted"
           "session.interrupted" ]
 
-let private handleSessionEnd (reviewStore: ReviewStore) (root: string) (sid: string) : JS.Promise<unit> =
+let private handleSessionEnd
+    (reviewStore: ReviewStore)
+    (fallbackRuntime: FallbackRuntimeStore)
+    (root: string)
+    (sid: string)
+    : JS.Promise<unit> =
     promise {
         if root <> "" then
             do! appendLoopCancelledOrFail root sid
             do! syncReviewFromEventLogDedicated reviewStore root sid
 
-        Wanxiangshu.Hosts.Omp.NudgeRuntime.markSessionForceStopped sid
+        Wanxiangshu.Hosts.Omp.NudgeRuntime.markSessionForceStopped fallbackRuntime sid
 
         // OMP does not register dispatchers in the DispatchRegistry
         // (no per-session mailbox yet), so there is nothing to tear down
@@ -100,7 +105,7 @@ let registerAbortHandler
                 | Some sid ->
                     if sessionEndEventTypes.Contains evtType then
                         let root = Dyn.str ctx "cwd"
-                        do! handleSessionEnd reviewStore root sid
+                        do! handleSessionEnd reviewStore fallbackRuntime root sid
                     elif fallbackEventTypes.Contains evtType then
                         do! handleFallbackEvent fallbackRuntime fallbackHandler event evtType sid
             })

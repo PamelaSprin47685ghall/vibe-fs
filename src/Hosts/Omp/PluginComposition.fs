@@ -33,6 +33,7 @@ open Wanxiangshu.Runtime.ToolHookRuntime
 open Wanxiangshu.Runtime.CommandProcessor
 open Wanxiangshu.Runtime.SubsessionPorts
 open Wanxiangshu.Runtime.SubsessionActor
+open Wanxiangshu.Kernel.HostCapability
 
 type CoreServices =
     { ReviewStore: ReviewStore
@@ -75,7 +76,6 @@ let private createCoreServices (pi: obj) : CoreServices =
     let directory = Dyn.str pi "directory"
     let fallbackConfigOpt = loadFallbackConfig directory
     let fallbackRuntime = FallbackRuntimeStore()
-    Wanxiangshu.Hosts.Omp.NudgeRuntime.setFallbackRuntime fallbackRuntime
 
     let configLookup: ConfigLookup =
         match fallbackConfigOpt with
@@ -126,6 +126,7 @@ let pluginFor (pi: obj) : JS.Promise<unit> =
         do! patchDisablePrune ()
         let services = createCoreServices pi
         applyAgentConfigIfSupported pi
+        pi?capabilities <- box (toStringArray allFull)
         registerHooks pi services
 
         // Minimal safe restart: unfinished subsession runs become poisoned actors.

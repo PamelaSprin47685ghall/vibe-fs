@@ -9,122 +9,111 @@ open Wanxiangshu.Tests.IntegrationSubagentMockClient
 
 open Wanxiangshu.Hosts.Mux.Plugin
 open Wanxiangshu.Hosts.Opencode.Plugin
+open Wanxiangshu.Hosts.Opencode.PluginComposition
+open Wanxiangshu.Kernel.HostTools
+open Wanxiangshu.Runtime.Fallback.RuntimeStore
 open Wanxiangshu.Runtime.LoopMessages
 open Wanxiangshu.Hosts.Mux.AiSettings
 open Wanxiangshu.Runtime.ChildAgentRegistry
 open Wanxiangshu.Runtime.Dyn
 
+let private withOpencodePlugin parentId responseText fn =
+    promise {
+        let pObjRef = ref null
+        let frRef = ref null
+        let cc, pc, mc = makeMockClient pObjRef frRef parentId responseText
+        let! dir = mkdtempAsync ("spec-" + parentId + "-")
+        let! seams = pluginForWithSeams opencode (box {| directory = dir; client = mc |})
+        pObjRef.Value <- seams.Plugin
+        frRef.Value <- box seams.FallbackRuntime
+        let! _ = fn cc pc seams.Plugin dir
+        do! rmAsync dir
+    }
 
 let inspectorToolSpec () =
-    promise {
-        let pObjRef = ref null
+    withOpencodePlugin "inspector-parent" "Found src/Opencode/Tools.fs"
+    <| fun createCalls promptCalls p workspaceDir ->
+        promise {
+            let inspector = get (get p "tool") "inspector"
 
-        let createCalls, promptCalls, mockClient =
-            makeMockClient pObjRef "inspector-parent" "Found src/Opencode/Tools.fs"
+            let! result =
+                (get inspector "execute")
+                $ (createObj [ "intents", box [| sampleInspectorIntent "find inspector registration" |] ],
+                   createObj
+                       [ "directory", box workspaceDir
+                         "sessionID", box "inspector-parent"
+                         "abort", box null ])
+                |> unbox<JS.Promise<string>>
 
-        let! workspaceDir = mkdtempAsync "inspector-tool-"
+            check "inspector tool returns subagent output" (result.Contains("src/Opencode/Tools.fs"))
 
-        let! p =
-            plugin (
-                box
-                    {| directory = workspaceDir
-                       client = mockClient |}
-            )
+            check
+                "inspector tool creates child session under parent"
+                (str (get createCalls.[0] "body") "parentID" = "inspector-parent")
 
-        pObjRef.Value <- p
-
-        let inspector = get (get p "tool") "inspector"
-
-        let! result =
-            (get inspector "execute")
-            $ (createObj [ "intents", box [| sampleInspectorIntent "find inspector registration" |] ],
-               createObj
-                   [ "directory", box workspaceDir
-                     "sessionID", box "inspector-parent"
-                     "abort", box null ])
-            |> unbox<JS.Promise<string>>
-
-        check "inspector tool returns subagent output" (result.Contains("src/Opencode/Tools.fs"))
-
-        check
-            "inspector tool creates child session under parent"
-            (str (get createCalls.[0] "body") "parentID" = "inspector-parent")
-
-        check "inspector tool prompts child inspector agent" (str (get promptCalls.[0] "body") "agent" = "inspector")
-
-        do! rmAsync workspaceDir
-    }
+            check
+                "inspector tool prompts child inspector agent"
+                (str (get promptCalls.[0] "body") "agent" = "inspector")
+        }
 
 let coderToolSpec () =
-    promise {
-        let pObjRef = ref null
+    withOpencodePlugin "coder-parent" "Coder finished"
+    <| fun createCalls promptCalls p workspaceDir ->
+        promise {
+            let coder = get (get p "tool") "coder"
 
-        let createCalls, promptCalls, mockClient =
-            makeMockClient pObjRef "coder-parent" "Coder finished"
+            let intents: obj array =
+                [| sampleCoderIntentWithDoNotTouch "fix bug" "a.ts" [| "src/shared.fs"; "Do not rename public API" |]
+                   sampleCoderIntent "add feature" "b.ts" |]
 
-        let! workspaceDir = mkdtempAsync "coder-tool-"
+            let! result =
+                (get coder "execute")
+                $ (createObj [ "intents", box intents ],
+                   createObj
+                       [ "directory", box workspaceDir
+                         "sessionID", box "coder-parent"
+                         "abort", box null ])
+                |> unbox<JS.Promise<string>>
 
-        let! p =
-            plugin (
-                box
-                    {| directory = workspaceDir
-                       client = mockClient |}
-            )
+            check "coder tool returns subagent output" (result.Contains("Coder finished"))
 
-        pObjRef.Value <- p
+            let coderCreates =
+                createCalls
+                |> Seq.filter (fun c -> str (get c "body") "parentID" = "coder-parent")
+                |> Seq.toArray
 
-        let coder = get (get p "tool") "coder"
+            check "coder tool creates one child per intent" (coderCreates.Length = 2)
+            check "coder tool prompts child coder agent" (str (get promptCalls.[0] "body") "agent" = "coder")
 
-        let intents: obj array =
-            [| sampleCoderIntentWithDoNotTouch "fix bug" "a.ts" [| "src/shared.fs"; "Do not rename public API" |]
-               sampleCoderIntent "add feature" "b.ts" |]
+            let firstPrompt =
+                str (unbox<obj[]> (get (get promptCalls.[0] "body") "parts")).[0] "text"
 
-        let! result =
-            (get coder "execute")
-            $ (createObj [ "intents", box intents ],
-               createObj
-                   [ "directory", box workspaceDir
-                     "sessionID", box "coder-parent"
-                     "abort", box null ])
-            |> unbox<JS.Promise<string>>
+            let secondPrompt =
+                str (unbox<obj[]> (get (get promptCalls.[1] "body") "parts")).[0] "text"
 
-        check "coder tool returns subagent output" (result.Contains("Coder finished"))
+            check
+                "coder prompt includes first intent do_not_touch"
+                (firstPrompt.Contains("do_not_touch:")
+                 && firstPrompt.Contains("src/shared.fs")
+                 && firstPrompt.Contains("Do not rename public API"))
 
-        let coderCreates =
-            createCalls
-            |> Seq.filter (fun call -> str (get call "body") "parentID" = "coder-parent")
-            |> Seq.toArray
-
-        check "coder tool creates one child per intent" (coderCreates.Length = 2)
-        check "coder tool prompts child coder agent" (str (get promptCalls.[0] "body") "agent" = "coder")
-
-        let firstPrompt =
-            str (unbox<obj[]> (get (get promptCalls.[0] "body") "parts")).[0] "text"
-
-        let secondPrompt =
-            str (unbox<obj[]> (get (get promptCalls.[1] "body") "parts")).[0] "text"
-
-        check
-            "coder prompt includes first intent do_not_touch"
-            (firstPrompt.Contains("do_not_touch:")
-             && firstPrompt.Contains("src/shared.fs")
-             && firstPrompt.Contains("Do not rename public API"))
-
-        check "coder prompt omits do_not_touch section when absent" (not (secondPrompt.Contains("do_not_touch:")))
-        do! rmAsync workspaceDir
-    }
+            check "coder prompt omits do_not_touch section when absent" (not (secondPrompt.Contains("do_not_touch:")))
+        }
 
 let inspectorToolLateClientInjectionSpec () =
     promise {
         let pObjRef = ref null
+        let frRef = ref null
 
         let createCalls, promptCalls, mockClient =
-            makeMockClient pObjRef "inspector-parent-late" "Late client injection worked"
+            makeMockClient pObjRef frRef "inspector-parent-late" "Late client injection worked"
 
         let! workspaceDir = mkdtempAsync "inspector-tool-late-client-"
         let ctx = createObj [ "directory", box workspaceDir ]
-        let! p = plugin ctx
-        pObjRef.Value <- p
+        let! seams = pluginForWithSeams opencode ctx
+        pObjRef.Value <- seams.Plugin
+        frRef.Value <- box seams.FallbackRuntime
+        let p = seams.Plugin
         ctx?("client") <- mockClient
         let inspector = get (get p "tool") "inspector"
 
@@ -153,6 +142,7 @@ let inspectorToolLateClientInjectionSpec () =
 let inspectorToolWithHostConfiguredModelSpec () =
     promise {
         let pObjRef = ref null
+        let frRef = ref null
 
         let configApi =
             createObj
@@ -169,19 +159,21 @@ let inspectorToolWithHostConfiguredModelSpec () =
                       }) ]
 
         let createCalls, promptCalls, mockClient =
-            makeMockClient pObjRef "inspector-parent-config" "Found src/Opencode/Tools.fs"
+            makeMockClient pObjRef frRef "inspector-parent-config" "Found src/Opencode/Tools.fs"
 
         setKey mockClient "config" configApi
         let! workspaceDir = mkdtempAsync "inspector-tool-config-"
 
-        let! p =
-            plugin (
-                box
+        let! seams =
+            pluginForWithSeams
+                opencode
+                (box
                     {| directory = workspaceDir
-                       client = mockClient |}
-            )
+                       client = mockClient |})
 
-        pObjRef.Value <- p
+        pObjRef.Value <- seams.Plugin
+        frRef.Value <- box seams.FallbackRuntime
+        let p = seams.Plugin
         let inspector = get (get p "tool") "inspector"
 
         let! result =

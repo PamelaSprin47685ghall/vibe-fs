@@ -39,6 +39,8 @@ type private ReconcileHost() =
 
         member _.ClosePhysicalSession(_) = Promise.lift StopUnknown
 
+let createReconcileHost () : ISubsessionHost = ReconcileHost() :> ISubsessionHost
+
 let private createPoisonEvents
     (sessionId: SessionId)
     (tid: TurnId)
@@ -95,9 +97,10 @@ let reconcileUnfinishedRuns
                     match actor.GetState() with
                     | Poisoned _ -> ()
                     | _ ->
-                        // NDJSON append is best-effort: if it fails, MarkUnknownAfterRestart
-                        // still poisons the actor in-memory. On next restart the same orphan
-                        // will be rediscovered and re-reconciled (idempotent).
+                        // NDJSON append may fail; if it does,
+                        // MarkUnknownAfterRestart still poisons the actor
+                        // in-memory. On next restart the same orphan will
+                        // be rediscovered and re-reconciled (idempotent).
                         try
                             do! eventStore.Append(sessionId, poisonEvents)
                             currentProj <- List.fold projectEvent currentProj poisonEvents

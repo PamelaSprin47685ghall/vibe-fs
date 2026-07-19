@@ -11,7 +11,7 @@
 | 文件系统 | `FileSys`、`WorkspaceFiles` | 读写工作区 |
 | 事件日志 | `EventStore/`（`EventStore`、`EventLogCodec`、`EventLogIo`、`EventLogFile`、`EventLogRuntime*`、各类 EventWriter） | NDJSON、锁、缓存、sync 与 projection |
 | 搜索 | `Search/FuzzySearch*`、`FuzzyIteratorStore`、`Semble*` | fff 后端、分页 iterator、MCP 搜索 |
-| Semble | `SembleMcp`、`SembleSearch`、`SembleSearchClient`、`SembleSearchTypes` | MCP 客户端与 inspector 断点注入 |
+| Semble | `SembleSearch`、`SembleSearchClient`、`SembleSearchTypes` | MCP 客户端与 inspector 断点注入 |
 | 执行器 | `Execution/Executor*`、`SessionExecutor`、`ExecutorToolsCodec` | shell/python/js、spawn、会话级执行 |
 | Tree-sitter | `TreeSitterShell`、`TreeSitterPlatform` | 可选语法能力 |
 | 网络 | `WebSearchApi`、`WebFetch`、`WebSearchCodec`、`TitleFetchGuardCommon` | 搜索与抓取守卫 |

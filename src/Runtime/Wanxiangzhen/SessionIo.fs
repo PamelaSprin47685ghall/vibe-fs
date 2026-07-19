@@ -16,11 +16,11 @@ let promptSession (client: obj) (sessionId: string) (text: string) : JS.Promise<
     promise {
         match getSession client with
         | Error err ->
-            // N-01 / Wanxiangzhen fix: host API missing must be a typed
+            // Host API missing must be a typed
             // failure, not a silent "ok".  Re-raise so the caller
             // (CoordinatorReplay) can log and skip; previously the
             // function returned () on missing API and the caller
-            // happily assumed the warning was delivered.
+            // assumed the warning was delivered.
             return raise (System.Exception("wanxiangzhen_session_api_missing:" + err))
         | Ok session ->
             let part = createObj [ "type", box "text"; "text", box text ]

@@ -16,7 +16,7 @@ open Wanxiangshu.Kernel.Subsession.Types
 //    3. persistBarrier — enforce commit ordering:
 //                        persist → commit → publish
 //
-//  All nine semantic laws (REF.md §3.2) are
+//  All nine semantic laws are
 //  documented in the code comments below.
 // ──────────────────────────────────────────────
 
@@ -128,7 +128,7 @@ let persistBarrier (persist: unit -> JS.Promise<unit>) (commit: unit -> 'a) : JS
 
 /// ── Derived: serial commit pipeline ──
 ///
-/// Full 10-step commit sequence (REF.md §4.3):
+/// Full 10-step commit sequence:
 ///
 ///   1. Dequeue Command
 ///   2. Validate correlation / deduplication

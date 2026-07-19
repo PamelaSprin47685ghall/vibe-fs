@@ -20,6 +20,7 @@ type Harness =
     abstract workDir: string
     abstract helpers: obj
     abstract registration: obj
+    abstract reviewStoreSurface: obj
     abstract fireEvent: obj -> JS.Promise<obj>
     abstract fireStreamEnd: string -> string[] -> JS.Promise<obj>
     abstract fireStreamAbort: string -> JS.Promise<obj>
@@ -39,7 +40,6 @@ let runRest
     (chk: string -> bool -> unit)
     (runTool: string -> obj -> (string -> bool) -> string -> JS.Promise<unit>)
     (warnTddValue: string)
-    (reg: obj)
     (fileExists: string -> bool)
     (readFileSync: string -> string -> string)
     (dynGet: obj -> string -> obj)
@@ -264,7 +264,7 @@ let runRest
         chk "mux.eventHook.abort.activateOk" (loopResponseAbort.Contains "With-Review Mode is active")
         let! _ = withTimeout (harness.fireStreamAbort "mux-e2e-session")
 
-        let reviewStoreSurface = dynGet reg "__reviewStore"
+        let reviewStoreSurface = harness.reviewStoreSurface
         let getReviewTask = dynGet reviewStoreSurface "getReviewTask"
         let taskResult = getReviewTask $ "mux-e2e-session"
         chk "mux.eventHook.abort.deactivated" (dynIsNull taskResult)

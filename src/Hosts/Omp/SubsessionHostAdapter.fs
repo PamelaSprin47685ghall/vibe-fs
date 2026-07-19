@@ -96,18 +96,81 @@ type OmpSubsessionHost(session: obj, agent: string, pi: obj, workspaceRoot: stri
             }
 
         member _.CancelPendingDispatch(turnId) =
-            // Best effort: the new unified DispatchRegistry does not
+            // The new unified DispatchRegistry does not
             // yet own an OMP per-session mailbox (OMP path goes through
             // the serial `session.prompt` Promise).  The previous
             // implementation was a no-op; we now at least record a
             // typed failure so the caller can distinguish "no-op"
-            // from "unknown dispatch".  When the OMP per-session
-            // mailbox lands, this becomes a registry call.
+            // from "unknown dispatch".
             let nonce = TurnId.value turnId
             ignore nonce
 
         member _.QueryDispatchStatus(sessionId, turnId) =
-            SubsessionDispatch.queryDispatchStatus session (Dyn.get pi "session") sessionId turnId
+            promise {
+                try
+                    let sessionApi = Dyn.get pi "session"
+
+                    let! dataOpt =
+                        promise {
+                            if not (Dyn.isNullish sessionApi) then
+                                let arg = box {| sessionId = SessionId.value sessionId |}
+                                let! resp = unbox<JS.Promise<obj>> (sessionApi?sessionMessages (arg))
+                                return Some(Dyn.get resp "data")
+                            else
+                                let sm = Dyn.get session "sessionManager"
+
+                                if Dyn.isNullish sm then
+                                    return None
+                                else
+                                    let getEntries = Dyn.get sm "getEntries"
+
+                                    let raw =
+                                        if Dyn.typeIs getEntries "function" then
+                                            Dyn.callMethod0 sm "getEntries"
+                                        else
+                                            Dyn.get sm "messages"
+
+                                    if Dyn.isArray raw then return Some raw else return None
+                        }
+
+                    match dataOpt with
+                    | Some data when not (Dyn.isNullish data) && Dyn.isArray data ->
+                        let msgs = unbox<obj array> data
+                        let target = TurnId.value turnId
+                        let mutable found = false
+                        let mutable anyUser = false
+
+                        for msg in msgs do
+                            let info = Dyn.get msg "info"
+
+                            if not (Dyn.isNullish info) then
+                                let cId1 = Dyn.str info "continuationId"
+                                let cId2 = Dyn.str info "continuationID"
+
+                                if cId1 = target || cId2 = target then
+                                    found <- true
+
+                            let roleTarget =
+                                if Dyn.str msg "role" <> "" then
+                                    msg
+                                else
+                                    let m = Dyn.get msg "message"
+                                    if not (Dyn.isNullish m) then m else info
+
+                            if not (Dyn.isNullish roleTarget) then
+                                let role = (Dyn.str roleTarget "role").ToLowerInvariant()
+
+                                if role = "user" then
+                                    anyUser <- true
+
+                        if found || anyUser then
+                            return DispatchStatus.Accepted OrderedTurnMarkerObserved
+                        else
+                            return DispatchStatus.Unknown
+                    | _ -> return DispatchStatus.Unknown
+                with _ ->
+                    return DispatchStatus.Unknown
+            }
 
         member _.QuerySessionQuiescence(sessionId, _turnId) =
             OmpSubsessionHostAdapterPrompts.querySessionQuiescence session (Dyn.get pi "session") sessionId _turnId

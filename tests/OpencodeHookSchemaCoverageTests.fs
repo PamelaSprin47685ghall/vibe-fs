@@ -3,7 +3,8 @@ module Wanxiangshu.Tests.OpencodeHookSchemaCoverageTests
 open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Tests.Assert
-open Wanxiangshu.Hosts.Opencode.HookSchema
+open Wanxiangshu.Hosts.Opencode.HookSchemaDecoration
+open Wanxiangshu.Hosts.Opencode.HookSchemaDecode
 open Wanxiangshu.Runtime.WorkBacklogSchema
 open Wanxiangshu.Kernel.WarnTdd
 open Wanxiangshu.Runtime.Dyn

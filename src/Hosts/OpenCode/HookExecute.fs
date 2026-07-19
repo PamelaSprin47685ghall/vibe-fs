@@ -8,7 +8,7 @@ open Wanxiangshu.Kernel.HostTools
 open Wanxiangshu.Runtime.ToolOutputInfo
 open Wanxiangshu.Runtime.TreeSitterFormat
 open Wanxiangshu.Kernel.ToolCatalog
-open Wanxiangshu.Hosts.Opencode.HookSchema
+open Wanxiangshu.Hosts.Opencode.HookSchemaDecoration
 open Wanxiangshu.Runtime.ChildAgentRegistry
 open Wanxiangshu.Runtime.OpencodeHookInputCodec
 open Wanxiangshu.Runtime.PatchToolsCodec
@@ -100,8 +100,8 @@ let toolExecuteBeforeFor (host: Host) (input: obj) (output: obj) : JS.Promise<un
 
             do! applyPtyReadThrottle tool nextArgs sessionID
 
-            HookSchema.setUiLabel args tool
-            HookSchema.setUiLabel nextArgs tool
+            setUiLabel args tool
+            setUiLabel nextArgs tool
     }
 
 let toolExecuteBefore (input: obj) (output: obj) : JS.Promise<unit> =

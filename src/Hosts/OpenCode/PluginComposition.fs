@@ -12,8 +12,18 @@ open Wanxiangshu.Hosts.Opencode.Tools
 open Wanxiangshu.Runtime.TitleFetchGuard
 open Wanxiangshu.Hosts.Opencode.PluginServices
 open Wanxiangshu.Hosts.Opencode.PluginHooks
+open Wanxiangshu.Runtime.Fallback.RuntimeStore
+open Wanxiangshu.Kernel.HostCapability
 
-let pluginFor (host: Host) (ctx: obj) : JS.Promise<obj> =
+let pluginForWithSeams
+    (host: Host)
+    (ctx: obj)
+    : JS.Promise<
+          {| Plugin: obj
+             ReviewStore: obj
+             FallbackRuntime: FallbackRuntimeStore |}
+       >
+    =
     promise {
         Wanxiangshu.Runtime.E2eSandbox.applyFromProcessEnv ()
         installTitleFetchGuard ()
@@ -23,6 +33,7 @@ let pluginFor (host: Host) (ctx: obj) : JS.Promise<obj> =
         setKey result "name" (box "wanxiangshu")
         setKey result "mcp" services.McpMap
         setKey result "tool" services.Tools
+        setKey result "capabilities" (box (toStringArray allFull))
 
         setKey
             result
@@ -38,7 +49,15 @@ let pluginFor (host: Host) (ctx: obj) : JS.Promise<obj> =
         registerHooks result host ctx services
         services.RuntimeScope.TriggerInit(services.Directory)
         do! services.RuntimeScope.WaitInit()
-        setKey result "__reviewStore" (box (createReviewTestSurface services.ReviewStore))
-        setKey result "__fallbackRuntime" (box services.FallbackRuntime)
-        return result
+
+        return
+            {| Plugin = result
+               ReviewStore = createReviewTestSurface services.ReviewStore
+               FallbackRuntime = services.FallbackRuntime |}
+    }
+
+let pluginFor (host: Host) (ctx: obj) : JS.Promise<obj> =
+    promise {
+        let! seams = pluginForWithSeams host ctx
+        return seams.Plugin
     }

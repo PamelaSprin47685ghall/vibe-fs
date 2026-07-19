@@ -50,8 +50,13 @@ let muxSubmitReviewTwoRoundPassAcceptsSpec () =
         let sessionID = "mux-submit-review-two-pass"
         do! seedLoopActivated workspaceDir sessionID "Implement feature X"
 
-        let reg =
-            createRegistration (muxDepsWithChatHistory sessionID (reviewActivationHistory "Implement feature X"))
+        let seams =
+            createRegistrationWithSeams (
+                muxDepsWithChatHistory sessionID (reviewActivationHistory "Implement feature X")
+            )
+
+        let reg = seams.Registration
+        let reviewStore = seams.ReviewStore
 
         let prompts = ResizeArray<string>()
 
@@ -77,7 +82,11 @@ let muxSubmitReviewTwoRoundPassAcceptsSpec () =
         check "submit_review two PERFECT rounds reports accepted" (result.Contains "verdict: accepted")
         check "submit_review runs a double-check round" (prompts.Count = 2)
         check "submit_review double-check round carries anchor" (prompts.[1].Contains "double-check:")
-        check "submit_review two PERFECT rounds deactivates review" (not (muxIsReviewActiveForTest reg sessionID))
+
+        check
+            "submit_review two PERFECT rounds deactivates review"
+            (not (muxIsReviewActiveForTest reviewStore sessionID))
+
         do! rmAsync workspaceDir
     }
 
@@ -89,8 +98,13 @@ let muxSubmitReviewReviseKeepsReviewActiveSpec () =
         let sessionID = "mux-submit-review-revise"
         do! seedLoopActivated workspaceDir sessionID "Implement feature X"
 
-        let reg =
-            createRegistration (muxDepsWithChatHistory sessionID (reviewActivationHistory "Implement feature X"))
+        let seams =
+            createRegistrationWithSeams (
+                muxDepsWithChatHistory sessionID (reviewActivationHistory "Implement feature X")
+            )
+
+        let reg = seams.Registration
+        let reviewStore = seams.ReviewStore
 
         let prompts = ResizeArray<string>()
 
@@ -116,7 +130,7 @@ let muxSubmitReviewReviseKeepsReviewActiveSpec () =
         check "submit_review revise reports needs_revision verdict" (result.Contains "verdict: needs_revision")
         check "submit_review revise surfaces feedback" (result.Contains "missing tests")
         check "submit_review revise runs only one round" (prompts.Count = 1)
-        check "submit_review revise keeps review session active" (muxIsReviewActiveForTest reg sessionID)
+        check "submit_review revise keeps review session active" (muxIsReviewActiveForTest reviewStore sessionID)
         do! rmAsync workspaceDir
     }
 
@@ -128,8 +142,13 @@ let muxSubmitReviewDoubleCheckReviseSpec () =
         let sessionID = "mux-submit-review-double-revise"
         do! seedLoopActivated workspaceDir sessionID "Implement feature X"
 
-        let reg =
-            createRegistration (muxDepsWithChatHistory sessionID (reviewActivationHistory "Implement feature X"))
+        let seams =
+            createRegistrationWithSeams (
+                muxDepsWithChatHistory sessionID (reviewActivationHistory "Implement feature X")
+            )
+
+        let reg = seams.Registration
+        let reviewStore = seams.ReviewStore
 
         let prompts = ResizeArray<string>()
 
@@ -155,7 +174,7 @@ let muxSubmitReviewDoubleCheckReviseSpec () =
         check "submit_review double-check revise reports needs_revision" (result.Contains "verdict: needs_revision")
         check "submit_review double-check revise surfaces feedback" (result.Contains "cut corners")
         check "submit_review double-check revise ran two rounds" (prompts.Count = 2)
-        check "submit_review double-check revise keeps review active" (muxIsReviewActiveForTest reg sessionID)
+        check "submit_review double-check revise keeps review active" (muxIsReviewActiveForTest reviewStore sessionID)
         do! rmAsync workspaceDir
     }
 
@@ -167,8 +186,13 @@ let muxSubmitReviewTerminatedCleansReviewStateSpec () =
         let sessionID = "mux-submit-review-terminated"
         do! seedLoopActivated workspaceDir sessionID "Implement feature X"
 
-        let reg =
-            createRegistration (muxDepsWithChatHistory sessionID (reviewActivationHistory "Implement feature X"))
+        let seams =
+            createRegistrationWithSeams (
+                muxDepsWithChatHistory sessionID (reviewActivationHistory "Implement feature X")
+            )
+
+        let reg = seams.Registration
+        let reviewStore = seams.ReviewStore
 
         let prompts = ResizeArray<string>()
 
@@ -192,7 +216,7 @@ let muxSubmitReviewTerminatedCleansReviewStateSpec () =
 
         let! result = ((get submitTool "execute") $ (ctx, args)) |> unbox<JS.Promise<string>>
         check "submit_review unclear report reports terminated" (result.Contains "verdict: terminated")
-        check "submit_review termination keeps review session active" (muxIsReviewActiveForTest reg sessionID)
+        check "submit_review termination keeps review session active" (muxIsReviewActiveForTest reviewStore sessionID)
         do! rmAsync workspaceDir
     }
 
@@ -203,8 +227,13 @@ let muxSubmitReviewOmittedWipSkipsReviewerSpec () =
         let sessionID = "mux-submit-review-omitted-wip"
         do! seedLoopActivated workspaceDir sessionID "Implement feature X"
 
-        let reg =
-            createRegistration (muxDepsWithChatHistory sessionID (reviewActivationHistory "Implement feature X"))
+        let seams =
+            createRegistrationWithSeams (
+                muxDepsWithChatHistory sessionID (reviewActivationHistory "Implement feature X")
+            )
+
+        let reg = seams.Registration
+        let reviewStore = seams.ReviewStore
 
         let prompts = ResizeArray<string>()
         let taskService = mockMuxTaskServiceReturningVerdicts prompts []
@@ -227,7 +256,7 @@ let muxSubmitReviewOmittedWipSkipsReviewerSpec () =
             (result = formatWipAcknowledgment "Implement feature X")
 
         check "submit_review omitted wip does not delegate to reviewer" (prompts.Count = 0)
-        check "submit_review omitted wip keeps review session active" (muxIsReviewActiveForTest reg sessionID)
+        check "submit_review omitted wip keeps review session active" (muxIsReviewActiveForTest reviewStore sessionID)
         do! rmAsync workspaceDir
     }
 
@@ -238,8 +267,13 @@ let muxSubmitReviewWipSkipsReviewerSpec () =
         let sessionID = "mux-submit-review-wip"
         do! seedLoopActivated workspaceDir sessionID "Implement feature X"
 
-        let reg =
-            createRegistration (muxDepsWithChatHistory sessionID (reviewActivationHistory "Implement feature X"))
+        let seams =
+            createRegistrationWithSeams (
+                muxDepsWithChatHistory sessionID (reviewActivationHistory "Implement feature X")
+            )
+
+        let reg = seams.Registration
+        let reviewStore = seams.ReviewStore
 
         let prompts = ResizeArray<string>()
         let taskService = mockMuxTaskServiceReturningVerdicts prompts []
@@ -261,6 +295,6 @@ let muxSubmitReviewWipSkipsReviewerSpec () =
         let! result = ((get submitTool "execute") $ (ctx, args)) |> unbox<JS.Promise<string>>
         check "submit_review wip returns kernel acknowledgment" (result = formatWipAcknowledgment "Implement feature X")
         check "submit_review wip does not delegate to reviewer" (prompts.Count = 0)
-        check "submit_review wip keeps review session active" (muxIsReviewActiveForTest reg sessionID)
+        check "submit_review wip keeps review session active" (muxIsReviewActiveForTest reviewStore sessionID)
         do! rmAsync workspaceDir
     }

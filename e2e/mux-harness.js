@@ -153,7 +153,8 @@ export async function start(opts = {}) {
     directory: workDir,
     taskService: mockTaskService,
   };
-  const reg = plugin.createRegistration(deps);
+  const seams = plugin.createRegistrationWithSeams(deps);
+  const reg = seams.Registration;
 
   const helpers = buildMockHelpers();
   const slashCommands = regSlashCommands(reg);
@@ -167,6 +168,7 @@ export async function start(opts = {}) {
     helpers,
     getChatHistoryCalled: () => getChatHistoryCalled,
     setMockReportMarkdown: (markdown) => { mockTaskService._reportMarkdown = markdown; },
+    getReviewStore: () => seams.ReviewStore,
 
     // Event hook -----------------------------------------------------------
     async fireEvent(event) {

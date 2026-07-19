@@ -105,7 +105,7 @@ module TurnIdentity =
         && identity.CancelGeneration = ctx.CancelGeneration
 
 /// Origin classification for a terminal event, used by nudge to decide
-/// whether to proceed with todo/review nudges.  PRD-06 §4.
+/// whether to proceed with todo/review nudges.
 [<RequireQualifiedAccess>]
 type TerminalEventOrigin =
     | HumanTurnCompleted
