@@ -96,3 +96,7 @@ type SendOutcome =
     | Busy
     | Failed of error: string
     | TransportUnavailable of error: string
+    | NotNeeded
+    | SnapshotUnavailable of error: string
+    | ClaimConflict
+    | EventStoreFailure of error: string

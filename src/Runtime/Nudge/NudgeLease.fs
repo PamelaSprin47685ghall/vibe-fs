@@ -71,6 +71,44 @@ let isLeaseValid (runtime: FallbackRuntimeStore) (sessionKey: string) (lease: Nu
     && not ((runtime.GetSession sessionKey).CompactionForceStopped)
     && isLifecycleNotCancelled
 
+let private claimDispatch
+    (workspaceRoot: string)
+    (sessionKey: string)
+    (action: NudgeAction)
+    (nudgeAnchorKey: string)
+    (nudgeId: string)
+    (nonce: string)
+    (sessionGen: int)
+    (cancelGen: int)
+    (humanTurnId: string)
+    (nudgeOrdinal: int)
+    : JS.Promise<bool> =
+    promise {
+        try
+            return!
+                tryClaimNudgeDispatch
+                    workspaceRoot
+                    sessionKey
+                    action
+                    nudgeAnchorKey
+                    nudgeId
+                    nonce
+                    sessionGen
+                    cancelGen
+                    humanTurnId
+                    nudgeOrdinal
+        with ex ->
+            JS.console.error (
+                box
+                    {| feature = "nudge"
+                       session = sessionKey
+                       phase = "claim"
+                       error = ex.Message |}
+            )
+
+            return raise ex
+    }
+
 let tryClaimAndRegisterLease
     (workspaceRoot: string)
     (fallbackRuntime: FallbackRuntimeStore)
@@ -90,23 +128,17 @@ let tryClaimAndRegisterLease
         let nonce = "nudge_" + System.Guid.NewGuid().ToString("N")
 
         let! claimed =
-            promise {
-                try
-                    return!
-                        tryClaimNudgeDispatch
-                            workspaceRoot
-                            sessionKey
-                            action
-                            nudgeAnchorKey
-                            nudgeId
-                            nonce
-                            sessionGen
-                            cancelGen
-                            humanTurnId
-                            nudgeOrdinal
-                with _ ->
-                    return false
-            }
+            claimDispatch
+                workspaceRoot
+                sessionKey
+                action
+                nudgeAnchorKey
+                nudgeId
+                nonce
+                sessionGen
+                cancelGen
+                humanTurnId
+                nudgeOrdinal
 
         if not claimed then
             return None

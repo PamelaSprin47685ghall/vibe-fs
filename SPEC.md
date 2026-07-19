@@ -359,21 +359,9 @@ OpenCode 当前多个路径把 nonce、continuation ID 等放入 prompt part met
 
 `ChatHooks.tryConsumeNudgeIfMatched` 在观察到匹配 `ActiveNudgeNonce` 的宿主消息时，立即通过 `tryTransitionPendingNudgeLeaseReturning` 将 nudge lease 从 `DispatchStarted` 推进到 `Dispatched`，并消费 nonce。`SessionRuntimeLeasePure.tryTransitionPendingNudgeLease` 已支持 idempotent：目标状态等于当前状态时直接返回 `Some s`。prompt Promise 的成功/失败现在仅作为终态辅助信号， lease 终态仍由后续 `assistant/error/idle` 组合决定。
 
-### N-04：异常被大量转换成“没有快照”或“未领取”
+### N-04：异常被大量转换成“没有快照”或“未领取” ✅ 已完成
 
-`collectSnapshot`、claim 等路径存在宽泛 catch，生产错误被伪装成正常的不触发。
-
-**整改要求：**
-
-“No nudge needed”与“无法判断是否需要 nudge”必须是两个状态：
-
-| 状态                  | 行为             |
-| ------------------- | -------------- |
-| NotNeeded           | 正常不发送          |
-| SnapshotUnavailable | 记录错误，不得伪装为策略决定 |
-| ClaimConflict       | 可正常忽略          |
-| EventStoreFailure   | 基础设施错误，必须暴露    |
-| TransportFailure    | 可重试或进入失败终态     |
+`SendOutcome` 新增 `NotNeeded`、`SnapshotUnavailable`、`ClaimConflict`、`EventStoreFailure` 变体。`NudgeLease.tryClaimAndRegisterLease` 不再用 `with _ -> return false` 吾掉异常——现在记录诊断日志并重新抛出。`NudgeRuntimeMux.sendNudgeMux` 不再用 `with _ -> return SendOutcome.Busy` 伪装所有异常——现在分类为 `Failed`。`NudgeOutcomeHandler` 处理所有新变体。
 
 ### N-05：陈旧 terminal fallback lease 不再阻塞 nudge ✅ 已完成
 

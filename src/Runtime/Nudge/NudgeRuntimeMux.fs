@@ -121,8 +121,16 @@ let sendNudgeMux
                     SendOutcome.Delivered
                 else
                     SendOutcome.Busy
-        with _ ->
-            return SendOutcome.Busy
+        with ex ->
+            JS.console.error (
+                box
+                    {| feature = "nudge"
+                       session = workspaceId
+                       hostVariant = "mux"
+                       error = ex.Message |}
+            )
+
+            return SendOutcome.Failed ex.Message
     }
 
 let runNudgeFlowWithRetryCheck

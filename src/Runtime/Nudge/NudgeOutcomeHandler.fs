@@ -88,6 +88,28 @@ let private handleSendOutcome
             ("TransportUnavailable: " + msg)
             ""
             ""
+    | SendOutcome.NotNeeded -> Promise.lift ()
+    | SendOutcome.SnapshotUnavailable msg ->
+        finishNudge
+            fallbackRuntime
+            workspaceRoot
+            sessionKey
+            lease
+            NudgeOutcome.Failed
+            ("SnapshotUnavailable: " + msg)
+            ""
+            ""
+    | SendOutcome.ClaimConflict -> Promise.lift ()
+    | SendOutcome.EventStoreFailure msg ->
+        finishNudge
+            fallbackRuntime
+            workspaceRoot
+            sessionKey
+            lease
+            NudgeOutcome.Failed
+            ("EventStoreFailure: " + msg)
+            ""
+            ""
 
 let validateAndFinalizeOutcome
     (workspaceRoot: string)
