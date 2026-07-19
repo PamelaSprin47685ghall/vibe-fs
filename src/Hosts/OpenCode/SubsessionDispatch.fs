@@ -109,6 +109,7 @@ module PendingTurnReceipt =
           Resolve: Result<HostStartReceipt, DispatchFailure> -> unit
           Reject: exn -> unit
           mutable Completed: bool
+          mutable Cancelled: bool
           mutable TransportState: TransportState }
 
     let mutable private pending = Map.empty<string, Waiter>
@@ -127,12 +128,20 @@ module PendingTurnReceipt =
                   Resolve = resolve
                   Reject = reject
                   Completed = false
+                  Cancelled = false
                   TransportState = InFlight }
 
             pending <- Map.add turnId w pending)
 
     let tryResolve (turnId: string) (receipt: HostStartReceipt) : bool =
         match Map.tryFind turnId pending with
+        | Some w when w.Cancelled ->
+            if not w.Completed then
+                w.Completed <- true
+                w.Resolve(Ok receipt)
+
+            pending <- Map.remove turnId pending
+            true
         | Some w ->
             match w.Completed, w.TransportState with
             | true, RejectedBeforeSend _ ->
@@ -175,4 +184,7 @@ module PendingTurnReceipt =
         | Some w -> Some w.TransportState
         | None -> None
 
-    let cancel (turnId: string) : unit = ignore turnId
+    let cancel (turnId: string) : unit =
+        match Map.tryFind turnId pending with
+        | Some w when not w.Completed && not w.Cancelled -> w.Cancelled <- true
+        | _ -> ()

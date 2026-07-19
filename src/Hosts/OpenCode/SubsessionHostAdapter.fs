@@ -181,7 +181,7 @@ type OpencodeSubsessionHost(client: obj, agent: string, directory: string) =
 
         member _.CancelPendingDispatch(turnId) =
             let nonce = TurnId.value turnId
-            ignore (Wanxiangshu.Hosts.Opencode.SubsessionHostAdapterTypes.subsessionRegistry, nonce)
+            Wanxiangshu.Hosts.Opencode.SubsessionDispatch.PendingTurnReceipt.cancel nonce
 
         member _.QueryDispatchStatus(sessionId, turnId) =
             Wanxiangshu.Hosts.Opencode.SubsessionHostAdapterOps.buildQueryDispatchStatus
