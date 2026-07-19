@@ -12,7 +12,9 @@ open Wanxiangshu.Kernel.Primitives.Identity
 open Wanxiangshu.Kernel.Errors.DomainError
 open Wanxiangshu.Kernel.Session.Causality
 open Wanxiangshu.Kernel.FallbackKernel.Types
+open Wanxiangshu.Kernel.Fallback.Continuation
 open Wanxiangshu.Runtime.Fallback.RuntimeStore
+open Wanxiangshu.Runtime.Fallback.SessionRuntime
 open Wanxiangshu.Runtime.Fallback.Ports
 open Wanxiangshu.Hosts.Opencode.Fallback.HostEventInspection
 open Wanxiangshu.Runtime.OpencodeSessionPromptBuilder
@@ -60,6 +62,39 @@ let private fetchMessagesImpl (client: obj) (sessionID: string) : JS.Promise<obj
             return [||]
     }
 
+let private createContinuationPromptBody
+    (runtime: FallbackRuntimeStore)
+    (sessionID: string)
+    (model: FallbackModel)
+    (agent: string option)
+    (payload: string)
+    (mode: ContinuationMode)
+    (continuationID: string)
+    : obj =
+    let state = runtime.GetSession sessionID
+
+    match state.PendingLease with
+    | Some lease when lease.ContinuationID = continuationID ->
+        let request: ContinuationRequest =
+            { ContinuationId = continuationID
+              ContinuationOrdinal = lease.ContinuationOrdinal
+              Attempt = 1
+              SessionId = sessionID
+              HumanTurnId = lease.HumanTurnID
+              SourceHumanMessageId =
+                if state.LastHumanMessageId = "" then
+                    None
+                else
+                    Some state.LastHumanMessageId
+              ContextGeneration = lease.SessionGeneration
+              CancelGeneration = lease.CancelGeneration
+              Model = model
+              Agent = agent |> Option.defaultValue ""
+              Mode = mode }
+
+        createFallbackContinuationPromptBody agent payload request
+    | _ -> invalidOp "fallback_continuation_lease_missing"
+
 let private sendContinueImpl
     (runtime: FallbackRuntimeStore)
     (client: obj)
@@ -71,11 +106,17 @@ let private sendContinueImpl
         let! _, liveAgentOpt = tryGetSessionModelAndAgentAsync client sessionID
         let! infoOpt = tryReadLatestMessageInfo client sessionID
 
-        let modelStr, agent =
-            resolveModelAndAgent runtime liveAgentOpt model sessionID infoOpt
+        let _, agent = resolveModelAndAgent runtime liveAgentOpt model sessionID infoOpt
 
         let body =
-            createPromptBodyWithModelAndNonce agent (Some modelStr) "\u200B" (Some continuationID)
+            createContinuationPromptBody
+                runtime
+                sessionID
+                model
+                agent
+                "\u200B"
+                ContinuationMode.ResumeInterruptedTurn
+                continuationID
 
         let arg =
             box
@@ -113,11 +154,17 @@ let private recoverWithPromptImpl
         let! _, liveAgentOpt = tryGetSessionModelAndAgentAsync client sessionID
         let! infoOpt = tryReadLatestMessageInfo client sessionID
 
-        let modelStr, agent =
-            resolveModelAndAgent runtime liveAgentOpt model sessionID infoOpt
+        let _, agent = resolveModelAndAgent runtime liveAgentOpt model sessionID infoOpt
 
         let body =
-            createPromptBodyWithModelAndNonce agent (Some modelStr) promptText (Some continuationID)
+            createContinuationPromptBody
+                runtime
+                sessionID
+                model
+                agent
+                promptText
+                (ContinuationMode.RecoverToolCallText promptText)
+                continuationID
 
         let arg =
             box

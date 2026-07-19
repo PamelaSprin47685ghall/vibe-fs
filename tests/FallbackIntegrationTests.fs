@@ -56,7 +56,8 @@ let private mkState phase idx fc cc =
       FailureCount = fc
       Lifecycle = FallbackLifecycle.Active
       ContinueCount = cc
-      RecoveryCount = 0 }
+      RecoveryCount = 0
+      LastAssistantMessageId = "" }
 
 let scan_k1_startsFromZero () =
     let s1, _ =

@@ -44,17 +44,31 @@ let translateEvent
                     return Some FallbackEvent.SessionIdle
                 else
                     let! msgs = executor.FetchMessages sessionID
+                    let lastAssistantIdOpt = tryGetLastAssistantMessageId msgs
+                    let lastAssistantId = lastAssistantIdOpt |> Option.defaultValue ""
 
-                    match tryGetLastAssistantAbortInfo msgs with
-                    | Some abortErr -> return Some(FallbackEvent.SessionError abortErr)
-                    | None ->
-                        if
-                            isIdleNoContentAndNoTools msgs
-                            && not (pendingReview |> Option.exists (fun f -> f sessionID))
-                        then
-                            return Some emptyOutputError
-                        else
-                            return Some FallbackEvent.SessionIdle
+                    runtime.Update(sessionID, setLastAssistantMessageId lastAssistantId)
+
+                    // Suppress duplicate empty-output idle events for the same assistant
+                    // message while a continuation is in flight; this prevents stale
+                    // FetchMessages snapshots from triggering extra retries.
+                    if
+                        isIdleNoContentAndNoTools msgs
+                        && lastAssistantId <> ""
+                        && lastAssistantId = state.LastAssistantMessageId
+                    then
+                        return None
+                    else
+                        match tryGetLastAssistantAbortInfo msgs with
+                        | Some abortErr -> return Some(FallbackEvent.SessionError abortErr)
+                        | None ->
+                            if
+                                isIdleNoContentAndNoTools msgs
+                                && not (pendingReview |> Option.exists (fun f -> f sessionID))
+                            then
+                                return Some emptyOutputError
+                            else
+                                return Some FallbackEvent.SessionIdle
             }
         else
             promise { return None }

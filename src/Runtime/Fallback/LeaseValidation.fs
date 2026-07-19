@@ -106,7 +106,12 @@ let finishContinuation
     promise {
         let isLeaseStillActive =
             match (runtime.GetSession sessionID).PendingLease with
-            | Some pending when pending.ContinuationID = lease.ContinuationID -> true
+            | Some pending when
+                pending.ContinuationID = lease.ContinuationID
+                && pending.Status <> LeaseStatus.Settled
+                && pending.Status <> LeaseStatus.Cancelled
+                ->
+                true
             | _ -> false
 
         if isLeaseStillActive then

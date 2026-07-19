@@ -109,6 +109,20 @@ let resolveOrigin
     | SessionOwner.Nudge -> TerminalOrigin.NudgeCompleted
     | SessionOwner.Title -> TerminalOrigin.TitleCompleted
 
+/// True when the session still owns a non-terminal fallback continuation lease.
+/// The snapshot is read once so a stale natural-stop event cannot clear the owner
+/// between lease creation and dispatch.
+let hasActiveFallbackContinuation (fallbackRuntime: FallbackRuntimeStore) (sessionIDStr: string) : bool =
+    let session = fallbackRuntime.GetSession sessionIDStr
+
+    session.Owner = SessionOwner.Fallback
+    && (match session.PendingLease with
+        | Some lease ->
+            lease.Owner = SessionOwner.Fallback
+            && lease.Status <> LeaseStatus.Settled
+            && lease.Status <> LeaseStatus.Cancelled
+        | None -> false)
+
 /// Clear the owner slot for Fallback / Title ownership.
 let clearOwnerSlot (fallbackRuntime: FallbackRuntimeStore) (owner: SessionOwner) (sessionIDStr: string) : unit =
     if owner = SessionOwner.Fallback || owner = SessionOwner.Title then

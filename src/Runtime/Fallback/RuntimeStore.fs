@@ -6,6 +6,7 @@ module Wanxiangshu.Runtime.Fallback.RuntimeStore
 /// (FallbackSessionRuntime.ActiveGates) — there is no separate mutable map.
 
 open Fable.Core.JsInterop
+open Fable.Core
 open Wanxiangshu.Kernel.FallbackKernel.Types
 open Wanxiangshu.Kernel.FallbackRuntimeFlags
 open Wanxiangshu.Kernel.FallbackRuntimeLifecycle
@@ -32,7 +33,9 @@ type FallbackRuntimeStore() =
         Map.tryFind sessionID sessionStates |> Option.defaultValue freshSessionState
 
     let updateSession (sessionID: string) (f: FallbackSessionRuntime -> FallbackSessionRuntime) : unit =
-        sessionStates <- Map.add sessionID (f (getSession sessionID)) sessionStates
+        let old = getSession sessionID
+        let s' = f old
+        sessionStates <- Map.add sessionID s' sessionStates
 
     member _.TriggerStateChanged(sessionID: string) : unit = triggerStateChanged sessionID
 

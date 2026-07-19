@@ -9,6 +9,7 @@ open Wanxiangshu.Kernel.Session.Causality
 open Wanxiangshu.Kernel.FallbackKernel.Types
 open Wanxiangshu.Kernel.HostTools
 open Wanxiangshu.Runtime.Fallback.RuntimeStore
+open Wanxiangshu.Runtime.Fallback.SessionRuntime
 open Wanxiangshu.Runtime.Fallback.SessionRuntimePropertyPure
 open Wanxiangshu.Runtime.ChildAgentRegistry
 open Wanxiangshu.Runtime.ReviewRuntime
@@ -113,13 +114,18 @@ let opencodeExecutorUsesRuntimeAgentWhenNoAssistantMessageSpec () =
               ReasoningEffort = None
               Thinking = false }
 
-        do! executor.SendContinue(sid, model, "dummy")
+        rt.UpdateSession(sid, startDispatch model None)
+        let continuationId = (rt.GetSession sid).PendingLease.Value.ContinuationID
+        do! executor.SendContinue(sid, model, continuationId)
 
         check "prompt was called" (not (isNull lastPromptArg))
         let body = Dyn.get lastPromptArg "body"
         equal "body has agent inspector" "inspector" (Dyn.str body "agent")
         let parts = unbox<obj array> (Dyn.get body "parts")
         equal "body prompt text is zero-width" "​" (Dyn.str parts.[0] "text")
+        let wanxiangshu = Dyn.get (Dyn.get parts.[0] "metadata") "wanxiangshu"
+        equal "body carries fallback continuation kind" "fallback_continuation" (Dyn.str wanxiangshu "kind")
+        equal "body carries active continuation id" continuationId (Dyn.str wanxiangshu "continuationId")
     }
 
 let opencodeExecutorRespectsUserSelectedModelAndAgentSpec () =
@@ -156,7 +162,9 @@ let opencodeExecutorRespectsUserSelectedModelAndAgentSpec () =
               ReasoningEffort = None
               Thinking = false }
 
-        do! executor.SendContinue(sid, model, "dummy")
+        rt.UpdateSession(sid, startDispatch model None)
+        let continuationId = (rt.GetSession sid).PendingLease.Value.ContinuationID
+        do! executor.SendContinue(sid, model, continuationId)
 
         check "prompt was called" (not (isNull lastPromptArg))
         let body = Dyn.get lastPromptArg "body"
@@ -164,6 +172,10 @@ let opencodeExecutorRespectsUserSelectedModelAndAgentSpec () =
         let modelObj = Dyn.get body "model"
         equal "body has fallback model provider" "openai" (Dyn.str modelObj "providerID")
         equal "body has fallback model ID" "gpt-5" (Dyn.str modelObj "modelID")
+        let parts = unbox<obj array> (Dyn.get body "parts")
+        let wanxiangshu = Dyn.get (Dyn.get parts.[0] "metadata") "wanxiangshu"
+        equal "body carries fallback continuation kind" "fallback_continuation" (Dyn.str wanxiangshu "kind")
+        equal "body carries active continuation id" continuationId (Dyn.str wanxiangshu "continuationId")
     }
 
 let ompExecutorRespectsUserSelectedModelAndAgentSpec () =

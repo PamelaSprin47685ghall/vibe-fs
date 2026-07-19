@@ -116,7 +116,8 @@ type SessionFallbackState =
       FailureCount: int
       Lifecycle: FallbackLifecycle
       ContinueCount: int
-      RecoveryCount: int }
+      RecoveryCount: int
+      LastAssistantMessageId: string }
 
 /// Result returned by the event-bridge hook to the host.
 type FallbackHookResult =

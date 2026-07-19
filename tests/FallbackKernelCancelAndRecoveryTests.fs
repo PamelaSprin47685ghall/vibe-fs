@@ -44,7 +44,8 @@ let mkState
       FailureCount = failureCount
       Lifecycle = lifecycle
       ContinueCount = continueCount
-      RecoveryCount = recoveryCount }
+      RecoveryCount = recoveryCount
+      LastAssistantMessageId = "" }
 
 let mkConfig (maxRetries: int) (loopMax: int) (maxRecoveries: int) =
     { DefaultChain = []

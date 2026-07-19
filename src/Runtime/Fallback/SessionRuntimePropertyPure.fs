@@ -1,5 +1,6 @@
 module Wanxiangshu.Runtime.Fallback.SessionRuntimePropertyPure
 
+open Fable.Core
 open Wanxiangshu.Kernel.FallbackKernel.Types
 open Wanxiangshu.Kernel.FallbackRuntimeFlags
 open Wanxiangshu.Runtime.Fallback.SessionRuntime
@@ -40,6 +41,14 @@ let recordLatestHumanModel model (s: FallbackSessionRuntime) =
     { s with LatestHumanModel = Some model }
 
 let clearLatestHumanModel (s: FallbackSessionRuntime) = { s with LatestHumanModel = None }
+
+// ----- Assistant message identity tracking -----
+
+let setLastAssistantMessageId messageId (s: FallbackSessionRuntime) =
+    { s with
+        Core =
+            { s.Core with
+                LastAssistantMessageId = messageId } }
 
 let setHumanTurnId turnId (s: FallbackSessionRuntime) = { s with HumanTurnId = turnId }
 

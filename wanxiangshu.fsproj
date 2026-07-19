@@ -202,6 +202,7 @@
     <Compile Include="src/Runtime/Fallback/SessionRuntime.fs"/>
     <Compile Include="src/Runtime/Fallback/SessionRuntimePropertyPure.fs"/>
     <Compile Include="src/Runtime/Fallback/SessionRuntimeLeasePure.fs"/>
+    <Compile Include="src/Runtime/Fallback/SessionRuntimeLeaseAcceptancePure.fs"/>
     <Compile Include="src/Runtime/Fallback/RuntimeStore.fs"/>
     <Compile Include="src/Runtime/Fallback/FallbackGateObservation.fs"/>
     <Compile Include="src/Runtime/Fallback/FallbackMessageParser.fs"/>

@@ -208,7 +208,13 @@ let handleEvent
                     do! nudge.SettleCompactionIfCompleted sid
                     do! tryIdle (pluginDirectoryFromCtx ctx) sid |> Promise.map ignore
             else
-                do! nudge.HandleNaturalStop eventEnvelope
+                let activeFallbackOwnsTerminal =
+                    sid <> ""
+                    && Option.exists (fun env -> NudgeTrigger.isNaturalStop env.EventType env.Props) eventEnvelope
+                    && hasActiveFallbackContinuation fallbackRuntime sid
+
+                if not activeFallbackOwnsTerminal then
+                    do! nudge.HandleNaturalStop eventEnvelope
 
                 if Option.exists isIdleEnvelope eventEnvelope then
                     do! tryIdle (pluginDirectoryFromCtx ctx) sid |> Promise.map ignore

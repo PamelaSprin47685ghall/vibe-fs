@@ -54,12 +54,13 @@ let resolveChain
             return finalChain
     }
 
-let calculateConsumed (evt: FallbackEvent) (statePhase: FallbackPhase) (finalPhase: FallbackPhase) : bool =
+let calculateConsumed (evt: FallbackEvent) (statePhase: FallbackPhase) (finalState: SessionFallbackState) : bool =
     match evt with
-    | FallbackEvent.SessionError _ -> finalPhase <> FallbackPhase.Exhausted
+    | FallbackEvent.SessionError _ -> finalState.Phase <> FallbackPhase.Exhausted
     | FallbackEvent.SessionIdle ->
-        finalPhase = FallbackPhase.ScanningToolCallText
-        || finalPhase = FallbackPhase.RecoveringToolCallText
+        finalState.Phase = FallbackPhase.ScanningToolCallText
+        || finalState.Phase = FallbackPhase.RecoveringToolCallText
+        || finalState.Lifecycle = FallbackLifecycle.TaskComplete
     | FallbackEvent.SessionBusy ->
         match statePhase with
         | FallbackPhase.Retrying _

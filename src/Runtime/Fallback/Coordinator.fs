@@ -64,7 +64,7 @@ let handleFallbackTransition
             let! finalState2, intentOpt = executeAction runtime executor workspaceRoot sessionID actionFiltered ns chain
             do! handleTerminalPostSettlement runtime workspaceRoot sessionID evt finalState2 intentOpt
 
-            let consumed = calculateConsumed evt state.Phase finalState2.Phase
+            let consumed = calculateConsumed evt state.Phase finalState2
             runtime.Update(sessionID, recordConsumed consumed)
 
             return

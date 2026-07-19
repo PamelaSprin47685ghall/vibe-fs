@@ -157,7 +157,8 @@ let private handleNewUserMessage (state: SessionFallbackState) =
         ContinueCount = 0
         FailureCount = 0
         CurrentIndex = 0
-        Lifecycle = FallbackLifecycle.Active },
+        Lifecycle = FallbackLifecycle.Active
+        LastAssistantMessageId = "" },
     FallbackAction.DoNothing
 
 let private handleTaskCompleteCalled (state: SessionFallbackState) =

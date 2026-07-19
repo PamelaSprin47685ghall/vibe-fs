@@ -68,7 +68,8 @@ let freshState: SessionFallbackState =
       FailureCount = 0
       Lifecycle = FallbackLifecycle.Active
       ContinueCount = 0
-      RecoveryCount = 0 }
+      RecoveryCount = 0
+      LastAssistantMessageId = "" }
 
 let freshSessionState: FallbackSessionRuntime =
     { Core = freshState

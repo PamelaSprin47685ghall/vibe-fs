@@ -22,6 +22,14 @@ let lastAssistantIndex (msgs: obj array) : int option =
         msgs
         |> Array.tryFindIndexBack (fun msg -> Dyn.str (Dyn.get msg "info") "role" = "assistant")
 
+/// Try to extract the message id of the most recent assistant message.
+let tryGetLastAssistantMessageId (msgs: obj array) : string option =
+    match lastAssistantIndex msgs with
+    | None -> None
+    | Some idx ->
+        let id = Dyn.str (Dyn.get msgs.[idx] "info") "id"
+        if id = "" then None else Some id
+
 /// Recovery prompt returned when a tool-call-as-text is detected.
 /// `RecoverWithPrompt` injects this verbatim into the user turn; the
 /// SSOT for the recovery event is the per-session log file, not this string.

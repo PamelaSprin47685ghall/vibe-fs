@@ -5,12 +5,15 @@ open Fable.Core.JsInterop
 open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Runtime.Dyn
 open Wanxiangshu.Runtime.Fallback.RuntimeStore
+open Wanxiangshu.Runtime.Fallback.SessionRuntime
+open Wanxiangshu.Runtime.Fallback.SessionRuntimeLeaseAcceptancePure
 open Wanxiangshu.Runtime.Fallback.SessionRuntimePropertyPure
 open Wanxiangshu.Kernel.FallbackKernel.Types
 open Wanxiangshu.Kernel.Nudge.Types
 open Wanxiangshu.Hosts.Opencode.ChatHooks
 open Wanxiangshu.Hosts.Opencode.ChatHooksDecoders
 open Wanxiangshu.Hosts.Opencode.NudgeTrigger
+open Wanxiangshu.Hosts.Opencode.NudgeTriggerOps
 
 // --- Production-shape fixtures (mirror packages/opencode/src/session/prompt.ts) ---
 // In OpenCode, the chat.message hook is invoked with
@@ -61,6 +64,43 @@ let test_isSystemMessage_fallbackContinuationIsSystem () =
     check "fallback_continuation is classified as system" result
     check "store owner untouched" ((fr.GetSession "s-1").Owner = SessionOwner.NoOwner)
     check "store nonce untouched" ((fr.GetSession "s-1").ActiveNudgeNonce = "")
+
+let test_isSystemMessage_acceptsFallbackContinuation () =
+    let fr = FallbackRuntimeStore()
+
+    let model =
+        { ProviderID = "mock"
+          ModelID = "model"
+          Variant = None
+          Temperature = None
+          TopP = None
+          MaxTokens = None
+          ReasoningEffort = None
+          Thinking = false }
+
+    fr.UpdateSession(
+        "s-accept",
+        fun state ->
+            let active = startDispatch model None state
+
+            { active with
+                PendingLease =
+                    active.PendingLease
+                    |> Option.map (fun lease -> { lease with ContinuationID = "fc-001" }) }
+    )
+
+    check
+        "continuation starts in dispatch-started state"
+        ((fr.GetSession "s-accept").PendingLease.Value.Status = LeaseStatus.Requested)
+
+    let result =
+        isSystemMessage [| fallbackContinuationPart |] fr "" "s-accept" "msg-fc-accept"
+
+    check "fallback continuation remains system" result
+
+    check
+        "host message advances continuation acceptance"
+        ((fr.GetSession "s-accept").PendingLease.Value.Status = LeaseStatus.Dispatched)
 
 let test_isSystemMessage_plainUserIsNotSystem () =
     let fr = FallbackRuntimeStore()
@@ -144,6 +184,71 @@ let test_isNudgeEvaluationEligible_allOrigins () =
     check "ToolSubturnCompleted + idle blocked" (not (eligible TerminalOrigin.ToolSubturnCompleted "session.idle"))
     check "Unknown + idle blocked" (not (eligible TerminalOrigin.Unknown "session.idle"))
 
+let test_activeFallbackLeaseVetoesNaturalStopCleanup () =
+    let model =
+        { ProviderID = "mock"
+          ModelID = "model"
+          Variant = None
+          Temperature = None
+          TopP = None
+          MaxTokens = None
+          ReasoningEffort = None
+          Thinking = false }
+
+    for status in
+        [ LeaseStatus.Requested
+          LeaseStatus.DispatchStarted
+          LeaseStatus.Dispatched
+          LeaseStatus.Running ] do
+        let runtime = FallbackRuntimeStore()
+        let sid = "active-fallback-" + string status
+
+        runtime.UpdateSession(
+            sid,
+            fun state ->
+                let active = startDispatch model None state
+
+                { active with
+                    PendingLease = active.PendingLease |> Option.map (fun lease -> { lease with Status = status }) }
+        )
+
+        check ($"non-terminal {status} lease protects owner") (hasActiveFallbackContinuation runtime sid)
+
+    for status in [ LeaseStatus.Settled; LeaseStatus.Cancelled ] do
+        let runtime = FallbackRuntimeStore()
+        let sid = "terminal-fallback-" + string status
+
+        runtime.UpdateSession(
+            sid,
+            fun state ->
+                let active = startDispatch model None state
+
+                { active with
+                    PendingLease = active.PendingLease |> Option.map (fun lease -> { lease with Status = status }) }
+        )
+
+        check ($"terminal {status} lease does not protect owner") (not (hasActiveFallbackContinuation runtime sid))
+
+    let ownerMismatch = FallbackRuntimeStore()
+    let ownerMismatchSid = "fallback-owner-mismatch"
+
+    ownerMismatch.UpdateSession(
+        ownerMismatchSid,
+        fun state ->
+            let active = startDispatch model None state
+
+            { active with
+                PendingLease =
+                    active.PendingLease
+                    |> Option.map (fun lease ->
+                        { lease with
+                            Owner = SessionOwner.Human }) }
+    )
+
+    check
+        "lease owner mismatch does not protect owner"
+        (not (hasActiveFallbackContinuation ownerMismatch ownerMismatchSid))
+
 // --- 4. TryConsumeActiveNudgeNonce: real implementation, real store ---
 
 let test_tryConsumeActiveNudgeNonce_matchClears () =
@@ -186,6 +291,7 @@ let test_isSystemMessage_consumeIsNotLeaky () =
 
 let run () =
     test_isSystemMessage_fallbackContinuationIsSystem ()
+    test_isSystemMessage_acceptsFallbackContinuation ()
     test_isSystemMessage_plainUserIsNotSystem ()
     test_isSystemMessage_activeNudgeNonceIsSystemAndConsumed ()
     test_isSystemMessage_nonMatchingNonceDoesNotConsume ()
@@ -193,6 +299,7 @@ let run () =
     test_tryGetChatMessageRole_assistantMessage ()
     test_tryGetChatMessageRole_noMessage ()
     test_isNudgeEvaluationEligible_allOrigins ()
+    test_activeFallbackLeaseVetoesNaturalStopCleanup ()
     test_tryConsumeActiveNudgeNonce_matchClears ()
     test_tryConsumeActiveNudgeNonce_mismatchNoOp ()
     test_tryConsumeActiveNudgeNonce_emptyNonceNoOp ()

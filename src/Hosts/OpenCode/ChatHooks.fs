@@ -9,6 +9,7 @@ open Wanxiangshu.Kernel.FallbackKernel.Types
 open Wanxiangshu.Runtime
 open Wanxiangshu.Runtime.Dispatch
 open Wanxiangshu.Runtime.Dyn
+open Wanxiangshu.Runtime.Fallback.SessionRuntimeLeaseAcceptancePure
 open Wanxiangshu.Runtime.Fallback.SessionRuntimePropertyPure
 open Wanxiangshu.Runtime.Fallback.SessionRuntimeLeasePure
 open Wanxiangshu.Runtime.Fallback.SessionRuntime
@@ -107,6 +108,13 @@ let private tryConsumeNudgeIfMatched
                 true
             | _ -> false
 
+let private tryAcceptFallbackContinuation
+    (fr: FallbackRuntimeStore)
+    (sessionIDStr: string)
+    (continuationId: string)
+    : bool =
+    fr.UpdateSessionReturning(sessionIDStr, tryAcceptPendingLeaseReturning continuationId)
+
 /// Classify whether a chat.message hook payload is system-synthesised.
 /// Internal so the regression suite can bind directly to this entry
 /// point (mirroring the `static member internal isNaturalStop` pattern
@@ -121,7 +129,12 @@ let internal isSystemMessage
     // Continuation prompts carry versioned provenance and should never
     // be confused with nudges, so check the namespaced kind first.
     match tryGetWanxiangshuKind parts with
-    | Some "fallback_continuation" -> true
+    | Some "fallback_continuation" ->
+        match tryDecodeWanxiangshuProvenance parts with
+        | Some provenance ->
+            let _ = tryAcceptFallbackContinuation fr sessionIDStr provenance.ContinuationId
+            true
+        | None -> true
     | _ ->
         match tryGetNonceFromParts parts with
         | Some nonce -> tryConsumeNudgeIfMatched fr workspaceRoot sessionIDStr msgId nonce

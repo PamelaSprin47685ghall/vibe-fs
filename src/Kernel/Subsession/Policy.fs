@@ -48,7 +48,8 @@ let private stateForClassification (p: FallbackPolicyState) : SessionFallbackSta
       FailureCount = p.FailureCount
       Lifecycle = FallbackLifecycle.Active
       ContinueCount = p.ContinueCount
-      RecoveryCount = p.RecoveryCount }
+      RecoveryCount = p.RecoveryCount
+      LastAssistantMessageId = "" }
 
 let private trySendContinue
     (cfg: FallbackConfig)

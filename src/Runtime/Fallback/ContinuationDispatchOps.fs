@@ -25,8 +25,19 @@ let private cancelAfterDispatch
     (reason: string)
     : JS.Promise<unit> =
     promise {
-        do! executor.AbortRun sessionID
-        do! finishContinuation runtime workspaceRoot sessionID lease ContinuationOutcome.Cancelled reason
+        let isActiveLease =
+            match (runtime.GetSession sessionID).PendingLease with
+            | Some pending when
+                pending.ContinuationID = lease.ContinuationID
+                && pending.Status <> LeaseStatus.Settled
+                && pending.Status <> LeaseStatus.Cancelled
+                ->
+                (runtime.GetSession sessionID).Core.Lifecycle = FallbackLifecycle.Active
+            | _ -> false
+
+        if isActiveLease then
+            do! executor.AbortRun sessionID
+            do! finishContinuation runtime workspaceRoot sessionID lease ContinuationOutcome.Cancelled reason
     }
 
 /// Handle post-dispatch completion: validate lease, write event, update state.
@@ -40,12 +51,11 @@ let handleDispatchComplete
     (agent: string)
     : JS.Promise<unit> =
     promise {
-        let isValid =
-            verifyLeaseWithStatus LeaseStatus.DispatchStarted runtime sessionID lease
+        let pending = (runtime.GetSession sessionID).PendingLease
+        let lifecycle = (runtime.GetSession sessionID).Core.Lifecycle
 
-        if not isValid then
-            do! cancelAfterDispatch runtime executor workspaceRoot sessionID lease "Cancelled after dispatch"
-        else
+        match pending, lifecycle with
+        | Some current, FallbackLifecycle.Active when current.ContinuationID = lease.ContinuationID ->
             let modelStr =
                 match model.Variant with
                 | Some v -> $"{model.ProviderID}/{model.ModelID}:{v}"
@@ -64,18 +74,41 @@ let handleDispatchComplete
                     lease.ContinuationOrdinal
 
             let canTransition =
-                runtime.UpdateSessionReturning(
-                    sessionID,
-                    tryTransitionPendingLeaseReturning
-                        lease.ContinuationID
-                        LeaseStatus.DispatchStarted
-                        LeaseStatus.Dispatched
-                )
+                match current.Status with
+                | LeaseStatus.Requested ->
+                    runtime.UpdateSessionReturning(
+                        sessionID,
+                        tryTransitionPendingLeaseReturning
+                            lease.ContinuationID
+                            LeaseStatus.Requested
+                            LeaseStatus.Dispatched
+                    )
+                | LeaseStatus.DispatchStarted ->
+                    runtime.UpdateSessionReturning(
+                        sessionID,
+                        tryTransitionPendingLeaseReturning
+                            lease.ContinuationID
+                            LeaseStatus.DispatchStarted
+                            LeaseStatus.Dispatched
+                    )
+                | LeaseStatus.Running ->
+                    runtime.UpdateSessionReturning(
+                        sessionID,
+                        tryTransitionPendingLeaseReturning
+                            lease.ContinuationID
+                            LeaseStatus.Running
+                            LeaseStatus.Dispatched
+                    )
+                | LeaseStatus.Dispatched -> true
+                | LeaseStatus.Cancelled
+                | LeaseStatus.Settled -> false
 
-            if not canTransition then
-                do! cancelAfterDispatch runtime executor workspaceRoot sessionID lease "Cancelled after dispatch"
-            else
-                runtime.UpdateSession(sessionID, setInjected model atMs)
+            if canTransition then
+                runtime.Update(sessionID, setInjected model atMs)
+        | _ ->
+            // Terminal handling or a newer lease won the race. The prompt
+            // completion is stale evidence; never append a late cancellation.
+            ()
     }
 
 /// Inner dispatch: write dispatch_started, transition lease, call action.
