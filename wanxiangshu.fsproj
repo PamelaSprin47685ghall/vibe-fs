@@ -314,7 +314,6 @@
     <Compile Include="src/Runtime/Tooling/FileToolsCodec.fs"/>
     <Compile Include="src/Runtime/Tooling/FileSwap.fs"/>
     <Compile Include="src/Runtime/Tooling/WorkBacklogToolsCodec.fs"/>
-    <Compile Include="src/Runtime/EventStore/EventLogRuntimeStore.fs"/>
     <Compile Include="src/Runtime/Execution/BacklogSession.fs"/>
     <Compile Include="src/Runtime/EventStore/SessionStateRestore.fs"/>
     <Compile Include="src/Runtime/EventStore/EventLogRuntimeSync.fs"/>
