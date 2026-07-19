@@ -160,5 +160,10 @@ let isNudgeEligible (origin: TerminalOrigin) (eventType: string) : bool =
     match origin with
     | TerminalOrigin.HumanTurnCompleted
     | TerminalOrigin.NudgeCompleted
-    | TerminalOrigin.FallbackContinuationCompleted when eventType <> "session.error" -> true
-    | _ -> false
+    | TerminalOrigin.FallbackContinuationCompleted -> eventType <> "session.error"
+    | TerminalOrigin.HumanTurnAborted
+    | TerminalOrigin.CompactionSummaryCompleted
+    | TerminalOrigin.CompactionContinuationCompleted
+    | TerminalOrigin.TitleCompleted
+    | TerminalOrigin.ToolSubturnCompleted
+    | TerminalOrigin.Unknown -> false

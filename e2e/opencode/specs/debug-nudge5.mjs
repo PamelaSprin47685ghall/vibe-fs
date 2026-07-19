@@ -1,34 +1,43 @@
-import { runScenario } from '../harness/scenario.js';
-import { findToolPart } from './p0-canary-utils.js';
+import { setupScenario, teardownScenario, getSessionId } from '../harness/scenario.js';
+import { sleep } from './p0-canary-utils.js';
 
-const exitCode = await runScenario({
+const t = await setupScenario({
   plugin: true,
   timeoutMs: 60000,
-  contextLimit: 20000,
+  contextLimit: 100000,
   allowSynthetic: true,
   allowTitleGen: true,
-}, [
-  {
-    name: 'debug-nudge5',
-    fn: async (t) => {
-      const sess = await t.client.createSession({
-        id: 'test-model', providerID: 'test', limit: { input: 100000, context: 100000 },
-      });
-      const sid = sess.data?.data?.data?.id || sess.data?.data?.id;
-      t.provider.expectToolCall({ id: 'nudge-todo', tool: 'todowrite', args: {
-        todos: [{ content: 'pending nudge task', status: 'pending', priority: 'high' }],
-        select_methodology: ['first_principles'],
-      } });
-      t.provider.expectNoMoreRequests();
-      const turn = await t.turn.start(sid);
-      await t.client.prompt(sid, 'write a todo and say continue');
-      await turn.awaitTerminal({ timeoutMs: 30000 });
-      const messages = (await t.client.messages(sid)).data || [];
-      const part = findToolPart(messages, 'todowrite');
-      console.log('todowrite output length:', (part?.state?.output || '').length);
-      console.log(part?.state?.output?.slice(0, 500));
-      console.log('synthetic markers:', t.provider.syntheticRequests.map((r) => r.marker));
-    },
-  },
-]);
-process.exit(exitCode);
+});
+
+try {
+  const pad = 'x'.repeat(1024);
+  const sess = await t.client.createSession();
+  const sid = getSessionId(sess);
+  t.provider.expectToolCall({ id: 'nudge-todo', tool: 'todowrite', args: {
+    ahaMoments: pad, changesAndReasons: pad, gotchas: pad,
+    lessonsAndConventions: pad, plan: pad,
+    todos: [{ content: 'pending nudge task', status: 'pending', priority: 'high' }],
+    select_methodology: ['first_principles'],
+  } });
+  t.provider.expectText({ id: 'nudge-todo-text', text: 'continue' });
+  t.provider.expectNoMoreRequests();
+  const turn = await t.turn.start(sid);
+  await t.client.prompt(sid, 'write a todo and say continue');
+  await turn.awaitTerminal({ timeoutMs: 30000 });
+
+  const deadline = Date.now() + 10000;
+  while (!t.provider.syntheticRequests.some((r) => r.marker === 'todo-nudge')) {
+    if (Date.now() > deadline) {
+      console.log('timed out waiting for todo-nudge. syntheticRequests:', t.provider.syntheticRequests.map((r) => r.marker));
+      break;
+    }
+    await sleep(200);
+  }
+  console.log('syntheticRequests:', t.provider.syntheticRequests.map((r) => r.marker));
+} finally {
+  console.log('\n=== HOST STDERR ===\n');
+  console.log(t.host.stderrLog);
+  console.log('\n=== HOST STDOUT ===\n');
+  console.log(t.host.stdoutLog);
+  await teardownScenario(t, { keepOnFailure: true });
+}

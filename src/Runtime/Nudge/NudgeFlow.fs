@@ -86,6 +86,41 @@ let private dispatchNudge
                         abortRun
     }
 
+let private dispatchSnapshot
+    (host: Host)
+    (workspaceRoot: string)
+    (fallbackRuntime: FallbackRuntimeStore)
+    (sessionKey: string)
+    (sendNudge: string -> string option -> string option -> string -> string -> JS.Promise<SendOutcome>)
+    (abortRun: string -> JS.Promise<unit>)
+    (runtimeState: NudgeRuntimeState)
+    (snapshot: SessionSnapshot)
+    : JS.Promise<NudgeRuntimeState> =
+    promise {
+        let action = deriveAction snapshot
+
+        match action with
+        | NudgeNone -> return runtimeState
+        | action ->
+            match selectNudgePrompt host action snapshot with
+            | None -> return runtimeState
+            | Some promptText ->
+                do!
+                    dispatchNudge
+                        workspaceRoot
+                        fallbackRuntime
+                        sessionKey
+                        action
+                        snapshot.nudgeAnchorKey
+                        snapshot.agentFromMessage
+                        snapshot.modelFromMessage
+                        promptText
+                        sendNudge
+                        abortRun
+
+                return runtimeState
+    }
+
 let runNudgeFlowCore
     (host: Host)
     (workspaceRoot: string)
@@ -114,26 +149,16 @@ let runNudgeFlowCore
             match! snapshotResult with
             | Ok None -> return runtimeState
             | Ok(Some snapshot) ->
-                match deriveAction snapshot with
-                | NudgeNone -> return runtimeState
-                | action ->
-                    match selectNudgePrompt host action snapshot with
-                    | None -> return runtimeState
-                    | Some promptText ->
-                        do!
-                            dispatchNudge
-                                workspaceRoot
-                                fallbackRuntime
-                                sessionKey
-                                action
-                                snapshot.nudgeAnchorKey
-                                snapshot.agentFromMessage
-                                snapshot.modelFromMessage
-                                promptText
-                                sendNudge
-                                abortRun
-
-                        return runtimeState
+                return!
+                    dispatchSnapshot
+                        host
+                        workspaceRoot
+                        fallbackRuntime
+                        sessionKey
+                        sendNudge
+                        abortRun
+                        runtimeState
+                        snapshot
             | Error ex ->
                 // Infrastructure failure: keep the runtime state but
                 // do NOT pretend the nudge was not needed.  The caller

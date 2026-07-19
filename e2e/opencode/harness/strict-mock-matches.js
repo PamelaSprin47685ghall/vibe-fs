@@ -10,7 +10,6 @@ export const NUDGE_MARKERS = [
   'command: with-review',
   'the system context is about to be suspended',
   'You must immediately force an emergency stop to all work',
-  'Hint: if your next response can perform several independent tool calls',
 ];
 
 const TITLE_GENERATION_MARKER = 'Generate a title for this conversation:';
@@ -29,7 +28,6 @@ function matchMarker(text) {
   if (text.includes('A background runner task is still active')) return 'runner-nudge';
   if (text.includes('the system context is about to be suspended')) return 'budget-nudge';
   if (text.includes('You must immediately force an emergency stop to all work')) return 'budget-nudge';
-  if (text.includes('Hint: if your next response can perform several independent tool calls')) return 'parallel-hint';
   return null;
 }
 

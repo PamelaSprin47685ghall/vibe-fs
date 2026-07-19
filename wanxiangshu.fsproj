@@ -121,6 +121,7 @@
     <Compile Include="src/Kernel/Nudge/NudgeSnapshotSource.fs"/>
     <Compile Include="src/Kernel/Review/ReviewProjection.fs"/>
     <Compile Include="src/Kernel/Backlog/BacklogProjection.fs"/>
+    <Compile Include="src/Kernel/Nudge/NudgeSnapshotProjection.fs"/>
     <Compile Include="src/Kernel/Nudge/NudgeProjection.fs"/>
     <Compile Include="src/Kernel/Subsession/SubsessionProjection.fs"/>
     <Compile Include="src/Kernel/SessionControl/HumanTurn.fs"/>

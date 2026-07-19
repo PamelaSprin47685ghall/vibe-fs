@@ -65,6 +65,25 @@ let assembleMessageInfo
         else
             Some(buildSnapshotResult snap))
 
+let private tryAssembleSnapshot
+    (messagesArr: obj array)
+    (idx: int)
+    (openTodos: string list)
+    (fallbackRuntime: FallbackRuntimeStore)
+    (pluginCtx: obj)
+    (sessionIDStr: string)
+    (isForceStopped: string -> bool)
+    : JS.Promise<SessionSnapshot option> =
+    promise {
+        if isForceStopped sessionIDStr then
+            return None
+        else
+            let! result =
+                assembleMessageInfo messagesArr idx fallbackRuntime sessionIDStr pluginCtx openTodos isForceStopped
+
+            return result
+    }
+
 let private processSessionMessages
     (messagesData: obj)
     (openTodosFromApi: string list)
@@ -85,7 +104,10 @@ let private processSessionMessages
                 else
                     recoverOpenTodosFromMessages messagesData
 
+
+
             let shouldSkip = shouldSkipNudge messagesData
+
 
             if shouldSkip then
                 return None
@@ -94,19 +116,16 @@ let private processSessionMessages
 
                 match lastAssistantIdx with
                 | None -> return None
-                | Some idx when isForceStopped sessionIDStr -> return None
                 | Some idx ->
-                    let! result =
-                        assembleMessageInfo
+                    return!
+                        tryAssembleSnapshot
                             messagesArr
                             idx
-                            fallbackRuntime
-                            sessionIDStr
-                            pluginCtx
                             openTodos
+                            fallbackRuntime
+                            pluginCtx
+                            sessionIDStr
                             isForceStopped
-
-                    return result
     }
 
 /// Distinguish a real error from "not needed". The previous implementation
@@ -134,7 +153,7 @@ let collectSnapshot
             return None
         else
             match getSessionApiFromClient client with
-            | Error _ -> return raise (System.Exception("opencode_session_api_missing"))
+            | Error e -> return raise (System.Exception("opencode_session_api_missing"))
             | Ok session when not (Dyn.has session "todo") || not (Dyn.has session "messages") -> return None
             | Ok session ->
                 let! todoResp = invoke1 (box {| path = {| id = sessionIDStr |} |}) "todo" session

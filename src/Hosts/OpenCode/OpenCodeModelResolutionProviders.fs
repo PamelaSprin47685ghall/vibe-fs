@@ -102,13 +102,24 @@ let resolveModelResolution
                     match extractLimitFromCatalogEntry modelDef with
                     | None -> return fallback
                     | Some(contextTokens, outputTokens) ->
-                        let usable = computeUsableInputTokens contextTokens outputTokens
+                        let limitObj = get modelDef "limit"
+                        let inputVal = get limitObj "input"
+
+                        let hasInput =
+                            not (isNullish inputVal)
+                            && typeIs inputVal "number"
+                            && (unbox<float> inputVal) > 0.0
+
+                        let usable =
+                            if hasInput then
+                                contextTokens
+                            else
+                                computeUsableInputTokens contextTokens outputTokens
 
                         let source =
-                            if outputTokens > 0 then
-                                "provider-catalog-input-reserved"
-                            else
-                                "provider-catalog-context"
+                            if hasInput then "provider-catalog-input"
+                            elif outputTokens > 0 then "provider-catalog-input-reserved"
+                            else "provider-catalog-context"
 
                         return
                             { ProviderID = providerID

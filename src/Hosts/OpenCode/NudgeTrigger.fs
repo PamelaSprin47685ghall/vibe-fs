@@ -144,7 +144,7 @@ type NudgeTrigger
                                 dispatchPostStopFromHistory host fallbackRuntime client ctx sessionID isForceStopped
 
                             fallbackRuntime.Update(sessionIDStr, setNudgeActive false)
-                        | Error _ -> ()
+                        | Error e -> ()
         }
 
     member _.SettleCompactionIfCompleted(sessionIDStr: string) : JS.Promise<unit> =

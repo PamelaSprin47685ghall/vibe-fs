@@ -202,7 +202,7 @@ let resolveTransformParams
 
         let p = getBacklogProjectionPolicy agent isSub
         let caps = getCapsInjectionPolicy agent isSub
-        let par = getParallelHintPolicy agent isSub
+        let par = ParallelHintPolicy.Exclude
         let budget = getContextBudgetPolicy agent isSub
 
         let! maxInputTokens = resolveMaxInputTokens sessionID client directory

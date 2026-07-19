@@ -115,6 +115,8 @@ let beginHumanTurn (msgId: string) (s: FallbackSessionRuntime) : FallbackSession
     let nextTurnId =
         "ht-" + string nextOrdinal + "-" + System.Guid.NewGuid().ToString("N")
 
+    let nextCancelGen = s.CancelGeneration + 1
+
     { s with
         Chain = []
         Model = None
@@ -128,8 +130,9 @@ let beginHumanTurn (msgId: string) (s: FallbackSessionRuntime) : FallbackSession
         HumanTurnOrdinal = nextOrdinal
         LastHumanMessageId = msgId
         CompactionForceStopped = false
+        CancelGeneration = nextCancelGen
         ActiveContinuationGen = s.SessionGeneration
-        ActiveContinuationCancelGen = s.CancelGeneration
+        ActiveContinuationCancelGen = nextCancelGen
         ActiveGates =
             s.ActiveGates
             |> Set.remove FallbackSessionGateFlag.EventHandlingActive

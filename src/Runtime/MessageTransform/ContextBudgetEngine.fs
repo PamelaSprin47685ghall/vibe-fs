@@ -43,7 +43,14 @@ let private resolveTokensAndCalibration
                     None
                     { storeEntry with
                         LastCalibration = calibration }
-            | None, Some obs -> int obs.InputTokens, UsageConfidence.Observed
+            | None, Some obs ->
+                let bootstrap = max 1 (totalBytes / 2)
+                let obsTokens = int obs.InputTokens
+
+                if bootstrap > obsTokens then
+                    bootstrap, UsageConfidence.BootstrapEstimate
+                else
+                    obsTokens, UsageConfidence.Observed
             | None, None -> resolveCurrentTokensFromCalibration totalBytes None storeEntry
 
         return currentTokens, confidence, calibration, newObservedID

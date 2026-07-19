@@ -149,6 +149,10 @@ export function createIsolatedEnv(opts) {
     OLLAMA_API_KEY: opts.apiKey || 'test-key',
     OLLAMA_API_BASE: mockApiBase,
 
+    // Prevent Bun/Node debug ports and heap profiling from leaking into spawned opencode
+    NODE_OPTIONS: '',
+    BUN_OPTIONS: '',
+
     // MCP fixture
     STEALTH_BROWSER_MCP_FIXTURE: fixturePath,
     PATH: `${fixtureUvxDir}${path.delimiter}${process.env.PATH || ''}`,

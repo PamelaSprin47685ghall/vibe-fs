@@ -41,7 +41,7 @@ let tryCalibrateFromObservation
         None
     else
         match pendingOutbound with
-        | Some po when po.Bytes > 0 -> calibrateUsage observation po
+        | Some po when po.Bytes >= 2000 -> calibrateUsage observation po
         | _ -> None
 
 let estimateTokensFromCalibration (calibration: UsageCalibration) (bytes: int) : int64 option =

@@ -97,6 +97,28 @@ let tryGetClient (target: obj) : obj =
         else
             box null
 
+let private tryExtractModelRefFromModelObj (modelObj: obj) : (string * string) option =
+    if isNullish modelObj then
+        None
+    elif typeIs modelObj "string" then
+        let modelStr = string modelObj
+        let parts = modelStr.Split([| '/' |])
+
+        if parts.Length = 2 then
+            Some(parts.[1], parts.[0])
+        else
+            None
+    else
+        let mId =
+            let v = string (get modelObj "modelID")
+            if v <> "" then v else string (get modelObj "id")
+
+        let pId =
+            let v = string (get modelObj "providerID")
+            if v <> "" then v else string (get modelObj "provider")
+
+        if mId = "" || pId = "" then None else Some(mId, pId)
+
 let tryGetSessionModelRef (target: obj) (sessionID: string) : JS.Promise<(string * string) option> =
     promise {
         if isNullish target then
@@ -132,23 +154,7 @@ let tryGetSessionModelRef (target: obj) (sessionID: string) : JS.Promise<(string
                             return None
                         else
                             let data = get res "data"
-                            let modelObj = sessionModelOf data
-
-                            if isNullish modelObj then
-                                return None
-                            else
-                                let mId =
-                                    let v = string (get modelObj "modelID")
-                                    if v <> "" then v else string (get modelObj "id")
-
-                                let pId =
-                                    let v = string (get modelObj "providerID")
-                                    if v <> "" then v else string (get modelObj "provider")
-
-                                if mId = "" || pId = "" then
-                                    return None
-                                else
-                                    return Some(mId, pId)
+                            return tryExtractModelRefFromModelObj (sessionModelOf data)
                     with _ ->
                         return None
     }

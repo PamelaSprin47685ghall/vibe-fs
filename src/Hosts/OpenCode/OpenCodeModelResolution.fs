@@ -44,6 +44,32 @@ let private trySessionGet (client: obj) : (obj * obj) option =
     [ [ "session" ]; [ "v2"; "session" ] ]
     |> List.tryPick (fun parts -> tryPath parts client client)
 
+let private extractProviderAndModel (modelObj: obj) : string * string =
+    if isNullish modelObj then
+        ("", "")
+    elif typeIs modelObj "string" then
+        let modelStr = string modelObj
+        let parts = modelStr.Split([| '/' |])
+
+        if parts.Length = 2 then
+            (parts.[0], parts.[1])
+        else
+            ("", modelStr)
+    else
+        let pId =
+            let v = str modelObj "providerID"
+            if v <> "" then v else str modelObj "provider"
+
+        let mId =
+            let v = str modelObj "modelID"
+            if v <> "" then v else str modelObj "id"
+
+        if pId <> "" && mId <> "" then
+            (pId, mId)
+        else
+            let idVal = str modelObj "id"
+            if idVal <> "" then ("", idVal) else ("", "")
+
 /// Extract {providerID, modelID} from the session's last user message model ref.
 let private extractModelFromSession
     (client: obj)
@@ -80,24 +106,7 @@ let private extractModelFromSession
                         else
                             let data2 = get data "data"
                             let sessionBody = if isNullish data2 then data else data2
-                            let modelObj = get sessionBody "model"
-
-                            if isNullish modelObj then
-                                return ("", "")
-                            else
-                                let pId =
-                                    let v = str modelObj "providerID"
-                                    if v <> "" then v else str modelObj "provider"
-
-                                let mId =
-                                    let v = str modelObj "modelID"
-                                    if v <> "" then v else str modelObj "id"
-
-                                if pId <> "" && mId <> "" then
-                                    return (pId, mId)
-                                else
-                                    let idVal = str modelObj "id"
-                                    return (if idVal <> "" then ("", idVal) else ("", ""))
+                            return extractProviderAndModel (get sessionBody "model")
                 with _ ->
                     return ("", "")
     }

@@ -28,6 +28,50 @@ let private trySessionGet (client: obj) : (obj * obj) option =
 
 /// Build model identity key `providerID/modelID[:variant]` from the session client,
 /// falling back gracefully through several levels. Never returns session@directory placeholder.
+let private normalizeProviderID (modelObj: obj) : string =
+    let v = str modelObj "providerID"
+    if v <> "" then v else str modelObj "provider"
+
+let private normalizeModelID (modelObj: obj) : string =
+    let v = str modelObj "modelID"
+    if v <> "" then v else str modelObj "id"
+
+let private extractModelKey (sessionBody: obj) (sessionID: string) : string =
+    let modelObj = get sessionBody "model"
+
+    if isNullish modelObj then
+        sessionID + "@" + "no-model"
+    elif typeIs modelObj "string" then
+        string modelObj
+    else
+        let pId = normalizeProviderID modelObj
+        let mId = normalizeModelID modelObj
+        let variant = str modelObj "variant"
+
+        if pId <> "" && mId <> "" then
+            let suffix = if variant <> "" then ":" + variant else ""
+            pId + "/" + mId + suffix
+        else
+            let idVal = str modelObj "id"
+
+            if idVal <> "" then
+                idVal
+            else
+                sessionID + "@" + "unknown-model"
+
+let private handleSessionGetResult (sessionID: string) (res: obj) : string =
+    if isNullish res then
+        sessionID + "@" + "no-response"
+    else
+        let data = get res "data"
+
+        if isNullish data then
+            sessionID + "@" + "no-data"
+        else
+            let nested = get data "data"
+            let sessionBody = if isNullish nested then data else nested
+            extractModelKey sessionBody sessionID
+
 let resolveModelKey (client: obj) (sessionID: string) : JS.Promise<string> =
     promise {
         if isNullish client then
@@ -49,41 +93,7 @@ let resolveModelKey (client: obj) (sessionID: string) : JS.Promise<string> =
                             else
                                 Promise.lift raw
 
-                        if isNullish res then
-                            return sessionID + "@" + "no-response"
-                        else
-                            let data = get res "data"
-
-                            if isNullish data then
-                                return sessionID + "@" + "no-data"
-                            else
-                                let data2 = get data "data"
-                                let sessionBody = if isNullish data2 then data else data2
-                                let modelObj = get sessionBody "model"
-
-                                if isNullish modelObj then
-                                    return sessionID + "@" + "no-model"
-                                else
-                                    let pId =
-                                        let v = str modelObj "providerID"
-                                        if v <> "" then v else str modelObj "provider"
-
-                                    let mId =
-                                        let v = str modelObj "modelID"
-                                        if v <> "" then v else str modelObj "id"
-
-                                    let variant = str modelObj "variant"
-
-                                    if pId <> "" && mId <> "" then
-                                        let suffix = if variant <> "" then ":" + variant else ""
-                                        return pId + "/" + mId + suffix
-                                    else
-                                        let idVal = str modelObj "id"
-
-                                        if idVal <> "" then
-                                            return idVal
-                                        else
-                                            return sessionID + "@" + "unknown-model"
+                        return handleSessionGetResult sessionID res
                     with _ ->
                         return sessionID + "@" + "resolve-error"
     }
