@@ -100,20 +100,27 @@ let checkContinuationMatches
         activeGen = (runtime.GetSession sessionID).SessionGeneration
         && activeCancel = (runtime.GetSession sessionID).CancelGeneration
 
+    // PR1: prohibit generation-only matching for isMatched.
+    // When continuationId is empty, we cannot prove the event belongs to
+    // the active continuation, so isMatched must be false.
     let isMatched =
         match pending with
         | Some lease ->
             if continuationId = "" then
-                activeMatch ()
+                false
             else
                 continuationId = lease.ContinuationID
         | None -> false
 
+    // However, isContIdMatch must remain true when continuationId is empty
+    // to avoid marking session-level status events (session.idle/busy) as
+    // stale in checkIsStale. These events lack continuation markers but
+    // are still relevant for the active continuation's lifecycle.
     let isContIdMatch =
         match pending with
         | Some lease ->
             if continuationId = "" then
-                activeMatch ()
+                true
             else
                 continuationId = lease.ContinuationID
         | None -> true
