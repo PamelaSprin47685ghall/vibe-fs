@@ -17,7 +17,7 @@ const TITLE_GENERATION_MARKER = 'Generate a title for this conversation:';
 function isZWSPContent(text) {
   if (typeof text !== 'string') return false;
   if (text === '') return true;
-  return text.replace(/[‍﻿]/g, '').trim() === '';
+  return text.replace(/[\u200B\u200C\u200D\uFEFF]/g, '').trim() === '';
 }
 
 function matchMarker(text) {

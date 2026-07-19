@@ -90,6 +90,8 @@ let normalizeToolNameForMux (toolName: string) : string =
 
 let normalizeToolName (host: Host) (toolName: string) : string =
     match host, toolName with
+    | Opencode, "web_search" -> "websearch"
+    | Mimocode, "web_search" -> "websearch"
     | Opencode, "todo_write" -> "todowrite"
     | Mimocode, "task" -> "todowrite"
     | Mimocode, "actor" -> "task"

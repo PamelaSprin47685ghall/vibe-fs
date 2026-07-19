@@ -181,12 +181,10 @@ let classifyPressure (maxInputTokens: int) (currentTokens: int64) (state: Contex
     else
         let bEff = effectiveMaxInputTokens maxInputTokens
 
-        if isCompactingRequired state.BaselineTokens bEff then
-            Compacting
-        else if
-            F currentTokens bEff state.BaselineTokens state.CompletedSegments state.RemainingTodoWritesUntilFold
-        then
+        if F currentTokens bEff state.BaselineTokens state.CompletedSegments state.RemainingTodoWritesUntilFold then
             RequireTodoWriteEmergency
+        elif isCompactingRequired state.BaselineTokens bEff then
+            Compacting
         else
             BelowThreshold
 

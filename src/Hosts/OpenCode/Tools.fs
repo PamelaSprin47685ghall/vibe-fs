@@ -46,7 +46,7 @@ let createTools
               yield "fuzzy_find", box (fuzzyFindTool finderCache iteratorStore)
               yield "fuzzy_grep", box (fuzzyGrepTool finderCache iteratorStore)
               yield "fuzzy_continue", box (fuzzyContinueTool finderCache iteratorStore)
-              yield "websearch", box (websearchTool host registry ctx fallbackRuntime)
+              yield "web_search", box (websearchTool host registry ctx fallbackRuntime)
               yield "webfetch", box (webfetchTool ctx)
               yield "submit_review", box (submitReviewTool registry ctx reviewStore sessionScope)
               yield "return_reviewer", box (submitReviewResultTool ctx reviewStore sessionScope)

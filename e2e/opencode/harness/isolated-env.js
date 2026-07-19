@@ -141,7 +141,7 @@ export function createIsolatedEnv(opts) {
     OPENCODE_DISABLE_MODELS_FETCH: '1',
     OPENCODE_AUTH_CONTENT: '{}',
     OPENCODE_EXPERIMENTAL_EVENT_SYSTEM: 'true',
-    OPENCODE_ENABLE_EXA: 'true',
+    OPENCODE_ENABLE_EXA: '0',
     OPENCODE_CONFIG_CONTENT: JSON.stringify(config),
     OPENCODE_PERMISSION: JSON.stringify({ '*': 'allow' }),
 
@@ -152,6 +152,9 @@ export function createIsolatedEnv(opts) {
     // Prevent Bun/Node debug ports and heap profiling from leaking into spawned opencode
     NODE_OPTIONS: '',
     BUN_OPTIONS: '',
+
+    // Zero-out the fallback continuation rate-limit governor in E2E.
+    WANXIANGSHU_TEST: 'true',
 
     // MCP fixture
     STEALTH_BROWSER_MCP_FIXTURE: fixturePath,

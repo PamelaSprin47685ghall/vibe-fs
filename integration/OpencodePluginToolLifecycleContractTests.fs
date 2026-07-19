@@ -50,7 +50,7 @@ let runToolLifecycle
 
         let! wsResult =
             harness.executePluginTool
-                "websearch"
+                "web_search"
                 (createObj
                     [ "query", box "test query"
                       "numResults", box 5

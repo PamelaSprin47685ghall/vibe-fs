@@ -16,6 +16,7 @@ import { runScenario } from '../harness/scenario.js';
 import basicTests from './p0-canary-tests-basics.js';
 import ptyTests from './p0-canary-tests-pty.js';
 import advancedTests from './p0-canary-tests-advanced.js';
+import fallbackTests from './p0-canary-tests-fallback.js';
 import nudgeSubTests from './p0-canary-tests-nudge-sub.js';
 
 const common = {
@@ -24,11 +25,11 @@ const common = {
   allowSynthetic: true,
   allowTitleGen: true,
 };
-
 const exitCode1 = await runScenario({ ...common, contextLimit: 20000 }, [
   ...basicTests,
   ...ptyTests,
   ...advancedTests,
+  ...fallbackTests,
 ]);
 
 const exitCode2 = await runScenario({ ...common, contextLimit: 100000 }, nudgeSubTests);

@@ -73,9 +73,17 @@ let private builtinAgentSpecs =
 let private tryFindBuiltinAgent name =
     builtinAgentSpecs |> List.tryFind (fun spec -> spec.name = name)
 
+let private opencodeToolKey (host: Host) (name: string) : string =
+    if host = Opencode then
+        match name with
+        | "websearch" -> "web_search"
+        | _ -> name
+    else
+        name
+
 let private toolDefaultsFor (host: Host) (agentName: string) : OpencodeAgentConfigCodec.ToolsOverrides =
     Array.append (allToolNames host) [| "methodology" |]
-    |> Seq.fold (fun acc name -> Map.add name (canUseForHost host agentName name) acc) Map.empty
+    |> Seq.fold (fun acc name -> Map.add (opencodeToolKey host name) (canUseForHost host agentName name) acc) Map.empty
 
 let private permissionDefaultsFor (host: Host) (agentName: string) : OpencodeAgentConfigCodec.PermissionOverrides =
     Array.append (allToolNames host) [| "methodology" |]
@@ -87,7 +95,7 @@ let private permissionDefaultsFor (host: Host) (agentName: string) : OpencodeAge
                 else
                     "deny"
 
-            Map.add name value acc)
+            Map.add (opencodeToolKey host name) value acc)
         Map.empty
 
 let private withRoleDefaultsFor (host: Host) (name: string) (userAgent: obj) : obj =

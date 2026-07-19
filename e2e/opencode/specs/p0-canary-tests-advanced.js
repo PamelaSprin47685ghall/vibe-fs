@@ -48,7 +48,7 @@ const tests = [
     fn: async (t) => {
       const sess = await t.client.createSession();
       const sid = getSessionId(sess);
-      t.provider.expectToolCall({ id: 'web-search', tool: 'websearch', args: { query: 'E2E websearch test', what_to_summarize: 'E2E websearch result', numResults: 1 } });
+      t.provider.expectToolCall({ id: 'web-search', tool: 'web_search', args: { query: 'E2E websearch test', what_to_summarize: 'E2E websearch result', numResults: 1 } });
       t.provider.expectText({ id: 'web-summary', text: 'Test search content for E2E.' });
       t.provider.expectText({ id: 'web-done', text: 'done' });
       const turn = await t.turn.start(sid);
@@ -66,14 +66,14 @@ const tests = [
 
       // The main session must see the summarized tool result in messages.
       const messages = (await t.client.messages(sid)).data || [];
-      const part = findToolPart(messages, 'websearch');
-      if (!part) throw new Error('websearch tool part not found in messages');
-      if (part.state?.status !== 'completed') throw new Error(`websearch state: ${part.state?.status}`);
+      const part = findToolPart(messages, 'web_search');
+      if (!part) throw new Error('web_search tool part not found in messages');
+      if (part.state?.status !== 'completed') throw new Error(`web_search state: ${part.state?.status}`);
       if (!part.state?.input?.query?.includes('E2E websearch test')) {
-        throw new Error(`websearch query mismatch: ${part.state?.input?.query}`);
+        throw new Error(`web_search query mismatch: ${part.state?.input?.query}`);
       }
       if (!part.state?.output?.includes('Test search content for E2E.')) {
-        throw new Error(`websearch output mismatch: ${part.state?.output}`);
+        throw new Error(`web_search output mismatch: ${part.state?.output}`);
       }
 
       // A final assistant response must exist after the tool result.
@@ -83,8 +83,9 @@ const tests = [
         .filter((p) => p.type === 'text' && typeof p.text === 'string')
         .map((p) => p.text);
       if (!assistantTexts.some((text) => text.includes('done'))) {
-        throw new Error('websearch did not produce final assistant response: ' + JSON.stringify(assistantTexts));
+        throw new Error('web_search did not produce final assistant response: ' + JSON.stringify(assistantTexts));
       }
+
       expectNoSessionError(t, sid);
     },
   },

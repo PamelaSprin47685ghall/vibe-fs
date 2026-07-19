@@ -23,7 +23,11 @@ let runServePluginChecks
     promise {
         do! textRound harness sessionID "list your available tool names briefly"
         let toolListBodies = bodies harness
-        chk "e2e.serve.tools.websearch-listed" (containsTool harness "websearch" || toolListBodies.Contains "websearch")
+
+        chk
+            "e2e.serve.tools.web_search-listed"
+            (containsTool harness "web_search" || toolListBodies.Contains "web_search")
+
         chk "e2e.serve.tools.webfetch-listed" (containsTool harness "webfetch" || toolListBodies.Contains "webfetch")
 
         chk "e2e.serve.tools.meditator-listed" (containsTool harness "meditator" || toolListBodies.Contains "meditator")
@@ -32,14 +36,14 @@ let runServePluginChecks
             toolRound
                 harness
                 sessionID
-                "websearch"
+                "web_search"
                 (box
                     {| query = "wanxiangshu e2e"
                        numResults = 3
                        what_to_summarize = "errors only" |})
-                "run websearch"
+                "run web_search"
 
-        chk "e2e.serve.websearch.tool-called" (containsTool harness "websearch")
+        chk "e2e.serve.web_search.tool-called" (containsTool harness "web_search")
 
         do!
             toolRound

@@ -2166,8 +2166,8 @@ OpenCode 当前注册的自定义工具包括 coder、inspector、browser、cont
 
 ### P0
 
-* [ ] **OC-FB-001** 空输出错误后向同一 session 注入单个零宽字符。
-* [ ] **OC-FB-002** 注入内容严格等于规定零宽字符，不使用 XML continuation。
+* [x] **OC-FB-001** 空输出错误后向同一 session 注入单个零宽字符（P0 canary 真实 E2E 通过）。
+* [x] **OC-FB-002** 注入内容严格等于规定零宽字符，不使用 XML continuation（由 OC-FB-001 真实 E2E 断言 U+200B 验证）。
 * [ ] **OC-FB-003** continuation 使用原 agent。
 * [ ] **OC-FB-004** continuation 使用正确 model 和 variant。
 * [ ] **OC-FB-005** 手工指定 model 的优先级高于自动捕获 model。
@@ -2452,7 +2452,7 @@ OC-FB-001
 OC-CB-005
 ```
 
-这些能验证 harness 的每一种 oracle。
+这些能验证 harness 的每一种 oracle。**截至本次提交，以上 15 条 P0 金丝雀已通过 `opencode-e2e-p0` 真实 E2E（新增 `OC-FB-001` 并修复 ZWSP/速率限制/test-env 等支撑问题）。**
 
 ## 阶段 3：补齐主要功能域
 
