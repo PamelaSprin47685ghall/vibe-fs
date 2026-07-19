@@ -31,6 +31,31 @@ let private populateSession (scope: RuntimeScope) (sid: string) : string =
 
     storeFindIterator scope.IteratorStore sid fState
 
+let private testPromptScopedTempFileCleanup () : unit =
+    let scope = RuntimeScope()
+    let sid = "prompt-cleanup-test"
+    let promptKey = sid + "\u0000prompt-extra"
+    scope.EnqueuePerSession(sid, (fun () -> Promise.lift ())) |> Promise.start
+    scope.RegisterTempFiles(promptKey, [ "extra-file" ])
+    check "prompt temp registered" (scope.TempFileMapCount = 1)
+    forgetSession scope sid
+    isNone (scope.TryGetTempFiles promptKey)
+    check "prompt temp cleared by forgetSession" (scope.TempFileMapCount = 0)
+
+let private testClearTempFilesForPromptDirect () : unit =
+    let scope = RuntimeScope()
+    let promptKey = "direct-prompt-key"
+    scope.RegisterTempFiles(promptKey, [ "file1"; "file2" ])
+    check "registered" (scope.TempFileMapCount = 1)
+    check "tryRemove returns true for existing key" (scope.TryRemoveTempFilesForPrompt promptKey)
+    isNone (scope.TryGetTempFiles promptKey)
+    check "cleared" (scope.TempFileMapCount = 0)
+    scope.RegisterTempFiles(promptKey, [ "file3" ])
+    scope.ClearTempFilesForPrompt promptKey
+    isNone (scope.TryGetTempFiles promptKey)
+    check "cleared again" (scope.TempFileMapCount = 0)
+    check "tryRemove returns false for missing key" (not (scope.TryRemoveTempFilesForPrompt "nonexistent"))
+
 let mutable private runIdCounter = 0
 
 let private populateEventLogStore (sid: string) : unit =
@@ -42,6 +67,27 @@ let private verifySessionCleared (scope: RuntimeScope) (sid: string) (findId: st
     check (sprintf "runner cleared %s" sid) (not (hasRunningRunnerJob scope sid))
     isNone (consumeFindIterator scope.IteratorStore findId)
 
+let private verifyAllSessionsCleared
+    (scope: RuntimeScope)
+    (prefix: string)
+    (n: int)
+    (findIds: ResizeArray<string>)
+    : unit =
+    for i in 0 .. n - 1 do
+        verifySessionCleared scope (sprintf "%s-%d" prefix i) findIds.[i]
+
+    match scope.TryFindKey "livelock_state" with
+    | Some m ->
+        let inner = unbox<Map<string, obj>> m
+        check "livelock inner map empty after forget" (Map.count inner = 0)
+    | None -> ()
+
+    match scope.TryFindKey "wanxiangshu.semble_breakpoints" with
+    | Some m ->
+        let inner = unbox<Map<string, int>> m
+        check "breakpoints inner map empty after forget" (Map.count inner = 0)
+    | None -> ()
+
 let run () : unit =
     runIdCounter <- runIdCounter + 1
     let runId = runIdCounter
@@ -50,12 +96,14 @@ let run () : unit =
     let n = 1000
     let findIds = ResizeArray<string>()
     let beforeEventLogCount = Wanxiangshu.Runtime.EventLogRuntimeStore.count ()
-    let beforeEventLogIds = Wanxiangshu.Runtime.EventLogRuntimeStore.ids ()
 
     for i in 0 .. n - 1 do
         let sid = sprintf "%s-%d" prefix i
         findIds.Add(populateSession scope sid)
         populateEventLogStore sid
+
+    testPromptScopedTempFileCleanup ()
+    testClearTempFilesForPromptDirect ()
 
     check
         "eventLogStore count before forget"
@@ -81,17 +129,4 @@ let run () : unit =
 
     check "eventLogStore ids after forget" (not hasNewId)
 
-    for i in 0 .. n - 1 do
-        verifySessionCleared scope (sprintf "%s-%d" prefix i) findIds.[i]
-
-    match scope.TryFindKey "livelock_state" with
-    | Some m ->
-        let inner = unbox<Map<string, obj>> m
-        check "livelock inner map empty after forget" (Map.count inner = 0)
-    | None -> ()
-
-    match scope.TryFindKey "wanxiangshu.semble_breakpoints" with
-    | Some m ->
-        let inner = unbox<Map<string, int>> m
-        check "breakpoints inner map empty after forget" (Map.count inner = 0)
-    | None -> ()
+    verifyAllSessionsCleared scope prefix n findIds
