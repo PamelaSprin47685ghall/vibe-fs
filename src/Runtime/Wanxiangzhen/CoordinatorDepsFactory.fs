@@ -4,14 +4,14 @@ open Fable.Core
 open Wanxiangshu.Kernel.Wanxiangzhen.SquadConfig
 open Wanxiangshu.Runtime.Wanxiangzhen.CoordinatorRuntime
 open Wanxiangshu.Runtime.Wanxiangzhen.ConfigReader
-open Wanxiangshu.Runtime.Wanxiangzhen.SquadEventLogRuntime
-open Wanxiangshu.Runtime.EventLogRuntime
 open Wanxiangshu.Runtime.Wanxiangzhen.GitShell
 open Wanxiangshu.Runtime.Wanxiangzhen.SlaveSpawn
 open Wanxiangshu.Runtime.Wanxiangzhen.PidMonitor
 open Wanxiangshu.Runtime.Wanxiangzhen.SymlinkShell
 open Wanxiangshu.Runtime.Wanxiangzhen.SessionIo
 open Wanxiangshu.Runtime.SquadEventStore
+open Wanxiangshu.Runtime.EventLogRuntimeStore
+open Wanxiangshu.Runtime.Wanxiangzhen.SquadEventLogRuntime
 
 let resolveMasterBranch (directory: string) (config: SquadConfig) (deps: CoordinatorDeps) : string * string option =
     match config.MasterBranch with

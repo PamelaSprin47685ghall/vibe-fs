@@ -36,7 +36,6 @@ open Wanxiangshu.Runtime.NudgeLease
 open Wanxiangshu.Runtime.FuzzyIteratorStore
 open Wanxiangshu.Runtime.ReviewRuntime
 open Wanxiangshu.Kernel.EventSourcing.Fold
-open Wanxiangshu.Runtime.EventLogRuntime
 open Wanxiangshu.Hosts.Omp.NudgeReminderDispatch
 
 module Dyn = Wanxiangshu.Runtime.Dyn

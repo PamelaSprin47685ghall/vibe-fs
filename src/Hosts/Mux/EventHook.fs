@@ -11,7 +11,6 @@ open Wanxiangshu.Runtime.Dyn
 open Wanxiangshu.Runtime.Fallback.RuntimeStore
 open Wanxiangshu.Runtime.Fallback.Ports
 open Wanxiangshu.Runtime.Fallback.FallbackConfigCodec
-open Wanxiangshu.Runtime.EventLogRuntime
 open Wanxiangshu.Runtime.ReviewRuntime
 open Wanxiangshu.Runtime.RuntimeScope
 open Wanxiangshu.Hosts.Mux.Fallback.Hook

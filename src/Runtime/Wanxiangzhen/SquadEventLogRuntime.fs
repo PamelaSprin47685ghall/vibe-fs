@@ -4,8 +4,8 @@ open Fable.Core
 open Wanxiangshu.Kernel.EventSourcing.EventEnvelope
 open Wanxiangshu.Kernel.EventSourcing.EventKind
 open Wanxiangshu.Kernel.Wanxiangzhen.SquadEvent
-open Wanxiangshu.Runtime.EventLogRuntime
 open Wanxiangshu.Runtime.SquadEventStore
+open Wanxiangshu.Runtime.EventLogRuntimeStore
 open Wanxiangshu.Runtime.Wanxiangzhen.SquadEventWanCodec
 open Wanxiangshu.Runtime.Clock
 

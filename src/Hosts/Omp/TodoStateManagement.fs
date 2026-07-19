@@ -21,7 +21,6 @@ open Wanxiangshu.Runtime.ToolOutputInfo
 open Wanxiangshu.Runtime
 open Wanxiangshu.Runtime.RunnerBackground
 open Wanxiangshu.Runtime.LivelockGuard
-open Wanxiangshu.Runtime.EventLogRuntime
 open Wanxiangshu.Runtime.ReviewRuntime
 open Wanxiangshu.Runtime.Dyn
 open Wanxiangshu.Runtime.BacklogProjectionBuild

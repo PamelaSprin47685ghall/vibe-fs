@@ -18,7 +18,7 @@ open Wanxiangshu.Runtime
 open Wanxiangshu.Runtime.Dyn
 open Wanxiangshu.Runtime.MuxHostBindings
 open Wanxiangshu.Runtime.WorkBacklogToolsCodec
-open Wanxiangshu.Runtime.EventLogRuntime
+open Wanxiangshu.Runtime.BacklogEventWriter
 open Wanxiangshu.Runtime.ToolExecute
 open Wanxiangshu.Runtime.ToolRuntimeContext
 open Wanxiangshu.Runtime.SubsessionEventRouter

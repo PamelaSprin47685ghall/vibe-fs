@@ -17,7 +17,7 @@ open Wanxiangshu.Runtime.OpencodeClientCodec
 open Wanxiangshu.Runtime.Messaging.OpencodeHostEvent
 open Wanxiangshu.Runtime.OpencodeHookInputCodec
 open Wanxiangshu.Runtime.ToolRuntimeContext
-open Wanxiangshu.Runtime.EventLogRuntime
+open Wanxiangshu.Runtime.NudgeEventWriter
 open Wanxiangshu.Hosts.Opencode.Fallback.HostEventInspection
 open Wanxiangshu.Hosts.Opencode.NudgeEffect
 open Wanxiangshu.Hosts.Opencode.NudgeTriggerOps
