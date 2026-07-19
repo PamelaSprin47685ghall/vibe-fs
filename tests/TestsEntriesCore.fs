@@ -23,7 +23,6 @@ open Wanxiangshu.Tests.ToolPermissionTests
 open Wanxiangshu.Tests.SubagentPromptsTests
 open Wanxiangshu.Tests.SubagentIntentsTests
 open Wanxiangshu.Tests.SubagentIteratorStoreTests
-open Wanxiangshu.Tests.NudgeRetryProgressTests
 open Wanxiangshu.Tests.NudgeTodoStatusTests
 open Wanxiangshu.Tests.NudgeEventSourcingTests
 open Wanxiangshu.Tests.OpencodeNudgeLifecycleTests
@@ -107,8 +106,7 @@ let private agentAndNudgeBlock () : (string * TestBody) list =
       "AgentNudgeSpecsDecode.decodeTodosOpenItems", TestBody.Sync(sync AgentNudgeSpecsDecode.decodeTodosOpenItems) ]
 
 let private nudgeLifecycleBlock () : (string * TestBody) list =
-    [ "NudgeRetryProgressTests.run", TestBody.Sync(sync NudgeRetryProgressTests.run)
-      "NudgeTodoStatusTests.run", TestBody.Sync(sync NudgeTodoStatusTests.run)
+    [ "NudgeTodoStatusTests.run", TestBody.Sync(sync NudgeTodoStatusTests.run)
       "NudgeEventSourcingTests.run", TestBody.Sync(sync NudgeEventSourcingTests.run)
       "OpencodeNudgeLifecycleTests.run", TestBody.Sync(sync OpencodeNudgeLifecycleTests.run)
       "OpencodeNudgeLifecycleTests.runAsync", TestBody.Async OpencodeNudgeLifecycleTests.runAsync

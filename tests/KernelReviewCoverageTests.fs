@@ -6,47 +6,8 @@ open System
 open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Kernel.Messaging
 open Wanxiangshu.Kernel.ToolExecutionStatusModule
-open Wanxiangshu.Kernel.ReviewReplayPolicy
 open Wanxiangshu.Kernel.ReviewSession.Types
 open Wanxiangshu.Kernel.Config
-
-// ── Kernel.ReviewReplayPolicy ─────────────────────────────────────────────────
-let rrpTextsFromFlatPartsTool () =
-    let toolState =
-        { status = fromString "completed"
-          output = "out"
-          error = ""
-          input = null
-          operationAction = "" }
-
-    let fp =
-        { msgIndex = 0
-          partIndex = 0
-          isUser = false
-          part = ToolPart("t", "c1", Some toolState, null) }
-
-    let texts = textsFromFlatParts [ fp ] |> Seq.toList
-    equal "tool output text" [ "out" ] texts
-
-let rrpTextsFromFlatPartsText () =
-    let fp =
-        { msgIndex = 0
-          partIndex = 0
-          isUser = false
-          part = TextPart "hello" }
-
-    let texts = textsFromFlatParts [ fp ] |> Seq.toList
-    equal "text part" [ "hello" ] texts
-
-let rrpTextsFromFlatPartsOther () =
-    let fp =
-        { msgIndex = 0
-          partIndex = 0
-          isUser = false
-          part = ToolPart("t", "c", None, null) }
-
-    let texts = textsFromFlatParts [ fp ] |> Seq.toList
-    equal "no output tool" [ "" ] texts
 
 // ── Kernel.ReviewSession.Types ────────────────────────────────────────────────
 let rstEmpty () =
@@ -105,9 +66,6 @@ let cfgStealthBrowserLocalConfig () =
     check "cmd has python" (Array.contains "python" cmd)
 
 let run () =
-    rrpTextsFromFlatPartsTool ()
-    rrpTextsFromFlatPartsText ()
-    rrpTextsFromFlatPartsOther ()
     rstEmpty ()
     rstWithTask ()
     rstWithFeedback ()

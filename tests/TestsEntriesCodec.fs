@@ -21,7 +21,6 @@ open Wanxiangshu.Tests.WorkBacklogTests
 open Wanxiangshu.Tests.MethodologyTests
 open Wanxiangshu.Tests.TitleFetchGuardTests
 open Wanxiangshu.Tests.TestsTestBody
-open Wanxiangshu.Tests.ReviewReplaySyncTests
 open Wanxiangshu.Tests.ToolArgsCoerceTests
 open Wanxiangshu.Tests.CapsSynthCommonTests
 open Wanxiangshu.Tests.CapsFileCacheTests
@@ -108,5 +107,4 @@ let codecTestEntries () : (string * TestBody) list =
       "SessionExecutorScopeTests.run", Async SessionExecutorScopeTests.run
       "CapsSynthCommonTests.run", Sync(sync CapsSynthCommonTests.run)
       "CapsFileCacheTests.run", Async CapsFileCacheTests.run
-      "CapsFormatTests.run", Sync(sync CapsFormatTests.run)
-      "ReviewReplaySyncTests.run", Sync(sync ReviewReplaySyncTests.run) ]
+      "CapsFormatTests.run", Sync(sync CapsFormatTests.run) ]

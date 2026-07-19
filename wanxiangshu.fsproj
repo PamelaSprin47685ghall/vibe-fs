@@ -58,7 +58,6 @@
     <Compile Include="src/Kernel/ReviewSession/Effects.fs"/>
     <Compile Include="src/Kernel/ReviewVerdict.fs"/>
     <Compile Include="src/Kernel/Review/ReviewVerdictWire.fs"/>
-    <Compile Include="src/Kernel/OmpPrompts.fs"/>
     <Compile Include="src/Kernel/WarnTdd.fs"/>
     <Compile Include="src/Kernel/ToolCatalog/ToolSpec.fs"/>
     <Compile Include="src/Kernel/ToolCatalog/Subagent.fs"/>
@@ -77,13 +76,11 @@
     <Compile Include="src/Kernel/Nudge.fs"/>
     <Compile Include="src/Kernel/Nudge/NudgePromptText.fs"/>
     <Compile Include="src/Kernel/Nudge/TodoStatus.fs"/>
-    <Compile Include="src/Kernel/Nudge/RetryProgress.fs"/>
     <Compile Include="src/Kernel/Nudge/SubmitReviewHooks.fs"/>
     <Compile Include="src/Kernel/ContextBudget.fs"/>
     <Compile Include="src/Kernel/ToolExecutionStatus.fs"/>
     <Compile Include="src/Kernel/Messaging.fs"/>
     <Compile Include="src/Kernel/Backlog/BacklogTypes.fs"/>
-    <Compile Include="src/Kernel/ReviewReplayPolicy.fs"/>
     <Compile Include="src/Kernel/CapsSynthPolicy.fs"/>
     <Compile Include="src/Kernel/CapsPrelude.fs"/>
     <Compile Include="src/Kernel/PatchParser.fs"/>
@@ -107,7 +104,6 @@
     <Compile Include="src/Kernel/Wanxiangzhen/Dag.fs"/>
     <Compile Include="src/Kernel/Wanxiangzhen/SquadEvent.fs"/>
     <Compile Include="src/Kernel/Wanxiangzhen/SquadUpdateIdAssign.fs"/>
-    <Compile Include="src/Kernel/Wanxiangzhen/EventLogParse.fs"/>
     <Compile Include="src/Kernel/Wanxiangzhen/Scheduler.fs"/>
     <Compile Include="src/Kernel/Wanxiangzhen/FfDecision.fs"/>
     <Compile Include="src/Kernel/Wanxiangzhen/SquadPrompts.fs"/>
@@ -295,7 +291,6 @@
     <Compile Include="src/Runtime/Subsession/SubagentSpawn.fs"/>
     <Compile Include="src/Runtime/Tooling/JsonSchemaBuilders.fs"/>
     <Compile Include="src/Runtime/Messaging/MuxJsonSchema.fs"/>
-    <Compile Include="src/Runtime/Tooling/WebFetch.fs"/>
     <Compile Include="src/Runtime/Execution/RunnerBackground.fs"/>
     <Compile Include="src/Runtime/Messaging/OmpFileScannerDiscovery.fs"/>
     <Compile Include="src/Runtime/Messaging/OmpFileScanner.fs"/>
@@ -707,7 +702,6 @@
     <Compile Include="tests/OmpReconcileTests.fs"/>
     <Compile Include="tests/OmpSessionLifecycleTests.fs"/>
     <Compile Include="tests/MethodologyTests.fs"/>
-    <Compile Include="tests/ReviewReplaySyncTests.fs"/>
     <Compile Include="tests/ReviewPromptsFormatTests.fs"/>
     <Compile Include="tests/CapsSynthCommonTests.fs"/>
     <Compile Include="tests/CapsFileCacheTests.fs"/>
@@ -744,7 +738,6 @@
     <Compile Include="tests/AgentConfigApplyTests.fs"/>
     <Compile Include="tests/SessionExecutorScopeTests.fs"/>
     <Compile Include="tests/ToolResultWireTests.fs"/>
-    <Compile Include="tests/NudgeRetryProgressTests.fs"/>
     <Compile Include="tests/NudgeTodoStatusTests.fs"/>
     <Compile Include="tests/NudgeEventSourcingTests.fs"/>
     <Compile Include="tests/ReviewSessionQueryTests.fs"/>
@@ -855,7 +848,6 @@
     <Compile Include="tests/Wanxiangzhen/DynTests.fs"/>
     <Compile Include="tests/Wanxiangzhen/E2eIntegrationTests.fs"/>
     <Compile Include="tests/Wanxiangzhen/EventCodecTests.fs"/>
-    <Compile Include="tests/Wanxiangzhen/EventLogParseTests.fs"/>
     <Compile Include="tests/Wanxiangzhen/EventReplayTests.fs"/>
     <Compile Include="tests/Wanxiangzhen/ExtendedCoordinatorOpsTests.fs"/>
     <Compile Include="tests/Wanxiangzhen/ExtendedFfDecisionTests.fs"/>

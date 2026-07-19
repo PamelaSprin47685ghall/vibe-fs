@@ -4,7 +4,6 @@ open Fable.Core
 open Fable.Core.JsInterop
 open System
 open Wanxiangshu.Tests.Assert
-open Wanxiangshu.Kernel.OmpPrompts
 open Wanxiangshu.Kernel.ToolArgs
 open Wanxiangshu.Kernel.ToolResult
 open Wanxiangshu.Kernel.Executor
@@ -12,16 +11,6 @@ open Wanxiangshu.Runtime.ExecutorFormat
 open Wanxiangshu.Kernel.Primitives.Identity
 open Wanxiangshu.Kernel.Errors.DomainError
 open Wanxiangshu.Kernel.Session.Causality
-// ── Kernel.OmpPrompts ─────────────────────────────────────────────────────────
-let ompEditorPrompt () =
-    check "editorPrompt contains code editing" (editorPromptOmp.Contains "code editing")
-
-let ompGreperPrompt () =
-    check "greperPrompt contains fuzzy_find" (greperPromptOmp.Contains "fuzzy_find")
-
-let ompBrowserPrompt () =
-    check "browserPrompt contains browser" (browserPromptOmp.Contains "browser")
-
 // ── Kernel.ToolArgs constructors ──────────────────────────────────────────────
 let taRead () =
     let a =
@@ -128,9 +117,6 @@ let trWireEncodeResultError () =
     check "error contains not permitted" (text.Contains "not permitted")
 
 let run () =
-    ompEditorPrompt ()
-    ompGreperPrompt ()
-    ompBrowserPrompt ()
     taRead ()
     taWrite ()
     taBrowser ()

@@ -20,7 +20,6 @@ let wanxiangzhenTestEntries () : (string * TestBody) list =
     @ prefix (Wanxiangshu.Tests.Wanxiangzhen.E2eBehaviorGapTests.entries ())
     @ prefix (Wanxiangshu.Tests.Wanxiangzhen.E2eIntegrationTests.entries ())
     @ prefix (Wanxiangshu.Tests.Wanxiangzhen.EventCodecTests.entries ())
-    @ prefix (Wanxiangshu.Tests.Wanxiangzhen.EventLogParseTests.entries ())
     @ prefix (Wanxiangshu.Tests.Wanxiangzhen.EventReplayTests.entries ())
     @ prefix (Wanxiangshu.Tests.Wanxiangzhen.ExtendedCoordinatorOpsTests.entries ())
     @ prefix (Wanxiangshu.Tests.Wanxiangzhen.ExtendedFfDecisionTests.entries ())

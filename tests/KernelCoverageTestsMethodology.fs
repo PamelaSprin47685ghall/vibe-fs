@@ -6,10 +6,8 @@ open System
 open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Kernel.Methodology.Api
 open Wanxiangshu.Kernel.Methodology.Registry
-open Wanxiangshu.Kernel.OmpPrompts
 open Wanxiangshu.Kernel.ToolArgs
 open Wanxiangshu.Kernel.ToolResult
-open Wanxiangshu.Kernel.ReviewReplayPolicy
 open Wanxiangshu.Kernel.ReviewSession.Types
 open Wanxiangshu.Kernel.Config
 open Wanxiangshu.Kernel.Executor
@@ -48,16 +46,6 @@ let methSelectFieldDesc () =
     check
         "selectMethodologyFieldDescription contains select_methodology"
         (selectMethodologyFieldDescription.Contains "select_methodology")
-
-// ── Kernel.OmpPrompts ─────────────────────────────────────────────────────────
-let ompEditorPrompt () =
-    check "editorPrompt contains code editing" (editorPromptOmp.Contains "code editing")
-
-let ompGreperPrompt () =
-    check "greperPrompt contains fuzzy_find" (greperPromptOmp.Contains "fuzzy_find")
-
-let ompBrowserPrompt () =
-    check "browserPrompt contains browser" (browserPromptOmp.Contains "browser")
 
 // ── Kernel.ToolArgs constructors ──────────────────────────────────────────────
 let taRead () =
@@ -166,44 +154,6 @@ let trWireEncodeResultError () =
     check "error contains failed" (text.Contains "failed")
     check "error contains not permitted" (text.Contains "not permitted")
 
-// ── Kernel.ReviewReplayPolicy ─────────────────────────────────────────────────
-let rrpTextsFromFlatPartsTool () =
-    let toolState =
-        { status = fromString "completed"
-          output = "out"
-          error = ""
-          input = null
-          operationAction = "" }
-
-    let fp =
-        { msgIndex = 0
-          partIndex = 0
-          isUser = false
-          part = ToolPart("t", "c1", Some toolState, null) }
-
-    let texts = textsFromFlatParts [ fp ] |> Seq.toList
-    equal "tool output text" [ "out" ] texts
-
-let rrpTextsFromFlatPartsText () =
-    let fp =
-        { msgIndex = 0
-          partIndex = 0
-          isUser = false
-          part = TextPart "hello" }
-
-    let texts = textsFromFlatParts [ fp ] |> Seq.toList
-    equal "text part" [ "hello" ] texts
-
-let rrpTextsFromFlatPartsOther () =
-    let fp =
-        { msgIndex = 0
-          partIndex = 0
-          isUser = false
-          part = ToolPart("t", "c", None, null) }
-
-    let texts = textsFromFlatParts [ fp ] |> Seq.toList
-    equal "no output tool" [ "" ] texts
-
 // ── Kernel.ReviewSession.Types ────────────────────────────────────────────────
 let rstEmpty () =
     let e = Wanxiangshu.Kernel.ReviewSession.Types.empty "rs1" 100L
@@ -267,9 +217,6 @@ let run () =
     methTodoResultTextOne ()
     methEnumCount ()
     methSelectFieldDesc ()
-    ompEditorPrompt ()
-    ompGreperPrompt ()
-    ompBrowserPrompt ()
     taRead ()
     taWrite ()
     taBrowser ()
@@ -281,9 +228,6 @@ let run () =
     taSubmitReview ()
     trWireEncodeResultOk ()
     trWireEncodeResultError ()
-    rrpTextsFromFlatPartsTool ()
-    rrpTextsFromFlatPartsText ()
-    rrpTextsFromFlatPartsOther ()
     rstEmpty ()
     rstWithTask ()
     rstWithFeedback ()

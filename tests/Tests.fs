@@ -30,7 +30,6 @@ open Wanxiangshu.Tests.TestsEntriesCore
 open Wanxiangshu.Tests.TestsEntriesWanxiangzhen
 open Wanxiangshu.Tests.TestsEntriesCodec
 open Wanxiangshu.Tests.TestsEntriesOmp
-open Wanxiangshu.Tests.ReviewReplaySyncTests
 open Wanxiangshu.Tests.CapsSynthCommonTests
 open Wanxiangshu.Tests.CapsFileCacheTests
 open Wanxiangshu.Tests.SubagentPromptBuildTests
