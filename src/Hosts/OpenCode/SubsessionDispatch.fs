@@ -48,7 +48,27 @@ let isMessageMatch (nonce: string) (msg: obj) : bool =
         else
             ""
 
-    id = nonce || propsNonce = nonce || infoNonce = nonce
+    let parts = Dyn.get msg "parts"
+
+    let partsNonce =
+        if not (Dyn.isNullish parts) && Dyn.isArray parts then
+            let arr = unbox<obj array> parts
+
+            arr
+            |> Array.tryPick (fun part ->
+                let metadata = Dyn.get part "metadata"
+
+                if Dyn.isNullish metadata then
+                    None
+                else
+                    let n = Dyn.str metadata "nonce"
+
+                    if n <> "" then Some n else None)
+            |> Option.defaultValue ""
+        else
+            ""
+
+    id = nonce || propsNonce = nonce || infoNonce = nonce || partsNonce = nonce
 
 let private checkActive (s: string) =
     let ls = s.Trim().ToLower()
