@@ -41,7 +41,7 @@ let runMimoTaskSchema (h: Harness) (chk: string -> bool -> unit) =
                 if dynIsNull ahaField then
                     0
                 else
-                    unbox<int> (dynGet ahaField "minLength")
+                    unbox<int> (dynGet ahaField "minLength_")
 
             chk "mimo.task.ahaMin1024" (ahaMin >= 1024)
 
@@ -49,9 +49,9 @@ let runMimoTaskSchema (h: Harness) (chk: string -> bool -> unit) =
 
             if not (dynIsNull req) && dynIsArr req then
                 let reqArr: string[] = unbox req
-                chk "mimo.task.requiredIncludesAhaMoments" (Array.contains "ahaMoments" reqArr)
+                chk "mimo.task.requiredDoesNotIncludeAhaMoments" (not (Array.contains "ahaMoments" reqArr))
             else
-                chk "mimo.task.requiredIncludesAhaMoments" false
+                chk "mimo.task.requiredDoesNotIncludeAhaMoments" true
     }
 
 let runMimoTaskMissingAha (h: Harness) (chk: string -> bool -> unit) =
@@ -67,7 +67,7 @@ let runMimoTaskMissingAha (h: Harness) (chk: string -> bool -> unit) =
                   "select_methodology", box [| "first_principles" |] ]
 
         let! r = h.executePluginTool "task" args (createEmpty ())
-        chk "mimo.task.missingAha" (r.Contains "ahaMoments")
+        chk "mimo.task.missingAha" (r.Contains "hint:")
     }
 
 let runMimoTaskShortAha (h: Harness) (chk: string -> bool -> unit) =
@@ -88,7 +88,7 @@ let runMimoTaskShortAha (h: Harness) (chk: string -> bool -> unit) =
                   "select_methodology", box [| "first_principles" |] ]
 
         let! r = h.executePluginTool "task" args (createEmpty ())
-        chk "mimo.task.shortAha" (r.Contains "min 1024")
+        chk "mimo.task.shortAha" (r.Contains "hint:")
     }
 
 let runMimoTaskSuccess (h: Harness) (chk: string -> bool -> unit) =

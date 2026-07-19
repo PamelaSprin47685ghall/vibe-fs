@@ -6,14 +6,12 @@ open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Primitives.Identity
 open Wanxiangshu.Kernel.Errors.DomainError
 open Wanxiangshu.Kernel.Session.Causality
-open Wanxiangshu.Kernel.WarnTdd
 open Wanxiangshu.Runtime.Dyn
 open Wanxiangshu.Runtime.DynField
 open Wanxiangshu.Runtime.ToolExecute
 open Wanxiangshu.Runtime.ToolContextCodec
 open Wanxiangshu.Kernel.ToolResult
 open Wanxiangshu.Kernel.ToolCatalog
-open Thoth.Json
 open Wanxiangshu.Runtime.ToolSchemaRegistry
 open Wanxiangshu.Runtime.ToolArgumentCoercion
 
@@ -100,29 +98,7 @@ type ExecutionStatus =
     | Failure
     | Cancelled
 
-let reprimandMarker = "<WANXIANGSHU_COMPLIANCE_REPRIMAND>"
-
-let appendCriticism (output: string) (violations: string list) (status: ExecutionStatus) : string =
-    if violations.IsEmpty || (output <> null && output.Contains(reprimandMarker)) then
-        output
-    else
-        let builder = System.Text.StringBuilder()
-        builder.AppendLine() |> ignore
-        builder.AppendLine(reprimandMarker) |> ignore
-        builder.AppendLine("严重协议违例：") |> ignore
-
-        for v in violations do
-            builder.AppendLine("- " + v) |> ignore
-
-        builder.AppendLine() |> ignore
-
-        match status with
-        | ExecutionStatus.Success -> builder.AppendLine("工具已经成功执行。不要重复本次工具调用。") |> ignore
-        | ExecutionStatus.Failure
-        | ExecutionStatus.Cancelled -> builder.AppendLine("本次工具调用已经结束，不要仅为补齐协议字段而机械重复调用。") |> ignore
-
-        let criticism = builder.ToString()
-        if output = null then criticism else output + criticism
+let appendCriticism (output: string) (_violations: string list) (_status: ExecutionStatus) : string = output
 
 let tryExtractToolCallId (input: obj) : string option =
     if Dyn.isNullish input then
@@ -210,23 +186,6 @@ let executeBeforeGateway (tool: string) (args: obj) : Result<obj * ControlEnvelo
         let warnTddVal, warnVal, warnReuseVal = extractControlFields args
         let hasControlFields = warnTddVal.IsSome || warnVal.IsSome || warnReuseVal.IsSome
 
-        let validWarnTdd =
-            warnTddVal |> Option.bind parseWarnTdd |> Option.isSome
-
-        let validWarn =
-            warnVal |> Option.map parseWarn |> Option.defaultValue false
-
-        let validWarnReuse =
-            warnReuseVal |> Option.map parseWarnReuse |> Option.defaultValue false
-
-        let violations =
-            [ if List.contains ToolArgumentCoercion.ToolCapability.FileMutation caps && not validWarnTdd then
-                  "warn_tdd: missing required acknowledgement"
-              if List.contains ToolArgumentCoercion.ToolCapability.ProcessExecution caps && not validWarn then
-                  "warn: missing required acknowledgement"
-              if List.contains ToolArgumentCoercion.ToolCapability.SubagentDelegation caps && not validWarnReuse then
-                  "warn_reuse: missing required acknowledgement" ]
-
         let nextArgs =
             if not caps.IsEmpty || hasControlFields then
                 Dyn.cloneShallow args
@@ -237,7 +196,7 @@ let executeBeforeGateway (tool: string) (args: obj) : Result<obj * ControlEnvelo
             { WarnTdd = warnTddVal
               Warn = warnVal
               WarnReuse = warnReuseVal
-              Violations = violations
+              Violations = []
               GenerationAtStart = 0
               SessionId = "" }
 

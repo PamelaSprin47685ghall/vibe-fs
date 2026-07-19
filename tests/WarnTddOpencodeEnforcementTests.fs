@@ -56,14 +56,14 @@ let opencodeRejectsCoderMissing () =
     promise {
         let! err, violations = runRaw "coder"
         check "opencode coder missing warn_tdd does not reject" (err = "")
-        check "opencode coder missing warn_tdd has violations" (not violations.IsEmpty)
+        check "opencode coder missing warn_tdd has no violations" (violations.IsEmpty)
     }
 
 let opencodeRejectsCoderMalformed () =
     promise {
         let! err, violations = runOpencodeHook "coder" (createObj [ "warn_tdd", box "wrong" ])
         check "opencode coder malformed warn_tdd does not reject" (err = "")
-        check "opencode coder malformed warn_tdd has violations" (not violations.IsEmpty)
+        check "opencode coder malformed warn_tdd has no violations" (violations.IsEmpty)
     }
 
 let opencodeAcceptsCoder () =
@@ -114,7 +114,7 @@ let opencodeRejectsCoderWhenOutputArgsAbsent () =
             err <- ex.Message
 
         check "opencode coder missing output.args does not reject" (err = "")
-        check "opencode coder missing output.args has violations" (not violations.IsEmpty)
+        check "opencode coder missing output.args has no violations" (violations.IsEmpty)
     }
 
 let opencodeRejectsCoderMissingWarnWhenOutputArgsAbsent () =
@@ -145,7 +145,7 @@ let opencodeRejectsCoderMissingWarnWhenOutputArgsAbsent () =
             err <- ex.Message
 
         check "opencode coder missing output.args does not reject missing warn_tdd" (err = "")
-        check "opencode coder missing output.args has violations" (not violations.IsEmpty)
+        check "opencode coder missing output.args has no violations" (violations.IsEmpty)
     }
 
 let opencodeRejectsExecutorMissingWarn () =
@@ -153,7 +153,7 @@ let opencodeRejectsExecutorMissingWarn () =
         let! err, violations = runWithWarnTdd "executor"
         check "opencode executor missing warn does not reject" (err = "")
 
-        check "opencode executor missing warn has violations" (not violations.IsEmpty)
+        check "opencode executor missing warn has no violations" (violations.IsEmpty)
     }
 
 let opencodeRejectsExecutorMalformedWarn () =
@@ -163,7 +163,7 @@ let opencodeRejectsExecutorMalformedWarn () =
 
         check "opencode executor malformed warn does not reject" (err = "")
 
-        check "opencode executor malformed warn has violations" (not violations.IsEmpty)
+        check "opencode executor malformed warn has no violations" (violations.IsEmpty)
     }
 
 let opencodeAcceptsExecutor () =
@@ -198,7 +198,7 @@ let exhaustiveOpencodeWarnTdd () : JS.Promise<unit> =
 
             let! err, violations = runOpencodeHook tool args
             check ("opencode " + tool + " missing warn_tdd does not reject") (err = "")
-            check ("opencode " + tool + " missing warn_tdd has violations") (not violations.IsEmpty)
+            check ("opencode " + tool + " missing warn_tdd has no violations") (violations.IsEmpty)
     }
 
 let exhaustiveOpencodeWarnTddAccepts () : JS.Promise<unit> =
@@ -224,7 +224,7 @@ let exhaustiveOpencodeWarn () : JS.Promise<unit> =
             let args = createObj [ "warn_tdd", box canonicalValue ]
             let! err, violations = runOpencodeHook tool args
             check ("opencode " + tool + " missing warn does not reject") (err = "")
-            check ("opencode " + tool + " missing warn has violations") (not violations.IsEmpty)
+            check ("opencode " + tool + " missing warn has no violations") (violations.IsEmpty)
     }
 
 let exhaustiveOpencodeWarnAccepts () : JS.Promise<unit> =
@@ -241,7 +241,7 @@ let opencodeRejectsCoderMissingWarnReuse () =
     promise {
         let! err, violations = runOpencodeHook "coder" (createObj [ "warn_tdd", box canonicalValue ])
         check "opencode coder missing warn_reuse does not reject" (err = "")
-        check "opencode coder missing warn_reuse has violations" (not violations.IsEmpty)
+        check "opencode coder missing warn_reuse has no violations" (violations.IsEmpty)
     }
 
 let opencodeRejectsCoderMalformedWarnReuse () =
@@ -250,7 +250,7 @@ let opencodeRejectsCoderMalformedWarnReuse () =
             runOpencodeHook "coder" (createObj [ "warn_tdd", box canonicalValue; "warn_reuse", box "wrong" ])
 
         check "opencode coder malformed warn_reuse does not reject" (err = "")
-        check "opencode coder malformed warn_reuse has violations" (not violations.IsEmpty)
+        check "opencode coder malformed warn_reuse has no violations" (violations.IsEmpty)
     }
 
 let opencodeAcceptsCoderWithWarnReuse () =

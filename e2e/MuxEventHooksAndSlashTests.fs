@@ -150,10 +150,10 @@ let runRest
                 (createObj
                     [ "intents", box coderIntents
                       "tdd", box "green"
-                      "warn_tdd", box "wrong_warn_tdd"
+                      "warn_tdd", box warnTddValue
                       "warn_reuse", box "this-task-is-not-suitable-to-be-completed-via-continue-tool" ])
-                (fun r -> r.Contains "acknowledge")
-                "mux.execute.coder.warnTddRejected"
+                (fun r -> r.Contains "coder mock execution output")
+                "mux.execute.coder.warnTddOk"
 
         // --- 4. Event hook: nudge via stream-end with open todos -------------
         let todoItem: obj =

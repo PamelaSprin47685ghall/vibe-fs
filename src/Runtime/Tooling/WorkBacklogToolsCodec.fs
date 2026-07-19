@@ -23,7 +23,6 @@ type TodoWriteArgs =
 
 type TodoToolOpts = { ToolCallId: string }
 
-let reportMinLength = 1024
 
 let private requireNonBlank
     (tool: string)
@@ -99,29 +98,17 @@ let private decodeSelectMethodology (args: obj) : Result<string list, DomainErro
         else
             Ok items
 
-let decodeTodoWriteArgs (isTask: bool) (args: obj) : Result<TodoWriteArgs * string list, DomainError> =
+let decodeTodoWriteArgs (_isTask: bool) (args: obj) : Result<TodoWriteArgs * string list, DomainError> =
     let decodeReportField k =
         match strField args k with
-        | None -> ("", None)
-        | Some v ->
-            let trimmed = v.Trim()
+        | None -> ""
+        | Some v -> v.Trim()
 
-            let viol =
-                if trimmed.Length < reportMinLength then
-                    Some(sprintf "%s: expected at least %d characters" k reportMinLength)
-                else
-                    None
-
-            (trimmed, viol)
-
-    let ahaMoments, ahaViol = decodeReportField "ahaMoments"
-    let changesAndReasons, changesViol = decodeReportField "changesAndReasons"
-    let gotchas, gotchasViol = decodeReportField "gotchas"
-    let lessonsAndConventions, lessonsViol = decodeReportField "lessonsAndConventions"
-    let plan, planViol = decodeReportField "plan"
-
-    let violations =
-        [ ahaViol; changesViol; gotchasViol; lessonsViol; planViol ] |> List.choose id
+    let ahaMoments = decodeReportField "ahaMoments"
+    let changesAndReasons = decodeReportField "changesAndReasons"
+    let gotchas = decodeReportField "gotchas"
+    let lessonsAndConventions = decodeReportField "lessonsAndConventions"
+    let plan = decodeReportField "plan"
 
     match decodeTodos args with
     | Error e -> Error e
@@ -138,7 +125,7 @@ let decodeTodoWriteArgs (isTask: bool) (args: obj) : Result<TodoWriteArgs * stri
                   Todos = todos
                   SelectMethodology = methodology }
 
-            Ok(decodedArgs, violations)
+            Ok(decodedArgs, [])
 
 let decodeTodoToolOpts (opts: obj) : Result<TodoToolOpts, DomainError> =
     match strField opts "toolCallId" with

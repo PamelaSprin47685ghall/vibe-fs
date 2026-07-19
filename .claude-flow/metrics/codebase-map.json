@@ -1,0 +1,11 @@
+{
+  "timestamp": "2026-07-18T23:03:36.103Z",
+  "projectRoot": "/home/kunweiz/Desktop/vibe/worktree-1",
+  "structure": {
+    "hasPackageJson": true,
+    "hasTsConfig": false,
+    "hasClaudeConfig": false,
+    "hasClaudeFlow": true
+  },
+  "scannedAt": 1784415816103
+}

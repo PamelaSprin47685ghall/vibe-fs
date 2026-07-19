@@ -166,34 +166,7 @@ let private injectProp
             if not (Dyn.isNullish prop) then
                 Dyn.setKey prop "required_" true
 
-let private reportSoftWarnings (toolName: string) (props: obj) (caps: ToolCapability list) (schema: obj) =
-    let requiredList =
-        let req = Dyn.get schema "required"
-
-        if Dyn.isArray req then
-            (req :?> obj array) |> Array.map string |> Array.toList
-        else
-            []
-
-    for reqField in requiredList do
-        if Dyn.isNullish (Dyn.get props reqField) then
-            Fable.Core.JS.console.warn
-                $"Schema soft warning: required field '{reqField}' is not defined in properties of tool '{toolName}'"
-
-    if List.contains FileMutation caps && Dyn.isNullish (Dyn.get props "warn_tdd") then
-        Fable.Core.JS.console.warn
-            $"Schema soft warning: FileMutation tool '{toolName}' is missing field 'warn_tdd' in properties"
-
-    if List.contains ProcessExecution caps && Dyn.isNullish (Dyn.get props "warn") then
-        Fable.Core.JS.console.warn
-            $"Schema soft warning: ProcessExecution tool '{toolName}' is missing field 'warn' in properties"
-
-    if
-        List.contains SubagentDelegation caps
-        && Dyn.isNullish (Dyn.get props "warn_reuse")
-    then
-        Fable.Core.JS.console.warn
-            $"Schema soft warning: SubagentDelegation tool '{toolName}' is missing field 'warn_reuse' in properties"
+let private reportSoftWarnings (_toolName: string) (_props: obj) (_caps: ToolCapability list) (_schema: obj) = ()
 
 let decorateAndValidateSchema (toolName: string) (schema: obj) : obj =
     if Dyn.isNullish schema then

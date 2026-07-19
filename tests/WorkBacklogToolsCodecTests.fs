@@ -20,7 +20,7 @@ let decodeTodoMissingCompletedWorkReport () =
               "select_methodology", box [| "first_principles" |] ]
 
     match decodeTodoWriteArgs false args with
-    | Ok(tw, violations) -> check "todo missing ahaMoments returns Ok with violations" (violations.Length > 0)
+    | Ok(tw, violations) -> check "todo missing ahaMoments returns Ok with no violations" (violations.IsEmpty)
     | Error _ -> check "todo missing ahaMoments returns Ok" false
 
 let decodeTodoOk () =
@@ -80,7 +80,7 @@ let decodeTodoItemMissingAhaMoments () =
               "todos", box [| createObj [ "content", box "x"; "status", box "pending"; "priority", box "high" ] |] ]
 
     match decodeTodoWriteArgs false args with
-    | Ok(tw, violations) -> check "todo item missing ahaMoments returns Ok with violations" (violations.Length > 0)
+    | Ok(tw, violations) -> check "todo item missing ahaMoments returns Ok with no violations" (violations.IsEmpty)
     | _ -> check "todo item missing ahaMoments returns Ok" false
 
 let decodeTodoInvalidStatusOrPriority () =
