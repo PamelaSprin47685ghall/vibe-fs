@@ -833,6 +833,9 @@
     <Compile Include="tests/FallbackRecoveryWaitTests.fs"/>
     <Compile Include="tests/FallbackIntegrationTests.fs"/>
     <Compile Include="tests/SubagentCompactionRegressionTests.fs"/>
+    <Compile Include="tests/FallbackLeaseValidationRulesTests.fs"/>
+    <Compile Include="tests/FallbackLeasePureTests.fs"/>
+    <Compile Include="tests/FallbackPropertyPureTests.fs"/>
     <Compile Include="tests/TestsEntriesFallback.fs"/>
     <Compile Include="tests/SembleInjectionTests.fs"/>
     <Compile Include="tests/OpencodeSessionLifecycleTests.fs"/>

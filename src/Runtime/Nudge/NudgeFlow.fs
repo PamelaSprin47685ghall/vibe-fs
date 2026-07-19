@@ -122,11 +122,6 @@ let runNudgeFlowCore
         if nudgeBlockedByFallbackState fallbackRuntime sessionKey then
             return runtimeState
         else
-            // N-05 / N-06 fix: the snapshot layer is the single place
-            // that can say "not needed" (None) vs "transport / event-store
-            // failure" (typed exception).  The previous flow conflated
-            // the two and silently suppressed infrastructure errors as
-            // "no nudge needed".
             let snapshotResult =
                 try
                     Promise.result (takeSnapshot ())

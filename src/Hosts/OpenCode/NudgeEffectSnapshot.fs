@@ -128,9 +128,10 @@ let private processSessionMessages
                             isForceStopped
     }
 
-/// Distinguish a real error from "not needed". The previous implementation
-/// used a blanket `try ... with _ -> None` that hid event-store failures
-/// as "no nudge needed" (N-04). The new contract is:
+/// Distinguish a real error from "not needed". The snapshot layer is the
+/// single place that can say "not needed" (None) vs "transport / event-store
+/// failure" (typed exception).
+///
 ///   NotNeeded = no problem; the flow treats `None` as a normal no-op
 ///   SnapshotUnavailable = a real failure; surface it as a typed
 ///     exception so the runNudgeFlowCore caller can mark the nudge as

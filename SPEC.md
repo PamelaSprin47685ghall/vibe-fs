@@ -31,40 +31,6 @@
 
 ---
 
-## 三、`tempFilesByPrompt` 完整生命周期
-
-已完成：
-
-* `ClearTempFilesForPrompt` / `TryRemoveTempFilesForPrompt` 提供 prompt 级精确清理；
-* `RemoveTempFiles(sessionId)` 覆盖 session 前缀级批量清理；
-* `forgetSession` 调用 `RemoveTempFiles`，覆盖 prompt 结束、session abort、workspace dispose、异常/超时路径。
-
----
-
-## 四、历史补丁注释肃清
-
-源码中仍能看到大量类似：
-
-* `S-07 fix`
-* `F-03`
-* `N-01`
-* `N-02`
-* `R-01`
-* `R-03`
-* `TASK §5`
-* `PRD-06`
-* `Phase 7`
-* `Phase 8`
-* `REF.md`
-* “until ... lands”
-* “best effort for now”
-
-应删除：谁修过哪个 ticket、这是第几阶段、过去曾经怎么实现、“暂时先这样”、“以后某模块落地后再改”。
-
-历史信息应该进入 commit / issue / ADR / regression test 名称。最终源码应像“一次写成”。
-
----
-
 ## 五、文件拆分反向技术债
 
 当前有大量 20～40 行文件，且若干目录极度扁平：`Hosts/OpenCode`、`Hosts/Omp`、`Kernel` 根目录、`Runtime/Tooling`、`Runtime/Messaging`、`Runtime/Subsession`、`Runtime/Fallback`。
