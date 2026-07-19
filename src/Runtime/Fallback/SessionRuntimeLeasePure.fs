@@ -55,24 +55,24 @@ let tryClearPendingNudgeLease expectedNudgeID (s: FallbackSessionRuntime) =
 
 let tryTransitionPendingNudgeLease expectedID expectedStatus nextStatus (s: FallbackSessionRuntime) =
     match s.PendingNudgeLease with
-    | Some lease ->
-        let isCurrent =
-            lease.NudgeID = expectedID
-            && lease.Status = expectedStatus
+    | Some lease when lease.NudgeID = expectedID ->
+        if lease.Status = nextStatus then
+            Some s
+        elif
+            lease.Status = expectedStatus
             && lease.SessionGeneration = s.SessionGeneration
             && lease.HumanTurnID = s.HumanTurnId
             && lease.CancelGeneration = s.CancelGeneration
             && lease.Owner = SessionOwner.Nudge
             && s.Owner = SessionOwner.Nudge
             && s.Core.Lifecycle = FallbackLifecycle.Active
-
-        if isCurrent then
+        then
             Some
                 { s with
                     PendingNudgeLease = Some { lease with Status = nextStatus } }
         else
             None
-    | None -> None
+    | _ -> None
 
 let applyCancelNudgeLease expectedNudgeID (s: FallbackSessionRuntime) =
     match s.PendingNudgeLease with

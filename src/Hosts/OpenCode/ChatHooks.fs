@@ -10,6 +10,8 @@ open Wanxiangshu.Runtime
 open Wanxiangshu.Runtime.Dispatch
 open Wanxiangshu.Runtime.Dyn
 open Wanxiangshu.Runtime.Fallback.SessionRuntimePropertyPure
+open Wanxiangshu.Runtime.Fallback.SessionRuntimeLeasePure
+open Wanxiangshu.Runtime.Fallback.SessionRuntime
 open Wanxiangshu.Hosts.Opencode.ChatHooksDecoders
 open Wanxiangshu.Hosts.Opencode.SubsessionDispatch
 
@@ -47,6 +49,64 @@ let recordContinuationUserMessage
         do! appendEventsAndCacheOrFail workspaceRoot [ wanEvent ]
     }
 
+/// Attempt to consume a nudge or subsession nonce observed in a
+/// chat.message hook payload. Returns true when the nonce is recognised.
+let private tryConsumeNudgeIfMatched
+    (fr: FallbackRuntimeStore)
+    (workspaceRoot: string)
+    (sessionIDStr: string)
+    (msgId: string)
+    (nonce: string)
+    : bool =
+    // Child subsession turn marker: ChatHooks resolves the host
+    // receipt for SubsessionActor. Never forges TurnStarted from
+    // the prompt Promise alone.
+    let ws = workspaceFor workspaceRoot
+
+    let receiptResult =
+        HostReceiptWaiterRegistry.tryResolve
+            ws
+            sessionIDStr
+            nonce
+            (Wanxiangshu.Kernel.Subsession.Types.UserMessageObserved msgId)
+
+    if receiptResult <> ResolveAttemptResult.NotFound then
+        true
+    else
+        let activeNudgeNonce = (fr.GetSession sessionIDStr).ActiveNudgeNonce
+
+        if activeNudgeNonce <> "" && nonce = activeNudgeNonce then
+            // Transition the nudge lease to Dispatched and consume the
+            // nonce now that the matching message has been observed.
+            // This decouples the lease lifetime from the prompt()
+            // Promise in NudgeEffect.sendNudge.
+            let consumeAndDispatch (s: FallbackSessionRuntime) : FallbackSessionRuntime * bool =
+                let s1, transitioned =
+                    match s.PendingNudgeLease with
+                    | Some lease when lease.Nonce = nonce ->
+                        tryTransitionPendingNudgeLeaseReturning
+                            lease.NudgeID
+                            LeaseStatus.DispatchStarted
+                            LeaseStatus.Dispatched
+                            s
+                    | _ -> s, false
+
+                let s2, consumed = tryConsumeNudgeNonce nonce s1
+                s2, transitioned || consumed
+
+            let _ = fr.UpdateSessionReturning(sessionIDStr, consumeAndDispatch)
+            true
+        else
+            match (fr.GetSession sessionIDStr).PendingLease with
+            | Some lease when
+                (lease.Status = LeaseStatus.DispatchStarted
+                 || lease.Status = LeaseStatus.Dispatched
+                 || lease.Status = LeaseStatus.Running)
+                && lease.ContinuationID = nonce
+                ->
+                true
+            | _ -> false
+
 /// Classify whether a chat.message hook payload is system-synthesised.
 /// Internal so the regression suite can bind directly to this entry
 /// point (mirroring the `static member internal isNaturalStop` pattern
@@ -58,48 +118,13 @@ let internal isSystemMessage
     (sessionIDStr: string)
     (msgId: string)
     : bool =
-    let consumeNudgeIfMatched (nonce: string) : bool =
-        // Child subsession turn marker: ChatHooks resolves the host
-        // receipt for SubsessionActor. Never forges TurnStarted from
-        // the prompt Promise alone.
-        let ws = workspaceFor workspaceRoot
-
-        let receiptResult =
-            HostReceiptWaiterRegistry.tryResolve
-                ws
-                sessionIDStr
-                nonce
-                (Wanxiangshu.Kernel.Subsession.Types.UserMessageObserved msgId)
-
-        if receiptResult <> ResolveAttemptResult.NotFound then
-            true
-        else
-            let activeNudgeNonce = (fr.GetSession sessionIDStr).ActiveNudgeNonce
-
-            if activeNudgeNonce <> "" && nonce = activeNudgeNonce then
-                // Consume the nonce now that the matching message has
-                // been observed. This decouples the nonce lifetime from
-                // the prompt() Promise in NudgeEffect.sendNudge.
-                let _ = fr.UpdateSessionReturning(sessionIDStr, tryConsumeNudgeNonce nonce)
-                true
-            else
-                match (fr.GetSession sessionIDStr).PendingLease with
-                | Some lease when
-                    (lease.Status = LeaseStatus.DispatchStarted
-                     || lease.Status = LeaseStatus.Dispatched
-                     || lease.Status = LeaseStatus.Running)
-                    && lease.ContinuationID = nonce
-                    ->
-                    true
-                | _ -> false
-
     // Continuation prompts carry versioned provenance and should never
     // be confused with nudges, so check the namespaced kind first.
     match tryGetWanxiangshuKind parts with
     | Some "fallback_continuation" -> true
     | _ ->
         match tryGetNonceFromParts parts with
-        | Some nonce -> consumeNudgeIfMatched nonce
+        | Some nonce -> tryConsumeNudgeIfMatched fr workspaceRoot sessionIDStr msgId nonce
         | None -> false
 
 let private recordProvenanceIfPresent

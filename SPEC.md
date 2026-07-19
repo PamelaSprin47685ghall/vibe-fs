@@ -302,15 +302,9 @@ OpenCode 当前多个路径把 nonce、continuation ID 等放入 prompt part met
 
 `NudgeEffect.sendNudge` 已用 `try...with` 包裹完整 dispatch 体；`with` 分支会消费 active nonce、在 owner 为 Nudge 时转移回 `NoOwner`、记录五字段诊断日志并重新抛出。API 缺失或 `prompt` 异步失败都会进入同一条清理路径。
 
-### N-03：在 prompt 返回后才标记 Dispatched
+### N-03：在 prompt 返回后才标记 Dispatched ✅ 已完成
 
-这会直接触发“运行已结束，随后才标记已发送”的反向时序。
-
-**整改要求：**
-
-* 获得真实宿主 user message identity 或经过验证的 accepted receipt 后，才能标记 HostAccepted；
-* prompt Promise 若代表整轮完成，应当仅作为一个附加 completion signal；
-* 终态仍应由严格关联的 assistant/error/idle 组合决定。
+`ChatHooks.tryConsumeNudgeIfMatched` 在观察到匹配 `ActiveNudgeNonce` 的宿主消息时，立即通过 `tryTransitionPendingNudgeLeaseReturning` 将 nudge lease 从 `DispatchStarted` 推进到 `Dispatched`，并消费 nonce。`SessionRuntimeLeasePure.tryTransitionPendingNudgeLease` 已支持 idempotent：目标状态等于当前状态时直接返回 `Some s`。prompt Promise 的成功/失败现在仅作为终态辅助信号， lease 终态仍由后续 `assistant/error/idle` 组合决定。
 
 ### N-04：异常被大量转换成“没有快照”或“未领取”
 
@@ -402,22 +396,9 @@ generation 相同并不能证明这些事件属于 continuation。
 
 不得再以“ID 缺失但 generation 差不多”推定匹配。
 
-### F-03：人类消息去重发生在取消之后
+### F-03：人类消息去重发生在取消之前 ✅ 已完成
 
-当同一个 `chat.message` hook 被重复调用，当前路径可能先取消 lease，再发现 message ID 已经处理过。
-
-**整改要求：**
-
-处理顺序必须固定为：
-
-1. 解码；
-2. 判断是否插件自动消息；
-3. message ID 幂等去重；
-4. 确认是真人新回合；
-5. 再增加 human turn；
-6. 再取消旧操作。
-
-任何会产生副作用的步骤都必须位于去重之后。
+`SessionLifecycleHumanTurn.onNewHumanMessage` 在进入任何副作用前先进行 `messageId` 去重：`MessageIdDedup.isKnownMessage` / `recordMessageId` 位于 `resetSessionState`、`clearSessionCompliance`、`finishPendingLease`、`cancelNudgeAndCompaction` 之前。处理顺序固定为解码 → 系统消息分类 → message ID 去重 → 真人新回合确认 → 增加 human turn → 取消旧操作。
 
 ### F-04：RetryDispatchGovernor 名称和实现不一致
 
