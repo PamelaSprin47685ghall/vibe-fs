@@ -68,7 +68,7 @@ let childCompactionIdleSettlesAfterFallbackConsumes () =
         let sessionID = "child-compaction-1"
         let runtime = FallbackRuntimeStore()
         runtime.UpdateSession(sessionID, transferOwnership SessionOwner.Compaction)
-        runtime.UpdateSession(sessionID, setActiveCompactionId "compact-1" 1)
+        runtime.UpdateSession(sessionID, setActiveCompactionId "compact-1" 1 "" 0)
         runtime.Update(sessionID, setCompacted true)
         runtime.Update(sessionID, setCompactionContinuationObserved true)
 

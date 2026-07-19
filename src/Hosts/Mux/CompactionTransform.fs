@@ -56,12 +56,17 @@ let readCompactionMetadata (runtimeScope: Wanxiangshu.Runtime.RuntimeScope.Runti
         | Some fr -> (fr.GetSession sessionID).HumanTurnId
         | None -> ""
 
+    let cancelGen =
+        match fallbackRuntime with
+        | Some fr -> (fr.GetSession sessionID).CancelGeneration
+        | None -> 0
+
     let compactionOrdinal =
         match fallbackRuntime with
         | Some fr -> fr.UpdateSessionReturning(sessionID, incrementCompactionOrdinal)
         | None -> 0
 
-    gen, turnId, compactionOrdinal, fallbackRuntime
+    gen, turnId, cancelGen, compactionOrdinal, fallbackRuntime
 
 let buildCompactedResult
     (deps: obj)
@@ -74,7 +79,7 @@ let buildCompactedResult
     promise {
         let guidGen = buildGuid deps
 
-        let gen, turnId, compactionOrdinal, fallbackRuntime =
+        let gen, turnId, cancelGen, compactionOrdinal, fallbackRuntime =
             readCompactionMetadata runtimeScope sessionID
 
         let compactionId = "compact-" + System.Guid.NewGuid().ToString("N")
@@ -91,7 +96,7 @@ let buildCompactedResult
         match fallbackRuntime with
         | Some fr ->
             fr.UpdateSession(sessionID, transferOwnership SessionOwner.Compaction)
-            fr.UpdateSession(sessionID, setActiveCompactionId compactionId compactionOrdinal)
+            fr.UpdateSession(sessionID, setActiveCompactionId compactionId compactionOrdinal turnId cancelGen)
         | None -> ()
 
         return Wanxiangshu.Runtime.BacklogProjectionBuild.compactingTransform cleaned backlog guidGen

@@ -96,11 +96,11 @@ let private decodeNudgeLease (nl: ReplayNudgeLeaseState) : NudgeLease =
       Owner = SessionOwner.Nudge
       Status = decodeLeaseStatus nl.Status }
 
-let private restoreCompactionIdentity (state: SessionState) : string * int =
+let private restoreCompactionIdentity (state: SessionState) : string * int * string * int =
     match state.ActiveCompaction, state.ActiveCompactionId with
-    | Some comp, _ -> comp.CompactionID, comp.CompactionOrdinal
-    | None, Some cid -> cid, state.CompactionOrdinal
-    | None, None -> "", 0
+    | Some comp, _ -> comp.CompactionID, comp.CompactionOrdinal, comp.HumanTurnID, comp.CancelGeneration
+    | None, Some cid -> cid, state.CompactionOrdinal, "", 0
+    | None, None -> "", 0, "", 0
 
 let private nextCoreFromState (state: SessionState) (core: SessionFallbackState) : SessionFallbackState =
     { core with
@@ -155,7 +155,9 @@ let restoreFromEventLogState (state: SessionState) (s: FallbackSessionRuntime) :
 
     let pendingLease = state.PendingLease |> Option.map decodePendingLease
     let pendingNudgeLease = state.PendingNudgeLease |> Option.map decodeNudgeLease
-    let compactionId, compactionOrdinal = restoreCompactionIdentity state
+
+    let compactionId, compactionOrdinal, compactionHumanTurnId, compactionCancelGeneration =
+        restoreCompactionIdentity state
 
     let baseState = buildBaseState s human ordinals state nextCore
     let afterLifecycle = applyLifecycleReset baseState nextCore
@@ -166,5 +168,7 @@ let restoreFromEventLogState (state: SessionState) (s: FallbackSessionRuntime) :
         PendingNudgeLease = pendingNudgeLease
         CompactionActiveId = compactionId
         CompactionActiveOrdinal = compactionOrdinal
+        CompactionHumanTurnId = compactionHumanTurnId
+        CompactionCancelGeneration = compactionCancelGeneration
         CompactionGeneration = state.CompactionGeneration
         CompactionCompacted = state.IsCompacted }

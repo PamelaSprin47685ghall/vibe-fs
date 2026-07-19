@@ -32,6 +32,7 @@ type ReplayCompactionState =
       CompactionOrdinal: int
       SessionGeneration: int
       HumanTurnID: string
+      CancelGeneration: int
       Status: string }
 
 // ── Episode state ──
