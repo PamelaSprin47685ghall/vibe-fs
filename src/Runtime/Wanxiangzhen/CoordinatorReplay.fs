@@ -29,6 +29,7 @@ let private reconcileTask (rt: CoordinatorRuntime) hasCommits now (_id: string) 
     else
         t
 
+
 let private warnOrphans (rt: CoordinatorRuntime) =
     let orphans =
         rt.Dag.Tasks
@@ -42,13 +43,20 @@ let private warnOrphans (rt: CoordinatorRuntime) =
         let warning =
             sprintf "WARNING: Orphan running tasks without PID: %s. Use /squad-kill or ignore." names
 
-        // Catch and log.  We never let a missing
-        // host API or a prompt Promise rejection crash the
-        // replay path; the warning is non-essential.
-        rt.Deps.PromptSession rt.Client rt.MasterSessionId warning
-        |> Promise.catch (fun _ -> ())
-        |> Promise.start
-        |> ignore
+        // Idempotency check / Dedup
+        if not (rt.SentWarnings.Contains warning) then
+            rt.SentWarnings <- rt.SentWarnings.Add warning
+
+            rt.Deps.PromptSession rt.Client rt.MasterSessionId warning
+            |> Promise.catch (fun ex ->
+                JS.console.error (
+                    "CoordinatorReplay: Failed to send orphan warning to prompt session: "
+                    + ex.Message
+                )
+
+                ())
+            |> Promise.start
+            |> ignore
 
 let replayFromEventLog (rt: CoordinatorRuntime) : JS.Promise<unit> =
     promise {

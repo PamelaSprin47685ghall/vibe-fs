@@ -173,6 +173,7 @@ let mkRuntime (deps: CoordinatorDeps) : CoordinatorRuntime =
       GitError = None
       InjectError = None
       IsE2e = false
+      SentWarnings = Set.empty
       Deps = deps }
 
 let mkTask (taskId: string) (title: string) (desc: string) (deps: string list) : obj =

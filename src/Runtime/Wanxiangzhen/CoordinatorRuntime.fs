@@ -74,6 +74,7 @@ type CoordinatorRuntime =
       mutable GitError: string option
       mutable InjectError: string option
       mutable IsE2e: bool
+      mutable SentWarnings: Set<string>
       Deps: CoordinatorDeps }
 
 let commitEvent (rt: CoordinatorRuntime) (e: SquadEvent) : JS.Promise<Result<unit, string>> =

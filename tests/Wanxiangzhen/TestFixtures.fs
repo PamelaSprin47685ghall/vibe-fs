@@ -74,6 +74,7 @@ let mkRuntimeWithDeps (deps: CoordinatorDeps) : CoordinatorRuntime =
       GitError = None
       InjectError = None
       IsE2e = false
+      SentWarnings = Set.empty
       Deps = deps }
 
 let mkRuntime () : CoordinatorRuntime = mkRuntimeWithDeps (stubDeps ())

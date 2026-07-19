@@ -16,22 +16,30 @@ let promptSession (client: obj) (sessionId: string) (text: string) : JS.Promise<
     promise {
         match getSession client with
         | Error err ->
-            // Host API missing must be a typed
-            // failure, not a silent "ok".  Re-raise so the caller
-            // (CoordinatorReplay) can log and skip; previously the
-            // function returned () on missing API and the caller
-            // assumed the warning was delivered.
-            return raise (System.Exception("wanxiangzhen_session_api_missing:" + err))
+            let exMsg = "wanxiangzhen_session_api_missing:" + err
+            JS.console.error ("SessionIo.promptSession failed: " + exMsg)
+            return raise (System.Exception(exMsg))
         | Ok session ->
-            let part = createObj [ "type", box "text"; "text", box text ]
+            let promptFn = get session "prompt"
 
-            let arg =
-                createObj
-                    [ "path", box (createObj [ "id", box sessionId ])
-                      "body", box (createObj [ "parts", box [| part |] ]) ]
+            if isNullish promptFn then
+                let exMsg = "wanxiangzhen_session_api_missing: session.prompt function missing"
+                JS.console.error ("SessionIo.promptSession failed: " + exMsg)
+                return raise (System.Exception(exMsg))
+            else
+                try
+                    let part = createObj [ "type", box "text"; "text", box text ]
 
-            let! _ = session?("prompt") (arg) |> unbox<JS.Promise<obj>>
-            return ()
+                    let arg =
+                        createObj
+                            [ "path", box (createObj [ "id", box sessionId ])
+                              "body", box (createObj [ "parts", box [| part |] ]) ]
+
+                    let! _ = session?("prompt") (arg) |> unbox<JS.Promise<obj>>
+                    return ()
+                with ex ->
+                    JS.console.error ("SessionIo.promptSession invocation failed: " + ex.Message)
+                    return raise ex
     }
 
 let clientId (hookInput: obj) : string = str hookInput "sessionID"

@@ -54,6 +54,7 @@ let createWithDeps
               GitError = gitError
               InjectError = None
               IsE2e = false
+              SentWarnings = Set.empty
               Deps = deps }
 
         rtRef.Value <- Some runtime
