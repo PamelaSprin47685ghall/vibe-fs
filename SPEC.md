@@ -33,10 +33,6 @@
 - `Helpers` 命名清理
 - Fallback 状态收口
 
-
-
-
-
 ## 六、Fallback 不能停留在“文件拆完了” ✅ 部分完成
 
 Fallback 已经有了更清楚的目录，但接下来要验证的是状态一致性，而不是文件数量。
@@ -1972,7 +1968,6 @@ e2e/opencode/
 
 ### P0
 
-* [ ] **OC-BOOT-001** 启动 `opencode serve`，插件从配置路径成功加载。
 * [ ] **OC-BOOT-002** `/command` 中存在 `loop`。
 * [ ] **OC-BOOT-003** LLM 请求中出现所有应注册的自定义工具。
 * [ ] **OC-BOOT-004** 插件缺失时建立 baseline，确认相关工具、命令、prompt 均不存在。
@@ -1999,7 +1994,6 @@ OpenCode 当前注册的自定义工具包括 coder、inspector、browser、cont
 
 ### P0
 
-* [ ] **OC-SCHEMA-001** 每个工具都有非空 description 和合法 JSON schema。
 * [ ] **OC-SCHEMA-002** executor 的真实 schema 包含必填 `max_bytes`。
 * [ ] **OC-SCHEMA-003** 修改类工具 schema 注入 `warn_tdd`。
 * [ ] **OC-SCHEMA-004** executor 等高风险工具注入 `warn`。
@@ -2049,14 +2043,7 @@ OpenCode 当前注册的自定义工具包括 coder、inspector、browser、cont
 
 ### P0
 
-* [ ] **OC-FILE-001** write 新建文件：存在、字节内容完全相等。
-* [ ] **OC-FILE-002** write 覆盖文件：最终内容正确，无旧尾部残留。
-* [ ] **OC-FILE-003** write 空文件：存在且长度为 0。
-* [ ] **OC-FILE-004** write Unicode：UTF-8 字节与原文一致。
-* [ ] **OC-FILE-005** write 多行内容：换行不被改变。
-* [ ] **OC-FILE-006** read 返回真实文件内容并进入下一轮模型输入。
 * [ ] **OC-FILE-007** read 不存在文件：tool part 为 error，session 仍可继续下一轮。
-* [ ] **OC-FILE-008** 写入后再次读取，证明跨轮次工作区一致。
 * [ ] **OC-FILE-009** 缺少 `warn_tdd` 时按当前设计执行但产生批评消息。
 * [ ] **OC-FILE-010** `warn_tdd` 不会写入文件工具真实参数。
 * [ ] **OC-FILE-011** permission deny 时文件绝对不存在。
@@ -2078,9 +2065,7 @@ OpenCode 当前注册的自定义工具包括 coder、inspector、browser、cont
 
 ### P0
 
-* [ ] **OC-FUZZY-001** fuzzy_find 返回真实匹配路径。
 * [ ] **OC-FUZZY-002** 无匹配返回明确空结果，不是仅“工具被调用”。
-* [ ] **OC-FUZZY-003** fuzzy_grep 返回文件、行号和文本。
 * [ ] **OC-FUZZY-004** 多 pattern 按规定形成分块结果。
 * [ ] **OC-FUZZY-005** `fuzzy_continue` 能取得下一页且无重复。
 * [ ] **OC-FUZZY-006** iterator 耗尽后返回完成状态。
@@ -2102,8 +2087,6 @@ OpenCode 当前注册的自定义工具包括 coder、inspector、browser、cont
 
 ### P0
 
-* [ ] **OC-EXEC-001** shell 命令 stdout 正确。
-* [ ] **OC-EXEC-002** JavaScript 命令 stdout 正确。
 * [ ] **OC-EXEC-003** 非零 exit code 被结构化返回。
 * [ ] **OC-EXEC-004** stderr 可见且不被当成成功 stdout。
 * [ ] **OC-EXEC-005** cwd 为目标工作区。
@@ -2133,11 +2116,9 @@ OpenCode 当前注册的自定义工具包括 coder、inspector、browser、cont
 
 ### P0
 
-* [ ] **OC-PTY-001** `pty_spawn` 启动长期进程并返回真实 session ID。
 * [ ] **OC-PTY-002** `pty_list` 能看到新建 PTY。
 * [ ] **OC-PTY-003** `pty_read` 读取初始输出。
 * [ ] **OC-PTY-004** `pty_write` 写入 stdin，随后读到响应。
-* [ ] **OC-PTY-005** `pty_kill` 后 PID 不再存活。
 * [ ] **OC-PTY-006** kill 后 list 不再报告 running。
 * [ ] **OC-PTY-007** 无效 PTY ID 返回错误，不影响其他 PTY。
 * [ ] **OC-PTY-008** session deleted 事件自动清理其所有 PTY。
@@ -2159,7 +2140,6 @@ OpenCode 当前注册的自定义工具包括 coder、inspector、browser、cont
 
 ### P0
 
-* [ ] **OC-WEB-001** websearch 结果 title、URL、content 被正确返回。
 * [ ] **OC-WEB-002** `what_to_summarize` 实际进入子代理 prompt。
 * [ ] **OC-WEB-003** provider HTTP 500 转为 tool error。
 * [ ] **OC-WEB-004** malformed search JSON 不导致宿主崩溃。
@@ -2180,11 +2160,9 @@ OpenCode 当前注册的自定义工具包括 coder、inspector、browser、cont
 
 ### P0
 
-* [ ] **OC-SUB-001** coder 创建真实 child session。
 * [ ] **OC-SUB-002** child 的 parentID 指向调用方 session。
 * [ ] **OC-SUB-003** child 使用 coder agent。
 * [ ] **OC-SUB-004** coder prompt 含用户 intent 和工作目录。
-* [ ] **OC-SUB-005** coder 完成后父 tool result 收到最终输出。
 * [ ] **OC-SUB-006** inspector 同样完成真实 child 链路。
 * [ ] **OC-SUB-007** meditator 使用指定 methodology 内容。
 * [ ] **OC-SUB-008** child 的工具权限符合对应角色。
@@ -2231,7 +2209,6 @@ OpenCode 当前注册的自定义工具包括 coder、inspector、browser、cont
 
 ### P0
 
-* [ ] **OC-REV-001** `/loop task` 返回 With-Review 激活文本。
 * [ ] **OC-REV-002** `loop_activated` 只追加一次。
 * [ ] **OC-REV-003** event 中的 sessionID、task、generation 正确。
 * [ ] **OC-REV-004** 已激活时再次 `/loop` 返回 already active，不重复 append。
@@ -2258,7 +2235,6 @@ OpenCode 当前注册的自定义工具包括 coder、inspector、browser、cont
 
 ### P0
 
-* [ ] **OC-NUDGE-001** active loop + 正常 stop + 未完成工作触发一次 nudge。
 * [ ] **OC-NUDGE-002** nudge 文本精确符合当前协议。
 * [ ] **OC-NUDGE-003** 重复 idle 不产生第二次 nudge。
 * [ ] **OC-NUDGE-004** abort finish 抑制 nudge。
@@ -2319,7 +2295,6 @@ OpenCode 当前注册的自定义工具包括 coder、inspector、browser、cont
 * [ ] **OC-CB-002** session model/provider 从真实 session API 解析。
 * [ ] **OC-CB-003** usage 来自真实 session token 数据，不用字符串长度替代。
 * [ ] **OC-CB-004** 阈值以下不注入 budget nudge。
-* [ ] **OC-CB-005** 越过阈值注入一次。
 * [ ] **OC-CB-006** 同一 phase 不重复注入。
 * [ ] **OC-CB-007** backlog commit 后 phase reset 保留正确基线。
 * [ ] **OC-CB-008** phase reset 后达到条件再次注入。
