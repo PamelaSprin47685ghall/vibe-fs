@@ -20,6 +20,7 @@ import fallbackTests from './p0-canary-tests-fallback.js';
 import fuzzyExecutorTests from './p0-canary-tests-fuzzy-executor.js';
 import nudgeSubTests from './p0-canary-tests-nudge-sub.js';
 import gateTests from './p0-canary-tests-gate.js';
+import webTests from './p0-canary-tests-web.js';
 
 const common = {
   plugin: true,
@@ -27,12 +28,17 @@ const common = {
   allowSynthetic: true,
   allowTitleGen: true,
 };
+
+const webTestsNormal = webTests.filter(t => t.name !== 'OC-WEB-012 MCP process failure = child + resources cleaned');
+const webTestsFail = webTests.filter(t => t.name === 'OC-WEB-012 MCP process failure = child + resources cleaned');
+
 const exitCode1 = await runScenario({ ...common, contextLimit: 20000 }, [
   ...basicTests,
   ...ptyTests,
   ...advancedTests,
   ...fallbackTests,
   ...gateTests,
+  ...webTestsNormal,
 ]);
 
 const exitCode2 = await runScenario({ ...common, contextLimit: 100000 }, nudgeSubTests);
@@ -57,4 +63,12 @@ const exitCode3 = await runScenario({
   }
 }, fuzzyExecutorTests);
 
-process.exit(exitCode1 || exitCode2 || exitCode3);
+const exitCode4 = await runScenario({
+  ...common,
+  contextLimit: 20000,
+  extraEnv: {
+    STEALTH_BROWSER_MCP_FAIL: 'true'
+  }
+}, webTestsFail);
+
+process.exit(exitCode1 || exitCode2 || exitCode3 || exitCode4);

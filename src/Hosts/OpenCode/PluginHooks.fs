@@ -92,7 +92,7 @@ let private registerTransformHooks (result: obj) (client: obj) (services: CoreSe
         "experimental.chat.system.transform"
         (twoArgHook (fun input output -> HookTransform.systemTransform services.Directory input output))
 
-let private handleSessionCleanup (services: CoreServices) (env: HostEventEnvelope) : JS.Promise<unit> =
+let private handleSessionCleanup (services: CoreServices) (ctx: obj) (env: HostEventEnvelope) : JS.Promise<unit> =
     promise {
         let ptyCleanupSessionId =
             if
@@ -111,6 +111,24 @@ let private handleSessionCleanup (services: CoreServices) (env: HostEventEnvelop
             do! eventStore.Append(sid, [ PhysicalSessionClosed sid ])
             SubsessionActorRegistry.ClearPoison services.Directory ptyCleanupSessionId
             SubsessionActorRegistry.Remove services.Directory ptyCleanupSessionId
+
+            let client =
+                match getClientFromPluginCtx ctx with
+                | Ok c -> c
+                | Error _ -> box null
+
+            let children = services.ChildAgentRegistry.ResolveChildren ptyCleanupSessionId
+
+            for childId in children do
+                try
+                    do!
+                        SubagentIoCleanup.abortAndUnregister
+                            services.ChildAgentRegistry
+                            client
+                            services.Directory
+                            childId
+                with _ ->
+                    ()
     }
 
 let private registerEventHooks (result: obj) (ctx: obj) (services: CoreServices) =
@@ -155,7 +173,7 @@ let private registerEventHooks (result: obj) (ctx: obj) (services: CoreServices)
                 else
                     promise {
                         do! EventHooks.eventHandler services.ReviewStore services.RuntimeScope ctx input
-                        do! handleSessionCleanup services env
+                        do! handleSessionCleanup services ctx env
                         do! services.SessionLifecycleObserver.handleEvent input
                     }))
 

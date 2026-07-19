@@ -187,46 +187,49 @@ let webfetchTool (ctx: obj) : obj =
                 let runtime = fromOpencode context (pluginDirectoryFromCtx ctx)
 
                 promise {
-                    let bodyEntries = ResizeArray<(string * obj)>()
-                    bodyEntries.Add("url", box wf.Url)
-                    addIfSome bodyEntries "extract_main" wf.ExtractMain
-                    addIfSome bodyEntries "prefer_llms_txt" wf.PreferLlmsTxt
-                    addIfSome bodyEntries "prompt" wf.Prompt
-                    addIfSome bodyEntries "timeout" wf.Timeout
-                    let body = createObj (Seq.toList bodyEntries)
-                    let! result = webApiPost "web_fetch" body runtime.AbortSignal
+                    match WebFetchGuard.validateFetchUrl wf.Url with
+                    | Error msg -> return webToolFailed "fetch" (UpstreamRefused msg)
+                    | Ok() ->
+                        let bodyEntries = ResizeArray<(string * obj)>()
+                        bodyEntries.Add("url", box wf.Url)
+                        addIfSome bodyEntries "extract_main" wf.ExtractMain
+                        addIfSome bodyEntries "prefer_llms_txt" wf.PreferLlmsTxt
+                        addIfSome bodyEntries "prompt" wf.Prompt
+                        addIfSome bodyEntries "timeout" wf.Timeout
+                        let body = createObj (Seq.toList bodyEntries)
+                        let! result = webApiPost "web_fetch" body runtime.AbortSignal
 
-                    match result with
-                    | Error e -> return webToolFailed "fetch" e
-                    | Ok data ->
-                        let title =
-                            if Dyn.isNullish (Dyn.get data "title") then
-                                None
-                            else
-                                Some(Dyn.str data "title")
+                        match result with
+                        | Error e -> return webToolFailed "fetch" e
+                        | Ok data ->
+                            let title =
+                                if Dyn.isNullish (Dyn.get data "title") then
+                                    None
+                                else
+                                    Some(Dyn.str data "title")
 
-                        let byline =
-                            if Dyn.isNullish (Dyn.get data "byline") then
-                                None
-                            else
-                                Some(Dyn.str data "byline")
+                            let byline =
+                                if Dyn.isNullish (Dyn.get data "byline") then
+                                    None
+                                else
+                                    Some(Dyn.str data "byline")
 
-                        let length_ =
-                            if Dyn.isNullish (Dyn.get data "length") then
-                                None
-                            else
-                                Some(unbox<int> (Dyn.get data "length"))
+                            let length_ =
+                                if Dyn.isNullish (Dyn.get data "length") then
+                                    None
+                                else
+                                    Some(unbox<int> (Dyn.get data "length"))
 
-                        let content =
-                            if Dyn.isNullish (Dyn.get data "content") then
-                                None
-                            else
-                                Some(Dyn.str data "content")
+                            let content =
+                                if Dyn.isNullish (Dyn.get data "content") then
+                                    None
+                                else
+                                    Some(Dyn.str data "content")
 
-                        return
-                            formatFetchResponse
-                                { title = title
-                                  byline = byline
-                                  length = length_
-                                  content = content }
+                            return
+                                formatFetchResponse
+                                    { title = title
+                                      byline = byline
+                                      length = length_
+                                      content = content }
                 })

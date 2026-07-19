@@ -69,3 +69,16 @@ type ChildAgentRegistry private (state: WorkspaceState ref) =
         match this.parseChildId sessionID with
         | None -> ()
         | Some childId -> state.Value <- reduce state.Value (ChildUnregistered childId)
+
+    member this.ResolveChildren(parentSessionID: string) =
+        let pIdOpt = this.parseSessionId parentSessionID
+
+        match pIdOpt with
+        | None -> []
+        | Some pId ->
+            state.Value.childSessions
+            |> Map.toList
+            |> List.choose (fun (childId, meta) ->
+                match meta.parentSessionId with
+                | Some pid when pid = pId -> Some(Id.childIdValue childId)
+                | _ -> None)

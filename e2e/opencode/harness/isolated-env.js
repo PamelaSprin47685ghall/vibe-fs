@@ -159,5 +159,6 @@ export function createIsolatedEnv(opts) {
     // MCP fixture
     STEALTH_BROWSER_MCP_FIXTURE: fixturePath,
     PATH: `${fixtureUvxDir}${path.delimiter}${process.env.PATH || ''}`,
+    ...opts.extraEnv,
   };
 }

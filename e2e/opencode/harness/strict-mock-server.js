@@ -28,23 +28,46 @@ export function stopHttpServer(server) {
 }
 
 export function handleWebSearch(req, res) {
-  req.on('data', () => {});
-  req.on('end', () => {
-    sendJSON(res, 200, {
-      results: [{ title: 'Test Search Title', url: 'http://example.com', content: 'Test search content for E2E.' }],
-    });
+  readRequestBody(req).then((body) => {
+    const query = body.query || '';
+    if (query.includes('trigger_500')) {
+      res.writeHead(500, { 'Content-Type': 'text/plain' });
+      res.end('Internal Server Error');
+    } else if (query.includes('trigger_malformed')) {
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end('{ malformed json');
+    } else {
+      sendJSON(res, 200, {
+        results: [{ title: 'Test Search Title', url: 'http://example.com', content: 'Test search content for E2E.' }],
+      });
+    }
+  }).catch(() => {
+    sendJSON(res, 400, { error: 'bad request' });
   });
 }
 
 export function handleWebFetch(req, res) {
-  req.on('data', () => {});
-  req.on('end', () => {
-    sendJSON(res, 200, {
-      title: 'Example Domain',
-      byline: 'IANA',
-      length: 500,
-      content: 'Example Domain\n\nThis domain is for use in documentation examples.',
-    });
+  readRequestBody(req).then((body) => {
+    const url = body.url || '';
+    if (url.includes('to-private') || url.includes('redirect-private')) {
+      res.writeHead(400, { 'Content-Type': 'text/plain' });
+      res.end('redirect to private IP blocked');
+    } else if (url.includes('trigger_500')) {
+      res.writeHead(500, { 'Content-Type': 'text/plain' });
+      res.end('Internal Server Error');
+    } else if (url.includes('trigger_malformed')) {
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end('{ malformed json');
+    } else {
+      sendJSON(res, 200, {
+        title: 'Example Domain',
+        byline: 'IANA',
+        length: 500,
+        content: 'Example Domain\n\nThis domain is for use in documentation examples.',
+      });
+    }
+  }).catch(() => {
+    sendJSON(res, 400, { error: 'bad request' });
   });
 }
 

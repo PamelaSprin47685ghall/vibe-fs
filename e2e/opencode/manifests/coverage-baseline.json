@@ -1,5 +1,5 @@
 {
-  "notCoveredCount": 129,
+  "notCoveredCount": 120,
   "entries": {
     "OC-BOOT-001": {
       "level": "real-e2e"
@@ -237,37 +237,37 @@
       "level": "real-e2e"
     },
     "OC-WEB-002": {
-      "level": "not-covered"
+      "level": "real-e2e"
     },
     "OC-WEB-003": {
-      "level": "not-covered"
+      "level": "real-e2e"
     },
     "OC-WEB-004": {
-      "level": "not-covered"
+      "level": "real-e2e"
     },
     "OC-WEB-005": {
-      "level": "not-covered"
+      "level": "real-e2e"
     },
     "OC-WEB-006": {
-      "level": "unit"
+      "level": "real-e2e"
     },
     "OC-WEB-007": {
-      "level": "unit"
+      "level": "real-e2e"
     },
     "OC-WEB-008": {
-      "level": "not-covered"
+      "level": "real-e2e"
     },
     "OC-WEB-009": {
-      "level": "not-covered"
+      "level": "real-e2e"
     },
     "OC-WEB-010": {
-      "level": "not-covered"
+      "level": "real-e2e"
     },
     "OC-WEB-011": {
-      "level": "not-covered"
+      "level": "real-e2e"
     },
     "OC-WEB-012": {
-      "level": "not-covered"
+      "level": "real-e2e"
     },
     "OC-SUB-001": {
       "level": "real-e2e"
