@@ -143,7 +143,6 @@ let test_isNudgeEvaluationEligible_allOrigins () =
     check "HumanTurnAborted + idle blocked" (not (eligible TerminalOrigin.HumanTurnAborted "session.idle"))
     check "ToolSubturnCompleted + idle blocked" (not (eligible TerminalOrigin.ToolSubturnCompleted "session.idle"))
     check "Unknown + idle blocked" (not (eligible TerminalOrigin.Unknown "session.idle"))
-    check "UnknownLegacyStop + idle blocked" (not (eligible TerminalOrigin.UnknownLegacyStop "session.idle"))
 
 // --- 4. TryConsumeActiveNudgeNonce: real implementation, real store ---
 

@@ -72,7 +72,6 @@ type TerminalOrigin =
     | NudgeCompleted
     | TitleCompleted
     | ToolSubturnCompleted
-    | UnknownLegacyStop
     | Unknown
 
 let isNaturalStop (origin: TerminalOrigin) : bool =

@@ -24,8 +24,6 @@ open Wanxiangshu.Kernel.ToolOutputInfoTypes
 
 module HostAdapter = Wanxiangshu.Kernel.HostAdapter
 
-let private _satisfyArchTestForRunParallelSpawns = runParallelSpawns
-
 let runCoderBatch
     (adapter: IHostAdapter)
     (host: Host)

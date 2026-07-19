@@ -177,6 +177,7 @@ let tailCoreTestEntriesGroup3 () : (string * TestBody) list =
         "ProductionDebugOutputTests.run", TestBody.Sync(sync Wanxiangshu.Tests.ProductionDebugOutputTests.run)
         "ArchitectureGatesTests.run", TestBody.Sync(sync Wanxiangshu.Tests.ArchitectureGatesTests.run)
         "RemovedProductionFilesTests.run", TestBody.Sync(sync Wanxiangshu.Tests.RemovedProductionFilesTests.run)
+        "ForbiddenSourceSymbolsTests.run", TestBody.Sync(sync Wanxiangshu.Tests.ForbiddenSourceSymbolsTests.run)
         "ProfilerDefaultTests.run", TestBody.Sync(sync Wanxiangshu.Tests.ProfilerDefaultTests.run)
         "PendingEvidenceEpochTests.run", TestBody.Sync(sync Wanxiangshu.Tests.PendingEvidenceEpochTests.run)
         "ContinuationCleanupTests.run", TestBody.Sync(sync Wanxiangshu.Tests.ContinuationCleanupTests.run)
