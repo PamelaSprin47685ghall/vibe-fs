@@ -94,4 +94,5 @@ type SendOutcome =
     | Delivered
     | Aborted
     | Busy
-    | Failed
+    | Failed of error: string
+    | TransportUnavailable of error: string

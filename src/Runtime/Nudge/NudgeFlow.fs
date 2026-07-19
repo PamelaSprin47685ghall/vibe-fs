@@ -6,6 +6,7 @@ open Wanxiangshu.Kernel.Nudge.Types
 open Wanxiangshu.Kernel.HostTools
 open Wanxiangshu.Runtime.Nudge.NudgeDerivation
 open Wanxiangshu.Runtime.NudgeLease
+open Wanxiangshu.Runtime.NudgeOutcomeHandler
 open Wanxiangshu.Runtime.NudgeRuntimeState
 open Wanxiangshu.Kernel.FallbackKernel.Types
 open Wanxiangshu.Runtime.Fallback.RuntimeStore

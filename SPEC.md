@@ -1314,10 +1314,10 @@ Retry governor、延时、异步 receipt 若在测试模式下全部变为零，
 只做：
 
 * OpenCode 真实 prompt contract probes；
-* 禁止 generation-only matching；
+* ~~禁止 generation-only matching~~ ✅ 已完成；
 * missing API 显式失败；
 * session 单 synthetic prompt 限制；
-* 人类消息去重前置；
+* ~~人类消息去重前置~~ ✅ 已完成；
 * quiescence 明确逻辑错误修复；
 * 补齐结构化 trace。
 

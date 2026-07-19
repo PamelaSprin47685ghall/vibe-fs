@@ -115,9 +115,14 @@ let sendNudgeMux
 
             fallbackRuntime.Update(workspaceId, setMainContinuationAwaitingStart true)
             let! delivered = unbox<JS.Promise<bool>> (Dyn.call4 nudgeFn workspaceId promptText modelVal agentVal)
-            return if delivered then Delivered else Busy
+
+            return
+                if delivered then
+                    SendOutcome.Delivered
+                else
+                    SendOutcome.Busy
         with _ ->
-            return Busy
+            return SendOutcome.Busy
     }
 
 let runNudgeFlowWithRetryCheck

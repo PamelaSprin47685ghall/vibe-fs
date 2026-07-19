@@ -381,6 +381,7 @@
     <Compile Include="src/Runtime/Nudge/NudgeRuntimeEvent.fs"/>
     <Compile Include="src/Runtime/Nudge/NudgeModelResolver.fs"/>
     <Compile Include="src/Runtime/Nudge/NudgeLease.fs"/>
+    <Compile Include="src/Runtime/Nudge/NudgeOutcomeHandler.fs"/>
     <Compile Include="src/Runtime/Nudge/NudgeFlow.fs"/>
     <Compile Include="src/Runtime/Nudge/MuxNudgeEventParse.fs"/>
     <Compile Include="src/Runtime/Nudge/NudgeRuntimeMux.fs"/>

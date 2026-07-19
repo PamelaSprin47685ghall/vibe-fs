@@ -97,10 +97,15 @@ let sendNudgeOutcome
             match caught with
             | Ok() -> Delivered
             | Error error ->
-                match translateJsError error with
-                | MessageAborted -> Aborted
-                | Wanxiangshu.Kernel.Errors.DomainError.SessionBusy -> Busy
-                | _ -> Wanxiangshu.Kernel.Nudge.Types.Failed
+                let msg = (error :?> System.Exception).Message
+
+                if msg = "opencode_session_api_missing" then
+                    TransportUnavailable msg
+                else
+                    match translateJsError error with
+                    | MessageAborted -> Aborted
+                    | Wanxiangshu.Kernel.Errors.DomainError.SessionBusy -> Busy
+                    | _ -> Wanxiangshu.Kernel.Nudge.Types.Failed msg
     }
 
 let startNudgeFlow
