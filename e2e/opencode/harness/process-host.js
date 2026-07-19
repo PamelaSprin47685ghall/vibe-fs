@@ -74,14 +74,14 @@ export class ProcessHost {
     const startTimeout = opts.startTimeoutMs || 30000;
     const listenLine = await this._waitForListening(startTimeout);
     if (!listenLine) {
-      try { this._child.kill('SIGKILL'); } catch {}
+      try { this._child?.kill('SIGKILL'); } catch {}
       throw new Error(
         'opencode serve did not output listening line within timeout\n' +
         `stdout tail:\n${this._stdoutBuffer.slice(-20).join('\n')}\n` +
         `stderr tail:\n${this._stderrBuffer.slice(-20).join('\n')}`,
       );
     }
-    this._pid = this._child.pid;
+    this._pid = this._child?.pid || null;
     this._port = parseListenPort(listenLine);
     this._baseUrl = `http://127.0.0.1:${this._port}`;
     await this._waitForHealth(startTimeout);
@@ -163,23 +163,41 @@ export class ProcessHost {
 
   async _waitForListening(timeoutMs) {
     return new Promise((resolve) => {
+      const child = this._child;
+      if (!child || !child.stdout) {
+        resolve(null);
+        return;
+      }
       const deadline = Date.now() + timeoutMs;
       let buf = '';
-      const handler = (chunk) => { buf += chunk.toString(); tryResolve(); };
+      let settled = false;
+      const finish = (value) => {
+        if (settled) return;
+        settled = true;
+        try { child.stdout.removeListener('data', handler); } catch {}
+        try { child.removeListener('exit', onExit); } catch {}
+        resolve(value);
+      };
+      const handler = (chunk) => {
+        buf += chunk.toString();
+        tryResolve();
+      };
       const tryResolve = () => {
         if (!buf.includes(READY_SENTINEL)) return false;
-        this._child.stdout.removeListener('data', handler);
         const lines = buf.split('\n');
-        const listenLine = lines.find(l => l.includes(READY_SENTINEL));
-        resolve(listenLine ? listenLine.trim() : buf.trim());
+        const listenLine = lines.find((l) => l.includes(READY_SENTINEL));
+        finish(listenLine ? listenLine.trim() : buf.trim());
         return true;
       };
-      this._child.stdout.on('data', handler);
+      const onExit = () => {
+        finish(null);
+      };
+      child.once('exit', onExit);
+      child.stdout.on('data', handler);
       const poll = () => {
         if (tryResolve()) return;
         if (Date.now() > deadline) {
-          this._child.stdout.removeListener('data', handler);
-          resolve(null);
+          finish(null);
           return;
         }
         setTimeout(poll, LISTEN_POLL_INTERVAL_MS);

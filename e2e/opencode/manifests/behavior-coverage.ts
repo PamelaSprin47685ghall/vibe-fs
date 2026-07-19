@@ -114,7 +114,7 @@ export const COVERAGE: Record<string, CoverageEntry[]> = {
     { id: "OC-PTY-010", description: "Permission deny = no child process", level: "not-covered", priority: "P0" },
   ],
   web: [
-    { id: "OC-WEB-001", description: "websearch returns title, URL, content", level: "real-e2e", priority: "P0", spec: "e2e/opencode/specs/p0-canary-tests-advanced.js", test: "OC-WEB-001 websearch is listed in available tools" },
+    { id: "OC-WEB-001", description: "websearch returns title, URL, content", level: "real-e2e", priority: "P0", spec: "e2e/opencode/specs/p0-canary-tests-advanced.js", test: "OC-WEB-001 websearch calls mock endpoint and backfills result" },
     { id: "OC-WEB-002", description: "what_to_summarize enters subagent prompt", level: "not-covered", priority: "P0" },
     { id: "OC-WEB-003", description: "Provider HTTP 500 → tool error", level: "not-covered", priority: "P0" },
     { id: "OC-WEB-004", description: "Malformed search JSON no host crash", level: "not-covered", priority: "P0" },
