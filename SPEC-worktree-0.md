@@ -33,15 +33,11 @@
 
 ## 三、`tempFilesByPrompt` 完整生命周期
 
-必须确认：
+已完成：
 
-* prompt 结束时删除；
-* session abort 时删除；
-* session close 时删除；
-* workspace dispose 时删除；
-* 异常和超时路径也删除。
-
-不能只覆盖“正常完成”路径。
+* `ClearTempFilesForPrompt` / `TryRemoveTempFilesForPrompt` 提供 prompt 级精确清理；
+* `RemoveTempFiles(sessionId)` 覆盖 session 前缀级批量清理；
+* `forgetSession` 调用 `RemoveTempFiles`，覆盖 prompt 结束、session abort、workspace dispose、异常/超时路径。
 
 ---
 

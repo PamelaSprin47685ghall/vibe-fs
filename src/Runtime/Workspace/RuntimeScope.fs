@@ -93,6 +93,22 @@ type RuntimeScope() =
         let key = if isNull prompt then "" else prompt.Trim()
         if key = "" then None else Map.tryFind key tempFilesByPrompt
 
+    member _.ClearTempFilesForPrompt(prompt: string) : unit =
+        let key = if isNull prompt then "" else prompt.Trim()
+
+        if key <> "" then
+            tempFilesByPrompt <- Map.remove key tempFilesByPrompt
+
+    member _.TryRemoveTempFilesForPrompt(prompt: string) : bool =
+        let key = if isNull prompt then "" else prompt.Trim()
+
+        if key = "" then
+            false
+        else
+            let existed = Map.containsKey key tempFilesByPrompt
+            tempFilesByPrompt <- Map.remove key tempFilesByPrompt
+            existed
+
     member _.TryGetCapsFiles(key: string) : CapsFile list option = Map.tryFind key capsFiles
 
     member _.AddCapsFilesIfAbsent(key: string, files: CapsFile list) : unit =
