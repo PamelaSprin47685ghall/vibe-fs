@@ -108,9 +108,9 @@ class MuxHarness {
       eventHook: this.fireEvent.bind(this),
       messagesTransform: this.runMessageTransform.bind(this),
       slashCommands: sharedHost.commands,
-      __reviewStore: {
-        getReviewTask: () => this.currentReviewTaskRef.value
-      }
+    };
+    this.reviewStoreSurface = {
+      getReviewTask: () => this.currentReviewTaskRef.value
     };
     this.getToolSchemaCache = sharedHost.getToolSchemaCache;
   }

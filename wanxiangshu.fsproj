@@ -563,6 +563,7 @@
     <Compile Include="tests/ArchitectureGatesTests.fs"/>
     <Compile Include="tests/RemovedProductionFilesTests.fs"/>
     <Compile Include="tests/ForbiddenSourceSymbolsTests.fs"/>
+    <Compile Include="tests/PluginObjectContractTests.fs"/>
     <Compile Include="tests/ProfilerDefaultTests.fs"/>
     <Compile Include="tests/PendingEvidenceEpochTests.fs"/>
     <Compile Include="tests/ContinuationCleanupTests.fs"/>

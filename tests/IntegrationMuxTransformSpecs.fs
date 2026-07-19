@@ -85,7 +85,9 @@ let muxSummarizationToolPolicySpec () =
 
 let muxMessagesTransformAcceptedSubmitReviewEndsLoopSpec () =
     promise {
-        let reg = sharedMuxRegistration ()
+        let seams = sharedMuxRegistrationWithSeams ()
+        let reg = seams.Registration
+        let reviewStore = seams.ReviewStore
         let tf = muxMessageTransform reg
         let sessionID = "mux-review-accepted-history"
 
@@ -99,12 +101,14 @@ let muxMessagesTransformAcceptedSubmitReviewEndsLoopSpec () =
                 [| muxTextMessage "loop-task" "assistant" "---\ntask: Ship feature\n---\nWith-Review Mode is active."
                    muxDynamicToolMessage "submit-review" "submit_review" "call-review" (createObj []) (box accepted) |]
 
-            muxReplayReviewTaskForTest reg sessionID (Some "Ship feature")
+            muxReplayReviewTaskForTest reviewStore sessionID (Some "Ship feature")
             let out = createObj [ "messages", box messages ]
             let input = createObj [ "agent", box "manager"; "sessionID", box sessionID ]
             do! (tf $ (input, out)) |> unbox<JS.Promise<unit>>
             // With IfStoreEmpty (Defect 1 fix), transform does NOT clear an active review
             // when store is non-empty — verdict resolution is the tool path's job, not replay's.
             // This prevents the mid-session silent deactivation bug.
-            check "mux transform preserves active review when store non-empty" (muxIsReviewActiveForTest reg sessionID)
+            check
+                "mux transform preserves active review when store non-empty"
+                (muxIsReviewActiveForTest reviewStore sessionID)
     }

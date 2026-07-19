@@ -17,10 +17,11 @@ module Dyn = Wanxiangshu.Runtime.Dyn
 
 let muxEventHookAbortDeactivatesReviewSpec () =
     promise {
-        let reg = sharedMuxRegistration ()
+        let seams = sharedMuxRegistrationWithSeams ()
+        let reg = seams.Registration
         let sessionID = "mux-abort-session"
-        muxActivateReviewForTest reg sessionID "review-task"
-        check "mux event hook abort starts with active review" (muxIsReviewActiveForTest reg sessionID)
+        muxActivateReviewForTest seams.ReviewStore sessionID "review-task"
+        check "mux event hook abort starts with active review" (muxIsReviewActiveForTest seams.ReviewStore sessionID)
         let eventHook = get reg "eventHook"
 
         if isNullish eventHook then
@@ -28,7 +29,7 @@ let muxEventHookAbortDeactivatesReviewSpec () =
         else
             let event = createObj [ "type", box "stream-abort"; "workspaceId", box sessionID ]
             do! (eventHook $ (event, createObj [])) |> unbox<JS.Promise<unit>>
-            check "mux event hook abort deactivates review" (not (muxIsReviewActiveForTest reg sessionID))
+            check "mux event hook abort deactivates review" (not (muxIsReviewActiveForTest seams.ReviewStore sessionID))
     }
 
 let muxToolExecuteBeforeSetsUiLabelSpec () =
@@ -211,11 +212,9 @@ let muxLoopSlashCommandWritesEventLogUnderDepsDirectorySpec () =
 /// error on the 3rd identical call (`LivelockGuard.defaultMaxRepeats` = 3).
 let muxToolExecuteAfterBlocksRepeatedIdenticalCallSpec () =
     promise {
-        let reg = sharedMuxRegistration ()
-
-        let scope =
-            unbox<Wanxiangshu.Runtime.RuntimeScope.RuntimeScope> (Dyn.get reg "__runtimeScope")
-
+        let seams = sharedMuxRegistrationWithSeams ()
+        let reg = seams.Registration
+        let scope = seams.Scope
         let sessionID = "mux-livelock-blocks-" + System.Guid.NewGuid().ToString("N")
         Wanxiangshu.Runtime.LivelockGuard.cleanup scope sessionID
 
@@ -241,10 +240,9 @@ let muxToolExecuteAfterBlocksRepeatedIdenticalCallSpec () =
 /// even if the control parameters (warn, warn_tdd, warn_reuse, amend) differ.
 let muxToolExecuteAfterBlocksRepeatedCallIgnoringControlsSpec () =
     promise {
-        let reg = sharedMuxRegistration ()
-
-        let scope =
-            unbox<Wanxiangshu.Runtime.RuntimeScope.RuntimeScope> (Dyn.get reg "__runtimeScope")
+        let seams = sharedMuxRegistrationWithSeams ()
+        let reg = seams.Registration
+        let scope = seams.Scope
 
         let sessionID =
             "mux-livelock-ignore-controls-" + System.Guid.NewGuid().ToString("N")

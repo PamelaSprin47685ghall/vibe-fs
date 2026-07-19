@@ -6,6 +6,7 @@ open Fable.Core.JsInterop
 open Wanxiangshu.Hosts.Mux.Plugin
 open Wanxiangshu.Tests.TempWorkspace
 open Wanxiangshu.Runtime.Dyn
+open Wanxiangshu.Runtime.RuntimeScope
 
 [<Import("createRequire", "node:module")>]
 let private createRequire': string -> (string -> obj) = jsNative
@@ -34,18 +35,26 @@ let muxDepsWithFixedNow () : obj =
           box (System.Func<obj, obj, string, JS.Promise<obj>>(fun _ _ _ -> Promise.lift (createObj [])))
           "nowUtc", box (System.Func<unit, System.DateTime>(fun () -> System.DateTime(2026, 6, 25))) ]
 
-let mutable cachedMuxRegistration: obj option = None
+type MuxSeams =
+    {| Registration: obj
+       Scope: RuntimeScope
+       ReviewStore: obj |}
 
-let sharedMuxRegistration () : obj =
-    match cachedMuxRegistration with
-    | Some reg -> reg
+let mutable private cachedMuxSeams: MuxSeams option = None
+
+let sharedMuxRegistrationWithSeams () : MuxSeams =
+    match cachedMuxSeams with
+    | Some seams -> seams
     | None ->
         let deps = muxDepsWithFixedNow ()
         let isolatedDir = mkdtempSync (pathJoin (tmpdir ()) "wanxiang-shared-mux-")
         deps?directory <- isolatedDir
-        let reg = createRegistration deps
-        cachedMuxRegistration <- Some reg
-        reg
+        let seams = createRegistrationWithSeams deps
+        cachedMuxSeams <- Some seams
+        seams
+
+let sharedMuxRegistration () : obj =
+    (sharedMuxRegistrationWithSeams ()).Registration
 
 let unlinkAsync (p: string) : JS.Promise<unit> = unbox (fsAsync?unlink (p))
 

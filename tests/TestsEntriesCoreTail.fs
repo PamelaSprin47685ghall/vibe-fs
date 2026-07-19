@@ -51,6 +51,7 @@ open Wanxiangshu.Tests.EventDrivenHarnessDemo
 open Wanxiangshu.Tests.SubagentOutputTranscriptTests
 open Wanxiangshu.Tests.SubagentDrainingTests
 open Wanxiangshu.Tests.TestsTestBody
+open Wanxiangshu.Tests.PluginObjectContractTests
 
 let tailCoreTestEntriesGroup1 () : (string * TestBody) list =
     [ "FuzzyTests.grepDetect", TestBody.Sync(sync FuzzyTests.grepDetect)
@@ -178,6 +179,7 @@ let tailCoreTestEntriesGroup3 () : (string * TestBody) list =
         "ArchitectureGatesTests.run", TestBody.Sync(sync Wanxiangshu.Tests.ArchitectureGatesTests.run)
         "RemovedProductionFilesTests.run", TestBody.Sync(sync Wanxiangshu.Tests.RemovedProductionFilesTests.run)
         "ForbiddenSourceSymbolsTests.run", TestBody.Sync(sync Wanxiangshu.Tests.ForbiddenSourceSymbolsTests.run)
+        "PluginObjectContractTests.run", TestBody.Sync(sync PluginObjectContractTests.run)
         "ProfilerDefaultTests.run", TestBody.Sync(sync Wanxiangshu.Tests.ProfilerDefaultTests.run)
         "PendingEvidenceEpochTests.run", TestBody.Sync(sync Wanxiangshu.Tests.PendingEvidenceEpochTests.run)
         "ContinuationCleanupTests.run", TestBody.Sync(sync Wanxiangshu.Tests.ContinuationCleanupTests.run)

@@ -16,5 +16,8 @@ let buildCapsFileReadData = Wanxiangshu.Runtime.CapsFileCache.buildCapsFileReadD
 let createToolCatalog deps toolNames reviewStore hostReadExec finderCache sessionScope =
     PluginCatalog.createToolCatalog deps toolNames reviewStore hostReadExec finderCache sessionScope
 
+let createRegistrationWithSeams deps =
+    Wanxiangshu.Hosts.Mux.PluginRegistration.createRegistrationWithSeams deps
+
 let createRegistration deps =
     Wanxiangshu.Hosts.Mux.PluginRegistration.createRegistration deps

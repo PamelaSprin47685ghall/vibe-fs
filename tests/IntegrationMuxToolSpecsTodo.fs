@@ -50,7 +50,9 @@ let muxTodoWriteWrapperSchemaSpec () =
 
 let muxTodoWriteCapturesCompletedWorkReportSpec () =
     promise {
-        let reg = sharedMuxRegistration ()
+        let seams = sharedMuxRegistrationWithSeams ()
+        let reg = seams.Registration
+        let scope = seams.Scope
         let wrappers = unbox<obj[]> (get reg "wrappers")
 
         let todoWrapper =
@@ -106,7 +108,6 @@ let muxTodoWriteCapturesCompletedWorkReportSpec () =
                 "mux todo_write wrapper strips priority before native execute"
                 (isNullish (get nativeTodos.[0] "priority"))
 
-            let scope = unbox<RuntimeScope> (get reg "__runtimeScope")
             let captured = scope.Projection.TryGetBacklogEntry(mux, "todo-call-1")
 
             check

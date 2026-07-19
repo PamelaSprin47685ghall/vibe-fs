@@ -65,6 +65,7 @@ let createReviewTestSurface (reviewStore: Wanxiangshu.Runtime.ReviewRuntime.Revi
           "unlockReview", box (System.Func<string, unit>(fun sessionID -> reviewStore.unlockReview sessionID)) ]
 
 let assembleRegistrationObject
+    (deps: obj)
     (scope: RuntimeScope)
     (tools: ToolDefinition array)
     (wrappers: obj)
@@ -74,11 +75,11 @@ let assembleRegistrationObject
     (messagesTransform: obj)
     (compactingTransform: obj)
     (getToolPolicy: obj)
-    (reviewTestSurface: obj)
     : obj =
+    let directory = if Dyn.isNullish deps then "" else Dyn.str deps "directory"
+
     createObj
-        [ "__runtimeScope", box scope
-          "toolNames", box muxToolNames
+        [ "toolNames", box muxToolNames
           "tools", box tools
           "wrappers", box wrappers
           "mcpServers", box mcpServers
@@ -87,12 +88,15 @@ let assembleRegistrationObject
           "messagesTransform", box messagesTransform
           "compactingTransform", box compactingTransform
           "getToolPolicy", box getToolPolicy
-          "__reviewStore", box reviewTestSurface
           "tool.execute.after",
           box (
               System.Func<obj, obj, JS.Promise<unit>>(fun input output ->
                   Wanxiangshu.Hosts.Mux.PluginCatalog.toolExecuteAfter scope input output)
-          ) ]
+          )
+          "tool.execute.before",
+          box (System.Func<obj, obj, JS.Promise<unit>>(fun input output -> toolExecuteBefore input output))
+          "systemTransform",
+          box (System.Func<obj, obj, JS.Promise<unit>>(fun input output -> systemTransform directory input output)) ]
 
 let private createScope (deps: obj) =
     let scope = create ()
@@ -106,21 +110,6 @@ let private createScope (deps: obj) =
 
     let toolsObj = toolsToObject tools
     (scope, backlogSession, reviewStore, hostReadExec, finderCache, tools, toolsObj)
-
-let private registerTestHooks (registration: obj) (deps: obj) : unit =
-    setKey
-        registration
-        "tool.execute.before"
-        (box (System.Func<obj, obj, JS.Promise<unit>>(fun input output -> toolExecuteBefore input output)))
-
-    setKey
-        registration
-        "systemTransform"
-        (box (
-            System.Func<obj, obj, JS.Promise<unit>>(fun input output ->
-                let directory = if Dyn.isNullish deps then "" else Dyn.str deps "directory"
-                systemTransform directory input output)
-        ))
 
 let private buildInitHandler
     (scope: RuntimeScope)
@@ -143,7 +132,12 @@ let private buildInitHandler
                     dir
         }
 
-let createRegistration (deps: obj) : obj =
+let createRegistrationWithSeams
+    (deps: obj)
+    : {| Registration: obj
+         Scope: RuntimeScope
+         ReviewStore: obj |}
+    =
     Wanxiangshu.Runtime.E2eSandbox.applyFromProcessEnv ()
 
     let (scope, backlogSession, reviewStore, hostReadExec, _, tools, toolsObj) =
@@ -162,6 +156,7 @@ let createRegistration (deps: obj) : obj =
 
     let registration =
         assembleRegistrationObject
+            deps
             scope
             tools
             wrappers
@@ -171,9 +166,6 @@ let createRegistration (deps: obj) : obj =
             messagesTransform
             compactingTransform
             getToolPolicy
-            (createReviewTestSurface reviewStore)
-
-    registerTestHooks registration deps
 
     scope.OnInit <- Some(buildInitHandler scope reviewStore)
 
@@ -182,4 +174,9 @@ let createRegistration (deps: obj) : obj =
     if directory <> "" then
         scope.TriggerInit(directory)
 
-    box registration
+    {| Registration = registration
+       Scope = scope
+       ReviewStore = createReviewTestSurface reviewStore |}
+
+let createRegistration (deps: obj) : obj =
+    (createRegistrationWithSeams deps).Registration

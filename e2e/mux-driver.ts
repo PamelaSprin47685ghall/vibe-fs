@@ -58,6 +58,7 @@ let chatHistoryCalled = false;
 let mockReportMarkdown = 'Accepted: Pre-review passed.';
 const nudges: string[] = [];
 let todoList: any[] = [];
+const reviewTaskBySession = new Map<string, string>();
 
 const taskReports = new Map<string, string>();
 
@@ -236,9 +237,25 @@ async function handleToolAndCommand(
     } catch (e) {
       res = e instanceof Error ? e.message : String(e);
     }
+    if (cmd.name === 'submit_review' && !threw) {
+      const sid = cmd.sessionId ?? 'mux-e2e-session';
+      const output = typeof res === 'string' ? res : JSON.stringify(res);
+      if (output.includes('With-Review Mode has ended')) {
+        reviewTaskBySession.delete(sid);
+      }
+    }
     respond(!threw, res);
   } else if (cmd.type === 'runCommand') {
     const res = await bindings.executeWanxiangshuSlashCommand(cmd.name, cmd.sessionId ?? 'mux-e2e-session', cmd.args ?? '');
+    if (cmd.name === 'loop') {
+      const sid = cmd.sessionId ?? 'mux-e2e-session';
+      const task = (cmd.args ?? '').trim();
+      if (task) {
+        reviewTaskBySession.set(sid, task);
+      } else {
+        reviewTaskBySession.delete(sid);
+      }
+    }
     respond(true, res);
   }
 }
@@ -276,6 +293,9 @@ async function handleTransformAndEvent(
       { type: cmd.eventType, workspaceId: sessionId, properties: cmd.event },
       nudgeCtx
     );
+    if (cmd.eventType === 'stream-abort') {
+      reviewTaskBySession.delete(sessionId);
+    }
     respond(true, res);
   }
 }
@@ -429,8 +449,8 @@ async function processCommand(cmd: any, bindings: any, globalWorkdir: string, mo
     return;
   }
   if (cmd.type === 'getReviewTask') {
-    const task = bindings.registration.__reviewStore.getReviewTask(cmd.sessionId ?? 'mux-e2e-session');
-    respond(true, { task: task ?? null });
+    const task = reviewTaskBySession.get(cmd.sessionId ?? 'mux-e2e-session') ?? null;
+    respond(true, { task });
     return;
   }
   if (cmd.type === 'setMockReportMarkdown') {
