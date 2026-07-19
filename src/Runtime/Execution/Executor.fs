@@ -10,6 +10,7 @@ open Wanxiangshu.Kernel.Executor
 open Wanxiangshu.Runtime.ExecutorFormat
 open Wanxiangshu.Runtime.ExecutorSpawn
 open Wanxiangshu.Runtime.ExecutorSpawnRunners
+open Wanxiangshu.Runtime.RuntimeScope
 
 [<Global("globalThis.process")>]
 let private nodeProcess: obj = jsNative
@@ -19,8 +20,8 @@ type ExecuteDeps = ExecutorSpawnRunners.ExecuteDeps
 let defaultExecuteDeps = ExecutorSpawnRunners.defaultExecuteDeps
 let missingExecutableFor = ExecutorSpawn.missingExecutableFor
 
-let abortExecutorRun (sessionId: string) : unit =
-    Wanxiangshu.Runtime.SessionExecutor.abortExecutorRun sessionId
+let abortExecutorRun (scope: RuntimeScope) (sessionId: string) : unit =
+    Wanxiangshu.Runtime.SessionExecutor.abortExecutorRun scope sessionId
 
 let mapOutcome (options: ExecuteOptions) (timeout: int) (output: string) (outcome: RunOutcome) : ExecuteResult =
     match outcome with
@@ -39,6 +40,7 @@ let mapOutcome (options: ExecuteOptions) (timeout: int) (output: string) (outcom
 
 let executeWith
     (deps: ExecuteDeps)
+    (scope: RuntimeScope)
     (options: ExecuteOptions)
     (sessionId: string)
     (onKillRegistered: ((unit -> unit) -> unit) option)
@@ -49,7 +51,7 @@ let executeWith
         let program = prepareProgramForExecution options
 
         let! outcome =
-            deps.runProgram program options.language options.dependencies cwd sessionId timeout onKillRegistered
+            deps.runProgram scope program options.language options.dependencies cwd sessionId timeout onKillRegistered
 
         let output =
             match outcome with
@@ -61,5 +63,5 @@ let executeWith
         return mapOutcome options timeout output outcome
     }
 
-let execute (options: ExecuteOptions) (sessionId: string) : JS.Promise<ExecuteResult> =
-    executeWith defaultExecuteDeps options sessionId None
+let execute (scope: RuntimeScope) (options: ExecuteOptions) (sessionId: string) : JS.Promise<ExecuteResult> =
+    executeWith defaultExecuteDeps scope options sessionId None

@@ -4,6 +4,7 @@ open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Runtime.ExecutorSpawn
+open Wanxiangshu.Runtime.RuntimeScope
 open Wanxiangshu.Kernel.Primitives.Identity
 open Wanxiangshu.Kernel.Errors.DomainError
 open Wanxiangshu.Kernel.Session.Causality
@@ -52,9 +53,10 @@ let isExitedZero (outcome: RunOutcome) : bool =
 let infiniteStdoutBounded () =
     promise {
         // Arrange: spawn a child that dumps ~100 MiB of stdout.
+        let scope = RuntimeScope()
         let sid = nextSessionId ()
         let workDir = cwdVal ()
-        let! outcome = spawnAndRun "node" [| "-e"; hugeOutputScript |] workDir (Some timeoutMs) (Some sid) None
+        let! outcome = spawnAndRun scope "node" [| "-e"; hugeOutputScript |] workDir (Some timeoutMs) (Some sid) None
 
         // Act: measure captured stdout / stderr size.
         let capturedOut, capturedErr =
@@ -101,9 +103,10 @@ let infiniteStderrBounded () =
     promise {
         // Arrange: spawn a child that dumps ~100 MiB of stderr.
         // The same accumulator flaw applies symmetrically.
+        let scope = RuntimeScope()
         let sid = nextSessionId ()
         let workDir = cwdVal ()
-        let! outcome = spawnAndRun "node" [| "-e"; scriptErr |] workDir (Some timeoutMs) (Some sid) None
+        let! outcome = spawnAndRun scope "node" [| "-e"; scriptErr |] workDir (Some timeoutMs) (Some sid) None
 
         let capturedErr =
             match outcome with
@@ -126,11 +129,12 @@ let infiniteStderrBounded () =
 let smallOutputUnchanged () =
     promise {
         // Arrange: spawn a child that emits a known, small payload.
+        let scope = RuntimeScope()
         let sid = nextSessionId ()
         let workDir = cwdVal ()
         let payload = "hello-world-payload"
         let scriptOk = "process.stdout.write('" + payload + "'); process.exit(0);"
-        let! outcome = spawnAndRun "node" [| "-e"; scriptOk |] workDir (Some timeoutMs) (Some sid) None
+        let! outcome = spawnAndRun scope "node" [| "-e"; scriptOk |] workDir (Some timeoutMs) (Some sid) None
 
         // Assert: Exited(0) and stdout exactly equals payload.
         match outcome with

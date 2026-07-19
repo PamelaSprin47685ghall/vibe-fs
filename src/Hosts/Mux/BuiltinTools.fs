@@ -164,7 +164,7 @@ let executorTool
                                 sessionScope.EnqueueExecutor(
                                     sessionId,
                                     opts.mode,
-                                    fun () -> Wanxiangshu.Runtime.Executor.execute opts sessionId
+                                    fun () -> Wanxiangshu.Runtime.Executor.execute sessionScope opts sessionId
                                 )
 
                             return! summarizeWhenNeeded deps config toolNames opts execResult

@@ -68,14 +68,14 @@ let private runExecutorJob (options: ExecuteOptions) (signal: obj) (childId: str
                 options.mode,
                 fun () ->
                     promise {
-                        let! r = executeWith defaultExecuteDeps options childId None
+                        let! r = executeWith defaultExecuteDeps ompScope options childId None
                         return r
                     }
             )
 
         let onSignalAbort () =
             if childId <> "" then
-                abortExecutorRun childId
+                abortExecutorRun ompScope childId
 
         return! raceWithAbortSignal signal onSignalAbort runWork
     }

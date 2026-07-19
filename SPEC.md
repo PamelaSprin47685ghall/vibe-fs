@@ -261,9 +261,9 @@
   * 全局 stores map；
   * 缺少清晰的 remove/dispose。
 
-* `Runtime/Execution/SessionExecutor.fs`
+ * `Runtime/Execution/SessionExecutor.fs`
 
-  * 全局 active runs。
+  * ~~全局 active runs~~ → `activeRuns` 已迁移到 `RuntimeScope` extState，随 `scope.Remove` 清理。
 
 * `Runtime/Search/SembleSearch.fs`
 
