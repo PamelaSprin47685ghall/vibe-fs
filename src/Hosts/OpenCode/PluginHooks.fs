@@ -107,15 +107,12 @@ let private handleSessionCleanup (services: CoreServices) (env: HostEventEnvelop
 
         if ptyCleanupSessionId <> "" then
             cleanupPtyBySession ptyCleanupSessionId
-            Wanxiangshu.Runtime.LivelockGuard.cleanup services.RuntimeScope ptyCleanupSessionId
+
+            Wanxiangshu.Runtime.RuntimeScopeForgetSession.forgetSession services.RuntimeScope ptyCleanupSessionId
+
             services.FallbackRuntime.CleanupSession ptyCleanupSessionId
             Wanxiangshu.Runtime.ToolHookRuntime.clearSessionCompliance ptyCleanupSessionId
             Wanxiangshu.Runtime.ToolHookRuntime.closeSession ptyCleanupSessionId
-
-            cleanupCapsEpochBySession services.RuntimeScope ptyCleanupSessionId
-
-            services.RuntimeScope.RemoveSessionQueue ptyCleanupSessionId
-            services.RuntimeScope.RemoveTempFiles ptyCleanupSessionId
 
             let sid = SessionId.create ptyCleanupSessionId
             let eventStore = SubsessionEventStore.create services.Directory

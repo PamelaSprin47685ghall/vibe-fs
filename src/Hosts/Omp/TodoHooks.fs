@@ -21,14 +21,12 @@ open Wanxiangshu.Kernel.WorkBacklog
 open Wanxiangshu.Runtime.ToolOutputInfo
 open Wanxiangshu.Runtime
 open Wanxiangshu.Runtime.RunnerBackground
-open Wanxiangshu.Runtime.LivelockGuard
 open Wanxiangshu.Runtime.EventLogRuntime
 open Wanxiangshu.Runtime.ReviewRuntime
 open Wanxiangshu.Runtime.Dyn
 
 module Dyn = Wanxiangshu.Runtime.Dyn
 
-open Wanxiangshu.Runtime.FuzzyIteratorStore
 open Wanxiangshu.Runtime.ReviewRuntime
 open Wanxiangshu.Runtime.BacklogProjectionBuild
 open Wanxiangshu.Hosts.Omp.ExecutorTools
@@ -85,7 +83,7 @@ let sessionShutdownHandler
         | None -> ()
         | Some sessionId ->
             clearNudgeSession fallbackRuntime sessionId
-            clearTypedIteratorScope ompScope.IteratorStore sessionId
+            Wanxiangshu.Runtime.RuntimeScopeForgetSession.forgetSession ExecutorTools.ompScope sessionId
             let cwd = Dyn.str ctx "cwd"
 
             if cwd <> "" then
@@ -99,9 +97,6 @@ let sessionShutdownHandler
                 Wanxiangshu.Runtime.SubsessionPendingEvidence.SubsessionPendingEvidence.ForgetSession sessionId
 
             do! cleanupRunnerJob ExecutorTools.ompScope sessionId
-            Wanxiangshu.Runtime.LivelockGuard.cleanup ExecutorTools.ompScope sessionId
             Wanxiangshu.Runtime.ToolHookRuntime.clearSessionCompliance sessionId
             Wanxiangshu.Runtime.ToolHookRuntime.closeSession sessionId
-            ExecutorTools.ompScope.RemoveSessionQueue sessionId
-            ExecutorTools.ompScope.RemoveTempFiles sessionId
     }

@@ -103,6 +103,12 @@ type RuntimeScope() =
         capsFiles <- Map.empty
         capsInflight <- Map.empty
 
+    member _.ClearCapsFilesForSession(prefix: string) : unit =
+        capsFiles <- capsFiles |> Map.filter (fun k _ -> not (k.StartsWith prefix))
+
+    member _.ClearCapsInflightForSession(prefix: string) : unit =
+        capsInflight <- capsInflight |> Map.filter (fun k _ -> not (k.StartsWith prefix))
+
     member _.GetOrLoadCapsInflight(key: string, load: unit -> JS.Promise<CapsFile list>) : JS.Promise<CapsFile list> =
         match Map.tryFind key capsInflight with
         | Some p -> p
@@ -186,6 +192,14 @@ type RuntimeScope() =
                 let initP = f workspaceRootStr
                 initPromise <- Some initP
             | None -> ()
+
+    member _.SessionLockCount = Map.count sessionLocks
+
+    member _.TempFileMapCount = Map.count tempFilesByPrompt
+
+    member _.CapsFileCount = Map.count capsFiles
+
+    member _.CapsInflightCount = Map.count capsInflight
 
     member _.WaitInit() : JS.Promise<unit> =
         match initPromise with

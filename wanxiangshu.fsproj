@@ -186,6 +186,7 @@
     <Compile Include="src/Runtime/Subsession/SubagentIteratorStore.fs"/>
     <Compile Include="src/Runtime/EventStore/SessionProjectionStore.fs"/>
     <Compile Include="src/Runtime/Workspace/RuntimeScope.fs"/>
+    <Compile Include="src/Runtime/Workspace/RuntimeScopeForgetSession.fs"/>
     <Compile Include="src/Runtime/Execution/BacklogSessionCodec.fs"/>
     <Compile Include="src/Runtime/Subsession/Flow.fs"/>
     <Compile Include="src/Runtime/Messaging/MethodologyArgs.fs"/>
@@ -570,6 +571,7 @@
     <Compile Include="tests/ProfilerOutputTests.fs"/>
     <Compile Include="tests/PendingEvidenceEpochTests.fs"/>
     <Compile Include="tests/ContinuationCleanupTests.fs"/>
+    <Compile Include="tests/RuntimeScopeLifecycleTests.fs"/>
     <Compile Include="tests/BacklogSessionRuntimeTests.fs"/>
     <Compile Include="tests/SessionLoopTests.fs"/>
     <Compile Include="tests/ToolExecutionStatusTests.fs"/>
