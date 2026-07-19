@@ -35,6 +35,7 @@ open Wanxiangshu.Hosts.Omp.ExecutorTools
 open Wanxiangshu.Runtime.ReviewRuntime
 open Wanxiangshu.Runtime.WorkBacklogToolsCodec
 open Wanxiangshu.Runtime.SubsessionActorRegistry
+open Wanxiangshu.Runtime.Fallback.RuntimeStore
 open Wanxiangshu.Kernel.Subsession.Types
 
 /// Shared BacklogSession bound to the OMP host.
@@ -74,12 +75,16 @@ let sessionPromptHandler (pi: obj) (reviewStore: ReviewStore) (ctx: obj) : JS.Pr
                     sessionId
     }
 
-let sessionShutdownHandler (reviewStore: ReviewStore) (ctx: obj) : JS.Promise<unit> =
+let sessionShutdownHandler
+    (reviewStore: ReviewStore)
+    (fallbackRuntime: FallbackRuntimeStore)
+    (ctx: obj)
+    : JS.Promise<unit> =
     promise {
         match getSessionIdFromContext ctx with
         | None -> ()
         | Some sessionId ->
-            clearNudgeSession sessionId
+            clearNudgeSession fallbackRuntime sessionId
             clearTypedIteratorScope ompScope.IteratorStore sessionId
             let cwd = Dyn.str ctx "cwd"
 

@@ -39,4 +39,8 @@ let registerSessionLifecycle (pi: obj) (reviewStore: ReviewStore) (fallbackRunti
     pi?on ("session_start", box (fun (_event: obj) (ctx: obj) -> sessionStartHandler pi reviewStore ctx))
     pi?on ("session_prompt", box (fun (_event: obj) (ctx: obj) -> sessionPromptHandler pi reviewStore ctx))
     pi?on ("turn_start", box (fun (event: obj) (ctx: obj) -> turnStartHandler pi event ctx fallbackRuntime))
-    pi?on ("session_shutdown", box (fun (_event: obj) (ctx: obj) -> sessionShutdownHandler reviewStore ctx))
+
+    pi?on (
+        "session_shutdown",
+        box (fun (_event: obj) (ctx: obj) -> sessionShutdownHandler reviewStore fallbackRuntime ctx)
+    )

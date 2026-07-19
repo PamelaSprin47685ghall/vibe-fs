@@ -87,7 +87,7 @@ let turnStartHandler
     : JS.Promise<unit> =
     match getSessionIdFromContext ctxObj with
     | Some sid ->
-        clearNudgeSession sid
+        clearNudgeSession fallbackRuntime sid
         fallbackRuntime.Update(sid, setMainContinuationAwaitingStart false)
         Wanxiangshu.Runtime.ToolHookRuntime.clearSessionCompliance sid
     | None -> ()

@@ -208,12 +208,14 @@ let sessionShutdownHandler_clearsState () =
     let h = createPiHarness ()
     let pi = piObject h
     let store = createReviewStore ()
+    let fallbackRuntime = FallbackRuntimeStore()
     let ctx = fakeCtx "sh1" "/tmp"
 
     promise {
-        do! sessionShutdownHandler store ctx
+        do! sessionShutdownHandler store fallbackRuntime ctx
         // nudge state cleared
-        Wanxiangshu.Hosts.Omp.NudgeRuntime.clearNudgeSession "sh1" |> ignore
+        Wanxiangshu.Hosts.Omp.NudgeRuntime.clearNudgeSession fallbackRuntime "sh1"
+        |> ignore
     }
 
 let run () : JS.Promise<unit> =

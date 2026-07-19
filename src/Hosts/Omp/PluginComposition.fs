@@ -75,7 +75,6 @@ let private createCoreServices (pi: obj) : CoreServices =
     let directory = Dyn.str pi "directory"
     let fallbackConfigOpt = loadFallbackConfig directory
     let fallbackRuntime = FallbackRuntimeStore()
-    Wanxiangshu.Hosts.Omp.NudgeRuntime.setFallbackRuntime fallbackRuntime
 
     let configLookup: ConfigLookup =
         match fallbackConfigOpt with

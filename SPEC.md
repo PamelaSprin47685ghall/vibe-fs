@@ -252,11 +252,11 @@
   * 全局 projection；
   * 可变 workspace root。
 
-* `Hosts/Omp/NudgeRuntime.fs`
+ * `Hosts/Omp/NudgeRuntime.fs`
 
-  * singleton fallback runtime。
+  * ~~singleton fallback runtime~~ → `FallbackRuntimeStore` 通过函数参数显式传递，不再存在进程级单例。
 
-* `Runtime/EventStore/EventLogRuntimeStore.fs`
+ * `Runtime/EventStore/EventLogRuntimeStore.fs`
 
   * 全局 stores map；
   * 缺少清晰的 remove/dispose。
