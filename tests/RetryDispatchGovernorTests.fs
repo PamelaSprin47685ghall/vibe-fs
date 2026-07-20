@@ -257,6 +257,34 @@ let test_cleanup_and_reset () =
         equal "reset cleared rate stamp" 0 sleeper.SleepCount
     }
 
+/// Cold start must not sleep rateLimitMs. Monotonic clocks start near zero;
+/// treating missing lastDispatch as 0.0 would delay the first dispatch by ~window.
+let test_cold_start_no_delay () =
+    promise {
+        let clock = MockClock(50.0)
+        let sleeper = MockSleeper(clock)
+
+        let governor =
+            RetryDispatchGovernor(rateLimitMs = 10000L, clock = clock, sleeper = sleeper)
+
+        let key = RetryModelKey.Create("ws-cold", "sess-cold", "provider-cold", "model-cold")
+        let mutable ran = false
+
+        let! r =
+            governor.RunWhenAllowed(
+                key,
+                (fun () -> true),
+                (fun () ->
+                    promise {
+                        ran <- true
+                    })
+            )
+
+        equal "cold start Dispatched" Dispatched r
+        check "cold start ran immediately" ran
+        equal "cold start slept 0ms" 0.0 sleeper.TotalSleptMs
+    }
+
 let run () =
     promise {
         do! test_same_key_concurrent_serial_no_overlap ()
@@ -267,4 +295,5 @@ let run () =
         do! test_different_workspaces_independent ()
         do! test_variant_is_part_of_key ()
         do! test_cleanup_and_reset ()
+        do! test_cold_start_no_delay ()
     }

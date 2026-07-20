@@ -24,7 +24,9 @@ let fromHostEnvelope (envelope: HostEventEnvelope) (rawInput: obj) : SessionFact
         else
             SessionFact.HostLifecycleEnvelope(eventType, props, rawInput)
     | "session.idle" -> SessionFact.SessionIdleObserved props
-    | "session.error" -> SessionFact.SessionErrorObserved props
+    // Keep original wire payload: fallback translators and error codecs read
+    // nested fields (isRetryable bool/string, statusCode) from the live host event.
+    | "session.error" -> SessionFact.HostLifecycleEnvelope(eventType, props, rawInput)
     | "session.deleted"
     | "session.delete"
     | "session.remove"

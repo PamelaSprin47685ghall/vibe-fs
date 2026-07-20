@@ -7,6 +7,7 @@ open Wanxiangshu.Runtime.Messaging.OpencodeHostEvent
 open Wanxiangshu.Runtime.OpencodeHookInputCodec
 open Wanxiangshu.Runtime.ToolRuntimeContext
 open Wanxiangshu.Runtime.Fallback.RuntimeStore
+open Wanxiangshu.Runtime.Fallback.SessionRuntimePropertyPure
 open Wanxiangshu.Hosts.Opencode.Fallback.Coordinator
 open Wanxiangshu.Hosts.Opencode.NudgeTrigger
 open Wanxiangshu.Hosts.Opencode.NudgeTriggerOps
@@ -52,28 +53,35 @@ let private runHostFanOut
     (rawInput: obj)
     : JS.Promise<unit> =
     promise {
-        let envOpt = Some envelope
-        do! processEventEnvelope ctx fallbackRuntime sid envOpt
-        settleChildDispatch ctx envOpt
-        fallback.UpdateBusyCount envOpt
-        do! nudge.TrackLifetimeEvents envOpt
-        let! fbConsumed = fallback.TryConsumeEvent rawInput
+        if sid <> "" then
+            fallbackRuntime.Update(sid, setEventHandlingActive true)
 
-        if fbConsumed then
-            if isIdleEnvelope envelope then
-                do! nudge.SettleCompactionIfCompleted sid
-                do! tryIdle (pluginDirectoryFromCtx ctx) sid |> Promise.map ignore
-        else
-            let activeFallbackOwnsTerminal =
-                sid <> ""
-                && NudgeTrigger.isNaturalStop envelope.EventType envelope.Props
-                && hasActiveFallbackContinuation fallbackRuntime sid
+        try
+            let envOpt = Some envelope
+            do! processEventEnvelope ctx fallbackRuntime sid envOpt
+            settleChildDispatch ctx envOpt
+            fallback.UpdateBusyCount envOpt
+            do! nudge.TrackLifetimeEvents envOpt
+            let! fbConsumed = fallback.TryConsumeEvent rawInput
 
-            if not activeFallbackOwnsTerminal then
-                do! nudge.HandleNaturalStop envOpt
+            if fbConsumed then
+                if isIdleEnvelope envelope then
+                    do! nudge.SettleCompactionIfCompleted sid
+                    do! tryIdle (pluginDirectoryFromCtx ctx) sid |> Promise.map ignore
+            else
+                let activeFallbackOwnsTerminal =
+                    sid <> ""
+                    && NudgeTrigger.isNaturalStop envelope.EventType envelope.Props
+                    && hasActiveFallbackContinuation fallbackRuntime sid
 
-            if isIdleEnvelope envelope then
-                do! tryIdle (pluginDirectoryFromCtx ctx) sid |> Promise.map ignore
+                if not activeFallbackOwnsTerminal then
+                    do! nudge.HandleNaturalStop envOpt
+
+                if isIdleEnvelope envelope then
+                    do! tryIdle (pluginDirectoryFromCtx ctx) sid |> Promise.map ignore
+        finally
+            if sid <> "" then
+                fallbackRuntime.Update(sid, setEventHandlingActive false)
     }
 
 /// Domain work for one admitted lifecycle fact. Runs only inside SessionActor.
@@ -90,6 +98,8 @@ let processLifecycleFact
         match fact with
         | SessionFact.SessionClosed ->
             // Cleanup only — do not re-enter NotifyClosed/Post (deadlocks the actor queue).
+            let closedEnv = envelopeOf "session.deleted" (createObj [ "sessionID" ==> sid ])
+            nudge.TrackLifetimeEvents (Some closedEnv) |> Promise.start
             finalizeSessionClosed ctx sid
         | _ ->
             match toHostSurface fact with
