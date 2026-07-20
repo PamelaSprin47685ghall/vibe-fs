@@ -69,33 +69,41 @@ let sendNudgeMux
     : JS.Promise<SendOutcome> =
     promise {
         try
-            let nudgeFn = Dyn.get helpers "nudge"
+            if Dyn.isNullish helpers then
+                return SendOutcome.Failed "helpers missing"
+            else
+                let nudgeFn = Dyn.get helpers "nudge"
 
-            let agentVal =
-                match agentOpt with
-                | Some a -> box a
-                | None -> null
+                if Dyn.isNullish nudgeFn then
+                    return SendOutcome.Failed "helpers.nudge missing"
+                elif not (Dyn.typeIs nudgeFn "function") then
+                    return SendOutcome.Failed "helpers.nudge is not a function"
+                else
+                    let agentVal =
+                        match agentOpt with
+                        | Some a -> box a
+                        | None -> null
 
-            let modelVal =
-                match modelOpt with
-                | Some m -> box m
-                | None -> null
+                    let modelVal =
+                        match modelOpt with
+                        | Some m -> box m
+                        | None -> null
 
-            fallbackRuntime.Update(workspaceId, setMainContinuationAwaitingStart true)
+                    fallbackRuntime.Update(workspaceId, setMainContinuationAwaitingStart true)
 
-            let! result =
-                (nudgeFn $ (workspaceId, promptText, modelVal, agentVal, nudgeId, nonce))
-                |> unbox<JS.Promise<obj>>
+                    let! result =
+                        (nudgeFn $ (workspaceId, promptText, modelVal, agentVal, nudgeId, nonce))
+                        |> unbox<JS.Promise<obj>>
 
-            let validation = validateMuxReceipt result workspaceId nonce nudgeId
+                    let validation = validateMuxReceipt result workspaceId nonce nudgeId
 
-            return
-                match validation with
-                | ValidReceipt _ -> SendOutcome.Delivered
-                | SimpleSuccess ->
-                    SendOutcome.AcceptanceUnknown "nudge resolved true, cannot verify delivery without receipt"
-                | SimpleFailure -> SendOutcome.Busy
-                | InvalidReceipt err -> SendOutcome.Failed err
+                    return
+                        match validation with
+                        | ValidReceipt _ -> SendOutcome.Delivered
+                        | SimpleSuccess ->
+                            SendOutcome.AcceptanceUnknown "nudge resolved true, cannot verify delivery without receipt"
+                        | SimpleFailure -> SendOutcome.Busy
+                        | InvalidReceipt err -> SendOutcome.Failed err
         with ex ->
             JS.console.error (
                 box

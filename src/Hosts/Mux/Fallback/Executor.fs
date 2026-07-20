@@ -67,12 +67,14 @@ let private invokeNudge
     : JS.Promise<unit> =
     promise {
         if Dyn.isNullish helpers then
-            return ()
+            return! Promise.reject (System.Exception("Failed: helpers missing"))
         else
             let nudge = Dyn.get helpers "nudge"
 
             if Dyn.isNullish nudge then
-                return ()
+                return! Promise.reject (System.Exception("Failed: helpers.nudge missing"))
+            elif not (Dyn.typeIs nudge "function") then
+                return! Promise.reject (System.Exception("Failed: helpers.nudge is not a function"))
             else
                 let! result =
                     (nudge $ (workspaceId, text, null, null, null, continuationId))

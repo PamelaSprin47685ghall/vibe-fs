@@ -73,7 +73,7 @@ type EventLogStore(workspaceRoot: string, ?appendLineOverride: string -> WanEven
                                 do! state.SyncNewEvents()
                                 do! appendLineFn eventFilePath e
                                 let! stats = statAsync eventFilePath
-                                state.LastKnownSize <- unbox<int64> (stats?size)
+                                state.LastKnownSize <- state.SizeOf stats
                                 state.LastReadByteOffset <- state.LastKnownSize
                             })
 
@@ -95,7 +95,7 @@ type EventLogStore(workspaceRoot: string, ?appendLineOverride: string -> WanEven
                             do! state.SyncNewEvents()
                             do! appendLineFn eventFilePath e
                             let! stats = statAsync eventFilePath
-                            state.LastKnownSize <- unbox<int64> (stats?size)
+                            state.LastKnownSize <- state.SizeOf stats
                             state.LastReadByteOffset <- state.LastKnownSize
                         })
 
@@ -122,7 +122,7 @@ type EventLogStore(workspaceRoot: string, ?appendLineOverride: string -> WanEven
 
                                 do! appendFileAsync eventFilePath block
                                 let! stats = statAsync eventFilePath
-                                state.LastKnownSize <- unbox<int64> (stats?size)
+                                state.LastKnownSize <- state.SizeOf stats
                                 state.LastReadByteOffset <- state.LastKnownSize
                             })
 
@@ -173,7 +173,7 @@ type EventLogStore(workspaceRoot: string, ?appendLineOverride: string -> WanEven
                             | Some ev ->
                                 do! appendLineFn eventFilePath ev
                                 let! stats = statAsync eventFilePath
-                                state.LastKnownSize <- unbox<int64> (stats?size)
+                                state.LastKnownSize <- state.SizeOf stats
                                 state.LastReadByteOffset <- state.LastKnownSize
                                 state.Cache.FoldWan ev
                                 state.EventCountRead <- state.EventCountRead + 1

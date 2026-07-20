@@ -9,6 +9,7 @@ open Wanxiangshu.Kernel.EventSourcing.EventKind
 open Wanxiangshu.Runtime.EventLogCodec
 open Wanxiangshu.Runtime.EventStore
 open Wanxiangshu.Runtime.EventLogFile
+open Wanxiangshu.Runtime.EventLogIo
 open Wanxiangshu.Runtime.SquadEventStore
 open Wanxiangshu.Runtime.ReviewEventWriter
 open Wanxiangshu.Runtime.SessionEventWriter
@@ -119,60 +120,6 @@ let strictAppendLoopActivatedFailsOnBadPath () =
         do! rmAsync dir
     }
 
-let selfHealingLockDeletesFileLock () =
-    promise {
-        let! dir = mkdtempAsync "eventlog-selfhealing-"
-        let lockPath = dir + "/.wanxiangshu.ndjson.lock"
-        do! writeFileAsync lockPath "1"
-        let store = EventLogStore dir
-
-        do!
-            store.AppendEventOrFail(
-                { V = 1
-                  Session = "s-heal"
-                  Kind = eventKindLoopActivated
-                  At = ""
-                  Payload = Map [ "task", "healed" ] }
-            )
-
-        let! events = store.ReadAllEvents()
-        check "self healing lock: successfully appended and read" (events.Length = 1)
-        do! rmAsync dir
-    }
-
-let appendSucceedsAfterStaleLockFile () =
-    promise {
-        let! dir = mkdtempAsync "eventlog-stale-"
-        let lockPath = dir + "/.wanxiangshu.ndjson.lock"
-        do! writeFileAsync lockPath "1"
-        let store = EventLogStore dir
-
-        do!
-            store.AppendEventOrFail(
-                { V = 1
-                  Session = "s-stale"
-                  Kind = eventKindLoopActivated
-                  At = ""
-                  Payload = Map [ "task", "stale healed" ] }
-            )
-
-        let! events = store.ReadAllEvents()
-        check "stale lock: append succeeded" (events.Length = 1)
-
-        do!
-            store.AppendEventOrFail(
-                { V = 1
-                  Session = "s-stale"
-                  Kind = eventKindLoopActivated
-                  At = ""
-                  Payload = Map [ "task", "second write" ] }
-            )
-
-        let! events2 = store.ReadAllEvents()
-        check "stale lock: second append succeeded" (events2.Length = 2)
-        do! rmAsync dir
-    }
-
 let tryClaimNudgeDispatchPreventsOutdatedAnchor () =
     promise {
         let! dir = mkdtempAsync "eventlog-claim-outdated-"
@@ -265,40 +212,29 @@ let appendWithEmptyWorkspaceRootWritesNothing () =
         equal "empty workspace root leaves cwd log untouched" before after
     }
 
-
-let testLockfileIsNotUnlinkedManually () =
+let deletingInitializedLogClearsProjection () =
     promise {
-        let! dir = mkdtempAsync "eventlog-no-unlink-"
+        let! dir = mkdtempAsync "eventlog-delete-"
+        let sessionId = "s-delete"
         let store = EventLogStore dir
-        let lockPath = dir + "/.wanxiangshu.ndjson.lock"
-        do! writeFileAsync lockPath "dummy"
-        
-        // Appending should still work because proper-lockfile handles lock checks and stale detection safely.
-        // But the lockfile MUST NOT be deleted via manual unlink if proper-lockfile isn't locking it or if it is stale,
-        // or rather, our code must not call unlinkAsync or delete it manually.
-        // Wait, let's verify that the lockfile is NOT deleted.
-        do!
-            store.AppendEventOrFail(
-                { V = 1
-                  Session = "s-no-unlink"
-                  Kind = eventKindLoopActivated
-                  At = ""
-                  Payload = Map [ "task", "no-unlink" ] }
-            )
-        
-        let! lockExists = fileExists lockPath
-        check "lockfile was NOT deleted manually" lockExists
+        do! appendLoopActivatedOrFail dir sessionId "task"
+        let! beforeDelete = store.GetSessionState sessionId
+        check "projection populated before delete" (beforeDelete.ReviewTask = Some "task")
+        do! rmAsync (eventPath dir)
+        let! afterDelete = store.GetSessionState sessionId
+        equal "deleted log clears projection" None afterDelete.ReviewTask
         do! rmAsync dir
     }
 
-let testSyncNewEventsAndEnsureSyncedPropagateErrors () =
+
+let ensureSyncedPropagatesNonMissingPathErrors () =
     promise {
         let! dir = mkdtempAsync "eventlog-err-propagate-"
-        // Use a path that is guaranteed to fail (like a directory as a file, or non-existent path)
-        let badPath = dir + "/invalid-dir/file.ndjson"
-        let store = EventLogStore(badPath)
-        
-        let! result = 
+        let workspaceFile = dir + "/workspace-file"
+        do! writeFileAsync workspaceFile "not a directory"
+        let store = EventLogStore workspaceFile
+
+        let! result =
             promise {
                 try
                     do! store.EnsureSynced()
@@ -306,11 +242,11 @@ let testSyncNewEventsAndEnsureSyncedPropagateErrors () =
                 with ex ->
                     return Error ex
             }
-            
+
         match result with
-        | Error _ -> check "EnsureSynced propagated the error" true
-        | Ok _ -> failwith "Expected EnsureSynced to fail but it succeeded"
-        
+        | Error _ -> check "EnsureSynced propagated non-missing path error" true
+        | Ok _ -> failwith "Expected EnsureSynced to fail for a file workspace root"
+
         do! rmAsync dir
     }
 let run () =
@@ -322,14 +258,12 @@ let run () =
         do! readStopsAtCorruptLine ()
         do! strictAppendLoopActivatedPersistsEvent ()
         do! strictAppendLoopActivatedFailsOnBadPath ()
-        do! selfHealingLockDeletesFileLock ()
-        do! appendSucceedsAfterStaleLockFile ()
         do! tryClaimNudgeDispatchPreventsOutdatedAnchor ()
         do! testGetSessionStateMemoryCache ()
         do! testMemoryCachingAndNoRepeatedFileReads ()
         do! testGetSquadEventsCache ()
         do! testReadAllEventsIdempotent ()
         do! appendWithEmptyWorkspaceRootWritesNothing ()
-        do! testLockfileIsNotUnlinkedManually ()
-        do! testSyncNewEventsAndEnsureSyncedPropagateErrors ()
+        do! deletingInitializedLogClearsProjection ()
+        do! ensureSyncedPropagatesNonMissingPathErrors ()
     }

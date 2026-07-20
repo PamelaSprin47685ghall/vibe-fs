@@ -63,7 +63,7 @@ type internal EventStoreState(eventFilePath: string) =
                                 initDone <- true
                                 eventCountRead <- events.Length
                                 let! stats = statAsync eventFilePath
-                                lastKnownSize <- unbox<int64> (stats?size)
+                                lastKnownSize <- this.SizeOf stats
                                 lastReadByteOffset <- lastKnownSize
                                 partialLineBuffer <- ""
                             })
@@ -77,10 +77,20 @@ type internal EventStoreState(eventFilePath: string) =
             initPromise <- Some p
             p
 
+    member private _.ClearForMissingFile() : unit =
+        cache.Clear()
+        eventCountRead <- 0
+        lastKnownSize <- 0L
+        lastReadByteOffset <- 0L
+        partialLineBuffer <- ""
+
+    member _.SizeOf(stats: obj) : int64 =
+        int64 (unbox<float> (stats?size))
+
     member this.SyncNewEvents() : JS.Promise<unit> =
         promise {
             let! stats = statAsync eventFilePath
-            let size = unbox<int64> (stats?size)
+            let size = this.SizeOf stats
 
             if size < lastReadByteOffset then
                 cache.Clear()
@@ -91,7 +101,7 @@ type internal EventStoreState(eventFilePath: string) =
                     cache.FoldWan e
 
                 let! newStats = statAsync eventFilePath
-                lastReadByteOffset <- unbox<int64> (newStats?size)
+                lastReadByteOffset <- this.SizeOf newStats
                 lastKnownSize <- lastReadByteOffset
                 partialLineBuffer <- ""
             elif size > lastReadByteOffset then
@@ -123,9 +133,12 @@ type internal EventStoreState(eventFilePath: string) =
         promise {
             do! this.EnsureInitialized()
 
-            let! stats = statAsync eventFilePath
-            let size = unbox<int64> (stats?size)
+            try
+                let! stats = statAsync eventFilePath
+                let size = this.SizeOf stats
 
-            if size <> lastKnownSize then
-                do! withWorkspaceLock eventFilePath (fun () -> this.SyncNewEvents())
+                if size <> lastKnownSize then
+                    do! withWorkspaceLock eventFilePath (fun () -> this.SyncNewEvents())
+            with ex when isMissingPathError (box ex) ->
+                this.ClearForMissingFile()
         }

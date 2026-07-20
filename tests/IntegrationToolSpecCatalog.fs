@@ -104,4 +104,12 @@ let integrationToolSpecs () : (string * (unit -> JS.Promise<unit>)) list =
       ("muxNudgeMismatchedReceiptReturnsFailed", muxNudgeMismatchedReceiptReturnsFailedSpec)
       ("muxContinueBooleanTrueRejectsAcceptanceUnknown", muxContinueBooleanTrueRejectsAcceptanceUnknownSpec)
       ("muxContinueValidReceiptResolves", muxContinueValidReceiptResolvesSpec)
-      ("muxAbortUnavailableNudgeFlow", muxAbortUnavailableNudgeFlowSpec) ]
+      ("muxAbortUnavailableNudgeFlow", muxAbortUnavailableNudgeFlowSpec)
+      ("muxNudgeMissingHelpersReturnsFailed", muxNudgeMissingHelpersReturnsFailedSpec)
+      ("muxNudgeMissingNudgeReturnsFailed", muxNudgeMissingNudgeReturnsFailedSpec)
+      ("muxNudgeNonFunctionNudgeReturnsFailed", muxNudgeNonFunctionNudgeReturnsFailedSpec)
+      ("muxContinueMissingHelpersRejectsFailed", muxContinueMissingHelpersRejectsFailedSpec)
+      ("muxContinueMissingNudgeRejectsFailed", muxContinueMissingNudgeRejectsFailedSpec)
+      ("muxContinueNonFunctionNudgeRejectsFailed", muxContinueNonFunctionNudgeRejectsFailedSpec)
+      ("muxContinueMismatchedReceiptRejectsFailed", muxContinueMismatchedReceiptRejectsFailedSpec)
+      ("muxRecoverWithPromptMissingNudgeRejectsFailed", muxRecoverWithPromptMissingNudgeRejectsFailedSpec) ]

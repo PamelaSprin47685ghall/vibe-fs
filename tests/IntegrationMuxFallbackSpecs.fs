@@ -343,3 +343,143 @@ let muxAbortUnavailableNudgeFlowSpec () =
 
         do! rmAsync tmpDir
     }
+
+let private defaultFallbackModel =
+    { ProviderID = "openai"
+      ModelID = "gpt-4"
+      Variant = None
+      Temperature = None
+      TopP = None
+      MaxTokens = None
+      ReasoningEffort = None
+      Thinking = false }
+
+let muxNudgeMissingHelpersReturnsFailedSpec () =
+    promise {
+        let runtime = FallbackRuntimeStore()
+
+        let! outcome =
+            sendNudgeMux runtime null "session-missing-helpers" "text" None None "n1" "nonce1"
+
+        match outcome with
+        | SendOutcome.Failed msg -> check "missing helpers returns Failed" (msg.Contains("helpers missing"))
+        | other -> failwith ("expected Failed, got " + string other)
+    }
+
+let muxNudgeMissingNudgeReturnsFailedSpec () =
+    promise {
+        let runtime = FallbackRuntimeStore()
+        let helpers = createObj []
+
+        let! outcome =
+            sendNudgeMux runtime helpers "session-missing-nudge" "text" None None "n1" "nonce1"
+
+        match outcome with
+        | SendOutcome.Failed msg -> check "missing nudge returns Failed" (msg.Contains("helpers.nudge missing"))
+        | other -> failwith ("expected Failed, got " + string other)
+    }
+
+let muxNudgeNonFunctionNudgeReturnsFailedSpec () =
+    promise {
+        let runtime = FallbackRuntimeStore()
+        let helpers = createObj [ "nudge", box 42 ]
+
+        let! outcome =
+            sendNudgeMux runtime helpers "session-nonfunction-nudge" "text" None None "n1" "nonce1"
+
+        match outcome with
+        | SendOutcome.Failed msg -> check "nonfunction nudge returns Failed" (msg.Contains("helpers.nudge is not a function"))
+        | other -> failwith ("expected Failed, got " + string other)
+    }
+
+let muxContinueMissingHelpersRejectsFailedSpec () =
+    promise {
+        let executor = muxActionExecutor null
+
+        let! caught =
+            executor.SendContinue("session-continue-missing-helpers", defaultFallbackModel, "continuation-id")
+            |> Promise.result
+
+        match caught with
+        | Error ex -> check "continue missing helpers rejects Failed" (ex.Message.Contains("Failed: helpers missing"))
+        | Ok _ -> failwith "expected SendContinue to reject"
+    }
+
+let muxContinueMissingNudgeRejectsFailedSpec () =
+    promise {
+        let executor = muxActionExecutor (createObj [])
+
+        let! caught =
+            executor.SendContinue("session-continue-missing-nudge", defaultFallbackModel, "continuation-id")
+            |> Promise.result
+
+        match caught with
+        | Error ex -> check "continue missing nudge rejects Failed" (ex.Message.Contains("Failed: helpers.nudge missing"))
+        | Ok _ -> failwith "expected SendContinue to reject"
+    }
+
+let muxContinueNonFunctionNudgeRejectsFailedSpec () =
+    promise {
+        let executor = muxActionExecutor (createObj [ "nudge", box 42 ])
+
+        let! caught =
+            executor.SendContinue("session-continue-nonfunction-nudge", defaultFallbackModel, "continuation-id")
+            |> Promise.result
+
+        match caught with
+        | Error ex -> check "continue nonfunction nudge rejects Failed" (ex.Message.Contains("Failed: helpers.nudge is not a function"))
+        | Ok _ -> failwith "expected SendContinue to reject"
+    }
+
+let muxContinueMismatchedReceiptRejectsFailedSpec () =
+    promise {
+        let helpers =
+            createObj
+                [ "nudge",
+                  box (
+                      System.Func<obj, obj, obj, obj, obj, obj, JS.Promise<obj>>(fun _ _ _ _ _ _ ->
+                          promise {
+                              return
+                                  box (
+                                      createObj
+                                          [ "messageId", box "msg-123"
+                                            "sessionId", box "wrong-session"
+                                            "dispatchId", box "continuation-id" ]
+                                  )
+                          })
+                  ) ]
+
+        let executor = muxActionExecutor helpers
+
+        let! caught =
+            executor.SendContinue("session-continue-mismatched", defaultFallbackModel, "continuation-id")
+            |> Promise.result
+
+        match caught with
+        | Error ex ->
+            check
+                "continue mismatched receipt rejects Failed"
+                (ex.Message.Contains("Failed:") && ex.Message.Contains("sessionId mismatch"))
+        | Ok _ -> failwith "expected SendContinue to reject"
+    }
+
+let muxRecoverWithPromptMissingNudgeRejectsFailedSpec () =
+    promise {
+        let executor = muxActionExecutor (createObj [])
+
+        let! caught =
+            executor.RecoverWithPrompt(
+                "session-recover-missing-nudge",
+                defaultFallbackModel,
+                "recovery prompt",
+                "continuation-id"
+            )
+            |> Promise.result
+
+        match caught with
+        | Error ex ->
+            check
+                "recover with prompt missing nudge rejects Failed"
+                (ex.Message.Contains("Failed: helpers.nudge missing"))
+        | Ok _ -> failwith "expected RecoverWithPrompt to reject"
+    }

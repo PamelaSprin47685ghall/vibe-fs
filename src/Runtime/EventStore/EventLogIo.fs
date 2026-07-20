@@ -19,6 +19,12 @@ let unlinkAsync (path: string) : JS.Promise<unit> =
 let statAsync (path: string) : JS.Promise<obj> =
     Wanxiangshu.Runtime.EventLogIoRaw.statAsync path
 
+let isMissingPathError (error: obj) : bool =
+    Wanxiangshu.Runtime.EventLogIoRaw.isMissingPathError error
+
+let isExistingPathError (error: obj) : bool =
+    Wanxiangshu.Runtime.EventLogIoRaw.isExistingPathError error
+
 let fileExists (filePath: string) : JS.Promise<bool> =
     Wanxiangshu.Runtime.EventLogIoRaw.fileExists filePath
 

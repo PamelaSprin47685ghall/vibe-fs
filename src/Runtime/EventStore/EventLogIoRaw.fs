@@ -18,6 +18,12 @@ let unlinkAsync (path: string) : JS.Promise<unit> = jsNative
 [<Import("stat", "node:fs/promises")>]
 let statAsync (path: string) : JS.Promise<obj> = jsNative
 
+[<Emit("$0 != null && $0.code === 'ENOENT'")>]
+let isMissingPathError (error: obj) : bool = jsNative
+
+[<Emit("$0 != null && $0.code === 'EEXIST'")>]
+let isExistingPathError (error: obj) : bool = jsNative
+
 [<Import("lock", "proper-lockfile")>]
 let private lockfileLock (path: string) (options: obj) : JS.Promise<unit -> JS.Promise<unit>> = jsNative
 
@@ -41,7 +47,7 @@ let fileExists (filePath: string) : JS.Promise<bool> =
         try
             let! _ = statAsync filePath
             return true
-        with _ ->
+        with ex when isMissingPathError (box ex) ->
             return false
     }
 
@@ -52,15 +58,8 @@ let private ensureFileExists (filePath: string) : JS.Promise<unit> =
         if not exists then
             try
                 do! writeFileFlagAsync filePath "" (createObj [ "flag", box "wx" ])
-            with _ ->
+            with ex when isExistingPathError (box ex) ->
                 ()
-    }
-
-let private cleanupStaleLockFile (lockPath: string) : JS.Promise<unit> =
-    promise {
-        // Do not unconditionially unlink the lock file, as it can delete an active lock from another process.
-        // proper-lockfile handles its own stale locks safely.
-        ()
     }
 
 let private acquireFileLock (filePath: string) : JS.Promise<unit -> JS.Promise<unit>> =
@@ -98,10 +97,7 @@ let withWorkspaceLock<'T> (filePath: string) (action: unit -> JS.Promise<'T>) : 
             with _ ->
                 ()
 
-            let lockPath = filePath + ".lock"
-
             do! ensureFileExists filePath
-            do! cleanupStaleLockFile lockPath
 
             let! release = acquireFileLock filePath
 
