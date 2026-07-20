@@ -78,14 +78,13 @@ type internal EventStoreState(eventFilePath: string) =
             p
 
     member private _.ClearForMissingFile() : unit =
-        cache.Clear()
+        cache.ClearSessionStatesOnly()
         eventCountRead <- 0
         lastKnownSize <- 0L
         lastReadByteOffset <- 0L
         partialLineBuffer <- ""
 
-    member _.SizeOf(stats: obj) : int64 =
-        int64 (unbox<float> (stats?size))
+    member _.SizeOf(stats: obj) : int64 = int64 (unbox<float> (stats?size))
 
     member this.SyncNewEvents() : JS.Promise<unit> =
         promise {

@@ -63,7 +63,7 @@ let private mkStagedPlan (sessionID: string) =
       RawArray = None
       SembleInjectEnabled = false
       Scope = RuntimeScope.create ()
-      MaxInputTokens = 150000
+      MaxInputTokens = 30000
       ModelKey = "openai/gpt-4o:default"
       LimitSource = "openai-session-model"
       ObserveLatestUsage =
@@ -125,7 +125,7 @@ let spec_applyContextBudget_mustSeeFinalOutboundAfterAllStages () =
 
         // Direct: applyContextBudget sees only encodedBacklogSlot (pre-injection)
         // 60 220 bytes / 2 = 30 110 degraded tokens > 30 000 phaseBase → nudge fires → Length = 2
-        let! resDirect = applyContextBudget plan mkBacklogOps messages [||]
+        let! resDirect = applyContextBudget plan mkBacklogOps messages (mkStagedEncodeMessages messages)
         equal "direct: nudge fires on pre-injection bytes (≈60k / 2 ≈ 30k tokens)" 2 resDirect.Length
 
         // Full pipeline: final outbound = encodedBacklogSlot (60k) + inject (10k) + caps (10k) ≈ 80k

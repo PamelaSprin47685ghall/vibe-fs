@@ -48,29 +48,37 @@ let private firstNonEmpty (options: string list) : string option =
             if t = "" then None else Some t)
 
 let decodeOpencodeToolContext (context: IOpenCodeToolContext) (fallbackDir: string) : ToolExecutionContext =
-    let directory =
-        match
-            firstNonEmpty
-                [ context.directory
-                  context.cwd
-                  context.workspaceDir
-                  context.workspace_dir
-                  context.workingDirectory ]
-        with
-        | Some s -> s
-        | None -> fallbackDir
+    if Wanxiangshu.Runtime.Dyn.isNullish context then
+        let finalDir = pathResolve (unbox<string> (nodeProcess?cwd ())) fallbackDir
 
-    let sessionId =
-        match firstNonEmpty [ context.sessionID; context.sessionId; context.session_id ] with
-        | Some s -> s
-        | None -> ""
+        { Directory = finalDir
+          SessionId = Id.sessionIdQuick ""
+          WorkspaceId = None
+          ChildRegistry = ChildAgentRegistry.Create() }
+    else
+        let directory =
+            match
+                firstNonEmpty
+                    [ context.directory
+                      context.cwd
+                      context.workspaceDir
+                      context.workspace_dir
+                      context.workingDirectory ]
+            with
+            | Some s -> s
+            | None -> fallbackDir
 
-    let finalDir = pathResolve (unbox<string> (nodeProcess?cwd ())) directory
+        let sessionId =
+            match firstNonEmpty [ context.sessionID; context.sessionId; context.session_id ] with
+            | Some s -> s
+            | None -> ""
 
-    { Directory = finalDir
-      SessionId = Id.sessionIdQuick sessionId
-      WorkspaceId = None
-      ChildRegistry = ChildAgentRegistry.Create() }
+        let finalDir = pathResolve (unbox<string> (nodeProcess?cwd ())) directory
+
+        { Directory = finalDir
+          SessionId = Id.sessionIdQuick sessionId
+          WorkspaceId = None
+          ChildRegistry = ChildAgentRegistry.Create() }
 
 let muxConfigDirectoryFallback (config: IMuxToolContext) : string =
     match firstNonEmpty [ config.directory; config.cwd; config.workspacePath ] with

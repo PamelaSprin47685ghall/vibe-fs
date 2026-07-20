@@ -27,6 +27,10 @@ type ProjectionCache() =
         latestSessionId <- None
         revision <- 0
 
+    member _.ClearSessionStatesOnly() =
+        sessionStates <- Map.empty
+        revision <- revision + 1
+
     member _.FoldWan(e: WanEvent) =
         let sId = e.Session
 

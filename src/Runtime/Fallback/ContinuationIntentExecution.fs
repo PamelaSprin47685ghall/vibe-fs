@@ -41,6 +41,90 @@ let private leaseOfIntent (intent: ContinuationIntent) : PendingLease option =
               Status = LeaseStatus.Requested }
     | PropagateFailureIntent -> None
 
+let private runWithLease
+    (runtime: FallbackRuntimeStore)
+    (executor: IActionExecutor)
+    (workspaceRoot: string)
+    (sessionID: string)
+    (intent: ContinuationIntent)
+    (lease: PendingLease)
+    (reenter: SessionReenter)
+    : JS.Promise<unit> =
+    promise {
+        let! isValid =
+            promise {
+                let mutable ok = false
+
+                do!
+                    reenter (fun () ->
+                        promise {
+                            ok <-
+                                verifyLease runtime sessionID lease
+                                && ensureActiveAndOwner runtime sessionID lease
+                        })
+
+                return ok
+            }
+
+        if not isValid then
+            do!
+                reenter (fun () ->
+                    finishContinuation
+                        runtime
+                        workspaceRoot
+                        sessionID
+                        lease
+                        ContinuationOutcome.Cancelled
+                        "Pre-submission lease validation failed")
+        else
+            try
+                do! executeContinuationIntent runtime executor workspaceRoot sessionID intent reenter
+            with ex ->
+                let outcome, reason =
+                    if isAcceptanceUnknownMessage ex.Message then
+                        ContinuationOutcome.AcceptanceUnknown, ex.Message
+                    elif isAbortUnavailableMessage ex.Message then
+                        ContinuationOutcome.AbortUnknown, ex.Message
+                    else
+                        ContinuationOutcome.Failed, ex.Message
+
+                do! reenter (fun () -> finishContinuation runtime workspaceRoot sessionID lease outcome reason)
+    }
+
+let private runWithoutLease
+    (runtime: FallbackRuntimeStore)
+    (executor: IActionExecutor)
+    (workspaceRoot: string)
+    (sessionID: string)
+    (intent: ContinuationIntent)
+    (reenter: SessionReenter)
+    : JS.Promise<unit> =
+    promise {
+        try
+            match intent with
+            | PropagateFailureIntent ->
+                do!
+                    reenter (fun () ->
+                        promise {
+                            match (runtime.GetSession sessionID).PendingLease with
+                            | Some lease ->
+                                do!
+                                    finishContinuation
+                                        runtime
+                                        workspaceRoot
+                                        sessionID
+                                        lease
+                                        ContinuationOutcome.Failed
+                                        "Fallback propagation failure"
+                            | None -> ()
+
+                            do! executor.PropagateFailure sessionID
+                        })
+            | _ -> do! executeContinuationIntent runtime executor workspaceRoot sessionID intent reenter
+        with ex ->
+            JS.console.error ("fallback continuation effect failed for " + sessionID + ": " + ex.Message)
+    }
+
 let run
     (runtime: FallbackRuntimeStore)
     (executor: IActionExecutor)
@@ -51,71 +135,8 @@ let run
     : JS.Promise<unit> =
     promise {
         match leaseOfIntent intent with
-        | Some lease ->
-            let! isValid =
-                promise {
-                    let mutable ok = false
-
-                    do!
-                        reenter (fun () ->
-                            promise {
-                                ok <-
-                                    verifyLease runtime sessionID lease
-                                    && ensureActiveAndOwner runtime sessionID lease
-                            })
-
-                    return ok
-                }
-
-            if not isValid then
-                do!
-                    reenter (fun () ->
-                        finishContinuation
-                            runtime
-                            workspaceRoot
-                            sessionID
-                            lease
-                            ContinuationOutcome.Cancelled
-                            "Pre-submission lease validation failed")
-            else
-                try
-                    do! executeContinuationIntent runtime executor workspaceRoot sessionID intent reenter
-                with ex ->
-                    let outcome, reason =
-                        if isAcceptanceUnknownMessage ex.Message then
-                            ContinuationOutcome.AcceptanceUnknown, ex.Message
-                        elif isAbortUnavailableMessage ex.Message then
-                            ContinuationOutcome.AbortUnknown, ex.Message
-                        else
-                            ContinuationOutcome.Failed, ex.Message
-
-                    do!
-                        reenter (fun () ->
-                            finishContinuation runtime workspaceRoot sessionID lease outcome reason)
-        | None ->
-            try
-                match intent with
-                | PropagateFailureIntent ->
-                    do!
-                        reenter (fun () ->
-                            promise {
-                                match (runtime.GetSession sessionID).PendingLease with
-                                | Some lease ->
-                                    do!
-                                        finishContinuation
-                                            runtime
-                                            workspaceRoot
-                                            sessionID
-                                            lease
-                                            ContinuationOutcome.Failed
-                                            "Fallback propagation failure"
-                                | None -> ()
-
-                                do! executor.PropagateFailure sessionID
-                            })
-                | _ -> do! executeContinuationIntent runtime executor workspaceRoot sessionID intent reenter
-            with ex ->
-                JS.console.error ("fallback continuation effect failed for " + sessionID + ": " + ex.Message)
+        | Some lease -> do! runWithLease runtime executor workspaceRoot sessionID intent lease reenter
+        | None -> do! runWithoutLease runtime executor workspaceRoot sessionID intent reenter
     }
 
 /// Compatibility entry for recovery paths that have no session actor queue yet.

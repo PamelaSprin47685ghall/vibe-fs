@@ -30,6 +30,56 @@ let private reconcileTask (rt: CoordinatorRuntime) hasCommits now (_id: string) 
     else
         t
 
+let private warnOrphansDiagnostics
+    (rt: CoordinatorRuntime)
+    (key: string)
+    (warning: string)
+    (orphanIds: string list)
+    (auditSession: string)
+    : JS.Promise<unit> =
+    promise {
+        let err = "MasterSessionId is empty, cannot send prompt warning"
+
+        let diagnostics =
+            createObj
+                [ "event", box "wanxiangzhen_orphan_tasks_diagnostic"
+                  "message", box err
+                  "idempotencyKey", box key
+                  "warning", box warning
+                  "orphans", box (orphanIds |> List.toArray) ]
+
+        JS.console.error diagnostics
+        let! _ = rt.Deps.AppendWanEvent rt.ProjectRoot (promptFailedEvent auditSession (rt.Deps.Now()) key warning err)
+        rt.SentWarnings <- rt.SentWarnings.Remove key
+    }
+
+let private warnOrphansPrompt (rt: CoordinatorRuntime) (key: string) (warning: string) : JS.Promise<unit> =
+    promise {
+        try
+            do! rt.Deps.PromptSession rt.Client rt.MasterSessionId warning
+
+            let! _ =
+                rt.Deps.AppendWanEvent rt.ProjectRoot (warningSentEvent rt.MasterSessionId (rt.Deps.Now()) key warning)
+
+            return ()
+        with ex ->
+            JS.console.error (
+                createObj
+                    [ "event", box "wanxiangzhen_orphan_notify_failed"
+                      "idempotencyKey", box key
+                      "sessionId", box rt.MasterSessionId
+                      "error", box ex.Message
+                      "warning", box warning ]
+            )
+
+            let! _ =
+                rt.Deps.AppendWanEvent
+                    rt.ProjectRoot
+                    (promptFailedEvent rt.MasterSessionId (rt.Deps.Now()) key warning ex.Message)
+
+            rt.SentWarnings <- rt.SentWarnings.Remove key
+    }
+
 /// Best-effort orphan notification: failures never abort replay; only successful
 /// delivery reserves durable idempotency (wanxiangzhen_warning_sent). In-flight
 /// reservation prevents double-send; failure releases the key so retry can proceed.
@@ -54,58 +104,16 @@ let private warnOrphans (rt: CoordinatorRuntime) : JS.Promise<unit> =
                 // Reserve before host call: concurrent/retry path cannot double-send.
                 rt.SentWarnings <- rt.SentWarnings.Add key
 
-                let releaseReservation () =
-                    rt.SentWarnings <- rt.SentWarnings.Remove key
-
-                let auditSession =
-                    if rt.MasterSessionId <> "" then
-                        rt.MasterSessionId
-                    elif rt.Dag.SessionId <> "" then
-                        rt.Dag.SessionId
-                    else
-                        "unknown_session"
-
                 if rt.MasterSessionId = "" then
-                    let err = "MasterSessionId is empty, cannot send prompt warning"
+                    let auditSession =
+                        if rt.Dag.SessionId <> "" then
+                            rt.Dag.SessionId
+                        else
+                            "unknown_session"
 
-                    let diagnostics =
-                        createObj
-                            [ "event", box "wanxiangzhen_orphan_tasks_diagnostic"
-                              "message", box err
-                              "idempotencyKey", box key
-                              "warning", box warning
-                              "orphans", box (orphanIds |> List.toArray) ]
-
-                    JS.console.error diagnostics
-                    let! _ = rt.Deps.AppendWanEvent rt.ProjectRoot (promptFailedEvent auditSession (rt.Deps.Now()) key warning err)
-                    releaseReservation ()
-                    return ()
+                    do! warnOrphansDiagnostics rt key warning orphanIds auditSession
                 else
-                    try
-                        do! rt.Deps.PromptSession rt.Client rt.MasterSessionId warning
-                        let! _ =
-                            rt.Deps.AppendWanEvent
-                                rt.ProjectRoot
-                                (warningSentEvent rt.MasterSessionId (rt.Deps.Now()) key warning)
-                        // Keep reservation = durable success (also recovered from event log).
-                        return ()
-                    with ex ->
-                        JS.console.error (
-                            createObj
-                                [ "event", box "wanxiangzhen_orphan_notify_failed"
-                                  "idempotencyKey", box key
-                                  "sessionId", box rt.MasterSessionId
-                                  "error", box ex.Message
-                                  "warning", box warning ]
-                        )
-
-                        let! _ =
-                            rt.Deps.AppendWanEvent
-                                rt.ProjectRoot
-                                (promptFailedEvent rt.MasterSessionId (rt.Deps.Now()) key warning ex.Message)
-
-                        releaseReservation ()
-                        return ()
+                    do! warnOrphansPrompt rt key warning
     }
 
 let replayFromEventLog (rt: CoordinatorRuntime) : JS.Promise<unit> =

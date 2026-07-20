@@ -78,6 +78,33 @@ let private claimDispatchStarted
         return ok
     }
 
+let private transitionLeaseToDispatchStarted
+    (runtime: FallbackRuntimeStore)
+    (sessionID: string)
+    (continuationID: string)
+    (status: LeaseStatus)
+    : bool =
+    match status with
+    | LeaseStatus.Requested ->
+        runtime.UpdateSessionReturning(
+            sessionID,
+            tryTransitionPendingLeaseReturning continuationID LeaseStatus.Requested LeaseStatus.DispatchStarted
+        )
+    | LeaseStatus.DispatchStarted -> false
+    | LeaseStatus.AcceptanceUnknown ->
+        runtime.UpdateSessionReturning(
+            sessionID,
+            tryTransitionPendingLeaseReturning continuationID LeaseStatus.AcceptanceUnknown LeaseStatus.DispatchStarted
+        )
+    | LeaseStatus.Running ->
+        runtime.UpdateSessionReturning(
+            sessionID,
+            tryTransitionPendingLeaseReturning continuationID LeaseStatus.Running LeaseStatus.DispatchStarted
+        )
+    | LeaseStatus.Dispatched -> true
+    | LeaseStatus.Cancelled
+    | LeaseStatus.Settled -> false
+
 /// Transport returned. Must NOT promote lease to Dispatched — that is solely
 /// `recordHostAcceptedContinuation` on host evidence. Stale prompt completion
 /// is ignored; never append a late cancellation from transport return alone.
@@ -114,42 +141,7 @@ let handleTransportReturned
                     lease.ContinuationOrdinal
 
             let canTransition =
-                match current.Status with
-                | LeaseStatus.Requested ->
-                    runtime.UpdateSessionReturning(
-                        sessionID,
-                        tryTransitionPendingLeaseReturning
-                            lease.ContinuationID
-                            LeaseStatus.Requested
-                            LeaseStatus.Dispatched
-                    )
-                | LeaseStatus.DispatchStarted ->
-                    runtime.UpdateSessionReturning(
-                        sessionID,
-                        tryTransitionPendingLeaseReturning
-                            lease.ContinuationID
-                            LeaseStatus.DispatchStarted
-                            LeaseStatus.Dispatched
-                    )
-                | LeaseStatus.AcceptanceUnknown ->
-                    runtime.UpdateSessionReturning(
-                        sessionID,
-                        tryTransitionPendingLeaseReturning
-                            lease.ContinuationID
-                            LeaseStatus.AcceptanceUnknown
-                            LeaseStatus.Dispatched
-                    )
-                | LeaseStatus.Running ->
-                    runtime.UpdateSessionReturning(
-                        sessionID,
-                        tryTransitionPendingLeaseReturning
-                            lease.ContinuationID
-                            LeaseStatus.Running
-                            LeaseStatus.Dispatched
-                    )
-                | LeaseStatus.Dispatched -> true
-                | LeaseStatus.Cancelled
-                | LeaseStatus.Settled -> false
+                transitionLeaseToDispatchStarted runtime sessionID lease.ContinuationID current.Status
 
             if canTransition then
                 runtime.Update(sessionID, setInjected model atMs)
@@ -185,6 +177,30 @@ let dispatchWithLeaseTransition
         else
             do! dispatchAction ()
             do! handleTransportReturned runtime executor workspaceRoot sessionID lease model agent
+    }
+
+let private handleDispatchException
+    (runtime: FallbackRuntimeStore)
+    (workspaceRoot: string)
+    (sessionID: string)
+    (lease: PendingLease)
+    (ex: exn)
+    : JS.Promise<unit> =
+    promise {
+        if isAcceptanceUnknownMessage ex.Message then
+            do!
+                finishContinuation
+                    runtime
+                    workspaceRoot
+                    sessionID
+                    lease
+                    ContinuationOutcome.AcceptanceUnknown
+                    ex.Message
+        elif isAbortUnavailableMessage ex.Message then
+            runtime.Update(sessionID, setAbortUnavailable true)
+            do! finishContinuation runtime workspaceRoot sessionID lease ContinuationOutcome.AbortUnknown ex.Message
+        else
+            do! finishContinuation runtime workspaceRoot sessionID lease ContinuationOutcome.Failed ex.Message
     }
 
 /// Run a dispatch action under rate-limit governor for the given model key.
@@ -236,19 +252,5 @@ let runWithRetryGovernor
                             ContinuationOutcome.Cancelled
                             "Cancelled before dispatch (rate-limited)")
         with ex ->
-            if isAcceptanceUnknownMessage ex.Message then
-                do!
-                    finishContinuation
-                        runtime
-                        workspaceRoot
-                        sessionID
-                        lease
-                        ContinuationOutcome.AcceptanceUnknown
-                        ex.Message
-            elif isAbortUnavailableMessage ex.Message then
-                runtime.Update(sessionID, setAbortUnavailable true)
-
-                do! finishContinuation runtime workspaceRoot sessionID lease ContinuationOutcome.AbortUnknown ex.Message
-            else
-                do! finishContinuation runtime workspaceRoot sessionID lease ContinuationOutcome.Failed ex.Message
+            do! handleDispatchException runtime workspaceRoot sessionID lease ex
     }

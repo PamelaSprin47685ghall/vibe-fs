@@ -34,6 +34,39 @@ let private clearPendingLeaseAfterTerminal
             runtime.Update(sessionID, setMainContinuationAwaitingStart false)
     }
 
+let private applyTerminalPostSettlementAction
+    (runtime: FallbackRuntimeStore)
+    (workspaceRoot: string)
+    (sessionID: string)
+    (lease: PendingLease)
+    (session: FallbackSessionRuntime)
+    (strongTerminal: bool)
+    (isIdleEvt: bool)
+    : JS.Promise<unit> =
+    promise {
+        if strongTerminal then
+            do! clearPendingLeaseAfterTerminal runtime workspaceRoot sessionID lease
+        elif isIdleEvt then
+            match classifyIdleDisposition session false false with
+            | MaySettle _ -> do! clearPendingLeaseAfterTerminal runtime workspaceRoot sessionID lease
+            | NeedsReconciliation(cid, hostMsgId) when workspaceRoot <> "" ->
+                do!
+                    appendContinuationIdleReconciliationOrFail
+                        workspaceRoot
+                        sessionID
+                        cid
+                        hostMsgId
+                        lease.ContinuationOrdinal
+            | NeedsReconciliation _
+            | RejectNotHostAccepted _
+            | SessionHintOnly
+            | IdempotentIgnore -> ()
+        elif lease.HostUserMessageId <> "" then
+            do! clearPendingLeaseAfterTerminal runtime workspaceRoot sessionID lease
+        else
+            ()
+    }
+
 /// Gate lease terminalisation by idle disposition (SPEC §七 step 6).
 let handleTerminalPostSettlement
     (runtime: FallbackRuntimeStore)
@@ -64,9 +97,7 @@ let handleTerminalPostSettlement
                     | LeaseStatus.Cancelled
                     | LeaseStatus.Settled -> false
 
-                if awaitingAcceptance then
-                    ()
-                else
+                if not awaitingAcceptance then
                     let session = runtime.GetSession sessionID
 
                     let strongTerminal =
@@ -76,29 +107,72 @@ let handleTerminalPostSettlement
 
                     let isIdleEvt = evt = FallbackEvent.SessionIdle
 
-                    if strongTerminal then
-                        do! clearPendingLeaseAfterTerminal runtime workspaceRoot sessionID lease
-                    elif isIdleEvt then
-                        match classifyIdleDisposition session false false with
-                        | MaySettle _ -> do! clearPendingLeaseAfterTerminal runtime workspaceRoot sessionID lease
-                        | NeedsReconciliation(cid, hostMsgId) when workspaceRoot <> "" ->
-                            do!
-                                appendContinuationIdleReconciliationOrFail
-                                    workspaceRoot
-                                    sessionID
-                                    cid
-                                    hostMsgId
-                                    lease.ContinuationOrdinal
-                        | NeedsReconciliation _
-                        | RejectNotHostAccepted _
-                        | SessionHintOnly
-                        | IdempotentIgnore -> ()
-                    elif lease.HostUserMessageId <> "" then
-                        do! clearPendingLeaseAfterTerminal runtime workspaceRoot sessionID lease
-                    else
-                        ()
+                    do!
+                        applyTerminalPostSettlementAction
+                            runtime
+                            workspaceRoot
+                            sessionID
+                            lease
+                            session
+                            strongTerminal
+                            isIdleEvt
             | None -> ()
     }
+
+let private handleSessionIdleEvent
+    (workspaceRoot: string)
+    (sessionID: string)
+    (session: FallbackSessionRuntime)
+    (isMatchedContinuation: bool)
+    : JS.Promise<FallbackEvent option> =
+    match classifyIdleDisposition session isMatchedContinuation false with
+    | SessionHintOnly -> promise { return Some FallbackEvent.SessionIdle }
+    | MaySettle _ when isMatchedContinuation -> promise { return Some FallbackEvent.SessionIdle }
+    | NeedsReconciliation(cid, hostMsgId) ->
+        promise {
+            if workspaceRoot <> "" then
+                let ord =
+                    session.PendingLease
+                    |> Option.map (fun l -> l.ContinuationOrdinal)
+                    |> Option.defaultValue 0
+
+                do! appendContinuationIdleReconciliationOrFail workspaceRoot sessionID cid hostMsgId ord
+
+            return None
+        }
+    | MaySettle _
+    | RejectNotHostAccepted _
+    | IdempotentIgnore -> promise { return None }
+
+let private filterAwaitingEvents
+    (session: FallbackSessionRuntime)
+    (eventOpt: FallbackEvent option)
+    (isMatchedContinuation: bool)
+    (continuationId: string)
+    : FallbackEvent option =
+    let hasPending = session.PendingLease.IsSome
+
+    let awaitingAcceptance =
+        match session.PendingLease with
+        | Some lease ->
+            match lease.Status with
+            | LeaseStatus.Requested
+            | LeaseStatus.DispatchStarted
+            | LeaseStatus.AcceptanceUnknown -> true
+            | LeaseStatus.Dispatched
+            | LeaseStatus.Running
+            | LeaseStatus.Cancelled
+            | LeaseStatus.Settled -> false
+        | None -> false
+
+    if
+        (hasPending || awaitingAcceptance || isMainContinuationAwaitingStart session)
+        && continuationId = ""
+        && not isMatchedContinuation
+    then
+        None
+    else
+        eventOpt
 
 /// Filter idle events: only SessionHintOnly / attributed MaySettle pass through.
 /// NeedsReconciliation emits a stub event and drops the idle from the state machine.
@@ -113,54 +187,5 @@ let filterIdleEvent
     : JS.Promise<FallbackEvent option> =
     match eventOpt with
     | Some FallbackEvent.NewUserMessage -> promise { return eventOpt }
-    | Some FallbackEvent.SessionIdle ->
-        match classifyIdleDisposition session isMatchedContinuation false with
-        | SessionHintOnly -> promise { return eventOpt }
-        | MaySettle _ when isMatchedContinuation -> promise { return eventOpt }
-        | NeedsReconciliation(cid, hostMsgId) ->
-            promise {
-                if workspaceRoot <> "" then
-                    let ord =
-                        session.PendingLease
-                        |> Option.map (fun l -> l.ContinuationOrdinal)
-                        |> Option.defaultValue 0
-
-                    do!
-                        appendContinuationIdleReconciliationOrFail
-                            workspaceRoot
-                            sessionID
-                            cid
-                            hostMsgId
-                            ord
-
-                return None
-            }
-        | MaySettle _
-        | RejectNotHostAccepted _
-        | IdempotentIgnore -> promise { return None }
-    | _ ->
-        promise {
-            let hasPending = session.PendingLease.IsSome
-
-            let awaitingAcceptance =
-                match session.PendingLease with
-                | Some lease ->
-                    match lease.Status with
-                    | LeaseStatus.Requested
-                    | LeaseStatus.DispatchStarted
-                    | LeaseStatus.AcceptanceUnknown -> true
-                    | LeaseStatus.Dispatched
-                    | LeaseStatus.Running
-                    | LeaseStatus.Cancelled
-                    | LeaseStatus.Settled -> false
-                | None -> false
-
-            if
-                (hasPending || awaitingAcceptance || isMainContinuationAwaitingStart session)
-                && continuationId = ""
-                && not isMatchedContinuation
-            then
-                return None
-            else
-                return eventOpt
-        }
+    | Some FallbackEvent.SessionIdle -> handleSessionIdleEvent workspaceRoot sessionID session isMatchedContinuation
+    | _ -> promise { return filterAwaitingEvents session eventOpt isMatchedContinuation continuationId }

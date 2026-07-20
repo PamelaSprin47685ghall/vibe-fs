@@ -23,6 +23,36 @@ open Wanxiangshu.Hosts.Opencode.NudgeEffect
 open Wanxiangshu.Hosts.Opencode.Fallback.HostEventInspection
 open Wanxiangshu.Hosts.Opencode.NudgeTriggerCleanup
 
+let private inferOwnerFromTestRun (ctx: obj) (sessionIDStr: string) (isTest: bool) : JS.Promise<SessionOwner> =
+    promise {
+        if isTest then
+            match getClientFromPluginCtx ctx with
+            | Error _ -> return SessionOwner.NoOwner
+            | Ok client ->
+                let arg = box {| path = box {| id = sessionIDStr |} |}
+                let! resp = invokeClient client "messages" arg
+                let data = Dyn.get resp "data"
+
+                if not (Dyn.isNullish data) && Dyn.isArray data then
+                    let messagesArr = data :?> obj array
+
+                    if messagesArr.Length > 0 then
+                        let lastMsg = messagesArr.[messagesArr.Length - 1]
+                        let info = Dyn.get lastMsg "info"
+                        let role = Dyn.str info "role"
+
+                        if role = "assistant" || role = "toolResult" then
+                            return SessionOwner.Human
+                        else
+                            return SessionOwner.NoOwner
+                    else
+                        return SessionOwner.NoOwner
+                else
+                    return SessionOwner.NoOwner
+        else
+            return SessionOwner.NoOwner
+    }
+
 /// Read the current owner; in test runs, fall back to the last observed
 /// role on the host session (assistant / toolResult -> Human).
 let resolveOwner
@@ -37,35 +67,7 @@ let resolveOwner
         if current <> SessionOwner.NoOwner then
             return current
         else
-            let! inferred =
-                promise {
-                    if isTest then
-                        match getClientFromPluginCtx ctx with
-                        | Error _ -> return SessionOwner.NoOwner
-                        | Ok client ->
-                            let arg = box {| path = box {| id = sessionIDStr |} |}
-                            let! resp = invokeClient client "messages" arg
-                            let data = Dyn.get resp "data"
-
-                            if not (Dyn.isNullish data) && Dyn.isArray data then
-                                let messagesArr = data :?> obj array
-
-                                if messagesArr.Length > 0 then
-                                    let lastMsg = messagesArr.[messagesArr.Length - 1]
-                                    let info = Dyn.get lastMsg "info"
-                                    let role = Dyn.str info "role"
-
-                                    if role = "assistant" || role = "toolResult" then
-                                        return SessionOwner.Human
-                                    else
-                                        return SessionOwner.NoOwner
-                                else
-                                    return SessionOwner.NoOwner
-                            else
-                                return SessionOwner.NoOwner
-                    else
-                        return SessionOwner.NoOwner
-                }
+            let! inferred = inferOwnerFromTestRun ctx sessionIDStr isTest
 
             if inferred <> SessionOwner.NoOwner then
                 return inferred

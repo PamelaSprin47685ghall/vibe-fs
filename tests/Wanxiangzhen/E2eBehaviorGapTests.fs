@@ -20,7 +20,7 @@ let entries () : (string * (unit -> unit)) list =
     [ ("e2e_behavior_gap.registry_matches_live",
        fun () ->
            let live = ExtendedMockE2eTests.entriesAsync () |> List.map fst
-           chk "gap.ext_mock_len_30" (List.length live = 30)
+           chk "gap.ext_mock_len_32" (List.length live = 32)
            chk "gap.ext_mock_labels_unique" (live |> List.distinct |> List.length = live.Length))
       ("e2e_behavior_gap.coverage_table",
        fun () ->

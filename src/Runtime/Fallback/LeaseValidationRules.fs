@@ -132,7 +132,9 @@ let classifyContinuationMatch
             // (OpenCode often reuses the user message id as the turn/run key).
             let isHostRunIdMatch =
                 match hostRunIDOpt with
-                | Some rid when rid <> "" && lease.HostRunId <> "" && rid = lease.HostRunId -> true
+                | Some rid when rid <> "" ->
+                    (lease.HostRunId <> "" && rid = lease.HostRunId)
+                    || (lease.HostUserMessageId <> "" && rid = lease.HostUserMessageId)
                 | _ -> false
 
             if isHostRunIdMatch then
