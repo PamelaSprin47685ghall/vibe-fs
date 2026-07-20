@@ -73,37 +73,6 @@ module SessionDispatcherOps =
                   IsRetryable = Some false }
 
             DispatchOps.resolveRecord r (TransportUnavailable err)
-<<<<<<< HEAD
-<<<<<<< HEAD
-        | Error exn ->
-            // Preserve host/transport failure text so callers can classify
-            // (helpers missing, nudge missing, session mismatch, etc.).
-            let msg =
-                let m = exn.Message
-                if System.String.IsNullOrEmpty m then "transport failed" else m
-            let name =
-                if msg.Contains("AcceptanceUnknown") then "AcceptanceUnknown"
-                elif msg.StartsWith("Busy:") then "Busy"
-                elif msg.StartsWith("Failed:") then "Failed"
-                elif msg.Contains("AbortUnknown") || msg.Contains("AbortUnavailable") then "AbortUnknown"
-                else "TransportFailed"
-
-            let err =
-                { ErrorName = name
-                  DomainError = None
-                  Message = msg
-                  StatusCode = None
-                  IsRetryable = Some (name = "Busy") }
-
-            let terminal =
-                if name = "AcceptanceUnknown" then AcceptanceUnknown err
-                elif name = "AbortUnknown" then AbortUnknown err
-                elif name = "Failed" then Failed err
-                elif msg.Contains("opencode_session_api_missing") then TransportUnavailable err
-                else RejectedBeforeSend err
-
-            DispatchOps.resolveRecord r terminal
-=======
         | Error exn when
             exn.Message.StartsWith("AcceptanceUnknown")
             || exn.Message.Contains("AcceptanceUnknown:")
@@ -128,7 +97,6 @@ module SessionDispatcherOps =
 
             DispatchOps.resolveRecord r (Failed err)
         | Error exn -> DispatchOps.rejectUnknown r "EmptyReceipt" exn.Message
->>>>>>> 11a984b6 (fix: exhaustive LeaseStatus/DispatchTerminal matches and recovery gating)
 
     /// Reserve the per-session slot. Refuses if another dispatch is in flight or the session is closed.
     let reserveRecord (state: SessionDispatcherState) (r: DispatchRecord) (logger: IDispatchEventLogger) : JS.Promise<unit> =

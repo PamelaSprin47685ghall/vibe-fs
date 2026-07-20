@@ -1,7 +1,6 @@
 module Wanxiangshu.Runtime.SessionStateRestore
 
 open Wanxiangshu.Runtime.Fallback.SessionRuntime
-open Wanxiangshu.Runtime.Fallback.SessionRuntimeTransitions
 open Wanxiangshu.Runtime.Fallback.FallbackMessageCodec
 open Wanxiangshu.Kernel.FallbackKernel.Types
 open Wanxiangshu.Kernel.EventSourcing.Fold

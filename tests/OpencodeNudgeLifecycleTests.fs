@@ -6,7 +6,6 @@ open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Runtime.Dyn
 open Wanxiangshu.Runtime.Fallback.RuntimeStore
 open Wanxiangshu.Runtime.Fallback.SessionRuntime
-open Wanxiangshu.Runtime.Fallback.SessionRuntimeTransitions
 open Wanxiangshu.Runtime.Fallback.SessionRuntimeLeaseAcceptancePure
 open Wanxiangshu.Runtime.Fallback.SessionRuntimePropertyPure
 open Wanxiangshu.Runtime.Dispatch

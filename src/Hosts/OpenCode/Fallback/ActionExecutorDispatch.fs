@@ -15,6 +15,7 @@ open Wanxiangshu.Runtime.Dispatch
 open Wanxiangshu.Kernel.Dispatch.Identity
 open Wanxiangshu.Kernel.Dispatch.Protocol
 open Wanxiangshu.Runtime.Fallback.ContinuationDispatchOps
+open Wanxiangshu.Runtime.Fallback.ContinuationDispatchRegistry
 
 let fetchMessagesImpl (client: obj) (sessionID: string) : JS.Promise<obj array> =
     promise {

@@ -14,6 +14,7 @@ open Wanxiangshu.Runtime.Fallback.RetryDispatchGovernor
 open Wanxiangshu.Runtime.Fallback.ContinuationSessionReenter
 open Wanxiangshu.Runtime.Fallback.ContinuationDispatchComplete
 open Wanxiangshu.Runtime.MuxLogicalReceipt
+open Wanxiangshu.Runtime.Clock
 open Wanxiangshu.Runtime.Fallback.ContinuationDispatchRegistry
 
 /// Shared per-process retry dispatch governor.
@@ -85,12 +86,12 @@ let private claimDispatchStarted
 /// is ignored; never append a late cancellation from transport return alone.
 let handleTransportReturned
     (runtime: FallbackRuntimeStore)
-    (_executor: IActionExecutor)
-    (_workspaceRoot: string)
+    (executor: IActionExecutor)
+    (workspaceRoot: string)
     (sessionID: string)
     (lease: PendingLease)
-    (_model: FallbackModel)
-    (_agent: string)
+    (model: FallbackModel)
+    (agent: string)
     : JS.Promise<unit> =
     promise {
         let pending = (runtime.GetSession sessionID).PendingLease
@@ -98,16 +99,6 @@ let handleTransportReturned
 
         match pending, lifecycle with
         | Some current, FallbackLifecycle.Active when current.ContinuationID = lease.ContinuationID ->
-<<<<<<< HEAD
-            match current.Status with
-            | LeaseStatus.Dispatched
-            | LeaseStatus.Running -> ()
-            | LeaseStatus.DispatchStarted
-            | LeaseStatus.Requested
-            | LeaseStatus.Cancelled
-            | LeaseStatus.Settled -> ()
-        | _ -> ()
-=======
             let modelStr =
                 match model.Variant with
                 | Some v -> $"{model.ProviderID}/{model.ModelID}:{v}"
@@ -166,10 +157,8 @@ let handleTransportReturned
             if canTransition then
                 runtime.Update(sessionID, setInjected model atMs)
         | _ ->
-            // Terminal handling or a newer lease won the race. The prompt
-            // completion is stale evidence; never append a late cancellation.
             ()
->>>>>>> 7a72d43e (fix: exhaustive LeaseStatus/DispatchTerminal matches (AcceptanceUnknown/AbortUnknown))
+
     }
 
 /// Inner dispatch: write dispatch_started, transition lease, call action.
@@ -255,41 +244,6 @@ let runWithRetryGovernor
                             ContinuationOutcome.Cancelled
                             "Cancelled before dispatch (rate-limited)")
         with ex ->
-<<<<<<< HEAD
-            do!
-                reenter (fun () ->
-                    promise {
-                        if isAcceptanceUnknownMessage ex.Message then
-                            do!
-                                finishContinuation
-                                    runtime
-                                    workspaceRoot
-                                    sessionID
-                                    lease
-                                    ContinuationOutcome.AcceptanceUnknown
-                                    ex.Message
-                        elif isAbortUnavailableMessage ex.Message then
-                            runtime.Update(sessionID, setAbortUnavailable true)
-
-                            do!
-                                finishContinuation
-                                    runtime
-                                    workspaceRoot
-                                    sessionID
-                                    lease
-                                    ContinuationOutcome.AbortUnknown
-                                    ex.Message
-                        else
-                            do!
-                                finishContinuation
-                                    runtime
-                                    workspaceRoot
-                                    sessionID
-                                    lease
-                                    ContinuationOutcome.Failed
-                                    ex.Message
-                    })
-=======
             if isAcceptanceUnknownMessage ex.Message then
                 do!
                     finishContinuation
@@ -312,5 +266,4 @@ let runWithRetryGovernor
                         ex.Message
             else
                 do! finishContinuation runtime workspaceRoot sessionID lease ContinuationOutcome.Failed ex.Message
->>>>>>> 7a72d43e (fix: exhaustive LeaseStatus/DispatchTerminal matches (AcceptanceUnknown/AbortUnknown))
     }

@@ -9,9 +9,6 @@ open Wanxiangshu.Kernel.SessionControl.State
 open Wanxiangshu.Kernel.SessionControl.Event
 open Wanxiangshu.Kernel.SessionControl.LeaseIdentity
 open Wanxiangshu.Kernel.SessionControl.LeaseIdentityOps
-open Wanxiangshu.Kernel.SessionControl.LeaseTransitionsCompaction
-open Wanxiangshu.Kernel.SessionControl.LeaseTransitionsContinuation
-open Wanxiangshu.Kernel.SessionControl.LeaseTransitionsNudge
 
 let private handleHumanTurn (st: OwnerEpisodeState) (ordinal: int option) (turn: HumanTurnState) : OwnerEpisodeState =
     let newOrdinal = defaultOrdinal st.HumanTurnOrdinal ordinal

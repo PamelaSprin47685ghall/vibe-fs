@@ -10,6 +10,7 @@ open Wanxiangshu.Kernel.FallbackKernel.Types
 open Wanxiangshu.Runtime.Fallback.RuntimeStore
 open Wanxiangshu.Runtime.Fallback.SessionRuntime
 open Wanxiangshu.Runtime.Fallback.ContinuationDispatchOps
+open Wanxiangshu.Runtime.Fallback.ContinuationDispatchRegistry
 open Wanxiangshu.Runtime.Fallback.ContinuationExecutionCore
 open Wanxiangshu.Runtime.Fallback.ContinuationExecution
 open Wanxiangshu.Runtime.Fallback.Ports
@@ -169,7 +170,7 @@ let executeSendContinueIsSingleBridge () =
                 member _.CaptureCurrentModel _ = Promise.lift None
                 member _.AbortRun _ = Promise.lift () }
 
-        do! executeSendContinue rt executor root sid lease defaultModel "reviewer"
+        do! executeSendContinue rt executor root sid lease defaultModel "reviewer" inlineReenter
 
         check "exactly one physical SendContinue" (calls.Count = 1)
         check "SendContinue args match lease" (calls.[0] = sid + ":" + lease.ContinuationID)

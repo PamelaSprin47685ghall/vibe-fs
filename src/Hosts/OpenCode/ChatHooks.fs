@@ -124,7 +124,7 @@ let chatMessageFor
                 let modelOpt = tryGetModelStringFromHook input output
                 do! lifecycleObserver.OnNewHumanMessage(sessionIDStr, agent, modelOpt, msgId)
 
-            do! ChatHooksProvenance.recordProvenanceIfPresent parts msgId lifecycleObserver.WorkspaceRoot sessionIDStr
+            do! recordProvenanceIfPresent parts msgId lifecycleObserver.WorkspaceRoot sessionIDStr
 
         applyToolOverrides host agent output
     }

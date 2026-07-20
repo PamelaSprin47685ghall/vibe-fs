@@ -4,9 +4,7 @@ open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Kernel.FallbackKernel.Types
 open Wanxiangshu.Runtime.Fallback.RuntimeStore
 open Wanxiangshu.Runtime.Fallback.SessionRuntime
-open Wanxiangshu.Runtime.Fallback.SessionRuntimeTransitions
 open Wanxiangshu.Runtime.Fallback.SessionRuntimeLeasePure
-open Wanxiangshu.Runtime.Fallback.SessionRuntimeCompactionPure
 open Wanxiangshu.Runtime.Fallback.SessionRuntimePropertyPure
 open Wanxiangshu.Runtime.Fallback.LeaseValidationRules
 // IdleDisposition cases live here (SessionHintOnly / MaySettle / …)
@@ -75,6 +73,7 @@ let verifyLeaseWithStatus_noPendingLease_returnsFalse () =
           SessionGeneration = 0
           HumanTurnID = ""
           HostUserMessageId = ""
+          HostRunId = ""
           CancelGeneration = 0
           Owner = SessionOwner.Fallback
           Model = mkModel ()

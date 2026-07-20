@@ -118,7 +118,6 @@ let setActiveContinuationGeneration gen (s: FallbackSessionRuntime) = { s with A
 let setActiveContinuationCancelGeneration gen (s: FallbackSessionRuntime) =
     { s with
         ActiveContinuationCancelGen = gen }
-<<<<<<< HEAD
 
 let setActiveCompactionId id ordinal humanTurnId cancelGeneration (s: FallbackSessionRuntime) =
     { s with

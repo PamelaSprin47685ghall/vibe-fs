@@ -8,10 +8,7 @@ open Wanxiangshu.Runtime.Fallback.Ports
 open Wanxiangshu.Runtime.Fallback.LeaseValidation
 open Wanxiangshu.Runtime.Fallback.ContinuationExecution
 open Wanxiangshu.Runtime.Fallback.ContinuationExecutionCore
-<<<<<<< HEAD
 open Wanxiangshu.Runtime.Fallback.ContinuationDispatchOps
-=======
->>>>>>> 11a984b6 (fix: exhaustive LeaseStatus/DispatchTerminal matches and recovery gating)
 open Wanxiangshu.Runtime.MuxLogicalReceipt
 
 let private leaseOfIntent (intent: ContinuationIntent) : PendingLease option =
@@ -72,9 +69,6 @@ let run
 
             if not isValid then
                 do!
-<<<<<<< HEAD
-            if not isValid then
-                do!
                     reenter (fun () ->
                         finishContinuation
                             runtime
@@ -86,26 +80,6 @@ let run
             else
                 try
                     do! executeContinuationIntent runtime executor workspaceRoot sessionID intent reenter
-=======
-                    finishContinuation
-                        runtime
-                        workspaceRoot
-                        sessionID
-                        lease
-                        ContinuationOutcome.Cancelled
-                        "Pre-submission lease validation failed"
-                return ()
-            else
-                try
-                    do! executeContinuationIntent runtime executor workspaceRoot sessionID intent
-
-                    match (runtime.GetSession sessionID).PendingLease with
-                    | Some current when
-                        current.ContinuationID = lease.ContinuationID
-                        && current.Status = LeaseStatus.Dispatched ->
-                        ()
-                    | _ -> ()
->>>>>>> 11a984b6 (fix: exhaustive LeaseStatus/DispatchTerminal matches and recovery gating)
                 with ex ->
                     let outcome, reason =
                         if isAcceptanceUnknownMessage ex.Message then
@@ -115,14 +89,9 @@ let run
                         else
                             ContinuationOutcome.Failed, ex.Message
 
-<<<<<<< HEAD
                     do!
                         reenter (fun () ->
                             finishContinuation runtime workspaceRoot sessionID lease outcome reason)
-=======
-                    do! finishContinuation runtime workspaceRoot sessionID lease outcome reason
-                    return ()
->>>>>>> 11a984b6 (fix: exhaustive LeaseStatus/DispatchTerminal matches and recovery gating)
         | None ->
             try
                 match intent with

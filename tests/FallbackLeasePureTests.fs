@@ -4,7 +4,6 @@ open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Kernel.FallbackKernel.Types
 open Wanxiangshu.Kernel.FallbackRuntimeFlags
 open Wanxiangshu.Runtime.Fallback.SessionRuntime
-open Wanxiangshu.Runtime.Fallback.SessionRuntimeTransitions
 open Wanxiangshu.Runtime.Fallback.SessionRuntimeLeasePure
 open Wanxiangshu.Runtime.Fallback.SessionRuntimeLeaseAcceptancePure
 open Wanxiangshu.Runtime.Fallback.SessionRuntimePropertyPure
@@ -229,7 +228,7 @@ let tryAcceptPendingLeaseFromAcceptanceUnknown () =
         tryTransitionPendingLease cid LeaseStatus.Requested LeaseStatus.AcceptanceUnknown s
         |> Option.get
 
-    match tryAcceptPendingLease cid sAu with
+    match tryAcceptPendingLease cid "" sAu with
     | Some s' -> check "accepted from AcceptanceUnknown" (s'.PendingLease.Value.Status = LeaseStatus.Dispatched)
     | None -> failwith "expected accept from AcceptanceUnknown"
 

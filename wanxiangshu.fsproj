@@ -127,9 +127,6 @@
     <Compile Include="src/Kernel/SessionControl/Event.fs"/>
     <Compile Include="src/Kernel/SessionControl/LeaseIdentity.fs"/>
     <Compile Include="src/Kernel/SessionControl/LeaseIdentityOps.fs"/>
-    <Compile Include="src/Kernel/SessionControl/LeaseTransitionsCompaction.fs"/>
-    <Compile Include="src/Kernel/SessionControl/LeaseTransitionsContinuation.fs"/>
-    <Compile Include="src/Kernel/SessionControl/LeaseTransitionsNudge.fs"/>
     <Compile Include="src/Kernel/SessionControl/LeaseTransitions.fs"/>
     <Compile Include="src/Kernel/SessionControl/Projection.fs"/>
     <Compile Include="src/Kernel/EventSourcing/SessionState.fs"/>
@@ -364,7 +361,6 @@
     <Compile Include="src/Runtime/Nudge/MuxLogicalReceipt.fs"/>
     <Compile Include="src/Runtime/Fallback/LeaseValidationRules.fs"/>
     <Compile Include="src/Runtime/Fallback/LeaseValidation.fs"/>
-    <Compile Include="src/Runtime/Nudge/MuxLogicalReceipt.fs"/>
     <Compile Include="src/Runtime/Fallback/RetryDispatchGovernor.fs"/>
     <Compile Include="src/Runtime/Fallback/ContinuationSessionReenter.fs"/>
     <Compile Include="src/Runtime/Fallback/ContinuationDispatchComplete.fs"/>
@@ -761,7 +757,6 @@
     <Compile Include="tests/OpencodeSubagentCoverageTests.fs"/>
     <Compile Include="tests/OmpReconcileTests.fs"/>
     <Compile Include="tests/OmpSessionLifecycleTests.fs"/>
-    <Compile Include="tests/OmpHostContractTests.fs"/>
     <Compile Include="tests/MethodologyTests.fs"/>
     <Compile Include="tests/ReviewPromptsFormatTests.fs"/>
     <Compile Include="tests/CapsSynthCommonTests.fs"/>

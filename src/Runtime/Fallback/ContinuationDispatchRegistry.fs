@@ -7,6 +7,7 @@ open Wanxiangshu.Runtime.Fallback.SessionRuntime
 open Wanxiangshu.Runtime.Fallback.SessionRuntimeLeaseAcceptancePure
 open Wanxiangshu.Runtime.Fallback.SessionRuntimePropertyPure
 open Wanxiangshu.Runtime.Fallback.Ports
+open Wanxiangshu.Runtime.Clock
 open Wanxiangshu.Runtime.ContinuationEventWriter
 
 let private modelString (model: FallbackModel) =
@@ -77,7 +78,7 @@ let recordHostAcceptedContinuation
             | LeaseStatus.Requested
             | LeaseStatus.DispatchStarted ->
                 let accepted =
-                    runtime.UpdateSessionReturning(sessionID, tryAcceptPendingLeaseReturning continuationID)
+                    runtime.UpdateSessionReturning(sessionID, tryAcceptPendingLeaseReturning continuationID "")
 
                 if not accepted then
                     return false

@@ -201,7 +201,7 @@ let private checkFsprojCompileOrder (cwd: string) =
     let fsprojPath = pathJoin cwd "wanxiangshu.fsproj"
     failIf (not (existsSync fsprojPath)) "wanxiangshu.fsproj missing"
     let content = readFileSync fsprojPath "utf8"
-    let re = Regex("Compile Include=\\\"([^\\\"]+)\\\"")
+    let re = Regex(@"Compile Include=""([^""]+)""")
     let includes =
         [ for m in re.Matches content -> m.Groups.[1].Value.Replace("\\", "/") ]
 

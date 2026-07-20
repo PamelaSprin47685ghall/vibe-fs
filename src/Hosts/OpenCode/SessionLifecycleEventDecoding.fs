@@ -10,7 +10,6 @@ open Wanxiangshu.Runtime.ToolRuntimeContext
 open Wanxiangshu.Runtime.Fallback.RuntimeStore
 open Wanxiangshu.Runtime.Fallback.SessionRuntimePropertyPure
 open Wanxiangshu.Runtime.Fallback.SessionRuntimeLeasePure
-open Wanxiangshu.Runtime.Fallback.SessionRuntimeCompactionPure
 open Wanxiangshu.Runtime.SessionEventWriter
 open Wanxiangshu.Hosts.Opencode.NudgeTriggerOps
 open Wanxiangshu.Hosts.Opencode.Fallback.HostEventInspection

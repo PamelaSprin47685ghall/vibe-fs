@@ -13,6 +13,7 @@ open Wanxiangshu.Runtime.Fallback.SessionRuntime
 open Wanxiangshu.Runtime.Fallback.ContinuationDispatchOps
 open Wanxiangshu.Hosts.Opencode.ChatHooksDecoders
 open Wanxiangshu.Runtime.Dispatch
+open Wanxiangshu.Runtime.Fallback.ContinuationDispatchRegistry
 open Wanxiangshu.Kernel.HostTools
 
 let consumeAndDispatch
