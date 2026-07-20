@@ -296,12 +296,11 @@ let run () =
         do! dispatchedLeaseIsNotRedispatched ()
         resetRetryGovernorForTests ()
         do! cancelledLeaseIsNotRedispatched ()
-<<<<<<< HEAD
         resetRetryGovernorForTests ()
-=======
         do! acceptanceUnknownLeaseIsNotBlindResent ()
+        resetRetryGovernorForTests ()
         do! dispatchStartedLeaseIsNotBlindResent ()
->>>>>>> 98bc01f6 (fix(mux): wire AcceptanceUnknown/AbortUnknown degrade paths end-to-end)
+        resetRetryGovernorForTests ()
         do! staleGenerationLeaseIsNotDispatched ()
         resetRetryGovernorForTests ()
         do! appendFailureDoesNotMutateMemory ()

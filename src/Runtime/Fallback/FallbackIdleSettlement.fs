@@ -142,7 +142,24 @@ let filterIdleEvent
         promise {
             let hasPending = session.PendingLease.IsSome
 
-            if hasPending && continuationId = "" && not isMatchedContinuation then
+            let awaitingAcceptance =
+                match session.PendingLease with
+                | Some lease ->
+                    match lease.Status with
+                    | LeaseStatus.Requested
+                    | LeaseStatus.DispatchStarted
+                    | LeaseStatus.AcceptanceUnknown -> true
+                    | LeaseStatus.Dispatched
+                    | LeaseStatus.Running
+                    | LeaseStatus.Cancelled
+                    | LeaseStatus.Settled -> false
+                | None -> false
+
+            if
+                (hasPending || awaitingAcceptance || isMainContinuationAwaitingStart session)
+                && continuationId = ""
+                && not isMatchedContinuation
+            then
                 return None
             else
                 return eventOpt

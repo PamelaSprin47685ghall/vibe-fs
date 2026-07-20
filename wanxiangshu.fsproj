@@ -361,6 +361,7 @@
     <Compile Include="src/Runtime/Session/SessionActorRegistry.fs"/>
     <Compile Include="src/Runtime/EventStore/EventLogRuntimeNudge.fs"/>
     <Compile Include="src/Runtime/Fallback/Ports.fs"/>
+    <Compile Include="src/Runtime/Nudge/MuxLogicalReceipt.fs"/>
     <Compile Include="src/Runtime/Fallback/LeaseValidationRules.fs"/>
     <Compile Include="src/Runtime/Fallback/LeaseValidation.fs"/>
     <Compile Include="src/Runtime/Nudge/MuxLogicalReceipt.fs"/>

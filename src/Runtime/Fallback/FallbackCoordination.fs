@@ -62,7 +62,64 @@ let calculateConsumed (evt: FallbackEvent) (statePhase: FallbackPhase) (finalSta
         | FallbackPhase.Scanning _ -> true
         | _ -> false
     | _ -> false
+<<<<<<< HEAD
 let handleTerminalPostSettlement = FallbackIdleSettlement.handleTerminalPostSettlement
+=======
+
+let handleTerminalPostSettlement
+    (runtime: FallbackRuntimeStore)
+    (workspaceRoot: string)
+    (sessionID: string)
+    (evt: FallbackEvent)
+    (finalState2: SessionFallbackState)
+    (intentOpt: 'Intent option)
+    : JS.Promise<unit> =
+    promise {
+        let isPostTerminal =
+            evt <> FallbackEvent.SessionBusy
+            && (finalState2.Lifecycle = FallbackLifecycle.TaskComplete
+                || finalState2.Lifecycle = FallbackLifecycle.Cancelled
+                || finalState2.Phase = FallbackPhase.Exhausted
+                || (finalState2.Phase = FallbackPhase.Idle && intentOpt.IsNone))
+
+        if isPostTerminal then
+            match (runtime.GetSession sessionID).PendingLease with
+            | Some lease ->
+                // Unscoped idle / phase Idle must not settle a dispatch that
+                // never reached HostAccepted (Requested/DispatchStarted/
+                // AcceptanceUnknown). Those require reconciliation.
+                let awaitingAcceptance =
+                    match lease.Status with
+                    | LeaseStatus.Requested
+                    | LeaseStatus.DispatchStarted
+                    | LeaseStatus.AcceptanceUnknown -> true
+                    | LeaseStatus.Dispatched
+                    | LeaseStatus.Running
+                    | LeaseStatus.Cancelled
+                    | LeaseStatus.Settled -> false
+
+                if awaitingAcceptance then
+                    ()
+                else
+                    if lease.Status <> LeaseStatus.Cancelled then
+                        do!
+                            appendContinuationSettledOrFail
+                                workspaceRoot
+                                sessionID
+                                lease.ContinuationID
+                                lease.HumanTurnID
+                                lease.SessionGeneration
+                                "completed"
+                                lease.ContinuationOrdinal
+
+                    if runtime.UpdateSessionReturning(sessionID, tryClearPendingLeaseReturning lease.ContinuationID) then
+                        if (runtime.GetSession sessionID).Owner = SessionOwner.Fallback then
+                            runtime.UpdateSession(sessionID, transferOwnership SessionOwner.NoOwner)
+
+                        runtime.Update(sessionID, setMainContinuationAwaitingStart false)
+            | None -> ()
+    }
+>>>>>>> 11a984b6 (fix: exhaustive LeaseStatus/DispatchTerminal matches and recovery gating)
 
 let executeAction
     (runtime: FallbackRuntimeStore)
@@ -124,7 +181,6 @@ let extractEventContext
         let eventOpt = if isStale then None else eventOpt
         let session = runtime.GetSession sessionID
 
-<<<<<<< HEAD
         let! eventOpt =
             filterIdleEvent
                 runtime
@@ -134,35 +190,6 @@ let extractEventContext
                 eventOpt
                 isMatchedContinuation
                 continuationId
-=======
-        let eventOpt =
-            match eventOpt with
-            | Some FallbackEvent.NewUserMessage -> eventOpt
-            | _ ->
-                let session = runtime.GetSession sessionID
-                let hasPending = session.PendingLease.IsSome
-
-                let awaitingAcceptance =
-                    match session.PendingLease with
-                    | Some lease ->
-                        match lease.Status with
-                        | LeaseStatus.Requested
-                        | LeaseStatus.DispatchStarted
-                        | LeaseStatus.AcceptanceUnknown -> true
-                        | _ -> false
-                    | None -> false
-
-                // Unscoped idle/busy/error cannot settle or drive a dispatch
-                // that lacks host identity / matched continuation correlation.
-                if
-                    (hasPending || awaitingAcceptance || isMainContinuationAwaitingStart session)
-                    && continuationId = ""
-                    && not isMatchedContinuation
-                then
-                    None
-                else
-                    eventOpt
->>>>>>> 98bc01f6 (fix(mux): wire AcceptanceUnknown/AbortUnknown degrade paths end-to-end)
 
         return eventOpt, eventTurnIdOpt, isMatchedContinuation
     }

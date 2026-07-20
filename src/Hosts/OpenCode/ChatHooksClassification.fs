@@ -79,6 +79,7 @@ let tryConsumeNudgeIfMatched
         match (fr.GetSession sessionIDStr).PendingLease with
         | Some lease when
             (lease.Status = LeaseStatus.DispatchStarted
+             || lease.Status = LeaseStatus.AcceptanceUnknown
              || lease.Status = LeaseStatus.Dispatched
              || lease.Status = LeaseStatus.Running
              || lease.Status = LeaseStatus.Requested)

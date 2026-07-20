@@ -209,6 +209,7 @@ let test_activeFallbackLeaseVetoesNaturalStopCleanup () =
     for status in
         [ LeaseStatus.Requested
           LeaseStatus.DispatchStarted
+          LeaseStatus.AcceptanceUnknown
           LeaseStatus.Dispatched
           LeaseStatus.Running ] do
         let runtime = FallbackRuntimeStore()

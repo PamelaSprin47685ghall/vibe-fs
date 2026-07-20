@@ -58,9 +58,13 @@ let private tryRecoverSession
             // Only Requested is safe to re-run. DispatchStarted / AcceptanceUnknown
             // may already be accepted by the host — reconcile, never blind resend.
             match intentFromLease session lease with
+<<<<<<< HEAD
             | Some intent ->
                 do!
                     runInline runtime executor workspaceRoot sessionID intent
+=======
+            | Some intent -> do! run runtime executor workspaceRoot sessionID intent
+>>>>>>> 11a984b6 (fix: exhaustive LeaseStatus/DispatchTerminal matches and recovery gating)
             | None -> ()
         | Some lease when
             (lease.Status = LeaseStatus.DispatchStarted

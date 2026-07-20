@@ -6,7 +6,7 @@ open Wanxiangshu.Kernel.FallbackRuntimeFlags
 open Wanxiangshu.Runtime.Fallback.SessionRuntime
 open Wanxiangshu.Runtime.Fallback.SessionRuntimeTransitions
 open Wanxiangshu.Runtime.Fallback.SessionRuntimeLeasePure
-open Wanxiangshu.Runtime.Fallback.SessionRuntimeCompactionPure
+open Wanxiangshu.Runtime.Fallback.SessionRuntimeLeaseAcceptancePure
 open Wanxiangshu.Runtime.Fallback.SessionRuntimePropertyPure
 open Wanxiangshu.Runtime.Fallback.RuntimeStore
 open Wanxiangshu.Runtime.Fallback.LeaseValidation
@@ -208,6 +208,42 @@ let markForceStoppedThenRemove () =
     let s2 = s1 |> removeForceStopped
     check "cleared" (not s2.CompactionForceStopped)
 
+// --- AcceptanceUnknown terminal paths ---
+
+let acceptanceUnknownIsActiveContinuationLease () =
+    let s = freshSessionState |> startDispatch dummyModel None
+    let cid = cidOf s
+
+    let sAu =
+        tryTransitionPendingLease cid LeaseStatus.Requested LeaseStatus.AcceptanceUnknown s
+        |> Option.get
+
+    check "AcceptanceUnknown is active" (isContinuationLeaseActive sAu)
+    check "status is AcceptanceUnknown" (sAu.PendingLease.Value.Status = LeaseStatus.AcceptanceUnknown)
+
+let tryAcceptPendingLeaseFromAcceptanceUnknown () =
+    let s = freshSessionState |> startDispatch dummyModel None
+    let cid = cidOf s
+
+    let sAu =
+        tryTransitionPendingLease cid LeaseStatus.Requested LeaseStatus.AcceptanceUnknown s
+        |> Option.get
+
+    match tryAcceptPendingLease cid sAu with
+    | Some s' -> check "accepted from AcceptanceUnknown" (s'.PendingLease.Value.Status = LeaseStatus.Dispatched)
+    | None -> failwith "expected accept from AcceptanceUnknown"
+
+let tryTransitionAcceptanceUnknownToDispatched () =
+    let s = freshSessionState |> startDispatch dummyModel None
+    let cid = cidOf s
+
+    let sAu =
+        tryTransitionPendingLease cid LeaseStatus.Requested LeaseStatus.AcceptanceUnknown s
+        |> Option.get
+
+    tryTransitionPendingLease cid LeaseStatus.AcceptanceUnknown LeaseStatus.Dispatched sAu
+    |> isSome
+
 let run () =
     tryTransitionPendingLeaseAllMatch ()
     tryTransitionPendingLeaseGenerationMismatch ()
@@ -232,3 +268,6 @@ let run () =
     tryConsumeCompactionSummaryTransformNotPending ()
     setTaskCompleteSetsLifecycle ()
     markForceStoppedThenRemove ()
+    acceptanceUnknownIsActiveContinuationLease ()
+    tryAcceptPendingLeaseFromAcceptanceUnknown ()
+    tryTransitionAcceptanceUnknownToDispatched ()

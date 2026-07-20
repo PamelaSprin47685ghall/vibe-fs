@@ -74,6 +74,7 @@ module SessionDispatcherOps =
 
             DispatchOps.resolveRecord r (TransportUnavailable err)
 <<<<<<< HEAD
+<<<<<<< HEAD
         | Error exn ->
             // Preserve host/transport failure text so callers can classify
             // (helpers missing, nudge missing, session mismatch, etc.).
@@ -102,6 +103,32 @@ module SessionDispatcherOps =
                 else RejectedBeforeSend err
 
             DispatchOps.resolveRecord r terminal
+=======
+        | Error exn when
+            exn.Message.StartsWith("AcceptanceUnknown")
+            || exn.Message.Contains("AcceptanceUnknown:")
+            ->
+            DispatchOps.rejectUnknown r "AcceptanceUnknown" exn.Message
+        | Error exn when exn.Message.StartsWith("Busy:") ->
+            let err =
+                { ErrorName = "Busy"
+                  DomainError = None
+                  Message = exn.Message
+                  StatusCode = None
+                  IsRetryable = Some true }
+
+            DispatchOps.resolveRecord r (RejectedBeforeSend err)
+        | Error exn when exn.Message.StartsWith("Failed:") ->
+            let err =
+                { ErrorName = "Failed"
+                  DomainError = None
+                  Message = exn.Message
+                  StatusCode = None
+                  IsRetryable = Some false }
+
+            DispatchOps.resolveRecord r (Failed err)
+        | Error exn -> DispatchOps.rejectUnknown r "EmptyReceipt" exn.Message
+>>>>>>> 11a984b6 (fix: exhaustive LeaseStatus/DispatchTerminal matches and recovery gating)
 
     /// Reserve the per-session slot. Refuses if another dispatch is in flight or the session is closed.
     let reserveRecord (state: SessionDispatcherState) (r: DispatchRecord) (logger: IDispatchEventLogger) : JS.Promise<unit> =

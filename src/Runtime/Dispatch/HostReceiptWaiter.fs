@@ -101,7 +101,13 @@ module HostReceiptWaiter =
         | Protocol.TransportUnavailable _
         | Protocol.Cancelled
         | Protocol.SessionClosed -> HostRejected err
-        | _ -> HostAcceptanceUnknown err
+        | Protocol.AcceptanceUnknown _
+        | Protocol.AbortUnknown _
+        | Protocol.Failed _
+        | Protocol.TimedOut _
+        | Protocol.Superseded
+        | Protocol.Poisoned _
+        | Protocol.Completed -> HostAcceptanceUnknown err
 
     let private transportStateOfTerminal (t: Protocol.DispatchTerminal) : HostReceiptWaiterTransportState option =
         match t with
