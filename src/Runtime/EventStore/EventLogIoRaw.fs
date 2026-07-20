@@ -58,14 +58,9 @@ let private ensureFileExists (filePath: string) : JS.Promise<unit> =
 
 let private cleanupStaleLockFile (lockPath: string) : JS.Promise<unit> =
     promise {
-        try
-            let! stats = statAsync lockPath
-            let isDir = unbox<bool> (stats?isDirectory ())
-
-            if not isDir then
-                do! unlinkAsync lockPath
-        with _ ->
-            ()
+        // Do not unconditionially unlink the lock file, as it can delete an active lock from another process.
+        // proper-lockfile handles its own stale locks safely.
+        ()
     }
 
 let private acquireFileLock (filePath: string) : JS.Promise<unit -> JS.Promise<unit>> =

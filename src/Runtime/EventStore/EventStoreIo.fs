@@ -79,59 +79,53 @@ type internal EventStoreState(eventFilePath: string) =
 
     member this.SyncNewEvents() : JS.Promise<unit> =
         promise {
-            try
-                let! stats = statAsync eventFilePath
-                let size = unbox<int64> (stats?size)
+            let! stats = statAsync eventFilePath
+            let size = unbox<int64> (stats?size)
 
-                if size < lastReadByteOffset then
-                    cache.Clear()
-                    eventCountRead <- 0
-                    let! events = readEventsFile eventFilePath
+            if size < lastReadByteOffset then
+                cache.Clear()
+                eventCountRead <- 0
+                let! events = readEventsFile eventFilePath
 
-                    for e in events do
-                        cache.FoldWan e
+                for e in events do
+                    cache.FoldWan e
 
-                    let! newStats = statAsync eventFilePath
-                    lastReadByteOffset <- unbox<int64> (newStats?size)
-                    lastKnownSize <- lastReadByteOffset
-                    partialLineBuffer <- ""
-                elif size > lastReadByteOffset then
-                    let offset = lastReadByteOffset
-                    let length = int (size - offset)
-                    let! newText = readChunkAsync eventFilePath (float offset) length
-                    let combinedText = partialLineBuffer + newText
-                    let lines = combinedText.Split('\n')
+                let! newStats = statAsync eventFilePath
+                lastReadByteOffset <- unbox<int64> (newStats?size)
+                lastKnownSize <- lastReadByteOffset
+                partialLineBuffer <- ""
+            elif size > lastReadByteOffset then
+                let offset = lastReadByteOffset
+                let length = int (size - offset)
+                let! newText = readChunkAsync eventFilePath (float offset) length
+                let combinedText = partialLineBuffer + newText
+                let lines = combinedText.Split('\n')
 
-                    let completeLines =
-                        if lines.Length > 1 then
-                            lines.[0 .. lines.Length - 2]
-                        else
-                            [||]
+                let completeLines =
+                    if lines.Length > 1 then
+                        lines.[0 .. lines.Length - 2]
+                    else
+                        [||]
 
-                    let newPartialLineBuffer =
-                        if combinedText.EndsWith("\n") then
-                            ""
-                        else
-                            lines.[lines.Length - 1]
+                let newPartialLineBuffer =
+                    if combinedText.EndsWith("\n") then
+                        ""
+                    else
+                        lines.[lines.Length - 1]
 
-                    this.ProcessLines completeLines
-                    partialLineBuffer <- newPartialLineBuffer
-                    lastReadByteOffset <- size
-                    lastKnownSize <- size
-            with _ ->
-                ()
+                this.ProcessLines completeLines
+                partialLineBuffer <- newPartialLineBuffer
+                lastReadByteOffset <- size
+                lastKnownSize <- size
         }
 
     member this.EnsureSynced() : JS.Promise<unit> =
         promise {
             do! this.EnsureInitialized()
 
-            try
-                let! stats = statAsync eventFilePath
-                let size = unbox<int64> (stats?size)
+            let! stats = statAsync eventFilePath
+            let size = unbox<int64> (stats?size)
 
-                if size <> lastKnownSize then
-                    do! withWorkspaceLock eventFilePath (fun () -> this.SyncNewEvents())
-            with _ ->
-                ()
+            if size <> lastKnownSize then
+                do! withWorkspaceLock eventFilePath (fun () -> this.SyncNewEvents())
         }

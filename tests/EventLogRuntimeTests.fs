@@ -265,6 +265,54 @@ let appendWithEmptyWorkspaceRootWritesNothing () =
         equal "empty workspace root leaves cwd log untouched" before after
     }
 
+
+let testLockfileIsNotUnlinkedManually () =
+    promise {
+        let! dir = mkdtempAsync "eventlog-no-unlink-"
+        let store = EventLogStore dir
+        let lockPath = dir + "/.wanxiangshu.ndjson.lock"
+        do! writeFileAsync lockPath "dummy"
+        
+        // Appending should still work because proper-lockfile handles lock checks and stale detection safely.
+        // But the lockfile MUST NOT be deleted via manual unlink if proper-lockfile isn't locking it or if it is stale,
+        // or rather, our code must not call unlinkAsync or delete it manually.
+        // Wait, let's verify that the lockfile is NOT deleted.
+        do!
+            store.AppendEventOrFail(
+                { V = 1
+                  Session = "s-no-unlink"
+                  Kind = eventKindLoopActivated
+                  At = ""
+                  Payload = Map [ "task", "no-unlink" ] }
+            )
+        
+        let! lockExists = fileExists lockPath
+        check "lockfile was NOT deleted manually" lockExists
+        do! rmAsync dir
+    }
+
+let testSyncNewEventsAndEnsureSyncedPropagateErrors () =
+    promise {
+        let! dir = mkdtempAsync "eventlog-err-propagate-"
+        // Use a path that is guaranteed to fail (like a directory as a file, or non-existent path)
+        let badPath = dir + "/invalid-dir/file.ndjson"
+        let store = EventLogStore(badPath)
+        
+        let! result = 
+            promise {
+                try
+                    do! store.EnsureSynced()
+                    return Ok ()
+                with ex ->
+                    return Error ex
+            }
+            
+        match result with
+        | Error _ -> check "EnsureSynced propagated the error" true
+        | Ok _ -> failwith "Expected EnsureSynced to fail but it succeeded"
+        
+        do! rmAsync dir
+    }
 let run () =
     promise {
         do! appendThenReadAll ()
@@ -282,4 +330,6 @@ let run () =
         do! testGetSquadEventsCache ()
         do! testReadAllEventsIdempotent ()
         do! appendWithEmptyWorkspaceRootWritesNothing ()
+        do! testLockfileIsNotUnlinkedManually ()
+        do! testSyncNewEventsAndEnsureSyncedPropagateErrors ()
     }

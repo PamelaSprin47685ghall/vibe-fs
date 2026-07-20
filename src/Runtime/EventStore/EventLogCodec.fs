@@ -67,13 +67,6 @@ let readEventsFromText (text: string) : WanEvent list =
 
 let readEventsFile (path: string) : JS.Promise<WanEvent list> =
     promise {
-        let! text =
-            promise {
-                try
-                    return! readFileAsync path "utf-8"
-                with _ ->
-                    return ""
-            }
-
+        let! text = readFileAsync path "utf-8"
         return readEventsFromText text
     }
