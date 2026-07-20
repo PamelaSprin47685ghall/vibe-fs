@@ -109,16 +109,18 @@ let opencodeExecutorUsesRuntimeAgentWhenNoAssistantMessageSpec () =
                                 let metadata = Dyn.get parts.[0] "metadata"
                                 let wanxiangshu = Dyn.get metadata "wanxiangshu"
                                 let continuationId = Dyn.str wanxiangshu "continuationId"
+
                                 HostReceiptWaiterRegistry.tryResolve
                                     (Id.workspaceIdQuick "opencode-default")
                                     sid
                                     continuationId
                                     OrderedTurnMarkerObserved
                                 |> ignore
+
                                 Promise.lift (box null)) ]
                   ) ]
 
-        let executor = opencodeActionExecutor rt mockClient
+        let executor = opencodeActionExecutorWithDir rt mockClient ""
 
         let model =
             { ProviderID = "openai"
@@ -167,16 +169,18 @@ let opencodeExecutorRespectsUserSelectedModelAndAgentSpec () =
                                 let metadata = Dyn.get parts.[0] "metadata"
                                 let wanxiangshu = Dyn.get metadata "wanxiangshu"
                                 let continuationId = Dyn.str wanxiangshu "continuationId"
+
                                 HostReceiptWaiterRegistry.tryResolve
                                     (Id.workspaceIdQuick "opencode-default")
                                     sid
                                     continuationId
                                     OrderedTurnMarkerObserved
                                 |> ignore
+
                                 Promise.lift (box null)) ]
                   ) ]
 
-        let executor = opencodeActionExecutor rt mockClient
+        let executor = opencodeActionExecutorWithDir rt mockClient ""
 
         let model =
             { ProviderID = "openai"
@@ -252,6 +256,7 @@ let ompExecutorRespectsUserSelectedModelAndAgentSpec () =
 let opencodeExecutorReceiptTimeoutFreesDispatcherSlot () =
     promise {
         setReceiptTimeout "50"
+
         try
             let rt = FallbackRuntimeStore()
             let sid = "opencode-receipt-timeout"
@@ -272,7 +277,7 @@ let opencodeExecutorReceiptTimeoutFreesDispatcherSlot () =
                                     Promise.lift (box null)) ]
                       ) ]
 
-            let executor = opencodeActionExecutor rt mockClient
+            let executor = opencodeActionExecutorWithDir rt mockClient ""
 
             let model =
                 { ProviderID = "openai"
@@ -291,7 +296,8 @@ let opencodeExecutorReceiptTimeoutFreesDispatcherSlot () =
 
             match caught with
             | Ok() -> check "expected timeout to throw" false
-            | Error ex -> check "timeout error is reported" (ex.Message.Contains("Fallback continuation dispatch failed"))
+            | Error ex ->
+                check "timeout error is reported" (ex.Message.Contains("Fallback continuation dispatch failed"))
 
             check "prompt was called once" (promptCallCount = 1)
         finally
