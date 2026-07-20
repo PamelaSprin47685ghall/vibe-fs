@@ -15,20 +15,22 @@ open Wanxiangshu.Hosts.Omp.SubsessionDispatch
 open Wanxiangshu.Hosts.Omp.MessagingCodec
 open Wanxiangshu.Hosts.Omp.OmpSubsessionHostAdapterPrompts
 open Wanxiangshu.Runtime.Dispatch
+open Wanxiangshu.Runtime.OmpHostBindings
 open Wanxiangshu.Hosts.Omp.OmpSubsessionHostHelper
 
 type private OmpSessionState =
     { ActiveTurnId: TurnId
       mutable AbortSent: bool }
 
-/// OMP serial prompt API: resolve means prompt entered the ordered stream
-/// (host-guaranteed barrier). Receipt is OrderedTurnMarkerObserved.
-///
-/// Contract: current turn error/idle events NEVER arrive before session.prompt resolves.
+/// OMP subsession host.
+/// Contract (fail closed — see OmpHostBindings):
+/// - session.prompt resolve is NOT ordered accept; only UserMessageObserved id is Ok.
+/// - idle/error MAY arrive before prompt resolve; never assume barrier ordering.
+/// - CancelPendingDispatch cancels waiter and issues single-path physical abort.
+/// - Abort uses session.abort XOR pi.sessionAbort, never both.
 
 type OmpSubsessionHost(session: obj, agent: string, pi: obj, workspaceRoot: string) =
-    let mutable sessionStates =
-        Map.empty<string, OmpSessionState>
+    let mutable sessionStates = Map.empty<string, OmpSessionState>
 
     do
         if not (Dyn.isNullish pi) then
@@ -37,11 +39,12 @@ type OmpSubsessionHost(session: obj, agent: string, pi: obj, workspaceRoot: stri
                     "event",
                     box (fun (event: obj) (ctx: obj) ->
                         let evtType = Dyn.str event "type"
+
                         if evtType = "session.idle" then
                             let sidOpt = getSessionIdFromContext ctx
+
                             match sidOpt with
-                            | Some sid ->
-                                sessionStates <- Map.remove sid sessionStates
+                            | Some sid -> sessionStates <- Map.remove sid sessionStates
                             | None -> ()
                     )
                 )
@@ -54,7 +57,6 @@ type OmpSubsessionHost(session: obj, agent: string, pi: obj, workspaceRoot: stri
                 let ws = workspaceFor workspaceRoot
                 let sid = SessionId.value sessionId
                 let tid = TurnId.value turn.TurnId
-
                 let waiter = HostReceiptWaiterRegistry.create ws sid tid
 
                 if not waiter.Completed then
@@ -70,7 +72,6 @@ type OmpSubsessionHost(session: obj, agent: string, pi: obj, workspaceRoot: stri
                     |> Promise.start
 
                 let! result = waiter.Promise
-
                 return result
             }
 
@@ -89,39 +90,9 @@ type OmpSubsessionHost(session: obj, agent: string, pi: obj, workspaceRoot: stri
                         return ConfirmedStopped
                     else
                         state.AbortSent <- true
+                        let! struct (ok, sawApi) = abortOnce session pi sid
 
-                        let arg = box {| sessionId = sid |}
-                        let mutable sawApi = false
-
-                        let sessionAbortP =
-                            try
-                                let abortFn = Dyn.get session "abort"
-                                if not (Dyn.isNullish abortFn) then
-                                    sawApi <- true
-                                    unbox<JS.Promise<obj>> (session?abort ())
-                                    |> Promise.map (fun _ -> true)
-                                    |> Promise.catch (fun _ -> false)
-                                else
-                                    Promise.lift false
-                            with _ ->
-                                Promise.lift false
-
-                        let piAbortP =
-                            try
-                                let sessionApi = Dyn.get pi "session"
-                                if not (Dyn.isNullish sessionApi) then
-                                    sawApi <- true
-                                    unbox<JS.Promise<obj>> (sessionApi?sessionAbort (arg))
-                                    |> Promise.map (fun _ -> true)
-                                    |> Promise.catch (fun _ -> false)
-                                else
-                                    Promise.lift false
-                            with _ ->
-                                Promise.lift false
-
-                        let! results = Promise.all [| sessionAbortP; piAbortP |]
-
-                        if Array.exists id results then return RequestAcceptedAwaitIdle
+                        if ok then return RequestAcceptedAwaitIdle
                         elif sawApi then return AbortUnavailable
                         else return AbortUnavailable
                 | _ -> return ConfirmedStopped
@@ -130,6 +101,7 @@ type OmpSubsessionHost(session: obj, agent: string, pi: obj, workspaceRoot: stri
         member this.CancelPendingDispatch(turnId) =
             let ws = workspaceFor workspaceRoot
             HostReceiptWaiterRegistry.cancelByTurn ws (TurnId.value turnId)
+
             sessionStates
             |> Map.tryFindKey (fun _ state -> state.ActiveTurnId = turnId)
             |> Option.iter (fun sid ->
@@ -165,10 +137,8 @@ type OmpSubsessionHost(session: obj, agent: string, pi: obj, workspaceRoot: stri
             promise {
                 let ws = workspaceFor workspaceRoot
                 let sid = SessionId.value sessionId
-
                 HostReceiptWaiterRegistry.removeSession ws sid
                 sessionStates <- Map.remove sid sessionStates
-
                 return! OmpSubsessionHostAdapterPrompts.closePhysicalSession session (Dyn.get pi "session") sessionId
             }
 

@@ -6,7 +6,26 @@ open Wanxiangshu.Kernel.FallbackKernel.Types
 open Wanxiangshu.Kernel.Subsession.Types
 open Wanxiangshu.Runtime
 open Wanxiangshu.Runtime.Dyn
+open Wanxiangshu.Runtime.OmpHostBindings
 
+let private acceptanceUnknown (name: string) (message: string) : DispatchFailure =
+    DispatchFailure.HostAcceptanceUnknown
+        { ErrorName = name
+          DomainError = None
+          Message = message
+          StatusCode = None
+          IsRetryable = Some true }
+
+let private hostRejected (name: string) (message: string) (retryable: bool) : DispatchFailure =
+    DispatchFailure.HostRejected
+        { ErrorName = name
+          DomainError = None
+          Message = message
+          StatusCode = None
+          IsRetryable = Some retryable }
+
+/// Dispatch a turn. Prompt resolve alone is NOT acceptance evidence (SPEC §4.5).
+/// Only a non-empty host message id yields Ok(UserMessageObserved). Otherwise fail closed.
 let dispatch
     (session: obj)
     (_agent: string)
@@ -15,43 +34,36 @@ let dispatch
     : JS.Promise<Result<HostStartReceipt, DispatchFailure>> =
     promise {
         if Dyn.isNullish session then
-            return
-                Error(
-                    DispatchFailure.HostRejected
-                        { ErrorName = "HostUnavailable"
-                          DomainError = None
-                          Message = "OMP host session object is nullish"
-                          StatusCode = None
-                          IsRetryable = Some false }
-                )
+            return Error(hostRejected "HostUnavailable" "OMP host session object is nullish" false)
         else
             let promptFn = Dyn.get session "prompt"
 
             if Dyn.isNullish promptFn || not (Dyn.typeIs promptFn "function") then
-                return
-                    Error(
-                        DispatchFailure.HostRejected
-                            { ErrorName = "PromptUnavailable"
-                              DomainError = None
-                              Message = "OMP host session does not support prompt API"
-                              StatusCode = None
-                              IsRetryable = Some false }
-                    )
+                return Error(hostRejected "PromptUnavailable" "OMP host session does not support prompt API" false)
             else
                 try
-                    // OMP session.prompt accepts the raw prompt string.
-                    let! _response = unbox<JS.Promise<obj>> (session?prompt (turn.Prompt))
-                    return Ok OrderedTurnMarkerObserved
+                    let modelOpt =
+                        turn.Model
+                        |> Option.bind (fun m -> formatModelString m.ProviderID m.ModelID m.Variant)
+
+                    let! response =
+                        match modelOpt with
+                        | None -> sessionPrompt session turn.Prompt
+                        | Some modelStr ->
+                            let body = buildSessionPromptBody turn.Prompt (Some modelStr) None None
+                            unbox<JS.Promise<obj>> (session?prompt (body))
+
+                    match tryExtractMessageId response with
+                    | Some mid -> return Ok(UserMessageObserved mid)
+                    | None ->
+                        return
+                            Error(
+                                acceptanceUnknown
+                                    "OmpPromptNoMessageId"
+                                    "OMP session.prompt resolved without a verifiable message id; ordered accept is not assumed"
+                            )
                 with ex ->
-                    return
-                        Error(
-                            DispatchFailure.HostAcceptanceUnknown
-                                { ErrorName = "DispatchFailed"
-                                  DomainError = None
-                                  Message = ex.Message
-                                  StatusCode = None
-                                  IsRetryable = Some true }
-                        )
+                    return Error(acceptanceUnknown "DispatchFailed" ex.Message)
     }
 
 /// Inspect a raw JS object and classify it as quiescent / still-running /
@@ -63,18 +75,12 @@ let detectStatus (obj: obj) : QuiescenceStatus option =
         let isIdleVal = Dyn.get obj "isIdle"
 
         if not (Dyn.isNullish isIdleVal) && Dyn.typeIs isIdleVal "boolean" then
-            if unbox<bool> isIdleVal then
-                Some Stopped
-            else
-                Some StillRunning
+            if unbox<bool> isIdleVal then Some Stopped else Some StillRunning
         else
             let isBusyVal = Dyn.get obj "isBusy"
 
             if not (Dyn.isNullish isBusyVal) && Dyn.typeIs isBusyVal "boolean" then
-                if unbox<bool> isBusyVal then
-                    Some StillRunning
-                else
-                    Some Stopped
+                if unbox<bool> isBusyVal then Some StillRunning else Some Stopped
             else
                 let statusVal = Dyn.get obj "status"
 
@@ -155,35 +161,35 @@ let private checkMessageForTurn (msg: obj) (target: string) : struct (bool * str
 
     let msgId =
         if found || isUser then
-            Dyn.str msg "id"
+            let id = Dyn.str msg "id"
+            if id <> "" then id else Dyn.str info "id"
         else
             ""
 
     struct (found, if msgId <> "" then Some msgId else None)
 
+/// Only UserMessageObserved with a real id is Accepted. No fabricated ordered marker.
 let private dispatchStatusFromMessages (msgs: obj array) (turnId: TurnId) : DispatchStatus =
     let target = TurnId.value turnId
-    let mutable accepted = false
-    let mutable receipt = None
+    let mutable receipt: string option = None
+    let mutable matchedWithoutId = false
 
     for msg in msgs do
         let struct (msgFound, msgIdOpt) = checkMessageForTurn msg target
 
         if msgFound then
-            accepted <- true
-            // A matched message is the strongest evidence; use its id if available.
+            match msgIdOpt with
+            | Some id -> receipt <- Some id
+            | None -> matchedWithoutId <- true
+        elif msgIdOpt.IsSome && receipt.IsNone then
             receipt <- msgIdOpt
-        elif msgIdOpt.IsSome then
-            // An unmatched user message with an id only wins if no matched id yet.
-            accepted <- true
-            if receipt.IsNone then receipt <- msgIdOpt
 
-    if accepted then
-        match receipt with
-        | Some id -> DispatchStatus.Accepted(UserMessageObserved id)
-        | None -> DispatchStatus.Accepted OrderedTurnMarkerObserved
-    else
+    match receipt with
+    | Some id -> DispatchStatus.Accepted(UserMessageObserved id)
+    | None when matchedWithoutId ->
+        // Evidence of a turn marker without durable id → Unknown, not fabricated OrderedTurnMarkerObserved.
         DispatchStatus.Unknown
+    | None -> DispatchStatus.Unknown
 
 /// Query whether the turn has been accepted by the host by inspecting the
 /// physical session transcript. Used by the OMP subsession host adapter.

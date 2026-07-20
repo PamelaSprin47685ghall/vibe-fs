@@ -343,17 +343,17 @@ let private ompAbortWithScopedTurnOwnership () =
         equal "no abort called for stale turn" 0 abortCount.Value
         equal "no pi abort called for stale turn" 0 piAbortCount.Value
 
-        // 4. Abort with the correct active turnId
+        // 4. Abort with the correct active turnId — single path: session.abort preferred, never both
         let! res3 = host.Abort(sid, turnId)
         equal "active abort is RequestAcceptedAwaitIdle" RequestAcceptedAwaitIdle res3
         equal "abort called" 1 abortCount.Value
-        equal "pi abort called" 1 piAbortCount.Value
+        equal "pi abort not called when session.abort present" 0 piAbortCount.Value
 
         // 5. Abort again with the correct active turnId (should not call the physical APIs a second time)
         let! res4 = host.Abort(sid, turnId)
         equal "duplicate abort is ConfirmedStopped" ConfirmedStopped res4
         equal "abort not called again" 1 abortCount.Value
-        equal "pi abort not called again" 1 piAbortCount.Value
+        equal "pi abort still not called" 0 piAbortCount.Value
 
         // 6. Capability degradation: session with no abort APIs should return AbortUnavailable
         let struct (sessionNoAbort, piNoAbort) =
@@ -463,11 +463,11 @@ let private ompCancelStartedDispatchTriggersPhysicalAbort () =
         let dispatchP = host.Dispatch(sid, plan)
         do! sleep 5
 
-        // Dispatch has started, so CancelPendingDispatch should trigger physical abort
+        // Dispatch has started, so CancelPendingDispatch should trigger physical abort (session path only)
         host.CancelPendingDispatch turnId
 
         equal "physical abort called" true abortCalled.Value
-        equal "physical pi abort called" true piAbortCalled.Value
+        equal "physical pi abort not dual-called" false piAbortCalled.Value
 
         // Clean up
         resolveRef.Value (box null)

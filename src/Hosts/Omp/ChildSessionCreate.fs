@@ -28,10 +28,16 @@ let initializeChildSession (scope: RuntimeScope) (pi: obj) (ctx: obj) : JS.Promi
         return createSessionManager sessionManagerType cwd
     }
 
-let resolveModel (modelOverride: string option) (ctx: obj) : obj =
+/// None → omit model (DelegateToHost). Some "" is treated as omit, never empty string key.
+let resolveModel (modelOverride: string option) (ctx: obj) : obj option =
     match modelOverride with
-    | Some m -> box m
-    | None -> Dyn.get ctx "model"
+    | Some m when m.Trim() <> "" -> Some(box m)
+    | Some _ -> None
+    | None ->
+        let m = Dyn.get ctx "model"
+        if Dyn.isNullish m then None
+        elif Dyn.typeIs m "string" && string m = "" then None
+        else Some m
 
 let buildCustomTools (pi: obj) (toolNames: string array) (customTools: obj array) : obj array =
     let myCustomTools = ResizeArray<obj>()
@@ -57,7 +63,7 @@ let buildSessionBody
     (ctx: obj)
     (toolNames: string array)
     (myCustomTools: obj array)
-    (modelOverrideResolved: obj)
+    (modelOverrideResolved: obj option)
     (systemPrompt: obj option)
     (sessionManager: obj)
     : obj =
@@ -68,20 +74,24 @@ let buildSessionBody
         | Some v -> v
         | None -> callOpt ctx "getSystemPrompt"
 
-    createObj
-        [ "cwd", box cwd
-          "hasUI", box false
-          "toolNames", box toolNames
-          "modelRegistry", Dyn.get ctx "modelRegistry"
-          "model", modelOverrideResolved
-          "thinkingLevel", callOpt ctx "getThinkingLevel"
-          "systemPrompt", sp
-          "agentsMdSearch", Dyn.get ctx "agentsMdSearch"
-          "workspaceTree", Dyn.get ctx "workspaceTree"
-          "sessionManager", box sessionManager
-          "customTools", box myCustomTools
-          "authStorage", Dyn.get ctx "authStorage"
-          "ui", Dyn.get ctx "ui" ]
+    let baseBody =
+        createObj
+            [ "cwd", box cwd
+              "hasUI", box false
+              "toolNames", box toolNames
+              "modelRegistry", Dyn.get ctx "modelRegistry"
+              "thinkingLevel", callOpt ctx "getThinkingLevel"
+              "systemPrompt", sp
+              "agentsMdSearch", Dyn.get ctx "agentsMdSearch"
+              "workspaceTree", Dyn.get ctx "workspaceTree"
+              "sessionManager", box sessionManager
+              "customTools", box myCustomTools
+              "authStorage", Dyn.get ctx "authStorage"
+              "ui", Dyn.get ctx "ui" ]
+
+    match modelOverrideResolved with
+    | Some m -> Dyn.withKey baseBody "model" m
+    | None -> baseBody
 
 let parseFallbackConfig (fallbackConfigOpt: FallbackConfig option) : string option * FallbackChain option =
     match fallbackConfigOpt with

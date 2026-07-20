@@ -27,6 +27,7 @@ open Wanxiangshu.Runtime.RunnerBackground
 open Wanxiangshu.Runtime.RuntimeScope
 open Wanxiangshu.Runtime.SessionExecutor
 open Wanxiangshu.Runtime.SubagentIo
+open Wanxiangshu.Runtime.OmpHostBindings
 
 [<Global("Buffer")>]
 let private nodeBuffer: obj = jsNative
@@ -81,7 +82,7 @@ let private runExecutorJob (options: ExecuteOptions) (signal: obj) (childId: str
     }
 
 let private summarizeOutput
-    (pi: obj)
+    (_pi: obj)
     (childSession: obj)
     (output: string)
     (lang: string)
@@ -94,14 +95,20 @@ let private summarizeOutput
         let summaryPrompt =
             executorSummarizerPrompt what output lang command deps "executor" mode
 
-        do! childSession?prompt (summaryPrompt) |> unbox<JS.Promise<unit>>
-        do! childSession?waitForIdle () |> unbox<JS.Promise<unit>>
+        // Anchor to target turn: baseline before prompt; wait idle only if transcript grew.
+        // Bare waitForIdle alone can observe a pre-existing idle (SPEC §4.5 #8).
+        let baseline = entryCountOfSession childSession
+        let! _ = sessionPrompt childSession summaryPrompt
+        let! grew = waitForIdleAfterBaseline childSession baseline 8
         let sm = unbox<ISessionManager> (Dyn.get childSession "sessionManager")
 
         let text =
-            match readAssistantText sm 0 "\n\n" with
-            | Some t -> t
-            | None -> output // fall back to raw output when AI summarization fails
+            if grew then
+                match readAssistantText sm baseline "\n\n" with
+                | Some t -> t
+                | None -> output
+            else
+                output
 
         return textResult text
     }
