@@ -24,6 +24,9 @@ open Wanxiangshu.Tests.Assert
 
 let private fail (msg: string) = check msg false
 
+let private decide state cmd =
+    Wanxiangshu.Kernel.Subsession.Decision.decide 1000000L state cmd
+
 let private hasEffect pred effects = List.exists pred effects
 
 let private model0: FallbackModel =
@@ -190,12 +193,12 @@ let idleBeforeBarrierIgnored () =
         { Reason = AcceptanceUnknownAfterDispatch
           AfterStop = RetryAfterSafeStop err }
 
-    let state = IssuingAbort(ctx, NotYetStarted plan, abortCtx, false)
+    let state = IssuingAbort(ctx, NotYetStarted plan, abortCtx, false, 1000000L)
 
     match decide state SessionIdleObserved with
     | Ok(Decided d) ->
         match d.NextState with
-        | IssuingAbort(_, _, _, true) -> check "idle buffered before barrier" true
+        | IssuingAbort(_, _, _, true, _) -> check "idle buffered before barrier" true
         | other -> fail ("expected IssuingAbort with idleBuffered=true, got " + string other)
 
         check "no events on idle buffer" (List.isEmpty d.Events)
@@ -281,7 +284,8 @@ let atomicBatchAppend () =
                             TurnId = TurnId.create "t0"
                             Ordinal = TurnOrdinal.first
                             Model = model0
-                            Prompt = "x" } ]
+                            Prompt = "x"
+                            DeadlineAtMs = 0L } ]
                 )
 
         equal "both events committed together" 2 store.Events.Length

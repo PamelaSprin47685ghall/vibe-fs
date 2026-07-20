@@ -86,7 +86,8 @@ let private encodeEvent (sid: string) (evt: SubsessionEvent) : string * Map<stri
               "turnOrdinal", string (TurnOrdinal.value data.Ordinal)
               "sessionId", sid
               "model", modelString data.Model
-              "prompt", data.Prompt ]
+              "prompt", data.Prompt
+              "deadlineAtMs", string data.DeadlineAtMs ]
 
     | TurnStarted data ->
         eventKindSubsessionTurnStarted,
@@ -100,9 +101,13 @@ let private encodeEvent (sid: string) (evt: SubsessionEvent) : string * Map<stri
         eventKindSubsessionTurnFinished,
         Map.add "turnId" (TurnId.value turnId) (Map.add "sessionId" sid (finishPayload finish))
 
-    | AbortRequested(runId, turnId) ->
+    | AbortRequested(runId, turnId, abortDeadlineAtMs) ->
         eventKindSubsessionAbortRequested,
-        Map [ "turnId", TurnId.value turnId; "sessionId", sid; "runId", RunId.value runId ]
+        Map
+            [ "turnId", TurnId.value turnId
+              "sessionId", sid
+              "runId", RunId.value runId
+              "abortDeadlineAtMs", string abortDeadlineAtMs ]
 
     | SessionPoisoned(s, reason) ->
         eventKindSubsessionSessionPoisoned, Map [ "sessionId", SessionId.value s; "reason", poisonTag reason ]

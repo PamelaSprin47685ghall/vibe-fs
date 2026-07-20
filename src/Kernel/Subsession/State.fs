@@ -123,15 +123,26 @@ type SubsessionState =
     /// not be silently destroyed — that was the root cause of subagent runs
     /// (inspector/coder/browser/meditator) spuriously failing with
     /// "No assistant message in current turn".
-    | Dispatching of RunContext * TurnPlan * CurrentTurnEvidence
-    | CancellingDispatch of RunContext * TurnPlan * CancelContext
-    | ReconcilingUnknownDispatch of RunContext * TurnPlan * CancelContext * retryCount: int
-    | ClosingUnknownDispatch of RunContext * TurnPlan * PoisonReason
-    | Running of RunContext * StartedTurn * CurrentTurnEvidence
-    | Draining of RunContext * StartedTurn * ErrorInput * CurrentTurnEvidence
-    | IssuingAbort of RunContext * ActiveTurn * AbortContext * idleObserved: bool
-    | AwaitingAbortSettle of RunContext * ActiveTurn * AbortContext
-    | ReconcilingAbortSettle of RunContext * ActiveTurn * AbortContext
+    | Dispatching of RunContext * TurnPlan * CurrentTurnEvidence * turnDeadlineAtMs: int64
+    | CancellingDispatch of RunContext * TurnPlan * CancelContext * turnDeadlineAtMs: int64
+    | ReconcilingUnknownDispatch of
+        RunContext *
+        TurnPlan *
+        CancelContext *
+        retryCount: int *
+        turnDeadlineAtMs: int64 *
+        reconciliationDeadlineAtMs: int64
+    | ClosingUnknownDispatch of
+        RunContext *
+        TurnPlan *
+        PoisonReason *
+        turnDeadlineAtMs: int64 *
+        reconciliationDeadlineAtMs: int64
+    | Running of RunContext * StartedTurn * CurrentTurnEvidence * turnDeadlineAtMs: int64
+    | Draining of RunContext * StartedTurn * ErrorInput * CurrentTurnEvidence * turnDeadlineAtMs: int64
+    | IssuingAbort of RunContext * ActiveTurn * AbortContext * idleObserved: bool * abortDeadlineAtMs: int64
+    | AwaitingAbortSettle of RunContext * ActiveTurn * AbortContext * abortDeadlineAtMs: int64
+    | ReconcilingAbortSettle of RunContext * ActiveTurn * AbortContext * abortDeadlineAtMs: int64
     | Poisoned of PoisonReason
 
 // ── Start-run ──

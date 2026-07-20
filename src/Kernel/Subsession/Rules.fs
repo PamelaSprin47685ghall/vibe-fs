@@ -19,7 +19,8 @@ let makeTurnData (c: RunContext) (p: TurnPlan) : TurnData =
       TurnId = p.TurnId
       Ordinal = p.Ordinal
       Model = p.Model |> Option.defaultValue delegateToHostSentinel
-      Prompt = p.Prompt }
+      Prompt = p.Prompt
+      DeadlineAtMs = 0L }
 
 let nextTurnFromPolicy (ctx: RunContext) (decision: PolicyDecision) : (RunContext * TurnPlan) option =
     match decision with
@@ -82,9 +83,10 @@ let finishWithResult (ctx: RunContext) (result: RunResult) (turnId: TurnId) =
         [ finishEvent; RunFinished(ctx.RunId, result) ]
         [ CompleteCaller(ctx.RunId, result) ]
 
-let beginAbort (ctx: RunContext) (turn: ActiveTurn) (reason: AbortReason) (afterStop: AfterAbort) =
+let beginAbort (nowMs: int64) (ctx: RunContext) (turn: ActiveTurn) (reason: AbortReason) (afterStop: AfterAbort) =
     let tid = activeTurnId turn
-    let events = [ AbortRequested(ctx.RunId, tid) ]
+    let abortDeadlineAtMs = nowMs + 60_000L
+    let events = [ AbortRequested(ctx.RunId, tid, abortDeadlineAtMs) ]
     let effects = [ AbortHostSession(ctx.SessionId, tid); CancelPendingDispatch tid ]
 
     decided
@@ -93,7 +95,8 @@ let beginAbort (ctx: RunContext) (turn: ActiveTurn) (reason: AbortReason) (after
             turn,
             { Reason = reason
               AfterStop = afterStop },
-            false
+            false,
+            abortDeadlineAtMs
         ))
         events
         effects
@@ -114,7 +117,7 @@ let closeActive (ctx: RunContext) (turnId: TurnId) =
           CompleteCaller(ctx.RunId, result)
           DisposeActor ]
 
-let applyAfterAbort (ctx: RunContext) (turn: ActiveTurn) (abortCtx: AbortContext) =
+let applyAfterAbort (nowMs: int64) (ctx: RunContext) (turn: ActiveTurn) (abortCtx: AbortContext) =
     let tid = activeTurnId turn
 
     match abortCtx.AfterStop with
@@ -123,11 +126,22 @@ let applyAfterAbort (ctx: RunContext) (turn: ActiveTurn) (abortCtx: AbortContext
     | RetryAfterSafeStop error ->
         match nextTurnFromPolicy ctx (afterError ctx.FallbackConfig ctx.Chain ctx.Policy error) with
         | Some(ctx2, plan2) ->
+            let turnDeadlineAtMs = nowMs + 300_000L
+
             let events =
                 [ TurnFinished(tid, TurnFailed error)
-                  TurnDispatchRequested(makeTurnData ctx2 plan2) ]
+                  TurnDispatchRequested
+                      { RunId = ctx2.RunId
+                        TurnId = plan2.TurnId
+                        Ordinal = plan2.Ordinal
+                        Model = plan2.Model |> Option.defaultValue delegateToHostSentinel
+                        Prompt = plan2.Prompt
+                        DeadlineAtMs = turnDeadlineAtMs } ]
 
-            decided (Dispatching(ctx2, plan2, CurrentTurnEvidence.empty)) events [ DispatchPrompt plan2 ]
+            decided
+                (Dispatching(ctx2, plan2, CurrentTurnEvidence.empty, turnDeadlineAtMs))
+                events
+                [ DispatchPrompt plan2 ]
         | None ->
             let failure' =
                 match afterError ctx.FallbackConfig ctx.Chain ctx.Policy error with

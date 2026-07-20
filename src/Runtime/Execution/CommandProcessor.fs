@@ -85,8 +85,9 @@ type CommandProcessor
                     return [], Some(StartRunError.SessionPoisoned SessionStateUnknownAfterRestart)
                 else
                     let priorState = state
+                    let nowMs = int64 (JS.Constructors.Date.now ())
 
-                    match decide state cmd with
+                    match decide nowMs state cmd with
                     | Ok(Decided decision) ->
                         react.OnTelemetry(
                             [ TelemetryStateTransition(stateName priorState, stateName decision.NextState, cmdName cmd) ]
@@ -129,8 +130,9 @@ type CommandProcessor
                         else
                             pendingReplies <- Map.add request.RunId deferred pendingReplies
                             let priorState = state
+                            let nowMs = int64 (JS.Constructors.Date.now ())
 
-                            match decide state (StartRun request) with
+                            match decide nowMs state (StartRun request) with
                             | Ok(Decided decision) -> return! applyDecision applier priorState decision
                             | Ok(NoChange _) ->
                                 pendingReplies <- Map.remove request.RunId pendingReplies

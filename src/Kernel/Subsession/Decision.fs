@@ -11,35 +11,35 @@ let private activeTurnId (turn: ActiveTurn) : TurnId =
 
 let private tryExtractActiveForReconcile (s: SubsessionState) : (RunContext * ActiveTurn) option =
     match s with
-    | Dispatching(ctx, plan, _) -> Some(ctx, NotYetStarted plan)
-    | CancellingDispatch(ctx, plan, _) -> Some(ctx, NotYetStarted plan)
-    | ReconcilingUnknownDispatch(ctx, plan, _, _) -> Some(ctx, NotYetStarted plan)
-    | ClosingUnknownDispatch(ctx, plan, _) -> Some(ctx, NotYetStarted plan)
-    | Running(ctx, started, _) -> Some(ctx, Started started)
-    | Draining(ctx, started, _, _) -> Some(ctx, Started started)
-    | IssuingAbort(ctx, turn, _, _) -> Some(ctx, turn)
-    | AwaitingAbortSettle(ctx, turn, _) -> Some(ctx, turn)
-    | ReconcilingAbortSettle(ctx, turn, _) -> Some(ctx, turn)
+    | Dispatching(ctx, plan, _, _) -> Some(ctx, NotYetStarted plan)
+    | CancellingDispatch(ctx, plan, _, _) -> Some(ctx, NotYetStarted plan)
+    | ReconcilingUnknownDispatch(ctx, plan, _, _, _, _) -> Some(ctx, NotYetStarted plan)
+    | ClosingUnknownDispatch(ctx, plan, _, _, _) -> Some(ctx, NotYetStarted plan)
+    | Running(ctx, started, _, _) -> Some(ctx, Started started)
+    | Draining(ctx, started, _, _, _) -> Some(ctx, Started started)
+    | IssuingAbort(ctx, turn, _, _, _) -> Some(ctx, turn)
+    | AwaitingAbortSettle(ctx, turn, _, _) -> Some(ctx, turn)
+    | ReconcilingAbortSettle(ctx, turn, _, _) -> Some(ctx, turn)
     | Available _
     | Poisoned _ -> None
 
-let private decideCore (state: SubsessionState) (cmd: Command) : Result<DecisionResult, DecisionError> =
+let private decideCore (nowMs: int64) (state: SubsessionState) (cmd: Command) : Result<DecisionResult, DecisionError> =
     match cmd with
-    | StartRun req -> DecisionStart.decide state req
-    | EvidenceUpdated _ -> DecisionObserve.decide state cmd
+    | StartRun req -> DecisionStart.decide nowMs state req
+    | EvidenceUpdated _ -> DecisionObserve.decide nowMs state cmd
     | SessionIdleObserved ->
         match state with
         | ReconcilingUnknownDispatch _
-        | ClosingUnknownDispatch _ -> Cancellation.decide state cmd
-        | _ -> DecisionObserve.decide state cmd
+        | ClosingUnknownDispatch _ -> Cancellation.decide nowMs state cmd
+        | _ -> DecisionObserve.decide nowMs state cmd
     | TurnErrorObserved _ ->
         match state with
         | ReconcilingUnknownDispatch _
-        | ClosingUnknownDispatch _ -> Cancellation.decide state cmd
-        | _ -> DecisionObserve.decide state cmd
-    | _ -> Cancellation.decide state cmd
+        | ClosingUnknownDispatch _ -> Cancellation.decide nowMs state cmd
+        | _ -> DecisionObserve.decide nowMs state cmd
+    | _ -> Cancellation.decide nowMs state cmd
 
-let decide (state: SubsessionState) (cmd: Command) : Result<DecisionResult, DecisionError> =
+let decide (nowMs: int64) (state: SubsessionState) (cmd: Command) : Result<DecisionResult, DecisionError> =
     let isReconcilingAbortSettle =
         match state with
         | ReconcilingAbortSettle _ -> true
@@ -50,7 +50,7 @@ let decide (state: SubsessionState) (cmd: Command) : Result<DecisionResult, Deci
         | DispatchStatusResolved _ -> true
         | _ -> false
 
-    match decideCore state cmd with
+    match decideCore nowMs state cmd with
     | Error(IllegalTransition _) as err when isStaleTimerCommand cmd ->
         if isReconcilingAbortSettle || isDispatchStatusResolved then
             err

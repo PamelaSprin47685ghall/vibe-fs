@@ -8,6 +8,9 @@ open Wanxiangshu.Tests.Assert
 
 let private fail (msg: string) = check msg false
 
+let private decide state cmd =
+    Wanxiangshu.Kernel.Subsession.Decision.decide 1000000L state cmd
+
 // ── Draining / handleDrainingIdle: CompletionRequested must not overwrite assistant text ──
 
 /// Minimal RunContext usable by decideRunning / handleDrainingIdle.
@@ -74,7 +77,8 @@ let private step3_idleObserved
     (error: ErrorInput)
     (mergedEvidence: CurrentTurnEvidence)
     =
-    let r3 = decide (Draining(ctx, started, error, mergedEvidence)) SessionIdleObserved
+    let r3 =
+        decide (Draining(ctx, started, error, mergedEvidence, 1000000L)) SessionIdleObserved
 
     match r3 with
     | Ok(Decided decided3) ->
@@ -98,14 +102,14 @@ let private step3_idleObserved
 let drainingIdle_completionRequestedEmptyDoesNotOverwriteAssistantText () =
     // Step 1: Running + TurnErrorObserved → Draining
     let runningState =
-        Running(makeRunContext (), makeStartedTurn (), CurrentTurnEvidence.empty)
+        Running(makeRunContext (), makeStartedTurn (), CurrentTurnEvidence.empty, 1000000L)
 
     let r1 = decide runningState turnErrorObserved
 
     match r1 with
     | Ok(Decided decided1) ->
         match decided1.NextState with
-        | Draining(ctx, started, error, _) ->
+        | Draining(ctx, started, error, _, _) ->
             // Step 2: EvidenceUpdated merges CompletionRequested "" + assistant snapshot
             let evUpdate =
                 { TurnId = Some(TurnId.create "turn-drain-1")
@@ -115,12 +119,12 @@ let drainingIdle_completionRequestedEmptyDoesNotOverwriteAssistantText () =
                         Assistant = AssistantSnapshot("", 0L, "drain result", Some NormalFinish) } }
 
             let r2 =
-                decide (Draining(ctx, started, error, CurrentTurnEvidence.empty)) (EvidenceUpdated evUpdate)
+                decide (Draining(ctx, started, error, CurrentTurnEvidence.empty, 1000000L)) (EvidenceUpdated evUpdate)
 
             match r2 with
             | Ok(Decided decided2) ->
                 match decided2.NextState with
-                | Draining(ctx2, started2, error2, mergedEvidence) ->
+                | Draining(ctx2, started2, error2, mergedEvidence, _) ->
                     let hasMarker =
                         match mergedEvidence.Outcome with
                         | CompletionRequested _ -> true

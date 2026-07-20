@@ -56,7 +56,7 @@ module CommittedProgress =
             | TurnFinished(tid, outcome) -> Some(ProgressTurnFinished(tid, outcome))
             | RunFinished(runId, result) -> Some(ProgressRunFinished(runId, result))
             | SessionPoisoned(sid, reason) -> Some(ProgressSessionPoisoned(sid, reason))
-            | AbortRequested(runId, turnId) -> Some(ProgressAbortRequested(runId, turnId))
+            | AbortRequested(runId, turnId, _) -> Some(ProgressAbortRequested(runId, turnId))
             | PhysicalSessionClosed sid -> Some(ProgressPhysicalSessionClosed sid)
             | RunStarted _ -> None)
 

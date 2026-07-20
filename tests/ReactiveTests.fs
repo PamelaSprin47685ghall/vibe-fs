@@ -24,7 +24,8 @@ let private makeTurnData (runId: RunId) (turnId: TurnId) (prompt: string) : Turn
           MaxTokens = None
           ReasoningEffort = None
           Thinking = false }
-      Prompt = prompt }
+      Prompt = prompt
+      DeadlineAtMs = 0L }
 
 let private makeStartedData (runId: RunId) (turnId: TurnId) (receipt: HostStartReceipt) : TurnStartedData =
     { RunId = runId
@@ -45,7 +46,7 @@ let fromEventsMapsAllVariants () =
           TurnFinished(tid1, TurnCompleted "done")
           RunFinished(rid, RunResult.Succeeded "done")
           SessionPoisoned(sid, PoisonReason.HostProtocolBroken "test")
-          AbortRequested(rid, tid1)
+          AbortRequested(rid, tid1, 0L)
           PhysicalSessionClosed sid ]
 
     let progress = CommittedProgress.fromEvents events

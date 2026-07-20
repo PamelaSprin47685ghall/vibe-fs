@@ -45,6 +45,9 @@ let private makeFallbackModel: FallbackModel =
       ReasoningEffort = None
       Thinking = false }
 
+let private decide state cmd =
+    Wanxiangshu.Kernel.Subsession.Decision.decide 1000000L state cmd
+
 let private defaultChain: FallbackChain = []
 
 let private defaultConfig: FallbackConfig =
@@ -114,7 +117,7 @@ let ``2 Cancel after dispatch accepted`` () =
     let tid = TurnId.create "t1"
 
     let state =
-        Running(makeCtx sid rid, makeStarted tid "m1", CurrentTurnEvidence.empty)
+        Running(makeCtx sid rid, makeStarted tid "m1", CurrentTurnEvidence.empty, 1000000L)
 
     let result = unwrapDecide "02" (decide state (CancelRequested))
 
@@ -148,7 +151,7 @@ let ``3 Error observed preserves evidence`` () =
           Recovery = NoRecoveryPrompt
           Outcome = NoOutcome }
 
-    let state = Running(makeCtx sid rid, makeStarted tid "m1", evidence)
+    let state = Running(makeCtx sid rid, makeStarted tid "m1", evidence, 1000000L)
 
     let err: ErrorInput =
         { ErrorName = "APIError"
@@ -182,7 +185,7 @@ let ``4 Abort host accepted awaits idle`` () =
           AfterStop = FinishCancelled }
 
     let state =
-        IssuingAbort(makeCtx sid rid, Started(makeStarted tid "m1"), abortCtx, false)
+        IssuingAbort(makeCtx sid rid, Started(makeStarted tid "m1"), abortCtx, false, 1000000L)
 
     let result = unwrapDecide "04" (decide state (AbortHostAccepted tid))
 
@@ -209,7 +212,7 @@ let ``5 Abort request failed stays issuing`` () =
           AfterStop = FinishCancelled }
 
     let state =
-        IssuingAbort(makeCtx sid rid, Started(makeStarted tid "m1"), abortCtx, false)
+        IssuingAbort(makeCtx sid rid, Started(makeStarted tid "m1"), abortCtx, false, 1000000L)
 
     let err: ErrorInput =
         { ErrorName = "AbortUnavailable"
@@ -235,7 +238,7 @@ let ``6 Deadline and idle are idempotent`` () =
     let tid = TurnId.create "t1"
 
     let state =
-        Running(makeCtx sid rid, makeStarted tid "m1", CurrentTurnEvidence.empty)
+        Running(makeCtx sid rid, makeStarted tid "m1", CurrentTurnEvidence.empty, 1000000L)
 
     let r1 = unwrapDecide "06a" (decide state (SessionIdleObserved))
 
@@ -298,7 +301,7 @@ let ``9 Actor dispose with incomplete run poisons`` () =
     let tid = TurnId.create "t1"
 
     let state =
-        Running(makeCtx sid rid, makeStarted tid "m1", CurrentTurnEvidence.empty)
+        Running(makeCtx sid rid, makeStarted tid "m1", CurrentTurnEvidence.empty, 1000000L)
 
     let result = unwrapDecide "09" (decide state (SessionClosed))
 
@@ -338,7 +341,8 @@ let ``10 Restart incomplete run`` () =
                 TurnId = tid
                 Ordinal = TurnOrdinal.first
                 Model = makeFallbackModel
-                Prompt = "work" } ]
+                Prompt = "work"
+                DeadlineAtMs = 0L } ]
 
     let safety = Wanxiangshu.Kernel.Subsession.Fold.projectEvents events
 
@@ -382,7 +386,7 @@ let ``12 Duplicate host callbacks`` () =
     let tid = TurnId.create "t1"
 
     let state =
-        Dispatching(makeCtx sid rid, makePlan tid "work", CurrentTurnEvidence.empty)
+        Dispatching(makeCtx sid rid, makePlan tid "work", CurrentTurnEvidence.empty, 1000000L)
 
     let r1 =
         unwrapDecide "12a" (decide state (DispatchAccepted(tid, UserMessageObserved "m1")))
@@ -409,7 +413,7 @@ let ``13 Duplicate command delivery`` () =
     let tid = TurnId.create "t1"
 
     let state =
-        Running(makeCtx sid rid, makeStarted tid "m1", CurrentTurnEvidence.empty)
+        Running(makeCtx sid rid, makeStarted tid "m1", CurrentTurnEvidence.empty, 1000000L)
 
     let r1 = unwrapDecide "13a" (decide state (CancelRequested))
 

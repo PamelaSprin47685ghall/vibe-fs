@@ -67,20 +67,24 @@ let private nowMs = 1000000L
 
 let availableProducesNoResources () =
     let state = Available { SessionId = sid }
-    let specs = projectResources nowMs state
+    let specs = projectResources state
     check "Available → no resources" (List.isEmpty specs)
 
 let poisonedProducesNoResources () =
     let state = Poisoned(PoisonReason.HostProtocolBroken "test")
-    let specs = projectResources nowMs state
+    let specs = projectResources state
     check "Poisoned → no resources" (List.isEmpty specs)
 
 let dispatchingProducesTurnDeadline () =
-    let state = Dispatching(runCtx, turnPlan, CurrentTurnEvidence.empty)
-    let specs = projectResources nowMs state
+    let turnDeadlineAtMs = nowMs + 300_000L
+
+    let state =
+        Dispatching(runCtx, turnPlan, CurrentTurnEvidence.empty, turnDeadlineAtMs)
+
+    let specs = projectResources state
     equal "Dispatching → 1 resource" 1 specs.Length
 
-    match specs[0] with
+    match specs.[0] with
     | TurnDeadline(id, deadline) ->
         check
             "Dispatching: resource id is TurnDeadlineId"
@@ -92,11 +96,15 @@ let dispatchingProducesTurnDeadline () =
     | _ -> check "Dispatching → expected TurnDeadline" false
 
 let runningProducesTurnDeadline () =
-    let state = Running(runCtx, startedTurn, CurrentTurnEvidence.empty)
-    let specs = projectResources nowMs state
+    let turnDeadlineAtMs = nowMs + 300_000L
+
+    let state =
+        Running(runCtx, startedTurn, CurrentTurnEvidence.empty, turnDeadlineAtMs)
+
+    let specs = projectResources state
     equal "Running → 1 resource" 1 specs.Length
 
-    match specs[0] with
+    match specs.[0] with
     | TurnDeadline(id, deadline) ->
         check
             "Running: resource id is TurnDeadlineId"
@@ -108,11 +116,15 @@ let runningProducesTurnDeadline () =
     | _ -> check "Running → expected TurnDeadline" false
 
 let issuingAbortProducesAbortDeadline () =
-    let state = IssuingAbort(runCtx, Started startedTurn, abortCtx, false)
-    let specs = projectResources nowMs state
+    let abortDeadlineAtMs = nowMs + 60_000L
+
+    let state =
+        IssuingAbort(runCtx, Started startedTurn, abortCtx, false, abortDeadlineAtMs)
+
+    let specs = projectResources state
     equal "IssuingAbort → 1 resource" 1 specs.Length
 
-    match specs[0] with
+    match specs.[0] with
     | AbortDeadline(id, deadline) ->
         check
             "IssuingAbort: resource id is AbortDeadlineId"
@@ -124,8 +136,13 @@ let issuingAbortProducesAbortDeadline () =
     | _ -> check "IssuingAbort → expected AbortDeadline" false
 
 let reconcilingProducesTwoDeadlines () =
-    let state = ReconcilingUnknownDispatch(runCtx, turnPlan, cancelCtx, 0)
-    let specs = projectResources nowMs state
+    let turnDeadlineAtMs = nowMs + 300_000L
+    let reconciliationDeadlineAtMs = nowMs + 30_000L
+
+    let state =
+        ReconcilingUnknownDispatch(runCtx, turnPlan, cancelCtx, 0, turnDeadlineAtMs, reconciliationDeadlineAtMs)
+
+    let specs = projectResources state
     equal "ReconcilingUnknownDispatch → 2 resources" 2 specs.Length
 
     let hasTurnDeadline =

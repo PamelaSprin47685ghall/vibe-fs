@@ -73,15 +73,15 @@ let filterHostEffects (effects: Effect list) : Effect list = effects |> List.fil
 
 let tryExtract (s: SubsessionState) : (RunContext * ActiveTurn) option =
     match s with
-    | Dispatching(ctx, plan, _) -> Some(ctx, NotYetStarted plan)
-    | CancellingDispatch(ctx, plan, _) -> Some(ctx, NotYetStarted plan)
-    | ReconcilingUnknownDispatch(ctx, plan, _, _) -> Some(ctx, NotYetStarted plan)
-    | ClosingUnknownDispatch(ctx, plan, _) -> Some(ctx, NotYetStarted plan)
-    | Running(ctx, started, _) -> Some(ctx, Started started)
-    | Draining(ctx, started, _, _) -> Some(ctx, Started started)
-    | IssuingAbort(ctx, turn, _, _) -> Some(ctx, turn)
-    | AwaitingAbortSettle(ctx, turn, _) -> Some(ctx, turn)
-    | ReconcilingAbortSettle(ctx, turn, _) -> Some(ctx, turn)
+    | Dispatching(ctx, plan, _, _) -> Some(ctx, NotYetStarted plan)
+    | CancellingDispatch(ctx, plan, _, _) -> Some(ctx, NotYetStarted plan)
+    | ReconcilingUnknownDispatch(ctx, plan, _, _, _, _) -> Some(ctx, NotYetStarted plan)
+    | ClosingUnknownDispatch(ctx, plan, _, _, _) -> Some(ctx, NotYetStarted plan)
+    | Running(ctx, started, _, _) -> Some(ctx, Started started)
+    | Draining(ctx, started, _, _, _) -> Some(ctx, Started started)
+    | IssuingAbort(ctx, turn, _, _, _) -> Some(ctx, turn)
+    | AwaitingAbortSettle(ctx, turn, _, _) -> Some(ctx, turn)
+    | ReconcilingAbortSettle(ctx, turn, _, _) -> Some(ctx, turn)
     | Available _
     | Poisoned _ -> None
 
@@ -100,7 +100,10 @@ let buildFailSafe (priorState: SubsessionState) (msg: string) : Decision option 
             { Reason = EventStoreFailure msg
               AfterStop = FinishFailed(InfrastructureFailure("event store append failed: " + msg)) }
 
+        let nowMs = int64 (JS.Constructors.Date.now ())
+        let abortDeadlineAtMs = nowMs + 60_000L
+
         Some
-            { NextState = IssuingAbort(ctx, turn, abortCtx, false)
+            { NextState = IssuingAbort(ctx, turn, abortCtx, false, abortDeadlineAtMs)
               Events = []
               Effects = [ AbortHostSession(ctx.SessionId, tid); CancelPendingDispatch tid ] }

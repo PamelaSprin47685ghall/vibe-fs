@@ -33,7 +33,7 @@ let private activeTurnId (turn: ActiveTurn) : TurnId =
 /// Derive the set of resources that MUST exist after committing to `state`.
 /// Called after every decision commit in the actor.
 /// `nowMs` MUST be injected so tests can be deterministic.
-let projectResources (nowMs: int64) (state: SubsessionState) : ResourceSpec list =
+let projectResources (state: SubsessionState) : ResourceSpec list =
     match state with
     | Available _ ->
         // No active turn — no deadlines.
@@ -43,31 +43,36 @@ let projectResources (nowMs: int64) (state: SubsessionState) : ResourceSpec list
         // Poisoned — no deadlines; all timers should be disposed.
         []
 
-    | Dispatching(_, plan, _)
-    | CancellingDispatch(_, plan, _) ->
+    | Dispatching(_, plan, _, turnDeadlineAtMs)
+    | CancellingDispatch(_, plan, _, turnDeadlineAtMs) ->
         let id = TurnDeadlineId(TurnId.value plan.TurnId)
-        [ TurnDeadline(id, { DeadlineAtMs = nowMs + 300_000L }) ]
+        [ TurnDeadline(id, { DeadlineAtMs = turnDeadlineAtMs }) ]
 
-    | ReconcilingUnknownDispatch(_, plan, _, _)
-    | ClosingUnknownDispatch(_, plan, _) ->
-        // Both turn deadline AND reconciliation deadline are active
+    | ReconcilingUnknownDispatch(_, plan, _, _, turnDeadlineAtMs, reconciliationDeadlineAtMs) ->
         let turnId = TurnDeadlineId(TurnId.value plan.TurnId)
         let reconId = ReconciliationDeadlineId(TurnId.value plan.TurnId)
 
-        [ TurnDeadline(turnId, { DeadlineAtMs = nowMs + 300_000L })
-          ReconciliationDeadline(reconId, { DeadlineAtMs = nowMs + 30_000L }) ]
+        [ TurnDeadline(turnId, { DeadlineAtMs = turnDeadlineAtMs })
+          ReconciliationDeadline(reconId, { DeadlineAtMs = reconciliationDeadlineAtMs }) ]
 
-    | Running(_, started, _)
-    | Draining(_, started, _, _) ->
+    | ClosingUnknownDispatch(_, plan, _, turnDeadlineAtMs, reconciliationDeadlineAtMs) ->
+        let turnId = TurnDeadlineId(TurnId.value plan.TurnId)
+        let reconId = ReconciliationDeadlineId(TurnId.value plan.TurnId)
+
+        [ TurnDeadline(turnId, { DeadlineAtMs = turnDeadlineAtMs })
+          ReconciliationDeadline(reconId, { DeadlineAtMs = reconciliationDeadlineAtMs }) ]
+
+    | Running(_, started, _, turnDeadlineAtMs)
+    | Draining(_, started, _, _, turnDeadlineAtMs) ->
         let id = TurnDeadlineId(TurnId.value started.Plan.TurnId)
-        [ TurnDeadline(id, { DeadlineAtMs = nowMs + 300_000L }) ]
+        [ TurnDeadline(id, { DeadlineAtMs = turnDeadlineAtMs }) ]
 
-    | IssuingAbort(_, turn, _, _)
-    | AwaitingAbortSettle(_, turn, _)
-    | ReconcilingAbortSettle(_, turn, _) ->
+    | IssuingAbort(_, turn, _, _, abortDeadlineAtMs)
+    | AwaitingAbortSettle(_, turn, _, abortDeadlineAtMs)
+    | ReconcilingAbortSettle(_, turn, _, abortDeadlineAtMs) ->
         let tid = activeTurnId turn
         let abortId = AbortDeadlineId(TurnId.value tid)
-        [ AbortDeadline(abortId, { DeadlineAtMs = nowMs + 60_000L }) ]
+        [ AbortDeadline(abortId, { DeadlineAtMs = abortDeadlineAtMs }) ]
 
 // ── Diff computation ──
 

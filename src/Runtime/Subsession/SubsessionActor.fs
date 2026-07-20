@@ -47,8 +47,7 @@ type SubsessionActor
 
     // ── Reconcile resources from actor state after each commit ──
     let reconcileResources (state: SubsessionState) : unit =
-        let nowMs = int64 (JS.Constructors.Date.now ())
-        let specs = projectResources nowMs state
+        let specs = projectResources state
         resourceScope.Reconcile specs
 
     // ── CommandProcessor: serial commit pipeline ──

@@ -188,7 +188,8 @@ let ``Replay: subsession safety projection idempotent`` () =
                 TurnId = tid
                 Ordinal = TurnOrdinal.first
                 Model = makeFallbackModel
-                Prompt = "work" }
+                Prompt = "work"
+                DeadlineAtMs = 0L }
           TurnFinished(tid, TurnCancelled)
           RunFinished(rid, Cancelled) ]
 

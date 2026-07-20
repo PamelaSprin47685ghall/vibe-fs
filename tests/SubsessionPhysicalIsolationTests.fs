@@ -24,6 +24,9 @@ module OmpHost = Wanxiangshu.Hosts.Omp.SubsessionHostAdapter
 let private createEmpty () = createObj []
 let private fail (msg: string) = check msg false
 
+let private decide state cmd =
+    Wanxiangshu.Kernel.Subsession.Decision.decide 1000000L state cmd
+
 let private model0: FallbackModel =
     { ProviderID = "p"
       ModelID = "m0"
@@ -256,10 +259,8 @@ let private makeOmpSessionAndPi (promptPromise: JS.Promise<obj>) (abortFn: unit 
               box (fun () ->
                   abortFn ()
                   Promise.lift (box null))
-              "sessionMessages",
-              box (fun (_: obj) -> Promise.lift (box {| data = [||] |}))
-              "sessionPrompt",
-              box (fun (_: obj) -> promptPromise) ]
+              "sessionMessages", box (fun (_: obj) -> Promise.lift (box {| data = [||] |}))
+              "sessionPrompt", box (fun (_: obj) -> promptPromise) ]
 
     let piSession =
         createObj
@@ -380,14 +381,14 @@ let private ompPreSendCancelRejectsAndDoesNotCallHost () =
         let plan = makePlan runId
 
         let promptCalled = ref false
-        let promptP =
-            Promise.lift (box null)
+        let promptP = Promise.lift (box null)
 
         let session =
             createObj
-                [ "prompt", box (fun (_: string) ->
-                    promptCalled.Value <- true
-                    promptP) ]
+                [ "prompt",
+                  box (fun (_: string) ->
+                      promptCalled.Value <- true
+                      promptP) ]
 
         let pi = createObj [ "session", box (createObj []) ]
 
@@ -419,6 +420,7 @@ let private ompSessionStatesWorkspaceIsolation () =
         let promptP = Promise.lift (box null)
         let abortCount = ref 0
         let piAbortCount = ref 0
+
         let struct (session, pi) =
             makeOmpSessionAndPi promptP (fun () -> abortCount.Value <- abortCount.Value + 1) (fun () ->
                 piAbortCount.Value <- piAbortCount.Value + 1)
@@ -470,7 +472,7 @@ let private ompCancelStartedDispatchTriggersPhysicalAbort () =
         equal "physical pi abort not dual-called" false piAbortCalled.Value
 
         // Clean up
-        resolveRef.Value (box null)
+        resolveRef.Value(box null)
         let! _ = dispatchP
         ()
     }
@@ -486,8 +488,7 @@ let private ompIdleEventRoutingValidation () =
         let resolveRef = ref (fun (_: obj) -> ())
         let promptP = Promise.create (fun resolve _ -> resolveRef.Value <- resolve)
 
-        let struct (session, pi) =
-            makeOmpSessionAndPi promptP (fun () -> ()) (fun () -> ())
+        let struct (session, pi) = makeOmpSessionAndPi promptP (fun () -> ()) (fun () -> ())
 
         let host = OmpHost.createHost session "" pi "omp-test-ws"
         let actor = SubsessionActorRegistry.GetOrCreate "omp-test-ws" sid host store
@@ -506,26 +507,21 @@ let private ompIdleEventRoutingValidation () =
 
         let runtime = FallbackRuntimeStore()
         let configLookup: ConfigLookup = fun _ -> cfg
+
         let handler =
-            Wanxiangshu.Hosts.Omp.Fallback.Hook.createOmpFallbackHandler
-                runtime
-                configLookup
-                session
-                "omp-test-ws"
+            Wanxiangshu.Hosts.Omp.Fallback.Hook.createOmpFallbackHandler runtime configLookup session "omp-test-ws"
 
         let rawIdleEvent =
             createObj
-                [ "event",
-                  box (createObj [ "type", box "session.idle" ])
-                  "props",
-                  box (createObj [ "sessionID", box sid ]) ]
+                [ "event", box (createObj [ "type", box "session.idle" ])
+                  "props", box (createObj [ "sessionID", box sid ]) ]
 
         // 1. When waiter is not completed, session.idle must be ignored (not consumed)
         let! res1 = handler rawIdleEvent
         equal "stale idle event is not consumed" false res1.Consumed
 
         // 2. Resolve prompt with verifiable message id (null alone is AcceptanceUnknown)
-        resolveRef.Value (box {| id = "omp-idle-msg-1" |})
+        resolveRef.Value(box {| id = "omp-idle-msg-1" |})
         do! sleep 10
 
         // 3. Now session.idle must be consumed
@@ -606,12 +602,12 @@ let private issuingAbortBuffersIdle () =
         { Reason = UserRequested
           AfterStop = FinishCancelled }
 
-    let state = IssuingAbort(ctx, NotYetStarted plan, abortCtx, false)
+    let state = IssuingAbort(ctx, NotYetStarted plan, abortCtx, false, 1000000L)
 
     match decide state SessionIdleObserved with
     | Ok(Decided d) ->
         match d.NextState with
-        | IssuingAbort(_, _, _, true) -> check "idle buffered before abort barrier" true
+        | IssuingAbort(_, _, _, true, _) -> check "idle buffered before abort barrier" true
         | other -> fail ("expected IssuingAbort with idleBuffered=true, got " + string other)
 
         check "no events on idle buffer" (List.isEmpty d.Events)
@@ -631,7 +627,7 @@ let private reconcilingAbortSettleUsesQuiescenceNotDispatchStatus () =
         { Reason = UserRequested
           AfterStop = FinishCancelled }
 
-    let state = ReconcilingAbortSettle(ctx, Started started, abortCtx)
+    let state = ReconcilingAbortSettle(ctx, Started started, abortCtx, 1000000L)
 
     match decide state (DispatchStatusResolved(DispatchStatus.Accepted OrderedTurnMarkerObserved)) with
     | Error(IllegalTransition _) -> check "ReconcilingAbortSettle rejects DispatchStatusResolved" true
@@ -653,12 +649,12 @@ let private reconcilingUnknownDeadlineExpiresTwicePoisons () =
         { Reason = AcceptanceUnknownAfterDispatch
           AfterStop = RetryAfterSafeStop err }
 
-    let state = ReconcilingUnknownDispatch(ctx, plan, cancelCtx, 0)
+    let state = ReconcilingUnknownDispatch(ctx, plan, cancelCtx, 0, 1000000L, 1000000L)
 
     match decide state (ReconciliationDeadlineExpired plan.TurnId) with
     | Ok(Decided d1) ->
         match d1.NextState with
-        | ReconcilingUnknownDispatch(_, _, _, retryCount) ->
+        | ReconcilingUnknownDispatch(_, _, _, retryCount, _, _) ->
             equal "retry count is 1 after first expiry" 1 retryCount
 
             match decide d1.NextState (ReconciliationDeadlineExpired plan.TurnId) with
@@ -693,10 +689,14 @@ let private reconciliationRetryPreservesAbortReason () =
         { Reason = UserRequested
           AfterStop = FinishCancelled }
 
-    match decide (ReconcilingUnknownDispatch(ctx, plan, cancelCtx, 0)) (ReconciliationDeadlineExpired plan.TurnId) with
+    match
+        decide
+            (ReconcilingUnknownDispatch(ctx, plan, cancelCtx, 0, 1000000L, 1000000L))
+            (ReconciliationDeadlineExpired plan.TurnId)
+    with
     | Ok(Decided d) ->
         match d.NextState with
-        | ReconcilingUnknownDispatch(_, _, retryContext, retryCount) ->
+        | ReconcilingUnknownDispatch(_, _, retryContext, retryCount, _, _) ->
             equal "retry count is 1 after retry" 1 retryCount
             equal "reconciliation retry preserves abort cause" UserRequested retryContext.Reason
         | other -> fail ("expected reconciliation retry, got " + string other)
@@ -788,7 +788,7 @@ let private routeNoneTurnIdEvidenceAttributedToCurrentTurn () =
         do! sleep 20
 
         match actor.GetState() with
-        | Running(_, _, currentEvidence) ->
+        | Running(_, _, currentEvidence, _) ->
             match currentEvidence.Assistant with
             | AssistantSnapshot(_, _, text, _) ->
                 equal

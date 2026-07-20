@@ -38,6 +38,7 @@ let private tryDecodeTurnDispatchRequested (e: WanEvent) : SubsessionEvent optio
     let ordinalStr = payload e "turnOrdinal"
     let modelStr = payload e "model"
     let prompt = payload e "prompt"
+    let deadlineAtMsStr = payload e "deadlineAtMs"
 
     if runId = "" || turnId = "" then
         None
@@ -49,13 +50,19 @@ let private tryDecodeTurnDispatchRequested (e: WanEvent) : SubsessionEvent optio
             | true, n -> ordinalFromInt n
             | _ -> TurnOrdinal.first
 
+        let deadlineAtMs =
+            match System.Int64.TryParse deadlineAtMsStr with
+            | true, d -> d
+            | _ -> 0L
+
         Some(
             TurnDispatchRequested
                 { RunId = RunId.create runId
                   TurnId = TurnId.create turnId
                   Ordinal = ord
                   Model = model
-                  Prompt = prompt }
+                  Prompt = prompt
+                  DeadlineAtMs = deadlineAtMs }
         )
 
 let private tryDecodeTurnStarted (e: WanEvent) : SubsessionEvent option =
@@ -83,11 +90,17 @@ let private tryDecodeTurnFinished (e: WanEvent) : SubsessionEvent option =
 let private tryDecodeAbortRequested (e: WanEvent) : SubsessionEvent option =
     let turnId = payload e "turnId"
     let runId = payload e "runId"
+    let abortDeadlineAtMsStr = payload e "abortDeadlineAtMs"
 
     if turnId = "" then
         None
     else
-        Some(AbortRequested(RunId.create runId, TurnId.create turnId))
+        let abortDeadlineAtMs =
+            match System.Int64.TryParse abortDeadlineAtMsStr with
+            | true, d -> d
+            | _ -> 0L
+
+        Some(AbortRequested(RunId.create runId, TurnId.create turnId, abortDeadlineAtMs))
 
 let private tryDecodeSessionPoisoned (e: WanEvent) : SubsessionEvent option =
     let sessionId = payload e "sessionId"

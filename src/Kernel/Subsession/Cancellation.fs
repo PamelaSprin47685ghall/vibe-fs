@@ -5,7 +5,7 @@ open Wanxiangshu.Kernel.Subsession.Types
 open Wanxiangshu.Kernel.Subsession.Policy
 open Wanxiangshu.Kernel.Subsession.Rules
 
-let decide (state: SubsessionState) (cmd: Command) : Result<DecisionResult, DecisionError> =
+let decide (nowMs: int64) (state: SubsessionState) (cmd: Command) : Result<DecisionResult, DecisionError> =
     match state with
     | Poisoned _ ->
         match cmd with
@@ -18,11 +18,11 @@ let decide (state: SubsessionState) (cmd: Command) : Result<DecisionResult, Deci
         | cmd when isStaleTimerCommand cmd -> Ok(noChange StaleTimer)
         | _ -> illegal (stateName state) (cmdName cmd)
     | Dispatching _
-    | CancellingDispatch _ -> Dispatch.decide state cmd
+    | CancellingDispatch _ -> Dispatch.decide nowMs state cmd
     | ReconcilingUnknownDispatch _
-    | ClosingUnknownDispatch _ -> Reconciliation.decide state cmd
-    | Running _ -> Running.decide state cmd
-    | Draining _ -> Draining.decide state cmd
+    | ClosingUnknownDispatch _ -> Reconciliation.decide nowMs state cmd
+    | Running _ -> Running.decide nowMs state cmd
+    | Draining _ -> Draining.decide nowMs state cmd
     | IssuingAbort _
     | AwaitingAbortSettle _
-    | ReconcilingAbortSettle _ -> Abort.decide state cmd
+    | ReconcilingAbortSettle _ -> Abort.decide nowMs state cmd

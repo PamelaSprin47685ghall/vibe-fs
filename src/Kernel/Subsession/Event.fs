@@ -12,7 +12,8 @@ type TurnData =
       TurnId: TurnId
       Ordinal: TurnOrdinal
       Model: FallbackModel
-      Prompt: string }
+      Prompt: string
+      DeadlineAtMs: int64 }
 
 type TurnStartedData =
     { RunId: RunId
@@ -31,7 +32,7 @@ type SubsessionEvent =
     | TurnDispatchRequested of TurnData
     | TurnStarted of TurnStartedData
     | TurnFinished of TurnId * TurnFinishOutcome
-    | AbortRequested of RunId * TurnId
+    | AbortRequested of RunId * TurnId * abortDeadlineAtMs: int64
     | RunFinished of RunId * RunResult
     | SessionPoisoned of SessionId * PoisonReason
     | PhysicalSessionClosed of SessionId

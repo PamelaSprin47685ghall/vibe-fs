@@ -8,6 +8,9 @@ open Wanxiangshu.Tests.Assert
 
 let private fail (msg: string) = check msg false
 
+let private decide state cmd =
+    Wanxiangshu.Kernel.Subsession.Decision.decide 1000000L state cmd
+
 let private model0: FallbackModel =
     { ProviderID = "p"
       ModelID = "m0"
@@ -65,7 +68,7 @@ let evidenceDuringDispatchingMustSurviveIntoRunning () =
     let d0 = mustDecide (Available { SessionId = sid }) (StartRun request)
 
     match d0.NextState with
-    | Dispatching(_, plan, _) ->
+    | Dispatching(_, plan, _, _) ->
         let earlyEvidence =
             { CurrentTurnEvidence.empty with
                 Assistant = AssistantSnapshot("", 0L, "inspector report: README found at docs/", Some NormalFinish) }
@@ -89,7 +92,7 @@ let evidenceDuringDispatchingMustSurviveIntoRunning () =
             match decide d1.NextState (DispatchAccepted(plan.TurnId, OrderedTurnMarkerObserved)) with
             | Ok(Decided d2) ->
                 match d2.NextState with
-                | Running(_, _, evidence) ->
+                | Running(_, _, evidence, _) ->
                     match evidence.Assistant with
                     | AssistantSnapshot(_, _, text, _) ->
                         equal
@@ -131,7 +134,7 @@ let toolResultDuringDispatchingMustSurviveIntoRunning () =
     let d0 = mustDecide (Available { SessionId = sid }) (StartRun request)
 
     match d0.NextState with
-    | Dispatching(_, plan, _) ->
+    | Dispatching(_, plan, _, _) ->
         let earlyToolEvidence =
             { CurrentTurnEvidence.empty with
                 Tool = HasToolResult }
@@ -147,7 +150,7 @@ let toolResultDuringDispatchingMustSurviveIntoRunning () =
             match decide d1.NextState (DispatchAccepted(plan.TurnId, OrderedTurnMarkerObserved)) with
             | Ok(Decided d2) ->
                 match d2.NextState with
-                | Running(_, _, evidence) ->
+                | Running(_, _, evidence, _) ->
                     equal "tool result observed before acceptance survives" HasToolResult evidence.Tool
                 | other -> fail ("expected Running, got " + string other)
             | other -> fail ("unexpected on DispatchAccepted: " + string other)
@@ -189,7 +192,7 @@ let unattributedEvidenceInRunningIsAccepted () =
     let d0 = mustDecide (Available { SessionId = sid }) (StartRun request)
 
     match d0.NextState with
-    | Dispatching(_, plan, _) ->
+    | Dispatching(_, plan, _, _) ->
         match decide d0.NextState (DispatchAccepted(plan.TurnId, OrderedTurnMarkerObserved)) with
         | Ok(Decided d1) ->
             match d1.NextState with
@@ -207,7 +210,7 @@ let unattributedEvidenceInRunningIsAccepted () =
                 with
                 | Ok(Decided d2) ->
                     match d2.NextState with
-                    | Running(_, _, evidence) ->
+                    | Running(_, _, evidence, _) ->
                         match evidence.Assistant with
                         | AssistantSnapshot(_, _, text, _) ->
                             equal "unattributed evidence accepted in Running" "inspector report found" text
@@ -226,7 +229,7 @@ let unattributedEvidenceInDispatchingIsBuffered () =
     let d0 = mustDecide (Available { SessionId = sid }) (StartRun request)
 
     match d0.NextState with
-    | Dispatching(_, plan, _) ->
+    | Dispatching(_, plan, _, _) ->
         let unattributed =
             { CurrentTurnEvidence.empty with
                 Assistant = AssistantSnapshot("", 0L, "early report", Some NormalFinish) }
@@ -240,7 +243,7 @@ let unattributedEvidenceInDispatchingIsBuffered () =
         with
         | Ok(Decided d1) ->
             match d1.NextState with
-            | Dispatching(_, _, evidence) ->
+            | Dispatching(_, _, evidence, _) ->
                 match evidence.Assistant with
                 | AssistantSnapshot(_, _, text, _) ->
                     equal "unattributed evidence buffered in Dispatching" "early report" text

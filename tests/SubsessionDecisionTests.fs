@@ -9,6 +9,9 @@ open Wanxiangshu.Tests.Assert
 
 let private fail (msg: string) = check msg false
 
+let private decide state cmd =
+    Wanxiangshu.Kernel.Subsession.Decision.decide 1000000L state cmd
+
 // ── Fixtures ──
 
 let private model0: FallbackModel =
@@ -104,7 +107,7 @@ let startRunFromAvailable () =
 let secondStartRunRejected () =
     let ctx = mkCtx policy0 (TurnOrdinal.next TurnOrdinal.first)
     let plan = mkPlan turn0 TurnOrdinal.first model0 "do work"
-    let state = Dispatching(ctx, plan, CurrentTurnEvidence.empty)
+    let state = Dispatching(ctx, plan, CurrentTurnEvidence.empty, 1000000L)
 
     match decide state (StartRun request) with
     | Ok(Decided d) ->
@@ -122,7 +125,7 @@ let secondStartRunRejected () =
 let dispatchingIdleIgnored () =
     let ctx = mkCtx policy0 (TurnOrdinal.next TurnOrdinal.first)
     let plan = mkPlan turn0 TurnOrdinal.first model0 "do work"
-    let state = Dispatching(ctx, plan, CurrentTurnEvidence.empty)
+    let state = Dispatching(ctx, plan, CurrentTurnEvidence.empty, 1000000L)
 
     match decide state SessionIdleObserved with
     | Ok(NoChange DuplicateIdleBeforeTurnMarker) -> ()
@@ -131,7 +134,7 @@ let dispatchingIdleIgnored () =
 let dispatchingErrorIgnored () =
     let ctx = mkCtx policy0 (TurnOrdinal.next TurnOrdinal.first)
     let plan = mkPlan turn0 TurnOrdinal.first model0 "do work"
-    let state = Dispatching(ctx, plan, CurrentTurnEvidence.empty)
+    let state = Dispatching(ctx, plan, CurrentTurnEvidence.empty, 1000000L)
 
     match decide state (TurnErrorObserved err) with
     | Ok(NoChange UnattributedObservationBeforeStart) -> ()
@@ -149,7 +152,7 @@ let dispatchingErrorIgnored () =
 let idleDuringDispatchingThenRealIdleConverges () =
     let ctx = mkCtx policy0 (TurnOrdinal.next TurnOrdinal.first)
     let plan = mkPlan turn0 TurnOrdinal.first model0 "do work"
-    let dispatchingState = Dispatching(ctx, plan, CurrentTurnEvidence.empty)
+    let dispatchingState = Dispatching(ctx, plan, CurrentTurnEvidence.empty, 1000000L)
 
     // Premature idle while still Dispatching: must be a named ignore, not a
     // state transition (i.e. the actor must remain Dispatching afterwards).
@@ -162,7 +165,7 @@ let idleDuringDispatchingThenRealIdleConverges () =
     match decide dispatchingState (DispatchAccepted(turn0, OrderedTurnMarkerObserved)) with
     | Ok(Decided d1) ->
         match d1.NextState with
-        | Running(_, _, evidence0) ->
+        | Running(_, _, evidence0, _) ->
             check "evidence starts empty" (evidence0 = CurrentTurnEvidence.empty)
 
             // Evidence arrives (assistant text, normal finish) before idle.
@@ -209,12 +212,12 @@ let runningErrorDrains () =
         { Plan = plan
           StartReceipt = OrderedTurnMarkerObserved }
 
-    let state = Running(ctx, started, CurrentTurnEvidence.empty)
+    let state = Running(ctx, started, CurrentTurnEvidence.empty, 1000000L)
 
     match decide state (TurnErrorObserved err) with
     | Ok(Decided d) ->
         match d.NextState with
-        | Draining(_, _, heldErr, _) -> equal "held error preserved" err.Message heldErr.Message
+        | Draining(_, _, heldErr, _, _) -> equal "held error preserved" err.Message heldErr.Message
         | other -> fail ("expected Draining, got " + string other)
 
         check "no DispatchPrompt on error" (not (hasEffect isDispatchPrompt d.Effects))
@@ -230,7 +233,7 @@ let drainingDuplicateErrorIgnored () =
         { Plan = plan
           StartReceipt = OrderedTurnMarkerObserved }
 
-    let state = Draining(ctx, started, err, CurrentTurnEvidence.empty)
+    let state = Draining(ctx, started, err, CurrentTurnEvidence.empty, 1000000L)
 
     match decide state (TurnErrorObserved err) with
     | Ok(NoChange DuplicateError) -> ()
@@ -244,7 +247,7 @@ let drainingIdleRetriesViaFallbackPolicy () =
         { Plan = plan
           StartReceipt = OrderedTurnMarkerObserved }
 
-    let state = Draining(ctx, started, err, CurrentTurnEvidence.empty)
+    let state = Draining(ctx, started, err, CurrentTurnEvidence.empty, 1000000L)
 
     match decide state SessionIdleObserved with
     | Ok(Decided d) ->
@@ -285,7 +288,7 @@ let sessionClosedCompletesCaller () =
         { Plan = plan
           StartReceipt = OrderedTurnMarkerObserved }
 
-    let state = Running(ctx, started, CurrentTurnEvidence.empty)
+    let state = Running(ctx, started, CurrentTurnEvidence.empty, 1000000L)
 
     match decide state SessionClosed with
     | Ok(Decided d) ->
@@ -322,7 +325,7 @@ let abortIdleTriggersReconcile () =
         { Reason = UserRequested
           AfterStop = FinishCancelled }
 
-    let state = AwaitingAbortSettle(ctx, Started started, abortCtx)
+    let state = AwaitingAbortSettle(ctx, Started started, abortCtx, 1000000L)
 
     match decide state SessionIdleObserved with
     | Ok(Decided d) ->
@@ -351,7 +354,7 @@ let reconcileAbortSettleAccepted () =
         { Reason = UserRequested
           AfterStop = FinishCancelled }
 
-    let state = ReconcilingAbortSettle(ctx, Started started, abortCtx)
+    let state = ReconcilingAbortSettle(ctx, Started started, abortCtx, 1000000L)
 
     match decide state (SessionQuiescenceResolved Stopped) with
     | Ok(Decided d) ->
@@ -380,7 +383,7 @@ let reconcileAbortSettleStopped () =
         { Reason = UserRequested
           AfterStop = FinishCancelled }
 
-    let state = ReconcilingAbortSettle(ctx, Started started, abortCtx)
+    let state = ReconcilingAbortSettle(ctx, Started started, abortCtx, 1000000L)
 
     match decide state (SessionQuiescenceResolved Stopped) with
     | Ok(Decided d) ->
@@ -409,7 +412,7 @@ let reconcileAbortSettleStillPending () =
         { Reason = UserRequested
           AfterStop = FinishCancelled }
 
-    let state = ReconcilingAbortSettle(ctx, Started started, abortCtx)
+    let state = ReconcilingAbortSettle(ctx, Started started, abortCtx, 1000000L)
 
     match decide state (SessionQuiescenceResolved StillRunning) with
     | Ok(Decided d) ->
@@ -430,7 +433,7 @@ let reconcileAbortSettleUnknown () =
         { Reason = UserRequested
           AfterStop = FinishCancelled }
 
-    let state = ReconcilingAbortSettle(ctx, Started started, abortCtx)
+    let state = ReconcilingAbortSettle(ctx, Started started, abortCtx, 1000000L)
 
     match decide state (SessionQuiescenceResolved StopUnknown) with
     | Ok(Decided d) ->
@@ -498,12 +501,12 @@ let idleBeforeAbortBarrierIgnored () =
         { Reason = AcceptanceUnknownAfterDispatch
           AfterStop = RetryAfterSafeStop err }
 
-    let state = IssuingAbort(ctx, NotYetStarted plan, abortCtx, false)
+    let state = IssuingAbort(ctx, NotYetStarted plan, abortCtx, false, 1000000L)
 
     match decide state SessionIdleObserved with
     | Ok(Decided d) ->
         match d.NextState with
-        | IssuingAbort(_, _, _, true) -> check "idle buffered before barrier" true
+        | IssuingAbort(_, _, _, true, _) -> check "idle buffered before barrier" true
         | other -> fail ("expected IssuingAbort with idleBuffered=true, got " + string other)
 
         check "no events on idle buffer" (List.isEmpty d.Events)
@@ -518,7 +521,7 @@ let abortUnavailableStaysIssuing () =
         { Reason = UserRequested
           AfterStop = FinishCancelled }
 
-    let state = IssuingAbort(ctx, NotYetStarted plan, abortCtx, false)
+    let state = IssuingAbort(ctx, NotYetStarted plan, abortCtx, false, 1000000L)
 
     match decide state (AbortRequestFailed(turn0, err)) with
     | Ok(NoChange AbortInProgress) -> ()
@@ -555,7 +558,7 @@ let acceptanceUnknownRetriesAfterAbortConfirmed () =
         { Reason = AcceptanceUnknownAfterDispatch
           AfterStop = RetryAfterSafeStop err }
 
-    let state = AwaitingAbortSettle(ctx, NotYetStarted plan, abortCtx)
+    let state = AwaitingAbortSettle(ctx, NotYetStarted plan, abortCtx, 1000000L)
 
     match decide state (AbortConfirmed turn0) with
     | Ok(Decided d) ->
@@ -595,7 +598,7 @@ let turnDeadlineAfterAbortIsTimeoutNotCancelled () =
         { Reason = TurnDeadline
           AfterStop = FinishFailed(InfrastructureFailure "turn deadline expired") }
 
-    let state = AwaitingAbortSettle(ctx, Started started, abortCtx)
+    let state = AwaitingAbortSettle(ctx, Started started, abortCtx, 1000000L)
 
     match decide state SessionIdleObserved with
     | Ok(Decided d) ->
@@ -642,7 +645,7 @@ let startRunWithDelegateToHostProducesNoneModel () =
     match decide avail (StartRun req) with
     | Ok(Decided d) ->
         match d.NextState with
-        | Dispatching(_, plan, _) -> check "DelegateToHost plan has no model" plan.Model.IsNone
+        | Dispatching(_, plan, _, _) -> check "DelegateToHost plan has no model" plan.Model.IsNone
         | other -> fail ("expected Dispatching, got " + string other)
 
         check "DelegateToHost still dispatches" (hasEffect isDispatchPrompt d.Effects)
@@ -679,7 +682,7 @@ let startRunWithRetryChainProducesSomeModel () =
     match decide avail (StartRun req) with
     | Ok(Decided d) ->
         match d.NextState with
-        | Dispatching(ctx, plan, _) ->
+        | Dispatching(ctx, plan, _, _) ->
             check "RetryChain plan model is first of chain" (plan.Model = Some model0)
             check "RetryChain ctx keeps full chain" (ctx.Chain = chain)
         | other -> fail ("expected Dispatching, got " + string other)

@@ -14,13 +14,6 @@ let private delegateToHostSentinel: FallbackModel =
       ReasoningEffort = None
       Thinking = false }
 
-let private makeTurnData (ctx: RunContext) (plan: TurnPlan) : TurnData =
-    { RunId = ctx.RunId
-      TurnId = plan.TurnId
-      Ordinal = plan.Ordinal
-      Model = plan.Model |> Option.defaultValue delegateToHostSentinel
-      Prompt = plan.Prompt }
-
 let private decided state events effects : DecisionResult =
     Decided
         { NextState = state
@@ -28,6 +21,7 @@ let private decided state events effects : DecisionResult =
           Effects = effects }
 
 let private startDispatch
+    (nowMs: int64)
     (state: SubsessionState)
     (req: StartRunRequest)
     (chainForCtx: FallbackChain)
@@ -50,24 +44,32 @@ let private startDispatch
           Model = modelForPlan
           Prompt = req.Prompt }
 
+    let turnDeadlineAtMs = nowMs + 300_000L
+
     let events =
         [ RunStarted
               { RunId = req.RunId
                 ParentSessionId = req.ParentSessionId
                 SessionId = req.SessionId }
-          TurnDispatchRequested(makeTurnData ctx plan) ]
+          TurnDispatchRequested
+              { RunId = ctx.RunId
+                TurnId = plan.TurnId
+                Ordinal = plan.Ordinal
+                Model = plan.Model |> Option.defaultValue delegateToHostSentinel
+                Prompt = plan.Prompt
+                DeadlineAtMs = turnDeadlineAtMs } ]
 
     let effects = [ DispatchPrompt plan ]
 
-    decided (Dispatching(ctx, plan, CurrentTurnEvidence.empty)) events effects
+    decided (Dispatching(ctx, plan, CurrentTurnEvidence.empty, turnDeadlineAtMs)) events effects
 
-let private handleAvailable (state: SubsessionState) (req: StartRunRequest) =
+let private handleAvailable (nowMs: int64) (state: SubsessionState) (req: StartRunRequest) =
     match req.Directive with
     | RetryChain [] -> decided state [] [ RejectStart NoModelAvailable ]
-    | RetryChain(firstModel :: _ as chain) -> startDispatch state req chain (Some firstModel)
-    | DelegateToHost -> startDispatch state req [] None
+    | RetryChain(firstModel :: _ as chain) -> startDispatch nowMs state req chain (Some firstModel)
+    | DelegateToHost -> startDispatch nowMs state req [] None
 
-let decide (state: SubsessionState) (req: StartRunRequest) : Result<DecisionResult, DecisionError> =
+let decide (nowMs: int64) (state: SubsessionState) (req: StartRunRequest) : Result<DecisionResult, DecisionError> =
     match state with
     | Poisoned reason -> Ok(decided state [] [ RejectStart(StartRunError.SessionPoisoned reason) ])
 
@@ -82,6 +84,6 @@ let decide (state: SubsessionState) (req: StartRunRequest) : Result<DecisionResu
         let effects = [ CompleteCaller(req.RunId, Cancelled) ]
         Ok(decided (Available avail) events effects)
 
-    | Available _ -> Ok(handleAvailable state req)
+    | Available _ -> Ok(handleAvailable nowMs state req)
 
     | _ -> Ok(decided state [] [ RejectStart AlreadyRunning ])

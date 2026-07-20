@@ -20,7 +20,8 @@ let internal makeTurnData (c: RunContext) (p: TurnPlan) : TurnData =
       TurnId = p.TurnId
       Ordinal = p.Ordinal
       Model = p.Model |> Option.defaultValue delegateToHostSentinel
-      Prompt = p.Prompt }
+      Prompt = p.Prompt
+      DeadlineAtMs = 0L }
 
 let internal nextTurnFromPolicy (ctx: RunContext) (decision: PolicyDecision) : (RunContext * TurnPlan) option =
     match decision with

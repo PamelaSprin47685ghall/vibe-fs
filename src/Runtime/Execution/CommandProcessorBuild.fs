@@ -27,15 +27,15 @@ let isPoisonedState (state: SubsessionState) : bool =
 
 let getCurrentTurnId (state: SubsessionState) : TurnId option =
     match state with
-    | Dispatching(_, plan, _) -> Some plan.TurnId
-    | CancellingDispatch(_, plan, _) -> Some plan.TurnId
-    | ReconcilingUnknownDispatch(_, plan, _, _) -> Some plan.TurnId
-    | ClosingUnknownDispatch(_, plan, _) -> Some plan.TurnId
-    | Running(_, started, _) -> Some started.Plan.TurnId
-    | Draining(_, started, _, _) -> Some started.Plan.TurnId
-    | IssuingAbort(_, turn, _, _) -> Some(activeTid turn)
-    | AwaitingAbortSettle(_, turn, _) -> Some(activeTid turn)
-    | ReconcilingAbortSettle(_, turn, _) -> Some(activeTid turn)
+    | Dispatching(_, plan, _, _) -> Some plan.TurnId
+    | CancellingDispatch(_, plan, _, _) -> Some plan.TurnId
+    | ReconcilingUnknownDispatch(_, plan, _, _, _, _) -> Some plan.TurnId
+    | ClosingUnknownDispatch(_, plan, _, _, _) -> Some plan.TurnId
+    | Running(_, started, _, _) -> Some started.Plan.TurnId
+    | Draining(_, started, _, _, _) -> Some started.Plan.TurnId
+    | IssuingAbort(_, turn, _, _, _) -> Some(activeTid turn)
+    | AwaitingAbortSettle(_, turn, _, _) -> Some(activeTid turn)
+    | ReconcilingAbortSettle(_, turn, _, _) -> Some(activeTid turn)
     | Available _
     | Poisoned _ -> None
 
@@ -134,7 +134,9 @@ let handleIllegal
                 { Reason = IllegalTransitionFailSafe(s + " + " + c)
                   AfterStop = FinishFailed(InfrastructureFailure("illegal transition: " + s + " + " + c)) }
 
-            applier.SetState(IssuingAbort(subCtx, turn, abortCtx, false))
+            let nowMs = int64 (JS.Constructors.Date.now ())
+            let abortDeadlineAtMs = nowMs + 60_000L
+            applier.SetState(IssuingAbort(subCtx, turn, abortCtx, false, abortDeadlineAtMs))
             applier.ReconcileResources(applier.GetState())
             let effects = [ AbortHostSession(subCtx.SessionId, tid); CancelPendingDispatch tid ]
 

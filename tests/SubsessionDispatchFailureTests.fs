@@ -138,13 +138,14 @@ let allEventsReplayFromWire () =
                 TurnId = turnId
                 Ordinal = TurnOrdinal.first
                 Model = model0
-                Prompt = "go" }
+                Prompt = "go"
+                DeadlineAtMs = 0L }
           TurnStarted
               { RunId = runId
                 TurnId = turnId
                 Receipt = OrderedTurnMarkerObserved }
           TurnFinished(turnId, TurnCompleted "done")
-          AbortRequested(runId, turnId)
+          AbortRequested(runId, turnId, 0L)
           RunFinished(runId, Succeeded "done")
           SessionPoisoned(sid, HostProtocolBroken "test") ]
 

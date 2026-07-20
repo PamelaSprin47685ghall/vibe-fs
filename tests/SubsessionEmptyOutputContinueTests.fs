@@ -8,6 +8,9 @@ open Wanxiangshu.Tests.Assert
 
 let private fail (msg: string) = check msg false
 
+let private decide state cmd =
+    Wanxiangshu.Kernel.Subsession.Decision.decide 1000000L state cmd
+
 let private model0: FallbackModel =
     { ProviderID = "p"
       ModelID = "m0"
@@ -64,7 +67,7 @@ let private mkRunning evidence =
         { Plan = plan
           StartReceipt = OrderedTurnMarkerObserved }
 
-    Running(ctx, started, evidence)
+    Running(ctx, started, evidence, 1000000L)
 
 let private assertContinues label evidence =
     let state = mkRunning evidence

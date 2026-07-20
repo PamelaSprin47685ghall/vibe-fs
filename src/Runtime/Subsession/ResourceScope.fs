@@ -62,57 +62,55 @@ type ResourceScope(callback: ResourceId -> unit) =
     /// Acquires new timers, releases stale ones, and re-arms timers whose
     /// deadline time has changed.
     member _.Reconcile(nextSpecs: ResourceSpec list) : unit =
-        if disposed.Value then
-            ()
+        if not disposed.Value then
+            // Build current set of (key, deadlineAtMs) pairs
+            let prevKeyDeadlines =
+                activeTimers
+                |> Map.toSeq
+                |> Seq.map (fun (key, entry) -> (key, entry.DeadlineAtMs))
+                |> Set.ofSeq
 
-        // Build current set of (key, deadlineAtMs) pairs
-        let prevKeyDeadlines =
-            activeTimers
-            |> Map.toSeq
-            |> Seq.map (fun (key, entry) -> (key, entry.DeadlineAtMs))
-            |> Set.ofSeq
+            let nextKeyDeadlines =
+                nextSpecs
+                |> List.map (fun spec ->
+                    let key =
+                        match spec with
+                        | TurnDeadline(id, _) -> timerKey id
+                        | AbortDeadline(id, _) -> timerKey id
+                        | ReconciliationDeadline(id, _) -> timerKey id
 
-        let nextKeyDeadlines =
-            nextSpecs
-            |> List.map (fun spec ->
+                    let deadlineAtMs =
+                        match spec with
+                        | TurnDeadline(_, d)
+                        | AbortDeadline(_, d)
+                        | ReconciliationDeadline(_, d) -> d.DeadlineAtMs
+
+                    (key, deadlineAtMs))
+                |> Set.ofList
+
+            // Release stale or changed
+            for (key, _) in Set.difference prevKeyDeadlines nextKeyDeadlines do
+                clearTimer key
+
+            // Also release entries whose deadline time changed
+            for (key, deadlineAtMs) in nextKeyDeadlines do
+                if Set.contains (key, deadlineAtMs) prevKeyDeadlines then
+                    // Unchanged — skip
+                    ()
+                else if activeTimers |> Map.containsKey key then
+                    // Key exists but deadline changed — clear and re-arm below
+                    clearTimer key
+
+            // Acquire new or re-arm changed
+            for spec in nextSpecs do
                 let key =
                     match spec with
                     | TurnDeadline(id, _) -> timerKey id
                     | AbortDeadline(id, _) -> timerKey id
                     | ReconciliationDeadline(id, _) -> timerKey id
 
-                let deadlineAtMs =
-                    match spec with
-                    | TurnDeadline(_, d)
-                    | AbortDeadline(_, d)
-                    | ReconciliationDeadline(_, d) -> d.DeadlineAtMs
-
-                (key, deadlineAtMs))
-            |> Set.ofList
-
-        // Release stale or changed
-        for (key, _) in Set.difference prevKeyDeadlines nextKeyDeadlines do
-            clearTimer key
-
-        // Also release entries whose deadline time changed
-        for (key, deadlineAtMs) in nextKeyDeadlines do
-            if Set.contains (key, deadlineAtMs) prevKeyDeadlines then
-                // Unchanged — skip
-                ()
-            else if activeTimers |> Map.containsKey key then
-                // Key exists but deadline changed — clear and re-arm below
-                clearTimer key
-
-        // Acquire new or re-arm changed
-        for spec in nextSpecs do
-            let key =
-                match spec with
-                | TurnDeadline(id, _) -> timerKey id
-                | AbortDeadline(id, _) -> timerKey id
-                | ReconciliationDeadline(id, _) -> timerKey id
-
-            if not (Map.containsKey key activeTimers) then
-                armTimer spec
+                if not (Map.containsKey key activeTimers) then
+                    armTimer spec
 
     /// Clear all active timers (called on dispose).
     member _.ClearAll() : unit =
