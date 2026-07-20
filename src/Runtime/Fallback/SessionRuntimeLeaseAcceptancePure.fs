@@ -35,13 +35,9 @@ let tryAcceptPendingLease expectedID (hostUserMessageId: string) (s: FallbackSes
         | LeaseStatus.Requested ->
             tryTransitionPendingLease expectedID LeaseStatus.Requested LeaseStatus.Dispatched sBound
         | LeaseStatus.DispatchStarted ->
-<<<<<<< HEAD
             tryTransitionPendingLease expectedID LeaseStatus.DispatchStarted LeaseStatus.Dispatched sBound
-=======
-            tryTransitionPendingLease expectedID LeaseStatus.DispatchStarted LeaseStatus.Dispatched s
         | LeaseStatus.AcceptanceUnknown ->
-            tryTransitionPendingLease expectedID LeaseStatus.AcceptanceUnknown LeaseStatus.Dispatched s
->>>>>>> 98bc01f6 (fix(mux): wire AcceptanceUnknown/AbortUnknown degrade paths end-to-end)
+            tryTransitionPendingLease expectedID LeaseStatus.AcceptanceUnknown LeaseStatus.Dispatched sBound
         | LeaseStatus.Dispatched
         | LeaseStatus.Running -> Some sBound
         | LeaseStatus.Cancelled

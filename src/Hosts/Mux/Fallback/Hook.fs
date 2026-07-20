@@ -175,7 +175,6 @@ let muxEventTranslator: IEventTranslator =
 
 let muxActionExecutor (helpers: obj) : IActionExecutor =
     Executor.muxActionExecutorDefault helpers
-
 let muxActionExecutorWithDir (helpers: obj) (directory: string) : IActionExecutor =
     Executor.muxActionExecutor helpers directory
 

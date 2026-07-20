@@ -65,7 +65,6 @@ let private terminalMessage (prefix: string) (e: ErrorInput) : string =
     let m = e.Message
     if m.StartsWith(prefix) || m.StartsWith("Failed:") || m.StartsWith("AcceptanceUnknown") then m
     else prefix + m
-
 let private handleMuxDispatchOutcome
     (dispatcher: SessionDispatcher)
     (identity: DispatchIdentity)
