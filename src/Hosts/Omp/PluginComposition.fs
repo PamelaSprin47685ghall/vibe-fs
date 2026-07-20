@@ -9,8 +9,6 @@ open Wanxiangshu.Runtime.Dyn
 open Wanxiangshu.Runtime.FuzzyFinderShell
 open Wanxiangshu.Hosts.Omp.AgentConfig
 open Wanxiangshu.Hosts.Omp.Codec
-open Wanxiangshu.Hosts.Omp.Tools
-open Wanxiangshu.Hosts.Omp.PruneGuard
 open Wanxiangshu.Hosts.Omp.ReviewToolsRegister
 open Wanxiangshu.Hosts.Omp.SessionLifecycle
 open Wanxiangshu.Runtime.Dispatch
@@ -33,6 +31,67 @@ open Wanxiangshu.Runtime.CommandProcessor
 open Wanxiangshu.Runtime.SubsessionPorts
 open Wanxiangshu.Runtime.SubsessionActor
 open Wanxiangshu.Kernel.HostCapability
+open Wanxiangshu.Hosts.Omp.FuzzyTools
+open Wanxiangshu.Hosts.Omp.ExecutorTools
+open Wanxiangshu.Hosts.Omp.SubagentTools
+open Wanxiangshu.Hosts.Omp.TodoTool
+open Wanxiangshu.Hosts.Omp.WebTools
+open Wanxiangshu.Hosts.Omp.OmpTools
+open Wanxiangshu.Hosts.Omp.SwapTool
+open Wanxiangshu.Hosts.Omp.PiResolve
+
+[<Import("join", "node:path")>]
+let private pathJoin (a: string) (b: string) : string = jsNative
+
+[<Import("pathToFileURL", "node:url")>]
+let private pathToFileURL (p: string) : obj = jsNative
+
+let private patchDisablePrune () : JS.Promise<unit> =
+    promise {
+        try
+            let basePath = getPiBase ()
+
+            let href =
+                pathToFileURL (pathJoin basePath "pi-agent-core/src/compaction/pruning.ts")?href
+
+            let! pruning = importDynamic<obj> (string href)
+            let config = Dyn.get pruning "DEFAULT_PRUNE_CONFIG"
+
+            if Dyn.isNullish config then
+                ()
+            else
+                for key in [| "protectTokens"; "minimumSavings" |] do
+                    try
+                        config?(key) <- System.Double.MaxValue
+                    with _ ->
+                        try
+                            emitJsExpr
+                                (config, key, System.Double.MaxValue)
+                                "Object.defineProperty($0, $1, { value: $2, configurable: true, writable: true })"
+                            |> ignore
+                        with _ ->
+                            ()
+        with _ ->
+            ()
+    }
+
+let private registerAllTools
+    (pi: obj)
+    (reviewStore: ReviewStore)
+    (fallbackRuntime: FallbackRuntimeStore)
+    (fallbackConfigOpt: FallbackConfig option)
+    : unit =
+    let finderCache = FinderCache()
+    let iteratorStore = ompScope.IteratorStore
+    registerFuzzyTools pi finderCache iteratorStore
+    registerWebTools pi fallbackRuntime fallbackConfigOpt
+    registerExecutorTools pi
+    registerSubagentTools pi fallbackRuntime fallbackConfigOpt
+    registerTodoTool pi
+    registerMeditatorTools pi fallbackRuntime fallbackConfigOpt
+    registerSwapTool pi
+    registerLoopFeatures pi reviewStore
+    registerContextTransform pi reviewStore
 
 type CoreServices =
     { ReviewStore: ReviewStore

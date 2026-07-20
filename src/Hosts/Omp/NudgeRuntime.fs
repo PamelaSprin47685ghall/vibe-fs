@@ -7,6 +7,7 @@ open Wanxiangshu.Kernel.Nudge
 open Wanxiangshu.Runtime.Nudge.NudgeDerivation
 open Wanxiangshu.Runtime.PromptFragments
 open Wanxiangshu.Runtime.Fallback.SessionRuntimeLeasePure
+open Wanxiangshu.Runtime.Fallback.SessionRuntimeCompactionPure
 
 let markSessionForceStopped (fallbackRuntime: FallbackRuntimeStore) (sessionId: string) : unit =
     fallbackRuntime.UpdateSession(sessionId, markForceStopped)

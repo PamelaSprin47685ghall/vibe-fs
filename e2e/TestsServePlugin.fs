@@ -155,13 +155,24 @@ let runServePluginChecks
         do! toolRound harness sessionID todoToolName todoArgs (sprintf "commit todo backlog via %s" todoToolName)
         chk "e2e.serve.todowrite.tool-called" (containsTool harness todoToolName)
 
-        for c in 1..2 do
-            let! _ = withTimeoutL "serve todowrite ndjson" 5000 (harness.waitForNdjson c 1000)
-            ()
+        // Prior loop/cancel events already populate NDJSON; wait on content, not line count.
+        let! ndTodoText =
+            withTimeoutL "serve todowrite work_backlog_committed" 8000 (promise {
+                let mutable text = ""
+                let mutable n = 0
 
-        let! ndTodo = Promise.lift true
-        chk "e2e.serve.todowrite.ndjson" ndTodo
-        let! ndTodoText = withTimeoutL "serve todowrite ndjson read" 5000 (harness.readNdjson ())
+                while n < 40 && not (text.Contains "work_backlog_committed") do
+                    let! t = harness.readNdjson ()
+                    text <- t
+                    n <- n + 1
+
+                    if not (text.Contains "work_backlog_committed") then
+                        do! Promise.sleep 100
+
+                return text
+            })
+
+        chk "e2e.serve.todowrite.ndjson" (ndTodoText <> "")
         chk "e2e.serve.todowrite.work-backlog" (ndTodoText.Contains "work_backlog_committed")
 
         // --- E2E Test: Todo soft-required validation (short fields are allowed, no criticism) ---

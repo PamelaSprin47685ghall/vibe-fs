@@ -8,6 +8,7 @@ open Wanxiangshu.Kernel.FallbackKernel.Types
 open Wanxiangshu.Runtime.BacklogSession
 open Wanxiangshu.Runtime.Fallback.SessionRuntimePropertyPure
 open Wanxiangshu.Runtime.Fallback.SessionRuntimeLeasePure
+open Wanxiangshu.Runtime.Fallback.SessionRuntimeCompactionPure
 open Wanxiangshu.Runtime
 open Wanxiangshu.Runtime.Dyn
 open Wanxiangshu.Runtime.SessionEventWriter

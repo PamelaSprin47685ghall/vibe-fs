@@ -20,11 +20,23 @@ open Wanxiangshu.Hosts.Opencode.NudgeTriggerOps
 open Wanxiangshu.Hosts.Opencode.ChatHooksMessageIdDedup
 open Wanxiangshu.Hosts.Opencode.Fallback.HostEventInspection
 open Wanxiangshu.Runtime.Dispatch
-
-// Open new split modules
 open Wanxiangshu.Hosts.Opencode.SessionLifecycleEventDecoding
 open Wanxiangshu.Hosts.Opencode.SessionLifecycleHumanDispatch
-open Wanxiangshu.Hosts.Opencode.SessionLifecycleClose
+
+let private handleSessionClosed (ctx: obj) (sid: string) (eventEnvelope: HostEventEnvelope option) : unit =
+    if
+        eventEnvelope
+        |> Option.exists (fun env ->
+            env.EventType = "session.deleted"
+            || env.EventType = "session.delete"
+            || env.EventType = "session.remove"
+            || env.EventType = "session.close")
+    then
+        let ws =
+            Wanxiangshu.Kernel.Primitives.Identity.Id.workspaceIdQuick ("opencode:" + (pluginDirectoryFromCtx ctx))
+
+        sharedDispatchRegistry.NotifySessionClosed ws sid
+        forget sid
 
 /// Host event fan-out: session.status / compacted / message.updated + fallback/nudge.
 let handleEvent

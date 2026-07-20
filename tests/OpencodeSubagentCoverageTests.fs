@@ -3,7 +3,8 @@ module Wanxiangshu.Tests.OpencodeSubagentCoverageTests
 open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Tests.Assert
-open Wanxiangshu.Hosts.Opencode.SubagentSpawn
+open Wanxiangshu.Hosts.Opencode.SubagentSpawnInput
+open Wanxiangshu.Hosts.Opencode.SubagentSpawnCleanup
 open Wanxiangshu.Hosts.Opencode.SubagentTypes
 open Wanxiangshu.Runtime.Dyn
 
