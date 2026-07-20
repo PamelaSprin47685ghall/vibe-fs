@@ -1168,7 +1168,7 @@ export const COVERAGE: Record<string, CoverageEntry[]> = {
       description: "Duplicate error does not double-continue",
       level: "real-e2e",
       spec: "e2e/opencode/specs/p0-canary-tests-fallback-errors.js",
-      test: "OC-FB-011 duplicate empty-output error does not double-continue",
+      test: "OC-FB-011 duplicate empty-output path does not double-continue",
       priority: "P0",
     },
     {

@@ -167,17 +167,24 @@ const tests = [
     name: 'OC-LIFE-005 API error round transitions to idle',
     fn: async (t) => {
       const sid = getSessionId(await t.client.createSession());
+      // Use non-retryable 400 so the host does not auto-retry and drain the mock queue.
       t.provider.expectError({
         id: 'life-005',
-        status: 503,
-        body: { error: { name: 'APIError', message: 'Service Unavailable', isRetryable: false } },
+        status: 400,
+        body: { error: { name: 'APIError', message: 'invalid request', type: 'invalid_request_error', isRetryable: false } },
       });
       const turn = await t.turn.start(sid);
       await t.client.prompt(sid, 'trigger error');
-      await turn.awaitTerminal({ timeoutMs: TIMEOUTS.prompt, requireAssistantTerminal: false });
+      const err = await t.events.awaitEvent((e) => isError(e, sid), TIMEOUTS.prompt);
+      await t.events.awaitEvent((e) => isIdle(e, sid) && e.seq >= err.seq, TIMEOUTS.prompt);
       const statuses = t.events.bySession(sid).filter((e) => e.type === 'session.status');
       const last = statusType(statuses[statuses.length - 1]);
-      if (last !== 'idle') throw new Error(`expected idle after API error, got ${last}`);
+      if (last !== 'idle' && t.events.count('session.idle', sid) < 1) {
+        throw new Error(`expected idle after API error, last status=${last}`);
+      }
+      if (t.provider.unexpectedRequests.length !== 0) {
+        throw new Error(`host retried after non-retryable error: ${t.provider.unexpectedRequests.length}`);
+      }
     },
   },
 
