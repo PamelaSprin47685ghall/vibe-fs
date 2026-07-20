@@ -31,7 +31,7 @@ let handleEvent
     (input: obj)
     : JS.Promise<unit> =
     promise {
-        match SessionFactDecode.tryFromHostInput input with
+        match tryFromHostInput input with
         | Some(sid, fact) ->
             let actor = SessionActorRegistry.GetOrCreate (workspaceKeyFromCtx ctx) sid
             actor.BindHandler(fun snap f -> processLifecycleFact ctx fallbackRuntime fallback nudge sid snap f)

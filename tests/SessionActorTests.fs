@@ -160,7 +160,7 @@ let decodeHostEnvelopeFacts () =
             ]
         ]
 
-    match SessionFactDecode.tryFromHostInput busyInput with
+    match tryFromHostInput busyInput with
     | Some("s-decode", SessionFact.SessionBusyObserved _) -> check "busy decode" true
     | other -> check ("busy decode unexpected: " + string other) false
 
@@ -173,7 +173,7 @@ let decodeHostEnvelopeFacts () =
             ]
         ]
 
-    match SessionFactDecode.tryFromHostInput idleInput with
+    match tryFromHostInput idleInput with
     | Some("s-decode", SessionFact.SessionIdleObserved _) -> check "idle decode" true
     | other -> check ("idle decode unexpected: " + string other) false
 
@@ -186,7 +186,7 @@ let decodeHostEnvelopeFacts () =
             ]
         ]
 
-    match SessionFactDecode.tryFromHostInput closedInput with
+    match tryFromHostInput closedInput with
     | Some("s-decode", SessionFact.SessionClosed) -> check "closed decode" true
     | other -> check ("closed decode unexpected: " + string other) false
 
