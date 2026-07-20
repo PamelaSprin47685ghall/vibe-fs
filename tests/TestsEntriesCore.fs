@@ -63,6 +63,8 @@ let private reviewSessionBlock () : (string * TestBody) list =
       TestBody.Sync(sync ReviewSessionEffectsTests.disposeSessionTreeSkipsUnknownIds)
       "ReviewSessionEffectsTests.disposeSessionTreeTerminatesAll",
       TestBody.Sync(sync ReviewSessionEffectsTests.disposeSessionTreeTerminatesAll)
+      "ReviewSessionEffectsTests.disposeSessionTreeClearsOrphanSuppressorWithoutPending",
+      TestBody.Sync(sync ReviewSessionEffectsTests.disposeSessionTreeClearsOrphanSuppressorWithoutPending)
       "ReviewSessionRegistryTests.run", TestBody.Sync(sync ReviewSessionRegistryTests.run)
       "ReviewSessionQueryTests.run", TestBody.Sync(sync ReviewSessionQueryTests.run)
       "ReviewPromptsFormatTests.run", TestBody.Sync(sync ReviewPromptsFormatTests.run)

@@ -36,6 +36,8 @@ let entries2 () : (string * TestBody) list =
       Async OmpReviewLoopAsyncTests.runReviewLoopResolvesViaAsyncCallbackNotPolling
       "OmpReviewLoopAsyncTests.runReviewLoopSendsNudgeOnTimeoutThenStopsOnResolve",
       Async OmpReviewLoopAsyncTests.runReviewLoopSendsNudgeOnTimeoutThenStopsOnResolve
+      "OmpReviewLoopAsyncTests.runReviewLoop_finallyCleansUpOnPromptError",
+      Async OmpReviewLoopAsyncTests.runReviewLoop_finallyCleansUpOnPromptError
       "OmpChildSessionTests.createChildSessionReviewToolNames",
       Async OmpChildSessionTests.createChildSessionReviewToolNames
       "OmpChildSessionTests.createChildSessionRunnerToolNames",

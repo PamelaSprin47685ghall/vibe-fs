@@ -67,6 +67,18 @@ let disposeSessionTreeTerminatesAll () =
     check "ghost leaves pending empty" next2.pendingResolutions.IsEmpty
     check "ghost leaves suppressors empty" next2.abortSuppressors.IsEmpty
 
+let disposeSessionTreeClearsOrphanSuppressorWithoutPending () =
+    let mutable suppressed = 0
+
+    let e =
+        { emptyEffects with
+            abortSuppressors = Map.add "orphan" (fun () -> suppressed <- suppressed + 1) Map.empty }
+
+    let next = disposeSessionTree e [ "orphan" ]
+    check "orphan suppressor fired" (suppressed = 1)
+    check "orphan suppressor removed" next.abortSuppressors.IsEmpty
+    check "orphan leaves pending empty" next.pendingResolutions.IsEmpty
+
 let run () : unit =
     emptyEffectsHasEmptyMaps ()
     setPendingAddsEntry ()
@@ -74,3 +86,4 @@ let run () : unit =
     resolvePendingUnknownIdReturnsFalse ()
     disposeSessionTreeSkipsUnknownIds ()
     disposeSessionTreeTerminatesAll ()
+    disposeSessionTreeClearsOrphanSuppressorWithoutPending ()

@@ -38,14 +38,26 @@ let resolvePending (effects: SessionEffects) sessionId result : SessionEffects *
     | None -> effects, false
     | Some next -> next, true
 
+let private clearOrphanSuppressor (effects: SessionEffects) id : SessionEffects =
+    match Map.tryFind id effects.abortSuppressors with
+    | None -> effects
+    | Some suppress ->
+        suppress ()
+
+        { effects with
+            abortSuppressors = Map.remove id effects.abortSuppressors }
+
 let disposeSessionTree (effects: SessionEffects) sessionIds : SessionEffects =
     sessionIds
     |> List.fold
         (fun acc id ->
-            if not (Map.containsKey id acc.pendingResolutions) then
-                acc
-            else
-                match fireClear acc id Terminated with
-                | None -> acc
-                | Some next -> next)
+            let afterPending =
+                if not (Map.containsKey id acc.pendingResolutions) then
+                    acc
+                else
+                    match fireClear acc id Terminated with
+                    | None -> acc
+                    | Some next -> next
+
+            clearOrphanSuppressor afterPending id)
         effects

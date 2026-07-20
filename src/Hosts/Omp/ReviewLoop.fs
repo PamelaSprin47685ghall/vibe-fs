@@ -103,12 +103,20 @@ let runReviewLoop
             attachReviewChild store parentId childId (fun r -> resolveReview r) childSession
             let initial = buildOmpReviewInitialPrompt report (files |> Array.toList) task
             let initialPrompt = childSession?prompt (initial) |> unbox<JS.Promise<unit>>
+            let mutable loopError = None
+            let mutable outcome = Terminated
 
-            let onMax () = Terminated
+            try
+                let! r = runNudgeLoop childSession resolvedPromise initialPrompt (fun () -> Terminated)
+                outcome <- r
+            with err ->
+                loopError <- Some err
 
-            let! outcome = runNudgeLoop childSession resolvedPromise initialPrompt onMax
             cleanupChild ()
-            return outcome
+
+            match loopError with
+            | Some err -> return! Promise.reject err
+            | None -> return outcome
     }
 
 let runPreReviewerSession
@@ -143,9 +151,20 @@ let runPreReviewerSession
                     attachReviewChild store parentId childId (fun r -> resolveReview r) childSession
                     let initial = reviewerPrompt taskTrim "" []
                     let initialPrompt = childSession?prompt (initial) |> unbox<JS.Promise<unit>>
+                    let mutable loopError = None
+                    let mutable outcome = Terminated
 
-                    let! jsOutcome = runNudgeLoop childSession resolvedPromise initialPrompt (fun () -> Terminated)
+                    try
+                        let! r =
+                            runNudgeLoop childSession resolvedPromise initialPrompt (fun () -> Terminated)
+
+                        outcome <- r
+                    with err ->
+                        loopError <- Some err
 
                     cleanupChild ()
-                    return jsOutcome
+
+                    match loopError with
+                    | Some err -> return! Promise.reject err
+                    | None -> return outcome
     }
