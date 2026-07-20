@@ -44,7 +44,26 @@ let entries () : (string * (unit -> unit)) list =
       ("clientId returns empty for empty sessionID",
        fun () ->
            let input = createObj [ "sessionID", box "" ]
-           equal "" (clientId input)) ]
+           equal "" (clientId input))
+
+      ("promptFailureDiagnostic is structured with event reason sessionId detail",
+       fun () ->
+           let d = promptFailureDiagnostic "session_api_missing" "sid-9" "wanxiangzhen_session_api_missing:x"
+           equal "wanxiangzhen_prompt_session_failed" (str d "event")
+           equal "session_api_missing" (str d "reason")
+           equal "sid-9" (str d "sessionId")
+           checkBare ((str d "detail").Contains "wanxiangzhen_session_api_missing"))
+
+      ("buildPromptArg shapes path.id and text part",
+       fun () ->
+           let arg = buildPromptArg "sid-1" "hello"
+           let p = get arg "path"
+           let b = get arg "body"
+           equal "sid-1" (string (get p "id"))
+           let parts = get b "parts" |> unbox<obj array>
+           equal 1 (int parts.Length)
+           equal "text" (str parts.[0] "type")
+           equal "hello" (str parts.[0] "text")) ]
 
 let entriesAsync () : (string * (unit -> JS.Promise<unit>)) list =
     [ ("promptSession rejects with ArgumentNullException if client is null",
@@ -183,4 +202,32 @@ let entriesAsync () : (string * (unit -> JS.Promise<unit>)) list =
                    checkBare (ex.Message.Contains "wanxiangzhen_session_api_missing")
 
                checkBare caught
+           })
+
+      ("promptSession logs structured failure when session.prompt missing",
+       fun () ->
+           promise {
+               let mutable logged: obj option = None
+               emitJsStatement (fun msg -> logged <- Some msg) "const oldErr = console.error; console.error = $0;"
+
+               try
+                   let mutable caught = false
+                   let client = createObj []
+
+                   try
+                       do! promptSession client "sid-struct" "hello"
+                   with _ ->
+                       caught <- true
+
+                   checkBare caught
+
+                   match logged with
+                   | None -> checkBare false
+                   | Some diag ->
+                       equal "wanxiangzhen_prompt_session_failed" (str diag "event")
+                       equal "session_api_missing" (str diag "reason")
+                       equal "sid-struct" (str diag "sessionId")
+                       checkBare ((str diag "detail").Contains "wanxiangzhen_session_api_missing")
+               finally
+                   emitJsStatement () "console.error = oldErr;"
            }) ]

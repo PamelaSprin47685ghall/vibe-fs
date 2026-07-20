@@ -82,7 +82,7 @@ HTTP / hook / squad_update
 | `src/Kernel/Wanxiangzhen/SquadEvent.fs` | `SquadEvent` DU、`foldEvent`/`foldEvents`、`eventTypeName`/`eventSessionId`/`eventProse` |
 | `src/Runtime/Wanxiangzhen/SquadEventWanCodec.fs` | `SquadEvent ↔ WanEvent` durable 编解码（`tasksJson` 等 payload 字段） |
 | `src/Runtime/Wanxiangzhen/SquadEventLogRuntime.fs` | 经通用 `Shell.EventLogRuntime`/`Shell.EventLogFiles` 读写 `.wanxiangshu.ndjson`；`readAllSquadEvents`/`appendSquadEvent` |
-| `src/Runtime/Wanxiangzhen/CoordinatorReplay.fs` | `replayFromEventLog`：读 NDJSON → foldEvent → git reconcile → orphan 告警<br>1. **归档与 Sessions 保留**：每次 `SquadCreated` 事件会在 fold 时划分会话，所有的 squad sessions 自然保留在 projection 字典中，当前活动会话通过 latestSessionId 确定，旧 DAG 自动隐式归档。<br>2. **GitError Reconcile 降级行为**：当 `rt.GitError` 存在时，`gitReconcile` 将回滚把处于 `Submitted` 的任务状态设为 `Running`（以允许 slave 在 git 恢复后重新 submit 探测），而原本就是 `Running` 的任务不受影响以防状态撕裂。 |
+| `src/Runtime/Wanxiangzhen/CoordinatorReplay.fs` | `replayFromEventLog`：读 NDJSON → foldEvent → git reconcile → orphan 告警<br>1. **归档与 Sessions 保留**：每次 `SquadCreated` 事件会在 fold 时划分会话，所有的 squad sessions 自然保留在 projection 字典中，当前活动会话通过 latestSessionId 确定，旧 DAG 自动隐式归档。<br>2. **GitError Reconcile 降级行为**：当 `rt.GitError` 存在时，`gitReconcile` 将回滚把处于 `Submitted` 的任务状态设为 `Running`（以允许 slave 在 git 恢复后重新 submit 探测），而原本就是 `Running` 的任务不受影响以防状态撕裂。<br>3. **Orphan 通知 = best-effort**：`session.prompt` 失败不中断 replay、不回滚 DAG；稳定 `idempotencyKey`（`OrphanNotify`）+ 发送前预留防双发；仅成功落盘 `wanxiangzhen_warning_sent` 并跨重启恢复；失败写 `wanxiangzhen_prompt_failed` 并释放预留以便重试。 |
 | `src/Runtime/Wanxiangzhen/EventCodec.fs`（模块 `SquadEventDisplayCodec`） | **仅**展示用 yaml frontmatter + prose 编解码（`encodeEvent`/`decodeEvents`）；**不参与** durable 重放主链 |
 
 ## 6. 删除或废弃的行为
