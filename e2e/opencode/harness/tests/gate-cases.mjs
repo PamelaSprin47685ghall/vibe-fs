@@ -255,6 +255,36 @@ async function runDiagnosticsCollection() {
   }
 }
 
+
+async function runLegacyHarnessDisposeContract() {
+  // Static contract: dispose must kill descendants and assert port/pid.
+  const src = fs.readFileSync(new URL('../../../harness.js', import.meta.url), 'utf8');
+  assertTrue(src.includes('getDescendantPids'), 'legacy dispose must kill process tree');
+  assertTrue(src.includes('checkSocketClosed'), 'legacy dispose must check port closed');
+  assertTrue(src.includes('isPidAlive'), 'legacy dispose must check pid dead');
+  assertTrue(src.includes('stopMocking'), 'legacy dispose must stop mock first');
+  assertTrue(src.includes('reuseHost === true'), 'singleton reuse must be opt-in only');
+  assertTrue(src.includes('opts.strict === true'), 'legacy default remains non-strict for F# integration');
+}
+
+async function runScenarioStrictDefault() {
+  const src = fs.readFileSync(new URL('../strict-mock-state.js', import.meta.url), 'utf8');
+  assertTrue(src.includes('strict: true'), 'StrictMockProvider state defaults strict=true');
+  const provider = new StrictMockProvider();
+  assertEq(provider.strict, true, 'new StrictMockProvider().strict === true');
+  await provider.start();
+  try {
+    const res = await postJson(`${provider.url}/v1/chat/completions`, {
+      model: 'test-model',
+      messages: [{ role: 'user', content: 'no expectation' }],
+    });
+    assertEq(res.status, 500, 'empty queue under strict must 500');
+    assertEq(provider.unexpectedRequests.length, 1, 'empty queue records unexpected');
+  } finally {
+    await provider.stop();
+  }
+}
+
 export const cases = [
   { name: 'isolation hardening', fn: runIsolationHardening },
   { name: 'ProcessHost env isolation + dispose reset', fn: runProcessHostEnvIsolation },
@@ -265,4 +295,6 @@ export const cases = [
   { name: 'no fixed-sleep critical assertion', fn: runNoFixedSleepCriticalAssertion },
   { name: 'ProcessHost leak probe', fn: runProcessHostLeakProbe },
   { name: 'diagnostics collection', fn: runDiagnosticsCollection },
+  { name: 'legacy harness dispose contract', fn: runLegacyHarnessDisposeContract },
+  { name: 'scenario strict mock default empty-queue fails', fn: runScenarioStrictDefault },
 ];
