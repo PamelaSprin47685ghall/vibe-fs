@@ -16,6 +16,7 @@ let verifyLeaseWithStatus
     let pending = (runtime.GetSession sessionID).PendingLease
 
     let s = runtime.GetSession sessionID
+
     continuationLeaseIsCurrent lease s
     && not s.CompactionForceStopped
     && s.CompactionActiveId = ""
@@ -34,6 +35,7 @@ let ensureActiveAndOwner (runtime: FallbackRuntimeStore) (sessionID: string) (le
     let state = runtime.GetOrCreateState sessionID
 
     let s = runtime.GetSession sessionID
+
     state.Lifecycle = FallbackLifecycle.Active
     && continuationLeaseIsCurrent lease s
     && not s.CompactionForceStopped
@@ -90,6 +92,7 @@ let private isHostAccepted (lease: PendingLease) : bool =
     lease.HostUserMessageId <> ""
     && match lease.Status with
        | LeaseStatus.Dispatched
+       | LeaseStatus.AcceptanceUnknown
        | LeaseStatus.Running -> true
        | LeaseStatus.Requested
        | LeaseStatus.DispatchStarted
@@ -129,7 +132,8 @@ let classifyContinuationMatch
             // (OpenCode often reuses the user message id as the turn/run key).
             let isHostRunIdMatch =
                 match hostRunIDOpt with
-                | Some rid when rid <> "" && lease.HostRunId <> "" && rid = lease.HostRunId -> true                | _ -> false
+                | Some rid when rid <> "" && lease.HostRunId <> "" && rid = lease.HostRunId -> true
+                | _ -> false
 
             if isHostRunIdMatch then
                 MatchedByHostRunId hostRunIDOpt.Value
@@ -233,8 +237,7 @@ let classifyIdleDisposition
                 RejectNotHostAccepted lease.ContinuationID
             | _ when hasStrongTerminalEvidence && lease.HostUserMessageId <> "" ->
                 MaySettle(lease.ContinuationID, lease.HostUserMessageId)
-            | _ when lease.HostUserMessageId <> "" ->
-                NeedsReconciliation(lease.ContinuationID, lease.HostUserMessageId)
+            | _ when lease.HostUserMessageId <> "" -> NeedsReconciliation(lease.ContinuationID, lease.HostUserMessageId)
             | _ -> RejectNotHostAccepted lease.ContinuationID
 
 /// True when idle may drive a domain terminal settlement for the pending lease.

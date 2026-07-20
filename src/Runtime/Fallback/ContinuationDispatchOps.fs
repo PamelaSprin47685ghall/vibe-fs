@@ -29,11 +29,7 @@ let inlineReenter = ContinuationSessionReenter.inlineReenter
 let queueReenter = ContinuationSessionReenter.queueReenter
 let handleDispatchComplete = ContinuationDispatchComplete.handleDispatchComplete
 
-let private leaseStillDispatchable
-    (runtime: FallbackRuntimeStore)
-    (sessionID: string)
-    (lease: PendingLease)
-    : bool =
+let private leaseStillDispatchable (runtime: FallbackRuntimeStore) (sessionID: string) (lease: PendingLease) : bool =
     let pending = (runtime.GetSession sessionID).PendingLease
 
     ensureActiveAndOwner runtime sessionID lease
@@ -42,6 +38,7 @@ let private leaseStillDispatchable
             match p.Status with
             | LeaseStatus.Requested
             | LeaseStatus.DispatchStarted -> true
+            | LeaseStatus.AcceptanceUnknown
             | LeaseStatus.Dispatched
             | LeaseStatus.Running
             | LeaseStatus.Cancelled
@@ -156,8 +153,7 @@ let handleTransportReturned
 
             if canTransition then
                 runtime.Update(sessionID, setInjected model atMs)
-        | _ ->
-            ()
+        | _ -> ()
 
     }
 
@@ -207,14 +203,10 @@ let runWithRetryGovernor
         // Transport scheduler key = workspace × provider credential × model × variant.
         // Session single in-flight is the session actor's job, not the transport governor.
         let transportKey =
-            ProviderModelTransportKey.Create(
-                workspaceRoot,
-                model.ProviderID,
-                model.ModelID,
-                ?variant = model.Variant
-            )
+            ProviderModelTransportKey.Create(workspaceRoot, model.ProviderID, model.ModelID, ?variant = model.Variant)
 
-        let stillValid () = leaseStillDispatchable runtime sessionID lease
+        let stillValid () =
+            leaseStillDispatchable runtime sessionID lease
 
         let dispatchWithLease () =
             dispatchWithLeaseTransition
@@ -256,14 +248,7 @@ let runWithRetryGovernor
             elif isAbortUnavailableMessage ex.Message then
                 runtime.Update(sessionID, setAbortUnavailable true)
 
-                do!
-                    finishContinuation
-                        runtime
-                        workspaceRoot
-                        sessionID
-                        lease
-                        ContinuationOutcome.AbortUnknown
-                        ex.Message
+                do! finishContinuation runtime workspaceRoot sessionID lease ContinuationOutcome.AbortUnknown ex.Message
             else
                 do! finishContinuation runtime workspaceRoot sessionID lease ContinuationOutcome.Failed ex.Message
     }

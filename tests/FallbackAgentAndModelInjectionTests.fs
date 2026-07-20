@@ -28,7 +28,7 @@ let opencodeCaptureCurrentModelDecodesStringModelSpec () =
         let mockClient =
             createObj [ "session", box (createObj [ "model", box "openai/gpt-4o" ]) ]
 
-        let executor = opencodeActionExecutor rt mockClient
+        let executor = opencodeActionExecutorWithDir rt mockClient ""
         let! modelOpt = executor.CaptureCurrentModel "opencode-string-model"
         check "model is captured" modelOpt.IsSome
         equal "provider is openai" "openai" modelOpt.Value.ProviderID
@@ -75,7 +75,7 @@ let opencodeCaptureCurrentModelDecodesFromUserMessageSpec () =
                                 )) ]
                   ) ]
 
-        let executor = opencodeActionExecutor rt mockClient
+        let executor = opencodeActionExecutorWithDir rt mockClient ""
         let! modelOpt = executor.CaptureCurrentModel "opencode-user-message-model"
         check "model is captured from user message" modelOpt.IsSome
         equal "provider is openai" "openai" modelOpt.Value.ProviderID
@@ -163,7 +163,7 @@ let opencodeCaptureCurrentModelPrioritizesLatestUserMessageModelSpec () =
                                 )) ]
                   ) ]
 
-        let executor = opencodeActionExecutor rt mockClient
+        let executor = opencodeActionExecutorWithDir rt mockClient ""
         let! modelOpt = executor.CaptureCurrentModel sid
         check "model is captured" modelOpt.IsSome
         equal "should prioritize user message model" "anthropic" modelOpt.Value.ProviderID
@@ -253,7 +253,7 @@ let opencodeCaptureCurrentModelPrioritizesSessionGetAsyncSpec () =
                             "messages", box (fun _ -> Promise.lift (box {| data = [||] |})) ]
                   ) ]
 
-        let executor = opencodeActionExecutor rt mockClient
+        let executor = opencodeActionExecutorWithDir rt mockClient ""
         let! modelOpt = executor.CaptureCurrentModel sid
 
         check "model captured from session.get() async" modelOpt.IsSome

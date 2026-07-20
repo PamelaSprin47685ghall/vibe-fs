@@ -71,6 +71,7 @@ let recordHostAcceptedContinuation
             match lease.Status with
             | LeaseStatus.Cancelled
             | LeaseStatus.Settled -> return false
+            | LeaseStatus.AcceptanceUnknown
             | LeaseStatus.Dispatched
             | LeaseStatus.Running ->
                 do! emitDispatchedFacts runtime workspaceRoot sessionID continuationID lease session.AgentName
