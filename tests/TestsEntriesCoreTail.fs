@@ -179,7 +179,6 @@ let tailCoreTestEntriesGroup3 () : (string * TestBody) list =
         "WarnTddOmpEnforcementTests.run", TestBody.Sync(sync WarnTddOmpEnforcementTests.run)
         "EventDrivenHarnessDemo.run", TestBody.Async(fun () -> EventDrivenHarnessDemo.run ())
         "ProductionDebugOutputTests.run", TestBody.Sync(sync Wanxiangshu.Tests.ProductionDebugOutputTests.run)
-        "ArchitectureGatesTests.run", TestBody.Sync(sync Wanxiangshu.Tests.ArchitectureGatesTests.run)
         "RemovedProductionFilesTests.run", TestBody.Sync(sync Wanxiangshu.Tests.RemovedProductionFilesTests.run)
         "ForbiddenSourceSymbolsTests.run", TestBody.Sync(sync Wanxiangshu.Tests.ForbiddenSourceSymbolsTests.run)
         "PluginObjectContractTests.run", TestBody.Sync(sync PluginObjectContractTests.run)

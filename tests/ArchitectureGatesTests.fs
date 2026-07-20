@@ -205,6 +205,22 @@ let private checkFsprojCompileOrder (cwd: string) =
     let includes =
         [ for m in re.Matches content -> m.Groups.[1].Value.Replace("\\", "/") ]
 
+    // Quality gate checking that all .fs files in tests/, integration/, and e2e/ are present in wanxiangshu.fsproj
+    let testsRoot = pathJoin cwd "tests"
+    let integrationRoot = pathJoin cwd "integration"
+    let e2eRoot = pathJoin cwd "e2e"
+    let seen = System.Collections.Generic.HashSet<string>()
+    for path in includes do
+        seen.Add path |> ignore
+
+    for rootDir in [testsRoot; integrationRoot; e2eRoot] do
+        if existsSync rootDir then
+            for path in collectFsFiles rootDir do
+                let rel = path.Replace("\\", "/").Replace(cwd.Replace("\\", "/") + "/", "")
+                // Exclude uncompiled retired/helper files
+                if not (rel.EndsWith("KernelCoverageTests.fs")) then
+                    failIf (not (seen.Contains rel)) (sprintf "Test file missing from fsproj: %s" rel)
+
     let layerOf (path: string) =
         if path.StartsWith "src/Kernel/" then 0
         elif path.StartsWith "src/Runtime/" then 1
@@ -215,10 +231,10 @@ let private checkFsprojCompileOrder (cwd: string) =
         else -1
 
     // No duplicates
-    let seen = System.Collections.Generic.HashSet<string>()
+    let seenOrder = System.Collections.Generic.HashSet<string>()
 
     for path in includes do
-        failIf (not (seen.Add path)) (sprintf "duplicate Compile Include: %s" path)
+        failIf (not (seenOrder.Add path)) (sprintf "duplicate Compile Include: %s" path)
 
     // Production layers monotonic: Kernel then Runtime then Hosts (no regression)
     let mutable maxProd = -1
@@ -284,7 +300,7 @@ let private checkFsprojCompileOrder (cwd: string) =
         let rel =
             path.Replace("\\", "/").Replace(cwd.Replace("\\", "/") + "/", "")
 
-        failIf (not (seen.Contains rel)) (sprintf "src file missing from fsproj: %s" rel)
+        failIf (not (seenOrder.Contains rel)) (sprintf "src file missing from fsproj: %s" rel)
 
 let run () : unit =
     let cwd = unbox<string> (nodeProcess?cwd ())

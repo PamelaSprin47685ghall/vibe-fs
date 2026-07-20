@@ -45,6 +45,8 @@ open Wanxiangshu.Tests.ContextBudgetAfterTodoTests
 open Wanxiangshu.Tests.ContextBudgetIntegrationTests
 open Wanxiangshu.Tests.ContextBudgetRealApiSpecs
 open Wanxiangshu.Tests.ContextBudgetEstimateTests
+open Wanxiangshu.Tests.ContextBudgetPipelineNudgeTests
+open Wanxiangshu.Tests.ContextBudgetCalibrationTests
 
 open Wanxiangshu.Tests.ExecutorToolsCodecTests
 open Wanxiangshu.Tests.ExecutorTests
@@ -113,10 +115,16 @@ let private appendFile (path: string) (content: string) (encoding: string) : uni
 [<Import("mkdirSync", "node:fs")>]
 let private mkdirSync (path: string) (opts: obj) : unit = jsNative
 
-let private verboseEnabledFromArgs () : bool = true
+let private verboseEnabledFromArgs (args: string array) : bool =
+    try
+        let p: obj = Fable.Core.JsInterop.emitJsExpr () "process"
+        let envVar = string p?env?("VIBE_FS_TEST_VERBOSE")
+        envVar = "1" || envVar = "true" || Array.contains "--verbose" args
+    with _ ->
+        Array.contains "--verbose" args
 
-let private initVerboseLog () : unit =
-    if verboseEnabledFromArgs () then
+let private initVerboseLog (args: string array) : unit =
+    if verboseEnabledFromArgs args then
         let ts = System.DateTime.Now.ToString("yyyyMMdd-HHmmss")
         let logDir = "tests/logs"
         let logPath = sprintf "%s/%s.verbose.log" logDir ts
@@ -162,15 +170,23 @@ let private allOtherTests: (string * TestBody) list =
         "ContextBudgetIntegrationTests.run", TestBody.Async ContextBudgetIntegrationTests.run
         "ContextBudgetRealApiSpecs.run", TestBody.Async ContextBudgetRealApiSpecs.run
         "ContextBudgetEstimateTests.run", TestBody.Async ContextBudgetEstimateTests.run
+        "ContextBudgetPipelineNudgeTests.spec_applyContextBudget_mustSeeFinalOutboundAfterAllStages", TestBody.Async ContextBudgetPipelineNudgeTests.spec_applyContextBudget_mustSeeFinalOutboundAfterAllStages
         "ContextBudgetCalibrationTests.run", TestBody.Sync(sync ContextBudgetCalibrationTests.run) ]
-    @ [ "Integration.OpencodePluginTests.run", TestBody.Async(fun () -> OpencodePluginTests.runAll [||] |> Promise.map ignore)
-        "Integration.MimocodePluginTests.run", TestBody.Async(fun () -> MimocodePluginTests.runAll [||] |> Promise.map ignore)
-        "Integration.MimoTuiPluginTests.run", TestBody.Async(fun () -> MimoTuiPluginTests.runAll [||] |> Promise.map ignore)
-        "IntegrationOpenCodeContractTests.run", TestBody.Async(fun () -> IntegrationOpencodeContractTests.runAll [||]) ]
+
+let private integrationTests: (string * TestBody) list =
+    [ "Integration.OpencodePluginTests.run", TestBody.Async(fun () -> OpencodePluginTests.runAll [||] |> Promise.map ignore)
+      "Integration.MimocodePluginTests.run", TestBody.Async(fun () -> MimocodePluginTests.runAll [||] |> Promise.map ignore)
+      "Integration.MimoTuiPluginTests.run", TestBody.Async(fun () -> MimoTuiPluginTests.runAll [||] |> Promise.map ignore)
+      "IntegrationOpenCodeContractTests.run", TestBody.Async(fun () -> IntegrationOpencodeContractTests.runAll [||]) ]
     @ integrationToolFlatTests
+
+let private qualityGatesTests: (string * TestBody) list =
+    [ "ArchitectureGatesTests.run", TestBody.Sync(sync Wanxiangshu.Tests.ArchitectureGatesTests.run) ]
 
 let private tests: (string * TestBody) list =
     allOtherTests
+    @ integrationTests
+    @ qualityGatesTests
     @ [ "TestRunnerBehaviorTests.defaultSuiteHasNoArchitectureLabels",
         TestBody.Sync(fun () -> defaultSuiteHasNoArchitectureLabels (allOtherTests |> List.map fst)) ]
 
@@ -179,10 +195,24 @@ let private matchesSelector (selectors: string array) (label: string) =
     || selectors
        |> Array.exists (fun selector ->
            let trimmed = selector.Trim()
-           trimmed.Length > 0 && label.StartsWith trimmed)
+           trimmed.Length > 0 && label.ToLower().Contains(trimmed.ToLower()))
 
 let private selectedTests (selectors: string array) =
-    tests |> List.filter (fun (label, _) -> matchesSelector selectors label)
+    let allTestList =
+        if selectors.Length > 0 && selectors.[0] = "L0" then
+            allOtherTests
+        elif selectors.Length > 0 && selectors.[0] = "L2" then
+            integrationTests
+        elif selectors.Length > 0 && selectors.[0] = "L4" then
+            qualityGatesTests
+        else
+            tests
+    let filterSelectors =
+        if selectors.Length > 0 && (selectors.[0] = "L0" || selectors.[0] = "L2" || selectors.[0] = "L4") then
+            selectors |> Array.skip 1
+        else
+            selectors
+    allTestList |> List.filter (fun (label, _) -> matchesSelector filterSelectors label)
 
 let runAll (args: string array) : JS.Promise<int> =
     promise {
@@ -193,16 +223,19 @@ let runAll (args: string array) : JS.Promise<int> =
             ()
 
         clearFailuresForRun ()
-        Assert.setSilent false
-        let selectors = args
-        initVerboseLog ()
+        Assert.disableGlobalClear ()
+        let silent = Array.contains "--silent" args || Array.contains "--quiet" args
+        Assert.setSilent silent
+        let cleanSelectors = args |> Array.filter (fun arg -> arg <> "--silent" && arg <> "--quiet" && arg <> "--verbose")
+        initVerboseLog args
         PluginComposition.reviewStore.clearReviewSessions ()
         RunnerBackground.clearRunnerLogsForTest ExecutorTools.ompScope
 
-        let runnableTests = selectedTests selectors
+        let runnableTests = selectedTests cleanSelectors
 
         if List.isEmpty runnableTests then
-            printfn "No tests matched selectors: %A" args
+            if not silent then
+                printfn "No tests matched selectors: %A" cleanSelectors
             return 1
         else
             let isIntegrationSuiteRun (label: string) =
@@ -210,7 +243,8 @@ let runAll (args: string array) : JS.Promise<int> =
                 || (label = "OmpExecutorToolsTests.run")
 
             for (label, body) in runnableTests do
-                printfn "[RUN] %s" label
+                if not silent then
+                    printfn "[RUN] %s" label
 
                 match body with
                 | Sync f -> timed label f
