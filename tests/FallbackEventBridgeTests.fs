@@ -15,6 +15,7 @@ open Wanxiangshu.Runtime.Fallback.Coordinator
 open Wanxiangshu.Runtime.Fallback.Ports
 open Wanxiangshu.Runtime.Fallback.ContinuationExecution
 open Wanxiangshu.Runtime.Fallback.ContinuationExecutionCore
+open Wanxiangshu.Runtime.Fallback.ContinuationDispatchOps
 open Wanxiangshu.Runtime.Fallback.SessionRuntime
 open Wanxiangshu.Runtime.Fallback.SessionRuntimePropertyPure
 open Wanxiangshu.Runtime.Fallback.LeaseValidation
@@ -260,7 +261,7 @@ let handleEvent_retrySame_consumedAndSendContinue () =
         let! result, intentOpt = handleEvent translator rt defaultCfgLookup executor "" (box ()) None
 
         match intentOpt with
-        | Some intent -> do! executeContinuationIntent rt executor "" sid intent
+        | Some intent -> do! executeContinuationIntent rt executor "" sid intent inlineReenter
         | None -> ()
 
         equal "consumed" true result.Consumed
@@ -452,7 +453,7 @@ let handleEvent_humanPreemptsIntent_executorNotCalled () =
         equal "consumed is false for human message" false res.Consumed
 
         // Execute the prepared intent
-        do! executeContinuationIntent rt executor "" sid intent
+        do! executeContinuationIntent rt executor "" sid intent inlineReenter
 
         equal "executor is not called" 0 executor.ContinueCalls.Length
     }
@@ -479,7 +480,7 @@ let handleEvent_intentDelayed_leaseExpires_executorNotCalled () =
         let executor = FakeExecutor()
 
         // Start continuation execution. It will enqueue in the governor and defer to the event loop.
-        let p = executeContinuationIntent rt executor "" sid intent
+        let p = executeContinuationIntent rt executor "" sid intent inlineReenter
 
         // Immediately invalidate the lease by advancing cancel generation
         rt.UpdateSession(sid, fun s -> setCancelGeneration (cancelGen + 1) s)
