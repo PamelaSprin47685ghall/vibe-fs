@@ -13,6 +13,13 @@ type DispatchEvent =
     | DispatchRunObserved of DispatchId * hostUserMessageId: string * atMs: int64
     | DispatchTerminal of DispatchId * terminal: DispatchTerminal * atMs: int64
     | DispatchLateReceipt of DispatchId * reason: string * atMs: int64
+    /// Host abort was requested for a turn that no longer owns the physical session.
+    /// Must never trigger a host session.abort; observability only (S-08).
+    | DispatchStaleAbort of
+        dispatchId: DispatchId *
+        logicalTurnId: string *
+        reason: string *
+        atMs: int64
 
 module DispatchEvent =
     /// Stable kind strings written into NDJSON. Do not rename without bumping
@@ -23,6 +30,7 @@ module DispatchEvent =
     let runObservedKindStr = "dispatch_run_observed"
     let terminalKindStr = "dispatch_terminal"
     let lateReceiptKindStr = "dispatch_late_receipt"
+    let staleAbortKindStr = "dispatch_stale_abort"
 
     let toString (e: DispatchEvent) : string =
         match e with
@@ -32,3 +40,4 @@ module DispatchEvent =
         | DispatchRunObserved _ -> runObservedKindStr
         | DispatchTerminal _ -> terminalKindStr
         | DispatchLateReceipt _ -> lateReceiptKindStr
+        | DispatchStaleAbort _ -> staleAbortKindStr
