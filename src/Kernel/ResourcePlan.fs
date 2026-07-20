@@ -43,7 +43,7 @@ let projectResources (state: SubsessionState) : ResourceSpec list =
         // Poisoned — no deadlines; all timers should be disposed.
         []
 
-    | Dispatching(_, plan, _, turnDeadlineAtMs)
+    | Dispatching(_, plan, _, _, turnDeadlineAtMs)
     | CancellingDispatch(_, plan, _, turnDeadlineAtMs) ->
         let id = TurnDeadlineId(TurnId.value plan.TurnId)
         [ TurnDeadline(id, { DeadlineAtMs = turnDeadlineAtMs }) ]

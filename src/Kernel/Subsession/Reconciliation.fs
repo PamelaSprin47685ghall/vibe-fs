@@ -136,44 +136,56 @@ let private handleDispatchRejected (ctx: RunContext) (plan: TurnPlan) (cancelCtx
 
 // ── main decision ───────────────────────────────────────────────────────────
 
+let private handleReconcilingDispatchStatusResolved
+    (nowMs: int64)
+    (ctx: RunContext)
+    (plan: TurnPlan)
+    (cancelCtx: CancelContext)
+    (retryCount: int)
+    (turnDeadlineAtMs: int64)
+    (reconciliationDeadlineAtMs: int64)
+    (status: DispatchStatus)
+    : DecisionResult =
+    match status with
+    | DispatchStatus.Accepted receipt -> beginAbortAfterDispatchAccepted nowMs ctx plan receipt cancelCtx
+    | DispatchStatus.TransportRejectedBeforeSend _
+    | DispatchStatus.TransportFailedAfterUnknownAcceptance _ ->
+        handleTransportRejectedBeforeSend nowMs ctx plan cancelCtx
+    | DispatchStatus.StillPending ->
+        decided
+            (ReconcilingUnknownDispatch(ctx, plan, cancelCtx, retryCount, turnDeadlineAtMs, reconciliationDeadlineAtMs))
+            []
+            []
+    | DispatchStatus.Unknown ->
+        let reconciliationDeadlineAtMs2 = nowMs + 30_000L
+
+        decided
+            (ClosingUnknownDispatch(
+                ctx,
+                plan,
+                HostProtocolBroken "acceptance unknown and unresolvable",
+                turnDeadlineAtMs,
+                reconciliationDeadlineAtMs2
+            ))
+            []
+            [ ClosePhysicalSession ctx.SessionId ]
+
+
 let decide (nowMs: int64) state cmd =
     match state, cmd with
     | ReconcilingUnknownDispatch(ctx, plan, cancelCtx, retryCount, turnDeadlineAtMs, reconciliationDeadlineAtMs),
       DispatchStatusResolved status ->
-        match status with
-        | DispatchStatus.Accepted receipt -> Ok(beginAbortAfterDispatchAccepted nowMs ctx plan receipt cancelCtx)
-        | DispatchStatus.TransportRejectedBeforeSend _ -> handleTransportRejectedBeforeSend nowMs ctx plan cancelCtx
-        | DispatchStatus.TransportFailedAfterUnknownAcceptance _ ->
-            handleTransportRejectedBeforeSend nowMs ctx plan cancelCtx
-        | DispatchStatus.StillPending ->
-            Ok(
-                decided
-                    (ReconcilingUnknownDispatch(
-                        ctx,
-                        plan,
-                        cancelCtx,
-                        retryCount,
-                        turnDeadlineAtMs,
-                        reconciliationDeadlineAtMs
-                    ))
-                    []
-                    []
-            )
-        | DispatchStatus.Unknown ->
-            let reconciliationDeadlineAtMs2 = nowMs + 30_000L
-
-            Ok(
-                decided
-                    (ClosingUnknownDispatch(
-                        ctx,
-                        plan,
-                        HostProtocolBroken "acceptance unknown and unresolvable",
-                        turnDeadlineAtMs,
-                        reconciliationDeadlineAtMs2
-                    ))
-                    []
-                    [ ClosePhysicalSession ctx.SessionId ]
-            )
+        Ok(
+            handleReconcilingDispatchStatusResolved
+                nowMs
+                ctx
+                plan
+                cancelCtx
+                retryCount
+                turnDeadlineAtMs
+                reconciliationDeadlineAtMs
+                status
+        )
     | ClosingUnknownDispatch(ctx, plan, poisonReason, turnDeadlineAtMs, reconciliationDeadlineAtMs),
       PhysicalCloseResolved Stopped -> Ok(handleClosingUnknownDispatchStopped ctx plan poisonReason)
     | ClosingUnknownDispatch(ctx, plan, poisonReason, turnDeadlineAtMs, reconciliationDeadlineAtMs),

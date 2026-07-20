@@ -79,7 +79,7 @@ let dispatchingProducesTurnDeadline () =
     let turnDeadlineAtMs = nowMs + 300_000L
 
     let state =
-        Dispatching(runCtx, turnPlan, CurrentTurnEvidence.empty, turnDeadlineAtMs)
+        Dispatching(runCtx, turnPlan, CurrentTurnEvidence.empty, PendingTerminal.empty, turnDeadlineAtMs)
 
     let specs = projectResources state
     equal "Dispatching → 1 resource" 1 specs.Length
