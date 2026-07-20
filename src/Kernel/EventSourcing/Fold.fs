@@ -42,58 +42,61 @@ let emptySessionState =
 
 // ── Main fold orchestrator ──
 
-let applyEvent (st: SessionState) (e: WanEvent) : SessionState =
-    if isLateEvent st e then
+let private getNextGeneration (st: SessionState) (e: WanEvent) =
+    match Wanxiangshu.Kernel.SessionControl.Event.decode e with
+    | Some ev ->
+        Projection.foldGeneration
+            (st.SessionGeneration,
+             st.CancelGeneration,
+             st.ActiveContinuationGen,
+             st.ActiveContinuationCancelGen,
+             st.LatestHumanTurn)
+            ev
+    | None -> st.SessionGeneration, st.CancelGeneration, st.ActiveContinuationGen, st.ActiveContinuationCancelGen
+
+let private applyEventInner (st: SessionState) (e: WanEvent) : SessionState =
+    let nextReviewLoop = ReviewLoopFold.foldEvent st.ReviewLoop e
+    let nextHumanTurn = computeNextHumanTurn st e
+
+    let nextSessionGen, nextCancelGen, nextActiveContGen, nextActiveCancelGen =
+        getNextGeneration st e
+
+    let nextEpisode = foldEpisode st nextHumanTurn nextSessionGen nextCancelGen e
+    let shouldUpdateNudge = not (Projection.isEpisodeEvent e) || not (isLateEvent st e)
+    let nextBacklog = computeNextBacklog st e
+    let nextBacklogSnapshot = BacklogProjection.foldSingleEvent st.BacklogSnapshot e
+
+    let nextNudgeDedup =
+        if shouldUpdateNudge then
+            NudgeProjection.foldSingleDedupEvent st.NudgeDedup e
+        else
+            st.NudgeDedup
+
+    let nextNudgeSnapshot =
+        if shouldUpdateNudge then
+            NudgeProjection.foldSingleSnapshotEvent st.NudgeSnapshot e
+        else
+            st.NudgeSnapshot
+
+    let nextSubagents = SubsessionProjection.foldSingleSubagentEvent st.Subagents e
+
+    createNextSessionState
         st
-    else
-        let nextReviewLoop = ReviewLoopFold.foldEvent st.ReviewLoop e
-        let nextHumanTurn = computeNextHumanTurn st e
+        nextEpisode
+        nextReviewLoop
+        nextBacklog
+        nextBacklogSnapshot
+        nextNudgeDedup
+        nextNudgeSnapshot
+        nextSubagents
+        nextHumanTurn
+        nextSessionGen
+        nextCancelGen
+        nextActiveContGen
+        nextActiveCancelGen
+        e
 
-        let nextSessionGen, nextCancelGen, nextActiveContGen, nextActiveCancelGen =
-            match Wanxiangshu.Kernel.SessionControl.Event.decode e with
-            | Some ev ->
-                Projection.foldGeneration
-                    (st.SessionGeneration,
-                     st.CancelGeneration,
-                     st.ActiveContinuationGen,
-                     st.ActiveContinuationCancelGen,
-                     st.LatestHumanTurn)
-                    ev
-            | None ->
-                st.SessionGeneration, st.CancelGeneration, st.ActiveContinuationGen, st.ActiveContinuationCancelGen
-
-        let nextEpisode = foldEpisode st nextHumanTurn nextSessionGen nextCancelGen e
-
-        let shouldUpdateNudge = not (Projection.isEpisodeEvent e) || not (isLateEvent st e)
-        let nextBacklog = computeNextBacklog st e
-        let nextBacklogSnapshot = BacklogProjection.foldSingleEvent st.BacklogSnapshot e
-
-        let nextNudgeDedup =
-            if shouldUpdateNudge then
-                NudgeProjection.foldSingleDedupEvent st.NudgeDedup e
-            else
-                st.NudgeDedup
-
-        let nextNudgeSnapshot =
-            if shouldUpdateNudge then
-                NudgeProjection.foldSingleSnapshotEvent st.NudgeSnapshot e
-            else
-                st.NudgeSnapshot
-
-        let nextSubagents = SubsessionProjection.foldSingleSubagentEvent st.Subagents e
-
-        createNextSessionState
-            st
-            nextEpisode
-            nextReviewLoop
-            nextBacklog
-            nextBacklogSnapshot
-            nextNudgeDedup
-            nextNudgeSnapshot
-            nextSubagents
-            nextHumanTurn
-            nextSessionGen
-            nextCancelGen
-            nextActiveContGen
-            nextActiveCancelGen
-            e
+let applyEvent (st: SessionState) (e: WanEvent) : SessionState =
+    match e.EventId with
+    | Some eid when st.ProcessedEventIds.Contains(eid) -> st
+    | _ -> if isLateEvent st e then st else applyEventInner st e

@@ -496,7 +496,11 @@ let private decisionReplayAtomicityCheck () =
           Session = "s-replay"
           Kind = "subsession_decision_committed"
           At = "1"
-          Payload = Map [ "events", "{invalid-json}" ] }
+          Payload = Map [ "events", "{invalid-json}" ]
+          EventId = None
+          WriterId = None
+          Sequence = None
+          Checksum = None }
 
     match tryDecodeWanEventBatch e1 with
     | [ SessionPoisoned(_, EventStoreCorrupt _) ] -> check "atomicity poison ok" true
@@ -508,7 +512,11 @@ let private decisionReplayAtomicityCheck () =
           Session = "s-replay"
           Kind = "subsession_decision_committed"
           At = "2"
-          Payload = Map [ "events", "[{\"Kind\":\"subsession_run_started\",\"Payload\":{}}]" ] }
+          Payload = Map [ "events", "[{\"Kind\":\"subsession_run_started\",\"Payload\":{}}]" ]
+          EventId = None
+          WriterId = None
+          Sequence = None
+          Checksum = None }
 
     match tryDecodeWanEventBatch e2 with
     | [ SessionPoisoned(_, EventStoreCorrupt _) ] -> check "atomicity poison ok" true

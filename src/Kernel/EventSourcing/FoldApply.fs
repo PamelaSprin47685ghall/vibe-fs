@@ -171,4 +171,8 @@ let createNextSessionState
       CompactionGeneration = nextEpisode.CompactionGeneration
       HumanTurnOrdinal = nextEpisode.HumanTurnOrdinal
       LastHumanTurnMessageId = nextEpisode.LastHumanTurnMessageId
+      ProcessedEventIds =
+        match e.EventId with
+        | Some eid -> st.ProcessedEventIds.Add(eid)
+        | None -> st.ProcessedEventIds
       EventCount = st.EventCount + 1 }

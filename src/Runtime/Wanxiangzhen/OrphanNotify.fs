@@ -10,7 +10,8 @@ let sortedOrphanIds (orphanTaskIds: string list) : string list =
 
 /// Stable idempotency key for orphan-no-PID notification (order-independent).
 let idempotencyKey (orphanTaskIds: string list) : string =
-    "wanxiangzhen:orphan_no_pid:" + String.concat "," (sortedOrphanIds orphanTaskIds)
+    "wanxiangzhen:orphan_no_pid:"
+    + String.concat "," (sortedOrphanIds orphanTaskIds)
 
 let warningText (orphanTaskIds: string list) : string =
     let names = sortedOrphanIds orphanTaskIds |> String.concat ", "
@@ -21,14 +22,22 @@ let warningSentEvent (sessionId: string) (at: string) (key: string) (warning: st
       Session = sessionId
       Kind = kindWarningSent
       At = at
-      Payload = Map [ "idempotencyKey", key; "warning", warning ] }
+      Payload = Map [ "idempotencyKey", key; "warning", warning ]
+      EventId = None
+      WriterId = None
+      Sequence = None
+      Checksum = None }
 
 let promptFailedEvent (sessionId: string) (at: string) (key: string) (text: string) (error: string) : WanEvent =
     { V = 1
       Session = sessionId
       Kind = kindPromptFailed
       At = at
-      Payload = Map [ "idempotencyKey", key; "text", text; "error", error ] }
+      Payload = Map [ "idempotencyKey", key; "text", text; "error", error ]
+      EventId = None
+      WriterId = None
+      Sequence = None
+      Checksum = None }
 
 /// Recover keys already delivered. Prefers payload.idempotencyKey; legacy rows used full warning text as key.
 let recoverSentKeys (sessionId: string) (events: WanEvent list) : Set<string> =

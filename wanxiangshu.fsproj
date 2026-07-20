@@ -186,6 +186,7 @@
     <Compile Include="src/Runtime/Subsession/SubagentIteratorStore.fs"/>
     <Compile Include="src/Runtime/EventStore/SessionProjectionStore.fs"/>
     <Compile Include="src/Runtime/Workspace/SessionReaderWriterLock.fs"/>
+    <Compile Include="src/Runtime/Workspace/RuntimeScopeComponents.fs"/>
     <Compile Include="src/Runtime/Workspace/RuntimeScope.fs"/>
     <Compile Include="src/Runtime/Execution/BacklogSessionCodec.fs"/>
     <Compile Include="src/Runtime/Messaging/MethodologyArgs.fs"/>
@@ -252,14 +253,18 @@
     <Compile Include="src/Runtime/Messaging/MuxAiSettingsCodec.fs"/>
     <Compile Include="src/Runtime/Workspace/FileSys.fs"/>
     <Compile Include="src/Runtime/EventStore/EventLogCodec.fs"/>
+    <Compile Include="src/Runtime/EventStore/EventLogRecovery.fs"/>
     <Compile Include="src/Runtime/Wanxiangzhen/SquadEventWanCodec.fs"/>
     <Compile Include="src/Runtime/EventStore/EventLogIoRaw.fs"/>
+    <Compile Include="src/Runtime/EventStore/EventLogLock.fs"/>
     <Compile Include="src/Runtime/EventStore/EventLogIo.fs"/>
     <Compile Include="src/Runtime/EventStore/EventLogSquadProjection.fs"/>
     <Compile Include="src/Runtime/EventStore/EventLogFile.fs"/>
     <Compile Include="src/Runtime/EventStore/ProjectionCache.fs"/>
     <Compile Include="src/Runtime/Nudge/NudgeDispatchClaim.fs"/>
     <Compile Include="src/Runtime/EventStore/EventStoreIo.fs"/>
+    <Compile Include="src/Runtime/EventStore/EventStoreStateInit.fs"/>
+    <Compile Include="src/Runtime/EventStore/EventStoreStateSync.fs"/>
     <Compile Include="src/Runtime/EventStore/EventStore.fs"/>
     <Compile Include="src/Runtime/EventStore/SquadEventStore.fs"/>
     <Compile Include="src/Runtime/EventStore/EventLogRuntimeStore.fs"/>
@@ -642,6 +647,7 @@
     <Compile Include="tests/ContinuationPathSsotTests.fs"/>
     <Compile Include="tests/EventLogRuntimeTests.fs"/>
     <Compile Include="tests/EventLogRuntimeRobustnessTests.fs"/>
+    <Compile Include="tests/EventLogInvariantsAndLockTests.fs"/>
     <Compile Include="tests/ReplayEquivalenceTests.fs"/>
     <Compile Include="tests/IntegrationToolSetup.fs"/>
     <Compile Include="tests/EventDrivenHarness.fs"/>

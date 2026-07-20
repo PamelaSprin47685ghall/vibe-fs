@@ -38,7 +38,11 @@ let private ev session kind payload =
       Session = session
       Kind = kind
       At = ""
-      Payload = payload }
+      Payload = payload
+      EventId = None
+      WriterId = None
+      Sequence = None
+      Checksum = None }
 
 let private makeFallbackModel: FallbackModel =
     { ProviderID = "p"

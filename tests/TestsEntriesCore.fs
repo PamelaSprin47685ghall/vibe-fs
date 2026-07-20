@@ -79,6 +79,7 @@ let private replayBlock () : (string * TestBody) list =
       "EventLogCodecTests.run", TestBody.Sync(sync EventLogCodecTests.run)
       "EventLogRuntimeTests.run", TestBody.Async EventLogRuntimeTests.run
       "EventLogRuntimeRobustnessTests.run", TestBody.Async EventLogRuntimeRobustnessTests.run
+      "EventLogInvariantsAndLockTests.run", TestBody.Async EventLogInvariantsAndLockTests.run
       "ReviewTests.inferReviewTaskFromTexts'", TestBody.Sync(sync ReviewTestsReplay.inferReviewTaskFromTexts')
       "ReviewTests.parseFrontMatterScalars'", TestBody.Sync(sync ReviewTestsReplay.parseFrontMatterScalars') ]
 

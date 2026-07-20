@@ -2,22 +2,28 @@ module Wanxiangshu.Runtime.EventStoreIo
 
 open Fable.Core
 open Fable.Core.JsInterop
-open Wanxiangshu.Kernel.EventSourcing.EventEnvelope
-open Wanxiangshu.Runtime.EventLogCodec
-open Wanxiangshu.Runtime.EventLogIo
 open Wanxiangshu.Runtime.ProjectionCache
 
-type internal EventStoreState(eventFilePath: string) =
+type EventStoreStateKind =
+    | Uninitialized
+    | Initializing of operationId: string * deadlineAt: float
+    | Ready of revision: int
+    | Repairing of operationId: string * fault: string
+    | Degraded of error: string
+    | Disposed
+
+type internal EventStoreState(workspaceRoot: string, eventFilePath: string) =
     let cache = ProjectionCache()
-    let mutable initDone = false
+    let mutable stateKind = Uninitialized
     let mutable initPromise: JS.Promise<unit> option = None
-    let mutable readCalled = false
     let mutable eventCountRead = 0
     let mutable lastKnownSize = 0L
     let mutable lastReadByteOffset = 0L
     let mutable partialLineBuffer = ""
 
     member _.Cache = cache
+    member _.WorkspaceRoot = workspaceRoot
+    member _.EventFilePath = eventFilePath
 
     member this.LastKnownSize
         with get () = lastKnownSize
@@ -31,113 +37,27 @@ type internal EventStoreState(eventFilePath: string) =
         with get () = eventCountRead
         and set (v) = eventCountRead <- v
 
-    member private this.ProcessLines(lines: string[]) =
-        let mutable stop = false
+    member this.PartialLineBuffer
+        with get () = partialLineBuffer
+        and set (v) = partialLineBuffer <- v
 
-        for line in lines do
-            if not stop && line.Trim() <> "" then
-                match tryParseEventLine line with
-                | Some e ->
-                    cache.FoldWan e
-                    this.EventCountRead <- this.EventCountRead + 1
-                | None -> stop <- true
+    member this.StateKind
+        with get () = stateKind
+        and set (v) = stateKind <- v
 
-    member this.EnsureInitializedInternal() : JS.Promise<unit> =
-        promise {
-            if not initDone && not readCalled then
-                let! exists = fileExists eventFilePath
+    member this.InitPromise
+        with get () = initPromise
+        and set (v) = initPromise <- v
 
-                if not exists then
-                    initDone <- true
-                else
-                    readCalled <- true
-
-                    do!
-                        withWorkspaceLock eventFilePath (fun () ->
-                            promise {
-                                let! events = readEventsFile eventFilePath
-
-                                for e in events do
-                                    cache.FoldWan e
-
-                                initDone <- true
-                                eventCountRead <- events.Length
-                                let! stats = statAsync eventFilePath
-                                lastKnownSize <- this.SizeOf stats
-                                lastReadByteOffset <- lastKnownSize
-                                partialLineBuffer <- ""
-                            })
-        }
-
-    member this.EnsureInitialized() : JS.Promise<unit> =
-        match initPromise with
-        | Some p -> p
-        | None ->
-            let p = this.EnsureInitializedInternal()
-            initPromise <- Some p
-            p
-
-    member private _.ClearForMissingFile() : unit =
+    member this.ClearForMissingFile() : unit =
         cache.ClearSessionStatesOnly()
-        eventCountRead <- 0
-        lastKnownSize <- 0L
-        lastReadByteOffset <- 0L
-        partialLineBuffer <- ""
+        this.EventCountRead <- 0
+        this.LastKnownSize <- 0L
+        this.LastReadByteOffset <- 0L
+        this.PartialLineBuffer <- ""
 
     member _.SizeOf(stats: obj) : int64 = int64 (unbox<float> (stats?size))
 
-    member this.SyncNewEvents() : JS.Promise<unit> =
-        promise {
-            let! stats = statAsync eventFilePath
-            let size = this.SizeOf stats
-
-            if size < lastReadByteOffset then
-                cache.Clear()
-                eventCountRead <- 0
-                let! events = readEventsFile eventFilePath
-
-                for e in events do
-                    cache.FoldWan e
-
-                let! newStats = statAsync eventFilePath
-                lastReadByteOffset <- this.SizeOf newStats
-                lastKnownSize <- lastReadByteOffset
-                partialLineBuffer <- ""
-            elif size > lastReadByteOffset then
-                let offset = lastReadByteOffset
-                let length = int (size - offset)
-                let! newText = readChunkAsync eventFilePath (float offset) length
-                let combinedText = partialLineBuffer + newText
-                let lines = combinedText.Split('\n')
-
-                let completeLines =
-                    if lines.Length > 1 then
-                        lines.[0 .. lines.Length - 2]
-                    else
-                        [||]
-
-                let newPartialLineBuffer =
-                    if combinedText.EndsWith("\n") then
-                        ""
-                    else
-                        lines.[lines.Length - 1]
-
-                this.ProcessLines completeLines
-                partialLineBuffer <- newPartialLineBuffer
-                lastReadByteOffset <- size
-                lastKnownSize <- size
-        }
-
-    member this.EnsureSynced() : JS.Promise<unit> =
-        promise {
-            do! this.EnsureInitialized()
-
-            try
-                let! stats = statAsync eventFilePath
-                let size = this.SizeOf stats
-
-                if size <> lastKnownSize then
-                    do! withWorkspaceLock eventFilePath (fun () -> this.SyncNewEvents())
-            with ex when isMissingPathError (box ex) ->
-                this.ClearForMissingFile()
-        }
+    member this.Dispose() : unit =
+        this.StateKind <- Disposed
+        this.InitPromise <- None

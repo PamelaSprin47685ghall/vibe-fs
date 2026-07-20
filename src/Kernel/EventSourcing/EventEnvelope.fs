@@ -6,7 +6,11 @@ type WanEvent =
       Session: string
       Kind: string
       At: string
-      Payload: Map<string, string> }
+      Payload: Map<string, string>
+      EventId: string option
+      WriterId: string option
+      Sequence: int option
+      Checksum: string option }
 
 type EpisodeStage =
     | NoEpisode

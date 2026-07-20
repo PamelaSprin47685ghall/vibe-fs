@@ -1,6 +1,11 @@
 module Wanxiangshu.Runtime.SubsessionReconcile
 
 open Fable.Core
+open Fable.Core.JsInterop
+
+[<Emit("performance.now()")>]
+let private now () : float = jsNative
+
 open Wanxiangshu.Kernel.EventSourcing.EventEnvelope
 open Wanxiangshu.Kernel.EventSourcing.EventKind
 open Wanxiangshu.Kernel.Subsession.Types
@@ -50,6 +55,51 @@ let private createPoisonEvents
       TurnFinished(tid, TurnInfrastructureFailed "session state unknown after restart")
       RunFinished(runProj.RunId, Failed(InfrastructureFailure "session state unknown after restart")) ]
 
+let private reconcileActiveRun
+    (workspaceRoot: string)
+    (hostFactory: (string -> ISubsessionHost) option)
+    (sessionId: SessionId)
+    (runProj: ActiveRunProjection)
+    (currentProj: SessionSafetyProjection)
+    : JS.Promise<SessionSafetyProjection> =
+    promise {
+        let sid = SessionId.value sessionId
+
+        let host =
+            hostFactory
+            |> Option.map (fun factory -> factory sid)
+            |> Option.defaultValue (ReconcileHost() :> ISubsessionHost)
+
+        let eventStore = create workspaceRoot
+        let actor = SubsessionActorRegistry.GetOrCreate workspaceRoot sid host eventStore
+        let tid = TurnId.create (RunId.value runProj.RunId + "-reconcile")
+
+        let! stopStatusOpt = PromiseQueue.withTimeout 2000 (host.ClosePhysicalSession sessionId)
+        let stopStatus = defaultArg stopStatusOpt StopUnknown
+
+        let poisonEvents = createPoisonEvents sessionId tid runProj
+
+        match actor.GetState(), stopStatus with
+        | _, Stopped ->
+            try
+                do! eventStore.Append(sessionId, [ PhysicalSessionClosed sessionId ])
+            with _ ->
+                ()
+        | _ -> ()
+
+        match actor.GetState() with
+        | Poisoned _ -> return currentProj
+        | _ ->
+            try
+                do! eventStore.Append(sessionId, poisonEvents)
+                let nextProj = List.fold projectEvent currentProj poisonEvents
+                let! markResult = PromiseQueue.withTimeout 2000 (actor.MarkUnknownAfterRestart())
+                return nextProj
+            with _ ->
+                let! markResult = PromiseQueue.withTimeout 2000 (actor.MarkUnknownAfterRestart())
+                return currentProj
+    }
+
 /// Load NDJSON, find RunStarted without RunFinished, and ensure those physical
 /// sessions cannot accept a new StartRun until SessionClosed dispose.
 /// Persists SessionPoisoned + TurnFinished + RunFinished so the decision is durable.
@@ -61,53 +111,23 @@ let reconcileUnfinishedRuns
         if System.String.IsNullOrWhiteSpace workspaceRoot then
             return emptyProjection
         else
-            let root = workspaceRoot
-            let store = getStore root
-            let! events = store.ReadAllEvents()
+            let store = getStore workspaceRoot
+            let! eventsOpt = PromiseQueue.withTimeout 10000 (store.ReadAllEvents())
+            let events = defaultArg eventsOpt []
             let proj = projectFromWanEvents events
             let mutable currentProj = proj
+            let deadline = now () + 30000.0
 
             for KeyValue(sessionId, entry) in proj do
-                match entry with
-                | PersistentlyPoisoned _ -> ()
-                | ActiveRun runProj ->
-                    let sid = SessionId.value sessionId
-
-                    let host =
-                        hostFactory
-                        |> Option.map (fun factory -> factory sid)
-                        |> Option.defaultValue (ReconcileHost() :> ISubsessionHost)
-
-                    let eventStore = create root
-                    let actor = SubsessionActorRegistry.GetOrCreate workspaceRoot sid host eventStore
-                    let tid = TurnId.create (RunId.value runProj.RunId + "-reconcile")
-
-                    let! stopStatus = host.ClosePhysicalSession sessionId
-
-                    let poisonEvents = createPoisonEvents sessionId tid runProj
-
-                    match actor.GetState(), stopStatus with
-                    | _, Stopped ->
+                if now () < deadline then
+                    match entry with
+                    | PersistentlyPoisoned _ -> ()
+                    | ActiveRun runProj ->
                         try
-                            do! eventStore.Append(sessionId, [ PhysicalSessionClosed sessionId ])
-                        with _ ->
+                            let! nextProj = reconcileActiveRun workspaceRoot hostFactory sessionId runProj currentProj
+                            currentProj <- nextProj
+                        with ex ->
                             ()
-                    | _ -> ()
-
-                    match actor.GetState() with
-                    | Poisoned _ -> ()
-                    | _ ->
-                        // NDJSON append may fail; if it does,
-                        // MarkUnknownAfterRestart still poisons the actor
-                        // in-memory. On next restart the same orphan will
-                        // be rediscovered and re-reconciled (idempotent).
-                        try
-                            do! eventStore.Append(sessionId, poisonEvents)
-                            currentProj <- List.fold projectEvent currentProj poisonEvents
-                        with _ ->
-                            ()
-
-                        do! actor.MarkUnknownAfterRestart()
 
             SubsessionActorRegistry.SetSafetyProjection workspaceRoot currentProj
             return currentProj

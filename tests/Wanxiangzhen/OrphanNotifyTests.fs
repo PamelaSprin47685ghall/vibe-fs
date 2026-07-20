@@ -41,25 +41,41 @@ let entries () : (string * (unit -> unit)) list =
                    Session = "sid"
                    Kind = kindWarningSent
                    At = "t"
-                   Payload = Map [ "idempotencyKey", "k1"; "warning", "old-text" ] }
+                   Payload = Map [ "idempotencyKey", "k1"; "warning", "old-text" ]
+                   EventId = None
+                   WriterId = None
+                   Sequence = None
+                   Checksum = None }
                  { V = 1
                    Session = "sid"
                    Kind = kindWarningSent
                    At = "t"
-                   Payload = Map [ "warning", "legacy-only" ] }
+                   Payload = Map [ "warning", "legacy-only" ]
+                   EventId = None
+                   WriterId = None
+                   Sequence = None
+                   Checksum = None }
                  { V = 1
                    Session = "other"
                    Kind = kindWarningSent
                    At = "t"
-                   Payload = Map [ "idempotencyKey", "other-key" ] }
+                   Payload = Map [ "idempotencyKey", "other-key" ]
+                   EventId = None
+                   WriterId = None
+                   Sequence = None
+                   Checksum = None }
                  { V = 1
                    Session = "sid"
                    Kind = kindPromptFailed
                    At = "t"
-                   Payload = Map [ "idempotencyKey", "failed-key" ] } ]
+                   Payload = Map [ "idempotencyKey", "failed-key" ]
+                   EventId = None
+                   WriterId = None
+                   Sequence = None
+                   Checksum = None } ]
 
            let keys = recoverSentKeys "sid" events
            checkBare (keys.Contains "k1")
            checkBare (keys.Contains "legacy-only")
            checkBare (not (keys.Contains "other-key"))
-           checkBare (not (keys.Contains "failed-key")) ) ]
+           checkBare (not (keys.Contains "failed-key"))) ]

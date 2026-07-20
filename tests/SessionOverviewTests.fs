@@ -14,7 +14,11 @@ let private ev session kind payload =
       Session = session
       Kind = kind
       At = ""
-      Payload = payload }
+      Payload = payload
+      EventId = None
+      WriterId = None
+      Sequence = None
+      Checksum = None }
 
 /// emptyOverview has all fields at default/empty values.
 let emptyOverviewDefaults () =

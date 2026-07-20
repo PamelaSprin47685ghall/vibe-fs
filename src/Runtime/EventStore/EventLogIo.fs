@@ -28,14 +28,14 @@ let isExistingPathError (error: obj) : bool =
 let fileExists (filePath: string) : JS.Promise<bool> =
     Wanxiangshu.Runtime.EventLogIoRaw.fileExists filePath
 
+let readFileBufferAsync (path: string) : JS.Promise<obj> =
+    Wanxiangshu.Runtime.EventLogIoRaw.readFileBufferAsync path
+
 let withWorkspaceLock<'T> (filePath: string) (action: unit -> JS.Promise<'T>) : JS.Promise<'T> =
-    Wanxiangshu.Runtime.EventLogIoRaw.withWorkspaceLock<'T> filePath action
+    Wanxiangshu.Runtime.EventLogLock.withWorkspaceLock<'T> filePath action
 
 let readChunkAsync (path: string) (position: float) (length: int) : JS.Promise<string> =
     Wanxiangshu.Runtime.EventLogCodec.readChunkAsync path position length
-
-let readEventsFromText (text: string) : WanEvent list =
-    Wanxiangshu.Runtime.EventLogCodec.readEventsFromText text
 
 let readEventsFile (path: string) : JS.Promise<WanEvent list> =
     Wanxiangshu.Runtime.EventLogCodec.readEventsFile path

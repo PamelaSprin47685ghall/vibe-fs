@@ -10,7 +10,11 @@ let private ev kind payload =
       Session = "s1"
       Kind = kind
       At = "t"
-      Payload = payload }
+      Payload = payload
+      EventId = None
+      WriterId = None
+      Sequence = None
+      Checksum = None }
 
 let inactiveInitial () =
     equal "initial inactive" Inactive initial

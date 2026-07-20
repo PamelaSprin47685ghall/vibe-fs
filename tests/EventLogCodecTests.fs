@@ -11,7 +11,11 @@ let roundtripLine () =
           Session = "sess-a"
           Kind = eventKindLoopActivated
           At = "2026-01-01T00:00:00Z"
-          Payload = Map [ "task", "do thing" ] }
+          Payload = Map [ "task", "do thing" ]
+          EventId = None
+          WriterId = None
+          Sequence = None
+          Checksum = None }
 
     let line = wanEventToLine e
 

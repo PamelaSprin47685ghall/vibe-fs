@@ -18,29 +18,34 @@ let unlinkAsync (path: string) : JS.Promise<unit> = jsNative
 [<Import("stat", "node:fs/promises")>]
 let statAsync (path: string) : JS.Promise<obj> = jsNative
 
+[<Import("readFile", "node:fs/promises")>]
+let readFileBufferAsync (path: string) : JS.Promise<obj> = jsNative
+
 [<Emit("$0 != null && $0.code === 'ENOENT'")>]
 let isMissingPathError (error: obj) : bool = jsNative
 
 [<Emit("$0 != null && $0.code === 'EEXIST'")>]
 let isExistingPathError (error: obj) : bool = jsNative
 
-[<Import("lock", "proper-lockfile")>]
-let private lockfileLock (path: string) (options: obj) : JS.Promise<unit -> JS.Promise<unit>> = jsNative
+let poisonedFiles = System.Collections.Generic.HashSet<string>()
 
-let private lockfileOptions () =
-    createObj
-        [ "stale", box 15000
-          "retries",
-          box (
-              createObj
-                  [ "retries", box 100
-                    "factor", box 1
-                    "minTimeout", box 50
-                    "maxTimeout", box 100 ]
-          ) ]
+let mutable lockAcquireTimeoutMs = 15000
+let mutable actionTimeoutMs = 10000
+let mutable lockReleaseTimeoutMs = 5000
+let mutable queueWaitTimeoutMs = 30000
+let mutable ensureFileTimeoutMs = 10000
 
-let private fileQueues =
-    System.Collections.Generic.Dictionary<string, JS.Promise<obj>>()
+let mutable lockfileLockOverride: System.Func<string, obj, JS.Promise<unit -> JS.Promise<unit>>> option =
+    None
+
+let resetLockingConfig () =
+    poisonedFiles.Clear()
+    lockAcquireTimeoutMs <- 15000
+    actionTimeoutMs <- 10000
+    lockReleaseTimeoutMs <- 5000
+    queueWaitTimeoutMs <- 30000
+    ensureFileTimeoutMs <- 10000
+    lockfileLockOverride <- None
 
 let fileExists (filePath: string) : JS.Promise<bool> =
     promise {
@@ -49,85 +54,4 @@ let fileExists (filePath: string) : JS.Promise<bool> =
             return true
         with ex when isMissingPathError (box ex) ->
             return false
-    }
-
-let private ensureFileExists (filePath: string) : JS.Promise<unit> =
-    promise {
-        let! exists = fileExists filePath
-
-        if not exists then
-            try
-                do! writeFileFlagAsync filePath "" (createObj [ "flag", box "wx" ])
-            with ex when isExistingPathError (box ex) ->
-                ()
-    }
-
-let private acquireFileLock (filePath: string) : JS.Promise<unit -> JS.Promise<unit>> =
-    promise {
-        let mutable releaseVal = None
-        let mutable lockError = None
-
-        try
-            let! rel = lockfileLock filePath (lockfileOptions ())
-            releaseVal <- Some rel
-        with ex ->
-            lockError <- Some ex
-
-        match lockError with
-        | Some ex -> return raise ex
-        | _ -> ()
-
-        let release = releaseVal.Value
-        return release
-    }
-
-let withWorkspaceLock<'T> (filePath: string) (action: unit -> JS.Promise<'T>) : JS.Promise<'T> =
-    let prev =
-        match fileQueues.TryGetValue(filePath) with
-        | true, p -> p
-        | _ -> Promise.lift (box null)
-
-    let mutable selfPromise = None
-
-    let next =
-        promise {
-            try
-                let! _ = prev
-                ()
-            with _ ->
-                ()
-
-            do! ensureFileExists filePath
-
-            let! release = acquireFileLock filePath
-
-            let mutable caught = None
-            let mutable resOpt = None
-
-            try
-                let! res = action ()
-                resOpt <- Some res
-            with ex ->
-                caught <- Some ex
-
-            try
-                do! release ()
-            with _ ->
-                ()
-
-            match fileQueues.TryGetValue(filePath) with
-            | true, current when Some current = selfPromise -> fileQueues.Remove(filePath) |> ignore
-            | _ -> ()
-
-            match caught with
-            | Some ex -> return raise ex
-            | None -> return box resOpt.Value
-        }
-
-    selfPromise <- Some next
-    fileQueues.[filePath] <- next
-
-    promise {
-        let! res = next
-        return unbox<'T> res
     }

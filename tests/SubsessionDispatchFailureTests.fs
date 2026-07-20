@@ -160,7 +160,11 @@ let allEventsReplayFromWire () =
               Map
                   [ "childId", SessionId.value sid
                     "parentSessionId", SessionId.value parent
-                    "runId", RunId.value runId ] }
+                    "runId", RunId.value runId ]
+            EventId = None
+            WriterId = None
+            Sequence = None
+            Checksum = None }
           { V = 1
             Session = SessionId.value sid
             Kind = eventKindSubsessionTurnDispatchRequested
@@ -172,7 +176,11 @@ let allEventsReplayFromWire () =
                     "turnOrdinal", "0"
                     "sessionId", SessionId.value sid
                     "model", "p/m0"
-                    "prompt", "go" ] }
+                    "prompt", "go" ]
+            EventId = None
+            WriterId = None
+            Sequence = None
+            Checksum = None }
           { V = 1
             Session = SessionId.value sid
             Kind = eventKindSubsessionTurnStarted
@@ -182,7 +190,11 @@ let allEventsReplayFromWire () =
                   [ "runId", RunId.value runId
                     "turnId", TurnId.value turnId
                     "sessionId", SessionId.value sid
-                    "receipt", "ordered_marker" ] }
+                    "receipt", "ordered_marker" ]
+            EventId = None
+            WriterId = None
+            Sequence = None
+            Checksum = None }
           { V = 1
             Session = SessionId.value sid
             Kind = eventKindSubsessionTurnFinished
@@ -191,12 +203,20 @@ let allEventsReplayFromWire () =
               Map
                   [ "turnId", TurnId.value turnId
                     "sessionId", SessionId.value sid
-                    "finish", "completed" ] }
+                    "finish", "completed" ]
+            EventId = None
+            WriterId = None
+            Sequence = None
+            Checksum = None }
           { V = 1
             Session = SessionId.value sid
             Kind = eventKindSubsessionAbortRequested
             At = "6"
-            Payload = Map [ "turnId", TurnId.value turnId; "sessionId", SessionId.value sid ] }
+            Payload = Map [ "turnId", TurnId.value turnId; "sessionId", SessionId.value sid ]
+            EventId = None
+            WriterId = None
+            Sequence = None
+            Checksum = None }
           { V = 1
             Session = SessionId.value sid
             Kind = eventKindSubsessionRunSettled
@@ -205,12 +225,20 @@ let allEventsReplayFromWire () =
               Map
                   [ "childId", SessionId.value sid
                     "runId", RunId.value runId
-                    "status", "succeeded" ] }
+                    "status", "succeeded" ]
+            EventId = None
+            WriterId = None
+            Sequence = None
+            Checksum = None }
           { V = 1
             Session = SessionId.value sid
             Kind = eventKindSubsessionSessionPoisoned
             At = "8"
-            Payload = Map [ "sessionId", SessionId.value sid; "reason", "host_protocol:test" ] } ]
+            Payload = Map [ "sessionId", SessionId.value sid; "reason", "host_protocol:test" ]
+            EventId = None
+            WriterId = None
+            Sequence = None
+            Checksum = None } ]
 
     let decoded = wanEvents |> List.choose tryDecodeWanEvent
     equal "decoded all 7 domain events" 7 decoded.Length

@@ -1,51 +1,124 @@
 namespace Wanxiangshu.Runtime
 
 open Fable.Core
-open PromiseQueue
+open Fable.Core.JsInterop
+open Wanxiangshu.Runtime.PromiseQueue
 
 type SessionReaderWriterLock() =
     let queue = SerialQueue()
     let mutable activeReaders = 0
-    let mutable readerZeroPromises: (unit -> unit) list = []
+    let mutable noReadersResolver: ((unit -> unit) * (exn -> unit)) option = None
+    let mutable disposed = false
 
     let awaitNoReaders () : JS.Promise<unit> =
         if activeReaders = 0 then
             Promise.lift ()
         else
-            Promise.create (fun resolve _ -> readerZeroPromises <- resolve :: readerZeroPromises)
+            Promise.create (fun resolve reject -> noReadersResolver <- Some(resolve, reject))
 
     let releaseReader () =
-        activeReaders <- activeReaders - 1
+        if not disposed then
+            activeReaders <- activeReaders - 1
 
-        if activeReaders = 0 then
-            let temp = readerZeroPromises
-            readerZeroPromises <- []
+            if activeReaders < 0 then
+                activeReaders <- 0
+                failwith "AssertionError: activeReaders is negative"
 
-            for resolve in temp do
-                resolve ()
+            if activeReaders = 0 then
+                match noReadersResolver with
+                | Some(r, _) ->
+                    noReadersResolver <- None
+                    r ()
+                | None -> ()
 
-    member _.EnqueueRead(work: unit -> JS.Promise<'T>) : JS.Promise<'T> =
-        Promise.create (fun resolve reject ->
+    member _.Dispose() =
+        disposed <- true
+        queue.Poisoned <- true
+
+        match noReadersResolver with
+        | Some(_, reject) ->
+            noReadersResolver <- None
+            reject (exn "DisposedException: Lock was disposed")
+        | None -> ()
+
+        activeReaders <- 0
+
+    member _.EnqueueRead(work: unit -> JS.Promise<'T>, ?timeoutMs: int, ?abortSignal: obj) : JS.Promise<'T> =
+        if disposed then
+            Promise.reject (exn "DisposedException: Lock was disposed")
+        else
+            Promise.create (fun resolve reject ->
+                queue.Enqueue(fun () ->
+                    if disposed then
+                        reject (exn "DisposedException: Lock was disposed")
+                    else
+                        activeReaders <- activeReaders + 1
+                        let mutable released = false
+
+                        let safeReleaseReader () =
+                            if not released then
+                                released <- true
+                                releaseReader ()
+
+                        let mutable cleanupAbort = fun () -> ()
+
+                        match abortSignal with
+                        | Some sigObj ->
+                            let onAbort () =
+                                safeReleaseReader ()
+                                reject (exn "AbortError: The reader lock request was aborted")
+
+                            sigObj?addEventListener ("abort", onAbort)
+                            cleanupAbort <- fun () -> sigObj?removeEventListener ("abort", onAbort)
+                        | None -> ()
+
+                        try
+                            let p = work ()
+                            let timeout = defaultArg timeoutMs 10000
+                            let timeoutPromise = PromiseQueue.withTimeout timeout p
+
+                            timeoutPromise
+                            |> Promise.map (fun resOpt ->
+                                cleanupAbort ()
+                                safeReleaseReader ()
+
+                                match resOpt with
+                                | Some res -> resolve res
+                                | None -> reject (exn "ReaderLockTimeout: Reader timed out"))
+                            |> Promise.catch (fun ex ->
+                                cleanupAbort ()
+                                safeReleaseReader ()
+                                reject ex)
+                            |> Promise.start
+                        with ex ->
+                            cleanupAbort ()
+                            safeReleaseReader ()
+                            reject ex
+
+                    Promise.lift ())
+                |> Promise.catch (fun ex -> reject ex)
+                |> ignore)
+
+    member _.EnqueueWrite(work: unit -> JS.Promise<'T>, ?timeoutMs: int) : JS.Promise<'T> =
+        if disposed then
+            Promise.reject (exn "DisposedException: Lock was disposed")
+        else
+            let timeout = defaultArg timeoutMs 10000
+
             queue.Enqueue(fun () ->
-                activeReaders <- activeReaders + 1
-                let p = work ()
+                promise {
+                    if disposed then
+                        return failwith "DisposedException: Lock was disposed"
+                    else
+                        let runWrite () =
+                            promise {
+                                do! awaitNoReaders ()
+                                return! work ()
+                            }
 
-                p
-                |> Promise.map (fun res ->
-                    releaseReader ()
-                    resolve res)
-                |> Promise.catch (fun ex ->
-                    releaseReader ()
-                    reject ex)
-                |> Promise.start
+                        let! resOpt = PromiseQueue.withTimeout timeout (runWrite ())
 
-                Promise.lift ())
-            |> Promise.catch (fun ex -> reject ex)
-            |> ignore)
-
-    member _.EnqueueWrite(work: unit -> JS.Promise<'T>) : JS.Promise<'T> =
-        queue.Enqueue(fun () ->
-            promise {
-                do! awaitNoReaders ()
-                return! work ()
-            })
+                        match resOpt with
+                        | Some res -> return res
+                        | None -> return failwith "WriterLockTimeout: Writer timed out"
+                })

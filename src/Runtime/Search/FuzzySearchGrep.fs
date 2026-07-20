@@ -87,23 +87,35 @@ let private fuzzyGrepMulti
         match finderResult with
         | Error msg -> return { output = msg; isError = true }
         | Ok finder ->
-            try
-                let runOne pat = runGrepPattern finder params' opts pat
+            let cleanup () =
+                promise {
+                    if externalBasePath.IsSome then
+                        do! opts.finderCache.Destroy searchPath.basePath
+                }
 
-                let promises = patterns |> List.map runOne |> List.toArray
-                let! outcomes = Promise.all promises
+            let! res =
+                promise {
+                    try
+                        let runOne pat = runGrepPattern finder params' opts pat
 
-                let body =
-                    outcomes
-                    |> Array.map (fun (pat, r, _) -> $"## pattern: \"{pat}\"\n{r.output}")
-                    |> Array.toList
-                    |> String.concat "\n\n"
+                        let promises = patterns |> List.map runOne |> List.toArray
+                        let! outcomes = Promise.all promises
 
-                let anyError = outcomes |> Array.exists (fun (_, r, _) -> r.isError)
-                return { output = body; isError = anyError }
-            finally
-                if externalBasePath.IsSome then
-                    opts.finderCache.Destroy searchPath.basePath |> ignore
+                        let body =
+                            outcomes
+                            |> Array.map (fun (pat, r, _) -> $"## pattern: \"{pat}\"\n{r.output}")
+                            |> Array.toList
+                            |> String.concat "\n\n"
+
+                        let anyError = outcomes |> Array.exists (fun (_, r, _) -> r.isError)
+                        return { output = body; isError = anyError }
+                    with ex ->
+                        do! cleanup ()
+                        return raise ex
+                }
+
+            do! cleanup ()
+            return res
     }
 
 let fuzzyGrep (params': FuzzyGrepParams) (opts: SearchOptions) : JS.Promise<SearchOutcome> =

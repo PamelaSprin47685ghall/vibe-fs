@@ -157,7 +157,11 @@ let tryDecodeWanEventBatch (e: WanEvent) : SubsessionEvent list =
                               Session = e.Session
                               Kind = item.Kind
                               At = e.At
-                              Payload = item.Payload }
+                              Payload = item.Payload
+                              EventId = None
+                              WriterId = None
+                              Sequence = None
+                              Checksum = None }
 
                         tryDecodeWanEvent synth)
 

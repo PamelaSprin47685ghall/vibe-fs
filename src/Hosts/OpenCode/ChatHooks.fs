@@ -43,7 +43,11 @@ let private recordContinuationUserMessage
               Session = sessionId
               Kind = eventKindContinuationHostAccepted
               At = at
-              Payload = Map [ "continuationId", continuationId; "userMessageId", messageId ] }
+              Payload = Map [ "continuationId", continuationId; "userMessageId", messageId ]
+              EventId = None
+              WriterId = None
+              Sequence = None
+              Checksum = None }
 
         do! appendEventsAndCacheOrFail workspaceRoot [ wanEvent ]
     }
@@ -110,12 +114,7 @@ let chatMessageFor
         if not isDuplicate then
             // Step 3–4: bind PendingDispatch + system classification.
             let isSystem =
-                ChatHooksClassification.isSystemMessage
-                    parts
-                    fr
-                    lifecycleObserver.WorkspaceRoot
-                    sessionIDStr
-                    msgId
+                ChatHooksClassification.isSystemMessage parts fr lifecycleObserver.WorkspaceRoot sessionIDStr msgId
 
             let messageRole = tryGetChatMessageRole output
 

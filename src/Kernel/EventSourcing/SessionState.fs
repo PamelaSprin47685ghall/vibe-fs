@@ -51,6 +51,7 @@ type SessionState =
       CompactionGeneration: int
       HumanTurnOrdinal: int
       LastHumanTurnMessageId: string option
+      ProcessedEventIds: Set<string>
       EventCount: int }
 
 let emptySessionState () : SessionState =
@@ -83,4 +84,5 @@ let emptySessionState () : SessionState =
       CompactionGeneration = 0
       HumanTurnOrdinal = 0
       LastHumanTurnMessageId = None
+      ProcessedEventIds = Set.empty
       EventCount = 0 }

@@ -84,13 +84,18 @@ let readStopsAtCorruptLine () =
                   Session = "s1"
                   Kind = eventKindLoopActivated
                   At = ""
-                  Payload = Map [ "task", "ok" ] }
+                  Payload = Map [ "task", "ok" ]
+                  EventId = None
+                  WriterId = None
+                  Sequence = None
+                  Checksum = None }
 
         let path = eventPath dir
         do! writeFileAsync path (good + "\n{broken\n" + good + "\n")
         let store = EventLogStore dir
         let! events = store.ReadAllEvents()
-        check "stops before third line" (events.Length = 1)
+        check "stops before third line" (events.Length = 2)
+        check "contains repaired event" (events |> List.exists (fun e -> e.Kind = "event_log_repaired"))
         do! rmAsync dir
     }
 
@@ -238,7 +243,7 @@ let ensureSyncedPropagatesNonMissingPathErrors () =
             promise {
                 try
                     do! store.EnsureSynced()
-                    return Ok ()
+                    return Ok()
                 with ex ->
                     return Error ex
             }
@@ -249,6 +254,7 @@ let ensureSyncedPropagatesNonMissingPathErrors () =
 
         do! rmAsync dir
     }
+
 let run () =
     promise {
         do! appendThenReadAll ()

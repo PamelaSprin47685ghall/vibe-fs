@@ -25,7 +25,11 @@ let testAppendEventFailsMemoryNotPolluted () =
               Session = "s-fail"
               Kind = eventKindLoopActivated
               At = ""
-              Payload = Map [ "task", "failed task" ] }
+              Payload = Map [ "task", "failed task" ]
+              EventId = None
+              WriterId = None
+              Sequence = None
+              Checksum = None }
 
         let! res = store.AppendEvent ev
 
@@ -51,7 +55,11 @@ let testAppendEventOrFailFailsMemoryNotPolluted () =
               Session = "s-fail"
               Kind = eventKindLoopActivated
               At = ""
-              Payload = Map [ "task", "failed task" ] }
+              Payload = Map [ "task", "failed task" ]
+              EventId = None
+              WriterId = None
+              Sequence = None
+              Checksum = None }
 
         let! res = store.AppendEventOrFail ev |> Promise.result
 

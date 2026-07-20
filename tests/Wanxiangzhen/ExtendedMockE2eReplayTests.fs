@@ -372,6 +372,7 @@ let testReplayWarnsOrphanDedupsFromEventLog () : JS.Promise<unit> =
 
         let sessionId = "squad-session-001"
         let taskId = "squad-a1b2"
+
         let warning =
             sprintf "WARNING: Orphan running tasks without PID: %s. Use /squad-kill or ignore." taskId
 
@@ -403,7 +404,11 @@ let testReplayWarnsOrphanDedupsFromEventLog () : JS.Promise<unit> =
                 Session = sessionId
                 Kind = kindWarningSent
                 At = "2025-01-01T00:00:00Z"
-                Payload = Map [ "idempotencyKey", key; "warning", warning ] } ]
+                Payload = Map [ "idempotencyKey", key; "warning", warning ]
+                EventId = None
+                WriterId = None
+                Sequence = None
+                Checksum = None } ]
 
         rt.MasterSessionId <- sessionId
         s.mergeBaseOverride <- Some(fun _ _ _ -> false)
@@ -422,6 +427,7 @@ let testReplayWarnsOrphanPromptFailedWritesAuditEvent () : JS.Promise<unit> =
 
         let sessionId = "squad-session-001"
         let taskId = "squad-a1b2"
+
         let warning =
             sprintf "WARNING: Orphan running tasks without PID: %s. Use /squad-kill or ignore." taskId
 
@@ -553,7 +559,7 @@ let entriesAsync () : (string * (unit -> JS.Promise<unit>)) list =
        testReplayWarnsOrphanEmptyMasterThenSendsWhenMasterAppears)
       ("ExtendedMockE2e.replay_warns_orphan_persists_warning_sent_event", testReplayWarnsOrphanPersistsWarningSentEvent)
       ("ExtendedMockE2e.replay_warns_orphan_dedups_from_event_log", testReplayWarnsOrphanDedupsFromEventLog)
-      ("ExtendedMockE2e.replay_warns_orphan_prompt_failed_writes_audit_event", testReplayWarnsOrphanPromptFailedWritesAuditEvent)
+      ("ExtendedMockE2e.replay_warns_orphan_prompt_failed_writes_audit_event",
+       testReplayWarnsOrphanPromptFailedWritesAuditEvent)
       ("ExtendedMockE2e.replay_warns_orphan_inflight_reservation_prevents_double_send",
-       testReplayWarnsOrphanInFlightReservationPreventsDoubleSend)
-    ]
+       testReplayWarnsOrphanInFlightReservationPreventsDoubleSend) ]
