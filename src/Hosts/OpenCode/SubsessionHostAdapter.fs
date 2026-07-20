@@ -85,19 +85,21 @@ type OpencodeSubsessionHost(client: obj, agent: string, directory: string) =
 
         member _.Abort(sessionId, turnId) =
             promise {
-                let dispatcher = getDispatcher directory (SessionId.value sessionId)
+                let sid = SessionId.value sessionId
+                let tid = TurnId.value turnId
+                let dispatcher = getDispatcher directory sid
 
                 let physicalAbort () : JS.Promise<bool> =
                     promise {
                         match trySessionApi client with
                         | Ok session ->
-                            let arg = box {| path = box {| id = SessionId.value sessionId |} |}
+                            let arg = box {| path = box {| id = sid |} |}
                             let! _ = invoke1 arg "abort" session
                             return true
                         | Error _ -> return false
                     }
 
-                let! result = dispatcher.CancelByTurn (TurnId.value turnId) physicalAbort
+                let! result = dispatcher.CancelByTurn tid physicalAbort
 
                 match result with
                 | DispatchCancelResult.AbortSent
@@ -105,7 +107,18 @@ type OpencodeSubsessionHost(client: obj, agent: string, directory: string) =
                     return (Wanxiangshu.Kernel.Subsession.Types.AbortResult.RequestAcceptedAwaitIdle)
                 | DispatchCancelResult.AbortUnavailable ->
                     return (Wanxiangshu.Kernel.Subsession.Types.AbortResult.AbortUnavailable)
-                | DispatchCancelResult.AlreadyTerminal _ ->
+                | DispatchCancelResult.AlreadyTerminal terminal ->
+                    JS.console.warn (
+                        box
+                            {| feature = "subsession"
+                               hostVariant = "opencode"
+                               session = sid
+                               turnId = tid
+                               event = "stale_abort"
+                               reason = "already_terminal"
+                               terminal = string terminal |}
+                    )
+
                     return (Wanxiangshu.Kernel.Subsession.Types.AbortResult.ConfirmedStopped)
             }
 

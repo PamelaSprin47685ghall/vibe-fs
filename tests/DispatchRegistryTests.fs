@@ -324,10 +324,96 @@ let hostAcceptedAbortFails () =
         sharedDispatchRegistry.NotifySessionClosed ws sid
     }
 
-/// If the physical abort confirms after the turn has already completed and a
-/// new turn owns the slot, the stale abort must not touch the new turn and
-/// must report AlreadyTerminal Superseded.
-let staleAbortDoesNotHarmNewTurn () =
+/// S-08: host abort holds the session mailbox. A competing Dispatch must wait
+/// until the abort finishes, so a delayed abort can never kill a newer turn.
+let abortHoldsMailboxUntilHostReturns () =
+    promise {
+        let ws = Id.workspaceIdQuick "test-abort-holds-ws"
+        let sid = "phys-session-abort-holds"
+        let logger = InMemoryDispatchEventLogger()
+        let dispatcher = sharedDispatchRegistry.GetOrCreate ws sid logger
+
+        let identity1 =
+            DispatchIdentity.newId ws sid DispatchKind.SubsessionTurn 0 0 0 "turn-holds" "human-1" ""
+
+        let sendPrompt1 (_: DispatchIdentity) : JS.Promise<DispatchAcceptance> =
+            Promise.lift (UserMessageAccepted "msg-holds")
+
+        let cancellation = System.Threading.CancellationToken.None
+        let! (outcome1, _waiter1) = dispatcher.Dispatch identity1 sendPrompt1 cancellation
+
+        check
+            "dispatch reached HostAccepted"
+            (match outcome1 with
+             | Accepted(UserMessageAccepted "msg-holds") -> true
+             | _ -> false)
+
+        let mutable resolveAbortStarted = fun () -> ()
+        let abortStartedP = Promise.create (fun resolve _ -> resolveAbortStarted <- resolve)
+        let mutable abortResolve: (bool -> unit) option = None
+        let mutable abortCalls = 0
+
+        let physicalAbort () : JS.Promise<bool> =
+            promise {
+                abortCalls <- abortCalls + 1
+                resolveAbortStarted ()
+                let! result = Promise.create (fun resolve _ -> abortResolve <- Some resolve)
+                return result
+            }
+
+        let cancelP = dispatcher.CancelByTurn "turn-holds" physicalAbort
+        do! abortStartedP
+
+        // While abort holds the mailbox, CompleteByTurn and a new Dispatch stay queued.
+        let completeP = dispatcher.CompleteByTurn "turn-holds"
+
+        let identity2 =
+            DispatchIdentity.newId ws sid DispatchKind.SubsessionTurn 0 0 0 "turn-holds-next" "human-2" ""
+
+        let mutable nextSendCalled = false
+
+        let nextP =
+            dispatcher.Dispatch
+                identity2
+                (fun _ ->
+                    nextSendCalled <- true
+                    Promise.lift (UserMessageAccepted "msg-holds-next"))
+                cancellation
+
+        do! Promise.sleep 20
+        check "physical abort issued once while holding mailbox" (abortCalls = 1)
+        check "new turn sendPrompt not invoked during abort" (not nextSendCalled)
+        check "old turn still owns slot during abort" (dispatcher.ActiveLogicalTurnId = Some "turn-holds")
+
+        match abortResolve with
+        | Some resolve -> resolve true
+        | None -> ()
+
+        let! cancelResult = cancelP
+        check "cancel result is AbortSent" (cancelResult = AbortSent)
+
+        let! completed = completeP
+        check "CompleteByTurn loses the race to AbortSent" (not completed)
+
+        let! (outcome2, _waiter2) = nextP
+
+        check
+            "new turn accepted only after abort released mailbox"
+            (match outcome2 with
+             | Accepted(UserMessageAccepted "msg-holds-next") -> true
+             | _ -> false)
+
+        check "new turn sendPrompt invoked after abort" nextSendCalled
+        check "new turn owns the active slot" (dispatcher.ActiveLogicalTurnId = Some "turn-holds-next")
+        check "host abort called exactly once" (abortCalls = 1)
+
+        let! _ = dispatcher.CompleteByTurn "turn-holds-next"
+        sharedDispatchRegistry.Remove ws sid
+    }
+
+/// S-08: cancel for a prior turn after a new turn owns the physical session
+/// must not call host abort; it logs DispatchStaleAbort and reports Superseded.
+let staleAbortAfterNewTurnIsLogOnly () =
     promise {
         let ws = Id.workspaceIdQuick "test-stale-abort-ws"
         let sid = "phys-session-stale-abort"
@@ -337,68 +423,98 @@ let staleAbortDoesNotHarmNewTurn () =
         let identity1 =
             DispatchIdentity.newId ws sid DispatchKind.SubsessionTurn 0 0 0 "turn-stale" "human-1" ""
 
-        let sendPrompt1 (_: DispatchIdentity) : JS.Promise<DispatchAcceptance> =
-            Promise.lift (UserMessageAccepted "msg-stale")
-
-        let cancellation = System.Threading.CancellationToken.None
-        let! (outcome1, _waiter1) = dispatcher.Dispatch identity1 sendPrompt1 cancellation
+        let! (outcome1, _waiter1) =
+            dispatcher.Dispatch
+                identity1
+                (fun _ -> Promise.lift (UserMessageAccepted "msg-stale"))
+                System.Threading.CancellationToken.None
 
         check
-            "dispatch reached HostAccepted"
+            "first dispatch HostAccepted"
             (match outcome1 with
              | Accepted(UserMessageAccepted "msg-stale") -> true
              | _ -> false)
 
-        let mutable resolveAbortStarted = fun () -> ()
-        let abortStartedP = Promise.create (fun resolve _ -> resolveAbortStarted <- resolve)
-        let mutable abortResolve : (bool -> unit) option = None
-
-        let physicalAbort () : JS.Promise<bool> =
-            promise {
-                resolveAbortStarted ()
-                let! result = Promise.create (fun resolve _ -> abortResolve <- Some resolve)
-                return result
-            }
-
-        let cancelP = dispatcher.CancelByTurn "turn-stale" physicalAbort
-
-        // Wait until the abort has actually been requested before completing the old turn.
-        do! abortStartedP
-
         let! completed = dispatcher.CompleteByTurn "turn-stale"
-        check "old turn completed before abort resolved" completed
+        check "old turn completed" completed
 
         let identity2 =
             DispatchIdentity.newId ws sid DispatchKind.SubsessionTurn 0 0 0 "turn-stale-next" "human-2" ""
 
         let! (outcome2, _waiter2) =
-            dispatcher.Dispatch identity2 (fun _ -> Promise.lift (UserMessageAccepted "msg-stale-next")) cancellation
+            dispatcher.Dispatch
+                identity2
+                (fun _ -> Promise.lift (UserMessageAccepted "msg-stale-next"))
+                System.Threading.CancellationToken.None
 
         check
-            "new turn accepted while abort in flight"
+            "new turn HostAccepted"
             (match outcome2 with
              | Accepted(UserMessageAccepted "msg-stale-next") -> true
              | _ -> false)
 
-        check "new turn owns the active slot" (dispatcher.ActiveLogicalTurnId = Some "turn-stale-next")
+        let mutable abortCalled = false
 
-        match abortResolve with
-        | Some resolve -> resolve true
-        | None -> ()
+        let physicalAbort () : JS.Promise<bool> =
+            abortCalled <- true
+            Promise.lift true
 
-        let! cancelResult = cancelP
+        let! cancelResult = dispatcher.CancelByTurn "turn-stale" physicalAbort
 
         check "stale abort reports AlreadyTerminal Superseded" (cancelResult = AlreadyTerminal Superseded)
-
-        check
-            "new turn outcome unchanged after stale abort"
-            (match outcome2 with
-             | Accepted(UserMessageAccepted "msg-stale-next") -> true
-             | _ -> false)
-
+        check "physical abort was not called for stale turn" (not abortCalled)
         check "new turn still owns the active slot" (dispatcher.ActiveLogicalTurnId = Some "turn-stale-next")
 
+        let staleEvents =
+            logger.Events
+            |> List.choose (function
+                | Wanxiangshu.Kernel.Dispatch.Events.DispatchStaleAbort(_, turnId, reason, _) -> Some(turnId, reason)
+                | _ -> None)
+
+        check "stale abort event emitted" (staleEvents.Length = 1)
+        check "stale abort names the old turn" (fst staleEvents.Head = "turn-stale")
+
         let! _ = dispatcher.CompleteByTurn "turn-stale-next"
+        sharedDispatchRegistry.Remove ws sid
+    }
+
+/// Duplicate CancelByTurn after AbortSent must not re-issue host abort.
+let duplicateAbortAfterAbortSentIsIgnored () =
+    promise {
+        let ws = Id.workspaceIdQuick "test-dup-abort-ws"
+        let sid = "phys-session-dup-abort"
+        let logger = InMemoryDispatchEventLogger()
+        let dispatcher = sharedDispatchRegistry.GetOrCreate ws sid logger
+
+        let identity =
+            DispatchIdentity.newId ws sid DispatchKind.SubsessionTurn 0 0 0 "turn-dup" "human-1" ""
+
+        let! (outcome, _waiter) =
+            dispatcher.Dispatch
+                identity
+                (fun _ -> Promise.lift (UserMessageAccepted "msg-dup"))
+                System.Threading.CancellationToken.None
+
+        check
+            "dispatch HostAccepted"
+            (match outcome with
+             | Accepted(UserMessageAccepted "msg-dup") -> true
+             | _ -> false)
+
+        let mutable abortCalls = 0
+
+        let physicalAbort () : JS.Promise<bool> =
+            abortCalls <- abortCalls + 1
+            Promise.lift true
+
+        let! first = dispatcher.CancelByTurn "turn-dup" physicalAbort
+        check "first cancel AbortSent" (first = AbortSent)
+        check "host abort once" (abortCalls = 1)
+
+        let! second = dispatcher.CancelByTurn "turn-dup" physicalAbort
+        check "second cancel AlreadyTerminal" (match second with | AlreadyTerminal _ -> true | _ -> false)
+        check "host abort still once" (abortCalls = 1)
+
         sharedDispatchRegistry.Remove ws sid
     }
 
@@ -484,9 +600,10 @@ let sessionClosedBeforeAbortIsRejectedWithoutPhysicalAbort () =
         sharedDispatchRegistry.Remove ws sid
     }
 
-/// If the session closes while the physical abort is in flight, the late
-/// abort result must be ignored and CancelByTurn must report SessionClosed.
-let sessionClosedDuringAbortReportsSessionClosed () =
+/// Session close queued while host abort holds the mailbox runs after abort.
+/// Abort still owns the turn at issue time, so host abort is legitimate (AbortSent);
+/// close then clears residual state without a second host call.
+let sessionCloseQueuedDuringAbortRunsAfterAbortSent () =
     promise {
         let ws = Id.workspaceIdQuick "test-close-during-abort-ws"
         let sid = "phys-session-close-during-abort"
@@ -510,29 +627,31 @@ let sessionClosedDuringAbortReportsSessionClosed () =
 
         let mutable resolveAbortStarted = fun () -> ()
         let abortStartedP = Promise.create (fun resolve _ -> resolveAbortStarted <- resolve)
-        let mutable abortResolve : (bool -> unit) option = None
+        let mutable abortResolve: (bool -> unit) option = None
+        let mutable abortCalls = 0
 
         let physicalAbort () : JS.Promise<bool> =
             promise {
+                abortCalls <- abortCalls + 1
                 resolveAbortStarted ()
                 let! result = Promise.create (fun resolve _ -> abortResolve <- Some resolve)
                 return result
             }
 
         let cancelP = dispatcher.CancelByTurn "turn-close-during-abort" physicalAbort
-
-        // Wait until physicalAbort has been requested inside the mailbox.
         do! abortStartedP
 
-        // Session closes while abort is still in flight.
-        do! dispatcher.OnSessionClosed()
+        let closeP = dispatcher.OnSessionClosed()
+
         match abortResolve with
         | Some resolve -> resolve true
         | None -> ()
 
         let! cancelResult = cancelP
+        do! closeP
 
-        check "cancel result is AlreadyTerminal SessionClosed" (cancelResult = AlreadyTerminal SessionClosed)
+        check "cancel result is AbortSent (owned turn at issue time)" (cancelResult = AbortSent)
+        check "host abort called once" (abortCalls = 1)
         check "slot cleared after session close" (not dispatcher.HasActive)
 
         sharedDispatchRegistry.Remove ws sid
@@ -547,8 +666,10 @@ let run () =
         do! samePhysicalSessionReentryRejected ()
         do! hostAcceptedAbortSucceeds ()
         do! hostAcceptedAbortFails ()
-        do! staleAbortDoesNotHarmNewTurn ()
+        do! abortHoldsMailboxUntilHostReturns ()
+        do! staleAbortAfterNewTurnIsLogOnly ()
+        do! duplicateAbortAfterAbortSentIsIgnored ()
         do! cancelAfterCompleteReportsSuperseded ()
         do! sessionClosedBeforeAbortIsRejectedWithoutPhysicalAbort ()
-        do! sessionClosedDuringAbortReportsSessionClosed ()
+        do! sessionCloseQueuedDuringAbortRunsAfterAbortSent ()
     }

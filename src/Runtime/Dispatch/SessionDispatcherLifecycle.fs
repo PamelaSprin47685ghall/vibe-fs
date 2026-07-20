@@ -34,17 +34,22 @@ module SessionDispatcherExtensions =
             |> ignore
 
         /// Try to cancel a dispatch by logical turn id.
-        /// Mark CancelRequested and trigger CancelWaiter immediately so the
-        /// in-flight transport promise is unblocked.  Physical abort is invoked
-        /// inside the mailbox after turn/generation/session-open validation; its
-        /// result is committed only after the mailbox re-confirms the same
-        /// dispatch still owns the session.
+        ///
+        /// Domain cancel is turn-scoped; host abort is physical-session-scoped.
+        /// Physical abort runs only after a second actor re-entry confirms:
+        /// active dispatch id, generation, physical ownership, abort-not-sent,
+        /// and session not closed. Stale aborts are logged and never reach the host.
         member this.CancelByTurn
             (logicalTurnId: string)
             (physicalAbort: unit -> JS.Promise<bool>)
             : JS.Promise<DispatchCancelResult> =
             promise {
-                let! decision =
+                let logStaleEarly (dispatchId: DispatchId) (reason: string) =
+                    this.State.EventLogger.Log(
+                        DispatchStaleAbort(dispatchId, logicalTurnId, reason, DispatchOps.getNowMs ())
+                    )
+
+                let! phase1 =
                     this.State.Queue.Enqueue(fun () ->
                         promise {
                             if this.State.IsClosed then
@@ -66,42 +71,65 @@ module SessionDispatcherExtensions =
                                     | Requested
                                     | TransportStarted ->
                                         DispatchOps.resolveRecord r Cancelled
-                                        return Choice1Of2(CancelledBeforeAcceptance)
+                                        return Choice1Of2 CancelledBeforeAcceptance
                                     | HostAccepted
                                     | RunObserved ->
-                                        let capturedGeneration = this.State.Generation
-                                        // physicalAbort is invoked inside the mailbox
-                                        // after active/turn/session-open re-validation.
-                                        let abortP = physicalAbort ()
-                                        let payload = (r, capturedGeneration, abortP)
-                                        return Choice2Of2 payload
+                                        if r.AbortSent then
+                                            logStaleEarly r.Identity.DispatchId "abort_already_sent"
+                                            return Choice1Of2(AlreadyTerminal Cancelled)
+                                        else
+                                            let capturedGeneration = this.State.Generation
+                                            let capturedDispatchId = r.Identity.DispatchId
+                                            return Choice2Of2(r, capturedGeneration, capturedDispatchId)
                                     | Terminal t -> return Choice1Of2(AlreadyTerminal t)
-                                | _ -> return Choice1Of2(AlreadyTerminal Superseded)
+                                | Some other ->
+                                    logStaleEarly other.Identity.DispatchId "superseded_by_new_turn"
+                                    return Choice1Of2(AlreadyTerminal Superseded)
+                                | None ->
+                                    logStaleEarly
+                                        (DispatchId.create ("stale:" + logicalTurnId))
+                                        "slot_empty"
+                                    return Choice1Of2(AlreadyTerminal Superseded)
                         })
 
-                match decision with
+                match phase1 with
                 | Choice1Of2 result -> return result
-                | Choice2Of2 (target, generation, abortP) ->
-                    let! abortSucceeded =
-                        promise {
-                            try
-                                return! abortP
-                            with _ ->
-                                return false
-                        }
-
+                | Choice2Of2(target, generation, dispatchId) ->
+                    // Hold the mailbox across ownership re-check AND host abort so a
+                    // new turn cannot Reserve the physical session mid-abort (S-08).
                     return!
                         this.State.Queue.Enqueue(fun () ->
                             promise {
+                                let logStale (reason: string) =
+                                    this.State.EventLogger.Log(
+                                        DispatchStaleAbort(
+                                            dispatchId,
+                                            logicalTurnId,
+                                            reason,
+                                            DispatchOps.getNowMs ()
+                                        )
+                                    )
+
                                 if this.State.IsClosed then
+                                    logStale "session_closed"
                                     return AlreadyTerminal SessionClosed
                                 else
                                     match this.State.Active with
                                     | Some current
                                         when obj.ReferenceEquals(current, target)
                                              && current.Identity.LogicalTurnId = logicalTurnId
+                                             && current.Identity.DispatchId = dispatchId
                                              && current.Terminal.IsNone
+                                             && not current.AbortSent
                                              && this.State.Generation = generation ->
+                                        let! abortSucceeded =
+                                            promise {
+                                                try
+                                                    return! physicalAbort ()
+                                                with _ ->
+                                                    return false
+                                            }
+
                                         if abortSucceeded then
                                             current.AbortSent <- true
                                             DispatchOps.resolveRecord current Cancelled
@@ -116,15 +144,20 @@ module SessionDispatcherExtensions =
 
                                             DispatchOps.resolveRecord current (AbortUnknown err)
                                             return AbortUnavailable
+                                    | Some current when current.AbortSent
+                                                        && obj.ReferenceEquals(current, target) ->
+                                        logStale "abort_already_sent"
+                                        return AlreadyTerminal Cancelled
                                     | Some _ ->
-                                        // A different turn now owns the slot.
+                                        logStale "superseded_by_new_turn"
                                         return AlreadyTerminal Superseded
                                     | None ->
                                         match target.Terminal with
-                                        | Some t -> return AlreadyTerminal t
+                                        | Some t ->
+                                            logStale "target_already_terminal"
+                                            return AlreadyTerminal t
                                         | None ->
-                                            // The slot is empty and the target
-                                            // was never terminal; treat as superseded.
+                                            logStale "slot_empty"
                                             return AlreadyTerminal Superseded
                             })
             }

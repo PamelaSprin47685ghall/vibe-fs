@@ -111,7 +111,12 @@ let appendNudgeSettledOrFail
         (buildEvent sessionID eventKindNudgeSettled payload (getTimestampMs().ToString()))
 
 let appendNudgeOwnerUnknownOrFail (workspaceRoot: string) (sessionID: string) (reason: string) : JS.Promise<unit> =
-    let payload = Map [ "feature", "nudge"; "session", sessionID; "reason", reason ]
+    let payload =
+        Map
+            [ "feature", "nudge"
+              "session", sessionID
+              "event", eventKindNudgeOwnerUnknown
+              "reason", reason ]
 
     appendAndCacheOrFail
         workspaceRoot

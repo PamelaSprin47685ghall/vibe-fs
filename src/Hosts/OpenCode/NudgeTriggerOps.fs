@@ -71,17 +71,28 @@ let resolveOwner
                 return inferred
             else
                 let directory = pluginDirectoryFromCtx ctx
+                let reason = "No owner inferred from runtime state or host messages"
+
+                // Diagnostic surface (N-06): structured console + durable event.
+                // Never guess owner; never silent permanent NoOwner dead zone.
+                JS.console.warn (
+                    box
+                        {| feature = "nudge"
+                           session = sessionIDStr
+                           event = "nudge_owner_unknown"
+                           reason = reason
+                           isTest = isTest
+                           directory = directory |}
+                )
 
                 do!
-                    appendNudgeOwnerUnknownOrFail
-                        directory
-                        sessionIDStr
-                        "No owner inferred from runtime state or host messages"
+                    appendNudgeOwnerUnknownOrFail directory sessionIDStr reason
                     |> Promise.catch (fun ex ->
                         JS.console.error (
                             box
                                 {| feature = "nudge"
                                    session = sessionIDStr
+                                   event = "nudge_owner_unknown"
                                    error = "Failed to append nudge_owner_unknown event: " + ex.Message |}
                         )
 

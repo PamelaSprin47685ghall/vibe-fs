@@ -77,6 +77,18 @@ type OmpSubsessionHost(session: obj, agent: string, pi: obj, workspaceRoot: stri
         member _.Abort(sessionId, turnId) =
             promise {
                 let sid = SessionId.value sessionId
+                let tid = TurnId.value turnId
+
+                let logStale (reason: string) =
+                    JS.console.warn (
+                        box
+                            {| feature = "subsession"
+                               hostVariant = "omp"
+                               session = sid
+                               turnId = tid
+                               event = "stale_abort"
+                               reason = reason |}
+                    )
 
                 let isOwner =
                     match Wanxiangshu.Runtime.SubsessionActorRegistry.SubsessionActorRegistry.TryGet workspaceRoot sid with
@@ -86,8 +98,10 @@ type OmpSubsessionHost(session: obj, agent: string, pi: obj, workspaceRoot: stri
                 match Map.tryFind sid sessionStates with
                 | Some state when state.ActiveTurnId = turnId && isOwner ->
                     if state.AbortSent then
+                        logStale "abort_already_sent"
                         return ConfirmedStopped
                     else
+                        // Mark before host call so a concurrent Abort cannot double-fire.
                         state.AbortSent <- true
 
                         let arg = box {| sessionId = sid |}
@@ -124,7 +138,18 @@ type OmpSubsessionHost(session: obj, agent: string, pi: obj, workspaceRoot: stri
                         if Array.exists id results then return RequestAcceptedAwaitIdle
                         elif sawApi then return AbortUnavailable
                         else return AbortUnavailable
-                | _ -> return ConfirmedStopped
+                | Some state when state.ActiveTurnId <> turnId ->
+                    logStale "active_turn_mismatch"
+                    return ConfirmedStopped
+                | Some _ when not isOwner ->
+                    logStale "actor_turn_mismatch"
+                    return ConfirmedStopped
+                | None ->
+                    logStale "no_active_turn"
+                    return ConfirmedStopped
+                | _ ->
+                    logStale "ownership_gate"
+                    return ConfirmedStopped
             }
 
         member this.CancelPendingDispatch(turnId) =
