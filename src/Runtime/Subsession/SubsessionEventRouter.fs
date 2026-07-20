@@ -42,6 +42,17 @@ let private tryGetCurrentTurnId (workspaceRoot: string) (sessionId: string) : Tu
 /// The caller awaits `actor.Post` so that event-store append errors propagate
 /// to the caller and persistent-event ordering is guaranteed end-to-end.
 /// EvidenceUpdated with TurnId=None is never posted; routing still counts as true.
+let private postDetached (sessionId: string) (actor: SubsessionActor) (cmd: Command) : unit =
+    actor.Post cmd
+    |> Promise.catch (fun ex ->
+        JS.console.error ("subsession event rejected for " + sessionId + ": " + ex.Message))
+    |> Promise.start
+    |> ignore
+
+/// Translate a host-level fact into a Command and post it to the child actor.
+/// Host hooks must return quickly: Post runs detached on the actor queue.
+/// Event-store ordering is still serial inside the actor; callers must not await
+/// host-hook completion for domain settlement.
 let routeToChild (workspaceRoot: string) (sessionId: string) (cmd: Command) : JS.Promise<bool> =
     promise {
         match SubsessionActorRegistry.TryGet workspaceRoot sessionId with
@@ -49,17 +60,12 @@ let routeToChild (workspaceRoot: string) (sessionId: string) (cmd: Command) : JS
             match cmd with
             | EvidenceUpdated obs when obs.TurnId.IsNone ->
                 match actor.GetCurrentTurn() with
-                | Some turnId -> do! actor.Post(EvidenceUpdated { obs with TurnId = Some turnId })
+                | Some turnId -> postDetached sessionId actor (EvidenceUpdated { obs with TurnId = Some turnId })
                 | None -> ()
 
                 return true
             | _ ->
-                actor.Post cmd
-                |> Promise.catch (fun ex ->
-                    JS.console.error ("subsession event rejected for " + sessionId + ": " + ex.Message))
-                |> Promise.start
-                |> ignore
-
+                postDetached sessionId actor cmd
                 return true
         | None -> return false
     }
