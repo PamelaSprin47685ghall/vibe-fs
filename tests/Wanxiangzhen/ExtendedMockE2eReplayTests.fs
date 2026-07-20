@@ -500,24 +500,31 @@ let testReplayWarnsOrphanInFlightReservationPreventsDoubleSend () : JS.Promise<u
                 Promise.lift dag)
 
         let mutable resolvePrompt: (unit -> unit) option = None
+        let mutable resolveEntered: (unit -> unit) option = None
         let mutable promptCalls = 0
+
+        let enteredGate: JS.Promise<unit> =
+            Promise.create (fun resolve _ -> resolveEntered <- Some(fun () -> resolve ()))
 
         s.promptSessionOverride <-
             Some(fun _c _m _p ->
                 promptCalls <- promptCalls + 1
                 s.promptSessionCalls <- s.promptSessionCalls @ [ (_m, _p) ]
 
-                Promise.create (fun resolve _reject ->
-                    resolvePrompt <- Some(fun () -> resolve ())))
+                match resolveEntered with
+                | Some e -> e ()
+                | None -> ()
+
+                Promise.create (fun resolve _ -> resolvePrompt <- Some(fun () -> resolve ())))
 
         rt.MasterSessionId <- sessionId
         s.mergeBaseOverride <- Some(fun _ _ _ -> false)
 
         let first = replayFromEventLog rt
-        do! Promise.sleep 10
+        do! enteredGate
         // Second replay while first prompt is in-flight must not call PromptSession again.
         let second = replayFromEventLog rt
-        do! Promise.sleep 10
+        do! Promise.sleep 0
         equal 1 promptCalls
         checkBare (rt.SentWarnings.Contains(idempotencyKey [ taskId ]))
 
