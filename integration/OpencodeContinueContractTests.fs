@@ -79,13 +79,13 @@ let run
                       match promptCount.Value with
                       | 1 ->
                           signalFirstPrompt ()
-                          Promise.lift ()
+                          Promise.lift (box {| data = {| id = "mock-spawn-msg-id" |} |})
                       | 2 ->
                           signalContinuePrompt ()
                           Promise.reject (exn "network connection lost")
                       | _ ->
                           signalRecoveryPrompt ()
-                          Promise.lift ())
+                          Promise.lift (box {| data = {| id = "mock-recovery-msg-id" |} |}))
                   "messages",
                   box (fun _ ->
                       let isComplete =
