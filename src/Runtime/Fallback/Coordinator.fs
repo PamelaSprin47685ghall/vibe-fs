@@ -18,6 +18,8 @@ open Wanxiangshu.Runtime.Fallback.CompactionHandler
 open Wanxiangshu.Runtime.Fallback.FallbackBridgeScanToolText
 open Wanxiangshu.Runtime.Fallback.FallbackConfigCodec
 open Wanxiangshu.Runtime.ContinuationEventWriter
+open Wanxiangshu.Kernel.Primitives.Identity
+open Wanxiangshu.Runtime.Dispatch
 
 open Wanxiangshu.Runtime.Fallback.FallbackCoordination
 
@@ -145,8 +147,17 @@ let private scheduleIntentEffect
     (intent: ContinuationIntent)
     : unit =
     let reenter = queueReenter queue
+    let ws =
+        if workspaceRoot = "" then
+            Id.workspaceIdQuick "fallback-default"
+        else
+            Id.workspaceIdQuick ("fallback:" + workspaceRoot)
+    let dispatcher = DispatchRegistryInstance.sharedDispatchRegistry.GetOrCreate ws sessionID (InMemoryDispatchEventLogger() :> IDispatchEventLogger)
 
-    run runtime executor workspaceRoot sessionID intent reenter
+    dispatcher.State.Queue.Enqueue(fun () ->
+        promise {
+            do! run runtime executor workspaceRoot sessionID intent reenter
+        })
     |> Promise.catch (fun ex ->
         JS.console.error ("fallback continuation effect failed for " + sessionID + ": " + ex.Message))
     |> Promise.start
