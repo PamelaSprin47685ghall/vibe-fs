@@ -14,5 +14,9 @@ let buildPromptBody = SubagentSpawnInput.buildPromptBody
 let extractSessionText = SubagentSpawnCleanup.extractSessionText
 let physicalAbort = SubagentSpawnCleanup.physicalAbort
 
+let createPromptAbortGate = SubagentSpawnTransport.createPromptAbortGate
+let bumpPromptAbortEpoch = SubagentSpawnTransport.bumpPromptAbortEpoch
+let closePromptAbortGate = SubagentSpawnTransport.closePromptAbortGate
+let promptWithAbortOwned = SubagentSpawnTransport.promptWithAbortOwned
 let promptWithAbort = SubagentSpawnTransport.promptWithAbort
 let startSubagentSession = SubagentSpawnTransport.startSubagentSession

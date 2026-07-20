@@ -16,17 +16,48 @@ open Wanxiangshu.Hosts.Opencode.SubagentTypes
 open Wanxiangshu.Hosts.Opencode.SubagentSpawnInput
 open Wanxiangshu.Hosts.Opencode.SubagentSpawnCleanup
 
-let promptWithAbort (client: obj) (args: obj) (signal: obj) : JS.Promise<unit> =
+/// S-08 style gate: physical session.abort only when the caller still owns
+/// this prompt epoch. Stale aborts after close / epoch bump skip host abort.
+type PromptAbortGate =
+    { mutable Live: bool
+      mutable Epoch: int }
+
+let createPromptAbortGate () : PromptAbortGate = { Live = true; Epoch = 0 }
+
+let bumpPromptAbortEpoch (gate: PromptAbortGate) : int =
+    gate.Epoch <- gate.Epoch + 1
+    gate.Epoch
+
+let closePromptAbortGate (gate: PromptAbortGate) : unit = gate.Live <- false
+
+let private ownsEpoch (gate: PromptAbortGate option) (epoch: int) : bool =
+    match gate with
+    | None -> true
+    | Some g -> g.Live && g.Epoch = epoch
+
+let private hostAbortIfOwned (session: obj) (childID: string) (gate: PromptAbortGate option) (epoch: int) =
+    promise {
+        if ownsEpoch gate epoch then
+            do! physicalAbort session childID
+    }
+
+let promptWithAbortOwned
+    (client: obj)
+    (args: obj)
+    (signal: obj)
+    (gate: PromptAbortGate option)
+    : JS.Promise<unit> =
     promise {
         match getSessionApiFromClient client with
         | Error err -> return! Promise.reject (exn (wireEncodeToolError "OpencodeClient" err))
         | Ok session ->
             let childID = Dyn.str (Dyn.get args "path") "id"
+            let epoch = match gate with | Some g -> g.Epoch | None -> 0
 
             if Dyn.isNullish signal then
                 do! session?prompt (args)
             elif Dyn.truthy (Dyn.get signal "aborted") then
-                do! physicalAbort session childID
+                do! hostAbortIfOwned session childID gate epoch
                 return! Promise.reject (DOMException("Aborted", "AbortError"))
             else
                 let settled = ref false
@@ -65,9 +96,12 @@ let promptWithAbort (client: obj) (args: obj) (signal: obj) : JS.Promise<unit> =
                 let! winner = Promise.race [ promptAsync; abortAsync ]
 
                 if winner = "aborted" then
-                    do! physicalAbort session childID
+                    do! hostAbortIfOwned session childID gate epoch
                     return! Promise.reject (DOMException("Aborted", "AbortError"))
     }
+
+let promptWithAbort (client: obj) (args: obj) (signal: obj) : JS.Promise<unit> =
+    promptWithAbortOwned client args signal None
 
 let startSubagentSession
     (registry: ChildAgentRegistry)

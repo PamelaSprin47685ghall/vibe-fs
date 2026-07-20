@@ -17,6 +17,7 @@ open Wanxiangshu.Kernel.Primitives.Identity
 open Wanxiangshu.Kernel.Errors.DomainError
 open Wanxiangshu.Kernel.Session.Causality
 open Wanxiangshu.Runtime.ReviewRuntime
+open Wanxiangshu.Hosts.Opencode.SubagentSpawnTransport
 
 let private maxNudges = 3
 
@@ -30,6 +31,7 @@ let runRound
     (childID: string)
     (childSignal: obj)
     (verdict: ReviewResult option ref)
+    (gate: PromptAbortGate)
     (parts: string list)
     : JS.Promise<RoundOutcome> =
     promise {
@@ -43,7 +45,8 @@ let runRound
                            tools = box (createObj [ "return_reviewer", box true ]) |} |}
 
         try
-            do! promptWithAbort client promptBody childSignal
+            bumpPromptAbortEpoch gate |> ignore
+            do! promptWithAbortOwned client promptBody childSignal (Some gate)
 
             match verdict.Value with
             | Some v -> return Resolved v
@@ -61,6 +64,7 @@ let rec loop
     (childSignal: obj)
     (verdict: ReviewResult option ref)
     (reviewStore: ReviewStore)
+    (gate: PromptAbortGate)
     (initialParts: string list)
     (nudgeCount: int)
     : JS.Promise<ReviewResult> =
@@ -68,12 +72,12 @@ let rec loop
         reviewStore.setPendingReview (childID, (fun r -> verdict.Value <- Some r))
 
         let parts = promptParts nudgeCount initialParts reviewerNudgePrompt
-        let! outcome = runRound client childID childSignal verdict parts
+        let! outcome = runRound client childID childSignal verdict gate parts
 
         match decideAfterRound nudgeCount outcome maxNudges with
         | Finish result -> return result
         | Nudge next ->
-            return! loop client childID childSignal verdict reviewStore initialParts next
+            return! loop client childID childSignal verdict reviewStore gate initialParts next
     }
 
 let performCleanup
@@ -85,10 +89,13 @@ let performCleanup
     (childID: string)
     (abortSignal: obj)
     (parentAbortHandler: (unit -> unit) option ref)
+    (gate: PromptAbortGate)
+    (childAbort: AbortController)
     : JS.Promise<unit> =
     promise {
         if not cleanedUp.Value then
             cleanedUp.Value <- true
+            closePromptAbortGate gate
 
             match parentAbortHandler.Value with
             | Some h when not (Dyn.isNullish abortSignal) ->
@@ -97,6 +104,11 @@ let performCleanup
                 with _ ->
                     ()
             | _ -> ()
+
+            try
+                childAbort.abort ()
+            with _ ->
+                ()
 
             try
                 reviewStore.unlockReview childID
@@ -126,6 +138,7 @@ let runLoopWithCleanup
     promise {
         let verdict = ref None
         let childAbort = AbortController()
+        let gate = createPromptAbortGate ()
 
         reviewStore.setAbortSuppressor (childID, (fun () -> childAbort.abort ()))
         reviewStore.setPendingReview (childID, (fun r -> verdict.Value <- Some r))
@@ -146,12 +159,23 @@ let runLoopWithCleanup
         let mutable result = Terminated
 
         try
-            let! r = loop client childID childAbort.signal verdict reviewStore initialParts 0
+            let! r = loop client childID childAbort.signal verdict reviewStore gate initialParts 0
             result <- r
         with err ->
             loopError <- Some err
 
-        do! performCleanup cleanedUp registry client reviewStore directory childID abortSignal parentAbortHandler
+        do!
+            performCleanup
+                cleanedUp
+                registry
+                client
+                reviewStore
+                directory
+                childID
+                abortSignal
+                parentAbortHandler
+                gate
+                childAbort
 
         match loopError with
         | Some err -> return! Promise.reject err

@@ -179,3 +179,60 @@ let runReviewLoopSendsNudgeOnTimeoutThenStopsOnResolve () =
         | Accepted _ -> check "nudge outcome accepted" true
         | _ -> check "nudge outcome accepted" false
     }
+
+/// R-03: exception during nudge loop still aborts+disposes the child.
+let runReviewLoop_finallyCleansUpOnPromptError () =
+    promise {
+        testScope.Remove "omp.coding_agent_module"
+        let childId = "review-child-cleanup-err"
+        let store = createReviewStore ()
+        let abortCalls = ref 0
+        let disposeCalls = ref 0
+
+        let session =
+            createObj
+                [ "sessionManager", box (createObj [ "getSessionId", box (fun () -> box childId) ])
+                  "prompt", box (fun (_: obj) -> Promise.reject (exn "omp prompt boom"))
+                  "waitForIdle", box (fun () -> emitJsExpr () "Promise.resolve()" |> unbox<JS.Promise<unit>>)
+                  "abort", box (fun () -> abortCalls.Value <- abortCalls.Value + 1) ]
+
+        let disposeFn = box (fun () -> disposeCalls.Value <- disposeCalls.Value + 1)
+
+        let createAgentSession =
+            box (fun (_body: obj) ->
+                Promise.lift (createObj [ "session", session; "dispose", disposeFn ]))
+
+        let pi =
+            createObj [ "pi", box (createObj [ "createAgentSession", createAgentSession ]) ]
+
+        testScope.Add(
+            "omp.coding_agent_module",
+            box (
+                createObj
+                    [ "SessionManager",
+                      box (
+                          createObj
+                              [ "create",
+                                box (fun (_cwd: string) -> createObj [ "getSessionId", box (fun () -> box "sm-1") ]) ]
+                      ) ]
+            )
+        )
+
+        let ctx = createObj [ "cwd", box "/tmp/ws" ]
+
+        // Prompt rejects immediately; nudge race treats rejection as unhandled unless
+        // mapped. Attach pending so attach path runs, then force loop error via reject.
+        let mutable sawError = false
+
+        try
+            let! _ = runReviewLoop testScope pi ctx store "parent-cleanup" "report" [| "a.fs" |] (Some "task")
+            ()
+        with _ ->
+            sawError <- true
+
+        // Even if loop maps error to Terminated without throw, cleanup must run.
+        check "omp child abort on error path" (abortCalls.Value >= 1)
+        check "omp child dispose on error path" (disposeCalls.Value >= 1)
+        check "omp pending cleared" (store.getPendingReviewIds () |> List.contains childId |> not)
+        ignore sawError
+    }

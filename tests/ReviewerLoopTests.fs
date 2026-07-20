@@ -313,6 +313,7 @@ let runReviewerLoop_finallyCleansUpEverything () =
 
             // After completion:
             check "unregistered from registry" (registry.LookupChildAgent "child-1" = None)
+            check "host abort called on success cleanup" abortCalled
             check "delete was called on host" deleteCalled
             check "reviewState is cleaned up in store" (store.getReviewState "child-1" = None)
         with ex ->
@@ -358,6 +359,7 @@ let runReviewerLoop_finallyCleansUpEverythingOnError () =
             let! _ = runReviewerLoop registry client store directory "child-1" [ "reviewerPrompt test" ] null
 
             check "unregistered from registry on error" (registry.LookupChildAgent "child-1" = None)
+            check "host abort called on error cleanup" abortCalled
             check "delete was called on host on error" deleteCalled
             check "reviewState is cleaned up in store on error" (store.getReviewState "child-1" = None)
         with ex ->
@@ -415,6 +417,7 @@ let runReviewerLoop_finallyCleansUpEverythingOnAbort () =
                 ()
 
             check "unregistered from registry on abort" (registry.LookupChildAgent "child-1" = None)
+            check "host abort called on parent abort" abortCalled
             check "delete was called on host on abort" deleteCalled
             check "reviewState is cleaned up in store on abort" (store.getReviewState "child-1" = None)
         with ex ->
@@ -425,6 +428,107 @@ let runReviewerLoop_finallyCleansUpEverythingOnAbort () =
         match loopError with
         | Some ex -> raise ex
         | None -> ()
+    }
+
+let promptWithAbort_abortsHostWhenSignalWins () =
+    promise {
+        let mutable abortCalled = false
+        let mutable abortPath = ""
+
+        let session =
+            createObj
+                [ "prompt", box (fun (_: obj) -> Promise.create (fun _ _ -> ()))
+                  "abort",
+                  box (fun (arg: obj) ->
+                      abortCalled <- true
+                      abortPath <- Wanxiangshu.Runtime.Dyn.str (Wanxiangshu.Runtime.Dyn.get arg "path") "id"
+                      Promise.lift ()) ]
+
+        let client = createObj [ "session", box session ]
+        let signal, trigger = createMockAbortSignal ()
+        let args = box {| path = box {| id = "child-abort-host" |} |}
+
+        let task =
+            Wanxiangshu.Hosts.Opencode.SubagentSpawn.promptWithAbort client args signal
+
+        let! () = yieldMicrotask ()
+        trigger ()
+
+        let mutable threw = false
+
+        try
+            do! task
+        with err ->
+            let domainErr = Wanxiangshu.Runtime.ErrorClassify.translateJsError err
+
+            match domainErr with
+            | Wanxiangshu.Kernel.Errors.DomainError.ClientCancellation _
+            | Wanxiangshu.Kernel.Errors.DomainError.MessageAborted -> threw <- true
+            | _ -> ()
+
+        check "promptWithAbort rejects on abort" threw
+        check "promptWithAbort calls host session.abort" abortCalled
+        equal "promptWithAbort aborts child path" "child-abort-host" abortPath
+    }
+
+let promptWithAbort_staleGateSkipsHostAbort () =
+    promise {
+        let mutable abortCount = 0
+
+        let session =
+            createObj
+                [ "prompt", box (fun (_: obj) -> Promise.create (fun _ _ -> ()))
+                  "abort",
+                  box (fun (_: obj) ->
+                      abortCount <- abortCount + 1
+                      Promise.lift ()) ]
+
+        let client = createObj [ "session", box session ]
+        let signal, trigger = createMockAbortSignal ()
+        let args = box {| path = box {| id = "child-stale" |} |}
+        let gate = Wanxiangshu.Hosts.Opencode.SubagentSpawn.createPromptAbortGate ()
+        Wanxiangshu.Hosts.Opencode.SubagentSpawn.bumpPromptAbortEpoch gate |> ignore
+
+        let task =
+            Wanxiangshu.Hosts.Opencode.SubagentSpawn.promptWithAbortOwned client args signal (Some gate)
+
+        let! () = yieldMicrotask ()
+        Wanxiangshu.Hosts.Opencode.SubagentSpawn.closePromptAbortGate gate
+        trigger ()
+
+        try
+            do! task
+        with _ ->
+            ()
+
+        check "closed gate skips physical host abort" (abortCount = 0)
+    }
+
+let promptWithAbort_alreadyAbortedCallsHostAbort () =
+    promise {
+        let mutable abortCalled = false
+
+        let session =
+            createObj
+                [ "prompt", box (fun (_: obj) -> Promise.lift ())
+                  "abort",
+                  box (fun (_: obj) ->
+                      abortCalled <- true
+                      Promise.lift ()) ]
+
+        let client = createObj [ "session", box session ]
+        let signal = createObj [ "aborted", box true ]
+        let args = box {| path = box {| id = "child-pre" |} |}
+
+        let mutable threw = false
+
+        try
+            do! Wanxiangshu.Hosts.Opencode.SubagentSpawn.promptWithAbort client args signal
+        with _ ->
+            threw <- true
+
+        check "pre-aborted signal rejects" threw
+        check "pre-aborted signal still host-aborts" abortCalled
     }
 
 let runReviewerLoop_cleanupExceptionDoesNotMaskOriginalError () =
@@ -494,5 +598,11 @@ let run () : JS.Promise<unit> =
         do! runReviewerLoop_finallyCleansUpEverythingOnAbort ()
         printfn "[TEST] runReviewerLoop_cleanupExceptionDoesNotMaskOriginalError"
         do! runReviewerLoop_cleanupExceptionDoesNotMaskOriginalError ()
+        printfn "[TEST] promptWithAbort_abortsHostWhenSignalWins"
+        do! promptWithAbort_abortsHostWhenSignalWins ()
+        printfn "[TEST] promptWithAbort_staleGateSkipsHostAbort"
+        do! promptWithAbort_staleGateSkipsHostAbort ()
+        printfn "[TEST] promptWithAbort_alreadyAbortedCallsHostAbort"
+        do! promptWithAbort_alreadyAbortedCallsHostAbort ()
         printfn "[TEST] All tests inside ReviewerLoopTests finished"
     }
