@@ -61,6 +61,11 @@ let private sendPromptFromNudge
         | Error ex -> return! Promise.reject ex
     }
 
+let private terminalMessage (prefix: string) (e: ErrorInput) : string =
+    let m = e.Message
+    if m.StartsWith(prefix) || m.StartsWith("Failed:") || m.StartsWith("AcceptanceUnknown") then m
+    else prefix + m
+
 let private handleMuxDispatchOutcome
     (dispatcher: SessionDispatcher)
     (identity: DispatchIdentity)
@@ -88,20 +93,20 @@ let private handleMuxDispatchOutcome
         | DispatchOutcome.Failed terminal ->
             match terminal with
             | DispatchTerminal.AcceptanceUnknown e ->
-                return! Promise.reject (System.Exception("AcceptanceUnknown: " + e.Message))
+                return! Promise.reject (System.Exception(terminalMessage "AcceptanceUnknown: " e))
             | DispatchTerminal.RejectedBeforeSend e ->
-                return! Promise.reject (System.Exception("Failed: " + e.Message))
+                return! Promise.reject (System.Exception(terminalMessage "Failed: " e))
             | DispatchTerminal.Failed e ->
-                return! Promise.reject (System.Exception("Failed: " + e.Message))
+                return! Promise.reject (System.Exception(terminalMessage "Failed: " e))
             | DispatchTerminal.TransportUnavailable e ->
-                return! Promise.reject (System.Exception("Failed: " + e.Message))
+                return! Promise.reject (System.Exception(terminalMessage "Failed: " e))
             | DispatchTerminal.Cancelled -> return! Promise.reject (System.Exception("Failed: cancelled"))
             | DispatchTerminal.Superseded ->
                 return! Promise.reject (System.Exception("Failed: AnotherDispatchInFlight"))
             | DispatchTerminal.SessionClosed -> return! Promise.reject (System.Exception("Failed: session closed"))
             | DispatchTerminal.AbortUnknown e ->
-                return! Promise.reject (System.Exception(abortUnavailableMessage + ": " + e.Message))
-            | DispatchTerminal.TimedOut e -> return! Promise.reject (System.Exception("Failed: " + e.Message))
+                return! Promise.reject (System.Exception(terminalMessage (abortUnavailableMessage + ": ") e))
+            | DispatchTerminal.TimedOut e -> return! Promise.reject (System.Exception(terminalMessage "Failed: " e))
             | DispatchTerminal.Poisoned s -> return! Promise.reject (System.Exception("Failed: " + s))
             | DispatchTerminal.Completed -> return ()
     }

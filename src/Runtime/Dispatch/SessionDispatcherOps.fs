@@ -73,7 +73,30 @@ module SessionDispatcherOps =
                   IsRetryable = Some false }
 
             DispatchOps.resolveRecord r (TransportUnavailable err)
-        | Error _ -> DispatchOps.rejectUnknown r "EmptyReceipt" "host returned empty user message id"
+        | Error exn ->
+            // Preserve host/transport failure text so callers can classify
+            // (helpers missing, nudge missing, session mismatch, etc.).
+            let msg =
+                let m = exn.Message
+                if System.String.IsNullOrEmpty m then "transport failed" else m
+            let name =
+                if msg.StartsWith("AcceptanceUnknown") then "AcceptanceUnknown"
+                elif msg.StartsWith("Failed:") then "RejectedBeforeSend"
+                else "TransportFailed"
+
+            let err =
+                { ErrorName = name
+                  DomainError = None
+                  Message = msg
+                  StatusCode = None
+                  IsRetryable = Some false }
+
+            let terminal =
+                if name = "AcceptanceUnknown" then AcceptanceUnknown err
+                elif msg.Contains("opencode_session_api_missing") then TransportUnavailable err
+                else RejectedBeforeSend err
+
+            DispatchOps.resolveRecord r terminal
 
     /// Reserve the per-session slot. Refuses if another dispatch is in flight or the session is closed.
     let reserveRecord (state: SessionDispatcherState) (r: DispatchRecord) (logger: IDispatchEventLogger) : JS.Promise<unit> =
