@@ -17,16 +17,18 @@ type PendingLease =
       Status: LeaseStatus }
 
 type NudgeLease =
-    { NudgeID: string
-      NudgeOrdinal: int
-      Nonce: string
-      HumanTurnID: string
-      /// Host-issued user message id bound at chat.message acceptance.
-      HostUserMessageId: string
-      SessionGeneration: int
-      CancelGeneration: int
-      Owner: SessionOwner
-      Status: LeaseStatus }
+    {
+        NudgeID: string
+        NudgeOrdinal: int
+        Nonce: string
+        HumanTurnID: string
+        /// Host-issued user message id bound at chat.message acceptance.
+        HostUserMessageId: string
+        SessionGeneration: int
+        CancelGeneration: int
+        Owner: SessionOwner
+        Status: LeaseStatus
+    }
 
 type FallbackSessionRuntime =
     { Core: SessionFallbackState

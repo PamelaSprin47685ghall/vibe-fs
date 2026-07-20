@@ -85,7 +85,7 @@ let finishWithResult (ctx: RunContext) (result: RunResult) (turnId: TurnId) =
 
 let beginAbort (nowMs: int64) (ctx: RunContext) (turn: ActiveTurn) (reason: AbortReason) (afterStop: AfterAbort) =
     let tid = activeTurnId turn
-    let abortDeadlineAtMs = nowMs + 60_000L
+    let abortDeadlineAtMs = nowMs + 30_000L
     let events = [ AbortRequested(ctx.RunId, tid, abortDeadlineAtMs) ]
     let effects = [ AbortHostSession(ctx.SessionId, tid); CancelPendingDispatch tid ]
 

@@ -44,7 +44,7 @@ let projectResources (state: SubsessionState) : ResourceSpec list =
         []
 
     | Dispatching(_, plan, _, turnDeadlineAtMs)
-    | CancellingDispatch(_, plan, _, turnDeadlineAtMs) ->
+    | CancellingDispatch(_, plan, _, _, turnDeadlineAtMs) ->
         let id = TurnDeadlineId(TurnId.value plan.TurnId)
         [ TurnDeadline(id, { DeadlineAtMs = turnDeadlineAtMs }) ]
 

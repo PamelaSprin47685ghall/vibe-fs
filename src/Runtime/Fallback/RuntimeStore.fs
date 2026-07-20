@@ -80,8 +80,7 @@ type FallbackRuntimeStore() =
         | Some s -> Some s.Core
         | None -> None
 
-    member _.GetAllSessionIds() : string list =
-        sessionStates |> Map.keys |> Seq.toList
+    member _.GetAllSessionIds() : string list = sessionStates |> Map.keys |> Seq.toList
 
     member _.GetOrCreateState(sessionID: string) : SessionFallbackState =
         if not (Map.containsKey sessionID sessionStates) then

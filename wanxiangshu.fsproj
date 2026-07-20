@@ -877,6 +877,7 @@
     <Compile Include="tests/SubsessionEmptyOutputContinueTests.fs"/>
     <Compile Include="tests/OpencodeSubsessionHostAdapterModelTests.fs"/>
     <Compile Include="tests/SubsessionScenarioTests.fs"/>
+    <Compile Include="tests/SubsessionExtendedTests.fs"/>
     <Compile Include="tests/SubsessionActorPumpTests.fs"/>
     <Compile Include="tests/DispatchRegistryTests.fs"/>
     <Compile Include="tests/SessionActorTests.fs"/>

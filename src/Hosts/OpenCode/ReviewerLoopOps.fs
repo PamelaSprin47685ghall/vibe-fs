@@ -77,8 +77,7 @@ let rec loop
 
         match decideAfterRound nudgeCount outcome maxNudges with
         | Finish result -> return result
-        | Nudge next ->
-            return! loop client childID childSignal verdict reviewStore gate initialParts next
+        | Nudge next -> return! loop client childID childSignal verdict reviewStore gate initialParts next
     }
 
 let performCleanup

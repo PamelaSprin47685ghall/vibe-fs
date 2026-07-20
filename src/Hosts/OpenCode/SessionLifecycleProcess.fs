@@ -27,14 +27,10 @@ let private rawOf (eventType: string) (props: obj) : obj =
 /// Rebuild host envelope + raw input from a standardized fact for existing fan-out.
 let private toHostSurface (fact: SessionFact) : (HostEventEnvelope * obj) option =
     match fact with
-    | SessionFact.HostLifecycleEnvelope(eventType, props, rawInput) ->
-        Some(envelopeOf eventType props, rawInput)
-    | SessionFact.SessionBusyObserved props ->
-        Some(envelopeOf "session.status" props, rawOf "session.status" props)
-    | SessionFact.SessionIdleObserved props ->
-        Some(envelopeOf "session.idle" props, rawOf "session.idle" props)
-    | SessionFact.SessionErrorObserved props ->
-        Some(envelopeOf "session.error" props, rawOf "session.error" props)
+    | SessionFact.HostLifecycleEnvelope(eventType, props, rawInput) -> Some(envelopeOf eventType props, rawInput)
+    | SessionFact.SessionBusyObserved props -> Some(envelopeOf "session.status" props, rawOf "session.status" props)
+    | SessionFact.SessionIdleObserved props -> Some(envelopeOf "session.idle" props, rawOf "session.idle" props)
+    | SessionFact.SessionErrorObserved props -> Some(envelopeOf "session.error" props, rawOf "session.error" props)
     | SessionFact.AssistantObserved(_, _, props)
     | SessionFact.ChatMessageObserved(_, _, props) ->
         Some(envelopeOf "message.updated" props, rawOf "message.updated" props)
@@ -99,7 +95,7 @@ let processLifecycleFact
         | SessionFact.SessionClosed ->
             // Cleanup only — do not re-enter NotifyClosed/Post (deadlocks the actor queue).
             let closedEnv = envelopeOf "session.deleted" (createObj [ "sessionID" ==> sid ])
-            nudge.TrackLifetimeEvents (Some closedEnv) |> Promise.start
+            nudge.TrackLifetimeEvents(Some closedEnv) |> Promise.start
             finalizeSessionClosed ctx sid
         | _ ->
             match toHostSurface fact with

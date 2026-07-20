@@ -16,7 +16,7 @@ let private beginAbortAfterDispatchAccepted
     (receipt: HostStartReceipt)
     (cancelCtx: CancelContext)
     : DecisionResult =
-    let abortDeadlineAtMs = nowMs + 60_000L
+    let abortDeadlineAtMs = nowMs + 30_000L
 
     let events =
         [ TurnStarted
@@ -100,7 +100,7 @@ let private handleReconciliationDeadlineExpired
     (turnDeadlineAtMs: int64)
     : DecisionResult =
     if retryCount >= 1 then
-        let reconciliationDeadlineAtMs = nowMs + 30_000L
+        let reconciliationDeadlineAtMs = nowMs + 10_000L
 
         decided
             (ClosingUnknownDispatch(
@@ -113,7 +113,7 @@ let private handleReconciliationDeadlineExpired
             []
             [ ClosePhysicalSession ctx.SessionId ]
     else
-        let reconciliationDeadlineAtMs = nowMs + 30_000L
+        let reconciliationDeadlineAtMs = nowMs + 10_000L
 
         decided
             (ReconcilingUnknownDispatch(ctx, plan, cancelCtx, 1, turnDeadlineAtMs, reconciliationDeadlineAtMs))
@@ -134,7 +134,7 @@ let private handleDispatchRejected (ctx: RunContext) (plan: TurnPlan) (cancelCtx
         [ TurnFinished(plan.TurnId, TurnCancelled); RunFinished(ctx.RunId, res) ]
         [ CompleteCaller(ctx.RunId, res) ]
 
-let private handleDispatchStatusResolved
+let private handleReconcilingDispatchStatusResolved
     (nowMs: int64)
     (ctx: RunContext)
     (plan: TurnPlan)
@@ -142,8 +142,8 @@ let private handleDispatchStatusResolved
     (retryCount: int)
     (turnDeadlineAtMs: int64)
     (reconciliationDeadlineAtMs: int64)
-    (status: DispatchStatus)
-    =
+    status
+    : Result<DecisionResult, DecisionError> =
     match status with
     | DispatchStatus.Accepted receipt -> Ok(beginAbortAfterDispatchAccepted nowMs ctx plan receipt cancelCtx)
     | DispatchStatus.TransportRejectedBeforeSend _ -> handleTransportRejectedBeforeSend nowMs ctx plan cancelCtx
@@ -164,7 +164,7 @@ let private handleDispatchStatusResolved
                 []
         )
     | DispatchStatus.Unknown ->
-        let reconciliationDeadlineAtMs2 = nowMs + 30_000L
+        let reconciliationDeadlineAtMs2 = nowMs + 10_000L
 
         Ok(
             decided
@@ -191,7 +191,7 @@ let private decideReconciling
     =
     match cmd with
     | DispatchStatusResolved status ->
-        handleDispatchStatusResolved
+        handleReconcilingDispatchStatusResolved
             nowMs
             ctx
             plan

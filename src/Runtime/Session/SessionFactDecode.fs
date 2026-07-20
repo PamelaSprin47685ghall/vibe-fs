@@ -2,7 +2,9 @@ module Wanxiangshu.Runtime.Session.SessionFactDecode
 
 open Wanxiangshu.Kernel.Session.SessionFact
 open Wanxiangshu.Runtime.Dyn
+
 module Dyn = Wanxiangshu.Runtime.Dyn
+
 open Wanxiangshu.Runtime.Messaging.OpencodeHostEvent
 open Wanxiangshu.Runtime.OpencodeHookInputCodec
 

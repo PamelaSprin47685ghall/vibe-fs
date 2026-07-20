@@ -153,7 +153,8 @@ let ``3 Error observed preserves evidence`` () =
           Todos = TodosCompleted
           Tool = HasToolResult
           Recovery = NoRecoveryPrompt
-          Outcome = NoOutcome }
+          Outcome = NoOutcome
+          IdleObserved = false }
 
     let state = Running(makeCtx sid rid, makeStarted tid "m1", evidence, 1000000L)
 

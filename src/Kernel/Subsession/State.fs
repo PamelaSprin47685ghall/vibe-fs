@@ -124,7 +124,7 @@ type SubsessionState =
     /// (inspector/coder/browser/meditator) spuriously failing with
     /// "No assistant message in current turn".
     | Dispatching of RunContext * TurnPlan * CurrentTurnEvidence * turnDeadlineAtMs: int64
-    | CancellingDispatch of RunContext * TurnPlan * CancelContext * turnDeadlineAtMs: int64
+    | CancellingDispatch of RunContext * TurnPlan * CancelContext * idleObserved: bool * turnDeadlineAtMs: int64
     | ReconcilingUnknownDispatch of
         RunContext *
         TurnPlan *

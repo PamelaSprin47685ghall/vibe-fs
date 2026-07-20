@@ -37,7 +37,7 @@ let private cmdName cmd =
     | EvidenceUpdated _ -> "EvidenceUpdated"
     | _ -> "Other"
 
-let private handleRunningIdle (nowMs: int64) (ctx: RunContext) (started: StartedTurn) (evidence: CurrentTurnEvidence) =
+let handleRunningIdle (nowMs: int64) (ctx: RunContext) (started: StartedTurn) (evidence: CurrentTurnEvidence) =
     let transcriptDec = classifyTurnEvidence evidence
 
     match transcriptDec with
@@ -80,7 +80,7 @@ let private handleRunningIdle (nowMs: int64) (ctx: RunContext) (started: Started
                 failure'
                 [ TurnFinished(started.Plan.TurnId, TurnInfrastructureFailed "session idle without task completion") ]
 
-let private handleDrainingIdle
+let handleDrainingIdle
     (nowMs: int64)
     (ctx: RunContext)
     (started: StartedTurn)
@@ -132,7 +132,12 @@ let private handleDrainingIdle
 
 let private decideDispatching (state: SubsessionState) (cmd: Command) =
     match state, cmd with
-    | Dispatching _, TurnErrorObserved _ -> Ok(noChange UnattributedObservationBeforeStart)
+    | Dispatching(ctx, plan, bufferedEvidence, turnDeadlineAtMs), TurnErrorObserved error ->
+        let merged =
+            { bufferedEvidence with
+                Outcome = FailureObserved error }
+
+        Ok(decided (Dispatching(ctx, plan, merged, turnDeadlineAtMs)) [] [])
     | Dispatching(ctx, plan, bufferedEvidence, turnDeadlineAtMs), EvidenceUpdated obs ->
         match obs.TurnId with
         | Some tid when tid = plan.TurnId ->
@@ -142,11 +147,25 @@ let private decideDispatching (state: SubsessionState) (cmd: Command) =
         | None ->
             let merged = CurrentTurnEvidence.merge bufferedEvidence obs.Evidence
             Ok(decided (Dispatching(ctx, plan, merged, turnDeadlineAtMs)) [] [])
-    | Dispatching _, SessionIdleObserved -> Ok(noChange DuplicateIdleBeforeTurnMarker)
+    | Dispatching(ctx, plan, bufferedEvidence, turnDeadlineAtMs), SessionIdleObserved ->
+        if bufferedEvidence.IdleObserved then
+            Ok(noChange DuplicateIdleBeforeTurnMarker)
+        else
+            let merged =
+                { bufferedEvidence with
+                    IdleObserved = true }
 
-    | CancellingDispatch _, SessionIdleObserved -> Ok(noChange DuplicateIdleBeforeTurnMarker)
-    | CancellingDispatch _, TurnErrorObserved _ -> Ok(noChange UnattributedObservationBeforeStart)
-    | CancellingDispatch _, EvidenceUpdated _ -> Ok(noChange EvidenceBeforeRun)
+            Ok(decided (Dispatching(ctx, plan, merged, turnDeadlineAtMs)) [] [])
+
+    | CancellingDispatch(ctx, plan, cancelCtx, idleObserved, turnDeadlineAtMs), SessionIdleObserved ->
+        if idleObserved then
+            Ok(noChange DuplicateIdleBeforeTurnMarker)
+        else
+            Ok(decided (CancellingDispatch(ctx, plan, cancelCtx, true, turnDeadlineAtMs)) [] [])
+    | CancellingDispatch(ctx, plan, cancelCtx, idleObserved, turnDeadlineAtMs), TurnErrorObserved error ->
+        Ok(decided (CancellingDispatch(ctx, plan, cancelCtx, idleObserved, turnDeadlineAtMs)) [] [])
+    | CancellingDispatch(ctx, plan, cancelCtx, idleObserved, turnDeadlineAtMs), EvidenceUpdated _ ->
+        Ok(noChange EvidenceBeforeRun)
 
     | ReconcilingUnknownDispatch _, SessionIdleObserved -> Ok(noChange StaleTimer)
     | ReconcilingUnknownDispatch _, TurnErrorObserved _ -> Ok(noChange StaleTimer)

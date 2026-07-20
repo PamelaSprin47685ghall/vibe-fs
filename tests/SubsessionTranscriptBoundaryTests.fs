@@ -101,7 +101,7 @@ let private dispatchingCancelProducesCancellingDispatch () =
     match decide state CancelRequested with
     | Ok(Decided d) ->
         match d.NextState with
-        | CancellingDispatch(ctx', plan', cancelCtx', _) ->
+        | CancellingDispatch(ctx', plan', cancelCtx', _, _) ->
             equal "ctx preserved" ctx.RunId ctx'.RunId
             equal "plan preserved" plan.TurnId plan'.TurnId
             equal "reason is UserRequested" UserRequested cancelCtx'.Reason
@@ -119,7 +119,7 @@ let private cancellingDispatchAcceptedInitiatesAbort () =
         { Reason = UserRequested
           AfterStop = FinishCancelled }
 
-    let state = CancellingDispatch(ctx, plan, cancelCtx, 1000000L)
+    let state = CancellingDispatch(ctx, plan, cancelCtx, false, 1000000L)
 
     match decide state (DispatchAccepted(turn0, receipt)) with
     | Ok(Decided d) ->
@@ -144,7 +144,7 @@ let private cancellingDispatchRejectedDefinitelyCancels () =
         { Reason = UserRequested
           AfterStop = FinishCancelled }
 
-    let state = CancellingDispatch(ctx, plan, cancelCtx, 1000000L)
+    let state = CancellingDispatch(ctx, plan, cancelCtx, false, 1000000L)
 
     match decide state (DispatchRejected(turn0, HostRejected err)) with
     | Ok(Decided d) ->
@@ -229,7 +229,7 @@ let private cancellingDispatchAcceptanceUnknownReconciles () =
         { Reason = UserRequested
           AfterStop = FinishCancelled }
 
-    let state = CancellingDispatch(ctx, plan, cancelCtx, 1000000L)
+    let state = CancellingDispatch(ctx, plan, cancelCtx, false, 1000000L)
 
     match decide state (DispatchRejected(turn0, HostAcceptanceUnknown err)) with
     | Ok(Decided d) ->

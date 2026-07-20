@@ -23,6 +23,7 @@ open Wanxiangshu.Tests.SubsessionDecisionTests
 open Wanxiangshu.Tests.OpencodeSubsessionHostAdapterModelTests
 open Wanxiangshu.Tests.SubsessionScenarioTests
 open Wanxiangshu.Tests.SubsessionActorPumpTests
+open Wanxiangshu.Tests.SubsessionExtendedTests
 open Wanxiangshu.Tests.SubsessionDispatchFailureTests
 open Wanxiangshu.Tests.SubsessionConcurrentCancelTests
 open Wanxiangshu.Tests.SubsessionTranscriptBoundaryTests
@@ -64,6 +65,7 @@ let fallbackTestEntries () : (string * TestBody) list =
       "SubsessionDecisionTests.run", Sync(sync SubsessionDecisionTests.run)
       "OpencodeSubsessionHostAdapterModelTests.run", Sync(sync OpencodeSubsessionHostAdapterModelTests.run)
       "SubsessionScenarioTests.run", Sync(sync SubsessionScenarioTests.run)
+      "SubsessionExtendedTests.run", Async SubsessionExtendedTests.run
       "SubsessionActorPumpTests.run", Async SubsessionActorPumpTests.run
       "SubsessionDispatchFailureTests.run", Async SubsessionDispatchFailureTests.run
       "DispatchRegistryTests.run", Async DispatchRegistryTests.run

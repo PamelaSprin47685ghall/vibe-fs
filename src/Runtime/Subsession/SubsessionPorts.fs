@@ -74,7 +74,7 @@ let filterHostEffects (effects: Effect list) : Effect list = effects |> List.fil
 let tryExtract (s: SubsessionState) : (RunContext * ActiveTurn) option =
     match s with
     | Dispatching(ctx, plan, _, _) -> Some(ctx, NotYetStarted plan)
-    | CancellingDispatch(ctx, plan, _, _) -> Some(ctx, NotYetStarted plan)
+    | CancellingDispatch(ctx, plan, _, _, _) -> Some(ctx, NotYetStarted plan)
     | ReconcilingUnknownDispatch(ctx, plan, _, _, _, _) -> Some(ctx, NotYetStarted plan)
     | ClosingUnknownDispatch(ctx, plan, _, _, _) -> Some(ctx, NotYetStarted plan)
     | Running(ctx, started, _, _) -> Some(ctx, Started started)
@@ -101,7 +101,7 @@ let buildFailSafe (priorState: SubsessionState) (msg: string) : Decision option 
               AfterStop = FinishFailed(InfrastructureFailure("event store append failed: " + msg)) }
 
         let nowMs = int64 (JS.Constructors.Date.now ())
-        let abortDeadlineAtMs = nowMs + 60_000L
+        let abortDeadlineAtMs = nowMs + 30_000L
 
         Some
             { NextState = IssuingAbort(ctx, turn, abortCtx, false, abortDeadlineAtMs)

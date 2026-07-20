@@ -46,10 +46,7 @@ let concurrentFactsSerialize () =
 
         let got = order |> Seq.toList
 
-        equal
-            "serialized order"
-            [ "busy-start"; "busy-end"; "idle"; "error" ]
-            got
+        equal "serialized order" [ "busy-start"; "busy-end"; "idle"; "error" ] got
 
         let snap = actor.Snapshot()
         equal "accepted count" 3 snap.AcceptedCount
@@ -76,17 +73,16 @@ let effectResultAfterCancelDropped () =
 
         do! actor.SetActiveDispatch(Some "dispatch-1")
         do! actor.SetOwner SessionOwner.Fallback
-        let identity = actor.CaptureEffectIdentity(dispatchId = "dispatch-1", owner = SessionOwner.Fallback)
+
+        let identity =
+            actor.CaptureEffectIdentity(dispatchId = "dispatch-1", owner = SessionOwner.Fallback)
 
         // Simulate cancel / human turn superseding the in-flight effect epoch.
         let! _ = actor.BumpGeneration()
         do! actor.SetActiveDispatch None
         do! actor.SetOwner SessionOwner.NoOwner
 
-        let! d1 =
-            actor.Post(
-                SessionFact.DispatchTransportReturned(identity, true, None)
-            )
+        let! d1 = actor.Post(SessionFact.DispatchTransportReturned(identity, true, None))
 
         let! d2 = actor.Post(SessionFact.AbortReturned(identity, true))
         let! d3 = actor.Post(SessionFact.TimeoutElapsed(identity, "prompt"))
@@ -101,10 +97,11 @@ let effectResultAfterCancelDropped () =
         // Fresh identity after cancel is admitted.
         do! actor.SetActiveDispatch(Some "dispatch-2")
         do! actor.SetOwner SessionOwner.Nudge
-        let fresh = actor.CaptureEffectIdentity(dispatchId = "dispatch-2", owner = SessionOwner.Nudge)
 
-        let! ok =
-            actor.Post(SessionFact.DispatchTransportReturned(fresh, true, None))
+        let fresh =
+            actor.CaptureEffectIdentity(dispatchId = "dispatch-2", owner = SessionOwner.Nudge)
+
+        let! ok = actor.Post(SessionFact.DispatchTransportReturned(fresh, true, None))
 
         check "fresh transport accepted" (ok = FactAdmission.Accept)
         equal "handler applied once" 1 applied
@@ -114,8 +111,7 @@ let effectResultAfterCancelDropped () =
             { fresh with
                 ExpectedDispatchId = Some "dispatch-other" }
 
-        let! bad =
-            actor.Post(SessionFact.AbortReturned(wrongDispatch, false))
+        let! bad = actor.Post(SessionFact.AbortReturned(wrongDispatch, false))
 
         check "wrong dispatch dropped" (bad = FactAdmission.DropDispatchMismatch)
         equal "still one apply" 1 applied
@@ -130,10 +126,7 @@ let sessionClosedDropsLaterFacts () =
         let actor = SessionActorRegistry.GetOrCreate "ws-close" "sess-3"
         let mutable count = 0
 
-        actor.ReplaceHandler(fun _ _ ->
-            promise {
-                count <- count + 1
-            })
+        actor.ReplaceHandler(fun _ _ -> promise { count <- count + 1 })
 
         let! c1 = actor.Post SessionFact.SessionClosed
         let! c2 = actor.Post(SessionFact.SessionIdleObserved(createObj []))
@@ -148,43 +141,34 @@ let sessionClosedDropsLaterFacts () =
 /// Decode path maps host envelopes into standard facts.
 let decodeHostEnvelopeFacts () =
     let busyInput =
-        createObj [
-            "event"
-            ==> createObj [
-                "type" ==> "session.status"
-                "properties"
-                ==> createObj [
-                    "sessionID" ==> "s-decode"
-                    "status" ==> createObj [ "type" ==> "busy" ]
-                ]
-            ]
-        ]
+        createObj
+            [ "event"
+              ==> createObj
+                      [ "type" ==> "session.status"
+                        "properties"
+                        ==> createObj [ "sessionID" ==> "s-decode"; "status" ==> createObj [ "type" ==> "busy" ] ] ] ]
 
     match tryFromHostInput busyInput with
     | Some("s-decode", SessionFact.SessionBusyObserved _) -> check "busy decode" true
     | other -> check ("busy decode unexpected: " + string other) false
 
     let idleInput =
-        createObj [
-            "event"
-            ==> createObj [
-                "type" ==> "session.idle"
-                "properties" ==> createObj [ "sessionID" ==> "s-decode" ]
-            ]
-        ]
+        createObj
+            [ "event"
+              ==> createObj
+                      [ "type" ==> "session.idle"
+                        "properties" ==> createObj [ "sessionID" ==> "s-decode" ] ] ]
 
     match tryFromHostInput idleInput with
     | Some("s-decode", SessionFact.SessionIdleObserved _) -> check "idle decode" true
     | other -> check ("idle decode unexpected: " + string other) false
 
     let closedInput =
-        createObj [
-            "event"
-            ==> createObj [
-                "type" ==> "session.deleted"
-                "properties" ==> createObj [ "info" ==> createObj [ "id" ==> "s-decode" ] ]
-            ]
-        ]
+        createObj
+            [ "event"
+              ==> createObj
+                      [ "type" ==> "session.deleted"
+                        "properties" ==> createObj [ "info" ==> createObj [ "id" ==> "s-decode" ] ] ] ]
 
     match tryFromHostInput closedInput with
     | Some("s-decode", SessionFact.SessionClosed) -> check "closed decode" true
@@ -207,9 +191,7 @@ let pureAdmissionRules () =
     let effect = SessionFact.DispatchTransportReturned(identity, true, None)
     let ownerSnap = SessionActorTransition.setOwner SessionOwner.Nudge baseSnap
 
-    check
-        "owner mismatch"
-        (FactAdmission.decide ownerSnap effect = FactAdmission.DropOwnerMismatch)
+    check "owner mismatch" (FactAdmission.decide ownerSnap effect = FactAdmission.DropOwnerMismatch)
 
     let dispatchSnap =
         baseSnap

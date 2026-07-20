@@ -155,5 +155,4 @@ let setInjected model ts (s: FallbackSessionRuntime) =
         InjectedModel = Some model
         InjectedAt = Some ts }
 
-let setAbortUnavailable value (s: FallbackSessionRuntime) =
-    { s with AbortUnavailable = value }
+let setAbortUnavailable value (s: FallbackSessionRuntime) = { s with AbortUnavailable = value }

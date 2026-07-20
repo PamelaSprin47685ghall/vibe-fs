@@ -67,11 +67,13 @@ let abortedRetrySpec () =
                                     (promise { return box {| data = messages |} }))
                             )
                             "prompt",
-                            box (System.Func<obj, JS.Promise<unit>>(fun arg ->
-                                promise {
-                                    resolveNudgeReceiptFromPromptArg workspaceDir arg
-                                    promptCalls.Add(arg)
-                                })) ]
+                            box (
+                                System.Func<obj, JS.Promise<unit>>(fun arg ->
+                                    promise {
+                                        resolveNudgeReceiptFromPromptArg workspaceDir arg
+                                        promptCalls.Add(arg)
+                                    })
+                            ) ]
                   ) ]
 
         let! p =

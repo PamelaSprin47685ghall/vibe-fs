@@ -7,7 +7,9 @@ open Wanxiangshu.Kernel.Subsession.TranscriptDecision
 open Wanxiangshu.Kernel.Subsession.Policy
 open Wanxiangshu.Tests.Assert
 
-let private fail (msg: string) = check msg false
+let private fail (msg: string) : 'a =
+    check msg false
+    failwith msg
 
 let private decide state cmd =
     Wanxiangshu.Kernel.Subsession.Decision.decide 1000000L state cmd
@@ -128,8 +130,11 @@ let dispatchingIdleIgnored () =
     let state = Dispatching(ctx, plan, CurrentTurnEvidence.empty, 1000000L)
 
     match decide state SessionIdleObserved with
-    | Ok(NoChange DuplicateIdleBeforeTurnMarker) -> ()
-    | other -> fail ("expected NoChange DuplicateIdleBeforeTurnMarker, got " + string other)
+    | Ok(Decided d) ->
+        match d.NextState with
+        | Dispatching(_, _, evidence, _) -> check "idle is cached" evidence.IdleObserved
+        | other -> fail ("expected Dispatching, got " + string other)
+    | other -> fail ("expected Decided, got " + string other)
 
 let dispatchingErrorIgnored () =
     let ctx = mkCtx policy0 (TurnOrdinal.next TurnOrdinal.first)
@@ -137,71 +142,54 @@ let dispatchingErrorIgnored () =
     let state = Dispatching(ctx, plan, CurrentTurnEvidence.empty, 1000000L)
 
     match decide state (TurnErrorObserved err) with
-    | Ok(NoChange UnattributedObservationBeforeStart) -> ()
-    | other -> fail ("expected UnattributedObservationBeforeStart, got " + string other)
+    | Ok(Decided d) ->
+        match d.NextState with
+        | Dispatching(_, _, evidence, _) ->
+            match evidence.Outcome with
+            | FailureObserved e -> equal "error message cached" err.Message e.Message
+            | _ -> fail "expected FailureObserved in outcome"
+        | other -> fail ("expected Dispatching, got " + string other)
+    | other -> fail ("expected Decided, got " + string other)
 
-/// Regression: idle can legitimately arrive while a turn is Dispatching (host
-/// event ordering is not process-ordered w.r.t. our own dispatch promise).
-/// It must be ignored here — NOT silently accepted into a state that can
-/// never recover. Then, once DispatchAccepted legitimately arrives and the
-/// turn reaches Running, a SUBSEQUENT idle must classify normally and the
-/// run must actually converge to Succeeded. This pins the exact causality
-/// bug that shipped in the IntegrationSubagentMockClient race: firing
-/// SessionIdleObserved before the Dispatch promise resolves must never wedge
-/// the actor forever.
+/// Premature idle during dispatching is cached, and immediately consumed when DispatchAccepted arrives.
 let idleDuringDispatchingThenRealIdleConverges () =
     let ctx = mkCtx policy0 (TurnOrdinal.next TurnOrdinal.first)
     let plan = mkPlan turn0 TurnOrdinal.first model0 "do work"
     let dispatchingState = Dispatching(ctx, plan, CurrentTurnEvidence.empty, 1000000L)
 
-    // Premature idle while still Dispatching: must be a named ignore, not a
-    // state transition (i.e. the actor must remain Dispatching afterwards).
-    match decide dispatchingState SessionIdleObserved with
-    | Ok(NoChange DuplicateIdleBeforeTurnMarker) -> ()
-    | other -> fail ("expected NoChange DuplicateIdleBeforeTurnMarker, got " + string other)
+    // Premature idle while still Dispatching: must cache the idle
+    let d0 =
+        match decide dispatchingState SessionIdleObserved with
+        | Ok(Decided d) -> d
+        | other ->
+            fail ("expected Decided for premature idle, got " + string other)
+            failwith "unexpected"
 
-    // Now the legitimate DispatchAccepted arrives (as if the host's prompt
-    // call had actually resolved) — must reach Running.
-    match decide dispatchingState (DispatchAccepted(turn0, OrderedTurnMarkerObserved)) with
+    match d0.NextState with
+    | Dispatching(_, _, evidence, _) -> check "idleObserved is cached" evidence.IdleObserved
+    | other -> fail ("expected Dispatching, got " + string other)
+
+    // Add some evidence to simulate assistant output during dispatching
+    let evidence =
+        { CurrentTurnEvidence.empty with
+            Assistant = AssistantSnapshot("", 0L, "done", Some NormalFinish)
+            IdleObserved = true }
+
+    let dispatchingState2 = Dispatching(ctx, plan, evidence, 1000000L)
+
+    // Now the legitimate DispatchAccepted arrives — must immediately consume the cached idle and reach Available
+    match decide dispatchingState2 (DispatchAccepted(turn0, OrderedTurnMarkerObserved)) with
     | Ok(Decided d1) ->
         match d1.NextState with
-        | Running(_, _, evidence0, _) ->
-            check "evidence starts empty" (evidence0 = CurrentTurnEvidence.empty)
-
-            // Evidence arrives (assistant text, normal finish) before idle.
-            let evidence =
-                { CurrentTurnEvidence.empty with
-                    Assistant = AssistantSnapshot("", 0L, "done", Some NormalFinish) }
-
-            match
-                decide
-                    d1.NextState
-                    (EvidenceUpdated
-                        { TurnId = Some turn0
-                          Evidence = evidence })
-            with
-            | Ok(Decided d2) ->
-                match d2.NextState with
-                | Running _ ->
-                    // Real idle now — must classify and converge to Succeeded,
-                    // proving the earlier premature idle did not leave any
-                    // latent state that would block or corrupt this transition.
-                    match decide d2.NextState SessionIdleObserved with
-                    | Ok(Decided d3) ->
-                        match d3.NextState with
-                        | Available _ ->
-                            check
-                                "run converges to Succeeded"
-                                (hasEffect
-                                    (function
-                                    | CompleteCaller(_, Succeeded "done") -> true
-                                    | _ -> false)
-                                    d3.Effects)
-                        | other -> fail ("expected Available (converged), got " + string other)
-                    | other -> fail ("unexpected on real idle: " + string other)
-                | other -> fail ("expected Running after evidence merge, got " + string other)
-            | other -> fail ("unexpected on EvidenceUpdated: " + string other)
-        | other -> fail ("expected Running after DispatchAccepted, got " + string other)
+        | Available _ ->
+            check
+                "run converges to Succeeded immediately using cached idle"
+                (hasEffect
+                    (function
+                    | CompleteCaller(_, Succeeded "done") -> true
+                    | _ -> false)
+                    d1.Effects)
+        | other -> fail ("expected Available (converged), got " + string other)
     | other -> fail ("unexpected on DispatchAccepted: " + string other)
 
 let runningErrorDrains () =
