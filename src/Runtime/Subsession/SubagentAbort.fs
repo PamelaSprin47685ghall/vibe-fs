@@ -22,8 +22,8 @@ let raceWithAbortSignal (signal: obj) (onAbort: unit -> unit) (work: JS.Promise<
                 if not (isNull handler) then
                     try
                         signal?removeEventListener ("abort", handler)
-                    with _ ->
-                        ()
+                    with ex ->
+                        JS.console.warn ("Failed to remove abort listener: " + ex.Message)
 
                     handler <- null
 
@@ -34,8 +34,8 @@ let raceWithAbortSignal (signal: obj) (onAbort: unit -> unit) (work: JS.Promise<
 
                     try
                         onAbort ()
-                    with _ ->
-                        ()
+                    with ex ->
+                        JS.console.error ("Abort handler callback threw: " + ex.Message)
 
                     reject rejecter
 
@@ -52,8 +52,8 @@ let raceWithAbortSignal (signal: obj) (onAbort: unit -> unit) (work: JS.Promise<
 
                 try
                     signal?addEventListener ("abort", handler)
-                with _ ->
-                    ()
+                with ex ->
+                    JS.console.warn ("Failed to add abort listener: " + ex.Message)
 
                 work?``then`` (
                     (fun res -> settleWork (fun () -> resolve res) ()),

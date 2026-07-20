@@ -151,7 +151,8 @@ let private integrationHarnessSuiteLabels =
     [ "Integration.OpencodePluginTests.run"
       "Integration.MimocodePluginTests.run"
       "Integration.MimoTuiPluginTests.run"
-      "IntegrationOpenCodeContractTests.run" ]
+      "IntegrationOpenCodeContractTests.run"
+      "IntegrationEventTests.run" ]
 
 let private allOtherTests: (string * TestBody) list =
     coreTestEntries ()
@@ -170,13 +171,17 @@ let private allOtherTests: (string * TestBody) list =
         "ContextBudgetIntegrationTests.run", TestBody.Async ContextBudgetIntegrationTests.run
         "ContextBudgetRealApiSpecs.run", TestBody.Async ContextBudgetRealApiSpecs.run
         "ContextBudgetEstimateTests.run", TestBody.Async ContextBudgetEstimateTests.run
-        "ContextBudgetPipelineNudgeTests.spec_applyContextBudget_mustSeeFinalOutboundAfterAllStages", TestBody.Async ContextBudgetPipelineNudgeTests.spec_applyContextBudget_mustSeeFinalOutboundAfterAllStages
+        "ContextBudgetPipelineNudgeTests.spec_applyContextBudget_mustSeeFinalOutboundAfterAllStages",
+        TestBody.Async ContextBudgetPipelineNudgeTests.spec_applyContextBudget_mustSeeFinalOutboundAfterAllStages
         "ContextBudgetCalibrationTests.run", TestBody.Sync(sync ContextBudgetCalibrationTests.run) ]
 
 let private integrationTests: (string * TestBody) list =
-    [ "Integration.OpencodePluginTests.run", TestBody.Async(fun () -> OpencodePluginTests.runAll [||] |> Promise.map ignore)
-      "Integration.MimocodePluginTests.run", TestBody.Async(fun () -> MimocodePluginTests.runAll [||] |> Promise.map ignore)
-      "Integration.MimoTuiPluginTests.run", TestBody.Async(fun () -> MimoTuiPluginTests.runAll [||] |> Promise.map ignore)
+    [ "Integration.OpencodePluginTests.run",
+      TestBody.Async(fun () -> OpencodePluginTests.runAll [||] |> Promise.map ignore)
+      "Integration.MimocodePluginTests.run",
+      TestBody.Async(fun () -> MimocodePluginTests.runAll [||] |> Promise.map ignore)
+      "Integration.MimoTuiPluginTests.run",
+      TestBody.Async(fun () -> MimoTuiPluginTests.runAll [||] |> Promise.map ignore)
       "IntegrationOpenCodeContractTests.run", TestBody.Async(fun () -> IntegrationOpencodeContractTests.runAll [||]) ]
     @ integrationToolFlatTests
 
@@ -207,12 +212,18 @@ let private selectedTests (selectors: string array) =
             qualityGatesTests
         else
             tests
+
     let filterSelectors =
-        if selectors.Length > 0 && (selectors.[0] = "L0" || selectors.[0] = "L2" || selectors.[0] = "L4") then
+        if
+            selectors.Length > 0
+            && (selectors.[0] = "L0" || selectors.[0] = "L2" || selectors.[0] = "L4")
+        then
             selectors |> Array.skip 1
         else
             selectors
-    allTestList |> List.filter (fun (label, _) -> matchesSelector filterSelectors label)
+
+    allTestList
+    |> List.filter (fun (label, _) -> matchesSelector filterSelectors label)
 
 let runAll (args: string array) : JS.Promise<int> =
     promise {
@@ -226,7 +237,11 @@ let runAll (args: string array) : JS.Promise<int> =
         Assert.disableGlobalClear ()
         let silent = Array.contains "--silent" args || Array.contains "--quiet" args
         Assert.setSilent silent
-        let cleanSelectors = args |> Array.filter (fun arg -> arg <> "--silent" && arg <> "--quiet" && arg <> "--verbose")
+
+        let cleanSelectors =
+            args
+            |> Array.filter (fun arg -> arg <> "--silent" && arg <> "--quiet" && arg <> "--verbose")
+
         initVerboseLog args
         PluginComposition.reviewStore.clearReviewSessions ()
         RunnerBackground.clearRunnerLogsForTest ExecutorTools.ompScope
@@ -236,6 +251,7 @@ let runAll (args: string array) : JS.Promise<int> =
         if List.isEmpty runnableTests then
             if not silent then
                 printfn "No tests matched selectors: %A" cleanSelectors
+
             return 1
         else
             let isIntegrationSuiteRun (label: string) =

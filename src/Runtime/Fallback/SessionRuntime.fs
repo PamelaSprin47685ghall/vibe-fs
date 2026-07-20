@@ -1,7 +1,24 @@
 module Wanxiangshu.Runtime.Fallback.SessionRuntime
 
+open System
 open Wanxiangshu.Kernel.FallbackKernel.Types
 open Wanxiangshu.Kernel.FallbackRuntimeFlags
+
+type EpisodeKind =
+    | Human = 0
+    | Nudge = 1
+    | Fallback = 2
+    | Compaction = 3
+    | Title = 4
+
+type ActiveEpisode =
+    { EpisodeId: string
+      SessionId: string
+      Generation: int
+      Kind: EpisodeKind
+      LeaseId: string option
+      HumanTurnId: string option
+      StartedByEventId: string option }
 
 type PendingLease =
     { ContinuationID: string
@@ -21,7 +38,6 @@ type NudgeLease =
       NudgeOrdinal: int
       Nonce: string
       HumanTurnID: string
-      /// Host-issued user message id bound at chat.message acceptance.
       HostUserMessageId: string
       SessionGeneration: int
       CancelGeneration: int
@@ -62,7 +78,9 @@ type FallbackSessionRuntime =
       ActiveContinuationGen: int
       ActiveContinuationCancelGen: int
       ActiveGates: Set<FallbackSessionGateFlag>
-      AbortUnavailable: bool }
+      AbortUnavailable: bool
+      TerminalConsumed: bool
+      ActiveEpisode: ActiveEpisode option }
 
 let emptyActiveGates: Set<FallbackSessionGateFlag> =
     Set.empty<FallbackSessionGateFlag>
@@ -110,20 +128,13 @@ let freshSessionState: FallbackSessionRuntime =
       ActiveContinuationGen = 0
       ActiveContinuationCancelGen = 0
       ActiveGates = emptyActiveGates
-      AbortUnavailable = false }
-// --- Unified domain transitions ---
-// Each function captures a complete lifecycle transition atomically.
-// These are the preferred mutation surface; callers should use them
-// through FallbackRuntimeStore.Update/UpdateSession/UpdateSessionReturning.
+      AbortUnavailable = false
+      TerminalConsumed = false
+      ActiveEpisode = None }
 
-/// A human turn has begun — reset per-turn state, set owner, clear lease gates,
-/// and atomically increment the turn ordinal with a new turn ID.
 let beginHumanTurn (msgId: string) (s: FallbackSessionRuntime) : FallbackSessionRuntime =
     let nextOrdinal = s.HumanTurnOrdinal + 1
-
-    let nextTurnId =
-        "ht-" + string nextOrdinal + "-" + System.Guid.NewGuid().ToString("N")
-
+    let nextTurnId = "ht-" + string nextOrdinal + "-" + Guid.NewGuid().ToString("N")
     let nextCancelGen = s.CancelGeneration + 1
 
     { s with
@@ -145,7 +156,17 @@ let beginHumanTurn (msgId: string) (s: FallbackSessionRuntime) : FallbackSession
         ActiveGates =
             s.ActiveGates
             |> Set.remove FallbackSessionGateFlag.EventHandlingActive
-            |> Set.remove FallbackSessionGateFlag.NudgeActive }
+            |> Set.remove FallbackSessionGateFlag.NudgeActive
+        TerminalConsumed = false
+        ActiveEpisode =
+            Some
+                { EpisodeId = "ep-human-" + nextTurnId
+                  SessionId = ""
+                  Generation = s.SessionGeneration
+                  Kind = EpisodeKind.Human
+                  LeaseId = None
+                  HumanTurnId = Some nextTurnId
+                  StartedByEventId = Some msgId } }
 
 let private hasActiveContinuationLease (s: FallbackSessionRuntime) =
     match s.PendingLease with
@@ -160,7 +181,6 @@ let private hasActiveContinuationLease (s: FallbackSessionRuntime) =
         | LeaseStatus.Settled -> false
     | None -> false
 
-/// A fallback continuation dispatch is being initiated — mark owner and gate, stamp generations.
 let startDispatch
     (model: FallbackModel)
     (promptTextOpt: string option)
@@ -172,12 +192,13 @@ let startDispatch
         let gen = s.SessionGeneration
         let cancelGen = s.CancelGeneration
         let nextOrdinal = s.ContinuationOrdinal + 1
+        let leaseId = Guid.NewGuid().ToString("N")
 
         { s with
             Owner = SessionOwner.Fallback
             PendingLease =
                 Some
-                    { ContinuationID = System.Guid.NewGuid().ToString("N")
+                    { ContinuationID = leaseId
                       ContinuationOrdinal = nextOrdinal
                       SessionGeneration = gen
                       HumanTurnID = s.HumanTurnId
@@ -191,9 +212,18 @@ let startDispatch
             ContinuationOrdinal = nextOrdinal
             ActiveContinuationGen = gen
             ActiveContinuationCancelGen = cancelGen
-            ActiveGates = Set.add FallbackSessionGateFlag.MainContinuationAwaitingStart s.ActiveGates }
+            ActiveGates = Set.add FallbackSessionGateFlag.MainContinuationAwaitingStart s.ActiveGates
+            TerminalConsumed = false
+            ActiveEpisode =
+                Some
+                    { EpisodeId = "ep-fallback-" + leaseId
+                      SessionId = ""
+                      Generation = gen
+                      Kind = EpisodeKind.Fallback
+                      LeaseId = Some leaseId
+                      HumanTurnId = Some s.HumanTurnId
+                      StartedByEventId = None } }
 
-/// A dispatched continuation lease has been fully acknowledged — clear lease and nudge gates.
 let completeDispatch (s: FallbackSessionRuntime) : FallbackSessionRuntime =
     { s with
         PendingNudgeLease = None
@@ -203,7 +233,6 @@ let completeDispatch (s: FallbackSessionRuntime) : FallbackSessionRuntime =
             |> Set.remove FallbackSessionGateFlag.EventHandlingActive
             |> Set.remove FallbackSessionGateFlag.NudgeActive }
 
-/// The episode is ending (user abort / task-complete / new human turn).
 let cancelEpisode (s: FallbackSessionRuntime) : FallbackSessionRuntime =
     { freshSessionState with
         SessionGeneration = s.SessionGeneration
@@ -221,7 +250,6 @@ let cancelEpisode (s: FallbackSessionRuntime) : FallbackSessionRuntime =
         ActiveGates = emptyActiveGates
         AbortUnavailable = s.AbortUnavailable }
 
-/// A compaction run is starting — claim ownership, track its identity, and arm the summary-transform bypass.
 let beginCompaction
     (compactionId: string)
     (compactionOrdinal: int)
@@ -234,9 +262,18 @@ let beginCompaction
         CompactionCancelGeneration = s.CancelGeneration
         CompactionGeneration = s.CompactionGeneration + 1
         CompactionSummaryTransformPending = true
-        Owner = SessionOwner.Compaction }
+        Owner = SessionOwner.Compaction
+        TerminalConsumed = false
+        ActiveEpisode =
+            Some
+                { EpisodeId = "ep-compaction-" + compactionId
+                  SessionId = ""
+                  Generation = s.SessionGeneration
+                  Kind = EpisodeKind.Compaction
+                  LeaseId = None
+                  HumanTurnId = Some s.HumanTurnId
+                  StartedByEventId = None } }
 
-/// A compaction run has settled — release ownership if compaction owned the session.
 let settleCompaction (s: FallbackSessionRuntime) : FallbackSessionRuntime =
     { s with
         CompactionActiveId = ""
@@ -251,4 +288,6 @@ let settleCompaction (s: FallbackSessionRuntime) : FallbackSessionRuntime =
             if s.Owner = SessionOwner.Compaction then
                 SessionOwner.NoOwner
             else
-                s.Owner }
+                s.Owner
+        TerminalConsumed = false
+        ActiveEpisode = None }

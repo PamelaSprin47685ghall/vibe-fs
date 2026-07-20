@@ -23,84 +23,212 @@ open Wanxiangshu.Hosts.Opencode.NudgeEffect
 open Wanxiangshu.Hosts.Opencode.Fallback.HostEventInspection
 open Wanxiangshu.Hosts.Opencode.NudgeTriggerCleanup
 
-let private inferOwnerFromTestRun (ctx: obj) (sessionIDStr: string) (isTest: bool) : JS.Promise<SessionOwner> =
+let private tryRecoverOwnerFromHostHistory
+    (ctx: obj)
+    (fallbackRuntime: FallbackRuntimeStore)
+    (sessionIDStr: string)
+    : JS.Promise<SessionOwner> =
     promise {
-        if isTest then
-            match getClientFromPluginCtx ctx with
-            | Error _ -> return SessionOwner.NoOwner
-            | Ok client ->
-                let arg = box {| path = box {| id = sessionIDStr |} |}
-                let! resp = invokeClient client "messages" arg
-                let data = Dyn.get resp "data"
+        match getClientFromPluginCtx ctx with
+        | Error _ -> return SessionOwner.NoOwner
+        | Ok client ->
+            let arg = box {| path = box {| id = sessionIDStr |} |}
+            let! resp = invokeClient client "messages" arg
+            let data = Dyn.get resp "data"
 
-                if not (Dyn.isNullish data) && Dyn.isArray data then
-                    let messagesArr = data :?> obj array
+            if Dyn.isNullish data || not (Dyn.isArray data) then
+                return SessionOwner.NoOwner
+            else
+                let messagesArr = data :?> obj array
 
-                    if messagesArr.Length > 0 then
-                        let lastMsg = messagesArr.[messagesArr.Length - 1]
-                        let info = Dyn.get lastMsg "info"
+                let lastNativeUserIdx =
+                    messagesArr
+                    |> Array.tryFindIndexBack (fun msg ->
+                        let info = Dyn.get msg "info"
                         let role = Dyn.str info "role"
+                        let isSynthetic = Dyn.get info "synthetic" |> string = "true"
+                        role = "user" && not isSynthetic)
 
-                        if role = "assistant" || role = "toolResult" then
-                            return SessionOwner.Human
-                        else
-                            return SessionOwner.NoOwner
+                match lastNativeUserIdx with
+                | None -> return SessionOwner.NoOwner
+                | Some idx ->
+                    let userMsgId = Dyn.str (Dyn.get messagesArr.[idx] "info") "id"
+
+                    let hasCausality =
+                        messagesArr.[idx + 1 ..]
+                        |> Array.exists (fun msg ->
+                            let info = Dyn.get msg "info"
+                            let role = Dyn.str info "role"
+                            role = "assistant" && Dyn.str info "parentID" = userMsgId)
+
+                    let session = fallbackRuntime.GetSession sessionIDStr
+
+                    let hasActiveLease =
+                        (match session.PendingLease with
+                         | Some l -> l.Status <> LeaseStatus.Settled && l.Status <> LeaseStatus.Cancelled
+                         | None -> false)
+                        || (match session.PendingNudgeLease with
+                            | Some l -> l.Status <> LeaseStatus.Settled && l.Status <> LeaseStatus.Cancelled
+                            | None -> false)
+                        || session.CompactionActiveId <> ""
+
+                    if hasCausality && not hasActiveLease then
+                        return SessionOwner.Human
                     else
                         return SessionOwner.NoOwner
-                else
-                    return SessionOwner.NoOwner
-        else
-            return SessionOwner.NoOwner
     }
 
-/// Read the current owner; in test runs, fall back to the last observed
-/// role on the host session (assistant / toolResult -> Human).
+let private emitOwnerUnknownDiagnostic
+    (directory: string)
+    (sessionIDStr: string)
+    (reason: string)
+    (isTest: bool)
+    (fallbackRuntime: FallbackRuntimeStore)
+    (props: obj)
+    (hostEventType: string)
+    : JS.Promise<unit> =
+    promise {
+        let session = fallbackRuntime.GetSession sessionIDStr
+        let isConsumed = session.TerminalConsumed
+
+        if not isConsumed then
+            fallbackRuntime.Update(sessionIDStr, setTerminalConsumed true)
+
+            let episodeId =
+                match session.ActiveEpisode with
+                | Some ep -> ep.EpisodeId
+                | None -> ""
+
+            let activeLeaseKind =
+                match session.ActiveEpisode with
+                | Some ep -> string ep.Kind
+                | None -> ""
+
+            let activeLeaseId =
+                session.ActiveEpisode
+                |> Option.bind (fun ep -> ep.LeaseId)
+                |> Option.defaultValue ""
+
+            let hostEventId =
+                let eid = Dyn.str props "id"
+
+                if eid = "" then
+                    let eventIdObj = Dyn.get props "eventId"
+
+                    if Dyn.isNullish eventIdObj then
+                        "evt-unknown"
+                    else
+                        box eventIdObj |> string
+                else
+                    eid
+
+            JS.console.warn (
+                box
+                    {| feature = "nudge"
+                       session = sessionIDStr
+                       event = "nudge_owner_unknown"
+                       reason = reason
+                       isTest = isTest
+                       directory = directory
+                       hostEventId = hostEventId
+                       hostEventType = hostEventType
+                       episodeId = episodeId
+                       generation = session.SessionGeneration
+                       runtimeOwner = string session.Owner
+                       actorOwner = string session.Owner
+                       lastHumanTurnId = session.HumanTurnId
+                       lastHumanMessageId = session.LastHumanMessageId
+                       activeLeaseKind = activeLeaseKind
+                       activeLeaseId = activeLeaseId
+                       restoreStatus = string session.Core.Lifecycle
+                       previousTerminalEventId = "" |}
+            )
+
+            try
+                do! appendNudgeOwnerUnknownOrFail directory sessionIDStr reason
+            with ex ->
+                JS.console.error (
+                    box
+                        {| feature = "nudge"
+                           session = sessionIDStr
+                           event = "nudge_owner_unknown"
+                           error = "Failed to append nudge_owner_unknown: " + ex.Message |}
+                )
+    }
+
+let private inferOwnerFromTestRun (isTest: bool) (messages: obj) : SessionOwner =
+    if not isTest then
+        SessionOwner.NoOwner
+    else if Dyn.isNullish messages || not (Dyn.isArray messages) then
+        SessionOwner.NoOwner
+    else
+        let arr = messages :?> obj array
+
+        if arr.Length = 0 then
+            SessionOwner.NoOwner
+        else
+            let last = arr.[arr.Length - 1]
+            let info = Dyn.get last "info"
+            let role = Dyn.str info "role"
+
+            if role = "assistant" || role = "toolResult" then
+                SessionOwner.Human
+            else
+                SessionOwner.NoOwner
+
+/// Read the current owner; in production and test, recover via causal history.
 let resolveOwner
     (ctx: obj)
     (fallbackRuntime: FallbackRuntimeStore)
     (sessionIDStr: string)
     (isTest: bool)
+    (props: obj)
+    (hostEventType: string)
     : JS.Promise<SessionOwner> =
     promise {
-        let current = (fallbackRuntime.GetSession sessionIDStr).Owner
+        let session = fallbackRuntime.GetSession sessionIDStr
 
-        if current <> SessionOwner.NoOwner then
-            return current
+        if isTerminalConsumed session then
+            return session.Owner
         else
-            let! inferred = inferOwnerFromTestRun ctx sessionIDStr isTest
+            let current = session.Owner
 
-            if inferred <> SessionOwner.NoOwner then
-                return inferred
+            if current <> SessionOwner.NoOwner then
+                return current
             else
-                let directory = pluginDirectoryFromCtx ctx
-                let reason = "No owner inferred from runtime state or host messages"
+                let! inferred = tryRecoverOwnerFromHostHistory ctx fallbackRuntime sessionIDStr
 
-                // Diagnostic surface (N-06): structured console + durable event.
-                // Never guess owner; never silent permanent NoOwner dead zone.
-                JS.console.warn (
-                    box
-                        {| feature = "nudge"
-                           session = sessionIDStr
-                           event = "nudge_owner_unknown"
-                           reason = reason
-                           isTest = isTest
-                           directory = directory |}
-                )
+                if inferred <> SessionOwner.NoOwner then
+                    return inferred
+                else
+                    let mutable testOwner = SessionOwner.NoOwner
 
-                do!
-                    appendNudgeOwnerUnknownOrFail directory sessionIDStr reason
-                    |> Promise.catch (fun ex ->
-                        JS.console.error (
-                            box
-                                {| feature = "nudge"
-                                   session = sessionIDStr
-                                   event = "nudge_owner_unknown"
-                                   error = "Failed to append nudge_owner_unknown event: " + ex.Message |}
-                        )
+                    if isTest then
+                        match getClientFromPluginCtx ctx with
+                        | Ok client ->
+                            let arg = box {| path = box {| id = sessionIDStr |} |}
+                            let! resp = invokeClient client "messages" arg
+                            let data = Dyn.get resp "data"
+                            testOwner <- inferOwnerFromTestRun isTest data
+                        | _ -> ()
 
-                        ())
+                    if testOwner <> SessionOwner.NoOwner then
+                        return testOwner
+                    else
+                        let directory = pluginDirectoryFromCtx ctx
+                        let reason = "No owner inferred from runtime state or host messages"
 
-                return SessionOwner.NoOwner
+                        do!
+                            emitOwnerUnknownDiagnostic
+                                directory
+                                sessionIDStr
+                                reason
+                                isTest
+                                fallbackRuntime
+                                props
+                                hostEventType
+
+                        return SessionOwner.NoOwner
     }
 
 /// Map (owner, isForce) to the TerminalOrigin that explains why the

@@ -2,6 +2,14 @@ module Wanxiangshu.Kernel.Session.SessionFact
 
 open Wanxiangshu.Kernel.FallbackKernel.Types
 
+type TerminalObservedInfo =
+    { SessionId: string
+      HostEventId: string
+      TerminalEpoch: int
+      Generation: int
+      SourceKind: string
+      Props: obj }
+
 /// Gate carried by effect-result facts. Actor drops the fact when generation,
 /// ownership, or dispatch identity no longer match the live session epoch.
 type EffectIdentity =
@@ -25,6 +33,7 @@ type SessionFact =
     | HumanTurnObserved of messageId: string * agent: string * model: string option
     | SessionClosed
     | RecoveryResult of identity: EffectIdentity * ok: bool * detail: string
+    | TerminalObserved of info: TerminalObservedInfo
     /// Migration bridge: opaque host lifecycle envelope still needing host-side fan-out.
     | HostLifecycleEnvelope of eventType: string * props: obj * rawInput: obj
 
@@ -59,4 +68,5 @@ module SessionFact =
         | SessionFact.HumanTurnObserved _ -> "HumanTurnObserved"
         | SessionFact.SessionClosed -> "SessionClosed"
         | SessionFact.RecoveryResult _ -> "RecoveryResult"
+        | SessionFact.TerminalObserved _ -> "TerminalObserved"
         | SessionFact.HostLifecycleEnvelope(eventType, _, _) -> "HostLifecycleEnvelope:" + eventType
