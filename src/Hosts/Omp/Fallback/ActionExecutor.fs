@@ -4,6 +4,7 @@ open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Runtime
 open Wanxiangshu.Runtime.Dyn
+open Wanxiangshu.Runtime.OmpHostBindings
 open Wanxiangshu.Kernel.Primitives.Identity
 open Wanxiangshu.Kernel.Errors.DomainError
 open Wanxiangshu.Kernel.Session.Causality
@@ -29,6 +30,18 @@ let private captureAgent (session: obj) : string option =
     let agent = Dyn.str session "agent"
     if agent <> "" then Some agent else None
 
+/// Prompt resolve is transport only — not HostAccepted (SPEC §4.5).
+/// Require a verifiable message id; otherwise raise AcceptanceUnknown.
+let private requirePromptReceipt (response: obj) : unit =
+    match tryExtractMessageId response with
+    | Some _ -> ()
+    | None ->
+        raise (
+            System.Exception(
+                "AcceptanceUnknown: OMP sessionPrompt resolved without message id; prompt complete ≠ accepted"
+            )
+        )
+
 type OmpActionExecutorClass(runtime: FallbackRuntimeStore, sessionApi: obj) =
     let invoke (method_: string) (arg: obj) : JS.Promise<obj> =
         if Dyn.isNullish sessionApi then
@@ -39,19 +52,18 @@ type OmpActionExecutorClass(runtime: FallbackRuntimeStore, sessionApi: obj) =
     let resolveModelAndAgent (fallbackModel: FallbackModel) (sessionID: string) =
         let sessionOpt = tryGetSession sessionID sessionApi
         let sessionAgentOpt = sessionOpt |> Option.bind captureAgent
-        let finalModel = fallbackModel
 
-        let modelStr =
-            match finalModel.Variant with
-            | Some v -> sprintf "%s/%s:%s" finalModel.ProviderID finalModel.ModelID v
-            | None -> sprintf "%s/%s" finalModel.ProviderID finalModel.ModelID
+        let modelOpt =
+            formatModelString fallbackModel.ProviderID fallbackModel.ModelID fallbackModel.Variant
 
         let agent =
             match sessionAgentOpt with
-            | Some sa -> sa
-            | None -> (runtime.GetSession sessionID).AgentName
+            | Some sa -> Some sa
+            | None ->
+                let a = (runtime.GetSession sessionID).AgentName
+                if a <> "" then Some a else None
 
-        modelStr, agent
+        modelOpt, agent
 
     let fetchMessages (sessionID: string) : JS.Promise<obj array> =
         promise {
@@ -61,40 +73,20 @@ type OmpActionExecutorClass(runtime: FallbackRuntimeStore, sessionApi: obj) =
             return if Dyn.isArray data then (data :?> obj array) else [||]
         }
 
+    let sendPrompt (sessionID: string) (text: string) (model: FallbackModel) (continuationID: string) =
+        promise {
+            let modelOpt, agentOpt = resolveModelAndAgent model sessionID
+            let promptBody = buildSessionPromptBody text modelOpt (Some continuationID) agentOpt
+            let! response = sessionPromptViaApi sessionApi sessionID promptBody
+            requirePromptReceipt response
+        }
+
     interface IActionExecutor with
         member _.SendContinue(sessionID, model, continuationID) =
-            promise {
-                let modelStr, agent = resolveModelAndAgent model sessionID
-
-                let pObj =
-                    let p =
-                        {| text = "\u200B"
-                           model = modelStr
-                           continuationID = continuationID |}
-
-                    if agent <> "" then Dyn.withKey p "agent" agent else box p
-
-                let body = box {| prompt = pObj |}
-                let arg = box {| sessionId = sessionID; body = body |}
-                do! invoke "sessionPrompt" arg |> Promise.map ignore
-            }
+            sendPrompt sessionID "\u200B" model continuationID
 
         member _.RecoverWithPrompt(sessionID, model, promptText, continuationID) =
-            promise {
-                let modelStr, agent = resolveModelAndAgent model sessionID
-
-                let pObj =
-                    let p =
-                        {| text = promptText
-                           model = modelStr
-                           continuationID = continuationID |}
-
-                    if agent <> "" then Dyn.withKey p "agent" agent else box p
-
-                let body = box {| prompt = pObj |}
-                let arg = box {| sessionId = sessionID; body = body |}
-                do! invoke "sessionPrompt" arg |> Promise.map ignore
-            }
+            sendPrompt sessionID promptText model continuationID
 
         member _.AbortRun sessionID =
             promise {

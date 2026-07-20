@@ -14,10 +14,18 @@ open Wanxiangshu.Runtime.ReviewRuntime
 module Dyn = Wanxiangshu.Runtime.Dyn
 
 open Wanxiangshu.Hosts.Omp.ChildCleanup
+open Wanxiangshu.Runtime.OmpHostBindings
 
 let private createDeferred () : JS.Promise<ReviewResult> * (ReviewResult -> unit) =
     let d = emitJsExpr () "Promise.withResolvers()"
     unbox (Dyn.get d "promise"), unbox (Dyn.get d "resolve")
+
+let private abortChildHost (childSession: obj) : unit =
+    // Single-path physical abort; ignore result (cleanup best-effort).
+    abortOnce childSession (box null) ""
+    |> Promise.map ignore
+    |> Promise.catch (fun _ -> ())
+    |> Promise.start
 
 let private attachReviewChild
     (store: ReviewStore)
@@ -31,15 +39,12 @@ let private attachReviewChild
     store.setPendingReview (
         childId,
         fun kr ->
-            try
-                Dyn.callMethod0 childSession "abort" |> ignore
-            with _ ->
-                ()
-
+            abortChildHost childSession
             onResolve kr
     )
 
-let private detachReviewChild (store: ReviewStore) (_parentId: string) (childId: string) =
+let private detachReviewChild (store: ReviewStore) (_parentId: string) (childId: string) (childSession: obj) =
+    abortChildHost childSession
     store.resolvePendingReview (childId, Terminated) |> ignore
     store.unlockReview childId
 
@@ -93,30 +98,23 @@ let runReviewLoop
         let childId = child.childId
 
         let cleanupChild () =
-            detachReviewChild store parentId childId
+            detachReviewChild store parentId childId childSession
             CleanupChildSession childSession child.dispose
 
-        if childId = "" then
+        try
+            if childId = "" then
+                cleanupChild ()
+                return Terminated
+            else
+                attachReviewChild store parentId childId (fun r -> resolveReview r) childSession
+                let initial = buildOmpReviewInitialPrompt report (files |> Array.toList) task
+                let initialPrompt = childSession?prompt (initial) |> unbox<JS.Promise<unit>>
+                let! outcome = runNudgeLoop childSession resolvedPromise initialPrompt (fun () -> Terminated)
+                cleanupChild ()
+                return outcome
+        with _ ->
             cleanupChild ()
             return Terminated
-        else
-            attachReviewChild store parentId childId (fun r -> resolveReview r) childSession
-            let initial = buildOmpReviewInitialPrompt report (files |> Array.toList) task
-            let initialPrompt = childSession?prompt (initial) |> unbox<JS.Promise<unit>>
-            let mutable loopError = None
-            let mutable outcome = Terminated
-
-            try
-                let! r = runNudgeLoop childSession resolvedPromise initialPrompt (fun () -> Terminated)
-                outcome <- r
-            with err ->
-                loopError <- Some err
-
-            cleanupChild ()
-
-            match loopError with
-            | Some err -> return! Promise.reject err
-            | None -> return outcome
     }
 
 let runPreReviewerSession
@@ -141,30 +139,21 @@ let runPreReviewerSession
                 let childId = child.childId
 
                 let cleanupChild () =
-                    detachReviewChild store parentId childId
+                    detachReviewChild store parentId childId childSession
                     CleanupChildSession childSession child.dispose
 
-                if childId = "" then
+                try
+                    if childId = "" then
+                        cleanupChild ()
+                        return Terminated
+                    else
+                        attachReviewChild store parentId childId (fun r -> resolveReview r) childSession
+                        let initial = reviewerPrompt taskTrim "" []
+                        let initialPrompt = childSession?prompt (initial) |> unbox<JS.Promise<unit>>
+                        let! jsOutcome = runNudgeLoop childSession resolvedPromise initialPrompt (fun () -> Terminated)
+                        cleanupChild ()
+                        return jsOutcome
+                with _ ->
                     cleanupChild ()
                     return Terminated
-                else
-                    attachReviewChild store parentId childId (fun r -> resolveReview r) childSession
-                    let initial = reviewerPrompt taskTrim "" []
-                    let initialPrompt = childSession?prompt (initial) |> unbox<JS.Promise<unit>>
-                    let mutable loopError = None
-                    let mutable outcome = Terminated
-
-                    try
-                        let! r =
-                            runNudgeLoop childSession resolvedPromise initialPrompt (fun () -> Terminated)
-
-                        outcome <- r
-                    with err ->
-                        loopError <- Some err
-
-                    cleanupChild ()
-
-                    match loopError with
-                    | Some err -> return! Promise.reject err
-                    | None -> return outcome
     }

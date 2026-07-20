@@ -21,6 +21,7 @@ open Wanxiangshu.Tests.OmpSessionLifecycleTests
 open Wanxiangshu.Tests.OmpCoverage2Tests
 open Wanxiangshu.Tests.OmpTodoToolTests
 open Wanxiangshu.Tests.OmpExecutorToolsTests
+open Wanxiangshu.Tests.OmpHostContractTests
 
 let entries2 () : (string * TestBody) list =
     [ "OmpPluginTestsLifecycle.websearchSchemaRequiresQueryAndWhatToSummarize",
@@ -159,4 +160,5 @@ let entries4 () : (string * TestBody) list =
       "OmpCoverage2Tests.run", Async OmpCoverage2Tests.run
       "OmpTodoToolTests.run", Async OmpTodoToolTests.run
       "OmpExecutorToolsTests.registersExecutorTools", Sync(sync OmpExecutorToolsTests.registersExecutorTools)
-      "OmpExecutorToolsTests.run", Async OmpExecutorToolsTests.run ]
+      "OmpExecutorToolsTests.run", Async OmpExecutorToolsTests.run
+      "OmpHostContractTests.run", Async OmpHostContractTests.run ]

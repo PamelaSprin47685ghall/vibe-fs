@@ -52,12 +52,11 @@ let fetchSessionMessages (pi: obj) (session: obj) (sessionId: SessionId) =
                 if Dyn.isArray raw then return Some raw else return None
     }
 
-/// Inspect the message array for a turn marker or any user message.
-/// When a user message or matched continuation carries an id, return
-/// UserMessageObserved instead of fabricating an ordered marker.
+/// Inspect messages for a turn marker or user message with a durable id.
+/// Fail closed: no id → Unknown. Never fabricate OrderedTurnMarkerObserved.
 let checkMessages (msgs: obj array) (target: string) =
-    let mutable accepted = false
-    let mutable receipt = None
+    let mutable receipt: string option = None
+    let mutable matchedWithoutId = false
 
     for msg in msgs do
         let info = Dyn.get msg "info"
@@ -83,21 +82,19 @@ let checkMessages (msgs: obj array) (target: string) =
             else
                 (Dyn.str roleTarget "role").ToLowerInvariant() = "user"
 
-        if found then
-            accepted <- true
-            let msgId = Dyn.str msg "id"
-            receipt <- if msgId <> "" then Some msgId else None
-        elif isUser then
-            accepted <- true
-            let msgId = Dyn.str msg "id"
-            if receipt.IsNone then receipt <- (if msgId <> "" then Some msgId else None)
+        let msgId =
+            let id = Dyn.str msg "id"
+            if id <> "" then id else Dyn.str info "id"
 
-    if accepted then
-        match receipt with
-        | Some id -> DispatchStatus.Accepted(UserMessageObserved id)
-        | None -> DispatchStatus.Accepted OrderedTurnMarkerObserved
-    else
-        DispatchStatus.Unknown
+        if found then
+            if msgId <> "" then receipt <- Some msgId else matchedWithoutId <- true
+        elif isUser && msgId <> "" && receipt.IsNone then
+            receipt <- Some msgId
+
+    match receipt with
+    | Some id -> DispatchStatus.Accepted(UserMessageObserved id)
+    | None when matchedWithoutId -> DispatchStatus.Unknown
+    | None -> DispatchStatus.Unknown
 
 let handleDispatchResult ws sid tid (result: Result<HostStartReceipt, DispatchFailure>) =
     match result with
