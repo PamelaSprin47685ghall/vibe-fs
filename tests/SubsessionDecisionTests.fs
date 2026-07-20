@@ -7,7 +7,9 @@ open Wanxiangshu.Kernel.Subsession.TranscriptDecision
 open Wanxiangshu.Kernel.Subsession.Policy
 open Wanxiangshu.Tests.Assert
 
-let private fail (msg: string) = check msg false
+let private fail (msg: string) : 'a =
+    check msg false
+    failwith msg
 
 let private decide state cmd =
     Wanxiangshu.Kernel.Subsession.Decision.decide 1000000L state cmd
