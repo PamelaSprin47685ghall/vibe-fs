@@ -5,61 +5,21 @@ open Fable.Core.JsInterop
 open Wanxiangshu.Runtime.Dyn
 open Wanxiangshu.Kernel.Nudge.Types
 open Wanxiangshu.Kernel.Nudge.NudgeProjection
+open Wanxiangshu.Runtime.MuxLogicalReceipt
 
 [<Global("globalThis.process")>]
 let private nodeProcess: obj = jsNative
 
-type MuxReceiptValidationResult =
-    | ValidReceipt of messageId: string
-    | InvalidReceipt of error: string
-    | SimpleSuccess
-    | SimpleFailure
-
+/// Re-export Mux logical receipt classification for nudge runtime callers.
 let validateMuxReceipt
     (result: obj)
     (expectedSessionId: string)
     (expectedDispatchId1: string)
     (expectedDispatchId2: string)
-    : MuxReceiptValidationResult =
-    if Dyn.isNullish result then
-        InvalidReceipt "nudge returned nullish value"
-    elif Dyn.typeIs result "boolean" then
-        if unbox<bool> result then SimpleSuccess else SimpleFailure
-    else
-        let msgId = Dyn.str result "messageId"
-        let msgId = if msgId <> "" then msgId else Dyn.str result "receiptId"
-        let sessId = Dyn.str result "sessionId"
+    : MuxLogicalReceipt =
+    classify result expectedSessionId expectedDispatchId1 expectedDispatchId2
 
-        let sessId =
-            if sessId <> "" then
-                sessId
-            else
-                Dyn.str result "workspaceId"
-
-        let dispId = Dyn.str result "dispatchId"
-        let dispId = if dispId <> "" then dispId else Dyn.str result "nonce"
-
-        let dispId =
-            if dispId <> "" then
-                dispId
-            else
-                Dyn.str result "continuationId"
-
-        let dispId =
-            if dispId <> "" then
-                dispId
-            else
-                Dyn.str result "continuationID"
-
-        if sessId <> expectedSessionId then
-            InvalidReceipt $"Receipt sessionId mismatch: expected {expectedSessionId}, got {sessId}"
-        elif dispId <> expectedDispatchId1 && dispId <> expectedDispatchId2 then
-            InvalidReceipt
-                $"Receipt dispatchId mismatch: expected {expectedDispatchId1} or {expectedDispatchId2}, got {dispId}"
-        elif msgId = "" then
-            InvalidReceipt "Receipt messageId is empty"
-        else
-            ValidReceipt msgId
+let receiptToSendOutcome = toSendOutcome
 
 let tryGetTodos (helpers: obj) (workspaceId: string) : JS.Promise<string list> =
     promise {

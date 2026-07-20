@@ -390,6 +390,7 @@
     <Compile Include="src/Runtime/Nudge/NudgeOutcomeHandler.fs"/>
     <Compile Include="src/Runtime/Nudge/NudgeFlow.fs"/>
     <Compile Include="src/Runtime/Nudge/MuxNudgeEventParse.fs"/>
+    <Compile Include="src/Runtime/Nudge/MuxLogicalReceipt.fs"/>
     <Compile Include="src/Runtime/Nudge/NudgeRuntimeMuxHelper.fs"/>
     <Compile Include="src/Runtime/Nudge/NudgeRuntimeMux.fs"/>
     <Compile Include="src/Runtime/Nudge/NudgeRuntime.fs"/>
