@@ -4,7 +4,6 @@ open Fable.Core
 open Fable.Core.JsInterop
 open System
 open Wanxiangshu.Tests.Assert
-open Wanxiangshu.Hosts.Opencode.HostField
 open Wanxiangshu.Hosts.Opencode.HookSchemaDecoration
 open Wanxiangshu.Hosts.Opencode.HookSchemaDecode
 open Wanxiangshu.Hosts.Opencode.ToolSchema
@@ -12,22 +11,24 @@ open Wanxiangshu.Kernel.Primitives.Identity
 open Wanxiangshu.Kernel.Errors.DomainError
 open Wanxiangshu.Kernel.Session.Causality
 open Wanxiangshu.Kernel.ToolCatalog
+open Wanxiangshu.Kernel.ToolResult
+open Wanxiangshu.Runtime.DynField
 
 module Dyn = Wanxiangshu.Runtime.Dyn
 open Wanxiangshu.Runtime.Dyn
 
-// ── Opencode.ToolHelpers ───────────────────────────────────────────────────
+// ── DynField / ToolResult probes (HostField deleted) ───────────────────────
 
 let toolHelpers () =
     equal
         "formatDomainError"
         "ctx failed: session busy"
-        (Wanxiangshu.Hosts.Opencode.HostField.formatDomainError "ctx" SessionBusy)
+        (wireEncodeToolError "ctx" SessionBusy)
 
     let o = createObj [ "a", box "hi"; "b", box 42; "c", box true; "d", box null ]
-    equal "optStr some" (Some "hi") (optStr o "a")
-    equal "optStr none" None (optStr o "missing")
-    equal "optStr null none" None (optStr o "d")
+    equal "optStr some" (Some "hi") (strField o "a")
+    equal "optStr none" None (strField o "missing")
+    equal "optStr null none" None (strField o "d")
     equal "optInt some" (Some 42) (optInt o "b")
     equal "optInt none" None (optInt o "missing")
     equal "optBool some" (Some true) (optBool o "c")

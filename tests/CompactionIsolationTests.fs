@@ -5,7 +5,9 @@ open Fable.Core.JsInterop
 open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Runtime.Fallback.RuntimeStore
 open Wanxiangshu.Runtime.Fallback.SessionRuntime
+open Wanxiangshu.Runtime.Fallback.SessionRuntimeTransitions
 open Wanxiangshu.Runtime.Fallback.SessionRuntimeLeasePure
+open Wanxiangshu.Runtime.Fallback.SessionRuntimeCompactionPure
 open Wanxiangshu.Kernel.FallbackKernel.Types
 
 let testCompactionSummaryTransformPendingFlag () =

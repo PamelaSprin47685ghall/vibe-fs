@@ -13,9 +13,12 @@ open Wanxiangshu.Runtime.ChatHookOutputCodec
 open Wanxiangshu.Runtime.OpencodeAgentConfigWire
 open Wanxiangshu.Hosts.Opencode.ChatHooksDecoders
 open Wanxiangshu.Hosts.Opencode.ChatHooksClassification
-open Wanxiangshu.Hosts.Opencode.ChatHooksProvenance
 open Wanxiangshu.Hosts.Opencode.ChatHooksMessageIdDedup
 open Wanxiangshu.Hosts.Opencode.SessionLifecycleObserver
+open Wanxiangshu.Kernel.EventSourcing.EventEnvelope
+open Wanxiangshu.Kernel.EventSourcing.EventKind
+open Wanxiangshu.Runtime.Clock
+open Wanxiangshu.Runtime.EventLogRuntimeStore
 
 let internal isSystemMessage
     (parts: obj)
@@ -25,6 +28,39 @@ let internal isSystemMessage
     (msgId: string)
     : bool =
     ChatHooksClassification.isSystemMessage parts fr workspaceRoot sessionIDStr msgId
+
+let private recordContinuationUserMessage
+    (workspaceRoot: string)
+    (sessionId: string)
+    (messageId: string)
+    (continuationId: string)
+    : JS.Promise<unit> =
+    promise {
+        let at = getTimestampMs().ToString()
+
+        let wanEvent: WanEvent =
+            { V = 2
+              Session = sessionId
+              Kind = eventKindContinuationHostAccepted
+              At = at
+              Payload = Map [ "continuationId", continuationId; "userMessageId", messageId ] }
+
+        do! appendEventsAndCacheOrFail workspaceRoot [ wanEvent ]
+    }
+
+let private recordProvenanceIfPresent
+    (parts: obj)
+    (msgId: string)
+    (workspaceRoot: string)
+    (sessionIDStr: string)
+    : JS.Promise<unit> =
+    promise {
+        if msgId <> "" then
+            match tryDecodeWanxiangshuProvenance parts with
+            | Some provenance ->
+                do! recordContinuationUserMessage workspaceRoot sessionIDStr msgId provenance.ContinuationId
+            | None -> ()
+    }
 
 let private applyToolOverrides (host: Host) (agent: string) (output: obj) : unit =
     match chatMessageFromHookOutput output with

@@ -16,6 +16,7 @@ open Wanxiangshu.Runtime.BacklogSession
 open Wanxiangshu.Runtime.Dyn
 open Wanxiangshu.Runtime.Fallback.SessionRuntimePropertyPure
 open Wanxiangshu.Runtime.Fallback.SessionRuntimeLeasePure
+open Wanxiangshu.Runtime.Fallback.SessionRuntimeCompactionPure
 
 let private sanitizeMuxMessages (sessionID: string) (messagesArr: obj array) = decodeMessages sessionID messagesArr
 

@@ -127,6 +127,9 @@
     <Compile Include="src/Kernel/SessionControl/Event.fs"/>
     <Compile Include="src/Kernel/SessionControl/LeaseIdentity.fs"/>
     <Compile Include="src/Kernel/SessionControl/LeaseIdentityOps.fs"/>
+    <Compile Include="src/Kernel/SessionControl/LeaseTransitionsCompaction.fs"/>
+    <Compile Include="src/Kernel/SessionControl/LeaseTransitionsContinuation.fs"/>
+    <Compile Include="src/Kernel/SessionControl/LeaseTransitionsNudge.fs"/>
     <Compile Include="src/Kernel/SessionControl/LeaseTransitions.fs"/>
     <Compile Include="src/Kernel/SessionControl/Projection.fs"/>
     <Compile Include="src/Kernel/EventSourcing/SessionState.fs"/>
@@ -160,7 +163,12 @@
     <Compile Include="src/Runtime/Tooling/NativeReadTranscript.fs"/>
     <Compile Include="src/Runtime/SubagentPrompts.fs"/>
     <Compile Include="src/Runtime/Subsession/Subagent.fs"/>
+    <Compile Include="src/Runtime/Execution/BacklogProjectionText.fs"/>
+    <Compile Include="src/Runtime/Execution/BacklogCompactionPrompt.fs"/>
+    <Compile Include="src/Runtime/Execution/BacklogCompactingTransform.fs"/>
     <Compile Include="src/Runtime/Execution/BacklogProjectionBuild.fs"/>
+    <Compile Include="src/Runtime/Execution/BacklogProjectionFold.fs"/>
+    <Compile Include="src/Runtime/Execution/BacklogProjectionRebuild.fs"/>
     <Compile Include="src/Runtime/Execution/BacklogProjection.fs"/>
     <Compile Include="src/Runtime/Execution/ExecutorFormat.fs"/>
     <Compile Include="src/Runtime/Tooling/TreeSitterFormat.fs"/>
@@ -206,7 +214,6 @@
     <Compile Include="src/Runtime/Fallback/SessionRuntimeLeasePure.fs"/>
     <Compile Include="src/Runtime/Fallback/SessionRuntimeLeaseAcceptancePure.fs"/>
     <Compile Include="src/Runtime/Fallback/RuntimeStore.fs"/>
-    <Compile Include="src/Runtime/Fallback/FallbackGateObservation.fs"/>
     <Compile Include="src/Runtime/Fallback/FallbackMessageParser.fs"/>
     <Compile Include="src/Runtime/Fallback/FallbackMessageDetection.fs"/>
     <Compile Include="src/Runtime/Fallback/FallbackMessageCodec.fs"/>
@@ -234,6 +241,9 @@
     <Compile Include="src/Runtime/Execution/ExecutorJavascript.fs"/>
     <Compile Include="src/Runtime/Subsession/SubagentIntentsCodec.fs"/>
     <Compile Include="src/Runtime/Tooling/WebSearchApi.fs"/>
+    <Compile Include="src/Runtime/Subsession/SubagentToolContext.fs"/>
+    <Compile Include="src/Runtime/Subsession/SubagentPromptBody.fs"/>
+    <Compile Include="src/Runtime/Subsession/SubagentAbort.fs"/>
     <Compile Include="src/Runtime/Subsession/SubagentIo.fs"/>
     <Compile Include="src/Runtime/Tooling/TreeSitterPlatform.fs"/>
     <Compile Include="src/Runtime/Tooling/TreeSitterDiagnostics.fs"/>
@@ -300,7 +310,6 @@
     <Compile Include="src/Runtime/Execution/RunnerBackground.fs"/>
     <Compile Include="src/Runtime/Messaging/OmpFileScannerDiscovery.fs"/>
     <Compile Include="src/Runtime/Messaging/OmpFileScanner.fs"/>
-    <Compile Include="src/Runtime/Messaging/OmpPromptContext.fs"/>
     <Compile Include="src/Runtime/Messaging/OmpCaps.fs"/>
     <Compile Include="src/Runtime/Subsession/TitleFetchGuard.fs"/>
     <Compile Include="src/Runtime/Execution/ExecutorPlatform.fs"/>
@@ -390,6 +399,7 @@
     <Compile Include="src/Runtime/Tooling/MuxToolDefinition.fs"/>
     <Compile Include="src/Runtime/Tooling/ToolSchemaRegistry.fs"/>
     <Compile Include="src/Runtime/Tooling/ToolArgumentCoercion.fs"/>
+    <Compile Include="src/Runtime/Tooling/ToolHookIdentity.fs"/>
     <Compile Include="src/Runtime/Tooling/ToolHookRuntime.fs"/>
     <Compile Include="src/Runtime/Messaging/MuxPluginCatalogShell.fs"/>
     <Compile Include="src/Runtime/Nudge/NudgeMessageClassifier.fs"/>
@@ -480,9 +490,12 @@
     <Compile Include="src/Hosts/OpenCode/SessionLifecycleProcess.fs"/>
     <Compile Include="src/Hosts/OpenCode/SessionLifecycleEvents.fs"/>
     <Compile Include="src/Hosts/OpenCode/SessionLifecycleObserver.fs"/>
+    <Compile Include="src/Hosts/OpenCode/Fallback/MessageInspectionObservation.fs"/>
+    <Compile Include="src/Hosts/OpenCode/Fallback/MessageInspectionIdentity.fs"/>
     <Compile Include="src/Hosts/OpenCode/Fallback/MessageInspection.fs"/>
     <Compile Include="src/Hosts/OpenCode/Fallback/EventTranslator.fs"/>
     <Compile Include="src/Hosts/OpenCode/Fallback/ContinuationPromptBuilder.fs"/>
+    <Compile Include="src/Hosts/OpenCode/Fallback/ActionExecutorDispatch.fs"/>
     <Compile Include="src/Hosts/OpenCode/Fallback/ActionExecutor.fs"/>
     <Compile Include="src/Hosts/OpenCode/Fallback/Hook.fs"/>
     <Compile Include="src/Hosts/OpenCode/SubagentTypes.fs"/>
@@ -493,7 +506,6 @@
     <Compile Include="src/Hosts/OpenCode/SubsessionHostAdapterTypes.fs"/>
     <Compile Include="src/Hosts/OpenCode/SubsessionHostAdapterOps.fs"/>
     <Compile Include="src/Hosts/OpenCode/SubsessionHostAdapter.fs"/>
-    <Compile Include="src/Hosts/OpenCode/SubagentIoArgs.fs"/>
     <Compile Include="src/Hosts/OpenCode/SubagentIoCleanup.fs"/>
     <Compile Include="src/Hosts/OpenCode/SubagentRunDirective.fs"/>
     <Compile Include="src/Hosts/OpenCode/SubagentRunExec.fs"/>
@@ -507,7 +519,6 @@
     <Compile Include="src/Hosts/OpenCode/CommandHooks.fs"/>
     <Compile Include="src/Hosts/OpenCode/ChatHooksDecoders.fs"/>
     <Compile Include="src/Hosts/OpenCode/ChatHooksClassification.fs"/>
-    <Compile Include="src/Hosts/OpenCode/ChatHooksProvenance.fs"/>
     <Compile Include="src/Hosts/OpenCode/ChatHooks.fs"/>
     <Compile Include="src/Hosts/OpenCode/ToolDefinitionHooks.fs"/>
     <Compile Include="src/Hosts/OpenCode/EventHooks.fs"/>
@@ -521,7 +532,6 @@
     <Compile Include="src/Hosts/OpenCode/MessageTransformPipelineHelper.fs"/>
     <Compile Include="src/Hosts/OpenCode/MessageTransformPipeline.fs"/>
     <Compile Include="src/Hosts/OpenCode/MessageTransformHook.fs"/>
-    <Compile Include="src/Hosts/OpenCode/HostField.fs"/>
     <Compile Include="src/Hosts/OpenCode/SubagentTools.fs"/>
     <Compile Include="src/Hosts/OpenCode/OpencodeTools.fs"/>
     <Compile Include="src/Hosts/OpenCode/ExecutorTool.fs"/>
@@ -559,6 +569,7 @@
     <Compile Include="src/Hosts/Omp/MessagingCodecEncode.fs"/>
     <Compile Include="src/Hosts/Omp/MessagingCodecDecode.fs"/>
     <Compile Include="src/Hosts/Omp/MessagingCodec.fs"/>
+    <Compile Include="src/Hosts/Omp/SubsessionQuiescence.fs"/>
     <Compile Include="src/Hosts/Omp/SubsessionDispatchStatus.fs"/>
     <Compile Include="src/Hosts/Omp/SubsessionDispatch.fs"/>
     <Compile Include="src/Hosts/Omp/ExecutorSummarizer.fs"/>
@@ -571,7 +582,6 @@
     <Compile Include="src/Hosts/Omp/ChildSessionRegistry.fs"/>
     <Compile Include="src/Hosts/Omp/ChildCleanup.fs"/>
     <Compile Include="src/Hosts/Omp/ToolResultEvent.fs"/>
-    <Compile Include="src/Hosts/Omp/PruneGuard.fs"/>
     <Compile Include="src/Hosts/Omp/NudgeRuntime.fs"/>
     <Compile Include="src/Hosts/Omp/CapsCodec.fs"/>
     <Compile Include="src/Hosts/Omp/FuzzyTools.fs"/>
@@ -599,7 +609,6 @@
     <Compile Include="src/Hosts/Omp/TodoStateManagement.fs"/>
     <Compile Include="src/Hosts/Omp/TodoHooks.fs"/>
     <Compile Include="src/Hosts/Omp/SessionLifecycle.fs"/>
-    <Compile Include="src/Hosts/Omp/Tools.fs"/>
     <Compile Include="src/Hosts/Omp/Fallback/MessageInspection.fs"/>
     <Compile Include="src/Hosts/Omp/Fallback/EventTranslator.fs"/>
     <Compile Include="src/Hosts/Omp/Fallback/ActionExecutor.fs"/>

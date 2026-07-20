@@ -9,8 +9,9 @@ open Wanxiangshu.Kernel.SessionControl.State
 open Wanxiangshu.Kernel.SessionControl.Event
 open Wanxiangshu.Kernel.SessionControl.LeaseIdentity
 open Wanxiangshu.Kernel.SessionControl.LeaseIdentityOps
-
-// ── Human turn ───────────────────────────────────────────────────────────────
+open Wanxiangshu.Kernel.SessionControl.LeaseTransitionsCompaction
+open Wanxiangshu.Kernel.SessionControl.LeaseTransitionsContinuation
+open Wanxiangshu.Kernel.SessionControl.LeaseTransitionsNudge
 
 let private handleHumanTurn (st: OwnerEpisodeState) (ordinal: int option) (turn: HumanTurnState) : OwnerEpisodeState =
     let newOrdinal = defaultOrdinal st.HumanTurnOrdinal ordinal
@@ -206,7 +207,6 @@ let private handleNudgeDedupClearedOrWip (st: OwnerEpisodeState) : OwnerEpisodeS
         NudgeStage = NoEpisode }
 
 // ── Dispatcher ───────────────────────────────────────────────────────────────
-
 let foldOwnerAndLeaseEvent (st: OwnerEpisodeState) (ev: SessionControlEvent) : OwnerEpisodeState =
     match ev with
     | HumanTurn(ordinal, turn) -> handleHumanTurn st ordinal turn

@@ -111,7 +111,6 @@ let freshSessionState: FallbackSessionRuntime =
       ActiveContinuationCancelGen = 0
       ActiveGates = emptyActiveGates
       AbortUnavailable = false }
-
 // --- Unified domain transitions ---
 // Each function captures a complete lifecycle transition atomically.
 // These are the preferred mutation surface; callers should use them

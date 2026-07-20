@@ -36,7 +36,6 @@ open Wanxiangshu.Hosts.Omp.NudgeReminderDispatch
 open Wanxiangshu.Kernel.TreeSitterKernel
 open Wanxiangshu.Hosts.Omp.ChildSession
 open Wanxiangshu.Hosts.Omp.ExecutorTools
-open Wanxiangshu.Hosts.Omp.PruneGuard
 
 module Dyn = Wanxiangshu.Runtime.Dyn
 

@@ -118,7 +118,10 @@ type ProgressObserver
         promise {
             let tool = normalizeToolName host (toolNameFromHookInput input)
 
-            if tool = todoWriteToolName host then
+            // Compare against the host-normalized canonical name ("todowrite"), not the
+            // host-local surface name ("task" on Mimocode) — normalizeToolName already
+            // rewrote Mimocode "task" → "todowrite".
+            if isTodoWriteToolName tool then
                 do! handleTodoWriteAfter input output
             elif tool = "task_complete" then
                 do! handleTaskCompleteAfter input

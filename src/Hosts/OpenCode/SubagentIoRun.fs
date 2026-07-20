@@ -19,10 +19,28 @@ open Wanxiangshu.Runtime.SubsessionEventStore
 open Wanxiangshu.Runtime.Dyn
 open Wanxiangshu.Hosts.Opencode.SubsessionHostAdapter
 open Wanxiangshu.Hosts.Opencode.SubagentIoCleanup
-open Wanxiangshu.Hosts.Opencode.SubagentIoArgs
+open Wanxiangshu.Runtime.DelegatedAiSettings
 
 module Dyn = Wanxiangshu.Runtime.Dyn
 open Wanxiangshu.Hosts.Opencode.SubagentTypes
+
+let private buildSubagentOptions
+    (agent: string)
+    (title: string)
+    (prompt: string)
+    (directory: string)
+    (sessionID: string)
+    (tools: obj)
+    : SubagentLaunchOptions =
+    { agent = agent
+      title = title
+      prompt = prompt
+      directory = directory
+      sessionID = sessionID
+      tools = tools
+      aiSettings =
+        { modelString = None
+          thinkingLevel = None } }
 
 let formatRunFailure (f: RunFailure) : string = SubagentRunExec.formatRunFailure f
 

@@ -8,7 +8,6 @@ open Wanxiangshu.Kernel.Methodology.Registry
 open Wanxiangshu.Runtime.Subagent
 open Wanxiangshu.Kernel.HostTools
 open Wanxiangshu.Hosts.Opencode.ToolSchema
-open Wanxiangshu.Hosts.Opencode.HostField
 open Wanxiangshu.Hosts.Opencode.SessionIo
 open Wanxiangshu.Runtime.ChildAgentRegistry
 open Wanxiangshu.Runtime.Dyn

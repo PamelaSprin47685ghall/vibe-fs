@@ -15,6 +15,8 @@ open Wanxiangshu.Runtime.OpencodeClientCodec
 open Wanxiangshu.Hosts.Opencode.MessagingCodec
 open Wanxiangshu.Hosts.Opencode.SubagentTypes
 open Wanxiangshu.Hosts.Opencode.SubagentSpawnInput
+open Wanxiangshu.Hosts.Opencode.SubagentSpawnCleanup
+open Wanxiangshu.Hosts.Opencode.SubagentSpawnTransport
 open Wanxiangshu.Hosts.Opencode.SubagentIoRun
 open Wanxiangshu.Runtime.ChildAgentRegistry
 open Wanxiangshu.Runtime.Fallback.RuntimeStore
