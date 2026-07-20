@@ -8,6 +8,7 @@ open Wanxiangshu.Runtime.NudgeEventWriter
 open Wanxiangshu.Runtime.EventLogRuntimeNudge
 open Wanxiangshu.Runtime.Fallback.RuntimeStore
 open Wanxiangshu.Runtime.Fallback.SessionRuntime
+open Wanxiangshu.Runtime.Fallback.EpisodeIdentity
 open Wanxiangshu.Runtime.Fallback.SessionRuntimeLeasePure
 open Wanxiangshu.Runtime.Fallback.SessionRuntimePropertyPure
 open Wanxiangshu.Kernel.FallbackKernel.Types
@@ -54,23 +55,9 @@ let finishNudge
     }
 
 let isLeaseValid (runtime: FallbackRuntimeStore) (sessionKey: string) (lease: NudgeLease) : bool =
-    let currentGen = (runtime.GetSession sessionKey).SessionGeneration
-    let currentCancelGen = (runtime.GetSession sessionKey).CancelGeneration
-    let currentTurnId = (runtime.GetSession sessionKey).HumanTurnId
-    let currentOwner = (runtime.GetSession sessionKey).Owner
-
-    let isLifecycleNotCancelled =
-        match runtime.TryGetState sessionKey with
-        | Some state -> state.Lifecycle <> FallbackLifecycle.Cancelled
-        | None -> true
-
-    lease.SessionGeneration = currentGen
-    && lease.HumanTurnID = currentTurnId
-    && lease.CancelGeneration = currentCancelGen
-    && lease.Owner = SessionOwner.Nudge
-    && currentOwner = SessionOwner.Nudge
-    && not ((runtime.GetSession sessionKey).CompactionForceStopped)
-    && isLifecycleNotCancelled
+    let s = runtime.GetSession sessionKey
+    nudgeLeaseIsCurrent lease s
+    && not s.CompactionForceStopped
 
 let private claimDispatch
     (workspaceRoot: string)
