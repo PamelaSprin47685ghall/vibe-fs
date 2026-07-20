@@ -224,11 +224,18 @@ let propagateFailureClearsLeaseAndTransfersOwnership () =
 
 let run () =
     promise {
+        resetRetryGovernorForTests ()
         do! requestedSendContinueIsDispatchedOnce ()
+        resetRetryGovernorForTests ()
         do! requestedRecoverWithPromptIsDispatchedOnce ()
+        resetRetryGovernorForTests ()
         do! dispatchedLeaseIsNotRedispatched ()
+        resetRetryGovernorForTests ()
         do! cancelledLeaseIsNotRedispatched ()
+        resetRetryGovernorForTests ()
         do! staleGenerationLeaseIsNotDispatched ()
+        resetRetryGovernorForTests ()
         do! appendFailureDoesNotMutateMemory ()
+        resetRetryGovernorForTests ()
         do! propagateFailureClearsLeaseAndTransfersOwnership ()
     }

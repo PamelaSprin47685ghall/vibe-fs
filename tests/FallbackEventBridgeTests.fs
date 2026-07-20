@@ -25,10 +25,6 @@ open Wanxiangshu.Runtime
 
 module Dyn = Wanxiangshu.Runtime.Dyn
 
-open Wanxiangshu.Tests.FallbackEventBridgeStateTests
-open Wanxiangshu.Tests.FallbackEventBridgeReviewInProgressTests
-
-
 type FakeExecutor(?messages: obj array) =
     let mutable continueCalls: ResizeArray<string * FallbackModel> = ResizeArray()
 
@@ -542,87 +538,11 @@ let createHandler_transportDoesNotBlockHumanCancellation () =
         do! rmAsync workspaceRoot
     }
 
-/// F-01: after SendContinue is decided, concurrent NewUserMessage on the same
-/// session must prevent the physical prompt. Deterministic via gated executor.
-type GatedCountingExecutor() =
-    let mutable resolveGate = fun () -> ()
-    let gate = Promise.create (fun resolve _ -> resolveGate <- resolve)
-    let mutable continueCount = 0
-    let mutable startedCount = 0
-
-    interface IActionExecutor with
-        member _.SendContinue(_sessionID, _model, _continuationID) =
-            promise {
-                startedCount <- startedCount + 1
-                do! gate
-                continueCount <- continueCount + 1
-            }
-
-        member _.RecoverWithPrompt(_sessionID, _model, _promptText, _continuationID) = Promise.lift ()
-        member _.FetchMessages _ = Promise.lift [||]
-        member _.PropagateFailure _ = Promise.lift ()
-        member _.CaptureCurrentModel _ = Promise.lift None
-        member _.AbortRun _ = Promise.lift ()
-
-    member _.ContinueCount = continueCount
-    member _.StartedCount = startedCount
-    member _.Release() = resolveGate ()
-
-let createHandler_humanCancelPreventsPhysicalSendContinue () =
-    promise {
-        let! workspaceRoot = mkdtempAsync "fallback-f01-queue-"
-        let model = mkModel "f01-provider" "f01-model"
-        let runtime = FallbackRuntimeStore()
-        let sessionID = "f01-queue-session"
-        runtime.UpdateSession(sessionID, selectChain [ model ])
-        runtime.UpdateSession(sessionID, recordAgentName "reviewer")
-
-        let translator = SwitchingTranslator(sessionID) :> IEventTranslator
-        let executor = GatedCountingExecutor()
-        let handler = createHandler translator runtime defaultCfgLookup executor workspaceRoot None
-
-        // Decision path: SessionError → SendContinue intent + lease Requested.
-        let! errorResult = handler (createObj [ "kind", box "error" ])
-        equal "retry event consumed" true errorResult.Consumed
-
-        // Lease must exist after decision (DispatchRequested persisted as PendingLease).
-        let leaseAfterDecision = (runtime.GetSession sessionID).PendingLease
-        check "pending lease after decision" leaseAfterDecision.IsSome
-
-        // Concurrent human cancel on the same session queue before effect claim/send.
-        let! humanResult = handler (createObj [ "kind", box "human" ])
-        equal "human event is not consumed" false humanResult.Consumed
-
-        let sessionAfterHuman = runtime.GetSession sessionID
-        equal "human clears pending lease" None sessionAfterHuman.PendingLease
-        equal "human owns session" SessionOwner.Human sessionAfterHuman.Owner
-
-        // Release any transport that might have raced past cancel; it must still
-        // not count as a successful physical prompt after ownership change.
-        executor.Release()
-        do! Promise.sleep 20
-
-        equal "physical SendContinue never ran" 0 executor.ContinueCount
-        // Effect may have observed cancel before claim (started=0) or after
-        // claim but before complete; either way ContinueCount stays 0 only if
-        // we gate after entry. Require that post-cancel release does not produce
-        // a counted continue when lease was cleared before claim.
-        check
-            "no late physical prompt after cancel"
-            (executor.ContinueCount = 0
-             && sessionAfterHuman.PendingLease.IsNone)
-
-        // Stale effect must not re-create lease or flip ownership.
-        let sessionFinal = runtime.GetSession sessionID
-        equal "stale effect does not restore lease" None sessionFinal.PendingLease
-        equal "stale effect does not steal ownership" SessionOwner.Human sessionFinal.Owner
-
-        do! rmAsync workspaceRoot
-    }
-
 let run () =
     promise {
+        resetRetryGovernorForTests ()
         do! handleEvent_retrySame_consumedAndSendContinue ()
+        resetRetryGovernorForTests ()
         do! handleEvent_exhausted_notConsumed ()
         do! handleEvent_noChain_notConsumed ()
         do! handleEvent_sessionAborted_setsCancelled ()
@@ -631,8 +551,6 @@ let run () =
         do! createHandler_twoSessionsIndependent ()
         do! handleEvent_humanPreemptsIntent_executorNotCalled ()
         do! handleEvent_intentDelayed_leaseExpires_executorNotCalled ()
+        resetRetryGovernorForTests ()
         do! createHandler_transportDoesNotBlockHumanCancellation ()
-        do! createHandler_humanCancelPreventsPhysicalSendContinue ()
-        do! FallbackEventBridgeStateTests.run ()
-        do! FallbackEventBridgeReviewInProgressTests.run ()
     }

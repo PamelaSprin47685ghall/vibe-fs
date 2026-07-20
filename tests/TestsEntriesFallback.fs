@@ -6,6 +6,9 @@ open Wanxiangshu.Tests.FallbackConfigCodecTests
 open Wanxiangshu.Tests.FallbackConfigShapeTests
 open Wanxiangshu.Tests.FallbackRuntimeStoreTests
 open Wanxiangshu.Tests.FallbackEventBridgeTests
+open Wanxiangshu.Tests.FallbackEventBridgeStateTests
+open Wanxiangshu.Tests.FallbackEventBridgeReviewInProgressTests
+open Wanxiangshu.Tests.FallbackQueueEffectTests
 open Wanxiangshu.Tests.FallbackMessageCodecTests
 open Wanxiangshu.Tests.FallbackIntegrationTests
 open Wanxiangshu.Tests.FallbackRecoveryWaitTests
@@ -46,6 +49,9 @@ let fallbackTestEntries () : (string * TestBody) list =
       "FallbackConfigShapeTests.run", Sync(sync FallbackConfigShapeTests.run)
       "FallbackRuntimeStoreTests.run", Sync(sync FallbackRuntimeStoreTests.run)
       "FallbackEventBridgeTests.run", Async FallbackEventBridgeTests.run
+      "FallbackEventBridgeStateTests.run", Async FallbackEventBridgeStateTests.run
+      "FallbackEventBridgeReviewInProgressTests.run", Async FallbackEventBridgeReviewInProgressTests.run
+      "FallbackQueueEffectTests.run", Async FallbackQueueEffectTests.run
       "FallbackAgentAndModelTests.run", Async FallbackAgentAndModelTests.run
       "FallbackAgentAndModelInjectionTests.run", Async FallbackAgentAndModelInjectionTests.run
       "FallbackMessageCodecTests.run", Sync(sync FallbackMessageCodecTests.run)

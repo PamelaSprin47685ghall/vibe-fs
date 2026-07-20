@@ -76,11 +76,16 @@ type RetryDispatchGovernor(?rateLimitMs: int64, ?clock: IClock, ?sleeper: ISleep
                 else
                     let now = clock.GetMonotonicTimeMs()
 
+                    // Missing key ⇒ never dispatched: allow immediately.
+                    // Defaulting to 0.0 would sleep ~rateLimitMs on cold start
+                    // because monotonic clocks start near zero.
                     let lastDispatch =
-                        lock gate (fun () ->
-                            Map.tryFind key lastActualDispatchAt |> Option.defaultValue 0.0)
+                        lock gate (fun () -> Map.tryFind key lastActualDispatchAt)
 
-                    let delay = max 0.0 (float rateLimitMs - (now - lastDispatch))
+                    let delay =
+                        match lastDispatch with
+                        | None -> 0.0
+                        | Some last -> max 0.0 (float rateLimitMs - (now - last))
 
                     if delay > 0.0 then
                         do! sleeper.Sleep(int delay)
@@ -88,8 +93,6 @@ type RetryDispatchGovernor(?rateLimitMs: int64, ?clock: IClock, ?sleeper: ISleep
                     if not (stillValid ()) then
                         return CancelledBeforeDispatch
                     else
-                        // Stamp under the same serial slot so the next waiter on this key
-                        // observes this send before computing its own wait.
                         let actualNow = clock.GetMonotonicTimeMs()
 
                         lock gate (fun () ->

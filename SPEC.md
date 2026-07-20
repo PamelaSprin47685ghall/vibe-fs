@@ -388,30 +388,18 @@ OpenCode 当前多个路径把 nonce、continuation ID 等放入 prompt part met
 
 ## 4.2 Fallback Continue
 
-### F-01：dispatch side effect 在状态队列之外
+### F-01：dispatch side effect 在状态队列之外 ✅ 已完成
 
-当前 coordinator 可以在队列中完成决定并更新 projection，然后将 continuation intent 放到队列外执行。
+`Coordinator.createHandler` 每 session 共用一条 `SerialQueue`：决策（含 `DispatchRequested`/PendingLease）在队内完成；effect 的 claim / finish / dispatch-complete 经 `queueReenter` 重入同一队列；物理 `SendContinue`/`RecoverWithPrompt` 仅在 claim 成功且同步 ownership 门通过后出队执行。迟到结果不得改 projection、finish lease 或 abort 新回合。表征：`createHandler_humanCancelPreventsPhysicalSendContinue`。
 
-这意味着：
+**整改要求（已落地）：**
 
-1. 决定 A 产生 SendPrompt；
-2. A 离开队列；
-3. 人类消息 B 进入队列并取消 A；
-4. A 的旧 side effect 此时才真正发送 prompt；
-5. 系统已经取消的 continuation 被物理发送。
-
-这是明确的 P0 竞态。
-
-**整改要求：**
-
-副作用不能在 actor 外“裸跑”。正确模型是：
-
-1. actor 持久化 `DispatchRequested`；
-2. actor 产生带 dispatch ID 的 effect；
-3. effect runner 执行；
-4. effect 结果重新进入同一 actor；
-5. actor 根据当前 generation 和 ownership 决定接受或丢弃结果；
-6. 过期 effect 结果不得直接改变状态，更不能任意 abort 新一轮。
+1. actor 持久化 `DispatchRequested`（PendingLease Requested + event log）；
+2. actor 产生带 continuation/dispatch ID 的 effect；
+3. effect runner 执行物理 transport（队列外）；
+4. effect 结果经 `SessionReenter` 重入同一 actor；
+5. actor 按 generation + ownership + lease id 接受或丢弃；
+6. 过期 effect 不得改状态 / finish lease / abort 新一轮。
 
 ### F-02：generation 相同被当作缺失 continuation ID 时的匹配依据
 

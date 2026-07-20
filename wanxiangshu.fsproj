@@ -356,6 +356,7 @@
     <Compile Include="src/Runtime/Fallback/LeaseValidation.fs"/>
     <Compile Include="src/Runtime/Fallback/RetryDispatchGovernor.fs"/>
     <Compile Include="src/Runtime/Fallback/ContinuationSessionReenter.fs"/>
+    <Compile Include="src/Runtime/Fallback/ContinuationDispatchComplete.fs"/>
     <Compile Include="src/Runtime/Fallback/ContinuationDispatchOps.fs"/>
     <Compile Include="src/Runtime/Fallback/ContinuationExecution.fs"/>
     <Compile Include="src/Runtime/Fallback/ContinuationExecutionCore.fs"/>
@@ -852,6 +853,7 @@
     <Compile Include="tests/FallbackEventBridgeStateTests.fs"/>
     <Compile Include="tests/FallbackEventBridgeReviewInProgressTests.fs"/>
     <Compile Include="tests/FallbackEventBridgeTests.fs"/>
+    <Compile Include="tests/FallbackQueueEffectTests.fs"/>
     <Compile Include="tests/FallbackAgentAndModelTests.fs"/>
     <Compile Include="tests/FallbackAgentAndModelInjectionTests.fs"/>
     <Compile Include="tests/SubsessionDecisionTests.fs"/>
