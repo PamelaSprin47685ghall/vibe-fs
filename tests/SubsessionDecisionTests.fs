@@ -107,9 +107,7 @@ let startRunFromAvailable () =
 let secondStartRunRejected () =
     let ctx = mkCtx policy0 (TurnOrdinal.next TurnOrdinal.first)
     let plan = mkPlan turn0 TurnOrdinal.first model0 "do work"
-
-    let state =
-        Dispatching(ctx, plan, CurrentTurnEvidence.empty, PendingTerminal.empty, 1000000L)
+    let state = Dispatching(ctx, plan, CurrentTurnEvidence.empty, 1000000L)
 
     match decide state (StartRun request) with
     | Ok(Decided d) ->
@@ -124,83 +122,73 @@ let secondStartRunRejected () =
         check "state unchanged" (d.NextState = state)
     | other -> fail ("unexpected: " + string other)
 
-let dispatchingIdleCached () =
+let dispatchingIdleIgnored () =
     let ctx = mkCtx policy0 (TurnOrdinal.next TurnOrdinal.first)
     let plan = mkPlan turn0 TurnOrdinal.first model0 "do work"
-
-    let state =
-        Dispatching(ctx, plan, CurrentTurnEvidence.empty, PendingTerminal.empty, 1000000L)
+    let state = Dispatching(ctx, plan, CurrentTurnEvidence.empty, 1000000L)
 
     match decide state SessionIdleObserved with
     | Ok(Decided d) ->
         match d.NextState with
-        | Dispatching(_, _, _, pending, _) ->
-            check "idle is cached" pending.PendingIdle
-            check "no error cached" pending.PendingError.IsNone
+        | Dispatching(_, _, evidence, _) -> check "idle is cached" evidence.IdleObserved
         | other -> fail ("expected Dispatching, got " + string other)
-    | other -> fail ("unexpected: " + string other)
+    | other -> fail ("expected Decided, got " + string other)
 
-let dispatchingErrorCached () =
+let dispatchingErrorIgnored () =
     let ctx = mkCtx policy0 (TurnOrdinal.next TurnOrdinal.first)
     let plan = mkPlan turn0 TurnOrdinal.first model0 "do work"
-
-    let state =
-        Dispatching(ctx, plan, CurrentTurnEvidence.empty, PendingTerminal.empty, 1000000L)
+    let state = Dispatching(ctx, plan, CurrentTurnEvidence.empty, 1000000L)
 
     match decide state (TurnErrorObserved err) with
     | Ok(Decided d) ->
         match d.NextState with
-        | Dispatching(_, _, _, pending, _) ->
-            check "error is cached" (pending.PendingError = Some err)
-            check "no idle cached" (not pending.PendingIdle)
+        | Dispatching(_, _, evidence, _) ->
+            match evidence.Outcome with
+            | FailureObserved e -> equal "error message cached" err.Message e.Message
+            | _ -> fail "expected FailureObserved in outcome"
         | other -> fail ("expected Dispatching, got " + string other)
-    | other -> fail ("unexpected: " + string other)
+    | other -> fail ("expected Decided, got " + string other)
 
-/// Regression: idle can legitimately arrive while a turn is Dispatching (host
-/// event ordering is not process-ordered w.r.t. our own dispatch promise).
-/// It must be ignored here — NOT silently accepted into a state that can
-/// never recover. Then, once DispatchAccepted legitimately arrives and the
-/// turn reaches Running, a SUBSEQUENT idle must classify normally and the
-/// run must actually converge to Succeeded. This pins the exact causality
-/// bug that shipped in the IntegrationSubagentMockClient race: firing
-/// SessionIdleObserved before the Dispatch promise resolves must never wedge
-/// the actor forever.
+/// Premature idle during dispatching is cached, and immediately consumed when DispatchAccepted arrives.
 let idleDuringDispatchingThenRealIdleConverges () =
     let ctx = mkCtx policy0 (TurnOrdinal.next TurnOrdinal.first)
     let plan = mkPlan turn0 TurnOrdinal.first model0 "do work"
+    let dispatchingState = Dispatching(ctx, plan, CurrentTurnEvidence.empty, 1000000L)
 
-    let dispatchingState =
-        Dispatching(ctx, plan, CurrentTurnEvidence.empty, PendingTerminal.empty, 1000000L)
-
-    // Premature idle while still Dispatching: must be cached in PendingTerminal
-    let dispatchingStateWithIdle =
+    // Premature idle while still Dispatching: must cache the idle
+    let d0 =
         match decide dispatchingState SessionIdleObserved with
-        | Ok(Decided d) ->
-            match d.NextState with
-            | Dispatching(_, _, _, pending, _) as s ->
-                check "idle is cached in pending" pending.PendingIdle
-                s
-            | other ->
-                fail ("expected Dispatching, got " + string other)
-                dispatchingState
+        | Ok(Decided d) -> d
         | other ->
-            fail ("unexpected: " + string other)
-            dispatchingState
+            fail ("expected Decided for premature idle, got " + string other)
+            failwith "unexpected"
 
-    // Now the legitimate DispatchAccepted arrives (as if the host's prompt
-    // call had actually resolved) — since idle was cached, it must immediately
-    // resolve/succeed the run or transition to another turn, not go to Running.
-    match decide dispatchingStateWithIdle (DispatchAccepted(turn0, OrderedTurnMarkerObserved)) with
-    | Ok(Decided d) ->
-        match d.NextState with
-        | Dispatching _ -> check "retries after idle" (hasEffect isDispatchPrompt d.Effects)
-        | Available _ -> check "exhausted to CompleteCaller" (hasEffect isCompleteCaller d.Effects)
-        | other ->
-            fail (
-                "expected Dispatching or Available due to immediate idle processing, got "
-                + string other
-            )
-    | other -> fail ("unexpected: " + string other)
+    match d0.NextState with
+    | Dispatching(_, _, evidence, _) -> check "idleObserved is cached" evidence.IdleObserved
+    | other -> fail ("expected Dispatching, got " + string other)
+
+    // Add some evidence to simulate assistant output during dispatching
+    let evidence =
+        { CurrentTurnEvidence.empty with
+            Assistant = AssistantSnapshot("", 0L, "done", Some NormalFinish)
+            IdleObserved = true }
+
+    let dispatchingState2 = Dispatching(ctx, plan, evidence, 1000000L)
+
+    // Now the legitimate DispatchAccepted arrives — must immediately consume the cached idle and reach Available
+    match decide dispatchingState2 (DispatchAccepted(turn0, OrderedTurnMarkerObserved)) with
+    | Ok(Decided d1) ->
+        match d1.NextState with
+        | Available _ ->
+            check
+                "run converges to Succeeded immediately using cached idle"
+                (hasEffect
+                    (function
+                    | CompleteCaller(_, Succeeded "done") -> true
+                    | _ -> false)
+                    d1.Effects)
+        | other -> fail ("expected Available (converged), got " + string other)
+    | other -> fail ("unexpected on DispatchAccepted: " + string other)
 
 let runningErrorDrains () =
     let ctx = mkCtx policy0 (TurnOrdinal.next TurnOrdinal.first)
@@ -643,7 +631,7 @@ let startRunWithDelegateToHostProducesNoneModel () =
     match decide avail (StartRun req) with
     | Ok(Decided d) ->
         match d.NextState with
-        | Dispatching(_, plan, _, _, _) -> check "DelegateToHost plan has no model" plan.Model.IsNone
+        | Dispatching(_, plan, _, _) -> check "DelegateToHost plan has no model" plan.Model.IsNone
         | other -> fail ("expected Dispatching, got " + string other)
 
         check "DelegateToHost still dispatches" (hasEffect isDispatchPrompt d.Effects)
@@ -680,7 +668,7 @@ let startRunWithRetryChainProducesSomeModel () =
     match decide avail (StartRun req) with
     | Ok(Decided d) ->
         match d.NextState with
-        | Dispatching(ctx, plan, _, _, _) ->
+        | Dispatching(ctx, plan, _, _) ->
             check "RetryChain plan model is first of chain" (plan.Model = Some model0)
             check "RetryChain ctx keeps full chain" (ctx.Chain = chain)
         | other -> fail ("expected Dispatching, got " + string other)
@@ -689,8 +677,8 @@ let startRunWithRetryChainProducesSomeModel () =
 let run () =
     startRunFromAvailable ()
     secondStartRunRejected ()
-    dispatchingIdleCached ()
-    dispatchingErrorCached ()
+    dispatchingIdleIgnored ()
+    dispatchingErrorIgnored ()
     idleDuringDispatchingThenRealIdleConverges ()
     runningErrorDrains ()
     drainingDuplicateErrorIgnored ()

@@ -178,4 +178,5 @@ let buildTurnEvidence (msgs: obj array) (anchor: TurnAnchor) : Result<CurrentTur
                   Todos = todos
                   Tool = tool
                   Recovery = recovery
-                  Outcome = NoOutcome }
+                  Outcome = NoOutcome
+                  IdleObserved = false }

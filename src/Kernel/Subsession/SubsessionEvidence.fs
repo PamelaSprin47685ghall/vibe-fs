@@ -44,7 +44,8 @@ type CurrentTurnEvidence =
       Todos: TodoEvidence
       Tool: ToolEvidence
       Recovery: RecoveryEvidence
-      Outcome: RecordedOutcome }
+      Outcome: RecordedOutcome
+      IdleObserved: bool }
 
 module CurrentTurnEvidence =
     let empty: CurrentTurnEvidence =
@@ -52,7 +53,8 @@ module CurrentTurnEvidence =
           Todos = NoTodoInfo
           Tool = NoToolResult
           Recovery = NoRecoveryPrompt
-          Outcome = NoOutcome }
+          Outcome = NoOutcome
+          IdleObserved = false }
 
     let private mergeAssistant e1 e2 =
         match e1, e2 with
@@ -140,7 +142,8 @@ module CurrentTurnEvidence =
           Todos = mergeTodos e1.Todos e2.Todos
           Tool = mergeTool e1.Tool e2.Tool
           Recovery = mergeRecovery e1.Recovery e2.Recovery
-          Outcome = mergeOutcome e1.Outcome e2.Outcome }
+          Outcome = mergeOutcome e1.Outcome e2.Outcome
+          IdleObserved = e1.IdleObserved || e2.IdleObserved }
 
 module AssistantEvidence =
     let content text finish = AssistantSnapshot("", 0L, text, finish)

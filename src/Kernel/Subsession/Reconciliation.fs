@@ -134,23 +134,7 @@ let private handleDispatchRejected (ctx: RunContext) (plan: TurnPlan) (cancelCtx
         [ TurnFinished(plan.TurnId, TurnCancelled); RunFinished(ctx.RunId, res) ]
         [ CompleteCaller(ctx.RunId, res) ]
 
-let private handleClosingUnknownDispatchTimeout
-    (ctx: RunContext)
-    (plan: TurnPlan)
-    (poisonReason: PoisonReason)
-    : DecisionResult =
-    let res = Failed(InfrastructureFailure "closing unknown dispatch timed out")
-
-    let events =
-        [ SessionPoisoned(ctx.SessionId, poisonReason)
-          TurnFinished(plan.TurnId, TurnInfrastructureFailed "closing unknown dispatch timed out")
-          RunFinished(ctx.RunId, res) ]
-
-    decided (Poisoned poisonReason) events [ CompleteCaller(ctx.RunId, res) ]
-
-// ── helper sub-state decisions ──────────────────────────────────────────────
-
-let private handleDispatchStatusResolved
+let private handleReconcilingDispatchStatusResolved
     (nowMs: int64)
     (ctx: RunContext)
     (plan: TurnPlan)
@@ -195,20 +179,13 @@ let private handleDispatchStatusResolved
                 [ ClosePhysicalSession ctx.SessionId ]
         )
 
-let private decideReconciling
-    (nowMs: int64)
-    (state: SubsessionState)
-    (cmd: Command)
-    (ctx: RunContext)
-    (plan: TurnPlan)
-    (cancelCtx: CancelContext)
-    (retryCount: int)
-    (turnDeadlineAtMs: int64)
-    (reconciliationDeadlineAtMs: int64)
-    : Result<DecisionResult, DecisionError> =
-    match cmd with
-    | DispatchStatusResolved status ->
-        handleDispatchStatusResolved
+// ── main decision ───────────────────────────────────────────────────────────
+
+let decide (nowMs: int64) state cmd =
+    match state, cmd with
+    | ReconcilingUnknownDispatch(ctx, plan, cancelCtx, retryCount, turnDeadlineAtMs, reconciliationDeadlineAtMs),
+      DispatchStatusResolved status ->
+        handleReconcilingDispatchStatusResolved
             nowMs
             ctx
             plan
@@ -217,48 +194,33 @@ let private decideReconciling
             turnDeadlineAtMs
             reconciliationDeadlineAtMs
             status
-    | ReconciliationDeadlineExpired tid when tid = plan.TurnId ->
+    | ClosingUnknownDispatch(ctx, plan, poisonReason, turnDeadlineAtMs, reconciliationDeadlineAtMs),
+      PhysicalCloseResolved Stopped -> Ok(handleClosingUnknownDispatchStopped ctx plan poisonReason)
+    | ClosingUnknownDispatch(ctx, plan, poisonReason, turnDeadlineAtMs, reconciliationDeadlineAtMs),
+      PhysicalCloseResolved _ -> Ok(handleClosingUnknownDispatchNotStopped ctx plan poisonReason)
+    | ClosingUnknownDispatch(_, _, _, _, _), SessionClosed -> Ok(noChange StaleTimer)
+    | ClosingUnknownDispatch _, _ -> Ok(noChange StaleTimer)
+    | ReconcilingUnknownDispatch(ctx, plan, cancelCtx, retryCount, turnDeadlineAtMs, reconciliationDeadlineAtMs),
+      ReconciliationDeadlineExpired tid when tid = plan.TurnId ->
         Ok(handleReconciliationDeadlineExpired nowMs ctx plan cancelCtx retryCount turnDeadlineAtMs)
-    | ReconciliationDeadlineExpired _ -> Ok(noChange StaleTimer)
-    | DispatchAccepted(tid, receipt) when tid = plan.TurnId ->
+    | ReconcilingUnknownDispatch _, ReconciliationDeadlineExpired _ -> Ok(noChange StaleTimer)
+    | ReconcilingUnknownDispatch(ctx, plan, cancelCtx, _, turnDeadlineAtMs, reconciliationDeadlineAtMs),
+      DispatchAccepted(tid, receipt) when tid = plan.TurnId ->
         Ok(beginAbortAfterDispatchAccepted nowMs ctx plan receipt cancelCtx)
-    | DispatchAccepted _ -> Ok(noChange StaleTurnMarker)
-    | DispatchRejected(tid, HostRejected _) when tid = plan.TurnId -> Ok(handleDispatchRejected ctx plan cancelCtx)
-    | DispatchRejected _ -> Ok(noChange StaleTurnMarker)
-    | SessionClosed -> Ok(closeActive ctx plan.TurnId)
-    | SessionIdleObserved -> Ok(applyAfterAbort nowMs ctx (NotYetStarted plan) cancelCtx)
-    | CancelRequested
-    | TurnErrorObserved _
-    | EvidenceUpdated _
-    | TurnDeadlineExpired _
-    | AbortDeadlineExpired _ -> Ok(noChange StaleTimer)
-    | AbortConfirmed _
-    | AbortHostAccepted _
-    | AbortRequestFailed _
-    | SessionQuiescenceResolved _ -> illegal (stateName state) (cmdName cmd)
-    | _ -> illegal (stateName state) (cmdName cmd)
-
-let private decideClosing
-    (state: SubsessionState)
-    (cmd: Command)
-    (ctx: RunContext)
-    (plan: TurnPlan)
-    (poisonReason: PoisonReason)
-    : Result<DecisionResult, DecisionError> =
-    match cmd with
-    | PhysicalCloseResolved Stopped -> Ok(handleClosingUnknownDispatchStopped ctx plan poisonReason)
-    | PhysicalCloseResolved _ -> Ok(handleClosingUnknownDispatchNotStopped ctx plan poisonReason)
-    | SessionClosed -> Ok(noChange StaleTimer)
-    | ReconciliationDeadlineExpired tid when tid = plan.TurnId ->
-        Ok(handleClosingUnknownDispatchTimeout ctx plan poisonReason)
-    | ReconciliationDeadlineExpired _ -> Ok(noChange StaleTimer)
-    | _ -> Ok(noChange StaleTimer)
-
-// ── main decision ───────────────────────────────────────────────────────────
-
-let decide (nowMs: int64) (state: SubsessionState) (cmd: Command) : Result<DecisionResult, DecisionError> =
-    match state, cmd with
-    | ReconcilingUnknownDispatch(ctx, plan, cancelCtx, retryCount, turnDeadlineAtMs, reconciliationDeadlineAtMs), _ ->
-        decideReconciling nowMs state cmd ctx plan cancelCtx retryCount turnDeadlineAtMs reconciliationDeadlineAtMs
-    | ClosingUnknownDispatch(ctx, plan, poisonReason, _, _), _ -> decideClosing state cmd ctx plan poisonReason
+    | ReconcilingUnknownDispatch _, DispatchAccepted _ -> Ok(noChange StaleTurnMarker)
+    | ReconcilingUnknownDispatch(ctx, plan, cancelCtx, _, turnDeadlineAtMs, reconciliationDeadlineAtMs),
+      DispatchRejected(tid, HostRejected _) when tid = plan.TurnId -> Ok(handleDispatchRejected ctx plan cancelCtx)
+    | ReconcilingUnknownDispatch _, DispatchRejected _ -> Ok(noChange StaleTurnMarker)
+    | ReconcilingUnknownDispatch(ctx, plan, cancelCtx, _, turnDeadlineAtMs, reconciliationDeadlineAtMs), SessionClosed ->
+        Ok(closeActive ctx plan.TurnId)
+    | ReconcilingUnknownDispatch(ctx, plan, cancelCtx, _, turnDeadlineAtMs, reconciliationDeadlineAtMs),
+      SessionIdleObserved -> Ok(applyAfterAbort nowMs ctx (NotYetStarted plan) cancelCtx)
+    | ReconcilingUnknownDispatch _, CancelRequested
+    | ReconcilingUnknownDispatch _, TurnErrorObserved _
+    | ReconcilingUnknownDispatch _, EvidenceUpdated _
+    | ReconcilingUnknownDispatch _, TurnDeadlineExpired _
+    | ReconcilingUnknownDispatch _, AbortDeadlineExpired _ -> Ok(noChange StaleTimer)
+    | ReconcilingUnknownDispatch _,
+      (AbortConfirmed _ | AbortHostAccepted _ | AbortRequestFailed _ | SessionQuiescenceResolved _) ->
+        illegal (stateName state) (cmdName cmd)
     | _ -> illegal (stateName state) (cmdName cmd)

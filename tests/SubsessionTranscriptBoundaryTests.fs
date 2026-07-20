@@ -96,13 +96,12 @@ let private isCompleteCallerCancelled =
 
 // ── 1: Dispatching + CancelRequested → CancellingDispatch (not IssuingAbort) ──
 let private dispatchingCancelProducesCancellingDispatch () =
-    let state =
-        Dispatching(ctx, plan, CurrentTurnEvidence.empty, PendingTerminal.empty, 1000000L)
+    let state = Dispatching(ctx, plan, CurrentTurnEvidence.empty, 1000000L)
 
     match decide state CancelRequested with
     | Ok(Decided d) ->
         match d.NextState with
-        | CancellingDispatch(ctx', plan', cancelCtx', _) ->
+        | CancellingDispatch(ctx', plan', cancelCtx', _, _) ->
             equal "ctx preserved" ctx.RunId ctx'.RunId
             equal "plan preserved" plan.TurnId plan'.TurnId
             equal "reason is UserRequested" UserRequested cancelCtx'.Reason
@@ -120,7 +119,7 @@ let private cancellingDispatchAcceptedInitiatesAbort () =
         { Reason = UserRequested
           AfterStop = FinishCancelled }
 
-    let state = CancellingDispatch(ctx, plan, cancelCtx, 1000000L)
+    let state = CancellingDispatch(ctx, plan, cancelCtx, false, 1000000L)
 
     match decide state (DispatchAccepted(turn0, receipt)) with
     | Ok(Decided d) ->
@@ -145,7 +144,7 @@ let private cancellingDispatchRejectedDefinitelyCancels () =
         { Reason = UserRequested
           AfterStop = FinishCancelled }
 
-    let state = CancellingDispatch(ctx, plan, cancelCtx, 1000000L)
+    let state = CancellingDispatch(ctx, plan, cancelCtx, false, 1000000L)
 
     match decide state (DispatchRejected(turn0, HostRejected err)) with
     | Ok(Decided d) ->
@@ -200,8 +199,7 @@ let private issuingAbortBuffersIdleThenSettlesOnBarrier () =
 // ── 6: reconcile persists SessionPoisoned + RunFinished events ──
 let private reconcilePersistsPoisonEvents () =
     // v38: reconcile should return events to persist when detecting unfinished state
-    let unfinishedState =
-        Dispatching(ctx, plan, CurrentTurnEvidence.empty, PendingTerminal.empty, 1000000L)
+    let unfinishedState = Dispatching(ctx, plan, CurrentTurnEvidence.empty, 1000000L)
 
     match reconcile unfinishedState with
     | Some decision ->
@@ -231,7 +229,7 @@ let private cancellingDispatchAcceptanceUnknownReconciles () =
         { Reason = UserRequested
           AfterStop = FinishCancelled }
 
-    let state = CancellingDispatch(ctx, plan, cancelCtx, 1000000L)
+    let state = CancellingDispatch(ctx, plan, cancelCtx, false, 1000000L)
 
     match decide state (DispatchRejected(turn0, HostAcceptanceUnknown err)) with
     | Ok(Decided d) ->
@@ -423,8 +421,7 @@ let private dispatchingAcceptanceUnknownEntersReconcile () =
           Model = Some model0
           Prompt = "go" }
 
-    let state =
-        Dispatching(ctx, plan, CurrentTurnEvidence.empty, PendingTerminal.empty, 1000000L)
+    let state = Dispatching(ctx, plan, CurrentTurnEvidence.empty, 1000000L)
 
     match decide state (DispatchRejected(turn0, HostAcceptanceUnknown err)) with
     | Ok(Decided d) ->
@@ -590,8 +587,7 @@ let private reconcilingAbortSettleResolvedUnknownPoisons () =
     | other -> fail ("expected Decided, got " + string other)
 
 let private ompOrderedBarrierTimingPreserved () =
-    let state0 =
-        Dispatching(ctx, plan, CurrentTurnEvidence.empty, PendingTerminal.empty, 1000000L)
+    let state0 = Dispatching(ctx, plan, CurrentTurnEvidence.empty, 1000000L)
 
     match decide state0 (DispatchAccepted(turn0, receipt)) with
     | Ok(Decided d1) ->

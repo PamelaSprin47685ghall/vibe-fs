@@ -5,6 +5,11 @@ open Wanxiangshu.Kernel.Subsession.Types
 open Wanxiangshu.Kernel.Subsession.Policy
 open Wanxiangshu.Kernel.Subsession.Rules
 
+let private prependEvent (ev: SubsessionEvent) (decResult: DecisionResult) : DecisionResult =
+    match decResult with
+    | Decided d -> Decided { d with Events = ev :: d.Events }
+    | NoChange _ -> decResult
+
 let private handleDispatchingHostRejected (nowMs: int64) (ctx: RunContext) (plan: TurnPlan) (error: ErrorInput) =
     match nextTurnFromPolicy ctx (afterError ctx.FallbackConfig ctx.Chain ctx.Policy error) with
     | Some(ctx2, plan2) ->
@@ -12,7 +17,7 @@ let private handleDispatchingHostRejected (nowMs: int64) (ctx: RunContext) (plan
 
         Ok(
             decided
-                (Dispatching(ctx2, plan2, CurrentTurnEvidence.empty, PendingTerminal.empty, turnDeadlineAtMs))
+                (Dispatching(ctx2, plan2, CurrentTurnEvidence.empty, turnDeadlineAtMs))
                 [ TurnDispatchRequested
                       { RunId = ctx2.RunId
                         TurnId = plan2.TurnId
@@ -122,60 +127,41 @@ let private handleDispatchAccepted
     (nowMs: int64)
     (ctx: RunContext)
     (plan: TurnPlan)
-    (bufferedEvidence: CurrentTurnEvidence)
-    (pending: PendingTerminal)
-    (turnDeadlineAtMs: int64)
-    (tid: TurnId)
-    (receipt: HostStartReceipt)
-    : DecisionResult =
+    bufferedEvidence
+    turnDeadlineAtMs
+    tid
+    receipt
+    =
     let started = { Plan = plan; StartReceipt = receipt }
 
-    let turnStartedEvent =
+    let startedEvent =
         TurnStarted
             { RunId = ctx.RunId
               TurnId = tid
               Receipt = receipt }
 
-    let result =
-        match pending.PendingError with
-        | Some error ->
+    if bufferedEvidence.IdleObserved then
+        let errorOpt =
             match bufferedEvidence.Outcome with
-            | CompletionRequested _ ->
-                if pending.PendingIdle then
-                    DecisionObserve.handleRunningIdle nowMs ctx started bufferedEvidence
-                else
-                    decided (Running(ctx, started, bufferedEvidence, turnDeadlineAtMs)) [] []
-            | _ ->
-                if pending.PendingIdle then
-                    DecisionObserve.handleDrainingIdle nowMs ctx started error bufferedEvidence
-                else
-                    decided (Draining(ctx, started, error, bufferedEvidence, turnDeadlineAtMs)) [] []
-        | None ->
-            if pending.PendingIdle then
-                DecisionObserve.handleRunningIdle nowMs ctx started bufferedEvidence
-            else
-                decided (Running(ctx, started, bufferedEvidence, turnDeadlineAtMs)) [] []
+            | FailureObserved error -> Some error
+            | _ -> None
 
-    match result with
-    | Decided decision ->
-        Decided
-            { decision with
-                Events = turnStartedEvent :: decision.Events }
-    | NoChange _ -> decided (Running(ctx, started, bufferedEvidence, turnDeadlineAtMs)) [ turnStartedEvent ] []
+        let dec =
+            match errorOpt with
+            | Some error -> DecisionObserve.handleDrainingIdle nowMs ctx started error bufferedEvidence
+            | None -> DecisionObserve.handleRunningIdle nowMs ctx started bufferedEvidence
 
+        Ok(prependEvent startedEvent dec)
+    else
+        match bufferedEvidence.Outcome with
+        | FailureObserved error ->
+            Ok(decided (Draining(ctx, started, error, bufferedEvidence, turnDeadlineAtMs)) [ startedEvent ] [])
+        | _ -> Ok(decided (Running(ctx, started, bufferedEvidence, turnDeadlineAtMs)) [ startedEvent ] [])
 
-let private handleDispatching
-    (nowMs: int64)
-    (ctx: RunContext)
-    (plan: TurnPlan)
-    bufferedEvidence
-    pending
-    turnDeadlineAtMs
-    cmd
-    =
+let private handleDispatching (nowMs: int64) (ctx: RunContext) (plan: TurnPlan) bufferedEvidence turnDeadlineAtMs cmd =
     match cmd with
     | DispatchAccepted(tid, receipt) when tid = plan.TurnId ->
-        Ok(handleDispatchAccepted nowMs ctx plan bufferedEvidence pending turnDeadlineAtMs tid receipt)
+        handleDispatchAccepted nowMs ctx plan bufferedEvidence turnDeadlineAtMs tid receipt
     | DispatchAccepted _ -> Ok(noChange StaleTurnMarker)
     | DispatchRejected(tid, failure) when tid = plan.TurnId ->
         match failure with
@@ -190,6 +176,7 @@ let private handleDispatching
                     plan,
                     { Reason = UserRequested
                       AfterStop = FinishCancelled },
+                    false,
                     turnDeadlineAtMs
                 ))
                 []
@@ -203,6 +190,7 @@ let private handleDispatching
                     plan,
                     { Reason = TurnDeadline
                       AfterStop = FinishFailed(InfrastructureFailure "turn deadline expired before host accepted") },
+                    false,
                     turnDeadlineAtMs
                 ))
                 []
@@ -211,13 +199,33 @@ let private handleDispatching
     | TurnDeadlineExpired _ -> Ok(noChange StaleTimer)
     | SessionClosed -> Ok(closeActive ctx plan.TurnId)
     | cmd when isIllegalWhenDispatching cmd ->
-        illegal (stateName (Dispatching(ctx, plan, bufferedEvidence, pending, turnDeadlineAtMs))) (cmdName cmd)
-    | _ -> illegal (stateName (Dispatching(ctx, plan, bufferedEvidence, pending, turnDeadlineAtMs))) (cmdName cmd)
+        illegal (stateName (Dispatching(ctx, plan, bufferedEvidence, turnDeadlineAtMs))) (cmdName cmd)
+    | _ -> illegal (stateName (Dispatching(ctx, plan, bufferedEvidence, turnDeadlineAtMs))) (cmdName cmd)
 
-let private handleCancellingDispatch (nowMs: int64) (ctx: RunContext) (plan: TurnPlan) cancelCtx turnDeadlineAtMs cmd =
+let private handleCancellingDispatch
+    (nowMs: int64)
+    (ctx: RunContext)
+    (plan: TurnPlan)
+    cancelCtx
+    idleObserved
+    turnDeadlineAtMs
+    cmd
+    =
     match cmd with
     | DispatchAccepted(tid, receipt) when tid = plan.TurnId ->
-        handleCancellingDispatchAccepted nowMs ctx plan cancelCtx tid receipt
+        if idleObserved then
+            let started = { Plan = plan; StartReceipt = receipt }
+
+            let startedEvent =
+                TurnStarted
+                    { RunId = ctx.RunId
+                      TurnId = tid
+                      Receipt = receipt }
+
+            let dec = applyAfterAbort nowMs ctx (Started started) cancelCtx
+            Ok(prependEvent startedEvent dec)
+        else
+            handleCancellingDispatchAccepted nowMs ctx plan cancelCtx tid receipt
     | DispatchAccepted _ -> Ok(noChange StaleTurnMarker)
     | DispatchRejected(tid, failure) when tid = plan.TurnId ->
         handleCancellingRejected nowMs ctx plan turnDeadlineAtMs cancelCtx failure
@@ -236,13 +244,13 @@ let private handleCancellingDispatch (nowMs: int64) (ctx: RunContext) (plan: Tur
     | AbortDeadlineExpired _ -> Ok(noChange StaleTimer)
     | SessionClosed -> Ok(closeActive ctx plan.TurnId)
     | cmd when isIllegalWhenCancelling cmd ->
-        illegal (stateName (CancellingDispatch(ctx, plan, cancelCtx, turnDeadlineAtMs))) (cmdName cmd)
-    | _ -> illegal (stateName (CancellingDispatch(ctx, plan, cancelCtx, turnDeadlineAtMs))) (cmdName cmd)
+        illegal (stateName (CancellingDispatch(ctx, plan, cancelCtx, idleObserved, turnDeadlineAtMs))) (cmdName cmd)
+    | _ -> illegal (stateName (CancellingDispatch(ctx, plan, cancelCtx, idleObserved, turnDeadlineAtMs))) (cmdName cmd)
 
 let decide (nowMs: int64) state cmd =
     match state, cmd with
-    | Dispatching(ctx, plan, bufferedEvidence, pending, turnDeadlineAtMs), _ ->
-        handleDispatching nowMs ctx plan bufferedEvidence pending turnDeadlineAtMs cmd
-    | CancellingDispatch(ctx, plan, cancelCtx, turnDeadlineAtMs), _ ->
-        handleCancellingDispatch nowMs ctx plan cancelCtx turnDeadlineAtMs cmd
+    | Dispatching(ctx, plan, bufferedEvidence, turnDeadlineAtMs), _ ->
+        handleDispatching nowMs ctx plan bufferedEvidence turnDeadlineAtMs cmd
+    | CancellingDispatch(ctx, plan, cancelCtx, idleObserved, turnDeadlineAtMs), _ ->
+        handleCancellingDispatch nowMs ctx plan cancelCtx idleObserved turnDeadlineAtMs cmd
     | _ -> illegal (stateName state) (cmdName cmd)

@@ -11,8 +11,8 @@ let private activeTurnId (turn: ActiveTurn) : TurnId =
 
 let private tryExtractActiveForReconcile (s: SubsessionState) : (RunContext * ActiveTurn) option =
     match s with
-    | Dispatching(ctx, plan, _, _, _) -> Some(ctx, NotYetStarted plan)
-    | CancellingDispatch(ctx, plan, _, _) -> Some(ctx, NotYetStarted plan)
+    | Dispatching(ctx, plan, _, _) -> Some(ctx, NotYetStarted plan)
+    | CancellingDispatch(ctx, plan, _, _, _) -> Some(ctx, NotYetStarted plan)
     | ReconcilingUnknownDispatch(ctx, plan, _, _, _, _) -> Some(ctx, NotYetStarted plan)
     | ClosingUnknownDispatch(ctx, plan, _, _, _) -> Some(ctx, NotYetStarted plan)
     | Running(ctx, started, _, _) -> Some(ctx, Started started)

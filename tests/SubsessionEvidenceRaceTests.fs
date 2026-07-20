@@ -68,7 +68,7 @@ let evidenceDuringDispatchingMustSurviveIntoRunning () =
     let d0 = mustDecide (Available { SessionId = sid }) (StartRun request)
 
     match d0.NextState with
-    | Dispatching(_, plan, _, _, _) ->
+    | Dispatching(_, plan, _, _) ->
         let earlyEvidence =
             { CurrentTurnEvidence.empty with
                 Assistant = AssistantSnapshot("", 0L, "inspector report: README found at docs/", Some NormalFinish) }
@@ -134,7 +134,7 @@ let toolResultDuringDispatchingMustSurviveIntoRunning () =
     let d0 = mustDecide (Available { SessionId = sid }) (StartRun request)
 
     match d0.NextState with
-    | Dispatching(_, plan, _, _, _) ->
+    | Dispatching(_, plan, _, _) ->
         let earlyToolEvidence =
             { CurrentTurnEvidence.empty with
                 Tool = HasToolResult }
@@ -192,7 +192,7 @@ let unattributedEvidenceInRunningIsAccepted () =
     let d0 = mustDecide (Available { SessionId = sid }) (StartRun request)
 
     match d0.NextState with
-    | Dispatching(_, plan, _, _, _) ->
+    | Dispatching(_, plan, _, _) ->
         match decide d0.NextState (DispatchAccepted(plan.TurnId, OrderedTurnMarkerObserved)) with
         | Ok(Decided d1) ->
             match d1.NextState with
@@ -229,7 +229,7 @@ let unattributedEvidenceInDispatchingIsBuffered () =
     let d0 = mustDecide (Available { SessionId = sid }) (StartRun request)
 
     match d0.NextState with
-    | Dispatching(_, plan, _, _, _) ->
+    | Dispatching(_, plan, _, _) ->
         let unattributed =
             { CurrentTurnEvidence.empty with
                 Assistant = AssistantSnapshot("", 0L, "early report", Some NormalFinish) }
@@ -243,7 +243,7 @@ let unattributedEvidenceInDispatchingIsBuffered () =
         with
         | Ok(Decided d1) ->
             match d1.NextState with
-            | Dispatching(_, _, evidence, _, _) ->
+            | Dispatching(_, _, evidence, _) ->
                 match evidence.Assistant with
                 | AssistantSnapshot(_, _, text, _) ->
                     equal "unattributed evidence buffered in Dispatching" "early report" text

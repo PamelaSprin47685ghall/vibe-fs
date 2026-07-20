@@ -139,7 +139,7 @@ let applyAfterAbort (nowMs: int64) (ctx: RunContext) (turn: ActiveTurn) (abortCt
                         DeadlineAtMs = turnDeadlineAtMs } ]
 
             decided
-                (Dispatching(ctx2, plan2, CurrentTurnEvidence.empty, PendingTerminal.empty, turnDeadlineAtMs))
+                (Dispatching(ctx2, plan2, CurrentTurnEvidence.empty, turnDeadlineAtMs))
                 events
                 [ DispatchPrompt plan2 ]
         | None ->
