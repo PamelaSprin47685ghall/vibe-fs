@@ -21,14 +21,18 @@ open Wanxiangshu.Kernel.Fallback.Continuation
 /// raw part types or abort flags — the host adapter collapses the boolean pair
 /// into the three legal `MessageOutcome` cases at this seam.
 ///
-/// All helpers here are pure `obj → typed` decoders. Encoding back to host
-/// payloads (e.g. `createPromptBody`) lives next to the decoders so the wire
-/// format stays a single read/write site.
+/// PromptInput metadata is a probe only — durable correlation is HostUserMessageId
+/// bound at chat.message, with assistant attribution via parentID equality.
 /// Re-export shared session event decoders for single-import convenience.
 let getSessionID eventType props = OpencodeHostEvent.getSessionID eventType props
 let getPartsText parts = OpencodeHostEvent.getPartsText parts
 
 let isCompletedAssistantMessage info = OpencodeHostEvent.isCompletedAssistantMessage info
+
+/// Strict assistant attribution (SPEC §七 step 5 / F-02):
+/// parentID must equal the HostUserMessageId bound at chat.message acceptance.
+let assistantMatchesHostUserMessage (parentID: string) (hostUserMessageId: string) : bool =
+    parentID <> "" && hostUserMessageId <> "" && parentID = hostUserMessageId
 
 /// Decode a todo list payload into the *open* todo contents, dropping items
 /// with terminal status. The returned strings are the raw `content` strings

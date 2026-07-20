@@ -16,6 +16,9 @@ let checkIsStale = LeaseValidationRules.checkIsStale
 let checkContinuationMatches = LeaseValidationRules.checkContinuationMatches
 let checkContinuationMatchesWithEvidence = LeaseValidationRules.checkContinuationMatchesWithEvidence
 let isTerminalOrSettled = LeaseValidationRules.isTerminalOrSettled
+let classifyIdleDisposition = LeaseValidationRules.classifyIdleDisposition
+let idleMaySettle = LeaseValidationRules.idleMaySettle
+type IdleDisposition = LeaseValidationRules.IdleDisposition
 
 let isContinuationLeaseActive (state: FallbackSessionRuntime) : bool =
     match state.PendingLease with

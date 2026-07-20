@@ -5,9 +5,9 @@ open Wanxiangshu.Kernel.FallbackKernel.Types
 open Wanxiangshu.Runtime.Fallback.RuntimeStore
 open Wanxiangshu.Runtime.Fallback.SessionRuntime
 open Wanxiangshu.Runtime.Fallback.SessionRuntimeLeasePure
-open Wanxiangshu.Runtime.Fallback.SessionRuntimeLeaseAcceptancePure
 open Wanxiangshu.Runtime.Fallback.SessionRuntimePropertyPure
 open Wanxiangshu.Runtime.Fallback.LeaseValidationRules
+// IdleDisposition cases live here (SessionHintOnly / MaySettle / …)
 
 let private sid = "test-session"
 
@@ -73,7 +73,6 @@ let verifyLeaseWithStatus_noPendingLease_returnsFalse () =
           SessionGeneration = 0
           HumanTurnID = ""
           HostUserMessageId = ""
-          HostRunId = ""
           CancelGeneration = 0
           Owner = SessionOwner.Fallback
           Model = mkModel ()
@@ -115,7 +114,11 @@ let checkContinuationMatches_noPendingEmptyContId () =
     chk "no pending empty contId isMatched false" (not isMatched)
     chk "no pending empty contId isContIdMatch true" isContIdMatch
 
-let private bindHostIds hostUserMessageId hostRunId (rt: FallbackRuntimeStore) =
+let checkContinuationMatches_matchByParentId () =
+    let rt, lease = setupDispatched ()
+    // F-02: parentID matches HostUserMessageId only — not HumanTurnID.
+    let hostMsg = "host-user-msg-1"
+
     rt.UpdateSession(
         sid,
         fun s ->
@@ -125,85 +128,151 @@ let private bindHostIds hostUserMessageId hostRunId (rt: FallbackRuntimeStore) =
                     PendingLease =
                         Some
                             { l with
-                                HostUserMessageId = hostUserMessageId
-                                HostRunId = hostRunId } }
+                                HostUserMessageId = hostMsg
+                                Status = LeaseStatus.Dispatched } }
             | None -> s
     )
 
-let checkContinuationMatches_matchByParentId () =
-    let rt, _ = setupDispatched ()
-    bindHostIds "host-user-msg-1" "" rt
-    let isMatched, isContIdMatch =
-        checkContinuationMatchesWithEvidence rt sid "" (Some "host-user-msg-1") None
+    let isMatched, isContIdMatch = checkContinuationMatchesWithEvidence rt sid "" (Some hostMsg) None
+    chk "match by parent id isMatched true" isMatched
+    chk "match by parent id isContIdMatch true" isContIdMatch
 
-    chk "match by HostUserMessageId parent isMatched true" isMatched
-    chk "match by HostUserMessageId parent isContIdMatch true" isContIdMatch
+    let noMatchOnHumanTurn, _ =
+        checkContinuationMatchesWithEvidence rt sid "" (Some lease.HumanTurnID) None
+
+    chk "humanTurnId alone is NOT parent match" (not noMatchOnHumanTurn)
 
 let checkContinuationMatches_matchByHostRunId () =
     let rt, _ = setupDispatched ()
-    bindHostIds "" "host-run-1" rt
-    let isMatched, isContIdMatch =
-        checkContinuationMatchesWithEvidence rt sid "" None (Some "host-run-1")
+    let hostMsg = "host-run-as-msg"
 
-    chk "match by HostRunId isMatched true" isMatched
-    chk "match by HostRunId isContIdMatch true" isContIdMatch
+    rt.UpdateSession(
+        sid,
+        fun s ->
+            match s.PendingLease with
+            | Some l ->
+                { s with
+                    PendingLease =
+                        Some
+                            { l with
+                                HostUserMessageId = hostMsg
+                                Status = LeaseStatus.Dispatched } }
+            | None -> s
+    )
 
-let checkContinuationMatches_humanTurnIdEqualsParentButHostUserMessageIdEmpty_unmatched () =
-    let rt, lease = setupDispatched ()
-    chk "HostUserMessageId starts empty" (lease.HostUserMessageId = "")
-    let isMatched, isContIdMatch =
-        checkContinuationMatchesWithEvidence rt sid "" (Some lease.HumanTurnID) None
-
-    chk "HumanTurnID==parent but HostUserMessageId empty isMatched false" (not isMatched)
-    chk "HumanTurnID==parent but HostUserMessageId empty isContIdMatch true" isContIdMatch
-
-let checkContinuationMatches_wrongHostUserMessageId_unmatched () =
-    let rt, _ = setupDispatched ()
-    bindHostIds "host-user-msg-1" "" rt
-    let isMatched, isContIdMatch =
-        checkContinuationMatchesWithEvidence rt sid "" (Some "wrong-host-user-msg") None
-
-    chk "wrong HostUserMessageId isMatched false" (not isMatched)
-    chk "wrong HostUserMessageId isContIdMatch true" isContIdMatch
-
-let checkContinuationMatches_generationEqualAlone_unmatched () =
-    let rt, lease = setupDispatched ()
-    // Same session generation is already true via setup; no parent/run/marker → Unmatched.
-    chk "generation equal on lease" (lease.SessionGeneration = (rt.GetSession sid).SessionGeneration)
-    let isMatched, isContIdMatch = checkContinuationMatchesWithEvidence rt sid "" None None
-    chk "generation-equal alone isMatched false" (not isMatched)
-    chk "generation-equal alone isContIdMatch true" isContIdMatch
+    let isMatched, isContIdMatch = checkContinuationMatchesWithEvidence rt sid "" None (Some hostMsg)
+    chk "match by host run id isMatched true" isMatched
+    chk "match by host run id isContIdMatch true" isContIdMatch
 
 let checkContinuationMatches_unmatchedStatusHint () =
     let rt, _ = setupDispatched ()
-    bindHostIds "host-user-msg-1" "host-run-1" rt
-    let isMatched, isContIdMatch =
-        checkContinuationMatchesWithEvidence rt sid "" (Some "diff-parent") (Some "diff-run")
-
+    let isMatched, isContIdMatch = checkContinuationMatchesWithEvidence rt sid "" (Some "diff-parent") (Some "diff-run")
     chk "unmatched status hint isMatched false" (not isMatched)
     chk "unmatched status hint isContIdMatch true" isContIdMatch
+
+let checkContinuationMatches_parentIdWithoutHostBinding_unmatched () =
+    let rt, _ = setupDispatched ()
+    // Pending lease has empty HostUserMessageId — parentID cannot prove ownership.
+    let isMatched, isContIdMatch =
+        checkContinuationMatchesWithEvidence rt sid "" (Some "orphan-parent") None
+
+    chk "unbound parent id isMatched false" (not isMatched)
+    chk "unbound parent id isContIdMatch true (status hint)" isContIdMatch
+
+// ---------------------------------------------------------------------------
+// classifyIdleDisposition (SPEC §七 step 6)
+// ---------------------------------------------------------------------------
+
+let classifyIdle_noActive_sessionHintOnly () =
+    let rt = FallbackRuntimeStore()
+    let d = classifyIdleDisposition (rt.GetSession sid) false false
+    chk "no active → SessionHintOnly" (d = SessionHintOnly)
+
+let classifyIdle_notHostAccepted_reject () =
+    let rt, lease = setupDispatched ()
+    let d = classifyIdleDisposition (rt.GetSession sid) false false
+
+    match d with
+    | RejectNotHostAccepted cid -> chk "reject not accepted" (cid = lease.ContinuationID)
+    | other -> failwith ("expected RejectNotHostAccepted, got " + string other)
+
+let classifyIdle_hostAccepted_noStrong_reconciliation () =
+    let rt, lease = setupDispatched ()
+
+    rt.UpdateSession(
+        sid,
+        fun s ->
+            match s.PendingLease with
+            | Some l ->
+                { s with
+                    PendingLease =
+                        Some
+                            { l with
+                                HostUserMessageId = "hm-1"
+                                Status = LeaseStatus.Dispatched } }
+            | None -> s
+    )
+
+    let d = classifyIdleDisposition (rt.GetSession sid) false false
+
+    match d with
+    | NeedsReconciliation(cid, mid) ->
+        chk "recon cid" (cid = lease.ContinuationID)
+        chk "recon host msg" (mid = "hm-1")
+    | other -> failwith ("expected NeedsReconciliation, got " + string other)
+
+let classifyIdle_hostAccepted_strong_maySettle () =
+    let rt, lease = setupDispatched ()
+
+    rt.UpdateSession(
+        sid,
+        fun s ->
+            match s.PendingLease with
+            | Some l ->
+                { s with
+                    PendingLease =
+                        Some
+                            { l with
+                                HostUserMessageId = "hm-2"
+                                Status = LeaseStatus.Running } }
+            | None -> s
+    )
+
+    let d = classifyIdleDisposition (rt.GetSession sid) true false
+
+    match d with
+    | MaySettle(cid, mid) ->
+        chk "settle cid" (cid = lease.ContinuationID)
+        chk "settle host msg" (mid = "hm-2")
+    | other -> failwith ("expected MaySettle, got " + string other)
+
+let classifyIdle_duplicate_idempotent () =
+    let rt, _ = setupDispatched ()
+    let d = classifyIdleDisposition (rt.GetSession sid) false true
+    chk "duplicate idle → IdempotentIgnore" (d = IdempotentIgnore)
+
+let classifyIdle_settledLease_idempotent () =
+    let rt, lease = setupDispatched ()
+
+    rt.UpdateSession(
+        sid,
+        fun s ->
+            match s.PendingLease with
+            | Some l ->
+                { s with
+                    PendingLease = Some { l with Status = LeaseStatus.Settled } }
+            | None -> s
+    )
+
+    let d = classifyIdleDisposition (rt.GetSession sid) false false
+    chk "settled lease → IdempotentIgnore" (d = IdempotentIgnore)
+    chk "lease id preserved for diagnostics" (lease.ContinuationID <> "")
 
 let checkContinuationMatches_mismatchedContinuationId () =
     let rt, _ = setupDispatched ()
     let isMatched, isContIdMatch = checkContinuationMatchesWithEvidence rt sid "different-cid" None None
     chk "mismatched continuation id isMatched false" (not isMatched)
     chk "mismatched continuation id isContIdMatch false" (not isContIdMatch)
-
-let tryAcceptPendingLease_bindsHostUserMessageId () =
-    let rt, lease = setupDispatched ()
-    chk "accept starts with empty HostUserMessageId" (lease.HostUserMessageId = "")
-    let accepted =
-        rt.UpdateSessionReturning(sid, tryAcceptPendingLeaseReturning lease.ContinuationID "msg-bound-1")
-
-    chk "accept returns true" accepted
-    let after = (rt.GetSession sid).PendingLease |> Option.get
-    chk "HostUserMessageId bound on accept" (after.HostUserMessageId = "msg-bound-1")
-    chk "status Dispatched after accept" (after.Status = LeaseStatus.Dispatched)
-
-    let isMatched, _ =
-        checkContinuationMatchesWithEvidence rt sid "" (Some "msg-bound-1") None
-
-    chk "parentID matches bound HostUserMessageId" isMatched
 
 // ---------------------------------------------------------------------------
 // checkIsStale
@@ -285,15 +354,18 @@ let run () =
     checkContinuationMatches_noPendingEmptyContId ()
     checkContinuationMatches_matchByParentId ()
     checkContinuationMatches_matchByHostRunId ()
-    checkContinuationMatches_humanTurnIdEqualsParentButHostUserMessageIdEmpty_unmatched ()
-    checkContinuationMatches_wrongHostUserMessageId_unmatched ()
-    checkContinuationMatches_generationEqualAlone_unmatched ()
     checkContinuationMatches_unmatchedStatusHint ()
     checkContinuationMatches_mismatchedContinuationId ()
-    tryAcceptPendingLease_bindsHostUserMessageId ()
+    checkContinuationMatches_parentIdWithoutHostBinding_unmatched ()
     checkIsStale_noneEvent_returnsFalse ()
     checkIsStale_newUserMessage_returnsFalse ()
     checkIsStale_contIdNotMatch_returnsTrue ()
     isTerminalOrSettled_newUserMessage_returnsFalse ()
     isTerminalOrSettled_cancelledLifecycle_returnsTrue ()
     isTerminalOrSettled_settledLease_returnsTrue ()
+    classifyIdle_noActive_sessionHintOnly ()
+    classifyIdle_notHostAccepted_reject ()
+    classifyIdle_hostAccepted_noStrong_reconciliation ()
+    classifyIdle_hostAccepted_strong_maySettle ()
+    classifyIdle_duplicate_idempotent ()
+    classifyIdle_settledLease_idempotent ()

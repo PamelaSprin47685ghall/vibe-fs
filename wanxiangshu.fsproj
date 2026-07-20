@@ -367,6 +367,7 @@
     <Compile Include="src/Runtime/Fallback/HumanTurnHandler.fs"/>
     <Compile Include="src/Runtime/Fallback/SessionStatusHandler.fs"/>
     <Compile Include="src/Runtime/Fallback/FallbackBridgeScanToolText.fs"/>
+    <Compile Include="src/Runtime/Fallback/FallbackIdleSettlement.fs"/>
     <Compile Include="src/Runtime/Fallback/FallbackCoordination.fs"/>
     <Compile Include="src/Runtime/Fallback/Coordinator.fs"/>
     <Compile Include="src/Runtime/Tooling/PatchToolsCodec.fs"/>
