@@ -118,7 +118,6 @@ type FallbackLifecycle =
     | Active
     | Cancelled
     | TaskComplete
-    | RecoveryRequired
 
 /// Per-session state tracked by the fallback runtime.
 type SessionFallbackState =

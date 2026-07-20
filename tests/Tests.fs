@@ -151,8 +151,7 @@ let private integrationHarnessSuiteLabels =
     [ "Integration.OpencodePluginTests.run"
       "Integration.MimocodePluginTests.run"
       "Integration.MimoTuiPluginTests.run"
-      "IntegrationOpenCodeContractTests.run"
-      "IntegrationEventTests.run" ]
+      "IntegrationOpenCodeContractTests.run" ]
 
 let private allOtherTests: (string * TestBody) list =
     coreTestEntries ()

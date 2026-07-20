@@ -117,52 +117,6 @@ let isInjectedSince_thresholdCheck () =
     check "since 50L true" (isInjectedSince 50L s)
     check "since 200L false" (not (isInjectedSince 200L s))
 
-let isTerminalConsumed_initial_false () =
-    check "fresh not consumed" (not (isTerminalConsumed freshSessionState))
-
-let setTerminalConsumed_then_query () =
-    let s = setTerminalConsumed true freshSessionState
-    check "consumed true" (isTerminalConsumed s)
-    check "no active episode created" s.ActiveEpisode.IsNone
-
-let setTerminalConsumed_false_clears () =
-    let s = freshSessionState |> setTerminalConsumed true |> setTerminalConsumed false
-    check "not consumed" (not (isTerminalConsumed s))
-
-let transferOwnership_nonNoOwner_resetsConsumed_and_doesNotCreateEpisode () =
-    let s =
-        freshSessionState
-        |> setTerminalConsumed true
-        |> transferOwnership SessionOwner.Human
-
-    equal "Owner is Human" SessionOwner.Human s.Owner
-    check "TerminalConsumed reset" (not (isTerminalConsumed s))
-    check "ActiveEpisode still None" s.ActiveEpisode.IsNone
-
-let transferOwnership_NoOwner_preservesConsumed () =
-    let s =
-        freshSessionState
-        |> setTerminalConsumed true
-        |> transferOwnership SessionOwner.NoOwner
-
-    check "TerminalConsumed preserved" (isTerminalConsumed s)
-    equal "Owner NoOwner" SessionOwner.NoOwner s.Owner
-
-let beginHumanTurn_resetsConsumed_and_keepsEpisode () =
-    let s = freshSessionState |> setTerminalConsumed true |> beginHumanTurn "msg-1"
-    check "TerminalConsumed reset" (not (isTerminalConsumed s))
-    check "ActiveEpisode created" s.ActiveEpisode.IsSome
-
-let cancelEpisode_clearsActiveEpisode_and_resetsConsumed () =
-    let s =
-        freshSessionState
-        |> beginHumanTurn "msg-1"
-        |> setTerminalConsumed true
-        |> cancelEpisode
-
-    check "ActiveEpisode cleared" s.ActiveEpisode.IsNone
-    check "TerminalConsumed reset" (not (isTerminalConsumed s))
-
 let run () =
     incrementCancelGeneration_incrementsByOne ()
     incrementCancelGeneration_accumulates ()
@@ -185,10 +139,3 @@ let run () =
     setInjected_setsBothFields ()
     clearInjected_clearsBoth ()
     isInjectedSince_thresholdCheck ()
-    isTerminalConsumed_initial_false ()
-    setTerminalConsumed_then_query ()
-    setTerminalConsumed_false_clears ()
-    transferOwnership_nonNoOwner_resetsConsumed_and_doesNotCreateEpisode ()
-    transferOwnership_NoOwner_preservesConsumed ()
-    beginHumanTurn_resetsConsumed_and_keepsEpisode ()
-    cancelEpisode_clearsActiveEpisode_and_resetsConsumed ()

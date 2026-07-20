@@ -21,18 +21,7 @@ let recordConsumed value (s: FallbackSessionRuntime) = { s with Consumed = Some 
 
 let clearConsumption (s: FallbackSessionRuntime) = { s with Consumed = None }
 
-let setTerminalConsumed (value: bool) (s: FallbackSessionRuntime) = { s with TerminalConsumed = value }
-
-let isTerminalConsumed (s: FallbackSessionRuntime) : bool = s.TerminalConsumed
-
-let transferOwnership owner (s: FallbackSessionRuntime) =
-    let baseRuntime = { s with Owner = owner }
-
-    if owner <> SessionOwner.NoOwner then
-        { baseRuntime with
-            TerminalConsumed = false }
-    else
-        baseRuntime
+let transferOwnership owner (s: FallbackSessionRuntime) = { s with Owner = owner }
 
 let armNudgeNonce nonce (s: FallbackSessionRuntime) = { s with ActiveNudgeNonce = nonce }
 

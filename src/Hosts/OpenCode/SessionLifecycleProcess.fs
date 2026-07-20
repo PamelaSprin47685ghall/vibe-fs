@@ -13,7 +13,6 @@ open Wanxiangshu.Hosts.Opencode.NudgeTrigger
 open Wanxiangshu.Hosts.Opencode.NudgeTriggerOps
 open Wanxiangshu.Hosts.Opencode.Fallback.HostEventInspection
 open Wanxiangshu.Hosts.Opencode.SessionLifecycleEventDecoding
-open Wanxiangshu.Hosts.Opencode.SessionLifecycleHumanTurn
 open Wanxiangshu.Hosts.Opencode.SessionLifecycleHumanDispatch
 open Wanxiangshu.Hosts.Opencode.SessionLifecycleClose
 open Wanxiangshu.Runtime.Session.SessionActorState
@@ -32,14 +31,6 @@ let private toHostSurface (fact: SessionFact) : (HostEventEnvelope * obj) option
     | SessionFact.SessionBusyObserved props -> Some(envelopeOf "session.status" props, rawOf "session.status" props)
     | SessionFact.SessionIdleObserved props -> Some(envelopeOf "session.idle" props, rawOf "session.idle" props)
     | SessionFact.SessionErrorObserved props -> Some(envelopeOf "session.error" props, rawOf "session.error" props)
-    | SessionFact.TerminalObserved info ->
-        let eventType =
-            if info.SourceKind = "session.status.idle" then
-                "session.status"
-            else
-                info.SourceKind
-
-        Some(envelopeOf eventType info.Props, rawOf eventType info.Props)
     | SessionFact.AssistantObserved(_, _, props)
     | SessionFact.ChatMessageObserved(_, _, props) ->
         Some(envelopeOf "message.updated" props, rawOf "message.updated" props)
@@ -106,8 +97,6 @@ let processLifecycleFact
             let closedEnv = envelopeOf "session.deleted" (createObj [ "sessionID" ==> sid ])
             nudge.TrackLifetimeEvents(Some closedEnv) |> Promise.start
             finalizeSessionClosed ctx sid
-        | SessionFact.HumanTurnObserved(msgId, agent, modelOpt) ->
-            do! onNewHumanMessage ctx fallbackRuntime sid agent modelOpt msgId
         | _ ->
             match toHostSurface fact with
             | Some(envelope, rawInput) -> do! runHostFanOut ctx fallbackRuntime fallback nudge sid envelope rawInput

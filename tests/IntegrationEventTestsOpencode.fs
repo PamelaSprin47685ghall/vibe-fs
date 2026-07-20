@@ -23,9 +23,6 @@ let private userTextMessage sessionID text =
               "parts", box [| createObj [ "type", box "text"; "text", box text ] |] ]
     )
 
-let private sleep (ms: int) : JS.Promise<unit> =
-    Promise.create (fun resolve _ -> JS.setTimeout (fun () -> resolve ()) ms |> ignore)
-
 let toolExecuteAfterSpec (p: obj) =
     promise {
         let output = createObj [ "output", box "Todos updated" ]
@@ -40,50 +37,50 @@ let toolExecuteAfterSpec (p: obj) =
             (hasExactHint (unbox<string> (get output "output")) hintTodosUpdated)
     }
 
-let private buildMockClient (workspaceDir: string) (getMessages: unit -> obj array) (promptCalls: ResizeArray<obj>) =
-    createObj
-        [ "session",
-          box (
-              createObj
-                  [ "todo",
-                    box (
-                        System.Func<unit, JS.Promise<obj>>(fun () ->
-                            (promise {
-                                return
-                                    box
-                                        {| data =
-                                            [| box
-                                                   {| id = "todo-1"
-                                                      content = "task"
-                                                      status = "in_progress" |} |] |}
-                            }))
-                    )
-                    "messages",
-                    box (
-                        System.Func<unit, JS.Promise<obj>>(fun () ->
-                            (promise { return box {| data = getMessages () |} }))
-                    )
-                    "prompt",
-                    box (
-                        System.Func<obj, JS.Promise<unit>>(fun arg ->
-                            promise {
-                                resolveNudgeReceiptFromPromptArg workspaceDir arg
-                                promptCalls.Add(arg)
-                            })
-                    ) ]
-          ) ]
-
 let abortedRetrySpec () =
     promise {
         let promptCalls = ResizeArray<obj>()
         let! workspaceDir = mkdtempAsync "aborted-retry-"
         let mutable messages: obj array = [||]
 
+        let mkClient (workspaceDir: string) =
+            createObj
+                [ "session",
+                  box (
+                      createObj
+                          [ "todo",
+                            box (
+                                System.Func<unit, JS.Promise<obj>>(fun () ->
+                                    (promise {
+                                        return
+                                            box
+                                                {| data =
+                                                    [| box
+                                                           {| id = "todo-1"
+                                                              content = "task"
+                                                              status = "in_progress" |} |] |}
+                                    }))
+                            )
+                            "messages",
+                            box (
+                                System.Func<unit, JS.Promise<obj>>(fun () ->
+                                    (promise { return box {| data = messages |} }))
+                            )
+                            "prompt",
+                            box (
+                                System.Func<obj, JS.Promise<unit>>(fun arg ->
+                                    promise {
+                                        resolveNudgeReceiptFromPromptArg workspaceDir arg
+                                        promptCalls.Add(arg)
+                                    })
+                            ) ]
+                  ) ]
+
         let! p =
             plugin (
                 box
                     {| directory = workspaceDir
-                       client = buildMockClient workspaceDir (fun () -> messages) promptCalls |}
+                       client = mkClient workspaceDir |}
             )
 
         let eventHook = get p "event"
@@ -103,14 +100,11 @@ let abortedRetrySpec () =
                                message = "Aborted" |} |}))
             |> unbox<JS.Promise<unit>>
 
-        do! sleep 2
-
         do!
             eventHook $ (mkEvent "session.idle" (box {| sessionID = "resume-ws" |}))
             |> unbox<JS.Promise<unit>>
 
-        do! sleep 2
-
+        do! yieldMicrotask ()
         check "aborted retry with no completed assistant does not nudge" (promptCalls.Count = 0)
 
         do!
@@ -122,34 +116,24 @@ let abortedRetrySpec () =
                        prompt = box {| text = "continue" |} |}))
             |> unbox<JS.Promise<unit>>
 
-        do! sleep 2
-
         messages <-
-            [| box (
-                   createObj
-                       [ "info"
-                         ==> createObj [ "role" ==> "user"; "id" ==> "msg-1"; "synthetic" ==> false ]
-                         "parts" ==> [| createObj [ "type" ==> "text"; "text" ==> "hello" ] |] ]
-               )
-               box (
-                   createObj
-                       [ "info"
-                         ==> createObj
-                                 [ "role" ==> "assistant"
-                                   "agent" ==> "manager"
-                                   "finish" ==> "stop"
-                                   "id" ==> "msg-2"
-                                   "parentID" ==> "msg-1"
-                                   "time" ==> createObj [ "completed" ==> 1 ] ]
-                         "parts" ==> [| createObj [ "type" ==> "text"; "text" ==> "working" ] |] ]
-               ) |]
+            [| box
+                   {| info =
+                       box
+                           {| role = "assistant"
+                              agent = "manager"
+                              finish = "stop"
+                              time = box {| completed = 1 |} |}
+                      parts =
+                       [| box
+                              {| ``type`` = "text"
+                                 text = "working" |} |] |} |]
 
         do!
             eventHook $ (mkEvent "session.idle" (box {| sessionID = "resume-ws" |}))
             |> unbox<JS.Promise<unit>>
 
-        do! sleep 2
-
+        do! yieldMicrotask ()
         check "new completed assistant history resumes todo nudge" (promptCalls.Count = 1)
         do! rmAsync workspaceDir
     }

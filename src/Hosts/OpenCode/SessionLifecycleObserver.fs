@@ -16,9 +16,6 @@ open Wanxiangshu.Hosts.Opencode.NudgeTrigger
 open Wanxiangshu.Runtime.BacklogSession
 open Wanxiangshu.Hosts.Opencode.SessionLifecycleHumanTurn
 open Wanxiangshu.Hosts.Opencode.SessionLifecycleEvents
-open Wanxiangshu.Hosts.Opencode.SessionLifecycleProcess
-open Wanxiangshu.Runtime.Session.SessionActorRegistry
-open Wanxiangshu.Kernel.Session.SessionFact
 
 type SessionLifecycleObserver
     (
@@ -52,14 +49,7 @@ type SessionLifecycleObserver
     member _.OnNewHumanMessage
         (sessionID: string, agent: string, modelOpt: string option, messageId: string)
         : JS.Promise<unit> =
-        promise {
-            let root = if isNullish ctx then "" else pluginDirectoryFromCtx ctx
-            let wkey = if root = "" then "opencode-default" else "opencode:" + root
-            let actor = SessionActorRegistry.GetOrCreate wkey sessionID
-            actor.BindHandler(fun snap f -> processLifecycleFact ctx fallbackRuntime fallback nudge sessionID snap f)
-            let! _ = actor.Post(SessionFact.HumanTurnObserved(messageId, agent, modelOpt))
-            ()
-        }
+        onNewHumanMessage ctx fallbackRuntime sessionID agent modelOpt messageId
 
     member _.FallbackRuntime = fallbackRuntime
 

@@ -101,29 +101,29 @@ let performCleanup
             | Some h when not (Dyn.isNullish abortSignal) ->
                 try
                     abortSignal?removeEventListener ("abort", h) |> ignore
-                with ex ->
-                    JS.console.warn ("Failed to remove parent abort handler: " + ex.Message)
+                with _ ->
+                    ()
             | _ -> ()
 
             try
                 childAbort.abort ()
-            with ex ->
-                JS.console.warn ("Failed to abort child controller: " + ex.Message)
+            with _ ->
+                ()
 
             try
                 reviewStore.unlockReview childID
-            with ex ->
-                JS.console.error ("Failed to unlock review: " + ex.Message)
+            with _ ->
+                ()
 
             try
                 reviewStore.CleanupSession childID
-            with ex ->
-                JS.console.error ("Failed to cleanup review session: " + ex.Message)
+            with _ ->
+                ()
 
             try
                 do! Wanxiangshu.Hosts.Opencode.SubagentIoCleanup.abortAndUnregister registry client directory childID
-            with ex ->
-                JS.console.error ("Failed to unregister subagent: " + ex.Message)
+            with _ ->
+                ()
     }
 
 let runLoopWithCleanup

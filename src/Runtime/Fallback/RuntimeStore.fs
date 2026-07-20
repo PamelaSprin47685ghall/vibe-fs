@@ -25,8 +25,8 @@ type FallbackRuntimeStore() =
             for cb in copy do
                 try
                     cb ()
-                with ex ->
-                    JS.console.error ("RuntimeStore listener callback threw: " + ex.Message)
+                with _ ->
+                    ()
         | None -> ()
 
     let getSession (sessionID: string) : FallbackSessionRuntime =

@@ -143,8 +143,7 @@ let startCompaction
         CompactionCompacted = false
         CompactionContinuationObserved = false
         CompactionSummaryTransformPending = true
-        Owner = SessionOwner.Compaction
-        TerminalConsumed = false }
+        Owner = SessionOwner.Compaction }
 
 let tryGetSettleInfo expectedCompactionID (s: FallbackSessionRuntime) =
     if canSettleCompaction expectedCompactionID s then
@@ -168,9 +167,7 @@ let applySettle expectedCompactionID (s: FallbackSessionRuntime) =
                     if s.Owner = SessionOwner.Compaction then
                         SessionOwner.NoOwner
                     else
-                        s.Owner
-                TerminalConsumed = false
-                ActiveEpisode = None }
+                        s.Owner }
     else
         None
 

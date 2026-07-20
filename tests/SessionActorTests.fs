@@ -105,29 +105,8 @@ let effectResultAfterCancelDropped () =
 
         check "fresh transport accepted" (ok = FactAdmission.Accept)
         equal "handler applied once" 1 applied
-        SessionActorRegistry.Clear()
-    }
 
-/// Wrong dispatch id on current generation is dropped.
-let wrongDispatchIdDropped () =
-    promise {
-        SessionActorRegistry.Clear()
-        let actor = SessionActorRegistry.GetOrCreate "ws-gate" "sess-2-wrong"
-        let mutable applied = 0
-
-        actor.ReplaceHandler(fun _ fact ->
-            promise {
-                match fact with
-                | SessionFact.AbortReturned _ -> applied <- applied + 1
-                | _ -> ()
-            })
-
-        do! actor.SetActiveDispatch(Some "dispatch-2")
-        do! actor.SetOwner SessionOwner.Nudge
-
-        let fresh =
-            actor.CaptureEffectIdentity(dispatchId = "dispatch-2", owner = SessionOwner.Nudge)
-
+        // Wrong dispatch id on current generation is dropped.
         let wrongDispatch =
             { fresh with
                 ExpectedDispatchId = Some "dispatch-other" }
@@ -135,7 +114,8 @@ let wrongDispatchIdDropped () =
         let! bad = actor.Post(SessionFact.AbortReturned(wrongDispatch, false))
 
         check "wrong dispatch dropped" (bad = FactAdmission.DropDispatchMismatch)
-        equal "still zero apply" 0 applied
+        equal "still one apply" 1 applied
+
         SessionActorRegistry.Clear()
     }
 
@@ -158,8 +138,8 @@ let sessionClosedDropsLaterFacts () =
         SessionActorRegistry.Clear()
     }
 
-/// Decode path maps host envelopes into standard facts part 1.
-let decodeHostEnvelopeFacts_part1 () =
+/// Decode path maps host envelopes into standard facts.
+let decodeHostEnvelopeFacts () =
     let busyInput =
         createObj
             [ "event"
@@ -172,8 +152,6 @@ let decodeHostEnvelopeFacts_part1 () =
     | Some("s-decode", SessionFact.SessionBusyObserved _) -> check "busy decode" true
     | other -> check ("busy decode unexpected: " + string other) false
 
-/// Decode path maps host envelopes into standard facts part 2.
-let decodeHostEnvelopeFacts_part2 () =
     let idleInput =
         createObj
             [ "event"
@@ -182,7 +160,7 @@ let decodeHostEnvelopeFacts_part2 () =
                         "properties" ==> createObj [ "sessionID" ==> "s-decode" ] ] ]
 
     match tryFromHostInput idleInput with
-    | Some("s-decode", SessionFact.TerminalObserved _) -> check "idle decode" true
+    | Some("s-decode", SessionFact.SessionIdleObserved _) -> check "idle decode" true
     | other -> check ("idle decode unexpected: " + string other) false
 
     let closedInput =
@@ -226,9 +204,7 @@ let run () =
     promise {
         do! concurrentFactsSerialize ()
         do! effectResultAfterCancelDropped ()
-        do! wrongDispatchIdDropped ()
         do! sessionClosedDropsLaterFacts ()
-        decodeHostEnvelopeFacts_part1 ()
-        decodeHostEnvelopeFacts_part2 ()
+        decodeHostEnvelopeFacts ()
         pureAdmissionRules ()
     }

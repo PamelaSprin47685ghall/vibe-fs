@@ -115,31 +115,9 @@ let private nextCoreFromState (state: SessionState) (core: SessionFallbackState)
         Phase = state.FallbackPhase |> Option.defaultValue FallbackPhase.Idle }
 
 let private applyOwner (state: SessionState) (afterLifecycle: FallbackSessionRuntime) : SessionOwner =
-    let decoded =
-        state.SessionOwner
-        |> Option.map decodeOwner
-        |> Option.defaultValue afterLifecycle.Owner
-
-    if decoded = SessionOwner.NoOwner && Option.isSome state.LatestHumanTurn then
-        let hasActiveContinuation =
-            match state.PendingLease with
-            | Some lease -> lease.Status <> "settled" && lease.Status <> "cancelled"
-            | None -> false
-
-        let hasActiveNudge =
-            match state.PendingNudgeLease with
-            | Some lease -> lease.Status <> "settled" && lease.Status <> "cancelled"
-            | None -> false
-
-        let hasActiveCompaction =
-            state.ActiveCompaction.IsSome || state.ActiveCompactionId.IsSome
-
-        if not hasActiveContinuation && not hasActiveNudge && not hasActiveCompaction then
-            SessionOwner.Human
-        else
-            SessionOwner.NoOwner
-    else
-        decoded
+    state.SessionOwner
+    |> Option.map decodeOwner
+    |> Option.defaultValue afterLifecycle.Owner
 
 let private buildBaseState
     (s: FallbackSessionRuntime)
@@ -191,32 +169,8 @@ let restoreFromEventLogState (state: SessionState) (s: FallbackSessionRuntime) :
     let baseState = buildBaseState s human ordinals state nextCore
     let afterLifecycle = applyLifecycleReset baseState nextCore
 
-    let restoredOwner = applyOwner state afterLifecycle
-
-    let restoredEpisode =
-        if restoredOwner <> SessionOwner.NoOwner then
-            let kind =
-                match restoredOwner with
-                | SessionOwner.Human -> EpisodeKind.Human
-                | SessionOwner.Nudge -> EpisodeKind.Nudge
-                | SessionOwner.Fallback -> EpisodeKind.Fallback
-                | SessionOwner.Compaction -> EpisodeKind.Compaction
-                | SessionOwner.Title -> EpisodeKind.Title
-                | _ -> EpisodeKind.Human
-
-            Some
-                { EpisodeId = "ep-restored-" + System.Guid.NewGuid().ToString("N")
-                  SessionId = ""
-                  Generation = state.SessionGeneration
-                  Kind = kind
-                  LeaseId = None
-                  HumanTurnId = Some afterLifecycle.HumanTurnId
-                  StartedByEventId = None }
-        else
-            None
-
     { afterLifecycle with
-        Owner = restoredOwner
+        Owner = applyOwner state afterLifecycle
         PendingLease = pendingLease
         PendingNudgeLease = pendingNudgeLease
         CompactionActiveId = compactionId
@@ -224,6 +178,4 @@ let restoreFromEventLogState (state: SessionState) (s: FallbackSessionRuntime) :
         CompactionHumanTurnId = compactionHumanTurnId
         CompactionCancelGeneration = compactionCancelGeneration
         CompactionGeneration = state.CompactionGeneration
-        CompactionCompacted = state.IsCompacted
-        TerminalConsumed = false
-        ActiveEpisode = restoredEpisode }
+        CompactionCompacted = state.IsCompacted }
