@@ -33,6 +33,7 @@ open Wanxiangshu.Tests.SubsessionEmptyOutputContinueTests
 open Wanxiangshu.Tests.DispatchRegistryTests
 open Wanxiangshu.Tests.FallbackLeaseValidationRulesTests
 open Wanxiangshu.Tests.FallbackLeasePureTests
+open Wanxiangshu.Tests.EpisodeIdentityTests
 open Wanxiangshu.Tests.FallbackPropertyPureTests
 open Wanxiangshu.Tests.NudgeErrorClassificationTests
 open Wanxiangshu.Tests.RetryDispatchGovernorTests
@@ -68,6 +69,7 @@ let fallbackTestEntries () : (string * TestBody) list =
       "SubsessionEmptyOutputContinueTests.run", Sync(sync SubsessionEmptyOutputContinueTests.run)
       "FallbackLeaseValidationRulesTests.run", Sync(sync FallbackLeaseValidationRulesTests.run)
       "FallbackLeasePureTests.run", Sync(sync FallbackLeasePureTests.run)
+      "EpisodeIdentityTests.run", Sync(sync EpisodeIdentityTests.run)
       "FallbackPropertyPureTests.run", Sync(sync FallbackPropertyPureTests.run)
       "NudgeErrorClassificationTests.run", Sync(sync NudgeErrorClassificationTests.run)
       "NudgeOwnerDiagnosticTests.run", Sync(sync NudgeOwnerDiagnosticTests.run) ]

@@ -3,6 +3,7 @@ module Wanxiangshu.Runtime.Fallback.SessionRuntimeLeasePure
 open Wanxiangshu.Kernel.FallbackKernel.Types
 open Wanxiangshu.Kernel.FallbackRuntimeFlags
 open Wanxiangshu.Runtime.Fallback.SessionRuntime
+open Wanxiangshu.Runtime.Fallback.EpisodeIdentity
 
 // ----- Core and lease transitions -----
 
@@ -23,24 +24,14 @@ let clearPendingLease (s: FallbackSessionRuntime) = { s with PendingLease = None
 
 let tryTransitionPendingLease expectedID expectedStatus nextStatus (s: FallbackSessionRuntime) =
     match s.PendingLease with
-    | Some lease ->
-        let isCurrent =
-            lease.ContinuationID = expectedID
-            && lease.Status = expectedStatus
-            && lease.SessionGeneration = s.SessionGeneration
-            && lease.HumanTurnID = s.HumanTurnId
-            && lease.CancelGeneration = s.CancelGeneration
-            && lease.Owner = SessionOwner.Fallback
-            && s.Owner = SessionOwner.Fallback
-            && s.Core.Lifecycle = FallbackLifecycle.Active
-
-        if isCurrent then
+    | Some lease when lease.ContinuationID = expectedID && lease.Status = expectedStatus ->
+        if continuationLeaseIsCurrent lease s then
             Some
                 { s with
                     PendingLease = Some { lease with Status = nextStatus } }
         else
             None
-    | None -> None
+    | _ -> None
 
 let setPendingNudgeLease lease (s: FallbackSessionRuntime) =
     { s with
@@ -58,15 +49,7 @@ let tryTransitionPendingNudgeLease expectedID expectedStatus nextStatus (s: Fall
     | Some lease when lease.NudgeID = expectedID ->
         if lease.Status = nextStatus then
             Some s
-        elif
-            lease.Status = expectedStatus
-            && lease.SessionGeneration = s.SessionGeneration
-            && lease.HumanTurnID = s.HumanTurnId
-            && lease.CancelGeneration = s.CancelGeneration
-            && lease.Owner = SessionOwner.Nudge
-            && s.Owner = SessionOwner.Nudge
-            && s.Core.Lifecycle = FallbackLifecycle.Active
-        then
+        elif lease.Status = expectedStatus && nudgeLeaseIsCurrent lease s then
             Some
                 { s with
                     PendingNudgeLease = Some { lease with Status = nextStatus } }
@@ -165,13 +148,13 @@ let startCompaction
         Owner = SessionOwner.Compaction }
 
 let tryGetSettleInfo expectedCompactionID (s: FallbackSessionRuntime) =
-    if s.CompactionActiveId = expectedCompactionID then
+    if canSettleCompaction expectedCompactionID s then
         Some(s.CompactionActiveId, s.CompactionActiveOrdinal)
     else
         None
 
 let applySettle expectedCompactionID (s: FallbackSessionRuntime) =
-    if s.CompactionActiveId = expectedCompactionID then
+    if canSettleCompaction expectedCompactionID s then
         Some
             { s with
                 CompactionActiveId = ""
