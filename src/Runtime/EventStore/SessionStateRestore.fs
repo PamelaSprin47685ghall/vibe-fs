@@ -93,6 +93,7 @@ let private decodeNudgeLease (nl: ReplayNudgeLeaseState) : NudgeLease =
       NudgeOrdinal = nl.NudgeOrdinal
       Nonce = nl.Nonce
       HumanTurnID = nl.HumanTurnID
+      HostUserMessageId = nl.HostUserMessageId
       SessionGeneration = nl.SessionGeneration
       CancelGeneration = nl.CancelGeneration
       Owner = SessionOwner.Nudge

@@ -67,6 +67,7 @@ let requestLease
                       Nonce = ""
                       Anchor = ""
                       HumanTurnID = deriveHumanTurnId st.HumanTurn evHumanTurnId
+                      HostUserMessageId = ""
                       SessionGeneration = defaultGeneration st.SessionGeneration evSessionGen
                       CancelGeneration = defaultCancelGeneration st.CancelGeneration evCancelGen
                       Status = "requested" }

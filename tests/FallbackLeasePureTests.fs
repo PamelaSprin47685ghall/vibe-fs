@@ -24,6 +24,7 @@ let private mkNudgeLease id status =
       NudgeOrdinal = 1
       Nonce = "n"
       HumanTurnID = ""
+      HostUserMessageId = ""
       SessionGeneration = 0
       CancelGeneration = 0
       Owner = SessionOwner.Nudge

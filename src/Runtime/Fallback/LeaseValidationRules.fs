@@ -75,11 +75,26 @@ let checkIsStale
             )
         )
 
+/// Strict attribution order (SPEC F-02 / §七 step 5):
+/// 1. assistant parentID == HostUserMessageId
+/// 2. host run id == HostRunId (when recorded; currently only HostUserMessageId path)
+/// 3. verified namespaced dispatch marker on host message
+/// 4. else Unmatched — never generation-only
 type ContinuationMatchClassification =
     | MatchedByParentId of parentId: string
     | MatchedByHostRunId of runId: string
     | MatchedByMarker of cid: string
     | UnmatchedStatusHint of continuationIdMissing: bool
+
+let private isHostAccepted (lease: PendingLease) : bool =
+    lease.HostUserMessageId <> ""
+    && match lease.Status with
+       | LeaseStatus.Dispatched
+       | LeaseStatus.Running -> true
+       | LeaseStatus.Requested
+       | LeaseStatus.DispatchStarted
+       | LeaseStatus.Cancelled
+       | LeaseStatus.Settled -> false
 
 let classifyContinuationMatch
     (runtime: FallbackRuntimeStore)
@@ -93,7 +108,7 @@ let classifyContinuationMatch
         // No pending lease: an event with a continuation id is a stale
         // continuation-tagged event and must not be treated as a current
         // status hint. An empty continuation id is a normal status hint.
-        UnmatchedStatusHint (continuationId = "")
+        UnmatchedStatusHint(continuationId = "")
     | Some lease ->
         // Strict correlation order (SPEC F-02):
         // 1. assistant.parentID == HostUserMessageId
@@ -109,10 +124,12 @@ let classifyContinuationMatch
         if isParentIdMatch then
             MatchedByParentId parentIDOpt.Value
         else
+            // Host run id is only strong evidence when the lease already holds
+            // a HostUserMessageId and the run id equals that same identity
+            // (OpenCode often reuses the user message id as the turn/run key).
             let isHostRunIdMatch =
                 match hostRunIDOpt with
-                | Some rid when rid <> "" && lease.HostRunId <> "" && rid = lease.HostRunId -> true
-                | _ -> false
+                | Some rid when rid <> "" && lease.HostRunId <> "" && rid = lease.HostRunId -> true                | _ -> false
 
             if isHostRunIdMatch then
                 MatchedByHostRunId hostRunIDOpt.Value
@@ -128,7 +145,8 @@ let checkContinuationMatchesWithEvidence
     (parentIDOpt: string option)
     (hostRunIDOpt: string option)
     : bool * bool =
-    let classification = classifyContinuationMatch runtime sessionID continuationId parentIDOpt hostRunIDOpt
+    let classification =
+        classifyContinuationMatch runtime sessionID continuationId parentIDOpt hostRunIDOpt
 
     let isMatched =
         match classification with
@@ -171,3 +189,56 @@ let isTerminalOrSettled
 
     evt <> FallbackEvent.NewUserMessage
     && (terminalSessionFallbackState || settledFallbackLease)
+
+/// Idle disposition for an identified physical session (SPEC §七 step 6).
+type IdleDisposition =
+    /// No active dispatch: record a session hint only; never cache for next turn.
+    | SessionHintOnly
+    /// Active dispatch has not reached HostAccepted — idle cannot terminalise it.
+    | RejectNotHostAccepted of continuationId: string
+    /// HostAccepted but no strong assistant/error terminal yet → reconciliation.
+    | NeedsReconciliation of continuationId: string * hostUserMessageId: string
+    /// HostAccepted and strong terminal evidence present → may settle.
+    | MaySettle of continuationId: string * hostUserMessageId: string
+    /// Duplicate idle while already terminal / already settled — ignore.
+    | IdempotentIgnore
+
+let classifyIdleDisposition
+    (session: FallbackSessionRuntime)
+    (hasStrongTerminalEvidence: bool)
+    (isDuplicateIdle: bool)
+    : IdleDisposition =
+    if isDuplicateIdle then
+        IdempotentIgnore
+    else
+        match session.PendingLease with
+        | None ->
+            match session.PendingNudgeLease with
+            | None -> SessionHintOnly
+            | Some nl ->
+                if nl.HostUserMessageId = "" then
+                    RejectNotHostAccepted nl.NudgeID
+                elif hasStrongTerminalEvidence then
+                    MaySettle(nl.NudgeID, nl.HostUserMessageId)
+                else
+                    NeedsReconciliation(nl.NudgeID, nl.HostUserMessageId)
+        | Some lease ->
+            match lease.Status with
+            | LeaseStatus.Settled
+            | LeaseStatus.Cancelled -> IdempotentIgnore
+            | LeaseStatus.Requested
+            | LeaseStatus.DispatchStarted when lease.HostUserMessageId = "" ->
+                RejectNotHostAccepted lease.ContinuationID
+            | _ when not (isHostAccepted lease) && lease.HostUserMessageId = "" ->
+                RejectNotHostAccepted lease.ContinuationID
+            | _ when hasStrongTerminalEvidence && lease.HostUserMessageId <> "" ->
+                MaySettle(lease.ContinuationID, lease.HostUserMessageId)
+            | _ when lease.HostUserMessageId <> "" ->
+                NeedsReconciliation(lease.ContinuationID, lease.HostUserMessageId)
+            | _ -> RejectNotHostAccepted lease.ContinuationID
+
+/// True when idle may drive a domain terminal settlement for the pending lease.
+let idleMaySettle (session: FallbackSessionRuntime) (hasStrongTerminalEvidence: bool) (isDuplicateIdle: bool) : bool =
+    match classifyIdleDisposition session hasStrongTerminalEvidence isDuplicateIdle with
+    | MaySettle _ -> true
+    | _ -> false

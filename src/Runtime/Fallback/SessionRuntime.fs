@@ -21,6 +21,8 @@ type NudgeLease =
       NudgeOrdinal: int
       Nonce: string
       HumanTurnID: string
+      /// Host-issued user message id bound at chat.message acceptance.
+      HostUserMessageId: string
       SessionGeneration: int
       CancelGeneration: int
       Owner: SessionOwner

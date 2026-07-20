@@ -142,6 +142,7 @@ let private handleNudgeRequested (st: OwnerEpisodeState) (ev: NudgeRequestEvent)
               Nonce = ev.Nonce
               Anchor = ev.Anchor
               HumanTurnID = deriveHumanTurnId st.HumanTurn ev.HumanTurnId
+              HostUserMessageId = ""
               SessionGeneration = defaultGeneration st.SessionGeneration ev.Generation
               CancelGeneration = defaultCancelGeneration st.CancelGeneration ev.CancelGeneration
               Status = "requested" }

@@ -25,6 +25,7 @@ type ReplayNudgeLeaseState =
       Nonce: string
       Anchor: string
       HumanTurnID: string
+      HostUserMessageId: string
       SessionGeneration: int
       CancelGeneration: int
       Status: string }
