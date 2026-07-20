@@ -87,23 +87,23 @@ let private handleMuxDispatchOutcome
                 return! Promise.reject (System.Exception("AcceptanceUnknown: OpaqueAccepted is not a strong Mux receipt"))
         | DispatchOutcome.Failed terminal ->
             match terminal with
-            | AcceptanceUnknown e ->
+            | DispatchTerminal.AcceptanceUnknown e ->
                 return! Promise.reject (System.Exception("AcceptanceUnknown: " + e.Message))
-            | RejectedBeforeSend e ->
+            | DispatchTerminal.RejectedBeforeSend e ->
                 return! Promise.reject (System.Exception("Failed: " + e.Message))
-            | Failed e ->
+            | DispatchTerminal.Failed e ->
                 return! Promise.reject (System.Exception("Failed: " + e.Message))
-            | TransportUnavailable e ->
+            | DispatchTerminal.TransportUnavailable e ->
                 return! Promise.reject (System.Exception("Failed: " + e.Message))
-            | Cancelled -> return! Promise.reject (System.Exception("Failed: cancelled"))
-            | Superseded ->
+            | DispatchTerminal.Cancelled -> return! Promise.reject (System.Exception("Failed: cancelled"))
+            | DispatchTerminal.Superseded ->
                 return! Promise.reject (System.Exception("Failed: AnotherDispatchInFlight"))
-            | SessionClosed -> return! Promise.reject (System.Exception("Failed: session closed"))
-            | AbortUnknown e ->
+            | DispatchTerminal.SessionClosed -> return! Promise.reject (System.Exception("Failed: session closed"))
+            | DispatchTerminal.AbortUnknown e ->
                 return! Promise.reject (System.Exception(abortUnavailableMessage + ": " + e.Message))
-            | TimedOut e -> return! Promise.reject (System.Exception("Failed: " + e.Message))
-            | Poisoned s -> return! Promise.reject (System.Exception("Failed: " + s))
-            | Completed -> return ()
+            | DispatchTerminal.TimedOut e -> return! Promise.reject (System.Exception("Failed: " + e.Message))
+            | DispatchTerminal.Poisoned s -> return! Promise.reject (System.Exception("Failed: " + s))
+            | DispatchTerminal.Completed -> return ()
     }
 
 let private dispatchMuxPrompt

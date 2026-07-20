@@ -13,7 +13,7 @@ let fromHostEnvelope (envelope: HostEventEnvelope) (rawInput: obj) : SessionFact
 
     match eventType with
     | "session.status" ->
-        let statusObj = get props "status"
+        let statusObj = Dyn.get props "status"
         let statusVal = resolveStatusValue statusObj
 
         if statusVal = "busy" then
@@ -29,16 +29,16 @@ let fromHostEnvelope (envelope: HostEventEnvelope) (rawInput: obj) : SessionFact
     | "session.remove"
     | "session.close" -> SessionFact.SessionClosed
     | "message.updated" ->
-        let info = get props "info"
-        let role = str info "role"
-        let messageId = str info "id"
+        let info = Dyn.get props "info"
+        let role = Dyn.str info "role"
+        let messageId = Dyn.str info "id"
 
         if role = "assistant" then
             let parentId =
-                let p = str info "parentID"
+                let p = Dyn.str info "parentID"
 
                 if p = "" then
-                    let p2 = str info "parentId"
+                    let p2 = Dyn.str info "parentId"
                     if p2 = "" then None else Some p2
                 else
                     Some p

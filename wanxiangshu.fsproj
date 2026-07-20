@@ -744,6 +744,7 @@
     <Compile Include="tests/OpencodeSubagentCoverageTests.fs"/>
     <Compile Include="tests/OmpReconcileTests.fs"/>
     <Compile Include="tests/OmpSessionLifecycleTests.fs"/>
+    <Compile Include="tests/OmpHostContractTests.fs"/>
     <Compile Include="tests/MethodologyTests.fs"/>
     <Compile Include="tests/ReviewPromptsFormatTests.fs"/>
     <Compile Include="tests/CapsSynthCommonTests.fs"/>
