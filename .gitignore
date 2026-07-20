@@ -63,6 +63,7 @@ ehthumbs.db
 .wanxiangzhen.ndjson
 .wanxiangzhen.ndjson.lock
 .wanxiangzhen-e2e-meta.json
+.wanxiangshu-recovery/
 
 ## Environment / secrets
 .env
