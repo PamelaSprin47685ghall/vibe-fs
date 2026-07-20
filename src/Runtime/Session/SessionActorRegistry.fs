@@ -26,18 +26,18 @@ module SessionActorRegistry =
 
     let Remove (workspaceKey: string) (sessionId: string) : unit =
         let k = key workspaceKey sessionId
+        actors <- Map.remove k actors
+
+    /// Drop the actor from the registry, then enqueue SessionClosed so domain
+    /// finally-cleanup still runs. Removal is first so a concurrent GetOrCreate
+    /// cannot observe a half-closed mailbox and drop live facts.
+    let NotifyClosed (workspaceKey: string) (sessionId: string) : unit =
+        let k = key workspaceKey sessionId
 
         match Map.tryFind k actors with
         | Some actor ->
             actors <- Map.remove k actors
             actor.Post SessionFact.SessionClosed |> ignore
-        | None -> ()
-
-    let NotifyClosed (workspaceKey: string) (sessionId: string) : unit =
-        match TryGet workspaceKey sessionId with
-        | Some actor ->
-            actor.Post SessionFact.SessionClosed |> ignore
-            actors <- Map.remove (key workspaceKey sessionId) actors
         | None -> ()
 
     let Clear () : unit =

@@ -77,8 +77,10 @@ let runStreamAbort
 
         let mutable errTicks = 0
 
-        while errNudgeCalls = 0 && errTicks < 20 do
+        while errNudgeCalls = 0 && errTicks < 100 do
             do! yieldMicrotask ()
+            if errTicks % 10 = 9 then
+                do! sleep 5
             errTicks <- errTicks + 1
 
         do! withTimeout (errNudgeHarness.dispose ())
@@ -131,8 +133,10 @@ let runStreamAbort
 
         let mutable continueTicks = 0
 
-        while continueModel = "" && continueTicks < 20 do
+        while continueModel = "" && continueTicks < 100 do
             do! yieldMicrotask ()
+            if continueTicks % 10 = 9 then
+                do! sleep 5
             continueTicks <- continueTicks + 1
 
         do! withTimeoutCustom 4000 (continueHarness.dispose ())

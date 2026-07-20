@@ -88,7 +88,11 @@ let processLifecycleFact
     : JS.Promise<unit> =
     promise {
         match fact with
-        | SessionFact.SessionClosed -> handleSessionClosed ctx sid (Some(envelopeOf "session.deleted" (createObj [ "sessionID" ==> sid ])))
+        | SessionFact.SessionClosed ->
+            handleSessionClosed
+                ctx
+                sid
+                (Some(envelopeOf "session.deleted" (createObj [ "sessionID" ==> sid ])))
         | _ ->
             match toHostSurface fact with
             | Some(envelope, rawInput) -> do! runHostFanOut ctx fallbackRuntime fallback nudge sid envelope rawInput

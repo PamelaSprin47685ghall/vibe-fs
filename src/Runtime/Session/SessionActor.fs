@@ -27,12 +27,11 @@ type SessionActor(workspaceKey: string, sessionId: string) =
     member _.IsClosed = snap.Closed
     member _.IsHandlerBound = handlerBound
 
-    /// Bind the domain handler once. Later binds are ignored so GetOrCreate
-    /// callers cannot replace a live production handler with a test stub.
+    /// Bind/replace the domain handler. Production hooks rebind on each event
+    /// so a process-global actor always closes over the live CoreServices.
     member _.BindHandler(next: SessionFactHandler) : unit =
-        if not handlerBound then
-            handler <- next
-            handlerBound <- true
+        handler <- next
+        handlerBound <- true
 
     /// Force-replace handler (tests only).
     member _.ReplaceHandler(next: SessionFactHandler) : unit =
