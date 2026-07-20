@@ -60,6 +60,12 @@ type NudgeTrigger
                 let sessionIDStr = getSessionID envelope.EventType envelope.Props
 
                 if sessionIDStr <> "" then
+                    if not (NudgeTrigger.isNaturalStop envelope.EventType envelope.Props) then
+                        fallbackRuntime.Update(
+                            sessionIDStr,
+                            Wanxiangshu.Runtime.Fallback.SessionRuntimePropertyPure.setTerminalConsumed false
+                        )
+
                     match envelope.EventType with
                     | "stream-abort"
                     | "session.abort"
@@ -79,7 +85,16 @@ type NudgeTrigger
                                 || containsAbortText msg
                             then
                                 markForceStopped sessionIDStr
-                    | "session.next.prompted" -> ()
+                    | "session.next.prompted" ->
+                        removeForceStopped sessionIDStr
+                        let state = fallbackRuntime.GetOrCreateState sessionIDStr
+
+                        if state.Lifecycle = FallbackLifecycle.Cancelled then
+                            let ns =
+                                { state with
+                                    Lifecycle = FallbackLifecycle.Active }
+
+                            fallbackRuntime.Update(sessionIDStr, (fun s -> { s with Core = ns }))
                     | "session.status" ->
                         let statusObj = Dyn.get envelope.Props "status"
 
@@ -119,40 +134,60 @@ type NudgeTrigger
                             try
                                 let p: obj = Fable.Core.JsInterop.emitJsExpr () "process"
                                 p?env?("WANXIANGSHU_TEST") = "true"
-                            with _ ->
+                            with ex ->
+                                JS.console.error ("Failed to resolve WANXIANGSHU_TEST env: " + ex.Message)
                                 false
 
-                        let! owner = NudgeTriggerOps.resolveOwner ctx fallbackRuntime sessionIDStr isTest
-                        let isForce = isForceStopped sessionIDStr
+                        let session = fallbackRuntime.GetSession sessionIDStr
+                        let isConsumed = isTerminalConsumed session
 
-                        let origin =
-                            NudgeTriggerOps.resolveOrigin fallbackRuntime owner isForce sessionIDStr
-
-                        if NudgeTriggerOps.hasActiveFallbackContinuation fallbackRuntime sessionIDStr then
+                        if isConsumed then
                             ()
                         else
-                            do! NudgeTriggerOps.applyPostTerminalCleanup ctx fallbackRuntime owner sessionIDStr
-                            let isEligible = NudgeTriggerOps.isNudgeEligible origin eventType
+                            let! owner =
+                                NudgeTriggerOps.resolveOwner
+                                    ctx
+                                    fallbackRuntime
+                                    sessionIDStr
+                                    isTest
+                                    envelope.Props
+                                    envelope.EventType
 
-                            if
-                                isEligible
-                                && not (reviewStore.getPendingReviewIds () |> List.contains sessionIDStr)
-                            then
-                                match getClientFromPluginCtx ctx with
-                                | Ok client ->
-                                    fallbackRuntime.Update(sessionIDStr, setNudgeActive true)
+                            fallbackRuntime.Update(
+                                sessionIDStr,
+                                Wanxiangshu.Runtime.Fallback.SessionRuntimePropertyPure.setTerminalConsumed true
+                            )
 
-                                    let! _ignored =
-                                        dispatchPostStopFromHistory
-                                            host
-                                            fallbackRuntime
-                                            client
-                                            ctx
-                                            sessionID
-                                            isForceStopped
+                            let isForce = isForceStopped sessionIDStr
 
-                                    fallbackRuntime.Update(sessionIDStr, setNudgeActive false)
-                                | Error e -> ()
+                            let origin =
+                                NudgeTriggerOps.resolveOrigin fallbackRuntime owner isForce sessionIDStr
+
+                            if NudgeTriggerOps.hasActiveFallbackContinuation fallbackRuntime sessionIDStr then
+                                ()
+                            else
+                                do! NudgeTriggerOps.applyPostTerminalCleanup ctx fallbackRuntime owner sessionIDStr
+                                let isEligible = NudgeTriggerOps.isNudgeEligible origin eventType
+
+                                if
+                                    isEligible
+                                    && not (reviewStore.getPendingReviewIds () |> List.contains sessionIDStr)
+                                then
+                                    match getClientFromPluginCtx ctx with
+                                    | Ok client ->
+                                        fallbackRuntime.Update(sessionIDStr, setNudgeActive true)
+
+                                        let! _ignored =
+                                            dispatchPostStopFromHistory
+                                                host
+                                                fallbackRuntime
+                                                client
+                                                ctx
+                                                sessionID
+                                                isForceStopped
+
+                                        fallbackRuntime.Update(sessionIDStr, setNudgeActive false)
+                                    | Error e -> ()
         }
 
     member _.SettleCompactionIfCompleted(sessionIDStr: string) : JS.Promise<unit> =

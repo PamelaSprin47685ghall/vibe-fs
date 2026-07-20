@@ -26,6 +26,43 @@ let restoreFallbackRuntimeStore
 
 // ── Sync loop entry points ─────────────────────────────────────────────
 
+let private syncSingleSessionFromEventLog
+    (host: Host)
+    (store: ReviewStore)
+    (scope: RuntimeScope)
+    (workspaceRoot: string)
+    (sid: string)
+    : JS.Promise<unit> =
+    promise {
+        try
+            let! state = getStore(workspaceRoot).GetSessionState(sid)
+            syncReviewProjection store sid state.ReviewTask
+            scope.Projection.StoreBacklog(host, sid, List.rev state.Backlog)
+            restoreFallbackRuntimeStore scope sid state
+        with ex ->
+            JS.console.error (
+                box
+                    {| event = "session_restore_failed"
+                       directory = workspaceRoot
+                       session = sid
+                       message = ex.Message |}
+            )
+
+            match scope.TryFindKey("fallbackRuntime") with
+            | Some obj ->
+                let rt = unbox<FallbackRuntimeStore> obj
+
+                rt.Update(
+                    sid,
+                    fun s ->
+                        { s with
+                            Core =
+                                { s.Core with
+                                    Lifecycle = FallbackLifecycle.RecoveryRequired } }
+                )
+            | None -> ()
+    }
+
 let syncAllSessionsFromEventLogDedicated
     (host: Host)
     (store: ReviewStore)
@@ -44,12 +81,29 @@ let syncAllSessionsFromEventLogDedicated
                     let sessionIds = allStates |> Map.keys |> Seq.toList
 
                     for sid in sessionIds do
-                        let! state = getStore(workspaceRoot).GetSessionState(sid)
-                        syncReviewProjection store sid state.ReviewTask
-                        scope.Projection.StoreBacklog(host, sid, List.rev state.Backlog)
-                        restoreFallbackRuntimeStore scope sid state
-        with _ ->
-            ()
+                        do! syncSingleSessionFromEventLog host store scope workspaceRoot sid
+        with ex ->
+            JS.console.error (
+                box
+                    {| event = "session_restore_failed"
+                       directory = workspaceRoot
+                       message = ex.Message |}
+            )
+
+            match scope.TryFindKey("fallbackRuntime") with
+            | Some obj ->
+                let rt = unbox<FallbackRuntimeStore> obj
+
+                for sid in rt.GetAllSessionIds() do
+                    rt.Update(
+                        sid,
+                        fun s ->
+                            { s with
+                                Core =
+                                    { s.Core with
+                                        Lifecycle = FallbackLifecycle.RecoveryRequired } }
+                    )
+            | None -> ()
     }
 
 let syncBacklogFromEventLogDedicated
@@ -68,6 +122,12 @@ let syncBacklogFromEventLogDedicated
                 if exists then
                     let! state = getStore(workspaceRoot).GetSessionState(sessionID)
                     projection.StoreBacklog(host, sessionID, List.rev state.Backlog)
-        with _ ->
-            ()
+        with ex ->
+            JS.console.error (
+                box
+                    {| event = "session_restore_failed"
+                       directory = workspaceRoot
+                       session = sessionID
+                       message = ex.Message |}
+            )
     }

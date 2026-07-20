@@ -477,6 +477,7 @@
     <Compile Include="src/Hosts/OpenCode/Fallback/Coordinator.fs"/>
     <Compile Include="src/Hosts/OpenCode/Fallback/HostEventInspection.fs"/>
     <Compile Include="src/Hosts/OpenCode/NudgeTriggerCleanup.fs"/>
+    <Compile Include="src/Hosts/OpenCode/NudgeTriggerOwner.fs"/>
     <Compile Include="src/Hosts/OpenCode/NudgeTriggerOps.fs"/>
     <Compile Include="src/Hosts/OpenCode/NudgeTrigger.fs"/>
     <Compile Include="src/Hosts/OpenCode/ChatHooksMessageIdDedup.fs"/>

@@ -144,7 +144,7 @@ let private handleDispatchStatusResolved
     (retryCount: int)
     (turnDeadlineAtMs: int64)
     (reconciliationDeadlineAtMs: int64)
-    status
+    (status: DispatchStatus)
     : Result<DecisionResult, DecisionError> =
     match status with
     | DispatchStatus.Accepted receipt -> Ok(beginAbortAfterDispatchAccepted nowMs ctx plan receipt cancelCtx)

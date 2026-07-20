@@ -1,110 +1,23 @@
 module Wanxiangshu.Hosts.Opencode.NudgeTriggerOps
 
 open Fable.Core
-open Fable.Core.JsInterop
-open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.FallbackKernel.Types
 open Wanxiangshu.Kernel.Primitives.Identity
-open Wanxiangshu.Kernel.Nudge
 open Wanxiangshu.Kernel.Nudge.Types
-open Wanxiangshu.Kernel.HostTools
-open Wanxiangshu.Runtime
 open Wanxiangshu.Runtime.Fallback.SessionRuntimeLeasePure
 open Wanxiangshu.Runtime.Fallback.RuntimeStore
-open Wanxiangshu.Runtime.Fallback.SessionRuntimePropertyPure
-open Wanxiangshu.Runtime.Dyn
-open Wanxiangshu.Runtime.OpencodeClientCodec
-open Wanxiangshu.Runtime.OpencodeHookInputCodec
-open Wanxiangshu.Runtime.ToolRuntimeContext
-open Wanxiangshu.Runtime.SessionEventWriter
-open Wanxiangshu.Runtime.NudgeEventWriter
-open Wanxiangshu.Runtime.NudgeLease
-open Wanxiangshu.Hosts.Opencode.NudgeEffect
-open Wanxiangshu.Hosts.Opencode.Fallback.HostEventInspection
 open Wanxiangshu.Hosts.Opencode.NudgeTriggerCleanup
 
-let private inferOwnerFromTestRun (ctx: obj) (sessionIDStr: string) (isTest: bool) : JS.Promise<SessionOwner> =
-    promise {
-        if isTest then
-            match getClientFromPluginCtx ctx with
-            | Error _ -> return SessionOwner.NoOwner
-            | Ok client ->
-                let arg = box {| path = box {| id = sessionIDStr |} |}
-                let! resp = invokeClient client "messages" arg
-                let data = Dyn.get resp "data"
-
-                if not (Dyn.isNullish data) && Dyn.isArray data then
-                    let messagesArr = data :?> obj array
-
-                    if messagesArr.Length > 0 then
-                        let lastMsg = messagesArr.[messagesArr.Length - 1]
-                        let info = Dyn.get lastMsg "info"
-                        let role = Dyn.str info "role"
-
-                        if role = "assistant" || role = "toolResult" then
-                            return SessionOwner.Human
-                        else
-                            return SessionOwner.NoOwner
-                    else
-                        return SessionOwner.NoOwner
-                else
-                    return SessionOwner.NoOwner
-        else
-            return SessionOwner.NoOwner
-    }
-
-/// Read the current owner; in test runs, fall back to the last observed
-/// role on the host session (assistant / toolResult -> Human).
 let resolveOwner
     (ctx: obj)
     (fallbackRuntime: FallbackRuntimeStore)
     (sessionIDStr: string)
     (isTest: bool)
+    (props: obj)
+    (hostEventType: string)
     : JS.Promise<SessionOwner> =
-    promise {
-        let current = (fallbackRuntime.GetSession sessionIDStr).Owner
+    NudgeTriggerOwner.resolveOwner ctx fallbackRuntime sessionIDStr isTest props hostEventType
 
-        if current <> SessionOwner.NoOwner then
-            return current
-        else
-            let! inferred = inferOwnerFromTestRun ctx sessionIDStr isTest
-
-            if inferred <> SessionOwner.NoOwner then
-                return inferred
-            else
-                let directory = pluginDirectoryFromCtx ctx
-                let reason = "No owner inferred from runtime state or host messages"
-
-                // Diagnostic surface (N-06): structured console + durable event.
-                // Never guess owner; never silent permanent NoOwner dead zone.
-                JS.console.warn (
-                    box
-                        {| feature = "nudge"
-                           session = sessionIDStr
-                           event = "nudge_owner_unknown"
-                           reason = reason
-                           isTest = isTest
-                           directory = directory |}
-                )
-
-                do!
-                    appendNudgeOwnerUnknownOrFail directory sessionIDStr reason
-                    |> Promise.catch (fun ex ->
-                        JS.console.error (
-                            box
-                                {| feature = "nudge"
-                                   session = sessionIDStr
-                                   event = "nudge_owner_unknown"
-                                   error = "Failed to append nudge_owner_unknown event: " + ex.Message |}
-                        )
-
-                        ())
-
-                return SessionOwner.NoOwner
-    }
-
-/// Map (owner, isForce) to the TerminalOrigin that explains why the
-/// session reached a terminal state.
 let resolveOrigin
     (fallbackRuntime: FallbackRuntimeStore)
     (owner: SessionOwner)

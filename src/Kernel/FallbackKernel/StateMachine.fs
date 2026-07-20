@@ -130,6 +130,7 @@ let private handleSessionBusy (state: SessionFallbackState) =
 let private handleSessionIdle (state: SessionFallbackState) =
     match state.Lifecycle with
     | FallbackLifecycle.Cancelled -> state, FallbackAction.DoNothing
+    | FallbackLifecycle.RecoveryRequired -> state, FallbackAction.DoNothing
     | FallbackLifecycle.TaskComplete ->
         { state with
             Lifecycle = FallbackLifecycle.Active },

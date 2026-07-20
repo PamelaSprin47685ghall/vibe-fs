@@ -77,8 +77,7 @@ let rec loop
 
         match decideAfterRound nudgeCount outcome maxNudges with
         | Finish result -> return result
-        | Nudge next ->
-            return! loop client childID childSignal verdict reviewStore gate initialParts next
+        | Nudge next -> return! loop client childID childSignal verdict reviewStore gate initialParts next
     }
 
 let performCleanup
@@ -102,29 +101,29 @@ let performCleanup
             | Some h when not (Dyn.isNullish abortSignal) ->
                 try
                     abortSignal?removeEventListener ("abort", h) |> ignore
-                with _ ->
-                    ()
+                with ex ->
+                    JS.console.warn ("Failed to remove parent abort handler: " + ex.Message)
             | _ -> ()
 
             try
                 childAbort.abort ()
-            with _ ->
-                ()
+            with ex ->
+                JS.console.warn ("Failed to abort child controller: " + ex.Message)
 
             try
                 reviewStore.unlockReview childID
-            with _ ->
-                ()
+            with ex ->
+                JS.console.error ("Failed to unlock review: " + ex.Message)
 
             try
                 reviewStore.CleanupSession childID
-            with _ ->
-                ()
+            with ex ->
+                JS.console.error ("Failed to cleanup review session: " + ex.Message)
 
             try
                 do! Wanxiangshu.Hosts.Opencode.SubagentIoCleanup.abortAndUnregister registry client directory childID
-            with _ ->
-                ()
+            with ex ->
+                JS.console.error ("Failed to unregister subagent: " + ex.Message)
     }
 
 let runLoopWithCleanup
