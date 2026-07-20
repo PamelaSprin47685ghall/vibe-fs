@@ -15,6 +15,7 @@ open Wanxiangshu.Runtime.Fallback.Coordinator
 open Wanxiangshu.Runtime.Fallback.Ports
 open Wanxiangshu.Runtime.Fallback.ContinuationExecution
 open Wanxiangshu.Runtime.Fallback.ContinuationExecutionCore
+open Wanxiangshu.Runtime.Fallback.ContinuationDispatchOps
 open Wanxiangshu.Runtime
 
 module Dyn = Wanxiangshu.Runtime.Dyn
@@ -231,7 +232,7 @@ let handleEvent_sessionIdle_idle_toolText_sendsPrompt () =
         let! result, intentOpt = handleEvent translator rt defaultCfgLookup executor "" (box ()) None
 
         match intentOpt with
-        | Some intent -> do! executeContinuationIntent rt executor "" sid intent
+        | Some intent -> do! executeContinuationIntent rt executor "" sid intent inlineReenter
         | None -> ()
 
         equal "phase RecoveringToolCallText" FallbackPhase.RecoveringToolCallText result.State.Phase
@@ -303,7 +304,7 @@ let handleEvent_sessionIdle_retryToIdle_emitsScanToolCallAsText () =
         let! result, intentOpt = handleEvent translator rt defaultCfgLookup executor "" (box ()) None
 
         match intentOpt with
-        | Some intent -> do! executeContinuationIntent rt executor "" sid intent
+        | Some intent -> do! executeContinuationIntent rt executor "" sid intent inlineReenter
         | None -> ()
 
         equal "phase RecoveringToolCallText" FallbackPhase.RecoveringToolCallText result.State.Phase
@@ -411,7 +412,7 @@ let handleEvent_userAbort_invalidatesLease () =
         equal "lifecycle Cancelled" FallbackLifecycle.Cancelled (rt.GetOrCreateState sid).Lifecycle
 
         // Simulate late dispatch intent execution
-        do! executeContinuationIntent rt executor "" sid intent
+        do! executeContinuationIntent rt executor "" sid intent inlineReenter
 
         equal "executor called 0 times" 0 executor.ContinueCalls.Length
     }

@@ -11,18 +11,15 @@ open Wanxiangshu.Runtime.Fallback.LeaseValidation
 open Wanxiangshu.Runtime.ContinuationEventWriter
 open Wanxiangshu.Runtime.Clock
 open Wanxiangshu.Runtime.Fallback.RetryDispatchGovernor
-open Wanxiangshu.Runtime.PromiseQueue
+open Wanxiangshu.Runtime.Fallback.ContinuationSessionReenter
 
 /// Shared per-process retry dispatch governor.
 let private retryGovernor = RetryDispatchGovernor()
 
-/// Serialize state mutations on the session actor queue. Physical transport stays outside.
-type SessionReenter = (unit -> JS.Promise<unit>) -> JS.Promise<unit>
+type SessionReenter = ContinuationSessionReenter.SessionReenter
 
-let inlineReenter (work: unit -> JS.Promise<unit>) : JS.Promise<unit> = work ()
-
-let queueReenter (queue: SerialQueue) (work: unit -> JS.Promise<unit>) : JS.Promise<unit> =
-    queue.Enqueue(work)
+let inlineReenter = ContinuationSessionReenter.inlineReenter
+let queueReenter = ContinuationSessionReenter.queueReenter
 
 /// Cancel a dispatch after it has been started.
 let private cancelAfterDispatch
@@ -139,6 +136,39 @@ let private leaseStillDispatchable
             | LeaseStatus.Settled -> false
         | _ -> false)
 
+let private claimDispatchStarted
+    (runtime: FallbackRuntimeStore)
+    (workspaceRoot: string)
+    (sessionID: string)
+    (lease: PendingLease)
+    (reenter: SessionReenter)
+    : JS.Promise<bool> =
+    promise {
+        let mutable ok = false
+
+        do!
+            reenter (fun () ->
+                promise {
+                    do!
+                        appendContinuationDispatchStartedOrFail
+                            workspaceRoot
+                            sessionID
+                            lease.ContinuationID
+                            lease.ContinuationOrdinal
+
+                    ok <-
+                        runtime.UpdateSessionReturning(
+                            sessionID,
+                            tryTransitionPendingLeaseReturning
+                                lease.ContinuationID
+                                LeaseStatus.Requested
+                                LeaseStatus.DispatchStarted
+                        )
+                })
+
+        return ok
+    }
+
 /// Inner dispatch: claim on reenter queue, physical action outside, complete on reenter.
 let dispatchWithLeaseTransition
     (runtime: FallbackRuntimeStore)
@@ -152,32 +182,7 @@ let dispatchWithLeaseTransition
     (reenter: SessionReenter)
     : JS.Promise<unit> =
     promise {
-        let! claimed =
-            promise {
-                let mutable ok = false
-
-                do!
-                    reenter (fun () ->
-                        promise {
-                            do!
-                                appendContinuationDispatchStartedOrFail
-                                    workspaceRoot
-                                    sessionID
-                                    lease.ContinuationID
-                                    lease.ContinuationOrdinal
-
-                            ok <-
-                                runtime.UpdateSessionReturning(
-                                    sessionID,
-                                    tryTransitionPendingLeaseReturning
-                                        lease.ContinuationID
-                                        LeaseStatus.Requested
-                                        LeaseStatus.DispatchStarted
-                                )
-                        })
-
-                return ok
-            }
+        let! claimed = claimDispatchStarted runtime workspaceRoot sessionID lease reenter
 
         if not claimed then
             do!

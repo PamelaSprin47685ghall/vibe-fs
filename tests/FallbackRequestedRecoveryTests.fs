@@ -214,7 +214,7 @@ let propagateFailureClearsLeaseAndTransfersOwnership () =
         check "starts with Fallback owner" ((rt.GetSession "s-prop").Owner = SessionOwner.Fallback)
         check "starts with requested lease" ((rt.GetSession "s-prop").PendingLease.IsSome)
 
-        do! Wanxiangshu.Runtime.Fallback.ContinuationIntentExecution.run rt executor "" "s-prop" PropagateFailureIntent
+        do! Wanxiangshu.Runtime.Fallback.ContinuationIntentExecution.runInline rt executor "" "s-prop" PropagateFailureIntent
 
         let sessionAfter = rt.GetSession "s-prop"
         check "lease is cleared" (sessionAfter.PendingLease.IsNone)

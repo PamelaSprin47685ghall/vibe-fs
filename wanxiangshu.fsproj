@@ -350,6 +350,7 @@
     <Compile Include="src/Runtime/Fallback/LeaseValidationRules.fs"/>
     <Compile Include="src/Runtime/Fallback/LeaseValidation.fs"/>
     <Compile Include="src/Runtime/Fallback/RetryDispatchGovernor.fs"/>
+    <Compile Include="src/Runtime/Fallback/ContinuationSessionReenter.fs"/>
     <Compile Include="src/Runtime/Fallback/ContinuationDispatchOps.fs"/>
     <Compile Include="src/Runtime/Fallback/ContinuationExecution.fs"/>
     <Compile Include="src/Runtime/Fallback/ContinuationExecutionCore.fs"/>
