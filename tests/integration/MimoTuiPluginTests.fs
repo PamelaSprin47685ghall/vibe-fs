@@ -5,7 +5,7 @@ open Fable.Core.JsInterop
 open Wanxiangshu.Tests.Assert
 open Wanxiangshu.E2e.HarnessTypes
 
-[<Import("start", "../e2e/harness.js")>]
+[<Import("start", "../../e2e/harness.js")>]
 let private startHarness: obj -> JS.Promise<obj> = jsNative
 
 let runAll (args: string array) : JS.Promise<int> =

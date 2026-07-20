@@ -12,7 +12,7 @@ open Wanxiangshu.Integration.OpencodeNudgeHostIntegrationTests
 [<Emit("JSON.stringify($0)")>]
 let private jsonStringify (o: obj) : string = jsNative
 
-[<Import("start", "../integration/harness.js")>]
+[<Import("start", "./integration/harness.js")>]
 let private startHarness: obj -> JS.Promise<obj> = jsNative
 
 let private createEmpty () = createObj []

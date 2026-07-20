@@ -3,7 +3,7 @@ import path from 'node:path';
 import {
   FallbackRuntimeStore__GetSession_Z721C83C5,
   FallbackRuntimeStore__OnStateChanged,
-} from '../build/src/Runtime/Fallback/RuntimeStore.js';
+} from '../../build/src/Runtime/Fallback/RuntimeStore.js';
 
 export function readPartsText(output) {
   const parts = output?.parts;

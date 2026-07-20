@@ -267,7 +267,7 @@
     <Compile Include="src/Runtime/Messaging/MessagingDecode.fs"/>
     <Compile Include="src/Runtime/Messaging/MessagingCodec.fs"/>
     <Compile Include="src/Runtime/Messaging/ChatTransformOutputCodec.fs"/>
-    <Compile Include="src/Runtime/Execution/SerialStateHolder.fs"/>
+
     <Compile Include="src/Runtime/Execution/ContextBudgetLimitResolverPure.fs"/>
     <Compile Include="src/Runtime/Execution/ContextBudgetLimitResolver.fs"/>
     <Compile Include="src/Runtime/Execution/ContextBudgetResolve.fs"/>
@@ -481,7 +481,7 @@
     <Compile Include="src/Hosts/OpenCode/SubsessionHostAdapterTypes.fs"/>
     <Compile Include="src/Hosts/OpenCode/SubsessionHostAdapterOps.fs"/>
     <Compile Include="src/Hosts/OpenCode/SubsessionHostAdapter.fs"/>
-    <Compile Include="src/Hosts/OpenCode/SubagentIoArgs.fs"/>
+
     <Compile Include="src/Hosts/OpenCode/SubagentIoCleanup.fs"/>
     <Compile Include="src/Hosts/OpenCode/SubagentRunDirective.fs"/>
     <Compile Include="src/Hosts/OpenCode/SubagentRunExec.fs"/>
@@ -952,17 +952,17 @@
     <Compile Include="tests/ContextBudgetIntegrationTests.fs"/>
     <Compile Include="tests/ContextBudgetPipelineNudgeTests.fs"/>
     <Compile Include="tests/TestRunnerBehaviorTests.fs"/>
-    <Compile Include="integration/OpencodePluginToolLifecycleContractTests.fs"/>
-    <Compile Include="integration/OpencodePluginNudgeForceStopContractTests.fs"/>
-    <Compile Include="integration/OpencodePluginStreamAbortContractTests.fs"/>
-    <Compile Include="integration/OpencodeContinueContractTests.fs"/>
-    <Compile Include="integration/OpencodeNudgeHostIntegrationTests.fs"/>
+    <Compile Include="tests/integration/OpencodePluginToolLifecycleContractTests.fs"/>
+    <Compile Include="tests/integration/OpencodePluginNudgeForceStopContractTests.fs"/>
+    <Compile Include="tests/integration/OpencodePluginStreamAbortContractTests.fs"/>
+    <Compile Include="tests/integration/OpencodeContinueContractTests.fs"/>
+    <Compile Include="tests/integration/OpencodeNudgeHostIntegrationTests.fs"/>
     <Compile Include="tests/IntegrationOpenCodeContractTests.fs"/>
     <Compile Include="e2e/HarnessTypes.fs"/>
     <Compile Include="e2e/TestsServePlugin.fs"/>
-    <Compile Include="integration/OpencodePluginTests.fs"/>
-    <Compile Include="integration/MimocodePluginTests.fs"/>
-    <Compile Include="integration/MimoTuiPluginTests.fs"/>
+    <Compile Include="tests/integration/OpencodePluginTests.fs"/>
+    <Compile Include="tests/integration/MimocodePluginTests.fs"/>
+    <Compile Include="tests/integration/MimoTuiPluginTests.fs"/>
     <Compile Include="tests/Tests.fs"/>
     <Compile Include="e2e/WanxiangzhenPluginTests.fs"/>
     <Compile Include="e2e/TestsEdgeCaseScenarios.fs"/>

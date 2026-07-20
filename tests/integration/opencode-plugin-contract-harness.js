@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { createMockLLM } from '../e2e/mock-llm.js';
+import { createMockLLM } from '../../e2e/mock-llm.js';
 import { OpencodePluginHarness } from './opencode-plugin-harness-class.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));

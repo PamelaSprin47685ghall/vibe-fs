@@ -199,7 +199,6 @@ let run () : unit =
     let cwd = unbox<string> (nodeProcess?cwd ())
     let srcRoot = pathJoin cwd "src"
     let testsRoot = pathJoin cwd "tests"
-    let integrationRoot = pathJoin cwd "integration"
     let e2eRoot = pathJoin cwd "e2e"
     violations.Clear()
 
@@ -217,7 +216,7 @@ let run () : unit =
     checkForbiddenFileNames srcRoot
     checkFunctionLengths srcRoot 60
 
-    for testRoot in [ testsRoot; integrationRoot; e2eRoot ] do
+    for testRoot in [ testsRoot; e2eRoot ] do
         if existsSync testRoot then
             checkForbiddenFileNames testRoot
             checkForbiddenTestNames testRoot

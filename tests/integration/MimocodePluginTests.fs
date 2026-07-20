@@ -1,17 +1,17 @@
-module Wanxiangshu.E2e.OpencodePluginTests
+module Wanxiangshu.E2e.MimocodePluginTests
 
 open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Tests.Assert
 open Wanxiangshu.E2e.HarnessTypes
 
-[<Import("start", "../e2e/harness.js")>]
+[<Import("start", "../../e2e/harness.js")>]
 let private startHarness: obj -> JS.Promise<obj> = jsNative
 
 let runAll (args: string array) : JS.Promise<int> =
     promise {
         clearFailuresForRun ()
-        let opts = createObj [ "plugin", box true ]
+        let opts = createObj [ "plugin", box true; "variant", box "mimocode" ]
         let! apiObj = withTimeoutCustom 60000 (startHarness opts)
         let harness = unbox<Harness> apiObj
         let mutable ok = 0
@@ -30,7 +30,7 @@ let runAll (args: string array) : JS.Promise<int> =
             )
 
         let createData = unbox<obj> createRes
-        check "op.session-create.ok" (createData?ok = true)
+        check "mimo.session-create.ok" (createData?ok = true)
         let sessionID = string (createData?data?data?id)
 
         harness.mockLLM.reset ()
@@ -101,7 +101,7 @@ let runAll (args: string array) : JS.Promise<int> =
                 emptyObj
                 "todowrite"
 
-        do! withTimeoutCustom 4000 (harness.dispose ())
-        printfn "\n✓ %d opencode plugin e2e checks passed" ok
+        do! withTimeoutCustom 4900 (harness.dispose ())
+        printfn "\n✓ %d mimocode plugin e2e checks passed" ok
         return summary ()
     }

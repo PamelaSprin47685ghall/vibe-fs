@@ -4,8 +4,16 @@ open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Kernel.ContextBudget
 open Wanxiangshu.Runtime.RuntimeScope
-open Wanxiangshu.Runtime.SerialStateHolder
 open Wanxiangshu.Runtime.ContextBudgetTrace
+
+/// Thread-local mutable holder used only by ContextBudgetStore.
+type private StateHolder<'state>(initialState: 'state) =
+    let mutable state = initialState
+
+    member _.Mutate<'result>(transition: 'state -> 'state * 'result) : 'result =
+        let nextState, result = transition state
+        state <- nextState
+        result
 
 type ContextBudgetEntry =
     { State: ContextState option

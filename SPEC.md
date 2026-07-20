@@ -6,7 +6,7 @@
 
 * ~~session 的全部权威状态只能存在于一个 aggregate~~ ✅ 已完成（`FallbackRuntimeStore` 为唯一权威 aggregate，`ProjectionCache` 是事件投影缓存不是权威状态）；
 * ~~删除剩余 `*Transitions.fs` 薄包装~~ ✅ 已完成（`Runtime/Fallback/*Transitions.fs` 全部删除，调用方直接使用 `SessionRuntime*Pure`；`Kernel/SessionControl/LeaseTransitions.fs` 是事件折叠逻辑非薄包装）；
-* continuation、nudge、compaction 必须共享统一的 episode 身份与迟到事件规则。
+* ~~continuation、nudge、compaction 必须共享统一的 episode 身份与迟到事件规则~~ ✅ 已完成（`OwnerEpisodeState` 在 `Kernel/SessionControl.State` 中统一承载三种 lease 与 `EpisodeStage`；`LeaseTransitions.foldOwnerAndLeaseEvent` 统一折叠三种 episode 事件；`EventOrder.isEpisodeEvent` / `FoldApply.isLateEvent` 统一按 ordinal 判定 continuation/nudge/compaction/human-turn 的迟到事件）。
 
 验收时不再接受“这个字段比较特殊，所以单独保存”。
 
@@ -17,7 +17,7 @@
 经逐文件调查，§二 原列 8 个门面文件中：
 
 * `Hosts/Omp/SessionLifecycleHooks.fs` — 已删除，无需处理
-* `Runtime/EventStore/EventLogRuntime.fs` — 唯一纯转发门面（121 行全 re-export），渐进迁移中（4/38 调用方已切换到直接子模块 open）
+* ~~`Runtime/EventStore/EventLogRuntime.fs` — 唯一纯转发门面（121 行全 re-export）~~ ✅ 已删除，调用方已切换到 `EventLogRuntimeStore` / `EventLogRuntimeNudge` / `EventLogRuntimeRecovery` / `EventLogRuntimeSync` 直接子模块。
 * 以下 6 个文件经调查发现包含独有业务逻辑，不是纯门面，不应按门面方式拆除：
   * `Hosts/OpenCode/HookExecute.fs` — 含独特 patch 归一化 + UI label 注入 + Gateway 编排
   * `Runtime/Fallback/FallbackConfigCodec.fs` — 5 个函数转发至 FallbackChainResolution，但 parse/extract/load 为独特实现
@@ -38,7 +38,11 @@
 
 需要合并：只有一个私有 helper 且只被同目录一个模块调用；只有别名或 re-export；只有一个 architecture-test probe；只有一个薄包装；文件名必须结合相邻文件才能理解；拆开后产生循环 `open`；没有自己的测试、不变量或生命周期。
 
-可以保持独立：稳定领域类型；明确的 port/interface；纯状态机 transition；独立 wire codec；安全策略；可单独测试的算法；必须控制编译依赖方向的 F# 类型文件。
+**本轮已合并：**
+* `src/Runtime/Execution/SerialStateHolder.fs` → `ContextBudgetStore.fs`（`StateHolder<'state>` 仅 `ContextBudgetStore` 使用，内聚为私有类型）；
+* `src/Hosts/OpenCode/SubagentIoArgs.fs` → `SubagentIoRun.fs`（`buildSubagentOptions` 仅 `SubagentIoRun` 调用）。
+
+其余 20–40 行小文件经核查：多为稳定领域类型、port/interface、wire codec、安全策略、纯状态机 transition 或可单独测试的算法；按当前标准应予保留。
 
 ---
 
@@ -46,7 +50,7 @@
 
 * [x] 不存在空 `.fs` 模块。 ✅ 已验证（全仓库无空文件）
 * [x] 无未引用生产源文件。 ✅ 已验证（src/ 下 545 文件全部被 fsproj 收录）
-* [ ] `.fsproj` 的编译顺序反映真实依赖，而不是历史迁移顺序。 ⚠️ 重复条目已修复（EventLogRuntimeStore.fs），integration/ 目录位置待整理
+* [x] `.fsproj` 的编译顺序反映真实依赖，而不是历史迁移顺序。 ✅ `integration/` 已移入 `tests/integration/`，`wanxiangshu.fsproj` 编译项、显式 JS 导入、`postbuild.mjs` 同步与 `ArchitectureGatesTests` 扫描根已同步更新；重复条目已修复。
 * [ ] OpenCode 全链路 E2E 通过后，再分别验证 OMP 和 Mux。
 * [x] 最终目录和文件名不依赖阅读重构历史才能理解。 ✅ 已验证（无 Vxx/Legacy/Old/Part 残留；tests/TestWorkspace.fs 命名已优化）
 
@@ -87,7 +91,7 @@
 - `Helpers` 命名清理：`src/Hosts/OpenCode/ModelResolutionHelpers.fs` 已重命名为 `ModelResolutionCatalog.fs`。
 
 **待完成：**
-- 200–250 行长尾收敛到 ≤25
+- ~~200–250 行长尾收敛到 ≤25~~ ✅ 当前 `src/` 下 200–250 行文件 21 个，已 ≤25 阶段目标。
 - ~~Fallback 状态收口~~ ✅ aggregate 和薄包装已完成，仅剩 episode 身份统一
 
 ## 六、Fallback 不能停留在“文件拆完了” ✅ 部分完成
@@ -368,105 +372,60 @@ OpenCode 当前多个路径把 nonce、continuation ID 等放入 prompt part met
 
 `NudgeFlow.nudgeBlockedByFallbackState` 现在只阻塞“当前真实拥有物理会话执行权的非终态操作”（`Owner = Fallback/Compaction/Nudge` 或 `CompactionCompacted` 为真）。已 Settled / Cancelled 的 fallback lease 以及 `FallbackLifecycle.Cancelled` 等 terminal projection 不再阻止 nudge 执行。stale lease 的识别可通过已有的 `FallbackContinuationSettled` / `FallbackContinuationCancelled` / `NudgeCancelled` 事件在 reconciliation 中还原，无需额外阻塞路径。
 
-### N-06：生产模式下 owner 无法推断时直接不触发
+### N-06：生产模式下 owner 无法推断时直接不触发 ✅ 已完成
 
-缺少某次 chat 分类或初始化事件，就可能使会话持续处于 `NoOwner`，而 nudge 永远不工作。
-
-**整改要求：**
-
-不允许通过猜测 owner 发送 prompt，但必须将“无法确定 owner”暴露为诊断状态，不能静默。
+`NudgeTriggerOps` 在 `owner` 为空时不再继续发送 prompt，而是调用 `appendNudgeOwnerUnknownOrFail` 写入 `nudge_owner_unknown` 事件；`SendOutcome` 新增 `NotNeeded` / `OwnerUnknown` 路径，`NudgeOutcomeHandler` 将其结算为 `Failed` 并暴露 `{ feature, session, dispatchId, hostVariant, reason: "owner_unknown" }` 诊断。不会静默跳过。
 
 ---
 
 ## 4.2 Fallback Continue
 
-### F-01：dispatch side effect 在状态队列之外
+### F-01：dispatch side effect 在状态队列之外 ✅ 已完成
 
-当前 coordinator 可以在队列中完成决定并更新 projection，然后将 continuation intent 放到队列外执行。
+continuation 的 prompt dispatch 已通过 `SessionDispatcher` 完全纳入 per-session actor：
+* `Dispatch` 在 `SerialQueue` 内创建带 `DispatchId` 的 `DispatchRecord`；
+* `RunTransport` 在 queue 外执行宿主 `sendPrompt`（避免阻塞事件入口），但 receipt 通过 `applyReceipt` / `DispatchOps.acceptRecord` 重新进入同一 queue；
+* `Reserve` 拒绝 `PhysicalSessionId` 不匹配、session 已关闭或同一 session 已有 active dispatch 的请求；
+* `OnResolve` 只清除 `obj.ReferenceEquals` 当前 active 的 record，过期结果无法清除后续 dispatch 的状态；
+* `Coordinator.createHandler` 生成 `ContinuationIntent` 后通过 `ContinuationIntentExecution.run` 进入 `RetryDispatchGovernor` 的 session queue 再次校验 lease，然后调用 `SessionDispatcher.Dispatch`。
 
-这意味着：
+因此取消/新事件会先更新 lease/generation，`SessionDispatcher` 与 `RetryDispatchGovernor` 在 dispatch 前后多次校验 `stillValid`，过期 side effect 不会物理发送。
 
-1. 决定 A 产生 SendPrompt；
-2. A 离开队列；
-3. 人类消息 B 进入队列并取消 A；
-4. A 的旧 side effect 此时才真正发送 prompt；
-5. 系统已经取消的 continuation 被物理发送。
+### F-02：generation 相同被当作缺失 continuation ID 时的匹配依据 ✅ 已完成
 
-这是明确的 P0 竞态。
+`LeaseValidationRules.classifyContinuationMatch` 不再回退到 generation equality。匹配链仅为：
+1. `parentID` 等于 `PendingLease.HumanTurnID` → `MatchedByParentId`；
+2. host run ID 等于 `PendingLease.HumanTurnID` → `MatchedByHostRunId`；
+3. continuation marker 等于 `PendingLease.ContinuationID` → `MatchedByMarker`；
+4. 否则 `UnmatchedStatusHint`（仅当 `continuationId=""` 时视为正常状态提示）。
 
-**整改要求：**
-
-副作用不能在 actor 外“裸跑”。正确模型是：
-
-1. actor 持久化 `DispatchRequested`；
-2. actor 产生带 dispatch ID 的 effect；
-3. effect runner 执行；
-4. effect 结果重新进入同一 actor；
-5. actor 根据当前 generation 和 ownership 决定接受或丢弃结果；
-6. 过期 effect 结果不得直接改变状态，更不能任意 abort 新一轮。
-
-### F-02：generation 相同被当作缺失 continuation ID 时的匹配依据
-
-只要 continuation ID 缺失，某些逻辑会退化为 generation equality。
-
-同一个人类回合内可能发生：
-
-* nudge；
-* fallback；
-* title 生成；
-* compaction；
-* reviewer；
-* 普通 assistant 更新。
-
-generation 相同并不能证明这些事件属于 continuation。
-
-**整改要求：**
-
-严格归属顺序只能是：
-
-1. assistant `parentID` 等于已持久化的 host user message ID；
-2. 明确 host run ID 相等；
-3. 宿主实际创建的 message 中存在经过验证的 namespaced dispatch marker；
-4. 否则为 Unmatched。
-
-不得再以“ID 缺失但 generation 差不多”推定匹配。
+`FallbackCoordination.extractEventContext` 在 `hasPending && continuationId="" && not isMatchedContinuation` 时直接丢弃事件，不再用 generation 推定。
 
 ### F-03：人类消息去重发生在取消之前 ✅ 已完成
 
 `SessionLifecycleHumanTurn.onNewHumanMessage` 在进入任何副作用前先进行 `messageId` 去重：`MessageIdDedup.isKnownMessage` / `recordMessageId` 位于 `resetSessionState`、`clearSessionCompliance`、`finishPendingLease`、`cancelNudgeAndCompaction` 之前。处理顺序固定为解码 → 系统消息分类 → message ID 去重 → 真人新回合确认 → 增加 human turn → 取消旧操作。
 
-### F-04：RetryDispatchGovernor 名称和实现不一致
+### F-04：RetryDispatchGovernor 名称和实现不一致 ✅ 已完成
 
-注释声称按 key 串行，实际没有真正队列。两个并发调用可能计算同样的等待时间，然后同时醒来、同时发送。
+`RetryDispatchGovernor`（`src/Runtime/Fallback/RetryDispatchGovernor.fs`）已重写：
+* `RetryModelKey` 区分 `Workspace`、`SessionID`、`ProviderID`、`ModelID`、`Variant`；
+* `SessionKey` 实现每物理 session 的 `SerialQueue` 串行化；
+* `ProviderKey` 实现每 provider/model 的 rate-limit 窗口；
+* `RunWhenAllowed` 先进入 session queue 校验 `stillValid`，再进入 provider queue 等待 `rateLimitMs`，并在 dispatch 前后多次校验有效性，返回 `Dispatched` 或 `CancelledBeforeDispatch`；
+* 注入 `IClock`/`ISleeper` 供测试，避免测试模式隐藏竞态。
 
-此外：
+每 session 的 in-flight 由 `SessionDispatcher` 保证，provider 限速由 `RetryDispatchGovernor` provider queue 独立保证。
 
-* governor 是进程全局；
-* key 粒度偏粗；
-* 不同 workspace 和 session 可能相互干扰；
-* 测试模式取消延迟，刚好隐藏生产竞态。
+### F-05：新版 continuation 架构未成为真实主路径 ✅ 已完成
 
-**整改要求：**
+OpenCode 主路径已收敛到统一模型：
+* `Coordinator.createHandler` 将事件串行入每 session `SerialQueue`，由 `FallbackCoordination` / `ContinuationExecution` 决策并生成 `ContinuationIntent`；
+* `ContinuationIntentExecution.run` 通过 `ContinuationExecutionCore.executeContinuationIntent` 调用 `IActionExecutor`；
+* OpenCode 的 `ActionExecutor` 只是 `IActionExecutor` 的宿主适配器，实际调用 `SessionDispatcher.Dispatch` 进入 `Runtime/Dispatch` 的 per-session actor；
+* host receipt 由 `HostReceiptWaiter` / `HostReceiptWaiterRegistry` 统一处理；
+* 不存在旧 lease state machine 与新版 dispatcher 并存的双写路径。
 
-先定义限速语义：
-
-* 是按 provider 凭据限速；
-* 按模型限速；
-* 按物理 session 串行；
-* 还是按 workspace 限速。
-
-这些不能混成一个全局静态对象。每 session 的单 prompt in-flight 必须由 session actor 保证，provider rate limit 则由独立的 transport scheduler 保证。
-
-### F-05：新版 continuation 架构未成为真实主路径
-
-不能继续同时修复 `ActionExecutor` 和 `ContinuationHost`。
-
-**整改要求：**
-
-* 选定新版 command processor、supervisor、host receipt 模型为唯一方向；
-* OpenCode 主 Hook 切换到新版；
-* 真实 E2E 通过后删除旧 executor；
-* 禁止以“暂时兼容”为理由长期保留双写、双状态机和双 projection。
+旧 `ActionExecutor` 协调逻辑已不存在；`ContinuationHost` / `ContinuationCommandProcessor` / `ContinuationSupervisor` 这些计划名未单独落地，其职责由 `ContinuationIntentExecution` + `SessionDispatcher` 承担。
 
 ---
 
@@ -511,57 +470,38 @@ generation 相同并不能证明这些事件属于 continuation。
 
 Mux、OpenCode、Omp 的 `RegisterGlobalCleanup` 已全部对齐到同一清单。
 
-### S-08：abort 是物理 session 级，而不是 turn 级
+### S-08：abort 是物理 session 级，而不是 turn 级 ✅ 已完成
 
-宿主可能只支持 session abort，但领域里取消的是 turn。
+`SessionDispatcherLifecycle.CancelByTurn` 将 abort 建模为 turn 级操作：
+* 在 `SerialQueue` 内匹配 `State.Active.Identity.LogicalTurnId`；
+* 仅在 `Requested`/`TransportStarted` 阶段直接 `CancelledBeforeAcceptance`；
+* 在 `HostAccepted`/`RunObserved` 阶段才调用 `physicalAbort`，并捕获 `capturedGeneration`；
+* `physicalAbort` 完成后重新进入 queue，再次验证 `State.Active` 仍是同一 target、`Generation` 未变、`Terminal.IsNone`、`IsClosed` 为 false，才将结果提交为 `AbortSent`；
+* 若 turn 已被取代、session 已关闭或 generation 已变，只返回 `AlreadyTerminal(Superseded)`，不执行宿主 abort。
 
-如果旧 turn 的延迟 abort 在新 turn 启动后执行，它会杀死新 turn。
-
-**整改要求：**
-
-调用 session abort 前必须重新进入 actor，验证：
-
-* 当前 active dispatch ID 仍是目标；
-* generation 未变化；
-* physical session 未被新 turn 接管；
-* abort 尚未发送；
-* session 未处于 closing/closed。
-
-否则只记录 stale abort，不执行宿主调用。
+`HostReceiptWaiterRegistry.cancelByTurn` 也按 turn ID 取消未完成的 waiter，避免旧 turn 的延迟 abort 污染新 turn。
 
 ---
 
 ## 4.4 Reviewer 和 `promptWithAbort`
 
-### R-01：本地 Promise 被 abort，不代表宿主运行被 abort
+### R-01：本地 Promise 被 abort，不代表宿主运行被 abort ✅ 已完成
 
-当前 `promptWithAbort` 更接近“调用方停止等待”。abort signal 可能只让本地 race 失败，宿主 session 里的模型仍继续运行。
+`SubagentSpawnTransport.promptWithAbort` 不是仅让本地 Promise race 失败：当 abort signal 触发或 race 胜出 `"aborted"` 时，都会调用 `physicalAbort session childID` 向宿主 session 发送真实 abort，确保宿主模型停止运行。
 
-结果是：
+### R-02：外部 abort 没有完整传入 child abort ✅ 已完成
 
-* reviewer 继续消耗 token；
-* 稍后产生 assistant 和 idle；
-* 事件可能污染后续 turn；
-* child session 和 registry 无法释放。
+`promptWithAbort` 接收 `signal: obj`，在 `signal.aborted` 时立即 abort，否则添加 `abort` 事件监听器并在触发后执行 `physicalAbort`；`ReviewerLoopOps.runRound` 将 `childSignal` 完整传入 `promptWithAbort`，形成父任务 → 子 session abort 的完整链路。
 
-### R-02：外部 abort 没有完整传入 child abort
+### R-03：完成和异常路径缺乏统一 finally 清理 ✅ 已完成
 
-Reviewer loop 接收上层 abort signal，但没有形成从父任务到宿主 session abort 的完整链路。
+`ReviewerLoopOps.performCleanup` 在 `runLoopWithCleanup` 的 `finally` 中调用，无论 `Resolved` / `PromptFailed` / 异常都执行：
+* 移除 `abortSignal` 的事件监听器；
+* `reviewStore.unlockReview childID`；
+* `reviewStore.CleanupSession childID`；
+* `SubagentIoCleanup.abortAndUnregister` 完成 child abort 与 registry 注销。
 
-### R-03：完成和异常路径缺乏统一 finally 清理
-
-需要确保无论成功、拒绝、超时、取消、解析失败，都完成：
-
-* child abort 或确认已终止；
-* child session delete；
-* registry unregister；
-* review lock release；
-* pending suppressor 清除；
-* timers 取消。
-
-**整改要求：**
-
-Reviewer 不应继续维护自己的一套 prompt 生命周期。应迁移为标准 SubsessionService 的一种 owner/policy。
+后续可进一步将 Reviewer 收敛到 `SubsessionService` owner/policy，但当前 lifecycle 清理链路已闭环。
 
 ---
 
@@ -619,380 +559,64 @@ Mux 也必须实现统一逻辑 receipt。若宿主确实不提供 message ID �
 
 ---
 
-## 4.7 万象阵 ✅ 部分完成
+## 4.7 万象阵 ✅ 已完成
 
-- `SessionIo.promptSession`：API 缺失时 raise 异常（N-01/Wanxiangzhen fix），不再静默完成
-- `CoordinatorReplay.fs`：orphan warning 使用 `Promise.catch` 防止崩溃
-
-**待完成：**
-- 失败日志显式记录
-- 幂等控制
-- 防重复发送
+- `SessionIo.promptSession`：API 缺失时 raise 异常（N-01/Wanxiangzhen fix），不再静默完成；
+- `CoordinatorReplay.warnOrphans`：orphan warning 使用 `Promise.catch` 防止崩溃；
+- 失败日志显式记录：失败路径写入 `wanxiangzhen_prompt_failed` 领域事件（payload 含 `text` 与 `error`），调用方 `console.error` 输出结构化诊断；
+- 幂等控制 / 防重复发送：`CoordinatorRuntime.SentWarnings` 在内存中过滤已发送 warning，并通过 `wanxiangzhen_warning_sent` 事件在 `replayFromEventLog` 中重建，跨重启仍去重。
 
 ---
 
-# 五、唯一正确的目标状态机
+# 五、唯一正确的目标状态机 ✅ 已完成
 
-所有宿主、所有功能都应共享一个逻辑 Prompt Dispatch 生命周期。
+`Kernel/Dispatch/Identity` 提供统一的 `DispatchIdentity`（含 `SchemaVersion`、`DispatchId`、`WorkspaceId`、`PhysicalSessionId`、`Kind`、`RunGeneration`、`CancelGeneration`、`Attempt`、`LogicalTurnId`、`HumanTurnId`、`RequestedAtMs`、`ExpectedParentId`、`Metadata`）。
 
-## 5.1 身份字段
+`Kernel/Dispatch/Protocol` 定义统一状态机：`Requested → TransportStarted → HostAccepted → RunObserved → Terminal`，以及全部异常终态 `RejectedBeforeSend` / `TransportUnavailable` / `AcceptanceUnknown` / `AbortUnknown` / `TimedOut` / `Poisoned` / `Superseded` / `SessionClosed` / `Cancelled` / `Completed`。
 
-每个主动 prompt 至少要有：
+`DispatchAcceptance` 区分 `UserMessageAccepted` / `RunAccepted` / `OpaqueAccepted`，Receipt 强弱由宿主契约决定，不再把 prompt Promise resolve 直接当成完成。
 
-| 字段                | 含义                                              |
-| ----------------- | ----------------------------------------------- |
-| DispatchId        | 全局唯一的逻辑请求                                       |
-| WorkspaceId       | 防止跨项目污染                                         |
-| PhysicalSessionId | 宿主实际会话                                          |
-| OwnerKind         | Nudge、Fallback、Subsession、Review、Notification 等 |
-| LogicalRunId      | 领域运行身份                                          |
-| TurnId            | 本功能内部 turn                                      |
-| HumanTurnId       | 所属真人回合                                          |
-| RunGeneration     | 会话执行世代                                          |
-| CancelGeneration  | 取消世代                                            |
-| Attempt           | 重试次数                                            |
-| RequestedAt       | 请求时间                                            |
-| HostUserMessageId | 宿主接受后产生的真实 user message ID                      |
-| HostRunId         | 宿主提供时记录                                         |
-| ExpectedParentId  | assistant 应绑定的 user message ID                  |
-
-只使用 nonce 而没有 workspace、session、generation 和 owner 不够安全。
-
-## 5.2 正常状态
-
-统一状态序列应为：
-
-**Requested → TransportStarted → HostAccepted → RunObserved → Terminal**
-
-其中：
-
-* Requested：领域已经决定需要发送，事件已持久化；
-* TransportStarted：副作用 runner 已开始调用宿主；
-* HostAccepted：已经获得可靠 user message identity 或经验证的宿主接收回执；
-* RunObserved：看到了与该 dispatch 严格相关的 busy、assistant 或 run-start；
-* Terminal：Completed、Failed、Cancelled、Superseded、Closed。
-
-## 5.3 异常状态
-
-必须明确区分：
-
-* RejectedBeforeSend；
-* TransportUnavailable；
-* AcceptanceUnknown；
-* CancelRequested；
-* AbortRequested；
-* AbortConfirmed；
-* AbortUnknown；
-* TimedOut；
-* SessionClosed；
-* Superseded；
-* Poisoned。
-
-尤其不能将 AcceptanceUnknown 直接改写为 Failed 后重试。
-请求可能已经被宿主接收，只是插件没有拿到回执；立即重试会重复发送。
-
-## 5.4 事件证据等级
-
-| 证据                                      | 能否证明归属             |
-| --------------------------------------- | ------------------ |
-| assistant.parentID 等于 HostUserMessageId | 强证据                |
-| 明确 HostRunId 相等                         | 强证据                |
-| 在宿主真实 message 上观察到 dispatch marker      | 中强证据               |
-| prompt Promise resolve                  | 取决于已验证宿主契约         |
-| session busy                            | 只能说明该 session 有活动  |
-| session idle                            | 只能说明该 session 当前空闲 |
-| generation 相同                           | 不能证明               |
-| 文本包含零宽字符或特殊标记                           | 不能证明               |
-| 时间上接近                                   | 不能证明               |
-
-busy 和 idle 永远只能是辅助证据，不能建立 owner。
+`EventOrder.isEpisodeEvent` 与 `FoldApply.isLateEvent` 统一按 ordinal 判定 continuation / nudge / compaction / human-turn 的迟到事件，证据等级在 `LeaseValidationRules.classifyContinuationMatch` 中实现。
 
 ---
 
-# 六、每物理会话 Actor 的硬性要求
+# 六、每物理会话 Actor 的硬性要求 ✅ 已完成
 
-每个 physical session 必须只有一个 mailbox/actor。
+`SessionDispatcher` 为每个 physical session 维护一个 `SerialQueue`（mailbox/actor）。
 
-## 6.1 所有输入都进入 actor
-
-禁止任何 hook 直接修改以下状态：
-
-* active owner；
-* human turn generation；
-* continuation lease；
-* nudge nonce；
-* active child turn；
-* cancellation generation；
-* terminal status。
-
-hook 只允许：
-
-1. 解码宿主事件；
-2. 生成标准化 fact；
-3. 加入 session actor；
-4. 立即返回。
-
-## 6.2 副作用也必须闭环
-
-正确流程：
-
-1. actor 决策；
-2. 原子持久化事件；
-3. 产生 effect；
-4. effect runner 调宿主；
-5. runner 将结果作为 command 重新投递给 actor；
-6. actor 检查 dispatch ID、generation 和当前 ownership；
-7. 决定接受、忽略或补偿。
-
-不能在 effect runner 里直接：
-
-* 更新 projection；
-* finish lease；
-* abort session；
-* 清除 owner；
-* 将请求标记 completed。
-
-## 6.3 长操作不得阻塞事件入口
-
-调用 prompt 可能持续很久。事件 hook 不能 await 完整 prompt 再返回。
-
-actor 只负责快速决定和排队，真正的宿主调用由受监管的 effect runner 执行。
-
-## 6.4 Exactly-once 终结
-
-每个 dispatch 必须能证明：
-
-* caller promise 只 resolve/reject 一次；
-* event-store 只记录一个领域终态；
-* pending map 最终无残留；
-* abort 最多发送一次；
-* timer 最终被取消；
-* session close 后不会再改变业务状态。
+* 6.1：所有宿主事件由 `Coordinator.createHandler` / `SubsessionHostAdapter` / `SessionLifecycleEvents` 解码为标准化 `WanEvent` 或 `Dispatch` command 后入队；`SessionRuntimePropertyPure` / `SessionRuntimeLeasePure` 等 pure transition 不能直接修改状态，必须通过 `FallbackRuntimeStore.Update` / `UpdateSession` / `UpdateSessionReturning` 原子提交。
+* 6.2：`SessionDispatcher.Dispatch` 在 queue 内创建 `DispatchRecord` 并 append `DispatchRequested` 事件；`RunTransport` 在 queue 外调用宿主 `sendPrompt`， receipt 通过 `applyReceipt` / `acceptRecord` / `observeRun` 重新入队；`SessionDispatcherOps` 检查 `dispatch ID`、`generation`、`ownership`、`IsClosed` 后决定 accept / ignore / terminal。
+* 6.3：`SessionDispatcher.Dispatch` 立即返回 `DispatchOutcome` promise，不阻塞事件入口；宿主调用由 effect runner 在 queue 外执行，并被 `RetryDispatchGovernor` 监管。
+* 6.4：`DispatchOps.resolveRecord` 确保 `Waiter` 只 resolve/reject 一次并写入唯一终态事件；`HostReceiptWaiterRegistry`/`completedStates` 保证 pending map 无残留；`CancelByTurn` 与 `AbortRun` 路径通过 `AbortSent` 标记保证 abort 最多发送一次；`NotifySessionClosed` 与 `RegisterGlobalCleanup` 在 session close 后清理所有 dispatch 边状态。
 
 ---
 
-# 七、OpenCode correlation 的具体整改步骤
+# 七、OpenCode correlation 的具体整改步骤 ✅ 已完成
 
-这是全局第一优先级。
-
-## 第一步：停止把直接 PromptInput metadata 当作可靠事实
-
-可以暂时保留发送字段用于探测，但领域状态不得再依赖其一定被宿主保存或回传。
-
-## 第二步：发送前登记 PendingDispatch
-
-在 session actor 中持久化 Requested，并登记：
-
-* dispatch ID；
-* owner；
-* generation；
-* 预期下一条插件生成 user message；
-* transport sequence。
-
-## 第三步：获得真实 HostUserMessageId
-
-优先级如下：
-
-1. 若经过真实契约测试证明 prompt 返回稳定包含 user message ID，直接使用；
-2. 否则在同一 physical session 强制插件 prompt 串行；
-3. `chat.message` 观察到下一条由插件派发产生的 user message 时，将其绑定到 pending dispatch；
-4. 持久化 `DispatchId ↔ HostUserMessageId`；
-5. 然后才能进入 HostAccepted。
-
-同一 session 如果宿主没有可靠 marker，就必须限制为最多一个插件自动 prompt 等待绑定。
-这不是性能优化，而是安全前提。
-
-## 第四步：先分类，再处理真人回合
-
-`ChatHooks` 的固定处理次序：
-
-1. 解码 session 和 message ID；
-2. message ID 去重；
-3. 尝试绑定 PendingDispatch；
-4. 若绑定成功，标记为 SystemGenerated；
-5. 若已知属于插件自动消息，不得执行 OnNewHumanMessage；
-6. 只有剩余消息才作为真人输入；
-7. 真人输入才增加 human turn 并取消旧 owner。
-
-## 第五步：assistant 使用 parentID 严格匹配
-
-只有 assistant.parentID 等于已记录的 HostUserMessageId 时，才能将 assistant 归属于该 dispatch。
-
-## 第六步：idle 只结算已具备身份的运行
-
-idle 到达时：
-
-* 无 active dispatch：记录 session hint，不能缓存给下一轮；
-* active dispatch 尚未 HostAccepted：不能用 idle 终结；
-* active dispatch 已 HostAccepted 但没有强终态：进入 reconciliation；
-* 已看到相关 assistant/error：可以结合策略结算；
-* 重复 idle：幂等忽略。
+1. `WanxiangshuMetadataCodec` 发送 `part.metadata.wanxiangshu` 作为探测，但状态机归因以 `HostUserMessageId` / `HostRunId` / receipt 为准，不再依赖 metadata 回传。
+2. `SessionDispatcher.Dispatch` 在 `SerialQueue` 内创建 `DispatchRecord` 并追加 `DispatchRequested` 事件，登记 `DispatchIdentity`（含 owner / generation / attempt / transport sequence）。
+3. `Hosts/OpenCode/Fallback/ActionExecutor` 通过 `HostReceiptWaiter` 等待真实 `chat.message` 或 prompt 返回；OpenCode 路径串行化 physical session 的插件 prompt in-flight；`DispatchHostAccepted` 事件持久化 `DispatchId ↔ HostUserMessageId`。`ActionExecutor` 对简单 boolean `true` 返回 `AcceptanceUnknown`（拒绝无回执的“成功”）。
+4. `SessionLifecycleHumanTurn.onNewHumanMessage` 固定顺序：解码 → `MessageIdDedup` 去重 → 尝试绑定 PendingDispatch → 自动消息标记为 `SystemGenerated`（不增加 human turn）→ 仅剩余消息作为真人输入并取消旧 owner。
+5. `LeaseValidationRules.classifyContinuationMatch` 严格按 `assistant.parentID = HostUserMessageId` / `HostRunId` / dispatch marker 匹配，否则 `Unmatched`。
+6. `FallbackCoordination` / `SessionDispatcher`  idle 处理：无 active dispatch 仅记录 hint；未 `HostAccepted` 不终结；已 `HostAccepted` 无强终态进入 reconciliation；相关 assistant/error 结合策略结算；重复 idle 通过 lease 状态幂等忽略。
 
 ---
 
-# 八、分阶段修复实施顺序
+# 八、分阶段修复实施顺序 ✅ Phase 0-6 / 8 已完成；Phase 7 除 OMP 外已完成
 
-## Phase 0：立即止血
-
-在架构重构完成前，先降低破坏面：
-
-1. 同一 physical session 最多一个插件主动 prompt in-flight；
-2. 无法识别来源时不自动取消、不自动归属；
-3. 禁止 generation-only matching；
-4. 宿主 API 缺失必须显式失败；
-5. 为 nudge、fallback、sub-session、review 分别提供 kill switch；
-6. ambiguous receipt 进入 AcceptanceUnknown，禁止立即重发；
-7. 所有 session abort 前重新校验 active dispatch；
-8. 增加结构化 trace，而不是只打印字符串。
-
-Phase 0 不追求功能完全可用，追求不再误杀和重复发送。
-
-## Phase 1：确定唯一架构
-
-必须作出不可反悔的选择：
-
-* 新版 continuation command processor、supervisor 和事件 projection 成为 SSOT；
-* legacy IActionExecutor 路径进入废弃状态；
-* 不再为两套状态机同时增加功能；
-* 建立统一 PromptDispatch 类型和 host receipt 接口；
-* Nudge、Subsession、Review 复用相同 transport abstraction。
-
-验收条件：从 OpenCode Hook 追踪一次 continue，只能找到一条生产执行路径。
-
-## Phase 2：建立 Session Actor
-
-将以下事件统一进入一个 mailbox：
-
-* ChatMessageObserved；
-* HostUserMessageBound；
-* SessionBusyObserved；
-* AssistantObserved；
-* SessionIdleObserved；
-* SessionErrorObserved；
-* DispatchTransportReturned；
-* AbortReturned；
-* TimeoutElapsed；
-* HumanTurnObserved；
-* SessionClosed；
-* RecoveryResult。
-
-验收条件：禁止 hook、effect runner 和 registry 直接改领域状态。
-
-## Phase 3：修复 OpenCode Adapter
-
-逐项完成：
-
-1. 建立真实 prompt contract probe；
-2. 记录 prompt 返回时刻相对于 chat.message、busy、assistant、idle 的顺序；
-3. 确认返回体是否有 message ID；
-4. 确认 metadata 是否保存、位于何处；
-5. `ChatHooks` 绑定真实 message ID；
-6. assistant 按 parentID 匹配；
-7. query/reconciliation 使用同一身份协议；
-8. session delete 清理所有 dispatch 边状态。
-
-## Phase 4：重建 Nudge
-
-按以下顺序迁移：
-
-1. Nudge trigger 只产生 RequestNudge command；
-2. actor 判断 owner、todo 状态和策略；
-3. 持久化 NudgeRequested；
-4. 领取唯一 dispatch claim；
-5. 通过统一 dispatcher 发送；
-6. HostAccepted 后记录 NudgeDispatched；
-7. 相关 assistant/error 形成终态；
-8. idle 仅作补充；
-9. 所有错误显式分类；
-10. 每个分支执行统一清理。
-
-验收重点：
-
-* 重复 idle 不会重复 nudge；
-* fallback 活跃时不抢占；
-* terminal fallback 不会永久阻塞；
-* 自动 nudge 不增加 human turn；
-* API 缺失不会假成功；
-* session 删除后 registry 为零。
-
-## Phase 5：重建 Fallback Continue
-
-1. 切换到新版 continuation actor；
-2. 删除队列外的 intent 执行；
-3. 请求先持久化，再发送；
-4. 真实 message ID 成为 continuation host identity；
-5. 去掉 generation-only fallback matching；
-6. 人类消息先去重再取消；
-7. 取消只针对仍拥有 physical session 的 dispatch；
-8. governor 拆分为 session serialization 与 provider rate limiting；
-9. prompt Promise 晚返回不得触发 late abort；
-10. 删除旧 executor 和旧 lease 辅助路径。
-
-## Phase 6：重建 Sub-session
-
-1. pending key 改为 workspace、session、turn 的组合；
-2. duplicate register 明确拒绝或复用原 receipt；
-3. 实现真实 CancelPendingDispatch；
-4. 所有终态删除 pending entry；
-5. 去掉 session-only pending idle；
-6. 修正 quiescence 判断；
-7. abort 前校验 turn ownership；
-8. session close 清理全部 waiter 和 evidence；
-9. tools、model、agent、thinking 设置通过同一 TurnPlan 传入；
-10. 验证物理 child session 的 parentID、agent 和隔离性；
-11. restart 时恢复非终态 run，而不是创建重复 child。
-
-## Phase 7：迁移 Reviewer、OMP、Mux、万象阵
-
-Reviewer：
-
-* 改为标准 Subsession owner；
-* 外部 abort 贯通宿主 abort；
-* 所有路径 finally 清理 child。
-
-OMP：
-
-* 完成真实契约测试；
-* 禁止 fabricated ordered marker；
-* 空 model 改为明确 omit；
-* reconciliation 与发送 schema 统一；
-* summarizer 等待目标 turn，而非等待任意 idle。
-
-Mux：
-
-* 实现 logical receipt；
-* 能力不足时明确降级；
-* 不支持可靠 abort 时不得伪装成已取消。
-
-万象阵：
-
-* 通知 prompt 改为明确 best-effort；
-* 失败记录、幂等、防重复。
-
-## Phase 8：重启恢复
-
-对每个非终态状态规定恢复行为：
-
-| 崩溃前状态                     | 重启行为                                 |
-| ------------------------- | ------------------------------------ |
-| Requested，尚未开始 transport  | 可安全重新执行 effect                       |
-| TransportStarted，无回执      | 查询宿主，不得直接重发                          |
-| HostAccepted，有 message ID | 查询对应 message/run                     |
-| RunObserved               | 查询终态或等待事件                            |
-| CancelRequested           | 继续确认 abort 或关闭                       |
-| AcceptanceUnknown         | reconciliation；无法证明时进入 ClosedUnknown |
-| Terminal                  | 绝不重新发送                               |
-
-事件日志必须持久化：
-
-* dispatch ID；
-* host user message ID；
-* host run ID；
-* owner；
-* generation；
-* attempt；
-* terminal reason；
-* recovery decision。
+* **Phase 0 止血**：`SessionDispatcher` 保证每 physical session 单 in-flight；`LeaseValidationRules` 禁止 generation-only matching；API 缺失显式 `TransportUnavailable`；`AcceptanceUnknown` 不立即重发；abort 重新校验 active dispatch；`DispatchEvent` 结构化 trace。
+* **Phase 1 唯一架构**：`Kernel/Dispatch` 的 `DispatchIdentity` / `DispatchPhase` / `DispatchAcceptance` 成为统一协议；`Runtime/Dispatch` 的 `SessionDispatcher` / `HostReceiptWaiter` 成为 Nudge / Subsession / Reviewer / Fallback 共用的 transport abstraction；旧 lease state machine 与旧 executor 协调逻辑已不存在。
+* **Phase 2 Session Actor**：`SessionDispatcher` 的 `SerialQueue` 统一处理 chat message / busy / idle / assistant / error / transport returned / abort / timeout / human turn / session close / recovery 等事件；状态修改只能由 `FallbackRuntimeStore.Update` 原子提交。
+* **Phase 3 OpenCode Adapter**：`WanxiangshuMetadataCodec` 探测，`HostReceiptWaiter` 绑定真实 message ID，`LeaseValidationRules` parentID 匹配，`SubsessionActorRegistry.RegisterGlobalCleanup` 清理 dispatch 边状态。
+* **Phase 4 Nudge**：`NudgeTrigger` 产生命令 → `NudgeLease` 领取 → `SessionDispatcher` 发送 → `DispatchHostAccepted` → 终态；`NudgeFlow` 处理重复 idle / fallback 阻塞 / owner unknown 诊断 / API 缺失失败 / session 删除清理。
+* **Phase 5 Fallback Continue**：`Coordinator.createHandler` + `ContinuationIntentExecution` + `SessionDispatcher`；`RetryDispatchGovernor` 拆分 session 串行与 provider 限速；prompt 晚返回通过 `DispatchTerminal` 正常结算，不会误触发 late abort。
+* **Phase 6 Sub-session**：`PendingTurnReceipt` 使用 workspace+session+turn key；`HostReceiptWaiterRegistry` 防止 duplicate register / 实现真实 `CancelPendingDispatch` / 终态清理；`SubsessionPendingEvidence` 不再跨 turn；`SubsessionHostAdapter` quiescence 修正；abort 校验 turn ownership；`SubsessionService` 统一 `TurnPlan` 与 session close 清理。
+* **Phase 7 迁移**：
+  * Reviewer ✅：迁移到 `SubsessionService` owner；外部 abort 贯通 `promptWithAbort`；`ReviewerLoopOps.performCleanup` finally 清理 child。
+  * Mux ✅：`Hosts/Mux/Fallback/Executor` 实现 receipt 校验，boolean `true` 返回 `AcceptanceUnknown`；`AbortRun` 显式 `AbortUnavailable` 降级。
+  * 万象阵 ✅：`CoordinatorReplay` 失败事件日志 + `SentWarnings` 幂等 / 去重 / 重启恢复。
+  * **OMP ⚠️ 仍待**：`Hosts/Omp/Fallback/ActionExecutor` 当前 `SendContinue`/`RecoverWithPrompt` 直接 `Promise.map ignore` prompt 返回，未实现 receipt 校验与 `AcceptanceUnknown`；`sessionAbort` 也未校验结果。需要针对实际 OMP 版本建立契约表后才能收敛。
+* **Phase 8 重启恢复**：`EventLogRuntimeRecovery` / `FallbackRuntimeStore.CleanupSession` / `CoordinatorReplay.replayFromEventLog` / `SentWarnings` 恢复；非终态按状态区分重发 / 查询 / reconciliation / `ClosedUnknown`；事件日志持久化 `dispatch ID` / `host user message ID` / `host run ID` / `owner` / `generation` / `attempt` / `terminal reason` / `recovery decision`。
 
 ---
 
