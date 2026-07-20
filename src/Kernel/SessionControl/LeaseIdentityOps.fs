@@ -53,6 +53,8 @@ let requestLease
                       ContinuationOrdinal = newOrdinal
                       SessionGeneration = defaultGeneration st.SessionGeneration evSessionGen
                       HumanTurnID = deriveHumanTurnId st.HumanTurn evHumanTurnId
+                      HostUserMessageId = ""
+                      HostRunId = ""
                       CancelGeneration = defaultCancelGeneration st.CancelGeneration evCancelGen
                       Owner = owner
                       Model = ""

@@ -99,6 +99,8 @@ let private handleContinuationRequested (st: OwnerEpisodeState) (ev: Continuatio
               ContinuationOrdinal = newOrdinal
               SessionGeneration = defaultGeneration st.SessionGeneration ev.Generation
               HumanTurnID = deriveHumanTurnId st.HumanTurn ev.HumanTurnId
+              HostUserMessageId = ""
+              HostRunId = ""
               CancelGeneration = defaultCancelGeneration st.CancelGeneration ev.CancelGeneration
               Owner = ev.Owner
               Model = ev.Model

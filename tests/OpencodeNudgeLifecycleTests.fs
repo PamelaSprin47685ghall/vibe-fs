@@ -102,9 +102,10 @@ let test_isSystemMessage_acceptsFallbackContinuation () =
 
     check "fallback continuation remains system" result
 
-    check
-        "host message advances continuation acceptance"
-        ((fr.GetSession "s-accept").PendingLease.Value.Status = LeaseStatus.Dispatched)
+    let accepted = (fr.GetSession "s-accept").PendingLease.Value
+
+    check "host message advances continuation acceptance" (accepted.Status = LeaseStatus.Dispatched)
+    check "accept binds real host user message id" (accepted.HostUserMessageId = "msg-fc-accept")
 
 let test_isSystemMessage_plainUserIsNotSystem () =
     let fr = FallbackRuntimeStore()
