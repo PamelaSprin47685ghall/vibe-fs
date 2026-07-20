@@ -98,7 +98,8 @@ let tryAcceptFallbackContinuation
                 (Wanxiangshu.Kernel.Subsession.Types.UserMessageObserved msgId)
             <> ResolveAttemptResult.NotFound
 
-    let accepted = fr.UpdateSessionReturning(sessionIDStr, tryAcceptPendingLeaseReturning continuationId)
+    let accepted =
+        fr.UpdateSessionReturning(sessionIDStr, tryAcceptPendingLeaseReturning continuationId msgId)
 
     accepted || receiptMatched
 

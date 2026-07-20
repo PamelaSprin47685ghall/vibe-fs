@@ -11,6 +11,8 @@ type ReplayLeaseState =
       ContinuationOrdinal: int
       SessionGeneration: int
       HumanTurnID: string
+      HostUserMessageId: string
+      HostRunId: string
       CancelGeneration: int
       Owner: string
       Model: string

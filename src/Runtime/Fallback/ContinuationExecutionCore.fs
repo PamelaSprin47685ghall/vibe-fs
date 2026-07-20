@@ -79,6 +79,8 @@ let executeContinuationIntent
                   ContinuationOrdinal = continuationOrdinal
                   SessionGeneration = gen
                   HumanTurnID = turnId
+                  HostUserMessageId = ""
+                  HostRunId = ""
                   CancelGeneration = cancelGen
                   Owner = SessionOwner.Fallback
                   Model = model
@@ -93,6 +95,8 @@ let executeContinuationIntent
                   ContinuationOrdinal = continuationOrdinal
                   SessionGeneration = gen
                   HumanTurnID = turnId
+                  HostUserMessageId = ""
+                  HostRunId = ""
                   CancelGeneration = cancelGen
                   Owner = SessionOwner.Fallback
                   Model = model

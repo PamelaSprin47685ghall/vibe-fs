@@ -8,6 +8,8 @@ type PendingLease =
       ContinuationOrdinal: int
       SessionGeneration: int
       HumanTurnID: string
+      HostUserMessageId: string
+      HostRunId: string
       CancelGeneration: int
       Owner: SessionOwner
       Model: FallbackModel
@@ -177,6 +179,8 @@ let startDispatch
                       ContinuationOrdinal = nextOrdinal
                       SessionGeneration = gen
                       HumanTurnID = s.HumanTurnId
+                      HostUserMessageId = ""
+                      HostRunId = ""
                       CancelGeneration = cancelGen
                       Owner = SessionOwner.Fallback
                       Model = model

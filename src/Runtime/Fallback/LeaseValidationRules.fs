@@ -106,9 +106,15 @@ let classifyContinuationMatch
         // status hint. An empty continuation id is a normal status hint.
         UnmatchedStatusHint (continuationId = "")
     | Some lease ->
+        // Strict correlation order (SPEC F-02):
+        // 1. assistant.parentID == HostUserMessageId
+        // 2. HostRunId equal
+        // 3. verified namespaced dispatch marker on real host message
+        // 4. else Unmatched
+        // HumanTurnID and SessionGeneration alone never establish ownership.
         let isParentIdMatch =
             match parentIDOpt with
-            | Some pid when pid <> "" && pid = lease.HumanTurnID -> true
+            | Some pid when pid <> "" && lease.HostUserMessageId <> "" && pid = lease.HostUserMessageId -> true
             | _ -> false
 
         if isParentIdMatch then
@@ -116,16 +122,15 @@ let classifyContinuationMatch
         else
             let isHostRunIdMatch =
                 match hostRunIDOpt with
-                | Some rid when rid <> "" && rid = lease.HumanTurnID -> true
+                | Some rid when rid <> "" && lease.HostRunId <> "" && rid = lease.HostRunId -> true
                 | _ -> false
 
             if isHostRunIdMatch then
                 MatchedByHostRunId hostRunIDOpt.Value
+            elif continuationId <> "" && continuationId = lease.ContinuationID then
+                MatchedByMarker continuationId
             else
-                if continuationId <> "" && continuationId = lease.ContinuationID then
-                    MatchedByMarker continuationId
-                else
-                    UnmatchedStatusHint (continuationId = "")
+                UnmatchedStatusHint(continuationId = "")
 
 let checkContinuationMatchesWithEvidence
     (runtime: FallbackRuntimeStore)
