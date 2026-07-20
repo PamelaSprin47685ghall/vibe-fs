@@ -11,6 +11,7 @@ open Wanxiangshu.Runtime.Fallback.SessionRuntimePropertyPure
 open Wanxiangshu.Runtime.Fallback.Ports
 open Wanxiangshu.Runtime.EventLogRuntimeRecovery
 open Wanxiangshu.Runtime.Fallback.ContinuationExecution
+open Wanxiangshu.Runtime.Fallback.ContinuationDispatchOps
 
 type ExecutorCall =
     | SendContinueCall of sessionID: string * continuationID: string
@@ -214,7 +215,7 @@ let propagateFailureClearsLeaseAndTransfersOwnership () =
         check "starts with Fallback owner" ((rt.GetSession "s-prop").Owner = SessionOwner.Fallback)
         check "starts with requested lease" ((rt.GetSession "s-prop").PendingLease.IsSome)
 
-        do! Wanxiangshu.Runtime.Fallback.ContinuationIntentExecution.run rt executor "" "s-prop" PropagateFailureIntent
+        do! Wanxiangshu.Runtime.Fallback.ContinuationIntentExecution.run rt executor "" "s-prop" PropagateFailureIntent inlineReenter
 
         let sessionAfter = rt.GetSession "s-prop"
         check "lease is cleared" (sessionAfter.PendingLease.IsNone)
