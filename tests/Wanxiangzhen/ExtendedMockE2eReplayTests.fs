@@ -7,6 +7,7 @@ open Wanxiangshu.Kernel.Wanxiangzhen.Dag
 open Wanxiangshu.Kernel.Wanxiangzhen.SquadEvent
 open Wanxiangshu.Runtime.Wanxiangzhen.CoordinatorRuntime
 open Wanxiangshu.Runtime.Wanxiangzhen.CoordinatorReplay
+open Wanxiangshu.Runtime.Wanxiangzhen.OrphanNotify
 open Wanxiangshu.Tests.Wanxiangzhen.AssertCompat
 open Wanxiangshu.Kernel.EventSourcing.EventEnvelope
 open Wanxiangshu.Tests.Wanxiangzhen.TestDoubles
@@ -255,10 +256,58 @@ let testReplayWarnsOrphanEmptyMasterSessionId () : JS.Promise<unit> =
             let ev = Wanxiangshu.Runtime.Dyn.str diag "event"
             let msg = Wanxiangshu.Runtime.Dyn.str diag "message"
             let warning = Wanxiangshu.Runtime.Dyn.str diag "warning"
+            let key = Wanxiangshu.Runtime.Dyn.str diag "idempotencyKey"
 
             equal "wanxiangzhen_orphan_tasks_diagnostic" ev
             checkBare (msg.Contains "MasterSessionId is empty")
             checkBare (warning.Contains "Orphan running tasks")
+            equal (idempotencyKey [ "squad-a1b2" ]) key
+
+        // Empty master must not permanently reserve: retry after master appears.
+        checkBare (rt.SentWarnings.Count = 0)
+        checkBare (s.appendWanEventCalls.Length = 1)
+        equal kindPromptFailed s.appendWanEventCalls.[0].Kind
+    }
+
+let testReplayWarnsOrphanEmptyMasterThenSendsWhenMasterAppears () : JS.Promise<unit> =
+    promise {
+        let s = mkFake ()
+        let deps = mkDeps s
+        let rt = mkRuntime deps
+
+        let sessionId = "squad-session-001"
+        let taskId = "squad-a1b2"
+        let evt1 = SquadCreated(sessionId, "req")
+
+        let evt2 =
+            TasksCreated(
+                sessionId,
+                [ { taskId = taskId
+                    title = "A"
+                    description = "desc"
+                    dependsOn = [] } ]
+            )
+
+        let evt3 = TaskStarted(sessionId, taskId, "/wt/a", taskId)
+        let history = [ evt1; evt2; evt3 ]
+
+        s.getLatestSquadSessionIdOverride <- Some(fun () -> Promise.lift (Some sessionId))
+
+        s.getSquadDagOverride <-
+            Some(fun sid ->
+                let dag = List.fold foldEvent (empty sid "") history
+                Promise.lift dag)
+
+        s.mergeBaseOverride <- Some(fun _ _ _ -> false)
+        rt.MasterSessionId <- ""
+        do! replayFromEventLog rt
+        checkBare (s.promptSessionCalls.IsEmpty)
+        checkBare (rt.SentWarnings.Count = 0)
+
+        rt.MasterSessionId <- sessionId
+        do! replayFromEventLog rt
+        checkBare (s.promptSessionCalls.Length = 1)
+        checkBare (rt.SentWarnings.Contains(idempotencyKey [ taskId ]))
     }
 
 let testReplayWarnsOrphanPersistsWarningSentEvent () : JS.Promise<unit> =
@@ -304,12 +353,15 @@ let testReplayWarnsOrphanPersistsWarningSentEvent () : JS.Promise<unit> =
         checkBare (s.appendWanEventCalls.Length = 1)
 
         let ev = s.appendWanEventCalls.[0]
-        equal "wanxiangzhen_warning_sent" ev.Kind
+        equal kindWarningSent ev.Kind
         equal sessionId ev.Session
 
+        let key = idempotencyKey [ taskId ]
+        equal key (Map.tryFind "idempotencyKey" ev.Payload |> Option.defaultValue "")
         let warningOpt = Map.tryFind "warning" ev.Payload
         checkBare (Option.isSome warningOpt)
         checkBare (warningOpt.Value.Contains taskId)
+        checkBare (rt.SentWarnings.Contains key)
     }
 
 let testReplayWarnsOrphanDedupsFromEventLog () : JS.Promise<unit> =
@@ -344,12 +396,14 @@ let testReplayWarnsOrphanDedupsFromEventLog () : JS.Promise<unit> =
                 let dag = List.fold foldEvent (empty sid "") history
                 Promise.lift dag)
 
+        let key = idempotencyKey [ taskId ]
+
         s.readWanEventsResult <-
             [ { V = 1
                 Session = sessionId
-                Kind = "wanxiangzhen_warning_sent"
+                Kind = kindWarningSent
                 At = "2025-01-01T00:00:00Z"
-                Payload = Map [ "warning", warning ] } ]
+                Payload = Map [ "idempotencyKey", key; "warning", warning ] } ]
 
         rt.MasterSessionId <- sessionId
         s.mergeBaseOverride <- Some(fun _ _ _ -> false)
@@ -357,7 +411,7 @@ let testReplayWarnsOrphanDedupsFromEventLog () : JS.Promise<unit> =
         do! replayFromEventLog rt
 
         checkBare (s.promptSessionCalls.IsEmpty)
-        checkBare (rt.SentWarnings.Contains warning)
+        checkBare (rt.SentWarnings.Contains key)
     }
 
 let testReplayWarnsOrphanPromptFailedWritesAuditEvent () : JS.Promise<unit> =
@@ -406,11 +460,76 @@ let testReplayWarnsOrphanPromptFailedWritesAuditEvent () : JS.Promise<unit> =
         checkBare (s.appendWanEventCalls.Length = 1)
 
         let ev = s.appendWanEventCalls.[0]
-        equal "wanxiangzhen_prompt_failed" ev.Kind
+        equal kindPromptFailed ev.Kind
         equal sessionId ev.Session
         equal warning (Map.tryFind "text" ev.Payload |> Option.defaultValue "")
+        equal (idempotencyKey [ taskId ]) (Map.tryFind "idempotencyKey" ev.Payload |> Option.defaultValue "")
         let errMsg = Map.tryFind "error" ev.Payload |> Option.defaultValue ""
         checkBare (errMsg.Contains "intentional network error")
+        // Failure releases reservation so a later retry may send.
+        checkBare (rt.SentWarnings.Count = 0)
+    }
+
+let testReplayWarnsOrphanInFlightReservationPreventsDoubleSend () : JS.Promise<unit> =
+    promise {
+        let s = mkFake ()
+        let deps = mkDeps s
+        let rt = mkRuntime deps
+
+        let sessionId = "squad-session-001"
+        let taskId = "squad-a1b2"
+        let evt1 = SquadCreated(sessionId, "req")
+
+        let evt2 =
+            TasksCreated(
+                sessionId,
+                [ { taskId = taskId
+                    title = "A"
+                    description = "desc"
+                    dependsOn = [] } ]
+            )
+
+        let evt3 = TaskStarted(sessionId, taskId, "/wt/a", taskId)
+        let history = [ evt1; evt2; evt3 ]
+
+        s.getLatestSquadSessionIdOverride <- Some(fun () -> Promise.lift (Some sessionId))
+
+        s.getSquadDagOverride <-
+            Some(fun sid ->
+                let dag = List.fold foldEvent (empty sid "") history
+                Promise.lift dag)
+
+        let mutable resolvePrompt: (unit -> unit) option = None
+        let mutable promptCalls = 0
+
+        s.promptSessionOverride <-
+            Some(fun _c _m _p ->
+                promptCalls <- promptCalls + 1
+                s.promptSessionCalls <- s.promptSessionCalls @ [ (_m, _p) ]
+
+                Promise.create (fun resolve _reject ->
+                    resolvePrompt <- Some(fun () -> resolve ())))
+
+        rt.MasterSessionId <- sessionId
+        s.mergeBaseOverride <- Some(fun _ _ _ -> false)
+
+        let first = replayFromEventLog rt
+        do! Promise.sleep 10
+        // Second replay while first prompt is in-flight must not call PromptSession again.
+        let second = replayFromEventLog rt
+        do! Promise.sleep 10
+        equal 1 promptCalls
+        checkBare (rt.SentWarnings.Contains(idempotencyKey [ taskId ]))
+
+        match resolvePrompt with
+        | Some r -> r ()
+        | None -> checkBare false
+
+        do! first
+        do! second
+        equal 1 promptCalls
+        equal 1 s.appendWanEventCalls.Length
+        equal kindWarningSent s.appendWanEventCalls.[0].Kind
     }
 
 let entriesAsync () : (string * (unit -> JS.Promise<unit>)) list =
@@ -423,7 +542,11 @@ let entriesAsync () : (string * (unit -> JS.Promise<unit>)) list =
       ("ExtendedMockE2e.replay_warns_orphan_retry_and_idempotency", testReplayWarnsOrphanRetryAndIdempotency)
 
       ("ExtendedMockE2e.replay_warns_orphan_empty_master_session_id", testReplayWarnsOrphanEmptyMasterSessionId)
+      ("ExtendedMockE2e.replay_warns_orphan_empty_master_then_sends_when_master_appears",
+       testReplayWarnsOrphanEmptyMasterThenSendsWhenMasterAppears)
       ("ExtendedMockE2e.replay_warns_orphan_persists_warning_sent_event", testReplayWarnsOrphanPersistsWarningSentEvent)
       ("ExtendedMockE2e.replay_warns_orphan_dedups_from_event_log", testReplayWarnsOrphanDedupsFromEventLog)
       ("ExtendedMockE2e.replay_warns_orphan_prompt_failed_writes_audit_event", testReplayWarnsOrphanPromptFailedWritesAuditEvent)
+      ("ExtendedMockE2e.replay_warns_orphan_inflight_reservation_prevents_double_send",
+       testReplayWarnsOrphanInFlightReservationPreventsDoubleSend)
     ]

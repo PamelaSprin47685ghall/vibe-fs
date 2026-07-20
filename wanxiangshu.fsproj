@@ -394,6 +394,7 @@
     <Compile Include="src/Runtime/Nudge/NudgeRuntime.fs"/>
     <Compile Include="src/Runtime/Wanxiangzhen/ConfigReader.fs"/>
     <Compile Include="src/Runtime/Wanxiangzhen/SessionIo.fs"/>
+    <Compile Include="src/Runtime/Wanxiangzhen/OrphanNotify.fs"/>
     <Compile Include="src/Runtime/Wanxiangzhen/GitShell.fs"/>
     <Compile Include="src/Runtime/Wanxiangzhen/HttpCodec.fs"/>
     <Compile Include="src/Runtime/Wanxiangzhen/HttpServer.fs"/>
@@ -918,6 +919,7 @@
     <Compile Include="tests/Wanxiangzhen/SchedulerTests.fs"/>
     <Compile Include="tests/Wanxiangzhen/SerialQueueTests.fs"/>
     <Compile Include="tests/Wanxiangzhen/SessionIoTests.fs"/>
+    <Compile Include="tests/Wanxiangzhen/OrphanNotifyTests.fs"/>
     <Compile Include="tests/Wanxiangzhen/SlaveRuntimeTests.fs"/>
     <Compile Include="tests/Wanxiangzhen/SlaveSpawnTests.fs"/>
     <Compile Include="tests/Wanxiangzhen/SquadConfigTests.fs"/>

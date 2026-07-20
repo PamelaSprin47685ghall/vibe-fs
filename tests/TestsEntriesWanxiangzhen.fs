@@ -31,6 +31,7 @@ let wanxiangzhenTestEntries () : (string * TestBody) list =
     @ prefix (Wanxiangshu.Tests.Wanxiangzhen.SchedulerTests.entries ())
     @ prefix (Wanxiangshu.Tests.Wanxiangzhen.SerialQueueTests.entries ())
     @ prefix (Wanxiangshu.Tests.Wanxiangzhen.SessionIoTests.entries ())
+    @ prefix (Wanxiangshu.Tests.Wanxiangzhen.OrphanNotifyTests.entries ())
     @ prefix (Wanxiangshu.Tests.Wanxiangzhen.SlaveSpawnTests.entries ())
     @ prefix (Wanxiangshu.Tests.Wanxiangzhen.SquadConfigTests.entries ())
     @ prefix (Wanxiangshu.Tests.Wanxiangzhen.SquadEventLogCodecTests.entries ())

@@ -18,41 +18,63 @@ let getSession (client: obj) : Result<obj, string> =
     else
         Ok session
 
+/// Structured failure diagnostic for host/console (testable pure builder).
+let promptFailureDiagnostic
+    (reason: string)
+    (sessionId: string)
+    (detail: string)
+    : obj =
+    createObj
+        [ "event", box "wanxiangzhen_prompt_session_failed"
+          "reason", box reason
+          "sessionId", box sessionId
+          "detail", box detail ]
+
+let private logPromptFailure (reason: string) (sessionId: string) (detail: string) : unit =
+    JS.console.error (promptFailureDiagnostic reason sessionId detail)
+
+let buildPromptArg (sessionId: string) (text: string) : obj =
+    let part = createObj [ "type", box "text"; "text", box text ]
+
+    createObj
+        [ "path", box (createObj [ "id", box sessionId ])
+          "body", box (createObj [ "parts", box [| part |] ]) ]
+
 let promptSession (client: obj) (sessionId: string) (text: string) : JS.Promise<unit> =
     promise {
         if isNullish client then
-            return raise (System.ArgumentNullException("client", "wanxiangzhen_prompt_parameter_missing: client cannot be null"))
+            let detail = "wanxiangzhen_prompt_parameter_missing: client cannot be null"
+            logPromptFailure "parameter_missing" "" detail
+            return raise (System.ArgumentNullException("client", detail))
         elif System.String.IsNullOrWhiteSpace(sessionId) then
-            return raise (System.ArgumentException("wanxiangzhen_prompt_parameter_missing: sessionId cannot be null or empty", "sessionId"))
+            let detail = "wanxiangzhen_prompt_parameter_missing: sessionId cannot be null or empty"
+            logPromptFailure "parameter_missing" sessionId detail
+            return raise (System.ArgumentException(detail, "sessionId"))
         elif System.String.IsNullOrWhiteSpace(text) then
-            return raise (System.ArgumentException("wanxiangzhen_prompt_parameter_missing: text cannot be null or empty", "text"))
+            let detail = "wanxiangzhen_prompt_parameter_missing: text cannot be null or empty"
+            logPromptFailure "parameter_missing" sessionId detail
+            return raise (System.ArgumentException(detail, "text"))
         else
             match getSession client with
             | Error err ->
-                let exMsg = "wanxiangzhen_session_api_missing:" + err
-                JS.console.error ("SessionIo.promptSession failed: " + exMsg)
-                return raise (System.Exception(exMsg))
+                let detail = "wanxiangzhen_session_api_missing:" + err
+                logPromptFailure "session_api_missing" sessionId detail
+                return raise (System.Exception(detail))
             | Ok session ->
                 let promptFn = get session "prompt"
 
                 if isNullish promptFn || jsTypeOf promptFn <> "function" then
-                    let exMsg = "wanxiangzhen_session_api_missing: session.prompt function missing"
-                    JS.console.error ("SessionIo.promptSession failed: " + exMsg)
-                    return raise (System.Exception(exMsg))
+                    let detail = "wanxiangzhen_session_api_missing: session.prompt function missing"
+                    logPromptFailure "session_api_missing" sessionId detail
+                    return raise (System.Exception(detail))
                 else
                     try
-                        let part = createObj [ "type", box "text"; "text", box text ]
-
-                        let arg =
-                            createObj
-                                [ "path", box (createObj [ "id", box sessionId ])
-                                  "body", box (createObj [ "parts", box [| part |] ]) ]
-
+                        let arg = buildPromptArg sessionId text
                         let res = session?("prompt") (arg)
                         let! _ = resolveThenable res
                         return ()
                     with ex ->
-                        JS.console.error ("SessionIo.promptSession invocation failed: " + ex.Message)
+                        logPromptFailure "invocation_failed" sessionId ex.Message
                         return raise ex
     }
 
