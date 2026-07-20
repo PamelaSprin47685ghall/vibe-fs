@@ -476,7 +476,6 @@
     <Compile Include="src/Hosts/OpenCode/SubagentSpawnInput.fs"/>
     <Compile Include="src/Hosts/OpenCode/SubagentSpawnCleanup.fs"/>
     <Compile Include="src/Hosts/OpenCode/SubagentSpawnTransport.fs"/>
-    <Compile Include="src/Hosts/OpenCode/SubagentSpawn.fs"/>
     <Compile Include="src/Hosts/OpenCode/SubsessionDispatch.fs"/>
     <Compile Include="src/Hosts/OpenCode/SubsessionHostAdapterTypes.fs"/>
     <Compile Include="src/Hosts/OpenCode/SubsessionHostAdapterOps.fs"/>
@@ -500,7 +499,6 @@
     <Compile Include="src/Hosts/OpenCode/ToolDefinitionHooks.fs"/>
     <Compile Include="src/Hosts/OpenCode/EventHooks.fs"/>
     <Compile Include="src/Hosts/OpenCode/CompactionTransform.fs"/>
-    <Compile Include="src/Hosts/OpenCode/SystemTransform.fs"/>
     <Compile Include="src/Hosts/OpenCode/CompactionHook.fs"/>
     <Compile Include="src/Hosts/OpenCode/ModelKeyResolver.fs"/>
     <Compile Include="src/Hosts/OpenCode/SembleInjection.fs"/>

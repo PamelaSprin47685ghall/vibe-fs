@@ -19,7 +19,7 @@ open Wanxiangshu.Runtime.ChildAgentRegistry
 module Dyn = Wanxiangshu.Runtime.Dyn
 
 open Wanxiangshu.Runtime.SessionIoSpawn
-open Wanxiangshu.Hosts.Opencode.SubagentSpawn
+open Wanxiangshu.Hosts.Opencode.SubagentSpawnInput
 
 let resolveParentLiveModel
     (runtime: FallbackRuntimeStore)

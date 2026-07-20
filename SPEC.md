@@ -14,11 +14,13 @@
 
 ## 二、拆除兼容门面
 
-经逐文件调查，§二 原列 8 个门面文件中：
+经逐文件调查，§二 原列门面文件中：
 
-* `Hosts/Omp/SessionLifecycleHooks.fs` — 已删除，无需处理
-* `Runtime/EventStore/EventLogRuntime.fs` — 唯一纯转发门面（121 行全 re-export），渐进迁移中（4/38 调用方已切换到直接子模块 open）
-* 以下 6 个文件经调查发现包含独有业务逻辑，不是纯门面，不应按门面方式拆除：
+* ~~`Hosts/Omp/SessionLifecycleHooks.fs`~~ ✅ 已删除
+* ~~`Runtime/EventStore/EventLogRuntime.fs`~~ ✅ 已删除（调用方直接 open `EventLogRuntimeStore` / `EventLogRuntimeNudge` / `EventLogRuntimeRecovery` / `EventLogRuntimeSync`）
+* ~~`Hosts/OpenCode/SubagentSpawn.fs`~~ ✅ 已删除（纯 re-export；调用方直接 open `SubagentSpawnInput` / `SubagentSpawnCleanup` / `SubagentSpawnTransport`；`Runtime/Subsession/SubagentSpawn.fs` 保留）
+* ~~`Hosts/OpenCode/SystemTransform.fs`~~ ✅ 已删除（逻辑内联进 `HookTransform.systemTransform`，经 `ChatTransformOutputCodec.setSystemOutputToDirectory`）
+* 以下 6 个文件含独有业务逻辑，不是纯门面，不应按门面方式拆除：
   * `Hosts/OpenCode/HookExecute.fs` — 含独特 patch 归一化 + UI label 注入 + Gateway 编排
   * `Runtime/Fallback/FallbackConfigCodec.fs` — 5 个函数转发至 FallbackChainResolution，但 parse/extract/load 为独特实现
   * `Runtime/Execution/BacklogProjectionBuild.fs` — 约 190 行独有 compaction 逻辑（compactingTransform 等）

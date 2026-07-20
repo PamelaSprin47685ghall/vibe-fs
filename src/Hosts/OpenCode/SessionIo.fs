@@ -14,7 +14,7 @@ open Wanxiangshu.Runtime.ToolContextCodec
 open Wanxiangshu.Runtime.OpencodeClientCodec
 open Wanxiangshu.Hosts.Opencode.MessagingCodec
 open Wanxiangshu.Hosts.Opencode.SubagentTypes
-open Wanxiangshu.Hosts.Opencode.SubagentSpawn
+open Wanxiangshu.Hosts.Opencode.SubagentSpawnInput
 open Wanxiangshu.Hosts.Opencode.SubagentIoRun
 open Wanxiangshu.Runtime.ChildAgentRegistry
 open Wanxiangshu.Runtime.Fallback.RuntimeStore
@@ -73,11 +73,6 @@ let readSessionTexts (client: obj) (sessionId: string) (directory: string) : JS.
         with _ ->
             return []
     }
-
-let extractSessionText = extractSessionText
-let startSubagentSession = startSubagentSession
-
-let promptWithAbort = promptWithAbort
 
 let runSubagent
     (runtime: FallbackRuntimeStore)
