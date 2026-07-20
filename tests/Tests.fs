@@ -45,6 +45,8 @@ open Wanxiangshu.Tests.ContextBudgetAfterTodoTests
 open Wanxiangshu.Tests.ContextBudgetIntegrationTests
 open Wanxiangshu.Tests.ContextBudgetRealApiSpecs
 open Wanxiangshu.Tests.ContextBudgetEstimateTests
+open Wanxiangshu.Tests.ContextBudgetPipelineNudgeTests
+open Wanxiangshu.Tests.ContextBudgetCalibrationTests
 
 open Wanxiangshu.Tests.ExecutorToolsCodecTests
 open Wanxiangshu.Tests.ExecutorTests
@@ -162,6 +164,7 @@ let private allOtherTests: (string * TestBody) list =
         "ContextBudgetIntegrationTests.run", TestBody.Async ContextBudgetIntegrationTests.run
         "ContextBudgetRealApiSpecs.run", TestBody.Async ContextBudgetRealApiSpecs.run
         "ContextBudgetEstimateTests.run", TestBody.Async ContextBudgetEstimateTests.run
+        "ContextBudgetPipelineNudgeTests.spec_applyContextBudget_mustSeeFinalOutboundAfterAllStages", TestBody.Async ContextBudgetPipelineNudgeTests.spec_applyContextBudget_mustSeeFinalOutboundAfterAllStages
         "ContextBudgetCalibrationTests.run", TestBody.Sync(sync ContextBudgetCalibrationTests.run) ]
     @ [ "Integration.OpencodePluginTests.run", TestBody.Async(fun () -> OpencodePluginTests.runAll [||] |> Promise.map ignore)
         "Integration.MimocodePluginTests.run", TestBody.Async(fun () -> MimocodePluginTests.runAll [||] |> Promise.map ignore)

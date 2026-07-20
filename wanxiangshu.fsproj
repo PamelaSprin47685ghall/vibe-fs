@@ -979,6 +979,11 @@
     <Compile Include="tests/ContextBudgetPipelineNudgeTests.fs"/>
     <Compile Include="tests/TestRunnerBehaviorTests.fs"/>
     <Compile Include="e2e/HarnessTypes.fs"/>
+    <Compile Include="e2e/MimocodePluginTaskAndArgsTests.fs"/>
+    <Compile Include="e2e/MimocodePluginSpecSections.fs"/>
+    <Compile Include="e2e/MimocodePluginSpecs.fs"/>
+    <Compile Include="e2e/OpencodePluginContextBudgetTests.fs"/>
+    <Compile Include="e2e/OpencodePluginContextBudgetE2e.fs"/>
     <Compile Include="e2e/TestsServePlugin.fs"/>
     <Compile Include="integration/OpencodePluginToolLifecycleContractTests.fs"/>
     <Compile Include="integration/OpencodePluginNudgeForceStopContractTests.fs"/>
