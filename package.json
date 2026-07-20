@@ -43,6 +43,8 @@
     "test:e2e:opencode:p0": "node tests/e2e.js opencode-e2e-p0",
     "test:e2e:opencode:full": "node tests/e2e.js opencode-e2e-full",
     "test:gates": "node tests/runner.js L4",
+    "test:all": "npm run test:unit && npm run test:contract && npm run test:integration && npm run test:gates && npm run test:e2e:p0 && npm run test:e2e:full",
+    "test:release": "npm run build && npm run test:all",
     "validate:coverage": "node --import tsx e2e/opencode/scripts/validate-manifest.mjs",
     "test:stability-gate": "node --import tsx e2e/opencode/scripts/stability-gate.mjs",
     "test:stability-gate:static": "node --import tsx e2e/opencode/scripts/stability-gate.mjs --static-only",
