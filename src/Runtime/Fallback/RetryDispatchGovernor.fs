@@ -1,175 +1,113 @@
 module Wanxiangshu.Runtime.Fallback.RetryDispatchGovernor
 
 open Fable.Core
-open Fable.Core.JsInterop
 open Wanxiangshu.Runtime.PromiseQueue
 open Wanxiangshu.Runtime.ToolSequenceThrottle
-
-[<Global("globalThis.process")>]
-let private nodeProcess: obj = jsNative
 
 [<Emit("typeof performance !== 'undefined' ? performance.now() : Date.now()")>]
 let private getMonotonicTimeMs () : float = jsNative
 
-/// Key for rate-limiting and serialization: contains workspace, session, provider/model.
-type RetryModelKey =
+/// Result of a transport schedule attempt.
+type RetryDispatchResult =
+    | Dispatched
+    | CancelledBeforeDispatch
+
+/// Clock abstraction for testability (virtual clock in tests; no production delay zeroing).
+type IClock =
+    abstract GetMonotonicTimeMs: unit -> float
+
+type SystemClock() =
+    interface IClock with
+        member _.GetMonotonicTimeMs() = getMonotonicTimeMs ()
+
+/// Provider-credential + model transport key.
+/// Rate limit and serial queue are shared by every session in the same workspace
+/// that targets the same provider/model/variant. Workspace is part of the key so
+/// distinct workspaces never share stamps or queues.
+/// Session single in-flight is NOT this type's job — that belongs to the session actor.
+type ProviderModelTransportKey =
     { Workspace: string
-      SessionID: string
       ProviderID: string
       ModelID: string
       Variant: string option }
 
     static member Create
-        (workspace: string, sessionId: string, providerId: string, modelId: string, ?variant: string)
-        : RetryModelKey =
+        (workspace: string, providerId: string, modelId: string, ?variant: string)
+        : ProviderModelTransportKey =
         { Workspace = workspace
-          SessionID = sessionId
           ProviderID = providerId
           ModelID = modelId
           Variant = variant }
 
-/// Result of a retry dispatch attempt.
-type RetryDispatchResult =
-    | Dispatched
-    | CancelledBeforeDispatch
+/// Backward-compatible alias used by older call sites / tests during migration.
+type RetryModelKey = ProviderModelTransportKey
 
-/// Clock abstraction for testability.
-type IClock =
-    abstract GetMonotonicTimeMs: unit -> float
-
-/// Default system clock.
-type SystemClock() =
-    interface IClock with
-        member _.GetMonotonicTimeMs() = getMonotonicTimeMs ()
-
-/// Key representing the session serialization scope.
-type SessionKey =
-    { Workspace: string; SessionID: string }
-
-/// Key representing the provider rate-limiting scope.
-type ProviderKey =
-    { Workspace: string
-      ProviderID: string
-      ModelID: string
-      Variant: string option }
-
-/// Per-key rate-limit gate: at most one dispatch per (provider, model,
-/// variant) tuple in the configured window.
-/// Per-session serialization queue: at most one active dispatch per physical session.
+/// Process-local provider transport scheduler:
+/// real per-key SerialQueue + spacing window. Not a session prompt mutex.
 type RetryDispatchGovernor(?rateLimitMs: int64, ?clock: IClock, ?sleeper: ISleeper) =
     let rateLimitMs = defaultArg rateLimitMs 10000L
     let clock = defaultArg clock (SystemClock() :> IClock)
     let sleeper = defaultArg sleeper (PromiseSleeper() :> ISleeper)
 
-    let mutable lastActualDispatchAt: Map<ProviderKey, float> = Map.empty
-    let mutable lastSessionUseAt: Map<SessionKey, float> = Map.empty
+    let mutable lastActualDispatchAt: Map<ProviderModelTransportKey, float> = Map.empty
+    let mutable transportQueues: Map<ProviderModelTransportKey, SerialQueue> = Map.empty
+    let gate = obj ()
 
-    let mutable sessionQueues: Map<SessionKey, SerialQueue> = Map.empty
-    let mutable providerQueues: Map<ProviderKey, SerialQueue> = Map.empty
-
-    let lockObj = obj ()
-
-    let getOrCreateSessionQueue (key: SessionKey) : SerialQueue =
-        match Map.tryFind key sessionQueues with
+    let getOrCreateTransportQueue (key: ProviderModelTransportKey) : SerialQueue =
+        match Map.tryFind key transportQueues with
         | Some q -> q
         | None ->
             let q = SerialQueue()
-            sessionQueues <- Map.add key q sessionQueues
+            transportQueues <- Map.add key q transportQueues
             q
 
-    let getOrCreateProviderQueue (key: ProviderKey) : SerialQueue =
-        match Map.tryFind key providerQueues with
-        | Some q -> q
-        | None ->
-            let q = SerialQueue()
-            providerQueues <- Map.add key q providerQueues
-            q
-
-    /// Enqueue a dispatch for the given key. The dispatch function will run
-    /// only when the rate-limit window allows. Returns CancelledBeforeDispatch
-    /// if stillValid returns false before the actual dispatch.
+    /// Enqueue transport work for one provider/model key.
+    /// Same key: fully serial (second cannot compute wait or send until first finishes).
+    /// Different keys: independent queues and stamps.
     member _.RunWhenAllowed
-        (key: RetryModelKey, stillValid: unit -> bool, dispatch: unit -> JS.Promise<unit>)
+        (key: ProviderModelTransportKey, stillValid: unit -> bool, dispatch: unit -> JS.Promise<unit>)
         : JS.Promise<RetryDispatchResult> =
-        promise {
-            let sessionKey =
-                { Workspace = key.Workspace
-                  SessionID = key.SessionID }
+        let queue = lock gate (fun () -> getOrCreateTransportQueue key)
 
-            let providerKey =
-                { Workspace = key.Workspace
-                  ProviderID = key.ProviderID
-                  ModelID = key.ModelID
-                  Variant = key.Variant }
+        queue.Enqueue(fun () ->
+            promise {
+                if not (stillValid ()) then
+                    return CancelledBeforeDispatch
+                else
+                    let now = clock.GetMonotonicTimeMs()
 
-            let sessionQueue =
-                lock lockObj (fun () ->
-                    lastSessionUseAt <- Map.add sessionKey (clock.GetMonotonicTimeMs()) lastSessionUseAt
-                    getOrCreateSessionQueue sessionKey)
+                    let lastDispatch =
+                        lock gate (fun () ->
+                            Map.tryFind key lastActualDispatchAt |> Option.defaultValue 0.0)
 
-            // Outer layer: Session serialization queue (scoped to workspace + session ID)
-            return!
-                sessionQueue.Enqueue(fun () ->
-                    promise {
-                        // Check validity immediately after entering the session queue
-                        if not (stillValid ()) then
-                            return CancelledBeforeDispatch
-                        else
-                            let providerQueue = lock lockObj (fun () -> getOrCreateProviderQueue providerKey)
+                    let delay = max 0.0 (float rateLimitMs - (now - lastDispatch))
 
-                            // Inner layer: Provider rate limiting queue (scoped to workspace + provider + model)
-                            return!
-                                providerQueue.Enqueue(fun () ->
-                                    promise {
-                                        // Check validity immediately after entering the provider queue
-                                        if not (stillValid ()) then
-                                            return CancelledBeforeDispatch
-                                        else
-                                            let now = clock.GetMonotonicTimeMs()
+                    if delay > 0.0 then
+                        do! sleeper.Sleep(int delay)
 
-                                            let lastDispatch =
-                                                lock lockObj (fun () ->
-                                                    Map.tryFind providerKey lastActualDispatchAt
-                                                    |> Option.defaultValue 0.0)
+                    if not (stillValid ()) then
+                        return CancelledBeforeDispatch
+                    else
+                        // Stamp under the same serial slot so the next waiter on this key
+                        // observes this send before computing its own wait.
+                        let actualNow = clock.GetMonotonicTimeMs()
 
-                                            let elapsed = now - lastDispatch
-                                            let delay = max 0.0 (float rateLimitMs - elapsed)
+                        lock gate (fun () ->
+                            lastActualDispatchAt <- Map.add key actualNow lastActualDispatchAt)
 
-                                            if delay > 0.0 then
-                                                do! sleeper.Sleep(int delay)
+                        do! dispatch ()
+                        return Dispatched
+            })
 
-                                            // Check validity again after sleeping/waiting
-                                            if not (stillValid ()) then
-                                                return CancelledBeforeDispatch
-                                            else
-                                                let actualNow = clock.GetMonotonicTimeMs()
-
-                                                lock lockObj (fun () ->
-                                                    lastActualDispatchAt <-
-                                                        Map.add providerKey actualNow lastActualDispatchAt)
-
-                                                do! dispatch ()
-                                                return Dispatched
-                                    })
-                    })
-        }
-
-    /// Remove stale entries that haven't been used for a long time.
     member _.Cleanup(staleThresholdMs: int64) : unit =
         let now = clock.GetMonotonicTimeMs()
         let cutoff = now - float staleThresholdMs
 
-        lock lockObj (fun () ->
+        lock gate (fun () ->
             lastActualDispatchAt <- lastActualDispatchAt |> Map.filter (fun _ last -> last >= cutoff)
-            lastSessionUseAt <- lastSessionUseAt |> Map.filter (fun _ last -> last >= cutoff)
+            transportQueues <- transportQueues |> Map.filter (fun k _ -> Map.containsKey k lastActualDispatchAt))
 
-            providerQueues <- providerQueues |> Map.filter (fun k _ -> Map.containsKey k lastActualDispatchAt)
-            sessionQueues <- sessionQueues |> Map.filter (fun k _ -> Map.containsKey k lastSessionUseAt))
-
-    /// Reset all state (for testing).
     member _.Reset() : unit =
-        lock lockObj (fun () ->
+        lock gate (fun () ->
             lastActualDispatchAt <- Map.empty
-            lastSessionUseAt <- Map.empty
-            sessionQueues <- Map.empty
-            providerQueues <- Map.empty)
+            transportQueues <- Map.empty)

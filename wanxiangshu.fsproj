@@ -869,6 +869,7 @@
     <Compile Include="tests/FallbackLeasePureTests.fs"/>
     <Compile Include="tests/FallbackPropertyPureTests.fs"/>
     <Compile Include="tests/NudgeErrorClassificationTests.fs"/>
+    <Compile Include="tests/RetryDispatchGovernorTestSupport.fs"/>
     <Compile Include="tests/RetryDispatchGovernorTests.fs"/>
     <Compile Include="tests/NudgeOwnerDiagnosticTests.fs"/>
     <Compile Include="tests/FallbackRequestedRecoveryTests.fs"/>

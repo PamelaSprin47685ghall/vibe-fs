@@ -158,8 +158,15 @@ let runWithRetryGovernor
     (dispatchAction: unit -> JS.Promise<unit>)
     : JS.Promise<unit> =
     promise {
-        let modelKey =
-            RetryModelKey.Create(workspaceRoot, sessionID, model.ProviderID, model.ModelID, ?variant = model.Variant)
+        // Transport scheduler key = workspace × provider credential × model × variant.
+        // Session single in-flight is the session actor's job, not the transport governor.
+        let transportKey =
+            ProviderModelTransportKey.Create(
+                workspaceRoot,
+                model.ProviderID,
+                model.ModelID,
+                ?variant = model.Variant
+            )
 
         let stillValid () =
             verifyLease runtime sessionID lease
@@ -169,7 +176,7 @@ let runWithRetryGovernor
             dispatchWithLeaseTransition runtime executor workspaceRoot sessionID lease model agent dispatchAction
 
         try
-            let! dispatchResult = retryGovernor.RunWhenAllowed(modelKey, stillValid, dispatchWithLease)
+            let! dispatchResult = retryGovernor.RunWhenAllowed(transportKey, stillValid, dispatchWithLease)
 
             match dispatchResult with
             | Dispatched -> ()
