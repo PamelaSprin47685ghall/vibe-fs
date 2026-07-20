@@ -14,7 +14,7 @@
 | WIP | `submit_review` 部分完成标记 |
 | Iterator | fuzzy_continue / continue 的翻页或子会话句柄 |
 | Subsession | 轻量 Actor 消息泵，隔离子代理的错误与状态 |
-| Fallback 续命 | 模型降级后的 v1 continuation 事件，或 `src/Kernel/Fallback/Continuation.fs` 定义的 v2 continuation |
+| Fallback 续命 | 模型降级后的租约生命周期（Requested → DispatchStarted → Dispatched → Settled/Failed/Cancelled） |
 | 门闩 (Gate) | `src/Runtime/Fallback/GateState.fs` 与 session runtime 中的互斥标志位 |
 | Flow Kernel | 基于 `IAsyncEnumerable` 的最小流程代数，与九条语义法律配套的领域级流程算子集 |
 | RAII Resource Scope | 由 `CommittedState → ResourceSpec` 投影驱动的资源管理范式，根据状态 Diff 自动 Acquire/Dispose 层级 Scope |
@@ -48,10 +48,10 @@
 | 子代理 durable 投影 | `subagent_spawned` / `subagent_continued` + `foldSubagents` | 仅 `SubagentIteratorStore` 内存 |
 | Fallback 续命租约 | `.wanxiangshu.ndjson` + `continuation_*` 事件 + `src/Kernel/EventSourcing/Fold.fs` session-control projection | `Runtime/Fallback` 内存状态 alone |
 | Fallback 注入记忆 | `fallback_continue_injected` 旧事件（兼容读取） | 嗅探消息零宽字符 |
-| 续命 v2 projection | `.wanxiangshu.ndjson` + v2 continuation 事件 + `src/Kernel/Fallback/ContinuationProjection.fs` | 仅内存的 projection 通知 |
+| 续命租约/所有者投影 | `.wanxiangshu.ndjson` + `continuation_*` 事件 + `src/Kernel/SessionControl/LeaseTransitions.fs` 折叠 | 仅内存 `FallbackRuntimeState` 的状态 |
 | 上下文预算 cycle | `src/Runtime/Execution/ContextBudgetStore.fs` 与 projection metadata（重启语义以实现为准） | 仅 `maxInputTokens` 静态值 |
 | 会话拥有者 | `continuation_*` / `human_turn_started` 事件 + `SessionOwner` fold | 内存 `FallbackRuntimeState` |
-| Continuation effect | `ContinuationCommandProcessor` 产生的 `ContinuationEffect` 与 continuation 事件 | 仅内存通知被误称为 durable outbox |
+| Continuation intent | `ContinuationIntent` 驱动的物理动作 | 仅内存通知 |
 | 续命 payload 文本 | OpenCode `ActionExecutor.sendContinueImpl` ZWSP `"\u200B"` | 见 `docs/CONTINUATION_PATH.md` |
 | 续命 Dispatched | `recordHostAcceptedContinuation`（host evidence only） | 禁止 prompt Promise 返回即 Dispatched |
 

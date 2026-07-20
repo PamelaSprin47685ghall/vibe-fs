@@ -82,7 +82,7 @@
 | `continuation_assistant_observed` | 观察到续命产生的 assistant 消息（payload：`continuationId` / `assistantMessageId`） |
 | `continuation_superseded` | 续命被新用户消息或新续命取代（payload：`continuationId` / `reason`） |
 
-v2 事件由 `Runtime/Fallback/ContinuationCommandProcessor.fs` 产生，经 `Kernel/Fallback/ContinuationProjection.fs` 投影，由 `Runtime/Fallback/ContinuationSupervisor.fs` 消费 effect 并调用宿主。该组件已存在，但各宿主是否将它作为唯一生产入口须以调用链为准。
+租约（Lease）模型下的续命系统使用统一的续命生命周期事件，包括 `continuation_requested`、`continuation_dispatch_started`、`continuation_dispatched`、`continuation_host_accepted`（由 ChatHooks 写入）、`continuation_failed`、`continuation_cancelled`、`continuation_settled`、`continuation_idle_reconciliation`。旧的 `ContinuationCommandProcessor.fs` 与 `ContinuationSupervisor.fs` 已被删除，不再使用。
 
 ### 上下文压缩（Compaction）事件
 
@@ -136,7 +136,7 @@ v2 事件由 `Runtime/Fallback/ContinuationCommandProcessor.fs` 产生，经 `Ke
 - **`foldNudgeSnapshot`**：供 nudge 决策的聚合视图（open todos、loop 是否活跃等）。
 - **`foldSubagents`** / `SessionState.Subagents`：`subagent_spawned` / `subagent_continued` 投影。
 - **SessionControl projection**：当前 fold 维护 generation、cancel generation、human turn 与 episode/owner 状态；不再有 `SessionState.FallbackInjection` 或 `FallbackInjectionFold`。
-- **`ContinuationProjection`**：v2 continuation 的独立 projection，来源为 `Kernel/Fallback/ContinuationProjection.fs`，不属于 `SessionState` 主 fold。
+- **续命租约/所有者投影**：由 `SessionControl.Projection` / `LeaseTransitions` 进行事件折叠，跟踪当前 Session 的租约所有权与续命代数，不依赖已删除的 `ContinuationProjection.fs`。
 - **万象阵**：`EventLogSquadProjection.applyWanEvent` 与 `CoordinatorReplay`（读同一 NDJSON）。
 
 `SessionState`（Runtime 缓存）聚合上述投影，供 `EventLogRuntimeNudge` / `EventLogRuntimeSync` 读取。
@@ -190,10 +190,10 @@ Attempt
 
 `appendAndCache` 先写盘后通知的链（`appendLine → foldWan`）已具备 Outbox 雏形。当前实现：
 
-1. **`ContinuationCommandProcessor`**：接收 `ContinuationCommand` → 决策 → 持久化 `ContinuationEvent` → 产生 `ContinuationEffect`
-2. **`ContinuationSupervisor`**：消费 effect → 调用 `IContinuationHost.Dispatch` / `TryAbortOwned` / `Reconcile` → 结果映射为 Command 回流至 Processor
-3. Effect 完成后写入确认事件（`continuation_host_accepted`、`continuation_run_started` 等）
-4. 重启时 Supervisor 从尚未确认的 Effect 事件恢复，重新发起或查询宿主动作
+1. **租约状态机驱动**：事件 `continuation_requested` 落盘，标志着 `PendingLease(Requested)` 被持久化。
+2. **Dispatch 意图执行**：`ContinuationIntentExecution` 执行对应 Intent，调用宿主 API 前写入 `continuation_dispatch_started`。
+3. **宿主接受与确认**：宿主接受并返回 runId/userMessageId 后，由宿主 hook (如 `ChatHooks`) 调用 `recordHostAcceptedContinuation` 写入 `continuation_host_accepted`。
+4. **终局与清理**：在发生 error/idle/abort 等情况时，写入终局事件（`continuation_failed` / `continuation_cancelled` / `continuation_settled`）以释放租约。
 
 演进方向：将更多 Effect 类型（如 `SendContinue`、`AbortRun`、`DispatchPrompt`）纳入同一 Outbox 模式。
 

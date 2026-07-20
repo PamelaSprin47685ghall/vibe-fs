@@ -156,7 +156,7 @@ OpenCode continuation payload 文本为 ZWSP `"\u200B"`（`ActionExecutor.sendCo
 | `CaptureCurrentModel(sessionID)` | 获取当前模型 |
 | `AbortRun(sessionID)` | 终止当前运行 |
 
-`SendContinue` 的 payload 文本由 `ContinuationHost` 中的 `continuationPayload` 常量（`"\u200B"`）提供，不再使用各 `ActionExecutor` 中的 `zwsChar` 私有定义。
+`SendContinue` 的 payload 文本在各宿主 ActionExecutor / 策略中统一使用零宽空格（ZWSP）`"\u200B"` 进行触发与探测。
 
 ## 子会话 Fallback 路由
 
@@ -205,16 +205,12 @@ models:
 | 层 | 路径 | 核心类型 |
 | :--- | :--- | :--- |
 | FSM | `Kernel/FallbackKernel/` | `SessionFallbackState`、`FallbackAction`、`FallbackPhase` |
-| 事件 kind | `src/Kernel/EventSourcing/EventKind.fs` | v1/v2 continuation kind 常量 |
+| 事件 kind | `src/Kernel/EventSourcing/EventKind.fs` | continuation kind 常量 |
 | 事件 fold | `src/Kernel/EventSourcing/Fold.fs` | session generation、episode、owner/lease 投影 |
-| v2 续命类型 | `src/Kernel/Fallback/Continuation.fs` | request、state、command、event、effect |
-| v2 续命决策 | `src/Kernel/Fallback/ContinuationDecision.fs` | `decide` 纯函数 |
-| v2 续命投影 | `src/Kernel/Fallback/ContinuationProjection.fs` | projection 与事件映射 |
-| v2 事件 codec | `src/Runtime/Fallback/ContinuationEventCodec.fs` | 事件编解码 |
-| v2 命令处理器 | `src/Runtime/Fallback/ContinuationCommandProcessor.fs` | 串行提交与 effect 产生 |
-| v2 监督器 | `src/Runtime/Fallback/ContinuationSupervisor.fs` | 宿主 effect 执行与 command 回流 |
-| v2 宿主接口 | `src/Runtime/Fallback/ContinuationHost.fs` | `IContinuationHost` |
+| 续命类型 | `src/Kernel/Fallback/Continuation.fs` | `ContinuationRequest`、`ContinuationState`、`ContinuationEvent` 等类型 |
+| 租约与流程编排 | `src/Runtime/Fallback/ContinuationDispatchOps.fs`、`ContinuationIntentExecution.fs` | 租约状态转换、流程驱动与并发控制 |
 | 运行时编排 | `src/Runtime/Fallback/Coordinator.fs`、`FallbackCoordination.fs` | 当前 Fallback 事件入口与动作执行 |
+| 租约校验与重试 | `src/Runtime/Fallback/LeaseValidation.fs`、`LeaseValidationRules.fs`、`RetryDispatchGovernor.fs` | 租约一致性检查、绝对到期时间与物理重试限制 |
 | 运行时门闩决策 | `Kernel/FallbackSubagentGate` | `needFallbackContinue`、`isSubagentSettledFromObservation` |
 | 运行时生命周期 | `Kernel/FallbackRuntimeLifecycle` | `FallbackContinueMode`、`FallbackTaskCompletion` |
 | 运行时标志 | `Kernel/FallbackRuntimeFlags` | `FallbackConsumedStatus`、`FallbackSessionGateFlag` |
@@ -227,7 +223,7 @@ Fallback Kernel、配置、集成与 Subagent Gate 测试；具体入口以 `tes
 
 ### Effect Supervisor 整合
 
-当前仍存在 v1 直接执行路径；v2 已提供 `ContinuationCommandProcessor` + `ContinuationSupervisor`。REF 方向要求宿主 effect 全部收敛到持久化意图与 command 回流：
+当前的续命流程通过 `ContinuationIntentExecution` 驱动。REF 方向要求宿主 effect 全部收敛到持久化意图与 command 回流：
 
 1. FSM 决策后，Continuation Intent 作为持久化 Outbox 事件写入（与领域事件同批提交）
 2. Effect Supervisor 从持久化存储消费该 Intent，而非仅凭内存通知
