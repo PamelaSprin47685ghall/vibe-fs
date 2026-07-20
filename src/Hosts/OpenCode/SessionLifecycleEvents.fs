@@ -1,32 +1,28 @@
 module Wanxiangshu.Hosts.Opencode.SessionLifecycleEvents
 
 open Fable.Core
-open Wanxiangshu.Kernel.Primitives.Identity
-open Wanxiangshu.Kernel.FallbackKernel.Types
-open Wanxiangshu.Kernel.Subsession.Types
-open Wanxiangshu.Runtime.Dyn
-open Wanxiangshu.Runtime.SubsessionEventRouter
-open Wanxiangshu.Runtime.SubsessionActorRegistry
+open Wanxiangshu.Kernel.Session.SessionFact
 open Wanxiangshu.Runtime.Messaging.OpencodeHostEvent
 open Wanxiangshu.Runtime.OpencodeHookInputCodec
 open Wanxiangshu.Runtime.ToolRuntimeContext
 open Wanxiangshu.Runtime.Fallback.RuntimeStore
-open Wanxiangshu.Runtime.Fallback.SessionRuntimePropertyPure
-open Wanxiangshu.Runtime.Fallback.SessionRuntimeLeasePure
-open Wanxiangshu.Runtime.SessionEventWriter
 open Wanxiangshu.Hosts.Opencode.Fallback.Coordinator
 open Wanxiangshu.Hosts.Opencode.NudgeTrigger
-open Wanxiangshu.Hosts.Opencode.NudgeTriggerOps
-open Wanxiangshu.Hosts.Opencode.ChatHooksMessageIdDedup
-open Wanxiangshu.Hosts.Opencode.Fallback.HostEventInspection
-open Wanxiangshu.Runtime.Dispatch
+open Wanxiangshu.Hosts.Opencode.SessionLifecycleProcess
+open Wanxiangshu.Runtime.Session.SessionActorRegistry
+open Wanxiangshu.Runtime.Session.SessionActorState
+open Wanxiangshu.Runtime.Session.SessionFactDecode
 
-// Open new split modules
-open Wanxiangshu.Hosts.Opencode.SessionLifecycleEventDecoding
-open Wanxiangshu.Hosts.Opencode.SessionLifecycleHumanDispatch
-open Wanxiangshu.Hosts.Opencode.SessionLifecycleClose
+let private workspaceKeyFromCtx (ctx: obj) : string =
+    let root = pluginDirectoryFromCtx ctx
 
-/// Host event fan-out: session.status / compacted / message.updated + fallback/nudge.
+    if root = "" then
+        "opencode-default"
+    else
+        "opencode:" + root
+
+/// Host event fan-out: decode → standard fact → session mailbox → return.
+/// Domain mutation (owner/lease/nonce/generation/terminal) runs only inside the actor.
 let handleEvent
     (ctx: obj)
     (fallbackRuntime: FallbackRuntimeStore)
@@ -35,42 +31,33 @@ let handleEvent
     (input: obj)
     : JS.Promise<unit> =
     promise {
-        let eventEnvelope = decodeHostEventEnvelope input
+        match SessionFactDecode.tryFromHostInput input with
+        | Some(sid, fact) ->
+            let actor = SessionActorRegistry.GetOrCreate (workspaceKeyFromCtx ctx) sid
+            actor.BindHandler(fun snap f -> processLifecycleFact ctx fallbackRuntime fallback nudge sid snap f)
+            let! _ = actor.Post fact
+            ()
+        | None ->
+            match decodeHostEventEnvelope input with
+            | None -> ()
+            | Some env ->
+                // Malformed / session-less envelope: still serialize via a scratch actor key.
+                let sid = getSessionID env.EventType env.Props
+                let fact = SessionFact.HostLifecycleEnvelope(env.EventType, env.Props, input)
 
-        let sid =
-            match eventEnvelope with
-            | Some env -> getSessionID env.EventType env.Props
-            | None -> ""
-
-        if sid <> "" then
-            fallbackRuntime.Update(sid, setEventHandlingActive true)
-
-        try
-            do! processEventEnvelope ctx fallbackRuntime sid eventEnvelope
-            settleChildDispatch ctx eventEnvelope
-
-            fallback.UpdateBusyCount eventEnvelope
-            do! nudge.TrackLifetimeEvents eventEnvelope
-
-            let! fbConsumed = fallback.TryConsumeEvent input
-
-            if fbConsumed then
-                if Option.exists isIdleEnvelope eventEnvelope then
-                    do! nudge.SettleCompactionIfCompleted sid
-                    do! tryIdle (pluginDirectoryFromCtx ctx) sid |> Promise.map ignore
-            else
-                let activeFallbackOwnsTerminal =
-                    sid <> ""
-                    && Option.exists (fun env -> NudgeTrigger.isNaturalStop env.EventType env.Props) eventEnvelope
-                    && hasActiveFallbackContinuation fallbackRuntime sid
-
-                if not activeFallbackOwnsTerminal then
-                    do! nudge.HandleNaturalStop eventEnvelope
-
-                if Option.exists isIdleEnvelope eventEnvelope then
-                    do! tryIdle (pluginDirectoryFromCtx ctx) sid |> Promise.map ignore
-        finally
-            if sid <> "" then
-                fallbackRuntime.Update(sid, setEventHandlingActive false)
-                handleSessionClosed ctx sid eventEnvelope
+                if sid = "" then
+                    do!
+                        processLifecycleFact
+                            ctx
+                            fallbackRuntime
+                            fallback
+                            nudge
+                            ""
+                            SessionActorSnapshot.empty
+                            fact
+                else
+                    let actor = SessionActorRegistry.GetOrCreate (workspaceKeyFromCtx ctx) sid
+                    actor.BindHandler(fun snap f -> processLifecycleFact ctx fallbackRuntime fallback nudge sid snap f)
+                    let! _ = actor.Post fact
+                    ()
     }
