@@ -89,10 +89,8 @@ let processLifecycleFact
     promise {
         match fact with
         | SessionFact.SessionClosed ->
-            handleSessionClosed
-                ctx
-                sid
-                (Some(envelopeOf "session.deleted" (createObj [ "sessionID" ==> sid ])))
+            // Cleanup only — do not re-enter NotifyClosed/Post (deadlocks the actor queue).
+            finalizeSessionClosed ctx sid
         | _ ->
             match toHostSurface fact with
             | Some(envelope, rawInput) -> do! runHostFanOut ctx fallbackRuntime fallback nudge sid envelope rawInput

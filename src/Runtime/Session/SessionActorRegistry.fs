@@ -24,28 +24,14 @@ module SessionActorRegistry =
             actors <- Map.add k actor actors
             actor
 
+    /// Drop actor from map. Does not Post — callers that need domain cleanup
+    /// must Post SessionClosed first (or call finalizeSessionClosed).
     let Remove (workspaceKey: string) (sessionId: string) : unit =
-        let k = key workspaceKey sessionId
-        actors <- Map.remove k actors
+        actors <- Map.remove (key workspaceKey sessionId) actors
 
-    /// Drop the actor from the registry, then enqueue SessionClosed so domain
-    /// finally-cleanup still runs. Removal is first so a concurrent GetOrCreate
-    /// cannot observe a half-closed mailbox and drop live facts.
     let NotifyClosed (workspaceKey: string) (sessionId: string) : unit =
-        let k = key workspaceKey sessionId
+        Remove workspaceKey sessionId
 
-        match Map.tryFind k actors with
-        | Some actor ->
-            actors <- Map.remove k actors
-            actor.Post SessionFact.SessionClosed |> ignore
-        | None -> ()
-
-    let Clear () : unit =
-        let current = actors
-        actors <- Map.empty
-
-        for KeyValue(_, actor) in current do
-            if not actor.IsClosed then
-                actor.Post SessionFact.SessionClosed |> ignore
+    let Clear () : unit = actors <- Map.empty
 
     let Count = fun () -> Map.count actors

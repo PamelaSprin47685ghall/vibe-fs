@@ -9,14 +9,24 @@ open Wanxiangshu.Hosts.Opencode.ChatHooksMessageIdDedup
 open Wanxiangshu.Runtime.Dispatch
 open Wanxiangshu.Runtime.Session.SessionActorRegistry
 
-/// SessionClosed is a single domain command
-/// that tears down every per-session side-effect at once,
-/// not a "leak one at a time" pattern.  It must be safe
-/// to call from the event handler's `finally` because the
-/// session is being torn down by the host.  We dispatch
-/// it through the unified DispatchRegistry so the
-/// per-session mailbox, active dispatch, and pending
-/// receipts are all released together.
+let private actorKeyFromCtx (ctx: obj) : string =
+    let root = pluginDirectoryFromCtx ctx
+    if root = "" then "opencode-default" else "opencode:" + root
+
+let private workspaceIdFromCtx (ctx: obj) =
+    let root = pluginDirectoryFromCtx ctx
+    Id.workspaceIdQuick (if root = "" then "opencode-default" else "opencode:" + root)
+
+/// Side-effect cleanup for a closed physical session.
+/// Safe to call from inside the SessionActor handler — does NOT Post back.
+let finalizeSessionClosed (ctx: obj) (sid: string) : unit =
+    if sid <> "" then
+        sharedDispatchRegistry.NotifySessionClosed (workspaceIdFromCtx ctx) sid
+        SessionActorRegistry.Remove (actorKeyFromCtx ctx) sid
+        forget sid
+
+/// Host session.deleted/close envelope path: enqueue SessionClosed via registry
+/// removal only after the actor has drained the closed fact externally.
 let handleSessionClosed (ctx: obj) (sid: string) (eventEnvelope: HostEventEnvelope option) : unit =
     if
         eventEnvelope
@@ -26,14 +36,6 @@ let handleSessionClosed (ctx: obj) (sid: string) (eventEnvelope: HostEventEnvelo
             || env.EventType = "session.remove"
             || env.EventType = "session.close")
     then
-        let root = pluginDirectoryFromCtx ctx
-
-        let ws =
-            Wanxiangshu.Kernel.Primitives.Identity.Id.workspaceIdQuick (
-                if root = "" then "opencode-default" else "opencode:" + root
-            )
-
-        let actorKey = if root = "" then "opencode-default" else "opencode:" + root
-        sharedDispatchRegistry.NotifySessionClosed ws sid
-        SessionActorRegistry.NotifyClosed actorKey sid
-        forget sid
+        // Prefer actor path: Post is done by SessionLifecycleEvents for decoded facts.
+        // Fallback when called without actor admission (legacy hooks): finalize directly.
+        finalizeSessionClosed ctx sid
