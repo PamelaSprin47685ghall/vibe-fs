@@ -7,6 +7,7 @@ open Wanxiangshu.Runtime.OpencodeHookInputCodec
 open Wanxiangshu.Runtime.ToolRuntimeContext
 open Wanxiangshu.Hosts.Opencode.ChatHooksMessageIdDedup
 open Wanxiangshu.Runtime.Dispatch
+open Wanxiangshu.Runtime.Session.SessionActorRegistry
 
 /// SessionClosed is a single domain command
 /// that tears down every per-session side-effect at once,
@@ -25,8 +26,14 @@ let handleSessionClosed (ctx: obj) (sid: string) (eventEnvelope: HostEventEnvelo
             || env.EventType = "session.remove"
             || env.EventType = "session.close")
     then
-        let ws =
-            Wanxiangshu.Kernel.Primitives.Identity.Id.workspaceIdQuick ("opencode:" + (pluginDirectoryFromCtx ctx))
+        let root = pluginDirectoryFromCtx ctx
 
+        let ws =
+            Wanxiangshu.Kernel.Primitives.Identity.Id.workspaceIdQuick (
+                if root = "" then "opencode-default" else "opencode:" + root
+            )
+
+        let actorKey = if root = "" then "opencode-default" else "opencode:" + root
         sharedDispatchRegistry.NotifySessionClosed ws sid
+        SessionActorRegistry.NotifyClosed actorKey sid
         forget sid

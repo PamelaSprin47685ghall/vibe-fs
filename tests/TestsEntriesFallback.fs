@@ -31,6 +31,7 @@ open Wanxiangshu.Tests.FallbackHooksHelperAgentModelTests
 open Wanxiangshu.Tests.SubagentOutputTests
 open Wanxiangshu.Tests.SubsessionEmptyOutputContinueTests
 open Wanxiangshu.Tests.DispatchRegistryTests
+open Wanxiangshu.Tests.SessionActorTests
 open Wanxiangshu.Tests.FallbackLeaseValidationRulesTests
 open Wanxiangshu.Tests.FallbackLeasePureTests
 open Wanxiangshu.Tests.EpisodeIdentityTests
@@ -58,6 +59,7 @@ let fallbackTestEntries () : (string * TestBody) list =
       "SubsessionActorPumpTests.run", Async SubsessionActorPumpTests.run
       "SubsessionDispatchFailureTests.run", Async SubsessionDispatchFailureTests.run
       "DispatchRegistryTests.run", Async DispatchRegistryTests.run
+      "SessionActorTests.run", Async SessionActorTests.run
       "SubsessionConcurrentCancelTests.run", Async SubsessionConcurrentCancelTests.run
       "SubsessionTranscriptBoundaryTests.run", Sync(sync SubsessionTranscriptBoundaryTests.run)
       "SubsessionPhysicalIsolationTests.run", Async SubsessionPhysicalIsolationTests.run

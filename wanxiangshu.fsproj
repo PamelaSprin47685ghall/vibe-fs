@@ -19,6 +19,7 @@
     <Compile Include="src/Kernel/WorkspaceState.fs"/>
     <Compile Include="src/Kernel/HostAdapter.fs"/>
     <Compile Include="src/Kernel/FallbackKernel/Types.fs"/>
+    <Compile Include="src/Kernel/Session/SessionFact.fs"/>
     <Compile Include="src/Kernel/FallbackKernel/Decision.fs"/>
     <Compile Include="src/Kernel/FallbackKernel/Recovery.fs"/>
     <Compile Include="src/Kernel/FallbackKernel/StateMachine.fs"/>
@@ -346,6 +347,9 @@
     <Compile Include="src/Runtime/Dispatch/SessionDispatcher.fs"/>
     <Compile Include="src/Runtime/Dispatch/SessionDispatcherLifecycle.fs"/>
     <Compile Include="src/Runtime/Dispatch/Registry.fs"/>
+    <Compile Include="src/Runtime/Session/SessionActorState.fs"/>
+    <Compile Include="src/Runtime/Session/SessionActor.fs"/>
+    <Compile Include="src/Runtime/Session/SessionActorRegistry.fs"/>
     <Compile Include="src/Runtime/EventStore/EventLogRuntimeNudge.fs"/>
     <Compile Include="src/Runtime/Fallback/Ports.fs"/>
     <Compile Include="src/Runtime/Fallback/LeaseValidationRules.fs"/>
@@ -378,6 +382,7 @@
     <Compile Include="src/Runtime/Messaging/OpencodeHostEvent.fs"/>
     <Compile Include="src/Runtime/Messaging/OpencodeSessionEventCodec.fs"/>
     <Compile Include="src/Runtime/Messaging/OpencodeHookInputCodec.fs"/>
+    <Compile Include="src/Runtime/Session/SessionFactDecode.fs"/>
     <Compile Include="src/Runtime/Tooling/MuxToolDefinition.fs"/>
     <Compile Include="src/Runtime/Tooling/ToolSchemaRegistry.fs"/>
     <Compile Include="src/Runtime/Tooling/ToolArgumentCoercion.fs"/>
@@ -469,6 +474,7 @@
     <Compile Include="src/Hosts/OpenCode/SessionLifecycleHumanDispatch.fs"/>
     <Compile Include="src/Hosts/OpenCode/SessionLifecycleEventDecoding.fs"/>
     <Compile Include="src/Hosts/OpenCode/SessionLifecycleClose.fs"/>
+    <Compile Include="src/Hosts/OpenCode/SessionLifecycleProcess.fs"/>
     <Compile Include="src/Hosts/OpenCode/SessionLifecycleEvents.fs"/>
     <Compile Include="src/Hosts/OpenCode/SessionLifecycleObserver.fs"/>
     <Compile Include="src/Hosts/OpenCode/Fallback/MessageInspection.fs"/>
@@ -853,6 +859,7 @@
     <Compile Include="tests/SubsessionScenarioTests.fs"/>
     <Compile Include="tests/SubsessionActorPumpTests.fs"/>
     <Compile Include="tests/DispatchRegistryTests.fs"/>
+    <Compile Include="tests/SessionActorTests.fs"/>
     <Compile Include="tests/SubsessionDispatchFailureTests.fs"/>
     <Compile Include="tests/SubsessionConcurrentCancelTests.fs"/>
     <Compile Include="tests/SubsessionTranscriptBoundaryTests.fs"/>
