@@ -111,6 +111,16 @@ type PoisonReason =
 /// CompletionRequested outcome, which takes priority. The buffered
 /// CurrentTurnEvidence is preserved so task_complete / error ordering cannot
 /// lose a successful completion.
+type PendingTerminal =
+    { PendingError: ErrorInput option
+      PendingIdle: bool }
+
+[<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
+module PendingTerminal =
+    let empty =
+        { PendingError = None
+          PendingIdle = false }
+
 type SubsessionState =
     | Available of AvailableState
     /// Third field buffers CurrentTurnEvidence that arrives BEFORE the host
@@ -123,7 +133,12 @@ type SubsessionState =
     /// not be silently destroyed — that was the root cause of subagent runs
     /// (inspector/coder/browser/meditator) spuriously failing with
     /// "No assistant message in current turn".
-    | Dispatching of RunContext * TurnPlan * CurrentTurnEvidence * turnDeadlineAtMs: int64
+    | Dispatching of
+        RunContext *
+        TurnPlan *
+        CurrentTurnEvidence *
+        PendingTerminal: PendingTerminal *
+        turnDeadlineAtMs: int64
     | CancellingDispatch of RunContext * TurnPlan * CancelContext * turnDeadlineAtMs: int64
     | ReconcilingUnknownDispatch of
         RunContext *

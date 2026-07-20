@@ -7,7 +7,9 @@ open Wanxiangshu.Kernel.Subsession.TranscriptDecision
 open Wanxiangshu.Kernel.Subsession.Policy
 open Wanxiangshu.Tests.Assert
 
-let private fail (msg: string) = check msg false
+let private fail (msg: string) =
+    check msg false
+    failwith msg
 
 let private decide state cmd =
     Wanxiangshu.Kernel.Subsession.Decision.decide 1000000L state cmd
@@ -107,7 +109,9 @@ let startRunFromAvailable () =
 let secondStartRunRejected () =
     let ctx = mkCtx policy0 (TurnOrdinal.next TurnOrdinal.first)
     let plan = mkPlan turn0 TurnOrdinal.first model0 "do work"
-    let state = Dispatching(ctx, plan, CurrentTurnEvidence.empty, 1000000L)
+
+    let state =
+        Dispatching(ctx, plan, CurrentTurnEvidence.empty, PendingTerminal.empty, 1000000L)
 
     match decide state (StartRun request) with
     | Ok(Decided d) ->
@@ -122,23 +126,37 @@ let secondStartRunRejected () =
         check "state unchanged" (d.NextState = state)
     | other -> fail ("unexpected: " + string other)
 
-let dispatchingIdleIgnored () =
+let dispatchingIdleCached () =
     let ctx = mkCtx policy0 (TurnOrdinal.next TurnOrdinal.first)
     let plan = mkPlan turn0 TurnOrdinal.first model0 "do work"
-    let state = Dispatching(ctx, plan, CurrentTurnEvidence.empty, 1000000L)
+
+    let state =
+        Dispatching(ctx, plan, CurrentTurnEvidence.empty, PendingTerminal.empty, 1000000L)
 
     match decide state SessionIdleObserved with
-    | Ok(NoChange DuplicateIdleBeforeTurnMarker) -> ()
-    | other -> fail ("expected NoChange DuplicateIdleBeforeTurnMarker, got " + string other)
+    | Ok(Decided d) ->
+        match d.NextState with
+        | Dispatching(_, _, _, pending, _) ->
+            check "idle is cached" pending.PendingIdle
+            check "no error cached" pending.PendingError.IsNone
+        | other -> fail ("expected Dispatching, got " + string other)
+    | other -> fail ("unexpected: " + string other)
 
-let dispatchingErrorIgnored () =
+let dispatchingErrorCached () =
     let ctx = mkCtx policy0 (TurnOrdinal.next TurnOrdinal.first)
     let plan = mkPlan turn0 TurnOrdinal.first model0 "do work"
-    let state = Dispatching(ctx, plan, CurrentTurnEvidence.empty, 1000000L)
+
+    let state =
+        Dispatching(ctx, plan, CurrentTurnEvidence.empty, PendingTerminal.empty, 1000000L)
 
     match decide state (TurnErrorObserved err) with
-    | Ok(NoChange UnattributedObservationBeforeStart) -> ()
-    | other -> fail ("expected UnattributedObservationBeforeStart, got " + string other)
+    | Ok(Decided d) ->
+        match d.NextState with
+        | Dispatching(_, _, _, pending, _) ->
+            check "error is cached" (pending.PendingError = Some err)
+            check "no idle cached" (not pending.PendingIdle)
+        | other -> fail ("expected Dispatching, got " + string other)
+    | other -> fail ("unexpected: " + string other)
 
 /// Regression: idle can legitimately arrive while a turn is Dispatching (host
 /// event ordering is not process-ordered w.r.t. our own dispatch promise).
@@ -152,57 +170,35 @@ let dispatchingErrorIgnored () =
 let idleDuringDispatchingThenRealIdleConverges () =
     let ctx = mkCtx policy0 (TurnOrdinal.next TurnOrdinal.first)
     let plan = mkPlan turn0 TurnOrdinal.first model0 "do work"
-    let dispatchingState = Dispatching(ctx, plan, CurrentTurnEvidence.empty, 1000000L)
 
-    // Premature idle while still Dispatching: must be a named ignore, not a
-    // state transition (i.e. the actor must remain Dispatching afterwards).
-    match decide dispatchingState SessionIdleObserved with
-    | Ok(NoChange DuplicateIdleBeforeTurnMarker) -> ()
-    | other -> fail ("expected NoChange DuplicateIdleBeforeTurnMarker, got " + string other)
+    let dispatchingState =
+        Dispatching(ctx, plan, CurrentTurnEvidence.empty, PendingTerminal.empty, 1000000L)
+
+    // Premature idle while still Dispatching: must be cached in PendingTerminal
+    let dispatchingStateWithIdle =
+        match decide dispatchingState SessionIdleObserved with
+        | Ok(Decided d) ->
+            match d.NextState with
+            | Dispatching(_, _, _, pending, _) as s ->
+                check "idle is cached in pending" pending.PendingIdle
+                s
+            | other -> fail ("expected Dispatching, got " + string other)
+        | other -> fail ("unexpected: " + string other)
 
     // Now the legitimate DispatchAccepted arrives (as if the host's prompt
-    // call had actually resolved) — must reach Running.
-    match decide dispatchingState (DispatchAccepted(turn0, OrderedTurnMarkerObserved)) with
-    | Ok(Decided d1) ->
-        match d1.NextState with
-        | Running(_, _, evidence0, _) ->
-            check "evidence starts empty" (evidence0 = CurrentTurnEvidence.empty)
-
-            // Evidence arrives (assistant text, normal finish) before idle.
-            let evidence =
-                { CurrentTurnEvidence.empty with
-                    Assistant = AssistantSnapshot("", 0L, "done", Some NormalFinish) }
-
-            match
-                decide
-                    d1.NextState
-                    (EvidenceUpdated
-                        { TurnId = Some turn0
-                          Evidence = evidence })
-            with
-            | Ok(Decided d2) ->
-                match d2.NextState with
-                | Running _ ->
-                    // Real idle now — must classify and converge to Succeeded,
-                    // proving the earlier premature idle did not leave any
-                    // latent state that would block or corrupt this transition.
-                    match decide d2.NextState SessionIdleObserved with
-                    | Ok(Decided d3) ->
-                        match d3.NextState with
-                        | Available _ ->
-                            check
-                                "run converges to Succeeded"
-                                (hasEffect
-                                    (function
-                                    | CompleteCaller(_, Succeeded "done") -> true
-                                    | _ -> false)
-                                    d3.Effects)
-                        | other -> fail ("expected Available (converged), got " + string other)
-                    | other -> fail ("unexpected on real idle: " + string other)
-                | other -> fail ("expected Running after evidence merge, got " + string other)
-            | other -> fail ("unexpected on EvidenceUpdated: " + string other)
-        | other -> fail ("expected Running after DispatchAccepted, got " + string other)
-    | other -> fail ("unexpected on DispatchAccepted: " + string other)
+    // call had actually resolved) — since idle was cached, it must immediately
+    // resolve/succeed the run or transition to another turn, not go to Running.
+    match decide dispatchingStateWithIdle (DispatchAccepted(turn0, OrderedTurnMarkerObserved)) with
+    | Ok(Decided d) ->
+        match d.NextState with
+        | Dispatching _ -> check "retries after idle" (hasEffect isDispatchPrompt d.Effects)
+        | Available _ -> check "exhausted to CompleteCaller" (hasEffect isCompleteCaller d.Effects)
+        | other ->
+            fail (
+                "expected Dispatching or Available due to immediate idle processing, got "
+                + string other
+            )
+    | other -> fail ("unexpected: " + string other)
 
 let runningErrorDrains () =
     let ctx = mkCtx policy0 (TurnOrdinal.next TurnOrdinal.first)
@@ -645,7 +641,7 @@ let startRunWithDelegateToHostProducesNoneModel () =
     match decide avail (StartRun req) with
     | Ok(Decided d) ->
         match d.NextState with
-        | Dispatching(_, plan, _, _) -> check "DelegateToHost plan has no model" plan.Model.IsNone
+        | Dispatching(_, plan, _, _, _) -> check "DelegateToHost plan has no model" plan.Model.IsNone
         | other -> fail ("expected Dispatching, got " + string other)
 
         check "DelegateToHost still dispatches" (hasEffect isDispatchPrompt d.Effects)
@@ -682,7 +678,7 @@ let startRunWithRetryChainProducesSomeModel () =
     match decide avail (StartRun req) with
     | Ok(Decided d) ->
         match d.NextState with
-        | Dispatching(ctx, plan, _, _) ->
+        | Dispatching(ctx, plan, _, _, _) ->
             check "RetryChain plan model is first of chain" (plan.Model = Some model0)
             check "RetryChain ctx keeps full chain" (ctx.Chain = chain)
         | other -> fail ("expected Dispatching, got " + string other)
@@ -691,8 +687,8 @@ let startRunWithRetryChainProducesSomeModel () =
 let run () =
     startRunFromAvailable ()
     secondStartRunRejected ()
-    dispatchingIdleIgnored ()
-    dispatchingErrorIgnored ()
+    dispatchingIdleCached ()
+    dispatchingErrorCached ()
     idleDuringDispatchingThenRealIdleConverges ()
     runningErrorDrains ()
     drainingDuplicateErrorIgnored ()

@@ -43,8 +43,7 @@ let private runBackgroundDispatch
         | DispatchOutcome.Failed terminal ->
             let failure = HostReceiptWaiter.dispatchFailureOfTerminal terminal
 
-            HostReceiptWaiter.reject waiter failure (HostReceiptWaiter.ReceiptRejected failure)
-            |> ignore
+            HostReceiptWaiter.reject waiter failure (ReceiptRejected failure) |> ignore
         | DispatchOutcome.Accepted _ -> ())
     |> Promise.catch (fun ex ->
         let failure =
@@ -55,8 +54,7 @@ let private runBackgroundDispatch
                   StatusCode = None
                   IsRetryable = Some true }
 
-        HostReceiptWaiter.reject waiter failure (HostReceiptWaiter.ReceiptRejected failure)
-        |> ignore)
+        HostReceiptWaiter.reject waiter failure (ReceiptRejected failure) |> ignore)
     |> Promise.start
 
 let private dispatchHelper

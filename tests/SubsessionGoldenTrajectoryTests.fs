@@ -386,7 +386,7 @@ let ``12 Duplicate host callbacks`` () =
     let tid = TurnId.create "t1"
 
     let state =
-        Dispatching(makeCtx sid rid, makePlan tid "work", CurrentTurnEvidence.empty, 1000000L)
+        Dispatching(makeCtx sid rid, makePlan tid "work", CurrentTurnEvidence.empty, PendingTerminal.empty, 1000000L)
 
     let r1 =
         unwrapDecide "12a" (decide state (DispatchAccepted(tid, UserMessageObserved "m1")))
