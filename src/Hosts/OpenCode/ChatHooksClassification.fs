@@ -17,17 +17,21 @@ open Wanxiangshu.Kernel.HostTools
 let consumeAndDispatch
     (activeNudgeNonce: string)
     (nonce: string)
+    (hostUserMessageId: string)
     (s: FallbackSessionRuntime)
     : FallbackSessionRuntime * bool =
+    let sBound, bound =
+        tryBindNudgeHostUserMessage nonce hostUserMessageId s
+
     let s1, transitioned =
-        match s.PendingNudgeLease with
+        match sBound.PendingNudgeLease with
         | Some lease when lease.Nonce = nonce ->
             tryTransitionPendingNudgeLeaseReturning
                 lease.NudgeID
                 LeaseStatus.DispatchStarted
                 LeaseStatus.Dispatched
-                s
-        | _ -> s, false
+                sBound
+        | _ -> sBound, false
 
     let s2, consumed =
         if activeNudgeNonce <> "" && nonce = activeNudgeNonce then
@@ -35,10 +39,11 @@ let consumeAndDispatch
         else
             s1, false
 
-    s2, transitioned || consumed
+    s2, bound || transitioned || consumed
 
 /// Attempt to consume a nudge or subsession nonce observed in a
 /// chat.message hook payload. Returns true when the nonce is recognised.
+/// Binds HostUserMessageId on accept (SPEC §七 step 3).
 let tryConsumeNudgeIfMatched
     (fr: FallbackRuntimeStore)
     (workspaceRoot: string)
@@ -63,7 +68,7 @@ let tryConsumeNudgeIfMatched
 
     let nudgeMatched =
         if receiptMatched || (activeNudgeNonce <> "" && nonce = activeNudgeNonce) then
-            fr.UpdateSessionReturning(sessionIDStr, consumeAndDispatch activeNudgeNonce nonce)
+            fr.UpdateSessionReturning(sessionIDStr, consumeAndDispatch activeNudgeNonce nonce msgId)
         else
             false
 
@@ -74,9 +79,13 @@ let tryConsumeNudgeIfMatched
         | Some lease when
             (lease.Status = LeaseStatus.DispatchStarted
              || lease.Status = LeaseStatus.Dispatched
-             || lease.Status = LeaseStatus.Running)
+             || lease.Status = LeaseStatus.Running
+             || lease.Status = LeaseStatus.Requested)
             && lease.ContinuationID = nonce
             ->
+            let _ =
+                fr.UpdateSessionReturning(sessionIDStr, tryAcceptPendingLeaseReturning nonce msgId)
+
             true
         | _ -> false
 
@@ -98,14 +107,14 @@ let tryAcceptFallbackContinuation
                 (Wanxiangshu.Kernel.Subsession.Types.UserMessageObserved msgId)
             <> ResolveAttemptResult.NotFound
 
-    let accepted = fr.UpdateSessionReturning(sessionIDStr, tryAcceptPendingLeaseReturning continuationId)
+    let accepted =
+        fr.UpdateSessionReturning(sessionIDStr, tryAcceptPendingLeaseReturning continuationId msgId)
 
     accepted || receiptMatched
 
 /// Classify whether a chat.message hook payload is system-synthesised.
-/// Internal so the regression suite can bind directly to this entry
-/// point (mirroring the `static member internal isNaturalStop` pattern
-/// in NudgeTrigger) instead of re-encoding the rule in test fixtures.
+/// Also binds PendingDispatch → HostUserMessageId when a marker matches.
+/// Metadata is a probe only; durable fact is the bound host message id.
 let isSystemMessage
     (parts: obj)
     (fr: FallbackRuntimeStore)

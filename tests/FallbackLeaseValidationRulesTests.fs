@@ -71,6 +71,7 @@ let verifyLeaseWithStatus_noPendingLease_returnsFalse () =
           ContinuationOrdinal = 0
           SessionGeneration = 0
           HumanTurnID = ""
+          HostUserMessageId = ""
           CancelGeneration = 0
           Owner = SessionOwner.Fallback
           Model = mkModel ()

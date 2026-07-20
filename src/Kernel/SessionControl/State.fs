@@ -11,6 +11,7 @@ type ReplayLeaseState =
       ContinuationOrdinal: int
       SessionGeneration: int
       HumanTurnID: string
+      HostUserMessageId: string
       CancelGeneration: int
       Owner: string
       Model: string
@@ -23,6 +24,7 @@ type ReplayNudgeLeaseState =
       Nonce: string
       Anchor: string
       HumanTurnID: string
+      HostUserMessageId: string
       SessionGeneration: int
       CancelGeneration: int
       Status: string }

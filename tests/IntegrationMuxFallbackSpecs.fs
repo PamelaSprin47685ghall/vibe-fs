@@ -318,9 +318,10 @@ let muxAbortUnavailableNudgeFlowSpec () =
               NudgeOrdinal = 1
               Nonce = "nonce-1"
               HumanTurnID = "ht-1"
+              HostUserMessageId = ""
               SessionGeneration = 0
               CancelGeneration = 0
-              Owner = SessionOwner.Human 
+              Owner = SessionOwner.Human
               Status = LeaseStatus.Requested }
 
         let abortRunCalledCount = ref 0

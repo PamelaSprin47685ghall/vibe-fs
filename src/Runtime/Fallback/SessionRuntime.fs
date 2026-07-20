@@ -8,6 +8,9 @@ type PendingLease =
       ContinuationOrdinal: int
       SessionGeneration: int
       HumanTurnID: string
+      /// Host-issued user message id bound at chat.message acceptance.
+      /// Empty until HostAccepted. Assistant attribution uses parentID == this.
+      HostUserMessageId: string
       CancelGeneration: int
       Owner: SessionOwner
       Model: FallbackModel
@@ -19,6 +22,8 @@ type NudgeLease =
       NudgeOrdinal: int
       Nonce: string
       HumanTurnID: string
+      /// Host-issued user message id bound at chat.message acceptance.
+      HostUserMessageId: string
       SessionGeneration: int
       CancelGeneration: int
       Owner: SessionOwner
@@ -177,6 +182,7 @@ let startDispatch
                       ContinuationOrdinal = nextOrdinal
                       SessionGeneration = gen
                       HumanTurnID = s.HumanTurnId
+                      HostUserMessageId = ""
                       CancelGeneration = cancelGen
                       Owner = SessionOwner.Fallback
                       Model = model

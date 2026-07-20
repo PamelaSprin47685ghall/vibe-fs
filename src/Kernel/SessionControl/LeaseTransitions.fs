@@ -99,6 +99,7 @@ let private handleContinuationRequested (st: OwnerEpisodeState) (ev: Continuatio
               ContinuationOrdinal = newOrdinal
               SessionGeneration = defaultGeneration st.SessionGeneration ev.Generation
               HumanTurnID = deriveHumanTurnId st.HumanTurn ev.HumanTurnId
+              HostUserMessageId = ""
               CancelGeneration = defaultCancelGeneration st.CancelGeneration ev.CancelGeneration
               Owner = ev.Owner
               Model = ev.Model
@@ -140,6 +141,7 @@ let private handleNudgeRequested (st: OwnerEpisodeState) (ev: NudgeRequestEvent)
               Nonce = ev.Nonce
               Anchor = ev.Anchor
               HumanTurnID = deriveHumanTurnId st.HumanTurn ev.HumanTurnId
+              HostUserMessageId = ""
               SessionGeneration = defaultGeneration st.SessionGeneration ev.Generation
               CancelGeneration = defaultCancelGeneration st.CancelGeneration ev.CancelGeneration
               Status = "requested" }

@@ -37,11 +37,13 @@ let private applyToolOverrides (host: Host) (agent: string) (output: obj) : unit
             | None -> ()
             | Some filtered -> setKey message "tools" (encodeToolsOverridesToMessage filtered)
 
-/// Message-id dedup MUST happen before any side-effect that could cancel an
-/// active fallback lease (`OnNewHumanMessage` does exactly that). The contract
-/// is: classify -> dedup -> bind dispatch -> record provenance -> tool
-/// overrides. The progress hook is preserved at the top because it only touches
-/// the `ProgressObserver` stream, never the leases.
+/// SPEC §七 fixed order:
+/// 1. decode session + message id
+/// 2. message id dedup (before any cancel side-effect)
+/// 3. bind PendingDispatch / classify SystemGenerated
+/// 4. system → skip OnNewHumanMessage
+/// 5. remaining user role → human turn (cancel owners)
+/// 6. provenance record + tool overrides
 let chatMessageFor
     (host: Host)
     (registry: ChildAgentRegistry)
@@ -66,22 +68,27 @@ let chatMessageFor
 
         do! lifecycleObserver.handleChatMessage (sessionID, agent, parts)
 
-        // Step 1: classify
-        let isSystem =
-            ChatHooksClassification.isSystemMessage parts fr lifecycleObserver.WorkspaceRoot sessionIDStr msgId
-
-        let messageRole = tryGetChatMessageRole output
-
-        // Step 2: dedup — drop the hook if the host already surfaced this id.
+        // Step 2: msgId dedup BEFORE bind / human-turn cancel.
         let isDuplicate = msgId <> "" && markSeen sessionIDStr msgId
 
         if not isDuplicate then
-            // Step 3: bind dispatch (only when this is a real user turn)
+            // Step 3–4: bind PendingDispatch + system classification.
+            let isSystem =
+                ChatHooksClassification.isSystemMessage
+                    parts
+                    fr
+                    lifecycleObserver.WorkspaceRoot
+                    sessionIDStr
+                    msgId
+
+            let messageRole = tryGetChatMessageRole output
+
+            // Step 5: only residual human user turns cancel owners.
             if not isSystem && messageRole = "user" then
                 let modelOpt = tryGetModelStringFromHook input output
                 do! lifecycleObserver.OnNewHumanMessage(sessionIDStr, agent, modelOpt, msgId)
 
-        do! ChatHooksProvenance.recordProvenanceIfPresent parts msgId lifecycleObserver.WorkspaceRoot sessionIDStr
+            do! ChatHooksProvenance.recordProvenanceIfPresent parts msgId lifecycleObserver.WorkspaceRoot sessionIDStr
 
         applyToolOverrides host agent output
     }

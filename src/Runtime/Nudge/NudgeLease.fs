@@ -149,6 +149,7 @@ let tryClaimAndRegisterLease
                   NudgeOrdinal = nudgeOrdinal
                   Nonce = nonce
                   HumanTurnID = humanTurnId
+                  HostUserMessageId = ""
                   SessionGeneration = sessionGen
                   CancelGeneration = cancelGen
                   Owner = SessionOwner.Nudge
