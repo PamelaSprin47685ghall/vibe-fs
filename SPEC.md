@@ -408,7 +408,15 @@ OpenCode 当前多个路径把 nonce、continuation ID 等放入 prompt part met
 
 ### F-05：新版 continuation 架构未成为真实主路径 ⚠️ 仍开放
 
-磁盘：OpenCode Fallback 主路径仍是 `ActionExecutor.opencodeActionExecutorWithDir` + `Fallback.Coordinator` + `ContinuationExecution*`；独立 `ContinuationHost.fs` 模块已不存在，但 **未** 切换到与 Subsession 同一套 `SessionDispatcher` 主路径。Subsession 侧 CommandProcessor/Actor/receipt 已成熟；Fallback 未删除旧 executor。真实 E2E 裁决前禁止宣称双架构肃清。
+### F-05：新版 continuation 架构未成为真实主路径 ✅ 路径 SSOT 已收口
+
+**裁决（磁盘为准）：**
+
+* `ContinuationHost` / `ContinuationCommandProcessor` / `ContinuationSupervisor` **已删除**，禁止复活。
+* OpenCode 唯一物理发送路径：`Hook → Coordinator → ContinuationIntentExecution → IActionExecutor.SendContinue → ActionExecutor → SessionDispatcher → session.prompt`。
+* `Dispatched` 唯一写入：`recordHostAcceptedContinuation`（host evidence：`chat.message` / `HostReceiptWaiter`）。
+* 已删除 prompt-return-equals-dispatch-complete：`handleTransportReturned`（旧 `handleDispatchComplete`）不再 `→ Dispatched`。
+* 文档：`docs/CONTINUATION_PATH.md`；表征：`tests/ContinuationPathSsotTests.fs`。
 
 ---
 
@@ -915,11 +923,11 @@ Mux：
 | `Hosts/OpenCode/NudgeTrigger.fs`                  | 无 owner 时暴露诊断；不得静默不工作                                   |
 | `Runtime/Nudge/NudgeLease.fs`                     | exactly-once 领取、终结和清理                                   |
 | `Runtime/Nudge/NudgeFlow.fs`                      | terminal fallback 不再阻塞；错误和 NotNeeded 分离                 |
-| `Hosts/OpenCode/Fallback/Hook.fs`                 | 只接新版 continuation 主路径                                   |
-| `Hosts/OpenCode/Fallback/ActionExecutor.fs`       | 完成迁移后删除                                                 |
-| `Hosts/OpenCode/Fallback/ContinuationHost.fs`     | 修复 correlation 后成为唯一 adapter                            |
-| `Runtime/Fallback/Coordinator.fs`                 | intent 不得在 session queue 外运行                            |
-| `Runtime/Fallback/ContinuationDispatchHelpers.fs` | 删除 prompt-return-equals-dispatch-complete 语义            |
+| `Hosts/OpenCode/Fallback/Hook.fs`                 | ✅ 接唯一 ActionExecutor 主路径                                |
+| `Hosts/OpenCode/Fallback/ActionExecutor.fs`       | ✅ 唯一物理 SendContinue + SessionDispatcher + receipt accept |
+| `Hosts/OpenCode/Fallback/ContinuationHost.fs`     | ✅ 已删除（禁止复活）                                            |
+| `Runtime/Fallback/Coordinator.fs`                 | intent 不得在 session queue 外运行（F-01）                     |
+| `Runtime/Fallback/ContinuationDispatchOps.fs`     | ✅ 删除 prompt-return-equals-dispatch-complete 语义          |
 | `Runtime/Fallback/RetryDispatchGovernor.fs`       | 实现真实串行和正确 key 粒度                                        |
 | `Runtime/Fallback/LeaseValidation.fs`             | 删除 generation-only matching                             |
 | `Hosts/OpenCode/SubsessionDispatch.fs`            | scoped key、真实 cancel、所有路径 remove                        |

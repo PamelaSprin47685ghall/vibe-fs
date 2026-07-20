@@ -83,15 +83,15 @@ OpenCode/Mux/OMP 通过各自 `src/Hosts/` 绑定调用 Runtime；OMP 不引用 
 宿主事件（session.error / session.idle / session.busy / message.updated）
   → 各宿主 `src/Hosts/*/Fallback/` handler
     → Runtime/Fallback Coordinator
-      → IEventTranslator.TranslateError → FallbackEvent
+      → IEventTranslator → FallbackEvent
       → Kernel.FallbackKernel.StateMachine.transition → (newState, action)
-      → 若 action 为 SendContinue → 构造六阶段续命租约
-        → appendContinuationRequested → TryTransitionPendingLease → executor.SendContinue
-        → appendContinuationDispatched
+      → SendContinue → lease Requested → intent → executor.SendContinue
+      → OpenCode: SessionDispatcher + HostReceiptWaiter
+      → recordHostAcceptedContinuation → Dispatched（非 prompt 返回）
       → 返回 FallbackHookResult { Consumed; State }
 ```
 
-详 [12-fallback.md](./12-fallback.md)。
+详 [12-fallback.md](./12-fallback.md)、[CONTINUATION_PATH.md](./CONTINUATION_PATH.md)。
 
 ## MessageTransform 管线
 

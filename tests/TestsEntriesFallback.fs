@@ -42,6 +42,7 @@ open Wanxiangshu.Tests.FallbackPropertyPureTests
 open Wanxiangshu.Tests.NudgeErrorClassificationTests
 open Wanxiangshu.Tests.RetryDispatchGovernorTests
 open Wanxiangshu.Tests.NudgeOwnerDiagnosticTests
+open Wanxiangshu.Tests.ContinuationPathSsotTests
 
 let fallbackTestEntries () : (string * TestBody) list =
     [ "FallbackKernelTests.run", Sync(sync FallbackKernelTests.run)
@@ -58,6 +59,7 @@ let fallbackTestEntries () : (string * TestBody) list =
       "FallbackIntegrationTests.run", Sync(sync FallbackIntegrationTests.run)
       "FallbackRecoveryWaitTests.run", Async FallbackRecoveryWaitTests.run
       "FallbackRequestedRecoveryTests.run", Async FallbackRequestedRecoveryTests.run
+      "ContinuationPathSsotTests.run", Async ContinuationPathSsotTests.run
       "RetryDispatchGovernorTests.run", Async RetryDispatchGovernorTests.run
       "SubsessionDecisionTests.run", Sync(sync SubsessionDecisionTests.run)
       "OpencodeSubsessionHostAdapterModelTests.run", Sync(sync OpencodeSubsessionHostAdapterModelTests.run)

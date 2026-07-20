@@ -21,6 +21,7 @@ open Wanxiangshu.Hosts.Opencode.Fallback.ContinuationPromptBuilder
 open Wanxiangshu.Runtime.Dispatch
 open Wanxiangshu.Kernel.Dispatch.Identity
 open Wanxiangshu.Kernel.Dispatch.Protocol
+open Wanxiangshu.Runtime.Fallback.ContinuationDispatchOps
 
 let private fetchMessagesImpl (client: obj) (sessionID: string) : JS.Promise<obj array> =
     promise {
@@ -49,6 +50,10 @@ let private loggerFor (_: WorkspaceId) : IDispatchEventLogger =
 let private receiptTimeoutMs () : int = jsNative
 
 let private handleContinuationResult
+    (runtime: FallbackRuntimeStore)
+    (workspaceRoot: string)
+    (sessionID: string)
+    (continuationID: string)
     (dispatcher: SessionDispatcher)
     (identity: DispatchIdentity)
     (outcome: DispatchOutcome)
@@ -68,12 +73,11 @@ let private handleContinuationResult
 
             match result with
             | Ok _ ->
-                // Real host receipt observed; mark the dispatcher slot complete.
+                // Host evidence only: receipt observed → Dispatched. Never prompt().
+                let! _ = recordHostAcceptedContinuation runtime workspaceRoot sessionID continuationID
                 let! _ = dispatcher.CompleteByTurn identity.LogicalTurnId
                 ()
             | Error failure ->
-                // Receipt failed or timed out; fail the dispatcher turn so the
-                // runtime does not keep an orphaned active dispatch.
                 let errInput =
                     match failure with
                     | HostRejected e -> e
@@ -83,7 +87,9 @@ let private handleContinuationResult
                 return raise (System.Exception(sprintf "Fallback continuation dispatch failed: %A" failure))
         | None ->
             match outcome with
-            | DispatchOutcome.Accepted _ -> ()
+            | DispatchOutcome.Accepted _ ->
+                // Opaque accept without receipt waiter is not host evidence for OpenCode.
+                ()
             | DispatchOutcome.Failed terminal ->
                 return raise (System.Exception(sprintf "Fallback continuation dispatch failed: %A" terminal))
     }
@@ -124,7 +130,16 @@ let private dispatchFallbackContinuation
         let! outcome, receiptWaiterOpt =
             dispatcher.Dispatch identity sendPrompt System.Threading.CancellationToken.None
 
-        do! handleContinuationResult dispatcher identity outcome receiptWaiterOpt
+        do!
+            handleContinuationResult
+                runtime
+                directory
+                sessionID
+                continuationID
+                dispatcher
+                identity
+                outcome
+                receiptWaiterOpt
     }
 
 let private sendContinueImpl

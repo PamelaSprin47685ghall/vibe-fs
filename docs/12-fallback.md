@@ -71,22 +71,21 @@ models:
 | 可重试 / 429/5xx | RetrySame |
 | 其他（安全网） | RetrySame |
 
-## 续命六阶段生命周期（v1 旧版，逐步退役）
+## 续命生命周期（唯一路径）
 
-每个 `SendContinue` / `RecoverWithPrompt` 经历完整生命周期并通过 NDJSON 事件持久化：
+权威路径图：[CONTINUATION_PATH.md](./CONTINUATION_PATH.md)。
 
 ```
 requested → dispatch_started → dispatched → [failed | cancelled | settled]
 ```
 
-1. **`continuation_requested`**：FSM 决策后，`handleEvent` 构造 `PendingLease`，记录 `continuationId` / `model` / `sessionGeneration` / `humanTurnId` / `cancelGeneration` 等
-2. **`continuation_dispatch_started`**：进入宿主 API 调用前（`appendContinuationDispatchStartedOrFail`）
-3. 最终派发门闩：`TryTransitionPendingLease("requested" → "dispatch_started")` 原子验证
-4. **`continuation_dispatched`**：`IActionExecutor.SendContinue` 成功后记录
-5. 第二次门闩：`TryTransitionPendingLease("dispatch_started" → "dispatched")` 验证
-6. **`continuation_failed`** / **`continuation_cancelled`** / **`continuation_settled`**：终局事件
+1. **`continuation_requested`**：FSM 决策后构造 `PendingLease(Requested)`
+2. **`continuation_dispatch_started`**：进入宿主 API 前；`Requested → DispatchStarted`
+3. 物理发送：`IActionExecutor.SendContinue` →（OpenCode）`SessionDispatcher` → `session.prompt`
+4. **`continuation_dispatched` / `Dispatched`**：仅 host evidence（`chat.message` / `HostReceiptWaiter`）经 `recordHostAcceptedContinuation`；**禁止** prompt Promise 返回即 Dispatched
+5. **`continuation_failed` / `cancelled` / `settled`**：终局
 
-每次续命调用前都执行 `verifyLease` 验证：`sessionGeneration` / `humanTurnId` / `cancelGeneration` / `owner == "Fallback"` / 非 forceStopped / lifecycle == Active / pendingLease match。
+每次续命调用前 `verifyLease`：generation / humanTurnId / cancelGeneration / owner / lifecycle / pendingLease。
 
 ## Consumed 路由
 
@@ -127,27 +126,11 @@ requested → dispatch_started → dispatched → [failed | cancelled | settled]
 
 ## 注入事件 SSOT
 
-### v1 旧版（逐步退役）
+生产唯一路径：Coordinator → ContinuationIntentExecution → `IActionExecutor.SendContinue`（OpenCode：`ActionExecutor` + `SessionDispatcher`）。`ContinuationHost` / `ContinuationCommandProcessor` / `ContinuationSupervisor` **已删除**，禁止复活（`ContinuationCleanupTests` + `ContinuationPathSsotTests`）。
 
-遗留 v1 路径由 Coordinator/ContinuationExecution 先追加 continuation 事实，再校验 lease 并调用 `IActionExecutor.SendContinue`；该描述只适用于 v1 兼容路径，不是 v2 `ContinuationCommandProcessor` 的调用协议。
+消费端不嗅探消息文本；lease / generation / owner 来自 `FallbackRuntimeStore`。`InjectedAt` / `InjectedModel` 由 `recordHostAcceptedContinuation` 在 host accept 时写入。
 
-消费端（`resolveNudgeModel` / `tryGetLatestUserModel` / 哨兵 `IsNewUserMessage`）**不**嗅探消息文本；当前运行时从 `RuntimeStore` 与 session-control projection 读取 lease、generation、owner 等状态。v1 `fallback_continue_injected` 仍是历史事件，不再作为独立 `SessionState.FallbackInjection` 模型描述。
-
-### v2 continuation supervisor（已实现组件，非全宿主切换宣告）
-
-`ContinuationCommandProcessor` 接收 `ContinuationCommand` → 决策 → 持久化 `ContinuationEvent` → 产生 `ContinuationEffect`（Outbox Intent）。`ContinuationSupervisor` 消费 Outbox Effect → 调用 `IContinuationHost`（`Dispatch` / `TryAbortOwned` / `Reconcile`）→ 结果映射为 Command 回流至 Processor。
-
-| 组件 | 路径 | 职责 |
-| :--- | :--- | :--- |
-| `ContinuationCommandProcessor` | `src/Runtime/Fallback/ContinuationCommandProcessor.fs` | 串行提交器：decide → append → emit effect |
-| `ContinuationSupervisor` | `src/Runtime/Fallback/ContinuationSupervisor.fs` | 消费 effect，调用宿主 API，回流 Command |
-| `IContinuationHost` | `src/Runtime/Fallback/ContinuationHost.fs` | 宿主适配器接口：Dispatch / TryAbortOwned / Reconcile |
-| `ContinuationEventCodec` | `src/Runtime/Fallback/ContinuationEventCodec.fs` | v2 续命事件编解码 |
-| `ContinuationProjection` | `src/Kernel/Fallback/ContinuationProjection.fs` | 纯 fold 投影 |
-| `ContinuationDecision` | `src/Kernel/Fallback/ContinuationDecision.fs` | 命令决策逻辑 |
-| `ContinuationHost` (OpenCode) | `src/Hosts/OpenCode/Fallback/ContinuationHost.fs` | OpenCode 宿主实现 |
-
-`continuationPayload`（`"\u200B"`）定义于 `src/Hosts/OpenCode/Fallback/ContinuationHost.fs`，作为 OpenCode continuation prompt 的文本参数；其他宿主的发送实现仍以各自 adapter 为准。
+OpenCode continuation payload 文本为 ZWSP `"\u200B"`（`ActionExecutor.sendContinueImpl`）。
 
 ## IEventTranslator 接口（宿主需实现）
 

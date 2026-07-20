@@ -10,6 +10,7 @@ open Wanxiangshu.Runtime.Fallback.SessionRuntimeLeaseAcceptancePure
 open Wanxiangshu.Runtime.Fallback.SessionRuntimePropertyPure
 open Wanxiangshu.Runtime.Fallback.SessionRuntimeLeasePure
 open Wanxiangshu.Runtime.Fallback.SessionRuntime
+open Wanxiangshu.Runtime.Fallback.ContinuationDispatchOps
 open Wanxiangshu.Hosts.Opencode.ChatHooksDecoders
 open Wanxiangshu.Runtime.Dispatch
 open Wanxiangshu.Kernel.HostTools
@@ -107,10 +108,16 @@ let tryAcceptFallbackContinuation
                 (Wanxiangshu.Kernel.Subsession.Types.UserMessageObserved msgId)
             <> ResolveAttemptResult.NotFound
 
-    let accepted =
-        fr.UpdateSessionReturning(sessionIDStr, tryAcceptPendingLeaseReturning continuationId msgId)
+    // chat.message is host evidence. Sync status first so classifiers see
+    // Dispatched immediately; async path emits continuation_dispatched once.
+    let acceptedSync = fr.UpdateSessionReturning(sessionIDStr, tryAcceptPendingLeaseReturning continuationId msgId)
 
-    accepted || receiptMatched
+    if acceptedSync then
+        recordHostAcceptedContinuation fr workspaceRoot sessionIDStr continuationId
+        |> Promise.map ignore
+        |> Promise.start
+
+    acceptedSync || receiptMatched
 
 /// Classify whether a chat.message hook payload is system-synthesised.
 /// Also binds PendingDispatch → HostUserMessageId when a marker matches.

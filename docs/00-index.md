@@ -21,7 +21,8 @@
 | 09 | [09-methodology.md](./09-methodology.md) | `methodology_*` schema 与注册 |
 | 10 | [10-message-transform.md](./10-message-transform.md) | 管线、Semble、并行提示 |
 | 11 | [11-subagents.md](./11-subagents.md) | spawn、SubsessionActor、continue、iterator |
-| 12 | [12-fallback.md](./12-fallback.md) | 模型降级运行时、续命六阶段、门闩 |
+| 12 | [12-fallback.md](./12-fallback.md) | 模型降级运行时、续命生命周期、门闩 |
+| 12′ | [CONTINUATION_PATH.md](./CONTINUATION_PATH.md) | F-05 OpenCode continue 唯一物理路径 SSOT |
 | 13 | [13-context-budget.md](./13-context-budget.md) | F 触发、R 参数、budget nudge |
 | 14–16 | host 文档 | OpenCode / Mux / OMP |
 | 17 | [17-build-test-verify.md](./17-build-test-verify.md) | 构建与行为验证 |

@@ -632,6 +632,7 @@
     <Compile Include="tests/EventLogCodecTests.fs"/>
     <Compile Include="tests/EventLogTestSeed.fs"/>
     <Compile Include="tests/TestWorkspace.fs"/>
+    <Compile Include="tests/ContinuationPathSsotTests.fs"/>
     <Compile Include="tests/EventLogRuntimeTests.fs"/>
     <Compile Include="tests/EventLogRuntimeRobustnessTests.fs"/>
     <Compile Include="tests/ReplayEquivalenceTests.fs"/>

@@ -32,9 +32,12 @@
 
 ## Fallback 续命
 
-- `src/Hosts/OpenCode/Fallback/ContinuationHost.fs`：`IContinuationHost` 的 OpenCode 实现
-- `src/Hosts/OpenCode/Fallback/ActionExecutor.fs`：遗留 `IActionExecutor` 适配
+唯一物理路径见 [CONTINUATION_PATH.md](./CONTINUATION_PATH.md)。
+
+- `src/Hosts/OpenCode/Fallback/ActionExecutor.fs`：`IActionExecutor.SendContinue` → `SessionDispatcher`
+- `src/Hosts/OpenCode/Fallback/Hook.fs`：事件入 Runtime Coordinator
 - `src/Hosts/OpenCode/Fallback/EventTranslator.fs`：宿主事件翻译
+- `src/Hosts/OpenCode/ChatHooksClassification.fs`：`chat.message` → `recordHostAcceptedContinuation`
 
 ## Mimocode 命名差异
 

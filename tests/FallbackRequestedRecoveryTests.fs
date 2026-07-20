@@ -91,7 +91,8 @@ let requestedSendContinueIsDispatchedOnce () =
         | _ -> failwith "expected SendContinue call"
 
         let leaseAfter = (rt.GetSession "s1").PendingLease.Value
-        check "lease becomes Dispatched" (leaseAfter.Status = LeaseStatus.Dispatched)
+        // Fake transport return is not host evidence; Dispatched requires receipt.
+        check "lease stays DispatchStarted after transport" (leaseAfter.Status = LeaseStatus.DispatchStarted)
         check "continuation id unchanged" (leaseAfter.ContinuationID = leaseBefore.ContinuationID)
     }
 
@@ -119,7 +120,7 @@ let requestedRecoverWithPromptIsDispatchedOnce () =
         | _ -> failwith "expected RecoverWithPrompt call"
 
         let leaseAfter = (rt.GetSession "s2").PendingLease.Value
-        check "lease becomes Dispatched" (leaseAfter.Status = LeaseStatus.Dispatched)
+        check "lease stays DispatchStarted after transport" (leaseAfter.Status = LeaseStatus.DispatchStarted)
     }
 
 let dispatchedLeaseIsNotRedispatched () =

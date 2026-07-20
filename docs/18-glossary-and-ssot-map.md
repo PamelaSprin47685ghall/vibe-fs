@@ -52,7 +52,8 @@
 | 上下文预算 cycle | `src/Runtime/Execution/ContextBudgetStore.fs` 与 projection metadata（重启语义以实现为准） | 仅 `maxInputTokens` 静态值 |
 | 会话拥有者 | `continuation_*` / `human_turn_started` 事件 + `SessionOwner` fold | 内存 `FallbackRuntimeState` |
 | Continuation effect | `ContinuationCommandProcessor` 产生的 `ContinuationEffect` 与 continuation 事件 | 仅内存通知被误称为 durable outbox |
-| 续命 payload 文本 | `ContinuationHost.continuationPayload`（`"\u200B"`） | 各 `ActionExecutor.zwsChar` 私有定义 |
+| 续命 payload 文本 | OpenCode `ActionExecutor.sendContinueImpl` ZWSP `"\u200B"` | 见 `docs/CONTINUATION_PATH.md` |
+| 续命 Dispatched | `recordHostAcceptedContinuation`（host evidence only） | 禁止 prompt Promise 返回即 Dispatched |
 
 ## 文件路径速查
 
