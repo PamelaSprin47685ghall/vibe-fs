@@ -85,5 +85,6 @@ let opencodeActionExecutorWithDir (runtime: FallbackRuntimeStore) (client: obj) 
 
         member _.AbortRun sessionID = abortRunImpl client sessionID }
 
+[<System.Obsolete("Use opencodeActionExecutorWithDir instead")>]
 let opencodeActionExecutor (runtime: FallbackRuntimeStore) (client: obj) : IActionExecutor =
     opencodeActionExecutorWithDir runtime client ""
