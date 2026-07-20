@@ -101,7 +101,7 @@ let buildFailSafe (priorState: SubsessionState) (msg: string) : Decision option 
               AfterStop = FinishFailed(InfrastructureFailure("event store append failed: " + msg)) }
 
         let nowMs = int64 (JS.Constructors.Date.now ())
-        let abortDeadlineAtMs = nowMs + 60_000L
+        let abortDeadlineAtMs = nowMs + 30_000L
 
         Some
             { NextState = IssuingAbort(ctx, turn, abortCtx, false, abortDeadlineAtMs)

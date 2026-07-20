@@ -53,7 +53,7 @@ let private handleDispatchingHostAcceptanceUnknown
         { Reason = AcceptanceUnknownAfterDispatch
           AfterStop = RetryAfterSafeStop error }
 
-    let reconciliationDeadlineAtMs = nowMs + 30_000L
+    let reconciliationDeadlineAtMs = nowMs + 10_000L
 
     Ok(
         decided
@@ -63,7 +63,7 @@ let private handleDispatchingHostAcceptanceUnknown
     )
 
 let private handleCancellingDispatchAccepted (nowMs: int64) (ctx: RunContext) (plan: TurnPlan) cancelCtx tid receipt =
-    let abortDeadlineAtMs = nowMs + 60_000L
+    let abortDeadlineAtMs = nowMs + 30_000L
 
     let events =
         [ TurnStarted
@@ -109,7 +109,7 @@ let private handleCancellingRejected
                 [ CompleteCaller(ctx.RunId, res) ]
         )
     | HostAcceptanceUnknown _ ->
-        let reconciliationDeadlineAtMs = nowMs + 30_000L
+        let reconciliationDeadlineAtMs = nowMs + 10_000L
 
         Ok(
             decided
@@ -224,7 +224,7 @@ let private handleCancellingDispatch (nowMs: int64) (ctx: RunContext) (plan: Tur
     | DispatchRejected _ -> Ok(noChange StaleTurnMarker)
     | CancelRequested -> Ok(noChange StaleTimer)
     | TurnDeadlineExpired tid when tid = plan.TurnId ->
-        let reconciliationDeadlineAtMs = nowMs + 30_000L
+        let reconciliationDeadlineAtMs = nowMs + 10_000L
 
         Ok(
             decided
