@@ -41,7 +41,7 @@ let createEventHook (deps: obj) (reviewStore: ReviewStore) (scope: RuntimeScope)
 
     let fallbackRuntime = FallbackRuntimeStore()
     scope.Add("fallbackRuntime", box fallbackRuntime)
-    registerFallbackExecutor scope (muxActionExecutor deps)
+    registerFallbackExecutor scope (muxActionExecutorWithDir deps directory)
     let fallbackConfigOpt = loadFallbackConfig directory
 
     let isReviewLoopActive (sessionID: string) =

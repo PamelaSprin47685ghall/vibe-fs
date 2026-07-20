@@ -95,15 +95,8 @@ let sendNudgeMux
                         (nudgeFn $ (workspaceId, promptText, modelVal, agentVal, nudgeId, nonce))
                         |> unbox<JS.Promise<obj>>
 
-                    let validation = validateMuxReceipt result workspaceId nonce nudgeId
-
-                    return
-                        match validation with
-                        | ValidReceipt _ -> SendOutcome.Delivered
-                        | SimpleSuccess ->
-                            SendOutcome.AcceptanceUnknown "nudge resolved true, cannot verify delivery without receipt"
-                        | SimpleFailure -> SendOutcome.Busy
-                        | InvalidReceipt err -> SendOutcome.Failed err
+                    let receipt = validateMuxReceipt result workspaceId nonce nudgeId
+                    return receiptToSendOutcome receipt
         with ex ->
             JS.console.error (
                 box
@@ -137,8 +130,6 @@ let runNudgeFlowWithRetryCheck
                 unbox<string> (nodeProcess?cwd ())
 
         let abortRun (_: string) =
-            Promise.reject (
-                System.Exception("AbortUnavailable: Mux host adapter does not expose a session-level abort API")
-            )
+            Promise.reject (Wanxiangshu.Runtime.MuxLogicalReceipt.abortUnavailableException ())
 
         runNudgeFlowCore Mux root fallbackRuntime runtimeState sessionKey takeSnapshot sendNudge abortRun

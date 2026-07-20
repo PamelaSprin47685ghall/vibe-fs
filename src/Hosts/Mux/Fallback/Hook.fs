@@ -172,7 +172,10 @@ let muxEventTranslator: IEventTranslator =
         member _.ExtractTurnObservation(rawEvent: obj) : TurnObservation option = extractTurnObservation rawEvent }
 
 let muxActionExecutor (helpers: obj) : IActionExecutor =
-    Executor.muxActionExecutor helpers
+    Executor.muxActionExecutorDefault helpers
+
+let muxActionExecutorWithDir (helpers: obj) (directory: string) : IActionExecutor =
+    Executor.muxActionExecutor helpers directory
 
 let createMuxFallbackHandler
     (runtime: FallbackRuntimeStore)
@@ -180,4 +183,10 @@ let createMuxFallbackHandler
     (helpers: obj)
     (workspaceRoot: string)
     : (obj -> JS.Promise<FallbackHookResult>) =
-    createHandler muxEventTranslator runtime configLookup (muxActionExecutor helpers) workspaceRoot None
+    createHandler
+        muxEventTranslator
+        runtime
+        configLookup
+        (muxActionExecutorWithDir helpers workspaceRoot)
+        workspaceRoot
+        None

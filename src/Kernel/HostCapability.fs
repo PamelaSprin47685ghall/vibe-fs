@@ -17,6 +17,10 @@ type HostCapability =
     | SubsessionAbort
     | SubsessionReconcile
     | FallbackContinue
+    /// Host exposes a scoped abort that can confirm cancellation.
+    | ReliableAbort
+    /// Host nudge/prompt returns a verifiable message/run identity receipt.
+    | LogicalMessageReceipt
 
 let toString (c: HostCapability) : string =
     match c with
@@ -35,6 +39,8 @@ let toString (c: HostCapability) : string =
     | HostCapability.SubsessionAbort -> "subsessionAbort"
     | HostCapability.SubsessionReconcile -> "subsessionReconcile"
     | HostCapability.FallbackContinue -> "fallbackContinue"
+    | HostCapability.ReliableAbort -> "reliableAbort"
+    | HostCapability.LogicalMessageReceipt -> "logicalMessageReceipt"
 
 let allFull: Set<HostCapability> =
     Set
@@ -52,8 +58,12 @@ let allFull: Set<HostCapability> =
           HostCapability.SubsessionDispatch
           HostCapability.SubsessionAbort
           HostCapability.SubsessionReconcile
-          HostCapability.FallbackContinue ]
+          HostCapability.FallbackContinue
+          HostCapability.ReliableAbort
+          HostCapability.LogicalMessageReceipt ]
 
+/// Mux host adapter is capability-degraded: no subsession control plane,
+/// no reliable abort, and no guaranteed message-id receipt on nudge resolve.
 let muxDefault: Set<HostCapability> =
     Set
         [ HostCapability.ToolCatalog

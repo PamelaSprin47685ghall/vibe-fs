@@ -36,6 +36,9 @@ type SessionOwner =
 type LeaseStatus =
     | Requested
     | DispatchStarted
+    /// Transport returned without a verifiable host receipt. Must not be
+    /// rewritten to Failed and must not be blindly re-dispatched on restart.
+    | AcceptanceUnknown
     | Dispatched
     | Running
     | Cancelled
@@ -46,6 +49,10 @@ type LeaseStatus =
 type ContinuationOutcome =
     | Failed
     | Cancelled
+    /// Transport returned without verifiable acceptance; reconciliation only.
+    | AcceptanceUnknown
+    /// Abort was requested but the host has no reliable abort API.
+    | AbortUnknown
     | Settled
 
 [<RequireQualifiedAccess>]
@@ -53,6 +60,9 @@ type ContinuationOutcome =
 type NudgeOutcome =
     | Failed
     | Cancelled
+    /// Abort was requested but the host has no reliable abort API.
+    /// Must never be recorded as Cancelled.
+    | AbortUnknown
     | Dispatched
     | Settled
 
