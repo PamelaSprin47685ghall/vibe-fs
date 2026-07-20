@@ -115,10 +115,16 @@ let private appendFile (path: string) (content: string) (encoding: string) : uni
 [<Import("mkdirSync", "node:fs")>]
 let private mkdirSync (path: string) (opts: obj) : unit = jsNative
 
-let private verboseEnabledFromArgs () : bool = true
+let private verboseEnabledFromArgs (args: string array) : bool =
+    try
+        let p: obj = Fable.Core.JsInterop.emitJsExpr () "process"
+        let envVar = string p?env?("VIBE_FS_TEST_VERBOSE")
+        envVar = "1" || envVar = "true" || Array.contains "--verbose" args
+    with _ ->
+        Array.contains "--verbose" args
 
-let private initVerboseLog () : unit =
-    if verboseEnabledFromArgs () then
+let private initVerboseLog (args: string array) : unit =
+    if verboseEnabledFromArgs args then
         let ts = System.DateTime.Now.ToString("yyyyMMdd-HHmmss")
         let logDir = "tests/logs"
         let logPath = sprintf "%s/%s.verbose.log" logDir ts
@@ -218,16 +224,18 @@ let runAll (args: string array) : JS.Promise<int> =
 
         clearFailuresForRun ()
         Assert.disableGlobalClear ()
-        Assert.setSilent false
-        let selectors = args
-        initVerboseLog ()
+        let silent = Array.contains "--silent" args || Array.contains "--quiet" args
+        Assert.setSilent silent
+        let cleanSelectors = args |> Array.filter (fun arg -> arg <> "--silent" && arg <> "--quiet" && arg <> "--verbose")
+        initVerboseLog args
         PluginComposition.reviewStore.clearReviewSessions ()
         RunnerBackground.clearRunnerLogsForTest ExecutorTools.ompScope
 
-        let runnableTests = selectedTests selectors
+        let runnableTests = selectedTests cleanSelectors
 
         if List.isEmpty runnableTests then
-            printfn "No tests matched selectors: %A" args
+            if not silent then
+                printfn "No tests matched selectors: %A" cleanSelectors
             return 1
         else
             let isIntegrationSuiteRun (label: string) =
@@ -235,7 +243,8 @@ let runAll (args: string array) : JS.Promise<int> =
                 || (label = "OmpExecutorToolsTests.run")
 
             for (label, body) in runnableTests do
-                printfn "[RUN] %s" label
+                if not silent then
+                    printfn "[RUN] %s" label
 
                 match body with
                 | Sync f -> timed label f
