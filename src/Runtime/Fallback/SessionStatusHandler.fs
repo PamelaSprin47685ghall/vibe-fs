@@ -82,15 +82,17 @@ let handleUserAbort (runtime: FallbackRuntimeStore) (workspaceRoot: string) (ses
     }
 
 let updateBusyLeases (runtime: FallbackRuntimeStore) (sessionID: string) : unit =
-    let markRunning (lease: PendingLease) =
-        { lease with
-            Status = LeaseStatus.Running }
-
+    // Busy is only RunObserved once HostUserMessageId is bound (HostAccepted).
     (runtime.GetSession sessionID).PendingLease
-    |> Option.filter (fun l -> l.Status = LeaseStatus.DispatchStarted || l.Status = LeaseStatus.Dispatched)
+    |> Option.filter (fun l ->
+        l.HostUserMessageId <> ""
+        && (l.Status = LeaseStatus.Dispatched || l.Status = LeaseStatus.Running))
+    |> Option.filter (fun l -> l.Status = LeaseStatus.Dispatched)
     |> Option.iter (fun l -> runtime.UpdateSession(sessionID, setPendingLease { l with Status = LeaseStatus.Running }))
 
     (runtime.GetSession sessionID).PendingNudgeLease
-    |> Option.filter (fun l -> l.Status = LeaseStatus.DispatchStarted || l.Status = LeaseStatus.Dispatched)
+    |> Option.filter (fun l ->
+        l.HostUserMessageId <> ""
+        && l.Status = LeaseStatus.Dispatched)
     |> Option.iter (fun l ->
         runtime.UpdateSession(sessionID, setPendingNudgeLease { l with Status = LeaseStatus.Running }))

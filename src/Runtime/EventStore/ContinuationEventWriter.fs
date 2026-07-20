@@ -159,3 +159,23 @@ let appendContinuationSettledOrFail
     appendAndCacheOrFail
         workspaceRoot
         (buildEvent sessionID eventKindContinuationSettled payload (getTimestampMs().ToString()))
+
+/// HostAccepted idle without strong terminal evidence — reconciliation stub (SPEC §七 step 6).
+let appendContinuationIdleReconciliationOrFail
+    (workspaceRoot: string)
+    (sessionID: string)
+    (continuationID: string)
+    (hostUserMessageId: string)
+    (continuationOrdinal: int)
+    : JS.Promise<unit> =
+    let payload =
+        Map
+            [ "continuationId", continuationID
+              "hostUserMessageId", hostUserMessageId
+              "userMessageId", hostUserMessageId
+              "reason", "idle_without_strong_terminal"
+              "continuationOrdinal", continuationOrdinal.ToString() ]
+
+    appendAndCacheOrFail
+        workspaceRoot
+        (buildEvent sessionID eventKindContinuationIdleReconciliation payload (getTimestampMs().ToString()))

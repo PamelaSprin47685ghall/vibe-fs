@@ -112,6 +112,27 @@ let private handleContinuationRequested (st: OwnerEpisodeState) (ev: Continuatio
             ContinuationStage = Requested
             ContinuationLease = Some nextLease }
 
+let private handleContinuationHostAccepted (st: OwnerEpisodeState) (ev: HostAcceptedEvent) : OwnerEpisodeState =
+    match st.ContinuationLease with
+    | Some lease when lease.ContinuationID = ev.ContinuationId && ev.UserMessageId <> "" ->
+        let bound =
+            { lease with
+                HostUserMessageId = ev.UserMessageId
+                Status =
+                    match lease.Status with
+                    | "requested"
+                    | "dispatch_started" -> "dispatched"
+                    | other -> other }
+
+        { st with
+            ContinuationLease = Some bound
+            ContinuationStage =
+                if st.ContinuationStage = Requested || st.ContinuationStage = DispatchStarted then
+                    Dispatched
+                else
+                    st.ContinuationStage }
+    | _ -> st
+
 let private handleContinuationTerminal (st: OwnerEpisodeState) (ev: EpisodeStageEvent) : OwnerEpisodeState =
     let eventOrdinal = defaultOrdinal st.ContinuationOrdinal ev.Ordinal
 
@@ -195,6 +216,7 @@ let foldOwnerAndLeaseEvent (st: OwnerEpisodeState) (ev: SessionControlEvent) : O
     | ContinuationRequested ev -> handleContinuationRequested st ev
     | ContinuationDispatchStarted ev -> advanceLease ContinuationField "dispatch_started" DispatchStarted st ev
     | ContinuationDispatched ev -> advanceLease ContinuationField "dispatched" Dispatched st ev
+    | ContinuationHostAccepted ev -> handleContinuationHostAccepted st ev
     | ContinuationTerminal ev -> handleContinuationTerminal st ev
     | NudgeRequested ev -> handleNudgeRequested st ev
     | NudgeDispatched ev -> advanceLease NudgeField "dispatched" Dispatched st ev

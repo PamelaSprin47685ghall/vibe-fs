@@ -3,20 +3,16 @@ module Wanxiangshu.Runtime.Fallback.FallbackCoordination
 open Fable.Core
 open Wanxiangshu.Kernel.FallbackKernel.Types
 open Wanxiangshu.Kernel.FallbackKernel.StateMachine
-open Wanxiangshu.Runtime.PromiseQueue
 open Wanxiangshu.Runtime.Fallback.RuntimeStore
-open Wanxiangshu.Runtime.Fallback.SessionRuntimeLeasePure
 open Wanxiangshu.Runtime.Fallback.SessionRuntimePropertyPure
 open Wanxiangshu.Runtime.Fallback.Ports
 open Wanxiangshu.Runtime.Fallback.LeaseValidation
 open Wanxiangshu.Runtime.Fallback.ContinuationExecution
-open Wanxiangshu.Runtime.Fallback.HumanTurnHandler
 open Wanxiangshu.Runtime.Fallback.SessionStatusHandler
-open Wanxiangshu.Runtime.Fallback.CompactionHandler
 open Wanxiangshu.Runtime.Fallback.FallbackBridgeScanToolText
 open Wanxiangshu.Runtime.Fallback.FallbackConfigCodec
 open Wanxiangshu.Runtime.Fallback.FallbackChainResolution
-open Wanxiangshu.Runtime.ContinuationEventWriter
+open Wanxiangshu.Runtime.Fallback.FallbackIdleSettlement
 
 let resolveChain
     (runtime: FallbackRuntimeStore)
@@ -67,43 +63,7 @@ let calculateConsumed (evt: FallbackEvent) (statePhase: FallbackPhase) (finalSta
         | _ -> false
     | _ -> false
 
-let handleTerminalPostSettlement
-    (runtime: FallbackRuntimeStore)
-    (workspaceRoot: string)
-    (sessionID: string)
-    (evt: FallbackEvent)
-    (finalState2: SessionFallbackState)
-    (intentOpt: 'Intent option)
-    : JS.Promise<unit> =
-    promise {
-        let isPostTerminal =
-            evt <> FallbackEvent.SessionBusy
-            && (finalState2.Lifecycle = FallbackLifecycle.TaskComplete
-                || finalState2.Lifecycle = FallbackLifecycle.Cancelled
-                || finalState2.Phase = FallbackPhase.Exhausted
-                || (finalState2.Phase = FallbackPhase.Idle && intentOpt.IsNone))
-
-        if isPostTerminal then
-            match (runtime.GetSession sessionID).PendingLease with
-            | Some lease ->
-                if lease.Status <> LeaseStatus.Cancelled then
-                    do!
-                        appendContinuationSettledOrFail
-                            workspaceRoot
-                            sessionID
-                            lease.ContinuationID
-                            lease.HumanTurnID
-                            lease.SessionGeneration
-                            "completed"
-                            lease.ContinuationOrdinal
-
-                if runtime.UpdateSessionReturning(sessionID, tryClearPendingLeaseReturning lease.ContinuationID) then
-                    if (runtime.GetSession sessionID).Owner = SessionOwner.Fallback then
-                        runtime.UpdateSession(sessionID, transferOwnership SessionOwner.NoOwner)
-
-                    runtime.Update(sessionID, setMainContinuationAwaitingStart false)
-            | None -> ()
-    }
+let handleTerminalPostSettlement = FallbackIdleSettlement.handleTerminalPostSettlement
 
 let executeAction
     (runtime: FallbackRuntimeStore)
@@ -130,6 +90,7 @@ let extractEventContext
     (translator: IEventTranslator)
     (executor: IActionExecutor)
     (runtime: FallbackRuntimeStore)
+    (workspaceRoot: string)
     (sessionID: string)
     (rawEvent: obj)
     (pendingReview: (string -> bool) option)
@@ -162,16 +123,17 @@ let extractEventContext
             checkIsStale isEventContIdMatch eventOpt eventTurnIdOpt runtime sessionID
 
         let eventOpt = if isStale then None else eventOpt
+        let session = runtime.GetSession sessionID
 
-        let eventOpt =
-            match eventOpt with
-            | Some FallbackEvent.NewUserMessage -> eventOpt
-            | _ ->
-                let hasPending = (runtime.GetSession sessionID).PendingLease.IsSome
-                if hasPending && continuationId = "" && not isMatchedContinuation then
-                    None
-                else
-                    eventOpt
+        let! eventOpt =
+            filterIdleEvent
+                runtime
+                workspaceRoot
+                sessionID
+                session
+                eventOpt
+                isMatchedContinuation
+                continuationId
 
         return eventOpt, eventTurnIdOpt, isMatchedContinuation
     }

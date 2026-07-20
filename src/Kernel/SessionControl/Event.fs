@@ -19,6 +19,11 @@ type ContinuationRequestEvent =
 
 type EpisodeStageEvent = { Id: string; Ordinal: int option }
 
+type HostAcceptedEvent =
+    { ContinuationId: string
+      UserMessageId: string
+      Ordinal: int option }
+
 type NudgeRequestEvent =
     { NudgeId: string
       Ordinal: int option
@@ -45,6 +50,7 @@ type SessionControlEvent =
     | ContinuationRequested of ContinuationRequestEvent
     | ContinuationDispatchStarted of EpisodeStageEvent
     | ContinuationDispatched of EpisodeStageEvent
+    | ContinuationHostAccepted of HostAcceptedEvent
     | ContinuationTerminal of EpisodeStageEvent
     | NudgeRequested of NudgeRequestEvent
     | NudgeDispatched of EpisodeStageEvent
@@ -75,6 +81,18 @@ let private decodeContinuation (k: string) (e: WanEvent) : SessionControlEvent o
         Some(ContinuationDispatchStarted(episode Field.continuationId Field.continuationOrdinal e))
     elif k = eventKindContinuationDispatched then
         Some(ContinuationDispatched(episode Field.continuationId Field.continuationOrdinal e))
+    elif k = eventKindContinuationHostAccepted then
+        Some(
+            ContinuationHostAccepted
+                { ContinuationId = fieldOr Field.continuationId "" e
+                  UserMessageId =
+                    let mid = fieldOr Field.userMessageId "" e
+                    if mid <> "" then mid else fieldOr Field.hostUserMessageId "" e
+                  Ordinal = tryIntField Field.continuationOrdinal e }
+        )
+    elif k = eventKindContinuationIdleReconciliation then
+        // Observational only — does not terminalise the lease on fold.
+        None
     elif
         k = eventKindContinuationFailed
         || k = eventKindContinuationCancelled

@@ -49,6 +49,7 @@ let isLateEvent (st: SessionState) (e: WanEvent) : bool =
     | k when
         (k = eventKindContinuationDispatchStarted
          || k = eventKindContinuationDispatched
+         || k = eventKindContinuationHostAccepted
          || k = eventKindContinuationFailed
          || k = eventKindContinuationCancelled
          || k = eventKindContinuationSettled)

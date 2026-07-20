@@ -52,8 +52,9 @@ let tryDecodePromptModelFromPayload (payload: obj) : obj option =
         tryDecodePromptModelFromModelString (Dyn.str payload "modelString")
 
 /// Versioned plugin metadata carried on an OpenCode text part.
-/// The host preserves `part.metadata` on `SessionV1.TextPart`, so all
-/// dispatch/reconciliation paths can share a single encode/decode pair.
+/// Probe only for chat.message classification — domain state must bind
+/// HostUserMessageId from the host-issued message id, never treat this
+/// metadata as the sole durable provenance fact (SPEC §七 step 1).
 module WanxiangshuMetadataCodec =
 
     [<NoComparison; NoEquality>]

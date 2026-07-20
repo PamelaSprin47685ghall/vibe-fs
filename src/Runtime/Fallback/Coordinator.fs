@@ -87,7 +87,7 @@ let handleEvent
         let sessionID = translator.ExtractSessionID rawEvent
 
         let! eventOpt, eventTurnIdOpt, isMatchedContinuation =
-            extractEventContext translator executor runtime sessionID rawEvent pendingReview
+            extractEventContext translator executor runtime workspaceRoot sessionID rawEvent pendingReview
 
         match eventOpt with
         | None ->

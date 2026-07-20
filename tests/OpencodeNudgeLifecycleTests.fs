@@ -16,6 +16,7 @@ open Wanxiangshu.Kernel.Subsession.Types
 open Wanxiangshu.Kernel.Nudge.Types
 open Wanxiangshu.Hosts.Opencode.ChatHooks
 open Wanxiangshu.Hosts.Opencode.ChatHooksDecoders
+open Wanxiangshu.Hosts.Opencode.ChatHooksMessageIdDedup
 open Wanxiangshu.Hosts.Opencode.NudgeTrigger
 open Wanxiangshu.Hosts.Opencode.NudgeTriggerOps
 
@@ -105,6 +106,10 @@ let test_isSystemMessage_acceptsFallbackContinuation () =
     check
         "host message advances continuation acceptance"
         ((fr.GetSession "s-accept").PendingLease.Value.Status = LeaseStatus.Dispatched)
+
+    check
+        "HostUserMessageId bound on accept"
+        ((fr.GetSession "s-accept").PendingLease.Value.HostUserMessageId = "msg-fc-accept")
 
 let test_isSystemMessage_plainUserIsNotSystem () =
     let fr = FallbackRuntimeStore()
@@ -324,6 +329,98 @@ let test_chatMessageBindsOpaqueReceiptToRealMessageId () =
         check "receipt contains real host message id" true
     | other -> failwith ("expected real user-message receipt, got " + string other)
 
+// --- 6. Classification order: system markers never raise human turn ---
+
+let test_nudgeMarker_doesNotCountAsHumanTurn () =
+    let fr = FallbackRuntimeStore()
+    let nonce = "nudge-no-human"
+    fr.UpdateSession("s-no-ht", armNudgeNonce nonce)
+    let beforeTurn = (fr.GetSession "s-no-ht").HumanTurnId
+    let beforeCancel = (fr.GetSession "s-no-ht").CancelGeneration
+
+    let isSys = isSystemMessage [| userPart "go" nonce |] fr "" "s-no-ht" "msg-nudge-ht"
+
+    check "nudge marker is system" isSys
+    check "human turn id unchanged" ((fr.GetSession "s-no-ht").HumanTurnId = beforeTurn)
+    check "cancel generation unchanged" ((fr.GetSession "s-no-ht").CancelGeneration = beforeCancel)
+
+let test_continuationMarker_doesNotCountAsHumanTurn () =
+    let fr = FallbackRuntimeStore()
+
+    let model =
+        { ProviderID = "mock"
+          ModelID = "model"
+          Variant = None
+          Temperature = None
+          TopP = None
+          MaxTokens = None
+          ReasoningEffort = None
+          Thinking = false }
+
+    fr.UpdateSession(
+        "s-no-ht-fc",
+        fun state ->
+            let active = startDispatch model None state
+
+            { active with
+                PendingLease =
+                    active.PendingLease
+                    |> Option.map (fun lease -> { lease with ContinuationID = "fc-001" }) }
+    )
+
+    let beforeTurn = (fr.GetSession "s-no-ht-fc").HumanTurnId
+    let beforeCancel = (fr.GetSession "s-no-ht-fc").CancelGeneration
+    let beforeOwner = (fr.GetSession "s-no-ht-fc").Owner
+
+    let isSys =
+        isSystemMessage [| fallbackContinuationPart |] fr "" "s-no-ht-fc" "msg-fc-ht"
+
+    check "continuation marker is system" isSys
+    check "human turn id unchanged on continuation" ((fr.GetSession "s-no-ht-fc").HumanTurnId = beforeTurn)
+    check "cancel generation unchanged on continuation" ((fr.GetSession "s-no-ht-fc").CancelGeneration = beforeCancel)
+    check "owner not reset to Human" ((fr.GetSession "s-no-ht-fc").Owner = beforeOwner)
+
+let test_dedupBeforeBind_secondObservationIsNoOp () =
+    let fr = FallbackRuntimeStore()
+    let sid = "s-dedup-order"
+    let msgId = "msg-once"
+
+    let model =
+        { ProviderID = "mock"
+          ModelID = "model"
+          Variant = None
+          Temperature = None
+          TopP = None
+          MaxTokens = None
+          ReasoningEffort = None
+          Thinking = false }
+
+    fr.UpdateSession(
+        sid,
+        fun state ->
+            let active = startDispatch model None state
+
+            { active with
+                PendingLease =
+                    active.PendingLease
+                    |> Option.map (fun lease -> { lease with ContinuationID = "fc-001" }) }
+    )
+
+    // Simulate ChatHooks order: dedup first, then classify only when fresh.
+    let firstDup = markSeen sid msgId
+    check "first markSeen is not duplicate" (not firstDup)
+
+    let _ = isSystemMessage [| fallbackContinuationPart |] fr "" sid msgId
+    let bound = (fr.GetSession sid).PendingLease.Value.HostUserMessageId
+    check "first observation binds host msg" (bound = msgId)
+
+    let secondDup = markSeen sid msgId
+    check "second markSeen is duplicate" secondDup
+
+    // Dedup gate means classify must not run again — binding stays stable.
+    check "host binding stable under duplicate" ((fr.GetSession sid).PendingLease.Value.HostUserMessageId = msgId)
+    forget sid
+
 let run () =
     test_isSystemMessage_fallbackContinuationIsSystem ()
     test_isSystemMessage_acceptsFallbackContinuation ()
@@ -340,5 +437,8 @@ let run () =
     test_tryConsumeActiveNudgeNonce_emptyNonceNoOp ()
     test_isSystemMessage_consumeIsNotLeaky ()
     test_chatMessageBindsOpaqueReceiptToRealMessageId ()
+    test_nudgeMarker_doesNotCountAsHumanTurn ()
+    test_continuationMarker_doesNotCountAsHumanTurn ()
+    test_dedupBeforeBind_secondObservationIsNoOp ()
 
 let runAsync () : JS.Promise<unit> = Promise.lift (run ())
