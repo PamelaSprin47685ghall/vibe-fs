@@ -17,7 +17,8 @@ open Wanxiangshu.Runtime.SubsessionEventStore
 
 module Dyn = Wanxiangshu.Runtime.Dyn
 
-open Wanxiangshu.Hosts.Opencode.SubagentSpawn
+open Wanxiangshu.Hosts.Opencode.SubagentSpawnCleanup
+open Wanxiangshu.Hosts.Opencode.SubagentSpawnTransport
 open Wanxiangshu.Hosts.Opencode.SubagentTypes
 open Wanxiangshu.Hosts.Opencode.SubagentRunDirective
 

@@ -8,6 +8,7 @@ open Wanxiangshu.Kernel.ReviewSession.Types
 open Wanxiangshu.Kernel.ReviewSession.StateMachine
 open Wanxiangshu.Runtime.ChildAgentRegistry
 open Wanxiangshu.Hosts.Opencode.SessionIo
+open Wanxiangshu.Hosts.Opencode.SubagentSpawnTransport
 open Wanxiangshu.Runtime
 open Wanxiangshu.Runtime.Dyn
 open Wanxiangshu.Runtime.OpencodeClientCodec

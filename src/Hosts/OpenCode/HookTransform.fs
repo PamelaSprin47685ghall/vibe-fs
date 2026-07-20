@@ -4,11 +4,11 @@ open Fable.Core
 open Wanxiangshu.Kernel.HostTools
 open Wanxiangshu.Hosts.Opencode.ChatHooks
 open Wanxiangshu.Hosts.Opencode.MessageTransformHook
-open Wanxiangshu.Hosts.Opencode.SystemTransform
 open Wanxiangshu.Hosts.Opencode.CompactionTransform
 open Wanxiangshu.Hosts.Opencode.ToolDefinitionHooks
 open Wanxiangshu.Hosts.Opencode.EventHooks
 open Wanxiangshu.Runtime.ChildAgentRegistry
+open Wanxiangshu.Runtime.ChatTransformOutputCodec
 
 let chatMessageFor
     (host: Host)
@@ -47,8 +47,8 @@ let messagesTransform
         input
         output
 
-let systemTransform (directory: string) (input: obj) (output: obj) : JS.Promise<unit> =
-    SystemTransform.systemTransform directory input output
+let systemTransform (directory: string) (_input: obj) (output: obj) : JS.Promise<unit> =
+    promise { setSystemOutputToDirectory directory output }
 
 let compactionAutocontinue (input: obj) (output: obj) : JS.Promise<unit> =
     CompactionTransform.compactionAutocontinue input output

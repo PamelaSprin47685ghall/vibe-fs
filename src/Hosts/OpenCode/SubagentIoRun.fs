@@ -11,7 +11,7 @@ open Wanxiangshu.Kernel.ToolResult
 open Wanxiangshu.Runtime.ErrorClassify
 open Wanxiangshu.Runtime.ChildAgentRegistry
 open Wanxiangshu.Runtime.Fallback.RuntimeStore
-open Wanxiangshu.Hosts.Opencode.SubagentSpawn
+open Wanxiangshu.Hosts.Opencode.SubagentSpawnInput
 open Wanxiangshu.Runtime.OpencodeClientCodec
 open Wanxiangshu.Runtime.SessionIoSpawn
 open Wanxiangshu.Runtime.SubsessionService
