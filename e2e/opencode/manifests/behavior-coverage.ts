@@ -1138,13 +1138,17 @@ export const COVERAGE: Record<string, CoverageEntry[]> = {
     {
       id: "OC-FB-007",
       description: "Non-retryable error does not continue",
-      level: "unit",
+      level: "real-e2e",
+      spec: "e2e/opencode/specs/p0-canary-tests-fallback-errors.js",
+      test: "OC-FB-007 non-retryable provider error does not continue",
       priority: "P0",
     },
     {
       id: "OC-FB-008",
       description: "MessageAbortedError does not continue",
-      level: "unit",
+      level: "real-e2e",
+      spec: "e2e/opencode/specs/p0-canary-tests-fallback-errors.js",
+      test: "OC-FB-008 MessageAbortedError does not continue",
       priority: "P0",
     },
     {
@@ -1162,13 +1166,17 @@ export const COVERAGE: Record<string, CoverageEntry[]> = {
     {
       id: "OC-FB-011",
       description: "Duplicate error does not double-continue",
-      level: "unit",
+      level: "real-e2e",
+      spec: "e2e/opencode/specs/p0-canary-tests-fallback-errors.js",
+      test: "OC-FB-011 duplicate empty-output error does not double-continue",
       priority: "P0",
     },
     {
       id: "OC-FB-012",
       description: "Duplicate idle does not double-continue",
-      level: "unit",
+      level: "real-e2e",
+      spec: "e2e/opencode/specs/p0-canary-tests-fallback-errors.js",
+      test: "OC-FB-012 duplicate idle does not double-continue",
       priority: "P0",
     },
     {

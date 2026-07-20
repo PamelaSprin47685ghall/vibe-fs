@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { getDescendantPids } from './opencode/harness/process-host-checks.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 let WANXIANG_ROOT = path.resolve(__dirname, '..');
@@ -195,6 +196,13 @@ export class HostSingletonManager {
         await host.mockLLM.stop().catch(() => {});
       }
       if (host.child) {
+        try {
+          const pid = host.child.pid;
+          const descendants = await getDescendantPids(pid);
+          for (const dpid of descendants) {
+            try { process.kill(dpid, 'SIGKILL'); } catch {}
+          }
+        } catch {}
         try { host.child.kill('SIGKILL'); } catch {}
       }
       if (host.home) {

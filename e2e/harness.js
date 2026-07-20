@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { StrictMockProvider } from './opencode/harness/strict-mock-provider.js';
+import { getDescendantPids, isPidAlive, checkSocketClosed } from './opencode/harness/process-host-checks.js';
 import {
   E2E_LOCK,
   releaseE2eLock,
@@ -50,6 +51,10 @@ class MockLLMAdapter {
 
   get url() {
     return this._provider.url;
+  }
+
+  get provider() {
+    return this._provider;
   }
 
   async start() {
@@ -203,7 +208,11 @@ async function connectPermissionResponder(hostObj) {
 
 async function spawnOpencodeHost(variant, opts) {
   const provider = new StrictMockProvider();
-  provider.strict = false;
+  // Legacy F# integration path: default non-strict auto-ok for unqueued calls.
+  // Real E2E uses e2e/opencode/harness StrictMockProvider (strict default true).
+  provider.strict = opts.strict === true;
+  if (opts.allowSynthetic) provider.allowSyntheticContinuations();
+  if (opts.allowTitleGen) provider.allowTitleGeneration();
   const llmHandle = new MockLLMAdapter(provider);
   const url = await provider.start();
   const { home, workDir, child, stderrBuffer } = initHostDirAndSpawn(llmHandle, opts);
@@ -489,12 +498,16 @@ class OpencodeHarness {
   }
 
   async dispose() {
-    // 1. Stop mock LLM
-    if (this.mockLLM?.stop) {
-      await this.mockLLM.stop().catch(() => {});
-    }
+    const errors = [];
+    const port = this.port;
+    const pid = this._child?.pid || null;
 
-    // 2. Abort SSE permission responder
+    // 1. Stop mock responses first so no late traffic
+    try {
+      if (this.mockLLM?.provider?.stopMocking) this.mockLLM.provider.stopMocking();
+    } catch (e) { errors.push(`stopMocking: ${e.message}`); }
+
+    // 2. Abort SSE permission responder and wait for exit
     if (this._permissionAbort) this._permissionAbort.abort();
     if (this._permissionPromise) await this._permissionPromise.catch(() => {});
 
@@ -503,41 +516,70 @@ class OpencodeHarness {
       try { await this.abortSession(sid); } catch {}
     }
 
-    // 4. SIGTERM → wait → SIGKILL
+    // 4. Kill process tree (descendants first), then SIGTERM → short wait → SIGKILL
     if (this._child) {
+      try {
+        const descendants = await getDescendantPids(pid);
+        for (const dpid of descendants) {
+          try { process.kill(dpid, 'SIGKILL'); } catch {}
+        }
+      } catch (e) { errors.push(`descendants: ${e.message}`); }
       try { this._child.kill('SIGTERM'); } catch {}
       try {
         await new Promise((resolve) => {
-          const timeout = setTimeout(() => {
-            this._child.kill('SIGKILL');
+          if (this._child.exitCode !== null || this._child.signalCode !== null) {
             resolve();
-          }, 5000);
-          this._child.on('exit', () => {
+            return;
+          }
+          const timeout = setTimeout(() => {
+            try { this._child.kill('SIGKILL'); } catch {}
+            resolve();
+          }, 2000);
+          this._child.once('exit', () => {
             clearTimeout(timeout);
             resolve();
           });
         });
-      } catch {}
+      } catch (e) { errors.push(`child-exit: ${e.message}`); }
+      try { this._child.stdout?.destroy(); } catch {}
+      try { this._child.stderr?.destroy(); } catch {}
+      try { this._child.stdin?.destroy(); } catch {}
+      this._child = null;
     }
 
-    // 5. Delete temp dir
+    // 5. Close mock provider
+    if (this.mockLLM?.stop) {
+      await this.mockLLM.stop().catch((e) => errors.push(`mock-stop: ${e.message}`));
+    }
+
+    // 6. Leak checks (port + pid)
+    if (port && !(await checkSocketClosed(port, 1500))) {
+      errors.push(`port ${port} still listening after dispose`);
+    }
+    if (pid && isPidAlive(pid)) {
+      errors.push(`pid ${pid} still alive after dispose`);
+    }
+
+    // 7. Delete temp HOME/workspace
     if (this.home) {
-      try { fs.rmSync(this.home, { recursive: true, force: true }); } catch {}
+      try { fs.rmSync(this.home, { recursive: true, force: true }); } catch (e) {
+        errors.push(`rm-home: ${e.message}`);
+      }
+    }
+
+    if (errors.length > 0) {
+      throw new Error(`OpencodeHarness.dispose failed: ${errors.join('; ')}`);
     }
   }
 }
 
 export async function start(opts = {}) {
   const variant = opts.variant || 'opencode';
-  // When cleanEnv / freshHost / fresh is set, always spawn a fresh host instead of
-  // using the singleton.  cleanEnv defaults to true in isolatedEnv(), so a plain call
-  // with no opts also gets a fresh host.
-  const forceFresh = (opts.cleanEnv ?? true) || opts.freshHost || opts.fresh;
-  let sharedHost;
-  if (forceFresh) {
-    sharedHost = await spawnOpencodeHost(variant, opts);
-  } else {
-    sharedHost = await hostSingletonManager.getHost(variant, () => spawnOpencodeHost(variant, opts));
-  }
+  // Default: one scenario = one process. reuseHost is opt-in only for dedicated
+  // multi-session isolation suites that intentionally share one host.
+  const reuseHost = opts.reuseHost === true && opts.freshHost !== true && opts.fresh !== true;
+  const sharedHost = reuseHost
+    ? await hostSingletonManager.getHost(variant, () => spawnOpencodeHost(variant, opts))
+    : await spawnOpencodeHost(variant, opts);
   return new OpencodeHarness(sharedHost);
 }

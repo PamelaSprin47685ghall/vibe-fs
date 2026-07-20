@@ -21,6 +21,7 @@ import fuzzyExecutorTests from './p0-canary-tests-fuzzy-executor.js';
 import nudgeSubTests from './p0-canary-tests-nudge-sub.js';
 import gateTests from './p0-canary-tests-gate.js';
 import webTests from './p0-canary-tests-web.js';
+import lifecycleTests from './p0-canary-tests-lifecycle.js';
 
 const common = {
   plugin: true,
@@ -32,6 +33,10 @@ const common = {
 const webTestsNormal = webTests.filter(t => t.name !== 'OC-WEB-012 MCP process failure = child + resources cleaned');
 const webTestsFail = webTests.filter(t => t.name === 'OC-WEB-012 MCP process failure = child + resources cleaned');
 
+const lifecycleP0 = lifecycleTests.filter((t) =>
+  /OC-LIFE-00[45]|OC-LIFE-010|OC-LIFE-015/.test(t.name)
+);
+
 const exitCode1 = await runScenario({ ...common, contextLimit: 20000 }, [
   ...basicTests,
   ...ptyTests,
@@ -39,6 +44,7 @@ const exitCode1 = await runScenario({ ...common, contextLimit: 20000 }, [
   ...fallbackTests,
   ...gateTests,
   ...webTestsNormal,
+  ...lifecycleP0,
 ]);
 
 const exitCode2 = await runScenario({ ...common, contextLimit: 100000 }, nudgeSubTests);

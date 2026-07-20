@@ -2168,16 +2168,16 @@ OpenCode 当前注册的自定义工具包括 coder、inspector、browser、cont
 
 * [x] **OC-FB-001** 空输出错误后向同一 session 注入单个零宽字符（P0 canary 真实 E2E 通过）。
 * [x] **OC-FB-002** 注入内容严格等于规定零宽字符，不使用 XML continuation（由 OC-FB-001 真实 E2E 断言 U+200B 验证）。
-* [ ] **OC-FB-003** continuation 使用原 agent。
-* [ ] **OC-FB-004** continuation 使用正确 model 和 variant。
+* [x] **OC-FB-003** continuation 使用原 agent。
+* [x] **OC-FB-004** continuation 使用正确 model 和 variant。
 * [ ] **OC-FB-005** 手工指定 model 的优先级高于自动捕获 model。
 * [ ] **OC-FB-006** retryable provider error 路由到下一模型。
-* [ ] **OC-FB-007** non-retryable error 不继续。
-* [ ] **OC-FB-008** MessageAbortedError 不继续。
+* [x] **OC-FB-007** non-retryable error 不继续。
+* [x] **OC-FB-008** MessageAbortedError 不继续。
 * [ ] **OC-FB-009** tool finish 后 idle，再迟到 EmptyOutputError，仍只继续一次。
 * [ ] **OC-FB-010** error 先到、idle 后到，仍只继续一次。
-* [ ] **OC-FB-011** 重复 error 不产生重复 continuation。
-* [ ] **OC-FB-012** 重复 idle 不产生重复 continuation。
+* [x] **OC-FB-011** 重复 error 不产生重复 continuation。
+* [x] **OC-FB-012** 重复 idle 不产生重复 continuation。
 * [ ] **OC-FB-013** continuation 自身失败不会无限递归。
 * [ ] **OC-FB-014** continuation 成功后 lease 正确 settled。
 * [ ] **OC-FB-015** tool-call-as-text 能生成恢复 prompt。
@@ -2188,7 +2188,7 @@ OpenCode 当前注册的自定义工具包括 coder、inspector、browser、cont
 * [ ] **OC-FB-020** session 删除清理所有 fallback runtime。
 * [ ] **OC-FB-021** 宿主在 dispatch 后、settle 前崩溃，重启不重复注入。
 * [ ] **OC-FB-022** 宿主在 append 后、dispatch 前崩溃，重启会继续未完成 effect。
-* [ ] **OC-FB-023** 不同 session 的 generation、ordinal 和 lease 完全隔离。
+* [x] **OC-FB-023** 不同 session 的 generation、ordinal 和 lease 完全隔离。
 * [ ] **OC-FB-024** fallback chain 耗尽后传播最终错误，不静默成功。
 
 ---
@@ -2277,18 +2277,18 @@ fold 后状态正确
 * [ ] **OC-LIFE-001** 新真人消息产生 human-turn 事实。
 * [ ] **OC-LIFE-002** 内部 nudge 不产生 human-turn。
 * [ ] **OC-LIFE-003** child nonce 消息不产生 human-turn。
-* [ ] **OC-LIFE-004** 正常回合观察到 running/busy 和 terminal idle。
-* [ ] **OC-LIFE-005** API error 回合观察到 error 和 idle。
+* [x] **OC-LIFE-004** 正常回合观察到 running/busy 和 terminal idle。
+* [x] **OC-LIFE-005** API error 回合观察到 error 和 idle。
 * [ ] **OC-LIFE-006** abort 产生 MessageAbortedError 或等价终止事实。
 * [ ] **OC-LIFE-007** abort 后不会继续执行尚未开始的 tool。
 * [ ] **OC-LIFE-008** tool 已执行完成、abort 迟到时结果不被错误抹除。
 * [ ] **OC-LIFE-009** abort 与 provider `[DONE]` 同时发生时最多一个终态。
-* [ ] **OC-LIFE-010** 重复 idle 幂等。
+* [x] **OC-LIFE-010** 重复 idle 幂等。
 * [ ] **OC-LIFE-011** session.deleted 清理 PTY、fallback、compliance、queue、temp file 和 actor。
 * [ ] **OC-LIFE-012** 删除 session A 不影响 session B。
 * [ ] **OC-LIFE-013** event hook 内部异步工作最终可观测，不依赖固定 sleep。
 * [ ] **OC-LIFE-014** session.post error 与 event error 两条入口不会重复执行恢复。
-* [ ] **OC-LIFE-015** 用户在 idle 时立即发送下一 prompt，不与上一轮清理串线。
+* [x] **OC-LIFE-015** 用户在 idle 时立即发送下一 prompt，不与上一轮清理串线。
 
 ---
 
@@ -2409,9 +2409,9 @@ await scenario("OC-FILE-001 writes exact bytes", async (t) => {
 ## 阶段 0：冻结和改名
 
 * [ ] 当前测试全部保留，记录现有通过基线。
-* [ ] 将 `opencode-harness.js` 相关套件改名为 integration/contract。
-* [ ] 禁止它们进入 E2E 覆盖统计。
-* [ ] 建立 `behavior-coverage.ts`，每项功能标明 unit、integration、real-e2e。
+* [x] 将 `opencode-harness.js` 相关套件改名为 integration/contract。
+* [x] 禁止它们进入 E2E 覆盖统计。
+* [x] 建立 `behavior-coverage.ts`，每项功能标明 unit、integration、real-e2e。
 
 ## 阶段 1：重写真实 harness
 
@@ -2429,6 +2429,9 @@ await scenario("OC-FILE-001 writes exact bytes", async (t) => {
 10. process/PTY leak probe。
 
 在这一步完成前，不批量增加业务测试。
+
+
+**阶段 1 harness 核心项已落地（本分支加固）：** scenario ProcessHost 真 dispose/进程树清理/leak assert；legacy `e2e/harness.js` dispose 同步进程树+port/pid 检查；HOME/XDG 隔离；stderr ring；StrictMockProvider 默认 strict；EventProbe + Turn terminal busy→idle；failure diagnostics；`opencode-harness` 已迁 `integration/opencode-plugin-contract-harness.js` 且不计入 E2E。
 
 ## 阶段 2：先打通 15 条 P0 金丝雀
 

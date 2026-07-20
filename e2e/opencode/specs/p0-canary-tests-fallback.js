@@ -7,6 +7,7 @@ import { getSessionId } from '../harness/scenario.js';
 import { waitForCondition, waitForNdjson } from './p0-canary-ndjson.js';
 import { TIMEOUTS } from './p0-canary-utils.js';
 import isolationTests from './p0-canary-tests-fallback-isolation.js';
+import errorTests from './p0-canary-tests-fallback-errors.js';
 
 function expectNoSessionError(t, sid) {
   t.events.expectCount({ type: 'session.error', sessionID: sid, count: 0 });
@@ -203,4 +204,4 @@ const tests = [
   },
 ];
 
-export default [...tests, ...isolationTests];
+export default [...tests, ...isolationTests, ...errorTests];
