@@ -31,12 +31,16 @@ let mutable private verboseEnabled = false
 let mutable private verboseLogPath: string option = None
 let mutable private verboseChecksLogged = 0
 
+let mutable private allowClear = true
+let disableGlobalClear () : unit = allowClear <- false
+
 let clearFailuresForRun () : unit =
-    passed <- 0
-    failed <- 0
-    failures.Clear()
-    timings.Clear()
-    verboseChecksLogged <- 0
+    if allowClear then
+        passed <- 0
+        failed <- 0
+        failures.Clear()
+        timings.Clear()
+        verboseChecksLogged <- 0
 
 /// Enable per-check log append to `path`; pass `None` to disable. Tests entry
 /// (`tests/Tests.fs:runAll`) calls this after reading the verbose switch
