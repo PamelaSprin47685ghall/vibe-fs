@@ -14,12 +14,12 @@ open Wanxiangshu.Runtime.Session.SessionActorState
 open Wanxiangshu.Runtime.Session.SessionFactDecode
 
 let private workspaceKeyFromCtx (ctx: obj) : string =
-    let root = pluginDirectoryFromCtx ctx
-
-    if root = "" then
+    if isNull ctx || Fable.Core.JsInterop.jsTypeof ctx = "undefined" then
         "opencode-default"
     else
-        "opencode:" + root
+        let root = pluginDirectoryFromCtx ctx
+
+        if root = "" then "opencode-default" else "opencode:" + root
 
 /// Host event fan-out: decode → standard fact → session mailbox → return.
 /// Domain mutation (owner/lease/nonce/generation/terminal) runs only inside the actor.
@@ -46,15 +46,7 @@ let handleEvent
                 let fact = SessionFact.HostLifecycleEnvelope(env.EventType, env.Props, input)
 
                 if sid = "" then
-                    do!
-                        processLifecycleFact
-                            ctx
-                            fallbackRuntime
-                            fallback
-                            nudge
-                            ""
-                            SessionActorSnapshot.empty
-                            fact
+                    do! processLifecycleFact ctx fallbackRuntime fallback nudge "" SessionActorSnapshot.empty fact
                 else
                     let actor = SessionActorRegistry.GetOrCreate (workspaceKeyFromCtx ctx) sid
                     actor.BindHandler(fun snap f -> processLifecycleFact ctx fallbackRuntime fallback nudge sid snap f)
