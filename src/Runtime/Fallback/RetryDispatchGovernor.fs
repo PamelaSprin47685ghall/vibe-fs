@@ -127,13 +127,16 @@ type RetryDispatchGovernor(?rateLimitMs: int64, ?clock: IClock, ?sleeper: ISleep
                                         else
                                             let now = clock.GetMonotonicTimeMs()
 
+                                            // Missing key ⇒ never dispatched: allow immediately.
+                                            // Defaulting to 0.0 would sleep ~rateLimitMs on cold start
+                                            // because monotonic clocks start near zero.
                                             let lastDispatch =
-                                                lock lockObj (fun () ->
-                                                    Map.tryFind providerKey lastActualDispatchAt
-                                                    |> Option.defaultValue 0.0)
+                                                lock lockObj (fun () -> Map.tryFind providerKey lastActualDispatchAt)
 
-                                            let elapsed = now - lastDispatch
-                                            let delay = max 0.0 (float rateLimitMs - elapsed)
+                                            let delay =
+                                                match lastDispatch with
+                                                | None -> 0.0
+                                                | Some last -> max 0.0 (float rateLimitMs - (now - last))
 
                                             if delay > 0.0 then
                                                 do! sleeper.Sleep(int delay)

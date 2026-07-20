@@ -11,6 +11,7 @@ open Wanxiangshu.Runtime.Fallback.SessionRuntimePropertyPure
 open Wanxiangshu.Runtime.Fallback.Ports
 open Wanxiangshu.Runtime.EventLogRuntimeRecovery
 open Wanxiangshu.Runtime.Fallback.ContinuationExecution
+open Wanxiangshu.Runtime.Fallback.ContinuationDispatchOps
 
 type ExecutorCall =
     | SendContinueCall of sessionID: string * continuationID: string
@@ -223,11 +224,18 @@ let propagateFailureClearsLeaseAndTransfersOwnership () =
 
 let run () =
     promise {
+        resetRetryGovernorForTests ()
         do! requestedSendContinueIsDispatchedOnce ()
+        resetRetryGovernorForTests ()
         do! requestedRecoverWithPromptIsDispatchedOnce ()
+        resetRetryGovernorForTests ()
         do! dispatchedLeaseIsNotRedispatched ()
+        resetRetryGovernorForTests ()
         do! cancelledLeaseIsNotRedispatched ()
+        resetRetryGovernorForTests ()
         do! staleGenerationLeaseIsNotDispatched ()
+        resetRetryGovernorForTests ()
         do! appendFailureDoesNotMutateMemory ()
+        resetRetryGovernorForTests ()
         do! propagateFailureClearsLeaseAndTransfersOwnership ()
     }

@@ -484,14 +484,23 @@ let ompEventTranslator_correctlyExtractsContinuationIdAndOrdinal () =
 
 let run () =
     promise {
+        resetRetryGovernorForTests ()
         do! handleEvent_sessionIdle_idle_emitsScanToolCallAsText ()
+        resetRetryGovernorForTests ()
         do! handleEvent_sessionIdle_idle_toolText_sendsPrompt ()
+        resetRetryGovernorForTests ()
         do! handleEvent_sessionIdle_idle_todosComplete_setsTaskComplete ()
+        resetRetryGovernorForTests ()
         do! handleEvent_sessionIdle_retryToIdle_emitsScanToolCallAsText ()
+        resetRetryGovernorForTests ()
         do! handleEvent_sessionBusy_duringRetrying_consumedTrue ()
+        resetRetryGovernorForTests ()
         do! handleEvent_chainPrependsCurrentModel ()
+        resetRetryGovernorForTests ()
         do! handleEvent_userAbort_invalidatesLease ()
+        resetRetryGovernorForTests ()
         do! handleEvent_newUserMessage_doesNotClearMainContinuationAwaitingStart ()
+        resetRetryGovernorForTests ()
         do! handleEvent_emptyFallbackChain_isNotBypassed ()
         do! ompEventTranslator_correctlyExtractsContinuationIdAndOrdinal ()
     }

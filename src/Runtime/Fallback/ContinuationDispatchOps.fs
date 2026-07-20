@@ -5,117 +5,24 @@ open Wanxiangshu.Kernel.FallbackKernel.Types
 open Wanxiangshu.Runtime.Fallback.RuntimeStore
 open Wanxiangshu.Runtime.Fallback.SessionRuntime
 open Wanxiangshu.Runtime.Fallback.SessionRuntimeLeasePure
-open Wanxiangshu.Runtime.Fallback.SessionRuntimePropertyPure
 open Wanxiangshu.Runtime.Fallback.Ports
 open Wanxiangshu.Runtime.Fallback.LeaseValidation
 open Wanxiangshu.Runtime.ContinuationEventWriter
-open Wanxiangshu.Runtime.Clock
 open Wanxiangshu.Runtime.Fallback.RetryDispatchGovernor
 open Wanxiangshu.Runtime.Fallback.ContinuationSessionReenter
+open Wanxiangshu.Runtime.Fallback.ContinuationDispatchComplete
 
 /// Shared per-process retry dispatch governor.
 let private retryGovernor = RetryDispatchGovernor()
+
+/// Clear rate-limit / queue memory between isolated tests.
+let resetRetryGovernorForTests () : unit = retryGovernor.Reset()
 
 type SessionReenter = ContinuationSessionReenter.SessionReenter
 
 let inlineReenter = ContinuationSessionReenter.inlineReenter
 let queueReenter = ContinuationSessionReenter.queueReenter
-
-/// Cancel a dispatch after it has been started.
-let private cancelAfterDispatch
-    (runtime: FallbackRuntimeStore)
-    (executor: IActionExecutor)
-    (workspaceRoot: string)
-    (sessionID: string)
-    (lease: PendingLease)
-    (reason: string)
-    : JS.Promise<unit> =
-    promise {
-        let isActiveLease =
-            match (runtime.GetSession sessionID).PendingLease with
-            | Some pending when
-                pending.ContinuationID = lease.ContinuationID
-                && pending.Status <> LeaseStatus.Settled
-                && pending.Status <> LeaseStatus.Cancelled
-                ->
-                (runtime.GetSession sessionID).Core.Lifecycle = FallbackLifecycle.Active
-            | _ -> false
-
-        if isActiveLease then
-            do! executor.AbortRun sessionID
-            do! finishContinuation runtime workspaceRoot sessionID lease ContinuationOutcome.Cancelled reason
-    }
-
-/// Handle post-dispatch completion: validate lease, write event, update state.
-let handleDispatchComplete
-    (runtime: FallbackRuntimeStore)
-    (executor: IActionExecutor)
-    (workspaceRoot: string)
-    (sessionID: string)
-    (lease: PendingLease)
-    (model: FallbackModel)
-    (agent: string)
-    : JS.Promise<unit> =
-    promise {
-        let pending = (runtime.GetSession sessionID).PendingLease
-        let lifecycle = (runtime.GetSession sessionID).Core.Lifecycle
-
-        match pending, lifecycle with
-        | Some current, FallbackLifecycle.Active when current.ContinuationID = lease.ContinuationID ->
-            let modelStr =
-                match model.Variant with
-                | Some v -> $"{model.ProviderID}/{model.ModelID}:{v}"
-                | None -> $"{model.ProviderID}/{model.ModelID}"
-
-            let atMs = getTimestampMs ()
-
-            do!
-                appendContinuationDispatchedOrFail
-                    workspaceRoot
-                    sessionID
-                    lease.ContinuationID
-                    modelStr
-                    agent
-                    atMs
-                    lease.ContinuationOrdinal
-
-            let canTransition =
-                match current.Status with
-                | LeaseStatus.Requested ->
-                    runtime.UpdateSessionReturning(
-                        sessionID,
-                        tryTransitionPendingLeaseReturning
-                            lease.ContinuationID
-                            LeaseStatus.Requested
-                            LeaseStatus.Dispatched
-                    )
-                | LeaseStatus.DispatchStarted ->
-                    runtime.UpdateSessionReturning(
-                        sessionID,
-                        tryTransitionPendingLeaseReturning
-                            lease.ContinuationID
-                            LeaseStatus.DispatchStarted
-                            LeaseStatus.Dispatched
-                    )
-                | LeaseStatus.Running ->
-                    runtime.UpdateSessionReturning(
-                        sessionID,
-                        tryTransitionPendingLeaseReturning
-                            lease.ContinuationID
-                            LeaseStatus.Running
-                            LeaseStatus.Dispatched
-                    )
-                | LeaseStatus.Dispatched -> true
-                | LeaseStatus.Cancelled
-                | LeaseStatus.Settled -> false
-
-            if canTransition then
-                runtime.Update(sessionID, setInjected model atMs)
-        | _ ->
-            // Terminal handling or a newer lease won the race. The prompt
-            // completion is stale evidence; never append a late cancellation.
-            ()
-    }
+let handleDispatchComplete = ContinuationDispatchComplete.handleDispatchComplete
 
 let private leaseStillDispatchable
     (runtime: FallbackRuntimeStore)
@@ -188,6 +95,12 @@ let dispatchWithLeaseTransition
             do!
                 reenter (fun () ->
                     cancelAfterDispatch runtime executor workspaceRoot sessionID lease "Lease invalid at dispatch")
+        // Sync ownership gate after claim reenter yields: human cancel may have
+        // cleared the lease on the actor queue between claim and this line.
+        // No await between the check and starting dispatchAction, so JS cannot
+        // interleave another actor turn before physical transport begins.
+        elif not (leaseStillDispatchable runtime sessionID lease) then
+            ()
         else
             try
                 do! dispatchAction ()
