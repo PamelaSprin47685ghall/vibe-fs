@@ -43,7 +43,7 @@ let ompFallbackHooksPreservesAgentAndModelSpec () =
                 [ "sessionPrompt",
                   box (fun (arg: obj) ->
                       lastPromptArg <- arg
-                      Promise.lift (box null)) ]
+                      Promise.lift (box {| id = "omp-cont-msg-1" |})) ]
 
         let executor = ompActionExecutor rt sessionApiMock
 
@@ -224,7 +224,7 @@ let ompExecutorRespectsUserSelectedModelAndAgentSpec () =
                 [ "sessionPrompt",
                   box (fun (arg: obj) ->
                       lastPromptArg <- arg
-                      Promise.lift (box null)) ]
+                      Promise.lift (box {| id = "omp-cont-msg-2" |})) ]
 
         let executor = ompActionExecutor rt sessionApiMock
 
