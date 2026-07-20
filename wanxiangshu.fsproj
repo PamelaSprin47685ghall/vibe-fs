@@ -415,12 +415,6 @@
     <Compile Include="src/Runtime/Wanxiangzhen/CoordinatorBootstrap.fs"/>
     <Compile Include="src/Runtime/Wanxiangzhen/SlaveRuntime.fs"/>
     <Compile Include="src/Hosts/Mux/AiSettings.fs"/>
-    <Compile Include="src/Hosts/OpenCode/MessagingCodec.fs"/>
-    <Compile Include="src/Hosts/OpenCode/CapsCodec.fs"/>
-    <Compile Include="src/Hosts/OpenCode/ToolSchema.fs"/>
-    <Compile Include="src/Hosts/OpenCode/HookSchemaDecoration.fs"/>
-    <Compile Include="src/Hosts/OpenCode/HookSchemaZod.fs"/>
-    <Compile Include="src/Hosts/OpenCode/HookSchemaDecode.fs"/>
     <Compile Include="src/Hosts/Mux/WrappersReview.fs"/>
     <Compile Include="src/Hosts/Mux/TodoWriteToolWrapper.fs"/>
     <Compile Include="src/Hosts/Mux/Wrappers.fs"/>
@@ -451,6 +445,12 @@
     <Compile Include="src/Hosts/Mux/PluginRegistrationAssembly.fs"/>
     <Compile Include="src/Hosts/Mux/PluginRegistration.fs"/>
     <Compile Include="src/Hosts/Mux/Plugin.fs"/>
+    <Compile Include="src/Hosts/OpenCode/MessagingCodec.fs"/>
+    <Compile Include="src/Hosts/OpenCode/CapsCodec.fs"/>
+    <Compile Include="src/Hosts/OpenCode/ToolSchema.fs"/>
+    <Compile Include="src/Hosts/OpenCode/HookSchemaDecoration.fs"/>
+    <Compile Include="src/Hosts/OpenCode/HookSchemaZod.fs"/>
+    <Compile Include="src/Hosts/OpenCode/HookSchemaDecode.fs"/>
     <Compile Include="src/Hosts/OpenCode/NudgeEffectPrompt.fs"/>
     <Compile Include="src/Hosts/OpenCode/NudgeEffectSnapshot.fs"/>
     <Compile Include="src/Hosts/OpenCode/NudgeEffect.fs"/>
@@ -538,6 +538,10 @@
     <Compile Include="src/Hosts/OpenCode/PluginMimoTuiTodo.fs"/>
     <Compile Include="src/Hosts/OpenCode/PluginMimoTuiSubagents.fs"/>
     <Compile Include="src/Hosts/OpenCode/PluginMimoTui.fs"/>
+    <Compile Include="src/Hosts/OpenCode/PluginWanxiangzhenE2eMeta.fs"/>
+    <Compile Include="src/Hosts/OpenCode/PluginWanxiangzhenHooks.fs"/>
+    <Compile Include="src/Hosts/OpenCode/PluginWanxiangzhenDeps.fs"/>
+    <Compile Include="src/Hosts/OpenCode/PluginWanxiangzhen.fs"/>
     <Compile Include="src/Hosts/Omp/PiResolve.fs"/>
     <Compile Include="src/Hosts/Omp/Schema.fs"/>
     <Compile Include="src/Hosts/Omp/Codec.fs"/>
@@ -590,10 +594,6 @@
     <Compile Include="src/Hosts/Omp/SessionAbortHandler.fs"/>
     <Compile Include="src/Hosts/Omp/PluginComposition.fs"/>
     <Compile Include="src/Hosts/Omp/Plugin.fs"/>
-    <Compile Include="src/Hosts/OpenCode/PluginWanxiangzhenE2eMeta.fs"/>
-    <Compile Include="src/Hosts/OpenCode/PluginWanxiangzhenHooks.fs"/>
-    <Compile Include="src/Hosts/OpenCode/PluginWanxiangzhenDeps.fs"/>
-    <Compile Include="src/Hosts/OpenCode/PluginWanxiangzhen.fs"/>
     <Compile Include="tests/Assert.fs"/>
     <Compile Include="tests/ArchitectureGatesFs.fs"/>
     <Compile Include="tests/ArchitectureGatesTests.fs"/>
@@ -952,18 +952,17 @@
     <Compile Include="tests/ContextBudgetIntegrationTests.fs"/>
     <Compile Include="tests/ContextBudgetPipelineNudgeTests.fs"/>
     <Compile Include="tests/TestRunnerBehaviorTests.fs"/>
+    <Compile Include="e2e/HarnessTypes.fs"/>
+    <Compile Include="e2e/TestsServePlugin.fs"/>
     <Compile Include="integration/OpencodePluginToolLifecycleContractTests.fs"/>
     <Compile Include="integration/OpencodePluginNudgeForceStopContractTests.fs"/>
     <Compile Include="integration/OpencodePluginStreamAbortContractTests.fs"/>
     <Compile Include="integration/OpencodeContinueContractTests.fs"/>
     <Compile Include="integration/OpencodeNudgeHostIntegrationTests.fs"/>
-    <Compile Include="tests/IntegrationOpenCodeContractTests.fs"/>
-    <Compile Include="e2e/HarnessTypes.fs"/>
-    <Compile Include="e2e/TestsServePlugin.fs"/>
     <Compile Include="integration/OpencodePluginTests.fs"/>
     <Compile Include="integration/MimocodePluginTests.fs"/>
     <Compile Include="integration/MimoTuiPluginTests.fs"/>
-    <Compile Include="tests/Tests.fs"/>
+    <Compile Include="tests/IntegrationOpenCodeContractTests.fs"/>
     <Compile Include="e2e/WanxiangzhenPluginTests.fs"/>
     <Compile Include="e2e/TestsEdgeCaseScenarios.fs"/>
     <Compile Include="e2e/Tests.fs"/>
@@ -973,5 +972,6 @@
     <Compile Include="e2e/TestsOmpSpecsLifecycle.fs"/>
     <Compile Include="e2e/TestsOmpSpecs.fs"/>
     <Compile Include="e2e/TestsOmp.fs"/>
+    <Compile Include="tests/Tests.fs"/>
   </ItemGroup>
 </Project>
