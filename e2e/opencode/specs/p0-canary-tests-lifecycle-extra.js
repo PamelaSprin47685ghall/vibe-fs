@@ -50,7 +50,7 @@ const tests = [
       const sess = await t.client.createSession();
       const sid = getSessionId(sess);
 
-      t.provider.expectError({ id: 'provider-503', status: 503, body: { error: { name: 'APIError', message: 'Service Unavailable', isRetryable: false } } });
+      t.provider.expectError({ id: 'provider-400', status: 400, body: { error: { name: 'APIError', message: 'invalid request', type: 'invalid_request_error', isRetryable: false } } });
       const turn = await t.turn.start(sid);
 
       // Prompting should fail but system must transition to idle cleanly.
