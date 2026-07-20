@@ -180,8 +180,12 @@ let idleDuringDispatchingThenRealIdleConverges () =
             | Dispatching(_, _, _, pending, _) as s ->
                 check "idle is cached in pending" pending.PendingIdle
                 s
-            | other -> fail ("expected Dispatching, got " + string other)
-        | other -> fail ("unexpected: " + string other)
+            | other ->
+                fail ("expected Dispatching, got " + string other)
+                dispatchingState
+        | other ->
+            fail ("unexpected: " + string other)
+            dispatchingState
 
     // Now the legitimate DispatchAccepted arrives (as if the host's prompt
     // call had actually resolved) — since idle was cached, it must immediately

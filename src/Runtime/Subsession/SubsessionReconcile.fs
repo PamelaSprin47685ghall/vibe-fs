@@ -86,24 +86,24 @@ let reconcileUnfinishedRuns
 
                     let poisonEvents = createPoisonEvents sessionId tid runProj
 
-                    match actor.GetState(), stopStatus with
-                    | _, Stopped ->
-                        try
-                            do! eventStore.Append(sessionId, [ PhysicalSessionClosed sessionId ])
-                        with _ ->
-                            ()
-                    | _ -> ()
-
                     match actor.GetState() with
-                    | Poisoned _ -> ()
+                    | Poisoned _ ->
+                        match stopStatus with
+                        | Stopped ->
+                            try
+                                do! eventStore.Append(sessionId, [ PhysicalSessionClosed sessionId ])
+                            with _ ->
+                                ()
+                        | _ -> ()
                     | _ ->
-                        // NDJSON append may fail; if it does,
-                        // MarkUnknownAfterRestart still poisons the actor
-                        // in-memory. On next restart the same orphan will
-                        // be rediscovered and re-reconciled (idempotent).
+                        let eventsToAppend =
+                            match stopStatus with
+                            | Stopped -> PhysicalSessionClosed sessionId :: poisonEvents
+                            | _ -> poisonEvents
+
                         try
-                            do! eventStore.Append(sessionId, poisonEvents)
-                            currentProj <- List.fold projectEvent currentProj poisonEvents
+                            do! eventStore.Append(sessionId, eventsToAppend)
+                            currentProj <- List.fold projectEvent currentProj eventsToAppend
                         with _ ->
                             ()
 
