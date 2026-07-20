@@ -61,7 +61,7 @@ let private startDispatch
 
     let effects = [ DispatchPrompt plan ]
 
-    decided (Dispatching(ctx, plan, CurrentTurnEvidence.empty, turnDeadlineAtMs)) events effects
+    decided (Dispatching(ctx, plan, CurrentTurnEvidence.empty, PendingTerminal.empty, turnDeadlineAtMs)) events effects
 
 let private handleAvailable (nowMs: int64) (state: SubsessionState) (req: StartRunRequest) =
     match req.Directive with

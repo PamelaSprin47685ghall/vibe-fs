@@ -27,7 +27,7 @@ let isPoisonedState (state: SubsessionState) : bool =
 
 let getCurrentTurnId (state: SubsessionState) : TurnId option =
     match state with
-    | Dispatching(_, plan, _, _) -> Some plan.TurnId
+    | Dispatching(_, plan, _, _, _) -> Some plan.TurnId
     | CancellingDispatch(_, plan, _, _) -> Some plan.TurnId
     | ReconcilingUnknownDispatch(_, plan, _, _, _, _) -> Some plan.TurnId
     | ClosingUnknownDispatch(_, plan, _, _, _) -> Some plan.TurnId
