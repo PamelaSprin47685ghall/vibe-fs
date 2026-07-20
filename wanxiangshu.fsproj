@@ -544,7 +544,9 @@
     <Compile Include="src/Hosts/Omp/MessagingCodecEncode.fs"/>
     <Compile Include="src/Hosts/Omp/MessagingCodecDecode.fs"/>
     <Compile Include="src/Hosts/Omp/MessagingCodec.fs"/>
+    <Compile Include="src/Hosts/Omp/SubsessionDispatchStatus.fs"/>
     <Compile Include="src/Hosts/Omp/SubsessionDispatch.fs"/>
+    <Compile Include="src/Hosts/Omp/ExecutorSummarizer.fs"/>
     <Compile Include="src/Hosts/Omp/OmpSubsessionHostAdapterPrompts.fs"/>
     <Compile Include="src/Hosts/Omp/OmpSubsessionHostHelper.fs"/>
     <Compile Include="src/Hosts/Omp/SubsessionHostAdapter.fs"/>
@@ -731,6 +733,7 @@
     <Compile Include="tests/OmpCoverage2Tests.fs"/>
     <Compile Include="tests/OmpTodoToolTests.fs"/>
     <Compile Include="tests/OmpExecutorToolsTests.fs"/>
+    <Compile Include="tests/OmpHostContractTests.fs"/>
     <Compile Include="tests/OpencodeHookSchemaCoverageTests.fs"/>
     <Compile Include="tests/OpencodeSearchToolsCoverageTests.fs"/>
     <Compile Include="tests/OpencodeSubagentCoverageTests.fs"/>

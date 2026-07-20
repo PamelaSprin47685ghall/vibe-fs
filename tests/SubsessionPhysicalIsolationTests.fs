@@ -524,8 +524,8 @@ let private ompIdleEventRoutingValidation () =
         let! res1 = handler rawIdleEvent
         equal "stale idle event is not consumed" false res1.Consumed
 
-        // 2. Resolve prompt so waiter completes
-        resolveRef.Value (box null)
+        // 2. Resolve prompt with verifiable message id (null alone is AcceptanceUnknown)
+        resolveRef.Value (box {| id = "omp-idle-msg-1" |})
         do! sleep 10
 
         // 3. Now session.idle must be consumed

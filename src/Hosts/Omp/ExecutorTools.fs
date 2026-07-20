@@ -27,7 +27,7 @@ open Wanxiangshu.Runtime.RunnerBackground
 open Wanxiangshu.Runtime.RuntimeScope
 open Wanxiangshu.Runtime.SessionExecutor
 open Wanxiangshu.Runtime.SubagentIo
-open Wanxiangshu.Runtime.OmpHostBindings
+open Wanxiangshu.Hosts.Omp.ExecutorSummarizer
 
 [<Global("Buffer")>]
 let private nodeBuffer: obj = jsNative
@@ -81,38 +81,6 @@ let private runExecutorJob (options: ExecuteOptions) (signal: obj) (childId: str
         return! raceWithAbortSignal signal onSignalAbort runWork
     }
 
-let private summarizeOutput
-    (_pi: obj)
-    (childSession: obj)
-    (output: string)
-    (lang: string)
-    (command: string)
-    (deps: string list)
-    (mode: string)
-    (what: string)
-    =
-    promise {
-        let summaryPrompt =
-            executorSummarizerPrompt what output lang command deps "executor" mode
-
-        // Anchor to target turn: baseline before prompt; wait idle only if transcript grew.
-        // Bare waitForIdle alone can observe a pre-existing idle (SPEC §4.5 #8).
-        let baseline = entryCountOfSession childSession
-        let! _ = sessionPrompt childSession summaryPrompt
-        let! grew = waitForIdleAfterBaseline childSession baseline 8
-        let sm = unbox<ISessionManager> (Dyn.get childSession "sessionManager")
-
-        let text =
-            if grew then
-                match readAssistantText sm baseline "\n\n" with
-                | Some t -> t
-                | None -> output
-            else
-                output
-
-        return textResult text
-    }
-
 let private buildExecutorRequest (params': obj) (ctx: obj) =
     let (lang, command, what, timeoutType, mode, deps, cwd, maxBytes) =
         parseExecutorParams params' ctx
@@ -145,7 +113,7 @@ let private parseExecutorResponse
             return textResult output
         else
             let! text =
-                summarizeOutput pi childSession output lang options.command options.dependencies options.mode what
+                summarizeOutput childSession output lang options.command options.dependencies options.mode what
 
             return text
     }

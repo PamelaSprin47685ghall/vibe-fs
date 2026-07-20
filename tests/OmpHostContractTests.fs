@@ -4,7 +4,6 @@ open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Runtime.OmpHostBindings
-open Wanxiangshu.Runtime.Dyn
 open Wanxiangshu.Kernel.FallbackKernel.Types
 open Wanxiangshu.Kernel.Subsession.Types
 open Wanxiangshu.Hosts.Omp.SubsessionDispatch
@@ -13,7 +12,10 @@ open Wanxiangshu.Hosts.Omp.Fallback.ActionExecutor
 open Wanxiangshu.Runtime.Fallback.RuntimeStore
 open Wanxiangshu.Runtime.Dispatch
 
+module Dyn = Wanxiangshu.Runtime.Dyn
 module OmpHost = Wanxiangshu.Hosts.Omp.SubsessionHostAdapter
+
+let private fail (msg: string) = check msg false
 
 /// Contract matrix (SPEC §4.5). Each row is a formal regression assertion.
 /// Verified = mock-proven below. Unverified = fail-closed production path.
@@ -197,7 +199,7 @@ let cancelPendingDispatchIsReal () =
         let sid = SessionId.create "child-cancel"
         let turnId = TurnId.create "run-cancel-t0"
 
-        let plan = makeTurn (TurnId.value turnId) "x" None
+        let plan = { makeTurn (TurnId.value turnId) "x" None with TurnId = turnId }
 
         let dispatchP = host.Dispatch(sid, plan)
         do! sleep 5
