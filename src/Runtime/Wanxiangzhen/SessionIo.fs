@@ -4,6 +4,12 @@ open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Runtime.Dyn
 
+[<Emit("Promise.resolve($0)")>]
+let private resolveThenable (x: obj) : JS.Promise<obj> = jsNative
+
+[<Emit("typeof $0")>]
+let private jsTypeOf (x: obj) : string = jsNative
+
 let getSession (client: obj) : Result<obj, string> =
     let session = get client "session"
 
@@ -15,11 +21,11 @@ let getSession (client: obj) : Result<obj, string> =
 let promptSession (client: obj) (sessionId: string) (text: string) : JS.Promise<unit> =
     promise {
         if isNullish client then
-            return raise (System.ArgumentNullException("client", "client cannot be null"))
+            return raise (System.ArgumentNullException("client", "wanxiangzhen_prompt_parameter_missing: client cannot be null"))
         elif System.String.IsNullOrWhiteSpace(sessionId) then
-            return raise (System.ArgumentException("sessionId cannot be null or empty", "sessionId"))
+            return raise (System.ArgumentException("wanxiangzhen_prompt_parameter_missing: sessionId cannot be null or empty", "sessionId"))
         elif System.String.IsNullOrWhiteSpace(text) then
-            return raise (System.ArgumentException("text cannot be null or empty", "text"))
+            return raise (System.ArgumentException("wanxiangzhen_prompt_parameter_missing: text cannot be null or empty", "text"))
         else
             match getSession client with
             | Error err ->
@@ -29,7 +35,7 @@ let promptSession (client: obj) (sessionId: string) (text: string) : JS.Promise<
             | Ok session ->
                 let promptFn = get session "prompt"
 
-                if isNullish promptFn then
+                if isNullish promptFn || jsTypeOf promptFn <> "function" then
                     let exMsg = "wanxiangzhen_session_api_missing: session.prompt function missing"
                     JS.console.error ("SessionIo.promptSession failed: " + exMsg)
                     return raise (System.Exception(exMsg))
@@ -42,7 +48,8 @@ let promptSession (client: obj) (sessionId: string) (text: string) : JS.Promise<
                                 [ "path", box (createObj [ "id", box sessionId ])
                                   "body", box (createObj [ "parts", box [| part |] ]) ]
 
-                        let! _ = session?("prompt") (arg) |> unbox<JS.Promise<obj>>
+                        let res = session?("prompt") (arg)
+                        let! _ = resolveThenable res
                         return ()
                     with ex ->
                         JS.console.error ("SessionIo.promptSession invocation failed: " + ex.Message)

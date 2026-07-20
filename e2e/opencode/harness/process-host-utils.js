@@ -47,9 +47,13 @@ export async function terminateChild(child, termMs, killMs) {
   if (!pid) return;
 
   // 6. kill 所有测试创建的 PTY / Descendants
-  const descendants = await getDescendantPids(pid);
-  for (const dpid of descendants) {
-    try { process.kill(dpid, 'SIGKILL'); } catch {}
+  try {
+    const descendants = await getDescendantPids(pid);
+    for (const dpid of descendants) {
+      try { process.kill(dpid, 'SIGKILL'); } catch {}
+    }
+  } catch (err) {
+    console.error(`[ProcessHost] failed to kill descendants: ${err.message}`);
   }
 
   // 7. SIGTERM opencode
@@ -57,6 +61,10 @@ export async function terminateChild(child, termMs, killMs) {
 
   // 8. 最多等待一个短 deadline
   const exited = await new Promise((resolve) => {
+    if (child.exitCode !== null || child.signalCode !== null) {
+      resolve(true);
+      return;
+    }
     const timer = setTimeout(() => resolve(false), 500); // 500ms short deadline
     child.once('exit', () => { clearTimeout(timer); resolve(true); });
   });
@@ -68,6 +76,10 @@ export async function terminateChild(child, termMs, killMs) {
 
   // 10. await child exit
   await new Promise((resolve) => {
+    if (child.exitCode !== null || child.signalCode !== null) {
+      resolve();
+      return;
+    }
     const timer = setTimeout(resolve, killMs);
     child.once('exit', () => { clearTimeout(timer); resolve(); });
   });

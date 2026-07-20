@@ -163,3 +163,20 @@ module HostReceiptWaiter =
 
     /// Resolve from an already-known host receipt.
     let resolveFromReceipt (w: HostReceiptWaiter) (receipt: HostStartReceipt) : unit = resolve w receipt |> ignore
+
+    /// Race a waiter's Promise against a timeout. If the timeout wins,
+    /// reject the waiter with `HostAcceptanceUnknown` so a late host
+    /// `chat.message` cannot mutate state after we have given up. This is
+    /// the OpenCode path: `OpaqueAccepted` must not be treated as success.
+    let awaitWithTimeout
+        (w: HostReceiptWaiter)
+        (timeoutMs: int)
+        (error: ErrorInput)
+        : JS.Promise<Result<HostStartReceipt, DispatchFailure>> =
+        let timeoutP =
+            promise {
+                do! Promise.sleep timeoutMs
+                reject w (HostAcceptanceUnknown error) (AfterSendUnknown error) |> ignore
+                return Error (HostAcceptanceUnknown error)
+            }
+        Promise.race [| w.Promise; timeoutP |]

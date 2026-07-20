@@ -11,6 +11,7 @@ open Wanxiangshu.Runtime.ExecutorFormat
 open Wanxiangshu.Runtime.ExecutorSpawn
 open Wanxiangshu.Runtime.ExecutorSpawnRunners
 open Wanxiangshu.Runtime.RuntimeScope
+open Wanxiangshu.Runtime.ExecutorSpawnHelper
 
 [<Global("globalThis.process")>]
 let private nodeProcess: obj = jsNative

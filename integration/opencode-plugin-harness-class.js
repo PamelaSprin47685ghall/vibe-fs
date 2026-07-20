@@ -128,7 +128,9 @@ export class OpencodePluginHarness {
   async runLifecycleHook(name, input, output = {}) {
     const hook = this.plugin[name];
     if (!hook) throw new Error(`plugin has no ${name} hook`);
+    if (name === 'session.post') console.log('[harness] lifecycle start', name);
     await hook(input, output);
+    if (name === 'session.post') console.log('[harness] lifecycle complete', name);
     return output;
   }
 
@@ -194,5 +196,22 @@ export class OpencodePluginHarness {
   readFile(relPath) { return utils.readFile(this.workDir, relPath); }
   fileExists(relPath) { return utils.fileExists(this.workDir, relPath); }
   async waitForFile(relPath, timeoutMs) { return utils.waitForFile(this.getSandboxDir.bind(this), this.sessionId, relPath, timeoutMs); }
-  async dispose() { return utils.disposeHarness(this.mockLLM, this.workDir, this.home); }
+  async dispose() {
+    // Signal stream abort before waiting, so any pending nudge/fallback lease
+    // can mark itself force-stopped instead of waiting forever.
+    try {
+      await this.fireStreamAbort();
+    } catch {}
+    await utils.waitForPendingFallbackWork(this.getFallbackRuntime(), this.sessionId);
+    await utils.waitForPendingFallbackWork(this.getFallbackRuntime(), this.sessionId);
+    const hook = this.plugin?.event;
+    if (hook && this.sessionId) {
+      try {
+        await hook({
+          event: { type: 'session.deleted', properties: { sessionID: this.sessionId } },
+        });
+      } catch {}
+    }
+    return utils.disposeHarness(this.mockLLM, this.workDir, this.home);
+  }
 }

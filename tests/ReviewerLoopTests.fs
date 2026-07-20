@@ -427,6 +427,47 @@ let runReviewerLoop_finallyCleansUpEverythingOnAbort () =
         | None -> ()
     }
 
+let runReviewerLoop_cleanupExceptionDoesNotMaskOriginalError () =
+    promise {
+        let! directory = mkdtempAsync "test-cleanup-mask-"
+        let mutable loopError = None
+
+        try
+            let registry = ChildAgentRegistry.Create()
+            let store = createReviewStore ()
+            store.applyReviewTaskProjection ("child-1", Some "task")
+
+            let session =
+                createObj
+                    [ "create", box (fun (arg: obj) -> Promise.lift (box {| data = box {| id = "child-1" |} |}))
+                      "prompt", box (fun (arg: obj) -> Promise.reject (unbox<exn> (createObj [ "name", box "MessageAbortedError"; "message", box "original prompt error" ])))
+                      "abort", box (fun (arg: obj) -> Promise.lift ())
+                      "delete", box (fun (arg: obj) -> Promise.reject (exn "cleanup delete error")) ]
+
+            let client = createObj [ "session", box session ]
+
+            let! childID = createReviewerChild registry client store directory (Some "parent-1") "parent-1" "Reviewer"
+
+            let mutable threwOriginalError = false
+
+            try
+                let! _ = runReviewerLoop registry client store directory "child-1" [ "reviewerPrompt test" ] null
+                ()
+            with err ->
+                if err.Message.Contains "original prompt error" then
+                    threwOriginalError <- true
+
+            check "threw the original error, not the cleanup error" threwOriginalError
+        with ex ->
+            loopError <- Some ex
+
+        do! rmAsync directory
+
+        match loopError with
+        | Some ex -> raise ex
+        | None -> ()
+    }
+
 let run () : JS.Promise<unit> =
     promise {
         printfn "[TEST] createReviewerChild_success"
@@ -451,5 +492,7 @@ let run () : JS.Promise<unit> =
         do! runReviewerLoop_finallyCleansUpEverythingOnError ()
         printfn "[TEST] runReviewerLoop_finallyCleansUpEverythingOnAbort"
         do! runReviewerLoop_finallyCleansUpEverythingOnAbort ()
+        printfn "[TEST] runReviewerLoop_cleanupExceptionDoesNotMaskOriginalError"
+        do! runReviewerLoop_cleanupExceptionDoesNotMaskOriginalError ()
         printfn "[TEST] All tests inside ReviewerLoopTests finished"
     }

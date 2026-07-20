@@ -9,6 +9,7 @@ open Wanxiangshu.Tests.FallbackEventBridgeTests
 open Wanxiangshu.Tests.FallbackMessageCodecTests
 open Wanxiangshu.Tests.FallbackIntegrationTests
 open Wanxiangshu.Tests.FallbackRecoveryWaitTests
+open Wanxiangshu.Tests.FallbackRequestedRecoveryTests
 open Wanxiangshu.Tests.WebFetchGuardTests
 open Wanxiangshu.Tests.ReviewVerdictTests
 open Wanxiangshu.Tests.ToolCopyTests
@@ -48,6 +49,7 @@ let fallbackTestEntries () : (string * TestBody) list =
       "FallbackMessageCodecTests.run", Sync(sync FallbackMessageCodecTests.run)
       "FallbackIntegrationTests.run", Sync(sync FallbackIntegrationTests.run)
       "FallbackRecoveryWaitTests.run", Async FallbackRecoveryWaitTests.run
+      "FallbackRequestedRecoveryTests.run", Async FallbackRequestedRecoveryTests.run
       "RetryDispatchGovernorTests.run", Async RetryDispatchGovernorTests.run
       "SubsessionDecisionTests.run", Sync(sync SubsessionDecisionTests.run)
       "OpencodeSubsessionHostAdapterModelTests.run", Sync(sync OpencodeSubsessionHostAdapterModelTests.run)
@@ -68,8 +70,7 @@ let fallbackTestEntries () : (string * TestBody) list =
       "FallbackLeasePureTests.run", Sync(sync FallbackLeasePureTests.run)
       "FallbackPropertyPureTests.run", Sync(sync FallbackPropertyPureTests.run)
       "NudgeErrorClassificationTests.run", Sync(sync NudgeErrorClassificationTests.run)
-      "NudgeOwnerDiagnosticTests.run", Sync(sync NudgeOwnerDiagnosticTests.run)
-      "RetryDispatchGovernorTests.run", Async RetryDispatchGovernorTests.run ]
+      "NudgeOwnerDiagnosticTests.run", Sync(sync NudgeOwnerDiagnosticTests.run) ]
 
 let tailTestEntries () : (string * TestBody) list =
     [ "WebFetchGuardTests.run", Sync(sync WebFetchGuardTests.run)

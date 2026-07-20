@@ -23,6 +23,7 @@ let private userTextMessage sessionID text =
 let sessionErrorWithoutFallbackTriggersNudgeSpec () =
     promise {
         let sessionID = "err-no-fallback-ws"
+        let! workspaceDir = mkdtempAsync "err-no-fallback-"
 
         let messages =
             [| box
@@ -39,7 +40,7 @@ let sessionErrorWithoutFallbackTriggersNudgeSpec () =
 
         let promptCalls = ResizeArray<obj>()
 
-        let mkClient () =
+        let mkClient (workspaceDir: string) =
             createObj
                 [ "session",
                   box (
@@ -63,16 +64,18 @@ let sessionErrorWithoutFallbackTriggersNudgeSpec () =
                                     promise { return box {| data = messages |} })
                             )
                             "prompt",
-                            box (System.Func<obj, JS.Promise<unit>>(fun arg -> promise { promptCalls.Add(arg) })) ]
+                            box (System.Func<obj, JS.Promise<unit>>(fun arg ->
+                                promise {
+                                    resolveNudgeReceiptFromPromptArg workspaceDir arg
+                                    promptCalls.Add(arg)
+                                })) ]
                   ) ]
-
-        let! workspaceDir = mkdtempAsync "err-no-fallback-"
 
         let! p =
             plugin (
                 box
                     {| directory = workspaceDir
-                       client = mkClient () |}
+                       client = mkClient workspaceDir |}
             )
 
         let eventHook = get p "event"
@@ -100,6 +103,7 @@ let sessionErrorWithoutFallbackTriggersNudgeSpec () =
 
 let repeatedAssistantSpec () =
     promise {
+        let! workspaceDir = mkdtempAsync "repeated-assistant-"
         let mutable messages =
             [| box
                    {| info =
@@ -115,7 +119,7 @@ let repeatedAssistantSpec () =
 
         let promptCalls = ResizeArray<obj>()
 
-        let mkClient () =
+        let mkClient (workspaceDir: string) =
             createObj
                 [ "session",
                   box (
@@ -139,16 +143,18 @@ let repeatedAssistantSpec () =
                                     (promise { return box {| data = messages |} }))
                             )
                             "prompt",
-                            box (System.Func<obj, JS.Promise<unit>>(fun arg -> (promise { promptCalls.Add(arg) }))) ]
+                            box (System.Func<obj, JS.Promise<unit>>(fun arg ->
+                                (promise {
+                                    resolveNudgeReceiptFromPromptArg workspaceDir arg
+                                    promptCalls.Add(arg)
+                                }))) ]
                   ) ]
-
-        let! workspaceDir = mkdtempAsync "repeated-assistant-"
 
         let! p =
             plugin (
                 box
                     {| directory = workspaceDir
-                       client = mkClient () |}
+                       client = mkClient workspaceDir |}
             )
 
         do!
@@ -182,7 +188,7 @@ let repeatedAssistantSpec () =
             plugin (
                 box
                     {| directory = workspaceDir
-                       client = mkClient () |}
+                       client = mkClient workspaceDir |}
             )
 
         do!
@@ -202,6 +208,7 @@ let repeatedAssistantSpec () =
 let repeatedIdleBeforeHistoryPersistsNudgeSpec () =
     promise {
         let sessionID = "history-race-ws"
+        let! workspaceDir = mkdtempAsync "repeated-idle-before-history-"
 
         let mutable messages =
             [| box
@@ -218,7 +225,7 @@ let repeatedIdleBeforeHistoryPersistsNudgeSpec () =
 
         let promptCalls = ResizeArray<obj>()
 
-        let mkClient () =
+        let mkClient (workspaceDir: string) =
             createObj
                 [ "session",
                   box (
@@ -245,6 +252,7 @@ let repeatedIdleBeforeHistoryPersistsNudgeSpec () =
                             box (
                                 System.Func<obj, JS.Promise<unit>>(fun arg ->
                                     promise {
+                                        resolveNudgeReceiptFromPromptArg workspaceDir arg
                                         promptCalls.Add(arg)
 
                                         messages <-
@@ -253,13 +261,11 @@ let repeatedIdleBeforeHistoryPersistsNudgeSpec () =
                             ) ]
                   ) ]
 
-        let! workspaceDir = mkdtempAsync "repeated-idle-before-history-"
-
         let! p =
             plugin (
                 box
                     {| directory = workspaceDir
-                       client = mkClient () |}
+                       client = mkClient workspaceDir |}
             )
 
         let eventHook = get p "event"

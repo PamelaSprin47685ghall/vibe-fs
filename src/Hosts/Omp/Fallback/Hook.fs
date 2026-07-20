@@ -81,7 +81,21 @@ let private routeEvent
 
             return! tryError workspaceRoot sessionID errorObj
         elif translator.IsSessionIdle rawEvent then
-            return! tryIdle workspaceRoot sessionID
+            let ws = Wanxiangshu.Hosts.Omp.OmpSubsessionHostHelper.workspaceFor workspaceRoot
+            let isNewIdle =
+                match Wanxiangshu.Runtime.SubsessionActorRegistry.SubsessionActorRegistry.TryGet workspaceRoot sessionID with
+                | Some actor ->
+                    match actor.GetCurrentTurn() with
+                    | Some turnId ->
+                        match Wanxiangshu.Runtime.Dispatch.HostReceiptWaiterRegistry.tryFind ws sessionID (TurnId.value turnId) with
+                        | Some waiter -> waiter.Completed
+                        | None -> false
+                    | None -> false
+                | None -> false
+            if isNewIdle then
+                return! tryIdle workspaceRoot sessionID
+            else
+                return false
         elif isChildSession workspaceRoot sessionID then
             match translator.ExtractTurnObservation rawEvent with
             | Some obs -> do! routeToChild workspaceRoot sessionID (EvidenceUpdated obs) |> Promise.map ignore

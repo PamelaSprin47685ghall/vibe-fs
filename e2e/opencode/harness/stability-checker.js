@@ -90,17 +90,22 @@ async function runOneTest(name, fn, opts = {}) {
 
   let testErr = null;
   const timeoutMs = opts.timeoutMs || 90000;
+  let timer;
 
   try {
     await Promise.race([
       fn(scenario),
-      new Promise((_, reject) => setTimeout(
-        () => reject(new Error(`${name} timed out after ${timeoutMs}ms`)),
-        timeoutMs,
-      )),
+      new Promise((_, reject) => {
+        timer = setTimeout(
+          () => reject(new Error(`${name} timed out after ${timeoutMs}ms`)),
+          timeoutMs,
+        );
+      }),
     ]);
   } catch (e) {
     testErr = e;
+  } finally {
+    clearTimeout(timer);
   }
 
   try {
@@ -148,13 +153,29 @@ export async function runStabilityGate(opts = {}) {
     throw new Error('No test specified for stability gate');
   }
 
+  const globalTimeoutMs = opts.globalTimeoutMs || 300000; // 5 minutes default
+  const startTime = Date.now();
+
   console.log(`Running stability gate for "${test.name}" (repeating ${repeat} times)...`);
   const runs = [];
   const failures = [];
 
   for (let i = 1; i <= repeat; i++) {
+    const elapsed = Date.now() - startTime;
+    if (elapsed >= globalTimeoutMs) {
+      console.warn(`[StabilityGate] Global timeout of ${globalTimeoutMs}ms reached. Stopping after ${i - 1} runs.`);
+      break;
+    }
+    const remainingTime = globalTimeoutMs - elapsed;
+    if (remainingTime < 5000) {
+      console.warn(`[StabilityGate] Insufficient time remaining (${remainingTime}ms). Stopping after ${i - 1} runs.`);
+      break;
+    }
+    const testTimeout = Math.min(scenarioOpts.timeoutMs || 90000, remainingTime);
+    const runOpts = { ...scenarioOpts, timeoutMs: testTimeout };
+
     const runName = `${test.name} (run ${i}/${repeat})`;
-    const result = await runOneTest(test.name, test.fn, scenarioOpts);
+    const result = await runOneTest(test.name, test.fn, runOpts);
     runs.push(result);
 
     if (result.ok) {
@@ -201,8 +222,8 @@ export async function runStabilityGate(opts = {}) {
     }
   }
 
-  const passedCount = repeat - failures.length;
-  console.log(`\nStability gate finished. ${passedCount}/${repeat} runs passed.`);
+  const passedCount = runs.filter(r => r.ok).length;
+  console.log(`\nStability gate finished. ${passedCount}/${runs.length} runs passed.`);
   return {
     passed: failures.length === 0,
     failures,

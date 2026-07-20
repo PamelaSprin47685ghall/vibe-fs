@@ -14,6 +14,7 @@ open Wanxiangshu.Runtime.Fallback.SessionRuntimeLeasePure
 open Wanxiangshu.Runtime.Fallback.Coordinator
 open Wanxiangshu.Runtime.Fallback.Ports
 open Wanxiangshu.Runtime.Fallback.ContinuationExecution
+open Wanxiangshu.Runtime.Fallback.ContinuationExecutionCore
 open Wanxiangshu.Runtime
 
 module Dyn = Wanxiangshu.Runtime.Dyn

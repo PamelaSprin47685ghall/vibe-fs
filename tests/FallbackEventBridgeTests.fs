@@ -14,9 +14,12 @@ open Wanxiangshu.Runtime.Fallback.SessionRuntimeLeasePure
 open Wanxiangshu.Runtime.Fallback.Coordinator
 open Wanxiangshu.Runtime.Fallback.Ports
 open Wanxiangshu.Runtime.Fallback.ContinuationExecution
+open Wanxiangshu.Runtime.Fallback.ContinuationExecutionCore
 open Wanxiangshu.Runtime.Fallback.SessionRuntime
 open Wanxiangshu.Runtime.Fallback.SessionRuntimePropertyPure
 open Wanxiangshu.Runtime.Fallback.LeaseValidation
+open Wanxiangshu.Runtime.PromiseQueue
+open Wanxiangshu.Tests.TestWorkspace
 open Wanxiangshu.Runtime
 
 module Dyn = Wanxiangshu.Runtime.Dyn
@@ -187,6 +190,56 @@ let mkConfig () : FallbackConfig =
       MaxRecoveries = 5 }
 
 let defaultCfgLookup (_agent: string) : FallbackConfig = mkConfig ()
+
+type SwitchingTranslator(sessionID: string) =
+    let errorTranslator =
+        FakeTranslator(sessionID, FallbackEvent.SessionError(mkRetryableErr ())) :> IEventTranslator
+
+    let humanTranslator = FakeTranslator(sessionID, FallbackEvent.NewUserMessage) :> IEventTranslator
+    let select rawEvent = if Dyn.str rawEvent "kind" = "human" then humanTranslator else errorTranslator
+
+    interface IEventTranslator with
+        member _.TranslateError(rawEvent) = (select rawEvent).TranslateError rawEvent
+        member _.ExtractSessionID(rawEvent) = (select rawEvent).ExtractSessionID rawEvent
+        member _.IsSessionError(rawEvent) = (select rawEvent).IsSessionError rawEvent
+        member _.IsSessionIdle(rawEvent) = (select rawEvent).IsSessionIdle rawEvent
+        member _.IsSessionBusy(rawEvent) = (select rawEvent).IsSessionBusy rawEvent
+
+        member _.IsNewUserMessage(sessionID, rawEvent) =
+            (select rawEvent).IsNewUserMessage(sessionID, rawEvent)
+
+        member _.ExtractNewUserMessageId(rawEvent) = (select rawEvent).ExtractNewUserMessageId rawEvent
+        member _.ExtractRoutingContext(rawEvent) = (select rawEvent).ExtractRoutingContext rawEvent
+        member _.IsAssistantMessage(rawEvent) = (select rawEvent).IsAssistantMessage rawEvent
+        member _.ExtractAssistantMessageId(rawEvent) = (select rawEvent).ExtractAssistantMessageId rawEvent
+        member _.ExtractAssistantParentId(rawEvent) = (select rawEvent).ExtractAssistantParentId rawEvent
+        member _.ExtractContinuationIdentity(rawEvent) = (select rawEvent).ExtractContinuationIdentity rawEvent
+        member _.ExtractHostRunId(rawEvent) = (select rawEvent).ExtractHostRunId rawEvent
+        member _.ExtractTurnObservation(rawEvent) = (select rawEvent).ExtractTurnObservation rawEvent
+
+type BlockingExecutor() =
+    let mutable resolveStarted = fun () -> ()
+    let started = Promise.create (fun resolve _ -> resolveStarted <- resolve)
+    let mutable resolveDispatch = fun () -> ()
+    let dispatchCompletion = Promise.create (fun resolve _ -> resolveDispatch <- resolve)
+    let mutable didStart = false
+
+    interface IActionExecutor with
+        member _.SendContinue(_sessionID, _model, _continuationID) =
+            if not didStart then
+                didStart <- true
+                resolveStarted ()
+
+            dispatchCompletion
+
+        member _.RecoverWithPrompt(_sessionID, _model, _promptText, _continuationID) = dispatchCompletion
+        member _.FetchMessages _ = Promise.lift [||]
+        member _.PropagateFailure _ = Promise.lift ()
+        member _.CaptureCurrentModel _ = Promise.lift None
+        member _.AbortRun _ = Promise.lift ()
+
+    member _.Started = started
+    member _.CompleteDispatch() = resolveDispatch ()
 
 
 let handleEvent_retrySame_consumedAndSendContinue () =
@@ -369,6 +422,124 @@ let createHandler_twoSessionsIndependent () =
         equal "sess-2 consumed" true r2.Consumed
     }
 
+let handleEvent_humanPreemptsIntent_executorNotCalled () =
+    promise {
+        let model = mkModel "oai" "gpt-5"
+        let rt = FallbackRuntimeStore()
+        let sid = "sess-preempt"
+        rt.UpdateSession(sid, selectChain [ model ])
+        rt.UpdateSession(sid, recordAgentName "reviewer")
+
+        // Setup active continuation lease
+        let turnId = rt.UpdateSessionReturning(sid, advanceHumanTurn)
+        let gen = (rt.GetSession sid).SessionGeneration
+        let cancelGen = (rt.GetSession sid).CancelGeneration
+        rt.UpdateSession(sid, setActiveContinuationGeneration gen)
+        rt.UpdateSession(sid, setActiveContinuationCancelGeneration cancelGen)
+        let continuationID = "cont-preempt"
+
+        let intent =
+            SendContinueIntent(model, "reviewer", turnId, gen, cancelGen, continuationID, 1)
+
+        let executor = FakeExecutor()
+
+        // Human message arrives in the meantime (e.g. before the intent execution is complete, but after it was returned/prepared)
+        let tr = FakeTranslator(sid, FallbackEvent.NewUserMessage) :> IEventTranslator
+        let handler = createHandler tr rt defaultCfgLookup executor "" None
+
+        // Call the handler with the human message. This transitions state to Idle/Active, increments cancel gen/turn
+        let! res = handler (box ())
+        equal "consumed is false for human message" false res.Consumed
+
+        // Execute the prepared intent
+        do! executeContinuationIntent rt executor "" sid intent
+
+        equal "executor is not called" 0 executor.ContinueCalls.Length
+    }
+
+let handleEvent_intentDelayed_leaseExpires_executorNotCalled () =
+    promise {
+        let model = mkModel "oai" "gpt-5"
+        let rt = FallbackRuntimeStore()
+        let sid = "sess-delayed"
+        rt.UpdateSession(sid, selectChain [ model ])
+        rt.UpdateSession(sid, recordAgentName "reviewer")
+
+        // Setup active continuation lease
+        let turnId = rt.UpdateSessionReturning(sid, advanceHumanTurn)
+        let gen = (rt.GetSession sid).SessionGeneration
+        let cancelGen = (rt.GetSession sid).CancelGeneration
+        rt.UpdateSession(sid, setActiveContinuationGeneration gen)
+        rt.UpdateSession(sid, setActiveContinuationCancelGeneration cancelGen)
+        let continuationID = "cont-delayed"
+
+        let intent =
+            SendContinueIntent(model, "reviewer", turnId, gen, cancelGen, continuationID, 1)
+
+        let executor = FakeExecutor()
+
+        // Start continuation execution. It will enqueue in the governor and defer to the event loop.
+        let p = executeContinuationIntent rt executor "" sid intent
+
+        // Immediately invalidate the lease by advancing cancel generation
+        rt.UpdateSession(sid, fun s -> setCancelGeneration (cancelGen + 1) s)
+
+        // Await the continuation promise
+        do! p
+
+        // Verify that executor is not called
+        equal "executor is not called" 0 executor.ContinueCalls.Length
+    }
+
+let createHandler_transportDoesNotBlockHumanCancellation () =
+    promise {
+        let! workspaceRoot = mkdtempAsync "fallback-actor-effect-"
+        let model = mkModel "actor-provider" "actor-model"
+        let runtime = FallbackRuntimeStore()
+        let sessionID = "actor-effect-session"
+        runtime.UpdateSession(sessionID, selectChain [ model ])
+        runtime.UpdateSession(sessionID, recordAgentName "reviewer")
+
+        let translator = SwitchingTranslator(sessionID) :> IEventTranslator
+        let executor = BlockingExecutor()
+        let handler = createHandler translator runtime defaultCfgLookup executor workspaceRoot None
+        let firstHook = handler (createObj [ "kind", box "error" ])
+        let! firstResult = withTimeout 1000 firstHook
+
+        match firstResult with
+        | None ->
+            executor.CompleteDispatch()
+            do! rmAsync workspaceRoot
+            failwith "fallback hook remained blocked by physical transport"
+        | Some result -> equal "retry event consumed" true result.Consumed
+
+        let! transportStarted = withTimeout 1000 executor.Started
+
+        match transportStarted with
+        | None ->
+            executor.CompleteDispatch()
+            do! rmAsync workspaceRoot
+            failwith "fallback transport did not start"
+        | Some() -> ()
+
+        let humanHook = handler (createObj [ "kind", box "human" ])
+        let! humanResult = withTimeout 1000 humanHook
+
+        match humanResult with
+        | None ->
+            executor.CompleteDispatch()
+            do! rmAsync workspaceRoot
+            failwith "human turn could not enter fallback actor while transport was pending"
+        | Some result -> equal "human event is not consumed" false result.Consumed
+
+        let session = runtime.GetSession sessionID
+        equal "human event clears pending continuation" None session.PendingLease
+        equal "human event transfers ownership" SessionOwner.Human session.Owner
+
+        executor.CompleteDispatch()
+        do! Promise.sleep 0
+        do! rmAsync workspaceRoot
+    }
 
 let run () =
     promise {
@@ -379,6 +550,9 @@ let run () =
         do! handleEvent_newUserMessage_resetsState ()
         do! createHandler_returnsCallable ()
         do! createHandler_twoSessionsIndependent ()
+        do! handleEvent_humanPreemptsIntent_executorNotCalled ()
+        do! handleEvent_intentDelayed_leaseExpires_executorNotCalled ()
+        do! createHandler_transportDoesNotBlockHumanCancellation ()
         do! FallbackEventBridgeStateTests.run ()
         do! FallbackEventBridgeReviewInProgressTests.run ()
     }

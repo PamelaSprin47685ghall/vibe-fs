@@ -13,6 +13,8 @@ open Wanxiangshu.Runtime.Dyn
 open Wanxiangshu.Runtime.ReviewEventWriter
 open Wanxiangshu.Runtime.Fallback.RuntimeStore
 open Wanxiangshu.Hosts.Opencode.NudgeEffect
+open Wanxiangshu.Runtime.Dispatch
+
 open Wanxiangshu.Tests.TestWorkspace
 
 let private snap todos msg blocked agent isLoop : Wanxiangshu.Kernel.Nudge.Types.SessionSnapshot =
@@ -214,6 +216,18 @@ let test_dispatchPostStopFromHistory () : JS.Promise<unit> =
                           let partsArr = unbox<obj array> parts
                           let firstPart = partsArr.[0]
                           promptText <- Dyn.str firstPart "text"
+
+                          let metadata = Dyn.get firstPart "metadata"
+                          let wanxiangshu = Dyn.get metadata "wanxiangshu"
+                          let nonce = Dyn.str wanxiangshu "nonce"
+
+                          if nonce <> "" then
+                              HostReceiptWaiterRegistry.tryResolve
+                                  (Wanxiangshu.Kernel.Primitives.Identity.Id.workspaceIdQuick ("opencode:" + dir))
+                                  sessionIDStr
+                                  nonce
+                                  Wanxiangshu.Kernel.Subsession.Types.OrderedTurnMarkerObserved
+                              |> ignore
 
                       Promise.lift (box {| ok = true |})) ]
 

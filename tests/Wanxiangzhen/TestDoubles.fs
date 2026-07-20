@@ -9,6 +9,7 @@ open Wanxiangshu.Kernel.Wanxiangzhen.SquadEvent
 open Wanxiangshu.Runtime.Wanxiangzhen.CoordinatorRuntime
 open Wanxiangshu.Runtime.PromiseQueue
 open Wanxiangshu.Tests.Wanxiangzhen.TestTypes
+open Wanxiangshu.Kernel.EventSourcing.EventEnvelope
 
 let mkFake = Wanxiangshu.Tests.Wanxiangzhen.TestTypes.mkFake
 
@@ -43,6 +44,13 @@ let mkDeps (s: FakeState) : CoordinatorDeps =
         fun _ _ e ->
             s.appendSquadEventCalls <- s.appendSquadEventCalls @ [ e ]
             Promise.lift (Ok())
+      AppendWanEvent =
+        fun _ e ->
+            s.appendWanEventCalls <- s.appendWanEventCalls @ [ e ]
+            Promise.lift (Ok())
+      ReadWanEvents =
+        fun _ ->
+            Promise.lift (s.readWanEventsResult @ s.appendWanEventCalls)
       TryWorktreeAdd =
         fun c b p b2 ->
             match s.tryWorktreeAddOverride with

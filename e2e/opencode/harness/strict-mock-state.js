@@ -54,4 +54,6 @@ export function resetState(state) {
   state.unexpected.length = 0;
   state.requests.length = 0;
   state.syntheticRequests.length = 0;
+  state.stopped = false;
+  state.nudgeBypassed = 0;
 }

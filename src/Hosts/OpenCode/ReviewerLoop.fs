@@ -17,8 +17,6 @@ open Wanxiangshu.Kernel.Primitives.Identity
 open Wanxiangshu.Kernel.Errors.DomainError
 open Wanxiangshu.Kernel.Session.Causality
 
-let private maxNudges = 3
-
 /// Create a reviewer child session under the given parent, register it, and
 /// return the child id (empty string on failure).
 let createReviewerChild
@@ -55,11 +53,6 @@ let createReviewerChild
             return childID
     }
 
-let private textParts (parts: string list) : obj array =
-    parts
-    |> List.map (fun text -> box {| ``type`` = "text"; text = text |})
-    |> Array.ofList
-
 /// Run the reviewer prompt-nudge loop on an existing child session: prompt with
 /// the review instructions, wait for the verdict via return_reviewer, nudging
 /// up to `maxNudges` times if the reviewer hasn't submitted.  Loop control is
@@ -74,89 +67,14 @@ let runReviewerLoop
     (initialParts: string list)
     (abortSignal: obj)
     : JS.Promise<ReviewResult> =
-    promise {
-        let verdict: ReviewResult option ref = ref None
-        let childAbort = AbortController()
-
-        reviewStore.setAbortSuppressor (childID, (fun () -> childAbort.abort ()))
-        reviewStore.setPendingReview (childID, (fun r -> verdict.Value <- Some r))
-        reviewStore.tryLockReview childID |> ignore
-
-        let parentAbortHandler = ref None
-
-        if not (Dyn.isNullish abortSignal) then
-            if Dyn.truthy (Dyn.get abortSignal "aborted") then
-                childAbort.abort ()
-            else
-                let handler = fun () -> childAbort.abort ()
-                parentAbortHandler.Value <- Some handler
-                abortSignal?addEventListener ("abort", handler) |> ignore
-
-        let runRound (parts: string list) =
-            promise {
-                let promptBody =
-                    box
-                        {| path = box {| id = childID |}
-                           body =
-                            box
-                                {| agent = "reviewer"
-                                   parts = textParts parts
-                                   tools = box (createObj [ "return_reviewer", box true ]) |} |}
-
-                try
-                    do! promptWithAbort client promptBody childAbort.signal
-
-                    match verdict.Value with
-                    | Some v -> return Resolved v
-                    | None -> return NoResult
-                with err ->
-                    match verdict.Value, translateJsError err with
-                    | Some v, (MessageAborted | ClientCancellation _) -> return Resolved v
-                    | _, (MessageAborted | ClientCancellation _) -> return! Promise.reject err
-                    | _ -> return PromptFailed
-            }
-
-        let rec loop nudgeCount =
-            promise {
-                reviewStore.setPendingReview (childID, (fun r -> verdict.Value <- Some r))
-
-                let parts = promptParts nudgeCount initialParts reviewerNudgePrompt
-                let! outcome = runRound parts
-
-                match decideAfterRound nudgeCount outcome maxNudges with
-                | Finish result -> return result
-                | Nudge next -> return! loop next
-            }
-
-        let mutable loopError = None
-        let mutable result = Terminated
-
-        try
-            let! r = loop 0
-            result <- r
-        with err ->
-            loopError <- Some err
-
-        match parentAbortHandler.Value with
-        | Some h ->
-            try
-                abortSignal?removeEventListener ("abort", h) |> ignore
-            with _ ->
-                ()
-        | None -> ()
-
-        reviewStore.unlockReview childID
-        reviewStore.CleanupSession childID
-
-        try
-            do! Wanxiangshu.Hosts.Opencode.SubagentIoCleanup.abortAndUnregister registry client directory childID
-        with _ ->
-            ()
-
-        match loopError with
-        | Some err -> return! Promise.reject err
-        | None -> return result
-    }
+    ReviewerLoopOps.runLoopWithCleanup
+        registry
+        client
+        reviewStore
+        directory
+        childID
+        initialParts
+        abortSignal
 
 /// Run a reviewer session: create a reviewer child, prompt it with review
 /// instructions + task, wait for the verdict.

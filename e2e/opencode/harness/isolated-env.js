@@ -123,7 +123,10 @@ export function createIsolatedEnv(opts) {
   const fixturePath = opts.mcpFixturePath || path.resolve('e2e/stealth-mcp-fixture.js');
   const fixtureUvxDir = createFixtureUvx(scenarioDir, fixturePath);
 
+  const extraEnv = opts.extraEnv || {};
   return {
+    // extraEnv first, so non-isolation variables pass through; isolation vars below will always win.
+    ...extraEnv,
     // Isolation dirs
     HOME: home,
     USERPROFILE: home,
@@ -158,7 +161,6 @@ export function createIsolatedEnv(opts) {
 
     // MCP fixture
     STEALTH_BROWSER_MCP_FIXTURE: fixturePath,
-    PATH: `${fixtureUvxDir}${path.delimiter}${process.env.PATH || ''}`,
-    ...opts.extraEnv,
+    PATH: `${fixtureUvxDir}${path.delimiter}${extraEnv.PATH || process.env.PATH || ''}`,
   };
 }

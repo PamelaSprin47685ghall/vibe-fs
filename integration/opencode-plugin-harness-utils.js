@@ -1,5 +1,9 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import {
+  FallbackRuntimeStore__GetSession_Z721C83C5,
+  FallbackRuntimeStore__OnStateChanged,
+} from '../build/src/Runtime/Fallback/RuntimeStore.js';
 
 export function readPartsText(output) {
   const parts = output?.parts;
@@ -58,6 +62,28 @@ export async function waitForFile(getSandboxDir, sessionId, relPath, timeoutMs =
     await new Promise((r) => setTimeout(r, 50));
   }
   return false;
+}
+
+function hasNoPendingContinuation(runtime, sessionId) {
+  const session = FallbackRuntimeStore__GetSession_Z721C83C5(runtime, sessionId);
+  const pending = session?.PendingLease;
+  const isPending = pending && pending.Status && pending.Status.tag < 2;
+  return !session || !isPending;
+}
+
+export function waitForPendingFallbackWork(runtime, sessionId) {
+  if (!runtime || !sessionId) return Promise.resolve();
+  if (hasNoPendingContinuation(runtime, sessionId)) return Promise.resolve();
+  return new Promise((resolve) => {
+    function onChange() {
+      if (hasNoPendingContinuation(runtime, sessionId)) {
+        resolve();
+      } else {
+        FallbackRuntimeStore__OnStateChanged(runtime, sessionId, onChange);
+      }
+    }
+    FallbackRuntimeStore__OnStateChanged(runtime, sessionId, onChange);
+  });
 }
 
 export async function disposeHarness(mockLLM, workDir, home) {

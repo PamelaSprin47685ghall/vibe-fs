@@ -6,6 +6,7 @@ open Wanxiangshu.Kernel.Wanxiangzhen.Dag
 open Wanxiangshu.Kernel.Wanxiangzhen.SquadConfig
 open Wanxiangshu.Runtime.PromiseQueue
 open Wanxiangshu.Runtime.Wanxiangzhen.CoordinatorRuntime
+open Wanxiangshu.Kernel.EventSourcing.EventEnvelope
 
 // ══════════════════════════════════════════════════════════════════════════════
 // Shared no-op CoordinatorDeps (20 fields, all stubs)
@@ -24,6 +25,8 @@ let stubDeps () : CoordinatorDeps =
       GetSquadDag = fun sid -> Promise.lift (Wanxiangshu.Kernel.Wanxiangzhen.Dag.empty sid "")
       GetSquadSessions = fun () -> Promise.lift Map.empty
       AppendSquadEvent = fun _ _ _ -> Promise.lift (Ok())
+      AppendWanEvent = fun _ _ -> Promise.lift (Ok())
+      ReadWanEvents = fun _ -> Promise.lift []
       TryWorktreeAdd = fun _ _ _ _ -> Ok ""
       TryWorktreeRemoveForce = fun _ _ -> Ok ""
       TryBranchDeleteForce = fun _ _ -> Ok ""

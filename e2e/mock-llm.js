@@ -231,7 +231,12 @@ function createMockLLM() {
             reset: () => { _queue.length = 0; _calls.length = 0; },
             getRemainingExpectations: () => _queue.length,
             calls: _calls,
-            stop: () => new Promise(fulfil => _server.close(fulfil)),
+            stop: () => new Promise(fulfil => {
+              if (!_server) return fulfil();
+              _server.close(fulfil);
+              _server.closeIdleConnections?.();
+              _server.closeAllConnections?.();
+            }),
           });
         });
       });

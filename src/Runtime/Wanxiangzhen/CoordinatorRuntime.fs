@@ -13,6 +13,7 @@ open Wanxiangshu.Runtime.Wanxiangzhen.GitShell
 open Wanxiangshu.Runtime.Wanxiangzhen.HttpServer
 open Wanxiangshu.Runtime.Wanxiangzhen.SessionIo
 open Wanxiangshu.Runtime.Wanxiangzhen.PidMonitor
+open Wanxiangshu.Kernel.EventSourcing.EventEnvelope
 
 [<Emit("process.kill($0, $1)")>]
 let killPid (pid: int) (signal: obj) : unit = jsNative
@@ -26,6 +27,8 @@ type CoordinatorDeps =
       GetSquadDag: string -> JS.Promise<Dag>
       GetSquadSessions: unit -> JS.Promise<Map<string, Dag>>
       AppendSquadEvent: string -> string -> SquadEvent -> JS.Promise<Result<unit, string>>
+      AppendWanEvent: string -> WanEvent -> JS.Promise<Result<unit, string>>
+      ReadWanEvents: string -> JS.Promise<WanEvent list>
       TryWorktreeAdd: string -> string -> string -> string -> Result<string, string>
       TryWorktreeRemoveForce: string -> string -> Result<string, string>
       TryBranchDeleteForce: string -> string -> Result<string, string>

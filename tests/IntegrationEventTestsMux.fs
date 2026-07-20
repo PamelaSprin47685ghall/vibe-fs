@@ -40,7 +40,7 @@ let repeatedTodoNudgeSpec () =
                   box (System.Func<obj, JS.Promise<obj>>(fun _ -> (promise { return box (todoList |> List.toArray) })))
                   "nudge",
                   box (
-                      System.Func<obj, obj, JS.Promise<bool>>(fun _ws msg ->
+                      System.Func<obj, obj, obj, obj, obj, obj, JS.Promise<obj>>(fun ws msg _model _agent _nudgeId nonce ->
                           promise {
                               nudges.Add(string msg)
                               nudgeCount <- nudgeCount + 1
@@ -50,7 +50,11 @@ let repeatedTodoNudgeSpec () =
                                       history
                                       [| muxTextMessage ($"repeat-nudge-{nudgeCount}") "user" (string msg) |]
 
-                              return true
+                              return
+                                  box
+                                      {| messageId = $"repeat-nudge-{nudgeCount}"
+                                         sessionId = string ws
+                                         dispatchId = string nonce |}
                           })
                   ) ]
 

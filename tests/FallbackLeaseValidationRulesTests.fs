@@ -104,7 +104,37 @@ let checkContinuationMatches_noPending () =
     let rt = FallbackRuntimeStore()
     let isMatched, isContIdMatch = checkContinuationMatches rt sid "x"
     chk "no pending isMatched false" (not isMatched)
-    chk "no pending isContIdMatch true" isContIdMatch
+    chk "no pending with contId is stale (contIdMatch false)" (not isContIdMatch)
+
+let checkContinuationMatches_noPendingEmptyContId () =
+    let rt = FallbackRuntimeStore()
+    let isMatched, isContIdMatch = checkContinuationMatches rt sid ""
+    chk "no pending empty contId isMatched false" (not isMatched)
+    chk "no pending empty contId isContIdMatch true" isContIdMatch
+
+let checkContinuationMatches_matchByParentId () =
+    let rt, lease = setupDispatched ()
+    let isMatched, isContIdMatch = checkContinuationMatchesWithEvidence rt sid "" (Some lease.HumanTurnID) None
+    chk "match by parent id isMatched true" isMatched
+    chk "match by parent id isContIdMatch true" isContIdMatch
+
+let checkContinuationMatches_matchByHostRunId () =
+    let rt, lease = setupDispatched ()
+    let isMatched, isContIdMatch = checkContinuationMatchesWithEvidence rt sid "" None (Some lease.HumanTurnID)
+    chk "match by host run id isMatched true" isMatched
+    chk "match by host run id isContIdMatch true" isContIdMatch
+
+let checkContinuationMatches_unmatchedStatusHint () =
+    let rt, _ = setupDispatched ()
+    let isMatched, isContIdMatch = checkContinuationMatchesWithEvidence rt sid "" (Some "diff-parent") (Some "diff-run")
+    chk "unmatched status hint isMatched false" (not isMatched)
+    chk "unmatched status hint isContIdMatch true" isContIdMatch
+
+let checkContinuationMatches_mismatchedContinuationId () =
+    let rt, _ = setupDispatched ()
+    let isMatched, isContIdMatch = checkContinuationMatchesWithEvidence rt sid "different-cid" None None
+    chk "mismatched continuation id isMatched false" (not isMatched)
+    chk "mismatched continuation id isContIdMatch false" (not isContIdMatch)
 
 // ---------------------------------------------------------------------------
 // checkIsStale
@@ -183,6 +213,11 @@ let run () =
     checkContinuationMatches_emptyContinuationId ()
     checkContinuationMatches_matchingId ()
     checkContinuationMatches_noPending ()
+    checkContinuationMatches_noPendingEmptyContId ()
+    checkContinuationMatches_matchByParentId ()
+    checkContinuationMatches_matchByHostRunId ()
+    checkContinuationMatches_unmatchedStatusHint ()
+    checkContinuationMatches_mismatchedContinuationId ()
     checkIsStale_noneEvent_returnsFalse ()
     checkIsStale_newUserMessage_returnsFalse ()
     checkIsStale_contIdNotMatch_returnsTrue ()

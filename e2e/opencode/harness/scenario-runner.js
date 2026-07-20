@@ -20,13 +20,27 @@ export async function runScenarioTests(opts, tests, setupScenario) {
   let failed = 0;
   const failures = [];
   const defaultTimeoutMs = opts.timeoutMs || 120000;
+  const globalTimeoutMs = opts.globalTimeoutMs || 500000; // 500s default to prevent 600s overall timeout
+  const suiteStart = Date.now();
 
   if (opts.reuseHost) {
     return runReusedHost(opts, tests, setupScenario, defaultTimeoutMs);
   }
 
   for (const { name, fn } of tests) {
-    const result = await runOne(name, fn, setupScenario, opts, defaultTimeoutMs);
+    const elapsed = Date.now() - suiteStart;
+    if (elapsed >= globalTimeoutMs) {
+      const err = new Error(`Global suite timeout of ${globalTimeoutMs}ms reached. Skipping remaining tests.`);
+      failures.push({ name: `[Global Timeout]`, error: err });
+      console.error(`  ✗ ${name}: skipped due to global suite timeout`);
+      failed += (tests.length - passed - failed);
+      break;
+    }
+
+    const remainingTime = globalTimeoutMs - elapsed;
+    const testTimeout = Math.min(defaultTimeoutMs, remainingTime);
+
+    const result = await runOne(name, fn, setupScenario, opts, testTimeout);
     if (result.ok) {
       passed++;
       console.log(`  ✓ ${name} (${result.elapsedMs}ms)`);
@@ -49,6 +63,7 @@ async function runReusedHost(opts, tests, setupScenario, defaultTimeoutMs) {
   const failures = [];
   let scenario;
   const suiteStart = Date.now();
+  const globalTimeoutMs = opts.globalTimeoutMs || 500000;
   try {
     scenario = await setupScenario(opts);
     console.log(`  [reuseHost] scenario ready (${Date.now() - suiteStart}ms)`);
@@ -58,7 +73,18 @@ async function runReusedHost(opts, tests, setupScenario, defaultTimeoutMs) {
   }
 
   for (const { name, fn } of tests) {
-    const result = await runOneReused(name, fn, scenario, defaultTimeoutMs);
+    const elapsed = Date.now() - suiteStart;
+    if (elapsed >= globalTimeoutMs) {
+      const err = new Error(`Global suite timeout of ${globalTimeoutMs}ms reached. Skipping remaining tests.`);
+      failures.push({ name: `[Global Timeout]`, error: err });
+      console.error(`  ✗ ${name}: skipped due to global suite timeout`);
+      failed += (tests.length - passed - failed);
+      break;
+    }
+    const remainingTime = globalTimeoutMs - elapsed;
+    const testTimeout = Math.min(defaultTimeoutMs, remainingTime);
+
+    const result = await runOneReused(name, fn, scenario, testTimeout);
     if (result.ok) {
       passed++;
       console.log(`  ✓ ${name} (${result.elapsedMs}ms)`);
@@ -139,13 +165,16 @@ async function runOne(name, fn, setupScenario, opts, timeoutMs) {
 }
 
 function raceWithTimeout(promise, timeoutMs, name) {
-  return Promise.race([
-    promise,
-    new Promise((_, reject) => setTimeout(
+  let timer;
+  const timeoutPromise = new Promise((_, reject) => {
+    timer = setTimeout(
       () => reject(new Error(`${name} timed out after ${timeoutMs}ms`)),
       timeoutMs,
-    )),
-  ]);
+    );
+  });
+  return Promise.race([promise, timeoutPromise]).finally(() => {
+    clearTimeout(timer);
+  });
 }
 
 function reportFailures(failures) {

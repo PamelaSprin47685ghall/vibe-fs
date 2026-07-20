@@ -22,6 +22,7 @@ open Wanxiangshu.Runtime
 open Wanxiangshu.Runtime.Fallback.FallbackConfigCodec
 open Wanxiangshu.Runtime.Fallback.RuntimeStore
 open Wanxiangshu.Runtime.Fallback.Ports
+open Wanxiangshu.Runtime.EventLogRuntimeRecovery
 open Wanxiangshu.Runtime.Dyn
 open Wanxiangshu.Runtime.OpencodeClientCodec
 open Wanxiangshu.Runtime.ToolRuntimeContext
@@ -59,8 +60,10 @@ let buildScopeInit
                         | Error _ -> createHost (box null) "" dir))
                 |> FablePromise.map ignore
 
-            return!
+            do!
                 Wanxiangshu.Runtime.EventLogRuntimeSync.syncAllSessionsFromEventLogDedicated host reviewStore scope dir
+
+            do! recoverRequestedFallbackLeases scope dir
         }
 
 let buildMcpMap () : obj =
@@ -122,6 +125,7 @@ let loadPluginServices (host: Host) (ctx: obj) : PluginServiceParts =
 
     let scope = create ()
     scope.Add("fallbackRuntime", box fallbackRuntime)
+    registerFallbackExecutor scope (Wanxiangshu.Hosts.Opencode.Fallback.ActionExecutor.opencodeActionExecutorWithDir fallbackRuntime client directory)
     let backlogSession = BacklogSession(host, scope)
 
     let lifecycleObserver =

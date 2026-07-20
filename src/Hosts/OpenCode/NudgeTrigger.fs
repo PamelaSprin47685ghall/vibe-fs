@@ -48,14 +48,10 @@ type NudgeTrigger
 
     /// Exposed as internal for unit testing of event-classification logic.
     static member internal isNaturalStop (eventType: string) (props: obj) : bool =
-        if eventType = "session.idle" then
-            true
-        elif eventType = "session.error" then
-            true
-        elif eventType = "session.status" then
-            resolveStatusValue (Dyn.get props "status") = "idle"
-        else
-            false
+        eventType = "session.idle"
+        || eventType = "session.error"
+        || (eventType = "session.status"
+            && resolveStatusValue (Dyn.get props "status") = "idle")
 
     member _.TrackLifetimeEvents(eventEnvelope: HostEventEnvelope option) : JS.Promise<unit> =
         promise {

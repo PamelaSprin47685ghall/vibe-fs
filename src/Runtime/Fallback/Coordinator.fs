@@ -10,6 +10,7 @@ open Wanxiangshu.Runtime.Fallback.SessionRuntimePropertyPure
 open Wanxiangshu.Runtime.Fallback.Ports
 open Wanxiangshu.Runtime.Fallback.LeaseValidation
 open Wanxiangshu.Runtime.Fallback.ContinuationExecution
+open Wanxiangshu.Runtime.Fallback.ContinuationIntentExecution
 open Wanxiangshu.Runtime.Fallback.HumanTurnHandler
 open Wanxiangshu.Runtime.Fallback.SessionStatusHandler
 open Wanxiangshu.Runtime.Fallback.CompactionHandler
@@ -117,6 +118,48 @@ let handleEvent
                         isMatchedContinuation
     }
 
+let private isRelevantEvent (translator: IEventTranslator) (sessionID: string) (rawEvent: obj) : bool =
+    translator.TranslateError rawEvent |> Option.isSome
+    || translator.IsNewUserMessage(sessionID, rawEvent)
+    || translator.IsSessionBusy rawEvent
+    || translator.IsSessionIdle rawEvent
+    || translator.ExtractContinuationIdentity rawEvent |> Option.isSome
+
+let private enqueueRelevantEvent
+    (queues: Map<string, SerialQueue> ref)
+    (translator: IEventTranslator)
+    (runtime: FallbackRuntimeStore)
+    (configLookup: ConfigLookup)
+    (executor: IActionExecutor)
+    (workspaceRoot: string)
+    (pendingReview: (string -> bool) option)
+    (sessionID: string)
+    (rawEvent: obj)
+    : JS.Promise<FallbackHookResult> =
+    let queue =
+        match Map.tryFind sessionID queues.Value with
+        | Some q -> q
+        | None ->
+            let q = SerialQueue()
+            queues.Value <- Map.add sessionID q queues.Value
+            q
+
+    promise {
+        let! result, intentOpt =
+            queue.Enqueue(fun () ->
+                handleEvent translator runtime configLookup executor workspaceRoot rawEvent pendingReview)
+
+        match intentOpt with
+        | Some intent ->
+            run runtime executor workspaceRoot sessionID intent
+            |> Promise.catch (fun ex ->
+                JS.console.error ("fallback continuation effect failed for " + sessionID + ": " + ex.Message))
+            |> Promise.start
+        | None -> ()
+
+        return result
+    }
+
 let createHandler
     (translator: IEventTranslator)
     (runtime: FallbackRuntimeStore)
@@ -125,52 +168,14 @@ let createHandler
     (workspaceRoot: string)
     (pendingReview: (string -> bool) option)
     : (obj -> JS.Promise<FallbackHookResult>) =
-    let mutable queues = Map.ofList<string, SerialQueue> []
+    let queues = ref Map.empty<string, SerialQueue>
 
     fun (rawEvent: obj) ->
         promise {
             let sessionID = translator.ExtractSessionID rawEvent
-            // Synchronous pre-filter: skip the SerialQueue entirely when the
-            // event cannot produce a FallbackEvent or affect continuation state.
-            // This is critical — the queue captures rawEvent in a closure and
-            // under high-frequency streaming messages the accumulated Promise
-            // nodes retain every raw object, causing O(n²) heap growth.
-            let isError = translator.TranslateError rawEvent |> Option.isSome
-            let isNewUser = translator.IsNewUserMessage(sessionID, rawEvent)
-            let isBusy = translator.IsSessionBusy rawEvent
-            let isIdle = translator.IsSessionIdle rawEvent
-
-            let hasContinuation =
-                match translator.ExtractContinuationIdentity rawEvent with
-                | Some _ -> true
-                | None -> false
-
-            if not isError && not isNewUser && not isBusy && not isIdle && not hasContinuation then
+            if not (isRelevantEvent translator sessionID rawEvent) then
                 let state = runtime.GetOrCreateState sessionID
                 return { Consumed = false; State = state }
             else
-                // Relevant event — enqueue for ordered processing.
-                let queue =
-                    match Map.tryFind sessionID queues with
-                    | Some q -> q
-                    | None ->
-                        let q = SerialQueue()
-                        queues <- Map.add sessionID q queues
-                        q
-
-
-                let! (result, intentOpt) =
-                    queue.Enqueue(fun () ->
-                        handleEvent translator runtime configLookup executor workspaceRoot rawEvent pendingReview)
-
-                match intentOpt with
-                | Some intent ->
-                    executeContinuationIntent runtime executor workspaceRoot sessionID intent
-                    |> Promise.catch (fun ex ->
-                        JS.console.error ("fallback continuation effect failed for " + sessionID + ": " + ex.Message))
-                    |> Promise.start
-                    |> ignore
-                | None -> ()
-
-                return result
+                return! enqueueRelevantEvent queues translator runtime configLookup executor workspaceRoot pendingReview sessionID rawEvent
         }

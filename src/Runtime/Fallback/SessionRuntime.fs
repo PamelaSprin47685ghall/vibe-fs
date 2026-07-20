@@ -57,7 +57,8 @@ type FallbackSessionRuntime =
       CompactionSummaryTransformPending: bool
       ActiveContinuationGen: int
       ActiveContinuationCancelGen: int
-      ActiveGates: Set<FallbackSessionGateFlag> }
+      ActiveGates: Set<FallbackSessionGateFlag>
+      AbortUnavailable: bool }
 
 let emptyActiveGates: Set<FallbackSessionGateFlag> =
     Set.empty<FallbackSessionGateFlag>
@@ -104,7 +105,8 @@ let freshSessionState: FallbackSessionRuntime =
       CompactionSummaryTransformPending = false
       ActiveContinuationGen = 0
       ActiveContinuationCancelGen = 0
-      ActiveGates = emptyActiveGates }
+      ActiveGates = emptyActiveGates
+      AbortUnavailable = false }
 
 // --- Unified domain transitions ---
 // Each function captures a complete lifecycle transition atomically.
@@ -142,33 +144,48 @@ let beginHumanTurn (msgId: string) (s: FallbackSessionRuntime) : FallbackSession
             |> Set.remove FallbackSessionGateFlag.EventHandlingActive
             |> Set.remove FallbackSessionGateFlag.NudgeActive }
 
+let private hasActiveContinuationLease (s: FallbackSessionRuntime) =
+    match s.PendingLease with
+    | Some lease ->
+        match lease.Status with
+        | LeaseStatus.Requested
+        | LeaseStatus.DispatchStarted
+        | LeaseStatus.Dispatched
+        | LeaseStatus.Running -> true
+        | LeaseStatus.Cancelled
+        | LeaseStatus.Settled -> false
+    | None -> false
+
 /// A fallback continuation dispatch is being initiated — mark owner and gate, stamp generations.
 let startDispatch
     (model: FallbackModel)
     (promptTextOpt: string option)
     (s: FallbackSessionRuntime)
     : FallbackSessionRuntime =
-    let gen = s.SessionGeneration
-    let cancelGen = s.CancelGeneration
-    let nextOrdinal = s.ContinuationOrdinal + 1
+    if hasActiveContinuationLease s then
+        s
+    else
+        let gen = s.SessionGeneration
+        let cancelGen = s.CancelGeneration
+        let nextOrdinal = s.ContinuationOrdinal + 1
 
-    { s with
-        Owner = SessionOwner.Fallback
-        PendingLease =
-            Some
-                { ContinuationID = System.Guid.NewGuid().ToString("N")
-                  ContinuationOrdinal = nextOrdinal
-                  SessionGeneration = gen
-                  HumanTurnID = s.HumanTurnId
-                  CancelGeneration = cancelGen
-                  Owner = SessionOwner.Fallback
-                  Model = model
-                  PromptText = promptTextOpt
-                  Status = LeaseStatus.Requested }
-        ContinuationOrdinal = nextOrdinal
-        ActiveContinuationGen = gen
-        ActiveContinuationCancelGen = cancelGen
-        ActiveGates = Set.add FallbackSessionGateFlag.MainContinuationAwaitingStart s.ActiveGates }
+        { s with
+            Owner = SessionOwner.Fallback
+            PendingLease =
+                Some
+                    { ContinuationID = System.Guid.NewGuid().ToString("N")
+                      ContinuationOrdinal = nextOrdinal
+                      SessionGeneration = gen
+                      HumanTurnID = s.HumanTurnId
+                      CancelGeneration = cancelGen
+                      Owner = SessionOwner.Fallback
+                      Model = model
+                      PromptText = promptTextOpt
+                      Status = LeaseStatus.Requested }
+            ContinuationOrdinal = nextOrdinal
+            ActiveContinuationGen = gen
+            ActiveContinuationCancelGen = cancelGen
+            ActiveGates = Set.add FallbackSessionGateFlag.MainContinuationAwaitingStart s.ActiveGates }
 
 /// A dispatched continuation lease has been fully acknowledged — clear lease and nudge gates.
 let completeDispatch (s: FallbackSessionRuntime) : FallbackSessionRuntime =
@@ -195,7 +212,8 @@ let cancelEpisode (s: FallbackSessionRuntime) : FallbackSessionRuntime =
         Chain = s.Chain
         AgentName = s.AgentName
         Model = s.Model
-        ActiveGates = emptyActiveGates }
+        ActiveGates = emptyActiveGates
+        AbortUnavailable = s.AbortUnavailable }
 
 /// A compaction run is starting — claim ownership, track its identity, and arm the summary-transform bypass.
 let beginCompaction

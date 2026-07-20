@@ -19,10 +19,12 @@ open Wanxiangshu.Tests.IntegrationEventTests
 open Wanxiangshu.Tests.IntegrationToolSpecCatalog
 open Wanxiangshu.Tests.IntegrationOpencodeReviewSpecs
 open Wanxiangshu.Tests.IntegrationOpencodeContractTests
+open Wanxiangshu.Tests.ReplayEquivalenceTests
 open Wanxiangshu.Tests.IntegrationChatTests
 open Wanxiangshu.Tests.WorkBacklogTests
 open Wanxiangshu.Tests.MethodologyTests
 open Wanxiangshu.Tests.TestRunnerBehaviorTests
+open Wanxiangshu.E2e
 
 open Wanxiangshu.Tests.TitleFetchGuardTests
 open Wanxiangshu.Tests.TestsTestBody
@@ -134,6 +136,15 @@ let private integrationToolFlatTests: (string * TestBody) list =
     integrationToolSpecs ()
     |> List.map (fun (shortName, spec) -> "IntegrationTool." + shortName, Async spec)
 
+/// Integration harness suites that start real OpenCode plugin processes. They
+/// already enforce internal per-operation deadlines and cannot complete inside
+/// the generic 1s suite cap, so the runner grants them a dedicated ceiling.
+let private integrationHarnessSuiteLabels =
+    [ "Integration.OpencodePluginTests.run"
+      "Integration.MimocodePluginTests.run"
+      "Integration.MimoTuiPluginTests.run"
+      "IntegrationOpenCodeContractTests.run" ]
+
 let private allOtherTests: (string * TestBody) list =
     coreTestEntries ()
     @ wanxiangzhenTestEntries ()
@@ -143,6 +154,7 @@ let private allOtherTests: (string * TestBody) list =
         "ReactiveTests.run", TestBody.Sync ReactiveTests.run
         "ResourcePlanTests.run", TestBody.Sync ResourcePlanTests.run
         "SessionOverviewTests.run", TestBody.Sync SessionOverviewTests.run
+        "ReplayEquivalenceTests.run", TestBody.Sync ReplayEquivalenceTests.run
         "ContextBudgetSpecs.run", TestBody.Sync(sync ContextBudgetSpecs.run)
         "ContextBudgetHookTests.run", TestBody.Async ContextBudgetHookTests.run
         "ContextBudgetNoReinjectTests.run", TestBody.Async ContextBudgetNoReinjectTests.run
@@ -151,7 +163,10 @@ let private allOtherTests: (string * TestBody) list =
         "ContextBudgetRealApiSpecs.run", TestBody.Async ContextBudgetRealApiSpecs.run
         "ContextBudgetEstimateTests.run", TestBody.Async ContextBudgetEstimateTests.run
         "ContextBudgetCalibrationTests.run", TestBody.Sync(sync ContextBudgetCalibrationTests.run) ]
-    @ [ "IntegrationOpenCodeContractTests.run", TestBody.Async(fun () -> IntegrationOpencodeContractTests.runAll [||]) ]
+    @ [ "Integration.OpencodePluginTests.run", TestBody.Async(fun () -> OpencodePluginTests.runAll [||] |> Promise.map ignore)
+        "Integration.MimocodePluginTests.run", TestBody.Async(fun () -> MimocodePluginTests.runAll [||] |> Promise.map ignore)
+        "Integration.MimoTuiPluginTests.run", TestBody.Async(fun () -> MimoTuiPluginTests.runAll [||] |> Promise.map ignore)
+        "IntegrationOpenCodeContractTests.run", TestBody.Async(fun () -> IntegrationOpencodeContractTests.runAll [||]) ]
     @ integrationToolFlatTests
 
 let private tests: (string * TestBody) list =
@@ -200,7 +215,9 @@ let runAll (args: string array) : JS.Promise<int> =
                 match body with
                 | Sync f -> timed label f
                 | Async f ->
-                    if isIntegrationSuiteRun label then
+                    if List.contains label integrationHarnessSuiteLabels then
+                        do! timedAsyncSuiteWithTimeout label Assert.integrationHarnessSuiteTimeoutMs f
+                    elif isIntegrationSuiteRun label then
                         do! timedAsyncSuite label f
                     else
                         do! timedAsync label f

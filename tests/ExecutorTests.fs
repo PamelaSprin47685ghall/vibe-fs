@@ -5,6 +5,7 @@ open Fable.Core.JsInterop
 open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Runtime.ExecutorSpawn
 open Wanxiangshu.Runtime.RuntimeScope
+open Wanxiangshu.Runtime.ExecutorSpawnHelper
 open Wanxiangshu.Kernel.Primitives.Identity
 open Wanxiangshu.Kernel.Errors.DomainError
 open Wanxiangshu.Kernel.Session.Causality

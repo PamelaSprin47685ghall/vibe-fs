@@ -60,7 +60,6 @@ let calculateConsumed (evt: FallbackEvent) (statePhase: FallbackPhase) (finalSta
     | FallbackEvent.SessionIdle ->
         finalState.Phase = FallbackPhase.ScanningToolCallText
         || finalState.Phase = FallbackPhase.RecoveringToolCallText
-        || finalState.Lifecycle = FallbackLifecycle.TaskComplete
     | FallbackEvent.SessionBusy ->
         match statePhase with
         | FallbackPhase.Retrying _
@@ -142,9 +141,11 @@ let extractEventContext
             | None -> ""
 
         let isAssistantMsg = translator.IsAssistantMessage rawEvent
+        let parentIDOpt = translator.ExtractAssistantParentId rawEvent
+        let eventTurnIdOpt = translator.ExtractHostRunId rawEvent
 
         let isMatchedContinuation, isEventContIdMatch =
-            checkContinuationMatches runtime sessionID continuationId
+            checkContinuationMatchesWithEvidence runtime sessionID continuationId parentIDOpt eventTurnIdOpt
 
         if
             isEventContIdMatch
@@ -156,12 +157,21 @@ let extractEventContext
             runtime.Update(sessionID, setMainContinuationAwaitingStart false)
 
         let! eventOpt = translateEvent translator executor runtime sessionID rawEvent pendingReview
-        let eventTurnIdOpt = translator.ExtractHostRunId rawEvent
 
         let isStale =
             checkIsStale isEventContIdMatch eventOpt eventTurnIdOpt runtime sessionID
 
         let eventOpt = if isStale then None else eventOpt
+
+        let eventOpt =
+            match eventOpt with
+            | Some FallbackEvent.NewUserMessage -> eventOpt
+            | _ ->
+                let hasPending = (runtime.GetSession sessionID).PendingLease.IsSome
+                if hasPending && continuationId = "" && not isMatchedContinuation then
+                    None
+                else
+                    eventOpt
 
         return eventOpt, eventTurnIdOpt, isMatchedContinuation
     }

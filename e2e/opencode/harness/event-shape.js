@@ -42,7 +42,12 @@ function pickFinishReason(parsed) {
 }
 
 function pickStatus(parsed) {
-  return parsed?.properties?.status;
+  const s = parsed?.properties?.status;
+  if (typeof s === 'string') return s;
+  if (s && typeof s === 'object') {
+    return s.type || s.status || undefined;
+  }
+  return s;
 }
 
 /**

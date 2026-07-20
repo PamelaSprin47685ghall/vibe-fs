@@ -40,9 +40,10 @@ let toolExecuteAfterSpec (p: obj) =
 let abortedRetrySpec () =
     promise {
         let promptCalls = ResizeArray<obj>()
+        let! workspaceDir = mkdtempAsync "aborted-retry-"
         let mutable messages: obj array = [||]
 
-        let mkClient () =
+        let mkClient (workspaceDir: string) =
             createObj
                 [ "session",
                   box (
@@ -66,16 +67,18 @@ let abortedRetrySpec () =
                                     (promise { return box {| data = messages |} }))
                             )
                             "prompt",
-                            box (System.Func<obj, JS.Promise<unit>>(fun arg -> (promise { promptCalls.Add(arg) }))) ]
+                            box (System.Func<obj, JS.Promise<unit>>(fun arg ->
+                                promise {
+                                    resolveNudgeReceiptFromPromptArg workspaceDir arg
+                                    promptCalls.Add(arg)
+                                })) ]
                   ) ]
-
-        let! workspaceDir = mkdtempAsync "aborted-retry-"
 
         let! p =
             plugin (
                 box
                     {| directory = workspaceDir
-                       client = mkClient () |}
+                       client = mkClient workspaceDir |}
             )
 
         let eventHook = get p "event"

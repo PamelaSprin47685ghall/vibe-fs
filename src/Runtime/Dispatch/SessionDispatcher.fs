@@ -10,23 +10,17 @@ open Wanxiangshu.Kernel.FallbackKernel.Types
 open Wanxiangshu.Kernel.Primitives.Identity
 open Wanxiangshu.Runtime.PromiseQueue
 
-/// Internal actor state. Kept as a plain record so `SessionDispatcher`
-/// can be a single class without cross-file type-extension pain.
-type SessionDispatcherState =
-    { Queue: SerialQueue
-      mutable Active: DispatchRecord option
-      Workspace: WorkspaceId
-      PhysicalSessionId: string
-      EventLogger: IDispatchEventLogger }
-
-/// Per-session mailbox. Hosts lifecycle transitions and the actual `sendPrompt`
-/// invocation inside one serial queue so two dispatches on the same physical
-/// session can never race.
+/// Per-session mailbox. Hosts lifecycle transitions and serializes the short
+/// state changes around a transport call. The host promise itself never runs
+/// inside the mailbox: a slow or unresolved prompt must not block lifecycle
+/// events, cancellation, or a competing dispatch from being observed.
 type SessionDispatcher(workspace: WorkspaceId, physicalSessionId: string, eventLogger: IDispatchEventLogger) =
 
     let state =
         { Queue = SerialQueue()
           Active = None
+          Generation = 0
+          IsClosed = false
           Workspace = workspace
           PhysicalSessionId = physicalSessionId
           EventLogger = eventLogger }
@@ -91,45 +85,16 @@ type SessionDispatcher(workspace: WorkspaceId, physicalSessionId: string, eventL
                         | _ -> ())
 
                 do! this.Reserve r
-                do! this.RunTransport r sendPrompt cancellation
+                // Keep the transport outside the mailbox. Its result is
+                // re-entered through the queue by RunTransport.
+                this.RunTransport r sendPrompt cancellation |> Promise.start
                 let! outcome = resultPromise
                 return (outcome, r.ReceiptWaiter)
         }
 
-    /// Reserve the per-session slot. Refuses if another dispatch is in flight.
+    /// Reserve the per-session slot. Refuses if another dispatch is in flight or the session is closed.
     member private this.Reserve(r: DispatchRecord) : JS.Promise<unit> =
-        state.Queue.Enqueue(fun () ->
-            promise {
-                match state.Active with
-                | Some existing when existing.Identity.LogicalTurnId <> r.Identity.LogicalTurnId ->
-                    // Different logical turn: the previous dispatch was accepted at
-                    // the host but state.Active was never cleared.  Resolve it as
-                    // Completed so the slot is free for the new dispatch.
-                    DispatchOps.resolveRecord existing Completed
-                    state.Active <- Some r
-
-                    eventLogger.Log(
-                        DispatchRequested(r.Identity, "host_prompt", DispatchOps.digestForPrompt r.Identity)
-                    )
-                | Some existing ->
-                    DispatchOps.resolveRecord
-                        r
-                        (RejectedBeforeSend
-                            { ErrorName = "AnotherDispatchInFlight"
-                              DomainError = None
-                              Message =
-                                "DispatchRegistry: physical session already has an active dispatch (id="
-                                + DispatchId.value existing.Identity.DispatchId
-                                + ")"
-                              StatusCode = None
-                              IsRetryable = Some false })
-                | None ->
-                    state.Active <- Some r
-
-                    eventLogger.Log(
-                        DispatchRequested(r.Identity, "host_prompt", DispatchOps.digestForPrompt r.Identity)
-                    )
-            })
+        SessionDispatcherOps.reserveRecord state r eventLogger
 
     /// Run the user-supplied `sendPrompt` and translate the result into the
     /// dispatch state machine.
@@ -138,23 +103,4 @@ type SessionDispatcher(workspace: WorkspaceId, physicalSessionId: string, eventL
         (sendPrompt: DispatchIdentity -> JS.Promise<DispatchAcceptance>)
         (cancellation: System.Threading.CancellationToken)
         : JS.Promise<unit> =
-        state.Queue.Enqueue(fun () ->
-            promise {
-                if DispatchOps.isCancelRequested r cancellation then
-                    DispatchOps.resolveRecord r Cancelled
-                else
-                    r.Phase <- TransportStarted
-                    eventLogger.Log(DispatchTransportStarted(r.Identity.DispatchId, DispatchOps.getNowMs ()))
-
-                    let awaitedOpt: JS.Promise<DispatchAcceptance> option =
-                        try
-                            Some(sendPrompt r.Identity)
-                        with _ex ->
-                            None
-
-                    match awaitedOpt with
-                    | None -> DispatchOps.rejectUnknown r "TransportThrew" "sendPrompt threw synchronously"
-                    | Some awaited ->
-                        let! receipt = SessionDispatcherOps.awaitReceipt awaited r
-                        SessionDispatcherOps.applyReceipt r receipt eventLogger
-            })
+        SessionDispatcherOps.runTransport state r sendPrompt cancellation eventLogger

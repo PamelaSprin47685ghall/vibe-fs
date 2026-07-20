@@ -39,7 +39,7 @@ let private checkProductionLineLimits (srcRoot: string) =
             let content = readFileSync path "utf8"
 
             let hasOrchestration =
-                Regex(@"(\blet\s+rec\b|\band\s+\w+\s+->|\bdo!\b|\blet!\b)", RegexOptions.Multiline)
+                Regex(@"(\blet\s+rec\b|\band\s+\w+\s+->|\bdo!|\blet!)", RegexOptions.Multiline)
                     .IsMatch
                     content
 

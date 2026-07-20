@@ -57,6 +57,7 @@ let entriesAsync () : (string * (unit -> JS.Promise<unit>)) list =
                with ex ->
                    caught <- true
                    checkBare (ex.Message.Contains "client")
+                   checkBare (ex.Message.Contains "wanxiangzhen_prompt_parameter_missing")
 
                checkBare caught
            })
@@ -72,6 +73,7 @@ let entriesAsync () : (string * (unit -> JS.Promise<unit>)) list =
                with ex ->
                    caught <- true
                    checkBare (ex.Message.Contains "sessionId")
+                   checkBare (ex.Message.Contains "wanxiangzhen_prompt_parameter_missing")
 
                checkBare caught
            })
@@ -87,6 +89,7 @@ let entriesAsync () : (string * (unit -> JS.Promise<unit>)) list =
                with ex ->
                    caught <- true
                    checkBare (ex.Message.Contains "text")
+                   checkBare (ex.Message.Contains "wanxiangzhen_prompt_parameter_missing")
 
                checkBare caught
            })
@@ -133,4 +136,51 @@ let entriesAsync () : (string * (unit -> JS.Promise<unit>)) list =
                    let part = parts.[0]
                    equal "text" (str part "type")
                    equal "hello" (str part "text")
+           })
+
+      ("promptSession normalizes synchronous non-promise return",
+       fun () ->
+           promise {
+               let mutable invokedWith = None
+
+               let fakePromptFn =
+                   System.Func<obj, obj>(fun arg ->
+                       invokedWith <- Some arg
+                       box 42)
+
+               let session = createObj [ "prompt", box fakePromptFn ]
+               let client = createObj [ "session", box session ]
+
+               do! promptSession client "sid-1" "hello"
+
+               match invokedWith with
+               | None -> checkBare false
+               | Some _ -> checkBare true
+           })
+
+      ("promptSession normalizes undefined return",
+       fun () ->
+           promise {
+               let fakePromptFn = System.Func<obj, obj>(fun _ -> null)
+               let session = createObj [ "prompt", box fakePromptFn ]
+               let client = createObj [ "session", box session ]
+
+               do! promptSession client "sid-1" "hello"
+               checkBare true
+           })
+
+      ("promptSession rejects when session.prompt is not a function",
+       fun () ->
+           promise {
+               let mutable caught = false
+               let session = createObj [ "prompt", box "not-a-function" ]
+               let client = createObj [ "session", box session ]
+
+               try
+                   do! promptSession client "sid-1" "hello"
+               with ex ->
+                   caught <- true
+                   checkBare (ex.Message.Contains "wanxiangzhen_session_api_missing")
+
+               checkBare caught
            }) ]

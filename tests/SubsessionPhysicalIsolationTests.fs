@@ -13,6 +13,8 @@ open Wanxiangshu.Runtime.SubsessionPorts
 open Wanxiangshu.Runtime.SubsessionActor
 open Wanxiangshu.Runtime.SubsessionActorRegistry
 open Wanxiangshu.Runtime.SubsessionEventStore
+open Wanxiangshu.Runtime.Fallback.RuntimeStore
+open Wanxiangshu.Runtime.Fallback.Ports
 open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Hosts.Opencode.SubsessionHostAdapterTypes
 
@@ -253,7 +255,11 @@ let private makeOmpSessionAndPi (promptPromise: JS.Promise<obj>) (abortFn: unit 
               "abort",
               box (fun () ->
                   abortFn ()
-                  Promise.lift (box null)) ]
+                  Promise.lift (box null))
+              "sessionMessages",
+              box (fun (_: obj) -> Promise.lift (box {| data = [||] |}))
+              "sessionPrompt",
+              box (fun (_: obj) -> promptPromise) ]
 
     let piSession =
         createObj
@@ -364,6 +370,169 @@ let private ompAbortWithScopedTurnOwnership () =
         let! _ = host.ClosePhysicalSession(sid)
         let! res6 = host.Abort(sid, turnId)
         equal "abort after close is ConfirmedStopped" ConfirmedStopped res6
+    }
+
+let private ompPreSendCancelRejectsAndDoesNotCallHost () =
+    promise {
+        let runId = RunId.create "run-omp-presend"
+        let sid = SessionId.create "child-omp-presend"
+        let turnId = TurnId.create (RunId.value runId + "-t0")
+        let plan = makePlan runId
+
+        let promptCalled = ref false
+        let promptP =
+            Promise.lift (box null)
+
+        let session =
+            createObj
+                [ "prompt", box (fun (_: string) ->
+                    promptCalled.Value <- true
+                    promptP) ]
+
+        let pi = createObj [ "session", box (createObj []) ]
+
+        let host = OmpHost.createHost session "" pi "omp-test-presend"
+
+        // Cancel BEFORE calling Dispatch (pre-send cancel)
+        host.CancelPendingDispatch turnId
+
+        let dispatchP = host.Dispatch(sid, plan)
+        let! result = dispatchP
+
+        equal "host.prompt was not called" false promptCalled.Value
+
+        match result with
+        | Error(HostRejected e) when e.Message = HostReceiptWaiter.cancelError.Message ->
+            check "omp dispatch rejected pre-send cancel" true
+        | other -> fail ("expected HostRejected cancel, got " + string other)
+    }
+
+let private ompSessionStatesWorkspaceIsolation () =
+    promise {
+        let runId = RunId.create "run-omp-iso"
+        let sid = SessionId.create "child-omp-iso"
+        let turnId1 = TurnId.create (RunId.value runId + "-t1")
+        let turnId2 = TurnId.create (RunId.value runId + "-t2")
+        let plan1 = { makePlan runId with TurnId = turnId1 }
+        let plan2 = { makePlan runId with TurnId = turnId2 }
+
+        let promptP = Promise.lift (box null)
+        let abortCount = ref 0
+        let piAbortCount = ref 0
+        let struct (session, pi) =
+            makeOmpSessionAndPi promptP (fun () -> abortCount.Value <- abortCount.Value + 1) (fun () ->
+                piAbortCount.Value <- piAbortCount.Value + 1)
+
+        let hostA = OmpHost.createHost session "" pi "omp-ws-A"
+        let hostB = OmpHost.createHost session "" pi "omp-ws-B"
+
+        // 1. Dispatch on hostA (active turn becomes turnId1)
+        let _ = hostA.Dispatch(sid, plan1)
+
+        // 2. Dispatch on hostB (active turn becomes turnId2)
+        let _ = hostB.Dispatch(sid, plan2)
+
+        // 3. Abort turnId1 on hostB: since hostB's active turn is turnId2, turnId1 is stale on hostB
+        let! res1 = hostB.Abort(sid, turnId1)
+        equal "aborting A's turn on B is stale" ConfirmedStopped res1
+        equal "no physical abort for stale turn on B" 0 abortCount.Value
+
+        // 4. Abort turnId1 on hostA: it is active on hostA, so it should trigger abort
+        let! res2 = hostA.Abort(sid, turnId1)
+        equal "aborting A's turn on A is active" RequestAcceptedAwaitIdle res2
+        equal "physical abort triggered" 1 abortCount.Value
+    }
+
+let private ompCancelStartedDispatchTriggersPhysicalAbort () =
+    promise {
+        let runId = RunId.create "run-omp-cancel-started"
+        let sid = SessionId.create "child-omp-cancel-started"
+        let turnId = TurnId.create (RunId.value runId + "-t0")
+        let plan = makePlan runId
+
+        let abortCalled = ref false
+        let piAbortCalled = ref false
+
+        let resolveRef = ref (fun (_: obj) -> ())
+        let promptP = Promise.create (fun resolve _ -> resolveRef.Value <- resolve)
+
+        let struct (session, pi) =
+            makeOmpSessionAndPi promptP (fun () -> abortCalled.Value <- true) (fun () -> piAbortCalled.Value <- true)
+
+        let host = OmpHost.createHost session "" pi "omp-test-ws"
+        let dispatchP = host.Dispatch(sid, plan)
+        do! sleep 5
+
+        // Dispatch has started, so CancelPendingDispatch should trigger physical abort
+        host.CancelPendingDispatch turnId
+
+        equal "physical abort called" true abortCalled.Value
+        equal "physical pi abort called" true piAbortCalled.Value
+
+        // Clean up
+        resolveRef.Value (box null)
+        let! _ = dispatchP
+        ()
+    }
+
+let private ompIdleEventRoutingValidation () =
+    promise {
+        let runId = RunId.create "run-omp-idle-validate"
+        let sid = "child-omp-idle-validate"
+        let turnId = TurnId.create (RunId.value runId + "-t0")
+        let plan = makePlan runId
+
+        let store = MemorySubsessionEventStore()
+        let resolveRef = ref (fun (_: obj) -> ())
+        let promptP = Promise.create (fun resolve _ -> resolveRef.Value <- resolve)
+
+        let struct (session, pi) =
+            makeOmpSessionAndPi promptP (fun () -> ()) (fun () -> ())
+
+        let host = OmpHost.createHost session "" pi "omp-test-ws"
+        let actor = SubsessionActorRegistry.GetOrCreate "omp-test-ws" sid host store
+
+        let request =
+            { RunId = runId
+              SessionId = SessionId.create sid
+              ParentSessionId = SessionId.create "parent-v40"
+              Prompt = "go"
+              FallbackConfig = cfg
+              Directive = RetryChain [ model0 ]
+              InitiallyCancelled = false }
+
+        let _ = actor.BeginRun request
+        do! sleep 10
+
+        let runtime = FallbackRuntimeStore()
+        let configLookup: ConfigLookup = fun _ -> cfg
+        let handler =
+            Wanxiangshu.Hosts.Omp.Fallback.Hook.createOmpFallbackHandler
+                runtime
+                configLookup
+                session
+                "omp-test-ws"
+
+        let rawIdleEvent =
+            createObj
+                [ "event",
+                  box (createObj [ "type", box "session.idle" ])
+                  "props",
+                  box (createObj [ "sessionID", box sid ]) ]
+
+        // 1. When waiter is not completed, session.idle must be ignored (not consumed)
+        let! res1 = handler rawIdleEvent
+        equal "stale idle event is not consumed" false res1.Consumed
+
+        // 2. Resolve prompt so waiter completes
+        resolveRef.Value (box null)
+        do! sleep 10
+
+        // 3. Now session.idle must be consumed
+        let! res2 = handler rawIdleEvent
+        equal "fresh idle event is consumed" true res2.Consumed
+
+        SubsessionActorRegistry.Remove "omp-test-ws" sid
     }
 
 // ── Decision / evidence semantics ──
@@ -653,5 +822,9 @@ let run () =
         do! ompQuiescenceHonestUnknown ()
         do! ompCancelPendingDispatchRejectsLateReceipt ()
         do! ompAbortWithScopedTurnOwnership ()
+        do! ompPreSendCancelRejectsAndDoesNotCallHost ()
+        do! ompSessionStatesWorkspaceIsolation ()
+        do! ompCancelStartedDispatchTriggersPhysicalAbort ()
+        do! ompIdleEventRoutingValidation ()
         do! routeNoneTurnIdEvidenceAttributedToCurrentTurn ()
     }

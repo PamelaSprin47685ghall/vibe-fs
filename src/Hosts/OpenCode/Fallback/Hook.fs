@@ -185,7 +185,7 @@ let createOpencodeFallbackHandler
             translator
             runtime
             configLookup
-            (opencodeActionExecutor runtime client)
+            (opencodeActionExecutorWithDir runtime client workspaceRoot)
             workspaceRoot
             (Some pendingReview)
 

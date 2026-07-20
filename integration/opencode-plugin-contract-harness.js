@@ -26,6 +26,8 @@ async function loadPlugin(variant) {
 }
 
 function buildMockClient(messages = [], opts = {}, hookRef) {
+  let hostMessageOrdinal = 0;
+
   return {
     session: {
       messages: async () => ({ data: messages }),
@@ -34,23 +36,35 @@ function buildMockClient(messages = [], opts = {}, hookRef) {
       prompt: async (body) => {
         const promptBody = (body && body.body) || {};
         const hook = (hookRef || {}).hook;
+        console.log('[harness] session.prompt called');
         if (hook) {
           const parts = (promptBody && promptBody.parts) || [];
-          const nonce = (parts[0] && parts[0].metadata && parts[0].metadata.nonce) || ('mock-' + Date.now());
+          const metadata = parts[0] && parts[0].metadata;
+          const wanxiangshu = metadata && metadata.wanxiangshu;
+          const nonce = (wanxiangshu && wanxiangshu.nonce)
+            || (metadata && metadata.nonce)
+            || ('mock-' + Date.now());
+          const messageId = 'mock-host-user-' + (++hostMessageOrdinal);
           const input = {
             sessionID: (body && body.path && body.path.id) || '',
             agent: (promptBody && promptBody.agent) || 'build',
           };
           const output = {
             parts,
-            message: { id: nonce, role: 'assistant', agent: (promptBody && promptBody.agent) || 'build' },
+            message: { id: messageId, role: 'user', agent: (promptBody && promptBody.agent) || 'build' },
           };
-          try { await hook(input, output); } catch (_) {}
+          console.log('[harness] chat.message receipt', messageId, nonce, wanxiangshu && wanxiangshu.kind, wanxiangshu && wanxiangshu.continuationId);
+          try { await hook(input, output); }
+          catch (error) {
+            console.error('[harness] chat.message receipt hook failed:', error?.stack || error);
+            throw error;
+          }
+          console.log('[harness] chat.message receipt completed', messageId);
         }
         const mockPrompt = (opts.mockSessionClient || {}).prompt;
         return mockPrompt ? await mockPrompt(body) : undefined;
       },
-      abort: async () => ({}),
+      abort: async () => { console.log('[harness] session.abort called'); return {}; },
     },
     ...(opts.mockClientExtra || {}),
   };

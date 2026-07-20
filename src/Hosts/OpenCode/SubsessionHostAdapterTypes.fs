@@ -137,4 +137,4 @@ let bindHostUserMessage
         (UserMessageObserved messageId)
     |> ignore
 
-let onSessionClosed (dispatcher: Wanxiangshu.Runtime.Dispatch.SessionDispatcher) : unit = dispatcher.OnSessionClosed()
+let onSessionClosed (dispatcher: Wanxiangshu.Runtime.Dispatch.SessionDispatcher) : unit = dispatcher.OnSessionClosed() |> Promise.start

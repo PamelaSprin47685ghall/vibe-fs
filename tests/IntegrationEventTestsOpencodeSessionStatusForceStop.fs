@@ -23,6 +23,8 @@ let private userTextMessage sessionID text =
 let opencodeForceStopTodoNudgeSpec () =
     promise {
         let sessionID = "force-stop-ws"
+        let! workspaceDir = mkdtempAsync "force-stop-"
+        let! workspaceDir = mkdtempAsync "force-stop-"
 
         let mutable messages =
             [| box
@@ -39,7 +41,7 @@ let opencodeForceStopTodoNudgeSpec () =
 
         let promptCalls = ResizeArray<obj>()
 
-        let mkClient () =
+        let mkClient (workspaceDir: string) =
             createObj
                 [ "session",
                   box (
@@ -63,16 +65,18 @@ let opencodeForceStopTodoNudgeSpec () =
                                     promise { return box {| data = messages |} })
                             )
                             "prompt",
-                            box (System.Func<obj, JS.Promise<unit>>(fun arg -> promise { promptCalls.Add(arg) })) ]
+                            box (System.Func<obj, JS.Promise<unit>>(fun arg ->
+                                promise {
+                                    resolveNudgeReceiptFromPromptArg workspaceDir arg
+                                    promptCalls.Add(arg)
+                                })) ]
                   ) ]
-
-        let! workspaceDir = mkdtempAsync "force-stop-"
 
         let! p =
             plugin (
                 box
                     {| directory = workspaceDir
-                       client = mkClient () |}
+                       client = mkClient workspaceDir |}
             )
 
         let eventHook = get p "event"
@@ -97,6 +101,7 @@ let opencodeForceStopTodoNudgeSpec () =
 
 let sessionStatusIdleDoesNotTriggerNudgeSpec () =
     promise {
+        let! workspaceDir = mkdtempAsync "session-status-idle-no-nudge-"
         let messages =
             [| box
                    {| info =
@@ -112,7 +117,7 @@ let sessionStatusIdleDoesNotTriggerNudgeSpec () =
 
         let promptCalls = ResizeArray<obj>()
 
-        let mkClient () =
+        let mkClient (workspaceDir: string) =
             createObj
                 [ "session",
                   box (
@@ -136,16 +141,18 @@ let sessionStatusIdleDoesNotTriggerNudgeSpec () =
                                     promise { return box {| data = messages |} })
                             )
                             "prompt",
-                            box (System.Func<obj, JS.Promise<unit>>(fun arg -> promise { promptCalls.Add(arg) })) ]
+                            box (System.Func<obj, JS.Promise<unit>>(fun arg ->
+                                promise {
+                                    resolveNudgeReceiptFromPromptArg workspaceDir arg
+                                    promptCalls.Add(arg)
+                                })) ]
                   ) ]
-
-        let! workspaceDir = mkdtempAsync "session-status-idle-no-nudge-"
 
         let! p =
             plugin (
                 box
                     {| directory = workspaceDir
-                       client = mkClient () |}
+                       client = mkClient workspaceDir |}
             )
 
         let eventHook = get p "event"

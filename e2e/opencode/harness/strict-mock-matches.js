@@ -69,7 +69,7 @@ export function isTitleGenerationRequest(body) {
   for (const msg of messages) {
     const texts = extractTextsFromContent(msg?.content);
     for (const t of texts) {
-      if (t.includes(TITLE_GENERATION_MARKER)) return true;
+      if (t.includes(TITLE_GENERATION_MARKER) || t.includes('Please name the conversation')) return true;
     }
   }
   return false;

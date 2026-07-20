@@ -50,7 +50,7 @@ function collectEvents(diag, scenario) {
   if (!scenario.events) return;
   diag.events = scenario.events.allEvents.slice(-TAIL_EVENT_LIMIT).map((e) => ({
     seq: e.seq,
-    time: new Date(e.time).toISOString().slice(11, 23),
+    time: new Date(e.time || Date.now()).toISOString().slice(11, 23),
     type: e.type,
     sessionID: e.sessionID ? String(e.sessionID).slice(0, 16) : undefined,
     error: e.error,

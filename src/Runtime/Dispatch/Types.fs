@@ -55,6 +55,16 @@ module DispatchOps =
         if r.Terminal.IsNone then
             r.Terminal <- Some terminal
             r.Phase <- Terminal terminal
+
+            // A terminal domain result also terminates the transport wait.
+            // Without this, CompleteByTurn/FailByTurn can free the slot while
+            // an unresolved host promise remains alive forever.
+            match r.CancelWaiter with
+            | Some cancelWaiter ->
+                r.CancelWaiter <- None
+                cancelWaiter ()
+            | None -> ()
+
             let outcome = Failed terminal
 
             match r.Waiter with

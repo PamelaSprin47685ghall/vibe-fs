@@ -111,15 +111,21 @@ let private handleSendOutcome
             ""
             ""
     | SendOutcome.AcceptanceUnknown msg ->
-        finishNudge
-            fallbackRuntime
-            workspaceRoot
-            sessionKey
-            lease
-            NudgeOutcome.Failed
-            ("AcceptanceUnknown: " + msg)
-            ""
-            ""
+        // AcceptanceUnknown means the host did not return a verifiable receipt.
+        // We must not rewrite it as Failed (which would clear the pending claim
+        // and allow an immediate duplicate nudge) and we must not pretend it was
+        // Dispatched. The existing nudge_requested event already records the
+        // logical dispatch claim and is the correct dedup anchor.
+        Promise.lift ()
+
+let private safeNudgeAbort (abortRun: string -> JS.Promise<unit>) (sessionKey: string) : JS.Promise<Result<unit, exn>> =
+    promise {
+        try
+            do! abortRun sessionKey
+            return Ok ()
+        with ex ->
+            return Error ex
+    }
 
 let validateAndFinalizeOutcome
     (workspaceRoot: string)
@@ -133,18 +139,47 @@ let validateAndFinalizeOutcome
     : JS.Promise<unit> =
     promise {
         if not (isLeaseValid fallbackRuntime sessionKey lease) then
-            do! abortRun sessionKey
-
-            do!
-                finishNudge
-                    fallbackRuntime
-                    workspaceRoot
-                    sessionKey
-                    lease
-                    NudgeOutcome.Cancelled
-                    "Cancelled after dispatch"
-                    ""
-                    ""
+            let session = fallbackRuntime.GetSession sessionKey
+            if session.AbortUnavailable then
+                do!
+                    finishNudge
+                        fallbackRuntime
+                        workspaceRoot
+                        sessionKey
+                        lease
+                        NudgeOutcome.Cancelled
+                        "Cancelled after dispatch (AbortUnavailable skipped)"
+                        ""
+                        ""
+            else
+                let! abortResult = safeNudgeAbort abortRun sessionKey
+                match abortResult with
+                | Ok () ->
+                    do!
+                        finishNudge
+                            fallbackRuntime
+                            workspaceRoot
+                            sessionKey
+                            lease
+                            NudgeOutcome.Cancelled
+                            "Cancelled after dispatch"
+                            ""
+                            ""
+                | Error ex ->
+                    if ex.Message.Contains("AbortUnavailable") then
+                        fallbackRuntime.Update(sessionKey, setAbortUnavailable true)
+                        do!
+                            finishNudge
+                                fallbackRuntime
+                                workspaceRoot
+                                sessionKey
+                                lease
+                                NudgeOutcome.Cancelled
+                                ("Cancelled (AbortUnavailable: " + ex.Message + ")")
+                                ""
+                                ""
+                    else
+                        return! Promise.reject ex
         else
             do! handleSendOutcome workspaceRoot fallbackRuntime sessionKey lease action nudgeAnchorKey outcome abortRun
     }

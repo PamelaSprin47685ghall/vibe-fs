@@ -8,7 +8,11 @@ open Wanxiangshu.Runtime.Fallback.RuntimeStore
 open Wanxiangshu.Runtime.Fallback.SessionRuntime
 open Wanxiangshu.Runtime.Fallback.SessionRuntimeLeaseAcceptancePure
 open Wanxiangshu.Runtime.Fallback.SessionRuntimePropertyPure
+open Wanxiangshu.Runtime.Dispatch
 open Wanxiangshu.Kernel.FallbackKernel.Types
+open Wanxiangshu.Kernel.Dispatch.Protocol
+open Wanxiangshu.Kernel.Primitives.Identity
+open Wanxiangshu.Kernel.Subsession.Types
 open Wanxiangshu.Kernel.Nudge.Types
 open Wanxiangshu.Hosts.Opencode.ChatHooks
 open Wanxiangshu.Hosts.Opencode.ChatHooksDecoders
@@ -289,6 +293,37 @@ let test_isSystemMessage_consumeIsNotLeaky () =
     check "first match is system" firstResult
     check "after consume, second same-nonce message is NOT system" (not secondResult)
 
+let test_chatMessageBindsOpaqueReceiptToRealMessageId () =
+    let sid = "s-receipt-binding"
+    let continuationId = "fc-receipt-binding"
+    let workspace = Id.workspaceIdQuick "opencode-default"
+    let waiter = HostReceiptWaiterRegistry.create workspace sid continuationId
+
+    HostReceiptWaiter.resolveFromAcceptance waiter (OpaqueAccepted continuationId)
+    check "opaque acceptance does not complete host receipt" (not waiter.Completed)
+
+    let fr = FallbackRuntimeStore()
+
+    let parts =
+        [| box
+               {| ``type`` = "text"
+                  text = "\u200B"
+                  metadata =
+                   box
+                       {| wanxiangshu =
+                           box
+                               {| kind = "fallback_continuation"
+                                  schema = 2
+                                  continuationId = continuationId |} |} |} |]
+
+    check "continuation message is system-owned" (isSystemMessage parts fr "" sid "host-msg-binding")
+    check "host receipt completed by chat.message" waiter.Completed
+
+    match waiter.TransportState with
+    | HostReceiptWaiterTransportState.ReceiptResolved(UserMessageObserved "host-msg-binding") ->
+        check "receipt contains real host message id" true
+    | other -> failwith ("expected real user-message receipt, got " + string other)
+
 let run () =
     test_isSystemMessage_fallbackContinuationIsSystem ()
     test_isSystemMessage_acceptsFallbackContinuation ()
@@ -304,5 +339,6 @@ let run () =
     test_tryConsumeActiveNudgeNonce_mismatchNoOp ()
     test_tryConsumeActiveNudgeNonce_emptyNonceNoOp ()
     test_isSystemMessage_consumeIsNotLeaky ()
+    test_chatMessageBindsOpaqueReceiptToRealMessageId ()
 
 let runAsync () : JS.Promise<unit> = Promise.lift (run ())

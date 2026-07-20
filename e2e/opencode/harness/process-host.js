@@ -247,8 +247,5 @@ function buildEnv(opts) {
   });
 
   const finalEnv = { ...baseEnv, ...envOverrides };
-  if (opts.extraEnv) {
-    Object.assign(finalEnv, opts.extraEnv);
-  }
   return finalEnv;
 }

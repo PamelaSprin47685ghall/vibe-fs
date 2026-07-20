@@ -11,14 +11,19 @@ open Wanxiangshu.Runtime.Dyn
 let sessionInterruptedEventSpec () =
     promise {
         let promptCalls = ResizeArray<obj>()
+        let! workspaceDir = mkdtempAsync "fallback-interrupted-"
 
-        let mkClient () =
+        let mkClient (workspaceDir: string) =
             createObj
                 [ "session",
                   box (
                       createObj
                           [ "prompt",
-                            box (System.Func<obj, JS.Promise<unit>>(fun arg -> promise { promptCalls.Add(arg) }))
+                            box (System.Func<obj, JS.Promise<unit>>(fun arg ->
+                                promise {
+                                    resolveNudgeReceiptFromPromptArg workspaceDir arg
+                                    promptCalls.Add(arg)
+                                }))
                             "messages",
                             box (
                                 System.Func<obj, JS.Promise<obj>>(fun _ ->
@@ -44,13 +49,11 @@ let sessionInterruptedEventSpec () =
                             "abort", box (System.Func<obj, JS.Promise<unit>>(fun _ -> Promise.lift ())) ]
                   ) ]
 
-        let! workspaceDir = mkdtempAsync "fallback-interrupted-"
-
         let! p =
             plugin (
                 box
                     {| directory = workspaceDir
-                       client = mkClient () |}
+                       client = mkClient workspaceDir |}
             )
 
         let eventHook = get p "event"
@@ -88,14 +91,19 @@ let sessionInterruptedEventSpec () =
 let sessionInterruptedMessageIdleEventSpec () =
     promise {
         let promptCalls = ResizeArray<obj>()
+        let! workspaceDir = mkdtempAsync "fallback-interrupted-msg-"
 
-        let mkClient () =
+        let mkClient (workspaceDir: string) =
             createObj
                 [ "session",
                   box (
                       createObj
                           [ "prompt",
-                            box (System.Func<obj, JS.Promise<unit>>(fun arg -> promise { promptCalls.Add(arg) }))
+                            box (System.Func<obj, JS.Promise<unit>>(fun arg ->
+                                promise {
+                                    resolveNudgeReceiptFromPromptArg workspaceDir arg
+                                    promptCalls.Add(arg)
+                                }))
                             "messages",
                             box (
                                 System.Func<obj, JS.Promise<obj>>(fun _ ->
@@ -117,13 +125,11 @@ let sessionInterruptedMessageIdleEventSpec () =
                             "abort", box (System.Func<obj, JS.Promise<unit>>(fun _ -> Promise.lift ())) ]
                   ) ]
 
-        let! workspaceDir = mkdtempAsync "fallback-interrupted-msg-"
-
         let! p =
             plugin (
                 box
                     {| directory = workspaceDir
-                       client = mkClient () |}
+                       client = mkClient workspaceDir |}
             )
 
         let eventHook = get p "event"
@@ -167,14 +173,19 @@ let sessionInterruptedMessageIdleEventSpec () =
 let sessionInterruptedMessageWithContentIdleEventSpec () =
     promise {
         let promptCalls = ResizeArray<obj>()
+        let! workspaceDir = mkdtempAsync "fallback-interrupted-content-"
 
-        let mkClient () =
+        let mkClient (workspaceDir: string) =
             createObj
                 [ "session",
                   box (
                       createObj
                           [ "prompt",
-                            box (System.Func<obj, JS.Promise<unit>>(fun arg -> promise { promptCalls.Add(arg) }))
+                            box (System.Func<obj, JS.Promise<unit>>(fun arg ->
+                                promise {
+                                    resolveNudgeReceiptFromPromptArg workspaceDir arg
+                                    promptCalls.Add(arg)
+                                }))
                             "messages",
                             box (
                                 System.Func<obj, JS.Promise<obj>>(fun _ ->
@@ -203,13 +214,11 @@ let sessionInterruptedMessageWithContentIdleEventSpec () =
                             "abort", box (System.Func<obj, JS.Promise<unit>>(fun _ -> Promise.lift ())) ]
                   ) ]
 
-        let! workspaceDir = mkdtempAsync "fallback-interrupted-content-"
-
         let! p =
             plugin (
                 box
                     {| directory = workspaceDir
-                       client = mkClient () |}
+                       client = mkClient workspaceDir |}
             )
 
         let eventHook = get p "event"

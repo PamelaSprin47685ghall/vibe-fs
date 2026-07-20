@@ -2,6 +2,9 @@ module Wanxiangshu.Tests.TestWorkspace
 
 open Fable.Core
 open Fable.Core.JsInterop
+open Wanxiangshu.Runtime.Dispatch
+open Wanxiangshu.Kernel.Subsession.Types
+open Wanxiangshu.Kernel.Primitives.Identity
 
 module Dyn = Wanxiangshu.Runtime.Dyn
 
@@ -50,3 +53,27 @@ let tryReadFileAsync (path: string) : JS.Promise<string option> =
         with _ ->
             return None
     }
+
+/// Resolve the HostReceiptWaiter for an OpenCode nudge prompt so tests that
+/// mock `client.session.prompt` do not hang waiting for an OpaqueAccepted
+/// receipt. The nonce is read from the part metadata and the session id from
+/// the prompt path.
+let resolveNudgeReceiptFromPromptArg (workspaceDir: string) (arg: obj) : unit =
+    let body = Dyn.get arg "body"
+    let parts = Dyn.get body "parts"
+
+    if not (Dyn.isNullish parts) && Dyn.isArray parts then
+        let partsArr = unbox<obj array> parts
+        let firstPart = partsArr.[0]
+        let metadata = Dyn.get firstPart "metadata"
+        let wanxiangshu = Dyn.get metadata "wanxiangshu"
+        let nonce = Dyn.str wanxiangshu "nonce"
+        let sessionID = Dyn.str (Dyn.get arg "path") "id"
+
+        if nonce <> "" && sessionID <> "" then
+            HostReceiptWaiterRegistry.tryResolve
+                (Id.workspaceIdQuick ("opencode:" + workspaceDir))
+                sessionID
+                nonce
+                OrderedTurnMarkerObserved
+            |> ignore

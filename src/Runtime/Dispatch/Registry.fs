@@ -1,5 +1,6 @@
 namespace Wanxiangshu.Runtime.Dispatch
 
+open Fable.Core
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Primitives.Identity
 
@@ -39,7 +40,11 @@ type DispatchRegistry() =
 
         match opt with
         | Some d ->
-            d.OnSessionClosed()
+            // OnSessionClosed returns a promise because the close is queued
+            // on the dispatcher mailbox.  The promise is hot; we do not need
+            // to await it here, but we do start it explicitly so the work is
+            // not silently dropped.
+            d.OnSessionClosed() |> Promise.start
             dispatchers <- Map.remove key dispatchers
         | None -> ()
 

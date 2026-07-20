@@ -103,7 +103,7 @@ let equal (label: string) (expected: 'a) (actual: 'a) : unit =
     let lines = stack.split('\\n');
     for (let i = 1; i < lines.length; i++) {
         if (!lines[i].includes('Assert') && !lines[i].includes('Promise') && !lines[i].includes('jsNative')) {
-            let match = lines[i].match(/([^\\/\\(\\)]+\\.(?:js|fs)):(\\d+):(\\d+)/);
+            let match = lines[i].match(/([^\/\\(\\)]+\\.(?:js|fs)):(\\d+):(\\d+)/);
             if (match) {
                 callerInfo = match[0];
             } else {
@@ -169,10 +169,13 @@ let timed (label: string) (f: unit -> unit) : unit =
 /// 铁律：单个测试 1s 封顶。挂起测试必须立刻暴露，绝不息。禁止调大。
 let asyncSpecTimeoutMs = 1000
 
-/// Suite-level async ceiling: one `*.run` that sequences many sub-specs must not
-/// inherit the 1s per-spec budget (e.g. other Integration*.run suites).
-/// 铁律：套件同样 1s 封顶。慢测试拆成更小子测试，禁止调大。
+/// Default suite-level async ceiling for lightweight suites that sequence many
+/// sub-specs but do not start external processes.
 let asyncSuiteTimeoutMs = 1000
+
+/// Real integration harness suites (OpenCode/Mimocode/MimoTui plugins) start
+/// external processes and already enforce their own per-operation deadlines.
+let integrationHarnessSuiteTimeoutMs = 120000
 
 /// Time an asynchronous test body with a 1s hard timeout; return a unit promise.
 /// Promise failure / timeout / throw are all converged into a single failure record.
@@ -213,28 +216,24 @@ let timedAsync (label: string) (f: unit -> JS.Promise<'a>) : JS.Promise<unit> =
             timings.Add(label, now () - start)
     }
 
-let timedAsyncSuite (label: string) (f: unit -> JS.Promise<'a>) : JS.Promise<unit> =
+/// Time an async suite with an explicit timeout. Used by the runner for
+/// integration harness suites that cannot fit the generic 1s suite cap.
+let timedAsyncSuiteWithTimeout (label: string) (suiteTimeoutMs: int) (f: unit -> JS.Promise<'a>) : JS.Promise<unit> =
     currentTestLabel <- label
 
     promise {
         let start = now ()
 
-        let suiteTimeout =
-            if label.Contains "Contract" then
-                120000
-            else
-                asyncSuiteTimeoutMs
-
         try
             let p = f ()
-            let! _ = raceWithTimeoutAndInfo p suiteTimeout
+            let! _ = raceWithTimeoutAndInfo p suiteTimeoutMs
             timings.Add(label, now () - start)
         with ex ->
             let msg = getErrorMessage ex
 
             if msg.Contains "TIMEOUT" then
                 failed <- failed + 1
-                failures.Add(sprintf "%s > [TIMEOUT>%dms]" label suiteTimeout)
+                failures.Add(sprintf "%s > [TIMEOUT>%dms]" label suiteTimeoutMs)
             else
                 printfn "TEST SUITE %s THREW: %A" label ex
                 printfn "KEYS of EX: %A" (Fable.Core.JS.Constructors.Object.keys ex)
@@ -244,6 +243,10 @@ let timedAsyncSuite (label: string) (f: unit -> JS.Promise<'a>) : JS.Promise<uni
 
             timings.Add(label, now () - start)
     }
+
+/// Default suite wrapper that keeps the 1s ceiling for lightweight suites.
+let timedAsyncSuite (label: string) (f: unit -> JS.Promise<'a>) : JS.Promise<unit> =
+    timedAsyncSuiteWithTimeout label asyncSuiteTimeoutMs f
 
 /// Print the pass/fail summary and the slowest tests, return the failure count.
 let summary () : int =

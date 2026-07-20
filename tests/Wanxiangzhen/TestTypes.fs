@@ -3,6 +3,7 @@ module Wanxiangshu.Tests.Wanxiangzhen.TestTypes
 open Fable.Core
 open Wanxiangshu.Kernel.Wanxiangzhen.Dag
 open Wanxiangshu.Kernel.Wanxiangzhen.SquadEvent
+open Wanxiangshu.Kernel.EventSourcing.EventEnvelope
 
 type FakeState =
     { mutable mergeFfOnlyCalled: bool
@@ -47,6 +48,8 @@ type FakeState =
       mutable getSquadDagOverride: (string -> JS.Promise<Dag>) option
       mutable getSquadSessionsOverride: (unit -> JS.Promise<Map<string, Dag>>) option
       mutable appendSquadEventCalls: SquadEvent list
+      mutable appendWanEventCalls: WanEvent list
+      mutable readWanEventsResult: WanEvent list
       mutable startPollingOverride: (int -> (unit -> unit) -> obj) option
       mutable stopPollingOverride: (obj -> unit) option
       mutable killPidOverride: (int -> obj -> unit) option
@@ -99,6 +102,8 @@ let mkFake () : FakeState =
       getSquadDagOverride = None
       getSquadSessionsOverride = None
       appendSquadEventCalls = []
+      appendWanEventCalls = []
+      readWanEventsResult = []
       startPollingOverride = None
       stopPollingOverride = None
       killPidOverride = None

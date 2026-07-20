@@ -86,46 +86,79 @@ let checkIsStale
                     activeGen < (runtime.GetSession sessionID).SessionGeneration
                     || activeCancel < (runtime.GetSession sessionID).CancelGeneration)
 
+type ContinuationMatchClassification =
+    | MatchedByParentId of parentId: string
+    | MatchedByHostRunId of runId: string
+    | MatchedByMarker of cid: string
+    | UnmatchedStatusHint of continuationIdMissing: bool
+
+let classifyContinuationMatch
+    (runtime: FallbackRuntimeStore)
+    (sessionID: string)
+    (continuationId: string)
+    (parentIDOpt: string option)
+    (hostRunIDOpt: string option)
+    : ContinuationMatchClassification =
+    match (runtime.GetSession sessionID).PendingLease with
+    | None ->
+        // No pending lease: an event with a continuation id is a stale
+        // continuation-tagged event and must not be treated as a current
+        // status hint. An empty continuation id is a normal status hint.
+        UnmatchedStatusHint (continuationId = "")
+    | Some lease ->
+        let isParentIdMatch =
+            match parentIDOpt with
+            | Some pid when pid <> "" && pid = lease.HumanTurnID -> true
+            | _ -> false
+
+        if isParentIdMatch then
+            MatchedByParentId parentIDOpt.Value
+        else
+            let isHostRunIdMatch =
+                match hostRunIDOpt with
+                | Some rid when rid <> "" && rid = lease.HumanTurnID -> true
+                | _ -> false
+
+            if isHostRunIdMatch then
+                MatchedByHostRunId hostRunIDOpt.Value
+            else
+                if continuationId <> "" && continuationId = lease.ContinuationID then
+                    MatchedByMarker continuationId
+                else
+                    UnmatchedStatusHint (continuationId = "")
+
+let checkContinuationMatchesWithEvidence
+    (runtime: FallbackRuntimeStore)
+    (sessionID: string)
+    (continuationId: string)
+    (parentIDOpt: string option)
+    (hostRunIDOpt: string option)
+    : bool * bool =
+    let classification = classifyContinuationMatch runtime sessionID continuationId parentIDOpt hostRunIDOpt
+
+    let isMatched =
+        match classification with
+        | MatchedByParentId _
+        | MatchedByHostRunId _
+        | MatchedByMarker _ -> true
+        | _ -> false
+
+    let isContIdMatch =
+        match classification with
+        | MatchedByParentId _
+        | MatchedByHostRunId _
+        | MatchedByMarker _ -> true
+        | UnmatchedStatusHint true -> true
+        | UnmatchedStatusHint false -> false
+
+    isMatched, isContIdMatch
+
 let checkContinuationMatches
     (runtime: FallbackRuntimeStore)
     (sessionID: string)
     (continuationId: string)
     : bool * bool =
-    let pending = (runtime.GetSession sessionID).PendingLease
-
-    let activeMatch () =
-        let activeGen = (runtime.GetSession sessionID).ActiveContinuationGen
-        let activeCancel = (runtime.GetSession sessionID).ActiveContinuationCancelGen
-
-        activeGen = (runtime.GetSession sessionID).SessionGeneration
-        && activeCancel = (runtime.GetSession sessionID).CancelGeneration
-
-    // PR1: prohibit generation-only matching for isMatched.
-    // When continuationId is empty, we cannot prove the event belongs to
-    // the active continuation, so isMatched must be false.
-    let isMatched =
-        match pending with
-        | Some lease ->
-            if continuationId = "" then
-                false
-            else
-                continuationId = lease.ContinuationID
-        | None -> false
-
-    // However, isContIdMatch must remain true when continuationId is empty
-    // to avoid marking session-level status events (session.idle/busy) as
-    // stale in checkIsStale. These events lack continuation markers but
-    // are still relevant for the active continuation's lifecycle.
-    let isContIdMatch =
-        match pending with
-        | Some lease ->
-            if continuationId = "" then
-                true
-            else
-                continuationId = lease.ContinuationID
-        | None -> true
-
-    isMatched, isContIdMatch
+    checkContinuationMatchesWithEvidence runtime sessionID continuationId None None
 
 let isTerminalOrSettled
     (evt: FallbackEvent)

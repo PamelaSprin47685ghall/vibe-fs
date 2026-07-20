@@ -5,6 +5,7 @@ open Fable.Core.JsInterop
 open Fable.Core.JS
 open Wanxiangshu.Kernel.HostTools
 open Wanxiangshu.Kernel
+open Wanxiangshu.Hosts.Opencode.PluginCleanup
 open Wanxiangshu.Hosts.Opencode.ChatHooks
 open Wanxiangshu.Hosts.Opencode.ToolDefinitionHooks
 open Wanxiangshu.Hosts.Opencode.HookExecute
@@ -92,45 +93,6 @@ let private registerTransformHooks (result: obj) (client: obj) (services: CoreSe
         "experimental.chat.system.transform"
         (twoArgHook (fun input output -> HookTransform.systemTransform services.Directory input output))
 
-let private handleSessionCleanup (services: CoreServices) (ctx: obj) (env: HostEventEnvelope) : JS.Promise<unit> =
-    promise {
-        let ptyCleanupSessionId =
-            if
-                env.EventType = "session.deleted"
-                || env.EventType = "session.delete"
-                || env.EventType = "session.remove"
-                || env.EventType = "session.close"
-            then
-                getSessionID env.EventType env.Props
-            else
-                ""
-
-        if ptyCleanupSessionId <> "" then
-            let sid = SessionId.create ptyCleanupSessionId
-            let eventStore = SubsessionEventStore.create services.Directory
-            do! eventStore.Append(sid, [ PhysicalSessionClosed sid ])
-            SubsessionActorRegistry.ClearPoison services.Directory ptyCleanupSessionId
-            SubsessionActorRegistry.Remove services.Directory ptyCleanupSessionId
-
-            let client =
-                match getClientFromPluginCtx ctx with
-                | Ok c -> c
-                | Error _ -> box null
-
-            let children = services.ChildAgentRegistry.ResolveChildren ptyCleanupSessionId
-
-            for childId in children do
-                try
-                    do!
-                        SubagentIoCleanup.abortAndUnregister
-                            services.ChildAgentRegistry
-                            client
-                            services.Directory
-                            childId
-                with _ ->
-                    ()
-    }
-
 let private registerEventHooks (result: obj) (ctx: obj) (services: CoreServices) =
     setKey
         result
@@ -173,37 +135,9 @@ let private registerEventHooks (result: obj) (ctx: obj) (services: CoreServices)
                 else
                     promise {
                         do! EventHooks.eventHandler services.ReviewStore services.RuntimeScope ctx input
-                        do! handleSessionCleanup services ctx env
+                        do! PluginCleanup.handleSessionCleanup services ctx env
                         do! services.SessionLifecycleObserver.handleEvent input
                     }))
-
-let private handleSessionPostError
-    (services: CoreServices)
-    (sessionID: string)
-    (outcome: string)
-    (errorMsg: string)
-    : JS.Promise<unit> =
-    promise {
-        let isAbort =
-            FinishReason.isAbort (FinishReason.fromString outcome)
-            || FinishReason.isAbort (FinishReason.fromString errorMsg)
-
-        let errName = if isAbort then "MessageAbortedError" else "APIError"
-
-        let rawEvent =
-            box
-                {| event =
-                    {| ``type`` = "session.error"
-                       properties =
-                        {| sessionID = sessionID
-                           info = {| sessionID = sessionID |}
-                           error =
-                            {| name = errName
-                               message = errorMsg
-                               isRetryable = (not isAbort) |} |} |} |}
-
-        do! services.SessionLifecycleObserver.handleEvent rawEvent
-    }
 
 let private registerSessionPostHooks (result: obj) (services: CoreServices) =
     setKey
@@ -216,7 +150,7 @@ let private registerSessionPostHooks (result: obj) (services: CoreServices) =
 
                 if outcome = "error" || outcome = "cancelled" || errorMsg <> "" then
                     let sessionID = Wanxiangshu.Runtime.Dyn.str input "sessionID"
-                    do! handleSessionPostError services sessionID outcome errorMsg
+                    do! PluginCleanup.handleSessionPostError services sessionID outcome errorMsg
             }))
 
     setKey
@@ -228,7 +162,7 @@ let private registerSessionPostHooks (result: obj) (services: CoreServices) =
 
                 if errorMsg <> "" then
                     let sessionID = Wanxiangshu.Runtime.Dyn.str input "sessionID"
-                    do! handleSessionPostError services sessionID "" errorMsg
+                    do! PluginCleanup.handleSessionPostError services sessionID "" errorMsg
             }))
 
 let registerHooks (result: obj) (host: Host) (ctx: obj) (services: CoreServices) =
@@ -237,22 +171,7 @@ let registerHooks (result: obj) (host: Host) (ctx: obj) (services: CoreServices)
         | Ok c -> c
         | Error _ -> box null
 
-    SubsessionActorRegistry.RegisterGlobalCleanup(fun workspaceRoot sessionId ->
-        if workspaceRoot = services.Directory && sessionId <> "" then
-            services.FallbackRuntime.CleanupSession sessionId
-            Wanxiangshu.Runtime.RuntimeScopeForgetSession.forgetSession services.RuntimeScope sessionId
-            Wanxiangshu.Runtime.RunnerBackground.abortRunnerJobCore services.RuntimeScope sessionId
-            Wanxiangshu.Runtime.ToolHookRuntime.clearSessionCompliance sessionId
-            Wanxiangshu.Runtime.ToolHookRuntime.closeSession sessionId
-            services.ReviewStore.CleanupSession sessionId
-            Wanxiangshu.Runtime.SubsessionPendingEvidence.SubsessionPendingEvidence.ForgetSession sessionId
-
-            let ws =
-                Wanxiangshu.Kernel.Primitives.Identity.Id.workspaceIdQuick ("opencode:" + services.Directory)
-
-            sharedDispatchRegistry.NotifySessionClosed ws sessionId
-            forget sessionId
-            cleanupPtyBySession sessionId)
+    PluginCleanup.registerGlobalCleanup services
 
     registerToolHooks result host services
     registerTransformHooks result client services

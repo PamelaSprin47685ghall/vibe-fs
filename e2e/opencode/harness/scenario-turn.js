@@ -28,7 +28,13 @@ const IDLE_TYPES = ['session.idle'];
 
 function isIdleEvent(e) {
   if (e.type === 'session.idle') return true;
-  if (e.type === 'session.status' && (e.status === 'idle' || e.properties?.status === 'idle')) return true;
+  if (e.type === 'session.status') {
+    const s = e.status ?? e.properties?.status;
+    if (s === 'idle') return true;
+    if (s && typeof s === 'object') {
+      return s.type === 'idle' || s.status === 'idle';
+    }
+  }
   return false;
 }
 

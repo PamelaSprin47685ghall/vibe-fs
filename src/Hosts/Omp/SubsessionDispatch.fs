@@ -129,7 +129,7 @@ let private tryGetSessionMessages (session: obj) (sessionApi: obj) (sessionId: S
                 if Dyn.isArray raw then return Some raw else return None
     }
 
-let private checkMessageForTurn (msg: obj) (target: string) : struct (bool * bool) =
+let private checkMessageForTurn (msg: obj) (target: string) : struct (bool * string option) =
     let info = Dyn.get msg "info"
 
     let found =
@@ -153,24 +153,35 @@ let private checkMessageForTurn (msg: obj) (target: string) : struct (bool * boo
         else
             (Dyn.str roleTarget "role").ToLowerInvariant() = "user"
 
-    struct (found, isUser)
+    let msgId =
+        if found || isUser then
+            Dyn.str msg "id"
+        else
+            ""
+
+    struct (found, if msgId <> "" then Some msgId else None)
 
 let private dispatchStatusFromMessages (msgs: obj array) (turnId: TurnId) : DispatchStatus =
     let target = TurnId.value turnId
-    let mutable found = false
-    let mutable anyUser = false
+    let mutable accepted = false
+    let mutable receipt = None
 
     for msg in msgs do
-        let struct (msgFound, isUser) = checkMessageForTurn msg target
+        let struct (msgFound, msgIdOpt) = checkMessageForTurn msg target
 
         if msgFound then
-            found <- true
+            accepted <- true
+            // A matched message is the strongest evidence; use its id if available.
+            receipt <- msgIdOpt
+        elif msgIdOpt.IsSome then
+            // An unmatched user message with an id only wins if no matched id yet.
+            accepted <- true
+            if receipt.IsNone then receipt <- msgIdOpt
 
-        if isUser then
-            anyUser <- true
-
-    if found || anyUser then
-        DispatchStatus.Accepted OrderedTurnMarkerObserved
+    if accepted then
+        match receipt with
+        | Some id -> DispatchStatus.Accepted(UserMessageObserved id)
+        | None -> DispatchStatus.Accepted OrderedTurnMarkerObserved
     else
         DispatchStatus.Unknown
 

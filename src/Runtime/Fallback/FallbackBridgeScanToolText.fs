@@ -65,49 +65,47 @@ let private dispatchRecovery
     (promptText: string)
     : JS.Promise<SessionFallbackState * ContinuationIntent option> =
     promise {
-        let updated =
-            { finalState with
-                Phase = FallbackPhase.RecoveringToolCallText }
-
-        runtime.Update(sessionID, setCore updated)
-
-        let lease = setupContinuationLease runtime sessionID model (Some promptText)
-        let agent = (runtime.GetSession sessionID).AgentName
-
-        let modelStr =
-            match model.Variant with
-            | Some v -> model.ProviderID + "/" + model.ModelID + ":" + v
-            | None -> model.ProviderID + "/" + model.ModelID
-
-        let atMs = getTimestampMs ()
-
-        do!
-            appendContinuationRequestedOrFail
-                workspaceRoot
-                sessionID
-                lease.ContinuationID
-                modelStr
-                agent
-                atMs
-                lease.SessionGeneration
-                lease.CancelGeneration
-                lease.HumanTurnID
-                "Fallback"
-                lease.ContinuationOrdinal
-
-        let intent =
-            RecoverWithPromptIntent(
-                model,
-                promptText,
-                agent,
-                lease.HumanTurnID,
-                lease.SessionGeneration,
-                lease.CancelGeneration,
-                lease.ContinuationID,
-                lease.ContinuationOrdinal
-            )
-
-        return updated, Some intent
+        let currentState = runtime.GetSession sessionID
+        let updated = { finalState with Phase = FallbackPhase.RecoveringToolCallText }
+        match tryReserveContinuationLease currentState model (Some promptText) with
+        | None ->
+            return finalState, None
+        | Some (nextState, lease) ->
+            let agent = currentState.AgentName
+            let modelStr =
+                match model.Variant with
+                | Some v -> model.ProviderID + "/" + model.ModelID + ":" + v
+                | None -> model.ProviderID + "/" + model.ModelID
+            let atMs = getTimestampMs ()
+            do!
+                appendContinuationRequestedOrFail
+                    workspaceRoot
+                    sessionID
+                    lease.ContinuationID
+                    modelStr
+                    agent
+                    atMs
+                    lease.SessionGeneration
+                    lease.CancelGeneration
+                    lease.HumanTurnID
+                    "Fallback"
+                    lease.ContinuationOrdinal
+            let committed = commitContinuationLease runtime sessionID currentState nextState (Some updated)
+            if not committed then
+                return finalState, None
+            else
+                let intent =
+                    RecoverWithPromptIntent(
+                        model,
+                        promptText,
+                        agent,
+                        lease.HumanTurnID,
+                        lease.SessionGeneration,
+                        lease.CancelGeneration,
+                        lease.ContinuationID,
+                        lease.ContinuationOrdinal
+                    )
+                return updated, Some intent
     }
 
 let handleScanToolCallAsText

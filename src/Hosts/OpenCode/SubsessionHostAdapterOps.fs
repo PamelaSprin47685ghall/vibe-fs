@@ -80,7 +80,8 @@ let buildSendPrompt
                     return UserMessageAccepted id
                 | _ ->
                     // OpaqueAccepted: no host user-message id to bind.
-                    // acceptRecord maps this to `OrderedTurnMarkerObserved`.
+                    // The caller must wait for the chat.message observation
+                    // that supplies the real host user-message id.
                     return OpaqueAccepted("opencode:" + TurnId.value turn.TurnId)
         }
 

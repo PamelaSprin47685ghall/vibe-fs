@@ -38,6 +38,7 @@ let sessionStatusIdleAndSessionIdleDedupSpec () =
                                  text = "still working" |} |] |} |]
 
         let promptCalls = ResizeArray<obj>()
+        let! workspaceDir = mkdtempAsync "session-status-idle-dedup-"
 
         let mkClient () =
             createObj
@@ -66,6 +67,7 @@ let sessionStatusIdleAndSessionIdleDedupSpec () =
                             box (
                                 System.Func<obj, JS.Promise<unit>>(fun arg ->
                                     promise {
+                                        resolveNudgeReceiptFromPromptArg workspaceDir arg
                                         promptCalls.Add(arg)
 
                                         messages <-
@@ -73,8 +75,6 @@ let sessionStatusIdleAndSessionIdleDedupSpec () =
                                     })
                             ) ]
                   ) ]
-
-        let! workspaceDir = mkdtempAsync "session-status-idle-dedup-"
 
         let! p =
             plugin (
@@ -126,6 +126,7 @@ let sessionStatusBusyDoesNotNudgeSpec () =
                                  text = "still working" |} |] |} |]
 
         let promptCalls = ResizeArray<obj>()
+        let! workspaceDir = mkdtempAsync "session-status-busy-"
 
         let mkClient () =
             createObj
@@ -151,10 +152,12 @@ let sessionStatusBusyDoesNotNudgeSpec () =
                                     promise { return box {| data = messages |} })
                             )
                             "prompt",
-                            box (System.Func<obj, JS.Promise<unit>>(fun arg -> promise { promptCalls.Add(arg) })) ]
+                            box (System.Func<obj, JS.Promise<unit>>(fun arg ->
+                                promise {
+                                    resolveNudgeReceiptFromPromptArg workspaceDir arg
+                                    promptCalls.Add(arg)
+                                })) ]
                   ) ]
-
-        let! workspaceDir = mkdtempAsync "session-status-busy-"
 
         let! p =
             plugin (
@@ -198,6 +201,7 @@ let reusedSessionSpec () =
                                  text = "reopened work" |} |] |} |]
 
         let promptCalls = ResizeArray<obj>()
+        let! workspaceDir = mkdtempAsync "reused-session-"
 
         let mkClient () =
             createObj
@@ -223,10 +227,12 @@ let reusedSessionSpec () =
                                     (promise { return box {| data = messages |} }))
                             )
                             "prompt",
-                            box (System.Func<obj, JS.Promise<unit>>(fun arg -> (promise { promptCalls.Add(arg) }))) ]
+                            box (System.Func<obj, JS.Promise<unit>>(fun arg ->
+                                (promise {
+                                    resolveNudgeReceiptFromPromptArg workspaceDir arg
+                                    promptCalls.Add(arg)
+                                }))) ]
                   ) ]
-
-        let! workspaceDir = mkdtempAsync "reused-session-"
 
         let! p =
             plugin (

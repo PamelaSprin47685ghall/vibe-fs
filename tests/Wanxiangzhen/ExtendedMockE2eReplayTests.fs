@@ -8,6 +8,7 @@ open Wanxiangshu.Kernel.Wanxiangzhen.SquadEvent
 open Wanxiangshu.Runtime.Wanxiangzhen.CoordinatorRuntime
 open Wanxiangshu.Runtime.Wanxiangzhen.CoordinatorReplay
 open Wanxiangshu.Tests.Wanxiangzhen.AssertCompat
+open Wanxiangshu.Kernel.EventSourcing.EventEnvelope
 open Wanxiangshu.Tests.Wanxiangzhen.TestDoubles
 open Wanxiangshu.Tests.Wanxiangzhen.ExtendedMockE2eFixtures
 
@@ -260,6 +261,158 @@ let testReplayWarnsOrphanEmptyMasterSessionId () : JS.Promise<unit> =
             checkBare (warning.Contains "Orphan running tasks")
     }
 
+let testReplayWarnsOrphanPersistsWarningSentEvent () : JS.Promise<unit> =
+    promise {
+        let s = mkFake ()
+        let deps = mkDeps s
+        let rt = mkRuntime deps
+
+        let sessionId = "squad-session-001"
+        let taskId = "squad-a1b2"
+        let evt1 = SquadCreated(sessionId, "req")
+
+        let evt2 =
+            TasksCreated(
+                sessionId,
+                [ { taskId = taskId
+                    title = "A"
+                    description = "desc"
+                    dependsOn = [] } ]
+            )
+
+        let evt3 = TaskStarted(sessionId, taskId, "/wt/a", taskId)
+        let history = [ evt1; evt2; evt3 ]
+
+        s.getLatestSquadSessionIdOverride <- Some(fun () -> Promise.lift (Some sessionId))
+
+        s.getSquadDagOverride <-
+            Some(fun sid ->
+                let dag = List.fold foldEvent (empty sid "") history
+                Promise.lift dag)
+
+        s.promptSessionOverride <-
+            Some(fun c m p ->
+                s.promptSessionCalls <- s.promptSessionCalls @ [ (m, p) ]
+                Promise.lift ())
+
+        rt.MasterSessionId <- sessionId
+        s.mergeBaseOverride <- Some(fun _ _ _ -> false)
+
+        do! replayFromEventLog rt
+
+        checkBare (s.promptSessionCalls.Length = 1)
+        checkBare (s.appendWanEventCalls.Length = 1)
+
+        let ev = s.appendWanEventCalls.[0]
+        equal "wanxiangzhen_warning_sent" ev.Kind
+        equal sessionId ev.Session
+
+        let warningOpt = Map.tryFind "warning" ev.Payload
+        checkBare (Option.isSome warningOpt)
+        checkBare (warningOpt.Value.Contains taskId)
+    }
+
+let testReplayWarnsOrphanDedupsFromEventLog () : JS.Promise<unit> =
+    promise {
+        let s = mkFake ()
+        let deps = mkDeps s
+        let rt = mkRuntime deps
+
+        let sessionId = "squad-session-001"
+        let taskId = "squad-a1b2"
+        let warning =
+            sprintf "WARNING: Orphan running tasks without PID: %s. Use /squad-kill or ignore." taskId
+
+        let evt1 = SquadCreated(sessionId, "req")
+
+        let evt2 =
+            TasksCreated(
+                sessionId,
+                [ { taskId = taskId
+                    title = "A"
+                    description = "desc"
+                    dependsOn = [] } ]
+            )
+
+        let evt3 = TaskStarted(sessionId, taskId, "/wt/a", taskId)
+        let history = [ evt1; evt2; evt3 ]
+
+        s.getLatestSquadSessionIdOverride <- Some(fun () -> Promise.lift (Some sessionId))
+
+        s.getSquadDagOverride <-
+            Some(fun sid ->
+                let dag = List.fold foldEvent (empty sid "") history
+                Promise.lift dag)
+
+        s.readWanEventsResult <-
+            [ { V = 1
+                Session = sessionId
+                Kind = "wanxiangzhen_warning_sent"
+                At = "2025-01-01T00:00:00Z"
+                Payload = Map [ "warning", warning ] } ]
+
+        rt.MasterSessionId <- sessionId
+        s.mergeBaseOverride <- Some(fun _ _ _ -> false)
+
+        do! replayFromEventLog rt
+
+        checkBare (s.promptSessionCalls.IsEmpty)
+        checkBare (rt.SentWarnings.Contains warning)
+    }
+
+let testReplayWarnsOrphanPromptFailedWritesAuditEvent () : JS.Promise<unit> =
+    promise {
+        let s = mkFake ()
+        let deps = mkDeps s
+        let rt = mkRuntime deps
+
+        let sessionId = "squad-session-001"
+        let taskId = "squad-a1b2"
+        let warning =
+            sprintf "WARNING: Orphan running tasks without PID: %s. Use /squad-kill or ignore." taskId
+
+        let evt1 = SquadCreated(sessionId, "req")
+
+        let evt2 =
+            TasksCreated(
+                sessionId,
+                [ { taskId = taskId
+                    title = "A"
+                    description = "desc"
+                    dependsOn = [] } ]
+            )
+
+        let evt3 = TaskStarted(sessionId, taskId, "/wt/a", taskId)
+        let history = [ evt1; evt2; evt3 ]
+
+        s.getLatestSquadSessionIdOverride <- Some(fun () -> Promise.lift (Some sessionId))
+
+        s.getSquadDagOverride <-
+            Some(fun sid ->
+                let dag = List.fold foldEvent (empty sid "") history
+                Promise.lift dag)
+
+        s.promptSessionOverride <-
+            Some(fun c m p ->
+                s.promptSessionCalls <- s.promptSessionCalls @ [ (m, p) ]
+                Promise.reject (System.Exception("intentional network error")))
+
+        rt.MasterSessionId <- sessionId
+        s.mergeBaseOverride <- Some(fun _ _ _ -> false)
+
+        do! replayFromEventLog rt
+
+        checkBare (s.promptSessionCalls.Length = 1)
+        checkBare (s.appendWanEventCalls.Length = 1)
+
+        let ev = s.appendWanEventCalls.[0]
+        equal "wanxiangzhen_prompt_failed" ev.Kind
+        equal sessionId ev.Session
+        equal warning (Map.tryFind "text" ev.Payload |> Option.defaultValue "")
+        let errMsg = Map.tryFind "error" ev.Payload |> Option.defaultValue ""
+        checkBare (errMsg.Contains "intentional network error")
+    }
+
 let entriesAsync () : (string * (unit -> JS.Promise<unit>)) list =
     [ ("ExtendedMockE2e.chat_message_captures_session_id_and_replays", testChatMessageCapturesSessionIdAndReplays)
 
@@ -269,4 +422,8 @@ let entriesAsync () : (string * (unit -> JS.Promise<unit>)) list =
 
       ("ExtendedMockE2e.replay_warns_orphan_retry_and_idempotency", testReplayWarnsOrphanRetryAndIdempotency)
 
-      ("ExtendedMockE2e.replay_warns_orphan_empty_master_session_id", testReplayWarnsOrphanEmptyMasterSessionId) ]
+      ("ExtendedMockE2e.replay_warns_orphan_empty_master_session_id", testReplayWarnsOrphanEmptyMasterSessionId)
+      ("ExtendedMockE2e.replay_warns_orphan_persists_warning_sent_event", testReplayWarnsOrphanPersistsWarningSentEvent)
+      ("ExtendedMockE2e.replay_warns_orphan_dedups_from_event_log", testReplayWarnsOrphanDedupsFromEventLog)
+      ("ExtendedMockE2e.replay_warns_orphan_prompt_failed_writes_audit_event", testReplayWarnsOrphanPromptFailedWritesAuditEvent)
+    ]

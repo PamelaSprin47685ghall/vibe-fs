@@ -25,14 +25,19 @@ let private waitForPrompt (promptCalls: ResizeArray<obj>) (expected: int) : JS.P
 let fallbackRetryWithoutFrontmatterSpec () =
     promise {
         let promptCalls = ResizeArray<obj>()
+        let! workspaceDir = mkdtempAsync "fallback-retry-no-frontmatter-"
 
-        let mkClient () =
+        let mkClient (workspaceDir: string) =
             createObj
                 [ "session",
                   box (
                       createObj
                           [ "prompt",
-                            box (System.Func<obj, JS.Promise<unit>>(fun arg -> promise { promptCalls.Add(arg) }))
+                            box (System.Func<obj, JS.Promise<unit>>(fun arg ->
+                                promise {
+                                    resolveNudgeReceiptFromPromptArg workspaceDir arg
+                                    promptCalls.Add(arg)
+                                }))
                             "messages",
                             box (
                                 System.Func<obj, JS.Promise<obj>>(fun _ ->
@@ -58,15 +63,13 @@ let fallbackRetryWithoutFrontmatterSpec () =
                             "abort", box (System.Func<obj, JS.Promise<unit>>(fun _ -> Promise.lift ())) ]
                   ) ]
 
-        let! workspaceDir = mkdtempAsync "fallback-retry-no-frontmatter-"
-
         do! writeFileAsync (workspaceDir + "/AGENTS.md") "---\nmodels:\n  default:\n    - openai/gpt-5\n---\n"
 
         let! p =
             plugin (
                 box
                     {| directory = workspaceDir
-                       client = mkClient () |}
+                       client = mkClient workspaceDir |}
             )
 
         let eventHook = get p "event"
@@ -115,14 +118,19 @@ let fallbackRetryWithoutFrontmatterSpec () =
 let sessionPostErrorSpec () =
     promise {
         let promptCalls = ResizeArray<obj>()
+        let! workspaceDir = mkdtempAsync "fallback-session-post-error-"
 
-        let mkClient () =
+        let mkClient (workspaceDir: string) =
             createObj
                 [ "session",
                   box (
                       createObj
                           [ "prompt",
-                            box (System.Func<obj, JS.Promise<unit>>(fun arg -> promise { promptCalls.Add(arg) }))
+                            box (System.Func<obj, JS.Promise<unit>>(fun arg ->
+                                promise {
+                                    resolveNudgeReceiptFromPromptArg workspaceDir arg
+                                    promptCalls.Add(arg)
+                                }))
                             "messages",
                             box (
                                 System.Func<obj, JS.Promise<obj>>(fun _ ->
@@ -148,15 +156,13 @@ let sessionPostErrorSpec () =
                             "abort", box (System.Func<obj, JS.Promise<unit>>(fun _ -> Promise.lift ())) ]
                   ) ]
 
-        let! workspaceDir = mkdtempAsync "fallback-session-post-error-"
-
         do! writeFileAsync (workspaceDir + "/AGENTS.md") "---\nmodels:\n  default:\n    - openai/gpt-5\n---\n"
 
         let! p =
             plugin (
                 box
                     {| directory = workspaceDir
-                       client = mkClient () |}
+                       client = mkClient workspaceDir |}
             )
 
         let sessionPostHook = get p "session.post"
@@ -179,14 +185,19 @@ let sessionPostErrorSpec () =
 let sessionUserQueryPostErrorSpec () =
     promise {
         let promptCalls = ResizeArray<obj>()
+        let! workspaceDir = mkdtempAsync "fallback-query-post-error-"
 
-        let mkClient () =
+        let mkClient (workspaceDir: string) =
             createObj
                 [ "session",
                   box (
                       createObj
                           [ "prompt",
-                            box (System.Func<obj, JS.Promise<unit>>(fun arg -> promise { promptCalls.Add(arg) }))
+                            box (System.Func<obj, JS.Promise<unit>>(fun arg ->
+                                promise {
+                                    resolveNudgeReceiptFromPromptArg workspaceDir arg
+                                    promptCalls.Add(arg)
+                                }))
                             "messages",
                             box (
                                 System.Func<obj, JS.Promise<obj>>(fun _ ->
@@ -212,15 +223,13 @@ let sessionUserQueryPostErrorSpec () =
                             "abort", box (System.Func<obj, JS.Promise<unit>>(fun _ -> Promise.lift ())) ]
                   ) ]
 
-        let! workspaceDir = mkdtempAsync "fallback-query-post-error-"
-
         do! writeFileAsync (workspaceDir + "/AGENTS.md") "---\nmodels:\n  default:\n    - openai/gpt-5\n---\n"
 
         let! p =
             plugin (
                 box
                     {| directory = workspaceDir
-                       client = mkClient () |}
+                       client = mkClient workspaceDir |}
             )
 
         let sessionUserQueryPostHook = get p "session.userQuery.post"

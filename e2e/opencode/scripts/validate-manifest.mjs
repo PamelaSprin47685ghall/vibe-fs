@@ -76,6 +76,10 @@ for (const e of realE2e) {
     error(`${ctx}: spec file does not exist: ${e.spec}`);
     continue;
   }
+  if (!path.basename(specPath).startsWith('p0-canary-tests-')) {
+    error(`${ctx}: real-e2e spec must be an inert test module, not an executable runner: ${e.spec}`);
+    continue;
+  }
 
   let tests;
   try {
@@ -90,7 +94,7 @@ for (const e of realE2e) {
     continue;
   }
 
-  const found = tests.find((t) => t?.name === e.test);
+  const found = tests.find((t) => t?.name === e.test && typeof t.fn === 'function');
   if (!found) {
     error(`${ctx}: test "${e.test}" not found in ${e.spec}`);
     continue;

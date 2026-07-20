@@ -12,6 +12,7 @@ open Wanxiangshu.Runtime.Wanxiangzhen.SessionIo
 open Wanxiangshu.Runtime.SquadEventStore
 open Wanxiangshu.Runtime.EventLogRuntimeStore
 open Wanxiangshu.Runtime.Wanxiangzhen.SquadEventLogRuntime
+open Wanxiangshu.Kernel.EventSourcing.EventEnvelope
 
 let resolveMasterBranch (directory: string) (config: SquadConfig) (deps: CoordinatorDeps) : string * string option =
     match config.MasterBranch with
@@ -38,6 +39,8 @@ let realCoordinatorDeps (workspaceRoot: string) : CoordinatorDeps =
           GetSquadDag = fun sessionId -> store.GetSquadDag sessionId
           GetSquadSessions = fun () -> store.GetSquadSessions()
           AppendSquadEvent = appendSquadEvent
+          AppendWanEvent = fun _ e -> store.AppendEvent e
+          ReadWanEvents = fun _ -> store.ReadAllEvents()
           TryWorktreeAdd = tryWorktreeAdd
           TryWorktreeRemoveForce = tryWorktreeRemoveForce
           TryBranchDeleteForce = tryBranchDeleteForce

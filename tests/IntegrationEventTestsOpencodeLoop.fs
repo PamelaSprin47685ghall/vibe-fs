@@ -30,11 +30,12 @@ let opencodeLoopNudgeSpec () =
     promise {
         let sessionID = "opencode-loop-nudge-ws"
         let promptCalls = ResizeArray<obj>()
+        let! workspaceDir = mkdtempAsync "opencode-loop-nudge-"
 
         let mutable messages: obj array =
             [| assistantMessage "manager" (loopAnchor "Ship the fix") 1 |]
 
-        let mkClient () =
+        let mkClient (workspaceDir: string) =
             createObj
                 [ "session",
                   box (
@@ -47,17 +48,20 @@ let opencodeLoopNudgeSpec () =
                                     promise { return box {| data = messages |} })
                             )
                             "prompt",
-                            box (System.Func<obj, JS.Promise<unit>>(fun arg -> promise { promptCalls.Add(arg) })) ]
+                            box (System.Func<obj, JS.Promise<unit>>(fun arg ->
+                                promise {
+                                    resolveNudgeReceiptFromPromptArg workspaceDir arg
+                                    promptCalls.Add(arg)
+                                })) ]
                   ) ]
 
-        let! workspaceDir = mkdtempAsync "opencode-loop-nudge-"
         do! seedLoopActivated workspaceDir sessionID "Ship the fix"
 
         let! p =
             plugin (
                 box
                     {| directory = workspaceDir
-                       client = mkClient () |}
+                       client = mkClient workspaceDir |}
             )
 
         let eventHook = get p "event"
@@ -87,11 +91,12 @@ let opencodeFreshChatMessageRearmsLoopNudgeSpec () =
     promise {
         let sessionID = "opencode-fresh-chat-ws"
         let promptCalls = ResizeArray<obj>()
+        let! workspaceDir = mkdtempAsync "opencode-fresh-chat-"
 
         let mutable messages: obj array =
             [| assistantMessage "manager" (loopAnchor "Ship the fix") 1 |]
 
-        let mkClient () =
+        let mkClient (workspaceDir: string) =
             createObj
                 [ "session",
                   box (
@@ -104,17 +109,20 @@ let opencodeFreshChatMessageRearmsLoopNudgeSpec () =
                                     promise { return box {| data = messages |} })
                             )
                             "prompt",
-                            box (System.Func<obj, JS.Promise<unit>>(fun arg -> promise { promptCalls.Add(arg) })) ]
+                            box (System.Func<obj, JS.Promise<unit>>(fun arg ->
+                                promise {
+                                    resolveNudgeReceiptFromPromptArg workspaceDir arg
+                                    promptCalls.Add(arg)
+                                })) ]
                   ) ]
 
-        let! workspaceDir = mkdtempAsync "opencode-fresh-chat-"
         do! seedLoopActivated workspaceDir sessionID "Ship the fix"
 
         let! p =
             plugin (
                 box
                     {| directory = workspaceDir
-                       client = mkClient () |}
+                       client = mkClient workspaceDir |}
             )
 
         let eventHook = get p "event"
@@ -175,10 +183,11 @@ let opencodeFreshChatMessageRearmsLoopNudgeSpec () =
 
 let opencodeBrowserSubsessionHistoryDoesNotLoopNudgeSpec () =
     promise {
-        let sessionID = "opencode-browser-child"
+        let sessionID = "opencode-browser-child-ws"
         let promptCalls = ResizeArray<obj>()
+        let! workspaceDir = mkdtempAsync "opencode-browser-child-"
 
-        let mkClient () =
+        let mkClient (workspaceDir: string) =
             createObj
                 [ "session",
                   box (
@@ -199,16 +208,18 @@ let opencodeBrowserSubsessionHistoryDoesNotLoopNudgeSpec () =
                                     })
                             )
                             "prompt",
-                            box (System.Func<obj, JS.Promise<unit>>(fun arg -> promise { promptCalls.Add(arg) })) ]
+                            box (System.Func<obj, JS.Promise<unit>>(fun arg ->
+                                promise {
+                                    resolveNudgeReceiptFromPromptArg workspaceDir arg
+                                    promptCalls.Add(arg)
+                                })) ]
                   ) ]
-
-        let! workspaceDir = mkdtempAsync "opencode-browser-child-"
 
         let! p =
             plugin (
                 box
                     {| directory = workspaceDir
-                       client = mkClient () |}
+                       client = mkClient workspaceDir |}
             )
 
         let eventHook = get p "event"

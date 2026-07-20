@@ -6,6 +6,8 @@ open Wanxiangshu.Kernel.FallbackRuntimeFlags
 open Wanxiangshu.Runtime.Fallback.SessionRuntime
 open Wanxiangshu.Runtime.Fallback.SessionRuntimeLeasePure
 open Wanxiangshu.Runtime.Fallback.SessionRuntimePropertyPure
+open Wanxiangshu.Runtime.Fallback.RuntimeStore
+open Wanxiangshu.Runtime.Fallback.LeaseValidation
 
 let private dummyModel =
     { ProviderID = "p"
@@ -76,6 +78,24 @@ let tryTransitionPendingLeaseReturningBool () =
         tryTransitionPendingLeaseReturning (cidOf s) LeaseStatus.Requested LeaseStatus.DispatchStarted s
 
     check "returning true on match" flag
+
+let trySetupContinuationLeasePreservesActiveLease () =
+    let runtime = FallbackRuntimeStore()
+    let sessionID = "active-continuation"
+    let first = trySetupContinuationLease runtime sessionID dummyModel None |> Option.get
+
+    let replacement =
+        { dummyModel with
+            ProviderID = "replacement"
+            ModelID = "other" }
+
+    let second = trySetupContinuationLease runtime sessionID replacement (Some "must-not-replace")
+    let active = (runtime.GetSession sessionID).PendingLease |> Option.get
+
+    equal "second continuation is rejected" None second
+    equal "active continuation id is preserved" first.ContinuationID active.ContinuationID
+    equal "active continuation model is preserved" dummyModel active.Model
+    equal "active continuation prompt is preserved" None active.PromptText
 
 // --- tryTransitionPendingNudgeLease ---
 
@@ -192,6 +212,7 @@ let run () =
     tryTransitionPendingLeaseOwnerNotFallback ()
     tryTransitionPendingLeaseNoLease ()
     tryTransitionPendingLeaseReturningBool ()
+    trySetupContinuationLeasePreservesActiveLease ()
     tryTransitionPendingNudgeLeaseIdempotent ()
     tryTransitionPendingNudgeLeaseGenerationMismatch ()
     tryTransitionPendingNudgeLeaseNoLease ()

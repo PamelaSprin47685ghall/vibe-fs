@@ -26,6 +26,11 @@ open Wanxiangshu.Hosts.Opencode.SubsessionHostAdapterTypes
 let buildDispatchModelString =
     Wanxiangshu.Hosts.Opencode.SubsessionHostAdapterTypes.buildDispatchModelString
 
+/// Receipt timeout for OpenCode `chat.message` arrival. Overridable via
+/// environment for tests.
+[<Emit("(() => { const v = typeof process !== 'undefined' && process.env && process.env.WANXIANGSHU_OPENCODE_RECEIPT_TIMEOUT_MS; const n = v ? parseInt(v, 10) : 30000; return isNaN(n) ? 30000 : n; })()")>]
+let private receiptTimeoutMs () : int = jsNative
+
 /// OpenCode subagent host. Every prompt and abort goes through the per-session
 /// `SessionDispatcher` so two requests on the same physical session cannot
 /// race, and so the caller receives a true `HostStartReceipt` (or a typed
@@ -47,12 +52,28 @@ type OpencodeSubsessionHost(client: obj, agent: string, directory: string) =
 
                 match receiptWaiterOpt with
                 | Some waiter ->
-                    // Wait for the real host user-message identity.
-                    let! result = waiter.Promise
+                    let timeoutErr =
+                        { ErrorName = "OpencodeReceiptTimeout"
+                          DomainError = None
+                          Message = "Timed out waiting for OpenCode chat.message receipt for subsession dispatch"
+                          StatusCode = None
+                          IsRetryable = Some false }
+
+                    let! result = HostReceiptWaiter.awaitWithTimeout waiter (receiptTimeoutMs ()) timeoutErr
 
                     match result with
-                    | Ok receipt -> return Ok receipt
-                    | Error failure -> return Error failure
+                    | Ok receipt ->
+                        return Ok receipt
+                    | Error failure ->
+                        // Fail the dispatcher turn on timeout or host error so
+                        // the slot is released and the next dispatch can proceed.
+                        let errInput =
+                            match failure with
+                            | HostRejected e -> e
+                            | HostAcceptanceUnknown e -> e
+
+                        let! _ = dispatcher.FailByTurn identity.LogicalTurnId errInput
+                        return Error failure
                 | None ->
                     // Dispatcher failed before creating the waiter
                     // (e.g. identity mismatch).
@@ -101,7 +122,7 @@ type OpencodeSubsessionHost(client: obj, agent: string, directory: string) =
             promise {
                 let sid = SessionId.value sessionId
                 let dispatcher = getDispatcher directory sid
-                dispatcher.OnSessionClosed()
+                do! dispatcher.OnSessionClosed()
 
                 HostReceiptWaiterRegistry.removeSession (workspaceFor directory) sid
 

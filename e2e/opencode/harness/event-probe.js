@@ -41,28 +41,41 @@ export class EventProbe {
 
   async connect() {
     if (this._connected) return;
-    this._abortController = new AbortController();
-    try {
-      const response = await fetch(`${this._baseUrl}/event`, {
-        headers: {
-          'Accept': 'text/event-stream',
-          'x-opencode-directory': this._workDir,
-        },
-        signal: this._abortController.signal,
-      });
-      if (!response.ok) {
-        throw new Error(`GET /event failed with status ${response.status}`);
+    this._readSettled = false;
+    this._closePromise = new Promise((resolve) => {
+      this._closeResolve = resolve;
+    });
+
+    let lastErr = null;
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      this._abortController = new AbortController();
+      try {
+        const response = await fetch(`${this._baseUrl}/event`, {
+          headers: {
+            'Accept': 'text/event-stream',
+            'x-opencode-directory': this._workDir,
+          },
+          signal: this._abortController.signal,
+        });
+        if (!response.ok) {
+          throw new Error(`GET /event failed with status ${response.status}`);
+        }
+        this._connected = true;
+        const reader = response.body.getReader();
+        this._reader = reader;
+        const decoder = new TextDecoder();
+        this._readPromise = this._readLoop(reader, decoder);
+        return;
+      } catch (err) {
+        lastErr = err;
+        if (err.name === 'AbortError') return;
+        if (attempt < 3) {
+          await new Promise((r) => setTimeout(r, 200));
+        }
       }
-      this._connected = true;
-      const reader = response.body.getReader();
-      this._reader = reader;
-      const decoder = new TextDecoder();
-      this._readPromise = this._readLoop(reader, decoder);
-    } catch (err) {
-      if (err.name === 'AbortError') return;
-      console.error(`[EventProbe] connect failed: ${err.message}`, err.cause ? `cause: ${err.cause}` : '');
-      throw err;
     }
+    console.error(`[EventProbe] connect failed after 3 attempts: ${lastErr.message}`, lastErr.cause ? `cause: ${lastErr.cause}` : '');
+    throw lastErr;
   }
 
   async _readLoop(reader, decoder) {

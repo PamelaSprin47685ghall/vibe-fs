@@ -20,8 +20,10 @@ open Wanxiangshu.Runtime.SubsessionChildObserver
 open Wanxiangshu.Runtime.SubsessionActorRegistry
 open Wanxiangshu.Runtime.SubsessionEventStore
 open Wanxiangshu.Hosts.Mux.EventHookHandlers
+open Wanxiangshu.Hosts.Mux.EventHookDecode
 open Wanxiangshu.Runtime.Dispatch
 open Wanxiangshu.Runtime.SubsessionPendingEvidence
+open Wanxiangshu.Runtime.EventLogRuntimeRecovery
 
 let createEventHook (deps: obj) (reviewStore: ReviewStore) (scope: RuntimeScope) : obj =
     let getChatHistory =
@@ -39,6 +41,7 @@ let createEventHook (deps: obj) (reviewStore: ReviewStore) (scope: RuntimeScope)
 
     let fallbackRuntime = FallbackRuntimeStore()
     scope.Add("fallbackRuntime", box fallbackRuntime)
+    registerFallbackExecutor scope (muxActionExecutor deps)
     let fallbackConfigOpt = loadFallbackConfig directory
 
     let isReviewLoopActive (sessionID: string) =

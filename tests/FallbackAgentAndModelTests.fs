@@ -21,8 +21,14 @@ open Wanxiangshu.Hosts.Opencode.SessionLifecycleObserver
 open Wanxiangshu.Hosts.Omp.Fallback.Hook
 open Wanxiangshu.Hosts.Opencode.Fallback.Hook
 open Wanxiangshu.Runtime.Dyn
+open Wanxiangshu.Runtime.Dispatch
+open Wanxiangshu.Kernel.Subsession.Types
 
 module Dyn = Wanxiangshu.Runtime.Dyn
+
+/// Override OpenCode chat.message receipt timeout for unit tests.
+[<Emit("process.env.WANXIANGSHU_OPENCODE_RECEIPT_TIMEOUT_MS = $0")>]
+let private setReceiptTimeout (ms: string) : unit = jsNative
 
 let ompFallbackHooksPreservesAgentAndModelSpec () =
     promise {
@@ -99,6 +105,16 @@ let opencodeExecutorUsesRuntimeAgentWhenNoAssistantMessageSpec () =
                             "prompt",
                             box (fun (arg: obj) ->
                                 lastPromptArg <- arg
+                                let parts = Dyn.get (Dyn.get arg "body") "parts" |> unbox<obj array>
+                                let metadata = Dyn.get parts.[0] "metadata"
+                                let wanxiangshu = Dyn.get metadata "wanxiangshu"
+                                let continuationId = Dyn.str wanxiangshu "continuationId"
+                                HostReceiptWaiterRegistry.tryResolve
+                                    (Id.workspaceIdQuick "opencode-default")
+                                    sid
+                                    continuationId
+                                    OrderedTurnMarkerObserved
+                                |> ignore
                                 Promise.lift (box null)) ]
                   ) ]
 
@@ -147,6 +163,16 @@ let opencodeExecutorRespectsUserSelectedModelAndAgentSpec () =
                             "prompt",
                             box (fun (arg: obj) ->
                                 lastPromptArg <- arg
+                                let parts = Dyn.get (Dyn.get arg "body") "parts" |> unbox<obj array>
+                                let metadata = Dyn.get parts.[0] "metadata"
+                                let wanxiangshu = Dyn.get metadata "wanxiangshu"
+                                let continuationId = Dyn.str wanxiangshu "continuationId"
+                                HostReceiptWaiterRegistry.tryResolve
+                                    (Id.workspaceIdQuick "opencode-default")
+                                    sid
+                                    continuationId
+                                    OrderedTurnMarkerObserved
+                                |> ignore
                                 Promise.lift (box null)) ]
                   ) ]
 
@@ -223,8 +249,58 @@ let ompExecutorRespectsUserSelectedModelAndAgentSpec () =
         Wanxiangshu.Hosts.Omp.ExecutorTools.ompScope.Remove("omp_session_" + sid)
     }
 
+let opencodeExecutorReceiptTimeoutFreesDispatcherSlot () =
+    promise {
+        setReceiptTimeout "50"
+        try
+            let rt = FallbackRuntimeStore()
+            let sid = "opencode-receipt-timeout"
+            rt.UpdateSession(sid, recordAgentName "coder")
+
+            let mutable promptCallCount = 0
+
+            let mockClient =
+                createObj
+                    [ "session",
+                      box (
+                          createObj
+                              [ "messages", box (fun (_arg: obj) -> Promise.lift (box {| data = [||] |}))
+                                "prompt",
+                                box (fun (_arg: obj) ->
+                                    promptCallCount <- promptCallCount + 1
+                                    // Simulate missing chat.message: never resolve the host receipt waiter.
+                                    Promise.lift (box null)) ]
+                      ) ]
+
+            let executor = opencodeActionExecutor rt mockClient
+
+            let model =
+                { ProviderID = "openai"
+                  ModelID = "gpt-5"
+                  Variant = None
+                  Temperature = None
+                  TopP = None
+                  MaxTokens = None
+                  ReasoningEffort = None
+                  Thinking = false }
+
+            rt.UpdateSession(sid, startDispatch model None)
+            let continuationId = (rt.GetSession sid).PendingLease.Value.ContinuationID
+
+            let! caught = executor.SendContinue(sid, model, continuationId) |> Promise.result
+
+            match caught with
+            | Ok() -> check "expected timeout to throw" false
+            | Error ex -> check "timeout error is reported" (ex.Message.Contains("Fallback continuation dispatch failed"))
+
+            check "prompt was called once" (promptCallCount = 1)
+        finally
+            setReceiptTimeout ""
+    }
+
 let run () =
     promise {
+        do! opencodeExecutorReceiptTimeoutFreesDispatcherSlot ()
         do! ompFallbackHooksPreservesAgentAndModelSpec ()
         do! ompCaptureCurrentModelReturnsModelWhenSessionHasModelSpec ()
         do! opencodeExecutorUsesRuntimeAgentWhenNoAssistantMessageSpec ()

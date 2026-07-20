@@ -1,5 +1,5 @@
 {
-  "notCoveredCount": 120,
+  "notCoveredCount": 103,
   "entries": {
     "OC-BOOT-001": {
       "level": "real-e2e"
@@ -143,6 +143,9 @@
     "OC-FILE-012": {
       "level": "not-covered"
     },
+    "OC-FILE-013": {
+      "level": "real-e2e"
+    },
     "OC-FUZZY-001": {
       "level": "real-e2e"
     },
@@ -165,6 +168,12 @@
       "level": "real-e2e"
     },
     "OC-FUZZY-008": {
+      "level": "real-e2e"
+    },
+    "OC-FUZZY-009": {
+      "level": "real-e2e"
+    },
+    "OC-FUZZY-010": {
       "level": "real-e2e"
     },
     "OC-EXEC-001": {
@@ -202,6 +211,9 @@
     },
     "OC-EXEC-012": {
       "level": "not-covered"
+    },
+    "OC-EXEC-013": {
+      "level": "real-e2e"
     },
     "OC-PTY-001": {
       "level": "real-e2e"
@@ -258,13 +270,16 @@
       "level": "real-e2e"
     },
     "OC-WEB-009": {
-      "level": "real-e2e"
+      "level": "real-e2e",
+      "note": "covered by browser E2E flow test"
     },
     "OC-WEB-010": {
-      "level": "real-e2e"
+      "level": "real-e2e",
+      "note": "covered by browser E2E flow test"
     },
     "OC-WEB-011": {
-      "level": "real-e2e"
+      "level": "real-e2e",
+      "note": "covered by browser E2E flow test"
     },
     "OC-WEB-012": {
       "level": "real-e2e"
@@ -527,20 +542,16 @@
       "level": "unit"
     },
     "OC-CB-001": {
-      "level": "not-covered",
-      "note": "demoted from real-e2e: no matching spec/test yet"
+      "level": "real-e2e"
     },
     "OC-CB-002": {
-      "level": "not-covered",
-      "note": "demoted from real-e2e: no matching spec/test yet"
+      "level": "real-e2e"
     },
     "OC-CB-003": {
-      "level": "not-covered",
-      "note": "demoted from real-e2e: no matching spec/test yet"
+      "level": "real-e2e"
     },
     "OC-CB-004": {
-      "level": "not-covered",
-      "note": "demoted from real-e2e: no matching spec/test yet"
+      "level": "real-e2e"
     },
     "OC-CB-005": {
       "level": "real-e2e"
@@ -657,7 +668,7 @@
       "level": "unit"
     },
     "OC-LIFE-004": {
-      "level": "not-covered"
+      "level": "real-e2e"
     },
     "OC-LIFE-005": {
       "level": "not-covered"
@@ -675,28 +686,28 @@
       "level": "unit"
     },
     "OC-LIFE-010": {
-      "level": "unit"
+      "level": "real-e2e"
     },
     "OC-LIFE-011": {
-      "level": "not-covered"
+      "level": "real-e2e"
     },
     "OC-LIFE-012": {
       "level": "not-covered"
     },
     "OC-LIFE-013": {
-      "level": "not-covered"
+      "level": "real-e2e"
     },
     "OC-LIFE-014": {
       "level": "unit"
     },
     "OC-LIFE-015": {
-      "level": "not-covered"
+      "level": "real-e2e"
     },
     "OC-CONC-001": {
       "level": "not-covered"
     },
     "OC-CONC-002": {
-      "level": "not-covered"
+      "level": "real-e2e"
     },
     "OC-CONC-003": {
       "level": "not-covered"

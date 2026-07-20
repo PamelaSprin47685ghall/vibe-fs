@@ -9,6 +9,10 @@ open Wanxiangshu.Runtime.Dyn
 open Wanxiangshu.Hosts.Mux.Fallback.Hook
 open Wanxiangshu.Runtime.NudgeRuntimeMux
 open Wanxiangshu.Runtime.Fallback.RuntimeStore
+open Wanxiangshu.Runtime.NudgeOutcomeHandler
+open Wanxiangshu.Runtime.Fallback.SessionRuntimePropertyPure
+open Wanxiangshu.Runtime.Fallback.SessionRuntime
+open Wanxiangshu.Kernel.Nudge
 open Wanxiangshu.Kernel.Nudge.Types
 open Wanxiangshu.Kernel.FallbackKernel.Types
 
@@ -298,4 +302,44 @@ let muxContinueValidReceiptResolvesSpec () =
 
         do! executor.SendContinue("session-continue-test", model, "continuation-id")
         check "continue with valid receipt resolves successfully" true
+    }
+
+let muxAbortUnavailableNudgeFlowSpec () =
+    promise {
+        let! tmpDir = mkdtempAsync "mux-abort-unavail-"
+
+        let runtime = FallbackRuntimeStore()
+        let sessionKey = "test-session-abort"
+        
+        let _ = runtime.GetOrCreateState(sessionKey)
+
+        let lease: NudgeLease =
+            { NudgeID = "nudge-1"
+              NudgeOrdinal = 1
+              Nonce = "nonce-1"
+              HumanTurnID = "ht-1"
+              SessionGeneration = 0
+              CancelGeneration = 0
+              Owner = SessionOwner.Human 
+              Status = LeaseStatus.Requested }
+
+        let abortRunCalledCount = ref 0
+        let abortRun _ =
+            promise {
+                abortRunCalledCount.Value <- abortRunCalledCount.Value + 1
+                return! Promise.reject (System.Exception("AbortUnavailable: Mux host adapter does not expose a session-level abort API"))
+            }
+
+        do! Wanxiangshu.Runtime.NudgeOutcomeHandler.validateAndFinalizeOutcome tmpDir runtime sessionKey lease NudgeAction.NudgeNone "anchor" SendOutcome.Delivered abortRun
+
+        check "abortRun was called once" (abortRunCalledCount.Value = 1)
+        
+        let session = runtime.GetSession sessionKey
+        check "session.AbortUnavailable is true" session.AbortUnavailable
+
+        do! Wanxiangshu.Runtime.NudgeOutcomeHandler.validateAndFinalizeOutcome tmpDir runtime sessionKey lease NudgeAction.NudgeNone "anchor" SendOutcome.Delivered abortRun
+        
+        check "abortRun was NOT called a second time" (abortRunCalledCount.Value = 1)
+
+        do! rmAsync tmpDir
     }

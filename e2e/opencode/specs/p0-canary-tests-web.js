@@ -15,28 +15,18 @@ const tests = [
     fn: async (t) => {
       const sess = await t.client.createSession();
       const sid = getSessionId(sess);
-      t.provider.expectToolCall({
-        id: 'web-search-002',
-        tool: 'web_search',
-        args: {
-          query: 'E2E websearch test',
-          what_to_summarize: 'extract key technology stacks',
-          numResults: 1
-        }
-      });
-      t.provider.expectText({ id: 'web-summary-002', text: 'Test search content for E2E.' });
+      t.provider.expectToolCall({ id: 'web-search-002', tool: 'web_search', args: { query: 'E2E websearch test', what_to_summarize: 'extract key technology stacks', numResults: 1 } });
+      t.provider.expectText({ id: 'web-summary-002', text: 'Test search content.' });
       t.provider.expectText({ id: 'web-done-002', text: 'done' });
       const turn = await t.turn.start(sid);
       await t.client.prompt(sid, 'search the web for E2E websearch test');
       await turn.awaitTerminal({ timeoutMs: TIMEOUTS.prompt });
 
       const subagentReq = t.provider.requests[1];
-      if (!subagentReq) throw new Error('websearch executor subagent request missing');
+      if (!subagentReq) throw new Error('subagent request missing');
       const last = subagentReq.messages?.[subagentReq.messages.length - 1];
       const lastText = typeof last?.content === 'string' ? last.content : JSON.stringify(last?.content);
-      if (!lastText.includes('extract key technology stacks')) {
-        throw new Error('what_to_summarize not in subagent prompt: ' + lastText);
-      }
+      if (!lastText.includes('extract key technology stacks')) throw new Error('what_to_summarize missing from prompt');
       expectNoSessionError(t, sid);
     },
   },
@@ -46,15 +36,7 @@ const tests = [
     fn: async (t) => {
       const sess = await t.client.createSession();
       const sid = getSessionId(sess);
-      t.provider.expectToolCall({
-        id: 'web-search-500',
-        tool: 'web_search',
-        args: {
-          query: 'trigger_500',
-          what_to_summarize: 'test',
-          numResults: 1
-        }
-      });
+      t.provider.expectToolCall({ id: 'web-search-500', tool: 'web_search', args: { query: 'trigger_500', what_to_summarize: 'test', numResults: 1 } });
       t.provider.expectText({ id: 'web-done-500', text: 'done' });
       const turn = await t.turn.start(sid);
       await t.client.prompt(sid, 'search the web for trigger_500');
@@ -62,12 +44,9 @@ const tests = [
 
       const messages = (await t.client.messages(sid)).data || [];
       const part = findToolPart(messages, 'web_search');
-      if (!part) throw new Error('web_search tool part not found in messages');
-      if (part.state?.status !== 'completed') throw new Error(`expected completed tool status, got ${part.state?.status}`);
+      if (!part || part.state?.status !== 'completed') throw new Error('completed status missing');
       const output = part.state?.output || '';
-      if (!output.includes('failed') && !output.includes('500')) {
-        throw new Error(`expected tool error containing 500/failed, got: ${output}`);
-      }
+      if (!output.includes('failed') && !output.includes('500')) throw new Error('error output missing');
       expectNoSessionError(t, sid);
     },
   },
@@ -77,15 +56,7 @@ const tests = [
     fn: async (t) => {
       const sess = await t.client.createSession();
       const sid = getSessionId(sess);
-      t.provider.expectToolCall({
-        id: 'web-search-malformed',
-        tool: 'web_search',
-        args: {
-          query: 'trigger_malformed',
-          what_to_summarize: 'test',
-          numResults: 1
-        }
-      });
+      t.provider.expectToolCall({ id: 'web-search-malformed', tool: 'web_search', args: { query: 'trigger_malformed', what_to_summarize: 'test', numResults: 1 } });
       t.provider.expectText({ id: 'web-done-malformed', text: 'done' });
       const turn = await t.turn.start(sid);
       await t.client.prompt(sid, 'search the web for trigger_malformed');
@@ -93,12 +64,9 @@ const tests = [
 
       const messages = (await t.client.messages(sid)).data || [];
       const part = findToolPart(messages, 'web_search');
-      if (!part) throw new Error('web_search tool part not found in messages');
-      if (part.state?.status !== 'completed') throw new Error(`expected completed tool status, got ${part.state?.status}`);
+      if (!part || part.state?.status !== 'completed') throw new Error('status missing');
       const output = part.state?.output || '';
-      if (!output.includes('failed') && !output.includes('malformed')) {
-        throw new Error(`expected failure representation in tool state or output, got: ${JSON.stringify(part.state)}`);
-      }
+      if (!output.includes('failed') && !output.includes('malformed')) throw new Error('failure text missing');
       expectNoSessionError(t, sid);
     },
   },
@@ -108,13 +76,7 @@ const tests = [
     fn: async (t) => {
       const sess = await t.client.createSession();
       const sid = getSessionId(sess);
-      t.provider.expectToolCall({
-        id: 'web-fetch-ok',
-        tool: 'webfetch',
-        args: {
-          url: 'http://example.com/fixture'
-        }
-      });
+      t.provider.expectToolCall({ id: 'web-fetch-ok', tool: 'webfetch', args: { url: 'http://example.com/fixture' } });
       t.provider.expectText({ id: 'web-done-fetch', text: 'done' });
       const turn = await t.turn.start(sid);
       await t.client.prompt(sid, 'fetch http://example.com/fixture');
@@ -122,12 +84,9 @@ const tests = [
 
       const messages = (await t.client.messages(sid)).data || [];
       const part = findToolPart(messages, 'webfetch');
-      if (!part) throw new Error('webfetch tool part not found in messages');
-      if (part.state?.status !== 'completed') throw new Error(`expected completed status, got ${part.state?.status}`);
+      if (!part || part.state?.status !== 'completed') throw new Error('status missing');
       const output = part.state?.output || '';
-      if (!output.includes('Example Domain') || !output.includes('This domain is for use in documentation examples.')) {
-        throw new Error(`webfetch output missing fixture content: ${output}`);
-      }
+      if (!output.includes('Example Domain') || !output.includes('This domain is for use')) throw new Error('content missing');
       expectNoSessionError(t, sid);
     },
   },
@@ -137,13 +96,7 @@ const tests = [
     fn: async (t) => {
       const sess = await t.client.createSession();
       const sid = getSessionId(sess);
-      t.provider.expectToolCall({
-        id: 'web-fetch-private',
-        tool: 'webfetch',
-        args: {
-          url: 'http://127.0.0.1/private'
-        }
-      });
+      t.provider.expectToolCall({ id: 'web-fetch-private', tool: 'webfetch', args: { url: 'http://127.0.0.1/private' } });
       t.provider.expectText({ id: 'web-done-private', text: 'done' });
       const turn = await t.turn.start(sid);
       await t.client.prompt(sid, 'fetch http://127.0.0.1/private');
@@ -151,12 +104,9 @@ const tests = [
 
       const messages = (await t.client.messages(sid)).data || [];
       const part = findToolPart(messages, 'webfetch');
-      if (!part) throw new Error('webfetch tool part not found');
-      if (part.state?.status !== 'completed') throw new Error(`expected completed status, got ${part.state?.status}`);
+      if (!part || part.state?.status !== 'completed') throw new Error('status missing');
       const output = part.state?.output || '';
-      if (!output.includes('Web fetch failed') || !output.includes('host not allowed')) {
-        throw new Error(`expected host not allowed error in output, got: ${output}`);
-      }
+      if (!output.includes('Web fetch failed') || !output.includes('host not allowed')) throw new Error('SSRF block missing');
       expectNoSessionError(t, sid);
     },
   },
@@ -166,13 +116,7 @@ const tests = [
     fn: async (t) => {
       const sess = await t.client.createSession();
       const sid = getSessionId(sess);
-      t.provider.expectToolCall({
-        id: 'web-fetch-redirect',
-        tool: 'webfetch',
-        args: {
-          url: 'http://mock-redirector.com/to-private'
-        }
-      });
+      t.provider.expectToolCall({ id: 'web-fetch-redirect', tool: 'webfetch', args: { url: 'http://mock-redirector.com/to-private' } });
       t.provider.expectText({ id: 'web-done-redirect', text: 'done' });
       const turn = await t.turn.start(sid);
       await t.client.prompt(sid, 'fetch http://mock-redirector.com/to-private');
@@ -180,12 +124,9 @@ const tests = [
 
       const messages = (await t.client.messages(sid)).data || [];
       const part = findToolPart(messages, 'webfetch');
-      if (!part) throw new Error('webfetch tool part not found');
-      if (part.state?.status !== 'completed') throw new Error(`expected completed status, got ${part.state?.status}`);
+      if (!part || part.state?.status !== 'completed') throw new Error('status missing');
       const output = part.state?.output || '';
-      if (!output.includes('Web fetch failed') || !output.includes('redirect to private IP blocked')) {
-        throw new Error(`expected redirect to private IP blocked in output, got: ${output}`);
-      }
+      if (!output.includes('Web fetch failed') || !output.includes('redirect to private IP blocked')) throw new Error('redirect SSRF block missing');
       expectNoSessionError(t, sid);
     },
   },
@@ -195,79 +136,34 @@ const tests = [
     fn: async (t) => {
       const sess = await t.client.createSession();
       const sid = getSessionId(sess);
-
-      // 1. Parent calls browser
-      t.provider.expectToolCall({
-        id: 'parent-browser-call',
-        tool: 'browser',
-        args: { intent: 'check debug view' }
-      });
-
-      // 2. Child session starts, calls MCP tool
-      t.provider.expectToolCall({
-        id: 'child-mcp-call',
-        tool: 'stealth-browser-mcp_get_debug_view',
-        args: {}
-      });
-
-      // 3. Child session receives MCP result, returns final text
-      t.provider.expectText({
-        id: 'child-final-text',
-        text: 'Successfully checked debug view: e2e stealth mcp debug view'
-      });
-
-      // 4. Parent session receives browser subagent result, returns done
-      t.provider.expectText({
-        id: 'parent-final-text',
-        text: 'done'
-      });
-
+      t.provider.expectToolCall({ id: 'parent-browser-call', tool: 'browser', args: { intent: 'check debug view' } });
+      t.provider.expectToolCall({ id: 'child-mcp-call', tool: 'stealth-browser-mcp_get_debug_view', args: {} });
+      t.provider.expectText({ id: 'child-final-text', text: 'Successfully checked debug view: e2e stealth mcp debug view' });
+      t.provider.expectText({ id: 'parent-final-text', text: 'done' });
       const turn = await t.turn.start(sid);
       await t.client.prompt(sid, 'start browser and check debug view');
       await turn.awaitTerminal({ timeoutMs: TIMEOUTS.prompt });
 
-      // Verifications:
-      // OC-WEB-008: Check browser started by finding child requests.
-      // We look for requests that have stealth-browser-mcp_get_debug_view tool in tools list
-      // and do not have tool results in messages (which is childReq1).
-      const childReq1 = t.provider.requests.find((r) => {
+      const childReq1 = t.provider.requests.find(r => {
         const names = extractToolNames(r.tools);
         return names.includes('stealth-browser-mcp_get_debug_view') &&
-               !r.messages?.some((m) => m.role === 'tool' || m.role === 'toolResult');
+               !r.messages?.some(m => m.role === 'tool' || m.role === 'toolResult');
       });
-      if (!childReq1) throw new Error('child session browser start request not found');
+      if (!childReq1) throw new Error('child start req missing');
+      if (!extractToolNames(childReq1.tools).includes('stealth-browser-mcp_get_debug_view')) throw new Error('MCP tool missing in tools');
 
-      // OC-WEB-009: Check MCP tools listed in the tools section of child request
-      const tools = childReq1.tools || [];
-      const toolNames = extractToolNames(tools);
-      if (!toolNames.includes('stealth-browser-mcp_get_debug_view')) {
-        throw new Error('stealth-browser-mcp_get_debug_view not in child session tools: ' + JSON.stringify(toolNames));
-      }
-
-      // OC-WEB-010: Check MCP tool result entered child session next LLM round.
-      // childReq2 is the request that has stealth-browser-mcp_get_debug_view in tools list
-      // and carries tool result in messages.
-      const childReq2 = t.provider.requests.find((r) => {
+      const childReq2 = t.provider.requests.find(r => {
         const names = extractToolNames(r.tools);
         return names.includes('stealth-browser-mcp_get_debug_view') &&
-               r.messages?.some((m) => m.role === 'tool' || m.role === 'toolResult');
+               r.messages?.some(m => m.role === 'tool' || m.role === 'toolResult');
       });
-      if (!childReq2) throw new Error('second child session completions request not found');
-      const childReq2Str = JSON.stringify(childReq2);
-      if (!childReq2Str.includes('e2e stealth mcp debug view')) {
-        throw new Error('MCP result did not enter child session next LLM round: ' + childReq2Str);
-      }
+      if (!childReq2 || !JSON.stringify(childReq2).includes('e2e stealth mcp debug view')) throw new Error('MCP result missing from LLM round');
 
-      // OC-WEB-011: Check browser final text returned to parent tool result
       const messages = (await t.client.messages(sid)).data || [];
       const part = findToolPart(messages, 'browser');
-      if (!part) throw new Error('browser tool part not found in messages');
-      if (part.state?.status !== 'completed') throw new Error(`expected browser status completed, got: ${part.state?.status}`);
+      if (!part || part.state?.status !== 'completed') throw new Error('status missing');
       const output = part.state?.output || '';
-      if (!output.includes('Successfully checked debug view: e2e stealth mcp debug view')) {
-        throw new Error(`expected subagent output in tool result, got: ${output}`);
-      }
-
+      if (!output.includes('Successfully checked debug view')) throw new Error('output missing debug view');
       expectNoSessionError(t, sid);
     },
   },
@@ -277,101 +173,51 @@ const tests = [
     fn: async (t) => {
       const sess = await t.client.createSession();
       const sid = getSessionId(sess);
-
-      // 1. Parent calls browser
-      t.provider.expectToolCall({
-        id: 'parent-browser-fail',
-        tool: 'browser',
-        args: { intent: 'trigger failure' }
-      });
-
-      // 2. Child session starts, tries to call MCP tool
-      t.provider.expectToolCall({
-        id: 'child-mcp-fail-call',
-        tool: 'stealth-browser-mcp_get_debug_view',
-        args: {}
-      });
-
-      // 3. Child session receives MCP error, returns text and exits
-      t.provider.expectText({
-        id: 'child-final-fail-exit',
-        text: 'Browser subagent failed due to MCP launch error'
-      });
-
-      // 4. Parent session receives browser subagent failure result, returns done
-      t.provider.expectText({
-        id: 'parent-final-fail-text',
-        text: 'done'
-      });
-
+      t.provider.expectToolCall({ id: 'parent-browser-fail', tool: 'browser', args: { intent: 'trigger failure' } });
+      t.provider.expectToolCall({ id: 'child-mcp-fail-call', tool: 'stealth-browser-mcp_get_debug_view', args: {} });
+      t.provider.expectText({ id: 'child-final-fail-exit', text: 'Browser subagent failed due to MCP launch error' });
+      t.provider.expectText({ id: 'parent-final-fail-text', text: 'done' });
       const turn = await t.turn.start(sid);
       await t.client.prompt(sid, 'run browser with failed mcp');
       await turn.awaitTerminal({ timeoutMs: TIMEOUTS.prompt });
 
-      // Verifications:
-      // Verify that the child session tool call failed
-      const childReq2 = t.provider.requests.find((r) => {
+      const childReq2 = t.provider.requests.find(r => {
         const names = extractToolNames(r.tools);
         return names.includes('stealth-browser-mcp_get_debug_view') &&
-               r.messages?.some((m) => m.role === 'tool' || m.role === 'toolResult');
+               r.messages?.some(m => m.role === 'tool' || m.role === 'toolResult');
       });
-      if (!childReq2) throw new Error('second child session completions request not found');
-
+      if (!childReq2) throw new Error('child req missing');
       const childReq2Str = JSON.stringify(childReq2);
-      if (!childReq2Str.includes('spawn failed') && !childReq2Str.includes('failed') && !childReq2Str.includes('error')) {
-        throw new Error('MCP launch error did not enter child session next LLM round: ' + childReq2Str);
-      }
+      if (!childReq2Str.includes('spawn failed') && !childReq2Str.includes('failed') && !childReq2Str.includes('error')) throw new Error('MCP error missing');
 
-      // Check that browser tool execution completed with status completed
       const messages = (await t.client.messages(sid)).data || [];
       const part = findToolPart(messages, 'browser');
-      if (!part) throw new Error('browser tool part not found in messages');
-      if (part.state?.status !== 'completed') {
-        throw new Error(`expected browser tool status completed (with error inside), got: ${part.state?.status}`);
-      }
+      if (!part || part.state?.status !== 'completed') throw new Error('status missing');
       const output = part.state?.output || '';
-      if (!output.includes('Browser subagent failed due to MCP launch error')) {
-        throw new Error(`expected failure output in browser tool result, got: ${output}`);
-      }
+      if (!output.includes('Browser subagent failed due to MCP launch error')) throw new Error('output missing error text');
 
-      // Find the childId from the subagent_spawned event
       const ndjsonLinesBefore = readNdjsonLines(t.host.workDir);
-      const subagentSpawnEvent = ndjsonLinesBefore.find(
-        (line) => line.Kind === 'subagent_spawned' && line.Session === sid
-      );
-      if (!subagentSpawnEvent) throw new Error('subagent_spawned event not found');
-      const childId = subagentSpawnEvent.Payload?.childId;
-      if (!childId) throw new Error('childId missing from subagent_spawned payload');
+      const subagentSpawnEvent = ndjsonLinesBefore.find(l => l.Kind === 'subagent_spawned' && l.Session === sid);
+      const childId = subagentSpawnEvent?.Payload?.childId;
+      if (!childId) throw new Error('childId missing');
 
-      // Delete the child session explicitly to trigger subsession physical close and cleanup hooks
-      const delChildRes = await t.client.request('DELETE', `/session/${childId}`);
-      console.log('DELETE child session result:', JSON.stringify(delChildRes));
-
-      // Wait for the close event to appear in the NDJSON logs (up to 3 seconds)
+      await t.client.request('DELETE', `/session/${childId}`);
       let closeEvents = [];
       const deadline = Date.now() + 3000;
       while (Date.now() < deadline) {
         const ndjsonLinesAfter = readNdjsonLines(t.host.workDir);
-        closeEvents = ndjsonLinesAfter.filter((line) => {
+        closeEvents = ndjsonLinesAfter.filter(line => {
           if (line.Kind !== 'subsession_decision_committed') return false;
           try {
             const evts = JSON.parse(line.Payload?.events || '[]');
-            return evts.some((e) => e.Kind === 'subsession_physical_session_closed' && e.Payload?.sessionId === childId);
-          } catch {
-            return false;
-          }
+            return evts.some(e => e.Kind === 'subsession_physical_session_closed' && e.Payload?.sessionId === childId);
+          } catch { return false; }
         });
         if (closeEvents.length > 0) break;
-        await new Promise((resolve) => setTimeout(resolve, 100));
+        await new Promise(r => setTimeout(r, 100));
       }
-
-      if (closeEvents.length === 0) {
-        throw new Error('No subsession_physical_session_closed event found for child session');
-      }
-
-      // Also clean up the parent session
+      if (closeEvents.length === 0) throw new Error('No close event found');
       await t.client.request('DELETE', `/session/${sid}`);
-
       expectNoSessionError(t, sid);
     },
   }

@@ -23,6 +23,11 @@ export function startHttpServer(handler) {
 export function stopHttpServer(server) {
   if (!server) return Promise.resolve();
   return new Promise((resolve) => {
+    try {
+      if (typeof server.closeAllConnections === 'function') {
+        server.closeAllConnections();
+      }
+    } catch {}
     server.close(() => resolve());
   });
 }
@@ -50,8 +55,8 @@ export function handleWebFetch(req, res) {
   readRequestBody(req).then((body) => {
     const url = body.url || '';
     if (url.includes('to-private') || url.includes('redirect-private')) {
-      res.writeHead(400, { 'Content-Type': 'text/plain' });
-      res.end('redirect to private IP blocked');
+      res.writeHead(302, { 'Location': 'http://127.0.0.1/private' });
+      res.end();
     } else if (url.includes('trigger_500')) {
       res.writeHead(500, { 'Content-Type': 'text/plain' });
       res.end('Internal Server Error');

@@ -20,8 +20,17 @@ build/
 build-kernel/
 build-shell/
 build-tests/
+build_verify/
+build-test/
 artifacts/
 coverage/
+
+## Local E2E probes
+e2e/opencode/specs/_debug*.mjs
+e2e/opencode/specs/debug-*.mjs
+e2e/opencode/specs/.fb-runner.mjs
+e2e/opencode/specs/_review-runner.mjs
+e2e/opencode/specs/p0-canary-recovery-temp.js
 
 ## Generated / vendored dumps
 repomix-output.xml
