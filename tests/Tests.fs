@@ -193,6 +193,7 @@ let runAll (args: string array) : JS.Promise<int> =
             ()
 
         clearFailuresForRun ()
+        Assert.disableGlobalClear ()
         Assert.setSilent false
         let selectors = args
         initVerboseLog ()
