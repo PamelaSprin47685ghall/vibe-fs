@@ -449,7 +449,7 @@ let promptWithAbort_abortsHostWhenSignalWins () =
         let args = box {| path = box {| id = "child-abort-host" |} |}
 
         let task =
-            Wanxiangshu.Hosts.Opencode.SubagentSpawn.promptWithAbort client args signal
+            Wanxiangshu.Hosts.Opencode.SubagentSpawnTransport.promptWithAbort client args signal
 
         let! () = yieldMicrotask ()
         trigger ()
@@ -486,14 +486,14 @@ let promptWithAbort_staleGateSkipsHostAbort () =
         let client = createObj [ "session", box session ]
         let signal, trigger = createMockAbortSignal ()
         let args = box {| path = box {| id = "child-stale" |} |}
-        let gate = Wanxiangshu.Hosts.Opencode.SubagentSpawn.createPromptAbortGate ()
-        Wanxiangshu.Hosts.Opencode.SubagentSpawn.bumpPromptAbortEpoch gate |> ignore
+        let gate = Wanxiangshu.Hosts.Opencode.SubagentSpawnTransport.createPromptAbortGate ()
+        Wanxiangshu.Hosts.Opencode.SubagentSpawnTransport.bumpPromptAbortEpoch gate |> ignore
 
         let task =
-            Wanxiangshu.Hosts.Opencode.SubagentSpawn.promptWithAbortOwned client args signal (Some gate)
+            Wanxiangshu.Hosts.Opencode.SubagentSpawnTransport.promptWithAbortOwned client args signal (Some gate)
 
         let! () = yieldMicrotask ()
-        Wanxiangshu.Hosts.Opencode.SubagentSpawn.closePromptAbortGate gate
+        Wanxiangshu.Hosts.Opencode.SubagentSpawnTransport.closePromptAbortGate gate
         trigger ()
 
         try
@@ -523,7 +523,7 @@ let promptWithAbort_alreadyAbortedCallsHostAbort () =
         let mutable threw = false
 
         try
-            do! Wanxiangshu.Hosts.Opencode.SubagentSpawn.promptWithAbort client args signal
+            do! Wanxiangshu.Hosts.Opencode.SubagentSpawnTransport.promptWithAbort client args signal
         with _ ->
             threw <- true
 
