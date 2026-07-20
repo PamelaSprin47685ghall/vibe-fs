@@ -13,6 +13,7 @@ open Wanxiangshu.Runtime.ContinuationEventWriter
 open Wanxiangshu.Runtime.Fallback.RetryDispatchGovernor
 open Wanxiangshu.Runtime.Fallback.ContinuationSessionReenter
 open Wanxiangshu.Runtime.Fallback.ContinuationDispatchComplete
+open Wanxiangshu.Runtime.MuxLogicalReceipt
 
 /// Shared per-process retry dispatch governor.
 let private retryGovernor = RetryDispatchGovernor()
@@ -173,6 +174,7 @@ let handleTransportReturned
 
         match pending, lifecycle with
         | Some current, FallbackLifecycle.Active when current.ContinuationID = lease.ContinuationID ->
+<<<<<<< HEAD
             match current.Status with
             | LeaseStatus.Dispatched
             | LeaseStatus.Running -> ()
@@ -181,6 +183,69 @@ let handleTransportReturned
             | LeaseStatus.Cancelled
             | LeaseStatus.Settled -> ()
         | _ -> ()
+=======
+            let modelStr =
+                match model.Variant with
+                | Some v -> $"{model.ProviderID}/{model.ModelID}:{v}"
+                | None -> $"{model.ProviderID}/{model.ModelID}"
+
+            let atMs = getTimestampMs ()
+
+            do!
+                appendContinuationDispatchedOrFail
+                    workspaceRoot
+                    sessionID
+                    lease.ContinuationID
+                    modelStr
+                    agent
+                    atMs
+                    lease.ContinuationOrdinal
+
+            let canTransition =
+                match current.Status with
+                | LeaseStatus.Requested ->
+                    runtime.UpdateSessionReturning(
+                        sessionID,
+                        tryTransitionPendingLeaseReturning
+                            lease.ContinuationID
+                            LeaseStatus.Requested
+                            LeaseStatus.Dispatched
+                    )
+                | LeaseStatus.DispatchStarted ->
+                    runtime.UpdateSessionReturning(
+                        sessionID,
+                        tryTransitionPendingLeaseReturning
+                            lease.ContinuationID
+                            LeaseStatus.DispatchStarted
+                            LeaseStatus.Dispatched
+                    )
+                | LeaseStatus.AcceptanceUnknown ->
+                    runtime.UpdateSessionReturning(
+                        sessionID,
+                        tryTransitionPendingLeaseReturning
+                            lease.ContinuationID
+                            LeaseStatus.AcceptanceUnknown
+                            LeaseStatus.Dispatched
+                    )
+                | LeaseStatus.Running ->
+                    runtime.UpdateSessionReturning(
+                        sessionID,
+                        tryTransitionPendingLeaseReturning
+                            lease.ContinuationID
+                            LeaseStatus.Running
+                            LeaseStatus.Dispatched
+                    )
+                | LeaseStatus.Dispatched -> true
+                | LeaseStatus.Cancelled
+                | LeaseStatus.Settled -> false
+
+            if canTransition then
+                runtime.Update(sessionID, setInjected model atMs)
+        | _ ->
+            // Terminal handling or a newer lease won the race. The prompt
+            // completion is stale evidence; never append a late cancellation.
+            ()
+>>>>>>> 98bc01f6 (fix(mux): wire AcceptanceUnknown/AbortUnknown degrade paths end-to-end)
     }
 
 /// Inner dispatch: write dispatch_started, transition lease, call action.
@@ -268,5 +333,35 @@ let runWithRetryGovernor
         with ex ->
             do!
                 reenter (fun () ->
-                    finishContinuation runtime workspaceRoot sessionID lease ContinuationOutcome.Failed ex.Message)
+                    promise {
+                        if isAcceptanceUnknownMessage ex.Message then
+                            do!
+                                finishContinuation
+                                    runtime
+                                    workspaceRoot
+                                    sessionID
+                                    lease
+                                    ContinuationOutcome.AcceptanceUnknown
+                                    ex.Message
+                        elif isAbortUnavailableMessage ex.Message then
+                            runtime.Update(sessionID, setAbortUnavailable true)
+
+                            do!
+                                finishContinuation
+                                    runtime
+                                    workspaceRoot
+                                    sessionID
+                                    lease
+                                    ContinuationOutcome.AbortUnknown
+                                    ex.Message
+                        else
+                            do!
+                                finishContinuation
+                                    runtime
+                                    workspaceRoot
+                                    sessionID
+                                    lease
+                                    ContinuationOutcome.Failed
+                                    ex.Message
+                    })
     }

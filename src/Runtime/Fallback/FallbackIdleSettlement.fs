@@ -54,36 +54,49 @@ let handleTerminalPostSettlement
         if isPostTerminal then
             match (runtime.GetSession sessionID).PendingLease with
             | Some lease ->
-                let session = runtime.GetSession sessionID
+                let awaitingAcceptance =
+                    match lease.Status with
+                    | LeaseStatus.Requested
+                    | LeaseStatus.DispatchStarted
+                    | LeaseStatus.AcceptanceUnknown -> true
+                    | LeaseStatus.Dispatched
+                    | LeaseStatus.Running
+                    | LeaseStatus.Cancelled
+                    | LeaseStatus.Settled -> false
 
-                let strongTerminal =
-                    finalState2.Lifecycle = FallbackLifecycle.Cancelled
-                    || finalState2.Lifecycle = FallbackLifecycle.TaskComplete
-                    || finalState2.Phase = FallbackPhase.Exhausted
-
-                let isIdleEvt = evt = FallbackEvent.SessionIdle
-
-                if strongTerminal then
-                    do! clearPendingLeaseAfterTerminal runtime workspaceRoot sessionID lease
-                elif isIdleEvt then
-                    match classifyIdleDisposition session false false with
-                    | MaySettle _ -> do! clearPendingLeaseAfterTerminal runtime workspaceRoot sessionID lease
-                    | NeedsReconciliation(cid, hostMsgId) when workspaceRoot <> "" ->
-                        do!
-                            appendContinuationIdleReconciliationOrFail
-                                workspaceRoot
-                                sessionID
-                                cid
-                                hostMsgId
-                                lease.ContinuationOrdinal
-                    | NeedsReconciliation _
-                    | RejectNotHostAccepted _
-                    | SessionHintOnly
-                    | IdempotentIgnore -> ()
-                elif lease.HostUserMessageId <> "" then
-                    do! clearPendingLeaseAfterTerminal runtime workspaceRoot sessionID lease
-                else
+                if awaitingAcceptance then
                     ()
+                else
+                    let session = runtime.GetSession sessionID
+
+                    let strongTerminal =
+                        finalState2.Lifecycle = FallbackLifecycle.Cancelled
+                        || finalState2.Lifecycle = FallbackLifecycle.TaskComplete
+                        || finalState2.Phase = FallbackPhase.Exhausted
+
+                    let isIdleEvt = evt = FallbackEvent.SessionIdle
+
+                    if strongTerminal then
+                        do! clearPendingLeaseAfterTerminal runtime workspaceRoot sessionID lease
+                    elif isIdleEvt then
+                        match classifyIdleDisposition session false false with
+                        | MaySettle _ -> do! clearPendingLeaseAfterTerminal runtime workspaceRoot sessionID lease
+                        | NeedsReconciliation(cid, hostMsgId) when workspaceRoot <> "" ->
+                            do!
+                                appendContinuationIdleReconciliationOrFail
+                                    workspaceRoot
+                                    sessionID
+                                    cid
+                                    hostMsgId
+                                    lease.ContinuationOrdinal
+                        | NeedsReconciliation _
+                        | RejectNotHostAccepted _
+                        | SessionHintOnly
+                        | IdempotentIgnore -> ()
+                    elif lease.HostUserMessageId <> "" then
+                        do! clearPendingLeaseAfterTerminal runtime workspaceRoot sessionID lease
+                    else
+                        ()
             | None -> ()
     }
 

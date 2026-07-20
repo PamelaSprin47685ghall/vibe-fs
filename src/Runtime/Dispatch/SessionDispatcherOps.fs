@@ -73,6 +73,7 @@ module SessionDispatcherOps =
                   IsRetryable = Some false }
 
             DispatchOps.resolveRecord r (TransportUnavailable err)
+<<<<<<< HEAD
         | Error exn ->
             // Preserve host/transport failure text so callers can classify
             // (helpers missing, nudge missing, session mismatch, etc.).
@@ -80,8 +81,10 @@ module SessionDispatcherOps =
                 let m = exn.Message
                 if System.String.IsNullOrEmpty m then "transport failed" else m
             let name =
-                if msg.StartsWith("AcceptanceUnknown") then "AcceptanceUnknown"
-                elif msg.StartsWith("Failed:") then "RejectedBeforeSend"
+                if msg.Contains("AcceptanceUnknown") then "AcceptanceUnknown"
+                elif msg.StartsWith("Busy:") then "Busy"
+                elif msg.StartsWith("Failed:") then "Failed"
+                elif msg.Contains("AbortUnknown") || msg.Contains("AbortUnavailable") then "AbortUnknown"
                 else "TransportFailed"
 
             let err =
@@ -89,10 +92,12 @@ module SessionDispatcherOps =
                   DomainError = None
                   Message = msg
                   StatusCode = None
-                  IsRetryable = Some false }
+                  IsRetryable = Some (name = "Busy") }
 
             let terminal =
                 if name = "AcceptanceUnknown" then AcceptanceUnknown err
+                elif name = "AbortUnknown" then AbortUnknown err
+                elif name = "Failed" then Failed err
                 elif msg.Contains("opencode_session_api_missing") then TransportUnavailable err
                 else RejectedBeforeSend err
 

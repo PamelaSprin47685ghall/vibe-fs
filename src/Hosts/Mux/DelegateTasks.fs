@@ -50,11 +50,7 @@ let createAndWaitTaskCore
         match decodeTaskCreateResult createResult with
         | Error e -> return Ok("", wireDomainFailure "delegate.create" e)
         | Ok taskId ->
-            let waitOpts =
-                box
-                    {| requestingWorkspaceId = Id.workspaceIdValue ctx.workspaceId
-                       abortSignal = ctx.abortSignal
-                       backgroundOnMessageQueued = false |}
+            let waitOpts = DelegateCodec.buildContinueOpts ctx.workspaceId taskId ctx.abortSignal
 
             try
                 let! report = taskWait ctx.taskService taskId waitOpts
@@ -94,11 +90,7 @@ let continueAndWaitTask
     (title: string)
     : JS.Promise<Result<string, DomainError>> =
     promise {
-        let waitOpts =
-            box
-                {| requestingWorkspaceId = Id.workspaceIdValue ctx.workspaceId
-                   abortSignal = ctx.abortSignal
-                   backgroundOnMessageQueued = false |}
+        let waitOpts = DelegateCodec.buildContinueOpts ctx.workspaceId childTaskId ctx.abortSignal
 
         let! continueResult = taskContinue ctx.taskService childTaskId prompt waitOpts
 

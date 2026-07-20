@@ -310,7 +310,7 @@ let muxAbortUnavailableNudgeFlowSpec () =
 
         let runtime = FallbackRuntimeStore()
         let sessionKey = "test-session-abort"
-        
+
         let _ = runtime.GetOrCreateState(sessionKey)
 
         let lease: NudgeLease =
@@ -325,22 +325,149 @@ let muxAbortUnavailableNudgeFlowSpec () =
               Status = LeaseStatus.Requested }
 
         let abortRunCalledCount = ref 0
+
         let abortRun _ =
             promise {
                 abortRunCalledCount.Value <- abortRunCalledCount.Value + 1
-                return! Promise.reject (System.Exception("AbortUnavailable: Mux host adapter does not expose a session-level abort API"))
+
+                return!
+                    Promise.reject (
+                        System.Exception(
+                            "AbortUnavailable: Mux host adapter does not expose a session-level abort API"
+                        )
+                    )
             }
 
-        do! Wanxiangshu.Runtime.NudgeOutcomeHandler.validateAndFinalizeOutcome tmpDir runtime sessionKey lease NudgeAction.NudgeNone "anchor" SendOutcome.Delivered abortRun
+        // Invalid lease (owner Human ≠ Nudge) forces the abort path after Delivered.
+        do!
+            Wanxiangshu.Runtime.NudgeOutcomeHandler.validateAndFinalizeOutcome
+                tmpDir
+                runtime
+                sessionKey
+                lease
+                NudgeAction.NudgeNone
+                "anchor"
+                SendOutcome.Delivered
+                abortRun
 
         check "abortRun was called once" (abortRunCalledCount.Value = 1)
-        
+
         let session = runtime.GetSession sessionKey
         check "session.AbortUnavailable is true" session.AbortUnavailable
+        check "pending nudge cleared after AbortUnknown" session.PendingNudgeLease.IsNone
 
-        do! Wanxiangshu.Runtime.NudgeOutcomeHandler.validateAndFinalizeOutcome tmpDir runtime sessionKey lease NudgeAction.NudgeNone "anchor" SendOutcome.Delivered abortRun
-        
+        do!
+            Wanxiangshu.Runtime.NudgeOutcomeHandler.validateAndFinalizeOutcome
+                tmpDir
+                runtime
+                sessionKey
+                lease
+                NudgeAction.NudgeNone
+                "anchor"
+                SendOutcome.Delivered
+                abortRun
+
         check "abortRun was NOT called a second time" (abortRunCalledCount.Value = 1)
+
+        do! rmAsync tmpDir
+    }
+
+let muxAbortUnavailableDoesNotReportCancelledSpec () =
+    promise {
+        let! tmpDir = mkdtempAsync "mux-abort-not-cancelled-"
+        let runtime = FallbackRuntimeStore()
+        let sessionKey = "test-abort-not-cancelled"
+        let _ = runtime.GetOrCreateState sessionKey
+
+        // Arm a real pending nudge lease so finishNudge records an outcome.
+        runtime.UpdateSession(
+            sessionKey,
+            fun s ->
+                { s with
+                    Owner = SessionOwner.Nudge
+                    HumanTurnId = "ht-1"
+                    PendingNudgeLease =
+                        Some
+                            { NudgeID = "nudge-abort"
+                              NudgeOrdinal = 1
+                              Nonce = "nonce-abort"
+                              HumanTurnID = "ht-1"
+                              SessionGeneration = 0
+                              CancelGeneration = 0
+                              Owner = SessionOwner.Nudge
+                              Status = LeaseStatus.DispatchStarted } }
+        )
+
+        let lease = (runtime.GetSession sessionKey).PendingNudgeLease.Value
+
+        // Force invalid-lease abort path by bumping cancel generation.
+        runtime.UpdateSession(sessionKey, fun s -> { s with CancelGeneration = 99 })
+
+        let abortRun _ =
+            Promise.reject (
+                System.Exception("AbortUnavailable: Mux host adapter does not expose a session-level abort API")
+            )
+
+        do!
+            Wanxiangshu.Runtime.NudgeOutcomeHandler.validateAndFinalizeOutcome
+                tmpDir
+                runtime
+                sessionKey
+                lease
+                NudgeAction.NudgeNone
+                "anchor"
+                SendOutcome.Delivered
+                abortRun
+
+        check "AbortUnavailable sets flag" (runtime.GetSession sessionKey).AbortUnavailable
+        check "lease cleared via AbortUnknown not Cancelled" (runtime.GetSession sessionKey).PendingNudgeLease.IsNone
+
+        do! rmAsync tmpDir
+    }
+
+let muxAcceptanceUnknownKeepsNudgeLeaseSpec () =
+    promise {
+        let! tmpDir = mkdtempAsync "mux-accept-unknown-nudge-"
+        let runtime = FallbackRuntimeStore()
+        let sessionKey = "test-accept-unknown-nudge"
+
+        runtime.UpdateSession(
+            sessionKey,
+            fun s ->
+                { s with
+                    Owner = SessionOwner.Nudge
+                    HumanTurnId = "ht-1"
+                    PendingNudgeLease =
+                        Some
+                            { NudgeID = "nudge-au"
+                              NudgeOrdinal = 1
+                              Nonce = "nonce-au"
+                              HumanTurnID = "ht-1"
+                              SessionGeneration = 0
+                              CancelGeneration = 0
+                              Owner = SessionOwner.Nudge
+                              Status = LeaseStatus.DispatchStarted } }
+        )
+
+        let lease = (runtime.GetSession sessionKey).PendingNudgeLease.Value
+
+        do!
+            Wanxiangshu.Runtime.NudgeOutcomeHandler.validateAndFinalizeOutcome
+                tmpDir
+                runtime
+                sessionKey
+                lease
+                NudgeAction.NudgeNone
+                "anchor"
+                (SendOutcome.AcceptanceUnknown "nudge resolved true, cannot verify delivery without receipt")
+                (fun _ -> Promise.lift ())
+
+        let pending = (runtime.GetSession sessionKey).PendingNudgeLease
+        check "AcceptanceUnknown keeps pending nudge lease" pending.IsSome
+
+        match pending with
+        | Some l -> check "lease status is AcceptanceUnknown" (l.Status = LeaseStatus.AcceptanceUnknown)
+        | None -> failwith "expected pending lease"
 
         do! rmAsync tmpDir
     }
@@ -354,6 +481,90 @@ let private defaultFallbackModel =
       MaxTokens = None
       ReasoningEffort = None
       Thinking = false }
+
+let muxOneInFlightSecondContinueRejectedSpec () =
+    promise {
+        let releaseFirst = ref (fun () -> ())
+        let firstGate = Promise.create (fun resolve _ -> releaseFirst.Value <- resolve)
+
+        let callCount = ref 0
+
+        let helpers =
+            createObj
+                [ "nudge",
+                  box (
+                      System.Func<obj, obj, obj, obj, obj, obj, JS.Promise<obj>>(fun _ _ _ _ _ _ ->
+                          promise {
+                              let n = callCount.Value + 1
+                              callCount.Value <- n
+
+                              if n = 1 then
+                                  do! firstGate
+
+                                  return
+                                      box (
+                                          createObj
+                                              [ "messageId", box "msg-first"
+                                                "sessionId", box "session-inflight"
+                                                "dispatchId", box "cont-1" ]
+                                      )
+                              else
+                                  return
+                                      box (
+                                          createObj
+                                              [ "messageId", box "msg-second"
+                                                "sessionId", box "session-inflight"
+                                                "dispatchId", box "cont-2" ]
+                                      )
+                          })
+                  ) ]
+
+        let executor = muxActionExecutor helpers
+
+        let firstP = executor.SendContinue("session-inflight", defaultFallbackModel, "cont-1")
+        do! Promise.sleep 20
+        let! second = executor.SendContinue("session-inflight", defaultFallbackModel, "cont-2") |> Promise.result
+
+        match second with
+        | Error ex ->
+            check
+                "second continue rejected while first in flight"
+                (ex.Message.Contains("AnotherDispatchInFlight") || ex.Message.Contains("Failed:"))
+        | Ok _ -> failwith "expected second continue to fail while first in flight"
+
+        releaseFirst.Value ()
+        do! firstP
+        check "first continue eventually succeeds" true
+    }
+
+let muxLogicalReceiptBooleanIsNotAcceptedSpec () =
+    promise {
+        let r =
+            Wanxiangshu.Runtime.MuxLogicalReceipt.classify (box true) "s1" "d1" "d1"
+
+        match r with
+        | Wanxiangshu.Runtime.MuxLogicalReceipt.AcceptanceUnknown _ ->
+            check "boolean true is AcceptanceUnknown not HostAccepted" true
+        | other -> failwith ("expected AcceptanceUnknown, got " + string other)
+    }
+
+let muxLogicalReceiptValidMapsToUserMessageSpec () =
+    promise {
+        let raw =
+            box (
+                createObj
+                    [ "messageId", box "m-9"
+                      "sessionId", box "s1"
+                      "dispatchId", box "d1" ]
+            )
+
+        let r = Wanxiangshu.Runtime.MuxLogicalReceipt.classify raw "s1" "d1" "d1"
+
+        match r with
+        | Wanxiangshu.Runtime.MuxLogicalReceipt.Accepted(Wanxiangshu.Kernel.Dispatch.Protocol.UserMessageAccepted mid) ->
+            check "valid receipt maps to UserMessageAccepted" (mid = "m-9")
+        | other -> failwith ("expected Accepted UserMessage, got " + string other)
+    }
 
 let muxNudgeMissingHelpersReturnsFailedSpec () =
     promise {

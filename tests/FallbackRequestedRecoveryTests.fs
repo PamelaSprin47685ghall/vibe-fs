@@ -36,15 +36,19 @@ let private fakeExecutor (calls: ResizeArray<ExecutorCall>) : IActionExecutor =
         member _.CaptureCurrentModel _ = Promise.lift None
         member _.AbortRun _ = Promise.lift () }
 
-let private defaultModel =
+let private modelFor (sid: string) : FallbackModel =
+    // Unique ModelID per session so the process-wide RetryDispatchGovernor
+    // rate-limit window does not serialize independent recovery specs.
     { ProviderID = "openai"
-      ModelID = "gpt-5"
+      ModelID = "gpt-5-" + sid
       Variant = None
       Temperature = None
       TopP = None
       MaxTokens = None
       ReasoningEffort = None
       Thinking = false }
+
+let private defaultModel = modelFor "default"
 
 let private setupSessionIdentity (rt: FallbackRuntimeStore) (sid: string) =
     rt.Update(sid, fun s ->
@@ -56,11 +60,11 @@ let private setupSessionIdentity (rt: FallbackRuntimeStore) (sid: string) =
 
 let private setupRequestedSendContinue (rt: FallbackRuntimeStore) (sid: string) =
     setupSessionIdentity rt sid
-    rt.Update(sid, startDispatch defaultModel None)
+    rt.Update(sid, startDispatch (modelFor sid) None)
 
 let private setupRequestedRecoverWithPrompt (rt: FallbackRuntimeStore) (sid: string) (prompt: string) =
     setupSessionIdentity rt sid
-    rt.Update(sid, startDispatch defaultModel (Some prompt))
+    rt.Update(sid, startDispatch (modelFor sid) (Some prompt))
 
 let private markLeaseDispatched (rt: FallbackRuntimeStore) (sid: string) =
     match (rt.GetSession sid).PendingLease with
@@ -161,6 +165,64 @@ let cancelledLeaseIsNotRedispatched () =
         check "cancelled lease not redispatched" (calls.Count = 0)
     }
 
+let acceptanceUnknownLeaseIsNotBlindResent () =
+    promise {
+        let rt = FallbackRuntimeStore()
+        let scope = RuntimeScope()
+        let calls = ResizeArray<ExecutorCall>()
+        scope.Add("fallbackRuntime", box rt)
+        registerFallbackExecutor scope (fakeExecutor calls)
+
+        setupRequestedSendContinue rt "s-au"
+
+        match (rt.GetSession "s-au").PendingLease with
+        | Some lease ->
+            rt.Update(
+                "s-au",
+                fun s ->
+                    { s with
+                        PendingLease = Some { lease with Status = LeaseStatus.AcceptanceUnknown } }
+            )
+        | None -> ()
+
+        do! recoverRequestedFallbackLeases scope ""
+
+        check "AcceptanceUnknown lease not blind-resent" (calls.Count = 0)
+
+        check
+            "status stays AcceptanceUnknown"
+            ((rt.GetSession "s-au").PendingLease.Value.Status = LeaseStatus.AcceptanceUnknown)
+    }
+
+let dispatchStartedLeaseIsNotBlindResent () =
+    promise {
+        let rt = FallbackRuntimeStore()
+        let scope = RuntimeScope()
+        let calls = ResizeArray<ExecutorCall>()
+        scope.Add("fallbackRuntime", box rt)
+        registerFallbackExecutor scope (fakeExecutor calls)
+
+        setupRequestedSendContinue rt "s-ds"
+
+        match (rt.GetSession "s-ds").PendingLease with
+        | Some lease ->
+            rt.Update(
+                "s-ds",
+                fun s ->
+                    { s with
+                        PendingLease = Some { lease with Status = LeaseStatus.DispatchStarted } }
+            )
+        | None -> ()
+
+        do! recoverRequestedFallbackLeases scope ""
+
+        check "DispatchStarted lease not blind-resent" (calls.Count = 0)
+
+        check
+            "status stays DispatchStarted"
+            ((rt.GetSession "s-ds").PendingLease.Value.Status = LeaseStatus.DispatchStarted)
+    }
+
 let staleGenerationLeaseIsNotDispatched () =
     promise {
         let rt = FallbackRuntimeStore()
@@ -233,7 +295,12 @@ let run () =
         do! dispatchedLeaseIsNotRedispatched ()
         resetRetryGovernorForTests ()
         do! cancelledLeaseIsNotRedispatched ()
+<<<<<<< HEAD
         resetRetryGovernorForTests ()
+=======
+        do! acceptanceUnknownLeaseIsNotBlindResent ()
+        do! dispatchStartedLeaseIsNotBlindResent ()
+>>>>>>> 98bc01f6 (fix(mux): wire AcceptanceUnknown/AbortUnknown degrade paths end-to-end)
         do! staleGenerationLeaseIsNotDispatched ()
         resetRetryGovernorForTests ()
         do! appendFailureDoesNotMutateMemory ()

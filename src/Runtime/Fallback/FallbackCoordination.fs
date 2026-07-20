@@ -62,7 +62,6 @@ let calculateConsumed (evt: FallbackEvent) (statePhase: FallbackPhase) (finalSta
         | FallbackPhase.Scanning _ -> true
         | _ -> false
     | _ -> false
-
 let handleTerminalPostSettlement = FallbackIdleSettlement.handleTerminalPostSettlement
 
 let executeAction
@@ -125,6 +124,7 @@ let extractEventContext
         let eventOpt = if isStale then None else eventOpt
         let session = runtime.GetSession sessionID
 
+<<<<<<< HEAD
         let! eventOpt =
             filterIdleEvent
                 runtime
@@ -134,6 +134,35 @@ let extractEventContext
                 eventOpt
                 isMatchedContinuation
                 continuationId
+=======
+        let eventOpt =
+            match eventOpt with
+            | Some FallbackEvent.NewUserMessage -> eventOpt
+            | _ ->
+                let session = runtime.GetSession sessionID
+                let hasPending = session.PendingLease.IsSome
+
+                let awaitingAcceptance =
+                    match session.PendingLease with
+                    | Some lease ->
+                        match lease.Status with
+                        | LeaseStatus.Requested
+                        | LeaseStatus.DispatchStarted
+                        | LeaseStatus.AcceptanceUnknown -> true
+                        | _ -> false
+                    | None -> false
+
+                // Unscoped idle/busy/error cannot settle or drive a dispatch
+                // that lacks host identity / matched continuation correlation.
+                if
+                    (hasPending || awaitingAcceptance || isMainContinuationAwaitingStart session)
+                    && continuationId = ""
+                    && not isMatchedContinuation
+                then
+                    None
+                else
+                    eventOpt
+>>>>>>> 98bc01f6 (fix(mux): wire AcceptanceUnknown/AbortUnknown degrade paths end-to-end)
 
         return eventOpt, eventTurnIdOpt, isMatchedContinuation
     }

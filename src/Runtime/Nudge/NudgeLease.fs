@@ -27,7 +27,9 @@ let finishNudge
         match (runtime.GetSession sessionKey).PendingNudgeLease with
         | Some nl when nl.NudgeID = lease.NudgeID ->
             match outcome with
-            | NudgeOutcome.Failed ->
+            | NudgeOutcome.Failed
+            | NudgeOutcome.AbortUnknown ->
+                // AbortUnknown is recorded as failed-with-reason, never cancelled.
                 do! appendNudgeFailedOrFail workspaceRoot sessionKey lease.NudgeID errorOrReason lease.NudgeOrdinal
             | NudgeOutcome.Cancelled ->
                 do! appendNudgeCancelledOrFail workspaceRoot sessionKey lease.NudgeID errorOrReason lease.NudgeOrdinal

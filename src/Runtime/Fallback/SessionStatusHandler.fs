@@ -85,14 +85,26 @@ let updateBusyLeases (runtime: FallbackRuntimeStore) (sessionID: string) : unit 
     // Busy is only RunObserved once HostUserMessageId is bound (HostAccepted).
     (runtime.GetSession sessionID).PendingLease
     |> Option.filter (fun l ->
+<<<<<<< HEAD
         l.HostUserMessageId <> ""
         && (l.Status = LeaseStatus.Dispatched || l.Status = LeaseStatus.Running))
     |> Option.filter (fun l -> l.Status = LeaseStatus.Dispatched)
+=======
+        l.Status = LeaseStatus.DispatchStarted
+        || l.Status = LeaseStatus.AcceptanceUnknown
+        || l.Status = LeaseStatus.Dispatched)
+>>>>>>> 98bc01f6 (fix(mux): wire AcceptanceUnknown/AbortUnknown degrade paths end-to-end)
     |> Option.iter (fun l -> runtime.UpdateSession(sessionID, setPendingLease { l with Status = LeaseStatus.Running }))
 
     (runtime.GetSession sessionID).PendingNudgeLease
     |> Option.filter (fun l ->
+<<<<<<< HEAD
         l.HostUserMessageId <> ""
         && l.Status = LeaseStatus.Dispatched)
+=======
+        l.Status = LeaseStatus.DispatchStarted
+        || l.Status = LeaseStatus.AcceptanceUnknown
+        || l.Status = LeaseStatus.Dispatched)
+>>>>>>> 98bc01f6 (fix(mux): wire AcceptanceUnknown/AbortUnknown degrade paths end-to-end)
     |> Option.iter (fun l ->
         runtime.UpdateSession(sessionID, setPendingNudgeLease { l with Status = LeaseStatus.Running }))

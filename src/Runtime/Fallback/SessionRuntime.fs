@@ -154,6 +154,7 @@ let private hasActiveContinuationLease (s: FallbackSessionRuntime) =
         match lease.Status with
         | LeaseStatus.Requested
         | LeaseStatus.DispatchStarted
+        | LeaseStatus.AcceptanceUnknown
         | LeaseStatus.Dispatched
         | LeaseStatus.Running -> true
         | LeaseStatus.Cancelled

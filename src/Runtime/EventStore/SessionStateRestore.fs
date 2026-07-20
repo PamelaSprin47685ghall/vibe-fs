@@ -27,12 +27,16 @@ let private decodeLeaseStatus (status: string) : LeaseStatus =
     | "Requested" -> LeaseStatus.Requested
     | "dispatch_started"
     | "DispatchStarted" -> LeaseStatus.DispatchStarted
+    | "acceptance_unknown"
+    | "AcceptanceUnknown" -> LeaseStatus.AcceptanceUnknown
     | "dispatched"
     | "Dispatched" -> LeaseStatus.Dispatched
     | "running"
     | "Running" -> LeaseStatus.Running
     | "cancelled"
     | "Cancelled" -> LeaseStatus.Cancelled
+    | "settled"
+    | "Settled" -> LeaseStatus.Settled
     | _ -> LeaseStatus.Requested
 
 /// Decode the model stored in a ReplayLeaseState (a plain string) to a

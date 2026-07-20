@@ -151,6 +151,8 @@ let muxEventTranslator: IEventTranslator =
 
         member _.IsSessionError(rawEvent: obj) : bool = isSessionError rawEvent
 
+        // stream-end is session-scoped idle, not a HostAccepted proof. Settlement
+        // still requires matched continuation identity (see extractEventContext).
         member _.IsSessionIdle(rawEvent: obj) : bool = Dyn.str rawEvent "type" = "stream-end"
 
         member _.IsSessionBusy(rawEvent: obj) : bool = false

@@ -26,6 +26,7 @@ let isContinuationLeaseActive (state: FallbackSessionRuntime) : bool =
         match lease.Status with
         | LeaseStatus.Requested
         | LeaseStatus.DispatchStarted
+        | LeaseStatus.AcceptanceUnknown
         | LeaseStatus.Dispatched
         | LeaseStatus.Running -> true
         | LeaseStatus.Cancelled
@@ -132,7 +133,10 @@ let appendOutcomeIfNeeded
     : JS.Promise<unit> =
     promise {
         match outcome with
-        | ContinuationOutcome.Failed ->
+        | ContinuationOutcome.Failed
+        | ContinuationOutcome.AbortUnknown
+        | ContinuationOutcome.AcceptanceUnknown ->
+            // AcceptanceUnknown/AbortUnknown must not be written as cancelled.
             do!
                 appendContinuationFailedOrFail
                     workspaceRoot
@@ -179,17 +183,41 @@ let finishContinuation
                 true
             | _ -> false
 
-        if isLeaseStillActive then
-            do! appendOutcomeIfNeeded workspaceRoot sessionID lease outcome errorOrReason
+        match outcome with
+        | ContinuationOutcome.AcceptanceUnknown when isLeaseStillActive ->
+            // Keep lease non-terminal. Do not append Failed (fold would clear)
+            // and do not clear memory — restart must reconcile, not resend.
+            let _ =
+                runtime.UpdateSessionReturning(
+                    sessionID,
+                    tryTransitionPendingLeaseReturning
+                        lease.ContinuationID
+                        LeaseStatus.DispatchStarted
+                        LeaseStatus.AcceptanceUnknown
+                )
 
-        let cleared =
-            runtime.UpdateSessionReturning(sessionID, tryClearPendingLeaseReturning lease.ContinuationID)
+            let _ =
+                runtime.UpdateSessionReturning(
+                    sessionID,
+                    tryTransitionPendingLeaseReturning
+                        lease.ContinuationID
+                        LeaseStatus.Requested
+                        LeaseStatus.AcceptanceUnknown
+                )
 
-        if cleared then
-            if (runtime.GetSession sessionID).Owner = SessionOwner.Fallback then
-                runtime.UpdateSession(sessionID, transferOwnership SessionOwner.NoOwner)
+            runtime.Update(sessionID, setCore (runtime.GetOrCreateState sessionID))
+        | _ ->
+            if isLeaseStillActive then
+                do! appendOutcomeIfNeeded workspaceRoot sessionID lease outcome errorOrReason
 
-            runtime.Update(sessionID, setMainContinuationAwaitingStart false)
+            let cleared =
+                runtime.UpdateSessionReturning(sessionID, tryClearPendingLeaseReturning lease.ContinuationID)
 
-        runtime.Update(sessionID, setCore (runtime.GetOrCreateState sessionID))
+            if cleared then
+                if (runtime.GetSession sessionID).Owner = SessionOwner.Fallback then
+                    runtime.UpdateSession(sessionID, transferOwnership SessionOwner.NoOwner)
+
+                runtime.Update(sessionID, setMainContinuationAwaitingStart false)
+
+            runtime.Update(sessionID, setCore (runtime.GetOrCreateState sessionID))
     }

@@ -55,11 +55,19 @@ let private tryRecoverSession
 
         match session.PendingLease with
         | Some lease when lease.Status = LeaseStatus.Requested && lease.Owner = SessionOwner.Fallback ->
+            // Only Requested is safe to re-run. DispatchStarted / AcceptanceUnknown
+            // may already be accepted by the host — reconcile, never blind resend.
             match intentFromLease session lease with
             | Some intent ->
                 do!
                     runInline runtime executor workspaceRoot sessionID intent
             | None -> ()
+        | Some lease when
+            (lease.Status = LeaseStatus.DispatchStarted
+             || lease.Status = LeaseStatus.AcceptanceUnknown)
+            && lease.Owner = SessionOwner.Fallback
+            ->
+            ()
         | _ -> ()
     }
 

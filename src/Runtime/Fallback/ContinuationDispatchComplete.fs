@@ -10,6 +10,7 @@ open Wanxiangshu.Runtime.Fallback.Ports
 open Wanxiangshu.Runtime.Fallback.LeaseValidation
 open Wanxiangshu.Runtime.ContinuationEventWriter
 open Wanxiangshu.Runtime.Clock
+open Wanxiangshu.Runtime.MuxLogicalReceipt
 
 /// Cancel a dispatch after it has been started.
 let cancelAfterDispatch
@@ -32,8 +33,32 @@ let cancelAfterDispatch
             | _ -> false
 
         if isActiveLease then
-            do! executor.AbortRun sessionID
-            do! finishContinuation runtime workspaceRoot sessionID lease ContinuationOutcome.Cancelled reason
+            let session = runtime.GetSession sessionID
+
+            if session.AbortUnavailable then
+                do!
+                    finishContinuation
+                        runtime
+                        workspaceRoot
+                        sessionID
+                        lease
+                        ContinuationOutcome.AbortUnknown
+                        (reason + " (" + abortUnavailableMessage + ")")
+            else
+                try
+                    do! executor.AbortRun sessionID
+                    do! finishContinuation runtime workspaceRoot sessionID lease ContinuationOutcome.Cancelled reason
+                with ex when isAbortUnavailableMessage ex.Message ->
+                    runtime.Update(sessionID, setAbortUnavailable true)
+
+                    do!
+                        finishContinuation
+                            runtime
+                            workspaceRoot
+                            sessionID
+                            lease
+                            ContinuationOutcome.AbortUnknown
+                            (reason + " (" + ex.Message + ")")
     }
 
 let private tryMarkDispatched
@@ -52,6 +77,11 @@ let private tryMarkDispatched
         runtime.UpdateSessionReturning(
             sessionID,
             tryTransitionPendingLeaseReturning lease.ContinuationID LeaseStatus.DispatchStarted LeaseStatus.Dispatched
+        )
+    | LeaseStatus.AcceptanceUnknown ->
+        runtime.UpdateSessionReturning(
+            sessionID,
+            tryTransitionPendingLeaseReturning lease.ContinuationID LeaseStatus.AcceptanceUnknown LeaseStatus.Dispatched
         )
     | LeaseStatus.Running ->
         runtime.UpdateSessionReturning(

@@ -23,6 +23,14 @@ let run () : unit =
         "HostCapability.muxDefault excludes SubsessionReconcile"
         (not (Set.contains HostCapability.SubsessionReconcile muxDefault))
 
+    check
+        "HostCapability.muxDefault excludes ReliableAbort"
+        (not (Set.contains HostCapability.ReliableAbort muxDefault))
+
+    check
+        "HostCapability.muxDefault excludes LogicalMessageReceipt"
+        (not (Set.contains HostCapability.LogicalMessageReceipt muxDefault))
+
     check "HostCapability.allFull contains SubsessionDispatch" (Set.contains HostCapability.SubsessionDispatch allFull)
 
     check "HostCapability.allFull contains SubsessionAbort" (Set.contains HostCapability.SubsessionAbort allFull)
@@ -30,6 +38,12 @@ let run () : unit =
     check
         "HostCapability.allFull contains SubsessionReconcile"
         (Set.contains HostCapability.SubsessionReconcile allFull)
+
+    check "HostCapability.allFull contains ReliableAbort" (Set.contains HostCapability.ReliableAbort allFull)
+
+    check
+        "HostCapability.allFull contains LogicalMessageReceipt"
+        (Set.contains HostCapability.LogicalMessageReceipt allFull)
 
     let deps = createObj []
     let registration = Wanxiangshu.Hosts.Mux.PluginRegistration.createRegistration deps
@@ -45,10 +59,16 @@ let run () : unit =
 
     check "Mux capabilities does not contain 'subsessionReconcile'" (not (contains caps "subsessionReconcile"))
 
+    check "Mux capabilities does not contain 'reliableAbort'" (not (contains caps "reliableAbort"))
+
+    check
+        "Mux capabilities does not contain 'logicalMessageReceipt'"
+        (not (contains caps "logicalMessageReceipt"))
+
     check "Mux capabilities contains 'toolCatalog'" (contains caps "toolCatalog")
 
     check "Mux capabilities contains 'reviewStore'" (contains caps "reviewStore")
 
-    check "HostCapability.allFull contains all 15 capabilities" (Set.count allFull = 15)
+    check "HostCapability.allFull contains all 17 capabilities" (Set.count allFull = 17)
 
     check "HostCapability.muxDefault contains 12 capabilities" (Set.count muxDefault = 12)

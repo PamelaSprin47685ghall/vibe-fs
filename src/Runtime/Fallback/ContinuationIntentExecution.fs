@@ -9,6 +9,7 @@ open Wanxiangshu.Runtime.Fallback.LeaseValidation
 open Wanxiangshu.Runtime.Fallback.ContinuationExecution
 open Wanxiangshu.Runtime.Fallback.ContinuationExecutionCore
 open Wanxiangshu.Runtime.Fallback.ContinuationDispatchOps
+open Wanxiangshu.Runtime.MuxLogicalReceipt
 
 let private leaseOfIntent (intent: ContinuationIntent) : PendingLease option =
     match intent with
@@ -68,6 +69,8 @@ let run
 
             if not isValid then
                 do!
+            if not isValid then
+                do!
                     reenter (fun () ->
                         finishContinuation
                             runtime
@@ -80,15 +83,17 @@ let run
                 try
                     do! executeContinuationIntent runtime executor workspaceRoot sessionID intent reenter
                 with ex ->
+                    let outcome, reason =
+                        if isAcceptanceUnknownMessage ex.Message then
+                            ContinuationOutcome.AcceptanceUnknown, ex.Message
+                        elif isAbortUnavailableMessage ex.Message then
+                            ContinuationOutcome.AbortUnknown, ex.Message
+                        else
+                            ContinuationOutcome.Failed, ex.Message
+
                     do!
                         reenter (fun () ->
-                            finishContinuation
-                                runtime
-                                workspaceRoot
-                                sessionID
-                                lease
-                                ContinuationOutcome.Failed
-                                ex.Message)
+                            finishContinuation runtime workspaceRoot sessionID lease outcome reason)
         | None ->
             try
                 match intent with
