@@ -134,73 +134,109 @@ let private handleDispatchRejected (ctx: RunContext) (plan: TurnPlan) (cancelCtx
         [ TurnFinished(plan.TurnId, TurnCancelled); RunFinished(ctx.RunId, res) ]
         [ CompleteCaller(ctx.RunId, res) ]
 
+let private handleDispatchStatus
+    (nowMs: int64)
+    (ctx: RunContext)
+    (plan: TurnPlan)
+    (cancelCtx: CancelContext)
+    (retryCount: int)
+    (turnDeadlineAtMs: int64)
+    (reconciliationDeadlineAtMs: int64)
+    (status: DispatchStatus)
+    : Result<DecisionResult, DecisionError> =
+    match status with
+    | DispatchStatus.Accepted receipt -> Ok(beginAbortAfterDispatchAccepted nowMs ctx plan receipt cancelCtx)
+    | DispatchStatus.TransportRejectedBeforeSend _
+    | DispatchStatus.TransportFailedAfterUnknownAcceptance _ ->
+        handleTransportRejectedBeforeSend nowMs ctx plan cancelCtx
+    | DispatchStatus.StillPending ->
+        Ok(
+            decided
+                (ReconcilingUnknownDispatch(
+                    ctx,
+                    plan,
+                    cancelCtx,
+                    retryCount,
+                    turnDeadlineAtMs,
+                    reconciliationDeadlineAtMs
+                ))
+                []
+                []
+        )
+    | DispatchStatus.Unknown ->
+        let reconciliationDeadlineAtMs2 = nowMs + 30_000L
+
+        Ok(
+            decided
+                (ClosingUnknownDispatch(
+                    ctx,
+                    plan,
+                    HostProtocolBroken "acceptance unknown and unresolvable",
+                    turnDeadlineAtMs,
+                    reconciliationDeadlineAtMs2
+                ))
+                []
+                [ ClosePhysicalSession ctx.SessionId ]
+        )
+
 // ── main decision ───────────────────────────────────────────────────────────
 
-let decide (nowMs: int64) state cmd =
-    match state, cmd with
-    | ReconcilingUnknownDispatch(ctx, plan, cancelCtx, retryCount, turnDeadlineAtMs, reconciliationDeadlineAtMs),
-      DispatchStatusResolved status ->
-        match status with
-        | DispatchStatus.Accepted receipt -> Ok(beginAbortAfterDispatchAccepted nowMs ctx plan receipt cancelCtx)
-        | DispatchStatus.TransportRejectedBeforeSend _ -> handleTransportRejectedBeforeSend nowMs ctx plan cancelCtx
-        | DispatchStatus.TransportFailedAfterUnknownAcceptance _ ->
-            handleTransportRejectedBeforeSend nowMs ctx plan cancelCtx
-        | DispatchStatus.StillPending ->
-            Ok(
-                decided
-                    (ReconcilingUnknownDispatch(
-                        ctx,
-                        plan,
-                        cancelCtx,
-                        retryCount,
-                        turnDeadlineAtMs,
-                        reconciliationDeadlineAtMs
-                    ))
-                    []
-                    []
-            )
-        | DispatchStatus.Unknown ->
-            let reconciliationDeadlineAtMs2 = nowMs + 30_000L
-
-            Ok(
-                decided
-                    (ClosingUnknownDispatch(
-                        ctx,
-                        plan,
-                        HostProtocolBroken "acceptance unknown and unresolvable",
-                        turnDeadlineAtMs,
-                        reconciliationDeadlineAtMs2
-                    ))
-                    []
-                    [ ClosePhysicalSession ctx.SessionId ]
-            )
-    | ClosingUnknownDispatch(ctx, plan, poisonReason, turnDeadlineAtMs, reconciliationDeadlineAtMs),
-      PhysicalCloseResolved Stopped -> Ok(handleClosingUnknownDispatchStopped ctx plan poisonReason)
-    | ClosingUnknownDispatch(ctx, plan, poisonReason, turnDeadlineAtMs, reconciliationDeadlineAtMs),
-      PhysicalCloseResolved _ -> Ok(handleClosingUnknownDispatchNotStopped ctx plan poisonReason)
-    | ClosingUnknownDispatch(_, _, _, _, _), SessionClosed -> Ok(noChange StaleTimer)
-    | ClosingUnknownDispatch _, _ -> Ok(noChange StaleTimer)
-    | ReconcilingUnknownDispatch(ctx, plan, cancelCtx, retryCount, turnDeadlineAtMs, reconciliationDeadlineAtMs),
-      ReconciliationDeadlineExpired tid when tid = plan.TurnId ->
+let private decideReconciling
+    (nowMs: int64)
+    (
+        ctx: RunContext,
+        plan: TurnPlan,
+        cancelCtx: CancelContext,
+        retryCount: int,
+        turnDeadlineAtMs: int64,
+        reconciliationDeadlineAtMs: int64
+    )
+    (cmd: Command)
+    : Result<DecisionResult, DecisionError> =
+    match cmd with
+    | DispatchStatusResolved status ->
+        handleDispatchStatus nowMs ctx plan cancelCtx retryCount turnDeadlineAtMs reconciliationDeadlineAtMs status
+    | ReconciliationDeadlineExpired tid when tid = plan.TurnId ->
         Ok(handleReconciliationDeadlineExpired nowMs ctx plan cancelCtx retryCount turnDeadlineAtMs)
-    | ReconcilingUnknownDispatch _, ReconciliationDeadlineExpired _ -> Ok(noChange StaleTimer)
-    | ReconcilingUnknownDispatch(ctx, plan, cancelCtx, _, turnDeadlineAtMs, reconciliationDeadlineAtMs),
-      DispatchAccepted(tid, receipt) when tid = plan.TurnId ->
+    | ReconciliationDeadlineExpired _ -> Ok(noChange StaleTimer)
+    | DispatchAccepted(tid, receipt) when tid = plan.TurnId ->
         Ok(beginAbortAfterDispatchAccepted nowMs ctx plan receipt cancelCtx)
-    | ReconcilingUnknownDispatch _, DispatchAccepted _ -> Ok(noChange StaleTurnMarker)
-    | ReconcilingUnknownDispatch(ctx, plan, cancelCtx, _, turnDeadlineAtMs, reconciliationDeadlineAtMs),
-      DispatchRejected(tid, HostRejected _) when tid = plan.TurnId -> Ok(handleDispatchRejected ctx plan cancelCtx)
-    | ReconcilingUnknownDispatch _, DispatchRejected _ -> Ok(noChange StaleTurnMarker)
-    | ReconcilingUnknownDispatch(ctx, plan, cancelCtx, _, turnDeadlineAtMs, reconciliationDeadlineAtMs), SessionClosed ->
-        Ok(closeActive ctx plan.TurnId)
-    | ReconcilingUnknownDispatch(ctx, plan, cancelCtx, _, turnDeadlineAtMs, reconciliationDeadlineAtMs),
-      SessionIdleObserved -> Ok(applyAfterAbort nowMs ctx (NotYetStarted plan) cancelCtx)
-    | ReconcilingUnknownDispatch _, CancelRequested
-    | ReconcilingUnknownDispatch _, TurnErrorObserved _
-    | ReconcilingUnknownDispatch _, EvidenceUpdated _
-    | ReconcilingUnknownDispatch _, TurnDeadlineExpired _
-    | ReconcilingUnknownDispatch _, AbortDeadlineExpired _ -> Ok(noChange StaleTimer)
-    | ReconcilingUnknownDispatch _,
-      (AbortConfirmed _ | AbortHostAccepted _ | AbortRequestFailed _ | SessionQuiescenceResolved _) ->
-        illegal (stateName state) (cmdName cmd)
+    | DispatchAccepted _ -> Ok(noChange StaleTurnMarker)
+    | DispatchRejected(tid, HostRejected _) when tid = plan.TurnId -> Ok(handleDispatchRejected ctx plan cancelCtx)
+    | DispatchRejected _ -> Ok(noChange StaleTurnMarker)
+    | SessionClosed -> Ok(closeActive ctx plan.TurnId)
+    | SessionIdleObserved -> Ok(applyAfterAbort nowMs ctx (NotYetStarted plan) cancelCtx)
+    | CancelRequested
+    | TurnErrorObserved _
+    | EvidenceUpdated _
+    | TurnDeadlineExpired _
+    | AbortDeadlineExpired _ -> Ok(noChange StaleTimer)
+    | AbortConfirmed _
+    | AbortHostAccepted _
+    | AbortRequestFailed _
+    | SessionQuiescenceResolved _ -> illegal "ReconcilingUnknownDispatch" (cmdName cmd)
+    | _ -> illegal "ReconcilingUnknownDispatch" (cmdName cmd)
+
+let private decideClosing
+    (
+        ctx: RunContext,
+        plan: TurnPlan,
+        poisonReason: PoisonReason,
+        turnDeadlineAtMs: int64,
+        reconciliationDeadlineAtMs: int64
+    )
+    (cmd: Command)
+    : Result<DecisionResult, DecisionError> =
+    match cmd with
+    | PhysicalCloseResolved Stopped -> Ok(handleClosingUnknownDispatchStopped ctx plan poisonReason)
+    | PhysicalCloseResolved _ -> Ok(handleClosingUnknownDispatchNotStopped ctx plan poisonReason)
+    | SessionClosed -> Ok(noChange StaleTimer)
+    | _ -> Ok(noChange StaleTimer)
+
+let decide (nowMs: int64) state cmd =
+    match state with
+    | ReconcilingUnknownDispatch(ctx, plan, cancelCtx, retryCount, turnDeadlineAtMs, reconciliationDeadlineAtMs) ->
+        decideReconciling nowMs (ctx, plan, cancelCtx, retryCount, turnDeadlineAtMs, reconciliationDeadlineAtMs) cmd
+    | ClosingUnknownDispatch(ctx, plan, poisonReason, turnDeadlineAtMs, reconciliationDeadlineAtMs) ->
+        decideClosing (ctx, plan, poisonReason, turnDeadlineAtMs, reconciliationDeadlineAtMs) cmd
     | _ -> illegal (stateName state) (cmdName cmd)

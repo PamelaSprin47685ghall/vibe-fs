@@ -31,6 +31,78 @@ let buildDispatchModelString =
 [<Emit("(() => { const v = typeof process !== 'undefined' && process.env && process.env.WANXIANGSHU_OPENCODE_RECEIPT_TIMEOUT_MS; const n = v ? parseInt(v, 10) : 30000; return isNaN(n) ? 30000 : n; })()")>]
 let private receiptTimeoutMs () : int = jsNative
 
+let private runBackgroundDispatch
+    (dispatcher: SessionDispatcher)
+    (identity: DispatchIdentity)
+    (sendPrompt: DispatchIdentity -> JS.Promise<DispatchAcceptance>)
+    (waiter: HostReceiptWaiter)
+    : unit =
+    dispatcher.Dispatch identity sendPrompt System.Threading.CancellationToken.None
+    |> Promise.map (fun (outcome, _) ->
+        match outcome with
+        | DispatchOutcome.Failed terminal ->
+            let failure = HostReceiptWaiter.dispatchFailureOfTerminal terminal
+
+            HostReceiptWaiter.reject waiter failure (HostReceiptWaiter.ReceiptRejected failure)
+            |> ignore
+        | DispatchOutcome.Accepted _ -> ())
+    |> Promise.catch (fun ex ->
+        let failure =
+            DispatchFailure.HostAcceptanceUnknown
+                { ErrorName = "DispatchFailed"
+                  DomainError = None
+                  Message = ex.Message
+                  StatusCode = None
+                  IsRetryable = Some true }
+
+        HostReceiptWaiter.reject waiter failure (HostReceiptWaiter.ReceiptRejected failure)
+        |> ignore)
+    |> Promise.start
+
+let private dispatchHelper
+    (client: obj)
+    (agent: string)
+    (directory: string)
+    (sessionId: SessionId)
+    (turn: TurnPlan)
+    : JS.Promise<Result<HostStartReceipt, DispatchFailure>> =
+    let dispatcher = getDispatcher directory (SessionId.value sessionId)
+
+    let identity =
+        encodeDispatchIdentity directory (SessionId.value sessionId) turn.TurnId turn.Model turn.Prompt
+
+    let sendPrompt =
+        SubsessionHostAdapterOps.buildSendPrompt client agent directory sessionId turn
+
+    let ws = workspaceFor directory
+    let sid = SessionId.value sessionId
+    let tid = TurnId.value turn.TurnId
+    let waiter = HostReceiptWaiterRegistry.create ws sid tid
+
+    runBackgroundDispatch dispatcher identity sendPrompt waiter
+
+    promise {
+        let timeoutErr =
+            { ErrorName = "OpencodeReceiptTimeout"
+              DomainError = None
+              Message = "Timed out waiting for OpenCode chat.message receipt for subsession dispatch"
+              StatusCode = None
+              IsRetryable = Some false }
+
+        let! result = HostReceiptWaiter.awaitWithTimeout waiter (receiptTimeoutMs ()) timeoutErr
+
+        match result with
+        | Ok receipt -> return Ok receipt
+        | Error failure ->
+            let errInput =
+                match failure with
+                | HostRejected e -> e
+                | HostAcceptanceUnknown e -> e
+
+            let! _ = dispatcher.FailByTurn identity.LogicalTurnId errInput
+            return Error failure
+    }
+
 /// OpenCode subagent host. Every prompt and abort goes through the per-session
 /// `SessionDispatcher` so two requests on the same physical session cannot
 /// race, and so the caller receives a true `HostStartReceipt` (or a typed
@@ -38,50 +110,7 @@ let private receiptTimeoutMs () : int = jsNative
 type OpencodeSubsessionHost(client: obj, agent: string, directory: string) =
     interface ISubsessionHost with
         member _.Dispatch(sessionId, turn) =
-            let dispatcher = getDispatcher directory (SessionId.value sessionId)
-
-            let identity =
-                encodeDispatchIdentity directory (SessionId.value sessionId) turn.TurnId turn.Model turn.Prompt
-
-            let sendPrompt =
-                SubsessionHostAdapterOps.buildSendPrompt client agent directory sessionId turn
-
-            promise {
-                let! outcome, receiptWaiterOpt =
-                    dispatcher.Dispatch identity sendPrompt System.Threading.CancellationToken.None
-
-                match receiptWaiterOpt with
-                | Some waiter ->
-                    let timeoutErr =
-                        { ErrorName = "OpencodeReceiptTimeout"
-                          DomainError = None
-                          Message = "Timed out waiting for OpenCode chat.message receipt for subsession dispatch"
-                          StatusCode = None
-                          IsRetryable = Some false }
-
-                    let! result = HostReceiptWaiter.awaitWithTimeout waiter (receiptTimeoutMs ()) timeoutErr
-
-                    match result with
-                    | Ok receipt ->
-                        return Ok receipt
-                    | Error failure ->
-                        // Fail the dispatcher turn on timeout or host error so
-                        // the slot is released and the next dispatch can proceed.
-                        let errInput =
-                            match failure with
-                            | HostRejected e -> e
-                            | HostAcceptanceUnknown e -> e
-
-                        let! _ = dispatcher.FailByTurn identity.LogicalTurnId errInput
-                        return Error failure
-                | None ->
-                    // Dispatcher failed before creating the waiter
-                    // (e.g. identity mismatch).
-                    match outcome with
-                    | DispatchOutcome.Accepted a -> return Ok(HostReceiptWaiter.dispatchAcceptanceToHostReceipt a)
-                    | DispatchOutcome.Failed terminal ->
-                        return Error(HostReceiptWaiter.dispatchFailureOfTerminal terminal)
-            }
+            dispatchHelper client agent directory sessionId turn
 
         member _.Abort(sessionId, turnId) =
             promise {
