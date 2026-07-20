@@ -11,6 +11,7 @@ open Wanxiangshu.Runtime.Fallback.Ports
 open Wanxiangshu.Runtime.Fallback.LeaseValidation
 open Wanxiangshu.Runtime.Fallback.ContinuationExecution
 open Wanxiangshu.Runtime.Fallback.ContinuationIntentExecution
+open Wanxiangshu.Runtime.Fallback.ContinuationDispatchOps
 open Wanxiangshu.Runtime.Fallback.HumanTurnHandler
 open Wanxiangshu.Runtime.Fallback.SessionStatusHandler
 open Wanxiangshu.Runtime.Fallback.CompactionHandler
@@ -125,6 +126,31 @@ let private isRelevantEvent (translator: IEventTranslator) (sessionID: string) (
     || translator.IsSessionIdle rawEvent
     || translator.ExtractContinuationIdentity rawEvent |> Option.isSome
 
+let private getOrCreateQueue (queues: Map<string, SerialQueue> ref) (sessionID: string) : SerialQueue =
+    match Map.tryFind sessionID queues.Value with
+    | Some q -> q
+    | None ->
+        let q = SerialQueue()
+        queues.Value <- Map.add sessionID q queues.Value
+        q
+
+/// Schedule effect on the session actor: claim/finish re-enter the same SerialQueue;
+/// physical prompt transport runs outside so human cancel is never blocked.
+let private scheduleIntentEffect
+    (queue: SerialQueue)
+    (runtime: FallbackRuntimeStore)
+    (executor: IActionExecutor)
+    (workspaceRoot: string)
+    (sessionID: string)
+    (intent: ContinuationIntent)
+    : unit =
+    let reenter = queueReenter queue
+
+    run runtime executor workspaceRoot sessionID intent reenter
+    |> Promise.catch (fun ex ->
+        JS.console.error ("fallback continuation effect failed for " + sessionID + ": " + ex.Message))
+    |> Promise.start
+
 let private enqueueRelevantEvent
     (queues: Map<string, SerialQueue> ref)
     (translator: IEventTranslator)
@@ -136,13 +162,7 @@ let private enqueueRelevantEvent
     (sessionID: string)
     (rawEvent: obj)
     : JS.Promise<FallbackHookResult> =
-    let queue =
-        match Map.tryFind sessionID queues.Value with
-        | Some q -> q
-        | None ->
-            let q = SerialQueue()
-            queues.Value <- Map.add sessionID q queues.Value
-            q
+    let queue = getOrCreateQueue queues sessionID
 
     promise {
         let! result, intentOpt =
@@ -150,11 +170,7 @@ let private enqueueRelevantEvent
                 handleEvent translator runtime configLookup executor workspaceRoot rawEvent pendingReview)
 
         match intentOpt with
-        | Some intent ->
-            run runtime executor workspaceRoot sessionID intent
-            |> Promise.catch (fun ex ->
-                JS.console.error ("fallback continuation effect failed for " + sessionID + ": " + ex.Message))
-            |> Promise.start
+        | Some intent -> scheduleIntentEffect queue runtime executor workspaceRoot sessionID intent
         | None -> ()
 
         return result
@@ -173,9 +189,20 @@ let createHandler
     fun (rawEvent: obj) ->
         promise {
             let sessionID = translator.ExtractSessionID rawEvent
+
             if not (isRelevantEvent translator sessionID rawEvent) then
                 let state = runtime.GetOrCreateState sessionID
                 return { Consumed = false; State = state }
             else
-                return! enqueueRelevantEvent queues translator runtime configLookup executor workspaceRoot pendingReview sessionID rawEvent
+                return!
+                    enqueueRelevantEvent
+                        queues
+                        translator
+                        runtime
+                        configLookup
+                        executor
+                        workspaceRoot
+                        pendingReview
+                        sessionID
+                        rawEvent
         }

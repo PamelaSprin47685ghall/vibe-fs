@@ -11,9 +11,18 @@ open Wanxiangshu.Runtime.Fallback.LeaseValidation
 open Wanxiangshu.Runtime.ContinuationEventWriter
 open Wanxiangshu.Runtime.Clock
 open Wanxiangshu.Runtime.Fallback.RetryDispatchGovernor
+open Wanxiangshu.Runtime.PromiseQueue
 
 /// Shared per-process retry dispatch governor.
 let private retryGovernor = RetryDispatchGovernor()
+
+/// Serialize state mutations on the session actor queue. Physical transport stays outside.
+type SessionReenter = (unit -> JS.Promise<unit>) -> JS.Promise<unit>
+
+let inlineReenter (work: unit -> JS.Promise<unit>) : JS.Promise<unit> = work ()
+
+let queueReenter (queue: SerialQueue) (work: unit -> JS.Promise<unit>) : JS.Promise<unit> =
+    queue.Enqueue(work)
 
 /// Cancel a dispatch after it has been started.
 let private cancelAfterDispatch
@@ -111,7 +120,26 @@ let handleDispatchComplete
             ()
     }
 
-/// Inner dispatch: write dispatch_started, transition lease, call action.
+let private leaseStillDispatchable
+    (runtime: FallbackRuntimeStore)
+    (sessionID: string)
+    (lease: PendingLease)
+    : bool =
+    let pending = (runtime.GetSession sessionID).PendingLease
+
+    ensureActiveAndOwner runtime sessionID lease
+    && (match pending with
+        | Some p when p.ContinuationID = lease.ContinuationID ->
+            match p.Status with
+            | LeaseStatus.Requested
+            | LeaseStatus.DispatchStarted -> true
+            | LeaseStatus.Dispatched
+            | LeaseStatus.Running
+            | LeaseStatus.Cancelled
+            | LeaseStatus.Settled -> false
+        | _ -> false)
+
+/// Inner dispatch: claim on reenter queue, physical action outside, complete on reenter.
 let dispatchWithLeaseTransition
     (runtime: FallbackRuntimeStore)
     (executor: IActionExecutor)
@@ -121,29 +149,57 @@ let dispatchWithLeaseTransition
     (model: FallbackModel)
     (agent: string)
     (dispatchAction: unit -> JS.Promise<unit>)
+    (reenter: SessionReenter)
     : JS.Promise<unit> =
     promise {
-        do!
-            appendContinuationDispatchStartedOrFail
-                workspaceRoot
-                sessionID
-                lease.ContinuationID
-                lease.ContinuationOrdinal
+        let! claimed =
+            promise {
+                let mutable ok = false
 
-        let isValid =
-            runtime.UpdateSessionReturning(
-                sessionID,
-                tryTransitionPendingLeaseReturning
-                    lease.ContinuationID
-                    LeaseStatus.Requested
-                    LeaseStatus.DispatchStarted
-            )
+                do!
+                    reenter (fun () ->
+                        promise {
+                            do!
+                                appendContinuationDispatchStartedOrFail
+                                    workspaceRoot
+                                    sessionID
+                                    lease.ContinuationID
+                                    lease.ContinuationOrdinal
 
-        if not isValid then
-            do! cancelAfterDispatch runtime executor workspaceRoot sessionID lease "Lease invalid at dispatch"
+                            ok <-
+                                runtime.UpdateSessionReturning(
+                                    sessionID,
+                                    tryTransitionPendingLeaseReturning
+                                        lease.ContinuationID
+                                        LeaseStatus.Requested
+                                        LeaseStatus.DispatchStarted
+                                )
+                        })
+
+                return ok
+            }
+
+        if not claimed then
+            do!
+                reenter (fun () ->
+                    cancelAfterDispatch runtime executor workspaceRoot sessionID lease "Lease invalid at dispatch")
         else
-            do! dispatchAction ()
-            do! handleDispatchComplete runtime executor workspaceRoot sessionID lease model agent
+            try
+                do! dispatchAction ()
+
+                do!
+                    reenter (fun () ->
+                        handleDispatchComplete runtime executor workspaceRoot sessionID lease model agent)
+            with ex ->
+                do!
+                    reenter (fun () ->
+                        finishContinuation
+                            runtime
+                            workspaceRoot
+                            sessionID
+                            lease
+                            ContinuationOutcome.Failed
+                            ex.Message)
     }
 
 /// Run a dispatch action under rate-limit governor for the given model key.
@@ -156,17 +212,25 @@ let runWithRetryGovernor
     (model: FallbackModel)
     (agent: string)
     (dispatchAction: unit -> JS.Promise<unit>)
+    (reenter: SessionReenter)
     : JS.Promise<unit> =
     promise {
         let modelKey =
             RetryModelKey.Create(workspaceRoot, sessionID, model.ProviderID, model.ModelID, ?variant = model.Variant)
 
-        let stillValid () =
-            verifyLease runtime sessionID lease
-            && ensureActiveAndOwner runtime sessionID lease
+        let stillValid () = leaseStillDispatchable runtime sessionID lease
 
         let dispatchWithLease () =
-            dispatchWithLeaseTransition runtime executor workspaceRoot sessionID lease model agent dispatchAction
+            dispatchWithLeaseTransition
+                runtime
+                executor
+                workspaceRoot
+                sessionID
+                lease
+                model
+                agent
+                dispatchAction
+                reenter
 
         try
             let! dispatchResult = retryGovernor.RunWhenAllowed(modelKey, stillValid, dispatchWithLease)
@@ -175,13 +239,16 @@ let runWithRetryGovernor
             | Dispatched -> ()
             | CancelledBeforeDispatch ->
                 do!
-                    finishContinuation
-                        runtime
-                        workspaceRoot
-                        sessionID
-                        lease
-                        ContinuationOutcome.Cancelled
-                        "Cancelled before dispatch (rate-limited)"
+                    reenter (fun () ->
+                        finishContinuation
+                            runtime
+                            workspaceRoot
+                            sessionID
+                            lease
+                            ContinuationOutcome.Cancelled
+                            "Cancelled before dispatch (rate-limited)")
         with ex ->
-            do! finishContinuation runtime workspaceRoot sessionID lease ContinuationOutcome.Failed ex.Message
+            do!
+                reenter (fun () ->
+                    finishContinuation runtime workspaceRoot sessionID lease ContinuationOutcome.Failed ex.Message)
     }

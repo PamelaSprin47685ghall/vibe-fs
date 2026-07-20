@@ -58,7 +58,7 @@ let private tryRecoverSession
             match intentFromLease session lease with
             | Some intent ->
                 do!
-                    run runtime executor workspaceRoot sessionID intent
+                    runInline runtime executor workspaceRoot sessionID intent
             | None -> ()
         | _ -> ()
     }

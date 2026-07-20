@@ -21,22 +21,46 @@ let executeContinuation
     (model: FallbackModel)
     (agent: string)
     (dispatchAction: unit -> JS.Promise<unit>)
+    (reenter: SessionReenter)
     : JS.Promise<unit> =
     promise {
-        if
-            verifyLease runtime sessionID lease
-            && ensureActiveAndOwner runtime sessionID lease
-        then
-            do! runWithRetryGovernor runtime executor workspaceRoot sessionID lease model agent dispatchAction
-        else
+        let! shouldRun =
+            promise {
+                let mutable ok = false
+
+                do!
+                    reenter (fun () ->
+                        promise {
+                            ok <-
+                                verifyLease runtime sessionID lease
+                                && ensureActiveAndOwner runtime sessionID lease
+                        })
+
+                return ok
+            }
+
+        if shouldRun then
             do!
-                finishContinuation
+                runWithRetryGovernor
                     runtime
+                    executor
                     workspaceRoot
                     sessionID
                     lease
-                    ContinuationOutcome.Cancelled
-                    "Lease validation failed"
+                    model
+                    agent
+                    dispatchAction
+                    reenter
+        else
+            do!
+                reenter (fun () ->
+                    finishContinuation
+                        runtime
+                        workspaceRoot
+                        sessionID
+                        lease
+                        ContinuationOutcome.Cancelled
+                        "Lease validation failed")
     }
 
 let executeSendContinue
@@ -47,9 +71,10 @@ let executeSendContinue
     (lease: PendingLease)
     (model: FallbackModel)
     (agent: string)
+    (reenter: SessionReenter)
     : JS.Promise<unit> =
     executeContinuation runtime executor workspaceRoot sessionID lease model agent (fun () ->
-        executor.SendContinue(sessionID, model, lease.ContinuationID))
+        executor.SendContinue(sessionID, model, lease.ContinuationID)) reenter
 
 let executeRecoverWithPrompt
     (runtime: FallbackRuntimeStore)
@@ -60,9 +85,10 @@ let executeRecoverWithPrompt
     (model: FallbackModel)
     (promptText: string)
     (agent: string)
+    (reenter: SessionReenter)
     : JS.Promise<unit> =
     executeContinuation runtime executor workspaceRoot sessionID lease model agent (fun () ->
-        executor.RecoverWithPrompt(sessionID, model, promptText, lease.ContinuationID))
+        executor.RecoverWithPrompt(sessionID, model, promptText, lease.ContinuationID)) reenter
 
 let executeContinuationIntent
     (runtime: FallbackRuntimeStore)
@@ -70,6 +96,7 @@ let executeContinuationIntent
     (workspaceRoot: string)
     (sessionID: string)
     (intent: ContinuationIntent)
+    (reenter: SessionReenter)
     : JS.Promise<unit> =
     promise {
         match intent with
@@ -85,7 +112,7 @@ let executeContinuationIntent
                   PromptText = None
                   Status = LeaseStatus.Requested }
 
-            do! executeSendContinue runtime executor workspaceRoot sessionID lease model agent
+            do! executeSendContinue runtime executor workspaceRoot sessionID lease model agent reenter
 
         | RecoverWithPromptIntent(model, promptText, agent, turnId, gen, cancelGen, continuationID, continuationOrdinal) ->
             let lease =
@@ -99,7 +126,22 @@ let executeContinuationIntent
                   PromptText = Some promptText
                   Status = LeaseStatus.Requested }
 
-            do! executeRecoverWithPrompt runtime executor workspaceRoot sessionID lease model promptText agent
+            do!
+                executeRecoverWithPrompt
+                    runtime
+                    executor
+                    workspaceRoot
+                    sessionID
+                    lease
+                    model
+                    promptText
+                    agent
+                    reenter
 
-        | PropagateFailureIntent -> do! executor.PropagateFailure sessionID
+        | PropagateFailureIntent ->
+            do!
+                reenter (fun () ->
+                    promise {
+                        do! executor.PropagateFailure sessionID
+                    })
     }

@@ -8,6 +8,7 @@ open Wanxiangshu.Runtime.Fallback.Ports
 open Wanxiangshu.Runtime.Fallback.LeaseValidation
 open Wanxiangshu.Runtime.Fallback.ContinuationExecution
 open Wanxiangshu.Runtime.Fallback.ContinuationExecutionCore
+open Wanxiangshu.Runtime.Fallback.ContinuationDispatchOps
 
 let private leaseOfIntent (intent: ContinuationIntent) : PendingLease option =
     match intent with
@@ -41,54 +42,81 @@ let run
     (workspaceRoot: string)
     (sessionID: string)
     (intent: ContinuationIntent)
+    (reenter: SessionReenter)
     : JS.Promise<unit> =
     promise {
         match leaseOfIntent intent with
         | Some lease ->
-            let isValid =
-                verifyLease runtime sessionID lease
-                && ensureActiveAndOwner runtime sessionID lease
+            let! isValid =
+                promise {
+                    let mutable ok = false
+
+                    do!
+                        reenter (fun () ->
+                            promise {
+                                ok <-
+                                    verifyLease runtime sessionID lease
+                                    && ensureActiveAndOwner runtime sessionID lease
+                            })
+
+                    return ok
+                }
 
             if not isValid then
                 do!
-                    finishContinuation
-                        runtime
-                        workspaceRoot
-                        sessionID
-                        lease
-                        ContinuationOutcome.Cancelled
-                        "Pre-submission lease validation failed"
-                return ()
-            else
-                try
-                    do! executeContinuationIntent runtime executor workspaceRoot sessionID intent
-
-                    match (runtime.GetSession sessionID).PendingLease with
-                    | Some current when
-                        current.ContinuationID = lease.ContinuationID
-                        && current.Status = LeaseStatus.Dispatched ->
-                        ()
-                    | _ -> ()
-                with ex ->
-                    do!
+                    reenter (fun () ->
                         finishContinuation
                             runtime
                             workspaceRoot
                             sessionID
                             lease
-                            ContinuationOutcome.Failed
-                            ex.Message
-                    return ()
+                            ContinuationOutcome.Cancelled
+                            "Pre-submission lease validation failed")
+            else
+                try
+                    do! executeContinuationIntent runtime executor workspaceRoot sessionID intent reenter
+                with ex ->
+                    do!
+                        reenter (fun () ->
+                            finishContinuation
+                                runtime
+                                workspaceRoot
+                                sessionID
+                                lease
+                                ContinuationOutcome.Failed
+                                ex.Message)
         | None ->
             try
                 match intent with
                 | PropagateFailureIntent ->
-                    match (runtime.GetSession sessionID).PendingLease with
-                    | Some lease ->
-                        do! finishContinuation runtime workspaceRoot sessionID lease ContinuationOutcome.Failed "Fallback propagation failure"
-                    | None -> ()
-                | _ -> ()
-                do! executeContinuationIntent runtime executor workspaceRoot sessionID intent
+                    do!
+                        reenter (fun () ->
+                            promise {
+                                match (runtime.GetSession sessionID).PendingLease with
+                                | Some lease ->
+                                    do!
+                                        finishContinuation
+                                            runtime
+                                            workspaceRoot
+                                            sessionID
+                                            lease
+                                            ContinuationOutcome.Failed
+                                            "Fallback propagation failure"
+                                | None -> ()
+
+                                do! executor.PropagateFailure sessionID
+                            })
+                | _ -> do! executeContinuationIntent runtime executor workspaceRoot sessionID intent reenter
             with ex ->
                 JS.console.error ("fallback continuation effect failed for " + sessionID + ": " + ex.Message)
     }
+
+/// Compatibility entry for recovery paths that have no session actor queue yet.
+let runInline
+    (runtime: FallbackRuntimeStore)
+    (executor: IActionExecutor)
+    (workspaceRoot: string)
+    (sessionID: string)
+    (intent: ContinuationIntent)
+    : JS.Promise<unit> =
+    run runtime executor workspaceRoot sessionID intent inlineReenter
