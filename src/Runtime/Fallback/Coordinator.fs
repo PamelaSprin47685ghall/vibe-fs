@@ -159,7 +159,7 @@ let private scheduleIntentEffect
             do! run runtime executor workspaceRoot sessionID intent reenter
         })
     |> Promise.catch (fun ex ->
-        JS.console.error ("fallback continuation effect failed for " + sessionID + ": " + ex.Message))
+        failwithf "fallback continuation effect failed for %s: %s" sessionID ex.Message)
     |> Promise.start
 
 let private enqueueRelevantEvent

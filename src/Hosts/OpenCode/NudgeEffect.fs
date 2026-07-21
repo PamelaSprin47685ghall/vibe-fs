@@ -85,15 +85,6 @@ let sendNudge
             if (fallbackRuntime.GetSession sidStr).Owner = SessionOwner.Nudge then
                 fallbackRuntime.UpdateSession(sidStr, transferOwnership SessionOwner.NoOwner)
 
-            JS.console.error (
-                box
-                    {| feature = "nudge"
-                       session = sidStr
-                       dispatchId = nonce
-                       hostVariant = "opencode"
-                       error = ex.Message |}
-            )
-
             return raise ex
     }
 

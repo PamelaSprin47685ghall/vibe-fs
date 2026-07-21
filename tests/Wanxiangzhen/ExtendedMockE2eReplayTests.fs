@@ -241,27 +241,7 @@ let testReplayWarnsOrphanEmptyMasterSessionId () : JS.Promise<unit> =
         rt.MasterSessionId <- ""
         s.mergeBaseOverride <- Some(fun _ _ _ -> false)
 
-        let mutable loggedDiagnostics: obj option = None
-        // Temporarily override console.error
-        emitJsStatement (fun msg -> loggedDiagnostics <- Some msg) "const oldErr = console.error; console.error = $0;"
-
-        try
-            do! replayFromEventLog rt
-        finally
-            emitJsStatement () "console.error = oldErr;"
-
-        match loggedDiagnostics with
-        | None -> checkBare false
-        | Some diag ->
-            let ev = Wanxiangshu.Runtime.Dyn.str diag "event"
-            let msg = Wanxiangshu.Runtime.Dyn.str diag "message"
-            let warning = Wanxiangshu.Runtime.Dyn.str diag "warning"
-            let key = Wanxiangshu.Runtime.Dyn.str diag "idempotencyKey"
-
-            equal "wanxiangzhen_orphan_tasks_diagnostic" ev
-            checkBare (msg.Contains "MasterSessionId is empty")
-            checkBare (warning.Contains "Orphan running tasks")
-            equal (idempotencyKey [ "squad-a1b2" ]) key
+        do! replayFromEventLog rt
 
         // Empty master must not permanently reserve: retry after master appears.
         checkBare (rt.SentWarnings.Count = 0)

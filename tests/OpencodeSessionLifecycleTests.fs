@@ -18,6 +18,7 @@ open Wanxiangshu.Runtime.Dyn
 
 let childIdleDoesNotAbortParent () =
     promise {
+        let! directory = mkdtempAsync "opencode-child-idle-"
         let abortCalls = ResizeArray<obj>()
         let promptCalls = ResizeArray<obj>()
 
@@ -27,7 +28,7 @@ let childIdleDoesNotAbortParent () =
                   "prompt", box (System.Func<obj, JS.Promise<unit>>(fun arg -> promise { promptCalls.Add arg })) ]
 
         let client = createObj [ "session", box sessionApi ]
-        let ctx = createObj [ "client", box client; "directory", box "/proj" ]
+        let ctx = createObj [ "client", box client; "directory", box directory ]
         let registry = ChildAgentRegistry.Create()
         registry.RegisterChildAgent("child-1", "coder", Some "parent-1")
 
@@ -60,6 +61,7 @@ let childIdleDoesNotAbortParent () =
 
         equal "child idle must not abort parent" 0 abortCalls.Count
         equal "child idle must not continue parent" 0 promptCalls.Count
+        do! rmAsync directory
     }
 
 let childCompactionIdleSettlesAfterFallbackConsumes () =

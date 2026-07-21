@@ -108,17 +108,6 @@ type OpencodeSubsessionHost(client: obj, agent: string, directory: string) =
                 | DispatchCancelResult.AbortUnavailable ->
                     return (Wanxiangshu.Kernel.Subsession.Types.AbortResult.AbortUnavailable)
                 | DispatchCancelResult.AlreadyTerminal terminal ->
-                    JS.console.warn (
-                        box
-                            {| feature = "subsession"
-                               hostVariant = "opencode"
-                               session = sid
-                               turnId = tid
-                               event = "stale_abort"
-                               reason = "already_terminal"
-                               terminal = string terminal |}
-                    )
-
                     return (Wanxiangshu.Kernel.Subsession.Types.AbortResult.ConfirmedStopped)
             }
 

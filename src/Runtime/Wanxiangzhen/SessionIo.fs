@@ -30,8 +30,7 @@ let promptFailureDiagnostic
           "sessionId", box sessionId
           "detail", box detail ]
 
-let private logPromptFailure (reason: string) (sessionId: string) (detail: string) : unit =
-    JS.console.error (promptFailureDiagnostic reason sessionId detail)
+let private logPromptFailure (_reason: string) (_sessionId: string) (_detail: string) : unit = ()
 
 let buildPromptArg (sessionId: string) (text: string) : obj =
     let part = createObj [ "type", box "text"; "text", box text ]

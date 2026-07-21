@@ -83,16 +83,7 @@ let private abortHelper
         let sid = SessionId.value sessionId
         let tid = TurnId.value turnId
 
-        let logStale (reason: string) =
-            JS.console.warn (
-                box
-                    {| feature = "subsession"
-                       hostVariant = "omp"
-                       session = sid
-                       turnId = tid
-                       event = "stale_abort"
-                       reason = reason |}
-            )
+        let logStale (_reason: string) = ()
 
         let isOwner =
             match Wanxiangshu.Runtime.SubsessionActorRegistry.SubsessionActorRegistry.TryGet workspaceRoot sid with

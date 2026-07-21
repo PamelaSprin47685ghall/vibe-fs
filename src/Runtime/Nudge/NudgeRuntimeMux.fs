@@ -98,14 +98,6 @@ let sendNudgeMux
                     let receipt = validateMuxReceipt result workspaceId nonce nudgeId
                     return receiptToSendOutcome receipt
         with ex ->
-            JS.console.error (
-                box
-                    {| feature = "nudge"
-                       session = workspaceId
-                       hostVariant = "mux"
-                       error = ex.Message |}
-            )
-
             return SendOutcome.Failed ex.Message
     }
 

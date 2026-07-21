@@ -88,14 +88,6 @@ let private claimDispatch
                     humanTurnId
                     nudgeOrdinal
         with ex ->
-            JS.console.error (
-                box
-                    {| feature = "nudge"
-                       session = sessionKey
-                       phase = "claim"
-                       error = ex.Message |}
-            )
-
             return raise ex
     }
 

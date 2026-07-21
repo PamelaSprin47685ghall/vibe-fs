@@ -40,15 +40,6 @@ let private warnOrphansDiagnostics
     promise {
         let err = "MasterSessionId is empty, cannot send prompt warning"
 
-        let diagnostics =
-            createObj
-                [ "event", box "wanxiangzhen_orphan_tasks_diagnostic"
-                  "message", box err
-                  "idempotencyKey", box key
-                  "warning", box warning
-                  "orphans", box (orphanIds |> List.toArray) ]
-
-        JS.console.error diagnostics
         let! _ = rt.Deps.AppendWanEvent rt.ProjectRoot (promptFailedEvent auditSession (rt.Deps.Now()) key warning err)
         rt.SentWarnings <- rt.SentWarnings.Remove key
     }
@@ -63,15 +54,6 @@ let private warnOrphansPrompt (rt: CoordinatorRuntime) (key: string) (warning: s
 
             return ()
         with ex ->
-            JS.console.error (
-                createObj
-                    [ "event", box "wanxiangzhen_orphan_notify_failed"
-                      "idempotencyKey", box key
-                      "sessionId", box rt.MasterSessionId
-                      "error", box ex.Message
-                      "warning", box warning ]
-            )
-
             let! _ =
                 rt.Deps.AppendWanEvent
                     rt.ProjectRoot

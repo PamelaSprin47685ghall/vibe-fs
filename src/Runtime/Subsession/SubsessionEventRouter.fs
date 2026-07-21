@@ -45,7 +45,7 @@ let private tryGetCurrentTurnId (workspaceRoot: string) (sessionId: string) : Tu
 let private postDetached (sessionId: string) (actor: SubsessionActor) (cmd: Command) : unit =
     actor.Post cmd
     |> Promise.catch (fun ex ->
-        JS.console.error ("subsession event rejected for " + sessionId + ": " + ex.Message))
+        failwithf "subsession event rejected for %s: %s" sessionId ex.Message)
     |> Promise.start
     |> ignore
 
@@ -59,10 +59,8 @@ let routeToChild (workspaceRoot: string) (sessionId: string) (cmd: Command) : JS
         | Some actor ->
             match cmd with
             | EvidenceUpdated obs when obs.TurnId.IsNone ->
-                match actor.GetCurrentTurn() with
-                | Some turnId -> postDetached sessionId actor (EvidenceUpdated { obs with TurnId = Some turnId })
-                | None -> ()
-
+                let turnIdOpt = actor.GetCurrentTurn()
+                postDetached sessionId actor (EvidenceUpdated { obs with TurnId = turnIdOpt })
                 return true
             | _ ->
                 postDetached sessionId actor cmd
@@ -74,17 +72,18 @@ let routeToChild (workspaceRoot: string) (sessionId: string) (cmd: Command) : JS
 /// Returns true if the actor exists and has an active turn.
 let routeEvidence (workspaceRoot: string) (sessionId: string) (evidence: CurrentTurnEvidence) : JS.Promise<bool> =
     promise {
-        match tryGetCurrentTurnId workspaceRoot sessionId with
-        | Some turnId ->
+        match SubsessionActorRegistry.TryGet workspaceRoot sessionId with
+        | Some actor ->
+            let turnIdOpt = actor.GetCurrentTurn()
             return!
                 routeToChild
                     workspaceRoot
                     sessionId
                     (EvidenceUpdated
-                        { TurnId = Some turnId
+                        { TurnId = turnIdOpt
                           Evidence = evidence })
         | None ->
-            // No actor has an active turn — buffer the evidence so
+            // No actor registered — buffer the evidence so
             // SubsessionService.StartRun can drain it once the turn is established.
             SubsessionPendingEvidence.BufferPreRun sessionId evidence
             return false

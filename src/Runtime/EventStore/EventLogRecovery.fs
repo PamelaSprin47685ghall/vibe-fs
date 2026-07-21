@@ -58,7 +58,6 @@ let saveCorruptTail (workspaceRoot: string) (tailBuf: obj) (tailHash: string) : 
                 for i = 0 to sortedFiles.Length - 4 do
                     do! unlinkAsync (sprintf "%s/%s" dir sortedFiles.[i])
         with ex ->
-            printfn "Error saving corrupt tail to disk: %s" ex.Message
             return raise ex
     }
 

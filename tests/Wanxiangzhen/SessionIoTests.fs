@@ -204,30 +204,16 @@ let entriesAsync () : (string * (unit -> JS.Promise<unit>)) list =
                checkBare caught
            })
 
-      ("promptSession logs structured failure when session.prompt missing",
+      ("promptSession fails when session.prompt missing",
        fun () ->
            promise {
-               let mutable logged: obj option = None
-               emitJsStatement (fun msg -> logged <- Some msg) "const oldErr = console.error; console.error = $0;"
+               let mutable caught = false
+               let client = createObj []
 
                try
-                   let mutable caught = false
-                   let client = createObj []
+                   do! promptSession client "sid-struct" "hello"
+               with _ ->
+                   caught <- true
 
-                   try
-                       do! promptSession client "sid-struct" "hello"
-                   with _ ->
-                       caught <- true
-
-                   checkBare caught
-
-                   match logged with
-                   | None -> checkBare false
-                   | Some diag ->
-                       equal "wanxiangzhen_prompt_session_failed" (str diag "event")
-                       equal "session_api_missing" (str diag "reason")
-                       equal "sid-struct" (str diag "sessionId")
-                       checkBare ((str diag "detail").Contains "wanxiangzhen_session_api_missing")
-               finally
-                   emitJsStatement () "console.error = oldErr;"
+               checkBare caught
            }) ]

@@ -82,6 +82,8 @@ let private scanProductionSources (cwd: string) =
             assertNoToken "debug-wanxiangzhen.txt" filePath content
             assertNoToken "DEBUG PROGRESS_OBSERVER" filePath content
             assertNoToken "JS.console.log" filePath content
+            assertNoToken "JS.console.error" filePath content
+            assertNoToken "JS.console.warn" filePath content
             assertNoDebugPrintf filePath content
 
 let run () : unit =

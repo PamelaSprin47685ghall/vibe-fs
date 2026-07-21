@@ -47,7 +47,7 @@ let start () =
                         ())
             )
         with _ ->
-            JS.console.warn ("HeapProfiler not available; skipping heap profile")
+            ()
 
         activeSession.Value <- Some session
 
@@ -61,17 +61,13 @@ let stopAndSave (outputDir: string option) =
         session?post (
             "Profiler.stop",
             fun err (res: obj) ->
-                if not (isNull err) then
-                    JS.console.error ("Profiler.stop error:", err)
-                else
+                if isNull err then
                     writeFile $"{dir}/{token}.cpu.profile" res?profile
 
                 session?post (
                     "HeapProfiler.stopSampling",
                     fun err2 (res2: obj) ->
-                        if not (isNull err2) then
-                            JS.console.error ("HeapProfiler.stopSampling error:", err2)
-                        else
+                        if isNull err2 then
                             writeFile $"{dir}/{token}.heap.profile" res2?profile
 
                         session?post ("Profiler.disable")

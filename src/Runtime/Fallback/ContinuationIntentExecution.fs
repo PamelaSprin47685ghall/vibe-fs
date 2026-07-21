@@ -122,7 +122,7 @@ let private runWithoutLease
                         })
             | _ -> do! executeContinuationIntent runtime executor workspaceRoot sessionID intent reenter
         with ex ->
-            JS.console.error ("fallback continuation effect failed for " + sessionID + ": " + ex.Message)
+            return raise ex
     }
 
 let run
