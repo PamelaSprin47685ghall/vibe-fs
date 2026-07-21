@@ -13,7 +13,7 @@
 
 ## 工具
 
-`src/Hosts/OpenCode/Tools.fs`：总表 + `registerMethodologyTools`。分族：`SearchTools.fs`、`SubagentTools.fs`、`MimoTodoTool.fs`、`ExecutorTool.fs`、`PtySpawn.fs`、`PtyIo.fs` 等。
+`src/Hosts/OpenCode/Tools.fs`：总表 + `registerMethodologyTools`。分族：`SearchTools.fs`、`SubagentTools.fs`、`MimoTodoTool.fs`、`ExecutorTool.fs`、`PtySpawn.fs`、`PtyReadTool.fs`、`PtyWriteTool.fs` 等。
 
 - **PTY**：`pty_*` 五工具注册于 `Tools.fs`；运行时依赖 npm `opencode-pty`
 - **Executor**：Zod schema 含必填 `max_bytes`
@@ -31,12 +31,16 @@
 
 ## Fallback 续命
 
-唯一物理路径：[CONTINUATION_PATH.md](./CONTINUATION_PATH.md)。
+唯一物理路径：`IActionExecutor.SendContinue` → `SessionDispatcher` → 宿主 `session.prompt`。
 
 - `src/Hosts/OpenCode/Fallback/ActionExecutor.fs`：`SendContinue` → `SessionDispatcher`
 - `src/Hosts/OpenCode/Fallback/Hook.fs`：事件入 Runtime Coordinator
 - `src/Hosts/OpenCode/Fallback/EventTranslator.fs`：宿主事件翻译
 - `src/Hosts/OpenCode/ChatHooksClassification.fs`：`chat.message` → `recordHostAcceptedContinuation`
+
+## Subsession Host Adapter
+
+`src/Hosts/OpenCode/SubsessionHostAdapter.fs`、`SubsessionHostAdapterOps.fs`、`SubsessionHostAdapterTypes.fs`：实现 `ISubsessionHost`，管理子会话生命周期。
 
 ## Mimocode 命名差异
 

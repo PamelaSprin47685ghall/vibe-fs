@@ -8,18 +8,20 @@
 
 | 簇 | 路径 | 核心内容 |
 | :--- | :--- | :--- |
-| ReviewSession | `ReviewSession/` | `Types`（5 状态 DU + 命令）、`StateMachine.fs`（穷举转移）、`Registry`、`Query`、`Effects`、`ReviewLoopFold.fs`、`ReviewProjection.fs` |
-| Nudge | `Nudge/` | `NudgeDerivation.fs`（`deriveAction`）、`TodoStatus.fs`、`SubmitReviewHooks.fs`、`Types.fs`（8 工作状态 DU）、`NudgeSnapshotProjection.fs` |
-| EventSourcing | `EventSourcing/` | `EventKind.fs`（64 个事件 kind 常量）、`EventEnvelope.fs`（`WanEvent` 类型）、`EventPayload.fs`、`SessionState.fs`（28 轴投影）、`Fold.fs`（主折叠引擎）、`FoldApply.fs` |
+| ReviewSession | `ReviewSession/` | `Types`（5 状态 DU + 命令）、`StateMachine.fs`（穷举转移）、`Registry`、`Query`、`Effects` |
+| Review | `Review/` | `ReviewLoopFold.fs`、`ReviewProjection.fs`、`ReviewEncouragement.fs`、`ReviewReportBuffer.fs`、`ReviewVerdictWire.fs` |
+| Nudge | `Nudge/` | `NudgeProjection.fs`、`NudgeSnapshotProjection.fs`、`NudgeSnapshotSource.fs`、`TodoStatus.fs`、`SubmitReviewHooks.fs`、`Types.fs`（8 工作状态 DU） |
+| Nudge（顶层） | `Nudge.fs` | `NudgeAction` DU、`ofString`/`toString`、skip 正则 |
+| EventSourcing | `EventSourcing/` | `EventKind.fs`（52 个事件 kind 常量）、`EventEnvelope.fs`（`WanEvent` 类型）、`EventPayload.fs`、`SessionState.fs`（28 轴投影）、`Fold.fs`（主折叠引擎）、`FoldApply.fs` |
 | Subsession | `Subsession/` | `State.fs`（9 状态 DU）、`Command.fs`（28 命令）、`Decision.fs`（纯函数 `decide`）、`Policy.fs`、`Fold.fs`、`SubsessionProjection.fs`、`TranscriptDecision.fs`、`TypeClassify.fs`、`Abort.fs`、`Cancellation.fs`、`Dispatch.fs` 等 24 文件 |
 | Wanxiangzhen | `Wanxiangzhen/` | `Dag.fs`、`SquadEvent.fs`（8 事件 DU + fold）、`Scheduler.fs`、`FfDecision.fs`、`SquadConfig.fs`、`SquadPrompts.fs`、`SquadTask.fs`、`SquadUpdateIdAssign.fs` |
 | FallbackKernel | `FallbackKernel/` | `Types.fs`（`SessionFallbackState`、`LeaseStatus`、`SessionOwner` 等）、`Decision.fs`（`classifyError`）、`Recovery.fs`（完美平方启发式）、`StateMachine.fs` |
 | Fallback 续命 | `Fallback/Continuation.fs` | `ContinuationRequest`、`ContinuationState`、`ContinuationEvent` 等类型 |
 | Fallback 辅助 | 顶层 | `FallbackRuntimeFlags.fs`、`FallbackRuntimeLifecycle.fs`、`FallbackSubagentGate.fs` |
 | ToolCatalog | `ToolCatalog/` | `ToolSpec.fs`、`Registry.fs`（`all` 列出核心工具）、`Classification.fs`、`FileIO.fs`、`Subagent.fs`、`Search.fs`、`Web.fs`、`Executor.fs`、`Review.fs` |
-| SessionControl | `SessionControl/` | `Event.fs`、`Projection.fs`（续命/compact 投影）、`LeaseTransitions.fs`、`HumanTurn.fs`、`LeaseIdentity.fs` |
-| Methodology | `Methodology/` | `Catalog.fs`（聚合 6 个条目模块）、`Registry.fs`（enum 派生）、`Schema.fs`、`Logic.fs`、`MathematicalReasoning.fs`、`Optimization.fs`、`SystemsEngineering.fs`、`CriticalInquiry.fs` |
-| 提示词 | `CapsPrelude.fs`、`CapsSynthPolicy.fs`、`PromptFragments.fs`、`LoopMessages.fs`、`ReviewPrompts/` | 宝典/铁律 SSOT；`ReviewEncouragement.fs`、`ReviewLoopFold.fs`、`ReviewProjection.fs` |
+| SessionControl | `SessionControl/` | `Event.fs`、`Projection.fs`（续命/compact 投影）、`LeaseTransitions.fs`、`HumanTurn.fs`、`LeaseIdentity.fs`、`State.fs`、`EventOrder.fs` |
+| Methodology | `Methodology/` | `Catalog.fs`（聚合 6 个条目模块）、`Registry.fs`（enum 派生）、`Schema.fs`、`Api.fs`、`Logic.fs`、`MathematicalReasoning.fs`、`Optimization.fs`、`SystemsEngineering.fs`、`CriticalInquiry.fs`、`ProblemTransformation.fs` |
+| 提示词 | `CapsPrelude.fs`、`CapsSynthPolicy.fs`、`PromptFragments.fs`、`LoopMessages.fs`、`ReviewPrompts/` | 宝典/铁律 SSOT |
 | HostTools | `HostTools.fs` | `Host` DU、工具名映射（`normalizeToolNameForMux` 等） |
 | 权限 | `ToolPermission.fs` | 角色 → 工具语义规则矩阵 |
 | Subagent 元数据 | `SubagentIntents.fs`、`SubagentToolPolicy.fs` | 意图、策略（非 spawn 本身） |

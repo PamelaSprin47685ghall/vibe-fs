@@ -30,7 +30,6 @@
 | 10 | 10-message-transform.md | 管线、Semble、并行提示 |
 | 11 | 11-subagents.md | spawn、SubsessionActor、continue、iterator |
 | 12 | 12-fallback.md | 模型降级运行时、续命生命周期、门闩 |
-| 12' | CONTINUATION_PATH.md | F-05 OpenCode continue 唯一物理路径 SSOT |
 | 14–16 | host 文档 | OpenCode / Mux / OMP |
 | 17 | 17-build-test-verify.md | 构建与行为验证 |
 | 18 | 18-glossary-and-ssot-map.md | 术语与真相源 |
@@ -41,7 +40,7 @@
 | 文件 | 内容 |
 | :--- | :--- |
 | [wanxiangzhen/00-index.md](./wanxiangzhen/00-index.md) | 索引 |
-| [wanxiangzhen/01-master-spec.md](./wanxiangzhen/01-master-spec.md) | 主规格（~1592 行） |
+| [wanxiangzhen/01-master-spec.md](./wanxiangzhen/01-master-spec.md) | 主规格（~449 行） |
 | [wanxiangzhen/02-event-sourcing.md](./wanxiangzhen/02-event-sourcing.md) | 万象阵事件（物理：`.wanxiangshu.ndjson`） |
 | [wanxiangzhen/03-dev-talk.md](./wanxiangzhen/03-dev-talk.md) | 决策与 API 核实纪要 |
 
@@ -62,11 +61,11 @@
 
 | 层级 | 文件数 | 说明 |
 | :--- | :--- | :--- |
-| Hosts/OpenCode | 100 | 最大模块，插件/代理/会话密集 |
-| Hosts/Omp | 44 | OMP 宿主 |
-| Hosts/Mux | 26 | Mux 宿主 |
-| Runtime | 168 | 基础设施全覆盖 |
-| Kernel | 62 | 核心域 |
-| **总计** | **300** | |
+| Hosts/OpenCode | 85 | 最大模块，插件/代理/会话密集 |
+| Hosts/Omp | 50 | OMP 宿主 |
+| Hosts/Mux | 28 | Mux 宿主 |
+| Runtime | 153 | 基础设施全覆盖 |
+| Kernel | 57 | 核心域 |
+| **总计** | **580** | `.fs` 文件 |
 
-测试：`tests/` 156 个 `.fs` 文件。
+测试：`tests/` 346 个 `.fs` 文件。

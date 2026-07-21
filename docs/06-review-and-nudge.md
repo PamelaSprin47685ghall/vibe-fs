@@ -113,7 +113,7 @@ runNudgeFlowCore:
 | 主题 | 路径 |
 | :--- | :--- |
 | FSM | `Kernel/ReviewSession/StateMachine.fs` |
-| Nudge 决策 | `Kernel/Nudge/NudgeDerivation.fs`、`Nudge.fs`、`Nudge/Types.fs` |
+| Nudge 决策 | `Kernel/Nudge/NudgeDerivation.fs`（Runtime）、`Nudge.fs`（Kernel）、`Nudge/Types.fs` |
 | Nudge 投影 | `Kernel/Nudge/NudgeProjection.fs`、`NudgeSnapshotProjection.fs` |
 | Nudge 运行时 | `src/Runtime/Nudge/NudgeFlow.fs`、`NudgeDispatchClaim.fs` |
 | Event append | `src/Runtime/EventStore/NudgeEventWriter.fs` |

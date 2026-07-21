@@ -71,16 +71,12 @@
 
 ### Fallback 运行时（模型降级）
 
-Kernel 纯规则在 `src/Kernel/FallbackKernel/`（`StateMachine.fs`、`Decision.fs`、`Recovery.fs`、`Types.fs`）。Runtime 编排在 `src/Runtime/Fallback/`（`Coordinator.fs`、`FallbackCoordination.fs`、`RuntimeStore.fs`、`SessionRuntime.fs`、`Continuation*` 等）。续命唯一物理路径：`IActionExecutor.SendContinue` → `SessionDispatcher` → 宿主 `session.prompt`，`recordHostAcceptedContinuation` 为唯一 Dispatched 写入入口。
+Kernel 纯规则在 `src/Kernel/FallbackKernel/`（`StateMachine.fs`、`Decision.fs`、`Recovery.fs`、`Types.fs`）。Runtime 编排在 `src/Runtime/Fallback/`（`Coordinator.fs`、`FallbackCoordination.fs`、`RuntimeStore.fs`、`SessionRuntime.fs`、`Continuation*` 等 33 文件）。续命唯一物理路径：`IActionExecutor.SendContinue` → `SessionDispatcher` → 宿主 `session.prompt`，`recordHostAcceptedContinuation` 为唯一 Dispatched 写入入口。
 
-详见 [12-fallback.md](./12-fallback.md)、[CONTINUATION_PATH.md](./CONTINUATION_PATH.md)。
+详见 [12-fallback.md](./12-fallback.md)。
 
 ### Nudge 运行时
 
 `src/Runtime/Nudge/NudgeFlow.fs` 与 `NudgeDispatchClaim.fs` 负责 nudge claim、去重和发送；`src/Kernel/Nudge/` 提供纯决策（`NudgeDerivation.fs`：`deriveAction` 从 `SessionSnapshot` 推导 action）。
 
 详见 [06-review-and-nudge.md](./06-review-and-nudge.md) § Nudge。
-
-## REF 架构演进方向
-
-三位一体哲学：DDD（限界上下文）+ Flow Kernel（`IAsyncEnumerable` 流程代数）+ RAII（资源作用域）。目标五部件：纯函数内核、串行事务运行时、RAII ResourceScope、Effect Supervisor、响应式边缘。九条语义法律约束所有流处理。详见 [02-architecture.md](../02-architecture.md) § REF。

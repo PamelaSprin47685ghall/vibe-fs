@@ -52,4 +52,3 @@
 | `src/Kernel/CapsPrelude.fs` | 宝典/铁律 SSOT |
 | `src/Runtime/EventStore/EventLogCodec.fs` | NDJSON codec |
 | `src/Runtime/EventStore/EventLogRuntimeStore.fs` | 进程内 EventLogStore |
-| `CONTINUATION_PATH.md` | OpenCode Fallback continue 唯一物理路径 |

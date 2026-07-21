@@ -15,7 +15,7 @@
 | `Recovery.fs` | 完美平方启发式：`isPerfectSquare`、`scanStartIndex`、`selectModel`、`updateFailureCount` |
 | `StateMachine.fs` | `transition(state, evt, cfg, chain)` → `(newState, action)` |
 
-### Runtime 运行时（`Fallback/`）
+### Runtime 运行时（`Fallback/`，33 文件）
 
 | 模块 | 职责 |
 | :--- | :--- |
@@ -23,13 +23,25 @@
 | `FallbackCoordination.fs` | `resolveChain`、`sendOrContinue`、`handleRetryingError` |
 | `RuntimeStore.fs` | `FallbackRuntimeStore`：单 map + change listeners |
 | `SessionRuntime.fs` | `FallbackSessionRuntime` 记录（含 `ActiveGates` 门闩） |
-| `GateState.fs` | 四类门闩：`NudgeActive`、`EventHandlingActive`、`MainContinuationAwaitingStart`、`Inactive` |
 | `FallbackConfigCodec.fs` | 从 `AGENTS.md` frontmatter `models:` 解析链；`resolveSubagentChain` / `resolveModelDirective` |
 | `FallbackMessageCodec.fs` | `decodeModelFromObj`、`scanToolCallAsText`、`allTodosCompleted`、`isIdleNoContentAndNoTools` |
 | `ContinuationExecution.fs` / `ContinuationExecutionCore.fs` | `executeSendContinue` 唯一物理路径 |
 | `ContinuationIntentExecution.fs` | Outbox Intent 消费驱动 |
 | `LeaseValidation.fs` / `LeaseValidationRules.fs` | 租约校验 |
-| `FallbackSubagentGate.fs` | `needFallbackContinue`、`isSubagentSettledFromObservation` |
+| `FallbackBridgeScanToolText.fs` | 工具调用文本扫描 |
+| `FallbackIdleSettlement.fs` | Idle 时终局处理 |
+| `FallbackRecoveryWait.fs` | 恢复等待 |
+| `HumanTurnHandler.fs` | 人机轮次处理 |
+| `NudgeHandler.fs` | Nudge 门闩处理 |
+| `SessionRuntimeCompaction.fs` | Compaction 状态管理 |
+| `SessionRuntimeLeasePure.fs` / `SessionRuntimeLeaseAcceptancePure.fs` / `SessionRuntimePropertyPure.fs` | 纯租约逻辑 |
+| `SessionStatusHandler.fs` | Session 状态处理 |
+| `RetryDispatchGovernor.fs` | 重试调度控制 |
+| `ContinuationDispatchGovernor.fs` / `ContinuationDispatchOps.fs` / `ContinuationDispatchRegistry.fs` / `ContinuationDispatchComplete.fs` | Dispatch 生命周期 |
+| `ContinuationSessionReenter.fs` | Session 重入 |
+| `EpisodeIdentity.fs` | Episode 标识 |
+| `HostEventInspection.fs` | 宿主事件检查 |
+| `Ports.fs` | 接口定义 |
 
 ## 唯一物理续命路径（F-05）
 

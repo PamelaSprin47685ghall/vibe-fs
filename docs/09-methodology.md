@@ -2,19 +2,20 @@
 
 ## 概述
 
-对外名 `methodology_<id>`，数量与 `src/Kernel/Methodology/Catalog.fs` 条目同步。工具供 LLM 在复杂推理时写入结构化 note，与 `todowrite` 的 `select_methodology` 联动。
+对外名 `methodology_<id>`，数量与 `src/Kernel/Methodology/Catalog.fs` 条目同步（54 个）。工具供 LLM 在复杂推理时写入结构化 note，与 `todowrite` 的 `select_methodology` 联动。
 
 ## 数据驱动 Schema
 
 | 模块 | 职责 |
 | :--- | :--- |
 | `Methodology/Schema.fs` | `MethodologyEntry` 类型、`buildUnifiedNoteDescription` |
-| `Methodology/Logic.fs` | 逻辑条目 |
-| `Methodology/ProblemTransformation.fs` | 问题转换条目 |
-| `Methodology/MathematicalReasoning.fs` | 数学推理条目 |
-| `Methodology/Optimization.fs` | 优化条目 |
-| `Methodology/SystemsEngineering.fs` | 系统工程条目 |
-| `Methodology/CriticalInquiry.fs` | 批判探究条目 |
+| `Methodology/Api.fs` | `selectMethodologyToolName`、`methodologyCatalog` 文案、`renderMeditatorIntent` |
+| `Methodology/Logic.fs` | 逻辑条目（7 个：first_principles、axiomatization、deduction、induction、abduction、reductio_ad_absurdum、falsification） |
+| `Methodology/ProblemTransformation.fs` | 问题转换条目（10 个：analogy、specialization、generalization、working_backwards、analysis_synthesis、auxiliary_construction、equivalent_transformation、decomposition_recombination、model_problem_transfer、constructive_method） |
+| `Methodology/MathematicalReasoning.fs` | 数学推理条目（9 个：invariance、symmetry_analysis、dimensional_reduction、perturbation_continuity、pigeonhole_principle、duality、quotient_space、category_mapping、renormalization） |
+| `Methodology/Optimization.fs` | 优化条目（7 个：relaxation、search_space_exploration、branch_and_bound、dynamic_programming、monte_carlo_sampling、simulated_annealing、swarm_optimization） |
+| `Methodology/SystemsEngineering.fs` | 系统工程条目（9 个：systems_thinking、root_cause_analysis、state_machine_reasoning、type_driven_design、event_sourcing、operationalism、bayesian_update、test_driven_reasoning、debugging_trace） |
+| `Methodology/CriticalInquiry.fs` | 批判探究条目（12 个：conceptual_analysis、dialectical_analysis、hermeneutic_circle、deconstruction、simplification、tradeoff_analysis、risk_analysis、security_review、performance_analysis、user_intent_clarification、thought_experiment、transcendental_argument） |
 | `Methodology/Catalog.fs` | 聚合 6 个条目模块（`all: Lazy<MethodologyEntry list>`） |
 | `Methodology/Registry.fs` | 从 `Catalog.all` 派生 `enumValues`、`enumValuesArray`、`tryFindEntry` |
 

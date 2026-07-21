@@ -15,7 +15,7 @@
 
 ## 事件种类（Kernel SSOT）
 
-定义于 `src/Kernel/EventSourcing/EventKind.fs`（64 个常量）。Runtime codec 引用这些常量，宿主层不复制字符串。
+定义于 `src/Kernel/EventSourcing/EventKind.fs`（52 个常量）。Runtime codec 引用这些常量，宿主层不复制字符串。
 
 ### 核心业务事件
 
@@ -29,6 +29,8 @@
 | `submit_review_reports_consumed` | 审查报告被消费记录 |
 | `subagent_spawned` | 子代理 spawn 成功 |
 | `subagent_continued` | `continue` 续跑子会话 |
+| `fallback_continue_injected` | Fallback 注入续命 |
+| `route_observed` | 路由观察 |
 
 ### nudge 生命周期事件（六阶段闭环）
 
@@ -40,6 +42,7 @@
 | `nudge_cancelled` | nudge 被取消 | 新用户消息打断 |
 | `nudge_settled` | nudge 终局 | 后续 idle 确认完成 |
 | `nudge_dedup_cleared` | 去重表清空 | 新消息 / WIP 提交 |
+| `nudge_owner_unknown` | nudge 归属未知 | 归属无法确定 |
 
 去重：`NudgeDedupState` = `{ PendingNudge: (anchor, nudgeId) option; LastDispatchedAnchor: string option }`。`isBlocked` 检查当前 anchor 是否已在 Pending 或 LastDispatched 中。
 
@@ -57,13 +60,20 @@
 | `continuation_requested` | FSM 决策后构造 `PendingLease(Requested)` |
 | `continuation_dispatch_started` | 即将调用宿主 API |
 | `continuation_dispatched` | 宿主已接受（`recordHostAcceptedContinuation` 唯一写入入口） |
-| `continuation_failed` / `cancelled` / `settled` | 终局 |
+| `continuation_failed` | 续命失败 |
+| `continuation_cancelled` | 续命取消 |
+| `continuation_settled` | 续命终局 |
 | `continuation_dispatch_claimed` | Effect Supervisor 从 Outbox 消费 Dispatch 意图 |
 | `continuation_host_accepted` | 宿主接受续命 |
-| `continuation_run_started` / `assistant_observed` / `superseded` | v2 续命阶段 |
-| `compaction_started` / `settled` / `context_generation_changed` | 上下文压缩事件 |
+| `continuation_idle_reconciliation` | Idle 时协调 |
+| `continuation_run_started` | 续命运行开始 |
+| `continuation_superseded` | 续命被取代 |
+| `continuation_assistant_observed` | 观察到 assistant 响应 |
+| `compaction_started` | 上下文压缩开始 |
+| `compaction_settled` | 上下文压缩终局 |
+| `context_generation_changed` | 上下文 generation 变化 |
 
-### 子会话 Actor 事件（13 种）
+### 子会话 Actor 事件（10 种）
 
 `subsession_run_started`、`subsession_run_settled`、`subsession_turn_dispatch_requested`、`subsession_turn_started`、`subsession_turn_outcome_observed`、`subsession_turn_finished`、`subsession_abort_requested`、`subsession_session_poisoned`、`subsession_physical_session_closed`、`subsession_decision_committed`（crash-atomic 信封）。
 

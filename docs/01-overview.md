@@ -2,7 +2,7 @@
 
 ## 一句话
 
-**万象术 (wanxiangshu)**：F# 经 Fable 编译为 JavaScript 的**多代理插件运行时**。同一套 **Kernel（纯规则）+ Runtime（副作用边界）** 接到四套宿主：**OpenCode、Mimocode、Mux、oh-my-pi (OMP)**。
+**万象术 (wanxiangshu)**：F# 经 Fable 编译为 JavaScript 的**多代理插件运行时**。同一套 **Kernel（纯规则）+ Runtime（副作用边界）** 接到三套宿主：**OpenCode/Mimocode、Mux、oh-my-pi (OMP)**。
 
 ## 表面能力 vs 真实难题
 
@@ -12,7 +12,7 @@
 - 文件读写、模糊搜索、执行器、审查循环、`submit_review` / `return_reviewer`
 - Nudge（todo / loop / runner）
 - 54 个结构化方法论笔记本工具（`methodology_<id>`）
-- 四套宿主各自的 tool schema 与 hook 接线
+- 三套宿主各自的 tool schema 与 hook 接线
 
 ### 工程根问题（不解决则一切退化为脆弱 hook）
 

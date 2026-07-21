@@ -10,6 +10,14 @@
 - `src/Hosts/Mux/BuiltinTools.fs`、`BuiltinToolsFuzzy.fs`：内建工具 + fuzzy
 - `src/Hosts/Mux/Wrappers.fs`：Mux 原生工具名 → 万象术执行链
 - `src/Hosts/Mux/SubagentTools.fs`：子代理与 delegate
+- `src/Hosts/Mux/MuxTools.fs`：Mux 特有工具
+- `src/Hosts/Mux/WebTools.fs`：网络工具
+- `src/Hosts/Mux/SwapTool.fs`：文件交换工具
+- `src/Hosts/Mux/ReviewToolsMux.fs`：审查工具
+
+## Delegate
+
+- `src/Hosts/Mux/Delegate.fs`、`DelegateCodec.fs`、`DelegateTasks.fs`、`DelegateTimeout.fs`：委托机制
 
 ## 消息
 

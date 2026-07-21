@@ -9,7 +9,7 @@
 | 文件 | 说明 |
 | :--- | :--- |
 | [wanxiangzhen/00-index.md](./wanxiangzhen/00-index.md) | 索引 |
-| [wanxiangzhen/01-master-spec.md](./wanxiangzhen/01-master-spec.md) | **主规格**（~1592 行） |
+| [wanxiangzhen/01-master-spec.md](./wanxiangzhen/01-master-spec.md) | **主规格**（~449 行） |
 | [wanxiangzhen/02-event-sourcing.md](./wanxiangzhen/02-event-sourcing.md) | NDJSON SSOT 专篇 |
 | [wanxiangzhen/03-dev-talk.md](./wanxiangzhen/03-dev-talk.md) | 决策与 API 核实纪要 |
 
@@ -24,4 +24,4 @@
 ## 入口与代码
 
 - npm：`wanxiangshu/wanxiangzhen` → `build/src/Hosts/OpenCode/PluginWanxiangzhen.js`
-- `src/Kernel/Wanxiangzhen/`、`src/Runtime/Wanxiangzhen/`
+- `src/Kernel/Wanxiangzhen/`（8 文件）、`src/Runtime/Wanxiangzhen/`（24 文件）

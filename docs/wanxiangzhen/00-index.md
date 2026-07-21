@@ -7,7 +7,7 @@
 | 文件 | 说明 |
 | :--- | :--- |
 | [00-index.md](./00-index.md) | 本索引 |
-| [01-master-spec.md](./01-master-spec.md) | 主规格（~1592 行）：§0–14 + 附录 A–D |
+| [01-master-spec.md](./01-master-spec.md) | 主规格（~449 行）：§0–14 + 附录 A–D |
 | [02-event-sourcing.md](./02-event-sourcing.md) | NDJSON SSOT 专篇 |
 | [03-dev-talk.md](./03-dev-talk.md) | 决策与 API 核实纪要 |
 
@@ -23,7 +23,7 @@
 | 层 | 路径 |
 | :--- | :--- |
 | Kernel | `src/Kernel/Wanxiangzhen/`（8 文件：Dag.fs、Scheduler.fs、FfDecision.fs、SquadTask.fs、SquadConfig.fs、SquadPrompts.fs、SquadEvent.fs、SquadUpdateIdAssign.fs） |
-| Runtime | `src/Runtime/Wanxiangzhen/`（15 文件） |
+| Runtime | `src/Runtime/Wanxiangzhen/`（24 文件） |
 | 宿主 | `src/Hosts/OpenCode/PluginWanxiangzhen.fs` |
 
 ## 与万象术的边界

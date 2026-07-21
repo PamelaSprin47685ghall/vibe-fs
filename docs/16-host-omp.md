@@ -24,12 +24,17 @@
 ## Review / Nudge / Magic
 
 - `src/Hosts/Omp/NudgeHooks.fs`、`NudgeRuntime.fs`
-- `src/Hosts/Omp/MagicTodo.fs`
-- Review：`ReviewToolsRegister` + `ReviewRuntime`
+- `src/Hosts/Omp/ReviewLoop.fs`、`ReviewToolsExecute.fs`、`ReviewToolsLoop.fs`、`ReviewToolsRegister.fs`
+- `src/Hosts/Omp/TodoTool.fs`、`TodoHooks.fs`、`TodoStateManagement.fs`
+
+## Subsession
+
+- `src/Hosts/Omp/SubsessionHostAdapter.fs`、`SubsessionDispatch.fs`、`SubsessionDispatchStatus.fs`、`SubsessionQuiescence.fs`
+- `src/Hosts/Omp/ChildSession.fs`、`ChildSessionCreate.fs`、`ChildSessionRegistry.fs`、`ChildCleanup.fs`
 
 ## Fallback
 
-`src/Hosts/Omp/Fallback/Hook.fs`、`EventTranslator.fs`、`ActionExecutor.fs`。
+`src/Hosts/Omp/Fallback/Hook.fs`、`EventTranslator.fs`、`ActionExecutor.fs`、`MessageInspection.fs`。
 
 ## 上游
 
