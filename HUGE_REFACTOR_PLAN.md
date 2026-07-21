@@ -534,64 +534,94 @@ type UniversalPrompt =
 
 ---
 
-### 6.2 `PromptToml.fs` 单向生成器实现规范
+### 6.2 零徒手格式化纪律与 `PromptToml.fs` 标准库序列化规范
+
+#### 1. 零徒手格式化纪律 (No Hand-Formatting Principle)
+- **严禁徒手拼接**：彻底禁止使用 `StringBuilder`、字符串拼接（`+`）、`sprintf` 或自定义 `escapeTomlString` 逻辑去“造” TOML 文本。徒手拼接格式是严重的 Code Smell，极易产生语法死锁与转义漏洞。
+- **标准库全权接管**：所有 TOML 序列化必须通过标准 TOML 序列化库（Fable FFI 引入的 `@iarna/toml` 或 `smol-toml` 的 `Toml.stringify`）进行单向输出。
+
+#### 2. `Toml.fs` 运行时模块定义 (`src/Runtime/Workspace/Toml.fs`)
+
+```fsharp
+module Wanxiangshu.Runtime.Toml
+
+open Fable.Core
+open Fable.Core.JsInterop
+
+[<ImportAll("@iarna/toml")>]
+let private tomlLib: obj = jsNative
+
+let stringify (value: obj) : string =
+    tomlLib?stringify value
+```
+
+#### 3. `PromptToml.fs` 单向生成器实现
 
 ```fsharp
 module Wanxiangshu.Runtime.PromptToml
 
 open Fable.Core
+open Fable.Core.JsInterop
 open Wanxiangshu.Runtime.UniversalSchema
+open Wanxiangshu.Runtime.Toml
 
-let private escapeTomlString (s: string) : string =
-    if s.Contains("\n") then
-        "\"\"\"\n" + s.Replace("\"\"\"", "\\\"\\\"\\\"") + "\n\"\"\""
-    else
-        "\"" + s.Replace("\\", "\\\\").Replace("\"", "\\\"") + "\""
+let private targetToObj (t: TargetItem) : obj =
+    let fields = [
+        "kind", box (t.kind.ToString().ToLowerInvariant())
+        "value", box t.value
+    ] @ (match t.hint with Some h -> ["hint", box h] | None -> [])
+      @ (match t.draft with Some d -> ["draft", box d] | None -> [])
+      @ (match t.content with Some c -> ["content", box c] | None -> [])
+    createObj fields
+
+let private boundaryToObj (b: BoundaryItem) : obj =
+    let fields = [
+        "kind", box (b.kind.ToString().ToLowerInvariant())
+        "value", box b.value
+    ] @ (match b.action with Some a -> ["action", box a] | None -> [])
+    createObj fields
+
+let private ruleToObj (r: RuleItem) : obj =
+    createObj [
+        "kind", box (r.kind.ToString().ToLowerInvariant())
+        "text", box r.text
+    ]
+
+let private outcomeToObj (o: OutcomeItem) : obj =
+    createObj [
+        "label", box o.label
+        "text", box o.text
+    ]
 
 let render (prompt: UniversalPrompt) : string =
-    let sb = System.Text.StringBuilder()
+    let rootFields = ResizeArray<string * obj>()
 
     match prompt.objective with
-    | Some objVal when objVal <> "" ->
-        sb.AppendLine($"objective = {escapeTomlString objVal}") |> ignore
+    | Some objVal when not (System.String.IsNullOrWhiteSpace objVal) ->
+        rootFields.Add("objective", box objVal)
     | _ -> ()
 
     match prompt.background with
-    | Some bgVal when bgVal <> "" ->
-        sb.AppendLine($"background = {escapeTomlString bgVal}") |> ignore
+    | Some bgVal when not (System.String.IsNullOrWhiteSpace bgVal) ->
+        rootFields.Add("background", box bgVal)
     | _ -> ()
 
-    sb.AppendLine($"agent_role = {escapeTomlString prompt.agentRole}") |> ignore
+    rootFields.Add("agent_role", box prompt.agentRole)
 
-    for t in prompt.targets do
-        sb.AppendLine() |> ignore
-        sb.AppendLine("[[targets]]") |> ignore
-        sb.AppendLine($"kind = {escapeTomlString (t.kind.ToString().ToLowerInvariant())}") |> ignore
-        sb.AppendLine($"value = {escapeTomlString t.value}") |> ignore
-        match t.hint with Some h -> sb.AppendLine($"hint = {escapeTomlString h}") |> ignore | None -> ()
-        match t.draft with Some d -> sb.AppendLine($"draft = {escapeTomlString d}") |> ignore | None -> ()
-        match t.content with Some c -> sb.AppendLine($"content = {escapeTomlString c}") |> ignore | None -> ()
+    if not prompt.targets.IsEmpty then
+        rootFields.Add("targets", box (prompt.targets |> List.map targetToObj |> List.toArray))
 
-    for b in prompt.boundaries do
-        sb.AppendLine() |> ignore
-        sb.AppendLine("[[boundaries]]") |> ignore
-        sb.AppendLine($"kind = {escapeTomlString (b.kind.ToString().ToLowerInvariant())}") |> ignore
-        sb.AppendLine($"value = {escapeTomlString b.value}") |> ignore
-        match b.action with Some a -> sb.AppendLine($"action = {escapeTomlString a}") |> ignore | None -> ()
+    if not prompt.boundaries.IsEmpty then
+        rootFields.Add("boundaries", box (prompt.boundaries |> List.map boundaryToObj |> List.toArray))
 
-    for r in prompt.rules do
-        sb.AppendLine() |> ignore
-        sb.AppendLine("[[rules]]") |> ignore
-        sb.AppendLine($"kind = {escapeTomlString (r.kind.ToString().ToLowerInvariant())}") |> ignore
-        sb.AppendLine($"text = {escapeTomlString r.text}") |> ignore
+    if not prompt.rules.IsEmpty then
+        rootFields.Add("rules", box (prompt.rules |> List.map ruleToObj |> List.toArray))
 
-    for o in prompt.outcomes do
-        sb.AppendLine() |> ignore
-        sb.AppendLine("[[outcomes]]") |> ignore
-        sb.AppendLine($"label = {escapeTomlString o.label}") |> ignore
-        sb.AppendLine($"text = {escapeTomlString o.text}") |> ignore
+    if not prompt.outcomes.IsEmpty then
+        rootFields.Add("outcomes", box (prompt.outcomes |> List.map outcomeToObj |> List.toArray))
 
-    sb.ToString().TrimEnd()
+    let rootObj = createObj (rootFields |> Seq.map (fun (k, v) -> k, v) |> Seq.toList)
+    Toml.stringify rootObj
 ```
 
 ---
