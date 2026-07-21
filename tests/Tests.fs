@@ -256,6 +256,7 @@ let runAll (args: string array) : JS.Promise<int> =
             let isIntegrationSuiteRun (label: string) =
                 (label.StartsWith "Integration" && label.EndsWith ".run")
                 || (label = "OmpExecutorToolsTests.run")
+                || (label = "ReaderWriterLockTests.run")
 
             for (label, body) in runnableTests do
                 if not silent then

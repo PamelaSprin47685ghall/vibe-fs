@@ -73,9 +73,8 @@ type SessionReaderWriterLock() =
                         | None -> ()
 
                         try
-                            let p = work ()
-                            let timeout = defaultArg timeoutMs 10000
-                            let timeoutPromise = PromiseQueue.withTimeout timeout p
+                            let timeout = defaultArg timeoutMs 120000
+                            let timeoutPromise = PromiseQueue.withTimeout timeout (work ())
 
                             timeoutPromise
                             |> Promise.map (fun resOpt ->
@@ -103,7 +102,7 @@ type SessionReaderWriterLock() =
         if disposed then
             Promise.reject (exn "DisposedException: Lock was disposed")
         else
-            let timeout = defaultArg timeoutMs 10000
+            let timeout = defaultArg timeoutMs 120000
 
             queue.Enqueue(fun () ->
                 promise {

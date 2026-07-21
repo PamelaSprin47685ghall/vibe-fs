@@ -12,43 +12,13 @@ open Wanxiangshu.Runtime.EventStore
 open Wanxiangshu.Runtime.EventLogFile
 open Wanxiangshu.Runtime.ProjectionCache
 open Wanxiangshu.Runtime.PromiseQueue
+open Wanxiangshu.Runtime.RuntimeScope
 
 [<Import("readdir", "fs/promises")>]
 let private readdirAsync (path: string) : JS.Promise<string[]> = jsNative
 
 [<Import("readFile", "node:fs/promises")>]
 let private readFileAsync (path: string) (encoding: string) : JS.Promise<string> = jsNative
-
-let testReaderWriterLockTimeoutRobustness () =
-    promise {
-        let lockObj = Wanxiangshu.Runtime.SessionReaderWriterLock()
-        let mutable readError = None
-
-        try
-            let! _ = lockObj.EnqueueRead((fun () -> Promise.create (fun _ _ -> ())), timeoutMs = 50)
-            ()
-        with ex ->
-            readError <- Some ex
-
-        check "C10 reader timeout" (Option.isSome readError && readError.Value.Message.Contains("ReaderLockTimeout"))
-
-        let mutable writeError = None
-
-        try
-            let! _ = lockObj.EnqueueWrite((fun () -> Promise.create (fun _ _ -> ())), timeoutMs = 50)
-            ()
-        with ex ->
-            writeError <- Some ex
-
-        check
-            "C11 writer timeout"
-            (Option.isSome writeError
-             && writeError.Value.Message.Contains("WriterLockTimeout"))
-
-        let! writeResult = lockObj.EnqueueWrite(fun () -> Promise.lift "write success")
-        equal "write lock should acquire successfully after reader/writer timeout" "write success" writeResult
-        lockObj.Dispose()
-    }
 
 let testProjectionEquivalence () =
     promise {
@@ -225,124 +195,53 @@ let testTruncationCases () =
         do! rmAsync dir
     }
 
-let testHangInjections () =
+let testTamperedChecksumTruncation () =
     promise {
-        let queue = SerialQueue()
-        let mutable firstError = None
-
-        try
-            let! _ = queue.Enqueue((fun () -> Promise.create (fun _ _ -> ())), timeoutMs = 50)
-            ()
-        with ex ->
-            firstError <- Some ex
-
-        check "C14 queue timeout" (Option.isSome firstError && firstError.Value.Message.Contains("TimeoutError"))
-        check "C14 queue poisoned" queue.Poisoned
-
-        let mutable secondError = None
-
-        try
-            let! _ = queue.Enqueue(fun () -> Promise.lift "ok")
-            ()
-        with ex ->
-            secondError <- Some ex
-
-        check "C14 subsequent fails" (Option.isSome secondError && secondError.Value.Message.Contains("QueuePoisoned"))
-    }
-
-let testLateCompletionFence () =
-    promise {
-        let! dir = mkdtempAsync "eventlog-late-"
+        let! dir = mkdtempAsync "eventlog-tampered-"
         let path = eventPath dir
-        do! writeFileAsync path ""
-        let queue = SerialQueue()
-        let mutable triggerLateResolve = fun (_: string) -> ()
-        let latePromise = Promise.create (fun resolve _ -> triggerLateResolve <- resolve)
-        let mutable error = None
 
-        try
-            let! _ = queue.Enqueue((fun () -> latePromise), timeoutMs = 50)
-            ()
-        with ex ->
-            error <- Some ex
+        let good =
+            wanEventToLine
+                { V = 1
+                  Session = "s1"
+                  Kind = eventKindLoopActivated
+                  At = ""
+                  Payload = Map [ "task", "ok" ]
+                  EventId = None
+                  WriterId = None
+                  Sequence = None
+                  Checksum = None }
 
-        check "task timed out" (Option.isSome error)
-        let timedOutGen = queue.Generation
-        triggerLateResolve "late success"
-        check "generation incremented" (timedOutGen > 0)
-        let! text = readFileAsync path "utf-8"
-        equal "physical file remains empty despite late completion" "" text
+        let tamperedEvent =
+            { V = 1
+              Session = "s1"
+              Kind = eventKindLoopActivated
+              At = ""
+              Payload = Map [ "task", "tampered" ]
+              EventId = Some "eid1"
+              WriterId = Some "wid1"
+              Sequence = Some 2
+              Checksum = Some "wrong-checksum" }
+
+        let tamperedLine = wanEventToLine tamperedEvent
+        do! writeFileAsync path (good + "\n" + tamperedLine + "\n")
+        let store = EventLogStore dir
+        let! events = store.ReadAllEvents()
+        equal "events length should be 2 (good + repair)" 2 events.Length
+        let repairEvent = events |> List.find (fun e -> e.Kind = "event_log_repaired")
+
+        equal
+            "repair reason is Checksum verification failed"
+            "Checksum verification failed"
+            repairEvent.Payload.["reason"]
+
         do! rmAsync dir
-    }
-
-let testReaderLockAbort () =
-    promise {
-        let lockObj = Wanxiangshu.Runtime.SessionReaderWriterLock()
-        let mutable handlers = []
-
-        let signal =
-            {| addEventListener =
-                System.Action<string, unit -> unit>(fun event handler ->
-                    if event = "abort" then
-                        handlers <- handler :: handlers)
-               removeEventListener = System.Action<string, unit -> unit>(fun _ _ -> ()) |}
-
-        let mutable caught = None
-
-        let p =
-            lockObj.EnqueueRead((fun () -> Promise.create (fun _ _ -> ())), abortSignal = signal)
-
-        do! Promise.sleep 10
-        handlers |> List.iter (fun h -> h ())
-
-        try
-            let! _ = p
-            ()
-        with ex ->
-            caught <- Some ex
-
-        check "C12 reader lock aborted" (Option.isSome caught && caught.Value.Message.Contains("AbortError"))
-        lockObj.Dispose()
-    }
-
-let testC13MockHangs () =
-    promise {
-        let lockObj = Wanxiangshu.Runtime.SessionReaderWriterLock()
-        let mutable readerStarted = false
-
-        let readerPromise =
-            lockObj.EnqueueRead(fun () ->
-                promise {
-                    readerStarted <- true
-                    do! Promise.sleep 1000
-                })
-
-        do! Promise.sleep 10
-        check "reader active" readerStarted
-        let mutable writeError = None
-
-        try
-            let! _ = lockObj.EnqueueWrite((fun () -> Promise.lift "write"), timeoutMs = 50)
-            ()
-        with ex ->
-            writeError <- Some ex
-
-        check
-            "writer timed out waiting for reader"
-            (Option.isSome writeError
-             && writeError.Value.Message.Contains("WriterLockTimeout"))
-
-        lockObj.Dispose()
     }
 
 let run () =
     promise {
-        do! testReaderWriterLockTimeoutRobustness ()
         do! testProjectionEquivalence ()
         do! testForensicRepairedEvent ()
         do! testTruncationCases ()
-        do! testHangInjections ()
-        do! testLateCompletionFence ()
-        do! testReaderLockAbort ()
-        do! testC13MockHangs ()
+        do! testTamperedChecksumTruncation ()
     }

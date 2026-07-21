@@ -83,8 +83,13 @@ let private parseSingleLine (buffer: obj) (startOff: int) (endOff: int) (hasNewl
     else
         match tryParseEventLine lineStr with
         | Some ev ->
-            lastValidOffset.Value <- if hasNewline then endOff + 1 else endOff
-            Some (Choice1Of2 ev)
+            if verifyEventChecksum ev then
+                lastValidOffset.Value <- if hasNewline then endOff + 1 else endOff
+                Some (Choice1Of2 ev)
+            else
+                let removedBytes = len - lastValidOffset.Value
+                let badLineNum = idx + 1
+                Some (Choice2Of2 (lastValidOffset.Value, startOff, badLineNum, "Checksum verification failed", removedBytes))
         | None ->
             let removedBytes = len - lastValidOffset.Value
             let badLineNum = idx + 1
@@ -154,11 +159,11 @@ let readEventsFile (path: string) : JS.Promise<WanEvent list> =
                 match scanEventLog buffer with
                 | Clean(_, evs) -> return evs
                 | ValidFinalLineMissingNewline(_, evs) -> return evs
-                 | CorruptTail(_, _, _, _, _, evs) -> return evs
-                 | CorruptMiddle(_, _, _, _, _, evs) -> return evs
-             finally
-                 handle?close() |> ignore
-     }
+                | CorruptTail(_, _, _, _, _, evs) -> return evs
+                | CorruptMiddle(_, _, _, _, _, evs) -> return evs
+            finally
+                handle?close() |> ignore
+    }
 
 let decorateEvent (writerId: string) (eventCountRead: int) (e: WanEvent) : WanEvent =
     let eid = match e.EventId with Some id -> id | None -> Guid.NewGuid().ToString()

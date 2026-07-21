@@ -23,7 +23,8 @@ let private nodeBuffer: obj = jsNative
 let private byteLength (s: string) : int =
     unbox<int> (nodeBuffer?byteLength (s, "utf-8"))
 
-type EventLogStore(workspaceRoot: string, ?appendLineOverride: string -> WanEvent -> JS.Promise<unit>) =
+type EventLogStore(workspaceRoot: string, ?appendLineOverride: string -> WanEvent -> JS.Promise<unit>, ?timeoutMs: int)
+    =
     let queue = SerialQueue()
     let eventFilePath = eventPath workspaceRoot
     let writesDisabled = workspaceRoot = ""
@@ -35,7 +36,10 @@ type EventLogStore(workspaceRoot: string, ?appendLineOverride: string -> WanEven
         if writesDisabled then
             Promise.lift noopValue
         else
-            queue.Enqueue work
+            queue.Enqueue(work, timeoutMs = defaultArg timeoutMs 10000)
+
+    member _.Generation = queue.Generation
+    member _.Poisoned = queue.Poisoned
 
     member this.EnsureSynced() : JS.Promise<unit> = state.EnsureSynced()
     member _.ProjectionCache = state.Cache

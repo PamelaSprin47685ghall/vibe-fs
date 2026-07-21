@@ -648,6 +648,7 @@
     <Compile Include="tests/EventLogRuntimeTests.fs"/>
     <Compile Include="tests/EventLogRuntimeRobustnessTests.fs"/>
     <Compile Include="tests/EventLogInvariantsAndLockTests.fs"/>
+    <Compile Include="tests/ReaderWriterLockTests.fs"/>
     <Compile Include="tests/ReplayEquivalenceTests.fs"/>
     <Compile Include="tests/IntegrationToolSetup.fs"/>
     <Compile Include="tests/EventDrivenHarness.fs"/>
