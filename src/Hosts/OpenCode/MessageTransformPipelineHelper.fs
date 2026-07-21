@@ -18,8 +18,7 @@ open Wanxiangshu.Hosts.Opencode.SembleInjection
 open Wanxiangshu.Runtime.Dyn
 
 open Wanxiangshu.Hosts.Opencode.CapsCodec
-
-let resolveCapsEpoch (_messagesList: obj) (_sessionID: string) (_runtimeScope: obj) : string = ""
+open Wanxiangshu.Hosts.Opencode.CapsEpochResolver
 
 let resolveSessionID (input: obj) (messagesList: Message<obj> list) : string =
     let sid1 = Dyn.str input "sessionID"

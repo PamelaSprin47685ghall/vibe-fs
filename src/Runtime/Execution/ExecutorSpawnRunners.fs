@@ -85,7 +85,7 @@ let private runPythonWithDependencies
 let private runPythonProgram
     scope
     program
-    dependencies
+    (dependencies: string list)
     cwd
     sessionId
     deadline

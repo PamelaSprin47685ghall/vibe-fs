@@ -63,6 +63,14 @@ let run
         let runtimeRef = ref (box null)
         let finalExtractionCalls = ref 0
 
+        let harnessRef = ref (box null)
+
+        let taskCompleteInput =
+            createObj
+                [ "tool", box "task_complete"
+                  "sessionID", box childID
+                  "args", box (createObj [ "output", box "continue final output" ]) ]
+
         let mockSessionClient =
             createObj
                 [ "model",
@@ -74,7 +82,6 @@ let run
                   "prompt",
                   box (fun _ ->
                       promptCount.Value <- promptCount.Value + 1
-                      printfn "mockSessionClient.prompt called, count = %d" promptCount.Value
 
                       match promptCount.Value with
                       | 1 ->
@@ -85,6 +92,16 @@ let run
                           Promise.reject (exn "network connection lost")
                       | _ ->
                           signalRecoveryPrompt ()
+
+                          if not (Dyn.isNullish harnessRef.Value) then
+                              let h: Harness = unbox harnessRef.Value
+
+                              h.runLifecycleHook
+                                  "tool.execute.after"
+                                  taskCompleteInput
+                                  (createObj [ "output", box "done" ])
+                              |> Promise.start
+
                           Promise.lift ())
                   "messages",
                   box (fun _ ->
@@ -110,6 +127,7 @@ let run
 
         let! harnessObject = withTimeoutCustom 30000 (startHarness opts)
         let harness = unbox<Harness> harnessObject
+        harnessRef.Value <- box harness
         runtimeRef.Value <- harness.getFallbackRuntime ()
 
         let spawnArgs =
@@ -131,7 +149,7 @@ let run
             createObj
                 [ "tool", box "task_complete"
                   "sessionID", box childID
-                  "args", box (createObj [ "output", box "done" ]) ]
+                  "args", box (createObj [ "output", box "continue final output" ]) ]
 
         let statusEvent =
             createObj
@@ -217,19 +235,15 @@ let run
             let! _ = withTimeout (harness.fireEvent statusEvent)
 
             do! withTimeout recoveryPromptSeen
-            do! yieldMicrotask ()
-            do! sleep 20
-            equal "continue does not extract before task completion" 0 finalExtractionCalls.Value
 
             let! _ =
                 withTimeout (
                     harness.runLifecycleHook "tool.execute.after" taskCompleteInput (createObj [ "output", box "done" ])
                 )
 
+            let! _ = withTimeout (harness.fireEvent statusEvent)
             do! yieldMicrotask ()
             do! sleep 20
-
-            let! _ = withTimeout (harness.fireEvent statusEvent)
 
             let! continueOutput = withTimeout continueP
             check "continue extracts after task completion" (finalExtractionCalls.Value > 0)

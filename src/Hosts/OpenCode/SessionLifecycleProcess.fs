@@ -54,8 +54,8 @@ let private runHostFanOut
 
         try
             let envOpt = Some envelope
-            do! processEventEnvelope ctx fallbackRuntime sid envOpt
             settleChildDispatch ctx envOpt
+            do! processEventEnvelope ctx fallbackRuntime sid envOpt
             fallback.UpdateBusyCount envOpt
             do! nudge.TrackLifetimeEvents envOpt
             let! fbConsumed = fallback.TryConsumeEvent rawInput

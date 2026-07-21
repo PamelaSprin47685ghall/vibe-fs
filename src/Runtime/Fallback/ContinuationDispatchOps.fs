@@ -18,7 +18,7 @@ open Wanxiangshu.Runtime.Clock
 open Wanxiangshu.Runtime.Fallback.ContinuationDispatchRegistry
 
 /// Shared per-process retry dispatch governor.
-let private retryGovernor = RetryDispatchGovernor()
+let retryGovernor = RetryDispatchGovernor()
 
 /// Clear rate-limit / queue memory between isolated tests.
 let resetRetryGovernorForTests () : unit = retryGovernor.Reset()
@@ -29,7 +29,7 @@ let inlineReenter = ContinuationSessionReenter.inlineReenter
 let queueReenter = ContinuationSessionReenter.queueReenter
 let handleDispatchComplete = ContinuationDispatchComplete.handleDispatchComplete
 
-let private leaseStillDispatchable (runtime: FallbackRuntimeStore) (sessionID: string) (lease: PendingLease) : bool =
+let leaseStillDispatchable (runtime: FallbackRuntimeStore) (sessionID: string) (lease: PendingLease) : bool =
     let pending = (runtime.GetSession sessionID).PendingLease
 
     ensureActiveAndOwner runtime sessionID lease
@@ -45,7 +45,7 @@ let private leaseStillDispatchable (runtime: FallbackRuntimeStore) (sessionID: s
             | LeaseStatus.Settled -> false
         | _ -> false)
 
-let private claimDispatchStarted
+let claimDispatchStarted
     (runtime: FallbackRuntimeStore)
     (workspaceRoot: string)
     (sessionID: string)
@@ -146,111 +146,4 @@ let handleTransportReturned
             if canTransition then
                 runtime.Update(sessionID, setInjected model atMs)
         | _ -> ()
-
-    }
-
-/// Inner dispatch: write dispatch_started, transition lease, call action.
-let dispatchWithLeaseTransition
-    (runtime: FallbackRuntimeStore)
-    (executor: IActionExecutor)
-    (workspaceRoot: string)
-    (sessionID: string)
-    (lease: PendingLease)
-    (model: FallbackModel)
-    (agent: string)
-    (dispatchAction: unit -> JS.Promise<unit>)
-    (reenter: SessionReenter)
-    : JS.Promise<unit> =
-    promise {
-        let! claimed = claimDispatchStarted runtime workspaceRoot sessionID lease reenter
-
-        if not claimed then
-            do!
-                reenter (fun () ->
-                    cancelAfterDispatch runtime executor workspaceRoot sessionID lease "Lease invalid at dispatch")
-        // Sync ownership gate after claim reenter yields: human cancel may have
-        // cleared the lease on the actor queue between claim and this line.
-        // No await between the check and starting dispatchAction, so JS cannot
-        // interleave another actor turn before physical transport begins.
-        elif not (leaseStillDispatchable runtime sessionID lease) then
-            ()
-        else
-            do! dispatchAction ()
-            do! handleTransportReturned runtime executor workspaceRoot sessionID lease model agent
-    }
-
-let private handleDispatchException
-    (runtime: FallbackRuntimeStore)
-    (workspaceRoot: string)
-    (sessionID: string)
-    (lease: PendingLease)
-    (ex: exn)
-    : JS.Promise<unit> =
-    promise {
-        if isAcceptanceUnknownMessage ex.Message then
-            do!
-                finishContinuation
-                    runtime
-                    workspaceRoot
-                    sessionID
-                    lease
-                    ContinuationOutcome.AcceptanceUnknown
-                    ex.Message
-        elif isAbortUnavailableMessage ex.Message then
-            runtime.Update(sessionID, setAbortUnavailable true)
-            do! finishContinuation runtime workspaceRoot sessionID lease ContinuationOutcome.AbortUnknown ex.Message
-        else
-            do! finishContinuation runtime workspaceRoot sessionID lease ContinuationOutcome.Failed ex.Message
-    }
-
-/// Run a dispatch action under rate-limit governor for the given model key.
-let runWithRetryGovernor
-    (runtime: FallbackRuntimeStore)
-    (executor: IActionExecutor)
-    (workspaceRoot: string)
-    (sessionID: string)
-    (lease: PendingLease)
-    (model: FallbackModel)
-    (agent: string)
-    (dispatchAction: unit -> JS.Promise<unit>)
-    (reenter: SessionReenter)
-    : JS.Promise<unit> =
-    promise {
-        // Transport scheduler key = workspace × provider credential × model × variant.
-        // Session single in-flight is the session actor's job, not the transport governor.
-        let transportKey =
-            ProviderModelTransportKey.Create(workspaceRoot, model.ProviderID, model.ModelID, ?variant = model.Variant)
-
-        let stillValid () =
-            leaseStillDispatchable runtime sessionID lease
-
-        let dispatchWithLease () =
-            dispatchWithLeaseTransition
-                runtime
-                executor
-                workspaceRoot
-                sessionID
-                lease
-                model
-                agent
-                dispatchAction
-                reenter
-
-        try
-            let! dispatchResult = retryGovernor.RunWhenAllowed(transportKey, stillValid, dispatchWithLease)
-
-            match dispatchResult with
-            | Dispatched -> ()
-            | CancelledBeforeDispatch ->
-                do!
-                    reenter (fun () ->
-                        finishContinuation
-                            runtime
-                            workspaceRoot
-                            sessionID
-                            lease
-                            ContinuationOutcome.Cancelled
-                            "Cancelled before dispatch (rate-limited)")
-        with ex ->
-            do! handleDispatchException runtime workspaceRoot sessionID lease ex
     }

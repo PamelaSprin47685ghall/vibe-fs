@@ -6,6 +6,7 @@ open Wanxiangshu.Kernel.FallbackKernel.Types
 open Wanxiangshu.Kernel.Subsession.Types
 open Wanxiangshu.Runtime
 open Wanxiangshu.Runtime.Dyn
+open Wanxiangshu.Hosts.Omp.Codec
 open Wanxiangshu.Runtime.Dispatch
 
 let workspaceFor (workspaceRoot: string) : Wanxiangshu.Kernel.Primitives.Identity.WorkspaceId =
@@ -87,7 +88,10 @@ let checkMessages (msgs: obj array) (target: string) =
             if id <> "" then id else Dyn.str info "id"
 
         if found then
-            if msgId <> "" then receipt <- Some msgId else matchedWithoutId <- true
+            if msgId <> "" then
+                receipt <- Some msgId
+            else
+                matchedWithoutId <- true
         elif isUser && msgId <> "" && receipt.IsNone then
             receipt <- Some msgId
 
@@ -95,6 +99,28 @@ let checkMessages (msgs: obj array) (target: string) =
     | Some id -> DispatchStatus.Accepted(UserMessageObserved id)
     | None when matchedWithoutId -> DispatchStatus.Unknown
     | None -> DispatchStatus.Unknown
+
+type OmpSessionState =
+    { ActiveTurnId: TurnId
+      mutable AbortSent: bool }
+
+let handleSessionIdle (pi: obj) (sessionStates: ref<Map<string, OmpSessionState>>) : unit =
+    if not (Dyn.isNullish pi) then
+        try
+            pi?on (
+                "event",
+                box (fun (event: obj) (ctx: obj) ->
+                    let evtType = Dyn.str event "type"
+
+                    if evtType = "session.idle" then
+                        let sidOpt = getSessionIdFromContext ctx
+
+                        match sidOpt with
+                        | Some sid -> sessionStates.Value <- Map.remove sid sessionStates.Value
+                        | None -> ())
+            )
+        with _ ->
+            ()
 
 let handleDispatchResult ws sid tid (result: Result<HostStartReceipt, DispatchFailure>) =
     match result with

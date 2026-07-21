@@ -32,8 +32,8 @@ let injectWarnTddIntoMuxSchema (tool: ToolDefinition) : ToolDefinition =
     if WarnTdd.isModificationTool tool.name then
         let props = tool.parameters.properties
 
-        if isNullish (props?warn_tdd) then
-            props?("warn_tdd") <- box (createObj [| "description", box WarnTdd.warnTddDescription |])
+        if isNullish (Dyn.get props WarnTdd.warnTddKey) then
+            Dyn.setKey props WarnTdd.warnTddKey (createObj [| "description", box WarnTdd.warnTddDescription |])
 
     tool
 
@@ -41,8 +41,8 @@ let injectWarnIntoMuxSchema (tool: ToolDefinition) : ToolDefinition =
     if WarnTdd.isWarnRequiredTool tool.name then
         let props = tool.parameters.properties
 
-        if isNullish (props?warn) then
-            props?("warn") <- box (createObj [| "description", box WarnTdd.warnDescription |])
+        if isNullish (Dyn.get props WarnTdd.warnKey) then
+            Dyn.setKey props WarnTdd.warnKey (createObj [| "description", box WarnTdd.warnDescription |])
 
     tool
 
@@ -54,7 +54,7 @@ let injectWarnReuseIntoMuxSchema (tool: ToolDefinition) : ToolDefinition =
     if WarnTdd.isSubagentTool tool.name then
         let props = tool.parameters.properties
 
-        if isNullish (props?warn_reuse) then
-            props?("warn_reuse") <- box (createObj [| "description", box WarnTdd.warnReuseDescription |])
+        if isNullish (Dyn.get props WarnTdd.warnReuseKey) then
+            Dyn.setKey props WarnTdd.warnReuseKey (createObj [| "description", box WarnTdd.warnReuseDescription |])
 
     tool

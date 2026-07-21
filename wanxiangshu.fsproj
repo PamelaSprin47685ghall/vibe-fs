@@ -38,6 +38,7 @@
     <Compile Include="src/Kernel/Subsession/DecisionObservePredicates.fs"/>
     <Compile Include="src/Kernel/Subsession/DecisionObserve.fs"/>
     <Compile Include="src/Kernel/Subsession/Rules.fs"/>
+    <Compile Include="src/Kernel/Subsession/DispatchCancelling.fs"/>
     <Compile Include="src/Kernel/Subsession/Dispatch.fs"/>
     <Compile Include="src/Kernel/Subsession/Reconciliation.fs"/>
     <Compile Include="src/Kernel/Subsession/Running.fs"/>
@@ -195,6 +196,7 @@
     <Compile Include="src/Runtime/Fallback/FallbackChainResolution.fs"/>
     <Compile Include="src/Runtime/Fallback/FallbackConfigCodec.fs"/>
     <Compile Include="src/Runtime/Fallback/SessionRuntime.fs"/>
+    <Compile Include="src/Runtime/Fallback/SessionRuntimeCompaction.fs"/>
     <Compile Include="src/Runtime/Fallback/EpisodeIdentity.fs"/>
     <Compile Include="src/Runtime/Fallback/SessionRuntimePropertyPure.fs"/>
     <Compile Include="src/Runtime/Fallback/SessionRuntimeLeasePure.fs"/>
@@ -343,6 +345,7 @@
     <Compile Include="src/Runtime/Fallback/ContinuationDispatchComplete.fs"/>
     <Compile Include="src/Runtime/Fallback/ContinuationDispatchRegistry.fs"/>
     <Compile Include="src/Runtime/Fallback/ContinuationDispatchOps.fs"/>
+    <Compile Include="src/Runtime/Fallback/ContinuationDispatchGovernor.fs"/>
     <Compile Include="src/Runtime/Fallback/ContinuationExecution.fs"/>
     <Compile Include="src/Runtime/Fallback/ContinuationExecutionCore.fs"/>
     <Compile Include="src/Runtime/Fallback/ContinuationIntentExecution.fs"/>
@@ -498,6 +501,7 @@
     <Compile Include="src/Hosts/OpenCode/ModelResolutionCatalog.fs"/>
     <Compile Include="src/Hosts/OpenCode/OpenCodeModelResolutionProviders.fs"/>
     <Compile Include="src/Hosts/OpenCode/OpenCodeModelResolution.fs"/>
+    <Compile Include="src/Hosts/OpenCode/CapsEpochResolver.fs"/>
     <Compile Include="src/Hosts/OpenCode/MessageTransformPipelineHelper.fs"/>
     <Compile Include="src/Hosts/OpenCode/MessageTransformPipeline.fs"/>
     <Compile Include="src/Hosts/OpenCode/MessageTransformHook.fs"/>

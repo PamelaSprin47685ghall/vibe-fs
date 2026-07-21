@@ -43,20 +43,13 @@ let integrationToolSpecs () : (string * (unit -> JS.Promise<unit>)) list =
       ("toolDefinition", toolDefinitionSpec)
       "toolExecuteBefore", toolExecuteBeforeSpec
       "mimoApplyPatchExecuteBefore", mimoApplyPatchExecuteBeforeSpec
-      "mimoTaskExecuteRoundTrip", mimoTaskExecuteRoundTripSpec
-      "mimoTaskExecuteNestedReport", mimoTaskExecuteNestedReportSpec
-      "mimoTaskExecuteInPlaceStrip", mimoTaskExecuteInPlaceStripSpec
-      "mimoTaskExecuteStripsTaskId", mimoTaskExecuteStripsTaskIdSpec
-      "mimoTaskDefinitionHandlesZodLikeParameters", mimoTaskDefinitionHandlesZodLikeParametersSpec
-      "mimoTaskDefinitionRoutesEffectSchemaShapedParametersToJsonSchema",
-      mimoTaskDefinitionRoutesEffectSchemaShapedParametersToJsonSchemaSpec
       "coderTool", coderToolSpec
       "inspectorTool", inspectorToolSpec
       "muxCoderInvalidIntents", muxCoderInvalidIntentsSpec
       "inspectorToolLateClientInjection", inspectorToolLateClientInjectionSpec
       "inspectorToolWithHostConfiguredModel", inspectorToolWithHostConfiguredModelSpec
       "writeTool", (fun () -> writeToolSpec reg)
-      "loopCommand", (fun () -> loopCommandSpec reg)
+      "loopCommand", loopCommandSpec
       "agentConfig", agentConfigSpec
       "disableMimoMemoryAndCheckpoint", disableMimoMemoryAndCheckpointSpec
       "disableMimoMemoryAndCheckpointPreservesUserAgent", disableMimoMemoryAndCheckpointPreservesUserAgentSpec
@@ -83,7 +76,6 @@ let integrationToolSpecs () : (string * (unit -> JS.Promise<unit>)) list =
       "muxSubmitReviewTerminatedCleansReviewState", muxSubmitReviewTerminatedCleansReviewStateSpec
       "muxSubmitReviewWipSkipsReviewer", muxSubmitReviewWipSkipsReviewerSpec
       "muxSubmitReviewOmittedWipSkipsReviewer", muxSubmitReviewOmittedWipSkipsReviewerSpec
-      "muxTodoWriteMethodologySchema", muxTodoWriteMethodologySchemaSpec
       "muxEventHookAbortDeactivatesReview", muxEventHookAbortDeactivatesReviewSpec
       "muxToolExecuteBeforeSetsUiLabel", muxToolExecuteBeforeSetsUiLabelSpec
       ("muxSystemTransformClearsOutputLength", muxSystemTransformClearsOutputLengthSpec)

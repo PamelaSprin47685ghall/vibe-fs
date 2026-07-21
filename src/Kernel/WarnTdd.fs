@@ -1,5 +1,9 @@
 module Wanxiangshu.Kernel.WarnTdd
 
+let warnTddKey = "follow-tdd-and-kolmogorov-principles"
+let warnKey = "impossible-via-other-tools"
+let warnReuseKey = "not-suitable-via-continue-tool"
+
 let canonicalValue =
     "i-am-sure-i-have-followed-tdd-and-kolmogorov-principles-and-kept-todo-updated"
 

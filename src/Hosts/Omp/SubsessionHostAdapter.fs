@@ -18,28 +18,6 @@ open Wanxiangshu.Runtime.Dispatch
 open Wanxiangshu.Runtime.OmpHostBindings
 open Wanxiangshu.Hosts.Omp.OmpSubsessionHostHelper
 
-type private OmpSessionState =
-    { ActiveTurnId: TurnId
-      mutable AbortSent: bool }
-
-let private handleSessionIdle (pi: obj) (sessionStates: ref<Map<string, OmpSessionState>>) : unit =
-    if not (Dyn.isNullish pi) then
-        try
-            pi?on (
-                "event",
-                box (fun (event: obj) (ctx: obj) ->
-                    let evtType = Dyn.str event "type"
-
-                    if evtType = "session.idle" then
-                        let sidOpt = getSessionIdFromContext ctx
-
-                        match sidOpt with
-                        | Some sid -> sessionStates.Value <- Map.remove sid sessionStates.Value
-                        | None -> ())
-            )
-        with _ ->
-            ()
-
 let private dispatchHelper
     (session: obj)
     (agent: string)

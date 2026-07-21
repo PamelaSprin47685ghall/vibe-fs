@@ -17,7 +17,8 @@ open Wanxiangshu.Runtime.Dyn
 let muxSubmitReviewNoActiveReviewSpec () =
     promise {
         let! workspaceDir = mkdtempAsync "mux-submit-review-no-active-"
-        let reg = sharedMuxRegistration ()
+        let deps = createObj [ "directory", box workspaceDir ]
+        let reg = Wanxiangshu.Hosts.Mux.Plugin.createRegistration deps
         let submitTool = muxToolByName reg "submit_review"
 
         if isNullish submitTool then

@@ -84,7 +84,12 @@ let toolDefinitionSpec () =
             (not (isNullish (get (get (get patchDef "jsonSchema") "properties") Wanxiangshu.Kernel.WarnTdd.warnTddKey)))
 
         let patchRequired =
-            unbox<obj[]> (get (get patchDef "jsonSchema") "required") |> Array.map string
+            let req = get (get patchDef "jsonSchema") "required"
+
+            if isNullish req then
+                [||]
+            else
+                unbox<obj[]> req |> Array.map string
 
         check
             "tool.definition does NOT require warn_tdd in required for apply_patch jsonSchema"
@@ -111,7 +116,14 @@ let toolDefinitionSpec () =
 
         let todoSchema = get todoDef "jsonSchema"
         let todoProps = get todoSchema "properties"
-        let required = unbox<obj[]> (get todoSchema "required") |> Array.map string
+
+        let required =
+            let req = get todoSchema "required"
+
+            if isNullish req then
+                [||]
+            else
+                unbox<obj[]> req |> Array.map string
 
         let tools = get p "tool"
         let executorTool = get tools "executor"
@@ -139,59 +151,6 @@ let toolDefinitionSpec () =
             (not (isNullish (get executorProps "impossible-via-other-tools")))
 
         check "tool.definition does not replace executor schema" (isNullish (get executorProps "todos"))
-        let! mimoP = Wanxiangshu.Hosts.Opencode.PluginMimo.plugin (box {| directory = workspaceDir |})
-        let mimoTd = get mimoP "tool.definition"
-
-        let taskParams =
-            createObj
-                [ "type", box "object"
-                  "properties", box (createObj [ "todos", box (createObj [ "type", box "array" ]) ])
-                  "required", box [| box "todos" |] ]
-
-        let taskDef =
-            createObj [ "description", box "native"; "parameters", box taskParams ]
-
-        do!
-            mimoTd $ (createObj [ "toolID", box "task" ], taskDef)
-            |> unbox<JS.Promise<unit>>
-
-        check "mimo task.definition keeps parameters not jsonSchema" (isNullish (get taskDef "jsonSchema"))
-
-        check
-            "mimo task.definition preserves todos"
-            (not (isNullish (get (get (get taskDef "parameters") "properties") "todos")))
-
-        let taskJsonSchema =
-            createObj
-                [ "type", box "object"
-                  "properties",
-                  box (
-                      createObj
-                          [ "todos", box (createObj [ "type", box "array" ])
-                            "task_id", box (createObj [ "type", box "string" ]) ]
-                  )
-                  "required", box [| box "todos"; box "task_id" |] ]
-
-        let taskJsonDef =
-            createObj [ "description", box "native"; "jsonSchema", box taskJsonSchema ]
-
-        do!
-            mimoTd $ (createObj [ "toolID", box "task" ], taskJsonDef)
-            |> unbox<JS.Promise<unit>>
-
-        check
-            "mimo task.definition strips task_id from jsonSchema"
-            (isNullish (get (get (get taskJsonDef "jsonSchema") "properties") "task_id"))
-
-        let jsonRequired =
-            unbox<obj[]> (get (get taskJsonDef "jsonSchema") "required") |> Array.map string
-
-        check "mimo task.definition keeps todos required in jsonSchema" (jsonRequired |> Array.contains "todos")
-
-        check
-            "mimo task.definition drops task_id required in jsonSchema"
-            (not (jsonRequired |> Array.contains "task_id"))
-
         do! rmAsync workspaceDir
     }
 

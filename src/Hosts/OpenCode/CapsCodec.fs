@@ -156,6 +156,13 @@ let private buildAckMessage (ackId: string) (parentID: string) (sessionID: strin
         [| box (createObj [ "type", box "text"; "text", box wrappedAck ]) |]
 
 /// Build the synthetic caps prefix: a single user message whose text wraps
+let private resolveRealSessionID (sessionID: string) (firstMsg: obj) : string =
+    if sessionID <> "" then
+        sessionID
+    else
+        let msgSid = messageSessionID firstMsg
+        if msgSid <> "" then msgSid else messageId firstMsg
+
 /// thinkText + llmText in <think></think>, then an assistant reasoning ack
 /// ("好的，我将遵守规则。"), followed by optional caps-file tool reads. The
 /// caller decides suppression by passing an empty `capsFiles` (no file reads)
@@ -178,17 +185,7 @@ let buildCapsMessages
         if existingStripped.Length = 0 then
             messages
         else
-            let realSessionID =
-                if sessionID <> "" then
-                    sessionID
-                else
-                    let msgSid = messageSessionID existingStripped.[0]
-
-                    if msgSid <> "" then
-                        msgSid
-                    else
-                        messageId existingStripped.[0]
-
+            let realSessionID = resolveRealSessionID sessionID existingStripped.[0]
             let sessionOpt = if realSessionID = "" then None else Some realSessionID
             let sortedCaps = capsFiles |> List.sortBy (fun cf -> cf.label, cf.filePath)
             let fp = stableFingerprint hashFn sortedCaps

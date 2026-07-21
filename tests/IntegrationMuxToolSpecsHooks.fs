@@ -17,7 +17,9 @@ module Dyn = Wanxiangshu.Runtime.Dyn
 
 let muxEventHookAbortDeactivatesReviewSpec () =
     promise {
-        let seams = sharedMuxRegistrationWithSeams ()
+        let! workspaceDir = mkdtempAsync "mux-abort-session-"
+        let deps = createObj [ "directory", box workspaceDir ]
+        let seams = Wanxiangshu.Hosts.Mux.Plugin.createRegistrationWithSeams deps
         let reg = seams.Registration
         let sessionID = "mux-abort-session"
         muxActivateReviewForTest seams.ReviewStore sessionID "review-task"
@@ -30,6 +32,8 @@ let muxEventHookAbortDeactivatesReviewSpec () =
             let event = createObj [ "type", box "stream-abort"; "workspaceId", box sessionID ]
             do! (eventHook $ (event, createObj [])) |> unbox<JS.Promise<unit>>
             check "mux event hook abort deactivates review" (not (muxIsReviewActiveForTest seams.ReviewStore sessionID))
+
+        do! rmAsync workspaceDir
     }
 
 let muxToolExecuteBeforeSetsUiLabelSpec () =

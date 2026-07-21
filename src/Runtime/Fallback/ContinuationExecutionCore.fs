@@ -10,6 +10,7 @@ open Wanxiangshu.Runtime.Fallback.LeaseValidation
 open Wanxiangshu.Runtime.ContinuationEventWriter
 open Wanxiangshu.Runtime.Clock
 open Wanxiangshu.Runtime.Fallback.ContinuationDispatchOps
+open Wanxiangshu.Runtime.Fallback.ContinuationDispatchGovernor
 open Wanxiangshu.Runtime.Fallback.ContinuationExecution
 
 let executeContinuation
@@ -40,17 +41,7 @@ let executeContinuation
             }
 
         if shouldRun then
-            do!
-                runWithRetryGovernor
-                    runtime
-                    executor
-                    workspaceRoot
-                    sessionID
-                    lease
-                    model
-                    agent
-                    dispatchAction
-                    reenter
+            do! runWithRetryGovernor runtime executor workspaceRoot sessionID lease model agent dispatchAction reenter
         else
             do!
                 reenter (fun () ->
@@ -73,8 +64,16 @@ let executeSendContinue
     (agent: string)
     (reenter: SessionReenter)
     : JS.Promise<unit> =
-    executeContinuation runtime executor workspaceRoot sessionID lease model agent (fun () ->
-        executor.SendContinue(sessionID, model, lease.ContinuationID)) reenter
+    executeContinuation
+        runtime
+        executor
+        workspaceRoot
+        sessionID
+        lease
+        model
+        agent
+        (fun () -> executor.SendContinue(sessionID, model, lease.ContinuationID))
+        reenter
 
 let executeRecoverWithPrompt
     (runtime: FallbackRuntimeStore)
@@ -87,8 +86,16 @@ let executeRecoverWithPrompt
     (agent: string)
     (reenter: SessionReenter)
     : JS.Promise<unit> =
-    executeContinuation runtime executor workspaceRoot sessionID lease model agent (fun () ->
-        executor.RecoverWithPrompt(sessionID, model, promptText, lease.ContinuationID)) reenter
+    executeContinuation
+        runtime
+        executor
+        workspaceRoot
+        sessionID
+        lease
+        model
+        agent
+        (fun () -> executor.RecoverWithPrompt(sessionID, model, promptText, lease.ContinuationID))
+        reenter
 
 let executeContinuationIntent
     (runtime: FallbackRuntimeStore)
@@ -130,22 +137,7 @@ let executeContinuationIntent
                   PromptText = Some promptText
                   Status = LeaseStatus.Requested }
 
-            do!
-                executeRecoverWithPrompt
-                    runtime
-                    executor
-                    workspaceRoot
-                    sessionID
-                    lease
-                    model
-                    promptText
-                    agent
-                    reenter
+            do! executeRecoverWithPrompt runtime executor workspaceRoot sessionID lease model promptText agent reenter
 
-        | PropagateFailureIntent ->
-            do!
-                reenter (fun () ->
-                    promise {
-                        do! executor.PropagateFailure sessionID
-                    })
+        | PropagateFailureIntent -> do! reenter (fun () -> promise { do! executor.PropagateFailure sessionID })
     }

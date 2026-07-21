@@ -3,6 +3,7 @@ module Wanxiangshu.Tests.IntegrationMuxTransformSpecs
 open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Tests.Assert
+open Wanxiangshu.Tests.TestWorkspace
 open Wanxiangshu.Tests.IntegrationMuxSetup
 open Wanxiangshu.Runtime.Dyn
 open Wanxiangshu.Hosts.Mux.Plugin
@@ -85,7 +86,9 @@ let muxSummarizationToolPolicySpec () =
 
 let muxMessagesTransformAcceptedSubmitReviewEndsLoopSpec () =
     promise {
-        let seams = sharedMuxRegistrationWithSeams ()
+        let! workspaceDir = mkdtempAsync "mux-review-accepted-"
+        let deps = createObj [ "directory", box workspaceDir ]
+        let seams = Wanxiangshu.Hosts.Mux.Plugin.createRegistrationWithSeams deps
         let reg = seams.Registration
         let reviewStore = seams.ReviewStore
         let tf = muxMessageTransform reg
@@ -103,7 +106,13 @@ let muxMessagesTransformAcceptedSubmitReviewEndsLoopSpec () =
 
             muxReplayReviewTaskForTest reviewStore sessionID (Some "Ship feature")
             let out = createObj [ "messages", box messages ]
-            let input = createObj [ "agent", box "manager"; "sessionID", box sessionID ]
+
+            let input =
+                createObj
+                    [ "agent", box "manager"
+                      "sessionID", box sessionID
+                      "directory", box workspaceDir ]
+
             do! (tf $ (input, out)) |> unbox<JS.Promise<unit>>
             // With IfStoreEmpty (Defect 1 fix), transform does NOT clear an active review
             // when store is non-empty — verdict resolution is the tool path's job, not replay's.
@@ -111,4 +120,6 @@ let muxMessagesTransformAcceptedSubmitReviewEndsLoopSpec () =
             check
                 "mux transform preserves active review when store non-empty"
                 (muxIsReviewActiveForTest reviewStore sessionID)
+
+        do! rmAsync workspaceDir
     }
