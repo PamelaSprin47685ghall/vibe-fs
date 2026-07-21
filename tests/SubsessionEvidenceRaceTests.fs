@@ -71,7 +71,7 @@ let evidenceDuringDispatchingMustSurviveIntoRunning () =
     | Dispatching(_, plan, _, _) ->
         let earlyEvidence =
             { CurrentTurnEvidence.empty with
-                Assistant = AssistantSnapshot("", 0L, "inspector report: README found at docs/", Some NormalFinish) }
+                Assistant = AssistantSnapshot("", 0L, "inspector report: README found at docs/") }
 
         // The assistant's full reply lands via message.updated BEFORE the host
         // has confirmed acceptance of our own prompt call.
@@ -94,7 +94,7 @@ let evidenceDuringDispatchingMustSurviveIntoRunning () =
                 match d2.NextState with
                 | Running(_, _, evidence, _) ->
                     match evidence.Assistant with
-                    | AssistantSnapshot(_, _, text, _) ->
+                    | AssistantSnapshot(_, _, text) ->
                         equal
                             "assistant evidence collected before acceptance is preserved into Running"
                             "inspector report: README found at docs/"
@@ -168,7 +168,7 @@ let mismatchedTurnEvidenceDuringDispatchingIsRejected () =
 
         let evidence =
             { CurrentTurnEvidence.empty with
-                Assistant = AssistantSnapshot("", 0L, "stale", Some NormalFinish) }
+                Assistant = AssistantSnapshot("", 0L, "stale") }
 
         match
             decide
@@ -199,7 +199,7 @@ let unattributedEvidenceInRunningIsAccepted () =
             | Running _ ->
                 let unattributed =
                     { CurrentTurnEvidence.empty with
-                        Assistant = AssistantSnapshot("", 0L, "inspector report found", Some NormalFinish) }
+                        Assistant = AssistantSnapshot("", 0L, "inspector report found") }
 
                 match
                     decide
@@ -212,7 +212,7 @@ let unattributedEvidenceInRunningIsAccepted () =
                     match d2.NextState with
                     | Running(_, _, evidence, _) ->
                         match evidence.Assistant with
-                        | AssistantSnapshot(_, _, text, _) ->
+                        | AssistantSnapshot(_, _, text) ->
                             equal "unattributed evidence accepted in Running" "inspector report found" text
                         | NoAssistant -> fail "unattributed evidence was dropped in Running"
                         | other -> fail ("unexpected assistant evidence: " + string other)
@@ -232,7 +232,7 @@ let unattributedEvidenceInDispatchingIsBuffered () =
     | Dispatching(_, plan, _, _) ->
         let unattributed =
             { CurrentTurnEvidence.empty with
-                Assistant = AssistantSnapshot("", 0L, "early report", Some NormalFinish) }
+                Assistant = AssistantSnapshot("", 0L, "early report") }
 
         match
             decide
@@ -245,7 +245,7 @@ let unattributedEvidenceInDispatchingIsBuffered () =
             match d1.NextState with
             | Dispatching(_, _, evidence, _) ->
                 match evidence.Assistant with
-                | AssistantSnapshot(_, _, text, _) ->
+                | AssistantSnapshot(_, _, text) ->
                     equal "unattributed evidence buffered in Dispatching" "early report" text
                 | NoAssistant -> fail "unattributed evidence was dropped in Dispatching"
                 | other -> fail ("unexpected assistant evidence: " + string other)

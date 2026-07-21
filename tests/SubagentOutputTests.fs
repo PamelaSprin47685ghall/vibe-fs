@@ -15,7 +15,7 @@ let todosCompletedWithAssistantTextReturnsText () =
     let evidence =
         { CurrentTurnEvidence.empty with
             Todos = TodosCompleted
-            Assistant = AssistantSnapshot("", 0L, "Done: fixed the bug", Some NormalFinish) }
+            Assistant = AssistantSnapshot("", 0L, "Done: fixed the bug") }
 
     match classifyTurnEvidence evidence with
     | CompleteNaturally output ->
@@ -53,8 +53,8 @@ let todosCompletedWithEmptyAssistantReturnsEmpty () =
 /// into existing streaming evidence (which has real text) must NOT destroy the
 /// real text.
 let mergeAssistantSnapshotEmptyDoesNotOverwriteRealText () =
-    let streaming = AssistantSnapshot("", 0L, "real summary text", Some NormalFinish)
-    let refresh = AssistantSnapshot("", 0L, "", Some ToolFinish)
+    let streaming = AssistantSnapshot("", 0L, "real summary text")
+    let refresh = AssistantSnapshot("", 0L, "")
 
     let merged =
         CurrentTurnEvidence.merge
@@ -64,14 +64,14 @@ let mergeAssistantSnapshotEmptyDoesNotOverwriteRealText () =
                 Assistant = refresh }
 
     match merged.Assistant with
-    | AssistantSnapshot(_, _, text, _) -> equal "merge preserves non-empty streaming text" "real summary text" text
+    | AssistantSnapshot(_, _, text) -> equal "merge preserves non-empty streaming text" "real summary text" text
     | other -> fail ("expected AssistantSnapshot with text, got " + string other)
 
 /// Normal merge: refresh with non-empty text overwrites streaming (refresh is
 /// more authoritative when it has data).
 let mergeAssistantSnapshotNonEmptyOverwritesStreaming () =
-    let streaming = AssistantSnapshot("", 0L, "partial text", Some NormalFinish)
-    let refresh = AssistantSnapshot("", 0L, "full final text", Some NormalFinish)
+    let streaming = AssistantSnapshot("", 0L, "partial text")
+    let refresh = AssistantSnapshot("", 0L, "full final text")
 
     let merged =
         CurrentTurnEvidence.merge
@@ -81,7 +81,7 @@ let mergeAssistantSnapshotNonEmptyOverwritesStreaming () =
                 Assistant = refresh }
 
     match merged.Assistant with
-    | AssistantSnapshot(_, _, text, _) -> equal "refresh non-empty text wins" "full final text" text
+    | AssistantSnapshot(_, _, text) -> equal "refresh non-empty text wins" "full final text" text
     | other -> fail ("expected AssistantSnapshot with text, got " + string other)
 
 // ── classifyTurnEvidence: CompletionRequested must yield to non-empty assistant text ──
@@ -95,7 +95,7 @@ let completionRequestedWithAssistantTextReturnsAssistantText () =
     let evidence =
         { CurrentTurnEvidence.empty with
             Outcome = CompletionRequested "tool marker"
-            Assistant = AssistantSnapshot("", 0L, "final assistant output", Some NormalFinish)
+            Assistant = AssistantSnapshot("", 0L, "final assistant output")
             Todos = TodosNotCompleted }
 
     match classifyTurnEvidence evidence with
@@ -117,6 +117,21 @@ let completionRequestedWithoutAssistantTextReturnsMarker () =
     | CompleteNaturally output -> equal "fallback to tool marker" "tool marker" output
     | other -> fail ("expected CompleteNaturally fallback, got " + string other)
 
+// ── classifyTurnEvidence: non-empty assistant text completes naturally without checking tool finish ──
+
+/// Subagent (inspector etc.) producing non-empty text must complete naturally regardless
+/// of whether tools were executed during the turn.
+let subagentTextOutputCompletesNaturally () =
+    let evidence =
+        { CurrentTurnEvidence.empty with
+            Assistant = AssistantSnapshot("", 0L, "Found 3 files matching criteria")
+            Tool = NoToolResult
+            Todos = NoTodoInfo }
+
+    match classifyTurnEvidence evidence with
+    | CompleteNaturally output -> equal "text output completes naturally" "Found 3 files matching criteria" output
+    | other -> fail ("expected CompleteNaturally, got " + string other)
+
 let run () =
     todosCompletedWithAssistantTextReturnsText ()
     todosCompletedWithoutAssistantTextReturnsEmpty ()
@@ -125,3 +140,4 @@ let run () =
     completionRequestedWithoutAssistantTextReturnsMarker ()
     mergeAssistantSnapshotEmptyDoesNotOverwriteRealText ()
     mergeAssistantSnapshotNonEmptyOverwritesStreaming ()
+    subagentTextOutputCompletesNaturally ()

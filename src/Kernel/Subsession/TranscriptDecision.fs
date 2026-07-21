@@ -20,16 +20,16 @@ let classifyTurnEvidence (evidence: CurrentTurnEvidence) : TranscriptDecision =
     match evidence.Outcome with
     | CompletionRequested output ->
         match evidence.Assistant with
-        | AssistantSnapshot(_, _, text, _)
-        | AssistantDelta(_, _, text, _) when not (System.String.IsNullOrWhiteSpace text) -> CompleteNaturally text
+        | AssistantSnapshot(_, _, text)
+        | AssistantDelta(_, _, text) when not (System.String.IsNullOrWhiteSpace text) -> CompleteNaturally text
         | _ -> CompleteNaturally output
     | FailureObserved err -> IncompleteWithoutRecovery err.Message
     | NoOutcome ->
         match evidence.Todos with
         | TodosCompleted ->
             match evidence.Assistant with
-            | AssistantSnapshot(_, _, text, _)
-            | AssistantDelta(_, _, text, _) when not (System.String.IsNullOrWhiteSpace text) -> CompleteNaturally text
+            | AssistantSnapshot(_, _, text)
+            | AssistantDelta(_, _, text) when not (System.String.IsNullOrWhiteSpace text) -> CompleteNaturally text
             | _ -> CompleteNaturally ""
         | TodosNotCompleted
         | NoTodoInfo ->
@@ -40,24 +40,9 @@ let classifyTurnEvidence (evidence: CurrentTurnEvidence) : TranscriptDecision =
                 match evidence.Assistant with
                 | NoAssistant -> ContinueNormally emptyTurnPrompt
                 | EmptyAssistant -> ContinueNormally emptyTurnPrompt
-                | AssistantSnapshot(_, _, text, finish)
-                | AssistantDelta(_, _, text, finish) ->
+                | AssistantSnapshot(_, _, text)
+                | AssistantDelta(_, _, text) ->
                     if System.String.IsNullOrWhiteSpace text then
                         ContinueNormally emptyTurnPrompt
                     else
-                        let toolFinish =
-                            match finish with
-                            | Some ToolFinish -> true
-                            | _ -> false
-
-                        let hasToolResult =
-                            match evidence.Tool with
-                            | HasToolResult -> true
-                            | NoToolResult -> false
-
-                        let taskComplete = (not toolFinish) || hasToolResult
-
-                        if taskComplete then
-                            CompleteNaturally text
-                        else
-                            ContinueNormally emptyTurnPrompt
+                        CompleteNaturally text

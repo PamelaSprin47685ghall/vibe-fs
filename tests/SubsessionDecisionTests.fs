@@ -172,7 +172,7 @@ let idleDuringDispatchingThenRealIdleConverges () =
     // Add some evidence to simulate assistant output during dispatching
     let evidence =
         { CurrentTurnEvidence.empty with
-            Assistant = AssistantSnapshot("", 0L, "done", Some NormalFinish)
+            Assistant = AssistantSnapshot("", 0L, "done")
             IdleObserved = true }
 
     let dispatchingState2 = Dispatching(ctx, plan, evidence, 1000000L)

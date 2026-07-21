@@ -120,15 +120,6 @@ let private extractTurnObservation (rawEvent: obj) : TurnObservation option =
                 |> Array.map (fun p -> Dyn.str p "text")
                 |> String.concat "\n"
 
-        let hasToolCall =
-            if Dyn.isNullish parts || not (Dyn.isArray parts) then
-                false
-            else
-                (parts :?> obj array)
-                |> Array.exists (fun p -> isToolCallPartType (Dyn.str p "type"))
-
-        let finish = if hasToolCall then ToolFinish else NormalFinish
-
         let recovery =
             match scanToolCallAsText [| rawEvent |] with
             | Some prompt -> RawToolCallDetected prompt
@@ -138,7 +129,7 @@ let private extractTurnObservation (rawEvent: obj) : TurnObservation option =
             { TurnId = tryExtractTurnIdFromEvent rawEvent
               Evidence =
                 { CurrentTurnEvidence.empty with
-                    Assistant = AssistantSnapshot("", 0L, text, Some finish)
+                    Assistant = AssistantSnapshot("", 0L, text)
                     Recovery = recovery } }
     else
         None

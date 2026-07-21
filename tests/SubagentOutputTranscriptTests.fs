@@ -50,7 +50,7 @@ let newAssistantAfterUserReturnsNewText () =
     | None -> fail "expected Some evidence after user+assistant"
     | Some ev ->
         match ev.Assistant with
-        | AssistantSnapshot(_, _, text, _) -> equal "only post-user assistant text returned" "fresh answer" text
+        | AssistantSnapshot(_, _, text) -> equal "only post-user assistant text returned" "fresh answer" text
         | other -> fail ("expected AssistantSnapshot, got " + string other)
 
 /// (c) No user message → latest assistant text returned (full-history fallback path).
@@ -64,7 +64,7 @@ let noUserReturnsLatestAssistant () =
     | None -> fail "expected Some evidence from assistant-only transcript"
     | Some ev ->
         match ev.Assistant with
-        | AssistantSnapshot(_, _, text, _) -> equal "latest assistant when no user boundary" "second reply" text
+        | AssistantSnapshot(_, _, text) -> equal "latest assistant when no user boundary" "second reply" text
         | other -> fail ("expected AssistantSnapshot, got " + string other)
 
 let anchorUsesAbsoluteIndex () =
@@ -92,7 +92,7 @@ let anchorIncludesOnlyCurrentAssistant () =
     match buildTurnEvidence msgs (AnchorByUserMessageId "u2") with
     | Ok(evidence: CurrentTurnEvidence) ->
         match evidence.Assistant with
-        | AssistantSnapshot(_, _, text, _) -> equal "current user anchor includes fresh assistant" "fresh answer" text
+        | AssistantSnapshot(_, _, text) -> equal "current user anchor includes fresh assistant" "fresh answer" text
         | other -> fail ("expected AssistantSnapshot, got " + string other)
     | Error err -> fail err.Message
 

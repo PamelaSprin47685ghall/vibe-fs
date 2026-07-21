@@ -98,27 +98,15 @@ let extractTurnObsFromMessage (t: string) (info: obj) (rawEvent: obj) : TurnObse
                 else
                     ""
 
-            let finishVal = Dyn.str info "finish"
-
-            let hasToolCall =
-                FinishReason.isToolFinish (FinishReason.fromString finishVal)
-                || (if Dyn.isArray parts then
-                        (parts :?> obj array)
-                        |> Array.exists (fun p -> isToolCallPartType (Dyn.str p "type"))
-                    else
-                        false)
-
-            let f = Some(if hasToolCall then ToolFinish else NormalFinish)
-
             Some
                 { TurnId = tryExtractTurnIdFromEvent rawEvent
                   Evidence =
                     { CurrentTurnEvidence.empty with
                         Assistant =
                             (if t.StartsWith("message.part.") then
-                                 AssistantDelta("", 0L, text, f)
+                                         AssistantDelta("", 0L, text)
                              else
-                                 AssistantSnapshot("", 0L, text, f))
+                                         AssistantSnapshot("", 0L, text))
                         Recovery = NoRecoveryPrompt } }
         elif role = "toolResult" then
             Some

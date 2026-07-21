@@ -26,7 +26,7 @@ let originalTurnAnchorSurvivesSyntheticCompactionContinuation () =
     match buildTurnEvidence messages (AnchorByUserMessageId "original-user") with
     | Ok evidence ->
         match evidence.Assistant with
-        | AssistantSnapshot(_, _, text, _) ->
+        | AssistantSnapshot(_, _, text) ->
             equal "compaction keeps original turn evidence" "subagent result before compaction" text
         | other -> check ("expected assistant evidence, got " + string other) false
     | Error failure -> check failure.Message false

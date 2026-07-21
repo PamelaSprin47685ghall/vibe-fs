@@ -26,20 +26,13 @@ let private extractAssistantObservation (rawEvent: obj) (props: obj) (info: obj)
     let parts = Dyn.get props "parts"
     let text = getPartsText parts
 
-    let hasToolCall =
-        if not (Dyn.isNullish parts) && Dyn.isArray parts then
-            (parts :?> obj array)
-            |> Array.exists (fun p -> let pt = Dyn.str p "type" in isToolCallPartType pt)
-        else
-            false
-
     let assistantEvidence =
         let eventType = getEventType rawEvent
 
         if eventType.StartsWith("message.part.") then
-            AssistantDelta("", 0L, text, Some(if hasToolCall then ToolFinish else NormalFinish))
+            AssistantDelta("", 0L, text)
         else
-            AssistantSnapshot("", 0L, text, Some(if hasToolCall then ToolFinish else NormalFinish))
+            AssistantSnapshot("", 0L, text)
 
     let recovery =
         if getEventType rawEvent = "message.updated" then

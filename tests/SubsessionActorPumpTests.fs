@@ -101,7 +101,7 @@ let dispatchOkReachesRunning () =
 
         let evidence =
             { CurrentTurnEvidence.empty with
-                Assistant = AssistantSnapshot("", 0L, "out", Some NormalFinish) }
+                Assistant = AssistantSnapshot("", 0L, "out") }
 
         let turnId = TurnId.create (RunId.value request.RunId + "-t0")
 
@@ -157,7 +157,7 @@ let concurrentStartRejected () =
                     { TurnId = Some turnId
                       Evidence =
                         { CurrentTurnEvidence.empty with
-                            Assistant = AssistantSnapshot("", 0L, "x", Some NormalFinish) } }
+                            Assistant = AssistantSnapshot("", 0L, "x") } }
             )
 
         do! sleep 5

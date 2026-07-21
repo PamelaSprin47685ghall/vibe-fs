@@ -99,17 +99,9 @@ let blankTextIdleContinues () =
     assertContinues
         "blank text continues"
         { CurrentTurnEvidence.empty with
-            Assistant = AssistantSnapshot("", 0L, "   ", Some NormalFinish) }
-
-let toolFinishNoResultContinues () =
-    assertContinues
-        "tool finish without result continues"
-        { CurrentTurnEvidence.empty with
-            Assistant = AssistantSnapshot("", 0L, "I will use a tool", Some ToolFinish)
-            Tool = NoToolResult }
+            Assistant = AssistantSnapshot("", 0L, "   ") }
 
 let run () =
     emptyAssistantIdleContinues ()
     noAssistantIdleContinues ()
     blankTextIdleContinues ()
-    toolFinishNoResultContinues ()

@@ -115,7 +115,7 @@ let tryBuildLatestAssistantEvidence (msgs: obj array) : CurrentTurnEvidence opti
                 else
                     Some
                         { CurrentTurnEvidence.empty with
-                            Assistant = AssistantSnapshot("", 0L, text, Some NormalFinish) })
+                                    Assistant = AssistantSnapshot("", 0L, text) })
 
 /// Build CurrentTurnEvidence from messages sliced after the anchor.
 /// Only analyzes messages at or after the anchor index.
@@ -142,8 +142,7 @@ let private buildAssistantEvidence (slice: obj array) : AssistantEvidence =
         if text = "" then
             EmptyAssistant
         else
-            let toolFinish = isLastAssistantToolFinish slice
-            AssistantSnapshot("", 0L, text, Some(if toolFinish then ToolFinish else NormalFinish))
+            AssistantSnapshot("", 0L, text)
 
 let buildTurnEvidence (msgs: obj array) (anchor: TurnAnchor) : Result<CurrentTurnEvidence, TranscriptReadFailure> =
     if isNull msgs || msgs.Length = 0 then

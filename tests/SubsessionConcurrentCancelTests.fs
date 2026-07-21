@@ -249,7 +249,7 @@ let terminalAppendFailNotSucceeded () =
 
         let evidence =
             { CurrentTurnEvidence.empty with
-                Assistant = AssistantSnapshot("", 0L, "out", Some NormalFinish) }
+                Assistant = AssistantSnapshot("", 0L, "out") }
 
         do! actor.Post(EvidenceUpdated { TurnId = None; Evidence = evidence })
 

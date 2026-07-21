@@ -90,8 +90,8 @@ let handleDrainingIdle
     // Priority 1: non-empty assistant text wins (mirrors classifyTurnEvidence).
     let assistantText =
         match evidence.Assistant with
-        | AssistantSnapshot(_, _, text, _)
-        | AssistantDelta(_, _, text, _) when not (System.String.IsNullOrWhiteSpace text) -> Some text
+        | AssistantSnapshot(_, _, text)
+        | AssistantDelta(_, _, text) when not (System.String.IsNullOrWhiteSpace text) -> Some text
         | _ -> None
 
     match assistantText with

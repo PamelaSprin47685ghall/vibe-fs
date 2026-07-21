@@ -135,7 +135,7 @@ let testEventOrderingPermutations () =
 
     let evidence =
         { CurrentTurnEvidence.empty with
-            Assistant = AssistantSnapshot("msg-1", 0L, "output-text", Some NormalFinish)
+            Assistant = AssistantSnapshot("msg-1", 0L, "output-text")
             Outcome = CompletionRequested "output-text" }
 
     let cmdEvidence =

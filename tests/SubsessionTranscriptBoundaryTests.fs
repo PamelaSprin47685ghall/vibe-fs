@@ -347,7 +347,7 @@ let private turnEvidenceCurrentTurnHasAssistant () =
     match buildTurnEvidence msgs AnchorByTurnMarkerOnly with
     | Ok evidence ->
         match evidence.Assistant with
-        | AssistantSnapshot(_, _, text, _) -> equal "current turn text" "new output" text
+        | AssistantSnapshot(_, _, text) -> equal "current turn text" "new output" text
         | other -> fail ("expected AssistantSnapshot, got " + string other)
     | Error _ -> fail "expected Ok"
 
@@ -603,7 +603,7 @@ let private ompOrderedBarrierTimingPreserved () =
         | Running _ ->
             let evidence =
                 { CurrentTurnEvidence.empty with
-                    Assistant = AssistantSnapshot("", 0L, "success-output", Some NormalFinish) }
+                    Assistant = AssistantSnapshot("", 0L, "success-output") }
 
             match
                 decide

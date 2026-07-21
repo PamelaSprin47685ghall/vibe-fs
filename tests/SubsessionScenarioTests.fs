@@ -301,7 +301,7 @@ let propAtMostOneCompleteCaller () =
 
         let evidence =
             { CurrentTurnEvidence.empty with
-                Assistant = AssistantSnapshot("", 0L, "x", Some NormalFinish) }
+                Assistant = AssistantSnapshot("", 0L, "x") }
 
         let d2 =
             mustDecide

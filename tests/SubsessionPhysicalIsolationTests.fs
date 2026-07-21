@@ -536,13 +536,13 @@ let private ompIdleEventRoutingValidation () =
 let private evidenceMergeOutcomePriorityAndSnapshot () =
     let baseEv =
         { CurrentTurnEvidence.empty with
-            Assistant = AssistantSnapshot("", 0L, "first", Some NormalFinish)
+            Assistant = AssistantSnapshot("", 0L, "first")
             Tool = HasToolResult
             Todos = TodosCompleted }
 
     let overrideEv =
         { CurrentTurnEvidence.empty with
-            Assistant = AssistantSnapshot("", 0L, "second", Some NormalFinish)
+            Assistant = AssistantSnapshot("", 0L, "second")
             Todos = TodosNotCompleted
             Outcome = CompletionRequested "second-out" }
 
@@ -552,7 +552,7 @@ let private evidenceMergeOutcomePriorityAndSnapshot () =
         "assistant snapshot replaced"
         "second"
         (match merged.Assistant with
-         | AssistantSnapshot(_, _, text, _) -> text
+         | AssistantSnapshot(_, _, text) -> text
          | _ -> "")
 
     equal "tool result persists" HasToolResult merged.Tool
@@ -580,13 +580,13 @@ let private evidenceMergeOutcomePriorityAndSnapshot () =
     let finishChanged =
         CurrentTurnEvidence.merge
             { CurrentTurnEvidence.empty with
-                Assistant = AssistantSnapshot("message", 1L, "draft", Some NormalFinish) }
+                Assistant = AssistantSnapshot("message", 1L, "draft") }
             { CurrentTurnEvidence.empty with
-                Assistant = AssistantSnapshot("message", 2L, "tool call", Some ToolFinish) }
+                Assistant = AssistantSnapshot("message", 2L, "tool call") }
 
     equal
         "newer snapshot upgrades finish"
-        (AssistantSnapshot("message", 2L, "tool call", Some ToolFinish))
+        (AssistantSnapshot("message", 2L, "tool call"))
         finishChanged.Assistant
 
 let private runIdUsesFullGuid () =
@@ -777,7 +777,7 @@ let private routeNoneTurnIdEvidenceAttributedToCurrentTurn () =
 
         let targetEvidence =
             { CurrentTurnEvidence.empty with
-                Assistant = AssistantSnapshot("", 0L, "inspector-report", Some NormalFinish) }
+                Assistant = AssistantSnapshot("", 0L, "inspector-report") }
 
         let obs =
             { TurnId = None
@@ -790,7 +790,7 @@ let private routeNoneTurnIdEvidenceAttributedToCurrentTurn () =
         match actor.GetState() with
         | Running(_, _, currentEvidence, _) ->
             match currentEvidence.Assistant with
-            | AssistantSnapshot(_, _, text, _) ->
+            | AssistantSnapshot(_, _, text) ->
                 equal
                     "EvidenceUpdated with TurnId = None is attributed to current turn and merged"
                     "inspector-report"

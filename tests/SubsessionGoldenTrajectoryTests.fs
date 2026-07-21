@@ -149,7 +149,7 @@ let ``3 Error observed preserves evidence`` () =
     let tid = TurnId.create "t1"
 
     let evidence: CurrentTurnEvidence =
-        { Assistant = AssistantEvidence.content "work" (Some ToolFinish)
+        { Assistant = AssistantEvidence.content "work"
           Todos = TodosCompleted
           Tool = HasToolResult
           Recovery = NoRecoveryPrompt

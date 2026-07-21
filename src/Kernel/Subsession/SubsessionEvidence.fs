@@ -13,17 +13,11 @@ type RecordedOutcome =
     | FailureObserved of ErrorInput
     | CompletionRequested of output: string
 
-/// Evidence about the current turn, accumulated from transcript slice.
-/// Replaces the old boolean-based TranscriptSnapshot for turn-sliced evaluation.
-type AssistantFinish =
-    | ToolFinish
-    | NormalFinish
-
 type AssistantEvidence =
     | NoAssistant
     | EmptyAssistant
-    | AssistantSnapshot of messageId: string * revision: int64 * text: string * finish: AssistantFinish option
-    | AssistantDelta of messageId: string * revision: int64 * text: string * finish: AssistantFinish option
+    | AssistantSnapshot of messageId: string * revision: int64 * text: string
+    | AssistantDelta of messageId: string * revision: int64 * text: string
 
 type TodoEvidence =
     | NoTodoInfo
@@ -62,43 +56,43 @@ module CurrentTurnEvidence =
         | x, NoAssistant -> x
         | EmptyAssistant, x -> x
         | x, EmptyAssistant -> x
-        | AssistantSnapshot(id1, rev1, t1, f1), AssistantSnapshot(id2, rev2, t2, f2) ->
+        | AssistantSnapshot(id1, rev1, t1), AssistantSnapshot(id2, rev2, t2) ->
             if id1 <> "" && id2 <> "" && id1 = id2 then
                 if rev2 >= rev1 then
-                    AssistantSnapshot(id2, rev2, t2, f2)
+                    AssistantSnapshot(id2, rev2, t2)
                 else
-                    AssistantSnapshot(id1, rev1, t1, f1)
+                    AssistantSnapshot(id1, rev1, t1)
             elif id1 = "" && id2 = "" then
                 if t2 <> "" then
-                    AssistantSnapshot("", 0L, t2, f2)
+                    AssistantSnapshot("", 0L, t2)
                 else
-                    AssistantSnapshot("", 0L, t1, f1)
+                    AssistantSnapshot("", 0L, t1)
             elif rev2 > rev1 then
-                AssistantSnapshot(id2, rev2, t2, f2)
+                AssistantSnapshot(id2, rev2, t2)
             else
-                AssistantSnapshot(id1, rev1, t1, f1)
-        | AssistantDelta(id1, rev1, t1, f1), AssistantDelta(id2, rev2, t2, f2) ->
+                AssistantSnapshot(id1, rev1, t1)
+        | AssistantDelta(id1, rev1, t1), AssistantDelta(id2, rev2, t2) ->
             if id1 <> "" && id2 <> "" && id1 = id2 then
-                AssistantDelta(id1, max rev1 rev2, t1 + t2, (if rev2 > rev1 then f2 else f1))
+                AssistantDelta(id1, max rev1 rev2, t1 + t2)
             elif id1 = "" && id2 = "" then
-                AssistantDelta("", max rev1 rev2, t1 + t2, (if rev2 >= rev1 then f2 else f1))
+                AssistantDelta("", max rev1 rev2, t1 + t2)
             elif rev2 > rev1 then
-                AssistantDelta(id2, rev2, t2, f2)
+                AssistantDelta(id2, rev2, t2)
             else
-                AssistantDelta(id1, rev1, t1, f1)
-        | AssistantSnapshot(id1, rev1, t1, f1), AssistantDelta(id2, rev2, t2, f2)
-        | AssistantDelta(id2, rev2, t2, f2), AssistantSnapshot(id1, rev1, t1, f1) ->
+                AssistantDelta(id1, rev1, t1)
+        | AssistantSnapshot(id1, rev1, t1), AssistantDelta(id2, rev2, t2)
+        | AssistantDelta(id2, rev2, t2), AssistantSnapshot(id1, rev1, t1) ->
             if id1 <> "" && id2 <> "" && id1 = id2 then
                 if rev2 > rev1 then
-                    AssistantSnapshot(id1, rev2, t1 + t2, f2)
+                    AssistantSnapshot(id1, rev2, t1 + t2)
                 else
-                    AssistantSnapshot(id1, rev1, t1, f1)
+                    AssistantSnapshot(id1, rev1, t1)
             elif id1 = "" && id2 = "" then
-                AssistantSnapshot("", 0L, t2, f2)
+                AssistantSnapshot("", 0L, t2)
             elif rev2 > rev1 then
-                AssistantSnapshot(id2, rev2, t2, f2)
+                AssistantSnapshot(id2, rev2, t2)
             else
-                AssistantSnapshot(id1, rev1, t1, f1)
+                AssistantSnapshot(id1, rev1, t1)
 
     let private mergeTodos e1 e2 =
         match e2 with
@@ -146,13 +140,13 @@ module CurrentTurnEvidence =
           IdleObserved = e1.IdleObserved || e2.IdleObserved }
 
 module AssistantEvidence =
-    let content text finish = AssistantSnapshot("", 0L, text, finish)
+    let content text = AssistantSnapshot("", 0L, text)
 
-    let snapshot messageId revision text finish =
-        AssistantSnapshot(messageId, revision, text, finish)
+    let snapshot messageId revision text =
+        AssistantSnapshot(messageId, revision, text)
 
-    let delta messageId revision text finish =
-        AssistantDelta(messageId, revision, text, finish)
+    let delta messageId revision text =
+        AssistantDelta(messageId, revision, text)
 
     let isSnapshot =
         function

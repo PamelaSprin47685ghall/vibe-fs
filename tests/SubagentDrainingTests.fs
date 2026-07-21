@@ -116,7 +116,7 @@ let drainingIdle_completionRequestedEmptyDoesNotOverwriteAssistantText () =
                   Evidence =
                     { CurrentTurnEvidence.empty with
                         Outcome = CompletionRequested ""
-                        Assistant = AssistantSnapshot("", 0L, "drain result", Some NormalFinish) } }
+                        Assistant = AssistantSnapshot("", 0L, "drain result") } }
 
             let r2 =
                 decide (Draining(ctx, started, error, CurrentTurnEvidence.empty, 1000000L)) (EvidenceUpdated evUpdate)
@@ -132,7 +132,7 @@ let drainingIdle_completionRequestedEmptyDoesNotOverwriteAssistantText () =
 
                     let hasRealText =
                         match mergedEvidence.Assistant with
-                        | AssistantSnapshot(_, _, text, _) -> not (System.String.IsNullOrWhiteSpace text)
+                        | AssistantSnapshot(_, _, text) -> not (System.String.IsNullOrWhiteSpace text)
                         | _ -> false
 
                     check "merged evidence retains CompletionRequested" hasMarker
