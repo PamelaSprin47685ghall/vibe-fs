@@ -50,3 +50,21 @@
 | **Reviewer** | ✓ | – | ✓ | `kind = "file"` | `kind = "file"` | `contract` / `criterion` | `label = "PERFECT/REVISE"` |
 | **Search / Fetch** | ✓ | – | ✓ | `kind = "evidence"` | – | – | `label = "report"` |
 | **PTY / Executor** | – | – | ✓ | `kind = "command"` | `kind = "action"` | `constraint` | `label = "running/killed"` |
+
+---
+
+## 五、 全面清查与 Pseudo-YAML 彻底收拢计划
+
+经过对代码库的深度扫荡，共查出 9 处 Pseudo-YAML / 伪 YAML Header 围栏遗留点。必须全量改造收拢为 Universal TOML Schema：
+
+| # | 涉及模块文件 | 现存 Pseudo-YAML 模式 / 留存点 | 统一收拢与重构方案 |
+| :---: | :--- | :--- | :--- |
+| 1 | `src/Runtime/PromptHeader.fs`<br/>`src/Runtime/Workspace/Yaml.fs` | `Yaml.stringify` / `yamlField` / `yamlSeqField` / `yamlStringSeqField` / `---` 围栏 | 销毁所有 YAML 生成函数与 `---` 围栏构建器。全量替换为纯 F# AST 构建的 `PromptToml.fs` 生成器。 |
+| 2 | `src/Kernel/Wanxiangzhen/SquadPrompts.fs` | 硬编码 `"---\ntask: %s\n---\n\n"` 伪 YAML 模板 | 替换为 Universal TOML：`objective = "%s"` / `agent_role = "Wanxiangzhen Slave Agent"`。 |
+| 3 | `src/Runtime/Wanxiangzhen/SquadEventDisplayCodec.fs` | `Yaml.stringify` 构造 `"---\n" + yamlText + "---\n\n"` 及其 `IndexOf` | 彻底移除 `---` 围栏与 `Yaml.stringify`，事件展示统一收敛为 Plain Text / JSON 结构输出。 |
+| 4 | `src/Runtime/Tooling/CapsFormat.fs` | `CapsYamlItem` 类型与 `yamlSeqField "caps"` 伪 YAML 块 | 收敛为 Universal Schema `[[targets]]` (`kind = "evidence"`, `value = label`, `content = content`)，Pure TOML 输出。 |
+| 5 | `src/Runtime/Search/SearchPrompts.fs` | `yamlSeqField "results"` 与 `yamlField` 生成 `---` 伪 YAML 标头 | 收敛为 Universal Schema `[[targets]]` (`kind = "evidence"`, `value = title/url`, `content = content`)，Pure TOML 输出。 |
+| 6 | `src/Runtime/Subsession/SubagentBatchSpawnCore.fs` | `yamlStringSeqField "iterators"` 构造 `---` 伪 YAML 标头 | 收敛为 Universal Schema `[[targets]]` (`kind = "command"`, `value = iterator`)，Pure TOML 输出。 |
+| 7 | `src/Runtime/Tooling/ToolOutputInfo.fs` | `flatFields` 转伪 YAML 并用 `---` 围栏包裹渲染 | 收敛为 Pure TOML `[[outcomes]]` / `[[rules]]` 格式，彻底移除 `---` 围栏。 |
+| 8 | `src/Runtime/Fallback/FallbackConfigCodec.fs` | `extractAgentsMdHeaderConfig` / `yamlParse` 解析 `AGENTS.md` 伪 YAML | 配置解析统一收敛为标准 TOML 配置构建器或原生 Parser，消除伪 YAML。 |
+| 9 | `src/Runtime/Wanxiangzhen/ConfigReader.fs` | `extractAgentsMdHeaderConfig` / `yamlParse` 解析 `AGENTS.md` 伪 YAML | 统一为标准 TOML 配置文件读入，彻底拔除 `yaml` npm 包依赖。 |
