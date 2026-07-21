@@ -107,13 +107,14 @@ type RuntimeScope() =
     member _.Add(key: string, value: obj) : unit = extState <- Map.add key value extState
     member _.Remove(key: string) : unit = extState <- Map.remove key extState
 
-    member _.InitState
-        with get () = initState
-        and set (v) = initState <- v
+    member _.InitState = initState
 
     member _.OnInit
         with get () = onInit
-        and set (v) = onInit <- v
+        and set (v) =
+            match onInit with
+            | Some _ -> failwith "InvalidOperationException: OnInit can only be assigned once"
+            | None -> onInit <- v
 
     member _.WorkspaceRoot
         with get () = workspaceRoot
@@ -129,43 +130,44 @@ type RuntimeScope() =
             this.WorkspaceRoot <- workspaceRootStr
 
         if workspaceRootStr <> "" then
-            match this.InitState with
+            match initState with
             | Uninitialized
             | Degraded _ ->
-                match this.OnInit with
+                match onInit with
                 | Some f ->
                     let opId = System.Guid.NewGuid().ToString()
                     let deadline = now () + 10000.0
                     let initP = f workspaceRootStr
-                    this.InitState <- Initializing(opId, deadline, initP)
+                    initState <- Initializing(opId, deadline, initP)
                 | None -> ()
             | _ -> ()
 
     member this.WaitInit() : JS.Promise<unit> =
-        match this.InitState with
+        match initState with
         | Initializing(opId, dl, p) ->
-            if now () > dl then
-                this.InitState <- Degraded "InitializationTimeout"
+            let remaining = max 0 (int (dl - now ()))
+
+            if remaining = 0 then
+                initState <- Degraded "InitializationTimeout"
                 Promise.reject (exn "InitializationTimeout: watchdog triggered")
             else
                 promise {
                     try
-                        let! res = PromiseQueue.withTimeout 10000 p
+                        let! res = PromiseQueue.withTimeout remaining p
 
                         match res with
                         | None ->
-                            match this.InitState with
+                            match initState with
                             | Initializing(currentOpId, _, _) when currentOpId = opId ->
-                                this.InitState <- Degraded "InitializationTimeout"
+                                initState <- Degraded "InitializationTimeout"
                             | _ -> ()
                         | Some _ ->
-                            match this.InitState with
-                            | Initializing(currentOpId, _, _) when currentOpId = opId -> this.InitState <- Ready
+                            match initState with
+                            | Initializing(currentOpId, _, _) when currentOpId = opId -> initState <- Ready
                             | _ -> ()
                     with ex ->
-                        match this.InitState with
-                        | Initializing(currentOpId, _, _) when currentOpId = opId ->
-                            this.InitState <- Degraded ex.Message
+                        match initState with
+                        | Initializing(currentOpId, _, _) when currentOpId = opId -> initState <- Degraded ex.Message
                         | _ -> ()
                 }
         | Ready -> Promise.lift ()

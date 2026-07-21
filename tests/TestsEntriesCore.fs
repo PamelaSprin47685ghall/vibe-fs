@@ -35,6 +35,8 @@ open Wanxiangshu.Tests.WanxiangzhenSquadEventTests
 open Wanxiangshu.Tests.EventLogCodecTests
 open Wanxiangshu.Tests.EventLogRuntimeTests
 open Wanxiangshu.Tests.EventLogRuntimeRobustnessTests
+open Wanxiangshu.Tests.EventLogInvariantsAndLockTests
+open Wanxiangshu.Tests.ReaderWriterLockTests
 open Wanxiangshu.Tests.KernelAndSupportCoverageEntries
 open Wanxiangshu.Tests.TestsEntriesSessionLoop
 
@@ -80,6 +82,7 @@ let private replayBlock () : (string * TestBody) list =
       "EventLogRuntimeTests.run", TestBody.Async EventLogRuntimeTests.run
       "EventLogRuntimeRobustnessTests.run", TestBody.Async EventLogRuntimeRobustnessTests.run
       "EventLogInvariantsAndLockTests.run", TestBody.Async EventLogInvariantsAndLockTests.run
+      "ReaderWriterLockTests.run", TestBody.Async ReaderWriterLockTests.run
       "ReviewTests.inferReviewTaskFromTexts'", TestBody.Sync(sync ReviewTestsReplay.inferReviewTaskFromTexts')
       "ReviewTests.parseFrontMatterScalars'", TestBody.Sync(sync ReviewTestsReplay.parseFrontMatterScalars') ]
 
