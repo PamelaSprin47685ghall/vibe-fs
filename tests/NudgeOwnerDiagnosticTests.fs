@@ -61,8 +61,36 @@ let resolveOwner_knownOwnerSkipsDiagnostic () =
         do! rmAsync dir
     }
 
+/// N-06: runtime state with HumanTurnId recovers Human owner and skips diagnostic error.
+let resolveOwner_runtimeHumanTurnStateRecoversOwner () =
+    promise {
+        let! dir = mkdtempAsync "nudge-owner-runtime-"
+        let ctx = createObj [ "directory", box dir ]
+        let runtime = FallbackRuntimeStore()
+        let sessionID = "s-owner-runtime-turn"
+
+        runtime.Update(sessionID, Wanxiangshu.Runtime.Fallback.SessionRuntime.beginHumanTurn "msg-1")
+
+        runtime.UpdateSession(
+            sessionID,
+            Wanxiangshu.Runtime.Fallback.SessionRuntimePropertyPure.transferOwnership SessionOwner.NoOwner
+        )
+
+        let! owner = resolveOwner ctx runtime sessionID false
+        equal "owner is recovered as Human" SessionOwner.Human owner
+
+        let! contentOpt = tryReadFileAsync (dir + "/.wanxiangshu.ndjson")
+
+        match contentOpt with
+        | None -> check "no diagnostic file when runtime state recovers owner" true
+        | Some content -> check "no owner_unknown when owner recovered" (not (content.Contains("nudge_owner_unknown")))
+
+        do! rmAsync dir
+    }
+
 let run () =
     promise {
         do! resolveOwner_emitsNudgeOwnerUnknownInProduction ()
         do! resolveOwner_knownOwnerSkipsDiagnostic ()
+        do! resolveOwner_runtimeHumanTurnStateRecoversOwner ()
     }

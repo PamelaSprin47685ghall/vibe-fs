@@ -23,43 +23,65 @@ open Wanxiangshu.Hosts.Opencode.NudgeEffect
 open Wanxiangshu.Hosts.Opencode.Fallback.HostEventInspection
 open Wanxiangshu.Hosts.Opencode.NudgeTriggerCleanup
 
-let private inferOwnerFromTestRun (ctx: obj) (sessionIDStr: string) (isTest: bool) : JS.Promise<SessionOwner> =
+let private inferOwnerFromHostMessages
+    (ctx: obj)
+    (fallbackRuntime: FallbackRuntimeStore)
+    (sessionIDStr: string)
+    : JS.Promise<SessionOwner> =
     promise {
-        if isTest then
-            match getClientFromPluginCtx ctx with
-            | Error _ -> return SessionOwner.NoOwner
-            | Ok client ->
-                let arg = box {| path = box {| id = sessionIDStr |} |}
-                let! resp = invokeClient client "messages" arg
-                let data = Dyn.get resp "data"
+        match getClientFromPluginCtx ctx with
+        | Error _ ->
+            let s = fallbackRuntime.GetSession sessionIDStr
 
-                if not (Dyn.isNullish data) && Dyn.isArray data then
-                    let messagesArr = data :?> obj array
+            if s.HumanTurnOrdinal > 0 && s.HumanTurnId <> "" then
+                return SessionOwner.Human
+            else
+                return SessionOwner.NoOwner
+        | Ok client ->
+            let arg = box {| path = box {| id = sessionIDStr |} |}
+            let! resp = invokeClient client "messages" arg
+            let data = Dyn.get resp "data"
 
-                    if messagesArr.Length > 0 then
-                        let lastMsg = messagesArr.[messagesArr.Length - 1]
-                        let info = Dyn.get lastMsg "info"
-                        let role = Dyn.str info "role"
+            if not (Dyn.isNullish data) && Dyn.isArray data then
+                let messagesArr = data :?> obj array
 
-                        if role = "assistant" || role = "toolResult" then
+                if messagesArr.Length > 0 then
+                    let lastMsg = messagesArr.[messagesArr.Length - 1]
+                    let info = Dyn.get lastMsg "info"
+                    let role = Dyn.str info "role"
+
+                    if role = "assistant" || role = "toolResult" || role = "user" then
+                        return SessionOwner.Human
+                    else
+                        let s = fallbackRuntime.GetSession sessionIDStr
+
+                        if s.HumanTurnOrdinal > 0 && s.HumanTurnId <> "" then
                             return SessionOwner.Human
                         else
                             return SessionOwner.NoOwner
+                else
+                    let s = fallbackRuntime.GetSession sessionIDStr
+
+                    if s.HumanTurnOrdinal > 0 && s.HumanTurnId <> "" then
+                        return SessionOwner.Human
                     else
                         return SessionOwner.NoOwner
+            else
+                let s = fallbackRuntime.GetSession sessionIDStr
+
+                if s.HumanTurnOrdinal > 0 && s.HumanTurnId <> "" then
+                    return SessionOwner.Human
                 else
                     return SessionOwner.NoOwner
-        else
-            return SessionOwner.NoOwner
     }
 
-/// Read the current owner; in test runs, fall back to the last observed
-/// role on the host session (assistant / toolResult -> Human).
+/// Read the current owner; fall back to host session messages
+/// (assistant / toolResult / user -> Human) or runtime human turn state.
 let resolveOwner
     (ctx: obj)
     (fallbackRuntime: FallbackRuntimeStore)
     (sessionIDStr: string)
-    (isTest: bool)
+    (_isTest: bool)
     : JS.Promise<SessionOwner> =
     promise {
         let current = (fallbackRuntime.GetSession sessionIDStr).Owner
@@ -67,9 +89,10 @@ let resolveOwner
         if current <> SessionOwner.NoOwner then
             return current
         else
-            let! inferred = inferOwnerFromTestRun ctx sessionIDStr isTest
+            let! inferred = inferOwnerFromHostMessages ctx fallbackRuntime sessionIDStr
 
             if inferred <> SessionOwner.NoOwner then
+                fallbackRuntime.UpdateSession(sessionIDStr, transferOwnership inferred)
                 return inferred
             else
                 let directory = pluginDirectoryFromCtx ctx
