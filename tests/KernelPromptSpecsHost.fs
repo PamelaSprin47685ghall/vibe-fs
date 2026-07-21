@@ -74,10 +74,10 @@ let toolCatalogCentralized () =
     check "executor describes timeout budgets" (executorSpec.description.Contains "timeout")
     check "executor requiredFields no warn_tdd" (not (List.contains "warn_tdd" executorSpec.requiredFields))
     check "executor requiredFields no warn" (not (List.contains "warn" executorSpec.requiredFields))
-    check "executor requires mode" (executorSpec.requiredFields |> List.contains "mode")
+    check "executor does not require mode" (not (executorSpec.requiredFields |> List.contains "mode"))
     check "executor paramDoc no warn_tdd" (not (Map.containsKey "warn_tdd" executorSpec.paramDocs))
     check "executor paramDoc no warn" (not (Map.containsKey "warn" executorSpec.paramDocs))
-    check "executor param doc for mode" (Map.containsKey "mode" executorSpec.paramDocs)
+    check "executor param doc no mode" (not (Map.containsKey "mode" executorSpec.paramDocs))
 
     let writeSpec = specOf "write"
     check "write spec carries description" (writeSpec.description.Length > 0)

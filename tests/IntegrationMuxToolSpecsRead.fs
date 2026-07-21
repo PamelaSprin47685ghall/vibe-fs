@@ -33,7 +33,6 @@ let muxExecutorRoCatPrependsWarningSpec () =
                     [ "language", box "shell"
                       "command", box "cat /etc/passwd"
                       "timeout_type", box "short"
-                      "mode", box "ro"
                       "what_to_summarize", box "summarize exit codes"
                       "max_bytes", box 8192
                       "warn",
@@ -51,11 +50,7 @@ let muxExecutorModeSchemaSpec () =
     promise {
         let reg = sharedMuxRegistration ()
         let modeSchema = muxExecutorModeSchema reg
-        check "mux executor mode schema exists" (not (isNullish modeSchema))
-        check "mux executor mode schema enum ro/rw" (enumValues modeSchema = [| "ro"; "rw" |])
-        let executor = muxToolByName reg "executor"
-        let required = muxToolSchemaRequired executor
-        check "mux executor mode is required" (required |> Array.contains "mode")
+        check "mux executor mode schema removed" (isNullish modeSchema)
     }
 
 let muxReadToolReturnsContentSpec () =

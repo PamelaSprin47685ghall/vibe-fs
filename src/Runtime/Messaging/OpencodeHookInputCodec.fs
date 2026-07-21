@@ -23,8 +23,7 @@ let argsFromHookInput (input: obj) : obj = Dyn.get input "args"
 
 let toolIdFromDefinitionHookInput (input: obj) : string = Dyn.str input "toolID"
 
-let executorModeFromHookInput (input: obj) : string =
-    Dyn.str (argsFromHookInput input) "mode"
+let executorModeFromHookInput (_input: obj) : string = ""
 
 let selectMethodologiesFromHookArgs (args: obj) : string list =
     let raw =

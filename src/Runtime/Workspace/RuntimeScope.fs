@@ -25,7 +25,7 @@ type RuntimeScope() =
 
     let capsCache = CapsCache()
     let tempFileRegistry = TempFileRegistry()
-    let sessionLockRegistry = SessionLockRegistry()
+    let sessionExecutorRegistry = SessionExecutorRegistry()
 
     let iteratorStore = createTypedIteratorStore 200
     let subagentIteratorStore = createSubagentIteratorStore 50
@@ -84,24 +84,21 @@ type RuntimeScope() =
         clearTypedIteratorStore iteratorStore
         clearSubagentIteratorStore subagentIteratorStore
 
-    member _.ClearSessionQueues() : unit = sessionLockRegistry.Clear()
+    member _.ClearSessionExecutors() : unit = sessionExecutorRegistry.Clear()
 
-    member _.RemoveSessionQueue(sessionId: string) : unit = sessionLockRegistry.Remove(sessionId)
+    member _.CloseSessionExecutor(sessionId: string) : unit =
+        sessionExecutorRegistry.Close(sessionId)
 
     member _.RemoveTempFiles(sessionId: string) : unit =
         tempFileRegistry.RemoveSession(sessionId)
 
-    member _.EnqueuePerSession(sessionId: string, work: unit -> JS.Promise<'T>, ?timeoutMs: int) : JS.Promise<'T> =
-        let lock = sessionLockRegistry.GetOrCreate(sessionId)
-        lock.EnqueueWrite(work, ?timeoutMs = timeoutMs)
+    member _.EnqueuePerSession(sessionId: string, work: unit -> JS.Promise<'T>) : JS.Promise<'T> =
+        let executor = sessionExecutorRegistry.GetOrCreate(sessionId)
+        executor.Enqueue(work)
 
-    member _.EnqueueExecutor(sessionId: string, mode: string, work: unit -> JS.Promise<'T>, ?timeoutMs: int) : JS.Promise<'T> =
-        let lock = sessionLockRegistry.GetOrCreate(sessionId)
-
-        if mode = "ro" then
-            lock.EnqueueRead(work, ?timeoutMs = timeoutMs)
-        else
-            lock.EnqueueWrite(work, ?timeoutMs = timeoutMs)
+    member _.EnqueueExecutor(sessionId: string, work: unit -> JS.Promise<'T>) : JS.Promise<'T> =
+        let executor = sessionExecutorRegistry.GetOrCreate(sessionId)
+        executor.Enqueue(work)
 
     member _.TryFindKey(key: string) : obj option = Map.tryFind key extState
     member _.Add(key: string, value: obj) : unit = extState <- Map.add key value extState
@@ -123,7 +120,7 @@ type RuntimeScope() =
         with get () = workspaceRoot
         and set (v) = workspaceRoot <- v
 
-    member _.SessionLockCount = sessionLockRegistry.SessionLockCount
+    member _.SessionExecutorCount = sessionExecutorRegistry.SessionExecutorCount
     member _.TempFileMapCount = tempFileRegistry.TempFileMapCount
     member _.CapsFileCount = capsCache.CapsFileCount
     member _.CapsInflightCount = capsCache.CapsInflightCount
@@ -173,6 +170,7 @@ type RuntimeScope() =
                         match initState with
                         | Initializing(currentOpId, _, _) when currentOpId = opId -> initState <- Degraded ex.Message
                         | _ -> ()
+
                         return raise ex
                 }
         | Ready -> Promise.lift ()

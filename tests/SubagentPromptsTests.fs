@@ -76,18 +76,16 @@ let meditatorPromptContainsQuestion () =
     check "contains quiet room" (p.Contains "quiet room")
 
 let executorSummarizerPromptContainsFields () =
-    let p =
-        executorSummarizerPrompt "output" "stdout" "python" "print(1)" [] "short" "ro"
+    let p = executorSummarizerPrompt "output" "stdout" "python" "print(1)" [] "short"
 
     check "contains language" (p.Contains "python")
     check "contains program" (p.Contains "print(1)")
-    check "contains mode" (p.Contains "ro")
     check "contains task section" (p.Contains "# Task")
     check "contains preserve directive" (p.Contains "Preserve errors")
 
 let executorSummarizerPromptEmbedsWhatToSummarize () =
     let p =
-        executorSummarizerPrompt "summarize exit codes and stderr only" "stdout" "python" "print(1)" [] "short" "ro"
+        executorSummarizerPrompt "summarize exit codes and stderr only" "stdout" "python" "print(1)" [] "short"
 
     check "what_to_summarize embedded" (p.Contains "summarize exit codes and stderr only")
     check "contains task section" (p.Contains "# Task")

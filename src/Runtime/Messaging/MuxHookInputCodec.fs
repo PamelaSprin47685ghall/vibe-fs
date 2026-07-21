@@ -79,11 +79,7 @@ let hookOutputErrorOptMux (output: obj) : string option =
     else
         Some(unbox<string> raw)
 
-let isReadOnlyExecutorMux (tool: string) (args: obj) : bool =
-    tool = "executor"
-    && match peekExecutorMode args with
-       | Some mode -> System.String.Equals(mode, "ro", System.StringComparison.OrdinalIgnoreCase)
-       | None -> false
+let isReadOnlyExecutorMux (_tool: string) (_args: obj) : bool = false
 
 let decodeMuxToolExecuteAfterInput (input: obj) (deps: obj) : MuxToolExecuteAfterInput =
     let tool = Dyn.str input "tool"

@@ -43,7 +43,6 @@ let private buildExecutorToolDef () : obj =
            command = strReq Params.executorCommand
            dependencies = strArrayOpt Params.executorDeps
            timeout_type = enumReq [| "short"; "long" |] Params.executorTimeout
-           mode = enumReq [| "ro"; "rw" |] Params.executorMode
            what_to_summarize = strReq Params.executorWhatToSummarize
            max_bytes = numReq Params.executorMaxBytes |}
 
@@ -54,32 +53,22 @@ let private buildExecutorSummaryPrompt (host: Host) (output: string) (options: E
 
     formatPrompt
         host
-        (ExecutorSummary(
-            output,
-            langStr,
-            options.command,
-            options.dependencies,
-            timeoutStr,
-            options.mode,
-            options.whatToSummarize
-        ))
+        (ExecutorSummary(output, langStr, options.command, options.dependencies, timeoutStr, options.whatToSummarize))
     |> List.head
 
-/// Run the executor command and return the formatted response string.
-/// If the output exceeds the byte limit, summarise via a subagent first.
-let private runExecutorWork
+/// Summarise output via subagent if needed, or format output directly.
+let private summarizeOrFormat
     (host: Host)
     (registry: ChildAgentRegistry)
-    (sessionScope: RuntimeScope)
     (fallbackRuntime: FallbackRuntimeStore)
     (directory: string)
     (options: ExecuteOptions)
     (sessionID: string)
     (client: obj)
     (context: obj)
+    (result: ExecuteResult)
     : JS.Promise<string> =
     promise {
-        let! result = Wanxiangshu.Runtime.Executor.execute sessionScope options sessionID
         let output = outputFromResult result
 
         if not (shouldSummarize byteLength options.maxBytes output) then
@@ -106,8 +95,8 @@ let private runExecutorWork
             return prependSafetyWarningForExecution formatted options
     }
 
-/// Execute the executor tool body: decode args, resolve client, run command,
-/// optionally summarise via subagent, return formatted response string.
+/// Execute the executor tool body: decode args, resolve client, run command inside EnqueueExecutor,
+/// optionally summarise via subagent outside lock, return formatted response string.
 let private executeExecutorTool
     (host: Host)
     (registry: ChildAgentRegistry)
@@ -123,31 +112,33 @@ let private executeExecutorTool
         match getClientFromPluginCtx ctx with
         | Error e -> resolveStr (wireEncodeToolError "OpencodeClient" e)
         | Ok client ->
-            let runtime = fromOpencode context (pluginDirectoryFromCtx ctx)
-            let sessionID = Id.sessionIdValue runtime.Execution.SessionId
+            promise {
+                let runtime = fromOpencode context (pluginDirectoryFromCtx ctx)
+                let sessionID = Id.sessionIdValue runtime.Execution.SessionId
 
-            if sessionID = "" then
-                resolveStr executorRequiresSession
-            else
-                let options = toExecuteOptions (Some runtime.Execution.Directory) decoded
-                let timeoutMs =
-                    match options.timeoutType with
-                    | ExecutorTimeoutType.Long -> 300000
-                    | ExecutorTimeoutType.Short -> 30000
+                if sessionID = "" then
+                    return! resolveStr executorRequiresSession
+                else
+                    let options = toExecuteOptions (Some runtime.Execution.Directory) decoded
 
-                let runWork () =
-                    runExecutorWork
-                        host
-                        registry
-                        sessionScope
-                        fallbackRuntime
-                        runtime.Execution.Directory
-                        options
-                        sessionID
-                        client
-                        context
+                    let! result =
+                        sessionScope.EnqueueExecutor(
+                            sessionID,
+                            fun () -> Wanxiangshu.Runtime.Executor.execute sessionScope options sessionID
+                        )
 
-                sessionScope.EnqueueExecutor(sessionID, options.mode, runWork, timeoutMs = timeoutMs)
+                    return!
+                        summarizeOrFormat
+                            host
+                            registry
+                            fallbackRuntime
+                            runtime.Execution.Directory
+                            options
+                            sessionID
+                            client
+                            context
+                            result
+            }
 
 let executorTool
     (host: Host)

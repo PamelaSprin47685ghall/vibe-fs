@@ -9,6 +9,9 @@ open Wanxiangshu.Runtime.RunnerBackground
 open Wanxiangshu.Runtime.SembleSearch
 open Wanxiangshu.Kernel.FuzzyQuery
 
+[<Emit("new Promise(function(resolve){ setTimeout(resolve, 0); })")>]
+let private yieldMicrotask () : JS.Promise<unit> = jsNative
+
 let private populateSession (scope: RuntimeScope) (sid: string) : string =
     scope.EnqueuePerSession(sid, (fun () -> Promise.lift ())) |> Promise.start
     scope.RegisterTempFiles(sid + "\u0000prompt", [ "f" + sid ])
@@ -29,16 +32,28 @@ let private populateSession (scope: RuntimeScope) (sid: string) : string =
 
     storeFindIterator scope.IteratorStore sid fState
 
-let private testPromptScopedTempFileCleanup () : unit =
-    let scope = RuntimeScope()
-    let sid = "prompt-cleanup-test"
-    let promptKey = sid + "\u0000prompt-extra"
-    scope.EnqueuePerSession(sid, (fun () -> Promise.lift ())) |> Promise.start
-    scope.RegisterTempFiles(promptKey, [ "extra-file" ])
-    check "prompt temp registered" (scope.TempFileMapCount = 1)
-    forgetSession scope sid
-    isNone (scope.TryGetTempFiles promptKey)
-    check "prompt temp cleared by forgetSession" (scope.TempFileMapCount = 0)
+let rec private flushMicrotasks n =
+    promise {
+        if n <= 0 then
+            ()
+        else
+            do! yieldMicrotask ()
+            do! flushMicrotasks (n - 1)
+    }
+
+let private testPromptScopedTempFileCleanup () =
+    promise {
+        let scope = RuntimeScope()
+        let sid = "prompt-cleanup-test"
+        let promptKey = sid + "\u0000prompt-extra"
+        scope.EnqueuePerSession(sid, (fun () -> Promise.lift ())) |> Promise.start
+        scope.RegisterTempFiles(promptKey, [ "extra-file" ])
+        check "prompt temp registered" (scope.TempFileMapCount = 1)
+        forgetSession scope sid
+        do! flushMicrotasks 10
+        isNone (scope.TryGetTempFiles promptKey)
+        check "prompt temp cleared by forgetSession" (scope.TempFileMapCount = 0)
+    }
 
 let private testClearTempFilesForPromptDirect () : unit =
     let scope = RuntimeScope()
@@ -85,45 +100,51 @@ let private verifyAllSessionsCleared
         check "breakpoints inner map empty after forget" (Map.count inner = 0)
     | None -> ()
 
-let run () : unit =
-    runIdCounter <- runIdCounter + 1
-    let runId = runIdCounter
-    let prefix = sprintf "rts-%d" runId
-    let scope = RuntimeScope()
-    let n = 1000
-    let findIds = ResizeArray<string>()
-    let beforeEventLogCount = Wanxiangshu.Runtime.EventLogRuntimeStore.count ()
+let run () =
+    promise {
+        runIdCounter <- runIdCounter + 1
+        let runId = runIdCounter
+        let prefix = sprintf "rts-%d" runId
+        let scope = RuntimeScope()
+        let n = 1000
+        let findIds = ResizeArray<string>()
+        let beforeEventLogCount = Wanxiangshu.Runtime.EventLogRuntimeStore.count ()
 
-    for i in 0 .. n - 1 do
-        let sid = sprintf "%s-%d" prefix i
-        findIds.Add(populateSession scope sid)
-        populateEventLogStore sid
+        for i in 0 .. n - 1 do
+            let sid = sprintf "%s-%d" prefix i
+            findIds.Add(populateSession scope sid)
+            populateEventLogStore sid
 
-    testPromptScopedTempFileCleanup ()
-    testClearTempFilesForPromptDirect ()
+        do! testPromptScopedTempFileCleanup ()
+        testClearTempFilesForPromptDirect ()
 
-    check
-        "eventLogStore count before forget"
-        (Wanxiangshu.Runtime.EventLogRuntimeStore.count () = beforeEventLogCount + n)
+        check
+            "eventLogStore count before forget"
+            (Wanxiangshu.Runtime.EventLogRuntimeStore.count () = beforeEventLogCount + n)
 
-    check "locks before forget" (scope.SessionLockCount = n)
-    check "temps before forget" (scope.TempFileMapCount = n)
-    check "caps before forget" (scope.CapsFileCount = n)
+        check "locks before forget" (scope.SessionExecutorCount = n)
+        check "temps before forget" (scope.TempFileMapCount = n)
+        check "caps before forget" (scope.CapsFileCount = n)
 
-    for i in 0 .. n - 1 do
-        forgetSession scope (sprintf "%s-%d" prefix i)
+        for i in 0 .. n - 1 do
+            forgetSession scope (sprintf "%s-%d" prefix i)
 
-    check "locks after forget" (scope.SessionLockCount = 0)
-    check "temps after forget" (scope.TempFileMapCount = 0)
-    check "caps after forget" (scope.CapsFileCount = 0)
-    check "capsInflight after forget" (scope.CapsInflightCount = 0)
+        do! flushMicrotasks 10
 
-    check "eventLogStore count after forget" (Wanxiangshu.Runtime.EventLogRuntimeStore.count () = beforeEventLogCount)
+        check "locks after forget" (scope.SessionExecutorCount = 0)
+        check "temps after forget" (scope.TempFileMapCount = 0)
+        check "caps after forget" (scope.CapsFileCount = 0)
+        check "capsInflight after forget" (scope.CapsInflightCount = 0)
 
-    let hasNewId =
-        Wanxiangshu.Runtime.EventLogRuntimeStore.ids ()
-        |> List.exists (fun id -> id.StartsWith(prefix + "-"))
+        check
+            "eventLogStore count after forget"
+            (Wanxiangshu.Runtime.EventLogRuntimeStore.count () = beforeEventLogCount)
 
-    check "eventLogStore ids after forget" (not hasNewId)
+        let hasNewId =
+            Wanxiangshu.Runtime.EventLogRuntimeStore.ids ()
+            |> List.exists (fun id -> id.StartsWith(prefix + "-"))
 
-    verifyAllSessionsCleared scope prefix n findIds
+        check "eventLogStore ids after forget" (not hasNewId)
+
+        verifyAllSessionsCleared scope prefix n findIds
+    }

@@ -39,7 +39,6 @@ let private mapExecutor (e: ExecutorToolsCodec.ExecutorArgs) : Wanxiangshu.Kerne
       Command = e.Command
       Dependencies = e.Dependencies
       TimeoutType = e.TimeoutType
-      Mode = e.Mode
       WhatToSummarize = e.WhatToSummarize }
 
 type DecodedToolInvocation =

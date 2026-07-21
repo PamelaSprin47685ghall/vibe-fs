@@ -50,7 +50,6 @@ let summarizeWhenNeeded
                         options.command,
                         options.dependencies,
                         timeoutStr,
-                        options.mode,
                         options.whatToSummarize
                     ))
                 |> List.head

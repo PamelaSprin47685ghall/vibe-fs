@@ -12,7 +12,6 @@ type ExecutorArgs =
       Command: string
       Dependencies: string list
       TimeoutType: ExecutorTimeoutType
-      Mode: string
       WhatToSummarize: string
       MaxBytes: int }
 
@@ -22,15 +21,6 @@ let private parseLanguageField (value: string) : Result<ExecutorLanguage, Domain
     | "python" -> Ok Python
     | "javascript" -> Ok Javascript
     | _ -> Error(InvalidIntent("executor", "language", "expected shell, python, or javascript"))
-
-let private parseModeField (value: string) : Result<string, DomainError> =
-    match value.Trim() with
-    | "ro"
-    | "rw" as m -> Ok m
-    | _ -> Error(InvalidIntent("executor", "mode", "must be ro or rw"))
-
-let peekExecutorMode (args: obj) : string option =
-    strField args "mode" |> Option.map (fun s -> s.Trim())
 
 let decodeExecutorArgs (args: obj) : Result<ExecutorArgs, DomainError> =
     let languageResult =
@@ -43,11 +33,6 @@ let decodeExecutorArgs (args: obj) : Result<ExecutorArgs, DomainError> =
         | None -> Error(InvalidIntent("executor", "command", "required"))
         | Some p when System.String.IsNullOrWhiteSpace p -> Error(InvalidIntent("executor", "command", "required"))
         | Some p -> Ok p
-
-    let modeResult =
-        match strField args "mode" with
-        | None -> Error(InvalidIntent("executor", "mode", "required"))
-        | Some modeStr -> parseModeField modeStr
 
     let whatResult =
         match strField args "what_to_summarize" with
@@ -65,26 +50,22 @@ let decodeExecutorArgs (args: obj) : Result<ExecutorArgs, DomainError> =
     |> Result.bind (fun language ->
         commandResult
         |> Result.bind (fun command ->
-            modeResult
-            |> Result.bind (fun mode ->
-                whatResult
-                |> Result.bind (fun whatToSummarize ->
-                    maxBytesResult
-                    |> Result.map (fun maxBytes ->
-                        { Language = language
-                          Command = command
-                          Dependencies = defaultArg (strListField args "dependencies") []
-                          TimeoutType = parseTimeout (defaultArg (strField args "timeout_type") "")
-                          Mode = mode
-                          WhatToSummarize = whatToSummarize
-                          MaxBytes = maxBytes })))))
+            whatResult
+            |> Result.bind (fun whatToSummarize ->
+                maxBytesResult
+                |> Result.map (fun maxBytes ->
+                    { Language = language
+                      Command = command
+                      Dependencies = defaultArg (strListField args "dependencies") []
+                      TimeoutType = parseTimeout (defaultArg (strField args "timeout_type") "")
+                      WhatToSummarize = whatToSummarize
+                      MaxBytes = maxBytes }))))
 
 let toExecuteOptions (cwd: string option) (decoded: ExecutorArgs) : ExecuteOptions =
     { command = decoded.Command
       language = decoded.Language
       dependencies = decoded.Dependencies
       timeoutType = decoded.TimeoutType
-      mode = decoded.Mode
       cwd = cwd
       whatToSummarize = decoded.WhatToSummarize
       maxBytes = decoded.MaxBytes }

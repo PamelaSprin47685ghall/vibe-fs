@@ -15,6 +15,12 @@ type RunOutcome =
     | Signaled of signal: string * stdout: string * stderr: string
     | SpawnFailed of reason: DomainError
 
+type StopReason =
+    | Timeout
+    | Aborted
+    | OutputLimit
+    | TerminationUnconfirmed
+
 type AwaitState =
     { scope: RuntimeScope
       child: SpawnedChild
@@ -23,6 +29,8 @@ type AwaitState =
       mutable settled: bool
       mutable totalBytes: int
       mutable limitReached: bool
+      mutable stopReason: StopReason option
+      mutable unregister: unit -> unit
       stdout: ResizeArray<string>
       stderr: ResizeArray<string>
       mutable onStdoutH: obj -> unit
@@ -33,6 +41,7 @@ type AwaitState =
 let settleOutcome (state: AwaitState) (outcome: RunOutcome) =
     if not state.settled then
         state.settled <- true
+
         try
             state.child?stdout?removeListener ("data", state.onStdoutH) |> ignore
         with _ ->
@@ -53,8 +62,24 @@ let settleOutcome (state: AwaitState) (outcome: RunOutcome) =
         with _ ->
             ()
 
-        unregisterActiveRun state.scope state.sessionId (fun () -> killTree state.child)
+        state.unregister ()
         state.resolve outcome
+
+let requestStop (state: AwaitState) (reason: StopReason) =
+    if not state.settled && state.stopReason.IsNone then
+        state.stopReason <- Some reason
+        killTree state.child
+
+        promise {
+            do! Promise.sleep 5000
+
+            if not state.settled then
+                state.stopReason <- Some TerminationUnconfirmed
+                let outStr = String.concat "" state.stdout
+                let errStr = String.concat "" state.stderr
+                settleOutcome state (TimedOut(outStr, errStr))
+        }
+        |> Promise.start
 
 let makeDataHandler (state: AwaitState) (buf: ResizeArray<string>) (otherBuf: ResizeArray<string>) =
     fun (c: obj) ->
@@ -69,8 +94,7 @@ let makeDataHandler (state: AwaitState) (buf: ResizeArray<string>) (otherBuf: Re
                     buf.Add(s.Substring(0, remaining))
 
                 state.limitReached <- true
-                killTree state.child
-                settleOutcome state (Signaled("SIGKILL", String.concat "" buf, String.concat "" otherBuf))
+                requestStop state OutputLimit
             else
                 buf.Add(s)
                 state.totalBytes <- state.totalBytes + len
@@ -80,33 +104,39 @@ let makeCloseHandler (state: AwaitState) =
         let capturedOut = String.concat "" state.stdout
         let capturedErr = String.concat "" state.stderr
 
-        settleOutcome
-            state
-            (if state.limitReached then
-                 Signaled("SIGKILL", capturedOut, capturedErr)
-             elif isNull code then
-                 let sigName = if isNull signal then "unknown" else string signal
-                 Signaled(sigName, capturedOut, capturedErr)
-             else
-                 Exited(unbox<int> code, capturedOut, capturedErr)))
+        let outcome =
+            match state.stopReason with
+            | Some Timeout -> TimedOut(capturedOut, capturedErr)
+            | Some OutputLimit -> Signaled("SIGKILL", capturedOut, capturedErr)
+            | Some Aborted -> Signaled("SIGABRT", capturedOut, capturedErr)
+            | Some TerminationUnconfirmed -> TimedOut(capturedOut, capturedErr)
+            | None ->
+                if state.limitReached then
+                    Signaled("SIGKILL", capturedOut, capturedErr)
+                elif isNull code then
+                    let sigName = if isNull signal then "unknown" else string signal
+                    Signaled(sigName, capturedOut, capturedErr)
+                else
+                    Exited(unbox<int> code, capturedOut, capturedErr)
+
+        settleOutcome state outcome)
 
 let makeErrorHandler (state: AwaitState) (executable: string) =
     fun (_e: obj) -> settleOutcome state (SpawnFailed(ExecutorExecutableMissing executable))
 
 let registerSessionRun (state: AwaitState) (onKillRegistered: ((unit -> unit) -> unit) option) =
-    match state.sessionId with
-    | sid when sid <> "" ->
-        registerActiveRun state.scope sid (fun () -> killTree state.child)
+    if state.sessionId <> "" then
+        let killFn () = requestStop state Aborted
+        let unreg = registerActiveRun state.scope state.sessionId killFn
+        state.unregister <- unreg
 
-        onKillRegistered
-        |> Option.iter (fun register -> register (fun () -> killTree state.child))
-    | _ -> ()
+        onKillRegistered |> Option.iter (fun register -> register killFn)
 
 let awaitChild
     (scope: RuntimeScope)
     (child: SpawnedChild)
     (executable: string)
-    (kill: SpawnedChild -> unit)
+    (_kill: SpawnedChild -> unit)
     (timeoutMs: int option)
     (sessionId: string option)
     (onKillRegistered: ((unit -> unit) -> unit) option)
@@ -120,6 +150,8 @@ let awaitChild
               settled = false
               totalBytes = 0
               limitReached = false
+              stopReason = None
+              unregister = fun () -> ()
               stdout = ResizeArray<string>()
               stderr = ResizeArray<string>()
               onStdoutH = fun _ -> ()
@@ -146,7 +178,6 @@ let awaitChild
                 do! Promise.sleep ms
 
                 if not state.settled then
-                    kill child
-                    settleOutcome state (TimedOut(String.concat "" state.stdout, String.concat "" state.stderr))
+                    requestStop state Timeout
             }
             |> Promise.start)

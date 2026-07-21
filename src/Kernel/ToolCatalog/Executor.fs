@@ -13,12 +13,11 @@ let internal executorSpec: ToolSpec =
               "command", "The program to execute."
               "dependencies", "Dependencies to install (for python or javascript)."
               "timeout_type", "Execution timeout budget: 'short' (10s) or 'long' (100s)."
-              "mode", "Execution mode: 'ro' (concurrent/unordered), 'rw' (sequential/ordered)."
               "what_to_summarize",
               "What the summary should focus on. Becomes the executor subagent's task description, so phrase it as a directive (e.g. 'only keep stack traces and exit codes')."
               "max_bytes",
               "Exceeding this value will trigger summarization instead of obtaining the raw output. It is not recommended to exceed 8192 unless there is a special reason." ]
-      requiredFields = [ "command"; "timeout_type"; "mode"; "what_to_summarize"; "max_bytes" ] }
+      requiredFields = [ "command"; "timeout_type"; "what_to_summarize"; "max_bytes" ] }
 
 let internal ptySpawnSpec: ToolSpec =
     { name = "pty_spawn"

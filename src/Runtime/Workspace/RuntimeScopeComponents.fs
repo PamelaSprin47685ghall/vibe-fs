@@ -81,20 +81,35 @@ type TempFileRegistry() =
     member _.TempFileMapCount = Map.count tempFilesByPrompt
 
 
-type SessionLockRegistry() =
-    let mutable sessionLocks = Map.empty<string, SessionReaderWriterLock>
+type SessionExecutorRegistry() =
+    let mutable executors = Map.empty<string, SessionSerialExecutor>
 
-    member _.GetOrCreate(sessionId: string) : SessionReaderWriterLock =
-        match Map.tryFind sessionId sessionLocks with
-        | Some l -> l
+    member _.GetOrCreate(sessionId: string) : SessionSerialExecutor =
+        match Map.tryFind sessionId executors with
+        | Some executor -> executor
         | None ->
-            let l = SessionReaderWriterLock()
-            sessionLocks <- Map.add sessionId l sessionLocks
-            l
+            let executor = SessionSerialExecutor()
+            executors <- Map.add sessionId executor executors
+            executor
 
-    member _.Clear() : unit = sessionLocks <- Map.empty
+    member _.Close(sessionId: string) : unit =
+        match Map.tryFind sessionId executors with
+        | None -> ()
+        | Some executor ->
+            executor.Close()
 
-    member _.Remove(sessionId: string) : unit =
-        sessionLocks <- Map.remove sessionId sessionLocks
+            executor.Drained
+            |> Promise.map (fun () ->
+                match Map.tryFind sessionId executors with
+                | Some current when obj.ReferenceEquals(current, executor) ->
+                    executors <- Map.remove sessionId executors
+                | _ -> ())
+            |> Promise.start
 
-    member _.SessionLockCount = Map.count sessionLocks
+    member _.Clear() : unit =
+        for (_, executor) in Map.toSeq executors do
+            executor.Close()
+
+        executors <- Map.empty
+
+    member _.SessionExecutorCount = Map.count executors

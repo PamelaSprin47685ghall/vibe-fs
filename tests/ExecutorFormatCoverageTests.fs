@@ -36,7 +36,6 @@ let summarizerInputCap () =
           language = Shell
           dependencies = []
           timeoutType = Long
-          mode = "ro"
           cwd = None
           whatToSummarize = ""
           maxBytes = 8192 }
@@ -67,7 +66,6 @@ let safetyWarning () =
               language = Shell
               dependencies = []
               timeoutType = Short
-              mode = "ro"
               cwd = None
               whatToSummarize = ""
               maxBytes = 8192 }
@@ -128,15 +126,14 @@ let executorToolResponseFormatting () =
     check "summary response has exit_code 0" (summaryResp.Contains "exit_code: 0")
 
 let summarizerPromptOmitsReturnValue () =
-    let prompt =
-        executorSummarizerPrompt "" "raw output" "shell" "echo 1" [] "short" "ro"
+    let prompt = executorSummarizerPrompt "" "raw output" "shell" "echo 1" [] "short"
 
     check "summarizer prompt omits exit status" (not (prompt.Contains "exit status"))
     check "summarizer prompt omits non-zero" (not (prompt.ToLowerInvariant().Contains "non-zero"))
     check "summarizer empty deps yaml" (prompt.Contains "dependencies: []")
 
     let multiline =
-        executorSummarizerPrompt "" "line1\nline2" "shell" "echo hi\necho bye" [ "dep1" ] "long" "ro"
+        executorSummarizerPrompt "" "line1\nline2" "shell" "echo hi\necho bye" [ "dep1" ] "long"
 
     check "summarizer multiline program uses block field" (multiline.Contains "program: |")
     check "summarizer multiline raw output in body" (multiline.Contains "line1" && multiline.Contains "line2")

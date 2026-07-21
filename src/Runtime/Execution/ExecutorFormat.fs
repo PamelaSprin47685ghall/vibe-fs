@@ -48,11 +48,4 @@ let buildSummaryPrompt
     let langStr = languageToString options.language
     let timeoutStr = timeoutToString options.timeoutType
 
-    executorSummarizerPrompt
-        options.whatToSummarize
-        capped
-        langStr
-        options.command
-        options.dependencies
-        timeoutStr
-        options.mode
+    executorSummarizerPrompt options.whatToSummarize capped langStr options.command options.dependencies timeoutStr

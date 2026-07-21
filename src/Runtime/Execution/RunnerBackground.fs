@@ -102,9 +102,12 @@ let abortRunnerJobCore (scope: RuntimeScope) (sessionId: string) : unit =
     abortExecutorRun scope sessionId
 
     if sessionId <> "" then
-        scope.RemoveSessionQueue(sessionId)
+        scope.CloseSessionExecutor(sessionId)
 
-    childId |> Option.iter (fun cid -> if cid <> "" then scope.RemoveSessionQueue(cid))
+    childId
+    |> Option.iter (fun cid ->
+        if cid <> "" then
+            scope.CloseSessionExecutor(cid))
 
     match Map.tryFind sessionId (getState scope).ChildDispose with
     | None -> ()

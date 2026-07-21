@@ -180,7 +180,7 @@ let tailCoreTestEntriesGroup3 () : (string * TestBody) list =
         "ProfilerOutputTests.run", TestBody.Sync(sync Wanxiangshu.Tests.ProfilerOutputTests.run)
         "PendingEvidenceEpochTests.run", TestBody.Sync(sync Wanxiangshu.Tests.PendingEvidenceEpochTests.run)
         "ContinuationCleanupTests.run", TestBody.Sync(sync Wanxiangshu.Tests.ContinuationCleanupTests.run)
-        "RuntimeScopeLifecycleTests.run", TestBody.Sync(sync Wanxiangshu.Tests.RuntimeScopeLifecycleTests.run) ]
+        "RuntimeScopeLifecycleTests.run", TestBody.Async Wanxiangshu.Tests.RuntimeScopeLifecycleTests.run ]
 
 let tailCoreTestEntries () : (string * TestBody) list =
     tailCoreTestEntriesGroup1 ()

@@ -119,7 +119,6 @@ let executorSummarizerPrompt
     (program: string)
     (dependencies: string list)
     (timeoutType: string)
-    (mode: string)
     : string =
     let capped = capExecutorSummaryOutput output
 
@@ -139,7 +138,6 @@ let executorSummarizerPrompt
           yamlField "program" program
           yamlStringSeqField "dependencies" dependencies
           yamlField "timeout_type" timeoutType
-          yamlField "mode" mode
           yamlField "what_to_summarize" whatToSummarize ]
         [ capped; "# Task\n" + taskBody ]
 

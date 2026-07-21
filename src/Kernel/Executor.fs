@@ -4,6 +4,13 @@ open System
 open Wanxiangshu.Kernel.ExecutorStrip
 open Wanxiangshu.Kernel.ToolOutputInfoTypes
 
+type ExecutionDeadline = { EndsAt: float }
+
+module ExecutionDeadline =
+    let start (now: unit -> float) (budgetMs: int) : ExecutionDeadline = { EndsAt = now () + float budgetMs }
+
+    let remainingMs (now: unit -> float) (deadline: ExecutionDeadline) : int = max 0 (int (deadline.EndsAt - now ()))
+
 type StrippedPipe = ExecutorStrip.StrippedPipe
 type StripResult = ExecutorStrip.StripResult
 let strip = ExecutorStrip.strip
@@ -35,7 +42,6 @@ type ExecuteOptions =
       language: ExecutorLanguage
       dependencies: string list
       timeoutType: ExecutorTimeoutType
-      mode: string
       cwd: string option
       whatToSummarize: string
       maxBytes: int }
