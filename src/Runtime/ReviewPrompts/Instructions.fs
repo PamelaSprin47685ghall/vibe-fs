@@ -1,6 +1,6 @@
 module Wanxiangshu.Runtime.ReviewPrompts.Instructions
 
-open Wanxiangshu.Runtime.PromptFrontMatter
+open Wanxiangshu.Runtime.PromptHeader
 open Wanxiangshu.Runtime.PromptFragments
 
 let reviewInstructionsProse =

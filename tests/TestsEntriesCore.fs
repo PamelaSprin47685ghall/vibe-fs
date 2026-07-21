@@ -81,14 +81,10 @@ let private replayBlock () : (string * TestBody) list =
       "EventLogRuntimeTests.run", TestBody.Async EventLogRuntimeTests.run
       "EventLogRuntimeStoreTests.run", TestBody.Async EventLogRuntimeStoreTests.run
       "EventLogRuntimeRobustnessTests.run", TestBody.Async EventLogRuntimeRobustnessTests.run
-      "EventLogInvariantsAndLockTests.run", TestBody.Async EventLogInvariantsAndLockTests.run
-      "ReviewTests.inferReviewTaskFromTexts'", TestBody.Sync(sync ReviewTestsReplay.inferReviewTaskFromTexts')
-      "ReviewTests.parseFrontMatterScalars'", TestBody.Sync(sync ReviewTestsReplay.parseFrontMatterScalars') ]
+      "EventLogInvariantsAndLockTests.run", TestBody.Async EventLogInvariantsAndLockTests.run ]
 
 let private reviewPromptsBlock () : (string * TestBody) list =
-    [ "KernelPromptSpecsReview.yamlFrontMatterRoundTrip",
-      TestBody.Sync(sync KernelPromptSpecsReview.yamlFrontMatterRoundTrip)
-      "ReviewTests.doubleCheckAnchorReplay", TestBody.Sync(sync ReviewTestsPrompts.doubleCheckAnchorReplay)
+    [ "ReviewTests.doubleCheckAnchorReplay", TestBody.Sync(sync ReviewTestsPrompts.doubleCheckAnchorReplay)
       "ReviewTests.doubleCheckPromptFormat", TestBody.Sync(sync ReviewTestsPrompts.doubleCheckPromptFormat)
       "ReviewTests.reviewerPromptFormat", TestBody.Sync(sync ReviewTestsPrompts.reviewerPromptFormat)
       "ReviewTests.muxReviewerVerdictPromptFormat",

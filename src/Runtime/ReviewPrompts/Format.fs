@@ -3,7 +3,7 @@ module Wanxiangshu.Runtime.ReviewPrompts.Format
 open Wanxiangshu.Runtime.LoopMessages
 open Wanxiangshu.Kernel.ReviewSession.Types
 open Wanxiangshu.Kernel.Review.ReviewEncouragement
-open Wanxiangshu.Runtime.PromptFrontMatter
+open Wanxiangshu.Runtime.PromptHeader
 
 /// Backward-compatible alias for the WIP acknowledgment body.
 let submitReviewWipAcknowledgment: string = wipAcknowledgment

@@ -2,7 +2,7 @@ module Wanxiangshu.Tests.KernelPromptSpecsReview
 
 open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Runtime.LoopMessages
-open Wanxiangshu.Runtime.PromptFrontMatter
+open Wanxiangshu.Runtime.PromptHeader
 open Wanxiangshu.Runtime.ReviewPrompts
 open Wanxiangshu.Runtime.ReviewPrompts.Instructions
 open Wanxiangshu.Kernel.ReviewSession
@@ -29,14 +29,8 @@ let loopMessagesShared () =
     check "loop message names reviewer" (kernelMsg.Contains "reviewer")
 
     let multilineTask = "ship S1 refactor\ninclude follow-up cleanup"
-
-    let parsedLoopMsg =
-        parseFrontMatterScalars (buildLoopMessage multilineTask [ intro ])
-
-    equal
-        "loop message multiline task round-trips through block front-matter"
-        (Some multilineTask)
-        (Map.tryFind "task" parsedLoopMsg)
+    let multilineMsg = buildLoopMessage multilineTask [ intro ]
+    check "loop message multiline task uses block front-matter" (multilineMsg.Contains "task: |")
 
     let loopTemplate = withReviewCommandTemplate
     check "loop template carries command front-matter" (loopTemplate.Contains "command: with-review")
@@ -182,42 +176,3 @@ let executorSummarizerNoExitStatus () =
     let prompt = executorSummarizerPrompt "" "raw" "shell" "echo 1" [] "short"
     check "summarizer prompt omits exit status" (not (prompt.Contains "exit status"))
     check "summarizer prompt omits non-zero exit" (not (prompt.ToLowerInvariant().Contains "non-zero exit"))
-
-open Fable.Core.JsInterop
-
-let yamlFrontMatterRoundTrip () =
-    // Scalar round-trip
-    let scalarFm = frontMatter [ yamlField "task" "ship feature" ]
-    let scalarParsed = parseFrontMatterScalars scalarFm
-    equal "scalar round-trip" (Some "ship feature") (Map.tryFind "task" scalarParsed)
-
-    // Sequence round-trip: write seq, parse structure, verify array
-    let seqFm = frontMatter [ yamlSeqField "affected" [ box "a.fs"; box "b.fs" ] ]
-    let seqObj = parseFrontMatter seqFm
-    let arr = seqObj?affected |> unbox<string[]>
-    equal "seq round-trip length" 2 arr.Length
-    equal "seq round-trip item 0" "a.fs" arr.[0]
-    equal "seq round-trip item 1" "b.fs" arr.[1]
-
-    // Mixed scalar + sequence
-    let mixedFm =
-        frontMatter [ yamlField "task" "ship"; yamlSeqField "files" [ box "x.fs" ] ]
-
-    let mixedScalars = parseFrontMatterScalars mixedFm
-    equal "mixed scalar preserved" (Some "ship") (Map.tryFind "task" mixedScalars)
-    let mixedObj = parseFrontMatter mixedFm
-    let mixedArr = mixedObj?files |> unbox<string[]>
-    equal "mixed seq preserved" 1 mixedArr.Length
-
-    // Special chars in scalar
-    let specialFm =
-        frontMatter [ yamlField "task" "line1\n: colon\n# hash\n\"quoted\"" ]
-
-    let specialParsed = parseFrontMatterScalars specialFm
-    equal "special chars round-trip" (Some "line1\n: colon\n# hash\n\"quoted\"") (Map.tryFind "task" specialParsed)
-
-    // String seq field helper
-    let strSeqFm = frontMatter [ yamlStringSeqField "caps" [ "a"; "b"; "c" ] ]
-    let strSeqObj = parseFrontMatter strSeqFm
-    let strArr = strSeqObj?caps |> unbox<string[]>
-    equal "yamlStringSeqField round-trip" 3 strArr.Length

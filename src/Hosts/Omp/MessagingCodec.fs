@@ -176,28 +176,6 @@ let openTodoStatuses (sessionManager: ISessionManager) : string list =
     statuses
     |> List.filter (fun s -> todoStatusOfString s |> Option.exists (fun st -> not (isTerminal st)))
 
-let extractHistoryTexts (messages: Message<obj> list) : string list =
-    messages
-    |> List.collect (fun m ->
-        m.parts
-        |> List.map (function
-            | TextPart t -> t
-            | ToolPart(_, _, Some st, _) -> st.output
-            | _ -> ""))
-
-let hasActiveLoopFromHistory (sessionManager: ISessionManager) : bool =
-    entries sessionManager
-    |> decodeEntries ""
-    |> extractHistoryTexts
-    |> inferReviewTaskFromTexts
-    |> Option.isSome
-
-let activeLoopTaskFromHistory (sessionManager: ISessionManager) : string option =
-    entries sessionManager
-    |> decodeEntries ""
-    |> extractHistoryTexts
-    |> inferReviewTaskFromTexts
-
 open Wanxiangshu.Hosts.Omp.MessagingCodecEncode
 
 let encodeMessage = MessagingCodecEncode.encodeMessage

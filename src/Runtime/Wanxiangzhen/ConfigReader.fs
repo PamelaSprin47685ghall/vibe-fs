@@ -1,9 +1,12 @@
 module Wanxiangshu.Runtime.Wanxiangzhen.ConfigReader
 
 open Fable.Core
+open Fable.Core.JsInterop
 open Wanxiangshu.Kernel.Wanxiangzhen.SquadConfig
-open Wanxiangshu.Runtime.Yaml
 open Wanxiangshu.Runtime.Dyn
+
+[<Import("parse", "yaml")>]
+let private yamlParse (text: string) : obj = jsNative
 
 [<Import("readFileSync", "node:fs")>]
 let private readFileSync (path: string) (encoding: string) : string = jsNative
@@ -14,7 +17,7 @@ let private existsSync (path: string) : bool = jsNative
 [<Import("join", "node:path")>]
 let private pathJoin (a: string) (b: string) : string = jsNative
 
-let private extractFrontmatter (text: string) : string option =
+let private extractConfigHeaderYaml (text: string) : string option =
     let trimmed = text.TrimStart()
 
     if not (trimmed.StartsWith "---") then
@@ -72,11 +75,11 @@ let readConfig (worktree: string) : SquadConfig =
     else
         let text = readFileSync path "utf-8"
 
-        match extractFrontmatter text with
+        match extractAgentsMdHeaderConfig text with
         | None -> defaults
         | Some fm ->
             try
-                let parsed = parse fm
+                let parsed = yamlParse fm
 
                 if isNullish parsed then
                     defaults

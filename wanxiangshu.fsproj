@@ -146,8 +146,7 @@
     <Compile Include="src/Kernel/SessionLoop.fs"/>
     <Compile Include="src/Kernel/FallbackSubagentGate.fs"/>
     <Compile Include="src/Runtime/Workspace/Yaml.fs"/>
-    <Compile Include="src/Runtime/PromptFrontMatterParse.fs"/>
-    <Compile Include="src/Runtime/PromptFrontMatter.fs"/>
+    <Compile Include="src/Runtime/PromptHeader.fs"/>
     <Compile Include="src/Runtime/Search/SearchPrompts.fs"/>
     <Compile Include="src/Runtime/Tooling/ToolOutputInfoParse.fs"/>
     <Compile Include="src/Runtime/Tooling/ToolOutputInfo.fs"/>

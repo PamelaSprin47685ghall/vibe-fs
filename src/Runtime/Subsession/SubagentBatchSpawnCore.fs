@@ -17,7 +17,7 @@ open Wanxiangshu.Runtime.ChildAgentRegistry
 open Wanxiangshu.Runtime.SubagentIteratorStore
 open Wanxiangshu.Runtime.ToolOutputInfo
 open Wanxiangshu.Kernel.ToolOutputInfoTypes
-open Wanxiangshu.Runtime.PromptFrontMatter
+open Wanxiangshu.Runtime.PromptHeader
 
 module HostAdapter = Wanxiangshu.Kernel.HostAdapter
 

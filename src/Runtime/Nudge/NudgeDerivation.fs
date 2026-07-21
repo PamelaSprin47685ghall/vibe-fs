@@ -3,7 +3,7 @@ module Wanxiangshu.Runtime.Nudge.NudgeDerivation
 open Wanxiangshu.Kernel.Nudge
 open Wanxiangshu.Kernel.Nudge.TodoStatus
 open Wanxiangshu.Runtime.PromptFragments
-open Wanxiangshu.Runtime.PromptFrontMatter
+open Wanxiangshu.Runtime.PromptHeader
 open Wanxiangshu.Kernel.HostTools
 open Wanxiangshu.Kernel.Nudge.NudgeProjection
 open Wanxiangshu.Kernel.Nudge.NudgeSnapshotSource

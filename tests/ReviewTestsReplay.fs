@@ -4,7 +4,7 @@ open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Kernel.ReviewSession.Types
 open Wanxiangshu.Kernel.ReviewSession.Effects
 open Wanxiangshu.Runtime.LoopMessages
-open Wanxiangshu.Runtime.PromptFrontMatter
+open Wanxiangshu.Runtime.PromptHeader
 
 let disposeSessionTreeTerminatesAll () =
     let mutable verdicts: (string * ReviewResult) list = []
@@ -37,99 +37,3 @@ let disposeSessionTreeTerminatesAll () =
     let next2 = disposeSessionTree next [ "ghost-1"; "ghost-2" ]
     check "disposing absent ids leaves pending empty" next2.pendingResolutions.IsEmpty
     check "disposing absent ids leaves suppressors empty" next2.abortSuppressors.IsEmpty
-
-let inferReviewTaskFromTexts' () =
-    let activate task =
-        buildLoopMessage task [ "With-Review Mode is active. Complete the task above, then call submit_review with:" ]
-
-    let accept = Wanxiangshu.Runtime.ReviewPrompts.formatReviewResult (Accepted "")
-    let cancel = loopCancelledMessage
-
-    let needsRevisionMsg =
-        Wanxiangshu.Runtime.ReviewPrompts.formatReviewResult (NeedsRevision "fix the tests")
-
-    let terminated = Wanxiangshu.Runtime.ReviewPrompts.formatReviewResult Terminated
-    equal "empty -> None" None (inferReviewTaskFromTexts [])
-    equal "only activate -> Some task" (Some "ship S1") (inferReviewTaskFromTexts [ activate "ship S1" ])
-    equal "activate + accept -> None" None (inferReviewTaskFromTexts [ activate "ship S1"; accept ])
-    equal "activate + cancel -> None" None (inferReviewTaskFromTexts [ activate "ship S1"; cancel ])
-
-    equal
-        "activate + needs_revision -> still active"
-        (Some "ship S1")
-        (inferReviewTaskFromTexts [ activate "ship S1"; needsRevisionMsg ])
-
-    equal
-        "activate + terminated -> still active"
-        (Some "ship S1")
-        (inferReviewTaskFromTexts [ activate "ship S1"; terminated ])
-
-    equal
-        "two activates no end -> last task"
-        (Some "ship S2")
-        (inferReviewTaskFromTexts [ activate "ship S1"; activate "ship S2" ])
-
-    equal
-        "activate + accept + activate -> second active"
-        (Some "ship S2")
-        (inferReviewTaskFromTexts [ activate "ship S1"; accept; activate "ship S2" ])
-
-    equal "accept without activate -> None" None (inferReviewTaskFromTexts [ accept ])
-
-    equal
-        "prose mention of accepted does not end review"
-        (Some "ship S1")
-        (inferReviewTaskFromTexts
-            [ activate "ship S1"
-              "I think your changes look accepted to me. With-Review Mode has ended, right?" ])
-
-    equal
-        "prose task line does not activate"
-        None
-        (inferReviewTaskFromTexts [ "Here is my plan:\ntask: refactor everything\nlet's go" ])
-
-    let reviewerChildPrompt =
-        Wanxiangshu.Runtime.ReviewPrompts.reviewerPrompt
-            "worker task from parent"
-            "self-reported changes"
-            [ "src/a.fs" ]
-
-    equal
-        "reviewerPrompt task must not activate worker With-Review"
-        None
-        (inferReviewTaskFromTexts [ reviewerChildPrompt ])
-
-    let reviewerVerdictPrompt =
-        Wanxiangshu.Runtime.ReviewPrompts.reviewSubmissionVerdictPrompt "worker task" "report body" [ "b.fs" ]
-
-    equal
-        "front matter task: original_task must not activate worker loop"
-        None
-        (inferReviewTaskFromTexts [ reviewerVerdictPrompt ])
-
-let parseFrontMatterScalars' () =
-    let scalars =
-        parseFrontMatterScalars (
-            frontMatterPrompt
-                [ yamlField "verdict" "needs_revision"
-                  yamlField "feedback" "line one\n---\nline three" ]
-                "Address the feedback above."
-        )
-
-    equal "scalar verdict parsed" (Some "needs_revision") (Map.tryFind "verdict" scalars)
-    equal "block field parsed" (Some "line one\n---\nline three") (Map.tryFind "feedback" scalars)
-
-    let multi =
-        parseFrontMatterScalars (frontMatter [ yamlField "task" "do thing"; yamlField "verdict" "accepted" ])
-
-    equal "first scalar" (Some "do thing") (Map.tryFind "task" multi)
-    equal "second scalar" (Some "accepted") (Map.tryFind "verdict" multi)
-
-    let block =
-        parseFrontMatterScalars (frontMatter [ yamlField "task" "line one\nline two\n: [] {} \"quoted\"" ])
-
-    equal "block scalar parsed" (Some "line one\nline two\n: [] {} \"quoted\"") (Map.tryFind "task" block)
-    equal "plain prose → empty" Map.empty (parseFrontMatterScalars "just a normal message, no front matter")
-    equal "no closing fence → empty" Map.empty (parseFrontMatterScalars "---\ntask: \"x\"\nnever closes")
-    let indented = parseFrontMatterScalars "---\n  task: \"indented\"\n---"
-    equal "indented task IS valid YAML top-level key" (Some "indented") (Map.tryFind "task" indented)

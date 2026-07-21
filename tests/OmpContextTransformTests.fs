@@ -11,7 +11,7 @@ module Dyn = Wanxiangshu.Runtime.Dyn
 
 open Wanxiangshu.Runtime.ReviewRuntime
 open Wanxiangshu.Runtime.LoopMessages
-open Wanxiangshu.Runtime.PromptFrontMatter
+open Wanxiangshu.Runtime.PromptHeader
 
 [<Import("createRequire", "node:module")>]
 let private createRequire': string -> (string -> obj) = jsNative

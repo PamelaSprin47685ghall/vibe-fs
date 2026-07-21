@@ -18,47 +18,6 @@ let isFull budget = WorkspaceFilesCollect.isFull budget
 let absorb file budget =
     WorkspaceFilesCollect.absorb file budget
 
-[<Import("parse", "yaml")>]
-let private yamlParse (text: string) : obj = jsNative
-
-let private splitFrontMatter (content: string) : string * obj option =
-    let trimmed = content.TrimStart('\r', '\n')
-
-    if not (trimmed.StartsWith("---")) then
-        (content, None)
-    else
-        let afterFirst = trimmed.[3..].TrimStart('\r', '\n')
-
-        match afterFirst.IndexOf("---") with
-        | -1 -> (content, None)
-        | closeIdx ->
-            let yamlText = afterFirst.[.. closeIdx - 1]
-            let body = afterFirst.[closeIdx + 3 ..].TrimStart('\r', '\n')
-
-            let fm =
-                try
-                    Some(yamlParse yamlText)
-                with _ ->
-                    None
-
-            (body, fm)
-
-let private extractImportList (frontmatter: obj option) : string list =
-    match frontmatter with
-    | None -> []
-    | Some fm ->
-        if Dyn.isNullish fm then
-            []
-        else
-            let importVal = Dyn.get fm "import"
-
-            if Dyn.isNullish importVal then
-                []
-            elif Dyn.isArray importVal then
-                importVal :?> obj array |> Array.map string |> List.ofArray
-            else
-                [ string importVal ]
-
 let findCapsFiles (projectRoot: string) : JS.Promise<CapsFile list> =
     promise {
         let agentsPath = joinPath projectRoot "AGENTS.md"
@@ -67,19 +26,15 @@ let findCapsFiles (projectRoot: string) : JS.Promise<CapsFile list> =
         match agentsFile with
         | None -> return []
         | Some agents ->
-            let body, fm = splitFrontMatter agents.content
-            let importList = extractImportList fm
-
             let initial =
-                if System.String.IsNullOrWhiteSpace body then
+                if System.String.IsNullOrWhiteSpace agents.content then
                     fresh ()
                 else
                     absorb
                         { filePath = agentsPath
                           label = "AGENTS.md"
-                          content = body }
+                          content = agents.content }
                         (fresh ())
 
-            let! finalBudget = readImportsAsync projectRoot importList initial
-            return finalBudget.results |> Seq.toList |> List.sortBy (fun file -> file.filePath)
+            return initial.results |> Seq.toList |> List.sortBy (fun file -> file.filePath)
     }

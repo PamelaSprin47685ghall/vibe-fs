@@ -18,7 +18,7 @@ let private readFileSync (path: string) (encoding: string) : string = jsNative
 [<Import("join", "node:path")>]
 let private pathJoin (a: string) (b: string) : string = jsNative
 
-let private splitFrontMatter (content: string) : obj option =
+let private extractAgentsMdHeaderConfig (content: string) : obj option =
     let trimmed = content.TrimStart('\r', '\n')
 
     if not (trimmed.StartsWith("---")) then
@@ -169,7 +169,7 @@ let loadFallbackConfig (directory: string) : FallbackConfig option =
         let agentsPath = pathJoin directory "AGENTS.md"
         let content = readFileSync agentsPath "utf-8"
 
-        match splitFrontMatter content with
+        match extractAgentsMdHeaderConfig content with
         | None -> None
         | Some frontmatter -> extractFallbackConfig frontmatter
     with _ ->

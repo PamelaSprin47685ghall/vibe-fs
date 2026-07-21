@@ -24,7 +24,6 @@ open Wanxiangshu.Runtime.ChildAgentRegistry
 open Wanxiangshu.Runtime.SubagentIteratorStore
 open Wanxiangshu.Runtime.ToolArgsDecode
 open Wanxiangshu.Runtime.ToolExecute
-open Wanxiangshu.Runtime.PromptFrontMatter
 open Wanxiangshu.Runtime.ToolOutputInfo
 open Wanxiangshu.Kernel.ToolOutputInfoTypes
 open Wanxiangshu.Runtime.SubsessionEventWriter

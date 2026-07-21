@@ -12,7 +12,6 @@ open Wanxiangshu.Runtime.Fallback.RuntimeStore
 open Wanxiangshu.Runtime.Fallback.SessionRuntimePropertyPure
 open Wanxiangshu.Kernel.Primitives.Identity
 open Wanxiangshu.Kernel.FallbackKernel.Types
-open Wanxiangshu.Runtime.PromptFrontMatter
 
 module Dyn = Wanxiangshu.Runtime.Dyn
 
@@ -35,6 +34,7 @@ let resolveModel (modelOverride: string option) (ctx: obj) : obj option =
     | Some _ -> None
     | None ->
         let m = Dyn.get ctx "model"
+
         if Dyn.isNullish m then None
         elif Dyn.typeIs m "string" && string m = "" then None
         else Some m
@@ -127,16 +127,6 @@ let setupSubagentSession
     (fallbackRuntime: FallbackRuntimeStore)
     : unit =
     scope.Add("omp_session_" + childId, session)
-    let scalars = Wanxiangshu.Runtime.PromptFrontMatter.parseFrontMatterScalars prompt
-
-    match Map.tryFind "objective" scalars with
-    | Some objVal when not (System.String.IsNullOrWhiteSpace objVal) ->
-        let parentKey = sessionId + "\u0000" + objVal.Trim()
-
-        match scope.TryGetTempFiles(parentKey) with
-        | Some files -> scope.RegisterTempFiles(childId + "\u0000" + objVal.Trim(), files)
-        | None -> ()
-    | _ -> ()
 
     defaultChain
     |> Option.iter (fun chain -> fallbackRuntime.UpdateSession(childId, selectChain chain))

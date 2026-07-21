@@ -8,7 +8,7 @@ open Wanxiangshu.Tests.EventLogTestSeed
 open Wanxiangshu.Tests.AsyncFlush
 open Wanxiangshu.Runtime.LoopMessages
 open Wanxiangshu.Runtime.PromptFragments
-open Wanxiangshu.Runtime.PromptFrontMatter
+open Wanxiangshu.Runtime.PromptHeader
 open Wanxiangshu.Hosts.Opencode.Plugin
 open Wanxiangshu.Runtime.Dyn
 open Wanxiangshu.Runtime.Messaging.OpencodeSessionEventCodec
@@ -48,11 +48,13 @@ let opencodeLoopNudgeSpec () =
                                     promise { return box {| data = messages |} })
                             )
                             "prompt",
-                            box (System.Func<obj, JS.Promise<unit>>(fun arg ->
-                                promise {
-                                    resolveNudgeReceiptFromPromptArg workspaceDir arg
-                                    promptCalls.Add(arg)
-                                })) ]
+                            box (
+                                System.Func<obj, JS.Promise<unit>>(fun arg ->
+                                    promise {
+                                        resolveNudgeReceiptFromPromptArg workspaceDir arg
+                                        promptCalls.Add(arg)
+                                    })
+                            ) ]
                   ) ]
 
         do! seedLoopActivated workspaceDir sessionID "Ship the fix"
@@ -109,11 +111,13 @@ let opencodeFreshChatMessageRearmsLoopNudgeSpec () =
                                     promise { return box {| data = messages |} })
                             )
                             "prompt",
-                            box (System.Func<obj, JS.Promise<unit>>(fun arg ->
-                                promise {
-                                    resolveNudgeReceiptFromPromptArg workspaceDir arg
-                                    promptCalls.Add(arg)
-                                })) ]
+                            box (
+                                System.Func<obj, JS.Promise<unit>>(fun arg ->
+                                    promise {
+                                        resolveNudgeReceiptFromPromptArg workspaceDir arg
+                                        promptCalls.Add(arg)
+                                    })
+                            ) ]
                   ) ]
 
         do! seedLoopActivated workspaceDir sessionID "Ship the fix"
@@ -208,11 +212,13 @@ let opencodeBrowserSubsessionHistoryDoesNotLoopNudgeSpec () =
                                     })
                             )
                             "prompt",
-                            box (System.Func<obj, JS.Promise<unit>>(fun arg ->
-                                promise {
-                                    resolveNudgeReceiptFromPromptArg workspaceDir arg
-                                    promptCalls.Add(arg)
-                                })) ]
+                            box (
+                                System.Func<obj, JS.Promise<unit>>(fun arg ->
+                                    promise {
+                                        resolveNudgeReceiptFromPromptArg workspaceDir arg
+                                        promptCalls.Add(arg)
+                                    })
+                            ) ]
                   ) ]
 
         let! p =

@@ -1,7 +1,7 @@
 module Wanxiangshu.Runtime.ReviewPrompts.Commands
 
 open Wanxiangshu.Runtime.LoopMessages
-open Wanxiangshu.Runtime.PromptFrontMatter
+open Wanxiangshu.Runtime.PromptHeader
 open Wanxiangshu.Runtime.PromptFragments
 
 let withReviewCommandTemplate =

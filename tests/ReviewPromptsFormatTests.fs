@@ -3,7 +3,7 @@ module Wanxiangshu.Tests.ReviewPromptsFormatTests
 open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Runtime.ReviewPrompts.Format
 open Wanxiangshu.Kernel.ReviewSession.Types
-open Wanxiangshu.Runtime.PromptFrontMatter
+open Wanxiangshu.Runtime.PromptHeader
 open Fable.Core.JsInterop
 
 // ── submitReviewIsWip ────────────────────────────────────────────────────────
@@ -58,32 +58,6 @@ let formatReviewResultTerminated () =
     check "terminated no verdict label in prose" (text.Contains "ended without a verdict")
     check "terminated keeps With-Review Mode active" (text.Contains "With-Review Mode remains active")
 
-// ── parseFrontMatter / multi-frontmatter ──────────────────────────────────────
-
-let multiFrontMatterInput =
-    "---\nauthor: Alice\nmode: review\n---\n---\nauthor: Bob\npriority: high\n---\nBody text after all frontmatter."
-
-let parseMultiFrontMatterMerging () =
-    let parsed = parseFrontMatter multiFrontMatterInput
-    check "parseFrontMatter returns non-null for multi-frontmatter input" (not (isNull parsed))
-    // later block overrides earlier — Bob overrides Alice
-    check "author from later block wins" (parsed?("author") = box "Bob")
-    check "mode from first block preserved" (parsed?("mode") = box "review")
-    check "priority from second block present" (parsed?("priority") = box "high")
-
-let parseMultiFrontMatterScalars () =
-    let scalars = parseFrontMatterScalars multiFrontMatterInput
-    check "scalars non-empty" (scalars.Count > 0)
-    check "author scalar from later block" (scalars.TryFind "author" = Some "Bob")
-    check "mode scalar from first block" (scalars.TryFind "mode" = Some "review")
-    check "priority scalar from second block" (scalars.TryFind "priority" = Some "high")
-
-let bodyAfterMultiFrontMatter () =
-    let body = bodyAfterFrontMatter multiFrontMatterInput
-    check "body is non-empty" (body <> "")
-    check "body starts with expected text" (body.StartsWith "Body text")
-    check "body does not contain frontmatter delimiter" (not (body.Contains "---"))
-
 // ── formatWipAcknowledgment ──────────────────────────────────────────────────
 
 let formatWipAcknowledgmentProducesFrontMatter () =
@@ -93,9 +67,8 @@ let formatWipAcknowledgmentProducesFrontMatter () =
     check "output contains frontmatter delimiter" (text.Contains "---")
     check "output mentions With-Review Mode" (text.Contains "With-Review Mode")
     check "output mentions Continue working" (text.Contains "Continue working")
-    let parsed = parseFrontMatter text
-    check "parsed task field equals input" (parsed?("task") = box task)
-    check "parsed review_progress field equals recorded" (parsed?("review_progress") = box "recorded")
+    check "output task field contains input" (text.Contains task)
+    check "output review_progress field recorded" (text.Contains "recorded")
 
 let run () =
     submitReviewIsWipNoneDefaultsTrue ()
@@ -106,7 +79,4 @@ let run () =
     formatReviewResultAcceptedWithFeedback ()
     formatReviewResultNeedsRevision ()
     formatReviewResultTerminated ()
-    parseMultiFrontMatterMerging ()
-    parseMultiFrontMatterScalars ()
-    bodyAfterMultiFrontMatter ()
     formatWipAcknowledgmentProducesFrontMatter ()

@@ -44,52 +44,6 @@ let buildLoopCommandTemplateContainsBody () =
     let tpl = buildLoopCommandTemplate "loop" [ "body line" ]
     check "buildLoopCommandTemplate contains body line" (tpl.Contains "body line")
 
-// ── inferReviewTaskFromTexts ──────────────────────────────────────────────────
-
-let inferReviewTaskFromTextsEmpty () =
-    equal "empty → None" None (inferReviewTaskFromTexts [])
-
-let inferReviewTaskFromTextsFromTask () =
-    equal "task field → Some task" (Some "fix login") (inferReviewTaskFromTexts [ taskText "fix login" ])
-
-let inferReviewTaskFromTextsCancelledClears () =
-    equal "task then cancelled → None" None (inferReviewTaskFromTexts [ taskText "old task"; verdictText "cancelled" ])
-
-let inferReviewTaskFromTextsAcceptedClears () =
-    equal "task then accepted → None" None (inferReviewTaskFromTexts [ taskText "old task"; verdictText "accepted" ])
-
-let inferReviewTaskFromTextsNeedsRevisionKeeps () =
-    equal
-        "task then needs_revision → keeps task"
-        (Some "surviving task")
-        (inferReviewTaskFromTexts [ taskText "surviving task"; verdictText "needs_revision" ])
-
-let inferReviewTaskFromTextsNonFrontMatterKeeps () =
-    equal
-        "task then prose → keeps task"
-        (Some "my task")
-        (inferReviewTaskFromTexts [ taskText "my task"; "just some plain chat text" ])
-
-let inferReviewTaskFromTextsTaskThenCancelled () =
-    equal
-        "task, cancelled, prose → None"
-        None
-        (inferReviewTaskFromTexts [ taskText "feature-x"; verdictText "cancelled"; "after cancellation" ])
-
-let inferReviewTaskFromTextsTaskInSecondBlock () =
-    let first = "---\nmode: chat\n---"
-    let second = "---\ntask: second-task\n---"
-
-    equal
-        "task in second block activates"
-        (Some "second-task")
-        (inferReviewTaskFromTexts [ first + "\n" + second + "\nbody" ])
-
-let inferReviewTaskFromTextsVerdictInSecondBlockClears () =
-    let first = "---\ntask: old-task\n---"
-    let second = "---\nverdict: accepted\n---"
-    equal "verdict in second block clears task" None (inferReviewTaskFromTexts [ first + "\n" + second + "\nbody" ])
-
 // ── hasDoubleCheckAnchor ──────────────────────────────────────────────────────
 
 let hasDoubleCheckAnchorTrue () =
@@ -109,14 +63,5 @@ let run () =
     buildLoopMessageContainsBody ()
     buildLoopCommandTemplateContainsCommand ()
     buildLoopCommandTemplateContainsBody ()
-    inferReviewTaskFromTextsEmpty ()
-    inferReviewTaskFromTextsFromTask ()
-    inferReviewTaskFromTextsCancelledClears ()
-    inferReviewTaskFromTextsAcceptedClears ()
-    inferReviewTaskFromTextsNeedsRevisionKeeps ()
-    inferReviewTaskFromTextsNonFrontMatterKeeps ()
-    inferReviewTaskFromTextsTaskThenCancelled ()
-    inferReviewTaskFromTextsTaskInSecondBlock ()
-    inferReviewTaskFromTextsVerdictInSecondBlockClears ()
     hasDoubleCheckAnchorTrue ()
     hasDoubleCheckAnchorFalse ()

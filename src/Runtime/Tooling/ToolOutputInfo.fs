@@ -3,7 +3,7 @@ module Wanxiangshu.Runtime.ToolOutputInfo
 open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Kernel.ToolOutputInfoTypes
-open Wanxiangshu.Runtime.PromptFrontMatter
+open Wanxiangshu.Runtime.PromptHeader
 
 let hintExecutorMisuse =
     "No executor for reading, searching, writing files. Use read/inspector/coder!"
@@ -89,56 +89,24 @@ let render (msg: ToolOutputMessage) : string =
         | "" -> fence
         | body -> fence + "\n" + body
 
-open Wanxiangshu.Runtime.ToolOutputInfoParse
-
-let tryParse (text: string) : ToolOutputMessage option =
-    if isNull text || text = "" then
-        None
-    else
-        let lines = text.Replace("\r\n", "\n").Replace("\r", "\n").Split('\n')
-
-        if lines.Length < 2 || lines.[0] <> "---" then
-            None
-        else
-            let parsed = parseFrontMatter text
-
-            if isNull parsed then
-                None
-            else
-                let body = bodyAfterFrontMatter text
-                let info = parseInfoItems parsed
-                Some { info = info; body = body }
-
-let hintsFromOutput (text: string) : string list =
-    match tryParse text with
-    | Some msg ->
-        msg.info
-        |> List.choose (function
-            | InfoItem.Hint h -> Some h
-            | _ -> None)
-    | None -> []
-
-let hasExactHint (text: string) (expected: string) : bool =
-    hintsFromOutput text |> List.exists ((=) expected)
-
-let hintTextContains (text: string) (fragment: string) : bool =
-    hintsFromOutput text |> List.exists (fun h -> h.Contains fragment)
-
 let noChangeEnvelope () =
     render
         { info = [ InfoItem.Status noChangeStatus ]
           body = "" }
 
-let parseOrBody (raw: string) : ToolOutputMessage =
-    match tryParse raw with
-    | Some msg -> msg
-    | None -> { empty with body = normalizedBody raw }
-
 let addSyntax (raw: string) (syntax: string) : string =
-    if syntax = "" then
+    if System.String.IsNullOrWhiteSpace syntax then
         raw
+    elif System.String.IsNullOrWhiteSpace raw then
+        render
+            { empty with
+                info = [ InfoItem.Syntax syntax ]
+                body = "" }
     else
-        parseOrBody raw |> appendInfo (InfoItem.Syntax syntax) |> render
+        render
+            { empty with
+                info = [ InfoItem.Syntax syntax ]
+                body = raw }
 
 let withIterator (body: string) (iterator: string) : string =
     if iterator = "" then

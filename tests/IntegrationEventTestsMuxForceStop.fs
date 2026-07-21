@@ -11,7 +11,7 @@ open Wanxiangshu.Tests.TestWorkspace
 open Wanxiangshu.Runtime.LoopMessages
 open Wanxiangshu.Runtime.ReviewPrompts
 open Wanxiangshu.Runtime.PromptFragments
-open Wanxiangshu.Runtime.PromptFrontMatter
+open Wanxiangshu.Runtime.PromptHeader
 open Wanxiangshu.Hosts.Mux.Plugin
 open Wanxiangshu.Runtime.Dyn
 

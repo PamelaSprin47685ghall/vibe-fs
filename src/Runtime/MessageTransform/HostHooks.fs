@@ -23,12 +23,7 @@ let extractObjectives (plan: MessageTransformPlan) : string list =
         m.parts
         |> List.choose (fun p ->
             match p with
-            | TextPart text when not (System.String.IsNullOrWhiteSpace text) ->
-                let scalars = Wanxiangshu.Runtime.PromptFrontMatter.parseFrontMatterScalars text
-
-                match Map.tryFind "objective" scalars with
-                | Some objVal when not (System.String.IsNullOrWhiteSpace objVal) -> Some(objVal.Trim())
-                | _ -> Some(text.Trim())
+            | TextPart text when not (System.String.IsNullOrWhiteSpace text) -> Some(text.Trim())
             | _ -> None))
 
 let buildCapsFileFromResult (baseDir: string) (r) : CapsFile option =

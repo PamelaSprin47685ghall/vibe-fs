@@ -112,13 +112,15 @@ let testContinueFlow () =
                 check "spawned has iterator" hasIter1
 
                 let nextIter =
-                    let parsed = Wanxiangshu.Runtime.PromptFrontMatter.parseFrontMatter result
-
-                    if isNullish parsed || isNullish parsed?iterators then
-                        "failed"
-                    else
-                        let iterators = parsed?iterators |> unbox<string array>
-                        iterators.[0]
+                    match Wanxiangshu.Runtime.ToolOutputInfo.tryParse result with
+                    | Some msg ->
+                        msg.info
+                        |> List.choose (function
+                            | Wanxiangshu.Kernel.ToolOutputInfoTypes.InfoItem.Iterator iter -> Some iter
+                            | _ -> None)
+                        |> List.tryHead
+                        |> Option.defaultValue "failed"
+                    | None -> "failed"
 
                 let args =
                     box

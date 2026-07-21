@@ -13,7 +13,7 @@ open Wanxiangshu.Runtime.SubsessionActorRegistry
 
 module Dyn = Wanxiangshu.Runtime.Dyn
 
-open Wanxiangshu.Runtime.PromptFrontMatter
+open Wanxiangshu.Runtime.PromptHeader
 
 let private deferred (name: string) : JS.Promise<unit> * (unit -> unit) =
     let resolver = ref (fun () -> ())
@@ -25,18 +25,14 @@ let private deferred (name: string) : JS.Promise<unit> * (unit -> unit) =
         resolver.Value())
 
 let private iteratorFromOutput (output: string) : string option =
-    let parsed = parseFrontMatter output
-
-    if isNull parsed then
-        None
-    else
-        let iters = parsed?iterators
-
-        if isNull iters then
-            None
-        else
-            let arr: string array = unbox iters
-            if arr.Length > 0 then Some arr.[0] else None
+    match tryParse output with
+    | Some msg ->
+        msg.info
+        |> List.choose (function
+            | InfoItem.Iterator iter -> Some iter
+            | _ -> None)
+        |> List.tryHead
+    | None -> None
 
 let private completedMessages () : obj =
     let model = createObj [ "providerID", box "test"; "modelID", box "test-model" ]

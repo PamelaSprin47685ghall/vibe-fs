@@ -14,7 +14,6 @@ open Wanxiangshu.Kernel.Messaging
 open Wanxiangshu.Kernel.HostTools
 open Wanxiangshu.Kernel.Methodology
 open Wanxiangshu.Kernel.MessageTransformPolicy
-open Wanxiangshu.Runtime.PromptFrontMatter
 open Wanxiangshu.Hosts.Mux.MessagingCodec
 open Wanxiangshu.Hosts.Mux.CapsCodec
 open Wanxiangshu.Runtime.JsArrayMutate

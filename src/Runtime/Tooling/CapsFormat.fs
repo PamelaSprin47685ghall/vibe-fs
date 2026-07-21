@@ -1,6 +1,6 @@
 module Wanxiangshu.Runtime.CapsFormat
 
-open Wanxiangshu.Runtime.PromptFrontMatter
+open Wanxiangshu.Runtime.PromptHeader
 open System.Collections.Generic
 
 /// A discovered capability file: its absolute path, display label, and content.

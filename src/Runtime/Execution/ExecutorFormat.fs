@@ -17,13 +17,10 @@ let prependSafetyWarning (output: string) (command: string) (language: ExecutorL
     if not (shouldAppendReadOnlyWarning command language) then
         output
     else
-        match tryParse output with
-        | Some msg -> render (appendInfo (InfoItem.Hint hintExecutorMisuse) msg)
-        | None ->
-            render
-                { empty with
-                    info = [ InfoItem.Hint hintExecutorMisuse ]
-                    body = output }
+        render
+            { empty with
+                info = [ InfoItem.Hint hintExecutorMisuse ]
+                body = output }
 
 let prependSafetyWarningForExecution (output: string) (options: ExecuteOptions) : string =
     prependSafetyWarning output (prepareProgramForExecution options) options.language

@@ -2,7 +2,7 @@ module Wanxiangshu.Runtime.PromptFragments
 
 open Wanxiangshu.Kernel.HostTools
 open Wanxiangshu.Kernel.Nudge.NudgePromptText
-open Wanxiangshu.Runtime.PromptFrontMatter
+open Wanxiangshu.Runtime.PromptHeader
 
 let todoNudgePromptProse =
     Wanxiangshu.Kernel.Nudge.NudgePromptText.todoNudgePromptProse

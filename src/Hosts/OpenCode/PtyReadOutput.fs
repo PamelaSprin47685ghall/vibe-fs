@@ -4,7 +4,7 @@ open Fable.Core
 open Fable.Core.JsInterop
 open Fable.Core.JS
 open Wanxiangshu.Kernel
-open Wanxiangshu.Runtime.PromptFrontMatter
+open Wanxiangshu.Runtime.PromptHeader
 open Wanxiangshu.Hosts.Opencode.PtySpawn
 
 module Dyn = Wanxiangshu.Runtime.Dyn

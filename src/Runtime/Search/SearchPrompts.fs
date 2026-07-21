@@ -2,7 +2,7 @@ module Wanxiangshu.Runtime.SearchPrompts
 
 open Fable.Core
 open Fable.Core.JsInterop
-open Wanxiangshu.Runtime.PromptFrontMatter
+open Wanxiangshu.Runtime.PromptHeader
 
 type SearchResult =
     { title: string
