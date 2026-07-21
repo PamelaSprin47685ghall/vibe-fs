@@ -40,6 +40,7 @@ type EventLogStore(workspaceRoot: string, ?appendLineOverride: string -> WanEven
 
     member _.Generation = queue.Generation
     member _.Poisoned = queue.Poisoned
+    member _.ResetPoison() = queue.ResetPoison()
 
     member this.EnsureSynced() : JS.Promise<unit> = state.EnsureSynced()
     member _.ProjectionCache = state.Cache

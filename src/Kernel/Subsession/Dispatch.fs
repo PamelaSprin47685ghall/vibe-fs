@@ -39,12 +39,12 @@ let private handleDispatchingHostRejected (nowMs: int64) (ctx: RunContext) (plan
         )
     | None ->
         Ok(
-            failRun
-                ctx
-                (match afterError ctx.FallbackConfig ctx.Chain ctx.Policy error with
-                 | StopWithFailure f -> f
-                 | _ -> FallbackExhausted error)
-                [ TurnFinished(plan.TurnId, TurnFailed error) ]
+                failRun
+                    ctx
+                    (match afterError ctx.FallbackConfig ctx.Chain ctx.Policy error with
+                     | StopWithFailure f -> f
+                     | NextTurn _ -> FallbackExhausted error)
+                    [ TurnFinished(plan.TurnId, TurnFailed error) ]
         )
 
 let private handleDispatchingHostAcceptanceUnknown

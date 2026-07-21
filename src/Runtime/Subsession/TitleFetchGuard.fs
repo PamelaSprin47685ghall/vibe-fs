@@ -30,7 +30,7 @@ let isTitleRequestBody (body: obj) : bool =
                     if not (isArray messages) then
                         false
                     else
-                        let arr = messages :?> obj array
+                        let arr = unbox<obj array> messages
                         let firstUser = arr |> Array.tryFind (fun msg -> str msg "role" = "user")
 
                         match firstUser with
@@ -50,7 +50,7 @@ let tryWrapStringContent (content: obj) : string option =
 
 let wrapArrayContentInPlace (content: obj) : unit =
     if isArray content then
-        (content :?> obj array)
+        unbox<obj array> content
         |> Array.iter (fun part ->
             if str part "type" = "text" then
                 let text = get part "text"
@@ -62,7 +62,7 @@ let rewriteTitleMessages (parsed: obj) : unit =
     let messages = get parsed "messages"
 
     if isArray messages then
-        (messages :?> obj array)
+        unbox<obj array> messages
         |> Array.iter (fun msg ->
             if str msg "role" = "user" then
                 let content = get msg "content"

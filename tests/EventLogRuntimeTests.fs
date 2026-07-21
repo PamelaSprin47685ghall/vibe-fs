@@ -10,17 +10,12 @@ open Wanxiangshu.Runtime.EventLogCodec
 open Wanxiangshu.Runtime.EventStore
 open Wanxiangshu.Runtime.EventLogFile
 open Wanxiangshu.Runtime.EventLogIo
-open Wanxiangshu.Runtime.SquadEventStore
 open Wanxiangshu.Runtime.ReviewEventWriter
 open Wanxiangshu.Runtime.SessionEventWriter
 open Wanxiangshu.Runtime.EventLogRuntimeNudge
 open Wanxiangshu.Runtime.ReviewRuntime
-open Wanxiangshu.Kernel.EventSourcing.Fold
 open Wanxiangshu.Kernel.Review
-open Wanxiangshu.Kernel.Backlog
 open Wanxiangshu.Kernel.Nudge
-open Wanxiangshu.Kernel.Subsession
-open Wanxiangshu.Kernel.Wanxiangzhen.SquadEvent
 
 let appendThenReadAll () =
     promise {
@@ -172,89 +167,6 @@ let testMemoryCachingAndNoRepeatedFileReads () : JS.Promise<unit> =
         do! rmAsync dir
     }
 
-let testGetSquadEventsCache () : JS.Promise<unit> =
-    promise {
-        let! dir = mkdtempAsync "eventlog-squad-cache-"
-        let store = EventLogStore dir
-        let squadEvent = SquadCreated("s1", "req")
-        let! _ = store.AppendSquadEvent "2025-01-01T00:00:00Z" squadEvent
-        let! _ = store.GetSessionState "s-any"
-
-        let path = eventPath dir
-        do! rmAsync path
-
-        let! dag = store.GetSquadDag "s1"
-        check "squad dag restored from memory" (dag.SessionId = "s1")
-        equal "expected squad dag requirement" "req" dag.RootRequirement
-
-        do! rmAsync dir
-    }
-
-let testReadAllEventsIdempotent () : JS.Promise<unit> =
-    promise {
-        let! dir = mkdtempAsync "eventlog-readonce-"
-        let store = EventLogStore dir
-        let! _ = appendLoopActivated dir "s-once" "task once"
-        let! events1 = store.ReadAllEvents()
-        check "first read: 1 event" (events1.Length = 1)
-        let! events2 = store.ReadAllEvents()
-        check "second read: same 1 event" (events2.Length = 1)
-        check "second read: same content" (events2.[0].Payload |> Map.tryFind "task" = Some "task once")
-        do! rmAsync dir
-    }
-
-let appendWithEmptyWorkspaceRootWritesNothing () =
-    promise {
-        let cwdLogPath = eventPath ""
-        let! before = tryReadFileAsync cwdLogPath
-        do! appendLoopActivatedOrFail "" "s-empty-root" "task"
-
-        let! claimed =
-            tryClaimNudgeDispatch "" "s-empty-root" Wanxiangshu.Kernel.Nudge.NudgeTodo "anchor" "" "" 0 0 "" 1
-
-        check "claim disabled without workspace" (not claimed)
-        let! after = tryReadFileAsync cwdLogPath
-        equal "empty workspace root leaves cwd log untouched" before after
-    }
-
-let deletingInitializedLogClearsProjection () =
-    promise {
-        let! dir = mkdtempAsync "eventlog-delete-"
-        let sessionId = "s-delete"
-        let store = EventLogStore dir
-        do! appendLoopActivatedOrFail dir sessionId "task"
-        let! beforeDelete = store.GetSessionState sessionId
-        check "projection populated before delete" (beforeDelete.ReviewTask = Some "task")
-        do! rmAsync (eventPath dir)
-        let! afterDelete = store.GetSessionState sessionId
-        equal "deleted log clears projection" None afterDelete.ReviewTask
-        do! rmAsync dir
-    }
-
-
-let ensureSyncedPropagatesNonMissingPathErrors () =
-    promise {
-        let! dir = mkdtempAsync "eventlog-err-propagate-"
-        let workspaceFile = dir + "/workspace-file"
-        do! writeFileAsync workspaceFile "not a directory"
-        let store = EventLogStore workspaceFile
-
-        let! result =
-            promise {
-                try
-                    do! store.EnsureSynced()
-                    return Ok()
-                with ex ->
-                    return Error ex
-            }
-
-        match result with
-        | Error _ -> check "EnsureSynced propagated non-missing path error" true
-        | Ok _ -> failwith "Expected EnsureSynced to fail for a file workspace root"
-
-        do! rmAsync dir
-    }
-
 let run () =
     promise {
         do! appendThenReadAll ()
@@ -267,9 +179,4 @@ let run () =
         do! tryClaimNudgeDispatchPreventsOutdatedAnchor ()
         do! testGetSessionStateMemoryCache ()
         do! testMemoryCachingAndNoRepeatedFileReads ()
-        do! testGetSquadEventsCache ()
-        do! testReadAllEventsIdempotent ()
-        do! appendWithEmptyWorkspaceRootWritesNothing ()
-        do! deletingInitializedLogClearsProjection ()
-        do! ensureSyncedPropagatesNonMissingPathErrors ()
     }

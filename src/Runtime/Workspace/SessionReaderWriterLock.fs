@@ -99,7 +99,6 @@ type SessionReaderWriterLock() =
                                 reject ex
 
                         Promise.lift ()),
-                    timeoutMs = timeout,
                     ?abortSignal = abortSignal
                 )
                 |> Promise.catch (fun ex -> reject ex)
@@ -128,6 +127,5 @@ type SessionReaderWriterLock() =
                             match resOpt with
                             | Some res -> return res
                             | None -> return failwith "WriterLockTimeout: Writer timed out"
-                    }),
-                timeoutMs = timeout
+                    })
             )

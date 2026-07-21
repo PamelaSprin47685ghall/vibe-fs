@@ -27,6 +27,12 @@ type SessionActor(workspaceKey: string, sessionId: string) =
     member _.IsClosed = snap.Closed
     member _.IsHandlerBound = handlerBound
 
+    member _.Poisoned
+        with get () = queue.Poisoned
+        and set (v) = queue.Poisoned <- v
+
+    member _.ResetPoison() : unit = queue.ResetPoison()
+
     /// Bind/replace the domain handler. Production hooks rebind on each event
     /// so a process-global actor always closes over the live CoreServices.
     member _.BindHandler(next: SessionFactHandler) : unit =

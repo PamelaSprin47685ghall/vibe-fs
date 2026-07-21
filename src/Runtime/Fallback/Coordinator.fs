@@ -23,11 +23,7 @@ open Wanxiangshu.Runtime.Dispatch
 
 open Wanxiangshu.Runtime.Fallback.FallbackCoordination
 
-let resolveChain = FallbackCoordination.resolveChain
-let calculateConsumed = FallbackCoordination.calculateConsumed
-let handleTerminalPostSettlement = FallbackCoordination.handleTerminalPostSettlement
-let executeAction = FallbackCoordination.executeAction
-let extractEventContext = FallbackCoordination.extractEventContext
+
 
 let handleFallbackTransition
     (translator: IEventTranslator)

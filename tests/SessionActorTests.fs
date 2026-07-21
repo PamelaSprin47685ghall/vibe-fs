@@ -200,6 +200,32 @@ let pureAdmissionRules () =
 
     check "matching effect accepts" (FactAdmission.decide dispatchSnap effect = FactAdmission.Accept)
 
+let poisonedActorDropsPostsUntilReset () =
+    promise {
+        SessionActorRegistry.Clear()
+        let actor = SessionActorRegistry.GetOrCreate "ws-poison" "sess-p1"
+        actor.Poisoned <- true
+        check "actor is poisoned" actor.Poisoned
+
+        let mutable rejectedError = None
+
+        try
+            let! _ = actor.Post(SessionFact.SessionIdleObserved(createObj []))
+            ()
+        with ex ->
+            rejectedError <- Some ex
+
+        check "post rejects when poisoned" (Option.isSome rejectedError && rejectedError.Value.Message.Contains("QueuePoisoned"))
+
+        actor.ResetPoison()
+        check "actor unpoisoned after ResetPoison" (not actor.Poisoned)
+
+        let! admission = actor.Post(SessionFact.SessionIdleObserved(createObj []))
+        equal "post accepted after ResetPoison" FactAdmission.Accept admission
+        equal "accepted count is 1" 1 (actor.Snapshot().AcceptedCount)
+        SessionActorRegistry.Clear()
+    }
+
 let run () =
     promise {
         do! concurrentFactsSerialize ()
@@ -207,4 +233,5 @@ let run () =
         do! sessionClosedDropsLaterFacts ()
         decodeHostEnvelopeFacts ()
         pureAdmissionRules ()
+        do! poisonedActorDropsPostsUntilReset ()
     }

@@ -34,6 +34,7 @@ open Wanxiangshu.Tests.EventLogReviewLoopFoldTests
 open Wanxiangshu.Tests.WanxiangzhenSquadEventTests
 open Wanxiangshu.Tests.EventLogCodecTests
 open Wanxiangshu.Tests.EventLogRuntimeTests
+open Wanxiangshu.Tests.EventLogRuntimeStoreTests
 open Wanxiangshu.Tests.EventLogRuntimeRobustnessTests
 open Wanxiangshu.Tests.EventLogInvariantsAndLockTests
 open Wanxiangshu.Tests.ReaderWriterLockTests
@@ -80,6 +81,7 @@ let private replayBlock () : (string * TestBody) list =
       "WanxiangzhenSquadEventTests.run", TestBody.Sync(sync WanxiangzhenSquadEventTests.run)
       "EventLogCodecTests.run", TestBody.Sync(sync EventLogCodecTests.run)
       "EventLogRuntimeTests.run", TestBody.Async EventLogRuntimeTests.run
+      "EventLogRuntimeStoreTests.run", TestBody.Async EventLogRuntimeStoreTests.run
       "EventLogRuntimeRobustnessTests.run", TestBody.Async EventLogRuntimeRobustnessTests.run
       "EventLogInvariantsAndLockTests.run", TestBody.Async EventLogInvariantsAndLockTests.run
       "ReaderWriterLockTests.run", TestBody.Async ReaderWriterLockTests.run
