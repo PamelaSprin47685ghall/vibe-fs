@@ -168,4 +168,7 @@ do
           ("executor", "dependencies", SObject)
           ("todowrite", "todos", SArray)
           ("todowrite", "select_methodology", SArray)
-          ("submit_review", "affectedFiles", SArray) ]
+          ("submit_review", "affectedFiles", SArray)
+          ("", "follow-tdd-and-kolmogorov-principles", SNumber)
+          ("", "impossible-via-other-tools", SNumber)
+          ("", "not-suitable-via-continue-tool", SNumber) ]

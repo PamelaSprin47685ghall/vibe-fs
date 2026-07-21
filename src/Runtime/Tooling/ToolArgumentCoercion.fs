@@ -10,8 +10,13 @@ open Thoth.Json
 
 /// Look up the registered SchemaType for a (tool, field) pair.
 let parseSchemaToTypes (tool: string) (field: string) : SchemaType option =
-    registry
-    |> Seq.tryPick (fun (t, f, s) -> if t = tool && f = field then Some s else None)
+    match field with
+    | "follow-tdd-and-kolmogorov-principles"
+    | "impossible-via-other-tools"
+    | "not-suitable-via-continue-tool" -> Some SNumber
+    | _ ->
+        registry
+        |> Seq.tryPick (fun (t, f, s) -> if (t = "" || t = tool) && f = field then Some s else None)
 
 /// Look up the required field names for a given tool from ToolSpec.
 /// Falls back to empty list for unknown tools.

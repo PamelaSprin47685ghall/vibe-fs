@@ -119,9 +119,14 @@ let testCoerceArgsTypesOk () =
     let intentsJson =
         """[{"objective":"fix bug","background":"test","targets":[{"file":"a.ts","guide":"fix it"}]}]"""
 
-    let coderArgs = createObj [ "intents", box intentsJson; "tdd", box "red" ]
+    let coderArgs =
+        createObj
+            [ "intents", box intentsJson
+              "tdd", box "red"
+              "follow-tdd-and-kolmogorov-principles", box "1.0" ]
 
     coerceArgsTypes "coder" coderArgs
+    check "coder follow-tdd coerced to number" (Dyn.get coderArgs "follow-tdd-and-kolmogorov-principles" = box 1.0)
 
     match decodeToolInvocation "read" readArgs with
     | Ok(Typed(ToolArgs.Read r)) ->
