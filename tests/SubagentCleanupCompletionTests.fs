@@ -147,7 +147,7 @@ let executeOpencodeCleanupSuccessAfterRealCompletionSpec () =
              | Ok res -> res = expectedText
              | Error _ -> false)
 
-        check "delete was called" deleted.Value
+        check "delete was not called" (not deleted.Value)
         check "actor is removed" (SubsessionActorRegistry.TryGet workspaceDir childId |> Option.isNone)
         check "child agent registry is unregistered" (registry.LookupChildAgent childId |> Option.isNone)
         do! rmAsync workspaceDir

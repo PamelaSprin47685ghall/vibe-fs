@@ -7,6 +7,7 @@ open Wanxiangshu.Kernel.Subsession.Types
 open Wanxiangshu.Runtime.ChildAgentRegistry
 open Wanxiangshu.Runtime.SubsessionEventStore
 open Wanxiangshu.Runtime.SubsessionActorRegistry
+open Wanxiangshu.Runtime.SubsessionPendingEvidence
 
 open Wanxiangshu.Hosts.Opencode.SubagentTypes
 open Wanxiangshu.Hosts.Opencode.SubsessionHostAdapterOps
@@ -15,6 +16,15 @@ open Wanxiangshu.Runtime.Messaging.OpencodeSessionEventCodec
 
 let abortedPrefix = "(aborted)"
 let noOutputText = "(no output)"
+
+let forgetSubagent
+    (registry: ChildAgentRegistry)
+    (directory: string)
+    (childID: string)
+    : unit =
+    SubsessionPendingEvidence.ForgetSession childID
+    SubsessionActorRegistry.Remove directory childID
+    registry.UnregisterChildAgent(childID)
 
 let abortAndUnregister
     (registry: ChildAgentRegistry)
@@ -51,11 +61,11 @@ let abortAndUnregister
 let cleanupChildIfRequested
     (registry: ChildAgentRegistry)
     (cleanup: bool)
-    (client: obj)
+    (_client: obj)
     (directory: string)
     (childID: string)
     : JS.Promise<unit> =
     promise {
         if cleanup then
-            do! abortAndUnregister registry client directory childID
+            forgetSubagent registry directory childID
     }
