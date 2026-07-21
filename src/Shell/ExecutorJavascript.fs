@@ -79,16 +79,42 @@ let private npmInstall (projectDir: string) (packages: string array) : JS.Promis
         Array.append [| "--yes"; "npm@latest"; "install"; "--prefix"; projectDir |] packages
 
     Promise.create (fun resolve reject ->
+        let timeoutMs = 60000
+        let mutable settled = false
         let c = childSpawn "npx" args' (box {| cwd = projectDir; stdio = "ignore" |})
-        c?on ("error", (fun (e: obj) -> reject (e :?> exn))) |> ignore
+
+        let timer =
+            JS.setTimeout
+                (fun () ->
+                    if not settled then
+                        settled <- true
+                        try
+                            c?kill ("SIGKILL") |> ignore
+                        with _ ->
+                            ()
+                        reject (exn $"npm install timed out after {timeoutMs}ms"))
+                timeoutMs
+
+        c?on (
+            "error",
+            (fun (e: obj) ->
+                if not settled then
+                    settled <- true
+                    JS.clearTimeout timer
+                    reject (e :?> exn))
+        )
+        |> ignore
 
         c?on (
             "close",
             fun (code: obj) ->
-                if unbox<int> code = 0 then
-                    resolve ()
-                else
-                    reject (exn $"npm install exited with {code}")
+                if not settled then
+                    settled <- true
+                    JS.clearTimeout timer
+                    if unbox<int> code = 0 then
+                        resolve ()
+                    else
+                        reject (exn $"npm install exited with {code}")
         )
         |> ignore)
 

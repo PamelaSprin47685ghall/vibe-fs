@@ -60,51 +60,52 @@ let executorTool
                     if sessionID = "" then
                         resolveStr executorRequiresSession
                     else
-                        sessionScope.EnqueuePerSession(
-                            sessionID,
-                            fun () ->
-                                let options = toExecuteOptions (Some runtime.Execution.Directory) decoded
+                        let options = toExecuteOptions (Some runtime.Execution.Directory) decoded
 
-                                promise {
-                                    let! result = Wanxiangshu.Shell.Executor.execute options sessionID
-                                    let output = outputFromResult result
+                        promise {
+                            let! result =
+                                sessionScope.EnqueuePerSession(
+                                    sessionID,
+                                    fun () -> Wanxiangshu.Shell.Executor.execute options sessionID
+                                )
 
-                                    if not (shouldSummarize byteLength output) then
-                                        let formatted = formatToolResponse result None
-                                        return prependSafetyWarningForExecution formatted options
-                                    else
-                                        let langStr = languageToString options.language
-                                        let timeoutStr = timeoutToString options.timeoutType
+                            let output = outputFromResult result
 
-                                        let prompt =
-                                            formatPrompt
-                                                host
-                                                (ExecutorSummary(
-                                                    output,
-                                                    langStr,
-                                                    options.program,
-                                                    options.dependencies,
-                                                    timeoutStr,
-                                                    options.mode,
-                                                    options.whatToSummarize
-                                                ))
-                                            |> List.head
+                            if not (shouldSummarize byteLength output) then
+                                let formatted = formatToolResponse result None
+                                return prependSafetyWarningForExecution formatted options
+                            else
+                                let langStr = languageToString options.language
+                                let timeoutStr = timeoutToString options.timeoutType
 
-                                        let! summary =
-                                            resolveSubagentPromise
-                                                "executor"
-                                                (runSubagentWithCleanup
-                                                    fallbackRuntime
-                                                    registry
-                                                    client
-                                                    "executor"
-                                                    "Executor summary"
-                                                    prompt
-                                                    runtime.Execution.Directory
-                                                    sessionID
-                                                    context)
+                                let prompt =
+                                    formatPrompt
+                                        host
+                                        (ExecutorSummary(
+                                            output,
+                                            langStr,
+                                            options.program,
+                                            options.dependencies,
+                                            timeoutStr,
+                                            options.mode,
+                                            options.whatToSummarize
+                                        ))
+                                    |> List.head
 
-                                        let formatted = formatToolResponse result (Some summary)
-                                        return prependSafetyWarningForExecution formatted options
-                                }
-                        ))
+                                let! summary =
+                                    resolveSubagentPromise
+                                        "executor"
+                                        (runSubagentWithCleanup
+                                            fallbackRuntime
+                                            registry
+                                            client
+                                            "executor"
+                                            "Executor summary"
+                                            prompt
+                                            runtime.Execution.Directory
+                                            sessionID
+                                            context)
+
+                                let formatted = formatToolResponse result (Some summary)
+                                return prependSafetyWarningForExecution formatted options
+                        })

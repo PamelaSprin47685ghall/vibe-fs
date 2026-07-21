@@ -72,6 +72,10 @@ type RuntimeScope() =
 
     member _.ClearSessionQueues() : unit = sessionQueues <- Map.empty
 
+    member _.RemoveSessionQueue(sessionId: string) : unit =
+        if sessionId <> "" then
+            sessionQueues <- Map.remove sessionId sessionQueues
+
     member _.EnqueuePerSession(sessionId: string, work: unit -> JS.Promise<'T>) : JS.Promise<'T> =
         let queue =
             match Map.tryFind sessionId sessionQueues with

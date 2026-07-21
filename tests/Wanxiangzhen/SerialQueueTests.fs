@@ -61,4 +61,20 @@ let entries () : (string * (unit -> unit)) list =
                let work = promise { return! Promise.create (fun _ _ -> ()) }
                let! r = withTimeout 1 work
                isNone r
+           })
+
+      ("SerialQueue.fails fast on safety timeout breach without jamming queue",
+       fun () ->
+           Promise.start
+           <| promise {
+               let q = SerialQueue(defaultSafetyTimeoutMs = 20)
+               let hangingTask = fun () -> promise { return! Promise.create (fun _ _ -> ()) }
+               let! err =
+                   q.Enqueue(hangingTask)
+                   |> Promise.catch (fun ex -> Some ex.Message)
+               isSome err
+               equal true (err.Value.Contains "[FATAL EXECUTOR QUEUE BUG]")
+
+               let! nextResult = q.Enqueue(fun () -> promise { return "recovered" })
+               equal "recovered" nextResult
            }) ]

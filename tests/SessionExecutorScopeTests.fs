@@ -57,5 +57,23 @@ let twoScopesSameSessionIdQueuesIsolate () =
         check "scope B serial order" (seenB |> Seq.toArray = [| "b-start"; "b-end" |])
     }
 
+let removeSessionQueueResetsPerSessionQueue () =
+    promise {
+        let scope = create ()
+        let exec = createForScope scope
+        let sessionId = "session-to-reset"
+
+        let! firstRes = exec.EnqueuePerSession(sessionId, fun () -> promise { return "first" })
+        equal "first execution" "first" firstRes
+
+        scope.RemoveSessionQueue(sessionId)
+
+        let! secondRes = exec.EnqueuePerSession(sessionId, fun () -> promise { return "second" })
+        equal "second execution after queue removal" "second" secondRes
+    }
+
 let run () =
-    promise { do! twoScopesSameSessionIdQueuesIsolate () }
+    promise {
+        do! twoScopesSameSessionIdQueuesIsolate ()
+        do! removeSessionQueueResetsPerSessionQueue ()
+    }

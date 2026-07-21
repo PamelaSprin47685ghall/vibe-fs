@@ -153,8 +153,12 @@ let private matchesSelector (selectors: string array) (label: string) =
 let private selectedTests (selectors: string array) =
     tests |> List.filter (fun (label, _) -> matchesSelector selectors label)
 
+[<Global("process")>]
+let private nodeProcess: obj = jsNative
+
 let runAll (args: string array) : JS.Promise<int> =
     promise {
+        nodeProcess?env?WANXIANGSHU_TEST <- "1"
         clearFailuresForRun ()
         Assert.setSilent false
         let selectors = args

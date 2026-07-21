@@ -52,7 +52,7 @@ let private runPythonProgram
     let sid = Some sessionId
 
     let warmup () =
-        spawnAndRun "uvx" (Array.append baseArgs [| "--from"; "python"; "python"; "-c"; "pass" |]) cwd None None None
+        spawnAndRun "uvx" (Array.append baseArgs [| "--from"; "python"; "python"; "-c"; "pass" |]) cwd (Some 60000) sid None
 
     promise {
         if not dependencies.IsEmpty then
