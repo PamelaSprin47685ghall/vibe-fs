@@ -6,6 +6,15 @@ open Wanxiangshu.Tests.AsyncFlush
 open Wanxiangshu.Runtime.RuntimeScope
 open Wanxiangshu.Runtime.SessionExecutor
 
+let rec private flushMicrotasks n =
+    promise {
+        if n <= 0 then
+            ()
+        else
+            do! yieldMicrotask ()
+            do! flushMicrotasks (n - 1)
+    }
+
 let twoScopesSameSessionIdQueuesIsolate () =
     promise {
         let scopeA = create ()
@@ -58,133 +67,161 @@ let twoScopesSameSessionIdQueuesIsolate () =
         check "scope B serial order" (seenB |> Seq.toArray = [| "b-start"; "b-end" |])
     }
 
-let rec flushMicrotasks n =
-    promise {
-        if n <= 0 then
-            ()
-        else
-            do! yieldMicrotask ()
-            do! flushMicrotasks (n - 1)
-    }
-
-let readerWriterLockConcurrencyAndMutualExclusion () =
+let testSameSessionStrictFifoSerial () =
     promise {
         let scope = create ()
         let exec = createForScope scope
-        let sessionId = "rw-lock-test"
-
+        let sessionId = "fifo-test-session"
         let seen = System.Collections.Generic.List<string>()
 
         let mutable resolveGate1 = fun () -> ()
         let gate1 = Promise.create (fun r _ -> resolveGate1 <- r)
 
-        let ro1 =
+        let item1 =
             exec.EnqueueExecutor(
                 sessionId,
-                "ro",
                 fun () ->
                     promise {
-                        seen.Add "ro1-start"
+                        seen.Add "1-start"
                         do! gate1
-                        seen.Add "ro1-end"
-                        return ()
+                        seen.Add "1-end"
+                        return "1"
                     }
             )
 
-        let mutable resolveGate2 = fun () -> ()
-        let gate2 = Promise.create (fun r _ -> resolveGate2 <- r)
-
-        let ro2 =
+        let item2 =
             exec.EnqueueExecutor(
                 sessionId,
-                "ro",
                 fun () ->
                     promise {
-                        seen.Add "ro2-start"
-                        do! gate2
-                        seen.Add "ro2-end"
-                        return ()
+                        seen.Add "2-start"
+                        seen.Add "2-end"
+                        return "2"
                     }
             )
 
-        let mutable resolveGate3 = fun () -> ()
-        let gate3 = Promise.create (fun r _ -> resolveGate3 <- r)
-
-        let rw1 =
-            exec.EnqueueExecutor(
-                sessionId,
-                "rw",
-                fun () ->
-                    promise {
-                        seen.Add "rw1-start"
-                        do! gate3
-                        seen.Add "rw1-end"
-                        return ()
-                    }
-            )
-
-        let ro3 =
-            exec.EnqueueExecutor(
-                sessionId,
-                "ro",
-                fun () ->
-                    promise {
-                        seen.Add "ro3-start"
-                        return ()
-                    }
-            )
-
-        do! flushMicrotasks 30
-
-        check "ro1 and ro2 concurrent started" (seen.Contains "ro1-start" && seen.Contains "ro2-start")
-        check "rw1 not started yet" (not (seen.Contains "rw1-start"))
-        check "ro3 not started yet" (not (seen.Contains "ro3-start"))
+        do! flushMicrotasks 20
+        check "item1 started, item2 waiting" (seen.Contains "1-start" && not (seen.Contains "2-start"))
 
         resolveGate1 ()
-        do! ro1
-        do! flushMicrotasks 30
-        check "rw1 still waiting on ro2" (not (seen.Contains "rw1-start"))
-
-        resolveGate2 ()
-        do! ro2
-        do! flushMicrotasks 30
-        check "rw1 started after all readers done" (seen.Contains "rw1-start")
-        check "ro3 still waiting on rw1" (not (seen.Contains "ro3-start"))
-
-        resolveGate3 ()
-        do! rw1
-        do! ro3
-        check "ro3 completed last" (seen.Contains "ro3-start")
-
-        let idxRo1End = seen.IndexOf "ro1-end"
-        let idxRo2End = seen.IndexOf "ro2-end"
-        let idxRw1Start = seen.IndexOf "rw1-start"
-        let idxRw1End = seen.IndexOf "rw1-end"
-        let idxRo3Start = seen.IndexOf "ro3-start"
-
-        check "rw1 after ro1-end" (idxRw1Start > idxRo1End)
-        check "rw1 after ro2-end" (idxRw1Start > idxRo2End)
-        check "ro3 after rw1-end" (idxRo3Start > idxRw1End)
+        let! r1 = item1
+        let! r2 = item2
+        equal "item1 result" "1" r1
+        equal "item2 result" "2" r2
+        equal "execution order" [| "1-start"; "1-end"; "2-start"; "2-end" |] (seen |> Seq.toArray)
     }
 
-let removeSessionQueueResetsPerSessionQueue () =
+let testDifferentSessionsParallel () =
     promise {
         let scope = create ()
         let exec = createForScope scope
-        let sessionId = "session-to-reset"
+        let seen = System.Collections.Generic.List<string>()
 
-        let! firstRes = exec.EnqueuePerSession(sessionId, fun () -> promise { return "first" })
+        let mutable resolveGateA = fun () -> ()
+        let gateA = Promise.create (fun r _ -> resolveGateA <- r)
+
+        let itemA =
+            exec.EnqueueExecutor(
+                "session-A",
+                fun () ->
+                    promise {
+                        seen.Add "A-start"
+                        do! gateA
+                        seen.Add "A-end"
+                        return "A"
+                    }
+            )
+
+        let itemB =
+            exec.EnqueueExecutor(
+                "session-B",
+                fun () ->
+                    promise {
+                        seen.Add "B-start"
+                        seen.Add "B-end"
+                        return "B"
+                    }
+            )
+
+        do! flushMicrotasks 20
+        check "session B runs in parallel with session A" (seen.Contains "A-start" && seen.Contains "B-start")
+
+        resolveGateA ()
+        let! _ = itemA
+        let! _ = itemB
+        ()
+    }
+
+let testPredecessorErrorDoesNotBreakTail () =
+    promise {
+        let scope = create ()
+        let exec = createForScope scope
+        let sessionId = "error-tail-session"
+
+        let item1 =
+            exec.EnqueueExecutor(sessionId, (fun () -> promise { return raise (exn "item1 failed") }))
+
+        let item2 =
+            exec.EnqueueExecutor(sessionId, (fun () -> promise { return "item2 success" }))
+
+        let mutable item1Failed = false
+
+        try
+            let! _ = item1
+            ()
+        with ex ->
+            item1Failed <- ex.Message.Contains "item1 failed"
+
+        check "item1 raised exception" item1Failed
+
+        let! r2 = item2
+        equal "item2 executed successfully despite item1 error" "item2 success" r2
+    }
+
+let testCloseSessionExecutorRejectsNewEnqueues () =
+    promise {
+        let scope = create ()
+        let exec = createForScope scope
+        let sessionId = "close-session"
+
+        let! firstRes = exec.EnqueuePerSession(sessionId, (fun () -> promise { return "first" }))
         equal "first execution" "first" firstRes
 
-        scope.RemoveSessionQueue(sessionId)
+        scope.CloseSessionExecutor(sessionId)
+        let mutable rejected = false
 
-        let! secondRes = exec.EnqueuePerSession(sessionId, fun () -> promise { return "second" })
-        equal "second execution after queue removal" "second" secondRes
+        try
+            let! _ = exec.EnqueuePerSession(sessionId, (fun () -> promise { return "second" }))
+            ()
+        with ex ->
+            rejected <- ex.Message.Contains "session executor is closed"
+
+        check "new enqueue rejected after CloseSessionExecutor" rejected
+    }
+
+let testActiveRunIdUnregister () =
+    promise {
+        let scope = create ()
+        let sid = "active-run-test"
+        check "initially inactive" (not (hasActiveExecutorRun scope sid))
+
+        let unreg1 = registerActiveRun scope sid (fun () -> ())
+        let unreg2 = registerActiveRun scope sid (fun () -> ())
+        check "active after register" (hasActiveExecutorRun scope sid)
+
+        unreg1 ()
+        check "still active with 1 run remaining" (hasActiveExecutorRun scope sid)
+
+        unreg2 ()
+        check "inactive after all unregistered" (not (hasActiveExecutorRun scope sid))
     }
 
 let run () =
     promise {
         do! twoScopesSameSessionIdQueuesIsolate ()
-        do! readerWriterLockConcurrencyAndMutualExclusion ()
-        do! removeSessionQueueResetsPerSessionQueue ()
+        do! testSameSessionStrictFifoSerial ()
+        do! testDifferentSessionsParallel ()
+        do! testPredecessorErrorDoesNotBreakTail ()
+        do! testCloseSessionExecutorRejectsNewEnqueues ()
+        do! testActiveRunIdUnregister ()
     }

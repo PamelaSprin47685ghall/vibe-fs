@@ -31,7 +31,7 @@ let forgetSession (scope: RuntimeScope) (sessionId: string) : unit =
     if sessionId = "" then
         ()
     else
-        scope.RemoveSessionQueue sessionId
+        scope.CloseSessionExecutor sessionId
         scope.RemoveTempFiles sessionId
         let prefix = sessionId + "\u0000"
         scope.ClearCapsFilesForSession prefix

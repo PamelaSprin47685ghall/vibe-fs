@@ -128,7 +128,6 @@ let decodeExecutorArgsMissingMaxBytes () =
     let args =
         createObj
             [ "command", box "echo hi"
-              "mode", box "ro"
               "what_to_summarize", box "files"
               "timeout_type", box "short" ]
 
@@ -142,7 +141,6 @@ let decodeExecutorArgsValidMaxBytes () =
     let args =
         createObj
             [ "command", box "echo hi"
-              "mode", box "ro"
               "what_to_summarize", box "files"
               "max_bytes", box 4096
               "timeout_type", box "short" ]
@@ -216,7 +214,6 @@ let buildSummaryPromptSmall () =
           language = Shell
           dependencies = []
           timeoutType = Short
-          mode = "ro"
           cwd = None
           whatToSummarize = "files"
           maxBytes = 8192 }
@@ -235,7 +232,6 @@ let buildSummaryPromptLarge () =
           language = Shell
           dependencies = []
           timeoutType = Short
-          mode = "ro"
           cwd = None
           whatToSummarize = "files"
           maxBytes = 8192 }
@@ -252,7 +248,6 @@ let buildSummaryPromptUtf8Boundary () =
           language = Shell
           dependencies = []
           timeoutType = Short
-          mode = "ro"
           cwd = None
           whatToSummarize = "files"
           maxBytes = 8192 }

@@ -76,7 +76,6 @@ let decodeExecutorOkShell () =
               "command", box "echo ok"
               "dependencies", box [| "dep-a" |]
               "timeout_type", box "long"
-              "mode", box "rw"
               "what_to_summarize", box "focus on exit codes and stderr"
               "max_bytes", box 8192
               "warn",
@@ -89,7 +88,6 @@ let decodeExecutorOkShell () =
         check "executor ok program" (ex.Command = "echo ok")
         equal "executor ok deps count" 1 ex.Dependencies.Length
         check "executor ok timeout" (ex.TimeoutType = Long)
-        check "executor ok mode" (ex.Mode = "rw")
         check "executor ok what_to_summarize" (ex.WhatToSummarize = "focus on exit codes and stderr")
     | _ -> check "executor ok shell via decodeToolInvocation" false
 
@@ -99,7 +97,6 @@ let decodeExecutorMissingWhatToSummarize () =
             [ "language", box "shell"
               "command", box "echo ok"
               "timeout_type", box "long"
-              "mode", box "rw"
               "warn",
               box
                   "it-is-not-possible-to-do-it-using-other-tools-and-only-run-tests-when-static-analysis-cannot-handle-it" ]

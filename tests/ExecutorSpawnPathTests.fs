@@ -11,6 +11,7 @@ open Wanxiangshu.Runtime.ToolOutputInfo
 open Wanxiangshu.Runtime.SubagentPrompts
 open Wanxiangshu.Runtime.SearchPrompts
 open Wanxiangshu.Runtime
+open Wanxiangshu.Runtime.RuntimeScope
 open Wanxiangshu.Runtime.Dyn
 open Wanxiangshu.Runtime.PromptFrontMatter
 
@@ -73,7 +74,6 @@ let executorMapping () =
           language = Shell
           dependencies = []
           timeoutType = Long
-          mode = "ro"
           cwd = None
           whatToSummarize = ""
           maxBytes = 8192 }
@@ -159,7 +159,8 @@ let ensureJavascriptProjectRepairsModuleType () =
         let! projectDir = mkdtempAsync "executor-js-project-"
         let packageJsonPath = unbox<string> (pathModule?join (projectDir, "package.json"))
         do! writeFileAsync packageJsonPath "{\n  \"dependencies\": {\n    \"tsx\": \"*\"\n  }\n}\n"
-        do! Wanxiangshu.Runtime.ExecutorJavascript.ensureJavascriptProject projectDir []
+        let scope = RuntimeScope()
+        let! _ = Wanxiangshu.Runtime.ExecutorJavascript.ensureJavascriptProject scope projectDir [] None None
         let fsAsync: obj = get (requireFn "fs") "promises"
         let! packageJson = unbox<JS.Promise<string>> (fsAsync?readFile (packageJsonPath, "utf-8"))
         check "ensureJavascriptProject writes type module" (packageJson.Contains "\"type\": \"module\"")

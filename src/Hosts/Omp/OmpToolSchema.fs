@@ -109,7 +109,6 @@ let executorParameters (tb: obj) : obj =
                ("command", str Params.executorCommand tb)
                ("dependencies", opt Params.executorDeps tb (fun desc tb -> strArray desc tb))
                ("timeout_type", enumOf [| "short"; "long" |] Params.executorTimeout tb)
-               ("mode", enumOf [| "ro"; "rw" |] Params.executorMode tb)
                ("what_to_summarize", str Params.executorWhatToSummarize tb)
                ("max_bytes", num Params.executorMaxBytes tb) |]
             tb

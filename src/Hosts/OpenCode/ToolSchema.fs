@@ -201,5 +201,3 @@ let submitReviewResult = toolDescription "return_reviewer"
 let continueSpec = toolDescription "continue"
 
 let fuzzyContinue = toolDescription "fuzzy_continue"
-
-let executorMode = Params.executorMode

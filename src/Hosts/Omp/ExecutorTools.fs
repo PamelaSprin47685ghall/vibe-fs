@@ -42,7 +42,6 @@ let private parseExecutorParams (params': obj) (ctx: obj) =
     let command = Dyn.str params' "command"
     let what = Dyn.str params' "what_to_summarize"
     let timeoutType = parseTimeout (Dyn.str params' "timeout_type")
-    let mode = let m = Dyn.str params' "mode" in if m = "" then "rw" else m
 
     let deps =
         let d = Dyn.get params' "dependencies"
@@ -59,25 +58,18 @@ let private parseExecutorParams (params': obj) (ctx: obj) =
         | Some mb -> mb
         | None -> 8192
 
-    (lang, command, what, timeoutType, mode, deps, cwd, maxBytes)
+    (lang, command, what, timeoutType, deps, cwd, maxBytes)
 
 let private runExecutorJob (options: ExecuteOptions) (signal: obj) (childId: string) =
     promise {
-        let timeoutMs =
-            match options.timeoutType with
-            | ExecutorTimeoutType.Long -> 300000
-            | ExecutorTimeoutType.Short -> 30000
-
         let runWork =
             sessionExecutor.EnqueueExecutor(
                 childId,
-                options.mode,
                 (fun () ->
                     promise {
                         let! r = executeWith defaultExecuteDeps ompScope options childId None
                         return r
-                    }),
-                timeoutMs = timeoutMs
+                    })
             )
 
         let onSignalAbort () =
@@ -88,7 +80,7 @@ let private runExecutorJob (options: ExecuteOptions) (signal: obj) (childId: str
     }
 
 let private buildExecutorRequest (params': obj) (ctx: obj) =
-    let (lang, command, what, timeoutType, mode, deps, cwd, maxBytes) =
+    let (lang, command, what, timeoutType, deps, cwd, maxBytes) =
         parseExecutorParams params' ctx
 
     let options =
@@ -96,7 +88,6 @@ let private buildExecutorRequest (params': obj) (ctx: obj) =
           language = parseLanguage lang
           dependencies = deps
           timeoutType = timeoutType
-          mode = mode
           cwd = Some cwd
           whatToSummarize = what
           maxBytes = maxBytes }
@@ -118,8 +109,7 @@ let private parseExecutorResponse
         if not (shouldSummarize byteLength options.maxBytes output) then
             return textResult output
         else
-            let! text =
-                summarizeOutput childSession output lang options.command options.dependencies options.mode what
+            let! text = summarizeOutput childSession output lang options.command options.dependencies what
 
             return text
     }

@@ -16,7 +16,6 @@ let decodeExecutorInvalidLanguage () =
             [ "language", box "ruby"
               "command", box "echo hi"
               "timeout_type", box "short"
-              "mode", box "ro"
               "warn",
               box
                   "it-is-not-possible-to-do-it-using-other-tools-and-only-run-tests-when-static-analysis-cannot-handle-it" ]
@@ -30,7 +29,6 @@ let decodeExecutorMissingProgram () =
     let args =
         createObj
             [ "language", box "shell"
-              "mode", box "ro"
               "warn",
               box
                   "it-is-not-possible-to-do-it-using-other-tools-and-only-run-tests-when-static-analysis-cannot-handle-it" ]
@@ -46,7 +44,6 @@ let decodeExecutorOkShell () =
               "command", box "echo ok"
               "dependencies", box [| "dep-a" |]
               "timeout_type", box "long"
-              "mode", box "rw"
               "what_to_summarize", box "summarize exit codes and stderr only"
               "max_bytes", box 8192 ]
 
@@ -56,7 +53,6 @@ let decodeExecutorOkShell () =
         check "executor ok program" (ex.Command = "echo ok")
         equal "executor ok deps count" 1 ex.Dependencies.Length
         check "executor ok timeout" (ex.TimeoutType = Long)
-        check "executor ok mode" (ex.Mode = "rw")
         check "executor ok what_to_summarize" (ex.WhatToSummarize = "summarize exit codes and stderr only")
         let opts = toExecuteOptions (Some "/tmp/ws") ex
         check "executor ok cwd" (opts.cwd = Some "/tmp/ws")
@@ -68,28 +64,15 @@ let decodeExecutorMissingWhatToSummarize () =
         createObj
             [ "language", box "shell"
               "command", box "echo ok"
-              "timeout_type", box "long"
-              "mode", box "rw" ]
+              "timeout_type", box "long" ]
 
     match decodeExecutorArgs args with
     | Error(InvalidIntent("executor", "what_to_summarize", "required")) ->
         check "executor missing what_to_summarize" true
     | _ -> check "executor missing what_to_summarize" false
 
-let decodeExecutorMissingMode () =
-    let args =
-        createObj
-            [ "language", box "shell"
-              "command", box "echo ok"
-              "timeout_type", box "short" ]
-
-    match decodeExecutorArgs args with
-    | Error(InvalidIntent("executor", "mode", "required")) -> check "executor missing mode" true
-    | _ -> check "executor missing mode" false
-
 let run () =
     decodeExecutorInvalidLanguage ()
     decodeExecutorMissingProgram ()
     decodeExecutorOkShell ()
-    decodeExecutorMissingMode ()
     decodeExecutorMissingWhatToSummarize ()

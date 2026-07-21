@@ -16,6 +16,9 @@ open Wanxiangshu.Runtime.ExecutorSpawnHelper
 [<Global("globalThis.process")>]
 let private nodeProcess: obj = jsNative
 
+[<Emit("performance.now()")>]
+let private now () : float = jsNative
+
 type RunOutcome = ExecutorSpawn.RunOutcome
 type ExecuteDeps = ExecutorSpawnRunners.ExecuteDeps
 let defaultExecuteDeps = ExecutorSpawnRunners.defaultExecuteDeps
@@ -47,12 +50,13 @@ let executeWith
     (onKillRegistered: ((unit -> unit) -> unit) option)
     : JS.Promise<ExecuteResult> =
     promise {
+        let deadline = ExecutionDeadline.start now (timeoutMs options.timeoutType)
         let timeout = timeoutMs options.timeoutType
         let cwd = defaultArg options.cwd (nodeProcess?cwd ())
         let program = prepareProgramForExecution options
 
         let! outcome =
-            deps.runProgram scope program options.language options.dependencies cwd sessionId timeout onKillRegistered
+            deps.runProgram scope program options.language options.dependencies cwd sessionId deadline onKillRegistered
 
         let output =
             match outcome with

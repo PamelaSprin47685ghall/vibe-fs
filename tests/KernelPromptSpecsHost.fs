@@ -85,14 +85,14 @@ let toolCatalogCentralized () =
         "executor requiredFields no warn"
         (not (List.contains Wanxiangshu.Kernel.WarnTdd.warnKey executorSpec.requiredFields))
 
-    check "executor requires mode" (executorSpec.requiredFields |> List.contains "mode")
+    check "executor does not require mode" (not (executorSpec.requiredFields |> List.contains "mode"))
 
     check
         "executor paramDoc no warn_tdd"
         (not (Map.containsKey Wanxiangshu.Kernel.WarnTdd.warnTddKey executorSpec.paramDocs))
 
     check "executor paramDoc no warn" (not (Map.containsKey Wanxiangshu.Kernel.WarnTdd.warnKey executorSpec.paramDocs))
-    check "executor param doc for mode" (Map.containsKey "mode" executorSpec.paramDocs)
+    check "executor param doc no mode" (not (Map.containsKey "mode" executorSpec.paramDocs))
 
     let writeSpec = specOf "write"
     check "write spec carries description" (writeSpec.description.Length > 0)

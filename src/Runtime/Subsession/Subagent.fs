@@ -19,7 +19,6 @@ type SubagentTaskKind =
         program: string *
         dependencies: string list *
         timeoutType: string *
-        mode: string *
         whatToSummarize: string
     | WebsearchSummary of question: string * raw: string
 
@@ -47,8 +46,8 @@ let formatPrompt (host: Host) (kind: SubagentTaskKind) : string list =
     | Meditator intent -> [ intent |> wrap ]
     | Browser intent -> [ browserPrompt intent |> wrap ]
     | Continue(iterator, prompt) -> [ prompt ]
-    | ExecutorSummary(output, language, program, dependencies, timeoutType, mode, whatToSummarize) ->
-        [ executorSummarizerPrompt whatToSummarize output language program dependencies timeoutType mode
+    | ExecutorSummary(output, language, program, dependencies, timeoutType, whatToSummarize) ->
+        [ executorSummarizerPrompt whatToSummarize output language program dependencies timeoutType
           |> wrap ]
     | WebsearchSummary(question, raw) -> [ websearchSummarizerPrompt question raw |> wrap ]
 

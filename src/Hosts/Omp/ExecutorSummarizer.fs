@@ -18,12 +18,11 @@ let summarizeOutput
     (lang: string)
     (command: string)
     (deps: string list)
-    (mode: string)
     (what: string)
     =
     promise {
         let summaryPrompt =
-            executorSummarizerPrompt what output lang command deps "executor" mode
+            executorSummarizerPrompt what output lang command deps "executor"
 
         let baseline = entryCountOfSession childSession
         let! _ = sessionPrompt childSession summaryPrompt

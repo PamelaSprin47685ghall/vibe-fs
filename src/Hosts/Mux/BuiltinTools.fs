@@ -38,7 +38,9 @@ let private description (name: string) : string =
 
 let summarizationAgentId = BuiltinToolsHelpers.summarizationAgentId
 let summarizationRole = BuiltinToolsHelpers.summarizationRole
-let summarizationAiSettingsAgentId = BuiltinToolsHelpers.summarizationAiSettingsAgentId
+
+let summarizationAiSettingsAgentId =
+    BuiltinToolsHelpers.summarizationAiSettingsAgentId
 
 let addIfSome (entries: ResizeArray<string * obj>) (key: string) (v: 'T option) =
     match v with
@@ -60,9 +62,8 @@ let executorTool
                   "command", box (strProp Params.executorCommand)
                   "dependencies", box (strArrayProp Params.executorDeps)
                   "timeout_type", box (strEnumProp Params.executorTimeout [| "short"; "long" |])
-                  "mode", box (strEnumProp Params.executorMode [| "ro"; "rw" |])
                   "what_to_summarize", box (strProp Params.executorWhatToSummarize) ])
-            [| "command"; "timeout_type"; "mode"; "what_to_summarize" |]
+            [| "command"; "timeout_type"; "what_to_summarize" |]
       execute =
         fun config args ->
             match fromMuxConfig config with
@@ -78,17 +79,11 @@ let executorTool
                     | Ok decoded ->
                         promise {
                             let opts = toExecuteOptions (Some runtime.Execution.Directory) decoded
-                            let timeoutMs =
-                                match opts.timeoutType with
-                                | ExecutorTimeoutType.Long -> 300000
-                                | ExecutorTimeoutType.Short -> 30000
 
                             let! execResult =
                                 sessionScope.EnqueueExecutor(
                                     sessionId,
-                                    opts.mode,
-                                    (fun () -> Wanxiangshu.Runtime.Executor.execute sessionScope opts sessionId),
-                                    timeoutMs = timeoutMs
+                                    (fun () -> Wanxiangshu.Runtime.Executor.execute sessionScope opts sessionId)
                                 )
 
                             return! summarizeWhenNeeded deps config toolNames opts execResult

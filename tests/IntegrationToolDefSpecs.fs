@@ -128,7 +128,7 @@ let toolDefinitionSpec () =
         let executorSchema = get executorDef "jsonSchema"
         let executorProps = get executorSchema "properties"
         check "tool.definition keeps executor command schema" (not (isNullish (get executorProps "command")))
-        check "tool.definition keeps executor mode schema" (not (isNullish (get executorProps "mode")))
+        check "tool.definition mode schema removed" (isNullish (get executorProps "mode"))
 
         check
             "tool.definition injects executor warn_tdd schema"

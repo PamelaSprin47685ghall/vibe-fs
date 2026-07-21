@@ -53,16 +53,16 @@ let hasRunningWhenActiveExecutorRun () =
     let sessionId = "runner-exec-active-1"
     check "not running before register" (not (hasRunningRunnerJob scope sessionId))
     let kill = (fun () -> ())
-    registerActiveRun scope sessionId kill
+    let unreg = registerActiveRun scope sessionId kill
     check "running when executor active" (hasRunningRunnerJob scope sessionId)
-    unregisterActiveRun scope sessionId kill
+    unreg ()
 
 let abortExecutorRunClearsActive () =
     let scope = RuntimeScope()
     clearRunnerLogsForTest scope
     let sessionId = "runner-exec-abort-1"
     let mutable killed = false
-    registerActiveRun scope sessionId (fun () -> killed <- true)
+    let _unreg = registerActiveRun scope sessionId (fun () -> killed <- true)
     check "running before abort" (hasRunningRunnerJob scope sessionId)
     abortExecutorRun scope sessionId
     check "kill invoked" killed

@@ -42,7 +42,6 @@ let runAll (args: string array) : JS.Promise<unit> =
             createObj
                 [ "command", box "echo test"
                   "language", box "shell"
-                  "mode", box "ro"
                   "timeout_type", box "short"
                   "warn_tdd", box warnTddValue
                   "warn", box warnValue ]

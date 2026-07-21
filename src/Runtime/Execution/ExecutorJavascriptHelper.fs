@@ -4,6 +4,9 @@ open Fable.Core
 open Fable.Core.JsInterop
 open System.Text.RegularExpressions
 open Thoth.Json
+open Wanxiangshu.Runtime.RuntimeScope
+open Wanxiangshu.Runtime.ExecutorSpawnHelper
+open Wanxiangshu.Runtime.ExecutorSpawn
 
 [<Import("join", "node:path")>]
 let join (a: string) (b: string) : string = jsNative
@@ -67,20 +70,14 @@ let jsonStringify (value: obj) : string =
 let jsonEscape (s: string) : string = Encode.Auto.toString (0, s)
 
 /// Spawn `npx npm install` in the project dir, resolving on a clean exit.
-let npmInstall (projectDir: string) (packages: string array) : JS.Promise<unit> =
+let npmInstall
+    (scope: RuntimeScope)
+    (projectDir: string)
+    (packages: string array)
+    (timeoutMs: int option)
+    (sessionId: string option)
+    : JS.Promise<RunOutcome> =
     let args' =
         Array.append [| "--yes"; "npm@latest"; "install"; "--prefix"; projectDir |] packages
 
-    Promise.create (fun resolve reject ->
-        let c = childSpawn "npx" args' (box {| cwd = projectDir; stdio = "ignore" |})
-        c?on ("error", (fun (e: obj) -> reject (e :?> exn))) |> ignore
-
-        c?on (
-            "close",
-            fun (code: obj) ->
-                if unbox<int> code = 0 then
-                    resolve ()
-                else
-                    reject (exn $"npm install exited with {code}")
-        )
-        |> ignore)
+    spawnAndRun scope "npx" args' projectDir timeoutMs sessionId None

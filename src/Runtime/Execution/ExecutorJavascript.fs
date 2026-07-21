@@ -5,6 +5,8 @@ open Fable.Core.JsInterop
 open System.Text.RegularExpressions
 open Wanxiangshu.Kernel
 open Wanxiangshu.Runtime.ExecutorJavascriptHelper
+open Wanxiangshu.Runtime.RuntimeScope
+open Wanxiangshu.Runtime.ExecutorSpawnHelper
 
 /// Build the ESM prelude that gives a transpiled script require/__dirname/__filename.
 let createJavascriptPrelude (cwd: string) : string =
@@ -91,7 +93,13 @@ let rewriteJavascriptModuleSpecifiers (program: string) (cwd: string) : JS.Promi
 /// Ensure the temp project dir is an ESM project with tsx + dependencies.
 /// Always guarantees `type: "module"` is present, repairing a pre-existing
 /// package.json that lacks it even when no dependencies need installation.
-let ensureJavascriptProject (projectDir: string) (dependencies: string list) : JS.Promise<unit> =
+let ensureJavascriptProject
+    (scope: RuntimeScope)
+    (projectDir: string)
+    (dependencies: string list)
+    (timeoutMs: int option)
+    (sessionId: string option)
+    : JS.Promise<RunOutcome option> =
     promise {
         mkdirSync projectDir (box {| recursive = true |})
         let pkgPath = $"{projectDir}/package.json"
@@ -114,5 +122,8 @@ let ensureJavascriptProject (projectDir: string) (dependencies: string list) : J
         writeFileSync pkgPath $"{jsonStringify pkg}\n" "utf-8"
 
         if not toInstall.IsEmpty then
-            do! npmInstall projectDir (Array.ofList toInstall)
+            let! res = npmInstall scope projectDir (Array.ofList toInstall) timeoutMs sessionId
+            return Some res
+        else
+            return None
     }

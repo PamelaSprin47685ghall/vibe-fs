@@ -182,7 +182,6 @@ let executorToolSchemaFourFields () =
                "command"
                "dependencies"
                "timeout_type"
-               "mode"
                "what_to_summarize"
                "warn" |] do
             check ("runner schema has " + field) (Dyn.has properties field)

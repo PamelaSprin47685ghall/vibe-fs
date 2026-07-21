@@ -5,19 +5,36 @@ open Wanxiangshu.Runtime.RuntimeScope
 
 let private activeRunsKey = "wanxiangshu.session_executor.active_runs"
 
-let private getActiveRuns (scope: RuntimeScope) : Map<string, (unit -> unit) list> =
+let private getActiveRuns (scope: RuntimeScope) : Map<string, Map<string, unit -> unit>> =
     match scope.TryFindKey activeRunsKey with
-    | Some v -> unbox<Map<string, (unit -> unit) list>> v
+    | Some v -> unbox<Map<string, Map<string, unit -> unit>>> v
     | None -> Map.empty
 
-let private setActiveRuns (scope: RuntimeScope) (runs: Map<string, (unit -> unit) list>) : unit =
+let private setActiveRuns (scope: RuntimeScope) (runs: Map<string, Map<string, unit -> unit>>) : unit =
     scope.Add(activeRunsKey, box runs)
 
-let registerActiveRun (scope: RuntimeScope) (sessionId: string) (kill: unit -> unit) : unit =
-    if sessionId <> "" then
+let registerActiveRun (scope: RuntimeScope) (sessionId: string) (kill: unit -> unit) : unit -> unit =
+    if sessionId = "" then
+        fun () -> ()
+    else
+        let runId = System.Guid.NewGuid().ToString("N")
         let activeRuns = getActiveRuns scope
-        let current = Map.tryFind sessionId activeRuns |> Option.defaultValue []
-        setActiveRuns scope (Map.add sessionId (kill :: current) activeRuns)
+        let currentMap = Map.tryFind sessionId activeRuns |> Option.defaultValue Map.empty
+        let updatedMap = Map.add runId kill currentMap
+        setActiveRuns scope (Map.add sessionId updatedMap activeRuns)
+
+        fun () ->
+            let activeRuns = getActiveRuns scope
+
+            match Map.tryFind sessionId activeRuns with
+            | None -> ()
+            | Some currentMap ->
+                let updatedMap = Map.remove runId currentMap
+
+                if Map.isEmpty updatedMap then
+                    setActiveRuns scope (Map.remove sessionId activeRuns)
+                else
+                    setActiveRuns scope (Map.add sessionId updatedMap activeRuns)
 
 let unregisterActiveRun (scope: RuntimeScope) (sessionId: string) (kill: unit -> unit) : unit =
     if sessionId <> "" then
@@ -25,17 +42,28 @@ let unregisterActiveRun (scope: RuntimeScope) (sessionId: string) (kill: unit ->
 
         match Map.tryFind sessionId activeRuns with
         | None -> ()
-        | Some current ->
-            let updated =
-                current |> List.filter (fun k -> not (System.Object.ReferenceEquals(k, kill)))
+        | Some currentMap ->
+            match
+                currentMap
+                |> Map.toSeq
+                |> Seq.tryFind (fun (_, k) -> System.Object.ReferenceEquals(k, kill))
+            with
+            | Some(runId, _) ->
+                let updatedMap = Map.remove runId currentMap
 
-            if List.isEmpty updated then
-                setActiveRuns scope (Map.remove sessionId activeRuns)
-            else
-                setActiveRuns scope (Map.add sessionId updated activeRuns)
+                if Map.isEmpty updatedMap then
+                    setActiveRuns scope (Map.remove sessionId activeRuns)
+                else
+                    setActiveRuns scope (Map.add sessionId updatedMap activeRuns)
+            | None -> ()
 
 let hasActiveExecutorRun (scope: RuntimeScope) (sessionId: string) : bool =
-    sessionId <> "" && Map.containsKey sessionId (getActiveRuns scope)
+    if sessionId = "" then
+        false
+    else
+        match Map.tryFind sessionId (getActiveRuns scope) with
+        | Some m -> not (Map.isEmpty m)
+        | None -> false
 
 let abortExecutorRun (scope: RuntimeScope) (sessionId: string) : unit =
     if sessionId <> "" then
@@ -43,8 +71,8 @@ let abortExecutorRun (scope: RuntimeScope) (sessionId: string) : unit =
 
         match Map.tryFind sessionId activeRuns with
         | None -> ()
-        | Some kills ->
-            for kill in kills do
+        | Some currentMap ->
+            for KeyValue(_, kill) in currentMap do
                 try
                     kill ()
                 with _ ->
@@ -56,10 +84,10 @@ let resetSessionExecutorForTesting (scope: RuntimeScope) : unit = scope.Remove(a
 
 /// Per-session serial executor bound to a registration [RuntimeScope].
 type SessionExecutor(scope: RuntimeScope) =
-    member _.EnqueuePerSession(sessionId: string, work: unit -> JS.Promise<'T>, ?timeoutMs: int) : JS.Promise<'T> =
-        scope.EnqueuePerSession(sessionId, work, ?timeoutMs = timeoutMs)
+    member _.EnqueuePerSession(sessionId: string, work: unit -> JS.Promise<'T>) : JS.Promise<'T> =
+        scope.EnqueuePerSession(sessionId, work)
 
-    member _.EnqueueExecutor(sessionId: string, mode: string, work: unit -> JS.Promise<'T>, ?timeoutMs: int) : JS.Promise<'T> =
-        scope.EnqueueExecutor(sessionId, mode, work, ?timeoutMs = timeoutMs)
+    member _.EnqueueExecutor(sessionId: string, work: unit -> JS.Promise<'T>) : JS.Promise<'T> =
+        scope.EnqueueExecutor(sessionId, work)
 
 let createForScope (scope: RuntimeScope) : SessionExecutor = SessionExecutor(scope)

@@ -10,70 +10,65 @@ open Wanxiangshu.Runtime.ExecutorJavascript
 open Wanxiangshu.Runtime.ExecutorSpawn
 open Wanxiangshu.Runtime.ExecutorPlatform
 open Wanxiangshu.Runtime.RuntimeScope
+open Wanxiangshu.Runtime.ExecutorSpawnHelper
 
-let private runShellProgram
-    (scope: RuntimeScope)
-    (program: string)
-    (cwd: string)
-    (sessionId: string)
-    (timeoutMs: int)
-    (onKillRegistered: ((unit -> unit) -> unit) option)
-    : JS.Promise<RunOutcome> =
-    let extension = if isWindows () then "ps1" else "sh"
+[<Emit("performance.now()")>]
+let private now () : float = jsNative
 
-    let scriptPath =
-        createTempScript (getExecutorTempScriptPath sessionId extension) program
+let private runShellProgram scope program cwd sessionId deadline onKillRegistered : JS.Promise<RunOutcome> =
+    let remaining = ExecutionDeadline.remainingMs now deadline
 
-    let sid = Some sessionId
-
-    if isWindows () then
-        runScript
-            scope
-            "powershell.exe"
-            [| "-ExecutionPolicy"; "Bypass"; "-File" |]
-            cwd
-            scriptPath
-            (Some timeoutMs)
-            sid
-            onKillRegistered
+    if remaining <= 0 then
+        Promise.lift (TimedOut("", "(execution deadline exceeded before start)"))
     else
-        runScript scope "bash" [||] cwd scriptPath (Some timeoutMs) sid onKillRegistered
+        let extension = if isWindows () then "ps1" else "sh"
 
-let private runPythonProgram
-    (scope: RuntimeScope)
-    (program: string)
-    (dependencies: string list)
-    (cwd: string)
-    (sessionId: string)
-    (timeoutMs: int)
-    (onKillRegistered: ((unit -> unit) -> unit) option)
+        let scriptPath =
+            createTempScript (getExecutorTempScriptPath sessionId extension) program
+
+        let sid = Some sessionId
+
+        if isWindows () then
+            runScript
+                scope
+                "powershell.exe"
+                [| "-ExecutionPolicy"; "Bypass"; "-File" |]
+                cwd
+                scriptPath
+                (Some remaining)
+                sid
+                onKillRegistered
+        else
+            runScript scope "bash" [||] cwd scriptPath (Some remaining) sid onKillRegistered
+
+let private runPythonWithDependencies
+    scope
+    baseArgs
+    cwd
+    scriptPath
+    sid
+    deadline
+    remaining
+    onKillRegistered
     : JS.Promise<RunOutcome> =
-    let scriptPath = createTempScript (getExecutorTempScriptPath sessionId "py") program
-
-    let baseArgs =
-        [| yield "--isolated"
-           for dep in dependencies do
-               yield "--with"
-               yield dep |]
-
-    let sid = Some sessionId
-
-    let warmup () =
-        spawnAndRun
-            scope
-            "uvx"
-            (Array.append baseArgs [| "--from"; "python"; "python"; "-c"; "pass" |])
-            cwd
-            (Some 60000)
-            sid
-            None
-
     promise {
-        if not dependencies.IsEmpty then
-            let! warm = warmup ()
+        let! warm =
+            spawnAndRun
+                scope
+                "uvx"
+                (Array.append baseArgs [| "--from"; "python"; "python"; "-c"; "pass" |])
+                cwd
+                (Some remaining)
+                sid
+                None
 
-            match warm with
-            | Exited(0, _, _) ->
+        match warm with
+        | Exited(0, _, _) ->
+            let scriptRemaining = ExecutionDeadline.remainingMs now deadline
+
+            if scriptRemaining <= 0 then
+                return TimedOut("", "(execution deadline exceeded after python warmup)")
+            else
                 return!
                     runScript
                         scope
@@ -81,49 +76,90 @@ let private runPythonProgram
                         (Array.append baseArgs [| "--from"; "python"; "python" |])
                         cwd
                         scriptPath
-                        (Some timeoutMs)
+                        (Some scriptRemaining)
                         sid
                         onKillRegistered
-            | _ -> return warm
-        else
-            return!
-                runScript
-                    scope
-                    "uvx"
-                    (Array.append baseArgs [| "--from"; "python"; "python" |])
-                    cwd
-                    scriptPath
-                    (Some timeoutMs)
-                    sid
-                    onKillRegistered
+        | _ -> return warm
     }
 
-let private runJavascriptProgram
-    (scope: RuntimeScope)
-    (program: string)
-    (dependencies: string list)
-    (cwd: string)
-    (sessionId: string)
-    (timeoutMs: int)
-    (onKillRegistered: ((unit -> unit) -> unit) option)
+let private runPythonProgram
+    scope
+    program
+    dependencies
+    cwd
+    sessionId
+    deadline
+    onKillRegistered
     : JS.Promise<RunOutcome> =
-    promise {
-        let projectDir = getExecutorProjectDir (Some sessionId)
-        do! ensureJavascriptProject projectDir dependencies
-        let! rewritten = rewriteJavascriptModuleSpecifiers program cwd
-        let body = $"{createJavascriptPrelude cwd}{rewritten}"
-        let scriptPath = createTempScript $"{projectDir}/script.mts" body
+    let remaining = ExecutionDeadline.remainingMs now deadline
 
-        return!
+    if remaining <= 0 then
+        Promise.lift (TimedOut("", "(execution deadline exceeded before start)"))
+    else
+        let scriptPath = createTempScript (getExecutorTempScriptPath sessionId "py") program
+
+        let baseArgs =
+            [| yield "--isolated"
+               for dep in dependencies do
+                   yield "--with"
+                   yield dep |]
+
+        let sid = Some sessionId
+
+        if not dependencies.IsEmpty then
+            runPythonWithDependencies scope baseArgs cwd scriptPath sid deadline remaining onKillRegistered
+        else
             runScript
                 scope
-                "npx"
-                [| "--prefix"; projectDir; "--yes"; "--no-install"; "tsx" |]
+                "uvx"
+                (Array.append baseArgs [| "--from"; "python"; "python" |])
                 cwd
                 scriptPath
-                (Some timeoutMs)
-                (Some sessionId)
+                (Some remaining)
+                sid
                 onKillRegistered
+
+let private runJavascriptProgram
+    scope
+    program
+    dependencies
+    cwd
+    sessionId
+    deadline
+    onKillRegistered
+    : JS.Promise<RunOutcome> =
+    promise {
+        let remaining = ExecutionDeadline.remainingMs now deadline
+
+        if remaining <= 0 then
+            return TimedOut("", "(execution deadline exceeded before start)")
+        else
+            let projectDir = getExecutorProjectDir (Some sessionId)
+            let! installRes = ensureJavascriptProject scope projectDir dependencies (Some remaining) (Some sessionId)
+
+            match installRes with
+            | Some(Exited(0, _, _))
+            | None ->
+                let scriptRemaining = ExecutionDeadline.remainingMs now deadline
+
+                if scriptRemaining <= 0 then
+                    return TimedOut("", "(execution deadline exceeded after javascript dependency setup)")
+                else
+                    let! rewritten = rewriteJavascriptModuleSpecifiers program cwd
+                    let body = $"{createJavascriptPrelude cwd}{rewritten}"
+                    let scriptPath = createTempScript $"{projectDir}/script.mts" body
+
+                    return!
+                        runScript
+                            scope
+                            "npx"
+                            [| "--prefix"; projectDir; "--yes"; "--no-install"; "tsx" |]
+                            cwd
+                            scriptPath
+                            (Some scriptRemaining)
+                            (Some sessionId)
+                            onKillRegistered
+            | Some otherOutcome -> return otherOutcome
     }
 
 type ExecuteDeps =
@@ -134,23 +170,23 @@ type ExecuteDeps =
             -> string list
             -> string
             -> string
-            -> int
+            -> ExecutionDeadline
             -> ((unit -> unit) -> unit) option
             -> JS.Promise<RunOutcome> }
 
 let defaultRunProgram
-    (scope: RuntimeScope)
-    (program: string)
-    (language: ExecutorLanguage)
-    (dependencies: string list)
-    (cwd: string)
-    (sessionId: string)
-    (timeout: int)
-    (onKillRegistered: ((unit -> unit) -> unit) option)
+    scope
+    program
+    language
+    dependencies
+    cwd
+    sessionId
+    deadline
+    onKillRegistered
     : JS.Promise<RunOutcome> =
     match language with
-    | Shell -> runShellProgram scope program cwd sessionId timeout onKillRegistered
-    | Python -> runPythonProgram scope program dependencies cwd sessionId timeout onKillRegistered
-    | Javascript -> runJavascriptProgram scope program dependencies cwd sessionId timeout onKillRegistered
+    | Shell -> runShellProgram scope program cwd sessionId deadline onKillRegistered
+    | Python -> runPythonProgram scope program dependencies cwd sessionId deadline onKillRegistered
+    | Javascript -> runJavascriptProgram scope program dependencies cwd sessionId deadline onKillRegistered
 
 let defaultExecuteDeps: ExecuteDeps = { runProgram = defaultRunProgram }

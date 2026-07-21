@@ -104,7 +104,6 @@ let taExecutor () =
               Command = "p"
               Dependencies = []
               TimeoutType = Short
-              Mode = "rw"
               WhatToSummarize = "s" }
 
     match a with

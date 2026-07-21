@@ -179,7 +179,7 @@ let reviewMarkdownCodec () =
         (parseReviewReportMarkdown (formatReviewVerdictMarkdown Revise "needs work"))
 
 let executorSummarizerNoExitStatus () =
-    let prompt = executorSummarizerPrompt "" "raw" "shell" "echo 1" [] "short" "ro"
+    let prompt = executorSummarizerPrompt "" "raw" "shell" "echo 1" [] "short"
     check "summarizer prompt omits exit status" (not (prompt.Contains "exit status"))
     check "summarizer prompt omits non-zero exit" (not (prompt.ToLowerInvariant().Contains "non-zero exit"))
 

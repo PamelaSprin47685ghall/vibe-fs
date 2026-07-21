@@ -174,7 +174,7 @@
     <Compile Include="src/Runtime/Search/FuzzyIteratorStore.fs"/>
     <Compile Include="src/Runtime/Subsession/SubagentIteratorStore.fs"/>
     <Compile Include="src/Runtime/EventStore/SessionProjectionStore.fs"/>
-    <Compile Include="src/Runtime/Workspace/SessionReaderWriterLock.fs"/>
+    <Compile Include="src/Runtime/Execution/SessionSerialExecutor.fs"/>
     <Compile Include="src/Runtime/Workspace/RuntimeScopeComponents.fs"/>
     <Compile Include="src/Runtime/Workspace/RuntimeScope.fs"/>
     <Compile Include="src/Runtime/Messaging/MethodologyArgs.fs"/>
@@ -222,8 +222,6 @@
     <Compile Include="src/Runtime/Messaging/MuxWorkspaceCodec.fs"/>
     <Compile Include="src/Runtime/Tooling/ToolRuntimeContext.fs"/>
     <Compile Include="src/Runtime/Execution/JsArrayMutate.fs"/>
-    <Compile Include="src/Runtime/Execution/ExecutorJavascriptHelper.fs"/>
-    <Compile Include="src/Runtime/Execution/ExecutorJavascript.fs"/>
     <Compile Include="src/Runtime/Subsession/SubagentIntentsCodec.fs"/>
     <Compile Include="src/Runtime/Tooling/WebSearchApi.fs"/>
     <Compile Include="src/Runtime/Subsession/SubagentToolContext.fs"/>
@@ -292,6 +290,8 @@
     <Compile Include="src/Runtime/Execution/ExecutorPlatform.fs"/>
     <Compile Include="src/Runtime/Execution/ExecutorSpawnHelper.fs"/>
     <Compile Include="src/Runtime/Execution/ExecutorSpawn.fs"/>
+    <Compile Include="src/Runtime/Execution/ExecutorJavascriptHelper.fs"/>
+    <Compile Include="src/Runtime/Execution/ExecutorJavascript.fs"/>
     <Compile Include="src/Runtime/Execution/ExecutorSpawnRunners.fs"/>
     <Compile Include="src/Runtime/Execution/Executor.fs"/>
     <Compile Include="src/Runtime/Search/FuzzySearchSupport.fs"/>
@@ -614,7 +614,6 @@
     <Compile Include="tests/EventLogRuntimeTests.fs"/>
     <Compile Include="tests/EventLogRuntimeRobustnessTests.fs"/>
     <Compile Include="tests/EventLogInvariantsAndLockTests.fs"/>
-    <Compile Include="tests/ReaderWriterLockTests.fs"/>
     <Compile Include="tests/ReplayEquivalenceTests.fs"/>
     <Compile Include="tests/IntegrationToolSetup.fs"/>
     <Compile Include="tests/EventDrivenHarness.fs"/>

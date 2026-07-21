@@ -45,7 +45,7 @@ let subagentDispatch () =
     check "browser prompt embeds intent" ((browserPrompts |> List.head).Contains "open google.com")
 
     let execPrompts =
-        formatPrompt host (ExecutorSummary("raw shell output", "shell", "echo 1", [ "dep1" ], "short", "ro", ""))
+        formatPrompt host (ExecutorSummary("raw shell output", "shell", "echo 1", [ "dep1" ], "short", ""))
 
     check "executor summary prompt count is one" (execPrompts |> List.length = 1)
     let execPrompt = execPrompts |> List.head
@@ -53,12 +53,11 @@ let subagentDispatch () =
     check "executor summary embeds program" (execPrompt.Contains "program:" && execPrompt.Contains "echo 1")
     check "executor summary embeds dependencies" (execPrompt.Contains "dependencies:" && execPrompt.Contains "dep1")
     check "executor summary embeds timeout_type" (execPrompt.Contains "timeout_type: short")
-    check "executor summary embeds mode" (execPrompt.Contains "mode: ro")
     check "executor summary embeds raw output in body" (execPrompt.Contains "raw shell output")
     check "executor summary includes task section" (execPrompt.Contains "# Task")
 
     let execPromptsWithFocus =
-        formatPrompt host (ExecutorSummary("out", "shell", "echo 1", [], "short", "ro", "only exit codes"))
+        formatPrompt host (ExecutorSummary("out", "shell", "echo 1", [], "short", "only exit codes"))
 
     check "executor summary embeds whatToSummarize" ((execPromptsWithFocus |> List.head).Contains "only exit codes")
 
