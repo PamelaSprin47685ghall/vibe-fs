@@ -7,19 +7,19 @@ open Fable.Core.JsInterop
 let appendFileSync (path: string) (data: string) : unit = jsNative
 
 [<Import("appendFile", "node:fs/promises")>]
-let appendFileAsync (path: string) (data: string) : JS.Promise<unit> = jsNative
+let inscribeRawEventLog (path: string) (data: string) : JS.Promise<unit> = jsNative
 
 [<Import("writeFile", "node:fs/promises")>]
-let writeFileFlagAsync (path: string) (data: string) (options: obj) : JS.Promise<unit> = jsNative
+let writeRawEventLogWithOptions (path: string) (data: string) (options: obj) : JS.Promise<unit> = jsNative
 
 [<Import("unlink", "node:fs/promises")>]
-let unlinkAsync (path: string) : JS.Promise<unit> = jsNative
+let unlinkRawEventLogFile (path: string) : JS.Promise<unit> = jsNative
 
 [<Import("stat", "node:fs/promises")>]
-let statAsync (path: string) : JS.Promise<obj> = jsNative
+let statRawEventLogFile (path: string) : JS.Promise<obj> = jsNative
 
 [<Import("readFile", "node:fs/promises")>]
-let readFileBufferAsync (path: string) : JS.Promise<obj> = jsNative
+let readRawEventLogBuffer (path: string) : JS.Promise<obj> = jsNative
 
 [<Emit("$0 != null && $0.code === 'ENOENT'")>]
 let isMissingPathError (error: obj) : bool = jsNative
@@ -47,10 +47,10 @@ let resetLockingConfig () =
     ensureFileTimeoutMs <- 10000
     lockfileLockOverride <- None
 
-let fileExists (filePath: string) : JS.Promise<bool> =
+let checkRawEventLogExists (filePath: string) : JS.Promise<bool> =
     promise {
         try
-            let! _ = statAsync filePath
+            let! _ = statRawEventLogFile filePath
             return true
         with ex when isMissingPathError (box ex) ->
             return false

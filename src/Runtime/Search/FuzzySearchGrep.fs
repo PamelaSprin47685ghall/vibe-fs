@@ -11,12 +11,6 @@ open Wanxiangshu.Runtime.FuzzySearchSupport
 open Wanxiangshu.Runtime.FuzzyGrepTypes
 open Wanxiangshu.Runtime.FuzzySearchGrepMatch
 
-let resolveGrepIteratorStateForPattern =
-    FuzzySearchGrepMatch.resolveGrepIteratorStateForPattern
-
-let resolveGrepIteratorState = FuzzySearchGrepMatch.resolveGrepIteratorState
-let resolveResult = FuzzySearchGrepMatch.resolveResult
-
 let private runGrepWithFinder
     (state: FuzzyGrepState)
     (cursor: obj option)
@@ -118,13 +112,13 @@ let private fuzzyGrepMulti
             return res
     }
 
-let fuzzyGrep (params': FuzzyGrepParams) (opts: SearchOptions) : JS.Promise<SearchOutcome> =
+let searchFuzzyContent (params': FuzzyGrepParams) (opts: SearchOptions) : JS.Promise<SearchOutcome> =
     match params'.pattern with
     | [ _ ]
     | [] -> fuzzyGrepSingle params' opts
     | multi -> fuzzyGrepMulti multi params' opts
 
-let fuzzyGrepContinue
+let paginateFuzzyGrepContent
     (iteratorState: GrepIteratorState)
     (store: TypedIteratorStore)
     (opts: SearchOptions)

@@ -7,7 +7,8 @@ open Wanxiangshu.Kernel.EventSourcing.EventEnvelope
 open Wanxiangshu.Runtime.EventLogCodec
 open Wanxiangshu.Runtime.EventStore
 open Wanxiangshu.Runtime.EventLogFile
-open Wanxiangshu.Runtime.EventLogIo
+open Wanxiangshu.Runtime.EventLogIoRaw
+open Wanxiangshu.Runtime.EventLogLock
 open Wanxiangshu.Runtime.ReviewEventWriter
 open Wanxiangshu.Runtime.SessionEventWriter
 open Wanxiangshu.Runtime.EventLogRuntimeNudge

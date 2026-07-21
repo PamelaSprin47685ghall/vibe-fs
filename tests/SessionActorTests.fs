@@ -7,6 +7,7 @@ open Wanxiangshu.Kernel.Session.SessionFact
 open Wanxiangshu.Runtime.Session.SessionActor
 open Wanxiangshu.Runtime.Session.SessionActorRegistry
 open Wanxiangshu.Runtime.Session.SessionActorState
+open Wanxiangshu.Runtime.Session.SessionActorState.SessionActorTransition
 open Wanxiangshu.Runtime.Session.SessionFactDecode
 open Wanxiangshu.Runtime.OpencodeHookInputCodec
 open Fable.Core.JsInterop
@@ -180,7 +181,7 @@ let pureAdmissionRules () =
     let openFact = SessionFact.SessionIdleObserved(createObj [])
     check "open accepts idle" (FactAdmission.decide baseSnap openFact = FactAdmission.Accept)
 
-    let closedSnap = SessionActorTransition.markClosed baseSnap
+    let closedSnap = markSnapshotClosed baseSnap
     check "closed drops idle" (FactAdmission.decide closedSnap openFact = FactAdmission.DropClosed)
 
     let identity: EffectIdentity =
@@ -189,14 +190,14 @@ let pureAdmissionRules () =
           ExpectedOwner = Some SessionOwner.Fallback }
 
     let effect = SessionFact.DispatchTransportReturned(identity, true, None)
-    let ownerSnap = SessionActorTransition.setOwner SessionOwner.Nudge baseSnap
+    let ownerSnap = assignSnapshotOwner SessionOwner.Nudge baseSnap
 
     check "owner mismatch" (FactAdmission.decide ownerSnap effect = FactAdmission.DropOwnerMismatch)
 
     let dispatchSnap =
         baseSnap
-        |> SessionActorTransition.setOwner SessionOwner.Fallback
-        |> SessionActorTransition.setActiveDispatch (Some "d1")
+        |> assignSnapshotOwner SessionOwner.Fallback
+        |> attachActiveDispatchId (Some "d1")
 
     check "matching effect accepts" (FactAdmission.decide dispatchSnap effect = FactAdmission.Accept)
 

@@ -11,10 +11,6 @@ open Wanxiangshu.Runtime.FuzzyFinderShell
 open Wanxiangshu.Runtime.FuzzySearchSupport
 open Wanxiangshu.Runtime.FuzzySearchFindHelper
 
-// Re-expose helpers required by FuzzySearch.fs / tests
-let resolveFindSearchState = FuzzySearchFindHelper.resolveFindSearchState
-let findNextIterator = FuzzySearchFindHelper.findNextIterator
-
 let private runFind
     (state: FuzzyFindState)
     (store: TypedIteratorStore)
@@ -134,13 +130,13 @@ let private fuzzyFindMulti
                     opts.finderCache.Destroy searchPath.basePath |> ignore
     }
 
-let fuzzyFind (params': FuzzyFindParams) (opts: SearchOptions) : JS.Promise<SearchOutcome> =
+let locateFuzzyMatches (params': FuzzyFindParams) (opts: SearchOptions) : JS.Promise<SearchOutcome> =
     match params'.pattern with
     | [ _ ]
     | [] -> fuzzyFindSingle params' opts
     | multi -> fuzzyFindMulti multi params' opts
 
-let fuzzyFindContinue
+let paginateFuzzyFindMatches
     (state: FuzzyFindState)
     (store: TypedIteratorStore)
     (opts: SearchOptions)

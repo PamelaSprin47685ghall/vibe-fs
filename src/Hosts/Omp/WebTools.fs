@@ -12,7 +12,7 @@ open Wanxiangshu.Hosts.Omp.Codec
 open Wanxiangshu.Hosts.Omp.ExecutorTools
 open Wanxiangshu.Hosts.Omp.Schema
 open Wanxiangshu.Runtime.Fallback.RuntimeStore
-open Wanxiangshu.Runtime.FuzzySearch
+open Wanxiangshu.Runtime.FuzzySearchSupport
 open Wanxiangshu.Runtime.RuntimeScope
 open Wanxiangshu.Runtime.WebSearchApi
 open Wanxiangshu.Runtime.WebSearchCodec

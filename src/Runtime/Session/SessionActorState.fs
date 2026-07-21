@@ -56,36 +56,36 @@ module FactAdmission =
         | _ -> false
 
 module SessionActorTransition =
-    let bumpGeneration (snap: SessionActorSnapshot) : SessionActorSnapshot =
+    let advanceSnapshotGeneration (snap: SessionActorSnapshot) : SessionActorSnapshot =
         { snap with
             Generation = snap.Generation + 1
             ActiveDispatchId = None }
 
-    let markClosed (snap: SessionActorSnapshot) : SessionActorSnapshot =
+    let markSnapshotClosed (snap: SessionActorSnapshot) : SessionActorSnapshot =
         { snap with
             Closed = true
             ActiveDispatchId = None
             Owner = SessionOwner.NoOwner
             Generation = snap.Generation + 1 }
 
-    let setOwner (owner: SessionOwner) (snap: SessionActorSnapshot) : SessionActorSnapshot = { snap with Owner = owner }
+    let assignSnapshotOwner (owner: SessionOwner) (snap: SessionActorSnapshot) : SessionActorSnapshot = { snap with Owner = owner }
 
-    let setActiveDispatch (dispatchId: string option) (snap: SessionActorSnapshot) : SessionActorSnapshot =
+    let attachActiveDispatchId (dispatchId: string option) (snap: SessionActorSnapshot) : SessionActorSnapshot =
         { snap with
             ActiveDispatchId = dispatchId }
 
-    let recordAccepted (snap: SessionActorSnapshot) : SessionActorSnapshot =
+    let recordSnapshotAccepted (snap: SessionActorSnapshot) : SessionActorSnapshot =
         { snap with
             AcceptedCount = snap.AcceptedCount + 1 }
 
-    let recordDropped (snap: SessionActorSnapshot) : SessionActorSnapshot =
+    let recordSnapshotDropped (snap: SessionActorSnapshot) : SessionActorSnapshot =
         { snap with
             DroppedCount = snap.DroppedCount + 1 }
 
     /// Apply fact-local epoch bookkeeping before the domain handler runs.
-    let applyFactEpoch (fact: SessionFact) (snap: SessionActorSnapshot) : SessionActorSnapshot =
+    let applyFactEpochToSnapshot (fact: SessionFact) (snap: SessionActorSnapshot) : SessionActorSnapshot =
         match fact with
-        | SessionFact.SessionClosed -> markClosed snap
+        | SessionFact.SessionClosed -> markSnapshotClosed snap
         | SessionFact.HumanTurnObserved _ ->
             { snap with
                 Owner = SessionOwner.Human

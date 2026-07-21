@@ -5,6 +5,7 @@ open Fable.Core.JsInterop
 open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Runtime.FuzzyFinderShell
 open Wanxiangshu.Runtime.FuzzySearchGrep
+open Wanxiangshu.Runtime.FuzzySearchGrepMatch
 open Wanxiangshu.Runtime.FuzzySearchSupport
 open Wanxiangshu.Runtime.FuzzyIteratorStore
 open Wanxiangshu.Kernel.FuzzyQuery

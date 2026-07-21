@@ -3,6 +3,7 @@ module Wanxiangshu.Runtime.EventLogCodec
 open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Kernel.EventSourcing.EventEnvelope
+open Wanxiangshu.Runtime.EventLogIoRaw
 open Thoth.Json
 open System
 
@@ -133,7 +134,7 @@ let private openFileHandleAsync (path: string) (flags: string) : JS.Promise<obj>
 [<Import("stat", "node:fs/promises")>]
 let private statAsync (path: string) : JS.Promise<obj> = jsNative
 
-let readChunkAsync (path: string) (position: float) (length: int) : JS.Promise<string> =
+let readEventLogChunk (path: string) (position: float) (length: int) : JS.Promise<string> =
     promise {
         let! handle = openFileHandleAsync path "r"
         try
@@ -145,7 +146,7 @@ let readChunkAsync (path: string) (position: float) (length: int) : JS.Promise<s
             handle?close () |> ignore
     }
 
-let readEventsFile (path: string) : JS.Promise<WanEvent list> =
+let decodeEventsFromFile (path: string) : JS.Promise<WanEvent list> =
     promise {
         let! stats = statAsync path
         let size = unbox<int> stats?size
@@ -163,6 +164,12 @@ let readEventsFile (path: string) : JS.Promise<WanEvent list> =
                 | CorruptMiddle(_, _, _, _, _, evs) -> return evs
             finally
                 handle?close() |> ignore
+    }
+
+let inscribeEventLogLine (path: string) (e: WanEvent) : JS.Promise<unit> =
+    promise {
+        let line = wanEventToLine e + "\n"
+        do! inscribeRawEventLog path line
     }
 
 let decorateEvent (writerId: string) (eventCountRead: int) (e: WanEvent) : WanEvent =

@@ -79,7 +79,7 @@ let grepMaxMatchesPerFileRespectsPageSize () =
               context = None
               limit = Some 100 }
 
-        let! _ = fuzzyGrep params' opts
+        let! _ = searchFuzzyContent params' opts
 
         match capturedOpts with
         | Some o ->
@@ -126,7 +126,7 @@ let findPagingWhenTotalMatchedIsNone () =
               path = None
               limit = Some 30 }
 
-        let! outcome = fuzzyFind params' opts
+        let! outcome = locateFuzzyMatches params' opts
         check "iterator generated when totalMatched=None at page boundary" (outcome.output.Contains "iterator:")
     }
 
@@ -175,7 +175,7 @@ let grepMultiPropagatesErrorAndSafety () =
               context = None
               limit = Some 100 }
 
-        let! outcome = fuzzyGrep params' opts
+        let! outcome = searchFuzzyContent params' opts
         check "multi grep isError is true" outcome.isError
         check "success subpattern was called" (callCount >= 1)
         check "finder was destroyed on error" destroyed

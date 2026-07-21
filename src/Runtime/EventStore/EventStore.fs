@@ -9,7 +9,8 @@ open Wanxiangshu.Kernel.EventSourcing.Fold
 open Wanxiangshu.Kernel.SessionOverview
 open Wanxiangshu.Runtime.EventLogCodec
 open Wanxiangshu.Runtime.EventLogFile
-open Wanxiangshu.Runtime.EventLogIo
+open Wanxiangshu.Runtime.EventLogIoRaw
+open Wanxiangshu.Runtime.EventLogLock
 open Wanxiangshu.Runtime.Clock
 open Wanxiangshu.Runtime.PromiseQueue
 open Wanxiangshu.Runtime.NudgeDispatchClaim
@@ -28,7 +29,7 @@ type EventLogStore(workspaceRoot: string, ?appendLineOverride: string -> WanEven
     let queue = SerialQueue()
     let eventFilePath = eventPath workspaceRoot
     let writesDisabled = workspaceRoot = ""
-    let appendLineFn = defaultArg appendLineOverride appendLine
+    let appendLineFn = defaultArg appendLineOverride inscribeEventLogLine
     let state = EventStoreState(workspaceRoot, eventFilePath)
     let writerId = System.Guid.NewGuid().ToString()
 
@@ -48,7 +49,7 @@ type EventLogStore(workspaceRoot: string, ?appendLineOverride: string -> WanEven
     member _.ReadAllEvents() : JS.Promise<WanEvent list> =
         promise {
             do! state.EnsureSynced()
-            let! events = withWorkspaceLock eventFilePath (fun () -> readEventsFile eventFilePath)
+            let! events = withWorkspaceEventLock eventFilePath (fun () -> decodeEventsFromFile eventFilePath)
             return events
         }
 
@@ -86,14 +87,14 @@ type EventLogStore(workspaceRoot: string, ?appendLineOverride: string -> WanEven
 
                             try
                                 do!
-                                    withWorkspaceLock eventFilePath (fun () ->
+                                    withWorkspaceEventLock eventFilePath (fun () ->
                                         promise {
                                             do! state.SyncNewEvents()
                                             let decorated = decorateEvent writerId state.EventCountRead e
                                             decoratedOpt <- Some decorated
                                             let line = wanEventToLine decorated + "\n"
                                             do! appendLineFn eventFilePath decorated
-                                            let! stats = statAsync eventFilePath
+                                            let! stats = statRawEventLogFile eventFilePath
                                             state.LastKnownSize <- state.SizeOf stats
                                             state.LastReadByteOffset <- state.LastReadByteOffset + int64 (byteLength line)
                                         })
@@ -121,14 +122,14 @@ type EventLogStore(workspaceRoot: string, ?appendLineOverride: string -> WanEven
                 let mutable decoratedOpt = None
 
                 do!
-                    withWorkspaceLock eventFilePath (fun () ->
+                    withWorkspaceEventLock eventFilePath (fun () ->
                         promise {
                             do! state.SyncNewEvents()
                             let decorated = decorateEvent writerId state.EventCountRead e
                             decoratedOpt <- Some decorated
                             let line = wanEventToLine decorated + "\n"
                             do! appendLineFn eventFilePath decorated
-                            let! stats = statAsync eventFilePath
+                            let! stats = statRawEventLogFile eventFilePath
                             state.LastKnownSize <- state.SizeOf stats
                             state.LastReadByteOffset <- state.LastReadByteOffset + int64 (byteLength line)
                         })
@@ -151,7 +152,7 @@ type EventLogStore(workspaceRoot: string, ?appendLineOverride: string -> WanEven
                     let mutable decoratedEvents = []
 
                     do!
-                        withWorkspaceLock eventFilePath (fun () ->
+                        withWorkspaceEventLock eventFilePath (fun () ->
                             promise {
                                 do! state.SyncNewEvents()
                                 let decorateds = decorateEvents writerId state.EventCountRead events
@@ -162,8 +163,8 @@ type EventLogStore(workspaceRoot: string, ?appendLineOverride: string -> WanEven
                                     |> List.map (fun e -> wanEventToLine e + "\n")
                                     |> String.concat ""
 
-                                do! appendFileAsync eventFilePath block
-                                let! stats = statAsync eventFilePath
+                                do! inscribeRawEventLog eventFilePath block
+                                let! stats = statRawEventLogFile eventFilePath
                                 state.LastKnownSize <- state.SizeOf stats
                                 state.LastReadByteOffset <- state.LastReadByteOffset + int64 (byteLength block)
                             })
@@ -192,7 +193,7 @@ type EventLogStore(workspaceRoot: string, ?appendLineOverride: string -> WanEven
                 let mutable claimed = false
 
                 do!
-                    withWorkspaceLock eventFilePath (fun () ->
+                    withWorkspaceEventLock eventFilePath (fun () ->
                         promise {
                             do! state.SyncNewEvents()
 
@@ -216,7 +217,7 @@ type EventLogStore(workspaceRoot: string, ?appendLineOverride: string -> WanEven
                                 let decorated = decorateEvent writerId state.EventCountRead ev
                                 let line = wanEventToLine decorated + "\n"
                                 do! appendLineFn eventFilePath decorated
-                                let! stats = statAsync eventFilePath
+                                let! stats = statRawEventLogFile eventFilePath
                                 state.LastKnownSize <- state.SizeOf stats
                                 state.LastReadByteOffset <- state.LastReadByteOffset + int64 (byteLength line)
                                 state.Cache.FoldWan decorated

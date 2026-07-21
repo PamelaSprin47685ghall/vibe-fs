@@ -5,6 +5,7 @@ open Wanxiangshu.Kernel.FallbackKernel.Types
 open Wanxiangshu.Kernel.Session.SessionFact
 open Wanxiangshu.Runtime.PromiseQueue
 open Wanxiangshu.Runtime.Session.SessionActorState
+open Wanxiangshu.Runtime.Session.SessionActorState.SessionActorTransition
 
 /// Domain handler invoked only after the mailbox admits a fact.
 type SessionFactHandler = SessionActorSnapshot -> SessionFact -> JS.Promise<unit>
@@ -47,20 +48,20 @@ type SessionActor(workspaceKey: string, sessionId: string) =
     member _.BumpGeneration() : JS.Promise<int> =
         commit (fun () ->
             promise {
-                snap <- SessionActorTransition.bumpGeneration snap
+                snap <- advanceSnapshotGeneration snap
                 return snap.Generation
             })
 
     member _.SetOwner(owner: SessionOwner) : JS.Promise<unit> =
         commit (fun () ->
             promise {
-                snap <- SessionActorTransition.setOwner owner snap
+                snap <- assignSnapshotOwner owner snap
             })
 
     member _.SetActiveDispatch(dispatchId: string option) : JS.Promise<unit> =
         commit (fun () ->
             promise {
-                snap <- SessionActorTransition.setActiveDispatch dispatchId snap
+                snap <- attachActiveDispatchId dispatchId snap
             })
 
     /// Enqueue a fact. Returns after admission + domain handler complete.
@@ -71,13 +72,13 @@ type SessionActor(workspaceKey: string, sessionId: string) =
                 let decision = FactAdmission.decide snap fact
 
                 if not (FactAdmission.isAccepted decision) then
-                    snap <- SessionActorTransition.recordDropped snap
+                    snap <- recordSnapshotDropped snap
                     return decision
                 else
-                    snap <- SessionActorTransition.applyFactEpoch fact snap
+                    snap <- applyFactEpochToSnapshot fact snap
                     let view = snap
                     do! handler view fact
-                    snap <- SessionActorTransition.recordAccepted snap
+                    snap <- recordSnapshotAccepted snap
                     return FactAdmission.Accept
             })
 

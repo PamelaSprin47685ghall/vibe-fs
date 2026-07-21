@@ -5,6 +5,7 @@ open Wanxiangshu.Kernel.FuzzyPath
 open Wanxiangshu.Kernel.FuzzyQuery
 open Wanxiangshu.Kernel.FuzzyFormat
 open Wanxiangshu.Runtime.FuzzySearch
+open Wanxiangshu.Runtime.FuzzySearchGrepMatch
 open Wanxiangshu.Runtime.FuzzyIteratorStore
 open Wanxiangshu.Kernel
 open Wanxiangshu.Runtime.FuzzyFinderShell

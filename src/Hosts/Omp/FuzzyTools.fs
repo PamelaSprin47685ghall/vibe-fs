@@ -80,7 +80,7 @@ let private registerFuzzyFind (pi: obj) (tb: obj) (finderCache: FinderCache) (it
               box (fun (_id: string) (params': obj) (_signal: obj) (_onUpdate: obj) (ctx: obj) ->
                   executeFuzzySearch
                       Wanxiangshu.Runtime.FuzzyToolsCodec.decodeFuzzyFindArgs
-                      fuzzyFind
+                      locateFuzzyMatches
                       finderCache
                       iteratorStore
                       params'
@@ -120,7 +120,7 @@ let private registerFuzzyGrep (pi: obj) (tb: obj) (finderCache: FinderCache) (it
               box (fun (_id: string) (params': obj) (_signal: obj) (_onUpdate: obj) (ctx: obj) ->
                   executeFuzzySearch
                       Wanxiangshu.Runtime.FuzzyToolsCodec.decodeFuzzyGrepArgs
-                      fuzzyGrep
+                      searchFuzzyContent
                       finderCache
                       iteratorStore
                       params'
@@ -140,7 +140,7 @@ let private registerFuzzyContinue (pi: obj) (tb: obj) (finderCache: FinderCache)
               box (fun (_id: string) (params': obj) (_signal: obj) (_onUpdate: obj) (ctx: obj) ->
                   executeFuzzySearch
                       Wanxiangshu.Runtime.FuzzyToolsCodec.decodeFuzzyContinueArgs
-                      fuzzyContinue
+                      paginateFuzzySearch
                       finderCache
                       iteratorStore
                       params'

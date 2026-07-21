@@ -6,6 +6,7 @@ open Wanxiangshu.Kernel.FuzzyQuery
 open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Runtime.FuzzySearchSupport
 open Wanxiangshu.Runtime.FuzzySearchGrep
+open Wanxiangshu.Runtime.FuzzySearchGrepMatch
 open Wanxiangshu.Runtime.FuzzyIteratorStore
 
 let private fakeStore () = createTypedIteratorStore 100

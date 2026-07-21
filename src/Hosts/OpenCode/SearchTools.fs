@@ -21,22 +21,19 @@ open Wanxiangshu.Runtime.FuzzyToolsCodec
 open Wanxiangshu.Runtime.Fallback.RuntimeStore
 open Wanxiangshu.Hosts.Opencode.SearchToolsHelper
 
-module ToolSchemaModule = Wanxiangshu.Hosts.Opencode.ToolSchema
-module FuzzyCommandsModule = Wanxiangshu.Runtime.FuzzySearch
-
 let fuzzyFindTool
     (finderCache: FinderCache)
     (iteratorStore: Wanxiangshu.Runtime.FuzzyIteratorStore.TypedIteratorStore)
     : obj =
     buildFuzzyTool
-        ToolSchemaModule.fuzzyFind
+        ToolSchema.fuzzyFind
         (box
             {| pattern = strArrayReq Params.fuzzyFindPattern
                path = strOpt Params.fuzzyFindPath
                limit = intMinNullish 1 Params.fuzzyFindLimit |})
         "fuzzy_find"
         decodeFuzzyFindArgs
-        FuzzyCommandsModule.fuzzyFind
+        locateFuzzyMatches
         finderCache
         iteratorStore
 
@@ -45,7 +42,7 @@ let fuzzyGrepTool
     (iteratorStore: Wanxiangshu.Runtime.FuzzyIteratorStore.TypedIteratorStore)
     : obj =
     buildFuzzyTool
-        ToolSchemaModule.fuzzyGrep
+        ToolSchema.fuzzyGrep
         (box
             {| pattern = strArrayReq Params.fuzzyGrepPattern
                path = strOpt Params.fuzzyGrepPath
@@ -56,7 +53,7 @@ let fuzzyGrepTool
                limit = intMinNullish 1 Params.fuzzyGrepLimit |})
         "fuzzy_grep"
         decodeFuzzyGrepArgs
-        FuzzyCommandsModule.fuzzyGrep
+        searchFuzzyContent
         finderCache
         iteratorStore
 
@@ -65,11 +62,11 @@ let fuzzyContinueTool
     (iteratorStore: Wanxiangshu.Runtime.FuzzyIteratorStore.TypedIteratorStore)
     : obj =
     buildFuzzyTool
-        ToolSchemaModule.fuzzyContinue
+        ToolSchema.fuzzyContinue
         (box {| iterator = strReq Params.fuzzyContinueIterator |})
         "fuzzy_continue"
         decodeFuzzyContinueArgs
-        FuzzyCommandsModule.fuzzyContinue
+        paginateFuzzySearch
         finderCache
         iteratorStore
 

@@ -13,10 +13,10 @@ type SearchOptions = FuzzySearchSupport.SearchOptions
 type ResolvedGrep = FuzzyGrepTypes.ResolvedGrep
 type FuzzyContinueParams = Wanxiangshu.Kernel.FuzzyQuery.FuzzyContinueParams
 
-let fuzzyFind = FuzzySearchFind.fuzzyFind
-let fuzzyGrep = FuzzySearchGrep.fuzzyGrep
+let locateFuzzyMatches = FuzzySearchFind.locateFuzzyMatches
+let searchFuzzyContent = FuzzySearchGrep.searchFuzzyContent
 
-let fuzzyContinue (params': FuzzyContinueParams) (opts: SearchOptions) : JS.Promise<SearchOutcome> =
+let paginateFuzzySearch (params': FuzzyContinueParams) (opts: SearchOptions) : JS.Promise<SearchOutcome> =
     promise {
         match resolveStore opts with
         | Error msg -> return { output = msg; isError = true }
@@ -33,14 +33,14 @@ let fuzzyContinue (params': FuzzyContinueParams) (opts: SearchOptions) : JS.Prom
 
             if isFind then
                 match consumeFindIterator store it with
-                | Some state -> return! FuzzySearchFind.fuzzyFindContinue state store opts
+                | Some state -> return! FuzzySearchFind.paginateFuzzyFindMatches state store opts
                 | None ->
                     return
                         { output = iteratorError "fuzzy_continue" it
                           isError = true }
             elif isGrep then
                 match consumeGrepIterator store it with
-                | Some state -> return! FuzzySearchGrep.fuzzyGrepContinue state store opts
+                | Some state -> return! FuzzySearchGrep.paginateFuzzyGrepContent state store opts
                 | None ->
                     return
                         { output = iteratorError "fuzzy_continue" it
@@ -50,18 +50,3 @@ let fuzzyContinue (params': FuzzyContinueParams) (opts: SearchOptions) : JS.Prom
                     { output = $"fuzzy_continue error: invalid iterator format \"{it}\""
                       isError = true }
     }
-
-let parseExcludeField = FuzzySearchSupport.parseExcludeField
-let optStr = FuzzySearchSupport.optStr
-let optInt = FuzzySearchSupport.optInt
-let optBool = FuzzySearchSupport.optBool
-let resolveStore = FuzzySearchSupport.resolveStore
-let runWithFinder = FuzzySearchSupport.runWithFinder
-
-// Re-export state resolvers used by tests
-let resolveFindSearchState = FuzzySearchFind.resolveFindSearchState
-let resolveGrepIteratorState = FuzzySearchGrep.resolveGrepIteratorState
-let findNextIterator = FuzzySearchFind.findNextIterator
-
-// Re-export result resolver used by tests
-let resolveResult = FuzzySearchGrep.resolveResult

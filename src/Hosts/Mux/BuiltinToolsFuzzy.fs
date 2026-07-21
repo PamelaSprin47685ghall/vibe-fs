@@ -22,8 +22,6 @@ let private description (name: string) : string =
     | Ok d -> d
     | Error e -> failwith e
 
-module FuzzyCommandsModule = Wanxiangshu.Runtime.FuzzySearch
-
 let private searchOptionsFromRuntime
     (runtime: IToolRuntimeContext)
     (finderCache: FinderCache)
@@ -59,12 +57,12 @@ let fuzzyFindTool
             | Ok runtime ->
                 match decodeFuzzyFindArgs args with
                 | Error e -> Promise.lift (wireDecodeFailure "fuzzy_find" e)
-                | Ok p ->
-                    let o = searchOptionsFromRuntime runtime finderCache iteratorStore
+                | Ok queryParams ->
+                    let matchOptions = searchOptionsFromRuntime runtime finderCache iteratorStore
 
                     promise {
-                        let! r = FuzzyCommandsModule.fuzzyFind p o
-                        return r.output
+                        let! searchOutcome = locateFuzzyMatches queryParams matchOptions
+                        return searchOutcome.output
                     }
       condition = None }
 
@@ -92,12 +90,12 @@ let fuzzyGrepTool
             | Ok runtime ->
                 match decodeFuzzyGrepArgs args with
                 | Error e -> Promise.lift (wireDecodeFailure "fuzzy_grep" e)
-                | Ok p ->
-                    let o = searchOptionsFromRuntime runtime finderCache iteratorStore
+                | Ok queryParams ->
+                    let matchOptions = searchOptionsFromRuntime runtime finderCache iteratorStore
 
                     promise {
-                        let! r = FuzzyCommandsModule.fuzzyGrep p o
-                        return r.output
+                        let! searchOutcome = searchFuzzyContent queryParams matchOptions
+                        return searchOutcome.output
                     }
       condition = None }
 
@@ -115,11 +113,11 @@ let fuzzyContinueTool
             | Ok runtime ->
                 match decodeFuzzyContinueArgs args with
                 | Error e -> Promise.lift (wireDecodeFailure "fuzzy_continue" e)
-                | Ok p ->
-                    let o = searchOptionsFromRuntime runtime finderCache iteratorStore
+                | Ok queryParams ->
+                    let matchOptions = searchOptionsFromRuntime runtime finderCache iteratorStore
 
                     promise {
-                        let! r = FuzzyCommandsModule.fuzzyContinue p o
-                        return r.output
+                        let! searchOutcome = paginateFuzzySearch queryParams matchOptions
+                        return searchOutcome.output
                     }
       condition = None }

@@ -32,7 +32,7 @@ let unpoisonFile (filePath: string) : unit =
 
 let private ensureFileExists (filePath: string) : JS.Promise<unit> =
     promise {
-        let! exists = fileExists filePath
+        let! exists = checkRawEventLogExists filePath
 
         if not exists then
             try
@@ -40,7 +40,7 @@ let private ensureFileExists (filePath: string) : JS.Promise<unit> =
                 if lastSlash > 0 then
                     let dir = filePath.Substring(0, lastSlash)
                     do! mkdirAsync (dir, {| recursive = true |})
-                do! writeFileFlagAsync filePath "" (createObj [ "flag", box "wx" ])
+                do! writeRawEventLogWithOptions filePath "" (createObj [ "flag", box "wx" ])
             with ex when isExistingPathError (box ex) ->
                 ()
     }
@@ -174,7 +174,7 @@ let private ensureFileOrFail (filePath: string) : JS.Promise<unit> =
         | Some() -> ()
     }
 
-let withWorkspaceLock<'T> (filePath: string) (action: unit -> JS.Promise<'T>) : JS.Promise<'T> =
+let withWorkspaceEventLock<'T> (filePath: string) (action: unit -> JS.Promise<'T>) : JS.Promise<'T> =
     if poisonedFiles.Contains(filePath) then
         Promise.reject (
             exn (
@@ -222,3 +222,6 @@ let withWorkspaceLock<'T> (filePath: string) (action: unit -> JS.Promise<'T>) : 
             let! res = next
             return unbox<'T> res
         }
+
+let withWorkspaceLock<'T> (filePath: string) (action: unit -> JS.Promise<'T>) : JS.Promise<'T> =
+    withWorkspaceEventLock<'T> filePath action

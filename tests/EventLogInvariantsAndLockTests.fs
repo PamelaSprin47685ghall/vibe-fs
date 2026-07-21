@@ -45,7 +45,7 @@ let testProjectionEquivalence () =
         for e in events1 do
             cache1.FoldWan e
 
-        let! cleanEvents = readEventsFile path
+        let! cleanEvents = decodeEventsFromFile path
         let cache2 = ProjectionCache()
 
         for e in cleanEvents do
@@ -103,27 +103,27 @@ let private testTruncationCasesPart1 (dir: string) (path: string) (line1: string
     promise {
         do! writeFileAsync path ""
         do! repairAndTruncateFile dir path
-        let! res1 = readEventsFile path
+        let! res1 = decodeEventsFromFile path
         equal "A1 empty" 0 res1.Length
 
         do! writeFileAsync path line1
         do! repairAndTruncateFile dir path
-        let! res2 = readEventsFile path
+        let! res2 = decodeEventsFromFile path
         equal "A2 single complete" 1 res2.Length
 
         do! writeFileAsync path (wanEventToLine ev1)
         do! repairAndTruncateFile dir path
-        let! res3 = readEventsFile path
+        let! res3 = decodeEventsFromFile path
         equal "A3 missing newline" 1 res3.Length
 
         do! writeFileAsync path (line1 + "{broken\n")
         do! repairAndTruncateFile dir path
-        let! res4 = readEventsFile path
+        let! res4 = decodeEventsFromFile path
         equal "A4 corrupt tail" 2 res4.Length
 
         do! writeFileAsync path (line1 + "{broken\n" + line1)
         do! repairAndTruncateFile dir path
-        let! res5 = readEventsFile path
+        let! res5 = decodeEventsFromFile path
         equal "A5 corrupt middle" 2 res5.Length
     }
 
@@ -131,7 +131,7 @@ let private testTruncationCasesPart2 (dir: string) (path: string) (line1: string
     promise {
         do! writeFileAsync path (line1.Replace("\n", "\r\n"))
         do! repairAndTruncateFile dir path
-        let! res6 = readEventsFile path
+        let! res6 = decodeEventsFromFile path
         equal "A6 CRLF" 1 res6.Length
 
         let evChinese =
@@ -147,29 +147,29 @@ let private testTruncationCasesPart2 (dir: string) (path: string) (line1: string
 
         do! writeFileAsync path (wanEventToLine evChinese + "\n{broken中文\n")
         do! repairAndTruncateFile dir path
-        let! res7 = readEventsFile path
+        let! res7 = decodeEventsFromFile path
         equal "A7 Chinese" 2 res7.Length
 
         do! writeFileAsync path ""
         do! repairAndTruncateFile dir path
-        let! res8 = readEventsFile path
+        let! res8 = decodeEventsFromFile path
         equal "A8 zero length" 0 res8.Length
 
         do! writeFileAsync path (line1 + "{broken\n")
         do! repairAndTruncateFile dir path
         do! repairAndTruncateFile dir path
-        let! res9 = readEventsFile path
+        let! res9 = decodeEventsFromFile path
         let repairs = res9 |> List.filter (fun e -> e.Kind = "event_log_repaired")
         equal "A9 & A12 repair event count" 1 repairs.Length
 
         do! writeFileAsync path "   \n\n   \n"
         do! repairAndTruncateFile dir path
-        let! res10 = readEventsFile path
+        let! res10 = decodeEventsFromFile path
         equal "A10 whitespace" 0 res10.Length
 
         do! writeFileAsync path "{\"invalid\":true}\n"
         do! repairAndTruncateFile dir path
-        let! res11 = readEventsFile path
+        let! res11 = decodeEventsFromFile path
         equal "A11 missing fields" 1 res11.Length
     }
 

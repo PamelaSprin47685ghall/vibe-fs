@@ -6,6 +6,8 @@ open Wanxiangshu.Kernel.FuzzyQuery
 open Wanxiangshu.Runtime.ToolOutputInfo
 open Wanxiangshu.Kernel.FuzzyFormat
 open Wanxiangshu.Runtime.FuzzySearch
+open Wanxiangshu.Runtime.FuzzySearchSupport
+open Wanxiangshu.Runtime.FuzzySearchFindHelper
 open Wanxiangshu.Runtime.FuzzyIteratorStore
 open Wanxiangshu.Kernel
 open Wanxiangshu.Runtime.FuzzyFinderShell
@@ -182,7 +184,7 @@ let runWithFinderSharedPipeline () =
             member _.isDestroyed = false }
 
     let outcome =
-        Wanxiangshu.Runtime.FuzzySearch.runWithFinder (Ok fakeFinder) (Some "/external/path") (fun _ ->
+        Wanxiangshu.Runtime.FuzzySearchSupport.runWithFinder (Ok fakeFinder) (Some "/external/path") (fun _ ->
             { output = "ok"; isError = false })
 
     equal "outcome propagated" "ok" outcome.output
@@ -199,7 +201,7 @@ let runWithFinderSharedPipeline () =
     let mutable raised = false
 
     try
-        Wanxiangshu.Runtime.FuzzySearch.runWithFinder (Ok fakeFinder2) (Some "/external/path") (fun _ ->
+        Wanxiangshu.Runtime.FuzzySearchSupport.runWithFinder (Ok fakeFinder2) (Some "/external/path") (fun _ ->
             failwith "boom")
         |> ignore
     with _ ->

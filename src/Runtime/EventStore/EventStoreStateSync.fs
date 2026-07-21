@@ -5,7 +5,8 @@ open Fable.Core.JsInterop
 open Wanxiangshu.Runtime.EventStoreIo
 open Wanxiangshu.Runtime.EventStoreStateInit
 open Wanxiangshu.Runtime.EventLogCodec
-open Wanxiangshu.Runtime.EventLogIo
+open Wanxiangshu.Runtime.EventLogIoRaw
+open Wanxiangshu.Runtime.EventLogLock
 
 type EventStoreState with
     member internal this.ProcessLines(lines: string[]) : bool =
@@ -23,7 +24,7 @@ type EventStoreState with
 
     member internal this.SyncNewEvents() : JS.Promise<unit> =
         promise {
-            let! stats = statAsync this.EventFilePath
+            let! stats = statRawEventLogFile this.EventFilePath
             let size = this.SizeOf stats
 
             if size < this.LastKnownSize then
@@ -33,7 +34,7 @@ type EventStoreState with
             elif size > this.LastReadByteOffset then
                 let offset = this.LastReadByteOffset
                 let length = int (size - offset)
-                let! newText = readChunkAsync this.EventFilePath (float offset) length
+                let! newText = readEventLogChunk this.EventFilePath (float offset) length
                 let combinedText = this.PartialLineBuffer + newText
 
                 if not (combinedText.EndsWith("\n")) then
@@ -56,20 +57,20 @@ type EventStoreState with
             do! this.EnsureInitialized()
 
             try
-                let! stats = statAsync this.EventFilePath
+                let! stats = statRawEventLogFile this.EventFilePath
                 let size = this.SizeOf stats
 
                 if size <> this.LastKnownSize || this.PartialLineBuffer <> "" then
-                    do! withWorkspaceLock this.EventFilePath (fun () -> this.SyncNewEvents())
+                    do! withWorkspaceEventLock this.EventFilePath (fun () -> this.SyncNewEvents())
             with ex ->
                 if isMissingPathError (box ex) then
                     if this.WorkspaceRoot = "" then
                         this.ClearForMissingFile()
                     else
-                        let! rootExists = fileExists this.WorkspaceRoot
+                        let! rootExists = checkRawEventLogExists this.WorkspaceRoot
 
                         if rootExists then
-                            let! rootStats = statAsync this.WorkspaceRoot
+                            let! rootStats = statRawEventLogFile this.WorkspaceRoot
 
                             if unbox<bool> (rootStats?isDirectory ()) then
                                 this.ClearForMissingFile()

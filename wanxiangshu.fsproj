@@ -252,12 +252,11 @@
     <Compile Include="src/Runtime/Messaging/DelegatedAiSettings.fs"/>
     <Compile Include="src/Runtime/Messaging/MuxAiSettingsCodec.fs"/>
     <Compile Include="src/Runtime/Workspace/FileSys.fs"/>
+    <Compile Include="src/Runtime/EventStore/EventLogIoRaw.fs"/>
+    <Compile Include="src/Runtime/EventStore/EventLogLock.fs"/>
     <Compile Include="src/Runtime/EventStore/EventLogCodec.fs"/>
     <Compile Include="src/Runtime/EventStore/EventLogRecovery.fs"/>
     <Compile Include="src/Runtime/Wanxiangzhen/SquadEventWanCodec.fs"/>
-    <Compile Include="src/Runtime/EventStore/EventLogIoRaw.fs"/>
-    <Compile Include="src/Runtime/EventStore/EventLogLock.fs"/>
-    <Compile Include="src/Runtime/EventStore/EventLogIo.fs"/>
     <Compile Include="src/Runtime/EventStore/EventLogSquadProjection.fs"/>
     <Compile Include="src/Runtime/EventStore/EventLogFile.fs"/>
     <Compile Include="src/Runtime/EventStore/ProjectionCache.fs"/>

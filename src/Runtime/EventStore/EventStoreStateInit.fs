@@ -5,7 +5,8 @@ open Fable.Core.JsInterop
 open Wanxiangshu.Runtime.EventStoreIo
 open Wanxiangshu.Runtime.EventLogCodec
 open Wanxiangshu.Runtime.EventLogRecovery
-open Wanxiangshu.Runtime.EventLogIo
+open Wanxiangshu.Runtime.EventLogIoRaw
+open Wanxiangshu.Runtime.EventLogLock
 open Wanxiangshu.Runtime.PromiseQueue
 open Wanxiangshu.Kernel.EventSourcing.EventEnvelope
 
@@ -19,7 +20,7 @@ type EventStoreState with
             this.StateKind <- Repairing(opId, "Incremental sync corruption")
             do! repairAndTruncateFile this.WorkspaceRoot this.EventFilePath
 
-            let! buffer = readFileBufferAsync this.EventFilePath
+            let! buffer = readRawEventLogBuffer this.EventFilePath
             let scanRes = scanEventLog buffer
 
             let (validOffset, events) =
@@ -29,7 +30,7 @@ type EventStoreState with
                 | CorruptTail(off, _, _, _, _, evs) -> (off, evs)
                 | CorruptMiddle(off, _, _, _, _, evs) -> (off, evs)
 
-            let! stats = statAsync this.EventFilePath
+            let! stats = statRawEventLogFile this.EventFilePath
 
             match this.StateKind with
             | Repairing(currentOpId, _) when currentOpId = opId ->
@@ -62,7 +63,7 @@ type EventStoreState with
 
     member private this.executeInitAction(opId: string) : JS.Promise<unit> =
         promise {
-            let! buffer = readFileBufferAsync this.EventFilePath
+            let! buffer = readRawEventLogBuffer this.EventFilePath
             let scanRes = scanEventLog buffer
 
             let needsRepair =
@@ -74,7 +75,7 @@ type EventStoreState with
                 this.StateKind <- Repairing(opId, "Initial scan corruption")
                 do! repairAndTruncateFile this.WorkspaceRoot this.EventFilePath
 
-            let! finalBuffer = readFileBufferAsync this.EventFilePath
+            let! finalBuffer = readRawEventLogBuffer this.EventFilePath
             let finalScan = scanEventLog finalBuffer
 
             let (validOffset, events) =
@@ -84,7 +85,7 @@ type EventStoreState with
                 | CorruptTail(off, _, _, _, _, evs) -> (off, evs)
                 | CorruptMiddle(off, _, _, _, _, evs) -> (off, evs)
 
-            let! stats = statAsync this.EventFilePath
+            let! stats = statRawEventLogFile this.EventFilePath
             this.onInitSuccess (events, validOffset, stats, opId)
         }
 
@@ -113,14 +114,14 @@ type EventStoreState with
 
                 let runInit () =
                     promise {
-                        let! exists = fileExists this.EventFilePath
+                        let! exists = checkRawEventLogExists this.EventFilePath
 
                         match this.StateKind with
                         | Initializing(currentOpId, _) when currentOpId = opId ->
                             if not exists then
                                 this.StateKind <- Ready 0
                             else
-                                do! withWorkspaceLock this.EventFilePath (fun () -> this.executeInitAction (opId))
+                                do! withWorkspaceEventLock this.EventFilePath (fun () -> this.executeInitAction (opId))
                         | _ -> ()
                     }
 
