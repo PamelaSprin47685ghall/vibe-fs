@@ -52,7 +52,7 @@ let registerSwapTool (pi: obj) : unit =
               "label", box "Swap"
               "description",
               box
-                  "Exchange two non-overlapping line ranges between text files, or within the same text file. Line numbers are 1-based; begin is inclusive and endExclusive is exclusive."
+                  "Exchange two non-overlapping line ranges between text files, or within the same text file. Use this as a structure-preserving refactoring primitive: move complete semantic blocks—functions, types, tests, or documentation sections—for module extraction, reordering, or cross-file migration without rewriting their contents. Line numbers are 1-based; begin is inclusive and endExclusive is exclusive."
               "parameters",
               objectOf
                   [| ("path0", str "First file path" tb)

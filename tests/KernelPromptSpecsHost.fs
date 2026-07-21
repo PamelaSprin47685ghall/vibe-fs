@@ -86,6 +86,15 @@ let toolCatalogCentralized () =
     check "write paramDoc no warn_tdd" (not (Map.containsKey "warn_tdd" writeSpec.paramDocs))
     check "write paramDoc no warn" (not (Map.containsKey "warn" writeSpec.paramDocs))
 
+    let swapSpec = specOf "swap"
+
+    check
+        "swap describes structure-preserving refactoring"
+        (swapSpec.description.Contains "structure-preserving refactoring")
+
+    check "swap describes semantic blocks" (swapSpec.description.Contains "semantic blocks")
+    check "swap avoids rewriting contents" (swapSpec.description.Contains "without rewriting their contents")
+
     let ackLower = submitReviewWipAcknowledgment.ToLowerInvariant()
     check "wip acknowledgment does not say No reviewer" (ackLower.IndexOf("no reviewer") < 0)
     check "wip acknowledgment does not mention wip set to false" (ackLower.IndexOf("wip set to false") < 0)

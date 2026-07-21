@@ -28,6 +28,8 @@ let internal swapSpec: ToolSpec =
     { name = "swap"
       description =
         "Exchange two non-overlapping line ranges between text files, or within the same text file. "
+        + "Use this as a structure-preserving refactoring primitive: move complete semantic blocks—functions, types, tests, or documentation sections—"
+        + "for module extraction, reordering, or cross-file migration without rewriting their contents. "
         + "Line numbers are 1-based; begin is inclusive and endExclusive is exclusive. "
         + "Both files are validated before either file is changed."
       paramDocs =
