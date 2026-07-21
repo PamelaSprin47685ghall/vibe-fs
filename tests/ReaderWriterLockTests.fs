@@ -5,6 +5,7 @@ open Fable.Core.JsInterop
 open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Tests.TestWorkspace
 open Wanxiangshu.Kernel.EventSourcing.EventEnvelope
+open Wanxiangshu.Runtime.EventLogCodec
 open Wanxiangshu.Runtime.EventLogFile
 open Wanxiangshu.Runtime.EventStore
 open Wanxiangshu.Runtime.PromiseQueue
@@ -12,6 +13,9 @@ open Wanxiangshu.Runtime.RuntimeScope
 
 [<Emit("performance.now()")>]
 let private now () : float = jsNative
+
+[<Global("globalThis")>]
+let private globalThis: obj = jsNative
 
 let testReaderWriterLockTimeoutRobustness () =
     promise {

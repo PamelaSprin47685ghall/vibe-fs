@@ -245,14 +245,14 @@ let testRestartReconciliationOfIncompleteRuns () =
                             member _.QuerySessionQuiescence(_, _) = Promise.lift Stopped
 
                             member _.ClosePhysicalSession(_) =
-                                hostCalled := true
+                                hostCalled.Value <- true
                                 Promise.lift Stopped }
 
                     let hostFactory = fun _ -> fakeHost
 
                     let! safetyProj = reconcileUnfinishedRuns tempDir (Some hostFactory)
 
-                    check "host ClosePhysicalSession was called" !hostCalled
+                    check "host ClosePhysicalSession was called" hostCalled.Value
                     check "session marked poisoned in safety projection" (Map.containsKey sessionId safetyProj)
 
                     let! events = getStore(tempDir).ReadAllEvents()

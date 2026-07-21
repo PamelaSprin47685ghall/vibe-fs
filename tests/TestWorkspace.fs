@@ -44,6 +44,11 @@ let rmAsync (path: string) : JS.Promise<unit> = rmRetry path 0
 
 let writeFileAsync (path: string) (content: string) : JS.Promise<unit> =
     unbox (fsAsync?writeFile (path, content))
+let readFileAsync (path: string) (encoding: string) : JS.Promise<string> =
+    unbox (fsAsync?readFile (path, box encoding))
+
+let appendFileAsync (path: string) (content: string) : JS.Promise<unit> =
+    unbox (fsAsync?appendFile (path, content))
 
 let tryReadFileAsync (path: string) : JS.Promise<string option> =
     promise {
