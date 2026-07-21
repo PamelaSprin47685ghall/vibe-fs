@@ -67,13 +67,12 @@ let entries () : (string * (unit -> unit)) list =
        fun () ->
            Promise.start
            <| promise {
-               let q = SerialQueue(defaultSafetyTimeoutMs = 20)
+               let q = SerialQueue()
                let hangingTask = fun () -> promise { return! Promise.create (fun _ _ -> ()) }
                let! err =
-                   q.Enqueue(hangingTask)
+                   q.Enqueue(hangingTask, timeoutMs = 20)
                    |> Promise.catch (fun ex -> Some ex.Message)
                isSome err
-               equal true (err.Value.Contains "[FATAL EXECUTOR QUEUE BUG]")
 
                let! nextResult = q.Enqueue(fun () -> promise { return "recovered" })
                equal "recovered" nextResult

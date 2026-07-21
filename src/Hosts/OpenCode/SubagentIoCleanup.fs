@@ -40,22 +40,16 @@ let abortAndUnregister
                 ()
             with _ ->
                 ()
-
-            try
-                do! SubsessionHostAdapterOps.deleteSession client directory childID
-
-                let sid = SessionId.create childID
-                let eventStore = create directory
-                do! eventStore.Append(sid, [ PhysicalSessionClosed sid ])
-
-                SubsessionActorRegistry.ClearPoison directory childID
-
-                SubsessionActorRegistry.Remove directory childID
-
-                registry.UnregisterChildAgent(childID)
-            with _ ->
-                ()
         | Error _ -> ()
+
+        let sid = Wanxiangshu.Kernel.Subsession.Types.SessionId.create childID
+        let eventStore = Wanxiangshu.Runtime.SubsessionEventStore.create directory
+        do! eventStore.Append(sid, [ Wanxiangshu.Kernel.Subsession.Types.PhysicalSessionClosed sid ])
+
+        SubsessionPendingEvidence.ForgetSession childID
+        SubsessionActorRegistry.ClearPoison directory childID
+        SubsessionActorRegistry.Remove directory childID
+        registry.UnregisterChildAgent(childID)
     }
 
 let cleanupChildIfRequested

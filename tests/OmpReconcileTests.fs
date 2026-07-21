@@ -6,10 +6,8 @@ open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Kernel.Subsession.Types
 open Wanxiangshu.Tests.TestWorkspace
 
-module Dyn = Wanxiangshu.Runtime.Dyn
-
 /// Verify that when reconcileUnfinishedRuns runs on startup, it constructs a real hostFactory
-/// and triggers physical close (sessionDelete) on zombie sessions.
+/// but does NOT trigger physical close (sessionDelete) on zombie sessions.
 let ompReconciliationClosesZombieSessions () =
     promise {
         let! root = mkdtempAsync "omp-reconcile-test-"
@@ -27,14 +25,12 @@ let ompReconciliationClosesZombieSessions () =
         do! eventStore.Append(sid, [ RunStarted runStartedData ])
 
         let mutable sessionDeleteCalled = false
-        let mutable calledSessionId = ""
 
         let sessionApi =
             createObj
                 [ "sessionDelete",
-                  box (fun (arg: obj) ->
+                  box (fun (_arg: obj) ->
                       sessionDeleteCalled <- true
-                      calledSessionId <- Dyn.str arg "sessionId"
                       Promise.lift (box null)) ]
 
         let pi = createObj [ "directory", box root; "session", box sessionApi ]
@@ -44,8 +40,7 @@ let ompReconciliationClosesZombieSessions () =
 
         let! _ = Wanxiangshu.Runtime.SubsessionReconcile.reconcileUnfinishedRuns root (Some hostFactory)
 
-        check "sessionDelete was called" sessionDeleteCalled
-        check "sessionDelete called with correct sessionId" (calledSessionId = "omp-zombie-sid-1")
+        check "sessionDelete was NOT called" (not sessionDeleteCalled)
 
         let actor =
             Wanxiangshu.Runtime.SubsessionActorRegistry.SubsessionActorRegistry.GetOrCreate

@@ -21,6 +21,7 @@ let private completeAsTaskDone (runtime: FallbackRuntimeStore) (sessionID: strin
     let updated =
         { finalState with
             Phase = FallbackPhase.Idle
+            ContinueCount = 0
             Lifecycle = FallbackLifecycle.TaskComplete }
 
     runtime.Update(sessionID, setCore updated)
@@ -29,7 +30,8 @@ let private completeAsTaskDone (runtime: FallbackRuntimeStore) (sessionID: strin
 let private settleIdle (runtime: FallbackRuntimeStore) (sessionID: string) (finalState: SessionFallbackState) =
     let updated =
         { finalState with
-            Phase = FallbackPhase.Idle }
+            Phase = FallbackPhase.Idle
+            ContinueCount = 0 }
 
     runtime.Update(sessionID, setCore updated)
     updated, None
@@ -47,6 +49,7 @@ let private settleByTranscript
     let updated =
         { finalState with
             Phase = FallbackPhase.Idle
+            ContinueCount = 0
             Lifecycle =
                 (if taskComplete then
                      FallbackLifecycle.TaskComplete

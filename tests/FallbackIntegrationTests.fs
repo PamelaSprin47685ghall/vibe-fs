@@ -94,11 +94,12 @@ let scanning_advancesOnError () =
     | _ -> failwith "expected Scanning"
 
 let scanning_busy_resetsFailure () =
-    let s0 = mkState (FallbackPhase.Scanning(0, 2)) 2 3 0
+    let s0 = mkState (FallbackPhase.Scanning(0, 2)) 2 3 2
     let s1, _ = transition s0 SessionBusy (mkCfg ()) (mkChain ())
     equal "phase Idle" FallbackPhase.Idle s1.Phase
     equal "currentIndex=0" 0 s1.CurrentIndex
     equal "failureCount=0" 0 s1.FailureCount
+    equal "continueCount=0 on busy" 0 s1.ContinueCount
 
 let hallucination_exceedsThreshold () =
     let cfg = { (mkCfg ()) with LoopMaxContinues = 3 }
@@ -151,10 +152,11 @@ let sessionIdle_taskComplete_doNothing () =
     equal "DoNothing" FallbackAction.DoNothing action
 
 let scanning_completesOnIdle () =
-    let state = mkState (FallbackPhase.Scanning(1, 0)) 0 1 0
+    let state = mkState (FallbackPhase.Scanning(1, 0)) 0 1 2
     let s1, action = transition state SessionIdle (mkCfg ()) (mkChain ())
     equal "Idle after scanning idle" FallbackPhase.Idle s1.Phase
     equal "CurrentIndex updated" 1 s1.CurrentIndex
+    equal "continueCount=0" 0 s1.ContinueCount
     equal "DoNothing" FallbackAction.DoNothing action
 
 let retrying_emitsScanToolCallAsText () =
@@ -163,10 +165,11 @@ let retrying_emitsScanToolCallAsText () =
     equal "ScanningToolCallText after retrying idle" FallbackPhase.ScanningToolCallText s1.Phase
     equal "ScanToolCallAsText" FallbackAction.ScanToolCallAsText action
 
-let continueCount_noDoubleIncrement () =
+let retrying_busy_resetsContinueCount () =
     let state = mkState (FallbackPhase.Retrying 1) 0 0 1
     let s1, _ = transition state SessionBusy (mkCfg ()) (mkChain ())
-    equal "ContinueCount unchanged on busy" 1 s1.ContinueCount
+    equal "phase Idle" FallbackPhase.Idle s1.Phase
+    equal "ContinueCount reset to 0 on busy" 0 s1.ContinueCount
 
 let exhausted_propagates () =
     let chain = [ mkModel "a" "m1" ]
@@ -199,6 +202,6 @@ let run () =
     sessionIdle_taskComplete_doNothing ()
     scanning_completesOnIdle ()
     retrying_emitsScanToolCallAsText ()
-    continueCount_noDoubleIncrement ()
+    retrying_busy_resetsContinueCount ()
     exhausted_propagates ()
     newUserMessage_resets ()

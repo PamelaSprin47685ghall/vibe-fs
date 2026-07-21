@@ -777,6 +777,7 @@
     <Compile Include="tests/ToolArgsDecodeTests.fs"/>
     <Compile Include="tests/ToolArgsCoerceTests.fs"/>
     <Compile Include="tests/SubagentToolExecuteTests.fs"/>
+    <Compile Include="tests/MuxSubagentToolExecuteTests.fs"/>
     <Compile Include="tests/SubagentCleanupCompletionTests.fs"/>
     <Compile Include="tests/FileToolsCodecTests.fs"/>
     <Compile Include="tests/FuzzyToolsCodecTests.fs"/>
@@ -861,6 +862,8 @@
     <Compile Include="tests/MuxCoverageTests.fs"/>
     <Compile Include="tests/FuzzySearchGrepTests.fs"/>
     <Compile Include="tests/SearchToolsTests.fs"/>
+    <Compile Include="tests/SubagentPromptAbortTests.fs"/>
+    <Compile Include="tests/ReviewerLoopCleanupTests.fs"/>
     <Compile Include="tests/ReviewerLoopTests.fs"/>
     <Compile Include="tests/KernelAndSupportCoverageEntries.fs"/>
     <Compile Include="tests/FallbackKernelCancelAndRecoveryTests.fs"/>

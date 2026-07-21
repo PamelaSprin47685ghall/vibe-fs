@@ -33,6 +33,7 @@ open Wanxiangshu.Tests.ExecutorToolsCodecTests
 open Wanxiangshu.Tests.ToolArgsDecodeTests
 open Wanxiangshu.Tests.ToolResultWireTests
 open Wanxiangshu.Tests.SubagentToolExecuteTests
+open Wanxiangshu.Tests.MuxSubagentToolExecuteTests
 open Wanxiangshu.Tests.FileToolsCodecTests
 open Wanxiangshu.Tests.FuzzyToolsCodecTests
 open Wanxiangshu.Tests.WorkBacklogToolsCodecTests
@@ -82,6 +83,7 @@ let codecTestEntries () : (string * TestBody) list =
       "ToolArgsCoerceTests.run", Sync(sync ToolArgsCoerceTests.run)
       "ToolResultWireTests.run", Sync(sync ToolResultWireTests.run)
       "SubagentToolExecuteTests.run", Async SubagentToolExecuteTests.run
+      "MuxSubagentToolExecuteTests.run", Async MuxSubagentToolExecuteTests.run
       "SubagentCleanupCompletionTests.run", Async SubagentCleanupCompletionTests.run
       "WebToolsCodecTests.run", Sync(sync WebToolsCodecTests.run)
       "ReviewToolsCodecTests.run", Sync(sync ReviewToolsCodecTests.run)

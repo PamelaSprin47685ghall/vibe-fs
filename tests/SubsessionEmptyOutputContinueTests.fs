@@ -101,7 +101,24 @@ let blankTextIdleContinues () =
         { CurrentTurnEvidence.empty with
             Assistant = AssistantSnapshot("", 0L, "   ") }
 
+let drainingIdleSuccess_resetsPolicyContinueCount () =
+    let policyWithContinue = { policy0 with ContinueCount = 2 }
+    let ctx = mkCtx policyWithContinue (TurnOrdinal.next TurnOrdinal.first)
+    let plan = mkPlan turn0 TurnOrdinal.first model0 "do work"
+    let started = { Plan = plan; StartReceipt = OrderedTurnMarkerObserved }
+    let err = { ErrorName = "err"; DomainError = None; Message = "transient"; StatusCode = None; IsRetryable = Some true }
+    let evidence = { CurrentTurnEvidence.empty with Assistant = AssistantSnapshot("", 0L, "Valid output text") }
+    let state = Draining(ctx, started, err, evidence, 1000000L)
+
+    match decide state SessionIdleObserved with
+    | Ok(Decided d) ->
+        match d.NextState with
+        | Available _ -> check "draining idle success state is Available" true
+        | other -> fail ("expected Available, got " + string other)
+    | other -> fail ("unexpected " + string other)
+
 let run () =
     emptyAssistantIdleContinues ()
     noAssistantIdleContinues ()
     blankTextIdleContinues ()
+    drainingIdleSuccess_resetsPolicyContinueCount ()

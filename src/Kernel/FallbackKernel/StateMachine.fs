@@ -21,7 +21,8 @@ let private completeScan (scanIdx: int) (origIdx: int) (state: SessionFallbackSt
     { state with
         Phase = FallbackPhase.Idle
         CurrentIndex = scanIdx
-        FailureCount = k },
+        FailureCount = k
+        ContinueCount = 0 },
     FallbackAction.DoNothing
 
 let private busyLifecycle (state: SessionFallbackState) =
@@ -122,7 +123,7 @@ let private handleSessionBusy (state: SessionFallbackState) =
 
         match ns.Phase with
         | FallbackPhase.Scanning(scanIdx, origIdx) -> completeScan scanIdx origIdx ns
-        | FallbackPhase.Retrying _ -> { ns with Phase = FallbackPhase.Idle }, FallbackAction.DoNothing
+        | FallbackPhase.Retrying _ -> { ns with Phase = FallbackPhase.Idle; ContinueCount = 0 }, FallbackAction.DoNothing
         | FallbackPhase.ScanningToolCallText
         | FallbackPhase.RecoveringToolCallText -> ns, FallbackAction.DoNothing
         | _ -> ns, FallbackAction.DoNothing
@@ -164,6 +165,7 @@ let private handleNewUserMessage (state: SessionFallbackState) =
 let private handleTaskCompleteCalled (state: SessionFallbackState) =
     { state with
         Phase = FallbackPhase.Idle
+        ContinueCount = 0
         Lifecycle = FallbackLifecycle.TaskComplete },
     FallbackAction.DoNothing
 

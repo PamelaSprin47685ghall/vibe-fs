@@ -128,11 +128,7 @@ type OpencodeSubsessionHost(client: obj, agent: string, directory: string) =
 
                 HostReceiptWaiterRegistry.removeSession (workspaceFor directory) sid
 
-                try
-                    do! SubsessionHostAdapterOps.deleteSession client directory sid
-                    return Stopped
-                with _ ->
-                    return StopUnknown
+                return Stopped
             }
 
 

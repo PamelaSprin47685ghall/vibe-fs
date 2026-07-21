@@ -95,12 +95,15 @@ let handleDrainingIdle
         | _ -> None
 
     match assistantText with
-    | Some text -> succeedRun ctx text started.Plan.TurnId
+    | Some text ->
+        let ctx2 = { ctx with Policy = afterSuccessfulTurn ctx.Policy }
+        succeedRun ctx2 text started.Plan.TurnId
     | None ->
         // Priority 2: non-empty CompletionRequested output as fallback.
         match evidence.Outcome with
         | CompletionRequested output when not (System.String.IsNullOrWhiteSpace output) ->
-            succeedRun ctx output started.Plan.TurnId
+            let ctx2 = { ctx with Policy = afterSuccessfulTurn ctx.Policy }
+            succeedRun ctx2 output started.Plan.TurnId
         | _ ->
             let policyDec = afterError ctx.FallbackConfig ctx.Chain ctx.Policy error
 

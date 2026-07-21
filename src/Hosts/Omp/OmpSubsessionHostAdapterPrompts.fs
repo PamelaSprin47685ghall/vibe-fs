@@ -65,13 +65,7 @@ let internal tryCloseSessionObj (obj: obj) : JS.Promise<QuiescenceStatus option>
                     let! _ = safeResolve (obj?close ())
                     return Some Stopped
                 else
-                    let deleteFn = Dyn.get obj "delete"
-
-                    if not (Dyn.isNullish deleteFn) && Dyn.typeIs deleteFn "function" then
-                        let! _ = safeResolve (obj?delete ())
-                        return Some Stopped
-                    else
-                        return None
+                    return None
         with _ ->
             return None
     }
@@ -81,11 +75,8 @@ let internal tryClosePiSession (sessionApi: obj) (sessionId: SessionId) : JS.Pro
         let arg = box {| sessionId = SessionId.value sessionId |}
 
         let fnNames =
-            [| "sessionDelete"
-               "deleteSession"
-               "sessionClose"
+            [| "sessionClose"
                "closeSession"
-               "delete"
                "close" |]
 
         let mutable executed = false

@@ -23,6 +23,8 @@ open Wanxiangshu.Tests.OpencodeHookSchemaCoverageTests
 open Wanxiangshu.Tests.OpencodeSearchToolsCoverageTests
 open Wanxiangshu.Tests.OpencodeSubagentCoverageTests
 open Wanxiangshu.Tests.ReviewerLoopTests
+open Wanxiangshu.Tests.ReviewerLoopCleanupTests
+open Wanxiangshu.Tests.SubagentPromptAbortTests
 open Wanxiangshu.Tests.MuxCoverageTests
 
 let kernelSupportCoverageTestEntries () : (string * TestBody) list =
@@ -47,5 +49,7 @@ let kernelSupportCoverageTestEntries () : (string * TestBody) list =
       "OpencodeSearchToolsCoverageTests.run", Async OpencodeSearchToolsCoverageTests.run
       "OpencodeSubagentCoverageTests.run", Async OpencodeSubagentCoverageTests.run
       "ReviewerLoopTests.run", Async ReviewerLoopTests.run
+      "ReviewerLoopCleanupTests.run", Async ReviewerLoopCleanupTests.run
+      "SubagentPromptAbortTests.run", Async SubagentPromptAbortTests.run
       "FuzzySearchAndLivelockGuardTests.run", Sync(sync FuzzySearchAndLivelockGuardTests.run)
       "LivelockGuardScopeTests.run", Sync(sync LivelockGuardScopeTests.run) ]
