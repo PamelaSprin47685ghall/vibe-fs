@@ -64,8 +64,8 @@ let private runPythonProgram
             "uvx"
             (Array.append baseArgs [| "--from"; "python"; "python"; "-c"; "pass" |])
             cwd
-            None
-            None
+            (Some 60000)
+            sid
             None
 
     promise {

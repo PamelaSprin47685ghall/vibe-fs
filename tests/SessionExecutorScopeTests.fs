@@ -167,8 +167,24 @@ let readerWriterLockConcurrencyAndMutualExclusion () =
         check "ro3 after rw1-end" (idxRo3Start > idxRw1End)
     }
 
+let removeSessionQueueResetsPerSessionQueue () =
+    promise {
+        let scope = create ()
+        let exec = createForScope scope
+        let sessionId = "session-to-reset"
+
+        let! firstRes = exec.EnqueuePerSession(sessionId, fun () -> promise { return "first" })
+        equal "first execution" "first" firstRes
+
+        scope.RemoveSessionQueue(sessionId)
+
+        let! secondRes = exec.EnqueuePerSession(sessionId, fun () -> promise { return "second" })
+        equal "second execution after queue removal" "second" secondRes
+    }
+
 let run () =
     promise {
         do! twoScopesSameSessionIdQueuesIsolate ()
         do! readerWriterLockConcurrencyAndMutualExclusion ()
+        do! removeSessionQueueResetsPerSessionQueue ()
     }

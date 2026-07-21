@@ -224,6 +224,9 @@ let private selectedTests (selectors: string array) =
     allTestList
     |> List.filter (fun (label, _) -> matchesSelector filterSelectors label)
 
+[<Global("process")>]
+let private nodeProcess: obj = jsNative
+
 let runAll (args: string array) : JS.Promise<int> =
     promise {
         try
@@ -231,7 +234,6 @@ let runAll (args: string array) : JS.Promise<int> =
             p?env?("WANXIANGSHU_TEST") <- "true"
         with _ ->
             ()
-
         clearFailuresForRun ()
         Assert.disableGlobalClear ()
         let silent = Array.contains "--silent" args || Array.contains "--quiet" args
