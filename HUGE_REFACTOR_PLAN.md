@@ -68,3 +68,14 @@
 | 7 | `src/Runtime/Tooling/ToolOutputInfo.fs` | `flatFields` 转伪 YAML 并用 `---` 围栏包裹渲染 | 收敛为 Pure TOML `[[outcomes]]` / `[[rules]]` 格式，彻底移除 `---` 围栏。 |
 | 8 | `src/Runtime/Fallback/FallbackConfigCodec.fs` | `extractAgentsMdHeaderConfig` / `yamlParse` 解析 `AGENTS.md` 伪 YAML | 配置解析统一收敛为标准 TOML 配置构建器或原生 Parser，消除伪 YAML。 |
 | 9 | `src/Runtime/Wanxiangzhen/ConfigReader.fs` | `extractAgentsMdHeaderConfig` / `yamlParse` 解析 `AGENTS.md` 伪 YAML | 统一为标准 TOML 配置文件读入，彻底拔除 `yaml` npm 包依赖。 |
+
+---
+
+## 六、 物理清扫与 Yaml.fs 权能红线
+
+1. **`PromptFrontMatter.fs` 与 `PromptHeader.fs` 物理销毁**：
+   - 彻底删除 `src/Runtime/PromptFrontMatter.fs` 别名残留文件，零 Stub 留存。
+   - 彻底删除 `src/Runtime/PromptHeader.fs`（及所有 `yamlField` / `---` 围栏映射），全量替换为 `PromptToml.fs`。
+2. **`Yaml.fs` 权能红线 (Config-Only Constraint)**：
+   - 重构完成后，`Yaml.fs` 及其底层 `yaml` 库**只准用于 Config 静态文件处理**（如启动时解析/读取 `AGENTS.md` 的 `squad:` / `models:` 静态配置）。
+   - **红线硬约束**：`Yaml.fs` 严禁被任何 Prompt 渲染、消息合成、Tool Output 格式化模块引用或调用。
