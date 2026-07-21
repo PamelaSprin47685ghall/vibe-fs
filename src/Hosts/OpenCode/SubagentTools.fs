@@ -65,7 +65,7 @@ let coderTool
                   "tdd", enumReq [| "red"; "green" |] Params.coderTdd
                   "ui_", uiParam
                   "follow-tdd-and-kolmogorov-principles", warnTddParam
-                  "not-suitable-via-continue-tool", warnReuseParam ]))
+                  "not-suitable-via-continue-tool", warnNotSuitableViaContinueToolParam ]))
         (fun args context -> executeSubagent host registry ctx "coder" args context runtime sessionScope)
 
 let inspectorTool
@@ -84,7 +84,7 @@ let inspectorTool
             (createObj
                 [ "intents", inspectorIntentsSchema Params.inspectorIntents
                   "ui_", uiParam
-                  "not-suitable-via-continue-tool", warnReuseParam ]))
+                  "not-suitable-via-continue-tool", warnNotSuitableViaContinueToolParam ]))
         (fun args context -> executeSubagent host registry ctx "inspector" args context runtime sessionScope)
 
 let browserTool
@@ -102,7 +102,7 @@ let browserTool
             browserRequiredKeys
             (createObj
                 [ "intent", strReq Params.browserIntent
-                  "not-suitable-via-continue-tool", warnReuseParam ]))
+                  "not-suitable-via-continue-tool", warnNotSuitableViaContinueToolParam ]))
         (fun args context -> executeSubagent host registry ctx "browser" args context runtime sessionScope)
 
 let continueTool

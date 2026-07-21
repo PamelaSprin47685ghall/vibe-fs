@@ -46,7 +46,7 @@ let private buildExecutorToolDef () : obj =
           "what_to_summarize", strReq Params.executorWhatToSummarize
           "max_bytes", numReq Params.executorMaxBytes
           "follow-tdd-and-kolmogorov-principles", warnTddParam
-          "impossible-via-other-tools", warnParam ]
+          "impossible-via-other-tools", warnImpossibleViaOtherToolsParam ]
 
 /// Build the subagent prompt for executor output summarisation.
 let private buildExecutorSummaryPrompt (host: Host) (output: string) (options: ExecuteOptions) : string =

@@ -136,15 +136,18 @@ let warnTddParam: obj =
         "describe"
         (box "MUST acknowledge that you have followed TDD and Kolmogorov principles and kept todo updated")
 
-let warnParam: obj =
+let warnImpossibleViaOtherToolsParam: obj =
     call1
         (call0 (str ()) "optional")
         "describe"
         (box
             "MUST acknowledge that this task cannot be done with other tools and only run tests when static analysis cannot handle it")
 
-let warnReuseParam: obj =
-    call1 (call0 (str ()) "optional") "describe" (box "this-task-is-not-suitable-to-be-completed-via-continue-tool")
+let warnNotSuitableViaContinueToolParam: obj =
+    call1
+        (call0 (str ()) "optional")
+        "describe"
+        (box "MUST acknowledge that this task cannot be completed using the continue tool")
 
 let strArrayReq (desc: string) : obj =
     call1 (arr (strMin 1 "")) "describe" (box desc)

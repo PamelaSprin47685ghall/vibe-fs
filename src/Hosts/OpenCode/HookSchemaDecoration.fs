@@ -181,14 +181,14 @@ let private getControlFieldFlags (toolID: string) =
            "swap" |]
         |> Array.contains toolID
 
-    let hasWarn =
+    let hasWarnImpossibleViaOtherTools =
         [| "executor"; "pty_spawn"; "pty_write"; "pty_read"; "pty_list"; "pty_kill" |]
         |> Array.contains toolID
 
-    let hasWarnReuse =
+    let hasWarnNotSuitableViaContinueTool =
         [| "coder"; "inspector"; "meditator"; "browser" |] |> Array.contains toolID
 
-    hasWarnTdd, hasWarn, hasWarnReuse
+    hasWarnTdd, hasWarnImpossibleViaOtherTools, hasWarnNotSuitableViaContinueTool
 
 let decorateControlFields (toolID: string) (output: obj) : unit =
     if toolID <> "" && not (isNullish output) then
@@ -200,7 +200,9 @@ let decorateControlFields (toolID: string) (output: obj) : unit =
             |> Array.filter (fun p -> not (isNullish p))
 
         let schemaTargets = if targets.Length > 0 then targets else [| output |]
-        let hasWarnTdd, hasWarn, hasWarnReuse = getControlFieldFlags toolID
+
+        let hasWarnTdd, hasWarnImpossibleViaOtherTools, hasWarnNotSuitableViaContinueTool =
+            getControlFieldFlags toolID
 
         for schemaTarget in schemaTargets do
             let mutable properties = get schemaTarget "properties"
@@ -219,10 +221,12 @@ let decorateControlFields (toolID: string) (output: obj) : unit =
                     "follow-tdd-and-kolmogorov-principles"
                     "MUST acknowledge that you have followed TDD and Kolmogorov principles and kept todo updated"
 
-            if hasWarn then
+            if hasWarnImpossibleViaOtherTools then
                 addField
                     "impossible-via-other-tools"
                     "MUST acknowledge that this task cannot be done with other tools and only run tests when static analysis cannot handle it"
 
-            if hasWarnReuse then
-                addField "not-suitable-via-continue-tool" "this-task-is-not-suitable-to-be-completed-via-continue-tool"
+            if hasWarnNotSuitableViaContinueTool then
+                addField
+                    "not-suitable-via-continue-tool"
+                    "MUST acknowledge that this task cannot be completed using the continue tool"

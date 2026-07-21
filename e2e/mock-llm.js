@@ -168,7 +168,7 @@ function handleChat(req, res, queue, calls, url) {
     if (item?.tool) {
       const args = {
         'follow-tdd-and-kolmogorov-principles': 'i-am-sure-i-have-followed-tdd-and-kolmogorov-principles-and-kept-todo-updated',
-        'not-suitable-via-continue-tool': 'this-task-is-not-suitable-to-be-completed-via-continue-tool',
+        'not-suitable-via-continue-tool': 'MUST acknowledge that this task cannot be completed using the continue tool',
         'impossible-via-other-tools': 'MUST acknowledge that this task cannot be done with other tools and only run tests when static analysis cannot handle it',
         ...(item.args ?? {})
       };

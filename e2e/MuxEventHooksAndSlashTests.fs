@@ -70,7 +70,7 @@ let runRest
                       "tdd", box "green"
                       "follow-tdd-and-kolmogorov-principles", box warnTddValue
                       "not-suitable-via-continue-tool",
-                      box "this-task-is-not-suitable-to-be-completed-via-continue-tool" ])
+                      box "MUST acknowledge that this task cannot be completed using the continue tool" ])
                 (fun r -> r.Contains "inspector output mock text")
                 "mux.execute.inspector.success"
 
@@ -83,7 +83,7 @@ let runRest
                 (createObj
                     [ "intent", box "browse"
                       "not-suitable-via-continue-tool",
-                      box "this-task-is-not-suitable-to-be-completed-via-continue-tool" ])
+                      box "MUST acknowledge that this task cannot be completed using the continue tool" ])
                 (fun r -> r.Contains "browser mock debug view text")
                 "mux.execute.browser.success"
 
@@ -115,7 +115,7 @@ let runRest
                       "note", box (String.replicate 1100 "n")
                       "background", box (String.replicate 1100 "b")
                       "intent", box (String.replicate 1100 "i")
-                      "warn_reuse", box "this-task-is-not-suitable-to-be-completed-via-continue-tool" ])
+                      "warn_reuse", box "MUST acknowledge that this task cannot be completed using the continue tool" ])
                 (fun r -> r.Contains "meditator mock report output")
                 "mux.execute.meditator.success"
 
@@ -142,7 +142,7 @@ let runRest
                     [ "intents", box coderIntents
                       "tdd", box "green"
                       "warn_tdd", box warnTddValue
-                      "warn_reuse", box "this-task-is-not-suitable-to-be-completed-via-continue-tool" ])
+                      "warn_reuse", box "MUST acknowledge that this task cannot be completed using the continue tool" ])
                 (fun r -> r.Contains "coder mock execution output")
                 "mux.execute.coder.success"
 
@@ -153,7 +153,7 @@ let runRest
                     [ "intents", box coderIntents
                       "tdd", box "green"
                       "warn_tdd", box warnTddValue
-                      "warn_reuse", box "this-task-is-not-suitable-to-be-completed-via-continue-tool" ])
+                      "warn_reuse", box "MUST acknowledge that this task cannot be completed using the continue tool" ])
                 (fun r -> r.Contains "coder mock execution output" || r.Contains "ok" || r.Length > 0)
                 "mux.execute.coder.warnTddOk"
 

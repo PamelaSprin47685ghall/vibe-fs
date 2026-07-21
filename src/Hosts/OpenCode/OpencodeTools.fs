@@ -20,7 +20,7 @@ let private methodologyArgs: obj =
           "intent", strReq intentFieldDescription
           "background", strReq backgroundFieldDescription
           "note", strReq unifiedNoteDescription.Value
-          "not-suitable-via-continue-tool", warnReuseParam ]
+          "not-suitable-via-continue-tool", warnNotSuitableViaContinueToolParam ]
 
 let private executeMethodology
     (host: Host)

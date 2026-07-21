@@ -75,7 +75,7 @@ let spawnParamsSchema: obj =
                   "Optional per-session timeout in seconds. The PTY is killed automatically when this duration elapses."
           )
           "follow-tdd-and-kolmogorov-principles", box warnTddParam
-          "impossible-via-other-tools", box warnParam ]
+          "impossible-via-other-tools", box warnImpossibleViaOtherToolsParam ]
 
 let executeSpawn (mgr: obj) (args: obj) (sessionId: string) (agent: string) : obj =
     mgr?spawn (

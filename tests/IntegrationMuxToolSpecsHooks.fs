@@ -59,7 +59,8 @@ let muxToolExecuteBeforeSetsUiLabelSpec () =
                 [ "intents", box [| intentOne; intentTwo |]
                   "follow-tdd-and-kolmogorov-principles",
                   box "i-am-sure-i-have-followed-tdd-and-kolmogorov-principles-and-kept-todo-updated"
-                  "not-suitable-via-continue-tool", box "this-task-is-not-suitable-to-be-completed-via-continue-tool" ]
+                  "not-suitable-via-continue-tool",
+                  box "MUST acknowledge that this task cannot be completed using the continue tool" ]
 
         let input = createObj [ "tool", box "coder"; "args", box args ]
         do! (before $ (input, createObj [ "args", box args ])) |> unbox<JS.Promise<unit>>

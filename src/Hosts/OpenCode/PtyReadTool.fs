@@ -58,7 +58,7 @@ let ptyReadTool (host: Host) : obj =
               )
               "ignoreCase", box (boolOpt "Case-insensitive pattern matching (default: false)")
               "follow-tdd-and-kolmogorov-principles", box warnTddParam
-              "impossible-via-other-tools", box warnParam ])
+              "impossible-via-other-tools", box warnImpossibleViaOtherToolsParam ])
         (fun args context ->
             checkExecPerm host context
             let id = string args?``id``

@@ -5,7 +5,7 @@
 
 const DEFAULT_WARN_TDD = 'i-am-sure-i-have-followed-tdd-and-kolmogorov-principles-and-kept-todo-updated';
 const DEFAULT_WARN = 'MUST acknowledge that this task cannot be done with other tools and only run tests when static analysis cannot handle it';
-const DEFAULT_WARN_REUSE = 'this-task-is-not-suitable-to-be-completed-via-continue-tool';
+const DEFAULT_WARN_REUSE = 'MUST acknowledge that this task cannot be completed using the continue tool';
 
 const WARN_TDD_KEY = 'follow-tdd-and-kolmogorov-principles';
 const WARN_KEY = 'impossible-via-other-tools';

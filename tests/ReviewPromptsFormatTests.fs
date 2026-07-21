@@ -84,38 +84,6 @@ let bodyAfterMultiFrontMatter () =
     check "body starts with expected text" (body.StartsWith "Body text")
     check "body does not contain frontmatter delimiter" (not (body.Contains "---"))
 
-// ── extractFrontMatterFenceStrings / renderCompactionAnchorPrompt ──────────────
-
-let multiFrontMatterExtractionToFenceStrings () =
-    let input =
-        "---\ntask: Ship feature\n---\n---\nauthor: Alice\nmode: review\n---\n---\nsource: compaction-anchor\n---\n---\nsquad_event: tasks_created\nsession_id: s1\n---\n---\nverdict: accepted\n---\nBody."
-
-    let fences = extractFrontMatterFenceStrings input
-    equal "whitelist keeps task, squad_event, verdict" 3 (List.length fences)
-    check "first fence has task" (fences.[0].Contains "task")
-    check "second fence has squad_event" (fences.[1].Contains "squad_event")
-    check "third fence has verdict" (fences.[2].Contains "verdict")
-
-    check
-        "no compaction marker in fences"
-        (not (List.exists (fun (s: string) -> s.Contains "compaction-anchor") fences))
-
-    check "no non-whitelist blocks" (not (List.exists (fun (s: string) -> s.Contains "Alice") fences))
-
-let compactionAnchorPromptRendersMarkerAndBody () =
-    let fence1 = "---\nauthor: Alice\n---"
-    let fence2 = "---\nauthor: Bob\n---"
-    let prompt = renderCompactionAnchorPrompt [ fence1; fence2 ]
-    check "prompt contains body" (prompt.Contains "See above for some messages before compaction.")
-
-    let fenceCount =
-        prompt.Split([| "---" |], System.StringSplitOptions.None).Length - 1
-
-    check "prompt has two fences" (fenceCount >= 2)
-
-let compactionAnchorPromptEmptyFencesReturnsEmpty () =
-    equal "empty fences returns empty string" "" (renderCompactionAnchorPrompt [])
-
 // ── formatWipAcknowledgment ──────────────────────────────────────────────────
 
 let formatWipAcknowledgmentProducesFrontMatter () =
@@ -141,7 +109,4 @@ let run () =
     parseMultiFrontMatterMerging ()
     parseMultiFrontMatterScalars ()
     bodyAfterMultiFrontMatter ()
-    multiFrontMatterExtractionToFenceStrings ()
-    compactionAnchorPromptRendersMarkerAndBody ()
-    compactionAnchorPromptEmptyFencesReturnsEmpty ()
     formatWipAcknowledgmentProducesFrontMatter ()

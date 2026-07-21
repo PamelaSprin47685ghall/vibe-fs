@@ -61,7 +61,7 @@ let ptyKillTool (host: Host) : obj =
             [ "id", box (strReq "The PTY session ID (e.g., pty_a1b2c3d4)")
               "cleanup", box (boolOpt "If true, removes the session and frees the buffer (default: false)")
               "follow-tdd-and-kolmogorov-principles", box warnTddParam
-              "impossible-via-other-tools", box warnParam ])
+              "impossible-via-other-tools", box warnImpossibleViaOtherToolsParam ])
         (fun args context ->
             checkExecPerm host context
             let id = string args?``id``
@@ -118,7 +118,7 @@ let ptyListTool (host: Host) : obj =
         "List all active PTY sessions."
         (createObj
             [ "follow-tdd-and-kolmogorov-principles", box warnTddParam
-              "impossible-via-other-tools", box warnParam ])
+              "impossible-via-other-tools", box warnImpossibleViaOtherToolsParam ])
         (fun _ context ->
             checkExecPerm host context
             let sessionId = Dyn.str context "sessionID"
