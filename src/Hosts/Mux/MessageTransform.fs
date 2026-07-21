@@ -37,8 +37,7 @@ let resolvePolicies (agent: string) (isChild: bool) =
     let cp =
         Wanxiangshu.Kernel.MessageTransformPolicy.getCapsInjectionPolicy agent isChild
 
-    let pp =
-        Wanxiangshu.Kernel.MessageTransformPolicy.getParallelHintPolicy agent isChild
+    let pp = Wanxiangshu.Kernel.MessageTransformPolicy.getParallelHintPolicy agent
 
     let cb =
         Wanxiangshu.Kernel.MessageTransformPolicy.getContextBudgetPolicy agent isChild

@@ -44,7 +44,7 @@ let private buildAndRunTransform
 
         let backlogPolicy = getBacklogProjectionPolicy agent isChild
         let capsPolicy = getCapsInjectionPolicy agent isChild
-        let parallelHintPolicy = getParallelHintPolicy agent isChild
+        let parallelHintPolicy = getParallelHintPolicy agent
         let contextBudgetPolicy = getContextBudgetPolicy agent isChild
 
         configureBacklogSession cwd

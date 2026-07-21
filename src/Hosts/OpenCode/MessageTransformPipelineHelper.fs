@@ -22,10 +22,14 @@ open Wanxiangshu.Hosts.Opencode.CapsCodec
 
 let resolveSessionID (input: obj) (messagesList: Message<obj> list) : string =
     let sid1 = Dyn.str input "sessionID"
-    if sid1 <> "" then sid1
+
+    if sid1 <> "" then
+        sid1
     else
         let sid2 = Dyn.str input "sessionId"
-        if sid2 <> "" then sid2
+
+        if sid2 <> "" then
+            sid2
         else
             let sid3 = Dyn.str input "session_id"
             if sid3 <> "" then sid3 else extractSessionID messagesList
@@ -60,16 +64,14 @@ let buildLoadCaps
                 loadCapsForScope
                     runtimeScope
                     AllowEmptyDirectory
-                    { plan with SessionID = parentSessionID }
+                    { plan with
+                        SessionID = parentSessionID }
 
             return caps |> List.sortBy (fun cf -> cf.label, cf.filePath)
         }
 
 /// Build the build-caps callback passed to runHostMessagesTransform.
-let buildCapsFn
-    (capsEpoch: string)
-    (directory: string)
-    : (obj array -> CapsFile list -> string option -> obj array) =
+let buildCapsFn (capsEpoch: string) (directory: string) : (obj array -> CapsFile list -> string option -> obj array) =
     fun encoded capsFiles preludeOpt ->
         buildCapsMessages
             Wanxiangshu.Runtime.FileSys.sha256HexTruncated
@@ -145,7 +147,7 @@ let resolveTransformParams
 
         let p = getBacklogProjectionPolicy agent isSub
         let caps = getCapsInjectionPolicy agent isSub
-        let par = ParallelHintPolicy.Exclude
+        let par = getParallelHintPolicy agent
         let budget = getContextBudgetPolicy agent isSub
 
         let! maxInputTokens = resolveMaxInputTokens sessionID client directory

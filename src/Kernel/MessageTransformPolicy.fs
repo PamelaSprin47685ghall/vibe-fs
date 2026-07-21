@@ -59,21 +59,11 @@ let getCapsInjectionPolicy (agent: string) (isChildWorkspace: bool) : CapsInject
         else
             CapsInjectionPolicy.Include
 
-let getParallelHintPolicy (agent: string) (isChildWorkspace: bool) : ParallelHintPolicy =
-    let agent = normalizeAgent agent
-
-    match agent with
-    | "browser"
-    | "executor"
+let getParallelHintPolicy (agent: string) : ParallelHintPolicy =
+    match normalizeAgent agent with
     | "title"
-    | "compaction"
-    | "exec"
-    | "explore" -> ParallelHintPolicy.Exclude
-    | _ ->
-        if isChildWorkspace && (agent = "exec" || agent = "explore") then
-            ParallelHintPolicy.Exclude
-        else
-            ParallelHintPolicy.Include
+    | "compaction" -> ParallelHintPolicy.Exclude
+    | _ -> ParallelHintPolicy.Include
 
 let getContextBudgetPolicy (agent: string) (isChildWorkspace: bool) : ContextBudgetPolicy =
     let agent = normalizeAgent agent
