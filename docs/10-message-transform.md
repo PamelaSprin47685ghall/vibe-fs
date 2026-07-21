@@ -2,87 +2,63 @@
 
 ## 目的
 
-在宿主将消息数组交给 LLM **之前**，插入 caps、backlog、review replay、Semble、parallel 提示等。共享逻辑在 `src/Runtime/MessageTransform/`；宿主只挂 hook 与 `RuntimeScope`。
+在宿主将消息数组交给 LLM **之前**，插入 caps、backlog、review replay、Semble、parallel 提示等。共享逻辑在 `src/Runtime/MessageTransform/Pipeline.fs`；宿主只挂 hook 与 `RuntimeScope`。
 
-## 核心模块
+## 管线阶段
 
-| 模块 | 职责 |
-| :--- | :--- |
-| `src/Runtime/MessageTransform/Pipeline.fs` | 主编排、阶段组合 |
-| `src/Runtime/MessageTransform/Stack.fs` | TransformState 三段状态（Caps、Backlog、Top slot） |
-| `src/Runtime/Tooling/ToolHookRuntime.fs` | 控制字段软校验、净化、after 还原、违例批评 |
-| `src/Kernel/MessageTransformPolicy.fs` | 策略（Backlog/Caps/ParallelHint 三分） |
-| `src/Runtime/MessageTransform/ParallelHintStage.fs` | 并行提示阶段 |
-| `src/Runtime/Search/SembleSearch.fs` | inspector 断点注入 |
-
-架构测试：三宿主须 `UsesProjectionPolicy` + Shell caps cache；`noQuadraticListAppend`。
-
-## 管线阶段（实现顺序）
-
-以 `runMessageTransformPipeline` 为准：
+`runMessageTransformPipeline`（`Pipeline.fs`）：
 
 1. Caps — 按 `scopeId × CapsRevision × PolicyVersion` 缓存，复用段引用
-2. Backlog 投影（事件 fold，非历史 tool SSOT；`BacklogRevision` 驱动）
-3. **tryInjectParallelToolPrompt**（`ParallelHintTop` key）
-5. Semble（inspector + 开关）
-6. **replaceArrayInPlace** 原地替换宿主数组
+2. Backlog 投影（事件 fold，非历史 tool SSOT）
+3. `tryInjectParallelToolPrompt`（`ParallelHintStage.fs`）
+4. Semble（inspector 断点注入，`SembleSearch.fs`）
+5. `replaceArrayInPlace` 原地替换宿主数组
 
-管线不再剥离 synthetic 段：host 每轮从 DB 重读数组，上一轮 synthetic 自然消失；`TransformState` 维护三段引用，revision/key 未变时复用对象引用以减少分配。发送前以 canonical outbound bytes/prefix equality 验证 prompt-cache 可命中。
+`TransformState` 维护 Caps/Backlog/Top slot 三段引用；revision/key 未变时复用对象引用减少分配。
 
-## 并行工具鼓励 (FEATURE1)
+## 并行工具鼓励（FEATURE1）
 
-**条件**（`tryInjectParallelToolPrompt`）：
+条件（`tryInjectParallelToolPrompt`，`ParallelHintStage.fs`）：
 
 - 过滤后 `Native` 消息链
 - **最后一条**带真实 tool 的 `Assistant` 消息中，**有且仅有 1** 个真实 tool part
 - 忽略 `semble-call-*`、`caps-call-*`
 - 白名单 = `ToolCatalog.all` 名 + `"methodology"`
-- 且该轮已有对应 `ToolResult`（单步已返回）
+- 该轮已有对应 `ToolResult`（单步已返回）
 
-**动作**：追加 synthetic `User`，id `parallel-tool-synth-<callID>`，`source = Synthetic "parallel-tool-synth-"`；文案 SSOT 在 `PromptFragments`（架构测试 `parallelToolPromptSSOTGuard`）。下轮 `stripSyntheticBySource` 剥离。
+动作：追加 synthetic `User`，id `parallel-tool-synth-<callID>`，下轮 `stripSyntheticBySource` 剥离。文案 SSOT 在 `PromptFragments.fs`（架构测试 `parallelToolPromptSSOTGuard`）。
 
 ## Semble MCP 注入
 
-**原则**：Shell 自管 MCP，**不**注册进宿主 MCP 表；失败静默返回原消息。
+- 仅 **inspector** agent 路径启用
+- 上下文 ≥ **50** 字符才 search
+- 提取 user/assistant 文本，排除所有 ToolPart
+- 每条结果 → `assistant` read call + `toolResult`，id 前缀 `semble-synth-`
+- Shell 自管 MCP，不注册进宿主 MCP 表；失败静默返回原消息
 
-| 项 | 规约 |
-| :--- | :--- |
-| 启动 | `uvx` + `Kernel.Config` 中 semble ref（`SEMBLE_MCP_REF`） |
-| 断点 | `lastBreakpoint: session → 消息长度`；上下文 ≥ **50** 字符才 search |
-| 提取 | `[startIndex, len)` 内仅 user/assistant 文本，**排除** 所有 ToolPart |
-| 伪装 | 每条结果 → `assistant` read call + `toolResult`，id 前缀 `semble-synth-` |
-| 格式 | 行 `%6d|content`（对齐 `FileSys` read） |
+## 空输出 → Fallback
 
-仅 **inspector** agent 路径启用。测试：`tests/SembleInjectionTests.fs`。
+`SessionIdle` 时最后 assistant 无 tool、text 为空 → `EmptyOutputError`（`FallbackMessageCodec.fs`），Fallback `SendContinue`，`Consumed=true` **短路 nudge**。
 
-## 空输出 → Fallback（与 [12](./12-fallback.md)）
+## Caps 注入策略
 
-`SessionIdle` 时若最后 assistant 无 tool、无可见 text → 译为 `EmptyOutputError`，Fallback `SendContinue`，`Consumed=true` **短路 nudge**。实现：`src/Runtime/Fallback/FallbackMessageCodec.fs`、`Coordinator.fs`。
+`src/Kernel/MessageTransformPolicy.fs`：
+
+- `CapsInjectionPolicy`：`Include | Exclude`（browser/executor/title/compaction/exec/explore 排除）
+- `ParallelHintPolicy`：同轴排除
+- `shouldExcludeAgentFromProjection`：子 workspace 额外排除 exec/explore
 
 ## Hook 复杂度纪律
 
-热路径须 O(消息长度) 或 O(log N)，禁止会话增长导致 O(N²)：
-
-| 区域 | 要点 |
-| :--- | :--- |
-| Read 去重 | `Kernel/Dedup`：`Set` 指纹 + 有界 raw 列表 |
-| EventLog 缓存 | `ResizeArray` 追加，非 `list @ [e]` |
-| Backlog fold | 头插 `::`，边界再 `rev` |
-| Mux read dedup | 嵌套 `Map` 索引 |
-
-原 hooks 复杂度审计已并入本节；豁免：`FuzzyFormat` 固定行数拼接等 O(1) 有界操作。
-
-## 宿主入口
-
-`src/Hosts/OpenCode/MessageTransformPipeline.fs`、`src/Hosts/Mux/MessageTransform.fs`、`src/Hosts/Omp/MessageTransform.fs`。
-
-OpenCode：**原地 mutate** hook 字段（`AGENTS.md`）。
+热路径 O(消息长度) 或 O(log N)。禁止会话增长导致 O(N²)：
+- Read 去重：`Kernel/Dedup`（Set 指纹 + 有界 raw 列表）
+- EventLog 缓存：`ResizeArray` 追加，非 `list @ [e]`
+- Backlog fold：头插 `::`，边界再 `rev`
 
 ## 控制字段生命周期
 
-控制字段（`warn_tdd`、`warn`、`warn_reuse`）作为提醒字段注入到 Schema description 中（key optional，value undefined），强制引起 LLM 注意。LLM 无须传值，宿主在工具执行前后不进行剥离与恢复。
+`warn_tdd`、`warn`、`warn_reuse`：key 存在 value undefined 的软协议字段，注入 Schema description 强制 LLM 注意，宿主执行前后不剥离。
 
-## 相关
+## 宿主入口
 
-- [06-review-and-nudge.md](./06-review-and-nudge.md)
-- [07-work-backlog.md](./07-work-backlog.md)
+`src/Hosts/OpenCode/MessageTransformPipeline.fs`、`src/Hosts/Mux/MessageTransform.fs`、`src/Hosts/Omp/MessageTransform.fs`。OpenCode：**原地 mutate** hook 字段（`AGENTS.md`）。

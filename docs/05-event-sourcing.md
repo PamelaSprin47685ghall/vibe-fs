@@ -2,14 +2,7 @@
 
 ## SSOT
 
-工作区根目录：
-
-```text
-[workspace]/.wanxiangshu.ndjson
-[workspace]/.wanxiangshu.ndjson.lock
-```
-
-**唯一 durable 真相**（review task、backlog、nudge 去重等）。宿主 `session.messages`、compaction 后注入的 anchor **不是** SSOT。
+工作区根目录：`.wanxiangshu.ndjson` + `.wanxiangshu.ndjson.lock`（`src/Runtime/EventStore/EventLogFile.fs`）。万象阵 `squad_*`/`task_*` 行与此文件同行序追加，物理共用同一文件与同一锁。
 
 ## 六条纪律
 
@@ -17,229 +10,125 @@
 2. **事实不可改**：仅追加行；修正靠补偿事件，非覆盖旧行。
 3. **内存 = fold**：`ReviewStore`、backlog 投影、nudge 表 = 对 NDJSON 的纯 fold + 可选进程缓存。
 4. **先盘后内存**：append 成功后才更新缓存投影；失败 = 命令未发生。
-5. **一行一事件**：每行自包含 JSON（Shell 解析为 `WanEvent`）。
+5. **一行一事件**：每行自包含 JSON（`WanEvent`）。
 6. **按 session 分区**：每行含 `session` 字段；fold 按 `sessionId` 过滤。
 
 ## 事件种类（Kernel SSOT）
 
-定义于 `src/Kernel/EventSourcing/EventKind.fs`。**所有事件种类均在此处以 `eventKind*` 常量定义**，`src/Runtime/EventStore/` codec 引用这些常量，宿主层不复制字符串。
+定义于 `src/Kernel/EventSourcing/EventKind.fs`（64 个常量）。Runtime codec 引用这些常量，宿主层不复制字符串。
 
 ### 核心业务事件
 
-| `Kind` 常量 | 含义 |
+| Kind 常量 | 含义 |
 | :--- | :--- |
-| `loop_activated` | With-Review 激活，payload 含 `task` |
+| `assistant_completed` | 助手轮次完成（含 `agent`/`model`/`turnId`/`openTodosJson`） |
+| `loop_activated` | With-Review 激活（payload 含 `task`） |
 | `loop_cancelled` | 取消 loop |
 | `review_verdict` | 审查结论（accepted / needs_revision / terminated / cancelled） |
-| `work_backlog_committed` | todowrite/task 校验通过后全量 todos + 五报告 + `select_methodology` |
 | `submit_review_wip_recorded` | WIP 提交记录 |
-| `assistant_completed` | 助手轮次完成（辅助 nudge 快照，含 `agent` / `model` / `turnId` / `openTodosJson`） |
-| `subagent_spawned` | 子代理 spawn 成功（payload：`childId` / `agent` / `title`） |
-| `subagent_continued` | `continue` 工具续跑子会话（payload：`childId` / `prompt`） |
+| `submit_review_reports_consumed` | 审查报告被消费记录 |
+| `subagent_spawned` | 子代理 spawn 成功 |
+| `subagent_continued` | `continue` 续跑子会话 |
 
 ### nudge 生命周期事件（六阶段闭环）
 
-| `Kind` 含义 | 触发时机 |
-| :--- | :--- |
-| `nudge_requested` | nudge 决策通过，进入串行 Claim 前（payload：`action` / `anchor` / `nudgeId` / `nonce` / `generation` / `cancelGeneration` / `humanTurnId` / `nudgeOrdinal`） |
-| `nudge_dispatched` | nudge 已成功派发（payload：`action` / `anchor` / `nudgeId` / `nudgeOrdinal`） |
-| `nudge_failed` | nudge 派发失败（payload：`nudgeId` / `error` / `nudgeOrdinal`） |
-| `nudge_cancelled` | nudge 被取消（如新用户消息打断，payload：`nudgeId` / `reason` / `nudgeOrdinal`） |
-| `nudge_settled` | nudge 终局（payload：`nudgeId` / `status` / `nudgeOrdinal`） |
-| `nudge_dedup_cleared` | 去重表清空（如新用户消息或 WIP 提交） |
+| Kind | 含义 | 时机 |
+| :--- | :--- | :--- |
+| `nudge_requested` | nudge 已进入串行 Claim 前 | claim 成功时 |
+| `nudge_dispatched` | nudge 已成功派发 | `session.prompt` 成功 |
+| `nudge_failed` | nudge 派发失败 | 发送失败 |
+| `nudge_cancelled` | nudge 被取消 | 新用户消息打断 |
+| `nudge_settled` | nudge 终局 | 后续 idle 确认完成 |
+| `nudge_dedup_cleared` | 去重表清空 | 新消息 / WIP 提交 |
 
-去重逻辑：`foldNudgeDedup` 在 `nudge_requested` 时记录 `PendingNudge`，`nudge_dispatched` 时记 `LastDispatchedAnchor`；`nudge_dedup_cleared` / `submit_review_wip_recorded` / `human_turn_started` 清空两者。`isNudgeBlockedForAnchor` 检查当前 anchor 是否已在 Pending 或 LastDispatched 中。
+去重：`NudgeDedupState` = `{ PendingNudge: (anchor, nudgeId) option; LastDispatchedAnchor: string option }`。`isBlocked` 检查当前 anchor 是否已在 Pending 或 LastDispatched 中。
 
 ### 人机交互轮次事件
 
-| `Kind` 含义 | 触发时机 |
+| Kind | 含义 |
 | :--- | :--- |
-| `human_turn_started` | 用户新消息开始（payload：`turnId` / `provider` / `model` / `variant` / `agent` / `humanTurnOrdinal` / `messageId`） |
-| `user_abort_observed` | 用户中断观察（payload 空） |
+| `human_turn_started` | 用户新消息开始（含 `turnId`/`provider`/`model`/`agent` 等） |
+| `user_abort_observed` | 用户中断观察 |
 
 ### 模型降级（Fallback）续命事件
 
-#### v1 六阶段生命周期（现有遗留事件）
-
-| `Kind` 含义 | 触发时机 |
+| Kind | 含义 |
 | :--- | :--- |
-| `continuation_requested` | 降级决策选好模型，即将发起续命（payload：`continuationId` / `model` / `agent` / `at` / `generation` / `cancelGeneration` / `humanTurnId` / `owner` / `continuationOrdinal`） |
-| `continuation_dispatch_started` | 续命已进入宿主 API 调用前（payload：`continuationId` / `continuationOrdinal`） |
-| `continuation_dispatched` | 续命已成功派发（payload：`continuationId` / `model` / `agent` / `at` / `continuationOrdinal`） |
-| `continuation_failed` | 续命失败（payload：`continuationId` / `error` / `continuationOrdinal`） |
-| `continuation_cancelled` | 续命被取消（payload：`continuationId` / `reason` / `continuationOrdinal`） |
-| `continuation_settled` | 续命终局（payload：`continuationId` / `humanTurnId` / `generation` / `status` / `continuationOrdinal`） |
+| `continuation_requested` | FSM 决策后构造 `PendingLease(Requested)` |
+| `continuation_dispatch_started` | 即将调用宿主 API |
+| `continuation_dispatched` | 宿主已接受（`recordHostAcceptedContinuation` 唯一写入入口） |
+| `continuation_failed` / `cancelled` / `settled` | 终局 |
+| `continuation_dispatch_claimed` | Effect Supervisor 从 Outbox 消费 Dispatch 意图 |
+| `continuation_host_accepted` | 宿主接受续命 |
+| `continuation_run_started` / `assistant_observed` / `superseded` | v2 续命阶段 |
+| `compaction_started` / `settled` / `context_generation_changed` | 上下文压缩事件 |
 
-`fallback_continue_injected`（旧版，payload：`model` / `agent` / `at`）仍保留但已逐步被上述六阶段续命事件取代。
+### 子会话 Actor 事件（13 种）
 
-#### v2 continuation 事件
+`subsession_run_started`、`subsession_run_settled`、`subsession_turn_dispatch_requested`、`subsession_turn_started`、`subsession_turn_outcome_observed`、`subsession_turn_finished`、`subsession_abort_requested`、`subsession_session_poisoned`、`subsession_physical_session_closed`、`subsession_decision_committed`（crash-atomic 信封）。
 
-| `Kind` 含义 | 触发时机 |
+### 万象阵事件（8 种）
+
+`squad_created`、`tasks_created`、`task_started`、`task_submitted`、`task_merged`、`task_done`、`task_error`、`squad_cancelled`。物理路径见 `src/Runtime/Wanxiangzhen/SquadEventWanCodec.fs` + `CoordinatorReplay.fs`。
+
+## WanEvent 信封
+
+```fsharp
+type WanEvent =
+    { V: int; Session: string; Kind: string; At: string
+      Payload: Map<string, string>
+      EventId: string option; WriterId: string option
+      Sequence: int option; Checksum: string option }
+```
+
+编解码：`src/Runtime/EventStore/EventLogCodec.fs`（`wanEventToLine`、`tryParseEventLine`、`computeEventChecksum`）。
+
+## Fold 函数（`src/Kernel/EventSourcing/Fold.fs`）
+
+`SessionState` 为 28 轴复合投影，`applyEvent` 为主折叠入口。各轴独立模块：
+
+| 投影轴 | 模块 |
 | :--- | :--- |
-| `continuation_dispatch_claimed` | Effect Supervisor 已从 Outbox 消费 Dispatch 意图，即将调用宿主（payload：`continuationId` / `attempt` / `effectId`） |
-| `continuation_host_accepted` | 宿主已接受续命请求，返回用户消息 ID 或 run ID（payload：`continuationId` / `userMessageId` 或 `runId` 或 `receiptId`） |
-| `continuation_run_started` | 续命 run 已开始（payload：`continuationId`） |
-| `continuation_assistant_observed` | 观察到续命产生的 assistant 消息（payload：`continuationId` / `assistantMessageId`） |
-| `continuation_superseded` | 续命被新用户消息或新续命取代（payload：`continuationId` / `reason`） |
+| Review loop | `ReviewLoopFold.fs` |
+| Nudge dedup | `NudgeProjection.fs` |
+| Nudge snapshot | `NudgeSnapshotProjection.fs` |
+| Subagents | `SubsessionProjection.fs` |
+| Human turn | `SessionControl/HumanTurn.fs` |
+| Owner/Lease/Episode | `SessionControl/Projection.fs`、`LeaseTransitions.fs` |
 
-租约（Lease）模型下的续命系统使用统一的续命生命周期事件，包括 `continuation_requested`、`continuation_dispatch_started`、`continuation_dispatched`、`continuation_host_accepted`（由 ChatHooks 写入）、`continuation_failed`、`continuation_cancelled`、`continuation_settled`、`continuation_idle_reconciliation`。旧的 `ContinuationCommandProcessor.fs` 与 `ContinuationSupervisor.fs` 已被删除，不再使用。
+## Subsession 决策信封
 
-### 上下文压缩（Compaction）事件
+`subsession_decision_committed` 事件含 `events` JSON 数组（`SubsessionEventStore.fs`），原子打包多事件为一行。解码 `tryDecodeWanEventBatch` 拆分数组；任意失败 → `SessionPoisoned(EventStoreCorrupt)`。
 
-| `Kind` 含义 | 触发时机 |
-| :--- | :--- |
-| `compaction_started` | 宿主 compaction 开始（payload：`compactionId` / `generationAtStart` / `humanTurnId` / `compactionOrdinal`） |
-| `compaction_settled` | compaction 完成或取消（payload：`compactionId` / `status` / `compactionOrdinal`） |
-| `context_generation_changed` | compaction 后上下文代数变更（payload：`generation`） |
+## 写路径
 
-### 子会话 Actor 事件（Subsession）
+```
+EventWriter.appendXxxOrFail
+  → EventLogRuntimeStore.appendAndCacheOrFail
+    → EventStore.AppendEvent / AppendEventsOrFail
+      → EventLogIo.appendLine（文件锁 + 追加）
+      → Fold.applyEvent（更新进程内 SessionState）
+```
 
-| `Kind` 含义 | 触发时机 |
-| :--- | :--- |
-| `subsession_run_started` | 子会话 run 开始（payload：`childId` / `parentSessionId` / `runId`） |
-| `subsession_run_settled` | 子会话 run 终局（payload：`childId` / `runId` / `status` / `detail`） |
-| `subsession_turn_dispatch_requested` | 子会话 turn 派发请求（payload：`runId` / `turnId` / `turnOrdinal` / `model` / `prompt`） |
-| `subsession_turn_started` | 子会话 turn 开始（payload：`runId` / `turnId` / `receipt`） |
-| `subsession_turn_outcome_observed` | 子会话 turn 结果观察 |
-| `subsession_turn_finished` | 子会话 turn 结束（payload：`finish` / `errorName` / `message` / `output`） |
-| `subsession_abort_requested` | 子会话 abort 请求 |
-| `subsession_session_poisoned` | 子会话中毒（payload：`reason`） |
-| `subsession_physical_session_closed` | 子会话物理 session 关闭 |
-| `subsession_decision_committed` | 子会话决策已持久化（原子信封，内含 `events` JSON 数组） |
+## 读路径
 
-### 万象阵事件
-
-| `Kind` 含义 | 触发时机 |
-| :--- | :--- |
-| `squad_created` | 万象阵 Session 创建 |
-| `tasks_created` | DAG 拆解产物 |
-| `task_started` | worktree 创建 + slave 启动 |
-| `task_submitted` | slave 调用 submit |
-| `task_merged` | ff 合并成功 |
-| `task_done` | slave 进程退出 |
-| `task_error` | git/worktree 操作失败 |
-| `squad_cancelled` | /squad-kill 触发 |
-
-**万象阵** kind（同文件、`session` = 万象阵 session id）：`squad_created`、`tasks_created`、`task_started`、`task_submitted`、`task_merged`、`task_done`、`task_error`、`squad_cancelled`。运行时经 `AppendSquadEvent` **追加到同一文件** `[workspace]/.wanxiangshu.ndjson`（与万象术事件共用锁与 EventStore）；DAG fold 在 `src/Kernel/Wanxiangzhen/` + `src/Runtime/EventStore/EventLogSquadProjection.fs`。规格叙事见 [wanxiangzhen/02-event-sourcing.md](./wanxiangzhen/02-event-sourcing.md)。
-
-## 信封字段（概念）
-
-事件信封中的 `v`、`session`、`kind`、`at`、`payload`、`id`、`host` 等由 `src/Runtime/EventStore/` codec 序列化；Kernel `WanEvent` 使用 `Map<string,string>` payload 参与 fold。
-
-## Fold 函数
-
-见 `src/Kernel/EventSourcing/Fold.fs`：
-
-- **`foldReviewTask`**：`loop_activated` 设 task；`review_verdict` 终局 verdict 清空；`loop_cancelled` 清空。
-- **`foldWorkBacklogSnapshot`**：取最后一次 `work_backlog_committed`。
-- **`foldNudgeDedup`**：记录已派发 anchor；WIP / dedup_cleared 重置策略。
-- **`foldNudgeSnapshot`**：供 nudge 决策的聚合视图（open todos、loop 是否活跃等）。
-- **`foldSubagents`** / `SessionState.Subagents`：`subagent_spawned` / `subagent_continued` 投影。
-- **SessionControl projection**：当前 fold 维护 generation、cancel generation、human turn 与 episode/owner 状态；不再有 `SessionState.FallbackInjection` 或 `FallbackInjectionFold`。
-- **续命租约/所有者投影**：由 `SessionControl.Projection` / `LeaseTransitions` 进行事件折叠，跟踪当前 Session 的租约所有权与续命代数，不依赖已删除的 `ContinuationProjection.fs`。
-- **万象阵**：`EventLogSquadProjection.applyWanEvent` 与 `CoordinatorReplay`（读同一 NDJSON）。
-
-`SessionState`（Runtime 缓存）聚合上述投影，供 `EventLogRuntimeNudge` / `EventLogRuntimeSync` 读取。
-
-## 写入 API（Runtime）
-
-`src/Runtime/EventStore/` 的 `SessionEventWriter`、`BacklogEventWriter`、`ReviewEventWriter`、`NudgeEventWriter`、`ContinuationEventWriter` 等暴露业务级写入；内部由 `EventStore` / `EventLogRuntimeStore` 统一追加与缓存。
-
-**`work_backlog_committed`**：在 `todowrite`/`task` 工具校验通过后调用，payload 由 `TodoWriteArgs` 构造。
-
-## 锁与并发
-
-- 跨进程：`O_CREAT|O_EXCL` 锁文件（架构测试 `eventLogUsesAdvisoryFlock` / proper-lockfile 策略以代码为准）。
-- 进程内：`PromiseQueue.SerialQueue` 串行化 append。
+`ReadAllEvents` → `EventLogRuntimeSync` → review/backlog/fallback projection 重建。损坏行截断：不跳过坏行继续 fold。
 
 ## Durable Effect Law 与 Outbox
 
-### 崩溃窗口问题
+持久化事件与发起外部效应之间存在崩溃窗口。外部副作用必须满足：
+1. 从已提交状态确定性重建，或
+2. 作为持久化 Outbox Intent 写入（与领域事件同一提交屏障落盘）
 
-当前持久化序列：`Persist → Commit → Publish → Launch Effects` 存在不可忽略的崩溃窗口：
+当前续命通过 `ContinuationIntentExecution` 驱动；Effect Supervisor 从 Outbox 消费 Intent 演进方向。
 
-```text
-事件已持久化 → 进程崩溃 → Effect 尚未启动
-```
+## 锁与并发
 
-例如已持久化"需要 Dispatch"但还没调用宿主；重启后若只订阅内存中的 `CommittedDecision`，该 Effect 将永久丢失。
-
-### Durable Effect Law
-
-外部副作用必须满足以下二者之一：
-
-1. **从已提交状态确定性重建**：重放后发现状态仍为 `DispatchRequested`，reconciliation 自动重新发起或查询 Dispatch。
-2. **作为持久化 Outbox Intent 写入**：与领域事件同一提交屏障落盘；Effect Supervisor 消费 Outbox；完成后写入确认事件。
-
-系统不能依赖"内存中恰好收到了 CommittedDecision"。对应的交付语义为：
-
-> **At-least-once delivery + idempotent host operation + correlation / reconciliation。**
-
-这需要为外部操作保留稳定身份：
-
-```text
-EffectId
-RunId
-TurnId
-CausationId
-IdempotencyKey
-Attempt
-```
-
-### Outbox 模式
-
-`appendAndCache` 先写盘后通知的链（`appendLine → foldWan`）已具备 Outbox 雏形。当前实现：
-
-1. **租约状态机驱动**：事件 `continuation_requested` 落盘，标志着 `PendingLease(Requested)` 被持久化。
-2. **Dispatch 意图执行**：`ContinuationIntentExecution` 执行对应 Intent，调用宿主 API 前写入 `continuation_dispatch_started`。
-3. **宿主接受与确认**：宿主接受并返回 runId/userMessageId 后，由宿主 hook (如 `ChatHooks`) 调用 `recordHostAcceptedContinuation` 写入 `continuation_host_accepted`。
-4. **终局与清理**：在发生 error/idle/abort 等情况时，写入终局事件（`continuation_failed` / `continuation_cancelled` / `continuation_settled`）以释放租约。
-
-演进方向：将更多 Effect 类型（如 `SendContinue`、`AbortRun`、`DispatchPrompt`）纳入同一 Outbox 模式。
-
-### 资源身份与 Deadline 持久化
-
-若 ResourcePlan 只写成 `Running → 启动 30 秒 Timer`，则每次进程重启都会重新获得完整 30 秒，Deadline 无限延后。
-
-Deadline 必须持久化**绝对到期时间**：
-
-```text
-DeadlineId
-DeadlineAt
-OwnerKey
-```
-
-重启后：`remaining = DeadlineAt - Clock.Now`：
-- `remaining > 0`：建立剩余时间的 Timer
-- `remaining <= 0`：立即将 Deadline Command 放入 Inbox
-
-Stable Resource Identity：资源是否复用由稳定 Key（`TurnDeadline(turnId)` / `AbortDeadline(turnId)`）决定，而非由 State 对象引用相等决定。
-
-## 损坏行处理
-
-读盘时遇到截断/非法行：按 `EventLogIo` 与 codec 的当前实现处理；文档不把未被测试锁定的损坏行策略写成额外协议。已确认的安全原则是：不得跳过无法解码的中间事件后继续构造看似完整的状态。
+- 跨进程：文件排他锁（`EventLogLock.fs`）
+- 进程内：`PromiseQueue.SerialQueue` 串行化 append
 
 ## 启动与恢复
 
 1. 打开 workspace → `EventStore` 读 NDJSON → 构建 `SessionState` 缓存
-2. `syncAllSessionsFromEventLog` / 单 session `syncReviewFromEventLog`、`syncBacklogFromEventLog`  
-3. 再注册宿主 hook  
-
-**文本回放备选**：`ReviewReplaySync.syncReviewFromTexts` 从对话文本推断 task，仅作 fallback；首选 **事件重放**（`EventLogRuntimeSync`）。
-
-## 与 compaction 的关系
-
-宿主压缩上下文时，万象术**不**依赖「compaction 前消息」或 multi-frontmatter 锚点恢复 backlog/review。展示层仍可输出 front-matter 供 LLM 阅读，但程序判断以 fold 为准。
-
-## 验证
-
-- 单元：`tests/` 中 EventLog fold / codec 测试
-- 架构：`nudgeDedupMustUseEventLogFold`、`nudgeLoopStateMustReplayHistory`
-- 关键套件：`EventLogFoldTests`、`EventLogCodecTests`、`EventLogRuntimeTests`、`NudgeEventSourcingTests`
-
-## 相关文档
-
-- [06-review-and-nudge.md](./06-review-and-nudge.md)
-- [07-work-backlog.md](./07-work-backlog.md)
-- [18-glossary-and-ssot-map.md](./18-glossary-and-ssot-map.md)
-- REF.md（架构演进总纲）
+2. `syncAllSessionsFromEventLog` 或单 session `syncReviewFromEventLog`、`syncBacklogFromEventLog`
+3. 再注册宿主 hook

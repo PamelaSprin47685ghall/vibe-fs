@@ -13,24 +13,17 @@
 
 ## 消息
 
-- `src/Hosts/Mux/MessageTransform.fs`：须用 Runtime caps cache + projection policy（架构测试）
+`src/Hosts/Mux/MessageTransform.fs`：须用 Runtime caps cache + projection policy（架构测试）。
 
 ## Slash 与配置
 
 - Slash command 与 workspace codec：`MuxWorkspaceCodec`、`MuxHookInputCodec`
 - AI 设置：`MuxAiSettingsCodec`、`DelegatedAiSettings`
 
-## 与 ../mux 仓库
-
-允许改 **binding**；mux 核心最小改动（`AGENTS.md`）。真正实现优先本仓库。
-
 ## Fallback
 
-- `src/Hosts/Mux/Fallback/`：Mux Fallback adapter 与事件翻译
+`src/Hosts/Mux/Fallback/Hook.fs`、`Executor.fs`。
 
-## 相关文档
+## 与 ../mux 仓库
 
-- [02-architecture.md](./02-architecture.md)
-- [08-tools-and-permissions.md](./08-tools-and-permissions.md)
-- [11-subagents.md](./11-subagents.md)
-- [12-fallback.md](./12-fallback.md)
+允许改 **binding**；mux 核心最小改动（`AGENTS.md`）。
