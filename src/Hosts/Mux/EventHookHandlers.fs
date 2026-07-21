@@ -119,6 +119,48 @@ let handleUnconsumedEvent
 // Top-level extracted event-processing body (replaces inline fn lambda)
 // ---------------------------------------------------------------------------
 
+let private dispatchMuxEventBody
+    (decoded: DecodedHookEvent)
+    (fallbackRuntime: FallbackRuntimeStore)
+    (effectiveDir: string)
+    (scope: RuntimeScope)
+    (reviewStore: ReviewStore)
+    (runtime: NudgeRuntime)
+    (fallbackHandler: obj -> JS.Promise<FallbackHookResult>)
+    (event: obj)
+    (helpers: obj)
+    : JS.Promise<unit> =
+    promise {
+        let workspaceId = decoded.workspaceId
+
+        if workspaceId <> "" then
+            if
+                decoded.eventType = "session.deleted"
+                || decoded.eventType = "session.close"
+                || decoded.eventType = "session.delete"
+                || decoded.eventType = "session.remove"
+            then
+                do! handleSessionClosed scope effectiveDir workspaceId
+
+        let isChild =
+            workspaceId <> ""
+            && SubsessionEventRouter.isChildSession effectiveDir workspaceId
+
+        if isChild then
+            do! handleChildSession effectiveDir workspaceId fallbackRuntime event
+        else
+            match parseHookEvent event with
+            | StreamAbort workspaceId
+            | AbortedError workspaceId when workspaceId <> "" ->
+                do! handleParentSession scope effectiveDir reviewStore workspaceId event
+            | _ -> ()
+
+            let! fbResult = fallbackHandler event
+
+            if not fbResult.Consumed then
+                do! handleUnconsumedEvent effectiveDir workspaceId runtime event helpers
+    }
+
 let processMuxEvent
     (decoded: DecodedHookEvent)
     (fallbackRuntime: FallbackRuntimeStore)
@@ -156,32 +198,17 @@ let processMuxEvent
             fallbackRuntime.Update(workspaceId, setEventHandlingActive true)
 
         try
-            if workspaceId <> "" then
-                if
-                    decoded.eventType = "session.deleted"
-                    || decoded.eventType = "session.close"
-                    || decoded.eventType = "session.delete"
-                    || decoded.eventType = "session.remove"
-                then
-                    do! handleSessionClosed scope effectiveDir workspaceId
-
-            let isChild =
-                workspaceId <> ""
-                && SubsessionEventRouter.isChildSession effectiveDir workspaceId
-
-            if isChild then
-                do! handleChildSession effectiveDir workspaceId fallbackRuntime event
-            else
-                match parseHookEvent event with
-                | StreamAbort workspaceId
-                | AbortedError workspaceId when workspaceId <> "" ->
-                    do! handleParentSession scope effectiveDir reviewStore workspaceId event
-                | _ -> ()
-
-                let! fbResult = fallbackHandler event
-
-                if not fbResult.Consumed then
-                    do! handleUnconsumedEvent effectiveDir workspaceId runtime event helpers
+            do!
+                dispatchMuxEventBody
+                    decoded
+                    fallbackRuntime
+                    effectiveDir
+                    scope
+                    reviewStore
+                    runtime
+                    fallbackHandler
+                    event
+                    helpers
         finally
             if workspaceId <> "" then
                 fallbackRuntime.Update(workspaceId, setEventHandlingActive false)

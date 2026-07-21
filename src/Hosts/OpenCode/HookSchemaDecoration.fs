@@ -161,6 +161,35 @@ let rewriteToolJsonSchema (setKey: obj -> string -> obj -> unit) (rewrite: obj -
             else
                 ()
 
+let private getControlFieldFlags (toolID: string) =
+    let hasWarnTdd =
+        [| "coder"
+           "executor"
+           "write"
+           "edit"
+           "apply_patch"
+           "patch"
+           "ast_edit"
+           "ast_grep_replace"
+           "file_edit_replace_string"
+           "file_edit_insert"
+           "pty_spawn"
+           "pty_write"
+           "pty_read"
+           "pty_list"
+           "pty_kill"
+           "swap" |]
+        |> Array.contains toolID
+
+    let hasWarn =
+        [| "executor"; "pty_spawn"; "pty_write"; "pty_read"; "pty_list"; "pty_kill" |]
+        |> Array.contains toolID
+
+    let hasWarnReuse =
+        [| "coder"; "inspector"; "meditator"; "browser" |] |> Array.contains toolID
+
+    hasWarnTdd, hasWarn, hasWarnReuse
+
 let decorateControlFields (toolID: string) (output: obj) : unit =
     if toolID <> "" && not (isNullish output) then
         let targets =
@@ -171,6 +200,7 @@ let decorateControlFields (toolID: string) (output: obj) : unit =
             |> Array.filter (fun p -> not (isNullish p))
 
         let schemaTargets = if targets.Length > 0 then targets else [| output |]
+        let hasWarnTdd, hasWarn, hasWarnReuse = getControlFieldFlags toolID
 
         for schemaTarget in schemaTargets do
             let mutable properties = get schemaTarget "properties"
@@ -183,32 +213,6 @@ let decorateControlFields (toolID: string) (output: obj) : unit =
                 if isNullish (get properties key) then
                     let propObj = createObj [ "type", box "string"; "description", box desc ]
                     setKey properties key propObj
-
-            let hasWarnTdd =
-                [| "coder"
-                   "executor"
-                   "write"
-                   "edit"
-                   "apply_patch"
-                   "patch"
-                   "ast_edit"
-                   "ast_grep_replace"
-                   "file_edit_replace_string"
-                   "file_edit_insert"
-                   "pty_spawn"
-                   "pty_write"
-                   "pty_read"
-                   "pty_list"
-                   "pty_kill"
-                   "swap" |]
-                |> Array.contains toolID
-
-            let hasWarn =
-                [| "executor"; "pty_spawn"; "pty_write"; "pty_read"; "pty_list"; "pty_kill" |]
-                |> Array.contains toolID
-
-            let hasWarnReuse =
-                [| "coder"; "inspector"; "meditator"; "browser" |] |> Array.contains toolID
 
             if hasWarnTdd then
                 addField

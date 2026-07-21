@@ -13,32 +13,12 @@ let swapTool () : obj =
     define
         "Exchange two non-overlapping line ranges between text files, or within the same text file. Use this as a structure-preserving refactoring primitive: move complete semantic blocks—functions, types, tests, or documentation sections—for module extraction, reordering, or cross-file migration without rewriting their contents. Line numbers are 1-based; begin is inclusive and endExclusive is exclusive."
         (createObj
-            [ "path0",
-              box
-                  {| ``type`` = "string"
-                     description = "First file path" |}
-              "begin0",
-              box
-                  {| ``type`` = "integer"
-                     minimum = 1
-                     description = "Start line in first file, 1-based, inclusive" |}
-              "endExclusive0",
-              box
-                  {| ``type`` = "integer"
-                     description = "End line in first file, 1-based, exclusive" |}
-              "path1",
-              box
-                  {| ``type`` = "string"
-                     description = "Second file path" |}
-              "begin1",
-              box
-                  {| ``type`` = "integer"
-                     minimum = 1
-                     description = "Start line in second file, 1-based, inclusive" |}
-              "endExclusive1",
-              box
-                  {| ``type`` = "integer"
-                     description = "End line in second file, 1-based, exclusive" |}
+            [ "path0", box (strReq "First file path")
+              "begin0", box (numReq "Start line in first file, 1-based, inclusive")
+              "endExclusive0", box (numReq "End line in first file, 1-based, exclusive")
+              "path1", box (strReq "Second file path")
+              "begin1", box (numReq "Start line in second file, 1-based, inclusive")
+              "endExclusive1", box (numReq "End line in second file, 1-based, exclusive")
               "follow-tdd-and-kolmogorov-principles", box warnTddParam ])
         (fun args context ->
             promise {
