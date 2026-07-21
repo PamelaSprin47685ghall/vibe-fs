@@ -53,8 +53,10 @@ let muxToolExecuteBeforeSetsUiLabelSpec () =
         let args =
             createObj
                 [ "intents", box [| intentOne; intentTwo |]
-                  "warn_tdd", box "i-am-sure-i-have-followed-tdd-and-kolmogorov-principles-and-kept-todo-updated"
-                  "warn_reuse", box "this-task-is-not-suitable-to-be-completed-via-continue-tool" ]
+                  Wanxiangshu.Kernel.WarnTdd.warnTddKey,
+                  box "i-am-sure-i-have-followed-tdd-and-kolmogorov-principles-and-kept-todo-updated"
+                  Wanxiangshu.Kernel.WarnTdd.warnReuseKey,
+                  box "this-task-is-not-suitable-to-be-completed-via-continue-tool" ]
 
         let input = createObj [ "tool", box "coder"; "args", box args ]
         do! (before $ (input, createObj [ "args", box args ])) |> unbox<JS.Promise<unit>>
@@ -111,17 +113,27 @@ let muxToolSchemasAreCleanStaticallyButInjectedDynamicallySpec () =
             Wanxiangshu.Hosts.Mux.SubagentTools.coderTool (createObj []) [| "coder" |]
 
         let staticCoderProps = staticProperties (box staticCoder)
-        check "coder static BuiltinTools schema has no warn_tdd" (isNullish (Dyn.get staticCoderProps "warn_tdd"))
+
+        check
+            "coder static BuiltinTools schema has no warn_tdd"
+            (isNullish (Dyn.get staticCoderProps Wanxiangshu.Kernel.WarnTdd.warnTddKey))
         // registered coder: warn_tdd injected into schema properties and required
         let coder = findTool "coder"
         check "coder tool exists" (not (isNullish coder))
         let coderProps = staticProperties coder
-        check "registered coder schema has warn_tdd" (not (isNullish (Dyn.get coderProps "warn_tdd")))
-        check "registered coder required has NO warn_tdd" (not (staticRequired coder |> Array.contains "warn_tdd"))
+
+        check
+            "registered coder schema has warn_tdd"
+            (not (isNullish (Dyn.get coderProps Wanxiangshu.Kernel.WarnTdd.warnTddKey)))
+
+        check
+            "registered coder required has NO warn_tdd"
+            (not (staticRequired coder |> Array.contains Wanxiangshu.Kernel.WarnTdd.warnTddKey))
 
         check
             "registered coder warn_tdd has prompt constraint only"
-            ((Dyn.str (Dyn.get coderProps "warn_tdd") "description").Length > 0)
+            ((Dyn.str (Dyn.get coderProps Wanxiangshu.Kernel.WarnTdd.warnTddKey) "description")
+                 .Length > 0)
         // executor: no warn or warn_tdd in raw static BuiltinTools schema
         let staticExec =
             Wanxiangshu.Hosts.Mux.BuiltinTools.executorTool
@@ -130,41 +142,65 @@ let muxToolSchemasAreCleanStaticallyButInjectedDynamicallySpec () =
                 (Wanxiangshu.Runtime.RuntimeScope.create ())
 
         let staticExecProps = staticProperties (box staticExec)
-        check "executor static BuiltinTools schema has no warn" (isNullish (Dyn.get staticExecProps "warn"))
-        check "executor static BuiltinTools schema has no warn_tdd" (isNullish (Dyn.get staticExecProps "warn_tdd"))
+
+        check
+            "executor static BuiltinTools schema has no warn"
+            (isNullish (Dyn.get staticExecProps Wanxiangshu.Kernel.WarnTdd.warnKey))
+
+        check
+            "executor static BuiltinTools schema has no warn_tdd"
+            (isNullish (Dyn.get staticExecProps Wanxiangshu.Kernel.WarnTdd.warnTddKey))
         // registered executor: warn and warn_tdd injected
         let executor = findTool "executor"
         check "executor tool exists" (not (isNullish executor))
         let execProps = staticProperties executor
-        check "registered executor schema has warn" (not (isNullish (Dyn.get execProps "warn")))
-        check "registered executor schema has warn_tdd" (not (isNullish (Dyn.get execProps "warn_tdd")))
-        check "registered executor required has NO warn" (not (staticRequired executor |> Array.contains "warn"))
+
+        check
+            "registered executor schema has warn"
+            (not (isNullish (Dyn.get execProps Wanxiangshu.Kernel.WarnTdd.warnKey)))
+
+        check
+            "registered executor schema has warn_tdd"
+            (not (isNullish (Dyn.get execProps Wanxiangshu.Kernel.WarnTdd.warnTddKey)))
+
+        check
+            "registered executor required has NO warn"
+            (not (staticRequired executor |> Array.contains Wanxiangshu.Kernel.WarnTdd.warnKey))
 
         check
             "registered executor required has NO warn_tdd"
-            (not (staticRequired executor |> Array.contains "warn_tdd"))
+            (not (staticRequired executor |> Array.contains Wanxiangshu.Kernel.WarnTdd.warnTddKey))
 
         check
             "registered executor warn has prompt constraint"
-            ((Dyn.str (Dyn.get execProps "warn") "description").Length > 0)
+            ((Dyn.str (Dyn.get execProps Wanxiangshu.Kernel.WarnTdd.warnKey) "description")
+                 .Length > 0)
 
         check
             "registered executor warn_tdd has prompt constraint"
-            ((Dyn.str (Dyn.get execProps "warn_tdd") "description").Length > 0)
+            ((Dyn.str (Dyn.get execProps Wanxiangshu.Kernel.WarnTdd.warnTddKey) "description")
+                 .Length > 0)
         // write (staticWrite): no warn_tdd in raw BuiltinTools.writeTool schema
         let staticWrite = Wanxiangshu.Hosts.Mux.BuiltinTools.writeTool (createObj [])
         let staticWriteProps = staticProperties (box staticWrite)
-        check "staticWrite has no warn_tdd" (isNullish (Dyn.get staticWriteProps "warn_tdd"))
+        check "staticWrite has no warn_tdd" (isNullish (Dyn.get staticWriteProps Wanxiangshu.Kernel.WarnTdd.warnTddKey))
         // registered write: warn_tdd injected into schema properties and required
         let write = findTool "write"
         check "write tool exists" (not (isNullish write))
         let writeProps = staticProperties write
-        check "registered write schema has warn_tdd" (not (isNullish (Dyn.get writeProps "warn_tdd")))
-        check "registered write required has NO warn_tdd" (not (staticRequired write |> Array.contains "warn_tdd"))
+
+        check
+            "registered write schema has warn_tdd"
+            (not (isNullish (Dyn.get writeProps Wanxiangshu.Kernel.WarnTdd.warnTddKey)))
+
+        check
+            "registered write required has NO warn_tdd"
+            (not (staticRequired write |> Array.contains Wanxiangshu.Kernel.WarnTdd.warnTddKey))
 
         check
             "registered write warn_tdd has prompt constraint"
-            ((Dyn.str (Dyn.get writeProps "warn_tdd") "description").Length > 0)
+            ((Dyn.str (Dyn.get writeProps Wanxiangshu.Kernel.WarnTdd.warnTddKey) "description")
+                 .Length > 0)
         // dynamic injection hook must be present
         let hook = get reg "tool.execute.before"
         check "tool.execute.before hook is present for dynamic warn/warn_tdd injection" (not (isNullish hook))

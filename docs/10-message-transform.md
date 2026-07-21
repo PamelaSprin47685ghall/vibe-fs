@@ -80,17 +80,7 @@ OpenCode：**原地 mutate** hook 字段（`AGENTS.md`）。
 
 ## 控制字段生命周期
 
-控制字段（`warn_tdd`、`warn`、`warn_reuse`）在工具执行边界经历完整生命周期：
-
-| 阶段 | 动作 | 模块 |
-| :--- | :--- | :--- |
-| Schema 注册 | 在 description 注入软提示，不放入 Host 强制 `required`/`minLength` | `ToolHookRuntime.decorateAndValidateSchema` |
-| Before hook | 提取并原地删除字段，构造 `ControlEnvelope` 存入 `ToolComplianceStore` | `executeBeforeGateway` + `saveCompliance` |
-| 真实执行 | 工具收到净化后的业务参数 | Host execute |
-| After hook | 调用 `restoreWarnToArgs` 将原始字段恢复到历史可见 args，不再追加违例批评 | `tryGetCompliance` → `restoreWarnToArgs` → `removeCompliance` |
-| Finally | 删除 compliance envelope | `removeCompliance` |
-
-缺失/空白/非规范值的控制字段不阻止工具执行，也不在 after 阶段追加批评。description 是仅供 LLM 感知的软提示，宿主 JSON Schema 校验器不强制。硬拒绝只保留给 malformed business args、权限/安全拒绝、解析失败或净化后仍泄漏的控制字段。
+控制字段（`warn_tdd`、`warn`、`warn_reuse`）作为提醒字段注入到 Schema description 中（key optional，value undefined），强制引起 LLM 注意。LLM 无须传值，宿主在工具执行前后不进行剥离与恢复。
 
 ## 相关
 

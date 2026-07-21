@@ -278,10 +278,6 @@ let mimoTaskDefinitionHandlesZodLikeParametersSpec () =
             (string (get (get taskDef "parameters") "kind") = "extended")
 
         check
-            "mimo task.definition does not overwrite existing ahaMoments field on zod schema"
-            (isNullish (get extendCalls.[0] "ahaMoments"))
-
-        check
             "mimo task.definition builds methodology from zod string template"
             (obj.ReferenceEquals(get extendCalls.[0] "select_methodology", describedMethodology))
 
@@ -316,10 +312,6 @@ let mimoTaskDefinitionRoutesEffectSchemaShapedParametersToJsonSchemaSpec () =
             (not (isNullish (get taskDef "jsonSchema")))
 
         let jsonSchema = get taskDef "jsonSchema"
-
-        check
-            "mimo task.definition under Effect parameters jsonSchema contains ahaMoments"
-            (not (isNullish (get (get jsonSchema "properties") "ahaMoments")))
 
         check
             "mimo task.definition under Effect parameters preserves original parameters reference"

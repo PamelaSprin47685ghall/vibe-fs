@@ -83,7 +83,7 @@ let runMimoCoderSchema (h: Harness) (chk: string -> bool -> unit) =
 
         if not (dynIsNull coderJsonSchema) then
             let coderProps = dynGet coderJsonSchema "properties"
-            chk "mimo.coder.hasWarnTdd" (not (dynIsNull (dynGet coderProps "warn_tdd")))
+            chk "mimo.coder.hasWarnTdd" (not (dynIsNull (dynGet coderProps "follow-tdd-and-kolmogorov-principles")))
         else
             chk "mimo.coder.hasWarnTdd" false
     }

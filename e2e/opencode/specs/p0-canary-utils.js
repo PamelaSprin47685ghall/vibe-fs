@@ -40,14 +40,18 @@ export async function sleep(ms) {
   return new Promise((r) => setTimeout(r, ms));
 }
 
-const CONTROL_FIELDS = ['warn_tdd', 'warn', 'warn_reuse'];
+const CONTROL_FIELDS = [
+  'follow-tdd-and-kolmogorov-principles',
+  'impossible-via-other-tools',
+  'not-suitable-via-continue-tool'
+];
 
 const EXPECTED_CONTROL_FIELDS = {
-  warn_tdd: new Set(['coder', 'executor', 'write', 'edit', 'apply_patch', 'patch', 'ast_edit',
+  'follow-tdd-and-kolmogorov-principles': new Set(['coder', 'executor', 'write', 'edit', 'apply_patch', 'patch', 'ast_edit',
     'ast_grep_replace', 'file_edit_replace_string', 'file_edit_insert',
     'pty_spawn', 'pty_write', 'pty_read', 'pty_list', 'pty_kill', 'swap']),
-  warn: new Set(['executor', 'pty_spawn', 'pty_write', 'pty_read', 'pty_list', 'pty_kill']),
-  warn_reuse: new Set(['coder', 'inspector', 'meditator', 'browser']),
+  'impossible-via-other-tools': new Set(['executor', 'pty_spawn', 'pty_write', 'pty_read', 'pty_list', 'pty_kill']),
+  'not-suitable-via-continue-tool': new Set(['coder', 'inspector', 'meditator', 'browser']),
 };
 
 function validateSchema(toolName, schema, errors) {

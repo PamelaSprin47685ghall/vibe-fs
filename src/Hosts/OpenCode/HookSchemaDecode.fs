@@ -35,7 +35,7 @@ let private injectWarnTddIntoJsonSchemaInPlace (schema: obj) : unit =
                 prop?("description") <- box Params.warnTddDesc
 
 let private injectWarnTddIntoArgsShapeInPlace (shape: obj) : unit =
-    shape?("warn_tdd") <- strOpt Params.warnTddDesc
+    shape?("warn_tdd") <- inlineJsonWarnTddProperty
 
 /// Inject warn_tdd into an Opencode tool schema in place.
 let injectWarnTddIntoJsonSchema (schema: obj) : obj =
@@ -59,7 +59,7 @@ let private injectWarnIntoJsonSchemaInPlace (schema: obj) : unit =
             props?("warn") <- inlineJsonWarnProperty
 
 let private injectWarnIntoArgsShapeInPlace (shape: obj) : unit =
-    shape?("warn") <- strOpt WarnTdd.warnDescription
+    shape?("warn") <- inlineJsonWarnProperty
 
 /// Inject warn into an Opencode tool schema in place.
 let injectWarnIntoJsonSchema (schema: obj) : obj =
@@ -86,7 +86,7 @@ let private injectWarnReuseIntoJsonSchemaInPlace (schema: obj) : unit =
             props?("warn_reuse") <- inlineJsonWarnReuseProperty
 
 let private injectWarnReuseIntoArgsShapeInPlace (shape: obj) : unit =
-    shape?("warn_reuse") <- strOpt WarnTdd.warnReuseDescription
+    shape?("warn_reuse") <- inlineJsonWarnReuseProperty
 
 /// Inject warn_reuse into an Opencode tool schema in place.
 let injectWarnReuseIntoJsonSchema (schema: obj) : obj =

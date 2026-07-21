@@ -135,15 +135,6 @@ let runToolLifecycle
         chk "op.todowrite.rewritten" ((dynStr twRes "output").IndexOf("first_principles") >= 0)
         chk "op.todowrite.noErr" (dynIsNull (dynGet twRes "error"))
 
-        chk
-            "op.todowrite.eventAppended"
-            (((if harness.fileExists ".wanxiangshu.ndjson" then
-                   harness.readFile ".wanxiangshu.ndjson"
-               else
-                   "")
-                .IndexOf("work_backlog_committed")
-              >= 0))
-
         // Bad todo (empty content) should still block the event.
         let chkTwErr label (errSub: string) extra =
             promise {

@@ -167,19 +167,19 @@ function handleChat(req, res, queue, calls, url) {
 
     if (item?.tool) {
       const args = {
-        warn_tdd: 'i-am-sure-i-have-followed-tdd-and-kolmogorov-principles-and-kept-todo-updated',
-        warn_reuse: 'this-task-is-not-suitable-to-be-completed-via-continue-tool',
-        warn: 'it-is-not-possible-to-do-it-using-other-tools-and-only-run-tests-when-static-analysis-cannot-handle-it',
+        'follow-tdd-and-kolmogorov-principles': 'i-am-sure-i-have-followed-tdd-and-kolmogorov-principles-and-kept-todo-updated',
+        'not-suitable-via-continue-tool': 'this-task-is-not-suitable-to-be-completed-via-continue-tool',
+        'impossible-via-other-tools': 'it-is-not-possible-to-do-it-using-other-tools-and-only-run-tests-when-static-analysis-cannot-handle-it',
         ...(item.args ?? {})
       };
-      if (item.args && item.args.warn_tdd === null) {
-        delete args.warn_tdd;
+      if (item.args && item.args['follow-tdd-and-kolmogorov-principles'] === null) {
+        delete args['follow-tdd-and-kolmogorov-principles'];
       }
-      if (item.args && item.args.warn === null) {
-        delete args.warn;
+      if (item.args && item.args['impossible-via-other-tools'] === null) {
+        delete args['impossible-via-other-tools'];
       }
-      if (item.args && item.args.warn_reuse === null) {
-        delete args.warn_reuse;
+      if (item.args && item.args['not-suitable-via-continue-tool'] === null) {
+        delete args['not-suitable-via-continue-tool'];
       }
       call.response = { type: 'tool_call', name: item.tool, args };
       sendSSE(res, toolCallChunks(id, item.tool, JSON.stringify(args), promptTokens));

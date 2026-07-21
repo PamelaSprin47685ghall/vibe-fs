@@ -7,9 +7,9 @@ const DEFAULT_WARN_TDD = 'i-am-sure-i-have-followed-tdd-and-kolmogorov-principle
 const DEFAULT_WARN = 'it-is-not-possible-to-do-it-using-other-tools-and-only-run-tests-when-static-analysis-cannot-handle-it';
 const DEFAULT_WARN_REUSE = 'this-task-is-not-suitable-to-be-completed-via-continue-tool';
 
-const WARN_TDD_KEY = 'warn_tdd';
-const WARN_KEY = 'warn';
-const WARN_REUSE_KEY = 'warn_reuse';
+const WARN_TDD_KEY = 'follow-tdd-and-kolmogorov-principles';
+const WARN_KEY = 'impossible-via-other-tools';
+const WARN_REUSE_KEY = 'not-suitable-via-continue-tool';
 
 function setOrDelete(args, key, defaultValue) {
   if (args[key] === null) {

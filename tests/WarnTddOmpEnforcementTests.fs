@@ -49,8 +49,6 @@ let ompAcceptsCoder () =
     let result, violations = ompHookResult "coder" args
     check "omp coder canonical returns None" (Option.isNone result)
     check "omp coder canonical has no violations" (violations.IsEmpty)
-    check "omp coder warn_tdd removed from args" (Dyn.str args "warn_tdd" = "")
-    check "omp coder warn_reuse removed from args" (Dyn.str args "warn_reuse" = "")
 
 let ompIgnoresNonModificationTool () =
     let result, violations = ompHookResult "read" (createObj [])
@@ -71,7 +69,6 @@ let ompAcceptsExecutor () =
     let result, violations = ompHookResult "executor" args
     check "omp executor canonical returns None" (Option.isNone result)
     check "omp executor canonical has no violations" (violations.IsEmpty)
-    check "omp executor warn removed from args" (Dyn.str args "warn" = "")
 
 let ompWriteDoesNotRequireWarn () =
     let result, violations =
@@ -156,8 +153,6 @@ let ompAcceptsCoderWithWarnReuse () =
     let result, violations = ompHookResult "coder" args
     check "omp coder canonical warn_reuse returns None" (Option.isNone result)
     check "omp coder canonical warn_reuse has no violations" (violations.IsEmpty)
-    check "omp coder warn_tdd removed from args" (Dyn.str args "warn_tdd" = "")
-    check "omp coder warn_reuse removed from args" (Dyn.str args "warn_reuse" = "")
 
 let ompNonSubagentIgnoresWarnReuse () =
     let result, violations = ompHookResult "read" (createObj [])

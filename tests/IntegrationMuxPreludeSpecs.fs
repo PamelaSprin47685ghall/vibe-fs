@@ -19,8 +19,7 @@ let wrapperSpec (reg: obj) =
         [| "agent_report"
            "file_edit_insert"
            "file_edit_replace_string"
-           "file_read"
-           "todo_write" |]
+           "file_read" |]
         |> Array.sort
 
     check "wrapper targets correct" (targets = expected)

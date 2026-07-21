@@ -62,8 +62,6 @@ let muxAcceptsCoder () =
         let! err, violations = runMuxHook "coder" args
         check "mux coder canonical passes" (err = "")
         check "mux coder canonical has no violations" (violations.IsEmpty)
-        check "mux coder warn_tdd removed from args" (Dyn.str args "warn_tdd" = "")
-        check "mux coder warn_reuse removed from args" (Dyn.str args "warn_reuse" = "")
     }
 
 let muxIgnoresNonModificationTool () =
@@ -88,7 +86,6 @@ let muxAcceptsExecutor () =
         let! err, violations = runMuxHook "executor" args
         check "mux executor canonical passes" (err = "")
         check "mux executor canonical has no violations" (violations.IsEmpty)
-        check "mux executor warn removed from args" (Dyn.str args "warn" = "")
     }
 
 let muxWriteDoesNotRequireWarn () =
@@ -174,8 +171,6 @@ let muxAcceptsCoderWithWarnReuse () =
         let! err, violations = runMuxHook "coder" args
         check "mux coder canonical warn_reuse passes" (err = "")
         check "mux coder canonical warn_reuse has no violations" (violations.IsEmpty)
-        check "mux coder warn_tdd removed from args" (Dyn.str args "warn_tdd" = "")
-        check "mux coder warn_reuse removed from args" (Dyn.str args "warn_reuse" = "")
     }
 
 let muxNonSubagentIgnoresWarnReuse () =

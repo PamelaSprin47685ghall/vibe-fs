@@ -84,22 +84,6 @@ let capsToolCallIdFitsProviderLimit () =
 
 // ── WarnTdd ─────────────────────────────────────────────────────────────────
 
-let parseWarnTddExactMatch () =
-    check
-        "exact canonical value parses"
-        (parseWarnTdd "i-am-sure-i-have-followed-tdd-and-kolmogorov-principles-and-kept-todo-updated" = Some
-                                                                                                            IAmSureIHaveFollowedTddAndKolmogorovPrinciples)
-
-let parseWarnTddCaseInsensitive () =
-    check
-        "uppercase variant parses"
-        (parseWarnTdd "I-AM-SURE-I-HAVE-FOLLOWED-TDD-AND-KOLMOGOROV-PRINCIPLES-AND-KEPT-TODO-UPDATED" = Some
-                                                                                                            IAmSureIHaveFollowedTddAndKolmogorovPrinciples)
-
-let parseWarnTddRejectsWrongValue () =
-    check "whitespace string returns None" (parseWarnTdd "   " = None)
-    check "empty string returns None" (parseWarnTdd "" = None)
-
 let isModificationToolRecognises () =
     check "coder is modification tool" (isModificationTool "coder")
     check "executor is modification tool" (isModificationTool "executor")
@@ -139,9 +123,6 @@ let run () =
     isCapsSynthIdRejects ()
     capsToolCallIdFitsProviderLimit ()
     // WarnTdd
-    parseWarnTddExactMatch ()
-    parseWarnTddCaseInsensitive ()
-    parseWarnTddRejectsWrongValue ()
     isModificationToolRecognises ()
     isModificationToolCaseInsensitive ()
     isModificationToolRejectsNonModification ()

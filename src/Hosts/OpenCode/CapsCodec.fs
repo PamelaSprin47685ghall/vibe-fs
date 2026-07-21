@@ -182,7 +182,12 @@ let buildCapsMessages
                 if sessionID <> "" then
                     sessionID
                 else
-                    messageSessionID existingStripped.[0]
+                    let msgSid = messageSessionID existingStripped.[0]
+
+                    if msgSid <> "" then
+                        msgSid
+                    else
+                        messageId existingStripped.[0]
 
             let sessionOpt = if realSessionID = "" then None else Some realSessionID
             let sortedCaps = capsFiles |> List.sortBy (fun cf -> cf.label, cf.filePath)

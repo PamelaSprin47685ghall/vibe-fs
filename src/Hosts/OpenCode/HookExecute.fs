@@ -65,25 +65,6 @@ let toolExecuteBeforeFor (host: Host) (input: obj) (output: obj) : JS.Promise<un
         if isNull args || Dyn.isNullish args then
             raise (System.Exception("Tool validation error: resolved arguments are null"))
 
-        let inputArgs = argsFromHookInput input
-
-        // Host runtimes may expose a distinct output rewriter object while
-        // retaining the original input args reference for the real execute
-        // call.  Transfer controls to the gateway's execution object, then
-        // remove them from the original reference too.
-        if
-            not (Dyn.isNullish inputArgs)
-            && Dyn.typeIs inputArgs "object"
-            && Dyn.typeIs args "object"
-        then
-            for k in [| "warn_tdd"; "warn"; "warn_reuse" |] do
-                if Dyn.has inputArgs k then
-                    args?(k) <- inputArgs?(k)
-
-            if not (obj.ReferenceEquals(inputArgs, args)) then
-                for k in [| "warn_tdd"; "warn"; "warn_reuse" |] do
-                    Dyn.deleteKey inputArgs k
-
         match ToolHookRuntime.executeBeforeGateway tool args with
         | Result.Error e ->
             setHookError output e

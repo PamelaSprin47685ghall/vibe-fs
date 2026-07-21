@@ -74,21 +74,7 @@
 
 ## warn_tdd / warn_reuse
 
-### WarnTdd / warn（契约）
-
-**修改类工具**须 `warn_tdd`，规范值：
-
-`i-am-sure-i-have-followed-tdd-and-kolmogorov-principles-and-kept-todo-updated`
-
-**高风险执行**（`executor`、`pty_*`）另须 `warn`：
-
-`it-is-not-possible-to-do-it-using-other-tools-and-only-run-tests-when-static-analysis-cannot-handle-it`
-
-**子代理委派**（`coder`、`inspector`、`meditator`、`browser`）另须 `warn_reuse`：
-
-`this-task-is-not-suitable-to-be-completed-via-continue-tool`
-
-三个字段均为软协议：schema description 提示模型填写，但不加入宿主强制 `required`；before hook 提取并移除，after hook 恢复到历史可见 args，不再追加批评。SSOT：`src/Kernel/WarnTdd.fs`、`src/Runtime/Tooling/ToolArgumentCoercion.fs`、`src/Runtime/Tooling/ToolHookRuntime.fs`；测试 `WarnTddKernelFactsTests` 与三宿主 enforcement tests。
+三个字段均为提示性软协议（key 存在，value 为 undefined，optional）：schema description 用于强制引起 LLM 注意，LLM 无须传值；若传值则直接忽略。无后续剥离与恢复环节。SSOT：`src/Kernel/WarnTdd.fs`、`src/Runtime/Tooling/ToolArgumentCoercion.fs`、`src/Runtime/Tooling/ToolHookRuntime.fs`；测试 `WarnTddKernelFactsTests` 与三宿主 enforcement tests。
 
 ## Mux 特有包装
 

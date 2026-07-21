@@ -29,8 +29,7 @@ let private injectWarnReuseIntoOmpParameters (schema: obj) (toolName: string) : 
 
         if not (isNullish props) then
             if isNullish (Dyn.get props "warn_reuse") then
-                props?("warn_reuse") <-
-                    box (createObj [| "type", box "string"; "description", box warnReuseDescription |])
+                props?("warn_reuse") <- box (createObj [| "description", box warnReuseDescription |])
 
     schema
 
@@ -72,7 +71,7 @@ let coderParameters (tb: obj) : obj =
         let props = Dyn.get schema "properties"
 
         if isNullish (Dyn.get props "warn_tdd") then
-            props?("warn_tdd") <- box (createObj [| "type", box "string"; "description", box warnTddDescription |])
+            props?("warn_tdd") <- box (createObj [| "description", box warnTddDescription |])
 
     injectWarnReuseIntoOmpParameters schema "coder"
 
@@ -119,13 +118,13 @@ let executorParameters (tb: obj) : obj =
         let props = Dyn.get schema "properties"
 
         if isNullish (Dyn.get props "warn_tdd") then
-            props?("warn_tdd") <- box (createObj [| "type", box "string"; "description", box warnTddDescription |])
+            props?("warn_tdd") <- box (createObj [| "description", box warnTddDescription |])
 
     if isWarnRequiredTool "executor" then
         let props = Dyn.get schema "properties"
 
         if isNullish (Dyn.get props "warn") then
-            props?("warn") <- box (createObj [| "type", box "string"; "description", box warnDescription |])
+            props?("warn") <- box (createObj [| "description", box warnDescription |])
 
     addRequired schema "max_bytes"
     addRequired schema "what_to_summarize"

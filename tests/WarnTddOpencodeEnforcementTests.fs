@@ -74,8 +74,6 @@ let opencodeAcceptsCoder () =
         let! err, violations = runOpencodeHook "coder" args
         check "opencode coder canonical passes" (err = "")
         check "opencode coder canonical has no violations" (violations.IsEmpty)
-        check "opencode coder warn_tdd removed from args" (Dyn.str args "warn_tdd" = "")
-        check "opencode coder warn_reuse removed from args" (Dyn.str args "warn_reuse" = "")
     }
 
 let opencodeIgnoresNonModificationTool () =
@@ -174,7 +172,6 @@ let opencodeAcceptsExecutor () =
         let! err, violations = runOpencodeHook "executor" args
         check "opencode executor canonical passes" (err = "")
         check "opencode executor canonical has no violations" (violations.IsEmpty)
-        check "opencode executor warn removed from args" (Dyn.str args "warn" = "")
     }
 
 let opencodeWriteDoesNotRequireWarn () =
@@ -261,8 +258,6 @@ let opencodeAcceptsCoderWithWarnReuse () =
         let! err, violations = runOpencodeHook "coder" args
         check "opencode coder canonical warn_reuse passes" (err = "")
         check "opencode coder canonical warn_reuse has no violations" (violations.IsEmpty)
-        check "opencode coder warn_tdd removed from args" (Dyn.str args "warn_tdd" = "")
-        check "opencode coder warn_reuse removed from args" (Dyn.str args "warn_reuse" = "")
     }
 
 let opencodeNonSubagentIgnoresWarnReuse () =

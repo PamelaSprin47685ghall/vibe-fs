@@ -64,7 +64,7 @@ let toolDefinitionSpec () =
 
         check
             "tool.definition injects warn_tdd into edit jsonSchema"
-            (not (isNullish (get (get editJsonSchema "properties") "warn_tdd")))
+            (not (isNullish (get (get editJsonSchema "properties") Wanxiangshu.Kernel.WarnTdd.warnTddKey)))
 
         let patchParameters = effectStruct (createObj [ "patchText", effectString ])
 
@@ -81,17 +81,17 @@ let toolDefinitionSpec () =
 
         check
             "tool.definition injects warn_tdd into apply_patch jsonSchema"
-            (not (isNullish (get (get (get patchDef "jsonSchema") "properties") "warn_tdd")))
+            (not (isNullish (get (get (get patchDef "jsonSchema") "properties") Wanxiangshu.Kernel.WarnTdd.warnTddKey)))
 
         let patchRequired =
             unbox<obj[]> (get (get patchDef "jsonSchema") "required") |> Array.map string
 
         check
             "tool.definition does NOT require warn_tdd in required for apply_patch jsonSchema"
-            (not (patchRequired |> Array.contains "warn_tdd"))
+            (not (patchRequired |> Array.contains Wanxiangshu.Kernel.WarnTdd.warnTddKey))
 
         let patchProps = get (get patchDef "jsonSchema") "properties"
-        let warnTddProp = get patchProps "warn_tdd"
+        let warnTddProp = get patchProps Wanxiangshu.Kernel.WarnTdd.warnTddKey
         check "warn_tdd description is present" ((str warnTddProp "description").Length > 0)
 
         let todoParams = createObj [ "__effectSchema", box true ]
@@ -111,11 +111,7 @@ let toolDefinitionSpec () =
 
         let todoSchema = get todoDef "jsonSchema"
         let todoProps = get todoSchema "properties"
-        let reportSchema = get todoProps "ahaMoments"
         let required = unbox<obj[]> (get todoSchema "required") |> Array.map string
-        check "tool.definition builds todo report field" (str reportSchema "type" = "string")
-
-        check "tool.definition non-null" (not (isNullish reportSchema))
 
         let tools = get p "tool"
         let executorTool = get tools "executor"
@@ -133,8 +129,15 @@ let toolDefinitionSpec () =
         let executorProps = get executorSchema "properties"
         check "tool.definition keeps executor command schema" (not (isNullish (get executorProps "command")))
         check "tool.definition keeps executor mode schema" (not (isNullish (get executorProps "mode")))
-        check "tool.definition injects executor warn_tdd schema" (not (isNullish (get executorProps "warn_tdd")))
-        check "tool.definition injects executor warn schema" (not (isNullish (get executorProps "warn")))
+
+        check
+            "tool.definition injects executor warn_tdd schema"
+            (not (isNullish (get executorProps "follow-tdd-and-kolmogorov-principles")))
+
+        check
+            "tool.definition injects executor warn schema"
+            (not (isNullish (get executorProps "impossible-via-other-tools")))
+
         check "tool.definition does not replace executor schema" (isNullish (get executorProps "todos"))
         let! mimoP = Wanxiangshu.Hosts.Opencode.PluginMimo.plugin (box {| directory = workspaceDir |})
         let mimoTd = get mimoP "tool.definition"
@@ -153,10 +156,6 @@ let toolDefinitionSpec () =
             |> unbox<JS.Promise<unit>>
 
         check "mimo task.definition keeps parameters not jsonSchema" (isNullish (get taskDef "jsonSchema"))
-
-        check
-            "mimo task.definition fuses report into parameters"
-            (not (isNullish (get (get (get taskDef "parameters") "properties") "ahaMoments")))
 
         check
             "mimo task.definition preserves todos"
@@ -179,10 +178,6 @@ let toolDefinitionSpec () =
         do!
             mimoTd $ (createObj [ "toolID", box "task" ], taskJsonDef)
             |> unbox<JS.Promise<unit>>
-
-        check
-            "mimo task.definition rewrites jsonSchema when that is the exposed path"
-            (not (isNullish (get (get (get taskJsonDef "jsonSchema") "properties") "ahaMoments")))
 
         check
             "mimo task.definition strips task_id from jsonSchema"

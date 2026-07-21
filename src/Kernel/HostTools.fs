@@ -83,6 +83,8 @@ let normalizeToolNameForMux (toolName: string) : string =
         "skill"
     elif toolName = "ask_user_question" then
         "question"
+    elif toolName = "task_complete" then
+        "task_complete"
     elif toolName.StartsWith "task" then
         "task"
     else

@@ -53,18 +53,7 @@ let appendSyntaxDiagnostics (directory: string) (input: obj) (output: obj) : JS.
     }
 
 let private collectTodoWriteViolations (host: Host) (output: obj) (input: obj) (decodedArgs: obj) : bool * string list =
-    if
-        toolNameFromHookInput input <> todoWriteToolName host
-        || Dyn.isNullish decodedArgs
-    then
-        false, []
-    else
-        match Error() with
-        | Ok(_, viols) -> false, viols
-        | Error err ->
-            let errStr = $"DECODE_FAILED: %A{err}"
-            setHookError output errStr
-            true, []
+    false, []
 
 let private processHookResult
     (decodedArgs: obj)

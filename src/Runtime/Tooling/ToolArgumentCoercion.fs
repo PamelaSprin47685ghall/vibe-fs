@@ -131,21 +131,17 @@ let getToolCapabilities (toolName: string) : ToolCapability list =
 
 let inlineJsonWarnTddProperty: obj =
     createObj
-        [ "type", box "string"
-          "description",
+        [ "description",
           box "MUST acknowledge that tests are written first (TDD) and Kolmogorov discipline is followed." ]
 
 let inlineJsonWarnProperty: obj =
     createObj
-        [ "type", box "string"
-          "description",
+        [ "description",
           box
               "MUST acknowledge that this task cannot be done with other tools and only run tests when static analysis cannot handle it." ]
 
 let inlineJsonWarnReuseProperty: obj =
-    createObj
-        [ "type", box "string"
-          "description", box "MUST acknowledge that this task is not suitable for completion via continue tool." ]
+    createObj [ "description", box "MUST acknowledge that this task is not suitable for completion via continue tool." ]
 
 let private injectProp
     (props: obj)

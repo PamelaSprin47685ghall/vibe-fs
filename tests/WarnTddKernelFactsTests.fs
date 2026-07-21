@@ -91,47 +91,7 @@ let kernelIsWarnRequiredToolMatrix () =
     for (tool, expected) in cases do
         equal ("isWarnRequiredTool " + tool) expected (isWarnRequiredTool tool)
 
-let kernelParseWarnTddCanonical () =
-    check
-        "parseWarnTdd accepts canonical"
-        (parseWarnTdd canonicalValue = Some IAmSureIHaveFollowedTddAndKolmogorovPrinciples)
-
-    check
-        "parseWarnTdd accepts title-case (case-insensitive)"
-        (parseWarnTdd "I-Am-Sure-I-Have-Followed-Tdd-And-Kolmogorov-Principles-And-Kept-Todo-Updated" = Some
-                                                                                                            IAmSureIHaveFollowedTddAndKolmogorovPrinciples)
-
-    check
-        "parseWarnTdd accepts mixed-case"
-        (parseWarnTdd "I-am-sure-i-have-followed-tdd-and-kolmogorov-principles-and-kept-todo-updated" = Some
-                                                                                                            IAmSureIHaveFollowedTddAndKolmogorovPrinciples)
-
-let kernelParseWarnTddRejectsVariants () =
-    let invalidValues = [ ""; "   "; "\t"; "\r\n" ]
-
-    for value in invalidValues do
-        check ("parseWarnTdd rejects: " + value) (parseWarnTdd value = None)
-
-let kernelParseWarnCanonical () =
-    check
-        "parseWarn accepts canonical"
-        (parseWarn
-            "it-is-not-possible-to-do-it-using-other-tools-and-only-run-tests-when-static-analysis-cannot-handle-it")
-
-let kernelParseWarnRejectsVariants () =
-    let invalidValues = [ ""; "   "; "\t"; "\n" ]
-
-    for value in invalidValues do
-        check ("parseWarn rejects: " + value) (not (parseWarn value))
-
 let kernelCanonicalValuesAreNonEmpty () =
-    check "warn_tdd canonicalValue non-empty" (canonicalValue <> "")
-
-    equal
-        "warnCanonicalValue matches new format"
-        "it-is-not-possible-to-do-it-using-other-tools-and-only-run-tests-when-static-analysis-cannot-handle-it"
-        warnCanonicalValue
-
     check "warnDescription non-empty" (warnDescription <> "")
 
 let kernelWarnDescriptionsDiffer () =
@@ -157,23 +117,6 @@ let kernelIsSubagentToolMatrix () =
     for (tool, expected) in cases do
         equal ("isSubagentTool " + tool) expected (isSubagentTool tool)
 
-let kernelParseWarnReuseCanonical () =
-    check "parseWarnReuse accepts canonical" (parseWarnReuse warnReuseCanonicalValue)
-
-    check
-        "parseWarnReuse accepts case variant"
-        (parseWarnReuse "THIS-TASK-IS-NOT-SUITABLE-TO-BE-COMPLETED-VIA-CONTINUE-TOOL")
-
-    check
-        "parseWarnReuse accepts spaces"
-        (parseWarnReuse "  this-task-is-not-suitable-to-be-completed-via-continue-tool  ")
-
-let kernelParseWarnReuseRejectsVariants () =
-    let invalid = [ ""; "   "; "\t"; "\n" ]
-
-    for v in invalid do
-        check ("parseWarnReuse rejects " + v) (not (parseWarnReuse v))
-
 let kernelWarnReuseDescriptionNonEmpty () =
     check "warnReuseDescription non-empty" (warnReuseDescription <> "")
 
@@ -187,13 +130,7 @@ let run () =
     kernelWarnRequiredSet ()
     kernelIsModificationToolMatrix ()
     kernelIsWarnRequiredToolMatrix ()
-    kernelParseWarnTddCanonical ()
-    kernelParseWarnTddRejectsVariants ()
-    kernelParseWarnCanonical ()
-    kernelParseWarnRejectsVariants ()
     kernelCanonicalValuesAreNonEmpty ()
     kernelWarnDescriptionsDiffer ()
     kernelIsSubagentToolMatrix ()
-    kernelParseWarnReuseCanonical ()
-    kernelParseWarnReuseRejectsVariants ()
     kernelWarnReuseDescriptionNonEmpty ()
