@@ -106,9 +106,23 @@ let private extractHostRunId (rawEvent: obj) : string option =
 let private extractTurnObservation (rawEvent: obj) : TurnObservation option =
     let eventType = Dyn.str rawEvent "type"
 
-    if eventType = "stream-end" then
+    let eventObjType =
+        let evt = Dyn.get rawEvent "event" in if Dyn.isNullish evt then "" else Dyn.str evt "type"
+
+    if
+        eventType = "stream-end"
+        || eventType = "session.idle"
+        || eventObjType = "session.idle"
+        || eventObjType = "stream-end"
+    then
         let properties = Dyn.get rawEvent "properties"
-        let properties = if Dyn.isNullish properties then rawEvent else properties
+
+        let properties =
+            if Dyn.isNullish properties then
+                (let props = Dyn.get rawEvent "props" in if Dyn.isNullish props then rawEvent else props)
+            else
+                properties
+
         let parts = Dyn.get properties "parts"
 
         let text =
@@ -166,6 +180,7 @@ let muxEventTranslator: IEventTranslator =
 
 let muxActionExecutor (helpers: obj) : IActionExecutor =
     Executor.muxActionExecutorDefault helpers
+
 let muxActionExecutorWithDir (helpers: obj) (directory: string) : IActionExecutor =
     Executor.muxActionExecutor helpers directory
 

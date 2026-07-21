@@ -125,6 +125,9 @@ async function runOneReused(name, fn, scenario, timeoutMs) {
   }
   try {
     scenario.provider.reset();
+    if (scenario.probe && typeof scenario.probe.reset === 'function') {
+      scenario.probe.reset();
+    }
   } catch (e) {
     testErr = testErr || new Error(`provider reset failed: ${e.message}`);
   }

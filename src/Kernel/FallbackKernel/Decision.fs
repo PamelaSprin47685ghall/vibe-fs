@@ -53,7 +53,7 @@ let classifyError (err: ErrorInput) (state: SessionFallbackState) (cfg: Fallback
     elif isImmediateStatusCode err.StatusCode then
         ErrorClass.ImmediateFallback
     elif err.IsRetryable = Some false then
-        ErrorClass.ImmediateFallback
+        ErrorClass.Exhausted
     elif retryCount >= cfg.MaxRetries then
         ErrorClass.Exhausted
     elif err.IsRetryable = Some true || isRetryableStatusCode err.StatusCode then

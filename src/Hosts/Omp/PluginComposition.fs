@@ -89,6 +89,7 @@ let private registerAllTools
     registerSubagentTools pi fallbackRuntime fallbackConfigOpt
     registerMeditatorTools pi fallbackRuntime fallbackConfigOpt
     registerSwapTool pi
+    registerTodoTool pi
     registerLoopFeatures pi reviewStore
     registerContextTransform pi reviewStore
 

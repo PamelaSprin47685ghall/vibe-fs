@@ -265,7 +265,8 @@ async function handleTransformAndEvent(
   transformWanxiangshuMessages: any,
   runWanxiangshuSystemTransform: any,
   registration: any,
-  eventHelpers: any
+  eventHelpers: any,
+  globalWorkdir: string
 ) {
   const sessionId = cmd.workspaceId || cmd.sessionId || 'mux-e2e-session';
   if (cmd.type === 'transformMessages') {
@@ -289,8 +290,9 @@ async function handleTransformAndEvent(
       sessionId,
       workspaceId: sessionId,
     };
+    const eventProps = cmd.event?.properties ?? cmd.event ?? {};
     const res = await registration.eventHook(
-      { type: cmd.eventType, workspaceId: sessionId, properties: cmd.event },
+      { type: cmd.eventType, workspaceId: sessionId, properties: eventProps },
       nudgeCtx
     );
     if (cmd.eventType === 'stream-abort') {
@@ -464,7 +466,7 @@ async function processCommand(cmd: any, bindings: any, globalWorkdir: string, mo
   }
   const categories = [
     () => handleToolAndCommand(cmd, bindings, globalWorkdir, mockTaskService),
-    () => handleTransformAndEvent(cmd, bindings.transformWanxiangshuMessages, bindings.runWanxiangshuSystemTransform, bindings.registration, eventHelpers),
+    () => handleTransformAndEvent(cmd, bindings.transformWanxiangshuMessages, bindings.runWanxiangshuSystemTransform, bindings.registration, eventHelpers, globalWorkdir),
     () => handleFileOps(cmd, globalWorkdir)
   ];
   let matched = false;

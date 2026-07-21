@@ -57,7 +57,15 @@ module SubsessionActorRegistry =
         | None -> runGlobalCleanups workspaceRoot sessionId
 
     let TryGet (workspaceRoot: string) (sessionId: string) : SubsessionActor option =
-        Map.tryFind (workspaceRoot, sessionId) actors
+        match Map.tryFind (workspaceRoot, sessionId) actors with
+        | Some actor when not actor.IsDisposed -> Some actor
+        | _ ->
+            actors
+            |> Map.tryPick (fun (root, sid) actor ->
+                if sid = sessionId && not actor.IsDisposed then
+                    Some actor
+                else
+                    None)
 
     let GetOrCreate
         (workspaceRoot: string)

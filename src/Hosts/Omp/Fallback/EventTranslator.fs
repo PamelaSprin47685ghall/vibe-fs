@@ -37,14 +37,39 @@ type OmpEventTranslatorClass(runtime: FallbackRuntimeStore) =
                 None
 
         member _.ExtractSessionID(rawEvent: obj) =
-            Dyn.str (Dyn.get rawEvent "props") "sessionID"
+            let props = Dyn.get rawEvent "props"
+            let props = if Dyn.isNullish props then rawEvent else props
+            let s1 = Dyn.str props "sessionID"
+            let s1 = if s1 <> "" then s1 else Dyn.str props "sessionId"
+            let s1 = if s1 <> "" then s1 else Dyn.str props "workspaceId"
+            let s1 = if s1 <> "" then s1 else Dyn.str rawEvent "sessionID"
+            let s1 = if s1 <> "" then s1 else Dyn.str rawEvent "sessionId"
+            if s1 <> "" then s1 else Dyn.str rawEvent "workspaceId"
 
         member _.IsSessionError(rawEvent: obj) =
-            let t = Dyn.str (Dyn.get rawEvent "event") "type"
-            t = "session.error" || t = "session.abort" || t = "session.interrupted"
+            let ev = Dyn.get rawEvent "event"
+
+            let t =
+                if Dyn.isNullish ev then
+                    Dyn.str rawEvent "type"
+                else
+                    Dyn.str ev "type"
+
+            t = "session.error"
+            || t = "session.abort"
+            || t = "session.interrupted"
+            || t = "error"
 
         member _.IsSessionIdle(rawEvent: obj) =
-            Dyn.str (Dyn.get rawEvent "event") "type" = "session.idle"
+            let ev = Dyn.get rawEvent "event"
+
+            let t =
+                if Dyn.isNullish ev then
+                    Dyn.str rawEvent "type"
+                else
+                    Dyn.str ev "type"
+
+            t = "session.idle" || t = "stream-end"
 
         member _.IsSessionBusy(rawEvent: obj) =
             Dyn.str (Dyn.get rawEvent "event") "type" = "session.busy"

@@ -102,6 +102,8 @@ export function makeDeps(shapeFn) {
     GetSquadDag: (sessionId) => Promise.resolve({ SessionId: sessionId, RootRequirement: '', Tasks: {} }),
     GetSquadSessions: () => Promise.resolve({}),
     AppendSquadEvent: (root, at, evt) => mockAppendSquadEvent(root, at, evt, shapeFn),
+    AppendWanEvent: (root, evt) => Promise.resolve({ tag: 0, fields: [undefined] }),
+    ReadWanEvents: (root) => Promise.resolve([]),
     TryWorktreeAdd: (cwd, branch, wtPath, base) => mockTryWorktreeAdd(cwd, branch, wtPath, base),
     TryWorktreeRemoveForce: (cwd, wtPath) => mockTryWorktreeRemoveForce(cwd, wtPath),
     TryBranchDeleteForce: (cwd, branch) => mockTryBranchDeleteForce(cwd, branch),

@@ -155,6 +155,11 @@ export class EventProbe {
     }
   }
 
+  reset() {
+    this._events.length = 0;
+    this._seq = 0;
+  }
+
   get allEvents() { return this._events; }
 }
 

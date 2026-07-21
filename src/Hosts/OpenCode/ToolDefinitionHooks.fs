@@ -61,8 +61,10 @@ let private registerToolHooks (toolID: string) (output: obj) : unit =
 
 let toolDefinitionFor (host: Host) (input: obj) (output: obj) : JS.Promise<unit> =
     promise {
+        let toolID = toolIdFromDefinitionHookInput input
+        decorateControlFields toolID output
         collectToolDefinitions host input output
-        registerToolHooks (toolIdFromDefinitionHookInput input) output
+        registerToolHooks toolID output
     }
 
 let toolDefinition (input: obj) (output: obj) : JS.Promise<unit> = toolDefinitionFor opencode input output

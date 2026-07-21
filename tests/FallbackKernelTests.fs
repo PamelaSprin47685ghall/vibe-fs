@@ -125,7 +125,7 @@ let classifyErrorPriority () =
 
     equal "401 → ImmediateFallback" ErrorClass.ImmediateFallback (classifyError err401 baseState cfg)
 
-    equal "isRetryable=false → ImmediateFallback" ErrorClass.ImmediateFallback (classifyError errNonRetry baseState cfg)
+    equal "isRetryable=false → Exhausted" ErrorClass.Exhausted (classifyError errNonRetry baseState cfg)
 
     let stRetry =
         { baseState with

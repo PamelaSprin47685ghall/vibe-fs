@@ -31,7 +31,17 @@ module HostReceiptWaiterRegistry =
         | None ->
             match Map.tryFind k completedStates with
             | Some w -> Some w
-            | None -> None
+            | None ->
+                let suffix = "/" + sessionId + "/" + turnId
+
+                let matchIn map =
+                    map
+                    |> Map.toSeq
+                    |> Seq.tryPick (fun ((keyStr: string), w) -> if keyStr.EndsWith suffix then Some w else None)
+
+                match matchIn waiters with
+                | Some w -> Some w
+                | None -> matchIn completedStates
 
     /// Create a waiter and register it under its dispatch key. If a waiter
     /// already exists for the same key the existing waiter is returned so that

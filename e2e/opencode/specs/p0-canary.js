@@ -28,6 +28,7 @@ const common = {
   timeoutMs: 90000,
   allowSynthetic: true,
   allowTitleGen: true,
+  reuseHost: true,
 };
 
 const webTestsNormal = webTests.filter(t => t.name !== 'OC-WEB-012 MCP process failure = child + resources cleaned');
@@ -37,21 +38,10 @@ const lifecycleP0 = lifecycleTests.filter((t) =>
   /OC-LIFE-00[45]|OC-LIFE-010|OC-LIFE-015/.test(t.name)
 );
 
-const exitCode1 = await runScenario({ ...common, contextLimit: 20000 }, [
-  ...basicTests,
-  ...ptyTests,
-  ...advancedTests,
-  ...fallbackTests,
-  ...gateTests,
-  ...webTestsNormal,
-  ...lifecycleP0,
-]);
-
-const exitCode2 = await runScenario({ ...common, contextLimit: 100000 }, nudgeSubTests);
-
-const exitCode3 = await runScenario({
+const exitCode1 = await runScenario({
   ...common,
   contextLimit: 20000,
+  reuseHost: true,
   project: {
     'page_file_1.txt': '1\n',
     'page_file_2.txt': '2\n',
@@ -67,9 +57,19 @@ const exitCode3 = await runScenario({
     'multi_pat_file_b.txt': 'content_pat_y\n',
     'work_cwd_marker.txt': 'cwd-correct\n',
   }
-}, fuzzyExecutorTests);
+}, [
+  ...basicTests,
+  ...ptyTests,
+  ...advancedTests,
+  ...fallbackTests,
+  ...gateTests,
+  ...webTestsNormal,
+  ...lifecycleP0,
+  ...nudgeSubTests,
+  ...fuzzyExecutorTests,
+]);
 
-const exitCode4 = await runScenario({
+const exitCode2 = await runScenario({
   ...common,
   contextLimit: 20000,
   extraEnv: {
@@ -77,4 +77,4 @@ const exitCode4 = await runScenario({
   }
 }, webTestsFail);
 
-process.exit(exitCode1 || exitCode2 || exitCode3 || exitCode4);
+process.exit(exitCode1 || exitCode2);

@@ -30,7 +30,25 @@ let tryGetTodos (helpers: obj) (workspaceId: string) : JS.Promise<string list> =
                 let! result = unbox<JS.Promise<obj>> (Dyn.call1 getTodosFn workspaceId)
 
                 if Dyn.isArray result then
-                    return (result :?> obj array) |> Array.map string |> List.ofArray
+                    return
+                        (result :?> obj array)
+                        |> Array.choose (fun item ->
+                            if Dyn.typeIs item "string" then
+                                Some(string item)
+                            else
+                                let status = Dyn.str item "status"
+
+                                match Wanxiangshu.Kernel.Nudge.TodoStatus.todoStatusOfString status with
+                                | Some s when Wanxiangshu.Kernel.Nudge.TodoStatus.isTerminal s -> None
+                                | _ ->
+                                    let content = Dyn.str item "content"
+
+                                    if content <> "" then
+                                        Some content
+                                    else
+                                        let task = Dyn.str item "task"
+                                        if task <> "" then Some task else Some(string item))
+                        |> List.ofArray
                 else
                     return []
             else

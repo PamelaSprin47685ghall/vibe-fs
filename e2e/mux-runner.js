@@ -9,15 +9,15 @@ import { hostSingletonManager } from './harness-bootstrap.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-function resolveBun() {
-  return process.env.BUN ?? (() => {
-    const r = spawnSync(process.platform === 'win32' ? 'where' : 'which', ['bun'], { encoding: 'utf8' });
-    if (r.status === 0 && r.stdout) {
-      const first = r.stdout.trim().split('\n')[0];
-      if (first) return first;
-    }
-    throw new Error('bun not found. Install bun (or set BUN env var)');
-  })();
+function resolveRunner() {
+  if (process.env.BUN) return { bin: process.env.BUN, args: ['run'] };
+  const r = spawnSync(process.platform === 'win32' ? 'where' : 'which', ['bun'], { encoding: 'utf8' });
+  if (r.status === 0 && r.stdout) {
+    const first = r.stdout.trim().split('\n')[0];
+    if (first) return { bin: first, args: ['run'] };
+  }
+  const tsxLoader = path.resolve(__dirname, '..', 'node_modules', 'tsx', 'dist', 'loader.mjs');
+  return { bin: process.execPath, args: ['--import', tsxLoader] };
 }
 
 function buildConfig(mockLlmUrl, tempHome) {
@@ -69,13 +69,16 @@ function buildCommandQueue(child) {
 
 function startDriverProcess(muxRepo, pluginPath, mockLlmUrl) {
   const driverPath = path.resolve(__dirname, 'mux-driver.ts');
-  const child = spawn(resolveBun(), ['run', driverPath], {
+  const runner = resolveRunner();
+  const child = spawn(runner.bin, [...runner.args, driverPath], {
     cwd: muxRepo,
     env: {
       ...process.env,
       WANXIANGSHU_PLUGIN_PATH: pluginPath,
       WANXIANGSHU_MUX_REPO: muxRepo,
       MOCK_LLM_URL: mockLlmUrl,
+      OLLAMA_API_KEY: 'test-key',
+      OPENAI_API_KEY: 'test-key',
     },
     stdio: ['pipe', 'pipe', 'pipe'],
     windowsHide: true,
@@ -99,7 +102,7 @@ class MuxHarness {
     this.helpers = {
       nudges: this.nudgesList,
       _setTodoList: (todos) => {
-        this.queue.send({ type: 'setTodoList', todos, sessionId: this.sessionId }).catch(() => {});
+        return this.queue.send({ type: 'setTodoList', todos, sessionId: this.sessionId });
       }
     };
     
@@ -259,7 +262,10 @@ export async function start(opts = {}) {
     const tempHome = fs.mkdtempSync(path.join(os.tmpdir(), 'mux-runner-home-'));
     buildConfig(mockLlm.url, tempHome);
 
-    const muxRepo = process.env.WANXIANGSHU_MUX_REPO || path.resolve(__dirname, '..', '..', 'mux');
+    let muxRepo = process.env.WANXIANGSHU_MUX_REPO || path.resolve(__dirname, '..', '..', 'mux');
+    if (!fs.existsSync(muxRepo)) {
+      muxRepo = path.resolve(__dirname, '..');
+    }
     const pluginPath = path.resolve(__dirname, '..', 'build', 'src', 'Hosts', 'Mux', 'Plugin.js');
     const child = startDriverProcess(muxRepo, pluginPath, mockLlm.url);
     const queue = buildCommandQueue(child);

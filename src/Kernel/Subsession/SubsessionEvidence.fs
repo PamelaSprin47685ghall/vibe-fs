@@ -57,20 +57,27 @@ module CurrentTurnEvidence =
         | EmptyAssistant, x -> x
         | x, EmptyAssistant -> x
         | AssistantSnapshot(id1, rev1, t1), AssistantSnapshot(id2, rev2, t2) ->
+            let targetId = if id2 <> "" then id2 else id1
+            let targetRev = max rev1 rev2
+
             if id1 <> "" && id2 <> "" && id1 = id2 then
                 if rev2 >= rev1 then
-                    AssistantSnapshot(id2, rev2, t2)
+                    AssistantSnapshot(id2, rev2, (if t2 <> "" then t2 else t1))
                 else
-                    AssistantSnapshot(id1, rev1, t1)
+                    AssistantSnapshot(id1, rev1, (if t1 <> "" then t1 else t2))
+            elif t1 = "" && t2 <> "" then
+                AssistantSnapshot(targetId, targetRev, t2)
+            elif t2 = "" && t1 <> "" then
+                AssistantSnapshot(targetId, targetRev, t1)
             elif id1 = "" && id2 = "" then
                 if t2 <> "" then
                     AssistantSnapshot("", 0L, t2)
                 else
                     AssistantSnapshot("", 0L, t1)
             elif rev2 > rev1 then
-                AssistantSnapshot(id2, rev2, t2)
+                AssistantSnapshot(id2, rev2, (if t2 <> "" then t2 else t1))
             else
-                AssistantSnapshot(id1, rev1, t1)
+                AssistantSnapshot(id1, rev1, (if t1 <> "" then t1 else t2))
         | AssistantDelta(id1, rev1, t1), AssistantDelta(id2, rev2, t2) ->
             if id1 <> "" && id2 <> "" && id1 = id2 then
                 AssistantDelta(id1, max rev1 rev2, t1 + t2)

@@ -137,7 +137,8 @@ let runOmpSubagentCore
                     let fromPi = Dyn.str pi "workspaceRoot"
                     if fromPi <> "" then fromPi else Dyn.str pi "cwd"
 
-        let hostFactory (_sid: string) = createHost session agentName pi workspaceRoot
+        let hostFactory (_sid: string) =
+            createHost session agentName pi workspaceRoot
 
         let eventStoreFactory (_sid: string) = create workspaceRoot
         let service = SubsessionService(workspaceRoot, hostFactory, eventStoreFactory)
@@ -149,9 +150,13 @@ let runOmpSubagentCore
                 | None -> service.StartRun(childId, parentSessionId, prompt, cfg, directive)
 
             match runResult with
-            | Succeeded _output ->
+            | Succeeded output ->
                 let sm = unbox<ISessionManager> (Dyn.get session "sessionManager")
-                return readSuccessText sm startCount
+                let text = readSuccessText sm startCount
+
+                if text <> noOutputText && text <> "" then return text
+                elif output <> "" then return output
+                else return text
             | Cancelled -> return abortedPrefix
             | Failed reason -> return! Promise.reject (failwith (formatRunFailure reason))
         with err ->

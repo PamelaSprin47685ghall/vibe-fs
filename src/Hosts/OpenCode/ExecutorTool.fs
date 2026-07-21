@@ -38,13 +38,15 @@ let private resolveStr (text: string) : JS.Promise<string> = Promise.lift text
 
 /// Schema for the executor tool parameters.
 let private buildExecutorToolDef () : obj =
-    box
-        {| language = enumOptWithDefault [| "shell"; "python"; "javascript" |] "shell" Params.executorLanguage
-           command = strReq Params.executorCommand
-           dependencies = strArrayOpt Params.executorDeps
-           timeout_type = enumReq [| "short"; "long" |] Params.executorTimeout
-           what_to_summarize = strReq Params.executorWhatToSummarize
-           max_bytes = numReq Params.executorMaxBytes |}
+    createObj
+        [ "language", enumOptWithDefault [| "shell"; "python"; "javascript" |] "shell" Params.executorLanguage
+          "command", strReq Params.executorCommand
+          "dependencies", strArrayOpt Params.executorDeps
+          "timeout_type", enumReq [| "short"; "long" |] Params.executorTimeout
+          "what_to_summarize", strReq Params.executorWhatToSummarize
+          "max_bytes", numReq Params.executorMaxBytes
+          "follow-tdd-and-kolmogorov-principles", warnTddParam
+          "impossible-via-other-tools", warnParam ]
 
 /// Build the subagent prompt for executor output summarisation.
 let private buildExecutorSummaryPrompt (host: Host) (output: string) (options: ExecuteOptions) : string =

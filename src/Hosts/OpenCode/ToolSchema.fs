@@ -130,6 +130,22 @@ let uiParam: obj =
         (box
             "Internal UI label. Visible to the LLM and UI, but the LLM must never fill it. Leave `ui_` unset; the tool.execute.before hook populates it automatically.")
 
+let warnTddParam: obj =
+    call1
+        (call0 (str ()) "optional")
+        "describe"
+        (box "MUST acknowledge that you have followed TDD and Kolmogorov principles and kept todo updated")
+
+let warnParam: obj =
+    call1
+        (call0 (str ()) "optional")
+        "describe"
+        (box
+            "MUST acknowledge that this task cannot be done with other tools and only run tests when static analysis cannot handle it")
+
+let warnReuseParam: obj =
+    call1 (call0 (str ()) "optional") "describe" (box "this-task-is-not-suitable-to-be-completed-via-continue-tool")
+
 let strArrayReq (desc: string) : obj =
     call1 (arr (strMin 1 "")) "describe" (box desc)
 

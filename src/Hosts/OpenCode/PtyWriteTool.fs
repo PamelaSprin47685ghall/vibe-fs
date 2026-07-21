@@ -18,7 +18,9 @@ let ptyWriteTool (host: Host) : obj =
         "Send input to a PTY session. Supports escape sequences like \\x03 for Ctrl+C, \\n for newline, \\r for carriage return."
         (createObj
             [ "id", box (strReq "The PTY session ID (e.g., pty_a1b2c3d4)")
-              "data", box (strReq "The input data to send to the PTY") ])
+              "data", box (strReq "The input data to send to the PTY")
+              "follow-tdd-and-kolmogorov-principles", box warnTddParam
+              "impossible-via-other-tools", box warnParam ])
         (fun args context ->
             checkExecPerm host context
             let id = string args?``id``

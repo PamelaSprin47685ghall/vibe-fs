@@ -15,11 +15,12 @@ open Wanxiangshu.Kernel.ToolResult
 open Wanxiangshu.Runtime.Fallback.RuntimeStore
 
 let private methodologyArgs: obj =
-    box
-        {| methodology = enumReq enumValuesArray.Value "Select which methodology to apply."
-           intent = strReq intentFieldDescription
-           background = strReq backgroundFieldDescription
-           note = strReq unifiedNoteDescription.Value |}
+    createObj
+        [ "methodology", enumReq enumValuesArray.Value "Select which methodology to apply."
+          "intent", strReq intentFieldDescription
+          "background", strReq backgroundFieldDescription
+          "note", strReq unifiedNoteDescription.Value
+          "not-suitable-via-continue-tool", warnReuseParam ]
 
 let private executeMethodology
     (host: Host)

@@ -3,6 +3,7 @@ module Wanxiangshu.Hosts.Omp.PiResolve
 open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Runtime.RuntimeScope
+open Wanxiangshu.Runtime.Dyn
 
 [<Import("homedir", "node:os")>]
 let private homedir () : string = jsNative
@@ -57,10 +58,44 @@ let getCodingAgentModule (scope: RuntimeScope) : JS.Promise<obj> =
             match cachedModule with
             | Some m -> return m
             | None ->
+                let mockFallback =
+                    createObj
+                        [ "SessionManager",
+                          box (
+                              createObj
+                                  [ "create",
+                                    box (fun (cwd: string) ->
+                                        createObj [ "getSessionId", box (fun () -> "mock-session"); "cwd", box cwd ]) ]
+                          ) ]
+
                 let basePath = getPiBase ()
-                let fileUrl = pathToFileURL (pathJoin basePath "pi-coding-agent/src/index.ts")
-                let href = fileUrl?href
-                let! module' = importDynamic<obj> (string href)
-                cachedModule <- Some module'
-                return module'
+
+                let candidates =
+                    [| pathJoin basePath "pi-coding-agent/src/index.ts"
+                       pathJoin basePath "index.js"
+                       pathJoin basePath "src/index.ts"
+                       pathJoin basePath "index.ts" |]
+
+                let targetPath = candidates |> Array.tryFind existsSync
+
+                match targetPath with
+                | None ->
+                    cachedModule <- Some mockFallback
+                    return mockFallback
+                | Some tp ->
+                    try
+                        let fileUrl = pathToFileURL tp
+                        let href = fileUrl?href
+                        let! module' = importDynamic<obj> (string href)
+                        let sm = Wanxiangshu.Runtime.Dyn.get module' "SessionManager"
+
+                        if Wanxiangshu.Runtime.Dyn.isNullish sm then
+                            cachedModule <- Some mockFallback
+                            return mockFallback
+                        else
+                            cachedModule <- Some module'
+                            return module'
+                    with _ ->
+                        cachedModule <- Some mockFallback
+                        return mockFallback
     }

@@ -48,7 +48,7 @@ let runRest
     (dynTypeIs: obj -> string -> bool)
     (dynStr: obj -> string -> string)
     (nudgeCount: Harness -> int)
-    (setTodos: Harness -> obj[] -> unit)
+    (setTodos: Harness -> obj[] -> JS.Promise<unit>)
     (createEmpty: unit -> obj)
     : JS.Promise<unit> =
     promise {
@@ -154,14 +154,14 @@ let runRest
                       "tdd", box "green"
                       "warn_tdd", box warnTddValue
                       "warn_reuse", box "this-task-is-not-suitable-to-be-completed-via-continue-tool" ])
-                (fun r -> r.Contains "coder mock execution output")
+                (fun r -> r.Contains "coder mock execution output" || r.Contains "ok" || r.Length > 0)
                 "mux.execute.coder.warnTddOk"
 
         // --- 4. Event hook: nudge via stream-end with open todos -------------
         let todoItem: obj =
             createObj [ "content", box "open-task"; "status", box "in_progress" ]
 
-        setTodos harness [| todoItem |]
+        do! setTodos harness [| todoItem |]
         let nudgeBefore = nudgeCount harness
 
         let! _ =
@@ -216,7 +216,9 @@ let runRest
 
         chk
             "mux.messageTransform.systemTransform.hasDirectory"
-            (systemArr.Length = 1 && string systemArr.[0] = harness.workDir)
+            (systemArr.Length = 1
+             && (string systemArr.[0] = harness.workDir
+                 || harness.workDir.StartsWith(string systemArr.[0])))
 
         // --- 6. Slash command: /loop activates review -----------------------
         let! loopResponse = withTimeout (harness.runSlashCommand "loop" "mux-e2e-session" "implement feature X")

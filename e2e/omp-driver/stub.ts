@@ -13,15 +13,16 @@ export function createStubExtensionContext(cwd: string, sessionId: string) {
 			return () => undefined;
 		}
 	});
-	const ompRepo = process.env.WANXIANGSHU_OMP_REPO || process.cwd();
-	const ModelRegistryClass = require(`${ompRepo}/packages/coding-agent/src/config/model-registry`).ModelRegistry;
-	const modelRegistry = new ModelRegistryClass(authStorage);
-	const mockModel = modelRegistry.find('openai', 'gpt-4o') || {
+	const mockModel = {
 		id: 'gpt-4o',
 		name: 'GPT-4o',
 		provider: 'openai',
 		model: 'gpt-4o',
 		api: 'openai-completions'
+	};
+	const modelRegistry = {
+		find: () => mockModel,
+		list: () => [mockModel],
 	};
 	const ui: any = new Proxy({}, { get(_, key) {
 		if (key === 'theme') return {};

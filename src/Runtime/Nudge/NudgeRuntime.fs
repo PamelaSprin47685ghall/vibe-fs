@@ -58,16 +58,25 @@ type NudgeRuntime
                         | None -> fallbackRuntime.UpdateSession(workspaceId, transferOwnership SessionOwner.NoOwner)
 
                     if not isNudgeOwner || isReviewLoopActive workspaceId then
+                        let effectiveWorkspaceDir =
+                            let d = Dyn.str helpers "directory"
+
+                            if d <> "" then
+                                d
+                            else
+                                let d2 = Dyn.str helpers "cwd"
+                                if d2 <> "" then d2 else workspaceDirectory
+
                         let! newState =
                             runNudgeFlowWithRetryCheck
                                 fallbackRuntime
-                                workspaceDirectory
+                                effectiveWorkspaceDir
                                 runtimeState
                                 workspaceId
                                 (collectSnapshotMux
                                     fallbackRuntime
                                     getChatHistory
-                                    workspaceDirectory
+                                    effectiveWorkspaceDir
                                     helpers
                                     workspaceId
                                     lastMsg)

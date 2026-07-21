@@ -8,7 +8,10 @@
  */
 
 function pickSessionID(parsed) {
-  return parsed?.properties?.sessionID;
+  return parsed?.properties?.sessionID
+    || parsed?.properties?.sessionId
+    || parsed?.sessionID
+    || parsed?.sessionId;
 }
 
 function pickMessageID(parsed) {

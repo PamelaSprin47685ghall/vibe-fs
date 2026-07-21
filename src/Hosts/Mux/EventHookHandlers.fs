@@ -42,7 +42,17 @@ let handleChildSession
             ()
         | None -> ()
 
-        if muxEventTranslator.IsSessionError event then
+        let isError = muxEventTranslator.IsSessionError event
+
+        let isIdle =
+            muxEventTranslator.IsSessionIdle event
+            || (let t = Dyn.str event "type" in t = "session.idle" || t = "stream-end")
+            || (let evt = Dyn.get event "event" in
+
+                not (Dyn.isNullish evt)
+                && (let t = Dyn.str evt "type" in t = "session.idle" || t = "stream-end"))
+
+        if isError then
             let errorObj =
                 match muxEventTranslator.TranslateError event with
                 | Some(FallbackEvent.SessionError err) -> err
@@ -55,7 +65,7 @@ let handleChildSession
 
             let! _ = SubsessionEventRouter.tryError directory workspaceId errorObj
             ()
-        elif muxEventTranslator.IsSessionIdle event then
+        elif isIdle then
             let! _ = SubsessionEventRouter.tryIdle directory workspaceId
             ()
     }
@@ -123,6 +133,25 @@ let processMuxEvent
     promise {
         let workspaceId = decoded.workspaceId
 
+        let effectiveDir =
+            let d = Dyn.str event "workspacePath"
+
+            if d <> "" then
+                d
+            else
+                let d2 = Dyn.str event "directory"
+
+                if d2 <> "" then
+                    d2
+                else
+                    let d3 = Dyn.str helpers "directory"
+
+                    if d3 <> "" then
+                        d3
+                    else
+                        let d4 = Dyn.str helpers "cwd"
+                        if d4 <> "" then d4 else directory
+
         if workspaceId <> "" then
             fallbackRuntime.Update(workspaceId, setEventHandlingActive true)
 
@@ -134,24 +163,25 @@ let processMuxEvent
                     || decoded.eventType = "session.delete"
                     || decoded.eventType = "session.remove"
                 then
-                    do! handleSessionClosed scope directory workspaceId
+                    do! handleSessionClosed scope effectiveDir workspaceId
 
             let isChild =
-                workspaceId <> "" && SubsessionEventRouter.isChildSession directory workspaceId
+                workspaceId <> ""
+                && SubsessionEventRouter.isChildSession effectiveDir workspaceId
 
             if isChild then
-                do! handleChildSession directory workspaceId fallbackRuntime event
+                do! handleChildSession effectiveDir workspaceId fallbackRuntime event
             else
                 match parseHookEvent event with
                 | StreamAbort workspaceId
                 | AbortedError workspaceId when workspaceId <> "" ->
-                    do! handleParentSession scope directory reviewStore workspaceId event
+                    do! handleParentSession scope effectiveDir reviewStore workspaceId event
                 | _ -> ()
 
                 let! fbResult = fallbackHandler event
 
                 if not fbResult.Consumed then
-                    do! handleUnconsumedEvent directory workspaceId runtime event helpers
+                    do! handleUnconsumedEvent effectiveDir workspaceId runtime event helpers
         finally
             if workspaceId <> "" then
                 fallbackRuntime.Update(workspaceId, setEventHandlingActive false)

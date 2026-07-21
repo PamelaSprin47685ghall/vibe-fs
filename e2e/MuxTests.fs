@@ -38,11 +38,14 @@ let private nudgeCount (harness: Harness) : int =
         let arr: obj[] = unbox<obj[]> nudges
         arr.Length
 
-let private setTodos (harness: Harness) (todos: obj[]) : unit =
-    let setter = dynGet harness.helpers "_setTodoList"
+let private setTodos (harness: Harness) (todos: obj[]) : JS.Promise<unit> =
+    promise {
+        let setter = dynGet harness.helpers "_setTodoList"
 
-    if not (dynIsNull setter) then
-        setter $ (box todos) |> ignore
+        if not (dynIsNull setter) then
+            let! _ = unbox<JS.Promise<obj>> (setter $ (box todos))
+            ()
+    }
 
 let private toolSchemaProperties (harness: Harness) (name: string) : obj =
     let schema = harness.getToolSchema name

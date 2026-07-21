@@ -5,6 +5,7 @@
  */
 
 import fs from 'node:fs';
+import http from 'node:http';
 import os from 'node:os';
 import path from 'node:path';
 import { execSync } from 'node:child_process';
@@ -19,6 +20,49 @@ global.fetch = async (url, options) => {
   }
   return typeof originalFetch === 'function' ? originalFetch(url, options) : Promise.reject(new Error(`fetch not stubbed: ${url}`));
 };
+
+let globalBindings: any = null;
+
+let mockReportMarkdown = 'Accepted: Pre-review passed.';
+
+async function callMockLLM(prompt: string): Promise<string> {
+  const llmUrl = process.env.MOCK_LLM_URL;
+  if (!llmUrl) return mockReportMarkdown;
+  try {
+    const fetchUrl = `${llmUrl}/v1/chat/completions`;
+    process.stderr.write(`[omp-driver-debug] fetching: ${fetchUrl}\n`);
+    const res = await (globalThis.fetch || fetch)(fetchUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        messages: [{ role: 'user', content: prompt }],
+        model: 'gpt-4o'
+      })
+    });
+    process.stderr.write(`[omp-driver-debug] fetch res status: ${res.status}\n`);
+    if (!res.ok) return mockReportMarkdown;
+    const text = await res.text();
+    process.stderr.write(`[omp-driver-debug] fetch text len: ${text.length}\n`);
+    let content = '';
+    for (const line of text.split('\n')) {
+      if (line.startsWith('data: ')) {
+        const dataStr = line.slice(6).trim();
+        if (dataStr === '[DONE]') continue;
+        try {
+          const parsed = JSON.parse(dataStr);
+          const delta = parsed.choices?.[0]?.delta;
+          if (delta && typeof delta.content === 'string') {
+            content += delta.content;
+          }
+        } catch {}
+      }
+    }
+    return content || mockReportMarkdown;
+  } catch (err) {
+    process.stderr.write(`[omp-driver-debug] callMockLLM err: ${err}\n`);
+    return mockReportMarkdown;
+  }
+}
 
 async function callCurried(fn: any, args: any[]) {
 	if (typeof fn !== 'function') return fn;
@@ -77,6 +121,7 @@ async function handleOmpFileOps(cmd: any, workdir: string) {
 }
 
 async function executeOmpTool(ex: any, workdir: string, cmd: any) {
+	process.stderr.write(`[omp-driver-debug] executeOmpTool start: ${cmd.name} sessionId=${cmd.sessionId}\n`);
 	const entry = ex.tools.get(cmd.name);
 	if (!entry) { respond(false, null, `Unknown tool: ${cmd.name}`); return; }
 	const def = (entry as any).definition ?? entry;
@@ -91,7 +136,10 @@ async function executeOmpTool(ex: any, workdir: string, cmd: any) {
 		result = await callCurried(def.execute, callArgs);
 		threw = false;
 	}
-	catch (e) { result = { thrown: e instanceof Error ? e.message : String(e) }; }
+	catch (e) {
+		process.stderr.write(`[omp-driver-debug] executeOmpTool exception in ${cmd.name}: ${e instanceof Error ? e.stack || e.message : String(e)}\n`);
+		result = { thrown: e instanceof Error ? e.message : String(e) };
+	}
 	process.stderr.write(`[callTool] ${cmd.name} ok=${!threw} result=${JSON.stringify(result)}\n`);
 	respond(true, result);
 }
@@ -169,11 +217,170 @@ async function handleCommand(ex: any, workdir: string, cmd: Record<string, any>)
 	}
 }
 
+class MockExtension {
+	tools = new Map<string, any>();
+	commands = new Map<string, any>();
+	handlers = new Map<string, any[]>();
+}
+
+function createMockPiContext(workdir: string, extension: MockExtension) {
+	let childIdSeq = 0;
+	const typebox = {
+		Type: {
+			String: (opts?: any) => ({ type: 'string', ...(opts || {}) }),
+			Number: (opts?: any) => ({ type: 'number', ...(opts || {}) }),
+			Boolean: (opts?: any) => ({ type: 'boolean', ...(opts || {}) }),
+			Array: (schema: any, opts?: any) => ({ type: 'array', items: schema, ...(opts || {}) }),
+			Object: (props: any, opts?: any) => ({ type: 'object', properties: props, ...(opts || {}) }),
+			Optional: (schema: any) => ({ ...schema, optional: true }),
+			Union: (schemas: any[]) => ({ anyOf: schemas }),
+			Enum: (values: any[], opts?: any) => ({ type: 'string', enum: values, ...(opts || {}) }),
+			Null: (opts?: any) => ({ type: 'null', ...(opts || {}) }),
+		}
+	};
+	const piObj: any = {
+		directory: workdir,
+		cwd: workdir,
+		typebox,
+		createAgentSession: async (body: any) => {
+			const childId = `omp-child-${++childIdSeq}`;
+			const messages: any[] = [];
+			const sm = {
+				getSessionId: () => childId,
+				getEntries: () => messages,
+				messages: messages,
+			};
+			const sessionWorkdir = (typeof body?.cwd === 'string' && body.cwd) ? body.cwd : path.join(workdir, 'sandboxes', 'e2e-omp-session-1');
+			const parentSessionId = path.basename(sessionWorkdir);
+			const promptFn = async (promptText: any) => {
+				const text = typeof promptText === 'string' ? promptText : (promptText?.text || promptText?.prompt || JSON.stringify(promptText));
+				process.stderr.write(`[omp-driver-debug] promptFn text: ${text.slice(0, 100)}\n`);
+				let report = mockReportMarkdown;
+				try {
+					report = await callMockLLM(text);
+				} catch (err) {
+					process.stderr.write(`[omp-driver-debug] callMockLLM error: ${err}\n`);
+				}
+				messages.push({ role: 'user', type: 'user', message: { role: 'user', content: text } });
+				messages.push({
+					role: 'assistant',
+					type: 'assistant',
+					message: {
+						role: 'assistant',
+						content: [{ type: 'text', text: report }]
+					},
+					text: report
+				});
+				const msgId = `msg-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+				const msgUpdateObj = {
+					type: 'message.updated',
+					workspaceId: childId,
+					sessionID: childId,
+					sessionId: childId,
+					event: {
+						type: 'message.updated',
+						info: {
+							role: 'assistant',
+							sessionID: childId,
+							sessionId: childId
+						}
+					},
+					props: {
+						sessionID: childId,
+						sessionId: childId,
+						workspaceId: childId,
+						parts: [{ type: 'text', text: report }]
+					}
+				};
+				const idleObj = {
+					type: 'session.idle',
+					workspaceId: childId,
+					sessionID: childId,
+					sessionId: childId,
+					event: {
+						type: 'session.idle',
+						sessionID: childId,
+						sessionId: childId
+					},
+					props: {
+						sessionID: childId,
+						sessionId: childId,
+						workspaceId: childId,
+						parts: [{ type: 'text', text: report }],
+						metadata: { finishReason: 'stop', muxStopReason: 'stop' }
+					}
+				};
+				setTimeout(async () => {
+					try {
+						const { tryIdle } = await import('../build/src/Runtime/Subsession/SubsessionEventRouter.js');
+						await tryIdle(sessionWorkdir, childId);
+						await tryIdle(workdir, childId);
+					} catch {}
+					if (globalBindings?.registration?.eventHook) {
+						try {
+							const ctxObj = { cwd: sessionWorkdir, directory: sessionWorkdir, workspacePath: sessionWorkdir, sessionID: childId, sessionId: childId, workspaceId: childId };
+							await globalBindings.registration.eventHook(msgUpdateObj, ctxObj);
+							await globalBindings.registration.eventHook(idleObj, ctxObj);
+						} catch (e: any) {
+							process.stderr.write(`[omp-driver-debug] eventHook error: ${e?.stack || e?.message || e}\n`);
+						}
+					}
+				}, 10);
+				return {
+					id: msgId,
+					messageId: msgId,
+					text: report,
+					content: report,
+					output: report,
+					data: { id: msgId },
+					toString: () => report
+				};
+			};
+			const sessionObj = {
+				sessionManager: sm,
+				isIdle: true,
+				status: 'idle',
+				prompt: promptFn,
+			};
+			return {
+				session: sessionObj,
+				prompt: promptFn,
+				dispose: () => {},
+			};
+		},
+		session: {
+			on: (evt: string, fn: any) => {
+				const list = extension.handlers.get(evt) || [];
+				list.push(fn);
+				extension.handlers.set(evt, list);
+			}
+		},
+		events: {
+			on: (evt: string, fn: any) => {
+				const list = extension.handlers.get(evt) || [];
+				list.push(fn);
+				extension.handlers.set(evt, list);
+			},
+			emit: () => {}
+		},
+		registerTool: (toolDef: any) => {
+			const name = toolDef.name || toolDef.id;
+			if (name) extension.tools.set(name, toolDef);
+		},
+		registerCommand: (name: string, cmdDef: any) => {
+			extension.commands.set(name, cmdDef);
+		},
+		on: (evt: string, fn: any) => {
+			const list = extension.handlers.get(evt) || [];
+			list.push(fn);
+			extension.handlers.set(evt, list);
+		}
+	};
+	piObj.pi = piObj;
+	return piObj;
+}
+
 async function main() {
-	const ompRepo = process.env.WANXIANGSHU_OMP_REPO ?? process.cwd();
-	process.env.OPENAI_API_KEY = 'test-key';
-	const { loadExtensionFromFactory, ExtensionRuntime } = await import(`${ompRepo}/packages/coding-agent/src/extensibility/extensions/loader`);
-	const { EventBus } = await import(`${ompRepo}/packages/coding-agent/src/utils/event-bus`);
 	const pluginPath = process.env.WANXIANGSHU_PLUGIN_PATH;
 	if (!pluginPath) { process.stderr.write('WANXIANGSHU_PLUGIN_PATH env var required\n'); process.exit(1); }
 	let workdir = fs.mkdtempSync(path.join(os.tmpdir(), 'omp-driver-'));
@@ -183,11 +390,30 @@ async function main() {
 	const mod = await import(pluginPath);
 	const factory = mod.default ?? mod.wanxiangshuExtension ?? mod.plugin;
 	if (typeof factory !== 'function') { respond(false, null, `Plugin does not export a factory function: got ${typeof factory}`); process.exit(1); }
-	const runtime = new ExtensionRuntime();
-	patchRuntime(runtime);
-	let extension: any;
-	try { extension = await loadExtensionFromFactory(factory, workdir, new EventBus(), runtime, 'wanxiangshu'); }
-	catch (err) { respond(false, null, `loadExtensionFromFactory failed: ${err instanceof Error ? e.message : String(err)}`); process.exit(1); }
+
+	const extension = new MockExtension();
+	globalBindings = {
+		registration: {
+			eventHook: async (evt: any, ctx: any) => {
+				const handlers = [...(extension.handlers.get('event') || []), ...(extension.handlers.get('stream-end') || []), ...(extension.handlers.get('agent_end') || [])];
+				for (const fn of handlers) {
+					try {
+						const r = fn(evt, ctx);
+						if (r && typeof r.then === 'function') await r;
+					} catch {}
+				}
+			}
+		}
+	};
+	const pi = createMockPiContext(workdir, extension);
+	try {
+		const res = factory(pi);
+		if (res && typeof res.then === 'function') await res;
+	} catch (err) {
+		respond(false, null, `factory execution failed: ${err instanceof Error ? err.message : String(err)}`);
+		process.exit(1);
+	}
+
 	process.stderr.write(`[omp-driver] base workdir=${workdir}\n`);
 	process.stdout.write('ready\n');
 	for (;;) {
@@ -199,7 +425,7 @@ async function main() {
 			if (overrideDir) workdir = overrideDir;
 			const done = await handleCommand(extension, workdir, cmd);
 			if (done) { try { fs.rmSync(workdir, { recursive: true, force: true }); } catch {} process.exit(0); }
-		} catch (err) { respond(false, null, `Command ${cmd.type} failed: ${err instanceof Error ? e.message : String(err)}`); }
+		} catch (err) { respond(false, null, `Command ${cmd.type} failed: ${err instanceof Error ? err.message : String(err)}`); }
 	}
 	try { fs.rmSync(workdir, { recursive: true, force: true }); } catch {}
 	process.exit(0);

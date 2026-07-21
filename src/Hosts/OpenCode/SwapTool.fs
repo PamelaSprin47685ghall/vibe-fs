@@ -38,7 +38,8 @@ let swapTool () : obj =
               "endExclusive1",
               box
                   {| ``type`` = "integer"
-                     description = "End line in second file, 1-based, exclusive" |} ])
+                     description = "End line in second file, 1-based, exclusive" |}
+              "follow-tdd-and-kolmogorov-principles", box warnTddParam ])
         (fun args context ->
             promise {
                 let runtime = fromOpencode context ""

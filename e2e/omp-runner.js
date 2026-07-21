@@ -9,15 +9,15 @@ import { hostSingletonManager } from './harness-bootstrap.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-function resolveBun() {
-  return process.env.BUN ?? (() => {
-    const r = spawnSync(process.platform === 'win32' ? 'where' : 'which', ['bun'], { encoding: 'utf8' });
-    if (r.status === 0 && r.stdout) {
-      const first = r.stdout.trim().split('\n')[0];
-      if (first) return first;
-    }
-    throw new Error('bun not found. Install bun: https://bun.sh/docs/installation (or set BUN env var)');
-  })();
+function resolveRunner() {
+  if (process.env.BUN) return { bin: process.env.BUN, args: ['run'] };
+  const r = spawnSync(process.platform === 'win32' ? 'where' : 'which', ['bun'], { encoding: 'utf8' });
+  if (r.status === 0 && r.stdout) {
+    const first = r.stdout.trim().split('\n')[0];
+    if (first) return { bin: first, args: ['run'] };
+  }
+  const tsxLoader = path.resolve(__dirname, '..', 'node_modules', 'tsx', 'dist', 'loader.mjs');
+  return { bin: process.execPath, args: ['--import', tsxLoader] };
 }
 
 class OmpHarness {
@@ -159,11 +159,13 @@ function setupReadline(child) {
 }
 
 function spawnProcess(ompRepo, pluginPath, mockLlm, agentDir) {
-  return spawn(resolveBun(), ['run', process.env.WANXIANGSHU_OMP_DRIVER || path.resolve(__dirname, 'omp-driver.ts')], {
+  const runner = resolveRunner();
+  return spawn(runner.bin, [...runner.args, process.env.WANXIANGSHU_OMP_DRIVER || path.resolve(__dirname, 'omp-driver.ts')], {
     cwd: ompRepo,
     env: {
       ...process.env,
       WANXIANGSHU_PLUGIN_PATH: pluginPath,
+      PI_BASE: path.resolve(__dirname, '..', '..', 'oh-my-pi'),
       MOCK_LLM_URL: mockLlm.url,
       PI_CODING_AGENT_DIR: agentDir,
       OPENAI_API_KEY: 'test-key',
@@ -185,7 +187,10 @@ async function spawnOmpHost(opts) {
   fs.mkdirSync(agentDir, { recursive: true });
   writeAgentConfigs(agentDir, mockLlm);
 
-  const ompRepo = process.env.WANXIANGSHU_OMP_REPO || path.resolve(__dirname, '..', '..', 'oh-my-pi');
+  let ompRepo = process.env.WANXIANGSHU_OMP_REPO || path.resolve(__dirname, '..', '..', 'oh-my-pi');
+  if (!fs.existsSync(ompRepo)) {
+    ompRepo = path.resolve(__dirname, '..');
+  }
   const pluginPath = path.resolve(__dirname, '..', 'build', 'src', 'Hosts', 'Omp', 'Plugin.js');
   const child = spawnProcess(ompRepo, pluginPath, mockLlm, agentDir);
   child.stderr.on('data', (chunk) => process.stderr.write(`[omp-driver] ${chunk}`));

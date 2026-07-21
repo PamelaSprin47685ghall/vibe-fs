@@ -56,7 +56,9 @@ let ptyReadTool (host: Host) : obj =
                   strOpt
                       "Regex pattern to filter lines. When set, only matching lines are returned, then offset/limit apply to the matches."
               )
-              "ignoreCase", box (boolOpt "Case-insensitive pattern matching (default: false)") ])
+              "ignoreCase", box (boolOpt "Case-insensitive pattern matching (default: false)")
+              "follow-tdd-and-kolmogorov-principles", box warnTddParam
+              "impossible-via-other-tools", box warnParam ])
         (fun args context ->
             checkExecPerm host context
             let id = string args?``id``
@@ -79,12 +81,12 @@ let ptyReadTool (host: Host) : obj =
             promise {
                 let! mgr = getManager ()
                 let lm = mgr?lifecycleManager
+
                 let ignoreCaseBool =
                     if Dyn.isNullish (Dyn.get args "ignoreCase") then
                         false
                     else
                         unbox<bool> args?ignoreCase
 
-                return!
-                    readPtyOutput mgr lm id sessionId pattern offset' limit' ignoreCaseBool
+                return! readPtyOutput mgr lm id sessionId pattern offset' limit' ignoreCaseBool
             })

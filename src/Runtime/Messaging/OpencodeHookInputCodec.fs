@@ -21,7 +21,14 @@ let toolNameFromHookInput (input: obj) : string = Dyn.str input "tool"
 
 let argsFromHookInput (input: obj) : obj = Dyn.get input "args"
 
-let toolIdFromDefinitionHookInput (input: obj) : string = Dyn.str input "toolID"
+let toolIdFromDefinitionHookInput (input: obj) : string =
+    let id = Dyn.str input "toolID"
+
+    if id <> "" then
+        id
+    else
+        let t = Dyn.str input "tool"
+        if t <> "" then t else Dyn.str input "name"
 
 let executorModeFromHookInput (_input: obj) : string = ""
 

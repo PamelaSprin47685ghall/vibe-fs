@@ -73,7 +73,9 @@ let spawnParamsSchema: obj =
           box (
               numOpt
                   "Optional per-session timeout in seconds. The PTY is killed automatically when this duration elapses."
-          ) ]
+          )
+          "follow-tdd-and-kolmogorov-principles", box warnTddParam
+          "impossible-via-other-tools", box warnParam ]
 
 let executeSpawn (mgr: obj) (args: obj) (sessionId: string) (agent: string) : obj =
     mgr?spawn (
@@ -100,8 +102,7 @@ let formatSpawnResponse (info: obj) : string =
     let fields =
         [ "id", box (string info?``id``)
           "title", box (string info?title)
-          "command",
-          box (sprintf "%s %s" (string info?command) (String.concat " " (unbox<string array> info?args)))
+          "command", box (sprintf "%s %s" (string info?command) (String.concat " " (unbox<string array> info?args)))
           "workdir", box (string info?workdir)
           "pid", box (unbox<int> info?pid)
           "status", box (string info?status)

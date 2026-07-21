@@ -198,5 +198,16 @@ let toolExecuteAfter (scope: RuntimeScope) (input: obj) (output: obj) : JS.Promi
             setHookErrorMux output "livelock guard: repeated identical tool call with identical result"
     }
 
-let systemTransform (directory: string) (_input: obj) (output: obj) : JS.Promise<unit> =
-    promise { setSystemOutputToDirectory directory output }
+let systemTransform (directory: string) (input: obj) (output: obj) : JS.Promise<unit> =
+    promise {
+        let dir =
+            let d = Dyn.str input "workspacePath"
+
+            if d <> "" then
+                d
+            else
+                let d2 = Dyn.str input "directory"
+                if d2 <> "" then d2 else directory
+
+        setSystemOutputToDirectory dir output
+    }

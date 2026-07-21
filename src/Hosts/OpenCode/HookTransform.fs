@@ -7,6 +7,7 @@ open Wanxiangshu.Hosts.Opencode.MessageTransformHook
 open Wanxiangshu.Hosts.Opencode.EventHooks
 open Wanxiangshu.Runtime.ChildAgentRegistry
 open Wanxiangshu.Runtime.ChatTransformOutputCodec
+open Wanxiangshu.Runtime.Dyn
 
 let chatMessageFor
     (host: Host)
@@ -36,8 +37,19 @@ let messagesTransform
     : JS.Promise<unit> =
     MessageTransformHook.messagesTransform registry directory runtimeScope reviewStore client input output
 
-let systemTransform (directory: string) (_input: obj) (output: obj) : JS.Promise<unit> =
-    promise { setSystemOutputToDirectory directory output }
+let systemTransform (directory: string) (input: obj) (output: obj) : JS.Promise<unit> =
+    promise {
+        let dir =
+            let d = Wanxiangshu.Runtime.Dyn.str input "workspacePath"
+
+            if d <> "" then
+                d
+            else
+                let d2 = Wanxiangshu.Runtime.Dyn.str input "directory"
+                if d2 <> "" then d2 else directory
+
+        setSystemOutputToDirectory dir output
+    }
 
 let compactionAutocontinue (_input: obj) (_output: obj) : JS.Promise<unit> = Promise.lift ()
 

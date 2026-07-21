@@ -47,7 +47,7 @@ const CONTROL_FIELDS = [
 ];
 
 const EXPECTED_CONTROL_FIELDS = {
-  'follow-tdd-and-kolmogorov-principles': new Set(['coder', 'executor', 'write', 'edit', 'apply_patch', 'patch', 'ast_edit',
+  'follow-tdd-and-kolmogorov-principles': new Set(['coder', 'executor', 'apply_patch', 'patch', 'ast_edit',
     'ast_grep_replace', 'file_edit_replace_string', 'file_edit_insert',
     'pty_spawn', 'pty_write', 'pty_read', 'pty_list', 'pty_kill', 'swap']),
   'impossible-via-other-tools': new Set(['executor', 'pty_spawn', 'pty_write', 'pty_read', 'pty_list', 'pty_kill']),
@@ -227,10 +227,10 @@ export function parsePtyKillOutput(output) {
 }
 
 export const TIMEOUTS = {
-  prompt: 60000,
-  quick: 30000,
-  long: 90000,
-  idleNudge: 30000,
+  prompt: 15000,
+  quick: 10000,
+  long: 30000,
+  idleNudge: 15000,
   postNudgeObserve: 3000,
   ptyPostObserve: 200,
 };

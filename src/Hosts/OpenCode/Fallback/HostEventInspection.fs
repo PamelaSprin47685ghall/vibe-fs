@@ -20,6 +20,46 @@ let getProps (rawEvent: obj) : obj =
     let rawProps = Dyn.get event "properties"
     if Dyn.isNullish rawProps then event else rawProps
 
+let extractIsRetryable (errorObj: obj) : bool option =
+    if Dyn.isNullish errorObj then
+        None
+    else
+        let target =
+            let d = Dyn.get errorObj "data"
+            if not (Dyn.isNullish d) then d else errorObj
+
+        let v = Dyn.get target "isRetryable"
+
+        if Dyn.isNullish v then
+            None
+        elif Dyn.typeIs v "boolean" then
+            Some(unbox<bool> v)
+        else
+            let s = Dyn.str target "isRetryable"
+            if s <> "" then Some(s = "true" || s = "1") else None
+
+let extractStatusCode (errorObj: obj) : int option =
+    if Dyn.isNullish errorObj then
+        None
+    else
+        let target =
+            let d = Dyn.get errorObj "data"
+            if not (Dyn.isNullish d) then d else errorObj
+
+        let v = Dyn.get target "statusCode"
+
+        if Dyn.isNullish v then
+            let s = Dyn.get target "status"
+
+            if Dyn.isNullish s then None
+            elif Dyn.typeIs s "number" then Some(unbox<int> s)
+            else None
+        elif Dyn.typeIs v "number" then
+            Some(unbox<int> v)
+        else
+            let s = Dyn.str target "statusCode"
+            if s <> "" then Some(int s) else None
+
 let opencodeErrorInput (errorObj: obj) : ErrorInput =
     let errorName = Dyn.str errorObj "name"
     let message = Dyn.str errorObj "message"
@@ -27,12 +67,8 @@ let opencodeErrorInput (errorObj: obj) : ErrorInput =
     { ErrorName = errorName
       DomainError = Some(translateJsError errorObj)
       Message = message
-      StatusCode =
-        let sc = Dyn.str errorObj "statusCode"
-        if sc <> "" then Some(int sc) else None
-      IsRetryable =
-        let ir = Dyn.str errorObj "isRetryable"
-        if ir <> "" then Some(ir = "true") else None }
+      StatusCode = extractStatusCode errorObj
+      IsRetryable = extractIsRetryable errorObj }
 
 let tryReadLatestMessageInfo (client: obj) (sessionID: string) : JS.Promise<obj option> =
     promise {

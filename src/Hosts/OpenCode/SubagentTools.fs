@@ -63,7 +63,9 @@ let coderTool
             (createObj
                 [ "intents", coderIntentsSchema Params.coderIntents
                   "tdd", enumReq [| "red"; "green" |] Params.coderTdd
-                  "ui_", uiParam ]))
+                  "ui_", uiParam
+                  "follow-tdd-and-kolmogorov-principles", warnTddParam
+                  "not-suitable-via-continue-tool", warnReuseParam ]))
         (fun args context -> executeSubagent host registry ctx "coder" args context runtime sessionScope)
 
 let inspectorTool
@@ -79,7 +81,10 @@ let inspectorTool
         inspector
         (subagentZodShape
             inspectorRequiredKeys
-            (createObj [ "intents", inspectorIntentsSchema Params.inspectorIntents; "ui_", uiParam ]))
+            (createObj
+                [ "intents", inspectorIntentsSchema Params.inspectorIntents
+                  "ui_", uiParam
+                  "not-suitable-via-continue-tool", warnReuseParam ]))
         (fun args context -> executeSubagent host registry ctx "inspector" args context runtime sessionScope)
 
 let browserTool
@@ -93,7 +98,11 @@ let browserTool
 
     define
         browser
-        (subagentZodShape browserRequiredKeys (createObj [ "intent", strReq Params.browserIntent ]))
+        (subagentZodShape
+            browserRequiredKeys
+            (createObj
+                [ "intent", strReq Params.browserIntent
+                  "not-suitable-via-continue-tool", warnReuseParam ]))
         (fun args context -> executeSubagent host registry ctx "browser" args context runtime sessionScope)
 
 let continueTool

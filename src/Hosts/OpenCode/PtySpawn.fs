@@ -16,8 +16,12 @@ module Dyn = Wanxiangshu.Runtime.Dyn
 let newRegex (pattern: string) (flags: string) : obj = PtySpawnCommon.newRegex pattern flags
 let storePtyClient (client: obj) : unit = PtySpawnCommon.storePtyClient client
 let getManager () : JS.Promise<obj> = PtySpawnCommon.getManager ()
-let cleanupPtyBySession (sessionId: string) : unit = PtySpawnCommon.cleanupPtyBySession sessionId
-let checkExecPerm (host: Host) (context: obj) : unit = PtySpawnCommon.checkExecPerm host context
+
+let cleanupPtyBySession (sessionId: string) : unit =
+    PtySpawnCommon.cleanupPtyBySession sessionId
+
+let checkExecPerm (host: Host) (context: obj) : unit =
+    PtySpawnCommon.checkExecPerm host context
 
 let ptySpawnTool (host: Host) : obj =
     define
@@ -55,7 +59,9 @@ let ptyKillTool (host: Host) : obj =
         "Terminate a PTY session and optionally remove it from the session list (cleanup)."
         (createObj
             [ "id", box (strReq "The PTY session ID (e.g., pty_a1b2c3d4)")
-              "cleanup", box (boolOpt "If true, removes the session and frees the buffer (default: false)") ])
+              "cleanup", box (boolOpt "If true, removes the session and frees the buffer (default: false)")
+              "follow-tdd-and-kolmogorov-principles", box warnTddParam
+              "impossible-via-other-tools", box warnParam ])
         (fun args context ->
             checkExecPerm host context
             let id = string args?``id``
@@ -108,29 +114,34 @@ let ptyKillTool (host: Host) : obj =
             })
 
 let ptyListTool (host: Host) : obj =
-    define "List all active PTY sessions." (createObj []) (fun _ context ->
-        checkExecPerm host context
-        let sessionId = Dyn.str context "sessionID"
+    define
+        "List all active PTY sessions."
+        (createObj
+            [ "follow-tdd-and-kolmogorov-principles", box warnTddParam
+              "impossible-via-other-tools", box warnParam ])
+        (fun _ context ->
+            checkExecPerm host context
+            let sessionId = Dyn.str context "sessionID"
 
-        promise {
-            let! mgr = getManager ()
-            let lm = mgr?lifecycleManager
-            let sessionsRaw = lm?listSessions ()
+            promise {
+                let! mgr = getManager ()
+                let lm = mgr?lifecycleManager
+                let sessionsRaw = lm?listSessions ()
 
-            let sessions =
-                if Dyn.isNullish sessionsRaw then
-                    [||]
-                else
-                    unbox<obj array> sessionsRaw
-                    |> Seq.filter (fun s -> string s?parentSessionId = sessionId)
-                    |> Seq.map (fun s -> lm?toInfo (s))
-                    |> Seq.toArray
+                let sessions =
+                    if Dyn.isNullish sessionsRaw then
+                        [||]
+                    else
+                        unbox<obj array> sessionsRaw
+                        |> Seq.filter (fun s -> string s?parentSessionId = sessionId)
+                        |> Seq.map (fun s -> lm?toInfo (s))
+                        |> Seq.toArray
 
-            let body =
-                if sessions.Length = 0 then
-                    "No active PTY sessions."
-                else
-                    formatSessionList sessions
+                let body =
+                    if sessions.Length = 0 then
+                        "No active PTY sessions."
+                    else
+                        formatSessionList sessions
 
-            return frontMatterPrompt [ "count", box sessions.Length ] body
-        })
+                return frontMatterPrompt [ "count", box sessions.Length ] body
+            })
