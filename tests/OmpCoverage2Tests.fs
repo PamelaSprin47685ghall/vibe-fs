@@ -57,7 +57,7 @@ let applyActiveToolFilterForMainSession_filtersChildOnly () =
         check "child-only tools removed from main session" (childOnlyInFiltered.Length = 0)
     }
 
-let toolCallHandler_missingWarnTddBlocks () =
+let toolCallHandler_coderWithoutTddAckDoesNotBlock () =
     let h = createPiHarness ()
     let pi = piObject h
     let store = createReviewStore ()
@@ -66,9 +66,9 @@ let toolCallHandler_missingWarnTddBlocks () =
     promise {
         Wanxiangshu.Runtime.ToolHookRuntime.clearSessionCompliance "s1"
         let! result = toolCallHandler pi store event (fakeCtx "s1" "/tmp")
-        check "missing warn_tdd does not block" (Dyn.isNullish result)
+        check "coder without tdd ack does not block" (Dyn.isNullish result)
         let comp = Wanxiangshu.Runtime.ToolHookRuntime.tryGetCompliance "s1" "c1"
-        check "missing warn_tdd has compliance entry" comp.IsSome
+        check "coder without tdd ack has compliance entry" comp.IsSome
         check "compliance entry has no violations" (comp.Value.Violations.IsEmpty)
     }
 
@@ -89,20 +89,14 @@ let toolCallHandler_normalToolReturnsNone () =
     let h = createPiHarness ()
     let pi = piObject h
     let store = createReviewStore ()
-    // "coder" is NOT child-only
-    let event =
-        fakeEvent
-            "coder"
-            (createObj
-                [ "warn_tdd", box "i-am-sure-i-have-followed-tdd-and-kolmogorov-principles-and-kept-todo-updated"
-                  "warn_reuse", box "this-task-is-not-suitable-to-be-completed-via-continue-tool" ])
+    let event = fakeEvent "coder" (createObj [])
 
     promise {
         let! result = toolCallHandler pi store event (fakeCtx "s1" "/tmp")
         check "normal tool returns null" (Dyn.isNullish result)
     }
 
-let toolCallHandler_childSessionCoderMissingWarnTddBlocked () =
+let toolCallHandler_childSessionCoderWithoutTddAckDoesNotBlock () =
     let scope = RuntimeScope()
     Wanxiangshu.Hosts.Omp.ChildSession.clearChildSessionsForTest scope ()
     let childId = "child-coder-1"
@@ -115,9 +109,9 @@ let toolCallHandler_childSessionCoderMissingWarnTddBlocked () =
     promise {
         Wanxiangshu.Runtime.ToolHookRuntime.clearSessionCompliance childId
         let! result = toolCallHandler pi store event (fakeCtx childId "/tmp")
-        check "child session coder without warn_tdd does not block" (Dyn.isNullish result)
+        check "child session coder without tdd ack does not block" (Dyn.isNullish result)
         let comp = Wanxiangshu.Runtime.ToolHookRuntime.tryGetCompliance childId "c1"
-        check "missing warn_tdd child session has compliance entry" comp.IsSome
+        check "child session coder without tdd ack has compliance entry" comp.IsSome
         check "compliance entry child session has no violations" (comp.Value.Violations.IsEmpty)
         Wanxiangshu.Hosts.Omp.ChildSession.unmarkChildSession scope childId
     }
@@ -192,19 +186,14 @@ let sessionShutdownHandler_clearsState () =
 
 let run () : JS.Promise<unit> =
     promise {
-        // 1. applyActiveToolFilterForMainSession
         do! applyActiveToolFilterForMainSession_filtersChildOnly ()
-        // 2. toolCallHandler
-        do! toolCallHandler_missingWarnTddBlocks ()
+        do! toolCallHandler_coderWithoutTddAckDoesNotBlock ()
         do! toolCallHandler_childOnlyToolBlockedInMainSession ()
         do! toolCallHandler_normalToolReturnsNone ()
-        do! toolCallHandler_childSessionCoderMissingWarnTddBlocked ()
+        do! toolCallHandler_childSessionCoderWithoutTddAckDoesNotBlock ()
         do! toolCallHandler_childSessionExecutorMissingWarnBlocked ()
         do! toolCallHandler_childSessionReadPasses ()
-        // 3. turnStartHandler
         do! turnStartHandler_filtersChildOnlyTools ()
-        // 4. toolResultHandler
         do! toolResultHandler_capturesReport ()
-        // 5. sessionShutdownHandler
         do! sessionShutdownHandler_clearsState ()
     }

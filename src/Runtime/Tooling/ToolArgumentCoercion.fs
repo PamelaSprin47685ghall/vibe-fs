@@ -129,45 +129,8 @@ let getToolCapabilities (toolName: string) : ToolCapability list =
       if t = "coder" || t = "inspector" || t = "meditator" || t = "browser" then
           yield SubagentDelegation ]
 
-let inlineJsonWarnTddProperty: obj =
-    createObj
-        [ "description",
-          box "MUST acknowledge that tests are written first (TDD) and Kolmogorov discipline is followed." ]
-
-let inlineJsonWarnProperty: obj =
-    createObj
-        [ "description",
-          box
-              "MUST acknowledge that this task cannot be done with other tools and only run tests when static analysis cannot handle it." ]
-
-let inlineJsonWarnReuseProperty: obj =
-    createObj [ "description", box "MUST acknowledge that this task is not suitable for completion via continue tool." ]
-
-let private injectProp
-    (props: obj)
-    (caps: ToolCapability list)
-    (cap: ToolCapability)
-    (propName: string)
-    (propVal: obj)
-    =
-    if List.contains cap caps then
-        if Dyn.isNullish (Dyn.get props propName) then
-            Dyn.setKey props propName propVal
-
 let decorateAndValidateSchema (toolName: string) (schema: obj) : obj =
-    if Dyn.isNullish schema then
-        schema
-    else
-        let props = Dyn.get schema "properties"
-
-        if Dyn.isNullish props then
-            schema
-        else
-            let caps = getToolCapabilities toolName
-            injectProp props caps FileMutation "warn_tdd" inlineJsonWarnTddProperty
-            injectProp props caps ProcessExecution "warn" inlineJsonWarnProperty
-            injectProp props caps SubagentDelegation "warn_reuse" inlineJsonWarnReuseProperty
-            schema
+    if Dyn.isNullish schema then schema else schema
 
 let registerSchemaTypes (toolName: string) (schema: obj) : unit =
     if toolName <> "" then

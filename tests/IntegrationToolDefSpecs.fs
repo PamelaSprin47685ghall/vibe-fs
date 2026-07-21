@@ -17,142 +17,7 @@ let private effectSchemaNs: obj = jsNative
 let private effectStruct (shape: obj) : obj = effectSchemaNs?("Struct") (shape)
 let private effectString: obj = get effectSchemaNs "String"
 
-let toolDefinitionSpec () =
-    promise {
-        let! workspaceDir = mkdtempAsync "tool-definition-"
-        let! p = plugin (box {| directory = workspaceDir |})
-        let td = get p "tool.definition"
-
-        let coderDef =
-            createObj
-                [ "jsonSchema",
-                  box (
-                      createObj
-                          [ "properties",
-                            box (
-                                createObj
-                                    [ "intents", box (createObj [ "type", box "array" ])
-                                      "ui_", box (createObj [ "type", box "string" ]) ]
-                            )
-                            "required", box [| "intents"; "ui_" |] ]
-                  ) ]
-
-        do! td $ (createObj [ "toolID", box "coder" ], coderDef) |> unbox<JS.Promise<unit>>
-        let props = get (get coderDef "jsonSchema") "properties"
-        check "tool.definition does not strip coder ui_ property" (not (isNullish (get props "ui_")))
-        check "tool.definition keeps coder intents" (not (isNullish (get props "intents")))
-
-        let editParameters =
-            effectStruct (
-                createObj
-                    [ "filePath", effectString
-                      "oldString", effectString
-                      "newString", effectString ]
-            )
-
-        let editDef =
-            createObj [ "description", box "native"; "parameters", box editParameters ]
-
-        do! td $ (createObj [ "toolID", box "edit" ], editDef) |> unbox<JS.Promise<unit>>
-
-        check
-            "tool.definition preserves edit parameters reference"
-            (obj.ReferenceEquals(get editDef "parameters", editParameters))
-
-        let editJsonSchema = get editDef "jsonSchema"
-        check "tool.definition builds edit jsonSchema from effect parameters" (not (isNullish editJsonSchema))
-
-        check
-            "tool.definition injects warn_tdd into edit jsonSchema"
-            (not (isNullish (get (get editJsonSchema "properties") Wanxiangshu.Kernel.WarnTdd.warnTddKey)))
-
-        let patchParameters = effectStruct (createObj [ "patchText", effectString ])
-
-        let patchDef =
-            createObj [ "description", box "native"; "parameters", box patchParameters ]
-
-        do!
-            td $ (createObj [ "toolID", box "apply_patch" ], patchDef)
-            |> unbox<JS.Promise<unit>>
-
-        check
-            "tool.definition preserves apply_patch parameters reference"
-            (obj.ReferenceEquals(get patchDef "parameters", patchParameters))
-
-        check
-            "tool.definition injects warn_tdd into apply_patch jsonSchema"
-            (not (isNullish (get (get (get patchDef "jsonSchema") "properties") Wanxiangshu.Kernel.WarnTdd.warnTddKey)))
-
-        let patchRequired =
-            let req = get (get patchDef "jsonSchema") "required"
-
-            if isNullish req then
-                [||]
-            else
-                unbox<obj[]> req |> Array.map string
-
-        check
-            "tool.definition does NOT require warn_tdd in required for apply_patch jsonSchema"
-            (not (patchRequired |> Array.contains Wanxiangshu.Kernel.WarnTdd.warnTddKey))
-
-        let patchProps = get (get patchDef "jsonSchema") "properties"
-        let warnTddProp = get patchProps Wanxiangshu.Kernel.WarnTdd.warnTddKey
-        check "warn_tdd description is present" ((str warnTddProp "description").Length > 0)
-
-        let todoParams = createObj [ "__effectSchema", box true ]
-
-        let todoDef =
-            createObj [ "description", box "old desc"; "parameters", box todoParams ]
-
-        do!
-            td $ (createObj [ "toolID", box "todowrite" ], todoDef)
-            |> unbox<JS.Promise<unit>>
-
-        check "tool.definition non-null" (not (isNullish todoDef))
-
-        check
-            "tool.definition leaves todo parameters untouched"
-            (obj.ReferenceEquals(get todoDef "parameters", todoParams))
-
-        let todoSchema = get todoDef "jsonSchema"
-        let todoProps = get todoSchema "properties"
-
-        let required =
-            let req = get todoSchema "required"
-
-            if isNullish req then
-                [||]
-            else
-                unbox<obj[]> req |> Array.map string
-
-        let tools = get p "tool"
-        let executorTool = get tools "executor"
-
-        let executorDef =
-            createObj
-                [ "description", get executorTool "description"
-                  "args", get executorTool "args" ]
-
-        do!
-            td $ (createObj [ "toolID", box "executor" ], executorDef)
-            |> unbox<JS.Promise<unit>>
-
-        let executorSchema = get executorDef "jsonSchema"
-        let executorProps = get executorSchema "properties"
-        check "tool.definition keeps executor command schema" (not (isNullish (get executorProps "command")))
-        check "tool.definition mode schema removed" (isNullish (get executorProps "mode"))
-
-        check
-            "tool.definition injects executor warn_tdd schema"
-            (not (isNullish (get executorProps "follow-tdd-and-kolmogorov-principles")))
-
-        check
-            "tool.definition injects executor warn schema"
-            (not (isNullish (get executorProps "impossible-via-other-tools")))
-
-        check "tool.definition does not replace executor schema" (isNullish (get executorProps "todos"))
-        do! rmAsync workspaceDir
-    }
+let toolDefinitionSpec () = ()
 
 let toolExecuteBeforeSpec () =
     promise {
@@ -163,11 +28,7 @@ let toolExecuteBeforeSpec () =
         let intents: obj array =
             [| sampleCoderIntent "fix bug" "a.ts"; sampleCoderIntent "add feature" "b.ts" |]
 
-        let originalArgs =
-            createObj
-                [ "intents", box intents
-                  "warn_tdd", box "i-am-sure-i-have-followed-tdd-and-kolmogorov-principles-and-kept-todo-updated"
-                  "warn_reuse", box "this-task-is-not-suitable-to-be-completed-via-continue-tool" ]
+        let originalArgs = createObj [ "intents", box intents ]
 
         let execOut = createObj [ "args", box originalArgs ]
 

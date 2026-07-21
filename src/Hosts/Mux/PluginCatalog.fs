@@ -66,22 +66,21 @@ let createToolCatalog
     let iteratorStore = sessionScope.IteratorStore
 
     let catalog =
-        [| yield injectWarnWarnTddIntoMuxSchema (coderTool deps toolNames sessionScope)
+        [| yield coderTool deps toolNames sessionScope
            yield inspectorTool deps toolNames sessionScope
            yield browserTool deps toolNames sessionScope
            yield continueTool deps toolNames sessionScope
-           yield injectWarnWarnTddIntoMuxSchema (executorTool deps toolNames sessionScope)
+           yield executorTool deps toolNames sessionScope
            yield submitReviewTool deps toolNames reviewStore sessionScope
            yield websearchTool deps toolNames
            yield webfetchTool
            yield fuzzyGrepTool finderCache iteratorStore
            yield fuzzyFindTool finderCache iteratorStore
            yield fuzzyContinueTool finderCache iteratorStore
-           yield injectWarnWarnTddIntoMuxSchema (writeTool deps)
+           yield writeTool deps
            yield readTool deps hostReadExec
            yield meditatorTool deps toolNames
            yield swapToolDef () |]
-        |> Array.map injectWarnReuseIntoMuxSchema
 
     for t in catalog do
         ToolHookRuntime.registerSchemaTypes t.name (box t.parameters)
@@ -161,11 +160,6 @@ let private processComplianceResult
 
         let allViolations = env.Violations @ todoViolations |> List.distinct
         appendCriticismIfNeeded output (hookOutputTextMux output) allViolations status
-
-        // Restore warn fields to decoded args so LLM history sees them.
-        if not (Dyn.isNullish args) then
-            ToolHookRuntime.restoreWarnToArgs args env
-
         ToolHookRuntime.removeCompliance sessionID toolCallID
     | None ->
         let status =

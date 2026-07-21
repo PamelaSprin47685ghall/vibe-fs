@@ -34,10 +34,7 @@ let muxExecutorRoCatPrependsWarningSpec () =
                       "command", box "cat /etc/passwd"
                       "timeout_type", box "short"
                       "what_to_summarize", box "summarize exit codes"
-                      "max_bytes", box 8192
-                      "warn",
-                      box
-                          "it-is-not-possible-to-do-it-using-other-tools-and-only-run-tests-when-static-analysis-cannot-handle-it" ]
+                      "max_bytes", box 8192 ]
 
             let! result = ((get executor "execute") $ (ctx, args)) |> unbox<JS.Promise<string>>
             check "mux executor ro cat includes misuse hint in envelope" (hasExactHint result hintExecutorMisuse)

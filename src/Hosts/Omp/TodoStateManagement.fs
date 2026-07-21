@@ -65,14 +65,10 @@ let cleanupCompliance
     (envOpt: ToolHookRuntime.ControlEnvelope option)
     (sessionId: string)
     (toolCallId: string)
-    (args: obj)
+    (_args: obj)
     : unit =
     match envOpt with
-    | Some env ->
-        if not (Dyn.isNullish args) then
-            ToolHookRuntime.restoreWarnToArgs args env
-
-        ToolHookRuntime.removeCompliance sessionId toolCallId
+    | Some env -> ToolHookRuntime.removeCompliance sessionId toolCallId
     | None -> ()
 
 let finalizeToolResult

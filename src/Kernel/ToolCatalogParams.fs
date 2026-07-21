@@ -1,7 +1,6 @@
 module Wanxiangshu.Kernel.ToolCatalog.Params
 
 open Wanxiangshu.Kernel.ToolCatalog
-open Wanxiangshu.Kernel.WarnTdd
 
 let private doc tool field =
     match paramDoc tool field with
@@ -20,9 +19,6 @@ let executorDeps = executor "dependencies"
 let executorTimeout = executor "timeout_type"
 let executorWhatToSummarize = executor "what_to_summarize"
 let executorMaxBytes = executor "max_bytes"
-let executorWarn = warnDescription
-
-let warnTddDesc = warnTddDescription
 let private fuzzyFind = doc "fuzzy_find"
 let fuzzyFindPattern = fuzzyFind "pattern"
 let fuzzyFindPath = fuzzyFind "path"

@@ -169,7 +169,7 @@ function handleChat(req, res, queue, calls, url) {
       const args = {
         'follow-tdd-and-kolmogorov-principles': 'i-am-sure-i-have-followed-tdd-and-kolmogorov-principles-and-kept-todo-updated',
         'not-suitable-via-continue-tool': 'this-task-is-not-suitable-to-be-completed-via-continue-tool',
-        'impossible-via-other-tools': 'it-is-not-possible-to-do-it-using-other-tools-and-only-run-tests-when-static-analysis-cannot-handle-it',
+        'impossible-via-other-tools': 'MUST acknowledge that this task cannot be done with other tools and only run tests when static analysis cannot handle it',
         ...(item.args ?? {})
       };
       if (item.args && item.args['follow-tdd-and-kolmogorov-principles'] === null) {

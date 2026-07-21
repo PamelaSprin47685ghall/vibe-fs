@@ -177,13 +177,7 @@ let executorToolSchemaFourFields () =
         let parameters = Dyn.get runner "parameters"
         let properties = Dyn.get parameters "properties"
 
-        for field in
-            [| "language"
-               "command"
-               "dependencies"
-               "timeout_type"
-               "what_to_summarize"
-               "warn" |] do
+        for field in [| "language"; "command"; "dependencies"; "timeout_type"; "what_to_summarize" |] do
             check ("runner schema has " + field) (Dyn.has properties field)
 
         match Dyn.get parameters "required" with

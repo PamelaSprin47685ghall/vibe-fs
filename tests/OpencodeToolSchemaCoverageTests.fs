@@ -33,16 +33,6 @@ let toolHelpers () =
 
 // ── Opencode.HookSchema ────────────────────────────────────────────────────
 
-let hookSchemaWarnTddProps () =
-    let p = warnTddProperty
-    equal "warnTdd type" "string" (Dyn.str p "type")
-    check "warnTdd has no hard minLength" (Dyn.isNullish (Dyn.get p "minLength"))
-    check "warnTdd desc non-empty" ((Dyn.str p "description") <> "")
-    check "warnTdd has no hard enum" (Dyn.isNullish (Dyn.get p "enum"))
-    let ip = inlineJsonWarnTddProperty
-    equal "inline type" "string" (Dyn.str ip "type")
-    check "inline has no hard enum" (Dyn.isNullish (Dyn.get ip "enum"))
-
 let hookSchemaDummySchema () = ()
 
 let hookSchemaRewriteToolJsonSchema () =
@@ -69,25 +59,4 @@ let hookSchemaRewriteToolJsonSchema () =
     rewriteToolJsonSchema setKey rewrite outNone |> ignore
     equal "no schema no setKey" "" lastKey
 
-let hookSchemaPtySpawnWarnSets () =
-    // (4) pty_spawn is in both the WarnTdd modification set and the warn-required set.
-    check "pty_spawn isModificationTool" (Wanxiangshu.Kernel.WarnTdd.isModificationTool "pty_spawn")
-    check "pty_spawn isWarnRequiredTool" (Wanxiangshu.Kernel.WarnTdd.isWarnRequiredTool "pty_spawn")
-
-let hookSchemaMethodologyNotInWarnSets () =
-    // (5) A methodology tool name is in neither set.
-    // methodology is the representative methodology tool name.
-    let methodologyTool = "methodology"
-
-    check
-        "methodology tool NOT isModificationTool"
-        (not (Wanxiangshu.Kernel.WarnTdd.isModificationTool methodologyTool))
-
-    check
-        "methodology tool NOT isWarnRequiredTool"
-        (not (Wanxiangshu.Kernel.WarnTdd.isWarnRequiredTool methodologyTool))
-
-let run () =
-    toolHelpers ()
-    hookSchemaPtySpawnWarnSets ()
-    hookSchemaMethodologyNotInWarnSets ()
+let run () = toolHelpers ()

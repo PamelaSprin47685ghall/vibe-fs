@@ -13,19 +13,29 @@ open Wanxiangshu.Runtime.ToolHookRuntime
 open Wanxiangshu.Hosts.Opencode.HookSchemaDecoration
 open Wanxiangshu.Hosts.Opencode.HookSchemaDecode
 
-let private setKey (o: obj) (k: string) (v: obj) : unit = o?(k) <- v
-
 let private collectToolDefinitions (host: Host) (input: obj) (output: obj) : unit =
     let toolID = toolIdFromDefinitionHookInput input
 
-    if WarnTdd.isModificationTool toolID then
-        rewriteToolJsonSchema setKey (injectWarnTddIntoJsonSchema) output
+    let schemaForRegistry =
+        let jsonSchema = get output "jsonSchema"
 
-    if WarnTdd.isWarnRequiredTool toolID then
-        rewriteToolJsonSchema setKey (injectWarnIntoJsonSchema) output
+        if not (isNullish jsonSchema) then
+            jsonSchema
+        else
+            let parameters = get output "parameters"
 
-    if WarnTdd.isSubagentTool toolID then
-        rewriteToolJsonSchema setKey (injectWarnReuseIntoJsonSchema) output
+            if not (isNullish parameters) then
+                let fromEffect = tryBuildJsonSchemaFromEffectSchema parameters
+
+                if not (isNullish fromEffect) then
+                    fromEffect
+                else
+                    parameters
+            else
+                null
+
+    if not (isNullish schemaForRegistry) then
+        registerSchemaTypes toolID schemaForRegistry
 
 let private registerToolHooks (toolID: string) (output: obj) : unit =
     let schemaForRegistry =

@@ -81,40 +81,21 @@ type ExecutionStatus =
 
 let appendCriticism (output: string) (_violations: string list) (_status: ExecutionStatus) : string = output
 
-let private extractControlFields (args: obj) =
-    let getField k = DynField.strField args k
-    getField "warn_tdd", getField "warn", getField "warn_reuse"
-
 let executeBeforeGateway (tool: string) (args: obj) : Result<obj * ControlEnvelope, string> =
     if Dyn.isNullish args then
         Result.Ok(
             createObj [],
-            { WarnTdd = None
-              Warn = None
-              WarnReuse = None
-              Violations = []
+            { Violations = []
               GenerationAtStart = 0
               SessionId = "" }
         )
     else
         coerceArgsTypes tool args
         sanitizeNullArgs tool args
-        let caps = getToolCapabilities tool
-        let warnTddVal, warnVal, warnReuseVal = extractControlFields args
-        let hasControlFields = warnTddVal.IsSome || warnVal.IsSome || warnReuseVal.IsSome
-
-        let nextArgs =
-            if not caps.IsEmpty || hasControlFields then
-                Dyn.cloneShallow args
-            else
-                args
 
         let env =
-            { WarnTdd = warnTddVal
-              Warn = warnVal
-              WarnReuse = warnReuseVal
-              Violations = []
+            { Violations = []
               GenerationAtStart = 0
               SessionId = "" }
 
-        Result.Ok(nextArgs, env)
+        Result.Ok(args, env)

@@ -160,14 +160,3 @@ let rewriteToolJsonSchema (setKey: obj -> string -> obj -> unit) (rewrite: obj -
                     rewrite args |> ignore
             else
                 ()
-
-let warnTddProperty: obj = createObj [ "description", box Params.warnTddDesc ]
-
-let inlineJsonWarnTddProperty: obj =
-    createObj [ "description", box Params.warnTddDesc ]
-
-let inlineJsonWarnProperty: obj =
-    createObj [ "description", box WarnTdd.warnDescription ]
-
-let inlineJsonWarnReuseProperty: obj =
-    createObj [ "description", box WarnTdd.warnReuseDescription ]

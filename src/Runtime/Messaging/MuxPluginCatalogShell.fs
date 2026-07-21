@@ -27,34 +27,3 @@ let addRequired (schema: obj) (key: string) : unit =
         existing?("push") (box key) |> ignore
     else
         schema?("required") <- box [| box key |]
-
-let injectWarnTddIntoMuxSchema (tool: ToolDefinition) : ToolDefinition =
-    if WarnTdd.isModificationTool tool.name then
-        let props = tool.parameters.properties
-
-        if isNullish (Dyn.get props WarnTdd.warnTddKey) then
-            Dyn.setKey props WarnTdd.warnTddKey (createObj [| "description", box WarnTdd.warnTddDescription |])
-
-    tool
-
-let injectWarnIntoMuxSchema (tool: ToolDefinition) : ToolDefinition =
-    if WarnTdd.isWarnRequiredTool tool.name then
-        let props = tool.parameters.properties
-
-        if isNullish (Dyn.get props WarnTdd.warnKey) then
-            Dyn.setKey props WarnTdd.warnKey (createObj [| "description", box WarnTdd.warnDescription |])
-
-    tool
-
-let injectWarnWarnTddIntoMuxSchema (tool: ToolDefinition) : ToolDefinition =
-    injectWarnTddIntoMuxSchema (injectWarnIntoMuxSchema tool)
-
-
-let injectWarnReuseIntoMuxSchema (tool: ToolDefinition) : ToolDefinition =
-    if WarnTdd.isSubagentTool tool.name then
-        let props = tool.parameters.properties
-
-        if isNullish (Dyn.get props WarnTdd.warnReuseKey) then
-            Dyn.setKey props WarnTdd.warnReuseKey (createObj [| "description", box WarnTdd.warnReuseDescription |])
-
-    tool

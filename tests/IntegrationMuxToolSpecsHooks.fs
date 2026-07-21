@@ -57,10 +57,9 @@ let muxToolExecuteBeforeSetsUiLabelSpec () =
         let args =
             createObj
                 [ "intents", box [| intentOne; intentTwo |]
-                  Wanxiangshu.Kernel.WarnTdd.warnTddKey,
+                  "follow-tdd-and-kolmogorov-principles",
                   box "i-am-sure-i-have-followed-tdd-and-kolmogorov-principles-and-kept-todo-updated"
-                  Wanxiangshu.Kernel.WarnTdd.warnReuseKey,
-                  box "this-task-is-not-suitable-to-be-completed-via-continue-tool" ]
+                  "not-suitable-via-continue-tool", box "this-task-is-not-suitable-to-be-completed-via-continue-tool" ]
 
         let input = createObj [ "tool", box "coder"; "args", box args ]
         do! (before $ (input, createObj [ "args", box args ])) |> unbox<JS.Promise<unit>>
@@ -119,26 +118,26 @@ let muxToolSchemasAreCleanStaticallyButInjectedDynamicallySpec () =
         let staticCoderProps = staticProperties (box staticCoder)
 
         check
-            "coder static BuiltinTools schema has no warn_tdd"
+            "coder static BuiltinTools schema has no follow-tdd-and-kolmogorov-principles"
             (isNullish (Dyn.get staticCoderProps Wanxiangshu.Kernel.WarnTdd.warnTddKey))
-        // registered coder: warn_tdd injected into schema properties and required
+        // registered coder: follow-tdd-and-kolmogorov-principles injected into schema properties and required
         let coder = findTool "coder"
         check "coder tool exists" (not (isNullish coder))
         let coderProps = staticProperties coder
 
         check
-            "registered coder schema has warn_tdd"
+            "registered coder schema has follow-tdd-and-kolmogorov-principles"
             (not (isNullish (Dyn.get coderProps Wanxiangshu.Kernel.WarnTdd.warnTddKey)))
 
         check
-            "registered coder required has NO warn_tdd"
+            "registered coder required has NO follow-tdd-and-kolmogorov-principles"
             (not (staticRequired coder |> Array.contains Wanxiangshu.Kernel.WarnTdd.warnTddKey))
 
         check
-            "registered coder warn_tdd has prompt constraint only"
+            "registered coder follow-tdd-and-kolmogorov-principles has prompt constraint only"
             ((Dyn.str (Dyn.get coderProps Wanxiangshu.Kernel.WarnTdd.warnTddKey) "description")
                  .Length > 0)
-        // executor: no warn or warn_tdd in raw static BuiltinTools schema
+        // executor: no impossible-via-other-tools or follow-tdd-and-kolmogorov-principles in raw static BuiltinTools schema
         let staticExec =
             Wanxiangshu.Hosts.Mux.BuiltinTools.executorTool
                 (createObj [])
@@ -148,66 +147,68 @@ let muxToolSchemasAreCleanStaticallyButInjectedDynamicallySpec () =
         let staticExecProps = staticProperties (box staticExec)
 
         check
-            "executor static BuiltinTools schema has no warn"
-            (isNullish (Dyn.get staticExecProps Wanxiangshu.Kernel.WarnTdd.warnKey))
+            "executor static BuiltinTools schema has no impossible-via-other-tools"
+            (isNullish (Dyn.get staticExecProps "impossible-via-other-tools"))
 
         check
-            "executor static BuiltinTools schema has no warn_tdd"
+            "executor static BuiltinTools schema has no follow-tdd-and-kolmogorov-principles"
             (isNullish (Dyn.get staticExecProps Wanxiangshu.Kernel.WarnTdd.warnTddKey))
-        // registered executor: warn and warn_tdd injected
+        // registered executor: impossible-via-other-tools and follow-tdd-and-kolmogorov-principles injected
         let executor = findTool "executor"
         check "executor tool exists" (not (isNullish executor))
         let execProps = staticProperties executor
 
         check
-            "registered executor schema has warn"
-            (not (isNullish (Dyn.get execProps Wanxiangshu.Kernel.WarnTdd.warnKey)))
+            "registered executor schema has impossible-via-other-tools"
+            (not (isNullish (Dyn.get execProps "impossible-via-other-tools")))
 
         check
-            "registered executor schema has warn_tdd"
+            "registered executor schema has follow-tdd-and-kolmogorov-principles"
             (not (isNullish (Dyn.get execProps Wanxiangshu.Kernel.WarnTdd.warnTddKey)))
 
         check
-            "registered executor required has NO warn"
-            (not (staticRequired executor |> Array.contains Wanxiangshu.Kernel.WarnTdd.warnKey))
+            "registered executor required has NO impossible-via-other-tools"
+            (not (staticRequired executor |> Array.contains "impossible-via-other-tools"))
 
         check
-            "registered executor required has NO warn_tdd"
+            "registered executor required has NO follow-tdd-and-kolmogorov-principles"
             (not (staticRequired executor |> Array.contains Wanxiangshu.Kernel.WarnTdd.warnTddKey))
 
         check
-            "registered executor warn has prompt constraint"
-            ((Dyn.str (Dyn.get execProps Wanxiangshu.Kernel.WarnTdd.warnKey) "description")
-                 .Length > 0)
+            "registered executor impossible-via-other-tools has prompt constraint"
+            ((Dyn.str (Dyn.get execProps "impossible-via-other-tools") "description").Length > 0)
 
         check
-            "registered executor warn_tdd has prompt constraint"
+            "registered executor follow-tdd-and-kolmogorov-principles has prompt constraint"
             ((Dyn.str (Dyn.get execProps Wanxiangshu.Kernel.WarnTdd.warnTddKey) "description")
                  .Length > 0)
-        // write (staticWrite): no warn_tdd in raw BuiltinTools.writeTool schema
+        // write (staticWrite): no follow-tdd-and-kolmogorov-principles in raw BuiltinTools.writeTool schema
         let staticWrite = Wanxiangshu.Hosts.Mux.BuiltinTools.writeTool (createObj [])
         let staticWriteProps = staticProperties (box staticWrite)
-        check "staticWrite has no warn_tdd" (isNullish (Dyn.get staticWriteProps Wanxiangshu.Kernel.WarnTdd.warnTddKey))
-        // registered write: warn_tdd injected into schema properties and required
+
+        check
+            "staticWrite has no follow-tdd-and-kolmogorov-principles"
+            (isNullish (Dyn.get staticWriteProps Wanxiangshu.Kernel.WarnTdd.warnTddKey))
+        // registered write: follow-tdd-and-kolmogorov-principles injected into schema properties and required
         let write = findTool "write"
         check "write tool exists" (not (isNullish write))
         let writeProps = staticProperties write
 
         check
-            "registered write schema has warn_tdd"
+            "registered write schema has follow-tdd-and-kolmogorov-principles"
             (not (isNullish (Dyn.get writeProps Wanxiangshu.Kernel.WarnTdd.warnTddKey)))
 
         check
-            "registered write required has NO warn_tdd"
+            "registered write required has NO follow-tdd-and-kolmogorov-principles"
             (not (staticRequired write |> Array.contains Wanxiangshu.Kernel.WarnTdd.warnTddKey))
 
         check
-            "registered write warn_tdd has prompt constraint"
+            "registered write follow-tdd-and-kolmogorov-principles has prompt constraint"
             ((Dyn.str (Dyn.get writeProps Wanxiangshu.Kernel.WarnTdd.warnTddKey) "description")
                  .Length > 0)
         // dynamic injection hook must be present
         let hook = get reg "tool.execute.before"
-        check "tool.execute.before hook is present for dynamic warn/warn_tdd injection" (not (isNullish hook))
+        check "tool.execute.before hook is present for dynamic schema injection" (not (isNullish hook))
     }
 
 [<Import("readFile", "node:fs/promises")>]

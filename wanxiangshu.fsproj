@@ -810,10 +810,6 @@
     <Compile Include="tests/FuzzySearchSupportCoverageTests.fs"/>
     <Compile Include="tests/MethodologyArgsCoverageTests.fs"/>
     <Compile Include="tests/OpencodeToolSchemaCoverageTests.fs"/>
-    <Compile Include="tests/WarnTddKernelFactsTests.fs"/>
-    <Compile Include="tests/WarnTddOpencodeEnforcementTests.fs"/>
-    <Compile Include="tests/WarnTddMuxEnforcementTests.fs"/>
-    <Compile Include="tests/WarnTddOmpEnforcementTests.fs"/>
     <Compile Include="tests/OmpToolsCoverageTests.fs"/>
     <Compile Include="tests/PluginMimoTuiTests.fs"/>
     <Compile Include="tests/MuxCoverageTests.fs"/>

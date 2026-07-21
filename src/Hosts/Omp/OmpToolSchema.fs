@@ -8,7 +8,6 @@ module Dyn = Wanxiangshu.Runtime.Dyn
 open Wanxiangshu.Kernel.Methodology.Api
 open Wanxiangshu.Kernel.SubagentIntents
 open Wanxiangshu.Kernel.ToolCatalog
-open Wanxiangshu.Kernel.WarnTdd
 open Wanxiangshu.Hosts.Omp.Schema
 open Wanxiangshu.Kernel.Methodology.Schema
 open Wanxiangshu.Kernel.Methodology.Registry
@@ -22,16 +21,6 @@ let private addRequired (schema: obj) (key: string) : unit =
         existing?("push") (box key) |> ignore
     else
         schema?("required") <- box [| box key |]
-
-let private injectWarnReuseIntoOmpParameters (schema: obj) (toolName: string) : obj =
-    if isSubagentTool toolName then
-        let props = Dyn.get schema "properties"
-
-        if not (isNullish props) then
-            if isNullish (Dyn.get props "warn_reuse") then
-                props?("warn_reuse") <- box (createObj [| "description", box warnReuseDescription |])
-
-    schema
 
 let meditatorParameters (tb: obj) : obj =
     objectOf
@@ -61,19 +50,10 @@ let private coderIntentItem (tb: obj) : obj =
         tb
 
 let coderParameters (tb: obj) : obj =
-    let schema =
-        objectOf
-            [| ("intents", arrayOf (coderIntentItem tb) Params.coderIntents tb)
-               ("tdd", enumOf [| "red"; "green" |] Params.coderTdd tb) |]
-            tb
-
-    if isModificationTool "coder" then
-        let props = Dyn.get schema "properties"
-
-        if isNullish (Dyn.get props "warn_tdd") then
-            props?("warn_tdd") <- box (createObj [| "description", box warnTddDescription |])
-
-    injectWarnReuseIntoOmpParameters schema "coder"
+    objectOf
+        [| ("intents", arrayOf (coderIntentItem tb) Params.coderIntents tb)
+           ("tdd", enumOf [| "red"; "green" |] Params.coderTdd tb) |]
+        tb
 
 let private inspectorIntentItem (tb: obj) : obj =
     objectOf
@@ -84,12 +64,10 @@ let private inspectorIntentItem (tb: obj) : obj =
         tb
 
 let inspectorParameters (tb: obj) : obj =
-    injectWarnReuseIntoOmpParameters
-        (objectOf [| ("intents", arrayOf (inspectorIntentItem tb) Params.inspectorIntents tb) |] tb)
-        "inspector"
+    objectOf [| ("intents", arrayOf (inspectorIntentItem tb) Params.inspectorIntents tb) |] tb
 
 let browserParameters (tb: obj) : obj =
-    injectWarnReuseIntoOmpParameters (objectOf [| ("intent", str Params.browserIntent tb) |] tb) "browser"
+    objectOf [| ("intent", str Params.browserIntent tb) |] tb
 
 let continueParameters (tb: obj) : obj =
     objectOf
@@ -112,18 +90,6 @@ let executorParameters (tb: obj) : obj =
                ("what_to_summarize", str Params.executorWhatToSummarize tb)
                ("max_bytes", num Params.executorMaxBytes tb) |]
             tb
-
-    if isModificationTool "executor" then
-        let props = Dyn.get schema "properties"
-
-        if isNullish (Dyn.get props "warn_tdd") then
-            props?("warn_tdd") <- box (createObj [| "description", box warnTddDescription |])
-
-    if isWarnRequiredTool "executor" then
-        let props = Dyn.get schema "properties"
-
-        if isNullish (Dyn.get props "warn") then
-            props?("warn") <- box (createObj [| "description", box warnDescription |])
 
     addRequired schema "max_bytes"
     addRequired schema "what_to_summarize"

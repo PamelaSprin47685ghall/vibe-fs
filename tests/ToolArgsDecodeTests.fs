@@ -77,10 +77,7 @@ let decodeExecutorOkShell () =
               "dependencies", box [| "dep-a" |]
               "timeout_type", box "long"
               "what_to_summarize", box "focus on exit codes and stderr"
-              "max_bytes", box 8192
-              "warn",
-              box
-                  "it-is-not-possible-to-do-it-using-other-tools-and-only-run-tests-when-static-analysis-cannot-handle-it" ]
+              "max_bytes", box 8192 ]
 
     match decodeToolInvocation "executor" args with
     | Ok(Typed(Executor ex)) ->
@@ -96,10 +93,7 @@ let decodeExecutorMissingWhatToSummarize () =
         createObj
             [ "language", box "shell"
               "command", box "echo ok"
-              "timeout_type", box "long"
-              "warn",
-              box
-                  "it-is-not-possible-to-do-it-using-other-tools-and-only-run-tests-when-static-analysis-cannot-handle-it" ]
+              "timeout_type", box "long" ]
 
     match decodeToolInvocation "executor" args with
     | Error(InvalidIntent("executor", "what_to_summarize", "required")) ->

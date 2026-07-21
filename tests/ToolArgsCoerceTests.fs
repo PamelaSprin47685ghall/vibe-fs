@@ -119,11 +119,7 @@ let testCoerceArgsTypesOk () =
     let intentsJson =
         """[{"objective":"fix bug","background":"test","targets":[{"file":"a.ts","guide":"fix it"}]}]"""
 
-    let coderArgs =
-        createObj
-            [ "intents", box intentsJson
-              "tdd", box "red"
-              "warn_tdd", box "i-am-sure-i-have-followed-tdd-and-kolmogorov-principles-and-kept-todo-updated" ]
+    let coderArgs = createObj [ "intents", box intentsJson; "tdd", box "red" ]
 
     coerceArgsTypes "coder" coderArgs
 

@@ -80,10 +80,6 @@ let private processHookResult
             let criticism = ToolHookRuntime.appendCriticism currentOutput allViolations status
             setOutputString criticism
 
-        // Restore warn fields so the LLM can see what it submitted.
-        if not (Dyn.isNullish decodedArgs) then
-            ToolHookRuntime.restoreWarnToArgs decodedArgs env
-
         ToolHookRuntime.removeCompliance sessionID toolCallID
     | None ->
         let status =

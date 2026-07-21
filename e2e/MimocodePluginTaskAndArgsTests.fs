@@ -41,7 +41,7 @@ let warnTddValue =
     "i-am-sure-i-have-followed-tdd-and-kolmogorov-principles-and-kept-todo-updated"
 
 let warnValue =
-    "it-is-not-possible-to-do-it-using-other-tools-and-only-run-tests-when-static-analysis-cannot-handle-it"
+    "MUST acknowledge that this task cannot be done with other tools and only run tests when static analysis cannot handle it"
 
 let taskArgsBase todos selectMethodology =
     createObj [ "todos", box todos; "select_methodology", box selectMethodology ]

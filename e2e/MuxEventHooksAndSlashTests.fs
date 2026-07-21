@@ -68,8 +68,9 @@ let runRest
                 (createObj
                     [ "intents", box inspectorIntents
                       "tdd", box "green"
-                      "warn_tdd", box warnTddValue
-                      "warn_reuse", box "this-task-is-not-suitable-to-be-completed-via-continue-tool" ])
+                      "follow-tdd-and-kolmogorov-principles", box warnTddValue
+                      "not-suitable-via-continue-tool",
+                      box "this-task-is-not-suitable-to-be-completed-via-continue-tool" ])
                 (fun r -> r.Contains "inspector output mock text")
                 "mux.execute.inspector.success"
 
@@ -81,7 +82,8 @@ let runRest
                 "browser"
                 (createObj
                     [ "intent", box "browse"
-                      "warn_reuse", box "this-task-is-not-suitable-to-be-completed-via-continue-tool" ])
+                      "not-suitable-via-continue-tool",
+                      box "this-task-is-not-suitable-to-be-completed-via-continue-tool" ])
                 (fun r -> r.Contains "browser mock debug view text")
                 "mux.execute.browser.success"
 

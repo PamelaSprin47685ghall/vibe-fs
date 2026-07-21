@@ -80,7 +80,7 @@ let runOmpExecutorTools (h: OmpHarness) (chk: string -> bool -> unit) (sessionId
             "i-am-sure-i-have-followed-tdd-and-kolmogorov-principles-and-kept-todo-updated"
 
         let warn =
-            "it-is-not-possible-to-do-it-using-other-tools-and-only-run-tests-when-static-analysis-cannot-handle-it"
+            "MUST acknowledge that this task cannot be done with other tools and only run tests when static analysis cannot handle it"
 
         let! executorResult =
             withTimeoutL
@@ -94,8 +94,8 @@ let runOmpExecutorTools (h: OmpHarness) (chk: string -> bool -> unit) (sessionId
                            timeout_type = "short"
                            mode = "ro"
                            what_to_summarize = "stdout"
-                           warn_tdd = warnTdd
-                           warn = warn |})
+                           ``follow-tdd-and-kolmogorov-principles`` = warnTdd
+                           ``impossible-via-other-tools`` = warn |})
                     sessionId
                     (createObj []))
 

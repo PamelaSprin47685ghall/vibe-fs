@@ -97,8 +97,8 @@ let runMimoExecutor (h: Harness) (chk: string -> bool -> unit) =
                   "mode", box "ro"
                   "timeout_type", box "short"
                   "what_to_summarize", box "keep stdout only"
-                  "warn_tdd", box warnTddValue
-                  "warn", box warnValue ]
+                  "follow-tdd-and-kolmogorov-principles", box warnTddValue
+                  "impossible-via-other-tools", box warnValue ]
 
         let! execResult = h.runToolWithHooks "executor" execArgs (createEmpty ())
         chk "mimo.executor.echo" (execResult.Contains "hello-mimo")

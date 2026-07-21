@@ -112,8 +112,8 @@ let runToolLifecycle
                   "mode", box "ro"
                   "timeout_type", box "short"
                   "what_to_summarize", box "keep stdout only"
-                  "warn_tdd", box warnTddValue
-                  "warn", box warnValue ]
+                  "follow-tdd-and-kolmogorov-principles", box warnTddValue
+                  "impossible-via-other-tools", box warnValue ]
 
         let! liveRes1 = harness.runToolExecuteHooks "executor" execArgs2 "hello-livelock"
         let! liveRes2 = harness.runToolExecuteHooks "executor" execArgs2 "hello-livelock"

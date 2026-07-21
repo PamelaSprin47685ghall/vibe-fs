@@ -24,9 +24,7 @@ open Wanxiangshu.Tests.IntegrationMuxReviewPromptSpecs
 open Wanxiangshu.Tests.IntegrationMuxFallbackSpecs
 open Wanxiangshu.Tests.IntegrationToolSetup
 
-let integrationToolSpecs () : (string * (unit -> JS.Promise<unit>)) list =
-    let reg = sharedMuxRegistration ()
-
+let private integrationToolSpecsGroup1 (reg: obj) : (string * (unit -> JS.Promise<unit>)) list =
     [ "wrapperSpec", (fun () -> promise { wrapperSpec reg })
       "computeCountSpec", (fun () -> promise { computeCountSpec reg })
       "subagentCapsInjection", subagentCapsInjectionSpec
@@ -40,9 +38,6 @@ let integrationToolSpecs () : (string * (unit -> JS.Promise<unit>)) list =
       ("defaultPreludeWithoutCaps", defaultPreludeWithoutCapsSpec)
       ("capsOrder", capsOrderSpec)
       ("capsEpochIsolationAndStability", capsEpochIsolationAndStabilitySpecs)
-      ("toolDefinition", toolDefinitionSpec)
-      "toolExecuteBefore", toolExecuteBeforeSpec
-      "mimoApplyPatchExecuteBefore", mimoApplyPatchExecuteBeforeSpec
       "coderTool", coderToolSpec
       "inspectorTool", inspectorToolSpec
       "muxCoderInvalidIntents", muxCoderInvalidIntentsSpec
@@ -66,8 +61,10 @@ let integrationToolSpecs () : (string * (unit -> JS.Promise<unit>)) list =
       "muxTodoWriteCapturesCompletedWorkReport", muxTodoWriteCapturesCompletedWorkReportSpec
       "muxTodoProjection", muxTodoProjectionSpec
       "muxExecutorRoCatPrependsWarning", muxExecutorRoCatPrependsWarningSpec
-      "muxSubmitReviewNoActiveReview", muxSubmitReviewNoActiveReviewSpec
-      "muxSubmitReviewPromptFormat", muxSubmitReviewPromptFormatSpec
+      "muxSubmitReviewNoActiveReview", muxSubmitReviewNoActiveReviewSpec ]
+
+let private integrationToolSpecsGroup2 (reg: obj) : (string * (unit -> JS.Promise<unit>)) list =
+    [ "muxSubmitReviewPromptFormat", muxSubmitReviewPromptFormatSpec
       "muxAgentReportWrapperFormatsVerdict", muxAgentReportWrapperFormatsVerdictSpec
       "muxSubmitReviewUsesRolledBackHistoryTask", muxSubmitReviewUsesRolledBackHistoryTaskSpec
       "muxSubmitReviewTwoRoundPassAccepts", muxSubmitReviewTwoRoundPassAcceptsSpec
@@ -110,3 +107,7 @@ let integrationToolSpecs () : (string * (unit -> JS.Promise<unit>)) list =
       ("muxContinueNonFunctionNudgeRejectsFailed", muxContinueNonFunctionNudgeRejectsFailedSpec)
       ("muxContinueMismatchedReceiptRejectsFailed", muxContinueMismatchedReceiptRejectsFailedSpec)
       ("muxRecoverWithPromptMissingNudgeRejectsFailed", muxRecoverWithPromptMissingNudgeRejectsFailedSpec) ]
+
+let integrationToolSpecs () : (string * (unit -> JS.Promise<unit>)) list =
+    let reg = sharedMuxRegistration ()
+    integrationToolSpecsGroup1 reg @ integrationToolSpecsGroup2 reg

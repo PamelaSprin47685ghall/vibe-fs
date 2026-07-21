@@ -35,16 +35,11 @@ let runAll (args: string array) : JS.Promise<unit> =
                 totalFailed <- totalFailed + 1
 
         // --- plugin tools, system transform, lifecycle hooks, tool.execute.before/after ---
-        let warnTddValue = "test-warn-tdd"
-        let warnValue = "test-warn"
-
         let execArgs =
             createObj
                 [ "command", box "echo test"
                   "language", box "shell"
-                  "timeout_type", box "short"
-                  "warn_tdd", box warnTddValue
-                  "warn", box warnValue ]
+                  "timeout_type", box "short" ]
 
         let toolLifecycleOpts =
             createObj
@@ -65,7 +60,7 @@ let runAll (args: string array) : JS.Promise<unit> =
         let harness2 =
             unbox<Wanxiangshu.Integration.OpencodePluginToolLifecycleContractTests.Harness> h2obj
 
-        do! runToolLifecycle harness2 chk warnTddValue warnValue execArgs createEmpty dynGet dynIsNull dynStr
+        do! runToolLifecycle harness2 chk "test-warn-tdd" "test-warn" execArgs createEmpty dynGet dynIsNull dynStr
 
         let pluginKeys = harness2.getPlugin () |> objectKeys
         let forbiddenKeys = pluginKeys |> Array.filter (fun k -> k.StartsWith "__")

@@ -40,10 +40,7 @@ open Wanxiangshu.Tests.ConfigTests
 open Wanxiangshu.Tests.JsonSchemaBuildersTests
 open Wanxiangshu.Tests.ExecutorStripTests
 open Wanxiangshu.Tests.ExecutorTests
-open Wanxiangshu.Tests.WarnTddKernelFactsTests
-open Wanxiangshu.Tests.WarnTddOpencodeEnforcementTests
-open Wanxiangshu.Tests.WarnTddMuxEnforcementTests
-open Wanxiangshu.Tests.WarnTddOmpEnforcementTests
+
 open Wanxiangshu.Tests.EventDrivenHarnessDemo
 open Wanxiangshu.Tests.SubagentOutputTranscriptTests
 open Wanxiangshu.Tests.SubagentDrainingTests
@@ -52,7 +49,7 @@ open Wanxiangshu.Tests.PluginObjectContractTests
 open Wanxiangshu.Tests.MuxCapabilityContractTests
 open Wanxiangshu.Tests.RuntimeScopeLifecycleTests
 
-let tailCoreTestEntriesGroup1 () : (string * TestBody) list =
+let tailCoreTestEntriesFuzzy () : (string * TestBody) list =
     [ "FuzzyTests.grepDetect", TestBody.Sync(sync FuzzyTests.grepDetect)
       "FuzzyTests.iteratorRoundTrip", TestBody.Sync(sync FuzzyTests.iteratorRoundTrip)
       "FuzzyTests.finderConversion", TestBody.Sync(sync FuzzyTests.finderConversion)
@@ -76,8 +73,10 @@ let tailCoreTestEntriesGroup1 () : (string * TestBody) list =
       "FuzzyTestsPaging.runWithFinderSharedPipeline", TestBody.Sync(sync FuzzyTestsPaging.runWithFinderSharedPipeline)
       "FuzzyTestsPaging.resolveStoreRequiresInjection",
       TestBody.Sync(sync FuzzyTestsPaging.resolveStoreRequiresInjection)
-      "FuzzyTestsPaging.emptyIteratorTreatedAsAbsent", TestBody.Sync(sync FuzzyTestsPaging.emptyIteratorTreatedAsAbsent)
-      "ExecutorSpawnPathTests.webApiFetchInit", TestBody.Sync(sync ExecutorSpawnPathTests.webApiFetchInit)
+      "FuzzyTestsPaging.emptyIteratorTreatedAsAbsent", TestBody.Sync(sync FuzzyTestsPaging.emptyIteratorTreatedAsAbsent) ]
+
+let tailCoreTestEntriesExecutor () : (string * TestBody) list =
+    [ "ExecutorSpawnPathTests.webApiFetchInit", TestBody.Sync(sync ExecutorSpawnPathTests.webApiFetchInit)
       "ExecutorSpawnPathTests.webApiResponseMethodCall",
       TestBody.Sync(sync ExecutorSpawnPathTests.webApiResponseMethodCall)
       "ExecutorSpawnPathTests.webApiKeyValidation", TestBody.Sync(sync ExecutorSpawnPathTests.webApiKeyValidation)
@@ -166,10 +165,7 @@ let tailCoreTestEntriesGroup3 () : (string * TestBody) list =
         "ExecutorTests.infiniteStdoutBounded", TestBody.Async ExecutorTests.infiniteStdoutBounded
         "ExecutorTests.infiniteStderrBounded", TestBody.Async ExecutorTests.infiniteStderrBounded
         "ExecutorTests.smallOutputUnchanged", TestBody.Async ExecutorTests.smallOutputUnchanged
-        "WarnTddKernelFactsTests.run", TestBody.Sync(sync WarnTddKernelFactsTests.run)
-        "WarnTddOpencodeEnforcementTests.run", TestBody.Async WarnTddOpencodeEnforcementTests.run
-        "WarnTddMuxEnforcementTests.run", TestBody.Async WarnTddMuxEnforcementTests.run
-        "WarnTddOmpEnforcementTests.run", TestBody.Sync(sync WarnTddOmpEnforcementTests.run)
+
         "EventDrivenHarnessDemo.run", TestBody.Async(fun () -> EventDrivenHarnessDemo.run ())
         "ProductionDebugOutputTests.run", TestBody.Sync(sync Wanxiangshu.Tests.ProductionDebugOutputTests.run)
         "RemovedProductionFilesTests.run", TestBody.Sync(sync Wanxiangshu.Tests.RemovedProductionFilesTests.run)
@@ -183,6 +179,7 @@ let tailCoreTestEntriesGroup3 () : (string * TestBody) list =
         "RuntimeScopeLifecycleTests.run", TestBody.Async Wanxiangshu.Tests.RuntimeScopeLifecycleTests.run ]
 
 let tailCoreTestEntries () : (string * TestBody) list =
-    tailCoreTestEntriesGroup1 ()
+    tailCoreTestEntriesFuzzy ()
+    @ tailCoreTestEntriesExecutor ()
     @ tailCoreTestEntriesGroup2 ()
     @ tailCoreTestEntriesGroup3 ()

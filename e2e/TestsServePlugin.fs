@@ -157,12 +157,12 @@ let runServePluginChecks
         let historyShortTodo = harness.allMessagesText (unbox<obj> msgsAfterShortTodo)
         chk "e2e.serve.todowrite.short.no-criticism" (not (historyShortTodo.Contains "严重协议违例"))
 
-        // --- E2E Test: Warn soft-required validation (missing warn_tdd is allowed, no criticism) ---
+        // --- E2E Test: Warn soft-required validation (missing follow-tdd-and-kolmogorov-principles is allowed, no criticism) ---
         let writeArgsWithoutWarnTdd =
             createObj
                 [ "filePath", box "test_warn_tdd.txt"
                   "content", box "hello without warn_tdd"
-                  "warn_tdd", box null ]
+                  "follow-tdd-and-kolmogorov-principles", box null ]
 
         do! toolRound harness sessionID "write" writeArgsWithoutWarnTdd "write without warn_tdd"
         chk "e2e.serve.write.missing-warn_tdd.tool-called" (containsTool harness "write")

@@ -1,10 +1,10 @@
 /**
- * strict-mock-decorate.js — Legacy args decoration (warn_tdd / warn /
- * warn_reuse) used by StrictMockProvider in non-strict mode.
+ * strict-mock-decorate.js — Args decoration (follow-tdd-and-kolmogorov-principles /
+ * impossible-via-other-tools / not-suitable-via-continue-tool) used by StrictMockProvider.
  */
 
 const DEFAULT_WARN_TDD = 'i-am-sure-i-have-followed-tdd-and-kolmogorov-principles-and-kept-todo-updated';
-const DEFAULT_WARN = 'it-is-not-possible-to-do-it-using-other-tools-and-only-run-tests-when-static-analysis-cannot-handle-it';
+const DEFAULT_WARN = 'MUST acknowledge that this task cannot be done with other tools and only run tests when static analysis cannot handle it';
 const DEFAULT_WARN_REUSE = 'this-task-is-not-suitable-to-be-completed-via-continue-tool';
 
 const WARN_TDD_KEY = 'follow-tdd-and-kolmogorov-principles';

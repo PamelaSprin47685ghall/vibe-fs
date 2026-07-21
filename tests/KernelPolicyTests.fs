@@ -8,7 +8,6 @@ open Wanxiangshu.Kernel.ToolResult
 open Wanxiangshu.Kernel.MessageTransformPolicy
 open Wanxiangshu.Kernel.Messaging
 open Wanxiangshu.Kernel.CapsSynthPolicy
-open Wanxiangshu.Kernel.WarnTdd
 
 // ── ToolResult ──────────────────────────────────────────────────────────────
 
@@ -84,28 +83,6 @@ let capsToolCallIdFitsProviderLimit () =
 
 // ── WarnTdd ─────────────────────────────────────────────────────────────────
 
-let isModificationToolRecognises () =
-    check "coder is modification tool" (isModificationTool "coder")
-    check "executor is modification tool" (isModificationTool "executor")
-    check "write is modification tool" (isModificationTool "write")
-    check "edit is modification tool" (isModificationTool "edit")
-    check "apply_patch is modification tool" (isModificationTool "apply_patch")
-    check "patch is modification tool" (isModificationTool "patch")
-    check "ast_edit is modification tool" (isModificationTool "ast_edit")
-    check "ast_grep_replace is modification tool" (isModificationTool "ast_grep_replace")
-    check "file_edit_replace_string is modification tool" (isModificationTool "file_edit_replace_string")
-    check "file_edit_insert is modification tool" (isModificationTool "file_edit_insert")
-
-let isModificationToolCaseInsensitive () =
-    check "Coder (capital C) recognised" (isModificationTool "Coder")
-    check "EDIT (all caps) recognised" (isModificationTool "EDIT")
-
-let isModificationToolRejectsNonModification () =
-    check "read is not a modification tool" (not (isModificationTool "read"))
-    check "search is not a modification tool" (not (isModificationTool "search"))
-    check "fuzzy is not a modification tool" (not (isModificationTool "fuzzy"))
-    check "random is not a modification tool" (not (isModificationTool "random"))
-
 let run () =
     // ToolResult
     wireEncodeResultOk ()
@@ -122,7 +99,4 @@ let run () =
     isCapsSynthIdMatches ()
     isCapsSynthIdRejects ()
     capsToolCallIdFitsProviderLimit ()
-    // WarnTdd
-    isModificationToolRecognises ()
-    isModificationToolCaseInsensitive ()
-    isModificationToolRejectsNonModification ()
+// WarnTdd removed

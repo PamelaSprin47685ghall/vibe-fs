@@ -60,13 +60,7 @@ let toolCatalogCentralized () =
     check "coder spec carries description" (coderSpec.description.Length > 0)
     check "coder description names intents" (coderSpec.description.Contains "intents")
 
-    check
-        "coder requiredFields no warn_tdd"
-        (not (List.contains Wanxiangshu.Kernel.WarnTdd.warnTddKey coderSpec.requiredFields))
-
     check "coder requiredFields are intents+tdd" (coderSpec.requiredFields = [ "intents"; "tdd" ])
-    check "coder paramDoc no warn_tdd" (not (Map.containsKey Wanxiangshu.Kernel.WarnTdd.warnTddKey coderSpec.paramDocs))
-    check "coder paramDoc no warn key" (not (Map.containsKey Wanxiangshu.Kernel.WarnTdd.warnKey coderSpec.paramDocs))
     check "coder param doc for intents" (Map.containsKey "intents" coderSpec.paramDocs)
     check "coder param doc for tdd" (Map.containsKey "tdd" coderSpec.paramDocs)
 
@@ -77,33 +71,16 @@ let toolCatalogCentralized () =
     let executorSpec = specOf "executor"
     check "executor describes timeout budgets" (executorSpec.description.Contains "timeout")
 
-    check
-        "executor requiredFields no warn_tdd"
-        (not (List.contains Wanxiangshu.Kernel.WarnTdd.warnTddKey executorSpec.requiredFields))
-
-    check
-        "executor requiredFields no warn"
-        (not (List.contains Wanxiangshu.Kernel.WarnTdd.warnKey executorSpec.requiredFields))
+    check "executor does not require mode" (not (executorSpec.requiredFields |> List.contains "mode"))
 
     check "executor does not require mode" (not (executorSpec.requiredFields |> List.contains "mode"))
 
-    check
-        "executor paramDoc no warn_tdd"
-        (not (Map.containsKey Wanxiangshu.Kernel.WarnTdd.warnTddKey executorSpec.paramDocs))
-
-    check "executor paramDoc no warn" (not (Map.containsKey Wanxiangshu.Kernel.WarnTdd.warnKey executorSpec.paramDocs))
     check "executor param doc no mode" (not (Map.containsKey "mode" executorSpec.paramDocs))
 
     let writeSpec = specOf "write"
     check "write spec carries description" (writeSpec.description.Length > 0)
 
-    check
-        "write requiredFields no warn_tdd"
-        (not (List.contains Wanxiangshu.Kernel.WarnTdd.warnTddKey writeSpec.requiredFields))
-
     check "write requiredFields are file_path+content" (writeSpec.requiredFields = [ "file_path"; "content" ])
-    check "write paramDoc no warn_tdd" (not (Map.containsKey Wanxiangshu.Kernel.WarnTdd.warnTddKey writeSpec.paramDocs))
-    check "write paramDoc no warn" (not (Map.containsKey Wanxiangshu.Kernel.WarnTdd.warnKey writeSpec.paramDocs))
 
     let swapSpec = specOf "swap"
 

@@ -85,10 +85,7 @@ let incrementSessionCancelGeneration (sessionID: string) : unit =
         sessionCancelGenerations.[sessionID] <- if found then g + 1 else 1
 
 type ControlEnvelope =
-    { WarnTdd: string option
-      Warn: string option
-      WarnReuse: string option
-      Violations: string list
+    { Violations: string list
       mutable GenerationAtStart: int
       mutable SessionId: string }
 

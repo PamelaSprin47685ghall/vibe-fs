@@ -160,7 +160,7 @@ let runAll (args: string array) : JS.Promise<int> =
                 (createObj
                     [ "file_path", box "mux-e2e-test.md"
                       "content", box "hello from mux e2e"
-                      "warn_tdd", box warnTddValue ])
+                      "follow-tdd-and-kolmogorov-principles", box warnTddValue ])
                 (fun r -> fileExists (harness.workDir + "/mux-e2e-test.md") && r.Contains "Successfully")
                 "mux.execute.write.success"
 
@@ -188,10 +188,10 @@ let runAll (args: string array) : JS.Promise<int> =
                       "max_bytes", box 8192
                       "timeout_type", box "short"
                       "what_to_summarize", box "keep stdout only"
-                      "warn_tdd", box warnTddValue
-                      "warn",
+                      "follow-tdd-and-kolmogorov-principles", box warnTddValue
+                      "impossible-via-other-tools",
                       box
-                          "it-is-not-possible-to-do-it-using-other-tools-and-only-run-tests-when-static-analysis-cannot-handle-it" ])
+                          "MUST acknowledge that this task cannot be done with other tools and only run tests when static analysis cannot handle it" ])
                 (fun r -> r.Contains "hello-executor")
                 "mux.execute.executor.success"
 
