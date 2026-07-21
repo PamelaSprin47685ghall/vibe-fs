@@ -24,7 +24,6 @@
 | 04 | 04-runtime.md | `src/Runtime/` IO、codec、事件日志与运行时 |
 | 05 | 05-event-sourcing.md | `.wanxiangshu.ndjson`、事件种类全集 |
 | 06 | 06-review-and-nudge.md | `/loop`、reviewer、nudge 三层架构 |
-| 07 | 07-work-backlog.md | todowrite / 待办写入 |
 | 08 | 08-tools-and-permissions.md | ToolCatalog、权限 |
 | 09 | 09-methodology.md | `methodology_*` schema 与注册 |
 | 10 | 10-message-transform.md | 管线、Semble、并行提示 |

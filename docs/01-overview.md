@@ -19,7 +19,7 @@
 1. **宿主协议漂移**：Zod / Mux catalog / TypeBox / Pi 事件模型互不兼容。
 2. **LLM 弱类型**：消息与工具参数是动态对象，须在边界立刻强类型化。
 3. **宿主 compaction**：对话历史不可靠，不能作 durable 状态真相。
-4. **跨轮状态**：review、todo backlog、nudge 须在进程重启后恢复。
+4. **跨轮状态**：review、nudge 须在进程重启后恢复。
 5. **副作用**：Node IO 不可避免，但业务规则须可单测、可重放。
 
 ## 七条设计公理
@@ -38,7 +38,7 @@
 
 ## 与万象阵 (wanxiangzhen) 的边界
 
-- **万象术**：单工作区内多代理工具、review；durable 事件 SSOT = `.wanxiangshu.ndjson`（`loop_*`、`work_backlog_*`、`nudge_*` 等 kind）。
+- **万象术**：单工作区内多代理工具、review；durable 事件 SSOT = `.wanxiangshu.ndjson`（`loop_*`、`nudge_*` 等 kind）。
 - **万象阵**：独立协调器插件，DAG + worktree + ff-only 合并；durable 事件与万象术**共用** `.wanxiangshu.ndjson`（`squad_*`/`task_*` 行，见 [19-wanxiangzhen.md](./19-wanxiangzhen.md)）。
 - 两插件**互不 import**；协同靠 slash / prompt front-matter（如 slave 侧触发 `/loop`）。
 
@@ -59,7 +59,7 @@ flowchart LR
 
 权限矩阵 SSOT：`src/Kernel/ToolCatalog/Registry.fs` + `ToolPermission.fs`。典型划分：
 
-- **Manager**：`todowrite`/`task`、子代理、`submit_review`
+- **Manager**：宿主原生待办写入、子代理、`submit_review`
 - **Coder**：读写改、patch、executor（写模式）
 - **Inspector**：read、fuzzy_*、executor（只读）
 - **Reviewer**：read、`return_reviewer`

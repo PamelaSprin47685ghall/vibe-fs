@@ -1,7 +1,7 @@
 # 万象阵：工作区事件溯源
 
 > **权威顺序**：实现 > 本文件 > `03-dev-talk` 历史叙述。
-> **物理文件**：`[workspace]/.wanxiangshu.ndjson` + `.wanxiangshu.ndjson.lock`（`src/Runtime/EventStore/EventLogFile.fs`），与万象术 review/backlog/nudge 等**共用**。
+> **物理文件**：`[workspace]/.wanxiangshu.ndjson` + `.wanxiangshu.ndjson.lock`（`src/Runtime/EventStore/EventLogFile.fs`），与万象术 review/nudge 等**共用**。
 > **逻辑 SSOT**：`src/Kernel/Wanxiangzhen/SquadEvent.fs` fold + `src/Runtime/Wanxiangzhen/CoordinatorReplay.fs` + `SquadEventWanCodec.fs` + `SquadEventLogRuntime.fs`。
 
 ## 0. 动机

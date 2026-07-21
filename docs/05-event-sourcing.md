@@ -8,7 +8,7 @@
 
 1. **意图不落盘**：未校验的自然语言、草稿参数不写入。
 2. **事实不可改**：仅追加行；修正靠补偿事件，非覆盖旧行。
-3. **内存 = fold**：`ReviewStore`、backlog 投影、nudge 表 = 对 NDJSON 的纯 fold + 可选进程缓存。
+3. **内存 = fold**：`ReviewStore`、nudge 表 = 对 NDJSON 的纯 fold + 可选进程缓存。
 4. **先盘后内存**：append 成功后才更新缓存投影；失败 = 命令未发生。
 5. **一行一事件**：每行自包含 JSON（`WanEvent`）。
 6. **按 session 分区**：每行含 `session` 字段；fold 按 `sessionId` 过滤。
@@ -122,7 +122,7 @@ EventWriter.appendXxxOrFail
 
 ## 读路径
 
-`ReadAllEvents` → `EventLogRuntimeSync` → review/backlog/fallback projection 重建。损坏行截断：不跳过坏行继续 fold。
+`ReadAllEvents` → `EventLogRuntimeSync` → review/fallback projection 重建。损坏行截断：不跳过坏行继续 fold。
 
 ## Durable Effect Law 与 Outbox
 
@@ -140,5 +140,5 @@ EventWriter.appendXxxOrFail
 ## 启动与恢复
 
 1. 打开 workspace → `EventStore` 读 NDJSON → 构建 `SessionState` 缓存
-2. `syncAllSessionsFromEventLog` 或单 session `syncReviewFromEventLog`、`syncBacklogFromEventLog`
+2. `syncAllSessionsFromEventLog` 或单 session `syncReviewFromEventLog`
 3. 再注册宿主 hook

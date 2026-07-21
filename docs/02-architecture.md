@@ -49,7 +49,7 @@
 
 `Kernel.HostTools.Host` = `Opencode | Mimocode | Mux | Omp`。
 
-工具名可能不同：待办写入 OpenCode/Mux/OMP → `todowrite`；Mimocode → `task`。
+工具名可能不同：子代理工具各宿主命名有差异。待办写入已由宿主原生实现。
 
 `HostTools.normalizeToolNameForMux` 在权限分类前统一 canonical 名。
 

@@ -26,7 +26,7 @@
 
 | 角色 | 典型允许 | 典型禁止 |
 | :--- | :--- | :--- |
-| Manager | todowrite/task、子代理、submit_review | 直接 fuzzy_grep、随意 shell |
+| Manager | 宿主原生待办写入、子代理、submit_review | 直接 fuzzy_grep、随意 shell |
 | Coder | read/write/edit、patch、executor | 委派 web/submit |
 | Inspector | read、fuzzy_*、executor(RO) | 写族工具 |
 | Meditator | read、methodology_* | 写族 |
@@ -39,8 +39,9 @@
 
 | 概念 | Opencode | Mimocode | Mux | Omp |
 | :--- | :--- | :--- | :--- | :--- |
-| 待办写入 | todowrite | task | todowrite | todowrite |
 | 子代理 task 工具 | task | actor | task | task |
+
+> 注：待办写入（todowrite/task）已由各宿主原生实现，非万象术提供。
 
 `normalizeToolNameForMux`（`HostTools.fs`）将 Mux 原生名映射到 canonical 名（`file_edit_*` → `edit`、`file_read` → `read`、`web_fetch` → `webfetch`、`web_search`/`google_search` → `websearch`）。
 

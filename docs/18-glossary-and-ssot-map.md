@@ -28,7 +28,6 @@
 | Concern | SSOT | 非 SSOT |
 | :--- | :--- | :--- |
 | Review task / loop 活跃 | `.wanxiangshu.ndjson` + `foldReviewTask` | 仅读 ReviewStore |
-| Todo backlog 内容 | `.wanxiangshu.ndjson`（`openTodosJson`） | 历史 tool 消息全文 fold |
 | Nudge 去重 | `NudgeDedupState` 事件 fold | 内存去重表单独为准 |
 | Nudge 决策快照 | `NudgeSnapshotState` 事件 fold | 末条消息文本直接嗅探 |
 | 工具 description | `Kernel/ToolCatalog/Registry.fs` | 宿主手写重复文案 |

@@ -32,6 +32,6 @@
 | :--- | :--- | :--- |
 | SSOT（物理） | `.wanxiangshu.ndjson`（与万象阵共用） | 同上 |
 | npm | `wanxiangshu` / `omp` | `wanxiangshu/wanxiangzhen` |
-| 协同 | `/loop`、todowrite | slave prompt / slash，无代码 import |
+| 协同 | `/loop`、宿主原生待办写入 | slave prompt / slash，无代码 import |
 
 **权威顺序：实现 > 本目录 > 03-dev-talk 历史叙述。**

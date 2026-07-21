@@ -44,7 +44,7 @@
 
 ## Mimocode 命名差异
 
-经 `HostTools`：`task` = todowrite；`actor` = task 子代理工具。
+经 `HostTools`：`actor` = task 子代理工具。待办写入（todowrite/task）已由宿主原生实现。
 
 ## 上游
 

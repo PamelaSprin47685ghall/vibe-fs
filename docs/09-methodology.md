@@ -2,7 +2,7 @@
 
 ## 概述
 
-对外名 `methodology_<id>`，数量与 `src/Kernel/Methodology/Catalog.fs` 条目同步（54 个）。工具供 LLM 在复杂推理时写入结构化 note，与 `todowrite` 的 `select_methodology` 联动。
+对外名 `methodology_<id>`，数量与 `src/Kernel/Methodology/Catalog.fs` 条目同步（54 个）。工具供 LLM 在复杂推理时写入结构化 note。
 
 ## 数据驱动 Schema
 
@@ -38,5 +38,5 @@
 
 1. 在职责对应的 `Logic.fs`、`Optimization.fs` 等条目模块增加数据
 2. 确认 `Catalog.all` 聚合包含
-3. 重跑 schema 生成测试；枚举自动反映到 `todowrite`
+3. 重跑 schema 生成测试；枚举自动反映到宿主待办写入工具
 4. **禁止**在宿主手写重复 enum 列表

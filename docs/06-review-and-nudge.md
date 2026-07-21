@@ -53,12 +53,12 @@
 ```
 Blocked → NudgeNone
 Idle → NudgeNone
-RunnerWithBacklog / AllAxes → NudgeNone
+RunnerOnly → NudgeRunner
 RunnerWithLoop → skipsReview ? NudgeNone : NudgeLoop
 RunnerOnly → NudgeRunner
-LoopWithBacklog → skipsTodo ? (skipsReview ? NudgeNone : NudgeLoop) : NudgeTodo
+LoopWithTodos → skipsTodo ? (skipsReview ? NudgeNone : NudgeLoop) : NudgeTodo
 LoopIdle → skipsReview ? NudgeNone : NudgeLoop
-BacklogOnly → skipsTodo ? NudgeNone : NudgeTodo
+RunnerWithLoop → skipsReview ? NudgeNone : NudgeLoop
 ```
 
 ### 七轴工作状态（`Nudge/Types.fs`）
@@ -93,7 +93,7 @@ runNudgeFlowCore:
 
 ### 决策优先级
 
-1. backlog 有 open todos → `nudge-todo`
+1. 有 open todos → `nudge-todo`
 2. 子代理 / runner 活跃 → `nudge-runner`
 3. review loop 活跃（**事件 fold**）→ `nudge-loop`
 4. 否则 → none

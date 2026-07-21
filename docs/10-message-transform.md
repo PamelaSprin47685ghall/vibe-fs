@@ -2,19 +2,18 @@
 
 ## 目的
 
-在宿主将消息数组交给 LLM **之前**，插入 caps、backlog、review replay、Semble、parallel 提示等。共享逻辑在 `src/Runtime/MessageTransform/Pipeline.fs`；宿主只挂 hook 与 `RuntimeScope`。
+在宿主将消息数组交给 LLM **之前**，插入 caps、review replay、Semble、parallel 提示等。共享逻辑在 `src/Runtime/MessageTransform/Pipeline.fs`；宿主只挂 hook 与 `RuntimeScope`。
 
 ## 管线阶段
 
 `runMessageTransformPipeline`（`Pipeline.fs`）：
 
 1. Caps — 按 `scopeId × CapsRevision × PolicyVersion` 缓存，复用段引用
-2. Backlog 投影（事件 fold，非历史 tool SSOT）
-3. `tryInjectParallelToolPrompt`（`ParallelHintStage.fs`）
-4. Semble（inspector 断点注入，`SembleSearch.fs`）
-5. `replaceArrayInPlace` 原地替换宿主数组
+2. `tryInjectParallelToolPrompt`（`ParallelHintStage.fs`）
+3. Semble（inspector 断点注入，`SembleSearch.fs`）
+4. `replaceArrayInPlace` 原地替换宿主数组
 
-`TransformState` 维护 Caps/Backlog/Top slot 三段引用；revision/key 未变时复用对象引用减少分配。
+`TransformState` 维护 Caps/Top slot 两段引用；revision/key 未变时复用对象引用减少分配。
 
 ## 并行工具鼓励（FEATURE1）
 
@@ -53,7 +52,6 @@
 热路径 O(消息长度) 或 O(log N)。禁止会话增长导致 O(N²)：
 - Read 去重：`Kernel/Dedup`（Set 指纹 + 有界 raw 列表）
 - EventLog 缓存：`ResizeArray` 追加，非 `list @ [e]`
-- Backlog fold：头插 `::`，边界再 `rev`
 
 ## 控制字段生命周期
 
