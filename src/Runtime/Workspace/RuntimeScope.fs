@@ -112,9 +112,12 @@ type RuntimeScope() =
     member _.OnInit
         with get () = onInit
         and set (v) =
-            match onInit with
-            | Some _ -> failwith "InvalidOperationException: OnInit can only be assigned once"
-            | None -> onInit <- v
+            match v with
+            | None -> onInit <- None
+            | Some _ ->
+                match onInit with
+                | Some _ -> failwith "InvalidOperationException: OnInit can only be assigned once"
+                | None -> onInit <- v
 
     member _.WorkspaceRoot
         with get () = workspaceRoot
@@ -148,8 +151,9 @@ type RuntimeScope() =
             let remaining = max 0 (int (dl - now ()))
 
             if remaining = 0 then
-                initState <- Degraded "InitializationTimeout"
-                Promise.reject (exn "InitializationTimeout: watchdog triggered")
+                let msg = "InitializationTimeout: watchdog triggered"
+                initState <- Degraded msg
+                Promise.reject (exn msg)
             else
                 promise {
                     try
@@ -169,6 +173,7 @@ type RuntimeScope() =
                         match initState with
                         | Initializing(currentOpId, _, _) when currentOpId = opId -> initState <- Degraded ex.Message
                         | _ -> ()
+                        return raise ex
                 }
         | Ready -> Promise.lift ()
         | Degraded _ -> Promise.lift ()

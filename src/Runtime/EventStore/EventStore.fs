@@ -75,35 +75,43 @@ type EventLogStore(workspaceRoot: string, ?appendLineOverride: string -> WanEven
         }
 
     member _.AppendEvent(e: WanEvent) : JS.Promise<Result<unit, string>> =
-        enqueueWrite (Ok()) (fun () ->
-            promise {
-                do! state.EnsureInitialized()
-                let mutable decoratedOpt = None
+        promise {
+            try
+                let! res =
+                    enqueueWrite (Ok()) (fun () ->
+                        promise {
+                            do! state.EnsureInitialized()
+                            let mutable decoratedOpt = None
 
-                try
-                    do!
-                        withWorkspaceLock eventFilePath (fun () ->
-                            promise {
-                                do! state.SyncNewEvents()
-                                let decorated = decorateEvent writerId state.EventCountRead e
-                                decoratedOpt <- Some decorated
-                                let line = wanEventToLine decorated + "\n"
-                                do! appendLineFn eventFilePath decorated
-                                let! stats = statAsync eventFilePath
-                                state.LastKnownSize <- state.SizeOf stats
-                                state.LastReadByteOffset <- state.LastReadByteOffset + int64 (byteLength line)
-                            })
+                            try
+                                do!
+                                    withWorkspaceLock eventFilePath (fun () ->
+                                        promise {
+                                            do! state.SyncNewEvents()
+                                            let decorated = decorateEvent writerId state.EventCountRead e
+                                            decoratedOpt <- Some decorated
+                                            let line = wanEventToLine decorated + "\n"
+                                            do! appendLineFn eventFilePath decorated
+                                            let! stats = statAsync eventFilePath
+                                            state.LastKnownSize <- state.SizeOf stats
+                                            state.LastReadByteOffset <- state.LastReadByteOffset + int64 (byteLength line)
+                                        })
 
-                    match decoratedOpt with
-                    | Some decorated ->
-                        state.Cache.FoldWan decorated
-                        state.EventCountRead <- state.EventCountRead + 1
-                    | None -> ()
+                                match decoratedOpt with
+                                | Some decorated ->
+                                    state.Cache.FoldWan decorated
+                                    state.EventCountRead <- state.EventCountRead + 1
+                                | None -> ()
 
-                    return Ok()
-                with ex ->
-                    return Error ex.Message
-            })
+                                return Ok()
+                            with ex ->
+                                return Error ex.Message
+                        })
+
+                return res
+            with ex ->
+                return Error ex.Message
+        }
 
     member _.AppendEventOrFail(e: WanEvent) : JS.Promise<unit> =
         enqueueWrite () (fun () ->
