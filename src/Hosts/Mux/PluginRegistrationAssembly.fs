@@ -12,7 +12,6 @@ open Wanxiangshu.Runtime.Dyn
 open Wanxiangshu.Runtime.RuntimeScope
 open Wanxiangshu.Hosts.Mux.PluginCatalog
 open Wanxiangshu.Hosts.Mux.Wrappers
-open Wanxiangshu.Hosts.Mux.CompactionTransform
 open Wanxiangshu.Hosts.Mux.MessageTransform
 
 let assembleRegistrationObject

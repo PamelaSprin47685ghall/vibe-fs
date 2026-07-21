@@ -121,16 +121,9 @@ let runToolLifecycle
         chk "op.executor.livelockIntercepted" ((string (dynGet liveRes3 "error")).IndexOf("livelock guard") >= 0)
 
         // --- 9. todowrite intercept flow --------------------------------------
-        let pad1024 = String.replicate 1024 "x"
-
         let twArgs =
             createObj
-                [ "ahaMoments", box pad1024
-                  "changesAndReasons", box pad1024
-                  "gotchas", box pad1024
-                  "lessonsAndConventions", box pad1024
-                  "plan", box pad1024
-                  "todos",
+                [ "todos",
                   box
                       [| box
                              {| content = "do task"
@@ -151,39 +144,6 @@ let runToolLifecycle
                 .IndexOf("work_backlog_committed")
               >= 0))
 
-        // Short report fields are now allowed (no length enforcement).
-        // Verify that a short ahaMoments still commits the event.
-        let shortArgs =
-            createObj
-                [ "ahaMoments", box "short"
-                  "changesAndReasons", box pad1024
-                  "gotchas", box pad1024
-                  "lessonsAndConventions", box pad1024
-                  "plan", box pad1024
-                  "todos",
-                  box
-                      [| box
-                             {| content = "do task"
-                                status = "pending"
-                                priority = "high" |} |]
-                  "select_methodology", box [| "first_principles" |] ]
-
-        let beforeShortLog =
-            if harness.fileExists ".wanxiangshu.ndjson" then
-                harness.readFile ".wanxiangshu.ndjson"
-            else
-                ""
-
-        let! _shortRes = harness.runToolExecuteHooks "todowrite" shortArgs "success"
-
-        let afterShortLog =
-            if harness.fileExists ".wanxiangshu.ndjson" then
-                harness.readFile ".wanxiangshu.ndjson"
-            else
-                ""
-
-        chk "op.todowrite.shortNoErr" (beforeShortLog <> afterShortLog)
-
         // Bad todo (empty content) should still block the event.
         let chkTwErr label (errSub: string) extra =
             promise {
@@ -194,12 +154,7 @@ let runToolLifecycle
                         ""
 
                 let baseArgs =
-                    [ "ahaMoments", box pad1024
-                      "changesAndReasons", box pad1024
-                      "gotchas", box pad1024
-                      "lessonsAndConventions", box pad1024
-                      "plan", box pad1024
-                      "todos",
+                    [ "todos",
                       box
                           [| box
                                  {| content = "do task"

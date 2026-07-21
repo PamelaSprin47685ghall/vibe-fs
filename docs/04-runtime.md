@@ -22,7 +22,6 @@
 | **Subsession Actor** | `Subsession/` 下的 `SubsessionActor`、`SubsessionActorRegistry`、`SubsessionEventRouter`、`SubsessionEventStore`、`SubsessionEventWire`、`SubsessionReconcile`、`SubsessionService`、`SubsessionTranscript`、`SubsessionChildObserver` | 子会话 Actor 消息泵与恢复 |
 | Review/Nudge | `ReviewPrompts/`、`Nudge/`、`EventStore/ReviewEventWriter`、`EventStore/NudgeEventWriter` | 投影同步与异步 nudge |
 | Fallback | `Fallback/`、`Continuation*`、`RuntimeStore`、`SessionRuntime*Pure` | 降级规则、租约、continuation 与运行时状态 |
-| Context budget | `Execution/ContextBudget*`、`MessageTransform/ContextBudget*` | 用量、触发、模型窗口与投影周期 |
 | Caps | `Workspace/`、`PromptFragments.fs`、`PromptFrontMatter.fs` | caps 文件、片段与 front matter |
 | MessageTransform | `MessageTransform/`、各宿主 `MessageTransform*`、`Messaging/` codec | 共享管线与宿主边界 |
 | Tool 编解码 | `Tooling/`、`Execution/*ToolsCodec`、`Messaging/` codec | 参数解析、控制字段、执行分发 |
@@ -101,7 +100,6 @@ OpenCode/Mux/OMP 通过各自 `src/Hosts/` 绑定调用 Runtime；OMP 不引用 
 - caps / backlog 投影注入
 - Semble 注入（开关）
 - parallel tool prompt（单工具伪装并行时的 SSOT 文案）
-- context budget 阶段（见 [13-context-budget.md](./13-context-budget.md)）
 
 宿主入口：
 
@@ -117,7 +115,6 @@ OpenCode/Mux/OMP 通过各自 `src/Hosts/` 绑定调用 Runtime；OMP 不引用 
 - Subagent iterator store
 - SessionProjectionStore（backlog 缓存）
 - Caps 文件缓存
-- ContextBudget 状态
 - 其他 scope 级可变状态（含 `fallbackRuntime` 引用）
 
 **禁止**在 Runtime 模块级复制第二份全局 store（架构测试）。

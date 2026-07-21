@@ -26,7 +26,7 @@ let hookCoderInjectUiLabel () =
                             targets =
                              [| box
                                     {| file = "SessionLifecycle.fs"
-                                       guide = "Call applyToolResultHook before backlog append." |} |] |} |] ]
+                                       guide = "Call applyToolResultHook before result processing." |} |] |} |] ]
 
     applyToolResultHook "coder" args
     let label = get args "ui_"

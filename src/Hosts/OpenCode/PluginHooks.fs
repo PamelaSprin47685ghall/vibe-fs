@@ -11,9 +11,7 @@ open Wanxiangshu.Hosts.Opencode.ToolDefinitionHooks
 open Wanxiangshu.Hosts.Opencode.HookExecute
 open Wanxiangshu.Hosts.Opencode.CommandHooks
 open Wanxiangshu.Hosts.Opencode.EventHooks
-open Wanxiangshu.Hosts.Opencode.CompactionHook
 open Wanxiangshu.Hosts.Opencode.HookTransform
-open Wanxiangshu.Hosts.Opencode.CompactionTransform
 open Wanxiangshu.Hosts.Opencode.SessionLifecycleObserver
 open Wanxiangshu.Runtime.Dyn
 open Wanxiangshu.Runtime.OpencodeHookInputCodec
@@ -66,22 +64,12 @@ let private registerTransformHooks (result: obj) (client: obj) (services: CoreSe
                 services.ChildAgentRegistry
                 services.Directory
                 services.RuntimeScope
-                services.BacklogSession
                 services.ReviewStore
                 client
                 input
                 output))
 
-    setKey
-        result
-        "experimental.session.compacting"
-        (twoArgHook (fun input output ->
-            CompactionTransform.compactingTransform
-                services.Directory
-                services.RuntimeScope
-                services.BacklogSession
-                input
-                output))
+    setKey result "experimental.session.compacting" (twoArgHook (fun _input _output -> promise { return () }))
 
     setKey
         result

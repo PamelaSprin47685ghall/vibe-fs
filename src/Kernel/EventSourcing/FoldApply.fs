@@ -8,18 +8,15 @@ open Wanxiangshu.Kernel.EventSourcing.EventPayload
 open Wanxiangshu.Kernel.EventSourcing.SessionState
 open Wanxiangshu.Kernel.Fallback
 open Wanxiangshu.Kernel.Review
-open Wanxiangshu.Kernel.Backlog
 open Wanxiangshu.Kernel.SessionControl
 open Wanxiangshu.Kernel.Subsession
 open Wanxiangshu.Kernel.Review.ReviewLoopFold
 open Wanxiangshu.Kernel.Review.ReviewProjection
-open Wanxiangshu.Kernel.Backlog.BacklogProjection
 open Wanxiangshu.Kernel.Nudge.NudgeProjection
 open Wanxiangshu.Kernel.Subsession.SubsessionProjection
 open Wanxiangshu.Kernel.SessionControl.HumanTurn
 open Wanxiangshu.Kernel.SessionControl.Projection
 open Wanxiangshu.Kernel.SessionControl.State
-open Wanxiangshu.Kernel.Backlog.BacklogTypes
 open Wanxiangshu.Kernel.Nudge.Types
 open Wanxiangshu.Kernel.Nudge
 open Wanxiangshu.Kernel.Review.ReviewVerdictWire
@@ -84,20 +81,6 @@ let computeNextHumanTurn (st: SessionState) (e: WanEvent) =
     else
         HumanTurn.foldSingleEvent e |> Option.orElse st.LatestHumanTurn
 
-let computeNextBacklog (st: SessionState) (e: WanEvent) : BacklogEntry list =
-    if e.Kind = eventKindWorkBacklogCommitted then
-        match BacklogProjection.backlogEntryFromPayload e.Payload with
-        | Some entry ->
-            let nextList = entry :: st.Backlog
-
-            if nextList.Length > 5 then
-                List.truncate 5 nextList
-            else
-                nextList
-        | None -> st.Backlog
-    else
-        st.Backlog
-
 let foldEpisode
     (st: SessionState)
     (nextHumanTurn: HumanTurnState option)
@@ -130,8 +113,6 @@ let createNextSessionState
     (st: SessionState)
     (nextEpisode: OwnerEpisodeState)
     (nextReviewLoop: ReviewLoopFold)
-    (nextBacklog: BacklogEntry list)
-    (nextBacklogSnapshot: WorkBacklogSnapshot)
     (nextNudgeDedup: NudgeDedupState)
     (nextNudgeSnapshot: NudgeSnapshotState)
     (nextSubagents: Map<string, SubagentState>)
@@ -144,8 +125,6 @@ let createNextSessionState
     : SessionState =
     { ReviewLoop = nextReviewLoop
       ReviewTask = ReviewLoopFold.activeTask nextReviewLoop
-      Backlog = nextBacklog
-      BacklogSnapshot = nextBacklogSnapshot
       NudgeDedup = nextNudgeDedup
       NudgeSnapshot = nextNudgeSnapshot
       Subagents = nextSubagents

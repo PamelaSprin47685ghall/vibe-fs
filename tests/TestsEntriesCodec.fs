@@ -17,7 +17,6 @@ open Wanxiangshu.Tests.IntegrationEventTests
 open Wanxiangshu.Tests.IntegrationToolSpecCatalog
 open Wanxiangshu.Tests.IntegrationOpencodeReviewSpecs
 open Wanxiangshu.Tests.IntegrationChatTests
-open Wanxiangshu.Tests.WorkBacklogTests
 open Wanxiangshu.Tests.MethodologyTests
 open Wanxiangshu.Tests.TitleFetchGuardTests
 open Wanxiangshu.Tests.TestsTestBody
@@ -36,7 +35,6 @@ open Wanxiangshu.Tests.SubagentToolExecuteTests
 open Wanxiangshu.Tests.MuxSubagentToolExecuteTests
 open Wanxiangshu.Tests.FileToolsCodecTests
 open Wanxiangshu.Tests.FuzzyToolsCodecTests
-open Wanxiangshu.Tests.WorkBacklogToolsCodecTests
 open Wanxiangshu.Tests.PatchToolsCodecTests
 open Wanxiangshu.Tests.HostMessageCodecTests
 open Wanxiangshu.Tests.MessagingCodecTests
@@ -69,7 +67,6 @@ open Wanxiangshu.Tests.OmpHookExecuteTests
 open Wanxiangshu.Tests.OmpSessionLifecycleTests
 open Wanxiangshu.Tests.OmpPluginCoreTests
 open Wanxiangshu.Tests.OmpTitleFetchGuardTests
-open Wanxiangshu.Tests.OmpMagicTodoTests
 open Wanxiangshu.Tests.OmpPluginCoreIntegrationTests
 open Wanxiangshu.Tests.SubagentIoTests
 open Wanxiangshu.Tests.SubagentCleanupCompletionTests
@@ -89,7 +86,6 @@ let codecTestEntries () : (string * TestBody) list =
       "ReviewToolsCodecTests.run", Sync(sync ReviewToolsCodecTests.run)
       "FileToolsCodecTests.run", Sync(sync FileToolsCodecTests.run)
       "FuzzyToolsCodecTests.run", Sync(sync FuzzyToolsCodecTests.run)
-      "WorkBacklogToolsCodecTests.run", Sync(sync WorkBacklogToolsCodecTests.run)
       "PatchToolsCodecTests.run", Sync(sync PatchToolsCodecTests.run)
       "HostMessageCodecTests.run", Sync(sync HostMessageCodecTests.run)
       "MessagingCodecTests.run", Sync(sync MessagingCodecTests.run)

@@ -22,19 +22,10 @@ open Wanxiangshu.Runtime.Fallback.RuntimeStore
 open Wanxiangshu.Runtime.Fallback.SessionRuntimeLeasePure
 open Wanxiangshu.Runtime.Fallback.SessionRuntimePropertyPure
 open Wanxiangshu.Runtime.SubsessionEventRouter
-open Wanxiangshu.Runtime.WorkBacklogToolsCodec
 open Wanxiangshu.Runtime.ToolRuntimeContext
 open Wanxiangshu.Runtime.Messaging.OpencodeHostEvent
-open Wanxiangshu.Runtime.BacklogSession
-open Wanxiangshu.Runtime.BacklogEventWriter
 
-type ProgressObserver
-    (
-        host: Host,
-        ctx: obj,
-        backlogSession: Wanxiangshu.Runtime.BacklogSession.BacklogSession,
-        fallbackRuntime: FallbackRuntimeStore
-    ) =
+type ProgressObserver(host: Host, ctx: obj, fallbackRuntime: FallbackRuntimeStore) =
 
     let resolvedUnitPromise () : JS.Promise<unit> = Promise.lift ()
 
@@ -59,20 +50,11 @@ type ProgressObserver
                 let args = argsFromHookInput input
 
                 if not (Dyn.isNullish args) && not isError then
-                    match decodeTodoWriteArgs (host = Mimocode) args with
-                    | Ok(decodedArgs, []) when sid <> "" ->
-                        do! appendWorkBacklogCommittedOrFail directory sid decodedArgs
+                    let ev =
+                        { CurrentTurnEvidence.empty with
+                            Todos = TodosCompleted }
 
-                        let allCompleted =
-                            decodedArgs.Todos
-                            |> Array.forall (fun t -> Wanxiangshu.Kernel.ToolArgs.TodoItemStatus.isTerminal t.Status)
-
-                        let ev =
-                            { CurrentTurnEvidence.empty with
-                                Todos = if allCompleted then TodosCompleted else TodosNotCompleted }
-
-                        do! SubsessionEventRouter.routeEvidence directory sid ev |> Promise.map ignore
-                    | _ -> ()
+                    do! SubsessionEventRouter.routeEvidence directory sid ev |> Promise.map ignore
             | None -> ()
         }
 

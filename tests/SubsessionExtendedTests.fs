@@ -17,7 +17,6 @@ open Wanxiangshu.Runtime.SubsessionReconcile
 open Wanxiangshu.Runtime.SubsessionService
 open Wanxiangshu.Kernel.HostTools
 open Wanxiangshu.Runtime.Dyn
-open Wanxiangshu.Hosts.Mux.TodoWriteToolWrapper
 open Wanxiangshu.Runtime.SessionProjectionStore
 open Wanxiangshu.Runtime.EventLogRuntimeStore
 
@@ -339,41 +338,6 @@ let testE2EParentChildRunWithTodoWrite () =
                     do! actor.Post(DispatchAccepted(turnId, OrderedTurnMarkerObserved))
                     do! Promise.sleep 20
 
-                    let projection = ProjectionStore()
-                    let wrapperObj = mkTodoWriteWrapper Mux projection
-
-                    let wrapperFn =
-                        unbox<System.Func<obj, obj, obj>> (Wanxiangshu.Runtime.Dyn.get wrapperObj "wrapper")
-
-                    let toolObj = wrapperFn.Invoke(null, null)
-
-                    let executeFn =
-                        unbox<System.Func<obj, obj, JS.Promise<obj>>> (Wanxiangshu.Runtime.Dyn.get toolObj "execute")
-
-                    let args =
-                        createObj
-                            [ "todos",
-                              box
-                                  [| createObj
-                                         [ "content", box "write more tests"
-                                           "status", box "pending"
-                                           "priority", box "high" ] |]
-                              "select_methodology", box [| box "deduction" |]
-                              "ahaMoments", box "discovered a way to test parent-child"
-                              "changesAndReasons", box "added new test file"
-                              "gotchas", box "none"
-                              "lessonsAndConventions", box "none"
-                              "plan", box "step 1" ]
-
-                    let opts =
-                        createObj
-                            [ "workspaceId", box childSessionId
-                              "directory", box tempDir
-                              "sessionID", box childSessionId ]
-
-                    printfn "DECODED MUX CONFIG: %A" (Wanxiangshu.Runtime.ToolRuntimeContext.fromMuxConfig opts)
-                    let! _toolResult = executeFn.Invoke(args, opts)
-
                     let ev =
                         { CurrentTurnEvidence.empty with
                             Todos = TodosNotCompleted }
@@ -414,5 +378,4 @@ let run () : JS.Promise<unit> =
         testIdleCachingBeforeDispatchAccepted ()
         testEventOrderingPermutations ()
         do! testRestartReconciliationOfIncompleteRuns ()
-        do! testE2EParentChildRunWithTodoWrite ()
     }

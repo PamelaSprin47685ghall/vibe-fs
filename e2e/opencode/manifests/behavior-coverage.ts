@@ -123,7 +123,7 @@ export const COVERAGE: Record<string, CoverageEntry[]> = {
     },
     {
       id: "OC-SCHEMA-006",
-      description: "todowrite schema replaced with work backlog schema",
+      description: "todowrite schema configured",
       level: "unit",
       priority: "P0",
     },
@@ -1257,90 +1257,6 @@ export const COVERAGE: Record<string, CoverageEntry[]> = {
       priority: "P0",
     },
   ],
-  contextBudget: [
-    {
-      id: "OC-CB-001",
-      description: "Provider input limit from /provider",
-      level: "real-e2e",
-      spec: "e2e/opencode/specs/p0-canary-tests-context.js",
-      test: "OC-CB-001 /provider exposes real test-model input limit",
-      priority: "P0",
-    },
-    {
-      id: "OC-CB-002",
-      description: "Session model/provider from session API",
-      level: "real-e2e",
-      spec: "e2e/opencode/specs/p0-canary-tests-context.js",
-      test: "OC-CB-002 session API returns real model and providerID",
-      priority: "P0",
-    },
-    {
-      id: "OC-CB-003",
-      description: "Usage from real session token data",
-      level: "real-e2e",
-      spec: "e2e/opencode/specs/p0-canary-tests-context.js",
-      test: "OC-CB-003 usage comes from real session token data",
-      priority: "P0",
-    },
-    {
-      id: "OC-CB-004",
-      description: "Below threshold = no budget nudge",
-      level: "real-e2e",
-      spec: "e2e/opencode/specs/p0-canary-tests-context.js",
-      test: "OC-CB-004 below threshold does not inject budget nudge",
-      priority: "P0",
-    },
-    {
-      id: "OC-CB-005",
-      description: "Above threshold = one nudge injected",
-      level: "real-e2e",
-      spec: "e2e/opencode/specs/p0-canary-tests-advanced.js",
-      priority: "P0",
-      test: "OC-CB-005 context budget nudge appears after threshold",
-    },
-    {
-      id: "OC-CB-006",
-      description: "Same phase no repeat nudge",
-      level: "unit",
-      priority: "P0",
-    },
-    {
-      id: "OC-CB-007",
-      description: "Backlog commit resets phase baseline",
-      level: "not-covered",
-      priority: "P0",
-    },
-    {
-      id: "OC-CB-008",
-      description: "After phase reset, condition met → nudge again",
-      level: "not-covered",
-      priority: "P0",
-    },
-    {
-      id: "OC-CB-009",
-      description: "Different sessions budget independent",
-      level: "not-covered",
-      priority: "P0",
-    },
-    {
-      id: "OC-CB-010",
-      description: "Provider missing limit = explicit fallback",
-      level: "unit",
-      priority: "P0",
-    },
-    {
-      id: "OC-CB-011",
-      description: "Missing usage does not fabricate value",
-      level: "unit",
-      priority: "P0",
-    },
-    {
-      id: "OC-CB-012",
-      description: "Session model switch re-resolves limit",
-      level: "not-covered",
-      priority: "P0",
-    },
-  ],
   compaction: [
     {
       id: "OC-COMP-001",
@@ -1352,7 +1268,7 @@ export const COVERAGE: Record<string, CoverageEntry[]> = {
     },
     {
       id: "OC-COMP-002",
-      description: "Output context includes backlog projection",
+      description: "Output context includes todo projection",
       level: "real-e2e",
       spec: "e2e/opencode/specs/p0-canary-tests-compaction.js",
       test: "OC-COMP-001 OC-COMP-002 OC-COMP-003 OC-COMP-004 OC-COMP-005 OC-COMP-006 Compaction success flow",
@@ -1482,10 +1398,10 @@ export const COVERAGE: Record<string, CoverageEntry[]> = {
     },
     {
       id: "OC-ES-006",
-      description: "Restart replays backlog state",
+      description: "Restart replays todo state",
       level: "real-e2e",
       spec: "e2e/opencode/specs/p0-canary-tests-recovery-replay.js",
-      test: "OC-ES-006 OC-ES-007 OC-ES-008 OC-ES-009 OC-ES-010 OC-ES-011 restart replay recovers states (review, backlog, nudge, fallback, context)",
+      test: "OC-ES-006 OC-ES-007 OC-ES-008 OC-ES-009 OC-ES-010 OC-ES-011 restart replay recovers states (review, todo, nudge, fallback, context)",
       priority: "P0",
     },
     {
@@ -1493,7 +1409,7 @@ export const COVERAGE: Record<string, CoverageEntry[]> = {
       description: "Restart replays review state",
       level: "real-e2e",
       spec: "e2e/opencode/specs/p0-canary-tests-recovery-replay.js",
-      test: "OC-ES-006 OC-ES-007 OC-ES-008 OC-ES-009 OC-ES-010 OC-ES-011 restart replay recovers states (review, backlog, nudge, fallback, context)",
+      test: "OC-ES-006 OC-ES-007 OC-ES-008 OC-ES-009 OC-ES-010 OC-ES-011 restart replay recovers states (review, todo, nudge, fallback, context)",
       priority: "P0",
     },
     {
@@ -1501,7 +1417,7 @@ export const COVERAGE: Record<string, CoverageEntry[]> = {
       description: "Restart replays nudge phase",
       level: "real-e2e",
       spec: "e2e/opencode/specs/p0-canary-tests-recovery-replay.js",
-      test: "OC-ES-006 OC-ES-007 OC-ES-008 OC-ES-009 OC-ES-010 OC-ES-011 restart replay recovers states (review, backlog, nudge, fallback, context)",
+      test: "OC-ES-006 OC-ES-007 OC-ES-008 OC-ES-009 OC-ES-010 OC-ES-011 restart replay recovers states (review, todo, nudge, fallback, context)",
       priority: "P0",
     },
     {
@@ -1509,7 +1425,7 @@ export const COVERAGE: Record<string, CoverageEntry[]> = {
       description: "Restart replays fallback state",
       level: "real-e2e",
       spec: "e2e/opencode/specs/p0-canary-tests-recovery-replay.js",
-      test: "OC-ES-006 OC-ES-007 OC-ES-008 OC-ES-009 OC-ES-010 OC-ES-011 restart replay recovers states (review, backlog, nudge, fallback, context)",
+      test: "OC-ES-006 OC-ES-007 OC-ES-008 OC-ES-009 OC-ES-010 OC-ES-011 restart replay recovers states (review, todo, nudge, fallback, context)",
       priority: "P0",
     },
     {
@@ -1517,7 +1433,7 @@ export const COVERAGE: Record<string, CoverageEntry[]> = {
       description: "Restart replays context phase",
       level: "real-e2e",
       spec: "e2e/opencode/specs/p0-canary-tests-recovery-replay.js",
-      test: "OC-ES-006 OC-ES-007 OC-ES-008 OC-ES-009 OC-ES-010 OC-ES-011 restart replay recovers states (review, backlog, nudge, fallback, context)",
+      test: "OC-ES-006 OC-ES-007 OC-ES-008 OC-ES-009 OC-ES-010 OC-ES-011 restart replay recovers states (review, todo, nudge, fallback, context)",
       priority: "P0",
     },
     {
@@ -1525,7 +1441,7 @@ export const COVERAGE: Record<string, CoverageEntry[]> = {
       description: "Duplicate seq/id does not double-apply",
       level: "real-e2e",
       spec: "e2e/opencode/specs/p0-canary-tests-recovery-replay.js",
-      test: "OC-ES-006 OC-ES-007 OC-ES-008 OC-ES-009 OC-ES-010 OC-ES-011 restart replay recovers states (review, backlog, nudge, fallback, context)",
+      test: "OC-ES-006 OC-ES-007 OC-ES-008 OC-ES-009 OC-ES-010 OC-ES-011 restart replay recovers states (review, todo, nudge, fallback, context)",
       priority: "P0",
     },
     {

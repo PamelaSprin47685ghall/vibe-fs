@@ -25,10 +25,7 @@ const tests = [
         id: 'test-model', providerID: 'test', limit: { input: 100000, context: 100000 },
       });
       const sid = getSessionId(sess);
-      const pad = 'x'.repeat(1024);
       t.provider.expectToolCall({ id: 'nudge-todo', tool: 'todowrite', args: {
-        ahaMoments: pad, changesAndReasons: pad, gotchas: pad,
-        lessonsAndConventions: pad, plan: pad,
         todos: [{ content: 'pending nudge task', status: 'pending', priority: 'high' }],
         select_methodology: ['first_principles'],
       } });

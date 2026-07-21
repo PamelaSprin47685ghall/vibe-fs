@@ -5,14 +5,14 @@ open Wanxiangshu.Kernel.EventSourcing.EventEnvelope
 open Wanxiangshu.Kernel.EventSourcing.EventKind
 open Wanxiangshu.Kernel.EventSourcing.Fold
 open Wanxiangshu.Kernel.Review
-open Wanxiangshu.Kernel.Backlog
+open Wanxiangshu.Kernel.ReviewTask
 open Wanxiangshu.Kernel.Nudge
 open Wanxiangshu.Kernel.Subsession
 open Wanxiangshu.Kernel.Review.ReviewProjection
-open Wanxiangshu.Kernel.Backlog.BacklogProjection
+open Wanxiangshu.Kernel.ReviewTask.ReviewTaskProjection
 open Wanxiangshu.Kernel.Nudge.NudgeProjection
 open Wanxiangshu.Kernel.Subsession.SubsessionProjection
-open Wanxiangshu.Runtime.BacklogProjectionBuild
+open Wanxiangshu.Runtime.ReviewTaskProjectionBuild
 
 let private foldEventStream
     (sessionId: string)
@@ -77,41 +77,6 @@ let foldReviewTaskTerminatedKeeps () =
           ev "s1" eventKindReviewVerdict (Map [ "verdict", verdictTerminated ]) ]
 
     equal "terminated keeps" (Some "ship S1") (ReviewProjection.foldReviewTask "s1" events)
-
-let foldWorkBacklogLatestEntry () =
-    let full a p =
-        Map
-            [ "ahaMoments", a
-              "changesAndReasons", "c"
-              "gotchas", "g"
-              "lessonsAndConventions", "l"
-              "plan", p ]
-
-    let events =
-        [ ev "s1" eventKindWorkBacklogCommitted (full "a1" "p1")
-          ev "s1" eventKindWorkBacklogCommitted (full "a2" "p2") ]
-
-    let snap = BacklogProjection.foldBacklogStream "s1" events
-    check "latest aha" (snap.LatestEntry |> Option.map (fun (e: BacklogEntry) -> e.ahaMoments) = Some "a2")
-    check "latest plan" (snap.LatestEntry |> Option.map (fun (e: BacklogEntry) -> e.plan) = Some "p2")
-
-let foldWorkBacklogTodosJson () =
-    let payload todos =
-        Map
-            [ "ahaMoments", "a"
-              "changesAndReasons", "c"
-              "gotchas", "g"
-              "lessonsAndConventions", "l"
-              "plan", "p"
-              "todosJson", todos ]
-
-    let events =
-        [ ev "s1" eventKindWorkBacklogCommitted (payload "[1]")
-          ev "s1" eventKindWorkBacklogCommitted (Map [ "ahaMoments", "only" ]) ]
-
-    let snap = BacklogProjection.foldBacklogStream "s1" events
-    check "todosJson kept when partial commit" (snap.TodosJson = Some "[1]")
-    check "partial commit keeps prior latest entry" (snap.LatestEntry |> Option.map (fun e -> e.ahaMoments) = Some "a")
 
 let foldNudgeDedupAnchor () =
     let events =
@@ -225,8 +190,6 @@ let run () =
     foldReviewTaskLastActivateWins ()
     foldReviewTaskCancelClears ()
     foldReviewTaskTerminatedKeeps ()
-    foldWorkBacklogLatestEntry ()
-    foldWorkBacklogTodosJson ()
     ordinalRejectsLateNudgeDispatched ()
     ordinalRejectsLateContinuationDispatched ()
     duplicateHumanTurnMessageIdIgnored ()

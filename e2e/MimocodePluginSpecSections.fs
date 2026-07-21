@@ -25,70 +25,16 @@ let runMimoTaskSchema (h: Harness) (chk: string -> bool -> unit) =
         if not (dynIsNull taskSchema) then
             let taskProps = dynGet taskSchema "properties"
 
-            for f in
-                [ "ahaMoments"
-                  "changesAndReasons"
-                  "gotchas"
-                  "lessonsAndConventions"
-                  "plan"
-                  "select_methodology"
-                  "todos" ] do
+            for f in [ "select_methodology"; "todos" ] do
                 chk ("mimo.task.has" + f) (not (dynIsNull (dynGet taskProps f)))
-
-            let ahaField = dynGet taskProps "ahaMoments"
-
-            let ahaDescription =
-                if dynIsNull ahaField then
-                    ""
-                else
-                    string (dynGet ahaField "description")
-
-            chk "mimo.task.ahaDescriptionHasMinLengthHint" (ahaDescription.Contains("MUST be at least 1024 characters"))
 
             let req = dynGet taskSchema "required"
 
             if not (dynIsNull req) && dynIsArr req then
                 let reqArr: string[] = unbox req
-                chk "mimo.task.requiredDoesNotIncludeAhaMoments" (not (Array.contains "ahaMoments" reqArr))
+                chk "mimo.task.requiredHasTodos" (Array.contains "todos" reqArr)
             else
-                chk "mimo.task.requiredDoesNotIncludeAhaMoments" true
-    }
-
-let runMimoTaskMissingAha (h: Harness) (chk: string -> bool -> unit) =
-    promise {
-        let args =
-            createObj
-                [ "todos",
-                  box
-                      [| box
-                             {| content = "do something"
-                                status = "pending"
-                                priority = "high" |} |]
-                  "select_methodology", box [| "first_principles" |] ]
-
-        let! r = h.executePluginTool "task" args (createEmpty ())
-        chk "mimo.task.missingAha" (r.Contains "hint:")
-    }
-
-let runMimoTaskShortAha (h: Harness) (chk: string -> bool -> unit) =
-    promise {
-        let args =
-            createObj
-                [ "ahaMoments", box "short"
-                  "changesAndReasons", box exactly1024
-                  "gotchas", box exactly1024
-                  "lessonsAndConventions", box exactly1024
-                  "plan", box exactly1024
-                  "todos",
-                  box
-                      [| box
-                             {| content = "do something"
-                                status = "pending"
-                                priority = "high" |} |]
-                  "select_methodology", box [| "first_principles" |] ]
-
-        let! r = h.executePluginTool "task" args (createEmpty ())
-        chk "mimo.task.shortAha" (r.Contains "hint:")
+                chk "mimo.task.requiredHasTodos" true
     }
 
 let runMimoTaskSuccess (h: Harness) (chk: string -> bool -> unit) =
@@ -107,12 +53,7 @@ let runMimoTaskNoMethodology (h: Harness) (chk: string -> bool -> unit) =
     promise {
         let args =
             createObj
-                [ "ahaMoments", box exactly1024
-                  "changesAndReasons", box exactly1024
-                  "gotchas", box exactly1024
-                  "lessonsAndConventions", box exactly1024
-                  "plan", box exactly1024
-                  "todos",
+                [ "todos",
                   box
                       [| box
                              {| content = "do something"

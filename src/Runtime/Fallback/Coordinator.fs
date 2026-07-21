@@ -14,7 +14,6 @@ open Wanxiangshu.Runtime.Fallback.ContinuationIntentExecution
 open Wanxiangshu.Runtime.Fallback.ContinuationDispatchOps
 open Wanxiangshu.Runtime.Fallback.HumanTurnHandler
 open Wanxiangshu.Runtime.Fallback.SessionStatusHandler
-open Wanxiangshu.Runtime.Fallback.CompactionHandler
 open Wanxiangshu.Runtime.Fallback.FallbackBridgeScanToolText
 open Wanxiangshu.Runtime.Fallback.FallbackConfigCodec
 open Wanxiangshu.Runtime.ContinuationEventWriter
@@ -59,9 +58,7 @@ let handleFallbackTransition
             if evt = FallbackEvent.SessionBusy then
                 updateBusyLeases runtime sessionID
 
-            let actionFiltered = filterActionDuringCompaction runtime sessionID action
-
-            let! finalState2, intentOpt = executeAction runtime executor workspaceRoot sessionID actionFiltered ns chain
+            let! finalState2, intentOpt = executeAction runtime executor workspaceRoot sessionID action ns chain
             do! handleTerminalPostSettlement runtime workspaceRoot sessionID evt finalState2 intentOpt
 
             let consumed = calculateConsumed evt state.Phase finalState2
@@ -143,19 +140,22 @@ let private scheduleIntentEffect
     (intent: ContinuationIntent)
     : unit =
     let reenter = queueReenter queue
+
     let ws =
         if workspaceRoot = "" then
             Id.workspaceIdQuick "fallback-default"
         else
             Id.workspaceIdQuick ("fallback:" + workspaceRoot)
-    let dispatcher = DispatchRegistryInstance.sharedDispatchRegistry.GetOrCreate ws sessionID (InMemoryDispatchEventLogger() :> IDispatchEventLogger)
+
+    let dispatcher =
+        DispatchRegistryInstance.sharedDispatchRegistry.GetOrCreate
+            ws
+            sessionID
+            (InMemoryDispatchEventLogger() :> IDispatchEventLogger)
 
     dispatcher.State.Queue.Enqueue(fun () ->
-        promise {
-            do! run runtime executor workspaceRoot sessionID intent reenter
-        })
-    |> Promise.catch (fun ex ->
-        failwithf "fallback continuation effect failed for %s: %s" sessionID ex.Message)
+        promise { do! run runtime executor workspaceRoot sessionID intent reenter })
+    |> Promise.catch (fun ex -> failwithf "fallback continuation effect failed for %s: %s" sessionID ex.Message)
     |> Promise.start
 
 let private enqueueRelevantEvent

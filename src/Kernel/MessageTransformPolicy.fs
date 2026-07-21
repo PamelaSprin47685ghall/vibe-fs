@@ -15,33 +15,9 @@ let shouldExcludeAgentFromProjection (agent: string) (isChildWorkspace: bool) : 
     || (isChildWorkspace && Set.contains agent childWorkspaceExcludedAgents)
 
 [<RequireQualifiedAccess>]
-type BacklogProjectionPolicy =
-    | Include
-    | Exclude
-
-[<RequireQualifiedAccess>]
 type CapsInjectionPolicy =
     | Include
     | Exclude
-
-[<RequireQualifiedAccess>]
-type ParallelHintPolicy =
-    | Include
-    | Exclude
-
-[<RequireQualifiedAccess>]
-type ContextBudgetPolicy =
-    | Include
-    | DisableTodoEmergency
-    | Disable
-
-let getBacklogProjectionPolicy (agent: string) (isChildWorkspace: bool) : BacklogProjectionPolicy =
-    let agent = normalizeAgent agent
-
-    if shouldExcludeAgentFromProjection agent isChildWorkspace then
-        BacklogProjectionPolicy.Exclude
-    else
-        BacklogProjectionPolicy.Include
 
 let getCapsInjectionPolicy (agent: string) (isChildWorkspace: bool) : CapsInjectionPolicy =
     let agent = normalizeAgent agent
@@ -59,26 +35,21 @@ let getCapsInjectionPolicy (agent: string) (isChildWorkspace: bool) : CapsInject
         else
             CapsInjectionPolicy.Include
 
-let getParallelHintPolicy (agent: string) : ParallelHintPolicy =
-    match normalizeAgent agent with
-    | "title"
-    | "compaction" -> ParallelHintPolicy.Exclude
-    | _ -> ParallelHintPolicy.Include
+[<RequireQualifiedAccess>]
+type ParallelHintPolicy =
+    | Include
+    | Exclude
 
-let getContextBudgetPolicy (agent: string) (isChildWorkspace: bool) : ContextBudgetPolicy =
+let getParallelHintPolicy (agent: string) (isChildWorkspace: bool) : ParallelHintPolicy =
     let agent = normalizeAgent agent
 
     match agent with
-    | "browser"
-    | "executor"
     | "title"
     | "compaction"
     | "exec"
-    | "explore" -> ContextBudgetPolicy.Disable
-    | "inspector"
-    | "reviewer" -> ContextBudgetPolicy.DisableTodoEmergency
+    | "explore" -> ParallelHintPolicy.Exclude
     | _ ->
         if isChildWorkspace && (agent = "exec" || agent = "explore") then
-            ContextBudgetPolicy.Disable
+            ParallelHintPolicy.Exclude
         else
-            ContextBudgetPolicy.Include
+            ParallelHintPolicy.Include

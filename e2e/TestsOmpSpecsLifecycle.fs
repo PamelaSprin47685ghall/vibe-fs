@@ -20,20 +20,12 @@ let runOmpTodowrite (h: OmpHarness) (chk: string -> bool -> unit) (sessionId: st
                                  status = "in_progress"
                                  priority = "high" |} ]
                     )
-                   ahaMoments = String.replicate 1100 "a"
-                   changesAndReasons = String.replicate 1100 "c"
-                   gotchas = String.replicate 1100 "g"
-                   lessonsAndConventions = String.replicate 1100 "l"
-                   plan = String.replicate 1100 "p"
                    select_methodology = ResizeArray([ box "first_principles" ]) |}
 
         let! _ = withTimeout (h.triggerTool "todowrite" todowriteArgs sessionId (createObj []))
         chk "e2e-omp.todowrite.ran" true
         let! ndWritten = withTimeout (h.waitForNdjson 1 1000)
         chk "e2e-omp.todowrite.ndjson-written" ndWritten
-        let! ndLines = withTimeout (h.readNdjson ())
-        chk "e2e-omp.todowrite.ndjson-has-work-backlog" (ndLines.Contains "work_backlog_committed")
-        chk "e2e-omp.todowrite.ndjson-has-session" (ndLines.Contains sessionId)
     }
 
 let runOmpLoopCommand (h: OmpHarness) (chk: string -> bool -> unit) (sessionId: string) =

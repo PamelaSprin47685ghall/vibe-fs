@@ -16,14 +16,13 @@
 | 04 | [04-runtime.md](./04-runtime.md) | `src/Runtime/` IO、codec、事件日志与运行时 |
 | 05 | [05-event-sourcing.md](./05-event-sourcing.md) | `.wanxiangshu.ndjson`、事件种类全集 |
 | 06 | [06-review-and-nudge.md](./06-review-and-nudge.md) | `/loop`、reviewer、nudge 三层架构 |
-| 07 | [07-work-backlog.md](./07-work-backlog.md) | todowrite / 五报告 |
+| 07 | [07-work-backlog.md](./07-work-backlog.md) | todowrite / 待办写入 |
 | 08 | [08-tools-and-permissions.md](./08-tools-and-permissions.md) | ToolCatalog、权限 |
 | 09 | [09-methodology.md](./09-methodology.md) | `methodology_*` schema 与注册 |
 | 10 | [10-message-transform.md](./10-message-transform.md) | 管线、Semble、并行提示 |
 | 11 | [11-subagents.md](./11-subagents.md) | spawn、SubsessionActor、continue、iterator |
 | 12 | [12-fallback.md](./12-fallback.md) | 模型降级运行时、续命生命周期、门闩 |
 | 12′ | [CONTINUATION_PATH.md](./CONTINUATION_PATH.md) | F-05 OpenCode continue 唯一物理路径 SSOT |
-| 13 | [13-context-budget.md](./13-context-budget.md) | F 触发、R 参数、budget nudge |
 | 14–16 | host 文档 | OpenCode / Mux / OMP |
 | 17 | [17-build-test-verify.md](./17-build-test-verify.md) | 构建与行为验证 |
 | 18 | [18-glossary-and-ssot-map.md](./18-glossary-and-ssot-map.md) | 术语与真相源 |
@@ -49,7 +48,7 @@
 **子系统**：
 - Subsession Actor：11 → 05（subsession 事件）→ 12（子会话 Fallback）
 - Fallback：12 → 05（续命事件）→ 06（nudge 抑制）
-- Nudge：06 → 05（nudge 事件）→ 13（预算 nudge）
+- Nudge：06 → 05（nudge 事件）
 
 ## 设计文档并入说明（原 PRD/）
 
@@ -65,7 +64,6 @@
 | semble-mcp | 10 § Semble |
 | parallel / empty-output | 10 |
 | hooks-complexity | 10 § 复杂度 |
-| context-budget 09/10 | 13 |
 | architecture-refactoring | 02 § 演进路线 |
 | Wanxiangshu/* | `wanxiangzhen/01`–`03` + [19](./19-wanxiangzhen.md) |
 

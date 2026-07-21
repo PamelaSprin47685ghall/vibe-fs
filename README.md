@@ -21,11 +21,10 @@
 | :--- | :--- |
 | 子代理 | `coder`、`inspector`、`browser`、`meditator`；支持 `continue` 对同一会话追问 |
 | 审查 | `/loop <任务>` 进入 With-Review；`submit_review` / `return_reviewer` |
-| 待办与交接 | `todowrite`（Mux / OpenCode / OMP）或 Mimocode 的 `task`；须带完整待办列表与五份工作报告 + `select_methodology` |
+| 待办与交接 | `todowrite`（Mux / OpenCode / OMP）或 Mimocode 的 `task`；须带完整待办列表 + `select_methodology` |
 | 方法论 | `meditator` 单一工具，内部枚举 54 种方法论；与待办里的 `select_methodology` 联动 |
 | 工具箱 | 读写改、模糊搜索（`fuzzy_find`/`fuzzy_grep`/`fuzzy_continue`）、网页搜索/抓取、执行器（`executor`，含模式与输出上限约束）、PTY（`pty_spawn`/`write`/`read`/`list`/`kill`）、`glob`、`question` |
 | 智能催促 | 待办未完成、审查卡住、子代理空闲等场景下的 nudge（规则在后台，用户主要感知为系统提醒） |
-| 上下文预算 | 自动估算 token 用量，阈值触发时要求 `todowrite` 折叠；连续催促无效则回退宿主 compact |
 | Fallback 重试 | 模型调用失败时自动按配置链扫描/重试/换模型，事件日志完整记录全过程 |
 | 子会话 Actor | 子代理运行由 `SubsessionActor` 状态机管理，确保 dispatch/abort/超时/恢复的确定性 |
 
@@ -66,11 +65,10 @@ OpenCode / Mimocode 插件入口在包内构建结果中（`Hosts/OpenCode/Plugi
 
 ## 使用上应知道的几件事
 
-1. **待办工具不是随手记一笔**：每次要交**整份**待办列表和五段高密度中文交接（突破、改动与理由、陷阱、惯例、下一步计划），否则不会记入持久进度。
+1. **待办工具**：每次要交**整份**待办列表（及 `select_methodology`），爱用不用。
 2. **审查是闭环**：loop 活跃时应用 `submit_review`；审查者结论会驱动继续改或结束任务。
 3. **改代码类工具**带有 TDD / 原则确认字段（宿主 schema 中的 `warn_tdd` 等），这是契约的一部分，不是可选装饰。
-4. **上下文快满时**，系统可能强制要求先 `todowrite` 折叠进度，再接着干（见文档中的 context budget）。
-5. **Fallback 自动重试**：模型调用失败时系统按配置链自动扫描/重试/换模型，无需手动干预。整个过程写入 NDJSON 事件日志，重启后可恢复。
+4. **Fallback 自动重试**：模型调用失败时系统按配置链自动扫描/重试/换模型，无需手动干预。整个过程写入 NDJSON 事件日志，重启后可恢复。
 6. **从源码参与开发**：需要 .NET（`net10.0`）、Fable、`npm run build-and-test`（完整构建+测试约数十秒）。日常改代码请遵守仓库 `AGENTS.md`（宿主上游改动范围、hook 写字段方式等）。
 
 ---

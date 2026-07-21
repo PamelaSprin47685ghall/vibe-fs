@@ -3,42 +3,20 @@ module Wanxiangshu.Hosts.Omp.TodoHooks
 open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Kernel.OmpSessionTools
-open Wanxiangshu.Runtime.PromptFragments
-open Wanxiangshu.Kernel.Nudge
-open Wanxiangshu.Kernel.TreeSitterKernel
-open Wanxiangshu.Hosts.Omp.NudgeToolFilter
-open Wanxiangshu.Hosts.Omp.ChildSession
 open Wanxiangshu.Hosts.Omp.Codec
-open Wanxiangshu.Hosts.Omp.HookExecute
-open Wanxiangshu.Hosts.Omp.MessageTransform
-open Wanxiangshu.Hosts.Omp.ToolResultEvent
-open Wanxiangshu.Runtime.BacklogSession
-open Wanxiangshu.Hosts.Omp.MessagingCodec
-open Wanxiangshu.Hosts.Omp.NudgeRuntime
-open Wanxiangshu.Hosts.Omp.TodoStateManagement
-open Wanxiangshu.Kernel.HostTools
-open Wanxiangshu.Kernel.WorkBacklog
-open Wanxiangshu.Runtime.ToolOutputInfo
+open Wanxiangshu.Hosts.Omp.NudgeToolFilter
+open Wanxiangshu.Hosts.Omp.ExecutorTools
 open Wanxiangshu.Runtime
 open Wanxiangshu.Runtime.RunnerBackground
 open Wanxiangshu.Runtime.ReviewEventWriter
 open Wanxiangshu.Runtime.EventLogRuntimeSync
 open Wanxiangshu.Runtime.ReviewRuntime
-open Wanxiangshu.Runtime.Dyn
-
-module Dyn = Wanxiangshu.Runtime.Dyn
-
-open Wanxiangshu.Runtime.ReviewRuntime
-open Wanxiangshu.Runtime.BacklogProjectionBuild
-open Wanxiangshu.Hosts.Omp.ExecutorTools
-open Wanxiangshu.Runtime.ReviewRuntime
-open Wanxiangshu.Runtime.WorkBacklogToolsCodec
 open Wanxiangshu.Runtime.SubsessionActorRegistry
+open Wanxiangshu.Runtime.SubsessionPorts
 open Wanxiangshu.Runtime.Fallback.RuntimeStore
 open Wanxiangshu.Kernel.Subsession.Types
 
-/// Shared BacklogSession bound to the OMP host.
-let private backlogSession = BacklogSession(omp, ExecutorTools.ompScope)
+module Dyn = Wanxiangshu.Runtime.Dyn
 
 let sessionStartHandler (pi: obj) (reviewStore: ReviewStore) (ctx: obj) : JS.Promise<unit> =
     promise {
@@ -48,8 +26,6 @@ let sessionStartHandler (pi: obj) (reviewStore: ReviewStore) (ctx: obj) : JS.Pro
 
         if sessionId <> "" && cwd <> "" then
             do! syncReviewFromEventLogDedicated reviewStore cwd sessionId
-
-            do! syncBacklogFromEventLogDedicated omp backlogSession.Projection cwd sessionId
     }
 
 /// session_prompt: lightweight re-sync before each prompt to catch cross-session durable state changes.
@@ -60,8 +36,6 @@ let sessionPromptHandler (pi: obj) (reviewStore: ReviewStore) (ctx: obj) : JS.Pr
 
         if sessionId <> "" && cwd <> "" then
             do! syncReviewFromEventLogDedicated reviewStore cwd sessionId
-
-            do! syncBacklogFromEventLogDedicated omp backlogSession.Projection cwd sessionId
     }
 
 let sessionShutdownHandler

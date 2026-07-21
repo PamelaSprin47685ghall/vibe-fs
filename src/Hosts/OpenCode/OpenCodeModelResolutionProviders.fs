@@ -4,7 +4,6 @@ open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Kernel
 open Wanxiangshu.Runtime
-open Wanxiangshu.Runtime.ContextBudgetUsageCodec
 open Wanxiangshu.Runtime.Dyn
 open Wanxiangshu.Hosts.Opencode.ModelResolutionCatalog
 

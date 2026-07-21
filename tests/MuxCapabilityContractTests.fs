@@ -61,14 +61,12 @@ let run () : unit =
 
     check "Mux capabilities does not contain 'reliableAbort'" (not (contains caps "reliableAbort"))
 
-    check
-        "Mux capabilities does not contain 'logicalMessageReceipt'"
-        (not (contains caps "logicalMessageReceipt"))
+    check "Mux capabilities does not contain 'logicalMessageReceipt'" (not (contains caps "logicalMessageReceipt"))
 
     check "Mux capabilities contains 'toolCatalog'" (contains caps "toolCatalog")
 
     check "Mux capabilities contains 'reviewStore'" (contains caps "reviewStore")
 
-    check "HostCapability.allFull contains all 17 capabilities" (Set.count allFull = 17)
+    check "HostCapability.allFull contains all 16 capabilities" (Set.count allFull = 16)
 
-    check "HostCapability.muxDefault contains 12 capabilities" (Set.count muxDefault = 12)
+    check "HostCapability.muxDefault contains 11 capabilities" (Set.count muxDefault = 11)

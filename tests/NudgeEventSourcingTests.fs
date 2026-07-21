@@ -134,14 +134,6 @@ let foldNudgeSnapshotDedupCleared () =
     let s = Wanxiangshu.Kernel.Nudge.NudgeProjection.foldSnapshotStream "s1" events
     check "dispatched anchors cleared" s.lastDispatchedAnchor.IsNone
 
-/// work_backlog_committed updates openTodos.
-let foldNudgeSnapshotWorkBacklogUpdatesTodos () =
-    let events =
-        [ ev "s1" eventKindWorkBacklogCommitted (Map [ "todosJson", "[\"a\",\"b\"]" ]) ]
-
-    let s = Wanxiangshu.Kernel.Nudge.NudgeProjection.foldSnapshotStream "s1" events
-    equal "open todos from work backlog" [ "a"; "b" ] s.openTodos
-
 /// Cold start (no events) → deriveAction returns NudgeNone.
 let foldNudgeSnapshotColdStartNudgeNone () =
     let s = Wanxiangshu.Kernel.Nudge.NudgeProjection.foldSnapshotStream "s1" []
@@ -149,31 +141,6 @@ let foldNudgeSnapshotColdStartNudgeNone () =
     match deriveAction (toSessionSnapshot s) with
     | NudgeNone -> check "cold start -> NudgeNone" true
     | _ -> check "cold start -> NudgeNone" false
-
-/// Sequence of events produces correct snapshot → deriveAction returns NudgeTodo.
-let foldNudgeSnapshotIntegrated () =
-    let events =
-        [ ev "s1" eventKindWorkBacklogCommitted (Map [ "todosJson", "[\"ship feature\"]" ])
-          ev
-              "s1"
-              eventKindAssistantCompleted
-              (Map
-                  [ "assistantMessage", "working on it"
-                    "agent", "bookkeeper"
-                    "model", "openai/gpt-4o"
-                    "turnId", "t42" ]) ]
-
-    let s = Wanxiangshu.Kernel.Nudge.NudgeProjection.foldSnapshotStream "s1" events
-    check "integrated: has todos" (s.openTodos = [ "ship feature" ])
-    check "integrated: has assistant text" (s.lastAssistantText = "working on it")
-
-    check "integrated: not loop active" (not (isLoopActive s.reviewLoop))
-    check "integrated: has turnId" (s.turnId = "t42")
-    equal "integrated: model" (Some "openai/gpt-4o") s.modelFromMessage
-
-    match deriveAction (toSessionSnapshot s) with
-    | NudgeTodo -> check "integrated -> NudgeTodo" true
-    | _ -> check "integrated -> NudgeTodo" false
 
 let run () =
     foldNudgeSnapshotEmpty ()
@@ -184,6 +151,4 @@ let run () =
     foldNudgeSnapshotNeedsRevisionKeeps ()
     foldNudgeSnapshotNudgeDispatched ()
     foldNudgeSnapshotDedupCleared ()
-    foldNudgeSnapshotWorkBacklogUpdatesTodos ()
     foldNudgeSnapshotColdStartNudgeNone ()
-    foldNudgeSnapshotIntegrated ()

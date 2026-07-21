@@ -9,7 +9,6 @@ open Wanxiangshu.Kernel.EventSourcing.EventKind
 open Wanxiangshu.Kernel.EventSourcing.Fold
 open Wanxiangshu.Kernel.Nudge
 open Wanxiangshu.Kernel.Review
-open Wanxiangshu.Kernel.Backlog
 open Wanxiangshu.Runtime.EventLogCodec
 open Wanxiangshu.Runtime.EventStore
 

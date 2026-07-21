@@ -43,14 +43,5 @@ let warnTddValue =
 let warnValue =
     "it-is-not-possible-to-do-it-using-other-tools-and-only-run-tests-when-static-analysis-cannot-handle-it"
 
-let exactly1024 = System.String('x', 1024)
-
 let taskArgsBase todos selectMethodology =
-    createObj
-        [ "ahaMoments", box exactly1024
-          "changesAndReasons", box exactly1024
-          "gotchas", box exactly1024
-          "lessonsAndConventions", box exactly1024
-          "plan", box exactly1024
-          "todos", box todos
-          "select_methodology", box selectMethodology ]
+    createObj [ "todos", box todos; "select_methodology", box selectMethodology ]

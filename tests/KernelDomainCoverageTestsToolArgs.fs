@@ -76,18 +76,10 @@ let taExecutor () =
     | _ -> check "Executor case" false
 
 let taTodoWrite () =
-    let a =
-        TodoWrite
-            { AhaMoments = "r"
-              ChangesAndReasons = ""
-              Gotchas = ""
-              LessonsAndConventions = ""
-              Plan = ""
-              Todos = [||]
-              SelectMethodology = [] }
+    let a = TodoWrite { Todos = [||]; SelectMethodology = [] }
 
     match a with
-    | TodoWrite t -> equal "TodoWrite.AhaMoments" "r" t.AhaMoments
+    | TodoWrite t -> equal "TodoWrite.Todos" 0 t.Todos.Length
     | _ -> check "TodoWrite case" false
 
 let taApplyPatch () =

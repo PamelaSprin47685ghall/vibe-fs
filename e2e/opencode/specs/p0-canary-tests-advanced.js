@@ -1,5 +1,5 @@
 /**
- * p0-canary-tests-advanced.js — Review / Web / Context-budget tests.
+ * p0-canary-tests-advanced.js — Review / Web tests.
  * Kept under the 300-line Kolmogorov line budget.
  */
 
@@ -89,49 +89,6 @@ const tests = [
       expectNoSessionError(t, sid);
     },
   },
-
-  {
-    name: 'OC-CB-005 context budget nudge appears after threshold',
-    fn: async (t) => {
-      const sess = await t.client.createSession();
-      const sid = getSessionId(sess);
-      const pad = 'x'.repeat(9500);
-      t.provider.expectToolCall({ id: 'cb-todo', tool: 'todowrite', args: {
-        ahaMoments: pad, changesAndReasons: pad, gotchas: pad,
-        lessonsAndConventions: pad, plan: pad,
-        todos: [{ content: 'budget test', status: 'completed', priority: 'high' }],
-        select_methodology: ['first_principles'],
-      } });
-      t.provider.expectNoMoreRequests();
-      // The todowrite tool result is followed by a budget-nudge synthetic
-      // continuation; no separate assistant text request occurs in this turn.
-      const turn = await t.turn.start(sid);
-      await t.client.prompt(sid, 'commit a detailed report via todowrite and say continue');
-      await turn.awaitTerminal({ timeoutMs: TIMEOUTS.prompt });
-      const s = await t.client.sessionStatus(sid);
-      const tokens = s.data?.data?.tokens || s.data?.tokens || {};
-      if ((tokens.input || 0) < 200) throw new Error('Too few input tokens: ' + tokens.input);
-
-      const nudges = t.provider.syntheticRequests.filter((r) => r.marker === 'budget-nudge');
-      if (nudges.length === 0) throw new Error('Budget nudge synthetic not found');
-      if (nudges.length > 1) throw new Error(`Expected one budget nudge, got ${nudges.length}`);
-
-      const nudge = nudges[0];
-      const nudgeMsg = nudge.body?.messages?.[nudge.body.messages.length - 1];
-      const nudgeText = typeof nudgeMsg?.content === 'string' ? nudgeMsg.content : JSON.stringify(nudgeMsg?.content);
-      if (!nudgeText.includes('the system context is about to be suspended')) {
-        throw new Error('Budget nudge missing marker text: ' + nudgeText);
-      }
-      if (!nudgeText.includes('emergency stop to all work')) {
-        throw new Error('Budget nudge missing emergency stop text: ' + nudgeText);
-      }
-
-      // Threshold: input tokens must be high enough to trigger the nudge.
-      if ((tokens.input || 0) < 2000) throw new Error('Input tokens too low to credibly trigger budget nudge: ' + tokens.input);
-      expectNoSessionError(t, sid);
-    },
-  },
-
 ];
 
 export default tests;

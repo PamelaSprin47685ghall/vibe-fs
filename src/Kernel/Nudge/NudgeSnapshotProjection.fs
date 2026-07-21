@@ -76,11 +76,11 @@ let private syncWorkState (st: NudgeSnapshotState) : NudgeSnapshotState =
             if not isActive && not hasTodos then
                 SessionWorkState.Idle
             elif not isActive && hasTodos then
-                SessionWorkState.BacklogOnly
+                SessionWorkState.TodosOnly
             elif isActive && not hasTodos then
                 SessionWorkState.LoopIdle
             else
-                SessionWorkState.LoopWithBacklog }
+                SessionWorkState.LoopWithTodos }
 
 let emptySnapshotState: NudgeSnapshotState =
     { openTodos = []
@@ -171,7 +171,6 @@ let private snapshotFolder (st: NudgeSnapshotState) (e: WanEvent) : NudgeSnapsho
         { st with
             lastDispatchedAnchor = None
             pendingNudge = None }
-    | k when k = eventKindWorkBacklogCommitted -> snapshotFromWorkEvent st e
     | _ -> st
 
 let foldSingleSnapshotEvent (st: NudgeSnapshotState) (e: WanEvent) : NudgeSnapshotState = snapshotFolder st e

@@ -54,7 +54,7 @@ let subagentCapsInjectionSpec () =
                     "test"
                     (box entries)
                     "coder"
-                    (fun _ -> Promise.lift None)
+                    (fun () -> Promise.lift ())
                     (box null)
 
             let mutable foundTargetRead = false
@@ -101,7 +101,7 @@ let crossSessionIsolationSpec () =
                     "session-B"
                     (box entries)
                     "coder"
-                    (fun _ -> Promise.lift None)
+                    (fun () -> Promise.lift ())
                     (box null)
 
             let mutable foundA = false
@@ -149,9 +149,6 @@ let opencodeSubsessionParentIDSpec () =
         let output = createObj [ "messages", box [| userMsg |] ]
         let input = createObj [ "agent", box "coder"; "sessionID", box childSessionID ]
 
-        let backlogSession =
-            Wanxiangshu.Runtime.BacklogSession.BacklogSession(Wanxiangshu.Kernel.HostTools.Host.Mimocode, scope)
-
         let reviewStore = createReviewStore ()
 
         do!
@@ -159,7 +156,6 @@ let opencodeSubsessionParentIDSpec () =
                 registry
                 workspaceDir
                 scope
-                backlogSession
                 reviewStore
                 (box null)
                 input
@@ -209,7 +205,7 @@ let subagentFallbackRawTextSpec () =
                     "test-session"
                     (box entries)
                     "coder"
-                    (fun _ -> Promise.lift None)
+                    (fun () -> Promise.lift ())
                     (box null)
 
             let mutable foundRawRead = false

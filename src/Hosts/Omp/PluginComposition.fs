@@ -87,7 +87,6 @@ let private registerAllTools
     registerWebTools pi fallbackRuntime fallbackConfigOpt
     registerExecutorTools pi
     registerSubagentTools pi fallbackRuntime fallbackConfigOpt
-    registerTodoTool pi
     registerMeditatorTools pi fallbackRuntime fallbackConfigOpt
     registerSwapTool pi
     registerLoopFeatures pi reviewStore

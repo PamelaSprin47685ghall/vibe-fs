@@ -45,7 +45,7 @@ async function warmupSession(t, sid) {
   // Plugin tools must have appeared on the warmup LLM request.
   const req = t.provider.requests[t.provider.requests.length - 1];
   const toolNames = (req?.tools || []).map((x) => x?.function?.name || x?.name).filter(Boolean);
-  if (!toolNames.includes('write') && !toolNames.includes('todowrite')) {
+  if (!toolNames.includes('write')) {
     throw new Error(`warmup did not expose plugin tools: ${toolNames.join(',')}`);
   }
 }

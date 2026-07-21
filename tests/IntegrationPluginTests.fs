@@ -40,7 +40,7 @@ let countsSpec (reg: obj) =
     let wrappers = unbox<obj[]> (get reg "wrappers")
     let tools = unbox<obj[]> (get reg "tools")
     let names = tools |> Array.map (fun t -> str t "name")
-    check "wrapper count" (wrappers.Length = 5)
+    check "wrapper count" (wrappers.Length = 4)
     equal "tool count" 15 tools.Length
     check "mux has meditator tool" (names |> Array.contains "meditator")
     check "mux has submit_review tool" (names |> Array.contains "submit_review")

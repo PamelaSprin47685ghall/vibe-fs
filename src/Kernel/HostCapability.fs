@@ -12,7 +12,6 @@ type HostCapability =
     | SlashCommands
     | ToolPolicy
     | ReviewStore
-    | BacklogSession
     | SubsessionDispatch
     | SubsessionAbort
     | SubsessionReconcile
@@ -34,7 +33,6 @@ let toString (c: HostCapability) : string =
     | HostCapability.SlashCommands -> "slashCommands"
     | HostCapability.ToolPolicy -> "toolPolicy"
     | HostCapability.ReviewStore -> "reviewStore"
-    | HostCapability.BacklogSession -> "backlogSession"
     | HostCapability.SubsessionDispatch -> "subsessionDispatch"
     | HostCapability.SubsessionAbort -> "subsessionAbort"
     | HostCapability.SubsessionReconcile -> "subsessionReconcile"
@@ -54,7 +52,6 @@ let allFull: Set<HostCapability> =
           HostCapability.SlashCommands
           HostCapability.ToolPolicy
           HostCapability.ReviewStore
-          HostCapability.BacklogSession
           HostCapability.SubsessionDispatch
           HostCapability.SubsessionAbort
           HostCapability.SubsessionReconcile
@@ -76,7 +73,6 @@ let muxDefault: Set<HostCapability> =
           HostCapability.SlashCommands
           HostCapability.ToolPolicy
           HostCapability.ReviewStore
-          HostCapability.BacklogSession
           HostCapability.FallbackContinue ]
 
 let toStringArray (caps: Set<HostCapability>) : string array =

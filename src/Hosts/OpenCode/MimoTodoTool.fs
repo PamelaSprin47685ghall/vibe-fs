@@ -6,7 +6,6 @@ open Fable.Core.JsInterop
 open Wanxiangshu.Runtime
 
 open Wanxiangshu.Kernel.HostTools
-open Wanxiangshu.Kernel.WorkBacklog
 open Wanxiangshu.Kernel.Methodology
 open Wanxiangshu.Runtime.ToolOutputInfo
 open Wanxiangshu.Hosts.Opencode.ToolSchema
@@ -68,33 +67,23 @@ let mimoTodoTool (_pluginCtx: obj) : obj =
     let todoItem =
         obj (
             createObj
-                [ "content", strReq todoContentDesc
-                  "status", strReq todoStatusDesc
-                  "priority", strReq todoPriorityDesc ]
+                [ "content", strReq "todo content"
+                  "status", strReq "todo status"
+                  "priority", strOpt "todo priority" ]
         )
 
     let enumVals =
         Wanxiangshu.Kernel.Methodology.Registry.enumValues.Value |> List.toArray
 
     define
-        (toolDescriptionFor Mimocode)
+        ("Mimo todo tool")
         (box
-            {| todos = ToolSchema.call1 (arr todoItem) "describe" (box todosDesc)
-               ahaMoments = strOpt ahaMomentsDesc
-               changesAndReasons = strOpt changesAndReasonsDesc
-               gotchas = strOpt gotchasDesc
-               lessonsAndConventions = strOpt lessonsAndConventionsDesc
-               plan = strOpt planDesc
+            {| todos = ToolSchema.call1 (arr todoItem) "describe" (box "todos list")
                select_methodology =
                 enumArrayMin enumVals 1 Wanxiangshu.Kernel.Methodology.Api.selectMethodologyFieldDescription |})
         (fun args context ->
             let sessionID = str context "sessionID" |> fun value -> value.Trim()
             let methodologies = decodeMethodologies args
-            let ahaMoments = (str args "ahaMoments").Trim()
-            let changesAndReasons = (str args "changesAndReasons").Trim()
-            let gotchas = (str args "gotchas").Trim()
-            let lessonsAndConventions = (str args "lessonsAndConventions").Trim()
-            let plan = (str args "plan").Trim()
 
             if sessionID = "" then
                 resolveStr "task requires sessionID"

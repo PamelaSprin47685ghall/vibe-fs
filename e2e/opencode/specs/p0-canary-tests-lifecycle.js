@@ -100,8 +100,6 @@ const tests = [
         id: 'life-002-todo',
         tool: 'todowrite',
         args: {
-          ahaMoments: '', changesAndReasons: '', gotchas: '',
-          lessonsAndConventions: '', plan: '',
           todos: [{ content: 'nudge check', status: 'pending', priority: 'high' }],
           select_methodology: ['first_principles'],
         },

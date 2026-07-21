@@ -55,15 +55,7 @@ let runnerNudgePromptFor (host: Host) =
 let runnerNudgePrompt = runnerNudgePromptFor opencode
 
 let managerSystemPromptFor (host: Host) =
-    let todoLine =
-        "For multi-step work, keep "
-        + todoWriteToolName host
-        + " current. Every "
-        + todoWriteToolName host
-        + " call must provide the full todos list plus five detailed report fields (ahaMoments, changesAndReasons, gotchas, lessonsAndConventions, plan), each at least 1024 characters, that can survive context folding."
-
-    "You are the manager agent. Coordinate the overall task, work towards the user's original goal.\n\n"
-    + todoLine
+    "You are the manager agent. Coordinate the overall task, work towards the user's original goal."
 
 let managerSystemPrompt = managerSystemPromptFor opencode
 

@@ -9,7 +9,7 @@
 ///  the fold is executed.
 ///
 ///  Also verify that independent projections (ReviewLoop,
-///  Backlog, Nudge, Subagents) reach the same state whether
+///  Nudge, Subagents) reach the same state whether
 ///  folded standalone or via the composite SessionState.
 /// ──────────────────────────────────────────────
 module Wanxiangshu.Tests.ReplayEquivalenceTests
@@ -73,7 +73,6 @@ let private assertIdempotentFold (label: string) (events: WanEvent list) : unit 
 let ``Replay: empty events produce empty state`` () =
     let st = List.fold applyEvent (emptySessionState ()) []
     check "empty state review task None" (st.ReviewTask = None)
-    check "empty state backlog empty" (st.Backlog = [])
     check "empty state nudge dedup empty" (st.NudgeDedup = emptyDedupState)
     check "empty state subagents empty" (Map.isEmpty st.Subagents)
     check "empty state event count 0" (st.EventCount = 0)
@@ -95,22 +94,12 @@ let ``Replay: single event fold is idempotent`` () =
 let ``Replay: full event sequence is idempotent`` () =
     let events: WanEvent list =
         [ ev "s1" eventKindLoopActivated (Map [ "task", "full replay" ])
-          ev
-              "s1"
-              eventKindWorkBacklogCommitted
-              (Map
-                  [ "ahaMoments", "aha"
-                    "changesAndReasons", "c"
-                    "gotchas", "g"
-                    "lessonsAndConventions", "l"
-                    "plan", "p" ])
           ev "s1" eventKindNudgeDispatched (Map [ "anchor", "t1\u001emsg" ])
           ev "s1" eventKindReviewVerdict (Map [ "verdict", "accepted" ]) ]
 
     assertIdempotentFold "full sequence" events
     let st = List.fold applyEvent (emptySessionState ()) events
     check "full sequence: review cleared after accept" (st.ReviewTask = None)
-    check "full sequence: backlog has entry" (not (List.isEmpty st.Backlog))
     check "full sequence: nudge dedup anchor set" (st.NudgeDedup.LastDispatchedAnchor.IsSome)
 
 // ──────────────────────────────────────────────
@@ -157,16 +146,7 @@ let ``Replay: standalone projection matches composite`` () =
 
 let ``Replay: SessionOverview from state matches`` () =
     let events: WanEvent list =
-        [ ev "s1" eventKindLoopActivated (Map [ "task", "overview parity" ])
-          ev
-              "s1"
-              eventKindWorkBacklogCommitted
-              (Map
-                  [ "ahaMoments", "a"
-                    "changesAndReasons", "c"
-                    "gotchas", "g"
-                    "lessonsAndConventions", "l"
-                    "plan", "p" ]) ]
+        [ ev "s1" eventKindLoopActivated (Map [ "task", "overview parity" ]) ]
 
     let st = List.fold applyEvent (emptySessionState ()) events
     let overview1 = fromSessionState st
@@ -175,7 +155,6 @@ let ``Replay: SessionOverview from state matches`` () =
 
     check "SessionOverview idempotent" (overview1 = overview2)
     check "SessionOverview review task" (overview1.ReviewTask = Some "overview parity")
-    check "SessionOverview backlog non-empty" (not (List.isEmpty overview1.Backlog))
 
 // ──────────────────────────────────────────────
 //  7. SubsessionEvent replay equivalence

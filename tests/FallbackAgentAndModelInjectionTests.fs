@@ -15,7 +15,6 @@ open Wanxiangshu.Runtime.ReviewRuntime
 open Wanxiangshu.Hosts.Omp.Fallback.ActionExecutor
 open Wanxiangshu.Hosts.Opencode.Fallback.ActionExecutor
 open Wanxiangshu.Runtime.RuntimeScope
-open Wanxiangshu.Runtime.BacklogSession
 open Wanxiangshu.Hosts.Opencode.SessionLifecycleObserver
 open Wanxiangshu.Hosts.Omp.Fallback.Hook
 open Wanxiangshu.Hosts.Opencode.Fallback.Hook
@@ -105,15 +104,7 @@ let opencodeSessionStatusCapturesActiveModelSpec () =
         let registry = ChildAgentRegistry.Create()
 
         let observer =
-            createSessionLifecycleObserver (
-                Opencode,
-                null,
-                createReviewStore (),
-                registry,
-                None,
-                rt,
-                BacklogSession(Opencode, create ())
-            )
+            createSessionLifecycleObserver (Opencode, null, createReviewStore (), registry, None, rt)
 
         do! observer.handleEvent rawEvent
         equal "agent is captured" "reviewer" ((rt.GetSession sid).AgentName)
@@ -215,15 +206,7 @@ let opencodeNewUserMessageResetsChainAndModelSpec () =
             createOpencodeFallbackHandler mockClient rt configLookup "" registry (createReviewStore ()) None
 
         let observer =
-            createSessionLifecycleObserver (
-                Opencode,
-                null,
-                createReviewStore (),
-                registry,
-                Some handler,
-                rt,
-                BacklogSession(Opencode, create ())
-            )
+            createSessionLifecycleObserver (Opencode, null, createReviewStore (), registry, Some handler, rt)
 
         do! observer.OnNewHumanMessage(sid, "manager", None, "msg-1")
 

@@ -9,8 +9,8 @@ let axesIdle () =
 let axesRunnerOnly () =
     equal "runner" SessionWorkState.RunnerOnly (workStateFromAxes true false [])
 
-let axesLoopWithBacklog () =
-    equal "loop+backlog" SessionWorkState.LoopWithBacklog (workStateFromAxes false true [ "t" ])
+let axesLoopWithTodos () =
+    equal "loop+todos" SessionWorkState.LoopWithTodos (workStateFromAxes false true [ "t" ])
 
 let axesAll () =
     equal "all" SessionWorkState.AllAxes (workStateFromAxes true true [ "x" ])
@@ -24,6 +24,6 @@ let helpersMatchAxes () =
 let run () =
     axesIdle ()
     axesRunnerOnly ()
-    axesLoopWithBacklog ()
+    axesLoopWithTodos ()
     axesAll ()
     helpersMatchAxes ()

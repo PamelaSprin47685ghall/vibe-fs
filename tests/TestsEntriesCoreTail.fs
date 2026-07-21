@@ -20,7 +20,6 @@ open Wanxiangshu.Tests.IntegrationChatTestsSubagent
 open Wanxiangshu.Tests.OpencodeSessionLifecycleTests
 open Wanxiangshu.Tests.LoopMessagesTests
 open Wanxiangshu.Tests.MessagingTests
-open Wanxiangshu.Tests.WorkBacklogTests
 open Wanxiangshu.Tests.MethodologyTests
 open Wanxiangshu.Tests.MethodologyRegistryTests
 open Wanxiangshu.Tests.ToolCatalogRegistryTests
@@ -30,8 +29,6 @@ open Wanxiangshu.Tests.ToolOutputInfoTests
 open Wanxiangshu.Tests.MessageTransformPolicyTests
 open Wanxiangshu.Tests.MessageTransformStackTests
 open Wanxiangshu.Tests.ParallelToolPromptTests
-open Wanxiangshu.Tests.CompactionTransformTests
-open Wanxiangshu.Tests.CompactionIsolationTests
 open Wanxiangshu.Tests.ModelResolutionTests
 open Wanxiangshu.Tests.MessageSanitizationTests
 open Wanxiangshu.Tests.SembleInjectionTests
@@ -132,7 +129,6 @@ let tailCoreTestEntriesGroup2 () : (string * TestBody) list =
       TestBody.Async OpencodeSessionLifecycleTests.childIdleDoesNotAbortParent
       "LoopMessagesTests.run", TestBody.Sync(sync LoopMessagesTests.run)
       "MessagingTests.run", TestBody.Sync(sync MessagingTests.run)
-      "WorkBacklogTests.run", TestBody.Sync(sync WorkBacklogTests.run)
       "MethodologyTests.run", TestBody.Sync(sync MethodologyTests.run)
       "MethodologyRegistryTests.run", TestBody.Sync(sync MethodologyRegistryTests.run)
       "ToolCatalogRegistryTests.run", TestBody.Sync(sync ToolCatalogRegistryTests.run)
@@ -150,9 +146,6 @@ let tailCoreTestEntriesGroup3 () : (string * TestBody) list =
       "MessageTransformPolicyTests.run", TestBody.Async MessageTransformPolicyTests.run
       "MessageTransformStackTests.run", TestBody.Async MessageTransformStackTests.run
       "ParallelToolPromptTests.run", TestBody.Async ParallelToolPromptTests.run
-      "CompactionTransformTests.run", TestBody.Async CompactionTransformTests.run
-      "CompactionHookOpenCodeTests.run", TestBody.Async CompactionHookOpenCodeTests.run
-      "CompactionIsolationTests.run", TestBody.Async CompactionIsolationTests.run
       "ModelResolutionTests.run", TestBody.Async ModelResolutionTests.run
       "MessageSanitizationTests.run", TestBody.Async MessageSanitizationTests.run
       "SembleInjectionTests.run", TestBody.Sync(sync SembleInjectionTests.run)
@@ -187,7 +180,6 @@ let tailCoreTestEntriesGroup3 () : (string * TestBody) list =
         "ProfilerOutputTests.run", TestBody.Sync(sync Wanxiangshu.Tests.ProfilerOutputTests.run)
         "PendingEvidenceEpochTests.run", TestBody.Sync(sync Wanxiangshu.Tests.PendingEvidenceEpochTests.run)
         "ContinuationCleanupTests.run", TestBody.Sync(sync Wanxiangshu.Tests.ContinuationCleanupTests.run)
-        "BacklogSessionRuntimeTests.run", TestBody.Sync(sync Wanxiangshu.Tests.BacklogSessionRuntimeTests.run)
         "RuntimeScopeLifecycleTests.run", TestBody.Sync(sync Wanxiangshu.Tests.RuntimeScopeLifecycleTests.run) ]
 
 let tailCoreTestEntries () : (string * TestBody) list =

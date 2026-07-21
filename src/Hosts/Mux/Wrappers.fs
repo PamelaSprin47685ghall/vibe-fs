@@ -5,13 +5,10 @@ open Fable.Core.JsInterop
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Primitives.Identity
 open Wanxiangshu.Kernel.Errors.DomainError
-open Wanxiangshu.Runtime.BacklogProjectionBuild
 open Wanxiangshu.Kernel.HostTools
-open Wanxiangshu.Kernel.WorkBacklog
 open Wanxiangshu.Runtime.ToolOutputInfo
 open Wanxiangshu.Runtime.PromptFragments
 open Wanxiangshu.Kernel.Methodology
-open Wanxiangshu.Runtime.WorkBacklogSchema
 open Wanxiangshu.Runtime.TreeSitterShell
 open Wanxiangshu.Runtime.RuntimeScope
 open Wanxiangshu.Runtime.SessionProjectionStore
@@ -27,7 +24,6 @@ open Wanxiangshu.Hosts.Mux.WrappersReview
 open Wanxiangshu.Runtime.MuxToolDefinition
 open Wanxiangshu.Kernel.Subsession.Types
 open Wanxiangshu.Runtime.SubsessionEventRouter
-open Wanxiangshu.Hosts.Mux.TodoWriteToolWrapper
 
 let strField = Wanxiangshu.Runtime.DynField.strField
 let optInt = Wanxiangshu.Runtime.DynField.optInt
@@ -129,11 +125,7 @@ let createAllWrappersFor
     : obj array =
     let projection = scope.Projection
 
-    Array.append
-        (mkSyntaxWrappers ())
-        [| mkFileReadCapture hostReadExec
-           mkTodoWriteWrapper host projection
-           mkAgentReportOverride () |]
+    Array.append (mkSyntaxWrappers ()) [| mkFileReadCapture hostReadExec; mkAgentReportOverride () |]
 
 let createAllWrappers (tools: obj) (hostReadExec: HostFunctionCapture) (scope: RuntimeScope) : obj array =
     createAllWrappersFor mux tools hostReadExec scope

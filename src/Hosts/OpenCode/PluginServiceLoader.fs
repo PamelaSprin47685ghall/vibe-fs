@@ -13,7 +13,6 @@ open Wanxiangshu.Hosts.Opencode.AgentConfig
 open Wanxiangshu.Hosts.Opencode.Tools
 open Wanxiangshu.Hosts.Opencode.Fallback.Hook
 open Wanxiangshu.Hosts.Opencode.SessionLifecycleObserver
-open Wanxiangshu.Runtime.BacklogSession
 open Wanxiangshu.Hosts.Opencode.Fallback.ConfigLoader
 open Wanxiangshu.Runtime.RuntimeScope
 open Wanxiangshu.Runtime.FuzzyFinderShell
@@ -39,7 +38,6 @@ type PluginServiceParts =
       FallbackConfigLookup: Wanxiangshu.Runtime.Fallback.Ports.ConfigLookup
       FallbackHandler: (obj -> JS.Promise<FallbackHookResult>) option
       Scope: RuntimeScope
-      BacklogSession: BacklogSession
       LifecycleObserver: SessionLifecycleObserver
       Tools: obj }
 
@@ -60,8 +58,7 @@ let buildScopeInit
                         | Error _ -> createHost (box null) "" dir))
                 |> FablePromise.map ignore
 
-            do!
-                Wanxiangshu.Runtime.EventLogRuntimeSync.syncAllSessionsFromEventLogDedicated host reviewStore scope dir
+            do! Wanxiangshu.Runtime.EventLogRuntimeSync.syncAllSessionsFromEventLogDedicated host reviewStore scope dir
 
             do! recoverRequestedFallbackLeases scope dir
         }
@@ -125,19 +122,16 @@ let loadPluginServices (host: Host) (ctx: obj) : PluginServiceParts =
 
     let scope = create ()
     scope.Add("fallbackRuntime", box fallbackRuntime)
-    registerFallbackExecutor scope (Wanxiangshu.Hosts.Opencode.Fallback.ActionExecutor.opencodeActionExecutorWithDir fallbackRuntime client directory)
-    let backlogSession = BacklogSession(host, scope)
+
+    registerFallbackExecutor
+        scope
+        (Wanxiangshu.Hosts.Opencode.Fallback.ActionExecutor.opencodeActionExecutorWithDir
+            fallbackRuntime
+            client
+            directory)
 
     let lifecycleObserver =
-        createSessionLifecycleObserver (
-            host,
-            ctx,
-            reviewStore,
-            childAgentRegistry,
-            fallbackHandler,
-            fallbackRuntime,
-            backlogSession
-        )
+        createSessionLifecycleObserver (host, ctx, reviewStore, childAgentRegistry, fallbackHandler, fallbackRuntime)
 
     let tools =
         createTools host childAgentRegistry finderCache ctx reviewStore scope fallbackRuntime
@@ -151,6 +145,5 @@ let loadPluginServices (host: Host) (ctx: obj) : PluginServiceParts =
       FallbackConfigLookup = fallbackConfigLookup
       FallbackHandler = fallbackHandler
       Scope = scope
-      BacklogSession = backlogSession
       LifecycleObserver = lifecycleObserver
       Tools = tools }

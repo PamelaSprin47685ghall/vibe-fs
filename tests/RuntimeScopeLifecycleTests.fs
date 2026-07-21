@@ -5,7 +5,6 @@ open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Runtime.RuntimeScope
 open Wanxiangshu.Runtime.RuntimeScopeForgetSession
 open Wanxiangshu.Runtime.FuzzyIteratorStore
-open Wanxiangshu.Runtime.ContextBudgetStore
 open Wanxiangshu.Runtime.RunnerBackground
 open Wanxiangshu.Runtime.SembleSearch
 open Wanxiangshu.Kernel.FuzzyQuery
@@ -18,7 +17,6 @@ let private populateSession (scope: RuntimeScope) (sid: string) : string =
     scope.GetOrLoadCapsInflight(sid + "\u0000inflight", (fun () -> Promise.lift []))
     |> ignore
 
-    get scope sid |> ignore
     Wanxiangshu.Runtime.LivelockGuard.check scope sid "tool" "{}" "{}" |> ignore
     registerActiveRunnerSession scope sid
     markBreakpoint scope sid 1
@@ -62,7 +60,6 @@ let private populateEventLogStore (sid: string) : unit =
     Wanxiangshu.Runtime.EventLogRuntimeStore.getStore sid |> ignore
 
 let private verifySessionCleared (scope: RuntimeScope) (sid: string) (findId: string) : unit =
-    isNone (scope.TryFindKey("contextbudget_" + sid))
     isNone (breakpointStart scope sid)
     check (sprintf "runner cleared %s" sid) (not (hasRunningRunnerJob scope sid))
     isNone (consumeFindIterator scope.IteratorStore findId)

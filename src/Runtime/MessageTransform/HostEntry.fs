@@ -164,9 +164,8 @@ let runHostMessagesTransform
     (_reviewStore: ReviewStore)
     (sessionID: string)
     (plan: MessageTransformPlan)
-    (backlogOps: BacklogSessionOps)
     (encodeMessages: Message<obj> list -> obj array)
-    (injectFn: Wanxiangshu.Kernel.MessageTransformPolicy.BacklogProjectionPolicy -> obj array -> JS.Promise<obj array>)
+    (injectFn: ProjectionPolicy -> obj array -> JS.Promise<obj array>)
     (loadCaps: unit -> JS.Promise<CapsFile list>)
     (buildCaps: obj array -> CapsFile list -> string option -> obj array)
     : JS.Promise<obj array> =
@@ -181,7 +180,13 @@ let runHostMessagesTransform
             sanitizeEmptyStrings visited raw
             return raw
         else
-            let! result = runMessageTransformPipeline plan backlogOps encodeMessages injectFn loadCaps buildCaps
+            let! result =
+                runMessageTransformPipeline
+                    plan
+                    encodeMessages
+                    (fun encoded -> injectFn plan.ProjectionPolicy encoded)
+                    loadCaps
+                    buildCaps
 
             let visited = System.Collections.Generic.HashSet<obj>()
             sanitizeEmptyStrings visited result

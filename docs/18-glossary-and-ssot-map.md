@@ -49,7 +49,6 @@
 | Fallback 续命租约 | `.wanxiangshu.ndjson` + `continuation_*` 事件 + `src/Kernel/EventSourcing/Fold.fs` session-control projection | `Runtime/Fallback` 内存状态 alone |
 | Fallback 注入记忆 | `fallback_continue_injected` 旧事件（兼容读取） | 嗅探消息零宽字符 |
 | 续命租约/所有者投影 | `.wanxiangshu.ndjson` + `continuation_*` 事件 + `src/Kernel/SessionControl/LeaseTransitions.fs` 折叠 | 仅内存 `FallbackRuntimeState` 的状态 |
-| 上下文预算 cycle | `src/Runtime/Execution/ContextBudgetStore.fs` 与 projection metadata（重启语义以实现为准） | 仅 `maxInputTokens` 静态值 |
 | 会话拥有者 | `continuation_*` / `human_turn_started` 事件 + `SessionOwner` fold | 内存 `FallbackRuntimeState` |
 | Continuation intent | `ContinuationIntent` 驱动的物理动作 | 仅内存通知 |
 | 续命 payload 文本 | OpenCode `ActionExecutor.sendContinueImpl` ZWSP `"\u200B"` | 见 `docs/CONTINUATION_PATH.md` |

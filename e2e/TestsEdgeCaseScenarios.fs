@@ -162,14 +162,12 @@ let runRest
                                      status = "in_progress"
                                      priority = "high" |} ]
                         )
-                       completedWorkReport = "started work on X"
                        select_methodology = ResizeArray([ "first_principles" ]) |})
                 "write todo with content"
 
         chk "e2e.todo-with-content.tool-called" (containsTool harness "todowrite")
         let todoBodies = bodies harness
         chk "e2e.todo-with-content.has-task-content" (todoBodies.Contains "implement feature X")
-        chk "e2e.todo-with-content.has-progress-report" (todoBodies.Contains "started work on X")
 
         // 25. executor-javascript
         do!

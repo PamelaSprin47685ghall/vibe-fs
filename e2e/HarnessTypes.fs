@@ -18,7 +18,6 @@ type Harness =
     abstract getMessages: string -> obj -> JS.Promise<obj>
     abstract getSession: string -> obj -> JS.Promise<obj>
     abstract listProviders: unit -> JS.Promise<obj>
-    abstract contextBudgetClient: unit -> obj
     abstract getSessions: obj -> JS.Promise<obj>
     abstract listCommands: obj -> JS.Promise<obj>
     abstract runSessionCommand: string -> string -> string -> obj -> JS.Promise<obj>

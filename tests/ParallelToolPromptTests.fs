@@ -6,7 +6,6 @@ open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Kernel.Messaging
 open Wanxiangshu.Kernel.ToolExecutionStatusModule
 open Wanxiangshu.Runtime.CapsFormat
-open Wanxiangshu.Runtime.BacklogProjectionBuild
 open Wanxiangshu.Kernel.HostTools
 open Wanxiangshu.Runtime.MessageTransform.Plan
 open Wanxiangshu.Runtime.MessageTransform.Pipeline
@@ -33,10 +32,6 @@ let testHostNativeToolsTrigger () =
     promise {
         let reviewStore = createReviewStore ()
 
-        let backlogOps =
-            { Host = opencode
-              GetOrRebuildBacklog = fun _ _ -> [] }
-
         let encodeMessages (msgs: Message<obj> list) = msgs |> List.map box |> List.toArray
         let injectFn _ (arr: obj array) = promise { return arr }
         let loadCaps () = promise { return [] }
@@ -48,11 +43,6 @@ let testHostNativeToolsTrigger () =
                   Agent = "main"
                   Directory = ""
                   ProjectionPolicy = projectionPolicy
-                  BacklogProjectionPolicy =
-                    (if projectionPolicy = ProjectionPolicy.IncludeProjection then
-                         Wanxiangshu.Kernel.MessageTransformPolicy.BacklogProjectionPolicy.Include
-                     else
-                         Wanxiangshu.Kernel.MessageTransformPolicy.BacklogProjectionPolicy.Exclude)
                   CapsInjectionPolicy =
                     (if projectionPolicy = ProjectionPolicy.IncludeProjection then
                          Wanxiangshu.Kernel.MessageTransformPolicy.CapsInjectionPolicy.Include
@@ -63,11 +53,6 @@ let testHostNativeToolsTrigger () =
                          Wanxiangshu.Kernel.MessageTransformPolicy.ParallelHintPolicy.Include
                      else
                          Wanxiangshu.Kernel.MessageTransformPolicy.ParallelHintPolicy.Exclude)
-                  ContextBudgetPolicy =
-                    (if projectionPolicy = ProjectionPolicy.IncludeProjection then
-                         Wanxiangshu.Kernel.MessageTransformPolicy.ContextBudgetPolicy.Include
-                     else
-                         Wanxiangshu.Kernel.MessageTransformPolicy.ContextBudgetPolicy.Disable)
                   IsSubagentSession = false
                   Cleaned = msgs
                   RawArray = None
@@ -76,9 +61,9 @@ let testHostNativeToolsTrigger () =
                   MaxInputTokens = 200000
                   ModelKey = "openai/gpt-4o:default"
                   LimitSource = "openai-session-model"
-                  ObserveLatestUsage = (fun () -> Promise.lift None) }
+                  ObserveLatestUsage = (fun () -> Promise.lift ()) }
 
-            runHostMessagesTransform reviewStore sessionID plan backlogOps encodeMessages injectFn loadCaps buildCaps
+            runHostMessagesTransform reviewStore sessionID plan encodeMessages injectFn loadCaps buildCaps
 
         let singleCallTriggers toolName sessionID =
             let msgs =
@@ -153,10 +138,6 @@ let testSynthCallIdExcluded () =
     promise {
         let reviewStore = createReviewStore ()
 
-        let backlogOps =
-            { Host = opencode
-              GetOrRebuildBacklog = fun _ _ -> [] }
-
         let encodeMessages (msgs: Message<obj> list) = msgs |> List.map box |> List.toArray
         let injectFn _ (arr: obj array) = promise { return arr }
         let loadCaps () = promise { return [] }
@@ -168,10 +149,8 @@ let testSynthCallIdExcluded () =
                   Agent = "main"
                   Directory = ""
                   ProjectionPolicy = ProjectionPolicy.IncludeProjection
-                  BacklogProjectionPolicy = Wanxiangshu.Kernel.MessageTransformPolicy.BacklogProjectionPolicy.Include
                   CapsInjectionPolicy = Wanxiangshu.Kernel.MessageTransformPolicy.CapsInjectionPolicy.Include
                   ParallelHintPolicy = Wanxiangshu.Kernel.MessageTransformPolicy.ParallelHintPolicy.Include
-                  ContextBudgetPolicy = Wanxiangshu.Kernel.MessageTransformPolicy.ContextBudgetPolicy.Include
                   IsSubagentSession = false
                   Cleaned = msgs
                   RawArray = None
@@ -180,9 +159,9 @@ let testSynthCallIdExcluded () =
                   MaxInputTokens = 200000
                   ModelKey = "openai/gpt-4o:default"
                   LimitSource = "openai-session-model"
-                  ObserveLatestUsage = (fun () -> Promise.lift None) }
+                  ObserveLatestUsage = (fun () -> Promise.lift ()) }
 
-            runHostMessagesTransform reviewStore sessionID plan backlogOps encodeMessages injectFn loadCaps buildCaps
+            runHostMessagesTransform reviewStore sessionID plan encodeMessages injectFn loadCaps buildCaps
 
         // 合成 callID（semble-call-*）不触发——宿主内部注入
         let msgs20 =
@@ -207,10 +186,6 @@ let testCompletedToolPartInAssistantTriggers () =
     promise {
         let reviewStore = createReviewStore ()
 
-        let backlogOps =
-            { Host = opencode
-              GetOrRebuildBacklog = fun _ _ -> [] }
-
         let encodeMessages (msgs: Message<obj> list) = msgs |> List.map box |> List.toArray
         let injectFn _ (arr: obj array) = promise { return arr }
         let loadCaps () = promise { return [] }
@@ -222,10 +197,8 @@ let testCompletedToolPartInAssistantTriggers () =
                   Agent = "main"
                   Directory = ""
                   ProjectionPolicy = ProjectionPolicy.IncludeProjection
-                  BacklogProjectionPolicy = Wanxiangshu.Kernel.MessageTransformPolicy.BacklogProjectionPolicy.Include
                   CapsInjectionPolicy = Wanxiangshu.Kernel.MessageTransformPolicy.CapsInjectionPolicy.Include
                   ParallelHintPolicy = Wanxiangshu.Kernel.MessageTransformPolicy.ParallelHintPolicy.Include
-                  ContextBudgetPolicy = Wanxiangshu.Kernel.MessageTransformPolicy.ContextBudgetPolicy.Include
                   IsSubagentSession = false
                   Cleaned = msgs
                   RawArray = None
@@ -234,9 +207,9 @@ let testCompletedToolPartInAssistantTriggers () =
                   MaxInputTokens = 200000
                   ModelKey = "openai/gpt-4o:default"
                   LimitSource = "openai-session-model"
-                  ObserveLatestUsage = (fun () -> Promise.lift None) }
+                  ObserveLatestUsage = (fun () -> Promise.lift ()) }
 
-            runHostMessagesTransform reviewStore sessionID plan backlogOps encodeMessages injectFn loadCaps buildCaps
+            runHostMessagesTransform reviewStore sessionID plan encodeMessages injectFn loadCaps buildCaps
 
         let state =
             { status = ToolExecutionStatus.Completed

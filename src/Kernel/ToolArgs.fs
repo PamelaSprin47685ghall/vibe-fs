@@ -70,12 +70,7 @@ type TodoItem =
       Priority: TodoItemPriority }
 
 type TodoWriteArgs =
-    { AhaMoments: string
-      ChangesAndReasons: string
-      Gotchas: string
-      LessonsAndConventions: string
-      Plan: string
-      Todos: TodoItem array
+    { Todos: TodoItem array
       SelectMethodology: string list }
 
 type ApplyPatchArgs = { PatchText: string }

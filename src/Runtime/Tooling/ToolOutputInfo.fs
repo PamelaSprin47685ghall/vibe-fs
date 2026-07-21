@@ -8,8 +8,6 @@ open Wanxiangshu.Runtime.PromptFrontMatter
 let hintExecutorMisuse =
     "No executor for reading, searching, writing files. Use read/inspector/coder!"
 
-let hintTodoRefresh = "Update todo list NOW and settle down your progress!"
-
 let hintTodosUpdated = "Todos updated."
 
 let hintMethodologyFollowup (methodologyId: string) =

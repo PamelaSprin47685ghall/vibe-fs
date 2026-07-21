@@ -12,7 +12,6 @@ open Wanxiangshu.Tests.OmpTitleFetchGuardTests
 open Wanxiangshu.Tests.SubagentIoTests
 open Wanxiangshu.Tests.OmpPluginCoreTests
 open Wanxiangshu.Tests.OmpReconcileTests
-open Wanxiangshu.Tests.OmpMagicTodoTests
 open Wanxiangshu.Tests.OmpToolResultEventTests
 open Wanxiangshu.Tests.OmpPluginCoreIntegrationTests
 open Wanxiangshu.Tests.OmpAgentConfigTests
@@ -83,13 +82,6 @@ let entries3 () : (string * TestBody) list =
       "OmpPluginCoreTests.unrelatedEventLeavesReviewActive", Async OmpPluginCoreTests.unrelatedEventLeavesReviewActive
       "OmpReconcileTests.ompReconciliationClosesZombieSessions",
       Async OmpReconcileTests.ompReconciliationClosesZombieSessions
-      "OmpMagicTodoTests.sharedSessionStoreByHost", Sync(sync OmpMagicTodoTests.sharedSessionStoreByHost)
-      "OmpMagicTodoTests.hostPartitionedReports", Sync(sync OmpMagicTodoTests.hostPartitionedReports)
-      "OmpMagicTodoTests.backlogEntryFromTodoInputHostAgnostic",
-      Sync(sync OmpMagicTodoTests.backlogEntryFromTodoInputHostAgnostic)
-      "OmpMagicTodoTests.inputOfPartNonTool", Sync(sync OmpMagicTodoTests.inputOfPartNonTool)
-      "OmpMagicTodoTests.replayBacklogOmpFallsBackToCapturedReport",
-      Sync(sync OmpMagicTodoTests.replayBacklogOmpFallsBackToCapturedReport)
       "OmpToolResultEventTests.getToolInputPrefersInputOverArgs",
       Sync(sync OmpToolResultEventTests.getToolInputPrefersInputOverArgs)
       "OmpToolResultEventTests.getToolInputFallsBackToArgs",

@@ -10,7 +10,6 @@ open Wanxiangshu.Runtime.SubagentIntentsCodec
 open Wanxiangshu.Runtime.SubagentSimpleArgsCodec
 open Wanxiangshu.Runtime.WebToolsCodec
 open Wanxiangshu.Runtime.ExecutorToolsCodec
-open Wanxiangshu.Runtime.WorkBacklogToolsCodec
 open Wanxiangshu.Runtime.PatchToolsCodec
 open Wanxiangshu.Runtime.ReviewToolsCodec
 
@@ -42,20 +41,6 @@ let private mapExecutor (e: ExecutorToolsCodec.ExecutorArgs) : Wanxiangshu.Kerne
       TimeoutType = e.TimeoutType
       Mode = e.Mode
       WhatToSummarize = e.WhatToSummarize }
-
-let private mapTodoItem (t: WorkBacklogToolsCodec.TodoItem) : Wanxiangshu.Kernel.ToolArgs.TodoItem =
-    { Content = t.Content
-      Status = t.Status
-      Priority = t.Priority }
-
-let private mapTodoWrite (tw: WorkBacklogToolsCodec.TodoWriteArgs) : Wanxiangshu.Kernel.ToolArgs.TodoWriteArgs =
-    { AhaMoments = tw.AhaMoments
-      ChangesAndReasons = tw.ChangesAndReasons
-      Gotchas = tw.Gotchas
-      LessonsAndConventions = tw.LessonsAndConventions
-      Plan = tw.Plan
-      Todos = tw.Todos |> Array.map mapTodoItem
-      SelectMethodology = tw.SelectMethodology }
 
 type DecodedToolInvocation =
     | Typed of ToolArgs
@@ -117,10 +102,6 @@ let private decodeExecutor args =
     ExecutorToolsCodec.decodeExecutorArgs args
     |> Result.map (fun e -> Typed(ToolArgs.Executor(mapExecutor e)))
 
-let private decodeTodoWrite (originalToolName: string) args =
-    decodeTodoWriteArgs (originalToolName = "task") args
-    |> Result.map (fun (tw, _) -> Typed(ToolArgs.TodoWrite(mapTodoWrite tw)))
-
 let private decodeApplyPatch args =
     decodeApplyPatchFields args
     |> Result.map (fun f -> Typed(ToolArgs.ApplyPatch { PatchText = f.PatchText }))
@@ -147,7 +128,6 @@ let decodeToolInvocation (toolName: string) (args: obj) : Result<DecodedToolInvo
     | "websearch" -> decodeWebsearch args
     | "webfetch" -> decodeWebfetch args
     | "executor" -> decodeExecutor args
-    | "todowrite" -> decodeTodoWrite toolName args
     | "apply_patch" -> decodeApplyPatch args
     | "submit_review" -> decodeSubmitReview args
     | _ -> Error(InvalidIntent(toolName, "tool", "unknown tool for ToolArgs decode"))

@@ -6,7 +6,6 @@ open Wanxiangshu.Kernel
 open Wanxiangshu.Runtime
 
 open Wanxiangshu.Runtime.RuntimeScope
-open Wanxiangshu.Runtime.BacklogSession
 open Wanxiangshu.Runtime.ReviewRuntime
 open Wanxiangshu.Hosts.Opencode.MessageTransformPipeline
 open Wanxiangshu.Runtime.ChildAgentRegistry
@@ -64,7 +63,6 @@ let messagesTransform
     (registry: ChildAgentRegistry)
     (directory: string)
     (runtimeScope: RuntimeScope)
-    (backlogSession: BacklogSession)
     (reviewStore: ReviewStore)
     (client: obj)
     (input: obj)
@@ -91,7 +89,6 @@ let messagesTransform
                         registry
                         directory
                         runtimeScope
-                        backlogSession
                         reviewStore
                         plan.SessionID
                         plan.Agent

@@ -3,7 +3,7 @@ module Wanxiangshu.Kernel.Nudge.NudgeProjection
 /// Independent projection for nudge state (dedup + snapshot).
 ///
 /// Owner: Nudge subsystem
-/// Input events: nudge_*, assistant_completed, work_backlog_committed,
+/// Input events: nudge_*, assistant_completed,
 ///               human_turn_started, submit_review_wip_recorded, loop_*
 /// Query: IsBlocked, CurrentSnapshot
 

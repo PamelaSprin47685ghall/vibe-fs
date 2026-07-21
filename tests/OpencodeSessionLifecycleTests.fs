@@ -12,7 +12,6 @@ open Wanxiangshu.Runtime.Fallback.SessionRuntimePropertyPure
 open Wanxiangshu.Runtime.RuntimeScope
 open Wanxiangshu.Runtime.ReviewRuntime
 open Wanxiangshu.Tests.TestWorkspace
-open Wanxiangshu.Runtime.BacklogSession
 open Wanxiangshu.Hosts.Opencode.SessionLifecycleObserver
 open Wanxiangshu.Runtime.Dyn
 
@@ -33,15 +32,7 @@ let childIdleDoesNotAbortParent () =
         registry.RegisterChildAgent("child-1", "coder", Some "parent-1")
 
         let observer =
-            createSessionLifecycleObserver (
-                opencode,
-                ctx,
-                createReviewStore (),
-                registry,
-                None,
-                FallbackRuntimeStore(),
-                BacklogSession(opencode, create ())
-            )
+            createSessionLifecycleObserver (opencode, ctx, createReviewStore (), registry, None, FallbackRuntimeStore())
 
         do!
             observer.handleEvent (
@@ -90,8 +81,7 @@ let childCompactionIdleSettlesAfterFallbackConsumes () =
                 createReviewStore (),
                 registry,
                 Some fallbackHandler,
-                runtime,
-                BacklogSession(opencode, create ())
+                runtime
             )
 
         do!

@@ -13,11 +13,9 @@ open Wanxiangshu.Runtime.MessageTransform.Pipeline
 open Wanxiangshu.Kernel.Messaging
 open Wanxiangshu.Kernel.HostTools
 open Wanxiangshu.Kernel.Methodology
-open Wanxiangshu.Kernel.ContextBudget
 open Wanxiangshu.Kernel.MessageTransformPolicy
 open Wanxiangshu.Runtime.PromptFrontMatter
 open Wanxiangshu.Hosts.Mux.MessagingCodec
-open Wanxiangshu.Runtime.BacklogSession
 open Wanxiangshu.Hosts.Mux.CapsCodec
 open Wanxiangshu.Runtime.JsArrayMutate
 open Wanxiangshu.Runtime.ReviewRuntime
@@ -27,27 +25,15 @@ open Wanxiangshu.Runtime.MuxHookInputCodec
 open Wanxiangshu.Runtime.MuxWorkspaceCodec
 open Wanxiangshu.Runtime.ChatTransformOutputCodec
 open Wanxiangshu.Runtime.Dyn
-open Wanxiangshu.Runtime.ContextBudgetUsageCodec
-open Wanxiangshu.Hosts.Mux.CompactionTransform
 
 let resolvePolicies (agent: string) (isChild: bool) =
-    let bp =
-        Wanxiangshu.Kernel.MessageTransformPolicy.getBacklogProjectionPolicy agent isChild
-
     let cp =
         Wanxiangshu.Kernel.MessageTransformPolicy.getCapsInjectionPolicy agent isChild
 
-    let pp = Wanxiangshu.Kernel.MessageTransformPolicy.getParallelHintPolicy agent
+    let pp =
+        Wanxiangshu.Kernel.MessageTransformPolicy.getParallelHintPolicy agent isChild
 
-    let cb =
-        Wanxiangshu.Kernel.MessageTransformPolicy.getContextBudgetPolicy agent isChild
-
-    bp, cp, pp, cb
-
-let resolveContextUsage (deps: obj) (sessionID: string) (directory: string) =
-    match ContextBudgetUsageCodec.tryGetRealContextUsage deps sessionID directory with
-    | Some f -> f
-    | None -> fun () -> Promise.lift None
+    cp, pp
 
 let sanitizeMuxMessages (sessionID: string) (messagesArr: obj[]) = decodeMessages sessionID messagesArr
 
@@ -78,27 +64,17 @@ let private buildPlan
     (isChild: bool)
     (runtimeScope: Wanxiangshu.Runtime.RuntimeScope.RuntimeScope)
     (messagesArr: obj[])
-    (backlogPolicy: Wanxiangshu.Kernel.MessageTransformPolicy.BacklogProjectionPolicy)
     (capsPolicy: Wanxiangshu.Kernel.MessageTransformPolicy.CapsInjectionPolicy)
     (parallelHintPolicy: Wanxiangshu.Kernel.MessageTransformPolicy.ParallelHintPolicy)
-    (contextBudgetPolicy: Wanxiangshu.Kernel.MessageTransformPolicy.ContextBudgetPolicy)
     (cleanedMessages: Message<obj> list)
-    (backlogOps: BacklogSessionOps)
     (maxInputTokens: int)
-    (observeUsage: unit -> JS.Promise<UsageObservation option>)
     : MessageTransformPlan =
     { SessionID = sessionID
       Agent = agent
       Directory = directory
-      ProjectionPolicy =
-        if backlogPolicy = Wanxiangshu.Kernel.MessageTransformPolicy.BacklogProjectionPolicy.Include then
-            ProjectionPolicy.IncludeProjection
-        else
-            ProjectionPolicy.ExcludeProjection
-      BacklogProjectionPolicy = backlogPolicy
+      ProjectionPolicy = projectionPolicyForAgent agent isChild
       CapsInjectionPolicy = capsPolicy
       ParallelHintPolicy = parallelHintPolicy
-      ContextBudgetPolicy = contextBudgetPolicy
       IsSubagentSession = isChild
       Cleaned = cleanedMessages
       RawArray = Some messagesArr
@@ -107,14 +83,13 @@ let private buildPlan
       MaxInputTokens = maxInputTokens
       ModelKey = "mux:host-unknown"
       LimitSource = "mux:no-model-client"
-      ObserveLatestUsage = observeUsage }
+      ObserveLatestUsage = fun () -> Promise.lift () }
 
 let applyTransformPipeline
     (deps: obj)
     (runtimeScope: Wanxiangshu.Runtime.RuntimeScope.RuntimeScope)
-    (backlogSession: BacklogSession)
     (reviewStore: ReviewStore)
-    (input: obj)
+    (_input: obj)
     (decoded: Wanxiangshu.Runtime.MuxHookInputCodec.MuxMessagesTransformInput)
     (messagesArr: obj[])
     (sessionID: string)
@@ -124,16 +99,11 @@ let applyTransformPipeline
         let agent = decoded.Agent
         let isChild = isChildWorkspace deps sessionID
 
-        let backlogPolicy, capsPolicy, parallelHintPolicy, contextBudgetPolicy =
-            resolvePolicies agent isChild
+        let capsPolicy, parallelHintPolicy = resolvePolicies agent isChild
 
         let cleanedMessages = sanitizeMuxMessages sessionID messagesArr
 
-        let backlogOps =
-            backlogSessionOpsFrom backlogSession.Host (fun sid msgs -> backlogSession.GetOrRebuildBacklog(sid, msgs))
-
-        let! maxInputTokens = resolveMaxInputTokens [ deps; input ] sessionID directory
-        let observeUsage = resolveContextUsage deps sessionID directory
+        let maxInputTokens = 8192
 
         let plan =
             buildPlan
@@ -143,14 +113,10 @@ let applyTransformPipeline
                 isChild
                 runtimeScope
                 messagesArr
-                backlogPolicy
                 capsPolicy
                 parallelHintPolicy
-                contextBudgetPolicy
                 cleanedMessages
-                backlogOps
                 maxInputTokens
-                observeUsage
 
         let buildCaps encoded capsFiles prelude =
             buildCapsMessages sessionID encoded capsFiles prelude
@@ -160,9 +126,8 @@ let applyTransformPipeline
                 reviewStore
                 sessionID
                 plan
-                backlogOps
                 encodeMessages
-                (fun _policy encoded -> Promise.lift encoded)
+                (fun _ encoded -> Promise.lift encoded)
                 (fun () -> loadCapsForSession runtimeScope deps sessionID plan)
                 buildCaps
 
@@ -173,7 +138,6 @@ let applyTransformPipeline
 let messagesTransform
     (deps: obj)
     (runtimeScope: Wanxiangshu.Runtime.RuntimeScope.RuntimeScope)
-    (backlogSession: BacklogSession)
     (reviewStore: ReviewStore)
     (input: obj)
     (output: obj)
@@ -188,5 +152,5 @@ let messagesTransform
         | None -> ()
         | Some messagesArr ->
             let sessionID = decoded.SessionID
-            do! applyTransformPipeline deps runtimeScope backlogSession reviewStore input decoded messagesArr sessionID
+            do! applyTransformPipeline deps runtimeScope reviewStore input decoded messagesArr sessionID
     }

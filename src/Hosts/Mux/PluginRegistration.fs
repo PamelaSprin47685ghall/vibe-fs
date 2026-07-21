@@ -8,7 +8,6 @@ open Wanxiangshu.Kernel.HostTools
 open Wanxiangshu.Runtime
 open Wanxiangshu.Runtime.MuxPluginCatalogShell
 open Wanxiangshu.Hosts.Mux.PluginCatalog
-open Wanxiangshu.Runtime.BacklogSession
 open Wanxiangshu.Runtime.RuntimeScope
 open Wanxiangshu.Runtime.FuzzyFinderShell
 open Wanxiangshu.Runtime.Dyn
@@ -16,7 +15,6 @@ open Wanxiangshu.Hosts.Mux.WrappersReview
 open Wanxiangshu.Hosts.Mux.Wrappers
 open Wanxiangshu.Hosts.Mux.EventHook
 open Wanxiangshu.Hosts.Mux.SlashCommands
-open Wanxiangshu.Hosts.Mux.CompactionTransform
 open Wanxiangshu.Hosts.Mux.MessageTransform
 open Wanxiangshu.Kernel.HostCapability
 open Wanxiangshu.Hosts.Mux.PluginRegistrationAssembly
@@ -28,16 +26,14 @@ let createWrapperExecution (toolsObj: obj) (hostReadExec: HostFunctionCapture) (
 let createMessageTransforms
     (deps: obj)
     (scope: RuntimeScope)
-    (backlogSession: BacklogSession)
     (reviewStore: Wanxiangshu.Runtime.ReviewRuntime.ReviewStore)
     : obj * obj =
     let messagesTransformFn =
         System.Func<obj, obj, JS.Promise<unit>>(fun input output ->
-            messagesTransform deps scope backlogSession reviewStore input output)
+            messagesTransform deps scope reviewStore input output)
 
     let compactingTransformFn =
-        System.Func<obj, obj, JS.Promise<unit>>(fun input output ->
-            compactingTransform deps scope backlogSession input output)
+        System.Func<obj, obj, JS.Promise<unit>>(fun _input _output -> Promise.lift ())
 
     (box messagesTransformFn, box compactingTransformFn)
 
@@ -69,7 +65,6 @@ let createReviewTestSurface (reviewStore: Wanxiangshu.Runtime.ReviewRuntime.Revi
 
 let private createScope (deps: obj) =
     let scope = create ()
-    let backlogSession = BacklogSession(mux, scope)
     let reviewStore = Wanxiangshu.Runtime.ReviewRuntime.createReviewStore ()
     let hostReadExec = HostFunctionCapture()
     let finderCache = FinderCache()
@@ -78,7 +73,7 @@ let private createScope (deps: obj) =
         createToolCatalog deps muxToolNames reviewStore hostReadExec finderCache scope
 
     let toolsObj = toolsToObject tools
-    (scope, backlogSession, reviewStore, hostReadExec, finderCache, tools, toolsObj)
+    (scope, reviewStore, hostReadExec, finderCache, tools, toolsObj)
 
 let private buildInitHandler
     (scope: RuntimeScope)
@@ -135,8 +130,7 @@ let createRegistrationWithSeams
     =
     Wanxiangshu.Runtime.E2eSandbox.applyFromProcessEnv ()
 
-    let (scope, backlogSession, reviewStore, hostReadExec, _, tools, toolsObj) =
-        createScope deps
+    let (scope, reviewStore, hostReadExec, _, tools, toolsObj) = createScope deps
 
     let wrappers = createWrapperExecution toolsObj hostReadExec scope
 
@@ -144,7 +138,7 @@ let createRegistrationWithSeams
         box {| ``stealth-browser-mcp`` = getStealthBrowserMcpCommand (envVar "STEALTH_BROWSER_MCP_REF") |}
 
     let messagesTransform, compactingTransform =
-        createMessageTransforms deps scope backlogSession reviewStore
+        createMessageTransforms deps scope reviewStore
 
     let eventHook, slashCommands, getToolPolicy =
         createEventHooksSlashAndPolicy deps scope reviewStore

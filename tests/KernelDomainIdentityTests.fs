@@ -218,10 +218,6 @@ let msgClassifySourceAndDecodeRole () =
     | Synthetic k -> equal "synth user kind" "caps-synth-user-" k
     | _ -> failwith "expected Synthetic"
 
-    match classifySource "backlog-projection-y" None None with
-    | Synthetic _ -> ()
-    | _ -> failwith "expected Synthetic"
-
     equal "decode User" User (decodeRole "user")
     equal "decode Assistant" Assistant (decodeRole "assistant")
     equal "decode toolResult" ToolResult (decodeRole "toolResult")

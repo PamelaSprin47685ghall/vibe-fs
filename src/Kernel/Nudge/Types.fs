@@ -4,11 +4,11 @@ module Wanxiangshu.Kernel.Nudge.Types
 [<RequireQualifiedAccess>]
 type SessionWorkState =
     | Idle
-    | BacklogOnly
+    | TodosOnly
     | LoopIdle
-    | LoopWithBacklog
+    | LoopWithTodos
     | RunnerOnly
-    | RunnerWithBacklog
+    | RunnerWithTodos
     | RunnerWithLoop
     | AllAxes
 
@@ -21,18 +21,18 @@ let workStateFromAxes (hasActiveRunner: bool) (isLoopActive: bool) (openTodos: s
 
     match hasActiveRunner, isLoopActive, hasTodos with
     | false, false, false -> SessionWorkState.Idle
-    | false, false, true -> SessionWorkState.BacklogOnly
+    | false, false, true -> SessionWorkState.TodosOnly
     | false, true, false -> SessionWorkState.LoopIdle
-    | false, true, true -> SessionWorkState.LoopWithBacklog
+    | false, true, true -> SessionWorkState.LoopWithTodos
     | true, false, false -> SessionWorkState.RunnerOnly
-    | true, false, true -> SessionWorkState.RunnerWithBacklog
+    | true, false, true -> SessionWorkState.RunnerWithTodos
     | true, true, false -> SessionWorkState.RunnerWithLoop
     | true, true, true -> SessionWorkState.AllAxes
 
 let hasActiveRunner (s: SessionWorkState) : bool =
     match s with
     | SessionWorkState.RunnerOnly
-    | SessionWorkState.RunnerWithBacklog
+    | SessionWorkState.RunnerWithTodos
     | SessionWorkState.RunnerWithLoop
     | SessionWorkState.AllAxes -> true
     | _ -> false
@@ -40,16 +40,16 @@ let hasActiveRunner (s: SessionWorkState) : bool =
 let isLoopActiveWorkState (s: SessionWorkState) : bool =
     match s with
     | SessionWorkState.LoopIdle
-    | SessionWorkState.LoopWithBacklog
+    | SessionWorkState.LoopWithTodos
     | SessionWorkState.RunnerWithLoop
     | SessionWorkState.AllAxes -> true
     | _ -> false
 
 let hasOpenTodos (s: SessionWorkState) : bool =
     match s with
-    | SessionWorkState.BacklogOnly
-    | SessionWorkState.LoopWithBacklog
-    | SessionWorkState.RunnerWithBacklog
+    | SessionWorkState.TodosOnly
+    | SessionWorkState.LoopWithTodos
+    | SessionWorkState.RunnerWithTodos
     | SessionWorkState.AllAxes -> true
     | _ -> false
 

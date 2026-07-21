@@ -25,7 +25,6 @@ let emptyOverviewDefaults () =
     let o = emptyOverview
     check "review loop is initial" (o.ReviewLoop = initial)
     check "review task is None" (o.ReviewTask = None)
-    check "backlog is empty" (o.Backlog = [])
     check "nudge dedup pending is None" (o.NudgeDedup.PendingNudge = None)
     check "nudge dedup last dispatched is None" (o.NudgeDedup.LastDispatchedAnchor = None)
     check "nudge snapshot todos empty" (o.NudgeSnapshot.openTodos = [])
@@ -45,25 +44,13 @@ let emptyOverviewDefaults () =
 
 /// fromSessionState correctly maps all fields from a populated SessionState.
 let fromSessionStatePopulated () =
-    let events =
-        [ ev "s1" eventKindLoopActivated (Map [ "task", "refactor core" ])
-          ev
-              "s1"
-              eventKindWorkBacklogCommitted
-              (Map
-                  [ "ahaMoments", "discovery"
-                    "changesAndReasons", "refactor"
-                    "gotchas", "gotcha"
-                    "lessonsAndConventions", "lessons"
-                    "plan", "next steps"
-                    "todosJson", "[\"task1\"]" ]) ]
+    let events = [ ev "s1" eventKindLoopActivated (Map [ "task", "refactor core" ]) ]
 
     let st = List.fold applyEvent (emptySessionState ()) events
     let overview = fromSessionState st
 
     check "review loop active" (isLoopActive overview.ReviewLoop)
     equal "review task" (Some "refactor core") overview.ReviewTask
-    check "backlog non-empty" (not (List.isEmpty overview.Backlog))
 
 /// fromSessionState maps NudgeDedupState correctly.
 let fromSessionStateNudgeDedup () =
@@ -148,7 +135,6 @@ let fromSessionStateEmpty () =
     let st = emptySessionState ()
     let overview = fromSessionState st
     check "empty review task" (overview.ReviewTask = None)
-    check "empty backlog" (overview.Backlog = [])
     check "empty nudge dedup" (overview.NudgeDedup = emptyDedupState)
     check "empty nudge snapshot" (overview.NudgeSnapshot = emptySnapshotState)
     check "empty subagents" (Map.isEmpty overview.Subagents)

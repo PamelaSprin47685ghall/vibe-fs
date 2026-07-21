@@ -46,28 +46,7 @@ let syncAllSessionsFromEventLogDedicated
                     for sid in sessionIds do
                         let! state = getStore(workspaceRoot).GetSessionState(sid)
                         syncReviewProjection store sid state.ReviewTask
-                        scope.Projection.StoreBacklog(host, sid, List.rev state.Backlog)
                         restoreFallbackRuntimeStore scope sid state
-        with _ ->
-            ()
-    }
-
-let syncBacklogFromEventLogDedicated
-    (host: Host)
-    (projection: ProjectionStore)
-    (workspaceRoot: string)
-    (sessionID: string)
-    : JS.Promise<unit> =
-    promise {
-        try
-            if sessionID = "" || workspaceRoot = "" then
-                ()
-            else
-                let! exists = directoryExists workspaceRoot
-
-                if exists then
-                    let! state = getStore(workspaceRoot).GetSessionState(sessionID)
-                    projection.StoreBacklog(host, sessionID, List.rev state.Backlog)
         with _ ->
             ()
     }

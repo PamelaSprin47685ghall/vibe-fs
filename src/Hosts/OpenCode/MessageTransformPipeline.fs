@@ -6,7 +6,6 @@ open Wanxiangshu.Runtime
 
 open Wanxiangshu.Runtime.MessageTransform.Plan
 open Wanxiangshu.Runtime.MessageTransform.Pipeline
-open Wanxiangshu.Runtime.BacklogSession
 open Wanxiangshu.Hosts.Opencode.MessagingCodec
 open Wanxiangshu.Runtime.ChildAgentRegistry
 open Wanxiangshu.Runtime.RuntimeScope
@@ -20,7 +19,6 @@ let runHostMessagesTransformExecution
     (registry: ChildAgentRegistry)
     (directory: string)
     (runtimeScope: RuntimeScope)
-    (backlogSession: BacklogSession)
     (reviewStore: Wanxiangshu.Runtime.ReviewRuntime.ReviewStore)
     (sessionID: string)
     (agent: string)
@@ -30,9 +28,6 @@ let runHostMessagesTransformExecution
     (plan: MessageTransformPlan)
     : JS.Promise<unit> =
     promise {
-        let backlogOps =
-            backlogSessionOpsFrom backlogSession.Host (fun sid msgs -> backlogSession.GetOrRebuildBacklog(sid, msgs))
-
         let injectFn = buildInjectionFn directory agent sessionID runtimeScope
 
         let loadCaps = buildLoadCaps registry runtimeScope sessionID plan
@@ -44,7 +39,6 @@ let runHostMessagesTransformExecution
                 reviewStore
                 sessionID
                 plan
-                backlogOps
                 MessagingCodec.encodeMessages
                 injectFn
                 loadCaps

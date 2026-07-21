@@ -15,10 +15,11 @@ open Wanxiangshu.Hosts.Opencode.OpenCodeModelResolution
 open Wanxiangshu.Hosts.Opencode.ModelKeyResolver
 open Wanxiangshu.Runtime.RuntimeScope
 open Wanxiangshu.Hosts.Opencode.SembleInjection
-open Wanxiangshu.Hosts.Opencode.CompactionHook
 open Wanxiangshu.Runtime.Dyn
 
 open Wanxiangshu.Hosts.Opencode.CapsCodec
+
+let resolveCapsEpoch (_messagesList: obj) (_sessionID: string) (_runtimeScope: obj) : string = ""
 
 let resolveSessionID (input: obj) (messagesList: Message<obj> list) : string =
     let sid1 = Dyn.str input "sessionID"
@@ -41,11 +42,11 @@ let buildInjectionFn
     (agent: string)
     (sessionID: string)
     (runtimeScope: RuntimeScope)
-    : (BacklogProjectionPolicy -> obj array -> JS.Promise<obj array>) =
+    : (ProjectionPolicy -> obj array -> JS.Promise<obj array>) =
     fun policy encoded ->
         match policy with
-        | BacklogProjectionPolicy.Exclude -> Promise.lift encoded
-        | BacklogProjectionPolicy.Include -> injectSembleIntoEncoded runtimeScope directory agent sessionID encoded
+        | ProjectionPolicy.ExcludeProjection -> Promise.lift encoded
+        | ProjectionPolicy.IncludeProjection -> injectSembleIntoEncoded runtimeScope directory agent sessionID encoded
 
 /// Build the load-caps async function for the transform pipeline.
 let buildLoadCaps
@@ -86,38 +87,27 @@ let buildTransformPlan
     (sessionID: string)
     (agent: string)
     (directory: string)
-    (p: BacklogProjectionPolicy)
+    (projectionPolicy: ProjectionPolicy)
     (caps: CapsInjectionPolicy)
     (par: ParallelHintPolicy)
-    (budget: ContextBudgetPolicy)
     (isSub: bool)
     (messagesList: Message<obj> list)
     (messagesArr: obj array)
     (sembleInjectEnabled: bool)
     (runtimeScope: RuntimeScope)
     (maxInputTokens: int)
-    (client: obj)
+    (_client: obj)
     (modelKey: string)
     (limitSource: string)
     : MessageTransformPlan =
-    let observeUsage () =
-        Wanxiangshu.Runtime.OpencodeContextBudgetObservation.tryObserveLatestUsage client sessionID directory
-        |> Promise.map (Option.map (fun observation -> observation))
-
-    let proj =
-        if p = BacklogProjectionPolicy.Include then
-            ProjectionPolicy.IncludeProjection
-        else
-            ProjectionPolicy.ExcludeProjection
+    let observeUsage () = Promise.lift ()
 
     { SessionID = sessionID
       Agent = agent
       Directory = directory
-      ProjectionPolicy = proj
-      BacklogProjectionPolicy = p
+      ProjectionPolicy = projectionPolicy
       CapsInjectionPolicy = caps
       ParallelHintPolicy = par
-      ContextBudgetPolicy = budget
       IsSubagentSession = isSub
       Cleaned = messagesList
       RawArray = Some messagesArr
@@ -145,17 +135,16 @@ let resolveTransformParams
         let capsEpoch = resolveCapsEpoch messagesList sessionID runtimeScope
         let isSub = registry.ResolveSubsessionParentID(Some sessionID) |> Option.isSome
 
-        let p = getBacklogProjectionPolicy agent isSub
+        let projectionPolicy = projectionPolicyForAgent agent isSub
         let caps = getCapsInjectionPolicy agent isSub
-        let par = getParallelHintPolicy agent
-        let budget = getContextBudgetPolicy agent isSub
+        let par = getParallelHintPolicy agent isSub
 
         let! maxInputTokens = resolveMaxInputTokens sessionID client directory
         let! modelKey = resolveModelKey client sessionID
         let limitSource = resolveLimitSource ()
 
         let sembleInjectEnabled =
-            p = BacklogProjectionPolicy.Include
+            projectionPolicy = ProjectionPolicy.IncludeProjection
             && (agent = "inspector" || agent = "reviewer")
 
         let plan =
@@ -163,10 +152,9 @@ let resolveTransformParams
                 sessionID
                 agent
                 directory
-                p
+                projectionPolicy
                 caps
                 par
-                budget
                 isSub
                 messagesList
                 messagesArr

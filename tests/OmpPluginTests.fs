@@ -38,8 +38,7 @@ let registersCoreToolsIdempotent () =
               "webfetch"
               "executor"
               "submit_review"
-              "return_reviewer"
-              "todowrite" ] do
+              "return_reviewer" ] do
             check ("has tool " + expected) (names.Contains expected)
 
         check "OMP parity: registers meditator tool" (names.Contains "meditator")

@@ -54,19 +54,14 @@ type FlatPart<'raw> =
       isUser: bool
       part: Part<'raw> }
 
-let backlogPrefixIdPrefix = "backlog-prefix-"
-
 let synthPrefixes =
     [ "caps-synth-user-"
       "caps-synth-assistant-"
       "caps-synth-ack-"
-      "backlog-projection-"
-      backlogPrefixIdPrefix
       "magic-todo-projection-"
       "magic-todo-prefix-"
       "methodology-probe-"
       "semble-synth-"
-      "context-budget-nudge-"
       "parallel-tool-synth-" ]
 
 let private roleMap =
@@ -197,4 +192,3 @@ let extractSessionID (messages: Message<'raw> list) : string =
 
 let capsSynthUserPrefix = "caps-synth-user-"
 let capsSynthAssistantPrefix = "caps-synth-assistant-"
-let backlogProjectionIdPrefix = "backlog-projection-"

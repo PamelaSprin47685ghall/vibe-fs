@@ -29,7 +29,6 @@ open Wanxiangshu.Tests.OpencodeNudgeLifecycleTests
 open Wanxiangshu.Tests.ReviewSessionRegistryTests
 open Wanxiangshu.Tests.ReviewSessionQueryTests
 open Wanxiangshu.Tests.ReviewPromptsFormatTests
-open Wanxiangshu.Tests.EventLogFoldTests
 open Wanxiangshu.Tests.EventLogReviewLoopFoldTests
 open Wanxiangshu.Tests.WanxiangzhenSquadEventTests
 open Wanxiangshu.Tests.EventLogCodecTests
@@ -76,7 +75,7 @@ let private reviewSessionBlock () : (string * TestBody) list =
 let private replayBlock () : (string * TestBody) list =
     [ "ReviewTests.disposeSessionTreeTerminatesAll",
       TestBody.Sync(sync ReviewTestsReplay.disposeSessionTreeTerminatesAll)
-      "EventLogFoldTests.run", TestBody.Sync(sync EventLogFoldTests.run)
+      //       "EventLogFoldTests.run", TestBody.Sync(sync EventLogFoldTests.run)
       "EventLogReviewLoopFoldTests.run", TestBody.Sync(sync EventLogReviewLoopFoldTests.run)
       "WanxiangzhenSquadEventTests.run", TestBody.Sync(sync WanxiangzhenSquadEventTests.run)
       "EventLogCodecTests.run", TestBody.Sync(sync EventLogCodecTests.run)

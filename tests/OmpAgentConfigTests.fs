@@ -23,7 +23,7 @@ let applyAgentConfigForRegistersBuiltinAgents () =
         check $"primary mode {name}" (str a "mode" = "primary")
 
     let manager = get agents "manager"
-    check "manager prompt mentions todowrite" ((str manager "prompt").Contains "todowrite")
+    check "manager prompt exists" (not (isNullish (get manager "prompt")))
 
     for name in subagentNames do
         let a = get agents name

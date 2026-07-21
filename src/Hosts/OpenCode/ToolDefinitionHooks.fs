@@ -6,10 +6,7 @@ open Wanxiangshu.Kernel
 open Wanxiangshu.Runtime
 
 open Wanxiangshu.Kernel.HostTools
-open Wanxiangshu.Runtime.BacklogProjectionBuild
-open Wanxiangshu.Kernel.WorkBacklog
 open Wanxiangshu.Hosts.Opencode.AgentConfig
-open Wanxiangshu.Runtime.BacklogSession
 open Wanxiangshu.Runtime.Dyn
 open Wanxiangshu.Runtime.OpencodeHookInputCodec
 open Wanxiangshu.Runtime.ToolHookRuntime
@@ -20,36 +17,6 @@ let private setKey (o: obj) (k: string) (v: obj) : unit = o?(k) <- v
 
 let private collectToolDefinitions (host: Host) (input: obj) (output: obj) : unit =
     let toolID = toolIdFromDefinitionHookInput input
-
-    if toolID = todoWriteToolNameFor host then
-        match host with
-        | Opencode
-        | Mux ->
-            setKey output "description" (box toolDescription)
-            setKey output "jsonSchema" (buildWorkBacklogSchema ())
-        | Mimocode ->
-            setKey output "description" (box fusedTaskToolDescription)
-            let parameters = get output "parameters"
-
-            if not (isNullish parameters) then
-                let safeExtend = get parameters "safeExtend"
-                let extend = get parameters "extend"
-
-                if
-                    (not (isNullish safeExtend) && Dyn.typeIs safeExtend "function")
-                    || (not (isNullish extend) && Dyn.typeIs extend "function")
-                then
-                    setKey output "parameters" (mergeWorkBacklogReportIntoTaskSchema parameters)
-                else
-                    let properties = get parameters "properties"
-
-                    if not (isNullish properties) then
-                        setKey output "parameters" (mergeWorkBacklogReportIntoTaskSchema parameters)
-                    else
-                        setKey output "jsonSchema" (buildWorkBacklogSchema ())
-            else
-                setKey output "jsonSchema" (buildWorkBacklogSchema ())
-        | Omp -> ()
 
     if WarnTdd.isModificationTool toolID then
         rewriteToolJsonSchema setKey (injectWarnTddIntoJsonSchema) output

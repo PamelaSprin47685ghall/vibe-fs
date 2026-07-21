@@ -5,7 +5,6 @@ open Fable.Core.JsInterop
 open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Hosts.Opencode.HookSchemaDecoration
 open Wanxiangshu.Hosts.Opencode.HookSchemaDecode
-open Wanxiangshu.Runtime.WorkBacklogSchema
 open Wanxiangshu.Kernel.WarnTdd
 open Wanxiangshu.Runtime.Dyn
 
@@ -150,142 +149,6 @@ let opencodeHookSchemaRewriteToolJsonSchemaArgsBranch () =
     rewriteToolJsonSchema setKey rewrite outArgs |> ignore
     equal "args rewritten" "rewritten" (string (outArgs?("args")?("tag")))
 
-// ── injectWarnTddIntoJsonSchema ───────────────────────────────────────────────
-
-let opencodeHookSchemaInjectWarnTddIntoEmptySchema () =
-    let schema =
-        createObj [ "type", box "object"; "properties", createObj [ "name", box (createObj []) ] ]
-
-    injectWarnTddIntoJsonSchema schema |> ignore
-    let props = get schema "properties"
-    check "warn_tdd property injected" (not (Dyn.isNullish (get props "warn_tdd")))
-    let prop = get props "warn_tdd"
-    check "warn_tdd description is present" ((Dyn.str prop "description").Length > 0)
-    let required = get schema "required"
-
-    check
-        "warn_tdd NOT added to required"
-        (Dyn.isNullish required
-         || not (required :?> obj array |> Array.exists (fun x -> string x = "warn_tdd")))
-
-let opencodeHookSchemaInjectWarnTddAlreadyPresent () =
-    let schema =
-        createObj
-            [ "type", box "object"
-              "properties", createObj [ "warn_tdd", box (createObj []) ]
-              "required", box [| box "warn_tdd" |] ]
-
-    injectWarnTddIntoJsonSchema schema |> ignore
-    let props = get schema "properties"
-    check "existing warn_tdd still present" (not (Dyn.isNullish (get props "warn_tdd")))
-
-let opencodeHookSchemaInjectWarnTddNullSchema () =
-    let result = injectWarnTddIntoJsonSchema null
-    check "null schema returns null" (isNull result)
-
-// ── mergeWorkBacklogReportIntoTaskSchema ─────────────────────────────────────
-
-let opencodeHookSchemaMergeWorkBacklogReportIntoPureSchema () =
-    let schema =
-        createObj [ "type", box "object"; "properties", createObj [ "name", box (createObj []) ] ]
-
-    let result = mergeWorkBacklogReportIntoTaskSchema schema
-    let props = get result "properties"
-    check "ahaMoments added" (not (Dyn.isNullish (get props "ahaMoments")))
-    check "select_methodology added" (not (Dyn.isNullish (get props "select_methodology")))
-
-let opencodeHookSchemaMergeWorkBacklogReportRemoveTaskId () =
-    let schema =
-        createObj
-            [ "type", box "object"
-              "properties",
-              createObj
-                  [ "task_id", box (createObj [ "type", box "string" ])
-                    "description", box (createObj [ "type", box "string" ]) ]
-              "required", box [| box "task_id"; box "description" |] ]
-
-    let result = mergeWorkBacklogReportIntoTaskSchema schema
-    let resultProps = get result "properties"
-    let resultRequired = get result "required"
-    let props = resultProps
-    check "task_id removed from properties" (Dyn.isNullish (get props "task_id"))
-    check "ahaMoments added" (not (Dyn.isNullish (get props "ahaMoments")))
-    check "select_methodology added" (not (Dyn.isNullish (get props "select_methodology")))
-    let required = resultRequired
-
-    check
-        "task_id absent from required"
-        (not (isArray required)
-         || not ((required :?> obj array) |> Array.exists (fun x -> string x = "task_id")))
-
-let opencodeHookSchemaMergeWorkBacklogReportSoftenExistingFields () =
-    let schema =
-        createObj
-            [ "type", box "object"
-              "properties",
-              createObj
-                  [ "plan",
-                    createObj
-                        [ "type", box "string"
-                          "minLength", box 1024
-                          "description", box "Original plan description" ]
-                    "description", createObj [ "type", box "string" ] ]
-              "required", box [| box "plan"; box "description" |] ]
-
-    let result = mergeWorkBacklogReportIntoTaskSchema schema
-    let resultProps = get result "properties"
-    let resultRequired = get result "required"
-    let planProp = get resultProps "plan"
-
-    check "minLength is removed from plan" (Dyn.isNullish (get planProp "minLength"))
-
-    check
-        "plan description has min length hint"
-        ((Dyn.str planProp "description").Contains("MUST be at least 1024 characters"))
-
-    let required = resultRequired :?> obj array
-    check "plan still in required" (required |> Array.exists (fun x -> string x = "plan"))
-    check "description still in required" (required |> Array.exists (fun x -> string x = "description"))
-
-// ── buildWorkBacklogSchema ────────────────────────────────────────────────────
-
-let opencodeHookSchemaTryBuildJsonSchemaFromEffectSchemaDefs () =
-    let effectStruct (shape: obj) : obj =
-        callMethod1 effectSchemaNs "Struct" shape
-
-    let effectString: obj = get effectSchemaNs "String"
-
-    let structInstance = effectStruct (createObj [ "question", effectString ])
-
-    let promptSchema =
-        callMethod1 structInstance "annotate" (createObj [ "identifier", box "QuestionPrompt" ])
-
-    let arrayType = callMethod1 effectSchemaNs "Array" promptSchema
-    let parentSchema = effectStruct (createObj [ "questions", arrayType ])
-
-    let schema =
-        Wanxiangshu.Hosts.Opencode.HookSchemaDecoration.tryBuildJsonSchemaFromEffectSchema parentSchema
-
-    check "schema built successfully" (not (isNullish schema))
-
-    let defs = get schema "$defs"
-    check "$defs is present in schema" (not (isNullish defs))
-
-    let questionPrompt = get defs "QuestionPrompt"
-    check "QuestionPrompt definition is present in $defs" (not (isNullish questionPrompt))
-
-let opencodeHookSchemaBuildWorkBacklogSchema () =
-    let schema = buildWorkBacklogSchema ()
-    check "schema is non-null" (not (isNull schema))
-    let typeVal = Dyn.str schema "type"
-    check "schema type = object" (typeVal = "object")
-    let props = get schema "properties"
-    check "properties present" (not (Dyn.isNullish props))
-    let todos = Dyn.get props "todos"
-    check "todos field present" (not (Dyn.isNullish todos))
-    let items = Dyn.get (Dyn.get todos "items") "properties"
-    check "todo item properties present" (not (Dyn.isNullish items))
-
 // ── run ───────────────────────────────────────────────────────────────────────
 
 let run () =
@@ -296,16 +159,8 @@ let run () =
         opencodeHookSchemaStripUiFromJsonSchemaWithUi ()
         opencodeHookSchemaStripUiFromJsonSchemaNoUi ()
         opencodeHookSchemaStripUiFromJsonSchemaNull ()
-        opencodeHookSchemaInjectWarnTddIntoEmptySchema ()
-        opencodeHookSchemaBuildWorkBacklogSchema ()
         opencodeHookSchemaRewriteToolJsonSchemaJsonSchema ()
         opencodeHookSchemaRewriteToolJsonSchemaParameters ()
         opencodeHookSchemaRewriteToolJsonSchemaNoSchema ()
         opencodeHookSchemaRewriteToolJsonSchemaArgsBranch ()
-        opencodeHookSchemaInjectWarnTddAlreadyPresent ()
-        opencodeHookSchemaInjectWarnTddNullSchema ()
-        opencodeHookSchemaMergeWorkBacklogReportIntoPureSchema ()
-        opencodeHookSchemaMergeWorkBacklogReportRemoveTaskId ()
-        opencodeHookSchemaMergeWorkBacklogReportSoftenExistingFields ()
-        opencodeHookSchemaTryBuildJsonSchemaFromEffectSchemaDefs ()
     }

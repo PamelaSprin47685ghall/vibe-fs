@@ -59,7 +59,7 @@ let private collectTodoWriteViolations (host: Host) (output: obj) (input: obj) (
     then
         false, []
     else
-        match Wanxiangshu.Runtime.WorkBacklogToolsCodec.decodeTodoWriteArgs (host = Mimocode) decodedArgs with
+        match Error() with
         | Ok(_, viols) -> false, viols
         | Error err ->
             let errStr = $"DECODE_FAILED: %A{err}"

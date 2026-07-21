@@ -18,7 +18,6 @@ open Wanxiangshu.Runtime.Fallback.RuntimeStore
 open Wanxiangshu.Runtime.RuntimeScope
 open Wanxiangshu.Runtime.ChildAgentRegistry
 open Wanxiangshu.Hosts.Opencode.SessionLifecycleObserver
-open Wanxiangshu.Runtime.BacklogSession
 open Wanxiangshu.Runtime.OpencodeClientCodec
 open Wanxiangshu.Hosts.Opencode.PluginServiceLoader
 open Wanxiangshu.Hosts.Opencode.PtySpawn
@@ -31,7 +30,6 @@ type CoreServices =
       SessionLifecycleObserver: SessionLifecycleObserver
       Directory: string
       RuntimeScope: RuntimeScope
-      BacklogSession: BacklogSession
       Tools: obj
       McpMap: obj
       FallbackConfig: FallbackConfig option
@@ -57,7 +55,6 @@ let private registerPluginHooks (host: Host) (ctx: obj) (parts: PluginServicePar
       SessionLifecycleObserver = parts.LifecycleObserver
       Directory = parts.Directory
       RuntimeScope = parts.Scope
-      BacklogSession = parts.BacklogSession
       Tools = parts.Tools
       McpMap = buildMcpMap ()
       FallbackConfig = parts.FallbackConfigOpt

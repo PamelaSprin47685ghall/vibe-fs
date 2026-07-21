@@ -4,8 +4,6 @@ open Fable.Core
 open Wanxiangshu.Kernel.HostTools
 open Wanxiangshu.Hosts.Opencode.ChatHooks
 open Wanxiangshu.Hosts.Opencode.MessageTransformHook
-open Wanxiangshu.Hosts.Opencode.CompactionTransform
-open Wanxiangshu.Hosts.Opencode.ToolDefinitionHooks
 open Wanxiangshu.Hosts.Opencode.EventHooks
 open Wanxiangshu.Runtime.ChildAgentRegistry
 open Wanxiangshu.Runtime.ChatTransformOutputCodec
@@ -31,33 +29,17 @@ let messagesTransform
     (registry: ChildAgentRegistry)
     (directory: string)
     (runtimeScope: Wanxiangshu.Runtime.RuntimeScope.RuntimeScope)
-    (backlogSession: Wanxiangshu.Runtime.BacklogSession.BacklogSession)
     (reviewStore: Wanxiangshu.Runtime.ReviewRuntime.ReviewStore)
     (client: obj)
     (input: obj)
     (output: obj)
     : JS.Promise<unit> =
-    MessageTransformHook.messagesTransform
-        registry
-        directory
-        runtimeScope
-        backlogSession
-        reviewStore
-        client
-        input
-        output
+    MessageTransformHook.messagesTransform registry directory runtimeScope reviewStore client input output
 
 let systemTransform (directory: string) (_input: obj) (output: obj) : JS.Promise<unit> =
     promise { setSystemOutputToDirectory directory output }
 
-let compactionAutocontinue (input: obj) (output: obj) : JS.Promise<unit> =
-    CompactionTransform.compactionAutocontinue input output
-
-let toolDefinitionFor (host: Host) (input: obj) (output: obj) : JS.Promise<unit> =
-    ToolDefinitionHooks.toolDefinitionFor host input output
-
-let toolDefinition (input: obj) (output: obj) : JS.Promise<unit> =
-    ToolDefinitionHooks.toolDefinition input output
+let compactionAutocontinue (_input: obj) (_output: obj) : JS.Promise<unit> = Promise.lift ()
 
 let eventHandler
     (reviewStore: Wanxiangshu.Runtime.ReviewRuntime.ReviewStore)

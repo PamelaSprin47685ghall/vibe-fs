@@ -16,7 +16,6 @@ open Wanxiangshu.Runtime.ReviewRuntime
 open Wanxiangshu.Runtime.RuntimeScope
 open Wanxiangshu.Hosts.Omp.Fallback.ActionExecutor
 open Wanxiangshu.Hosts.Opencode.Fallback.ActionExecutor
-open Wanxiangshu.Runtime.BacklogSession
 open Wanxiangshu.Hosts.Opencode.SessionLifecycleObserver
 open Wanxiangshu.Hosts.Omp.Fallback.Hook
 open Wanxiangshu.Hosts.Opencode.Fallback.Hook

@@ -7,13 +7,11 @@ import { waitForLoopCommand, waitForAsyncCondition, validateNdjson } from './p0-
 import { TIMEOUTS } from './p0-canary-utils.js';
 import fs from 'node:fs';
 
-const pad = 'x'.repeat(1024);
-
 function getHasPlugin(t) {
   return t.host._startOpts.pluginPaths && t.host._startOpts.pluginPaths.length > 0;
 }
 
-async function triggerReviewAndBacklog(t, sid) {
+async function triggerReviewAndTodo(t, sid) {
   t.provider.expectText({ id: 'warm', text: 'ok' });
   const turn = await t.turn.start(sid);
   await t.client.prompt(sid, 'hello');
@@ -28,19 +26,14 @@ async function triggerReviewAndBacklog(t, sid) {
     id: 'todo-write',
     tool: 'todowrite',
     args: {
-      ahaMoments: pad,
-      changesAndReasons: pad,
-      gotchas: pad,
-      lessonsAndConventions: pad,
-      plan: pad,
-      todos: [{ content: 'backlog task', status: 'pending', priority: 'high' }],
+      todos: [{ content: 'todo task', status: 'pending', priority: 'high' }],
       select_methodology: ['first_principles'],
     },
   });
-  t.provider.expectText({ id: 'todo-done', text: 'backlog written' });
+  t.provider.expectText({ id: 'todo-done', text: 'todo written' });
 
   const todoTurn = await t.turn.start(sid);
-  await t.client.prompt(sid, 'add a backlog task via todowrite');
+  await t.client.prompt(sid, 'add a todo task via todowrite');
   await todoTurn.awaitTerminal({ timeoutMs: TIMEOUTS.quick });
 }
 
@@ -100,8 +93,8 @@ async function verifyRecoveredState(t, sid) {
   const lastReq = t.provider.requests.find(r => JSON.stringify(r).includes('verify state'));
   if (!lastReq) throw new Error('Verification request not captured');
   const reqStr = JSON.stringify(lastReq);
-  if (!reqStr.includes('backlog task')) {
-    throw new Error('Backlog state was not recovered: "backlog task" missing from LLM request context');
+  if (!reqStr.includes('todo task')) {
+    throw new Error('Todo state was not recovered: "todo task" missing from LLM request context');
   }
   if (!reqStr.includes('contextGeneration":5') && !reqStr.includes('contextGeneration\\":5')) {
     throw new Error('Context generation state was not recovered: contextGeneration 5 missing from request metadata');
@@ -114,7 +107,7 @@ async function verifyRecoveredState(t, sid) {
 }
 
 async function runReplayFlow(t, sid) {
-  await triggerReviewAndBacklog(t, sid);
+  await triggerReviewAndTodo(t, sid);
   await waitForNudge(t);
   await requestFallback(t, sid);
   await appendContextGeneration(t, sid);
@@ -123,7 +116,7 @@ async function runReplayFlow(t, sid) {
 }
 
 const testRestartReplayRecovery = {
-  name: 'OC-ES-006 OC-ES-007 OC-ES-008 OC-ES-009 OC-ES-010 OC-ES-011 restart replay recovers states (review, backlog, nudge, fallback, context)',
+  name: 'OC-ES-006 OC-ES-007 OC-ES-008 OC-ES-009 OC-ES-010 OC-ES-011 restart replay recovers states (review, todo, nudge, fallback, context)',
   fn: async (t) => {
     const sid = getSessionId(await t.client.createSession());
     if (getHasPlugin(t)) {

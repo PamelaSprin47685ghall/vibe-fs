@@ -21,7 +21,6 @@ open Wanxiangshu.Hosts.Omp.ToolResultEvent
 open Wanxiangshu.Hosts.Omp.MessagingCodec
 open Wanxiangshu.Hosts.Omp.NudgeRuntime
 open Wanxiangshu.Kernel.HostTools
-open Wanxiangshu.Kernel.WorkBacklog
 open Wanxiangshu.Runtime.ToolOutputInfo
 open Wanxiangshu.Runtime.RunnerBackground
 open Wanxiangshu.Runtime.LivelockGuard

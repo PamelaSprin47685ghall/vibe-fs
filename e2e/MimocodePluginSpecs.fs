@@ -18,8 +18,6 @@ let testSpecs (harness: Harness) (ok: int ref) : JS.Promise<unit> =
         runMimoToolPresence harness chk
 
         do! runMimoTaskSchema harness chk
-        do! runMimoTaskMissingAha harness chk
-        do! runMimoTaskShortAha harness chk
         do! runMimoTaskSuccess harness chk
         do! runMimoTaskNoMethodology harness chk
         do! runMimoTaskEmptyTodo harness chk

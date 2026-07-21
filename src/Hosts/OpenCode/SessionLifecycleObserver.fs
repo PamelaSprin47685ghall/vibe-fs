@@ -8,12 +8,12 @@ open Wanxiangshu.Runtime.ChildAgentRegistry
 open Wanxiangshu.Runtime.Dyn
 open Wanxiangshu.Runtime.OpencodeHookInputCodec
 open Wanxiangshu.Runtime.ToolRuntimeContext
+open Wanxiangshu.Runtime.ReviewRuntime
 open Wanxiangshu.Runtime.Fallback.RuntimeStore
 open Wanxiangshu.Runtime.Fallback.SessionRuntimeLeasePure
 open Wanxiangshu.Hosts.Opencode.ProgressObserver
 open Wanxiangshu.Hosts.Opencode.Fallback.Coordinator
 open Wanxiangshu.Hosts.Opencode.NudgeTrigger
-open Wanxiangshu.Runtime.BacklogSession
 open Wanxiangshu.Hosts.Opencode.SessionLifecycleHumanTurn
 open Wanxiangshu.Hosts.Opencode.SessionLifecycleEvents
 
@@ -21,16 +21,15 @@ type SessionLifecycleObserver
     (
         host: Host,
         ctx: obj,
-        reviewStore: Wanxiangshu.Runtime.ReviewRuntime.ReviewStore,
+        reviewStore: ReviewStore,
         registry: ChildAgentRegistry,
         fallbackHandler: (obj -> JS.Promise<FallbackHookResult>) option,
-        fallbackRuntime: FallbackRuntimeStore,
-        backlogSession: BacklogSession
+        fallbackRuntime: FallbackRuntimeStore
     ) =
 
     let resolvedUnitPromise () : JS.Promise<unit> = Promise.lift ()
 
-    let progress = ProgressObserver(host, ctx, backlogSession, fallbackRuntime)
+    let progress = ProgressObserver(host, ctx, fallbackRuntime)
     let fallback = FallbackCoordinator(fallbackHandler, fallbackRuntime)
 
     let nudge =
@@ -69,10 +68,9 @@ let createSessionLifecycleObserver
     (
         host: Host,
         ctx: obj,
-        reviewStore: Wanxiangshu.Runtime.ReviewRuntime.ReviewStore,
+        reviewStore: ReviewStore,
         registry: ChildAgentRegistry,
         fallbackHandler: (obj -> JS.Promise<FallbackHookResult>) option,
-        fallbackRuntime: FallbackRuntimeStore,
-        backlogSession: BacklogSession
+        fallbackRuntime: FallbackRuntimeStore
     ) : SessionLifecycleObserver =
-    SessionLifecycleObserver(host, ctx, reviewStore, registry, fallbackHandler, fallbackRuntime, backlogSession)
+    SessionLifecycleObserver(host, ctx, reviewStore, registry, fallbackHandler, fallbackRuntime)

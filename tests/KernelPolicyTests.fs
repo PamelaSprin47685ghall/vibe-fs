@@ -61,8 +61,6 @@ let childWorkspaceDefaultStillExcluded () =
 let messagePrefixes () =
     check "capsSynthUserPrefix value" (capsSynthUserPrefix = "caps-synth-user-")
     check "capsSynthAssistantPrefix value" (capsSynthAssistantPrefix = "caps-synth-assistant-")
-    check "backlogProjectionIdPrefix value" (backlogProjectionIdPrefix = "backlog-projection-")
-    check "backlogPrefixIdPrefix value" (backlogPrefixIdPrefix = "backlog-prefix-")
 
 // ── CapsSynthPolicy ─────────────────────────────────────────────────────────
 

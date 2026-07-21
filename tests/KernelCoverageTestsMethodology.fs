@@ -111,21 +111,6 @@ let taExecutor () =
     | Executor e -> equal "Executor.Command" "p" e.Command
     | _ -> check "Executor case" false
 
-let taTodoWrite () =
-    let a =
-        TodoWrite
-            { AhaMoments = "am"
-              ChangesAndReasons = "cr"
-              Gotchas = "g"
-              LessonsAndConventions = "lc"
-              Plan = "p"
-              Todos = [||]
-              SelectMethodology = [] }
-
-    match a with
-    | TodoWrite t -> equal "TodoWrite.Plan" "p" t.Plan
-    | _ -> check "TodoWrite case" false
-
 let taApplyPatch () =
     let a = ApplyPatch { PatchText = "diff" }
 
@@ -223,7 +208,6 @@ let run () =
     taWebsearch ()
     taWebfetch ()
     taExecutor ()
-    taTodoWrite ()
     taApplyPatch ()
     taSubmitReview ()
     trWireEncodeResultOk ()

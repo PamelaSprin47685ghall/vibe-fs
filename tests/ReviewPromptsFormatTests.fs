@@ -124,8 +124,7 @@ let formatWipAcknowledgmentProducesFrontMatter () =
     check "output is non-empty" (text <> "")
     check "output contains frontmatter delimiter" (text.Contains "---")
     check "output mentions With-Review Mode" (text.Contains "With-Review Mode")
-    check "output mentions todowrite" (text.Contains "todowrite")
-    check "output mentions continue working" (text.Contains "continue working")
+    check "output mentions Continue working" (text.Contains "Continue working")
     let parsed = parseFrontMatter text
     check "parsed task field equals input" (parsed?("task") = box task)
     check "parsed review_progress field equals recorded" (parsed?("review_progress") = box "recorded")

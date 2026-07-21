@@ -188,11 +188,10 @@ BacklogOnly → skipsTodo ? NudgeNone : NudgeTodo
 
 ### 决策优先级
 
-1. `context-budget-nudge`（见 [13](./13-context-budget.md)）— 上下文预算紧急 nudge
-2. backlog 有 open todos → `nudge-todo`
-3. 子代理 / runner 活跃 → `nudge-runner`
-4. review loop 活跃（**事件 fold**）→ `nudge-loop`
-5. 否则 → none
+1. backlog 有 open todos → `nudge-todo`
+2. 子代理 / runner 活跃 → `nudge-runner`
+3. review loop 活跃（**事件 fold**）→ `nudge-loop`
+4. 否则 → none
 
 ### 与 PromiseQueue 的关系
 
@@ -242,4 +241,3 @@ sequenceDiagram
 - [05-event-sourcing.md](./05-event-sourcing.md) § nudge 事件
 - [11-subagents.md](./11-subagents.md)
 - [08-tools-and-permissions.md](./08-tools-and-permissions.md)
-- [13-context-budget.md](./13-context-budget.md)

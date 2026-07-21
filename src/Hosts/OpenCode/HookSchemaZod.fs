@@ -6,8 +6,6 @@ open Wanxiangshu.Kernel
 open Wanxiangshu.Runtime
 open Wanxiangshu.Runtime.Dyn
 open Wanxiangshu.Hosts.Opencode.ToolSchema
-open Wanxiangshu.Kernel.WorkBacklog
-open Wanxiangshu.Runtime.WorkBacklogSchema
 open Wanxiangshu.Hosts.Opencode.HookSchemaDecoration
 
 type IZodDef =
@@ -113,9 +111,6 @@ let scanZodShape (shape: obj) (schema: IZodSchema) : IZodSchema option * Set<str
     for k in keys do
         let prop = unbox<IZodSchema> (get shape k)
 
-        if Wanxiangshu.Kernel.WorkBacklog.reportFieldNames |> List.contains k then
-            existingReportFields <- Set.add k existingReportFields
-
         if k = "select_methodology" then
             existingMethodology <- Some prop
 
@@ -143,25 +138,6 @@ let buildExtensionProperties
     (existingMethodology: IZodSchema option)
     : (string * obj) list =
     let mutable extProps: (string * obj) list = []
-
-    let reportFields = Wanxiangshu.Kernel.WorkBacklog.reportFieldNames
-
-    for field in reportFields do
-        let desc =
-            match field with
-            | "ahaMoments" -> ahaMomentsDesc
-            | "changesAndReasons" -> changesAndReasonsDesc
-            | "gotchas" -> gotchasDesc
-            | "lessonsAndConventions" -> lessonsAndConventionsDesc
-            | "plan" -> planDesc
-            | _ -> ""
-
-        match tryCallSchemaMethod templateStr "describe" (box desc) with
-        | Some describedStr ->
-            match tryCallSchemaMethod0 (unbox<IZodSchema> describedStr) "optional" with
-            | Some optionalStr -> extProps <- (field, optionalStr) :: extProps
-            | None -> ()
-        | None -> ()
 
     if existingMethodology.IsNone then
         match tryCallSchemaMethod0 templateStr "array" with

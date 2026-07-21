@@ -2,16 +2,16 @@
 
 ## 目的
 
-在宿主将消息数组交给 LLM **之前**，插入 caps、backlog、review replay、Semble、parallel 提示、context budget 等。共享逻辑在 `src/Runtime/MessageTransform/`；宿主只挂 hook 与 `RuntimeScope`。
+在宿主将消息数组交给 LLM **之前**，插入 caps、backlog、review replay、Semble、parallel 提示等。共享逻辑在 `src/Runtime/MessageTransform/`；宿主只挂 hook 与 `RuntimeScope`。
 
 ## 核心模块
 
 | 模块 | 职责 |
 | :--- | :--- |
-| `src/Runtime/MessageTransform/Pipeline.fs` | 主编排、`applyContextBudget`、阶段组合 |
+| `src/Runtime/MessageTransform/Pipeline.fs` | 主编排、阶段组合 |
 | `src/Runtime/MessageTransform/Stack.fs` | TransformState 三段状态（Caps、Backlog、Top slot） |
 | `src/Runtime/Tooling/ToolHookRuntime.fs` | 控制字段软校验、净化、after 还原、违例批评 |
-| `src/Kernel/MessageTransformPolicy.fs` | 策略（Backlog/Caps/ParallelHint/ContextBudget 四分） |
+| `src/Kernel/MessageTransformPolicy.fs` | 策略（Backlog/Caps/ParallelHint 三分） |
 | `src/Runtime/MessageTransform/ParallelHintStage.fs` | 并行提示阶段 |
 | `src/Runtime/Search/SembleSearch.fs` | inspector 断点注入 |
 
@@ -23,8 +23,7 @@
 
 1. Caps — 按 `scopeId × CapsRevision × PolicyVersion` 缓存，复用段引用
 2. Backlog 投影（事件 fold，非历史 tool SSOT；`BacklogRevision` 驱动）
-3. **applyContextBudget**（`BudgetRevision` + `TopSlotKey` 驱动，见 [13](./13-context-budget.md)）
-4. **tryInjectParallelToolPrompt**（与 budget nudge 互斥，`ParallelHintTop` key）
+3. **tryInjectParallelToolPrompt**（`ParallelHintTop` key）
 5. Semble（inspector + 开关）
 6. **replaceArrayInPlace** 原地替换宿主数组
 
@@ -97,4 +96,3 @@ OpenCode：**原地 mutate** hook 字段（`AGENTS.md`）。
 
 - [06-review-and-nudge.md](./06-review-and-nudge.md)
 - [07-work-backlog.md](./07-work-backlog.md)
-- [13-context-budget.md](./13-context-budget.md)

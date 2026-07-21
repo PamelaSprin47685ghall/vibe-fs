@@ -106,10 +106,6 @@ let testAmendSkippedWhenSembleInjectEnabled () =
     promise {
         let reviewStore = createReviewStore ()
 
-        let backlogOps =
-            { Host = Opencode
-              GetOrRebuildBacklog = fun _ _ -> [] }
-
         let encodeMessages (msgs: Message<obj> list) = msgs |> List.map box |> List.toArray
         let injectFn _ (arr: obj array) = promise { return arr }
         let loadCaps () = promise { return [] }
@@ -137,10 +133,8 @@ let testAmendSkippedWhenSembleInjectEnabled () =
               Agent = "main"
               Directory = ""
               ProjectionPolicy = ProjectionPolicy.ExcludeProjection
-              BacklogProjectionPolicy = Wanxiangshu.Kernel.MessageTransformPolicy.BacklogProjectionPolicy.Exclude
               CapsInjectionPolicy = Wanxiangshu.Kernel.MessageTransformPolicy.CapsInjectionPolicy.Exclude
               ParallelHintPolicy = Wanxiangshu.Kernel.MessageTransformPolicy.ParallelHintPolicy.Exclude
-              ContextBudgetPolicy = Wanxiangshu.Kernel.MessageTransformPolicy.ContextBudgetPolicy.Disable
               IsSubagentSession = false
               Cleaned = msgs
               RawArray = None
@@ -149,18 +143,9 @@ let testAmendSkippedWhenSembleInjectEnabled () =
               MaxInputTokens = 200000
               ModelKey = "openai/gpt-4o:default"
               LimitSource = "openai-session-model"
-              ObserveLatestUsage = (fun () -> Promise.lift None) }
+              ObserveLatestUsage = (fun () -> Promise.lift ()) }
 
-        let! res =
-            runHostMessagesTransform
-                reviewStore
-                "s-amend-semble"
-                plan
-                backlogOps
-                encodeMessages
-                injectFn
-                loadCaps
-                buildCaps
+        let! res = runHostMessagesTransform reviewStore "s-amend-semble" plan encodeMessages injectFn loadCaps buildCaps
 
         equal "amend skipped: output should preserve all 4 messages" 4 res.Length
     }

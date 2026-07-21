@@ -12,82 +12,24 @@ open Wanxiangshu.Hosts.Omp.Codec
 open Wanxiangshu.Hosts.Omp.HookExecute
 open Wanxiangshu.Hosts.Omp.MessageTransform
 open Wanxiangshu.Hosts.Omp.ToolResultEvent
-open Wanxiangshu.Runtime.BacklogSession
 open Wanxiangshu.Hosts.Omp.MessagingCodec
 open Wanxiangshu.Hosts.Omp.NudgeRuntime
 open Wanxiangshu.Kernel.HostTools
-open Wanxiangshu.Kernel.WorkBacklog
 open Wanxiangshu.Runtime.ToolOutputInfo
 open Wanxiangshu.Runtime
 open Wanxiangshu.Runtime.RunnerBackground
 open Wanxiangshu.Runtime.LivelockGuard
 open Wanxiangshu.Runtime.ReviewRuntime
 open Wanxiangshu.Runtime.Dyn
-open Wanxiangshu.Runtime.BacklogProjectionBuild
 
 module Dyn = Wanxiangshu.Runtime.Dyn
 
 open Wanxiangshu.Hosts.Omp.ExecutorTools
-open Wanxiangshu.Runtime.WorkBacklogToolsCodec
 open Wanxiangshu.Runtime.SubsessionActorRegistry
 open Wanxiangshu.Kernel.Subsession.Types
 
-/// Shared BacklogSession bound to the OMP host.
-let private backlogSession = BacklogSession(omp, ExecutorTools.ompScope)
-
 let collectViolations (_envOpt: ToolHookRuntime.ControlEnvelope option) (_toolName: string) (_args: obj) : string list =
     []
-
-let tryCaptureBacklogEntry (isError: bool) (callId: string) (input: obj) (event: obj) : unit =
-    if callId = "" then
-        ()
-
-    let ahaMoments =
-        if Dyn.isNullish input then
-            ""
-        else
-            (Dyn.str input "ahaMoments").Trim()
-
-    let changesAndReasons =
-        if Dyn.isNullish input then
-            ""
-        else
-            (Dyn.str input "changesAndReasons").Trim()
-
-    let gotchas =
-        if Dyn.isNullish input then
-            ""
-        else
-            (Dyn.str input "gotchas").Trim()
-
-    let lessonsAndConventions =
-        if Dyn.isNullish input then
-            ""
-        else
-            (Dyn.str input "lessonsAndConventions").Trim()
-
-    let plan =
-        if Dyn.isNullish input then
-            ""
-        else
-            (Dyn.str input "plan").Trim()
-
-    if
-        not isError
-        && (ahaMoments <> ""
-            || changesAndReasons <> ""
-            || gotchas <> ""
-            || lessonsAndConventions <> ""
-            || plan <> "")
-    then
-        let entry: BacklogEntry =
-            { ahaMoments = ahaMoments
-              changesAndReasons = changesAndReasons
-              gotchas = gotchas
-              lessonsAndConventions = lessonsAndConventions
-              plan = plan }
-
-        backlogSession.CaptureReport(callId, entry.plan)
 
 let isToolError (event: obj) : bool =
     Dyn.truthy (Dyn.get event "isError")
@@ -176,11 +118,6 @@ let toolResultHandler (_pi: obj) (_reviewStore: ReviewStore) (event: obj) (ctx: 
                 businessProcessedText <- textAfterSyntax
 
                 if toolName = todoWriteToolName omp then
-                    let callId = getToolCallId event
-                    let input = getToolInput event
-
-                    tryCaptureBacklogEntry isError callId input event
-
                     let methodologies = getTodoWriteMethodologies args
 
                     if textAfterSyntax <> "" && not isError then

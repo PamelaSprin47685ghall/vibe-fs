@@ -38,7 +38,7 @@ let integrationToolSpecs () : (string * (unit -> JS.Promise<unit>)) list =
       ("capsTransform", capsTransformSpec)
       ("capsTransformInPlace", capsTransformInPlaceSpec)
       ("defaultPreludeWithoutCaps", defaultPreludeWithoutCapsSpec)
-      ("capsAndBacklogOrder", capsAndBacklogOrderSpec)
+      ("capsOrder", capsOrderSpec)
       ("capsEpochIsolationAndStability", capsEpochIsolationAndStabilitySpecs)
       ("toolDefinition", toolDefinitionSpec)
       "toolExecuteBefore", toolExecuteBeforeSpec
@@ -71,7 +71,7 @@ let integrationToolSpecs () : (string * (unit -> JS.Promise<unit>)) list =
       "muxMessagesTransformAcceptedSubmitReviewEndsLoop", muxMessagesTransformAcceptedSubmitReviewEndsLoopSpec
       "muxTodoWriteWrapperSchema", muxTodoWriteWrapperSchemaSpec
       "muxTodoWriteCapturesCompletedWorkReport", muxTodoWriteCapturesCompletedWorkReportSpec
-      "muxBacklogProjection", muxBacklogProjectionSpec
+      "muxTodoProjection", muxTodoProjectionSpec
       "muxExecutorRoCatPrependsWarning", muxExecutorRoCatPrependsWarningSpec
       "muxSubmitReviewNoActiveReview", muxSubmitReviewNoActiveReviewSpec
       "muxSubmitReviewPromptFormat", muxSubmitReviewPromptFormatSpec

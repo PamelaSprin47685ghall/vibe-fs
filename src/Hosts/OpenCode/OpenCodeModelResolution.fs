@@ -4,7 +4,6 @@ open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Kernel
 open Wanxiangshu.Runtime
-open Wanxiangshu.Runtime.ContextBudgetUsageCodec
 open Wanxiangshu.Runtime.Dyn
 open Wanxiangshu.Hosts.Opencode.ModelResolutionCatalog
 
@@ -119,23 +118,10 @@ let resolveMaxInputTokens (sessionID: string) (client: obj) (directory: string) 
             let! (providerID, modelID) = extractModelFromSession client sessionID directory
 
             if providerID = "" && modelID = "" then
-                let! fallback =
-                    Wanxiangshu.Runtime.ContextBudgetUsageCodec.resolveMaxInputTokens [ client ] sessionID directory
-
-                return fallback
+                return fallbackMaxInputTokens
             else
                 let! result = resolveModelResolution client providerID modelID directory
-
-                let limitTarget =
-                    createObj
-                        [ "model",
-                          box (createObj [ "limit", box (createObj [ "input", box result.UsableInputTokens ]) ]) ]
-
-                return!
-                    Wanxiangshu.Runtime.ContextBudgetUsageCodec.resolveMaxInputTokens
-                        [ limitTarget; client ]
-                        sessionID
-                        directory
+                return result.UsableInputTokens
     }
 
 /// Resolve the full model resolution result including source information.

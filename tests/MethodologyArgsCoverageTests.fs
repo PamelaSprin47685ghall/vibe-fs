@@ -113,44 +113,8 @@ let hookSchemaStripUi () =
     let req = get r "required"
     check "ui removed from required" (not (Array.contains (box "ui_") (unbox<obj[]> req)))
 
-let hookSchemaInjectWarnTdd () =
-    let schema =
-        createObj
-            [ "properties", createObj [ "name", box (createObj [ "type", box "string" ]) ]
-              "required", box [| box "name" |] ]
-
-    injectWarnTddIntoJsonSchema schema |> ignore
-    let props = get schema "properties"
-    check "warn_tdd property added" (not (isNullish (get props "warn_tdd")))
-    let req = unbox<obj[]> (get schema "required")
-    check "warn_tdd NOT in required" (not (Array.contains (box "warn_tdd") req))
-    let prop = get props "warn_tdd"
-    check "warn_tdd description is present" ((string (get prop "description")).Length > 0)
-    let schema2 = createObj [ "warn_tdd", box "ignored" ]
-    let r2 = injectWarnTddIntoJsonSchema schema2
-    check "nullish returns non-null" (not (isNullish r2))
-
-let hookSchemaMergeWorkBacklogReport () =
-    let jsonSchema =
-        createObj
-            [ "type", box "object"
-              "properties", createObj [ "task_id", box (createObj [ "type", box "string" ]) ]
-              "required", box [| box "task_id" |] ]
-
-    let r = mergeWorkBacklogReportIntoTaskSchema jsonSchema
-    let props = get r "properties"
-    check "ahaMoments added" (not (isNullish (get props "ahaMoments")))
-    check "select_methodology added" (not (isNullish (get props "select_methodology")))
-    check "task_id removed from properties" (isNullish (get props "task_id"))
-    let req = unbox<obj[]> (get r "required")
-    check "task_id removed from required" (not (Array.contains (box "task_id") req))
-    check "select_methodology in required" (Array.contains (box "select_methodology") req)
-
-
 let run () =
     methArgs ()
     methSchemaCommon ()
     hookSchemaSetUiLabel ()
     hookSchemaStripUi ()
-    hookSchemaInjectWarnTdd ()
-    hookSchemaMergeWorkBacklogReport ()

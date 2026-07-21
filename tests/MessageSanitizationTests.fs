@@ -33,10 +33,6 @@ let testMessageSanitization () =
     promise {
         let reviewStore = createReviewStore ()
 
-        let backlogOps =
-            { Host = opencode
-              GetOrRebuildBacklog = fun _ _ -> [] }
-
         let encodeMessages (msgs: Message<obj> list) =
             [| createObj
                    [ "id", box "msg-1"
@@ -62,10 +58,8 @@ let testMessageSanitization () =
                   Agent = "main"
                   Directory = ""
                   ProjectionPolicy = ProjectionPolicy.IncludeProjection
-                  BacklogProjectionPolicy = Wanxiangshu.Kernel.MessageTransformPolicy.BacklogProjectionPolicy.Include
                   CapsInjectionPolicy = Wanxiangshu.Kernel.MessageTransformPolicy.CapsInjectionPolicy.Include
                   ParallelHintPolicy = Wanxiangshu.Kernel.MessageTransformPolicy.ParallelHintPolicy.Include
-                  ContextBudgetPolicy = Wanxiangshu.Kernel.MessageTransformPolicy.ContextBudgetPolicy.Include
                   IsSubagentSession = false
                   Cleaned = msgs
                   RawArray = None
@@ -74,9 +68,9 @@ let testMessageSanitization () =
                   MaxInputTokens = 200000
                   ModelKey = "openai/gpt-4o:default"
                   LimitSource = "openai-session-model"
-                  ObserveLatestUsage = (fun () -> Promise.lift None) }
+                  ObserveLatestUsage = (fun () -> Promise.lift ()) }
 
-            runHostMessagesTransform reviewStore sessionID plan backlogOps encodeMessages injectFn loadCaps buildCaps
+            runHostMessagesTransform reviewStore sessionID plan encodeMessages injectFn loadCaps buildCaps
 
         let! res1 = runTransform "sanitize-session" [ mkMsg "user" User [] ]
         equal "sanitize result length" 1 res1.Length
@@ -97,10 +91,6 @@ let testMessageSanitization () =
 let testEmptyArrayAndMissingContentSanitization () =
     promise {
         let reviewStore = createReviewStore ()
-
-        let backlogOps =
-            { Host = opencode
-              GetOrRebuildBacklog = fun _ _ -> [] }
 
         let partsRef = [||]
         let contentRef = [||]
@@ -145,10 +135,8 @@ let testEmptyArrayAndMissingContentSanitization () =
               Agent = "main"
               Directory = ""
               ProjectionPolicy = ProjectionPolicy.IncludeProjection
-              BacklogProjectionPolicy = Wanxiangshu.Kernel.MessageTransformPolicy.BacklogProjectionPolicy.Include
               CapsInjectionPolicy = Wanxiangshu.Kernel.MessageTransformPolicy.CapsInjectionPolicy.Include
               ParallelHintPolicy = Wanxiangshu.Kernel.MessageTransformPolicy.ParallelHintPolicy.Include
-              ContextBudgetPolicy = Wanxiangshu.Kernel.MessageTransformPolicy.ContextBudgetPolicy.Include
               IsSubagentSession = false
               Cleaned = []
               RawArray = Some raw
@@ -157,18 +145,10 @@ let testEmptyArrayAndMissingContentSanitization () =
               MaxInputTokens = 200000
               ModelKey = "openai/gpt-4o:default"
               LimitSource = "openai-session-model"
-              ObserveLatestUsage = (fun () -> Promise.lift None) }
+              ObserveLatestUsage = (fun () -> Promise.lift ()) }
 
         let! res =
-            runHostMessagesTransform
-                reviewStore
-                "sanitize-session-2"
-                plan
-                backlogOps
-                (fun _ -> [||])
-                injectFn
-                loadCaps
-                buildCaps
+            runHostMessagesTransform reviewStore "sanitize-session-2" plan (fun _ -> [||]) injectFn loadCaps buildCaps
 
         check "res should be same array reference as raw" (System.Object.ReferenceEquals(res, raw))
         equal "sanitize result length" 8 res.Length

@@ -272,39 +272,6 @@ let opencodeNonSubagentIgnoresWarnReuse () =
         check "opencode read has no violations" (violations.IsEmpty)
     }
 
-// ── Opencode Hook Schema warn_reuse injection tests ─────────────────────────
-
-let opencodeHookSchemaInjectWarnReuseIntoEmptySchema () =
-    let schema =
-        createObj [ "type", box "object"; "properties", createObj [ "name", box (createObj []) ] ]
-
-    injectWarnReuseIntoJsonSchema schema |> ignore
-    let props = get schema "properties"
-    check "warn_reuse property injected" (not (Dyn.isNullish (get props "warn_reuse")))
-    let prop = get props "warn_reuse"
-    check "warn_reuse description is present" ((Dyn.str prop "description").Length > 0)
-    let required = get schema "required"
-
-    check
-        "warn_reuse NOT added to required"
-        (Dyn.isNullish required
-         || not (required :?> obj array |> Array.exists (fun x -> string x = "warn_reuse")))
-
-let opencodeHookSchemaInjectWarnReuseAlreadyPresent () =
-    let schema =
-        createObj
-            [ "type", box "object"
-              "properties", createObj [ "warn_reuse", box (createObj []) ]
-              "required", box [| box "warn_reuse" |] ]
-
-    injectWarnReuseIntoJsonSchema schema |> ignore
-    let props = get schema "properties"
-    check "existing warn_reuse still present" (not (Dyn.isNullish (get props "warn_reuse")))
-
-let opencodeHookSchemaInjectWarnReuseNullSchema () =
-    let result = injectWarnReuseIntoJsonSchema null
-    check "null schema returns null" (isNull result)
-
 let run () : JS.Promise<unit> =
     promise {
         do! opencodeRejectsCoderMissing ()
@@ -325,7 +292,4 @@ let run () : JS.Promise<unit> =
         do! opencodeRejectsCoderMalformedWarnReuse ()
         do! opencodeAcceptsCoderWithWarnReuse ()
         do! opencodeNonSubagentIgnoresWarnReuse ()
-        opencodeHookSchemaInjectWarnReuseIntoEmptySchema ()
-        opencodeHookSchemaInjectWarnReuseAlreadyPresent ()
-        opencodeHookSchemaInjectWarnReuseNullSchema ()
     }

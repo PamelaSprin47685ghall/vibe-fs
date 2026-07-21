@@ -8,7 +8,6 @@ open Wanxiangshu.Runtime.Fallback.RuntimeStore
 open Wanxiangshu.Runtime.Fallback.SessionRuntimeLeasePure
 open Wanxiangshu.Runtime.Fallback.SessionRuntimePropertyPure
 open Wanxiangshu.Runtime.Fallback.NudgeHandler
-open Wanxiangshu.Runtime.Fallback.CompactionHandler
 open Wanxiangshu.Runtime.Fallback.FallbackMessageCodec
 open Wanxiangshu.Runtime.Fallback.Ports
 open Wanxiangshu.Runtime.Fallback.ContinuationExecution
@@ -79,8 +78,6 @@ let handleNewUserMessage
     (rawEvent: obj)
     : JS.Promise<FallbackHookResult * ContinuationIntent option> =
     promise {
-        do! settleActiveCompactionIfOwner runtime workspaceRoot sessionID
-
         let msgId = translator.ExtractNewUserMessageId rawEvent |> Option.defaultValue ""
 
         if msgId = "" || msgId <> (runtime.GetSession sessionID).LastHumanMessageId then

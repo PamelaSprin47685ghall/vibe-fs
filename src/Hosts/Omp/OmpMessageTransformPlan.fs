@@ -6,26 +6,15 @@ open Wanxiangshu.Kernel.Config
 open Wanxiangshu.Kernel.HostTools
 open Wanxiangshu.Kernel.Messaging
 open Wanxiangshu.Kernel.MessageTransformPolicy
-open Wanxiangshu.Runtime.BacklogProjection
-open Wanxiangshu.Runtime.CapsFormat
-open Wanxiangshu.Runtime.MessageTransform.Plan
-open Wanxiangshu.Runtime.OmpCaps
-open Wanxiangshu.Runtime.RuntimeScope
-open Wanxiangshu.Kernel.ContextBudget
-open Wanxiangshu.Runtime.ContextBudgetUsageCodec
-open Wanxiangshu.Runtime.MessageTransform.HostEntry
 open Wanxiangshu.Hosts.Omp.Codec
-open Wanxiangshu.Runtime.BacklogSession
 open Wanxiangshu.Hosts.Omp.CapsCodec
+open Wanxiangshu.Runtime.CapsFormat
+open Wanxiangshu.Runtime.OmpCaps
+open Wanxiangshu.Runtime.MessageTransform.Plan
 open Wanxiangshu.Runtime.FileSys
 open Wanxiangshu.Runtime.Dyn
 
 module Dyn = Wanxiangshu.Runtime.Dyn
-
-let defaultBacklogSession = BacklogSession(omp, ExecutorTools.ompScope)
-
-let configureBacklogSession (cwd: string) : unit =
-    ExecutorTools.ompScope.WorkspaceRoot <- cwd
 
 let resolveAgent (ctx: obj) : string =
     let sm = Dyn.get ctx "sessionManager"
@@ -36,42 +25,32 @@ let resolveAgent (ctx: obj) : string =
         let name = Dyn.str sm "agentName"
         if name <> "" then name else "manager"
 
-let resolveMaxInputTokens (sessionId: string) (cwd: string) (ctx: obj) : JS.Promise<int> =
-    Wanxiangshu.Runtime.ContextBudgetUsageCodec.resolveMaxInputTokens [ ctx ] sessionId cwd
+let resolveMaxInputTokens (_sessionId: string) (_cwd: string) (_ctx: obj) : JS.Promise<int> = Promise.lift 8192
 
 let createMessageTransformPlan
     (sessionId: string)
     (agent: string)
     (cwd: string)
-    (backlogPolicy: Wanxiangshu.Kernel.MessageTransformPolicy.BacklogProjectionPolicy)
     (capsPolicy: Wanxiangshu.Kernel.MessageTransformPolicy.CapsInjectionPolicy)
     (parallelHintPolicy: Wanxiangshu.Kernel.MessageTransformPolicy.ParallelHintPolicy)
-    (contextBudgetPolicy: Wanxiangshu.Kernel.MessageTransformPolicy.ContextBudgetPolicy)
     (isChild: bool)
     (messagesList: Message<obj> list)
     (entriesArr: obj array)
     (maxInputTokens: int)
-    (observeUsage: unit -> JS.Promise<UsageObservation option>)
     : MessageTransformPlan =
     { SessionID = sessionId
       Agent = agent
       Directory = cwd
-      ProjectionPolicy =
-        (if backlogPolicy = Wanxiangshu.Kernel.MessageTransformPolicy.BacklogProjectionPolicy.Include then
-             ProjectionPolicy.IncludeProjection
-         else
-             ProjectionPolicy.ExcludeProjection)
-      BacklogProjectionPolicy = backlogPolicy
+      ProjectionPolicy = projectionPolicyForAgent agent isChild
       CapsInjectionPolicy = capsPolicy
       ParallelHintPolicy = parallelHintPolicy
-      ContextBudgetPolicy = contextBudgetPolicy
       IsSubagentSession = isChild
       Cleaned = messagesList
       RawArray = Some entriesArr
       SembleInjectEnabled = false
       Scope = ExecutorTools.ompScope
       MaxInputTokens = maxInputTokens
-      ObserveLatestUsage = observeUsage
+      ObserveLatestUsage = fun () -> Promise.lift ()
       ModelKey = "omp:host-unknown"
       LimitSource = "omp:no-model-client" }
 

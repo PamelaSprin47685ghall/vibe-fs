@@ -4,8 +4,6 @@ module Wanxiangshu.Kernel.SessionOverview
 /// Process Managers should read only the projections they need.
 
 open Wanxiangshu.Kernel.Review.ReviewLoopFold
-open Wanxiangshu.Kernel.Backlog.BacklogTypes
-open Wanxiangshu.Kernel.Backlog.BacklogProjection
 open Wanxiangshu.Kernel.Nudge.NudgeProjection
 open Wanxiangshu.Kernel.Subsession.SubsessionProjection
 open Wanxiangshu.Kernel.SessionControl.HumanTurn
@@ -17,8 +15,6 @@ open Wanxiangshu.Kernel.FallbackKernel.Types
 type SessionOverview =
     { ReviewLoop: ReviewLoopFold
       ReviewTask: string option
-      Backlog: BacklogEntry list
-      BacklogSnapshot: WorkBacklogSnapshot
       NudgeDedup: NudgeDedupState
       NudgeSnapshot: NudgeSnapshotState
       Subagents: Map<string, SubagentState>
@@ -40,8 +36,6 @@ type SessionOverview =
 let fromSessionState (st: SessionState) : SessionOverview =
     { ReviewLoop = st.ReviewLoop
       ReviewTask = st.ReviewTask
-      Backlog = st.Backlog
-      BacklogSnapshot = st.BacklogSnapshot
       NudgeDedup = st.NudgeDedup
       NudgeSnapshot = st.NudgeSnapshot
       Subagents = st.Subagents
@@ -63,8 +57,6 @@ let emptyOverview: SessionOverview = fromSessionState (emptySessionState ())
 let emptyOverviewDirect: SessionOverview =
     { ReviewLoop = initial
       ReviewTask = None
-      Backlog = []
-      BacklogSnapshot = emptySnapshot
       NudgeDedup = emptyDedupState
       NudgeSnapshot = emptySnapshotState
       Subagents = Map.empty

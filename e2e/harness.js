@@ -341,23 +341,6 @@ class OpencodeHarness {
     return this.request('GET', '/provider', {});
   }
 
-  contextBudgetClient() {
-    return {
-      session: {
-        get: async ({ path: { id } }) => {
-          const response = await this.request('GET', `/session/${id}`);
-          return { data: response.data };
-        },
-      },
-      provider: {
-        list: async (options = {}) => {
-          const response = await this.request('GET', '/provider', { query: options.query });
-          return { data: response.data };
-        },
-      },
-    };
-  }
-
   async getSessions(query = {}) {
     return this.request('GET', '/api/session', { query });
   }

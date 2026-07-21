@@ -11,7 +11,6 @@ open Wanxiangshu.Runtime.MessageTransform.Plan
 open Wanxiangshu.Runtime.MessageTransform.Pipeline
 open Wanxiangshu.Runtime.MessageTransform.HostEntry
 open Wanxiangshu.Runtime.ReviewRuntime
-open Wanxiangshu.Runtime.BacklogProjectionBuild
 
 module Dyn = Wanxiangshu.Runtime.Dyn
 
@@ -45,15 +44,6 @@ let childWorkspaceNotExcluded () =
 let agentNormalizationTest () =
     check "Inspector (caps)" (getCapsInjectionPolicy "Inspector" false = CapsInjectionPolicy.Include)
     check "inspector  (caps)" (getCapsInjectionPolicy "inspector " false = CapsInjectionPolicy.Include)
-
-    check
-        "Inspector (context budget)"
-        (getContextBudgetPolicy "Inspector" false = ContextBudgetPolicy.DisableTodoEmergency)
-
-    check
-        "inspector  (context budget)"
-        (getContextBudgetPolicy "inspector " false = ContextBudgetPolicy.DisableTodoEmergency)
-
     check "EXec (caps)" (getCapsInjectionPolicy "EXec" false = CapsInjectionPolicy.Exclude)
 
 let testCapsSlotReuse () =
@@ -74,10 +64,8 @@ let testCapsSlotReuse () =
               Agent = "main"
               Directory = ""
               ProjectionPolicy = ProjectionPolicy.IncludeProjection
-              BacklogProjectionPolicy = Wanxiangshu.Kernel.MessageTransformPolicy.BacklogProjectionPolicy.Include
               CapsInjectionPolicy = Wanxiangshu.Kernel.MessageTransformPolicy.CapsInjectionPolicy.Include
               ParallelHintPolicy = Wanxiangshu.Kernel.MessageTransformPolicy.ParallelHintPolicy.Include
-              ContextBudgetPolicy = Wanxiangshu.Kernel.MessageTransformPolicy.ContextBudgetPolicy.Include
               IsSubagentSession = false
               Cleaned = cleanMsgs
               RawArray = None
@@ -86,15 +74,11 @@ let testCapsSlotReuse () =
               MaxInputTokens = 200000
               ModelKey = "openai/gpt-4o:default"
               LimitSource = "openai-session-model"
-              ObserveLatestUsage = (fun () -> Promise.lift None) }
-
-        let backlogOps =
-            { Host = opencode
-              GetOrRebuildBacklog = fun _ _ -> [] }
+              ObserveLatestUsage = (fun () -> promise { return () }) }
 
         let encodeMessages (msgs: Message<obj> list) = msgs |> List.map box |> List.toArray
 
-        let injectFn (_policy: BacklogProjectionPolicy) (arr: obj array) = promise { return arr }
+        let injectFn (_policy: ProjectionPolicy) (arr: obj array) = promise { return arr }
 
         let loadCapsCount = ref 0
 
@@ -121,29 +105,13 @@ let testCapsSlotReuse () =
         let plan = mkPlan [ msg ]
 
         let! res1 =
-            runHostMessagesTransform
-                reviewStore
-                "caps-slot-test"
-                plan
-                backlogOps
-                encodeMessages
-                injectFn
-                loadCaps
-                buildCaps
+            runHostMessagesTransform reviewStore "caps-slot-test" plan encodeMessages injectFn loadCaps buildCaps
 
         equal "first call invokes loadCaps" 1 loadCapsCount.Value
         equal "first call prepends caps" 2 res1.Length
 
         let! res2 =
-            runHostMessagesTransform
-                reviewStore
-                "caps-slot-test"
-                plan
-                backlogOps
-                encodeMessages
-                injectFn
-                loadCaps
-                buildCaps
+            runHostMessagesTransform reviewStore "caps-slot-test" plan encodeMessages injectFn loadCaps buildCaps
 
         equal "second call does NOT invoke loadCaps (CapsSlot hit)" 1 loadCapsCount.Value
 
@@ -168,10 +136,6 @@ let testSingleToolCallPromptInjection () =
     promise {
         let reviewStore = createReviewStore ()
 
-        let backlogOps =
-            { Host = opencode
-              GetOrRebuildBacklog = fun _ _ -> [] }
-
         let encodeMessages (msgs: Message<obj> list) = msgs |> List.map box |> List.toArray
         let injectFn _ (arr: obj array) = promise { return arr }
         let loadCaps () = promise { return [] }
@@ -183,11 +147,6 @@ let testSingleToolCallPromptInjection () =
                   Agent = "main"
                   Directory = ""
                   ProjectionPolicy = projectionPolicy
-                  BacklogProjectionPolicy =
-                    (if projectionPolicy = ProjectionPolicy.IncludeProjection then
-                         Wanxiangshu.Kernel.MessageTransformPolicy.BacklogProjectionPolicy.Include
-                     else
-                         Wanxiangshu.Kernel.MessageTransformPolicy.BacklogProjectionPolicy.Exclude)
                   CapsInjectionPolicy =
                     (if projectionPolicy = ProjectionPolicy.IncludeProjection then
                          Wanxiangshu.Kernel.MessageTransformPolicy.CapsInjectionPolicy.Include
@@ -198,11 +157,6 @@ let testSingleToolCallPromptInjection () =
                          Wanxiangshu.Kernel.MessageTransformPolicy.ParallelHintPolicy.Include
                      else
                          Wanxiangshu.Kernel.MessageTransformPolicy.ParallelHintPolicy.Exclude)
-                  ContextBudgetPolicy =
-                    (if projectionPolicy = ProjectionPolicy.IncludeProjection then
-                         Wanxiangshu.Kernel.MessageTransformPolicy.ContextBudgetPolicy.Include
-                     else
-                         Wanxiangshu.Kernel.MessageTransformPolicy.ContextBudgetPolicy.Disable)
                   IsSubagentSession = false
                   Cleaned = msgs
                   RawArray = None
@@ -211,9 +165,9 @@ let testSingleToolCallPromptInjection () =
                   MaxInputTokens = 200000
                   ModelKey = "openai/gpt-4o:default"
                   LimitSource = "openai-session-model"
-                  ObserveLatestUsage = (fun () -> Promise.lift None) }
+                  ObserveLatestUsage = (fun () -> promise { return () }) }
 
-            runHostMessagesTransform reviewStore sessionID plan backlogOps encodeMessages injectFn loadCaps buildCaps
+            runHostMessagesTransform reviewStore sessionID plan encodeMessages injectFn loadCaps buildCaps
 
         // Case 1: 单工具调用 + ToolResult -> 应当被附加
         let msgs1 =

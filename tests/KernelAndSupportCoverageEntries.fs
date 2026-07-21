@@ -5,7 +5,6 @@ open Wanxiangshu.Tests.SearchToolsTests
 open Wanxiangshu.Tests.KernelDomainIdentityTests
 open Wanxiangshu.Tests.KernelFuzzyPathConstraintTests
 open Wanxiangshu.Tests.KernelReviewSessionCoverageTests
-open Wanxiangshu.Tests.RuntimeBacklogAndSubagentTests
 open Wanxiangshu.Tests.FuzzySearchSupportCoverageTests
 open Wanxiangshu.Tests.MethodologyArgsCoverageTests
 open Wanxiangshu.Tests.FuzzySearchGrepTests
@@ -31,7 +30,6 @@ let kernelSupportCoverageTestEntries () : (string * TestBody) list =
     [ "KernelDomainIdentityTests.run", Sync(sync KernelDomainIdentityTests.run)
       "KernelFuzzyPathConstraintTests.run", Sync(sync KernelFuzzyPathConstraintTests.run)
       "KernelReviewSessionCoverageTests.run", Sync(sync KernelReviewSessionCoverageTests.run)
-      "RuntimeBacklogAndSubagentTests.run", Async RuntimeBacklogAndSubagentTests.run
       "FuzzySearchSupportCoverageTests.run", Sync(sync FuzzySearchSupportCoverageTests.run)
       "FuzzySearchGrepTests.run", Sync(sync FuzzySearchGrepTests.run)
       "MethodologyArgsCoverageTests.run", Sync(sync MethodologyArgsCoverageTests.run)

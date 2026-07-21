@@ -264,7 +264,6 @@ let runAll (args: string array) : JS.Promise<int> =
                         "todowrite"
                         (box
                             {| todos = ResizeArray([])
-                               completedWorkReport = "test"
                                select_methodology = ResizeArray([ "first_principles" ]) |})
                         "write todo"
 

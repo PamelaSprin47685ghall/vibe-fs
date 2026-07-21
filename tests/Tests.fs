@@ -21,7 +21,6 @@ open Wanxiangshu.Tests.IntegrationOpencodeReviewSpecs
 open Wanxiangshu.Tests.IntegrationOpencodeContractTests
 open Wanxiangshu.Tests.ReplayEquivalenceTests
 open Wanxiangshu.Tests.IntegrationChatTests
-open Wanxiangshu.Tests.WorkBacklogTests
 open Wanxiangshu.Tests.MethodologyTests
 open Wanxiangshu.Tests.TestRunnerBehaviorTests
 open Wanxiangshu.E2e
@@ -38,16 +37,6 @@ open Wanxiangshu.Tests.SubagentPromptBuildTests
 open Wanxiangshu.Tests.SubagentSpawnTests
 open Wanxiangshu.Tests.WebToolsCodecTests
 open Wanxiangshu.Tests.ReviewToolsCodecTests
-open Wanxiangshu.Tests.ContextBudgetSpecs
-open Wanxiangshu.Tests.ContextBudgetHookTests
-open Wanxiangshu.Tests.ContextBudgetNoReinjectTests
-open Wanxiangshu.Tests.ContextBudgetAfterTodoTests
-open Wanxiangshu.Tests.ContextBudgetIntegrationTests
-open Wanxiangshu.Tests.ContextBudgetRealApiSpecs
-open Wanxiangshu.Tests.ContextBudgetEstimateTests
-open Wanxiangshu.Tests.ContextBudgetPipelineNudgeTests
-open Wanxiangshu.Tests.ContextBudgetCalibrationTests
-
 open Wanxiangshu.Tests.ExecutorToolsCodecTests
 open Wanxiangshu.Tests.ExecutorTests
 open Wanxiangshu.Tests.ToolArgsDecodeTests
@@ -56,7 +45,6 @@ open Wanxiangshu.Tests.ToolResultWireTests
 open Wanxiangshu.Tests.SubagentToolExecuteTests
 open Wanxiangshu.Tests.FileToolsCodecTests
 open Wanxiangshu.Tests.FuzzyToolsCodecTests
-open Wanxiangshu.Tests.WorkBacklogToolsCodecTests
 open Wanxiangshu.Tests.PatchToolsCodecTests
 open Wanxiangshu.Tests.HostMessageCodecTests
 open Wanxiangshu.Tests.MessagingCodecTests
@@ -91,7 +79,6 @@ open Wanxiangshu.Tests.OmpHookExecuteTests
 open Wanxiangshu.Tests.OmpSessionLifecycleTests
 open Wanxiangshu.Tests.OmpPluginCoreTests
 open Wanxiangshu.Tests.OmpTitleFetchGuardTests
-open Wanxiangshu.Tests.OmpMagicTodoTests
 open Wanxiangshu.Tests.OmpPluginCoreIntegrationTests
 open Wanxiangshu.Tests.EventDrivenHarnessDemo
 open Wanxiangshu.Tests.SubagentIoTests
@@ -162,17 +149,7 @@ let private allOtherTests: (string * TestBody) list =
         "ReactiveTests.run", TestBody.Sync ReactiveTests.run
         "ResourcePlanTests.run", TestBody.Sync ResourcePlanTests.run
         "SessionOverviewTests.run", TestBody.Sync SessionOverviewTests.run
-        "ReplayEquivalenceTests.run", TestBody.Sync ReplayEquivalenceTests.run
-        "ContextBudgetSpecs.run", TestBody.Sync(sync ContextBudgetSpecs.run)
-        "ContextBudgetHookTests.run", TestBody.Async ContextBudgetHookTests.run
-        "ContextBudgetNoReinjectTests.run", TestBody.Async ContextBudgetNoReinjectTests.run
-        "ContextBudgetAfterTodoTests.run", TestBody.Async ContextBudgetAfterTodoTests.run
-        "ContextBudgetIntegrationTests.run", TestBody.Async ContextBudgetIntegrationTests.run
-        "ContextBudgetRealApiSpecs.run", TestBody.Async ContextBudgetRealApiSpecs.run
-        "ContextBudgetEstimateTests.run", TestBody.Async ContextBudgetEstimateTests.run
-        "ContextBudgetPipelineNudgeTests.spec_applyContextBudget_mustSeeFinalOutboundAfterAllStages",
-        TestBody.Async ContextBudgetPipelineNudgeTests.spec_applyContextBudget_mustSeeFinalOutboundAfterAllStages
-        "ContextBudgetCalibrationTests.run", TestBody.Sync(sync ContextBudgetCalibrationTests.run) ]
+        "ReplayEquivalenceTests.run", TestBody.Sync ReplayEquivalenceTests.run ]
 
 let private integrationTests: (string * TestBody) list =
     [ "Integration.OpencodePluginTests.run",
@@ -234,6 +211,7 @@ let runAll (args: string array) : JS.Promise<int> =
             p?env?("WANXIANGSHU_TEST") <- "true"
         with _ ->
             ()
+
         clearFailuresForRun ()
         Assert.disableGlobalClear ()
         let silent = Array.contains "--silent" args || Array.contains "--quiet" args

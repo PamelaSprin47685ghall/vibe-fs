@@ -21,11 +21,6 @@ type TopSlotKey =
 /// Synthetic sections owned by the transform hook for one session. Host
 /// messages are deliberately absent: they are reconstructed from the host DB
 /// on every run and must never be treated as hook state.
-type BacklogSlot =
-    { EventCount: int
-      Segment: obj array
-      BacklogRevision: int }
-
 type CapsSlot =
     { Segment: obj array option
       ScopeId: string
@@ -40,10 +35,7 @@ type TopSlot =
 type TransformState =
     {
         Caps: CapsSlot option
-        Backlog: BacklogSlot
         Top: TopSlot
-        /// Monotonic revision for backlog content changes.
-        BacklogRevision: int
         /// Monotonic revision for caps content changes.
         CapsRevision: int
         /// Monotonic revision for policy version changes.
@@ -56,15 +48,10 @@ let private stateKey (sessionID: string) = "message_transform_state_" + sessionI
 
 let private emptyState: TransformState =
     { Caps = None
-      Backlog =
-        { EventCount = -1
-          Segment = [||]
-          BacklogRevision = 0 }
       Top =
         { Key = NoTop
           Item = None
           BudgetRevision = 0 }
-      BacklogRevision = 0
       CapsRevision = 0
       PolicyVersion = 0
       BudgetRevision = 0 }
@@ -79,15 +66,6 @@ let set (scope: RuntimeScope) (sessionID: string) (state: TransformState) : unit
 
 let getCapsSlot (scope: RuntimeScope) (sessionID: string) = (get scope sessionID).Caps
 
-let getBacklogSlot (scope: RuntimeScope) (sessionID: string) =
-    let state = get scope sessionID
-    let slot = state.Backlog
-
-    if slot.EventCount < 0 || slot.Segment.Length = 0 then
-        None
-    else
-        Some slot
-
 let getTopSlot (scope: RuntimeScope) (sessionID: string) =
     let slot = (get scope sessionID).Top
 
@@ -100,25 +78,16 @@ module TransformState =
 
     let emptyState: TransformState =
         { Caps = None
-          Backlog =
-            { EventCount = -1
-              Segment = [||]
-              BacklogRevision = 0 }
           Top =
             { Key = NoTop
               Item = None
               BudgetRevision = 0 }
-          BacklogRevision = 0
           CapsRevision = 0
           PolicyVersion = 0
           BudgetRevision = 0 }
 
     let updateCapsRevision (state: TransformState) (revision: int) : TransformState =
         { state with CapsRevision = revision }
-
-    let updateBacklogRevision (state: TransformState) (revision: int) : TransformState =
-        { state with
-            BacklogRevision = revision }
 
     let updatePolicyVersion (state: TransformState) (version: int) : TransformState =
         { state with PolicyVersion = version }
@@ -147,19 +116,6 @@ module TransformState =
                       PolicyVersion = policyVersion }
             CapsRevision = capsRevision
             PolicyVersion = policyVersion }
-
-    let setBacklog
-        (state: TransformState)
-        (eventCount: int)
-        (segment: obj array)
-        (backlogRevision: int)
-        : TransformState =
-        { state with
-            Backlog =
-                { EventCount = eventCount
-                  Segment = segment
-                  BacklogRevision = backlogRevision }
-            BacklogRevision = backlogRevision }
 
     let setTop (state: TransformState) (key: TopSlotKey) (item: obj option) (budgetRevision: int) : TransformState =
         { state with

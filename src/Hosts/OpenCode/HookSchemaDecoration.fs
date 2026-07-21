@@ -8,12 +8,10 @@ open Wanxiangshu.Runtime
 
 open Wanxiangshu.Kernel.SubagentIntents
 open Wanxiangshu.Runtime.SubagentIntentsCodec
-open Wanxiangshu.Kernel.WorkBacklog
 open Wanxiangshu.Kernel.ToolCatalog
 open Wanxiangshu.Kernel.Methodology
 open Wanxiangshu.Hosts.Opencode.ToolSchema
 open Wanxiangshu.Runtime.Dyn
-open Wanxiangshu.Runtime.WorkBacklogSchema
 
 let selectMethodologyFieldDescription =
     Wanxiangshu.Kernel.Methodology.Api.selectMethodologyFieldDescription
@@ -174,8 +172,3 @@ let inlineJsonWarnProperty: obj =
 
 let inlineJsonWarnReuseProperty: obj =
     createObj [ "type", box "string"; "description", box WarnTdd.warnReuseDescription ]
-
-let buildWorkBacklogSchema () : obj =
-    WorkBacklogSchema.buildWorkBacklogSchema ()
-
-let fusedTaskToolDescription = toolDescriptionFor Mimocode

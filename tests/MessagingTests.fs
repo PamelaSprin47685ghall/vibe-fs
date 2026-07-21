@@ -21,16 +21,6 @@ let classifySourceCapsSynthAssistant () =
     | Synthetic kind -> equal "kind" "caps-synth-assistant-" kind
     | _ -> failwith "expected synthetic"
 
-let classifySourceBacklogProjection () =
-    match classifySource "backlog-projection-abc" None None with
-    | Synthetic kind -> check "backlog" (kind.StartsWith "backlog-")
-    | _ -> failwith "expected synthetic"
-
-let classifySourceBacklogPrefix () =
-    match classifySource "backlog-prefix-xyz" None None with
-    | Synthetic _ -> ()
-    | _ -> failwith "expected synthetic"
-
 let classifySourceMagicTodo () =
     match classifySource "magic-todo-projection-x" None None with
     | Synthetic _ -> ()
@@ -162,8 +152,6 @@ let run () =
     classifySourceUnknownIsNative ()
     classifySourceCapsSynthUser ()
     classifySourceCapsSynthAssistant ()
-    classifySourceBacklogProjection ()
-    classifySourceBacklogPrefix ()
     classifySourceMagicTodo ()
     classifySourceMethodologyProbe ()
     classifySourceSembleSynth ()

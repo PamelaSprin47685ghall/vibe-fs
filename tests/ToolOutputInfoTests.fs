@@ -152,7 +152,6 @@ let testEmptyWithBody () =
 
 let testConstants () =
     check "hintExecutorMisuse nonempty" (hintExecutorMisuse.Length > 0)
-    check "hintTodoRefresh nonempty" (hintTodoRefresh.Length > 0)
     check "hintTodosUpdated nonempty" (hintTodosUpdated.Length > 0)
     let r = hintMethodologyFollowup "methodology"
     check "hintMethodologyFollowup contains id" (r.Contains "methodology")

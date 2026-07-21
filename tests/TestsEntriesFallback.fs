@@ -30,7 +30,6 @@ open Wanxiangshu.Tests.SubsessionTranscriptBoundaryTests
 open Wanxiangshu.Tests.SubsessionPhysicalIsolationTests
 open Wanxiangshu.Tests.SubsessionEvidenceRaceTests
 open Wanxiangshu.Tests.OpencodeFallbackChildIdleTests
-open Wanxiangshu.Tests.SubagentCompactionRegressionTests
 open Wanxiangshu.Tests.FallbackHooksHelperAgentModelTests
 open Wanxiangshu.Tests.SubagentOutputTests
 open Wanxiangshu.Tests.SubsessionEmptyOutputContinueTests
@@ -75,7 +74,6 @@ let fallbackTestEntries () : (string * TestBody) list =
       "SubsessionPhysicalIsolationTests.run", Async SubsessionPhysicalIsolationTests.run
       "SubsessionEvidenceRaceTests.run", Sync(sync SubsessionEvidenceRaceTests.run)
       "OpencodeFallbackChildIdleTests.run", Async OpencodeFallbackChildIdleTests.run
-      "SubagentCompactionRegressionTests.run", Sync(sync SubagentCompactionRegressionTests.run)
       "FallbackHooksHelperAgentModelTests.run", Async FallbackHooksHelperAgentModelTests.run
       "SubagentOutputTests.run", Sync(sync SubagentOutputTests.run)
       "SubsessionEmptyOutputContinueTests.run", Sync(sync SubsessionEmptyOutputContinueTests.run)

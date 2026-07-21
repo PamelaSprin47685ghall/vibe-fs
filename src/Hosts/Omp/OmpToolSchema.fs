@@ -5,7 +5,6 @@ open Wanxiangshu.Runtime.Dyn
 
 module Dyn = Wanxiangshu.Runtime.Dyn
 
-open Wanxiangshu.Kernel.WorkBacklog
 open Wanxiangshu.Kernel.Methodology.Api
 open Wanxiangshu.Kernel.SubagentIntents
 open Wanxiangshu.Kernel.ToolCatalog
@@ -141,18 +140,13 @@ let returnReviewerParameters (tb: obj) : obj =
 let todowriteParameters (tb: obj) : obj =
     let todoItem =
         objectOf
-            [| ("content", str todoContentDesc tb)
-               ("status", str todoStatusDesc tb)
-               ("priority", str todoPriorityDesc tb) |]
+            [| ("content", str "todo content" tb)
+               ("status", str "todo status" tb)
+               ("priority", str "todo priority" tb) |]
             tb
 
     objectOf
-        [| ("todos", arrayOf todoItem todosDesc tb)
-           ("ahaMoments", opt ahaMomentsDesc tb str)
-           ("changesAndReasons", opt changesAndReasonsDesc tb str)
-           ("gotchas", opt gotchasDesc tb str)
-           ("lessonsAndConventions", opt lessonsAndConventionsDesc tb str)
-           ("plan", opt planDesc tb str)
+        [| ("todos", arrayOf todoItem "todos list" tb)
            ("select_methodology",
             arrayOf
                 (enumOf Wanxiangshu.Kernel.Methodology.Registry.enumValuesArray.Value "Methodology name" tb)

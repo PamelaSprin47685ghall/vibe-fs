@@ -59,15 +59,15 @@ let deriveAction (snapshot: Snapshot) : NudgeAction =
     match snapshot.blockStatus, snapshot.workState with
     | NudgeBlockStatus.Blocked, _ -> NudgeNone
     | _, SessionWorkState.Idle -> NudgeNone
-    | _, SessionWorkState.RunnerWithBacklog
+    | _, SessionWorkState.RunnerWithTodos
     | _, SessionWorkState.AllAxes -> NudgeNone
     | _, SessionWorkState.RunnerWithLoop when reviewTaskAvailable && not (skipsReview text) -> NudgeLoop
     | _, SessionWorkState.RunnerWithLoop -> NudgeNone
     | _, SessionWorkState.RunnerOnly -> NudgeRunner
-    | _, SessionWorkState.LoopWithBacklog when not (skipsTodo text) -> NudgeTodo
-    | _, SessionWorkState.LoopWithBacklog when reviewTaskAvailable && not (skipsReview text) -> NudgeLoop
+    | _, SessionWorkState.LoopWithTodos when not (skipsTodo text) -> NudgeTodo
+    | _, SessionWorkState.LoopWithTodos when reviewTaskAvailable && not (skipsReview text) -> NudgeLoop
     | _, SessionWorkState.LoopIdle when reviewTaskAvailable && not (skipsReview text) -> NudgeLoop
-    | _, SessionWorkState.BacklogOnly when not (skipsTodo text) -> NudgeTodo
+    | _, SessionWorkState.TodosOnly when not (skipsTodo text) -> NudgeTodo
     | _ -> NudgeNone
 
 let selectNudgePrompt (host: Host) (action: NudgeAction) (snapshot: Snapshot) : string option =

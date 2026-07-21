@@ -12,7 +12,6 @@ open Wanxiangshu.Kernel.HostTools
 open Wanxiangshu.Hosts.Mux.Plugin
 open Wanxiangshu.Hosts.Opencode.Plugin
 open Wanxiangshu.Hosts.Mux.AiSettings
-open Wanxiangshu.Runtime.BacklogSession
 open Wanxiangshu.Hosts.Mux.MessageTransform
 open Wanxiangshu.Runtime.ChildAgentRegistry
 open Wanxiangshu.Runtime.ReviewRuntime
@@ -77,17 +76,9 @@ let muxSubsessionParentIDSpec () =
                   "sessionID", box childSessionID
                   "workspacePath", box workspaceDir ]
 
-        let backlogSession = Wanxiangshu.Runtime.BacklogSession.BacklogSession(mux, scope)
         let reviewStore = createReviewStore ()
 
-        do!
-            Wanxiangshu.Hosts.Mux.MessageTransform.messagesTransform
-                mockDeps
-                scope
-                backlogSession
-                reviewStore
-                input
-                output
+        do! Wanxiangshu.Hosts.Mux.MessageTransform.messagesTransform mockDeps scope reviewStore input output
 
         let msgs = unbox<obj[]> (get output "messages")
         let mutable foundMuxParentRead = false
