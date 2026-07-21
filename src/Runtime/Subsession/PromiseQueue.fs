@@ -117,12 +117,16 @@ type SerialQueue(?observer: IExceptionObserver) =
         with get () = generation
         and set (v) = generation <- v
 
+    member _.ResetPoison() =
+        poisoned <- false
+        generation <- generation + 1
+
     member _.Enqueue(work: unit -> JS.Promise<'T>, ?name: string, ?timeoutMs: int, ?abortSignal: obj) : JS.Promise<'T> =
         if poisoned then
             Promise.reject (exn "QueuePoisoned: The serial queue is poisoned due to a previous task timeout")
         else
             Promise.create (fun resolve reject ->
-                let timeout = defaultArg timeoutMs 10000
+                let timeout = defaultArg timeoutMs 60000
                 let deadline = now () + float timeout
                 let itemGen = generation
                 let stateRef = ref QueueItemState.Pending

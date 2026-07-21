@@ -75,24 +75,28 @@ type FinderCache(?createFinderFn: string -> JS.Promise<Result<FinderLike, string
     let mutable pending = Map.empty<string, JS.Promise<Result<FinderLike, string>>>
 
     member _.Get(cwd: string) : JS.Promise<Result<FinderLike, string>> =
-        queue.Enqueue(fun () ->
-            match Map.tryFind cwd instances with
-            | Some finder when not finder.isDestroyed -> Promise.lift (Ok finder)
-            | _ ->
-                match Map.tryFind cwd pending with
-                | Some finderPromise -> finderPromise
-                | None ->
-                    let finderPromise = createFinderImpl cwd
-                    pending <- Map.add cwd finderPromise pending
+        let timeout = max 30000 (getScanTimeout () + 10000)
+        queue.Enqueue(
+            (fun () ->
+                match Map.tryFind cwd instances with
+                | Some finder when not finder.isDestroyed -> Promise.lift (Ok finder)
+                | _ ->
+                    match Map.tryFind cwd pending with
+                    | Some finderPromise -> finderPromise
+                    | None ->
+                        let finderPromise = createFinderImpl cwd
+                        pending <- Map.add cwd finderPromise pending
 
-                    finderPromise
-                    |> Promise.bind (fun result ->
-                        match result with
-                        | Ok finder -> instances <- Map.add cwd finder instances
-                        | Error _ -> ()
+                        finderPromise
+                        |> Promise.bind (fun result ->
+                            match result with
+                            | Ok finder -> instances <- Map.add cwd finder instances
+                            | Error _ -> ()
 
-                        pending <- Map.remove cwd pending
-                        Promise.lift result))
+                            pending <- Map.remove cwd pending
+                            Promise.lift result)),
+            timeoutMs = timeout
+        )
 
     member _.Destroy(cwd: string) : JS.Promise<unit> =
         queue.Enqueue(fun () ->

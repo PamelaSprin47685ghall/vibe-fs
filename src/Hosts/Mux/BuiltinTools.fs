@@ -78,12 +78,17 @@ let executorTool
                     | Ok decoded ->
                         promise {
                             let opts = toExecuteOptions (Some runtime.Execution.Directory) decoded
+                            let timeoutMs =
+                                match opts.timeoutType with
+                                | ExecutorTimeoutType.Long -> 300000
+                                | ExecutorTimeoutType.Short -> 30000
 
                             let! execResult =
                                 sessionScope.EnqueueExecutor(
                                     sessionId,
                                     opts.mode,
-                                    fun () -> Wanxiangshu.Runtime.Executor.execute sessionScope opts sessionId
+                                    (fun () -> Wanxiangshu.Runtime.Executor.execute sessionScope opts sessionId),
+                                    timeoutMs = timeoutMs
                                 )
 
                             return! summarizeWhenNeeded deps config toolNames opts execResult

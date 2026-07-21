@@ -71,6 +71,12 @@ let testHangInjections () =
             secondError <- Some ex
 
         check "C14 subsequent fails" (Option.isSome secondError && secondError.Value.Message.Contains("QueuePoisoned"))
+
+        queue.ResetPoison()
+        check "queue unpoisoned after ResetPoison" (not queue.Poisoned)
+
+        let! thirdResult = queue.Enqueue(fun () -> Promise.lift "recovered")
+        equal "task succeeds after ResetPoison" "recovered" thirdResult
     }
 
 let testLateCompletionFence () =

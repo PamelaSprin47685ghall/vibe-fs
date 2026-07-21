@@ -91,17 +91,17 @@ type RuntimeScope() =
     member _.RemoveTempFiles(sessionId: string) : unit =
         tempFileRegistry.RemoveSession(sessionId)
 
-    member _.EnqueuePerSession(sessionId: string, work: unit -> JS.Promise<'T>) : JS.Promise<'T> =
+    member _.EnqueuePerSession(sessionId: string, work: unit -> JS.Promise<'T>, ?timeoutMs: int) : JS.Promise<'T> =
         let lock = sessionLockRegistry.GetOrCreate(sessionId)
-        lock.EnqueueWrite(work)
+        lock.EnqueueWrite(work, ?timeoutMs = timeoutMs)
 
-    member _.EnqueueExecutor(sessionId: string, mode: string, work: unit -> JS.Promise<'T>) : JS.Promise<'T> =
+    member _.EnqueueExecutor(sessionId: string, mode: string, work: unit -> JS.Promise<'T>, ?timeoutMs: int) : JS.Promise<'T> =
         let lock = sessionLockRegistry.GetOrCreate(sessionId)
 
         if mode = "ro" then
-            lock.EnqueueRead(work)
+            lock.EnqueueRead(work, ?timeoutMs = timeoutMs)
         else
-            lock.EnqueueWrite(work)
+            lock.EnqueueWrite(work, ?timeoutMs = timeoutMs)
 
     member _.TryFindKey(key: string) : obj option = Map.tryFind key extState
     member _.Add(key: string, value: obj) : unit = extState <- Map.add key value extState

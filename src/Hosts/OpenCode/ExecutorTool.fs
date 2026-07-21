@@ -130,6 +130,10 @@ let private executeExecutorTool
                 resolveStr executorRequiresSession
             else
                 let options = toExecuteOptions (Some runtime.Execution.Directory) decoded
+                let timeoutMs =
+                    match options.timeoutType with
+                    | ExecutorTimeoutType.Long -> 300000
+                    | ExecutorTimeoutType.Short -> 30000
 
                 let runWork () =
                     runExecutorWork
@@ -143,7 +147,7 @@ let private executeExecutorTool
                         client
                         context
 
-                sessionScope.EnqueueExecutor(sessionID, options.mode, runWork)
+                sessionScope.EnqueueExecutor(sessionID, options.mode, runWork, timeoutMs = timeoutMs)
 
 let executorTool
     (host: Host)

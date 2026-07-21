@@ -24,12 +24,22 @@ let private lockfileOptions () =
 let private fileQueues =
     System.Collections.Generic.Dictionary<string, JS.Promise<obj>>()
 
+[<Import("mkdir", "node:fs/promises")>]
+let private mkdirAsync (path: string, options: obj) : JS.Promise<unit> = jsNative
+
+let unpoisonFile (filePath: string) : unit =
+    poisonedFiles.Remove(filePath) |> ignore
+
 let private ensureFileExists (filePath: string) : JS.Promise<unit> =
     promise {
         let! exists = fileExists filePath
 
         if not exists then
             try
+                let lastSlash = max (filePath.LastIndexOf('/')) (filePath.LastIndexOf('\\'))
+                if lastSlash > 0 then
+                    let dir = filePath.Substring(0, lastSlash)
+                    do! mkdirAsync (dir, {| recursive = true |})
                 do! writeFileFlagAsync filePath "" (createObj [ "flag", box "wx" ])
             with ex when isExistingPathError (box ex) ->
                 ()

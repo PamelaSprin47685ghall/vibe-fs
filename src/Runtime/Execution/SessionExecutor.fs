@@ -56,10 +56,10 @@ let resetSessionExecutorForTesting (scope: RuntimeScope) : unit = scope.Remove(a
 
 /// Per-session serial executor bound to a registration [RuntimeScope].
 type SessionExecutor(scope: RuntimeScope) =
-    member _.EnqueuePerSession(sessionId: string, work: unit -> JS.Promise<'T>) : JS.Promise<'T> =
-        scope.EnqueuePerSession(sessionId, work)
+    member _.EnqueuePerSession(sessionId: string, work: unit -> JS.Promise<'T>, ?timeoutMs: int) : JS.Promise<'T> =
+        scope.EnqueuePerSession(sessionId, work, ?timeoutMs = timeoutMs)
 
-    member _.EnqueueExecutor(sessionId: string, mode: string, work: unit -> JS.Promise<'T>) : JS.Promise<'T> =
-        scope.EnqueueExecutor(sessionId, mode, work)
+    member _.EnqueueExecutor(sessionId: string, mode: string, work: unit -> JS.Promise<'T>, ?timeoutMs: int) : JS.Promise<'T> =
+        scope.EnqueueExecutor(sessionId, mode, work, ?timeoutMs = timeoutMs)
 
 let createForScope (scope: RuntimeScope) : SessionExecutor = SessionExecutor(scope)

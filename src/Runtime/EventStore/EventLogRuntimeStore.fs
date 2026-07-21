@@ -22,7 +22,9 @@ let mutable private stores: Map<string, EventLogStore> = Map.empty
 
 let getStore (workspaceRoot: string) : EventLogStore =
     match Map.tryFind workspaceRoot stores with
-    | Some s -> s
+    | Some s ->
+        if s.Poisoned then s.ResetPoison()
+        s
     | None ->
         let s = EventLogStore workspaceRoot
         stores <- Map.add workspaceRoot s stores

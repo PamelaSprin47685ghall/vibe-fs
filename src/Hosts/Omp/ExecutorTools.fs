@@ -63,15 +63,21 @@ let private parseExecutorParams (params': obj) (ctx: obj) =
 
 let private runExecutorJob (options: ExecuteOptions) (signal: obj) (childId: string) =
     promise {
+        let timeoutMs =
+            match options.timeoutType with
+            | ExecutorTimeoutType.Long -> 300000
+            | ExecutorTimeoutType.Short -> 30000
+
         let runWork =
             sessionExecutor.EnqueueExecutor(
                 childId,
                 options.mode,
-                fun () ->
+                (fun () ->
                     promise {
                         let! r = executeWith defaultExecuteDeps ompScope options childId None
                         return r
-                    }
+                    }),
+                timeoutMs = timeoutMs
             )
 
         let onSignalAbort () =
