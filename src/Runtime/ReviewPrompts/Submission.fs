@@ -35,7 +35,8 @@ let private evidenceTargets (report: string) (affectedFiles: string list) : Prom
     summaryTargets @ findingTargets @ reportFileTargets @ codeTargets
 
 let private perfectReviseOutcomes perfectText reviseText : PromptOutcome list =
-    [ { label = "PERFECT"; text = perfectText }
+    [ { label = "PERFECT"
+        text = perfectText }
       { label = "REVISE"; text = reviseText } ]
 
 let doubleCheckPrompt (task: string) : string =
@@ -54,8 +55,10 @@ let doubleCheckPrompt (task: string) : string =
           rules =
             readOnlyConstraints
             @ [ PromptRule.Policy doubleCheckChallenge
+                PromptRule.Contract "You MUST call return_reviewer before finishing. Do not end without a verdict."
                 PromptRule.Contract "PERFECT only if you still accept; otherwise REVISE with detailed feedback." ]
-          outcomes = perfectReviseOutcomes "Confirm acceptance after re-evaluation." "Request revision with detailed feedback." }
+          outcomes =
+            perfectReviseOutcomes "Confirm acceptance after re-evaluation." "Request revision with detailed feedback." }
 
     match PromptDocument.create docView with
     | Ok doc -> PromptToml.render doc
@@ -78,8 +81,7 @@ let reviewerPrompt (task: string) (report: string) (affectedFiles: string list) 
             reviewBaseRules
                 [ PromptRule.Policy
                       "Read the summary, findings, and affected files; inspect actual contents before judging."
-                  PromptRule.Contract
-                      "You MUST call return_reviewer before finishing. Do not end without a verdict." ]
+                  PromptRule.Contract "You MUST call return_reviewer before finishing. Do not end without a verdict." ]
           outcomes =
             perfectReviseOutcomes
                 "Accept submission without required changes (or with minor suggestions)."
@@ -102,8 +104,7 @@ let reviewSubmissionVerdictPrompt (task: string) (report: string) (affectedFiles
           agentRole = AgentRole.CodeReview
           targets = evidenceTargets report affectedFiles
           boundaries = [ PromptBoundary.DoNotModify(BoundaryTarget.Directory ".") ]
-          rules =
-            reviewBaseRules [ PromptRule.Contract "Call agent_report to submit your verdict." ]
+          rules = reviewBaseRules [ PromptRule.Contract "Call agent_report to submit your verdict." ]
           outcomes = perfectReviseOutcomes "Accept submission." "Request revision with detailed feedback." }
 
     match PromptDocument.create docView with

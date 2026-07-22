@@ -134,6 +134,34 @@ let deactivateParentPreservesChildPending () =
     check "child pending still resolvable" (store.resolvePendingReview ("child-reviewer", Accepted []))
     check "child callback fired after explicit resolve" childResolved
 
+/// First PERFECT records challenge on the reviewer *child* id (no registry row of its own).
+/// Challenge must seed + stick; second PERFECT must Finalize Accepted — else loop Terminated.
+let childChallengeSeedAndSecondPerfectFinalizes () =
+    let store = createReviewStore ()
+    store.applyReviewTaskProjection ("parent", Some "ship feature X")
+    store.addChild ("parent", "child-reviewer")
+    let mutable resolved: ReviewResult option = None
+    store.setPendingReview ("child-reviewer", (fun r -> resolved <- Some r))
+
+    check "child has no own registry row before challenge" (store.getReviewState "child-reviewer" |> Option.isNone)
+
+    store.recordChallengeRequested "child-reviewer"
+    check "challenge sticks on child without prior row" (store.isChallengeRequested "child-reviewer")
+    equal "challenge inherits parent task" (Some "ship feature X") (store.getReviewTask "child-reviewer")
+
+    let decision =
+        Wanxiangshu.Kernel.ReviewVerdict.decideReviewSubmission
+            Wanxiangshu.Kernel.ReviewVerdict.Perfect
+            "confirmed after double-check"
+            (store.isChallengeRequested "child-reviewer")
+
+    match decision with
+    | Wanxiangshu.Kernel.ReviewVerdict.Finalize(Accepted fb) ->
+        equal "second PERFECT finalizes accepted feedback" [ "confirmed after double-check" ] fb
+        check "resolve pending after finalize" (store.resolvePendingReview ("child-reviewer", Accepted fb))
+        equal "pending receives Accepted" (Some(Accepted [ "confirmed after double-check" ])) resolved
+    | other -> check (sprintf "expected Finalize Accepted, got %A" other) false
+
 let promptPartsBranches () =
     let initial = [ "task body"; "extra detail" ]
     let nudge = "please answer"

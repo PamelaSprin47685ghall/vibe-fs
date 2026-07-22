@@ -6,9 +6,11 @@ open Wanxiangshu.Runtime.LoopMessages
 let doubleCheckAnchorReplay () =
     let prompt = Wanxiangshu.Runtime.ReviewPrompts.doubleCheckPrompt "ship feature X"
     check "double-check prompt carries objective" (prompt.Contains "objective =")
+
     check
         "double-check prompt carries challenge"
-        (prompt.Contains "COMPLETENESS_RECHECK" || prompt.ToLowerInvariant().Contains "cutting corners")
+        (prompt.Contains "COMPLETENESS_RECHECK"
+         || prompt.ToLowerInvariant().Contains "cutting corners")
 
 let doubleCheckPromptFormat () =
     let prompt =
@@ -17,6 +19,16 @@ let doubleCheckPromptFormat () =
     check "has objective" (prompt.Contains "objective =")
     check "embeds task" (prompt.Contains "build the login page")
     check "asks for re-submission" (prompt.Contains "REVISE with detailed feedback")
+
+    check
+        "double-check forces return_reviewer"
+        (prompt.Contains "return_reviewer" || prompt.Contains "tool: return_reviewer")
+
+    check
+        "double-check forbids stop without verdict"
+        (prompt.Contains "Do not end without a verdict"
+         || prompt.Contains "before finishing"
+         || prompt.Contains "MUST call")
 
     let multiline =
         Wanxiangshu.Runtime.ReviewPrompts.doubleCheckPrompt "task with\nnewline and ### markdown"
@@ -30,11 +42,13 @@ let reviewerPromptFormat () =
     check "has objective" (prompt.Contains "objective =")
     check "embeds task in objective" (prompt.Contains "ship S1")
     check "embeds affected file a.fs" (prompt.Contains "a.fs")
+
     check
         "carries review criteria"
         (prompt.Contains "language features"
          || prompt.Contains "cutting corners"
          || prompt.Contains "criterion")
+
     check "embeds report as summary evidence" (prompt.Contains "changed A and B" || prompt.Contains "summary")
     check "no ugly Task header" (not (prompt.Contains "=== Task ==="))
     check "no ugly Change Report header" (not (prompt.Contains "=== Change Report ==="))
@@ -66,14 +80,19 @@ let reviewInstructionsFrontMatter () =
     let instr = Wanxiangshu.Runtime.ReviewPrompts.reviewInstructions
     check "instructions are structured review doc" (instr.Contains "objective =")
     check "instructions mention return_reviewer" (instr.Contains "return_reviewer")
+
     check
         "instructions carry atomic criteria"
         (instr.Contains "language features"
          || instr.Contains "cutting corners"
          || instr.Contains "criterion")
+
     check
         "instructions carry atomic read-only"
         (instr.Contains "Do not write"
          || instr.Contains "mutating tools"
          || instr.Contains "constraint")
-    check "instructions have no PREFIX prose markers" (not (instr.Contains "LANGUAGE_FIT:") && not (instr.Contains "READ_ONLY:"))
+
+    check
+        "instructions have no PREFIX prose markers"
+        (not (instr.Contains "LANGUAGE_FIT:") && not (instr.Contains "READ_ONLY:"))
