@@ -49,6 +49,8 @@ let private reviewBlock () : (string * TestBody) list =
       "PtyReadThrottleTests.run", TestBody.Async PtyReadThrottleTests.run
       "ReviewTests.deactivateParentPreservesChildPending",
       TestBody.Sync(sync ReviewTests.deactivateParentPreservesChildPending)
+      "ReviewTests.childChallengeSeedAndSecondPerfectFinalizes",
+      TestBody.Sync(sync ReviewTests.childChallengeSeedAndSecondPerfectFinalizes)
       "ReviewTests.promptPartsBranches", TestBody.Sync(sync ReviewTests.promptPartsBranches)
       "ReviewTests.resolvePendingClearsSuppressor", TestBody.Sync(sync ReviewTests.resolvePendingClearsSuppressor) ]
 

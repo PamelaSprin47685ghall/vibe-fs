@@ -106,9 +106,31 @@ let cleanupSessionInState (state: ReviewStoreState) (sessionID: string) : Review
         { Registry = nextRegistry
           Effects = nextEffects }
 
+/// Seed challenge on the caller's id. Reviewer child often has no own registry row
+/// (only parent is Active); RequestChallenge on a missing id is a silent no-op and
+/// leaves second PERFECT stuck in AskDoubleCheck → loop NoResult → Terminated.
 let recordChallengeRequestedInState (state: ReviewStoreState) (sessionID: string) : ReviewStoreState =
-    { state with
-        Registry = reduce state.Registry (RegistryAction.RequestChallenge sessionID) }
+    if sessionID = "" then
+        state
+    else
+        let seeded =
+            match Map.tryFind sessionID state.Registry with
+            | Some _ -> state.Registry
+            | None ->
+                let parentTask =
+                    state.Registry
+                    |> Map.toSeq
+                    |> Seq.tryPick (fun (_, s) ->
+                        if List.contains sessionID s.childIds then
+                            s.originalTask
+                        else
+                            None)
+
+                let task = parentTask |> Option.defaultValue "double-check"
+                reduce state.Registry (RegistryAction.Activate(sessionID, task, getTimestampMs ()))
+
+        { state with
+            Registry = reduce seeded (RegistryAction.RequestChallenge sessionID) }
 
 let canLockReview (state: ReviewStoreState) (sessionID: string) : bool =
     canTransition state.Registry sessionID (ReviewCommand.Lock sessionID)
