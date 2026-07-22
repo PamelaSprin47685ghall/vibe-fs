@@ -37,11 +37,19 @@ module Signatures =
         ignore (typeof<LocalPromptProtocol>)
         ignore (typeof<BootSnapshot>)
         ignore (typeof<ProjectionSet>)
+        ignore (typeof<ChildScript>)
+        ignore MessageTransform.transform
+        ignore ChildFlows.runChild
+        ignore ChildFlows.runParallel
+        ignore FactCodec.serializeFact
         ignore ProcessFlows.execute
         ignore Review.acceptVerdict
         ignore Gateway.start
         ignore Boot.kWayMerge
         ignore SessionFlows.run
+        ignore SessionFlows.runFlow
+        ignore ProcessFlows.runFlow
+        ignore JournalFlows.runFlow
 
     [<Fact>]
     let Guide_types_exist () = assertTypes ()

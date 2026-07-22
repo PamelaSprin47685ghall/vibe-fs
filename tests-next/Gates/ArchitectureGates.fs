@@ -139,3 +139,21 @@ module ArchitectureGates =
         Assert.DoesNotContain("ProjectReference", text)
         Assert.DoesNotContain("wanxiangshu.fsproj", text)
         Assert.DoesNotContain("../src", text)
+
+    [<Fact>]
+    let ``Next_source_files_do_not_exceed_300_lines`` () =
+        let repoRoot = findRepoRoot ()
+        let nextDir = Path.Combine(repoRoot, "next")
+        Assert.True(Directory.Exists(nextDir), sprintf "Directory 'next' does not exist at %s" nextDir)
+
+        let nextFsFiles = Directory.GetFiles(nextDir, "*.fs", SearchOption.AllDirectories)
+        let violations = List<string>()
+
+        for file in nextFsFiles do
+            let lineCount = File.ReadAllLines(file).Length
+
+            if lineCount > 300 then
+                let relPath = Path.GetRelativePath(repoRoot, file)
+                violations.Add(sprintf "File '%s' has %d lines (exceeds maximum of 300 lines)" relPath lineCount)
+
+        Assert.Empty(violations)

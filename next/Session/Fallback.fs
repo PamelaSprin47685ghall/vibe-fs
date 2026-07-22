@@ -43,12 +43,8 @@ module Fallback =
                 | None -> return! tryModels s sendContinue remaining
         }
 
-    let continueWork
-        (s: SessionScript)
-        (sendContinue: SendContinueFunction)
-        (commitTodoFrom: SendOutcome -> SessionFlow<unit>)
-        : SessionFlow<unit> =
+    let continueWork (s: SessionScript) (sendContinue: SendContinueFunction) : SessionFlow<unit> =
         session {
             let! outcome = tryModels s sendContinue s.Config.FallbackModels
-            do! commitTodoFrom outcome
+            do! s.CommitTodoFrom outcome
         }

@@ -6,6 +6,7 @@ open Wanxiangshu.Next.Kernel.Identity
 open Wanxiangshu.Next.Kernel.Fact
 open Wanxiangshu.Next.Journal.FactSubEncoders
 open Wanxiangshu.Next.Journal.FactDecoders
+open Wanxiangshu.Next.Journal.FactDecodersExtras
 
 module FactCodec =
 

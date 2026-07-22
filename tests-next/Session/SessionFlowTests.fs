@@ -1,6 +1,8 @@
 namespace Wanxiangshu.Next.Tests
 
+open System
 open System.Threading
+open System.Threading.Tasks
 open Xunit
 open Wanxiangshu.Next.Kernel
 open Wanxiangshu.Next.Kernel.Outcome
@@ -92,4 +94,30 @@ module SessionFlowTests =
             Assert.Equal(Ok(), res)
             Assert.False(reviewRequired)
             Assert.Equal(11L, stamp)
+        }
+
+    [<Fact>]
+    let ``Session_runFlow_maps_OCE_to_SessionCancelled`` () =
+        task {
+            use cts = new CancellationTokenSource()
+            cts.Cancel()
+
+            let script =
+                createTestScript
+                    { Unfinished = true
+                      ProgressStamp = 1L }
+                    (fun () -> session { return () })
+
+            let hangingFlow: SessionFlow<unit> =
+                Flow.create (fun _ ct ->
+                    task {
+                        ct.ThrowIfCancellationRequested()
+                        return Ok()
+                    })
+
+            let! res = SessionFlows.runFlow script cts.Token hangingFlow
+
+            match res with
+            | Error SessionError.SessionCancelled -> ()
+            | _ -> Assert.Fail(sprintf "Expected SessionCancelled error but got %A" res)
         }

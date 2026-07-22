@@ -52,11 +52,7 @@ module Review =
             return! r.AcceptVerdict(report)
         }
 
-    let rec requestValidReview
-        (s: SessionScript)
-        (reviewOnce: ReviewOnceFunction)
-        (remaining: int)
-        : SessionFlow<Fact.ReviewVerdict> =
+    let rec requestValidReview (reviewOnce: ReviewOnceFunction) (remaining: int) : SessionFlow<Fact.ReviewVerdict> =
         session {
             if remaining <= 0 then
                 return! Flow.fail SessionError.ReviewExhausted
@@ -64,7 +60,7 @@ module Review =
                 let! verdict = reviewOnce ()
 
                 match verdict with
-                | Fact.ReviewVerdict.Invalid _ -> return! requestValidReview s reviewOnce (remaining - 1)
+                | Fact.ReviewVerdict.Invalid _ -> return! requestValidReview reviewOnce (remaining - 1)
                 | Fact.ReviewVerdict.Passed
                 | Fact.ReviewVerdict.NeedsChanges _ -> return verdict
         }
@@ -79,10 +75,6 @@ module Review =
             then
                 return! Flow.fail SessionError.ReviewExhausted
             else
-                let! verdict = requestValidReview s reviewOnce s.Config.MaxInvalidRetries
-
-                match verdict with
-                | Fact.ReviewVerdict.Passed
-                | Fact.ReviewVerdict.NeedsChanges _ -> return ()
-                | Fact.ReviewVerdict.Invalid _ -> return! Flow.fail SessionError.ReviewExhausted
+                let! _ = requestValidReview reviewOnce s.Config.MaxInvalidRetries
+                return ()
         }
