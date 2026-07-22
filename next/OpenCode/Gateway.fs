@@ -30,14 +30,12 @@ type GatewayError =
     | BootFailed of reason: string
 
 type Gateway =
+    inherit IGateway
     inherit IAsyncDisposable
-    abstract RuntimeId: RuntimeId
     abstract BootSnapshot: BootSnapshot
-    abstract ProjectionSet: ProjectionSet
     abstract RuntimeSnapshot: RuntimeSnapshot
     abstract JournalPath: string
     abstract JournalWriter: JournalWriter option
-    abstract Append: StreamId -> TurnId option -> Fact -> CommitResult<Envelope>
 
 module Gateway =
 

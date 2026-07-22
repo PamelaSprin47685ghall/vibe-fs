@@ -2,7 +2,11 @@ namespace Wanxiangshu.Next.Tools
 
 open Wanxiangshu.Next.Kernel
 
-type HostMessage = { Role: string; Text: string }
+type HostMessage =
+    { Role: string
+      Text: string
+      ToolCalls: string list option
+      Metadata: Map<string, string> option }
 
 type SessionSnapshot =
     { Caps: string list
@@ -13,7 +17,15 @@ module MessageTransform =
 
     let sanitize (messages: HostMessage list) : HostMessage list =
         messages
-        |> List.filter (fun m -> not (System.String.IsNullOrWhiteSpace(m.Text)))
+        |> List.filter (fun m ->
+            let hasText = not (System.String.IsNullOrWhiteSpace(m.Text))
+
+            let hasTools =
+                match m.ToolCalls with
+                | Some t -> not (List.isEmpty t)
+                | None -> false
+
+            hasText || hasTools)
 
     let stripSystemMarkers (messages: HostMessage list) : HostMessage list =
         messages
@@ -32,7 +44,12 @@ module MessageTransform =
                 None
             else
                 let capsText = sprintf "[CAPS: %s]" (String.concat ", " snapshot.Caps)
-                Some { Role = "system"; Text = capsText }
+
+                Some
+                    { Role = "system"
+                      Text = capsText
+                      ToolCalls = None
+                      Metadata = None }
 
         let reviewSystemMsg =
             match snapshot.ReviewContext with
@@ -40,7 +57,9 @@ module MessageTransform =
             | Some ctx ->
                 Some
                     { Role = "system"
-                      Text = sprintf "[REVIEW: %s]" ctx }
+                      Text = sprintf "[REVIEW: %s]" ctx
+                      ToolCalls = None
+                      Metadata = None }
 
         let hintSystemMsg =
             match snapshot.ParallelHint with
@@ -48,7 +67,9 @@ module MessageTransform =
             | Some hint ->
                 Some
                     { Role = "system"
-                      Text = sprintf "[HINT: %s]" hint }
+                      Text = sprintf "[HINT: %s]" hint
+                      ToolCalls = None
+                      Metadata = None }
 
         let systemMsgs = [ capsSystemMsg; reviewSystemMsg; hintSystemMsg ] |> List.choose id
 
