@@ -1,8 +1,8 @@
 namespace Wanxiangshu.Next.Tests.JournalTests
 
 open System
-open System.IO
-open System.Security.Cryptography
+open Fable.Core
+open Fable.Core.JsInterop
 open Xunit
 open Wanxiangshu.Next.Kernel
 open Wanxiangshu.Next.Kernel.Identity
@@ -10,6 +10,19 @@ open Wanxiangshu.Next.Kernel.Fact
 open Wanxiangshu.Next.Kernel.Outcome
 open Wanxiangshu.Next.Journal
 open Wanxiangshu.Next.Session
+
+module private NodeFsIsolation =
+    [<Import("appendFileSync", "node:fs")>]
+    let appendFileSync (path: string, content: string) : unit = jsNative
+
+    [<Import("readFileSync", "node:fs")>]
+    let readFileSync (path: string, encoding: string) : string = jsNative
+
+    [<Import("readdirSync", "node:fs")>]
+    let readdirSync (path: string) : string array = jsNative
+
+    [<Import("join", "node:path")>]
+    let pathJoin (a: string, b: string) : string = jsNative
 
 module JournalIsolationTests =
 
@@ -44,8 +57,8 @@ module JournalIsolationTests =
                     | _ -> false
                 )
 
-                do! (writerA :> IAsyncDisposable).DisposeAsync().AsTask()
-                do! (writerB :> IAsyncDisposable).DisposeAsync().AsTask()
+                (writerA :> IDisposable).Dispose()
+                (writerB :> IDisposable).Dispose()
 
                 let bootSnapshot = Boot.boot tempDir
 
@@ -58,9 +71,7 @@ module JournalIsolationTests =
 
                 Assert.True(Set.contains "rtA" runtimes)
                 Assert.True(Set.contains "rtB" runtimes)
-            }
-            |> Async.AwaitTask
-            |> Async.RunSynchronously)
+            })
 
     [<Fact>]
     let ``Runtime A cannot see B appends mid life`` () =
@@ -86,13 +97,11 @@ module JournalIsolationTests =
 
                 Assert.Equal(initialLength, bootSnapshotA.Envelopes.Length)
 
-                do! (writerB :> IAsyncDisposable).DisposeAsync().AsTask()
+                (writerB :> IDisposable).Dispose()
 
                 let bootSnapshotC = Boot.boot tempDir
                 Assert.Equal(initialLength + 1, bootSnapshotC.Envelopes.Length)
-            }
-            |> Async.AwaitTask
-            |> Async.RunSynchronously)
+            })
 
     [<Fact>]
     let ``Partial trailing line ignored writer file unchanged by boot`` () =
@@ -102,32 +111,28 @@ module JournalIsolationTests =
                 let writerA, _ = JournalWriter.create tempDir runtimeA 100 DateTimeOffset.UtcNow
                 let factA = Fact.Session(Fact.HumanTurnStarted {| TurnId = TurnId.create "turn1" |})
                 let _ = writerA.Append StreamId.Workspace None factA
-                do! (writerA :> IAsyncDisposable).DisposeAsync().AsTask()
+                (writerA :> IDisposable).Dispose()
 
-                let fileA = Path.Combine(tempDir, "rtA.ndjson")
+                let fileA = NodeFsIsolation.pathJoin (tempDir, "rtA.ndjson")
 
                 let partialContent =
                     "{\"RuntimeId\":\"rtA\",\"LocalSeq\":3,\"ObservedAt\":\"2026-01-01T00:00:00Z\",\"EventId\":\"evt_partial"
 
-                File.AppendAllText(fileA, partialContent)
+                NodeFsIsolation.appendFileSync (fileA, partialContent)
 
-                let fileBytesBefore = File.ReadAllBytes(fileA)
+                let fileBytesBefore = NodeFsIsolation.readFileSync (fileA, "utf-8")
                 let fileLengthBefore = fileBytesBefore.Length
-                let hashBefore = SHA256.HashData(fileBytesBefore)
 
                 let bootSnapshot = Boot.boot tempDir
 
                 Assert.Equal(2, bootSnapshot.Envelopes.Length)
 
-                let fileBytesAfter = File.ReadAllBytes(fileA)
+                let fileBytesAfter = NodeFsIsolation.readFileSync (fileA, "utf-8")
                 let fileLengthAfter = fileBytesAfter.Length
-                let hashAfter = SHA256.HashData(fileBytesAfter)
 
                 Assert.Equal(fileLengthBefore, fileLengthAfter)
-                Assert.Equal<byte seq>(hashBefore, hashAfter)
-            }
-            |> Async.AwaitTask
-            |> Async.RunSynchronously)
+                Assert.Equal(fileBytesBefore, fileBytesAfter)
+            })
 
     [<Fact>]
     let ``No lockfile created under temp dir`` () =
@@ -138,7 +143,7 @@ module JournalIsolationTests =
                 let factA = Fact.Session(Fact.HumanTurnStarted {| TurnId = TurnId.create "turn1" |})
                 let _ = writerA.Append StreamId.Workspace None factA
 
-                let allFiles = Directory.GetFiles(tempDir, "*", SearchOption.AllDirectories)
+                let allFiles = NodeFsIsolation.readdirSync tempDir
 
                 let lockFiles =
                     allFiles
@@ -146,10 +151,9 @@ module JournalIsolationTests =
 
                 Assert.Empty(lockFiles)
 
-                do! (writerA :> IAsyncDisposable).DisposeAsync().AsTask()
-            }
-            |> Async.AwaitTask
-            |> Async.RunSynchronously)
+                (writerA :> IDisposable).Dispose()
+                return ()
+            })
 
     [<Fact>]
     let ``Prompt duplicate key historical prompts after fold`` () =

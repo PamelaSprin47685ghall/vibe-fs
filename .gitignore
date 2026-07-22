@@ -73,3 +73,5 @@ ehthumbs.db
 *.key
 
 .cortexkit/
+
+*.fs.js

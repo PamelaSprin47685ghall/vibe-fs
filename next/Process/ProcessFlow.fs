@@ -35,6 +35,11 @@ module ProcessFlows =
         task {
             try
                 return! Flow.run ctx ct flow
-            with :? System.OperationCanceledException ->
-                return Error(ProcessError.ProcessCancelled "Operation cancelled")
+            with ex ->
+                let msg = if isNull (box ex) then "" else string ex
+
+                if msg.Contains("cancel") || msg.Contains("Cancel") || msg.Contains("Operation") then
+                    return Error(ProcessError.ProcessCancelled "Operation cancelled")
+                else
+                    return Error(ProcessError.ExecutionFailed msg)
         }
