@@ -2,7 +2,6 @@ namespace Wanxiangshu.Next.Tests.Integration
 
 open System
 open System.Threading
-open System.Threading.Tasks
 open Xunit
 open Wanxiangshu.Next.Kernel
 open Wanxiangshu.Next.Kernel.Identity
@@ -17,7 +16,11 @@ open Wanxiangshu.Next.Tests.JournalTests.JournalTestSupport
 
 module VerticalSliceIntegrationTests =
 
-    let private runStep1 (gateway: Gateway) (sessionId: SessionId) =
+    let private runStep1
+        (gateway: Gateway)
+        (sessionId: SessionId)
+        (inboxes: System.Collections.Generic.Dictionary<SessionId, ISessionInbox>)
+        =
         let userMsgObj =
             {| id = "msg_user_1"
                role = "user"
@@ -33,7 +36,7 @@ module VerticalSliceIntegrationTests =
               model = None }
 
         let drivers = SessionDrivers()
-        OpencodeHooks.handleChatMessage gateway drivers hookInput {| message = userMsgObj |}
+        OpencodeHooks.handleChatMessage gateway drivers inboxes hookInput {| message = userMsgObj |}
         let sessionProj1 = Map.find sessionId gateway.ProjectionSet.SessionProjections
         Assert.Equal(Some(TurnId.create "msg_user_1"), sessionProj1.HumanTurnId)
 
@@ -50,20 +53,13 @@ module VerticalSliceIntegrationTests =
                   Session = port }
 
             let payload = "[\"implement vertical slice\", \"run tests\"]"
-            let! toolOutput = todoTool.Execute toolCtx { Payload = payload }
+            let toolTask = todoTool.Execute toolCtx { Payload = payload }
+
+            // Await the todowrite tool execution directly.
+            // The SessionDriver worker loop automatically processes SessionCommandEvent (UpsertTodo) from inbox,
+            // appends the TodoChanged fact to the gateway, and replies to the command port.
+            let! toolOutput = toolTask
             Assert.False(toolOutput.Truncated)
-
-            let! inboxEv = inbox.Receive CancellationToken.None
-
-            match inboxEv with
-            | SessionCommandEvent(UpsertTodo snap) ->
-                let commitRes =
-                    gateway.Append (StreamId.Session sessionId) None (Fact.Todo(TodoChanged {| Snapshot = snap |}))
-
-                match commitRes with
-                | Committed _ -> ()
-                | _ -> Assert.True(false, "Expected Committed for TodoChanged")
-            | _ -> Assert.True(false, sprintf "Expected SessionCommandEvent, got %A" inboxEv)
 
             let sessionProj2 = Map.find sessionId gateway.ProjectionSet.SessionProjections
             Assert.True(sessionProj2.Todos.IsSome)
@@ -82,8 +78,10 @@ module VerticalSliceIntegrationTests =
                     let sessionId = SessionId.create "session-integration-vertical"
                     let inbox = Plugin.getOrCreateInbox sessionId
                     use driver = new SessionDriver(gateway, sessionId, inbox)
+                    let inboxes = System.Collections.Generic.Dictionary<SessionId, ISessionInbox>()
+                    inboxes.[sessionId] <- inbox
 
-                    runStep1 gateway sessionId
+                    runStep1 gateway sessionId inboxes
                     do! runStep2 gateway sessionId tempDir inbox
 
                     let finishFact =

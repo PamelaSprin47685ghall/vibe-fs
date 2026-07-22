@@ -3,7 +3,12 @@ namespace Wanxiangshu.Next.Session
 open System
 open System.Collections.Generic
 open System.Threading
+open System.Threading.Tasks
+open Wanxiangshu.Next.Kernel
 open Wanxiangshu.Next.Kernel.Identity
+open Wanxiangshu.Next.Kernel.Fact
+open Wanxiangshu.Next.Kernel.Outcome
+open Wanxiangshu.Next.Journal
 
 type DriverSlot =
     | Idle
@@ -93,12 +98,83 @@ type SessionDrivers() =
                 ()
         | None -> ()
 
-type SessionDriver(gateway: obj, sessionId: SessionId, inbox: ISessionInbox) =
+type SessionDriver(gateway: IGateway, sessionId: SessionId, inbox: ISessionInbox) =
     let cts = new CancellationTokenSource()
+
+    let dispatchCommand (cmd: SessionCommand) =
+        match cmd with
+        | UpsertTodo(snap, reply) ->
+            let fact = Fact.Todo(TodoChanged {| Snapshot = snap |})
+            let commitRes = gateway.Append (StreamId.Session sessionId) None fact
+
+            match commitRes with
+            | Committed _ -> reply (Ok SessionCommandResult.Upserted)
+            | _ -> reply (Error SessionCommandError.InboxFull)
+        | QuerySnapshot reply ->
+            match Map.tryFind sessionId gateway.ProjectionSet.SessionProjections with
+            | Some proj ->
+                let todoSnap = defaultArg proj.Todos { Items = [] }
+                reply todoSnap
+            | None -> reply { Items = [] }
+
+    let dispatchEvent (eventOpt: SessionInboxEvent) : Task<bool> =
+        task {
+            match eventOpt with
+            | SessionCommandEvent cmd ->
+                dispatchCommand cmd
+                return true
+
+            | HumanMessageEvent(turnId, _text) ->
+                let turnFact = Fact.Session(HumanTurnStarted {| TurnId = turnId |})
+                gateway.Append (StreamId.Session sessionId) (Some turnId) turnFact |> ignore
+                return true
+
+            | AssistantTerminalEvent(_userMsgId, assistantMsgId, outcome) ->
+                let pFact =
+                    Fact.Prompt(
+                        PromptTerminal
+                            {| PromptKey = SessionId.value sessionId
+                               Outcome = outcome
+                               AssistantMessageId = Some assistantMsgId |}
+                    )
+
+                gateway.Append (StreamId.Session sessionId) None pFact |> ignore
+                return true
+
+            | CancelEvent _ ->
+                try
+                    cts.Cancel()
+                with _ ->
+                    ()
+
+                return false
+
+            | PluginEvent _
+            | ToolAfterEvent _
+            | LifecycleEvent _
+            | LoopCommandEvent _
+            | SquadCommandEvent _ -> return true
+        }
+
+    let startWorker () : Task<unit> =
+        task {
+            let mutable keepGoing = true
+
+            while keepGoing && not cts.IsCancellationRequested do
+                try
+                    let! evt = inbox.Receive cts.Token
+                    let! continueLoop = dispatchEvent evt
+                    keepGoing <- continueLoop
+                with _ ->
+                    keepGoing <- false
+        }
+
+    let workerTask = startWorker ()
 
     member _.SessionId = sessionId
     member _.Inbox = inbox
     member _.CancellationToken = cts.Token
+    member _.Worker = workerTask
 
     member _.Cancel() =
         try

@@ -23,6 +23,7 @@
     <Compile Include="Journal/Writer.fs"/>
     <Compile Include="Journal/Fold.fs"/>
     <Compile Include="Journal/JournalFlows.fs"/>
+    <Compile Include="Journal/GatewayTypes.fs"/>
     <Compile Include="Session/PromptKey.fs"/>
     <Compile Include="Session/PromptProtocol.fs"/>
     <Compile Include="Session/Inbox.fs"/>

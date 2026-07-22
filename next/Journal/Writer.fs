@@ -2,13 +2,11 @@ namespace Wanxiangshu.Next.Journal
 
 open System
 open System.Threading.Tasks
+open Fable.Core
+open Fable.Core.JsInterop
 open Wanxiangshu.Next.Kernel.Identity
 open Wanxiangshu.Next.Kernel.Fact
 open Wanxiangshu.Next.Kernel.Outcome
-
-#if FABLE_COMPILER
-open Fable.Core
-open Fable.Core.JsInterop
 
 module private NodeFsWriter =
     [<Import("existsSync", "node:fs")>]
@@ -25,10 +23,6 @@ module private NodeFsWriter =
 
     [<Import("join", "node:path")>]
     let pathJoin (a: string, b: string) : string = jsNative
-#else
-open System.IO
-open System.Text
-#endif
 
 type JournalWriter private (runtimeId: RuntimeId, filePath: string) =
     let gate = obj ()
@@ -48,7 +42,6 @@ type JournalWriter private (runtimeId: RuntimeId, filePath: string) =
         (processId: int)
         (startedAt: DateTimeOffset)
         : JournalWriter * Envelope =
-#if FABLE_COMPILER
         if not (NodeFsWriter.existsSync directory) then
             NodeFsWriter.mkdirSync (directory, {| recursive = true |}) |> ignore
 
@@ -78,48 +71,10 @@ type JournalWriter private (runtimeId: RuntimeId, filePath: string) =
         NodeFsWriter.writeFileSync (filePath, jsonLine)
 
         (new JournalWriter(runtimeId, filePath), initEnvelope)
-#else
-        if not (Directory.Exists(directory)) then
-            Directory.CreateDirectory(directory) |> ignore
-
-        let filename = sprintf "%s.ndjson" (RuntimeId.value runtimeId)
-        let filePath = Path.Combine(directory, filename)
-
-        let fileStream =
-            new FileStream(filePath, FileMode.CreateNew, FileAccess.Write, FileShare.Read)
-
-        let streamWriter = new StreamWriter(fileStream, UTF8Encoding(false))
-
-        let initEventId = EventId.create (Guid.NewGuid().ToString("N"))
-
-        let initFact =
-            Fact.Runtime(
-                RuntimeStarted
-                    {| RuntimeId = runtimeId
-                       ProcessId = processId
-                       StartedAt = startedAt |}
-            )
-
-        let initEnvelope: Envelope =
-            { RuntimeId = runtimeId
-              LocalSeq = LocalSeq.create 1L
-              ObservedAt = startedAt
-              EventId = initEventId
-              Stream = StreamId.Workspace
-              TurnId = None
-              Fact = initFact }
-
-        let jsonLine = Envelope.serialize initEnvelope
-        streamWriter.WriteLine(jsonLine)
-        streamWriter.Flush()
-        fileStream.Flush(true)
-
-        (new JournalWriter(runtimeId, filePath), initEnvelope)
-#endif
 
     member private this.WriteAndFlush (env: Envelope) (eventId: EventId) =
         let line = Envelope.serialize env
-#if FABLE_COMPILER
+
         try
             NodeFsWriter.appendFileSync (filePath, line + "\n")
             currentSeq <- currentSeq + 1L
@@ -127,15 +82,6 @@ type JournalWriter private (runtimeId: RuntimeId, filePath: string) =
         with ex ->
             poisoned <- true
             CommitUnknown(eventId, WriteFailed ex.Message)
-#else
-        try
-            File.AppendAllText(filePath, line + "\n")
-            currentSeq <- currentSeq + 1L
-            Committed env
-        with ex ->
-            poisoned <- true
-            CommitUnknown(eventId, WriteFailed ex.Message)
-#endif
 
     member this.Append (streamKind: StreamId) (turnId: TurnId option) (fact: Fact) : CommitResult<Envelope> =
         lock gate (fun () ->

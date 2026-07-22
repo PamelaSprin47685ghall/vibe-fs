@@ -13,14 +13,17 @@ module MessageTransformTests =
               ParallelHint = Some "Run in parallel" }
 
         let input =
-            [ { Role = "user"; Text = "  " }; { Role = "user"; Text = "hello world" } ]
+            [ { Role = "user"
+                Text = "  "
+                ToolCalls = None
+                Metadata = None }
+              { Role = "user"
+                Text = "hello world"
+                ToolCalls = None
+                Metadata = None } ]
 
         let result = MessageTransform.transform snapshot input
 
-        // Sanitization removes empty/whitespace text, leaves "hello world"
-        // addCaps adds system message at front: [CAPS: coder, browser]
-        // addReviewContext adds system message: [REVIEW: Reviewing PR #42]
-        // addParallelHint adds system message: [HINT: Run in parallel]
         Assert.Equal(4, List.length result)
         Assert.Equal("system", result.[0].Role)
         Assert.Equal("[CAPS: coder, browser]", result.[0].Text)
@@ -38,7 +41,11 @@ module MessageTransformTests =
               ReviewContext = Some "Context"
               ParallelHint = None }
 
-        let input = [ { Role = "user"; Text = "test message" } ]
+        let input =
+            [ { Role = "user"
+                Text = "test message"
+                ToolCalls = None
+                Metadata = None } ]
 
         let once = MessageTransform.transform snapshot input
         let twice = MessageTransform.transform snapshot once
@@ -54,11 +61,21 @@ module MessageTransformTests =
 
         let input =
             [ { Role = "assistant"
-                Text = "Executing tools" }
-              { Role = "tool"; Text = "  " }
+                Text = "Executing tools"
+                ToolCalls = None
+                Metadata = None }
               { Role = "tool"
-                Text = "tool result ok" }
-              { Role = "user"; Text = "next step" } ]
+                Text = "  "
+                ToolCalls = None
+                Metadata = None }
+              { Role = "tool"
+                Text = "tool result ok"
+                ToolCalls = None
+                Metadata = None }
+              { Role = "user"
+                Text = "next step"
+                ToolCalls = None
+                Metadata = None } ]
 
         let result = MessageTransform.transform snapshot input
 
@@ -72,7 +89,11 @@ module MessageTransformTests =
 
     [<Fact>]
     let ``MessageTransform_input_list_not_mutated`` () =
-        let input = [ { Role = "user"; Text = "original" } ]
+        let input =
+            [ { Role = "user"
+                Text = "original"
+                ToolCalls = None
+                Metadata = None } ]
 
         let snapshot =
             { Caps = []

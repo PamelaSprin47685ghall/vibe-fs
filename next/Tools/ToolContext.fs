@@ -8,16 +8,8 @@ open Wanxiangshu.Next.Kernel.Identity
 open Wanxiangshu.Next.Process
 open Wanxiangshu.Next.Session
 
-[<RequireQualifiedAccess>]
-type SessionCommandError =
-    | InboxFull
-    | Timeout of reason: string
-    | CommandFailed of reason: string
-
-[<RequireQualifiedAccess>]
-type SessionCommandResult =
-    | Upserted
-    | SnapshotQueried of Fact.TodoSnapshot
+type SessionCommandError = Wanxiangshu.Next.Session.SessionCommandError
+type SessionCommandResult = Wanxiangshu.Next.Session.SessionCommandResult
 
 type SessionCommandPort =
     abstract Request:
@@ -47,9 +39,21 @@ type SessionInboxCommandPort(inbox: ISessionInbox) =
         member _.Request (command: SessionCommand) (cancellation: CancellationToken) (deadline: Deadline) =
             task {
                 cancellation.ThrowIfCancellationRequested()
-                let cmdEvent = SessionCommandEvent command
+                let tcs = JsTcs<Result<SessionCommandResult, SessionCommandError>>()
+
+                let cmdWithReply =
+                    match command with
+                    | UpsertTodo(snap, _) -> UpsertTodo(snap, (fun res -> tcs.TrySetResult(res) |> ignore))
+                    | QuerySnapshot reply -> QuerySnapshot reply
+
+                let cmdEvent = SessionCommandEvent cmdWithReply
 
                 match inbox.TryPost cmdEvent with
-                | Ok() -> return Ok SessionCommandResult.Upserted
                 | Error _ -> return Error SessionCommandError.InboxFull
+                | Ok() ->
+                    use reg =
+                        cancellation.Register(fun () ->
+                            tcs.TrySetResult(Error(SessionCommandError.Timeout "cancelled")) |> ignore)
+
+                    return! tcs.Task
             }
