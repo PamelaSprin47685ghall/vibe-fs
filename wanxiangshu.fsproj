@@ -162,6 +162,7 @@
     <Compile Include="src/Runtime/Tooling/NativeReadTranscript.fs"/>
     <Compile Include="src/Runtime/SubagentPrompts.fs"/>
     <Compile Include="src/Runtime/SubagentSummarizerPrompts.fs"/>
+    <Compile Include="src/Runtime/Subsession/SubagentReportParse.fs"/>
     <Compile Include="src/Runtime/Subsession/Subagent.fs"/>
     <Compile Include="src/Runtime/Execution/ExecutorFormat.fs"/>
     <Compile Include="src/Runtime/Tooling/TreeSitterFormat.fs"/>
@@ -734,6 +735,8 @@
     <Compile Include="tests/OmpCoverage2Tests.fs"/>
     <Compile Include="tests/OmpTodoToolTests.fs"/>
     <Compile Include="tests/OmpExecutorToolsTests.fs"/>
+    <Compile Include="tests/OmpHostContractCoreTests.fs"/>
+    <Compile Include="tests/OmpHostContractAsyncTests.fs"/>
     <Compile Include="tests/OmpHostContractTests.fs"/>
     <Compile Include="tests/OpencodeHookSchemaCoverageTests.fs"/>
     <Compile Include="tests/OpencodeSearchToolsCoverageTests.fs"/>

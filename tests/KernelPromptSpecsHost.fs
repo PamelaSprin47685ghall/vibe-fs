@@ -44,7 +44,7 @@ let hostKernel' () =
         renderMeditatorIntent dummyEntry "why?" "my background" "note detail"
 
     check "meditator has question" (prompt.Contains "why?")
-    check "meditator no-tools constraint" (prompt.Contains "NO_TOOLS")
+    check "meditator no-tools constraint" (prompt.ToLowerInvariant().Contains "do not call tools")
     check "meditator methodology structured id" (prompt.Contains "methodology_id" || prompt.Contains "test_methodology")
     check "meditator no METHODOLOGY_ID prose" (not (prompt.Contains "METHODOLOGY_ID:"))
 

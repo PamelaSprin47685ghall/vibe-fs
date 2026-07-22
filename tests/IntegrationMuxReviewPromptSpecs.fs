@@ -57,7 +57,9 @@ let muxSubmitReviewPromptFormatSpec () =
             check "submit_review prompt does not ask for tool-level callId" (not (promptText.Contains "callId"))
             check
                 "submit_review prompt reuses review criteria"
-                (promptText.Contains "LANGUAGE_FIT" || promptText.Contains "COMPLETENESS" || promptText.Contains "criterion")
+                (promptText.Contains "language features"
+         || promptText.Contains "cutting corners"
+         || promptText.Contains "criterion")
             check "submit_review prompt uses agent_report protocol" (promptText.Contains "agent_report" || promptText.Contains "return_reviewer")
             check "submit_review prompt drops legacy divider" (not (promptText.Contains "==="))
             check

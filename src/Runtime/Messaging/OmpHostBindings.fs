@@ -43,10 +43,12 @@ let tryExtractMessageId (response: obj) : string option =
         | Some _ as hit -> hit
         | None ->
             let data = Dyn.get response "data"
+
             match pick data with
             | Some _ as hit -> hit
             | None ->
                 let msg = Dyn.get response "message"
+
                 match pick msg with
                 | Some _ as hit -> hit
                 | None -> pick (Dyn.get data "message")
@@ -60,30 +62,30 @@ let formatModelString (providerId: string) (modelId: string) (variant: string op
         | _ -> Some(sprintf "%s/%s" providerId modelId)
 
 /// OMP host prompt envelope: structured fields { text; model?; continuationID?; agent? }.
-/// Variable name is host-API "body" (session.prompt arg), not a freeform prompt bag.
-let buildSessionPromptBody (text: string) (model: string option) (continuationId: string option) (agent: string option) : obj =
-    let mutable payload: obj = box {| text = text |}
-
-    match model with
-    | Some m when m <> "" -> payload <- Dyn.withKey payload "model" (box m)
-    | _ -> ()
-
-    match continuationId with
-    | Some c when c <> "" -> payload <- Dyn.withKey payload "continuationID" (box c)
-    | _ -> ()
-
-    match agent with
-    | Some a when a <> "" -> payload <- Dyn.withKey payload "agent" (box a)
-    | _ -> ()
-
-    payload
+/// This is the session.prompt wire payload (not a freeform prompt bag).
+let buildSessionPromptPayload
+    (text: string)
+    (model: string option)
+    (continuationId: string option)
+    (agent: string option)
+    : obj =
+    match model, continuationId, agent with
+    | Some m, Some c, Some a when m <> "" && c <> "" && a <> "" ->
+        box {| text = text; model = m; continuationID = c; agent = a |}
+    | Some m, Some c, _ when m <> "" && c <> "" -> box {| text = text; model = m; continuationID = c |}
+    | Some m, _, Some a when m <> "" && a <> "" -> box {| text = text; model = m; agent = a |}
+    | _, Some c, Some a when c <> "" && a <> "" -> box {| text = text; continuationID = c; agent = a |}
+    | Some m, _, _ when m <> "" -> box {| text = text; model = m |}
+    | _, Some c, _ when c <> "" -> box {| text = text; continuationID = c |}
+    | _, _, Some a when a <> "" -> box {| text = text; agent = a |}
+    | _ -> box {| text = text |}
 
 let sessionPrompt (session: obj) (prompt: string) : JS.Promise<obj> =
     unbox<JS.Promise<obj>> (Dyn.callMethod1 session "prompt" (box prompt))
 
-let sessionPromptViaApi (sessionApi: obj) (sessionId: string) (promptBody: obj) : JS.Promise<obj> =
-    let body = box {| prompt = promptBody |}
-    let arg = box {| sessionId = sessionId; body = body |}
+let sessionPromptViaApi (sessionApi: obj) (sessionId: string) (promptPayload: obj) : JS.Promise<obj> =
+    let envelope = box {| prompt = promptPayload |}
+    let arg = box {| sessionId = sessionId; body = envelope |}
     unbox<JS.Promise<obj>> (sessionApi?sessionPrompt (arg))
 
 let sessionWaitForIdle (session: obj) : JS.Promise<unit> =

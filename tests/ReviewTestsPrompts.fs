@@ -32,10 +32,10 @@ let reviewerPromptFormat () =
     check "embeds affected file a.fs" (prompt.Contains "a.fs")
     check
         "carries review criteria"
-        (prompt.Contains "LANGUAGE_FIT"
-         || prompt.Contains "COMPLETENESS"
-         || prompt.Contains "language features")
-    check "embeds report content" (prompt.Contains "changed A and B")
+        (prompt.Contains "language features"
+         || prompt.Contains "cutting corners"
+         || prompt.Contains "criterion")
+    check "embeds report as summary evidence" (prompt.Contains "changed A and B" || prompt.Contains "summary")
     check "no ugly Task header" (not (prompt.Contains "=== Task ==="))
     check "no ugly Change Report header" (not (prompt.Contains "=== Change Report ==="))
     let minimal = Wanxiangshu.Runtime.ReviewPrompts.reviewerPrompt "only task" "" []
@@ -55,9 +55,9 @@ let muxReviewerVerdictPromptFormat () =
 
     check
         "mux prompt reuses review criteria"
-        (prompt.Contains "LANGUAGE_FIT"
-         || prompt.Contains "COMPLETENESS"
-         || prompt.Contains "language features")
+        (prompt.Contains "language features"
+         || prompt.Contains "cutting corners"
+         || prompt.Contains "criterion")
 
     check "mux prompt names agent_report" (prompt.Contains "agent_report")
     check "mux prompt has no legacy divider" (not (prompt.Contains "==="))
@@ -66,5 +66,14 @@ let reviewInstructionsFrontMatter () =
     let instr = Wanxiangshu.Runtime.ReviewPrompts.reviewInstructions
     check "instructions are structured review doc" (instr.Contains "objective =")
     check "instructions mention return_reviewer" (instr.Contains "return_reviewer")
-    check "instructions carry atomic criteria" (instr.Contains "LANGUAGE_FIT" || instr.Contains "COMPLETENESS")
-    check "instructions carry atomic read-only" (instr.Contains "READ_ONLY" || instr.Contains "NO_MUTATING")
+    check
+        "instructions carry atomic criteria"
+        (instr.Contains "language features"
+         || instr.Contains "cutting corners"
+         || instr.Contains "criterion")
+    check
+        "instructions carry atomic read-only"
+        (instr.Contains "Do not write"
+         || instr.Contains "mutating tools"
+         || instr.Contains "constraint")
+    check "instructions have no PREFIX prose markers" (not (instr.Contains "LANGUAGE_FIT:") && not (instr.Contains "READ_ONLY:"))

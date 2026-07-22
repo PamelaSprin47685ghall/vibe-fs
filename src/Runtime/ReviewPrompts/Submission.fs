@@ -10,15 +10,29 @@ let doubleCheckChallenge =
 let private reviewBaseRules (extra: PromptRule list) : PromptRule list =
     readOnlyConstraints @ reviewCriteriaRules @ extra
 
+/// Flatten worker report into summary + findings + file references (no opaque bag).
 let private evidenceTargets (report: string) (affectedFiles: string list) : PromptTarget list =
-    let reportTargets =
-        if System.String.IsNullOrWhiteSpace report then
-            []
-        else
-            [ PromptTarget.EvidenceTarget("worker_report", report) ]
+    let parsed = Wanxiangshu.Runtime.SubagentReportParse.parseSubagentReportText report
 
-    let fileTargets = affectedFiles |> List.map PromptTarget.FileReference
-    reportTargets @ fileTargets
+    let summaryTargets =
+        match parsed.summary with
+        | Some s when s.Trim() <> "" -> [ PromptTarget.EvidenceTarget("summary", s.Trim()) ]
+        | _ -> []
+
+    let findingTargets =
+        parsed.findings
+        |> List.mapi (fun i f -> PromptTarget.EvidenceTarget(sprintf "finding_%d" (i + 1), f))
+
+    let reportFileTargets =
+        (parsed.relatedFiles @ affectedFiles)
+        |> List.distinct
+        |> List.map PromptTarget.FileReference
+
+    let codeTargets =
+        parsed.relatedCode
+        |> List.mapi (fun i c -> PromptTarget.EvidenceTarget(sprintf "related_code_%d" (i + 1), c))
+
+    summaryTargets @ findingTargets @ reportFileTargets @ codeTargets
 
 let private perfectReviseOutcomes perfectText reviseText : PromptOutcome list =
     [ { label = "PERFECT"; text = perfectText }
@@ -63,7 +77,7 @@ let reviewerPrompt (task: string) (report: string) (affectedFiles: string list) 
           rules =
             reviewBaseRules
                 [ PromptRule.Policy
-                      "Read worker_report and affected files; inspect actual contents before judging."
+                      "Read the summary, findings, and affected files; inspect actual contents before judging."
                   PromptRule.Contract
                       "You MUST call return_reviewer before finishing. Do not end without a verdict." ]
           outcomes =

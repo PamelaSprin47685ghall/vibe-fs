@@ -76,8 +76,8 @@ type OmpActionExecutorClass(runtime: FallbackRuntimeStore, sessionApi: obj) =
     let sendPrompt (sessionID: string) (text: string) (model: FallbackModel) (continuationID: string) =
         promise {
             let modelOpt, agentOpt = resolveModelAndAgent model sessionID
-            let promptBody = buildSessionPromptBody text modelOpt (Some continuationID) agentOpt
-            let! response = sessionPromptViaApi sessionApi sessionID promptBody
+            let promptPayload = buildSessionPromptPayload text modelOpt (Some continuationID) agentOpt
+            let! response = sessionPromptViaApi sessionApi sessionID promptPayload
             requirePromptReceipt response
         }
 

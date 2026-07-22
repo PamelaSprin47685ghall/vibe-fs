@@ -80,7 +80,7 @@ let methSchemaCommon () =
     check "prompt has note" (prompt.Contains "my note")
     check
         "prompt has quiet room"
-        (prompt.Contains "NO_TOOLS" || prompt.ToLowerInvariant().Contains "do not call tools")
+        (prompt.ToLowerInvariant().Contains "do not call tools")
     check "no METHODOLOGY_ID prose key" (not (prompt.Contains "METHODOLOGY_ID:"))
     check "no DEFINITION prose key" (not (prompt.Contains "DEFINITION:"))
     check "kind is methodology" (prompt.Contains "methodology")

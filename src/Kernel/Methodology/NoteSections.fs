@@ -40,12 +40,12 @@ let private afterHeader (line: string) : string =
 /// Split freeform note into sections keyed by noteDescription tokens.
 let splitNoteSections (noteDescription: string) (noteText: string) : (string * string) list =
     let keys = noteKeys noteDescription
-    let body = if isNull noteText then "" else noteText.Trim()
+    let content = if isNull noteText then "" else noteText.Trim()
 
-    if body = "" then
+    if content = "" then
         []
     elif List.isEmpty keys then
-        [ "note", body ]
+        [ "note", content ]
     else
         let keySet = keys |> List.map (fun k -> k.ToLowerInvariant()) |> Set.ofList
         let mutable current: string option = None
@@ -60,7 +60,7 @@ let splitNoteSections (noteDescription: string) (noteText: string) : (string * s
                 let k = defaultArg current (List.head keys)
                 acc <- Map.add k (text :: (Map.tryFind k acc |> Option.defaultValue [])) acc
 
-        for line in body.Split('\n') do
+        for line in content.Split('\n') do
             match headerKey keySet line with
             | Some k ->
                 flush ()
@@ -82,6 +82,6 @@ let splitNoteSections (noteDescription: string) (noteText: string) : (string * s
                     | None -> None)
 
         if List.isEmpty ordered then
-            [ List.head keys, body ]
+            [ List.head keys, content ]
         else
             ordered

@@ -22,7 +22,7 @@ let formatNumberedLines (startLine: int) (lines: string array) : string =
 
 /// Format a NativeReadTranscript as a string, matching the real FileSys.read output format.
 let formatTranscript (transcript: NativeReadTranscript) : string =
-    let body =
+    let content =
         if transcript.Lines.Length = 0 then
             "(empty file)"
         else
@@ -45,4 +45,4 @@ let formatTranscript (transcript: NativeReadTranscript) : string =
         else
             "(End of file)"
 
-    $"{header}\n{body}\n{footer}"
+    $"{header}\n{content}\n{footer}"

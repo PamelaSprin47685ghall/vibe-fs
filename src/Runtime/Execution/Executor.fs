@@ -43,8 +43,8 @@ let mapOutcome
     | TimedOut _ -> Truncated(partialStdout out, err, options.timeoutType)
     | Signaled(signal, _, _) -> Failed(partialStdout out, err, None, Some signal)
     | Exited(0, _, _) ->
-        let body = if out = "" && err = "" then "(no output)" else out
-        Completed(body, err, 0)
+        let completedStdout = if out = "" && err = "" then "(no output)" else out
+        Completed(completedStdout, err, 0)
     | Exited(code, _, _) -> Failed(out, err, Some code, None)
     | SpawnFailed(ExecutorExecutableMissing exe) ->
         MissingExecutable(

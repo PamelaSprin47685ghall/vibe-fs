@@ -1,7 +1,5 @@
 module Wanxiangshu.Kernel.Methodology.Schema
 
-open System
-open System.Text
 open Wanxiangshu.Kernel.Prompt
 open Wanxiangshu.Kernel.Methodology.NoteSections
 
@@ -30,22 +28,20 @@ let unifiedToolName = "meditator"
 let unifiedToolDescription =
     "Record a durable, structured methodology notebook entry for this workspace and turn. "
     + "Select a methodology from the enum, then fill intent, background, and note. "
-    + "The note field description lists what each methodology expects you to cover."
+    + "The note field MUST be structured as key: value sections matching the methodology's noteDescription tokens "
+    + "(one section per key, e.g. problem_statement: ...). Freeform prose without keys is rejected for structured projection."
 
 let buildUnifiedNoteDescription (entries: MethodologyEntry list) : string =
-    let sb = StringBuilder()
+    let header =
+        "Fill structured note sections for the selected methodology. "
+        + "Write each token from the list as its own `key: text` section (not a single freeform body). "
+        + "Per methodology:"
 
-    sb.AppendLine(
-        "Fill in the content for the selected methodology. Depending on which methodology you choose, your note should cover:"
-    )
-    |> ignore
+    let lines =
+        entries
+        |> List.map (fun e -> e.methodologyId + ": " + e.noteDescription)
 
-    sb.AppendLine() |> ignore
-
-    for e in entries do
-        sb.AppendLine(e.methodologyId + ": " + e.noteDescription) |> ignore
-
-    sb.ToString()
+    String.concat "\n" (header :: "" :: lines)
 
 let renderMeditatorDocument
     (entry: MethodologyEntry)
@@ -85,6 +81,6 @@ let renderMeditatorDocument
       targets = [ PromptTarget.MethodologyTarget meta ]
       boundaries = []
       rules =
-        [ PromptRule.Constraint "LANGUAGE: dense modern Chinese unless inputs are explicitly English-only."
-          PromptRule.Constraint "NO_TOOLS: do not call tools or invent workspace facts." ]
+        [ PromptRule.Constraint "Write in dense modern Chinese unless inputs are explicitly English-only."
+          PromptRule.Constraint "Do not call tools or invent workspace facts." ]
       outcomes = outcomes }

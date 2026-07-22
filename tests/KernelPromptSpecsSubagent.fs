@@ -136,8 +136,8 @@ let subagentDispatch () =
 let subagentJoinReports () =
     let joined =
         joinReports
-            [ reportFromSummary "first  "
-              { reportFromSummary "  second" with
+            [ reportFromText "first  "
+              { reportFromText "  second" with
                   findings = [ "finding-a" ]
                   relatedFiles = [ "src/A.fs" ]
                   relatedCode = [ "let x = 1" ] } ]
@@ -175,6 +175,6 @@ let meditatorMentionsReadCapability () =
 
     let doc = parseToml prompt
     equal "meditator objective" "what is the core abstraction?" (strField doc "objective")
-    check "meditator prompt is no-tools" (prompt.Contains "NO_TOOLS")
+    check "meditator prompt is no-tools" (prompt.ToLowerInvariant().Contains "do not call tools")
     check "meditator methodology structured id" (prompt.Contains "methodology_id" || prompt.Contains "test_methodology")
     check "meditator no METHODOLOGY_ID prose" (not (prompt.Contains "METHODOLOGY_ID:"))

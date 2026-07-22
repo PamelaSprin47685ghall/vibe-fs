@@ -90,7 +90,10 @@ let checkNoLegacyPromptSymbols (srcRoot: string) =
           "parallelToolPromptProse"
           "readOnlyRulesFor"
           "readOnlyWorkspaceConstraint"
-          "wipAcknowledgmentAnchor" ]
+          "wipAcknowledgmentAnchor"
+          "buildSessionPromptBody"
+          "reportFromSummary"
+          "capExecutorSummaryOutput" ]
 
     for path in collectFsFiles srcRoot do
         let content = readFileSync path "utf8"
@@ -101,6 +104,41 @@ let checkNoLegacyPromptSymbols (srcRoot: string) =
             if re.IsMatch content then
                 failIf true (sprintf "Forbidden legacy prompt symbol '%s' in %s" sym path)
 
+let checkNoPromptTomlBodyKey (srcRoot: string) =
+    // Model-facing TOML projections must not reintroduce a root `body =` bag key.
+    // Host HTTP envelopes and free-text prose may still contain the word "body".
+    let projectionFiles =
+        [ "src/Runtime/Prompt/PromptToml.fs"
+          "src/Runtime/Tooling/ToolOutputToml.fs"
+          "src/Runtime/Tooling/ToolOutputBatchToml.fs"
+          "src/Runtime/PromptFragments.fs"
+          "src/Runtime/SubagentPrompts.fs"
+          "src/Runtime/SubagentSummarizerPrompts.fs"
+          "src/Kernel/Methodology/Schema.fs"
+          "src/Runtime/ReviewPrompts"
+          "src/Runtime/Subsession/Subagent.fs"
+          "src/Runtime/Execution/LoopMessages.fs"
+          "src/Runtime/Nudge/NudgeDerivation.fs" ]
+
+    let repoRoot = srcRoot.Replace("/src", "")
+    let bodyKeyRe = Regex(@"^\s*body\s*=", RegexOptions.Multiline)
+
+    for rel in projectionFiles do
+        let abs = pathJoin repoRoot rel
+
+        if existsSync abs then
+            if isDirectory abs then
+                for path in collectFsFiles abs do
+                    let content = readFileSync path "utf8"
+
+                    if bodyKeyRe.IsMatch content then
+                        failIf true (sprintf "Forbidden TOML body= key in projection %s" path)
+            else
+                let content = readFileSync abs "utf8"
+
+                if bodyKeyRe.IsMatch content then
+                    failIf true (sprintf "Forbidden TOML body= key in projection %s" abs)
+
 let checkNoHandwrittenTomlOrStringBuilderInProjections (srcRoot: string) =
     let repoRoot = srcRoot.Replace("/src", "")
 
@@ -109,7 +147,8 @@ let checkNoHandwrittenTomlOrStringBuilderInProjections (srcRoot: string) =
           "src/Runtime/Tooling"
           "src/Runtime/ReviewPrompts"
           "src/Runtime/Subsession"
-          "src/Runtime" ]
+          "src/Runtime"
+          "src/Kernel/Methodology" ]
 
     let forbiddenPatterns =
         [ Regex(@"\bStringBuilder\b")
@@ -122,7 +161,9 @@ let checkNoHandwrittenTomlOrStringBuilderInProjections (srcRoot: string) =
     let pathAllowed (norm: string) =
         norm.Contains("/Toml")
         || norm.EndsWith("SubagentPrompts.fs")
+        || norm.EndsWith("SubagentSummarizerPrompts.fs")
         || norm.EndsWith("Subagent.fs")
+        || norm.EndsWith("Schema.fs") && norm.Contains("/Methodology/")
         || norm.Contains("/ReviewPrompts/")
 
     for dir in dirs do
@@ -175,6 +216,7 @@ let run (srcRoot: string) (phase: int) : ResizeArray<string> =
     if phase >= 5 then
         checkDeletedProductionFiles srcRoot
         checkNoLegacyPromptSymbols srcRoot
+        checkNoPromptTomlBodyKey srcRoot
 
     checkNoHandwrittenTomlOrStringBuilderInProjections srcRoot
     checkNoMarkdownSectionDividersInPromptProducers repoRoot
