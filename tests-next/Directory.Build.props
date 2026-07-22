@@ -1,0 +1,18 @@
+<Project>
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <RootNamespace>Wanxiangshu.Next.Tests</RootNamespace>
+    <LangVersion>preview</LangVersion>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <OtherFlags>--nowarn:1182</OtherFlags>
+    <IsPackable>false</IsPackable>
+    <ArtifactsDir Condition="'$(ArtifactsDir)' == ''">$(MSBuildThisFileDirectory)../artifacts/</ArtifactsDir>
+    <BaseIntermediateOutputPath>$(ArtifactsDir)obj/$(MSBuildProjectName)/</BaseIntermediateOutputPath>
+    <MSBuildProjectExtensionsPath>$(BaseIntermediateOutputPath)</MSBuildProjectExtensionsPath>
+    <BaseOutputPath>$(ArtifactsDir)bin/$(MSBuildProjectName)/</BaseOutputPath>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Remove="Fable.Core" />
+    <PackageReference Remove="Fable.Promise" />
+  </ItemGroup>
+</Project>
