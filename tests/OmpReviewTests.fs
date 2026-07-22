@@ -112,7 +112,6 @@ let returnReviewerVerdictPerfectRevise () =
         let tool = h.tools |> Seq.find (fun t -> str t "name" = "return_reviewer")
         let reviewSessionId = "review-child-1"
         let task = "review loop task"
-        let ts = 0L
         let mutable firstKr: ReviewResult option = None
         reviewStore.applyReviewTaskProjection (reviewSessionId, Some task)
         reviewStore.setPendingReview (reviewSessionId, (fun kr -> firstKr <- Some kr))
@@ -142,19 +141,8 @@ let private createResolvablePromise () : obj =
         ()
         "(function() { var res; var p = new Promise(function(r) { res = r; }); return { promise: p, resolve: res }; })()"
 
-let returnReviewerViaSetPendingStateForTest () =
+let private testPendingPerfectPass tool ctx reviewSessionId parentSessionId =
     promise {
-        resetPluginState ()
-        let h = createPiHarness ()
-        let pi = piObject h
-        do! Plugin.wanxiangshuExtension pi
-        let tool = h.tools |> Seq.find (fun t -> str t "name" = "return_reviewer")
-        let reviewSessionId = "review-child-1"
-        let parentSessionId = "parent-1"
-
-        let ctx =
-            createObj [ "sessionManager", box (createObj [ "getSessionId", box (fun () -> box reviewSessionId) ]) ]
-
         let firstPending = createResolvablePromise ()
         reviewStore.recordChallengeRequested reviewSessionId
         setPendingReviewStateForTest reviewStore reviewSessionId parentSessionId firstPending
@@ -164,6 +152,10 @@ let returnReviewerViaSetPendingStateForTest () =
         let! firstResolved = emitJsExpr firstPending "$0.promise" |> unbox<JS.Promise<obj>>
         equal "setPending PERFECT feedback absent" true (Dyn.isNullish (Dyn.get firstResolved "feedback"))
         equal "setPending PERFECT tool text" "Review submitted: accepted." (toolText passResult)
+    }
+
+let private testPendingRevisePass tool ctx reviewSessionId parentSessionId =
+    promise {
         let secondPending = createResolvablePromise ()
         setPendingReviewStateForTest reviewStore reviewSessionId parentSessionId secondPending
 
@@ -179,25 +171,45 @@ let returnReviewerViaSetPendingStateForTest () =
             (toolText rejectResult)
     }
 
+let returnReviewerViaSetPendingStateForTest () =
+    promise {
+        resetPluginState ()
+        let h = createPiHarness ()
+        let pi = piObject h
+        do! Plugin.wanxiangshuExtension pi
+        let tool = h.tools |> Seq.find (fun t -> str t "name" = "return_reviewer")
+        let reviewSessionId = "review-child-1"
+        let parentSessionId = "parent-1"
+
+        let ctx =
+            createObj [ "sessionManager", box (createObj [ "getSessionId", box (fun () -> box reviewSessionId) ]) ]
+
+        do! testPendingPerfectPass tool ctx reviewSessionId parentSessionId
+        do! testPendingRevisePass tool ctx reviewSessionId parentSessionId
+    }
+
+let private installCodingAgentModule () =
+    testScope.Remove "omp.coding_agent_module"
+
+    testScope.Add(
+        "omp.coding_agent_module",
+        box (
+            createObj
+                [ "SessionManager",
+                  box (
+                      createObj
+                          [ "create",
+                            box (fun (_cwd: string) -> createObj [ "getSessionId", box (fun () -> box "sm-1") ]) ]
+                  ) ]
+        )
+    )
+
 let runReviewLoopChildToolNames () =
     promise {
-        testScope.Remove "omp.coding_agent_module"
+        installCodingAgentModule ()
         let captured = ref [||]
         let store = createReviewStore ()
         let childId = "review-child-tools"
-
-        testScope.Add(
-            "omp.coding_agent_module",
-            box (
-                createObj
-                    [ "SessionManager",
-                      box (
-                          createObj
-                              [ "create",
-                                box (fun (_cwd: string) -> createObj [ "getSessionId", box (fun () -> box "sm-1") ]) ]
-                      ) ]
-            )
-        )
 
         let promptAcceptOnFirst =
             box (fun (_: obj) ->
@@ -234,7 +246,7 @@ let runReviewLoopChildToolNames () =
 
 let runReviewLoopAcceptsWhenPendingResolved () =
     promise {
-        testScope.Remove "omp.coding_agent_module"
+        installCodingAgentModule ()
         let childId = "review-child-accept"
         let store = createReviewStore ()
 
@@ -257,19 +269,6 @@ let runReviewLoopAcceptsWhenPendingResolved () =
 
         let pi =
             createObj [ "pi", box (createObj [ "createAgentSession", createAgentSession ]) ]
-
-        testScope.Add(
-            "omp.coding_agent_module",
-            box (
-                createObj
-                    [ "SessionManager",
-                      box (
-                          createObj
-                              [ "create",
-                                box (fun (_cwd: string) -> createObj [ "getSessionId", box (fun () -> box "sm-1") ]) ]
-                      ) ]
-            )
-        )
 
         let ctx = createObj [ "cwd", box "/tmp/ws" ]
         let! outcome = runReviewLoop testScope pi ctx store "parent-accept" "report body" [| "src/a.fs" |] (Some "fix")

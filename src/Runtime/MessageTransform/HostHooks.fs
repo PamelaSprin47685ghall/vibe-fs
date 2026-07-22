@@ -1,9 +1,10 @@
 module Wanxiangshu.Runtime.MessageTransform.HostHooks
 
-open Wanxiangshu.Runtime
-
 open Fable.Core
 open Fable.Core.JsInterop
+
+module Dyn = Wanxiangshu.Runtime.Dyn
+
 open Wanxiangshu.Runtime.CapsFormat
 open Wanxiangshu.Kernel.Config
 open Wanxiangshu.Kernel.Messaging
