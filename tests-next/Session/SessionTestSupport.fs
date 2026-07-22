@@ -22,4 +22,5 @@ module SessionTestSupport =
               MaxInvalidRetries = 2 }
           ContinueWork = continueWork
           RequestReview = fun () -> session { return () }
-          Finish = fun () -> session { return CompletedSession "ok" } }
+          Finish = fun () -> session { return CompletedSession "ok" }
+          CommitTodoFrom = fun _ -> session { return () } }

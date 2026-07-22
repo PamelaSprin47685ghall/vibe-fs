@@ -46,6 +46,11 @@ type SessionDrivers() =
                 with _ ->
                     ()
 
+                try
+                    cts.Dispose()
+                with _ ->
+                    ()
+
                 if not (drivers.TryUpdate(key, Idle, Running cts)) then
                     loop ()
             | true, Idle -> ()
@@ -53,4 +58,18 @@ type SessionDrivers() =
 
         loop ()
 
-    member _.Deactivate(key: SessionDriversKey) : unit = drivers.TryRemove(key) |> ignore
+    member _.Deactivate(key: SessionDriversKey) : unit =
+        match drivers.TryGetValue(key) with
+        | true, Running cts ->
+            try
+                cts.Cancel()
+            with _ ->
+                ()
+
+            try
+                cts.Dispose()
+            with _ ->
+                ()
+        | _ -> ()
+
+        drivers.TryRemove(key) |> ignore
