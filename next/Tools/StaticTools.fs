@@ -23,13 +23,17 @@ module NodeFs =
     [<Import("statSync", "fs")>]
     let statSync (path: string) : obj = jsNative
 
+module NodeProcess =
+    [<Import("platform", "process")>]
+    let platform: string = jsNative
+
 module StaticTools =
 
     let todowriteTool (port: SessionCommandPort) : Tool =
         { Name = "todowrite"
           Description = "Update task todo snapshot, report progress, and methodology."
           SchemaJson =
-            """{"type":"object","properties":{"todos":{"type":"array","items":{"type":"string"}},"select_methodology":{"type":"string"},"report":{"type":"string"}},"required":["todos"]}"""
+            """{"type":"object","properties":{"todos":{"type":"array","items":{"type":"string"}}},"required":["todos"]}"""
           Execute =
             fun ctx input ->
                 task {
@@ -38,9 +42,7 @@ module StaticTools =
                     let items =
                         try
                             let decoder =
-                                Decode.object (fun get ->
-                                    let todos = get.Required.Field "todos" (Decode.list Decode.string)
-                                    todos)
+                                Decode.object (fun get -> get.Required.Field "todos" (Decode.list Decode.string))
 
                             match Decode.fromString decoder input.Payload with
                             | Ok list -> list
@@ -87,9 +89,13 @@ module StaticTools =
                         with _ ->
                             input.Payload
 
+                    let isWindows = NodeProcess.platform = "win32"
+                    let fileName = if isWindows then "cmd.exe" else "sh"
+                    let argFlag = if isWindows then "/c" else "-c"
+
                     let cmd: Command =
-                        { FileName = "sh"
-                          Arguments = [ "-c"; cmdText ]
+                        { FileName = fileName
+                          Arguments = [ argFlag; cmdText ]
                           WorkingDirectory = None
                           Environment = None
                           Stdin = None
@@ -156,7 +162,7 @@ module StaticTools =
                 task {
                     ctx.Cancellation.ThrowIfCancellationRequested()
 
-                    let (filePath, content) =
+                    let parsedOpt =
                         try
                             let decoder =
                                 Decode.object (fun get ->
@@ -165,23 +171,29 @@ module StaticTools =
                                     (path, c))
 
                             match Decode.fromString decoder input.Payload with
-                            | Ok res -> res
-                            | Error _ -> (input.Payload, "")
+                            | Ok res -> Some res
+                            | Error _ -> None
                         with _ ->
-                            (input.Payload, "")
+                            None
 
-                    NodeFs.writeFileSync (filePath, content, "utf8")
-                    let stat = NodeFs.statSync filePath
+                    match parsedOpt with
+                    | None ->
+                        return
+                            { Result = sprintf "Failed to parse JSON payload for write tool: %s" input.Payload
+                              Truncated = false }
+                    | Some(filePath, content) ->
+                        NodeFs.writeFileSync (filePath, content, "utf8")
+                        let stat = NodeFs.statSync filePath
 
-                    let size =
-                        if isNull stat || isNull stat?size then
-                            content.Length
-                        else
-                            unbox<int> stat?size
+                        let size =
+                            if isNull stat || isNull stat?size then
+                                content.Length
+                            else
+                                unbox<int> stat?size
 
-                    return
-                        { Result = sprintf "Wrote %s (%d bytes)" filePath size
-                          Truncated = false }
+                        return
+                            { Result = sprintf "Wrote %s (%d bytes)" filePath size
+                              Truncated = false }
                 } }
 
     let fileEditTool () : Tool =
@@ -253,15 +265,17 @@ module StaticTools =
                         with _ ->
                             input.Payload
 
-                    let cmd =
-                        UpsertTodo({ Items = [ sprintf "ReviewSubmitted: %s" reportText ] }, ignore)
-
+                    let cmd = SubmitReview(reportText, ignore)
                     let! res = port.Request cmd ctx.Cancellation ctx.Deadline
 
                     match res with
+                    | Ok SessionCommandResult.ReviewSubmitted ->
+                        return
+                            { Result = "Review submitted and structured fact recorded"
+                              Truncated = false }
                     | Ok _ ->
                         return
-                            { Result = "Review submitted and snapshot recorded"
+                            { Result = "Review submitted"
                               Truncated = false }
                     | Error err ->
                         return
@@ -288,12 +302,14 @@ module StaticTools =
                         with _ ->
                             input.Payload
 
-                    let cmd =
-                        UpsertTodo({ Items = [ sprintf "ReviewerVerdict: %s" verdictText ] }, ignore)
-
+                    let cmd = ReturnVerdict(verdictText, ignore)
                     let! res = port.Request cmd ctx.Cancellation ctx.Deadline
 
                     match res with
+                    | Ok SessionCommandResult.VerdictReturned ->
+                        return
+                            { Result = sprintf "Reviewer verdict returned: %s" verdictText
+                              Truncated = false }
                     | Ok _ ->
                         return
                             { Result = sprintf "Reviewer verdict returned: %s" verdictText

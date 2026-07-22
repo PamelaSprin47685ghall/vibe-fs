@@ -44,7 +44,14 @@ type SessionInboxCommandPort(inbox: ISessionInbox) =
                 let cmdWithReply =
                     match command with
                     | UpsertTodo(snap, _) -> UpsertTodo(snap, (fun res -> tcs.TrySetResult(res) |> ignore))
-                    | QuerySnapshot reply -> QuerySnapshot reply
+                    | QuerySnapshot reply ->
+                        let wrapped snap =
+                            reply snap
+                            tcs.TrySetResult(Ok(SessionCommandResult.SnapshotQueried snap)) |> ignore
+
+                        QuerySnapshot wrapped
+                    | SubmitReview(report, _) -> SubmitReview(report, (fun res -> tcs.TrySetResult(res) |> ignore))
+                    | ReturnVerdict(verdict, _) -> ReturnVerdict(verdict, (fun res -> tcs.TrySetResult(res) |> ignore))
 
                 let cmdEvent = SessionCommandEvent cmdWithReply
 

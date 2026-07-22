@@ -116,6 +116,40 @@ type SessionDriver(gateway: IGateway, sessionId: SessionId, inbox: ISessionInbox
                 let todoSnap = defaultArg proj.Todos { Items = [] }
                 reply todoSnap
             | None -> reply { Items = [] }
+        | SubmitReview(reportText, reply) ->
+            let fact =
+                Fact.Review(
+                    ReviewApplied
+                        {| Verdict = ReviewVerdict.NeedsChanges [ reportText ]
+                           Round = 1
+                           ResultingTodo = None |}
+                )
+
+            let commitRes = gateway.Append (StreamId.Session sessionId) None fact
+
+            match commitRes with
+            | Committed _ -> reply (Ok SessionCommandResult.ReviewSubmitted)
+            | _ -> reply (Error SessionCommandError.InboxFull)
+        | ReturnVerdict(verdictText, reply) ->
+            let verdict =
+                if verdictText.Equals("Passed", StringComparison.OrdinalIgnoreCase) then
+                    ReviewVerdict.Passed
+                else
+                    ReviewVerdict.NeedsChanges [ verdictText ]
+
+            let fact =
+                Fact.Review(
+                    ReviewApplied
+                        {| Verdict = verdict
+                           Round = 1
+                           ResultingTodo = None |}
+                )
+
+            let commitRes = gateway.Append (StreamId.Session sessionId) None fact
+
+            match commitRes with
+            | Committed _ -> reply (Ok SessionCommandResult.VerdictReturned)
+            | _ -> reply (Error SessionCommandError.InboxFull)
 
     let dispatchEvent (eventOpt: SessionInboxEvent) : Task<bool> =
         task {
@@ -124,16 +158,13 @@ type SessionDriver(gateway: IGateway, sessionId: SessionId, inbox: ISessionInbox
                 dispatchCommand cmd
                 return true
 
-            | HumanMessageEvent(turnId, _text) ->
-                let turnFact = Fact.Session(HumanTurnStarted {| TurnId = turnId |})
-                gateway.Append (StreamId.Session sessionId) (Some turnId) turnFact |> ignore
-                return true
+            | HumanMessageEvent(_turnId, _text) -> return true
 
-            | AssistantTerminalEvent(_userMsgId, assistantMsgId, outcome) ->
+            | AssistantTerminalEvent(userMsgId, assistantMsgId, outcome) ->
                 let pFact =
                     Fact.Prompt(
                         PromptTerminal
-                            {| PromptKey = SessionId.value sessionId
+                            {| PromptKey = sprintf "terminal:%s" (MessageId.value userMsgId)
                                Outcome = outcome
                                AssistantMessageId = Some assistantMsgId |}
                     )
