@@ -1,7 +1,5 @@
 module Wanxiangshu.Kernel.ToolPolling.PtyReadPolicy
 
-open Wanxiangshu.Kernel.EventSourcing.EventEnvelope
-
 /// Record of the last tool invocation for PTY throttle purposes.
 type LastToolInvocation =
     { ToolName: string

@@ -22,14 +22,31 @@ let extractObjectives (plan: MessageTransformPlan) : string list =
     plan.Cleaned
     |> List.collect (fun m ->
         m.parts
-        |> List.choose (fun p ->
+        |> List.collect (fun p ->
             match p with
-            | TextPart text when not (System.String.IsNullOrWhiteSpace text) -> Some(text.Trim())
-            | _ -> None))
+            | TextPart text when not (System.String.IsNullOrWhiteSpace text) ->
+                let trimmed = text.Trim()
+
+                let matchToml =
+                    System.Text.RegularExpressions.Regex.Match(text, @"objective\s*=\s*""([^""]+)""")
+
+                let matchYaml =
+                    System.Text.RegularExpressions.Regex.Match(text, @"objective:\s*([^\r\n]+)")
+
+                let extracted =
+                    if matchToml.Success then
+                        [ matchToml.Groups.[1].Value.Trim() ]
+                    elif matchYaml.Success then
+                        [ matchYaml.Groups.[1].Value.Trim() ]
+                    else
+                        []
+
+                extracted @ [ trimmed ]
+            | _ -> []))
 
 let buildCapsFileFromResult (baseDir: string) (r) : CapsFile option =
     match r.content with
-    | Some content ->
+    | Some content when not (System.String.IsNullOrWhiteSpace content) ->
         Some
             { filePath = r.filePath
               label = pathRelative baseDir r.filePath

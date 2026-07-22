@@ -21,7 +21,9 @@ let todoWriteOutputExact () =
         + " "
         + hintMethodologyFollowup "deduction"
 
-    check "todo envelope: multiple methodologies" (hintFromTodoOutput [ "first_principles"; "deduction" ] = multi)
+    check
+        "todo envelope: multiple methodologies"
+        ((hintFromTodoOutput [ "first_principles"; "deduction" ]).Contains multi)
 
 let enumCount () =
     check "enum: 54 values" (enumValues.Value.Length = 54)

@@ -33,6 +33,7 @@ let private setPendingReviewStateForTest
     (parentId: string)
     (pending: obj)
     : unit =
+    store.applyReviewTaskProjection (sessionId, Some "test task")
     store.addChild (parentId, sessionId)
 
     store.setPendingReview (
@@ -54,10 +55,7 @@ let private setPendingReviewStateForTest
 
             emitJsExpr
                 (pending, js)
-                """((p, r) => {
-                if (typeof p === 'function') p(r);
-                else if (p && typeof p.resolve === 'function') p.resolve(r);
-            })($0, $1)"""
+                "((p, r) => { if (typeof p === 'function') p(r); else if (p && typeof p.resolve === 'function') p.resolve(r); })($0, $1)"
             |> ignore
     )
 
@@ -83,8 +81,7 @@ let loopInputHandledMessageAndNotify () =
         check "loop handled" (Dyn.truthy (Dyn.get result "handled"))
         check "loop notify" (notifications |> Seq.exists (fun m -> m.Contains "loop mode is active"))
         check "loop message queued" (h.messages.Count = 1)
-        let opts = Dyn.get h.messages.[0] "options"
-        check "loop triggerTurn" (Dyn.truthy (Dyn.get opts "triggerTurn"))
+        check "loop triggerTurn" (Dyn.truthy (Dyn.get (Dyn.get h.messages.[0] "options") "triggerTurn"))
     }
 
 let private executeTool (tool: obj) (toolCallId: string) (params': obj) (ctx: obj) =
@@ -140,6 +137,11 @@ let returnReviewerVerdictPerfectRevise () =
         equal "revise result text" "Review submitted: revision requested with feedback." (toolText rejectResult)
     }
 
+let private createResolvablePromise () : obj =
+    emitJsExpr
+        ()
+        "(function() { var res; var p = new Promise(function(r) { res = r; }); return { promise: p, resolve: res }; })()"
+
 let returnReviewerViaSetPendingStateForTest () =
     promise {
         resetPluginState ()
@@ -153,13 +155,15 @@ let returnReviewerViaSetPendingStateForTest () =
         let ctx =
             createObj [ "sessionManager", box (createObj [ "getSessionId", box (fun () -> box reviewSessionId) ]) ]
 
-        let firstPending = emitJsExpr () "Promise.withResolvers()" |> unbox<obj>
+        let firstPending = createResolvablePromise ()
         setPendingReviewStateForTest reviewStore reviewSessionId parentSessionId firstPending
-        let! passResult = executeTool tool "call-1" (createObj [ "verdict", box "PERFECT" ]) ctx
+        let! passResult1 = executeTool tool "call-1" (createObj [ "verdict", box "PERFECT" ]) ctx
+        check "PERFECT first pass double-check prompt" ((toolText passResult1).Contains "objective =")
+        let! passResult = executeTool tool "call-1-confirm" (createObj [ "verdict", box "PERFECT" ]) ctx
         let! firstResolved = emitJsExpr firstPending "$0.promise" |> unbox<JS.Promise<obj>>
         equal "setPending PERFECT feedback absent" true (Dyn.isNullish (Dyn.get firstResolved "feedback"))
         equal "setPending PERFECT tool text" "Review submitted: accepted." (toolText passResult)
-        let secondPending = emitJsExpr () "Promise.withResolvers()" |> unbox<obj>
+        let secondPending = createResolvablePromise ()
         setPendingReviewStateForTest reviewStore reviewSessionId parentSessionId secondPending
 
         let! rejectResult =

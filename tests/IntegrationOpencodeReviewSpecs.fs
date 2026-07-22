@@ -40,6 +40,7 @@ let private reviewerContext workspaceDir sessionID : obj =
     createObj [ "directory", box workspaceDir; "sessionID", box sessionID ]
 
 let private setPending (store: ReviewStore) sessionID (resolved: ReviewResult option ref) : unit =
+    store.applyReviewTaskProjection (sessionID, Some "Implement feature X")
     store.setPendingReview (sessionID, (fun result -> resolved.Value <- Some result))
 
 let private execVerdict (returnTool: obj) (args: obj) ctx : JS.Promise<string> =
@@ -82,6 +83,7 @@ let secondPassResolvesAcceptedSpec () =
         let store = createReviewStore ()
         let resolved = ref None
         setPending store sessionID resolved
+        store.recordChallengeRequested sessionID
 
         let history =
             [| opencodeTextMessage

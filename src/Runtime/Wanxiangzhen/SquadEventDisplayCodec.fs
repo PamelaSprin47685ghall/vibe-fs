@@ -4,6 +4,13 @@ open System
 open Wanxiangshu.Kernel.Wanxiangzhen.SquadEvent
 open Wanxiangshu.Runtime.Tooling.ToolOutputToml
 
+let private makeView kind sid tid sha msg : SquadEventTomlView =
+    { eventKind = kind
+      sessionId = sid
+      taskId = tid
+      commitSha = sha
+      message = msg }
+
 let toTomlView (e: SquadEvent) : SquadEventTomlView =
     let sid = eventSessionId e
     let kind = eventTypeName e
@@ -17,61 +24,16 @@ let toTomlView (e: SquadEvent) : SquadEventTomlView =
             else
                 sprintf "%s\nRequirement: %s" prose req
 
-        { eventKind = kind
-          sessionId = sid
-          taskId = None
-          commitSha = None
-          message = msg }
-        : SquadEventTomlView
-    | TasksCreated(_, _) ->
-        { eventKind = kind
-          sessionId = sid
-          taskId = None
-          commitSha = None
-          message = prose }
-        : SquadEventTomlView
+        makeView kind sid None None msg
+    | TasksCreated _ -> makeView kind sid None None prose
     | TaskStarted(_, tid, wt, branch) ->
-        { eventKind = kind
-          sessionId = sid
-          taskId = Some tid
-          commitSha = None
-          message = sprintf "%s (Worktree: %s, Branch: %s)" prose wt branch }
-        : SquadEventTomlView
-    | TaskSubmitted(_, tid, sha) ->
-        { eventKind = kind
-          sessionId = sid
-          taskId = Some tid
-          commitSha = Some sha
-          message = prose }
-        : SquadEventTomlView
-    | TaskMerged(_, tid, sha) ->
-        { eventKind = kind
-          sessionId = sid
-          taskId = Some tid
-          commitSha = Some sha
-          message = prose }
-        : SquadEventTomlView
-    | TaskDone(_, tid, _) ->
-        { eventKind = kind
-          sessionId = sid
-          taskId = Some tid
-          commitSha = None
-          message = prose }
-        : SquadEventTomlView
-    | TaskError(_, tid, _) ->
-        { eventKind = kind
-          sessionId = sid
-          taskId = Some tid
-          commitSha = None
-          message = prose }
-        : SquadEventTomlView
-    | SquadCancelled _ ->
-        { eventKind = kind
-          sessionId = sid
-          taskId = None
-          commitSha = None
-          message = prose }
-        : SquadEventTomlView
+        let msg = sprintf "%s (Worktree: %s, Branch: %s)" prose wt branch
+        makeView kind sid (Some tid) None msg
+    | TaskSubmitted(_, tid, sha) -> makeView kind sid (Some tid) (Some sha) prose
+    | TaskMerged(_, tid, sha) -> makeView kind sid (Some tid) (Some sha) prose
+    | TaskDone(_, tid, _) -> makeView kind sid (Some tid) None prose
+    | TaskError(_, tid, _) -> makeView kind sid (Some tid) None prose
+    | SquadCancelled _ -> makeView kind sid None None prose
 
 let encodeEvent (e: SquadEvent) : string = toTomlView e |> renderSquadEvent
 

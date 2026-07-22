@@ -130,8 +130,10 @@ let executeMuxSubagentSpawnPreservesPhysicalTaskId () =
         check "output has content" (out.Contains "body =")
 
         let iterOpt =
-            if out.Contains "iter-" then
-                let m = System.Text.RegularExpressions.Regex.Match(out, @"iter-[a-zA-Z0-9_-]+")
+            if out.Contains "sci_s" || out.Contains "iter-" then
+                let m =
+                    System.Text.RegularExpressions.Regex.Match(out, @"(?:sci_s:[^\s""]+|iter-[a-zA-Z0-9_-]+)")
+
                 if m.Success then Some m.Value else None
             else
                 None

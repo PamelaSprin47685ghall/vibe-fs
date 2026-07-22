@@ -26,15 +26,10 @@ let formatSearchResults (results: SearchResult list) : string =
 let formatFetchResponse (data: FetchResponse) : string =
     let nonEmpty (s: string) = not (System.String.IsNullOrEmpty s)
 
-    let title = defaultArg (data.title |> Option.filter nonEmpty) ""
-    let byline = data.byline |> Option.filter nonEmpty
-    let length = defaultArg data.length 0
-    let content = defaultArg (data.content |> Option.filter nonEmpty) ""
-
     let fetch =
-        { FetchResult.title = title
-          byline = byline
-          length = length
-          content = content }
+        { FetchResult.title = data.title |> Option.filter nonEmpty
+          byline = data.byline |> Option.filter nonEmpty
+          length = data.length
+          content = data.content |> Option.filter nonEmpty }
 
     renderFetchResult fetch

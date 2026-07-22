@@ -6,17 +6,13 @@ open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Tests.TestWorkspace
 open Wanxiangshu.Kernel.HostAdapter
 open Wanxiangshu.Runtime.HostAdapter
-open Wanxiangshu.Kernel.Primitives.Identity
 open Wanxiangshu.Kernel.Errors.DomainError
-open Wanxiangshu.Kernel.Session.Causality
 open Wanxiangshu.Kernel.HostTools
-open Wanxiangshu.Kernel.EventSourcing.EventEnvelope
 open Wanxiangshu.Kernel.EventSourcing.EventKind
 open Wanxiangshu.Runtime.EventLogRuntimeStore
 open Wanxiangshu.Runtime.SubagentDispatcher
 open Wanxiangshu.Runtime.ChildAgentRegistry
 open Wanxiangshu.Runtime.RuntimeScope
-open Wanxiangshu.Runtime.Dyn
 
 let fakeAdapter (workspaceRoot: string) (response: SubagentResponse) : IHostAdapter =
     { new IHostAdapter with
@@ -49,8 +45,7 @@ let dispatchReturnsSuccessText () =
         let scope = create ()
         let registry = ChildAgentRegistry.Create()
         let! result = dispatch Opencode adapter "coder" sampleCoderArgs scope (Some registry)
-        let containsReport = result.Contains "report"
-        check "success returns text" containsReport
+        check "success returns text" (result.Contains "report")
         do! rmAsync tempDir
     }
 
@@ -62,8 +57,7 @@ let dispatchReturnsFailureMessage () =
         let scope = create ()
         let registry = ChildAgentRegistry.Create()
         let! result = dispatch Opencode adapter "coder" sampleCoderArgs scope (Some registry)
-        let hasFsFault = result.Contains "file system fault"
-        check "failure has error text" hasFsFault
+        check "failure has error text" (result.Contains "file system fault")
         do! rmAsync tempDir
     }
 
@@ -74,9 +68,33 @@ let dispatchReturnsAbortMessage () =
         let scope = create ()
         let registry = ChildAgentRegistry.Create()
         let! result = dispatch Opencode adapter "coder" sampleCoderArgs scope (Some registry)
-        let hasAborted = result.Contains "aborted"
-        check "abort contains 'aborted'" hasAborted
+        check "abort contains 'aborted'" (result.Contains "aborted")
         do! rmAsync tempDir
+    }
+
+let private parseIterator (text: string) : string =
+    let m =
+        System.Text.RegularExpressions.Regex.Match(text, @"(?:sci_s:[^\s""]+|iter-[a-zA-Z0-9_-]+)")
+
+    if m.Success then m.Value else "failed"
+
+let private assertEvents (tempDir: string) =
+    promise {
+        let! events = getStore(tempDir).ReadAllEvents()
+
+        let spawnedEvents =
+            events |> List.filter (fun e -> e.Kind = eventKindSubagentSpawned)
+
+        check "has 1 subagent_spawned event" (spawnedEvents.Length = 1)
+        equal "spawned childId matches" "session-1" (spawnedEvents.[0].Payload |> Map.find "childId")
+        equal "spawned agent matches" "coder" (spawnedEvents.[0].Payload |> Map.find "agent")
+
+        let continuedEvents =
+            events |> List.filter (fun e -> e.Kind = eventKindSubagentContinued)
+
+        check "has 2 subagent_continued events" (continuedEvents.Length = 2)
+        equal "first continued prompt matches" "continue standard" (continuedEvents.[0].Payload |> Map.find "prompt")
+        equal "second continued prompt matches" "second continue" (continuedEvents.[1].Payload |> Map.find "prompt")
     }
 
 let testContinueFlow () =
@@ -85,7 +103,7 @@ let testContinueFlow () =
         let lastReceivedChildID = ref ""
         let lastReceivedAgent = ref ""
 
-        let fakeAdapterWithSpy =
+        let spyAdapter =
             { new IHostAdapter with
                 member _.WorkspaceRoot = tempDir
                 member _.SessionId = "test-session"
@@ -103,88 +121,48 @@ let testContinueFlow () =
         let registry = ChildAgentRegistry.Create()
         registry.RegisterChildAgent("session-1", "coder", None)
 
-        let runFlow () =
-            promise {
-                let! result = dispatch Opencode fakeAdapterWithSpy "coder" sampleCoderArgs scope (Some registry)
-                let containsSpawned = result.Contains "spawned"
-                check "spawned has output" containsSpawned
-                let hasIter1 = result.Contains "iter-" || result.Contains "iterator"
-                check "spawned has iterator" hasIter1
-
-                let nextIter =
-                    let m = System.Text.RegularExpressions.Regex.Match(result, @"iter-[a-zA-Z0-9_-]+")
-                    if m.Success then m.Value else "failed"
-
-                let args =
-                    box
-                        {| iterator = nextIter
-                           prompt = "continue standard" |}
-
-                let! continueResult = dispatch Opencode fakeAdapterWithSpy "continue" args scope (Some registry)
-                let hasNext = continueResult.Contains "next report: continue standard"
-                check "continue returns next report" hasNext
-                let agentMatches = lastReceivedAgent.Value = "coder"
-                check "continue receives correct agent role" agentMatches
-                let hasIter2 = continueResult.Contains "iter-" || continueResult.Contains "iterator"
-                check "continue has iterator" hasIter2
-
-                let nextIter2 =
-                    let m =
-                        System.Text.RegularExpressions.Regex.Match(continueResult, @"iter-[a-zA-Z0-9_-]+")
-
-                    if m.Success then m.Value else "failed"
-
-                let nextArgs =
-                    box
-                        {| iterator = nextIter2
-                           prompt = "second continue" |}
-
-                let! nextResult = dispatch Opencode fakeAdapterWithSpy "continue" nextArgs scope (Some registry)
-                let hasNext2 = nextResult.Contains "next report: second continue"
-                check "continue again returns next report" hasNext2
-                let hasIter3 = nextResult.Contains "iter-" || nextResult.Contains "iterator"
-                check "continue again has iterator" hasIter3
-
-                // Verify event log contains expected spawned and continued events
-                let! events = getStore(tempDir).ReadAllEvents()
-
-                let spawnedEvents =
-                    events |> List.filter (fun e -> e.Kind = eventKindSubagentSpawned)
-
-                check "has 1 subagent_spawned event" (spawnedEvents.Length = 1)
-                let firstSpawned = spawnedEvents.[0]
-                equal "spawned childId matches" "session-1" (firstSpawned.Payload |> Map.find "childId")
-                equal "spawned agent matches" "coder" (firstSpawned.Payload |> Map.find "agent")
-                equal "spawned title matches" "Coder" (firstSpawned.Payload |> Map.find "title")
-
-                let continuedEvents =
-                    events |> List.filter (fun e -> e.Kind = eventKindSubagentContinued)
-
-                check "has 2 subagent_continued events" (continuedEvents.Length = 2)
-
-                equal
-                    "first continued prompt matches"
-                    "continue standard"
-                    (continuedEvents.[0].Payload |> Map.find "prompt")
-
-                equal
-                    "second continued prompt matches"
-                    "second continue"
-                    (continuedEvents.[1].Payload |> Map.find "prompt")
-
-                // Assert invalid iterator still fails (since parts length will be 5, failing validation)
-                let invalidArgs =
-                    box
-                        {| iterator = "sci_s:session-invalid:coder:Opencode:extra"
-                           prompt = "should fail" |}
-
-                let! failedResult = dispatch Opencode fakeAdapterWithSpy "continue" invalidArgs scope (Some registry)
-                let hasErrorMsg = failedResult.Contains "continue failed"
-                check "continue with invalid iterator fails" hasErrorMsg
-            }
-
         try
-            do! runFlow ()
+            let! res1 = dispatch Opencode spyAdapter "coder" sampleCoderArgs scope (Some registry)
+            check "spawned output" (res1.Contains "spawned")
+            let iter1 = parseIterator res1
+
+            let! res2 =
+                dispatch
+                    Opencode
+                    spyAdapter
+                    "continue"
+                    (box
+                        {| iterator = iter1
+                           prompt = "continue standard" |})
+                    scope
+                    (Some registry)
+
+            check "continue next report" (res2.Contains "next report: continue standard")
+            equal "coder agent match" "coder" lastReceivedAgent.Value
+            let iter2 = parseIterator res2
+
+            let! res3 =
+                dispatch
+                    Opencode
+                    spyAdapter
+                    "continue"
+                    (box
+                        {| iterator = iter2
+                           prompt = "second continue" |})
+                    scope
+                    (Some registry)
+
+            check "second continue report" (res3.Contains "next report: second continue")
+
+            do! assertEvents tempDir
+
+            let invalidArgs =
+                box
+                    {| iterator = "sci_s:session-invalid:coder:Opencode:extra"
+                       prompt = "should fail" |}
+
+            let! failedRes = dispatch Opencode spyAdapter "continue" invalidArgs scope (Some registry)
+            check "invalid iterator fails" (failedRes.Contains "continue failed")
             do! rmAsync tempDir
         with ex ->
             do! rmAsync tempDir

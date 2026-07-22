@@ -168,7 +168,7 @@ let executorSummarizerPromptWithHost
 
     let objective =
         if String.IsNullOrWhiteSpace whatToSummarize then
-            "Summarize the executor output while preserving stack traces and exit status"
+            "Summarize the executor output while preserving stack traces"
         else
             whatToSummarize.Trim()
 

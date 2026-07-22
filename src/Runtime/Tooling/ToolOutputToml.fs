@@ -86,20 +86,34 @@ let renderSearchResults (results: SearchResultItem list) : string =
     searchResultsDocument results |> stringify
 
 type FetchResult =
-    { title: string
+    { title: string option
       byline: string option
-      length: int
-      content: string }
+      length: int option
+      content: string option }
 
 let fetchResultDocument (fetch: FetchResult) : TomlValue =
-    let mutable fields = [ "title", String fetch.title ]
+    let mutable fields = []
+
+    match fetch.title with
+    | Some t when t <> "" -> fields <- fields @ [ "title", String t ]
+    | _ -> ()
 
     match fetch.byline with
-    | Some b -> fields <- fields @ [ "byline", String b ]
+    | Some b when b <> "" -> fields <- fields @ [ "byline", String b ]
+    | _ -> ()
+
+    match fetch.length with
+    | Some l -> fields <- fields @ [ "length", Integer l ]
     | None -> ()
 
-    fields <- fields @ [ "length", Integer fetch.length; "content", String fetch.content ]
-    Table fields
+    match fetch.content with
+    | Some c -> fields <- fields @ [ "content", String c ]
+    | None -> ()
+
+    if List.isEmpty fields then
+        Table [ "title", String "" ]
+    else
+        Table fields
 
 let renderFetchResult (fetch: FetchResult) : string = fetchResultDocument fetch |> stringify
 

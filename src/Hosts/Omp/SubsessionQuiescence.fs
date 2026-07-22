@@ -1,56 +1,53 @@
 module Wanxiangshu.Hosts.Omp.SubsessionQuiescence
-open Wanxiangshu.Runtime
 
 open Wanxiangshu.Kernel.Subsession.Types
 open Wanxiangshu.Runtime.Dyn
 
+let private detectBool (v: obj) (trueVal: QuiescenceStatus) (falseVal: QuiescenceStatus) : QuiescenceStatus option =
+    if not (isNullish v) && typeIs v "boolean" then
+        if unbox<bool> v then Some trueVal else Some falseVal
+    else
+        None
+
+let private detectString (v: obj) : QuiescenceStatus option =
+    if not (isNullish v) && typeIs v "string" then
+        match (string v).ToLowerInvariant() with
+        | "idle"
+        | "closed"
+        | "completed"
+        | "done"
+        | "stopped" -> Some Stopped
+        | "busy"
+        | "running"
+        | "active"
+        | "pending" -> Some StillRunning
+        | _ -> None
+    else
+        None
+
 /// Inspect a raw JS object and classify it as quiescent / still-running /
-/// unknown.  Used by both the OpenCode adapter and the OMP host.
+/// unknown. Used by the OMP host.
 let detectStatus (obj: obj) : QuiescenceStatus option =
-    if Dyn.isNullish obj then
+    if isNullish obj then
         None
     else
-        let isIdleVal = Dyn.get obj "isIdle"
-
-        if not (Dyn.isNullish isIdleVal) && Dyn.typeIs isIdleVal "boolean" then
-            if unbox<bool> isIdleVal then
-                Some Stopped
-            else
-                Some StillRunning
-        else
-            let isBusyVal = Dyn.get obj "isBusy"
-
-            if not (Dyn.isNullish isBusyVal) && Dyn.typeIs isBusyVal "boolean" then
-                if unbox<bool> isBusyVal then
-                    Some StillRunning
-                else
-                    Some Stopped
-            else
-                let statusVal = Dyn.get obj "status"
-
-                if not (Dyn.isNullish statusVal) && Dyn.typeIs statusVal "string" then
-                    let status = (string statusVal).ToLowerInvariant()
-
-                    match status with
-                    | "idle"
-                    | "closed"
-                    | "completed"
-                    | "done"
-                    | "stopped" -> Some Stopped
-                    | "busy"
-                    | "running"
-                    | "active"
-                    | "pending" -> Some StillRunning
-                    | _ -> None
-                else
-                    let activeTurn = Dyn.get obj "activeTurn"
-                    let runningTurn = Dyn.get obj "runningTurn"
-                    let currentTurn = Dyn.get obj "currentTurn"
+        match detectBool (get obj "isIdle") Stopped StillRunning with
+        | Some status -> Some status
+        | None ->
+            match detectBool (get obj "isBusy") StillRunning Stopped with
+            | Some status -> Some status
+            | None ->
+                match detectString (get obj "status") with
+                | Some status -> Some status
+                | None ->
+                    let activeTurn = get obj "activeTurn"
+                    let runningTurn = get obj "runningTurn"
+                    let currentTurn = get obj "currentTurn"
 
                     if
-                        (not (Dyn.isNullish activeTurn))
-                        || (not (Dyn.isNullish runningTurn))
-                        || (not (Dyn.isNullish currentTurn))
+                        not (isNullish activeTurn)
+                        || not (isNullish runningTurn)
+                        || not (isNullish currentTurn)
                     then
                         Some StillRunning
                     else

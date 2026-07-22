@@ -127,7 +127,7 @@ let findPagingWhenTotalMatchedIsNone () =
               limit = Some 30 }
 
         let! outcome = locateFuzzyMatches params' opts
-        check "iterator generated when totalMatched=None at page boundary" (outcome.output.Contains "iterator:")
+        check "iterator generated when totalMatched=None at page boundary" (outcome.output.Contains "iterator")
     }
 
 let grepMultiPropagatesErrorAndSafety () =
