@@ -49,6 +49,7 @@ let testConfigHookRegistersCommands () : JS.Promise<unit> =
         let squadCmd = get cmds "squad"
         checkBare ((str squadCmd "template") <> "")
         checkBare ((str squadCmd "description") <> "")
+        checkBare ((str squadCmd "agent") = "plan")
     }
 
 // Test 3 — dispose returns a thenable

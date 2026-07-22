@@ -3,6 +3,43 @@ module Wanxiangshu.Kernel.Wanxiangzhen.SquadPrompts
 open System
 open Wanxiangshu.Kernel.Prompt
 
+let buildCoordinatorPromptDocument (requirement: string) : PromptDocument =
+    let bg =
+        if String.IsNullOrWhiteSpace requirement then
+            None
+        else
+            Some(requirement.Trim())
+
+    let targets =
+        if String.IsNullOrWhiteSpace requirement then
+            []
+        else
+            [ PromptTarget.EvidenceTarget("requirement", requirement.Trim()) ]
+
+    let docView: PromptDocumentView =
+        { objective = "Decompose the requirement into a valid squad DAG and submit it."
+          background = bg
+          agentRole = AgentRole.Coordinator
+          targets = targets
+          boundaries =
+            [ PromptBoundary.DoNotExecute(
+                "implementing, modifying files, searching, browsing, testing, or running commands for the requirement"
+              ) ]
+          rules =
+            [ PromptRule.Contract
+                "Call squad_update exactly once with a tasks_created event containing tasks[]."
+              PromptRule.Contract
+                "Each task must be independently executable, have title, description, and dependsOn."
+              PromptRule.Contract "Dependencies in dependsOn must refer to valid task IDs."
+              PromptRule.Contract "Stop execution immediately after successful squad_update submission." ]
+          outcomes =
+            [ { label = "squad_update"
+                text = "Task DAG successfully created and submitted." } ] }
+
+    match PromptDocument.create docView with
+    | Ok doc -> doc
+    | Error errs -> failwithf "Failed to create Coordinator PromptDocument: %A" errs
+
 let buildSlavePromptDocument
     (taskId: string)
     (title: string)

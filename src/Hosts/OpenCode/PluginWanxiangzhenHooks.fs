@@ -4,6 +4,8 @@ open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Kernel.Wanxiangzhen.Dag
 open Wanxiangshu.Kernel.Wanxiangzhen.SquadEvent
+open Wanxiangshu.Kernel.Wanxiangzhen.SquadPrompts
+open Wanxiangshu.Runtime.Prompt
 open Wanxiangshu.Runtime.Dyn
 open Wanxiangshu.Runtime.Wanxiangzhen.CoordinatorRuntime
 open Wanxiangshu.Runtime.Wanxiangzhen.CoordinatorOps
@@ -11,7 +13,6 @@ open Wanxiangshu.Runtime.Wanxiangzhen.CoordinatorLifecycle
 open Wanxiangshu.Runtime.Wanxiangzhen.CoordinatorSquadUpdate
 open Wanxiangshu.Runtime.Wanxiangzhen.CoordinatorReplay
 open Wanxiangshu.Hosts.Opencode.PluginWanxiangzhenE2eMeta
-open Wanxiangshu.Runtime.Wanxiangzhen.SquadEventDisplayCodec
 
 let internal twoArgHook (f: obj -> obj -> JS.Promise<unit>) =
     box (System.Func<obj, obj, JS.Promise<unit>>(f))
@@ -57,10 +58,11 @@ let internal handleCommandExecuteBefore (rt: CoordinatorRuntime) (input: obj) (o
                 rt.Dag <- empty newSid requirement
                 writeE2eMetaIfEnabled rt
 
+            let doc = buildCoordinatorPromptDocument requirement
             let part =
                 box
                     {| ``type`` = "text"
-                       text = encodeEvent evt |}
+                       text = PromptToml.render doc |}
 
             mutateOutputParts output part
         | "squad-kill" ->
@@ -146,7 +148,8 @@ let private configHook (cfg: obj) (rt: CoordinatorRuntime) : JS.Promise<obj> =
                 "squad"
                 (box
                     {| template = "/squad <requirement>"
-                       description = "Decompose requirement into parallel task DAG" |})
+                       description = "Decompose requirement into parallel task DAG"
+                       agent = "plan" |})
 
             setKey
                 commands

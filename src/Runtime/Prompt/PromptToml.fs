@@ -17,6 +17,7 @@ module PromptToml =
         | AgentRole.MethodologyReasoning -> "Methodology Reasoning Agent (read-only)"
         | AgentRole.NudgeSupervisor -> "Nudge Supervisor (synthetic)"
         | AgentRole.SquadWorker -> "Wanxiangzhen Slave Agent (mutating)"
+        | AgentRole.Coordinator -> "Coordinator Agent (decomposition-only)"
 
     let timeoutKindText =
         function

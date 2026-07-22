@@ -9,10 +9,10 @@ let private childSpawn (cmd: string) (args: string array) (opts: obj) : obj = js
 let private shellEscape (s: string) : string = s.Replace("'", "'\\''")
 
 let buildSlaveCommand (terminal: string) (worktree: string) (prompt: string) : string * string array =
-    let ocArgs = [| "tui"; "--prompt"; prompt |]
+    let ocArgs = [| "--prompt"; prompt |]
 
     match terminal with
-    | "alacritty" -> "alacritty", Array.append [| "--working-directory"; worktree; "-e"; "opencode" |] ocArgs
+    | "alacritty" -> "alacritty", Array.append [| "--hold"; "--working-directory"; worktree; "-e"; "opencode" |] ocArgs
     | "kitty" -> "kitty", Array.append [| "--directory"; worktree; "opencode" |] ocArgs
     | "gnome-terminal" ->
         "gnome-terminal", Array.append [| "--working-directory=" + worktree; "--"; "opencode" |] ocArgs
@@ -21,7 +21,7 @@ let buildSlaveCommand (terminal: string) (worktree: string) (prompt: string) : s
     | "wt" -> "wt.exe", Array.append [| "-d"; worktree; "opencode" |] ocArgs
     | "iterm2" ->
         let script =
-            sprintf "cd '%s' && opencode tui --prompt '%s'" (shellEscape worktree) (shellEscape prompt)
+            sprintf "cd '%s' && opencode --prompt '%s'" (shellEscape worktree) (shellEscape prompt)
 
         "osascript",
         [| "-e"

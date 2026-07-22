@@ -15,7 +15,7 @@ open Wanxiangshu.Tests.Wanxiangzhen.AssertCompat
 open Wanxiangshu.Tests.Wanxiangzhen.TestDoubles
 open Wanxiangshu.Tests.Wanxiangzhen.OpencodePluginE2eMocks
 
-// Test 4 — /squad command writes a squad_created frontmatter event
+// Test 4 — /squad command writes prompt document for coordinator
 let testSquadCommandCreatesSession () : JS.Promise<unit> =
     promise {
         let captures =
@@ -42,8 +42,12 @@ let testSquadCommandCreatesSession () : JS.Promise<unit> =
         let parts = get cmdOutput "parts" :?> System.Collections.Generic.List<obj>
         checkBare (parts.Count = 1)
         let text = str parts.[0] "text"
-        checkBare (text.Contains "squad_created")
+        checkBare (text.Contains "Coordinator Agent (decomposition-only)")
+        checkBare (text.Contains "squad_update")
+        checkBare (text.Contains "tasks_created")
         checkBare (text.Contains "add remember-me")
+        checkBare (not (text.Contains "event_kind"))
+        checkBare (not (text.Contains "squad_created"))
 
         checkBare (rt.MasterSessionId = "sess-e2e")
     }

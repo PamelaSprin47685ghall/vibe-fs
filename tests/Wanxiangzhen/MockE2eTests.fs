@@ -24,7 +24,7 @@ let testHappyPath () : JS.Promise<unit> =
         let deps = TestDoubles.mkDeps s
         let rt = TestDoubles.mkRuntime deps
 
-        // ① /squad → handleCommandExecuteBefore → squad_created frontmatter
+        // ① /squad → handleCommandExecuteBefore → prompt document output
         let input =
             createObj
                 [ "command", box "squad"
@@ -36,7 +36,13 @@ let testHappyPath () : JS.Promise<unit> =
 
         let parts = get output "parts" :?> System.Collections.Generic.List<obj>
         checkBare (parts.Count = 1)
-        checkBare ((str parts.[0] "text").Contains "squad_created")
+        let text = str parts.[0] "text"
+        checkBare (text.Contains "Coordinator Agent (decomposition-only)")
+        checkBare (text.Contains "squad_update")
+        checkBare (text.Contains "tasks_created")
+        checkBare (text.Contains "add remember-me")
+        checkBare (not (text.Contains "event_kind"))
+        checkBare (not (text.Contains "squad_created"))
 
         // ② handleSquadUpdate → task Pending ( Scheduling=true suppresses fire-and-forget tick )
         rt.Scheduling <- true

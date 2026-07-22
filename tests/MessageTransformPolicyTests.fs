@@ -45,6 +45,7 @@ let agentNormalizationTest () =
     check "Inspector (caps)" (getCapsInjectionPolicy "Inspector" false = CapsInjectionPolicy.Include)
     check "inspector  (caps)" (getCapsInjectionPolicy "inspector " false = CapsInjectionPolicy.Include)
     check "EXec (caps)" (getCapsInjectionPolicy "EXec" false = CapsInjectionPolicy.Exclude)
+    check "plan (parallel hint)" (getParallelHintPolicy "plan" false = ParallelHintPolicy.Exclude)
 
 let testCapsSlotReuse () =
     promise {

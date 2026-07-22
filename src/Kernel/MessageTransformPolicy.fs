@@ -44,6 +44,7 @@ let getParallelHintPolicy (agent: string) (isChildWorkspace: bool) : ParallelHin
     let agent = normalizeAgent agent
 
     match agent with
+    | "plan"
     | "title"
     | "compaction"
     | "exec"

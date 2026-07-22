@@ -11,6 +11,7 @@ type AgentRole =
     | MethodologyReasoning
     | NudgeSupervisor
     | SquadWorker
+    | Coordinator
 
 type TimeoutKind =
     | Short
