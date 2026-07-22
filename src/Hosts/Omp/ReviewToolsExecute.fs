@@ -44,8 +44,7 @@ let private handleReviewResult
         let verdict, feedback =
             match r with
             | Accepted fb ->
-                Wanxiangshu.Kernel.EventSourcing.EventKind.verdictAccepted,
-                (if fb = "" then None else Some fb)
+                Wanxiangshu.Kernel.EventSourcing.EventKind.verdictAccepted, (if fb = "" then None else Some fb)
             | NeedsRevision fb -> Wanxiangshu.Kernel.EventSourcing.EventKind.verdictNeedsRevision, Some fb
             | Terminated -> Wanxiangshu.Kernel.EventSourcing.EventKind.verdictTerminated, None
 
@@ -120,28 +119,29 @@ let executeReturnReviewer
 
             match Wanxiangshu.Kernel.ReviewVerdict.parseVerdict vStr with
             | None -> return textResult reviewerNudgePrompt
-            | Some Wanxiangshu.Kernel.ReviewVerdict.Perfect ->
+            | Some verdict ->
                 let fb = (Dyn.str params' "feedback").Trim()
-                let res = store.resolvePendingReview (sessionId, Accepted fb)
+                let doubleCheckDone = store.isChallengeRequested sessionId
 
-                if not res then
-                    return errorResult "No pending review to resolve."
-                else
-                    return
-                        { textResult "Review submitted: accepted." with
-                            display = Some false }
-            | Some Wanxiangshu.Kernel.ReviewVerdict.Revise ->
-                let fb = (Dyn.str params' "feedback").Trim()
-
-                if fb = "" then
-                    return textResult reviewerNudgePrompt
-                else
-                    let res = store.resolvePendingReview (sessionId, NeedsRevision fb)
+                match Wanxiangshu.Kernel.ReviewVerdict.decideReviewSubmission verdict fb doubleCheckDone with
+                | Wanxiangshu.Kernel.ReviewVerdict.AskDoubleCheck ->
+                    store.recordChallengeRequested sessionId
+                    let task = store.getReviewTask sessionId |> Option.defaultValue ""
+                    return textResult (doubleCheckPrompt task)
+                | Wanxiangshu.Kernel.ReviewVerdict.Finalize result ->
+                    let res = store.resolvePendingReview (sessionId, result)
 
                     if not res then
                         return errorResult "No pending review to resolve."
                     else
-                        return
-                            { textResult "Review submitted: revision requested with feedback." with
-                                display = Some false }
+                        match result with
+                        | Accepted _ ->
+                            return
+                                { textResult "Review submitted: accepted." with
+                                    display = Some false }
+                        | NeedsRevision _ ->
+                            return
+                                { textResult "Review submitted: revision requested with feedback." with
+                                    display = Some false }
+                        | Terminated -> return errorResult "Review terminated."
     }

@@ -11,7 +11,6 @@ open Wanxiangshu.Tests.TestWorkspace
 open Wanxiangshu.Runtime.LoopMessages
 open Wanxiangshu.Runtime.ReviewPrompts
 open Wanxiangshu.Runtime.PromptFragments
-open Wanxiangshu.Runtime.PromptHeader
 open Wanxiangshu.Hosts.Mux.Plugin
 open Wanxiangshu.Runtime.Dyn
 
@@ -133,7 +132,8 @@ let nudgeWithoutChatHistoryButEventCarriesTextSpec () =
 
         check
             "loop nudge fires from event-carried text when getChatHistory is absent"
-            (nudges.Count = 1 && nudges.[0].Contains(loopNudgePromptProse))
+            (nudges.Count = 1
+             && (nudges.[0].Contains "submit_review" || nudges.[0].Contains "With-Review"))
 
         do! rmAsync tempDir
     }

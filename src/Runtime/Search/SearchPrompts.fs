@@ -1,8 +1,6 @@
 module Wanxiangshu.Runtime.SearchPrompts
 
-open Fable.Core
-open Fable.Core.JsInterop
-open Wanxiangshu.Runtime.PromptHeader
+open Wanxiangshu.Runtime.Tooling.ToolOutputToml
 
 type SearchResult =
     { title: string
@@ -16,30 +14,27 @@ type FetchResponse =
       content: string option }
 
 let formatSearchResults (results: SearchResult list) : string =
-    if results.IsEmpty then
-        "No results found."
-    else
-        let items =
-            results
-            |> List.map (fun r -> createObj [ "title", box r.title; "url", box r.url; "content", box r.content ])
+    let items =
+        results
+        |> List.map (fun r ->
+            { SearchResultItem.title = r.title
+              url = r.url
+              content = r.content })
 
-        frontMatter [ yamlSeqField "results" items ]
+    renderSearchResults items
 
 let formatFetchResponse (data: FetchResponse) : string =
     let nonEmpty (s: string) = not (System.String.IsNullOrEmpty s)
 
-    let fields =
-        [ match data.title with
-          | Some v when nonEmpty v -> yield yamlField "title" v
-          | _ -> ()
-          match data.byline with
-          | Some v when nonEmpty v -> yield yamlField "byline" v
-          | _ -> ()
-          match data.length with
-          | Some l -> yield ("length", box l)
-          | None -> ()
-          match data.content with
-          | Some c when nonEmpty c -> yield yamlField "content" c
-          | _ -> () ]
+    let title = defaultArg (data.title |> Option.filter nonEmpty) ""
+    let byline = data.byline |> Option.filter nonEmpty
+    let length = defaultArg data.length 0
+    let content = defaultArg (data.content |> Option.filter nonEmpty) ""
 
-    frontMatter fields
+    let fetch =
+        { FetchResult.title = title
+          byline = byline
+          length = length
+          content = content }
+
+    renderFetchResult fetch

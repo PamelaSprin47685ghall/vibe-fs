@@ -15,9 +15,7 @@ open Wanxiangshu.Kernel.ToolResult
 open Wanxiangshu.Runtime.SubagentSpawn
 open Wanxiangshu.Runtime.ChildAgentRegistry
 open Wanxiangshu.Runtime.SubagentIteratorStore
-open Wanxiangshu.Runtime.ToolOutputInfo
-open Wanxiangshu.Kernel.ToolOutputInfoTypes
-open Wanxiangshu.Runtime.PromptHeader
+open Wanxiangshu.Runtime.Tooling.ToolOutputToml
 
 module HostAdapter = Wanxiangshu.Kernel.HostAdapter
 
@@ -90,13 +88,13 @@ let private wrapWithIterator
     (text: string)
     (role: HostAdapter.SubagentRole)
     (title: string)
-    : JS.Promise<string> =
+    : JS.Promise<SubagentReport> =
     promise {
         let spawnedChildId =
             resolveSpawnedChildId provenChildId role getChildIDForSpawn host registry scope
 
         match spawnedChildId with
-        | None -> return text
+        | None -> return { iterator = None; body = text }
         | Some cid ->
             let roleStr =
                 match role with
@@ -127,7 +125,7 @@ let private wrapWithIterator
                         roleStr
                         title
 
-            return Wanxiangshu.Runtime.ToolOutputInfo.withIterator text iter
+            return { iterator = Some iter; body = text }
     }
 
 let spawnOne
@@ -139,7 +137,7 @@ let spawnOne
     (role: HostAdapter.SubagentRole)
     (title: string)
     (prompt: string)
-    : JS.Promise<string> =
+    : JS.Promise<SubagentReport> =
     let request =
         { Role = role
           Title = title
@@ -156,41 +154,17 @@ let spawnOne
         | Success text ->
             let! res = wrapWithIterator adapter host registry scope toolName None text role title
             return res
-        | Failure err -> return subagentToolFailed toolName err
-        | Aborted -> return subagentToolFailed toolName MessageAborted
+        | Failure err ->
+            return
+                { iterator = None
+                  body = subagentToolFailed toolName err }
+        | Aborted ->
+            return
+                { iterator = None
+                  body = subagentToolFailed toolName MessageAborted }
     }
 
-let formatBatchReports (reports: string list) : string =
-    let parsed =
-        reports
-        |> List.map (fun r ->
-            match tryParse r with
-            | Some msg ->
-                let iterOpt =
-                    msg.info
-                    |> List.tryPick (function
-                        | InfoItem.Iterator iter -> Some iter
-                        | _ -> None)
-
-                iterOpt, msg.body
-            | None -> None, r)
-
-    let allIterators = parsed |> List.choose fst
-
-    let fm =
-        if List.isEmpty allIterators then
-            ""
-        else
-            frontMatter [ yamlStringSeqField "iterators" allIterators ]
-
-    let formattedBlocks =
-        parsed
-        |> List.map (fun (iterOpt, body) ->
-            match iterOpt with
-            | Some iter -> $"# {iter}\n{body}"
-            | None -> body)
-
-    let joinedBlocks =
-        String.concat "\n\n" (formattedBlocks |> List.map (fun b -> b.Trim()))
-
-    if fm = "" then joinedBlocks else fm + "\n\n" + joinedBlocks
+let formatBatchReports (reports: SubagentReport list) : string =
+    match BatchReport.create reports with
+    | Some batch -> renderBatchReport batch
+    | None -> ""

@@ -8,6 +8,11 @@ type ReviewState =
     | Accepted
     | NeedsRevision of feedback: string
 
+[<RequireQualifiedAccess>]
+type ReviewChallengeState =
+    | NotRequested
+    | Requested
+
 type ReviewCommand =
     | Activate of task: string
     | Submit
@@ -15,6 +20,7 @@ type ReviewCommand =
     | Unlock
     | Accept
     | RequestRevision of feedback: string
+    | RequestChallenge
 
 [<RequireQualifiedAccess>]
 type ReviewEvent =
@@ -24,6 +30,7 @@ type ReviewEvent =
     | LockReleased
     | Accepted
     | NeedsRevision of feedback: string
+    | ChallengeRequested
 
 type ReviewResult =
     | Accepted of feedback: string
@@ -38,7 +45,8 @@ type ReviewSession =
       originalTask: string option
       lastFeedback: string option
       parentId: string option
-      childIds: string list }
+      childIds: string list
+      challengeState: ReviewChallengeState }
 
 let empty id createdAt : ReviewSession =
     { id = id
@@ -48,7 +56,8 @@ let empty id createdAt : ReviewSession =
       originalTask = None
       lastFeedback = None
       parentId = None
-      childIds = [] }
+      childIds = []
+      challengeState = ReviewChallengeState.NotRequested }
 
 let withTask task session =
     if session.originalTask = Some task then

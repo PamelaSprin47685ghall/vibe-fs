@@ -27,7 +27,7 @@ let isEndVerdictRejectsTerminated () =
 
 let buildLoopMessageContainsTaskField () =
     let msg = buildLoopMessage "fix login bug" [ "step 1"; "step 2" ]
-    check "buildLoopMessage contains task field" (msg.Contains "task: fix login bug")
+    check "buildLoopMessage contains task field" (msg.Contains "fix login bug")
 
 let buildLoopMessageContainsBody () =
     let msg = buildLoopMessage "do work" [ "step 1"; "step 2" ]
@@ -38,21 +38,13 @@ let buildLoopMessageContainsBody () =
 
 let buildLoopCommandTemplateContainsCommand () =
     let tpl = buildLoopCommandTemplate "with-review" [ "body line" ]
-    check "buildLoopCommandTemplate contains command field" (tpl.Contains "command: with-review")
+    check "buildLoopCommandTemplate contains command field" (tpl.Contains "with-review")
 
 let buildLoopCommandTemplateContainsBody () =
     let tpl = buildLoopCommandTemplate "loop" [ "body line" ]
     check "buildLoopCommandTemplate contains body line" (tpl.Contains "body line")
 
 // ── hasDoubleCheckAnchor ──────────────────────────────────────────────────────
-
-let hasDoubleCheckAnchorTrue () =
-    check "hasDoubleCheckAnchor true" (hasDoubleCheckAnchor [ doubleCheckText ])
-
-let hasDoubleCheckAnchorFalse () =
-    check "hasDoubleCheckAnchor false" (not (hasDoubleCheckAnchor [ taskText "some work" ]))
-
-// ── run ───────────────────────────────────────────────────────────────────────
 
 let run () =
     isEndVerdictAcceptsAccepted ()
@@ -63,5 +55,3 @@ let run () =
     buildLoopMessageContainsBody ()
     buildLoopCommandTemplateContainsCommand ()
     buildLoopCommandTemplateContainsBody ()
-    hasDoubleCheckAnchorTrue ()
-    hasDoubleCheckAnchorFalse ()

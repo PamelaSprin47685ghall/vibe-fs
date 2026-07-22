@@ -7,7 +7,8 @@ open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.HostTools
 open Wanxiangshu.Kernel.ToolPermission
 open Wanxiangshu.Kernel.ToolCatalog
-open Wanxiangshu.Runtime.PromptHeader
+open Wanxiangshu.Kernel.ToolOutputInfoTypes
+open Wanxiangshu.Runtime.Tooling.ToolOutputToml
 open Wanxiangshu.Hosts.Opencode.ToolSchema
 open Wanxiangshu.Hosts.Opencode.PtySpawn
 
@@ -53,5 +54,11 @@ let ptyWriteTool (host: Host) : obj =
                         .Replace("\n", "\\n")
                         .Replace("\r", "\\r")
 
-                return frontMatterPrompt [ "id", box id; "bytes", box data.Length ] (sprintf "Sent: \"%s\"" display)
+                let bodyText = sprintf "Sent: \"%s\"\nid: %s\nbytes: %d" display id data.Length
+
+                let msg =
+                    { info = [ InfoItem.Status "written" ]
+                      body = bodyText }
+
+                return renderToolOutput msg
             })

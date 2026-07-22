@@ -147,11 +147,11 @@ let submitReviewResultTool
                     match getClientFromPluginCtx ctx with
                     | Error e -> return wireEncodeToolError "OpencodeClient" e
                     | Ok client ->
-                        let! texts = Wanxiangshu.Hosts.Opencode.SessionIo.readSessionTexts client sessionID directory
-                        let doubleCheckDone = hasDoubleCheckAnchor texts
+                        let doubleCheckDone = store.isChallengeRequested sessionID
 
                         match decideReviewSubmission decoded.Verdict decoded.Feedback doubleCheckDone with
                         | AskDoubleCheck ->
+                            store.recordChallengeRequested sessionID
                             let task = store.getReviewTask sessionID |> Option.defaultValue ""
                             return doubleCheckPrompt task
                         | Finalize result ->

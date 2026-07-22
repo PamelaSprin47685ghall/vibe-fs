@@ -29,7 +29,7 @@ let coderPromptContainsDoNotTouch () =
 
 let coderPromptContainsYaml () =
     let p = coderPrompt sampleCoderIntent
-    check "contains yaml field" (p.Contains "objective:")
+    check "contains objective field" (p.Contains "objective =")
 
 let coderPromptEmptyDoNotTouchOmitsField () =
     let intent =
@@ -37,7 +37,7 @@ let coderPromptEmptyDoNotTouchOmitsField () =
             doNotTouch = [||] }
 
     let p = coderPrompt intent
-    check "omits do_not_touch when empty" (not (p.Contains "do_not_touch"))
+    check "omits boundaries when empty" (not (p.Contains "boundaries"))
 
 let inspectorPromptContainsQuestions () =
     let p = inspectorPrompt sampleInspectorIntent
@@ -45,7 +45,7 @@ let inspectorPromptContainsQuestions () =
 
 let inspectorPromptContainsYaml () =
     let p = inspectorPrompt sampleInspectorIntent
-    check "contains yaml" (p.Contains "objective:")
+    check "contains objective" (p.Contains "objective =")
 
 let browserPromptContainsTask () =
     let p = browserPrompt "Search for docs"
@@ -80,7 +80,7 @@ let executorSummarizerPromptContainsFields () =
 
     check "contains language" (p.Contains "python")
     check "contains program" (p.Contains "print(1)")
-    check "contains task section" (p.Contains "# Task")
+    check "contains agent_role" (p.Contains "agent_role =")
     check "contains preserve directive" (p.Contains "Preserve errors")
 
 let executorSummarizerPromptEmbedsWhatToSummarize () =
@@ -88,12 +88,12 @@ let executorSummarizerPromptEmbedsWhatToSummarize () =
         executorSummarizerPrompt "summarize exit codes and stderr only" "stdout" "python" "print(1)" [] "short"
 
     check "what_to_summarize embedded" (p.Contains "summarize exit codes and stderr only")
-    check "contains task section" (p.Contains "# Task")
+    check "contains objective" (p.Contains "objective =")
 
 let websearchSummarizerPromptContains () =
     let p = websearchSummarizerPrompt "Q?" "results..."
     check "contains question" (p.Contains "Q?")
-    check "contains raw_results" (p.Contains "raw_results")
+    check "contains websearch_results" (p.Contains "websearch_results")
     check "contains raw output" (p.Contains "results...")
 
 let run () =

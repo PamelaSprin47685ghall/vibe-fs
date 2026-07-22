@@ -2,7 +2,8 @@ module Wanxiangshu.Runtime.PromptFragments
 
 open Wanxiangshu.Kernel.HostTools
 open Wanxiangshu.Kernel.Nudge.NudgePromptText
-open Wanxiangshu.Runtime.PromptHeader
+open Wanxiangshu.Kernel.Prompt
+open Wanxiangshu.Runtime.Prompt
 
 let todoNudgePromptProse =
     Wanxiangshu.Kernel.Nudge.NudgePromptText.todoNudgePromptProse
@@ -33,24 +34,72 @@ let reviewCriteria =
 7. Is the result natural and intuitive for the user or caller?
 8. Does it fully satisfy the original task without cutting corners?"""
 
+let todoNudgePromptDocument (todos: string list) : PromptDocument =
+    let targets = todos |> List.map PromptTarget.TodoTarget
+
+    let view =
+        { objective = "Continue incomplete work and finish the next pending todo"
+          background = Some "The stream ended while work remained open"
+          agentRole = AgentRole.NudgeSupervisor
+          targets = targets
+          boundaries = []
+          rules = [ PromptRule.Policy "Mark work in progress before editing and complete only after verification." ]
+          outcomes =
+            [ { label = "continue"
+                text = "Resume the next pending work item instead of ending the session." } ] }
+
+    match PromptDocument.create view with
+    | Ok doc -> doc
+    | Error errs -> failwithf "Invalid todo nudge PromptDocument: %A" errs
+
 let todoNudgePromptFor (todos: string list) : string =
-    let fields = [ yamlStringSeqField "todos" todos ]
-    frontMatterPrompt fields todoNudgePromptProse
+    PromptToml.render (todoNudgePromptDocument todos)
+
+let loopNudgePromptDocument (todos: string list) : PromptDocument =
+    let targets = todos |> List.map PromptTarget.TodoTarget
+
+    let view =
+        { objective = "Continue execution in review loop mode"
+          background = Some "You are in loop mode. You must call the submit_review tool before finishing."
+          agentRole = AgentRole.NudgeSupervisor
+          targets = targets
+          boundaries = []
+          rules =
+            [ PromptRule.Policy
+                  "Call the submit_review tool to submit your detailed report and list of modified files for review." ]
+          outcomes =
+            [ { label = "continue"
+                text = "Submit review or complete remaining loop work." } ] }
+
+    match PromptDocument.create view with
+    | Ok doc -> doc
+    | Error errs -> failwithf "Invalid loop nudge PromptDocument: %A" errs
 
 let loopNudgePromptFor (todos: string list) : string =
-    let fields =
-        if List.isEmpty todos then
-            []
-        else
-            [ yamlStringSeqField "todos" todos ]
+    PromptToml.render (loopNudgePromptDocument todos)
 
-    frontMatterPrompt fields loopNudgePromptProse
+let todoNudgePrompt = todoNudgePromptFor []
+let loopNudgePrompt = loopNudgePromptFor []
 
-let todoNudgePrompt = todoNudgePromptProse
-let loopNudgePrompt = loopNudgePromptProse
+let runnerNudgePromptDocument (host: Host) : PromptDocument =
+    let view =
+        { objective = "Manage active background runner task"
+          background = Some "A background runner task is still active."
+          agentRole = AgentRole.NudgeSupervisor
+          targets = []
+          boundaries = []
+          rules =
+            [ PromptRule.Policy "Call runner_wait to collect output or runner_abort to stop it before finishing." ]
+          outcomes =
+            [ { label = "continue"
+                text = "Resolve active runner task before ending session." } ] }
+
+    match PromptDocument.create view with
+    | Ok doc -> doc
+    | Error errs -> failwithf "Invalid runner nudge PromptDocument: %A" errs
 
 let runnerNudgePromptFor (host: Host) =
-    $"A background runner task is still active. Call runner_wait to collect output or runner_abort to stop it before finishing."
+    PromptToml.render (runnerNudgePromptDocument host)
 
 let runnerNudgePrompt = runnerNudgePromptFor opencode
 

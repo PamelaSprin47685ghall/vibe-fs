@@ -29,6 +29,8 @@ let rec resolveBranchName (rt: CoordinatorRuntime) (taskId: string) (attempts: i
     else
         candidate
 
+open Wanxiangshu.Runtime.Prompt
+
 let startTask (rt: CoordinatorRuntime) (taskId: string) : JS.Promise<unit> =
     promise {
         match findTask taskId rt.Dag with
@@ -56,7 +58,10 @@ let startTask (rt: CoordinatorRuntime) (taskId: string) : JS.Promise<unit> =
                 | Error _ -> return ()
                 | Ok() ->
                     rt.Deps.CreateSymlinks wtPath rt.ProjectRoot rt.Config.SharedDirs
-                    let prompt = buildSlavePrompt taskId task.Title task.Description rt.MasterBranch
+
+                    let prompt =
+                        PromptToml.render (buildSlavePromptDocument taskId task.Title task.Description rt.MasterBranch)
+
                     let slaveEnv = createObj []
                     assignInto slaveEnv (get nodeProcess "env") |> ignore
                     setKey slaveEnv "SQUAD_COORDINATOR_URL" (box rt.CoordinatorUrl)

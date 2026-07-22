@@ -10,7 +10,6 @@ open Wanxiangshu.Hosts.Omp.Plugin
 open Wanxiangshu.Runtime
 open Wanxiangshu.Runtime.Dyn
 open Wanxiangshu.Runtime.LoopMessages
-open Wanxiangshu.Runtime.PromptHeader
 
 module Dyn = Wanxiangshu.Runtime.Dyn
 
@@ -88,12 +87,7 @@ let agentEndLoopNudgeWhenActive () =
                                                        box
                                                            [| createObj
                                                                   [ "type", box "text"
-                                                                    "text",
-                                                                    box (
-                                                                        frontMatterPrompt
-                                                                            [ yamlField taskField "do task" ]
-                                                                            "With-Review Mode is active."
-                                                                    ) ] |] ]
+                                                                    "text", box (buildLoopMessage "do task" []) ] |] ]
                                              ) ] |]) ]
                   )
                   "hasPendingMessages", box (fun () -> box false)

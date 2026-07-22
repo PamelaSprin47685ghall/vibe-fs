@@ -36,7 +36,7 @@ let testHappyPath () : JS.Promise<unit> =
 
         let parts = get output "parts" :?> System.Collections.Generic.List<obj>
         checkBare (parts.Count = 1)
-        checkBare ((str parts.[0] "text").Contains "squad_event: squad_created")
+        checkBare ((str parts.[0] "text").Contains "squad_created")
 
         // ② handleSquadUpdate → task Pending ( Scheduling=true suppresses fire-and-forget tick )
         rt.Scheduling <- true

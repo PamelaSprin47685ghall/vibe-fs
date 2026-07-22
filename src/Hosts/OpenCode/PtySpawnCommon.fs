@@ -7,7 +7,8 @@ open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.HostTools
 open Wanxiangshu.Kernel.ToolPermission
 open Wanxiangshu.Kernel.ToolCatalog
-open Wanxiangshu.Runtime.PromptHeader
+open Wanxiangshu.Kernel.ToolOutputInfoTypes
+open Wanxiangshu.Runtime.Tooling.ToolOutputToml
 open Wanxiangshu.Hosts.Opencode.ToolSchema
 
 module Dyn = Wanxiangshu.Runtime.Dyn
@@ -99,14 +100,31 @@ let formatSpawnResponse (info: obj) : string =
         else
             string info?timeoutSeconds
 
-    let fields =
-        [ "id", box (string info?``id``)
-          "title", box (string info?title)
-          "command", box (sprintf "%s %s" (string info?command) (String.concat " " (unbox<string array> info?args)))
-          "workdir", box (string info?workdir)
-          "pid", box (unbox<int> info?pid)
-          "status", box (string info?status)
-          "notify_on_exit", box (unbox<bool> info?notifyOnExit)
-          "timeout_seconds", box timeoutStr ]
+    let idStr = string info?``id``
+    let statusStr = string info?status
+    let pidVal = unbox<int> info?pid
+    let titleStr = string info?title
 
-    frontMatterPrompt fields "PTY session spawned."
+    let commandStr =
+        sprintf "%s %s" (string info?command) (String.concat " " (unbox<string array> info?args))
+
+    let workdirStr = string info?workdir
+    let notifyOnExitVal = unbox<bool> info?notifyOnExit
+
+    let bodyLines =
+        [ "PTY session spawned."
+          sprintf "id: %s" idStr
+          sprintf "title: %s" titleStr
+          sprintf "command: %s" commandStr
+          sprintf "workdir: %s" workdirStr
+          sprintf "pid: %d" pidVal
+          sprintf "status: %s" statusStr
+          sprintf "notify_on_exit: %b" notifyOnExitVal
+          sprintf "timeout_seconds: %s" timeoutStr ]
+        |> String.concat "\n"
+
+    let msg =
+        { info = [ InfoItem.Status statusStr ]
+          body = bodyLines }
+
+    renderToolOutput msg

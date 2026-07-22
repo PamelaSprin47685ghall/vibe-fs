@@ -42,24 +42,14 @@ let run () =
     check "not isSyntheticAssistantAgent bookkeeper" (not (isSyntheticAssistantAgent "bookkeeper"))
     check "not isSyntheticAssistantAgent orchestrator" (not (isSyntheticAssistantAgent "orchestrator"))
 
-    // --- isNudgePrompt ---
-    check "isNudgePrompt todoNudgePrompt" (isNudgePrompt todoNudgePrompt)
-    check "isNudgePrompt loopNudgePrompt" (isNudgePrompt loopNudgePrompt)
-    check "not isNudgePrompt other" (not (isNudgePrompt "hi"))
-
-    // --- todoNudgePromptFor with front matter ---
+    // --- todoNudgePromptFor with TOML schema ---
     let todoPromptWithFm = todoNudgePromptFor [ "todo1"; "todo2" ]
-    check "todoNudgePromptFor contains front matter" (todoPromptWithFm.Contains("---"))
-    check "todoNudgePromptFor contains todos list" (todoPromptWithFm.Contains("todos"))
+    check "todoNudgePromptFor contains objective" (todoPromptWithFm.Contains("objective"))
+    check "todoNudgePromptFor contains Nudge Supervisor" (todoPromptWithFm.Contains("Nudge Supervisor"))
     check "todoNudgePromptFor contains todo1" (todoPromptWithFm.Contains("todo1"))
-    check "todoNudgePromptFor contains original prose" (todoPromptWithFm.Contains("There are still incomplete todos"))
 
-    // --- loopNudgePromptFor with front matter ---
+    // --- loopNudgePromptFor with TOML schema ---
     let loopPromptWithFm = loopNudgePromptFor [ "todo1" ]
-    check "loopNudgePromptFor contains front matter" (loopPromptWithFm.Contains("---"))
-    check "loopNudgePromptFor contains original prose" (loopPromptWithFm.Contains("You are in loop mode"))
-    check "loopNudgePromptFor contains skip-review-check" (loopPromptWithFm.Contains("skip-review-check"))
-
-    // --- isNudgePrompt recognizes new format ---
-    check "isNudgePrompt recognizes todoNudgePromptFor" (isNudgePrompt todoPromptWithFm)
-    check "isNudgePrompt recognizes loopNudgePromptFor" (isNudgePrompt loopPromptWithFm)
+    check "loopNudgePromptFor contains objective" (loopPromptWithFm.Contains("objective"))
+    check "loopNudgePromptFor contains Nudge Supervisor" (loopPromptWithFm.Contains("Nudge Supervisor"))
+    check "loopNudgePromptFor contains submit_review" (loopPromptWithFm.Contains("submit_review"))

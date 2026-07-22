@@ -49,12 +49,11 @@ let subagentDispatch () =
 
     check "executor summary prompt count is one" (execPrompts |> List.length = 1)
     let execPrompt = execPrompts |> List.head
-    check "executor summary embeds language" (execPrompt.Contains "language: shell")
-    check "executor summary embeds program" (execPrompt.Contains "program:" && execPrompt.Contains "echo 1")
-    check "executor summary embeds dependencies" (execPrompt.Contains "dependencies:" && execPrompt.Contains "dep1")
-    check "executor summary embeds timeout_type" (execPrompt.Contains "timeout_type: short")
+    check "executor summary embeds language" (execPrompt.Contains "shell")
+    check "executor summary embeds program" (execPrompt.Contains "program" && execPrompt.Contains "echo 1")
+    check "executor summary embeds dependencies" (execPrompt.Contains "dep1")
+    check "executor summary embeds timeout_type" (execPrompt.Contains "short")
     check "executor summary embeds raw output in body" (execPrompt.Contains "raw shell output")
-    check "executor summary includes task section" (execPrompt.Contains "# Task")
 
     let execPromptsWithFocus =
         formatPrompt host (ExecutorSummary("out", "shell", "echo 1", [], "short", "only exit codes"))

@@ -13,6 +13,8 @@ open Wanxiangshu.Hosts.Opencode.Plugin
 open Wanxiangshu.Runtime.Dyn
 open Wanxiangshu.Runtime.Messaging.OpencodeSessionEventCodec
 
+let private hasExactHint (text: string) (hintText: string) = text.Contains hintText
+
 let private promptText (arg: obj) =
     getPartsText (get (get arg "body") "parts")
 

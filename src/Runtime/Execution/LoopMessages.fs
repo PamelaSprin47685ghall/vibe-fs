@@ -1,8 +1,9 @@
 module Wanxiangshu.Runtime.LoopMessages
 
-open Wanxiangshu.Runtime.PromptHeader
+open Wanxiangshu.Kernel.Prompt
+open Wanxiangshu.Runtime.Prompt
 
-/// Structured front-matter field names and verdict values shared by producers —
+/// Structured field names and verdict values shared by producers —
 /// slash-command activation, the submit_review rendering in `Prompts.formatReviewResult`,
 /// and loop cancellation.
 let taskField = "task"
@@ -31,21 +32,54 @@ let loopFooter =
       "A reviewer will examine your submission. If accepted, you are done. If revision is requested, you will receive specific feedback to address." ]
 
 let buildLoopMessage (task: string) (bodyLines: string list) : string =
-    frontMatterPrompt
-        [ yamlField commandField commandWithReview; yamlField taskField task ]
-        (String.concat "\n" (bodyLines @ loopFooter))
+    let bg = String.concat "\n" (bodyLines @ loopFooter)
+
+    let docView =
+        { objective = task
+          background = Some bg
+          agentRole = AgentRole.CodeReview
+          targets = []
+          boundaries = []
+          rules = [ PromptRule.Contract "Complete every requirement in the task and submit review." ]
+          outcomes =
+            [ { label = "submit_review"
+                text = "Call submit_review when work is complete." } ] }
+
+    match PromptDocument.create docView with
+    | Ok doc -> PromptToml.render doc
+    | Error errs -> failwithf "Failed to create buildLoopMessage doc: %A" errs
 
 let buildLoopCommandTemplate (commandName: string) (bodyLines: string list) : string =
-    frontMatterPrompt [ yamlField commandField commandName ] (String.concat "\n" bodyLines)
+    let bg = String.concat "\n" bodyLines
 
-/// Loop cancellation carries a `verdict: cancelled` front-matter anchor so a
-/// restart replay recognizes it structurally, followed by the human-readable
-/// line. Authored once here, consumed verbatim by both hosts' cancel paths.
+    let docView =
+        { objective = commandName
+          background = Some bg
+          agentRole = AgentRole.CodeReview
+          targets = []
+          boundaries = []
+          rules = []
+          outcomes =
+            [ { label = "activate"
+                text = $"Activate {commandName} mode." } ] }
+
+    match PromptDocument.create docView with
+    | Ok doc -> PromptToml.render doc
+    | Error errs -> failwithf "Failed to create buildLoopCommandTemplate doc: %A" errs
+
+/// Loop cancellation carries a structured verdict in TOML outcomes.
 let loopCancelledMessage: string =
-    frontMatterPrompt [ yamlField verdictField verdictCancelled ] "With-Review Mode cancelled."
+    let docView =
+        { objective = "Cancel With-Review Mode"
+          background = Some "With-Review Mode cancelled."
+          agentRole = AgentRole.CodeReview
+          targets = []
+          boundaries = []
+          rules = []
+          outcomes =
+            [ { label = "cancelled"
+                text = "With-Review Mode cancelled." } ] }
 
-let doubleCheckField = "double-check"
-
-let hasDoubleCheckAnchor (texts: string seq) : bool =
-    texts
-    |> Seq.exists (fun text -> not (isNull text) && text.Contains doubleCheckField)
+    match PromptDocument.create docView with
+    | Ok doc -> PromptToml.render doc
+    | Error errs -> failwithf "Failed to create loopCancelledMessage doc: %A" errs

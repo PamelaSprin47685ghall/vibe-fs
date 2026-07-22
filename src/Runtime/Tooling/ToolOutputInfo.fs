@@ -3,7 +3,7 @@ module Wanxiangshu.Runtime.ToolOutputInfo
 open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Kernel.ToolOutputInfoTypes
-open Wanxiangshu.Runtime.PromptHeader
+open Wanxiangshu.Runtime.Tooling.ToolOutputToml
 
 let hintExecutorMisuse =
     "No executor for reading, searching, writing files. Use read/inspector/coder!"
@@ -28,66 +28,7 @@ let withBody body =
 
 let appendInfo item (msg: ToolOutputMessage) : ToolOutputMessage = { msg with info = item :: msg.info }
 
-let private itemKey =
-    function
-    | InfoItem.Hint _ -> "hint"
-    | InfoItem.Syntax _ -> "syntax"
-    | InfoItem.Iterator _ -> "iterator"
-    | InfoItem.Status _ -> "status"
-    | InfoItem.ExitCode _ -> "exit_code"
-
-let private itemValue =
-    function
-    | InfoItem.Hint h -> box h
-    | InfoItem.Syntax s -> box s
-    | InfoItem.Iterator i -> box i
-    | InfoItem.Status s -> box s
-    | InfoItem.ExitCode n -> box n
-
-let private flatFields (items: InfoItem list) : FrontMatterField list =
-    let map =
-        items
-        |> List.fold
-            (fun acc item ->
-                let k = itemKey item
-                let v = itemValue item
-
-                match Map.tryFind k acc with
-                | Some vs -> Map.add k (v :: vs) acc
-                | None -> Map.add k [ v ] acc)
-            Map.empty
-
-    let rec loop acc seen items =
-        match items with
-        | [] -> List.rev acc
-        | item :: rest ->
-            let k = itemKey item
-
-            if Set.contains k seen then
-                loop acc seen rest
-            else
-                let vs = Map.find k map |> List.rev
-
-                let field =
-                    match vs with
-                    | [ v ] -> (k, v)
-                    | _ -> (k, box (List.toArray vs))
-
-                loop (field :: acc) (Set.add k seen) rest
-
-    loop [] Set.empty items
-
-let render (msg: ToolOutputMessage) : string =
-    if msg.info.IsEmpty && msg.body = "" then
-        ""
-    elif msg.info.IsEmpty then
-        msg.body
-    else
-        let fence = frontMatter (flatFields (List.rev msg.info))
-
-        match msg.body with
-        | "" -> fence
-        | body -> fence + "\n" + body
+let render (msg: ToolOutputMessage) : string = renderToolOutput msg
 
 let noChangeEnvelope () =
     render

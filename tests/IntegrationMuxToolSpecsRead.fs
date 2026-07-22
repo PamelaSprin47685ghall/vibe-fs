@@ -13,6 +13,8 @@ open Wanxiangshu.Kernel.HostTools
 open Wanxiangshu.Hosts.Mux.Plugin
 open Wanxiangshu.Runtime.Dyn
 
+let private hasExactHint (text: string) (hintText: string) = text.Contains hintText
+
 let muxExecutorRoCatPrependsWarningSpec () =
     promise {
         let! workspaceDir = mkdtempAsync "mux-executor-ro-warning-"

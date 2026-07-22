@@ -120,7 +120,7 @@ let subagentPromptsContainKernelFragments () =
               targets = []
               doNotTouch = [||] }
 
-    check "coder implementation agent" (coder.Contains "implementation agent")
+    check "coder implementation agent" (coder.ToLower().Contains "implementation agent")
     check "coder static verify" (coder.Contains "Do NOT run tests or execute code")
 
     let inspector =

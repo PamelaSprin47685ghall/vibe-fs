@@ -4,7 +4,8 @@ open Fable.Core
 open Fable.Core.JsInterop
 open Fable.Core.JS
 open Wanxiangshu.Kernel
-open Wanxiangshu.Runtime.PromptHeader
+open Wanxiangshu.Kernel.ToolOutputInfoTypes
+open Wanxiangshu.Runtime.Tooling.ToolOutputToml
 open Wanxiangshu.Hosts.Opencode.PtySpawn
 
 module Dyn = Wanxiangshu.Runtime.Dyn
@@ -20,16 +21,16 @@ let readUnfiltered (mgr: obj) (id: string) (session: obj) (offset: int) (limit: 
         let totalLines = unbox<int> result?totalLines
         let hasMore = unbox<bool> result?hasMore
         let resultOffset = unbox<int> result?offset
-
-        let fields =
-            [ "id", box id
-              "status", box (string session?status)
-              "offset", box resultOffset
-              "returned", box lines.Length
-              "total_lines", box totalLines
-              "has_more", box hasMore ]
+        let statusStr = string session?status
 
         let sb = ResizeArray<string>()
+        sb.Add(sprintf "id: %s" id)
+        sb.Add(sprintf "status: %s" statusStr)
+        sb.Add(sprintf "offset: %d" resultOffset)
+        sb.Add(sprintf "returned: %d" lines.Length)
+        sb.Add(sprintf "total_lines: %d" totalLines)
+        sb.Add(sprintf "has_more: %b" hasMore)
+        sb.Add("")
 
         for i in 0 .. lines.Length - 1 do
             sb.Add(lines.[i])
@@ -46,7 +47,11 @@ let readUnfiltered (mgr: obj) (id: string) (session: obj) (offset: int) (limit: 
         else
             sb.Add(sprintf "(End of buffer - total %d lines)" totalLines)
 
-        return frontMatterPrompt fields (String.concat "\n" sb)
+        let msg =
+            { info = [ InfoItem.Status statusStr ]
+              body = String.concat "\n" sb }
+
+        return renderToolOutput msg
     }
 
 let private formatFilteredResult
@@ -59,17 +64,18 @@ let private formatFilteredResult
     (totalMatches: int)
     (hasMore: bool)
     : string =
-    let fields =
-        [ "id", box id
-          "status", box (string session?status)
-          "pattern", box pattern
-          "offset", box offset
-          "returned", box matches.Length
-          "total_matches", box totalMatches
-          "total_lines", box totalLines
-          "has_more", box hasMore ]
+    let statusStr = string session?status
 
     let sb = ResizeArray<string>()
+    sb.Add(sprintf "id: %s" id)
+    sb.Add(sprintf "status: %s" statusStr)
+    sb.Add(sprintf "pattern: %s" pattern)
+    sb.Add(sprintf "offset: %d" offset)
+    sb.Add(sprintf "returned: %d" matches.Length)
+    sb.Add(sprintf "total_matches: %d" totalMatches)
+    sb.Add(sprintf "total_lines: %d" totalLines)
+    sb.Add(sprintf "has_more: %b" hasMore)
+    sb.Add("")
 
     if matches.Length = 0 then
         sb.Add(sprintf "No lines matched the pattern '%s'." pattern)
@@ -98,7 +104,11 @@ let private formatFilteredResult
                     totalLines
             )
 
-    frontMatterPrompt fields (String.concat "\n" sb)
+    let msg =
+        { info = [ InfoItem.Status statusStr ]
+          body = String.concat "\n" sb }
+
+    renderToolOutput msg
 
 let readFiltered
     (mgr: obj)

@@ -4,7 +4,6 @@ open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Kernel.ReviewSession.Types
 open Wanxiangshu.Kernel.ReviewSession.Effects
 open Wanxiangshu.Runtime.LoopMessages
-open Wanxiangshu.Runtime.PromptHeader
 
 let disposeSessionTreeTerminatesAll () =
     let mutable verdicts: (string * ReviewResult) list = []

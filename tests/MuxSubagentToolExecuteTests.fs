@@ -22,11 +22,13 @@ let executeMuxDecodeFailureNeverCallsRunMux () =
     promise {
         let mutable runMuxCalls = 0
         let runMuxWithTaskId _ _ _ _ _ _ = Promise.lift (Ok("", "should not run"))
+
         let runMux _ _ _ _ _ _ =
             runMuxCalls <- runMuxCalls + 1
             Promise.lift "should not run"
 
         let args = createObj [ "intents", box [||] ]
+
         let! out =
             executeMuxSubagentTool
                 runMuxWithTaskId
@@ -46,6 +48,7 @@ let executeMuxInvalidConfigNeverCallsRunMux () =
     promise {
         let mutable runMuxCalls = 0
         let runMuxWithTaskId _ _ _ _ _ _ = Promise.lift (Ok("", "should not run"))
+
         let runMux _ _ _ _ _ _ =
             runMuxCalls <- runMuxCalls + 1
             Promise.lift "should not run"
@@ -53,6 +56,7 @@ let executeMuxInvalidConfigNeverCallsRunMux () =
         let args =
             createObj
                 [ "intents", box [| createObj [ "objective", box "x"; "background", box "b"; "targets", box [||] ] |] ]
+
         let badConfig = createObj [ "directory", box "/proj" ]
 
         let! out =
@@ -74,6 +78,7 @@ let executeMuxDecodeInvalidIntentNeverCallsRunMux () =
     promise {
         let mutable runMuxCalls = 0
         let runMuxWithTaskId _ _ _ _ _ _ = Promise.lift (Ok("", "should not run"))
+
         let runMux _ _ _ _ _ _ =
             runMuxCalls <- runMuxCalls + 1
             Promise.lift "should not run"
@@ -99,8 +104,12 @@ let executeMuxDecodeInvalidIntentNeverCallsRunMux () =
 
 let executeMuxSubagentSpawnPreservesPhysicalTaskId () =
     promise {
-        let runMuxWithTaskId _ _ _ _ _ _ = Promise.lift (Ok("task-physical-1", "task completed successfully"))
-        let runMux _ _ _ _ _ _ = Promise.lift "task completed successfully"
+        let runMuxWithTaskId _ _ _ _ _ _ =
+            Promise.lift (Ok("task-physical-1", "task completed successfully"))
+
+        let runMux _ _ _ _ _ _ =
+            Promise.lift "task completed successfully"
+
         let continueMux _ _ _ _ _ _ = Promise.lift "continue completed"
 
         let args = createObj [ "intent", box "Do spawn task" ]
@@ -118,15 +127,14 @@ let executeMuxSubagentSpawnPreservesPhysicalTaskId () =
                 config
                 sessionScope
 
-        let msgOpt = Wanxiangshu.Runtime.ToolOutputInfo.tryParse out
-        check "output has frontmatter info" (Option.isSome msgOpt)
-        let msg = Option.get msgOpt
+        check "output has content" (out.Contains "body =")
 
         let iterOpt =
-            msg.info
-            |> List.tryPick (function
-                | InfoItem.Iterator iter -> Some iter
-                | _ -> None)
+            if out.Contains "iter-" then
+                let m = System.Text.RegularExpressions.Regex.Match(out, @"iter-[a-zA-Z0-9_-]+")
+                if m.Success then Some m.Value else None
+            else
+                None
 
         check "iterator is found in output" (Option.isSome iterOpt)
         let iter = Option.get iterOpt

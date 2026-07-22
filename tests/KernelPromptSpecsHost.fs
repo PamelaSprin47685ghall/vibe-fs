@@ -53,7 +53,7 @@ let hostKernel' () =
 
     let inspectorPromptText = inspectorPrompt inv
     check "inspector has objective" (inspectorPromptText.IndexOf("find auth") >= 0)
-    check "inspector read-only" (inspectorPromptText.IndexOf("READ-ONLY") >= 0)
+    check "inspector read-only" (inspectorPromptText.ToLowerInvariant().IndexOf("read-only") >= 0)
 
 let toolCatalogCentralized () =
     let coderSpec = specOf "coder"

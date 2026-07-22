@@ -124,13 +124,17 @@ let returnReviewerVerdictPerfectRevise () =
             createObj [ "sessionManager", box (createObj [ "getSessionId", box (fun () -> box reviewSessionId) ]) ]
 
         let! passResult = executeTool tool "call-1" (createObj [ "verdict", box "PERFECT" ]) ctx1
-        equal "PERFECT verdict" (Some(Accepted "")) firstKr
-        equal "PERFECT result text" "Review submitted: accepted." (toolText passResult)
+        check "PERFECT first pass double-check prompt" ((toolText passResult).Contains "objective =")
+
+        let! passResult2 = executeTool tool "call-2" (createObj [ "verdict", box "PERFECT" ]) ctx1
+        equal "PERFECT second pass verdict" (Some(Accepted "")) firstKr
+        equal "PERFECT result text" "Review submitted: accepted." (toolText passResult2)
+
         let mutable secondKr: ReviewResult option = None
         reviewStore.setPendingReview (reviewSessionId, (fun kr -> secondKr <- Some kr))
 
         let! rejectResult =
-            executeTool tool "call-2" (createObj [ "verdict", box "REVISE"; "feedback", box "Fix it" ]) ctx1
+            executeTool tool "call-3" (createObj [ "verdict", box "REVISE"; "feedback", box "Fix it" ]) ctx1
 
         equal "REVISE verdict" (Some(NeedsRevision "Fix it")) secondKr
         equal "revise result text" "Review submitted: revision requested with feedback." (toolText rejectResult)

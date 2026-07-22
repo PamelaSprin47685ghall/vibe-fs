@@ -4,6 +4,12 @@ open Wanxiangshu.Kernel.TreeSitterKernel
 open Wanxiangshu.Kernel.ToolOutputInfoTypes
 open Wanxiangshu.Runtime.ToolOutputInfo
 
+let hasSyntaxInOutput (s: string) : bool =
+    if System.String.IsNullOrWhiteSpace s then
+        false
+    else
+        s.Contains("kind = \"syntax\"") || s.Contains("kind = 'syntax'")
+
 let appendSyntaxDiagnosticsToOutput (currentOutput: string) (filePath: string) (result: SyntaxCheckResult) : string =
     match formatSyntaxDiagnostics filePath result false with
     | Some formatted -> addSyntax currentOutput formatted

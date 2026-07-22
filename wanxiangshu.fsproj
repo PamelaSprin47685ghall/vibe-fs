@@ -79,6 +79,7 @@
     <Compile Include="src/Kernel/Nudge/TodoStatus.fs"/>
     <Compile Include="src/Kernel/Nudge/SubmitReviewHooks.fs"/>
     <Compile Include="src/Kernel/ToolExecutionStatus.fs"/>
+    <Compile Include="src/Kernel/Messaging/MessageOrigin.fs"/>
     <Compile Include="src/Kernel/Messaging.fs"/>
     <Compile Include="src/Kernel/CapsSynthPolicy.fs"/>
     <Compile Include="src/Kernel/CapsPrelude.fs"/>
@@ -86,6 +87,7 @@
     <Compile Include="src/Kernel/TreeSitterKernel.fs"/>
     <Compile Include="src/Kernel/MessageTransformPolicy.fs"/>
     <Compile Include="src/Kernel/Methodology/Api.fs"/>
+    <Compile Include="src/Kernel/Prompt/Document.fs"/>
     <Compile Include="src/Kernel/Methodology/Schema.fs"/>
     <Compile Include="src/Kernel/Methodology/Logic.fs"/>
     <Compile Include="src/Kernel/Methodology/ProblemTransformation.fs"/>
@@ -145,10 +147,11 @@
     <Compile Include="src/Kernel/FallbackRuntimeLifecycle.fs"/>
     <Compile Include="src/Kernel/SessionLoop.fs"/>
     <Compile Include="src/Kernel/FallbackSubagentGate.fs"/>
-    <Compile Include="src/Runtime/Workspace/Yaml.fs"/>
-    <Compile Include="src/Runtime/PromptHeader.fs"/>
+    <Compile Include="src/Runtime/Serialization/TomlValue.fs"/>
+    <Compile Include="src/Runtime/Serialization/Toml.fs"/>
+    <Compile Include="src/Runtime/Prompt/PromptToml.fs"/>
+    <Compile Include="src/Runtime/Tooling/ToolOutputToml.fs"/>
     <Compile Include="src/Runtime/Search/SearchPrompts.fs"/>
-    <Compile Include="src/Runtime/Tooling/ToolOutputInfoParse.fs"/>
     <Compile Include="src/Runtime/Tooling/ToolOutputInfo.fs"/>
     <Compile Include="src/Runtime/Execution/LoopMessages.fs"/>
     <Compile Include="src/Runtime/PromptFragments.fs"/>
@@ -382,6 +385,7 @@
     <Compile Include="src/Runtime/Nudge/NudgeRuntimeEvent.fs"/>
     <Compile Include="src/Runtime/Nudge/NudgeModelResolver.fs"/>
     <Compile Include="src/Runtime/Nudge/NudgeLease.fs"/>
+    <Compile Include="src/Runtime/Nudge/NudgeOutcomeAbort.fs"/>
     <Compile Include="src/Runtime/Nudge/NudgeOutcomeHandler.fs"/>
     <Compile Include="src/Runtime/Nudge/NudgeFlow.fs"/>
     <Compile Include="src/Runtime/Nudge/MuxNudgeEventParse.fs"/>
@@ -590,6 +594,12 @@
     <Compile Include="src/Hosts/Omp/Plugin.fs"/>
     <Compile Include="tests/Assert.fs"/>
     <Compile Include="tests/ArchitectureGatesFs.fs"/>
+    <Compile Include="tests/ArchitectureGatesSize.fs"/>
+    <Compile Include="tests/ArchitectureGatesLayer.fs"/>
+    <Compile Include="tests/ArchitectureGatesProject.fs"/>
+    <Compile Include="tests/PromptArchitectureGatesTests.fs"/>
+    <Compile Include="tests/TomlSerializationTests.fs"/>
+    <Compile Include="tests/PromptTomlTests.fs"/>
     <Compile Include="tests/ArchitectureGatesTests.fs"/>
     <Compile Include="tests/RemovedProductionFilesTests.fs"/>
     <Compile Include="tests/ForbiddenSourceSymbolsTests.fs"/>

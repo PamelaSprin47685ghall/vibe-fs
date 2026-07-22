@@ -19,7 +19,6 @@ open Wanxiangshu.Runtime.Wanxiangzhen.SessionIo
 open Wanxiangshu.Runtime.Wanxiangzhen.SlaveSpawn
 open Wanxiangshu.Runtime.Wanxiangzhen.PidMonitor
 open Wanxiangshu.Runtime.Wanxiangzhen.SymlinkShell
-open Wanxiangshu.Runtime.Yaml
 open Wanxiangshu.Runtime.Wanxiangzhen.CoordinatorRuntime
 open Wanxiangshu.Runtime.Wanxiangzhen.SquadTaskLifecycle
 

@@ -8,13 +8,11 @@ open Wanxiangshu.Tests.EventLogTestSeed
 open Wanxiangshu.Tests.AsyncFlush
 open Wanxiangshu.Runtime.LoopMessages
 open Wanxiangshu.Runtime.PromptFragments
-open Wanxiangshu.Runtime.PromptHeader
 open Wanxiangshu.Hosts.Opencode.Plugin
 open Wanxiangshu.Runtime.Dyn
 open Wanxiangshu.Runtime.Messaging.OpencodeSessionEventCodec
 
-let private loopAnchor task =
-    frontMatterPrompt [ yamlField taskField task ] "With-Review Mode is active."
+let private loopAnchor task = buildLoopMessage task []
 
 let private assistantMessage agent text completed =
     box
@@ -85,7 +83,11 @@ let opencodeLoopNudgeSpec () =
             else
                 getPartsText (get (get promptCalls.[0] "body") "parts")
 
-        check "with-review idle emits loop nudge" (promptCalls.Count = 1 && nudgeText.Contains(loopNudgePromptProse))
+        check
+            "with-review idle emits loop nudge"
+            (promptCalls.Count = 1
+             && (nudgeText.Contains "submit_review" || nudgeText.Contains "With-Review"))
+
         do! rmAsync workspaceDir
     }
 
@@ -151,7 +153,8 @@ let opencodeFreshChatMessageRearmsLoopNudgeSpec () =
 
         check
             "first with-review idle emits loop nudge"
-            (promptCalls.Count = 1 && (textOf 0).Contains(loopNudgePromptProse))
+            (promptCalls.Count = 1
+             && ((textOf 0).Contains "submit_review" || (textOf 0).Contains "With-Review"))
 
         do!
             chatHook
@@ -180,7 +183,8 @@ let opencodeFreshChatMessageRearmsLoopNudgeSpec () =
 
         check
             "new assistant turn in history re-arms loop nudge on next idle"
-            (promptCalls.Count = 2 && (textOf 1).Contains(loopNudgePromptProse))
+            (promptCalls.Count = 2
+             && ((textOf 1).Contains "submit_review" || (textOf 1).Contains "With-Review"))
 
         do! rmAsync workspaceDir
     }

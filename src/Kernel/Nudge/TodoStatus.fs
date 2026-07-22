@@ -50,6 +50,3 @@ let syntheticAssistantAgents: Set<string> = Set.ofList [ "compaction"; "title" ]
 
 let isSyntheticAssistantAgent (agent: string) : bool =
     Set.contains (agent.Trim().ToLowerInvariant()) syntheticAssistantAgents
-
-let isNudgePrompt (text: string) : bool =
-    text.Contains(todoNudgePromptProse) || text.Contains(loopNudgePromptProse)

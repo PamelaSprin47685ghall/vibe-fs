@@ -1,42 +1,85 @@
 module Wanxiangshu.Runtime.ReviewPrompts.Format
 
-open Wanxiangshu.Runtime.LoopMessages
+open Wanxiangshu.Kernel.Prompt
+open Wanxiangshu.Runtime.Prompt
 open Wanxiangshu.Kernel.ReviewSession.Types
 open Wanxiangshu.Kernel.Review.ReviewEncouragement
-open Wanxiangshu.Runtime.PromptHeader
 
 /// Backward-compatible alias for the WIP acknowledgment body.
 let submitReviewWipAcknowledgment: string = wipAcknowledgment
 
 let submitReviewIsWip (wip: bool option) : bool = defaultArg wip true
 
-/// Structured YAML anchor for WIP acknowledgment detection.
-/// Used by isSubmitReviewWipProgressOutput instead of scanning prose.
+/// Structured anchor for WIP acknowledgment detection.
 let wipAcknowledgmentAnchor = "review_progress"
 
 /// Value of the anchor when a WIP was recorded.
 let wipAcknowledgmentRecorded = "recorded"
 
 let formatWipAcknowledgment (task: string) : string =
-    frontMatterPrompt
-        [ yamlField "task" task
-          yamlField wipAcknowledgmentAnchor wipAcknowledgmentRecorded ]
-        wipAcknowledgment
+    let docView =
+        { objective = task
+          background = Some wipAcknowledgment
+          agentRole = AgentRole.CodeReview
+          targets = []
+          boundaries = []
+          rules = [ PromptRule.Policy "Continue working carefully on the task." ]
+          outcomes =
+            [ { label = wipAcknowledgmentAnchor
+                text = wipAcknowledgmentRecorded } ] }
+
+    match PromptDocument.create docView with
+    | Ok doc -> PromptToml.render doc
+    | Error errs -> failwithf "Failed to create formatWipAcknowledgment doc: %A" errs
 
 let formatReviewResult (result: ReviewResult) : string =
-    match result with
-    | ReviewResult.Accepted feedback ->
-        let trimmed = (if isNull feedback then "" else feedback).Trim()
+    let docView =
+        match result with
+        | ReviewResult.Accepted feedback ->
+            let trimmed = (if isNull feedback then "" else feedback).Trim()
 
-        let body =
-            if trimmed = "" then
-                acceptedVerdict
-            else
-                acceptedVerdict + "\n\n" + trimmed
+            let body =
+                if trimmed = "" then
+                    acceptedVerdict
+                else
+                    acceptedVerdict + "\n\n" + trimmed
 
-        frontMatterPrompt [ yamlField verdictField verdictAccepted ] body
-    | ReviewResult.Terminated -> frontMatterPrompt [ yamlField verdictField verdictTerminated ] terminatedVerdict
-    | ReviewResult.NeedsRevision feedback ->
-        frontMatterPrompt
-            [ yamlField verdictField verdictNeedsRevision; yamlField "feedback" feedback ]
-            needsRevisionVerdict
+            { objective = "Review verdict: accepted."
+              background = Some body
+              agentRole = AgentRole.CodeReview
+              targets = []
+              boundaries = []
+              rules = []
+              outcomes = [ { label = "verdict"; text = "accepted" } ] }
+        | ReviewResult.Terminated ->
+            { objective = "Review verdict: terminated."
+              background = Some terminatedVerdict
+              agentRole = AgentRole.CodeReview
+              targets = []
+              boundaries = []
+              rules = []
+              outcomes =
+                [ { label = "verdict"
+                    text = "terminated" } ] }
+        | ReviewResult.NeedsRevision feedback ->
+            let trimmed = (if isNull feedback then "" else feedback).Trim()
+
+            let body =
+                if trimmed = "" then
+                    needsRevisionVerdict
+                else
+                    needsRevisionVerdict + "\n\n" + trimmed
+
+            { objective = "Review verdict: needs revision."
+              background = Some body
+              agentRole = AgentRole.CodeReview
+              targets = []
+              boundaries = []
+              rules = []
+              outcomes =
+                [ { label = "verdict"
+                    text = "needs_revision" } ] }
+
+    match PromptDocument.create docView with
+    | Ok doc -> PromptToml.render doc
+    | Error errs -> failwithf "Failed to create formatReviewResult doc: %A" errs

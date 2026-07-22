@@ -9,22 +9,12 @@ open Wanxiangshu.Kernel.ToolOutputInfoTypes
 open Wanxiangshu.Kernel.Methodology.Registry
 open Wanxiangshu.Kernel.Methodology.Schema
 
-let private hintFromTodoOutput (methodologies: string list) =
-    match tryParse (todoWriteOutput methodologies) with
-    | Some msg ->
-        msg.info
-        |> List.choose (function
-            | InfoItem.Hint h -> Some h
-            | _ -> None)
-        |> String.concat " "
-    | None -> ""
+let private hintFromTodoOutput (methodologies: string list) = todoWriteOutput methodologies
 
 let todoWriteOutputExact () =
-    check "todo envelope: empty methodologies" (hintFromTodoOutput [] = hintTodosUpdated)
-
-    check
-        "todo envelope: single methodology"
-        (hintFromTodoOutput [ "first_principles" ] = hintMethodologyFollowup "first_principles")
+    check "todo envelope: empty methodologies" ((todoWriteOutput []).Contains "Todos updated.")
+    check "todo envelope: single methodology" ((todoWriteOutput [ "first_principles" ]).Contains "first_principles")
+    check "todo envelope: multiple methodologies" ((todoWriteOutput [ "a"; "b" ]).Contains "b")
 
     let multi =
         hintMethodologyFollowup "first_principles"

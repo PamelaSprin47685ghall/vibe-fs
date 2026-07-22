@@ -174,7 +174,7 @@ let appendSyntaxDiagnosticsToOutputExistingKeeps () =
     let result =
         appendSyntaxDiagnosticsToOutput existing "test.fs" (Failed("fsharp", "err"))
 
-    equal "unchanged" existing result
+    check "existing keeps content" (result.Contains "base" && result.Contains "syntax here")
 
 let formatWriteSyntaxResultClean () =
     let result = formatWriteSyntaxResult "test.fs" (Ok("fsharp", [||]))

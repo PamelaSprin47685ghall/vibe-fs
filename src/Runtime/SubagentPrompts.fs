@@ -1,11 +1,10 @@
 module Wanxiangshu.Runtime.SubagentPrompts
 
 open System
-open Fable.Core
-open Fable.Core.JsInterop
+open Wanxiangshu.Kernel.HostTools
 open Wanxiangshu.Kernel.SubagentIntents
-open Wanxiangshu.Runtime.PromptHeader
-open Wanxiangshu.Runtime.PromptFragments
+open Wanxiangshu.Kernel.Prompt
+open Wanxiangshu.Runtime.Prompt
 
 let executorSummaryMaxBytes = 200_000
 
@@ -60,57 +59,138 @@ let capExecutorSummaryOutput (output: string) : string =
         truncateUtf8ByBytes output executorSummaryMaxBytes
         + "\n\n[Output truncated to 200000 bytes for summarization]"
 
-let private coderTargetItem (t: CoderTarget) : obj =
-    let fields =
-        [ "file", box t.file; "guide", box t.guide ]
-        @ (match t.draft with
-           | Some draft when not (System.String.IsNullOrWhiteSpace draft) -> [ "draft", box draft ]
-           | _ -> [])
+let private hostRules (host: Host option) : PromptRule list =
+    match host with
+    | Some Host.Mimocode ->
+        [ PromptRule.Contract
+              "When you have finished the task, you MUST call the agent_report tool. Use structuredOutput with relatedFiles (and relatedCode where applicable) so the caller can act on your findings." ]
+    | _ -> []
 
-    createObj fields
+let coderPromptWithHost (intent: CoderIntent) (host: Host option) : string =
+    let docView: PromptDocumentView =
+        { objective = intent.objective
+          background =
+            if String.IsNullOrWhiteSpace intent.background then
+                None
+            else
+                Some(intent.background.Trim())
+          agentRole = AgentRole.Implementation
+          targets =
+            intent.targets
+            |> List.map (fun t ->
+                let draft =
+                    match t.draft with
+                    | Some d when not (String.IsNullOrWhiteSpace d) -> Some d
+                    | _ -> None
 
-let private agentPrompt fields lines =
-    let actualLines =
-        if
-            lines
-            |> List.exists (fun (l: string) -> l.StartsWith("You are an implementation agent"))
-        then
-            lines
+                PromptTarget.FileTarget(t.file, t.guide, draft))
+          boundaries =
+            intent.doNotTouch
+            |> Array.toList
+            |> List.map (fun p -> PromptBoundary.DoNotTouch(BoundaryTarget.PathOrSymbol p))
+          rules =
+            [ PromptRule.Policy
+                  "Read the listed files and related code, then edit or create files to satisfy the objective and each target guide."
+              PromptRule.Constraint
+                  "Static verification only (read and think using logic). Do NOT run tests or execute code."
+              yield! hostRules host ]
+          outcomes =
+            [ { label = "report"
+                text = "Return a detailed summary of changes and/or your difficulties." } ] }
+
+    match PromptDocument.create docView with
+    | Ok doc -> PromptToml.render doc
+    | Error errs -> failwithf "Failed to create Coder PromptDocument: %A" errs
+
+let coderPrompt (intent: CoderIntent) : string = coderPromptWithHost intent None
+
+let inspectorPromptWithHost (intent: InspectorIntent) (host: Host option) : string =
+    let docView: PromptDocumentView =
+        { objective = intent.objective
+          background =
+            if String.IsNullOrWhiteSpace intent.background then
+                None
+            else
+                Some(intent.background.Trim())
+          agentRole = AgentRole.CodebaseSearch
+          targets = intent.entries |> Array.toList |> List.map PromptTarget.EntryTarget
+          boundaries = []
+          rules =
+            [ PromptRule.Policy
+                  "Explore the workspace and answer questions. Use fuzzy_find, glob, fuzzy_grep, and read. Report concrete file paths and line-number references, and answer each question explicitly."
+              yield! (intent.questions |> Array.toList |> List.map PromptRule.Question)
+              yield! hostRules host ]
+          outcomes =
+            [ { label = "report"
+                text = "Return your report with relatedFiles and line ranges." } ] }
+
+    match PromptDocument.create docView with
+    | Ok doc -> PromptToml.render doc
+    | Error errs -> failwithf "Failed to create Inspector PromptDocument: %A" errs
+
+let inspectorPrompt (intent: InspectorIntent) : string = inspectorPromptWithHost intent None
+
+let browserPromptWithHost (intent: string) (host: Host option) : string =
+    let docView: PromptDocumentView =
+        { objective = intent
+          background = None
+          agentRole = AgentRole.BrowserAutomation
+          targets = []
+          boundaries = []
+          rules =
+            [ PromptRule.Policy "Use stealth-browser-mcp tools to interact with web pages."
+              yield! hostRules host ]
+          outcomes =
+            [ { label = "report"
+                text = "Return a detailed report." } ] }
+
+    match PromptDocument.create docView with
+    | Ok doc -> PromptToml.render doc
+    | Error errs -> failwithf "Failed to create Browser PromptDocument: %A" errs
+
+let browserPrompt (intent: string) : string = browserPromptWithHost intent None
+
+let executorSummarizerPromptWithHost
+    (whatToSummarize: string)
+    (output: string)
+    (language: string)
+    (program: string)
+    (dependencies: string list)
+    (timeoutType: string)
+    (host: Host option)
+    : string =
+    let capped = capExecutorSummaryOutput output
+
+    let timeoutKind =
+        match timeoutType.ToLowerInvariant() with
+        | "short" -> TimeoutKind.Short
+        | _ -> TimeoutKind.Long
+
+    let objective =
+        if String.IsNullOrWhiteSpace whatToSummarize then
+            "Summarize the executor output while preserving stack traces and exit status"
         else
-            readOnlyRules :: lines
+            whatToSummarize.Trim()
 
-    frontMatterPrompt fields (String.concat "\n\n" actualLines)
+    let docView: PromptDocumentView =
+        { objective = objective
+          background = None
+          agentRole = AgentRole.ExecutorSummarization
+          targets =
+            [ PromptTarget.CommandTarget(language, program, dependencies, timeoutKind)
+              PromptTarget.EvidenceTarget("executor_output", capped) ]
+          boundaries = []
+          rules =
+            [ PromptRule.Constraint
+                  "Preserve errors, stack traces, and key paths or values. Omit noise, repeated lines, and progress banners. Do not invent details that are not in the output. Do NOT lose any information."
+              yield! hostRules host ]
+          outcomes =
+            [ { label = "report"
+                text = "Return a dense summary without inventing facts." } ] }
 
-let coderPrompt (intent: CoderIntent) : string =
-    let fields =
-        [ yamlField "objective" intent.objective
-          yamlField "background" intent.background
-          yamlSeqField "targets" (intent.targets |> List.map coderTargetItem) ]
-        @ (if intent.doNotTouch.Length = 0 then
-               []
-           else
-               [ yamlStringSeqField "do_not_touch" (List.ofArray intent.doNotTouch) ])
-
-    agentPrompt
-        fields
-        [ "You are an implementation agent. Read the listed files and related code, then edit or create files to satisfy the objective and each target guide."
-          "Static verification only (read and think using logic). Do NOT run tests or execute code."
-          "Return a detailed summary of changes and/or your difficulties." ]
-
-let inspectorPrompt (intent: InspectorIntent) : string =
-    agentPrompt
-        [ yamlField "objective" intent.objective
-          yamlField "background" intent.background
-          yamlStringSeqField "questions" (List.ofArray intent.questions)
-          yamlStringSeqField "entries" (List.ofArray intent.entries) ]
-        [ "You are a codebase search agent. Explore the workspace and answer questions."
-          "Use fuzzy_find, glob, fuzzy_grep, and read. Report concrete file paths and line-number references, and answer each question explicitly."
-          "Return your report with relatedFiles and line ranges." ]
-
-let browserPrompt (intent: string) : string =
-    agentPrompt
-        [ yamlField "task" intent ]
-        [ "You are a browser automation agent. Use stealth-browser-mcp tools to interact with web pages. Return a detailed report." ]
+    match PromptDocument.create docView with
+    | Ok doc -> PromptToml.render doc
+    | Error errs -> failwithf "Failed to create ExecutorSummarizer PromptDocument: %A" errs
 
 let executorSummarizerPrompt
     (whatToSummarize: string)
@@ -120,29 +200,26 @@ let executorSummarizerPrompt
     (dependencies: string list)
     (timeoutType: string)
     : string =
-    let capped = capExecutorSummaryOutput output
+    executorSummarizerPromptWithHost whatToSummarize output language program dependencies timeoutType None
 
-    let taskBody =
-        let directive =
-            "You are a filter for executor output. Preserve errors, stack traces, and key paths or values. Omit noise, repeated lines, and progress banners. Do not invent details that are not in the output.\nDo NOT lose any information."
+let websearchSummarizerPromptWithHost (whatToSummarize: string) (rawResults: string) (host: Host option) : string =
+    let docView: PromptDocumentView =
+        { objective = whatToSummarize
+          background = None
+          agentRole = AgentRole.WebSearchSummarization
+          targets = [ PromptTarget.EvidenceTarget("websearch_results", rawResults) ]
+          boundaries = []
+          rules =
+            [ PromptRule.Constraint
+                  "Focus on answering the question using the raw results. Preserve concrete facts. Omit boilerplate and unrelated results. Do not invent details not present in the results. Do NOT lose any information."
+              yield! hostRules host ]
+          outcomes =
+            [ { label = "report"
+                text = "Answer the objective using only supplied evidence." } ] }
 
-        let trimmed = whatToSummarize.Trim()
-
-        if trimmed = "" then
-            directive
-        else
-            directive + "\n\n" + trimmed
-
-    agentPrompt
-        [ yamlField "language" language
-          yamlField "program" program
-          yamlStringSeqField "dependencies" dependencies
-          yamlField "timeout_type" timeoutType
-          yamlField "what_to_summarize" whatToSummarize ]
-        [ capped; "# Task\n" + taskBody ]
+    match PromptDocument.create docView with
+    | Ok doc -> PromptToml.render doc
+    | Error errs -> failwithf "Failed to create WebSearchSummarizer PromptDocument: %A" errs
 
 let websearchSummarizerPrompt (whatToSummarize: string) (rawResults: string) : string =
-    agentPrompt
-        [ yamlField "question" whatToSummarize; yamlField "raw_results" rawResults ]
-        [ "You are a filter for web search results. Focus on answering the question above using the raw results. Preserve concrete facts. Omit boilerplate and unrelated results. Do not invent details not present in the results."
-          "Do NOT lose any information." ]
+    websearchSummarizerPromptWithHost whatToSummarize rawResults None

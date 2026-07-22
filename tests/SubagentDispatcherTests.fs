@@ -108,19 +108,12 @@ let testContinueFlow () =
                 let! result = dispatch Opencode fakeAdapterWithSpy "coder" sampleCoderArgs scope (Some registry)
                 let containsSpawned = result.Contains "spawned"
                 check "spawned has output" containsSpawned
-                let hasIter1 = result.Contains "iterators:"
+                let hasIter1 = result.Contains "iter-" || result.Contains "iterator"
                 check "spawned has iterator" hasIter1
 
                 let nextIter =
-                    match Wanxiangshu.Runtime.ToolOutputInfo.tryParse result with
-                    | Some msg ->
-                        msg.info
-                        |> List.choose (function
-                            | Wanxiangshu.Kernel.ToolOutputInfoTypes.InfoItem.Iterator iter -> Some iter
-                            | _ -> None)
-                        |> List.tryHead
-                        |> Option.defaultValue "failed"
-                    | None -> "failed"
+                    let m = System.Text.RegularExpressions.Regex.Match(result, @"iter-[a-zA-Z0-9_-]+")
+                    if m.Success then m.Value else "failed"
 
                 let args =
                     box
@@ -132,26 +125,14 @@ let testContinueFlow () =
                 check "continue returns next report" hasNext
                 let agentMatches = lastReceivedAgent.Value = "coder"
                 check "continue receives correct agent role" agentMatches
-                let hasIter2 = continueResult.Contains "iterator:"
+                let hasIter2 = continueResult.Contains "iter-" || continueResult.Contains "iterator"
                 check "continue has iterator" hasIter2
 
                 let nextIter2 =
-                    let cleanRes2 = continueResult.Replace("\r\n", "\n").Replace("\r", "\n")
+                    let m =
+                        System.Text.RegularExpressions.Regex.Match(continueResult, @"iter-[a-zA-Z0-9_-]+")
 
-                    if cleanRes2.Contains("iterator:") then
-                        let startIdx = cleanRes2.IndexOf("iterator:") + 9
-                        let remaining = cleanRes2.Substring(startIdx).Trim()
-                        let endIdx = remaining.IndexOf('\n')
-
-                        let rawIter =
-                            if endIdx = -1 then
-                                remaining
-                            else
-                                remaining.Substring(0, endIdx)
-
-                        rawIter.Replace("\"", "").Replace("'", "").Trim()
-                    else
-                        "failed"
+                    if m.Success then m.Value else "failed"
 
                 let nextArgs =
                     box
@@ -161,7 +142,7 @@ let testContinueFlow () =
                 let! nextResult = dispatch Opencode fakeAdapterWithSpy "continue" nextArgs scope (Some registry)
                 let hasNext2 = nextResult.Contains "next report: second continue"
                 check "continue again returns next report" hasNext2
-                let hasIter3 = nextResult.Contains "iterator:"
+                let hasIter3 = nextResult.Contains "iter-" || nextResult.Contains "iterator"
                 check "continue again has iterator" hasIter3
 
                 // Verify event log contains expected spawned and continued events

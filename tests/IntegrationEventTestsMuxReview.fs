@@ -11,15 +11,13 @@ open Wanxiangshu.Tests.TestWorkspace
 open Wanxiangshu.Runtime.LoopMessages
 open Wanxiangshu.Runtime.ReviewPrompts
 open Wanxiangshu.Runtime.PromptFragments
-open Wanxiangshu.Runtime.PromptHeader
 open Wanxiangshu.Hosts.Mux.Plugin
 open Wanxiangshu.Runtime.Dyn
 
 [<Emit("process.cwd()")>]
 let private processCwd () : string = jsNative
 
-let private loopAnchor task =
-    frontMatterPrompt [ yamlField taskField task ] "With-Review Mode is active."
+let private loopAnchor task = buildLoopMessage task []
 
 let reviewerReviseRenudgesLoopSpec () =
     promise {
@@ -79,7 +77,11 @@ let reviewerReviseRenudgesLoopSpec () =
 
         do! hook $ (streamEnd "implemented first pass", helpers) |> unbox<JS.Promise<unit>>
         do! yieldMicrotask ()
-        check "active review emits loop nudge" (nudges.Count = 1 && nudges.[0].Contains(loopNudgePromptProse))
+
+        check
+            "active review emits loop nudge"
+            (nudges.Count = 1
+             && (nudges.[0].Contains "submit_review" || nudges.[0].Contains "With-Review"))
 
         history <-
             Array.append
@@ -94,7 +96,8 @@ let reviewerReviseRenudgesLoopSpec () =
 
         check
             "reviewer reject reopens loop nudge on fresh assistant output"
-            (nudges.Count = 2 && nudges.[1].Contains(loopNudgePromptProse))
+            (nudges.Count = 2
+             && (nudges.[1].Contains "submit_review" || nudges.[1].Contains "With-Review"))
 
         do! rmAsync tempDir
     }
@@ -157,7 +160,11 @@ let muxSubmitReviewWipDoesNotSuppressLoopNudgeSpec () =
 
         do! hook $ (streamEnd "implemented first pass", helpers) |> unbox<JS.Promise<unit>>
         do! yieldMicrotask ()
-        check "active review emits first loop nudge" (nudges.Count = 1 && nudges.[0].Contains(loopNudgePromptProse))
+
+        check
+            "active review emits first loop nudge"
+            (nudges.Count = 1
+             && (nudges.[0].Contains "submit_review" || nudges.[0].Contains "With-Review"))
 
         history <-
             Array.append
@@ -177,7 +184,8 @@ let muxSubmitReviewWipDoesNotSuppressLoopNudgeSpec () =
 
         check
             "wip submit_review does not permanently suppress loop nudge"
-            (nudges.Count = 2 && nudges.[1].Contains(loopNudgePromptProse))
+            (nudges.Count = 2
+             && (nudges.[1].Contains "submit_review" || nudges.[1].Contains "With-Review"))
 
         do! rmAsync tempDir
     }

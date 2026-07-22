@@ -21,6 +21,8 @@ type ReviewStore =
     abstract member resolvePendingReview: sessionID: string * result: ReviewResult -> bool
     abstract member getReviewTask: sessionID: string -> string option
     abstract member getReviewState: sessionID: string -> ReviewState option
+    abstract member isChallengeRequested: sessionID: string -> bool
+    abstract member recordChallengeRequested: sessionID: string -> unit
     abstract member addChild: parentID: string * childID: string -> unit
     abstract member CleanupSession: sessionID: string -> unit
 
@@ -58,6 +60,12 @@ let createReviewStore () : ReviewStore =
 
         member _.getReviewTask(sessionID) = taskOf state.Registry sessionID
         member _.getReviewState(sessionID) = stateOf state.Registry sessionID
+
+        member _.isChallengeRequested(sessionID) =
+            isChallengeRequested state.Registry sessionID
+
+        member _.recordChallengeRequested(sessionID) =
+            state <- recordChallengeRequestedInState state sessionID
 
         member _.addChild(parentID, childID) =
             state <- addChildInState state parentID childID

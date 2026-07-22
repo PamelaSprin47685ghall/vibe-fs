@@ -3,11 +3,12 @@ module Wanxiangshu.Runtime.Nudge.NudgeDerivation
 open Wanxiangshu.Kernel.Nudge
 open Wanxiangshu.Kernel.Nudge.TodoStatus
 open Wanxiangshu.Runtime.PromptFragments
-open Wanxiangshu.Runtime.PromptHeader
+open Wanxiangshu.Kernel.Prompt
+open Wanxiangshu.Runtime.Prompt
 open Wanxiangshu.Kernel.HostTools
-open Wanxiangshu.Kernel.Nudge.NudgeProjection
-open Wanxiangshu.Kernel.Nudge.NudgeSnapshotSource
-open Wanxiangshu.Kernel.Nudge.Types
+open global.Wanxiangshu.Kernel.Nudge.NudgeProjection
+open global.Wanxiangshu.Kernel.Nudge.NudgeSnapshotSource
+open global.Wanxiangshu.Kernel.Nudge.Types
 
 type Snapshot = Wanxiangshu.Kernel.Nudge.Types.SessionSnapshot
 
@@ -76,23 +77,34 @@ let selectNudgePrompt (host: Host) (action: NudgeAction) (snapshot: Snapshot) : 
     | NudgeLoop ->
         match snapshot.reviewLoop with
         | Some info when not (System.String.IsNullOrWhiteSpace info.originalTask) ->
-            let fields =
-                [ yamlField "original_task" info.originalTask
-                  yamlField "review_loop_id" info.reviewLoopId
-                  yamlField "review_round" (info.currentRound.ToString())
-                  yamlField "prompt_origin" "review_nudge" ]
-                @ (match info.latestVerdict with
-                   | Some v -> [ yamlField "latest_verdict" v ]
-                   | None -> [])
-                @ (match info.latestFeedback with
-                   | Some f -> [ yamlField "latest_feedback" f ]
-                   | None -> [])
-                @ (if not snapshot.todos.IsEmpty then
-                       [ yamlStringSeqField "todos" snapshot.todos ]
-                   else
-                       [])
+            let bgLines =
+                [ sprintf "Review loop ID: %s, round: %d" info.reviewLoopId info.currentRound
+                  match info.latestVerdict with
+                  | Some v -> sprintf "Latest verdict: %s" v
+                  | None -> ()
+                  match info.latestFeedback with
+                  | Some f -> sprintf "Latest feedback: %s" f
+                  | None -> () ]
 
-            Some(frontMatterPrompt fields (loopNudgePromptFor snapshot.todos))
+            let bgText = String.concat "\n" bgLines
+            let targets = snapshot.todos |> List.map PromptTarget.TodoTarget
+
+            let view =
+                { objective = info.originalTask
+                  background = Some bgText
+                  agentRole = AgentRole.NudgeSupervisor
+                  targets = targets
+                  boundaries = []
+                  rules =
+                    [ PromptRule.Policy
+                          "Call the submit_review tool to submit your detailed report and list of modified files for review before finishing." ]
+                  outcomes =
+                    [ { label = "continue"
+                        text = "Submit review or complete remaining loop work." } ] }
+
+            match PromptDocument.create view with
+            | Ok doc -> Some(PromptToml.render doc)
+            | Error _ -> Some(loopNudgePromptFor snapshot.todos)
         | Some _ -> None
         | None -> None
     | NudgeRunner -> Some(runnerNudgePromptFor host)

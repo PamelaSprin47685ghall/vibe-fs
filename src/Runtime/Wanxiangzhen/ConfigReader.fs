@@ -75,7 +75,7 @@ let readConfig (worktree: string) : SquadConfig =
     else
         let text = readFileSync path "utf-8"
 
-        match extractAgentsMdHeaderConfig text with
+        match extractConfigHeaderYaml text with
         | None -> defaults
         | Some fm ->
             try

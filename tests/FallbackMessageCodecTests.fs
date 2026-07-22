@@ -9,6 +9,7 @@ open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Runtime.Fallback.FallbackMessageCodec
 open Wanxiangshu.Runtime.Fallback.FallbackMessageParser
 open Wanxiangshu.Runtime.Fallback.SessionRuntimePropertyPure
+open Wanxiangshu.Runtime.MessageTransform.HostHooks
 
 module Dyn = Wanxiangshu.Runtime.Dyn
 
@@ -249,12 +250,20 @@ let testResolveNudgeModel () =
     // Test case 4: Nudge message -> use same model
     let runtime4 = FallbackRuntimeStore()
 
+    let userNudgeMsg =
+        let m =
+            mkMsg
+                "user"
+                "There are still incomplete todos. Continue working through the remaining items."
+                (Some "openai/gpt-3.5")
+
+        attachMessageOrigin Wanxiangshu.Kernel.Messaging.MessageOrigin.TodoNudge (Dyn.get m "info")
+        |> ignore
+
+        m
+
     let msgs4 =
-        [| mkMsg
-               "user"
-               "There are still incomplete todos. Continue working through the remaining items."
-               (Some "openai/gpt-3.5")
-           mkMsg "assistant" "thinking..." (Some "openai/gpt-4") |]
+        [| userNudgeMsg; mkMsg "assistant" "thinking..." (Some "openai/gpt-4") |]
 
     let res4 = resolveNudgeModel msgs4 runtime4 sid (Some "openai/gpt-4")
     equal "use nudge model or last assistant model for nudge prompt" (Some "openai/gpt-4") res4

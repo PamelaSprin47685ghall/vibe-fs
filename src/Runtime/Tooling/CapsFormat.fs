@@ -1,7 +1,7 @@
 module Wanxiangshu.Runtime.CapsFormat
 
-open Wanxiangshu.Runtime.PromptHeader
 open System.Collections.Generic
+open Wanxiangshu.Runtime.Tooling.ToolOutputToml
 
 /// A discovered capability file: its absolute path, display label, and content.
 type CapsFile =
@@ -18,15 +18,16 @@ let stableFingerprint (hashFn: string -> string) (capsFiles: CapsFile list) : st
     |> String.concat ""
     |> hashFn
 
-type CapsYamlItem = { label: string; content: string }
-
-/// Wrap already-discovered capability files as a YAML front-matter block. Pure:
+/// Wrap already-discovered capability files as a TOML block. Pure:
 /// file discovery lives in the shell; this only formats.
 let buildCapitalsContext (files: CapsFile list) : string =
     let items =
-        files |> List.map (fun f -> box { label = f.label; content = f.content })
+        files
+        |> List.map (fun f ->
+            { CapsItem.label = f.label
+              content = f.content })
 
-    frontMatter [ yamlSeqField "caps" items ]
+    renderCaps items
 
 let formatReadOutput (filePath: string) (content: string) (startLine: int) (totalLines: int option) : string =
     let lines = content.Split('\n')

@@ -13,6 +13,7 @@ open Wanxiangshu.Runtime.MessageTransform.Pipeline
 open Wanxiangshu.Runtime.RuntimeScope
 open Wanxiangshu.Runtime.WorkspaceFiles
 open Wanxiangshu.Runtime.WorkspaceReverieFiles
+open Wanxiangshu.Runtime.OpencodeSessionPromptCodec
 
 [<Import("relative", "node:path")>]
 let private pathRelative (a: string) (b: string) : string = jsNative
@@ -107,3 +108,56 @@ let loadCapsForScope
                 let! baseFiles = getOrLoadCapsFilesForScope scope plan.SessionID plan.Directory
                 return! injectSubagentFilesIfAny scope plan baseFiles
             }
+
+/// Attach MessageOrigin metadata to a host message object or part (metadata.wanxiangshu.origin).
+let attachMessageOrigin (origin: MessageOrigin) (partOrMessageObj: obj) : obj =
+    if Dyn.isNullish partOrMessageObj then
+        partOrMessageObj
+    else
+        let metadata = Dyn.get partOrMessageObj "metadata"
+
+        let ws =
+            if Dyn.isNullish metadata then
+                createObj []
+            else
+                let existingWs = Dyn.get metadata "wanxiangshu"
+
+                if Dyn.isNullish existingWs then
+                    createObj []
+                else
+                    existingWs
+
+        Dyn.setKey ws "origin" (box (MessageOrigin.toWireString origin))
+        Dyn.setKey ws "schema" (box WanxiangshuMetadataCodec.currentSchema)
+
+        if Dyn.isNullish metadata then
+            Dyn.setKey partOrMessageObj "metadata" (box {| wanxiangshu = ws |})
+        else
+            Dyn.setKey metadata "wanxiangshu" ws
+
+        partOrMessageObj
+
+/// Extract MessageOrigin from host message object or part metadata.
+let extractMessageOrigin (partOrMessageObj: obj) : MessageOrigin option =
+    if Dyn.isNullish partOrMessageObj then
+        None
+    else
+        let parts = Dyn.get partOrMessageObj "parts"
+        let metaRecord = WanxiangshuMetadataCodec.tryDecodeFromParts parts
+
+        match metaRecord with
+        | Some m when m.Origin.IsSome -> m.Origin
+        | _ ->
+            let meta = Dyn.get partOrMessageObj "metadata"
+
+            let ws =
+                if Dyn.isNullish meta then
+                    null
+                else
+                    Dyn.get meta "wanxiangshu"
+
+            if not (Dyn.isNullish ws) then
+                let o = Dyn.str ws "origin"
+                if o <> "" then MessageOrigin.tryParse o else None
+            else
+                None

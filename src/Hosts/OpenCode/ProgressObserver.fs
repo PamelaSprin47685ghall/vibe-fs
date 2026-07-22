@@ -6,7 +6,7 @@ open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Primitives.Identity
 open Wanxiangshu.Kernel.Errors.DomainError
 open Wanxiangshu.Kernel.Session.Causality
-open Wanxiangshu.Kernel.Nudge.TodoStatus
+open Wanxiangshu.Runtime.NudgeMessageClassifier
 open Wanxiangshu.Kernel.Nudge.SubmitReviewHooks
 open Wanxiangshu.Kernel.HostTools
 open Wanxiangshu.Kernel.Methodology
@@ -88,10 +88,9 @@ type ProgressObserver(host: Host, ctx: obj, fallbackRuntime: FallbackRuntimeStor
     member _.OnChatMessage
         (sessionID: Wanxiangshu.Kernel.Primitives.Identity.SessionId, agent: string, parts: obj)
         : JS.Promise<unit> =
-        let text = getPartsText parts
         let sid = Id.sessionIdValue sessionID
 
-        if not (isNudgePrompt text) && agent <> "" then
+        if not (isNudgeFromParts parts) && agent <> "" then
             fallbackRuntime.UpdateSession(sid, recordAgentName agent)
 
         resolvedUnitPromise ()

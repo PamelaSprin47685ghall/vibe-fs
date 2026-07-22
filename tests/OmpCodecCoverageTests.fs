@@ -90,6 +90,16 @@ let encToolNoState () =
     equal "tool" "t" (Dyn.str (Array.get p 0) "tool")
     check "no state field" (Dyn.isNullish (Dyn.get (Array.get p 0) "state"))
 
+let private extractHistoryTexts (msgs: Message<obj> list) : string list =
+    msgs
+    |> List.map (fun m ->
+        m.parts
+        |> List.map (function
+            | TextPart t -> t
+            | ToolPart(_, _, Some res, _) -> res.output
+            | _ -> "")
+        |> String.concat "")
+
 let encRawPart () =
     let raw = createObj [ "type", box "raw"; "data", box 42 ]
     let e = encodeMessage (rmsg raw)

@@ -42,7 +42,7 @@ let testSquadCommandCreatesSession () : JS.Promise<unit> =
         let parts = get cmdOutput "parts" :?> System.Collections.Generic.List<obj>
         checkBare (parts.Count = 1)
         let text = str parts.[0] "text"
-        checkBare (text.Contains "squad_event: squad_created")
+        checkBare (text.Contains "squad_created")
         checkBare (text.Contains "add remember-me")
 
         checkBare (rt.MasterSessionId = "sess-e2e")

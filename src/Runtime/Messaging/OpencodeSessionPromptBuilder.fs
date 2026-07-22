@@ -3,6 +3,7 @@ module Wanxiangshu.Runtime.OpencodeSessionPromptBuilder
 open Fable.Core.JsInterop
 open Wanxiangshu.Runtime.Dyn
 open Wanxiangshu.Runtime.OpencodeSessionPromptCodec
+open Wanxiangshu.Kernel.Messaging
 open Wanxiangshu.Kernel.Fallback.Continuation
 
 /// Build the host wire prompt body for `session.prompt`. The agent-scoped
@@ -17,12 +18,13 @@ let createPromptBody (agent: string option) (text: string) : obj =
                parts = [| box {| ``type`` = "text"; text = text |} |] |}
     | None -> box {| parts = [| box {| ``type`` = "text"; text = text |} |] |}
 
-/// Build prompt body with optional agent and model override.
-let createPromptBodyWithModelAndNonce
+/// Build prompt body with optional agent, model override, and origin.
+let createPromptBodyWithModelNonceAndOrigin
     (agent: string option)
     (model: string option)
     (text: string)
     (nonce: string option)
+    (origin: MessageOrigin option)
     : obj =
     let textPart =
         match nonce with
@@ -31,8 +33,34 @@ let createPromptBodyWithModelAndNonce
                 {| ``type`` = "text"
                    text = text
                    metadata =
-                    WanxiangshuMetadataCodec.encodePartMetadata n WanxiangshuMetadataCodec.nudgeKind None 0 0 "" 0 0 |}
-        | None -> box {| ``type`` = "text"; text = text |}
+                    WanxiangshuMetadataCodec.encodePartMetadataWithOrigin
+                        n
+                        WanxiangshuMetadataCodec.nudgeKind
+                        origin
+                        None
+                        0
+                        0
+                        ""
+                        0
+                        0 |}
+        | None ->
+            match origin with
+            | Some orig ->
+                box
+                    {| ``type`` = "text"
+                       text = text
+                       metadata =
+                        WanxiangshuMetadataCodec.encodePartMetadataWithOrigin
+                            ""
+                            WanxiangshuMetadataCodec.nudgeKind
+                            (Some orig)
+                            None
+                            0
+                            0
+                            ""
+                            0
+                            0 |}
+            | None -> box {| ``type`` = "text"; text = text |}
 
     let parts: obj array = [| textPart |]
 
@@ -44,6 +72,14 @@ let createPromptBodyWithModelAndNonce
     match model |> Option.bind tryDecodePromptModelFromModelString with
     | Some promptModel -> Dyn.withKey baseBody "model" promptModel
     | None -> baseBody
+
+let createPromptBodyWithModelAndNonce
+    (agent: string option)
+    (model: string option)
+    (text: string)
+    (nonce: string option)
+    : obj =
+    createPromptBodyWithModelNonceAndOrigin agent model text nonce (Some MessageOrigin.TodoNudge)
 
 let createPromptBodyWithModel (agent: string option) (model: string option) (text: string) : obj =
     createPromptBodyWithModelAndNonce agent model text None
@@ -67,9 +103,10 @@ let createFallbackContinuationPromptBody
            variant = variantVal |}
 
     let metadata =
-        WanxiangshuMetadataCodec.encodePartMetadata
+        WanxiangshuMetadataCodec.encodePartMetadataWithOrigin
             request.ContinuationId
             WanxiangshuMetadataCodec.fallbackContinuationKind
+            (Some MessageOrigin.FallbackContinuation)
             (Some request.ContinuationId)
             request.ContinuationOrdinal
             request.Attempt

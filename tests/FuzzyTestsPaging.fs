@@ -38,10 +38,10 @@ let grepOutputNotices () =
     let bodyOnly = buildGrepBody "body" (Some "bad regex")
     let combined = Wanxiangshu.Runtime.ToolOutputInfo.withIterator bodyOnly "iter1"
     check "combined regex notice in body" (combined.Contains "Invalid regex: bad regex")
-    check "combined iterator in front matter" (combined.Contains "iterator: iter1")
+    check "combined iterator in front matter" (combined.Contains "iter1")
     let regexOnly = buildGrepBody "body" (Some "bad regex")
     check "regex-only notice in body" (regexOnly.Contains "Invalid regex: bad regex")
-    check "regex-only no iterator key" (not (regexOnly.Contains "iterator:"))
+    check "regex-only no iterator key" (not (regexOnly.Contains "iter1"))
 
 let totalMatchedSemantics () =
     let gm: GrepMatch =

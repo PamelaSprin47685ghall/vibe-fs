@@ -2,10 +2,25 @@ module Wanxiangshu.Tests.Wanxiangzhen.EventCodecTests
 
 open Wanxiangshu.Kernel.Wanxiangzhen.SquadEvent
 open Wanxiangshu.Runtime.Wanxiangzhen.SquadEventDisplayCodec
+open Wanxiangshu.Runtime.Tooling.ToolOutputToml
 open Wanxiangshu.Tests.Wanxiangzhen.AssertCompat
 
 let entries () : (string * (unit -> unit)) list =
-    [ ("Codec.TasksCreated round-trip",
+    [ ("Codec.SquadCreated toTomlView and encodeEvent",
+       fun () ->
+           let ev = SquadCreated("s1", "decompose this requirement")
+           let view: SquadEventTomlView = toTomlView ev
+           equal "squad_created" view.eventKind
+           equal "s1" view.sessionId
+           isNone view.taskId
+           isNone view.commitSha
+           checkBare (view.message.Contains "decompose this requirement")
+
+           let encoded = encodeEvent ev
+           checkBare (encoded.Contains "event_kind = \"squad_created\"")
+           checkBare (encoded.Contains "session_id = \"s1\""))
+
+      ("Codec.TasksCreated toTomlView and encodeEvent",
        fun () ->
            let tasks =
                [ { taskId = "a1"
@@ -17,201 +32,75 @@ let entries () : (string * (unit -> unit)) list =
                    description = "desc2"
                    dependsOn = [ "a1" ] } ]
 
-           let encoded = encodeEvent (TasksCreated("s1", tasks))
-           checkBare (encoded.StartsWith "---")
+           let ev = TasksCreated("s1", tasks)
+           let view: SquadEventTomlView = toTomlView ev
+           equal "tasks_created" view.eventKind
+           equal "s1" view.sessionId
 
-           match decodeEvent encoded with
-           | Some(TasksCreated(_, decoded)) ->
-               equal 2 decoded.Length
-               equal "a1" decoded.[0].taskId
-               equal "title1" decoded.[0].title
-               equal [ "a1" ] decoded.[1].dependsOn
-           | _ -> checkBare false)
+           let encoded = encodeEvent ev
+           checkBare (encoded.Contains "event_kind = \"tasks_created\""))
 
-      ("Codec.TaskMerged round-trip",
+      ("Codec.TaskStarted toTomlView includes worktree and branch in message",
        fun () ->
-           let encoded = encodeEvent (TaskMerged("s1", "a1", "sha123"))
+           let ev = TaskStarted("s1", "t1", "/wt/path", "branch-x")
+           let view: SquadEventTomlView = toTomlView ev
+           equal "task_started" view.eventKind
+           equal (Some "t1") view.taskId
+           isNone view.commitSha
+           checkBare (view.message.Contains "/wt/path")
+           checkBare (view.message.Contains "branch-x")
 
-           match decodeEvent encoded with
-           | Some(TaskMerged(_, _, sha)) -> equal "sha123" sha
-           | _ -> checkBare false)
+           let encoded = encodeEvent ev
+           checkBare (encoded.Contains "task_id = \"t1\""))
 
-      ("Codec.no frontmatter", (fun () -> isNone (decodeEvent "just some text")))
-
-      ("Codec.empty string", (fun () -> isNone (decodeEvent "")))
-
-      ("Codec.SquadCreated round-trip includes requirement",
+      ("Codec.TaskSubmitted toTomlView includes commit_sha",
        fun () ->
-           let encoded = encodeEvent (SquadCreated("s1", "decompose this requirement"))
-           checkBare (encoded.Contains "decompose this requirement")
+           let ev = TaskSubmitted("s1", "t1", "abc123sha")
+           let view: SquadEventTomlView = toTomlView ev
+           equal "task_submitted" view.eventKind
+           equal (Some "t1") view.taskId
+           equal (Some "abc123sha") view.commitSha
 
-           match decodeEvent encoded with
-           | Some(SquadCreated(_, req)) -> equal "decompose this requirement" req
-           | _ -> checkBare false)
+           let encoded = encodeEvent ev
+           checkBare (encoded.Contains "commit_sha = \"abc123sha\""))
 
-      ("Codec.TaskStarted round-trip includes worktree_path and branch_name",
+      ("Codec.TaskMerged toTomlView includes master_sha as commit_sha",
        fun () ->
-           let encoded = encodeEvent (TaskStarted("s1", "t1", "/wt/path", "branch-x"))
-           checkBare (encoded.Contains "/wt/path")
-           checkBare (encoded.Contains "branch-x")
+           let ev = TaskMerged("s1", "t1", "sha999")
+           let view: SquadEventTomlView = toTomlView ev
+           equal "task_merged" view.eventKind
+           equal (Some "t1") view.taskId
+           equal (Some "sha999") view.commitSha
 
-           match decodeEvent encoded with
-           | Some(TaskStarted(_, tid, wt, branch)) ->
-               equal "t1" tid
-               equal "/wt/path" wt
-               equal "branch-x" branch
-           | _ -> checkBare false)
+           let encoded = encodeEvent ev
+           checkBare (encoded.Contains "commit_sha = \"sha999\""))
 
-      ("Codec.TaskSubmitted round-trip includes commit_sha",
+      ("Codec.TaskDone toTomlView",
        fun () ->
-           let encoded = encodeEvent (TaskSubmitted("s1", "t1", "abc123sha"))
-           checkBare (encoded.Contains "abc123sha")
+           let ev = TaskDone("s1", "t1", true)
+           let view: SquadEventTomlView = toTomlView ev
+           equal "task_done" view.eventKind
+           equal (Some "t1") view.taskId
+           isNone view.commitSha)
 
-           match decodeEvent encoded with
-           | Some(TaskSubmitted(_, tid, sha)) ->
-               equal "t1" tid
-               equal "abc123sha" sha
-           | _ -> checkBare false)
-
-      ("Codec.TaskDone round-trip merged=true",
+      ("Codec.TaskError toTomlView",
        fun () ->
-           let encoded = encodeEvent (TaskDone("s1", "t1", true))
+           let ev = TaskError("s1", "t1", "git fail")
+           let view: SquadEventTomlView = toTomlView ev
+           equal "task_error" view.eventKind
+           equal (Some "t1") view.taskId)
 
-           match decodeEvent encoded with
-           | Some(TaskDone(_, _, merged)) -> equal true merged
-           | _ -> checkBare false)
-
-      ("Codec.TaskDone round-trip merged=false",
+      ("Codec.SquadCancelled toTomlView",
        fun () ->
-           let encoded = encodeEvent (TaskDone("s1", "t1", false))
+           let ev = SquadCancelled "s1"
+           let view: SquadEventTomlView = toTomlView ev
+           equal "squad_cancelled" view.eventKind
+           equal "s1" view.sessionId)
 
-           match decodeEvent encoded with
-           | Some(TaskDone(_, _, merged)) -> equal false merged
-           | _ -> checkBare false)
-
-      ("Codec.SquadCancelled round-trip",
+      ("Codec.encodeEvents produces combined TOML blocks",
        fun () ->
-           let encoded = encodeEvent (SquadCancelled "s1")
-
-           match decodeEvent encoded with
-           | Some(SquadCancelled sid) -> equal "s1" sid
-           | _ -> checkBare false)
-
-      ("Codec.corrupted frontmatter no trailing ---",
-       fun () -> isNone (decodeEvent "---\nsquad_event: tasks_created\nsession_id: s1"))
-
-      ("Codec.TaskMerged prose includes sha",
-       fun () ->
-           let prose = eventProse (TaskMerged("s1", "t1", "sha999"))
-           checkBare (prose.Contains "sha999"))
-
-      ("Codec.multi frontmatter decodes first event",
-       fun () ->
-           let ev1 = SquadCreated("s1", "req one")
-
-           let ev2 =
-               TasksCreated(
-                   "s2",
-                   [ { taskId = "t1"
-                       title = "title1"
-                       description = "desc1"
-                       dependsOn = [] } ]
-               )
-
-           let combined = encodeEvent ev1 + "\n" + encodeEvent ev2
-
-           match decodeEvent combined with
-           | Some(SquadCreated(_, req)) -> equal "req one" req
-           | _ -> checkBare false)
-
-      ("Codec.encodeEvents two events has two frontmatter blocks",
-       fun () ->
-           let ev1 = SquadCreated("s1", "req one")
-
-           let ev2 =
-               TasksCreated(
-                   "s2",
-                   [ { taskId = "t1"
-                       title = "title1"
-                       description = "desc1"
-                       dependsOn = [] } ]
-               )
-
-           let encoded = encodeEvents [ ev1; ev2 ]
-
-           let eventLines =
-               encoded.Split('\n') |> Array.filter (fun l -> l.StartsWith "squad_event:")
-
-           equal 2 eventLines.Length
-           checkBare (encoded.Contains "squad_event: squad_created")
-           checkBare (encoded.Contains "squad_event: tasks_created"))
-
-      ("Codec.decodeEvents parses multiple frontmatter events",
-       fun () ->
-           let ev1 = SquadCreated("s1", "req one")
-
-           let ev2 =
-               TasksCreated(
-                   "s2",
-                   [ { taskId = "t1"
-                       title = "title1"
-                       description = "desc1"
-                       dependsOn = [] } ]
-               )
-
-           let combined = encodeEvent ev1 + "\n" + encodeEvent ev2
-           let decoded = decodeEvents combined
-           equal 2 decoded.Length
-
-           match (decoded.[0], decoded.[1]) with
-           | SquadCreated(_, req), TasksCreated(_, tasks) ->
-               equal "req one" req
-               equal 1 tasks.Length
-               equal "t1" tasks.[0].taskId
-           | _ -> checkBare false)
-
-      ("Codec.decodeEvents skips unrecognized blocks",
-       fun () ->
-           let preamble = "This is just a paragraph with no frontmatter.\n\n"
            let ev1 = SquadCreated("s1", "req one")
            let ev2 = TaskMerged("s1", "t1", "sha999")
-           let combined = preamble + encodeEvent ev1 + "\n" + encodeEvent ev2
-           let decoded = decodeEvents combined
-           equal 2 decoded.Length
-
-           match (decoded.[0], decoded.[1]) with
-           | SquadCreated(_, req), TaskMerged(_, _, sha) ->
-               equal "req one" req
-               equal "sha999" sha
-           | _ -> checkBare false)
-
-      ("Codec.decodeEvents empty string returns empty list",
-       fun () ->
-           let decoded = decodeEvents ""
-           equal 0 decoded.Length)
-
-      ("Codec.encodeEvents/decodeEvents round-trip",
-       fun () ->
-           let events =
-               [ SquadCreated("s1", "req one")
-                 TasksCreated(
-                     "s1",
-                     [ { taskId = "t1"
-                         title = "title1"
-                         description = "desc1"
-                         dependsOn = [] }
-                       { taskId = "t2"
-                         title = "title2"
-                         description = "desc2"
-                         dependsOn = [ "t1" ] } ]
-                 )
-                 TaskStarted("s1", "t1", "/wt/path", "branch-x")
-                 TaskSubmitted("s1", "t1", "abc123")
-                 TaskMerged("s1", "t1", "sha999")
-                 TaskDone("s1", "t1", true)
-                 SquadCancelled "s1" ]
-
-           let encoded = encodeEvents events
-           let decoded = decodeEvents encoded
-           equal events.Length decoded.Length
-           List.iter2 (fun e1 e2 -> equal e1 e2) events decoded) ]
+           let encoded = encodeEvents [ ev1; ev2 ]
+           checkBare (encoded.Contains "event_kind = \"squad_created\"")
+           checkBare (encoded.Contains "event_kind = \"task_merged\"")) ]

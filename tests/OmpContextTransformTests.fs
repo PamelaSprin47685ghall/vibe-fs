@@ -11,7 +11,6 @@ module Dyn = Wanxiangshu.Runtime.Dyn
 
 open Wanxiangshu.Runtime.ReviewRuntime
 open Wanxiangshu.Runtime.LoopMessages
-open Wanxiangshu.Runtime.PromptHeader
 
 [<Import("createRequire", "node:module")>]
 let private createRequire': string -> (string -> obj) = jsNative
@@ -140,8 +139,7 @@ let reviewReplayIfStoreEmptyOnTransform () =
         let sessionId = "omp-review-if-empty"
         reviewStore.applyReviewTaskProjection (sessionId, Some "task A")
 
-        let historyTaskB =
-            frontMatterPrompt [ yamlField taskField "task B" ] "With-Review body from history"
+        let historyTaskB = buildLoopMessage "task B" []
 
         let entries =
             [| createObj

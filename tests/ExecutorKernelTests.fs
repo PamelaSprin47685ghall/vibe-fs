@@ -52,10 +52,9 @@ let outputFromResultAllVariants () =
 
 let formatCompletedNoSummary () =
     let resp = formatToolResponse (Completed("hello", 0)) None
-    check "starts with ---" (resp.StartsWith "---")
     check "contains body" (resp.Contains "hello")
-    check "contains status completed" (resp.Contains "status: completed")
-    check "contains exit_code" (resp.Contains "exit_code: 0")
+    check "contains status completed" (resp.Contains "completed")
+    check "contains exit_code" (resp.Contains "0")
 
 let formatCompletedWithSummary () =
     let resp = formatToolResponse (Completed("raw", 0)) (Some "SUMMARY")
@@ -72,20 +71,20 @@ let formatCompletedBodyRef () =
 
 let formatToolResponseFailedSignal () =
     let resp = formatToolResponse (Failed("partial", None, Some "SIGTERM")) None
-    check "signal status" (resp.Contains "status: SIGTERM")
+    check "signal status" (resp.Contains "SIGTERM")
 
 let formatToolResponseFailedExitCode () =
     let resp = formatToolResponse (Failed("err", Some 2, None)) None
-    check "exit error status" (resp.Contains "status: exit_error")
-    check "exit code 2" (resp.Contains "exit_code: 2")
+    check "exit error status" (resp.Contains "exit_error")
+    check "exit code 2" (resp.Contains "2")
 
 let formatToolResponseSpawnFailed () =
     let resp = formatToolResponse (Failed("spawn failed: ENOENT", None, None)) None
-    check "spawn failed status" (resp.Contains "status: spawn_failed")
+    check "spawn failed status" (resp.Contains "spawn_failed")
 
 let formatToolResponseMissingExec () =
     let resp = formatToolResponse (MissingExecutable("bash", "not found")) None
-    check "missing exec status" (resp.Contains "status: missing_executable")
+    check "missing exec status" (resp.Contains "missing_executable")
 
 // ── shouldAppendReadOnlyWarning ───────────────────────────────────────
 

@@ -15,12 +15,15 @@ let transition (state: ReviewState) (command: ReviewCommand) : ReviewState * Rev
     | ReviewState.Locked _, Accept -> ReviewState.Accepted, Some ReviewEvent.Accepted
     | ReviewState.Locked _, RequestRevision feedback ->
         ReviewState.NeedsRevision feedback, Some(ReviewEvent.NeedsRevision feedback)
+    | ReviewState.Active _, RequestChallenge
+    | ReviewState.Locked _, RequestChallenge -> state, Some ReviewEvent.ChallengeRequested
     // Inactive: only Activate is valid (matched above)
     | ReviewState.Inactive, Submit
     | ReviewState.Inactive, Lock _
     | ReviewState.Inactive, Unlock
     | ReviewState.Inactive, Accept
-    | ReviewState.Inactive, RequestRevision _ -> state, None
+    | ReviewState.Inactive, RequestRevision _
+    | ReviewState.Inactive, RequestChallenge -> state, None
     // Active: Submit/Lock/Accept/RequestRevision valid (above), Activate/Unlock invalid
     | ReviewState.Active _, Activate _
     | ReviewState.Active _, Unlock -> state, None
@@ -34,14 +37,16 @@ let transition (state: ReviewState) (command: ReviewCommand) : ReviewState * Rev
     | ReviewState.Accepted, Lock _
     | ReviewState.Accepted, Unlock
     | ReviewState.Accepted, Accept
-    | ReviewState.Accepted, RequestRevision _ -> state, None
+    | ReviewState.Accepted, RequestRevision _
+    | ReviewState.Accepted, RequestChallenge -> state, None
     // NeedsRevision: all commands invalid
     | ReviewState.NeedsRevision _, Activate _
     | ReviewState.NeedsRevision _, Submit
     | ReviewState.NeedsRevision _, Lock _
     | ReviewState.NeedsRevision _, Unlock
     | ReviewState.NeedsRevision _, Accept
-    | ReviewState.NeedsRevision _, RequestRevision _ -> state, None
+    | ReviewState.NeedsRevision _, RequestRevision _
+    | ReviewState.NeedsRevision _, RequestChallenge -> state, None
 
 let isActive (state: ReviewState) : bool =
     match state with
@@ -54,14 +59,20 @@ let isActive (state: ReviewState) : bool =
 let initialState = ReviewState.Inactive
 
 let applyCommand (session: ReviewSession) (command: ReviewCommand) : ReviewSession =
-    let nextState, event = transition session.state command
-
-    match event with
-    | None -> session
-    | Some _ ->
+    match command with
+    | ReviewCommand.RequestChallenge ->
         { session with
-            state = nextState
+            challengeState = ReviewChallengeState.Requested
             version = session.version + 1 }
+    | _ ->
+        let nextState, event = transition session.state command
+
+        match event with
+        | None -> session
+        | Some _ ->
+            { session with
+                state = nextState
+                version = session.version + 1 }
 
 let decideAfterRound nudgeCount outcome maxNudges : LoopDecision =
     match outcome with

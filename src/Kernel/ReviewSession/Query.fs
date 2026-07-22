@@ -9,6 +9,11 @@ let hasActiveReviewState registry id =
     |> Option.map (fun s -> isActive s.state)
     |> Option.defaultValue false
 
+let isChallengeRequested registry id =
+    Map.tryFind id registry
+    |> Option.map (fun s -> s.challengeState = ReviewChallengeState.Requested)
+    |> Option.defaultValue false
+
 let taskOf registry id =
     Map.tryFind id registry |> Option.bind (fun s -> s.originalTask)
 

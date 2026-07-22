@@ -10,66 +10,7 @@ open Wanxiangshu.Runtime.Fallback.SessionRuntime
 open Wanxiangshu.Runtime.Fallback.SessionRuntimeLeasePure
 open Wanxiangshu.Runtime.Fallback.SessionRuntimePropertyPure
 open Wanxiangshu.Runtime.MuxLogicalReceipt
-
-let private abortDeliveredNudge
-    (runtime: FallbackRuntimeStore)
-    (workspaceRoot: string)
-    (sessionKey: string)
-    (lease: NudgeLease)
-    (abortRun: string -> JS.Promise<unit>)
-    : JS.Promise<unit> =
-    promise {
-        let session = runtime.GetSession sessionKey
-
-        if session.AbortUnavailable then
-            // No reliable abort → never claim Cancelled.
-            do!
-                finishNudge
-                    runtime
-                    workspaceRoot
-                    sessionKey
-                    lease
-                    NudgeOutcome.AbortUnknown
-                    abortUnavailableMessage
-                    ""
-                    ""
-        else
-            let! abortResult =
-                promise {
-                    try
-                        do! abortRun sessionKey
-                        return Ok()
-                    with ex ->
-                        return Error ex
-                }
-
-            match abortResult with
-            | Ok() ->
-                do!
-                    finishNudge
-                        runtime
-                        workspaceRoot
-                        sessionKey
-                        lease
-                        NudgeOutcome.Cancelled
-                        "Cancelled after dispatch"
-                        ""
-                        ""
-            | Error ex when isAbortUnavailableMessage ex.Message ->
-                runtime.Update(sessionKey, setAbortUnavailable true)
-
-                do!
-                    finishNudge
-                        runtime
-                        workspaceRoot
-                        sessionKey
-                        lease
-                        NudgeOutcome.AbortUnknown
-                        ("AbortUnavailable: " + ex.Message)
-                        ""
-                        ""
-            | Error ex -> return! Promise.reject ex
-    }
+open Wanxiangshu.Runtime.NudgeOutcomeAbort
 
 let processDeliveredOutcome
     (runtime: FallbackRuntimeStore)

@@ -8,14 +8,17 @@ let private title = "test-title"
 let private description = "test-description-body"
 let private masterBranch = "main"
 
+open Wanxiangshu.Runtime.Prompt
+
 let private prompt () : string =
-    buildSlavePrompt taskId title description masterBranch
+    PromptToml.render (buildSlavePromptDocument taskId title description masterBranch)
 
 let entries () : (string * (unit -> unit)) list =
-    [ ("buildSlavePrompt output starts with ---\\ntask: frontmatter",
+    [ ("buildSlavePrompt output renders TOML with SquadWorker agent_role",
        fun () ->
            let p = prompt ()
-           checkBare (p.StartsWith "---\ntask: "))
+           checkBare (p.Contains "objective = ")
+           checkBare (p.Contains "Wanxiangzhen Slave Agent (mutating)"))
 
       ("buildSlavePrompt contains taskId and title",
        fun () ->

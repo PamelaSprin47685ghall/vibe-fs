@@ -1,4 +1,5 @@
 module Wanxiangshu.Hosts.Opencode.Fallback.MessageInspection
+
 open Wanxiangshu.Runtime
 
 open Wanxiangshu.Runtime.Dyn
@@ -11,17 +12,8 @@ open Wanxiangshu.Runtime.Fallback.RuntimeStore
 open Wanxiangshu.Hosts.Opencode.Fallback.HostEventInspection
 open Wanxiangshu.Hosts.Opencode.Fallback.MessageInspectionObservation
 open Wanxiangshu.Hosts.Opencode.Fallback.MessageInspectionIdentity
-
-let private isSyntheticText (text: string) : bool =
-    let t = text.Trim()
-
-    t = "\u200b"
-    || t.Contains("There are still incomplete todos")
-    || t.Contains("command: with-review")
-    || t.Contains("You are in loop mode. You must call the submit_review")
-    || t.Contains("A background runner task is still active")
-    || t.Contains("the system context is about to be suspended")
-    || t.Contains("You must immediately force an emergency stop")
+open Wanxiangshu.Kernel.Messaging
+open Wanxiangshu.Runtime.OpencodeSessionPromptCodec
 
 let internal isNewUserMessageImpl (runtime: FallbackRuntimeStore) (sessionID: string) (rawEvent: obj) : bool =
     let props = getProps rawEvent
@@ -31,7 +23,6 @@ let internal isNewUserMessageImpl (runtime: FallbackRuntimeStore) (sessionID: st
         false
     else
         let partsArr = parts :?> obj array
-        let text = getPartsText parts
 
         let hasSyntheticMarker =
             partsArr
@@ -39,7 +30,22 @@ let internal isNewUserMessageImpl (runtime: FallbackRuntimeStore) (sessionID: st
                 let synthetic = Dyn.get part "synthetic"
                 not (Dyn.isNullish synthetic) && unbox<bool> synthetic)
 
-        not hasSyntheticMarker && not (isSyntheticText text)
+        let metaRecord = WanxiangshuMetadataCodec.tryDecodeFromParts parts
+
+        let isSyntheticOrigin =
+            match metaRecord with
+            | Some m ->
+                match m.Origin with
+                | Some orig -> MessageOrigin.isNudge orig || orig = MessageOrigin.FallbackContinuation
+                | None ->
+                    m.Kind = WanxiangshuMetadataCodec.nudgeKind
+                    || m.Kind = WanxiangshuMetadataCodec.fallbackContinuationKind
+            | None -> false
+
+        let text = getPartsText parts
+        let isZeroWidthSpace = text.Trim() = "\u200b"
+
+        not hasSyntheticMarker && not isSyntheticOrigin && not isZeroWidthSpace
 
 let internal translateErrorImpl (rawEvent: obj) : FallbackEvent option =
     let eventType = getEventType rawEvent
@@ -78,9 +84,19 @@ let internal translateErrorImpl (rawEvent: obj) : FallbackEvent option =
     else
         None
 
-let internal extractTurnObservationImpl = MessageInspectionObservation.extractTurnObservationImpl
-let internal isAssistantMessageImpl = MessageInspectionObservation.isAssistantMessageImpl
-let internal extractAssistantMessageIdImpl = MessageInspectionIdentity.extractAssistantMessageIdImpl
-let internal extractAssistantParentIdImpl = MessageInspectionIdentity.extractAssistantParentIdImpl
-let internal extractContinuationIdentityImpl = MessageInspectionIdentity.extractContinuationIdentityImpl
+let internal extractTurnObservationImpl =
+    MessageInspectionObservation.extractTurnObservationImpl
+
+let internal isAssistantMessageImpl =
+    MessageInspectionObservation.isAssistantMessageImpl
+
+let internal extractAssistantMessageIdImpl =
+    MessageInspectionIdentity.extractAssistantMessageIdImpl
+
+let internal extractAssistantParentIdImpl =
+    MessageInspectionIdentity.extractAssistantParentIdImpl
+
+let internal extractContinuationIdentityImpl =
+    MessageInspectionIdentity.extractContinuationIdentityImpl
+
 let internal extractHostRunIdImpl = MessageInspectionIdentity.extractHostRunIdImpl

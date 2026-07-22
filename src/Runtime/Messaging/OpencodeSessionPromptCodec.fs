@@ -2,6 +2,7 @@ module Wanxiangshu.Runtime.OpencodeSessionPromptCodec
 
 open Fable.Core.JsInterop
 open Wanxiangshu.Runtime.Dyn
+open Wanxiangshu.Kernel.Messaging
 
 let tryDecodePromptModelFromModelString (modelString: string) : obj option =
     if modelString = "" then
@@ -61,6 +62,7 @@ module WanxiangshuMetadataCodec =
     type T =
         { Schema: int
           Kind: string
+          Origin: MessageOrigin option
           Nonce: string
           ContinuationId: string
           ContinuationOrdinal: int
@@ -76,6 +78,7 @@ module WanxiangshuMetadataCodec =
     let private empty =
         { Schema = 0
           Kind = ""
+          Origin = None
           Nonce = ""
           ContinuationId = ""
           ContinuationOrdinal = 0
@@ -107,9 +110,19 @@ module WanxiangshuMetadataCodec =
                 let ws = Dyn.get metadata "wanxiangshu"
 
                 if not (Dyn.isNullish ws) then
+                    let kindStr = Dyn.str ws "kind"
+                    let originStr = Dyn.str ws "origin"
+
+                    let originOpt =
+                        if originStr <> "" then
+                            MessageOrigin.tryParse originStr
+                        else
+                            MessageOrigin.tryParse kindStr
+
                     Some
                         { Schema = tryInt ws "schema" |> Option.defaultValue 0
-                          Kind = Dyn.str ws "kind"
+                          Kind = kindStr
+                          Origin = originOpt
                           Nonce = Dyn.str ws "nonce"
                           ContinuationId = Dyn.str ws "continuationId"
                           ContinuationOrdinal = tryInt ws "continuationOrdinal" |> Option.defaultValue 0
@@ -125,6 +138,7 @@ module WanxiangshuMetadataCodec =
                             { empty with
                                 Schema = 1
                                 Kind = nudgeKind
+                                Origin = Some MessageOrigin.TodoNudge
                                 Nonce = legacy }
                     else
                         None
@@ -140,9 +154,10 @@ module WanxiangshuMetadataCodec =
     /// Build a `part.metadata` object carrying versioned `wanxiangshu`
     /// provenance. Optional continuation fields are omitted when empty/zero
     /// so the wire shape stays minimal for nudge prompts.
-    let encodePartMetadata
+    let encodePartMetadataWithOrigin
         (nonce: string)
         (kind: string)
+        (origin: MessageOrigin option)
         (continuationId: string option)
         (continuationOrdinal: int)
         (attempt: int)
@@ -153,6 +168,10 @@ module WanxiangshuMetadataCodec =
         let ws = createObj []
         Dyn.setKey ws "schema" (box currentSchema)
         Dyn.setKey ws "kind" (box kind)
+
+        origin
+        |> Option.iter (fun o -> Dyn.setKey ws "origin" (box (MessageOrigin.toWireString o)))
+
         Dyn.setKey ws "nonce" (box nonce)
 
         let setIfNonEmpty key value =
@@ -171,3 +190,26 @@ module WanxiangshuMetadataCodec =
         setIfPositive "cancelGeneration" cancelGeneration
 
         box {| wanxiangshu = ws |}
+
+    let encodePartMetadata
+        (nonce: string)
+        (kind: string)
+        (continuationId: string option)
+        (continuationOrdinal: int)
+        (attempt: int)
+        (humanTurnId: string)
+        (contextGeneration: int)
+        (cancelGeneration: int)
+        : obj =
+        let defaultOrigin = MessageOrigin.tryParse kind
+
+        encodePartMetadataWithOrigin
+            nonce
+            kind
+            defaultOrigin
+            continuationId
+            continuationOrdinal
+            attempt
+            humanTurnId
+            contextGeneration
+            cancelGeneration

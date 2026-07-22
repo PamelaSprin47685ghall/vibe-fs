@@ -13,8 +13,6 @@ open Wanxiangshu.Runtime.SubsessionActorRegistry
 
 module Dyn = Wanxiangshu.Runtime.Dyn
 
-open Wanxiangshu.Runtime.PromptHeader
-
 let private deferred (name: string) : JS.Promise<unit> * (unit -> unit) =
     let resolver = ref (fun () -> ())
     let pending = Promise.create (fun resolve _ -> resolver.Value <- resolve)
@@ -25,14 +23,8 @@ let private deferred (name: string) : JS.Promise<unit> * (unit -> unit) =
         resolver.Value())
 
 let private iteratorFromOutput (output: string) : string option =
-    match tryParse output with
-    | Some msg ->
-        msg.info
-        |> List.choose (function
-            | InfoItem.Iterator iter -> Some iter
-            | _ -> None)
-        |> List.tryHead
-    | None -> None
+    let m = System.Text.RegularExpressions.Regex.Match(output, @"iter-[a-zA-Z0-9_-]+")
+    if m.Success then Some m.Value else None
 
 let private completedMessages () : obj =
     let model = createObj [ "providerID", box "test"; "modelID", box "test-model" ]

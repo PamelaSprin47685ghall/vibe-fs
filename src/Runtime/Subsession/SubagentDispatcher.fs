@@ -81,7 +81,7 @@ let dispatch
         match decodeToolInvocation toolName args with
         | Error err -> return wireDecodeFailure toolName err
         | Ok(Typed(Browser b)) ->
-            return!
+            let! rep =
                 spawnOne
                     adapter
                     host
@@ -91,6 +91,8 @@ let dispatch
                     HostAdapter.Browser
                     "Browser"
                     (browserPromptText host b.Intent)
+
+            return formatBatchReports [ rep ]
         | Ok(Typed(Continue c)) -> return! handleContinue adapter host scope toolName c
         | Ok(CoderBatch rawIntents) ->
             match validateCoderBatchArgs toolName args with

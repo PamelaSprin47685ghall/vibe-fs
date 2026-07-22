@@ -1,26 +1,28 @@
 module Wanxiangshu.Runtime.ReviewPrompts.Commands
 
-open Wanxiangshu.Runtime.LoopMessages
-open Wanxiangshu.Runtime.PromptHeader
+open Wanxiangshu.Kernel.Prompt
+open Wanxiangshu.Runtime.Prompt
 open Wanxiangshu.Runtime.PromptFragments
 
-let withReviewCommandTemplate =
-    frontMatterPrompt
-        [ yamlField commandField commandWithReview; yamlField taskField "$ARGUMENTS" ]
-        (String.concat
-            "\n"
-            [ "You are entering With-Review Mode."
-              "Complete the task recorded in the front matter."
-              ""
-              "CRITICAL: You must fully satisfy every requirement in the task — no shortcuts, no partial implementations, no deferred work. If the task has multiple items, every single one must be addressed. Do not skip, trim, or reduce scope under any circumstance. The reviewer will verify completeness against the original task text."
-              ""
-              "The reviewer will judge your eventual submission using these criteria:"
-              ""
-              reviewCriteria
-              ""
-              "Before finishing, you must call submit_review with:"
-              "- report: a detailed description of what you did and why"
-              "- affectedFiles: every file you modified or created"
-              "- wip (optional, defaults to true): omit or true until the task is fully complete; false only when everything required is done"
-              "Defend proactively against reviewer rejection: keep the implementation natural, minimal, complete, and well-tested."
-              "Do not end the conversation without submit_review." ])
+let withReviewCommandTemplate: string =
+    let docView =
+        { objective = "$ARGUMENTS"
+          background = Some "You are entering With-Review Mode. Complete the task recorded in objective."
+          agentRole = AgentRole.CodeReview
+          targets = []
+          boundaries = []
+          rules =
+            [ PromptRule.Policy
+                  "CRITICAL: You must fully satisfy every requirement in the task — no shortcuts, no partial implementations, no deferred work. If the task has multiple items, every single one must be addressed. Do not skip, trim, or reduce scope under any circumstance. The reviewer will verify completeness against the original task text."
+              PromptRule.Criterion reviewCriteria
+              PromptRule.Policy
+                  "Defend proactively against reviewer rejection: keep the implementation natural, minimal, complete, and well-tested."
+              PromptRule.Contract "Do not end the conversation without submit_review." ]
+          outcomes =
+            [ { label = "submit_review"
+                text =
+                  "Before finishing, call submit_review with report, affectedFiles, and wip (defaults to true until everything required is done)." } ] }
+
+    match PromptDocument.create docView with
+    | Ok doc -> PromptToml.render doc
+    | Error errs -> failwithf "Failed to create withReviewCommandTemplate doc: %A" errs

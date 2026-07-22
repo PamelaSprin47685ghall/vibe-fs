@@ -7,7 +7,8 @@ open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.HostTools
 open Wanxiangshu.Kernel.ToolPermission
 open Wanxiangshu.Kernel.ToolCatalog
-open Wanxiangshu.Runtime.PromptHeader
+open Wanxiangshu.Kernel.ToolOutputInfoTypes
+open Wanxiangshu.Runtime.Tooling.ToolOutputToml
 open Wanxiangshu.Hosts.Opencode.ToolSchema
 open Wanxiangshu.Hosts.Opencode
 
@@ -54,6 +55,52 @@ let formatSessionList (sessions: obj array) : string =
 
     String.concat "\n" sb
 
+let private executePtyKill (mgr: obj) (id: string) (sessionId: string) (cleanup: bool) : string =
+    let lm = mgr?lifecycleManager
+    let sessionRaw = lm?getSession (id)
+
+    if Dyn.isNullish sessionRaw || string sessionRaw?parentSessionId <> sessionId then
+        failwithf "PTY session not found: %s" id
+
+    let session = lm?toInfo (sessionRaw)
+    let wasRunning = string session?status = "running"
+    let success = unbox<bool> (mgr?kill (id, cleanup))
+
+    if not success then
+        failwithf "Failed to kill PTY session '%s'" id
+
+    let action = if wasRunning then "killed" else "cleaned_up"
+
+    let retainedNote =
+        if cleanup then
+            "session removed"
+        else
+            "session retained for log access"
+
+    let statusStr = string session?status
+    let titleStr = string session?title
+
+    let commandStr =
+        sprintf "%s %s" (string session?command) (String.concat " " (unbox<string array> session?args))
+
+    let lineCountVal = unbox<int> session?lineCount
+
+    let bodyLines =
+        [ sprintf "%s %s (%s)." action id retainedNote
+          sprintf "id: %s" id
+          sprintf "action: %s" action
+          sprintf "cleanup: %b" cleanup
+          sprintf "title: %s" titleStr
+          sprintf "command: %s" commandStr
+          sprintf "final_line_count: %d" lineCountVal ]
+        |> String.concat "\n"
+
+    let msg =
+        { info = [ InfoItem.Status statusStr ]
+          body = bodyLines }
+
+    renderToolOutput msg
+
 let ptyKillTool (host: Host) : obj =
     define
         "Terminate a PTY session and optionally remove it from the session list (cleanup)."
@@ -75,42 +122,7 @@ let ptyKillTool (host: Host) : obj =
 
             promise {
                 let! mgr = getManager ()
-                let lm = mgr?lifecycleManager
-                let sessionRaw = lm?getSession (id)
-
-                if Dyn.isNullish sessionRaw || string sessionRaw?parentSessionId <> sessionId then
-                    failwithf "PTY session not found: %s" id
-
-                let session = lm?toInfo (sessionRaw)
-                let wasRunning = string session?status = "running"
-                let success = unbox<bool> (mgr?kill (id, cleanup))
-
-                if not success then
-                    failwithf "Failed to kill PTY session '%s'" id
-
-                let action = if wasRunning then "killed" else "cleaned_up"
-
-                let retainedNote =
-                    if cleanup then
-                        "session removed"
-                    else
-                        "session retained for log access"
-
-                let fields =
-                    [ "id", box id
-                      "action", box action
-                      "cleanup", box cleanup
-                      "title", box (string session?title)
-                      "command",
-                      box (
-                          sprintf
-                              "%s %s"
-                              (string session?command)
-                              (String.concat " " (unbox<string array> session?args))
-                      )
-                      "final_line_count", box (unbox<int> session?lineCount) ]
-
-                return frontMatterPrompt fields (sprintf "%s %s (%s)." action id retainedNote)
+                return executePtyKill mgr id sessionId cleanup
             })
 
 let ptyListTool (host: Host) : obj =
@@ -143,5 +155,15 @@ let ptyListTool (host: Host) : obj =
                     else
                         formatSessionList sessions
 
-                return frontMatterPrompt [ "count", box sessions.Length ] body
+                let bodyLines =
+                    if sessions.Length = 0 then
+                        body
+                    else
+                        sprintf "count: %d\n%s" sessions.Length body
+
+                let msg =
+                    { info = [ InfoItem.Status(sprintf "count=%d" sessions.Length) ]
+                      body = bodyLines }
+
+                return renderToolOutput msg
             })

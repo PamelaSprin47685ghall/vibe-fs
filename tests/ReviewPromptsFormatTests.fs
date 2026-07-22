@@ -3,7 +3,6 @@ module Wanxiangshu.Tests.ReviewPromptsFormatTests
 open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Runtime.ReviewPrompts.Format
 open Wanxiangshu.Kernel.ReviewSession.Types
-open Wanxiangshu.Runtime.PromptHeader
 open Fable.Core.JsInterop
 
 // ── submitReviewIsWip ────────────────────────────────────────────────────────
@@ -64,7 +63,7 @@ let formatWipAcknowledgmentProducesFrontMatter () =
     let task = "Implement the new feature: format wip acknowledgment."
     let text = formatWipAcknowledgment task
     check "output is non-empty" (text <> "")
-    check "output contains frontmatter delimiter" (text.Contains "---")
+    check "output contains objective" (text.Contains "objective =")
     check "output mentions With-Review Mode" (text.Contains "With-Review Mode")
     check "output mentions Continue working" (text.Contains "Continue working")
     check "output task field contains input" (text.Contains task)

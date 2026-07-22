@@ -31,25 +31,26 @@ let private withReportTail (host: Host) (body: string) : string =
     match host with
     | Opencode
     | Mux -> body
-    | Mimocode -> body + agentReportTail
+    | Mimocode ->
+        if body.Contains "agent_report" then
+            body
+        else
+            body + agentReportTail
     | Omp -> body
 
 /// Produce one prompt per parallel intent for coder/inspector, exactly one
 /// prompt for the singleton task kinds.  Host decides whether to append the
 /// agent_report tail; otherwise prompt body is identical between hosts.
 let formatPrompt (host: Host) (kind: SubagentTaskKind) : string list =
-    let wrap = withReportTail host
-
     match kind with
-    | Coder intents -> intents |> List.map (coderPrompt >> wrap)
-    | Inspector intents -> intents |> List.map (inspectorPrompt >> wrap)
-    | Meditator intent -> [ intent |> wrap ]
-    | Browser intent -> [ browserPrompt intent |> wrap ]
+    | Coder intents -> intents |> List.map (fun i -> coderPromptWithHost i (Some host))
+    | Inspector intents -> intents |> List.map (fun i -> inspectorPromptWithHost i (Some host))
+    | Meditator intent -> [ withReportTail host intent ]
+    | Browser intent -> [ browserPromptWithHost intent (Some host) ]
     | Continue(iterator, prompt) -> [ prompt ]
     | ExecutorSummary(output, language, program, dependencies, timeoutType, whatToSummarize) ->
-        [ executorSummarizerPrompt whatToSummarize output language program dependencies timeoutType
-          |> wrap ]
-    | WebsearchSummary(question, raw) -> [ websearchSummarizerPrompt question raw |> wrap ]
+        [ executorSummarizerPromptWithHost whatToSummarize output language program dependencies timeoutType (Some host) ]
+    | WebsearchSummary(question, raw) -> [ websearchSummarizerPromptWithHost question raw (Some host) ]
 
 let promptsForParallelIntents (host: Host) (constructor: 'a -> SubagentTaskKind) (intents: 'a) : string list =
     formatPrompt host (constructor intents)

@@ -12,6 +12,8 @@ open Wanxiangshu.Runtime.Fallback.RuntimeStore
 open Wanxiangshu.Runtime.Fallback
 open Wanxiangshu.Runtime.Fallback.HostEventInspection
 open Wanxiangshu.Runtime.Fallback.SessionRuntimePropertyPure
+open Wanxiangshu.Kernel.Messaging
+open Wanxiangshu.Runtime.OpencodeSessionPromptCodec
 
 let ompErrorInput (err: obj) : ErrorInput =
     let getOpt key =
@@ -33,38 +35,52 @@ let ompIsNewUserMessageImpl (runtime: FallbackRuntimeStore) (sessionID: string) 
         false
     else
         let parts = Dyn.get eventObj "parts"
+        let metaRecord = WanxiangshuMetadataCodec.tryDecodeFromParts parts
 
-        let text =
-            if Dyn.isArray parts then
-                (parts :?> obj array)
-                |> Array.choose (fun p ->
-                    if Dyn.str p "type" = "text" then
-                        Some(string p?text)
-                    else
-                        None)
-                |> String.concat "\n"
-            else
-                ""
+        let isSyntheticOrigin =
+            match metaRecord with
+            | Some m ->
+                match m.Origin with
+                | Some orig -> MessageOrigin.isNudge orig || orig = MessageOrigin.FallbackContinuation
+                | None ->
+                    m.Kind = WanxiangshuMetadataCodec.nudgeKind
+                    || m.Kind = WanxiangshuMetadataCodec.fallbackContinuationKind
+            | None -> false
 
-        if text = "" then
+        if isSyntheticOrigin then
             false
         else
-            let time = Dyn.get (Dyn.get eventObj "info") "time"
-
-            let completed =
-                if Dyn.isNullish time then
-                    null
+            let text =
+                if Dyn.isArray parts then
+                    (parts :?> obj array)
+                    |> Array.choose (fun p ->
+                        if Dyn.str p "type" = "text" then
+                            Some(string p?text)
+                        else
+                            None)
+                    |> String.concat "\n"
                 else
-                    Dyn.get time "completed"
+                    ""
 
-            let msgTime =
-                match completed with
-                | :? int64 as i -> i
-                | :? float as f -> int64 f
-                | :? int as i32 -> int64 i32
-                | _ -> 0L
+            if text = "" then
+                false
+            else
+                let time = Dyn.get (Dyn.get eventObj "info") "time"
 
-            not (isInjectedSince msgTime (runtime.GetSession sessionID))
+                let completed =
+                    if Dyn.isNullish time then
+                        null
+                    else
+                        Dyn.get time "completed"
+
+                let msgTime =
+                    match completed with
+                    | :? int64 as i -> i
+                    | :? float as f -> int64 f
+                    | :? int as i32 -> int64 i32
+                    | _ -> 0L
+
+                not (isInjectedSince msgTime (runtime.GetSession sessionID))
 
 let private tryExtractTurnIdFromEvent (rawEvent: obj) : TurnId option =
     let getOpt target =
@@ -104,9 +120,9 @@ let extractTurnObsFromMessage (t: string) (info: obj) (rawEvent: obj) : TurnObse
                     { CurrentTurnEvidence.empty with
                         Assistant =
                             (if t.StartsWith("message.part.") then
-                                         AssistantDelta("", 0L, text)
+                                 AssistantDelta("", 0L, text)
                              else
-                                         AssistantSnapshot("", 0L, text))
+                                 AssistantSnapshot("", 0L, text))
                         Recovery = NoRecoveryPrompt } }
         elif role = "toolResult" then
             Some

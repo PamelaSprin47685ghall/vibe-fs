@@ -104,5 +104,5 @@ let executorSummarizerPromptCarriesWhatToSummarize () =
 
     let prompt = executorSummarizerPrompt marker "raw" "shell" "echo 1" [] "omp-runner"
 
-    check "prompt has task directive" (prompt.Contains "# Task")
+    check "prompt has objective" (prompt.Contains "objective =")
     check "prompt embeds summarize intent" (prompt.Contains marker)

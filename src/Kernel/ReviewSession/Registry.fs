@@ -12,6 +12,7 @@ type RegistryAction =
     | Unlock of id: string
     | Accept of id: string
     | RequestRevision of id: string * feedback: string
+    | RequestChallenge of id: string
     | AddChild of parentId: string * childId: string
     | Clear
     | NoOp
@@ -58,6 +59,7 @@ let reduce (registry: Registry) (action: RegistryAction) : Registry =
     | RegistryAction.RequestRevision(id, feedback) ->
         transitionSessionWithExtra registry id (ReviewCommand.RequestRevision feedback) (fun s ->
             withFeedback s feedback)
+    | RegistryAction.RequestChallenge id -> transitionSession registry id ReviewCommand.RequestChallenge
     | RegistryAction.Deactivate id -> Map.remove id registry
     | RegistryAction.Evict cutoff -> evictStale registry cutoff
     | RegistryAction.AddChild(parentId, childId) -> updateSession registry parentId (fun s -> addChild s childId)

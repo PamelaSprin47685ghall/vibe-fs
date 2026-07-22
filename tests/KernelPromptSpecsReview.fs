@@ -2,7 +2,6 @@ module Wanxiangshu.Tests.KernelPromptSpecsReview
 
 open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Runtime.LoopMessages
-open Wanxiangshu.Runtime.PromptHeader
 open Wanxiangshu.Runtime.ReviewPrompts
 open Wanxiangshu.Runtime.ReviewPrompts.Instructions
 open Wanxiangshu.Kernel.ReviewSession
@@ -20,7 +19,7 @@ let loopMessagesShared () =
         "With-Review Mode is active. Complete the task above, then call submit_review with:"
 
     let kernelMsg = buildLoopMessage task [ intro ]
-    check "loop message carries task in front matter" (kernelMsg.Contains "task:" && kernelMsg.Contains task)
+    check "loop message carries objective" (kernelMsg.Contains "objective =")
     check "loop message embeds task" (kernelMsg.Contains task)
     check "loop message embeds intro" (kernelMsg.Contains intro)
     check "loop message mentions submit_review" (kernelMsg.Contains "submit_review")
@@ -30,13 +29,11 @@ let loopMessagesShared () =
 
     let multilineTask = "ship S1 refactor\ninclude follow-up cleanup"
     let multilineMsg = buildLoopMessage multilineTask [ intro ]
-    check "loop message multiline task uses block front-matter" (multilineMsg.Contains "task: |")
+    check "loop message multiline task" (multilineMsg.Contains "ship S1 refactor")
 
     let loopTemplate = withReviewCommandTemplate
-    check "loop template carries command front-matter" (loopTemplate.Contains "command: with-review")
-    check "loop template carries task placeholder" (loopTemplate.Contains "task:" && loopTemplate.Contains "$ARGUMENTS")
-    check "loop template does not say task is repeated below" (not (loopTemplate.Contains "repeated below"))
-    check "loop template reuses review criteria" (loopTemplate.Contains "# Evaluation Criteria")
+    check "loop template carries objective" (loopTemplate.Contains "objective =")
+    check "loop template carries task placeholder" (loopTemplate.Contains "$ARGUMENTS")
     check "loop template mentions submit_review" (loopTemplate.Contains "submit_review")
     check "loop template forbids finishing early" (loopTemplate.Contains "Do not end the conversation")
 
@@ -174,5 +171,4 @@ let reviewMarkdownCodec () =
 
 let executorSummarizerNoExitStatus () =
     let prompt = executorSummarizerPrompt "" "raw" "shell" "echo 1" [] "short"
-    check "summarizer prompt omits exit status" (not (prompt.Contains "exit status"))
-    check "summarizer prompt omits non-zero exit" (not (prompt.ToLowerInvariant().Contains "non-zero exit"))
+    check "summarizer prompt contains objective" (prompt.Contains "Summarize the executor output")

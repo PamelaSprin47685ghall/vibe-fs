@@ -158,17 +158,15 @@ let selectPrompt () =
     match selectNudgePrompt opencode NudgeTodo todoSnapshot with
     | Some prompt ->
         check "selectNudgePrompt NudgeTodo returns prompt" true
-        check "todo prompt contains front matter" (prompt.Contains("---"))
-        check "todo prompt contains todos" (prompt.Contains("todos"))
-        check "todo prompt contains todo content" (prompt.Contains("todo1"))
+        check "todo prompt contains objective" (prompt.Contains("objective"))
+        check "todo prompt contains todo1" (prompt.Contains("todo1"))
     | None -> check "selectNudgePrompt NudgeTodo returns prompt" false
 
     match selectNudgePrompt opencode NudgeLoop loopSnapshot with
     | Some prompt ->
         check "selectNudgePrompt NudgeLoop returns prompt" true
-        check "loop prompt contains front matter" (prompt.Contains("---"))
-        check "loop prompt contains original_task" (prompt.Contains("original_task"))
-        check "loop prompt contains review_loop_id" (prompt.Contains("review_loop_id"))
+        check "loop prompt contains objective" (prompt.Contains("objective"))
+        check "loop prompt contains review_loop_id" (prompt.Contains("loop-123") || prompt.Contains("Review loop ID"))
     | None -> check "selectNudgePrompt NudgeLoop returns prompt" false
 
     match selectNudgePrompt opencode NudgeNone noneSnapshot with
@@ -263,7 +261,7 @@ let test_dispatchPostStopFromHistory () : JS.Promise<unit> =
                 (fun _ -> false)
 
         check "dispatchPostStopFromHistory triggered prompt" promptCalled
-        check "promptText is loop nudge" (promptText.Contains("You are in loop mode. You must call the submit_review"))
+        check "promptText is loop nudge" (promptText.Contains("submit_review"))
 
         try
             let ndjsonFile = System.IO.Path.Combine(dir, ".wanxiangshu.ndjson")

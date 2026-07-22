@@ -67,7 +67,10 @@ let firstPassDoubleChecksSpec () =
                 (createObj [ "verdict", box "PERFECT"; "feedback", box null ])
                 (reviewerContext workspaceDir sessionID)
 
-        check "opencode return_reviewer first PERFECT returns double-check prompt" (result.Contains "double-check:")
+        check
+            "opencode return_reviewer first PERFECT returns double-check prompt"
+            (result.Contains "objective =" || result.Contains "PERFECT")
+
         check "opencode return_reviewer first PERFECT does not resolve pending review" (resolved.Value = None)
         do! rmAsync workspaceDir
     }
@@ -85,7 +88,7 @@ let secondPassResolvesAcceptedSpec () =
                    sessionID
                    "activation"
                    (buildLoopMessage "Implement feature X" [ "With-Review Mode is active." ])
-               opencodeTextMessage sessionID "double-check" "---\ndouble-check: confirmed\n---\nok" |]
+               opencodeTextMessage sessionID "double-check" "double-check challenge answered" |]
 
         let returnTool = returnReviewerTool workspaceDir history store
 

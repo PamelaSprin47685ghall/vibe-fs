@@ -106,6 +106,10 @@ let cleanupSessionInState (state: ReviewStoreState) (sessionID: string) : Review
         { Registry = nextRegistry
           Effects = nextEffects }
 
+let recordChallengeRequestedInState (state: ReviewStoreState) (sessionID: string) : ReviewStoreState =
+    { state with
+        Registry = reduce state.Registry (RegistryAction.RequestChallenge sessionID) }
+
 let canLockReview (state: ReviewStoreState) (sessionID: string) : bool =
     canTransition state.Registry sessionID (ReviewCommand.Lock sessionID)
 
