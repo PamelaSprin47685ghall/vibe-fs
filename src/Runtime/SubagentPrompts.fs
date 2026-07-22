@@ -57,7 +57,7 @@ let capExecutorSummaryOutput (output: string) : string =
         output
     else
         truncateUtf8ByBytes output executorSummaryMaxBytes
-        + "\n\n[Output truncated to 200000 bytes for summarization]"
+        + sprintf "\n\n[Output truncated to %d bytes for summarization]" executorSummaryMaxBytes
 
 let private hostRules (host: Host option) : PromptRule list =
     match host with
@@ -65,6 +65,11 @@ let private hostRules (host: Host option) : PromptRule list =
         [ PromptRule.Contract
               "When you have finished the task, you MUST call the agent_report tool. Use structuredOutput with relatedFiles (and relatedCode where applicable) so the caller can act on your findings." ]
     | _ -> []
+
+let private renderOrFail (docView: PromptDocumentView) (label: string) : string =
+    match PromptDocument.create docView with
+    | Ok doc -> PromptToml.render doc
+    | Error errs -> failwithf "Failed to create %s PromptDocument: %A" label errs
 
 let coderPromptWithHost (intent: CoderIntent) (host: Host option) : string =
     let docView: PromptDocumentView =
@@ -98,9 +103,7 @@ let coderPromptWithHost (intent: CoderIntent) (host: Host option) : string =
             [ { label = "report"
                 text = "Return a detailed summary of changes and/or your difficulties." } ] }
 
-    match PromptDocument.create docView with
-    | Ok doc -> PromptToml.render doc
-    | Error errs -> failwithf "Failed to create Coder PromptDocument: %A" errs
+    renderOrFail docView "Coder"
 
 let coderPrompt (intent: CoderIntent) : string = coderPromptWithHost intent None
 
@@ -124,9 +127,7 @@ let inspectorPromptWithHost (intent: InspectorIntent) (host: Host option) : stri
             [ { label = "report"
                 text = "Return your report with relatedFiles and line ranges." } ] }
 
-    match PromptDocument.create docView with
-    | Ok doc -> PromptToml.render doc
-    | Error errs -> failwithf "Failed to create Inspector PromptDocument: %A" errs
+    renderOrFail docView "Inspector"
 
 let inspectorPrompt (intent: InspectorIntent) : string = inspectorPromptWithHost intent None
 
@@ -144,9 +145,7 @@ let browserPromptWithHost (intent: string) (host: Host option) : string =
             [ { label = "report"
                 text = "Return a detailed report." } ] }
 
-    match PromptDocument.create docView with
-    | Ok doc -> PromptToml.render doc
-    | Error errs -> failwithf "Failed to create Browser PromptDocument: %A" errs
+    renderOrFail docView "Browser"
 
 let browserPrompt (intent: string) : string = browserPromptWithHost intent None
 
@@ -188,9 +187,7 @@ let executorSummarizerPromptWithHost
             [ { label = "report"
                 text = "Return a dense summary without inventing facts." } ] }
 
-    match PromptDocument.create docView with
-    | Ok doc -> PromptToml.render doc
-    | Error errs -> failwithf "Failed to create ExecutorSummarizer PromptDocument: %A" errs
+    renderOrFail docView "ExecutorSummarizer"
 
 let executorSummarizerPrompt
     (whatToSummarize: string)
@@ -217,9 +214,7 @@ let websearchSummarizerPromptWithHost (whatToSummarize: string) (rawResults: str
             [ { label = "report"
                 text = "Answer the objective using only supplied evidence." } ] }
 
-    match PromptDocument.create docView with
-    | Ok doc -> PromptToml.render doc
-    | Error errs -> failwithf "Failed to create WebSearchSummarizer PromptDocument: %A" errs
+    renderOrFail docView "WebSearchSummarizer"
 
 let websearchSummarizerPrompt (whatToSummarize: string) (rawResults: string) : string =
     websearchSummarizerPromptWithHost whatToSummarize rawResults None

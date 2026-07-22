@@ -2,15 +2,14 @@ module Wanxiangshu.Hosts.Omp.OmpSubsessionHostAdapterPrompts
 
 open Fable.Core
 open Fable.Core.JsInterop
-open Wanxiangshu.Kernel.FallbackKernel.Types
 open Wanxiangshu.Kernel.Subsession.Types
 open Wanxiangshu.Runtime
 open Wanxiangshu.Runtime.Dyn
-open Wanxiangshu.Hosts.Omp.SubsessionDispatch
+open Wanxiangshu.Hosts.Omp.SubsessionQuiescence
 
 /// Status and close query helpers used by OmpSubsessionHostAdapter.
 
-let internal checkPiSessionStatus (sessionApi: obj) (sessionId: SessionId) : JS.Promise<QuiescenceStatus option> =
+let private checkStatusApi (sessionApi: obj) (sessionId: SessionId) : JS.Promise<QuiescenceStatus option> =
     promise {
         try
             let statusFn = Dyn.get sessionApi "sessionStatus"
@@ -20,9 +19,7 @@ let internal checkPiSessionStatus (sessionApi: obj) (sessionId: SessionId) : JS.
                 let! resp = unbox<JS.Promise<obj>> (sessionApi?sessionStatus (arg))
 
                 if Dyn.typeIs resp "string" then
-                    let status = (string resp).ToLowerInvariant()
-
-                    match status with
+                    match (string resp).ToLowerInvariant() with
                     | "idle"
                     | "closed"
                     | "completed"
@@ -36,16 +33,33 @@ let internal checkPiSessionStatus (sessionApi: obj) (sessionId: SessionId) : JS.
                 else
                     return detectStatus resp
             else
-                let getSessionFn = Dyn.get sessionApi "session"
-
-                if not (Dyn.isNullish getSessionFn) && Dyn.typeIs getSessionFn "function" then
-                    let arg = box {| sessionId = SessionId.value sessionId |}
-                    let! sObj = unbox<JS.Promise<obj>> (sessionApi?session (arg))
-                    return detectStatus sObj
-                else
-                    return None
+                return None
         with _ ->
             return None
+    }
+
+let private checkSessionApi (sessionApi: obj) (sessionId: SessionId) : JS.Promise<QuiescenceStatus option> =
+    promise {
+        try
+            let getSessionFn = Dyn.get sessionApi "session"
+
+            if not (Dyn.isNullish getSessionFn) && Dyn.typeIs getSessionFn "function" then
+                let arg = box {| sessionId = SessionId.value sessionId |}
+                let! sObj = unbox<JS.Promise<obj>> (sessionApi?session (arg))
+                return detectStatus sObj
+            else
+                return None
+        with _ ->
+            return None
+    }
+
+let internal checkPiSessionStatus (sessionApi: obj) (sessionId: SessionId) : JS.Promise<QuiescenceStatus option> =
+    promise {
+        let! res1 = checkStatusApi sessionApi sessionId
+
+        match res1 with
+        | Some s -> return Some s
+        | None -> return! checkSessionApi sessionApi sessionId
     }
 
 let internal safeResolve (v: obj) : JS.Promise<obj> = emitJsExpr v "Promise.resolve($0)"
@@ -73,28 +87,35 @@ let internal tryCloseSessionObj (obj: obj) : JS.Promise<QuiescenceStatus option>
 let internal tryClosePiSession (sessionApi: obj) (sessionId: SessionId) : JS.Promise<QuiescenceStatus option> =
     promise {
         let arg = box {| sessionId = SessionId.value sessionId |}
+        let fnNames = [ "sessionClose"; "closeSession"; "close" ]
 
-        let fnNames =
-            [| "sessionClose"
-               "closeSession"
-               "close" |]
-
-        let mutable executed = false
-        let mutable success = false
-
-        for name in fnNames do
-            if not executed then
+        let attempt name =
+            promise {
                 try
                     let fn = Dyn.get sessionApi name
 
                     if not (Dyn.isNullish fn) && Dyn.typeIs fn "function" then
-                        executed <- true
                         let! _ = safeResolve (sessionApi?(name) (arg))
-                        success <- true
+                        return Some Stopped
+                    else
+                        return None
                 with _ ->
-                    ()
+                    return None
+            }
 
-        if success then return Some Stopped else return None
+        let rec loop names =
+            promise {
+                match names with
+                | [] -> return None
+                | name :: rest ->
+                    let! res = attempt name
+
+                    match res with
+                    | Some status -> return Some status
+                    | None -> return! loop rest
+            }
+
+        return! loop fnNames
     }
 
 /// Resolve quiescence for an OMP physical session, consulting the session object,
@@ -106,22 +127,19 @@ let querySessionQuiescence
     (_turnId: TurnId)
     : JS.Promise<QuiescenceStatus> =
     promise {
-        match detectStatus session with
+        let sm = Dyn.get session "sessionManager"
+
+        let localStatus =
+            detectStatus session |> Option.orElseWith (fun () -> detectStatus sm)
+
+        match localStatus with
         | Some status -> return status
         | None ->
-            let sm = Dyn.get session "sessionManager"
-
-            match detectStatus sm with
-            | Some status -> return status
-            | None ->
-                if not (Dyn.isNullish sessionApi) then
-                    let! piStatus = checkPiSessionStatus sessionApi sessionId
-
-                    match piStatus with
-                    | Some status -> return status
-                    | None -> return StopUnknown
-                else
-                    return StopUnknown
+            if Dyn.isNullish sessionApi then
+                return StopUnknown
+            else
+                let! piStatus = checkPiSessionStatus sessionApi sessionId
+                return defaultArg piStatus StopUnknown
     }
 
 /// Close an OMP physical session by trying the session object, then the session
@@ -139,12 +157,9 @@ let closePhysicalSession (session: obj) (sessionApi: obj) (sessionId: SessionId)
             match smClose with
             | Some status -> return status
             | None ->
-                if not (Dyn.isNullish sessionApi) then
-                    let! piClose = tryClosePiSession sessionApi sessionId
-
-                    match piClose with
-                    | Some status -> return status
-                    | None -> return StopUnknown
-                else
+                if Dyn.isNullish sessionApi then
                     return StopUnknown
+                else
+                    let! piClose = tryClosePiSession sessionApi sessionId
+                    return defaultArg piClose StopUnknown
     }

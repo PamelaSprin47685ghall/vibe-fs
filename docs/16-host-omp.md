@@ -29,7 +29,7 @@
 
 ## Subsession
 
-- `src/Hosts/Omp/SubsessionHostAdapter.fs`、`SubsessionDispatch.fs`、`SubsessionDispatchStatus.fs`、`SubsessionQuiescence.fs`
+- `src/Hosts/Omp/SubsessionHostAdapter.fs`、`SubsessionDispatch.fs`、`SubsessionQuiescence.fs`
 - `src/Hosts/Omp/ChildSession.fs`、`ChildSessionCreate.fs`、`ChildSessionRegistry.fs`、`ChildCleanup.fs`
 
 ## Fallback

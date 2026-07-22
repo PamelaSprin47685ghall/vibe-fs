@@ -18,6 +18,18 @@ open Wanxiangshu.Runtime.OpencodeSessionPromptCodec
 [<Import("relative", "node:path")>]
 let private pathRelative (a: string) (b: string) : string = jsNative
 
+let private tomlObjectiveRegex =
+    System.Text.RegularExpressions.Regex(
+        @"objective\s*=\s*""([^""]+)""",
+        System.Text.RegularExpressions.RegexOptions.Compiled
+    )
+
+let private yamlObjectiveRegex =
+    System.Text.RegularExpressions.Regex(
+        @"objective:\s*([^\r\n]+)",
+        System.Text.RegularExpressions.RegexOptions.Compiled
+    )
+
 let extractObjectives (plan: MessageTransformPlan) : string list =
     plan.Cleaned
     |> List.collect (fun m ->
@@ -26,12 +38,8 @@ let extractObjectives (plan: MessageTransformPlan) : string list =
             match p with
             | TextPart text when not (System.String.IsNullOrWhiteSpace text) ->
                 let trimmed = text.Trim()
-
-                let matchToml =
-                    System.Text.RegularExpressions.Regex.Match(text, @"objective\s*=\s*""([^""]+)""")
-
-                let matchYaml =
-                    System.Text.RegularExpressions.Regex.Match(text, @"objective:\s*([^\r\n]+)")
+                let matchToml = tomlObjectiveRegex.Match(text)
+                let matchYaml = yamlObjectiveRegex.Match(text)
 
                 let extracted =
                     if matchToml.Success then
@@ -69,17 +77,13 @@ let injectSubagentFilesIfAny
     : JS.Promise<CapsFile list> =
     promise {
         let isExcluded =
-            match plan.CapsInjectionPolicy with
-            | Wanxiangshu.Kernel.MessageTransformPolicy.CapsInjectionPolicy.Exclude -> true
-            | Wanxiangshu.Kernel.MessageTransformPolicy.CapsInjectionPolicy.Include -> false
+            plan.CapsInjectionPolicy = Wanxiangshu.Kernel.MessageTransformPolicy.CapsInjectionPolicy.Exclude
 
         if isExcluded || not plan.IsSubagentSession then
             return baseFiles
         else
-            let objectivesAndTexts = extractObjectives plan
-
             let tempFiles =
-                objectivesAndTexts
+                extractObjectives plan
                 |> List.tryPick (fun key ->
                     match scope.TryGetTempFiles(plan.SessionID + "\u0000" + key) with
                     | Some files -> Some files
@@ -90,14 +94,8 @@ let injectSubagentFilesIfAny
                 return baseFiles
             else
                 let! results = readReverieFiles plan.Directory tempFiles
-
                 let loaded = results |> List.choose (buildCapsFileFromResult plan.Directory)
-
-                let merged = baseFiles @ loaded
-
-                let deduped = deduplicateCapsFiles merged
-
-                return deduped
+                return deduplicateCapsFiles (baseFiles @ loaded)
     }
 
 type CapsLoadPolicy =

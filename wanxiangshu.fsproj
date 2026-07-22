@@ -546,7 +546,6 @@
     <Compile Include="src/Hosts/Omp/MessagingCodecDecode.fs"/>
     <Compile Include="src/Hosts/Omp/MessagingCodec.fs"/>
     <Compile Include="src/Hosts/Omp/SubsessionQuiescence.fs"/>
-    <Compile Include="src/Hosts/Omp/SubsessionDispatchStatus.fs"/>
     <Compile Include="src/Hosts/Omp/SubsessionDispatch.fs"/>
     <Compile Include="src/Hosts/Omp/ExecutorSummarizer.fs"/>
     <Compile Include="src/Hosts/Omp/OmpSubsessionHostAdapterPrompts.fs"/>

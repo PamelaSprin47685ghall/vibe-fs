@@ -97,6 +97,60 @@ let private assertEvents (tempDir: string) =
         equal "second continued prompt matches" "second continue" (continuedEvents.[1].Payload |> Map.find "prompt")
     }
 
+let private runSpawnAndFirstContinue
+    spyAdapter
+    scope
+    registry
+    (lastReceivedChildID: string ref)
+    (lastReceivedAgent: string ref)
+    =
+    promise {
+        let! res1 = dispatch Opencode spyAdapter "coder" sampleCoderArgs scope (Some registry)
+        check "spawned output" (res1.Contains "spawned")
+        let iter1 = parseIterator res1
+
+        let! res2 =
+            dispatch
+                Opencode
+                spyAdapter
+                "continue"
+                (box
+                    {| iterator = iter1
+                       prompt = "continue standard" |})
+                scope
+                (Some registry)
+
+        check "continue next report" (res2.Contains "next report: continue standard")
+        equal "coder childId match" "session-1" lastReceivedChildID.Value
+        equal "coder agent match" "coder" lastReceivedAgent.Value
+        return parseIterator res2
+    }
+
+let private runSecondContinueAndFailure spyAdapter scope registry tempDir iter2 =
+    promise {
+        let! res3 =
+            dispatch
+                Opencode
+                spyAdapter
+                "continue"
+                (box
+                    {| iterator = iter2
+                       prompt = "second continue" |})
+                scope
+                (Some registry)
+
+        check "second continue report" (res3.Contains "next report: second continue")
+        do! assertEvents tempDir
+
+        let invalidArgs =
+            box
+                {| iterator = "sci_s:session-invalid:coder:Opencode:extra"
+                   prompt = "should fail" |}
+
+        let! failedRes = dispatch Opencode spyAdapter "continue" invalidArgs scope (Some registry)
+        check "invalid iterator fails" (failedRes.Contains "continue failed")
+    }
+
 let testContinueFlow () =
     promise {
         let! tempDir = mkdtempAsync "subagent-dispatcher-continue-"
@@ -122,47 +176,8 @@ let testContinueFlow () =
         registry.RegisterChildAgent("session-1", "coder", None)
 
         try
-            let! res1 = dispatch Opencode spyAdapter "coder" sampleCoderArgs scope (Some registry)
-            check "spawned output" (res1.Contains "spawned")
-            let iter1 = parseIterator res1
-
-            let! res2 =
-                dispatch
-                    Opencode
-                    spyAdapter
-                    "continue"
-                    (box
-                        {| iterator = iter1
-                           prompt = "continue standard" |})
-                    scope
-                    (Some registry)
-
-            check "continue next report" (res2.Contains "next report: continue standard")
-            equal "coder agent match" "coder" lastReceivedAgent.Value
-            let iter2 = parseIterator res2
-
-            let! res3 =
-                dispatch
-                    Opencode
-                    spyAdapter
-                    "continue"
-                    (box
-                        {| iterator = iter2
-                           prompt = "second continue" |})
-                    scope
-                    (Some registry)
-
-            check "second continue report" (res3.Contains "next report: second continue")
-
-            do! assertEvents tempDir
-
-            let invalidArgs =
-                box
-                    {| iterator = "sci_s:session-invalid:coder:Opencode:extra"
-                       prompt = "should fail" |}
-
-            let! failedRes = dispatch Opencode spyAdapter "continue" invalidArgs scope (Some registry)
-            check "invalid iterator fails" (failedRes.Contains "continue failed")
+            let! iter2 = runSpawnAndFirstContinue spyAdapter scope registry lastReceivedChildID lastReceivedAgent
+            do! runSecondContinueAndFailure spyAdapter scope registry tempDir iter2
             do! rmAsync tempDir
         with ex ->
             do! rmAsync tempDir
