@@ -20,15 +20,6 @@ type Flow<'ctx, 'error, 'a> =
 - `CancellationToken`：唯一取消信号族（可 linked）。
 - `Task`：全库异步货币。Host 边界若给 Promise/Async，只在 Adapter 转一次。
 
-`Flow` 是可执行闭包，不是可检查流程图。因此第一版不提供 AST、解释器、动态注册或 continuation 序列化；重启依赖事实、稳定键和主程序重入，而不是恢复某个 Stage 编号。
-
-### 1.0 Bind 不变式
-
-`Bind` 只执行左侧、遇到 Error 短路、把成功值传给右侧。它不自动捕获异常、不刷新投影、不写 Journal、不重试。
-
-```
-```
-
 `Flow` 是函数闭包而不是可检查的流程图，因此第一版不提供 AST、解释器、动态注册或 continuation 序列化。重启恢复依赖领域事实、稳定键和主程序重入，而不是恢复某个“执行到第 17 个 Stage”的快照。
 
 ### 1.0 Bind 不变式
@@ -142,8 +133,6 @@ type FlowBuilder<'ctx, 'error>(progress: ProgressGuard<'ctx, 'error> option) =
 
 同步 `IDisposable` 可适配为 `IAsyncDisposable`。资源路径：Kill → 有界等退出 → Drain → `DisposeAsync` → **然后** Flow 返回。禁止同步 Dispose 内 fire-and-forget。
 
-`Using` 必须让 body 的成功、Flow Error、同步异常和取消都进入同一释放路径。释放异常不能悄悄覆盖主失败；至少保留主失败与 cleanup 诊断。
-
 `Using` 的实现必须在资源已经获得后包住整个 body，并保证 body 的返回值、Flow Error、同步异常和取消都经过同一释放路径。释放异常不能悄悄覆盖原始业务失败；实现至少要保留主失败与 cleanup 诊断。
 
 ### 1.3 While + 进展 [NORMATIVE]
@@ -174,15 +163,6 @@ member _.While(condition, body) =
 ```
 
 **ProgressStamp** 仅权威提交前进（KISS-02）。禁止手增。
-
-condition 每次迭代重新读取；body 通过 Delay 延迟构造，不能缓存旧 View。以下错误实现必须被测试杀死：
-
-```
-while view.Unfinished do return Ok()          // body 无变化
-while view.Unfinished do do! noOp            // 永远读取同一快照
-只刷新未变化投影                              // 不算 progress
-Stamp <- Stamp + 1                            // 禁止伪造
-```
 
 `While` 的 condition 在每次迭代重新读取，不缓存进入循环时的布尔值。body 用 `Delay` 延迟构造，保证循环内拿到最新 Script/View。`ProgressGuard=None` 适用于不具有领域进展定义的技术流程；它不允许技术流程伪造业务 Stamp。
 
@@ -230,8 +210,6 @@ module ProcessFlow =
 
 主业务少用 `attempt`。可预见分支 → 成功值 DU；不可恢复 → `'error`。
 
-`attempt` 是边界工具，不是把整个系统重新包成 Result 状态机。使用后应立即重新分类，不能让 `Result<Result<...>>` 沿主流程传播。
-
 `attempt` 是边界工具，不是把整个 Flow 重新变成 `Result` 状态机。适用场景是：一个领域组合子需要把某个终止错误转成“可以选择下一步”的值；使用后必须立即重新分类，不能在外层到处传播 `Result<Result<…>>`。
 
 ### 1.5 Cancellation
@@ -259,8 +237,6 @@ let rec tryModels s models = session { ... return! tryModels s remaining }
 见 KISS-08、KISS-09。仍是结构化程序，不引入控制信号 AST。
 
 `For` 适合逐项 unit 效应，例如按 wave 接受任务；不适合“找到值就退出”。搜索、Fallback 和有界 Invalid 必须用尾递归，把唯一停止路径写进模式匹配。
-
-`For` 仍适合纯遍历和逐项 unit 效应：例如按 wave 接受任务、按输入顺序提交无返回值动作。它不适合“找到一个值就退出”的搜索。后者使用显式递归，把停止条件放在函数签名和模式匹配里，读者可以沿唯一返回路径证明不会继续执行。
 
 ---
 
@@ -295,18 +271,15 @@ let squad = FlowBuilder(Some squadProgress)
 
 各领域自建：`Prompt.sendOnce`、`Review.requestOnce`、`Child.runOnce`、`Merge.fastForwardOnce`。三处真实重复后再抽私有 helper。
 
-### 3.2 retry
+### 3.2 无公共通用 Flow retry [NORMATIVE]
 
-```
-type RetryPolicy<'error> =
-    { MaxAttempts: int
-      Backoff: TimeSpan list
-      RetryWhen: 'error -> bool }
+[FORBIDDEN] 公共 `val retry: RetryPolicy -> Flow` 组合子。
 
-val retry: RetryPolicy<'e> -> Flow<'c, 'e, 'a> -> Flow<'c, 'e, 'a>
-```
+第一版不提供通用 `Flow` retry。领域重试规则：
 
-幂等在领域动词；retry 只处理尝试中的瞬时失败。
+1. `fallback`/`review`/`process` 使用领域专用尾递归或专用 `Try*` 重试（如 `TryProcess`、`TryReview`）。
+2. 仅当操作无持久副作用且符合领域幂等条件时，才允许在模块内部使用私有 retry helper。
+3. 幂等由领域动词和稳定键保证，重试逻辑内聚在领域语义内部。
 
 ### 3.3 mapBounded — Task 层，非共享 Flow Context [NORMATIVE]
 
@@ -452,7 +425,7 @@ let runSquad (z: SquadScript) (plan: SquadPlan) : SquadFlow<SquadOutcome> =
 |---|---|
 |1|Flow + ProgressGuard + While/For/Using/TryFinally(sync) + run/fail/attempt|
 |2|领域别名 + SessionFlow.run 等取消映射|
-|3|retry；Task 层 mapBounded|
+|3|领域专用重试/尾递归；Task 层 mapBounded|
 |4|GoldenFlows + 进展/取消/释放测试|
 
 每个 PR 都要有反例测试：Bind 短路、Delay 最新值、TryWith 不吞 OCE、Using 四路径释放、NoProgress、mapBounded 全 await、semaphore finally 释放，以及黄金源码与文档签名一致。

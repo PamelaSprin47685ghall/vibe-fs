@@ -91,12 +91,12 @@ Fallback 的真实状态由当前调用栈表达：model、attempt、remaining m
 
 AcceptanceUnknown 不等于普通网络超时：它说明宿主可能已接受 prompt。继续换模型会制造重复 assistant 回合，必须停在 PromptProtocol。
 
-Runtime A 与 B 可以各自对同一 Session 运行 Fallback；双方只保证本地 sendOnce。重启时所有 Prompt 事实按 `CommittedAt → RuntimeId → LocalSeq` 归并，存储层不选择其中一支。
+Runtime A 与 B 可以各自对同一 Session 运行 Fallback；双方只保证本地 sendOnce。重启时所有 Prompt 事实按 `ObservedAt → RuntimeId → LocalSeq` 归并，存储层不选择其中一支。
 
 ## 四、AcceptanceUnknown
 
 属 Prompt 协议。Unknown 时 **禁止** 试下一模型。  
-恢复：宿主确认 | 新 Epoch | reconcile Deadline → 可诊断错误。
+恢复：宿主确认 | 新 LocalEpoch / TurnId 抢占 | reconcile Deadline → 可诊断错误。
 
 ---
 
@@ -119,7 +119,7 @@ Lease* RuntimeStore RetryDispatchGovernor…
 
 ## 七、测试
 
-transient；不可重试；模型顺序；exhausted；空输出；幂等；AcceptanceUnknown；重启不重发；child 隔离；取消；新 Epoch；尾递归在 MaxRetries 边界停。
+transient；不可重试；模型顺序；exhausted；空输出；幂等；AcceptanceUnknown；重启不重发；child 隔离；取消；新 LocalEpoch/TurnId 抢占；尾递归在 MaxRetries 边界停。
 
 补充断言：Attempt 单调递增；model 耗尽后才换模；成功后 CommitTodo 恰好一次；Unknown 后不调用第二模型；空模型列表返回领域错误；本 Runtime 重启可识别已 flush 的 PromptKey；多 Runtime 事实全部保留。
 

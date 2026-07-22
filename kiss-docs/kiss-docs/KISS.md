@@ -2,7 +2,7 @@
 
 | Field | Value |
 | :--- | :--- |
-| **Status** | 原则批准 · Journal 定为 Lifetime Snapshot Isolation · Phase 0 余 host spike + GuideContract |
+| **Status** | 原则批准 · Phase 0 未闭合（待四协议清稿 + host spike + GuideContract 真编译 + 26 条隔离测试方案） |
 | **Journal** | Per-Runtime 单写 NDJSON · 启动 Frontier 快照 · 重启时间归并 · 无跨进程锁 |
 
 ## 系列总表
@@ -18,7 +18,7 @@
 |`KISS-05.md`|Process|
 |`KISS-06.md`|Session Runtime 投影|
 |`KISS-07`–`12`|Child…Squad|
-|`KISS-13.md`|实施 · 18 条隔离测|
+|`KISS-13.md`|实施 · 26 条隔离测|
 |`KISS-Tools.md`|Tools · CommandPort · Deadline|
 
 ## 持久化一句话
@@ -36,7 +36,7 @@
 |Journal|`RuntimeId`|单进程单写、多进程只读；不续写别人的文件|
 |BootSnapshot|一次启动|所有源在 Frontier 内的完整合法前缀|
 |CurrentState|运行期间|BootSnapshot + 本 Runtime 自己 flush 后的事件|
-|Chronological Replay|下一次启动|按 `CommittedAt → RuntimeId → LocalSeq` 稳定归并|
+|Chronological Replay|下一次启动|按 `ObservedAt → RuntimeId → LocalSeq` 稳定归并|
 
 “快照隔离”不是“最终一致性”。当前 Runtime 不会自动看到其他 Runtime 的后续事件；只有新进程建立新 Frontier 后重新归并。允许陈旧视图上的合法事实，是产品取舍，不是待修复的并发 bug。
 
@@ -44,7 +44,7 @@
 
 1. 任意 Runtime 文件最多一个 Writer，Writer 只属于创建它的进程。
 2. Reader 不截断、不修复、不追加任何其他 Runtime 文件。
-3. 每个 Runtime 内 `LocalSeq` 严格递增，`CommittedAt` 单调不倒退。
+3. 每个 Runtime 内 `LocalSeq` 严格递增，`ObservedAt` 记录 raw wall time（跨源按 ObservedAt → RuntimeId 确定性破平局归并）。
 4. 单源损坏只降低该源的可见前缀，不阻断其他源的启动恢复。
 5. 同一 Session 的多个 Runtime 可以同时产生事实；存储层不判定 fork，不静默删除事实。
 6. 领域 Fold 决定较晚事实如何影响投影；Journal 不伪造冲突解决器。
@@ -66,14 +66,15 @@
 - Journal：**非** workspace 单写锁，而是 Lifetime Snapshot Isolation  
 - 时间归并确定性；领域 Fold 定义覆盖；非 LWW 冲突引擎  
 
-## Phase 0 剩余动作
+## Phase 0 闭合条件
 
-1. OpenCode host spike  
-2. GuideContract 真编译  
-3. 单套正式文件名  
-4. Status → `Phase 0 已闭合 · 准许 Phase A`
+1. **四协议清稿修订**（TurnId与LocalEpoch、Outcome/Error/CommitUnknown三态、raw ObservedAt与回执/时钟验证、HistoricalPromptIndex与LocalPromptProtocol）  
+2. **OpenCode host spike 验证**（MessageID/ParentID/synthetic 事实生成、ACK 回执与 raw ObservedAt 时钟验证）  
+3. **GuideContract 真实编译**（`tests-next/GuideContract/` 包含 Flow、Outcome、MessageId、Journal Envelope、LocalPromptProtocol 核心签名）  
+4. **Journal 26 条隔离测试方案确认**（Lifetime Snapshot Isolation 多 Runtime 集成规范）  
+5. **Status 转换** → `Phase 0 已闭合 · 准许 Phase A`（完成前不实现业务功能，不得声称完成未实现的测试或代码）  
 
-Phase 0 不是再写一卷架构说明。它的验收对象是：真实 OpenCode host spike、GuideContract 的编译、两个 Runtime 的隔离测试，以及仓库中不存在同名旧稿。完成前不实现业务功能。
+Phase 0 不是再写一卷架构说明。它的验收对象是：真实四协议清稿、OpenCode host spike、GuideContract 的真实编译、多 Runtime 26 条隔离测试规范，以及仓库中不存在同名旧稿。在测试真实编译与 spike 验证完成前，状态保持未闭合。
 
 ## 标记
 

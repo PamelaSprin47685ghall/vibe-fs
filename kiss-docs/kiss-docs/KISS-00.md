@@ -19,7 +19,8 @@
 
 当源码把一段普通顺序程序：
 
-```
+```text
+[ILLUSTRATIVE PSEUDOCODE]
 for model in models do
     for attempt in attempts do
         match! send model attempt with
@@ -65,7 +66,7 @@ Squad:    parallel work → ordered verify/FF → wave accepted
 Per-Runtime Journal 并没有取消持久化困难，只把它压缩到可证明边界：
 
 1. 自己的文件只有一个 Writer；
-2. 每一行自包含、带 RuntimeId、LocalSeq、CommittedAt 和 Fact；
+2. 每一行自包含、带 RuntimeId、LocalSeq、ObservedAt 和 Fact；
 3. 启动只读固定 byte Frontier；
 4. EOF 半行可忽略，中间非法行只降级该源；
 5. 本进程先 flush 再更新自己的内存投影；
@@ -96,7 +97,7 @@ Per-Runtime Journal 并没有取消持久化困难，只把它压缩到可证明
 |恢复|主程序重放；不持久化 continuation|
 |保留事实|全部 Runtime 日志在重启时按时间归并；不删他进程历史|
 |Driver|每 Runtime 内每 Session 0|1|
-|Origin|仅 Human 升本侧 Epoch|
+|Origin|仅 Human 升本侧 LocalEpoch 并绑定 TurnId|
 |Outcome≠Error|分支 DU vs 终止 error|
 |Journal|Per-Runtime 单写；Lifetime Snapshot Isolation|
 |同 Session 多进程|合法；陈旧视图上操作；重启时间线 Fold|
