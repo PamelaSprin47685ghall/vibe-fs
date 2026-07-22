@@ -20,7 +20,8 @@ type SessionScript =
       Config: SessionScriptConfig
       ContinueWork: unit -> SessionFlow<unit>
       RequestReview: unit -> SessionFlow<unit>
-      Finish: unit -> SessionFlow<SessionOutcome> }
+      Finish: unit -> SessionFlow<SessionOutcome>
+      CommitTodoFrom: SendOutcome -> SessionFlow<unit> }
 
 and SessionScriptConfig =
     { FallbackModels: string list
@@ -56,4 +57,16 @@ module SessionFlows =
         session {
             do! passReview s
             return! s.Finish()
+        }
+
+    let runFlow
+        (s: SessionScript)
+        (ct: System.Threading.CancellationToken)
+        (flow: SessionFlow<'a>)
+        : System.Threading.Tasks.Task<Result<'a, SessionError>> =
+        task {
+            try
+                return! Flow.run s ct flow
+            with :? System.OperationCanceledException ->
+                return Error SessionError.SessionCancelled
         }

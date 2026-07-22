@@ -56,8 +56,7 @@ module SessionFallbackTests =
                     return Retryable "error"
                 }
 
-            let program =
-                Fallback.continueWork script sendContinue (fun _ -> session { return () })
+            let program = Fallback.continueWork script sendContinue
 
             let! res = Flow.run script CancellationToken.None program
 
@@ -67,4 +66,38 @@ module SessionFallbackTests =
             let emptyProgram = Fallback.tryModels script sendContinue []
             let! emptyRes = Flow.run script CancellationToken.None emptyProgram
             Assert.Equal(Error SessionError.FallbackExhausted, emptyRes)
+        }
+
+    [<Fact>]
+    let ``Fallback_continueWork_calls_CommitTodoFrom`` () =
+        task {
+            let mutable committedOutcome = None
+
+            let script =
+                { createTestScript
+                      { Unfinished = true
+                        ProgressStamp = 1L }
+                      (fun () -> session { return () }) with
+                    Config =
+                        { FallbackModels = [ "modelA" ]
+                          MaxRetriesPerModel = 1
+                          MaxInvalidRetries = 1 }
+                    CommitTodoFrom =
+                        fun outcome ->
+                            session {
+                                committedOutcome <- Some outcome
+                                return ()
+                            } }
+
+            let sendContinue (model: string) (attempt: int) : SessionFlow<SendOutcome> =
+                session { return Delivered(MessageId.create "msg_delivered") }
+
+            let program = Fallback.continueWork script sendContinue
+            let! res = Flow.run script CancellationToken.None program
+
+            Assert.Equal(Ok(), res)
+
+            match committedOutcome with
+            | Some(Delivered msgId) -> Assert.Equal("msg_delivered", MessageId.value msgId)
+            | _ -> Assert.Fail(sprintf "Expected Some (Delivered msg_delivered), got %A" committedOutcome)
         }

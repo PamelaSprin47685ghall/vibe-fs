@@ -121,8 +121,7 @@ module Boot =
 
                 let minHeadEnv =
                     heads
-                    |> List.minBy (fun env ->
-                        (env.ObservedAt, RuntimeId.value env.RuntimeId, LocalSeq.value env.LocalSeq))
+                    |> List.reduce (fun acc env -> if Envelope.compareSortKey env acc < 0 then env else acc)
 
                 let rec pickAndRemove headsList =
                     match headsList with

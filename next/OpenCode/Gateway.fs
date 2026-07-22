@@ -126,6 +126,9 @@ module Gateway =
                         :> Gateway
 
                     return Ok gatewayInstance
-            with ex ->
-                return Error(GatewayError.BootFailed ex.Message)
+            with
+            | :? IOException as ex -> return Error(GatewayError.StorageFailed($"[IOException] {ex.Message}"))
+            | :? UnauthorizedAccessException as ex ->
+                return Error(GatewayError.StorageFailed($"[UnauthorizedAccessException] {ex.Message}"))
+            | ex -> return Error(GatewayError.BootFailed($"[{ex.GetType().FullName}] {ex.Message}"))
         }

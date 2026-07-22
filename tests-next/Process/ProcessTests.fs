@@ -187,3 +187,26 @@ module ProcessTests =
             finally
                 h.DisposeAsync().AsTask().GetAwaiter().GetResult() |> ignore
         | Error err -> Assert.True(false, sprintf "Expected Ok handle, got: %A" err)
+
+    [<Fact>]
+    let Process_runFlow_maps_OCE_to_ProcessCancelled () =
+        use cts = new CancellationTokenSource()
+        cts.Cancel()
+
+        let ctx: ProcessContext =
+            { WorkingDirectory = None
+              DefaultTimeout = None }
+
+        let hangingFlow: ProcessFlows.ProcessFlow<Fact.ProcessResult> =
+            Flow.create (fun _ ct ->
+                task {
+                    ct.ThrowIfCancellationRequested()
+                    return Ok Unchecked.defaultof<Fact.ProcessResult>
+                })
+
+        let taskRes = ProcessFlows.runFlow ctx cts.Token hangingFlow
+        let res = taskRes.GetAwaiter().GetResult()
+
+        match res with
+        | Error(ProcessError.ProcessCancelled reason) -> Assert.False(String.IsNullOrWhiteSpace(reason))
+        | other -> Assert.True(false, sprintf "Expected Error (ProcessCancelled), got: %A" other)

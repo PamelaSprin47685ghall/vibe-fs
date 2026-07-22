@@ -26,3 +26,15 @@ module ProcessFlows =
                     use h = handle
                     return! Flow.run ctx ct (h.RunToCompletion())
             })
+
+    let runFlow
+        (ctx: ProcessContext)
+        (ct: System.Threading.CancellationToken)
+        (flow: ProcessFlow<'a>)
+        : System.Threading.Tasks.Task<Result<'a, ProcessError>> =
+        task {
+            try
+                return! Flow.run ctx ct flow
+            with :? System.OperationCanceledException ->
+                return Error(ProcessError.ProcessCancelled "Operation cancelled")
+        }

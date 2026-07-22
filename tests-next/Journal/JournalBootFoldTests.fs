@@ -9,7 +9,7 @@ open Wanxiangshu.Next.Kernel.Fact
 open Wanxiangshu.Next.Journal
 open JournalTestSupport
 
-module JournalBootFoldTests =
+module JournalBootTests =
 
     [<Fact>]
     let Boot_ignores_partial_trailing_line () =
@@ -122,50 +122,47 @@ module JournalBootFoldTests =
             Assert.Equal(rtA, snapshot.Envelopes.[1].RuntimeId))
 
     [<Fact>]
-    let Fold_applies_TodoChanged () =
-        let rt = RuntimeId.create "rt-fold"
-        let t0 = DateTimeOffset.UtcNow
+    let Boot_merges_same_ObservedAt_by_RuntimeId_Ordinal () =
+        withTempDir (fun dir ->
+            let rtA, rtB = RuntimeId.create "rt-A", RuntimeId.create "rt-B"
+            let t = DateTimeOffset.Parse("2025-01-01T10:00:00Z")
 
-        let env1: Envelope =
-            { RuntimeId = rt
-              LocalSeq = LocalSeq.create 1L
-              ObservedAt = t0
-              EventId = EventId.create "e1"
-              Stream = StreamId.Workspace
-              TurnId = None
-              Fact =
-                Fact.Runtime(
-                    RuntimeStarted
-                        {| RuntimeId = rt
-                           ProcessId = 1
-                           StartedAt = t0 |}
-                ) }
+            let envB1: Envelope =
+                { RuntimeId = rtB
+                  LocalSeq = LocalSeq.create 1L
+                  ObservedAt = t
+                  EventId = EventId.create "b1"
+                  Stream = StreamId.Workspace
+                  TurnId = None
+                  Fact =
+                    Fact.Runtime(
+                        RuntimeStarted
+                            {| RuntimeId = rtB
+                               ProcessId = 2
+                               StartedAt = t |}
+                    ) }
 
-        let env2: Envelope =
-            { RuntimeId = rt
-              LocalSeq = LocalSeq.create 2L
-              ObservedAt = t0.AddSeconds(1.0)
-              EventId = EventId.create "e2"
-              Stream = StreamId.Workspace
-              TurnId = None
-              Fact = Fact.Todo(TodoChanged {| Snapshot = { Items = [ "item1" ] } |}) }
+            let envA1: Envelope =
+                { RuntimeId = rtA
+                  LocalSeq = LocalSeq.create 1L
+                  ObservedAt = t
+                  EventId = EventId.create "a1"
+                  Stream = StreamId.Workspace
+                  TurnId = None
+                  Fact =
+                    Fact.Runtime(
+                        RuntimeStarted
+                            {| RuntimeId = rtA
+                               ProcessId = 1
+                               StartedAt = t |}
+                    ) }
 
-        let env3: Envelope =
-            { RuntimeId = rt
-              LocalSeq = LocalSeq.create 3L
-              ObservedAt = t0.AddSeconds(2.0)
-              EventId = EventId.create "e3"
-              Stream = StreamId.Workspace
-              TurnId = None
-              Fact = Fact.Todo(TodoChanged {| Snapshot = { Items = [ "item1"; "item2" ] } |}) }
-
-        let proj = Fold.apply Fold.empty [ env1; env2; env3 ]
-        Assert.Equal(Some rt, proj.RuntimeId)
-        Assert.True(proj.Todos.IsSome)
-        let items = proj.Todos.Value.Items
-        Assert.Equal(2, items.Length)
-        Assert.Equal("item1", items.[0])
-        Assert.Equal("item2", items.[1])
+            File.WriteAllText(Path.Combine(dir, "rt-B.ndjson"), Envelope.serialize envB1 + "\n")
+            File.WriteAllText(Path.Combine(dir, "rt-A.ndjson"), Envelope.serialize envA1 + "\n")
+            let snapshot = Boot.boot dir
+            Assert.Equal(2, snapshot.Envelopes.Length)
+            Assert.Equal(rtA, snapshot.Envelopes.[0].RuntimeId)
+            Assert.Equal(rtB, snapshot.Envelopes.[1].RuntimeId))
 
     [<Fact>]
     let Boot_accepts_complete_line_without_trailing_newline () =
@@ -232,57 +229,3 @@ module JournalBootFoldTests =
             Assert.Equal(2, snapshot.Envelopes.Length)
             Assert.Equal(EventId.create "e1", snapshot.Envelopes.[0].EventId)
             Assert.Equal(EventId.create "e2", snapshot.Envelopes.[1].EventId))
-
-    [<Fact>]
-    let Fold_rebuilds_HistoricalPrompts_from_Prompt_facts () =
-        let rt = RuntimeId.create "rt-prompt-fold"
-        let turnId = TurnId.create "t1"
-        let keyStr = "s1:t1:ContinueTodo:model1:1:none:hash123"
-        let msgIdU, msgIdA = MessageId.create "u1", MessageId.create "a1"
-        let t0 = DateTimeOffset.UtcNow
-        let delivered: PromptOutcome = Fact.Delivered msgIdA
-
-        let reqFact =
-            Fact.Prompt(
-                PromptRequested
-                    {| PromptKey = keyStr
-                       TurnId = turnId
-                       Purpose = "ContinueTodo" |}
-            )
-
-        let subFact =
-            Fact.Prompt(
-                PromptSubmitted
-                    {| PromptKey = keyStr
-                       MessageId = msgIdU |}
-            )
-
-        let termFact =
-            Fact.Prompt(
-                PromptTerminal
-                    {| PromptKey = keyStr
-                       Outcome = delivered
-                       AssistantMessageId = Some msgIdA |}
-            )
-
-        let makeEnv seq dt fact =
-            { RuntimeId = rt
-              LocalSeq = LocalSeq.create seq
-              ObservedAt = dt
-              EventId = EventId.create ("e" + string seq)
-              Stream = StreamId.Session(SessionId.create "s1")
-              TurnId = Some turnId
-              Fact = fact }
-
-        let proj =
-            Fold.apply
-                Fold.empty
-                [ makeEnv 1L t0 reqFact
-                  makeEnv 2L (t0.AddSeconds 1.0) subFact
-                  makeEnv 3L (t0.AddSeconds 2.0) termFact ]
-
-        Assert.True(Map.containsKey keyStr proj.HistoricalPrompts)
-        let history = Map.find keyStr proj.HistoricalPrompts
-        Assert.Equal(Some msgIdU, history.UserMessageId)
-        Assert.Equal(Some msgIdA, history.AssistantMessageId)
-        Assert.Equal(Some delivered, history.Outcome)
