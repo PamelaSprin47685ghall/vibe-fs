@@ -134,12 +134,22 @@ let subagentDispatch () =
     assertWebsearchPrompts ()
 
 let subagentJoinReports () =
-    let joined = joinReports [ "first  "; "  second" ]
+    let joined =
+        joinReports
+            [ reportFromSummary "first  "
+              { reportFromSummary "  second" with
+                  findings = [ "finding-a" ]
+                  relatedFiles = [ "src/A.fs" ]
+                  relatedCode = [ "let x = 1" ] } ]
+
     let doc = parseToml joined
     check "joinReports parses as table" (not (isNull doc))
     check "joinReports uses reports table" (joined.Contains "reports" || joined.Contains "[[reports]]")
     check "joinReports embeds first summary" (joined.Contains "first")
     check "joinReports embeds second summary" (joined.Contains "second")
+    check "joinReports embeds findings" (joined.Contains "finding-a")
+    check "joinReports embeds related_files" (joined.Contains "src/A.fs")
+    check "joinReports embeds related_code" (joined.Contains "let x = 1")
     check "joinReports no markdown divider" (not (joined.Contains "\n---\n"))
 
 let mimocodeFormatPromptAppendsAgentReportTail () =

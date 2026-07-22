@@ -44,21 +44,6 @@ let truncateUtf8ByBytes (text: string) (maxBytes: int) : string =
 
         text.Substring(0, endIndex)
 
-let capExecutorSummaryOutput (output: string) : string =
-    let mutable index = 0
-    let mutable total = 0
-
-    while index < output.Length do
-        let width, step = utf8CharWidth output index
-        total <- total + width
-        index <- index + step
-
-    if total <= executorSummaryMaxBytes then
-        output
-    else
-        truncateUtf8ByBytes output executorSummaryMaxBytes
-        + sprintf "\n\n[Output truncated to %d bytes for summarization]" executorSummaryMaxBytes
-
 let private hostRules (host: Host option) : PromptRule list =
     match host with
     | Some Host.Mimocode ->

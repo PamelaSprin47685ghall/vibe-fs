@@ -54,21 +54,30 @@ let promptsForParallelIntents (host: Host) (constructor: 'a -> SubagentTaskKind)
 let browserPromptText (host: Host) (intent: string) : string =
     formatPrompt host (Browser intent) |> List.head
 
-/// Join free-form report texts as typed BatchReport TOML (`[[reports]]`).
-/// No Markdown `---` dividers — iterator/summary stay in the same table shape.
-let joinReports (reports: string seq) : string =
+/// Boundary helper for free-text subagent replies (no structured agent_report).
+let reportFromSummary (summary: string) : SubagentReport =
+    let trimmed = summary.Trim()
+
+    { iterator = None
+      summary = if trimmed = "" then None else Some trimmed
+      error = None
+      findings = []
+      relatedFiles = []
+      relatedCode = [] }
+
+/// Join typed SubagentReport rows as BatchReport TOML (`[[reports]]`).
+let joinReports (reports: SubagentReport seq) : string =
     let items =
         reports
-        |> Seq.map (fun r -> r.Trim())
-        |> Seq.filter (fun r -> r <> "")
-        |> Seq.map (fun summary ->
-            { iterator = None
-              summary = Some summary
-              error = None
-              findings = []
-              relatedFiles = []
-              relatedCode = [] })
         |> Seq.toList
+        |> List.filter (fun r ->
+            match r.summary, r.error with
+            | Some s, _ when s.Trim() <> "" -> true
+            | _, Some _ -> true
+            | _ ->
+                not (List.isEmpty r.findings)
+                || not (List.isEmpty r.relatedFiles)
+                || not (List.isEmpty r.relatedCode))
 
     match BatchReport.create items with
     | Some batch -> renderBatchReport batch

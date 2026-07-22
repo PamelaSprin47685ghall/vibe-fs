@@ -3,6 +3,7 @@ module Wanxiangshu.Runtime.SubagentSpawn
 open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Runtime.Subagent
+open Wanxiangshu.Runtime.Tooling.ToolOutputBatchToml
 open Wanxiangshu.Runtime.Dyn
 
 [<Global>]
@@ -12,7 +13,10 @@ type AbortController() =
 
 let private abortableConfig (config: obj) (signal: obj) = Dyn.withKey config "abortSignal" signal
 
-let runParallelSpawns (prompts: string list) (spawnOne: string -> JS.Promise<string>) : JS.Promise<string> =
+let runParallelSpawns
+    (prompts: string list)
+    (spawnOne: string -> JS.Promise<SubagentReport>)
+    : JS.Promise<string> =
     promise {
         let! reports = prompts |> List.map spawnOne |> List.toArray |> Promise.all
         return joinReports reports
@@ -20,7 +24,7 @@ let runParallelSpawns (prompts: string list) (spawnOne: string -> JS.Promise<str
 
 let runParallelSpawnsWithAbort
     (prompts: string array)
-    (spawn: string -> obj -> JS.Promise<string>)
+    (spawn: string -> obj -> JS.Promise<SubagentReport>)
     (config: obj)
     : JS.Promise<string> =
     promise {
