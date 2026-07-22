@@ -1,0 +1,40 @@
+<?xml version="1.0"?>
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <RootNamespace>Wanxiangshu.Next</RootNamespace>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <DisableImplicitFSharpCoreReference>true</DisableImplicitFSharpCoreReference>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="FSharp.Core" Version="10.1.203"/>
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="Kernel/Identity.fs"/>
+    <Compile Include="Kernel/Flow.fs"/>
+    <Compile Include="Kernel/Outcome.fs"/>
+    <Compile Include="Kernel/Fact.fs"/>
+    <Compile Include="Kernel/SendOutcomeMap.fs"/>
+    <Compile Include="Journal/FactSubEncoders.fs"/>
+    <Compile Include="Journal/FactDecoders.fs"/>
+    <Compile Include="Journal/FactCodec.fs"/>
+    <Compile Include="Journal/Envelope.fs"/>
+    <Compile Include="Journal/Boot.fs"/>
+    <Compile Include="Journal/Writer.fs"/>
+    <Compile Include="Journal/Fold.fs"/>
+    <Compile Include="Session/PromptKey.fs"/>
+    <Compile Include="Session/PromptProtocol.fs"/>
+    <Compile Include="Session/Inbox.fs"/>
+    <Compile Include="Session/Script.fs"/>
+    <Compile Include="Session/Fallback.fs"/>
+    <Compile Include="Session/Review.fs"/>
+    <Compile Include="Session/Driver.fs"/>
+    <Compile Include="Process/Deadline.fs"/>
+    <Compile Include="Process/Command.fs"/>
+    <Compile Include="Process/ProcessTypes.fs"/>
+    <Compile Include="Process/ProcessHandle.fs"/>
+    <Compile Include="Process/ProcessFlow.fs"/>
+    <Compile Include="Tools/ToolContext.fs"/>
+    <Compile Include="OpenCode/Gateway.fs"/>
+  </ItemGroup>
+</Project>
