@@ -8,8 +8,19 @@ open Wanxiangshu.Next.Kernel
 open Wanxiangshu.Next.Kernel.Identity
 open Wanxiangshu.Next.Kernel.Outcome
 
+[<RequireQualifiedAccess>]
+type SessionCommandError =
+    | InboxFull
+    | Timeout of reason: string
+    | CommandFailed of reason: string
+
+[<RequireQualifiedAccess>]
+type SessionCommandResult =
+    | Upserted
+    | SnapshotQueried of Fact.TodoSnapshot
+
 type SessionCommand =
-    | UpsertTodo of Fact.TodoSnapshot
+    | UpsertTodo of Fact.TodoSnapshot * reply: (Result<SessionCommandResult, SessionCommandError> -> unit)
     | QuerySnapshot of reply: (Fact.TodoSnapshot -> unit)
 
 type SessionInboxEvent =
@@ -20,6 +31,8 @@ type SessionInboxEvent =
     | SessionCommandEvent of command: SessionCommand
     | CancelEvent of reason: string
     | LifecycleEvent of kind: string
+    | LoopCommandEvent of sessionId: SessionId * taskText: string
+    | SquadCommandEvent of squadId: string * actionText: string
 
 type ISessionInbox =
     abstract TryPost: event: SessionInboxEvent -> Result<unit, SessionError>
@@ -28,8 +41,7 @@ type ISessionInbox =
 type FifoInbox(capacity: int) =
     let queue = System.Collections.Generic.Queue<SessionInboxEvent>()
 
-    let waiters =
-        System.Collections.Generic.Queue<TaskCompletionSource<SessionInboxEvent>>()
+    let waiters = System.Collections.Generic.Queue<JsTcs<SessionInboxEvent>>()
 
     let lockObj = obj ()
 
@@ -56,14 +68,16 @@ type FifoInbox(capacity: int) =
                         if queue.Count > 0 then
                             (Some(queue.Dequeue()), None)
                         else
-                            let tcs = TaskCompletionSource<SessionInboxEvent>()
+                            let tcs = JsTcs<SessionInboxEvent>()
+                            waiters.Enqueue(tcs)
                             (None, Some tcs))
 
                 match itemOpt, waiterOpt with
                 | Some item, _ -> return item
                 | None, Some tcs ->
                     use reg =
-                        cancellationToken.Register(fun () -> tcs.TrySetCanceled(cancellationToken) |> ignore)
+                        cancellationToken.Register(fun () ->
+                            tcs.TrySetResult(LifecycleEvent "inbox-cancelled") |> ignore)
 
                     return! tcs.Task
                 | None, None -> return LifecycleEvent "inbox-desync"

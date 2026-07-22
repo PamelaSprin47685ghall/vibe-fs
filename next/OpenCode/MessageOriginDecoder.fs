@@ -20,15 +20,42 @@ module MessageOriginDecoder =
             let pType = partObj?``type``
             not (isNull pType) && unbox<string> pType = "compaction"
 
+    let tryExtractPromptKey (partObj: obj) : PromptKey option =
+        if isNull partObj then
+            None
+        else
+            let meta = partObj?metadata
+
+            if isNull meta then
+                None
+            else
+                let keyStr = meta?wanxiangshu_prompt_key
+
+                if not (isNull keyStr) then
+                    PromptKey.parse (unbox<string> keyStr)
+                else
+                    let keyStr2 = meta?promptKey
+
+                    if not (isNull keyStr2) then
+                        PromptKey.parse (unbox<string> keyStr2)
+                    else
+                        None
+
     let decodeUserMessageOrigin (userMsg: OpencodeUserMessage) : MessageOrigin =
         let parts = userMsg.parts
-        let allSynthetic = parts.Length > 0 && (parts |> List.forall isSyntheticPart)
         let hasCompaction = parts |> List.exists isCompactionPart
+        let pluginKeyOpt = parts |> List.tryPick tryExtractPromptKey
 
-        if hasCompaction || allSynthetic then
-            HostInternal
-        else
-            Human(TurnId.create userMsg.id)
+        match pluginKeyOpt with
+        | Some key -> PluginGenerated(PromptKeyRef.create (PromptKey.asString key))
+        | None when hasCompaction -> HostInternal
+        | None ->
+            let allSynthetic = parts.Length > 0 && (parts |> List.forall isSyntheticPart)
+
+            if allSynthetic then
+                HostInternal
+            else
+                Human(TurnId.create userMsg.id)
 
     let isCompactionAssistant (msg: OpencodeAssistantMessage) : bool =
         match msg.summary with

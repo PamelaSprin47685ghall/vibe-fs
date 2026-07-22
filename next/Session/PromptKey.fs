@@ -118,3 +118,59 @@ module PromptKey =
 
         let payload = escapeField pk.PayloadHash
         sprintf "%s:%s:%s:%s:%s:%s:%s" sId tId purp mdl att trig payload
+
+    let parse (s: string) : PromptKey option =
+        if System.String.IsNullOrWhiteSpace(s) then
+            None
+        else
+            let parts = s.Split(':')
+
+            if parts.Length <> 7 then
+                None
+            else
+                try
+                    let unescape (str: string) = System.Uri.UnescapeDataString(str)
+                    let sId = SessionId.create (unescape parts.[0])
+                    let tId = TurnId.create (unescape parts.[1])
+                    let purpStr = unescape parts.[2]
+
+                    let purp =
+                        match purpStr with
+                        | "ContinueTodo" -> PromptPurpose.ContinueTodo
+                        | "RetryTurn" -> PromptPurpose.RetryTurn
+                        | "SwitchModel" -> PromptPurpose.SwitchModel
+                        | "ReviewChanges" -> PromptPurpose.ReviewChanges
+                        | "RunChild" -> PromptPurpose.RunChild
+                        | _ -> PromptPurpose.ReturnToParent
+
+                    let mdlStr = unescape parts.[3]
+
+                    let mdl =
+                        if mdlStr = "default" then
+                            None
+                        else
+                            match Model.ofString mdlStr with
+                            | Ok m -> Some m
+                            | Error _ -> None
+
+                    let att = System.Int32.Parse(unescape parts.[4])
+                    let trigStr = unescape parts.[5]
+
+                    let trig =
+                        if trigStr = "none" then
+                            None
+                        else
+                            Some(MessageId.create (unescape trigStr))
+
+                    let payload = unescape parts.[6]
+
+                    Some
+                        { SessionId = sId
+                          TurnId = tId
+                          Purpose = purp
+                          Model = mdl
+                          Attempt = att
+                          TriggerMessageId = trig
+                          PayloadHash = payload }
+                with _ ->
+                    None

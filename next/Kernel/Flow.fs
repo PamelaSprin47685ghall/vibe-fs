@@ -148,29 +148,38 @@ module Flow =
                 return Ok res
             })
 
-type private JsFlowTcs<'T>() =
+type JsTcs<'T>() =
+    let mutable completed = false
     let mutable resolveFn: ('T -> unit) option = None
 
     let p =
         Fable.Core.JS.Constructors.Promise.Create(fun res _ -> resolveFn <- Some res)
 
     member _.Task: Task<'T> = unbox p
+    member _.IsCompleted = completed
 
     member _.SetResult(res: 'T) =
+        completed <- true
+
         match resolveFn with
         | Some f -> f res
         | None -> ()
 
     member _.TrySetResult(res: 'T) =
-        match resolveFn with
-        | Some f ->
-            f res
-            true
-        | None -> false
+        if completed then
+            false
+        else
+            completed <- true
+
+            match resolveFn with
+            | Some f ->
+                f res
+                true
+            | None -> false
 
 type AsyncSemaphore(maxCount: int) =
     let mutable count = maxCount
-    let waiters = System.Collections.Generic.Queue<JsFlowTcs<unit>>()
+    let waiters = System.Collections.Generic.Queue<JsTcs<unit>>()
     let lockObj = obj ()
 
     member _.WaitAsync(ct: CancellationToken) =
@@ -183,7 +192,7 @@ type AsyncSemaphore(maxCount: int) =
                         count <- count - 1
                         None
                     else
-                        let tcs = JsFlowTcs<unit>()
+                        let tcs = JsTcs<unit>()
                         waiters.Enqueue(tcs)
                         Some tcs)
 
