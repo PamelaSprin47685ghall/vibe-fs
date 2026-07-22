@@ -6,21 +6,16 @@ open Wanxiangshu.Runtime.SubagentPrompts
 open Wanxiangshu.Runtime.ToolOutputInfo
 
 let formatToolResponse (result: ExecuteResult) (summaryOption: string option) : string =
-    let body = Option.defaultValue (outputFromResult result) summaryOption
-
-    render
-        { empty with
-            info = executorInfoItems result
-            body = body }
+    let bodyText = Option.defaultValue (outputFromResult result) summaryOption
+    let msg = applyExecutorStatus result (withBody bodyText)
+    render msg
 
 let prependSafetyWarning (output: string) (command: string) (language: ExecutorLanguage) : string =
     if not (shouldAppendReadOnlyWarning command language) then
         output
     else
-        render
-            { empty with
-                info = [ InfoItem.Hint hintExecutorMisuse ]
-                body = output }
+        let msg = { empty with body = Some output; hint = Some hintExecutorMisuse }
+        render msg
 
 let prependSafetyWarningForExecution (output: string) (options: ExecuteOptions) : string =
     prependSafetyWarning output (prepareProgramForExecution options) options.language

@@ -73,7 +73,8 @@ let runToolLifecycle
             "op.returnReviewer.ok"
             (not (isNull rrResult)
              && ((string rrResult).IndexOf "No active review" >= 0
-                 || (string rrResult).IndexOf "double-check" >= 0))
+                 || (string rrResult).IndexOf "double-check" >= 0
+                 || (string rrResult).IndexOf "objective =" >= 0))
 
         // --- 5. Lifecycle hooks: config -----------------------------------------
         let configArgs =

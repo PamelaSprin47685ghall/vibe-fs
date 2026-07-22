@@ -61,15 +61,46 @@ let outputFromResult (result: ExecuteResult) : string =
 
 let private isSpawnFailedMessage (output: string) = output.StartsWith "spawn failed:"
 
-let executorInfoItems (result: ExecuteResult) : InfoItem list =
+[<RequireQualifiedAccess>]
+type ExecutorStatus =
+    | Completed of exitCode: int
+    | KilledTimeout
+    | ExitError of exitCode: int option
+    | Signal of string
+    | SpawnFailed
+    | MissingExecutable
+
+let executorStatusText =
+    function
+    | ExecutorStatus.Completed _ -> "completed"
+    | ExecutorStatus.KilledTimeout -> "killed_timeout (Output Truncated)"
+    | ExecutorStatus.ExitError _ -> "exit_error"
+    | ExecutorStatus.Signal sig' -> sig'
+    | ExecutorStatus.SpawnFailed -> "spawn_failed"
+    | ExecutorStatus.MissingExecutable -> "missing_executable"
+
+let resolveExecutorStatus (result: ExecuteResult) : ExecutorStatus =
     match result with
-    | Completed(_, code) -> [ InfoItem.Status "completed"; InfoItem.ExitCode code ]
-    | Truncated(_, timeoutType) -> [ InfoItem.Status "killed_timeout (Output Truncated)" ]
-    | Failed(_, Some c, _) -> [ InfoItem.Status "exit_error"; InfoItem.ExitCode c ]
-    | Failed(_, None, Some sig') when sig' <> "" -> [ InfoItem.Status sig' ]
-    | Failed(output, _, _) when isSpawnFailedMessage output -> [ InfoItem.Status "spawn_failed" ]
-    | Failed(_, None, _) -> [ InfoItem.Status "exit_error" ]
-    | MissingExecutable _ -> [ InfoItem.Status "missing_executable" ]
+    | Completed(_, code) -> ExecutorStatus.Completed code
+    | Truncated(_, _) -> ExecutorStatus.KilledTimeout
+    | Failed(_, Some c, _) -> ExecutorStatus.ExitError(Some c)
+    | Failed(_, None, Some sig') when sig' <> "" -> ExecutorStatus.Signal sig'
+    | Failed(output, _, _) when isSpawnFailedMessage output -> ExecutorStatus.SpawnFailed
+    | Failed(_, None, _) -> ExecutorStatus.ExitError None
+    | MissingExecutable _ -> ExecutorStatus.MissingExecutable
+
+let applyExecutorStatus (result: ExecuteResult) (msg: ToolOutputMessage) : ToolOutputMessage =
+    let status = resolveExecutorStatus result
+
+    let codeOpt =
+        match status with
+        | ExecutorStatus.Completed code -> Some code
+        | ExecutorStatus.ExitError code -> code
+        | _ -> None
+
+    { msg with
+        status = Some(executorStatusText status)
+        exitCode = codeOpt }
 
 let readOnlyReadCommands: Set<string> =
     Set.ofList

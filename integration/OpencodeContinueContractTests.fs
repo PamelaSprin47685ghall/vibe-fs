@@ -23,7 +23,9 @@ let private deferred (name: string) : JS.Promise<unit> * (unit -> unit) =
         resolver.Value())
 
 let private iteratorFromOutput (output: string) : string option =
-    let m = System.Text.RegularExpressions.Regex.Match(output, @"iter-[a-zA-Z0-9_-]+")
+    let m =
+        System.Text.RegularExpressions.Regex.Match(output, @"(?:sci_s:[^\s""]+|iter-[a-zA-Z0-9_-]+)")
+
     if m.Success then Some m.Value else None
 
 let private completedMessages () : obj =

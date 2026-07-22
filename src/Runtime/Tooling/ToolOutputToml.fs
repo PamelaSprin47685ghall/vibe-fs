@@ -19,37 +19,39 @@ module BatchReport =
 
     let items (BatchReport reports) : SubagentReport list = reports
 
-let infoItemTable =
-    function
-    | InfoItem.Hint h -> Table [ "kind", String "hint"; "text", String h ]
-    | InfoItem.Syntax s -> Table [ "kind", String "syntax"; "text", String s ]
-    | InfoItem.Iterator i -> Table [ "kind", String "iterator"; "text", String i ]
-    | InfoItem.Status s -> Table [ "kind", String "status"; "text", String s ]
-    | InfoItem.ExitCode n -> Table [ "kind", String "exit_code"; "number", Integer n ]
-
 let toolOutputDocument (msg: ToolOutputMessage) : TomlValue =
-    let mutable fields = [ "body", String msg.body ]
+    let mutable fields = []
 
-    if not (List.isEmpty msg.info) then
-        let tables =
-            msg.info
-            |> List.rev
-            |> List.map (
-                infoItemTable
-                >> function
-                    | Table t -> t
-                    | _ -> []
-            )
+    match msg.body with
+    | Some b when b <> "" -> fields <- fields @ [ "body", String b ]
+    | _ -> ()
 
-        fields <- fields @ [ "info", TableArray tables ]
+    match msg.hint with
+    | Some h when h <> "" -> fields <- fields @ [ "hint", String h ]
+    | _ -> ()
+
+    match msg.syntax with
+    | Some s when s <> "" -> fields <- fields @ [ "syntax", String s ]
+    | _ -> ()
+
+    match msg.iterator with
+    | Some i when i <> "" -> fields <- fields @ [ "iterator", String i ]
+    | _ -> ()
+
+    match msg.status with
+    | Some st when st <> "" -> fields <- fields @ [ "status", String st ]
+    | _ -> ()
+
+    match msg.exitCode with
+    | Some code -> fields <- fields @ [ "exit_code", Integer code ]
+    | None -> ()
 
     Table fields
 
 let renderToolOutput (msg: ToolOutputMessage) : string =
-    if List.isEmpty msg.info && msg.body = "" then
-        ""
-    else
-        toolOutputDocument msg |> stringify
+    match toolOutputDocument msg with
+    | Table [] -> ""
+    | doc -> stringify doc
 
 let batchReportDocument (batch: BatchReport) : TomlValue =
     let reports = BatchReport.items batch

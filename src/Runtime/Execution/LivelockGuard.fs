@@ -3,7 +3,7 @@ module Wanxiangshu.Runtime.LivelockGuard
 open Fable.Core
 open Wanxiangshu.Runtime.RuntimeScope
 
-[<Emit("($0 === undefined || $0 === null) ? '{}' : JSON.stringify($0, (key, value) => { if (key === 'ui_') return undefined; return value; })")>]
+[<Emit("($0 === undefined || $0 === null) ? '{}' : JSON.stringify($0, (key, value) => { if (key === 'ui_' || key === 'warn' || key === 'warn_tdd' || key === 'warn_reuse' || key === 'amend' || key === 'follow-tdd-and-kolmogorov-principles' || key === 'impossible-via-other-tools' || key === 'not-suitable-via-continue-tool') return undefined; return value; })")>]
 let cleanArgsJson (args: obj) : string = jsNative
 
 type LivelockState =

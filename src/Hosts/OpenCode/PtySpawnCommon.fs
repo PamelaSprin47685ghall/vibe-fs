@@ -11,6 +11,8 @@ open Wanxiangshu.Kernel.ToolOutputInfoTypes
 open Wanxiangshu.Runtime.Tooling.ToolOutputToml
 open Wanxiangshu.Hosts.Opencode.ToolSchema
 
+open Wanxiangshu.Runtime.ToolOutputInfo
+
 module Dyn = Wanxiangshu.Runtime.Dyn
 
 [<Emit("import($0)")>]
@@ -124,7 +126,8 @@ let formatSpawnResponse (info: obj) : string =
         |> String.concat "\n"
 
     let msg =
-        { info = [ InfoItem.Status statusStr ]
-          body = bodyLines }
+        { empty with
+            status = Some statusStr
+            body = Some bodyLines }
 
     renderToolOutput msg

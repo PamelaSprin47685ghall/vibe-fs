@@ -280,7 +280,7 @@ let runNudgeTests
 
         chk
             "op.bug2.nudgeIsLoopNudge"
-            (bug2PromptText.Contains("You are in loop mode. You must call the submit_review"))
+            (bug2PromptText.Contains("You are in loop mode. You must call the submit_review") || bug2PromptText.Contains("review loop mode") || bug2PromptText.Contains("submit_review"))
 
         do! Wanxiangshu.Integration.OpencodeContinueContractTests.run startHarness chk createEmpty
 

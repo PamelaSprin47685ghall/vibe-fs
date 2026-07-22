@@ -7,37 +7,26 @@ open Wanxiangshu.Runtime.ToolOutputInfo
 open Wanxiangshu.Kernel.ToolOutputInfoTypes
 open Wanxiangshu.Runtime.Tooling.ToolOutputToml
 
-let private hint s = InfoItem.Hint s
-let private syntax s = InfoItem.Syntax s
-let private status s = InfoItem.Status s
-let private exitCode n = InfoItem.ExitCode n
-let private iterator s = InfoItem.Iterator s
-
 let testRenderEmpty () =
-    equal "render empty msg" "" (render { info = []; body = "" })
+    equal "render empty msg" "" (render empty)
 
 let testRenderBodyOnly () =
-    equal "render body only" "body = \"hello\"\n" (render { info = []; body = "hello" })
+    equal "render body only" "body = \"hello\"\n" (render (withBody "hello"))
 
 let testRenderHintOnly () =
-    let r = render { info = [ hint "test" ]; body = "" }
-    check "render hint contains body" (r.Contains "body = \"\"")
-    check "render hint contains info table" (r.Contains "[[info]]")
+    let r = render { empty with hint = Some "test" }
     check "render hint contains hint text" (r.Contains "test")
+    check "render hint uses flat key" (r.Contains "hint =")
 
 let testRenderBodyAndInfo () =
-    let r = render { info = [ hint "x" ]; body = "b" }
+    let r = render { empty with body = Some "b"; hint = Some "x" }
     check "body+info contains body" (r.Contains "body = \"b\"")
-    check "body+info contains info" (r.Contains "[[info]]")
+    check "body+info contains hint" (r.Contains "hint = \"x\"")
 
 let testNoChangeEnvelope () =
     let r = noChangeEnvelope ()
-    check "noChangeEnvelope contains info" (r.Contains "[[info]]")
     check "noChangeEnvelope has status" (r.Contains noChangeStatus)
-
-let testAppendInfo () =
-    let msg = { info = [ hint "a" ]; body = "" }
-    equal "appendInfo count" 2 (List.length (appendInfo (hint "b") msg).info)
+    check "noChangeEnvelope uses flat status" (r.Contains "status =")
 
 let testAddSyntax () =
     let r = addSyntax "code block" "fsharp"
@@ -61,21 +50,9 @@ let testHintForMethodologies () =
     check "hintForMethodologies nonempty" ((hintForMethodologies [ "a" ]).Contains "a")
     check "hintForMethodologies multiple" ((hintForMethodologies [ "a"; "b" ]).Contains "b")
 
-let testAppendMultiple () =
-    let msg = { info = []; body = "" }
-
-    let r =
-        appendInfo (hint "a") msg
-        |> appendInfo (syntax "py")
-        |> appendInfo (status "done")
-
-    equal "append info count" 3 (List.length r.info)
-    check "append preserves original" (msg.info.Length = 0)
-
 let testEmptyWithBody () =
     let msg = withBody "some body"
-    equal "withBody body" "some body" msg.body
-    check "withBody empty info" (List.isEmpty msg.info)
+    equal "withBody body" (Some "some body") msg.body
 
 let testConstants () =
     check "hintExecutorMisuse nonempty" (hintExecutorMisuse.Length > 0)
@@ -89,11 +66,9 @@ let run () =
     testRenderHintOnly ()
     testRenderBodyAndInfo ()
     testNoChangeEnvelope ()
-    testAppendInfo ()
     testAddSyntax ()
     testWithIterator ()
     testTodoWriteOutput ()
     testHintForMethodologies ()
-    testAppendMultiple ()
     testEmptyWithBody ()
     testConstants ()

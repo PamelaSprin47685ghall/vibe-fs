@@ -5,7 +5,7 @@ open Wanxiangshu.Kernel.ToolCatalog.ToolSpec
 let internal fuzzyFindSpec: ToolSpec =
     { name = "fuzzy_find"
       description =
-        "Search for files by fuzzy path text matching. Returns file paths ranked by relevance and frecency. Regex and glob syntax are not supported. When more results exist, the YAML front matter includes an iterator item for the next page."
+        "Search for files by fuzzy path text matching. Returns file paths ranked by relevance and frecency. Regex and glob syntax are not supported. When more results exist, the tool output carries an `iterator` field for the next page."
       paramDocs =
         map
             [ "pattern",
@@ -17,7 +17,7 @@ let internal fuzzyFindSpec: ToolSpec =
 let internal fuzzyGrepSpec: ToolSpec =
     { name = "fuzzy_grep"
       description =
-        "Search file contents using fuzzy-aware content search. Smart-case, git-aware, frecency-ranked. Supports automatic regex mode detection. Use mode=fuzzy explicitly for fuzzy matching when exact regex yields no results. When more results exist, the YAML front matter includes an iterator item for the next page."
+        "Search file contents using fuzzy-aware content search. Smart-case, git-aware, frecency-ranked. Supports automatic regex mode detection. Use mode=fuzzy explicitly for fuzzy matching when exact regex yields no results. When more results exist, the tool output carries an `iterator` field for the next page."
       paramDocs =
         map
             [ "pattern",

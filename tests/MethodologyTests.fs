@@ -16,10 +16,7 @@ let todoWriteOutputExact () =
     check "todo envelope: single methodology" ((todoWriteOutput [ "first_principles" ]).Contains "first_principles")
     check "todo envelope: multiple methodologies" ((todoWriteOutput [ "a"; "b" ]).Contains "b")
 
-    let multi =
-        hintMethodologyFollowup "first_principles"
-        + " "
-        + hintMethodologyFollowup "deduction"
+    let multi = hintForMethodologies [ "first_principles"; "deduction" ]
 
     check
         "todo envelope: multiple methodologies"

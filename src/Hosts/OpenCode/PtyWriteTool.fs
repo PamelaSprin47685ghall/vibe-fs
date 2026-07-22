@@ -12,6 +12,8 @@ open Wanxiangshu.Runtime.Tooling.ToolOutputToml
 open Wanxiangshu.Hosts.Opencode.ToolSchema
 open Wanxiangshu.Hosts.Opencode.PtySpawn
 
+open Wanxiangshu.Runtime.ToolOutputInfo
+
 module Dyn = Wanxiangshu.Runtime.Dyn
 
 let ptyWriteTool (host: Host) : obj =
@@ -57,8 +59,9 @@ let ptyWriteTool (host: Host) : obj =
                 let bodyText = sprintf "Sent: \"%s\"\nid: %s\nbytes: %d" display id data.Length
 
                 let msg =
-                    { info = [ InfoItem.Status "written" ]
-                      body = bodyText }
+                    { empty with
+                        status = Some "written"
+                        body = Some bodyText }
 
                 return renderToolOutput msg
             })

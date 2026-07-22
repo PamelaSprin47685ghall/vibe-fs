@@ -8,7 +8,7 @@ let hasSyntaxInOutput (s: string) : bool =
     if System.String.IsNullOrWhiteSpace s then
         false
     else
-        s.Contains("kind = \"syntax\"") || s.Contains("kind = 'syntax'")
+        s.Contains("syntax =") || s.Contains("kind = \"syntax\"") || s.Contains("kind = 'syntax'")
 
 let appendSyntaxDiagnosticsToOutput (currentOutput: string) (filePath: string) (result: SyntaxCheckResult) : string =
     match formatSyntaxDiagnostics filePath result false with
@@ -33,5 +33,5 @@ let formatWriteSyntaxResult (filePath: string) (result: SyntaxCheckResult) : str
     let successBody = $"Successfully wrote to {filePath}"
 
     match result with
-    | Ok(_, [||]) -> render { empty with body = successBody }
+    | Ok(_, [||]) -> render { empty with body = Some successBody }
     | _ -> addSyntax successBody syntaxText

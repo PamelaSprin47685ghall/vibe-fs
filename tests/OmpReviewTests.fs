@@ -156,6 +156,7 @@ let returnReviewerViaSetPendingStateForTest () =
             createObj [ "sessionManager", box (createObj [ "getSessionId", box (fun () -> box reviewSessionId) ]) ]
 
         let firstPending = createResolvablePromise ()
+        reviewStore.recordChallengeRequested reviewSessionId
         setPendingReviewStateForTest reviewStore reviewSessionId parentSessionId firstPending
         let! passResult1 = executeTool tool "call-1" (createObj [ "verdict", box "PERFECT" ]) ctx
         check "PERFECT first pass double-check prompt" ((toolText passResult1).Contains "objective =")

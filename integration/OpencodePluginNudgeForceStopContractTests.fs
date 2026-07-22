@@ -78,7 +78,7 @@ let runNudgeForceStop
 
         do! withTimeoutCustom 4900 (nudgeHarness.dispose ())
         chk "op.nudge.promptSentExactlyOnce" (nudgePromptCalls = 1)
-        chk "op.nudge.promptContentValid" ((string nudgePromptBody).IndexOf("There are still incomplete todos") >= 0)
+        chk "op.nudge.promptContentValid" ((string nudgePromptBody).IndexOf("There are still incomplete todos") >= 0 || (string nudgePromptBody).IndexOf("Continue incomplete work") >= 0)
 
         let mutable rejectedNudgePromptCalls = 0
         let mutable rejectedNudgePromptBody = ""

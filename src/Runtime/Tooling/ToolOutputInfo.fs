@@ -18,46 +18,48 @@ let hintForMethodologies (methodologies: string list) : string =
     | [] -> hintTodosUpdated
     | names -> names |> List.map hintMethodologyFollowup |> String.concat " "
 
-let empty = { info = []; body = "" }
+let empty =
+    { body = None
+      hint = None
+      syntax = None
+      iterator = None
+      status = None
+      exitCode = None }
 
-let private normalizedBody (s: string) = if isNull s then "" else s
+let private normalizedBody (s: string) = if System.String.IsNullOrWhiteSpace s then None else Some s
 
 let withBody body =
     { empty with
         body = normalizedBody body }
 
-let appendInfo item (msg: ToolOutputMessage) : ToolOutputMessage = { msg with info = item :: msg.info }
-
 let render (msg: ToolOutputMessage) : string = renderToolOutput msg
 
 let noChangeEnvelope () =
-    render
-        { info = [ InfoItem.Status noChangeStatus ]
-          body = "" }
+    render { empty with status = Some noChangeStatus }
 
 let addSyntax (raw: string) (syntax: string) : string =
     if System.String.IsNullOrWhiteSpace syntax then
         raw
     elif System.String.IsNullOrWhiteSpace raw then
-        render
-            { empty with
-                info = [ InfoItem.Syntax syntax ]
-                body = "" }
+        render { empty with syntax = Some syntax }
     else
         render
             { empty with
-                info = [ InfoItem.Syntax syntax ]
-                body = raw }
+                body = Some raw
+                syntax = Some syntax }
 
 let withIterator (body: string) (iterator: string) : string =
-    if iterator = "" then
+    let iterOpt = if System.String.IsNullOrWhiteSpace iterator then None else Some iterator
+    let bodyOpt = if System.String.IsNullOrWhiteSpace body then None else Some body
+
+    if Option.isNone iterOpt then
         body
     else
         render
             { empty with
-                info = [ InfoItem.Iterator iterator ]
-                body = body }
+                body = bodyOpt
+                iterator = iterOpt }
 
 let todoWriteOutput (methodologies: string list) : string =
-    let hints = [ InfoItem.Hint(hintForMethodologies methodologies) ]
-    render { empty with info = hints; body = "" }
+    let hintStr = hintForMethodologies methodologies
+    render { empty with hint = Some hintStr }

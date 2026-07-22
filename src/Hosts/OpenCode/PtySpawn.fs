@@ -12,6 +12,8 @@ open Wanxiangshu.Runtime.Tooling.ToolOutputToml
 open Wanxiangshu.Hosts.Opencode.ToolSchema
 open Wanxiangshu.Hosts.Opencode
 
+open Wanxiangshu.Runtime.ToolOutputInfo
+
 module Dyn = Wanxiangshu.Runtime.Dyn
 
 let newRegex (pattern: string) (flags: string) : obj = PtySpawnCommon.newRegex pattern flags
@@ -96,8 +98,9 @@ let private executePtyKill (mgr: obj) (id: string) (sessionId: string) (cleanup:
         |> String.concat "\n"
 
     let msg =
-        { info = [ InfoItem.Status statusStr ]
-          body = bodyLines }
+        { empty with
+            status = Some statusStr
+            body = Some bodyLines }
 
     renderToolOutput msg
 
@@ -162,8 +165,9 @@ let ptyListTool (host: Host) : obj =
                         sprintf "count: %d\n%s" sessions.Length body
 
                 let msg =
-                    { info = [ InfoItem.Status(sprintf "count=%d" sessions.Length) ]
-                      body = bodyLines }
+                    { empty with
+                        status = Some(sprintf "count=%d" sessions.Length)
+                        body = Some bodyLines }
 
                 return renderToolOutput msg
             })

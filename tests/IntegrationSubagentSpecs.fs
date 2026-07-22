@@ -95,7 +95,7 @@ let coderToolSpec () =
 
             check
                 "coder prompt includes first intent do_not_touch"
-                (firstPrompt.Contains("do_not_touch:")
+                (firstPrompt.Contains("boundaries")
                  && firstPrompt.Contains("src/shared.fs")
                  && firstPrompt.Contains("Do not rename public API"))
 

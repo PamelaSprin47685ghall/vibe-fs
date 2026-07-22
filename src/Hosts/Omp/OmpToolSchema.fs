@@ -73,7 +73,7 @@ let continueParameters (tb: obj) : obj =
     objectOf
         [| ("iterator",
             str
-                "The iterator ID representing the target subagent session (usually returned in the front matter of a previous subagent run)."
+                "The iterator ID representing the target subagent session (usually returned in the `iterator` field of an entry in the prior batch's `[[reports]]` table)."
                 tb)
            ("prompt", str "The new query, instructions, or follow-up question to send to the subagent session." tb) |]
         tb

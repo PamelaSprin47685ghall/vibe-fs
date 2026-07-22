@@ -8,6 +8,8 @@ open Wanxiangshu.Kernel.ToolOutputInfoTypes
 open Wanxiangshu.Runtime.Tooling.ToolOutputToml
 open Wanxiangshu.Hosts.Opencode.PtySpawn
 
+open Wanxiangshu.Runtime.ToolOutputInfo
+
 module Dyn = Wanxiangshu.Runtime.Dyn
 
 let readUnfiltered (mgr: obj) (id: string) (session: obj) (offset: int) (limit: int) : JS.Promise<string> =
@@ -48,8 +50,9 @@ let readUnfiltered (mgr: obj) (id: string) (session: obj) (offset: int) (limit: 
             sb.Add(sprintf "(End of buffer - total %d lines)" totalLines)
 
         let msg =
-            { info = [ InfoItem.Status statusStr ]
-              body = String.concat "\n" sb }
+            { empty with
+                status = Some statusStr
+                body = Some(String.concat "\n" sb) }
 
         return renderToolOutput msg
     }
@@ -105,8 +108,9 @@ let private formatFilteredResult
             )
 
     let msg =
-        { info = [ InfoItem.Status statusStr ]
-          body = String.concat "\n" sb }
+        { empty with
+            status = Some statusStr
+            body = Some(String.concat "\n" sb) }
 
     renderToolOutput msg
 
