@@ -41,11 +41,13 @@ let private ompCapsToKernel (files: OmpCapsFile list) : CapsFile list =
 let private buildTextPart (text: string) : obj =
     createObj [ "type", box "text"; "text", box text ]
 
+/// Caps injection envelope: XML markers are host-wide synthetic-message protocol
+/// (MessageSourceClassify). Capability files use native read-tool synth parts.
 let private buildUserEntry (userId: string) (sessionId: string) (preludeText: string option) (version: string) : obj =
-    let body = userCapsText preludeText
+    let prelude = userCapsText preludeText
 
     let text =
-        $"<wanxiangshu-caps epoch='{sessionId}' version='{version}'>\n{body}\n</wanxiangshu-caps>"
+        $"<wanxiangshu-caps epoch='{sessionId}' version='{version}'>\n{prelude}\n</wanxiangshu-caps>"
 
     let info = createObj [ "id", box userId; "role", box "user" ]
 

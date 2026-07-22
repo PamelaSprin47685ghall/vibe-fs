@@ -4,26 +4,25 @@ open Wanxiangshu.Kernel.HostTools
 open Wanxiangshu.Kernel.Prompt
 open Wanxiangshu.Runtime.Prompt
 
-/// Atomic read-only constraints (structured rules only).
+/// Atomic read-only constraints (natural-language rules, no PREFIX: prose markers).
 let readOnlyConstraintsFor (host: Host) : PromptRule list =
-    [ PromptRule.Constraint "READ_ONLY: do not write, edit, patch, or create files."
-      PromptRule.Constraint "NO_MUTATING_TOOLS: do not run commands or call mutating tools."
-      PromptRule.Constraint
-          ("NO_TODO_WRITE: do not call " + todoWritePromptName host + " or equivalent task-mutation tools.")
-      PromptRule.Constraint "NO_WORKSPACE_STATE_CHANGE: do not change workspace state; output reports only." ]
+    [ PromptRule.Constraint "Do not write, edit, patch, or create files."
+      PromptRule.Constraint "Do not run commands or call mutating tools."
+      PromptRule.Constraint("Do not call " + todoWritePromptName host + " or equivalent task-mutation tools.")
+      PromptRule.Constraint "Do not change workspace state; output reports only." ]
 
 let readOnlyConstraints = readOnlyConstraintsFor opencode
 
-/// Atomic evaluation criteria — one Criterion per concern.
+/// Atomic evaluation criteria — one Criterion per concern (no PREFIX: markers).
 let reviewCriteriaItems: string list =
-    [ "LANGUAGE_FIT: full use of language features; correct algorithms and data structures."
-      "MINIMAL_COMPLEXITY: no more complexity than necessary; no garbage, dead, legacy-wrapper, or workaround code."
-      "STRUCTURE: elegant structure free of redundancy."
-      "SIZE: no oversized files, overly long functions, or avoidable complexity."
-      "TESTS: necessary unit or integration tests exist."
-      "CORRECTNESS: no design flaws, logic errors, or best-practice violations."
-      "UX: result is natural and intuitive for the user or caller."
-      "COMPLETENESS: fully satisfies the original task without cutting corners." ]
+    [ "Use language features fully; prefer correct algorithms and data structures."
+      "Keep complexity minimal; remove garbage, dead, legacy-wrapper, and workaround code."
+      "Prefer elegant structure free of redundancy."
+      "Avoid oversized files, overly long functions, and avoidable complexity."
+      "Ensure necessary unit or integration tests exist."
+      "Reject design flaws, logic errors, and best-practice violations."
+      "Result should feel natural and intuitive for the user or caller."
+      "Fully satisfy the original task without cutting corners." ]
 
 let reviewCriteriaRules: PromptRule list =
     reviewCriteriaItems |> List.map PromptRule.Criterion
@@ -75,7 +74,7 @@ let loopNudgePromptFor (todos: string list) : string =
 let todoNudgePrompt = todoNudgePromptFor []
 let loopNudgePrompt = loopNudgePromptFor []
 
-let runnerNudgePromptDocument (host: Host) : PromptDocument =
+let runnerNudgePromptDocument (_host: Host) : PromptDocument =
     let view =
         { objective = "Manage active background runner task"
           background = Some "A background runner task is still active"

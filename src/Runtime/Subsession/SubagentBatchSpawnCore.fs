@@ -92,8 +92,10 @@ let private wrapWithIterator
         let spawnedChildId =
             resolveSpawnedChildId provenChildId role getChildIDForSpawn host registry scope
 
+        let parsed = Wanxiangshu.Runtime.SubagentReportParse.parseSubagentReportText text
+
         match spawnedChildId with
-        | None -> return { iterator = None; summary = Some text; error = None; findings = []; relatedFiles = []; relatedCode = [] }
+        | None -> return parsed
         | Some cid ->
             let roleStr =
                 match role with
@@ -124,7 +126,9 @@ let private wrapWithIterator
                         roleStr
                         title
 
-            return { iterator = Some iter; summary = Some text; error = None; findings = []; relatedFiles = []; relatedCode = [] }
+            return
+                { parsed with
+                    iterator = Some iter }
     }
 
 let spawnOne

@@ -54,16 +54,10 @@ let promptsForParallelIntents (host: Host) (constructor: 'a -> SubagentTaskKind)
 let browserPromptText (host: Host) (intent: string) : string =
     formatPrompt host (Browser intent) |> List.head
 
-/// Boundary helper for free-text subagent replies (no structured agent_report).
-let reportFromSummary (summary: string) : SubagentReport =
-    let trimmed = summary.Trim()
+open Wanxiangshu.Runtime.SubagentReportParse
 
-    { iterator = None
-      summary = if trimmed = "" then None else Some trimmed
-      error = None
-      findings = []
-      relatedFiles = []
-      relatedCode = [] }
+/// Parse free-text / lightly-structured agent report into SubagentReport fields.
+let reportFromText (text: string) : SubagentReport = parseSubagentReportText text
 
 /// Join typed SubagentReport rows as BatchReport TOML (`[[reports]]`).
 let joinReports (reports: SubagentReport seq) : string =

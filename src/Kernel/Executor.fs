@@ -47,17 +47,24 @@ type ExecuteOptions =
       maxBytes: int }
 
 type ExecuteResult =
-    | Completed of output: string * exitCode: int
-    | Truncated of output: string * timeoutType: ExecutorTimeoutType
-    | Failed of output: string * exitCode: int option * signal: string option
-    | MissingExecutable of executable: string * output: string
+    | Completed of stdout: string * stderr: string * exitCode: int
+    | Truncated of stdout: string * stderr: string * timeoutType: ExecutorTimeoutType
+    | Failed of stdout: string * stderr: string * exitCode: int option * signal: string option
+    | MissingExecutable of executable: string * message: string
 
 let outputFromResult (result: ExecuteResult) : string =
     match result with
-    | Completed(o, _)
-    | Truncated(o, _)
-    | Failed(o, _, _)
-    | MissingExecutable(_, o) -> o
+    | Completed(stdout, _, _)
+    | Truncated(stdout, _, _)
+    | Failed(stdout, _, _, _)
+    | MissingExecutable(_, stdout) -> stdout
+
+let stderrFromResult (result: ExecuteResult) : string option =
+    match result with
+    | Completed(_, stderr, _)
+    | Truncated(_, stderr, _)
+    | Failed(_, stderr, _, _) when stderr.Trim() <> "" -> Some(stderr.Trim())
+    | _ -> None
 
 let private isSpawnFailedMessage (output: string) = output.StartsWith "spawn failed:"
 
@@ -81,12 +88,12 @@ let executorStatusText =
 
 let resolveExecutorStatus (result: ExecuteResult) : ExecutorStatus =
     match result with
-    | Completed(_, code) -> ExecutorStatus.Completed code
-    | Truncated(_, _) -> ExecutorStatus.KilledTimeout
-    | Failed(_, Some c, _) -> ExecutorStatus.ExitError(Some c)
-    | Failed(_, None, Some sig') when sig' <> "" -> ExecutorStatus.Signal sig'
-    | Failed(output, _, _) when isSpawnFailedMessage output -> ExecutorStatus.SpawnFailed
-    | Failed(_, None, _) -> ExecutorStatus.ExitError None
+    | Completed(_, _, code) -> ExecutorStatus.Completed code
+    | Truncated(_, _, _) -> ExecutorStatus.KilledTimeout
+    | Failed(_, _, Some c, _) -> ExecutorStatus.ExitError(Some c)
+    | Failed(_, _, None, Some sig') when sig' <> "" -> ExecutorStatus.Signal sig'
+    | Failed(output, _, _, _) when isSpawnFailedMessage output -> ExecutorStatus.SpawnFailed
+    | Failed(_, _, None, _) -> ExecutorStatus.ExitError None
     | MissingExecutable _ -> ExecutorStatus.MissingExecutable
 
 let readOnlyReadCommands: Set<string> =

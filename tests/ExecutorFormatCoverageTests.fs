@@ -43,7 +43,7 @@ let summarizerInputCap () =
           maxBytes = 8192 }
 
     let small = String.replicate 100 "x"
-    let smallPrompt = buildSummaryPrompt bl trunc opts (Completed(small, 0))
+    let smallPrompt = buildSummaryPrompt bl trunc opts (Completed(small, "", 0))
     check "small output kept whole" (smallPrompt.Contains small)
 
     check
@@ -53,7 +53,7 @@ let summarizerInputCap () =
     let marker = "END_OF_OUTPUT_TAIL"
     let large = String.replicate (200_000 + 100 - marker.Length) "x" + marker
     let tail = marker
-    let largePrompt = buildSummaryPrompt bl trunc opts (Completed(large, 0))
+    let largePrompt = buildSummaryPrompt bl trunc opts (Completed(large, "", 0))
     check "large output truncated message" (largePrompt.Contains "[Output truncated to 200000 bytes for summarization]")
     check "large output tail absent" (not (largePrompt.Contains tail))
 
@@ -96,14 +96,16 @@ let safetyWarning () =
         (not (hasExactHint (prependSafetyWarning empty "grep foo" Python) hintExecutorMisuse))
 
 let executorToolResponseFormatting () =
-    let completedResult = Completed("all good", 0)
-    let failedResult = Failed("boom", Some 2, None)
-    let truncatedResult = Truncated("partial", Long)
+    let completedResult = Completed("all good", "", 0)
+    let failedResult = Failed("boom", "err-stream", Some 2, None)
+    let truncatedResult = Truncated("partial", "", Long)
     let missingResult = MissingExecutable("bash", "Error: not found")
     equal "outputFromResult completed" "all good" (outputFromResult completedResult)
     equal "outputFromResult failed" "boom" (outputFromResult failedResult)
     equal "outputFromResult truncated" "partial" (outputFromResult truncatedResult)
     equal "outputFromResult missing" "Error: not found" (outputFromResult missingResult)
+    equal "stderrFromResult failed" (Some "err-stream") (stderrFromResult failedResult)
+    equal "stderrFromResult completed empty" None (stderrFromResult completedResult)
     let resp = formatToolResponse completedResult None |> render
     check "response includes output payload" (resp.Contains "all good")
     check "response includes exit_code" (resp.Contains "0")
@@ -117,7 +119,7 @@ let executorToolResponseFormatting () =
     check "truncated response omits timeout_ms field" (not (truncatedResp.Contains "timeout_ms:"))
     check "truncated response omits timeout hints" (not (truncatedResp.Contains "Killed after"))
     check "truncated payload excludes legacy executor suffix" (not (truncatedResp.Contains "[executor]"))
-    let signaledResult = Failed("partial out", None, Some "SIGTERM")
+    let signaledResult = Failed("partial out", "", None, Some "SIGTERM")
     let signaledResp = formatToolResponse signaledResult None |> render
     check "signaled response includes signal as status" (signaledResp.Contains "SIGTERM")
     check "signaled response omits legacy signal field" (not (signaledResp.Contains "signal: SIGTERM"))

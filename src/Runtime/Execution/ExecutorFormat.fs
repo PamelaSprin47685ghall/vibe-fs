@@ -21,7 +21,7 @@ let private executorStatusValues (result: ExecuteResult) : string * int option *
 
     let signal =
         match result with
-        | Failed(_, _, Some sig') when sig' <> "" -> Some sig'
+        | Failed(_, _, _, Some sig') when sig' <> "" -> Some sig'
         | _ -> None
 
     let truncated =
@@ -39,7 +39,7 @@ let formatToolResponse (result: ExecuteResult) (summaryOption: string option) : 
         content =
             Executor
                 { stdout = stdout
-                  stderr = None
+                  stderr = stderrFromResult result
                   exitCode = exitCode
                   signal = signal
                   exitStatus = status
@@ -75,7 +75,7 @@ let buildExecutorEvidence
             raw, false
 
     { stdout = capped
-      stderr = None
+      stderr = stderrFromResult result
       exitStatus = status
       exitCode = exitCode
       signal = signal

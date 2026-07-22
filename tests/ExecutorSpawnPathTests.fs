@@ -78,30 +78,30 @@ let executorMapping () =
           maxBytes = 8192 }
 
     let run o =
-        Wanxiangshu.Runtime.Executor.mapOutcome opts 10000 "out" o
+        Wanxiangshu.Runtime.Executor.mapOutcome opts 10000 "out" "err" o
 
     check
         "exit0→Completed"
-        (match run (Exited(0, "", "")) with
-         | Completed _ -> true
+        (match run (Exited(0, "out", "err")) with
+         | Completed(stdout, stderr, 0) when stdout = "out" && stderr = "err" -> true
          | _ -> false)
 
     check
         "nonzero→Failed"
-        (match run (Exited(2, "", "")) with
-         | Failed _ -> true
+        (match run (Exited(2, "out", "err")) with
+         | Failed(stdout, stderr, Some 2, None) when stdout = "out" && stderr = "err" -> true
          | _ -> false)
 
     check
         "timeout→Truncated"
-        (match run (TimedOut("", "")) with
+        (match run (TimedOut("out", "err")) with
          | Truncated _ -> true
          | _ -> false)
 
     check
         "signaled→Failed"
-        (match run (Signaled("SIGKILL", "", "")) with
-         | Failed _ -> true
+        (match run (Signaled("SIGKILL", "out", "err")) with
+         | Failed(_, _, None, Some "SIGKILL") -> true
          | _ -> false)
 
     check

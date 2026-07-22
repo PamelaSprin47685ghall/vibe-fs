@@ -59,23 +59,24 @@ let formatModelString (providerId: string) (modelId: string) (variant: string op
         | Some v when v <> "" -> Some(sprintf "%s/%s:%s" providerId modelId v)
         | _ -> Some(sprintf "%s/%s" providerId modelId)
 
-/// Build sessionPrompt body. Model key is omitted when None (not empty string).
+/// OMP host prompt envelope: structured fields { text; model?; continuationID?; agent? }.
+/// Variable name is host-API "body" (session.prompt arg), not a freeform prompt bag.
 let buildSessionPromptBody (text: string) (model: string option) (continuationId: string option) (agent: string option) : obj =
-    let mutable body: obj = box {| text = text |}
+    let mutable payload: obj = box {| text = text |}
 
     match model with
-    | Some m when m <> "" -> body <- Dyn.withKey body "model" (box m)
+    | Some m when m <> "" -> payload <- Dyn.withKey payload "model" (box m)
     | _ -> ()
 
     match continuationId with
-    | Some c when c <> "" -> body <- Dyn.withKey body "continuationID" (box c)
+    | Some c when c <> "" -> payload <- Dyn.withKey payload "continuationID" (box c)
     | _ -> ()
 
     match agent with
-    | Some a when a <> "" -> body <- Dyn.withKey body "agent" (box a)
+    | Some a when a <> "" -> payload <- Dyn.withKey payload "agent" (box a)
     | _ -> ()
 
-    body
+    payload
 
 let sessionPrompt (session: obj) (prompt: string) : JS.Promise<obj> =
     unbox<JS.Promise<obj>> (Dyn.callMethod1 session "prompt" (box prompt))

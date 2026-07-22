@@ -44,43 +44,44 @@ let timeoutMsValues () =
 // ── outputFromResult ──────────────────────────────────────────────────
 
 let outputFromResultAllVariants () =
-    equal "Completed" "out" (outputFromResult (Completed("out", 0)))
-    equal "Truncated" "part" (outputFromResult (Truncated("part", Short)))
-    equal "Failed" "err" (outputFromResult (Failed("err", Some 1, None)))
+    equal "Completed" "out" (outputFromResult (Completed("out", "", 0)))
+    equal "Truncated" "part" (outputFromResult (Truncated("part", "", Short)))
+    equal "Failed" "err" (outputFromResult (Failed("err", "se", Some 1, None)))
     equal "MissingExecutable" "msg" (outputFromResult (MissingExecutable("bash", "msg")))
+    equal "stderrFromResult" (Some "se") (stderrFromResult (Failed("err", "se", Some 1, None)))
 
 // ── formatToolResponse ────────────────────────────────────────────────
 
 let formatCompletedNoSummary () =
-    let resp = formatToolResponse (Completed("hello", 0)) None |> render
+    let resp = formatToolResponse (Completed("hello", "", 0)) None |> render
     check "contains body" (resp.Contains "hello")
     check "contains status completed" (resp.Contains "completed")
     check "contains exit_code" (resp.Contains "0")
 
 let formatCompletedWithSummary () =
-    let resp = formatToolResponse (Completed("raw", 0)) (Some "SUMMARY") |> render
+    let resp = formatToolResponse (Completed("raw", "", 0)) (Some "SUMMARY") |> render
     check "summary is body" (resp.Contains "SUMMARY")
     check "no raw output" (not (resp.Contains "raw"))
 
 let formatTruncatedBodyRef () =
-    let resp = formatToolResponse (Truncated("x", Short)) None |> render
+    let resp = formatToolResponse (Truncated("x", "", Short)) None |> render
     check "uses truncated body ref" (resp.Contains "truncated = true")
 
 let formatCompletedBodyRef () =
-    let resp = formatToolResponse (Completed("x", 0)) None |> render
+    let resp = formatToolResponse (Completed("x", "", 0)) None |> render
     check "no tool_output field" (not (resp.Contains "tool_output:"))
 
 let formatToolResponseFailedSignal () =
-    let resp = formatToolResponse (Failed("partial", None, Some "SIGTERM")) None |> render
+    let resp = formatToolResponse (Failed("partial", "err", None, Some "SIGTERM")) None |> render
     check "signal status" (resp.Contains "SIGTERM")
 
 let formatToolResponseFailedExitCode () =
-    let resp = formatToolResponse (Failed("err", Some 2, None)) None |> render
+    let resp = formatToolResponse (Failed("err", "se", Some 2, None)) None |> render
     check "exit error status" (resp.Contains "exit_error")
     check "exit code 2" (resp.Contains "2")
 
 let formatToolResponseSpawnFailed () =
-    let resp = formatToolResponse (Failed("spawn failed: ENOENT", None, None)) None |> render
+    let resp = formatToolResponse (Failed("spawn failed: ENOENT", "", None, None)) None |> render
     check "spawn failed status" (resp.Contains "spawn_failed")
 
 let formatToolResponseMissingExec () =
@@ -220,7 +221,7 @@ let buildSummaryPromptSmall () =
           maxBytes = 8192 }
 
     let prompt =
-        buildSummaryPrompt byteLength truncateToBytes opts (Completed("small output", 0))
+        buildSummaryPrompt byteLength truncateToBytes opts (Completed("small output", "", 0))
 
     check "contains raw output" (prompt.Contains "small output")
     check "no truncation marker" (not (prompt.Contains "[Output truncated to 200000 bytes for summarization]"))
@@ -238,7 +239,7 @@ let buildSummaryPromptLarge () =
           maxBytes = 8192 }
 
     let large = String.replicate 200_001 "x"
-    let prompt = buildSummaryPrompt byteLength truncateUtf8 opts (Completed(large, 0))
+    let prompt = buildSummaryPrompt byteLength truncateUtf8 opts (Completed(large, "", 0))
     check "large truncation marker present" (prompt.Contains "[Output truncated to 200000 bytes for summarization]")
 
 let buildSummaryPromptUtf8Boundary () =
@@ -254,7 +255,7 @@ let buildSummaryPromptUtf8Boundary () =
           maxBytes = 8192 }
 
     let raw = String.replicate 66_667 "你"
-    let prompt = buildSummaryPrompt byteLength truncateUtf8 opts (Completed(raw, 0))
+    let prompt = buildSummaryPrompt byteLength truncateUtf8 opts (Completed(raw, "", 0))
     check "utf8 truncation marker present" (prompt.Contains "[Output truncated to 200000 bytes for summarization]")
     check "utf8 truncation preserves whole chars" (not (prompt.Contains "�"))
     check "utf8 truncation excludes partial tail" (not (prompt.EndsWith "你"))

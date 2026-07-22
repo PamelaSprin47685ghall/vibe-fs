@@ -18,11 +18,13 @@ let private buildTextPart (text: string) : obj =
 let private buildMuxMessage (id: string) (role: string) (parts: obj array) : obj =
     createObj [ "id", box id; "role", box role; "parts", box parts ]
 
+/// Caps injection envelope: XML markers are host-wide synthetic-message protocol
+/// (MessageSourceClassify). Capability file content is native Mux file_read tool parts.
 let private buildUserMessage (userId: string) (preludeText: string option) (epochId: string) (version: string) : obj =
-    let body = userCapsText preludeText
+    let prelude = userCapsText preludeText
 
     let wrappedText =
-        $"<wanxiangshu-caps epoch='{epochId}' version='{version}'>\n{body}\n</wanxiangshu-caps>"
+        $"<wanxiangshu-caps epoch='{epochId}' version='{version}'>\n{prelude}\n</wanxiangshu-caps>"
 
     buildMuxMessage userId "user" [| buildTextPart wrappedText |]
 

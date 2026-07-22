@@ -31,8 +31,9 @@ let private executePrompt (session: obj) (turn: TurnPlan) : JS.Promise<obj> =
     match modelOpt with
     | None -> sessionPrompt session turn.Prompt
     | Some modelStr ->
-        let body = buildSessionPromptBody turn.Prompt (Some modelStr) None None
-        unbox<JS.Promise<obj>> (session?prompt (body))
+        // OMP host envelope (text/model/agent fields) — not a freeform TOML bag.
+        let promptPayload = buildSessionPromptBody turn.Prompt (Some modelStr) None None
+        unbox<JS.Promise<obj>> (session?prompt (promptPayload))
 
 /// Prompt resolve alone is NOT acceptance (SPEC §4.5). Only UserMessageObserved id → Ok.
 let dispatch

@@ -27,20 +27,31 @@ let missingExecutableFor = ExecutorSpawn.missingExecutableFor
 let abortExecutorRun (scope: RuntimeScope) (sessionId: string) : unit =
     Wanxiangshu.Runtime.SessionExecutor.abortExecutorRun scope sessionId
 
-let mapOutcome (options: ExecuteOptions) (timeout: int) (output: string) (outcome: RunOutcome) : ExecuteResult =
+let private trimOut (s: string) = s.Trim()
+
+let mapOutcome
+    (options: ExecuteOptions)
+    (_timeout: int)
+    (stdout: string)
+    (stderr: string)
+    (outcome: RunOutcome)
+    : ExecuteResult =
+    let out = trimOut stdout
+    let err = trimOut stderr
+
     match outcome with
-    | TimedOut _ -> Truncated(output = partialStdout output, timeoutType = options.timeoutType)
-    | Signaled(signal, _, _) -> Failed(partialStdout output, None, Some signal)
+    | TimedOut _ -> Truncated(partialStdout out, err, options.timeoutType)
+    | Signaled(signal, _, _) -> Failed(partialStdout out, err, None, Some signal)
     | Exited(0, _, _) ->
-        let body = if output = "" then "(no output)" else output
-        Completed(body, 0)
-    | Exited(code, _, _) -> Failed(output, Some code, None)
+        let body = if out = "" && err = "" then "(no output)" else out
+        Completed(body, err, 0)
+    | Exited(code, _, _) -> Failed(out, err, Some code, None)
     | SpawnFailed(ExecutorExecutableMissing exe) ->
         MissingExecutable(
             exe,
             $"Error: '{exe}' executable not found. Please ensure '{exe}' is installed and available on your PATH."
         )
-    | SpawnFailed reason -> Failed($"spawn failed: {formatDomainError reason}", None, None)
+    | SpawnFailed reason -> Failed($"spawn failed: {formatDomainError reason}", "", None, None)
 
 let executeWith
     (deps: ExecuteDeps)
@@ -58,14 +69,14 @@ let executeWith
         let! outcome =
             deps.runProgram scope program options.language options.dependencies cwd sessionId deadline onKillRegistered
 
-        let output =
+        let stdout, stderr =
             match outcome with
-            | Exited(_, stdout, stderr)
-            | TimedOut(stdout, stderr)
-            | Signaled(_, stdout, stderr) -> (stdout + stderr).Trim()
-            | SpawnFailed _ -> ""
+            | Exited(_, so, se)
+            | TimedOut(so, se)
+            | Signaled(_, so, se) -> so, se
+            | SpawnFailed _ -> "", ""
 
-        return mapOutcome options timeout output outcome
+        return mapOutcome options timeout stdout stderr outcome
     }
 
 let execute (scope: RuntimeScope) (options: ExecuteOptions) (sessionId: string) : JS.Promise<ExecuteResult> =
