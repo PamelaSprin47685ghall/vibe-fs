@@ -11,13 +11,11 @@ type PtySpawnInfo =
       pid: int
       status: string
       notifyOnExit: bool
-      timeoutSeconds: string
-      message: string }
+      timeoutSeconds: string }
 
 let ptySpawnDocument (info: PtySpawnInfo) : TomlValue =
     Table
-        [ "message", String info.message
-          "id", String info.id
+        [ "id", String info.id
           "title", String info.title
           "command", String info.command
           "workdir", String info.workdir
@@ -63,13 +61,11 @@ type PtyKillInfo =
       command: string
       status: string
       finalLineCount: int
-      note: string
-      message: string }
+      note: string }
 
 let ptyKillDocument (info: PtyKillInfo) : TomlValue =
     Table
-        [ "message", String info.message
-          "id", String info.id
+        [ "id", String info.id
           "action", String info.action
           "cleanup", Boolean info.cleanup
           "title", String info.title
@@ -122,13 +118,11 @@ type PtyWriteInfo =
     { id: string
       display: string
       bytes: int
-      status: string
-      message: string }
+      status: string }
 
 let ptyWriteDocument (info: PtyWriteInfo) : TomlValue =
     Table
-        [ "message", String info.message
-          "id", String info.id
+        [ "id", String info.id
           "display", String info.display
           "bytes", Integer info.bytes
           "status", String info.status ]

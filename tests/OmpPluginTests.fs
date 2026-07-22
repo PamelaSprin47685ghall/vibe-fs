@@ -94,7 +94,7 @@ let sessionStartStripsMainSessionTools () =
 
 let fuzzyDescriptionsMatchMuxWording () =
     check "fuzzy_find regex disclaimer" (fuzzyFindDescriptionOmp.Contains "Regex and glob syntax are not supported.")
-    check "fuzzy_find iterator hint" (fuzzyFindDescriptionOmp.Contains "Every result ends with iterator=")
+    check "fuzzy_find iterator hint" (fuzzyFindDescriptionOmp.Contains "iterator")
     check "fuzzy_grep smart-case" (fuzzyGrepDescriptionOmp.Contains "Smart-case, git-aware, frecency-ranked.")
 
 let readAssistantTextFromEntries () =

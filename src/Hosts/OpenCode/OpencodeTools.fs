@@ -36,7 +36,7 @@ let private executeMethodology
                 match tryFindEntry parsed.methodology with
                 | None -> return "Error: unknown methodology: " + parsed.methodology
                 | Some entry ->
-                    let intent = renderMeditatorIntent entry parsed.intent parsed.background parsed.note
+                    let intent = Wanxiangshu.Runtime.SubagentPrompts.renderMeditatorIntent entry parsed.intent parsed.background parsed.note
                     let tc = extractToolContext context (str ctx "directory")
                     let directory = str tc "directory"
                     let sessionID = str tc "sessionID"

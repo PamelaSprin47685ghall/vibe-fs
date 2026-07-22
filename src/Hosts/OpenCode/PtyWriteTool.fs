@@ -61,8 +61,7 @@ let ptyWriteTool (host: Host) : obj =
                     { id = id
                       display = display
                       bytes = data.Length
-                      status = "written"
-                      message = sprintf "Sent: \"%s\"" display }
+                      status = "written" }
 
                 return renderPtyWrite ptyWriteInfo
             })

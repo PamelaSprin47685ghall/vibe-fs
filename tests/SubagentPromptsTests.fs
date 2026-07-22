@@ -65,7 +65,7 @@ let meditatorPromptContainsQuestion () =
           outputSections = [] }
 
     let p =
-        Wanxiangshu.Kernel.Methodology.Schema.renderMeditatorIntent
+        Wanxiangshu.Runtime.SubagentPrompts.renderMeditatorIntent
             dummyEntry
             "Analyze auth"
             "JWT background"
@@ -73,7 +73,7 @@ let meditatorPromptContainsQuestion () =
 
     check "contains question/intent" (p.Contains "Analyze auth")
     check "contains background" (p.Contains "JWT background")
-    check "contains quiet room" (p.Contains "quiet room")
+    check "contains agent_role" (p.Contains "agent_role =")
 
 let executorSummarizerPromptContainsFields () =
     let p = executorSummarizerPrompt "output" "stdout" "python" "print(1)" [] "short"

@@ -85,8 +85,6 @@ let private executePtyKill (mgr: obj) (id: string) (sessionId: string) (cleanup:
         sprintf "%s %s" (string session?command) (String.concat " " (unbox<string array> session?args))
 
     let lineCountVal = unbox<int> session?lineCount
-    let msgText = sprintf "%s %s (%s)." action id retainedNote
-
     let ptyKillInfo: PtyKillInfo =
         { id = id
           action = action
@@ -95,8 +93,7 @@ let private executePtyKill (mgr: obj) (id: string) (sessionId: string) (cleanup:
           command = commandStr
           status = statusStr
           finalLineCount = lineCountVal
-          note = retainedNote
-          message = msgText }
+          note = retainedNote }
 
     renderPtyKill ptyKillInfo
 
@@ -148,11 +145,5 @@ let ptyListTool (host: Host) : obj =
                         |> Seq.map (fun s -> lm?toInfo (s))
                         |> Seq.toArray
 
-                let body =
-                    if sessions.Length = 0 then
-                        render { empty with body = Some "No active PTY sessions."; status = Some "count=0" }
-                    else
-                        formatSessionList sessions
-
-                return body
+                return renderPtyList { count = sessions.Length; sessions = items }
             })

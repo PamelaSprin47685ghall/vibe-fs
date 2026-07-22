@@ -122,7 +122,6 @@ let formatSpawnResponse (info: obj) : string =
           pid = pidVal
           status = statusStr
           notifyOnExit = notifyOnExitVal
-          timeoutSeconds = timeoutStr
-          message = "PTY session spawned." }
+          timeoutSeconds = timeoutStr }
 
     renderPtySpawn ptyInfo

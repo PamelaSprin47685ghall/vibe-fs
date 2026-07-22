@@ -33,7 +33,7 @@ let private executeMethodology
                     match tryFindEntry parsed.methodology with
                     | None -> return errorResult ("Error: unknown methodology: " + parsed.methodology)
                     | Some entry ->
-                        let intent = renderMeditatorIntent entry parsed.intent parsed.background parsed.note
+                        let intent = Wanxiangshu.Runtime.SubagentPrompts.renderMeditatorIntent entry parsed.intent parsed.background parsed.note
                         let prompt = formatPrompt omp (Meditator intent) |> List.head
 
                         try

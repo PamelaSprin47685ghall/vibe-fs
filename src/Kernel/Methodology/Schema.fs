@@ -45,31 +45,29 @@ let buildUnifiedNoteDescription (entries: MethodologyEntry list) : string =
 
     sb.ToString()
 
-let renderMeditatorIntent (entry: MethodologyEntry) (intentText: string) (backgroundText: string) (noteText: string) =
+let renderMeditatorDocument (entry: MethodologyEntry) (intentText: string) (backgroundText: string) (noteText: string) : PromptDocumentView =
     let sections =
         entry.outputSections
         |> List.mapi (fun i s -> $"{i + 1}. {s}")
         |> String.concat "\n"
 
-    $"""You are applying the "{entry.methodologyId}" methodology.
+    let bg =
+        [ $"Methodology: {entry.methodologyId}"
+          $"Definition: {entry.shortDefinition}"
+          $"Use when: {entry.triggerWhen}"
+          $"Background: {backgroundText.Trim()}" ]
+        |> String.concat "\n"
 
-Definition: {entry.shortDefinition}
-Use when: {entry.triggerWhen}
-
-Role: {entry.meditatorRole}
-
-Intent: {intentText}
-
-Background: {backgroundText}
-
-Note: {noteText}
-
-Produce the tool output in dense modern Chinese unless the inputs are explicitly English-only. Structure your answer with these sections:
-{sections}
-
-Do not call tools. Do not propose code edits unless the inputs ask for implementation plans. End with concrete next actions the parent can execute without you.
-
-You are in a quiet room with the question.
-No tools (except the read tool to view files), no distractions — just you and the problem.
-Read carefully. Turn it over in your mind.
-When you are ready, answer with clarity and depth."""
+    { objective = intentText.Trim()
+      background = Some bg
+      agentRole = AgentRole.MethodologyReasoning
+      targets = [ PromptTarget.EvidenceTarget("methodology_note", noteText.Trim()) ]
+      boundaries = []
+      rules =
+        [ PromptRule.Policy $"Apply the role of {entry.meditatorRole}."
+          PromptRule.Policy $"Structure your report using these sections:\n{sections}"
+          PromptRule.Constraint "Produce dense modern Chinese unless the inputs are explicitly English-only."
+          PromptRule.Constraint "Do NOT call tools or invent workspace facts." ]
+      outcomes =
+        [ { label = "report"
+            text = "Use every methodology output section and end with concrete next actions." } ] }

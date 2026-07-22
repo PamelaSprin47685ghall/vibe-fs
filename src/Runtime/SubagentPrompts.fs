@@ -218,3 +218,9 @@ let websearchSummarizerPromptWithHost (whatToSummarize: string) (rawResults: str
 
 let websearchSummarizerPrompt (whatToSummarize: string) (rawResults: string) : string =
     websearchSummarizerPromptWithHost whatToSummarize rawResults None
+
+let renderMeditatorIntent (entry: Wanxiangshu.Kernel.Methodology.Schema.MethodologyEntry) (intentText: string) (backgroundText: string) (noteText: string) : string =
+    let docView = Wanxiangshu.Kernel.Methodology.Schema.renderMeditatorDocument entry intentText backgroundText noteText
+    match PromptDocument.create docView with
+    | Ok doc -> PromptToml.render doc
+    | Error errs -> failwithf "Failed to create Meditator PromptDocument: %A" errs
