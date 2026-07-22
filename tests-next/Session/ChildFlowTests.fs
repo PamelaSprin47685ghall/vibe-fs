@@ -54,7 +54,7 @@ module ChildFlowTests =
                                         Flow.create (fun _ _ ->
                                             task {
                                                 if req.Prompt = "req2" then
-                                                    do! Task.Delay(50)
+                                                    do! FlowHelpers.sleepJs 50
 
                                                 return Ok(CompletedChild(sprintf "result_%s" text))
                                             })
@@ -88,7 +88,7 @@ module ChildFlowTests =
             let mutable scriptCreationCount = 0
 
             let createScript () : ChildScript =
-                Interlocked.Increment(&scriptCreationCount) |> ignore
+                scriptCreationCount <- scriptCreationCount + 1
                 let mutable runCount = 0
 
                 { GetOrCreateSession =

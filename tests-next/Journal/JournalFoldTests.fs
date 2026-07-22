@@ -109,3 +109,141 @@ module JournalFoldTests =
         Assert.Equal(Some msgIdU, history.UserMessageId)
         Assert.Equal(Some msgIdA, history.AssistantMessageId)
         Assert.Equal(Some delivered, history.Outcome)
+
+    let private makeEnv seq dt stream fact rt =
+        { RuntimeId = rt
+          LocalSeq = LocalSeq.create seq
+          ObservedAt = dt
+          EventId = EventId.create ("e" + string seq)
+          Stream = stream
+          TurnId = None
+          Fact = fact }
+
+    [<Fact>]
+    let Fold_isolates_TodoChanged_and_ReviewApplied_by_SessionId () =
+        let rt = RuntimeId.create "rt-session-isolation"
+        let t0 = DateTimeOffset.UtcNow
+        let sA, sB = SessionId.create "session-a", SessionId.create "session-b"
+
+        let envs =
+            [ makeEnv 1L t0 (StreamId.Session sA) (Fact.Todo(TodoChanged {| Snapshot = { Items = [ "task-a1" ] } |})) rt
+              makeEnv
+                  2L
+                  (t0.AddSeconds 1.0)
+                  (StreamId.Session sB)
+                  (Fact.Todo(TodoChanged {| Snapshot = { Items = [ "task-b1" ] } |}))
+                  rt
+              makeEnv
+                  3L
+                  (t0.AddSeconds 2.0)
+                  (StreamId.Session sA)
+                  (Fact.Review(
+                      ReviewApplied
+                          {| Verdict = ReviewVerdict.NeedsChanges [ "fix a" ]
+                             Round = 1
+                             ResultingTodo = Some { Items = [ "task-a1"; "task-a2" ] } |}
+                  ))
+                  rt
+              makeEnv
+                  4L
+                  (t0.AddSeconds 3.0)
+                  (StreamId.Session sB)
+                  (Fact.Review(
+                      ReviewApplied
+                          {| Verdict = ReviewVerdict.Passed
+                             Round = 1
+                             ResultingTodo = None |}
+                  ))
+                  rt ]
+
+        let proj = Fold.apply Fold.empty envs
+        let projA = Map.find sA proj.SessionProjections
+        Assert.Equal({ Items = [ "task-a1"; "task-a2" ] }, projA.Todos.Value)
+        Assert.Equal(ReviewVerdict.NeedsChanges [ "fix a" ], projA.LastReview.Value)
+
+        let projB = Map.find sB proj.SessionProjections
+        Assert.Equal({ Items = [ "task-b1" ] }, projB.Todos.Value)
+        Assert.Equal(ReviewVerdict.Passed, projB.LastReview.Value)
+
+    [<Fact>]
+    let Fold_preserves_Workspace_events_as_global_projections () =
+        let rt = RuntimeId.create "rt-workspace-global"
+        let t0 = DateTimeOffset.UtcNow
+
+        let env1: Envelope =
+            { RuntimeId = rt
+              LocalSeq = LocalSeq.create 1L
+              ObservedAt = t0
+              EventId = EventId.create "e1"
+              Stream = StreamId.Workspace
+              TurnId = None
+              Fact = Fact.Todo(TodoChanged {| Snapshot = { Items = [ "global-task" ] } |}) }
+
+        let proj = Fold.apply Fold.empty [ env1 ]
+        Assert.Equal({ Items = [ "global-task" ] }, proj.Todos.Value)
+
+    [<Fact>]
+    let Fold_applies_SessionFact_ChildFact_ProcessFact_and_SquadFact () =
+        let rt = RuntimeId.create "rt-all-facts"
+        let t0 = DateTimeOffset.UtcNow
+        let sessionId = SessionId.create "session-1"
+        let childId = ChildId.create "child-1"
+        let processId = ProcessId.create "proc-1"
+
+        let envs =
+            [ makeEnv
+                  1L
+                  t0
+                  (StreamId.Session sessionId)
+                  (Fact.Session(HumanTurnStarted {| TurnId = TurnId.create "turn-1" |}))
+                  rt
+              makeEnv
+                  2L
+                  (t0.AddSeconds 1.0)
+                  (StreamId.Session sessionId)
+                  (Fact.Child(
+                      ChildCompletedFact
+                          {| ChildId = childId
+                             Result = ChildCompleted "done" |}
+                  ))
+                  rt
+              makeEnv
+                  3L
+                  (t0.AddSeconds 2.0)
+                  (StreamId.Session sessionId)
+                  (Fact.Process(
+                      ProcessExited
+                          {| ProcessId = processId
+                             Result =
+                              { ExitCode = 0
+                                Stdout = "ok"
+                                Stderr = ""
+                                StdoutTruncated = false
+                                StderrTruncated = false } |}
+                  ))
+                  rt
+              makeEnv
+                  4L
+                  (t0.AddSeconds 3.0)
+                  (StreamId.Session sessionId)
+                  (Fact.Squad(
+                      TaskVerifiedFact
+                          {| TaskId = "task-1"
+                             Result = TaskVerified "verified" |}
+                  ))
+                  rt
+              makeEnv
+                  5L
+                  (t0.AddSeconds 4.0)
+                  (StreamId.Session sessionId)
+                  (Fact.Session(SessionSettled {| Result = SessionResult.Completed "all done" |}))
+                  rt ]
+
+        let proj = Fold.apply Fold.empty envs
+        let sessionProj = Map.find sessionId proj.SessionProjections
+
+        Assert.Equal(Some(TurnId.create "turn-1"), sessionProj.HumanTurnId)
+        Assert.Equal(Some(SessionResult.Completed "all done"), sessionProj.SettledResult)
+        Assert.Equal(ChildCompleted "done", Map.find childId sessionProj.Children)
+        Assert.Equal(0, (Map.find processId sessionProj.Processes).ExitCode)
+        Assert.Equal(TaskVerified "verified", Map.find "task-1" sessionProj.SquadTasks)

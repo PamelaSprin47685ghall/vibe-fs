@@ -16,6 +16,7 @@ type ProcessContext =
       DefaultTimeout: TimeSpan option }
 
 type ProcessHandle =
+    inherit IDisposable
     inherit IAsyncDisposable
     abstract ExitCodeTask: Task<int>
     abstract StdoutTask: Task<string * bool>

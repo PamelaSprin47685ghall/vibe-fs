@@ -8,6 +8,8 @@
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="FSharp.Core" Version="10.1.203"/>
+    <PackageReference Include="Fable.Core" Version="5.0.0"/>
+    <PackageReference Include="Thoth.Json" Version="10.5.1"/>
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Kernel/Identity.fs"/>
@@ -15,11 +17,6 @@
     <Compile Include="Kernel/Outcome.fs"/>
     <Compile Include="Kernel/Fact.fs"/>
     <Compile Include="Kernel/SendOutcomeMap.fs"/>
-    <Compile Include="Journal/FactSubEncoders.fs"/>
-    <Compile Include="Journal/FactDecodersHelpers.fs"/>
-    <Compile Include="Journal/FactDecodersPrompt.fs"/>
-    <Compile Include="Journal/FactDecoders.fs"/>
-    <Compile Include="Journal/FactDecodersExtras.fs"/>
     <Compile Include="Journal/FactCodec.fs"/>
     <Compile Include="Journal/Envelope.fs"/>
     <Compile Include="Journal/Boot.fs"/>
@@ -42,6 +39,13 @@
     <Compile Include="Process/ProcessFlow.fs"/>
     <Compile Include="Tools/MessageTransform.fs"/>
     <Compile Include="Tools/ToolContext.fs"/>
+    <Compile Include="Tools/StaticTools.fs"/>
+    <Compile Include="Wanxiangzhen/SquadTypes.fs"/>
+    <Compile Include="Wanxiangzhen/SquadFlow.fs"/>
+    <Compile Include="OpenCode/OpencodeTypes.fs"/>
+    <Compile Include="OpenCode/MessageOriginDecoder.fs"/>
     <Compile Include="OpenCode/Gateway.fs"/>
+    <Compile Include="OpenCode/OpencodeHooks.fs"/>
+    <Compile Include="OpenCode/Plugin.fs"/>
   </ItemGroup>
 </Project>

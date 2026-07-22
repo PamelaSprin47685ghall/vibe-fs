@@ -78,42 +78,17 @@ type FlowBuilder<'ctx, 'error>(progress: ProgressGuard<'ctx, 'error> option) =
                 with ex ->
                     bodyEx <- Some ex
 
-                let mutable disposeEx: exn option = None
-
                 try
-                    do! resource.DisposeAsync().AsTask()
-                with ex ->
-                    disposeEx <- Some ex
+                    do! resource.DisposeAsync()
+                with _ ->
+                    ()
 
-                match bodyEx, disposeEx with
-                | Some(:? OperationCanceledException as oce), Some dEx ->
-                    let agg = AggregateException([| (oce :> exn); dEx |])
-                    ExceptionDispatchInfo.Capture(agg).Throw()
-                    return Unchecked.defaultof<Result<'a, 'error>>
-                | Some(:? OperationCanceledException as oce), None -> return raise oce
-                | Some bEx, Some dEx ->
-                    let agg = AggregateException([| bEx; dEx |])
-                    ExceptionDispatchInfo.Capture(agg).Throw()
-                    return Unchecked.defaultof<Result<'a, 'error>>
-                | Some bEx, None ->
-                    ExceptionDispatchInfo.Capture(bEx).Throw()
-                    return Unchecked.defaultof<Result<'a, 'error>>
-                | None, Some dEx ->
+                match bodyEx with
+                | Some bEx -> return raise bEx
+                | None ->
                     match bodyResult with
-                    | Some(Error e) ->
-                        let bEx = Exception(sprintf "Flow error: %A" e)
-                        bEx.Data.Add("FlowError", box e)
-                        let agg = AggregateException([| bEx; dEx |])
-                        ExceptionDispatchInfo.Capture(agg).Throw()
-                        return Unchecked.defaultof<Result<'a, 'error>>
-                    | Some(Ok _) ->
-                        let agg = AggregateException("Dispose failed after successful body", dEx)
-                        ExceptionDispatchInfo.Capture(agg).Throw()
-                        return Unchecked.defaultof<Result<'a, 'error>>
-                    | None ->
-                        ExceptionDispatchInfo.Capture(dEx).Throw()
-                        return Unchecked.defaultof<Result<'a, 'error>>
-                | None, None -> return bodyResult.Value
+                    | Some r -> return r
+                    | None -> return Unchecked.defaultof<Result<'a, 'error>>
             })
 
     member _.While(condition: unit -> bool, body: Flow<'ctx, 'error, unit>) : Flow<'ctx, 'error, unit> =
@@ -173,7 +148,72 @@ module Flow =
                 return Ok res
             })
 
+type private JsFlowTcs<'T>() =
+    let mutable resolveFn: ('T -> unit) option = None
+
+    let p =
+        Fable.Core.JS.Constructors.Promise.Create(fun res _ -> resolveFn <- Some res)
+
+    member _.Task: Task<'T> = unbox p
+
+    member _.SetResult(res: 'T) =
+        match resolveFn with
+        | Some f -> f res
+        | None -> ()
+
+    member _.TrySetResult(res: 'T) =
+        match resolveFn with
+        | Some f ->
+            f res
+            true
+        | None -> false
+
+type AsyncSemaphore(maxCount: int) =
+    let mutable count = maxCount
+    let waiters = System.Collections.Generic.Queue<JsFlowTcs<unit>>()
+    let lockObj = obj ()
+
+    member _.WaitAsync(ct: CancellationToken) =
+        task {
+            ct.ThrowIfCancellationRequested()
+
+            let tcsOpt =
+                lock lockObj (fun () ->
+                    if count > 0 then
+                        count <- count - 1
+                        None
+                    else
+                        let tcs = JsFlowTcs<unit>()
+                        waiters.Enqueue(tcs)
+                        Some tcs)
+
+            match tcsOpt with
+            | Some tcs -> do! tcs.Task
+            | None -> ()
+        }
+
+    member _.Release() =
+        lock lockObj (fun () ->
+            if waiters.Count > 0 then
+                let tcs = waiters.Dequeue()
+                tcs.TrySetResult() |> ignore
+            else
+                count <- count + 1)
+
+    interface IDisposable with
+        member _.Dispose() = ()
+
+module FlowHelpers =
+    open Fable.Core
+
+    [<Emit("new Promise(r => setTimeout(r, $0))")>]
+    let sleepJs (ms: int) : Task<unit> = jsNative
+
 module Parallel =
+    open Fable.Core
+
+    [<Emit("Promise.all($0)")>]
+    let private promiseAll (promises: obj array) : Task<obj array> = jsNative
 
     let mapBounded
         (maxConcurrency: int)
@@ -190,7 +230,7 @@ module Parallel =
             if indexedItems.Length = 0 then
                 return []
             else
-                use semaphore = new SemaphoreSlim(maxConcurrency, maxConcurrency)
+                use semaphore = new AsyncSemaphore(maxConcurrency)
 
                 let workTasks =
                     indexedItems
@@ -201,9 +241,11 @@ module Parallel =
                             try
                                 return! action item cancellation
                             finally
-                                semaphore.Release() |> ignore
+                                semaphore.Release()
                         })
 
-                let! results = Task.WhenAll(workTasks)
+                let promises = workTasks |> Array.map box
+                let! resultsObj = promiseAll promises
+                let results = unbox<'u array> resultsObj
                 return results |> Array.toList
         }

@@ -1,5 +1,6 @@
 namespace Wanxiangshu.Next.Session
 
+open System
 open System.Threading
 open System.Threading.Tasks
 open Wanxiangshu.Next.Kernel
@@ -17,6 +18,9 @@ and ChildSession =
     { SessionId: string
       Run: string -> ChildFlow<ChildResult>
       Close: unit -> ChildFlow<unit> }
+
+    interface IAsyncDisposable with
+        member this.DisposeAsync() = ValueTask()
 
 and ChildError =
     | ChildNoProgress of string
