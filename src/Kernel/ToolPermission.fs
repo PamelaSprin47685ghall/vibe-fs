@@ -13,6 +13,7 @@ type ToolSemantic =
     | ReturnRoleEcho
     | TodoFamily
     | MethodologyFamily
+    | SquadFamily
     | Read
     | WritePatchFamily
     | FuzzyGrep
@@ -79,6 +80,8 @@ let classifyTool (host: Host) (tool: Tool) : ToolSemantic =
         TodoFamily
     elif t.StartsWith methodologyPrefix || t = "methodology" then
         MethodologyFamily
+    elif t = "squad_update" then
+        SquadFamily
     elif t = "read" then
         Read
     elif isDispatchOrWebSkillTool t then
@@ -94,7 +97,7 @@ let classifyTool (host: Host) (tool: Tool) : ToolSemantic =
     else
         Other
 
-let canUseSemantic (agent: Agent) (semantic: ToolSemantic) (tool: Tool) : bool =
+let rec canUseSemantic (agent: Agent) (semantic: ToolSemantic) (tool: Tool) : bool =
 
     match agent, semantic with
     | _, AgentReport -> true
@@ -105,6 +108,8 @@ let canUseSemantic (agent: Agent) (semantic: ToolSemantic) (tool: Tool) : bool =
         not (Set.contains agent knownAgentSet)
         || agent = "inspector"
         || agent = "manager"
+    | _, SquadFamily ->
+        canUseSemantic agent (classifyTool opencode "coder") "coder"
     | "meditator", Read -> true
     | "meditator", SubagentWebSkillOrSubmit when tool = "inspector" -> true
     | "meditator", _

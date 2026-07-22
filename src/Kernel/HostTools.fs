@@ -188,6 +188,7 @@ let allToolNames (host: Host) : string array =
        "apply_patch"
        todoWriteToolName host
        todoWritePromptName host
+       "squad_update"
        "stealth-browser-mcp_*"
        "question"
        "ask_user_question"

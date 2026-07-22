@@ -49,6 +49,9 @@ let classifyToolWebsearch () =
 let classifyToolFuzzyGrep () =
     equal "fuzzy_grep" FuzzyGrep (classifyTool Opencode "fuzzy_grep")
 
+let classifyToolSquadUpdate () =
+    equal "squad_update" SquadFamily (classifyTool Opencode "squad_update")
+
 let classifyToolOther () =
     equal "unknown" Other (classifyTool Opencode "unknown_tool")
 
@@ -205,6 +208,13 @@ let testReviewerCannotWrite () =
     check "reviewer cannot write" (not (canUse "reviewer" "write"))
     check "reviewer cannot edit" (not (canUse "reviewer" "edit"))
 
+let testSquadUpdatePermissionMatchesCoder () =
+    let agents = [ "manager"; "plan"; "build"; "coder"; "inspector"; "reviewer"; "browser"; "executor" ]
+    for agent in agents do
+        let expected = canUseForHost Opencode agent "coder"
+        let actual = canUseForHost Opencode agent "squad_update"
+        equal (sprintf "%s squad_update permission matches coder" agent) expected actual
+
 let run () =
     classifyToolAgentReport ()
     classifyToolBlockedShell ()
@@ -221,6 +231,7 @@ let run () =
     classifyToolSubagent ()
     classifyToolWebsearch ()
     classifyToolFuzzyGrep ()
+    classifyToolSquadUpdate ()
     classifyToolOther ()
     canUseSemanticAgentReport ()
     canUseSemanticBlockedShell ()
@@ -263,3 +274,5 @@ let run () =
     testReviewerCanUseFuzzyFind ()
     testReviewerCanSpawnInspectorButNotExecutor ()
     testReviewerCannotWrite ()
+    testSquadUpdatePermissionMatchesCoder ()
+    
