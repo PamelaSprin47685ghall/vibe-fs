@@ -12,7 +12,9 @@ let hasSyntaxInOutput (s: string) : bool =
 
 let appendSyntaxDiagnosticsToOutput (currentOutput: string) (filePath: string) (result: SyntaxCheckResult) : string =
     match formatSyntaxDiagnostics filePath result false with
-    | Some formatted -> addSyntax currentOutput formatted
+    | Some formatted ->
+        addSyntax (plainText currentOutput) formatted
+        |> render
     | None -> currentOutput
 
 let formatWriteSyntaxResult (filePath: string) (result: SyntaxCheckResult) : string =
@@ -30,8 +32,19 @@ let formatWriteSyntaxResult (filePath: string) (result: SyntaxCheckResult) : str
             header + "\n" + body
         | Failed(lang, reason) -> $"Syntax check failed for {filePath} ({lang}): {reason}"
 
-    let successBody = $"Successfully wrote to {filePath}"
+    let success =
+        match result with
+        | Ok(_, [||]) -> true
+        | _ -> false
 
-    match result with
-    | Ok(_, [||]) -> render { empty with body = Some successBody }
-    | _ -> addSyntax successBody syntaxText
+    let syntaxErrors = if syntaxText = "" then [] else [ syntaxText ]
+
+    addSyntax
+        { empty with
+            content =
+                WriteResult
+                    { path = filePath
+                      success = success
+                      syntaxErrors = syntaxErrors } }
+        syntaxText
+    |> render

@@ -5,7 +5,7 @@ open Fable.Core.JsInterop
 open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Tests.OmpPluginTestsHarness
 open Wanxiangshu.Hosts.Omp.Plugin
-open Wanxiangshu.Kernel.FuzzyQuery
+open Wanxiangshu.Kernel.ToolCatalog
 open Wanxiangshu.Hosts.Omp.Codec
 open Wanxiangshu.Hosts.Omp.MessagingCodec
 open Wanxiangshu.Kernel.OmpSessionTools
@@ -93,9 +93,11 @@ let sessionStartStripsMainSessionTools () =
     }
 
 let fuzzyDescriptionsMatchMuxWording () =
-    check "fuzzy_find regex disclaimer" (fuzzyFindDescriptionOmp.Contains "Regex and glob syntax are not supported.")
-    check "fuzzy_find iterator hint" (fuzzyFindDescriptionOmp.Contains "iterator")
-    check "fuzzy_grep smart-case" (fuzzyGrepDescriptionOmp.Contains "Smart-case, git-aware, frecency-ranked.")
+    let findDesc = description "fuzzy_find" |> Result.defaultValue ""
+    let grepDesc = description "fuzzy_grep" |> Result.defaultValue ""
+    check "fuzzy_find regex disclaimer" (findDesc.Contains "Regex and glob syntax are not supported.")
+    check "fuzzy_find iterator hint" (findDesc.Contains "iterator")
+    check "fuzzy_grep smart-case" (grepDesc.Contains "Smart-case, git-aware, frecency-ranked.")
 
 let readAssistantTextFromEntries () =
     let sm =

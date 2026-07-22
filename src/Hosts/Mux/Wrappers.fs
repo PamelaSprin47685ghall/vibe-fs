@@ -70,10 +70,18 @@ let private applySyntaxCheck (result: obj) (args: obj) (config: obj) : JS.Promis
                 | None -> return result
                 | Some f ->
                     if Dyn.typeIs result "string" then
-                        return box (addSyntax (string result) f)
+                        let wrapped =
+                            addSyntax (plainText (string result)) f
+                            |> render
+
+                        return box wrapped
                     elif Dyn.typeIs result "object" && Dyn.truthy (Dyn.get result "success") then
                         let out = Dyn.str result "output"
-                        let wrapped = if out <> "" then addSyntax out f else addSyntax "" f
+
+                        let wrapped =
+                            addSyntax (plainText out) f
+                            |> render
+
                         return Dyn.withKey result "output" (box wrapped)
                     else
                         return result

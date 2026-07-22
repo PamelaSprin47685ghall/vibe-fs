@@ -49,7 +49,7 @@ let appendSyntaxDiagnostics (directory: string) (input: obj) (output: obj) : JS.
                     let formatted = diagnostics |> Array.choose id |> String.concat "\n"
 
                     if formatted <> "" then
-                        setHookOutputString output (addSyntax s formatted)
+                        setHookOutputString output (addSyntax (plainText s) formatted |> render)
     }
 
 let private collectTodoWriteViolations (host: Host) (output: obj) (input: obj) (decodedArgs: obj) : bool * string list =

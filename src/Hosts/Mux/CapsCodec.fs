@@ -26,13 +26,19 @@ let private buildUserMessage (userId: string) (preludeText: string option) (epoc
 
     buildMuxMessage userId "user" [| buildTextPart wrappedText |]
 
+/// Mux file_read content format: `${lineNumber}\t${line}` joined by newlines.
+let private formatMuxFileReadContent (content: string) : string * int =
+    let lines = if content = "" then [||] else content.Split('\n')
+
+    let numbered =
+        lines
+        |> Array.mapi (fun i line -> $"{i + 1}\t{line}")
+        |> String.concat "\n"
+
+    numbered, lines.Length
+
 let private buildMuxToolPart (epochId: string) (fp: string) (index: int) (cap: CapsFile) : obj =
-    let lines = cap.content.Split('\n')
-    let numbered = Wanxiangshu.Runtime.NativeReadTranscript.formatNumberedLines 1 lines
-
-    let wrappedOutput =
-        $"{cap.filePath}\n{numbered}\n(End of file - total {lines.Length} lines)"
-
+    let contentBody, linesRead = formatMuxFileReadContent cap.content
     let callId = capsToolCallId "caps-fr-" epochId fp index
 
     createObj
@@ -47,8 +53,8 @@ let private buildMuxToolPart (epochId: string) (fp: string) (index: int) (cap: C
                   [ "success", box true
                     "file_size", box cap.content.Length
                     "modifiedTime", box "1970-01-01T00:00:00.000Z"
-                    "lines_read", box (cap.content.Split('\n').Length)
-                    "content", box wrappedOutput ]
+                    "lines_read", box linesRead
+                    "content", box contentBody ]
           ) ]
 
 let private buildCapsAssistantMessage

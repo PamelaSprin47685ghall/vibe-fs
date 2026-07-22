@@ -61,9 +61,10 @@ let private handleContinue
                             do! appendSubagentContinuedOrFail root parentSid item.childID c.Prompt
 
                         preserveSubagentIterator scope.SubagentIteratorStore cleanIter item
-                        return withIterator text cleanIter
-                    | Failure err -> return subagentToolFailed "continue" err
-                    | Aborted -> return subagentToolFailed "continue" MessageAborted
+                        let msg = withIterator (plainText text) cleanIter
+                        return render msg
+                    | Failure err -> return subagentToolFailed "continue" (ToolError err)
+                    | SubagentResponse.Aborted -> return subagentToolFailed "continue" FailureReason.Aborted
                 }
 
             return textResult

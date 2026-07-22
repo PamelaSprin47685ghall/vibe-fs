@@ -4,6 +4,7 @@ open System.Text
 open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Kernel.Executor
 open Wanxiangshu.Runtime.ExecutorFormat
+open Wanxiangshu.Runtime.ToolOutputInfo
 open Wanxiangshu.Runtime.SubagentPrompts
 open Wanxiangshu.Kernel.Primitives.Identity
 open Wanxiangshu.Kernel.Errors.DomainError
@@ -51,39 +52,39 @@ let outputFromResultAllVariants () =
 // ── formatToolResponse ────────────────────────────────────────────────
 
 let formatCompletedNoSummary () =
-    let resp = formatToolResponse (Completed("hello", 0)) None
+    let resp = formatToolResponse (Completed("hello", 0)) None |> render
     check "contains body" (resp.Contains "hello")
     check "contains status completed" (resp.Contains "completed")
     check "contains exit_code" (resp.Contains "0")
 
 let formatCompletedWithSummary () =
-    let resp = formatToolResponse (Completed("raw", 0)) (Some "SUMMARY")
+    let resp = formatToolResponse (Completed("raw", 0)) (Some "SUMMARY") |> render
     check "summary is body" (resp.Contains "SUMMARY")
     check "no raw output" (not (resp.Contains "raw"))
 
 let formatTruncatedBodyRef () =
-    let resp = formatToolResponse (Truncated("x", Short)) None
-    check "uses truncated body ref" (resp.Contains "(Output Truncated)")
+    let resp = formatToolResponse (Truncated("x", Short)) None |> render
+    check "uses truncated body ref" (resp.Contains "truncated = true")
 
 let formatCompletedBodyRef () =
-    let resp = formatToolResponse (Completed("x", 0)) None
+    let resp = formatToolResponse (Completed("x", 0)) None |> render
     check "no tool_output field" (not (resp.Contains "tool_output:"))
 
 let formatToolResponseFailedSignal () =
-    let resp = formatToolResponse (Failed("partial", None, Some "SIGTERM")) None
+    let resp = formatToolResponse (Failed("partial", None, Some "SIGTERM")) None |> render
     check "signal status" (resp.Contains "SIGTERM")
 
 let formatToolResponseFailedExitCode () =
-    let resp = formatToolResponse (Failed("err", Some 2, None)) None
+    let resp = formatToolResponse (Failed("err", Some 2, None)) None |> render
     check "exit error status" (resp.Contains "exit_error")
     check "exit code 2" (resp.Contains "2")
 
 let formatToolResponseSpawnFailed () =
-    let resp = formatToolResponse (Failed("spawn failed: ENOENT", None, None)) None
+    let resp = formatToolResponse (Failed("spawn failed: ENOENT", None, None)) None |> render
     check "spawn failed status" (resp.Contains "spawn_failed")
 
 let formatToolResponseMissingExec () =
-    let resp = formatToolResponse (MissingExecutable("bash", "not found")) None
+    let resp = formatToolResponse (MissingExecutable("bash", "not found")) None |> render
     check "missing exec status" (resp.Contains "missing_executable")
 
 // ── shouldAppendReadOnlyWarning ───────────────────────────────────────
@@ -153,17 +154,18 @@ let decodeExecutorArgsValidMaxBytes () =
 // ── prependSafetyWarning ──────────────────────────────────────────────
 
 let prependWarningReadCommand () =
-    let out = prependSafetyWarning "OUT" "grep foo" Shell
+    let msg = prependSafetyWarning (plainText "OUT") "grep foo" Shell
+    let out = render msg
     check "warning prepended for grep" (out.Contains "hint")
     check "output body preserved" (out.Contains "OUT")
 
 let prependWarningNonRead () =
-    let out = prependSafetyWarning "OUT" "echo hi" Shell
-    check "no warning for echo" (out = "OUT")
+    let msg = prependSafetyWarning (plainText "OUT") "echo hi" Shell
+    equal "no warning for echo" (plainText "OUT") msg
 
 let prependWarningNonShell () =
-    let out = prependSafetyWarning "OUT" "head -n 1" Python
-    check "no warning in python" (out = "OUT")
+    let msg = prependSafetyWarning (plainText "OUT") "head -n 1" Python
+    equal "no warning in python" (plainText "OUT") msg
 
 // ── parseLanguage / languageToString ──────────────────────────────────
 

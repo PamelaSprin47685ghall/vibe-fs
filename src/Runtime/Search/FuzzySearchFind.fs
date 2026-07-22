@@ -10,6 +10,42 @@ open Wanxiangshu.Runtime.FuzzyIteratorStore
 open Wanxiangshu.Runtime.FuzzyFinderShell
 open Wanxiangshu.Runtime.FuzzySearchSupport
 open Wanxiangshu.Runtime.FuzzySearchFindHelper
+open Wanxiangshu.Runtime.ToolOutputInfo
+open Wanxiangshu.Kernel.ToolOutputInfoTypes
+
+let private annotationText (annotation: FileAnnotation option) : string option =
+    match annotation with
+    | None -> None
+    | Some a ->
+        let text = fileAnnotation (Some a)
+
+        if text = "" then
+            None
+        else
+            Some(text.Trim())
+
+let private toFindItems (pattern: string option) (items: FindMatch list) : FuzzyFindMatchItem list =
+    items
+    |> List.map (fun m ->
+        { path = m.relativePath
+          pattern = pattern
+          annotation = annotationText m.annotation })
+
+let private renderFind
+    (pattern: string option)
+    (result: FindResult)
+    (nextIterator: string)
+    : string =
+    let msg =
+        { empty with
+            content =
+                FuzzyFind
+                    { pattern = pattern
+                      totalMatched = result.totalMatched
+                      totalFiles = Some result.totalFiles
+                      matches = toFindItems pattern result.items } }
+
+    render (withIterator msg nextIterator)
 
 let private runFind
     (state: FuzzyFindState)
@@ -30,7 +66,7 @@ let private runFind
           isError = true }
     else
         let value = Dyn.get raw "value"
-        let body, result = processRawFindResponse value
+        let _, result = processRawFindResponse value
 
         let totalForPaging =
             match result.totalMatched with
@@ -42,14 +78,7 @@ let private runFind
                     0
 
         let nextIterator = findNextIterator state store opts totalForPaging
-
-        let output =
-            if nextIterator = "" then
-                body
-            else
-                Wanxiangshu.Runtime.ToolOutputInfo.withIterator body nextIterator
-
-        { output = output; isError = false }
+        { output = renderFind None result nextIterator; isError = false }
 
 let private fuzzyFindSingle (params': FuzzyFindParams) (opts: SearchOptions) : JS.Promise<SearchOutcome> =
     promise {
@@ -63,35 +92,29 @@ let private fuzzyFindSingle (params': FuzzyFindParams) (opts: SearchOptions) : J
                 return runWithFinder finderResult state.externalBasePath (runFind state store opts)
     }
 
-let private runFindForPattern
+let private collectPattern
     (finder: FinderLike)
     (params': FuzzyFindParams)
     (opts: SearchOptions)
     (pat: string)
-    : JS.Promise<string * SearchOutcome> =
-    promise {
-        match resolveFindSearchStateForPattern pat params' opts with
-        | Error msg -> return (pat, { output = msg; isError = true })
-        | Ok state ->
-            let raw =
-                finder.fileSearch (
-                    state.query,
-                    box
-                        {| pageIndex = 0
-                           pageSize = state.pageSize |}
-                )
+    : Result<FindResult, string> =
+    match resolveFindSearchStateForPattern pat params' opts with
+    | Error msg -> Error msg
+    | Ok state ->
+        let raw =
+            finder.fileSearch (
+                state.query,
+                box
+                    {| pageIndex = 0
+                       pageSize = state.pageSize |}
+            )
 
-            if not (Dyn.truthy (Dyn.get raw "ok")) then
-                return
-                    (pat,
-                     { output = errorMsg raw "fuzzy_find failed"
-                       isError = true })
-            else
-                let value = Dyn.get raw "value"
-                let body, _ = processRawFindResponse value
-
-                return (pat, { output = body; isError = false })
-    }
+        if not (Dyn.truthy (Dyn.get raw "ok")) then
+            Error(errorMsg raw "fuzzy_find failed")
+        else
+            let value = Dyn.get raw "value"
+            let _, result = processRawFindResponse value
+            Ok result
 
 let private fuzzyFindMulti
     (patterns: string list)
@@ -113,18 +136,40 @@ let private fuzzyFindMulti
         | Error msg -> return { output = msg; isError = true }
         | Ok finder ->
             try
-                let promises =
-                    patterns |> List.map (runFindForPattern finder params' opts) |> List.toArray
+                let acc = ResizeArray<FuzzyFindMatchItem>()
+                let mutable anyError = false
+                let mutable errOut = ""
+                let mutable totalFilesAcc = 0
+                let mutable totalMatchedAcc = 0
 
-                let! outcomes = Promise.all promises
+                for pat in patterns do
+                    match collectPattern finder params' opts pat with
+                    | Error msg ->
+                        anyError <- true
+                        errOut <- msg
+                    | Ok result ->
+                        totalFilesAcc <- max totalFilesAcc result.totalFiles
 
-                let body =
-                    outcomes
-                    |> Array.map (fun (pat, r) -> $"## pattern: \"{pat}\"\n{r.output}")
-                    |> Array.toList
-                    |> String.concat "\n\n"
+                        match result.totalMatched with
+                        | Some t -> totalMatchedAcc <- totalMatchedAcc + t
+                        | None -> totalMatchedAcc <- totalMatchedAcc + result.items.Length
 
-                return { output = body; isError = false }
+                        for item in toFindItems (Some pat) result.items do
+                            acc.Add item
+
+                if anyError && acc.Count = 0 then
+                    return { output = errOut; isError = true }
+                else
+                    let msg =
+                        { empty with
+                            content =
+                                FuzzyFind
+                                    { pattern = None
+                                      totalMatched = Some totalMatchedAcc
+                                      totalFiles = Some totalFilesAcc
+                                      matches = acc |> Seq.toList } }
+
+                    return { output = render msg; isError = anyError }
             finally
                 if externalBasePath.IsSome then
                     opts.finderCache.Destroy searchPath.basePath |> ignore

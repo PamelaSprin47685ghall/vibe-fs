@@ -27,7 +27,7 @@ let writeToolSpec (reg: obj) =
                createObj [ "file_path", box "empty.txt"; "content", box "" ])
             |> unbox<JS.Promise<string>>
 
-        check "write empty string succeeds" (writeResult.Contains "Successfully wrote")
+        check "write empty string succeeds" (writeResult.Contains "path =")
         do! rmAsync tmpDir
     }
 

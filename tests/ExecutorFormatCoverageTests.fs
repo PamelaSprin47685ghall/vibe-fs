@@ -2,6 +2,7 @@ module Wanxiangshu.Tests.ExecutorFormatCoverageTests
 
 open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Kernel.Executor
+open Wanxiangshu.Kernel.ToolOutputInfoTypes
 open Wanxiangshu.Runtime.ExecutorFormat
 open Wanxiangshu.Runtime.SearchPrompts
 open Wanxiangshu.Runtime.SubagentPrompts
@@ -55,15 +56,18 @@ let summarizerInputCap () =
     check "large output truncated message" (largePrompt.Contains "[Output truncated to 200000 bytes for summarization]")
     check "large output tail absent" (not (largePrompt.Contains tail))
 
-let private hasExactHint (text: string) (hintText: string) = text.Contains hintText
+let private hasExactHint (msg: ToolOutputMessage) (hintText: string) =
+    match msg.hint with
+    | Some h -> h.Contains hintText
+    | None -> false
 
 let safetyWarning () =
     let warn program =
-        prependSafetyWarning "OUT" program Shell
+        prependSafetyWarning empty program Shell
 
     let warnForExecution program =
         prependSafetyWarningForExecution
-            "OUT"
+            empty
             { command = program
               language = Shell
               dependencies = []
@@ -88,7 +92,7 @@ let safetyWarning () =
 
     check
         "non-shell language ignored"
-        (not (hasExactHint (prependSafetyWarning "OUT" "grep foo" Python) hintExecutorMisuse))
+        (not (hasExactHint (prependSafetyWarning empty "grep foo" Python) hintExecutorMisuse))
 
 let executorToolResponseFormatting () =
     let completedResult = Completed("all good", 0)
@@ -99,30 +103,28 @@ let executorToolResponseFormatting () =
     equal "outputFromResult failed" "boom" (outputFromResult failedResult)
     equal "outputFromResult truncated" "partial" (outputFromResult truncatedResult)
     equal "outputFromResult missing" "Error: not found" (outputFromResult missingResult)
-    let resp = formatToolResponse completedResult None
-    check "response prepends return block" (resp.Contains "body =")
+    let resp = formatToolResponse completedResult None |> render
     check "response includes output body" (resp.Contains "all good")
     check "response includes exit_code" (resp.Contains "0")
     check "response includes status completed" (resp.Contains "completed")
-    let failedResp = formatToolResponse failedResult None
+    let failedResp = formatToolResponse failedResult None |> render
     check "failed response includes exit_code 2" (failedResp.Contains "2")
     check "failed response includes status exit_error" (failedResp.Contains "exit_error")
-    let truncatedResp = formatToolResponse truncatedResult None
+    let truncatedResp = formatToolResponse truncatedResult None |> render
     check "truncated response includes killed_timeout status" (truncatedResp.Contains "killed_timeout")
-    check "truncated response includes Output Truncated suffix" (truncatedResp.Contains "(Output Truncated)")
+    check "truncated response includes Output Truncated suffix" (truncatedResp.Contains "truncated = true")
     check "truncated response omits timeout_ms field" (not (truncatedResp.Contains "timeout_ms:"))
     check "truncated response omits timeout hints" (not (truncatedResp.Contains "Killed after"))
     check "truncated body excludes legacy executor suffix" (not (truncatedResp.Contains "[executor]"))
     let signaledResult = Failed("partial out", None, Some "SIGTERM")
-    let signaledResp = formatToolResponse signaledResult None
+    let signaledResp = formatToolResponse signaledResult None |> render
     check "signaled response includes signal as status" (signaledResp.Contains "SIGTERM")
     check "signaled response omits legacy signal field" (not (signaledResp.Contains "signal: SIGTERM"))
     check "signaled body has no legacy suffix" (not (signaledResp.Contains "[executor]"))
-    let missingResp = formatToolResponse missingResult None
+    let missingResp = formatToolResponse missingResult None |> render
     check "missing response includes status missing_executable" (missingResp.Contains "missing_executable")
     let summary = "SUMMARY: task succeeded"
-    let summaryResp = formatToolResponse completedResult (Some summary)
-    check "summary response prepends return block" (summaryResp.Contains "body =")
+    let summaryResp = formatToolResponse completedResult (Some summary) |> render
     check "summary response uses summary as body" (summaryResp.Contains summary)
     check "summary response has exit_code 0" (summaryResp.Contains "0")
 

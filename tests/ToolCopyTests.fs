@@ -72,7 +72,7 @@ let reviewAlreadyActive () =
         reviewAlreadyActiveMessage
 
 let subagentToolFailed () =
-    let r = subagentToolFailed "ctx" MessageAborted
+    let r = subagentToolFailed "ctx" Wanxiangshu.Kernel.ToolOutputInfoTypes.FailureReason.Aborted
     check "contains ctx" (r.Contains "ctx")
     check "contains aborted" (r.Contains "aborted")
 

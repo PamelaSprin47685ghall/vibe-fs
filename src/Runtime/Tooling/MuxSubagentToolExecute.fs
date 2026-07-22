@@ -21,6 +21,7 @@ open Wanxiangshu.Runtime.SubagentSpawn
 open Wanxiangshu.Runtime.ToolArgsDecode
 open Wanxiangshu.Runtime.ToolExecute
 open Wanxiangshu.Runtime.ToolRuntimeContext
+open Wanxiangshu.Kernel.ToolOutputInfoTypes
 
 open Wanxiangshu.Runtime.RuntimeScope
 
@@ -89,7 +90,7 @@ type MuxHostAdapter
 let private muxConfigMessage (title: string) (error: DomainError) : string =
     match error with
     | InvalidIntent("mux", "workspaceId", _) -> muxToolRequiresWorkspaceId title
-    | _ -> subagentToolFailed title error
+    | _ -> subagentToolFailed title (ToolError error)
 
 let executeMuxSubagentTool
     (runMuxWithTaskId: RunMuxSubagentWithTaskId)

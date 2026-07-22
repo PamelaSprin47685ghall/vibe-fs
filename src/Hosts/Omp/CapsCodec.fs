@@ -3,6 +3,7 @@ module Wanxiangshu.Hosts.Omp.CapsCodec
 open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Runtime.CapsFormat
+open Wanxiangshu.Runtime.OpencodeReadSynth
 open Wanxiangshu.Kernel.CapsSynthPolicy
 open Wanxiangshu.Kernel.CapsPrelude
 open Wanxiangshu.Runtime.OmpCaps
@@ -54,26 +55,17 @@ let private buildUserEntry (userId: string) (sessionId: string) (preludeText: st
     createObj [ "info", box info; "parts", box [| buildTextPart text |] ]
 
 let private buildReadToolPart (cap: CapsFile) (epochId: string) (fp: string) (index: int) : obj =
-    let lines = cap.content.Split('\n')
-    let numbered = Wanxiangshu.Runtime.NativeReadTranscript.formatNumberedLines 1 lines
-
-    let wrappedOutput =
-        $"{cap.filePath}\n{numbered}\n(End of file - total {lines.Length} lines)"
-
+    let totalLines = cap.content.Split('\n').Length
     let callId = capsToolCallId "caps-call-" epochId fp index
+    let input = createObj [ "filePath", box cap.filePath ]
+    let state = buildCompletedReadState cap.filePath cap.content 1 totalLines input
+    state?error <- box ""
 
     createObj
         [ "type", box "tool"
           "tool", box "read"
           "callID", box callId
-          "state",
-          box (
-              createObj
-                  [ "status", box "completed"
-                    "input", box (createObj [ "filePath", box cap.filePath ])
-                    "output", box wrappedOutput
-                    "error", box "" ]
-          ) ]
+          "state", box state ]
 
 let private buildAssistantEntry
     (assistantId: string)

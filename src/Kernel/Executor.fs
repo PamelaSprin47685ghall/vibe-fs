@@ -89,19 +89,6 @@ let resolveExecutorStatus (result: ExecuteResult) : ExecutorStatus =
     | Failed(_, None, _) -> ExecutorStatus.ExitError None
     | MissingExecutable _ -> ExecutorStatus.MissingExecutable
 
-let applyExecutorStatus (result: ExecuteResult) (msg: ToolOutputMessage) : ToolOutputMessage =
-    let status = resolveExecutorStatus result
-
-    let codeOpt =
-        match status with
-        | ExecutorStatus.Completed code -> Some code
-        | ExecutorStatus.ExitError code -> code
-        | _ -> None
-
-    { msg with
-        status = Some(executorStatusText status)
-        exitCode = codeOpt }
-
 let readOnlyReadCommands: Set<string> =
     Set.ofList
         [ "head"

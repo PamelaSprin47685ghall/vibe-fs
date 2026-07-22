@@ -59,23 +59,4 @@ type FuzzyGrepState =
 
 type SearchOutcome = { output: string; isError: bool }
 
-let fuzzyIteratorDescriptionHint =
-    "When more results exist, the tool output carries an `iterator` field; feed this iterator value into the fuzzy_continue tool to get the next page."
 
-let fuzzyFindDescriptionOmpPrefix =
-    "Search for files by fuzzy path text matching. Returns file paths ranked by relevance and frecency. Regex and glob syntax are not supported.\n\nFirst call: provide pattern (an array of strings) and optional path. To fetch the next page, call fuzzy_continue with the `iterator` field in the tool output.\nMultiple patterns run in parallel and results are grouped per pattern.\n"
-
-let fuzzyFindDescriptionOmp =
-    fuzzyFindDescriptionOmpPrefix + fuzzyIteratorDescriptionHint
-
-let fuzzyGrepDescriptionOmpPrefix =
-    "Search file contents using fuzzy-aware content search. Smart-case, git-aware, frecency-ranked.\n\nFirst call: provide pattern (an array of strings) and optional filters. To fetch the next page, call fuzzy_continue with the `iterator` field in the tool output.\nMultiple patterns run in parallel and results are grouped per pattern.\n"
-
-let fuzzyGrepDescriptionOmp =
-    fuzzyGrepDescriptionOmpPrefix + fuzzyIteratorDescriptionHint
-
-/// Body text only. Runtime wraps withIterator when nextIterator is non-empty.
-let buildGrepBody (body: string) (regexError: string option) : string =
-    match regexError with
-    | Some error -> body + "\n\nInvalid regex: " + error + ", used literal match"
-    | None -> body

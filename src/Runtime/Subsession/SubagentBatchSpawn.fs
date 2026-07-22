@@ -19,7 +19,7 @@ open Wanxiangshu.Runtime.SubagentBatchSpawnCore
 open Wanxiangshu.Runtime.SubagentSpawn
 open Wanxiangshu.Runtime.ChildAgentRegistry
 open Wanxiangshu.Runtime.SubagentIteratorStore
-open Wanxiangshu.Runtime.Tooling.ToolOutputToml
+open Wanxiangshu.Runtime.Tooling.ToolOutputBatchToml
 
 module HostAdapter = Wanxiangshu.Kernel.HostAdapter
 

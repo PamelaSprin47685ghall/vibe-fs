@@ -47,7 +47,7 @@ let buildMeditatorSectionsMatchesManualZip () =
           outputSections = [] }
 
     let viaText =
-        Wanxiangshu.Kernel.Methodology.Schema.renderMeditatorIntent dummyEntry "why?" "my background" "note detail"
+        renderMeditatorIntent dummyEntry "why?" "my background" "note detail"
 
     for host in [| opencode; mimocode |] do
         let viaFormat = formatPrompt host (Meditator viaText) |> List.head

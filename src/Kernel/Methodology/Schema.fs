@@ -2,6 +2,7 @@ module Wanxiangshu.Kernel.Methodology.Schema
 
 open System
 open System.Text
+open Wanxiangshu.Kernel.Prompt
 
 type MethodologyEntry =
     { methodologyId: string

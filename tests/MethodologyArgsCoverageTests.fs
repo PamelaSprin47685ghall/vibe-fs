@@ -5,6 +5,7 @@ open Fable.Core.JsInterop
 open System
 open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Runtime.MethodologyArgs
+open Wanxiangshu.Runtime.SubagentPrompts
 open Wanxiangshu.Kernel.Methodology.Schema
 open Wanxiangshu.Hosts.Opencode.HookSchemaDecoration
 open Wanxiangshu.Hosts.Opencode.HookSchemaDecode
@@ -71,7 +72,7 @@ let methSchemaCommon () =
     check "prompt has intent" (prompt.Contains "hi")
     check "prompt has background" (prompt.Contains "my background")
     check "prompt has note" (prompt.Contains "my note")
-    check "prompt has quiet room" (prompt.Contains "quiet room")
+    check "prompt has quiet room" (prompt.Contains "Do NOT call tools")
 
 // ── Opencode.HookSchema ────────────────────────────────────────────────────
 

@@ -4,6 +4,7 @@ open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Kernel.FuzzyPath
 open Wanxiangshu.Kernel.FuzzyQuery
 open Wanxiangshu.Runtime.ToolOutputInfo
+open Wanxiangshu.Kernel.ToolOutputInfoTypes
 open Wanxiangshu.Kernel.FuzzyFormat
 open Wanxiangshu.Runtime.FuzzySearch
 open Wanxiangshu.Runtime.FuzzySearchSupport
@@ -32,15 +33,27 @@ let findPagingDefault () =
     check "many matches → iterator stored" (id <> "")
 
 let emptyIteratorNotRendered () =
-    equal "empty iterator omitted" "body" (buildGrepBody "body" None)
+    let msg = Wanxiangshu.Runtime.ToolOutputInfo.plainText "body"
+    let rendered = Wanxiangshu.Runtime.ToolOutputInfo.render msg
+    check "empty iterator omitted" (rendered.Contains "output = \"body\"")
+    check "no iterator key when empty" (not (rendered.Contains "iterator"))
 
 let grepOutputNotices () =
-    let bodyOnly = buildGrepBody "body" (Some "bad regex")
-    let combined = Wanxiangshu.Runtime.ToolOutputInfo.withIterator bodyOnly "iter1"
-    check "combined regex notice in body" (combined.Contains "Invalid regex: bad regex")
+    let payload =
+        Wanxiangshu.Kernel.ToolOutputInfoTypes.FuzzyGrep
+            { pattern = None
+              totalMatched = None
+              regexFallbackError = Some "bad regex"
+              matches = [] }
+
+    let msg = { Wanxiangshu.Runtime.ToolOutputInfo.empty with content = payload }
+    let regexOnly = Wanxiangshu.Runtime.ToolOutputInfo.render msg
+    let withIter = Wanxiangshu.Runtime.ToolOutputInfo.withIterator msg "iter1"
+    let combined = Wanxiangshu.Runtime.ToolOutputInfo.render withIter
+    check "regex fallback error field present" (regexOnly.Contains "regex_fallback_error = \"bad regex\"")
+    check "matches table present" (regexOnly.Contains "matches")
+    check "no body key" (not (regexOnly.Contains "body ="))
     check "combined iterator in front matter" (combined.Contains "iter1")
-    let regexOnly = buildGrepBody "body" (Some "bad regex")
-    check "regex-only notice in body" (regexOnly.Contains "Invalid regex: bad regex")
     check "regex-only no iterator key" (not (regexOnly.Contains "iter1"))
 
 let totalMatchedSemantics () =

@@ -40,6 +40,20 @@ let decodeReturnReviewerArgs (args: obj) : Result<ReturnReviewerArgs, DomainErro
         match parseVerdict raw with
         | None -> Error(InvalidIntent("return_reviewer", "verdict", "must be PERFECT or REVISE"))
         | Some verdict ->
-            Ok
-                { Verdict = verdict
-                  Feedback = defaultArg (strField args "feedback") "" }
+            let feedback =
+                defaultArg (strField args "feedback") ""
+                |> fun value -> if isNull value then "" else value.Trim()
+
+            match verdict with
+            | Revise when feedback = "" ->
+                Error(
+                    InvalidIntent(
+                        "return_reviewer",
+                        "feedback",
+                        "REVISE requires non-empty actionable feedback; do not mine dialogue text"
+                    )
+                )
+            | _ ->
+                Ok
+                    { Verdict = verdict
+                      Feedback = feedback }

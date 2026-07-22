@@ -3,6 +3,7 @@ module Wanxiangshu.Runtime.SembleSearch
 open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Runtime.CapsFormat
+open Wanxiangshu.Runtime.OpencodeReadSynth
 open Wanxiangshu.Kernel.Messaging
 open Wanxiangshu.Runtime.Dyn
 open Wanxiangshu.Runtime.RuntimeScope
@@ -54,6 +55,15 @@ let buildReadToolParts (assistantId: string) (sessionID: string) (results: Sembl
     results
     |> List.mapi (fun i r ->
         let g = shortGuid ()
+        let limit = max 1 (r.endLine - r.startLine + 1)
+
+        let input =
+            createObj
+                [ "filePath", box r.filePath
+                  "offset", box r.startLine
+                  "limit", box limit ]
+
+        let state = buildCompletedReadState r.filePath r.content r.startLine r.totalLines input
 
         box (
             createObj
@@ -63,38 +73,7 @@ let buildReadToolParts (assistantId: string) (sessionID: string) (results: Sembl
                   "id", box $"prt_{g}"
                   "sessionID", box sessionID
                   "messageID", box assistantId
-                  "state",
-                  box (
-                      createObj
-                          [ "status", box "completed"
-                            "input",
-                            box (
-                                createObj [ "filePath", box r.filePath; "offset", box r.startLine; "limit", box 2000 ]
-                            )
-                            "output",
-                            box (
-                                let lines = r.content.Split('\n')
-
-                                let numbered =
-                                    Wanxiangshu.Runtime.NativeReadTranscript.formatNumberedLines r.startLine lines
-
-                                $"{r.filePath}\n{numbered}\n(End of file - total {r.totalLines} lines)"
-                            )
-                            "title", box $"Read {r.filePath}"
-                            "metadata",
-                            box (
-                                createObj
-                                    [ "preview", box true
-                                      "truncated", box false
-                                      "loaded", box true
-                                      "display", box true ]
-                            )
-                            "time",
-                            box (
-                                let t = System.DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() in
-                                createObj [ "start", box t; "end", box (t + 1L) ]
-                            ) ]
-                  ) ]
+                  "state", box state ]
         ))
     |> Array.ofList
 

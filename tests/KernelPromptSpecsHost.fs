@@ -40,10 +40,10 @@ let hostKernel' () =
           outputSections = [] }
 
     let prompt =
-        Wanxiangshu.Kernel.Methodology.Schema.renderMeditatorIntent dummyEntry "why?" "my background" "note detail"
+        renderMeditatorIntent dummyEntry "why?" "my background" "note detail"
 
     check "meditator has question" (prompt.IndexOf("why?") >= 0)
-    check "meditator read-only" (prompt.IndexOf("quiet room") >= 0)
+    check "meditator read-only" (prompt.IndexOf("Do NOT call tools") >= 0)
 
     let inv =
         { objective = "find auth"

@@ -7,6 +7,7 @@ open Wanxiangshu.Kernel.HostTools
 open Wanxiangshu.Kernel.Executor
 open Wanxiangshu.Kernel.FuzzyFormat
 open Wanxiangshu.Runtime.ExecutorFormat
+open Wanxiangshu.Runtime.ToolOutputInfo
 open Wanxiangshu.Runtime.Dyn
 open Wanxiangshu.Runtime.Subagent
 open Wanxiangshu.Runtime.ExecutorToolsCodec
@@ -35,8 +36,8 @@ let summarizeWhenNeeded
         let output = outputFromResult result
 
         if not (shouldSummarize byteLength options.maxBytes output) then
-            let formatted = formatToolResponse result None
-            return prependSafetyWarningForExecution formatted options
+            let msg = formatToolResponse result None
+            return render (prependSafetyWarningForExecution msg options)
         else
             let langStr = languageToString options.language
             let timeoutStr = timeoutToString options.timeoutType
@@ -56,8 +57,8 @@ let summarizeWhenNeeded
 
             let opts = toolOptions toolNames summarizationRole summarizationAiSettingsAgentId
             let! report = runMuxSubagent deps config summarizationAgentId prompt "Executor summary" opts
-            let formatted = formatToolResponse result (Some report)
-            return prependSafetyWarningForExecution formatted options
+            let msg = formatToolResponse result (Some report)
+            return render (prependSafetyWarningForExecution msg options)
     }
 
 let formatHostReadResult (result: obj) : string =

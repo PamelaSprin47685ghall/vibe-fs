@@ -41,7 +41,7 @@ let readUnfiltered (mgr: obj) (id: string) (session: obj) (offset: int) (limit: 
               hasMore = hasMore
               pattern = None
               totalMatches = None
-              lines = Array.toList lines
+              lines = List.ofArray lines
               continuationHint = hintOpt }
 
         return renderPtyRead ptyRead
@@ -60,7 +60,7 @@ let private formatFilteredResult
     let statusStr = string session?status
 
     let matchLines =
-        matches |> Array.map (fun m -> string m?text) |> Array.toList
+        matches |> Microsoft.FSharp.Collections.Array.map (fun m -> string m?text) |> List.ofArray
 
     let hintOpt =
         if matches.Length = 0 then

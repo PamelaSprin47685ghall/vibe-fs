@@ -45,14 +45,14 @@ let ptySpawnTool (host: Host) : obj =
 let formatSessionList (sessions: obj array) : string =
     let items =
         sessions
-        |> Array.map (fun s ->
+        |> Microsoft.FSharp.Collections.Array.map (fun s ->
             { PtySessionItem.id = string s?``id``
               title = string s?title
               command = sprintf "%s %s" (string s?command) (String.concat " " (unbox<string array> s?args))
               status = string s?status
               pid = unbox<int> s?pid
               lineCount = unbox<int> s?lineCount })
-        |> Array.toList
+        |> List.ofArray
 
     renderPtyList { count = sessions.Length; sessions = items }
 
@@ -145,5 +145,5 @@ let ptyListTool (host: Host) : obj =
                         |> Seq.map (fun s -> lm?toInfo (s))
                         |> Seq.toArray
 
-                return renderPtyList { count = sessions.Length; sessions = items }
+                return formatSessionList sessions
             })

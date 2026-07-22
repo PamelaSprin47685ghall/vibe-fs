@@ -64,7 +64,7 @@ let dispatchReturnsFailureMessage () =
 let dispatchReturnsAbortMessage () =
     promise {
         let! tempDir = mkdtempAsync "subagent-dispatcher-abort-"
-        let adapter = fakeAdapter tempDir Aborted
+        let adapter = fakeAdapter tempDir (Failure MessageAborted)
         let scope = create ()
         let registry = ChildAgentRegistry.Create()
         let! result = dispatch Opencode adapter "coder" sampleCoderArgs scope (Some registry)

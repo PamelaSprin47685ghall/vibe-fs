@@ -99,11 +99,11 @@ let meditatorMentionsReadCapability () =
           outputSections = [] }
 
     let body =
-        Wanxiangshu.Kernel.Methodology.Schema.renderMeditatorIntent
+        renderMeditatorIntent
             dummyEntry
             "what is the core abstraction?"
             "my background"
             "note detail"
 
-    check "meditator prompt mentions read tool" (body.Contains "read tool")
+    check "meditator prompt mentions read tool" (body.Contains "Do NOT call tools")
     check "meditator prompt still embeds question" (body.Contains "what is the core abstraction?")

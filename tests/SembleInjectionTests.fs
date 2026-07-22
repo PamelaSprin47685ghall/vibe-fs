@@ -40,15 +40,16 @@ let private emptyInfo id role =
       details = null
       time = null }
 
-let formatReadOutputPrefixesLines () =
-    let out =
-        Wanxiangshu.Runtime.NativeReadTranscript.formatNumberedLines
-            sampleResult.startLine
-            (sampleResult.content.Split('\n'))
+let formatReadOutputMatchesOpenCodeNative () =
+    let out = formatReadOutput sampleResult.filePath sampleResult.content sampleResult.startLine (Some sampleResult.totalLines)
 
-    check "has 127| prefix" (out.Contains " 127|def save_pretrained")
-    check "has piped format" (out.Contains "|")
-    check "starts with proper spacing" (out.StartsWith "   127|")
+    check "starts with path tag" (out.StartsWith "<path>src/auth.py</path>")
+    check "has type file tag" (out.Contains "<type>file</type>")
+    check "has content open tag" (out.Contains "<content>")
+    check "has native colon line" (out.Contains "127: def save_pretrained")
+    check "no pipe line prefix" (not (out.Contains "127|"))
+    check "has EOF footer" (out.Contains "(End of file - total 300 lines)")
+    check "closes content tag" (out.Contains "</content>")
 
 let buildReadToolPartsProducesOnePartPerResult () =
     let parts = buildReadToolParts "msg-1" "session-1" [ sampleResult; sampleResult2 ]
@@ -67,18 +68,26 @@ let buildReadToolPartsStructureMatchesCaps () =
     let input = get state "input"
     equal "input filePath" "src/auth.py" (str input "filePath")
     equal "input offset" 127 (getValue<int> input "offset")
-    equal "input limit" 2000 (getValue<int> input "limit")
-    check "output has file path" ((str state "output").Contains "src/auth.py")
-    check "output has 127|" ((str state "output").Contains "127|")
+    equal "input limit" 3 (getValue<int> input "limit")
+    let output = str state "output"
+    check "output has path tag" (output.Contains "<path>src/auth.py</path>")
+    check "output has 127: line" (output.Contains "127: def save_pretrained")
+    check "output has type tag" (output.Contains "<type>file</type>")
     let metadata = get state "metadata"
-    check "metadata has preview" (has metadata "preview")
-    check "metadata has truncated" (has metadata "truncated")
-    check "metadata has loaded" (has metadata "loaded")
-    check "metadata has display" (has metadata "display")
+    check "metadata preview is string" ((str metadata "preview").Contains "def save_pretrained")
+    equal "metadata truncated bool" true (getValue<bool> metadata "truncated")
+    check "metadata loaded is array" (isArray (get metadata "loaded"))
+    let display = get metadata "display"
+    equal "display type file" "file" (str display "type")
+    equal "display path" "src/auth.py" (str display "path")
+    equal "display lineStart" 127 (getValue<int> display "lineStart")
+    equal "display lineEnd" 129 (getValue<int> display "lineEnd")
+    equal "display totalLines" 300 (getValue<int> display "totalLines")
+    equal "display truncated" true (getValue<bool> display "truncated")
     let time = get state "time"
     check "time start > 0" ((getValue<int> time "start") > 0)
     check "time end >= start" ((getValue<int> time "end") >= (getValue<int> time "start"))
-    equal "title" "Read src/auth.py" (str state "title")
+    equal "title is path" "src/auth.py" (str state "title")
 
 let buildReadToolPartsCallIDsUnique () =
     let parts = buildReadToolParts "msg-1" "session-1" [ sampleResult; sampleResult2 ]
@@ -228,7 +237,7 @@ type SembleBreakpointScopeTests =
     static member run() = breakpointsAreScopedByRuntimeScope ()
 
 let run () =
-    formatReadOutputPrefixesLines ()
+    formatReadOutputMatchesOpenCodeNative ()
     buildReadToolPartsProducesOnePartPerResult ()
     buildReadToolPartsStructureMatchesCaps ()
     buildReadToolPartsCallIDsUnique ()

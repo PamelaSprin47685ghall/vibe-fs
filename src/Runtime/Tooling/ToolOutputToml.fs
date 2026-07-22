@@ -4,73 +4,120 @@ open Wanxiangshu.Kernel.ToolOutputInfoTypes
 open Wanxiangshu.Runtime.Serialization.TomlValue
 open Wanxiangshu.Runtime.Serialization.Toml
 
-type SubagentReport =
-    { iterator: string option
-      body: string }
+let private nonEmpty (s: string option) : string option =
+    match s with
+    | Some v when System.String.IsNullOrWhiteSpace v -> None
+    | _ -> s
 
-type BatchReport = private BatchReport of SubagentReport list
+let private nonEmptyList (xs: string list) : string list =
+    xs |> List.filter (System.String.IsNullOrWhiteSpace >> not)
 
-module BatchReport =
-    let create (reports: SubagentReport list) : BatchReport option =
-        if List.isEmpty reports then
-            None
-        else
-            Some(BatchReport reports)
+let private executorFields (e: ExecutorOutput) : (string * TomlValue) list =
+    [ yield "stdout", String e.stdout
+      yield "status", String e.status
+      yield "truncated", Boolean e.truncated
+      match e.stderr with
+      | Some s when s <> "" -> yield "stderr", String s
+      | _ -> ()
+      match e.exitCode with
+      | Some c -> yield "exit_code", Integer c
+      | None -> ()
+      match e.signal with
+      | Some s when s <> "" -> yield "signal", String s
+      | _ -> ()
+      match nonEmpty e.summary with
+      | Some s -> yield "summary", String s
+      | None -> () ]
 
-    let items (BatchReport reports) : SubagentReport list = reports
+let private annotationField (annotation: string option) : (string * TomlValue) list =
+    match nonEmpty annotation with
+    | Some a -> [ "annotation", String a ]
+    | None -> []
+
+let private fuzzyFindFields (f: FuzzyFindOutput) : (string * TomlValue) list =
+    let matchTables =
+        f.matches
+        |> List.map (fun m ->
+            [ yield "path", String m.path
+              match nonEmpty m.pattern with
+              | Some p -> yield "pattern", String p
+              | None -> ()
+              yield! annotationField m.annotation ])
+
+    [ match nonEmpty f.pattern with
+      | Some p -> yield "pattern", String p
+      | None -> ()
+      match f.totalMatched with
+      | Some t -> yield "total_matched", Integer t
+      | None -> ()
+      match f.totalFiles with
+      | Some t -> yield "total_files", Integer t
+      | None -> ()
+      yield "matches", TableArray matchTables ]
+
+let private fuzzyGrepFields (g: FuzzyGrepOutput) : (string * TomlValue) list =
+    let matchTables =
+        g.matches
+        |> List.map (fun m ->
+            [ yield "path", String m.path
+              yield "line", Integer m.line
+              yield "content", String m.content
+              match nonEmpty m.pattern with
+              | Some p -> yield "pattern", String p
+              | None -> ()
+              if not (List.isEmpty m.contextBefore) then
+                  yield "context_before", StringArray m.contextBefore
+              if not (List.isEmpty m.contextAfter) then
+                  yield "context_after", StringArray m.contextAfter
+              yield! annotationField m.annotation ])
+
+    [ match nonEmpty g.pattern with
+      | Some p -> yield "pattern", String p
+      | None -> ()
+      match g.totalMatched with
+      | Some t -> yield "total_matched", Integer t
+      | None -> ()
+      match nonEmpty g.regexFallbackError with
+      | Some e -> yield "regex_fallback_error", String e
+      | None -> ()
+      yield "matches", TableArray matchTables ]
+
+let private writeResultFields (w: WriteResultInfo) : (string * TomlValue) list =
+    [ "path", String w.path
+      "success", Boolean w.success
+      "syntax_errors", StringArray (nonEmptyList w.syntaxErrors) ]
 
 let toolOutputDocument (msg: ToolOutputMessage) : TomlValue =
-    let mutable fields = []
+    let messageFields =
+        [ match msg.hint with
+          | Some h when h <> "" -> yield "hint", String h
+          | _ -> ()
+          match msg.syntax with
+          | Some s when s <> "" -> yield "syntax", String s
+          | _ -> ()
+          match msg.iterator with
+          | Some i when i <> "" -> yield "iterator", String i
+          | _ -> ()
+          match msg.status with
+          | Some st when st <> "" -> yield "status", String st
+          | _ -> () ]
 
-    match msg.body with
-    | Some b when b <> "" -> fields <- fields @ [ "body", String b ]
-    | _ -> ()
+    let contentFields =
+        match msg.content with
+        | Empty -> []
+        | Plain s when System.String.IsNullOrWhiteSpace s -> []
+        | Plain s -> [ "output", String s ]
+        | Executor e -> executorFields e
+        | FuzzyFind f -> fuzzyFindFields f
+        | FuzzyGrep g -> fuzzyGrepFields g
+        | WriteResult w -> writeResultFields w
 
-    match msg.hint with
-    | Some h when h <> "" -> fields <- fields @ [ "hint", String h ]
-    | _ -> ()
-
-    match msg.syntax with
-    | Some s when s <> "" -> fields <- fields @ [ "syntax", String s ]
-    | _ -> ()
-
-    match msg.iterator with
-    | Some i when i <> "" -> fields <- fields @ [ "iterator", String i ]
-    | _ -> ()
-
-    match msg.status with
-    | Some st when st <> "" -> fields <- fields @ [ "status", String st ]
-    | _ -> ()
-
-    match msg.exitCode with
-    | Some code -> fields <- fields @ [ "exit_code", Integer code ]
-    | None -> ()
-
-    Table fields
+    Table (messageFields @ contentFields)
 
 let renderToolOutput (msg: ToolOutputMessage) : string =
     match toolOutputDocument msg with
     | Table [] -> ""
     | doc -> stringify doc
-
-let batchReportDocument (batch: BatchReport) : TomlValue =
-    let reports = BatchReport.items batch
-
-    let tables =
-        reports
-        |> List.map (fun r ->
-            let mutable f = []
-
-            match r.iterator with
-            | Some iter -> f <- f @ [ "iterator", String iter ]
-            | None -> ()
-
-            f <- f @ [ "body", String r.body ]
-            f)
-
-    Table [ "reports", TableArray tables ]
-
-let renderBatchReport (batch: BatchReport) : string = batchReportDocument batch |> stringify
 
 type SearchResultItem =
     { title: string
@@ -129,27 +176,3 @@ let capsDocument (caps: CapsItem list) : TomlValue =
     Table [ "capabilities", TableArray tables ]
 
 let renderCaps (caps: CapsItem list) : string = capsDocument caps |> stringify
-
-type SquadEventTomlView =
-    { eventKind: string
-      sessionId: string
-      taskId: string option
-      commitSha: string option
-      message: string }
-
-let squadEventDocument (view: SquadEventTomlView) : TomlValue =
-    let mutable fields =
-        [ "event_kind", String view.eventKind; "session_id", String view.sessionId ]
-
-    match view.taskId with
-    | Some tid -> fields <- fields @ [ "task_id", String tid ]
-    | None -> ()
-
-    match view.commitSha with
-    | Some sha -> fields <- fields @ [ "commit_sha", String sha ]
-    | None -> ()
-
-    fields <- fields @ [ "message", String view.message ]
-    Table fields
-
-let renderSquadEvent (view: SquadEventTomlView) : string = squadEventDocument view |> stringify

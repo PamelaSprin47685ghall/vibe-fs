@@ -18,47 +18,35 @@ let hintForMethodologies (methodologies: string list) : string =
     | [] -> hintTodosUpdated
     | names -> names |> List.map hintMethodologyFollowup |> String.concat " "
 
-let empty =
-    { body = None
+let empty : ToolOutputMessage =
+    { content = Empty
       hint = None
       syntax = None
       iterator = None
-      status = None
-      exitCode = None }
+      status = None }
 
-let private normalizedBody (s: string) = if System.String.IsNullOrWhiteSpace s then None else Some s
-
-let withBody body =
-    { empty with
-        body = normalizedBody body }
+let plainText (text: string) : ToolOutputMessage =
+    if System.String.IsNullOrWhiteSpace text then
+        empty
+    else
+        { empty with content = Plain text }
 
 let render (msg: ToolOutputMessage) : string = renderToolOutput msg
 
 let noChangeEnvelope () =
     render { empty with status = Some noChangeStatus }
 
-let addSyntax (raw: string) (syntax: string) : string =
+let addSyntax (msg: ToolOutputMessage) (syntax: string) : ToolOutputMessage =
     if System.String.IsNullOrWhiteSpace syntax then
-        raw
-    elif System.String.IsNullOrWhiteSpace raw then
-        render { empty with syntax = Some syntax }
+        msg
     else
-        render
-            { empty with
-                body = Some raw
-                syntax = Some syntax }
+        { msg with syntax = Some syntax }
 
-let withIterator (body: string) (iterator: string) : string =
-    let iterOpt = if System.String.IsNullOrWhiteSpace iterator then None else Some iterator
-    let bodyOpt = if System.String.IsNullOrWhiteSpace body then None else Some body
-
-    if Option.isNone iterOpt then
-        body
+let withIterator (msg: ToolOutputMessage) (iterator: string) : ToolOutputMessage =
+    if System.String.IsNullOrWhiteSpace iterator then
+        msg
     else
-        render
-            { empty with
-                body = bodyOpt
-                iterator = iterOpt }
+        { msg with iterator = Some iterator }
 
 let todoWriteOutput (methodologies: string list) : string =
     let hintStr = hintForMethodologies methodologies

@@ -10,8 +10,9 @@ open Wanxiangshu.Kernel.Errors.DomainError
 open Wanxiangshu.Kernel.Session.Causality
 open Wanxiangshu.Kernel.Executor
 open Wanxiangshu.Runtime.ExecutorFormat
-open Wanxiangshu.Kernel.HostTools
+open Wanxiangshu.Runtime.ToolOutputInfo
 
+open Wanxiangshu.Kernel.HostTools
 open Wanxiangshu.Runtime.Subagent
 open Wanxiangshu.Kernel.ToolCatalog
 open Wanxiangshu.Kernel.ToolCopy
@@ -74,8 +75,8 @@ let private summarizeOrFormat
         let output = outputFromResult result
 
         if not (shouldSummarize byteLength options.maxBytes output) then
-            let formatted = formatToolResponse result None
-            return prependSafetyWarningForExecution formatted options
+            let msg = formatToolResponse result None
+            return render (prependSafetyWarningForExecution msg options)
         else
             let prompt = buildExecutorSummaryPrompt host output options
 
@@ -93,8 +94,8 @@ let private summarizeOrFormat
                         sessionID
                         context)
 
-            let formatted = formatToolResponse result (Some summary)
-            return prependSafetyWarningForExecution formatted options
+            let msg = formatToolResponse result (Some summary)
+            return render (prependSafetyWarningForExecution msg options)
     }
 
 /// Execute the executor tool body: decode args, resolve client, run command inside EnqueueExecutor,

@@ -151,12 +151,15 @@
     <Compile Include="src/Runtime/Serialization/Toml.fs"/>
     <Compile Include="src/Runtime/Prompt/PromptToml.fs"/>
     <Compile Include="src/Runtime/Tooling/ToolOutputToml.fs"/>
+    <Compile Include="src/Runtime/Tooling/ToolOutputBatchToml.fs"/>
+    <Compile Include="src/Runtime/Tooling/ToolOutputSquadToml.fs"/>
     <Compile Include="src/Runtime/Tooling/ToolOutputPtyToml.fs"/>
     <Compile Include="src/Runtime/Search/SearchPrompts.fs"/>
     <Compile Include="src/Runtime/Tooling/ToolOutputInfo.fs"/>
     <Compile Include="src/Runtime/Execution/LoopMessages.fs"/>
     <Compile Include="src/Runtime/PromptFragments.fs"/>
     <Compile Include="src/Runtime/Tooling/CapsFormat.fs"/>
+    <Compile Include="src/Runtime/Tooling/OpencodeReadSynth.fs"/>
     <Compile Include="src/Runtime/Tooling/NativeReadTranscript.fs"/>
     <Compile Include="src/Runtime/SubagentPrompts.fs"/>
     <Compile Include="src/Runtime/Subsession/Subagent.fs"/>
@@ -560,6 +563,7 @@
     <Compile Include="src/Hosts/Omp/ToolResultEvent.fs"/>
     <Compile Include="src/Hosts/Omp/NudgeRuntime.fs"/>
     <Compile Include="src/Hosts/Omp/CapsCodec.fs"/>
+    <Compile Include="src/Hosts/Omp/FuzzyToolParameters.fs"/>
     <Compile Include="src/Hosts/Omp/FuzzyTools.fs"/>
     <Compile Include="src/Hosts/Omp/OmpToolSchema.fs"/>
     <Compile Include="src/Hosts/Omp/ExecutorTools.fs"/>

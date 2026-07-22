@@ -12,7 +12,7 @@ let testRenderEmpty () =
     equal "render empty msg" "" (render empty)
 
 let testRenderBodyOnly () =
-    equal "render body only" "body = \"hello\"\n" (render (withBody "hello"))
+    equal "render body only" "output = \"hello\"\n" (render (plainText "hello"))
 
 let testRenderHintOnly () =
     let r = render { empty with hint = Some "test" }
@@ -20,8 +20,8 @@ let testRenderHintOnly () =
     check "render hint uses flat key" (r.Contains "hint =")
 
 let testRenderBodyAndInfo () =
-    let r = render { empty with body = Some "b"; hint = Some "x" }
-    check "body+info contains body" (r.Contains "body = \"b\"")
+    let r = render { empty with content = Plain "b"; hint = Some "x" }
+    check "body+info contains output" (r.Contains "output = \"b\"")
     check "body+info contains hint" (r.Contains "hint = \"x\"")
 
 let testNoChangeEnvelope () =
@@ -30,15 +30,15 @@ let testNoChangeEnvelope () =
     check "noChangeEnvelope uses flat status" (r.Contains "status =")
 
 let testAddSyntax () =
-    let r = addSyntax "code block" "fsharp"
+    let r = addSyntax (plainText "code block") "fsharp" |> render
     check "addSyntax has syntax" (r.Contains "fsharp")
-    check "addSyntax has body" (r.Contains "code block")
-    equal "addSyntax empty preserves" "raw" (addSyntax "raw" "")
+    check "addSyntax has output" (r.Contains "code block")
+    equal "addSyntax empty preserves" (plainText "raw") (addSyntax (plainText "raw") "")
 
 let testWithIterator () =
-    let r = withIterator "body" "my-iter"
+    let r = withIterator (plainText "body") "my-iter" |> render
     check "withIterator has iterator" (r.Contains "my-iter")
-    equal "withIterator empty returns body" "body" (withIterator "body" "")
+    equal "withIterator empty returns msg" (plainText "body") (withIterator (plainText "body") "")
 
 let testTodoWriteOutput () =
     let r = todoWriteOutput [ "methodology" ]
@@ -52,8 +52,8 @@ let testHintForMethodologies () =
     check "hintForMethodologies multiple" ((hintForMethodologies [ "a"; "b" ]).Contains "b")
 
 let testEmptyWithBody () =
-    let msg = withBody "some body"
-    equal "withBody body" (Some "some body") msg.body
+    let msg = plainText "some body"
+    equal "plainText content" (Plain "some body") msg.content
 
 let testConstants () =
     check "hintExecutorMisuse nonempty" (hintExecutorMisuse.Length > 0)
@@ -73,8 +73,7 @@ let testPtySpawnTomlFlatFields () =
           pid = 1234
           status = "running"
           notifyOnExit = false
-          timeoutSeconds = "none"
-          message = "PTY session spawned." }
+          timeoutSeconds = "none" }
 
     let text = renderPtySpawn info
     let parsed = parseToml text
@@ -82,7 +81,6 @@ let testPtySpawnTomlFlatFields () =
     equal "pty spawn status" "running" (string parsed?status)
     equal "pty spawn command" "npm run dev" (string parsed?command)
     equal "pty spawn pid" 1234 (unbox<int> parsed?pid)
-    equal "pty spawn message" "PTY session spawned." (string parsed?message)
 
 let testPtyKillTomlFlatFields () =
     let info: PtyKillInfo =
@@ -93,8 +91,7 @@ let testPtyKillTomlFlatFields () =
           command = "npm run dev"
           status = "stopped"
           finalLineCount = 42
-          note = "session removed"
-          message = "killed pty_100 (session removed)." }
+          note = "session removed" }
 
     let text = renderPtyKill info
     let parsed = parseToml text
@@ -129,8 +126,7 @@ let testPtyWriteTomlFlatFields () =
         { id = "pty_100"
           display = "^C"
           bytes = 1
-          status = "written"
-          message = "Sent: \"^C\"" }
+          status = "written" }
 
     let text = renderPtyWrite info
     let parsed = parseToml text
@@ -155,6 +151,83 @@ let testPtyListTomlTableArray () =
     equal "pty list sess len" 1 sess.Length
     equal "pty list sess id" "pty_1" (string sess.[0]?id)
 
+let testFuzzyFindStructuredMatches () =
+    let msg =
+        { empty with
+            content =
+                FuzzyFind
+                    { pattern = Some "Tool"
+                      totalMatched = Some 1
+                      totalFiles = Some 10
+                      matches =
+                          [ { path = "src/A.fs"
+                              pattern = Some "Tool"
+                              annotation = None } ] } }
+
+    let text = render msg
+    check "fuzzy find has matches table" (text.Contains "[[matches]]" || text.Contains "matches")
+    check "fuzzy find has path" (text.Contains "src/A.fs")
+    check "fuzzy find has total_matched" (text.Contains "total_matched")
+    check "fuzzy find no body" (not (text.Contains "body ="))
+    check "fuzzy find no summary prose" (not (text.Contains "summary ="))
+
+let testFuzzyGrepStructuredMatches () =
+    let msg =
+        { empty with
+            content =
+                FuzzyGrep
+                    { pattern = Some "foo"
+                      totalMatched = Some 1
+                      regexFallbackError = None
+                      matches =
+                          [ { path = "src/B.fs"
+                              line = 12
+                              content = "let foo = 1"
+                              pattern = Some "foo"
+                              contextBefore = []
+                              contextAfter = []
+                              annotation = None } ] } }
+
+    let text = render msg
+    check "fuzzy grep has matches" (text.Contains "matches")
+    check "fuzzy grep has path" (text.Contains "src/B.fs")
+    check "fuzzy grep has line" (text.Contains "12")
+    check "fuzzy grep has content" (text.Contains "let foo = 1")
+    check "fuzzy grep no body" (not (text.Contains "body ="))
+    check "fuzzy grep no summary prose" (not (text.Contains "summary ="))
+
+let testExecutorStructuredFields () =
+    let msg =
+        { empty with
+            content =
+                Executor
+                    { stdout = "ok"
+                      stderr = None
+                      exitCode = Some 0
+                      signal = None
+                      status = "completed"
+                      truncated = false
+                      summary = None } }
+
+    let text = render msg
+    check "executor has stdout" (text.Contains "stdout")
+    check "executor has status" (text.Contains "completed")
+    check "executor no body" (not (text.Contains "body ="))
+
+let testWriteResultStructuredFields () =
+    let msg =
+        { empty with
+            content =
+                WriteResult
+                    { path = "a.fs"
+                      success = true
+                      syntaxErrors = [] } }
+
+    let text = render msg
+    check "write has path" (text.Contains "a.fs")
+    check "write has success" (text.Contains "success = true")
+    check "write no body" (not (text.Contains "body ="))
+
 let run () =
     testRenderEmpty ()
     testRenderBodyOnly ()
@@ -172,3 +245,7 @@ let run () =
     testPtyReadTomlFlatFields ()
     testPtyWriteTomlFlatFields ()
     testPtyListTomlTableArray ()
+    testFuzzyFindStructuredMatches ()
+    testFuzzyGrepStructuredMatches ()
+    testExecutorStructuredFields ()
+    testWriteResultStructuredFields ()

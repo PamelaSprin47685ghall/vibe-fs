@@ -156,7 +156,7 @@ let formatSyntaxDiagnosticsOkCleanInclude () =
     | None -> failwith "expected Some"
 
 let hasSyntaxInOutputWithSyntax () =
-    let output = addSyntax "base" "test syntax"
+    let output = addSyntax (plainText "base") "test syntax" |> render
     check "has syntax" (hasSyntaxInOutput output)
 
 let hasSyntaxInOutputWithoutSyntax () =
@@ -169,7 +169,7 @@ let appendSyntaxDiagnosticsToOutputNoExisting () =
     check "append" (result <> "base")
 
 let appendSyntaxDiagnosticsToOutputExistingKeeps () =
-    let existing = addSyntax "base" "syntax here"
+    let existing = addSyntax (plainText "base") "syntax here" |> render
 
     let result =
         appendSyntaxDiagnosticsToOutput existing "test.fs" (Failed("fsharp", "err"))
@@ -178,7 +178,7 @@ let appendSyntaxDiagnosticsToOutputExistingKeeps () =
 
 let formatWriteSyntaxResultClean () =
     let result = formatWriteSyntaxResult "test.fs" (Ok("fsharp", [||]))
-    check "clean" (result.Contains "Successfully wrote")
+    check "clean" (result.Contains "success = true")
 
 let formatWriteSyntaxResultFailed () =
     let result = formatWriteSyntaxResult "test.fs" (Failed("fsharp", "parse error"))

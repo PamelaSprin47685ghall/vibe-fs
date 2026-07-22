@@ -3,6 +3,7 @@ module Wanxiangshu.Kernel.ToolCopy
 open Wanxiangshu.Kernel.Primitives.Identity
 open Wanxiangshu.Kernel.Errors.DomainError
 open Wanxiangshu.Kernel.Session.Causality
+open Wanxiangshu.Kernel.ToolOutputInfoTypes
 open Wanxiangshu.Kernel.ToolResult
 
 let muxToolRequiresWorkspaceId (title: string) : string = $"{title} requires workspaceId"
@@ -45,7 +46,8 @@ let webToolFailed (label: string) (error: DomainError) : string =
 let reviewAlreadyActiveMessage: string =
     "With-Review Mode is already active. Submit your work via submit_review."
 
-let subagentToolFailed (context: string) (error: DomainError) : string = wireEncodeToolError context error
+let subagentToolFailed (context: string) (reason: FailureReason) : string =
+    $"{context} failed: {failureReasonText reason}"
 
 let subagentIntentsMustBeNonEmpty: string =
     "Error: `intents` must be a non-empty array."

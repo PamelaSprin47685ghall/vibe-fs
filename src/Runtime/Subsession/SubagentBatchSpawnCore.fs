@@ -10,12 +10,11 @@ open Wanxiangshu.Runtime.HostAdapter
 open Wanxiangshu.Kernel.HostTools
 open Wanxiangshu.Runtime.Subagent
 open Wanxiangshu.Kernel.ToolArgs
-open Wanxiangshu.Kernel.ToolCopy
-open Wanxiangshu.Kernel.ToolResult
+open Wanxiangshu.Kernel.ToolOutputInfoTypes
 open Wanxiangshu.Runtime.SubagentSpawn
 open Wanxiangshu.Runtime.ChildAgentRegistry
 open Wanxiangshu.Runtime.SubagentIteratorStore
-open Wanxiangshu.Runtime.Tooling.ToolOutputToml
+open Wanxiangshu.Runtime.Tooling.ToolOutputBatchToml
 
 module HostAdapter = Wanxiangshu.Kernel.HostAdapter
 
@@ -94,7 +93,7 @@ let private wrapWithIterator
             resolveSpawnedChildId provenChildId role getChildIDForSpawn host registry scope
 
         match spawnedChildId with
-        | None -> return { iterator = None; body = text }
+        | None -> return { iterator = None; summary = Some text; error = None; findings = []; relatedFiles = []; relatedCode = [] }
         | Some cid ->
             let roleStr =
                 match role with
@@ -125,7 +124,7 @@ let private wrapWithIterator
                         roleStr
                         title
 
-            return { iterator = Some iter; body = text }
+            return { iterator = Some iter; summary = Some text; error = None; findings = []; relatedFiles = []; relatedCode = [] }
     }
 
 let spawnOne
@@ -157,11 +156,19 @@ let spawnOne
         | Failure err ->
             return
                 { iterator = None
-                  body = subagentToolFailed toolName err }
-        | Aborted ->
+                  summary = None
+                  error = Some(ToolError err)
+                  findings = []
+                  relatedFiles = []
+                  relatedCode = [] }
+        | SubagentResponse.Aborted ->
             return
                 { iterator = None
-                  body = subagentToolFailed toolName MessageAborted }
+                  summary = None
+                  error = Some FailureReason.Aborted
+                  findings = []
+                  relatedFiles = []
+                  relatedCode = [] }
     }
 
 let formatBatchReports (reports: SubagentReport list) : string =

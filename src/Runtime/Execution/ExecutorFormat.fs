@@ -5,20 +5,53 @@ open Wanxiangshu.Kernel.ToolOutputInfoTypes
 open Wanxiangshu.Runtime.SubagentPrompts
 open Wanxiangshu.Runtime.ToolOutputInfo
 
-let formatToolResponse (result: ExecuteResult) (summaryOption: string option) : string =
-    let bodyText = Option.defaultValue (outputFromResult result) summaryOption
-    let msg = applyExecutorStatus result (withBody bodyText)
-    render msg
+let private stdoutText (summaryOption: string option) (result: ExecuteResult) : string =
+    Option.defaultValue (outputFromResult result) summaryOption
 
-let prependSafetyWarning (output: string) (command: string) (language: ExecutorLanguage) : string =
+let private executorStatusValues (result: ExecuteResult) : string * int option * string option * bool =
+    let status = resolveExecutorStatus result
+
+    let exitCode =
+        match status with
+        | ExecutorStatus.Completed code -> Some code
+        | ExecutorStatus.ExitError code -> code
+        | _ -> None
+
+    let signal =
+        match result with
+        | Failed(_, _, Some sig') when sig' <> "" -> Some sig'
+        | _ -> None
+
+    let truncated =
+        match result with
+        | Truncated _ -> true
+        | _ -> false
+
+    executorStatusText status, exitCode, signal, truncated
+
+let formatToolResponse (result: ExecuteResult) (summaryOption: string option) : ToolOutputMessage =
+    let stdout = stdoutText summaryOption result
+    let status, exitCode, signal, truncated = executorStatusValues result
+
+    { empty with
+        content =
+            Executor
+                { stdout = stdout
+                  stderr = None
+                  exitCode = exitCode
+                  signal = signal
+                  status = status
+                  truncated = truncated
+                  summary = summaryOption } }
+
+let prependSafetyWarning (msg: ToolOutputMessage) (command: string) (language: ExecutorLanguage) : ToolOutputMessage =
     if not (shouldAppendReadOnlyWarning command language) then
-        output
+        msg
     else
-        let msg = { empty with body = Some output; hint = Some hintExecutorMisuse }
-        render msg
+        { msg with hint = Some hintExecutorMisuse }
 
-let prependSafetyWarningForExecution (output: string) (options: ExecuteOptions) : string =
-    prependSafetyWarning output (prepareProgramForExecution options) options.language
+let prependSafetyWarningForExecution (msg: ToolOutputMessage) (options: ExecuteOptions) : ToolOutputMessage =
+    prependSafetyWarning msg (prepareProgramForExecution options) options.language
 
 let private summaryInputMaxBytes = 200_000
 

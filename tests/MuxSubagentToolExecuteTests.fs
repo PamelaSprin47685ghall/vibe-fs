@@ -127,7 +127,7 @@ let executeMuxSubagentSpawnPreservesPhysicalTaskId () =
                 config
                 sessionScope
 
-        check "output has content" (out.Contains "body =")
+        check "output has content" (out.Contains "output =" || out.Contains "reports =" || out.Contains "summary =")
 
         let iterOpt =
             if out.Contains "sci_s" || out.Contains "iter-" then
