@@ -41,7 +41,23 @@ let private stringArrayField () =
     equal "string array length" 3 lines.Length
     equal "string array first" "a" (string lines.[0])
 
+let private multilineStringFormatting () =
+    let doc =
+        Table
+            [ "multiline", String "first line\nsecond line"
+              "single", String "hello" ]
+    let text = stringify doc
+    check "multiline text contains triple quotes" (text.Contains "\"\"\"")
+    check "multiline text formatted with leading newline" (text.Contains "multiline = \"\"\"\nfirst line\nsecond line\"\"\"")
+    check "multiline text contains natural line break" (text.Contains "first line\nsecond line")
+    check "multiline text does not contain escaped newline" (not (text.Contains "\\n"))
+    check "single line field formatted correctly" (text.Contains "single = \"hello\"")
+    let parsed = parseToml text
+    equal "round-trip multiline value" "first line\nsecond line" (string parsed?multiline)
+    equal "round-trip single line value" "hello" (string parsed?single)
+
 let run () : unit =
     stringifyRoundTrip ()
     emptyTableIsEmptyString ()
     stringArrayField ()
+    multilineStringFormatting ()

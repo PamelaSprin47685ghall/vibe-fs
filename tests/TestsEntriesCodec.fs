@@ -70,10 +70,12 @@ open Wanxiangshu.Tests.OmpTitleFetchGuardTests
 open Wanxiangshu.Tests.OmpPluginCoreIntegrationTests
 open Wanxiangshu.Tests.SubagentIoTests
 open Wanxiangshu.Tests.SubagentCleanupCompletionTests
+open Wanxiangshu.Tests.TomlSerializationTests
 open Wanxiangshu.Tests.TestsTestBody
 
 let codecTestEntries () : (string * TestBody) list =
     [ "SubagentToolPolicyTests.run", Sync(sync SubagentToolPolicyTests.run)
+      "TomlSerializationTests.run", Sync(sync TomlSerializationTests.run)
       "SubagentPromptBuildTests.run", Sync(sync SubagentPromptBuildTests.run)
       "SubagentSpawnTests.run", Async SubagentSpawnTests.run
       "ToolArgsDecodeTests.run", Sync(sync ToolArgsDecodeTests.run)
