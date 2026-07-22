@@ -6,6 +6,7 @@ open Fable.Core.JS
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.ToolOutputInfoTypes
 open Wanxiangshu.Runtime.Tooling.ToolOutputToml
+open Wanxiangshu.Runtime.Tooling.ToolOutputPtyToml
 open Wanxiangshu.Hosts.Opencode.PtySpawn
 
 open Wanxiangshu.Runtime.ToolOutputInfo
@@ -25,36 +26,25 @@ let readUnfiltered (mgr: obj) (id: string) (session: obj) (offset: int) (limit: 
         let resultOffset = unbox<int> result?offset
         let statusStr = string session?status
 
-        let sb = ResizeArray<string>()
-        sb.Add(sprintf "id: %s" id)
-        sb.Add(sprintf "status: %s" statusStr)
-        sb.Add(sprintf "offset: %d" resultOffset)
-        sb.Add(sprintf "returned: %d" lines.Length)
-        sb.Add(sprintf "total_lines: %d" totalLines)
-        sb.Add(sprintf "has_more: %b" hasMore)
-        sb.Add("")
+        let hintOpt =
+            if hasMore then
+                Some(sprintf "(Buffer has more lines. Use offset=%d to read beyond line %d)" (resultOffset + lines.Length) (resultOffset + lines.Length))
+            else
+                Some(sprintf "(End of buffer - total %d lines)" totalLines)
 
-        for i in 0 .. lines.Length - 1 do
-            sb.Add(lines.[i])
+        let ptyRead: PtyReadInfo =
+            { id = id
+              status = statusStr
+              offset = resultOffset
+              returned = lines.Length
+              totalLines = totalLines
+              hasMore = hasMore
+              pattern = None
+              totalMatches = None
+              lines = Array.toList lines
+              continuationHint = hintOpt }
 
-        sb.Add("")
-
-        if hasMore then
-            sb.Add(
-                sprintf
-                    "(Buffer has more lines. Use offset=%d to read beyond line %d)"
-                    (resultOffset + lines.Length)
-                    (resultOffset + lines.Length)
-            )
-        else
-            sb.Add(sprintf "(End of buffer - total %d lines)" totalLines)
-
-        let msg =
-            { empty with
-                status = Some statusStr
-                body = Some(String.concat "\n" sb) }
-
-        return renderToolOutput msg
+        return renderPtyRead ptyRead
     }
 
 let private formatFilteredResult
@@ -69,50 +59,30 @@ let private formatFilteredResult
     : string =
     let statusStr = string session?status
 
-    let sb = ResizeArray<string>()
-    sb.Add(sprintf "id: %s" id)
-    sb.Add(sprintf "status: %s" statusStr)
-    sb.Add(sprintf "pattern: %s" pattern)
-    sb.Add(sprintf "offset: %d" offset)
-    sb.Add(sprintf "returned: %d" matches.Length)
-    sb.Add(sprintf "total_matches: %d" totalMatches)
-    sb.Add(sprintf "total_lines: %d" totalLines)
-    sb.Add(sprintf "has_more: %b" hasMore)
-    sb.Add("")
+    let matchLines =
+        matches |> Array.map (fun m -> string m?text) |> Array.toList
 
-    if matches.Length = 0 then
-        sb.Add(sprintf "No lines matched the pattern '%s'." pattern)
-        sb.Add(sprintf "Total lines in buffer: %d" totalLines)
-    else
-        for i in 0 .. matches.Length - 1 do
-            let m = matches.[i]
-            sb.Add(string m?text)
-
-        sb.Add("")
-
-        if hasMore then
-            sb.Add(
-                sprintf
-                    "(%d of %d matches shown. Use offset=%d to see more.)"
-                    matches.Length
-                    totalMatches
-                    (offset + matches.Length)
-            )
+    let hintOpt =
+        if matches.Length = 0 then
+            Some(sprintf "No lines matched the pattern '%s'. Total lines in buffer: %d" pattern totalLines)
+        elif hasMore then
+            Some(sprintf "(%d of %d matches shown. Use offset=%d to see more.)" matches.Length totalMatches (offset + matches.Length))
         else
-            sb.Add(
-                sprintf
-                    "(%d match%s from %d total lines)"
-                    totalMatches
-                    (if totalMatches = 1 then "" else "es")
-                    totalLines
-            )
+            Some(sprintf "(%d match%s from %d total lines)" totalMatches (if totalMatches = 1 then "" else "es") totalLines)
 
-    let msg =
-        { empty with
-            status = Some statusStr
-            body = Some(String.concat "\n" sb) }
+    let ptyRead: PtyReadInfo =
+        { id = id
+          status = statusStr
+          offset = offset
+          returned = matches.Length
+          totalLines = totalLines
+          hasMore = hasMore
+          pattern = Some pattern
+          totalMatches = Some totalMatches
+          lines = matchLines
+          continuationHint = hintOpt }
 
-    renderToolOutput msg
+    renderPtyRead ptyRead
 
 let readFiltered
     (mgr: obj)

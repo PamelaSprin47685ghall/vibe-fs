@@ -9,6 +9,7 @@ open Wanxiangshu.Kernel.ToolPermission
 open Wanxiangshu.Kernel.ToolCatalog
 open Wanxiangshu.Kernel.ToolOutputInfoTypes
 open Wanxiangshu.Runtime.Tooling.ToolOutputToml
+open Wanxiangshu.Runtime.Tooling.ToolOutputPtyToml
 open Wanxiangshu.Hosts.Opencode.ToolSchema
 open Wanxiangshu.Hosts.Opencode
 
@@ -42,20 +43,18 @@ let ptySpawnTool (host: Host) : obj =
             })
 
 let formatSessionList (sessions: obj array) : string =
-    let sb = ResizeArray<string>()
+    let items =
+        sessions
+        |> Array.map (fun s ->
+            { PtySessionItem.id = string s?``id``
+              title = string s?title
+              command = sprintf "%s %s" (string s?command) (String.concat " " (unbox<string array> s?args))
+              status = string s?status
+              pid = unbox<int> s?pid
+              lineCount = unbox<int> s?lineCount })
+        |> Array.toList
 
-    for s in sessions do
-        sb.Add(sprintf "### %s" (string s?``id``))
-        sb.Add(sprintf "title: %s" (string s?title))
-
-        sb.Add(sprintf "command: %s %s" (string s?command) (String.concat " " (unbox<string array> s?args)))
-
-        sb.Add(sprintf "status: %s" (string s?status))
-        sb.Add(sprintf "pid: %d" (unbox<int> s?pid))
-        sb.Add(sprintf "lines: %d" (unbox<int> s?lineCount))
-        sb.Add("")
-
-    String.concat "\n" sb
+    renderPtyList { count = sessions.Length; sessions = items }
 
 let private executePtyKill (mgr: obj) (id: string) (sessionId: string) (cleanup: bool) : string =
     let lm = mgr?lifecycleManager
@@ -86,23 +85,20 @@ let private executePtyKill (mgr: obj) (id: string) (sessionId: string) (cleanup:
         sprintf "%s %s" (string session?command) (String.concat " " (unbox<string array> session?args))
 
     let lineCountVal = unbox<int> session?lineCount
+    let msgText = sprintf "%s %s (%s)." action id retainedNote
 
-    let bodyLines =
-        [ sprintf "%s %s (%s)." action id retainedNote
-          sprintf "id: %s" id
-          sprintf "action: %s" action
-          sprintf "cleanup: %b" cleanup
-          sprintf "title: %s" titleStr
-          sprintf "command: %s" commandStr
-          sprintf "final_line_count: %d" lineCountVal ]
-        |> String.concat "\n"
+    let ptyKillInfo: PtyKillInfo =
+        { id = id
+          action = action
+          cleanup = cleanup
+          title = titleStr
+          command = commandStr
+          status = statusStr
+          finalLineCount = lineCountVal
+          note = retainedNote
+          message = msgText }
 
-    let msg =
-        { empty with
-            status = Some statusStr
-            body = Some bodyLines }
-
-    renderToolOutput msg
+    renderPtyKill ptyKillInfo
 
 let ptyKillTool (host: Host) : obj =
     define
@@ -154,20 +150,9 @@ let ptyListTool (host: Host) : obj =
 
                 let body =
                     if sessions.Length = 0 then
-                        "No active PTY sessions."
+                        render { empty with body = Some "No active PTY sessions."; status = Some "count=0" }
                     else
                         formatSessionList sessions
 
-                let bodyLines =
-                    if sessions.Length = 0 then
-                        body
-                    else
-                        sprintf "count: %d\n%s" sessions.Length body
-
-                let msg =
-                    { empty with
-                        status = Some(sprintf "count=%d" sessions.Length)
-                        body = Some bodyLines }
-
-                return renderToolOutput msg
+                return body
             })

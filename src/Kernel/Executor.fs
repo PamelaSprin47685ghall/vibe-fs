@@ -73,7 +73,7 @@ type ExecutorStatus =
 let executorStatusText =
     function
     | ExecutorStatus.Completed _ -> "completed"
-    | ExecutorStatus.KilledTimeout -> "killed_timeout (Output Truncated)"
+    | ExecutorStatus.KilledTimeout -> "killed_timeout"
     | ExecutorStatus.ExitError _ -> "exit_error"
     | ExecutorStatus.Signal sig' -> sig'
     | ExecutorStatus.SpawnFailed -> "spawn_failed"

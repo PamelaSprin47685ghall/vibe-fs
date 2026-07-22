@@ -151,6 +151,7 @@
     <Compile Include="src/Runtime/Serialization/Toml.fs"/>
     <Compile Include="src/Runtime/Prompt/PromptToml.fs"/>
     <Compile Include="src/Runtime/Tooling/ToolOutputToml.fs"/>
+    <Compile Include="src/Runtime/Tooling/ToolOutputPtyToml.fs"/>
     <Compile Include="src/Runtime/Search/SearchPrompts.fs"/>
     <Compile Include="src/Runtime/Tooling/ToolOutputInfo.fs"/>
     <Compile Include="src/Runtime/Execution/LoopMessages.fs"/>

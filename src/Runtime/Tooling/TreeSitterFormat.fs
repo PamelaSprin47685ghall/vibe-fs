@@ -8,7 +8,7 @@ let hasSyntaxInOutput (s: string) : bool =
     if System.String.IsNullOrWhiteSpace s then
         false
     else
-        s.Contains("syntax =") || s.Contains("kind = \"syntax\"") || s.Contains("kind = 'syntax'")
+        s.Contains("syntax =")
 
 let appendSyntaxDiagnosticsToOutput (currentOutput: string) (filePath: string) (result: SyntaxCheckResult) : string =
     match formatSyntaxDiagnostics filePath result false with

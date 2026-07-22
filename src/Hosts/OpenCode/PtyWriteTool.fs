@@ -9,6 +9,7 @@ open Wanxiangshu.Kernel.ToolPermission
 open Wanxiangshu.Kernel.ToolCatalog
 open Wanxiangshu.Kernel.ToolOutputInfoTypes
 open Wanxiangshu.Runtime.Tooling.ToolOutputToml
+open Wanxiangshu.Runtime.Tooling.ToolOutputPtyToml
 open Wanxiangshu.Hosts.Opencode.ToolSchema
 open Wanxiangshu.Hosts.Opencode.PtySpawn
 
@@ -56,12 +57,12 @@ let ptyWriteTool (host: Host) : obj =
                         .Replace("\n", "\\n")
                         .Replace("\r", "\\r")
 
-                let bodyText = sprintf "Sent: \"%s\"\nid: %s\nbytes: %d" display id data.Length
+                let ptyWriteInfo: PtyWriteInfo =
+                    { id = id
+                      display = display
+                      bytes = data.Length
+                      status = "written"
+                      message = sprintf "Sent: \"%s\"" display }
 
-                let msg =
-                    { empty with
-                        status = Some "written"
-                        body = Some bodyText }
-
-                return renderToolOutput msg
+                return renderPtyWrite ptyWriteInfo
             })

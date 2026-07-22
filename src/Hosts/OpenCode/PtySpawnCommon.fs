@@ -9,6 +9,7 @@ open Wanxiangshu.Kernel.ToolPermission
 open Wanxiangshu.Kernel.ToolCatalog
 open Wanxiangshu.Kernel.ToolOutputInfoTypes
 open Wanxiangshu.Runtime.Tooling.ToolOutputToml
+open Wanxiangshu.Runtime.Tooling.ToolOutputPtyToml
 open Wanxiangshu.Hosts.Opencode.ToolSchema
 
 open Wanxiangshu.Runtime.ToolOutputInfo
@@ -113,21 +114,15 @@ let formatSpawnResponse (info: obj) : string =
     let workdirStr = string info?workdir
     let notifyOnExitVal = unbox<bool> info?notifyOnExit
 
-    let bodyLines =
-        [ "PTY session spawned."
-          sprintf "id: %s" idStr
-          sprintf "title: %s" titleStr
-          sprintf "command: %s" commandStr
-          sprintf "workdir: %s" workdirStr
-          sprintf "pid: %d" pidVal
-          sprintf "status: %s" statusStr
-          sprintf "notify_on_exit: %b" notifyOnExitVal
-          sprintf "timeout_seconds: %s" timeoutStr ]
-        |> String.concat "\n"
+    let ptyInfo: PtySpawnInfo =
+        { id = idStr
+          title = titleStr
+          command = commandStr
+          workdir = workdirStr
+          pid = pidVal
+          status = statusStr
+          notifyOnExit = notifyOnExitVal
+          timeoutSeconds = timeoutStr
+          message = "PTY session spawned." }
 
-    let msg =
-        { empty with
-            status = Some statusStr
-            body = Some bodyLines }
-
-    renderToolOutput msg
+    renderPtySpawn ptyInfo
