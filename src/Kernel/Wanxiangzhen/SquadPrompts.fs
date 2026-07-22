@@ -31,6 +31,10 @@ let buildCoordinatorPromptDocument (requirement: string) : PromptDocument =
               PromptRule.Contract
                 "Each task must be independently executable, have title, description, and dependsOn."
               PromptRule.Contract "Dependencies in dependsOn must refer to valid task IDs."
+              PromptRule.Contract
+                "For any research/investigation task, description must explicitly state a workspace-relative report path (e.g. `research/<task-id>-<slug>.md`) for downstream or subsequent tasks to read."
+              PromptRule.Contract
+                "Do not create research/investigation tasks without specifying a workspace-relative report path in description, as research reports must be committed for downstream reading."
               PromptRule.Contract "Stop execution immediately after successful squad_update submission." ]
           outcomes =
             [ { label = "squad_update"
@@ -61,8 +65,11 @@ let buildSlavePromptDocument
           rules =
             [ PromptRule.Contract "Complete the task following the review workflow."
               PromptRule.Contract "Activate With-Review Mode by following the review workflow below."
+              PromptRule.Contract
+                "If task is research or investigation with a workspace-relative report path specified in description, create the report file in repository so downstream or subsequent tasks can read it."
               PromptRule.Contract "After development, call submit_review for review."
-              PromptRule.Contract "After review PASS, git commit, then call submit_to_squad."
+              PromptRule.Contract
+                "After review PASS, git add the report file and other modified files, git commit, then call submit_to_squad."
               PromptRule.Contract "If review REJECT, fix per feedback and re-review until PASS."
               PromptRule.Contract(sprintf "If asked to rebase, run: git rebase %s, then resubmit." masterBranch) ]
           outcomes =

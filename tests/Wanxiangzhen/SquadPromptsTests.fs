@@ -14,7 +14,7 @@ open Wanxiangshu.Runtime.Prompt
 let private prompt () : string =
     PromptToml.render (buildSlavePromptDocument taskId title description masterBranch)
 
-let entries () : (string * (unit -> unit)) list =
+let private slaveEntries () : (string * (unit -> unit)) list =
     [ ("buildSlavePrompt output renders TOML with SquadWorker agent_role",
        fun () ->
            let p = prompt ()
@@ -42,7 +42,19 @@ let entries () : (string * (unit -> unit)) list =
            let p = prompt ()
            checkBare (p.Contains "/loop" || p.Contains "With-Review"))
 
-      ("buildCoordinatorPromptDocument renders TOML with Coordinator agent_role and requirement",
+      ("buildSlavePromptDocument requires research task execution to create report file, enable downstream reading, git add and commit",
+       fun () ->
+           let doc = buildSlavePromptDocument taskId title description masterBranch
+           let rendered = PromptToml.render doc
+           let lower = rendered.ToLowerInvariant()
+           checkBare (lower.Contains "report")
+           checkBare (lower.Contains "workspace-relative" || lower.Contains "relative")
+           checkBare (lower.Contains "git add")
+           checkBare (lower.Contains "commit" || lower.Contains "git commit")
+           checkBare (lower.Contains "subsequent" || lower.Contains "downstream" || lower.Contains "read")) ]
+
+let private coordinatorEntries () : (string * (unit -> unit)) list =
+    [ ("buildCoordinatorPromptDocument renders TOML with Coordinator agent_role and requirement",
        fun () ->
            let req = "Implement user authentication subsystem"
            let doc = buildCoordinatorPromptDocument req
@@ -63,4 +75,18 @@ let entries () : (string * (unit -> unit)) list =
            checkBare (rendered.Contains "squad_update")
            checkBare (rendered.Contains "tasks_created")
            checkBare (not (rendered.Contains "submit_to_squad"))
-           checkBare (not (rendered.Contains "git rebase"))) ]
+           checkBare (not (rendered.Contains "git rebase")))
+
+      ("buildCoordinatorPromptDocument requires research task description to specify workspace-relative report path and commit requirements",
+       fun () ->
+           let req = "Investigate memory leak in actor system"
+           let doc = buildCoordinatorPromptDocument req
+           let rendered = PromptToml.render doc
+           let lower = rendered.ToLowerInvariant()
+           checkBare (lower.Contains "research" || lower.Contains "investigat")
+           checkBare (lower.Contains "workspace-relative" || lower.Contains "report path" || lower.Contains "relative report path")
+           checkBare (lower.Contains "description")
+           checkBare (lower.Contains "commit" || lower.Contains "submit")) ]
+
+let entries () : (string * (unit -> unit)) list =
+    slaveEntries () @ coordinatorEntries ()
