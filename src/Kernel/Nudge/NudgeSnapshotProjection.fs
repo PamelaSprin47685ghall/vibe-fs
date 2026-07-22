@@ -1,10 +1,10 @@
 module Wanxiangshu.Kernel.Nudge.NudgeSnapshotProjection
 
-open System.Text.RegularExpressions
 open Wanxiangshu.Kernel.EventSourcing.EventEnvelope
 open Wanxiangshu.Kernel.EventSourcing.EventKind
 open Wanxiangshu.Kernel.Review
 open Wanxiangshu.Kernel.Review.ReviewLoopFold
+open Wanxiangshu.Kernel.Nudge
 open Wanxiangshu.Kernel.Nudge.Types
 
 let private payloadField (key: string) (e: WanEvent) : string option = e.Payload |> Map.tryFind key
@@ -17,6 +17,8 @@ let private strOrEmpty (o: string option) : string =
 type NudgeSnapshotState =
     { openTodos: string list
       lastAssistantText: string
+      skipTodo: bool
+      skipReview: bool
       agentFromMessage: string option
       modelFromMessage: string option
       turnId: string
@@ -24,48 +26,6 @@ type NudgeSnapshotState =
       workState: SessionWorkState
       pendingNudge: (string * string) option
       lastDispatchedAnchor: string option }
-
-let private parseTodosJson (json: string) : string list =
-    let trimmed = json.Trim()
-
-    if trimmed = "" || trimmed = "[]" then
-        []
-    elif trimmed.Length < 2 || trimmed.[0] <> '[' || trimmed.[trimmed.Length - 1] <> ']' then
-        []
-    else
-        let inner = trimmed.Substring(1, trimmed.Length - 2).Trim()
-
-        if inner = "" then
-            []
-        elif inner.Contains "{" then
-            let objectRe = Regex(@"\{[^{}]*\}")
-            let contentRe = Regex(@"""(?:Content|content)""\s*:\s*""([^""]*)""")
-            let statusRe = Regex(@"""(?:Status|status)""\s*:\s*""([^""]*)""")
-
-            objectRe.Matches(inner)
-            |> Seq.cast<Match>
-            |> Seq.choose (fun m ->
-                let objText = m.Value
-
-                let status =
-                    match statusRe.Match(objText) with
-                    | s when s.Success -> s.Groups.[1].Value.Trim().ToLowerInvariant()
-                    | _ -> ""
-
-                if status = "completed" || status = "cancelled" || status = "canceled" then
-                    None
-                else
-                    match contentRe.Match(objText) with
-                    | c when c.Success -> Some(c.Groups.[1].Value)
-                    | _ -> None)
-            |> Seq.toList
-        else
-            let stringRe = Regex(@"""([^""]*)""")
-
-            stringRe.Matches(inner)
-            |> Seq.cast<Match>
-            |> Seq.map (fun m -> m.Groups.[1].Value)
-            |> Seq.toList
 
 let private syncWorkState (st: NudgeSnapshotState) : NudgeSnapshotState =
     let isActive = st.reviewLoop |> ReviewLoopFold.isLoopActive
@@ -85,6 +45,8 @@ let private syncWorkState (st: NudgeSnapshotState) : NudgeSnapshotState =
 let emptySnapshotState: NudgeSnapshotState =
     { openTodos = []
       lastAssistantText = ""
+      skipTodo = false
+      skipReview = false
       agentFromMessage = None
       modelFromMessage = None
       turnId = ""
@@ -103,12 +65,14 @@ let private snapshotFromAssistantCompleted (st: NudgeSnapshotState) (e: WanEvent
         payloadField "model" e |> Option.bind (fun m -> if m = "" then None else Some m)
 
     let tid = payloadField "turnId" e |> strOrEmpty
-    let todosFromPayload = payloadField "openTodosJson" e |> Option.map parseTodosJson
+    let todosFromPayload = payloadField "openTodosJson" e |> Option.map decodeOpenTodosJson
     let openTodos = todosFromPayload |> Option.defaultValue st.openTodos
 
     syncWorkState
         { st with
             lastAssistantText = msg
+            skipTodo = payloadBool "skipTodo" e.Payload
+            skipReview = payloadBool "skipReview" e.Payload
             agentFromMessage = agent
             modelFromMessage = model
             turnId = tid
@@ -139,7 +103,7 @@ let private snapshotFromNudgeEvent (st: NudgeSnapshotState) (e: WanEvent) : Nudg
     | _ -> st
 
 let private snapshotFromWorkEvent (st: NudgeSnapshotState) (e: WanEvent) : NudgeSnapshotState =
-    let todosOpt = payloadField "todosJson" e |> Option.map parseTodosJson
+    let todosOpt = payloadField "todosJson" e |> Option.map decodeOpenTodosJson
 
     syncWorkState
         { st with

@@ -56,13 +56,19 @@ let websearchTool (deps: obj) (toolNames: string array) : ToolDefinition =
                         | Error e -> return webToolFailed "search" e
                         | Ok data ->
                             let items = parseSearchResults (Dyn.get data "results")
-                            let rawResults = formatSearchResults items
 
                             if items.IsEmpty then
-                                return rawResults
+                                return formatSearchResults items
                             else
+                                let structured: Wanxiangshu.Kernel.Prompt.WebSearchResultItem list =
+                                    items
+                                    |> List.map (fun r ->
+                                        { title = r.title
+                                          url = r.url
+                                          content = r.content })
+
                                 let prompt =
-                                    formatPrompt mimocode (WebsearchSummary(ws.WhatToSummarize, rawResults))
+                                    formatPrompt mimocode (WebsearchSummary(ws.WhatToSummarize, structured))
                                     |> List.head
 
                                 let opts = toolOptions toolNames summarizationRole summarizationAiSettingsAgentId

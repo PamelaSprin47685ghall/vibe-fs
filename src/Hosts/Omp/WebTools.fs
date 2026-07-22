@@ -70,12 +70,18 @@ let private handleWebSearch
             | Error e -> return asErrorResult (box (formatDomainError e))
             | Ok data ->
                 let items = parseSearchResults (Dyn.get data "results")
-                let rawText = formatSearchResults items
 
                 if items.IsEmpty then
-                    return textResult rawText
+                    return textResult (formatSearchResults items)
                 else
-                    let prompt = formatPrompt omp (WebsearchSummary(what, rawText)) |> List.head
+                    let structured: Wanxiangshu.Kernel.Prompt.WebSearchResultItem list =
+                        items
+                        |> List.map (fun r ->
+                            { title = r.title
+                              url = r.url
+                              content = r.content })
+
+                    let prompt = formatPrompt omp (WebsearchSummary(what, structured)) |> List.head
 
                     let! summary =
                         runSubagent

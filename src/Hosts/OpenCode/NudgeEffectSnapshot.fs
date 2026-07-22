@@ -18,7 +18,7 @@ module Dyn = Wanxiangshu.Runtime.Dyn
 
 let buildSnapshotResult (snap: Wanxiangshu.Kernel.Nudge.NudgeProjection.NudgeSnapshotState) : SessionSnapshot =
     let anchor =
-        Wanxiangshu.Kernel.Nudge.NudgeProjection.nudgeAnchorKey snap.turnId snap.lastAssistantText
+        Wanxiangshu.Kernel.Nudge.NudgeProjection.nudgeAnchorKey snap.turnId snap.agentFromMessage snap.modelFromMessage
 
     let blockStatus =
         if

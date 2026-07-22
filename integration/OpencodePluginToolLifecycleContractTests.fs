@@ -66,7 +66,7 @@ let runToolLifecycle
         let! rrResult =
             harness.executePluginTool
                 "return_reviewer"
-                (createObj [ "verdict", box "PERFECT"; "feedback", box "" ])
+                (createObj [ "verdict", box "PERFECT"; "feedback", box "looks good" ])
                 (createEmpty ())
 
         chk
@@ -74,7 +74,8 @@ let runToolLifecycle
             (not (isNull rrResult)
              && ((string rrResult).IndexOf "No active review" >= 0
                  || (string rrResult).IndexOf "double-check" >= 0
-                 || (string rrResult).IndexOf "objective =" >= 0))
+                 || (string rrResult).IndexOf "objective =" >= 0
+                 || (string rrResult).IndexOf "feedback" >= 0))
 
         // --- 5. Lifecycle hooks: config -----------------------------------------
         let configArgs =

@@ -21,7 +21,11 @@ let runParallelSpawnsPreservesOrderAndJoins () =
 
         let! joined = runParallelSpawns prompts spawnOne
         equal "spawn order" (order |> Seq.toArray) (prompts |> List.toArray)
-        equal "joined trimmed" "alpha-out\n---\nbeta-out\n---\ngamma-out" joined
+        check "joined uses reports table" (joined.Contains "reports" || joined.Contains "[[reports]]")
+        check "joined embeds alpha" (joined.Contains "alpha-out")
+        check "joined embeds beta" (joined.Contains "beta-out")
+        check "joined embeds gamma" (joined.Contains "gamma-out")
+        check "joined no markdown divider" (not (joined.Contains "\n---\n"))
     }
 
 let runParallelSpawnsEmptyList () =

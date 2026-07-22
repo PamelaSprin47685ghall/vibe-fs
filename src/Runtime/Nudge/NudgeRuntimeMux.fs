@@ -50,7 +50,7 @@ let collectSnapshotMux
         let! snapshot = getNudgeSnapshotFromEventLog root workspaceId
 
         let currentAnchor =
-            Wanxiangshu.Kernel.Nudge.NudgeProjection.nudgeAnchorKey snapshot.turnId snapshot.lastAssistantText
+            Wanxiangshu.Kernel.Nudge.NudgeProjection.nudgeAnchorKey snapshot.turnId snapshot.agentFromMessage snapshot.modelFromMessage
 
         let blockStatus = getBlockStatus snapshot currentAnchor
 

@@ -1,9 +1,6 @@
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
 module Wanxiangshu.Runtime.ReviewPrompts
 
-let reviewInstructionsProse =
-    Wanxiangshu.Runtime.ReviewPrompts.Instructions.reviewInstructionsProse
-
 let reviewInstructions =
     Wanxiangshu.Runtime.ReviewPrompts.Instructions.reviewInstructions
 
@@ -44,11 +41,12 @@ let buildOmpReviewInitialPrompt =
 
 let submitReviewIsWip = Wanxiangshu.Runtime.ReviewPrompts.Format.submitReviewIsWip
 
-let submitReviewWipAcknowledgment =
-    Wanxiangshu.Runtime.ReviewPrompts.Format.submitReviewWipAcknowledgment
-
 let formatWipAcknowledgment =
     Wanxiangshu.Runtime.ReviewPrompts.Format.formatWipAcknowledgment
+
+/// Structured WIP acknowledgment (same as formatWipAcknowledgment with empty task objective).
+let submitReviewWipAcknowledgment =
+    Wanxiangshu.Runtime.ReviewPrompts.Format.formatWipAcknowledgment "Progress recorded"
 
 let formatReviewResult = Wanxiangshu.Runtime.ReviewPrompts.Format.formatReviewResult
 

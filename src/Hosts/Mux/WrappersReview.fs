@@ -55,32 +55,30 @@ let private reviewerAgentReportDefinition () : obj =
                               box (
                                   createObj
                                       [ "type", box "string"
-                                        "description", box "Detailed actionable feedback. Optional when passing." ]
+                                        "description",
+                                        box
+                                            "Required non-empty review opinion for both PERFECT and REVISE. Sole feedback source." ]
                               ) ]
                     )
                     "required", box [| "verdict"; "feedback" |]
                     "additionalProperties", box false ]
           ) ]
 
-let private formatReviewerAgentReportMarkdown (args: obj) : string =
+let private formatReviewerAgentReportMarkdown (args: obj) : Result<string, string> =
     let verdict =
         defaultArg (strField args "verdict") ""
         |> fun value -> value.Trim().ToUpperInvariant()
 
     let feedback = defaultArg (strField args "feedback") "" |> fun value -> value.Trim()
 
-    if verdict = "REVISE" then
-        if feedback = "" then
-            "REVISE: No feedback provided."
-        else
-            "REVISE: " + feedback
-    elif feedback <> "" then
-        "PERFECT: " + feedback
+    if feedback = "" then
+        Error "return_reviewer schema violation: feedback is required and non-empty for PERFECT and REVISE"
+    elif verdict = "REVISE" then
+        Ok("REVISE: " + feedback)
+    elif verdict = "PERFECT" then
+        Ok("PERFECT: " + feedback)
     else
-        "PERFECT"
-
-let private reviewerAgentReportPayload (args: obj) : obj =
-    createObj [ "reportMarkdown", box (formatReviewerAgentReportMarkdown args) ]
+        Error "return_reviewer schema violation: verdict must be PERFECT or REVISE"
 
 let private isThenable (value: obj) : bool =
     not (Dyn.isNullish value) && Dyn.typeIs (Dyn.get value "then") "function"
@@ -96,19 +94,23 @@ let mkAgentReportOverride () : obj =
                 let execFn =
                     System.Func<obj, obj, JS.Promise<obj>>(fun (args: obj) (opts: obj) ->
                         promise {
-                            let upstreamArgs = reviewerAgentReportPayload args
-                            let raw = invokeToolExecute tool upstreamArgs opts
+                            match formatReviewerAgentReportMarkdown args with
+                            | Error msg ->
+                                return createObj [ "success", box false; "error", box msg ]
+                            | Ok markdown ->
+                                let upstreamArgs = createObj [ "reportMarkdown", box markdown ]
+                                let raw = invokeToolExecute tool upstreamArgs opts
 
-                            let! result =
-                                if isThenable raw then
-                                    unbox<JS.Promise<obj>> raw
+                                let! result =
+                                    if isThenable raw then
+                                        unbox<JS.Promise<obj>> raw
+                                    else
+                                        Promise.lift raw
+
+                                if Dyn.typeIs result "object" && Dyn.truthy (Dyn.get result "success") then
+                                    return Dyn.withKey result "report" (box upstreamArgs)
                                 else
-                                    Promise.lift raw
-
-                            if Dyn.typeIs result "object" && Dyn.truthy (Dyn.get result "success") then
-                                return Dyn.withKey result "report" (box upstreamArgs)
-                            else
-                                return result
+                                    return result
                         })
 
                 createObj

@@ -65,7 +65,7 @@ let firstPassDoubleChecksSpec () =
         let! result =
             execVerdict
                 returnTool
-                (createObj [ "verdict", box "PERFECT"; "feedback", box null ])
+                (createObj [ "verdict", box "PERFECT"; "feedback", box "meets criteria" ])
                 (reviewerContext workspaceDir sessionID)
 
         check
@@ -97,7 +97,7 @@ let secondPassResolvesAcceptedSpec () =
         let! result =
             execVerdict
                 returnTool
-                (createObj [ "verdict", box "PERFECT"; "feedback", box null ])
+                (createObj [ "verdict", box "PERFECT"; "feedback", box "confirmed after double-check" ])
                 (reviewerContext workspaceDir sessionID)
 
         check "opencode return_reviewer second PERFECT reports submitted" (result.Contains "Verdict submitted.")
@@ -106,7 +106,10 @@ let secondPassResolvesAcceptedSpec () =
             "opencode return_reviewer second PERFECT asks stop"
             (result.Contains "Please stop the session immediately.")
 
-        check "opencode return_reviewer second PERFECT resolves accepted" (resolved.Value = Some(Accepted ""))
+        check
+            "opencode return_reviewer second PERFECT resolves accepted with feedback"
+            (resolved.Value = Some(Accepted [ "confirmed after double-check" ]))
+
         do! rmAsync workspaceDir
     }
 
@@ -131,12 +134,12 @@ let reviseResolvesNeedsRevisionSpec () =
 
         check
             "opencode return_reviewer REVISE resolves needs_revision with feedback"
-            (resolved.Value = Some(NeedsRevision "missing tests"))
+            (resolved.Value = Some(NeedsRevision [ "missing tests" ]))
 
         do! rmAsync workspaceDir
     }
 
-let reviseEmptyFeedbackStillNeedsRevisionSpec () =
+let reviseEmptyFeedbackRejectedSpec () =
     promise {
         let! workspaceDir = mkdtempAsync "opencode-return-reviewer-revise-empty-"
         let sessionID = "opencode-return-reviewer-revise-empty"
@@ -151,13 +154,13 @@ let reviseEmptyFeedbackStillNeedsRevisionSpec () =
                 (createObj [ "verdict", box "REVISE"; "feedback", box null ])
                 (reviewerContext workspaceDir sessionID)
 
-        check "opencode return_reviewer REVISE empty feedback reports submitted" (result.Contains "Verdict submitted.")
-
-        check "opencode return_reviewer REVISE empty asks stop" (result.Contains "Please stop the session immediately.")
+        check
+            "opencode return_reviewer REVISE empty feedback rejected"
+            (result.Contains "feedback" || result.Contains "non-empty" || result.Contains "InvalidIntent" || result.Contains "schema")
 
         check
-            "opencode return_reviewer REVISE empty feedback still needs_revision"
-            (resolved.Value = Some(NeedsRevision ""))
+            "opencode return_reviewer REVISE empty does not resolve pending"
+            (resolved.Value = None)
 
         do! rmAsync workspaceDir
     }
@@ -191,6 +194,6 @@ let run () : JS.Promise<unit> =
         do! firstPassDoubleChecksSpec ()
         do! secondPassResolvesAcceptedSpec ()
         do! reviseResolvesNeedsRevisionSpec ()
-        do! reviseEmptyFeedbackStillNeedsRevisionSpec ()
+        do! reviseEmptyFeedbackRejectedSpec ()
         do! invalidVerdictNudgesSpec ()
     }

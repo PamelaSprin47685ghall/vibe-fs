@@ -60,15 +60,21 @@ let assistantPayload
     (turnId: string)
     (openTodos: string list)
     : Map<string, string> =
-    let baseMap = Map [ "assistantMessage", assistantMessage; "turnId", turnId ]
+    let skipTodo = Wanxiangshu.Runtime.Nudge.NudgeSkipTokens.parseSkipTodo assistantMessage
+    let skipReview = Wanxiangshu.Runtime.Nudge.NudgeSkipTokens.parseSkipReview assistantMessage
 
-    let withTodos =
-        Map.add "openTodosJson" (Encode.Auto.toString (0, openTodos)) baseMap
+    let baseMap =
+        Map
+            [ "assistantMessage", assistantMessage
+              "turnId", turnId
+              "skipTodo", if skipTodo then "true" else "false"
+              "skipReview", if skipReview then "true" else "false"
+              "openTodosJson", Encode.Auto.toString (0, openTodos) ]
 
     let withAgent =
         match agent with
-        | Some a when a <> "" -> Map.add "agent" a withTodos
-        | _ -> withTodos
+        | Some a when a <> "" -> Map.add "agent" a baseMap
+        | _ -> baseMap
 
     match model with
     | Some m when m <> "" -> Map.add "model" m withAgent

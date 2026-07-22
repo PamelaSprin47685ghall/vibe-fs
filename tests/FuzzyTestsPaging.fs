@@ -33,9 +33,9 @@ let findPagingDefault () =
     check "many matches → iterator stored" (id <> "")
 
 let emptyIteratorNotRendered () =
-    let msg = Wanxiangshu.Runtime.ToolOutputInfo.plainText "body"
+    let msg = Wanxiangshu.Runtime.ToolOutputInfo.plainText "payload"
     let rendered = Wanxiangshu.Runtime.ToolOutputInfo.render msg
-    check "empty iterator omitted" (rendered.Contains "output = \"body\"")
+    check "empty iterator omitted" (rendered.Contains "output = \"payload\"")
     check "no iterator key when empty" (not (rendered.Contains "iterator"))
 
 let grepOutputNotices () =

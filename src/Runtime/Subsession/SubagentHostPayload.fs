@@ -1,4 +1,4 @@
-module Wanxiangshu.Runtime.SubagentPromptBody
+module Wanxiangshu.Runtime.SubagentHostPayload
 
 open Fable.Core.JsInterop
 open Wanxiangshu.Runtime.Dyn
@@ -46,29 +46,27 @@ let private tryReadPromptModel (payload: obj) : obj option =
                                modelID = basePart.[slash + 1 ..] |}
                     )
 
-let buildPromptBody (agent: string) (prompt: string) (tools: obj) (settings: SubagentAiSettings) : obj =
-    let body =
+/// Build the host JSON payload for a subagent prompt (not a TOML prompt document).
+let buildHostPayload (agent: string) (prompt: string) (tools: obj) (settings: SubagentAiSettings) : obj =
+    let payload =
         box
             {| agent = agent
                parts = [| box {| ``type`` = "text"; text = prompt |} |] |}
 
-    let body =
+    let payload =
         if Dyn.isNullish tools then
-            body
+            payload
         else
-            Dyn.withKey body "tools" tools
+            Dyn.withKey payload "tools" tools
 
-    let body =
+    let payload =
         match settings.ModelString with
-        | None -> body
+        | None -> payload
         | Some modelString ->
             match tryReadPromptModel (createObj [ "modelString", box modelString ]) with
-            | Some model -> Dyn.withKey body "model" model
-            | None -> body
+            | Some model -> Dyn.withKey payload "model" model
+            | None -> payload
 
-    let body =
-        match settings.ThinkingLevel with
-        | Some level when level.Trim() <> "" -> Dyn.withKey body "variant" (box level)
-        | _ -> body
-
-    body
+    match settings.ThinkingLevel with
+    | Some level when level.Trim() <> "" -> Dyn.withKey payload "variant" (box level)
+    | _ -> payload

@@ -36,9 +36,12 @@ let private toSessionSnapshot (s: NudgeSnapshotState) : SessionSnapshot =
 
     { todos = s.openTodos
       lastAssistantMessage = s.lastAssistantText
+      skipTodo = s.skipTodo
+      skipReview = s.skipReview
       workState = s.workState
       blockStatus = NudgeBlockStatus.Allowed
-      nudgeAnchorKey = Wanxiangshu.Kernel.Nudge.NudgeProjection.nudgeAnchorKey s.turnId s.lastAssistantText
+      nudgeAnchorKey =
+          Wanxiangshu.Kernel.Nudge.NudgeProjection.nudgeAnchorKey s.turnId s.agentFromMessage s.modelFromMessage
       agentFromMessage = s.agentFromMessage
       modelFromMessage = s.modelFromMessage
       reviewLoop = reviewLoopInfo
@@ -119,16 +122,16 @@ let foldNudgeSnapshotNeedsRevisionKeeps () =
 /// nudge_dispatched sets lastDispatchedAnchor to the latest anchor.
 let foldNudgeSnapshotNudgeDispatched () =
     let events =
-        [ ev "s1" eventKindNudgeDispatched (Map [ "anchor", "t1\u001emsg body" ])
-          ev "s1" eventKindNudgeDispatched (Map [ "anchor", "t2\u001emsg body" ]) ]
+        [ ev "s1" eventKindNudgeDispatched (Map [ "anchor", "t1" ])
+          ev "s1" eventKindNudgeDispatched (Map [ "anchor", "t2" ]) ]
 
     let s = Wanxiangshu.Kernel.Nudge.NudgeProjection.foldSnapshotStream "s1" events
-    equal "dispatched contains anchor 2" (Some "t2\u001emsg body") s.lastDispatchedAnchor
+    equal "dispatched contains anchor 2" (Some "t2") s.lastDispatchedAnchor
 
 /// submit_review_wip_recorded clears lastDispatchedAnchor.
 let foldNudgeSnapshotDedupCleared () =
     let events =
-        [ ev "s1" eventKindNudgeDispatched (Map [ "anchor", "t1\u001emsg body" ])
+        [ ev "s1" eventKindNudgeDispatched (Map [ "anchor", "t1" ])
           ev "s1" eventKindSubmitReviewWipRecorded Map.empty ]
 
     let s = Wanxiangshu.Kernel.Nudge.NudgeProjection.foldSnapshotStream "s1" events

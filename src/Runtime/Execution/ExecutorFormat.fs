@@ -2,7 +2,9 @@ module Wanxiangshu.Runtime.ExecutorFormat
 
 open Wanxiangshu.Kernel.Executor
 open Wanxiangshu.Kernel.ToolOutputInfoTypes
+open Wanxiangshu.Kernel.Prompt
 open Wanxiangshu.Runtime.SubagentPrompts
+open Wanxiangshu.Runtime.SubagentSummarizerPrompts
 open Wanxiangshu.Runtime.ToolOutputInfo
 
 let private stdoutText (summaryOption: string option) (result: ExecuteResult) : string =
@@ -40,7 +42,7 @@ let formatToolResponse (result: ExecuteResult) (summaryOption: string option) : 
                   stderr = None
                   exitCode = exitCode
                   signal = signal
-                  status = status
+                  exitStatus = status
                   truncated = truncated
                   summary = summaryOption } }
 
@@ -55,22 +57,42 @@ let prependSafetyWarningForExecution (msg: ToolOutputMessage) (options: ExecuteO
 
 let private summaryInputMaxBytes = 200_000
 
+/// Single truncation SSOT for summarizer input; builds structured ExecutorOutputEvidence.
+let buildExecutorEvidence
+    (byteLength: string -> int)
+    (truncateToBytes: string -> int -> string)
+    (result: ExecuteResult)
+    : ExecutorOutputEvidence =
+    let raw = outputFromResult result
+    let status, exitCode, signal, resultTruncated = executorStatusValues result
+
+    let capped, capTruncated =
+        if byteLength raw > summaryInputMaxBytes then
+            truncateToBytes raw summaryInputMaxBytes
+            + "\n\n[Output truncated to 200000 bytes for summarization]",
+            true
+        else
+            raw, false
+
+    { stdout = capped
+      stderr = None
+      exitStatus = status
+      exitCode = exitCode
+      signal = signal
+      truncated = resultTruncated || capTruncated }
+
 let buildSummaryPrompt
     (byteLength: string -> int)
     (truncateToBytes: string -> int -> string)
     (options: ExecuteOptions)
     (result: ExecuteResult)
     : string =
-    let raw = outputFromResult result
-
-    let capped =
-        if byteLength raw > summaryInputMaxBytes then
-            truncateToBytes raw summaryInputMaxBytes
-            + "\n\n[Output truncated to 200000 bytes for summarization]"
-        else
-            raw
-
+    let evidence = buildExecutorEvidence byteLength truncateToBytes result
     let langStr = languageToString options.language
-    let timeoutStr = timeoutToString options.timeoutType
 
-    executorSummarizerPrompt options.whatToSummarize capped langStr options.command options.dependencies timeoutStr
+    let timeoutKind =
+        match options.timeoutType with
+        | ExecutorTimeoutType.Short -> Wanxiangshu.Kernel.Prompt.TimeoutKind.Short
+        | ExecutorTimeoutType.Long -> Wanxiangshu.Kernel.Prompt.TimeoutKind.Long
+
+    executorSummarizerPrompt options.whatToSummarize evidence langStr options.command options.dependencies timeoutKind

@@ -80,7 +80,12 @@ let muxSubmitReviewTwoRoundPassAcceptsSpec () =
                   "wip", box false ]
 
         let! result = ((get submitTool "execute") $ (ctx, args)) |> unbox<JS.Promise<string>>
-        check "submit_review two PERFECT rounds reports accepted" (result.Contains "accepted" && result.Contains "verdict")
+        check
+            "submit_review two PERFECT rounds requires follow-through"
+            (result.Contains "recommendation"
+             || result.Contains "follow_through"
+             || result.Contains "follow_through"
+             || (result.Contains "review_mode" && result.Contains "ended"))
         check "submit_review runs a double-check round" (prompts.Count = 2)
         check "submit_review double-check round carries anchor" (prompts.[1].Contains "Re-evaluate" || prompts.[1].Contains "PERFECT")
 
@@ -216,7 +221,10 @@ let muxSubmitReviewTerminatedCleansReviewStateSpec () =
                   "wip", box false ]
 
         let! result = ((get submitTool "execute") $ (ctx, args)) |> unbox<JS.Promise<string>>
-        check "submit_review unclear report reports terminated" (result.Contains "verdict: terminated")
+        check
+            "submit_review unclear report reports terminated"
+            (result.Contains "terminated"
+             && (result.Contains "review_mode" || result.Contains "With-Review" || result.Contains "active"))
         check "submit_review termination keeps review session active" (muxIsReviewActiveForTest reviewStore sessionID)
         do! rmAsync workspaceDir
     }

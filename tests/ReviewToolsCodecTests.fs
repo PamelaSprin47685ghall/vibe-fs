@@ -41,8 +41,45 @@ let decodeReturnReviewerRevise () =
         check "return_reviewer feedback" (rr.Feedback = "fix tests")
     | Error _ -> check "return_reviewer revise" false
 
+let decodeReturnReviewerReviseEmptyFeedbackRejected () =
+    let args = createObj [ "verdict", box "REVISE"; "feedback", box "" ]
+
+    match decodeReturnReviewerArgs args with
+    | Error(InvalidIntent("return_reviewer", "feedback", msg)) ->
+        check "return_reviewer REVISE empty feedback rejected" (msg.Contains "non-empty")
+    | _ -> check "return_reviewer REVISE empty feedback rejected" false
+
+let decodeReturnReviewerReviseMissingFeedbackRejected () =
+    let args = createObj [ "verdict", box "REVISE" ]
+
+    match decodeReturnReviewerArgs args with
+    | Error(InvalidIntent("return_reviewer", "feedback", _)) ->
+        check "return_reviewer REVISE missing feedback rejected" true
+    | _ -> check "return_reviewer REVISE missing feedback rejected" false
+
+let decodeReturnReviewerPerfectEmptyFeedbackRejected () =
+    let args = createObj [ "verdict", box "PERFECT"; "feedback", box "" ]
+
+    match decodeReturnReviewerArgs args with
+    | Error(InvalidIntent("return_reviewer", "feedback", msg)) ->
+        check "return_reviewer PERFECT empty feedback rejected" (msg.Contains "non-empty")
+    | _ -> check "return_reviewer PERFECT empty feedback rejected" false
+
+let decodeReturnReviewerPerfectWithFeedback () =
+    let args = createObj [ "verdict", box "PERFECT"; "feedback", box "looks good" ]
+
+    match decodeReturnReviewerArgs args with
+    | Ok rr ->
+        check "return_reviewer PERFECT verdict" (rr.Verdict = Wanxiangshu.Kernel.ReviewVerdict.Perfect)
+        equal "return_reviewer PERFECT feedback" "looks good" rr.Feedback
+    | Error _ -> check "return_reviewer PERFECT with feedback" false
+
 let run () =
     decodeSubmitReviewMissingReport ()
     decodeSubmitReviewOk ()
     decodeReturnReviewerInvalidVerdict ()
     decodeReturnReviewerRevise ()
+    decodeReturnReviewerReviseEmptyFeedbackRejected ()
+    decodeReturnReviewerReviseMissingFeedbackRejected ()
+    decodeReturnReviewerPerfectEmptyFeedbackRejected ()
+    decodeReturnReviewerPerfectWithFeedback ()

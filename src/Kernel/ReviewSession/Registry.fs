@@ -69,5 +69,5 @@ let reduce (registry: Registry) (action: RegistryAction) : Registry =
 let actionFor (id: string) (result: ReviewResult) : RegistryAction =
     match result with
     | Accepted _ -> RegistryAction.Accept id
-    | NeedsRevision feedback -> RegistryAction.RequestRevision(id, feedback)
+    | NeedsRevision feedback -> RegistryAction.RequestRevision(id, String.concat "\n" feedback)
     | Terminated -> RegistryAction.NoOp

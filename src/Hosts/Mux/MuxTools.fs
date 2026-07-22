@@ -33,8 +33,13 @@ let private executeMethodology (deps: obj) (toolNames: string array) : obj -> ob
                     match tryFindEntry parsed.methodology with
                     | None -> return "Error: unknown methodology: " + parsed.methodology
                     | Some entry ->
-                        let intent = Wanxiangshu.Runtime.SubagentPrompts.renderMeditatorIntent entry parsed.intent parsed.background parsed.note
-                        let prompt = formatPrompt Host.Mimocode (Meditator intent) |> List.head
+                        let prompt =
+                            Wanxiangshu.Runtime.SubagentSummarizerPrompts.renderMeditatorIntentWithHost
+                                entry
+                                parsed.intent
+                                parsed.background
+                                parsed.note
+                                (Some Host.Mimocode)
 
                         return!
                             runMuxSubagent

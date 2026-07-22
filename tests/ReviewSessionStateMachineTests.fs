@@ -110,14 +110,14 @@ let applyCommandNoop () =
 let decideAfterRoundResolvedAccepted () =
     equal
         "Resolved Accepted→Finish Accepted"
-        (Finish(ReviewResult.Accepted "ok"))
-        (decideAfterRound 0 (Resolved(ReviewResult.Accepted "ok")) 3)
+        (Finish(ReviewResult.Accepted [ "ok" ]))
+        (decideAfterRound 0 (Resolved(ReviewResult.Accepted [ "ok" ])) 3)
 
 let decideAfterRoundResolvedNeedsRevision () =
     equal
         "Resolved NeedsRevision→Finish NeedsRevision"
-        (Finish(ReviewResult.NeedsRevision "bad"))
-        (decideAfterRound 0 (Resolved(ReviewResult.NeedsRevision "bad")) 3)
+        (Finish(ReviewResult.NeedsRevision [ "bad" ]))
+        (decideAfterRound 0 (Resolved(ReviewResult.NeedsRevision [ "bad" ])) 3)
 
 let decideAfterRoundPromptFailed () =
     equal "PromptFailed→Finish Terminated" (Finish ReviewResult.Terminated) (decideAfterRound 0 PromptFailed 3)

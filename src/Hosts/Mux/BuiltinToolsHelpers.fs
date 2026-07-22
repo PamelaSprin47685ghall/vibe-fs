@@ -24,6 +24,7 @@ let summarizationAiSettingsAgentId = "explore"
 let private nodeBuffer: obj = jsNative
 
 let private byteLength (s: string) : int = nodeBuffer?byteLength (s, "utf-8")
+let private truncateToBytes (s: string) (n: int) : string = Wanxiangshu.Runtime.SubagentPrompts.truncateUtf8ByBytes s n
 
 let summarizeWhenNeeded
     (deps: obj)
@@ -39,18 +40,23 @@ let summarizeWhenNeeded
             let msg = formatToolResponse result None
             return render (prependSafetyWarningForExecution msg options)
         else
+            let evidence = buildExecutorEvidence byteLength truncateToBytes result
             let langStr = languageToString options.language
-            let timeoutStr = timeoutToString options.timeoutType
+
+            let timeoutKind =
+                match options.timeoutType with
+                | Short -> Wanxiangshu.Kernel.Prompt.TimeoutKind.Short
+                | Long -> Wanxiangshu.Kernel.Prompt.TimeoutKind.Long
 
             let prompt =
                 formatPrompt
                     mimocode
                     (ExecutorSummary(
-                        output,
+                        evidence,
                         langStr,
                         options.command,
                         options.dependencies,
-                        timeoutStr,
+                        timeoutKind,
                         options.whatToSummarize
                     ))
                 |> List.head

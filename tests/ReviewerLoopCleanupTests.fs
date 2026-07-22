@@ -54,7 +54,7 @@ let runReviewerLoop_finallyCleansUpEverything () =
             let session =
                 createObj
                     [ "create", box (fun (_: obj) -> Promise.lift (box {| data = box {| id = "child-1" |} |}))
-                      "prompt", box (fun (_: obj) -> Promise.lift (store.resolvePendingReview ("child-1", Accepted "looks good") |> ignore))
+                      "prompt", box (fun (_: obj) -> Promise.lift (store.resolvePendingReview ("child-1", Accepted [ "looks good" ]) |> ignore))
                       "abort", box (fun (_: obj) -> abortCalled <- true; Promise.lift ())
                       "delete", box (fun (_: obj) -> deleteCalled <- true; Promise.lift ()) ]
             let client = createObj [ "session", box session ]

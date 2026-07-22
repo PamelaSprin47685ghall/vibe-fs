@@ -61,7 +61,7 @@ let runOmpReview (h: OmpHarness) (chk: string -> bool -> unit) (sessionId: strin
             (wipStr.Contains "Your progress report was saved successfully"
              && not (wipStr.Contains "error"))
 
-        do! h.expectTool "return_reviewer" (box {| verdict = "PERFECT"; feedback = "" |})
+        do! h.expectTool "return_reviewer" (box {| verdict = "PERFECT"; feedback = "looks good" |})
 
         let! submitFinalRes =
             withTimeoutCustom

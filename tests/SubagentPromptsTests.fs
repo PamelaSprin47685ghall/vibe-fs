@@ -3,6 +3,7 @@ module Wanxiangshu.Tests.SubagentPromptsTests
 open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Kernel.SubagentIntents
 open Wanxiangshu.Runtime.SubagentPrompts
+open Wanxiangshu.Runtime.SubagentSummarizerPrompts
 
 let private sampleCoderIntent: CoderIntent =
     { objective = "Add auth"
@@ -27,7 +28,7 @@ let coderPromptContainsDoNotTouch () =
     let p = coderPrompt sampleCoderIntent
     check "contains do_not_touch" (p.Contains "tests/")
 
-let coderPromptContainsYaml () =
+let coderPromptContainsToml () =
     let p = coderPrompt sampleCoderIntent
     check "contains objective field" (p.Contains "objective =")
 
@@ -43,7 +44,7 @@ let inspectorPromptContainsQuestions () =
     let p = inspectorPrompt sampleInspectorIntent
     check "contains questions" (p.Contains "Where is auth.handler?")
 
-let inspectorPromptContainsYaml () =
+let inspectorPromptContainsToml () =
     let p = inspectorPrompt sampleInspectorIntent
     check "contains objective" (p.Contains "objective =")
 
@@ -65,7 +66,7 @@ let meditatorPromptContainsQuestion () =
           outputSections = [] }
 
     let p =
-        Wanxiangshu.Runtime.SubagentPrompts.renderMeditatorIntent
+        Wanxiangshu.Runtime.SubagentSummarizerPrompts.renderMeditatorIntent
             dummyEntry
             "Analyze auth"
             "JWT background"
@@ -75,34 +76,63 @@ let meditatorPromptContainsQuestion () =
     check "contains background" (p.Contains "JWT background")
     check "contains agent_role" (p.Contains "agent_role =")
 
+let private sampleEvidence status exitCode truncated stdout : Wanxiangshu.Kernel.Prompt.ExecutorOutputEvidence =
+    { stdout = stdout
+      stderr = None
+      exitStatus = status
+      exitCode = exitCode
+      signal = None
+      truncated = truncated }
+
 let executorSummarizerPromptContainsFields () =
-    let p = executorSummarizerPrompt "output" "stdout" "python" "print(1)" [] "short"
+    let evidence = sampleEvidence "exit_error" (Some 1) false "stdout"
+    let p = executorSummarizerPrompt "output" evidence "python" "print(1)" [] Wanxiangshu.Kernel.Prompt.TimeoutKind.Short
 
     check "contains language" (p.Contains "python")
     check "contains program" (p.Contains "print(1)")
     check "contains agent_role" (p.Contains "agent_role =")
     check "contains preserve directive" (p.Contains "Preserve errors")
+    check "contains executor_output kind" (p.Contains "executor_output")
+    check "contains stdout field" (p.Contains "stdout")
+    check "contains real exit_status" (p.Contains "exit_error")
+    check "contains exit_code" (p.Contains "exit_code")
+    check "no evidence bag label" (not (p.Contains "value = \"executor_output\""))
+    check "not hard-coded completed when error" (not (p.Contains "exit_status = \"completed\""))
 
 let executorSummarizerPromptEmbedsWhatToSummarize () =
+    let evidence = sampleEvidence "completed" (Some 0) false "stdout"
     let p =
-        executorSummarizerPrompt "summarize exit codes and stderr only" "stdout" "python" "print(1)" [] "short"
+        executorSummarizerPrompt "summarize exit codes and stderr only" evidence "python" "print(1)" [] Wanxiangshu.Kernel.Prompt.TimeoutKind.Short
 
     check "what_to_summarize embedded" (p.Contains "summarize exit codes and stderr only")
     check "contains objective" (p.Contains "objective =")
 
 let websearchSummarizerPromptContains () =
-    let p = websearchSummarizerPrompt "Q?" "results..."
+    let results: Wanxiangshu.Kernel.Prompt.WebSearchResultItem list =
+        [ { title = "Doc"
+            url = "https://example.com/doc"
+            content = "results..." }
+          { title = "Other"
+            url = "https://example.com/other"
+            content = "more" } ]
+
+    let p = websearchSummarizerPrompt "Q?" results
     check "contains question" (p.Contains "Q?")
     check "contains websearch_results" (p.Contains "websearch_results")
     check "contains raw output" (p.Contains "results...")
+    check "contains first url" (p.Contains "https://example.com/doc")
+    check "contains second url" (p.Contains "https://example.com/other")
+    check "contains results table" (p.Contains "results" || p.Contains "title")
+    check "no evidence bag label" (not (p.Contains "value = \"websearch_results\""))
+    check "no raw_results fake title bag" (not (p.Contains "raw_results"))
 
 let run () =
     coderPromptContainsObjective ()
     coderPromptContainsDoNotTouch ()
-    coderPromptContainsYaml ()
+    coderPromptContainsToml ()
     coderPromptEmptyDoNotTouchOmitsField ()
     inspectorPromptContainsQuestions ()
-    inspectorPromptContainsYaml ()
+    inspectorPromptContainsToml ()
     browserPromptContainsTask ()
     browserPromptContainsStealth ()
     meditatorPromptContainsQuestion ()

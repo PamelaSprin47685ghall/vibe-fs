@@ -82,6 +82,8 @@ let isNaturalStop (origin: TerminalOrigin) : bool =
 type SessionSnapshot =
     { todos: string list
       lastAssistantMessage: string
+      skipTodo: bool
+      skipReview: bool
       workState: SessionWorkState
       blockStatus: NudgeBlockStatus
       nudgeAnchorKey: string

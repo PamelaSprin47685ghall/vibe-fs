@@ -29,6 +29,46 @@ module PromptToml =
         | BoundaryTarget.Directory path -> "dir", path
         | BoundaryTarget.PathOrSymbol value -> "path", value
 
+    let private methodologyTarget (m: MethodologyMeta) : TomlValue =
+        let sectionTables =
+            m.noteSections
+            |> List.map (fun (key, text) -> [ "key", String key; "text", String text ])
+
+        [ yield "kind", String "methodology"
+          yield "methodology_id", String m.id
+          yield "definition", String m.definition
+          yield "trigger", String m.trigger
+          yield "role", String m.role
+          if not (List.isEmpty sectionTables) then
+              yield "note_sections", TableArray sectionTables ]
+        |> Table
+
+    let private executorOutputTarget (e: ExecutorOutputEvidence) : TomlValue =
+        [ yield "kind", String "executor_output"
+          yield "stdout", String e.stdout
+          yield "exit_status", String e.exitStatus
+          yield "truncated", Boolean e.truncated
+          match e.stderr with
+          | Some s when s <> "" -> yield "stderr", String s
+          | _ -> ()
+          match e.exitCode with
+          | Some c -> yield "exit_code", Integer c
+          | None -> ()
+          match e.signal with
+          | Some s when s <> "" -> yield "signal", String s
+          | _ -> () ]
+        |> Table
+
+    let private webSearchResultsTarget (results: WebSearchResultItem list) : TomlValue =
+        let resultTables =
+            results
+            |> List.map (fun r ->
+                [ "title", String r.title
+                  "url", String r.url
+                  "content", String r.content ])
+
+        Table [ "kind", String "websearch_results"; "results", TableArray resultTables ]
+
     let target =
         function
         | FileTarget(path, guide, draft) ->
@@ -53,6 +93,9 @@ module PromptToml =
         | EvidenceTarget(label, content) ->
             Table [ "kind", String "evidence"; "value", String label; "content", String content ]
         | TodoTarget content -> Table [ "kind", String "todo"; "value", String content ]
+        | MethodologyTarget m -> methodologyTarget m
+        | ExecutorOutputTarget e -> executorOutputTarget e
+        | WebSearchResultsTarget results -> webSearchResultsTarget results
 
     let boundary =
         function
@@ -88,52 +131,25 @@ module PromptToml =
 
         fields <- fields @ [ "agent_role", String(agentRoleText v.agentRole) ]
 
-        if not (List.isEmpty v.targets) then
-            let tables =
-                v.targets
-                |> List.map (
-                    target
-                    >> function
-                        | Table t -> t
-                        | _ -> []
-                )
+        let tableFields label =
+            function
+            | Table t -> t
+            | _ -> failwithf "PromptToml.%s projection must be a Table" label
 
+        if not (List.isEmpty v.targets) then
+            let tables = v.targets |> List.map (target >> tableFields "target")
             fields <- fields @ [ "targets", TableArray tables ]
 
         if not (List.isEmpty v.boundaries) then
-            let tables =
-                v.boundaries
-                |> List.map (
-                    boundary
-                    >> function
-                        | Table t -> t
-                        | _ -> []
-                )
-
+            let tables = v.boundaries |> List.map (boundary >> tableFields "boundary")
             fields <- fields @ [ "boundaries", TableArray tables ]
 
         if not (List.isEmpty v.rules) then
-            let tables =
-                v.rules
-                |> List.map (
-                    rule
-                    >> function
-                        | Table t -> t
-                        | _ -> []
-                )
-
+            let tables = v.rules |> List.map (rule >> tableFields "rule")
             fields <- fields @ [ "rules", TableArray tables ]
 
         if not (List.isEmpty v.outcomes) then
-            let tables =
-                v.outcomes
-                |> List.map (
-                    outcome
-                    >> function
-                        | Table t -> t
-                        | _ -> []
-                )
-
+            let tables = v.outcomes |> List.map (outcome >> tableFields "outcome")
             fields <- fields @ [ "outcomes", TableArray tables ]
 
         Table fields

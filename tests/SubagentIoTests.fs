@@ -70,18 +70,18 @@ let signalAbortedNullIsFalse () =
 let signalAbortedNullishIsFalse () =
     check "false" (not (signalAborted (box (createObj []))))
 
-let buildPromptBodyBasic () =
-    let body = buildPromptBody "coder" "do it" null emptySettings
-    let agent = DynModule.str body "agent"
+let buildHostPayloadBasic () =
+    let payload = buildHostPayload "coder" "do it" null emptySettings
+    let agent = DynModule.str payload "agent"
     equal "agent" "coder" agent
 
-let buildPromptBodyWithThinkingLevel () =
+let buildHostPayloadWithThinkingLevel () =
     let settings =
         { emptySettings with
             ThinkingLevel = Some "high" }
 
-    let body = buildPromptBody "coder" "do it" null settings
-    let variant = DynModule.str body "variant"
+    let payload = buildHostPayload "coder" "do it" null settings
+    let variant = DynModule.str payload "variant"
     equal "variant" "high" variant
 
 let run () =
@@ -99,5 +99,5 @@ let run () =
     firstStringNoneWhenNotFound ()
     signalAbortedNullIsFalse ()
     signalAbortedNullishIsFalse ()
-    buildPromptBodyBasic ()
-    buildPromptBodyWithThinkingLevel ()
+    buildHostPayloadBasic ()
+    buildHostPayloadWithThinkingLevel ()

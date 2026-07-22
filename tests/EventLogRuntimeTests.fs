@@ -126,10 +126,12 @@ let tryClaimNudgeDispatchPreventsOutdatedAnchor () =
         let! dir = mkdtempAsync "eventlog-claim-outdated-"
         let sessionID = "s-claim"
         do! appendAssistantCompletedOrFail dir sessionID "task 1" (Some "agent1") (Some "provider/model-a") "t1" []
-        let anchorA = Wanxiangshu.Kernel.Nudge.NudgeProjection.nudgeAnchorKey "t1" "task 1"
+        let anchorA =
+            Wanxiangshu.Kernel.Nudge.NudgeProjection.nudgeAnchorKey "t1" (Some "agent1") (Some "provider/model-a")
 
         do! appendAssistantCompletedOrFail dir sessionID "task 2" (Some "agent1") (Some "provider/model-b") "t2" []
-        let anchorB = Wanxiangshu.Kernel.Nudge.NudgeProjection.nudgeAnchorKey "t2" "task 2"
+        let anchorB =
+            Wanxiangshu.Kernel.Nudge.NudgeProjection.nudgeAnchorKey "t2" (Some "agent1") (Some "provider/model-b")
 
         let! claimA = tryClaimNudgeDispatch dir sessionID Wanxiangshu.Kernel.Nudge.NudgeTodo anchorA "" "" 0 0 "" 1
         check "claim never-claimed outdated anchor A" (not claimA)

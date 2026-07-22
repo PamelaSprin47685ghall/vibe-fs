@@ -5,6 +5,7 @@ open Wanxiangshu.Kernel.HostTools
 open Wanxiangshu.Runtime.Subagent
 open Wanxiangshu.Kernel.SubagentIntents
 open Wanxiangshu.Runtime.SubagentPrompts
+open Wanxiangshu.Runtime.SubagentSummarizerPrompts
 open Wanxiangshu.Kernel.Primitives.Identity
 open Wanxiangshu.Kernel.Errors.DomainError
 open Wanxiangshu.Kernel.Session.Causality
@@ -46,20 +47,22 @@ let buildMeditatorSectionsMatchesManualZip () =
           meditatorRole = "test role"
           outputSections = [] }
 
-    let viaText =
-        renderMeditatorIntent dummyEntry "why?" "my background" "note detail"
+    let baseText = renderMeditatorIntent dummyEntry "why?" "my background" "note detail"
 
     for host in [| opencode; mimocode |] do
-        let viaFormat = formatPrompt host (Meditator viaText) |> List.head
+        // Host contracts are projected inside renderMeditatorIntentWithHost before stringify.
+        let withHost =
+            renderMeditatorIntentWithHost dummyEntry "why?" "my background" "note detail" (Some host)
 
-        let expected =
-            if host = mimocode then
-                viaText
-                + "\n\nWhen you have finished the task, you MUST call the agent_report tool. Use structuredOutput with relatedFiles (and relatedCode where applicable) so the caller can act on your findings."
-            else
-                viaText
+        let viaFormat = formatPrompt host (Meditator withHost) |> List.head
+        equal $"meditator formatPrompt is pass-through host={host}" withHost viaFormat
 
-        equal $"meditator prompt matches formatPrompt host={host}" expected viaFormat
+        if host = mimocode then
+            check "mimocode meditator includes agent_report contract" (withHost.Contains "agent_report")
+        else
+            check "opencode meditator keeps base objective" (withHost.Contains "why?")
+
+        check "meditator base has objective" (baseText.Contains "why?")
 
 let browserPromptTextMatchesFormatPrompt () =
     for host in [| opencode; mimocode |] do

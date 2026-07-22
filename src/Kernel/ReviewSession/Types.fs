@@ -33,9 +33,21 @@ type ReviewEvent =
     | ChallengeRequested
 
 type ReviewResult =
-    | Accepted of feedback: string
-    | NeedsRevision of feedback: string
+    | Accepted of feedback: string list
+    | NeedsRevision of feedback: string list
     | Terminated
+
+/// Boundary helper: host/wire strings become structured feedback items once.
+let feedbackItems (feedback: string) : string list =
+    let t = if isNull feedback then "" else feedback.Trim()
+
+    if t = "" then
+        []
+    else
+        t.Split([| '\n' |], System.StringSplitOptions.RemoveEmptyEntries)
+        |> Array.map (fun s -> s.Trim())
+        |> Array.filter (fun s -> s <> "")
+        |> Array.toList
 
 type ReviewSession =
     { id: string

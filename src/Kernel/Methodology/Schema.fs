@@ -3,6 +3,7 @@ module Wanxiangshu.Kernel.Methodology.Schema
 open System
 open System.Text
 open Wanxiangshu.Kernel.Prompt
+open Wanxiangshu.Kernel.Methodology.NoteSections
 
 type MethodologyEntry =
     { methodologyId: string
@@ -46,29 +47,44 @@ let buildUnifiedNoteDescription (entries: MethodologyEntry list) : string =
 
     sb.ToString()
 
-let renderMeditatorDocument (entry: MethodologyEntry) (intentText: string) (backgroundText: string) (noteText: string) : PromptDocumentView =
-    let sections =
-        entry.outputSections
-        |> List.mapi (fun i s -> $"{i + 1}. {s}")
-        |> String.concat "\n"
+let renderMeditatorDocument
+    (entry: MethodologyEntry)
+    (intentText: string)
+    (backgroundText: string)
+    (noteText: string)
+    : PromptDocumentView =
+    let turnBackground =
+        let trimmed = backgroundText.Trim()
 
-    let bg =
-        [ $"Methodology: {entry.methodologyId}"
-          $"Definition: {entry.shortDefinition}"
-          $"Use when: {entry.triggerWhen}"
-          $"Background: {backgroundText.Trim()}" ]
-        |> String.concat "\n"
+        if System.String.IsNullOrWhiteSpace trimmed then
+            None
+        else
+            Some trimmed
+
+    let meta: MethodologyMeta =
+        { id = entry.methodologyId
+          definition = entry.shortDefinition
+          trigger = entry.triggerWhen
+          role = entry.meditatorRole
+          noteSections = splitNoteSections entry.noteDescription noteText }
+
+    let sectionOutcomes =
+        entry.outputSections
+        |> List.mapi (fun i s ->
+            { label = sprintf "section_%d" (i + 1)
+              text = s })
+
+    let outcomes =
+        sectionOutcomes
+        @ [ { label = "report"
+              text = "Use every methodology output section and end with concrete next actions." } ]
 
     { objective = intentText.Trim()
-      background = Some bg
+      background = turnBackground
       agentRole = AgentRole.MethodologyReasoning
-      targets = [ PromptTarget.EvidenceTarget("methodology_note", noteText.Trim()) ]
+      targets = [ PromptTarget.MethodologyTarget meta ]
       boundaries = []
       rules =
-        [ PromptRule.Policy $"Apply the role of {entry.meditatorRole}."
-          PromptRule.Policy $"Structure your report using these sections:\n{sections}"
-          PromptRule.Constraint "Produce dense modern Chinese unless the inputs are explicitly English-only."
-          PromptRule.Constraint "Do NOT call tools or invent workspace facts." ]
-      outcomes =
-        [ { label = "report"
-            text = "Use every methodology output section and end with concrete next actions." } ] }
+        [ PromptRule.Constraint "LANGUAGE: dense modern Chinese unless inputs are explicitly English-only."
+          PromptRule.Constraint "NO_TOOLS: do not call tools or invent workspace facts." ]
+      outcomes = outcomes }

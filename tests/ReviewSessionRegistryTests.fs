@@ -68,11 +68,11 @@ let run () =
     check "Clear empties" r7.IsEmpty
 
     // actionFor
-    equal "Accepted->Accept" (RegistryAction.Accept "s1") (actionFor "s1" (Accepted ""))
+    equal "Accepted->Accept" (RegistryAction.Accept "s1") (actionFor "s1" (Accepted []))
 
     equal
         "NeedsRevision->RequestRevision"
         (RegistryAction.RequestRevision("s1", "bad"))
-        (actionFor "s1" (NeedsRevision "bad"))
+        (actionFor "s1" (NeedsRevision [ "bad" ]))
 
     equal "Terminated->NoOp" RegistryAction.NoOp (actionFor "s1" Terminated)

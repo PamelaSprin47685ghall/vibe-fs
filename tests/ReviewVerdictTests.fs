@@ -23,12 +23,12 @@ let parseVerdictUnknownToken () =
 
 let decideRevise () =
     match decideReviewSubmission Revise "" false with
-    | Finalize(Wanxiangshu.Kernel.ReviewSession.Types.ReviewResult.NeedsRevision fb) -> equal "revise feedback" "" fb
+    | Finalize(Wanxiangshu.Kernel.ReviewSession.Types.ReviewResult.NeedsRevision fb) -> equal "revise feedback" [] fb
     | _ -> check "revise -> Finalize NeedsRevision" false
 
 let decidePerfectDoubleCheckDone () =
     match decideReviewSubmission Perfect "ok" true with
-    | Finalize(Wanxiangshu.Kernel.ReviewSession.Types.ReviewResult.Accepted fb) -> equal "accepted feedback" "ok" fb
+    | Finalize(Wanxiangshu.Kernel.ReviewSession.Types.ReviewResult.Accepted fb) -> equal "accepted feedback" [ "ok" ] fb
     | _ -> check "perfect+done -> Finalize Accepted" false
 
 let decidePerfectNotDoubleCheckDone () =
@@ -50,17 +50,17 @@ let formatReviseWithFeedback () =
 
 let parseReportPerfect () =
     match parseReviewReportMarkdown "PERFECT" with
-    | Wanxiangshu.Kernel.ReviewSession.Types.ReviewResult.Accepted fb -> equal "PERFECT empty fb" "" fb
+    | Wanxiangshu.Kernel.ReviewSession.Types.ReviewResult.Accepted fb -> equal "PERFECT empty fb" [] fb
     | _ -> check "PERFECT -> Accepted" false
 
 let parseReportPerfectFeedback () =
     match parseReviewReportMarkdown "PERFECT: ok" with
-    | Wanxiangshu.Kernel.ReviewSession.Types.ReviewResult.Accepted fb -> equal "PERFECT ok fb" "ok" fb
+    | Wanxiangshu.Kernel.ReviewSession.Types.ReviewResult.Accepted fb -> equal "PERFECT ok fb" [ "ok" ] fb
     | _ -> check "PERFECT: ok -> Accepted ok" false
 
 let parseReportRevise () =
     match parseReviewReportMarkdown "REVISE: bad" with
-    | Wanxiangshu.Kernel.ReviewSession.Types.ReviewResult.NeedsRevision fb -> equal "REVISE bad fb" "bad" fb
+    | Wanxiangshu.Kernel.ReviewSession.Types.ReviewResult.NeedsRevision fb -> equal "REVISE bad fb" [ "bad" ] fb
     | _ -> check "REVISE: bad -> NeedsRevision bad" false
 
 let parseReportUnrecognizedMarkdownTerminated () =

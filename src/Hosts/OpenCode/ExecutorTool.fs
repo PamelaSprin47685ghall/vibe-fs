@@ -35,6 +35,7 @@ open Wanxiangshu.Runtime.Fallback.RuntimeStore
 let private nodeBuffer: obj = jsNative
 
 let private byteLength (s: string) : int = nodeBuffer?byteLength (s, "utf-8")
+let private truncateToBytes (s: string) (n: int) : string = Wanxiangshu.Runtime.SubagentPrompts.truncateUtf8ByBytes s n
 let private resolveStr (text: string) : JS.Promise<string> = Promise.lift text
 
 /// Schema for the executor tool parameters.
@@ -49,14 +50,19 @@ let private buildExecutorToolDef () : obj =
           "follow-tdd-and-kolmogorov-principles", warnTddParam
           "impossible-via-other-tools", warnImpossibleViaOtherToolsParam ]
 
-/// Build the subagent prompt for executor output summarisation.
-let private buildExecutorSummaryPrompt (host: Host) (output: string) (options: ExecuteOptions) : string =
+/// Build the subagent prompt for executor output summarisation from ExecuteResult.
+let private buildExecutorSummaryPrompt (host: Host) (result: ExecuteResult) (options: ExecuteOptions) : string =
+    let evidence = buildExecutorEvidence byteLength truncateToBytes result
     let langStr = languageToString options.language
-    let timeoutStr = timeoutToString options.timeoutType
+
+    let timeoutKind =
+        match options.timeoutType with
+        | Short -> Wanxiangshu.Kernel.Prompt.TimeoutKind.Short
+        | Long -> Wanxiangshu.Kernel.Prompt.TimeoutKind.Long
 
     formatPrompt
         host
-        (ExecutorSummary(output, langStr, options.command, options.dependencies, timeoutStr, options.whatToSummarize))
+        (ExecutorSummary(evidence, langStr, options.command, options.dependencies, timeoutKind, options.whatToSummarize))
     |> List.head
 
 /// Summarise output via subagent if needed, or format output directly.
@@ -78,7 +84,7 @@ let private summarizeOrFormat
             let msg = formatToolResponse result None
             return render (prependSafetyWarningForExecution msg options)
         else
-            let prompt = buildExecutorSummaryPrompt host output options
+            let prompt = buildExecutorSummaryPrompt host result options
 
             let! summary =
                 resolveSubagentPromise

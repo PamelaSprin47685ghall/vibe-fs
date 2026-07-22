@@ -60,7 +60,7 @@ let tryInjectParallelToolPrompt (sessionID: string) (messages: Message<obj> list
                               toolName = ""
                               details = null
                               time = null }
-                          parts = [ TextPart parallelToolPromptProse ]
+                          parts = [ TextPart parallelToolHint ]
                           source = Synthetic "parallel-tool-synth-"
                           raw = null }
 

@@ -73,19 +73,19 @@ let registry () =
     check "clear empties" ((reduce accepted RegistryAction.Clear).IsEmpty)
 
 let resultMapping () =
-    equal "Accepted→Accept" (RegistryAction.Accept "s1") (actionFor "s1" (Accepted ""))
+    equal "Accepted→Accept" (RegistryAction.Accept "s1") (actionFor "s1" (Accepted []))
 
     equal
         "NeedsRevision→RequestRevision"
         (RegistryAction.RequestRevision("s1", "bad"))
-        (actionFor "s1" (NeedsRevision "bad"))
+        (actionFor "s1" (NeedsRevision [ "bad" ]))
 
     equal "Terminated→NoOp" (RegistryAction.NoOp) (actionFor "s1" Terminated)
 
 let reviewerLoop () =
     check
         "resolved finishes"
-        (match decideAfterRound 0 (Resolved(Accepted "")) 3 with
+        (match decideAfterRound 0 (Resolved(Accepted [])) 3 with
          | Finish _ -> true
          | _ -> false)
 
@@ -116,7 +116,7 @@ let runtime () =
     store.unlockReview "w1"
     let mutable fired = false
     store.setPendingReview ("w1", (fun _ -> fired <- true))
-    check "resolve fires" (store.resolvePendingReview ("w1", Accepted ""))
+    check "resolve fires" (store.resolvePendingReview ("w1", Accepted []))
     check "callback called" fired
     store.clearReviewSessions ()
     check "cleared" (store.getReviewState "w1" |> Option.isNone)
@@ -131,7 +131,7 @@ let deactivateParentPreservesChildPending () =
     store.applyReviewTaskProjection ("parent", None)
     check "parent registry cleared" (store.getReviewState "parent" |> Option.isNone)
     check "child pending survives parent deactivate" (not childResolved)
-    check "child pending still resolvable" (store.resolvePendingReview ("child-reviewer", Accepted ""))
+    check "child pending still resolvable" (store.resolvePendingReview ("child-reviewer", Accepted []))
     check "child callback fired after explicit resolve" childResolved
 
 let promptPartsBranches () =
@@ -152,13 +152,13 @@ let resolvePendingClearsSuppressor () =
             { e with
                 abortSuppressors = Map.add "child-1" (fun () -> suppressed <- suppressed + 1) e.abortSuppressors }
 
-    let next, fired = resolvePending effects "child-1" (Accepted "")
+    let next, fired = resolvePending effects "child-1" (Accepted [])
     check "fired flag true" fired
-    equal "resolver received verdict" (Some(Accepted "")) resolved
+    equal "resolver received verdict" (Some(Accepted [])) resolved
     equal "suppressor invoked exactly once" 1 suppressed
     check "pending cleared" (not (Map.containsKey "child-1" next.pendingResolutions))
     check "suppressor cleared" (not (Map.containsKey "child-1" next.abortSuppressors))
-    let next2, fired2 = resolvePending next "nonexistent" (Accepted "")
+    let next2, fired2 = resolvePending next "nonexistent" (Accepted [])
     check "unknown id → fired false" (not fired2)
     equal "pending count untouched on unknown id" next.pendingResolutions.Count next2.pendingResolutions.Count
     equal "suppressor count untouched on unknown id" next.abortSuppressors.Count next2.abortSuppressors.Count

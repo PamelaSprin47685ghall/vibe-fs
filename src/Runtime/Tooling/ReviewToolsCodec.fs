@@ -44,16 +44,15 @@ let decodeReturnReviewerArgs (args: obj) : Result<ReturnReviewerArgs, DomainErro
                 defaultArg (strField args "feedback") ""
                 |> fun value -> if isNull value then "" else value.Trim()
 
-            match verdict with
-            | Revise when feedback = "" ->
+            if feedback = "" then
                 Error(
                     InvalidIntent(
                         "return_reviewer",
                         "feedback",
-                        "REVISE requires non-empty actionable feedback; do not mine dialogue text"
+                        "required non-empty review opinion for PERFECT and REVISE; do not mine dialogue text"
                     )
                 )
-            | _ ->
+            else
                 Ok
                     { Verdict = verdict
                       Feedback = feedback }

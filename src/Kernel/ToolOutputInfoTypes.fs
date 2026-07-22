@@ -16,7 +16,9 @@ type ExecutorOutput =
       stderr: string option
       exitCode: int option
       signal: string option
-      status: string
+      /// Command/process outcome label (completed, exit_error, killed_timeout, …).
+      /// Wire key: exit_status — not ToolOutputMessage.status (no-change envelope).
+      exitStatus: string
       truncated: bool
       summary: string option }
 

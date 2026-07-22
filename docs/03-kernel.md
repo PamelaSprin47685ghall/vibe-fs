@@ -9,7 +9,7 @@
 | 簇 | 路径 | 核心内容 |
 | :--- | :--- | :--- |
 | ReviewSession | `ReviewSession/` | `Types`（5 状态 DU + 命令）、`StateMachine.fs`（穷举转移）、`Registry`、`Query`、`Effects` |
-| Review | `Review/` | `ReviewLoopFold.fs`、`ReviewProjection.fs`、`ReviewEncouragement.fs`、`ReviewReportBuffer.fs`、`ReviewVerdictWire.fs` |
+| Review | `Review/` | `ReviewLoopFold.fs`、`ReviewProjection.fs`、`ReviewReportBuffer.fs`、`ReviewVerdictWire.fs` |
 | Nudge | `Nudge/` | `NudgeProjection.fs`、`NudgeSnapshotProjection.fs`、`NudgeSnapshotSource.fs`、`TodoStatus.fs`、`SubmitReviewHooks.fs`、`Types.fs`（8 工作状态 DU） |
 | Nudge（顶层） | `Nudge.fs` | `NudgeAction` DU、`ofString`/`toString`、skip 正则 |
 | EventSourcing | `EventSourcing/` | `EventKind.fs`（52 个事件 kind 常量）、`EventEnvelope.fs`（`WanEvent` 类型）、`EventPayload.fs`、`SessionState.fs`（28 轴投影）、`Fold.fs`（主折叠引擎）、`FoldApply.fs` |

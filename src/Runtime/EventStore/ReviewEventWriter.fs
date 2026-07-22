@@ -118,7 +118,12 @@ let syncReviewFromEventLogDedicated
 let verdictStringFromReviewResult
     (result: Wanxiangshu.Kernel.ReviewSession.Types.ReviewResult)
     : string * string option =
+    let joined (items: string list) =
+        match items with
+        | [] -> None
+        | xs -> Some(String.concat "\n" xs)
+
     match result with
-    | Wanxiangshu.Kernel.ReviewSession.Types.ReviewResult.Accepted fb -> (verdictAccepted, Some fb)
-    | Wanxiangshu.Kernel.ReviewSession.Types.ReviewResult.NeedsRevision fb -> (verdictNeedsRevision, Some fb)
+    | Wanxiangshu.Kernel.ReviewSession.Types.ReviewResult.Accepted fb -> (verdictAccepted, joined fb)
+    | Wanxiangshu.Kernel.ReviewSession.Types.ReviewResult.NeedsRevision fb -> (verdictNeedsRevision, joined fb)
     | Wanxiangshu.Kernel.ReviewSession.Types.ReviewResult.Terminated -> (verdictTerminated, None)

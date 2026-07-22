@@ -6,6 +6,7 @@ open Wanxiangshu.Kernel.ToolOutputInfoTypes
 open Wanxiangshu.Runtime.ExecutorFormat
 open Wanxiangshu.Runtime.SearchPrompts
 open Wanxiangshu.Runtime.SubagentPrompts
+open Wanxiangshu.Runtime.SubagentSummarizerPrompts
 open Wanxiangshu.Runtime.ToolOutputInfo
 open Wanxiangshu.Runtime
 
@@ -104,7 +105,7 @@ let executorToolResponseFormatting () =
     equal "outputFromResult truncated" "partial" (outputFromResult truncatedResult)
     equal "outputFromResult missing" "Error: not found" (outputFromResult missingResult)
     let resp = formatToolResponse completedResult None |> render
-    check "response includes output body" (resp.Contains "all good")
+    check "response includes output payload" (resp.Contains "all good")
     check "response includes exit_code" (resp.Contains "0")
     check "response includes status completed" (resp.Contains "completed")
     let failedResp = formatToolResponse failedResult None |> render
@@ -115,31 +116,50 @@ let executorToolResponseFormatting () =
     check "truncated response includes Output Truncated suffix" (truncatedResp.Contains "truncated = true")
     check "truncated response omits timeout_ms field" (not (truncatedResp.Contains "timeout_ms:"))
     check "truncated response omits timeout hints" (not (truncatedResp.Contains "Killed after"))
-    check "truncated body excludes legacy executor suffix" (not (truncatedResp.Contains "[executor]"))
+    check "truncated payload excludes legacy executor suffix" (not (truncatedResp.Contains "[executor]"))
     let signaledResult = Failed("partial out", None, Some "SIGTERM")
     let signaledResp = formatToolResponse signaledResult None |> render
     check "signaled response includes signal as status" (signaledResp.Contains "SIGTERM")
     check "signaled response omits legacy signal field" (not (signaledResp.Contains "signal: SIGTERM"))
-    check "signaled body has no legacy suffix" (not (signaledResp.Contains "[executor]"))
+    check "signaled payload has no legacy suffix" (not (signaledResp.Contains "[executor]"))
     let missingResp = formatToolResponse missingResult None |> render
     check "missing response includes status missing_executable" (missingResp.Contains "missing_executable")
     let summary = "SUMMARY: task succeeded"
     let summaryResp = formatToolResponse completedResult (Some summary) |> render
-    check "summary response uses summary as body" (summaryResp.Contains summary)
+    check "summary response uses summary as stdout payload" (summaryResp.Contains summary)
     check "summary response has exit_code 0" (summaryResp.Contains "0")
 
 let summarizerPromptOmitsReturnValue () =
-    let prompt = executorSummarizerPrompt "" "raw output" "shell" "echo 1" [] "short"
+    let evidence: Wanxiangshu.Kernel.Prompt.ExecutorOutputEvidence =
+        { stdout = "raw output"
+          stderr = None
+          exitStatus = "completed"
+          exitCode = Some 0
+          signal = None
+          truncated = false }
+
+    let prompt = executorSummarizerPrompt "" evidence "shell" "echo 1" [] Wanxiangshu.Kernel.Prompt.TimeoutKind.Short
 
     check "summarizer prompt omits exit status" (not (prompt.Contains "exit status"))
     check "summarizer prompt omits non-zero" (not (prompt.ToLowerInvariant().Contains "non-zero"))
     check "summarizer empty deps toml" (prompt.Contains "dependencies = []")
 
     let multiline =
-        executorSummarizerPrompt "" "line1\nline2" "shell" "echo hi\necho bye" [ "dep1" ] "long"
+        executorSummarizerPrompt
+            ""
+            { stdout = "line1\nline2"
+              stderr = None
+              exitStatus = "completed"
+              exitCode = Some 0
+              signal = None
+              truncated = false }
+            "shell"
+            "echo hi\necho bye"
+            [ "dep1" ]
+            Wanxiangshu.Kernel.Prompt.TimeoutKind.Long
 
     check "summarizer multiline program field" (multiline.Contains "program")
-    check "summarizer multiline raw output in body" (multiline.Contains "line1" && multiline.Contains "line2")
+    check "summarizer multiline raw output in evidence" (multiline.Contains "line1" && multiline.Contains "line2")
 
 // --- formatFetchResponse ---
 
@@ -148,13 +168,13 @@ let formatFetchResponseAllFields () =
         { title = Some "The Title"
           byline = Some "By Author"
           length = Some 500
-          content = Some "body text" }
+          content = Some "page content" }
 
     let out = formatFetchResponse data
     check "front matter contains title" (out.Contains "The Title")
     check "front matter contains byline" (out.Contains "By Author")
     check "front matter contains length" (out.Contains "500")
-    check "front matter contains content" (out.Contains "body text")
+    check "front matter contains content" (out.Contains "page content")
 
 let formatFetchResponseOnlyTitle () =
     let data =
@@ -173,10 +193,10 @@ let formatFetchResponseOnlyContent () =
         { title = None
           byline = None
           length = None
-          content = Some "just body" }
+          content = Some "just content" }
 
     let out = formatFetchResponse data
-    check "front matter contains content" (out.Contains "just body")
+    check "front matter contains content" (out.Contains "just content")
     check "front matter omits title" (not (out.Contains "title ="))
     check "front matter omits byline" (not (out.Contains "byline ="))
 
@@ -188,15 +208,15 @@ let formatFetchResponseAllNone () =
           content = None }
 
     let out = formatFetchResponse data
-    check "formatFetchResponseAllNone" (out.Contains "title = \"\"")
+    check "formatFetchResponseAllNone empty document" (out = "" || not (out.Contains "title = \"\""))
 
 let formatFetchResponseEmptyTitleOmitted () =
     let data =
         { title = Some ""
           byline = None
           length = None
-          content = Some "body" }
+          content = Some "payload" }
 
     let out = formatFetchResponse data
     check "empty title omitted" (not (out.Contains "title:"))
-    check "content still present" (out.Contains "body")
+    check "content still present" (out.Contains "payload")

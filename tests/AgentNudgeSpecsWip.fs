@@ -13,13 +13,15 @@ open Wanxiangshu.Kernel.Nudge.Types
 let private snap todos msg blocked agent : Wanxiangshu.Kernel.Nudge.Types.SessionSnapshot =
     { todos = todos
       lastAssistantMessage = msg
+      skipTodo = false
+      skipReview = false
       workState = getSessionWorkState false false todos
       blockStatus =
         (if blocked then
              NudgeBlockStatus.Blocked
          else
              NudgeBlockStatus.Allowed)
-      nudgeAnchorKey = msg
+      nudgeAnchorKey = nudgeAnchorKey "" agent None
       agentFromMessage = agent
       modelFromMessage = None
       reviewLoop = None

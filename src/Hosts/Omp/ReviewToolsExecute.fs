@@ -41,24 +41,10 @@ let private handleReviewResult
     (r: ReviewResult)
     : JS.Promise<ToolResult> =
     promise {
-        let verdict, feedback =
-            match r with
-            | Accepted fb ->
-                Wanxiangshu.Kernel.EventSourcing.EventKind.verdictAccepted, (if fb = "" then None else Some fb)
-            | NeedsRevision fb -> Wanxiangshu.Kernel.EventSourcing.EventKind.verdictNeedsRevision, Some fb
-            | Terminated -> Wanxiangshu.Kernel.EventSourcing.EventKind.verdictTerminated, None
-
+        let verdict, feedback = verdictStringFromReviewResult r
         do! appendReviewVerdictOrFail root sessionId verdict feedback
         do! syncReviewFromEventLogDedicated store root sessionId
-
-        match r with
-        | Accepted fb ->
-            if fb = "" then
-                return textResult "Review passed. Loop mode ended."
-            else
-                return errorResult ("Review feedback:\n\n" + fb)
-        | NeedsRevision fb -> return errorResult ("Review feedback:\n\n" + fb)
-        | Terminated -> return errorResult "Review terminated."
+        return textResult (formatReviewResult r)
     }
 
 let executeSubmitReview
@@ -117,13 +103,21 @@ let executeReturnReviewer
         | Some sessionId ->
             let vStr = Dyn.str params' "verdict"
 
-            match Wanxiangshu.Kernel.ReviewVerdict.parseVerdict vStr with
-            | None -> return textResult reviewerNudgePrompt
-            | Some verdict ->
-                let fb = (Dyn.str params' "feedback").Trim()
+            match Wanxiangshu.Runtime.ReviewToolsCodec.decodeReturnReviewerArgs params' with
+            | Error e ->
+                return
+                    errorResult (
+                        Wanxiangshu.Kernel.Errors.DomainError.formatDomainError e
+                    )
+            | Ok decoded ->
                 let doubleCheckDone = store.isChallengeRequested sessionId
 
-                match Wanxiangshu.Kernel.ReviewVerdict.decideReviewSubmission verdict fb doubleCheckDone with
+                match
+                    Wanxiangshu.Kernel.ReviewVerdict.decideReviewSubmission
+                        decoded.Verdict
+                        decoded.Feedback
+                        doubleCheckDone
+                with
                 | Wanxiangshu.Kernel.ReviewVerdict.AskDoubleCheck ->
                     store.recordChallengeRequested sessionId
                     let task = store.getReviewTask sessionId |> Option.defaultValue ""
@@ -134,14 +128,7 @@ let executeReturnReviewer
                     if not res then
                         return errorResult "No pending review to resolve."
                     else
-                        match result with
-                        | Accepted _ ->
-                            return
-                                { textResult "Review submitted: accepted." with
-                                    display = Some false }
-                        | NeedsRevision _ ->
-                            return
-                                { textResult "Review submitted: revision requested with feedback." with
-                                    display = Some false }
-                        | Terminated -> return errorResult "Review terminated."
+                        return
+                            { textResult returnReviewerVerdictSubmittedMessage with
+                                display = Some false }
     }

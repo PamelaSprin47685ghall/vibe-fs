@@ -707,23 +707,34 @@ text = "Use every methodology output section and end with concrete next actions.
 
 ### C.10 Tool output 独立 Schema
 
-Tool output 不伪装成 instruction Prompt：
+Tool output 不伪装成 instruction Prompt。现网 SSOT 为 `ToolOutputContent` DU + 扁平 TOML 键（非 `body`+`[[info]]` 垃圾袋）：
 
 ```toml
-body = "Search result body"
+# Plain
+output = "opaque free text"
+iterator = "iter-123"
+syntax = "fsharp"
 
-[[info]]
-kind = "iterator"
-text = "iter-123"
+# Executor
+stdout = "..."
+exit_status = "completed"
+exit_code = 0
+truncated = false
 
-[[info]]
-kind = "syntax"
-text = "fsharp"
+# FuzzyFind / FuzzyGrep
+total_matched = 2
+[[matches]]
+path = "src/A.fs"
+line = 12
+content = "let foo = 1"
 
-[[info]]
-kind = "exit_code"
-number = 0
+# WriteResult
+path = "src/A.fs"
+success = true
+syntax_errors = []
 ```
+
+元数据 `hint` / `syntax` / `iterator` / `status`(no-change envelope) 与 content 字段正交；Executor 进程态用 `exit_status`，避免与 message `status` 撞键。
 
 ### C.11 Search / Fetch 独立 Schema
 
@@ -827,17 +838,27 @@ text = "Preserve raw facts and eliminate marketing boilerplate."
 ```toml
 [[reports]]
 iterator = "iter-coder-1"
-body = "First subagent report"
+summary = "First subagent report"
+findings = []
+related_files = []
+related_code = []
 
 [[reports]]
 iterator = "iter-coder-2"
-body = "Second subagent report"
+summary = "Second subagent report"
+findings = [ "path:note" ]
+related_files = [ "src/A.fs" ]
+related_code = []
 
 [[reports]]
-body = "Synchronous report without a continuation iterator"
+summary = "Synchronous report without a continuation iterator"
+error = "aborted"
+findings = []
+related_files = []
+related_code = []
 ```
 
-iterator 与对应 body 同处一张 table。禁止恢复旧 `iterators = [...]` + Markdown report blocks 的平行数组设计；平行数组无法由类型保证索引对齐。
+iterator 与 summary/error/findings 同处一张 table（`SubagentReport`）。禁止 Markdown `---` divider 与平行 `iterators = [...]` 数组。
 
 ## 附录 D：旧 9 处审计与扩展追溯
 

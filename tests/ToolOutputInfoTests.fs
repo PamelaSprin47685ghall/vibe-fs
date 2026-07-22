@@ -11,18 +11,18 @@ open Wanxiangshu.Runtime.Tooling.ToolOutputPtyToml
 let testRenderEmpty () =
     equal "render empty msg" "" (render empty)
 
-let testRenderBodyOnly () =
-    equal "render body only" "output = \"hello\"\n" (render (plainText "hello"))
+let testRenderOutputOnly () =
+    equal "render output only" "output = \"hello\"\n" (render (plainText "hello"))
 
 let testRenderHintOnly () =
     let r = render { empty with hint = Some "test" }
     check "render hint contains hint text" (r.Contains "test")
     check "render hint uses flat key" (r.Contains "hint =")
 
-let testRenderBodyAndInfo () =
+let testRenderOutputAndInfo () =
     let r = render { empty with content = Plain "b"; hint = Some "x" }
-    check "body+info contains output" (r.Contains "output = \"b\"")
-    check "body+info contains hint" (r.Contains "hint = \"x\"")
+    check "output+info contains output" (r.Contains "output = \"b\"")
+    check "output+info contains hint" (r.Contains "hint = \"x\"")
 
 let testNoChangeEnvelope () =
     let r = noChangeEnvelope ()
@@ -36,9 +36,9 @@ let testAddSyntax () =
     equal "addSyntax empty preserves" (plainText "raw") (addSyntax (plainText "raw") "")
 
 let testWithIterator () =
-    let r = withIterator (plainText "body") "my-iter" |> render
+    let r = withIterator (plainText "payload") "my-iter" |> render
     check "withIterator has iterator" (r.Contains "my-iter")
-    equal "withIterator empty returns msg" (plainText "body") (withIterator (plainText "body") "")
+    equal "withIterator empty returns msg" (plainText "payload") (withIterator (plainText "payload") "")
 
 let testTodoWriteOutput () =
     let r = todoWriteOutput [ "methodology" ]
@@ -51,9 +51,9 @@ let testHintForMethodologies () =
     check "hintForMethodologies nonempty" ((hintForMethodologies [ "a" ]).Contains "a")
     check "hintForMethodologies multiple" ((hintForMethodologies [ "a"; "b" ]).Contains "b")
 
-let testEmptyWithBody () =
-    let msg = plainText "some body"
-    equal "plainText content" (Plain "some body") msg.content
+let testPlainTextContent () =
+    let msg = plainText "some output"
+    equal "plainText content" (Plain "some output") msg.content
 
 let testConstants () =
     check "hintExecutorMisuse nonempty" (hintExecutorMisuse.Length > 0)
@@ -205,14 +205,21 @@ let testExecutorStructuredFields () =
                       stderr = None
                       exitCode = Some 0
                       signal = None
-                      status = "completed"
+                      exitStatus = "completed"
                       truncated = false
                       summary = None } }
 
     let text = render msg
     check "executor has stdout" (text.Contains "stdout")
-    check "executor has status" (text.Contains "completed")
+    check "executor has exit_status wire key" (text.Contains "exit_status =")
+    check "executor exit_status value completed" (text.Contains "completed")
     check "executor no body" (not (text.Contains "body ="))
+    check
+        "executor has no bare message status field"
+        (not (
+            text.Split('\n')
+            |> Array.exists (fun line -> line.TrimStart().StartsWith "status =")
+        ))
 
 let testWriteResultStructuredFields () =
     let msg =
@@ -230,15 +237,15 @@ let testWriteResultStructuredFields () =
 
 let run () =
     testRenderEmpty ()
-    testRenderBodyOnly ()
+    testRenderOutputOnly ()
     testRenderHintOnly ()
-    testRenderBodyAndInfo ()
+    testRenderOutputAndInfo ()
     testNoChangeEnvelope ()
     testAddSyntax ()
     testWithIterator ()
     testTodoWriteOutput ()
     testHintForMethodologies ()
-    testEmptyWithBody ()
+    testPlainTextContent ()
     testConstants ()
     testPtySpawnTomlFlatFields ()
     testPtyKillTomlFlatFields ()

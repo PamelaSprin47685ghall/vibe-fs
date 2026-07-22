@@ -79,7 +79,7 @@ let testTryClaimNudgeDispatchFailsMemoryNotPolluted () =
         let mockAppend (_: string) (_: WanEvent) : JS.Promise<unit> = Promise.reject (exn "mock disk full")
         let store = EventLogStore(dir, appendLineOverride = mockAppend)
         let sessionId = "s-claim-fail"
-        let anchor = Wanxiangshu.Kernel.Nudge.NudgeProjection.nudgeAnchorKey "" ""
+        let anchor = Wanxiangshu.Kernel.Nudge.NudgeProjection.nudgeAnchorKey "" None None
         let isBlocked _ _ = false
 
         let! claimRes =

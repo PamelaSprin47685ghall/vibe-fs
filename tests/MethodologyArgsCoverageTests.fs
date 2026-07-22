@@ -6,6 +6,7 @@ open System
 open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Runtime.MethodologyArgs
 open Wanxiangshu.Runtime.SubagentPrompts
+open Wanxiangshu.Runtime.SubagentSummarizerPrompts
 open Wanxiangshu.Kernel.Methodology.Schema
 open Wanxiangshu.Hosts.Opencode.HookSchemaDecoration
 open Wanxiangshu.Hosts.Opencode.HookSchemaDecode
@@ -62,17 +63,27 @@ let methSchemaCommon () =
           outputSections = [ "Findings"; "Plan" ] }
 
     let prompt = renderMeditatorIntent entry "hi" "my background" "my note"
-    check "prompt has methodology id" (prompt.Contains "first_principles")
-    check "prompt has def" (prompt.Contains "rebuild from facts")
-    check "prompt has trigger" (prompt.Contains "hard")
-    check "prompt has role" (prompt.Contains "analyst")
+    check "prompt has methodology_id key" (prompt.Contains "methodology_id")
+    check "prompt has methodology id value" (prompt.Contains "first_principles")
+    check "prompt has definition key" (prompt.Contains "definition")
+    check "prompt has def value" (prompt.Contains "rebuild from facts")
+    check "prompt has trigger key" (prompt.Contains "trigger")
+    check "prompt has trigger value" (prompt.Contains "hard")
+    check "prompt has role key" (prompt.Contains "role")
+    check "prompt has role value" (prompt.Contains "analyst")
     check "prompt has sections" (prompt.Contains "Findings")
-    check "prompt has section order" (prompt.Contains "1. Findings")
-    check "prompt has section 2" (prompt.Contains "2. Plan")
+    check "prompt has section outcome 1" (prompt.Contains "section_1" && prompt.Contains "Findings")
+    check "prompt has section outcome 2" (prompt.Contains "section_2" && prompt.Contains "Plan")
+    check "no OUTPUT_SECTION prose key" (not (prompt.Contains "OUTPUT_SECTION_"))
     check "prompt has intent" (prompt.Contains "hi")
     check "prompt has background" (prompt.Contains "my background")
     check "prompt has note" (prompt.Contains "my note")
-    check "prompt has quiet room" (prompt.Contains "Do NOT call tools")
+    check
+        "prompt has quiet room"
+        (prompt.Contains "NO_TOOLS" || prompt.ToLowerInvariant().Contains "do not call tools")
+    check "no METHODOLOGY_ID prose key" (not (prompt.Contains "METHODOLOGY_ID:"))
+    check "no DEFINITION prose key" (not (prompt.Contains "DEFINITION:"))
+    check "kind is methodology" (prompt.Contains "methodology")
 
 // ── Opencode.HookSchema ────────────────────────────────────────────────────
 

@@ -81,7 +81,7 @@ type ProjectionCache() =
             | None -> emptySessionState ()
 
         let snap = oldState.NudgeSnapshot
-        let currentAnchor = nudgeAnchorKey snap.turnId snap.lastAssistantText
+        let currentAnchor = nudgeAnchorKey snap.turnId snap.agentFromMessage snap.modelFromMessage
 
         let currentHumanTurnId =
             oldState.LatestHumanTurn

@@ -24,7 +24,7 @@ let resolvePendingFiresCallback () =
             abortSuppressors = Map.add "s1" (fun () -> suppressed <- true) Map.empty }
         |> fun eff -> setPending eff "s1" (fun _ -> resolved <- true)
 
-    let next, fired = resolvePending e "s1" (Accepted "")
+    let next, fired = resolvePending e "s1" (Accepted [])
     check "resolvePending fired true" fired
     check "resolvePending called resolver" resolved
     check "resolvePending called suppressor" suppressed
@@ -33,7 +33,7 @@ let resolvePendingFiresCallback () =
 
 let resolvePendingUnknownIdReturnsFalse () =
     let e = setPending emptyEffects "s1" (fun _ -> ())
-    let next, fired = resolvePending e "ghost" (Accepted "")
+    let next, fired = resolvePending e "ghost" (Accepted [])
     check "unknown id fired false" (not fired)
     equal "pending count unchanged" e.pendingResolutions.Count next.pendingResolutions.Count
     equal "suppressor count unchanged" e.abortSuppressors.Count next.abortSuppressors.Count

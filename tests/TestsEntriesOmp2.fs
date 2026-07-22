@@ -4,6 +4,7 @@ open Wanxiangshu.Tests.TestsTestBody
 open Wanxiangshu.Tests.OmpPluginTestsLifecycle
 open Wanxiangshu.Tests.OmpPluginTestsAgentEnd
 open Wanxiangshu.Tests.OmpReviewTests
+open Wanxiangshu.Tests.OmpReviewLoopTests
 open Wanxiangshu.Tests.OmpReviewLoopAsyncTests
 open Wanxiangshu.Tests.OmpChildSessionTests
 open Wanxiangshu.Tests.OmpRunnerTests
@@ -29,9 +30,9 @@ let entries2 () : (string * TestBody) list =
       "OmpReviewTests.returnReviewerVerdictPerfectRevise", Async OmpReviewTests.returnReviewerVerdictPerfectRevise
       "OmpReviewTests.returnReviewerViaSetPendingStateForTest",
       Async OmpReviewTests.returnReviewerViaSetPendingStateForTest
-      "OmpReviewTests.runReviewLoopChildToolNames", Async OmpReviewTests.runReviewLoopChildToolNames
-      "OmpReviewTests.runReviewLoopAcceptsWhenPendingResolved",
-      Async OmpReviewTests.runReviewLoopAcceptsWhenPendingResolved
+      "OmpReviewLoopTests.runReviewLoopChildToolNames", Async OmpReviewLoopTests.runReviewLoopChildToolNames
+      "OmpReviewLoopTests.runReviewLoopAcceptsWhenPendingResolved",
+      Async OmpReviewLoopTests.runReviewLoopAcceptsWhenPendingResolved
       "OmpReviewLoopAsyncTests.runReviewLoopResolvesViaAsyncCallbackNotPolling",
       Async OmpReviewLoopAsyncTests.runReviewLoopResolvesViaAsyncCallbackNotPolling
       "OmpReviewLoopAsyncTests.runReviewLoopSendsNudgeOnTimeoutThenStopsOnResolve",
@@ -70,7 +71,7 @@ let entries2 () : (string * TestBody) list =
       Sync(sync SubagentIoTests.extractToolContextFallsBackToPluginDirectory)
       "SubagentIoTests.extractToolContextUsesDirectory", Sync(sync SubagentIoTests.extractToolContextUsesDirectory)
       "SubagentIoTests.textPartsReturnsArrayOfTextParts", Sync(sync SubagentIoTests.textPartsReturnsArrayOfTextParts)
-      "SubagentIoTests.buildPromptBodyBasic", Sync(sync SubagentIoTests.buildPromptBodyBasic)
+      "SubagentIoTests.buildHostPayloadBasic", Sync(sync SubagentIoTests.buildHostPayloadBasic)
       "SubagentIoTests.signalAbortedNullIsFalse", Sync(sync SubagentIoTests.signalAbortedNullIsFalse) ]
 
 let entries3 () : (string * TestBody) list =

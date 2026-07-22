@@ -55,10 +55,17 @@ let muxSubmitReviewPromptFormatSpec () =
             check "submit_review prompt has agent_role" (promptText.Contains "agent_role =")
             check "submit_review prompt drops call_id field" (not (promptText.Contains "call_id"))
             check "submit_review prompt does not ask for tool-level callId" (not (promptText.Contains "callId"))
-            check "submit_review prompt reuses review criteria" (promptText.Contains "Evaluation Criteria")
+            check
+                "submit_review prompt reuses review criteria"
+                (promptText.Contains "LANGUAGE_FIT" || promptText.Contains "COMPLETENESS" || promptText.Contains "criterion")
             check "submit_review prompt uses agent_report protocol" (promptText.Contains "agent_report" || promptText.Contains "return_reviewer")
             check "submit_review prompt drops legacy divider" (not (promptText.Contains "==="))
-            check "submit_review accepts two-round PERFECT verdict" (result.Contains "accepted" || result.Contains "verdict")
+            check
+                "submit_review two-round pass requires follow-through"
+                (result.Contains "recommendation"
+                 || result.Contains "follow_through"
+                 || result.Contains "follow_through"
+                 || (result.Contains "review_mode" && result.Contains "ended"))
 
         do! rmAsync workspaceDir
     }
@@ -109,7 +116,7 @@ let muxAgentReportWrapperFormatsVerdictSpec () =
 
             let! passResult =
                 (get wrapped "execute")
-                $ (createObj [ "verdict", box "PERFECT"; "feedback", box "" ], createObj [])
+                $ (createObj [ "verdict", box "PERFECT"; "feedback", box "looks solid" ], createObj [])
                 |> unbox<JS.Promise<obj>>
 
             check "agent_report wrapper PERFECT returns success" (truthy (get passResult "success"))
@@ -117,12 +124,22 @@ let muxAgentReportWrapperFormatsVerdictSpec () =
 
             check
                 "agent_report wrapper PERFECT attaches PERFECT markdown"
-                (not (isNullish passReport) && (str passReport "reportMarkdown" = "PERFECT"))
+                (not (isNullish passReport)
+                 && (str passReport "reportMarkdown" = "PERFECT: looks solid"))
 
             check
                 "agent_report wrapper forwards PERFECT markdown upstream"
                 (capturedUpstream.Count = 1
-                 && (str capturedUpstream.[0] "reportMarkdown" = "PERFECT"))
+                 && (str capturedUpstream.[0] "reportMarkdown" = "PERFECT: looks solid"))
+
+            let! emptyPerfectResult =
+                (get wrapped "execute")
+                $ (createObj [ "verdict", box "PERFECT"; "feedback", box "" ], createObj [])
+                |> unbox<JS.Promise<obj>>
+
+            check
+                "agent_report wrapper PERFECT empty feedback fails"
+                (not (truthy (get emptyPerfectResult "success")))
 
             let! reviseResult =
                 (get wrapped "execute")
@@ -139,6 +156,19 @@ let muxAgentReportWrapperFormatsVerdictSpec () =
             check
                 "agent_report wrapper REVISE markdown starts with REVISE"
                 ((str (capturedUpstream.[1]) "reportMarkdown").StartsWith "REVISE")
+
+            let! emptyReviseResult =
+                (get wrapped "execute")
+                $ (createObj [ "verdict", box "REVISE"; "feedback", box "" ], createObj [])
+                |> unbox<JS.Promise<obj>>
+
+            check
+                "agent_report wrapper REVISE empty feedback fails"
+                (not (truthy (get emptyReviseResult "success")))
+
+            check
+                "agent_report wrapper REVISE empty feedback error mentions feedback"
+                ((str emptyReviseResult "error").Contains "feedback")
 
         do! rmAsync workspaceDir
     }

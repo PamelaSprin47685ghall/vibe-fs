@@ -14,7 +14,7 @@ let private nonEmptyList (xs: string list) : string list =
 
 let private executorFields (e: ExecutorOutput) : (string * TomlValue) list =
     [ yield "stdout", String e.stdout
-      yield "status", String e.status
+      yield "exit_status", String e.exitStatus
       yield "truncated", Boolean e.truncated
       match e.stderr with
       | Some s when s <> "" -> yield "stderr", String s
@@ -159,12 +159,12 @@ let fetchResultDocument (fetch: FetchResult) : TomlValue =
     | Some c -> fields <- fields @ [ "content", String c ]
     | None -> ()
 
-    if List.isEmpty fields then
-        Table [ "title", String "" ]
-    else
-        Table fields
+    Table fields
 
-let renderFetchResult (fetch: FetchResult) : string = fetchResultDocument fetch |> stringify
+let renderFetchResult (fetch: FetchResult) : string =
+    match fetchResultDocument fetch with
+    | Table [] -> ""
+    | doc -> stringify doc
 
 type CapsItem = { label: string; content: string }
 

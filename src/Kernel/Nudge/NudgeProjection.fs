@@ -73,10 +73,7 @@ let foldDedupStream (sessionId: string) (events: WanEvent list) : NudgeDedupStat
     |> List.filter (fun e -> e.Session = sessionId)
     |> List.fold dedupFolder emptyDedupState
 
-let nudgeAnchorKey (turnId: string) (assistantMessage: string) : string =
-    let body = assistantMessage.Trim()
-    let tid = turnId.Trim()
-    if tid = "" then body else tid + "\u001e" + body
+let nudgeAnchorKey = Wanxiangshu.Kernel.Nudge.nudgeAnchorKey
 
 let isBlocked (st: NudgeDedupState) (anchorKey: string) : bool =
     let trimmed = anchorKey.Trim()

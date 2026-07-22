@@ -14,7 +14,7 @@ let makeFakeClient (store: Wanxiangshu.Runtime.ReviewRuntime.ReviewStore) (child
     let session =
         createObj
             [ "create", box (fun (_: obj) -> Promise.lift (box {| data = box {| id = childID |} |}))
-              "prompt", box (fun (_: obj) -> Promise.lift (store.resolvePendingReview (childID, Accepted "looks good") |> ignore))
+              "prompt", box (fun (_: obj) -> Promise.lift (store.resolvePendingReview (childID, Accepted [ "looks good" ]) |> ignore))
               "abort", box (fun (_: obj) -> Promise.lift ()) ]
 
     createObj [ "session", box session ]
@@ -48,7 +48,7 @@ let runReviewerLoop_resolvesVerdict () =
         let client = makeFakeClient store "child-1"
         let! _ = createReviewerChild registry client store "/tmp" (Some "parent-1") "parent-1" "Reviewer"
         let! result = runReviewerLoop registry client store "/tmp" "child-1" [ "reviewerPrompt test" ] null
-        equal "resolved verdict" (Accepted "looks good") result
+        equal "resolved verdict" (Accepted [ "looks good" ]) result
     }
 
 let runReviewerLoop_rebindsPendingEachRound () =
@@ -67,7 +67,7 @@ let runReviewerLoop_rebindsPendingEachRound () =
                       if promptCount = 1 then
                           Promise.lift ()
                       else
-                          secondRoundHadPending <- store.resolvePendingReview ("child-1", Accepted "nudge-round")
+                          secondRoundHadPending <- store.resolvePendingReview ("child-1", Accepted [ "nudge-round" ])
                           Promise.lift ())
                   "abort", box (fun (_: obj) -> Promise.lift ()) ]
 
@@ -75,7 +75,7 @@ let runReviewerLoop_rebindsPendingEachRound () =
         let! result = runReviewerLoop registry client store "/tmp" "child-1" [ "p1" ] null
         check "nudge round ran" (promptCount >= 2)
         check "second prompt could resolve pending" secondRoundHadPending
-        equal "verdict from nudge round" (Accepted "nudge-round") result
+        equal "verdict from nudge round" (Accepted [ "nudge-round" ]) result
     }
 
 let runReviewerLoop_promptFailedReturnsTerminated () =
@@ -117,10 +117,10 @@ let runReviewerLoop_verdictAbortsPromptWithoutWaiting () =
         let loopTask = runReviewerLoop registry client store "/tmp" "child-1" [ "reviewerPrompt test" ] null
 
         let! () = yieldMicrotask ()
-        store.resolvePendingReview ("child-1", Accepted "abort verdict") |> ignore
+        store.resolvePendingReview ("child-1", Accepted [ "abort verdict" ]) |> ignore
         let! result = loopTask
 
-        equal "abort returns accepted verdict" (Accepted "abort verdict") result
+        equal "abort returns accepted verdict" (Accepted [ "abort verdict" ]) result
         check "prompt never resolved on its own" (not promptResolved)
     }
 

@@ -7,21 +7,21 @@ open Wanxiangshu.Runtime.PromptFragments
 let withReviewCommandTemplate: string =
     let docView =
         { objective = "$ARGUMENTS"
-          background = Some "You are entering With-Review Mode. Complete the task recorded in objective."
+          background = None
           agentRole = AgentRole.CodeReview
-          targets = []
+          targets = [ PromptTarget.EvidenceTarget("review_mode", "activating") ]
           boundaries = []
           rules =
-            [ PromptRule.Policy
-                  "CRITICAL: You must fully satisfy every requirement in the task — no shortcuts, no partial implementations, no deferred work. If the task has multiple items, every single one must be addressed. Do not skip, trim, or reduce scope under any circumstance. The reviewer will verify completeness against the original task text."
-              PromptRule.Criterion reviewCriteria
-              PromptRule.Policy
-                  "Defend proactively against reviewer rejection: keep the implementation natural, minimal, complete, and well-tested."
-              PromptRule.Contract "Do not end the conversation without submit_review." ]
+            reviewCriteriaRules
+            @ [ PromptRule.Policy "NO_SHORTCUTS: fully satisfy every task requirement; no partial or deferred work."
+                PromptRule.Policy "Defend proactively: natural, minimal, complete, well-tested implementation."
+                PromptRule.Contract "Do not end the conversation without submit_review." ]
           outcomes =
             [ { label = "submit_review"
                 text =
-                  "Before finishing, call submit_review with report, affectedFiles, and wip (defaults to true until everything required is done)." } ] }
+                  "Before finishing, call submit_review with report, affectedFiles, and wip (true until everything required is done)." }
+              { label = "activate"
+                text = "With-Review Mode active for the objective task." } ] }
 
     match PromptDocument.create docView with
     | Ok doc -> PromptToml.render doc

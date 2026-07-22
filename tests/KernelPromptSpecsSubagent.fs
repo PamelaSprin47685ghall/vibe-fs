@@ -1,93 +1,155 @@
 module Wanxiangshu.Tests.KernelPromptSpecsSubagent
 
+open Fable.Core
+open Fable.Core.JsInterop
 open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Kernel.HostTools
 open Wanxiangshu.Kernel.SubagentIntents
 open Wanxiangshu.Runtime.Subagent
 open Wanxiangshu.Runtime.SubagentPrompts
+open Wanxiangshu.Runtime.SubagentSummarizerPrompts
 
-let subagentDispatch () =
-    let host = opencode
-    let muxHost = mimocode
+[<Import("parse", "smol-toml")>]
+let private parseToml (text: string) : obj = jsNative
 
-    let coderIntent: CoderIntent =
-        { objective = "fix bug"
-          background = "user reported failure"
-          targets =
-            [ { file = "a.ts"
-                guide = "fix root cause"
-                draft = None } ]
-          doNotTouch = [||] }
+let private strField (o: obj) (k: string) : string =
+    let v = o?(k)
+    if isNull v then "" else string v
 
-    let opencodeCoderPrompts = formatPrompt host (Coder [ coderIntent ])
-    check "opencode coder prompt count" (opencodeCoderPrompts |> List.length = 1)
-    let opencodeBody = opencodeCoderPrompts |> List.head
-    check "opencode coder mentions objective" (opencodeBody.Contains "fix bug")
-    check "opencode coder has no agent_report tail" (not (opencodeBody.Contains "agent_report"))
+let private hasRuleKind (doc: obj) (kind: string) : bool =
+    let rules = doc?rules
 
-    let muxCoderPrompts = formatPrompt muxHost (Coder [ coderIntent ])
-    let muxBody = muxCoderPrompts |> List.head
-    check "mux coder mentions objective" (muxBody.Contains "fix bug")
-    check "mux coder ends in agent_report tail" (muxBody.Contains "agent_report")
+    if isNull rules then
+        false
+    else
+        unbox<obj array> rules |> Array.exists (fun r -> strField r "kind" = kind)
 
+let private hasTargetKind (doc: obj) (kind: string) : bool =
+    let targets = doc?targets
+
+    if isNull targets then
+        false
+    else
+        unbox<obj array> targets |> Array.exists (fun t -> strField t "kind" = kind)
+
+let private sampleCoderIntent: CoderIntent =
+    { objective = "fix bug"
+      background = "user reported failure"
+      targets =
+        [ { file = "a.ts"
+            guide = "fix root cause"
+            draft = None } ]
+      doNotTouch = [||] }
+
+let private assertCoderPrompts () =
+    let opencodePrompt = formatPrompt opencode (Coder [ sampleCoderIntent ]) |> List.head
+    let opencodeDoc = parseToml opencodePrompt
+    equal "opencode coder objective field" "fix bug" (strField opencodeDoc "objective")
+    check "opencode coder has file target" (hasTargetKind opencodeDoc "file")
+    check "opencode coder has no agent_report contract" (not (opencodePrompt.Contains "agent_report"))
+
+    let muxPrompt = formatPrompt mimocode (Coder [ sampleCoderIntent ]) |> List.head
+    let muxDoc = parseToml muxPrompt
+    equal "mux coder objective field" "fix bug" (strField muxDoc "objective")
+    check "mux coder ends in agent_report contract" (muxPrompt.Contains "agent_report")
+
+let private assertInspectorAndBrowserPrompts () =
     let inspectorIntent: InspectorIntent =
         { objective = "find auth"
           background = "need entry points"
           questions = [| "Where is auth configured?" |]
           entries = [||] }
 
-    let invPrompts = formatPrompt host (Inspector [ inspectorIntent ])
-    check "inspector prompt count" (invPrompts |> List.length = 1)
-    check "inspector prompt mentions objective" ((invPrompts |> List.head).Contains "find auth")
+    let invPrompt = formatPrompt opencode (Inspector [ inspectorIntent ]) |> List.head
+    let invDoc = parseToml invPrompt
+    equal "inspector objective field" "find auth" (strField invDoc "objective")
+    check "inspector has question rule" (hasRuleKind invDoc "question")
 
-    let browserPrompts = formatPrompt host (Browser "open google.com")
-    check "browser prompt count is one" (browserPrompts |> List.length = 1)
-    check "browser prompt embeds intent" ((browserPrompts |> List.head).Contains "open google.com")
+    let browserPromptText = formatPrompt opencode (Browser "open google.com") |> List.head
+    let browserDoc = parseToml browserPromptText
+    equal "browser objective field" "open google.com" (strField browserDoc "objective")
 
-    let execPrompts =
-        formatPrompt host (ExecutorSummary("raw shell output", "shell", "echo 1", [ "dep1" ], "short", ""))
+let private assertExecutorPrompts () =
+    let evidence: Wanxiangshu.Kernel.Prompt.ExecutorOutputEvidence =
+        { stdout = "raw shell output"
+          stderr = Some "boom"
+          exitStatus = "exit_error"
+          exitCode = Some 2
+          signal = None
+          truncated = false }
 
-    check "executor summary prompt count is one" (execPrompts |> List.length = 1)
-    let execPrompt = execPrompts |> List.head
-    check "executor summary embeds language" (execPrompt.Contains "shell")
-    check "executor summary embeds program" (execPrompt.Contains "program" && execPrompt.Contains "echo 1")
-    check "executor summary embeds dependencies" (execPrompt.Contains "dep1")
-    check "executor summary embeds timeout_type" (execPrompt.Contains "short")
-    check "executor summary embeds raw output in body" (execPrompt.Contains "raw shell output")
+    let execPrompt =
+        formatPrompt
+            opencode
+            (ExecutorSummary(evidence, "shell", "echo 1", [ "dep1" ], Wanxiangshu.Kernel.Prompt.TimeoutKind.Short, ""))
+        |> List.head
 
-    let execPromptsWithFocus =
-        formatPrompt host (ExecutorSummary("out", "shell", "echo 1", [], "short", "only exit codes"))
+    let execDoc = parseToml execPrompt
+    check "executor summary has command target" (hasTargetKind execDoc "command")
+    check "executor summary has executor_output target" (hasTargetKind execDoc "executor_output")
+    check "executor summary embeds program value" (execPrompt.Contains "echo 1")
+    check "executor summary embeds dependency" (execPrompt.Contains "dep1")
+    check "executor summary embeds short timeout" (execPrompt.Contains "short")
+    check "executor summary embeds raw output evidence" (execPrompt.Contains "raw shell output")
+    check "executor summary real exit_status" (execPrompt.Contains "exit_error")
+    check "executor summary real exit_code" (execPrompt.Contains "2")
+    check "executor summary stderr" (execPrompt.Contains "boom")
+    check "executor summary no evidence bag" (not (hasTargetKind execDoc "evidence"))
 
-    check "executor summary embeds whatToSummarize" ((execPromptsWithFocus |> List.head).Contains "only exit codes")
+    let focusEvidence =
+        { evidence with
+            stdout = "out"
+            exitStatus = "completed"
+            exitCode = Some 0
+            stderr = None }
 
-    let webPrompts =
-        formatPrompt host (WebsearchSummary("ts compiler", "raw search results blob"))
+    let focusDoc =
+        formatPrompt
+            opencode
+            (ExecutorSummary(focusEvidence, "shell", "echo 1", [], Wanxiangshu.Kernel.Prompt.TimeoutKind.Short, "only exit codes"))
+        |> List.head
+        |> parseToml
 
-    check "websearch prompt count is one" (webPrompts |> List.length = 1)
-    let webBody = webPrompts |> List.head
-    check "websearch prompt embeds question" (webBody.Contains "ts compiler")
-    check "websearch prompt embeds raw blob" (webBody.Contains "raw search results blob")
+    equal "executor summary objective is whatToSummarize" "only exit codes" (strField focusDoc "objective")
+
+let private assertWebsearchPrompts () =
+    let webResults: Wanxiangshu.Kernel.Prompt.WebSearchResultItem list =
+        [ { title = "TS handbook"
+            url = "https://www.typescriptlang.org/docs"
+            content = "raw search results blob" } ]
+
+    let webPrompt = formatPrompt opencode (WebsearchSummary("ts compiler", webResults)) |> List.head
+    let webDoc = parseToml webPrompt
+    equal "websearch objective field" "ts compiler" (strField webDoc "objective")
+    check "websearch has websearch_results target" (hasTargetKind webDoc "websearch_results")
+    check "websearch embeds raw blob evidence" (webPrompt.Contains "raw search results blob")
+    check "websearch embeds real url" (webPrompt.Contains "https://www.typescriptlang.org/docs")
+    check "websearch no evidence bag" (not (hasTargetKind webDoc "evidence"))
+    check "websearch no raw_results bag title" (not (webPrompt.Contains "raw_results"))
+
+let subagentDispatch () =
+    assertCoderPrompts ()
+    assertInspectorAndBrowserPrompts ()
+    assertExecutorPrompts ()
+    assertWebsearchPrompts ()
 
 let subagentJoinReports () =
     let joined = joinReports [ "first  "; "  second" ]
-    check "joinReports separator" (joined.Contains "\n---\n")
-    check "joinReports trims left" (joined.StartsWith "first")
-    check "joinReports trims right" (joined.EndsWith "second")
+    let doc = parseToml joined
+    check "joinReports parses as table" (not (isNull doc))
+    check "joinReports uses reports table" (joined.Contains "reports" || joined.Contains "[[reports]]")
+    check "joinReports embeds first summary" (joined.Contains "first")
+    check "joinReports embeds second summary" (joined.Contains "second")
+    check "joinReports no markdown divider" (not (joined.Contains "\n---\n"))
 
 let mimocodeFormatPromptAppendsAgentReportTail () =
-    let browserPrompts = formatPrompt Mimocode (Browser "open google.com")
-    let mimocodeBody = browserPrompts |> List.head
+    let mimocodePrompt = formatPrompt Mimocode (Browser "open google.com") |> List.head
+    let mimocodeDoc = parseToml mimocodePrompt
+    equal "mimocode browser objective" "open google.com" (strField mimocodeDoc "objective")
+    check "mimocode browser has agent_report contract" (mimocodePrompt.Contains "agent_report")
 
-    check
-        "mimocode browser prompt contains MUST call the agent_report"
-        (mimocodeBody.Contains "MUST call the agent_report")
-
-    let opencodePrompts = formatPrompt Opencode (Browser "open google.com")
-    let opencodeBody = opencodePrompts |> List.head
-
-    check
-        "opencode browser prompt does not append agent_report tail"
-        (not (opencodeBody.Contains "MUST call the agent_report"))
+    let opencodePrompt = formatPrompt Opencode (Browser "open google.com") |> List.head
+    check "opencode browser has no agent_report contract" (not (opencodePrompt.Contains "agent_report"))
 
 let meditatorMentionsReadCapability () =
     let dummyEntry: Wanxiangshu.Kernel.Methodology.Schema.MethodologyEntry =
@@ -98,12 +160,11 @@ let meditatorMentionsReadCapability () =
           meditatorRole = "test role"
           outputSections = [] }
 
-    let body =
-        renderMeditatorIntent
-            dummyEntry
-            "what is the core abstraction?"
-            "my background"
-            "note detail"
+    let prompt =
+        renderMeditatorIntent dummyEntry "what is the core abstraction?" "my background" "note detail"
 
-    check "meditator prompt mentions read tool" (body.Contains "Do NOT call tools")
-    check "meditator prompt still embeds question" (body.Contains "what is the core abstraction?")
+    let doc = parseToml prompt
+    equal "meditator objective" "what is the core abstraction?" (strField doc "objective")
+    check "meditator prompt is no-tools" (prompt.Contains "NO_TOOLS")
+    check "meditator methodology structured id" (prompt.Contains "methodology_id" || prompt.Contains "test_methodology")
+    check "meditator no METHODOLOGY_ID prose" (not (prompt.Contains "METHODOLOGY_ID:"))

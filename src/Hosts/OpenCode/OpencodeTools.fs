@@ -36,11 +36,17 @@ let private executeMethodology
                 match tryFindEntry parsed.methodology with
                 | None -> return "Error: unknown methodology: " + parsed.methodology
                 | Some entry ->
-                    let intent = Wanxiangshu.Runtime.SubagentPrompts.renderMeditatorIntent entry parsed.intent parsed.background parsed.note
                     let tc = extractToolContext context (str ctx "directory")
                     let directory = str tc "directory"
                     let sessionID = str tc "sessionID"
-                    let prompt = formatPrompt host (Meditator intent) |> List.head
+
+                    let prompt =
+                        Wanxiangshu.Runtime.SubagentSummarizerPrompts.renderMeditatorIntentWithHost
+                            entry
+                            parsed.intent
+                            parsed.background
+                            parsed.note
+                            (Some host)
 
                     let! subResult =
                         runSubagent

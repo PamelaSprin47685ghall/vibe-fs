@@ -109,8 +109,7 @@ let private parseExecutorResponse
         if not (shouldSummarize byteLength options.maxBytes output) then
             return textResult output
         else
-            let! text = summarizeOutput childSession output lang options.command options.dependencies what
-
+            let! text = summarizeOutput childSession result lang options.command options.dependencies what
             return text
     }
 

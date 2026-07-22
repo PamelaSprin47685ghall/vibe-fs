@@ -3,12 +3,6 @@ module Wanxiangshu.Tests.LoopMessagesTests
 open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Runtime.LoopMessages
 
-// ── Helpers ──────────────────────────────────────────────────────────────────
-
-let private taskText t = $"---\ntask: {t}\n---"
-let private verdictText v = $"---\nverdict: {v}\n---"
-let private doubleCheckText = "---\ndouble-check: review-passed\n---"
-
 // ── isEndVerdict ─────────────────────────────────────────────────────────────
 
 let isEndVerdictAcceptsAccepted () =
@@ -29,22 +23,20 @@ let buildLoopMessageContainsTaskField () =
     let msg = buildLoopMessage "fix login bug" [ "step 1"; "step 2" ]
     check "buildLoopMessage contains task field" (msg.Contains "fix login bug")
 
-let buildLoopMessageContainsBody () =
+let buildLoopMessageContainsContext () =
     let msg = buildLoopMessage "do work" [ "step 1"; "step 2" ]
-    check "buildLoopMessage contains body line" (msg.Contains "step 1")
-    check "buildLoopMessage contains second body line" (msg.Contains "step 2")
+    check "buildLoopMessage contains context line" (msg.Contains "step 1")
+    check "buildLoopMessage contains second context line" (msg.Contains "step 2")
 
 // ── buildLoopCommandTemplate ──────────────────────────────────────────────────
 
 let buildLoopCommandTemplateContainsCommand () =
-    let tpl = buildLoopCommandTemplate "with-review" [ "body line" ]
+    let tpl = buildLoopCommandTemplate "with-review" [ "rule line" ]
     check "buildLoopCommandTemplate contains command field" (tpl.Contains "with-review")
 
-let buildLoopCommandTemplateContainsBody () =
-    let tpl = buildLoopCommandTemplate "loop" [ "body line" ]
-    check "buildLoopCommandTemplate contains body line" (tpl.Contains "body line")
-
-// ── hasDoubleCheckAnchor ──────────────────────────────────────────────────────
+let buildLoopCommandTemplateContainsRules () =
+    let tpl = buildLoopCommandTemplate "loop" [ "rule line" ]
+    check "buildLoopCommandTemplate contains rule line" (tpl.Contains "rule line")
 
 let run () =
     isEndVerdictAcceptsAccepted ()
@@ -52,6 +44,6 @@ let run () =
     isEndVerdictNeedsRevisionNotEnd ()
     isEndVerdictRejectsTerminated ()
     buildLoopMessageContainsTaskField ()
-    buildLoopMessageContainsBody ()
+    buildLoopMessageContainsContext ()
     buildLoopCommandTemplateContainsCommand ()
-    buildLoopCommandTemplateContainsBody ()
+    buildLoopCommandTemplateContainsRules ()

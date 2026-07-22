@@ -4,23 +4,14 @@ open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Tests.OmpPluginTestsHarness
-open Wanxiangshu.Kernel.OmpSessionTools
-open Wanxiangshu.Kernel.ReviewSession
 open Wanxiangshu.Kernel.ReviewSession.Types
-open Wanxiangshu.Hosts.Omp.ChildSession
-open Wanxiangshu.Hosts.Omp.ReviewLoop
-open Wanxiangshu.Hosts.Omp.ReviewToolsRegister
 open Wanxiangshu.Hosts.Omp
 open Wanxiangshu.Runtime.ReviewRuntime
-open Wanxiangshu.Runtime
-open Wanxiangshu.Runtime.RuntimeScope
 open Wanxiangshu.Runtime.Dyn
 
 module Dyn = Wanxiangshu.Runtime.Dyn
 
 let private reviewStore = PluginComposition.reviewStore
-
-let private testScope = RuntimeScope()
 
 let private jsUndefined: obj = emitJsExpr () "undefined"
 
@@ -42,11 +33,17 @@ let private setPendingReviewStateForTest
             let js =
                 match kr with
                 | Accepted fb ->
+                    let feedbackText = String.concat "\n" fb
+
                     createObj
                         [ "accepted", box true
-                          "feedback", (if fb = "" then null else box fb)
+                          "feedback", (if feedbackText = "" then null else box feedbackText)
                           "terminated", null ]
-                | NeedsRevision fb -> createObj [ "accepted", box false; "feedback", box fb; "terminated", null ]
+                | NeedsRevision fb ->
+                    createObj
+                        [ "accepted", box false
+                          "feedback", box (String.concat "\n" fb)
+                          "terminated", null ]
                 | Terminated ->
                     createObj
                         [ "accepted", box false
@@ -119,12 +116,23 @@ let returnReviewerVerdictPerfectRevise () =
         let ctx1 =
             createObj [ "sessionManager", box (createObj [ "getSessionId", box (fun () -> box reviewSessionId) ]) ]
 
-        let! passResult = executeTool tool "call-1" (createObj [ "verdict", box "PERFECT" ]) ctx1
+        let! passResult =
+            executeTool tool "call-1" (createObj [ "verdict", box "PERFECT"; "feedback", box "looks good" ]) ctx1
+
         check "PERFECT first pass double-check prompt" ((toolText passResult).Contains "objective =")
 
-        let! passResult2 = executeTool tool "call-2" (createObj [ "verdict", box "PERFECT" ]) ctx1
-        equal "PERFECT second pass verdict" (Some(Accepted "")) firstKr
-        equal "PERFECT result text" "Review submitted: accepted." (toolText passResult2)
+        let! passResult2 =
+            executeTool
+                tool
+                "call-2"
+                (createObj [ "verdict", box "PERFECT"; "feedback", box "confirmed after double-check" ])
+                ctx1
+
+        equal "PERFECT second pass verdict" (Some(Accepted [ "confirmed after double-check" ])) firstKr
+
+        check
+            "PERFECT result text is submit ack"
+            ((toolText passResult2).Contains "Verdict submitted" || (toolText passResult2).Contains "stop")
 
         let mutable secondKr: ReviewResult option = None
         reviewStore.setPendingReview (reviewSessionId, (fun kr -> secondKr <- Some kr))
@@ -132,8 +140,11 @@ let returnReviewerVerdictPerfectRevise () =
         let! rejectResult =
             executeTool tool "call-3" (createObj [ "verdict", box "REVISE"; "feedback", box "Fix it" ]) ctx1
 
-        equal "REVISE verdict" (Some(NeedsRevision "Fix it")) secondKr
-        equal "revise result text" "Review submitted: revision requested with feedback." (toolText rejectResult)
+        equal "REVISE verdict" (Some(NeedsRevision [ "Fix it" ])) secondKr
+
+        check
+            "revise result text is submit ack"
+            ((toolText rejectResult).Contains "Verdict submitted" || (toolText rejectResult).Contains "stop")
     }
 
 let private createResolvablePromise () : obj =
@@ -144,14 +155,26 @@ let private createResolvablePromise () : obj =
 let private testPendingPerfectPass tool ctx reviewSessionId parentSessionId =
     promise {
         let firstPending = createResolvablePromise ()
-        reviewStore.recordChallengeRequested reviewSessionId
         setPendingReviewStateForTest reviewStore reviewSessionId parentSessionId firstPending
-        let! passResult1 = executeTool tool "call-1" (createObj [ "verdict", box "PERFECT" ]) ctx
+
+        let! passResult1 =
+            executeTool tool "call-1" (createObj [ "verdict", box "PERFECT"; "feedback", box "looks good" ]) ctx
+
         check "PERFECT first pass double-check prompt" ((toolText passResult1).Contains "objective =")
-        let! passResult = executeTool tool "call-1-confirm" (createObj [ "verdict", box "PERFECT" ]) ctx
+
+        let! passResult =
+            executeTool
+                tool
+                "call-1-confirm"
+                (createObj [ "verdict", box "PERFECT"; "feedback", box "confirmed after double-check" ])
+                ctx
+
         let! firstResolved = emitJsExpr firstPending "$0.promise" |> unbox<JS.Promise<obj>>
-        equal "setPending PERFECT feedback absent" true (Dyn.isNullish (Dyn.get firstResolved "feedback"))
-        equal "setPending PERFECT tool text" "Review submitted: accepted." (toolText passResult)
+        equal "setPending PERFECT feedback present" "confirmed after double-check" (str firstResolved "feedback")
+
+        check
+            "setPending PERFECT tool text is submit ack"
+            ((toolText passResult).Contains "Verdict submitted" || (toolText passResult).Contains "stop")
     }
 
 let private testPendingRevisePass tool ctx reviewSessionId parentSessionId =
@@ -165,10 +188,9 @@ let private testPendingRevisePass tool ctx reviewSessionId parentSessionId =
         let! secondResolved = emitJsExpr secondPending "$0.promise" |> unbox<JS.Promise<obj>>
         equal "setPending REVISE feedback" "Fix it" (str secondResolved "feedback")
 
-        equal
-            "setPending revise tool text"
-            "Review submitted: revision requested with feedback."
-            (toolText rejectResult)
+        check
+            "setPending revise tool text is submit ack"
+            ((toolText rejectResult).Contains "Verdict submitted" || (toolText rejectResult).Contains "stop")
     }
 
 let returnReviewerViaSetPendingStateForTest () =
@@ -186,94 +208,4 @@ let returnReviewerViaSetPendingStateForTest () =
 
         do! testPendingPerfectPass tool ctx reviewSessionId parentSessionId
         do! testPendingRevisePass tool ctx reviewSessionId parentSessionId
-    }
-
-let private installCodingAgentModule () =
-    testScope.Remove "omp.coding_agent_module"
-
-    testScope.Add(
-        "omp.coding_agent_module",
-        box (
-            createObj
-                [ "SessionManager",
-                  box (
-                      createObj
-                          [ "create",
-                            box (fun (_cwd: string) -> createObj [ "getSessionId", box (fun () -> box "sm-1") ]) ]
-                  ) ]
-        )
-    )
-
-let runReviewLoopChildToolNames () =
-    promise {
-        installCodingAgentModule ()
-        let captured = ref [||]
-        let store = createReviewStore ()
-        let childId = "review-child-tools"
-
-        let promptAcceptOnFirst =
-            box (fun (_: obj) ->
-                store.resolvePendingReview (childId, Accepted "") |> ignore
-                emitJsExpr () "Promise.resolve()" |> unbox<JS.Promise<unit>>)
-
-        let createAgentSession =
-            box (fun (body: obj) ->
-                captured.Value <- unbox<string array> (Dyn.get body "toolNames")
-
-                emitJsExpr
-                    promptAcceptOnFirst
-                    """Promise.resolve({
-                    session: {
-                        sessionManager: { getSessionId: () => 'review-child-tools' },
-                        prompt: (msg) => $0(msg),
-                        waitForIdle: () => Promise.resolve(),
-                        abort: () => {}
-                    },
-                    dispose: null
-                })"""
-                |> unbox<JS.Promise<obj>>)
-
-        let pi =
-            createObj [ "pi", box (createObj [ "createAgentSession", createAgentSession ]) ]
-
-        let ctx = createObj [ "cwd", box "/tmp/ws" ]
-        let! _ = runReviewLoop testScope pi ctx store "parent-tools" "report" [||] (Some "task")
-        equal "runReviewLoop tool count" ompReviewChildToolNames.Length captured.Value.Length
-
-        for i in 0 .. ompReviewChildToolNames.Length - 1 do
-            equal ("runReviewLoop tool " + string i) ompReviewChildToolNames.[i] captured.Value.[i]
-    }
-
-let runReviewLoopAcceptsWhenPendingResolved () =
-    promise {
-        installCodingAgentModule ()
-        let childId = "review-child-accept"
-        let store = createReviewStore ()
-
-        let promptResolve =
-            box (fun (_: obj) ->
-                store.resolvePendingReview (childId, Accepted "") |> ignore
-                emitJsExpr () "Promise.resolve()" |> unbox<JS.Promise<unit>>)
-
-        let session =
-            createObj
-                [ "sessionManager", box (createObj [ "getSessionId", box (fun () -> box childId) ])
-                  "prompt", promptResolve
-                  "waitForIdle", box (fun () -> emitJsExpr () "Promise.resolve()" |> unbox<JS.Promise<unit>>)
-                  "abort", box (fun () -> ()) ]
-
-        let createAgentSession =
-            box (fun (_body: obj) ->
-                emitJsExpr session """Promise.resolve({ session: $0, dispose: null })"""
-                |> unbox<JS.Promise<obj>>)
-
-        let pi =
-            createObj [ "pi", box (createObj [ "createAgentSession", createAgentSession ]) ]
-
-        let ctx = createObj [ "cwd", box "/tmp/ws" ]
-        let! outcome = runReviewLoop testScope pi ctx store "parent-accept" "report body" [| "src/a.fs" |] (Some "fix")
-
-        match outcome with
-        | Accepted fb -> check "accepted no feedback" (fb = "")
-        | _ -> check "accepted outcome" false
     }

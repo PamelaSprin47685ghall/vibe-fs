@@ -111,7 +111,7 @@ let private buildNudgeSnapshot
                 RunnerPresence.Absent
 
         let anchor =
-            Wanxiangshu.Kernel.Nudge.NudgeProjection.nudgeAnchorKey snap.turnId snap.lastAssistantText
+            Wanxiangshu.Kernel.Nudge.NudgeProjection.nudgeAnchorKey snap.turnId snap.agentFromMessage snap.modelFromMessage
 
         let blockStatus =
             if

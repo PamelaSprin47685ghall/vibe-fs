@@ -54,7 +54,7 @@ let private getTurnId (info: obj) (idx: int) : string =
 
 /// Convert a NudgeSnapshotState fold result into a SessionSnapshot for the nudge decision engine.
 let private buildSnapshotResult (snap: NudgeSnapshotState) : SessionSnapshot =
-    let anchor = nudgeAnchorKey snap.turnId snap.lastAssistantText
+    let anchor = nudgeAnchorKey snap.turnId snap.agentFromMessage snap.modelFromMessage
 
     let blockStatus =
         if

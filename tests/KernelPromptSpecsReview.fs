@@ -8,6 +8,7 @@ open Wanxiangshu.Kernel.ReviewSession
 open Wanxiangshu.Kernel.ReviewSession.Types
 open Wanxiangshu.Kernel.ReviewVerdict
 open Wanxiangshu.Runtime.SubagentPrompts
+open Wanxiangshu.Runtime.SubagentSummarizerPrompts
 open Wanxiangshu.Kernel.Primitives.Identity
 open Wanxiangshu.Kernel.Errors.DomainError
 open Wanxiangshu.Kernel.Session.Causality
@@ -45,20 +46,23 @@ let reviewerVerdictPromptsShared () =
     check "reviewer verdict mentions feedback" (verdict.Contains "feedback")
 
 let reviewResultFormattingShared () =
-    let accepted = formatReviewResult (ReviewResult.Accepted "")
+    let accepted = formatReviewResult (ReviewResult.Accepted [ "tighten tests" ])
 
-    check
-        "accepted text mentions passed"
-        (accepted.ToLower().Contains "passed" || accepted.ToLower().Contains "accepted")
+    check "accepted text omits PERFECT" (not (accepted.Contains "PERFECT"))
+    check "accepted text omits Review passed" (not (accepted.Contains "Review passed"))
+    check "accepted has follow_through outcome" (accepted.Contains "follow_through")
+    check "accepted has recommendation outcome" (accepted.Contains "recommendation_")
+    check "accepted embeds reviewer opinion" (accepted.Contains "tighten tests")
+    check "accepted signals review_mode ended" (accepted.Contains "review_mode" && accepted.Contains "ended")
 
-    check "accepted text signals with-review ended" (accepted.ToLower().Contains "with-review")
-
-    let needsRevision = formatReviewResult (ReviewResult.NeedsRevision "missing tests")
-    check "needs_revision text embeds feedback" (needsRevision.Contains "missing tests")
-    check "needs_revision text instructs to continue" (needsRevision.Contains "continue")
+    let needsRevision = formatReviewResult (ReviewResult.NeedsRevision [ "missing tests" ])
+    check "needs_revision has verdict outcome" (needsRevision.Contains "needs_revision")
+    check "needs_revision has feedback outcome" (needsRevision.Contains "feedback_")
+    check "needs_revision embeds feedback text" (needsRevision.Contains "missing tests")
 
     let terminated = formatReviewResult ReviewResult.Terminated
-    check "terminated text mentions terminated" (terminated.ToLower().Contains "terminat")
+    check "terminated has verdict outcome" (terminated.Contains "terminated")
+    check "terminated keeps review_mode active" (terminated.Contains "review_mode" && terminated.Contains "active")
 
 let domainErrorsShared () =
     let err1 = DomainError.ExecutorExecutableMissing "npm"
@@ -117,19 +121,20 @@ let reviewVerdictDecode () =
 let reviewDecisionPolicy () =
     equal
         "revise finalizes as needs_revision with feedback"
-        (Finalize(NeedsRevision "missing tests"))
+        (Finalize(NeedsRevision [ "missing tests" ]))
         (decideReviewSubmission Revise "missing tests" false)
 
+    // Policy layer still accepts empty feedback; boundary codec rejects REVISE+empty.
     equal
-        "revise with empty feedback still finalizes as needs_revision"
-        (Finalize(NeedsRevision ""))
+        "policy revise empty feedback finalizes (codec must reject earlier)"
+        (Finalize(NeedsRevision []))
         (decideReviewSubmission Revise "" true)
 
     equal "perfect before double-check asks for re-evaluation" AskDoubleCheck (decideReviewSubmission Perfect "" false)
 
     equal
         "perfect after double-check finalizes as accepted"
-        (Finalize(Accepted ""))
+        (Finalize(Accepted []))
         (decideReviewSubmission Perfect "" true)
 
 let reviewMarkdownCodec () =
@@ -143,32 +148,40 @@ let reviewMarkdownCodec () =
     check "format revise embeds feedback" ((formatReviewVerdictMarkdown Revise "fix the leak").Contains "fix the leak")
     check "format revise starts with REVISE" ((formatReviewVerdictMarkdown Revise "fix the leak").StartsWith "REVISE")
     check "format revise empty feedback placeholder" ((formatReviewVerdictMarkdown Revise "").StartsWith "REVISE")
-    equal "parse PERFECT markdown -> Accepted" (Accepted "") (parseReviewReportMarkdown "PERFECT")
+    equal "parse PERFECT markdown -> Accepted" (Accepted []) (parseReviewReportMarkdown "PERFECT")
 
     equal
         "parse PERFECT with feedback -> Accepted with feedback"
-        (Accepted "nice work")
+        (Accepted [ "nice work" ])
         (parseReviewReportMarkdown "PERFECT: nice work")
 
     equal
         "parse REVISE markdown -> NeedsRevision feedback"
-        (NeedsRevision "fix the leak")
+        (NeedsRevision [ "fix the leak" ])
         (parseReviewReportMarkdown "REVISE: fix the leak")
 
     equal "parse unrecognized markdown -> Terminated" Terminated (parseReviewReportMarkdown "I think it looks fine")
     equal "parse empty markdown -> Terminated" Terminated (parseReviewReportMarkdown "")
-    equal "round-trip perfect" (Accepted "") (parseReviewReportMarkdown (formatReviewVerdictMarkdown Perfect ""))
+    equal "round-trip perfect" (Accepted []) (parseReviewReportMarkdown (formatReviewVerdictMarkdown Perfect ""))
 
     equal
         "round-trip perfect with feedback"
-        (Accepted "looks good")
+        (Accepted [ "looks good" ])
         (parseReviewReportMarkdown (formatReviewVerdictMarkdown Perfect "looks good"))
 
     equal
         "round-trip revise non-empty"
-        (NeedsRevision "needs work")
+        (NeedsRevision [ "needs work" ])
         (parseReviewReportMarkdown (formatReviewVerdictMarkdown Revise "needs work"))
 
 let executorSummarizerNoExitStatus () =
-    let prompt = executorSummarizerPrompt "" "raw" "shell" "echo 1" [] "short"
+    let evidence: Wanxiangshu.Kernel.Prompt.ExecutorOutputEvidence =
+        { stdout = "raw"
+          stderr = None
+          exitStatus = "completed"
+          exitCode = Some 0
+          signal = None
+          truncated = false }
+
+    let prompt = executorSummarizerPrompt "" evidence "shell" "echo 1" [] Wanxiangshu.Kernel.Prompt.TimeoutKind.Short
     check "summarizer prompt contains objective" (prompt.Contains "Summarize the executor output")

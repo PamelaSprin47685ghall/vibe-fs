@@ -82,7 +82,15 @@ let checkNoLegacyPromptSymbols (srcRoot: string) =
           "CapsYamlItem"
           "hasDoubleCheckAnchor"
           "isNudgePromptText"
-          "isNudgePrompt" ]
+          "isNudgePrompt"
+          "reviewInstructionsProse"
+          "reviewSubmissionVerdictBody"
+          "todoNudgePromptProse"
+          "loopNudgePromptProse"
+          "parallelToolPromptProse"
+          "readOnlyRulesFor"
+          "readOnlyWorkspaceConstraint"
+          "wipAcknowledgmentAnchor" ]
 
     for path in collectFsFiles srcRoot do
         let content = readFileSync path "utf8"
@@ -94,33 +102,71 @@ let checkNoLegacyPromptSymbols (srcRoot: string) =
                 failIf true (sprintf "Forbidden legacy prompt symbol '%s' in %s" sym path)
 
 let checkNoHandwrittenTomlOrStringBuilderInProjections (srcRoot: string) =
-    let serializationDir = "src/Runtime/Serialization"
-    let promptDir = "src/Runtime/Prompt"
-    let toolingDir = "src/Runtime/Tooling"
+    let repoRoot = srcRoot.Replace("/src", "")
+
+    let dirs =
+        [ "src/Runtime/Prompt"
+          "src/Runtime/Tooling"
+          "src/Runtime/ReviewPrompts"
+          "src/Runtime/Subsession"
+          "src/Runtime" ]
 
     let forbiddenPatterns =
         [ Regex(@"\bStringBuilder\b")
           Regex(@"\bescapeToml\w*\b")
-          Regex(@"\bToString\(\)\.ToLowerInvariant\(\)")
+          Regex(@"\.ToLowerInvariant\(\)")
           Regex(@"[""']---\n[""']")
           Regex(@"[""']\n---[""']") ]
 
-    for dir in [ promptDir; toolingDir ] do
-        let fullDir = pathJoin (srcRoot.Replace("/src", "")) dir
+    // Toml projection files + prompt producers that must not normalize wire strings.
+    let pathAllowed (norm: string) =
+        norm.Contains("/Toml")
+        || norm.EndsWith("SubagentPrompts.fs")
+        || norm.EndsWith("Subagent.fs")
+        || norm.Contains("/ReviewPrompts/")
+
+    for dir in dirs do
+        let fullDir = pathJoin repoRoot dir
 
         if existsSync fullDir then
             for path in collectFsFiles fullDir do
                 let norm = path.Replace("\\", "/")
 
-                if norm.Contains("Toml") then
+                if pathAllowed norm then
                     let content = readFileSync path "utf8"
 
                     for pat in forbiddenPatterns do
                         if pat.IsMatch content then
                             failIf true (sprintf "Forbidden projection anti-pattern '%s' in %s" (pat.ToString()) path)
 
+let checkNoMarkdownSectionDividersInPromptProducers (repoRoot: string) =
+    let dirs =
+        [ "src/Runtime/ReviewPrompts"
+          "src/Runtime/Subsession"
+          "src/Runtime/Prompt" ]
+
+    let forbidden =
+        [ Regex(@"===\s*(Affected Files|Original Task|Change Report)\s*===")
+          Regex(@"\\n---\\n")
+          Regex(@"\bwithReportTail\b")
+          Regex(@"reportSeparator") ]
+
+    for dir in dirs do
+        let fullDir = pathJoin repoRoot dir
+
+        if existsSync fullDir then
+            for path in collectFsFiles fullDir do
+                let content = readFileSync path "utf8"
+
+                for pat in forbidden do
+                    if pat.IsMatch content then
+                        failIf
+                            true
+                            (sprintf "Forbidden markdown/prose-join anti-pattern '%s' in %s" (pat.ToString()) path)
+
 let run (srcRoot: string) (phase: int) : ResizeArray<string> =
     violations.Clear()
+    let repoRoot = srcRoot.Replace("/src", "")
 
     checkSmolTomlImports srcRoot
     checkNoSmolTomlParseInProduction srcRoot
@@ -131,5 +177,6 @@ let run (srcRoot: string) (phase: int) : ResizeArray<string> =
         checkNoLegacyPromptSymbols srcRoot
 
     checkNoHandwrittenTomlOrStringBuilderInProjections srcRoot
+    checkNoMarkdownSectionDividersInPromptProducers repoRoot
 
     violations

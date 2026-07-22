@@ -1,47 +1,41 @@
 module Wanxiangshu.Runtime.PromptFragments
 
 open Wanxiangshu.Kernel.HostTools
-open Wanxiangshu.Kernel.Nudge.NudgePromptText
 open Wanxiangshu.Kernel.Prompt
 open Wanxiangshu.Runtime.Prompt
 
-let todoNudgePromptProse =
-    Wanxiangshu.Kernel.Nudge.NudgePromptText.todoNudgePromptProse
+/// Atomic read-only constraints (structured rules only).
+let readOnlyConstraintsFor (host: Host) : PromptRule list =
+    [ PromptRule.Constraint "READ_ONLY: do not write, edit, patch, or create files."
+      PromptRule.Constraint "NO_MUTATING_TOOLS: do not run commands or call mutating tools."
+      PromptRule.Constraint
+          ("NO_TODO_WRITE: do not call " + todoWritePromptName host + " or equivalent task-mutation tools.")
+      PromptRule.Constraint "NO_WORKSPACE_STATE_CHANGE: do not change workspace state; output reports only." ]
 
-let loopNudgePromptProse =
-    Wanxiangshu.Kernel.Nudge.NudgePromptText.loopNudgePromptProse
+let readOnlyConstraints = readOnlyConstraintsFor opencode
 
-let readOnlyRulesFor (host: Host) =
-    "READ-ONLY: You must NOT write, edit, patch, or create files. "
-    + "You must NOT run commands or call "
-    + todoWritePromptName host
-    + " or any mutating tool. "
-    + "You must NOT change workspace state. Output detailed reports only."
+/// Atomic evaluation criteria — one Criterion per concern.
+let reviewCriteriaItems: string list =
+    [ "LANGUAGE_FIT: full use of language features; correct algorithms and data structures."
+      "MINIMAL_COMPLEXITY: no more complexity than necessary; no garbage, dead, legacy-wrapper, or workaround code."
+      "STRUCTURE: elegant structure free of redundancy."
+      "SIZE: no oversized files, overly long functions, or avoidable complexity."
+      "TESTS: necessary unit or integration tests exist."
+      "CORRECTNESS: no design flaws, logic errors, or best-practice violations."
+      "UX: result is natural and intuitive for the user or caller."
+      "COMPLETENESS: fully satisfies the original task without cutting corners." ]
 
-let readOnlyRules = readOnlyRulesFor opencode
-
-let readOnlyWorkspaceConstraint = readOnlyRules
-
-let reviewCriteria =
-    """# Evaluation Criteria
-
-1. Does the implementation make full use of language features? Are the correct algorithms and data structures used?
-2. Is the implementation no more complex than necessary? Are there any garbage code, dead code, legacy compatible wrappers or unnecessary workarounds?
-3. Is the program structure elegant and free of redundancy?
-4. Are there no oversized files, overly long functions, or avoidable complexity?
-5. Are there necessary unit or integration tests?
-6. Are there design flaws, logic errors, or best-practice violations?
-7. Is the result natural and intuitive for the user or caller?
-8. Does it fully satisfy the original task without cutting corners?"""
+let reviewCriteriaRules: PromptRule list =
+    reviewCriteriaItems |> List.map PromptRule.Criterion
 
 let todoNudgePromptDocument (todos: string list) : PromptDocument =
-    let targets = todos |> List.map PromptTarget.TodoTarget
+    let todoTargets = todos |> List.map PromptTarget.TodoTarget
 
     let view =
         { objective = "Continue incomplete work and finish the next pending todo"
           background = Some "The stream ended while work remained open"
           agentRole = AgentRole.NudgeSupervisor
-          targets = targets
+          targets = todoTargets
           boundaries = []
           rules = [ PromptRule.Policy "Mark work in progress before editing and complete only after verification." ]
           outcomes =
@@ -56,17 +50,17 @@ let todoNudgePromptFor (todos: string list) : string =
     PromptToml.render (todoNudgePromptDocument todos)
 
 let loopNudgePromptDocument (todos: string list) : PromptDocument =
-    let targets = todos |> List.map PromptTarget.TodoTarget
+    let todoTargets = todos |> List.map PromptTarget.TodoTarget
 
     let view =
         { objective = "Continue execution in review loop mode"
-          background = Some "You are in loop mode. You must call the submit_review tool before finishing."
+          background = Some "Review mode is active"
           agentRole = AgentRole.NudgeSupervisor
-          targets = targets
+          targets = todoTargets
           boundaries = []
           rules =
-            [ PromptRule.Policy
-                  "Call the submit_review tool to submit your detailed report and list of modified files for review." ]
+            [ PromptRule.Contract
+                  "Call submit_review with a detailed report and the complete affected-file list before finishing." ]
           outcomes =
             [ { label = "continue"
                 text = "Submit review or complete remaining loop work." } ] }
@@ -84,7 +78,7 @@ let loopNudgePrompt = loopNudgePromptFor []
 let runnerNudgePromptDocument (host: Host) : PromptDocument =
     let view =
         { objective = "Manage active background runner task"
-          background = Some "A background runner task is still active."
+          background = Some "A background runner task is still active"
           agentRole = AgentRole.NudgeSupervisor
           targets = []
           boundaries = []
@@ -103,16 +97,47 @@ let runnerNudgePromptFor (host: Host) =
 
 let runnerNudgePrompt = runnerNudgePromptFor opencode
 
+/// Manager primary-agent system prompt as typed PromptDocument (not free prose module).
+let managerSystemPromptDocument (_host: Host) : PromptDocument =
+    let view =
+        { objective = "Coordinate the overall task toward the user's original goal."
+          background = None
+          agentRole = AgentRole.NudgeSupervisor
+          targets = []
+          boundaries = []
+          rules =
+            [ PromptRule.Policy "Delegate specialized work to subagents when appropriate."
+              PromptRule.Policy "Prefer complete, correct outcomes over premature finish." ]
+          outcomes =
+            [ { label = "coordinate"
+                text = "Drive the session until the user's goal is satisfied." } ] }
+
+    match PromptDocument.create view with
+    | Ok doc -> doc
+    | Error errs -> failwithf "Invalid manager system PromptDocument: %A" errs
+
 let managerSystemPromptFor (host: Host) =
-    "You are the manager agent. Coordinate the overall task, work towards the user's original goal."
+    PromptToml.render (managerSystemPromptDocument host)
 
 let managerSystemPrompt = managerSystemPromptFor opencode
 
-let parallelToolPromptProse =
-    "Hint: if your next response can perform several independent tool calls "
-    + "(for example multiple `read`/`fuzzy_grep`/`executor`/`bash` operations on "
-    + "different targets, or a mix of independent reads, greps and searches), "
-    + "issue them all in one assistant turn. The runtime executes parallel "
-    + "tool calls concurrently and there is no reason to serialize independent "
-    + "operations. Reserve a single tool call only when the next step strictly "
-    + "depends on the current result."
+/// Parallel-tool orchestration hint as typed PromptDocument.
+let parallelToolHintDocument: PromptDocument =
+    let view =
+        { objective = "Issue independent tool calls in one turn when possible."
+          background = None
+          agentRole = AgentRole.NudgeSupervisor
+          targets = []
+          boundaries = []
+          rules =
+            [ PromptRule.Policy "Batch independent read/grep/search/executor calls in a single assistant turn."
+              PromptRule.Policy "Serialize only when a later call strictly depends on the prior result." ]
+          outcomes =
+            [ { label = "parallel_tools"
+                text = "Prefer concurrent tool batches over serial independent steps." } ] }
+
+    match PromptDocument.create view with
+    | Ok doc -> doc
+    | Error errs -> failwithf "Invalid parallel tool PromptDocument: %A" errs
+
+let parallelToolHint = PromptToml.render parallelToolHintDocument

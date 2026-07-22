@@ -28,9 +28,11 @@ type ReviewDecision =
     | AskDoubleCheck
 
 let decideReviewSubmission (verdict: Verdict) (feedback: string) (doubleCheckDone: bool) : ReviewDecision =
+    let items = feedbackItems feedback
+
     match verdict with
-    | Revise -> Finalize(ReviewResult.NeedsRevision feedback)
-    | Perfect when doubleCheckDone -> Finalize(ReviewResult.Accepted feedback)
+    | Revise -> Finalize(ReviewResult.NeedsRevision items)
+    | Perfect when doubleCheckDone -> Finalize(ReviewResult.Accepted items)
     | Perfect -> AskDoubleCheck
 
 // ── mux reportMarkdown text codec ────────────────────────────────────────────
@@ -63,11 +65,11 @@ let parseReviewReportMarkdown (markdown: string) : ReviewResult =
 
     let extractAfterColon () =
         match trimmed.IndexOf(':') with
-        | i when i >= 0 -> trimmed.Substring(i + 1).Trim()
-        | _ -> ""
+        | i when i >= 0 -> feedbackItems (trimmed.Substring(i + 1))
+        | _ -> []
 
     if upper = "PERFECT" then
-        ReviewResult.Accepted ""
+        ReviewResult.Accepted []
     elif upper.StartsWith "PERFECT" then
         ReviewResult.Accepted(extractAfterColon ())
     elif upper.StartsWith "REVISE" then

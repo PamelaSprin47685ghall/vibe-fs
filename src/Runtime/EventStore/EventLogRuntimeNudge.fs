@@ -15,15 +15,6 @@ let isLoopActiveFromEventLog (workspaceRoot: string) (sessionID: string) : JS.Pr
             return state.ReviewTask |> Option.isSome
     }
 
-let nudgeBlockedForTurn (workspaceRoot: string) (sessionID: string) (assistantMessage: string) : JS.Promise<bool> =
-    promise {
-        if sessionID = "" || workspaceRoot = "" then
-            return false
-        else
-            let! state = getStore(workspaceRoot).GetSessionState(sessionID)
-            return Wanxiangshu.Kernel.Nudge.NudgeProjection.isBlocked state.NudgeDedup assistantMessage
-    }
-
 let tryClaimNudgeDispatch
     (workspaceRoot: string)
     (sessionID: string)

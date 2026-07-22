@@ -138,13 +138,19 @@ let executeWebsearch
                 | Error e -> return webToolFailed "search" e
                 | Ok data ->
                     let items = parseSearchResults (Dyn.get data "results")
-                    let rawResults = formatSearchResults items
 
                     if items.IsEmpty then
-                        return rawResults
+                        return formatSearchResults items
                     else
+                        let structured: Wanxiangshu.Kernel.Prompt.WebSearchResultItem list =
+                            items
+                            |> List.map (fun r ->
+                                { title = r.title
+                                  url = r.url
+                                  content = r.content })
+
                         let prompt =
-                            formatPrompt host (WebsearchSummary(ws.WhatToSummarize, rawResults))
+                            formatPrompt host (WebsearchSummary(ws.WhatToSummarize, structured))
                             |> List.head
 
                         return!

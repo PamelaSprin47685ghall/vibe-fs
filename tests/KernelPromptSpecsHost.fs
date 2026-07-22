@@ -3,6 +3,7 @@ module Wanxiangshu.Tests.KernelPromptSpecsHost
 open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Kernel.HostTools
 open Wanxiangshu.Runtime.SubagentPrompts
+open Wanxiangshu.Runtime.SubagentSummarizerPrompts
 open Wanxiangshu.Kernel.SubagentIntents
 open Wanxiangshu.Kernel.ToolCatalog
 open Wanxiangshu.Runtime.ReviewPrompts
@@ -42,8 +43,10 @@ let hostKernel' () =
     let prompt =
         renderMeditatorIntent dummyEntry "why?" "my background" "note detail"
 
-    check "meditator has question" (prompt.IndexOf("why?") >= 0)
-    check "meditator read-only" (prompt.IndexOf("Do NOT call tools") >= 0)
+    check "meditator has question" (prompt.Contains "why?")
+    check "meditator no-tools constraint" (prompt.Contains "NO_TOOLS")
+    check "meditator methodology structured id" (prompt.Contains "methodology_id" || prompt.Contains "test_methodology")
+    check "meditator no METHODOLOGY_ID prose" (not (prompt.Contains "METHODOLOGY_ID:"))
 
     let inv =
         { objective = "find auth"
@@ -52,8 +55,8 @@ let hostKernel' () =
           entries = [||] }
 
     let inspectorPromptText = inspectorPrompt inv
-    check "inspector has objective" (inspectorPromptText.IndexOf("find auth") >= 0)
-    check "inspector read-only" (inspectorPromptText.ToLowerInvariant().IndexOf("read-only") >= 0)
+    check "inspector has objective" (inspectorPromptText.Contains "find auth")
+    check "inspector agent role codebase search" (inspectorPromptText.Contains "Codebase Search" || inspectorPromptText.Contains "read-only")
 
 let toolCatalogCentralized () =
     let coderSpec = specOf "coder"
@@ -91,10 +94,10 @@ let toolCatalogCentralized () =
     check "swap describes semantic blocks" (swapSpec.description.Contains "semantic blocks")
     check "swap avoids rewriting contents" (swapSpec.description.Contains "without rewriting their contents")
 
-    let ackLower = submitReviewWipAcknowledgment.ToLowerInvariant()
-    check "wip acknowledgment does not say No reviewer" (ackLower.IndexOf("no reviewer") < 0)
-    check "wip acknowledgment does not mention wip set to false" (ackLower.IndexOf("wip set to false") < 0)
-    check "wip acknowledgment does not mention starting a reviewer" (ackLower.IndexOf("starting a reviewer") < 0)
+    let ack = formatWipAcknowledgment "Progress recorded"
+    check "wip acknowledgment is structured" (ack.Contains "review_progress" || ack.Contains "review_mode")
+    check "wip acknowledgment does not say No reviewer" (ack.ToLowerInvariant().IndexOf("no reviewer") < 0)
+    check "wip acknowledgment does not mention starting a reviewer" (ack.ToLowerInvariant().IndexOf("starting a reviewer") < 0)
 
     let allSpecs = all
     let names = allSpecs |> List.map (fun spec -> spec.name) |> Set.ofList

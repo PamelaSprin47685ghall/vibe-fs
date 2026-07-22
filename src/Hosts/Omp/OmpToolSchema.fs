@@ -96,10 +96,18 @@ let executorParameters (tb: obj) : obj =
     schema
 
 let returnReviewerParameters (tb: obj) : obj =
-    objectOf
-        [| ("verdict", enumOf [| "PERFECT"; "REVISE" |] "PERFECT to accept, REVISE to request revision" tb)
-           ("feedback", opt "Detailed, actionable feedback when requesting revision; omit when passing." tb str) |]
-        tb
+    let schema =
+        objectOf
+            [| ("verdict", enumOf [| "PERFECT"; "REVISE" |] "PERFECT to accept, REVISE to request revision" tb)
+               ("feedback",
+                str
+                    "Required non-empty review opinion for both PERFECT and REVISE. Sole source of feedback."
+                    tb) |]
+            tb
+
+    addRequired schema "verdict"
+    addRequired schema "feedback"
+    schema
 
 let todowriteParameters (tb: obj) : obj =
     let todoItem =

@@ -125,7 +125,7 @@ let submitReviewResultTool
         submitReviewResult
         (box
             {| verdict = enumReq [| "PERFECT"; "REVISE" |] Params.returnReviewerVerdict
-               feedback = strOpt Params.returnReviewerFeedback |})
+               feedback = strReq Params.returnReviewerFeedback |})
         (fun args context ->
             let runtime = fromOpencode context (pluginDirectoryFromCtx ctx)
 

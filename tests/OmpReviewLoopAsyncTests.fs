@@ -85,7 +85,7 @@ let runReviewLoopResolvesViaAsyncCallbackNotPolling () =
                     runReviewLoop testScope pi ctx store "parent-async" "report body" [| "src/a.fs" |] (Some "fix")
 
                 do! waitForPending ()
-                store.resolvePendingReview (childId, Accepted "") |> ignore
+                store.resolvePendingReview (childId, Accepted []) |> ignore
                 return! loop
             }
 
@@ -169,7 +169,7 @@ let runReviewLoopSendsNudgeOnTimeoutThenStopsOnResolve () =
                     runReviewLoop testScope pi ctx store "parent-nudge" "report body" [| "src/a.fs" |] (Some "fix")
 
                 do! waitForPending ()
-                store.resolvePendingReview (childId, Accepted "") |> ignore
+                store.resolvePendingReview (childId, Accepted []) |> ignore
                 return! loop
             }
 

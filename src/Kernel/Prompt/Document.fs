@@ -16,6 +16,27 @@ type TimeoutKind =
     | Short
     | Long
 
+type MethodologyMeta =
+    { id: string
+      definition: string
+      trigger: string
+      role: string
+      /// Ordered note sections keyed by methodology noteDescription tokens.
+      noteSections: (string * string) list }
+
+type ExecutorOutputEvidence =
+    { stdout: string
+      stderr: string option
+      exitStatus: string
+      exitCode: int option
+      signal: string option
+      truncated: bool }
+
+type WebSearchResultItem =
+    { title: string
+      url: string
+      content: string }
+
 type PromptTarget =
     | FileTarget of path: string * guide: string * draft: string option
     | FileReference of path: string
@@ -24,6 +45,9 @@ type PromptTarget =
     | CommandTarget of language: string * program: string * dependencies: string list * timeoutKind: TimeoutKind
     | EvidenceTarget of label: string * content: string
     | TodoTarget of content: string
+    | MethodologyTarget of MethodologyMeta
+    | ExecutorOutputTarget of ExecutorOutputEvidence
+    | WebSearchResultsTarget of WebSearchResultItem list
 
 [<RequireQualifiedAccess>]
 type BoundaryTarget =

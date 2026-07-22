@@ -16,9 +16,11 @@ let internal submitReviewSpec: ToolSpec =
 
 let internal returnReviewerSpec: ToolSpec =
     { name = "return_reviewer"
-      description = "Submit your review verdict."
+      description =
+        "Submit your review verdict via tool args only. Both PERFECT and REVISE require non-empty feedback (review opinion). Do not put the verdict only in chat text."
       paramDocs =
         map
             [ "verdict", "PERFECT to accept, REVISE to request revision"
-              "feedback", "Detailed, actionable feedback when requesting revision; omit when passing" ]
-      requiredFields = [ "verdict" ] }
+              "feedback",
+              "Required non-empty review opinion for both PERFECT and REVISE. Sole source of review feedback; conversation prose is ignored." ]
+      requiredFields = [ "verdict"; "feedback" ] }

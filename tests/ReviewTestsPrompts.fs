@@ -6,7 +6,9 @@ open Wanxiangshu.Runtime.LoopMessages
 let doubleCheckAnchorReplay () =
     let prompt = Wanxiangshu.Runtime.ReviewPrompts.doubleCheckPrompt "ship feature X"
     check "double-check prompt carries objective" (prompt.Contains "objective =")
-    check "double-check prompt carries challenge" (prompt.Contains "re-evaluate")
+    check
+        "double-check prompt carries challenge"
+        (prompt.Contains "COMPLETENESS_RECHECK" || prompt.ToLowerInvariant().Contains "cutting corners")
 
 let doubleCheckPromptFormat () =
     let prompt =
@@ -28,7 +30,11 @@ let reviewerPromptFormat () =
     check "has objective" (prompt.Contains "objective =")
     check "embeds task in objective" (prompt.Contains "ship S1")
     check "embeds affected file a.fs" (prompt.Contains "a.fs")
-    check "carries review criteria" (prompt.Contains "Evaluation Criteria" || prompt.Contains "language features")
+    check
+        "carries review criteria"
+        (prompt.Contains "LANGUAGE_FIT"
+         || prompt.Contains "COMPLETENESS"
+         || prompt.Contains "language features")
     check "embeds report content" (prompt.Contains "changed A and B")
     check "no ugly Task header" (not (prompt.Contains "=== Task ==="))
     check "no ugly Change Report header" (not (prompt.Contains "=== Change Report ==="))
@@ -49,12 +55,16 @@ let muxReviewerVerdictPromptFormat () =
 
     check
         "mux prompt reuses review criteria"
-        (prompt.Contains "Evaluation Criteria" || prompt.Contains "language features")
+        (prompt.Contains "LANGUAGE_FIT"
+         || prompt.Contains "COMPLETENESS"
+         || prompt.Contains "language features")
 
     check "mux prompt names agent_report" (prompt.Contains "agent_report")
     check "mux prompt has no legacy divider" (not (prompt.Contains "==="))
 
 let reviewInstructionsFrontMatter () =
     let instr = Wanxiangshu.Runtime.ReviewPrompts.reviewInstructions
-    check "instructions are review prose" (instr.Contains "You are a code reviewer performing")
+    check "instructions are structured review doc" (instr.Contains "objective =")
     check "instructions mention return_reviewer" (instr.Contains "return_reviewer")
+    check "instructions carry atomic criteria" (instr.Contains "LANGUAGE_FIT" || instr.Contains "COMPLETENESS")
+    check "instructions carry atomic read-only" (instr.Contains "READ_ONLY" || instr.Contains "NO_MUTATING")

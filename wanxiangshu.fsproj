@@ -75,8 +75,7 @@
     <Compile Include="src/Kernel/ToolArgs.fs"/>
     <Compile Include="src/Kernel/FinishReason.fs"/>
     <Compile Include="src/Kernel/Nudge.fs"/>
-    <Compile Include="src/Kernel/Nudge/NudgePromptText.fs"/>
-    <Compile Include="src/Kernel/Nudge/TodoStatus.fs"/>
+        <Compile Include="src/Kernel/Nudge/TodoStatus.fs"/>
     <Compile Include="src/Kernel/Nudge/SubmitReviewHooks.fs"/>
     <Compile Include="src/Kernel/ToolExecutionStatus.fs"/>
     <Compile Include="src/Kernel/Messaging/MessageOrigin.fs"/>
@@ -88,6 +87,7 @@
     <Compile Include="src/Kernel/MessageTransformPolicy.fs"/>
     <Compile Include="src/Kernel/Methodology/Api.fs"/>
     <Compile Include="src/Kernel/Prompt/Document.fs"/>
+    <Compile Include="src/Kernel/Methodology/NoteSections.fs"/>
     <Compile Include="src/Kernel/Methodology/Schema.fs"/>
     <Compile Include="src/Kernel/Methodology/Logic.fs"/>
     <Compile Include="src/Kernel/Methodology/ProblemTransformation.fs"/>
@@ -112,8 +112,7 @@
     <Compile Include="src/Kernel/EventSourcing/EventPayload.fs"/>
     <Compile Include="src/Kernel/ToolPolling/PtyReadPolicy.fs"/>
     <Compile Include="src/Kernel/Review/ReviewReportBuffer.fs"/>
-    <Compile Include="src/Kernel/Review/ReviewEncouragement.fs"/>
-    <Compile Include="src/Kernel/Review/ReviewLoopFold.fs"/>
+        <Compile Include="src/Kernel/Review/ReviewLoopFold.fs"/>
     <Compile Include="src/Kernel/Nudge/Types.fs"/>
     <Compile Include="src/Kernel/Fallback/Continuation.fs"/>
     <Compile Include="src/Kernel/Nudge/NudgeSnapshotSource.fs"/>
@@ -162,6 +161,7 @@
     <Compile Include="src/Runtime/Tooling/OpencodeReadSynth.fs"/>
     <Compile Include="src/Runtime/Tooling/NativeReadTranscript.fs"/>
     <Compile Include="src/Runtime/SubagentPrompts.fs"/>
+    <Compile Include="src/Runtime/SubagentSummarizerPrompts.fs"/>
     <Compile Include="src/Runtime/Subsession/Subagent.fs"/>
     <Compile Include="src/Runtime/Execution/ExecutorFormat.fs"/>
     <Compile Include="src/Runtime/Tooling/TreeSitterFormat.fs"/>
@@ -233,7 +233,7 @@
     <Compile Include="src/Runtime/Subsession/SubagentIntentsCodec.fs"/>
     <Compile Include="src/Runtime/Tooling/WebSearchApi.fs"/>
     <Compile Include="src/Runtime/Subsession/SubagentToolContext.fs"/>
-    <Compile Include="src/Runtime/Subsession/SubagentPromptBody.fs"/>
+    <Compile Include="src/Runtime/Subsession/SubagentHostPayload.fs"/>
     <Compile Include="src/Runtime/Subsession/SubagentAbort.fs"/>
     <Compile Include="src/Runtime/Subsession/SubagentIo.fs"/>
     <Compile Include="src/Runtime/Tooling/TreeSitterPlatform.fs"/>
@@ -259,6 +259,7 @@
     <Compile Include="src/Runtime/EventStore/EventStoreStateSync.fs"/>
     <Compile Include="src/Runtime/EventStore/EventStore.fs"/>
     <Compile Include="src/Runtime/EventStore/SquadEventStore.fs"/>
+    <Compile Include="src/Runtime/Nudge/NudgeSkipTokens.fs"/>
     <Compile Include="src/Runtime/EventStore/EventLogRuntimeStore.fs"/>
     <Compile Include="src/Runtime/Workspace/RuntimeScopeForgetSession.fs"/>
     <Compile Include="src/Runtime/Search/SembleSearchTypes.fs"/>
@@ -719,6 +720,7 @@
     <Compile Include="tests/OmpPluginTestsAgentEnd.fs"/>
     <Compile Include="tests/OmpContextTransformTests.fs"/>
     <Compile Include="tests/OmpReviewTests.fs"/>
+    <Compile Include="tests/OmpReviewLoopTests.fs"/>
     <Compile Include="tests/OmpChildSessionTests.fs"/>
     <Compile Include="tests/OmpToolingTests.fs"/>
     <Compile Include="tests/OmpRunnerTests.fs"/>

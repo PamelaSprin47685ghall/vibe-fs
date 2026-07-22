@@ -4,6 +4,7 @@ open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Kernel.OmpSessionTools
 open Wanxiangshu.Runtime.ReviewPrompts
 open Wanxiangshu.Runtime.SubagentPrompts
+open Wanxiangshu.Runtime.SubagentSummarizerPrompts
 open Wanxiangshu.Kernel.WebFetchGuard
 
 let private mainSessionActive =
@@ -92,17 +93,26 @@ let reviewInstructionsCanonicalVerdictTool () =
     check "reviewInstructions no submit_review_result" (not (reviewInstructions.Contains "submit_review_result"))
 
     let initial =
-        buildOmpReviewInitialPrompt "report body" [ "src/a.fs" ] (Some "fix login")
+        buildOmpReviewInitialPrompt "report content" [ "src/a.fs" ] (Some "fix login")
 
     check "initial prompt has return_reviewer" (initial.Contains "return_reviewer")
     check "initial prompt no submit_review_result" (not (initial.Contains "submit_review_result"))
-    check "initial prompt has change report" (initial.Contains "=== Change Report ===")
+    check "initial prompt has change report evidence" (initial.Contains "report content")
     check "initial prompt has affected files" (initial.Contains "src/a.fs")
+    check "initial prompt no markdown section headers" (not (initial.Contains "=== "))
 
 let executorSummarizerPromptCarriesWhatToSummarize () =
     let marker = "summarize exit codes and stderr only"
 
-    let prompt = executorSummarizerPrompt marker "raw" "shell" "echo 1" [] "omp-runner"
+    let evidence: Wanxiangshu.Kernel.Prompt.ExecutorOutputEvidence =
+        { stdout = "raw"
+          stderr = None
+          exitStatus = "completed"
+          exitCode = Some 0
+          signal = None
+          truncated = false }
+
+    let prompt = executorSummarizerPrompt marker evidence "shell" "echo 1" [] Wanxiangshu.Kernel.Prompt.TimeoutKind.Long
 
     check "prompt has objective" (prompt.Contains "objective =")
     check "prompt embeds summarize intent" (prompt.Contains marker)

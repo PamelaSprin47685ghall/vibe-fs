@@ -12,6 +12,8 @@ type RunnerPresence =
 type NudgeSnapshotSource =
     { openTodos: string list
       lastAssistantText: string
+      skipTodo: bool
+      skipReview: bool
       agentFromMessage: string option
       modelFromMessage: string option
       reviewLoop: ReviewLoopFold
@@ -20,9 +22,7 @@ type NudgeSnapshotSource =
       turnId: string }
 
 let nudgeAnchorKeyForSource (source: NudgeSnapshotSource) : string =
-    let body = source.lastAssistantText.Trim()
-    let tid = source.turnId.Trim()
-    if tid = "" then body else tid + "\u001e" + body
+    Wanxiangshu.Kernel.Nudge.nudgeAnchorKey source.turnId source.agentFromMessage source.modelFromMessage
 
 let workStateFromSource (source: NudgeSnapshotSource) : SessionWorkState =
     let hasRunner =
