@@ -18,10 +18,14 @@ type SessionCommandError =
 type SessionCommandResult =
     | Upserted
     | SnapshotQueried of Fact.TodoSnapshot
+    | ReviewSubmitted
+    | VerdictReturned
 
 type SessionCommand =
     | UpsertTodo of Fact.TodoSnapshot * reply: (Result<SessionCommandResult, SessionCommandError> -> unit)
     | QuerySnapshot of reply: (Fact.TodoSnapshot -> unit)
+    | SubmitReview of report: string * reply: (Result<SessionCommandResult, SessionCommandError> -> unit)
+    | ReturnVerdict of verdict: string * reply: (Result<SessionCommandResult, SessionCommandError> -> unit)
 
 type SessionInboxEvent =
     | HumanMessageEvent of turnId: TurnId * text: string
