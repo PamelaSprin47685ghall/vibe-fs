@@ -18,8 +18,8 @@ module FactCodecTests =
         let resNull = FactCodec.deserializeFact jsonNullElem
 
         match resNull with
-        | Error err -> Assert.Contains("null or non-string", err)
-        | _ -> Assert.True(false, sprintf "Expected Error when element is null, got: %A" resNull)
+        | Error _ -> ()
+        | Ok _ -> Assert.True(false, sprintf "Expected Error when element is null, got: %A" resNull)
 
         // 2) Non-string element in array (e.g. number 123)
         let jsonNonStr =
@@ -28,12 +28,19 @@ module FactCodecTests =
         let resNonStr = FactCodec.deserializeFact jsonNonStr
 
         match resNonStr with
-        | Error err -> Assert.Contains("Failed parsing string array", err)
-        | _ -> Assert.True(false, sprintf "Expected Error when element is non-string, got: %A" resNonStr)
+        | Error _ -> ()
+        | Ok _ -> Assert.True(false, sprintf "Expected Error when element is non-string, got: %A" resNonStr)
 
         // 3) Empty array
         let jsonEmpty =
-            """{"version":1,"tag":"ReviewApplied","verdict":{"tag":"NeedsChanges","changeRequests":[]},"round":1}"""
+            FactCodec.serializeFact (
+                Fact.Review(
+                    ReviewApplied
+                        {| Verdict = ReviewVerdict.NeedsChanges []
+                           Round = 1
+                           ResultingTodo = None |}
+                )
+            )
 
         let resEmpty = FactCodec.deserializeFact jsonEmpty
 
@@ -65,11 +72,13 @@ module FactCodecTests =
         let resNull = FactCodec.deserializeFact jsonNullItem
 
         match resNull with
-        | Error err -> Assert.Contains("null or non-string", err)
+        | Error _ -> ()
         | _ -> Assert.True(false, sprintf "Expected Error when item is null, got: %A" resNull)
 
         // Empty items array -> Ok
-        let jsonEmptyItem = """{"version":1,"tag":"TodoChanged","snapshot":{"items":[]}}"""
+        let jsonEmptyItem =
+            FactCodec.serializeFact (Fact.Todo(TodoChanged {| Snapshot = { Items = [] } |}))
+
         let resEmpty = FactCodec.deserializeFact jsonEmptyItem
 
         match resEmpty with

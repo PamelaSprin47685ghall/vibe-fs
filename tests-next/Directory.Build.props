@@ -4,15 +4,12 @@
     <RootNamespace>Wanxiangshu.Next.Tests</RootNamespace>
     <LangVersion>preview</LangVersion>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
-    <OtherFlags>--nowarn:1182</OtherFlags>
+    <OtherFlags>--nowarn:1182 --nowarn:1108</OtherFlags>
+    <NoWarn>$(NoWarn);NU1510</NoWarn>
     <IsPackable>false</IsPackable>
     <ArtifactsDir Condition="'$(ArtifactsDir)' == ''">$(MSBuildThisFileDirectory)../artifacts/</ArtifactsDir>
     <BaseIntermediateOutputPath>$(ArtifactsDir)obj/$(MSBuildProjectName)/</BaseIntermediateOutputPath>
     <MSBuildProjectExtensionsPath>$(BaseIntermediateOutputPath)</MSBuildProjectExtensionsPath>
     <BaseOutputPath>$(ArtifactsDir)bin/$(MSBuildProjectName)/</BaseOutputPath>
   </PropertyGroup>
-  <ItemGroup>
-    <PackageReference Remove="Fable.Core" />
-    <PackageReference Remove="Fable.Promise" />
-  </ItemGroup>
 </Project>

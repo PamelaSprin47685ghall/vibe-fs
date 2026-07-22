@@ -1,9 +1,28 @@
 namespace Wanxiangshu.Next.Journal
 
 open System
-open System.IO
-open System.Text
+open Fable.Core
+open Fable.Core.JsInterop
 open Wanxiangshu.Next.Kernel.Identity
+
+module private NodeFsBoot =
+    [<Import("existsSync", "node:fs")>]
+    let existsSync (path: string) : bool = jsNative
+
+    [<Import("readdirSync", "node:fs")>]
+    let readdirSync (path: string) : string array = jsNative
+
+    [<Import("readFileSync", "node:fs")>]
+    let readFileSync (path: string, encoding: string) : string = jsNative
+
+    [<Import("statSync", "node:fs")>]
+    let statSync (path: string) : obj = jsNative
+
+    [<Import("join", "node:path")>]
+    let pathJoin (a: string, b: string) : string = jsNative
+
+    [<Import("basename", "node:path")>]
+    let pathBasename (p: string) : string = jsNative
 
 type Frontier = Map<RuntimeId, int64>
 
@@ -15,97 +34,59 @@ type BootSnapshot =
 module Boot =
 
     let private getRuntimeIdFromFilename (filePath: string) : RuntimeId =
-        let name = Path.GetFileNameWithoutExtension(filePath)
-        RuntimeId.create name
+        let name = NodeFsBoot.pathBasename filePath
+        let idx = name.LastIndexOf('.')
+        let cleanName = if idx > 0 then name.Substring(0, idx) else name
+        RuntimeId.create cleanName
 
     let captureFrontiers (directory: string) : Frontier =
-        if not (Directory.Exists(directory)) then
+        if not (NodeFsBoot.existsSync directory) then
             Map.empty
         else
-            Directory.GetFiles(directory, "*.ndjson")
-            |> Array.map (fun filePath ->
+            NodeFsBoot.readdirSync directory
+            |> Array.filter (fun filePath -> filePath.EndsWith(".ndjson"))
+            |> Array.map (fun name ->
+                let filePath = NodeFsBoot.pathJoin (directory, name)
                 let runtimeId = getRuntimeIdFromFilename filePath
-                let fileInfo = FileInfo(filePath)
-                (runtimeId, fileInfo.Length))
+                let stat = NodeFsBoot.statSync filePath
+                let size = unbox<int64> (stat?size)
+                (runtimeId, size))
             |> Map.ofArray
 
     let private parseLines (filePath: string) (frontierLength: int64) : Envelope list * string list =
         try
-            use stream =
-                new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite)
+            if frontierLength <= 0L || not (NodeFsBoot.existsSync filePath) then
+                [], []
+            else
+                let text = NodeFsBoot.readFileSync (filePath, "utf-8")
 
-            let actualReadLen = min frontierLength stream.Length
-            let buffer = Array.zeroCreate<byte> (int actualReadLen)
-            let mutable bytesRead = 0
-            let mutable continueLoop = true
-
-            while bytesRead < buffer.Length && continueLoop do
-                let n = stream.Read(buffer, bytesRead, buffer.Length - bytesRead)
-
-                if n = 0 then
-                    continueLoop <- false
-                else
-                    bytesRead <- bytesRead + n
-
-            let text = Encoding.UTF8.GetString(buffer, 0, bytesRead)
-
-            let fullText, partialDiag =
-                if text.EndsWith("\n") then
-                    text, None
-                else
-                    let lastNewline = text.LastIndexOf('\n')
-
-                    if lastNewline < 0 then
-                        if bytesRead > 0 then
-                            match Envelope.deserialize text with
-                            | Ok _ -> text, None
-                            | Error _ ->
-                                "", Some(sprintf "Partial trailing line ignored in %s" (Path.GetFileName(filePath)))
-                        else
-                            "", None
+                let actualText =
+                    if int64 text.Length > frontierLength then
+                        text.Substring(0, int frontierLength)
                     else
-                        let prefix = text.Substring(0, lastNewline + 1)
-                        let segment = text.Substring(lastNewline + 1)
+                        text
 
-                        if String.IsNullOrEmpty(segment) then
-                            prefix, None
-                        else
-                            match Envelope.deserialize segment with
-                            | Ok _ -> prefix + segment + "\n", None
-                            | Error _ ->
-                                prefix, Some(sprintf "Partial trailing line ignored in %s" (Path.GetFileName(filePath)))
+                let lines =
+                    actualText.Split([| "\r\n"; "\n" |], StringSplitOptions.RemoveEmptyEntries)
 
-            let lines =
-                fullText.Split([| "\r\n"; "\n" |], StringSplitOptions.RemoveEmptyEntries)
+                let rec collect idx acc =
+                    if idx >= lines.Length then
+                        List.rev acc, []
+                    else
+                        match Envelope.deserialize lines.[idx] with
+                        | Ok env -> collect (idx + 1) (env :: acc)
+                        | Error err ->
+                            let diag =
+                                sprintf "Failed to parse line %d in %s: %s" idx (NodeFsBoot.pathBasename filePath) err
 
-            let rec collect idx acc =
-                if idx >= lines.Length then
-                    let initialDiags =
-                        match partialDiag with
-                        | Some d -> [ d ]
-                        | None -> []
+                            List.rev acc, [ diag ]
 
-                    List.rev acc, initialDiags
-                else
-                    match Envelope.deserialize lines.[idx] with
-                    | Ok env -> collect (idx + 1) (env :: acc)
-                    | Error err ->
-                        let diag =
-                            sprintf "Failed to parse line %d in %s: %s" idx (Path.GetFileName(filePath)) err
-
-                        let initialDiags =
-                            match partialDiag with
-                            | Some d -> [ d ]
-                            | None -> []
-
-                        List.rev acc, initialDiags @ [ diag ]
-
-            collect 0 []
+                collect 0 []
         with ex ->
-            [], [ sprintf "IO error reading %s: %s" (Path.GetFileName(filePath)) ex.Message ]
+            [], [ sprintf "IO error reading %s: %s" (NodeFsBoot.pathBasename filePath) ex.Message ]
 
     let private readPrefixEnvelopes (filePath: string) (frontierLength: int64) : Envelope list * string list =
-        if frontierLength <= 0L || not (File.Exists(filePath)) then
+        if frontierLength <= 0L || not (NodeFsBoot.existsSync filePath) then
             [], []
         else
             parseLines filePath frontierLength
@@ -139,17 +120,21 @@ module Boot =
     let boot (directory: string) : BootSnapshot =
         let frontier = captureFrontiers directory
 
-        if not (Directory.Exists(directory)) then
+        if not (NodeFsBoot.existsSync directory) then
             { Envelopes = []
               Frontier = Map.empty
               Diagnostics = [] }
         else
-            let files = Directory.GetFiles(directory, "*.ndjson")
+            let files =
+                NodeFsBoot.readdirSync directory
+                |> Array.filter (fun f -> f.EndsWith(".ndjson"))
+
             let mutable allDiags = []
 
             let streamEnvelopes =
                 files
-                |> Array.map (fun filePath ->
+                |> Array.map (fun filename ->
+                    let filePath = NodeFsBoot.pathJoin (directory, filename)
                     let runtimeId = getRuntimeIdFromFilename filePath
                     let len = Map.tryFind runtimeId frontier |> Option.defaultValue 0L
                     let envs, diags = readPrefixEnvelopes filePath len

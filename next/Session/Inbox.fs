@@ -26,32 +26,45 @@ type ISessionInbox =
     abstract Receive: cancellationToken: CancellationToken -> Task<SessionInboxEvent>
 
 type FifoInbox(capacity: int) =
-    let queue = new ConcurrentQueue<SessionInboxEvent>()
-    let sem = new SemaphoreSlim(0, Int32.MaxValue)
-    let mutable count = 0
+    let queue = System.Collections.Generic.Queue<SessionInboxEvent>()
+
+    let waiters =
+        System.Collections.Generic.Queue<TaskCompletionSource<SessionInboxEvent>>()
+
+    let lockObj = obj ()
 
     interface ISessionInbox with
 
         member _.TryPost(event: SessionInboxEvent) : Result<unit, SessionError> =
-            let currentCount = Interlocked.Increment(&count)
-
-            if currentCount > capacity then
-                Interlocked.Decrement(&count) |> ignore
-                Error SessionError.InboxFull
-            else
-                queue.Enqueue(event)
-                sem.Release() |> ignore
-                Ok()
+            lock lockObj (fun () ->
+                if waiters.Count > 0 then
+                    let waiter = waiters.Dequeue()
+                    waiter.TrySetResult(event) |> ignore
+                    Ok()
+                elif queue.Count >= capacity then
+                    Error SessionError.InboxFull
+                else
+                    queue.Enqueue(event)
+                    Ok())
 
         member _.Receive(cancellationToken: CancellationToken) : Task<SessionInboxEvent> =
             task {
-                do! sem.WaitAsync(cancellationToken)
+                cancellationToken.ThrowIfCancellationRequested()
 
-                match queue.TryDequeue() with
-                | true, item ->
-                    Interlocked.Decrement(&count) |> ignore
-                    return item
-                | false, _ ->
-                    Interlocked.Decrement(&count) |> ignore
-                    return LifecycleEvent "inbox-desync"
+                let itemOpt, waiterOpt =
+                    lock lockObj (fun () ->
+                        if queue.Count > 0 then
+                            (Some(queue.Dequeue()), None)
+                        else
+                            let tcs = TaskCompletionSource<SessionInboxEvent>()
+                            (None, Some tcs))
+
+                match itemOpt, waiterOpt with
+                | Some item, _ -> return item
+                | None, Some tcs ->
+                    use reg =
+                        cancellationToken.Register(fun () -> tcs.TrySetCanceled(cancellationToken) |> ignore)
+
+                    return! tcs.Task
+                | None, None -> return LifecycleEvent "inbox-desync"
             }

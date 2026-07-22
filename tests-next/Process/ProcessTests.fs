@@ -11,202 +11,210 @@ module ProcessTests =
 
     [<Fact>]
     let Process_execute_true_command_returns_exitCode_0 () =
-        let isWindows = OperatingSystem.IsWindows()
-        let cmdName = if isWindows then "cmd.exe" else "true"
-        let cmdArgs = if isWindows then [ "/c"; "exit 0" ] else []
+        task {
+            let isWindows = false
+            let cmdName = if isWindows then "cmd.exe" else "true"
+            let cmdArgs = if isWindows then [ "/c"; "exit 0" ] else []
 
-        let cmd: Command =
-            { FileName = cmdName
-              Arguments = cmdArgs
-              WorkingDirectory = None
-              Environment = None
-              Stdin = None
-              Deadline = None }
+            let cmd: Command =
+                { FileName = cmdName
+                  Arguments = cmdArgs
+                  WorkingDirectory = None
+                  Environment = None
+                  Stdin = None
+                  Deadline = None }
 
-        let ctx: ProcessContext =
-            { WorkingDirectory = None
-              DefaultTimeout = Some(TimeSpan.FromSeconds 5.0) }
+            let ctx: ProcessContext =
+                { WorkingDirectory = None
+                  DefaultTimeout = Some(TimeSpan.FromSeconds 5.0) }
 
-        let taskRes = Flow.run ctx CancellationToken.None (ProcessFlows.execute cmd)
-        let res = taskRes.GetAwaiter().GetResult()
+            let! res = Flow.run ctx CancellationToken.None (ProcessFlows.execute cmd)
 
-        match res with
-        | Ok processResult ->
-            Assert.Equal(0, processResult.ExitCode)
-            Assert.False(processResult.StdoutTruncated)
-            Assert.False(processResult.StderrTruncated)
-        | Error err -> Assert.True(false, sprintf "Expected Ok processResult exit code 0, got Error: %A" err)
+            match res with
+            | Ok processResult ->
+                Assert.Equal(0, processResult.ExitCode)
+                Assert.False(processResult.StdoutTruncated)
+                Assert.False(processResult.StderrTruncated)
+            | Error err -> Assert.True(false, sprintf "Expected Ok processResult exit code 0, got Error: %A" err)
+        }
 
     [<Fact>]
     let Process_execute_stdin_roundtrip () =
-        let isWindows = OperatingSystem.IsWindows()
-        let payload = "hello-stdin-wanxiangshu"
-        let cmdName = if isWindows then "cmd.exe" else "cat"
-        let cmdArgs = if isWindows then [ "/c"; "findstr"; "/R"; ".*" ] else []
+        task {
+            let isWindows = false
+            let payload = "hello-stdin-wanxiangshu"
+            let cmdName = if isWindows then "cmd.exe" else "cat"
+            let cmdArgs = if isWindows then [ "/c"; "findstr"; "/R"; ".*" ] else []
 
-        let cmd: Command =
-            { FileName = cmdName
-              Arguments = cmdArgs
-              WorkingDirectory = None
-              Environment = None
-              Stdin = Some(payload + "\n")
-              Deadline = None }
+            let cmd: Command =
+                { FileName = cmdName
+                  Arguments = cmdArgs
+                  WorkingDirectory = None
+                  Environment = None
+                  Stdin = Some(payload + "\n")
+                  Deadline = None }
 
-        let ctx: ProcessContext =
-            { WorkingDirectory = None
-              DefaultTimeout = Some(TimeSpan.FromSeconds 5.0) }
+            let ctx: ProcessContext =
+                { WorkingDirectory = None
+                  DefaultTimeout = Some(TimeSpan.FromSeconds 5.0) }
 
-        let taskRes = Flow.run ctx CancellationToken.None (ProcessFlows.execute cmd)
-        let res = taskRes.GetAwaiter().GetResult()
+            let! res = Flow.run ctx CancellationToken.None (ProcessFlows.execute cmd)
 
-        match res with
-        | Ok processResult ->
-            Assert.Equal(0, processResult.ExitCode)
+            match res with
+            | Ok processResult ->
+                Assert.Equal(0, processResult.ExitCode)
 
-            Assert.True(
-                processResult.Stdout.Contains(payload),
-                sprintf "Expected stdout to contain payload %s, got stdout: %s" payload processResult.Stdout
-            )
-        | Error err -> Assert.True(false, sprintf "Expected Ok processResult with stdin roundtrip, got Error: %A" err)
+                Assert.True(
+                    processResult.Stdout.Contains(payload),
+                    sprintf "Expected stdout to contain payload %s, got stdout: %s" payload processResult.Stdout
+                )
+            | Error err ->
+                Assert.True(false, sprintf "Expected Ok processResult with stdin roundtrip, got Error: %A" err)
+        }
 
     [<Fact>]
     let Process_spawn_nonexistent_binary_returns_SpawnFailed () =
-        let nonExistentBinary =
-            "non_existent_binary_wanxiangshu_xyz_" + Guid.NewGuid().ToString("N")
+        task {
+            let nonExistentBinary =
+                "non_existent_binary_wanxiangshu_xyz_" + Guid.NewGuid().ToString("N")
 
-        let cmd: Command =
-            { FileName = nonExistentBinary
-              Arguments = []
-              WorkingDirectory = None
-              Environment = None
-              Stdin = None
-              Deadline = None }
+            let cmd: Command =
+                { FileName = nonExistentBinary
+                  Arguments = []
+                  WorkingDirectory = None
+                  Environment = None
+                  Stdin = None
+                  Deadline = None }
 
-        match
-            ProcessSpawn.spawn cmd None CancellationToken.None
-            |> (fun t -> t.GetAwaiter().GetResult())
-        with
-        | Error(ProcessError.SpawnFailed reason) -> Assert.False(String.IsNullOrWhiteSpace(reason))
-        | other -> Assert.True(false, sprintf "Expected Error (SpawnFailed), got: %A" other)
+            let! spawnRes = ProcessSpawn.spawn cmd None CancellationToken.None
+
+            match spawnRes with
+            | Error(ProcessError.SpawnFailed reason) -> Assert.False(String.IsNullOrWhiteSpace(reason))
+            | other -> Assert.True(false, sprintf "Expected Error (SpawnFailed), got: %A" other)
+        }
 
     [<Fact>]
     let Process_execute_cancel_long_running_returns_ProcessCancelled () =
-        let isWindows = OperatingSystem.IsWindows()
-        let cmdName = if isWindows then "cmd.exe" else "sleep"
+        task {
+            let isWindows = false
+            let cmdName = if isWindows then "cmd.exe" else "sleep"
 
-        let cmdArgs =
-            if isWindows then
-                [ "/c"; "timeout /t 30 /nobreak" ]
-            else
-                [ "30" ]
+            let cmdArgs =
+                if isWindows then
+                    [ "/c"; "timeout /t 30 /nobreak" ]
+                else
+                    [ "30" ]
 
-        let cmd: Command =
-            { FileName = cmdName
-              Arguments = cmdArgs
-              WorkingDirectory = None
-              Environment = None
-              Stdin = None
-              Deadline = None }
+            let cmd: Command =
+                { FileName = cmdName
+                  Arguments = cmdArgs
+                  WorkingDirectory = None
+                  Environment = None
+                  Stdin = None
+                  Deadline = None }
 
-        let ctx: ProcessContext =
-            { WorkingDirectory = None
-              DefaultTimeout = Some(TimeSpan.FromSeconds 60.0) }
+            let ctx: ProcessContext =
+                { WorkingDirectory = None
+                  DefaultTimeout = Some(TimeSpan.FromSeconds 60.0) }
 
-        use cts = new CancellationTokenSource()
-        cts.CancelAfter(200)
+            use cts = new CancellationTokenSource()
+            cts.CancelAfter(200)
 
-        let taskRes = Flow.run ctx cts.Token (ProcessFlows.execute cmd)
-        let res = taskRes.GetAwaiter().GetResult()
+            let! res = Flow.run ctx cts.Token (ProcessFlows.execute cmd)
 
-        match res with
-        | Error(ProcessError.ProcessCancelled reason) -> Assert.False(String.IsNullOrWhiteSpace(reason))
-        | other -> Assert.True(false, sprintf "Expected Error (ProcessCancelled), got: %A" other)
+            match res with
+            | Error(ProcessError.ProcessCancelled reason) -> Assert.False(String.IsNullOrWhiteSpace(reason))
+            | other -> Assert.True(false, sprintf "Expected Error (ProcessCancelled), got: %A" other)
+        }
 
     [<Fact>]
     let Process_execute_short_deadline_returns_Timeout () =
-        let isWindows = OperatingSystem.IsWindows()
-        let cmdName = if isWindows then "cmd.exe" else "sleep"
+        task {
+            let isWindows = false
+            let cmdName = if isWindows then "cmd.exe" else "sleep"
 
-        let cmdArgs =
-            if isWindows then
-                [ "/c"; "timeout /t 10 /nobreak" ]
-            else
-                [ "10" ]
+            let cmdArgs =
+                if isWindows then
+                    [ "/c"; "timeout /t 10 /nobreak" ]
+                else
+                    [ "10" ]
 
-        let now = DateTimeOffset.UtcNow
-        let deadline = Deadline.ofBudget now (TimeSpan.FromMilliseconds 50.0)
+            let now = DateTimeOffset.UtcNow
+            let deadline = Deadline.ofBudget now (TimeSpan.FromMilliseconds 50.0)
 
-        let cmd: Command =
-            { FileName = cmdName
-              Arguments = cmdArgs
-              WorkingDirectory = None
-              Environment = None
-              Stdin = None
-              Deadline = Some deadline }
+            let cmd: Command =
+                { FileName = cmdName
+                  Arguments = cmdArgs
+                  WorkingDirectory = None
+                  Environment = None
+                  Stdin = None
+                  Deadline = Some deadline }
 
-        let ctx: ProcessContext =
-            { WorkingDirectory = None
-              DefaultTimeout = None }
+            let ctx: ProcessContext =
+                { WorkingDirectory = None
+                  DefaultTimeout = None }
 
-        let taskRes = Flow.run ctx CancellationToken.None (ProcessFlows.execute cmd)
-        let res = taskRes.GetAwaiter().GetResult()
+            let! res = Flow.run ctx CancellationToken.None (ProcessFlows.execute cmd)
 
-        match res with
-        | Error(ProcessError.Timeout reason) -> Assert.False(String.IsNullOrWhiteSpace(reason))
-        | other -> Assert.True(false, sprintf "Expected Error (Timeout), got: %A" other)
+            match res with
+            | Error(ProcessError.Timeout reason) -> Assert.False(String.IsNullOrWhiteSpace(reason))
+            | other -> Assert.True(false, sprintf "Expected Error (Timeout), got: %A" other)
+        }
 
     [<Fact>]
     let Process_kill_is_idempotent () =
-        let isWindows = OperatingSystem.IsWindows()
-        let cmdName = if isWindows then "cmd.exe" else "sleep"
+        task {
+            let isWindows = false
+            let cmdName = if isWindows then "cmd.exe" else "sleep"
 
-        let cmdArgs =
-            if isWindows then
-                [ "/c"; "timeout /t 30 /nobreak" ]
-            else
-                [ "30" ]
+            let cmdArgs =
+                if isWindows then
+                    [ "/c"; "timeout /t 30 /nobreak" ]
+                else
+                    [ "30" ]
 
-        let cmd: Command =
-            { FileName = cmdName
-              Arguments = cmdArgs
-              WorkingDirectory = None
-              Environment = None
-              Stdin = None
-              Deadline = None }
+            let cmd: Command =
+                { FileName = cmdName
+                  Arguments = cmdArgs
+                  WorkingDirectory = None
+                  Environment = None
+                  Stdin = None
+                  Deadline = None }
 
-        let spawnTask = ProcessSpawn.spawn cmd None CancellationToken.None
-        let spawnRes = spawnTask.GetAwaiter().GetResult()
+            let! spawnRes = ProcessSpawn.spawn cmd None CancellationToken.None
 
-        match spawnRes with
-        | Ok handle ->
-            let h = handle
+            match spawnRes with
+            | Ok handle ->
+                let h = handle
 
-            try
-                h.Kill().GetAwaiter().GetResult()
-                h.Kill().GetAwaiter().GetResult()
-            finally
-                h.DisposeAsync().AsTask().GetAwaiter().GetResult() |> ignore
-        | Error err -> Assert.True(false, sprintf "Expected Ok handle, got: %A" err)
+                try
+                    do! h.Kill()
+                    do! h.Kill()
+                finally
+                    h.Dispose()
+            | Error err -> Assert.True(false, sprintf "Expected Ok handle, got: %A" err)
+        }
 
     [<Fact>]
     let Process_runFlow_maps_OCE_to_ProcessCancelled () =
-        use cts = new CancellationTokenSource()
-        cts.Cancel()
+        task {
+            use cts = new CancellationTokenSource()
+            cts.Cancel()
 
-        let ctx: ProcessContext =
-            { WorkingDirectory = None
-              DefaultTimeout = None }
+            let ctx: ProcessContext =
+                { WorkingDirectory = None
+                  DefaultTimeout = None }
 
-        let hangingFlow: ProcessFlows.ProcessFlow<Fact.ProcessResult> =
-            Flow.create (fun _ ct ->
-                task {
-                    ct.ThrowIfCancellationRequested()
-                    return Ok Unchecked.defaultof<Fact.ProcessResult>
-                })
+            let hangingFlow: ProcessFlows.ProcessFlow<Fact.ProcessResult> =
+                Flow.create (fun _ ct ->
+                    task {
+                        ct.ThrowIfCancellationRequested()
+                        return Ok Unchecked.defaultof<Fact.ProcessResult>
+                    })
 
-        let taskRes = ProcessFlows.runFlow ctx cts.Token hangingFlow
-        let res = taskRes.GetAwaiter().GetResult()
+            let! res = ProcessFlows.runFlow ctx cts.Token hangingFlow
 
-        match res with
-        | Error(ProcessError.ProcessCancelled reason) -> Assert.False(String.IsNullOrWhiteSpace(reason))
-        | other -> Assert.True(false, sprintf "Expected Error (ProcessCancelled), got: %A" other)
+            match res with
+            | Error(ProcessError.ProcessCancelled reason) -> Assert.False(String.IsNullOrWhiteSpace(reason))
+            | other -> Assert.True(false, sprintf "Expected Error (ProcessCancelled), got: %A" other)
+        }

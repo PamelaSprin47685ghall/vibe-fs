@@ -41,3 +41,15 @@ type Tool =
       Description: string
       SchemaJson: string
       Execute: ToolContext -> ToolInput -> Task<ToolOutput> }
+
+type SessionInboxCommandPort(inbox: ISessionInbox) =
+    interface SessionCommandPort with
+        member _.Request (command: SessionCommand) (cancellation: CancellationToken) (deadline: Deadline) =
+            task {
+                cancellation.ThrowIfCancellationRequested()
+                let cmdEvent = SessionCommandEvent command
+
+                match inbox.TryPost cmdEvent with
+                | Ok() -> return Ok SessionCommandResult.Upserted
+                | Error _ -> return Error SessionCommandError.InboxFull
+            }

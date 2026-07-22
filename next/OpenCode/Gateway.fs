@@ -1,12 +1,28 @@
 namespace Wanxiangshu.Next.OpenCode
 
 open System
-open System.IO
 open System.Threading
 open System.Threading.Tasks
+open Fable.Core
+open Fable.Core.JsInterop
 open Wanxiangshu.Next.Kernel
 open Wanxiangshu.Next.Kernel.Identity
+open Wanxiangshu.Next.Kernel.Fact
+open Wanxiangshu.Next.Kernel.Outcome
 open Wanxiangshu.Next.Journal
+
+module private NodeFsGateway =
+    [<Import("existsSync", "node:fs")>]
+    let existsSync (path: string) : bool = jsNative
+
+    [<Import("mkdirSync", "node:fs")>]
+    let mkdirSync (path: string, opts: obj) : unit = jsNative
+
+    [<Import("join", "node:path")>]
+    let pathJoin (a: string, b: string) : string = jsNative
+
+    [<Import("pid", "node:process")>]
+    let nodeProcessId: int = jsNative
 
 [<RequireQualifiedAccess>]
 type GatewayError =
@@ -21,6 +37,7 @@ type Gateway =
     abstract RuntimeSnapshot: RuntimeSnapshot
     abstract JournalPath: string
     abstract JournalWriter: JournalWriter option
+    abstract Append: StreamId -> TurnId option -> Fact -> CommitResult<Envelope>
 
 module Gateway =
 
@@ -28,29 +45,59 @@ module Gateway =
         (
             runtimeId: RuntimeId,
             bootSnapshot: BootSnapshot,
-            projectionSet: ProjectionSet,
-            runtimeSnapshot: RuntimeSnapshot,
+            initialProjectionSet: ProjectionSet,
+            initialRuntimeSnapshot: RuntimeSnapshot,
             journalPath: string,
             journalWriter: JournalWriter option,
             cts: CancellationTokenSource
         ) =
 
+        let lockObj = obj ()
+        let mutable currentProjectionSet = initialProjectionSet
+        let mutable currentRuntimeSnapshot = initialRuntimeSnapshot
+
         interface Gateway with
             member _.RuntimeId = runtimeId
             member _.BootSnapshot = bootSnapshot
-            member _.ProjectionSet = projectionSet
-            member _.RuntimeSnapshot = runtimeSnapshot
+            member _.ProjectionSet = lock lockObj (fun () -> currentProjectionSet)
+            member _.RuntimeSnapshot = lock lockObj (fun () -> currentRuntimeSnapshot)
             member _.JournalPath = journalPath
             member _.JournalWriter = journalWriter
 
+            member _.Append stream turnId fact =
+                match journalWriter with
+                | None ->
+                    CommitUnknown(
+                        EventId.create (Guid.NewGuid().ToString("N")),
+                        JournalFailure.WriteFailed "JournalWriter not initialized"
+                    )
+                | Some writer ->
+                    let commitRes = writer.Append stream turnId fact
+
+                    match commitRes with
+                    | Committed env ->
+                        lock lockObj (fun () ->
+                            let updatedProj = Fold.foldEnvelope currentProjectionSet env
+
+                            let updatedSnapshot: RuntimeSnapshot =
+                                { currentRuntimeSnapshot with
+                                    Projections = updatedProj
+                                    OwnLocalSeq = writer.LocalSeq }
+
+                            currentProjectionSet <- updatedProj
+                            currentRuntimeSnapshot <- updatedSnapshot)
+
+                        commitRes
+                    | CommitUnknown _ -> commitRes
+
             member _.DisposeAsync() =
-                ValueTask(
+                unbox<ValueTask> (
                     task {
                         cts.Cancel()
                         cts.Dispose()
 
                         match journalWriter with
-                        | Some w -> do! (w :> IAsyncDisposable).DisposeAsync().AsTask()
+                        | Some w -> do! (w :> IAsyncDisposable).DisposeAsync()
                         | None -> ()
                     }
                 )
@@ -73,31 +120,33 @@ module Gateway =
             else
                 let runtimeIdStr = Guid.NewGuid().ToString("N")
                 let runtimeId = RuntimeId.create runtimeIdStr
-                let path = Path.Combine(runtimesDir, runtimeIdStr + ".ndjson")
+                let path = NodeFsGateway.pathJoin (runtimesDir, runtimeIdStr + ".ndjson")
 
-                if File.Exists(path) then
+                if NodeFsGateway.existsSync path then
                     loop (attemptsLeft - 1)
                 else
                     try
                         let writer, initEnv = JournalWriter.create runtimesDir runtimeId processId startedAt
                         Ok(runtimeId, writer, initEnv)
-                    with
-                    | :? IOException as ex when File.Exists(path) -> loop (attemptsLeft - 1)
-                    | :? IOException as ex -> Error(GatewayError.StorageFailed ex.Message)
-                    | ex -> Error(GatewayError.StorageFailed ex.Message)
+                    with ex ->
+                        Error(GatewayError.StorageFailed ex.Message)
 
         loop maxAttempts
 
     let start (baseDir: string) (cancellationToken: CancellationToken) : Task<Result<Gateway, GatewayError>> =
         task {
             try
-                let runtimesDir = Path.Combine(baseDir, ".wanxiangshu-next", "runtimes")
-                Directory.CreateDirectory(runtimesDir) |> ignore
+                let runtimesDir =
+                    NodeFsGateway.pathJoin (baseDir, NodeFsGateway.pathJoin (".wanxiangshu-next", "runtimes"))
+
+                if not (NodeFsGateway.existsSync runtimesDir) then
+                    NodeFsGateway.mkdirSync (runtimesDir, {| recursive = true |}) |> ignore
+
+                let processId = NodeFsGateway.nodeProcessId
 
                 let bootSnapshot = Boot.boot runtimesDir
                 let projectionSet = Fold.apply Fold.empty bootSnapshot.Envelopes
 
-                let processId = System.Diagnostics.Process.GetCurrentProcess().Id
                 let startedAt = DateTimeOffset.UtcNow
 
                 match createWriterWithRetry runtimesDir processId startedAt 10 with
@@ -111,7 +160,7 @@ module Gateway =
                           OwnRuntimeId = Some runtimeId
                           OwnLocalSeq = journalWriter.LocalSeq }
 
-                    let cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken)
+                    let cts = new CancellationTokenSource()
 
                     let gatewayInstance =
                         new GatewayImpl(
@@ -126,9 +175,6 @@ module Gateway =
                         :> Gateway
 
                     return Ok gatewayInstance
-            with
-            | :? IOException as ex -> return Error(GatewayError.StorageFailed($"[IOException] {ex.Message}"))
-            | :? UnauthorizedAccessException as ex ->
-                return Error(GatewayError.StorageFailed($"[UnauthorizedAccessException] {ex.Message}"))
-            | ex -> return Error(GatewayError.BootFailed($"[{ex.GetType().FullName}] {ex.Message}"))
+            with ex ->
+                return Error(GatewayError.BootFailed($"[{ex.Message}]"))
         }

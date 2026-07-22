@@ -1,0 +1,18 @@
+{
+  "name": "wanxiangshu-next",
+  "version": "0.3.0",
+  "private": true,
+  "type": "module",
+  "description": "Wanxiangshu.Next Structured Flow runtime compiled via Fable",
+  "main": "../build/next/OpenCode/Plugin.js",
+  "scripts": {
+    "build": "node -e \"import fs from 'node:fs'; fs.rmSync('../build/next', {recursive: true, force: true});\" && dotnet fable precompile Wanxiangshu.Next.fsproj -o ../build/next --noCache",
+    "test:compile": "node -e \"import fs from 'node:fs'; fs.rmSync('../build/tests-next', {recursive: true, force: true});\" && cd ../tests-next && dotnet fable Wanxiangshu.Next.Tests.fsproj --outDir ../build/tests-next --precompiledLib ../build/next --noCache",
+    "test": "npm run build && npm run test:compile && node ../tests-next/runner.js"
+  },
+  "dependencies": {
+    "@fable-org/fable-library-js": "^2.4.0",
+    "smol-toml": "1.7.0",
+    "thoth-json": "^10.2.0"
+  }
+}

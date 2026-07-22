@@ -67,6 +67,11 @@ module SessionFlows =
         task {
             try
                 return! Flow.run s ct flow
-            with :? System.OperationCanceledException ->
-                return Error SessionError.SessionCancelled
+            with ex ->
+                let msg = if isNull (box ex) then "" else string ex
+
+                if msg.Contains("cancel") || msg.Contains("Cancel") || msg.Contains("Operation") then
+                    return Error SessionError.SessionCancelled
+                else
+                    return Error(SessionError.Protocol msg)
         }

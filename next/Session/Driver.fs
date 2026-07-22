@@ -1,6 +1,7 @@
 namespace Wanxiangshu.Next.Session
 
-open System.Collections.Concurrent
+open System
+open System.Collections.Generic
 open System.Threading
 open Wanxiangshu.Next.Kernel.Identity
 
@@ -13,54 +14,49 @@ type SessionDriversKey =
       SessionId: SessionId }
 
 type SessionDrivers() =
-    let drivers = new ConcurrentDictionary<SessionDriversKey, DriverSlot>()
-    let localEpochs = new ConcurrentDictionary<SessionDriversKey, LocalEpoch>()
+    let drivers = Dictionary<SessionDriversKey, DriverSlot>()
+    let localEpochs = Dictionary<SessionDriversKey, LocalEpoch>()
+    let lockObj = obj ()
 
-    member _.GetLocalEpoch(key: SessionDriversKey) : LocalEpoch = localEpochs.GetOrAdd(key, 0L)
+    member _.GetLocalEpoch(key: SessionDriversKey) : LocalEpoch =
+        lock lockObj (fun () ->
+            match localEpochs.TryGetValue(key) with
+            | true, v -> v
+            | false, _ ->
+                localEpochs.[key] <- 0L
+                0L)
 
     member _.BumpLocalEpochOnHuman(key: SessionDriversKey) : LocalEpoch =
-        localEpochs.AddOrUpdate(key, 1L, (fun _ current -> current + 1L))
+        lock lockObj (fun () ->
+            let current =
+                match localEpochs.TryGetValue(key) with
+                | true, v -> v
+                | false, _ -> 0L
+
+            let next = current + 1L
+            localEpochs.[key] <- next
+            next)
 
     member _.Activate(key: SessionDriversKey, cts: CancellationTokenSource) : bool =
-        if drivers.TryAdd(key, Running cts) then
-            true
-        else
-            let rec loop () =
-                match drivers.TryGetValue(key) with
-                | true, Idle ->
-                    if drivers.TryUpdate(key, Running cts, Idle) then
-                        true
-                    else
-                        loop ()
-                | true, Running _ -> false
-                | false, _ -> if drivers.TryAdd(key, Running cts) then true else loop ()
-
-            loop ()
+        lock lockObj (fun () ->
+            match drivers.TryGetValue(key) with
+            | true, Running _ -> false
+            | true, Idle
+            | false, _ ->
+                drivers.[key] <- Running cts
+                true)
 
     member _.Cancel(key: SessionDriversKey) : unit =
-        let rec loop () =
-            match drivers.TryGetValue(key) with
-            | true, Running cts ->
-                try
-                    cts.Cancel()
-                with _ ->
-                    ()
+        let ctsOpt =
+            lock lockObj (fun () ->
+                match drivers.TryGetValue(key) with
+                | true, Running cts ->
+                    drivers.[key] <- Idle
+                    Some cts
+                | _ -> None)
 
-                try
-                    cts.Dispose()
-                with _ ->
-                    ()
-
-                if not (drivers.TryUpdate(key, Idle, Running cts)) then
-                    loop ()
-            | true, Idle -> ()
-            | false, _ -> ()
-
-        loop ()
-
-    member _.Deactivate(key: SessionDriversKey) : unit =
-        match drivers.TryGetValue(key) with
-        | true, Running cts ->
+        match ctsOpt with
+        | Some cts ->
             try
                 cts.Cancel()
             with _ ->
@@ -70,6 +66,54 @@ type SessionDrivers() =
                 cts.Dispose()
             with _ ->
                 ()
-        | _ -> ()
+        | None -> ()
 
-        drivers.TryRemove(key) |> ignore
+    member _.Deactivate(key: SessionDriversKey) : unit =
+        let ctsOpt =
+            lock lockObj (fun () ->
+                match drivers.TryGetValue(key) with
+                | true, Running cts ->
+                    drivers.Remove(key) |> ignore
+                    Some cts
+                | true, Idle ->
+                    drivers.Remove(key) |> ignore
+                    None
+                | false, _ -> None)
+
+        match ctsOpt with
+        | Some cts ->
+            try
+                cts.Cancel()
+            with _ ->
+                ()
+
+            try
+                cts.Dispose()
+            with _ ->
+                ()
+        | None -> ()
+
+type SessionDriver(gateway: obj, sessionId: SessionId, inbox: ISessionInbox) =
+    let cts = new CancellationTokenSource()
+
+    member _.SessionId = sessionId
+    member _.Inbox = inbox
+    member _.CancellationToken = cts.Token
+
+    member _.Cancel() =
+        try
+            cts.Cancel()
+        with _ ->
+            ()
+
+    interface IDisposable with
+        member _.Dispose() =
+            try
+                cts.Cancel()
+            with _ ->
+                ()
+
+            try
+                cts.Dispose()
+            with _ ->
+                ()
