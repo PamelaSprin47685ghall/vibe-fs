@@ -13,7 +13,7 @@ let formatWipAcknowledgment (task: string) : string =
     let docView =
         { objective = task
           background = None
-          agentRole = AgentRole.CodeReview
+          agentRole = AgentRole.Implementation
           targets =
             [ reviewMode "active"
               PromptTarget.EvidenceTarget("progress", "saved") ]
@@ -39,7 +39,7 @@ let private recommendationOutcomes (items: string list) : PromptOutcome list =
 let private acceptedDoc (items: string list) : PromptDocumentView =
     { objective = "Carry out the reviewer's final recommendations carefully and completely."
       background = None
-      agentRole = AgentRole.CodeReview
+      agentRole = AgentRole.Implementation
       targets = [ reviewMode "ended" ]
       boundaries = []
       rules =
@@ -66,7 +66,7 @@ let private needsRevisionDoc (items: string list) : PromptDocumentView =
 
     { objective = "Revise the work using the reviewer's structured feedback."
       background = None
-      agentRole = AgentRole.CodeReview
+      agentRole = AgentRole.Implementation
       targets = [ reviewMode "active" ]
       boundaries = []
       rules = rules
@@ -75,7 +75,7 @@ let private needsRevisionDoc (items: string list) : PromptDocumentView =
 let private terminatedDoc: PromptDocumentView =
     { objective = "Recover from a review that ended without a verdict."
       background = None
-      agentRole = AgentRole.CodeReview
+      agentRole = AgentRole.Implementation
       targets = [ reviewMode "active" ]
       boundaries = []
       rules = [ PromptRule.Policy "Verify state, resolve blockers, and submit again when ready." ]

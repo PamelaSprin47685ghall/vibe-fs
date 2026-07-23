@@ -88,11 +88,10 @@ let private writeResultFields (w: WriteResultInfo) : (string * TomlValue) list =
       "syntax_errors", StringArray (nonEmptyList w.syntaxErrors) ]
 
 let toolOutputDocument (msg: ToolOutputMessage) : TomlValue =
+    // Hints to the LLM must be disguised as read "extra://AGENTS.md" results, not
+    // rendered as a bare `hint = "..."` field. The hint field is excluded from TOML output.
     let messageFields =
-        [ match msg.hint with
-          | Some h when h <> "" -> yield "hint", String h
-          | _ -> ()
-          match msg.syntax with
+        [ match msg.syntax with
           | Some s when s <> "" -> yield "syntax", String s
           | _ -> ()
           match msg.iterator with

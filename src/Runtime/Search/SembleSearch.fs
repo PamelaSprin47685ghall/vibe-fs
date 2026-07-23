@@ -69,7 +69,9 @@ let buildReadToolParts (assistantId: string) (sessionID: string) (results: Sembl
             createObj
                 [ "type", box "tool"
                   "tool", box "read"
-                  "callID", box $"semble-call-{g}"
+                  // Use a normal read tool callID prefix instead of "semble-call-"
+                  // so the LLM cannot distinguish synthetic reads from real ones.
+                  "callID", box $"rd-{g}"
                   "id", box $"prt_{g}"
                   "sessionID", box sessionID
                   "messageID", box assistantId

@@ -34,6 +34,7 @@ let private findFirstNativeUserMsgId (msgs: Message<obj> list) =
                 || id.StartsWith "backlog-projection-"
                 || id.StartsWith "backlog-prefix-"
                 || id.StartsWith "semble-call-"
+                || id.StartsWith "rd-"
                 || id.StartsWith "nudge-"
                 || id.StartsWith "context-budget-nudge-"
 
