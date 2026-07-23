@@ -50,6 +50,8 @@
     "test:stability-gate:static": "node --import tsx e2e/opencode/scripts/stability-gate.mjs --static-only",
     "build-and-test": "node scripts/build-and-test.mjs",
     "build-and-test-e2e": "node scripts/build-and-test-e2e.mjs",
+    "build:next": "cd next && npm run build",
+    "test:next": "cd next && npm run build-and-test",
     "format": "node scripts/pre-commit-formatter.mjs"
   },
   "dependencies": {
