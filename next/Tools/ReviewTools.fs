@@ -6,7 +6,7 @@ open Wanxiangshu.Next.Session
 
 module ReviewTools =
 
-    let submitReviewTool (port: SessionCommandPort) : Tool =
+    let submitReviewTool () : Tool =
         { Name = "submit_review"
           Description = "Submit review task result."
           SchemaJson = """{"type":"object","properties":{"report":{"type":"string"}},"required":["report"]}"""
@@ -27,7 +27,7 @@ module ReviewTools =
 
                     let mutable replyVal = Ok SessionCommandResult.ReviewSubmitted
                     let cmd = SubmitReview(reportText, (fun r -> replyVal <- r))
-                    let! res = port.Request cmd ctx.Cancellation ctx.Deadline
+                    let! res = ctx.Session.Request cmd ctx.Cancellation ctx.Deadline
 
                     match res with
                     | Ok SessionCommandResult.ReviewSubmitted ->
@@ -44,7 +44,7 @@ module ReviewTools =
                               Truncated = false }
                 } }
 
-    let returnReviewerTool (port: SessionCommandPort) : Tool =
+    let returnReviewerTool () : Tool =
         { Name = "return_reviewer"
           Description = "Return verdict from reviewer."
           SchemaJson = """{"type":"object","properties":{"verdict":{"type":"string"}},"required":["verdict"]}"""
@@ -65,7 +65,7 @@ module ReviewTools =
 
                     let mutable replyVal = Ok SessionCommandResult.VerdictReturned
                     let cmd = ReturnVerdict(verdictText, (fun r -> replyVal <- r))
-                    let! res = port.Request cmd ctx.Cancellation ctx.Deadline
+                    let! res = ctx.Session.Request cmd ctx.Cancellation ctx.Deadline
 
                     match res with
                     | Ok SessionCommandResult.VerdictReturned ->

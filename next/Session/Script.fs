@@ -173,7 +173,20 @@ module private SessionAsync =
         (ct: CancellationToken)
         : Task<Result<unit, SessionError>> =
         task {
-            return Ok()
+            match outcome with
+            | Delivered _ ->
+                match Map.tryFind sessionId gateway.ProjectionSet.SessionProjections with
+                | Some proj ->
+                    match proj.Todos with
+                    | Some snap when not (List.isEmpty snap.Items) ->
+                        let remaining = List.tail snap.Items
+                        let fact = Fact.Todo(Fact.TodoChanged {| Snapshot = { Items = remaining } |})
+                        match gateway.Append (StreamId.Session sessionId) None fact with
+                        | Committed _ -> return Ok()
+                        | CommitUnknown _ -> return Error(SessionError.ProjectionBroken "commitTodoFrom write failed")
+                    | _ -> return Ok()
+                | None -> return Ok()
+            | _ -> return Ok()
         }
 
 
