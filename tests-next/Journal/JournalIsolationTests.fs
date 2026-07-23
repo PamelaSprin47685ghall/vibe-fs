@@ -32,6 +32,7 @@ module JournalIsolationTests =
             task {
                 let runtimeA = RuntimeId.create "rtA"
                 let runtimeB = RuntimeId.create "rtB"
+                let session1 = SessionId.create "s1"
 
                 let writerA, initEnvA =
                     JournalWriter.create tempDir runtimeA 100 DateTimeOffset.UtcNow
@@ -39,11 +40,11 @@ module JournalIsolationTests =
                 let writerB, initEnvB =
                     JournalWriter.create tempDir runtimeB 101 DateTimeOffset.UtcNow
 
-                let factA = Fact.Session(Fact.HumanTurnStarted {| TurnId = TurnId.create "turn1" |})
-                let factB = Fact.Session(Fact.HumanTurnStarted {| TurnId = TurnId.create "turn2" |})
+                let factA = Fact.Todo(TodoChanged {| Snapshot = { Items = [ "todoA" ] } |})
+                let factB = Fact.Todo(TodoChanged {| Snapshot = { Items = [ "todoB" ] } |})
 
-                let commitA = writerA.Append StreamId.Workspace None factA
-                let commitB = writerB.Append StreamId.Workspace None factB
+                let commitA = writerA.Append (StreamId.Session session1) None factA
+                let commitB = writerB.Append (StreamId.Session session1) None factB
 
                 Assert.True(
                     match commitA with
@@ -61,8 +62,10 @@ module JournalIsolationTests =
                 (writerB :> IDisposable).Dispose()
 
                 let bootSnapshot = Boot.boot tempDir
+                let proj = Fold.apply Fold.empty bootSnapshot.Envelopes
 
-                Assert.True(bootSnapshot.Envelopes.Length >= 4)
+                let sessProj = Map.find session1 proj.SessionProjections
+                Assert.True(sessProj.Todos.IsSome)
 
                 let runtimes =
                     bootSnapshot.Envelopes

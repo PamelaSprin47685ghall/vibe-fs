@@ -1,4 +1,4 @@
-namespace Wanxiangshu.Next.Tests
+namespace Wanxiangshu.Next.Tests.Flow
 
 open System
 open System.Threading

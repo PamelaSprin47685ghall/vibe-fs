@@ -32,9 +32,9 @@
     <Compile Include="Session/Fallback.fs"/>
     <Compile Include="Session/Review.fs"/>
     <Compile Include="Session/Driver.fs"/>
+    <Compile Include="Process/ProcessTypes.fs"/>
     <Compile Include="Process/Deadline.fs"/>
     <Compile Include="Process/Command.fs"/>
-    <Compile Include="Process/ProcessTypes.fs"/>
     <Compile Include="Process/ProcessPump.fs"/>
     <Compile Include="Process/ProcessHandle.fs"/>
     <Compile Include="Process/ProcessFlow.fs"/>
