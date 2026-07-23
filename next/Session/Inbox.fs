@@ -45,9 +45,27 @@ type ISessionInbox =
 type FifoInbox(capacity: int) =
     let queue = System.Collections.Generic.Queue<SessionInboxEvent>()
 
-    let waiters = System.Collections.Generic.Queue<JsTcs<SessionInboxEvent>>()
+    let waiters =
+        System.Collections.Generic.Queue<TaskCompletionSource<SessionInboxEvent>>()
 
     let lockObj = obj ()
+
+    let removeWaiter (waiter: TaskCompletionSource<SessionInboxEvent>) =
+        let remaining =
+            System.Collections.Generic.Queue<TaskCompletionSource<SessionInboxEvent>>()
+
+        while waiters.Count > 0 do
+            let candidate = waiters.Dequeue()
+
+            if not (obj.ReferenceEquals(candidate, waiter)) then
+                remaining.Enqueue(candidate)
+
+        while remaining.Count > 0 do
+            waiters.Enqueue(remaining.Dequeue())
+
+    let cancelWaiter (waiter: TaskCompletionSource<SessionInboxEvent>) =
+        lock lockObj (fun () -> removeWaiter waiter)
+        waiter.TrySetCanceled() |> ignore
 
     interface ISessionInbox with
 
@@ -72,16 +90,14 @@ type FifoInbox(capacity: int) =
                         if queue.Count > 0 then
                             (Some(queue.Dequeue()), None)
                         else
-                            let tcs = JsTcs<SessionInboxEvent>()
+                            let tcs = new TaskCompletionSource<SessionInboxEvent>()
                             waiters.Enqueue(tcs)
                             (None, Some tcs))
 
                 match itemOpt, waiterOpt with
                 | Some item, _ -> return item
                 | None, Some tcs ->
-                    use reg =
-                        cancellationToken.Register(fun () ->
-                            tcs.TrySetResult(LifecycleEvent "inbox-cancelled") |> ignore)
+                    use reg = cancellationToken.Register(fun () -> cancelWaiter tcs)
 
                     return! tcs.Task
                 | None, None -> return LifecycleEvent "inbox-desync"

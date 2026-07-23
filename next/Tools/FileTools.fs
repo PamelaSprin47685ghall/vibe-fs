@@ -1,6 +1,8 @@
 namespace Wanxiangshu.Next.Tools
 
 open System.Threading.Tasks
+open Fable.Core
+open Fable.Core.JsInterop
 open Thoth.Json
 
 module FileTools =

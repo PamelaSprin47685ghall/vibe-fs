@@ -38,5 +38,6 @@
     <Compile Include="Session/ChildFlowTests.fs"/>
     <Compile Include="Gates/ArchitectureGates.fs"/>
     <Compile Include="Integration/VerticalSliceIntegrationTests.fs"/>
+    <Compile Include="E2E/VerticalSliceE2ETests.fs"/>
   </ItemGroup>
 </Project>
