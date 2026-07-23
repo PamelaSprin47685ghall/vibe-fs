@@ -1,0 +1,3209 @@
+[
+  {
+    "id": "OC-BOOT-001",
+    "category": "BOOT",
+    "userVisibleBehavior": "opencode serve starts with plugin loaded",
+    "decision": "Keep",
+    "newOwner": "src/OpenCode/Plugin.fs, src/Journal/Gateway.fs, src/OpenCode/PluginRuntime.fs",
+    "tests": "e2e/opencode/specs/p0-canary-tests-basics.js (OC-BOOT-001 opencode serve starts with plugin loaded)",
+    "nextStatus": "Proven",
+    "legacyFiles": [
+      "src/Hosts/OpenCode/Plugin.fs",
+      "src/Runtime/PluginRuntime.fs"
+    ],
+    "notes": ""
+  },
+  {
+    "id": "OC-BOOT-002",
+    "category": "BOOT",
+    "userVisibleBehavior": "/command lists loop",
+    "decision": "Keep",
+    "newOwner": "src/OpenCode/Plugin.fs, src/Journal/Gateway.fs, src/OpenCode/PluginRuntime.fs",
+    "tests": "Pending next test suite migration",
+    "nextStatus": "Implemented",
+    "legacyFiles": [
+      "src/Hosts/OpenCode/Plugin.fs",
+      "src/Runtime/PluginRuntime.fs"
+    ],
+    "notes": "demoted from real-e2e: no matching spec/test yet"
+  },
+  {
+    "id": "OC-BOOT-003",
+    "category": "BOOT",
+    "userVisibleBehavior": "LLM request includes all registered tools",
+    "decision": "Keep",
+    "newOwner": "src/OpenCode/Plugin.fs, src/Journal/Gateway.fs, src/OpenCode/PluginRuntime.fs",
+    "tests": "Pending next test suite migration",
+    "nextStatus": "Implemented",
+    "legacyFiles": [
+      "src/Hosts/OpenCode/Plugin.fs",
+      "src/Runtime/PluginRuntime.fs"
+    ],
+    "notes": ""
+  },
+  {
+    "id": "OC-BOOT-004",
+    "category": "BOOT",
+    "userVisibleBehavior": "No plugin = baseline with no custom tools/commands",
+    "decision": "Keep",
+    "newOwner": "src/OpenCode/Plugin.fs, src/Journal/Gateway.fs, src/OpenCode/PluginRuntime.fs",
+    "tests": "Pending next test suite migration",
+    "nextStatus": "Implemented",
+    "legacyFiles": [
+      "src/Hosts/OpenCode/Plugin.fs",
+      "src/Runtime/PluginRuntime.fs"
+    ],
+    "notes": ""
+  },
+  {
+    "id": "OC-BOOT-005",
+    "category": "BOOT",
+    "userVisibleBehavior": "Bad plugin path = stderr diagnostic",
+    "decision": "Keep",
+    "newOwner": "src/OpenCode/Plugin.fs, src/Journal/Gateway.fs, src/OpenCode/PluginRuntime.fs",
+    "tests": "Pending next test suite migration",
+    "nextStatus": "Implemented",
+    "legacyFiles": [
+      "src/Hosts/OpenCode/Plugin.fs",
+      "src/Runtime/PluginRuntime.fs"
+    ],
+    "notes": ""
+  },
+  {
+    "id": "OC-BOOT-006",
+    "category": "BOOT",
+    "userVisibleBehavior": "No AGENTS.md = default config, no crash",
+    "decision": "Keep",
+    "newOwner": "src/OpenCode/Plugin.fs, src/Journal/Gateway.fs, src/OpenCode/PluginRuntime.fs",
+    "tests": "Pending next test suite migration",
+    "nextStatus": "Implemented",
+    "legacyFiles": [
+      "src/Hosts/OpenCode/Plugin.fs",
+      "src/Runtime/PluginRuntime.fs"
+    ],
+    "notes": ""
+  },
+  {
+    "id": "OC-BOOT-007",
+    "category": "BOOT",
+    "userVisibleBehavior": "Valid AGENTS.md config applies",
+    "decision": "Keep",
+    "newOwner": "src/OpenCode/Plugin.fs, src/Journal/Gateway.fs, src/OpenCode/PluginRuntime.fs",
+    "tests": "Pending next test suite migration",
+    "nextStatus": "Implemented",
+    "legacyFiles": [
+      "src/Hosts/OpenCode/Plugin.fs",
+      "src/Runtime/PluginRuntime.fs"
+    ],
+    "notes": ""
+  },
+  {
+    "id": "OC-BOOT-008",
+    "category": "BOOT",
+    "userVisibleBehavior": "Corrupt frontmatter does not load half-config",
+    "decision": "Keep",
+    "newOwner": "src/OpenCode/Plugin.fs, src/Journal/Gateway.fs, src/OpenCode/PluginRuntime.fs",
+    "tests": "Pending next test suite migration",
+    "nextStatus": "Implemented",
+    "legacyFiles": [
+      "src/Hosts/OpenCode/Plugin.fs",
+      "src/Runtime/PluginRuntime.fs"
+    ],
+    "notes": ""
+  },
+  {
+    "id": "OC-BOOT-009",
+    "category": "BOOT",
+    "userVisibleBehavior": "Two independent scenarios = no sharing",
+    "decision": "Keep",
+    "newOwner": "src/OpenCode/Plugin.fs, src/Journal/Gateway.fs, src/OpenCode/PluginRuntime.fs",
+    "tests": "Pending next test suite migration",
+    "nextStatus": "Implemented",
+    "legacyFiles": [
+      "src/Hosts/OpenCode/Plugin.fs",
+      "src/Runtime/PluginRuntime.fs"
+    ],
+    "notes": ""
+  },
+  {
+    "id": "OC-BOOT-010",
+    "category": "BOOT",
+    "userVisibleBehavior": "Restart does not double-register hooks",
+    "decision": "Keep",
+    "newOwner": "src/OpenCode/Plugin.fs, src/Journal/Gateway.fs, src/OpenCode/PluginRuntime.fs",
+    "tests": "Pending next test suite migration",
+    "nextStatus": "Implemented",
+    "legacyFiles": [
+      "src/Hosts/OpenCode/Plugin.fs",
+      "src/Runtime/PluginRuntime.fs"
+    ],
+    "notes": ""
+  },
+  {
+    "id": "OC-SCHEMA-001",
+    "category": "SCHEMA",
+    "userVisibleBehavior": "Every tool has non-empty description and valid JSON schema",
+    "decision": "Keep",
+    "newOwner": "src/Tools/Catalog.fs, src/Tools/Types.fs",
+    "tests": "e2e/opencode/specs/p0-canary-tests-basics.js (OC-SCHEMA-001 tools have description and valid schema)",
+    "nextStatus": "Proven",
+    "legacyFiles": [
+      "src/Runtime/ToolRegistry.fs",
+      "src/Hosts/OpenCode/PluginTools.fs"
+    ],
+    "notes": ""
+  },
+  {
+    "id": "OC-SCHEMA-002",
+    "category": "SCHEMA",
+    "userVisibleBehavior": "Executor schema includes required max_bytes",
+    "decision": "Keep",
+    "newOwner": "src/Tools/Catalog.fs, src/Tools/Types.fs",
+    "tests": "tests-next/ (unit)",
+    "nextStatus": "Proven",
+    "legacyFiles": [
+      "src/Runtime/ToolRegistry.fs",
+      "src/Hosts/OpenCode/PluginTools.fs"
+    ],
+    "notes": ""
+  },
+  {
+    "id": "OC-SCHEMA-003",
+    "category": "SCHEMA",
+    "userVisibleBehavior": "Write tools inject warn_tdd into schema",
+    "decision": "Keep",
+    "newOwner": "src/Tools/Catalog.fs, src/Tools/Types.fs",
+    "tests": "tests-next/ (unit)",
+    "nextStatus": "Proven",
+    "legacyFiles": [
+      "src/Runtime/ToolRegistry.fs",
+      "src/Hosts/OpenCode/PluginTools.fs"
+    ],
+    "notes": ""
+  },
+  {
+    "id": "OC-SCHEMA-004",
+    "category": "SCHEMA",
+    "userVisibleBehavior": "Executor injects warn into schema",
+    "decision": "Keep",
+    "newOwner": "src/Tools/Catalog.fs, src/Tools/Types.fs",
+    "tests": "tests-next/ (unit)",
+    "nextStatus": "Proven",
+    "legacyFiles": [
+      "src/Runtime/ToolRegistry.fs",
+      "src/Hosts/OpenCode/PluginTools.fs"
+    ],
+    "notes": ""
+  },
+  {
+    "id": "OC-SCHEMA-005",
+    "category": "SCHEMA",
+    "userVisibleBehavior": "Subagent tools inject warn_reuse",
+    "decision": "Keep",
+    "newOwner": "src/Tools/Catalog.fs, src/Tools/Types.fs",
+    "tests": "tests-next/ (unit)",
+    "nextStatus": "Proven",
+    "legacyFiles": [
+      "src/Runtime/ToolRegistry.fs",
+      "src/Hosts/OpenCode/PluginTools.fs"
+    ],
+    "notes": ""
+  },
+  {
+    "id": "OC-SCHEMA-006",
+    "category": "SCHEMA",
+    "userVisibleBehavior": "todowrite schema configured",
+    "decision": "Keep",
+    "newOwner": "src/Tools/Catalog.fs, src/Tools/Types.fs",
+    "tests": "tests-next/ (unit)",
+    "nextStatus": "Proven",
+    "legacyFiles": [
+      "src/Runtime/ToolRegistry.fs",
+      "src/Hosts/OpenCode/PluginTools.fs"
+    ],
+    "notes": ""
+  },
+  {
+    "id": "OC-SCHEMA-007",
+    "category": "SCHEMA",
+    "userVisibleBehavior": "Missing required params rejected by host before execute",
+    "decision": "Keep",
+    "newOwner": "src/Tools/Catalog.fs, src/Tools/Types.fs",
+    "tests": "Pending next test suite migration",
+    "nextStatus": "Skeleton",
+    "legacyFiles": [
+      "src/Runtime/ToolRegistry.fs",
+      "src/Hosts/OpenCode/PluginTools.fs"
+    ],
+    "notes": ""
+  },
+  {
+    "id": "OC-SCHEMA-008",
+    "category": "SCHEMA",
+    "userVisibleBehavior": "Control fields deleted in before hook, not in execute",
+    "decision": "Keep",
+    "newOwner": "src/Tools/Catalog.fs, src/Tools/Types.fs",
+    "tests": "tests-next/ (integration)",
+    "nextStatus": "Implemented",
+    "legacyFiles": [
+      "src/Runtime/ToolRegistry.fs",
+      "src/Hosts/OpenCode/PluginTools.fs"
+    ],
+    "notes": ""
+  },
+  {
+    "id": "OC-SCHEMA-009",
+    "category": "SCHEMA",
+    "userVisibleBehavior": "After hook args correlate with actual exec params",
+    "decision": "Keep",
+    "newOwner": "src/Tools/Catalog.fs, src/Tools/Types.fs",
+    "tests": "tests-next/ (integration)",
+    "nextStatus": "Implemented",
+    "legacyFiles": [
+      "src/Runtime/ToolRegistry.fs",
+      "src/Hosts/OpenCode/PluginTools.fs"
+    ],
+    "notes": ""
+  },
+  {
+    "id": "OC-PERM-001",
+    "category": "SCHEMA",
+    "userVisibleBehavior": "Tool visibility per agent matches permission matrix",
+    "decision": "Keep",
+    "newOwner": "src/Tools/Catalog.fs, src/Tools/Types.fs",
+    "tests": "tests-next/ (unit)",
+    "nextStatus": "Proven",
+    "legacyFiles": [
+      "src/Runtime/ToolRegistry.fs",
+      "src/Hosts/OpenCode/PluginTools.fs"
+    ],
+    "notes": ""
+  },
+  {
+    "id": "OC-PERM-002",
+    "category": "SCHEMA",
+    "userVisibleBehavior": "Forbidden tools absent from agent tool list",
+    "decision": "Keep",
+    "newOwner": "src/Tools/Catalog.fs, src/Tools/Types.fs",
+    "tests": "tests-next/ (unit)",
+    "nextStatus": "Proven",
+    "legacyFiles": [
+      "src/Runtime/ToolRegistry.fs",
+      "src/Hosts/OpenCode/PluginTools.fs"
+    ],
+    "notes": ""
+  },
+  {
+    "id": "OC-PERM-003",
+    "category": "SCHEMA",
+    "userVisibleBehavior": "Permission=deny = zero side effects",
+    "decision": "Keep",
+    "newOwner": "src/Tools/Catalog.fs, src/Tools/Types.fs",
+    "tests": "Pending next test suite migration",
+    "nextStatus": "Skeleton",
+    "legacyFiles": [
+      "src/Runtime/ToolRegistry.fs",
+      "src/Hosts/OpenCode/PluginTools.fs"
+    ],
+    "notes": ""
+  },
+  {
+    "id": "OC-PERM-004",
+    "category": "SCHEMA",
+    "userVisibleBehavior": "Permission=once = one execution only",
+    "decision": "Keep",
+    "newOwner": "src/Tools/Catalog.fs, src/Tools/Types.fs",
+    "tests": "Pending next test suite migration",
+    "nextStatus": "Skeleton",
+    "legacyFiles": [
+      "src/Runtime/ToolRegistry.fs",
+      "src/Hosts/OpenCode/PluginTools.fs"
+    ],
+    "notes": ""
+  },
+  {
+    "id": "OC-PERM-005",
+    "category": "SCHEMA",
+    "userVisibleBehavior": "No permission responder = wait, then abortable",
+    "decision": "Keep",
+    "newOwner": "src/Tools/Catalog.fs, src/Tools/Types.fs",
+    "tests": "Pending next test suite migration",
+    "nextStatus": "Skeleton",
+    "legacyFiles": [
+      "src/Runtime/ToolRegistry.fs",
+      "src/Hosts/OpenCode/PluginTools.fs"
+    ],
+    "notes": ""
+  },
+  {
+    "id": "OC-MSG-001",
+    "category": "MSG",
+    "userVisibleBehavior": "System transform contains real work directory",
+    "decision": "Keep",
+    "newOwner": "src/OpenCode/Decode.fs, src/OpenCode/Types.fs",
+    "tests": "tests-next/ (integration)",
+    "nextStatus": "Implemented",
+    "legacyFiles": [
+      "src/Hosts/OpenCode/Codec.fs"
+    ],
+    "notes": ""
+  },
+  {
+    "id": "OC-MSG-002",
+    "category": "MSG",
+    "userVisibleBehavior": "Caps prelude in first round",
+    "decision": "Keep",
+    "newOwner": "src/OpenCode/Decode.fs, src/OpenCode/Types.fs",
+    "tests": "Pending next test suite migration",
+    "nextStatus": "Implemented",
+    "legacyFiles": [
+      "src/Hosts/OpenCode/Codec.fs"
+    ],
+    "notes": "demoted from real-e2e: no matching spec/test yet"
+  },
+  {
+    "id": "OC-MSG-003",
+    "category": "MSG",
+    "userVisibleBehavior": "No duplicate Caps injection in same epoch",
+    "decision": "Keep",
+    "newOwner": "src/OpenCode/Decode.fs, src/OpenCode/Types.fs",
+    "tests": "tests-next/ (unit)",
+    "nextStatus": "Proven",
+    "legacyFiles": [
+      "src/Hosts/OpenCode/Codec.fs"
+    ],
+    "notes": ""
+  },
+  {
+    "id": "OC-MSG-004",
+    "category": "MSG",
+    "userVisibleBehavior": "New session gets fresh Caps",
+    "decision": "Keep",
+    "newOwner": "src/OpenCode/Decode.fs, src/OpenCode/Types.fs",
+    "tests": "Pending next test suite migration",
+    "nextStatus": "Implemented",
+    "legacyFiles": [
+      "src/Hosts/OpenCode/Codec.fs"
+    ],
+    "notes": ""
+  },
+  {
+    "id": "OC-MSG-005",
+    "category": "MSG",
+    "userVisibleBehavior": "Tool result backfilled into next model context",
+    "decision": "Keep",
+    "newOwner": "src/OpenCode/Decode.fs, src/OpenCode/Types.fs",
+    "tests": "Pending next test suite migration",
+    "nextStatus": "Implemented",
+    "legacyFiles": [
+      "src/Hosts/OpenCode/Codec.fs"
+    ],
+    "notes": "demoted from real-e2e: no matching spec/test yet"
+  },
+  {
+    "id": "OC-MSG-006",
+    "category": "MSG",
+    "userVisibleBehavior": "Tool error backfilled as correct part type",
+    "decision": "Keep",
+    "newOwner": "src/OpenCode/Decode.fs, src/OpenCode/Types.fs",
+    "tests": "Pending next test suite migration",
+    "nextStatus": "Implemented",
+    "legacyFiles": [
+      "src/Hosts/OpenCode/Codec.fs"
+    ],
+    "notes": ""
+  },
+  {
+    "id": "OC-MSG-007",
+    "category": "MSG",
+    "userVisibleBehavior": "Unicode, newlines, large output not escaped",
+    "decision": "Keep",
+    "newOwner": "src/OpenCode/Decode.fs, src/OpenCode/Types.fs",
+    "tests": "Pending next test suite migration",
+    "nextStatus": "Implemented",
+    "legacyFiles": [
+      "src/Hosts/OpenCode/Codec.fs"
+    ],
+    "notes": ""
+  },
+  {
+    "id": "OC-MSG-008",
+    "category": "MSG",
+    "userVisibleBehavior": "Incomplete tool-call/result pairs dont corrupt messages",
+    "decision": "Keep",
+    "newOwner": "src/OpenCode/Decode.fs, src/OpenCode/Types.fs",
+    "tests": "tests-next/ (unit)",
+    "nextStatus": "Proven",
+    "legacyFiles": [
+      "src/Hosts/OpenCode/Codec.fs"
+    ],
+    "notes": ""
+  },
+  {
+    "id": "OC-MSG-009",
+    "category": "MSG",
+    "userVisibleBehavior": "Control fields not leaked to builtin tools",
+    "decision": "Keep",
+    "newOwner": "src/OpenCode/Decode.fs, src/OpenCode/Types.fs",
+    "tests": "tests-next/ (unit)",
+    "nextStatus": "Proven",
+    "legacyFiles": [
+      "src/Hosts/OpenCode/Codec.fs"
+    ],
+    "notes": ""
+  },
+  {
+    "id": "OC-MSG-010",
+    "category": "MSG",
+    "userVisibleBehavior": "Agent tool filtering scoped per session",
+    "decision": "Keep",
+    "newOwner": "src/OpenCode/Decode.fs, src/OpenCode/Types.fs",
+    "tests": "Pending next test suite migration",
+    "nextStatus": "Implemented",
+    "legacyFiles": [
+      "src/Hosts/OpenCode/Codec.fs"
+    ],
+    "notes": ""
+  },
+  {
+    "id": "OC-FILE-001",
+    "category": "FILE",
+    "userVisibleBehavior": "write creates file with exact byte content",
+    "decision": "Keep",
+    "newOwner": "src/Tools/File.fs",
+    "tests": "e2e/opencode/specs/p0-canary-tests-basics.js (OC-FILE-001 write creates file with exact bytes)",
+    "nextStatus": "Proven",
+    "legacyFiles": [
+      "src/Hosts/OpenCode/FileTools.fs"
+    ],
+    "notes": ""
+  },
+  {
+    "id": "OC-FILE-002",
+    "category": "FILE",
+    "userVisibleBehavior": "write overwrites file, no trailing residue",
+    "decision": "Keep",
+    "newOwner": "src/Tools/File.fs",
+    "tests": "e2e/opencode/specs/p0-canary-tests-basics.js (OC-FILE-002 write overwrites file with no trailing residue)",
+    "nextStatus": "Proven",
+    "legacyFiles": [
+      "src/Hosts/OpenCode/FileTools.fs"
+    ],
+    "notes": ""
+  },
+  {
+    "id": "OC-FILE-003",
+    "category": "FILE",
+    "userVisibleBehavior": "write empty file exists with length 0",
+    "decision": "Keep",
+    "newOwner": "src/Tools/File.fs",
+    "tests": "e2e/opencode/specs/p0-canary-tests-basics.js (OC-FILE-003 write empty file exists with length 0)",
+    "nextStatus": "Proven",
+    "legacyFiles": [
+      "src/Hosts/OpenCode/FileTools.fs"
+    ],
+    "notes": ""
+  },
+  {
+    "id": "OC-FILE-004",
+    "category": "FILE",
+    "userVisibleBehavior": "write Unicode preserves UTF-8 bytes",
+    "decision": "Keep",
+    "newOwner": "src/Tools/File.fs",
+    "tests": "e2e/opencode/specs/p0-canary-tests-basics.js (OC-FILE-004 Unicode UTF-8 content survives round-trip)",
+    "nextStatus": "Proven",
+    "legacyFiles": [
+      "src/Hosts/OpenCode/FileTools.fs"
+    ],
+    "notes": ""
+  },
+  {
+    "id": "OC-FILE-005",
+    "category": "FILE",
+    "userVisibleBehavior": "write multi-line preserves line endings",
+    "decision": "Keep",
+    "newOwner": "src/Tools/File.fs",
+    "tests": "e2e/opencode/specs/p0-canary-tests-basics.js (OC-FILE-005 multi-line content preserves every line)",
+    "nextStatus": "Proven",
+    "legacyFiles": [
+      "src/Hosts/OpenCode/FileTools.fs"
+    ],
+    "notes": ""
+  },
+  {
+    "id": "OC-FILE-006",
+    "category": "FILE",
+    "userVisibleBehavior": "read returns real content into next model round",
+    "decision": "Keep",
+    "newOwner": "src/Tools/File.fs",
+    "tests": "e2e/opencode/specs/p0-canary-tests-basics.js (OC-FILE-006 read returns real file content)",
+    "nextStatus": "Proven",
+    "legacyFiles": [
+      "src/Hosts/OpenCode/FileTools.fs"
+    ],
+    "notes": ""
+  },
+  {
+    "id": "OC-FILE-007",
+    "category": "FILE",
+    "userVisibleBehavior": "read missing file produces error part, session continues",
+    "decision": "Keep",
+    "newOwner": "src/Tools/File.fs",
+    "tests": "Pending next test suite migration",
+    "nextStatus": "Skeleton",
+    "legacyFiles": [
+      "src/Hosts/OpenCode/FileTools.fs"
+    ],
+    "notes": ""
+  },
+  {
+    "id": "OC-FILE-008",
+    "category": "FILE",
+    "userVisibleBehavior": "write-then-read proves cross-round consistency",
+    "decision": "Keep",
+    "newOwner": "src/Tools/File.fs",
+    "tests": "e2e/opencode/specs/p0-canary-tests-basics.js (OC-FILE-008 write-then-read returns identical content)",
+    "nextStatus": "Proven",
+    "legacyFiles": [
+      "src/Hosts/OpenCode/FileTools.fs"
+    ],
+    "notes": ""
+  },
+  {
+    "id": "OC-FILE-009",
+    "category": "FILE",
+    "userVisibleBehavior": "Missing warn_tdd executes and does not produce criticism",
+    "decision": "Keep",
+    "newOwner": "src/Tools/File.fs",
+    "tests": "Pending next test suite migration",
+    "nextStatus": "Skeleton",
+    "legacyFiles": [
+      "src/Hosts/OpenCode/FileTools.fs"
+    ],
+    "notes": "demoted from real-e2e: no matching spec/test yet"
+  },
+  {
+    "id": "OC-FILE-010",
+    "category": "FILE",
+    "userVisibleBehavior": "warn_tdd not written to file",
+    "decision": "Keep",
+    "newOwner": "src/Tools/File.fs",
+    "tests": "Pending next test suite migration",
+    "nextStatus": "Skeleton",
+    "legacyFiles": [
+      "src/Hosts/OpenCode/FileTools.fs"
+    ],
+    "notes": ""
+  },
+  {
+    "id": "OC-FILE-011",
+    "category": "FILE",
+    "userVisibleBehavior": "Permission deny = file does not exist",
+    "decision": "Keep",
+    "newOwner": "src/Tools/File.fs",
+    "tests": "Pending next test suite migration",
+    "nextStatus": "Skeleton",
+    "legacyFiles": [
+      "src/Hosts/OpenCode/FileTools.fs"
+    ],
+    "notes": ""
+  },
+  {
+    "id": "OC-FILE-012",
+    "category": "FILE",
+    "userVisibleBehavior": "Two sessions write same relative path correctly",
+    "decision": "Keep",
+    "newOwner": "src/Tools/File.fs",
+    "tests": "Pending next test suite migration",
+    "nextStatus": "Skeleton",
+    "legacyFiles": [
+      "src/Hosts/OpenCode/FileTools.fs"
+    ],
+    "notes": ""
+  },
+  {
+    "id": "OC-FILE-013",
+    "category": "FILE",
+    "userVisibleBehavior": "Write preserves exact byte length and content",
+    "decision": "Keep",
+    "newOwner": "src/Tools/File.fs",
+    "tests": "e2e/opencode/specs/p0-canary-tests-tools.js (OC-FILE-013 write preserves exact byte length and content)",
+    "nextStatus": "Proven",
+    "legacyFiles": [
+      "src/Hosts/OpenCode/FileTools.fs"
+    ],
+    "notes": ""
+  },
+  {
+    "id": "OC-FUZZY-001",
+    "category": "FUZZY",
+    "userVisibleBehavior": "fuzzy_find returns real matching paths",
+    "decision": "Keep",
+    "newOwner": "src/Tools/Search.fs",
+    "tests": "e2e/opencode/specs/p0-canary-tests-basics.js (OC-FUZZY-001 fuzzy_find returns real matching paths)",
+    "nextStatus": "Proven",
+    "legacyFiles": [
+      "src/Hosts/OpenCode/FuzzyTools.fs"
+    ],
+    "notes": ""
+  },
+  {
+    "id": "OC-FUZZY-002",
+    "category": "FUZZY",
+    "userVisibleBehavior": "No match returns explicit empty result",
+    "decision": "Keep",
+    "newOwner": "src/Tools/Search.fs",
+    "tests": "e2e/opencode/specs/p0-canary-tests-fuzzy-executor.js (OC-FUZZY-002 No match returns explicit empty result)",
+    "nextStatus": "Proven",
+    "legacyFiles": [
+      "src/Hosts/OpenCode/FuzzyTools.fs"
+    ],
+    "notes": ""
+  },
+  {
+    "id": "OC-FUZZY-003",
+    "category": "FUZZY",
+    "userVisibleBehavior": "fuzzy_grep returns file, line number, text",
+    "decision": "Keep",
+    "newOwner": "src/Tools/Search.fs",
+    "tests": "e2e/opencode/specs/p0-canary-tests-basics.js (OC-FUZZY-003 fuzzy_grep returns file, line, text)",
+    "nextStatus": "Proven",
+    "legacyFiles": [
+      "src/Hosts/OpenCode/FuzzyTools.fs"
+    ],
+    "notes": ""
+  },
+  {
+    "id": "OC-FUZZY-004",
+    "category": "FUZZY",
+    "userVisibleBehavior": "Multi-pattern returns chunked results",
+    "decision": "Keep",
+    "newOwner": "src/Tools/Search.fs",
+    "tests": "e2e/opencode/specs/p0-canary-tests-fuzzy-executor.js (OC-FUZZY-004 Multi-pattern returns chunked results)",
+    "nextStatus": "Proven",
+    "legacyFiles": [
+      "src/Hosts/OpenCode/FuzzyTools.fs"
+    ],
+    "notes": ""
+  },
+  {
+    "id": "OC-FUZZY-005",
+    "category": "FUZZY",
+    "userVisibleBehavior": "fuzzy_continue gets next page, no duplicates",
+    "decision": "Keep",
+    "newOwner": "src/Tools/Search.fs",
+    "tests": "e2e/opencode/specs/p0-canary-tests-fuzzy-executor.js (OC-FUZZY-005 fuzzy_continue gets next page, no duplicates)",
+    "nextStatus": "Proven",
+    "legacyFiles": [
+      "src/Hosts/OpenCode/FuzzyTools.fs"
+    ],
+    "notes": ""
+  },
+  {
+    "id": "OC-FUZZY-006",
+    "category": "FUZZY",
+    "userVisibleBehavior": "Iterator exhausted returns completion state",
+    "decision": "Keep",
+    "newOwner": "src/Tools/Search.fs",
+    "tests": "e2e/opencode/specs/p0-canary-tests-fuzzy-executor.js (OC-FUZZY-006 Iterator exhausted returns completion state)",
+    "nextStatus": "Proven",
+    "legacyFiles": [
+      "src/Hosts/OpenCode/FuzzyTools.fs"
+    ],
+    "notes": ""
+  },
+  {
+    "id": "OC-FUZZY-007",
+    "category": "FUZZY",
+    "userVisibleBehavior": "Wrong iterator ID does not read other session data",
+    "decision": "Keep",
+    "newOwner": "src/Tools/Search.fs",
+    "tests": "e2e/opencode/specs/p0-canary-tests-fuzzy-executor.js (OC-FUZZY-007 Wrong iterator ID does not read other session data)",
+    "nextStatus": "Proven",
+    "legacyFiles": [
+      "src/Hosts/OpenCode/FuzzyTools.fs"
+    ],
+    "notes": ""
+  },
+  {
+    "id": "OC-FUZZY-008",
+    "category": "FUZZY",
+    "userVisibleBehavior": "Session deleted cleans up iterator",
+    "decision": "Keep",
+    "newOwner": "src/Tools/Search.fs",
+    "tests": "e2e/opencode/specs/p0-canary-tests-fuzzy-executor.js (OC-FUZZY-008 Session deleted cleans up iterator)",
+    "nextStatus": "Proven",
+    "legacyFiles": [
+      "src/Hosts/OpenCode/FuzzyTools.fs"
+    ],
+    "notes": ""
+  },
+  {
+    "id": "OC-FUZZY-009",
+    "category": "FUZZY",
+    "userVisibleBehavior": "fuzzy_grep no match returns explicit empty result",
+    "decision": "Keep",
+    "newOwner": "src/Tools/Search.fs",
+    "tests": "e2e/opencode/specs/p0-canary-tests-tools.js (OC-FUZZY-009 fuzzy_grep no match returns explicit empty result)",
+    "nextStatus": "Proven",
+    "legacyFiles": [
+      "src/Hosts/OpenCode/FuzzyTools.fs"
+    ],
+    "notes": ""
+  },
+  {
+    "id": "OC-FUZZY-010",
+    "category": "FUZZY",
+    "userVisibleBehavior": "fuzzy_grep pagination continues until exhausted",
+    "decision": "Keep",
+    "newOwner": "src/Tools/Search.fs",
+    "tests": "e2e/opencode/specs/p0-canary-tests-tools.js (OC-FUZZY-010 fuzzy_grep pagination boundary continues until exhausted)",
+    "nextStatus": "Proven",
+    "legacyFiles": [
+      "src/Hosts/OpenCode/FuzzyTools.fs"
+    ],
+    "notes": ""
+  },
+  {
+    "id": "OC-EXEC-001",
+    "category": "EXEC",
+    "userVisibleBehavior": "Shell command stdout correct",
+    "decision": "Keep",
+    "newOwner": "src/Tools/Executor.fs, src/Process/Command.fs, src/Process/Handle.fs",
+    "tests": "e2e/opencode/specs/p0-canary-tests-basics.js (OC-EXEC-001 shell command stdout correct)",
+    "nextStatus": "Proven",
+    "legacyFiles": [
+      "src/Hosts/OpenCode/ExecutorTools.fs",
+      "src/Runtime/ProcessManager.fs"
+    ],
+    "notes": ""
+  },
+  {
+    "id": "OC-EXEC-002",
+    "category": "EXEC",
+    "userVisibleBehavior": "JavaScript command stdout correct",
+    "decision": "Keep",
+    "newOwner": "src/Tools/Executor.fs, src/Process/Command.fs, src/Process/Handle.fs",
+    "tests": "e2e/opencode/specs/p0-canary-tests-basics.js (OC-EXEC-002 JavaScript command stdout correct)",
+    "nextStatus": "Proven",
+    "legacyFiles": [
+      "src/Hosts/OpenCode/ExecutorTools.fs",
+      "src/Runtime/ProcessManager.fs"
+    ],
+    "notes": ""
+  },
+  {
+    "id": "OC-EXEC-003",
+    "category": "EXEC",
+    "userVisibleBehavior": "Non-zero exit code structured return",
+    "decision": "Keep",
+    "newOwner": "src/Tools/Executor.fs, src/Process/Command.fs, src/Process/Handle.fs",
+    "tests": "e2e/opencode/specs/p0-canary-tests-fuzzy-executor.js (OC-EXEC-003 Non-zero exit code structured return)",
+    "nextStatus": "Proven",
+    "legacyFiles": [
+      "src/Hosts/OpenCode/ExecutorTools.fs",
+      "src/Runtime/ProcessManager.fs"
+    ],
+    "notes": ""
+  },
+  {
+    "id": "OC-EXEC-004",
+    "category": "EXEC",
+    "userVisibleBehavior": "stderr visible, not conflated with success",
+    "decision": "Keep",
+    "newOwner": "src/Tools/Executor.fs, src/Process/Command.fs, src/Process/Handle.fs",
+    "tests": "e2e/opencode/specs/p0-canary-tests-fuzzy-executor.js (OC-EXEC-004 stderr visible, not conflated with success)",
+    "nextStatus": "Proven",
+    "legacyFiles": [
+      "src/Hosts/OpenCode/ExecutorTools.fs",
+      "src/Runtime/ProcessManager.fs"
+    ],
+    "notes": ""
+  },
+  {
+    "id": "OC-EXEC-005",
+    "category": "EXEC",
+    "userVisibleBehavior": "cwd points to target workspace",
+    "decision": "Keep",
+    "newOwner": "src/Tools/Executor.fs, src/Process/Command.fs, src/Process/Handle.fs",
+    "tests": "e2e/opencode/specs/p0-canary-tests-fuzzy-executor.js (OC-EXEC-005 cwd points to target workspace)",
+    "nextStatus": "Proven",
+    "legacyFiles": [
+      "src/Hosts/OpenCode/ExecutorTools.fs",
+      "src/Runtime/ProcessManager.fs"
+    ],
+    "notes": ""
+  },
+  {
+    "id": "OC-EXEC-006",
+    "category": "EXEC",
+    "userVisibleBehavior": "max_bytes truncation works",
+    "decision": "Keep",
+    "newOwner": "src/Tools/Executor.fs, src/Process/Command.fs, src/Process/Handle.fs",
+    "tests": "e2e/opencode/specs/p0-canary-tests-fuzzy-executor.js (OC-EXEC-006 max_bytes truncation works)",
+    "nextStatus": "Proven",
+    "legacyFiles": [
+      "src/Hosts/OpenCode/ExecutorTools.fs",
+      "src/Runtime/ProcessManager.fs"
+    ],
+    "notes": ""
+  },
+  {
+    "id": "OC-EXEC-007",
+    "category": "EXEC",
+    "userVisibleBehavior": "max_bytes boundary no off-by-one",
+    "decision": "Keep",
+    "newOwner": "src/Tools/Executor.fs, src/Process/Command.fs, src/Process/Handle.fs",
+    "tests": "tests-next/ (unit)",
+    "nextStatus": "Proven",
+    "legacyFiles": [
+      "src/Hosts/OpenCode/ExecutorTools.fs",
+      "src/Runtime/ProcessManager.fs"
+    ],
+    "notes": ""
+  },
+  {
+    "id": "OC-EXEC-008",
+    "category": "EXEC",
+    "userVisibleBehavior": "Missing warn executes and does not produce protocol criticism",
+    "decision": "Keep",
+    "newOwner": "src/Tools/Executor.fs, src/Process/Command.fs, src/Process/Handle.fs",
+    "tests": "tests-next/ (integration)",
+    "nextStatus": "Implemented",
+    "legacyFiles": [
+      "src/Hosts/OpenCode/ExecutorTools.fs",
+      "src/Runtime/ProcessManager.fs"
+    ],
+    "notes": ""
+  },
+  {
+    "id": "OC-EXEC-009",
+    "category": "EXEC",
+    "userVisibleBehavior": "Network error converted to domain error",
+    "decision": "Keep",
+    "newOwner": "src/Tools/Executor.fs, src/Process/Command.fs, src/Process/Handle.fs",
+    "tests": "tests-next/ (unit)",
+    "nextStatus": "Proven",
+    "legacyFiles": [
+      "src/Hosts/OpenCode/ExecutorTools.fs",
+      "src/Runtime/ProcessManager.fs"
+    ],
+    "notes": ""
+  },
+  {
+    "id": "OC-EXEC-010",
+    "category": "EXEC",
+    "userVisibleBehavior": "Livelock guard triggers on repeated calls",
+    "decision": "Keep",
+    "newOwner": "src/Tools/Executor.fs, src/Process/Command.fs, src/Process/Handle.fs",
+    "tests": "tests-next/ (integration)",
+    "nextStatus": "Implemented",
+    "legacyFiles": [
+      "src/Hosts/OpenCode/ExecutorTools.fs",
+      "src/Runtime/ProcessManager.fs"
+    ],
+    "notes": ""
+  },
+  {
+    "id": "OC-EXEC-011",
+    "category": "EXEC",
+    "userVisibleBehavior": "Permission deny = process not started",
+    "decision": "Keep",
+    "newOwner": "src/Tools/Executor.fs, src/Process/Command.fs, src/Process/Handle.fs",
+    "tests": "Pending next test suite migration",
+    "nextStatus": "Skeleton",
+    "legacyFiles": [
+      "src/Hosts/OpenCode/ExecutorTools.fs",
+      "src/Runtime/ProcessManager.fs"
+    ],
+    "notes": ""
+  },
+  {
+    "id": "OC-EXEC-012",
+    "category": "EXEC",
+    "userVisibleBehavior": "Session abort terminates long command",
+    "decision": "Keep",
+    "newOwner": "src/Tools/Executor.fs, src/Process/Command.fs, src/Process/Handle.fs",
+    "tests": "Pending next test suite migration",
+    "nextStatus": "Skeleton",
+    "legacyFiles": [
+      "src/Hosts/OpenCode/ExecutorTools.fs",
+      "src/Runtime/ProcessManager.fs"
+    ],
+    "notes": ""
+  },
+  {
+    "id": "OC-EXEC-013",
+    "category": "EXEC",
+    "userVisibleBehavior": "Executor returns structured non-zero exit and stderr",
+    "decision": "Keep",
+    "newOwner": "src/Tools/Executor.fs, src/Process/Command.fs, src/Process/Handle.fs",
+    "tests": "e2e/opencode/specs/p0-canary-tests-tools.js (OC-EXEC-013 executor returns structured non-zero exit and stderr)",
+    "nextStatus": "Proven",
+    "legacyFiles": [
+      "src/Hosts/OpenCode/ExecutorTools.fs",
+      "src/Runtime/ProcessManager.fs"
+    ],
+    "notes": ""
+  },
+  {
+    "id": "OC-PTY-001",
+    "category": "PTY",
+    "userVisibleBehavior": "pty_spawn starts process, returns real session ID",
+    "decision": "Keep",
+    "newOwner": "src/Tools/Pty.fs, src/Process/Pty.fs",
+    "tests": "e2e/opencode/specs/p0-canary-tests-pty.js (OC-PTY-001 pty_spawn starts process and returns session ID)",
+    "nextStatus": "Proven",
+    "legacyFiles": [
+      "src/Hosts/OpenCode/PtyTools.fs",
+      "src/Runtime/PtyManager.fs"
+    ],
+    "notes": ""
+  },
+  {
+    "id": "OC-PTY-002",
+    "category": "PTY",
+    "userVisibleBehavior": "pty_list shows newly created PTY",
+    "decision": "Keep",
+    "newOwner": "src/Tools/Pty.fs, src/Process/Pty.fs",
+    "tests": "e2e/opencode/specs/p0-canary-tests-pty.js (OC-PTY-002 pty_list shows newly created PTY)",
+    "nextStatus": "Proven",
+    "legacyFiles": [
+      "src/Hosts/OpenCode/PtyTools.fs",
+      "src/Runtime/PtyManager.fs"
+    ],
+    "notes": ""
+  },
+  {
+    "id": "OC-PTY-003",
+    "category": "PTY",
+    "userVisibleBehavior": "pty_read reads initial output",
+    "decision": "Keep",
+    "newOwner": "src/Tools/Pty.fs, src/Process/Pty.fs",
+    "tests": "e2e/opencode/specs/p0-canary-tests-pty.js (OC-PTY-003 pty_read reads initial output)",
+    "nextStatus": "Proven",
+    "legacyFiles": [
+      "src/Hosts/OpenCode/PtyTools.fs",
+      "src/Runtime/PtyManager.fs"
+    ],
+    "notes": ""
+  },
+  {
+    "id": "OC-PTY-004",
+    "category": "PTY",
+    "userVisibleBehavior": "pty_write writes stdin, reads response",
+    "decision": "Keep",
+    "newOwner": "src/Tools/Pty.fs, src/Process/Pty.fs",
+    "tests": "e2e/opencode/specs/p0-canary-tests-pty.js (OC-PTY-004 pty_write writes stdin, reads response)",
+    "nextStatus": "Proven",
+    "legacyFiles": [
+      "src/Hosts/OpenCode/PtyTools.fs",
+      "src/Runtime/PtyManager.fs"
+    ],
+    "notes": ""
+  },
+  {
+    "id": "OC-PTY-005",
+    "category": "PTY",
+    "userVisibleBehavior": "pty_kill = PID no longer alive",
+    "decision": "Keep",
+    "newOwner": "src/Tools/Pty.fs, src/Process/Pty.fs",
+    "tests": "e2e/opencode/specs/p0-canary-tests-pty.js (OC-PTY-005 pty_kill terminates process)",
+    "nextStatus": "Proven",
+    "legacyFiles": [
+      "src/Hosts/OpenCode/PtyTools.fs",
+      "src/Runtime/PtyManager.fs"
+    ],
+    "notes": ""
+  },
+  {
+    "id": "OC-PTY-006",
+    "category": "PTY",
+    "userVisibleBehavior": "After kill, list no longer reports running",
+    "decision": "Keep",
+    "newOwner": "src/Tools/Pty.fs, src/Process/Pty.fs",
+    "tests": "e2e/opencode/specs/p0-canary-tests-pty.js (OC-PTY-006 After kill, list no longer reports running)",
+    "nextStatus": "Proven",
+    "legacyFiles": [
+      "src/Hosts/OpenCode/PtyTools.fs",
+      "src/Runtime/PtyManager.fs"
+    ],
+    "notes": ""
+  },
+  {
+    "id": "OC-PTY-007",
+    "category": "PTY",
+    "userVisibleBehavior": "Invalid PTY ID returns error, others unaffected",
+    "decision": "Keep",
+    "newOwner": "src/Tools/Pty.fs, src/Process/Pty.fs",
+    "tests": "e2e/opencode/specs/p0-canary-tests-pty.js (OC-PTY-007 Invalid PTY ID returns error, others unaffected)",
+    "nextStatus": "Proven",
+    "legacyFiles": [
+      "src/Hosts/OpenCode/PtyTools.fs",
+      "src/Runtime/PtyManager.fs"
+    ],
+    "notes": ""
+  },
+  {
+    "id": "OC-PTY-008",
+    "category": "PTY",
+    "userVisibleBehavior": "Session deleted cleans up its PTYs",
+    "decision": "Keep",
+    "newOwner": "src/Tools/Pty.fs, src/Process/Pty.fs",
+    "tests": "e2e/opencode/specs/p0-canary-tests-pty.js (OC-PTY-008 Session deleted cleans up its PTYs)",
+    "nextStatus": "Proven",
+    "legacyFiles": [
+      "src/Hosts/OpenCode/PtyTools.fs",
+      "src/Runtime/PtyManager.fs"
+    ],
+    "notes": ""
+  },
+  {
+    "id": "OC-PTY-009",
+    "category": "PTY",
+    "userVisibleBehavior": "Different sessions PTYs isolated",
+    "decision": "Keep",
+    "newOwner": "src/Tools/Pty.fs, src/Process/Pty.fs",
+    "tests": "e2e/opencode/specs/p0-canary-tests-pty.js (OC-PTY-009 Different sessions PTYs isolated)",
+    "nextStatus": "Proven",
+    "legacyFiles": [
+      "src/Hosts/OpenCode/PtyTools.fs",
+      "src/Runtime/PtyManager.fs"
+    ],
+    "notes": ""
+  },
+  {
+    "id": "OC-PTY-010",
+    "category": "PTY",
+    "userVisibleBehavior": "Permission deny = no child process",
+    "decision": "Keep",
+    "newOwner": "src/Tools/Pty.fs, src/Process/Pty.fs",
+    "tests": "e2e/opencode/specs/p0-canary-tests-pty.js (OC-PTY-010 Permission deny = no child process)",
+    "nextStatus": "Proven",
+    "legacyFiles": [
+      "src/Hosts/OpenCode/PtyTools.fs",
+      "src/Runtime/PtyManager.fs"
+    ],
+    "notes": ""
+  },
+  {
+    "id": "OC-PTY-011",
+    "category": "PTY",
+    "userVisibleBehavior": "Child PTY and session cleaned up on parent delete",
+    "decision": "Keep",
+    "newOwner": "src/Tools/Pty.fs, src/Process/Pty.fs",
+    "tests": "e2e/opencode/specs/p0-canary-tests-child-pty.js (OC-PTY-011 child PTY and session cleaned up on parent delete E2E)",
+    "nextStatus": "Proven",
+    "legacyFiles": [
+      "src/Hosts/OpenCode/PtyTools.fs",
+      "src/Runtime/PtyManager.fs"
+    ],
+    "notes": ""
+  },
+  {
+    "id": "OC-WEB-001",
+    "category": "WEB",
+    "userVisibleBehavior": "websearch returns title, URL, content",
+    "decision": "Keep",
+    "newOwner": "src/Tools/Web.fs",
+    "tests": "e2e/opencode/specs/p0-canary-tests-advanced.js (OC-WEB-001 websearch calls mock endpoint and backfills result)",
+    "nextStatus": "Proven",
+    "legacyFiles": [
+      "src/Hosts/OpenCode/WebTools.fs"
+    ],
+    "notes": ""
+  },
+  {
+    "id": "OC-WEB-002",
+    "category": "WEB",
+    "userVisibleBehavior": "what_to_summarize enters subagent prompt",
+    "decision": "Keep",
+    "newOwner": "src/Tools/Web.fs",
+    "tests": "e2e/opencode/specs/p0-canary-tests-web.js (OC-WEB-002 what_to_summarize enters subagent prompt)",
+    "nextStatus": "Proven",
+    "legacyFiles": [
+      "src/Hosts/OpenCode/WebTools.fs"
+    ],
+    "notes": ""
+  },
+  {
+    "id": "OC-WEB-003",
+    "category": "WEB",
+    "userVisibleBehavior": "Provider HTTP 500 → tool error",
+    "decision": "Keep",
+    "newOwner": "src/Tools/Web.fs",
+    "tests": "e2e/opencode/specs/p0-canary-tests-web.js (OC-WEB-003 provider HTTP 500 → tool error)",
+    "nextStatus": "Proven",
+    "legacyFiles": [
+      "src/Hosts/OpenCode/WebTools.fs"
+    ],
+    "notes": ""
+  },
+  {
+    "id": "OC-WEB-004",
+    "category": "WEB",
+    "userVisibleBehavior": "Malformed search JSON no host crash",
+    "decision": "Keep",
+    "newOwner": "src/Tools/Web.fs",
+    "tests": "e2e/opencode/specs/p0-canary-tests-web.js (OC-WEB-004 malformed search JSON no host crash)",
+    "nextStatus": "Proven",
+    "legacyFiles": [
+      "src/Hosts/OpenCode/WebTools.fs"
+    ],
+    "notes": ""
+  },
+  {
+    "id": "OC-WEB-005",
+    "category": "WEB",
+    "userVisibleBehavior": "webfetch returns fixture content",
+    "decision": "Keep",
+    "newOwner": "src/Tools/Web.fs",
+    "tests": "e2e/opencode/specs/p0-canary-tests-web.js (OC-WEB-005 webfetch returns fixture content)",
+    "nextStatus": "Proven",
+    "legacyFiles": [
+      "src/Hosts/OpenCode/WebTools.fs"
+    ],
+    "notes": ""
+  },
+  {
+    "id": "OC-WEB-006",
+    "category": "WEB",
+    "userVisibleBehavior": "webfetch rejects loopback/private/link-local/metadata",
+    "decision": "Keep",
+    "newOwner": "src/Tools/Web.fs",
+    "tests": "e2e/opencode/specs/p0-canary-tests-web.js (OC-WEB-006 webfetch rejects loopback/private/link-local/metadata)",
+    "nextStatus": "Proven",
+    "legacyFiles": [
+      "src/Hosts/OpenCode/WebTools.fs"
+    ],
+    "notes": ""
+  },
+  {
+    "id": "OC-WEB-007",
+    "category": "WEB",
+    "userVisibleBehavior": "Redirect to private still rejected",
+    "decision": "Keep",
+    "newOwner": "src/Tools/Web.fs",
+    "tests": "e2e/opencode/specs/p0-canary-tests-web.js (OC-WEB-007 Redirect to private still rejected)",
+    "nextStatus": "Proven",
+    "legacyFiles": [
+      "src/Hosts/OpenCode/WebTools.fs"
+    ],
+    "notes": ""
+  },
+  {
+    "id": "OC-WEB-008",
+    "category": "WEB",
+    "userVisibleBehavior": "browser starts browser subagent",
+    "decision": "Keep",
+    "newOwner": "src/Tools/Web.fs",
+    "tests": "e2e/opencode/specs/p0-canary-tests-web.js (OC-WEB-008 OC-WEB-009 OC-WEB-010 OC-WEB-011 browser starts subagent and calls MCP)",
+    "nextStatus": "Proven",
+    "legacyFiles": [
+      "src/Hosts/OpenCode/WebTools.fs"
+    ],
+    "notes": ""
+  },
+  {
+    "id": "OC-WEB-009",
+    "category": "WEB",
+    "userVisibleBehavior": "Browser subagent can call MCP tools",
+    "decision": "Keep",
+    "newOwner": "src/Tools/Web.fs",
+    "tests": "e2e/opencode/specs/p0-canary-tests-web.js (OC-WEB-008 OC-WEB-009 OC-WEB-010 OC-WEB-011 browser starts subagent and calls MCP)",
+    "nextStatus": "Proven",
+    "legacyFiles": [
+      "src/Hosts/OpenCode/WebTools.fs"
+    ],
+    "notes": "covered by browser E2E flow test"
+  },
+  {
+    "id": "OC-WEB-010",
+    "category": "WEB",
+    "userVisibleBehavior": "MCP result enters browser next LLM round",
+    "decision": "Keep",
+    "newOwner": "src/Tools/Web.fs",
+    "tests": "e2e/opencode/specs/p0-canary-tests-web.js (OC-WEB-008 OC-WEB-009 OC-WEB-010 OC-WEB-011 browser starts subagent and calls MCP)",
+    "nextStatus": "Proven",
+    "legacyFiles": [
+      "src/Hosts/OpenCode/WebTools.fs"
+    ],
+    "notes": "covered by browser E2E flow test"
+  },
+  {
+    "id": "OC-WEB-011",
+    "category": "WEB",
+    "userVisibleBehavior": "Browser final text → parent tool result",
+    "decision": "Keep",
+    "newOwner": "src/Tools/Web.fs",
+    "tests": "e2e/opencode/specs/p0-canary-tests-web.js (OC-WEB-008 OC-WEB-009 OC-WEB-010 OC-WEB-011 browser starts subagent and calls MCP)",
+    "nextStatus": "Proven",
+    "legacyFiles": [
+      "src/Hosts/OpenCode/WebTools.fs"
+    ],
+    "notes": "covered by browser E2E flow test"
+  },
+  {
+    "id": "OC-WEB-012",
+    "category": "WEB",
+    "userVisibleBehavior": "MCP process failure = child + resources cleaned",
+    "decision": "Keep",
+    "newOwner": "src/Tools/Web.fs",
+    "tests": "e2e/opencode/specs/p0-canary-tests-web.js (OC-WEB-012 MCP process failure = child + resources cleaned)",
+    "nextStatus": "Proven",
+    "legacyFiles": [
+      "src/Hosts/OpenCode/WebTools.fs"
+    ],
+    "notes": ""
+  },
+  {
+    "id": "OC-SUB-001",
+    "category": "SUB",
+    "userVisibleBehavior": "coder creates real child session",
+    "decision": "Replace",
+    "newOwner": "src/Session/Child.fs, src/Tools/Subagent.fs",
+    "tests": "e2e/opencode/specs/p0-canary-tests-nudge-sub.js (OC-SUB-001 OC-SUB-005 coder child session round-trip)",
+    "nextStatus": "Skeleton",
+    "legacyFiles": [
+      "src/Runtime/SubsessionActor.fs",
+      "src/Hosts/OpenCode/SubagentTools.fs"
+    ],
+    "notes": "Replaced SubsessionActor with Child.fs"
+  },
+  {
+    "id": "OC-SUB-002",
+    "category": "SUB",
+    "userVisibleBehavior": "Child parentID points to caller",
+    "decision": "Replace",
+    "newOwner": "src/Session/Child.fs, src/Tools/Subagent.fs",
+    "tests": "e2e/opencode/specs/p0-canary-tests-child-pty.js (OC-SUB-002 OC-SUB-006 child session parentID and PTY list/read/write/kill E2E)",
+    "nextStatus": "Skeleton",
+    "legacyFiles": [
+      "src/Runtime/SubsessionActor.fs",
+      "src/Hosts/OpenCode/SubagentTools.fs"
+    ],
+    "notes": "Replaced SubsessionActor with Child.fs"
+  },
+  {
+    "id": "OC-SUB-003",
+    "category": "SUB",
+    "userVisibleBehavior": "Child uses coder agent",
+    "decision": "Replace",
+    "newOwner": "src/Session/Child.fs, src/Tools/Subagent.fs",
+    "tests": "Pending next test suite migration",
+    "nextStatus": "Skeleton",
+    "legacyFiles": [
+      "src/Runtime/SubsessionActor.fs",
+      "src/Hosts/OpenCode/SubagentTools.fs"
+    ],
+    "notes": "Replaced SubsessionActor with Child.fs"
+  },
+  {
+    "id": "OC-SUB-004",
+    "category": "SUB",
+    "userVisibleBehavior": "Coder prompt includes intent and workdir",
+    "decision": "Replace",
+    "newOwner": "src/Session/Child.fs, src/Tools/Subagent.fs",
+    "tests": "Pending next test suite migration",
+    "nextStatus": "Skeleton",
+    "legacyFiles": [
+      "src/Runtime/SubsessionActor.fs",
+      "src/Hosts/OpenCode/SubagentTools.fs"
+    ],
+    "notes": "Replaced SubsessionActor with Child.fs"
+  },
+  {
+    "id": "OC-SUB-005",
+    "category": "SUB",
+    "userVisibleBehavior": "Coder complete = tool result with final output",
+    "decision": "Replace",
+    "newOwner": "src/Session/Child.fs, src/Tools/Subagent.fs",
+    "tests": "e2e/opencode/specs/p0-canary-tests-nudge-sub.js (OC-SUB-001 OC-SUB-005 coder child session round-trip)",
+    "nextStatus": "Skeleton",
+    "legacyFiles": [
+      "src/Runtime/SubsessionActor.fs",
+      "src/Hosts/OpenCode/SubagentTools.fs"
+    ],
+    "notes": "covered by OC-SUB-001 test; Replaced SubsessionActor with Child.fs"
+  },
+  {
+    "id": "OC-SUB-006",
+    "category": "SUB",
+    "userVisibleBehavior": "Inspector complete real child chain",
+    "decision": "Replace",
+    "newOwner": "src/Session/Child.fs, src/Tools/Subagent.fs",
+    "tests": "e2e/opencode/specs/p0-canary-tests-child-pty.js (OC-SUB-002 OC-SUB-006 child session parentID and PTY list/read/write/kill E2E)",
+    "nextStatus": "Skeleton",
+    "legacyFiles": [
+      "src/Runtime/SubsessionActor.fs",
+      "src/Hosts/OpenCode/SubagentTools.fs"
+    ],
+    "notes": "Replaced SubsessionActor with Child.fs"
+  },
+  {
+    "id": "OC-SUB-007",
+    "category": "SUB",
+    "userVisibleBehavior": "Meditator uses specified methodology",
+    "decision": "Replace",
+    "newOwner": "src/Session/Child.fs, src/Tools/Subagent.fs",
+    "tests": "Pending next test suite migration",
+    "nextStatus": "Skeleton",
+    "legacyFiles": [
+      "src/Runtime/SubsessionActor.fs",
+      "src/Hosts/OpenCode/SubagentTools.fs"
+    ],
+    "notes": "Replaced SubsessionActor with Child.fs"
+  },
+  {
+    "id": "OC-SUB-008",
+    "category": "SUB",
+    "userVisibleBehavior": "Child tool permissions match role",
+    "decision": "Replace",
+    "newOwner": "src/Session/Child.fs, src/Tools/Subagent.fs",
+    "tests": "tests-next/ (unit)",
+    "nextStatus": "Skeleton",
+    "legacyFiles": [
+      "src/Runtime/SubsessionActor.fs",
+      "src/Hosts/OpenCode/SubagentTools.fs"
+    ],
+    "notes": "Replaced SubsessionActor with Child.fs"
+  },
+  {
+    "id": "OC-SUB-009",
+    "category": "SUB",
+    "userVisibleBehavior": "Child empty output triggers continuation/fallback",
+    "decision": "Replace",
+    "newOwner": "src/Session/Child.fs, src/Tools/Subagent.fs",
+    "tests": "Pending next test suite migration",
+    "nextStatus": "Skeleton",
+    "legacyFiles": [
+      "src/Runtime/SubsessionActor.fs",
+      "src/Hosts/OpenCode/SubagentTools.fs"
+    ],
+    "notes": "Replaced SubsessionActor with Child.fs"
+  },
+  {
+    "id": "OC-SUB-010",
+    "category": "SUB",
+    "userVisibleBehavior": "Child tool-only finish not early-completed",
+    "decision": "Replace",
+    "newOwner": "src/Session/Child.fs, src/Tools/Subagent.fs",
+    "tests": "Pending next test suite migration",
+    "nextStatus": "Skeleton",
+    "legacyFiles": [
+      "src/Runtime/SubsessionActor.fs",
+      "src/Hosts/OpenCode/SubagentTools.fs"
+    ],
+    "notes": "Replaced SubsessionActor with Child.fs"
+  },
+  {
+    "id": "OC-SUB-011",
+    "category": "SUB",
+    "userVisibleBehavior": "Parent abort cancels child",
+    "decision": "Replace",
+    "newOwner": "src/Session/Child.fs, src/Tools/Subagent.fs",
+    "tests": "Pending next test suite migration",
+    "nextStatus": "Skeleton",
+    "legacyFiles": [
+      "src/Runtime/SubsessionActor.fs",
+      "src/Hosts/OpenCode/SubagentTools.fs"
+    ],
+    "notes": "Replaced SubsessionActor with Child.fs"
+  },
+  {
+    "id": "OC-SUB-012",
+    "category": "SUB",
+    "userVisibleBehavior": "Child API error returned to parent",
+    "decision": "Replace",
+    "newOwner": "src/Session/Child.fs, src/Tools/Subagent.fs",
+    "tests": "Pending next test suite migration",
+    "nextStatus": "Skeleton",
+    "legacyFiles": [
+      "src/Runtime/SubsessionActor.fs",
+      "src/Hosts/OpenCode/SubagentTools.fs"
+    ],
+    "notes": "Replaced SubsessionActor with Child.fs"
+  },
+  {
+    "id": "OC-SUB-013",
+    "category": "SUB",
+    "userVisibleBehavior": "Child create failure no phantom registry",
+    "decision": "Replace",
+    "newOwner": "src/Session/Child.fs, src/Tools/Subagent.fs",
+    "tests": "tests-next/ (unit)",
+    "nextStatus": "Skeleton",
+    "legacyFiles": [
+      "src/Runtime/SubsessionActor.fs",
+      "src/Hosts/OpenCode/SubagentTools.fs"
+    ],
+    "notes": "Replaced SubsessionActor with Child.fs"
+  },
+  {
+    "id": "OC-SUB-014",
+    "category": "SUB",
+    "userVisibleBehavior": "Child complete = registry/actor/receipt cleanup",
+    "decision": "Replace",
+    "newOwner": "src/Session/Child.fs, src/Tools/Subagent.fs",
+    "tests": "tests-next/ (unit)",
+    "nextStatus": "Skeleton",
+    "legacyFiles": [
+      "src/Runtime/SubsessionActor.fs",
+      "src/Hosts/OpenCode/SubagentTools.fs"
+    ],
+    "notes": "Replaced SubsessionActor with Child.fs"
+  },
+  {
+    "id": "OC-SUB-015",
+    "category": "SUB",
+    "userVisibleBehavior": "Two concurrent child results not swapped",
+    "decision": "Replace",
+    "newOwner": "src/Session/Child.fs, src/Tools/Subagent.fs",
+    "tests": "tests-next/ (unit)",
+    "nextStatus": "Skeleton",
+    "legacyFiles": [
+      "src/Runtime/SubsessionActor.fs",
+      "src/Hosts/OpenCode/SubagentTools.fs"
+    ],
+    "notes": "Replaced SubsessionActor with Child.fs"
+  },
+  {
+    "id": "OC-CONT-001",
+    "category": "CONT",
+    "userVisibleBehavior": "First subagent returns continuation handle",
+    "decision": "Replace",
+    "newOwner": "src/Session/PromptProtocol.fs, src/Session/Script.fs",
+    "tests": "tests-next/ (integration)",
+    "nextStatus": "Implemented",
+    "legacyFiles": [
+      "src/Runtime/ContinuationManager.fs"
+    ],
+    "notes": "Replaced continuation handles with Session Flow + PromptProtocol"
+  },
+  {
+    "id": "OC-CONT-002",
+    "category": "CONT",
+    "userVisibleBehavior": "Continue before child completion = still-running",
+    "decision": "Replace",
+    "newOwner": "src/Session/PromptProtocol.fs, src/Session/Script.fs",
+    "tests": "tests-next/ (integration)",
+    "nextStatus": "Implemented",
+    "legacyFiles": [
+      "src/Runtime/ContinuationManager.fs"
+    ],
+    "notes": "Replaced continuation handles with Session Flow + PromptProtocol"
+  },
+  {
+    "id": "OC-CONT-003",
+    "category": "CONT",
+    "userVisibleBehavior": "Continue after child completion = next segment",
+    "decision": "Replace",
+    "newOwner": "src/Session/PromptProtocol.fs, src/Session/Script.fs",
+    "tests": "tests-next/ (integration)",
+    "nextStatus": "Implemented",
+    "legacyFiles": [
+      "src/Runtime/ContinuationManager.fs"
+    ],
+    "notes": "Replaced continuation handles with Session Flow + PromptProtocol"
+  },
+  {
+    "id": "OC-CONT-004",
+    "category": "CONT",
+    "userVisibleBehavior": "Final page returns completion state",
+    "decision": "Replace",
+    "newOwner": "src/Session/PromptProtocol.fs, src/Session/Script.fs",
+    "tests": "tests-next/ (integration)",
+    "nextStatus": "Implemented",
+    "legacyFiles": [
+      "src/Runtime/ContinuationManager.fs"
+    ],
+    "notes": "Replaced continuation handles with Session Flow + PromptProtocol"
+  },
+  {
+    "id": "OC-CONT-005",
+    "category": "CONT",
+    "userVisibleBehavior": "Repeated final page idempotent",
+    "decision": "Replace",
+    "newOwner": "src/Session/PromptProtocol.fs, src/Session/Script.fs",
+    "tests": "tests-next/ (unit)",
+    "nextStatus": "Proven",
+    "legacyFiles": [
+      "src/Runtime/ContinuationManager.fs"
+    ],
+    "notes": "Replaced continuation handles with Session Flow + PromptProtocol"
+  },
+  {
+    "id": "OC-CONT-006",
+    "category": "CONT",
+    "userVisibleBehavior": "Invalid continuation ID fails explicitly",
+    "decision": "Replace",
+    "newOwner": "src/Session/PromptProtocol.fs, src/Session/Script.fs",
+    "tests": "tests-next/ (unit)",
+    "nextStatus": "Proven",
+    "legacyFiles": [
+      "src/Runtime/ContinuationManager.fs"
+    ],
+    "notes": "Replaced continuation handles with Session Flow + PromptProtocol"
+  },
+  {
+    "id": "OC-CONT-007",
+    "category": "CONT",
+    "userVisibleBehavior": "Other session cannot consume continuation",
+    "decision": "Replace",
+    "newOwner": "src/Session/PromptProtocol.fs, src/Session/Script.fs",
+    "tests": "tests-next/ (unit)",
+    "nextStatus": "Proven",
+    "legacyFiles": [
+      "src/Runtime/ContinuationManager.fs"
+    ],
+    "notes": "Replaced continuation handles with Session Flow + PromptProtocol"
+  },
+  {
+    "id": "OC-CONT-008",
+    "category": "CONT",
+    "userVisibleBehavior": "Session deleted invalidates continuation",
+    "decision": "Replace",
+    "newOwner": "src/Session/PromptProtocol.fs, src/Session/Script.fs",
+    "tests": "Pending next test suite migration",
+    "nextStatus": "Skeleton",
+    "legacyFiles": [
+      "src/Runtime/ContinuationManager.fs"
+    ],
+    "notes": "Replaced continuation handles with Session Flow + PromptProtocol"
+  },
+  {
+    "id": "OC-CONT-009",
+    "category": "CONT",
+    "userVisibleBehavior": "Parent abort during continue does not revive",
+    "decision": "Replace",
+    "newOwner": "src/Session/PromptProtocol.fs, src/Session/Script.fs",
+    "tests": "Pending next test suite migration",
+    "nextStatus": "Skeleton",
+    "legacyFiles": [
+      "src/Runtime/ContinuationManager.fs"
+    ],
+    "notes": "Replaced continuation handles with Session Flow + PromptProtocol"
+  },
+  {
+    "id": "OC-CONT-010",
+    "category": "CONT",
+    "userVisibleBehavior": "Host restart recovery of continuation",
+    "decision": "Replace",
+    "newOwner": "src/Session/PromptProtocol.fs, src/Session/Script.fs",
+    "tests": "Pending next test suite migration",
+    "nextStatus": "Skeleton",
+    "legacyFiles": [
+      "src/Runtime/ContinuationManager.fs"
+    ],
+    "notes": "Replaced continuation handles with Session Flow + PromptProtocol"
+  },
+  {
+    "id": "OC-REV-001",
+    "category": "REV",
+    "userVisibleBehavior": "/loop task returns With-Review activated",
+    "decision": "Keep",
+    "newOwner": "src/Session/Review.fs, src/Tools/Review.fs",
+    "tests": "e2e/opencode/specs/p0-canary-tests-advanced.js (OC-REV-001 /loop task activates review mode)",
+    "nextStatus": "Skeleton",
+    "legacyFiles": [
+      "src/Runtime/ReviewLoop.fs"
+    ],
+    "notes": ""
+  },
+  {
+    "id": "OC-REV-002",
+    "category": "REV",
+    "userVisibleBehavior": "loop_activated appended once",
+    "decision": "Keep",
+    "newOwner": "src/Session/Review.fs, src/Tools/Review.fs",
+    "tests": "Pending next test suite migration",
+    "nextStatus": "Skeleton",
+    "legacyFiles": [
+      "src/Runtime/ReviewLoop.fs"
+    ],
+    "notes": "demoted from real-e2e: no matching spec/test yet"
+  },
+  {
+    "id": "OC-REV-003",
+    "category": "REV",
+    "userVisibleBehavior": "Event sessionID, task, generation correct",
+    "decision": "Keep",
+    "newOwner": "src/Session/Review.fs, src/Tools/Review.fs",
+    "tests": "Pending next test suite migration",
+    "nextStatus": "Skeleton",
+    "legacyFiles": [
+      "src/Runtime/ReviewLoop.fs"
+    ],
+    "notes": "demoted from real-e2e: no matching spec/test yet"
+  },
+  {
+    "id": "OC-REV-004",
+    "category": "REV",
+    "userVisibleBehavior": "Second /loop returns already active",
+    "decision": "Keep",
+    "newOwner": "src/Session/Review.fs, src/Tools/Review.fs",
+    "tests": "Pending next test suite migration",
+    "nextStatus": "Skeleton",
+    "legacyFiles": [
+      "src/Runtime/ReviewLoop.fs"
+    ],
+    "notes": "demoted from real-e2e: no matching spec/test yet"
+  },
+  {
+    "id": "OC-REV-005",
+    "category": "REV",
+    "userVisibleBehavior": "Empty /loop cancels, appends loop_cancelled",
+    "decision": "Keep",
+    "newOwner": "src/Session/Review.fs, src/Tools/Review.fs",
+    "tests": "Pending next test suite migration",
+    "nextStatus": "Skeleton",
+    "legacyFiles": [
+      "src/Runtime/ReviewLoop.fs"
+    ],
+    "notes": "demoted from real-e2e: no matching spec/test yet"
+  },
+  {
+    "id": "OC-REV-006",
+    "category": "REV",
+    "userVisibleBehavior": "submit_review with no active loop rejected",
+    "decision": "Keep",
+    "newOwner": "src/Session/Review.fs, src/Tools/Review.fs",
+    "tests": "Pending next test suite migration",
+    "nextStatus": "Skeleton",
+    "legacyFiles": [
+      "src/Runtime/ReviewLoop.fs"
+    ],
+    "notes": ""
+  },
+  {
+    "id": "OC-REV-007",
+    "category": "REV",
+    "userVisibleBehavior": "submit_review creates real reviewer child session",
+    "decision": "Keep",
+    "newOwner": "src/Session/Review.fs, src/Tools/Review.fs",
+    "tests": "Pending next test suite migration",
+    "nextStatus": "Skeleton",
+    "legacyFiles": [
+      "src/Runtime/ReviewLoop.fs"
+    ],
+    "notes": ""
+  },
+  {
+    "id": "OC-REV-008",
+    "category": "REV",
+    "userVisibleBehavior": "Reviewer only exposes allowed tools",
+    "decision": "Keep",
+    "newOwner": "src/Session/Review.fs, src/Tools/Review.fs",
+    "tests": "tests-next/ (unit)",
+    "nextStatus": "Skeleton",
+    "legacyFiles": [
+      "src/Runtime/ReviewLoop.fs"
+    ],
+    "notes": ""
+  },
+  {
+    "id": "OC-REV-009",
+    "category": "REV",
+    "userVisibleBehavior": "affectedFiles and report in reviewer prompt",
+    "decision": "Keep",
+    "newOwner": "src/Session/Review.fs, src/Tools/Review.fs",
+    "tests": "tests-next/ (unit)",
+    "nextStatus": "Skeleton",
+    "legacyFiles": [
+      "src/Runtime/ReviewLoop.fs"
+    ],
+    "notes": ""
+  },
+  {
+    "id": "OC-REV-010",
+    "category": "REV",
+    "userVisibleBehavior": "First PERFECT double-check semantics",
+    "decision": "Keep",
+    "newOwner": "src/Session/Review.fs, src/Tools/Review.fs",
+    "tests": "tests-next/ (unit)",
+    "nextStatus": "Skeleton",
+    "legacyFiles": [
+      "src/Runtime/ReviewLoop.fs"
+    ],
+    "notes": ""
+  },
+  {
+    "id": "OC-REV-011",
+    "category": "REV",
+    "userVisibleBehavior": "Second PERFECT ends review",
+    "decision": "Keep",
+    "newOwner": "src/Session/Review.fs, src/Tools/Review.fs",
+    "tests": "tests-next/ (unit)",
+    "nextStatus": "Skeleton",
+    "legacyFiles": [
+      "src/Runtime/ReviewLoop.fs"
+    ],
+    "notes": ""
+  },
+  {
+    "id": "OC-REV-012",
+    "category": "REV",
+    "userVisibleBehavior": "REVISE feedback → parent session, loop stays active",
+    "decision": "Keep",
+    "newOwner": "src/Session/Review.fs, src/Tools/Review.fs",
+    "tests": "tests-next/ (unit)",
+    "nextStatus": "Skeleton",
+    "legacyFiles": [
+      "src/Runtime/ReviewLoop.fs"
+    ],
+    "notes": ""
+  },
+  {
+    "id": "OC-REV-013",
+    "category": "REV",
+    "userVisibleBehavior": "Invalid verdict does not end review",
+    "decision": "Keep",
+    "newOwner": "src/Session/Review.fs, src/Tools/Review.fs",
+    "tests": "tests-next/ (unit)",
+    "nextStatus": "Skeleton",
+    "legacyFiles": [
+      "src/Runtime/ReviewLoop.fs"
+    ],
+    "notes": ""
+  },
+  {
+    "id": "OC-REV-014",
+    "category": "REV",
+    "userVisibleBehavior": "Reviewer empty output → nudge, limit reached → terminate",
+    "decision": "Keep",
+    "newOwner": "src/Session/Review.fs, src/Tools/Review.fs",
+    "tests": "Pending next test suite migration",
+    "nextStatus": "Skeleton",
+    "legacyFiles": [
+      "src/Runtime/ReviewLoop.fs"
+    ],
+    "notes": ""
+  },
+  {
+    "id": "OC-REV-015",
+    "category": "REV",
+    "userVisibleBehavior": "submit_review wip=true does not complete task",
+    "decision": "Keep",
+    "newOwner": "src/Session/Review.fs, src/Tools/Review.fs",
+    "tests": "Pending next test suite migration",
+    "nextStatus": "Skeleton",
+    "legacyFiles": [
+      "src/Runtime/ReviewLoop.fs"
+    ],
+    "notes": ""
+  },
+  {
+    "id": "OC-REV-016",
+    "category": "REV",
+    "userVisibleBehavior": "Parent abort during review cancels reviewer",
+    "decision": "Keep",
+    "newOwner": "src/Session/Review.fs, src/Tools/Review.fs",
+    "tests": "Pending next test suite migration",
+    "nextStatus": "Skeleton",
+    "legacyFiles": [
+      "src/Runtime/ReviewLoop.fs"
+    ],
+    "notes": ""
+  },
+  {
+    "id": "OC-REV-017",
+    "category": "REV",
+    "userVisibleBehavior": "Concurrent submit_review single lock",
+    "decision": "Keep",
+    "newOwner": "src/Session/Review.fs, src/Tools/Review.fs",
+    "tests": "tests-next/ (unit)",
+    "nextStatus": "Skeleton",
+    "legacyFiles": [
+      "src/Runtime/ReviewLoop.fs"
+    ],
+    "notes": ""
+  },
+  {
+    "id": "OC-REV-018",
+    "category": "REV",
+    "userVisibleBehavior": "Restart recovers active review from NDJSON",
+    "decision": "Keep",
+    "newOwner": "src/Session/Review.fs, src/Tools/Review.fs",
+    "tests": "Pending next test suite migration",
+    "nextStatus": "Skeleton",
+    "legacyFiles": [
+      "src/Runtime/ReviewLoop.fs"
+    ],
+    "notes": ""
+  },
+  {
+    "id": "OC-REV-019",
+    "category": "REV",
+    "userVisibleBehavior": "After accepted, restart keeps inactive",
+    "decision": "Keep",
+    "newOwner": "src/Session/Review.fs, src/Tools/Review.fs",
+    "tests": "Pending next test suite migration",
+    "nextStatus": "Skeleton",
+    "legacyFiles": [
+      "src/Runtime/ReviewLoop.fs"
+    ],
+    "notes": ""
+  },
+  {
+    "id": "OC-REV-020",
+    "category": "REV",
+    "userVisibleBehavior": "NDJSON append failure does not mutate memory first",
+    "decision": "Keep",
+    "newOwner": "src/Session/Review.fs, src/Tools/Review.fs",
+    "tests": "tests-next/ (unit)",
+    "nextStatus": "Skeleton",
+    "legacyFiles": [
+      "src/Runtime/ReviewLoop.fs"
+    ],
+    "notes": ""
+  },
+  {
+    "id": "OC-NUDGE-001",
+    "category": "NUDGE",
+    "userVisibleBehavior": "Active loop + stop + incomplete work → nudge",
+    "decision": "Replace",
+    "newOwner": "src/Session/Script.fs, src/Session/Driver.fs",
+    "tests": "e2e/opencode/specs/p0-canary-tests-nudge-sub.js (OC-NUDGE-001 nudge fires exactly once after human turn completed)",
+    "nextStatus": "Proven",
+    "legacyFiles": [
+      "src/Kernel/Nudge/Manager.fs",
+      "src/Kernel/Nudge/Lease.fs"
+    ],
+    "notes": "User-visible continuation moved to Session Flow; deleted Nudge Owner/Lease architecture"
+  },
+  {
+    "id": "OC-NUDGE-002",
+    "category": "NUDGE",
+    "userVisibleBehavior": "Nudge text matches current protocol",
+    "decision": "Replace",
+    "newOwner": "src/Session/Script.fs, src/Session/Driver.fs",
+    "tests": "tests-next/ (integration)",
+    "nextStatus": "Implemented",
+    "legacyFiles": [
+      "src/Kernel/Nudge/Manager.fs",
+      "src/Kernel/Nudge/Lease.fs"
+    ],
+    "notes": "User-visible continuation moved to Session Flow; deleted Nudge Owner/Lease architecture"
+  },
+  {
+    "id": "OC-NUDGE-003",
+    "category": "NUDGE",
+    "userVisibleBehavior": "Repeated idle does not double-nudge",
+    "decision": "Replace",
+    "newOwner": "src/Session/Script.fs, src/Session/Driver.fs",
+    "tests": "tests-next/ (integration)",
+    "nextStatus": "Implemented",
+    "legacyFiles": [
+      "src/Kernel/Nudge/Manager.fs",
+      "src/Kernel/Nudge/Lease.fs"
+    ],
+    "notes": "User-visible continuation moved to Session Flow; deleted Nudge Owner/Lease architecture"
+  },
+  {
+    "id": "OC-NUDGE-004",
+    "category": "NUDGE",
+    "userVisibleBehavior": "Abort finish suppresses nudge",
+    "decision": "Replace",
+    "newOwner": "src/Session/Script.fs, src/Session/Driver.fs",
+    "tests": "tests-next/ (integration)",
+    "nextStatus": "Implemented",
+    "legacyFiles": [
+      "src/Kernel/Nudge/Manager.fs",
+      "src/Kernel/Nudge/Lease.fs"
+    ],
+    "notes": "User-visible continuation moved to Session Flow; deleted Nudge Owner/Lease architecture"
+  },
+  {
+    "id": "OC-NUDGE-005",
+    "category": "NUDGE",
+    "userVisibleBehavior": "Stream-abort suppresses late idle",
+    "decision": "Replace",
+    "newOwner": "src/Session/Script.fs, src/Session/Driver.fs",
+    "tests": "Pending next test suite migration",
+    "nextStatus": "Skeleton",
+    "legacyFiles": [
+      "src/Kernel/Nudge/Manager.fs",
+      "src/Kernel/Nudge/Lease.fs"
+    ],
+    "notes": "User-visible continuation moved to Session Flow; deleted Nudge Owner/Lease architecture"
+  },
+  {
+    "id": "OC-NUDGE-006",
+    "category": "NUDGE",
+    "userVisibleBehavior": "No assistant text + loop active still nudges",
+    "decision": "Replace",
+    "newOwner": "src/Session/Script.fs, src/Session/Driver.fs",
+    "tests": "tests-next/ (integration)",
+    "nextStatus": "Implemented",
+    "legacyFiles": [
+      "src/Kernel/Nudge/Manager.fs",
+      "src/Kernel/Nudge/Lease.fs"
+    ],
+    "notes": "User-visible continuation moved to Session Flow; deleted Nudge Owner/Lease architecture"
+  },
+  {
+    "id": "OC-NUDGE-007",
+    "category": "NUDGE",
+    "userVisibleBehavior": "Missing finish field infers from evidence",
+    "decision": "Replace",
+    "newOwner": "src/Session/Script.fs, src/Session/Driver.fs",
+    "tests": "tests-next/ (integration)",
+    "nextStatus": "Implemented",
+    "legacyFiles": [
+      "src/Kernel/Nudge/Manager.fs",
+      "src/Kernel/Nudge/Lease.fs"
+    ],
+    "notes": "User-visible continuation moved to Session Flow; deleted Nudge Owner/Lease architecture"
+  },
+  {
+    "id": "OC-NUDGE-008",
+    "category": "NUDGE",
+    "userVisibleBehavior": "All todos complete = no work nudge",
+    "decision": "Replace",
+    "newOwner": "src/Session/Script.fs, src/Session/Driver.fs",
+    "tests": "tests-next/ (unit)",
+    "nextStatus": "Proven",
+    "legacyFiles": [
+      "src/Kernel/Nudge/Manager.fs",
+      "src/Kernel/Nudge/Lease.fs"
+    ],
+    "notes": "User-visible continuation moved to Session Flow; deleted Nudge Owner/Lease architecture"
+  },
+  {
+    "id": "OC-NUDGE-009",
+    "category": "NUDGE",
+    "userVisibleBehavior": "Rejected review triggers revision nudge",
+    "decision": "Replace",
+    "newOwner": "src/Session/Script.fs, src/Session/Driver.fs",
+    "tests": "tests-next/ (integration)",
+    "nextStatus": "Implemented",
+    "legacyFiles": [
+      "src/Kernel/Nudge/Manager.fs",
+      "src/Kernel/Nudge/Lease.fs"
+    ],
+    "notes": "User-visible continuation moved to Session Flow; deleted Nudge Owner/Lease architecture"
+  },
+  {
+    "id": "OC-NUDGE-010",
+    "category": "NUDGE",
+    "userVisibleBehavior": "Nudge nonce = system message, no new human turn",
+    "decision": "Replace",
+    "newOwner": "src/Session/Script.fs, src/Session/Driver.fs",
+    "tests": "Pending next test suite migration",
+    "nextStatus": "Skeleton",
+    "legacyFiles": [
+      "src/Kernel/Nudge/Manager.fs",
+      "src/Kernel/Nudge/Lease.fs"
+    ],
+    "notes": "User-visible continuation moved to Session Flow; deleted Nudge Owner/Lease architecture"
+  },
+  {
+    "id": "OC-NUDGE-011",
+    "category": "NUDGE",
+    "userVisibleBehavior": "Nudge send failure = event, retryable",
+    "decision": "Replace",
+    "newOwner": "src/Session/Script.fs, src/Session/Driver.fs",
+    "tests": "Pending next test suite migration",
+    "nextStatus": "Skeleton",
+    "legacyFiles": [
+      "src/Kernel/Nudge/Manager.fs",
+      "src/Kernel/Nudge/Lease.fs"
+    ],
+    "notes": "User-visible continuation moved to Session Flow; deleted Nudge Owner/Lease architecture"
+  },
+  {
+    "id": "OC-NUDGE-012",
+    "category": "NUDGE",
+    "userVisibleBehavior": "Two sessions nudge dedup isolated",
+    "decision": "Replace",
+    "newOwner": "src/Session/Script.fs, src/Session/Driver.fs",
+    "tests": "Pending next test suite migration",
+    "nextStatus": "Skeleton",
+    "legacyFiles": [
+      "src/Kernel/Nudge/Manager.fs",
+      "src/Kernel/Nudge/Lease.fs"
+    ],
+    "notes": "User-visible continuation moved to Session Flow; deleted Nudge Owner/Lease architecture"
+  },
+  {
+    "id": "OC-NUDGE-013",
+    "category": "NUDGE",
+    "userVisibleBehavior": "Session deleted cleans nudge runtime",
+    "decision": "Replace",
+    "newOwner": "src/Session/Script.fs, src/Session/Driver.fs",
+    "tests": "Pending next test suite migration",
+    "nextStatus": "Skeleton",
+    "legacyFiles": [
+      "src/Kernel/Nudge/Manager.fs",
+      "src/Kernel/Nudge/Lease.fs"
+    ],
+    "notes": "User-visible continuation moved to Session Flow; deleted Nudge Owner/Lease architecture"
+  },
+  {
+    "id": "OC-NUDGE-014",
+    "category": "NUDGE",
+    "userVisibleBehavior": "Force-stop late events do not revive nudge",
+    "decision": "Replace",
+    "newOwner": "src/Session/Script.fs, src/Session/Driver.fs",
+    "tests": "tests-next/ (unit)",
+    "nextStatus": "Proven",
+    "legacyFiles": [
+      "src/Kernel/Nudge/Manager.fs",
+      "src/Kernel/Nudge/Lease.fs"
+    ],
+    "notes": "User-visible continuation moved to Session Flow; deleted Nudge Owner/Lease architecture"
+  },
+  {
+    "id": "OC-NUDGE-015",
+    "category": "NUDGE",
+    "userVisibleBehavior": "idle→error vs error→idle give consistent result",
+    "decision": "Replace",
+    "newOwner": "src/Session/Script.fs, src/Session/Driver.fs",
+    "tests": "tests-next/ (unit)",
+    "nextStatus": "Proven",
+    "legacyFiles": [
+      "src/Kernel/Nudge/Manager.fs",
+      "src/Kernel/Nudge/Lease.fs"
+    ],
+    "notes": "User-visible continuation moved to Session Flow; deleted Nudge Owner/Lease architecture"
+  },
+  {
+    "id": "OC-FB-001",
+    "category": "FB",
+    "userVisibleBehavior": "Empty output → single zero-width char injection",
+    "decision": "Replace",
+    "newOwner": "src/Session/Fallback.fs",
+    "tests": "e2e/opencode/specs/p0-canary-tests-fallback.js (OC-FB-001 OC-FB-002 OC-FB-003 OC-FB-004 OC-FB-017 fallback continuation zero-width nonce agent model)",
+    "nextStatus": "Skeleton",
+    "legacyFiles": [
+      "src/Runtime/FallbackCoordinator.fs",
+      "src/Runtime/FallbackPhase.fs"
+    ],
+    "notes": "Replaced Fallback state machine tower with tail-recursive Session Fallback"
+  },
+  {
+    "id": "OC-FB-002",
+    "category": "FB",
+    "userVisibleBehavior": "Injection = zero-width char, not XML",
+    "decision": "Replace",
+    "newOwner": "src/Session/Fallback.fs",
+    "tests": "e2e/opencode/specs/p0-canary-tests-fallback.js (OC-FB-001 OC-FB-002 OC-FB-003 OC-FB-004 OC-FB-017 fallback continuation zero-width nonce agent model)",
+    "nextStatus": "Skeleton",
+    "legacyFiles": [
+      "src/Runtime/FallbackCoordinator.fs",
+      "src/Runtime/FallbackPhase.fs"
+    ],
+    "notes": "Replaced Fallback state machine tower with tail-recursive Session Fallback"
+  },
+  {
+    "id": "OC-FB-003",
+    "category": "FB",
+    "userVisibleBehavior": "Continuation uses original agent",
+    "decision": "Replace",
+    "newOwner": "src/Session/Fallback.fs",
+    "tests": "e2e/opencode/specs/p0-canary-tests-fallback.js (OC-FB-001 OC-FB-002 OC-FB-003 OC-FB-004 OC-FB-017 fallback continuation zero-width nonce agent model)",
+    "nextStatus": "Skeleton",
+    "legacyFiles": [
+      "src/Runtime/FallbackCoordinator.fs",
+      "src/Runtime/FallbackPhase.fs"
+    ],
+    "notes": "Replaced Fallback state machine tower with tail-recursive Session Fallback"
+  },
+  {
+    "id": "OC-FB-004",
+    "category": "FB",
+    "userVisibleBehavior": "Continuation uses correct model/variant",
+    "decision": "Replace",
+    "newOwner": "src/Session/Fallback.fs",
+    "tests": "e2e/opencode/specs/p0-canary-tests-fallback.js (OC-FB-001 OC-FB-002 OC-FB-003 OC-FB-004 OC-FB-017 fallback continuation zero-width nonce agent model)",
+    "nextStatus": "Skeleton",
+    "legacyFiles": [
+      "src/Runtime/FallbackCoordinator.fs",
+      "src/Runtime/FallbackPhase.fs"
+    ],
+    "notes": "Replaced Fallback state machine tower with tail-recursive Session Fallback"
+  },
+  {
+    "id": "OC-FB-005",
+    "category": "FB",
+    "userVisibleBehavior": "Manual model overrides auto-captured",
+    "decision": "Replace",
+    "newOwner": "src/Session/Fallback.fs",
+    "tests": "tests-next/ (integration)",
+    "nextStatus": "Skeleton",
+    "legacyFiles": [
+      "src/Runtime/FallbackCoordinator.fs",
+      "src/Runtime/FallbackPhase.fs"
+    ],
+    "notes": "Replaced Fallback state machine tower with tail-recursive Session Fallback"
+  },
+  {
+    "id": "OC-FB-006",
+    "category": "FB",
+    "userVisibleBehavior": "Retryable provider error → next model",
+    "decision": "Replace",
+    "newOwner": "src/Session/Fallback.fs",
+    "tests": "tests-next/ (unit)",
+    "nextStatus": "Skeleton",
+    "legacyFiles": [
+      "src/Runtime/FallbackCoordinator.fs",
+      "src/Runtime/FallbackPhase.fs"
+    ],
+    "notes": "Replaced Fallback state machine tower with tail-recursive Session Fallback"
+  },
+  {
+    "id": "OC-FB-007",
+    "category": "FB",
+    "userVisibleBehavior": "Non-retryable error does not continue",
+    "decision": "Replace",
+    "newOwner": "src/Session/Fallback.fs",
+    "tests": "e2e/opencode/specs/p0-canary-tests-fallback-errors.js (OC-FB-007 non-retryable provider error does not continue)",
+    "nextStatus": "Skeleton",
+    "legacyFiles": [
+      "src/Runtime/FallbackCoordinator.fs",
+      "src/Runtime/FallbackPhase.fs"
+    ],
+    "notes": "Replaced Fallback state machine tower with tail-recursive Session Fallback"
+  },
+  {
+    "id": "OC-FB-008",
+    "category": "FB",
+    "userVisibleBehavior": "MessageAbortedError does not continue",
+    "decision": "Replace",
+    "newOwner": "src/Session/Fallback.fs",
+    "tests": "e2e/opencode/specs/p0-canary-tests-fallback-errors.js (OC-FB-008 MessageAbortedError does not continue)",
+    "nextStatus": "Skeleton",
+    "legacyFiles": [
+      "src/Runtime/FallbackCoordinator.fs",
+      "src/Runtime/FallbackPhase.fs"
+    ],
+    "notes": "Replaced Fallback state machine tower with tail-recursive Session Fallback"
+  },
+  {
+    "id": "OC-FB-009",
+    "category": "FB",
+    "userVisibleBehavior": "Tool finish idle then late EmptyOutputError → one continue",
+    "decision": "Replace",
+    "newOwner": "src/Session/Fallback.fs",
+    "tests": "tests-next/ (unit)",
+    "nextStatus": "Skeleton",
+    "legacyFiles": [
+      "src/Runtime/FallbackCoordinator.fs",
+      "src/Runtime/FallbackPhase.fs"
+    ],
+    "notes": "Replaced Fallback state machine tower with tail-recursive Session Fallback"
+  },
+  {
+    "id": "OC-FB-010",
+    "category": "FB",
+    "userVisibleBehavior": "Error first, idle later → one continue",
+    "decision": "Replace",
+    "newOwner": "src/Session/Fallback.fs",
+    "tests": "tests-next/ (unit)",
+    "nextStatus": "Skeleton",
+    "legacyFiles": [
+      "src/Runtime/FallbackCoordinator.fs",
+      "src/Runtime/FallbackPhase.fs"
+    ],
+    "notes": "Replaced Fallback state machine tower with tail-recursive Session Fallback"
+  },
+  {
+    "id": "OC-FB-011",
+    "category": "FB",
+    "userVisibleBehavior": "Duplicate error does not double-continue",
+    "decision": "Replace",
+    "newOwner": "src/Session/Fallback.fs",
+    "tests": "e2e/opencode/specs/p0-canary-tests-fallback-errors.js (OC-FB-011 duplicate empty-output path does not double-continue)",
+    "nextStatus": "Skeleton",
+    "legacyFiles": [
+      "src/Runtime/FallbackCoordinator.fs",
+      "src/Runtime/FallbackPhase.fs"
+    ],
+    "notes": "Replaced Fallback state machine tower with tail-recursive Session Fallback"
+  },
+  {
+    "id": "OC-FB-012",
+    "category": "FB",
+    "userVisibleBehavior": "Duplicate idle does not double-continue",
+    "decision": "Replace",
+    "newOwner": "src/Session/Fallback.fs",
+    "tests": "e2e/opencode/specs/p0-canary-tests-fallback-errors.js (OC-FB-012 duplicate idle does not double-continue)",
+    "nextStatus": "Skeleton",
+    "legacyFiles": [
+      "src/Runtime/FallbackCoordinator.fs",
+      "src/Runtime/FallbackPhase.fs"
+    ],
+    "notes": "Replaced Fallback state machine tower with tail-recursive Session Fallback"
+  },
+  {
+    "id": "OC-FB-013",
+    "category": "FB",
+    "userVisibleBehavior": "Continuation failure not infinite loop",
+    "decision": "Replace",
+    "newOwner": "src/Session/Fallback.fs",
+    "tests": "tests-next/ (unit)",
+    "nextStatus": "Skeleton",
+    "legacyFiles": [
+      "src/Runtime/FallbackCoordinator.fs",
+      "src/Runtime/FallbackPhase.fs"
+    ],
+    "notes": "Replaced Fallback state machine tower with tail-recursive Session Fallback"
+  },
+  {
+    "id": "OC-FB-014",
+    "category": "FB",
+    "userVisibleBehavior": "After continuation, lease settled correctly",
+    "decision": "Replace",
+    "newOwner": "src/Session/Fallback.fs",
+    "tests": "tests-next/ (unit)",
+    "nextStatus": "Skeleton",
+    "legacyFiles": [
+      "src/Runtime/FallbackCoordinator.fs",
+      "src/Runtime/FallbackPhase.fs"
+    ],
+    "notes": "Replaced Fallback state machine tower with tail-recursive Session Fallback"
+  },
+  {
+    "id": "OC-FB-015",
+    "category": "FB",
+    "userVisibleBehavior": "Tool-call-as-text generates recovery prompt",
+    "decision": "Replace",
+    "newOwner": "src/Session/Fallback.fs",
+    "tests": "tests-next/ (unit)",
+    "nextStatus": "Skeleton",
+    "legacyFiles": [
+      "src/Runtime/FallbackCoordinator.fs",
+      "src/Runtime/FallbackPhase.fs"
+    ],
+    "notes": "Replaced Fallback state machine tower with tail-recursive Session Fallback"
+  },
+  {
+    "id": "OC-FB-016",
+    "category": "FB",
+    "userVisibleBehavior": "Normal code text not mistaken for tool call",
+    "decision": "Replace",
+    "newOwner": "src/Session/Fallback.fs",
+    "tests": "tests-next/ (unit)",
+    "nextStatus": "Skeleton",
+    "legacyFiles": [
+      "src/Runtime/FallbackCoordinator.fs",
+      "src/Runtime/FallbackPhase.fs"
+    ],
+    "notes": "Replaced Fallback state machine tower with tail-recursive Session Fallback"
+  },
+  {
+    "id": "OC-FB-017",
+    "category": "FB",
+    "userVisibleBehavior": "Continuation nonce not treated as human message",
+    "decision": "Replace",
+    "newOwner": "src/Session/Fallback.fs",
+    "tests": "e2e/opencode/specs/p0-canary-tests-fallback.js (OC-FB-001 OC-FB-002 OC-FB-003 OC-FB-004 OC-FB-017 fallback continuation zero-width nonce agent model)",
+    "nextStatus": "Skeleton",
+    "legacyFiles": [
+      "src/Runtime/FallbackCoordinator.fs",
+      "src/Runtime/FallbackPhase.fs"
+    ],
+    "notes": "Replaced Fallback state machine tower with tail-recursive Session Fallback"
+  },
+  {
+    "id": "OC-FB-018",
+    "category": "FB",
+    "userVisibleBehavior": "New human message invalidates old continuation",
+    "decision": "Replace",
+    "newOwner": "src/Session/Fallback.fs",
+    "tests": "tests-next/ (unit)",
+    "nextStatus": "Skeleton",
+    "legacyFiles": [
+      "src/Runtime/FallbackCoordinator.fs",
+      "src/Runtime/FallbackPhase.fs"
+    ],
+    "notes": "pending deterministic real-e2e harness support for in-flight continuation cancellation; Replaced Fallback state machine tower with tail-recursive Session Fallback"
+  },
+  {
+    "id": "OC-FB-019",
+    "category": "FB",
+    "userVisibleBehavior": "Session abort + fallback dispatch race safe",
+    "decision": "Replace",
+    "newOwner": "src/Session/Fallback.fs",
+    "tests": "tests-next/ (unit)",
+    "nextStatus": "Skeleton",
+    "legacyFiles": [
+      "src/Runtime/FallbackCoordinator.fs",
+      "src/Runtime/FallbackPhase.fs"
+    ],
+    "notes": "Replaced Fallback state machine tower with tail-recursive Session Fallback"
+  },
+  {
+    "id": "OC-FB-020",
+    "category": "FB",
+    "userVisibleBehavior": "Session delete cleans fallback runtime",
+    "decision": "Replace",
+    "newOwner": "src/Session/Fallback.fs",
+    "tests": "tests-next/ (unit)",
+    "nextStatus": "Skeleton",
+    "legacyFiles": [
+      "src/Runtime/FallbackCoordinator.fs",
+      "src/Runtime/FallbackPhase.fs"
+    ],
+    "notes": "Replaced Fallback state machine tower with tail-recursive Session Fallback"
+  },
+  {
+    "id": "OC-FB-021",
+    "category": "FB",
+    "userVisibleBehavior": "Crash after dispatch, before settle: no double-inject",
+    "decision": "Replace",
+    "newOwner": "src/Session/Fallback.fs",
+    "tests": "Pending next test suite migration",
+    "nextStatus": "Skeleton",
+    "legacyFiles": [
+      "src/Runtime/FallbackCoordinator.fs",
+      "src/Runtime/FallbackPhase.fs"
+    ],
+    "notes": "Replaced Fallback state machine tower with tail-recursive Session Fallback"
+  },
+  {
+    "id": "OC-FB-022",
+    "category": "FB",
+    "userVisibleBehavior": "Crash after append, before dispatch: effect continues",
+    "decision": "Replace",
+    "newOwner": "src/Session/Fallback.fs",
+    "tests": "tests-next/ (unit)",
+    "nextStatus": "Skeleton",
+    "legacyFiles": [
+      "src/Runtime/FallbackCoordinator.fs",
+      "src/Runtime/FallbackPhase.fs"
+    ],
+    "notes": "Replaced Fallback state machine tower with tail-recursive Session Fallback"
+  },
+  {
+    "id": "OC-FB-023",
+    "category": "FB",
+    "userVisibleBehavior": "Different sessions generation/ordinal/lease isolated",
+    "decision": "Replace",
+    "newOwner": "src/Session/Fallback.fs",
+    "tests": "e2e/opencode/specs/p0-canary-tests-fallback.js (OC-FB-023 two sessions fallback leases isolated)",
+    "nextStatus": "Skeleton",
+    "legacyFiles": [
+      "src/Runtime/FallbackCoordinator.fs",
+      "src/Runtime/FallbackPhase.fs"
+    ],
+    "notes": "Replaced Fallback state machine tower with tail-recursive Session Fallback"
+  },
+  {
+    "id": "OC-FB-024",
+    "category": "FB",
+    "userVisibleBehavior": "Fallback chain exhausted = final error, not silence",
+    "decision": "Replace",
+    "newOwner": "src/Session/Fallback.fs",
+    "tests": "tests-next/ (unit)",
+    "nextStatus": "Skeleton",
+    "legacyFiles": [
+      "src/Runtime/FallbackCoordinator.fs",
+      "src/Runtime/FallbackPhase.fs"
+    ],
+    "notes": "Replaced Fallback state machine tower with tail-recursive Session Fallback"
+  },
+  {
+    "id": "OC-COMP-001",
+    "category": "COMP",
+    "userVisibleBehavior": "Real trigger of experimental.session.compacting",
+    "decision": "Keep",
+    "newOwner": "src/Tools/MessageTransform.fs, src/Session/Script.fs",
+    "tests": "e2e/opencode/specs/p0-canary-tests-compaction.js (OC-COMP-001 OC-COMP-002 OC-COMP-003 OC-COMP-004 OC-COMP-005 OC-COMP-006 Compaction success flow)",
+    "nextStatus": "Proven",
+    "legacyFiles": [
+      "src/Runtime/Compaction.fs",
+      "src/Runtime/MessageTransformPipeline.fs"
+    ],
+    "notes": ""
+  },
+  {
+    "id": "OC-COMP-002",
+    "category": "COMP",
+    "userVisibleBehavior": "Output context includes todo projection",
+    "decision": "Keep",
+    "newOwner": "src/Tools/MessageTransform.fs, src/Session/Script.fs",
+    "tests": "e2e/opencode/specs/p0-canary-tests-compaction.js (OC-COMP-001 OC-COMP-002 OC-COMP-003 OC-COMP-004 OC-COMP-005 OC-COMP-006 Compaction success flow)",
+    "nextStatus": "Proven",
+    "legacyFiles": [
+      "src/Runtime/Compaction.fs",
+      "src/Runtime/MessageTransformPipeline.fs"
+    ],
+    "notes": ""
+  },
+  {
+    "id": "OC-COMP-003",
+    "category": "COMP",
+    "userVisibleBehavior": "compaction_started structured event",
+    "decision": "Keep",
+    "newOwner": "src/Tools/MessageTransform.fs, src/Session/Script.fs",
+    "tests": "e2e/opencode/specs/p0-canary-tests-compaction.js (OC-COMP-001 OC-COMP-002 OC-COMP-003 OC-COMP-004 OC-COMP-005 OC-COMP-006 Compaction success flow)",
+    "nextStatus": "Proven",
+    "legacyFiles": [
+      "src/Runtime/Compaction.fs",
+      "src/Runtime/MessageTransformPipeline.fs"
+    ],
+    "notes": ""
+  },
+  {
+    "id": "OC-COMP-004",
+    "category": "COMP",
+    "userVisibleBehavior": "Compaction success = settled/compacted events",
+    "decision": "Keep",
+    "newOwner": "src/Tools/MessageTransform.fs, src/Session/Script.fs",
+    "tests": "e2e/opencode/specs/p0-canary-tests-compaction.js (OC-COMP-001 OC-COMP-002 OC-COMP-003 OC-COMP-004 OC-COMP-005 OC-COMP-006 Compaction success flow)",
+    "nextStatus": "Proven",
+    "legacyFiles": [
+      "src/Runtime/Compaction.fs",
+      "src/Runtime/MessageTransformPipeline.fs"
+    ],
+    "notes": ""
+  },
+  {
+    "id": "OC-COMP-005",
+    "category": "COMP",
+    "userVisibleBehavior": "Autocontinue hook fires after compaction",
+    "decision": "Keep",
+    "newOwner": "src/Tools/MessageTransform.fs, src/Session/Script.fs",
+    "tests": "e2e/opencode/specs/p0-canary-tests-compaction.js (OC-COMP-001 OC-COMP-002 OC-COMP-003 OC-COMP-004 OC-COMP-005 OC-COMP-006 Compaction success flow)",
+    "nextStatus": "Proven",
+    "legacyFiles": [
+      "src/Runtime/Compaction.fs",
+      "src/Runtime/MessageTransformPipeline.fs"
+    ],
+    "notes": ""
+  },
+  {
+    "id": "OC-COMP-006",
+    "category": "COMP",
+    "userVisibleBehavior": "Compaction continuation not a human turn",
+    "decision": "Keep",
+    "newOwner": "src/Tools/MessageTransform.fs, src/Session/Script.fs",
+    "tests": "e2e/opencode/specs/p0-canary-tests-compaction.js (OC-COMP-001 OC-COMP-002 OC-COMP-003 OC-COMP-004 OC-COMP-005 OC-COMP-006 Compaction success flow)",
+    "nextStatus": "Proven",
+    "legacyFiles": [
+      "src/Runtime/Compaction.fs",
+      "src/Runtime/MessageTransformPipeline.fs"
+    ],
+    "notes": ""
+  },
+  {
+    "id": "OC-COMP-007",
+    "category": "COMP",
+    "userVisibleBehavior": "Compaction failure = failed settle event",
+    "decision": "Keep",
+    "newOwner": "src/Tools/MessageTransform.fs, src/Session/Script.fs",
+    "tests": "e2e/opencode/specs/p0-canary-tests-compaction.js (OC-COMP-007 OC-COMP-008 Compaction failure and recovery)",
+    "nextStatus": "Proven",
+    "legacyFiles": [
+      "src/Runtime/Compaction.fs",
+      "src/Runtime/MessageTransformPipeline.fs"
+    ],
+    "notes": ""
+  },
+  {
+    "id": "OC-COMP-008",
+    "category": "COMP",
+    "userVisibleBehavior": "Compaction failure cleans active owner",
+    "decision": "Keep",
+    "newOwner": "src/Tools/MessageTransform.fs, src/Session/Script.fs",
+    "tests": "e2e/opencode/specs/p0-canary-tests-compaction.js (OC-COMP-007 OC-COMP-008 Compaction failure and recovery)",
+    "nextStatus": "Proven",
+    "legacyFiles": [
+      "src/Runtime/Compaction.fs",
+      "src/Runtime/MessageTransformPipeline.fs"
+    ],
+    "notes": ""
+  },
+  {
+    "id": "OC-COMP-009",
+    "category": "COMP",
+    "userVisibleBehavior": "Late events for old compaction do not affect new",
+    "decision": "Keep",
+    "newOwner": "src/Tools/MessageTransform.fs, src/Session/Script.fs",
+    "tests": "e2e/opencode/specs/p0-canary-tests-compaction.js (OC-COMP-009 Late events for old compaction do not affect new)",
+    "nextStatus": "Proven",
+    "legacyFiles": [
+      "src/Runtime/Compaction.fs",
+      "src/Runtime/MessageTransformPipeline.fs"
+    ],
+    "notes": ""
+  },
+  {
+    "id": "OC-COMP-010",
+    "category": "COMP",
+    "userVisibleBehavior": "Restart recovers incomplete compaction",
+    "decision": "Keep",
+    "newOwner": "src/Tools/MessageTransform.fs, src/Session/Script.fs",
+    "tests": "e2e/opencode/specs/p0-canary-tests-compaction.js (OC-COMP-010 Restart recovers incomplete compaction)",
+    "nextStatus": "Proven",
+    "legacyFiles": [
+      "src/Runtime/Compaction.fs",
+      "src/Runtime/MessageTransformPipeline.fs"
+    ],
+    "notes": ""
+  },
+  {
+    "id": "OC-COMP-011",
+    "category": "COMP",
+    "userVisibleBehavior": "Two simultaneous compactions isolated",
+    "decision": "Keep",
+    "newOwner": "src/Tools/MessageTransform.fs, src/Session/Script.fs",
+    "tests": "e2e/opencode/specs/p0-canary-tests-compaction.js (OC-COMP-011 Two simultaneous compactions isolated)",
+    "nextStatus": "Proven",
+    "legacyFiles": [
+      "src/Runtime/Compaction.fs",
+      "src/Runtime/MessageTransformPipeline.fs"
+    ],
+    "notes": ""
+  },
+  {
+    "id": "OC-COMP-012",
+    "category": "COMP",
+    "userVisibleBehavior": "After summary, old tool output not re-injected",
+    "decision": "Keep",
+    "newOwner": "src/Tools/MessageTransform.fs, src/Session/Script.fs",
+    "tests": "e2e/opencode/specs/p0-canary-tests-compaction.js (OC-COMP-012 Old tool output not re-injected)",
+    "nextStatus": "Proven",
+    "legacyFiles": [
+      "src/Runtime/Compaction.fs",
+      "src/Runtime/MessageTransformPipeline.fs"
+    ],
+    "notes": ""
+  },
+  {
+    "id": "OC-ES-001",
+    "category": "ES",
+    "userVisibleBehavior": "First append creates NDJSON",
+    "decision": "Replace",
+    "newOwner": "src/Journal/Writer.fs, src/Journal/Reader.fs, src/Journal/Fold.fs",
+    "tests": "e2e/opencode/specs/p0-canary-tests-recovery-eventlog.js (OC-ES-001 OC-ES-002 OC-ES-012 NDJSON creation, structure validation, and session isolation)",
+    "nextStatus": "Proven",
+    "legacyFiles": [
+      "src/Kernel/EventStore/EventStoreRuntime.fs"
+    ],
+    "notes": "Replaced global .wanxiangshu.ndjson with Per-Runtime Journal"
+  },
+  {
+    "id": "OC-ES-002",
+    "category": "ES",
+    "userVisibleBehavior": "Multiple events each valid line",
+    "decision": "Replace",
+    "newOwner": "src/Journal/Writer.fs, src/Journal/Reader.fs, src/Journal/Fold.fs",
+    "tests": "e2e/opencode/specs/p0-canary-tests-recovery-eventlog.js (OC-ES-001 OC-ES-002 OC-ES-012 NDJSON creation, structure validation, and session isolation)",
+    "nextStatus": "Proven",
+    "legacyFiles": [
+      "src/Kernel/EventStore/EventStoreRuntime.fs"
+    ],
+    "notes": "Replaced global .wanxiangshu.ndjson with Per-Runtime Journal"
+  },
+  {
+    "id": "OC-ES-003",
+    "category": "ES",
+    "userVisibleBehavior": "Concurrent append no interleaving",
+    "decision": "Replace",
+    "newOwner": "src/Journal/Writer.fs, src/Journal/Reader.fs, src/Journal/Fold.fs",
+    "tests": "e2e/opencode/specs/p0-canary-tests-recovery-eventlog.js (OC-ES-003 concurrent appends to NDJSON do not interleave or corrupt)",
+    "nextStatus": "Proven",
+    "legacyFiles": [
+      "src/Kernel/EventStore/EventStoreRuntime.fs"
+    ],
+    "notes": "Replaced global .wanxiangshu.ndjson with Per-Runtime Journal"
+  },
+  {
+    "id": "OC-ES-004",
+    "category": "ES",
+    "userVisibleBehavior": "Tail truncation ignores only incomplete last line",
+    "decision": "Replace",
+    "newOwner": "src/Journal/Writer.fs, src/Journal/Reader.fs, src/Journal/Fold.fs",
+    "tests": "e2e/opencode/specs/p0-canary-tests-recovery-restart.js (OC-ES-004 OC-ES-005 OC-ES-014 recovery from truncated, corrupt NDJSON and orphan lock files)",
+    "nextStatus": "Proven",
+    "legacyFiles": [
+      "src/Kernel/EventStore/EventStoreRuntime.fs"
+    ],
+    "notes": "Replaced global .wanxiangshu.ndjson with Per-Runtime Journal"
+  },
+  {
+    "id": "OC-ES-005",
+    "category": "ES",
+    "userVisibleBehavior": "Middle corruption stops at prefix",
+    "decision": "Replace",
+    "newOwner": "src/Journal/Writer.fs, src/Journal/Reader.fs, src/Journal/Fold.fs",
+    "tests": "e2e/opencode/specs/p0-canary-tests-recovery-restart.js (OC-ES-004 OC-ES-005 OC-ES-014 recovery from truncated, corrupt NDJSON and orphan lock files)",
+    "nextStatus": "Proven",
+    "legacyFiles": [
+      "src/Kernel/EventStore/EventStoreRuntime.fs"
+    ],
+    "notes": "Replaced global .wanxiangshu.ndjson with Per-Runtime Journal"
+  },
+  {
+    "id": "OC-ES-006",
+    "category": "ES",
+    "userVisibleBehavior": "Restart replays todo state",
+    "decision": "Replace",
+    "newOwner": "src/Journal/Writer.fs, src/Journal/Reader.fs, src/Journal/Fold.fs",
+    "tests": "e2e/opencode/specs/p0-canary-tests-recovery-replay.js (OC-ES-006 OC-ES-007 OC-ES-008 OC-ES-009 OC-ES-010 OC-ES-011 restart replay recovers states (review, todo, nudge, fallback, context))",
+    "nextStatus": "Proven",
+    "legacyFiles": [
+      "src/Kernel/EventStore/EventStoreRuntime.fs"
+    ],
+    "notes": "Replaced global .wanxiangshu.ndjson with Per-Runtime Journal"
+  },
+  {
+    "id": "OC-ES-007",
+    "category": "ES",
+    "userVisibleBehavior": "Restart replays review state",
+    "decision": "Replace",
+    "newOwner": "src/Journal/Writer.fs, src/Journal/Reader.fs, src/Journal/Fold.fs",
+    "tests": "e2e/opencode/specs/p0-canary-tests-recovery-replay.js (OC-ES-006 OC-ES-007 OC-ES-008 OC-ES-009 OC-ES-010 OC-ES-011 restart replay recovers states (review, todo, nudge, fallback, context))",
+    "nextStatus": "Proven",
+    "legacyFiles": [
+      "src/Kernel/EventStore/EventStoreRuntime.fs"
+    ],
+    "notes": "Replaced global .wanxiangshu.ndjson with Per-Runtime Journal"
+  },
+  {
+    "id": "OC-ES-008",
+    "category": "ES",
+    "userVisibleBehavior": "Restart replays nudge phase",
+    "decision": "Replace",
+    "newOwner": "src/Journal/Writer.fs, src/Journal/Reader.fs, src/Journal/Fold.fs",
+    "tests": "e2e/opencode/specs/p0-canary-tests-recovery-replay.js (OC-ES-006 OC-ES-007 OC-ES-008 OC-ES-009 OC-ES-010 OC-ES-011 restart replay recovers states (review, todo, nudge, fallback, context))",
+    "nextStatus": "Proven",
+    "legacyFiles": [
+      "src/Kernel/EventStore/EventStoreRuntime.fs"
+    ],
+    "notes": "Replaced global .wanxiangshu.ndjson with Per-Runtime Journal"
+  },
+  {
+    "id": "OC-ES-009",
+    "category": "ES",
+    "userVisibleBehavior": "Restart replays fallback state",
+    "decision": "Replace",
+    "newOwner": "src/Journal/Writer.fs, src/Journal/Reader.fs, src/Journal/Fold.fs",
+    "tests": "e2e/opencode/specs/p0-canary-tests-recovery-replay.js (OC-ES-006 OC-ES-007 OC-ES-008 OC-ES-009 OC-ES-010 OC-ES-011 restart replay recovers states (review, todo, nudge, fallback, context))",
+    "nextStatus": "Proven",
+    "legacyFiles": [
+      "src/Kernel/EventStore/EventStoreRuntime.fs"
+    ],
+    "notes": "Replaced global .wanxiangshu.ndjson with Per-Runtime Journal"
+  },
+  {
+    "id": "OC-ES-010",
+    "category": "ES",
+    "userVisibleBehavior": "Restart replays context phase",
+    "decision": "Replace",
+    "newOwner": "src/Journal/Writer.fs, src/Journal/Reader.fs, src/Journal/Fold.fs",
+    "tests": "e2e/opencode/specs/p0-canary-tests-recovery-replay.js (OC-ES-006 OC-ES-007 OC-ES-008 OC-ES-009 OC-ES-010 OC-ES-011 restart replay recovers states (review, todo, nudge, fallback, context))",
+    "nextStatus": "Proven",
+    "legacyFiles": [
+      "src/Kernel/EventStore/EventStoreRuntime.fs"
+    ],
+    "notes": "Replaced global .wanxiangshu.ndjson with Per-Runtime Journal"
+  },
+  {
+    "id": "OC-ES-011",
+    "category": "ES",
+    "userVisibleBehavior": "Duplicate seq/id does not double-apply",
+    "decision": "Replace",
+    "newOwner": "src/Journal/Writer.fs, src/Journal/Reader.fs, src/Journal/Fold.fs",
+    "tests": "e2e/opencode/specs/p0-canary-tests-recovery-replay.js (OC-ES-006 OC-ES-007 OC-ES-008 OC-ES-009 OC-ES-010 OC-ES-011 restart replay recovers states (review, todo, nudge, fallback, context))",
+    "nextStatus": "Proven",
+    "legacyFiles": [
+      "src/Kernel/EventStore/EventStoreRuntime.fs"
+    ],
+    "notes": "Replaced global .wanxiangshu.ndjson with Per-Runtime Journal"
+  },
+  {
+    "id": "OC-ES-012",
+    "category": "ES",
+    "userVisibleBehavior": "Two sessions recover independently",
+    "decision": "Replace",
+    "newOwner": "src/Journal/Writer.fs, src/Journal/Reader.fs, src/Journal/Fold.fs",
+    "tests": "e2e/opencode/specs/p0-canary-tests-recovery-eventlog.js (OC-ES-001 OC-ES-002 OC-ES-012 NDJSON creation, structure validation, and session isolation)",
+    "nextStatus": "Proven",
+    "legacyFiles": [
+      "src/Kernel/EventStore/EventStoreRuntime.fs"
+    ],
+    "notes": "Replaced global .wanxiangshu.ndjson with Per-Runtime Journal"
+  },
+  {
+    "id": "OC-ES-013",
+    "category": "ES",
+    "userVisibleBehavior": "Append failure => memory not advance",
+    "decision": "Replace",
+    "newOwner": "src/Journal/Writer.fs, src/Journal/Reader.fs, src/Journal/Fold.fs",
+    "tests": "e2e/opencode/specs/p0-canary-tests-recovery-eventlog.js (OC-ES-013 append failure: memory does not exceed durable)",
+    "nextStatus": "Proven",
+    "legacyFiles": [
+      "src/Kernel/EventStore/EventStoreRuntime.fs"
+    ],
+    "notes": "Replaced global .wanxiangshu.ndjson with Per-Runtime Journal"
+  },
+  {
+    "id": "OC-ES-014",
+    "category": "ES",
+    "userVisibleBehavior": "Orphan lock recoverable after crash",
+    "decision": "Replace",
+    "newOwner": "src/Journal/Writer.fs, src/Journal/Reader.fs, src/Journal/Fold.fs",
+    "tests": "e2e/opencode/specs/p0-canary-tests-recovery-restart.js (OC-ES-004 OC-ES-005 OC-ES-014 recovery from truncated, corrupt NDJSON and orphan lock files)",
+    "nextStatus": "Proven",
+    "legacyFiles": [
+      "src/Kernel/EventStore/EventStoreRuntime.fs"
+    ],
+    "notes": "Replaced global .wanxiangshu.ndjson with Per-Runtime Journal"
+  },
+  {
+    "id": "OC-ES-015",
+    "category": "ES",
+    "userVisibleBehavior": "SIGKILL host preserves complete newline",
+    "decision": "Replace",
+    "newOwner": "src/Journal/Writer.fs, src/Journal/Reader.fs, src/Journal/Fold.fs",
+    "tests": "e2e/opencode/specs/p0-canary-tests-recovery-kill.js (OC-ES-015 SIGKILL host preserves NDJSON integrity on restart)",
+    "nextStatus": "Proven",
+    "legacyFiles": [
+      "src/Kernel/EventStore/EventStoreRuntime.fs"
+    ],
+    "notes": "Replaced global .wanxiangshu.ndjson with Per-Runtime Journal"
+  },
+  {
+    "id": "OC-LIFE-001",
+    "category": "LIFE",
+    "userVisibleBehavior": "New human message = human-turn fact",
+    "decision": "Keep",
+    "newOwner": "src/Session/Runtime.fs, src/Session/Driver.fs",
+    "tests": "tests-next/ (unit)",
+    "nextStatus": "Proven",
+    "legacyFiles": [
+      "src/Runtime/SessionLifecycle.fs"
+    ],
+    "notes": ""
+  },
+  {
+    "id": "OC-LIFE-002",
+    "category": "LIFE",
+    "userVisibleBehavior": "Internal nudge not a human turn",
+    "decision": "Keep",
+    "newOwner": "src/Session/Runtime.fs, src/Session/Driver.fs",
+    "tests": "tests-next/ (unit)",
+    "nextStatus": "Proven",
+    "legacyFiles": [
+      "src/Runtime/SessionLifecycle.fs"
+    ],
+    "notes": ""
+  },
+  {
+    "id": "OC-LIFE-003",
+    "category": "LIFE",
+    "userVisibleBehavior": "Child nonce message not a human turn",
+    "decision": "Keep",
+    "newOwner": "src/Session/Runtime.fs, src/Session/Driver.fs",
+    "tests": "tests-next/ (unit)",
+    "nextStatus": "Proven",
+    "legacyFiles": [
+      "src/Runtime/SessionLifecycle.fs"
+    ],
+    "notes": ""
+  },
+  {
+    "id": "OC-LIFE-004",
+    "category": "LIFE",
+    "userVisibleBehavior": "Normal round: running/busy → terminal idle",
+    "decision": "Keep",
+    "newOwner": "src/Session/Runtime.fs, src/Session/Driver.fs",
+    "tests": "e2e/opencode/specs/p0-canary-tests-lifecycle.js (OC-LIFE-004 normal round transitions from busy to terminal idle)",
+    "nextStatus": "Proven",
+    "legacyFiles": [
+      "src/Runtime/SessionLifecycle.fs"
+    ],
+    "notes": ""
+  },
+  {
+    "id": "OC-LIFE-005",
+    "category": "LIFE",
+    "userVisibleBehavior": "API error round: error → idle",
+    "decision": "Keep",
+    "newOwner": "src/Session/Runtime.fs, src/Session/Driver.fs",
+    "tests": "e2e/opencode/specs/p0-canary-tests-lifecycle-extra.js (OC-LIFE-005 API error round results in idle state)",
+    "nextStatus": "Proven",
+    "legacyFiles": [
+      "src/Runtime/SessionLifecycle.fs"
+    ],
+    "notes": ""
+  },
+  {
+    "id": "OC-LIFE-006",
+    "category": "LIFE",
+    "userVisibleBehavior": "Abort = MessageAbortedError or equivalent",
+    "decision": "Keep",
+    "newOwner": "src/Session/Runtime.fs, src/Session/Driver.fs",
+    "tests": "e2e/opencode/specs/p0-canary-tests-lifecycle-extra.js (OC-LIFE-006 OC-LIFE-007 OC-LIFE-008 abort tool execution and preserve completed parts)",
+    "nextStatus": "Proven",
+    "legacyFiles": [
+      "src/Runtime/SessionLifecycle.fs"
+    ],
+    "notes": ""
+  },
+  {
+    "id": "OC-LIFE-007",
+    "category": "LIFE",
+    "userVisibleBehavior": "Abort prevents pending tool execution",
+    "decision": "Keep",
+    "newOwner": "src/Session/Runtime.fs, src/Session/Driver.fs",
+    "tests": "e2e/opencode/specs/p0-canary-tests-lifecycle-extra.js (OC-LIFE-006 OC-LIFE-007 OC-LIFE-008 abort tool execution and preserve completed parts)",
+    "nextStatus": "Proven",
+    "legacyFiles": [
+      "src/Runtime/SessionLifecycle.fs"
+    ],
+    "notes": ""
+  },
+  {
+    "id": "OC-LIFE-008",
+    "category": "LIFE",
+    "userVisibleBehavior": "Tool completed before abort not erased",
+    "decision": "Keep",
+    "newOwner": "src/Session/Runtime.fs, src/Session/Driver.fs",
+    "tests": "e2e/opencode/specs/p0-canary-tests-lifecycle-extra.js (OC-LIFE-006 OC-LIFE-007 OC-LIFE-008 abort tool execution and preserve completed parts)",
+    "nextStatus": "Proven",
+    "legacyFiles": [
+      "src/Runtime/SessionLifecycle.fs"
+    ],
+    "notes": ""
+  },
+  {
+    "id": "OC-LIFE-009",
+    "category": "LIFE",
+    "userVisibleBehavior": "Abort + [DONE] race ≤ 1 terminal state",
+    "decision": "Keep",
+    "newOwner": "src/Session/Runtime.fs, src/Session/Driver.fs",
+    "tests": "tests-next/ (unit)",
+    "nextStatus": "Proven",
+    "legacyFiles": [
+      "src/Runtime/SessionLifecycle.fs"
+    ],
+    "notes": ""
+  },
+  {
+    "id": "OC-LIFE-010",
+    "category": "LIFE",
+    "userVisibleBehavior": "Repeated idle idempotent",
+    "decision": "Keep",
+    "newOwner": "src/Session/Runtime.fs, src/Session/Driver.fs",
+    "tests": "e2e/opencode/specs/p0-canary-tests-lifecycle.js (OC-LIFE-010 repeated idle is idempotent per turn)",
+    "nextStatus": "Proven",
+    "legacyFiles": [
+      "src/Runtime/SessionLifecycle.fs"
+    ],
+    "notes": ""
+  },
+  {
+    "id": "OC-LIFE-011",
+    "category": "LIFE",
+    "userVisibleBehavior": "session.deleted cleans PTY, fallback, compliance, queue, temp, actor",
+    "decision": "Keep",
+    "newOwner": "src/Session/Runtime.fs, src/Session/Driver.fs",
+    "tests": "e2e/opencode/specs/p0-canary-tests-lifecycle.js (OC-LIFE-011 session deleted cleans spawned PTY and runtime state)",
+    "nextStatus": "Proven",
+    "legacyFiles": [
+      "src/Runtime/SessionLifecycle.fs"
+    ],
+    "notes": ""
+  },
+  {
+    "id": "OC-LIFE-012",
+    "category": "LIFE",
+    "userVisibleBehavior": "Delete session A does not affect session B",
+    "decision": "Keep",
+    "newOwner": "src/Session/Runtime.fs, src/Session/Driver.fs",
+    "tests": "e2e/opencode/specs/p0-canary-tests-lifecycle-extra.js (OC-LIFE-012 delete session A does not affect session B)",
+    "nextStatus": "Proven",
+    "legacyFiles": [
+      "src/Runtime/SessionLifecycle.fs"
+    ],
+    "notes": ""
+  },
+  {
+    "id": "OC-LIFE-013",
+    "category": "LIFE",
+    "userVisibleBehavior": "Event hook async work observable, no fixed sleep",
+    "decision": "Keep",
+    "newOwner": "src/Session/Runtime.fs, src/Session/Driver.fs",
+    "tests": "e2e/opencode/specs/p0-canary-tests-lifecycle.js (OC-LIFE-013 event hook async work is observable without fixed sleep)",
+    "nextStatus": "Proven",
+    "legacyFiles": [
+      "src/Runtime/SessionLifecycle.fs"
+    ],
+    "notes": ""
+  },
+  {
+    "id": "OC-LIFE-014",
+    "category": "LIFE",
+    "userVisibleBehavior": "session.post and event two paths do not double-recover",
+    "decision": "Keep",
+    "newOwner": "src/Session/Runtime.fs, src/Session/Driver.fs",
+    "tests": "tests-next/ (unit)",
+    "nextStatus": "Proven",
+    "legacyFiles": [
+      "src/Runtime/SessionLifecycle.fs"
+    ],
+    "notes": ""
+  },
+  {
+    "id": "OC-LIFE-015",
+    "category": "LIFE",
+    "userVisibleBehavior": "User sends next prompt immediately after idle, no race",
+    "decision": "Keep",
+    "newOwner": "src/Session/Runtime.fs, src/Session/Driver.fs",
+    "tests": "e2e/opencode/specs/p0-canary-tests-lifecycle.js (OC-LIFE-015 next prompt immediately after idle is race-free)",
+    "nextStatus": "Proven",
+    "legacyFiles": [
+      "src/Runtime/SessionLifecycle.fs"
+    ],
+    "notes": ""
+  },
+  {
+    "id": "OC-CONC-001",
+    "category": "CONC",
+    "userVisibleBehavior": "10 sessions on same host, no cross-talk",
+    "decision": "Keep",
+    "newOwner": "src/Session/Runtime.fs, src/Session/Inbox.fs",
+    "tests": "e2e/opencode/specs/p0-canary-tests-lifecycle-extra.js (OC-CONC-001 multiple sessions on same host execute without cross-talk)",
+    "nextStatus": "Proven",
+    "legacyFiles": [
+      "src/Runtime/SessionDispatcher.fs",
+      "src/Runtime/ConcurrencyManager.fs"
+    ],
+    "notes": ""
+  },
+  {
+    "id": "OC-CONC-002",
+    "category": "CONC",
+    "userVisibleBehavior": "Two sessions write without polluting runtime",
+    "decision": "Keep",
+    "newOwner": "src/Session/Runtime.fs, src/Session/Inbox.fs",
+    "tests": "e2e/opencode/specs/p0-canary-tests-lifecycle.js (OC-CONC-002 two sessions write without polluting runtime)",
+    "nextStatus": "Proven",
+    "legacyFiles": [
+      "src/Runtime/SessionDispatcher.fs",
+      "src/Runtime/ConcurrencyManager.fs"
+    ],
+    "notes": ""
+  },
+  {
+    "id": "OC-CONC-003",
+    "category": "CONC",
+    "userVisibleBehavior": "Two sessions nudge = each sends once",
+    "decision": "Keep",
+    "newOwner": "src/Session/Runtime.fs, src/Session/Inbox.fs",
+    "tests": "e2e/opencode/specs/p0-canary-tests-lifecycle-extra.js (OC-CONC-003 OC-CONC-004 OC-CONC-005 OC-CONC-006 two sessions nudges and continuation isolation)",
+    "nextStatus": "Proven",
+    "legacyFiles": [
+      "src/Runtime/SessionDispatcher.fs",
+      "src/Runtime/ConcurrencyManager.fs"
+    ],
+    "notes": ""
+  },
+  {
+    "id": "OC-CONC-004",
+    "category": "CONC",
+    "userVisibleBehavior": "Two sessions fallback = independent continuation IDs",
+    "decision": "Keep",
+    "newOwner": "src/Session/Runtime.fs, src/Session/Inbox.fs",
+    "tests": "e2e/opencode/specs/p0-canary-tests-lifecycle-extra.js (OC-CONC-003 OC-CONC-004 OC-CONC-005 OC-CONC-006 two sessions nudges and continuation isolation)",
+    "nextStatus": "Proven",
+    "legacyFiles": [
+      "src/Runtime/SessionDispatcher.fs",
+      "src/Runtime/ConcurrencyManager.fs"
+    ],
+    "notes": ""
+  },
+  {
+    "id": "OC-CONC-005",
+    "category": "CONC",
+    "userVisibleBehavior": "Two sessions child sessions = correct ownership",
+    "decision": "Keep",
+    "newOwner": "src/Session/Runtime.fs, src/Session/Inbox.fs",
+    "tests": "e2e/opencode/specs/p0-canary-tests-lifecycle-extra.js (OC-CONC-003 OC-CONC-004 OC-CONC-005 OC-CONC-006 two sessions nudges and continuation isolation)",
+    "nextStatus": "Proven",
+    "legacyFiles": [
+      "src/Runtime/SessionDispatcher.fs",
+      "src/Runtime/ConcurrencyManager.fs"
+    ],
+    "notes": ""
+  },
+  {
+    "id": "OC-CONC-006",
+    "category": "CONC",
+    "userVisibleBehavior": "Same session multi-tool-call ordering",
+    "decision": "Keep",
+    "newOwner": "src/Session/Runtime.fs, src/Session/Inbox.fs",
+    "tests": "e2e/opencode/specs/p0-canary-tests-lifecycle-extra.js (OC-CONC-003 OC-CONC-004 OC-CONC-005 OC-CONC-006 two sessions nudges and continuation isolation)",
+    "nextStatus": "Proven",
+    "legacyFiles": [
+      "src/Runtime/SessionDispatcher.fs",
+      "src/Runtime/ConcurrencyManager.fs"
+    ],
+    "notes": ""
+  },
+  {
+    "id": "OC-CONC-007",
+    "category": "CONC",
+    "userVisibleBehavior": "Out-of-order event injection → consistent fold",
+    "decision": "Keep",
+    "newOwner": "src/Session/Runtime.fs, src/Session/Inbox.fs",
+    "tests": "tests-next/ (unit)",
+    "nextStatus": "Proven",
+    "legacyFiles": [
+      "src/Runtime/SessionDispatcher.fs",
+      "src/Runtime/ConcurrencyManager.fs"
+    ],
+    "notes": ""
+  },
+  {
+    "id": "OC-CONC-008",
+    "category": "CONC",
+    "userVisibleBehavior": "High-frequency idle/error no unbounded queue",
+    "decision": "Keep",
+    "newOwner": "src/Session/Runtime.fs, src/Session/Inbox.fs",
+    "tests": "tests-next/ (unit)",
+    "nextStatus": "Proven",
+    "legacyFiles": [
+      "src/Runtime/SessionDispatcher.fs",
+      "src/Runtime/ConcurrencyManager.fs"
+    ],
+    "notes": ""
+  },
+  {
+    "id": "OC-CONC-009",
+    "category": "CONC",
+    "userVisibleBehavior": "100 rounds, runtime store does not keep ended session data",
+    "decision": "Keep",
+    "newOwner": "src/Session/Runtime.fs, src/Session/Inbox.fs",
+    "tests": "e2e/opencode/specs/p0-canary-tests-lifecycle-extra.js (OC-CONC-009 OC-CONC-010 OC-CONC-011 runtime resources and leak-free cycles)",
+    "nextStatus": "Proven",
+    "legacyFiles": [
+      "src/Runtime/SessionDispatcher.fs",
+      "src/Runtime/ConcurrencyManager.fs"
+    ],
+    "notes": ""
+  },
+  {
+    "id": "OC-CONC-010",
+    "category": "CONC",
+    "userVisibleBehavior": "Repeated create/delete = no PTY/actor/iterator/lock leak",
+    "decision": "Keep",
+    "newOwner": "src/Session/Runtime.fs, src/Session/Inbox.fs",
+    "tests": "e2e/opencode/specs/p0-canary-tests-lifecycle-extra.js (OC-CONC-009 OC-CONC-010 OC-CONC-011 runtime resources and leak-free cycles)",
+    "nextStatus": "Proven",
+    "legacyFiles": [
+      "src/Runtime/SessionDispatcher.fs",
+      "src/Runtime/ConcurrencyManager.fs"
+    ],
+    "notes": ""
+  },
+  {
+    "id": "OC-CONC-011",
+    "category": "CONC",
+    "userVisibleBehavior": "Mock provider delay, other sessions still run",
+    "decision": "Keep",
+    "newOwner": "src/Session/Runtime.fs, src/Session/Inbox.fs",
+    "tests": "e2e/opencode/specs/p0-canary-tests-lifecycle-extra.js (OC-CONC-009 OC-CONC-010 OC-CONC-011 runtime resources and leak-free cycles)",
+    "nextStatus": "Proven",
+    "legacyFiles": [
+      "src/Runtime/SessionDispatcher.fs",
+      "src/Runtime/ConcurrencyManager.fs"
+    ],
+    "notes": ""
+  },
+  {
+    "id": "OC-CONC-012",
+    "category": "CONC",
+    "userVisibleBehavior": "Restart frees old port, SSE, provider socket",
+    "decision": "Keep",
+    "newOwner": "src/Session/Runtime.fs, src/Session/Inbox.fs",
+    "tests": "e2e/opencode/specs/p0-canary-tests-lifecycle-extra.js (OC-CONC-012 restart cleans up old port and SSE bindings)",
+    "nextStatus": "Proven",
+    "legacyFiles": [
+      "src/Runtime/SessionDispatcher.fs",
+      "src/Runtime/ConcurrencyManager.fs"
+    ],
+    "notes": ""
+  },
+  {
+    "id": "OC-STAB-001",
+    "category": "STAB",
+    "userVisibleBehavior": "Stability gate runner repeat-e2e-50 execution",
+    "decision": "Keep",
+    "newOwner": "tests/Gates/",
+    "tests": "e2e/opencode/specs/p0-canary-tests-gate.js (OC-STAB-001 stability gate repeat execution)",
+    "nextStatus": "Proven",
+    "legacyFiles": [
+      "e2e/opencode/scripts/stability-gate.mjs"
+    ],
+    "notes": ""
+  },
+  {
+    "id": "OC-STAB-002",
+    "category": "STAB",
+    "userVisibleBehavior": "Static gate validation for sleep and containsTool",
+    "decision": "Keep",
+    "newOwner": "tests/Gates/",
+    "tests": "e2e/opencode/specs/p0-canary-tests-gate.js (OC-STAB-002 static gate validation)",
+    "nextStatus": "Proven",
+    "legacyFiles": [
+      "e2e/opencode/scripts/stability-gate.mjs"
+    ],
+    "notes": ""
+  },
+  {
+    "id": "OC-STAB-003",
+    "category": "STAB",
+    "userVisibleBehavior": "Isolated environment check",
+    "decision": "Keep",
+    "newOwner": "tests/Gates/",
+    "tests": "e2e/opencode/specs/p0-canary-tests-gate.js (OC-STAB-003 isolated env check)",
+    "nextStatus": "Proven",
+    "legacyFiles": [
+      "e2e/opencode/scripts/stability-gate.mjs"
+    ],
+    "notes": ""
+  },
+  {
+    "id": "OC-STAB-004",
+    "category": "STAB",
+    "userVisibleBehavior": "Scenario host restart API check",
+    "decision": "Keep",
+    "newOwner": "tests/Gates/",
+    "tests": "e2e/opencode/specs/p0-canary-tests-gate.js (OC-STAB-004 restart API check)",
+    "nextStatus": "Proven",
+    "legacyFiles": [
+      "e2e/opencode/scripts/stability-gate.mjs"
+    ],
+    "notes": ""
+  },
+  {
+    "id": "OC-STAB-005",
+    "category": "STAB",
+    "userVisibleBehavior": "Strict LLM failure modes check",
+    "decision": "Keep",
+    "newOwner": "tests/Gates/",
+    "tests": "e2e/opencode/specs/p0-canary-tests-gate.js (OC-STAB-005 strict failure modes check)",
+    "nextStatus": "Proven",
+    "legacyFiles": [
+      "e2e/opencode/scripts/stability-gate.mjs"
+    ],
+    "notes": ""
+  },
+  {
+    "id": "OC-STAB-006",
+    "category": "STAB",
+    "userVisibleBehavior": "Cleanup resource leak detection check",
+    "decision": "Keep",
+    "newOwner": "tests/Gates/",
+    "tests": "e2e/opencode/specs/p0-canary-tests-gate.js (OC-STAB-006 cleanup leak detection check)",
+    "nextStatus": "Proven",
+    "legacyFiles": [
+      "e2e/opencode/scripts/stability-gate.mjs"
+    ],
+    "notes": ""
+  }
+]
