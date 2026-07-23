@@ -11,7 +11,6 @@
   },
   "dependencies": {
     "@fable-org/fable-library-js": "^2.4.0",
-    "smol-toml": "1.7.0",
-    "thoth-json": "^10.2.0"
+    "smol-toml": "1.7.0"
   }
 }
