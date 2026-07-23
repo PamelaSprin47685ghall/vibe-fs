@@ -19,6 +19,7 @@
     <Compile Include="Kernel/SendOutcomeMap.fs"/>
     <Compile Include="Journal/FactCodec.fs"/>
     <Compile Include="Journal/Envelope.fs"/>
+    <Compile Include="Journal/Reader.fs"/>
     <Compile Include="Journal/Boot.fs"/>
     <Compile Include="Journal/Writer.fs"/>
     <Compile Include="Journal/Fold.fs"/>
@@ -47,6 +48,7 @@
     <Compile Include="Tools/StaticTools.fs"/>
     <Compile Include="Tools/FileTools.fs"/>
     <Compile Include="Tools/ReviewTools.fs"/>
+    <Compile Include="Tools/Catalog.fs"/>
     <Compile Include="Wanxiangzhen/SquadTypes.fs"/>
     <Compile Include="Wanxiangzhen/SquadFlow.fs"/>
     <Compile Include="OpenCode/OpencodeTypes.fs"/>

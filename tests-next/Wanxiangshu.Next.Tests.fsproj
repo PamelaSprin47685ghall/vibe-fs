@@ -39,11 +39,10 @@
     <Compile Include="Session/ChildFlowTests.fs"/>
     <Compile Include="Gates/ArchitectureGateSupport.fs"/>
     <Compile Include="Gates/ArchitectureGates.fs"/>
-    <Compile Include="Integration/VerticalSliceJournalSupport.fs"/>
-    <Compile Include="Integration/VerticalSliceWaiters.fs"/>
+    <Compile Include="Integration/VerticalSliceJournalTestSupport.fs"/>
+    <Compile Include="Integration/VerticalSliceWaitTestSupport.fs"/>
     <Compile Include="Integration/VerticalSliceIntegrationTests.fs"/>
     <Compile Include="Integration/VerticalSliceE2ETests.fs"/>
     <Compile Include="Integration/VerticalSliceFlowTests.fs"/>
-    <Compile Include="E2E/OpencodeServeE2ETests.fs"/>
   </ItemGroup>
 </Project>

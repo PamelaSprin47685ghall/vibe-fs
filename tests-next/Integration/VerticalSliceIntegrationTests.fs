@@ -17,11 +17,8 @@ open Wanxiangshu.Next.Tools
 open Wanxiangshu.Next.OpenCode
 open Wanxiangshu.Next.Tests
 open Wanxiangshu.Next.Tests.JournalTests.JournalTestSupport
-
-type FakePromptPort(continuationMsgId: MessageId) =
-    interface IPromptPort with
-        member _.SendPrompt (_sessionId: SessionId) (_text: string) (_opts: PromptOptions) =
-            Task.FromResult(Delivered continuationMsgId)
+open VerticalSliceJournalTestSupport
+open VerticalSliceWaitTestSupport
 
 module VerticalSliceIntegrationTests =
 
@@ -40,8 +37,8 @@ module VerticalSliceIntegrationTests =
                     let inboxes = System.Collections.Generic.Dictionary<SessionId, ISessionInbox>()
                     inboxes.[sessionId] <- inbox
 
-                    do! VerticalSliceJournalSupport._runStep1 gateway sessionId inboxes
-                    do! VerticalSliceJournalSupport._runStep2 gateway sessionId tempDir inbox
+                    do! VerticalSliceJournalTestSupport._runStep1 gateway sessionId inboxes
+                    do! VerticalSliceJournalTestSupport._runStep2 gateway sessionId tempDir inbox
 
                     let finishFact =
                         Fact.Session(SessionSettled {| Result = SessionResult.Completed "Vertical slice completed" |})
@@ -81,8 +78,8 @@ module VerticalSliceIntegrationTests =
                     Assert.Equal(Ok(), inboxA.TryPost(HumanMessageEvent(turnA, "work for session A")))
                     Assert.Equal(Ok(), inboxB.TryPost(HumanMessageEvent(turnB, "work for session B")))
 
-                    do! VerticalSliceJournalSupport._awaitDriverProcessed inboxA
-                    do! VerticalSliceJournalSupport._awaitDriverProcessed inboxB
+                    do! VerticalSliceJournalTestSupport._awaitDriverProcessed inboxA
+                    do! VerticalSliceJournalTestSupport._awaitDriverProcessed inboxB
 
                     let projections = gateway.ProjectionSet.SessionProjections
                     let projectionA = Map.tryFind sessionA projections
@@ -128,10 +125,10 @@ module VerticalSliceIntegrationTests =
                           model = None }
 
                     OpencodeHooks.handleChatMessage gateway (SessionDrivers()) inboxes hookInput {| message = userMessage |}
-                    do! VerticalSliceJournalSupport._awaitDriverProcessed inbox
+                    do! VerticalSliceJournalTestSupport._awaitDriverProcessed inbox
 
-                    let envelopes = VerticalSliceJournalSupport._readEnvelopes gateway.JournalPath
-                    VerticalSliceJournalSupport._assertSingleHumanTurn envelopes
+                    let envelopes = VerticalSliceJournalTestSupport._readEnvelopes gateway.JournalPath
+                    VerticalSliceJournalTestSupport._assertSingleHumanTurn envelopes
                     let! _ = gateway.DisposeAsync()
                     ()
             })
@@ -168,10 +165,10 @@ module VerticalSliceIntegrationTests =
                           model = None }
 
                     OpencodeHooks.handleChatMessage gateway drivers inboxes hookInput {| message = userMsgObj |}
-                    do! VerticalSliceJournalSupport._awaitDriverProcessed inbox
+                    do! VerticalSliceJournalTestSupport._awaitDriverProcessed inbox
 
-                    let envelopes = VerticalSliceJournalSupport._readEnvelopes gateway.JournalPath
-                    VerticalSliceJournalSupport._assertSingleHumanTurn envelopes
+                    let envelopes = VerticalSliceJournalTestSupport._readEnvelopes gateway.JournalPath
+                    VerticalSliceJournalTestSupport._assertSingleHumanTurn envelopes
 
                     let! _ = gateway.DisposeAsync()
                     ()
@@ -192,8 +189,8 @@ module VerticalSliceIntegrationTests =
                     inboxMap.[sessionId] <- inbox
                     use driver = new SessionDriver(gateway, sessionId, inbox)
 
-                    let! _ = VerticalSliceJournalSupport._runStep1 gateway sessionId inboxMap
-                    do! VerticalSliceJournalSupport._runStep2 gateway sessionId tempDir inbox
+                    let! _ = VerticalSliceJournalTestSupport._runStep1 gateway sessionId inboxMap
+                    do! VerticalSliceJournalTestSupport._runStep2 gateway sessionId tempDir inbox
 
                     let userMsgId = MessageId.create "msg_user_1"
                     let assistantMsgId = MessageId.create "assistant_e2e_1"

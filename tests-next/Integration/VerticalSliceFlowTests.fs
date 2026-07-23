@@ -13,11 +13,8 @@ open Wanxiangshu.Next.Session
 open Wanxiangshu.Next.OpenCode
 open Wanxiangshu.Next.Tests
 open Wanxiangshu.Next.Tests.JournalTests.JournalTestSupport
-
-type FakePromptPort(continuationMsgId: MessageId) =
-    interface IPromptPort with
-        member _.SendPrompt (_sessionId: SessionId) (_text: string) (_opts: PromptOptions) =
-            Task.FromResult(Delivered continuationMsgId)
+open VerticalSliceJournalTestSupport
+open VerticalSliceWaitTestSupport
 
 module VerticalSliceFlowTests =
 
@@ -57,7 +54,7 @@ module VerticalSliceFlowTests =
                     )
 
                     let! promptSeen =
-                        VerticalSliceWaiters._awaitEnvelope
+                        VerticalSliceWaitTestSupport._awaitEnvelope
                             gateway
                             (fun env ->
                                 match env.Fact with
@@ -84,7 +81,7 @@ module VerticalSliceFlowTests =
                     )
 
                     let! prompt2Seen =
-                        VerticalSliceWaiters._awaitEnvelope
+                        VerticalSliceWaitTestSupport._awaitEnvelope
                             gateway
                             (fun env ->
                                 match env.Fact with
@@ -112,10 +109,10 @@ module VerticalSliceFlowTests =
                         )
                     )
 
-                    let! settledSeen = VerticalSliceWaiters._awaitSettled gateway sessionId
+                    let! settledSeen = VerticalSliceWaitTestSupport._awaitSettled gateway sessionId
                     Assert.True(settledSeen, "Expected SessionSettled")
 
-                    let finalEnvelopes = VerticalSliceJournalSupport._readEnvelopes gateway.JournalPath
+                    let finalEnvelopes = VerticalSliceJournalTestSupport._readEnvelopes gateway.JournalPath
 
                     let terminalCount =
                         finalEnvelopes
@@ -168,7 +165,7 @@ module VerticalSliceFlowTests =
                     )
 
                     let! promptSeen =
-                        VerticalSliceWaiters._awaitEnvelope
+                        VerticalSliceWaitTestSupport._awaitEnvelope
                             gateway
                             (fun env ->
                                 match env.Fact with
@@ -181,7 +178,7 @@ module VerticalSliceFlowTests =
                     Assert.Equal(Ok(), inbox.TryPost(CancelEvent "test-cancel"))
 
                     let! cancelTerminalSeen =
-                        VerticalSliceWaiters._awaitEnvelope
+                        VerticalSliceWaitTestSupport._awaitEnvelope
                             gateway
                             (fun env ->
                                 match env.Fact with
@@ -194,7 +191,7 @@ module VerticalSliceFlowTests =
                     let proj = Map.find sessionId gateway.ProjectionSet.SessionProjections
                     Assert.Equal(None, proj.SettledResult)
 
-                    let envelopes = VerticalSliceJournalSupport._readEnvelopes gateway.JournalPath
+                    let envelopes = VerticalSliceJournalTestSupport._readEnvelopes gateway.JournalPath
 
                     let terminalCount =
                         envelopes
