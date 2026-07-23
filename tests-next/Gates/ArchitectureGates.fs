@@ -231,7 +231,7 @@ module ArchitectureGates =
             sprintf "Expected recursive scan to return >= 10 files, got %d" (List.length files)
         )
 
-        let fromSubdir token leaf =
+        let fromSubdir (token: string) (leaf: string) =
             files |> List.exists (fun f -> f.Contains(token) && f.EndsWith(leaf))
 
         Assert.True(fromSubdir "Kernel" "Flow.fs", "Recursive scan missed next/Kernel/Flow.fs")

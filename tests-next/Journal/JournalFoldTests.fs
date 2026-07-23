@@ -166,6 +166,26 @@ module JournalFoldTests =
         Assert.Equal(ReviewVerdict.Passed, projB.LastReview.Value)
 
     [<Fact>]
+    let Fold_keeps_TodoChanged_isolated_between_sessions () =
+        let rt = RuntimeId.create "rt-todo-isolation"
+        let t0 = DateTimeOffset.UtcNow
+        let sA, sB = SessionId.create "todo-session-a", SessionId.create "todo-session-b"
+
+        let envs =
+            [ makeEnv 1L t0 (StreamId.Session sA) (Fact.Todo(TodoChanged {| Snapshot = { Items = [ "a" ] } |})) rt
+              makeEnv
+                  2L
+                  (t0.AddSeconds 1.0)
+                  (StreamId.Session sB)
+                  (Fact.Todo(TodoChanged {| Snapshot = { Items = [ "b" ] } |}))
+                  rt ]
+
+        let projections = (Fold.apply Fold.empty envs).SessionProjections
+
+        Assert.Equal(Some { Items = [ "a" ] }, (Map.find sA projections).Todos)
+        Assert.Equal(Some { Items = [ "b" ] }, (Map.find sB projections).Todos)
+
+    [<Fact>]
     let Fold_preserves_Workspace_events_as_global_projections () =
         let rt = RuntimeId.create "rt-workspace-global"
         let t0 = DateTimeOffset.UtcNow
