@@ -42,6 +42,7 @@
     <Compile Include="Integration/VerticalSliceJournalSupport.fs"/>
     <Compile Include="Integration/VerticalSliceWaiters.fs"/>
     <Compile Include="Integration/VerticalSliceIntegrationTests.fs"/>
+    <Compile Include="Integration/VerticalSliceE2ETests.fs"/>
     <Compile Include="Integration/VerticalSliceFlowTests.fs"/>
     <Compile Include="E2E/OpencodeServeE2ETests.fs"/>
   </ItemGroup>

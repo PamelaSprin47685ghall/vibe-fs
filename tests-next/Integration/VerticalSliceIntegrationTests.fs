@@ -18,6 +18,11 @@ open Wanxiangshu.Next.OpenCode
 open Wanxiangshu.Next.Tests
 open Wanxiangshu.Next.Tests.JournalTests.JournalTestSupport
 
+type FakePromptPort(continuationMsgId: MessageId) =
+    interface IPromptPort with
+        member _.SendPrompt (_sessionId: SessionId) (_text: string) (_opts: PromptOptions) =
+            Task.FromResult(Delivered continuationMsgId)
+
 module VerticalSliceIntegrationTests =
 
     [<Fact>]
@@ -188,12 +193,11 @@ module VerticalSliceIntegrationTests =
                     use driver = new SessionDriver(gateway, sessionId, inbox)
 
                     let! _ = VerticalSliceJournalSupport._runStep1 gateway sessionId inboxMap
+                    do! VerticalSliceJournalSupport._runStep2 gateway sessionId tempDir inbox
 
                     let userMsgId = MessageId.create "msg_user_1"
                     let assistantMsgId = MessageId.create "assistant_e2e_1"
                     Assert.Equal(Ok(), inbox.TryPost(AssistantTerminalEvent(userMsgId, assistantMsgId, PromptOutcome.Delivered assistantMsgId)))
-
-                    do! VerticalSliceJournalSupport._runStep2 gateway sessionId tempDir inbox
 
                     let finishFact =
                         Fact.Session(SessionSettled {| Result = SessionResult.Completed "Vertical slice completed" |})

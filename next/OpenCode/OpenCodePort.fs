@@ -42,6 +42,8 @@ module OpenCodePort =
                         let! res = unbox<Task<obj>> (promptFn?call(sessObj, payload))
                         if not (isNull res) && not (isNull res?id) then
                             return Delivered(MessageId.create (unbox<string> res?id))
+                        elif not (isNull res) && not (isNull res?info) && not (isNull res?info?id) then
+                            return Delivered(MessageId.create (unbox<string> res?info?id))
                         else
                             return AcceptanceUnknown("Missing message id in SDK response", None)
                     with ex ->

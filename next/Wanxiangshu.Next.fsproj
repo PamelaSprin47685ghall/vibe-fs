@@ -55,6 +55,7 @@
     <Compile Include="OpenCode/OpenCodePort.fs"/>
     <Compile Include="OpenCode/PluginRuntime.fs"/>
     <Compile Include="OpenCode/OpencodeHooks.fs"/>
+    <Compile Include="OpenCode/PluginTools.fs"/>
     <Compile Include="OpenCode/Plugin.fs"/>
   </ItemGroup>
 </Project>

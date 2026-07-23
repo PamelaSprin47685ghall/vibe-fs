@@ -107,6 +107,7 @@ type SessionDriver(gateway: IGateway, sessionId: SessionId, inbox: ISessionInbox
     let mutable flowTask: Task<Result<SessionOutcome, SessionError>> option = None
     let mutable flowCts: CancellationTokenSource option = None
     let mutable currentTurnId: TurnId option = None
+    let mutable awaitingNativeTerminal: bool = false
     let mutable localHistoricalIndex = PromptProtocol.emptyHistoricalIndex
     let mutable localPromptProtocol = PromptProtocol.emptyLocalProtocol
 
@@ -175,6 +176,7 @@ type SessionDriver(gateway: IGateway, sessionId: SessionId, inbox: ISessionInbox
                 match gateway.Append (StreamId.Session sessionId) (Some turnId) fact with
                 | Committed _ ->
                     currentTurnId <- Some turnId
+                    awaitingNativeTerminal <- true
                     cancelCurrentFlow ()
                     return true
                 | CommitUnknown _ -> return false
@@ -182,21 +184,10 @@ type SessionDriver(gateway: IGateway, sessionId: SessionId, inbox: ISessionInbox
             | AssistantTerminalEvent(userMsgId, assistantMsgId, outcome) ->
                 let userMsgStr = MessageId.value userMsgId
 
-                let matchedKeyOpt =
-                    match Map.tryFind userMsgStr pendingUserMsgToKeyRef.Value with
-                    | Some promptKeyStr ->
-                        pendingUserMsgToKeyRef.Value <- Map.remove userMsgStr pendingUserMsgToKeyRef.Value
-                        Some promptKeyStr
-                    | None ->
-                        if currentTurnId.IsSome then
-                            let initialKeyText = sprintf "initial:%s:%s" (SessionId.value sessionId) (TurnId.value currentTurnId.Value)
-                            let pk = PromptKey.create sessionId currentTurnId.Value PromptPurpose.ContinueTodo None 1 (Some userMsgId) initialKeyText
-                            Some(PromptKey.asString pk)
-                        else
-                            None
-
-                match matchedKeyOpt with
+                match Map.tryFind userMsgStr pendingUserMsgToKeyRef.Value with
                 | Some promptKeyStr ->
+                    pendingUserMsgToKeyRef.Value <- Map.remove userMsgStr pendingUserMsgToKeyRef.Value
+
                     let pFact =
                         Fact.Prompt(
                             PromptTerminal
@@ -215,10 +206,11 @@ type SessionDriver(gateway: IGateway, sessionId: SessionId, inbox: ISessionInbox
                     localPromptProtocol <- newLocal
 
                     signalWaiterByKey promptKeyStr outcome
-
-                    if flowCts.IsNone && currentTurnId.IsSome then
-                        startFlow currentTurnId.Value |> ignore
-                | None -> ()
+                | None ->
+                    if awaitingNativeTerminal || flowCts.IsNone then
+                        awaitingNativeTerminal <- false
+                        if currentTurnId.IsSome then
+                            startFlow currentTurnId.Value |> ignore
 
                 return true
 
