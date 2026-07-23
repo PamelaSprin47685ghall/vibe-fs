@@ -28,6 +28,7 @@
     <Compile Include="Session/PromptProtocol.fs"/>
     <Compile Include="Session/Inbox.fs"/>
     <Compile Include="Session/Script.fs"/>
+    <Compile Include="Session/SessionFlows.fs"/>
     <Compile Include="Session/ChildFlows.fs"/>
     <Compile Include="Session/Fallback.fs"/>
     <Compile Include="Session/Review.fs"/>
@@ -48,6 +49,8 @@
     <Compile Include="OpenCode/OpencodeTypes.fs"/>
     <Compile Include="OpenCode/MessageOriginDecoder.fs"/>
     <Compile Include="OpenCode/Gateway.fs"/>
+    <Compile Include="OpenCode/OpenCodePort.fs"/>
+    <Compile Include="OpenCode/PluginRuntime.fs"/>
     <Compile Include="OpenCode/OpencodeHooks.fs"/>
     <Compile Include="OpenCode/Plugin.fs"/>
   </ItemGroup>

@@ -130,7 +130,6 @@ module FlowTests =
 
             let action (x: int) (ct: CancellationToken) =
                 task {
-                    do! FlowHelpers.sleepJs ((10 - x) * 5)
                     return x * 10
                 }
 
