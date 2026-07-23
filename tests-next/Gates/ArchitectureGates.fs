@@ -25,6 +25,18 @@ module private NodeFsGates =
     [<Import("dirname", "node:path")>]
     let pathDirname (p: string) : string = jsNative
 
+    let isDir (path: string) : bool =
+        try
+            let s = statSync path
+
+            if isNull s then
+                false
+            else
+                let p = s?isDirectory
+                if isNull p then false else unbox<bool> p
+        with _ ->
+            false
+
 module ArchitectureGates =
 
     let findRepoRoot () =
@@ -32,6 +44,27 @@ module ArchitectureGates =
         elif NodeFsGates.existsSync "../next" then ".."
         elif NodeFsGates.existsSync "../../next" then "../.."
         else "."
+
+    let collectFsFiles (root: string) : string list =
+        let rec walk (dir: string) (acc: string list) =
+            let entries = NodeFsGates.readdirSync dir
+            let mutable result = acc
+
+            for e in entries do
+                let full = NodeFsGates.pathJoin (dir, e)
+
+                if e = "fable_modules" || e = "node_modules" || e = ".git" then
+                    ()
+                elif NodeFsGates.isDir full then
+                    result <- walk full result
+                elif e.EndsWith(".fs") || e.EndsWith(".fsproj") then
+                    result <- full :: result
+                else
+                    ()
+
+            result
+
+        walk root []
 
     let forbiddenTokens =
         [ "Nudge"
@@ -114,12 +147,10 @@ module ArchitectureGates =
 
         let nextFiles = List<string>()
 
-        let nextFs =
-            NodeFsGates.readdirSync (nextDir)
-            |> Array.filter (fun f -> f.EndsWith(".fs") || f.EndsWith(".fsproj"))
+        let nextFs = collectFsFiles nextDir
 
         for f in nextFs do
-            nextFiles.Add(NodeFsGates.pathJoin (nextDir, f))
+            nextFiles.Add(f)
 
         let propsPathNext = NodeFsGates.pathJoin (nextDir, "Directory.Build.props")
 
@@ -128,12 +159,10 @@ module ArchitectureGates =
 
         let testsNextFiles = List<string>()
 
-        let testsFs =
-            NodeFsGates.readdirSync (testsNextDir)
-            |> Array.filter (fun f -> f.EndsWith(".fs") || f.EndsWith(".fsproj"))
+        let testsFs = collectFsFiles testsNextDir
 
         for f in testsFs do
-            testsNextFiles.Add(NodeFsGates.pathJoin (testsNextDir, f))
+            testsNextFiles.Add(f)
 
         let propsPathTests = NodeFsGates.pathJoin (testsNextDir, "Directory.Build.props")
 
@@ -174,10 +203,7 @@ module ArchitectureGates =
         let nextDir = NodeFsGates.pathJoin (repoRoot, "next")
         Assert.True(NodeFsGates.existsSync (nextDir), sprintf "Directory 'next' does not exist at %s" nextDir)
 
-        let nextFsFiles =
-            NodeFsGates.readdirSync (nextDir)
-            |> Array.filter (fun f -> f.EndsWith(".fs") && not (f.Contains("fable_modules")))
-            |> Array.map (fun f -> NodeFsGates.pathJoin (nextDir, f))
+        let nextFsFiles = collectFsFiles nextDir
 
         let violations = List<string>()
 
@@ -191,3 +217,42 @@ module ArchitectureGates =
                 violations.Add(sprintf "File '%s' has %d lines (exceeds maximum of 300 lines)" file lineCount)
 
         Assert.Empty(violations)
+
+    [<Fact>]
+    let ``Next_recursive_scan_includes_subdirectory_files`` () =
+        let repoRoot = findRepoRoot ()
+        let nextDir = NodeFsGates.pathJoin (repoRoot, "next")
+        Assert.True(NodeFsGates.existsSync (nextDir), sprintf "Directory 'next' does not exist at %s" nextDir)
+
+        let files = collectFsFiles nextDir
+
+        Assert.True(
+            List.length files >= 10,
+            sprintf "Expected recursive scan to return >= 10 files, got %d" (List.length files)
+        )
+
+        let fromSubdir token leaf =
+            files |> List.exists (fun f -> f.Contains(token) && f.EndsWith(leaf))
+
+        Assert.True(fromSubdir "Kernel" "Flow.fs", "Recursive scan missed next/Kernel/Flow.fs")
+        Assert.True(fromSubdir "Journal" "Writer.fs", "Recursive scan missed next/Journal/Writer.fs")
+        Assert.True(fromSubdir "OpenCode" "Plugin.fs", "Recursive scan missed next/OpenCode/Plugin.fs")
+        Assert.True(fromSubdir "Tools" "StaticTools.fs", "Recursive scan missed next/Tools/StaticTools.fs")
+
+        let knownSubdirs =
+            [ "Kernel"
+              "Journal"
+              "OpenCode"
+              "Tools"
+              "Session"
+              "Process"
+              "Wanxiangzhen" ]
+
+        let observedSubdirs =
+            knownSubdirs
+            |> List.filter (fun token -> files |> List.exists (fun f -> f.Contains(token)))
+
+        Assert.True(
+            List.length observedSubdirs >= 3,
+            sprintf "Recursive scan only observed %d subdirs (expected >= 3)" (List.length observedSubdirs)
+        )
