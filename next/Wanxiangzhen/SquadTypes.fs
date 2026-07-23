@@ -25,7 +25,8 @@ type SquadOutcome =
     | SquadFailed of error: string
 
 type SquadScript =
-    { CreateWorktree: SquadTask -> SquadFlow<IAsyncDisposable>
+    { GetProgressStamp: unit -> int64
+      CreateWorktree: SquadTask -> SquadFlow<IAsyncDisposable>
       StartSlave: IAsyncDisposable -> SquadTask -> SquadFlow<ChildSession>
       Verify: Wanxiangshu.Next.Session.ChildResult -> SquadFlow<SquadTaskResult>
       PublishVerified: IAsyncDisposable -> SquadTaskResult -> SquadFlow<VerifiedResult>
