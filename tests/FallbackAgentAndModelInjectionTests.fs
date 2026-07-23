@@ -104,7 +104,15 @@ let opencodeSessionStatusCapturesActiveModelSpec () =
         let registry = ChildAgentRegistry.Create()
 
         let observer =
-            createSessionLifecycleObserver (Opencode, null, createReviewStore (), registry, None, rt)
+            createSessionLifecycleObserver (
+                Opencode,
+                null,
+                createReviewStore (),
+                registry,
+                None,
+                rt,
+                Wanxiangshu.Runtime.RuntimeScope.create ()
+            )
 
         do! observer.handleEvent rawEvent
         equal "agent is captured" "reviewer" ((rt.GetSession sid).AgentName)
@@ -161,59 +169,61 @@ let opencodeCaptureCurrentModelPrioritizesLatestUserMessageModelSpec () =
         equal "should prioritize user message model id" "claude-3-5" modelOpt.Value.ModelID
     }
 
+let private emptyFallbackConfigLookup _ =
+    { LoopMaxContinues = 3
+      MaxRetries = 3
+      MaxRecoveries = 3
+      AgentChains = Map.empty
+      DefaultChain = [] }
+
+let private seedChainAndModel (rt: FallbackRuntimeStore) (sid: string) =
+    let testModel =
+        { ProviderID = "openai"
+          ModelID = "gpt-4"
+          Variant = None
+          Temperature = None
+          TopP = None
+          MaxTokens = None
+          ReasoningEffort = None
+          Thinking = false }
+
+    rt.UpdateSession(sid, selectChain [ testModel ])
+    rt.UpdateSession(sid, selectModel testModel)
+
 let opencodeNewUserMessageResetsChainAndModelSpec () =
     promise {
         let rt = FallbackRuntimeStore()
         let sid = "reset-chain-model"
-
-        let testModel =
-            { ProviderID = "openai"
-              ModelID = "gpt-4"
-              Variant = None
-              Temperature = None
-              TopP = None
-              MaxTokens = None
-              ReasoningEffort = None
-              Thinking = false }
-
-        rt.UpdateSession(sid, selectChain [ testModel ])
-        rt.UpdateSession(sid, selectModel testModel)
-
-        let rawEvent =
-            createObj
-                [ "event",
-                  box (
-                      createObj
-                          [ "type", box "message.updated"
-                            "properties",
-                            box (createObj [ "info", box (createObj [ "sessionID", box sid; "role", box "user" ]) ]) ]
-                  ) ]
-
+        seedChainAndModel rt sid
         let registry = ChildAgentRegistry.Create()
-
-        let configLookup =
-            fun _ ->
-                { LoopMaxContinues = 3
-                  MaxRetries = 3
-                  MaxRecoveries = 3
-                  AgentChains = Map.empty
-                  DefaultChain = [] }
 
         let mockClient =
             createObj [ "session", box (createObj [ "messages", box (fun _ -> Promise.lift (box {| data = [||] |})) ]) ]
 
         let handler =
-            createOpencodeFallbackHandler mockClient rt configLookup "" registry (createReviewStore ()) None
+            createOpencodeFallbackHandler
+                mockClient
+                rt
+                emptyFallbackConfigLookup
+                ""
+                registry
+                (createReviewStore ())
+                None
 
         let observer =
-            createSessionLifecycleObserver (Opencode, null, createReviewStore (), registry, Some handler, rt)
+            createSessionLifecycleObserver (
+                Opencode,
+                null,
+                createReviewStore (),
+                registry,
+                Some handler,
+                rt,
+                Wanxiangshu.Runtime.RuntimeScope.create ()
+            )
 
         do! observer.OnNewHumanMessage(sid, "manager", None, "msg-1")
-
-        let chain = (rt.GetSession sid).Chain
-        let modelOpt = (rt.GetSession sid).Model
-        equal "chain should be cleared" 0 chain.Length
-        check "model should be cleared" modelOpt.IsNone
+        equal "chain should be cleared" 0 (rt.GetSession sid).Chain.Length
+        check "model should be cleared" (rt.GetSession sid).Model.IsNone
     }
 
 let opencodeCaptureCurrentModelPrioritizesSessionGetAsyncSpec () =

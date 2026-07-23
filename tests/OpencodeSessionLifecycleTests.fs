@@ -32,7 +32,15 @@ let childIdleDoesNotAbortParent () =
         registry.RegisterChildAgent("child-1", "coder", Some "parent-1")
 
         let observer =
-            createSessionLifecycleObserver (opencode, ctx, createReviewStore (), registry, None, FallbackRuntimeStore())
+            createSessionLifecycleObserver (
+                opencode,
+                ctx,
+                createReviewStore (),
+                registry,
+                None,
+                FallbackRuntimeStore(),
+                Wanxiangshu.Runtime.RuntimeScope.create ()
+            )
 
         do!
             observer.handleEvent (
@@ -81,7 +89,8 @@ let childCompactionIdleSettlesAfterFallbackConsumes () =
                 createReviewStore (),
                 registry,
                 Some fallbackHandler,
-                runtime
+                runtime,
+                Wanxiangshu.Runtime.RuntimeScope.create ()
             )
 
         do!

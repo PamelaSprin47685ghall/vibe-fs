@@ -17,6 +17,7 @@ open Wanxiangshu.Hosts.Opencode.SessionLifecycleHumanDispatch
 open Wanxiangshu.Hosts.Opencode.SessionLifecycleClose
 open Wanxiangshu.Runtime.Session.SessionActorState
 open Wanxiangshu.Runtime.SubsessionEventRouter
+open Wanxiangshu.Runtime.RuntimeScope
 
 let private envelopeOf (eventType: string) (props: obj) : HostEventEnvelope =
     { EventType = eventType; Props = props }
@@ -42,6 +43,7 @@ let private toHostSurface (fact: SessionFact) : (HostEventEnvelope * obj) option
 let private runHostFanOut
     (ctx: obj)
     (fallbackRuntime: FallbackRuntimeStore)
+    (runtimeScope: RuntimeScope)
     (fallback: FallbackCoordinator)
     (nudge: NudgeTrigger)
     (sid: string)
@@ -55,7 +57,7 @@ let private runHostFanOut
         try
             let envOpt = Some envelope
             settleChildDispatch ctx envOpt
-            do! processEventEnvelope ctx fallbackRuntime sid envOpt
+            do! processEventEnvelope ctx fallbackRuntime runtimeScope sid envOpt
             fallback.UpdateBusyCount envOpt
             do! nudge.TrackLifetimeEvents envOpt
             let! fbConsumed = fallback.TryConsumeEvent rawInput
@@ -84,6 +86,7 @@ let private runHostFanOut
 let processLifecycleFact
     (ctx: obj)
     (fallbackRuntime: FallbackRuntimeStore)
+    (runtimeScope: RuntimeScope)
     (fallback: FallbackCoordinator)
     (nudge: NudgeTrigger)
     (sid: string)
@@ -99,6 +102,7 @@ let processLifecycleFact
             finalizeSessionClosed ctx sid
         | _ ->
             match toHostSurface fact with
-            | Some(envelope, rawInput) -> do! runHostFanOut ctx fallbackRuntime fallback nudge sid envelope rawInput
+            | Some(envelope, rawInput) ->
+                do! runHostFanOut ctx fallbackRuntime runtimeScope fallback nudge sid envelope rawInput
             | None -> ()
     }

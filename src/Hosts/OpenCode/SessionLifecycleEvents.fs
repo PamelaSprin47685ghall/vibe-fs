@@ -12,20 +12,19 @@ open Wanxiangshu.Hosts.Opencode.SessionLifecycleProcess
 open Wanxiangshu.Runtime.Session.SessionActorRegistry
 open Wanxiangshu.Runtime.Session.SessionActorState
 open Wanxiangshu.Runtime.Session.SessionFactDecode
+open Wanxiangshu.Runtime.RuntimeScope
 
 let private workspaceKeyFromCtx (ctx: obj) : string =
     let root = pluginDirectoryFromCtx ctx
 
-    if root = "" then
-        "opencode-default"
-    else
-        "opencode:" + root
+    if root = "" then "opencode-default" else "opencode:" + root
 
 /// Host event fan-out: decode → standard fact → session mailbox → return.
 /// Domain mutation (owner/lease/nonce/generation/terminal) runs only inside the actor.
 let handleEvent
     (ctx: obj)
     (fallbackRuntime: FallbackRuntimeStore)
+    (runtimeScope: RuntimeScope)
     (fallback: FallbackCoordinator)
     (nudge: NudgeTrigger)
     (input: obj)
@@ -34,7 +33,10 @@ let handleEvent
         match tryFromHostInput input with
         | Some(sid, fact) ->
             let actor = SessionActorRegistry.GetOrCreate (workspaceKeyFromCtx ctx) sid
-            actor.BindHandler(fun snap f -> processLifecycleFact ctx fallbackRuntime fallback nudge sid snap f)
+
+            actor.BindHandler(fun snap f ->
+                processLifecycleFact ctx fallbackRuntime runtimeScope fallback nudge sid snap f)
+
             let! _ = actor.Post fact
             ()
         | None ->
@@ -50,6 +52,7 @@ let handleEvent
                         processLifecycleFact
                             ctx
                             fallbackRuntime
+                            runtimeScope
                             fallback
                             nudge
                             ""
@@ -57,7 +60,10 @@ let handleEvent
                             fact
                 else
                     let actor = SessionActorRegistry.GetOrCreate (workspaceKeyFromCtx ctx) sid
-                    actor.BindHandler(fun snap f -> processLifecycleFact ctx fallbackRuntime fallback nudge sid snap f)
+
+                    actor.BindHandler(fun snap f ->
+                        processLifecycleFact ctx fallbackRuntime runtimeScope fallback nudge sid snap f)
+
                     let! _ = actor.Post fact
                     ()
     }

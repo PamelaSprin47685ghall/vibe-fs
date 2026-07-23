@@ -13,14 +13,11 @@ open Wanxiangshu.Runtime.Fallback.SessionRuntimeLeasePure
 open Wanxiangshu.Runtime.SessionEventWriter
 open Wanxiangshu.Hosts.Opencode.NudgeTriggerOps
 open Wanxiangshu.Hosts.Opencode.Fallback.HostEventInspection
+open Wanxiangshu.Runtime.MessageTransform.CapsStage
+open Wanxiangshu.Runtime.RuntimeScope
 
 /// Apply mutations from a session.status event (agent name + model).
-let handleSessionStatus
-    (fallbackRuntime: FallbackRuntimeStore)
-    (sid: string)
-    (statusObj: obj)
-    (agentName: string)
-    =
+let handleSessionStatus (fallbackRuntime: FallbackRuntimeStore) (sid: string) (statusObj: obj) (agentName: string) =
     if agentName <> "" then
         fallbackRuntime.UpdateSession(sid, recordAgentName agentName)
 
@@ -32,8 +29,16 @@ let handleSessionStatus
 
 /// Apply mutations from a session.compacted event. Async because it writes
 /// to disk via appendCompactionContextGenerationChangedOrFail.
-let handleSessionCompacted (ctx: obj) (fallbackRuntime: FallbackRuntimeStore) (sid: string) : JS.Promise<unit> =
+let handleSessionCompacted
+    (ctx: obj)
+    (fallbackRuntime: FallbackRuntimeStore)
+    (runtimeScope: RuntimeScope)
+    (sid: string)
+    : JS.Promise<unit> =
     promise {
+        if sid <> "" then
+            invalidateCapsAfterCompaction runtimeScope sid
+
         let currentOwner = (fallbackRuntime.GetSession sid).Owner
         let session = fallbackRuntime.GetSession sid
         let compactionGen = session.CompactionGeneration
@@ -87,38 +92,42 @@ let handleMessageUpdated (fallbackRuntime: FallbackRuntimeStore) (sid: string) (
                 if currentOwner = SessionOwner.Compaction then
                     fallbackRuntime.Update(sid, setCompactionContinuationObserved true)
 
+let private handleBusyAfterTaskComplete (fallbackRuntime: FallbackRuntimeStore) (sid: string) =
+    let state = fallbackRuntime.GetOrCreateState sid
+
+    if state.Lifecycle = FallbackLifecycle.TaskComplete then
+        fallbackRuntime.Update(
+            sid,
+            fun session ->
+                { session with
+                    Core =
+                        { session.Core with
+                            Lifecycle = FallbackLifecycle.Active } }
+        )
+
+let private handleSessionStatusEnvelope (fallbackRuntime: FallbackRuntimeStore) (props: obj) =
+    let statusObj = get props "status"
+    let agentName = str statusObj "agent"
+    let sid2 = getSessionID "session.status" props
+
+    if sid2 <> "" then
+        handleSessionStatus fallbackRuntime sid2 statusObj agentName
+
+        if resolveStatusValue statusObj = "busy" then
+            handleBusyAfterTaskComplete fallbackRuntime sid2
+
 /// Process the event-envelope match body: route idle + keep existing handlers.
 let processEventEnvelope
     (ctx: obj)
     (fallbackRuntime: FallbackRuntimeStore)
+    (runtimeScope: RuntimeScope)
     (sid: string)
     (eventEnvelope: HostEventEnvelope option)
     : JS.Promise<unit> =
     promise {
         match eventEnvelope with
         | Some { EventType = "session.status"
-                 Props = props } ->
-            let statusObj = get props "status"
-            let agentName = str statusObj "agent"
-            let sid2 = getSessionID "session.status" props
-
-            if sid2 <> "" then
-                handleSessionStatus fallbackRuntime sid2 statusObj agentName
-
-                let statusVal = resolveStatusValue statusObj
-
-                if statusVal = "busy" then
-                    let state = fallbackRuntime.GetOrCreateState sid2
-
-                    if state.Lifecycle = FallbackLifecycle.TaskComplete then
-                        fallbackRuntime.Update(
-                            sid2,
-                            fun session ->
-                                { session with
-                                    Core =
-                                        { session.Core with
-                                            Lifecycle = FallbackLifecycle.Active } }
-                        )
+                 Props = props } -> handleSessionStatusEnvelope fallbackRuntime props
 
         | Some { EventType = "session.idle"
                  Props = _props } -> ()
@@ -128,7 +137,7 @@ let processEventEnvelope
             let sid2 = getSessionID "session.compacted" props
 
             if sid2 <> "" then
-                do! handleSessionCompacted ctx fallbackRuntime sid2
+                do! handleSessionCompacted ctx fallbackRuntime runtimeScope sid2
 
         | Some { EventType = "message.updated"
                  Props = props } ->

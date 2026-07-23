@@ -69,7 +69,20 @@ let private registerTransformHooks (result: obj) (client: obj) (services: CoreSe
                 input
                 output))
 
-    setKey result "experimental.session.compacting" (twoArgHook (fun _input _output -> promise { return () }))
+    setKey
+        result
+        "experimental.session.compacting"
+        (twoArgHook (fun input _output ->
+            promise {
+                let sid =
+                    let s1 = Dyn.str input "sessionID"
+                    if s1 <> "" then s1 else Dyn.str input "sessionId"
+
+                if sid <> "" then
+                    Wanxiangshu.Runtime.MessageTransform.CapsStage.invalidateCapsAfterCompaction
+                        services.RuntimeScope
+                        sid
+            }))
 
     setKey
         result

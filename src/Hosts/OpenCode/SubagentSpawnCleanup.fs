@@ -36,17 +36,13 @@ let extractSessionText (client: obj) (sessionId: string) (directory: string) (st
                 else
                     let messagesList = MessagingCodec.decodeMessages (unbox<obj[]> data)
 
-                    let lastUserIdx =
-                        messagesList
-                        |> List.tryFindIndexBack (fun m -> m.info.role = User)
-                        |> Option.defaultValue 0
+                    // Collect ALL assistant text from the given startIndex onwards
+                    // (not just the last user turn) so the subagent report includes
+                    // every round's output, not only the final round.
+                    let effectiveStartIndex =
+                        if startIndex >= List.length messagesList then 0 else startIndex
 
-                    let finalStartIndex =
-                        if startIndex >= List.length messagesList then lastUserIdx
-                        else if lastUserIdx >= startIndex then lastUserIdx
-                        else startIndex
-
-                    match readAssistantText messagesList finalStartIndex "\n\n" with
+                    match readAssistantText messagesList effectiveStartIndex "\n\n" with
                     | Some text -> return text
                     | None -> return noOutputText
         with _ ->

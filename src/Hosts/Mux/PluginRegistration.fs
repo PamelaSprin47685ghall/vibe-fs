@@ -33,7 +33,20 @@ let createMessageTransforms
             messagesTransform deps scope reviewStore input output)
 
     let compactingTransformFn =
-        System.Func<obj, obj, JS.Promise<unit>>(fun _input _output -> Promise.lift ())
+        System.Func<obj, obj, JS.Promise<unit>>(fun input _output ->
+            promise {
+                let sid =
+                    let s1 = Dyn.str input "sessionID"
+
+                    if s1 <> "" then
+                        s1
+                    else
+                        let s2 = Dyn.str input "sessionId"
+                        if s2 <> "" then s2 else Dyn.str input "session_id"
+
+                if sid <> "" then
+                    Wanxiangshu.Runtime.MessageTransform.CapsStage.invalidateCapsAfterCompaction scope sid
+            })
 
     (box messagesTransformFn, box compactingTransformFn)
 

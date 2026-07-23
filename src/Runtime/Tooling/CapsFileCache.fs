@@ -91,3 +91,13 @@ let getOrLoadCapsFilesForScope
                     return files
                 }
         )
+
+/// Drop per-session caps file cache so the next load re-reads the workspace.
+/// Prefix matches CapsCache keys: sessionID + "\u0000" + directory.
+let invalidateCapsFilesForSession (scope: RuntimeScope) (sessionID: string) : unit =
+    if sessionID = "" then
+        ()
+    else
+        let prefix = sessionID + "\u0000"
+        scope.ClearCapsFilesForSession prefix
+        scope.ClearCapsInflightForSession prefix

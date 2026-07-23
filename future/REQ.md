@@ -1,1 +1,0 @@
-parallelToolHintDocument 的 synthetic 注入内容 现在伪装成 user message，这不对。应该伪装成工具调用的结果

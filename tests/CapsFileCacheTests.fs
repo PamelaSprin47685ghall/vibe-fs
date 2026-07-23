@@ -89,6 +89,18 @@ let getOrLoadCapsFilesParallelMissSharesInflight () =
         equal "caps cache parallel miss same length" pair.[0].Length pair.[1].Length
     }
 
+let invalidateCapsFilesForSessionForcesReload () =
+    promise {
+        let scope = create ()
+        let sessionID = "caps-cache-invalidate-" + string (uniqueId ())
+        let directory = "."
+        let! first = getOrLoadCapsFilesForScope scope sessionID directory
+        invalidateCapsFilesForSession scope sessionID
+        let! second = getOrLoadCapsFilesForScope scope sessionID directory
+        check "invalidate drops cached list ref" (not (obj.ReferenceEquals(box first, box second)))
+        equal "invalidate reload keeps length" first.Length second.Length
+    }
+
 let run () =
     promise {
         do! getOrLoadCapsFilesCachesPerSession ()
@@ -97,4 +109,5 @@ let run () =
         do! getOrLoadCapsFilesReusesAfterDirectoryRoundTrip ()
         do! getOrLoadCapsFilesNormalizesDirectoryAlias ()
         do! getOrLoadCapsFilesParallelMissSharesInflight ()
+        do! invalidateCapsFilesForSessionForcesReload ()
     }

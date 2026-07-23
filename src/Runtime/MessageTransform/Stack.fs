@@ -66,6 +66,24 @@ let set (scope: RuntimeScope) (sessionID: string) (state: TransformState) : unit
 
 let getCapsSlot (scope: RuntimeScope) (sessionID: string) = (get scope sessionID).Caps
 
+/// Drop cached caps prefix for one session. Compaction removes early synth messages;
+/// the next transform must rebuild from disk instead of reusing the stale Segment.
+let clearCapsSlot (scope: RuntimeScope) (sessionID: string) : unit =
+    if sessionID = "" then
+        ()
+    else
+        let state = get scope sessionID
+
+        match state.Caps with
+        | None -> ()
+        | Some _ ->
+            set
+                scope
+                sessionID
+                { state with
+                    Caps = None
+                    CapsRevision = RevisionId.next state.CapsRevision }
+
 let getTopSlot (scope: RuntimeScope) (sessionID: string) =
     let slot = (get scope sessionID).Top
 
