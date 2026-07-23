@@ -100,18 +100,16 @@ module OpencodeHooks =
 
                 processUserMessage gateway drivers inboxMap sessionId userMsg
 
+    [<Emit("delete $1[$0]")>]
+    let private jsDeleteProp (prop: string) (target: obj) : unit = jsNative
+
     let handleToolExecuteBefore (input: OpencodeToolExecuteInput) (output: OpencodeToolExecuteOutput) =
         let argsObj = output.args
 
         if not (isNull argsObj) then
-            if not (isNull argsObj?warn_tdd) then
-                argsObj?warn_tdd <- null
-
-            if not (isNull argsObj?warn_reuse) then
-                argsObj?warn_reuse <- null
-
-            if not (isNull argsObj?warn_context) then
-                argsObj?warn_context <- null
+            jsDeleteProp "warn_tdd" argsObj
+            jsDeleteProp "warn_reuse" argsObj
+            jsDeleteProp "warn_context" argsObj
 
     let handleEvent
         (gateway: Gateway)
