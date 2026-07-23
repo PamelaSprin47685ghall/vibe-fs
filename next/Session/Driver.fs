@@ -103,86 +103,50 @@ type SessionDrivers() =
 type SessionDriver(gateway: IGateway, sessionId: SessionId, inbox: ISessionInbox, ?port: IPromptPort) =
     let cts = new CancellationTokenSource()
     let waiterMapRef = ref PromptWaiters.emptyWaiters
+    let pendingUserMsgToKeyRef = ref (Map.empty<string, string>)
     let mutable flowTask: Task<Result<SessionOutcome, SessionError>> option = None
-    let mutable flowRunning = false
+    let mutable flowCts: CancellationTokenSource option = None
+    let mutable currentTurnId: TurnId option = None
+    let mutable localHistoricalIndex = PromptProtocol.emptyHistoricalIndex
+    let mutable localPromptProtocol = PromptProtocol.emptyLocalProtocol
 
-    let signalWaiters outcome =
+    let signalWaiterByKey keyString outcome =
         let waiters = waiterMapRef.Value
-        waiterMapRef.Value <-
-            Map.fold (fun remaining key _ -> PromptWaiters.trySignalWaiter remaining key outcome) waiters waiters
+        waiterMapRef.Value <- PromptWaiters.trySignalWaiter waiters keyString outcome
 
     let defaultConfig: SessionScriptConfig =
         { FallbackModels = [ "default" ]
           MaxRetriesPerModel = 3
           MaxInvalidRetries = 3 }
 
-    let dispatchCommand (cmd: SessionCommand) =
-        match cmd with
-        | UpsertTodo(snap, reply) ->
-            let fact = Fact.Todo(TodoChanged {| Snapshot = snap |})
-            let commitRes = gateway.Append (StreamId.Session sessionId) None fact
+    let dispatchCommand cmd = DriverDispatch.dispatchCommand gateway sessionId cmd
 
-            match commitRes with
-            | Committed _ -> reply (Ok SessionCommandResult.Upserted)
-            | _ -> reply (Error SessionCommandError.InboxFull)
-        | QuerySnapshot reply ->
-            match Map.tryFind sessionId gateway.ProjectionSet.SessionProjections with
-            | Some proj ->
-                let todoSnap = defaultArg proj.Todos { Items = [] }
-                reply todoSnap
-            | None -> reply { Items = [] }
-        | SubmitReview(reportText, reply) ->
-            let fact =
-                Fact.Review(
-                    ReviewApplied
-                        {| Verdict = ReviewVerdict.NeedsChanges [ reportText ]
-                           Round = 1
-                           ResultingTodo = None |}
-                )
-
-            let commitRes = gateway.Append (StreamId.Session sessionId) None fact
-
-            match commitRes with
-            | Committed _ -> reply (Ok SessionCommandResult.ReviewSubmitted)
-            | _ -> reply (Error SessionCommandError.InboxFull)
-        | ReturnVerdict(verdictText, reply) ->
-            let verdict =
-                if verdictText.Equals("Passed", StringComparison.OrdinalIgnoreCase) then
-                    ReviewVerdict.Passed
-                else
-                    ReviewVerdict.NeedsChanges [ verdictText ]
-
-            let fact =
-                Fact.Review(
-                    ReviewApplied
-                        {| Verdict = verdict
-                           Round = 1
-                           ResultingTodo = None |}
-                )
-
-            let commitRes = gateway.Append (StreamId.Session sessionId) None fact
-
-            match commitRes with
-            | Committed _ -> reply (Ok SessionCommandResult.VerdictReturned)
-            | _ -> reply (Error SessionCommandError.InboxFull)
+    let cancelCurrentFlow () =
+        match flowCts with
+        | Some c ->
+            try c.Cancel() with _ -> ()
+            try c.Dispose() with _ -> ()
+            flowCts <- None
+        | None -> ()
 
     let startFlow (turnId: TurnId) : bool =
-        if flowRunning then
-            false
-        else
-            flowRunning <- true
-            let script = SessionScript.create gateway sessionId inbox waiterMapRef port turnId defaultConfig
+        cancelCurrentFlow ()
+        let newFlowCts = new CancellationTokenSource()
+        flowCts <- Some newFlowCts
+        currentTurnId <- Some turnId
+        let script = SessionScript.create gateway sessionId inbox waiterMapRef port turnId defaultConfig pendingUserMsgToKeyRef
 
-            let task =
-                task {
-                    try
-                        return! SessionFlows.runFlow script cts.Token (SessionFlows.run script)
-                    finally
-                        flowRunning <- false
-                }
+        let task =
+            task {
+                try
+                    return! SessionFlows.runFlow script newFlowCts.Token (SessionFlows.run script)
+                finally
+                    if flowCts = Some newFlowCts then
+                        flowCts <- None
+            }
 
-            flowTask <- Some task
-            true
+        flowTask <- Some task
+        true
 
     let dispatchEvent (eventOpt: SessionInboxEvent) : Task<bool> =
         task {
@@ -191,38 +155,84 @@ type SessionDriver(gateway: IGateway, sessionId: SessionId, inbox: ISessionInbox
                 dispatchCommand cmd
                 return true
 
+            | ToolAfterEvent(toolName, _callId, argsJson, _outJson) ->
+                if toolName = "todowrite" then
+                    try
+                        let items =
+                            let parsed = Thoth.Json.Decode.fromString (Thoth.Json.Decode.field "todos" (Thoth.Json.Decode.list Thoth.Json.Decode.string)) argsJson
+                            match parsed with
+                            | Ok list -> list
+                            | Error _ -> []
+                        let snap: Fact.TodoSnapshot = { Items = items }
+                        let fact = Fact.Todo(TodoChanged {| Snapshot = snap |})
+                        gateway.Append (StreamId.Session sessionId) None fact |> ignore
+                    with _ -> ()
+                return true
+
             | HumanMessageEvent(turnId, _text) ->
                 let fact = Fact.Session(HumanTurnStarted {| TurnId = turnId |})
 
                 match gateway.Append (StreamId.Session sessionId) (Some turnId) fact with
                 | Committed _ ->
-                    startFlow turnId |> ignore
+                    currentTurnId <- Some turnId
+                    cancelCurrentFlow ()
                     return true
                 | CommitUnknown _ -> return false
 
-            | AssistantTerminalEvent(_userMsgId, _assistantMsgId, outcome) ->
-                let pFact =
-                    Fact.Prompt(
-                        PromptTerminal
-                            {| PromptKey = sprintf "terminal:%s" (MessageId.value _userMsgId)
-                               Outcome = outcome
-                               AssistantMessageId = Some _assistantMsgId |}
-                    )
+            | AssistantTerminalEvent(userMsgId, assistantMsgId, outcome) ->
+                let userMsgStr = MessageId.value userMsgId
 
-                gateway.Append (StreamId.Session sessionId) None pFact |> ignore
-                signalWaiters outcome
+                let matchedKeyOpt =
+                    match Map.tryFind userMsgStr pendingUserMsgToKeyRef.Value with
+                    | Some promptKeyStr ->
+                        pendingUserMsgToKeyRef.Value <- Map.remove userMsgStr pendingUserMsgToKeyRef.Value
+                        Some promptKeyStr
+                    | None ->
+                        if currentTurnId.IsSome then
+                            let initialKeyText = sprintf "initial:%s:%s" (SessionId.value sessionId) (TurnId.value currentTurnId.Value)
+                            let pk = PromptKey.create sessionId currentTurnId.Value PromptPurpose.ContinueTodo None 1 (Some userMsgId) initialKeyText
+                            Some(PromptKey.asString pk)
+                        else
+                            None
+
+                match matchedKeyOpt with
+                | Some promptKeyStr ->
+                    let pFact =
+                        Fact.Prompt(
+                            PromptTerminal
+                                {| PromptKey = promptKeyStr
+                                   Outcome = outcome
+                                   AssistantMessageId = Some assistantMsgId |}
+                        )
+
+                    gateway.Append (StreamId.Session sessionId) None pFact |> ignore
+
+                    let now = DateTimeOffset.UtcNow
+                    let pkOpt = PromptKey.parse promptKeyStr
+                    let pKey = defaultArg pkOpt (PromptKey.create sessionId (defaultArg currentTurnId (TurnId.create "unknown")) PromptPurpose.ContinueTodo None 1 (Some userMsgId) promptKeyStr)
+                    let (newHist, newLocal) = PromptProtocol.recordTerminal localHistoricalIndex localPromptProtocol pKey (Some userMsgId) (Some assistantMsgId) outcome now
+                    localHistoricalIndex <- newHist
+                    localPromptProtocol <- newLocal
+
+                    signalWaiterByKey promptKeyStr outcome
+
+                    if flowCts.IsNone && currentTurnId.IsSome then
+                        startFlow currentTurnId.Value |> ignore
+                | None -> ()
+
                 return true
 
             | CancelEvent _ ->
+                cancelCurrentFlow ()
                 let pFact =
                     Fact.Prompt(
                         PromptTerminal
-                            {| PromptKey = sprintf "terminal:cancel"
+                            {| PromptKey = "terminal:cancel"
                                Outcome = Fact.PromptOutcome.FatalFailure "cancelled"
                                AssistantMessageId = None |}
                     )
                 gateway.Append (StreamId.Session sessionId) None pFact |> ignore
-                signalWaiters (Fact.PromptOutcome.FatalFailure "cancelled")
+                signalWaiterByKey "terminal:cancel" (Fact.PromptOutcome.FatalFailure "cancelled")
 
                 try
                     cts.Cancel()
@@ -232,7 +242,6 @@ type SessionDriver(gateway: IGateway, sessionId: SessionId, inbox: ISessionInbox
                 return false
 
             | PluginEvent _
-            | ToolAfterEvent _
             | LifecycleEvent _
             | LoopCommandEvent _
             | SquadCommandEvent _ -> return true
@@ -260,7 +269,7 @@ type SessionDriver(gateway: IGateway, sessionId: SessionId, inbox: ISessionInbox
     member _.Worker = workerTask
 
     member _.Cancel() =
-        signalWaiters (Fact.PromptOutcome.FatalFailure "cancelled")
+        signalWaiterByKey "terminal:cancel" (Fact.PromptOutcome.FatalFailure "cancelled")
 
         try
             cts.Cancel()

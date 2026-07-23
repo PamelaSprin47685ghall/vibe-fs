@@ -8,103 +8,131 @@ open Wanxiangshu.Next.Kernel.Identity
 open Wanxiangshu.Next.Kernel.Outcome
 open Wanxiangshu.Next.Journal
 
-type TodoView =
-    { Unfinished: bool
-      ProgressStamp: int64 }
-
-type ReviewView =
-    { Required: bool
-      Round: int
-      MaxRound: int
-      Verdict: Fact.ReviewVerdict option }
-
 module private SessionAsync =
+
+    let mutable private globalHistoricalIndex = PromptProtocol.emptyHistoricalIndex
+    let mutable private globalLocalProtocol = PromptProtocol.emptyLocalProtocol
 
     let continueWork
         (gateway: IGateway)
         (sessionId: SessionId)
         (turnId: TurnId)
         (waiterMapRef: ref<WaiterMap>)
+        (pendingMapRef: ref<Map<string, string>>)
         (port: IPromptPort option)
         (ct: CancellationToken)
         : Task<Result<unit, SessionError>> =
         task {
+            let attempt =
+                match Map.tryFind sessionId gateway.ProjectionSet.SessionProjections with
+                | Some proj -> (int proj.Version) + 1
+                | None -> 1
+
             let promptKeyText =
-                sprintf "continue:%s:%s" (SessionId.value sessionId) (TurnId.value turnId)
+                sprintf "continue:%s:%s:%d" (SessionId.value sessionId) (TurnId.value turnId) attempt
 
             let pKey =
-                PromptKey.create sessionId turnId PromptPurpose.ContinueTodo None 1 None promptKeyText
+                PromptKey.create sessionId turnId PromptPurpose.ContinueTodo None attempt None promptKeyText
 
             let promptKeyStr = PromptKey.asString pKey
 
-            let pFact =
-                Fact.Prompt(
-                    Fact.PromptFact.PromptRequested
-                        {| PromptKey = promptKeyStr
-                           TurnId = turnId
-                           Purpose = "ContinueTodo" |}
-                )
+            let decision = PromptProtocol.evaluateSendOnce globalHistoricalIndex globalLocalProtocol pKey
 
-            match gateway.Append (StreamId.Session sessionId) (Some turnId) pFact with
-            | CommitUnknown _ ->
-                return Error(SessionError.ProjectionBroken "prompt-requested write failed")
-            | Committed _ ->
-                let newWaiters, tcs = PromptWaiters.registerWaiter waiterMapRef.Value promptKeyStr
-                waiterMapRef.Value <- newWaiters
+            match decision with
+            | HistoricalHit history ->
+                match history.Outcome with
+                | Some (Fact.PromptOutcome.Delivered _) -> return Ok()
+                | Some (Fact.PromptOutcome.AcceptanceUnknown (reason, _)) ->
+                    return Error(SessionError.Protocol ("Historical status unknown: " + reason))
+                | Some (Fact.PromptOutcome.RetryableFailure msg)
+                | Some (Fact.PromptOutcome.FatalFailure msg) ->
+                    return Error(SessionError.Protocol ("Historical failure: " + msg))
+                | None -> return Ok()
+            | LocalPending _ ->
+                return Ok()
+            | Uncertain reason ->
+                return Error(SessionError.Protocol ("Prompt state uncertain: " + reason))
+            | SendNew ->
+                let pFact =
+                    Fact.Prompt(
+                        Fact.PromptFact.PromptRequested
+                            {| PromptKey = promptKeyStr
+                               TurnId = turnId
+                               Purpose = "ContinueTodo" |}
+                    )
 
-                let! sendResult =
-                    match port with
-                    | Some p ->
-                        task {
-                            let options: PromptOptions =
-                                { Model = None
-                                  Agent = None
-                                  Parts = [] }
+                match gateway.Append (StreamId.Session sessionId) (Some turnId) pFact with
+                | CommitUnknown _ ->
+                    return Error(SessionError.ProjectionBroken "prompt-requested write failed")
+                | Committed _ ->
+                    let newWaiters, tcs = PromptWaiters.registerWaiter waiterMapRef.Value promptKeyStr
+                    waiterMapRef.Value <- newWaiters
 
-                            let! outcome =
-                                p.SendPrompt sessionId "Continue the current task according to the todo snapshot." options
+                    let! sendResult =
+                        match port with
+                        | Some p ->
+                            task {
+                                let options: PromptOptions =
+                                    { Model = None
+                                      Agent = None
+                                      Parts = [] }
 
-                            match outcome with
-                            | Delivered msgId ->
-                                let submitted =
-                                    Fact.Prompt(
-                                        Fact.PromptFact.PromptSubmitted
-                                            {| PromptKey = promptKeyStr
-                                               MessageId = msgId |}
-                                    )
+                                let! outcome =
+                                    p.SendPrompt sessionId "Continue the current task according to the todo snapshot." options
 
-                                match gateway.Append (StreamId.Session sessionId) (Some turnId) submitted with
-                                | Committed _ -> return Ok()
-                                | CommitUnknown _ ->
-                                    return Error(SessionError.ProjectionBroken "prompt-submitted write failed")
-                            | AcceptanceUnknown(reason, _) ->
-                                return Error(SessionError.Protocol ("Prompt submission status unknown: " + reason))
-                            | Retryable reason ->
-                                return Error(SessionError.Protocol ("Prompt submission retryable error: " + reason))
-                            | Fatal reason ->
-                                return Error(SessionError.Protocol ("Prompt submission fatal error: " + reason))
-                        }
-                    | None -> Task.FromResult(Ok())
+                                match outcome with
+                                | Delivered msgId ->
+                                    let msgIdStr = MessageId.value msgId
+                                    pendingMapRef.Value <- Map.add msgIdStr promptKeyStr pendingMapRef.Value
 
-                match sendResult with
-                | Error error ->
-                    waiterMapRef.Value <- Map.remove promptKeyStr waiterMapRef.Value
-                    return Error error
-                | Ok () ->
-                    let! outcome = tcs.Task
-                    ct.ThrowIfCancellationRequested()
+                                    let now = DateTimeOffset.UtcNow
+                                    let dispatchId = DispatchId.create (Guid.NewGuid().ToString("N"))
+                                    globalLocalProtocol <- PromptProtocol.recordSubmitted globalLocalProtocol pKey dispatchId msgId now
 
-                    let tFact =
-                        Fact.Prompt(
-                            Fact.PromptFact.PromptTerminal
-                                {| PromptKey = promptKeyStr
-                                   Outcome = outcome
-                                   AssistantMessageId = None |}
-                        )
+                                    let submitted =
+                                        Fact.Prompt(
+                                            Fact.PromptFact.PromptSubmitted
+                                                {| PromptKey = promptKeyStr
+                                                   MessageId = msgId |}
+                                        )
 
-                    match gateway.Append (StreamId.Session sessionId) None tFact with
-                    | CommitUnknown _ -> return Error(SessionError.Protocol "prompt-terminal write failed")
-                    | Committed _ -> return Ok()
+                                    match gateway.Append (StreamId.Session sessionId) (Some turnId) submitted with
+                                    | Committed _ -> return Ok()
+                                    | CommitUnknown _ ->
+                                        return Error(SessionError.ProjectionBroken "prompt-submitted write failed")
+                                | AcceptanceUnknown(reason, msgIdOpt) ->
+                                    return Error(SessionError.Protocol ("Prompt submission status unknown: " + reason))
+                                | Retryable reason ->
+                                    return Error(SessionError.Protocol ("Prompt submission retryable error: " + reason))
+                                | Fatal reason ->
+                                    return Error(SessionError.Protocol ("Prompt submission fatal error: " + reason))
+                            }
+                        | None -> Task.FromResult(Ok())
+
+                    match sendResult with
+                    | Error error ->
+                        waiterMapRef.Value <- Map.remove promptKeyStr waiterMapRef.Value
+                        return Error error
+                    | Ok () ->
+                        let! outcome = tcs.Task
+                        ct.ThrowIfCancellationRequested()
+
+                        let now = DateTimeOffset.UtcNow
+                        let (newHist, newLocal) = PromptProtocol.recordTerminal globalHistoricalIndex globalLocalProtocol pKey None None outcome now
+                        globalHistoricalIndex <- newHist
+                        globalLocalProtocol <- newLocal
+
+                        let tFact =
+                            Fact.Prompt(
+                                Fact.PromptFact.PromptTerminal
+                                    {| PromptKey = promptKeyStr
+                                       Outcome = outcome
+                                       AssistantMessageId = None |}
+                            )
+
+                        match gateway.Append (StreamId.Session sessionId) None tFact with
+                        | CommitUnknown _ -> return Error(SessionError.Protocol "prompt-terminal write failed")
+                        | Committed _ -> return Ok()
         }
 
     let requestReview
@@ -150,20 +178,7 @@ module private SessionAsync =
         (ct: CancellationToken)
         : Task<Result<unit, SessionError>> =
         task {
-            match outcome with
-            | Delivered _ ->
-                match Map.tryFind sessionId gateway.ProjectionSet.SessionProjections with
-                | Some proj ->
-                    match proj.Todos with
-                    | Some snap when not (List.isEmpty snap.Items) ->
-                        let remaining = List.tail snap.Items
-                        let fact = Fact.Todo(Fact.TodoChanged {| Snapshot = { Items = remaining } |})
-                        match gateway.Append (StreamId.Session sessionId) None fact with
-                        | Committed _ -> return Ok()
-                        | CommitUnknown _ -> return Error(SessionError.ProjectionBroken "commitTodoFrom write failed")
-                    | _ -> return Ok()
-                | None -> return Ok()
-            | _ -> return Ok()
+            return Ok()
         }
 
 
@@ -177,11 +192,6 @@ type SessionScript =
       Finish: unit -> SessionFlow<SessionOutcome>
       CommitTodoFrom: SendOutcome -> SessionFlow<unit> }
 
-and SessionScriptConfig =
-    { FallbackModels: string list
-      MaxRetriesPerModel: int
-      MaxInvalidRetries: int }
-
 and SessionFlow<'a> = Flow<SessionScript, SessionError, 'a>
 
 module SessionScript =
@@ -194,54 +204,18 @@ module SessionScript =
         (port: IPromptPort option)
         (turnId: TurnId)
         (config: SessionScriptConfig)
+        (pendingMapRef: ref<Map<string, string>>)
         : SessionScript =
 
-        let projs () = gateway.ProjectionSet.SessionProjections
-
-        { GetTodo =
-            fun () ->
-                match Map.tryFind sessionId (projs ()) with
-                | Some proj ->
-                    match proj.Todos with
-                    | Some snap ->
-                        { Unfinished = not (List.isEmpty snap.Items)
-                          ProgressStamp = proj.Version }
-                    | None ->
-                        { Unfinished = false
-                          ProgressStamp = proj.Version }
-                | None ->
-                    { Unfinished = false
-                      ProgressStamp = 0L }
-
-          GetReview =
-            fun () ->
-                match Map.tryFind sessionId (projs ()) with
-                | Some proj ->
-                    let req =
-                        match proj.LastReview with
-                        | Some Fact.ReviewVerdict.Passed -> false
-                        | _ -> true
-                    { Required = req
-                      Round = 0
-                      MaxRound = config.MaxInvalidRetries
-                      Verdict = proj.LastReview }
-                | None ->
-                    { Required = true
-                      Round = 0
-                      MaxRound = config.MaxInvalidRetries
-                      Verdict = None }
-
-          GetProgressStamp =
-            fun () ->
-                match Map.tryFind sessionId (projs ()) with
-                | Some proj -> proj.Version
-                | None -> 0L
+        { GetTodo = SessionScriptViews.getTodo gateway sessionId
+          GetReview = SessionScriptViews.getReview gateway sessionId config
+          GetProgressStamp = SessionScriptViews.getProgressStamp gateway sessionId
           Config = config
 
           ContinueWork =
             fun () ->
                 Flow.create (fun _ctx ct ->
-                    SessionAsync.continueWork gateway sessionId turnId waiterMapRef port ct)
+                    SessionAsync.continueWork gateway sessionId turnId waiterMapRef pendingMapRef port ct)
 
           RequestReview =
             fun () ->

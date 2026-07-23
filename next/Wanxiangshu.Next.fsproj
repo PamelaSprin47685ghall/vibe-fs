@@ -27,11 +27,14 @@
     <Compile Include="Session/PromptKey.fs"/>
     <Compile Include="Session/PromptProtocol.fs"/>
     <Compile Include="Session/Inbox.fs"/>
+    <Compile Include="Session/ScriptTypes.fs"/>
+    <Compile Include="Session/ScriptViews.fs"/>
     <Compile Include="Session/Script.fs"/>
     <Compile Include="Session/SessionFlows.fs"/>
     <Compile Include="Session/ChildFlows.fs"/>
     <Compile Include="Session/Fallback.fs"/>
     <Compile Include="Session/Review.fs"/>
+    <Compile Include="Session/DriverDispatch.fs"/>
     <Compile Include="Session/Driver.fs"/>
     <Compile Include="Process/ProcessTypes.fs"/>
     <Compile Include="Process/Deadline.fs"/>

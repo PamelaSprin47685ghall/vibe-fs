@@ -56,7 +56,8 @@ module OpencodePluginTests =
                 let initArg = createObj [ "directory", box tempDir ]
                 let! hooksObj = Plugin.initPlugin initArg
                 let sessionId = SessionId.create "sess-cmd-test"
-                let inbox = Plugin.getOrCreateInbox sessionId
+                let getInbox = unbox<SessionId -> ISessionInbox> hooksObj?getOrCreateInbox
+                let inbox = getInbox sessionId
 
                 let cmdFn = unbox<obj -> unit> hooksObj?command
 
@@ -133,7 +134,8 @@ module OpencodePluginTests =
                 let initArg = {| directory = tempDir |}
                 let! hooksObj = Plugin.initPlugin initArg
                 let sessionId = SessionId.create "sess-ev-test"
-                let inbox = Plugin.getOrCreateInbox sessionId
+                let getInbox = unbox<SessionId -> ISessionInbox> hooksObj?getOrCreateInbox
+                let inbox = getInbox sessionId
 
                 let eventFn = unbox<obj -> unit> hooksObj?event
 

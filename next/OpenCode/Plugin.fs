@@ -15,13 +15,6 @@ type PluginConfig = { Directory: string }
 
 module Plugin =
 
-    let mutable private activeRuntime: PluginRuntime option = None
-
-    let getOrCreateInbox (sessionId: SessionId) : ISessionInbox =
-        match activeRuntime with
-        | Some rt -> (rt.GetOrCreateSessionRuntime sessionId).Inbox
-        | None -> FifoInbox(1000) :> ISessionInbox
-
     let private buildHookInput (inObj: obj) : OpencodeHookInput =
         let m =
             if isNull inObj || isNull inObj?model then
@@ -55,47 +48,44 @@ module Plugin =
                 Some(unbox<string> inObj?agent)
           model = m }
 
-    let private handleChatTransform (outObj: obj) =
+    let private handleChatTransform (rt: PluginRuntime) (outObj: obj) =
         if not (isNull outObj) then
-            match activeRuntime with
-            | Some rt ->
-                let proj = rt.Gateway.ProjectionSet
-                let caps = [ "coder"; "inspector"; "browser"; "meditator" ]
-                let revCtx = proj.LastReview |> Option.map (fun v -> sprintf "%A" v)
+            let proj = rt.Gateway.ProjectionSet
+            let caps = [ "coder"; "inspector"; "browser"; "meditator" ]
+            let revCtx = proj.LastReview |> Option.map (fun v -> sprintf "%A" v)
 
-                let snap: SessionSnapshot =
-                    { Caps = caps
-                      ReviewContext = revCtx
-                      ParallelHint = Some "Issue independent tool calls in parallel when possible." }
+            let snap: SessionSnapshot =
+                { Caps = caps
+                  ReviewContext = revCtx
+                  ParallelHint = Some "Issue independent tool calls in parallel when possible." }
 
-                let rawMsgs =
-                    if isNull outObj?messages then
-                        []
+            let rawMsgs =
+                if isNull outObj?messages then
+                    []
+                else
+                    unbox<obj list> outObj?messages
+
+            let hostMsgs =
+                rawMsgs
+                |> List.choose (fun m ->
+                    if isNull m then
+                        None
                     else
-                        unbox<obj list> outObj?messages
+                        let r = if isNull m?role then "" else unbox<string> m?role
+                        let t = if isNull m?text then "" else unbox<string> m?text
 
-                let hostMsgs =
-                    rawMsgs
-                    |> List.choose (fun m ->
-                        if isNull m then
-                            None
-                        else
-                            let r = if isNull m?role then "" else unbox<string> m?role
-                            let t = if isNull m?text then "" else unbox<string> m?text
+                        Some
+                            { Role = r
+                              Text = t
+                              ToolCalls = None
+                              Metadata = None })
 
-                            Some
-                                { Role = r
-                                  Text = t
-                                  ToolCalls = None
-                                  Metadata = None })
+            let transformed = MessageTransform.transform snap hostMsgs
 
-                let transformed = MessageTransform.transform snap hostMsgs
+            let jsMsgs =
+                transformed |> List.map (fun tm -> {| role = tm.Role; text = tm.Text |} |> box)
 
-                let jsMsgs =
-                    transformed |> List.map (fun tm -> {| role = tm.Role; text = tm.Text |} |> box)
-
-                outObj?messages <- jsMsgs
-            | None -> ()
+            outObj?messages <- jsMsgs
 
     let private handleToolDefinition (outObj: obj) =
         if not (isNull outObj) then
@@ -120,7 +110,7 @@ module Plugin =
 
             outObj?tools <- staticToolsList
 
-    let private handleToolExecuteAfter (inObj: obj) (outObj: obj) =
+    let private handleToolExecuteAfter (rt: PluginRuntime) (inObj: obj) (outObj: obj) =
         if not (isNull inObj) then
             let t =
                 if isNull inObj?tool then
@@ -144,19 +134,19 @@ module Plugin =
                 if isNull outObj || isNull outObj?args then
                     "{}"
                 else
-                    sprintf "%A" outObj?args
+                    Fable.Core.JS.JSON.stringify outObj?args
 
             let outStr =
                 if isNull outObj || isNull outObj?output then
                     "{}"
                 else
-                    sprintf "%A" outObj?output
+                    Fable.Core.JS.JSON.stringify outObj?output
 
             if not (String.IsNullOrEmpty s) then
-                let ib = getOrCreateInbox (SessionId.create s)
-                ib.TryPost(ToolAfterEvent(t, c, argsStr, outStr)) |> ignore
+                let sr = rt.GetOrCreateSessionRuntime(SessionId.create s)
+                sr.Inbox.TryPost(ToolAfterEvent(t, c, argsStr, outStr)) |> ignore
 
-    let private handleCommand (inObj: obj) =
+    let private handleCommand (rt: PluginRuntime) (inObj: obj) =
         if not (isNull inObj) then
             let cmdName = if isNull inObj?name then "" else unbox<string> inObj?name
 
@@ -173,12 +163,12 @@ module Plugin =
                     unbox<string> inObj?arguments
 
             if not (String.IsNullOrEmpty s) then
-                let ib = getOrCreateInbox (SessionId.create s)
+                let sr = rt.GetOrCreateSessionRuntime(SessionId.create s)
 
                 if cmdName = "loop" || cmdName = "/loop" then
-                    ib.TryPost(LoopCommandEvent(SessionId.create s, argsText)) |> ignore
+                    sr.Inbox.TryPost(LoopCommandEvent(SessionId.create s, argsText)) |> ignore
                 elif cmdName = "squad" || cmdName = "/squad" then
-                    ib.TryPost(SquadCommandEvent(s, argsText)) |> ignore
+                    sr.Inbox.TryPost(SquadCommandEvent(s, argsText)) |> ignore
 
     let private handleConfig (config: obj) =
         if not (isNull config) then
@@ -202,27 +192,24 @@ module Plugin =
 
             config?command <- commands
 
-    let private handleCompacting (outObj: obj) =
+    let private handleCompacting (rt: PluginRuntime) (outObj: obj) =
         if not (isNull outObj) then
-            match activeRuntime with
-            | Some rt ->
-                let proj = rt.Gateway.ProjectionSet
+            let proj = rt.Gateway.ProjectionSet
 
-                let revInfo =
-                    match proj.LastReview with
-                    | Some v -> sprintf "Review: %A\n" v
-                    | None -> ""
+            let revInfo =
+                match proj.LastReview with
+                | Some v -> sprintf "Review: %A\n" v
+                | None -> ""
 
-                let todoInfo =
-                    match proj.Todos with
-                    | Some t -> sprintf "Todos: %s" (String.concat "; " t.Items)
-                    | None -> ""
+            let todoInfo =
+                match proj.Todos with
+                | Some t -> sprintf "Todos: %s" (String.concat "; " t.Items)
+                | None -> ""
 
-                let ctxStr = (revInfo + todoInfo).Trim()
+            let ctxStr = (revInfo + todoInfo).Trim()
 
-                if not (String.IsNullOrEmpty ctxStr) then
-                    outObj?context <- ctxStr
-            | None -> ()
+            if not (String.IsNullOrEmpty ctxStr) then
+                outObj?context <- ctxStr
 
     let initPlugin (input: obj) : Task<obj> =
         task {
@@ -232,22 +219,21 @@ module Plugin =
                 else
                     unbox<string> input?directory
 
-            let port = OpenCodePort.HttpPort "http://127.0.0.1:4096" :> IOpenCodePort
-            let! rtRes = PluginRuntime.start dir (Some port)
-            match rtRes with
-            | Ok rt -> activeRuntime <- Some rt
-            | Error _ -> ()
+            let portOpt = OpenCodePort.create input
+            let! rtRes = PluginRuntime.start dir portOpt
+            let rt =
+                match rtRes with
+                | Ok runtime -> runtime
+                | Error err -> failwithf "Failed to initialize PluginRuntime: %A" err
 
             let hooks =
                 {| ``chat.message`` =
                     fun (inObj: obj) (outObj: obj) ->
-                        match activeRuntime with
-                        | Some rt ->
-                            let hookInput = buildHookInput inObj
+                        let hookInput = buildHookInput inObj
+                        if not (String.IsNullOrEmpty hookInput.sessionID) then
                             rt.EnsureSessionDriver(SessionId.create hookInput.sessionID) |> ignore
-                            OpencodeHooks.handleChatMessage rt.Gateway rt.SessionDrivers (rt.GetInboxMap()) hookInput outObj
-                        | None -> ()
-                   ``chat.transform`` = fun (inObj: obj) (outObj: obj) -> handleChatTransform outObj
+                        OpencodeHooks.handleChatMessage rt.Gateway rt.SessionDrivers (rt.GetInboxMap()) hookInput outObj
+                   ``chat.transform`` = fun (inObj: obj) (outObj: obj) -> handleChatTransform rt outObj
                    ``tool.definition`` = fun (inObj: obj) (outObj: obj) -> handleToolDefinition outObj
                    ``tool.execute.before`` =
                     fun (inObj: obj) (outObj: obj) ->
@@ -258,25 +244,24 @@ module Plugin =
 
                         let toolOut: OpencodeToolExecuteOutput = { args = outObj?args }
                         OpencodeHooks.handleToolExecuteBefore toolIn toolOut
-                   ``tool.execute.after`` = fun (inObj: obj) (outObj: obj) -> handleToolExecuteAfter inObj outObj
+                   ``tool.execute.after`` = fun (inObj: obj) (outObj: obj) -> handleToolExecuteAfter rt inObj outObj
                    config = fun (config: obj) -> handleConfig config
-                   ``command.execute.before`` = fun (inObj: obj) (outObj: obj) -> handleCommand inObj
+                   ``command.execute.before`` = fun (inObj: obj) (outObj: obj) -> handleCommand rt inObj
                    event =
                     fun (eventObj: obj) ->
-                        match activeRuntime with
-                        | Some rt -> OpencodeHooks.handleEvent rt.Gateway (rt.GetInboxMap()) eventObj
-                        | None -> ()
-                   ``experimental.session.compacting`` = fun (inObj: obj) (outObj: obj) -> handleCompacting outObj
+                        OpencodeHooks.handleEvent rt.Gateway (rt.GetInboxMap()) eventObj
+                   ``experimental.session.compacting`` = fun (inObj: obj) (outObj: obj) -> handleCompacting rt outObj
                    ``experimental.compaction.autocontinue`` =
                     fun (inObj: obj) (outObj: obj) ->
                         if not (isNull outObj) then
                             outObj?enabled <- true
-                   command = fun (inObj: obj) (outObj: obj) -> handleCommand inObj
+                   command = fun (inObj: obj) (outObj: obj) -> handleCommand rt inObj
+                   getOrCreateInbox = fun (sessionId: SessionId) -> (rt.GetOrCreateSessionRuntime sessionId).Inbox
                    dispose =
                     fun () ->
-                        match activeRuntime with
-                        | Some rt -> (rt :> IAsyncDisposable).DisposeAsync() |> ignore
-                        | None -> () |}
+                        let valueTask = (rt :> IAsyncDisposable).DisposeAsync()
+                        unbox<Task<unit>> valueTask
+                |}
 
             return box hooks
         }
