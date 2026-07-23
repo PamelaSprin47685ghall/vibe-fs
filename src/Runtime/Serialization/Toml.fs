@@ -1,5 +1,6 @@
 module Wanxiangshu.Runtime.Serialization.Toml
 
+open System
 open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Runtime.Serialization.TomlValue
@@ -17,50 +18,51 @@ let rec private toJs =
     | Table fields -> fields |> List.map (fun (key, value) -> key, toJs value) |> createObj
 
 let private unescapeStringToken (inner: string) : string =
-    let rec unescape j (buf: System.Text.StringBuilder) =
+    let rec unescape j (acc: char list) =
         if j >= inner.Length then
-            buf.ToString()
+            System.String(acc |> List.rev |> List.toArray)
         else
             match inner.[j] with
             | '\\' when j + 1 < inner.Length ->
                 match inner.[j + 1] with
-                | 'n' -> buf.Append('\n') |> ignore; unescape (j + 2) buf
-                | 'r' -> buf.Append('\r') |> ignore; unescape (j + 2) buf
-                | 't' -> buf.Append('\t') |> ignore; unescape (j + 2) buf
-                | '"' -> buf.Append('"') |> ignore; unescape (j + 2) buf
-                | '\\' -> buf.Append('\\') |> ignore; unescape (j + 2) buf
-                | 'b' -> buf.Append('\b') |> ignore; unescape (j + 2) buf
-                | 'f' -> buf.Append('\f') |> ignore; unescape (j + 2) buf
-                | c -> buf.Append('\\').Append(c) |> ignore; unescape (j + 2) buf
-            | c -> buf.Append(c) |> ignore; unescape (j + 1) buf
-    unescape 0 (System.Text.StringBuilder())
+                | 'n' -> unescape (j + 2) ('\n' :: acc)
+                | 'r' -> unescape (j + 2) ('\r' :: acc)
+                | 't' -> unescape (j + 2) ('\t' :: acc)
+                | '"' -> unescape (j + 2) ('"' :: acc)
+                | '\\' -> unescape (j + 2) ('\\' :: acc)
+                | 'b' -> unescape (j + 2) ('\b' :: acc)
+                | 'f' -> unescape (j + 2) ('\f' :: acc)
+                | c -> unescape (j + 2) (c :: '\\' :: acc)
+            | c -> unescape (j + 1) (c :: acc)
+    unescape 0 []
 
 let private encodeMultilineBody (s: string) : string =
-    let sb = System.Text.StringBuilder()
-    for c in s do
-        match c with
-        | '\\' -> sb.Append("\\\\") |> ignore
-        | '\r' -> sb.Append("\\r") |> ignore
-        | _ -> sb.Append(c) |> ignore
-    sb.ToString().Replace("\"\"\"", "\\\"\\\"\\\"")
+    let chars: char[] =
+        s |> Seq.collect (function
+            | '\\' -> [ '\\'; '\\' ]
+            | '\r' -> [ '\\'; 'r' ]
+            | c -> [ c ])
+        |> Seq.toArray
+    let res = System.String(chars)
+    res.Replace("\"\"\"", "\\\"\\\"\\\"")
 
-let private processStringToken (rawToken: string) (acc: System.Text.StringBuilder) =
+let private processStringToken (rawToken: string) (acc: string list) =
     if rawToken.Contains("\\n") || rawToken.Contains("\n") then
         let inner = rawToken.Substring(1, rawToken.Length - 2)
         let decoded = unescapeStringToken inner
         if decoded.Contains("\n") then
             let multilineBody = encodeMultilineBody decoded
-            acc.Append("\"\"\"\n").Append(multilineBody).Append("\"\"\"") |> ignore
+            ("\"\"\"\n" + multilineBody + "\"\"\"") :: acc
         else
-            acc.Append(rawToken) |> ignore
+            rawToken :: acc
     else
-        acc.Append(rawToken) |> ignore
+        rawToken :: acc
 
 let private formatMultiline (tomlStr: string) : string =
     let len = tomlStr.Length
-    let rec parse i inString stringStart escaped (acc: System.Text.StringBuilder) =
+    let rec parse i inString stringStart escaped (acc: string list) =
         if i >= len then
-            acc.ToString()
+            String.Concat(acc |> List.rev |> List.toArray)
         else
             let ch = tomlStr.[i]
             if inString then
@@ -70,17 +72,16 @@ let private formatMultiline (tomlStr: string) : string =
                     parse (i + 1) true stringStart true acc
                 elif ch = '"' then
                     let rawToken = tomlStr.Substring(stringStart, i - stringStart + 1)
-                    processStringToken rawToken acc
-                    parse (i + 1) false -1 false acc
+                    let newAcc = processStringToken rawToken acc
+                    parse (i + 1) false -1 false newAcc
                 else
                     parse (i + 1) true stringStart false acc
             else
                 if ch = '"' then
                     parse (i + 1) true i false acc
                 else
-                    acc.Append(ch) |> ignore
-                    parse (i + 1) false -1 false acc
-    parse 0 false -1 false (System.Text.StringBuilder())
+                    parse (i + 1) false -1 false (string ch :: acc)
+    parse 0 false -1 false []
 
 let stringify =
     function
