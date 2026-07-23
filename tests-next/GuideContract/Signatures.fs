@@ -16,11 +16,8 @@ module Signatures =
 
     let assertTypes () =
         ignore (typeof<Flow<unit, string, int>>)
-        ignore (typeof<PromptKey>)
         ignore (typeof<Envelope>)
         ignore (typeof<Deadline>)
-        ignore (typeof<Gateway>)
-        ignore (typeof<SessionDrivers>)
         ignore (typeof<RuntimeSnapshot>)
 
         let _run: 'c -> CancellationToken -> Flow<'c, 'e, 'a> -> Task<Result<'a, 'e>> =
@@ -33,25 +30,13 @@ module Signatures =
             Parallel.mapBounded
 
         ignore (typeof<CommitResult<Envelope>>)
-        ignore (typeof<HistoricalPromptIndex>)
-        ignore (typeof<LocalPromptProtocol>)
         ignore (typeof<BootSnapshot>)
         ignore (typeof<ProjectionSet>)
-        ignore (typeof<ChildScript>)
         ignore MessageTransform.transform
         ignore (typeof<MessageWatermark>)
         ignore MessageTransform.replacePrefix
-        ignore ChildFlows.runChild
-        ignore ChildFlows.runParallel
         ignore FactCodec.serializeFact
-        ignore ProcessFlows.execute
-        ignore Review.acceptVerdict
-        ignore Gateway.start
         ignore Boot.kWayMerge
-        ignore SessionFlows.run
-        ignore SessionFlows.runFlow
-        ignore ProcessFlows.runFlow
-        ignore JournalFlows.runFlow
 
     [<Fact>]
     let Guide_types_exist () = assertTypes ()

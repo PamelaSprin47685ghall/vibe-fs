@@ -3,8 +3,8 @@
  * Kept under the 300-line Kolmogorov line budget.
  */
 
-import { getSessionId } from '../harness/scenario.js';
-import { isPidAlive } from '../harness/process-host-checks.js';
+import { getSessionId } from '../../../testkit/opencode/scenario.js';
+import { isPidAlive } from '../../../testkit/opencode/process-host-checks.js';
 import { findPtySessionId, parsePtySpawnOutput, parsePtyListOutput, parsePtyKillOutput, findToolPart, extractToolNames, TIMEOUTS } from './p0-canary-utils.js';
 import { sleep } from './p0-canary-utils.js';
 

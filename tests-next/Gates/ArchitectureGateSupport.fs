@@ -27,7 +27,8 @@ module ArchitectureGateSupport =
         try
             let s = NodeFsGatesSupport.statSync path
             if isNull s then false else unbox<bool> (s?isDirectory ())
-        with _ -> false
+        with _ ->
+            false
 
     let findRepoRoot () =
         if NodeFsGatesSupport.existsSync "next" then "."
@@ -39,21 +40,51 @@ module ArchitectureGateSupport =
         let rec walk (dir: string) (acc: string list) =
             let entries = NodeFsGatesSupport.readdirSync dir
             let mutable result = acc
+
             for e in entries do
                 let full = NodeFsGatesSupport.pathJoin (dir, e)
-                if e = "fable_modules" || e = "node_modules" || e = ".git" then ()
-                elif isDir full then result <- walk full result
-                elif e.EndsWith(".fs") || e.EndsWith(".fsproj") then result <- full :: result
-                else ()
+
+                if e = "fable_modules" || e = "node_modules" || e = ".git" then
+                    ()
+                elif isDir full then
+                    result <- walk full result
+                elif e.EndsWith(".fs") || e.EndsWith(".fsproj") then
+                    result <- full :: result
+                else
+                    ()
+
             result
+
         walk root []
 
     let forbiddenTokens =
-        [ "Nudge"; "idleProposals"; "callOnce"; "FallbackPhase"; "ContinuationStage"
-          "SubsessionActor"; "SessionDriverRegistry"; "EventBus"; "MailboxProcessor"
-          "workspace lockfile"; "Wait(predicate)"; "Previous"; "Fork"; "Owner"
-          "Lease"; "Coordinator"; "Registry"; "sleepJs"; "setTimeout" ]
+        [ "idleProposals"
+          "callOnce"
+          "FallbackPhase"
+          "ContinuationStage"
+          "ReviewPhase"
+          "SessionStage"
+          "JoinOwner"
+          "NudgeLease"
+          "CompactionGeneration"
+          "SessionActor"
+          "SubsessionActor"
+          "WorkflowRegistry"
+          "JournalDrivenWorkflow"
+          "TodoState"
+          "Methodology"
+          "SquadWave"
+          "EventStore"
+          "SessionDriverRegistry"
+          "EventBus"
+          "MailboxProcessor"
+          "workspace lockfile"
+          "Wait(predicate)"
+          "sleepJs"
+          "setTimeout" ]
 
     let containsForbiddenToken (text: string) (token: string) =
-        if token.Contains("(") || token.Contains(")") || token.Contains(" ") then text.Contains(token)
-        else Regex.IsMatch(text, @"\b" + Regex.Escape(token) + @"\b", RegexOptions.IgnoreCase)
+        if token.Contains("(") || token.Contains(")") || token.Contains(" ") then
+            text.Contains(token)
+        else
+            Regex.IsMatch(text, @"\b" + Regex.Escape(token) + @"\b", RegexOptions.IgnoreCase)

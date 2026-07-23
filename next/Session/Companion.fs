@@ -4,81 +4,153 @@ open System
 open System.Threading.Tasks
 open Wanxiangshu.Next.Tools
 
-type TranscriptEvent = { Cursor: int; Json: string }
-
-type BlogCheckpoint = { Watermark: int; Content: string }
+type ProjectionSnapshot = string
+type BlogText = string
 
 type CompanionOutcome =
     | Submitted
     | SkippedBusy
 
+type CompanionMemory =
+    { LastSuccessfulProjection: ProjectionSnapshot option
+      CurrentB: BlogText option
+      BloggerBusy: bool
+      ReplacementActive: bool }
+
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
 module Companion =
 
-    /// Pure jsonDelta: returns only contiguous events after the last submitted cursor (watermark).
-    let jsonDelta (previous: BlogCheckpoint option) (current: TranscriptEvent list) : TranscriptEvent list =
-        let watermark =
-            match previous with
-            | Some cp -> cp.Watermark
-            | None -> 0
+    /// Pure jsonDelta: returns None when previous and current are equal canonical JSON;
+    /// otherwise returns a JSON object string containing top-level fields changed in current.
+    /// Absent previous returns current.
+    let jsonDelta (previous: ProjectionSnapshot option) (current: ProjectionSnapshot) : ProjectionSnapshot option =
+        match previous with
+        | None -> Some current
+        | Some prev ->
+            if prev = current then
+                None
+            else
+                try
 
-        let filtered =
-            current
-            |> List.filter (fun e -> e.Cursor > watermark)
-            |> List.sortBy (fun e -> e.Cursor)
+#if FABLE_COMPILER
+                    let prevObj = Fable.Core.JS.JSON.parse prev
+                    let currObj = Fable.Core.JS.JSON.parse current
 
-        match filtered with
-        | [] -> []
-        | head :: _ ->
-            let startCursor = if watermark > 0 then watermark + 1 else head.Cursor
+                    let isObject (value: obj) =
+                        Fable.Core.JsInterop.emitJsExpr value "typeof $0 === 'object' && $0 !== null"
 
-            filtered
-            |> List.fold
-                (fun (acc, expected) e ->
-                    if e.Cursor = expected then
-                        (e :: acc, expected + 1)
+                    let stringify (value: obj) : string =
+                        Fable.Core.JsInterop.emitJsExpr value "JSON.stringify($0)"
+
+                    if isObject prevObj && isObject currObj then
+                        let currKeys: string array =
+                            Fable.Core.JsInterop.emitJsExpr currObj "Object.keys($0)"
+
+                        let diffObj: obj = Fable.Core.JsInterop.createEmpty
+                        let mutable changed = false
+
+                        for key in currKeys do
+                            let valCurr: obj = Fable.Core.JsInterop.emitJsExpr (currObj, key) "$0[$1]"
+                            let valPrev: obj = Fable.Core.JsInterop.emitJsExpr (prevObj, key) "$0[$1]"
+
+                            if stringify valCurr <> stringify valPrev then
+                                changed <- true
+                                Fable.Core.JsInterop.emitJsExpr (diffObj, key, valCurr) "$0[$1] = $2" |> ignore
+
+                        if changed then Some(stringify diffObj) else None
                     else
-                        (acc, expected))
-                ([], startCursor)
-            |> fst
-            |> List.rev
+                        Some current
+#else
+                    use docPrev = System.Text.Json.JsonDocument.Parse prev
+                    use docCurr = System.Text.Json.JsonDocument.Parse current
 
-    /// Helper for jsonDelta taking a BlogCheckpoint directly.
-    let jsonDeltaCheckpoint (previous: BlogCheckpoint) (current: TranscriptEvent list) : TranscriptEvent list =
-        jsonDelta (Some previous) current
+                    if
+                        docPrev.RootElement.ValueKind = System.Text.Json.JsonValueKind.Object
+                        && docCurr.RootElement.ValueKind = System.Text.Json.JsonValueKind.Object
+                    then
+                        let prevProps =
+                            docPrev.RootElement.EnumerateObject()
+                            |> Seq.map (fun p -> p.Name, p.Value.GetRawText())
+                            |> Map.ofSeq
 
-    /// Helper for jsonDelta taking a watermark integer directly.
-    let jsonDeltaWatermark (watermark: int) (current: TranscriptEvent list) : TranscriptEvent list =
-        jsonDelta (Some { Watermark = watermark; Content = "" }) current
+                        let changedProps =
+                            docCurr.RootElement.EnumerateObject()
+                            |> Seq.filter (fun p ->
+                                match Map.tryFind p.Name prevProps with
+                                | Some prevRaw -> prevRaw <> p.Value.GetRawText()
+                                | None -> true)
+                            |> Seq.toList
 
-    /// Pure compressPrefix: delegates to MessageTransform.replacePrefix while preserving tail after watermark.
-    let compressPrefix (messages: HostMessage list) (checkpoint: BlogCheckpoint option) : HostMessage list =
-        match checkpoint with
+                        if List.isEmpty changedProps then
+                            None
+                        else
+                            use stream = new System.IO.MemoryStream()
+                            use writer = new System.Text.Json.Utf8JsonWriter(stream)
+                            writer.WriteStartObject()
+
+                            for p in changedProps do
+                                writer.WritePropertyName(p.Name)
+                                p.Value.WriteTo(writer)
+
+                            writer.WriteEndObject()
+                            writer.Flush()
+                            Some(System.Text.Encoding.UTF8.GetString(stream.ToArray()))
+                    else
+                        Some current
+#endif
+                with _ ->
+                    Some current
+
+    /// Pure compressPrefix: delegates to MessageTransform.replacePrefix using currentB and explicit watermark index.
+    let compressPrefix
+        (messages: HostMessage list)
+        (currentB: BlogText option)
+        (watermarkIndex: int)
+        : HostMessage list =
+        match currentB with
         | None -> messages
-        | Some cp -> MessageTransform.replacePrefix messages cp.Content (Index cp.Watermark)
+        | Some b -> MessageTransform.replacePrefix messages b (Index watermarkIndex)
 
-    /// Helper for compressPrefix taking a BlogCheckpoint directly.
-    let compressPrefixCheckpoint (messages: HostMessage list) (checkpoint: BlogCheckpoint) : HostMessage list =
-        compressPrefix messages (Some checkpoint)
+    let compressPrefixText (messages: HostMessage list) (currentB: BlogText) (watermarkIndex: int) : HostMessage list =
+        compressPrefix messages (Some currentB) watermarkIndex
 
 /// Companion state wrapper with a single mutable in-flight Task gate.
-type Companion(?initialCheckpoint: BlogCheckpoint) =
+type Companion(?initialMemory: CompanionMemory) =
     let lockObj = obj ()
-    let mutable currentCheckpoint: BlogCheckpoint option = initialCheckpoint
+
+    let mutable lastSuccessfulProjection: ProjectionSnapshot option =
+        initialMemory |> Option.bind (fun m -> m.LastSuccessfulProjection)
+
+    let mutable currentB: BlogText option =
+        initialMemory |> Option.bind (fun m -> m.CurrentB)
+
+    let mutable replacementActive: bool =
+        initialMemory
+        |> Option.map (fun m -> m.ReplacementActive)
+        |> Option.defaultValue false
+
     let mutable inFlightTask: Task<unit> option = None
 
-    /// Returns current checkpoint snapshot.
-    member _.Snapshot: BlogCheckpoint option = lock lockObj (fun () -> currentCheckpoint)
+    let isBusyUnlocked () =
+        match inFlightTask with
+        | Some t -> not t.IsCompleted
+        | None -> false
 
-    /// Helper method for snapshot access.
-    member this.GetSnapshot() : BlogCheckpoint option = this.Snapshot
+    /// Returns current CompanionMemory state.
+    member _.Memory: CompanionMemory =
+        lock lockObj (fun () ->
+            { LastSuccessfulProjection = lastSuccessfulProjection
+              CurrentB = currentB
+              BloggerBusy = isBusyUnlocked ()
+              ReplacementActive = replacementActive })
+
+    /// Alias for Memory to satisfy Snapshot access.
+    member this.Snapshot: CompanionMemory = this.Memory
+
+    member this.GetMemory() : CompanionMemory = this.Memory
 
     /// Returns true if an async blog operation is currently in-flight.
-    member _.IsBusy: bool =
-        lock lockObj (fun () ->
-            match inFlightTask with
-            | Some t -> not t.IsCompleted
-            | None -> false)
+    member _.IsBusy: bool = lock lockObj isBusyUnlocked
 
     /// Current in-flight task, if any.
     member _.InFlightTask: Task<unit> option = lock lockObj (fun () -> inFlightTask)
@@ -91,99 +163,86 @@ type Companion(?initialCheckpoint: BlogCheckpoint) =
         | Some t -> t :> Task
         | None -> Task.CompletedTask
 
-    /// Blogger context reset: updates checkpoint if idle, returns true; returns false if busy.
-    member this.TryRebase(newCheckpoint: BlogCheckpoint option) : bool =
+    member _.ReplacementActive
+        with get () = lock lockObj (fun () -> replacementActive)
+        and set value = lock lockObj (fun () -> replacementActive <- value)
+
+    /// Blogger context reset (self-rebase): updates B and baseline if idle, returns true; returns false if busy.
+    member this.TryRebase(newB: BlogText option, newBaseline: ProjectionSnapshot option) : bool =
         lock lockObj (fun () ->
-            match inFlightTask with
-            | Some t when not t.IsCompleted -> false
-            | _ ->
-                currentCheckpoint <- newCheckpoint
+            if isBusyUnlocked () then
+                false
+            else
+                currentB <- newB
+                lastSuccessfulProjection <- newBaseline
                 true)
 
-    /// Helper for TryRebase taking BlogCheckpoint directly.
-    member this.TryRebase(newCheckpoint: BlogCheckpoint) : bool = this.TryRebase(Some newCheckpoint)
+    member this.TryRebase(newB: BlogText, newBaseline: ProjectionSnapshot) : bool =
+        this.TryRebase(Some newB, Some newBaseline)
+
+    member this.TryRebase(rebaseFn: unit -> Async<BlogText * ProjectionSnapshot>) : bool =
+        lock lockObj (fun () ->
+            if isBusyUnlocked () then
+                false
+            else
+                let t =
+                    Task.Run<unit>(fun () ->
+                        async {
+                            try
+                                let! (b, proj) = rebaseFn ()
+
+                                lock lockObj (fun () ->
+                                    currentB <- Some b
+                                    lastSuccessfulProjection <- Some proj)
+                            with _ ->
+                                ()
+                        }
+                        |> Async.StartAsTask)
+
+                inFlightTask <- Some t
+                true)
+
+    member this.TryRebase(rebaseFn: unit -> Task<BlogText * ProjectionSnapshot>) : bool =
+        this.TryRebase(fun () -> rebaseFn () |> Async.AwaitTask)
 
     /// Submit: starts async blog function only when idle, returns SkippedBusy when busy, never queues.
-    /// Completion updates checkpoint atomically; failure leaves main caller unaffected.
-    member this.Submit(events: TranscriptEvent list, blogFn: TranscriptEvent list -> Async<string>) : CompanionOutcome =
-        lock lockObj (fun () ->
-            match inFlightTask with
-            | Some t when not t.IsCompleted -> SkippedBusy
-            | _ ->
-                let targetWatermark =
-                    if List.isEmpty events then
-                        match currentCheckpoint with
-                        | Some cp -> cp.Watermark
-                        | None -> 0
-                    else
-                        events |> List.map (fun e -> e.Cursor) |> List.max
-
-                let t =
-                    Task.Run<unit>(fun () ->
-                        async {
-                            try
-                                let! content = blogFn events
-
-                                let cp =
-                                    { Watermark = targetWatermark
-                                      Content = content }
-
-                                lock lockObj (fun () -> currentCheckpoint <- Some cp)
-                            with _ ->
-                                ()
-                        }
-                        |> Async.StartAsTask)
-
-                inFlightTask <- Some t
-                Submitted)
-
-    member this.Submit(events: TranscriptEvent list, blogFn: TranscriptEvent list -> Task<string>) : CompanionOutcome =
-        this.Submit(events, (fun evs -> blogFn evs |> Async.AwaitTask))
-
+    /// Completion atomically updates currentB and lastSuccessfulProjection on success; failure leaves both unchanged.
     member this.Submit
-        (events: TranscriptEvent list, blogFn: TranscriptEvent list -> Async<BlogCheckpoint>)
+        (currentProjection: ProjectionSnapshot, blogFn: ProjectionSnapshot -> Async<BlogText>)
         : CompanionOutcome =
         lock lockObj (fun () ->
-            match inFlightTask with
-            | Some t when not t.IsCompleted -> SkippedBusy
-            | _ ->
-                let t =
-                    Task.Run<unit>(fun () ->
-                        async {
-                            try
-                                let! cp = blogFn events
-                                lock lockObj (fun () -> currentCheckpoint <- Some cp)
-                            with _ ->
-                                ()
-                        }
-                        |> Async.StartAsTask)
+            if isBusyUnlocked () then
+                SkippedBusy
+            else
+                let deltaOpt = Companion.jsonDelta lastSuccessfulProjection currentProjection
 
-                inFlightTask <- Some t
-                Submitted)
+                match deltaOpt with
+                | None -> Submitted
+                | Some delta ->
+                    let t =
+                        Task.Run<unit>(fun () ->
+                            async {
+                                try
+                                    let! content = blogFn delta
+
+                                    lock lockObj (fun () ->
+                                        currentB <- Some content
+                                        lastSuccessfulProjection <- Some currentProjection)
+                                with _ ->
+                                    ()
+                            }
+                            |> Async.StartAsTask)
+
+                    inFlightTask <- Some t
+                    Submitted)
 
     member this.Submit
-        (events: TranscriptEvent list, blogFn: TranscriptEvent list -> Task<BlogCheckpoint>)
+        (currentProjection: ProjectionSnapshot, blogFn: ProjectionSnapshot -> Task<BlogText>)
         : CompanionOutcome =
-        this.Submit(events, (fun evs -> blogFn evs |> Async.AwaitTask))
+        this.Submit(currentProjection, (fun (delta: ProjectionSnapshot) -> blogFn delta |> Async.AwaitTask))
 
-    member this.Submit(blogFn: unit -> Async<BlogCheckpoint>) : CompanionOutcome =
-        lock lockObj (fun () ->
-            match inFlightTask with
-            | Some t when not t.IsCompleted -> SkippedBusy
-            | _ ->
-                let t =
-                    Task.Run<unit>(fun () ->
-                        async {
-                            try
-                                let! cp = blogFn ()
-                                lock lockObj (fun () -> currentCheckpoint <- Some cp)
-                            with _ ->
-                                ()
-                        }
-                        |> Async.StartAsTask)
+    member this.Submit(currentProjection: ProjectionSnapshot, blogFn: unit -> Async<BlogText>) : CompanionOutcome =
+        this.Submit(currentProjection, (fun (_: ProjectionSnapshot) -> blogFn ()))
 
-                inFlightTask <- Some t
-                Submitted)
-
-    member this.Submit(blogFn: unit -> Task<BlogCheckpoint>) : CompanionOutcome =
-        this.Submit(fun () -> blogFn () |> Async.AwaitTask)
+    member this.Submit(currentProjection: ProjectionSnapshot, blogFn: unit -> Task<BlogText>) : CompanionOutcome =
+        this.Submit(currentProjection, (fun (_: ProjectionSnapshot) -> blogFn () |> Async.AwaitTask))

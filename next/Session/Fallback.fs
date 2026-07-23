@@ -9,7 +9,6 @@ type FallbackState = { Side: ModelSide; Failures: int }
 [<RequireQualifiedAccess>]
 type FallbackDecision =
     | NextAttempt of FallbackState
-    | Reconcile of FallbackState
     | Dead
 
 module Fallback =
@@ -24,15 +23,13 @@ module Fallback =
                     { Side = ModelSide.A
                       Failures = state.Failures + 1 }
             else
-                FallbackDecision.NextAttempt { Side = ModelSide.B; Failures = 0 }
+                FallbackDecision.NextAttempt
+                    { Side = ModelSide.B
+                      Failures = state.Failures + 1 }
         | ModelSide.B ->
-            if state.Failures < 1 then
+            if state.Failures < 3 then
                 FallbackDecision.NextAttempt
                     { Side = ModelSide.B
                       Failures = state.Failures + 1 }
             else
                 FallbackDecision.Dead
-
-    let reconcile (state: FallbackState) : FallbackDecision = FallbackDecision.Reconcile state
-
-    let handleAcceptanceUnknown (state: FallbackState) : FallbackDecision = reconcile state

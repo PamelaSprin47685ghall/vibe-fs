@@ -6,10 +6,18 @@ open System.Threading
 open System.Threading.Tasks
 
 module FlowHelpers =
+#if FABLE_COMPILER
     open Fable.Core
 
     [<Emit("($0 && typeof $0.then === 'function') ? $0 : Promise.resolve()")>]
-    let awaitValueTask (vt: obj) : Task<unit> = jsNative
+    let awaitValueTask (vt: obj) : Task = jsNative
+#else
+    let awaitValueTask (vt: obj) : Task =
+        match vt with
+        | :? ValueTask as v -> v.AsTask()
+        | :? Task as t -> t
+        | _ -> Task.CompletedTask
+#endif
 
 type Flow<'ctx, 'error, 'a> = private Flow of ('ctx -> CancellationToken -> Task<Result<'a, 'error>>)
 
@@ -49,10 +57,26 @@ type FlowBuilder<'ctx, 'error>(progress: ProgressGuard<'ctx, 'error> option) =
     member _.TryFinally(Flow body: Flow<'ctx, 'error, 'a>, compensation: unit -> unit) : Flow<'ctx, 'error, 'a> =
         Flow(fun ctx ct ->
             task {
+                let mutable bodyResult: Result<'a, 'error> option = None
+                let mutable bodyEx: exn option = None
+
                 try
-                    return! body ctx ct
-                finally
+                    let! r = body ctx ct
+                    bodyResult <- Some r
+                with ex ->
+                    bodyEx <- Some ex
+
+                let mutable compEx: exn option = None
+
+                try
                     compensation ()
+                with ex ->
+                    compEx <- Some ex
+
+                match bodyEx, compEx with
+                | Some bEx, _ -> return raise bEx
+                | None, Some cEx -> return raise cEx
+                | None, None -> return bodyResult.Value
             })
 
     member _.TryWith
@@ -62,11 +86,22 @@ type FlowBuilder<'ctx, 'error>(progress: ProgressGuard<'ctx, 'error> option) =
             task {
                 try
                     return! body ctx ct
-                with
-                | :? OperationCanceledException as ex -> return raise ex
-                | ex ->
-                    let (Flow h) = handler ex
-                    return! h ctx ct
+                with ex ->
+#if FABLE_COMPILER
+                    if
+                        ex :? OperationCanceledException
+                        || (not (isNull ex) && ex.ToString().Contains("OperationCanceledException"))
+                    then
+#else
+                    if
+                        ex :? OperationCanceledException
+                        || (not (isNull ex) && ex.GetType().Name = "OperationCanceledException")
+                    then
+#endif
+                        return raise ex
+                    else
+                        let (Flow h) = handler ex
+                        return! h ctx ct
             })
 
     member _.Using
@@ -84,17 +119,17 @@ type FlowBuilder<'ctx, 'error>(progress: ProgressGuard<'ctx, 'error> option) =
                 with ex ->
                     bodyEx <- Some ex
 
+                let mutable disposeEx: exn option = None
+
                 try
                     do! FlowHelpers.awaitValueTask (resource.DisposeAsync())
-                with _ ->
-                    ()
+                with ex ->
+                    disposeEx <- Some ex
 
-                match bodyEx with
-                | Some bEx -> return raise bEx
-                | None ->
-                    match bodyResult with
-                    | Some r -> return r
-                    | None -> return Unchecked.defaultof<Result<'a, 'error>>
+                match bodyEx, disposeEx with
+                | Some bEx, _ -> return raise bEx
+                | None, Some dEx -> return raise dEx
+                | None, None -> return bodyResult.Value
             })
 
     member _.While(condition: unit -> bool, body: Flow<'ctx, 'error, unit>) : Flow<'ctx, 'error, unit> =

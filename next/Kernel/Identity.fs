@@ -11,7 +11,6 @@ module Identity =
     type EventId = private EventId of string
     type DispatchId = private DispatchId of string
     type ChildId = private ChildId of string
-    type SquadId = private SquadId of string
     type ProcessId = private ProcessId of string
 
     type LocalEpoch = int64
@@ -54,10 +53,6 @@ module Identity =
     module ChildId =
         let create (value: string) = ChildId value
         let value (ChildId v) = v
-
-    module SquadId =
-        let create (value: string) = SquadId value
-        let value (SquadId v) = v
 
     module ProcessId =
         let create (value: string) = ProcessId value

@@ -3,7 +3,7 @@
  * Imported by p0-canary-tests-fallback.js so the runner stays unchanged.
  */
 
-import { getSessionId } from '../harness/scenario.js';
+import { getSessionId } from '../../../testkit/opencode/scenario.js';
 import { waitForCondition, waitForNdjson } from './p0-canary-ndjson.js';
 import { TIMEOUTS } from './p0-canary-utils.js';
 

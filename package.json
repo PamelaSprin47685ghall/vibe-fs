@@ -3,21 +3,15 @@
   "version": "0.3.0",
   "private": true,
   "type": "module",
-  "description": "wanxiangshu: multi-agent plugin runtime in F#\u2192JS via Fable",
-  "main": "build/src/Hosts/Mux/Plugin.js",
+  "description": "Wanxiangshu.Next Structured Flow runtime compiled via Fable",
+  "main": "build/next/OpenCode/Plugin.js",
   "types": "index.d.ts",
   "exports": {
     ".": {
       "types": "./index.d.ts",
-      "import": "./build/src/Hosts/Mux/Plugin.js",
-      "require": "./build/src/Hosts/Mux/Plugin.js",
-      "default": "./build/src/Hosts/Mux/Plugin.js"
-    },
-    "./omp": {
-      "types": "./index.d.ts",
-      "import": "./build/src/Hosts/Omp/Plugin.js",
-      "require": "./build/src/Hosts/Omp/Plugin.js",
-      "default": "./build/src/Hosts/Omp/Plugin.js"
+      "import": "./build/next/OpenCode/Plugin.js",
+      "require": "./build/next/OpenCode/Plugin.js",
+      "default": "./build/next/OpenCode/Plugin.js"
     }
   },
   "files": [
@@ -26,24 +20,11 @@
   ],
   "scripts": {
     "prepare": "node scripts/setup-git-hooks.mjs",
-    "build": "dotnet fable wanxiangshu.fsproj --outDir build && node scripts/postbuild.mjs",
+    "build": "dotnet fable precompile next/Wanxiangshu.Next.fsproj -o build/next && node scripts/postbuild.mjs",
     "postbuild": "node scripts/postbuild.mjs",
-    "test": "node tests/runner.js",
-    "test:unit": "node tests/runner.js L0",
-    "test:contract": "node tests/runner.js L0 codec",
-    "test:integration": "node tests/runner.js L2",
-    "test:e2e:p0": "node tests/e2e.js opencode-e2e-p0",
-    "test:e2e:full": "node tests/e2e.js opencode-e2e-full",
-    "test:e2e:opencode:p0": "node tests/e2e.js opencode-e2e-p0",
-    "test:e2e:opencode:full": "node tests/e2e.js opencode-e2e-full",
-    "test:gates": "node tests/runner.js L4",
-    "test:all": "npm run test:unit && npm run test:contract && npm run test:integration && npm run test:gates && npm run test:e2e:p0 && npm run test:e2e:full",
-    "test:release": "npm run build && npm run test:all",
-    "validate:coverage": "node --import tsx e2e/opencode/scripts/validate-manifest.mjs",
-    "test:stability-gate": "node --import tsx e2e/opencode/scripts/stability-gate.mjs",
-    "test:stability-gate:static": "node --import tsx e2e/opencode/scripts/stability-gate.mjs --static-only",
-    "build-and-test": "node scripts/build-and-test.mjs",
-    "build-and-test-e2e": "node scripts/build-and-test-e2e.mjs",
+    "test": "npm run build && cd tests-next && dotnet fable Wanxiangshu.Next.Tests.fsproj --outDir ../build/tests-next --precompiledLib ../build/next && node --test runner.test.mjs && node runner.js && cd .. && node testkit/opencode/tests/gate-testkit.mjs",
+    "test:e2e:p0": "node testkit/opencode/tests/agent-dsl-canary.mjs",
+    "test:release": "npm run build && npm test && npm run test:e2e:p0",
     "format": "node scripts/pre-commit-formatter.mjs"
   },
   "dependencies": {

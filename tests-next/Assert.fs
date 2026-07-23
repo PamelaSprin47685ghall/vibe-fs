@@ -6,50 +6,57 @@ open Fable.Core
 open Fable.Core.JsInterop
 
 type FactAttribute() =
-    inherit Attribute()
+    inherit global.Xunit.FactAttribute()
 
 module private AssertHelper =
-    [<Emit("if (typeof globalThis.__resetAssertionTimeout === 'function') globalThis.__resetAssertionTimeout()")>]
-    let resetHeartbeat () : unit = jsNative
+    let resetHeartbeat () : unit = ()
 
 type Assert =
     static member Equal<'T>(expected: 'T, actual: 'T) =
         AssertHelper.resetHeartbeat ()
+
         if not (Unchecked.equals expected actual) then
             failwithf "Assert.Equal failed.\nExpected: %A\nActual:   %A" expected actual
 
     static member True(condition: bool) =
         AssertHelper.resetHeartbeat ()
+
         if not condition then
             failwith "Assert.True failed: expected true, got false"
 
     static member True(condition: bool, userMessage: string) =
         AssertHelper.resetHeartbeat ()
+
         if not condition then
             failwithf "Assert.True failed: %s" userMessage
 
     static member False(condition: bool) =
         AssertHelper.resetHeartbeat ()
+
         if condition then
             failwith "Assert.False failed: expected false, got true"
 
     static member False(condition: bool, userMessage: string) =
         AssertHelper.resetHeartbeat ()
+
         if condition then
             failwithf "Assert.False failed: %s" userMessage
 
     static member NotNull(value: obj) =
         AssertHelper.resetHeartbeat ()
+
         if isNull value then
             failwith "Assert.NotNull failed: object is null"
 
     static member Null(value: obj) =
         AssertHelper.resetHeartbeat ()
+
         if not (isNull value) then
             failwithf "Assert.Null failed: expected null, got %A" value
 
     static member Empty(collection: System.Collections.IEnumerable) =
         AssertHelper.resetHeartbeat ()
+
         if isNull collection then
             ()
         else
@@ -60,6 +67,7 @@ type Assert =
 
     static member NotEmpty(collection: System.Collections.IEnumerable) =
         AssertHelper.resetHeartbeat ()
+
         if isNull collection then
             failwith "Assert.NotEmpty failed: collection is null"
         else
@@ -70,6 +78,7 @@ type Assert =
 
     static member Single(collection: System.Collections.IEnumerable) =
         AssertHelper.resetHeartbeat ()
+
         if isNull collection then
             failwith "Assert.Single failed: collection is null"
         else
@@ -86,6 +95,7 @@ type Assert =
 
     static member IsAssignableFrom<'T>(value: obj) =
         AssertHelper.resetHeartbeat ()
+
         if isNull value then
             failwith "Assert.IsAssignableFrom failed: object is null"
 

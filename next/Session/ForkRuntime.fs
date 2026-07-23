@@ -1,9 +1,6 @@
 namespace Wanxiangshu.Next.Session
 
 open System
-open System.Collections.Concurrent
-open System.Collections.Generic
-open System.Threading.Channels
 open System.Threading.Tasks
 
 [<RequireQualifiedAccess>]
@@ -24,10 +21,22 @@ type AgentStatus =
     | Closed
 
 [<RequireQualifiedAccess>]
+type ForkResult =
+    | Created of agentId: string
+    | Nudged of agentId: string
+    | NotFound of agentId: string
+
+type ForkResult with
+    member this.AgentId =
+        match this with
+        | ForkResult.Created id
+        | ForkResult.Nudged id
+        | ForkResult.NotFound id -> id
+
+[<RequireQualifiedAccess>]
 type ForkError =
-    | Busy
     | Empty
-    | NotFound
+    | NotFound of agentId: string
 
 type RunCompletion =
     { RunId: string
@@ -48,114 +57,169 @@ type AgentRecord =
       Status: AgentStatus
       CurrentRunId: string option }
 
-type ForkRuntime() =
-    let mailbox = Channel.CreateUnbounded<RunCompletion>()
-    let agents = ConcurrentDictionary<string, AgentRecord>()
-    let ptys = ConcurrentDictionary<string, PtyRecord>()
-    let pendingCompletions = List<RunCompletion>()
+type ForkRuntime
+    (
+        ?runner: string -> AgentRole -> string option -> Task<Result<string, string>>,
+        ?listener: RunCompletion -> unit,
+        ?cleanup: string -> unit
+    ) =
+
+    let childRunner =
+        defaultArg runner (fun _ _ prompt -> Task.FromResult(Ok(defaultArg prompt "ok")))
+
+    let terminalListener = defaultArg listener ignore
+    let cleanupPort = defaultArg cleanup ignore
+
+    let mailbox = System.Collections.Generic.Queue<RunCompletion>()
+    let agents = System.Collections.Generic.Dictionary<string, AgentRecord>()
+    let ptys = System.Collections.Generic.Dictionary<string, PtyRecord>()
     let lockObj = obj ()
+    let mutable isCancelled = false
 
-    let drainMailbox () =
-        let mutable item = Unchecked.defaultof<RunCompletion>
-
-        while mailbox.Reader.TryRead(&item) do
-            pendingCompletions.Add(item)
-
-    member _.Fork
-        (agentId: string, role: AgentRole, runWork: unit -> Task<Result<string, string>>)
-        : Result<string, ForkError> =
+    let startRun
+        (agentId: string)
+        (role: AgentRole)
+        (promptOpt: string option)
+        (workOpt: (unit -> Task<Result<string, string>>) option)
+        =
         let runId = "run-" + Guid.NewGuid().ToString("N").Substring(0, 8)
-        let mutable canStart = false
-        let mutable err = None
 
+        let onTerminal (completion: RunCompletion) =
+            try
+                terminalListener completion
+            with _ ->
+                ()
+
+        let runTask () =
+            task {
+                let! outcome =
+                    task {
+                        try
+                            match workOpt with
+                            | Some w -> return! w ()
+                            | None -> return! childRunner agentId role promptOpt
+                        with ex ->
+                            return Error ex.Message
+                    }
+
+                let completion =
+                    { RunId = runId
+                      AgentId = agentId
+                      Role = role
+                      Outcome = outcome
+                      CompletedAt = DateTimeOffset.UtcNow }
+
+
+                // 1. Invoke terminal listener (registered before firing prompt)
+                onTerminal completion
+
+                // 2. Put completion into channel before live status changes
+                lock lockObj (fun () -> mailbox.Enqueue(completion))
+
+                // 3. Update status in live agent handle map
+                lock lockObj (fun () ->
+                    match agents.TryGetValue(agentId) with
+                    | true, rec' when rec'.Status <> AgentStatus.Closed ->
+                        agents.[agentId] <-
+                            { rec' with
+                                Status = AgentStatus.Idle
+                                CurrentRunId = None }
+                    | _ -> ())
+            }
+
+#if FABLE_COMPILER
+        let _ = runTask ()
+#else
+        Task.Run(fun () -> runTask () :> Task) |> ignore
+#endif
+        runId
+
+    member this.Fork
+        (agentId: string, role: AgentRole, ?prompt: string, ?runWork: unit -> Task<Result<string, string>>)
+        : ForkResult =
         lock lockObj (fun () ->
             match agents.TryGetValue(agentId) with
-            | true, rec' when rec'.Status = AgentStatus.Busy -> err <- Some ForkError.Busy
             | true, rec' ->
+                let runId = startRun agentId role prompt runWork
+
                 agents.[agentId] <-
                     { rec' with
-                        Status = AgentStatus.Busy
                         Role = role
+                        Status = AgentStatus.Busy
                         CurrentRunId = Some runId }
 
-                canStart <- true
+                ForkResult.Nudged agentId
             | false, _ ->
+                let runId = startRun agentId role prompt runWork
+
                 agents.[agentId] <-
                     { AgentId = agentId
                       Role = role
                       Status = AgentStatus.Busy
                       CurrentRunId = Some runId }
 
-                canStart <- true)
+                ForkResult.Created agentId)
 
-        match err with
-        | Some e -> Error e
-        | None ->
-            Task.Run(fun () ->
-                (task {
-                    let! outcome =
-                        task {
-                            try
-                                return! runWork ()
-                            with ex ->
-                                return Error ex.Message
-                        }
+    member this.Fork(agentId: string, prompt: string) : ForkResult =
+        lock lockObj (fun () ->
+            match agents.TryGetValue(agentId) with
+            | true, rec' ->
+                let runId = startRun agentId rec'.Role (Some prompt) None
 
-                    let completion =
-                        { RunId = runId
-                          AgentId = agentId
-                          Role = role
-                          Outcome = outcome
-                          CompletedAt = DateTimeOffset.UtcNow }
+                agents.[agentId] <-
+                    { rec' with
+                        Status = AgentStatus.Busy
+                        CurrentRunId = Some runId }
 
-                    // Enqueue completion BEFORE updating status to Idle
-                    mailbox.Writer.TryWrite(completion) |> ignore
+                ForkResult.Nudged agentId
+            | false, _ -> ForkResult.NotFound agentId)
 
-                    lock lockObj (fun () ->
-                        match agents.TryGetValue(agentId) with
-                        | true, rec' ->
-                            agents.[agentId] <-
-                                { rec' with
-                                    Status = AgentStatus.Idle
-                                    CurrentRunId = None }
-                        | false, _ -> ())
-                }
-                :> Task))
-            |> ignore
-
-            Ok runId
 
     member _.Join() : Result<RunCompletion, ForkError> =
         lock lockObj (fun () ->
-            drainMailbox ()
-
-            if pendingCompletions.Count > 0 then
-                let item = pendingCompletions.[0]
-                pendingCompletions.RemoveAt(0)
-                Ok item
+            if mailbox.Count > 0 then
+                Ok(mailbox.Dequeue())
             else
                 Error ForkError.Empty)
 
-    member _.Join(agentId: string) : Result<RunCompletion, ForkError> =
-        lock lockObj (fun () ->
-            drainMailbox ()
-            let idx = pendingCompletions.FindIndex(fun c -> c.AgentId = agentId)
+    member _.RegisterPty(pty: PtyRecord) : unit =
+        lock lockObj (fun () -> ptys.[pty.PtyId] <- pty)
 
-            if idx >= 0 then
-                let item = pendingCompletions.[idx]
-                pendingCompletions.RemoveAt(idx)
-                Ok item
-            else if agents.ContainsKey(agentId) then
-                Error ForkError.Empty
-            else
-                Error ForkError.NotFound)
-
-    member _.RegisterPty(pty: PtyRecord) : unit = ptys.[pty.PtyId] <- pty
-
-    member _.UnregisterPty(ptyId: string) : unit = ptys.TryRemove(ptyId) |> ignore
+    member _.UnregisterPty(ptyId: string) : unit =
+        lock lockObj (fun () -> ptys.Remove(ptyId) |> ignore)
 
     member _.List() : AgentRecord list * PtyRecord list =
         lock lockObj (fun () ->
             let agentList = agents.Values |> Seq.toList
             let ptyList = ptys.Values |> Seq.toList
             (agentList, ptyList))
+
+    member _.Cancel() : unit =
+        let toClean =
+            lock lockObj (fun () ->
+                if isCancelled then
+                    []
+                else
+                    isCancelled <- true
+                    let agentIds = agents.Keys |> Seq.toList
+
+                    for id in agentIds do
+                        match agents.TryGetValue(id) with
+                        | true, rec' ->
+                            agents.[id] <-
+                                { rec' with
+                                    Status = AgentStatus.Closed
+                                    CurrentRunId = None }
+                        | _ -> ()
+
+                    let ptyIds = ptys.Keys |> Seq.toList
+                    ptys.Clear()
+                    agentIds @ ptyIds)
+
+        for id in toClean do
+            try
+                cleanupPort id
+            with _ ->
+                ()
+
+    member this.Close() : unit = this.Cancel()

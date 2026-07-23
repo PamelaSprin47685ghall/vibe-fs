@@ -2,10 +2,9 @@
   "name": "wanxiangshu",
   "version": "0.1.4",
   "type": "module",
-  "main": "src/Hosts/Mux/Plugin.js",
+  "main": "OpenCode/Plugin.js",
   "exports": {
-    ".": "./src/Hosts/Mux/Plugin.js",
-    "./omp": "./src/Hosts/Omp/Plugin.js"
+    ".": "./OpenCode/Plugin.js"
   },
   "dependencies": {
     "highlight.js": "*",

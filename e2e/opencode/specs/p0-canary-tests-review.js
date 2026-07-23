@@ -4,7 +4,7 @@
  */
 
 import fs from 'node:fs';
-import { getSessionId } from '../harness/scenario.js';
+import { getSessionId } from '../../../testkit/opencode/scenario.js';
 import { readNdjsonLines, sleep, TIMEOUTS } from './p0-canary-utils.js';
 
 function expectNoSessionError(t, sid) {

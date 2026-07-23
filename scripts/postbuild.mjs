@@ -24,8 +24,7 @@ if (fs.existsSync(pkgSrc)) {
   warn('Warning: build-package.json not found');
 }
 
-// 3. Recursively copy non-F# assets from src/ directories to build/
-// This handles harnesses, fixtures, and runner scripts
+// 3. Recursively copy non-F# assets into build/
 function syncAssets(sourceDir, targetDir) {
   if (!fs.existsSync(sourceDir)) return;
   fs.mkdirSync(targetDir, { recursive: true });
@@ -47,31 +46,9 @@ function syncAssets(sourceDir, targetDir) {
 }
 
 log('Syncing assets...');
-// Remove stale F# plugin-test outputs that moved from e2e/ to integration/.
-// Fable does not delete old build artifacts when source files move.
-const staleE2eTests = [
-  'OpencodePluginTests.js',
-  'MimocodePluginTests.js',
-  'MimoTuiPluginTests.js',
-];
-for (const name of staleE2eTests) {
-  const p = path.join(buildDir, 'e2e', name);
-  if (fs.existsSync(p)) {
-    fs.rmSync(p);
-    log(`  removed stale ${p}`);
-  }
-}
 syncAssets(
-  path.join(root, 'integration'),
-  path.join(buildDir, 'integration')
-);
-syncAssets(
-  path.join(root, 'tests'),
-  path.join(buildDir, 'tests')
-);
-syncAssets(
-  path.join(root, 'e2e'),
-  path.join(buildDir, 'e2e')
+  path.join(root, 'testkit'),
+  path.join(buildDir, 'testkit')
 );
 log('✓ Assets synced');
 

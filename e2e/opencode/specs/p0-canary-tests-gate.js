@@ -6,7 +6,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { runStaticGate, runStabilityGate } from '../harness/stability-checker.js';
+import { runStaticGate, runStabilityGate } from '../../../testkit/opencode/stability-checker.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '../../..');
@@ -252,7 +252,7 @@ const tests = [
         });
       });
 
-      const { ProcessHost } = await import('../harness/process-host.js');
+      const { ProcessHost } = await import('../../../testkit/opencode/process-host.js');
       const leakHost = new ProcessHost();
       leakHost._port = port;
       leakHost._started = true;

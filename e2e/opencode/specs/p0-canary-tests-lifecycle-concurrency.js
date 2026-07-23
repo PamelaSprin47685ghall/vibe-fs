@@ -3,9 +3,9 @@
  * Kept under the 250-line Kolmogorov line budget.
  */
 
-import { runScenario, getSessionId } from '../harness/scenario.js';
+import { runScenario, getSessionId } from '../../../testkit/opencode/scenario.js';
 import { TIMEOUTS } from './p0-canary-utils.js';
-import { getDescendantPids, checkSocketClosed, isPidAlive } from '../harness/process-host-checks.js';
+import { getDescendantPids, checkSocketClosed, isPidAlive } from '../../../testkit/opencode/process-host-checks.js';
 import fs from 'node:fs';
 
 const COMMON = { plugin: true, timeoutMs: 300000, contextLimit: 20000, allowSynthetic: true, allowTitleGen: true };

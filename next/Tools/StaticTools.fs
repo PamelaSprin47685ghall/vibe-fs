@@ -8,7 +8,6 @@ open Thoth.Json
 open Wanxiangshu.Next.Kernel
 open Wanxiangshu.Next.Kernel.Identity
 open Wanxiangshu.Next.Process
-open Wanxiangshu.Next.Session
 
 module NodeFs =
     [<Import("readFileSync", "fs")>]
@@ -62,63 +61,35 @@ module StaticTools =
                           WorkingDirectory = None
                           Environment = None
                           Stdin = None
-                          Deadline = Some ctx.Deadline
+                          Deadline = None
                           PtyOptions = None }
 
                     let procCtx: ProcessContext =
                         { WorkingDirectory = None
-                          DefaultTimeout = Some(Deadline.remaining (fun () -> DateTimeOffset.UtcNow) ctx.Deadline) }
+                          DefaultTimeout = None }
 
-                    let! res = ProcessFlows.runFlow procCtx ctx.Cancellation (ProcessFlows.execute cmd)
+                    let estimate: ProcessEstimate =
+                        { EstimatedRuntime = RuntimeSeconds 30.0
+                          EstimatedOutput = OutputBytes 200000L
+                          EstimatedMemory = EstimatedMemory.Medium }
+
+                    let! res = Runner.execute cmd estimate procCtx ctx.Cancellation
 
                     match res with
-                    | Ok procRes ->
-                        let resultText =
-                            sprintf "Exit: %d\nStdout: %s\nStderr: %s" procRes.ExitCode procRes.Stdout procRes.Stderr
-
+                    | Ok(RunnerOutcome.Completed(code, stdout, stderr, _)) ->
                         return
-                            { Result = resultText
-                              Truncated = procRes.StdoutTruncated || procRes.StderrTruncated }
+                            { Result = sprintf "Exit: %d\nStdout: %s\nStderr: %s" code stdout stderr
+                              Truncated = false }
+                    | Ok(RunnerOutcome.Spooled(code, path, totalBytes, chunks, _)) ->
+                        return
+                            { Result = sprintf "Exit: %d\nSpool: %s\nBytes: %d\nChunks: %d" code path totalBytes chunks
+                              Truncated = false }
+                    | Ok(RunnerOutcome.OutputExceeded(bytes, path)) ->
+                        return
+                            { Result = sprintf "Output exceeded budget: %d (%A)" bytes path
+                              Truncated = true }
                     | Error err ->
                         return
                             { Result = sprintf "Error: %A" err
-                              Truncated = false }
-                } }
-
-    let subagentTool (name: string) (role: string) (script: ChildScript) : Tool =
-        { Name = name
-          Description = sprintf "Spawn subagent %s for %s" name role
-          SchemaJson = """{"type":"object","properties":{"prompt":{"type":"string"}},"required":["prompt"]}"""
-          Execute =
-            fun ctx input ->
-                task {
-                    ctx.Cancellation.ThrowIfCancellationRequested()
-
-                    let promptText =
-                        try
-                            let decoder = Decode.field "prompt" Decode.string
-
-                            match Decode.fromString decoder input.Payload with
-                            | Ok p -> p
-                            | Error _ -> input.Payload
-                        with _ ->
-                            input.Payload
-
-                    let req: ChildRequest = { Prompt = promptText }
-                    let flow = ChildFlows.runChild script req
-                    let! res = Flow.run script ctx.Cancellation flow
-
-                    match res with
-                    | Ok(CompletedChild out) ->
-                        return
-                            { Result = sprintf "Subagent %s completed: %s" name out
-                              Truncated = false }
-                    | Ok(FailedChild err) ->
-                        return
-                            { Result = sprintf "Subagent %s failed: %s" name err
-                              Truncated = false }
-                    | Error err ->
-                        return
-                            { Result = sprintf "Subagent %s flow error: %A" name err
                               Truncated = false }
                 } }

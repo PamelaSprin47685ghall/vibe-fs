@@ -3,8 +3,8 @@
  * Kept under the 300-line Kolmogorov line budget.
  */
 
-import { getSessionId, runScenario } from '../harness/scenario.js';
-import { isPidAlive } from '../harness/process-host-checks.js';
+import { getSessionId, runScenario } from '../../../testkit/opencode/scenario.js';
+import { isPidAlive } from '../../../testkit/opencode/process-host-checks.js';
 import {
   findPtySessionId,
   findToolPart,

@@ -20,7 +20,7 @@ module MessageOriginDecoder =
             let pType = partObj?``type``
             not (isNull pType) && unbox<string> pType = "compaction"
 
-    let tryExtractPromptKey (partObj: obj) : PromptKey option =
+    let tryExtractPromptKey (partObj: obj) : PromptKeyRef option =
         if isNull partObj then
             None
         else
@@ -32,12 +32,12 @@ module MessageOriginDecoder =
                 let keyStr = meta?wanxiangshu_prompt_key
 
                 if not (isNull keyStr) then
-                    PromptKey.parse (unbox<string> keyStr)
+                    Some(PromptKeyRef.create (unbox<string> keyStr))
                 else
                     let keyStr2 = meta?promptKey
 
                     if not (isNull keyStr2) then
-                        PromptKey.parse (unbox<string> keyStr2)
+                        Some(PromptKeyRef.create (unbox<string> keyStr2))
                     else
                         None
 
@@ -47,7 +47,7 @@ module MessageOriginDecoder =
         let pluginKeyOpt = parts |> List.tryPick tryExtractPromptKey
 
         match pluginKeyOpt with
-        | Some key -> PluginGenerated(PromptKeyRef.create (PromptKey.asString key))
+        | Some keyRef -> PluginGenerated keyRef
         | None when hasCompaction -> HostInternal
         | None ->
             let allSynthetic = parts.Length > 0 && (parts |> List.forall isSyntheticPart)

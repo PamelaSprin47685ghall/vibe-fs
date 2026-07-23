@@ -3,6 +3,7 @@
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
     <RootNamespace>Wanxiangshu.Next.Tests</RootNamespace>
+    <IsTestProject>true</IsTestProject>
     <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
     <DisableImplicitFSharpCoreReference>true</DisableImplicitFSharpCoreReference>
   </PropertyGroup>
@@ -20,7 +21,6 @@
   <ItemGroup>
     <Compile Include="Assert.fs"/>
     <Compile Include="EventDrivenHarness.fs"/>
-    <Compile Include="GuideContract/Signatures.fs"/>
     <Compile Include="Flow/FlowTests.fs"/>
     <Compile Include="Journal/JournalTestSupport.fs"/>
     <Compile Include="Journal/JournalWriterTests.fs"/>
@@ -28,28 +28,22 @@
     <Compile Include="Journal/JournalFoldTests.fs"/>
     <Compile Include="Journal/FactCodecTests.fs"/>
     <Compile Include="Journal/JournalIsolationTests.fs"/>
-    <Compile Include="Process/ProcessTests.fs"/>
+    <Compile Include="Journal/AgentFactsTests.fs"/>
+    <Compile Include="Journal/AgentJournalTests.fs"/>
     <Compile Include="Process/ProcessBudgetTests.fs"/>
-    <Compile Include="Tools/MessageTransformTests.fs"/>
-    <Compile Include="OpenCode/GatewayBootTests.fs"/>
-    <Compile Include="OpenCode/OpencodePluginTests.fs"/>
-    <Compile Include="Session/SessionTestSupport.fs"/>
-    <Compile Include="Session/SessionFlowTests.fs"/>
-    <Compile Include="Session/SessionFallbackTests.fs"/>
-    <Compile Include="Session/SessionProtocolTests.fs"/>
-    <Compile Include="Session/ChildFlowTests.fs"/>
-    <Compile Include="Session/CompanionTests.fs"/>
+    <Compile Include="Process/ProcessRunnerTests.fs"/>
+    <Compile Include="Process/PtyTests.fs"/>
+    <Compile Include="Agent/ProgramsTests.fs"/>
     <Compile Include="Session/ForkRuntimeTests.fs"/>
     <Compile Include="Session/RolesTests.fs"/>
     <Compile Include="Session/ReviewGuardTests.fs"/>
+    <Compile Include="Review/GuardTests.fs"/>
+    <Compile Include="OpenCode/SpikeHostTests.fs"/>
+    <Compile Include="Tools/MessageTransformTests.fs"/>
     <Compile Include="Integration/OrchestratorTests.fs"/>
+    <Compile Include="Integration/ManagerCanaryTests.fs"/>
     <Compile Include="Gates/ArchitectureGateSupport.fs"/>
     <Compile Include="Gates/ArchitectureGates.fs"/>
-    <Compile Include="Integration/VerticalSliceJournalSupport.fs"/>
-    <Compile Include="Integration/VerticalSliceWaiters.fs"/>
-    <Compile Include="Integration/VerticalSliceIntegrationTests.fs"/>
-    <Compile Include="Integration/VerticalSliceE2ETests.fs"/>
-    <Compile Include="Integration/VerticalSliceFlowTests.fs"/>
-    <Compile Include="E2E/OpencodeServeE2ETests.fs"/>
+    <Compile Include="GuideContract/Signatures.fs"/>
   </ItemGroup>
 </Project>

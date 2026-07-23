@@ -1,9 +1,6 @@
 namespace Wanxiangshu.Next.Orchestrator
 
 open System
-open System.Collections.Concurrent
-open System.Collections.Generic
-open System.Threading
 open System.Threading.Tasks
 open Wanxiangshu.Next.Process
 
@@ -13,21 +10,15 @@ type OrchestratorVerdict =
     | RejectedDirty of reason: string
     | NeedsReview of managerId: string * reviewDetails: string
     | IntegrationFailed of managerId: string * errorDetails: string
+    | Empty
 
-[<RequireQualifiedAccess>]
-type ManagerStatus =
-    | Forked
-    | Running
-    | ReadyToPublish
-    | Published of commit: string
-    | RejectedDirty of reason: string
-    | NeedsReview of details: string
-    | Failed of error: string
+type OrchestratorHandle =
+    { ManagerId: string
+      WorktreePath: string }
 
-type ManagerInfo =
-    { Id: string
-      WorktreePath: string
-      Status: ManagerStatus }
+type ManagerCompletion =
+    { Handle: OrchestratorHandle
+      Result: Result<unit, string> }
 
 type GitPort =
     { IsDirty: string -> Task<bool>
@@ -41,10 +32,38 @@ type ManagerPort =
       Reverify: string -> string -> Task<Result<unit, string>> }
 
 type Orchestrator(git: GitPort, manager: ManagerPort, repoPath: string, targetBranch: string) =
-    let publishLock = new SemaphoreSlim(1, 1)
-    let managers = ConcurrentDictionary<string, ManagerInfo>()
+    let lockObj = obj ()
+    let mutable publishChain: Task = Task.CompletedTask
+    let mailbox = System.Collections.Generic.Queue<ManagerCompletion>()
 
-    member this.ForkManager(managerId: string, ?worktreePath: string) : Task<Result<ManagerInfo, OrchestratorVerdict>> =
+    let runSerial (fn: unit -> Task<'T>) : Task<'T> =
+        task {
+            let tcs = TaskCompletionSource<'T>()
+
+            lock lockObj (fun () ->
+                let prev = publishChain
+
+                publishChain <-
+                    task {
+                        try
+                            do! prev
+                        with _ ->
+                            ()
+
+                        try
+                            let! res = fn ()
+                            tcs.SetResult(res)
+                        with ex ->
+                            tcs.SetException(ex)
+                    }
+                    :> Task)
+
+            return! tcs.Task
+        }
+
+    member this.ForkManager
+        (managerId: string, ?worktreePath: string)
+        : Task<Result<OrchestratorHandle, OrchestratorVerdict>> =
         task {
             let path =
                 defaultArg worktreePath (IO.Path.Combine(repoPath, sprintf ".worktrees/%s" managerId))
@@ -52,111 +71,82 @@ type Orchestrator(git: GitPort, manager: ManagerPort, repoPath: string, targetBr
             let! isDirty = git.IsDirty repoPath
 
             if isDirty then
-                let verdict = OrchestratorVerdict.RejectedDirty "Worktree is dirty"
-
-                let info =
-                    { Id = managerId
-                      WorktreePath = path
-                      Status = ManagerStatus.RejectedDirty "Worktree is dirty" }
-
-                managers.[managerId] <- info
-                return Error verdict
+                return Error(OrchestratorVerdict.RejectedDirty "Worktree is dirty")
             else
                 match! git.CreateWorktree repoPath managerId path with
                 | Error err ->
-                    let verdict =
-                        OrchestratorVerdict.IntegrationFailed(managerId, sprintf "Failed to create worktree: %s" err)
-
-                    let info =
-                        { Id = managerId
-                          WorktreePath = path
-                          Status = ManagerStatus.Failed err }
-
-                    managers.[managerId] <- info
-                    return Error verdict
+                    return
+                        Error(
+                            OrchestratorVerdict.IntegrationFailed(
+                                managerId,
+                                sprintf "Failed to create worktree: %s" err
+                            )
+                        )
                 | Ok() ->
-                    let info =
-                        { Id = managerId
-                          WorktreePath = path
-                          Status = ManagerStatus.Running }
+                    let handle =
+                        { ManagerId = managerId
+                          WorktreePath = path }
 
-                    managers.[managerId] <- info
+                    let _ =
+                        Task.Run(fun () ->
+                            task {
+                                let! res = manager.RunManager managerId path
+                                let completion = { Handle = handle; Result = res }
+                                lock lockObj (fun () -> mailbox.Enqueue(completion))
+                            }
+                            :> Task)
 
-                    match! manager.RunManager managerId path with
-                    | Error err ->
-                        let failedInfo =
-                            { info with
-                                Status = ManagerStatus.Failed err }
-
-                        managers.[managerId] <- failedInfo
-
-                        let verdict =
-                            OrchestratorVerdict.IntegrationFailed(managerId, sprintf "Manager run failed: %s" err)
-
-                        return Error verdict
-                    | Ok() ->
-                        let readyInfo =
-                            { info with
-                                Status = ManagerStatus.ReadyToPublish }
-
-                        managers.[managerId] <- readyInfo
-                        return Ok readyInfo
+                    return Ok handle
         }
 
-    member this.JoinPublished(managerId: string) : Task<OrchestratorVerdict> =
+    member this.JoinPublished() : Task<OrchestratorVerdict> =
         task {
-            match managers.TryGetValue(managerId) with
-            | false, _ ->
-                return OrchestratorVerdict.IntegrationFailed(managerId, sprintf "Manager '%s' not found" managerId)
-            | true, info ->
-                let! _ = publishLock.WaitAsync()
+            let completionOpt =
+                lock lockObj (fun () -> if mailbox.Count > 0 then Some(mailbox.Dequeue()) else None)
 
-                try
-                    match! git.Rebase info.WorktreePath targetBranch with
-                    | Error err ->
-                        let verdict =
-                            OrchestratorVerdict.IntegrationFailed(managerId, sprintf "Rebase failed: %s" err)
+            match completionOpt with
+            | None -> return OrchestratorVerdict.Empty
 
-                        managers.[managerId] <-
-                            { info with
-                                Status = ManagerStatus.Failed("Rebase failed: " + err) }
+            | Some completion ->
+                match completion.Result with
+                | Error err ->
+                    return
+                        OrchestratorVerdict.IntegrationFailed(
+                            completion.Handle.ManagerId,
+                            sprintf "Manager run failed: %s" err
+                        )
+                | Ok() ->
+                    return!
+                        runSerial (fun () ->
+                            task {
+                                match! git.Rebase completion.Handle.WorktreePath targetBranch with
+                                | Error err ->
+                                    return
+                                        OrchestratorVerdict.IntegrationFailed(
+                                            completion.Handle.ManagerId,
+                                            sprintf "Rebase failed: %s" err
+                                        )
+                                | Ok() ->
+                                    match!
+                                        manager.Reverify completion.Handle.ManagerId completion.Handle.WorktreePath
+                                    with
+                                    | Error err ->
+                                        return OrchestratorVerdict.NeedsReview(completion.Handle.ManagerId, err)
+                                    | Ok() ->
+                                        match! git.FfMerge completion.Handle.WorktreePath targetBranch with
+                                        | Error err ->
+                                            return
+                                                OrchestratorVerdict.IntegrationFailed(
+                                                    completion.Handle.ManagerId,
+                                                    sprintf "FF merge failed: %s" err
+                                                )
+                                        | Ok commitHash ->
+                                            let! _ = git.RemoveWorktree completion.Handle.WorktreePath
 
-                        return verdict
-                    | Ok() ->
-                        match! manager.Reverify managerId info.WorktreePath with
-                        | Error err ->
-                            let verdict = OrchestratorVerdict.NeedsReview(managerId, err)
-
-                            managers.[managerId] <-
-                                { info with
-                                    Status = ManagerStatus.NeedsReview err }
-
-                            return verdict
-                        | Ok() ->
-                            match! git.FfMerge info.WorktreePath targetBranch with
-                            | Error err ->
-                                let verdict =
-                                    OrchestratorVerdict.IntegrationFailed(managerId, sprintf "FF merge failed: %s" err)
-
-                                managers.[managerId] <-
-                                    { info with
-                                        Status = ManagerStatus.Failed("Merge failed: " + err) }
-
-                                return verdict
-                            | Ok commitHash ->
-                                let! _ = git.RemoveWorktree info.WorktreePath
-                                let verdict = OrchestratorVerdict.Published(managerId, commitHash)
-
-                                managers.[managerId] <-
-                                    { info with
-                                        Status = ManagerStatus.Published commitHash }
-
-                                return verdict
-                finally
-                    publishLock.Release() |> ignore
+                                            return
+                                                OrchestratorVerdict.Published(completion.Handle.ManagerId, commitHash)
+                            })
         }
-
-    member this.List() : ManagerInfo list = managers.Values |> Seq.toList
 
 module OrchestratorEngine =
     let create git manager repoPath targetBranch =
@@ -165,19 +155,17 @@ module OrchestratorEngine =
     let forkManager (orch: Orchestrator) managerId (worktreePath: string option) =
         orch.ForkManager(managerId, ?worktreePath = worktreePath)
 
-    let joinPublished (orch: Orchestrator) managerId = orch.JoinPublished(managerId)
-
-    let list (orch: Orchestrator) = orch.List()
+    let joinPublished (orch: Orchestrator) = orch.JoinPublished()
 
 module ProcessGitPort =
-    let createWithRunner (runner: Command -> Task<int * string * string>) : GitPort =
+    let createWithRepo (repoPath: string) (runner: Command -> Task<int * string * string>) : GitPort =
         { IsDirty =
-            fun repoPath ->
+            fun targetPath ->
                 task {
                     let cmd =
                         { FileName = "git"
                           Arguments = [ "status"; "--porcelain" ]
-                          WorkingDirectory = Some repoPath
+                          WorkingDirectory = Some targetPath
                           Environment = None
                           Stdin = None
                           Deadline = None
@@ -187,12 +175,12 @@ module ProcessGitPort =
                     return code = 0 && not (String.IsNullOrWhiteSpace stdout)
                 }
           CreateWorktree =
-            fun repoPath managerId targetPath ->
+            fun targetRepoPath managerId targetPath ->
                 task {
                     let cmd =
                         { FileName = "git"
                           Arguments = [ "worktree"; "add"; targetPath; "-b"; sprintf "manager/%s" managerId ]
-                          WorkingDirectory = Some repoPath
+                          WorkingDirectory = Some targetRepoPath
                           Environment = None
                           Stdin = None
                           Deadline = None
@@ -227,31 +215,43 @@ module ProcessGitPort =
           FfMerge =
             fun worktreePath targetBranch ->
                 task {
-                    let cmd =
+                    let revCmd =
                         { FileName = "git"
-                          Arguments = [ "merge"; "--ff-only"; "HEAD" ]
-                          WorkingDirectory = Some targetBranch
+                          Arguments = [ "rev-parse"; "HEAD" ]
+                          WorkingDirectory = Some worktreePath
                           Environment = None
                           Stdin = None
                           Deadline = None
                           PtyOptions = None }
 
-                    let! (code, stdout, stderr) = runner cmd
+                    let! (revCode, revStdout, revStderr) = runner revCmd
 
-                    if code = 0 then
-                        let revCmd =
+                    if revCode <> 0 then
+                        return
+                            Error(
+                                if String.IsNullOrWhiteSpace revStderr then
+                                    revStdout
+                                else
+                                    revStderr
+                            )
+                    else
+                        let commitHash = revStdout.Trim()
+
+                        let mergeCmd =
                             { FileName = "git"
-                              Arguments = [ "rev-parse"; "HEAD" ]
-                              WorkingDirectory = Some worktreePath
+                              Arguments = [ "merge"; "--ff-only"; commitHash ]
+                              WorkingDirectory = Some repoPath
                               Environment = None
                               Stdin = None
                               Deadline = None
                               PtyOptions = None }
 
-                        let! (_, revStdout, _) = runner revCmd
-                        return Ok(revStdout.Trim())
-                    else
-                        return Error(if String.IsNullOrWhiteSpace stderr then stdout else stderr)
+                        let! (code, stdout, stderr) = runner mergeCmd
+
+                        if code = 0 then
+                            return Ok commitHash
+                        else
+                            return Error(if String.IsNullOrWhiteSpace stderr then stdout else stderr)
                 }
           RemoveWorktree =
             fun worktreePath ->
@@ -272,3 +272,5 @@ module ProcessGitPort =
                     else
                         return Error(if String.IsNullOrWhiteSpace stderr then stdout else stderr)
                 } }
+
+    let createWithRunner (runner: Command -> Task<int * string * string>) : GitPort = createWithRepo "." runner

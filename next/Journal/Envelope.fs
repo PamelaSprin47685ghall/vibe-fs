@@ -9,7 +9,6 @@ type StreamId =
     | Workspace
     | Session of SessionId
     | Child of ChildId
-    | Squad of SquadId
     | Process of ProcessId
 
 type Envelope =
@@ -32,11 +31,13 @@ module Envelope =
             seqA.CompareTo(seqB)
         else
             let cmpObs = a.ObservedAt.CompareTo(b.ObservedAt)
+
             if cmpObs <> 0 then
                 cmpObs
             else
                 let cmpRt =
                     String.Compare(RuntimeId.value a.RuntimeId, RuntimeId.value b.RuntimeId, StringComparison.Ordinal)
+
                 cmpRt
 
     let serialize (env: Envelope) : string =

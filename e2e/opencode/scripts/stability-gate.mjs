@@ -16,8 +16,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { runStaticGate, runStabilityGate } from '../harness/stability-checker.js';
-import { runScenario } from '../harness/scenario.js';
+import { runStaticGate, runStabilityGate } from '../../../testkit/opencode/stability-checker.js';
+import { runScenario } from '../../../testkit/opencode/scenario.js';
 
 // Import all E2E specs
 import basicTests from '../specs/p0-canary-tests-basics.js';

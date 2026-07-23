@@ -2,7 +2,7 @@
  * p0-canary-tests-recovery-eventlog.js — NDJSON append and integrity tests.
  */
 
-import { getSessionId } from '../harness/scenario.js';
+import { getSessionId } from '../../../testkit/opencode/scenario.js';
 import { waitForLoopCommand, validateNdjson } from './p0-canary-tests-recovery-helpers.js';
 import { TIMEOUTS } from './p0-canary-utils.js';
 import fs from 'node:fs';

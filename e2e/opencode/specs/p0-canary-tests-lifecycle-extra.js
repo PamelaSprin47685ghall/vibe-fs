@@ -18,8 +18,8 @@
  *   OC-CONC-012  Restart frees old port, SSE, provider socket
  */
 
-import { getSessionId } from '../harness/scenario.js';
-import { isPidAlive } from '../harness/process-host-checks.js';
+import { getSessionId } from '../../../testkit/opencode/scenario.js';
+import { isPidAlive } from '../../../testkit/opencode/process-host-checks.js';
 import {
   content,
   findToolPart,

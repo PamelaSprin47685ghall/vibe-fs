@@ -5,8 +5,8 @@
  * Uses EventProbe await helpers and scenario harness; no fixed sleeps.
  */
 
-import { getSessionId, runScenario } from '../harness/scenario.js';
-import { isPidAlive, getDescendantPids } from '../harness/process-host-checks.js';
+import { getSessionId, runScenario } from '../../../testkit/opencode/scenario.js';
+import { isPidAlive, getDescendantPids } from '../../../testkit/opencode/process-host-checks.js';
 import {
   content,
   findToolPart,

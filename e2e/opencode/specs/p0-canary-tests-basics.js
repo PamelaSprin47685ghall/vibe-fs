@@ -3,7 +3,7 @@
  * Kept under the 300-line Kolmogorov line budget.
  */
 
-import { getSessionId, setupScenario, teardownScenario } from '../harness/scenario.js';
+import { getSessionId, setupScenario, teardownScenario } from '../../../testkit/opencode/scenario.js';
 import { content, writeWorkFile, extractToolNames, validateToolSchema, findToolPart, assertFuzzyGrepResult, TIMEOUTS } from './p0-canary-utils.js';
 import fs from 'node:fs';
 

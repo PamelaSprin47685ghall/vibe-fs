@@ -2,7 +2,7 @@
  * p0-canary-tests-recovery-restart.js — Recovery from corrupt NDJSON / orphan lock files.
  */
 
-import { getSessionId } from '../harness/scenario.js';
+import { getSessionId } from '../../../testkit/opencode/scenario.js';
 import { validateNdjson } from './p0-canary-tests-recovery-helpers.js';
 import { readNdjsonLines, TIMEOUTS } from './p0-canary-utils.js';
 import fs from 'node:fs';

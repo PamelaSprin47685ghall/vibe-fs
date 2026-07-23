@@ -2,7 +2,7 @@
  * p0-canary-tests-web.js — E2E tests for Web search, Web fetch, and Browser agent.
  */
 
-import { getSessionId } from '../harness/scenario.js';
+import { getSessionId } from '../../../testkit/opencode/scenario.js';
 import { extractToolNames, findToolPart, readNdjsonLines, TIMEOUTS } from './p0-canary-utils.js';
 
 function expectNoSessionError(t, sid) {

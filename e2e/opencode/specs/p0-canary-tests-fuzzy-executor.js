@@ -3,7 +3,7 @@
  * Covers OC-FUZZY-002/004/005/006/007/008 and OC-EXEC-003/004/005/006.
  */
 
-import { getSessionId } from '../harness/scenario.js';
+import { getSessionId } from '../../../testkit/opencode/scenario.js';
 import { content, writeWorkFile, findToolPart, TIMEOUTS } from './p0-canary-utils.js';
 import YAML from 'yaml';
 

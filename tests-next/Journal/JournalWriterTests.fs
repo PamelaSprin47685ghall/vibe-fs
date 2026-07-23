@@ -17,6 +17,7 @@ module JournalWriterTests =
         withTempDir (fun dir ->
             task {
                 let runtimeId = RuntimeId.create "rt-writer-test"
+                let sid = SessionId.create "s1"
                 let now = DateTimeOffset.UtcNow
 
                 let writer, initEnv = JournalWriter.create dir runtimeId 1234 now
@@ -30,8 +31,14 @@ module JournalWriterTests =
                 Assert.Equal("rt-writer-test", RuntimeId.value writer.RuntimeId)
                 Assert.False(writer.IsPoisoned)
 
-                let todoFact = Fact.Todo(TodoChanged {| Snapshot = { Items = [ "t1" ] } |})
-                let result = writer.Append StreamId.Workspace None todoFact
+                let agentFact =
+                    Fact.Agent(
+                        AgentFact.FallbackFailureRecorded
+                            {| SessionId = sid
+                               Reason = "Timeout" |}
+                    )
+
+                let result = writer.Append StreamId.Workspace None agentFact
 
                 match result with
                 | Committed env ->
@@ -45,10 +52,8 @@ module JournalWriterTests =
                 Assert.Equal(2, snapshot.Envelopes.Length)
 
                 let proj = Fold.apply Fold.empty snapshot.Envelopes
-                Assert.True(proj.Todos.IsSome)
-                let items = proj.Todos.Value.Items
-                Assert.Single(items) |> ignore
-                Assert.Equal("t1", items.[0])
+                Assert.Equal(Some runtimeId, proj.RuntimeId)
+                Assert.True(proj.AgentProjections.Sessions.ContainsKey sid)
             })
 
     [<Fact>]
@@ -76,7 +81,13 @@ module JournalWriterTests =
 
                 (writer :> IDisposable).Dispose()
 
-                let fact = Fact.Todo(TodoChanged {| Snapshot = { Items = [] } |})
+                let fact =
+                    Fact.Agent(
+                        AgentFact.FallbackFailureRecorded
+                            {| SessionId = SessionId.create "s1"
+                               Reason = "err" |}
+                    )
+
                 let res = writer.Append StreamId.Workspace None fact
 
                 match res with
@@ -99,7 +110,11 @@ module JournalWriterTests =
                     [| 1..count |]
                     |> Array.map (fun i ->
                         let fact =
-                            Fact.Todo(TodoChanged {| Snapshot = { Items = [ sprintf "item%d" i ] } |})
+                            Fact.Agent(
+                                AgentFact.FallbackFailureRecorded
+                                    {| SessionId = SessionId.create (sprintf "s%d" i)
+                                       Reason = "err" |}
+                            )
 
                         writer.Append StreamId.Workspace None fact)
 

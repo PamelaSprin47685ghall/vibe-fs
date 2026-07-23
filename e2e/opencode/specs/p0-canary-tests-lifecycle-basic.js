@@ -4,7 +4,7 @@
  * Kept under the 250-line Kolmogorov line budget.
  */
 
-import { runScenario, getSessionId } from '../harness/scenario.js';
+import { runScenario, getSessionId } from '../../../testkit/opencode/scenario.js';
 import { TIMEOUTS } from './p0-canary-utils.js';
 import { waitForNdjson } from './p0-canary-ndjson.js';
 

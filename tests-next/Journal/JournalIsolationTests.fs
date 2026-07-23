@@ -40,8 +40,19 @@ module JournalIsolationTests =
                 let writerB, initEnvB =
                     JournalWriter.create tempDir runtimeB 101 DateTimeOffset.UtcNow
 
-                let factA = Fact.Todo(TodoChanged {| Snapshot = { Items = [ "todoA" ] } |})
-                let factB = Fact.Todo(TodoChanged {| Snapshot = { Items = [ "todoB" ] } |})
+                let factA =
+                    Fact.Agent(
+                        AgentFact.FallbackFailureRecorded
+                            {| SessionId = session1
+                               Reason = "errA" |}
+                    )
+
+                let factB =
+                    Fact.Agent(
+                        AgentFact.FallbackFailureRecorded
+                            {| SessionId = session1
+                               Reason = "errB" |}
+                    )
 
                 let commitA = writerA.Append (StreamId.Session session1) None factA
                 let commitB = writerB.Append (StreamId.Session session1) None factB
@@ -64,8 +75,7 @@ module JournalIsolationTests =
                 let bootSnapshot = Boot.boot tempDir
                 let proj = Fold.apply Fold.empty bootSnapshot.Envelopes
 
-                let sessProj = Map.find session1 proj.SessionProjections
-                Assert.True(sessProj.Todos.IsSome)
+                Assert.True(proj.AgentProjections.Sessions.ContainsKey session1)
 
                 let runtimes =
                     bootSnapshot.Envelopes
@@ -82,11 +92,16 @@ module JournalIsolationTests =
             task {
                 let runtimeA = RuntimeId.create "rtA"
                 let runtimeB = RuntimeId.create "rtB"
+                let session1 = SessionId.create "s1"
 
                 let writerB, _ = JournalWriter.create tempDir runtimeB 100 DateTimeOffset.UtcNow
 
                 let factB1 =
-                    Fact.Session(Fact.HumanTurnStarted {| TurnId = TurnId.create "turnB1" |})
+                    Fact.Agent(
+                        AgentFact.FallbackFailureRecorded
+                            {| SessionId = session1
+                               Reason = "errB1" |}
+                    )
 
                 let _ = writerB.Append StreamId.Workspace None factB1
 
@@ -94,7 +109,11 @@ module JournalIsolationTests =
                 let initialLength = bootSnapshotA.Envelopes.Length
 
                 let factB2 =
-                    Fact.Session(Fact.HumanTurnStarted {| TurnId = TurnId.create "turnB2" |})
+                    Fact.Agent(
+                        AgentFact.FallbackFailureRecorded
+                            {| SessionId = session1
+                               Reason = "errB2" |}
+                    )
 
                 let _ = writerB.Append StreamId.Workspace None factB2
 
@@ -111,8 +130,16 @@ module JournalIsolationTests =
         JournalTestSupport.withTempDir (fun tempDir ->
             task {
                 let runtimeA = RuntimeId.create "rtA"
+                let session1 = SessionId.create "s1"
                 let writerA, _ = JournalWriter.create tempDir runtimeA 100 DateTimeOffset.UtcNow
-                let factA = Fact.Session(Fact.HumanTurnStarted {| TurnId = TurnId.create "turn1" |})
+
+                let factA =
+                    Fact.Agent(
+                        AgentFact.FallbackFailureRecorded
+                            {| SessionId = session1
+                               Reason = "err1" |}
+                    )
+
                 let _ = writerA.Append StreamId.Workspace None factA
                 (writerA :> IDisposable).Dispose()
 
@@ -142,8 +169,16 @@ module JournalIsolationTests =
         JournalTestSupport.withTempDir (fun tempDir ->
             task {
                 let runtimeA = RuntimeId.create "rtA"
+                let session1 = SessionId.create "s1"
                 let writerA, _ = JournalWriter.create tempDir runtimeA 100 DateTimeOffset.UtcNow
-                let factA = Fact.Session(Fact.HumanTurnStarted {| TurnId = TurnId.create "turn1" |})
+
+                let factA =
+                    Fact.Agent(
+                        AgentFact.FallbackFailureRecorded
+                            {| SessionId = session1
+                               Reason = "err1" |}
+                    )
+
                 let _ = writerA.Append StreamId.Workspace None factA
 
                 let allFiles = NodeFsIsolation.readdirSync tempDir
@@ -157,75 +192,3 @@ module JournalIsolationTests =
                 (writerA :> IDisposable).Dispose()
                 return ()
             })
-
-    [<Fact>]
-    let ``Prompt duplicate key historical prompts after fold`` () =
-        let runtimeId = RuntimeId.create "rt1"
-        let sessionId = SessionId.create "s1"
-        let turnId = TurnId.create "t1"
-
-        let promptKey =
-            PromptKey.create sessionId turnId PromptPurpose.ContinueTodo None 1 None "hash1"
-
-        let keyString = PromptKey.asString promptKey
-
-        let envReq: Envelope =
-            { RuntimeId = runtimeId
-              LocalSeq = LocalSeq.create 1L
-              ObservedAt = DateTimeOffset.UtcNow
-              EventId = EventId.create "evt1"
-              Stream = StreamId.Workspace
-              TurnId = None
-              Fact =
-                Fact.Prompt(
-                    Fact.PromptRequested
-                        {| PromptKey = keyString
-                           TurnId = turnId
-                           Purpose = "ContinueTodo" |}
-                ) }
-
-        let envSub: Envelope =
-            { RuntimeId = runtimeId
-              LocalSeq = LocalSeq.create 2L
-              ObservedAt = DateTimeOffset.UtcNow
-              EventId = EventId.create "evt2"
-              Stream = StreamId.Workspace
-              TurnId = None
-              Fact =
-                Fact.Prompt(
-                    Fact.PromptSubmitted
-                        {| PromptKey = keyString
-                           MessageId = MessageId.create "m1" |}
-                ) }
-
-        let envTerm: Envelope =
-            { RuntimeId = runtimeId
-              LocalSeq = LocalSeq.create 3L
-              ObservedAt = DateTimeOffset.UtcNow
-              EventId = EventId.create "evt3"
-              Stream = StreamId.Workspace
-              TurnId = None
-              Fact =
-                Fact.Prompt(
-                    Fact.PromptTerminal
-                        {| PromptKey = keyString
-                           Outcome = PromptOutcome.Delivered(MessageId.create "m2")
-                           AssistantMessageId = Some(MessageId.create "m2") |}
-                ) }
-
-        let envelopes = [ envReq; envSub; envTerm ]
-        let projSet = Fold.apply Fold.empty envelopes
-
-        Assert.True(projSet.HistoricalPrompts.ContainsKey keyString)
-
-        let historicalIndex =
-            PromptProtocol.rebuildHistoricalIndex projSet.HistoricalPrompts
-
-        let decision =
-            PromptProtocol.evaluateSendOnce historicalIndex PromptProtocol.emptyLocalProtocol promptKey
-
-        match decision with
-        | SendOnceDecision.HistoricalHit history ->
-            Assert.Equal(keyString, history.Key)
-            Assert.True(history.Outcome.IsSome)
-        | other -> Assert.Fail(sprintf "Expected HistoricalHit, got %A" other)

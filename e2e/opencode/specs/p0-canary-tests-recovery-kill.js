@@ -2,7 +2,7 @@
  * p0-canary-tests-recovery-kill.js — SIGKILL restart preserves NDJSON integrity.
  */
 
-import { getSessionId } from '../harness/scenario.js';
+import { getSessionId } from '../../../testkit/opencode/scenario.js';
 import { waitForLoopCommand, validateNdjson } from './p0-canary-tests-recovery-helpers.js';
 
 const testSigkillPreservesNdjson = {

@@ -6,7 +6,7 @@
  * Usage: node e2e/opencode/specs/full.js
  */
 
-import { runScenario } from "../harness/scenario.js";
+import { runScenario } from "../../../testkit/opencode/scenario.js";
 import basicTests from "./p0-canary-tests-basics.js";
 import ptyTests from "./p0-canary-tests-pty.js";
 import advancedTests from "./p0-canary-tests-advanced.js";
