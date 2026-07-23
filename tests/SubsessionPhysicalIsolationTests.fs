@@ -1,0 +1,827 @@
+module Wanxiangshu.Tests.SubsessionPhysicalIsolationTests
+
+open Fable.Core
+open Fable.Core.JsInterop
+open Wanxiangshu.Kernel.FallbackKernel.Types
+open Wanxiangshu.Kernel.Subsession.Types
+open Wanxiangshu.Kernel.Subsession.Decision
+open Wanxiangshu.Kernel.Subsession.Policy
+open Wanxiangshu.Kernel.Subsession.Fold
+open Wanxiangshu.Runtime.CommandProcessor
+open Wanxiangshu.Runtime.Dispatch
+open Wanxiangshu.Runtime.SubsessionPorts
+open Wanxiangshu.Runtime.SubsessionActor
+open Wanxiangshu.Runtime.SubsessionActorRegistry
+open Wanxiangshu.Runtime.SubsessionEventStore
+open Wanxiangshu.Runtime.Fallback.RuntimeStore
+open Wanxiangshu.Runtime.Fallback.Ports
+open Wanxiangshu.Tests.Assert
+open Wanxiangshu.Hosts.Opencode.SubsessionHostAdapterTypes
+
+module OpencodeHost = Wanxiangshu.Hosts.Opencode.SubsessionHostAdapter
+module OmpHost = Wanxiangshu.Hosts.Omp.SubsessionHostAdapter
+
+let private createEmpty () = createObj []
+let private fail (msg: string) = check msg false
+
+let private decide state cmd =
+    Wanxiangshu.Kernel.Subsession.Decision.decide 1000000L state cmd
+
+let private model0: FallbackModel =
+    { ProviderID = "p"
+      ModelID = "m0"
+      Variant = None
+      Temperature = None
+      TopP = None
+      MaxTokens = None
+      ReasoningEffort = None
+      Thinking = false }
+
+let private cfg: FallbackConfig =
+    { DefaultChain = [ model0 ]
+      AgentChains = Map.empty
+      MaxRetries = 1
+      LoopMaxContinues = 10
+      MaxRecoveries = 3 }
+
+let private sleep (ms: int) : JS.Promise<unit> =
+    Promise.create (fun resolve _ -> JS.setTimeout (fun () -> resolve ()) ms |> ignore)
+
+let private policy0 = initialPolicy cfg [ model0 ]
+
+let private makeCtx runId =
+    { RunId = runId
+      ParentSessionId = SessionId.create "parent-v40"
+      SessionId = SessionId.create "child-v40"
+      Policy = policy0
+      FallbackConfig = cfg
+      Chain = [ model0 ]
+      NextTurnOrdinal = TurnOrdinal.next TurnOrdinal.first }
+
+let private makePlan runId =
+    { TurnId = TurnId.create (RunId.value runId + "-t0")
+      Ordinal = TurnOrdinal.first
+      Model = Some model0
+      Prompt = "go" }
+
+let private err: ErrorInput =
+    { ErrorName = "Network"
+      DomainError = None
+      Message = "timeout"
+      StatusCode = None
+      IsRetryable = Some true }
+
+// ── OpenCode host adapter: receipt barrier and transport-state queries ──
+
+let private makeClient (promptResult: obj option) (messagesData: obj) =
+    let prompt: obj -> JS.Promise<obj> =
+        match promptResult with
+        | Some r -> fun _ -> Promise.lift r
+        | None -> fun _ -> Promise.reject (exn "prompt failed")
+
+    let messages: obj -> JS.Promise<obj> =
+        fun _ -> Promise.lift (createObj [ "data", messagesData ])
+
+    let session = createObj [ "prompt", box prompt; "messages", box messages ]
+    createObj [ "session", box session ]
+
+let private opencodeReceiptWaitsForObservation () =
+    promise {
+        let runId = RunId.create "run-v40-oc-receipt"
+        let sid = SessionId.create "child-v40-oc-receipt"
+        let turnId = TurnId.create (RunId.value runId + "-t0")
+        let plan = makePlan runId
+        let client = makeClient (Some(box {| id = "msg-1" |})) (box null)
+        let host = OpencodeHost.createHost client "" ""
+        let dispatchP = host.Dispatch(sid, plan)
+        do! sleep 5
+        // Simulate a chat.message observation arriving slightly after dispatch.
+        HostReceiptWaiterRegistry.tryResolve
+            (workspaceFor "")
+            (SessionId.value sid)
+            (TurnId.value turnId)
+            (UserMessageObserved "msg-1")
+        |> ignore
+
+        let! result = dispatchP
+
+        match result with
+        | Ok(UserMessageObserved "msg-1") -> check "receipt resolved by observation" true
+        | other -> fail ("expected UserMessageObserved msg-1, got " + string other)
+    }
+
+let private opencodeQueryDispatchStatusRejectedBeforeSend () =
+    promise {
+        let runId = RunId.create "run-v40-oc-reject"
+        let sid = SessionId.create "child-v40-oc-reject"
+        let turnId = TurnId.create (RunId.value runId + "-t0")
+        let plan = makePlan runId
+        let client = createEmpty () // no session API
+        let host = OpencodeHost.createHost client "" ""
+        let _ = host.Dispatch(sid, plan) |> ignore
+        do! sleep 5
+        let! status = host.QueryDispatchStatus(sid, turnId)
+
+        match status with
+        | TransportRejectedBeforeSend _ -> check "rejected before send detected" true
+        | other -> fail ("expected TransportRejectedBeforeSend, got " + string other)
+    }
+
+let private opencodeRejectedBeforeSendRejectsLateReceipt () =
+    promise {
+        let runId = RunId.create "run-v40-oc-reject-late-receipt"
+        let sid = SessionId.create "child-v40-oc-reject-late-receipt"
+        let turnId = TurnId.create (RunId.value runId + "-t0")
+        let host = OpencodeHost.createHost (createEmpty ()) "" ""
+        let dispatchP = host.Dispatch(sid, makePlan runId)
+        do! sleep 5
+        let! dispatchResult = dispatchP
+
+        match dispatchResult with
+        | Error(HostRejected _) -> check "pre-send rejection completes dispatch" true
+        | other -> fail ("expected HostRejected, got " + string other)
+
+        let resolveResult =
+            HostReceiptWaiterRegistry.tryResolve
+                (workspaceFor "")
+                (SessionId.value sid)
+                (TurnId.value turnId)
+                (UserMessageObserved "late")
+
+        check "late receipt after pre-send rejection is ignored" (resolveResult <> ResolveAttemptResult.ResolvedNow)
+    }
+
+let private opencodeQueryDispatchStatusFailedAfterUnknown () =
+    promise {
+        let runId = RunId.create "run-v40-oc-fail"
+        let sid = SessionId.create "child-v40-oc-fail"
+        let turnId = TurnId.create (RunId.value runId + "-t0")
+        let plan = makePlan runId
+        let client = makeClient None (box null)
+        let host = OpencodeHost.createHost client "" ""
+        let _ = host.Dispatch(sid, plan) |> ignore
+        do! sleep 5
+        let! status = host.QueryDispatchStatus(sid, turnId)
+
+        match status with
+        | TransportFailedAfterUnknownAcceptance _ -> check "failed after unknown detected" true
+        | other -> fail ("expected TransportFailedAfterUnknownAcceptance, got " + string other)
+    }
+
+let private opencodeCancelPendingDispatchRejectsLateReceipt () =
+    promise {
+        let runId = RunId.create "run-v40-oc-cancel-receipt"
+        let sid = SessionId.create "child-v40-oc-cancel-receipt"
+        let turnId = TurnId.create (RunId.value runId + "-t0")
+        let plan = makePlan runId
+        // No prompt id in the response, so the receipt only resolves from a
+        // chat.message observation (or a manual tryResolve below).
+        let client = makeClient (Some(box {| data = box [||] |})) (box null)
+        let host = OpencodeHost.createHost client "" ""
+        let dispatchP = host.Dispatch(sid, plan)
+        do! sleep 5
+        host.CancelPendingDispatch turnId
+
+        // A late chat.message observation must not resurrect a cancelled turn.
+        let resolveResult =
+            HostReceiptWaiterRegistry.tryResolve
+                (workspaceFor "")
+                (SessionId.value sid)
+                (TurnId.value turnId)
+                (UserMessageObserved "msg-1")
+
+        check "late receipt after cancel is ignored" (resolveResult <> ResolveAttemptResult.ResolvedNow)
+
+        let! result = dispatchP
+
+        match result with
+        | Error(HostRejected e) when e.Message = HostReceiptWaiter.cancelError.Message ->
+            check "dispatch rejected after cancel" true
+        | other -> fail ("expected HostRejected cancel, got " + string other)
+    }
+
+let private opencodeQuiescenceHonestUnknown () =
+    promise {
+        let host = OpencodeHost.createHost (createEmpty ()) "" ""
+        let! status = host.QuerySessionQuiescence(SessionId.create "s", TurnId.create "t")
+        equal "OpenCode quiescence is StopUnknown" StopUnknown status
+    }
+
+let private opencodeQuiescenceStillRunning () =
+    promise {
+        let runId = RunId.create "run-still-running"
+        let sid = SessionId.create "child-still-running"
+        let turnId = TurnId.create (RunId.value runId + "-t0")
+
+        let msg = createObj [ "id", box (TurnId.value turnId); "status", box "running" ]
+        let messagesData = [| msg |]
+        let client = makeClient None messagesData
+        let host = OpencodeHost.createHost client "" ""
+
+        let! status = host.QuerySessionQuiescence(sid, turnId)
+        equal "OpenCode quiescence is StillRunning" StillRunning status
+    }
+
+let private opencodeQuiescenceStopped () =
+    promise {
+        let runId = RunId.create "run-stopped"
+        let sid = SessionId.create "child-stopped"
+        let turnId = TurnId.create (RunId.value runId + "-t0")
+
+        let msg = createObj [ "id", box (TurnId.value turnId); "status", box "completed" ]
+        let messagesData1 = [| msg |]
+        let client1 = makeClient None messagesData1
+        let host1 = OpencodeHost.createHost client1 "" ""
+
+        let! status1 = host1.QuerySessionQuiescence(sid, turnId)
+        equal "OpenCode quiescence is Stopped when message completed" Stopped status1
+
+        let messagesData2 = [||]
+        let client2 = makeClient None messagesData2
+        let host2 = OpencodeHost.createHost client2 "" ""
+
+        let! status2 = host2.QuerySessionQuiescence(sid, turnId)
+        equal "OpenCode quiescence is StopUnknown when nonce is absent" StopUnknown status2
+    }
+
+let private ompQuiescenceHonestUnknown () =
+    promise {
+        let host = OmpHost.createHost (createEmpty ()) "" (createEmpty ()) ""
+        let! status = host.QuerySessionQuiescence(SessionId.create "s", TurnId.create "t")
+        equal "OMP quiescence is StopUnknown" StopUnknown status
+    }
+
+let private makeOmpSessionAndPi (promptPromise: JS.Promise<obj>) (abortFn: unit -> unit) (piAbortFn: unit -> unit) =
+    let session =
+        createObj
+            [ "prompt", box (fun (_: string) -> promptPromise)
+              "abort",
+              box (fun () ->
+                  abortFn ()
+                  Promise.lift (box null))
+              "sessionMessages", box (fun (_: obj) -> Promise.lift (box {| data = [||] |}))
+              "sessionPrompt", box (fun (_: obj) -> promptPromise) ]
+
+    let piSession =
+        createObj
+            [ "sessionAbort",
+              box (fun (_: obj) ->
+                  piAbortFn ()
+                  Promise.lift (box null)) ]
+
+    let pi = createObj [ "session", box piSession ]
+    struct (session, pi)
+
+let private ompCancelPendingDispatchRejectsLateReceipt () =
+    promise {
+        let runId = RunId.create "run-omp-cancel-receipt"
+        let sid = SessionId.create "child-omp-cancel-receipt"
+        let turnId = TurnId.create (RunId.value runId + "-t0")
+        let plan = makePlan runId
+
+        let resolveRef = ref (fun (_: obj) -> ())
+        let promptP = Promise.create (fun resolve _ -> resolveRef.Value <- resolve)
+
+        let abortCalled = ref false
+        let piAbortCalled = ref false
+
+        let struct (session, pi) =
+            makeOmpSessionAndPi promptP (fun () -> abortCalled.Value <- true) (fun () -> piAbortCalled.Value <- true)
+
+        let host = OmpHost.createHost session "" pi "omp-test-ws"
+        let dispatchP = host.Dispatch(sid, plan)
+        do! sleep 5
+        host.CancelPendingDispatch turnId
+
+        // A late host receipt tryResolve must be rejected / ignored
+        let resolveResult =
+            HostReceiptWaiterRegistry.tryResolve
+                (Wanxiangshu.Kernel.Primitives.Identity.Id.workspaceIdQuick "omp:omp-test-ws")
+                (SessionId.value sid)
+                (TurnId.value turnId)
+                (UserMessageObserved "late-msg")
+
+        check "late receipt after cancel is ignored" (resolveResult <> ResolveAttemptResult.ResolvedNow)
+
+        let! result = dispatchP
+
+        match result with
+        | Error(HostRejected e) when e.Message = HostReceiptWaiter.cancelError.Message ->
+            check "omp dispatch rejected after cancel" true
+        | other -> fail ("expected HostRejected cancel, got " + string other)
+    }
+
+let private ompAbortWithScopedTurnOwnership () =
+    promise {
+        let runId = RunId.create "run-omp-abort"
+        let sid = SessionId.create "child-omp-abort"
+        let turnId = TurnId.create (RunId.value runId + "-t0")
+        let plan = makePlan runId
+
+        let promptP = Promise.lift (box null)
+        let abortCount = ref 0
+        let piAbortCount = ref 0
+
+        let struct (session, pi) =
+            makeOmpSessionAndPi promptP (fun () -> abortCount.Value <- abortCount.Value + 1) (fun () ->
+                piAbortCount.Value <- piAbortCount.Value + 1)
+
+        let host = OmpHost.createHost session "" pi "omp-test-ws"
+
+        // 1. Abort with no active turn should be ignored and return ConfirmedStopped
+        let! res1 = host.Abort(sid, turnId)
+        equal "stale abort with no active turn is ConfirmedStopped" ConfirmedStopped res1
+        equal "no abort called" 0 abortCount.Value
+        equal "no pi abort called" 0 piAbortCount.Value
+
+        // 2. Start a dispatch so there is an active turn
+        let _ = host.Dispatch(sid, plan)
+
+        // 3. Abort with a stale turnId (different from the active one)
+        let staleTurnId = TurnId.create "different-turn"
+        let! res2 = host.Abort(sid, staleTurnId)
+        equal "stale abort is ConfirmedStopped" ConfirmedStopped res2
+        equal "no abort called for stale turn" 0 abortCount.Value
+        equal "no pi abort called for stale turn" 0 piAbortCount.Value
+
+        // 4. Abort with the correct active turnId — single path: session.abort preferred, never both
+        let! res3 = host.Abort(sid, turnId)
+        equal "active abort is RequestAcceptedAwaitIdle" RequestAcceptedAwaitIdle res3
+        equal "abort called" 1 abortCount.Value
+        equal "pi abort not called when session.abort present" 0 piAbortCount.Value
+
+        // 5. Abort again with the correct active turnId (should not call the physical APIs a second time)
+        let! res4 = host.Abort(sid, turnId)
+        equal "duplicate abort is ConfirmedStopped" ConfirmedStopped res4
+        equal "abort not called again" 1 abortCount.Value
+        equal "pi abort still not called" 0 piAbortCount.Value
+
+        // 6. Capability degradation: session with no abort APIs should return AbortUnavailable
+        let struct (sessionNoAbort, piNoAbort) =
+            let s = createObj [ "prompt", box (fun (_: string) -> Promise.lift (box null)) ]
+            let p = createObj [ "session", box (createObj []) ]
+            struct (s, p)
+
+        let hostNoAbort = OmpHost.createHost sessionNoAbort "" piNoAbort "omp-test-ws"
+        let _ = hostNoAbort.Dispatch(sid, plan)
+        let! res5 = hostNoAbort.Abort(sid, turnId)
+        equal "abort without API returns AbortUnavailable" AbortUnavailable res5
+
+        // 7. Session closed
+        let! _ = host.ClosePhysicalSession(sid)
+        let! res6 = host.Abort(sid, turnId)
+        equal "abort after close is ConfirmedStopped" ConfirmedStopped res6
+    }
+
+let private ompPreSendCancelRejectsAndDoesNotCallHost () =
+    promise {
+        let runId = RunId.create "run-omp-presend"
+        let sid = SessionId.create "child-omp-presend"
+        let turnId = TurnId.create (RunId.value runId + "-t0")
+        let plan = makePlan runId
+
+        let promptCalled = ref false
+        let promptP = Promise.lift (box null)
+
+        let session =
+            createObj
+                [ "prompt",
+                  box (fun (_: string) ->
+                      promptCalled.Value <- true
+                      promptP) ]
+
+        let pi = createObj [ "session", box (createObj []) ]
+
+        let host = OmpHost.createHost session "" pi "omp-test-presend"
+
+        // Cancel BEFORE calling Dispatch (pre-send cancel)
+        host.CancelPendingDispatch turnId
+
+        let dispatchP = host.Dispatch(sid, plan)
+        let! result = dispatchP
+
+        equal "host.prompt was not called" false promptCalled.Value
+
+        match result with
+        | Error(HostRejected e) when e.Message = HostReceiptWaiter.cancelError.Message ->
+            check "omp dispatch rejected pre-send cancel" true
+        | other -> fail ("expected HostRejected cancel, got " + string other)
+    }
+
+let private ompSessionStatesWorkspaceIsolation () =
+    promise {
+        let runId = RunId.create "run-omp-iso"
+        let sid = SessionId.create "child-omp-iso"
+        let turnId1 = TurnId.create (RunId.value runId + "-t1")
+        let turnId2 = TurnId.create (RunId.value runId + "-t2")
+        let plan1 = { makePlan runId with TurnId = turnId1 }
+        let plan2 = { makePlan runId with TurnId = turnId2 }
+
+        let promptP = Promise.lift (box null)
+        let abortCount = ref 0
+        let piAbortCount = ref 0
+
+        let struct (session, pi) =
+            makeOmpSessionAndPi promptP (fun () -> abortCount.Value <- abortCount.Value + 1) (fun () ->
+                piAbortCount.Value <- piAbortCount.Value + 1)
+
+        let hostA = OmpHost.createHost session "" pi "omp-ws-A"
+        let hostB = OmpHost.createHost session "" pi "omp-ws-B"
+
+        // 1. Dispatch on hostA (active turn becomes turnId1)
+        let _ = hostA.Dispatch(sid, plan1)
+
+        // 2. Dispatch on hostB (active turn becomes turnId2)
+        let _ = hostB.Dispatch(sid, plan2)
+
+        // 3. Abort turnId1 on hostB: since hostB's active turn is turnId2, turnId1 is stale on hostB
+        let! res1 = hostB.Abort(sid, turnId1)
+        equal "aborting A's turn on B is stale" ConfirmedStopped res1
+        equal "no physical abort for stale turn on B" 0 abortCount.Value
+
+        // 4. Abort turnId1 on hostA: it is active on hostA, so it should trigger abort
+        let! res2 = hostA.Abort(sid, turnId1)
+        equal "aborting A's turn on A is active" RequestAcceptedAwaitIdle res2
+        equal "physical abort triggered" 1 abortCount.Value
+    }
+
+let private ompCancelStartedDispatchTriggersPhysicalAbort () =
+    promise {
+        let runId = RunId.create "run-omp-cancel-started"
+        let sid = SessionId.create "child-omp-cancel-started"
+        let turnId = TurnId.create (RunId.value runId + "-t0")
+        let plan = makePlan runId
+
+        let abortCalled = ref false
+        let piAbortCalled = ref false
+
+        let resolveRef = ref (fun (_: obj) -> ())
+        let promptP = Promise.create (fun resolve _ -> resolveRef.Value <- resolve)
+
+        let struct (session, pi) =
+            makeOmpSessionAndPi promptP (fun () -> abortCalled.Value <- true) (fun () -> piAbortCalled.Value <- true)
+
+        let host = OmpHost.createHost session "" pi "omp-test-ws"
+        let dispatchP = host.Dispatch(sid, plan)
+        do! sleep 5
+
+        // Dispatch has started, so CancelPendingDispatch should trigger physical abort (session path only)
+        host.CancelPendingDispatch turnId
+
+        equal "physical abort called" true abortCalled.Value
+        equal "physical pi abort not dual-called" false piAbortCalled.Value
+
+        // Clean up
+        resolveRef.Value(box null)
+        let! _ = dispatchP
+        ()
+    }
+
+let private ompIdleEventRoutingValidation () =
+    promise {
+        let runId = RunId.create "run-omp-idle-validate"
+        let sid = "child-omp-idle-validate"
+        let turnId = TurnId.create (RunId.value runId + "-t0")
+        let plan = makePlan runId
+
+        let store = MemorySubsessionEventStore()
+        let resolveRef = ref (fun (_: obj) -> ())
+        let promptP = Promise.create (fun resolve _ -> resolveRef.Value <- resolve)
+
+        let struct (session, pi) = makeOmpSessionAndPi promptP (fun () -> ()) (fun () -> ())
+
+        let host = OmpHost.createHost session "" pi "omp-test-ws"
+        let actor = SubsessionActorRegistry.GetOrCreate "omp-test-ws" sid host store
+
+        let request =
+            { RunId = runId
+              SessionId = SessionId.create sid
+              ParentSessionId = SessionId.create "parent-v40"
+              Prompt = "go"
+              FallbackConfig = cfg
+              Directive = RetryChain [ model0 ]
+              InitiallyCancelled = false }
+
+        let _ = actor.BeginRun request
+        do! sleep 10
+
+        let runtime = FallbackRuntimeStore()
+        let configLookup: ConfigLookup = fun _ -> cfg
+
+        let handler =
+            Wanxiangshu.Hosts.Omp.Fallback.Hook.createOmpFallbackHandler runtime configLookup session "omp-test-ws"
+
+        let rawIdleEvent =
+            createObj
+                [ "event", box (createObj [ "type", box "session.idle" ])
+                  "props", box (createObj [ "sessionID", box sid ]) ]
+
+        // 1. When waiter is not completed, session.idle must be ignored (not consumed)
+        let! res1 = handler rawIdleEvent
+        equal "stale idle event is not consumed" false res1.Consumed
+
+        // 2. Resolve prompt with verifiable message id (null alone is AcceptanceUnknown)
+        resolveRef.Value(box {| id = "omp-idle-msg-1" |})
+        do! sleep 10
+
+        // 3. Now session.idle must be consumed
+        let! res2 = handler rawIdleEvent
+        equal "fresh idle event is consumed" true res2.Consumed
+
+        SubsessionActorRegistry.Remove "omp-test-ws" sid
+    }
+
+// ── Decision / evidence semantics ──
+
+let private evidenceMergeOutcomePriorityAndSnapshot () =
+    let baseEv =
+        { CurrentTurnEvidence.empty with
+            Assistant = AssistantSnapshot("", 0L, "first")
+            Tool = HasToolResult
+            Todos = TodosCompleted }
+
+    let overrideEv =
+        { CurrentTurnEvidence.empty with
+            Assistant = AssistantSnapshot("", 0L, "second")
+            Todos = TodosNotCompleted
+            Outcome = CompletionRequested "second-out" }
+
+    let merged = CurrentTurnEvidence.merge baseEv overrideEv
+
+    equal
+        "assistant snapshot replaced"
+        "second"
+        (match merged.Assistant with
+         | AssistantSnapshot(_, _, text) -> text
+         | _ -> "")
+
+    equal "tool result persists" HasToolResult merged.Tool
+    equal "todos replaced" TodosNotCompleted merged.Todos
+    equal "completion outcome wins" (CompletionRequested "second-out") merged.Outcome
+
+    let failureThenCompletion =
+        CurrentTurnEvidence.merge
+            { CurrentTurnEvidence.empty with
+                Outcome = FailureObserved err }
+            { CurrentTurnEvidence.empty with
+                Outcome = CompletionRequested "done" }
+
+    equal "completion over failure" (CompletionRequested "done") failureThenCompletion.Outcome
+
+    let completionThenFailure =
+        CurrentTurnEvidence.merge
+            { CurrentTurnEvidence.empty with
+                Outcome = CompletionRequested "done" }
+            { CurrentTurnEvidence.empty with
+                Outcome = FailureObserved err }
+
+    equal "completion resists failure" (CompletionRequested "done") completionThenFailure.Outcome
+
+    let finishChanged =
+        CurrentTurnEvidence.merge
+            { CurrentTurnEvidence.empty with
+                Assistant = AssistantSnapshot("message", 1L, "draft") }
+            { CurrentTurnEvidence.empty with
+                Assistant = AssistantSnapshot("message", 2L, "tool call") }
+
+    equal "newer snapshot upgrades finish" (AssistantSnapshot("message", 2L, "tool call")) finishChanged.Assistant
+
+let private runIdUsesFullGuid () =
+    let value = RunId.newId () |> RunId.value
+    check "RunId carries 128-bit GUID" (value.Length = 36 && value.StartsWith "run-")
+
+let private issuingAbortBuffersIdle () =
+    let runId = RunId.create "run-v40-idle"
+    let ctx = makeCtx runId
+    let plan = makePlan runId
+
+    let abortCtx =
+        { Reason = UserRequested
+          AfterStop = FinishCancelled }
+
+    let state = IssuingAbort(ctx, NotYetStarted plan, abortCtx, false, 1000000L)
+
+    match decide state SessionIdleObserved with
+    | Ok(Decided d) ->
+        match d.NextState with
+        | IssuingAbort(_, _, _, true, _) -> check "idle buffered before abort barrier" true
+        | other -> fail ("expected IssuingAbort with idleBuffered=true, got " + string other)
+
+        check "no events on idle buffer" (List.isEmpty d.Events)
+        check "no effects on idle buffer" (List.isEmpty d.Effects)
+    | other -> fail ("expected Decided on idle, got " + string other)
+
+let private reconcilingAbortSettleUsesQuiescenceNotDispatchStatus () =
+    let runId = RunId.create "run-v40-quiescence"
+    let ctx = makeCtx runId
+    let plan = makePlan runId
+
+    let started =
+        { Plan = plan
+          StartReceipt = OrderedTurnMarkerObserved }
+
+    let abortCtx =
+        { Reason = UserRequested
+          AfterStop = FinishCancelled }
+
+    let state = ReconcilingAbortSettle(ctx, Started started, abortCtx, 1000000L)
+
+    match decide state (DispatchStatusResolved(DispatchStatus.Accepted OrderedTurnMarkerObserved)) with
+    | Error(IllegalTransition _) -> check "ReconcilingAbortSettle rejects DispatchStatusResolved" true
+    | other -> fail ("expected IllegalTransition, got " + string other)
+
+    match decide state (SessionQuiescenceResolved Stopped) with
+    | Ok(Decided d) ->
+        match d.NextState with
+        | Available _ -> check "quiescence Stopped settles run" true
+        | other -> fail ("expected Available after Stopped, got " + string other)
+    | other -> fail ("expected Decided on SessionQuiescenceResolved, got " + string other)
+
+let private reconcilingUnknownDeadlineExpiresTwicePoisons () =
+    let runId = RunId.create "run-v40-reconcile"
+    let ctx = makeCtx runId
+    let plan = makePlan runId
+
+    let cancelCtx =
+        { Reason = AcceptanceUnknownAfterDispatch
+          AfterStop = RetryAfterSafeStop err }
+
+    let state = ReconcilingUnknownDispatch(ctx, plan, cancelCtx, 0, 1000000L, 1000000L)
+
+    match decide state (ReconciliationDeadlineExpired plan.TurnId) with
+    | Ok(Decided d1) ->
+        match d1.NextState with
+        | ReconcilingUnknownDispatch(_, _, _, retryCount, _, _) ->
+            equal "retry count is 1 after first expiry" 1 retryCount
+
+            match decide d1.NextState (ReconciliationDeadlineExpired plan.TurnId) with
+            | Ok(Decided d2) ->
+                match d2.NextState with
+                | ClosingUnknownDispatch _ as closing ->
+                    match decide closing (PhysicalCloseResolved Stopped) with
+                    | Ok(Decided closed) ->
+                        match closed.NextState with
+                        | Poisoned _ ->
+                            check "physical close permits terminal poison" true
+
+                            check
+                                "physical close completes caller"
+                                (closed.Effects
+                                 |> List.exists (function
+                                     | CompleteCaller _ -> true
+                                     | _ -> false))
+                        | other -> fail ("expected Poisoned after physical close, got " + string other)
+                    | other -> fail ("expected Decided after physical close, got " + string other)
+                | other -> fail ("expected ClosingUnknownDispatch after second deadline, got " + string other)
+            | other -> fail ("expected Decided on second expiry, got " + string other)
+        | other -> fail ("expected ReconcilingUnknownDispatch after first expiry, got " + string other)
+    | other -> fail ("expected Decided on first expiry, got " + string other)
+
+let private reconciliationRetryPreservesAbortReason () =
+    let runId = RunId.create "run-v40-reconcile-cause"
+    let ctx = makeCtx runId
+    let plan = makePlan runId
+
+    let cancelCtx =
+        { Reason = UserRequested
+          AfterStop = FinishCancelled }
+
+    match
+        decide
+            (ReconcilingUnknownDispatch(ctx, plan, cancelCtx, 0, 1000000L, 1000000L))
+            (ReconciliationDeadlineExpired plan.TurnId)
+    with
+    | Ok(Decided d) ->
+        match d.NextState with
+        | ReconcilingUnknownDispatch(_, _, retryContext, retryCount, _, _) ->
+            equal "retry count is 1 after retry" 1 retryCount
+            equal "reconciliation retry preserves abort cause" UserRequested retryContext.Reason
+        | other -> fail ("expected reconciliation retry, got " + string other)
+    | Ok(NoChange reason) -> fail ("expected decision, got NoChange: " + string reason)
+    | Error err -> fail ("unexpected decision error " + string err)
+
+// ── Registry workspace isolation ──
+
+let private noopHost =
+    { new ISubsessionHost with
+        member _.Dispatch(_, _) =
+            Promise.lift (Ok OrderedTurnMarkerObserved)
+
+        member _.Abort(_, _) = Promise.lift AbortUnavailable
+        member _.CancelPendingDispatch(_) = ()
+        member _.QueryDispatchStatus(_, _) = Promise.lift Unknown
+        member _.QuerySessionQuiescence(_, _) = Promise.lift StopUnknown
+        member _.ClosePhysicalSession(_) = Promise.lift StopUnknown }
+
+let private actorRegistryWorkspaceIsolation () =
+    SubsessionActorRegistry.Clear()
+    let sid = SessionId.create "shared-v40"
+    let sidStr = SessionId.value sid
+
+    let active =
+        ActiveRun
+            { RunId = RunId.create "r"
+              ParentSessionId = SessionId.create "p" }
+
+    // Set safety projection for ws-a to persistently poisoned
+    SubsessionActorRegistry.SetSafetyProjection
+        "ws-a"
+        (Map.ofList [ sid, PersistentlyPoisoned SessionStateUnknownAfterRestart ])
+    // Set safety projection for ws-b to active run
+    SubsessionActorRegistry.SetSafetyProjection "ws-b" (Map.ofList [ sid, active ])
+
+    let storeA = MemorySubsessionEventStore()
+    let storeB = MemorySubsessionEventStore()
+
+    // Using the proposed GetOrCreate API which takes workspaceRoot
+    let actorA = SubsessionActorRegistry.GetOrCreate "ws-a" sidStr noopHost storeA
+    let actorB = SubsessionActorRegistry.GetOrCreate "ws-b" sidStr noopHost storeB
+
+    // Assert that the two workspaces obtain DIFFERENT actors for the same session id
+    check "workspace A and B get different actors" (not (obj.ReferenceEquals(actorA, actorB)))
+
+    // Assert that workspace A's poison does not pollute workspace B
+    check "poison in workspace A does not pollute workspace B" (not actorB.IsPoisoned)
+
+    SubsessionActorRegistry.Clear()
+
+let private routeNoneTurnIdEvidenceAttributedToCurrentTurn () =
+    promise {
+        let store = MemorySubsessionEventStore()
+        let sid = "child-v40-router-none"
+        let actor = SubsessionActorRegistry.GetOrCreate "" sid noopHost store
+        let runId = RunId.create "run-v40-router-none"
+
+        let request =
+            { RunId = runId
+              SessionId = SessionId.create sid
+              ParentSessionId = SessionId.create "parent-v40"
+              Prompt = "go"
+              FallbackConfig = cfg
+              Directive = RetryChain [ model0 ]
+              InitiallyCancelled = false }
+
+        let _ = actor.BeginRun request
+        do! sleep 20
+
+        let turnId = TurnId.create (RunId.value runId + "-t0")
+        do! actor.Post(DispatchAccepted(turnId, OrderedTurnMarkerObserved))
+        do! sleep 20
+
+        match actor.GetState() with
+        | Running _ -> ()
+        | other -> fail ("expected actor to be in Running state, got " + string other)
+
+        let targetEvidence =
+            { CurrentTurnEvidence.empty with
+                Assistant = AssistantSnapshot("", 0L, "inspector-report") }
+
+        let obs =
+            { TurnId = None
+              Evidence = targetEvidence }
+
+        let! routed = Wanxiangshu.Runtime.SubsessionEventRouter.routeToChild "" sid (EvidenceUpdated obs)
+        check "should route successfully" routed
+        do! sleep 20
+
+        match actor.GetState() with
+        | Running(_, _, currentEvidence, _) ->
+            match currentEvidence.Assistant with
+            | AssistantSnapshot(_, _, text) ->
+                equal
+                    "EvidenceUpdated with TurnId = None is attributed to current turn and merged"
+                    "inspector-report"
+                    text
+            | NoAssistant ->
+                fail "TurnId=None evidence was dropped — host without nonce propagation loses all assistant content"
+            | other -> fail ("unexpected assistant evidence: " + string other)
+        | other -> fail ("expected actor to remain in Running state, got " + string other)
+    }
+
+let run () =
+    promise {
+        evidenceMergeOutcomePriorityAndSnapshot ()
+        runIdUsesFullGuid ()
+        issuingAbortBuffersIdle ()
+        reconcilingAbortSettleUsesQuiescenceNotDispatchStatus ()
+        reconcilingUnknownDeadlineExpiresTwicePoisons ()
+        reconciliationRetryPreservesAbortReason ()
+        actorRegistryWorkspaceIsolation ()
+
+        do! opencodeReceiptWaitsForObservation ()
+        do! opencodeQueryDispatchStatusRejectedBeforeSend ()
+        do! opencodeRejectedBeforeSendRejectsLateReceipt ()
+        do! opencodeQueryDispatchStatusFailedAfterUnknown ()
+        do! opencodeCancelPendingDispatchRejectsLateReceipt ()
+        do! opencodeQuiescenceHonestUnknown ()
+        do! opencodeQuiescenceStillRunning ()
+        do! opencodeQuiescenceStopped ()
+        do! ompQuiescenceHonestUnknown ()
+        do! ompCancelPendingDispatchRejectsLateReceipt ()
+        do! ompAbortWithScopedTurnOwnership ()
+        do! ompPreSendCancelRejectsAndDoesNotCallHost ()
+        do! ompSessionStatesWorkspaceIsolation ()
+        do! ompCancelStartedDispatchTriggersPhysicalAbort ()
+        do! ompIdleEventRoutingValidation ()
+        do! routeNoneTurnIdEvidenceAttributedToCurrentTurn ()
+    }
