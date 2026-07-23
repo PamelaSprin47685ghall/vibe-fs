@@ -41,8 +41,6 @@ module OpencodeHooks =
         match origin with
         | Human turnId ->
             drivers.BumpLocalEpochOnHuman key |> ignore
-            let fact = Fact.Session(HumanTurnStarted {| TurnId = turnId |})
-            gateway.Append (StreamId.Session sessionId) (Some turnId) fact |> ignore
             inbox.TryPost(HumanMessageEvent(turnId, text)) |> ignore
             let cts = new CancellationTokenSource()
             drivers.Activate(key, cts) |> ignore
