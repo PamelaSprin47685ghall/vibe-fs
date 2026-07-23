@@ -215,9 +215,9 @@ module SessionProtocolTests =
 
             cancellation.Cancel()
 
-            let! exception = Record.ExceptionAsync(fun () -> pending :> Task)
-            Assert.NotNull(exception)
-            Assert.IsAssignableFrom<OperationCanceledException>(exception) |> ignore
+            let! capturedException = Record.ExceptionAsync(fun () -> pending :> Task)
+            Assert.NotNull(capturedException)
+            Assert.IsAssignableFrom<OperationCanceledException>(capturedException) |> ignore
         }
 
     [<Fact>]
