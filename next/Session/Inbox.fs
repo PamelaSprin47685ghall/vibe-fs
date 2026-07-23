@@ -38,6 +38,11 @@ type SessionInboxEvent =
     | LoopCommandEvent of sessionId: SessionId * taskText: string
     | SquadCommandEvent of squadId: string * actionText: string
 
+type private InboxWaiter =
+    { Task: Task<SessionInboxEvent>
+      Resolve: SessionInboxEvent -> unit
+      Reject: exn -> unit }
+
 type ISessionInbox =
     abstract TryPost: event: SessionInboxEvent -> Result<unit, SessionError>
     abstract Receive: cancellationToken: CancellationToken -> Task<SessionInboxEvent>
@@ -45,14 +50,12 @@ type ISessionInbox =
 type FifoInbox(capacity: int) =
     let queue = System.Collections.Generic.Queue<SessionInboxEvent>()
 
-    let waiters =
-        System.Collections.Generic.Queue<TaskCompletionSource<SessionInboxEvent>>()
+    let waiters = System.Collections.Generic.Queue<InboxWaiter>()
 
     let lockObj = obj ()
 
-    let removeWaiter (waiter: TaskCompletionSource<SessionInboxEvent>) =
-        let remaining =
-            System.Collections.Generic.Queue<TaskCompletionSource<SessionInboxEvent>>()
+    let removeWaiter (waiter: InboxWaiter) =
+        let remaining = System.Collections.Generic.Queue<InboxWaiter>()
 
         while waiters.Count > 0 do
             let candidate = waiters.Dequeue()
@@ -63,9 +66,9 @@ type FifoInbox(capacity: int) =
         while remaining.Count > 0 do
             waiters.Enqueue(remaining.Dequeue())
 
-    let cancelWaiter (waiter: TaskCompletionSource<SessionInboxEvent>) =
+    let cancelWaiter (waiter: InboxWaiter) =
         lock lockObj (fun () -> removeWaiter waiter)
-        waiter.TrySetCanceled() |> ignore
+        waiter.Reject(OperationCanceledException("Session inbox receive cancelled"))
 
     interface ISessionInbox with
 
@@ -73,7 +76,7 @@ type FifoInbox(capacity: int) =
             lock lockObj (fun () ->
                 if waiters.Count > 0 then
                     let waiter = waiters.Dequeue()
-                    waiter.TrySetResult(event) |> ignore
+                    waiter.Resolve event
                     Ok()
                 elif queue.Count >= capacity then
                     Error SessionError.InboxFull
@@ -90,15 +93,27 @@ type FifoInbox(capacity: int) =
                         if queue.Count > 0 then
                             (Some(queue.Dequeue()), None)
                         else
-                            let tcs = new TaskCompletionSource<SessionInboxEvent>()
-                            waiters.Enqueue(tcs)
-                            (None, Some tcs))
+                            let mutable resolveFn: (SessionInboxEvent -> unit) option = None
+                            let mutable rejectFn: (exn -> unit) option = None
+
+                            let promise =
+                                Fable.Core.JS.Constructors.Promise.Create(fun resolve reject ->
+                                    resolveFn <- Some resolve
+                                    rejectFn <- Some reject)
+
+                            let waiter =
+                                { Task = unbox promise
+                                  Resolve = fun event -> resolveFn |> Option.iter (fun resolve -> resolve event)
+                                  Reject = fun error -> rejectFn |> Option.iter (fun reject -> reject error) }
+
+                            waiters.Enqueue(waiter)
+                            (None, Some waiter))
 
                 match itemOpt, waiterOpt with
                 | Some item, _ -> return item
-                | None, Some tcs ->
-                    use reg = cancellationToken.Register(fun () -> cancelWaiter tcs)
+                | None, Some waiter ->
+                    use reg = cancellationToken.Register(fun () -> cancelWaiter waiter)
 
-                    return! tcs.Task
+                    return! waiter.Task
                 | None, None -> return LifecycleEvent "inbox-desync"
             }

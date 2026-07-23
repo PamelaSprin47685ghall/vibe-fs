@@ -15,7 +15,7 @@ module SessionProtocolTests =
 
     [<Fact>]
     let ``Driver_second_Activate_fails`` () =
-        let registry = SessionDrivers()
+        let drivers = SessionDrivers()
 
         let key =
             { RuntimeId = RuntimeId.create "rt1"
@@ -24,8 +24,8 @@ module SessionProtocolTests =
         use cts1 = new CancellationTokenSource()
         use cts2 = new CancellationTokenSource()
 
-        let activated1 = registry.Activate(key, cts1)
-        let activated2 = registry.Activate(key, cts2)
+        let activated1 = drivers.Activate(key, cts1)
+        let activated2 = drivers.Activate(key, cts2)
 
         Assert.True(activated1)
         Assert.False(activated2)
@@ -215,8 +215,9 @@ module SessionProtocolTests =
 
             cancellation.Cancel()
 
-            let! error = Assert.ThrowsAsync<OperationCanceledException>(fun () -> pending :> Task)
-            Assert.NotNull(error)
+            let! exception = Record.ExceptionAsync(fun () -> pending :> Task)
+            Assert.NotNull(exception)
+            Assert.IsAssignableFrom<OperationCanceledException>(exception) |> ignore
         }
 
     [<Fact>]
