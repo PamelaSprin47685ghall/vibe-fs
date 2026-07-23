@@ -1,0 +1,41 @@
+{
+  "id": "devops-ad1f7daa",
+  "role": "devops",
+  "session_id": "devops-ad1f7daa",
+  "permissions": [
+    "config:read",
+    "files:read",
+    "files:write",
+    "status:read",
+    "tasks:claim",
+    "tasks:read",
+    "tests:run"
+  ],
+  "status": "active",
+  "created_at": 1784802131.198342,
+  "last_authenticated_at": 0.0,
+  "revoked_at": 0.0,
+  "revocation_reason": "",
+  "credential": {
+    "token_hash": "dd4fb24386f7551a16da008a2cb365d0bcf762db31cc9b65ca35bf1cb3696b37",
+    "created_at": 1784802131.198342,
+    "expires_at": 1784816531.0,
+    "revoked": false,
+    "token_type": "jwt",
+    "algorithm": "HS256",
+    "jti": "5ccea0ee7d734930a50c3a09f606ba4f",
+    "tenant_id": "default",
+    "task_ids": [
+      "0ef2f21ddb6f"
+    ],
+    "allowed_files": []
+  },
+  "parent_identity_id": null,
+  "metadata": {
+    "source": "spawner"
+  },
+  "task_ids": [
+    "0ef2f21ddb6f"
+  ],
+  "allowed_files": []
+}

@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "bernstein": {
+      "command": "/home/kunweiz/.local/share/uv/tools/bernstein/bin/python",
+      "args": [
+        "-m",
+        "bernstein.mcp.server"
+      ]
+    }
+  }
+}

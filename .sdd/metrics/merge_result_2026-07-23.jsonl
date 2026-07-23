@@ -1,0 +1,16 @@
+{"timestamp": 1784801241.1061125, "metric_type": "merge_result", "value": 0.0, "labels": {"task_id": "03e1329c9a4b", "success": "False", "tenant_id": "default"}}
+{"timestamp": 1784801311.6229534, "metric_type": "merge_result", "value": 0.0, "labels": {"task_id": "80e25989a9df", "success": "False", "tenant_id": "default"}}
+{"timestamp": 1784801957.2305694, "metric_type": "merge_result", "value": 0.0, "labels": {"task_id": "d0aab4f19811", "success": "False", "tenant_id": "default"}}
+{"timestamp": 1784802075.239546, "metric_type": "merge_result", "value": 0.0, "labels": {"task_id": "b4517e87d312", "success": "False", "tenant_id": "default"}}
+{"timestamp": 1784802111.4798968, "metric_type": "merge_result", "value": 0.0, "labels": {"task_id": "b0fc4890644b", "success": "False", "tenant_id": "default"}}
+{"timestamp": 1784802122.7943757, "metric_type": "merge_result", "value": 0.0, "labels": {"task_id": "5c7ccb0dfa2d", "success": "False", "tenant_id": "default"}}
+{"timestamp": 1784802122.7944767, "metric_type": "merge_result", "value": 0.0, "labels": {"task_id": "dc2ea6c5b87f", "success": "False", "tenant_id": "default"}}
+{"timestamp": 1784802123.1872854, "metric_type": "merge_result", "value": 0.0, "labels": {"task_id": "aa210caca606", "success": "False", "tenant_id": "default"}}
+{"timestamp": 1784802130.1212866, "metric_type": "merge_result", "value": 0.0, "labels": {"task_id": "e90ca5c5211c", "success": "False", "tenant_id": "default"}}
+{"timestamp": 1784802130.1213608, "metric_type": "merge_result", "value": 0.0, "labels": {"task_id": "253a4d139cbe", "success": "False", "tenant_id": "default"}}
+{"timestamp": 1784802168.1201186, "metric_type": "merge_result", "value": 0.0, "labels": {"task_id": "fd58620e4ee2", "success": "False", "tenant_id": "default"}}
+{"timestamp": 1784802171.5403852, "metric_type": "merge_result", "value": 0.0, "labels": {"task_id": "1a48cc294214", "success": "False", "tenant_id": "default"}}
+{"timestamp": 1784802171.8883467, "metric_type": "merge_result", "value": 0.0, "labels": {"task_id": "c0844adb4d6d", "success": "False", "tenant_id": "default"}}
+{"timestamp": 1784802178.6850343, "metric_type": "merge_result", "value": 0.0, "labels": {"task_id": "54ed15847ba4", "success": "False", "tenant_id": "default"}}
+{"timestamp": 1784802178.6851368, "metric_type": "merge_result", "value": 0.0, "labels": {"task_id": "3a9b99c9bded", "success": "False", "tenant_id": "default"}}
+{"timestamp": 1784802182.1812222, "metric_type": "merge_result", "value": 0.0, "labels": {"task_id": "84ac9072e34e", "success": "False", "tenant_id": "default"}}

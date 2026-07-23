@@ -77,3 +77,4 @@ ehthumbs.db
 .cortexkit/
 
 *.fs.js
+.sdd/runtime/

@@ -1,0 +1,7 @@
+recommendations:
+- id: claude-i-have-created-the-claude-md-file-for-the-projec
+  category: coding
+  severity: suggestion
+  text: I have created the `CLAUDE.md` file for the project based on the raw scan
+    data provided.
+  applies_to: []

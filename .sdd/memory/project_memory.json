@@ -1,0 +1,29 @@
+[
+  {
+    "run_id": "20260723-180310",
+    "goal": "Plan and decompose goal into tasks",
+    "tasks_done": 0,
+    "tasks_failed": 1,
+    "cost_usd": 0,
+    "lesson": "",
+    "timestamp": 1784800990.3573565
+  },
+  {
+    "run_id": "20260723-180831",
+    "goal": "Unknown goal",
+    "tasks_done": 0,
+    "tasks_failed": 0,
+    "cost_usd": 0.0,
+    "lesson": "",
+    "timestamp": 1784801311.8648148
+  },
+  {
+    "run_id": "20260723-181917",
+    "goal": "Plan and decompose goal into tasks",
+    "tasks_done": 1,
+    "tasks_failed": 0,
+    "cost_usd": 0.0,
+    "lesson": "",
+    "timestamp": 1784801957.4727647
+  }
+]
