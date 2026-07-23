@@ -39,7 +39,7 @@ module VerticalSliceE2ETests =
                     Assert.Equal(Ok(), inbox.TryPost(HumanMessageEvent(turnId, "Build feature Z")))
 
                     let commandPort = SessionInboxCommandPort(inbox) :> SessionCommandPort
-                    let todoTool = StaticTools.todowriteTool commandPort
+                    let todoTool = StaticTools.todowriteTool ()
                     let toolCtx: ToolContext =
                         { SessionId = sessionId
                           Workspace = tempDir

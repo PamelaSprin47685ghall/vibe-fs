@@ -86,7 +86,7 @@ module VerticalSliceJournalSupport =
     let _runStep2 (gateway: Gateway) (sessionId: SessionId) (tempDir: string) (inbox: ISessionInbox) =
         task {
             let port = SessionInboxCommandPort(inbox)
-            let todoTool = StaticTools.todowriteTool port
+            let todoTool = StaticTools.todowriteTool ()
 
             let toolCtx: ToolContext =
                 { SessionId = sessionId
