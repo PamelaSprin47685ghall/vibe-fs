@@ -17,6 +17,7 @@ open Wanxiangshu.Hosts.Mux.MessageTransform
 let private decorateTool (toolID: string) (target: obj) =
     if not (isNullish target) then
         let mutable properties = Dyn.get target "properties"
+
         if isNullish properties then
             properties <- createObj []
             Dyn.setKey target "properties" properties
@@ -27,7 +28,15 @@ let private decorateTool (toolID: string) (target: obj) =
                 Dyn.setKey properties key propObj
 
         let hasTdd =
-            [| "coder"; "executor"; "write"; "edit"; "swap"; "pty_spawn"; "pty_write"; "pty_read"; "pty_list"; "pty_kill" |]
+            [| "coder"
+               "executor"
+               "write"
+               "edit"
+               "pty_spawn"
+               "pty_write"
+               "pty_read"
+               "pty_list"
+               "pty_kill" |]
             |> Array.contains toolID
 
         let hasImpossible =
@@ -35,15 +44,22 @@ let private decorateTool (toolID: string) (target: obj) =
             |> Array.contains toolID
 
         let hasNotSuitable =
-            [| "coder"; "inspector"; "meditator"; "browser" |]
-            |> Array.contains toolID
+            [| "coder"; "inspector"; "meditator"; "browser" |] |> Array.contains toolID
 
         if hasTdd then
-            addField "follow-tdd-and-kolmogorov-principles" "MUST acknowledge that you have followed TDD and Kolmogorov principles and kept todo updated"
+            addField
+                "follow-tdd-and-kolmogorov-principles"
+                "MUST acknowledge that you have followed TDD and Kolmogorov principles and kept todo updated"
+
         if hasImpossible then
-            addField "impossible-via-other-tools" "MUST acknowledge that this task cannot be done with other tools and only run tests when static analysis cannot handle it"
+            addField
+                "impossible-via-other-tools"
+                "MUST acknowledge that this task cannot be done with other tools and only run tests when static analysis cannot handle it"
+
         if hasNotSuitable then
-            addField "not-suitable-via-continue-tool" "MUST acknowledge that this task cannot be completed using the continue tool"
+            addField
+                "not-suitable-via-continue-tool"
+                "MUST acknowledge that this task cannot be completed using the continue tool"
 
 let assembleRegistrationObject
     (deps: obj)
@@ -66,19 +82,27 @@ let assembleRegistrationObject
             let origParams = box t.parameters
             let origProps = Dyn.get origParams "properties"
             let newProps = createObj []
+
             if not (isNullish origProps) then
                 let keys = emitJsExpr origProps "Object.keys($0)" |> unbox<string array>
+
                 for key in keys do
                     Dyn.setKey newProps key (Dyn.get origProps key)
+
             let newParams = createObj [ "type", box "object"; "properties", box newProps ]
             let req = Dyn.get origParams "required"
-            if not (isNullish req) then Dyn.setKey newParams "required" req
+
+            if not (isNullish req) then
+                Dyn.setKey newParams "required" req
+
             let tCopy =
                 createObj
                     [ "name", box t.name
                       "description", box t.description
                       "parameters", box newParams
-                      "execute", box (System.Func<obj, obj, JS.Promise<string>>(fun config args -> t.execute config args)) ]
+                      "execute",
+                      box (System.Func<obj, obj, JS.Promise<string>>(fun config args -> t.execute config args)) ]
+
             decorateTool t.name newParams
             tCopy)
 

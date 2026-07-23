@@ -14,22 +14,19 @@ open Wanxiangshu.Hosts.Opencode.SearchTools
 open Wanxiangshu.Hosts.Opencode.ReviewTools
 open Wanxiangshu.Hosts.Opencode.MimoTodoTool
 open Wanxiangshu.Hosts.Opencode.OpencodeTools
-open Wanxiangshu.Hosts.Opencode.SwapTool
 open Wanxiangshu.Runtime.ChildAgentRegistry
-open Wanxiangshu.Runtime.FuzzyFinderShell
 open Wanxiangshu.Runtime.RuntimeScope
 open Wanxiangshu.Runtime.Fallback.RuntimeStore
 
 let createTools
     (host: Host)
     (registry: ChildAgentRegistry)
-    (finderCache: FinderCache)
+    (finderCache: obj)
     (ctx: obj)
     (reviewStore: Wanxiangshu.Runtime.ReviewRuntime.ReviewStore)
     (sessionScope: RuntimeScope)
     (fallbackRuntime: FallbackRuntimeStore)
     : obj =
-    let iteratorStore = sessionScope.IteratorStore
 
     let tools =
         createObj
@@ -43,14 +40,8 @@ let createTools
               yield "pty_read", box (ptyReadTool host)
               yield "pty_list", box (ptyListTool host)
               yield "pty_kill", box (ptyKillTool host)
-              yield "fuzzy_find", box (fuzzyFindTool finderCache iteratorStore)
-              yield "fuzzy_grep", box (fuzzyGrepTool finderCache iteratorStore)
-              yield "fuzzy_continue", box (fuzzyContinueTool finderCache iteratorStore)
-              yield "web_search", box (websearchTool host registry ctx fallbackRuntime)
-              yield "webfetch", box (webfetchTool ctx)
               yield "submit_review", box (submitReviewTool registry ctx reviewStore sessionScope)
               yield "return_reviewer", box (submitReviewResultTool ctx reviewStore sessionScope)
-              yield "swap", box (swapTool ())
               if host = Mimocode then
                   yield todoWriteToolName host, box (mimoTodoTool ctx) ]
 
@@ -61,7 +52,7 @@ let createTools
 let createToolsForTests
     (host: Host)
     (registry: ChildAgentRegistry)
-    (finderCache: FinderCache)
+    (finderCache: obj)
     (ctx: obj)
     (reviewStore: Wanxiangshu.Runtime.ReviewRuntime.ReviewStore)
     (sessionScope: RuntimeScope)

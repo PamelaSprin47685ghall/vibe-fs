@@ -83,28 +83,45 @@ module Plugin =
             let transformed = MessageTransform.transform snap hostMsgs
 
             let jsMsgs =
-                transformed |> List.map (fun tm -> {| role = tm.Role; text = tm.Text |} |> box)
+                transformed
+                |> List.map (fun tm ->
+                    match
+                        rawMsgs
+                        |> List.tryFind (fun rm ->
+                            not (isNull rm)
+                            && (if isNull rm?role then "" else unbox<string> rm?role) = tm.Role
+                            && (if isNull rm?text then "" else unbox<string> rm?text) = tm.Text)
+                    with
+                    | Some orig -> orig
+                    | None -> {| role = tm.Role; text = tm.Text |} |> box)
+                |> List.toArray
+                |> box
 
             outObj?messages <- jsMsgs
 
     let private handleToolDefinition (outObj: obj) =
         if not (isNull outObj) then
             let staticToolsList =
-                [ {| name = "todowrite"
-                     description = "Update task todo snapshot, report progress, and methodology."
-                     parameters = Fable.Core.JS.JSON.parse """{"type":"object","properties":{"todos":{"type":"array","items":{"type":"string"}}},"required":["todos"]}""" |}
-                  {| name = "read"
+                [ {| name = "read"
                      description = "Read file content from filesystem."
-                     parameters = Fable.Core.JS.JSON.parse """{"type":"object","properties":{"filePath":{"type":"string"}},"required":["filePath"]}""" |}
+                     parameters =
+                      Fable.Core.JS.JSON.parse
+                          """{"type":"object","properties":{"filePath":{"type":"string"}},"required":["filePath"]}""" |}
                   {| name = "write"
                      description = "Write file content to filesystem."
-                     parameters = Fable.Core.JS.JSON.parse """{"type":"object","properties":{"filePath":{"type":"string"},"content":{"type":"string"}},"required":["filePath","content"]}""" |}
+                     parameters =
+                      Fable.Core.JS.JSON.parse
+                          """{"type":"object","properties":{"filePath":{"type":"string"},"content":{"type":"string"}},"required":["filePath","content"]}""" |}
                   {| name = "edit"
                      description = "Edit file content in filesystem using exact string replacement."
-                     parameters = Fable.Core.JS.JSON.parse """{"type":"object","properties":{"filePath":{"type":"string"},"oldString":{"type":"string"},"newString":{"type":"string"}},"required":["filePath","oldString","newString"]}""" |}
+                     parameters =
+                      Fable.Core.JS.JSON.parse
+                          """{"type":"object","properties":{"filePath":{"type":"string"},"oldString":{"type":"string"},"newString":{"type":"string"}},"required":["filePath","oldString","newString"]}""" |}
                   {| name = "executor"
                      description = "Execute shell command within timeout budget."
-                     parameters = Fable.Core.JS.JSON.parse """{"type":"object","properties":{"command":{"type":"string"}},"required":["command"]}""" |} ]
+                     parameters =
+                      Fable.Core.JS.JSON.parse
+                          """{"type":"object","properties":{"command":{"type":"string"}},"required":["command"]}""" |} ]
                 |> List.map box
                 |> List.toArray
 
@@ -167,8 +184,6 @@ module Plugin =
 
                 if cmdName = "loop" || cmdName = "/loop" then
                     sr.Inbox.TryPost(LoopCommandEvent(SessionId.create s, argsText)) |> ignore
-                elif cmdName = "squad" || cmdName = "/squad" then
-                    sr.Inbox.TryPost(SquadCommandEvent(s, argsText)) |> ignore
 
     let private handleConfig (config: obj) =
         if not (isNull config) then
@@ -184,11 +199,6 @@ module Plugin =
                         [ "template", box "$ARGUMENTS"
                           "description", box "Continue work until the task is complete." ]
 
-            if isNull commands?squad then
-                commands?squad <-
-                    createObj
-                        [ "template", box "$ARGUMENTS"
-                          "description", box "Delegate work to a coordinated agent squad." ]
 
             config?command <- commands
 
@@ -221,6 +231,7 @@ module Plugin =
 
             let portOpt = OpenCodePort.create input
             let! rtRes = PluginRuntime.start dir portOpt
+
             let rt =
                 match rtRes with
                 | Ok runtime -> runtime
@@ -232,10 +243,14 @@ module Plugin =
                 {| ``chat.message`` =
                     fun (inObj: obj) (outObj: obj) ->
                         let hookInput = buildHookInput inObj
+
                         if not (String.IsNullOrEmpty hookInput.sessionID) then
                             rt.EnsureSessionDriver(SessionId.create hookInput.sessionID) |> ignore
+
                         OpencodeHooks.handleChatMessage rt.Gateway rt.SessionDrivers (rt.GetInboxMap()) hookInput outObj
                    ``chat.transform`` = fun (inObj: obj) (outObj: obj) -> handleChatTransform rt outObj
+                   ``experimental.chat.messages.transform`` =
+                    fun (inObj: obj) (outObj: obj) -> handleChatTransform rt outObj
                    ``tool.definition`` = fun (inObj: obj) (outObj: obj) -> handleToolDefinition outObj
                    ``tool.execute.before`` =
                     fun (inObj: obj) (outObj: obj) ->
@@ -249,9 +264,7 @@ module Plugin =
                    ``tool.execute.after`` = fun (inObj: obj) (outObj: obj) -> handleToolExecuteAfter rt inObj outObj
                    config = fun (config: obj) -> handleConfig config
                    ``command.execute.before`` = fun (inObj: obj) (outObj: obj) -> handleCommand rt inObj
-                   event =
-                    fun (eventObj: obj) ->
-                        OpencodeHooks.handleEvent rt.Gateway (rt.GetInboxMap()) eventObj
+                   event = fun (eventObj: obj) -> OpencodeHooks.handleEvent rt.Gateway (rt.GetInboxMap()) eventObj
                    ``experimental.session.compacting`` = fun (inObj: obj) (outObj: obj) -> handleCompacting rt outObj
                    ``experimental.compaction.autocontinue`` =
                     fun (inObj: obj) (outObj: obj) ->
@@ -260,12 +273,7 @@ module Plugin =
                    command = fun (inObj: obj) (outObj: obj) -> handleCommand rt inObj
                    getOrCreateInbox = fun (sessionId: SessionId) -> (rt.GetOrCreateSessionRuntime sessionId).Inbox
                    tool = toolsObj
-                   dispose =
-                    fun () ->
-                        task {
-                            do! (rt :> IAsyncDisposable).DisposeAsync()
-                        }
-                |}
+                   dispose = fun () -> task { do! (rt :> IAsyncDisposable).DisposeAsync() } |}
 
             return box hooks
         }

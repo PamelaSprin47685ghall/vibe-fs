@@ -28,14 +28,10 @@ let registersCoreToolsIdempotent () =
         let names = toolNames h1
 
         for expected in
-            [ "fuzzy_find"
-              "fuzzy_grep"
-              "coder"
+            [ "coder"
               "inspector"
               "meditator"
               "browser"
-              "websearch"
-              "webfetch"
               "executor"
               "submit_review"
               "return_reviewer" ] do
@@ -82,7 +78,7 @@ let sessionStartStripsMainSessionTools () =
             if not (childOnly.Contains name) then
                 check ("session_start keeps " + name) (active.Contains name)
 
-        for name in [| "executor"; "submit_review"; "websearch"; "webfetch"; "todowrite"; "read" |] do
+        for name in [| "executor"; "submit_review"; "todowrite"; "read" |] do
             check ("session_start keeps " + name) (active.Contains name)
 
         for name in ompAlwaysStripToolNames do
@@ -92,12 +88,6 @@ let sessionStartStripsMainSessionTools () =
             check ("session_start strips " + name) (not (active.Contains name))
     }
 
-let fuzzyDescriptionsMatchMuxWording () =
-    let findDesc = description "fuzzy_find" |> Result.defaultValue ""
-    let grepDesc = description "fuzzy_grep" |> Result.defaultValue ""
-    check "fuzzy_find regex disclaimer" (findDesc.Contains "Regex and glob syntax are not supported.")
-    check "fuzzy_find iterator hint" (findDesc.Contains "iterator")
-    check "fuzzy_grep smart-case" (grepDesc.Contains "Smart-case, git-aware, frecency-ranked.")
 
 let readAssistantTextFromEntries () =
     let sm =
@@ -132,42 +122,11 @@ let subagentPromptsContainKernelFragments () =
               questions = [||]
               entries = [||] }
 
-    check "inspector fuzzy_find" (inspector.Contains "fuzzy_find")
     check "inspector no glob tool" (not (inspector.Contains "glob tool"))
     check "inspector no executor tool name" (not (inspector.Contains "executor("))
     let browser = browserPrompt "open example.com"
     check "browser stealth" (browser.Contains "stealth-browser-mcp")
 
-let fuzzyGrepExcludeAnyOfLength2 () =
-    promise {
-        resetPluginState ()
-        let h = createPiHarness ()
-        let pi = piObject h
-        do! wanxiangshuExtension pi
-        let fuzzyGrep = h.tools |> Seq.find (fun t -> Dyn.str t "name" = "fuzzy_grep")
-        let parameters = Dyn.get fuzzyGrep "parameters"
-        check "fuzzy_grep has parameters" (not (Dyn.isNullish parameters))
-        let properties = Dyn.get parameters "properties"
-        check "parameters has properties" (not (Dyn.isNullish properties))
-
-        let exclude =
-            if Dyn.has properties "exclude" then
-                Dyn.get properties "exclude"
-            else
-                Dyn.undefinedValue
-
-        check "properties has exclude" (not (Dyn.isNullish exclude))
-        let anyOf = Dyn.get exclude "anyOf"
-        check "exclude anyOf is array" (not (Dyn.isNullish anyOf) && Dyn.isArray anyOf)
-
-        let anyOfLen =
-            if Dyn.isArray anyOf then
-                (unbox<obj array> anyOf).Length
-            else
-                0
-
-        equal "exclude anyOf length" 2 anyOfLen
-    }
 
 let executorToolSchemaFourFields () =
     promise {

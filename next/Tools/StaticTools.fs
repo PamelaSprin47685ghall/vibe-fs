@@ -29,44 +29,6 @@ module NodeProcess =
 
 module StaticTools =
 
-    let todowriteTool (port: SessionCommandPort) : Tool =
-        { Name = "todowrite"
-          Description = "Update task todo snapshot, report progress, and methodology."
-          SchemaJson =
-            """{"type":"object","properties":{"todos":{"type":"array","items":{"type":"string"}}},"required":["todos"]}"""
-          Execute =
-            fun ctx input ->
-                task {
-                    ctx.Cancellation.ThrowIfCancellationRequested()
-
-                    let items =
-                        try
-                            let decoder =
-                                Decode.object (fun get -> get.Required.Field "todos" (Decode.list Decode.string))
-
-                            match Decode.fromString decoder input.Payload with
-                            | Ok list -> list
-                            | Error _ ->
-                                match Decode.Auto.fromString<string list> input.Payload with
-                                | Ok list -> list
-                                | Error _ -> []
-                        with _ ->
-                            []
-
-                    let snap: Fact.TodoSnapshot = { Items = items }
-                    let mutable replyVal = Ok SessionCommandResult.Upserted
-                    let! res = port.Request (UpsertTodo(snap, (fun r -> replyVal <- r))) ctx.Cancellation ctx.Deadline
-
-                    match res with
-                    | Ok _ ->
-                        return
-                            { Result = sprintf "Updated %d todo items" items.Length
-                              Truncated = false }
-                    | Error err ->
-                        return
-                            { Result = sprintf "Failed: %A" err
-                              Truncated = false }
-                } }
 
     let executorTool () : Tool =
         { Name = "executor"

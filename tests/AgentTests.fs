@@ -21,15 +21,12 @@ let canUse' () =
 
     check "reviewer can read" (canUse "reviewer" "read")
     check "reviewer denied coder" (not (canUse "reviewer" "coder"))
-    check "reviewer can fuzzy_find" (canUse "reviewer" "fuzzy_find")
 
     check "browser can read" (canUse "browser" "read")
     check "browser denied coder" (not (canUse "browser" "coder"))
 
     check "inspector can read" (canUse "inspector" "read")
     check "inspector can executor" (canUse "inspector" "executor")
-    check "inspector can fuzzy_find" (canUse "inspector" "fuzzy_find")
-    check "inspector can fuzzy_grep" (canUse "inspector" "fuzzy_grep")
     check "inspector denied write" (not (canUse "inspector" "write"))
     check "inspector denied coder dispatch" (not (canUse "inspector" "coder"))
     check "inspector denied todo" (not (canUse "inspector" "todowrite"))
@@ -37,8 +34,6 @@ let canUse' () =
     check "coder can read" (canUse "coder" "read")
     check "coder can write" (canUse "coder" "write")
     check "coder can edit" (canUse "coder" "edit")
-    check "coder can fuzzy_find" (canUse "coder" "fuzzy_find")
-    check "coder can fuzzy_grep" (canUse "coder" "fuzzy_grep")
     check "coder allowed inspector dispatch" (canUse "coder" "inspector")
     check "coder allowed todo" (canUse "coder" "todowrite")
 
@@ -50,8 +45,6 @@ let canUse' () =
     check "manager can meditator dispatch" (canUse "manager" "meditator")
     check "manager can manage_todo_list" (canUse "manager" "manage_todo_list")
     check "manager allowed todowrite" (canUse "manager" "todowrite")
-    check "manager can fuzzy_find" (canUse "manager" "fuzzy_find")
-    check "manager denied fuzzy_grep" (not (canUse "manager" "fuzzy_grep"))
     check "manager denied write" (not (canUse "manager" "write"))
     check "manager denied edit" (not (canUse "manager" "edit"))
 
@@ -59,35 +52,24 @@ let canUse' () =
     check "unknown agent can write" (canUse "build" "write")
     check "unknown agent can coder dispatch" (canUse "build" "coder")
     check "unknown agent can inspector dispatch" (canUse "build" "inspector")
-    check "unknown agent can fuzzy_find" (canUse "build" "fuzzy_find")
     check "unknown agent can pty_spawn" (canUse "build" "pty_spawn")
     check "unknown agent can pty_write" (canUse "build" "pty_write")
     check "unknown agent can pty_read" (canUse "build" "pty_read")
 
 let deniedTools' () =
-    let tools =
-        [ "coder"
-          "inspector"
-          "read"
-          "write"
-          "bash"
-          "fuzzy_find"
-          "fuzzy_grep"
-          "agent_report" ]
+    let tools = [ "coder"; "inspector"; "read"; "write"; "bash"; "agent_report" ]
 
     let denied = deniedTools "inspector" tools |> Set.ofList
-    check "inspector denied write" (Set.contains "write" denied)
-    check "inspector denied bash" (Set.contains "bash" denied)
-    check "inspector denied coder dispatch" (Set.contains "coder" denied)
+    check "inspector denies write" (Set.contains "write" denied)
+    check "inspector denies edit" (Set.contains "edit" denied)
+    check "inspector denies bash" (Set.contains "bash" denied)
     check "inspector keeps read" (not (Set.contains "read" denied))
-    check "inspector keeps fuzzy_find" (not (Set.contains "fuzzy_find" denied))
-    check "inspector keeps fuzzy_grep" (not (Set.contains "fuzzy_grep" denied))
     check "inspector keeps agent_report" (not (Set.contains "agent_report" denied))
 
 /// Full permission characterization: snapshot `canUse agent tool` for every
 /// known agent across a tool set that exercises each permission rule (reserved
 /// tools, agent_report, shell/grep, stealth, return_<role>, read, terminal
-/// roles, dispatch/planning/web/todo/skill, mutating file tools, fuzzy_grep).
+/// roles, dispatch/planning/web/todo/skill, mutating file tools, grep).
 /// Order matters — this is the lock that lets Config.canUseCanonical be
 /// reshaped without drifting behavior (REFACTOR.md §1 D8).
 let canUseMatrix () =
@@ -109,18 +91,13 @@ let canUseMatrix () =
           "plan", [ false; false; false; false; false; false; false ]
           "memory", [ false; false; false; false; false; false; false ]
           "grep_x", [ true; true; true; true; false; false; false ]
-          "fuzzy_grep", [ false; true; true; true; false; false; false ]
-          "fuzzy_find", [ true; true; true; true; false; false; false ]
-          "fuzzy_continue", [ true; true; true; true; false; false; false ]
           "glob", [ true; true; true; true; false; false; false ]
           "read", [ true; true; true; true; true; true; false ]
           "write", [ false; false; true; false; false; false; false ]
           "edit", [ false; false; true; false; false; false; false ]
           "patch", [ false; false; true; false; false; false; false ]
-          "ast_edit", [ false; false; true; false; false; false; false ]
           "apply_patch", [ false; false; true; false; false; false; false ]
-          "websearch", [ true; false; false; false; false; false; false ]
-          "webfetch", [ true; false; false; false; false; false; false ]
+          "submit_review", [ true; false; false; false; false; false; false ]
           "submit_review", [ true; false; false; false; false; false; false ]
           "todowrite", [ true; false; true; true; false; false; false ]
           "todo_write", [ true; false; true; true; false; false; false ]

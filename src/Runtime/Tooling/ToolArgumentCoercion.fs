@@ -125,7 +125,6 @@ let getToolCapabilities (toolName: string) : ToolCapability list =
           || t = "file_edit_replace_string"
           || t = "file_edit_insert"
           || t = "executor"
-          || t = "swap"
           || t.StartsWith "pty_"
       then
           yield FileMutation

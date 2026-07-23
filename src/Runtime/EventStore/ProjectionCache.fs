@@ -6,25 +6,17 @@ open Wanxiangshu.Kernel.EventSourcing.EventKind
 open Wanxiangshu.Kernel.EventSourcing.Fold
 open Wanxiangshu.Kernel.Nudge.NudgeProjection
 open Wanxiangshu.Kernel.SessionOverview
-open Wanxiangshu.Kernel.Wanxiangzhen.Dag
-open Wanxiangshu.Kernel.Wanxiangzhen.SquadEvent
-open Wanxiangshu.Runtime.EventLogSquadProjection
-open Wanxiangshu.Runtime.Wanxiangzhen.SquadEventWanCodec
 open Wanxiangshu.Kernel.Nudge.Types
 open Wanxiangshu.Kernel.Nudge
 
 type ProjectionCache() =
     let mutable sessionStates: Map<string, SessionState> = Map.empty
-    let mutable squadProj = emptyProjection ()
-    let mutable latestSessionId: string option = None
     let mutable revision = 0
 
     member _.Revision = revision
 
     member _.Clear() =
         sessionStates <- Map.empty
-        squadProj <- emptyProjection ()
-        latestSessionId <- None
         revision <- 0
 
     member _.ClearSessionStatesOnly() =
@@ -46,12 +38,7 @@ type ProjectionCache() =
                 | None -> emptySessionState ()
 
             sessionStates <- Map.add sId (applyEvent oldState e) sessionStates
-            squadProj <- applyWanEvent squadProj e
             revision <- revision + 1
-
-            if isSquadEventKind e.Kind then
-                latestSessionId <- Some e.Session
-                ()
 
     member _.GetSessionStateSync(sessionId: string) : SessionState =
         match Map.tryFind sessionId sessionStates with
@@ -59,12 +46,6 @@ type ProjectionCache() =
         | None -> emptySessionState ()
 
     member _.GetAllSessionStates() : Map<string, SessionState> = sessionStates
-
-    member _.GetSquadDag(sessionId: string) : Dag = getDag squadProj sessionId
-
-    member _.GetLatestSquadSessionId() : string option = latestSessionId
-
-    member _.GetSquadSessions() : Map<string, Dag> = squadProj.Dags
 
     member _.CanClaimNudgeDispatch
         (sessionId: string)
@@ -81,7 +62,9 @@ type ProjectionCache() =
             | None -> emptySessionState ()
 
         let snap = oldState.NudgeSnapshot
-        let currentAnchor = nudgeAnchorKey snap.turnId snap.agentFromMessage snap.modelFromMessage
+
+        let currentAnchor =
+            nudgeAnchorKey snap.turnId snap.agentFromMessage snap.modelFromMessage
 
         let currentHumanTurnId =
             oldState.LatestHumanTurn

@@ -177,8 +177,7 @@ let private getControlFieldFlags (toolID: string) =
            "pty_write"
            "pty_read"
            "pty_list"
-           "pty_kill"
-           "swap" |]
+           "pty_kill" |]
         |> Array.contains toolID
 
     let hasWarnImpossibleViaOtherTools =

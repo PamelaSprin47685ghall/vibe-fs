@@ -3,7 +3,6 @@ module Wanxiangshu.Runtime.RuntimeScope
 open Fable.Core
 open Wanxiangshu.Runtime.CapsFormat
 open Wanxiangshu.Runtime.SessionProjectionStore
-open Wanxiangshu.Runtime.FuzzyIteratorStore
 open Wanxiangshu.Runtime.SubagentIteratorStore
 open Wanxiangshu.Runtime
 open Wanxiangshu.Runtime.Workspace
@@ -27,7 +26,6 @@ type RuntimeScope() =
     let tempFileRegistry = TempFileRegistry()
     let sessionExecutorRegistry = SessionExecutorRegistry()
 
-    let iteratorStore = createTypedIteratorStore 200
     let subagentIteratorStore = createSubagentIteratorStore 50
     let mutable extState = Map.empty<string, obj>
     let mutable childSessionCounter = 0
@@ -52,7 +50,6 @@ type RuntimeScope() =
         childSessionCounter
 
     member _.Projection = projection
-    member _.IteratorStore = iteratorStore
     member _.SubagentIteratorStore = subagentIteratorStore
 
     member _.RegisterTempFiles(prompt: string, files: string list) : unit =
@@ -81,7 +78,6 @@ type RuntimeScope() =
         capsCache.GetOrLoadInflight(key, load)
 
     member _.ClearIterators() : unit =
-        clearTypedIteratorStore iteratorStore
         clearSubagentIteratorStore subagentIteratorStore
 
     member _.ClearSessionExecutors() : unit = sessionExecutorRegistry.Clear()

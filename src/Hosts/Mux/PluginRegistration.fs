@@ -9,7 +9,6 @@ open Wanxiangshu.Runtime
 open Wanxiangshu.Runtime.MuxPluginCatalogShell
 open Wanxiangshu.Hosts.Mux.PluginCatalog
 open Wanxiangshu.Runtime.RuntimeScope
-open Wanxiangshu.Runtime.FuzzyFinderShell
 open Wanxiangshu.Runtime.Dyn
 open Wanxiangshu.Hosts.Mux.WrappersReview
 open Wanxiangshu.Hosts.Mux.Wrappers
@@ -67,13 +66,11 @@ let private createScope (deps: obj) =
     let scope = create ()
     let reviewStore = Wanxiangshu.Runtime.ReviewRuntime.createReviewStore ()
     let hostReadExec = HostFunctionCapture()
-    let finderCache = FinderCache()
 
-    let tools =
-        createToolCatalog deps muxToolNames reviewStore hostReadExec finderCache scope
+    let tools = createToolCatalog deps muxToolNames reviewStore hostReadExec scope
 
     let toolsObj = toolsToObject tools
-    (scope, reviewStore, hostReadExec, finderCache, tools, toolsObj)
+    (scope, reviewStore, hostReadExec, tools, toolsObj)
 
 let private buildInitHandler
     (scope: RuntimeScope)
@@ -130,7 +127,7 @@ let createRegistrationWithSeams
     =
     Wanxiangshu.Runtime.E2eSandbox.applyFromProcessEnv ()
 
-    let (scope, reviewStore, hostReadExec, _, tools, toolsObj) = createScope deps
+    let (scope, reviewStore, hostReadExec, tools, toolsObj) = createScope deps
 
     let wrappers = createWrapperExecution toolsObj hostReadExec scope
 

@@ -337,27 +337,3 @@ let muxToolExecuteAfterBlocksRepeatedCallIgnoringControlsSpec () =
         check "3rd call with different controls: livelock error set" (err <> "")
         check "3rd call with different controls: error mentions livelock" (err.Contains "livelock")
     }
-
-/// `tool.execute.after` must map single-line tool output containing both
-/// "error" and "network" (case-insensitive) to `output.error = "network
-/// connection lost"`.  TDD-red: current Mux `toolExecuteAfter` is noop.
-let muxToolExecuteAfterMapsNetworkErrorSpec () =
-    promise {
-        let reg = sharedMuxRegistration ()
-        let after = get reg "tool.execute.after"
-        check "mux registration exposes tool.execute.after for network error" (not (isNullish after))
-
-        let input =
-            createObj
-                [ "tool", box "webfetch"
-                  "sessionID", box "mux-net-session"
-                  "args", box (createObj []) ]
-        // Non-network output must not set error
-        let cleanOutput = createObj [ "output", box "success" ]
-        do! (after $ (input, cleanOutput)) |> unbox<JS.Promise<unit>>
-        check "non-network output: error remains empty" (Dyn.str cleanOutput "error" = "")
-        // Single-line output with "error" + "network" -> map to error field
-        let netOutput = createObj [ "output", box "error: network connection refused" ]
-        do! (after $ (input, netOutput)) |> unbox<JS.Promise<unit>>
-        check "network error output: error field set" (Dyn.str netOutput "error" = "network connection lost")
-    }

@@ -7,10 +7,8 @@ type AgentRole =
     | BrowserAutomation
     | CodeReview
     | ExecutorSummarization
-    | WebSearchSummarization
     | MethodologyReasoning
     | NudgeSupervisor
-    | SquadWorker
     | Coordinator
 
 type TimeoutKind =
@@ -18,12 +16,14 @@ type TimeoutKind =
     | Long
 
 type MethodologyMeta =
-    { id: string
-      definition: string
-      trigger: string
-      role: string
-      /// Ordered note sections keyed by methodology noteDescription tokens.
-      noteSections: (string * string) list }
+    {
+        id: string
+        definition: string
+        trigger: string
+        role: string
+        /// Ordered note sections keyed by methodology noteDescription tokens.
+        noteSections: (string * string) list
+    }
 
 type ExecutorOutputEvidence =
     { stdout: string
@@ -33,10 +33,6 @@ type ExecutorOutputEvidence =
       signal: string option
       truncated: bool }
 
-type WebSearchResultItem =
-    { title: string
-      url: string
-      content: string }
 
 type PromptTarget =
     | FileTarget of path: string * guide: string * draft: string option
@@ -48,7 +44,6 @@ type PromptTarget =
     | TodoTarget of content: string
     | MethodologyTarget of MethodologyMeta
     | ExecutorOutputTarget of ExecutorOutputEvidence
-    | WebSearchResultsTarget of WebSearchResultItem list
 
 [<RequireQualifiedAccess>]
 type BoundaryTarget =

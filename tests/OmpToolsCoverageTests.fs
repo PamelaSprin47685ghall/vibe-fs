@@ -31,20 +31,6 @@ let run () =
         check "executor has parameters" (Dyn.has execTool "parameters")
         check "executor has execute" (Dyn.has execTool "execute")
 
-        // ---- WebTools ----
-        resetPluginState ()
-        let h2 = createPiHarness ()
-        let pi2 = piObject h2
-        Wanxiangshu.Hosts.Omp.WebTools.registerWebTools pi2 (FallbackRuntimeStore()) None
-        let names2 = toolNames h2 |> Set.ofList
-        check "websearch tool registered" (names2.Contains "websearch")
-        check "webfetch tool registered" (names2.Contains "webfetch")
-        let ws = h2.tools |> Seq.find (fun t -> Dyn.str t "name" = "websearch")
-        check "websearch has parameters" (Dyn.has ws "parameters")
-        check "websearch has execute" (Dyn.has ws "execute")
-        let wf = h2.tools |> Seq.find (fun t -> Dyn.str t "name" = "webfetch")
-        check "webfetch has parameters" (Dyn.has wf "parameters")
-        check "webfetch has execute" (Dyn.has wf "execute")
 
         // ---- ReviewToolsRegister: registerLoopFeatures ----
         resetPluginState ()

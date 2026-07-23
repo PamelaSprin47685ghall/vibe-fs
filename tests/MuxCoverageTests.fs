@@ -6,7 +6,6 @@ open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Tests.TestWorkspace
 open Wanxiangshu.Runtime.Dyn
 open Wanxiangshu.Hosts.Mux.Wrappers
-open Wanxiangshu.Hosts.Mux.WebTools
 open Wanxiangshu.Runtime.CapsFormat
 open Wanxiangshu.Hosts.Mux.CapsCodec
 open Wanxiangshu.Hosts.Mux.BuiltinTools
@@ -99,20 +98,7 @@ let wrappersRequireWorkspaceIdInvalid () =
 
 // ── Mux.WebTools ──────────────────────────────────────────────────────────────
 
-let webToolsWebsearchTool () =
-    let deps = createObj []
-    let toolNames = [| "websearch" |]
-    let defn = websearchTool deps toolNames
-    equal "websearchTool name" "websearch" defn.name
-    check "websearchTool description non-empty" (defn.description.Length > 0)
-    check "websearchTool schema type=object" (defn.parameters.``type`` = "object")
-    let propsHasQuery = Dyn.has (defn.parameters.properties) "query"
-    check "websearchTool params has query" propsHasQuery
 
-let webToolsWebfetchTool () =
-    let defn = webfetchTool
-    equal "webfetchTool name" "webfetch" defn.name
-    check "webfetchTool description non-empty" (defn.description.Length > 0)
 
 // ── Mux.BuiltinTools ──────────────────────────────────────────────────────────
 
@@ -179,8 +165,6 @@ let run () : unit =
     wrappersRequireWorkspaceIdPresent ()
     wrappersRequireWorkspaceIdMissing ()
     wrappersRequireWorkspaceIdInvalid ()
-    webToolsWebsearchTool ()
-    webToolsWebfetchTool ()
     builtinToolsAddIfSomeSome ()
     builtinToolsAddIfSomeNone ()
     builtinToolsExecutorTool ()

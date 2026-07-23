@@ -36,7 +36,6 @@ type SessionInboxEvent =
     | CancelEvent of reason: string
     | LifecycleEvent of kind: string
     | LoopCommandEvent of sessionId: SessionId * taskText: string
-    | SquadCommandEvent of squadId: string * actionText: string
 
 type private InboxWaiter =
     { Task: Task<SessionInboxEvent>

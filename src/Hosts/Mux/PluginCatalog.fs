@@ -12,14 +12,11 @@ open Wanxiangshu.Kernel.Errors.DomainError
 open Wanxiangshu.Kernel.Session.Causality
 open Wanxiangshu.Runtime.MuxToolDefinition
 open Wanxiangshu.Hosts.Mux.WrappersReview
-open Wanxiangshu.Runtime.FuzzyFinderShell
 open Wanxiangshu.Runtime.MuxWorkspaceCodec
 open Wanxiangshu.Hosts.Mux.SubagentTools
 open Wanxiangshu.Hosts.Mux.ReviewToolsMux
 open Wanxiangshu.Hosts.Mux.BuiltinTools
-open Wanxiangshu.Hosts.Mux.WebTools
 open Wanxiangshu.Hosts.Mux.MuxTools
-open Wanxiangshu.Hosts.Mux.SwapTool
 open Wanxiangshu.Runtime.RuntimeScope
 open Wanxiangshu.Runtime.Dyn
 open Wanxiangshu.Runtime.MuxHookInputCodec
@@ -38,17 +35,11 @@ let muxToolNames =
            "continue"
            "executor"
            "submit_review"
-           "websearch"
-           "webfetch"
-           "fuzzy_grep"
-           "fuzzy_find"
-           "fuzzy_continue"
            "write"
-           "read"
-           "swap" |]
+           "read" |]
         meditatorToolNames
 
-let private canUseMuxTopLevel (agent: string) (toolName: string) : bool = canUseForHost mux agent toolName
+let private canUseMuxTopLevel (agent: string) (toolName: string) : bool = canUseForHost Mux agent toolName
 
 let buildToolPolicy (toolNames: string array) (role: obj) : obj =
     let agent = if Dyn.isNullish role then "manager" else string role
@@ -60,10 +51,8 @@ let createToolCatalog
     (toolNames: string array)
     (reviewStore: Wanxiangshu.Runtime.ReviewRuntime.ReviewStore)
     (hostReadExec: HostFunctionCapture)
-    (finderCache: FinderCache)
     (sessionScope: Wanxiangshu.Runtime.RuntimeScope.RuntimeScope)
     : ToolDefinition array =
-    let iteratorStore = sessionScope.IteratorStore
 
     let catalog =
         [| yield coderTool deps toolNames sessionScope
@@ -72,15 +61,9 @@ let createToolCatalog
            yield continueTool deps toolNames sessionScope
            yield executorTool deps toolNames sessionScope
            yield submitReviewTool deps toolNames reviewStore sessionScope
-           yield websearchTool deps toolNames
-           yield webfetchTool
-           yield fuzzyGrepTool finderCache iteratorStore
-           yield fuzzyFindTool finderCache iteratorStore
-           yield fuzzyContinueTool finderCache iteratorStore
            yield writeTool deps
            yield readTool deps hostReadExec
-           yield meditatorTool deps toolNames
-           yield swapToolDef () |]
+           yield meditatorTool deps toolNames |]
 
     for t in catalog do
         ToolHookRuntime.registerSchemaTypes t.name (box t.parameters)

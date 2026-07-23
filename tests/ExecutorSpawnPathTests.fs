@@ -23,49 +23,14 @@ let private importMeta: obj = jsNative
 let private requireFn: string -> obj = createRequire' (string importMeta?url)
 let private pathModule: obj = requireFn "path"
 
-let webApiFetchInit () =
-    let init = Wanxiangshu.Runtime.WebSearchApi.postInit "KEY123" "{\"a\":1}" None
-    equal "init method POST" "POST" (Wanxiangshu.Runtime.Dyn.str init "method")
-    let headers = Wanxiangshu.Runtime.Dyn.get init "headers"
-    equal "init Content-Type" "application/json" (Wanxiangshu.Runtime.Dyn.str headers "Content-Type")
-    let auth = Wanxiangshu.Runtime.Dyn.str headers "Authorization"
-    check "init Authorization key" (auth.Contains "KEY123")
-    equal "init body json" "{\"a\":1}" (Wanxiangshu.Runtime.Dyn.str init "body")
-    check "init no signal when None" (Wanxiangshu.Runtime.Dyn.isNullish (Wanxiangshu.Runtime.Dyn.get init "signal"))
 
-    let withSignal =
-        Wanxiangshu.Runtime.WebSearchApi.postInit "K" "b" (Some(box "ABORT"))
 
-    check
-        "init signal when Some"
-        (not (Wanxiangshu.Runtime.Dyn.isNullish (Wanxiangshu.Runtime.Dyn.get withSignal "signal")))
 
-let webApiResponseMethodCall () =
-    let response =
-        createObj
-            [ "text", box (fun () -> "body")
-              "json", box (fun () -> createObj [ "ok", box "yes" ]) ]
 
-    equal
-        "response.text() invoked"
-        "body"
-        (unbox<string> (Wanxiangshu.Runtime.WebSearchApi.responseMethod0 response "text"))
 
-    let json = Wanxiangshu.Runtime.WebSearchApi.responseMethod0 response "json"
-    equal "response.json() invoked" "yes" (Wanxiangshu.Runtime.Dyn.str json "ok")
 
-let webApiKeyValidation () =
-    equal "requireWebApiKey trims" (Ok "KEY123") (Wanxiangshu.Runtime.WebSearchApi.requireWebApiKey "  KEY123  ")
 
-    equal
-        "requireWebApiKey rejects missing"
-        (Error "Missing OLLAMA_API_KEY environment variable.")
-        (Wanxiangshu.Runtime.WebSearchApi.requireWebApiKey "")
 
-    equal
-        "requireWebApiKey rejects empty"
-        (Error "Missing OLLAMA_API_KEY environment variable.")
-        (Wanxiangshu.Runtime.WebSearchApi.requireWebApiKey "   ")
 
 let executorMapping () =
     let opts: ExecuteOptions =

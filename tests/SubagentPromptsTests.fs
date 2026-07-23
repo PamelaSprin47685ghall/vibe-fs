@@ -86,7 +86,9 @@ let private sampleEvidence status exitCode truncated stdout : Wanxiangshu.Kernel
 
 let executorSummarizerPromptContainsFields () =
     let evidence = sampleEvidence "exit_error" (Some 1) false "stdout"
-    let p = executorSummarizerPrompt "output" evidence "python" "print(1)" [] Wanxiangshu.Kernel.Prompt.TimeoutKind.Short
+
+    let p =
+        executorSummarizerPrompt "output" evidence "python" "print(1)" [] Wanxiangshu.Kernel.Prompt.TimeoutKind.Short
 
     check "contains language" (p.Contains "python")
     check "contains program" (p.Contains "print(1)")
@@ -101,30 +103,19 @@ let executorSummarizerPromptContainsFields () =
 
 let executorSummarizerPromptEmbedsWhatToSummarize () =
     let evidence = sampleEvidence "completed" (Some 0) false "stdout"
+
     let p =
-        executorSummarizerPrompt "summarize exit codes and stderr only" evidence "python" "print(1)" [] Wanxiangshu.Kernel.Prompt.TimeoutKind.Short
+        executorSummarizerPrompt
+            "summarize exit codes and stderr only"
+            evidence
+            "python"
+            "print(1)"
+            []
+            Wanxiangshu.Kernel.Prompt.TimeoutKind.Short
 
     check "what_to_summarize embedded" (p.Contains "summarize exit codes and stderr only")
     check "contains objective" (p.Contains "objective =")
 
-let websearchSummarizerPromptContains () =
-    let results: Wanxiangshu.Kernel.Prompt.WebSearchResultItem list =
-        [ { title = "Doc"
-            url = "https://example.com/doc"
-            content = "results..." }
-          { title = "Other"
-            url = "https://example.com/other"
-            content = "more" } ]
-
-    let p = websearchSummarizerPrompt "Q?" results
-    check "contains question" (p.Contains "Q?")
-    check "contains websearch_results" (p.Contains "websearch_results")
-    check "contains raw output" (p.Contains "results...")
-    check "contains first url" (p.Contains "https://example.com/doc")
-    check "contains second url" (p.Contains "https://example.com/other")
-    check "contains results table" (p.Contains "results" || p.Contains "title")
-    check "no evidence bag label" (not (p.Contains "value = \"websearch_results\""))
-    check "no raw_results fake title bag" (not (p.Contains "raw_results"))
 
 let run () =
     coderPromptContainsObjective ()
@@ -138,4 +129,3 @@ let run () =
     meditatorPromptContainsQuestion ()
     executorSummarizerPromptContainsFields ()
     executorSummarizerPromptEmbedsWhatToSummarize ()
-    websearchSummarizerPromptContains ()

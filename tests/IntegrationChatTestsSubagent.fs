@@ -11,30 +11,6 @@ open Wanxiangshu.Runtime.ChildAgentRegistry
 open Wanxiangshu.Hosts.Opencode.SessionIo
 open Wanxiangshu.Runtime.Dyn
 
-let websearchBoundariesSpec () =
-    promise {
-        let! workspaceDir = mkdtempAsync "websearch-boundaries-"
-        let! p = plugin (box {| directory = workspaceDir |})
-        let chatMsg = get p "chat.message"
-
-        let coderChat =
-            createObj
-                [ "message",
-                  box (createObj [ "tools", box (createObj [ "websearch", box true; "webfetch", box true ]) ]) ]
-
-        do!
-            chatMsg
-            $ (box
-                {| sessionID = "root"
-                   agent = "coder" |},
-               coderChat)
-            |> unbox<JS.Promise<unit>>
-
-        let tools = get (get coderChat "message") "tools"
-        check "coder websearch forced false" (not (unbox<bool> (get tools "websearch")))
-        check "coder webfetch forced false" (not (unbox<bool> (get tools "webfetch")))
-        do! rmAsync workspaceDir
-    }
 
 let subagentParentAlreadyAbortedSpec () =
     promise {
@@ -105,8 +81,5 @@ let subagentParentAlreadyAbortedSpec () =
         do! rmAsync workspaceDir
     }
 
-let run () : JS.Promise<unit> =
-    promise {
-        do! websearchBoundariesSpec ()
-        do! subagentParentAlreadyAbortedSpec ()
-    }
+let runAll () : JS.Promise<unit> =
+    promise { do! subagentParentAlreadyAbortedSpec () }

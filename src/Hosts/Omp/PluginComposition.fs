@@ -6,7 +6,6 @@ open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.HostTools
 open Wanxiangshu.Runtime
 open Wanxiangshu.Runtime.Dyn
-open Wanxiangshu.Runtime.FuzzyFinderShell
 open Wanxiangshu.Hosts.Omp.AgentConfig
 open Wanxiangshu.Hosts.Omp.Codec
 open Wanxiangshu.Hosts.Omp.ReviewToolsRegister
@@ -31,13 +30,10 @@ open Wanxiangshu.Runtime.CommandProcessor
 open Wanxiangshu.Runtime.SubsessionPorts
 open Wanxiangshu.Runtime.SubsessionActor
 open Wanxiangshu.Kernel.HostCapability
-open Wanxiangshu.Hosts.Omp.FuzzyTools
 open Wanxiangshu.Hosts.Omp.ExecutorTools
 open Wanxiangshu.Hosts.Omp.SubagentTools
 open Wanxiangshu.Hosts.Omp.TodoTool
-open Wanxiangshu.Hosts.Omp.WebTools
 open Wanxiangshu.Hosts.Omp.OmpTools
-open Wanxiangshu.Hosts.Omp.SwapTool
 open Wanxiangshu.Hosts.Omp.PiResolve
 
 [<Import("join", "node:path")>]
@@ -81,21 +77,15 @@ let private registerAllTools
     (fallbackRuntime: FallbackRuntimeStore)
     (fallbackConfigOpt: FallbackConfig option)
     : unit =
-    let finderCache = FinderCache()
-    let iteratorStore = ompScope.IteratorStore
-    registerFuzzyTools pi finderCache iteratorStore
-    registerWebTools pi fallbackRuntime fallbackConfigOpt
     registerExecutorTools pi
     registerSubagentTools pi fallbackRuntime fallbackConfigOpt
     registerMeditatorTools pi fallbackRuntime fallbackConfigOpt
-    registerSwapTool pi
     registerTodoTool pi
     registerLoopFeatures pi reviewStore
     registerContextTransform pi reviewStore
 
 type CoreServices =
     { ReviewStore: ReviewStore
-      FinderCache: FinderCache
       Pi: obj
       FallbackHandler: (obj -> JS.Promise<FallbackHookResult>) option
       FallbackRuntime: FallbackRuntimeStore
@@ -129,7 +119,6 @@ let private wrapRegisterToolForSchema (pi: obj) : unit =
 
 let private createCoreServices (pi: obj) : CoreServices =
     wrapRegisterToolForSchema pi
-    let finderCache = FinderCache()
 
     let directory = Dyn.str pi "directory"
     let fallbackConfigOpt = loadFallbackConfig directory
@@ -146,7 +135,6 @@ let private createCoreServices (pi: obj) : CoreServices =
         Some(createOmpFallbackHandler fallbackRuntime configLookup sessionApi directory)
 
     { ReviewStore = reviewStore
-      FinderCache = finderCache
       Pi = pi
       FallbackHandler = fallbackHandler
       FallbackRuntime = fallbackRuntime

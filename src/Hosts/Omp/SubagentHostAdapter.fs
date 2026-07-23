@@ -19,18 +19,9 @@ open Wanxiangshu.Kernel.FallbackKernel.Types
 module Dyn = Wanxiangshu.Runtime.Dyn
 
 let private coderChildTools =
-    [| "read"
-       "edit"
-       "write"
-       "find"
-       "fuzzy_find"
-       "fuzzy_grep"
-       "fuzzy_continue"
-       "lsp"
-       "inspector" |]
+    [| "read"; "edit"; "write"; "find"; "lsp"; "inspector" |]
 
-let private inspectorChildTools =
-    [| "read"; "find"; "fuzzy_find"; "fuzzy_grep"; "fuzzy_continue" |]
+let private inspectorChildTools = [| "read"; "find" |]
 
 type OmpHostAdapter
     (

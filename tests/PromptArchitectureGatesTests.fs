@@ -36,9 +36,7 @@ let checkYamlImports (srcRoot: string) =
     let yamlRe =
         Regex(@"import\s+.*from\s+['""]yaml['""]|Import\([^)]*['""]yaml['""]\)", RegexOptions.Multiline)
 
-    let allowed =
-        [ "src/Runtime/Fallback/FallbackConfigCodec.fs"
-          "src/Runtime/Wanxiangzhen/ConfigReader.fs" ]
+    let allowed = [ "src/Runtime/Fallback/FallbackConfigCodec.fs" ]
 
     for path in collectFsFiles srcRoot do
         let norm = path.Replace("\\", "/")
@@ -182,9 +180,7 @@ let checkNoHandwrittenTomlOrStringBuilderInProjections (srcRoot: string) =
 
 let checkNoMarkdownSectionDividersInPromptProducers (repoRoot: string) =
     let dirs =
-        [ "src/Runtime/ReviewPrompts"
-          "src/Runtime/Subsession"
-          "src/Runtime/Prompt" ]
+        [ "src/Runtime/ReviewPrompts"; "src/Runtime/Subsession"; "src/Runtime/Prompt" ]
 
     let forbidden =
         [ Regex(@"===\s*(Affected Files|Original Task|Change Report)\s*===")

@@ -8,7 +8,6 @@ open Wanxiangshu.Kernel.SubagentIntents
 open Wanxiangshu.Runtime.Dyn
 open Wanxiangshu.Runtime.SubagentIntentsCodec
 open Wanxiangshu.Runtime.SubagentSimpleArgsCodec
-open Wanxiangshu.Runtime.WebToolsCodec
 open Wanxiangshu.Runtime.ExecutorToolsCodec
 open Wanxiangshu.Runtime.PatchToolsCodec
 open Wanxiangshu.Runtime.ReviewToolsCodec
@@ -22,17 +21,7 @@ let private mapWrite (w: FileToolsCodec.WriteArgs) : Wanxiangshu.Kernel.ToolArgs
     { FilePath = w.FilePath
       Content = w.Content }
 
-let private mapWebsearch (w: WebToolsCodec.WebsearchArgs) : Wanxiangshu.Kernel.ToolArgs.WebsearchArgs =
-    { Query = w.Query
-      NumResults = w.NumResults
-      WhatToSummarize = w.WhatToSummarize }
 
-let private mapWebfetch (w: WebToolsCodec.WebfetchArgs) : Wanxiangshu.Kernel.ToolArgs.WebfetchArgs =
-    { Url = w.Url
-      ExtractMain = w.ExtractMain
-      PreferLlmsTxt = w.PreferLlmsTxt
-      Prompt = w.Prompt
-      Timeout = w.Timeout }
 
 let private mapExecutor (e: ExecutorToolsCodec.ExecutorArgs) : Wanxiangshu.Kernel.ToolArgs.ExecutorArgs =
     { Language = e.Language
@@ -89,13 +78,7 @@ let private decodeContinue args =
                   Prompt = d.Prompt }
         ))
 
-let private decodeWebsearch args =
-    WebToolsCodec.decodeWebsearchArgs args
-    |> Result.map (fun w -> Typed(ToolArgs.Websearch(mapWebsearch w)))
 
-let private decodeWebfetch args =
-    WebToolsCodec.decodeWebfetchArgs args
-    |> Result.map (fun w -> Typed(ToolArgs.Webfetch(mapWebfetch w)))
 
 let private decodeExecutor args =
     ExecutorToolsCodec.decodeExecutorArgs args
@@ -124,8 +107,6 @@ let decodeToolInvocation (toolName: string) (args: obj) : Result<DecodedToolInvo
     | "inspector" -> decodeInspector args
     | "browser" -> decodeBrowser args
     | "continue" -> decodeContinue args
-    | "websearch" -> decodeWebsearch args
-    | "webfetch" -> decodeWebfetch args
     | "executor" -> decodeExecutor args
     | "apply_patch" -> decodeApplyPatch args
     | "submit_review" -> decodeSubmitReview args

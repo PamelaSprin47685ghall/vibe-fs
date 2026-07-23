@@ -71,10 +71,6 @@ let normalizeToolNameForMux (toolName: string) : string =
         "edit"
     elif toolName = "file_read" then
         "read"
-    elif toolName = "web_fetch" then
-        "webfetch"
-    elif toolName = "web_search" || toolName = "google_search" then
-        "websearch"
     elif toolName = "todo_write" then
         todoWriteToolName Mux
     elif toolName = "todo_read" then
@@ -92,8 +88,6 @@ let normalizeToolNameForMux (toolName: string) : string =
 
 let normalizeToolName (host: Host) (toolName: string) : string =
     match host, toolName with
-    | Opencode, "web_search" -> "websearch"
-    | Mimocode, "web_search" -> "websearch"
     | Opencode, "todo_write" -> "todowrite"
     | Mimocode, "task" -> "todowrite"
     | Mimocode, "actor" -> "task"
@@ -147,9 +141,6 @@ let muxSpawnToolUniverse =
        "review_pane_get"
        "notify"
        "analytics_query"
-       "web_fetch"
-       "web_search"
-       "google_search"
        "url_context" |]
 
 /// Synthetic callID prefixes injected by the host (Semble search, caps
@@ -171,11 +162,6 @@ let allToolNames (host: Host) : string array =
        "pty_read"
        "pty_list"
        "pty_kill"
-       "fuzzy_find"
-       "fuzzy_grep"
-       "fuzzy_continue"
-       "websearch"
-       "webfetch"
        "submit_review"
        "return_reviewer"
        "read"

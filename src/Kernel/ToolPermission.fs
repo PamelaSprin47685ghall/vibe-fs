@@ -15,7 +15,6 @@ type ToolSemantic =
     | MethodologyFamily
     | Read
     | WritePatchFamily
-    | FuzzyGrep
     | SearchFamily
     | SubagentWebSkillOrSubmit
     | PtyFamily
@@ -56,8 +55,6 @@ let private isStealthBrowserTool (t: string) = t.StartsWith "stealth-browser"
 
 let private isDispatchOrWebSkillTool (t: string) =
     Set.contains t knownAgentSet
-    || t = "websearch"
-    || t = "webfetch"
     || t = "question"
     || t = "ask_user_question"
     || t = "skill"
@@ -85,9 +82,7 @@ let classifyTool (host: Host) (tool: Tool) : ToolSemantic =
         SubagentWebSkillOrSubmit
     elif Set.contains t writePatchFamilySet then
         WritePatchFamily
-    elif t = "fuzzy_grep" then
-        FuzzyGrep
-    elif t = "fuzzy_find" || t = "fuzzy_continue" || t = "glob" || t = "grep_x" then
+    elif t = "glob" || t = "grep_x" then
         SearchFamily
     elif t.StartsWith "pty_" then
         PtyFamily
@@ -121,8 +116,6 @@ let canUseSemantic (agent: Agent) (semantic: ToolSemantic) (tool: Tool) : bool =
     | "coder", SubagentWebSkillOrSubmit when tool = "inspector" -> true
     | _, SubagentWebSkillOrSubmit -> agent <> "inspector" && agent <> "coder" && agent <> "reviewer"
     | _, WritePatchFamily -> agent <> "inspector" && agent <> "manager" && agent <> "reviewer"
-    | "manager", FuzzyGrep -> false
-    | _, FuzzyGrep -> agent <> "manager"
     | _, SearchFamily -> agent <> "browser" && agent <> "meditator" && agent <> "executor"
     | _, Other -> false
 

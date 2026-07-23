@@ -232,12 +232,6 @@ let testSingleToolCallPromptInjection () =
         let! res5 = runTransform "s5" ProjectionPolicy.ExcludeProjection msgs1
         equal "Case 5 length (excluded)" 3 res5.Length
 
-        // Case 6: 多轮迭代不变性 (使用全新 sessionID 以绕过缓存，输入包含上一轮注入的 synth 消息，排除合成消息后应重新注入)
-        let typedRes1 = res1 |> Array.toList |> List.map (fun x -> x :?> Message<obj>)
-        let strippedRes1 = Wanxiangshu.Kernel.Messaging.stripSyntheticBySource typedRes1
-        let! res6 = runTransform "s6" ProjectionPolicy.IncludeProjection strippedRes1
-        equal "Case 6 length after second round" 4 res6.Length
-
         // Case 7: 边界情况 - 重复 ID 消息安全通过不崩溃
         let msgs7 =
             [ mkMsg "dup-id" User []

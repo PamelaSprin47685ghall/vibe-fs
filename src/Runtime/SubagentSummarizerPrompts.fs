@@ -61,30 +61,6 @@ let executorSummarizerPrompt
     : string =
     executorSummarizerPromptWithHost whatToSummarize evidence language program dependencies timeoutKind None
 
-/// Summarizer prompt from structured search results (no TOML re-parse).
-let websearchSummarizerPromptWithHost
-    (whatToSummarize: string)
-    (results: WebSearchResultItem list)
-    (host: Host option)
-    : string =
-    let docView: PromptDocumentView =
-        { objective = whatToSummarize
-          background = None
-          agentRole = AgentRole.WebSearchSummarization
-          targets = [ PromptTarget.WebSearchResultsTarget results ]
-          boundaries = []
-          rules =
-            [ PromptRule.Constraint
-                  "Focus on answering the question using the raw results. Preserve concrete facts. Omit boilerplate and unrelated results. Do not invent details not present in the results. Do NOT lose any information."
-              yield! hostRules host ]
-          outcomes =
-            [ { label = "report"
-                text = "Answer the objective using only supplied evidence." } ] }
-
-    renderOrFail docView "WebSearchSummarizer"
-
-let websearchSummarizerPrompt (whatToSummarize: string) (results: WebSearchResultItem list) : string =
-    websearchSummarizerPromptWithHost whatToSummarize results None
 
 let renderMeditatorIntentWithHost
     (entry: Wanxiangshu.Kernel.Methodology.Schema.MethodologyEntry)

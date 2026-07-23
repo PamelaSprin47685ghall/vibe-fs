@@ -9,9 +9,6 @@ open Wanxiangshu.Kernel.Session.Causality
 open Wanxiangshu.Kernel.HostTools
 open Wanxiangshu.Kernel.Executor
 open Wanxiangshu.Runtime.ExecutorFormat
-open Wanxiangshu.Kernel.FuzzyPath
-open Wanxiangshu.Kernel.FuzzyQuery
-open Wanxiangshu.Kernel.FuzzyFormat
 open Wanxiangshu.Runtime.Subagent
 open Wanxiangshu.Kernel.ToolCatalog
 open Wanxiangshu.Kernel.ToolCopy
@@ -21,12 +18,10 @@ open Wanxiangshu.Hosts.Mux.Wrappers
 open Wanxiangshu.Hosts.Mux.WrappersReview
 open Wanxiangshu.Hosts.Mux.SubagentTools
 open Wanxiangshu.Runtime.FileSys
-open Wanxiangshu.Runtime.FuzzyFinderShell
 open Wanxiangshu.Runtime
 open Wanxiangshu.Runtime.Dyn
 open Wanxiangshu.Runtime.ExecutorToolsCodec
 open Wanxiangshu.Runtime.FileToolsCodec
-open Wanxiangshu.Hosts.Mux.BuiltinToolsFuzzy
 open Wanxiangshu.Runtime.ToolExecute
 open Wanxiangshu.Runtime.ToolRuntimeContext
 open Wanxiangshu.Hosts.Mux.BuiltinToolsHelpers
@@ -160,7 +155,3 @@ let writeTool (_deps: obj) : ToolDefinition =
                         | Error e -> return wireDomainFailure "write" e
                 }
       condition = None }
-
-let fuzzyFindTool = BuiltinToolsFuzzy.fuzzyFindTool
-let fuzzyGrepTool = BuiltinToolsFuzzy.fuzzyGrepTool
-let fuzzyContinueTool = BuiltinToolsFuzzy.fuzzyContinueTool

@@ -17,6 +17,7 @@
     <Compile Include="Kernel/Outcome.fs"/>
     <Compile Include="Kernel/Fact.fs"/>
     <Compile Include="Kernel/SendOutcomeMap.fs"/>
+    <Compile Include="Kernel/Roles.fs"/>
     <Compile Include="Journal/FactCodec.fs"/>
     <Compile Include="Journal/Envelope.fs"/>
     <Compile Include="Journal/Boot.fs"/>
@@ -32,8 +33,10 @@
     <Compile Include="Session/Script.fs"/>
     <Compile Include="Session/SessionFlows.fs"/>
     <Compile Include="Session/ChildFlows.fs"/>
+    <Compile Include="Session/ForkRuntime.fs"/>
     <Compile Include="Session/Fallback.fs"/>
     <Compile Include="Session/Review.fs"/>
+    <Compile Include="Session/ReviewGuard.fs"/>
     <Compile Include="Session/DriverDispatch.fs"/>
     <Compile Include="Session/Driver.fs"/>
     <Compile Include="Process/ProcessTypes.fs"/>
@@ -42,13 +45,14 @@
     <Compile Include="Process/ProcessPump.fs"/>
     <Compile Include="Process/ProcessHandle.fs"/>
     <Compile Include="Process/ProcessFlow.fs"/>
+    <Compile Include="Process/ProcessBudget.fs"/>
+    <Compile Include="Orchestrator.fs"/>
     <Compile Include="Tools/MessageTransform.fs"/>
+    <Compile Include="Session/Companion.fs"/>
     <Compile Include="Tools/ToolContext.fs"/>
     <Compile Include="Tools/StaticTools.fs"/>
     <Compile Include="Tools/FileTools.fs"/>
     <Compile Include="Tools/ReviewTools.fs"/>
-    <Compile Include="Wanxiangzhen/SquadTypes.fs"/>
-    <Compile Include="Wanxiangzhen/SquadFlow.fs"/>
     <Compile Include="OpenCode/OpencodeTypes.fs"/>
     <Compile Include="OpenCode/MessageOriginDecoder.fs"/>
     <Compile Include="OpenCode/Gateway.fs"/>

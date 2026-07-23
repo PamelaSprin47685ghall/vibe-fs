@@ -14,7 +14,7 @@ open Wanxiangshu.Next.OpenCode
 open Wanxiangshu.Next.Tests
 open Wanxiangshu.Next.Tests.JournalTests.JournalTestSupport
 
-type FakePromptPort(continuationMsgId: MessageId) =
+type private FakePromptPort(continuationMsgId: MessageId) =
     interface IPromptPort with
         member _.SendPrompt (_sessionId: SessionId) (_text: string) (_opts: PromptOptions) =
             Task.FromResult(Delivered continuationMsgId)
@@ -45,6 +45,7 @@ module VerticalSliceFlowTests =
 
                     let turnId = TurnId.create "msg-flow-terminal"
                     Assert.Equal(Ok(), inbox.TryPost(HumanMessageEvent(turnId, "Build the feature")))
+
                     Assert.Equal(
                         Ok(),
                         inbox.TryPost(
@@ -94,8 +95,7 @@ module VerticalSliceFlowTests =
 
                     Assert.True(prompt2Seen, "Expected PromptTerminal after unblock")
 
-                    let clearTodo =
-                        Fact.Todo(TodoChanged {| Snapshot = { Items = [] } |})
+                    let clearTodo = Fact.Todo(TodoChanged {| Snapshot = { Items = [] } |})
 
                     match gateway.Append (StreamId.Session sessionId) None clearTodo with
                     | Committed _ -> ()
@@ -143,8 +143,7 @@ module VerticalSliceFlowTests =
                     let sessionId = SessionId.create "session-flow-cancel"
                     let inbox = FifoInbox(100) :> ISessionInbox
 
-                    let seedTodo =
-                        Fact.Todo(TodoChanged {| Snapshot = { Items = [ "unblock me" ] } |})
+                    let seedTodo = Fact.Todo(TodoChanged {| Snapshot = { Items = [ "unblock me" ] } |})
 
                     match gateway.Append (StreamId.Session sessionId) None seedTodo with
                     | Committed _ -> ()
@@ -156,6 +155,7 @@ module VerticalSliceFlowTests =
 
                     let turnId = TurnId.create "msg-flow-cancel"
                     Assert.Equal(Ok(), inbox.TryPost(HumanMessageEvent(turnId, "work")))
+
                     Assert.Equal(
                         Ok(),
                         inbox.TryPost(

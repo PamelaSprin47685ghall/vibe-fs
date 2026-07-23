@@ -105,3 +105,75 @@ module MessageTransformTests =
         Assert.Equal(1, List.length input)
         Assert.Equal("original", input.[0].Text)
         Assert.Equal("original", output.[0].Text)
+
+    [<Fact>]
+    let ``MessageTransform_replacePrefix_tail_preservation`` () =
+        let input =
+            [ { Role = "user"
+                Text = "m0"
+                ToolCalls = None
+                Metadata = None }
+              { Role = "assistant"
+                Text = "m1"
+                ToolCalls = None
+                Metadata = None }
+              { Role = "user"
+                Text = "m2"
+                ToolCalls = None
+                Metadata = None }
+              { Role = "assistant"
+                Text = "m3"
+                ToolCalls = None
+                Metadata = None }
+              { Role = "user"
+                Text = "m4"
+                ToolCalls = None
+                Metadata = None } ]
+
+        let result = MessageTransform.replacePrefix input "[B_RECORD]" (Index 1)
+
+        Assert.Equal(4, List.length result)
+        Assert.Equal("system", result.[0].Role)
+        Assert.Equal("[B_RECORD]", result.[0].Text)
+        Assert.Equal<HostMessage list>(input |> List.skip 2, result |> List.skip 1)
+
+    [<Fact>]
+    let ``MessageTransform_replacePrefix_watermark_at_end`` () =
+        let input =
+            [ { Role = "user"
+                Text = "m0"
+                ToolCalls = None
+                Metadata = None }
+              { Role = "assistant"
+                Text = "m1"
+                ToolCalls = None
+                Metadata = None }
+              { Role = "user"
+                Text = "m2"
+                ToolCalls = None
+                Metadata = None } ]
+
+        let result = MessageTransform.replacePrefix input "[B_RECORD]" (Index 2)
+
+        Assert.Equal<HostMessage list>(
+            [ { Role = "system"
+                Text = "[B_RECORD]"
+                ToolCalls = None
+                Metadata = None } ],
+            result
+        )
+
+    [<Fact>]
+    let ``MessageTransform_replacePrefix_watermark_not_found_noop`` () =
+        let input =
+            [ { Role = "user"
+                Text = "m0"
+                ToolCalls = None
+                Metadata = None }
+              { Role = "assistant"
+                Text = "m1"
+                ToolCalls = None
+                Metadata = None } ]
+
+        Assert.Equal<HostMessage list>(input, MessageTransform.replacePrefix input "[B_RECORD]" (Index 10))
+        Assert.Equal<HostMessage list>(input, MessageTransform.replacePrefix input "[B_RECORD]" (Index -1))

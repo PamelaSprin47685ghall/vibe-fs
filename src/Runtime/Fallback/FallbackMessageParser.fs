@@ -43,12 +43,12 @@ let private toolCallRegexes =
        Regex(@"\{""name""\s*:?$", RegexOptions.IgnoreCase ||| RegexOptions.Multiline)
        // name="tool_name" attribute pattern
        Regex(
-           @"<[^>]*\bname\s*=\s*[""'](read|write|edit|execute|search|fuzzy_find|fuzzy_grep|fuzzy_search|list|bash|shell|terminal|browser|web|grep|find|submit_review|return_reviewer|inspector|coder|meditator|webfetch|websearch)[""']",
+           @"<[^>]*\bname\s*=\s*[""'](read|write|edit|execute|search|list|bash|shell|terminal|browser|web|grep|find|submit_review|return_reviewer|inspector|coder|meditator)[""']",
            RegexOptions.IgnoreCase
        )
        // Tool-name tags - standalone tool name elements
        Regex(
-           @"<(read|write|edit|execute|search|fuzzy_find|fuzzy_grep|fuzzy_search|list|bash|shell|terminal|browser|web|grep|find|submit_review|return_reviewer|inspector|coder|meditator|webfetch|websearch)\b",
+           @"<(read|write|edit|execute|search|list|bash|shell|terminal|browser|web|grep|find|submit_review|return_reviewer|inspector|coder|meditator)\b",
            RegexOptions.IgnoreCase
        ) |]
 

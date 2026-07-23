@@ -13,6 +13,8 @@ type SessionSnapshot =
       ReviewContext: string option
       ParallelHint: string option }
 
+type MessageWatermark = Index of int
+
 module MessageTransform =
 
     let sanitize (messages: HostMessage list) : HostMessage list =
@@ -74,3 +76,19 @@ module MessageTransform =
         let systemMsgs = [ capsSystemMsg; reviewSystemMsg; hintSystemMsg ] |> List.choose id
 
         systemMsgs @ baseMsgs
+
+    let replacePrefix (messages: HostMessage list) (bRecord: string) (watermark: MessageWatermark) : HostMessage list =
+        match watermark with
+        | Index idx ->
+            if idx < 0 || idx >= List.length messages then
+                messages
+            else
+                let tail = messages |> List.skip (idx + 1)
+
+                let syntheticMsg =
+                    { Role = "system"
+                      Text = bRecord
+                      ToolCalls = None
+                      Metadata = None }
+
+                syntheticMsg :: tail

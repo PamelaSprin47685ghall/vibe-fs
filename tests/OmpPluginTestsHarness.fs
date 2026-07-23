@@ -37,8 +37,6 @@ let createPiHarness () : PiHarness =
                      "edit"
                      "write"
                      "find"
-                     "fuzzy_find"
-                     "fuzzy_grep"
                      "lsp"
                      "browser"
                      "search"
@@ -51,8 +49,6 @@ let createPiHarness () : PiHarness =
                      "executor"
                      "submit_review"
                      "return_reviewer"
-                     "websearch"
-                     "webfetch"
                      "todowrite" |] ]
 
     { hookStore = hookStore

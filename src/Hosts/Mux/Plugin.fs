@@ -13,8 +13,8 @@ let getPluginToolPolicy (agentId: string) (role: obj) : obj = buildToolPolicy mu
 
 let buildCapsFileReadData = Wanxiangshu.Runtime.CapsFileCache.buildCapsFileReadData
 
-let createToolCatalog deps toolNames reviewStore hostReadExec finderCache sessionScope =
-    PluginCatalog.createToolCatalog deps toolNames reviewStore hostReadExec finderCache sessionScope
+let createToolCatalog deps toolNames reviewStore hostReadExec sessionScope =
+    PluginCatalog.createToolCatalog deps toolNames reviewStore hostReadExec sessionScope
 
 let createRegistrationWithSeams deps =
     Wanxiangshu.Hosts.Mux.PluginRegistration.createRegistrationWithSeams deps

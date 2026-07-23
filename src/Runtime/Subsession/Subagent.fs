@@ -24,7 +24,6 @@ type SubagentTaskKind =
         dependencies: string list *
         timeoutKind: TimeoutKind *
         whatToSummarize: string
-    | WebsearchSummary of question: string * results: WebSearchResultItem list
 
 /// Produce one prompt per parallel intent for coder/inspector, exactly one
 /// prompt for the singleton task kinds. Host-specific contracts (e.g. agent_report)
@@ -45,8 +44,6 @@ let formatPrompt (host: Host) (kind: SubagentTaskKind) : string list =
               dependencies
               timeoutKind
               (Some host) ]
-    | WebsearchSummary(question, results) ->
-        [ websearchSummarizerPromptWithHost question results (Some host) ]
 
 let promptsForParallelIntents (host: Host) (constructor: 'a -> SubagentTaskKind) (intents: 'a) : string list =
     formatPrompt host (constructor intents)

@@ -76,7 +76,6 @@ let private tryFindBuiltinAgent name =
 let private opencodeToolKey (host: Host) (name: string) : string =
     if host = Opencode then
         match name with
-        | "websearch" -> "web_search"
         | _ -> name
     else
         name

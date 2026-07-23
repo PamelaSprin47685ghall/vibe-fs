@@ -30,7 +30,6 @@ let computeCountSpec (reg: obj) =
     let tools = unbox<obj[]> (get reg "tools")
     let names = tools |> Array.map (fun t -> str t "name")
     check "has coder tool" (names |> Array.contains "coder")
-    check "has webfetch tool" (names |> Array.contains "webfetch")
     check "has write tool" (names |> Array.contains "write")
     check "has read tool" (names |> Array.contains "read")
     check "has submit_review tool" (names |> Array.contains "submit_review")

@@ -32,7 +32,6 @@ open Wanxiangshu.Runtime.Dyn
 open Wanxiangshu.Runtime.Fallback.RuntimeStore
 open Wanxiangshu.Runtime.Fallback.SessionRuntime
 open Wanxiangshu.Kernel.FallbackKernel.Types
-open Wanxiangshu.Runtime.FuzzyIteratorStore
 open Wanxiangshu.Runtime.ReviewRuntime
 open Wanxiangshu.Kernel.EventSourcing.Fold
 

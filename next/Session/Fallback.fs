@@ -1,50 +1,38 @@
 namespace Wanxiangshu.Next.Session
 
-open Wanxiangshu.Next.Kernel
-open Wanxiangshu.Next.Kernel.Outcome
-open Wanxiangshu.Next.Session.SessionFlows
+type ModelSide =
+    | A
+    | B
+
+type FallbackState = { Side: ModelSide; Failures: int }
+
+[<RequireQualifiedAccess>]
+type FallbackDecision =
+    | NextAttempt of FallbackState
+    | Reconcile of FallbackState
+    | Dead
 
 module Fallback =
 
-    type SendContinueFunction = string -> int -> SessionFlow<SendOutcome>
+    let initial: FallbackState = { Side = ModelSide.A; Failures = 0 }
 
-    let rec tryAttempts
-        (s: SessionScript)
-        (sendContinue: SendContinueFunction)
-        (model: string)
-        (attempt: int)
-        : SessionFlow<SendOutcome option> =
-        session {
-            if attempt > s.Config.MaxRetriesPerModel then
-                return None
+    let nextAttempt (state: FallbackState) : FallbackDecision =
+        match state.Side with
+        | ModelSide.A ->
+            if state.Failures < 1 then
+                FallbackDecision.NextAttempt
+                    { Side = ModelSide.A
+                      Failures = state.Failures + 1 }
             else
-                let! outcome = sendContinue model attempt
+                FallbackDecision.NextAttempt { Side = ModelSide.B; Failures = 0 }
+        | ModelSide.B ->
+            if state.Failures < 1 then
+                FallbackDecision.NextAttempt
+                    { Side = ModelSide.B
+                      Failures = state.Failures + 1 }
+            else
+                FallbackDecision.Dead
 
-                match outcome with
-                | Delivered _ -> return Some outcome
-                | Retryable _ -> return! tryAttempts s sendContinue model (attempt + 1)
-                | Fatal reason -> return! Flow.fail (SessionError.Protocol reason)
-                | AcceptanceUnknown(reason, _) -> return! Flow.fail SessionError.PromptUncertain
-        }
+    let reconcile (state: FallbackState) : FallbackDecision = FallbackDecision.Reconcile state
 
-    let rec tryModels
-        (s: SessionScript)
-        (sendContinue: SendContinueFunction)
-        (models: string list)
-        : SessionFlow<SendOutcome> =
-        session {
-            match models with
-            | [] -> return! Flow.fail SessionError.FallbackExhausted
-            | model :: remaining ->
-                let! resultOpt = tryAttempts s sendContinue model 1
-
-                match resultOpt with
-                | Some outcome -> return outcome
-                | None -> return! tryModels s sendContinue remaining
-        }
-
-    let continueWork (s: SessionScript) (sendContinue: SendContinueFunction) : SessionFlow<unit> =
-        session {
-            let! outcome = tryModels s sendContinue s.Config.FallbackModels
-            do! s.CommitTodoFrom outcome
-        }
+    let handleAcceptanceUnknown (state: FallbackState) : FallbackDecision = reconcile state

@@ -40,8 +40,7 @@ let hostKernel' () =
           meditatorRole = "test role"
           outputSections = [] }
 
-    let prompt =
-        renderMeditatorIntent dummyEntry "why?" "my background" "note detail"
+    let prompt = renderMeditatorIntent dummyEntry "why?" "my background" "note detail"
 
     check "meditator has question" (prompt.Contains "why?")
     check "meditator no-tools constraint" (prompt.ToLowerInvariant().Contains "do not call tools")
@@ -56,7 +55,11 @@ let hostKernel' () =
 
     let inspectorPromptText = inspectorPrompt inv
     check "inspector has objective" (inspectorPromptText.Contains "find auth")
-    check "inspector agent role codebase search" (inspectorPromptText.Contains "Codebase Search" || inspectorPromptText.Contains "read-only")
+
+    check
+        "inspector agent role codebase search"
+        (inspectorPromptText.Contains "Codebase Search"
+         || inspectorPromptText.Contains "read-only")
 
 let toolCatalogCentralized () =
     let coderSpec = specOf "coder"
@@ -85,19 +88,16 @@ let toolCatalogCentralized () =
 
     check "write requiredFields are file_path+content" (writeSpec.requiredFields = [ "file_path"; "content" ])
 
-    let swapSpec = specOf "swap"
 
-    check
-        "swap describes structure-preserving refactoring"
-        (swapSpec.description.Contains "structure-preserving refactoring")
 
-    check "swap describes semantic blocks" (swapSpec.description.Contains "semantic blocks")
-    check "swap avoids rewriting contents" (swapSpec.description.Contains "without rewriting their contents")
 
     let ack = formatWipAcknowledgment "Progress recorded"
     check "wip acknowledgment is structured" (ack.Contains "review_progress" || ack.Contains "review_mode")
     check "wip acknowledgment does not say No reviewer" (ack.ToLowerInvariant().IndexOf("no reviewer") < 0)
-    check "wip acknowledgment does not mention starting a reviewer" (ack.ToLowerInvariant().IndexOf("starting a reviewer") < 0)
+
+    check
+        "wip acknowledgment does not mention starting a reviewer"
+        (ack.ToLowerInvariant().IndexOf("starting a reviewer") < 0)
 
     let allSpecs = all
     let names = allSpecs |> List.map (fun spec -> spec.name) |> Set.ofList

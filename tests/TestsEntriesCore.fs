@@ -30,7 +30,6 @@ open Wanxiangshu.Tests.ReviewSessionRegistryTests
 open Wanxiangshu.Tests.ReviewSessionQueryTests
 open Wanxiangshu.Tests.ReviewPromptsFormatTests
 open Wanxiangshu.Tests.EventLogReviewLoopFoldTests
-open Wanxiangshu.Tests.WanxiangzhenSquadEventTests
 open Wanxiangshu.Tests.EventLogCodecTests
 open Wanxiangshu.Tests.EventLogRuntimeTests
 open Wanxiangshu.Tests.EventLogRuntimeStoreTests
@@ -78,7 +77,6 @@ let private replayBlock () : (string * TestBody) list =
       TestBody.Sync(sync ReviewTestsReplay.disposeSessionTreeTerminatesAll)
       //       "EventLogFoldTests.run", TestBody.Sync(sync EventLogFoldTests.run)
       "EventLogReviewLoopFoldTests.run", TestBody.Sync(sync EventLogReviewLoopFoldTests.run)
-      "WanxiangzhenSquadEventTests.run", TestBody.Sync(sync WanxiangzhenSquadEventTests.run)
       "EventLogCodecTests.run", TestBody.Sync(sync EventLogCodecTests.run)
       "EventLogRuntimeTests.run", TestBody.Async EventLogRuntimeTests.run
       "EventLogRuntimeStoreTests.run", TestBody.Async EventLogRuntimeStoreTests.run
@@ -160,6 +158,5 @@ let coreTestEntries () : (string * TestBody) list =
     @ TestsEntriesCoreTail.tailCoreTestEntries ()
     @ TestsEntriesFallback.tailTestEntries ()
     @ fallbackTestEntries ()
-    @ TestsEntriesFuzzy.fuzzyTestEntries ()
     @ TestsEntriesDomain.domainTestEntries ()
     @ KernelAndSupportCoverageEntries.kernelSupportCoverageTestEntries ()

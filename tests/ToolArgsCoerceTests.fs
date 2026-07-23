@@ -112,10 +112,6 @@ let testCoerceArgsTypesOk () =
 
     coerceArgsTypes "read" readArgs
 
-    let fetchArgs = createObj [ "url", box "http://localhost"; "timeout", box "15" ]
-
-    coerceArgsTypes "webfetch" fetchArgs
-
     let intentsJson =
         """[{"objective":"fix bug","background":"test","targets":[{"file":"a.ts","guide":"fix it"}]}]"""
 
@@ -133,10 +129,6 @@ let testCoerceArgsTypesOk () =
         check "read offset coerced" (r.Offset = Some 123)
         check "read limit coerced" (r.Limit = Some 456)
     | _ -> check "read coerced failed" false
-
-    match decodeToolInvocation "webfetch" fetchArgs with
-    | Ok(Typed(ToolArgs.Webfetch w)) -> check "webfetch timeout coerced" (w.Timeout = Some 15)
-    | _ -> check "webfetch coerced failed" false
 
     match decodeToolInvocation "coder" coderArgs with
     | Ok(CoderBatch [ intent ]) ->

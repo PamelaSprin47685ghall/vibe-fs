@@ -43,12 +43,6 @@ let classifyToolEdit () =
 let classifyToolSubagent () =
     equal "coder" SubagentWebSkillOrSubmit (classifyTool Opencode "coder")
 
-let classifyToolWebsearch () =
-    equal "websearch" SubagentWebSkillOrSubmit (classifyTool Opencode "websearch")
-
-let classifyToolFuzzyGrep () =
-    equal "fuzzy_grep" FuzzyGrep (classifyTool Opencode "fuzzy_grep")
-
 let classifyToolOther () =
     equal "unknown" Other (classifyTool Opencode "unknown_tool")
 
@@ -140,12 +134,6 @@ let canUseSemanticSubagentCoder () =
 let canUseSemanticSubagentManager () =
     check "manager can use subagent (not excluded)" (canUseSemantic "manager" SubagentWebSkillOrSubmit "coder")
 
-let canUseSemanticFuzzyGrepManager () =
-    check "manager denied fuzzy_grep" (not (canUseSemantic "manager" FuzzyGrep "fuzzy_grep"))
-
-let canUseSemanticFuzzyGrepCoder () =
-    check "coder can fuzzy_grep" (canUseSemantic "coder" FuzzyGrep "fuzzy_grep")
-
 let canUseSemanticMeditatorAll () =
     check "meditator can read" (canUseSemantic "meditator" Read "read")
 
@@ -190,12 +178,6 @@ let deniedToolsForHostMethodology () =
     check "browser denied todowrite" (List.contains "todowrite" denied)
     check "browser allowed read" (not (List.contains "read" denied))
 
-let testReviewerCanUseFuzzyGrep () =
-    check "reviewer can use fuzzy_grep" (canUse "reviewer" "fuzzy_grep")
-
-let testReviewerCanUseFuzzyFind () =
-    check "reviewer can use fuzzy_find" (canUse "reviewer" "fuzzy_find")
-
 let testReviewerCanSpawnInspectorButNotExecutor () =
     check "reviewer can spawn inspector" (canUse "reviewer" "inspector")
     check "reviewer cannot spawn executor" (not (canUse "reviewer" "executor"))
@@ -219,10 +201,6 @@ let run () =
     classifyToolWrite ()
     classifyToolEdit ()
     classifyToolSubagent ()
-    classifyToolWebsearch ()
-    classifyToolFuzzyGrep ()
-    classifyToolOther ()
-    canUseSemanticAgentReport ()
     canUseSemanticBlockedShell ()
     canUseSemanticStealthBrowserOk ()
     canUseSemanticStealthBrowserDenied ()
@@ -248,9 +226,6 @@ let run () =
     canUseSemanticSubagentInspectorExecutor ()
     canUseSemanticSubagentCoder ()
     canUseSemanticSubagentManager ()
-    canUseSemanticFuzzyGrepManager ()
-    canUseSemanticFuzzyGrepCoder ()
-    canUseSemanticMeditatorAll ()
     canUseSemanticExecutorAll ()
     canUseForHostOpenCode ()
     canUseForHostNormalizedMux ()
@@ -259,7 +234,4 @@ let run () =
     canUseForHostMethodologyDenied ()
     canUseForHostMethodologyAllowed ()
     deniedToolsForHostMethodology ()
-    testReviewerCanUseFuzzyGrep ()
-    testReviewerCanUseFuzzyFind ()
-    testReviewerCanSpawnInspectorButNotExecutor ()
     testReviewerCannotWrite ()

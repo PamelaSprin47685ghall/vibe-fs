@@ -161,8 +161,7 @@ do
     registerToolParameterTypes
         [ ("read", "offset", SNumber)
           ("read", "limit", SNumber)
-          ("websearch", "numResults", SNumber)
-          ("webfetch", "timeout", SNumber)
+
           ("coder", "intents", SArray)
           ("inspector", "intents", SArray)
           ("executor", "dependencies", SObject)

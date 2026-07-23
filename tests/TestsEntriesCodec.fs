@@ -6,7 +6,6 @@ open Wanxiangshu.Tests.AgentTests
 open Wanxiangshu.Tests.AgentNudgeSpecs
 open Wanxiangshu.Tests.KernelTests
 open Wanxiangshu.Tests.KernelPromptSpecs
-open Wanxiangshu.Tests.FuzzyTests
 open Wanxiangshu.Tests.ExecutorSpawnPathTests
 open Wanxiangshu.Tests.DynTests
 open Wanxiangshu.Tests.DelegateTests
@@ -26,7 +25,6 @@ open Wanxiangshu.Tests.CapsFileCacheTests
 open Wanxiangshu.Tests.CapsFormatTests
 open Wanxiangshu.Tests.SubagentPromptBuildTests
 open Wanxiangshu.Tests.SubagentSpawnTests
-open Wanxiangshu.Tests.WebToolsCodecTests
 open Wanxiangshu.Tests.ReviewToolsCodecTests
 open Wanxiangshu.Tests.ExecutorToolsCodecTests
 open Wanxiangshu.Tests.ToolArgsDecodeTests
@@ -34,7 +32,6 @@ open Wanxiangshu.Tests.ToolResultWireTests
 open Wanxiangshu.Tests.SubagentToolExecuteTests
 open Wanxiangshu.Tests.MuxSubagentToolExecuteTests
 open Wanxiangshu.Tests.FileToolsCodecTests
-open Wanxiangshu.Tests.FuzzyToolsCodecTests
 open Wanxiangshu.Tests.PatchToolsCodecTests
 open Wanxiangshu.Tests.HostMessageCodecTests
 open Wanxiangshu.Tests.MessagingCodecTests
@@ -53,9 +50,7 @@ open Wanxiangshu.Tests.AgentConfigApplyTests
 open Wanxiangshu.Tests.SessionExecutorScopeTests
 open Wanxiangshu.Tests.OmpKernelTests
 open Wanxiangshu.Tests.OmpSessionToolsTests
-open Wanxiangshu.Tests.OmpWebFetchTests
 open Wanxiangshu.Tests.OmpCapsTests
-open Wanxiangshu.Tests.OmpFuzzyTests
 open Wanxiangshu.Tests.OmpPluginTests
 open Wanxiangshu.Tests.OmpPluginTestsAgentEnd
 open Wanxiangshu.Tests.OmpReviewTests
@@ -84,10 +79,8 @@ let codecTestEntries () : (string * TestBody) list =
       "SubagentToolExecuteTests.run", Async SubagentToolExecuteTests.run
       "MuxSubagentToolExecuteTests.run", Async MuxSubagentToolExecuteTests.run
       "SubagentCleanupCompletionTests.run", Async SubagentCleanupCompletionTests.run
-      "WebToolsCodecTests.run", Sync(sync WebToolsCodecTests.run)
       "ReviewToolsCodecTests.run", Sync(sync ReviewToolsCodecTests.run)
       "FileToolsCodecTests.run", Sync(sync FileToolsCodecTests.run)
-      "FuzzyToolsCodecTests.run", Sync(sync FuzzyToolsCodecTests.run)
       "PatchToolsCodecTests.run", Sync(sync PatchToolsCodecTests.run)
       "HostMessageCodecTests.run", Sync(sync HostMessageCodecTests.run)
       "MessagingCodecTests.run", Sync(sync MessagingCodecTests.run)

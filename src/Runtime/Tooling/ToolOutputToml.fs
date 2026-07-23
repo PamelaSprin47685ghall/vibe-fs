@@ -34,58 +34,11 @@ let private annotationField (annotation: string option) : (string * TomlValue) l
     | Some a -> [ "annotation", String a ]
     | None -> []
 
-let private fuzzyFindFields (f: FuzzyFindOutput) : (string * TomlValue) list =
-    let matchTables =
-        f.matches
-        |> List.map (fun m ->
-            [ yield "path", String m.path
-              match nonEmpty m.pattern with
-              | Some p -> yield "pattern", String p
-              | None -> ()
-              yield! annotationField m.annotation ])
-
-    [ match nonEmpty f.pattern with
-      | Some p -> yield "pattern", String p
-      | None -> ()
-      match f.totalMatched with
-      | Some t -> yield "total_matched", Integer t
-      | None -> ()
-      match f.totalFiles with
-      | Some t -> yield "total_files", Integer t
-      | None -> ()
-      yield "matches", TableArray matchTables ]
-
-let private fuzzyGrepFields (g: FuzzyGrepOutput) : (string * TomlValue) list =
-    let matchTables =
-        g.matches
-        |> List.map (fun m ->
-            [ yield "path", String m.path
-              yield "line", Integer m.line
-              yield "content", String m.content
-              match nonEmpty m.pattern with
-              | Some p -> yield "pattern", String p
-              | None -> ()
-              if not (List.isEmpty m.contextBefore) then
-                  yield "context_before", StringArray m.contextBefore
-              if not (List.isEmpty m.contextAfter) then
-                  yield "context_after", StringArray m.contextAfter
-              yield! annotationField m.annotation ])
-
-    [ match nonEmpty g.pattern with
-      | Some p -> yield "pattern", String p
-      | None -> ()
-      match g.totalMatched with
-      | Some t -> yield "total_matched", Integer t
-      | None -> ()
-      match nonEmpty g.regexFallbackError with
-      | Some e -> yield "regex_fallback_error", String e
-      | None -> ()
-      yield "matches", TableArray matchTables ]
 
 let private writeResultFields (w: WriteResultInfo) : (string * TomlValue) list =
     [ "path", String w.path
       "success", Boolean w.success
-      "syntax_errors", StringArray (nonEmptyList w.syntaxErrors) ]
+      "syntax_errors", StringArray(nonEmptyList w.syntaxErrors) ]
 
 let toolOutputDocument (msg: ToolOutputMessage) : TomlValue =
     let messageFields =
@@ -108,11 +61,9 @@ let toolOutputDocument (msg: ToolOutputMessage) : TomlValue =
         | Plain s when System.String.IsNullOrWhiteSpace s -> []
         | Plain s -> [ "output", String s ]
         | Executor e -> executorFields e
-        | FuzzyFind f -> fuzzyFindFields f
-        | FuzzyGrep g -> fuzzyGrepFields g
         | WriteResult w -> writeResultFields w
 
-    Table (messageFields @ contentFields)
+    Table(messageFields @ contentFields)
 
 let renderToolOutput (msg: ToolOutputMessage) : string =
     match toolOutputDocument msg with

@@ -13,7 +13,6 @@ open Wanxiangshu.Tests.FallbackMessageCodecTests
 open Wanxiangshu.Tests.FallbackIntegrationTests
 open Wanxiangshu.Tests.FallbackRecoveryWaitTests
 open Wanxiangshu.Tests.FallbackRequestedRecoveryTests
-open Wanxiangshu.Tests.WebFetchGuardTests
 open Wanxiangshu.Tests.ReviewVerdictTests
 open Wanxiangshu.Tests.ToolCopyTests
 open Wanxiangshu.Tests.JsArrayMutateTests
@@ -85,7 +84,6 @@ let fallbackTestEntries () : (string * TestBody) list =
       "NudgeOwnerDiagnosticTests.run", Sync(sync NudgeOwnerDiagnosticTests.run) ]
 
 let tailTestEntries () : (string * TestBody) list =
-    [ "WebFetchGuardTests.run", Sync(sync WebFetchGuardTests.run)
-      "ReviewVerdictTests.run", Sync(sync ReviewVerdictTests.run)
+    [ "ReviewVerdictTests.run", Sync(sync ReviewVerdictTests.run)
       "ToolCopyTests.run", Sync(sync ToolCopyTests.run)
       "JsArrayMutateTests.run", Sync(sync JsArrayMutateTests.run) ]

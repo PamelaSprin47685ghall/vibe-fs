@@ -23,21 +23,3 @@ let internal writeSpec: ToolSpec =
             [ "file_path", "The absolute or relative path of the file to write"
               "content", "The content to write to the file" ]
       requiredFields = [ "file_path"; "content" ] }
-
-let internal swapSpec: ToolSpec =
-    { name = "swap"
-      description =
-        "Exchange two non-overlapping line ranges between text files, or within the same text file. "
-        + "Use this as a structure-preserving refactoring primitive: move complete semantic blocks—functions, types, tests, or documentation sections—"
-        + "for module extraction, reordering, or cross-file migration without rewriting their contents. "
-        + "Line numbers are 1-based; begin is inclusive and endExclusive is exclusive. "
-        + "Both files are validated before either file is changed."
-      paramDocs =
-        map
-            [ "path0", "First file path"
-              "begin0", "Start line in first file, 1-based, inclusive"
-              "endExclusive0", "End line in first file, 1-based, exclusive"
-              "path1", "Second file path"
-              "begin1", "Start line in second file, 1-based, inclusive"
-              "endExclusive1", "End line in second file, 1-based, exclusive" ]
-      requiredFields = [ "path0"; "begin0"; "endExclusive0"; "path1"; "begin1"; "endExclusive1" ] }

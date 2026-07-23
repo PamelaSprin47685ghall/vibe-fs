@@ -1,8 +1,5 @@
 module Wanxiangshu.Tests.TestsEntriesCoreTail
 
-open Wanxiangshu.Tests.FuzzyTests
-open Wanxiangshu.Tests.FuzzyTestsPromise
-open Wanxiangshu.Tests.FuzzyTestsPaging
 open Wanxiangshu.Tests.ExecutorSpawnPathTests
 open Wanxiangshu.Tests.ExecutorFormatCoverageTests
 open Wanxiangshu.Tests.DynTests
@@ -49,38 +46,10 @@ open Wanxiangshu.Tests.PluginObjectContractTests
 open Wanxiangshu.Tests.MuxCapabilityContractTests
 open Wanxiangshu.Tests.RuntimeScopeLifecycleTests
 
-let tailCoreTestEntriesFuzzy () : (string * TestBody) list =
-    [ "FuzzyTests.grepDetect", TestBody.Sync(sync FuzzyTests.grepDetect)
-      "FuzzyTests.iteratorRoundTrip", TestBody.Sync(sync FuzzyTests.iteratorRoundTrip)
-      "FuzzyTests.finderConversion", TestBody.Sync(sync FuzzyTests.finderConversion)
-      "FuzzyTests.formatFull", TestBody.Sync(sync FuzzyTests.formatFull)
-      "FuzzyTests.fuzzyFallbackNotice", TestBody.Sync(sync FuzzyTests.fuzzyFallbackNotice)
-      "FuzzyTests.scanTimeoutConfigurable", TestBody.Sync(sync FuzzyTests.scanTimeoutConfigurable)
-      "FuzzyTests.iteratorCounterUniqueness", TestBody.Sync(sync FuzzyTests.iteratorCounterUniqueness)
-      "FuzzyTestsPromise.finderCacheConcurrencyRace", TestBody.Async FuzzyTestsPromise.finderCacheConcurrencyRace
-      "FuzzyTestsPromise.grepMaxMatchesPerFileRespectsPageSize",
-      TestBody.Async FuzzyTestsPromise.grepMaxMatchesPerFileRespectsPageSize
-      "FuzzyTestsPromise.findPagingWhenTotalMatchedIsNone",
-      TestBody.Async FuzzyTestsPromise.findPagingWhenTotalMatchedIsNone
-      "FuzzyTestsPromise.grepMultiPropagatesErrorAndSafety",
-      TestBody.Async FuzzyTestsPromise.grepMultiPropagatesErrorAndSafety
-      "FuzzyTestsPaging.findPagingDefault", TestBody.Sync(sync FuzzyTestsPaging.findPagingDefault)
-      "FuzzyTestsPaging.emptyIteratorNotRendered", TestBody.Sync(sync FuzzyTestsPaging.emptyIteratorNotRendered)
-      "FuzzyTestsPaging.totalMatchedSemantics", TestBody.Sync(sync FuzzyTestsPaging.totalMatchedSemantics)
-      "FuzzyTestsPaging.grepOutputNotices", TestBody.Sync(sync FuzzyTestsPaging.grepOutputNotices)
-      "FuzzyTestsPaging.iteratorNamespaceConstants", TestBody.Sync(sync FuzzyTestsPaging.iteratorNamespaceConstants)
-      "FuzzyTestsPaging.iteratorStoreStronglyTyped", TestBody.Sync(sync FuzzyTestsPaging.iteratorStoreStronglyTyped)
-      "FuzzyTestsPaging.runWithFinderSharedPipeline", TestBody.Sync(sync FuzzyTestsPaging.runWithFinderSharedPipeline)
-      "FuzzyTestsPaging.resolveStoreRequiresInjection",
-      TestBody.Sync(sync FuzzyTestsPaging.resolveStoreRequiresInjection)
-      "FuzzyTestsPaging.emptyIteratorTreatedAsAbsent", TestBody.Sync(sync FuzzyTestsPaging.emptyIteratorTreatedAsAbsent) ]
+let tailCoreTestEntriesFuzzy () : (string * TestBody) list = []
 
 let tailCoreTestEntriesExecutor () : (string * TestBody) list =
-    [ "ExecutorSpawnPathTests.webApiFetchInit", TestBody.Sync(sync ExecutorSpawnPathTests.webApiFetchInit)
-      "ExecutorSpawnPathTests.webApiResponseMethodCall",
-      TestBody.Sync(sync ExecutorSpawnPathTests.webApiResponseMethodCall)
-      "ExecutorSpawnPathTests.webApiKeyValidation", TestBody.Sync(sync ExecutorSpawnPathTests.webApiKeyValidation)
-      "ExecutorSpawnPathTests.executorMapping", TestBody.Sync(sync ExecutorSpawnPathTests.executorMapping)
+    [ "ExecutorSpawnPathTests.executorMapping", TestBody.Sync(sync ExecutorSpawnPathTests.executorMapping)
       "ExecutorFormatCoverageTests.safetyWarning", TestBody.Sync(sync ExecutorFormatCoverageTests.safetyWarning)
       "ExecutorSpawnPathTests.capsFileShape", TestBody.Sync(sync ExecutorSpawnPathTests.capsFileShape)
       "ExecutorSpawnPathTests.capsFileSizeLimit", TestBody.Sync(sync ExecutorSpawnPathTests.capsFileSizeLimit)
@@ -89,24 +58,10 @@ let tailCoreTestEntriesExecutor () : (string * TestBody) list =
       "ExecutorSpawnPathTests.stripHeadTailPipesHeadTailChain",
       TestBody.Sync(sync ExecutorSpawnPathTests.stripHeadTailPipesHeadTailChain)
       "ExecutorFormatCoverageTests.ollamaFormat", TestBody.Sync(sync ExecutorFormatCoverageTests.ollamaFormat)
-      "ExecutorFormatCoverageTests.webApiSearchFormat",
-      TestBody.Sync(sync ExecutorFormatCoverageTests.webApiSearchFormat)
-      "ExecutorFormatCoverageTests.summarizerInputCap",
-      TestBody.Sync(sync ExecutorFormatCoverageTests.summarizerInputCap)
       "ExecutorFormatCoverageTests.executorToolResponseFormatting",
       TestBody.Sync(sync ExecutorFormatCoverageTests.executorToolResponseFormatting)
       "ExecutorFormatCoverageTests.summarizerPromptOmitsReturnValue",
-      TestBody.Sync(sync ExecutorFormatCoverageTests.summarizerPromptOmitsReturnValue)
-      "ExecutorFormatCoverageTests.formatFetchResponseAllFields",
-      TestBody.Sync(sync ExecutorFormatCoverageTests.formatFetchResponseAllFields)
-      "ExecutorFormatCoverageTests.formatFetchResponseOnlyTitle",
-      TestBody.Sync(sync ExecutorFormatCoverageTests.formatFetchResponseOnlyTitle)
-      "ExecutorFormatCoverageTests.formatFetchResponseOnlyContent",
-      TestBody.Sync(sync ExecutorFormatCoverageTests.formatFetchResponseOnlyContent)
-      "ExecutorFormatCoverageTests.formatFetchResponseAllNone",
-      TestBody.Sync(sync ExecutorFormatCoverageTests.formatFetchResponseAllNone)
-      "ExecutorFormatCoverageTests.formatFetchResponseEmptyTitleOmitted",
-      TestBody.Sync(sync ExecutorFormatCoverageTests.formatFetchResponseEmptyTitleOmitted) ]
+      TestBody.Sync(sync ExecutorFormatCoverageTests.summarizerPromptOmitsReturnValue) ]
 
 let tailCoreTestEntriesGroup2 () : (string * TestBody) list =
     [ "ExecutorSpawnPathTests.readDirectoryListing", TestBody.Async ExecutorSpawnPathTests.readDirectoryListing
@@ -123,7 +78,7 @@ let tailCoreTestEntriesGroup2 () : (string * TestBody) list =
       "IntegrationEventTests.run", TestBody.Async IntegrationEventTests.run
       "IntegrationOpencodeReviewSpecs.run", TestBody.Async IntegrationOpencodeReviewSpecs.run
       "IntegrationChatTests.run", TestBody.Async IntegrationChatTests.run
-      "IntegrationChatTestsSubagent.run", TestBody.Async IntegrationChatTestsSubagent.run
+      "IntegrationChatTestsSubagent.runAll", TestBody.Async IntegrationChatTestsSubagent.runAll
       "OpencodeSessionLifecycleTests.childIdleDoesNotAbortParent",
       TestBody.Async OpencodeSessionLifecycleTests.childIdleDoesNotAbortParent
       "LoopMessagesTests.run", TestBody.Sync(sync LoopMessagesTests.run)

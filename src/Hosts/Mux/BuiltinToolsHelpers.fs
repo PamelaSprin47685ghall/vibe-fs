@@ -5,7 +5,6 @@ open Fable.Core.JsInterop
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.HostTools
 open Wanxiangshu.Kernel.Executor
-open Wanxiangshu.Kernel.FuzzyFormat
 open Wanxiangshu.Runtime.ExecutorFormat
 open Wanxiangshu.Runtime.ToolOutputInfo
 open Wanxiangshu.Runtime.Dyn
@@ -24,7 +23,9 @@ let summarizationAiSettingsAgentId = "explore"
 let private nodeBuffer: obj = jsNative
 
 let private byteLength (s: string) : int = nodeBuffer?byteLength (s, "utf-8")
-let private truncateToBytes (s: string) (n: int) : string = Wanxiangshu.Runtime.SubagentPrompts.truncateUtf8ByBytes s n
+
+let private truncateToBytes (s: string) (n: int) : string =
+    Wanxiangshu.Runtime.SubagentPrompts.truncateUtf8ByBytes s n
 
 let summarizeWhenNeeded
     (deps: obj)

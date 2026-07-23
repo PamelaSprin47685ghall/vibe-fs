@@ -24,9 +24,7 @@ open Wanxiangshu.Tests.OmpExecutorToolsTests
 open Wanxiangshu.Tests.OmpHostContractTests
 
 let entries2 () : (string * TestBody) list =
-    [ "OmpPluginTestsLifecycle.websearchSchemaRequiresQueryAndWhatToSummarize",
-      Async OmpPluginTestsLifecycle.websearchSchemaRequiresQueryAndWhatToSummarize
-      "OmpPluginTestsAgentEnd.run", Async OmpPluginTestsAgentEnd.run
+    [ "OmpPluginTestsAgentEnd.run", Async OmpPluginTestsAgentEnd.run
       "OmpReviewTests.returnReviewerVerdictPerfectRevise", Async OmpReviewTests.returnReviewerVerdictPerfectRevise
       "OmpReviewTests.returnReviewerViaSetPendingStateForTest",
       Async OmpReviewTests.returnReviewerViaSetPendingStateForTest

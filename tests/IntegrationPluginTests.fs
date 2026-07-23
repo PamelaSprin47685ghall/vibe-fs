@@ -21,14 +21,6 @@ let syntaxSpec () =
         | Failed _ -> check "tree-sitter not failed" false
     }
 
-let webfetchSchemaSpec (reg: obj) =
-    let tools = unbox<obj[]> (get reg "tools")
-    let wf = tools |> Array.find (fun t -> str t "name" = "webfetch")
-    let props = get (get wf "parameters") "properties"
-    check "webfetch schema has url" (not (isNullish (get props "url")))
-    check "webfetch schema has extract_main" (not (isNullish (get props "extract_main")))
-    check "webfetch schema has timeout" (not (isNullish (get props "timeout")))
-    check "webfetch execute is function" (typeIs (get wf "execute") "function")
 
 let slashCommandsSpec (reg: obj) =
     let cmds = unbox<obj[]> (get reg "slashCommands")
@@ -113,7 +105,6 @@ let run () : JS.Promise<unit> =
         registrationShape reg
         topLevelExportsSpec ()
         do! syntaxSpec ()
-        webfetchSchemaSpec reg
         slashCommandsSpec reg
         countsSpec reg
         do! configSpec ()

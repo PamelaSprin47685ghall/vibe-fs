@@ -23,7 +23,6 @@ let muxTopLevelPolicySpec () =
             "mux top-level policy manager keeps submit_review"
             (not (managerRemoves |> Array.contains "submit_review"))
 
-        check "mux top-level policy manager removes fuzzy_grep" (managerRemoves |> Array.contains "fuzzy_grep")
         let coderPolicy = getPluginToolPolicy "x" (box "coder")
         let coderRemoves = unbox<string[]> (get coderPolicy "remove")
         check "mux top-level policy coder keeps write" (not (coderRemoves |> Array.contains "write"))
@@ -52,10 +51,6 @@ let muxSummarizationToolPolicySpec () =
            "executor"
            "submit_review"
            "return_reviewer"
-           "websearch"
-           "webfetch"
-           "fuzzy_grep"
-           "fuzzy_find"
            "write"
            "read" |]
 
@@ -76,10 +71,6 @@ let muxSummarizationToolPolicySpec () =
           "executor"
           "submit_review"
           "return_reviewer"
-          "websearch"
-          "webfetch"
-          "fuzzy_grep"
-          "fuzzy_find"
           "write"
           "read" ] do
         check $"summary child strips {removed}" (Set.contains removed disabled)

@@ -33,11 +33,7 @@ let normalizeToolNameForMuxEdit () =
 let normalizeToolNameForMuxRead () =
     equal "file_read" "read" (normalizeToolNameForMux "file_read")
 
-let normalizeToolNameForMuxWebFetch () =
-    equal "web_fetch" "webfetch" (normalizeToolNameForMux "web_fetch")
 
-let normalizeToolNameForMuxWebSearch () =
-    equal "web_search" "websearch" (normalizeToolNameForMux "web_search")
 
 let normalizeToolNameForMuxTodoWrite () =
     equal "todo_write" "todowrite" (normalizeToolNameForMux "todo_write")
@@ -97,8 +93,6 @@ let run () =
     taskToolNameMimo ()
     normalizeToolNameForMuxEdit ()
     normalizeToolNameForMuxRead ()
-    normalizeToolNameForMuxWebFetch ()
-    normalizeToolNameForMuxWebSearch ()
     normalizeToolNameForMuxTodoWrite ()
     normalizeToolNameForMuxSkill ()
     normalizeToolNameForMuxQuestion ()

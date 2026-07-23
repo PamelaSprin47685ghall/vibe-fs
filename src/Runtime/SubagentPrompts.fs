@@ -105,7 +105,7 @@ let inspectorPromptWithHost (intent: InspectorIntent) (host: Host option) : stri
           boundaries = []
           rules =
             [ PromptRule.Policy
-                  "Explore the workspace and answer questions. Use fuzzy_find, glob, fuzzy_grep, and read. Report concrete file paths and line-number references, and answer each question explicitly."
+                  "Explore the workspace and answer questions. Use glob, grep, and read. Report concrete file paths and line-number references, and answer each question explicitly."
               yield! (intent.questions |> Array.toList |> List.map PromptRule.Question)
               yield! hostRules host ]
           outcomes =

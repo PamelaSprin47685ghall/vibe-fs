@@ -205,18 +205,12 @@ let browser = toolDescription "browser"
 
 let executor = toolDescription "executor"
 
-let fuzzyFind = toolDescription "fuzzy_find"
 
-let fuzzyGrep = toolDescription "fuzzy_grep"
 
-let websearch = toolDescription "websearch"
 
-let webfetch = toolDescription "webfetch"
 
 let submitReview = toolDescription "submit_review"
 
 let submitReviewResult = toolDescription "return_reviewer"
 
 let continueSpec = toolDescription "continue"
-
-let fuzzyContinue = toolDescription "fuzzy_continue"

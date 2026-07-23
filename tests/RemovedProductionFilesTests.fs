@@ -27,12 +27,9 @@ let run () : unit =
           "Kernel/ReviewSession/Facade.fs"
           "Kernel/OmpPrompts.fs"
           "Kernel/Nudge/RetryProgress.fs"
-          "Kernel/Wanxiangzhen/EventLogParse.fs"
           "Kernel/ReviewReplayPolicy.fs"
-          "Runtime/Tooling/WebFetch.fs"
           "Runtime/Subsession/Flow.fs"
           "Runtime/MessageTransform/PlanCodec.fs"
-          "Kernel/Wanxiangzhen/SquadTaskTransition.fs"
           "Hosts/Omp/SubsessionDispatchStatus.fs" ]
 
     for relativePath in removedFiles do

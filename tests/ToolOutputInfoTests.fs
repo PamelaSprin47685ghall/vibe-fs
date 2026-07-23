@@ -20,7 +20,12 @@ let testRenderHintOnly () =
     check "render hint uses flat key" (r.Contains "hint =")
 
 let testRenderOutputAndInfo () =
-    let r = render { empty with content = Plain "b"; hint = Some "x" }
+    let r =
+        render
+            { empty with
+                content = Plain "b"
+                hint = Some "x" }
+
     check "output+info contains output" (r.Contains "output = \"b\"")
     check "output+info contains hint" (r.Contains "hint = \"x\"")
 
@@ -151,51 +156,6 @@ let testPtyListTomlTableArray () =
     equal "pty list sess len" 1 sess.Length
     equal "pty list sess id" "pty_1" (string sess.[0]?id)
 
-let testFuzzyFindStructuredMatches () =
-    let msg =
-        { empty with
-            content =
-                FuzzyFind
-                    { pattern = Some "Tool"
-                      totalMatched = Some 1
-                      totalFiles = Some 10
-                      matches =
-                          [ { path = "src/A.fs"
-                              pattern = Some "Tool"
-                              annotation = None } ] } }
-
-    let text = render msg
-    check "fuzzy find has matches table" (text.Contains "[[matches]]" || text.Contains "matches")
-    check "fuzzy find has path" (text.Contains "src/A.fs")
-    check "fuzzy find has total_matched" (text.Contains "total_matched")
-    check "fuzzy find no body" (not (text.Contains "body ="))
-    check "fuzzy find no summary prose" (not (text.Contains "summary ="))
-
-let testFuzzyGrepStructuredMatches () =
-    let msg =
-        { empty with
-            content =
-                FuzzyGrep
-                    { pattern = Some "foo"
-                      totalMatched = Some 1
-                      regexFallbackError = None
-                      matches =
-                          [ { path = "src/B.fs"
-                              line = 12
-                              content = "let foo = 1"
-                              pattern = Some "foo"
-                              contextBefore = []
-                              contextAfter = []
-                              annotation = None } ] } }
-
-    let text = render msg
-    check "fuzzy grep has matches" (text.Contains "matches")
-    check "fuzzy grep has path" (text.Contains "src/B.fs")
-    check "fuzzy grep has line" (text.Contains "12")
-    check "fuzzy grep has content" (text.Contains "let foo = 1")
-    check "fuzzy grep no body" (not (text.Contains "body ="))
-    check "fuzzy grep no summary prose" (not (text.Contains "summary ="))
-
 let testExecutorStructuredFields () =
     let msg =
         { empty with
@@ -214,6 +174,7 @@ let testExecutorStructuredFields () =
     check "executor has exit_status wire key" (text.Contains "exit_status =")
     check "executor exit_status value completed" (text.Contains "completed")
     check "executor no body" (not (text.Contains "body ="))
+
     check
         "executor has no bare message status field"
         (not (
@@ -252,7 +213,5 @@ let run () =
     testPtyReadTomlFlatFields ()
     testPtyWriteTomlFlatFields ()
     testPtyListTomlTableArray ()
-    testFuzzyFindStructuredMatches ()
-    testFuzzyGrepStructuredMatches ()
     testExecutorStructuredFields ()
     testWriteResultStructuredFields ()

@@ -18,8 +18,7 @@ let fileEditTools: Set<string> =
           "ast_grep_replace"
           "file_edit_replace_string"
           "file_edit_insert"
-          "apply_patch"
-          "swap" ]
+          "apply_patch" ]
 
 let isFileEditTool (tool: string) : bool =
     Set.contains (tool.ToLowerInvariant()) fileEditTools

@@ -32,7 +32,6 @@ open Wanxiangshu.Runtime.Fallback.SessionRuntime
 open Wanxiangshu.Runtime.Fallback.SessionRuntimePropertyPure
 open Wanxiangshu.Kernel.FallbackKernel.Types
 open Wanxiangshu.Runtime.NudgeLease
-open Wanxiangshu.Runtime.FuzzyIteratorStore
 open Wanxiangshu.Runtime.ReviewRuntime
 open Wanxiangshu.Kernel.EventSourcing.Fold
 open Wanxiangshu.Hosts.Omp.NudgeReminderDispatch

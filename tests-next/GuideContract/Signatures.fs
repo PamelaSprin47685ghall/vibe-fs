@@ -39,6 +39,8 @@ module Signatures =
         ignore (typeof<ProjectionSet>)
         ignore (typeof<ChildScript>)
         ignore MessageTransform.transform
+        ignore (typeof<MessageWatermark>)
+        ignore MessageTransform.replacePrefix
         ignore ChildFlows.runChild
         ignore ChildFlows.runParallel
         ignore FactCodec.serializeFact

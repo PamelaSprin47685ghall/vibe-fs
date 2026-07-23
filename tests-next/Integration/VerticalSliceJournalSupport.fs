@@ -20,7 +20,8 @@ module VerticalSliceJournalSupport =
         let readFileSync (path: string, encoding: string) : string = jsNative
 
     let _readEnvelopes (path: string) =
-        (NodeFs.readFileSync (path, "utf-8")).Split([| '\n' |], StringSplitOptions.RemoveEmptyEntries)
+        (NodeFs.readFileSync (path, "utf-8"))
+            .Split([| '\n' |], StringSplitOptions.RemoveEmptyEntries)
         |> Array.map (fun line ->
             match Envelope.deserialize line with
             | Ok envelope -> envelope
@@ -44,13 +45,16 @@ module VerticalSliceJournalSupport =
                 match envelope.Fact with
                 | Fact.Session(HumanTurnStarted _) -> true
                 | _ -> false)
-             |> Array.length
+            |> Array.length
         )
 
     let _awaitDriverProcessed (inbox: ISessionInbox) =
         task {
             let commandPort = SessionInboxCommandPort(inbox) :> SessionCommandPort
-            let deadline = Wanxiangshu.Next.Process.Deadline.ofBudget DateTimeOffset.UtcNow (TimeSpan.FromSeconds 10.0)
+
+            let deadline =
+                Wanxiangshu.Next.Process.Deadline.ofBudget DateTimeOffset.UtcNow (TimeSpan.FromSeconds 10.0)
+
             let! result = commandPort.Request (QuerySnapshot ignore) CancellationToken.None deadline
 
             match result with
@@ -68,7 +72,9 @@ module VerticalSliceJournalSupport =
                 {| id = "msg_user_1"
                    role = "user"
                    sessionID = SessionId.value sessionId
-                   parts = [ {| ``type`` = "text"; text = "Build feature X" |} ] |}
+                   parts =
+                    [ {| ``type`` = "text"
+                         text = "Build feature X" |} ] |}
 
             let hookInput: OpencodeHookInput =
                 { sessionID = SessionId.value sessionId
@@ -86,20 +92,18 @@ module VerticalSliceJournalSupport =
     let _runStep2 (gateway: Gateway) (sessionId: SessionId) (tempDir: string) (inbox: ISessionInbox) =
         task {
             let port = SessionInboxCommandPort(inbox)
-            let todoTool = StaticTools.todowriteTool port
+            let execTool = StaticTools.executorTool ()
 
             let toolCtx: ToolContext =
                 { SessionId = sessionId
                   Workspace = tempDir
                   Cancellation = CancellationToken.None
-                  Deadline = Wanxiangshu.Next.Process.Deadline.ofBudget DateTimeOffset.UtcNow (TimeSpan.FromSeconds 10.0)
+                  Deadline =
+                    Wanxiangshu.Next.Process.Deadline.ofBudget DateTimeOffset.UtcNow (TimeSpan.FromSeconds 10.0)
                   Session = port }
 
-            let payload = "[\"implement vertical slice\", \"run tests\"]"
-            let! toolOutput = todoTool.Execute toolCtx { Payload = payload }
+            let payload = "{\"command\":\"echo vertical slice tool test\"}"
+            let! toolOutput = execTool.Execute toolCtx { Payload = payload }
             Assert.False(toolOutput.Truncated)
-
-            let sessionProj2 = Map.find sessionId gateway.ProjectionSet.SessionProjections
-            Assert.True(sessionProj2.Todos.IsSome)
-            Assert.Equal(2, sessionProj2.Todos.Value.Items.Length)
+            Assert.Contains("vertical slice tool test", toolOutput.Result)
         }

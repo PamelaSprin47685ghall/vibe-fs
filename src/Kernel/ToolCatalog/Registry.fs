@@ -4,7 +4,6 @@ module Wanxiangshu.Kernel.ToolCatalog
 open Wanxiangshu.Kernel.ToolCatalog.ToolSpec
 open Wanxiangshu.Kernel.ToolCatalog.Subagent
 open Wanxiangshu.Kernel.ToolCatalog.Search
-open Wanxiangshu.Kernel.ToolCatalog.Web
 open Wanxiangshu.Kernel.ToolCatalog.Executor
 open Wanxiangshu.Kernel.ToolCatalog.Review
 open Wanxiangshu.Kernel.ToolCatalog.FileIO
@@ -19,16 +18,10 @@ let all: ToolSpec list =
       browserSpec
       continueSpec
       executorSpec
-      fuzzyFindSpec
-      fuzzyGrepSpec
-      fuzzyContinueSpec
-      websearchSpec
-      webfetchSpec
       submitReviewSpec
       returnReviewerSpec
       readSpec
       writeSpec
-      swapSpec
       ptySpawnSpec
       ptyWriteSpec
       ptyReadSpec

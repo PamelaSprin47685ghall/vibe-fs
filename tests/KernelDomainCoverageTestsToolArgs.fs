@@ -37,29 +37,6 @@ let taBrowser () =
     | Browser b -> equal "Browser.Intent" "browse" b.Intent
     | _ -> check "Browser case" false
 
-let taWebsearch () =
-    let a =
-        Websearch
-            { Query = "q"
-              NumResults = 5
-              WhatToSummarize = "s" }
-
-    match a with
-    | Websearch w -> equal "Websearch.Query" "q" w.Query
-    | _ -> check "Websearch case" false
-
-let taWebfetch () =
-    let a =
-        Webfetch
-            { Url = "http://x"
-              ExtractMain = None
-              PreferLlmsTxt = None
-              Prompt = None
-              Timeout = None }
-
-    match a with
-    | Webfetch w -> equal "Webfetch.Url" "http://x" w.Url
-    | _ -> check "Webfetch case" false
 
 let taExecutor () =
     let a =
@@ -111,8 +88,6 @@ let run () =
     taRead ()
     taWrite ()
     taBrowser ()
-    taWebsearch ()
-    taWebfetch ()
     taExecutor ()
     taTodoWrite ()
     taApplyPatch ()

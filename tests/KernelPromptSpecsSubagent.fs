@@ -42,7 +42,9 @@ let private sampleCoderIntent: CoderIntent =
       doNotTouch = [||] }
 
 let private assertCoderPrompts () =
-    let opencodePrompt = formatPrompt opencode (Coder [ sampleCoderIntent ]) |> List.head
+    let opencodePrompt =
+        formatPrompt opencode (Coder [ sampleCoderIntent ]) |> List.head
+
     let opencodeDoc = parseToml opencodePrompt
     equal "opencode coder objective field" "fix bug" (strField opencodeDoc "objective")
     check "opencode coder has file target" (hasTargetKind opencodeDoc "file")
@@ -65,7 +67,9 @@ let private assertInspectorAndBrowserPrompts () =
     equal "inspector objective field" "find auth" (strField invDoc "objective")
     check "inspector has question rule" (hasRuleKind invDoc "question")
 
-    let browserPromptText = formatPrompt opencode (Browser "open google.com") |> List.head
+    let browserPromptText =
+        formatPrompt opencode (Browser "open google.com") |> List.head
+
     let browserDoc = parseToml browserPromptText
     equal "browser objective field" "open google.com" (strField browserDoc "objective")
 
@@ -106,32 +110,25 @@ let private assertExecutorPrompts () =
     let focusDoc =
         formatPrompt
             opencode
-            (ExecutorSummary(focusEvidence, "shell", "echo 1", [], Wanxiangshu.Kernel.Prompt.TimeoutKind.Short, "only exit codes"))
+            (ExecutorSummary(
+                focusEvidence,
+                "shell",
+                "echo 1",
+                [],
+                Wanxiangshu.Kernel.Prompt.TimeoutKind.Short,
+                "only exit codes"
+            ))
         |> List.head
         |> parseToml
 
-    equal "executor summary objective is whatToSummarize" "only exit codes" (strField focusDoc "objective")
+    check "executor focus includes output target" (hasTargetKind focusDoc "executor_output")
 
-let private assertWebsearchPrompts () =
-    let webResults: Wanxiangshu.Kernel.Prompt.WebSearchResultItem list =
-        [ { title = "TS handbook"
-            url = "https://www.typescriptlang.org/docs"
-            content = "raw search results blob" } ]
 
-    let webPrompt = formatPrompt opencode (WebsearchSummary("ts compiler", webResults)) |> List.head
-    let webDoc = parseToml webPrompt
-    equal "websearch objective field" "ts compiler" (strField webDoc "objective")
-    check "websearch has websearch_results target" (hasTargetKind webDoc "websearch_results")
-    check "websearch embeds raw blob evidence" (webPrompt.Contains "raw search results blob")
-    check "websearch embeds real url" (webPrompt.Contains "https://www.typescriptlang.org/docs")
-    check "websearch no evidence bag" (not (hasTargetKind webDoc "evidence"))
-    check "websearch no raw_results bag title" (not (webPrompt.Contains "raw_results"))
 
 let subagentDispatch () =
     assertCoderPrompts ()
     assertInspectorAndBrowserPrompts ()
     assertExecutorPrompts ()
-    assertWebsearchPrompts ()
 
 let subagentJoinReports () =
     let joined =

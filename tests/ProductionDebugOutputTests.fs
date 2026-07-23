@@ -60,8 +60,7 @@ let private checkExplicitFiles (cwd: string) =
         [ "src/Runtime/Fallback/Coordinator.fs"
           "src/Runtime/Fallback/RuntimeStore.fs"
           "src/Runtime/Tooling/ToolHookRuntime.fs"
-          "src/Hosts/OpenCode/ProgressObserver.fs"
-          "src/Hosts/OpenCode/PluginWanxiangzhenE2eMeta.fs" ]
+          "src/Hosts/OpenCode/ProgressObserver.fs" ]
 
     for rel in files do
         let content = readFileSync (resolvePath cwd rel) "utf8"
@@ -79,7 +78,6 @@ let private scanProductionSources (cwd: string) =
         if not isSembleFile then
             let content = readFileSync filePath "utf8"
             assertNoToken "debug-mimocode.txt" filePath content
-            assertNoToken "debug-wanxiangzhen.txt" filePath content
             assertNoToken "DEBUG PROGRESS_OBSERVER" filePath content
             assertNoToken "JS.console.log" filePath content
             assertNoToken "JS.console.error" filePath content

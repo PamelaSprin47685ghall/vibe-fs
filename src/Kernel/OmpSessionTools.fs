@@ -11,8 +11,6 @@ let ompChildOnlyToolNames =
        "edit"
        "write"
        "lsp"
-       "fuzzy_find"
-       "fuzzy_grep"
        "return_reviewer"
        "search"
        "glob"

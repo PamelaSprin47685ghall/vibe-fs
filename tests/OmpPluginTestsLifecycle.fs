@@ -85,8 +85,6 @@ let turnStartRestoresMainSessionTools () =
                    "executor"
                    "submit_review"
                    "return_reviewer"
-                   "websearch"
-                   "webfetch"
                    "todowrite" |]
 
         let handler = eventHandler h "turn_start"
@@ -100,30 +98,4 @@ let turnStartRestoresMainSessionTools () =
         let active = Set.ofArray (activeTools h)
         check "turn_start strips edit from main session" (not (active.Contains "edit"))
         check "turn_start keeps coder" (active.Contains "coder")
-    }
-
-let websearchSchemaRequiresQueryAndWhatToSummarize () =
-    promise {
-        resetPluginState ()
-        let h = createPiHarness ()
-        let pi = piObject h
-        do! wanxiangshuExtension pi
-        let websearch = h.tools |> Seq.tryFind (fun t -> Dyn.str t "name" = "websearch")
-        check "websearch tool registered" (websearch.IsSome)
-
-        match websearch with
-        | None -> ()
-        | Some tool ->
-            let parameters = Dyn.get tool "parameters"
-            let req = Dyn.get parameters "required"
-
-            let reqArr =
-                if Dyn.isArray req then
-                    req :?> obj array |> Array.map string
-                else
-                    [||]
-
-            check "required contains query" (reqArr |> Array.exists ((=) "query"))
-            check "required contains what_to_summarize" (reqArr |> Array.exists ((=) "what_to_summarize"))
-            check "required length is 2" (reqArr.Length = 2)
     }

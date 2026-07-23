@@ -17,7 +17,7 @@ let private policyDenied (extraNames: string array) (role: string) : Set<string>
 
 let disabledMatchesManualDeniedForHost () =
     for role in [| "coder"; "inspector"; "reviewer"; "manager"; "browser" |] do
-        for extra in [| [||]; [| "custom_plugin_tool" |]; [| "fuzzy_find"; "write" |] |] do
+        for extra in [| [||]; [| "custom_plugin_tool" |]; [| "search"; "write" |] |] do
             let manual = manualDeniedForMux extra role
             let policy = policyDenied extra role
 

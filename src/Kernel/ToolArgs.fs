@@ -13,17 +13,7 @@ type BrowserArgs = { Intent: string }
 
 type ContinueArgs = { Iterator: string; Prompt: string }
 
-type WebsearchArgs =
-    { Query: string
-      NumResults: int
-      WhatToSummarize: string }
 
-type WebfetchArgs =
-    { Url: string
-      ExtractMain: bool option
-      PreferLlmsTxt: string option
-      Prompt: string option
-      Timeout: int option }
 
 type ExecutorArgs =
     { Language: ExecutorLanguage
@@ -83,8 +73,6 @@ type ToolArgs =
     | Write of WriteArgs
     | Browser of BrowserArgs
     | Continue of ContinueArgs
-    | Websearch of WebsearchArgs
-    | Webfetch of WebfetchArgs
     | Executor of ExecutorArgs
     | TodoWrite of TodoWriteArgs
     | ApplyPatch of ApplyPatchArgs

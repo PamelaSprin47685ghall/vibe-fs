@@ -15,7 +15,6 @@ open Wanxiangshu.Hosts.Opencode.Fallback.Hook
 open Wanxiangshu.Hosts.Opencode.SessionLifecycleObserver
 open Wanxiangshu.Hosts.Opencode.Fallback.ConfigLoader
 open Wanxiangshu.Runtime.RuntimeScope
-open Wanxiangshu.Runtime.FuzzyFinderShell
 open Wanxiangshu.Runtime.ChildAgentRegistry
 open Wanxiangshu.Runtime
 open Wanxiangshu.Runtime.Fallback.FallbackConfigCodec
@@ -31,7 +30,7 @@ open Wanxiangshu.Hosts.Opencode.SubsessionHostAdapter
 type PluginServiceParts =
     { ReviewStore: Wanxiangshu.Runtime.ReviewRuntime.ReviewStore
       ChildAgentRegistry: ChildAgentRegistry
-      FinderCache: Wanxiangshu.Runtime.FuzzyFinderShell.FinderCache
+      FinderCache: obj
       Directory: string
       FallbackConfigOpt: FallbackConfig option
       FallbackRuntime: FallbackRuntimeStore
@@ -102,7 +101,7 @@ let buildFallbackHandler
 let loadPluginServices (host: Host) (ctx: obj) : PluginServiceParts =
     let reviewStore = Wanxiangshu.Runtime.ReviewRuntime.createReviewStore ()
     let childAgentRegistry = ChildAgentRegistry.Create()
-    let finderCache = FinderCache()
+    let finderCache = box null
 
     let client = getClient ctx
     let directory = pluginDirectoryFromCtx ctx

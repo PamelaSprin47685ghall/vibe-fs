@@ -13,10 +13,8 @@ module PromptToml =
         | AgentRole.BrowserAutomation -> "Browser Automation Agent (read-only)"
         | AgentRole.CodeReview -> "Code Reviewer (read-only)"
         | AgentRole.ExecutorSummarization -> "Executor Output Summarizer (read-only)"
-        | AgentRole.WebSearchSummarization -> "Web Search Summarizer (read-only)"
         | AgentRole.MethodologyReasoning -> "Methodology Reasoning Agent (read-only)"
         | AgentRole.NudgeSupervisor -> "Nudge Supervisor (synthetic)"
-        | AgentRole.SquadWorker -> "Wanxiangzhen Slave Agent (mutating)"
         | AgentRole.Coordinator -> "Coordinator Agent (decomposition-only)"
 
     let timeoutKindText =
@@ -60,15 +58,6 @@ module PromptToml =
           | _ -> () ]
         |> Table
 
-    let private webSearchResultsTarget (results: WebSearchResultItem list) : TomlValue =
-        let resultTables =
-            results
-            |> List.map (fun r ->
-                [ "title", String r.title
-                  "url", String r.url
-                  "content", String r.content ])
-
-        Table [ "kind", String "websearch_results"; "results", TableArray resultTables ]
 
     let target =
         function
@@ -96,7 +85,6 @@ module PromptToml =
         | TodoTarget content -> Table [ "kind", String "todo"; "value", String content ]
         | MethodologyTarget m -> methodologyTarget m
         | ExecutorOutputTarget e -> executorOutputTarget e
-        | WebSearchResultsTarget results -> webSearchResultsTarget results
 
     let boundary =
         function

@@ -44,7 +44,7 @@ let applyActiveToolFilterForMainSession_filtersChildOnly () =
     let h = createPiHarness ()
     let pi = piObject h
     let tools = unbox<string array> (Dyn.get h.hookStore "activeTools")
-    // activeTools from harness includes child-only names: find, edit, write, lsp, fuzzy_find, fuzzy_grep, executor_wait, executor_abort, return_reviewer, search, glob, ast_edit, ast_grep, browser
+    // activeTools from harness includes child-only names: find, edit, write, lsp, executor_wait, executor_abort, return_reviewer, search, glob, ast_edit, ast_grep, browser
     let childOnlyInActive = tools |> Array.filter (fun t -> Set.contains t childOnlySet)
     // harness activeTools already contains "coder" so isMainSession = true
     promise {

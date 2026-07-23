@@ -3,7 +3,7 @@
   "version": "0.3.0",
   "private": true,
   "type": "module",
-  "description": "wanxiangshu: multi-agent plugin runtime in F#→JS via Fable",
+  "description": "wanxiangshu: multi-agent plugin runtime in F#\u2192JS via Fable",
   "main": "build/src/Hosts/Mux/Plugin.js",
   "types": "index.d.ts",
   "exports": {
@@ -18,12 +18,6 @@
       "import": "./build/src/Hosts/Omp/Plugin.js",
       "require": "./build/src/Hosts/Omp/Plugin.js",
       "default": "./build/src/Hosts/Omp/Plugin.js"
-    },
-    "./wanxiangzhen": {
-      "types": "./index.d.ts",
-      "import": "./build/src/Hosts/OpenCode/PluginWanxiangzhen.js",
-      "require": "./build/src/Hosts/OpenCode/PluginWanxiangzhen.js",
-      "default": "./build/src/Hosts/OpenCode/PluginWanxiangzhen.js"
     }
   },
   "files": [
@@ -68,7 +62,6 @@
     "eventsource": "^3.0.7"
   },
   "optionalDependencies": {
-    "@ff-labs/fff-node": "^0.9.4",
     "@kreuzberg/tree-sitter-language-pack": "^1.8.1",
     "es-module-lexer": "^2.1.0",
     "highlight.js": "^11.11.1",

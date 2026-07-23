@@ -82,7 +82,7 @@ let private integrationToolSpecsGroup2 (reg: obj) : (string * (unit -> JS.Promis
       ("muxToolExecuteAfterBlocksRepeatedIdenticalCall", muxToolExecuteAfterBlocksRepeatedIdenticalCallSpec)
       ("muxToolExecuteAfterBlocksRepeatedCallIgnoringControls",
        muxToolExecuteAfterBlocksRepeatedCallIgnoringControlsSpec)
-      ("muxToolExecuteAfterMapsNetworkError", muxToolExecuteAfterMapsNetworkErrorSpec)
+
       ("muxStreamEndToolUseErrorTriggersNudge", muxStreamEndToolUseErrorTriggersNudgeSpec)
       ("muxStreamEndToolCallsDoesNotTriggerNudge", muxStreamEndToolCallsDoesNotTriggerNudgeSpec)
       ("muxSessionErrorTriggersFallbackContinue", muxSessionErrorTriggersFallbackContinueSpec)

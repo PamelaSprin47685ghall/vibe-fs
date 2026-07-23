@@ -9,8 +9,6 @@ if (target === "mux") {
   runAll = (await import("../build/e2e/MuxTests.js")).runAll;
 } else if (target === "omp") {
   runAll = (await import("../build/e2e/TestsOmp.js")).runAll;
-} else if (target === "wanxiangzhen") {
-  runAll = (await import("../build/e2e/WanxiangzhenPluginTests.js")).runAll;
 } else if (target === "opencode-e2e-p0") {
   runAll = async (args) => {
     console.log("\n--- Running opencode e2e P0 canary suite ---");
@@ -76,10 +74,6 @@ if (target === "mux") {
     const { runAll: ompRun } = await import("../build/e2e/TestsOmp.js");
     totalFailed += await ompRun(args);
 
-    console.log("\n--- Running e2e wanxiangzhen ---");
-    const { runAll: wanRun } =
-      await import("../build/e2e/WanxiangzhenPluginTests.js");
-    totalFailed += await wanRun(args);
 
     console.log("\n--- Running opencode e2e P0 canary suite ---");
     const { spawnSync } = await import("node:child_process");

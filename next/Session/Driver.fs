@@ -120,13 +120,22 @@ type SessionDriver(gateway: IGateway, sessionId: SessionId, inbox: ISessionInbox
           MaxRetriesPerModel = 3
           MaxInvalidRetries = 3 }
 
-    let dispatchCommand cmd = DriverDispatch.dispatchCommand gateway sessionId cmd
+    let dispatchCommand cmd =
+        DriverDispatch.dispatchCommand gateway sessionId cmd
 
     let cancelCurrentFlow () =
         match flowCts with
         | Some c ->
-            try c.Cancel() with _ -> ()
-            try c.Dispose() with _ -> ()
+            try
+                c.Cancel()
+            with _ ->
+                ()
+
+            try
+                c.Dispose()
+            with _ ->
+                ()
+
             flowCts <- None
         | None -> ()
 
@@ -135,7 +144,9 @@ type SessionDriver(gateway: IGateway, sessionId: SessionId, inbox: ISessionInbox
         let newFlowCts = new CancellationTokenSource()
         flowCts <- Some newFlowCts
         currentTurnId <- Some turnId
-        let script = SessionScript.create gateway sessionId inbox waiterMapRef port turnId defaultConfig pendingUserMsgToKeyRef
+
+        let script =
+            SessionScript.create gateway sessionId inbox waiterMapRef port turnId defaultConfig pendingUserMsgToKeyRef
 
         let task =
             task {
@@ -156,19 +167,7 @@ type SessionDriver(gateway: IGateway, sessionId: SessionId, inbox: ISessionInbox
                 dispatchCommand cmd
                 return true
 
-            | ToolAfterEvent(toolName, _callId, argsJson, _outJson) ->
-                if toolName = "todowrite" then
-                    try
-                        let items =
-                            let parsed = Thoth.Json.Decode.fromString (Thoth.Json.Decode.field "todos" (Thoth.Json.Decode.list Thoth.Json.Decode.string)) argsJson
-                            match parsed with
-                            | Ok list -> list
-                            | Error _ -> []
-                        let snap: Fact.TodoSnapshot = { Items = items }
-                        let fact = Fact.Todo(TodoChanged {| Snapshot = snap |})
-                        gateway.Append (StreamId.Session sessionId) None fact |> ignore
-                    with _ -> ()
-                return true
+            | ToolAfterEvent(toolName, _callId, argsJson, _outJson) -> return true
 
             | HumanMessageEvent(turnId, _text) ->
                 let fact = Fact.Session(HumanTurnStarted {| TurnId = turnId |})
@@ -200,8 +199,29 @@ type SessionDriver(gateway: IGateway, sessionId: SessionId, inbox: ISessionInbox
 
                     let now = DateTimeOffset.UtcNow
                     let pkOpt = PromptKey.parse promptKeyStr
-                    let pKey = defaultArg pkOpt (PromptKey.create sessionId (defaultArg currentTurnId (TurnId.create "unknown")) PromptPurpose.ContinueTodo None 1 (Some userMsgId) promptKeyStr)
-                    let (newHist, newLocal) = PromptProtocol.recordTerminal localHistoricalIndex localPromptProtocol pKey (Some userMsgId) (Some assistantMsgId) outcome now
+
+                    let pKey =
+                        defaultArg
+                            pkOpt
+                            (PromptKey.create
+                                sessionId
+                                (defaultArg currentTurnId (TurnId.create "unknown"))
+                                PromptPurpose.ContinueTodo
+                                None
+                                1
+                                (Some userMsgId)
+                                promptKeyStr)
+
+                    let (newHist, newLocal) =
+                        PromptProtocol.recordTerminal
+                            localHistoricalIndex
+                            localPromptProtocol
+                            pKey
+                            (Some userMsgId)
+                            (Some assistantMsgId)
+                            outcome
+                            now
+
                     localHistoricalIndex <- newHist
                     localPromptProtocol <- newLocal
 
@@ -209,6 +229,7 @@ type SessionDriver(gateway: IGateway, sessionId: SessionId, inbox: ISessionInbox
                 | None ->
                     if awaitingNativeTerminal || flowCts.IsNone then
                         awaitingNativeTerminal <- false
+
                         if currentTurnId.IsSome then
                             startFlow currentTurnId.Value |> ignore
 
@@ -216,6 +237,7 @@ type SessionDriver(gateway: IGateway, sessionId: SessionId, inbox: ISessionInbox
 
             | CancelEvent _ ->
                 cancelCurrentFlow ()
+
                 let pFact =
                     Fact.Prompt(
                         PromptTerminal
@@ -223,6 +245,7 @@ type SessionDriver(gateway: IGateway, sessionId: SessionId, inbox: ISessionInbox
                                Outcome = Fact.PromptOutcome.FatalFailure "cancelled"
                                AssistantMessageId = None |}
                     )
+
                 gateway.Append (StreamId.Session sessionId) None pFact |> ignore
                 signalWaiterByKey "terminal:cancel" (Fact.PromptOutcome.FatalFailure "cancelled")
 
@@ -235,8 +258,7 @@ type SessionDriver(gateway: IGateway, sessionId: SessionId, inbox: ISessionInbox
 
             | PluginEvent _
             | LifecycleEvent _
-            | LoopCommandEvent _
-            | SquadCommandEvent _ -> return true
+            | LoopCommandEvent _ -> return true
         }
 
     let startWorker () : Task<unit> =

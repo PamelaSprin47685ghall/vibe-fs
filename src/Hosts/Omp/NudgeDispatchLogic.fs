@@ -26,7 +26,6 @@ open Wanxiangshu.Runtime.Fallback.SessionRuntime
 open Wanxiangshu.Runtime.Fallback.SessionRuntimePropertyPure
 open Wanxiangshu.Kernel.FallbackKernel.Types
 open Wanxiangshu.Runtime.NudgeLease
-open Wanxiangshu.Runtime.FuzzyIteratorStore
 open Wanxiangshu.Runtime.ReviewRuntime
 open Wanxiangshu.Kernel.EventSourcing.Fold
 open Wanxiangshu.Runtime.SessionEventWriter
@@ -111,7 +110,10 @@ let private buildNudgeSnapshot
                 RunnerPresence.Absent
 
         let anchor =
-            Wanxiangshu.Kernel.Nudge.NudgeProjection.nudgeAnchorKey snap.turnId snap.agentFromMessage snap.modelFromMessage
+            Wanxiangshu.Kernel.Nudge.NudgeProjection.nudgeAnchorKey
+                snap.turnId
+                snap.agentFromMessage
+                snap.modelFromMessage
 
         let blockStatus =
             if

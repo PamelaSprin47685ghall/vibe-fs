@@ -20,6 +20,11 @@ open Wanxiangshu.Next.Tests.JournalTests.JournalTestSupport
 
 module VerticalSliceE2ETests =
 
+    type private FakePromptPort(continuationMsgId: MessageId) =
+        interface IPromptPort with
+            member _.SendPrompt (_sessionId: SessionId) (_text: string) (_opts: PromptOptions) =
+                Task.FromResult(Delivered continuationMsgId)
+
     [<Fact>]
     let Vertical_slice_full_production_vertical_slice_e2e () =
         withTempDir (fun tempDir ->
@@ -39,17 +44,9 @@ module VerticalSliceE2ETests =
                     Assert.Equal(Ok(), inbox.TryPost(HumanMessageEvent(turnId, "Build feature Z")))
 
                     let commandPort = SessionInboxCommandPort(inbox) :> SessionCommandPort
-                    let todoTool = StaticTools.todowriteTool commandPort
-                    let toolCtx: ToolContext =
-                        { SessionId = sessionId
-                          Workspace = tempDir
-                          Cancellation = CancellationToken.None
-                          Deadline = Wanxiangshu.Next.Process.Deadline.ofBudget DateTimeOffset.UtcNow (TimeSpan.FromSeconds 10.0)
-                          Session = commandPort }
-
-                    let! _ = todoTool.Execute toolCtx { Payload = "{\"todos\":[\"task 1\"]}" }
 
                     let nativeAstId = MessageId.create "native-ast-1"
+
                     Assert.Equal(
                         Ok(),
                         inbox.TryPost(
@@ -72,9 +69,14 @@ module VerticalSliceE2ETests =
 
                     Assert.True(promptReqSeen, "Expected PromptRequested during continuation flow")
 
-                    let! _ = todoTool.Execute toolCtx { Payload = "{\"todos\":[]}" }
+                    let deadline =
+                        Wanxiangshu.Next.Process.Deadline.ofBudget DateTimeOffset.UtcNow (TimeSpan.FromSeconds 10.0)
+
+                    let! _ =
+                        commandPort.Request (ReturnVerdict("Passed", (fun _ -> ()))) CancellationToken.None deadline
 
                     let contAstId = MessageId.create "cont-ast-1"
+
                     Assert.Equal(
                         Ok(),
                         inbox.TryPost(
@@ -95,7 +97,7 @@ module VerticalSliceE2ETests =
                                 | _ -> false)
                             1
 
-                    Assert.True(settledSeen, "Expected SessionSettled after todo cleared")
+                    Assert.True(settledSeen, "Expected SessionSettled after review passed")
 
                     let sessionProj = Map.find sessionId gateway.ProjectionSet.SessionProjections
                     Assert.True(sessionProj.SettledResult.IsSome, "Expected SettledResult to be present")

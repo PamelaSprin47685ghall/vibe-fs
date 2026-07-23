@@ -3,7 +3,6 @@ module Wanxiangshu.Runtime.RuntimeScopeForgetSession
 open Fable.Core.JsInterop
 open Wanxiangshu.Runtime.Dyn
 open Wanxiangshu.Runtime.EventLogRuntimeStore
-open Wanxiangshu.Runtime.FuzzyIteratorStore
 open Wanxiangshu.Runtime.RuntimeScope
 open Wanxiangshu.Runtime.SubagentIteratorStore
 
@@ -36,7 +35,6 @@ let forgetSession (scope: RuntimeScope) (sessionId: string) : unit =
         let prefix = sessionId + "\u0000"
         scope.ClearCapsFilesForSession prefix
         scope.ClearCapsInflightForSession prefix
-        clearTypedIteratorScope scope.IteratorStore sessionId
         clearSubagentIteratorScope scope.SubagentIteratorStore sessionId
         scope.Remove("contextbudget_" + sessionId)
 

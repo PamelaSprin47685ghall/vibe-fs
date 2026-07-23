@@ -12,27 +12,8 @@ open Wanxiangshu.Runtime.EventLogLock
 open Wanxiangshu.Runtime.ReviewEventWriter
 open Wanxiangshu.Runtime.SessionEventWriter
 open Wanxiangshu.Runtime.EventLogRuntimeNudge
-open Wanxiangshu.Runtime.SquadEventStore
 open Wanxiangshu.Kernel.Nudge
-open Wanxiangshu.Kernel.Wanxiangzhen.SquadEvent
 
-let testGetSquadEventsCache () : JS.Promise<unit> =
-    promise {
-        let! dir = mkdtempAsync "eventlog-squad-cache-"
-        let store = EventLogStore dir
-        let squadEvent = SquadCreated("s1", "req")
-        let! _ = store.AppendSquadEvent "2025-01-01T00:00:00Z" squadEvent
-        let! _ = store.GetSessionState "s-any"
-
-        let path = eventPath dir
-        do! rmAsync path
-
-        let! dag = store.GetSquadDag "s1"
-        check "squad dag restored from memory" (dag.SessionId = "s1")
-        equal "expected squad dag requirement" "req" dag.RootRequirement
-
-        do! rmAsync dir
-    }
 
 let testReadAllEventsIdempotent () : JS.Promise<unit> =
     promise {
@@ -107,16 +88,30 @@ let testEventLogStoreResetPoisonRecoversEnqueue () =
 
         let mockAppend (filePath: string) (ev: WanEvent) =
             promise {
-                if slowWrite then do! slowWritePromise
+                if slowWrite then
+                    do! slowWritePromise
+
                 do! appendFileAsync filePath (wanEventToLine ev + "\n")
             }
 
         let store = EventLogStore(dir, appendLineOverride = mockAppend, timeoutMs = 50)
-        let ev = { V = 1; Session = "s1"; Kind = "test_reset"; At = ""; Payload = Map [ "k", "v" ]; EventId = None; WriterId = None; Sequence = None; Checksum = None }
+
+        let ev =
+            { V = 1
+              Session = "s1"
+              Kind = "test_reset"
+              At = ""
+              Payload = Map [ "k", "v" ]
+              EventId = None
+              WriterId = None
+              Sequence = None
+              Checksum = None }
 
         let! res = store.AppendEvent ev
+
         match res with
-        | Error msg -> check "store timed out and was poisoned" (msg.Contains("TimeoutError") || msg.Contains("QueuePoisoned"))
+        | Error msg ->
+            check "store timed out and was poisoned" (msg.Contains("TimeoutError") || msg.Contains("QueuePoisoned"))
         | Ok _ -> failwith "expected timeout"
 
         check "store is poisoned" store.Poisoned
@@ -127,8 +122,9 @@ let testEventLogStoreResetPoisonRecoversEnqueue () =
         resolveSlowWrite ()
 
         let! res2 = store.AppendEvent ev
+
         match res2 with
-        | Ok () -> check "append succeeded after ResetPoison" true
+        | Ok() -> check "append succeeded after ResetPoison" true
         | Error msg -> failwith ("expected Ok after ResetPoison, got: " + msg)
 
         let! events = store.ReadAllEvents()
@@ -138,7 +134,7 @@ let testEventLogStoreResetPoisonRecoversEnqueue () =
 
 let testEventLogRuntimeStoreCacheAutoResetsPoisonedEntry () =
     promise {
-        Wanxiangshu.Runtime.EventLogRuntimeStore.clear()
+        Wanxiangshu.Runtime.EventLogRuntimeStore.clear ()
         let! dir = mkdtempAsync "eventlog-runtime-autoreset-"
 
         let store = Wanxiangshu.Runtime.EventLogRuntimeStore.getStore dir
@@ -149,13 +145,12 @@ let testEventLogRuntimeStoreCacheAutoResetsPoisonedEntry () =
         let store2 = Wanxiangshu.Runtime.EventLogRuntimeStore.getStore dir
         check "getStore auto resets poisoned instance" (not store2.Poisoned)
 
-        Wanxiangshu.Runtime.EventLogRuntimeStore.clear()
+        Wanxiangshu.Runtime.EventLogRuntimeStore.clear ()
         do! rmAsync dir
     }
 
 let run () =
     promise {
-        do! testGetSquadEventsCache ()
         do! testReadAllEventsIdempotent ()
         do! appendWithEmptyWorkspaceRootWritesNothing ()
         do! deletingInitializedLogClearsProjection ()

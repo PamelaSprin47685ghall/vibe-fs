@@ -3,11 +3,8 @@ module Wanxiangshu.Tests.KernelAndSupportCoverageEntries
 open Wanxiangshu.Tests.TestsTestBody
 open Wanxiangshu.Tests.SearchToolsTests
 open Wanxiangshu.Tests.KernelDomainIdentityTests
-open Wanxiangshu.Tests.KernelFuzzyPathConstraintTests
 open Wanxiangshu.Tests.KernelReviewSessionCoverageTests
-open Wanxiangshu.Tests.FuzzySearchSupportCoverageTests
 open Wanxiangshu.Tests.MethodologyArgsCoverageTests
-open Wanxiangshu.Tests.FuzzySearchGrepTests
 open Wanxiangshu.Tests.OpencodeToolSchemaCoverageTests
 open Wanxiangshu.Tests.KernelDomainCoverageTests
 open Wanxiangshu.Tests.KernelDomainCoverageTestsToolArgs
@@ -16,7 +13,6 @@ open Wanxiangshu.Tests.KernelCoverageTestsMethodology
 open Wanxiangshu.Tests.OmpToolsCoverageTests
 open Wanxiangshu.Tests.OmpCodecCoverageTests
 open Wanxiangshu.Tests.PluginMimoTuiTests
-open Wanxiangshu.Tests.FuzzySearchAndLivelockGuardTests
 open Wanxiangshu.Tests.LivelockGuardScopeTests
 open Wanxiangshu.Tests.OpencodeHookSchemaCoverageTests
 open Wanxiangshu.Tests.OpencodeSearchToolsCoverageTests
@@ -28,10 +24,7 @@ open Wanxiangshu.Tests.MuxCoverageTests
 
 let kernelSupportCoverageTestEntries () : (string * TestBody) list =
     [ "KernelDomainIdentityTests.run", Sync(sync KernelDomainIdentityTests.run)
-      "KernelFuzzyPathConstraintTests.run", Sync(sync KernelFuzzyPathConstraintTests.run)
       "KernelReviewSessionCoverageTests.run", Sync(sync KernelReviewSessionCoverageTests.run)
-      "FuzzySearchSupportCoverageTests.run", Sync(sync FuzzySearchSupportCoverageTests.run)
-      "FuzzySearchGrepTests.run", Sync(sync FuzzySearchGrepTests.run)
       "MethodologyArgsCoverageTests.run", Sync(sync MethodologyArgsCoverageTests.run)
       "OpencodeToolSchemaCoverageTests.run", Sync(sync OpencodeToolSchemaCoverageTests.run)
       "KernelDomainCoverageTests.run", Sync(sync KernelDomainCoverageTests.run)
@@ -49,5 +42,4 @@ let kernelSupportCoverageTestEntries () : (string * TestBody) list =
       "ReviewerLoopTests.run", Async ReviewerLoopTests.run
       "ReviewerLoopCleanupTests.run", Async ReviewerLoopCleanupTests.run
       "SubagentPromptAbortTests.run", Async SubagentPromptAbortTests.run
-      "FuzzySearchAndLivelockGuardTests.run", Sync(sync FuzzySearchAndLivelockGuardTests.run)
       "LivelockGuardScopeTests.run", Sync(sync LivelockGuardScopeTests.run) ]

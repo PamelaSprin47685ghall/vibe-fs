@@ -5,15 +5,12 @@ open Wanxiangshu.Kernel.OmpSessionTools
 open Wanxiangshu.Runtime.ReviewPrompts
 open Wanxiangshu.Runtime.SubagentPrompts
 open Wanxiangshu.Runtime.SubagentSummarizerPrompts
-open Wanxiangshu.Kernel.WebFetchGuard
 
 let private mainSessionActive =
     [| "read"
        "edit"
        "write"
        "find"
-       "fuzzy_find"
-       "fuzzy_grep"
        "lsp"
        "browser"
        "search"
@@ -28,8 +25,6 @@ let private mainSessionActive =
        "executor"
        "submit_review"
        "return_reviewer"
-       "websearch"
-       "webfetch"
        "todowrite" |]
 
 let filterOmpMainSessionTools () =
@@ -43,8 +38,6 @@ let filterOmpMainSessionTools () =
            "meditator"
            "executor"
            "submit_review"
-           "websearch"
-           "webfetch"
            "todowrite" |] do
         check ("main keeps " + name) (set.Contains name)
 
@@ -53,8 +46,6 @@ let filterOmpMainSessionTools () =
            "edit"
            "write"
            "lsp"
-           "fuzzy_find"
-           "fuzzy_grep"
            "return_reviewer"
            "search"
            "glob"
@@ -64,28 +55,6 @@ let filterOmpMainSessionTools () =
            "bash" |] do
         check ("main strips " + name) (not (set.Contains name))
 
-let validateFetchUrlBlocksPrivate () =
-    let blocked =
-        [| "http://localhost/"
-           "http://127.0.0.1/"
-           "http://0.0.0.0/"
-           "http://[::1]/"
-           "http://10.0.0.1/"
-           "http://192.168.1.1/"
-           "http://169.254.169.254/" |]
-
-    for url in blocked do
-        check
-            ("ssrf block " + url)
-            (match validateFetchUrl url with
-             | Error _ -> true
-             | Ok _ -> false)
-
-    check
-        "ssrf allow public https"
-        (match validateFetchUrl "https://example.com/path" with
-         | Ok _ -> true
-         | _ -> false)
 
 let reviewInstructionsCanonicalVerdictTool () =
     check "reviewInstructions has return_reviewer" (reviewInstructions.Contains "return_reviewer")
@@ -112,7 +81,8 @@ let executorSummarizerPromptCarriesWhatToSummarize () =
           signal = None
           truncated = false }
 
-    let prompt = executorSummarizerPrompt marker evidence "shell" "echo 1" [] Wanxiangshu.Kernel.Prompt.TimeoutKind.Long
+    let prompt =
+        executorSummarizerPrompt marker evidence "shell" "echo 1" [] Wanxiangshu.Kernel.Prompt.TimeoutKind.Long
 
     check "prompt has objective" (prompt.Contains "objective =")
     check "prompt embeds summarize intent" (prompt.Contains marker)

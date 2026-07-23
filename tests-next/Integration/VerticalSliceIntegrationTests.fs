@@ -18,12 +18,12 @@ open Wanxiangshu.Next.OpenCode
 open Wanxiangshu.Next.Tests
 open Wanxiangshu.Next.Tests.JournalTests.JournalTestSupport
 
-type FakePromptPort(continuationMsgId: MessageId) =
-    interface IPromptPort with
-        member _.SendPrompt (_sessionId: SessionId) (_text: string) (_opts: PromptOptions) =
-            Task.FromResult(Delivered continuationMsgId)
-
 module VerticalSliceIntegrationTests =
+
+    type private FakePromptPort(continuationMsgId: MessageId) =
+        interface IPromptPort with
+            member _.SendPrompt (_sessionId: SessionId) (_text: string) (_opts: PromptOptions) =
+                Task.FromResult(Delivered continuationMsgId)
 
     [<Fact>]
     let Vertical_slice_integration_closed_loop () =
@@ -57,7 +57,7 @@ module VerticalSliceIntegrationTests =
 
                     let! _ = gateway.DisposeAsync()
                     ()
-             })
+            })
 
     [<Fact>]
     let ``SessionDriver_commits_human_turns_without_cross_session_projection_leakage`` () =
@@ -98,7 +98,7 @@ module VerticalSliceIntegrationTests =
 
                     let! _ = gateway.DisposeAsync()
                     ()
-             })
+            })
 
     [<Fact>]
     let ``OpenCode_human_hook_commits_one_turn_fact`` () =
@@ -119,7 +119,9 @@ module VerticalSliceIntegrationTests =
                         {| id = "msg-human-hook"
                            role = "user"
                            sessionID = "session-human-hook"
-                           parts = [ {| ``type`` = "text"; text = "continue" |} ] |}
+                           parts =
+                            [ {| ``type`` = "text"
+                                 text = "continue" |} ] |}
 
                     let hookInput: OpencodeHookInput =
                         { sessionID = "session-human-hook"
@@ -127,7 +129,13 @@ module VerticalSliceIntegrationTests =
                           agent = Some "coder"
                           model = None }
 
-                    OpencodeHooks.handleChatMessage gateway (SessionDrivers()) inboxes hookInput {| message = userMessage |}
+                    OpencodeHooks.handleChatMessage
+                        gateway
+                        (SessionDrivers())
+                        inboxes
+                        hookInput
+                        {| message = userMessage |}
+
                     do! VerticalSliceJournalSupport._awaitDriverProcessed inbox
 
                     let envelopes = VerticalSliceJournalSupport._readEnvelopes gateway.JournalPath
@@ -197,7 +205,13 @@ module VerticalSliceIntegrationTests =
 
                     let userMsgId = MessageId.create "msg_user_1"
                     let assistantMsgId = MessageId.create "assistant_e2e_1"
-                    Assert.Equal(Ok(), inbox.TryPost(AssistantTerminalEvent(userMsgId, assistantMsgId, PromptOutcome.Delivered assistantMsgId)))
+
+                    Assert.Equal(
+                        Ok(),
+                        inbox.TryPost(
+                            AssistantTerminalEvent(userMsgId, assistantMsgId, PromptOutcome.Delivered assistantMsgId)
+                        )
+                    )
 
                     let finishFact =
                         Fact.Session(SessionSettled {| Result = SessionResult.Completed "Vertical slice completed" |})
@@ -230,7 +244,12 @@ module VerticalSliceIntegrationTests =
                 let eventFn = unbox<obj -> unit> hooksObj?event
                 let cmdFn = unbox<obj -> unit> hooksObj?command
 
-                let cmdArg = createObj [ "name", box "loop"; "sessionID", box "sess-e2e-flow"; "arguments", box "task loop" ]
+                let cmdArg =
+                    createObj
+                        [ "name", box "loop"
+                          "sessionID", box "sess-e2e-flow"
+                          "arguments", box "task loop" ]
+
                 cmdFn cmdArg
 
                 let! ev1 = inbox.Receive CancellationToken.None
@@ -241,7 +260,11 @@ module VerticalSliceIntegrationTests =
                     Assert.Equal("task loop", text)
                 | other -> Assert.True(false, sprintf "Expected LoopCommandEvent, got %A" other)
 
-                let evIdle = createObj [ "type", box "session.idle"; "properties", box (createObj [ "sessionID", box "sess-e2e-flow" ]) ]
+                let evIdle =
+                    createObj
+                        [ "type", box "session.idle"
+                          "properties", box (createObj [ "sessionID", box "sess-e2e-flow" ]) ]
+
                 eventFn evIdle
 
                 let! ev2 = inbox.Receive CancellationToken.None

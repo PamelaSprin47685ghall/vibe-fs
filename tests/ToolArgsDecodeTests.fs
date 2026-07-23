@@ -61,14 +61,6 @@ let decodeToolArgsRejectsCoderBatch () =
     | Error(InvalidIntent("coder", "tool", _)) -> check "decodeToolArgs rejects batch" true
     | _ -> check "decodeToolArgs rejects batch" false
 
-let decodeWebsearchMissingWhatToSummarize () =
-    let args = createObj [ "query", box "q" ]
-
-    match decodeToolInvocation "websearch" args with
-    | Error(InvalidIntent("websearch", "what_to_summarize", "required")) ->
-        check "websearch missing what_to_summarize via decodeToolInvocation" true
-    | _ -> check "websearch missing what_to_summarize via decodeToolInvocation" false
-
 let decodeExecutorOkShell () =
     let args =
         createObj
@@ -161,7 +153,6 @@ let run () =
     decodeCoderInvalidIntentShape ()
     decodeCoderEmptyIntentsArray ()
     decodeToolArgsRejectsCoderBatch ()
-    decodeWebsearchMissingWhatToSummarize ()
     decodeExecutorOkShell ()
     decodeExecutorMissingWhatToSummarize ()
     decodeApplyPatchMissingPatchText ()

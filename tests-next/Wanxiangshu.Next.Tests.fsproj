@@ -29,6 +29,7 @@
     <Compile Include="Journal/FactCodecTests.fs"/>
     <Compile Include="Journal/JournalIsolationTests.fs"/>
     <Compile Include="Process/ProcessTests.fs"/>
+    <Compile Include="Process/ProcessBudgetTests.fs"/>
     <Compile Include="Tools/MessageTransformTests.fs"/>
     <Compile Include="OpenCode/GatewayBootTests.fs"/>
     <Compile Include="OpenCode/OpencodePluginTests.fs"/>
@@ -37,6 +38,11 @@
     <Compile Include="Session/SessionFallbackTests.fs"/>
     <Compile Include="Session/SessionProtocolTests.fs"/>
     <Compile Include="Session/ChildFlowTests.fs"/>
+    <Compile Include="Session/CompanionTests.fs"/>
+    <Compile Include="Session/ForkRuntimeTests.fs"/>
+    <Compile Include="Session/RolesTests.fs"/>
+    <Compile Include="Session/ReviewGuardTests.fs"/>
+    <Compile Include="Integration/OrchestratorTests.fs"/>
     <Compile Include="Gates/ArchitectureGateSupport.fs"/>
     <Compile Include="Gates/ArchitectureGates.fs"/>
     <Compile Include="Integration/VerticalSliceJournalSupport.fs"/>

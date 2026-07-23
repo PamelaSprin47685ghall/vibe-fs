@@ -5,8 +5,7 @@
   "main": "src/Hosts/Mux/Plugin.js",
   "exports": {
     ".": "./src/Hosts/Mux/Plugin.js",
-    "./omp": "./src/Hosts/Omp/Plugin.js",
-    "./wanxiangzhen": "./src/Hosts/OpenCode/PluginWanxiangzhen.js"
+    "./omp": "./src/Hosts/Omp/Plugin.js"
   },
   "dependencies": {
     "highlight.js": "*",
