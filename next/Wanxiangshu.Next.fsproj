@@ -41,6 +41,8 @@
     <Compile Include="Tools/MessageTransform.fs"/>
     <Compile Include="Tools/ToolContext.fs"/>
     <Compile Include="Tools/StaticTools.fs"/>
+    <Compile Include="Tools/FileTools.fs"/>
+    <Compile Include="Tools/ReviewTools.fs"/>
     <Compile Include="Wanxiangzhen/SquadTypes.fs"/>
     <Compile Include="Wanxiangzhen/SquadFlow.fs"/>
     <Compile Include="OpenCode/OpencodeTypes.fs"/>

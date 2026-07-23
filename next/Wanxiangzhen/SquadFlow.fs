@@ -1,6 +1,5 @@
 namespace Wanxiangshu.Next.Wanxiangzhen
 
-open System
 open Wanxiangshu.Next.Kernel
 open Wanxiangshu.Next.Kernel.Fact
 open Wanxiangshu.Next.Session
@@ -8,7 +7,7 @@ open Wanxiangshu.Next.Session
 module SquadFlows =
 
     let squadProgress: ProgressGuard<SquadScript, SquadError> =
-        { Stamp = fun _ -> DateTimeOffset.UtcNow.Ticks
+        { Stamp = fun s -> s.GetProgressStamp()
           NoProgress = fun msg -> SquadError.SquadNoProgress msg }
 
     let squad = FlowBuilder<SquadScript, SquadError>(Some squadProgress)
