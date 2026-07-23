@@ -8,7 +8,7 @@ open Wanxiangshu.Next.Kernel
 open Wanxiangshu.Next.Kernel.Identity
 open Wanxiangshu.Next.Kernel.Fact
 open Wanxiangshu.Next.Journal
-open Wanxiangshu.Next.Journal.Writer
+open Wanxiangshu.Next.Kernel.Outcome
 open Wanxiangshu.Next.Session
 open Wanxiangshu.Next.OpenCode
 open Wanxiangshu.Next.Tests
