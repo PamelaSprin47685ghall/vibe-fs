@@ -18,11 +18,6 @@ open Wanxiangshu.Next.OpenCode
 open Wanxiangshu.Next.Tests
 open Wanxiangshu.Next.Tests.JournalTests.JournalTestSupport
 
-type FakePromptPort(continuationMsgId: MessageId) =
-    interface IPromptPort with
-        member _.SendPrompt (_sessionId: SessionId) (_text: string) (_opts: PromptOptions) =
-            Task.FromResult(Delivered continuationMsgId)
-
 module VerticalSliceIntegrationTests =
 
     [<Fact>]

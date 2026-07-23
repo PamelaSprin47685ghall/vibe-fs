@@ -102,7 +102,7 @@ async function runTests() {
         if (file !== 'fable_modules' && file !== 'node_modules' && file !== 'fixtures') {
           results = results.concat(findJsFiles(fullPath));
         }
-      } else if (file.endsWith('.js') && !file.endsWith('TestSupport.js') && !file.endsWith('GateSupport.js') && !file.endsWith('Signatures.js') && !file.endsWith('Assert.js') && !file.endsWith('EventDrivenHarness.js') && !file.endsWith('worker.js') && !file.includes('.nuget')) {
+      } else if (file.endsWith('.js') && !file.endsWith('TestSupport.js') && !file.endsWith('GateSupport.js') && !file.endsWith('JournalSupport.js') && !file.endsWith('Waiters.js') && !file.endsWith('Signatures.js') && !file.endsWith('Assert.js') && !file.endsWith('EventDrivenHarness.js') && !file.endsWith('worker.js') && !file.includes('.nuget')) {
         results.push(fullPath);
       }
     }
@@ -111,11 +111,29 @@ async function runTests() {
 
   const buildDir = path.join(__dirname, '../build/tests-next');
   const targetDir = fs.existsSync(buildDir) ? buildDir : __dirname;
+  const categoryArg = process.argv[2];
+  let filterFn = () => true;
+  if (categoryArg) {
+    const cat = categoryArg.toLowerCase();
+    if (cat === 'unit' || cat === 'l0') {
+      filterFn = (rel) => !rel.includes('Integration') && !rel.includes('E2E');
+    } else if (cat === 'integration' || cat === 'l2') {
+      filterFn = (rel) => rel.includes('Integration');
+    } else if (cat === 'e2e' || cat === 'l4') {
+      filterFn = (rel) => rel.includes('E2E');
+    } else if (cat !== 'all') {
+      filterFn = (rel) => rel.toLowerCase().includes(cat);
+    }
+  }
+
   const testFiles = findJsFiles(targetDir).filter((file) => {
     if (targetDir !== buildDir) return true;
 
     const sourcePath = path.join(__dirname, path.relative(buildDir, file).replace(/\.js$/, '.fs'));
-    return fs.existsSync(sourcePath);
+    if (!fs.existsSync(sourcePath)) return false;
+
+    const rel = path.relative(buildDir, file);
+    return filterFn(rel);
   });
   console.log(`Found ${testFiles.length} test files in ${targetDir}`);
 

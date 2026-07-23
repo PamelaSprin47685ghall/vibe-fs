@@ -6,3 +6,5 @@
 {"digest":"ea33a34910773378161a95aea7241e16","role":"backend","skill":"bernstein-test-runner","task_id":"2810665ec83e","timestamp":"2026-07-23T10:23:02.525Z","trigger_source":"role-binding","version":""}
 {"digest":"eda3646de2225382f3f38b4073381fd1","role":"backend","skill":"bernstein-commit-protocol","task_id":"82ffd45475a8","timestamp":"2026-07-23T10:23:02.526Z","trigger_source":"role-binding","version":""}
 {"digest":"eda3646de2225382f3f38b4073381fd1","role":"backend","skill":"bernstein-commit-protocol","task_id":"2810665ec83e","timestamp":"2026-07-23T10:23:02.526Z","trigger_source":"role-binding","version":""}
+{"digest":"55c41bcce9881b40528510fb9a0b216a","role":"devops","skill":"bernstein-completion-protocol","task_id":"eb349425cc89","timestamp":"2026-07-23T10:27:35.399Z","trigger_source":"role-binding","version":""}
+{"digest":"42d7f4676f3e968226279d2ddeb50cd9","role":"devops","skill":"bernstein-signal-check","task_id":"eb349425cc89","timestamp":"2026-07-23T10:27:35.400Z","trigger_source":"role-binding","version":""}

@@ -52,6 +52,10 @@
     "build-and-test-e2e": "node scripts/build-and-test-e2e.mjs",
     "build:next": "cd next && npm run build",
     "test:next": "cd next && npm run build-and-test",
+    "test:next:unit": "cd next && npm run test:unit",
+    "test:next:integration": "cd next && npm run test:integration",
+    "test:next:e2e": "cd next && npm run test:e2e",
+    "test:next:all": "cd next && npm run test:all",
     "format": "node scripts/pre-commit-formatter.mjs"
   },
   "dependencies": {

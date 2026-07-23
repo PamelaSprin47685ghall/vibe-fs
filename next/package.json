@@ -7,7 +7,11 @@
   "main": "../build/next/OpenCode/Plugin.js",
   "scripts": {
     "build": "dotnet fable precompile Wanxiangshu.Next.fsproj -o ../build/next",
-    "build-and-test": "npm run build && cd ../tests-next && dotnet fable Wanxiangshu.Next.Tests.fsproj --outDir ../build/tests-next --precompiledLib ../build/next && node --test runner.test.mjs && node runner.js"
+    "build-and-test": "npm run build && cd ../tests-next && dotnet fable Wanxiangshu.Next.Tests.fsproj --outDir ../build/tests-next --precompiledLib ../build/next && node --test runner.test.mjs && node runner.js",
+    "test:unit": "npm run build && cd ../tests-next && dotnet fable Wanxiangshu.Next.Tests.fsproj --outDir ../build/tests-next --precompiledLib ../build/next && node runner.js unit",
+    "test:integration": "npm run build && cd ../tests-next && dotnet fable Wanxiangshu.Next.Tests.fsproj --outDir ../build/tests-next --precompiledLib ../build/next && node runner.js integration",
+    "test:e2e": "npm run build && cd ../tests-next && dotnet fable Wanxiangshu.Next.Tests.fsproj --outDir ../build/tests-next --precompiledLib ../build/next && node runner.js e2e",
+    "test:all": "npm run build-and-test"
   },
   "dependencies": {
     "@fable-org/fable-library-js": "^2.4.0",

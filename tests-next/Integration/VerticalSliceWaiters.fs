@@ -7,9 +7,16 @@ open Xunit
 open Wanxiangshu.Next.Kernel
 open Wanxiangshu.Next.Kernel.Identity
 open Wanxiangshu.Next.Kernel.Fact
+open Wanxiangshu.Next.Kernel.Outcome
 open Wanxiangshu.Next.Journal
+open Wanxiangshu.Next.Session
 open Wanxiangshu.Next.OpenCode
 open Wanxiangshu.Next.Tests
+
+type FakePromptPort(continuationMsgId: MessageId) =
+    interface IPromptPort with
+        member _.SendPrompt (_sessionId: SessionId) (_text: string) (_opts: PromptOptions) =
+            Task.FromResult(Delivered continuationMsgId)
 
 module VerticalSliceWaiters =
 
