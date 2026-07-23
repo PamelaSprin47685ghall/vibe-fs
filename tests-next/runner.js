@@ -1,17 +1,90 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fork } from 'node:child_process';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const repoRoot = path.join(__dirname, '..');
+const workerPath = path.join(__dirname, 'worker.js');
 
-function withTimeout(promise, ms, label) {
-  let timer;
-  const timeoutP = new Promise((_, reject) => {
-    timer = setTimeout(() => {
-      reject(new Error(`TIMEOUT: Test '${label}' exceeded ${ms}ms limit`));
-    }, ms);
+function stopWorker(worker, signal) {
+  if (!worker.pid) return;
+
+  try {
+    if (process.platform === 'win32') {
+      worker.kill(signal);
+    } else {
+      process.kill(-worker.pid, signal);
+    }
+  } catch (error) {
+    if (error.code !== 'ESRCH') throw error;
+  }
+}
+
+export function runTestInWorker(file, exportName, timeoutMs) {
+  return new Promise((resolve, reject) => {
+    const worker = fork(workerPath, [file, exportName], {
+      cwd: repoRoot,
+      detached: true,
+      stdio: ['ignore', 'inherit', 'inherit', 'ipc']
+    });
+
+    let finished = false;
+    let timer;
+    let assertionCount = 0;
+    let lastAssertionAt = Date.now();
+
+    const finish = (settle, value, signal) => {
+      if (finished) return;
+
+      finished = true;
+      clearTimeout(timer);
+      stopWorker(worker, signal);
+      settle(value);
+    };
+
+    const resetTimer = () => {
+      clearTimeout(timer);
+      timer = setTimeout(() => {
+        finish(
+          reject,
+          new Error(
+            `TIMEOUT: Assertion step in '${exportName}' (${path.basename(file)}) exceeded ${timeoutMs}ms limit; ` +
+            `last assertion ${Date.now() - lastAssertionAt}ms ago (${assertionCount} total)`
+          ),
+          'SIGKILL'
+        );
+      }, timeoutMs);
+    };
+
+    resetTimer();
+
+    worker.on('message', (msg) => {
+      if (msg.status === 'heartbeat') {
+        if (!finished) {
+          assertionCount++;
+          lastAssertionAt = Date.now();
+          resetTimer();
+        }
+      } else if (msg.status === 'ok') {
+        finish(resolve, msg.result, 'SIGTERM');
+      } else {
+        finish(reject, new Error(msg.message), 'SIGTERM');
+      }
+    });
+
+    worker.on('error', (err) => {
+      finish(reject, err, 'SIGTERM');
+    });
+
+    worker.on('exit', (code, signal) => {
+      finish(
+        reject,
+        new Error(`Worker stopped before reporting a result (exit code ${code}, signal ${signal})`),
+        'SIGTERM'
+      );
+    });
   });
-  return Promise.race([promise, timeoutP]).finally(() => clearTimeout(timer));
 }
 
 async function runTests() {
@@ -26,10 +99,10 @@ async function runTests() {
       const fullPath = path.join(dir, file);
       const stat = fs.statSync(fullPath);
       if (stat.isDirectory()) {
-        if (file !== 'fable_modules' && file !== 'node_modules') {
+        if (file !== 'fable_modules' && file !== 'node_modules' && file !== 'fixtures') {
           results = results.concat(findJsFiles(fullPath));
         }
-      } else if (file.endsWith('.js') && !file.endsWith('TestSupport.js') && !file.endsWith('Signatures.js') && !file.endsWith('Assert.js') && !file.endsWith('EventDrivenHarness.js') && !file.includes('.nuget')) {
+      } else if (file.endsWith('.js') && !file.endsWith('TestSupport.js') && !file.endsWith('GateSupport.js') && !file.endsWith('Signatures.js') && !file.endsWith('Assert.js') && !file.endsWith('EventDrivenHarness.js') && !file.endsWith('worker.js') && !file.includes('.nuget')) {
         results.push(fullPath);
       }
     }
@@ -38,21 +111,23 @@ async function runTests() {
 
   const buildDir = path.join(__dirname, '../build/tests-next');
   const targetDir = fs.existsSync(buildDir) ? buildDir : __dirname;
-  const testFiles = findJsFiles(targetDir);
+  const testFiles = findJsFiles(targetDir).filter((file) => {
+    if (targetDir !== buildDir) return true;
+
+    const sourcePath = path.join(__dirname, path.relative(buildDir, file).replace(/\.js$/, '.fs'));
+    return fs.existsSync(sourcePath);
+  });
   console.log(`Found ${testFiles.length} test files in ${targetDir}`);
 
   for (const file of testFiles) {
     const rel = path.relative(__dirname, file);
     try {
-      const module = await import(fileURLToPath(new URL(`file://${file}`)));
+      const module = await import(pathToFileURL(file).href);
       for (const [key, value] of Object.entries(module)) {
         if (typeof value === 'function' && !key.startsWith('_') && !value.toString().startsWith('class ') && !key.endsWith('_$ctor') && !key.endsWith('_$reflection') && !key.startsWith('check') && !key.startsWith('contains')) {
+          const start = Date.now();
           try {
-            const start = Date.now();
-            const res = value();
-            if (res && typeof res.then === 'function') {
-              await withTimeout(res, 10000, key);
-            }
+            await runTestInWorker(file, key, 1000);
             const elapsed = Date.now() - start;
             passed++;
             console.log(`  ✓ ${rel} > ${key} (${elapsed}ms)`);
@@ -77,4 +152,6 @@ async function runTests() {
   }
 }
 
-runTests();
+if (process.argv[1] === fileURLToPath(import.meta.url)) {
+  runTests();
+}

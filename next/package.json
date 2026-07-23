@@ -7,7 +7,7 @@
   "main": "../build/next/OpenCode/Plugin.js",
   "scripts": {
     "build": "dotnet fable precompile Wanxiangshu.Next.fsproj -o ../build/next",
-    "build-and-test": "npm run build && cd ../tests-next && dotnet fable Wanxiangshu.Next.Tests.fsproj --outDir ../build/tests-next --precompiledLib ../build/next && node ../tests-next/runner.js"
+    "build-and-test": "npm run build && cd ../tests-next && dotnet fable Wanxiangshu.Next.Tests.fsproj --outDir ../build/tests-next --precompiledLib ../build/next && node --test runner.test.mjs && node runner.js"
   },
   "dependencies": {
     "@fable-org/fable-library-js": "^2.4.0",

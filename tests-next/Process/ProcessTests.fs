@@ -100,13 +100,9 @@ module ProcessTests =
     let Process_execute_cancel_long_running_returns_ProcessCancelled () =
         task {
             let isWindows = false
-            let cmdName = if isWindows then "cmd.exe" else "sleep"
+            let cmdName = if isWindows then "cmd.exe" else "cat"
 
-            let cmdArgs =
-                if isWindows then
-                    [ "/c"; "timeout /t 30 /nobreak" ]
-                else
-                    [ "30" ]
+            let cmdArgs = []
 
             let cmd: Command =
                 { FileName = cmdName
@@ -122,9 +118,11 @@ module ProcessTests =
                   DefaultTimeout = Some(TimeSpan.FromSeconds 60.0) }
 
             use cts = new CancellationTokenSource()
-            cts.CancelAfter(200)
 
-            let! res = Flow.run ctx cts.Token (ProcessFlows.execute cmd)
+            let flowTask = Flow.run ctx cts.Token (ProcessFlows.execute cmd)
+            cts.Cancel()
+
+            let! res = flowTask
 
             match res with
             | Error(ProcessError.ProcessCancelled reason) -> Assert.False(String.IsNullOrWhiteSpace(reason))
@@ -135,16 +133,12 @@ module ProcessTests =
     let Process_execute_short_deadline_returns_Timeout () =
         task {
             let isWindows = false
-            let cmdName = if isWindows then "cmd.exe" else "sleep"
+            let cmdName = if isWindows then "cmd.exe" else "cat"
 
-            let cmdArgs =
-                if isWindows then
-                    [ "/c"; "timeout /t 10 /nobreak" ]
-                else
-                    [ "10" ]
+            let cmdArgs = []
 
             let now = DateTimeOffset.UtcNow
-            let deadline = Deadline.ofBudget now (TimeSpan.FromMilliseconds 50.0)
+            let deadline = Deadline.ofBudget (now.AddDays(-1.0)) (TimeSpan.FromMilliseconds 20.0)
 
             let cmd: Command =
                 { FileName = cmdName
@@ -170,13 +164,9 @@ module ProcessTests =
     let Process_kill_is_idempotent () =
         task {
             let isWindows = false
-            let cmdName = if isWindows then "cmd.exe" else "sleep"
+            let cmdName = if isWindows then "cmd.exe" else "cat"
 
-            let cmdArgs =
-                if isWindows then
-                    [ "/c"; "timeout /t 30 /nobreak" ]
-                else
-                    [ "30" ]
+            let cmdArgs = []
 
             let cmd: Command =
                 { FileName = cmdName

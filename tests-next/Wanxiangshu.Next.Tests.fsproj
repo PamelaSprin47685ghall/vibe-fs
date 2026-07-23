@@ -37,6 +37,7 @@
     <Compile Include="Session/SessionFallbackTests.fs"/>
     <Compile Include="Session/SessionProtocolTests.fs"/>
     <Compile Include="Session/ChildFlowTests.fs"/>
+    <Compile Include="Gates/ArchitectureGateSupport.fs"/>
     <Compile Include="Gates/ArchitectureGates.fs"/>
     <Compile Include="Integration/VerticalSliceJournalSupport.fs"/>
     <Compile Include="Integration/VerticalSliceWaiters.fs"/>

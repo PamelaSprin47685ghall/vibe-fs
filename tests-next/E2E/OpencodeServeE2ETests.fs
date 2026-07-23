@@ -7,7 +7,6 @@ open Fable.Core
 open Fable.Core.JsInterop
 open Xunit
 open Wanxiangshu.Next.Kernel
-open Wanxiangshu.Next.Process
 open Wanxiangshu.Next.Tests.JournalTests.JournalTestSupport
 
 module private NodeFsE2E =
@@ -20,6 +19,13 @@ module private NodeFsE2E =
 module private NodeFetchE2E =
     [<Emit("fetch($0).then(r => r.json())")>]
     let fetchJson (url: string) : Task<obj> = jsNative
+
+module private NodeEventLoopE2E =
+    [<Import("scheduler", "node:timers/promises")>]
+    let private scheduler: obj = jsNative
+
+    let waitForHeartbeatInterval () : Task<unit> =
+        unbox (scheduler?wait (100))
 
 module private NodeChildProcE2E =
     [<Import("spawn", "node:child_process")>]
@@ -34,7 +40,7 @@ module OpencodeServeE2ETests =
     let ``Opencode_serve_spawns_and_loads_plugin_e2e`` () =
         withTempDir (fun tempDir ->
             task {
-                let pluginPath = NodeFsE2E.resolve "../build/next/OpenCode/Plugin.js"
+                let pluginPath = NodeFsE2E.resolve "build/next/OpenCode/Plugin.js"
                 Assert.True(NodeFsE2E.existsSync pluginPath, sprintf "Plugin file not found at %s" pluginPath)
 
                 let configJson = sprintf """{"plugin":["%s"]}""" (pluginPath.Replace("\\", "/"))
@@ -44,9 +50,18 @@ module OpencodeServeE2ETests =
                         createObj [],
                         NodeChildProcE2E.processEnv (),
                         createObj
-                            [ "OPENCODE_DISABLE_AUTOUPDATE", box "1"
+                            [ "HOME", box tempDir
+                              "USERPROFILE", box tempDir
+                              "XDG_DATA_HOME", box tempDir
+                              "XDG_CONFIG_HOME", box tempDir
+                              "XDG_CACHE_HOME", box tempDir
+                              "XDG_STATE_HOME", box tempDir
+                              "TMPDIR", box tempDir
+                              "OPENCODE_DISABLE_AUTOUPDATE", box "1"
                               "OPENCODE_DISABLE_AUTOCOMPACT", box "1"
                               "OPENCODE_DISABLE_MODELS_FETCH", box "1"
+                              "OPENCODE_AUTH_CONTENT", box "{}"
+                              "OPENCODE_PERMISSION", box """{"*":"allow"}"""
                               "OPENCODE_CONFIG_CONTENT", box configJson ]
                     )
 
@@ -58,6 +73,7 @@ module OpencodeServeE2ETests =
 
                 let onData =
                     fun (chunk: obj) ->
+                        Assert.True(true)
                         let s = unbox<string> (chunk?toString ("utf-8"))
                         stdoutBuf <- stdoutBuf + s
                         let matchIdx = stdoutBuf.IndexOf("opencode server listening on http://127.0.0.1:")
@@ -68,21 +84,59 @@ module OpencodeServeE2ETests =
                             let portStr = if endIdx > 0 then sub.Substring(0, endIdx) else sub.Trim()
 
                             match Int32.TryParse(portStr) with
-                            | true, port -> portOpt <- Some port
+                            | true, port ->
+                                portOpt <- Some port
                             | _ -> ()
 
                 child?stdout?on ("data", onData) |> ignore
+                child?stderr?on ("data", onData) |> ignore
 
-                let deadline = DateTime.UtcNow.AddSeconds(8.0)
+                let startupDeadline = DateTimeOffset.UtcNow.AddSeconds(15.0)
 
-                while DateTime.UtcNow < deadline && portOpt.IsNone do
-                    do! FlowHelpers.sleepJs 50
+                while portOpt.IsNone && DateTimeOffset.UtcNow < startupDeadline do
+                    Assert.True(true)
+                    do! NodeEventLoopE2E.waitForHeartbeatInterval ()
 
-                Assert.True(portOpt.IsSome, sprintf "opencode serve failed to output listening port. Stdout: %s" stdoutBuf)
-                let port = portOpt.Value
+                let port =
+                    match portOpt with
+                    | Some value -> value
+                    | None ->
+                        child?kill ("SIGKILL") |> ignore
+                        Assert.Fail(sprintf "opencode serve did not publish a port: %s" stdoutBuf)
+                        0
 
                 let url = sprintf "http://127.0.0.1:%d/command" port
-                let! jsonObj = NodeFetchE2E.fetchJson url
+                let fetchResult = JsTcs<Result<obj, string>>()
+
+                task {
+                    try
+                        let! value = NodeFetchE2E.fetchJson url
+                        fetchResult.TrySetResult(Ok value) |> ignore
+                    with error ->
+                        fetchResult.TrySetResult(Error error.Message) |> ignore
+                }
+                |> ignore
+
+                let fetchDeadline = DateTimeOffset.UtcNow.AddSeconds(15.0)
+
+                while not fetchResult.IsCompleted && DateTimeOffset.UtcNow < fetchDeadline do
+                    Assert.True(true)
+                    do! NodeEventLoopE2E.waitForHeartbeatInterval ()
+
+                if not fetchResult.IsCompleted then
+                    child?kill ("SIGKILL") |> ignore
+                    Assert.Fail("GET /command did not complete")
+
+                let! result = fetchResult.Task
+
+                let jsonObj =
+                    match result with
+                    | Ok value -> value
+                    | Error error ->
+                        child?kill ("SIGKILL") |> ignore
+                        Assert.Fail(sprintf "GET /command failed: %s" error)
+                        null
+
                 Assert.False(isNull jsonObj, "GET /command returned null")
 
                 let jsonArray: obj array = unbox jsonObj

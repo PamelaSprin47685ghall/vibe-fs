@@ -5,6 +5,12 @@ open System.Runtime.ExceptionServices
 open System.Threading
 open System.Threading.Tasks
 
+module FlowHelpers =
+    open Fable.Core
+
+    [<Emit("($0 && typeof $0.then === 'function') ? $0 : Promise.resolve()")>]
+    let awaitValueTask (vt: obj) : Task<unit> = jsNative
+
 type Flow<'ctx, 'error, 'a> = private Flow of ('ctx -> CancellationToken -> Task<Result<'a, 'error>>)
 
 type ProgressGuard<'ctx, 'error> =
@@ -79,7 +85,7 @@ type FlowBuilder<'ctx, 'error>(progress: ProgressGuard<'ctx, 'error> option) =
                     bodyEx <- Some ex
 
                 try
-                    do! resource.DisposeAsync()
+                    do! FlowHelpers.awaitValueTask (resource.DisposeAsync())
                 with _ ->
                     ()
 
@@ -211,12 +217,6 @@ type AsyncSemaphore(maxCount: int) =
 
     interface IDisposable with
         member _.Dispose() = ()
-
-module FlowHelpers =
-    open Fable.Core
-
-    [<Emit("new Promise(r => setTimeout(r, $0))")>]
-    let sleepJs (ms: int) : Task<unit> = jsNative
 
 module Parallel =
     open Fable.Core

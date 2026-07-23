@@ -53,9 +53,6 @@ module ChildFlowTests =
                                     fun text ->
                                         Flow.create (fun _ _ ->
                                             task {
-                                                if req.Prompt = "req2" then
-                                                    do! FlowHelpers.sleepJs 50
-
                                                 return Ok(CompletedChild(sprintf "result_%s" text))
                                             })
                                   Close = fun () -> ChildFlows.child { return () } }

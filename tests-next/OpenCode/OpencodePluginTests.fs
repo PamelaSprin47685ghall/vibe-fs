@@ -37,6 +37,8 @@ module OpencodePluginTests =
                 Assert.True(hasProp "chat.transform", "chat.transform hook missing")
                 Assert.True(hasProp "tool.execute.before", "tool.execute.before hook missing")
                 Assert.True(hasProp "tool.execute.after", "tool.execute.after hook missing")
+                Assert.True(hasProp "config", "config hook missing")
+                Assert.True(hasProp "command.execute.before", "command.execute.before hook missing")
                 Assert.True(hasProp "command", "command hook missing")
                 Assert.True(hasProp "event", "event hook missing")
                 Assert.True(hasProp "experimental.session.compacting", "compacting hook missing")
@@ -79,6 +81,22 @@ module OpencodePluginTests =
                     Assert.Equal("sess-cmd-test", sId)
                     Assert.Equal("squad task Y", text)
                 | other -> Assert.True(false, sprintf "Expected SquadCommandEvent, got %A" other)
+
+                let disposeFn = unbox<unit -> unit> hooksObj?dispose
+                disposeFn ()
+            })
+
+    [<Fact>]
+    let ``Opencode_plugin_config_hook_registers_loop_and_squad`` () =
+        withTempDir (fun tempDir ->
+            task {
+                let! hooksObj = Plugin.initPlugin (createObj [ "directory", box tempDir ])
+                let configObj = createObj []
+                call1 hooksObj?config configObj
+
+                Assert.False(isNull configObj?command?loop)
+                Assert.Equal("$ARGUMENTS", unbox<string> configObj?command?loop?template)
+                Assert.False(isNull configObj?command?squad)
 
                 let disposeFn = unbox<unit -> unit> hooksObj?dispose
                 disposeFn ()

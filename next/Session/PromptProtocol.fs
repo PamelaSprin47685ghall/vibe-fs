@@ -1,9 +1,19 @@
 namespace Wanxiangshu.Next.Session
 
 open System
+open System.Threading.Tasks
 open Wanxiangshu.Next.Kernel
 open Wanxiangshu.Next.Kernel.Identity
+open Wanxiangshu.Next.Kernel.Outcome
 open Wanxiangshu.Next.Journal
+
+type PromptOptions =
+    { Model: string option
+      Agent: string option
+      Parts: obj list }
+
+type IPromptPort =
+    abstract SendPrompt: sessionId: SessionId -> promptText: string -> options: PromptOptions -> Task<SendOutcome>
 
 type PromptHistory =
     { Key: string
@@ -109,3 +119,19 @@ module PromptProtocol =
             | _ -> local
 
         (newHistorical, newLocal)
+
+type WaiterMap = Map<string, JsTcs<Fact.PromptOutcome>>
+
+module PromptWaiters =
+    let emptyWaiters : WaiterMap = Map.empty
+
+    let registerWaiter (waiters: WaiterMap) (keyString: string) : WaiterMap * JsTcs<Fact.PromptOutcome> =
+        let tcs = JsTcs<Fact.PromptOutcome>()
+        (Map.add keyString tcs waiters, tcs)
+
+    let trySignalWaiter (waiters: WaiterMap) (keyString: string) (outcome: Fact.PromptOutcome) : WaiterMap =
+        match Map.tryFind keyString waiters with
+        | Some tcs ->
+            tcs.TrySetResult(outcome) |> ignore
+            Map.remove keyString waiters
+        | None -> waiters

@@ -105,7 +105,7 @@ module StaticTools =
 
                     let procCtx: ProcessContext =
                         { WorkingDirectory = None
-                          DefaultTimeout = Some(TimeSpan.FromSeconds 30.0) }
+                          DefaultTimeout = Some(Deadline.remaining (fun () -> DateTimeOffset.UtcNow) ctx.Deadline) }
 
                     let! res = ProcessFlows.runFlow procCtx ctx.Cancellation (ProcessFlows.execute cmd)
 

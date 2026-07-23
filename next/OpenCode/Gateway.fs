@@ -89,16 +89,11 @@ module Gateway =
                     | CommitUnknown _ -> commitRes
 
             member _.DisposeAsync() =
-                unbox<ValueTask> (
-                    task {
-                        cts.Cancel()
-                        cts.Dispose()
-
-                        match journalWriter with
-                        | Some w -> do! (w :> IAsyncDisposable).DisposeAsync()
-                        | None -> ()
-                    }
-                )
+                cts.Cancel()
+                cts.Dispose()
+                match journalWriter with
+                | Some w -> (w :> IAsyncDisposable).DisposeAsync()
+                | None -> Fable.Core.JS.Constructors.Promise.resolve() |> unbox<ValueTask>
 
     let private createWriterWithRetry
         (runtimesDir: string)

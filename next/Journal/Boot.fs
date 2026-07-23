@@ -12,8 +12,14 @@ module private NodeFsBoot =
     [<Import("readdirSync", "node:fs")>]
     let readdirSync (path: string) : string array = jsNative
 
-    [<Import("readFileSync", "node:fs")>]
-    let readFileSync (path: string, encoding: string) : string = jsNative
+    [<Import("openSync", "node:fs")>]
+    let openSync (path: string, flags: string) : int = jsNative
+
+    [<Import("readSync", "node:fs")>]
+    let readSync (fd: int, buffer: obj, offset: int, length: int, position: obj) : int = jsNative
+
+    [<Import("closeSync", "node:fs")>]
+    let closeSync (fd: int) : unit = jsNative
 
     [<Import("statSync", "node:fs")>]
     let statSync (path: string) : obj = jsNative
@@ -39,6 +45,9 @@ module Boot =
         let cleanName = if idx > 0 then name.Substring(0, idx) else name
         RuntimeId.create cleanName
 
+    let private getStatSize (stat: obj) : int64 =
+        stat?size |> unbox<double> |> int64
+
     let captureFrontiers (directory: string) : Frontier =
         if not (NodeFsBoot.existsSync directory) then
             Map.empty
@@ -49,47 +58,70 @@ module Boot =
                 let filePath = NodeFsBoot.pathJoin (directory, name)
                 let runtimeId = getRuntimeIdFromFilename filePath
                 let stat = NodeFsBoot.statSync filePath
-                let size = unbox<int64> (stat?size)
+                let size = getStatSize stat
                 (runtimeId, size))
             |> Map.ofArray
 
-    let private parseLines (filePath: string) (frontierLength: int64) : Envelope list * string list =
-        try
-            if frontierLength <= 0L || not (NodeFsBoot.existsSync filePath) then
-                [], []
-            else
-                let text = NodeFsBoot.readFileSync (filePath, "utf-8")
-
-                let actualText =
-                    if int64 text.Length > frontierLength then
-                        text.Substring(0, int frontierLength)
-                    else
-                        text
-
-                let lines =
-                    actualText.Split([| "\r\n"; "\n" |], StringSplitOptions.RemoveEmptyEntries)
-
-                let rec collect idx acc =
-                    if idx >= lines.Length then
-                        List.rev acc, []
-                    else
-                        match Envelope.deserialize lines.[idx] with
-                        | Ok env -> collect (idx + 1) (env :: acc)
-                        | Error err ->
-                            let diag =
-                                sprintf "Failed to parse line %d in %s: %s" idx (NodeFsBoot.pathBasename filePath) err
-
-                            List.rev acc, [ diag ]
-
-                collect 0 []
-        with ex ->
-            [], [ sprintf "IO error reading %s: %s" (NodeFsBoot.pathBasename filePath) ex.Message ]
-
-    let private readPrefixEnvelopes (filePath: string) (frontierLength: int64) : Envelope list * string list =
-        if frontierLength <= 0L || not (NodeFsBoot.existsSync filePath) then
+    let private readPrefixEnvelopes (filePath: string) (frontierBytes: int64) : Envelope list * string list =
+        if not (NodeFsBoot.existsSync filePath) then
             [], []
         else
-            parseLines filePath frontierLength
+            let stat = NodeFsBoot.statSync filePath
+            let actualFileSize = getStatSize stat
+            let readLen = min frontierBytes actualFileSize
+            if readLen <= 0L then
+                [], []
+            else
+                let fd = NodeFsBoot.openSync (filePath, "r")
+                let mutable res = [], []
+                try
+                    let buffer = Array.zeroCreate<byte> (int readLen)
+                    let bytesRead = NodeFsBoot.readSync (fd, buffer, 0, int readLen, null)
+                    let effectiveBytes =
+                        if bytesRead <= 0 then [||]
+                        else
+                            let mutable lastNewline = -1
+                            let mutable i = bytesRead - 1
+                            while i >= 0 && lastNewline = -1 do
+                                if buffer.[i] = 10uy then
+                                    lastNewline <- i
+                                i <- i - 1
+
+                            if lastNewline = -1 then
+                                [||]
+                            else
+                                buffer.[0 .. lastNewline]
+
+                    let text = System.Text.Encoding.UTF8.GetString(effectiveBytes)
+                    let lines = text.Split([| "\r\n"; "\n" |], StringSplitOptions.RemoveEmptyEntries)
+                    let expectedRuntimeId = getRuntimeIdFromFilename filePath
+
+                    let rec collect idx expectedSeq acc =
+                        if idx >= lines.Length then
+                            List.rev acc, []
+                        else
+                            match Envelope.deserialize lines.[idx] with
+                            | Ok env ->
+                                if env.RuntimeId <> expectedRuntimeId then
+                                    let diag = sprintf "RuntimeId mismatch in %s: expected %s, got %s" (NodeFsBoot.pathBasename filePath) (RuntimeId.value expectedRuntimeId) (RuntimeId.value env.RuntimeId)
+                                    List.rev acc, [ diag ]
+                                else
+                                    let seqVal = LocalSeq.value env.LocalSeq
+                                    if seqVal <> expectedSeq then
+                                        let diag = sprintf "LocalSeq anomaly in %s: expected %d, got %d" (NodeFsBoot.pathBasename filePath) expectedSeq seqVal
+                                        List.rev acc, [ diag ]
+                                    else
+                                        collect (idx + 1) (expectedSeq + 1L) (env :: acc)
+                            | Error err ->
+                                let diag =
+                                    sprintf "Failed to parse line %d in %s: %s" idx (NodeFsBoot.pathBasename filePath) err
+                                List.rev acc, [ diag ]
+
+                    res <- collect 0 1L []
+                with ex ->
+                    res <- [], [ sprintf "IO error reading %s: %s" (NodeFsBoot.pathBasename filePath) ex.Message ]
+                try NodeFsBoot.closeSync fd with _ -> ()
+                res
 
     let kWayMerge (streams: Envelope list list) : Envelope list =
         let rec merge (queues: Envelope list list) acc =

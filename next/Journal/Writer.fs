@@ -15,16 +15,25 @@ module private NodeFsWriter =
     [<Import("mkdirSync", "node:fs")>]
     let mkdirSync (path: string, opts: obj) : unit = jsNative
 
-    [<Import("appendFileSync", "node:fs")>]
-    let appendFileSync (path: string, content: string) : unit = jsNative
+    [<Import("openSync", "node:fs")>]
+    let openSync (path: string, flags: string) : int = jsNative
 
-    [<Import("writeFileSync", "node:fs")>]
-    let writeFileSync (path: string, content: string) : unit = jsNative
+    [<Import("writeSync", "node:fs")>]
+    let writeSync (fd: int, buffer: obj) : int = jsNative
+
+    [<Import("fdatasyncSync", "node:fs")>]
+    let fdatasyncSync (fd: int) : unit = jsNative
+
+    [<Import("fsyncSync", "node:fs")>]
+    let fsyncSync (fd: int) : unit = jsNative
+
+    [<Import("closeSync", "node:fs")>]
+    let closeSync (fd: int) : unit = jsNative
 
     [<Import("join", "node:path")>]
     let pathJoin (a: string, b: string) : string = jsNative
 
-type JournalWriter private (runtimeId: RuntimeId, filePath: string) =
+type JournalWriter private (runtimeId: RuntimeId, filePath: string, fd: int) =
     let gate = obj ()
     let mutable currentSeq = 2L
     let mutable poisoned = false
@@ -48,6 +57,8 @@ type JournalWriter private (runtimeId: RuntimeId, filePath: string) =
         let filename = sprintf "%s.ndjson" (RuntimeId.value runtimeId)
         let filePath = NodeFsWriter.pathJoin (directory, filename)
 
+        let fd = NodeFsWriter.openSync (filePath, "wx")
+
         let initEventId = EventId.create (Guid.NewGuid().ToString("N"))
 
         let initFact =
@@ -68,15 +79,19 @@ type JournalWriter private (runtimeId: RuntimeId, filePath: string) =
               Fact = initFact }
 
         let jsonLine = Envelope.serialize initEnvelope + "\n"
-        NodeFsWriter.writeFileSync (filePath, jsonLine)
+        let bytes = System.Text.Encoding.UTF8.GetBytes(jsonLine)
+        NodeFsWriter.writeSync (fd, bytes) |> ignore
+        try NodeFsWriter.fdatasyncSync fd with _ -> NodeFsWriter.fsyncSync fd
 
-        (new JournalWriter(runtimeId, filePath), initEnvelope)
+        (new JournalWriter(runtimeId, filePath, fd), initEnvelope)
 
     member private this.WriteAndFlush (env: Envelope) (eventId: EventId) =
-        let line = Envelope.serialize env
+        let line = Envelope.serialize env + "\n"
+        let bytes = System.Text.Encoding.UTF8.GetBytes(line)
 
         try
-            NodeFsWriter.appendFileSync (filePath, line + "\n")
+            NodeFsWriter.writeSync (fd, bytes) |> ignore
+            try NodeFsWriter.fdatasyncSync fd with _ -> NodeFsWriter.fsyncSync fd
             currentSeq <- currentSeq + 1L
             Committed env
         with ex ->
@@ -101,9 +116,16 @@ type JournalWriter private (runtimeId: RuntimeId, filePath: string) =
 
                 this.WriteAndFlush env eventId)
 
+    member private this.DisposeInternal() =
+        lock gate (fun () ->
+            if not disposed then
+                disposed <- true
+                try NodeFsWriter.closeSync fd with _ -> ())
+
     interface IDisposable with
-        member _.Dispose() = lock gate (fun () -> disposed <- true)
+        member this.Dispose() = this.DisposeInternal()
 
     interface IAsyncDisposable with
-        member _.DisposeAsync() =
-            unbox<ValueTask> (task { lock gate (fun () -> disposed <- true) })
+        member this.DisposeAsync() =
+            this.DisposeInternal()
+            Fable.Core.JS.Constructors.Promise.resolve() |> unbox<ValueTask>

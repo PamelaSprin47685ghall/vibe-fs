@@ -64,6 +64,8 @@ module ProcessPump =
 
                 let onError = fun (_: obj) -> tcs.TrySetResult((text, truncated)) |> ignore
 
+                use reg = cancellation.Register(fun () -> tcs.TrySetResult((text, truncated)) |> ignore)
+
                 stream?on ("data", onData) |> ignore
                 stream?on ("end", onEnd) |> ignore
                 stream?on ("error", onError) |> ignore

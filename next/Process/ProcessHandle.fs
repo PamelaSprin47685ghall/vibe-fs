@@ -11,7 +11,15 @@ module private NodeChildProc =
     [<Import("spawn", "node:child_process")>]
     let spawn (cmd: string) (args: string array) (opts: obj) : obj = jsNative
 
+    [<Emit("Promise.resolve()")>]
+    let yieldMicrotask () : Task<unit> = jsNative
+
 module ProcessSpawn =
+
+    type private ProcessCompletion =
+        | Exited
+        | Cancelled
+        | TimedOut
 
     type private ProcessHandleImpl
         (
@@ -72,37 +80,63 @@ module ProcessSpawn =
             member _.Kill() = killProc ()
 
             member _.RunToCompletion() =
-                Flow.create (fun ctx ct ->
+                Flow.create (fun _ctx ct ->
                     task {
                         try
                             let isDeadlineExpired () =
                                 cmd.Deadline
                                 |> Option.exists (Deadline.isExpired (fun () -> DateTimeOffset.UtcNow))
 
-                            let mutable terminalResult: Result<Fact.ProcessResult, ProcessError> option = None
+                            if isDeadlineExpired () then
+                                do! killProc ()
+                                return Error(ProcessError.Timeout "Process deadline expired")
+                            else
+                                let completion = JsTcs<ProcessCompletion>()
 
-                            while terminalResult.IsNone do
+                                let stopProcess result =
+                                    completion.TrySetResult(result) |> ignore
+                                    try childProc?kill ("SIGTERM") |> ignore with _ -> ()
+
+                                use cancellationRegistration =
+                                    ct.Register(fun () -> stopProcess Cancelled)
+
+                                use internalCancellationRegistration =
+                                    cts.Token.Register(fun () -> stopProcess Cancelled)
+
+                                use deadlineCancellation = new CancellationTokenSource()
+
+                                use deadlineRegistration =
+                                    deadlineCancellation.Token.Register(fun () -> stopProcess TimedOut)
+
                                 if ct.IsCancellationRequested || cts.IsCancellationRequested then
-                                    try
-                                        childProc?kill ("SIGTERM") |> ignore
-                                    with _ ->
-                                        ()
+                                    stopProcess Cancelled
 
-                                    terminalResult <- Some(Error(ProcessError.ProcessCancelled "Operation was cancelled"))
-                                elif isDeadlineExpired () then
-                                    try
-                                        childProc?kill ("SIGTERM") |> ignore
-                                    with _ ->
-                                        ()
+                                match cmd.Deadline with
+                                | Some deadline ->
+                                    deadlineCancellation.CancelAfter(
+                                        Deadline.remaining (fun () -> DateTimeOffset.UtcNow) deadline
+                                    )
+                                | None -> ()
 
-                                    terminalResult <- Some(Error(ProcessError.Timeout "Process deadline expired"))
-                                elif exitTcs.IsCompleted then
-                                    let! result = getOkResult ()
-                                    terminalResult <- Some result
-                                else
-                                    do! FlowHelpers.sleepJs 10
+                                let observeExit =
+                                    task {
+                                        let! _ = exitTcs.Task
+                                        completion.TrySetResult(Exited) |> ignore
+                                    }
 
-                            return Option.get terminalResult
+                                observeExit |> ignore
+                                let! terminal = completion.Task
+
+                                match terminal with
+                                | Cancelled ->
+                                    return Error(ProcessError.ProcessCancelled "Operation was cancelled")
+                                | TimedOut ->
+                                    return Error(ProcessError.Timeout "Process deadline expired")
+                                | Exited when ct.IsCancellationRequested || cts.IsCancellationRequested ->
+                                    return Error(ProcessError.ProcessCancelled "Operation was cancelled")
+                                | Exited when isDeadlineExpired () ->
+                                    return Error(ProcessError.Timeout "Process deadline expired")
+                                | Exited -> return! getOkResult ()
                         with ex ->
                             let! _ = killProc ()
                             return Error(ProcessError.ExecutionFailed ex.Message)
@@ -166,7 +200,8 @@ module ProcessSpawn =
                 childProc?on (
                     "error",
                     fun (err: obj) ->
-                        spawnError <- Some(if isNull err then "Failed to spawn process" else string err)
+                        let msg = if isNull err then "Failed to spawn process" else string err
+                        spawnError <- Some msg
                         exitTcs.TrySetResult(-1) |> ignore
                 )
                 |> ignore
@@ -180,13 +215,15 @@ module ProcessSpawn =
                         ()
                 | None -> ()
 
-                do! FlowHelpers.sleepJs 15
-
-                match spawnError with
-                | Some err -> return Error(ProcessError.SpawnFailed err)
-                | None ->
-                    return
-                        Ok(new ProcessHandleImpl(childProc, cts, exitTcs, stdoutTask, stderrTask, cmd) :> ProcessHandle)
+                if isNull childProc?pid then
+                    do! NodeChildProc.yieldMicrotask ()
+                    return Error(ProcessError.SpawnFailed(defaultArg spawnError "Failed to spawn process"))
+                else
+                    match spawnError with
+                    | Some err -> return Error(ProcessError.SpawnFailed err)
+                    | None ->
+                        return
+                            Ok(new ProcessHandleImpl(childProc, cts, exitTcs, stdoutTask, stderrTask, cmd) :> ProcessHandle)
             with ex ->
                 return Error(ProcessError.SpawnFailed ex.Message)
         }
