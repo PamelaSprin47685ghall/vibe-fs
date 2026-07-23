@@ -267,7 +267,7 @@
   },
   {
     "id": "OC-PERM-001",
-    "category": "SCHEMA",
+    "category": "PERM",
     "userVisibleBehavior": "Tool visibility per agent matches permission matrix",
     "decision": "Keep",
     "newOwner": "src/Tools/Catalog.fs, src/Tools/Types.fs",
@@ -281,7 +281,7 @@
   },
   {
     "id": "OC-PERM-002",
-    "category": "SCHEMA",
+    "category": "PERM",
     "userVisibleBehavior": "Forbidden tools absent from agent tool list",
     "decision": "Keep",
     "newOwner": "src/Tools/Catalog.fs, src/Tools/Types.fs",
@@ -295,7 +295,7 @@
   },
   {
     "id": "OC-PERM-003",
-    "category": "SCHEMA",
+    "category": "PERM",
     "userVisibleBehavior": "Permission=deny = zero side effects",
     "decision": "Keep",
     "newOwner": "src/Tools/Catalog.fs, src/Tools/Types.fs",
@@ -309,7 +309,7 @@
   },
   {
     "id": "OC-PERM-004",
-    "category": "SCHEMA",
+    "category": "PERM",
     "userVisibleBehavior": "Permission=once = one execution only",
     "decision": "Keep",
     "newOwner": "src/Tools/Catalog.fs, src/Tools/Types.fs",
@@ -323,7 +323,7 @@
   },
   {
     "id": "OC-PERM-005",
-    "category": "SCHEMA",
+    "category": "PERM",
     "userVisibleBehavior": "No permission responder = wait, then abortable",
     "decision": "Keep",
     "newOwner": "src/Tools/Catalog.fs, src/Tools/Types.fs",
