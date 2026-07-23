@@ -100,11 +100,16 @@ type SessionDrivers() =
 
 /// A SessionDriver runs the event-processing loop AND launches
 /// SessionFlows.run as a separate task when a HumanTurn arrives.
-type SessionDriver(gateway: IGateway, sessionId: SessionId, inbox: ISessionInbox) =
+type SessionDriver(gateway: IGateway, sessionId: SessionId, inbox: ISessionInbox, ?port: IPromptPort) =
     let cts = new CancellationTokenSource()
-    let signal = TerminalSignal.create ()
+    let waiterMapRef = ref PromptWaiters.emptyWaiters
     let mutable flowTask: Task<Result<SessionOutcome, SessionError>> option = None
     let mutable flowRunning = false
+
+    let signalWaiters outcome =
+        let waiters = waiterMapRef.Value
+        waiterMapRef.Value <-
+            Map.fold (fun remaining key _ -> PromptWaiters.trySignalWaiter remaining key outcome) waiters waiters
 
     let defaultConfig: SessionScriptConfig =
         { FallbackModels = [ "default" ]
@@ -166,7 +171,7 @@ type SessionDriver(gateway: IGateway, sessionId: SessionId, inbox: ISessionInbox
             false
         else
             flowRunning <- true
-            let script = SessionScript.create gateway sessionId inbox signal turnId defaultConfig
+            let script = SessionScript.create gateway sessionId inbox waiterMapRef port turnId defaultConfig
 
             let task =
                 task {
@@ -205,13 +210,10 @@ type SessionDriver(gateway: IGateway, sessionId: SessionId, inbox: ISessionInbox
                     )
 
                 gateway.Append (StreamId.Session sessionId) None pFact |> ignore
-
-                // Unblock the flow
-                TerminalSignal.signalTerminal signal outcome |> ignore
+                signalWaiters outcome
                 return true
 
             | CancelEvent _ ->
-                TerminalSignal.cancelWait signal
                 let pFact =
                     Fact.Prompt(
                         PromptTerminal
@@ -220,6 +222,8 @@ type SessionDriver(gateway: IGateway, sessionId: SessionId, inbox: ISessionInbox
                                AssistantMessageId = None |}
                     )
                 gateway.Append (StreamId.Session sessionId) None pFact |> ignore
+                signalWaiters (Fact.PromptOutcome.FatalFailure "cancelled")
+
                 try
                     cts.Cancel()
                 with _ ->
@@ -256,7 +260,7 @@ type SessionDriver(gateway: IGateway, sessionId: SessionId, inbox: ISessionInbox
     member _.Worker = workerTask
 
     member _.Cancel() =
-        TerminalSignal.cancelWait signal
+        signalWaiters (Fact.PromptOutcome.FatalFailure "cancelled")
 
         try
             cts.Cancel()
@@ -264,13 +268,8 @@ type SessionDriver(gateway: IGateway, sessionId: SessionId, inbox: ISessionInbox
             ()
 
     interface IDisposable with
-        member _.Dispose() =
-            TerminalSignal.cancelWait signal
-
-            try
-                cts.Cancel()
-            with _ ->
-                ()
+        member this.Dispose() =
+            this.Cancel()
 
             try
                 cts.Dispose()

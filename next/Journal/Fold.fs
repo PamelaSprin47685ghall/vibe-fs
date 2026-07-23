@@ -18,7 +18,8 @@ type SessionProjection =
       HumanTurnId: TurnId option
       Children: Map<ChildId, ChildResult>
       Processes: Map<ProcessId, ProcessResult>
-      SquadTasks: Map<string, SquadTaskResult> }
+      SquadTasks: Map<string, SquadTaskResult>
+      Version: int64 }
 
 type ProjectionSet =
     { Todos: TodoSnapshot option
@@ -42,7 +43,8 @@ module Fold =
           HumanTurnId = None
           Children = Map.empty
           Processes = Map.empty
-          SquadTasks = Map.empty }
+          SquadTasks = Map.empty
+          Version = 0L }
 
     let empty: ProjectionSet =
         { Todos = None
@@ -70,7 +72,8 @@ module Fold =
             | Some s -> s
             | None -> emptySessionProjection
 
-        Map.add sessionId (updateFn existing) map
+        let updated = updateFn existing
+        Map.add sessionId { updated with Version = updated.Version + 1L } map
 
     let private foldPrompt (proj: ProjectionSet) (env: Envelope) : ProjectionSet =
         match env.Fact with
