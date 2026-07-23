@@ -29,7 +29,7 @@ module NodeProcess =
 
 module StaticTools =
 
-    let todowriteTool (port: SessionCommandPort) : Tool =
+    let todowriteTool () : Tool =
         { Name = "todowrite"
           Description = "Update task todo snapshot, report progress, and methodology."
           SchemaJson =
@@ -55,7 +55,7 @@ module StaticTools =
 
                     let snap: Fact.TodoSnapshot = { Items = items }
                     let mutable replyVal = Ok SessionCommandResult.Upserted
-                    let! res = port.Request (UpsertTodo(snap, (fun r -> replyVal <- r))) ctx.Cancellation ctx.Deadline
+                    let! res = ctx.Session.Request (UpsertTodo(snap, (fun r -> replyVal <- r))) ctx.Cancellation ctx.Deadline
 
                     match res with
                     | Ok _ ->

@@ -37,8 +37,7 @@ module PluginTools =
                parameters = Fable.Core.JS.JSON.parse tool.SchemaJson
                execute = fun (args: obj) (context: obj) -> executeTool tool args context |}
 
-        let dummyPort = SessionInboxCommandPort(FifoInbox(10) :> ISessionInbox)
-        let todoT = StaticTools.todowriteTool dummyPort
+        let todoT = StaticTools.todowriteTool ()
         let execT = StaticTools.executorTool ()
         let readT = FileTools.fileReadTool ()
         let writeT = FileTools.fileWriteTool ()
