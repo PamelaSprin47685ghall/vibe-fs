@@ -32,7 +32,7 @@ module private NodeFsGates =
             if isNull s then
                 false
             else
-                let p = s?isDirectory
+                let p = s?isDirectory ()
                 if isNull p then false else unbox<bool> p
         with _ ->
             false
@@ -45,7 +45,7 @@ module ArchitectureGates =
         elif NodeFsGates.existsSync "../../next" then "../.."
         else "."
 
-    let collectFsFiles (root: string) : string list =
+    let private collectFsFiles (root: string) : string list =
         let rec walk (dir: string) (acc: string list) =
             let entries = NodeFsGates.readdirSync dir
             let mutable result = acc
@@ -154,7 +154,7 @@ module ArchitectureGates =
 
         let propsPathNext = NodeFsGates.pathJoin (nextDir, "Directory.Build.props")
 
-        if NodeFsGates.existsSync (propsPathNext) then
+        if NodeFsGates.existsSync (propsPathNext) && NodeFsGates.isDir propsPathNext then
             nextFiles.Add(propsPathNext)
 
         let testsNextFiles = List<string>()
@@ -166,7 +166,7 @@ module ArchitectureGates =
 
         let propsPathTests = NodeFsGates.pathJoin (testsNextDir, "Directory.Build.props")
 
-        if NodeFsGates.existsSync (propsPathTests) then
+        if NodeFsGates.existsSync (propsPathTests) && NodeFsGates.isDir propsPathTests then
             testsNextFiles.Add(propsPathTests)
 
         Assert.NotEmpty(nextFiles)
