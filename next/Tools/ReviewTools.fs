@@ -25,8 +25,8 @@ module ReviewTools =
                         with _ ->
                             input.Payload
 
-                    let replyRef = ref (Ok SessionCommandResult.ReviewSubmitted)
-                    let cmd = SubmitReview(reportText, (fun r -> replyRef := r))
+                    let mutable replyVal = Ok SessionCommandResult.ReviewSubmitted
+                    let cmd = SubmitReview(reportText, (fun r -> replyVal <- r))
                     let! res = port.Request cmd ctx.Cancellation ctx.Deadline
 
                     match res with
@@ -63,8 +63,8 @@ module ReviewTools =
                         with _ ->
                             input.Payload
 
-                    let replyRef = ref (Ok SessionCommandResult.VerdictReturned)
-                    let cmd = ReturnVerdict(verdictText, (fun r -> replyRef := r))
+                    let mutable replyVal = Ok SessionCommandResult.VerdictReturned
+                    let cmd = ReturnVerdict(verdictText, (fun r -> replyVal <- r))
                     let! res = port.Request cmd ctx.Cancellation ctx.Deadline
 
                     match res with

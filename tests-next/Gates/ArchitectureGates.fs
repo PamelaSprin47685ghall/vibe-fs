@@ -201,20 +201,24 @@ module ArchitectureGates =
     let ``Next_source_files_do_not_exceed_300_lines`` () =
         let repoRoot = findRepoRoot ()
         let nextDir = NodeFsGates.pathJoin (repoRoot, "next")
+        let testsNextDir = NodeFsGates.pathJoin (repoRoot, "tests-next")
         Assert.True(NodeFsGates.existsSync (nextDir), sprintf "Directory 'next' does not exist at %s" nextDir)
+        Assert.True(NodeFsGates.existsSync (testsNextDir), sprintf "Directory 'tests-next' does not exist at %s" testsNextDir)
 
         let nextFsFiles = collectFsFiles nextDir
+        let testsFsFiles = collectFsFiles testsNextDir
 
         let violations = List<string>()
 
-        for file in nextFsFiles do
-            let text = NodeFsGates.readFileSync (file, "utf-8")
+        for file in (List.append nextFsFiles testsFsFiles) do
+            if file.EndsWith(".fs") then
+                let text = NodeFsGates.readFileSync (file, "utf-8")
 
-            let lineCount =
-                text.Split([| "\r\n"; "\n" |], System.StringSplitOptions.None).Length
+                let lineCount =
+                    text.Split([| "\r\n"; "\n" |], System.StringSplitOptions.None).Length
 
-            if lineCount > 300 then
-                violations.Add(sprintf "File '%s' has %d lines (exceeds maximum of 300 lines)" file lineCount)
+                if lineCount > 300 then
+                    violations.Add(sprintf "File '%s' has %d lines (exceeds maximum of 300 lines)" file lineCount)
 
         Assert.Empty(violations)
 

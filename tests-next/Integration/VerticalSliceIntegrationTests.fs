@@ -2,6 +2,7 @@ namespace Wanxiangshu.Next.Tests.Integration
 
 open System
 open System.Threading
+open System.Threading.Tasks
 open Xunit
 open Wanxiangshu.Next.Kernel
 open Wanxiangshu.Next.Kernel.Identity
@@ -12,59 +13,10 @@ open Wanxiangshu.Next.Process
 open Wanxiangshu.Next.Session
 open Wanxiangshu.Next.Tools
 open Wanxiangshu.Next.OpenCode
+open Wanxiangshu.Next.Tests
 open Wanxiangshu.Next.Tests.JournalTests.JournalTestSupport
 
 module VerticalSliceIntegrationTests =
-
-    let private runStep1
-        (gateway: Gateway)
-        (sessionId: SessionId)
-        (inboxes: System.Collections.Generic.Dictionary<SessionId, ISessionInbox>)
-        =
-        let userMsgObj =
-            {| id = "msg_user_1"
-               role = "user"
-               sessionID = "session-integration-vertical"
-               parts =
-                [ {| ``type`` = "text"
-                     text = "Build feature X" |} ] |}
-
-        let hookInput: OpencodeHookInput =
-            { sessionID = "session-integration-vertical"
-              messageID = Some "msg_user_1"
-              agent = Some "coder"
-              model = None }
-
-        let drivers = SessionDrivers()
-        OpencodeHooks.handleChatMessage gateway drivers inboxes hookInput {| message = userMsgObj |}
-        let sessionProj1 = Map.find sessionId gateway.ProjectionSet.SessionProjections
-        Assert.Equal(Some(TurnId.create "msg_user_1"), sessionProj1.HumanTurnId)
-
-    let private runStep2 (gateway: Gateway) (sessionId: SessionId) (tempDir: string) (inbox: ISessionInbox) =
-        task {
-            let port = SessionInboxCommandPort(inbox)
-            let todoTool = StaticTools.todowriteTool port
-
-            let toolCtx: ToolContext =
-                { SessionId = sessionId
-                  Workspace = tempDir
-                  Cancellation = CancellationToken.None
-                  Deadline = Deadline.ofBudget DateTimeOffset.UtcNow (TimeSpan.FromSeconds 10.0)
-                  Session = port }
-
-            let payload = "[\"implement vertical slice\", \"run tests\"]"
-            let toolTask = todoTool.Execute toolCtx { Payload = payload }
-
-            // Await the todowrite tool execution directly.
-            // The SessionDriver worker loop automatically processes SessionCommandEvent (UpsertTodo) from inbox,
-            // appends the TodoChanged fact to the gateway, and replies to the command port.
-            let! toolOutput = toolTask
-            Assert.False(toolOutput.Truncated)
-
-            let sessionProj2 = Map.find sessionId gateway.ProjectionSet.SessionProjections
-            Assert.True(sessionProj2.Todos.IsSome)
-            Assert.Equal(2, sessionProj2.Todos.Value.Items.Length)
-        }
 
     [<Fact>]
     let Vertical_slice_integration_closed_loop () =
@@ -81,8 +33,8 @@ module VerticalSliceIntegrationTests =
                     let inboxes = System.Collections.Generic.Dictionary<SessionId, ISessionInbox>()
                     inboxes.[sessionId] <- inbox
 
-                    runStep1 gateway sessionId inboxes
-                    do! runStep2 gateway sessionId tempDir inbox
+                    do! VerticalSliceJournalSupport._runStep1 gateway sessionId inboxes
+                    do! VerticalSliceJournalSupport._runStep2 gateway sessionId tempDir inbox
 
                     let finishFact =
                         Fact.Session(SessionSettled {| Result = SessionResult.Completed "Vertical slice completed" |})
@@ -95,6 +47,124 @@ module VerticalSliceIntegrationTests =
 
                     let sessionProj3 = Map.find sessionId gateway.ProjectionSet.SessionProjections
                     Assert.Equal(Some(SessionResult.Completed "Vertical slice completed"), sessionProj3.SettledResult)
+
+                    let! _ = gateway.DisposeAsync()
+                    ()
+             })
+
+    [<Fact>]
+    let ``SessionDriver_commits_human_turns_without_cross_session_projection_leakage`` () =
+        withTempDir (fun tempDir ->
+            task {
+                let! startRes = Gateway.start tempDir CancellationToken.None
+
+                match startRes with
+                | Error err -> Assert.True(false, sprintf "Gateway start failed: %A" err)
+                | Ok gateway ->
+                    let sessionA = SessionId.create "session-human-a"
+                    let sessionB = SessionId.create "session-human-b"
+                    let inboxA = FifoInbox(10) :> ISessionInbox
+                    let inboxB = FifoInbox(10) :> ISessionInbox
+                    use driverA = new SessionDriver(gateway, sessionA, inboxA)
+                    use driverB = new SessionDriver(gateway, sessionB, inboxB)
+
+                    let turnA = TurnId.create "msg-human-a"
+                    let turnB = TurnId.create "msg-human-b"
+
+                    Assert.Equal(Ok(), inboxA.TryPost(HumanMessageEvent(turnA, "work for session A")))
+                    Assert.Equal(Ok(), inboxB.TryPost(HumanMessageEvent(turnB, "work for session B")))
+
+                    do! VerticalSliceJournalSupport._awaitDriverProcessed inboxA
+                    do! VerticalSliceJournalSupport._awaitDriverProcessed inboxB
+
+                    let projections = gateway.ProjectionSet.SessionProjections
+                    let projectionA = Map.tryFind sessionA projections
+                    let projectionB = Map.tryFind sessionB projections
+
+                    Assert.True(projectionA.IsSome)
+                    Assert.True(projectionB.IsSome)
+                    Assert.Equal(Some turnA, projectionA.Value.HumanTurnId)
+                    Assert.Equal(Some turnB, projectionB.Value.HumanTurnId)
+                    Assert.False(projectionA.Value.HumanTurnId = Some turnB)
+                    Assert.False(projectionB.Value.HumanTurnId = Some turnA)
+                    Assert.Equal(2, Map.count projections)
+
+                    let! _ = gateway.DisposeAsync()
+                    ()
+             })
+
+    [<Fact>]
+    let ``OpenCode_human_hook_commits_one_turn_fact`` () =
+        withTempDir (fun tempDir ->
+            task {
+                let! startRes = Gateway.start tempDir CancellationToken.None
+
+                match startRes with
+                | Error err -> Assert.True(false, sprintf "Gateway start failed: %A" err)
+                | Ok gateway ->
+                    let sessionId = SessionId.create "session-human-hook"
+                    let inbox = FifoInbox(10) :> ISessionInbox
+                    use driver = new SessionDriver(gateway, sessionId, inbox)
+                    let inboxes = System.Collections.Generic.Dictionary<SessionId, ISessionInbox>()
+                    inboxes.[sessionId] <- inbox
+
+                    let userMessage =
+                        {| id = "msg-human-hook"
+                           role = "user"
+                           sessionID = "session-human-hook"
+                           parts = [ {| ``type`` = "text"; text = "continue" |} ] |}
+
+                    let hookInput: OpencodeHookInput =
+                        { sessionID = "session-human-hook"
+                          messageID = Some "msg-human-hook"
+                          agent = Some "coder"
+                          model = None }
+
+                    OpencodeHooks.handleChatMessage gateway (SessionDrivers()) inboxes hookInput {| message = userMessage |}
+                    do! VerticalSliceJournalSupport._awaitDriverProcessed inbox
+
+                    let envelopes = VerticalSliceJournalSupport._readEnvelopes gateway.JournalPath
+                    VerticalSliceJournalSupport._assertSingleHumanTurn envelopes
+                    let! _ = gateway.DisposeAsync()
+                    ()
+            })
+
+    [<Fact>]
+    let ``OpenCode_human_message_is_committed_exactly_once`` () =
+        withTempDir (fun tempDir ->
+            task {
+                let! startRes = Gateway.start tempDir CancellationToken.None
+
+                match startRes with
+                | Error err -> Assert.True(false, sprintf "Gateway start failed: %A" err)
+                | Ok gateway ->
+                    let sessionId = SessionId.create "session-human-once"
+                    let inbox = FifoInbox(10) :> ISessionInbox
+                    let drivers = SessionDrivers()
+                    let inboxes = System.Collections.Generic.Dictionary<SessionId, ISessionInbox>()
+                    inboxes.[sessionId] <- inbox
+
+                    use driver = new SessionDriver(gateway, sessionId, inbox)
+
+                    let userMsgObj =
+                        {| id = "msg-human-once"
+                           role = "user"
+                           sessionID = "session-human-once"
+                           parts =
+                            [ {| ``type`` = "text"
+                                 text = "Work once" |} ] |}
+
+                    let hookInput: OpencodeHookInput =
+                        { sessionID = "session-human-once"
+                          messageID = Some "msg-human-once"
+                          agent = Some "coder"
+                          model = None }
+
+                    OpencodeHooks.handleChatMessage gateway drivers inboxes hookInput {| message = userMsgObj |}
+                    do! VerticalSliceJournalSupport._awaitDriverProcessed inbox
+
+                    let envelopes = VerticalSliceJournalSupport._readEnvelopes gateway.JournalPath
+                    VerticalSliceJournalSupport._assertSingleHumanTurn envelopes
 
                     let! _ = gateway.DisposeAsync()
                     ()

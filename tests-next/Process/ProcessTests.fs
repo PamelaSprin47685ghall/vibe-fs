@@ -22,7 +22,8 @@ module ProcessTests =
                   WorkingDirectory = None
                   Environment = None
                   Stdin = None
-                  Deadline = None }
+                  Deadline = None
+                  PtyOptions = None }
 
             let ctx: ProcessContext =
                 { WorkingDirectory = None
@@ -52,7 +53,8 @@ module ProcessTests =
                   WorkingDirectory = None
                   Environment = None
                   Stdin = Some(payload + "\n")
-                  Deadline = None }
+                  Deadline = None
+                  PtyOptions = None }
 
             let ctx: ProcessContext =
                 { WorkingDirectory = None
@@ -84,7 +86,8 @@ module ProcessTests =
                   WorkingDirectory = None
                   Environment = None
                   Stdin = None
-                  Deadline = None }
+                  Deadline = None
+                  PtyOptions = None }
 
             let! spawnRes = ProcessSpawn.spawn cmd None CancellationToken.None
 
@@ -111,7 +114,8 @@ module ProcessTests =
                   WorkingDirectory = None
                   Environment = None
                   Stdin = None
-                  Deadline = None }
+                  Deadline = None
+                  PtyOptions = None }
 
             let ctx: ProcessContext =
                 { WorkingDirectory = None
@@ -148,7 +152,8 @@ module ProcessTests =
                   WorkingDirectory = None
                   Environment = None
                   Stdin = None
-                  Deadline = Some deadline }
+                  Deadline = Some deadline
+                  PtyOptions = None }
 
             let ctx: ProcessContext =
                 { WorkingDirectory = None
@@ -179,7 +184,8 @@ module ProcessTests =
                   WorkingDirectory = None
                   Environment = None
                   Stdin = None
-                  Deadline = None }
+                  Deadline = None
+                  PtyOptions = None }
 
             let! spawnRes = ProcessSpawn.spawn cmd None CancellationToken.None
 

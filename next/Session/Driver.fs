@@ -98,8 +98,18 @@ type SessionDrivers() =
                 ()
         | None -> ()
 
+/// A SessionDriver runs the event-processing loop AND launches
+/// SessionFlows.run as a separate task when a HumanTurn arrives.
 type SessionDriver(gateway: IGateway, sessionId: SessionId, inbox: ISessionInbox) =
     let cts = new CancellationTokenSource()
+    let signal = TerminalSignal.create ()
+    let mutable flowTask: Task<Result<SessionOutcome, SessionError>> option = None
+    let mutable flowRunning = false
+
+    let defaultConfig: SessionScriptConfig =
+        { FallbackModels = [ "default" ]
+          MaxRetriesPerModel = 3
+          MaxInvalidRetries = 3 }
 
     let dispatchCommand (cmd: SessionCommand) =
         match cmd with
@@ -151,6 +161,24 @@ type SessionDriver(gateway: IGateway, sessionId: SessionId, inbox: ISessionInbox
             | Committed _ -> reply (Ok SessionCommandResult.VerdictReturned)
             | _ -> reply (Error SessionCommandError.InboxFull)
 
+    let startFlow (turnId: TurnId) : bool =
+        if flowRunning then
+            false
+        else
+            flowRunning <- true
+            let script = SessionScript.create gateway sessionId inbox signal turnId defaultConfig
+
+            let task =
+                task {
+                    try
+                        return! SessionFlows.runFlow script cts.Token (SessionFlows.run script)
+                    finally
+                        flowRunning <- false
+                }
+
+            flowTask <- Some task
+            true
+
     let dispatchEvent (eventOpt: SessionInboxEvent) : Task<bool> =
         task {
             match eventOpt with
@@ -158,21 +186,40 @@ type SessionDriver(gateway: IGateway, sessionId: SessionId, inbox: ISessionInbox
                 dispatchCommand cmd
                 return true
 
-            | HumanMessageEvent(_turnId, _text) -> return true
+            | HumanMessageEvent(turnId, _text) ->
+                let fact = Fact.Session(HumanTurnStarted {| TurnId = turnId |})
 
-            | AssistantTerminalEvent(userMsgId, assistantMsgId, outcome) ->
+                match gateway.Append (StreamId.Session sessionId) (Some turnId) fact with
+                | Committed _ ->
+                    startFlow turnId |> ignore
+                    return true
+                | CommitUnknown _ -> return false
+
+            | AssistantTerminalEvent(_userMsgId, _assistantMsgId, outcome) ->
                 let pFact =
                     Fact.Prompt(
                         PromptTerminal
-                            {| PromptKey = sprintf "terminal:%s" (MessageId.value userMsgId)
+                            {| PromptKey = sprintf "terminal:%s" (MessageId.value _userMsgId)
                                Outcome = outcome
-                               AssistantMessageId = Some assistantMsgId |}
+                               AssistantMessageId = Some _assistantMsgId |}
                     )
 
                 gateway.Append (StreamId.Session sessionId) None pFact |> ignore
+
+                // Unblock the flow
+                TerminalSignal.signalTerminal signal outcome |> ignore
                 return true
 
             | CancelEvent _ ->
+                TerminalSignal.cancelWait signal
+                let pFact =
+                    Fact.Prompt(
+                        PromptTerminal
+                            {| PromptKey = sprintf "terminal:cancel"
+                               Outcome = Fact.PromptOutcome.FatalFailure "cancelled"
+                               AssistantMessageId = None |}
+                    )
+                gateway.Append (StreamId.Session sessionId) None pFact |> ignore
                 try
                     cts.Cancel()
                 with _ ->
@@ -196,8 +243,9 @@ type SessionDriver(gateway: IGateway, sessionId: SessionId, inbox: ISessionInbox
                     let! evt = inbox.Receive cts.Token
                     let! continueLoop = dispatchEvent evt
                     keepGoing <- continueLoop
-                with _ ->
-                    keepGoing <- false
+                with
+                | :? OperationCanceledException -> keepGoing <- false
+                | _ -> keepGoing <- false
         }
 
     let workerTask = startWorker ()
@@ -208,6 +256,8 @@ type SessionDriver(gateway: IGateway, sessionId: SessionId, inbox: ISessionInbox
     member _.Worker = workerTask
 
     member _.Cancel() =
+        TerminalSignal.cancelWait signal
+
         try
             cts.Cancel()
         with _ ->
@@ -215,6 +265,8 @@ type SessionDriver(gateway: IGateway, sessionId: SessionId, inbox: ISessionInbox
 
     interface IDisposable with
         member _.Dispose() =
+            TerminalSignal.cancelWait signal
+
             try
                 cts.Cancel()
             with _ ->

@@ -15,28 +15,9 @@ open Wanxiangshu.Next.Session
 open Wanxiangshu.Next.Tools
 open Wanxiangshu.Next.OpenCode
 open Wanxiangshu.Next.Tests.JournalTests.JournalTestSupport
+open Wanxiangshu.Next.Tests.Integration
 
 module VerticalSliceE2ETests =
-
-    let private runStep1 (gateway: Gateway) (sessionId: SessionId) (inboxMap: Dictionary<SessionId, ISessionInbox>) =
-        let userMsgObj =
-            {| id = "msg_user_1"
-               role = "user"
-               sessionID = "session-e2e-vertical"
-               parts =
-                [ {| ``type`` = "text"
-                     text = "Build feature X" |} ] |}
-
-        let hookInput: OpencodeHookInput =
-            { sessionID = "session-e2e-vertical"
-              messageID = Some "msg_user_1"
-              agent = Some "coder"
-              model = None }
-
-        let drivers = SessionDrivers()
-        OpencodeHooks.handleChatMessage gateway drivers inboxMap hookInput {| message = userMsgObj |}
-        let sessionProj1 = Map.find sessionId gateway.ProjectionSet.SessionProjections
-        Assert.Equal(Some(TurnId.create "msg_user_1"), sessionProj1.HumanTurnId)
 
     let private runStep2 (gateway: Gateway) (sessionId: SessionId) (tempDir: string) (inbox: ISessionInbox) =
         task {
@@ -68,9 +49,10 @@ module VerticalSliceE2ETests =
             let! toolOutput = toolTask
             Assert.False(toolOutput.Truncated)
 
-            let sessionProj2 = Map.find sessionId gateway.ProjectionSet.SessionProjections
-            Assert.True(sessionProj2.Todos.IsSome)
-            Assert.Equal(2, sessionProj2.Todos.Value.Items.Length)
+            let sessionProj2 = Map.tryFind sessionId gateway.ProjectionSet.SessionProjections
+            Assert.True(sessionProj2.IsSome)
+            Assert.True(sessionProj2.Value.Todos.IsSome)
+            Assert.Equal(2, sessionProj2.Value.Todos.Value.Items.Length)
         }
 
     [<Fact>]
@@ -88,7 +70,14 @@ module VerticalSliceE2ETests =
                     inboxMap.[sessionId] <- inbox
                     use driver = new SessionDriver(gateway, sessionId, inbox)
 
-                    runStep1 gateway sessionId inboxMap
+                    let! _ = VerticalSliceJournalSupport._runStep1 gateway sessionId inboxMap
+
+                    // Step 1 starts SessionFlows.run which requested ContinueWork prompt.
+                    // Deliver terminal outcome to unblock flow:
+                    let userMsgId = MessageId.create "msg_user_1"
+                    let assistantMsgId = MessageId.create "assistant_e2e_1"
+                    Assert.Equal(Ok(), inbox.TryPost(AssistantTerminalEvent(userMsgId, assistantMsgId, PromptOutcome.Delivered assistantMsgId)))
+
                     do! runStep2 gateway sessionId tempDir inbox
 
                     let finishFact =

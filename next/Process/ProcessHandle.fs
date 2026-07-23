@@ -64,6 +64,10 @@ module ProcessSpawn =
             member _.ExitCodeTask = exitTcs.Task
             member _.StdoutTask = stdoutTask
             member _.StderrTask = stderrTask
+            member _.IsPty = Option.isSome cmd.PtyOptions
+            member _.ResizePty(cols, rows) =
+                if Option.isSome cmd.PtyOptions && not (isNull childProc?resize) then
+                    try childProc?resize(cols, rows) |> ignore with _ -> ()
 
             member _.Kill() = killProc ()
 
@@ -75,30 +79,30 @@ module ProcessSpawn =
                                 cmd.Deadline
                                 |> Option.exists (Deadline.isExpired (fun () -> DateTimeOffset.UtcNow))
 
-                            let rec checkLoop () =
-                                task {
-                                    if ct.IsCancellationRequested || cts.IsCancellationRequested then
-                                        try
-                                            childProc?kill ("SIGTERM") |> ignore
-                                        with _ ->
-                                            ()
+                            let mutable terminalResult: Result<Fact.ProcessResult, ProcessError> option = None
 
-                                        return Error(ProcessError.ProcessCancelled "Operation was cancelled")
-                                    elif isDeadlineExpired () then
-                                        try
-                                            childProc?kill ("SIGTERM") |> ignore
-                                        with _ ->
-                                            ()
+                            while terminalResult.IsNone do
+                                if ct.IsCancellationRequested || cts.IsCancellationRequested then
+                                    try
+                                        childProc?kill ("SIGTERM") |> ignore
+                                    with _ ->
+                                        ()
 
-                                        return Error(ProcessError.Timeout "Process deadline expired")
-                                    elif exitTcs.IsCompleted then
-                                        return! getOkResult ()
-                                    else
-                                        do! FlowHelpers.sleepJs 10
-                                        return! checkLoop ()
-                                }
+                                    terminalResult <- Some(Error(ProcessError.ProcessCancelled "Operation was cancelled"))
+                                elif isDeadlineExpired () then
+                                    try
+                                        childProc?kill ("SIGTERM") |> ignore
+                                    with _ ->
+                                        ()
 
-                            return! checkLoop ()
+                                    terminalResult <- Some(Error(ProcessError.Timeout "Process deadline expired"))
+                                elif exitTcs.IsCompleted then
+                                    let! result = getOkResult ()
+                                    terminalResult <- Some result
+                                else
+                                    do! FlowHelpers.sleepJs 10
+
+                            return Option.get terminalResult
                         with ex ->
                             let! _ = killProc ()
                             return Error(ProcessError.ExecutionFailed ex.Message)

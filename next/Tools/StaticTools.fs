@@ -54,8 +54,8 @@ module StaticTools =
                             []
 
                     let snap: Fact.TodoSnapshot = { Items = items }
-                    let replyRef = ref (Ok SessionCommandResult.Upserted)
-                    let! res = port.Request (UpsertTodo(snap, (fun r -> replyRef := r))) ctx.Cancellation ctx.Deadline
+                    let mutable replyVal = Ok SessionCommandResult.Upserted
+                    let! res = port.Request (UpsertTodo(snap, (fun r -> replyVal <- r))) ctx.Cancellation ctx.Deadline
 
                     match res with
                     | Ok _ ->
@@ -100,7 +100,8 @@ module StaticTools =
                           WorkingDirectory = None
                           Environment = None
                           Stdin = None
-                          Deadline = Some ctx.Deadline }
+                          Deadline = Some ctx.Deadline
+                          PtyOptions = None }
 
                     let procCtx: ProcessContext =
                         { WorkingDirectory = None

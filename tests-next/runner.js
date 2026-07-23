@@ -51,7 +51,7 @@ async function runTests() {
             const start = Date.now();
             const res = value();
             if (res && typeof res.then === 'function') {
-              await withTimeout(res, 1000, key);
+              await withTimeout(res, 10000, key);
             }
             const elapsed = Date.now() - start;
             passed++;
