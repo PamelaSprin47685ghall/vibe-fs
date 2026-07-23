@@ -30,7 +30,7 @@ module VerticalSliceIntegrationTests =
                 | Error err -> Assert.True(false, sprintf "Gateway start failed: %A" err)
                 | Ok gateway ->
                     let sessionId = SessionId.create "session-integration-vertical"
-                    let inbox = Plugin.getOrCreateInbox sessionId
+                    let inbox = FifoInbox(1000) :> ISessionInbox
                     use driver = new SessionDriver(gateway, sessionId, inbox)
                     let inboxes = System.Collections.Generic.Dictionary<SessionId, ISessionInbox>()
                     inboxes.[sessionId] <- inbox
@@ -220,7 +220,8 @@ module VerticalSliceIntegrationTests =
                 Assert.False(isNull hooksObj)
 
                 let sessionId = SessionId.create "sess-e2e-flow"
-                let inbox = Plugin.getOrCreateInbox sessionId
+                let getInbox = unbox<SessionId -> ISessionInbox> hooksObj?getOrCreateInbox
+                let inbox = getInbox sessionId
 
                 let eventFn = unbox<obj -> unit> hooksObj?event
                 let cmdFn = unbox<obj -> unit> hooksObj?command
