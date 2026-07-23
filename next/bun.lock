@@ -1,0 +1,18 @@
+{
+  "lockfileVersion": 1,
+  "configVersion": 1,
+  "workspaces": {
+    "": {
+      "name": "wanxiangshu-next",
+      "dependencies": {
+        "@fable-org/fable-library-js": "^2.4.0",
+        "smol-toml": "1.7.0",
+      },
+    },
+  },
+  "packages": {
+    "@fable-org/fable-library-js": ["@fable-org/fable-library-js@2.5.0", "", {}, "sha512-KVhtuOB++nilgGuv7DhHVoWcR3yTFwusqAEJ6VVPbq10EQ/0roTonZ2V8Nw/8MPfmjcEUaJD6h3OzX+JDKYHDQ=="],
+
+    "smol-toml": ["smol-toml@1.7.0", "", {}, "sha512-aqVvWoyO21L23mb+drl4RmMXbf6N7FdHjAhTRA9ZBL7apWBgfWC16KjrASI+1p9GAroljyMHj6fK67i0UiTNvQ=="],
+  }
+}
