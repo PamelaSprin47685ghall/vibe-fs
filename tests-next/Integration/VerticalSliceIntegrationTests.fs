@@ -169,3 +169,42 @@ module VerticalSliceIntegrationTests =
                     let! _ = gateway.DisposeAsync()
                     ()
             })
+
+    [<Fact>]
+    let Vertical_slice_integration_step2_closed_loop () =
+        withTempDir (fun tempDir ->
+            task {
+                let! startRes = Gateway.start tempDir CancellationToken.None
+
+                match startRes with
+                | Error err -> Assert.True(false, sprintf "Gateway start failed: %A" err)
+                | Ok gateway ->
+                    let sessionId = SessionId.create "session-demoted-vertical"
+                    let inboxMap = System.Collections.Generic.Dictionary<SessionId, ISessionInbox>()
+                    let inbox = FifoInbox(1000) :> ISessionInbox
+                    inboxMap.[sessionId] <- inbox
+                    use driver = new SessionDriver(gateway, sessionId, inbox)
+
+                    let! _ = VerticalSliceJournalSupport._runStep1 gateway sessionId inboxMap
+
+                    let userMsgId = MessageId.create "msg_user_1"
+                    let assistantMsgId = MessageId.create "assistant_e2e_1"
+                    Assert.Equal(Ok(), inbox.TryPost(AssistantTerminalEvent(userMsgId, assistantMsgId, PromptOutcome.Delivered assistantMsgId)))
+
+                    do! VerticalSliceJournalSupport._runStep2 gateway sessionId tempDir inbox
+
+                    let finishFact =
+                        Fact.Session(SessionSettled {| Result = SessionResult.Completed "Vertical slice completed" |})
+
+                    let commitFinish = gateway.Append (StreamId.Session sessionId) None finishFact
+
+                    match commitFinish with
+                    | Committed _ -> ()
+                    | _ -> Assert.True(false, "Expected Committed for SessionSettled")
+
+                    let sessionProj3 = Map.find sessionId gateway.ProjectionSet.SessionProjections
+                    Assert.Equal(Some(SessionResult.Completed "Vertical slice completed"), sessionProj3.SettledResult)
+
+                    let! _ = gateway.DisposeAsync()
+                    ()
+            })
