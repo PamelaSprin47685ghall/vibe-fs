@@ -11,6 +11,7 @@ open Wanxiangshu.Runtime.ToolRuntimeContext
 open Wanxiangshu.Runtime.ReviewRuntime
 open Wanxiangshu.Runtime.Fallback.RuntimeStore
 open Wanxiangshu.Runtime.Fallback.SessionRuntimeLeasePure
+open Wanxiangshu.Runtime.RuntimeScope
 open Wanxiangshu.Hosts.Opencode.ProgressObserver
 open Wanxiangshu.Hosts.Opencode.Fallback.Coordinator
 open Wanxiangshu.Hosts.Opencode.NudgeTrigger
@@ -24,7 +25,8 @@ type SessionLifecycleObserver
         reviewStore: ReviewStore,
         registry: ChildAgentRegistry,
         fallbackHandler: (obj -> JS.Promise<FallbackHookResult>) option,
-        fallbackRuntime: FallbackRuntimeStore
+        fallbackRuntime: FallbackRuntimeStore,
+        runtimeScope: RuntimeScope
     ) =
 
     let resolvedUnitPromise () : JS.Promise<unit> = Promise.lift ()
@@ -62,7 +64,7 @@ type SessionLifecycleObserver
         progress.HandleToolExecuteAfter input output
 
     member _.handleEvent(input: obj) : JS.Promise<unit> =
-        handleEvent ctx fallbackRuntime fallback nudge input
+        handleEvent ctx fallbackRuntime runtimeScope fallback nudge input
 
 let createSessionLifecycleObserver
     (
@@ -71,6 +73,7 @@ let createSessionLifecycleObserver
         reviewStore: ReviewStore,
         registry: ChildAgentRegistry,
         fallbackHandler: (obj -> JS.Promise<FallbackHookResult>) option,
-        fallbackRuntime: FallbackRuntimeStore
+        fallbackRuntime: FallbackRuntimeStore,
+        runtimeScope: RuntimeScope
     ) : SessionLifecycleObserver =
-    SessionLifecycleObserver(host, ctx, reviewStore, registry, fallbackHandler, fallbackRuntime)
+    SessionLifecycleObserver(host, ctx, reviewStore, registry, fallbackHandler, fallbackRuntime, runtimeScope)

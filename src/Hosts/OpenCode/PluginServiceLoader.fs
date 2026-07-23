@@ -131,7 +131,15 @@ let loadPluginServices (host: Host) (ctx: obj) : PluginServiceParts =
             directory)
 
     let lifecycleObserver =
-        createSessionLifecycleObserver (host, ctx, reviewStore, childAgentRegistry, fallbackHandler, fallbackRuntime)
+        createSessionLifecycleObserver (
+            host,
+            ctx,
+            reviewStore,
+            childAgentRegistry,
+            fallbackHandler,
+            fallbackRuntime,
+            scope
+        )
 
     let tools =
         createTools host childAgentRegistry finderCache ctx reviewStore scope fallbackRuntime
