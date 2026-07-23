@@ -1,6 +1,7 @@
 namespace Wanxiangshu.Next.Tests.E2E
 
 open System
+open System.Collections.Generic
 open System.Threading
 open System.Threading.Tasks
 open Xunit
@@ -17,7 +18,7 @@ open Wanxiangshu.Next.Tests.JournalTests.JournalTestSupport
 
 module VerticalSliceE2ETests =
 
-    let private runStep1 (gateway: Gateway) (sessionId: SessionId) =
+    let private runStep1 (gateway: Gateway) (sessionId: SessionId) (inboxMap: Dictionary<SessionId, ISessionInbox>) =
         let userMsgObj =
             {| id = "msg_user_1"
                role = "user"
@@ -33,7 +34,7 @@ module VerticalSliceE2ETests =
               model = None }
 
         let drivers = SessionDrivers()
-        OpencodeHooks.handleChatMessage gateway drivers hookInput {| message = userMsgObj |}
+        OpencodeHooks.handleChatMessage gateway drivers inboxMap hookInput {| message = userMsgObj |}
         let sessionProj1 = Map.find sessionId gateway.ProjectionSet.SessionProjections
         Assert.Equal(Some(TurnId.create "msg_user_1"), sessionProj1.HumanTurnId)
 
@@ -50,20 +51,22 @@ module VerticalSliceE2ETests =
                   Session = port }
 
             let payload = "[\"implement vertical slice\", \"run tests\"]"
-            let! toolOutput = todoTool.Execute toolCtx { Payload = payload }
-            Assert.False(toolOutput.Truncated)
+            let toolTask = todoTool.Execute toolCtx { Payload = payload }
 
             let! inboxEv = inbox.Receive CancellationToken.None
 
             match inboxEv with
-            | SessionCommandEvent(UpsertTodo snap) ->
+            | SessionCommandEvent(UpsertTodo(snap, reply)) ->
                 let commitRes =
                     gateway.Append (StreamId.Session sessionId) None (Fact.Todo(TodoChanged {| Snapshot = snap |}))
 
                 match commitRes with
-                | Committed _ -> ()
+                | Committed _ -> reply (Ok SessionCommandResult.Upserted)
                 | _ -> Assert.True(false, "Expected Committed for TodoChanged")
             | _ -> Assert.True(false, sprintf "Expected SessionCommandEvent, got %A" inboxEv)
+
+            let! toolOutput = toolTask
+            Assert.False(toolOutput.Truncated)
 
             let sessionProj2 = Map.find sessionId gateway.ProjectionSet.SessionProjections
             Assert.True(sessionProj2.Todos.IsSome)
@@ -80,10 +83,12 @@ module VerticalSliceE2ETests =
                 | Error err -> Assert.True(false, sprintf "Gateway start failed: %A" err)
                 | Ok gateway ->
                     let sessionId = SessionId.create "session-e2e-vertical"
-                    let inbox = Plugin.getOrCreateInbox sessionId
+                    let inboxMap = Dictionary<SessionId, ISessionInbox>()
+                    let inbox = FifoInbox(1000) :> ISessionInbox
+                    inboxMap.[sessionId] <- inbox
                     use driver = new SessionDriver(gateway, sessionId, inbox)
 
-                    runStep1 gateway sessionId
+                    runStep1 gateway sessionId inboxMap
                     do! runStep2 gateway sessionId tempDir inbox
 
                     let finishFact =

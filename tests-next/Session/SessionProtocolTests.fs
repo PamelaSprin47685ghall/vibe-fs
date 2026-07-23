@@ -2,6 +2,7 @@ namespace Wanxiangshu.Next.Tests
 
 open System
 open System.Threading
+open System.Threading.Tasks
 open Xunit
 open Wanxiangshu.Next.Kernel
 open Wanxiangshu.Next.Kernel.Identity
@@ -204,6 +205,19 @@ module SessionProtocolTests =
 
         Assert.Equal(Ok(), res1)
         Assert.Equal(Error SessionError.InboxFull, res2)
+
+    [<Fact>]
+    let ``FifoInbox_Receive_throws_when_cancelled`` () =
+        task {
+            use cancellation = new CancellationTokenSource()
+            let inbox = FifoInbox(1) :> ISessionInbox
+            let pending = inbox.Receive(cancellation.Token)
+
+            cancellation.Cancel()
+
+            let! error = Assert.ThrowsAsync<OperationCanceledException>(fun () -> pending :> Task)
+            Assert.NotNull(error)
+        }
 
     [<Fact>]
     let ``SendOutcomeMap_toPromptOutcome_all_cases`` () =
