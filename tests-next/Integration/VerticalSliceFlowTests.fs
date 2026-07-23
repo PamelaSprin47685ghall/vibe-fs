@@ -14,6 +14,11 @@ open Wanxiangshu.Next.OpenCode
 open Wanxiangshu.Next.Tests
 open Wanxiangshu.Next.Tests.JournalTests.JournalTestSupport
 
+type FakePromptPort(continuationMsgId: MessageId) =
+    interface IPromptPort with
+        member _.SendPrompt (_sessionId: SessionId) (_text: string) (_opts: PromptOptions) =
+            Task.FromResult(Delivered continuationMsgId)
+
 module VerticalSliceFlowTests =
 
     [<Fact>]
@@ -27,7 +32,9 @@ module VerticalSliceFlowTests =
                 | Ok gateway ->
                     let sessionId = SessionId.create "session-flow-terminal"
                     let inbox = FifoInbox(100) :> ISessionInbox
-                    use driver = new SessionDriver(gateway, sessionId, inbox)
+                    let continuationMsgId = MessageId.create "assistant-msg-1"
+                    let fakePort = FakePromptPort(continuationMsgId) :> IPromptPort
+                    use driver = new SessionDriver(gateway, sessionId, inbox, port = fakePort)
 
                     let seedTodo =
                         Fact.Todo(TodoChanged {| Snapshot = { Items = [ "implement feature X" ] } |})
@@ -38,6 +45,16 @@ module VerticalSliceFlowTests =
 
                     let turnId = TurnId.create "msg-flow-terminal"
                     Assert.Equal(Ok(), inbox.TryPost(HumanMessageEvent(turnId, "Build the feature")))
+                    Assert.Equal(
+                        Ok(),
+                        inbox.TryPost(
+                            AssistantTerminalEvent(
+                                MessageId.create "human-msg-1",
+                                MessageId.create "native-ast-1",
+                                Fact.PromptOutcome.Delivered(MessageId.create "native-ast-1")
+                            )
+                        )
+                    )
 
                     let! promptSeen =
                         VerticalSliceWaiters._awaitEnvelope
@@ -133,10 +150,22 @@ module VerticalSliceFlowTests =
                     | Committed _ -> ()
                     | _ -> Assert.True(false, "seed Todo commit failed")
 
-                    use driver = new SessionDriver(gateway, sessionId, inbox)
+                    let continuationMsgId = MessageId.create "assistant-msg-cancel"
+                    let fakePort = FakePromptPort(continuationMsgId) :> IPromptPort
+                    use driver = new SessionDriver(gateway, sessionId, inbox, port = fakePort)
 
                     let turnId = TurnId.create "msg-flow-cancel"
                     Assert.Equal(Ok(), inbox.TryPost(HumanMessageEvent(turnId, "work")))
+                    Assert.Equal(
+                        Ok(),
+                        inbox.TryPost(
+                            AssistantTerminalEvent(
+                                MessageId.create "human-msg-cancel",
+                                MessageId.create "native-ast-cancel",
+                                Fact.PromptOutcome.Delivered(MessageId.create "native-ast-cancel")
+                            )
+                        )
+                    )
 
                     let! promptSeen =
                         VerticalSliceWaiters._awaitEnvelope

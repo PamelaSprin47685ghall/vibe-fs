@@ -226,6 +226,8 @@ module Plugin =
                 | Ok runtime -> runtime
                 | Error err -> failwithf "Failed to initialize PluginRuntime: %A" err
 
+            let toolsObj = PluginTools.buildToolsObject rt
+
             let hooks =
                 {| ``chat.message`` =
                     fun (inObj: obj) (outObj: obj) ->
@@ -257,10 +259,12 @@ module Plugin =
                             outObj?enabled <- true
                    command = fun (inObj: obj) (outObj: obj) -> handleCommand rt inObj
                    getOrCreateInbox = fun (sessionId: SessionId) -> (rt.GetOrCreateSessionRuntime sessionId).Inbox
+                   tool = toolsObj
                    dispose =
                     fun () ->
-                        let valueTask = (rt :> IAsyncDisposable).DisposeAsync()
-                        unbox<Task<unit>> valueTask
+                        task {
+                            do! (rt :> IAsyncDisposable).DisposeAsync()
+                        }
                 |}
 
             return box hooks
