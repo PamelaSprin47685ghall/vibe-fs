@@ -59,7 +59,7 @@ module VerticalSliceFlowTests =
                         Ok(),
                         inbox.TryPost(
                             AssistantTerminalEvent(
-                                MessageId.create "continue-flow",
+                                MessageId.create "assistant-msg-1",
                                 userMsgId,
                                 Fact.PromptOutcome.Delivered userMsgId
                             )
