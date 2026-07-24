@@ -45,21 +45,6 @@ module SpikePlugin =
                         let getTreeHash = rawPort?getTreeHash
                         unbox<string> (getTreeHash ()) }
 
-    let private nudgeReviewer (sessionPort: ISessionHostPort) (nudgeSent: HashSet<string>) (sessionId: string) : unit =
-        if nudgeSent.Add sessionId then
-            let prompt =
-                "Submit a structured verdict with the verdict tool: PERFECT or REVISE. "
-                + "Do not put a verdict in prose."
-
-            let nudgeTask: Task<Result<MessageId, string>> =
-                sessionPort.SendPrompt(
-                    SessionId.create sessionId,
-                    prompt,
-                    { Model = None
-                      Agent = Some "reviewer" }
-                )
-
-            nudgeTask |> ignore
 
     let createSpikeHost (portOpt: IOpenCodePort option) =
         let eventPort = Events.DeterministicEventPort() :> IEventObservationPort
@@ -177,78 +162,23 @@ module SpikePlugin =
                     | Some port -> Some port
                     | None -> workspaceDirectory input |> Option.map GitTree.create
 
-                let mutable latestSessionId = ""
-
-                let rawEvent (raw: obj) =
-                    if isNull raw || isNull raw?event then raw else raw?event
-
-                let rawProperties (raw: obj) =
-                    let event = rawEvent raw
-                    if isNull event then null else event?properties
-
-                let rawSessionId (raw: obj) =
-                    let event = rawEvent raw
-                    let properties = rawProperties raw
-
-                    if not (isNull properties) && not (isNull properties?sessionID) then
-                        Some(unbox<string> properties?sessionID)
-                    elif not (isNull event) && not (isNull event?sessionID) then
-                        Some(unbox<string> event?sessionID)
-                    else
-                        None
-
-                let rawParentSessionId (raw: obj) =
-                    let event = rawEvent raw
-                    let properties = rawProperties raw
-
-                    if not (isNull properties) && not (isNull properties?parentID) then
-                        Some(unbox<string> properties?parentID)
-                    elif
-                        not (isNull properties)
-                        && not (isNull properties?info)
-                        && not (isNull properties?info?parentID)
-                    then
-                        Some(unbox<string> properties?info?parentID)
-                    elif not (isNull event) && not (isNull event?parentID) then
-                        Some(unbox<string> event?parentID)
-                    else
-                        None
-
-                let isTerminalEvent (raw: obj) =
-                    let event = rawEvent raw
-
-                    if isNull event || isNull event?``type`` then
-                        false
-                    else
-                        let eventType = unbox<string> event?``type``
-                        eventType = "session.idle" || eventType = "session.aborted"
-
-                let isAbortEvent (raw: obj) =
-                    let event = rawEvent raw
-
-                    not (isNull event)
-                    && not (isNull event?``type``)
-                    && unbox<string> event?``type`` = "session.aborted"
-
-                let abortChildren parentId =
-                    sessionParents
-                    |> Seq.choose (fun pair -> if pair.Value = parentId then Some pair.Key else None)
-                    |> Seq.iter (fun childId -> sessionPort.AbortSession(SessionId.create childId) |> ignore)
+                let eventRouter =
+                    HostEventRouter(sessionPort, sessionParents, sessionRoles, verdictSessions, nudgeSent)
 
                 let transform inObj outObj =
                     if
                         not (isNull inObj)
                         && isNull inObj?sessionID
-                        && not (String.IsNullOrWhiteSpace latestSessionId)
+                        && not (String.IsNullOrWhiteSpace eventRouter.LatestSessionId)
                     then
-                        inObj?sessionID <- latestSessionId
+                        inObj?sessionID <- eventRouter.LatestSessionId
 
                     if
                         not (isNull inObj)
                         && isNull inObj?agent
-                        && sessionRoles.ContainsKey latestSessionId
+                        && sessionRoles.ContainsKey eventRouter.LatestSessionId
                     then
-                        inObj?agent <- sessionRoles.[latestSessionId]
+                        inObj?agent <- sessionRoles.[eventRouter.LatestSessionId]
 
                     CompanionTransform.handleCompanionTransform companions companionGate sessionPort inObj outObj
 
@@ -264,32 +194,7 @@ module SpikePlugin =
                           "config", box (fun (config: obj) -> configureManager config) ]
 
                 observeEvent
-                |> Option.iter (fun observe ->
-                    hooks?event <-
-                        box (fun raw ->
-                            let sessionId, role = HostSessionContext.read raw
-
-                            if not (String.IsNullOrWhiteSpace sessionId) then
-                                latestSessionId <- sessionId
-
-                                role |> Option.iter (fun value -> sessionRoles.[sessionId] <- value)
-
-                                rawParentSessionId raw
-                                |> Option.iter (fun parentId ->
-                                    if not (String.IsNullOrWhiteSpace parentId) then
-                                        sessionParents.[sessionId] <- parentId)
-
-                                if isAbortEvent raw then
-                                    abortChildren sessionId
-
-                                if isTerminalEvent raw then
-                                    match sessionRoles.TryGetValue sessionId with
-                                    | true, agent when agent.Equals("reviewer", StringComparison.OrdinalIgnoreCase) ->
-                                        if not (verdictSessions.Contains sessionId) then
-                                            nudgeReviewer sessionPort nudgeSent sessionId
-                                    | _ -> ()
-
-                            observe raw))
+                |> Option.iter (fun observe -> hooks?event <- box (fun raw -> eventRouter.Observe(raw, observe)))
 
                 let client = if isNull input then null else input?client
 

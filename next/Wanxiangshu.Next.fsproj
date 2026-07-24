@@ -65,6 +65,7 @@
     <Compile Include="Session/CompanionHost.fs"/>
     <Compile Include="OpenCode/CompanionTransform.fs"/>
     <Compile Include="OpenCode/HostSessionContext.fs"/>
+    <Compile Include="OpenCode/HostEventRouter.fs"/>
     <Compile Include="OpenCode/GitTree.fs"/>
     <Compile Include="OpenCode/ExecutorTool.fs"/>
     <Compile Include="OpenCode/ToolSurface.fs"/>

@@ -10,7 +10,7 @@ import:
 
 - 已恢复 `next/Doc/SSOT.md`，冻结 Agent DSL、Companion、Fork/Join、durable facts、Review、Process 与 Orchestrator 最终语义。
 - 已完成 per-Run terminal listener、输出增量切片、existing-agent nudge 重装 listener、标准 workspace Journal Boot；真实 Manager→Coder→Join 与 Companion B1/B2 已通过 OpenCode P0。
-- 已拆出 `OpenCode/CompanionTransform.fs`、`OpenCode/ToolSurface.fs`、`OpenCode/ExecutorTool.fs`、`Orchestrator.Types.fs`、`Orchestrator.GitPort.fs`，恢复 300 行架构门禁；`npm test` = 135/135、Manager contract = 1/1、TestKit = 11/11。
+- 已拆出 `OpenCode/CompanionTransform.fs`、`OpenCode/HostEventRouter.fs`、`OpenCode/ToolSurface.fs`、`OpenCode/ExecutorTool.fs`、`Orchestrator.Types.fs`、`Orchestrator.GitPort.fs`，恢复 300 行架构门禁；此前 `npm test` = 135/135、Manager contract = 1/1、TestKit = 11/11。
 - Manager provider request 已证明只暴露 `fork/join/list`，禁止 `read/write/edit/bash/glob/grep/verdict`；P0 默认 3×稳定性通过，`CANARY_REPEAT` 仍可提高门槛。
 - Companion 真实 Blogger child 已产生 B1/B2，同一 child 被复用，角色 sidecar 门禁通过；durable B/baseline/replacement 已有重启 Port/Fake 测试，真实近上限投影 E2E 仍未验收。
 - Process 已完成 lossless pump、动态 `3×estimated_output_bytes` spool、200KB chunk、SIGKILL 后等待 pipe EOF；真实 Inspector→Executor map/reduce canary 已通过，SIGKILL/PTY 压力仍待纳入稳定性门。
@@ -45,7 +45,7 @@ import:
 
 ### 🟡 Host terminal：已改 per-Run，待真实验收
 - Session 不再永久标记 terminal；每次新 prompt 都安装独立 listener，使用启动前输出边界截取本轮增量并在完成后 dispose。
-- 真实 Manager→Coder→Join 已通过；parent abort 已由 Host event 向已登记 child 传播，连续多轮、迟到 terminal 与真实 assistant part 边界仍需 E2E。
+- 真实 Manager→Coder→Join 已通过；parent abort 已由 HostEventRouter 向已登记 child 传播，连续多轮、迟到 terminal 与真实 assistant part 边界仍需 E2E。
 
 ### 🟡 A 版输出：当前为新增输出切片，仍待完整 Host part 验证
 - `HostForkRuntime` 不再直接返回全历史；按 Run 启动边界截取新增输出并排除本地 prompt 标记。
