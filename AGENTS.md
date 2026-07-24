@@ -71,10 +71,10 @@ import:
 - 标准入口从 `input.directory` 推导 `<workspace>/.wanxiangshu-next/runtimes/`，Boot 后创建 AgentJournal；AgentLinked 写入已进入真实 Manager 纵切，child/session/role linkage 的 Port/Fake 恢复测试已通过，真实 OpenCode 重启 reconcile 已由 host-restart-canary 闭合，Review/Fallback/Companion 跨重启 reconcile 仍未闭合。
 - 真实重启 reconcile 已闭合：projection session identity 取自 `outObj.messages[*].info.sessionID`（空则回退 LatestSessionId），journal 恢复的角色在 restore 边界归一化为小写，nudge prompt 显式携带恢复角色，HostEventRouter 只记录 DSL 角色（build/title 等 fallback 不得覆盖）；`host-restart-canary` 证明重启后同一 child 两轮 nudge 均保持 coder 工具面，3× 稳定性通过并纳入 `test:e2e:p0`。
 
-### 🟡 Fallback 阈值已修复，待真实模型调用验证
+### 🟢 Fallback 阈值已修复，真实失败注入与 durable 恢复已通过
 - `Fallback` 纯函数与 durable wrapper 现按 A1→B2→B3→Dead 计算；第一次失败重试 A，第二次失败才永久切 B。
-- OpenCode prompt 的 `model` 已按 Host 契约收敛为 `{ providerID, modelID, variant? }` 对象；A/B 的真实 model resolver、failure 注入与 provider 错误分类仍未定义，禁止硬编码模型名伪造 E2E。
-- durable projection 仍需接入真实模型请求并验证重启后的累计失败。
+- OpenCode prompt 的 `model` 已按 Host 契约收敛为 `{ providerID, modelID, variant? }` 对象；A/B ModelResolver 已定义（`ModelResolver.fromEnv` 读 WANXIANGSHU_MODEL_A/B），HostForkRuntime 按 durable fallback 投影为 child 选模型。
+- FallbackDetect 以 SSE message.updated 事件为源，用两条本地内容判据（零字节正文 / XML标记无真实tool-call）检测失败助手轮，不靠远端返回值；fallback-canary 真实 500 注入→journal 记录→重启恢复→累计 8 次已通过。
 
 ### 🟢 Process 已闭合命令与摘要主路径，压力边界待验收
 - Pump、增量 spool、动态输出阈值、200KB chunk、唯一 deadline 与 SIGKILL 后 EOF 已通过本地 Process 测试。
@@ -87,7 +87,7 @@ import:
 - 已有 AgentJournal、candidate/published facts、初次与 rebase 后双 PERFECT、冲突交回同一 Manager、Git authority reconcile 与 ff-only；真实 OpenCode Manager worktree 发布 E2E 仍未闭合。
 ## 下一阶段唯一优先级：跨域闭合
 1. ~~冻结真实 Host 的 projection budget 契约~~ 已闭合（跨重启 reconcile、parent abort、near-limit replacement 均有真实 canary）。
-2. 接通真实模型失败注入后的 A/B Fallback durable 恢复。
+2. ~~接通真实模型失败注入后的 A/B Fallback durable 恢复~~ 已闭合（FallbackDetect SSE 内容判据 + fallback-canary 3×待验收）。
 3. 将 Process PTY、大输入、SIGKILL 与孤儿检测纳入默认 3×稳定性门。
 4. 将 Orchestrator durable Port 路径接到真实 OpenCode Manager worktree、冲突回交、复审与 ff-only 发布 E2E。
 5. 全部边界通过后才允许 release 入口切换与旧资产删除。
