@@ -113,18 +113,17 @@ type ForkRuntime
                       Outcome = outcome
                       CompletedAt = DateTimeOffset.UtcNow }
 
-
-                // 1. Invoke terminal listener (registered before firing prompt)
-                onTerminal completion
-
-                // 2. Deliver to an existing join before changing live status.
+                // Deliver to an existing join before changing live status.
                 lock lockObj (fun () ->
                     if waiters.Count > 0 then
                         waiters.Dequeue().SetResult(Ok completion)
                     else
                         mailbox.Enqueue(completion))
 
-                // 3. Update status in live agent handle map
+                // Notify observers after the completion is available to Join.
+                onTerminal completion
+
+                // Update status in live agent handle map.
                 lock lockObj (fun () ->
                     match agents.TryGetValue(agentId) with
                     | true, rec' when rec'.Status <> AgentStatus.Closed ->
@@ -135,8 +134,8 @@ type ForkRuntime
                     | _ -> ())
             }
 
-        let _ = runTask ()
-        runId
+        let launch () = runTask () |> ignore
+        runId, launch
 
     member this.Fork
         (agentId: string, role: AgentRole, ?prompt: string, ?runWork: unit -> Task<Result<string, string>>)
@@ -144,7 +143,7 @@ type ForkRuntime
         lock lockObj (fun () ->
             match agents.TryGetValue(agentId) with
             | true, rec' ->
-                let runId = startRun agentId role prompt runWork
+                let runId, launch = startRun agentId role prompt runWork
 
                 agents.[agentId] <-
                     { rec' with
@@ -152,9 +151,10 @@ type ForkRuntime
                         Status = AgentStatus.Busy
                         CurrentRunId = Some runId }
 
+                launch ()
                 ForkResult.Nudged agentId
             | false, _ ->
-                let runId = startRun agentId role prompt runWork
+                let runId, launch = startRun agentId role prompt runWork
 
                 agents.[agentId] <-
                     { AgentId = agentId
@@ -162,19 +162,21 @@ type ForkRuntime
                       Status = AgentStatus.Busy
                       CurrentRunId = Some runId }
 
+                launch ()
                 ForkResult.Created agentId)
 
     member this.Fork(agentId: string, prompt: string) : ForkResult =
         lock lockObj (fun () ->
             match agents.TryGetValue(agentId) with
             | true, rec' ->
-                let runId = startRun agentId rec'.Role (Some prompt) None
+                let runId, launch = startRun agentId rec'.Role (Some prompt) None
 
                 agents.[agentId] <-
                     { rec' with
                         Status = AgentStatus.Busy
                         CurrentRunId = Some runId }
 
+                launch ()
                 ForkResult.Nudged agentId
             | false, _ -> ForkResult.NotFound agentId)
 

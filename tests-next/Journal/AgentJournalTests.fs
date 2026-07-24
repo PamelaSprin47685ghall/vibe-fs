@@ -136,3 +136,32 @@ module AgentJournalTests =
                 let orchProj = snap.AgentProjections.Orchestrator
                 Assert.True(orchProj.Managers.ContainsKey(ManagerId.create mgrId))
             })
+
+    [<Fact>]
+    let Boot_history_is_loaded_into_new_journal_snapshot () =
+        withTempDir (fun tempDir ->
+            task {
+                let previousRuntimeId = RuntimeId.create "rt-agent-journal-boot-previous"
+                let currentRuntimeId = RuntimeId.create "rt-agent-journal-boot-current"
+                let sessionId = SessionId.create "s-boot-history"
+
+                let fact =
+                    AgentFact.FallbackFailureRecorded
+                        {| SessionId = sessionId
+                           Reason = "external startup fact" |}
+
+                use previousJournal =
+                    AgentJournal.create tempDir previousRuntimeId 4321 DateTimeOffset.UtcNow
+
+                Assert.True(Result.isOk (AgentJournal.appendAgent StreamId.Workspace None fact previousJournal))
+                (previousJournal :> IDisposable).Dispose()
+
+                let boot = Boot.boot tempDir
+
+                use currentJournal =
+                    AgentJournal.createFromBoot tempDir currentRuntimeId 4322 DateTimeOffset.UtcNow boot
+
+                let snapshot = AgentJournal.snapshot currentJournal
+                Assert.Equal(Some currentRuntimeId, snapshot.RuntimeId)
+                Assert.True(snapshot.AgentProjections.Sessions.ContainsKey sessionId)
+            })

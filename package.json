@@ -20,11 +20,13 @@
   ],
   "scripts": {
     "prepare": "node scripts/setup-git-hooks.mjs",
-    "build": "dotnet fable precompile next/Wanxiangshu.Next.fsproj -o build/next && node scripts/postbuild.mjs",
+    "build": "dotnet fable precompile next/Wanxiangshu.Next.fsproj -o build/next",
     "postbuild": "node scripts/postbuild.mjs",
-    "test": "npm run build && cd tests-next && dotnet fable Wanxiangshu.Next.Tests.fsproj --outDir ../build/tests-next --precompiledLib ../build/next && node --test runner.test.mjs && node runner.js && cd .. && node testkit/opencode/tests/gate-testkit.mjs",
+    "test:compile": "cd tests-next && dotnet fable Wanxiangshu.Next.Tests.fsproj --outDir ../build/tests-next --precompiledLib ../build/next",
+    "test:next": "node --test tests-next/runner.test.mjs && node tests-next/runner.js --build-dir build/tests-next",
+    "test": "npm run build && npm run test:compile && npm run test:next && node testkit/opencode/tests/gate-testkit.mjs",
     "test:e2e:p0": "node testkit/opencode/tests/agent-dsl-canary.mjs",
-    "test:release": "npm run build && npm test && npm run test:e2e:p0",
+    "test:release": "npm test && npm run test:e2e:p0",
     "format": "node scripts/pre-commit-formatter.mjs"
   },
   "dependencies": {

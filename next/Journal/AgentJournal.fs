@@ -42,10 +42,29 @@ type AgentJournal internal (writer: JournalWriter, initialProjection: Projection
 
 module AgentJournal =
 
-    let create (directory: string) (runtimeId: RuntimeId) (processId: int) (startedAt: DateTimeOffset) : AgentJournal =
+    let createFromProjection
+        (directory: string)
+        (runtimeId: RuntimeId)
+        (processId: int)
+        (startedAt: DateTimeOffset)
+        (projection: ProjectionSet)
+        : AgentJournal =
         let writer, initEnv = JournalWriter.create directory runtimeId processId startedAt
-        let initialProj = Fold.foldEnvelope Fold.empty initEnv
+        let initialProj = Fold.foldEnvelope projection initEnv
         new AgentJournal(writer, initialProj)
+
+    let createFromBoot
+        (directory: string)
+        (runtimeId: RuntimeId)
+        (processId: int)
+        (startedAt: DateTimeOffset)
+        (boot: BootSnapshot)
+        : AgentJournal =
+        let projection = Fold.apply Fold.empty boot.Envelopes
+        createFromProjection directory runtimeId processId startedAt projection
+
+    let create (directory: string) (runtimeId: RuntimeId) (processId: int) (startedAt: DateTimeOffset) : AgentJournal =
+        createFromProjection directory runtimeId processId startedAt Fold.empty
 
     let appendAgent
         (stream: StreamId)

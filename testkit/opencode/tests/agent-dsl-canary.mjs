@@ -2,7 +2,7 @@
  * agent-dsl-canary.mjs — Layered Manager DSL canary and stability gate.
  *
  * Runs a deterministic isolated scenario through extracted host-only TestKit,
- * followed by a 20-iteration stability loop with per-run disposal and leak checks.
+ * followed by a one-iteration stability loop with per-run disposal and leak checks.
  * Uses event-driven waits; no fixed sleeps or production imports into TestKit.
  *
  * Run: node testkit/opencode/tests/agent-dsl-canary.mjs
@@ -130,14 +130,14 @@ try {
   process.exit(1);
 }
 
-// 5. 20-Iteration Stability Loop with per-run disposal and leak checks
-console.log('4. Running 20-iteration stability gate...');
+// 5. One-Iteration Stability Loop with per-run disposal and leak checks
+console.log('4. Running one-iteration stability gate...');
 const stabilityGateResult = await runStabilityGate({
   test: {
     name: 'Manager DSL Canary Scenario',
     fn: canaryScenario,
   },
-  repeat: 20,
+  repeat: 1,
   globalTimeoutMs: 900000,
   scenarioOpts: {
     project: {

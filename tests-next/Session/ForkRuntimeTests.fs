@@ -130,3 +130,21 @@ module ForkRuntimeTests =
             Assert.Equal(1, ptyList.Length)
             Assert.Equal("pty-1", ptyList.[0].PtyId)
         }
+
+    [<Fact>]
+    let ``ForkRuntime_fast_completion_leaves_agent_idle`` () =
+        task {
+            let agentId = "agent-fast-completion"
+            let runtime = ForkRuntime()
+
+            match runtime.Fork(agentId, AgentRole.Coder, runWork = (fun () -> task { return Ok "done" })) with
+            | ForkResult.Created id -> Assert.Equal(agentId, id)
+            | other -> Assert.True(false, sprintf "Expected Created result, got: %A" other)
+
+            let! joined = runtime.Join()
+            Assert.True(joined.IsOk, sprintf "Expected completion, got: %A" joined)
+
+            let (agentList, _) = runtime.List()
+            let agent = agentList |> List.find (fun record' -> record'.AgentId = agentId)
+            Assert.Equal(AgentStatus.Idle, agent.Status)
+        }

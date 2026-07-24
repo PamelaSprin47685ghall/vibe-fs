@@ -87,6 +87,15 @@ export function runTestInWorker(file, exportName, timeoutMs) {
   });
 }
 
+function compiledTestDir(args = process.argv.slice(2)) {
+  const option = args.indexOf('--build-dir');
+  if (option < 0) return path.join(repoRoot, 'build/tests-next');
+
+  const value = args[option + 1];
+  if (!value || value.startsWith('--')) throw new Error('--build-dir requires a directory');
+  return path.resolve(repoRoot, value);
+}
+
 async function runTests() {
   let passed = 0;
   let failed = 0;
@@ -109,15 +118,19 @@ async function runTests() {
     return results;
   }
 
-  const buildDir = path.join(__dirname, '../build/tests-next');
-  const targetDir = fs.existsSync(buildDir) ? buildDir : __dirname;
-  const testFiles = findJsFiles(targetDir).filter((file) => {
-    if (targetDir !== buildDir) return true;
+  const buildDir = compiledTestDir();
+  if (!fs.existsSync(buildDir)) {
+    throw new Error(`Compiled Fable test directory not found: ${buildDir}`);
+  }
 
-    const sourcePath = path.join(__dirname, path.relative(buildDir, file).replace(/\.js$/, '.fs'));
+  const testFiles = findJsFiles(buildDir).filter((file) => {
+    const sourcePath = path.join(repoRoot, 'tests-next', path.relative(buildDir, file).replace(/\.js$/, '.fs'));
     return fs.existsSync(sourcePath);
   });
-  console.log(`Found ${testFiles.length} test files in ${targetDir}`);
+  if (testFiles.length === 0) {
+    throw new Error(`No compiled Fable test files found in ${buildDir}`);
+  }
+  console.log(`Found ${testFiles.length} compiled Fable test files in ${buildDir}`);
 
   for (const file of testFiles) {
     const rel = path.relative(__dirname, file);
