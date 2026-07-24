@@ -65,7 +65,10 @@ async function runProjectionScenario(scenario) {
   scenario.provider.expectText({
     id: 'manager-first',
     text: 'Manager first projection complete.',
-    match: { containsText: ['first projection'] },
+    match: {
+      requiredTools: ['fork', 'join', 'list'],
+      forbiddenTools: ['read', 'write', 'edit', 'bash', 'glob', 'grep'],
+    },
   });
   scenario.provider.expectText({
     id: 'blogger-b1',
@@ -75,7 +78,10 @@ async function runProjectionScenario(scenario) {
   scenario.provider.expectText({
     id: 'manager-second',
     text: 'Manager second projection complete.',
-    match: { containsText: ['second projection'] },
+    match: {
+      requiredTools: ['fork', 'join', 'list'],
+      forbiddenTools: ['read', 'write', 'edit', 'bash', 'glob', 'grep'],
+    },
   });
   scenario.provider.expectText({
     id: 'blogger-b2',
