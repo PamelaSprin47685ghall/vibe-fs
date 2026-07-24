@@ -10,6 +10,7 @@ import:
 
 - 已恢复 `next/Doc/SSOT.md`，冻结 Agent DSL、Companion、Fork/Join、durable facts、Review、Process 与 Orchestrator 最终语义。
 - 已完成 per-Run terminal listener、输出增量切片、existing-agent nudge 重装 listener、标准 workspace Journal Boot；真实 Manager→Coder→Join 与 Companion B1/B2 已通过 OpenCode P0。
+- 已把 tests-next 的 1s 续命看门狗移植到 testkit：Watchdog 以 SSE/provider/HTTP 事件为心跳，静默超限即诊断并退出；修复 `awaitEvent` 共享计时器句柄被并发 await 覆盖导致永不超时的失控根因；全部 P0 canary 已接入 `watchdogMs`。
 - 已拆出 `OpenCode/CompanionTransform.fs`、`OpenCode/HostEventRouter.fs`、`OpenCode/ToolSurface.fs`、`OpenCode/ExecutorTool.fs`、`Orchestrator.Types.fs`、`Orchestrator.GitPort.fs`，恢复 300 行架构门禁；此前 `npm test` = 135/135、Manager contract = 1/1、TestKit = 11/11。
 - Manager provider request 已证明只暴露 `fork/join/list`，禁止 `read/write/edit/bash/glob/grep/verdict`；P0 默认 3×稳定性通过，`CANARY_REPEAT` 仍可提高门槛。
 - Companion 真实 Blogger child 已产生 B1/B2，同一 child 被复用，角色 sidecar 门禁通过；durable B/baseline/replacement 已有重启 Port/Fake 测试，真实近上限投影 E2E 仍未验收。
@@ -40,7 +41,7 @@ import:
 ## 当前边界：不得误称已完成
 
 - `npm run test:release` 已通过不等于 production-ready；默认 P0 稳定性是 3×，不是 20×。
-- 真实 Host parent abort、跨重启 child reconcile、Fallback provider failure、Process/PTY 长压、Orchestrator 发布 E2E 尚未闭合；同一 child 三轮 nudge 已有真实 canary。
+- 真实 Host parent abort、Fallback provider failure、Process/PTY 长压、Orchestrator 发布 E2E 尚未闭合；跨重启 child reconcile 与同一 child 三轮 nudge 已有真实 canary。
 - 在上述边界闭合前，不切换 production entry，不删除黑盒 Oracle 测试资产，不宣称 release-ready。
 
 ## 当前已知关键 Bug 与未修复缺口
@@ -63,10 +64,9 @@ import:
 ### 🟢 Manager 工具权限已由 provider request 验证
 - `SpikePlugin` config hook 原地注入 manager agent 的 deny-all + fork/join/list allow 配置；P0 已证明真实 provider request 无 read/write/edit/bash/glob/grep/verdict。
 
-### 🟡 Journal 默认路径已接线，跨重启仍待生产验证
-- 标准入口从 `input.directory` 推导 `<workspace>/.wanxiangshu-next/runtimes/`，Boot 后创建 AgentJournal；AgentLinked 写入已进入真实 Manager 纵切，child/session/role linkage 的 Port/Fake 恢复测试已通过，真实 OpenCode 重启与 Review/Fallback/Companion reconcile 仍未闭合。
-- 真实重启探针已证明 child API 仍报告 `agent=coder`，但 child outbound projection 在缺少 session identity 时错误继承 parent Manager 工具面；探针已删除，不能用伪绿色 E2E 代替 Host hook 契约。
-- 不允许用 raw message 扫描或全局 `LatestSessionId` 继续猜测 child 身份；必须由 Host 提供可靠 projection session context 后再接通真实重启 reconcile。
+### 🟢 Journal 默认路径已接线，跨重启 reconcile 已通过真实 E2E
+- 标准入口从 `input.directory` 推导 `<workspace>/.wanxiangshu-next/runtimes/`，Boot 后创建 AgentJournal；AgentLinked 写入已进入真实 Manager 纵切，child/session/role linkage 的 Port/Fake 恢复测试已通过，真实 OpenCode 重启 reconcile 已由 host-restart-canary 闭合，Review/Fallback/Companion 跨重启 reconcile 仍未闭合。
+- 真实重启 reconcile 已闭合：projection session identity 取自 `outObj.messages[*].info.sessionID`（空则回退 LatestSessionId），journal 恢复的角色在 restore 边界归一化为小写，nudge prompt 显式携带恢复角色，HostEventRouter 只记录 DSL 角色（build/title 等 fallback 不得覆盖）；`host-restart-canary` 证明重启后同一 child 两轮 nudge 均保持 coder 工具面，3× 稳定性通过并纳入 `test:e2e:p0`。
 
 ### 🟡 Fallback 阈值已修复，待真实模型调用验证
 - `Fallback` 纯函数与 durable wrapper 现按 A1→B2→B3→Dead 计算；第一次失败重试 A，第二次失败才永久切 B。
@@ -83,7 +83,7 @@ import:
 ### 🟡 Orchestrator 纯 Port 路径已成形，真实发布仍未验收
 - 已有 AgentJournal、candidate/published facts、初次与 rebase 后双 PERFECT、冲突交回同一 Manager、Git authority reconcile 与 ff-only；真实 OpenCode Manager worktree 发布 E2E 仍未闭合。
 ## 下一阶段唯一优先级：跨域闭合
-1. 冻结真实 Host 的 projection budget、parent abort 与跨重启 reconcile 契约，补齐对应 OpenCode E2E。
+1. 冻结真实 Host 的 projection budget 与 parent abort 契约，补齐对应 OpenCode E2E（跨重启 reconcile 已闭合）。
 2. 接通真实模型失败注入后的 A/B Fallback durable 恢复。
 3. 将 Process PTY、大输入、SIGKILL 与孤儿检测纳入默认 3×稳定性门。
 4. 将 Orchestrator durable Port 路径接到真实 OpenCode Manager worktree、冲突回交、复审与 ff-only 发布 E2E。
