@@ -67,6 +67,7 @@ import:
 
 ### 🟡 Fallback 阈值已修复，待真实模型调用验证
 - `Fallback` 纯函数与 durable wrapper 现按 A1→B2→B3→Dead 计算；第一次失败重试 A，第二次失败才永久切 B。
+- OpenCode prompt 的 `model` 已按 Host 契约收敛为 `{ providerID, modelID, variant? }` 对象；A/B 的真实 model resolver、failure 注入与 provider 错误分类仍未定义，禁止硬编码模型名伪造 E2E。
 - durable projection 仍需接入真实模型请求并验证重启后的累计失败。
 
 ### 🟢 Process 已闭合命令与摘要主路径，压力边界待验收

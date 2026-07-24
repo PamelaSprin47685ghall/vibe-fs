@@ -8,7 +8,7 @@ open Wanxiangshu.Next.Kernel.Identity
 open Wanxiangshu.Next.Kernel.Outcome
 
 type OpenCodePromptOptions =
-    { Model: string option
+    { Model: OpencodeModel option
       Agent: string option }
 
 type IPromptPort =
