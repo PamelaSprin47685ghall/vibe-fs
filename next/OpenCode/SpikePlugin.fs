@@ -112,21 +112,6 @@ module SpikePlugin =
                         sessionRoles.[ChildId.value childId] <- role
                 | None -> ()
 
-    let private sessionIdFromMessages (output: obj) =
-        if isNull output || isNull output?messages then
-            None
-        else
-            let messages = unbox<obj array> output?messages
-
-            messages
-            |> Array.tryPick (fun message ->
-                if not (isNull message?info) && not (isNull message?info?sessionID) then
-                    Some(unbox<string> message?info?sessionID)
-                elif not (isNull message?sessionID) then
-                    Some(unbox<string> message?sessionID)
-                else
-                    None)
-
     let private configureManager (config: obj) =
         if not (isNull config) then
             let agents =
@@ -197,8 +182,7 @@ module SpikePlugin =
                     HostEventRouter(sessionPort, sessionParents, sessionRoles, verdictSessions, nudgeSent)
 
                 let transform inObj outObj =
-                    let projectionSessionId =
-                        sessionIdFromMessages outObj |> Option.defaultValue eventRouter.LatestSessionId
+                    let projectionSessionId = eventRouter.LatestSessionId
 
                     if
                         not (isNull inObj)

@@ -66,6 +66,7 @@ import:
 ### 🟡 Journal 默认路径已接线，跨重启仍待生产验证
 - 标准入口从 `input.directory` 推导 `<workspace>/.wanxiangshu-next/runtimes/`，Boot 后创建 AgentJournal；AgentLinked 写入已进入真实 Manager 纵切，child/session/role linkage 的 Port/Fake 恢复测试已通过，真实 OpenCode 重启与 Review/Fallback/Companion reconcile 仍未闭合。
 - 真实重启探针已证明 child API 仍报告 `agent=coder`，但 child outbound projection 在缺少 session identity 时错误继承 parent Manager 工具面；探针已删除，不能用伪绿色 E2E 代替 Host hook 契约。
+- 不允许用 raw message 扫描或全局 `LatestSessionId` 继续猜测 child 身份；必须由 Host 提供可靠 projection session context 后再接通真实重启 reconcile。
 
 ### 🟡 Fallback 阈值已修复，待真实模型调用验证
 - `Fallback` 纯函数与 durable wrapper 现按 A1→B2→B3→Dead 计算；第一次失败重试 A，第二次失败才永久切 B。
