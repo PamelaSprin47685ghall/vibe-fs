@@ -13,6 +13,7 @@ import:
 - 已完成 per-Run terminal listener、输出增量切片、existing-agent nudge 重装 listener、标准 workspace Journal Boot；`npm test` 当前 127/127、Manager contract 1/1、TestKit 11/11。
 - 已拆出 `OpenCode/CompanionTransform.fs`，恢复 300 行架构门禁；尚未证明真实 provider 工具权限与真实 child-session E2E。
 - 主代理配置已同时覆盖 `manager/build/plan`，deny 全部常规工具，仅 allow `fork/join/list`；provider request 层仍待真实 canary 证明。
+- P0 canary 已改为真实 Manager→fork(coder)→join→Coder write 纵切，严格校验 Manager 禁止常规工具；当前真实 OpenCode 在 turn idle 收敛处超时，故仍不得宣称纵切闭合。
 - 下一步必须以真实 Host per-Run terminal 与 Manager→Coder→Join 纵切为验收门，不得以既有 127 个测试替代。
 
 ## 已完成并验证

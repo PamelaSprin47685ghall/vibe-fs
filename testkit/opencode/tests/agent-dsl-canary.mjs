@@ -8,7 +8,7 @@
  * Run: node testkit/opencode/tests/agent-dsl-canary.mjs
  */
 
-import path from 'node:path';
+import assert from 'node:assert/strict';
 import { fileURLToPath } from 'node:url';
 import { execSync } from 'node:child_process';
 import {
@@ -56,22 +56,59 @@ console.log('  - Resource Leak Detection: Active (Port/PID/Process-tree tracking
 
 // 3. Scenario Definition
 async function canaryScenario(scenario) {
-  // Allow synthetic continuation and title generation for deterministic mock response
+  // Title generation is a separate host request; keep it deterministic without
+  // weakening the FIFO expectations for Manager and Coder turns.
   scenario.provider.allowSyntheticContinuations();
   scenario.provider.allowTitleGeneration();
 
-  // Queue expectations for manager task turn:
-  // Step 1: Tool call to write canary output file
+  const forbiddenManagerTools = ['read', 'write', 'edit', 'bash', 'glob', 'grep'];
+
+  // FIFO: Manager forks Coder, then emits join (which waits); the child Coder
+  // writes and reports, after which Manager returns the joined completion. The
+  // response args are real tool payloads consumed by the host, not a shortcut.
   scenario.provider.expectToolCall({
-    id: 'canary-write-1',
-    tool: 'write',
-    args: { filePath: 'canary_output.txt', content: 'Manager canary slice OK\n' },
+    id: 'manager-fork-coder',
+    tool: 'fork',
+    args: {
+      agent: 'coder',
+      prompt: 'Write canary_output.txt with exactly Coder canary slice OK\\n, then report completion.',
+    },
+    match: {
+      requiredTools: ['fork', 'join', 'list'],
+      forbiddenTools: forbiddenManagerTools,
+    },
   });
 
-  // Step 2: Follow-up final response after tool execution completes
+  scenario.provider.expectToolCall({
+    id: 'manager-join-coder',
+    tool: 'join',
+    args: {},
+    match: {
+      requiredTools: ['fork', 'join', 'list'],
+      forbiddenTools: forbiddenManagerTools,
+    },
+  });
+
+  scenario.provider.expectToolCall({
+    id: 'coder-write-file',
+    tool: 'write',
+    args: { filePath: 'canary_output.txt', content: 'Coder canary slice OK\n' },
+    match: { requiredTools: ['write'] },
+  });
+
   scenario.provider.expectText({
-    id: 'canary-done-1',
-    text: 'Manager canary task completed successfully.',
+    id: 'coder-completed',
+    text: 'Coder completed the canary write.',
+    match: { requiredTools: ['write'] },
+  });
+
+  scenario.provider.expectText({
+    id: 'manager-joined-coder',
+    text: 'Manager joined Coder: canary complete.',
+    match: {
+      requiredTools: ['fork', 'join', 'list'],
+      forbiddenTools: forbiddenManagerTools,
+    },
   });
 
   // Create session on real host process
@@ -85,8 +122,15 @@ async function canaryScenario(scenario) {
   // Monitor turn with event-driven watermark tracking
   const turn = scenario.turn.start(sessionID);
 
-  // Prompt the session
-  const promptRes = await scenario.client.prompt(sessionID, 'Run manager canary task and write canary_output.txt');
+  // Prompt the real Manager agent explicitly. Do not use the default primary
+  // agent: that would make a direct Manager write look like a passing canary.
+  const promptRes = await scenario.client.request('POST', `/session/${sessionID}/prompt_async`, {
+    body: {
+      agent: 'manager',
+      parts: [{ type: 'text', text: 'Delegate this canary to a Coder with fork, join the Coder, and report the result.' }],
+      model: { providerID: 'test', modelID: 'test-model' },
+    },
+  });
   if (!promptRes.ok) {
     throw new Error(`Prompt failed with status ${promptRes.status}: ${JSON.stringify(promptRes.data)}`);
   }
@@ -99,9 +143,27 @@ async function canaryScenario(scenario) {
     requireIdleAfterActivity: true,
   });
 
-  // Check file oracle state using FsOracle assertions
+  // Check file oracle state: only the Coder response writes this file.
   scenario.fs.expectFile('canary_output.txt');
-  scenario.fs.expectFileContains('canary_output.txt', 'Manager canary slice OK');
+  scenario.fs.expectFileContent('canary_output.txt', 'Coder canary slice OK\n');
+
+  const requests = scenario.provider.requests;
+  const managerRequests = requests.filter((request) => JSON.stringify(request).includes('Delegate this canary to a Coder'));
+  assert.ok(managerRequests.length >= 3, 'Manager must issue fork, join, and final turns');
+  for (const request of managerRequests) {
+    const names = request.tools?.map((tool) => tool.function?.name || tool.name).filter(Boolean) || [];
+    assert.deepEqual(names.filter((name) => forbiddenManagerTools.includes(name)), [], 'Manager request exposed a forbidden file/process tool');
+  }
+
+  const childRequests = requests.filter((request) => JSON.stringify(request).includes('Write canary_output.txt with exactly'));
+  assert.ok(childRequests.some((request) => {
+    const names = request.tools?.map((tool) => tool.function?.name || tool.name).filter(Boolean) || [];
+    return names.includes('write');
+  }), 'Coder provider turn did not expose write');
+
+  const managerRequestText = JSON.stringify(managerRequests);
+  assert.match(managerRequestText, /agentId/, 'fork result did not reach Manager continuation');
+  assert.match(managerRequestText, /Coder completed the canary write\./, 'join result did not reach Manager final turn');
 }
 
 // 4. Single Isolated Execution Check
@@ -112,7 +174,7 @@ const singleScenarioOpts = {
       'AGENTS.md': '- manager dsl canary project\n',
     },
   },
-  strict: false,
+  strict: true,
 };
 
 let scenario;
@@ -145,7 +207,7 @@ const stabilityGateResult = await runStabilityGate({
         'AGENTS.md': '- manager dsl canary iteration\n',
       },
     },
-    strict: false,
+    strict: true,
   },
 });
 
