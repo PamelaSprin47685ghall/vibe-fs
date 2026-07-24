@@ -75,6 +75,7 @@ import:
 - `Fallback` 纯函数与 durable wrapper 现按 A1→B2→B3→Dead 计算；第一次失败重试 A，第二次失败才永久切 B。
 - OpenCode prompt 的 `model` 已按 Host 契约收敛为 `{ providerID, modelID, variant? }` 对象；A/B ModelResolver 已定义（`ModelResolver.fromEnv` 读 WANXIANGSHU_MODEL_A/B），HostForkRuntime 按 durable fallback 投影为 child 选模型。
 - FallbackDetect 以 SSE message.updated 事件为源，用两条本地内容判据（零字节正文 / XML标记无真实tool-call）检测失败助手轮，不靠远端返回值；fallback-canary 真实 500 注入→journal 记录→重启恢复→累计 8 次已通过。
+- **零宽续命设计裁决**：看门狗心跳判据 = 是否有新断言成立，每次续 1s，无新断言 1s 即杀。助手轮正文为空且无新的未闭合工具调用 → 插件主动发一条 Unicode 零宽（​）user 消息让 LLM 继续生成；正文含 XML 标记但无真正 tool-call part → 同样发零宽续命。两条判据均为纯本地消息内容检测，禁止依赖远端 HTTP 状态码或 error 字段。
 
 ### 🟢 Process 已闭合命令与摘要主路径，压力边界待验收
 - Pump、增量 spool、动态输出阈值、200KB chunk、唯一 deadline 与 SIGKILL 后 EOF 已通过本地 Process 测试。
