@@ -63,7 +63,7 @@ async function canaryScenario(scenario) {
   scenario.provider.allowBloggerRequests();
   scenario.provider.allowOutOfOrder();
 
-  const forbiddenManagerTools = ['read', 'write', 'edit', 'bash', 'glob', 'grep'];
+  const forbiddenManagerTools = ['read', 'write', 'edit', 'bash', 'glob', 'grep', 'verdict'];
 
   // FIFO: Manager forks Coder, then emits join (which waits); the child Coder
   // writes and reports, after which Manager returns the joined completion. The

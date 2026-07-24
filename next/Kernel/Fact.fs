@@ -45,6 +45,10 @@ module Fact =
         | FallbackFailureRecorded of
             {| SessionId: SessionId
                Reason: string |}
+        | OrchestratorManagerJobCreated of
+            {| ManagerId: string
+               WorktreePath: string
+               Branch: string |}
         | OrchestratorCandidateRegistered of
             {| ManagerId: string
                CandidateId: string

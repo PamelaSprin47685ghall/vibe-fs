@@ -5,11 +5,35 @@ open System.Threading.Tasks
 open Fable.Core
 open Fable.Core.JsInterop
 open Xunit
+open Wanxiangshu.Next.Kernel.Fact
 open Wanxiangshu.Next.Kernel.Identity
 open Wanxiangshu.Next.Kernel.Outcome
 open Wanxiangshu.Next.OpenCode
+open Wanxiangshu.Next.Tools
 
 module SpikeHostTests =
+
+    [<Fact>]
+    let ``Reviewer_verdict_surface_is_enum_and_manager_coder_are_denied`` () =
+        let reviewer = StaticTools.reviewerAgentConfig ()
+        let manager = StaticTools.managerAgentConfig ()
+        let coder = StaticTools.coderAgentConfig ()
+
+        Assert.Equal("allow", unbox<string> reviewer?permission?verdict)
+        Assert.Equal("deny", unbox<string> manager?permission?verdict)
+        Assert.Equal("deny", unbox<string> coder?permission?verdict)
+        Assert.Contains("\"enum\":[\"PERFECT\",\"REVISE\"]", StaticTools.reviewerVerdictSchemaJson)
+
+        match StaticTools.reviewerVerdictOfString "PERFECT" with
+        | Ok ReviewGuardVerdict.Perfect -> ()
+        | other -> Assert.True(false, sprintf "Expected PERFECT, got %A" other)
+
+        match StaticTools.reviewerVerdictOfString "REVISE" with
+        | Ok ReviewGuardVerdict.Revise -> ()
+        | other -> Assert.True(false, sprintf "Expected REVISE, got %A" other)
+
+        Assert.True(Result.isError (StaticTools.reviewerVerdictOfString "PERFECT: looks good"))
+        Assert.True(Result.isError (StaticTools.reviewerVerdictOfString "perfect"))
 
     [<Fact>]
     let ``AG_CURRENT_TAIL_PRESERVED_preserves_raw_tail_messages`` () =

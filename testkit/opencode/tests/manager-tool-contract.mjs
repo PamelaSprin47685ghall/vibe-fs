@@ -11,7 +11,7 @@ test('manager exposes only fork join list and executes the mailbox path', async 
     const hooks = await SpikePlugin_initSpikePlugin({ client: {}, directory: journalDirectory });
     const names = Object.keys(hooks.tool).sort();
 
-    assert.deepEqual(names, ['fork', 'join', 'list']);
+    assert.deepEqual(names, ['fork', 'join', 'list', 'verdict']);
     assert.deepEqual(Object.keys(hooks.tool.fork.args).sort(), ['agent', 'prompt']);
 
     const transformed = { messages: [{ role: 'user', text: 'hello' }] };

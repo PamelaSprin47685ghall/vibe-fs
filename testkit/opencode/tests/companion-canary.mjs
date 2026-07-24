@@ -67,7 +67,7 @@ async function runProjectionScenario(scenario) {
     text: 'Manager first projection complete.',
     match: {
       requiredTools: ['fork', 'join', 'list'],
-      forbiddenTools: ['read', 'write', 'edit', 'bash', 'glob', 'grep'],
+      forbiddenTools: ['read', 'write', 'edit', 'bash', 'glob', 'grep', 'verdict'],
     },
   });
   scenario.provider.expectText({
@@ -80,7 +80,7 @@ async function runProjectionScenario(scenario) {
     text: 'Manager second projection complete.',
     match: {
       requiredTools: ['fork', 'join', 'list'],
-      forbiddenTools: ['read', 'write', 'edit', 'bash', 'glob', 'grep'],
+      forbiddenTools: ['read', 'write', 'edit', 'bash', 'glob', 'grep', 'verdict'],
     },
   });
   scenario.provider.expectText({
@@ -114,6 +114,10 @@ async function runProjectionScenario(scenario) {
   const childIdsAfterFirstProjection = [...new Set(sessionCreatedIds(scenario))].filter((id) => id !== managerId);
   assert.equal(childIdsAfterFirstProjection.length, 1, 'first Manager projection must create exactly one Blogger child session');
   const bloggerId = childIdsAfterFirstProjection[0];
+  await scenario.events.awaitEvent(
+    (event) => event.type === 'session.idle' && event.sessionID === bloggerId,
+    30000,
+  );
 
   const secondTurn = scenario.turn.start(managerId);
   const secondPrompt = await scenario.client.request('POST', `/session/${managerId}/prompt_async`, {

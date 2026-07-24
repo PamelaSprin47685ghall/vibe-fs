@@ -8,6 +8,9 @@ open Wanxiangshu.Next.Kernel.Identity
 open Wanxiangshu.Next.OpenCode
 open Wanxiangshu.Next.Session
 open Wanxiangshu.Next.Tools
+open Wanxiangshu.Next.Journal
+open Wanxiangshu.Next.Tests.JournalTests
+open Wanxiangshu.Next.Tests.JournalTests.JournalTestSupport
 
 module CompanionHostTests =
 
@@ -57,6 +60,7 @@ module CompanionHostTests =
             Assert.Equal(Submitted, companion.SubmitProjection("{\"step\":2}"))
             do! companion.WaitInFlightAsync()
             Assert.Equal(1, childCount ())
+            Assert.True(companion.EnablePrefixReplacement())
 
             let messages =
                 [ { Role = "user"
@@ -77,8 +81,50 @@ module CompanionHostTests =
             let second = first @ [ createObj [ "role", box "user"; "text", box "tail" ] ]
             companion2.TransformRaw first |> ignore
             do! companion2.WaitInFlightAsync()
+            Assert.True(companion2.EnablePrefixReplacement())
             let projected = companion2.TransformRaw second
             Assert.Equal(2, projected.Length)
             Assert.Equal("blog paragraph", (projected.Head: obj)?text)
             Assert.Equal("tail", (projected.[1]: obj)?text)
         }
+
+    [<Fact>]
+    let ``CompanionHost_persists_and_restores_B_baseline_and_replacement`` () =
+        withTempDir (fun directory ->
+            task {
+                let primaryId = SessionId.create "durable-primary"
+                let runtimeId = Wanxiangshu.Next.Kernel.Identity.RuntimeId.create "durable-runtime"
+                let journal = AgentJournal.create directory runtimeId 1001 DateTimeOffset.UtcNow
+                let durable = AgentJournalCompanionPort(journal) :> ICompanionDurablePort
+                let host, _ = makeFake ()
+                let companion = CompanionHost(primaryId, host, durable)
+
+                Assert.Equal(Submitted, companion.SubmitProjection("{\"step\":1}"))
+                do! companion.WaitInFlightAsync()
+                Assert.True(companion.EnablePrefixReplacement())
+                Assert.Equal(Some "blog paragraph", companion.Memory.CurrentB)
+                Assert.Equal(Some "{\"step\":1}", companion.Memory.LastSuccessfulProjection)
+                Assert.True(companion.Memory.ReplacementActive)
+
+                (journal :> IDisposable).Dispose()
+                let boot = Boot.boot directory
+
+                let restoredJournal =
+                    AgentJournal.createFromBoot
+                        directory
+                        (RuntimeId.create "restored-runtime")
+                        1002
+                        DateTimeOffset.UtcNow
+                        boot
+
+                let restoredDurable =
+                    AgentJournalCompanionPort(restoredJournal) :> ICompanionDurablePort
+
+                let restoredHost, _ = makeFake ()
+                let restored = CompanionHost(primaryId, restoredHost, restoredDurable)
+
+                Assert.Equal(Some "blog paragraph", restored.Memory.CurrentB)
+                Assert.Equal(Some "{\"step\":1}", restored.Memory.LastSuccessfulProjection)
+                Assert.True(restored.Memory.ReplacementActive)
+                (restoredJournal :> IDisposable).Dispose()
+            })

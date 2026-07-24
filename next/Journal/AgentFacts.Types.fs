@@ -35,6 +35,8 @@ type CompanionProjection =
       CurrentB: BlogText option
       ReplacementActive: bool }
 
+    member this.PrefixReplacementEnabled = this.ReplacementActive
+
 type AgentLinkageProjection =
     { LinkedChildren: Map<ChildId, string> }
 
@@ -42,7 +44,7 @@ type ReviewGuardProjection =
     { LastGitTreeHash: GitTreeHash option
       ConsecutivePerfects: int
       IsConfirmed: bool
-      AcceptedGuardKeys: Set<string>
+      AcceptedGuardKey: string option
       RecentToolCallIds: string list }
 
 type ModelSide =
@@ -60,20 +62,26 @@ type CandidateStatus =
     | Published of candidateId: CandidateId * commitHash: string
     | Rejected of candidateId: CandidateId * reason: string
 
-type ManagerState =
-    { Status: CandidateStatus option
-      History: CandidateStatus list }
+type ManagerState = { Status: CandidateStatus option }
+
+type ManagerJob =
+    { WorktreePath: string
+      Branch: string
+      CandidateId: CandidateId option
+      CandidateCommit: string option
+      PublishedCommit: string option }
 
 type OrchestratorProjection =
-    { Managers: Map<ManagerId, ManagerState>
-      PublishedCommits: string list }
+    { ManagerJobs: Map<ManagerId, ManagerJob>
+      Managers: Map<ManagerId, ManagerState>
+      PublishedCommit: string option }
 
 type EffectStatus =
     | Requested of target: string * payload: string
     | Accepted of target: string * payload: string * result: string
 
 type DurableEffectProjection =
-    { Effects: Map<EffectId, EffectStatus> }
+    { Current: (EffectId * EffectStatus) option }
 
 type SessionAgentProjection =
     { Companion: CompanionProjection option

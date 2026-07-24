@@ -70,7 +70,7 @@ module Guard =
             match Map.tryFind targetSessionId projSet.AgentProjections.Sessions with
             | Some s ->
                 match s.ReviewGuard with
-                | Some rg -> Set.contains guardKey rg.AcceptedGuardKeys
+                | Some rg -> rg.AcceptedGuardKey = Some guardKey
                 | None -> false
             | None -> false
 

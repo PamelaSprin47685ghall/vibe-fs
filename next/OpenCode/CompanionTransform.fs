@@ -51,6 +51,15 @@ module CompanionTransform =
 
                     Some(sessionId, role))
 
+        let messageSessionIds =
+            rawMsgs
+            |> List.choose (fun message ->
+                if isNull message || isNull message?info || isNull message?info?sessionID then
+                    None
+                else
+                    Some(unbox<string> message?info?sessionID))
+            |> Set.ofList
+
         match messageContext with
         | Some(Some sessionId, _) when not (isNull inObj) && isNull inObj?sessionID -> inObj?sessionID <- sessionId
         | _ -> ()
@@ -79,7 +88,12 @@ module CompanionTransform =
                         match companions.TryGetValue sessionId with
                         | true, value -> value
                         | false, _ ->
-                            let value = CompanionHost(SessionId.create sessionId, sessionPort)
+                            let value =
+                                companions.Values
+                                |> Seq.tryFind (fun candidate ->
+                                    messageSessionIds.Contains(SessionId.value candidate.PrimarySessionId))
+                                |> Option.defaultValue (CompanionHost(SessionId.create sessionId, sessionPort))
+
                             companions.[sessionId] <- value
                             value)
 

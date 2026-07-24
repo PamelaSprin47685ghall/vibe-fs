@@ -6,11 +6,18 @@ open AgentFactsFoldHelpers
 
 module internal AgentFactsReview =
 
+    let private recentToolCallWindowSize = 2
+
     let private appendRecentToolCallId (ids: string list) (toolCallId: string) =
         if List.contains toolCallId ids then
             ids
         else
-            ids @ [ toolCallId ]
+            let updated = ids @ [ toolCallId ]
+
+            if List.length updated > recentToolCallWindowSize then
+                List.skip (List.length updated - recentToolCallWindowSize) updated
+            else
+                updated
 
     let foldReviewVerdictRecorded
         (proj: AgentProjectionSet)
@@ -71,13 +78,13 @@ module internal AgentFactsReview =
                                 { LastGitTreeHash = Some hash
                                   ConsecutivePerfects = 1
                                   IsConfirmed = false
-                                  AcceptedGuardKeys = Set.empty
+                                  AcceptedGuardKey = None
                                   RecentToolCallIds = [ p.ToolCallId ] }
                             | ReviewGuardVerdict.Revise ->
                                 { LastGitTreeHash = Some hash
                                   ConsecutivePerfects = 0
                                   IsConfirmed = false
-                                  AcceptedGuardKeys = Set.empty
+                                  AcceptedGuardKey = None
                                   RecentToolCallIds = [ p.ToolCallId ] }
 
                     { s with ReviewGuard = Some rg })
@@ -100,12 +107,12 @@ module internal AgentFactsReview =
                         match s.ReviewGuard with
                         | Some existing ->
                             { existing with
-                                AcceptedGuardKeys = Set.add p.GuardKey existing.AcceptedGuardKeys }
+                                AcceptedGuardKey = Some p.GuardKey }
                         | None ->
                             { LastGitTreeHash = None
                               ConsecutivePerfects = 0
                               IsConfirmed = false
-                              AcceptedGuardKeys = Set.singleton p.GuardKey
+                              AcceptedGuardKey = Some p.GuardKey
                               RecentToolCallIds = [] }
 
                     { s with ReviewGuard = Some rg })

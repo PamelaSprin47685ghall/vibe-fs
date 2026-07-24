@@ -213,8 +213,7 @@ module AgentFactsTests =
 
         let mgrState = proj.Orchestrator.Managers.[mgrId]
         Assert.Equal(Some(Published(candId, "c0mm1t123")), mgrState.Status)
-        Assert.Single(proj.Orchestrator.PublishedCommits)
-        Assert.Equal("c0mm1t123", proj.Orchestrator.PublishedCommits.[0])
+        Assert.Equal(Some "c0mm1t123", proj.Orchestrator.PublishedCommit)
 
     [<Fact>]
     let Agent_linkage_and_durable_effect_folds () =
@@ -253,7 +252,8 @@ module AgentFactsTests =
         Assert.Equal("WorkerAgent", sessionProj.Linkage.Value.LinkedChildren.[childId])
 
         let effId = EffectId.create effIdStr
-        let effStatus = sessionProj.Effects.Value.Effects.[effId]
+        let currentEffectId, effStatus = sessionProj.Effects.Value.Current.Value
+        Assert.Equal(effId, currentEffectId)
         Assert.Equal(Accepted("FileSystem", "Write config", "Success"), effStatus)
 
     [<Fact>]
@@ -280,6 +280,4 @@ module AgentFactsTests =
         let proj = AgentFacts.apply AgentFacts.empty [ env1; env2 ]
 
         let rg = proj.Sessions.[sid].ReviewGuard.Value
-        Assert.True(Set.contains "key-1" rg.AcceptedGuardKeys)
-        Assert.True(Set.contains "key-2" rg.AcceptedGuardKeys)
-        Assert.False(Set.contains "key-3" rg.AcceptedGuardKeys)
+        Assert.Equal(Some "key-2", rg.AcceptedGuardKey)

@@ -149,7 +149,7 @@ module GuardTests =
         let (proj1, msgId1) = res1 |> Result.defaultWith (fun _ -> failwith "unexpected")
         Assert.Equal(1, hostCalls)
         Assert.Equal(Some "msg-1", msgId1)
-        Assert.True(Set.contains key proj1.AgentProjections.Sessions.[sid].ReviewGuard.Value.AcceptedGuardKeys)
+        Assert.Equal(Some key, proj1.AgentProjections.Sessions.[sid].ReviewGuard.Value.AcceptedGuardKey)
 
         // Second call with same key: skips host port call (idempotent)
         let res2 =

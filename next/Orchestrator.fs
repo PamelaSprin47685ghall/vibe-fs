@@ -3,6 +3,9 @@ namespace Wanxiangshu.Next.Orchestrator
 open System
 open System.Threading.Tasks
 open Wanxiangshu.Next.Process
+open Wanxiangshu.Next.Kernel.Fact
+open Wanxiangshu.Next.Journal
+open Wanxiangshu.Next.Kernel.Outcome
 
 [<RequireQualifiedAccess>]
 type OrchestratorVerdict =
@@ -31,10 +34,72 @@ type ManagerPort =
     { RunManager: string -> string -> Task<Result<unit, string>>
       Reverify: string -> string -> Task<Result<unit, string>> }
 
-type Orchestrator(git: GitPort, manager: ManagerPort, repoPath: string, targetBranch: string) =
+type OrchestratorJournalPort =
+    { AppendFact: StreamId -> AgentFact -> Result<ProjectionSet, string>
+      Snapshot: unit -> ProjectionSet }
+
+module OrchestratorJournalPort =
+    let fromAgentJournal (journal: AgentJournal) : OrchestratorJournalPort =
+        { AppendFact =
+            fun stream fact ->
+                match AgentJournal.appendAgent stream None fact journal with
+                | Ok projection -> Ok projection
+                | Error failure -> Error(sprintf "%A" failure.Failure)
+          Snapshot = fun () -> AgentJournal.snapshot journal }
+
+type GitAuthorityPort =
+    { GetHead: string -> Task<Result<string, string>>
+      GetTargetHead: string -> string -> Task<Result<string, string>> }
+
+type Orchestrator
+    (
+        git: GitPort,
+        manager: ManagerPort,
+        repoPath: string,
+        targetBranch: string,
+        ?journal: OrchestratorJournalPort,
+        ?authority: GitAuthorityPort
+    ) =
     let lockObj = obj ()
     let mutable publishChain: Task = Task.FromResult(()) :> Task
     let mailbox = System.Collections.Generic.Queue<ManagerCompletion>()
+    let journalPort = journal
+    let authorityPort = authority
+
+    let appendFact stream fact =
+        match journalPort with
+        | None -> Ok()
+        | Some port ->
+            match port.AppendFact stream fact with
+            | Ok _ -> Ok()
+            | Error err -> Error err
+
+    let reverifyTwice managerId worktreePath =
+        task {
+            match! manager.Reverify managerId worktreePath with
+            | Error err -> return Error err
+            | Ok() -> return! manager.Reverify managerId worktreePath
+        }
+
+    let readHead worktreePath fallback =
+        task {
+            match authorityPort with
+            | None -> return Ok fallback
+            | Some port ->
+                match! port.GetHead worktreePath with
+                | Ok head -> return Ok head
+                | Error err -> return Error err
+        }
+
+    let reconcileTarget () =
+        task {
+            match authorityPort with
+            | None -> return Ok()
+            | Some port ->
+                match! port.GetTargetHead repoPath targetBranch with
+                | Ok _ -> return Ok()
+                | Error err -> return Error err
+        }
 
     let waiters =
         System.Collections.Generic.Queue<TaskCompletionSource<ManagerCompletion>>()
@@ -90,19 +155,38 @@ type Orchestrator(git: GitPort, manager: ManagerPort, repoPath: string, targetBr
                         { ManagerId = managerId
                           WorktreePath = path }
 
-                    let _ =
-                        task {
-                            let! res = manager.RunManager managerId path
-                            let completion = { Handle = handle; Result = res }
+                    match
+                        appendFact
+                            StreamId.Workspace
+                            (AgentFact.OrchestratorManagerJobCreated
+                                {| ManagerId = managerId
+                                   WorktreePath = path
+                                   Branch = sprintf "manager/%s" managerId |})
+                    with
+                    | Error err ->
+                        let _ = git.RemoveWorktree path
 
-                            lock lockObj (fun () ->
-                                if waiters.Count > 0 then
-                                    waiters.Dequeue().SetResult(completion)
-                                else
-                                    mailbox.Enqueue(completion))
-                        }
+                        return
+                            Error(
+                                OrchestratorVerdict.IntegrationFailed(
+                                    managerId,
+                                    sprintf "Failed to persist manager job: %s" err
+                                )
+                            )
+                    | Ok() ->
+                        let _ =
+                            task {
+                                let! res = manager.RunManager managerId path
+                                let completion = { Handle = handle; Result = res }
 
-                    return Ok handle
+                                lock lockObj (fun () ->
+                                    if waiters.Count > 0 then
+                                        waiters.Dequeue().SetResult(completion)
+                                    else
+                                        mailbox.Enqueue(completion))
+                            }
+
+                        return Ok handle
         }
 
     member this.JoinPublished() : Task<OrchestratorVerdict> =
@@ -129,28 +213,121 @@ type Orchestrator(git: GitPort, manager: ManagerPort, repoPath: string, targetBr
                 return!
                     runSerial (fun () ->
                         task {
-                            match! git.Rebase completion.Handle.WorktreePath targetBranch with
+                            let managerId = completion.Handle.ManagerId
+                            let worktreePath = completion.Handle.WorktreePath
+
+                            match! reconcileTarget () with
                             | Error err ->
                                 return
                                     OrchestratorVerdict.IntegrationFailed(
-                                        completion.Handle.ManagerId,
-                                        sprintf "Rebase failed: %s" err
+                                        managerId,
+                                        sprintf "Git reconcile failed: %s" err
                                     )
                             | Ok() ->
-                                match! manager.Reverify completion.Handle.ManagerId completion.Handle.WorktreePath with
-                                | Error err -> return OrchestratorVerdict.NeedsReview(completion.Handle.ManagerId, err)
+                                match! reverifyTwice managerId worktreePath with
+                                | Error err -> return OrchestratorVerdict.NeedsReview(managerId, err)
                                 | Ok() ->
-                                    match! git.FfMerge completion.Handle.WorktreePath targetBranch with
+                                    let candidateId = sprintf "candidate-%s" managerId
+                                    let! candidateHeadResult = readHead worktreePath ""
+
+                                    match candidateHeadResult with
                                     | Error err ->
                                         return
                                             OrchestratorVerdict.IntegrationFailed(
-                                                completion.Handle.ManagerId,
-                                                sprintf "FF merge failed: %s" err
+                                                managerId,
+                                                sprintf "Git head lookup failed: %s" err
                                             )
-                                    | Ok commitHash ->
-                                        let! _ = git.RemoveWorktree completion.Handle.WorktreePath
+                                    | Ok candidateHead ->
+                                        match
+                                            appendFact
+                                                (StreamId.Workspace)
+                                                (AgentFact.OrchestratorCandidateRegistered
+                                                    {| ManagerId = managerId
+                                                       CandidateId = candidateId
+                                                       Branch = sprintf "manager/%s" managerId
+                                                       CommitHash = candidateHead |})
+                                        with
+                                        | Error err ->
+                                            return
+                                                OrchestratorVerdict.IntegrationFailed(
+                                                    managerId,
+                                                    sprintf "Failed to persist candidate: %s" err
+                                                )
+                                        | Ok() ->
+                                            let! rebaseResult = git.Rebase worktreePath targetBranch
 
-                                        return OrchestratorVerdict.Published(completion.Handle.ManagerId, commitHash)
+                                            let! finalRebase =
+                                                match rebaseResult with
+                                                | Ok() -> Task.FromResult(Ok())
+                                                | Error conflict ->
+                                                    task {
+                                                        // A conflict is a continuation of this ManagerJob, never a new manager.
+                                                        match! manager.RunManager managerId worktreePath with
+                                                        | Error err ->
+                                                            return
+                                                                Error(
+                                                                    sprintf
+                                                                        "Rebase conflict (%s); manager continuation failed: %s"
+                                                                        conflict
+                                                                        err
+                                                                )
+                                                        | Ok() -> return! git.Rebase worktreePath targetBranch
+                                                    }
+
+                                            match finalRebase with
+                                            | Error err ->
+                                                return
+                                                    OrchestratorVerdict.IntegrationFailed(
+                                                        managerId,
+                                                        sprintf "Rebase failed: %s" err
+                                                    )
+                                            | Ok() ->
+                                                match! reconcileTarget () with
+                                                | Error err ->
+                                                    return
+                                                        OrchestratorVerdict.IntegrationFailed(
+                                                            managerId,
+                                                            sprintf "Git reconcile failed after rebase: %s" err
+                                                        )
+                                                | Ok() ->
+                                                    match! reverifyTwice managerId worktreePath with
+                                                    | Error err ->
+                                                        return OrchestratorVerdict.NeedsReview(managerId, err)
+                                                    | Ok() ->
+                                                        // FfMerge is deliberately the only write to the target ref: the Git port
+                                                        // performs `git merge --ff-only`, keeping Git authoritative on reconcile.
+                                                        match! git.FfMerge worktreePath targetBranch with
+                                                        | Error err ->
+                                                            return
+                                                                OrchestratorVerdict.IntegrationFailed(
+                                                                    managerId,
+                                                                    sprintf "FF merge failed: %s" err
+                                                                )
+                                                        | Ok commitHash ->
+                                                            match
+                                                                appendFact
+                                                                    StreamId.Workspace
+                                                                    (AgentFact.OrchestratorPublished
+                                                                        {| ManagerId = managerId
+                                                                           CandidateId = candidateId
+                                                                           CommitHash = commitHash |})
+                                                            with
+                                                            | Error err ->
+                                                                return
+                                                                    OrchestratorVerdict.IntegrationFailed(
+                                                                        managerId,
+                                                                        sprintf
+                                                                            "Failed to persist published fact: %s"
+                                                                            err
+                                                                    )
+                                                            | Ok() ->
+                                                                let! _ = git.RemoveWorktree worktreePath
+
+                                                                return
+                                                                    OrchestratorVerdict.Published(
+                                                                        managerId,
+                                                                        commitHash
+                                                                    )
                         })
         }
 
@@ -162,121 +339,3 @@ module OrchestratorEngine =
         orch.ForkManager(managerId, ?worktreePath = worktreePath)
 
     let joinPublished (orch: Orchestrator) = orch.JoinPublished()
-
-module ProcessGitPort =
-    let createWithRepo (repoPath: string) (runner: Command -> Task<int * string * string>) : GitPort =
-        { IsDirty =
-            fun targetPath ->
-                task {
-                    let cmd =
-                        { FileName = "git"
-                          Arguments = [ "status"; "--porcelain" ]
-                          WorkingDirectory = Some targetPath
-                          Environment = None
-                          Stdin = None
-                          Deadline = None
-                          PtyOptions = None }
-
-                    let! (code, stdout, _) = runner cmd
-                    return code = 0 && not (String.IsNullOrWhiteSpace stdout)
-                }
-          CreateWorktree =
-            fun targetRepoPath managerId targetPath ->
-                task {
-                    let cmd =
-                        { FileName = "git"
-                          Arguments = [ "worktree"; "add"; targetPath; "-b"; sprintf "manager/%s" managerId ]
-                          WorkingDirectory = Some targetRepoPath
-                          Environment = None
-                          Stdin = None
-                          Deadline = None
-                          PtyOptions = None }
-
-                    let! (code, stdout, stderr) = runner cmd
-
-                    if code = 0 then
-                        return Ok()
-                    else
-                        return Error(if String.IsNullOrWhiteSpace stderr then stdout else stderr)
-                }
-          Rebase =
-            fun worktreePath targetBranch ->
-                task {
-                    let cmd =
-                        { FileName = "git"
-                          Arguments = [ "rebase"; targetBranch ]
-                          WorkingDirectory = Some worktreePath
-                          Environment = None
-                          Stdin = None
-                          Deadline = None
-                          PtyOptions = None }
-
-                    let! (code, stdout, stderr) = runner cmd
-
-                    if code = 0 then
-                        return Ok()
-                    else
-                        return Error(if String.IsNullOrWhiteSpace stderr then stdout else stderr)
-                }
-          FfMerge =
-            fun worktreePath targetBranch ->
-                task {
-                    let revCmd =
-                        { FileName = "git"
-                          Arguments = [ "rev-parse"; "HEAD" ]
-                          WorkingDirectory = Some worktreePath
-                          Environment = None
-                          Stdin = None
-                          Deadline = None
-                          PtyOptions = None }
-
-                    let! (revCode, revStdout, revStderr) = runner revCmd
-
-                    if revCode <> 0 then
-                        return
-                            Error(
-                                if String.IsNullOrWhiteSpace revStderr then
-                                    revStdout
-                                else
-                                    revStderr
-                            )
-                    else
-                        let commitHash = revStdout.Trim()
-
-                        let mergeCmd =
-                            { FileName = "git"
-                              Arguments = [ "merge"; "--ff-only"; commitHash ]
-                              WorkingDirectory = Some repoPath
-                              Environment = None
-                              Stdin = None
-                              Deadline = None
-                              PtyOptions = None }
-
-                        let! (code, stdout, stderr) = runner mergeCmd
-
-                        if code = 0 then
-                            return Ok commitHash
-                        else
-                            return Error(if String.IsNullOrWhiteSpace stderr then stdout else stderr)
-                }
-          RemoveWorktree =
-            fun worktreePath ->
-                task {
-                    let cmd =
-                        { FileName = "git"
-                          Arguments = [ "worktree"; "remove"; "--force"; worktreePath ]
-                          WorkingDirectory = None
-                          Environment = None
-                          Stdin = None
-                          Deadline = None
-                          PtyOptions = None }
-
-                    let! (code, stdout, stderr) = runner cmd
-
-                    if code = 0 then
-                        return Ok()
-                    else
-                        return Error(if String.IsNullOrWhiteSpace stderr then stdout else stderr)
-                } }
-
-    let createWithRunner (runner: Command -> Task<int * string * string>) : GitPort = createWithRepo "." runner

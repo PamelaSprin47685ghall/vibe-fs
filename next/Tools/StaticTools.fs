@@ -6,6 +6,7 @@ open Fable.Core
 open Fable.Core.JsInterop
 open Thoth.Json
 open Wanxiangshu.Next.Kernel
+open Wanxiangshu.Next.Kernel.Fact
 open Wanxiangshu.Next.Kernel.Identity
 open Wanxiangshu.Next.Process
 
@@ -28,6 +29,18 @@ module NodeProcess =
 
 module StaticTools =
 
+    /// The only values accepted by the OpenCode reviewer tool.  Keep this
+    /// parser deliberately independent of assistant text: a verdict is a tool
+    /// argument, never something inferred from a transcript.
+    let reviewerVerdictOfString (value: string) : Result<ReviewGuardVerdict, string> =
+        match value with
+        | "PERFECT" -> Ok ReviewGuardVerdict.Perfect
+        | "REVISE" -> Ok ReviewGuardVerdict.Revise
+        | _ -> Error "verdict must be exactly PERFECT or REVISE"
+
+    let reviewerVerdictSchemaJson =
+        """{"type":"object","properties":{"verdict":{"type":"string","enum":["PERFECT","REVISE"]}},"required":["verdict"],"additionalProperties":false}"""
+
     let managerAgentConfig () : obj =
         createObj
             [ "mode", box "primary"
@@ -37,7 +50,8 @@ module StaticTools =
                       [ "*", box "deny"
                         "fork", box "allow"
                         "join", box "allow"
-                        "list", box "allow" ]
+                        "list", box "allow"
+                        "verdict", box "deny" ]
               ) ]
 
     let coderAgentConfig () : obj =
@@ -51,7 +65,22 @@ module StaticTools =
                         "write", box "allow"
                         "edit", box "allow"
                         "glob", box "allow"
-                        "grep", box "allow" ]
+                        "grep", box "allow"
+                        "verdict", box "deny" ]
+              ) ]
+
+    let reviewerAgentConfig () : obj =
+        createObj
+            [ "mode", box "primary"
+              "permission",
+              box (
+                  createObj
+                      [ "*", box "deny"
+                        "read", box "allow"
+                        "glob", box "allow"
+                        "grep", box "allow"
+                        "inspector", box "allow"
+                        "verdict", box "allow" ]
               ) ]
 
     let toollessAgentConfig () : obj =

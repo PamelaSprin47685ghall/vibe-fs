@@ -1,11 +1,15 @@
 namespace Wanxiangshu.Next.OpenCode
 
+#nowarn "3511"
+
 open System
 open System.Collections.Generic
 open System.Threading.Tasks
 open Fable.Core
 open Fable.Core.JsInterop
+open Wanxiangshu.Next.Kernel.Outcome
 open Wanxiangshu.Next.Kernel.Identity
+open Wanxiangshu.Next.Kernel.Fact
 open Wanxiangshu.Next.Journal
 open Wanxiangshu.Next.Session
 open Wanxiangshu.Next.Tools
@@ -26,20 +30,36 @@ module SpikePlugin =
     [<Emit("import('@opencode-ai/plugin/tool')")>]
     let private importToolModule () : Task<obj> = jsNative
 
-    [<Emit("$0.schema.string()")>]
-    let private stringSchema (tool: obj) : obj = jsNative
-
-    [<Emit("$0($1)")>]
-    let private applyTool (factory: obj) (definition: obj) : obj = jsNative
-
     [<Emit("(args, context) => $0(args)(context)")>]
     let private uncurriedExecute (fn: obj) : obj = jsNative
 
-    [<Emit("Math.random().toString(36).slice(2, 8)")>]
-    let private newAgentId () : string = jsNative
+    let private gitTreePortFromInput (input: obj) : GitTreePort option =
+        if isNull input || isNull input?gitTreePort || isNull input?gitTreePort?getTreeHash then
+            None
+        else
+            let rawPort = input?gitTreePort
 
-    [<Emit("JSON.stringify($0)")>]
-    let private stringify (value: obj) : string = jsNative
+            Some
+                { GetTreeHash =
+                    fun () ->
+                        let getTreeHash = rawPort?getTreeHash
+                        unbox<string> (getTreeHash ()) }
+
+    let private nudgeReviewer (sessionPort: ISessionHostPort) (nudgeSent: HashSet<string>) (sessionId: string) : unit =
+        if nudgeSent.Add sessionId then
+            let prompt =
+                "Submit a structured verdict with the verdict tool: PERFECT or REVISE. "
+                + "Do not put a verdict in prose."
+
+            let nudgeTask: Task<Result<MessageId, string>> =
+                sessionPort.SendPrompt(
+                    SessionId.create sessionId,
+                    prompt,
+                    { Model = None
+                      Agent = Some "reviewer" }
+                )
+
+            nudgeTask |> ignore
 
     let createSpikeHost (portOpt: IOpenCodePort option) =
         let eventPort = Events.DeterministicEventPort() :> IEventObservationPort
@@ -115,112 +135,18 @@ module SpikePlugin =
             agents?inspector <- StaticTools.inspectorAgentConfig ()
             agents?browser <- toollessConfig
             agents?meditator <- toollessConfig
-            agents?reviewer <- toollessConfig
+            agents?reviewer <- StaticTools.reviewerAgentConfig ()
 
-    let private toolHooks (toolModule: obj) (sessionPort: ISessionHostPort) (journal: AgentJournal option) : obj =
-        let factory = toolModule?tool
-        let runtimes = Dictionary<string, HostForkRuntime>()
-        let gate = obj ()
-
-        let runtimeFor (context: obj) =
-            let sessionID =
-                if isNull context || isNull context?sessionID then
-                    ""
-                else
-                    unbox<string> context?sessionID
-
-            if String.IsNullOrWhiteSpace sessionID then
-                Error "Missing sessionID"
-            else
-                Ok(
-                    lock gate (fun () ->
-                        match runtimes.TryGetValue sessionID with
-                        | true, runtime -> runtime
-                        | false, _ ->
-                            let runtime =
-                                HostForkRuntime(SessionId.create sessionID, sessionPort, ?journal = journal)
-
-                            runtimes.[sessionID] <- runtime
-                            runtime)
-                )
-
-        let textArg (args: obj) (name: string) =
-            if isNull args || isNull args?(name) then
-                ""
-            else
-                unbox<string> args?(name)
-
-        let forkExecute (args: obj) (context: obj) =
-            task {
-                match runtimeFor context with
-                | Error err -> return box (stringify (createObj [ "error", box err ]))
-                | Ok runtime ->
-                    let agent = textArg args "agent"
-                    let prompt = textArg args "prompt"
-
-                    let! result =
-                        match HostSessionContext.roleOf agent with
-                        | Some role -> runtime.Fork(newAgentId (), role, prompt)
-                        | None -> runtime.Reuse(agent, prompt)
-
-                    match result with
-                    | Ok fork -> return box (stringify (createObj [ "agentId", box fork.AgentId ]))
-                    | Error err -> return box (stringify (createObj [ "error", box err ]))
-            }
-
-        let joinExecute (_args: obj) (context: obj) =
-            task {
-                match runtimeFor context with
-                | Error err -> return box (stringify (createObj [ "error", box err ]))
-                | Ok runtime ->
-                    let! result = runtime.Join()
-
-                    match result with
-                    | Ok completion ->
-                        return
-                            box (
-                                stringify (
-                                    createObj
-                                        [ "agentId", box completion.AgentId
-                                          "runId", box completion.RunId
-                                          "outcome", box completion.Outcome ]
-                                )
-                            )
-                    | Error error -> return box (stringify (createObj [ "error", box (error.ToString()) ]))
-            }
-
-        let listExecute (_args: obj) (context: obj) =
-            task {
-                match runtimeFor context with
-                | Error err -> return box (stringify (createObj [ "error", box err ]))
-                | Ok runtime ->
-                    let agents, _ = runtime.List()
-
-                    let result =
-                        agents
-                        |> List.map (fun agent ->
-                            createObj
-                                [ "agentId", box agent.AgentId
-                                  "role", box (agent.Role.ToString())
-                                  "status", box (agent.Status.ToString()) ])
-                        |> List.toArray
-
-                    return box (stringify (box result))
-            }
-
-        let definition description args execute =
-            createObj
-                [ "description", box description
-                  "args", box args
-                  "execute", uncurriedExecute (box execute) ]
-
-        let forkArgs =
-            createObj [ "agent", box (stringSchema factory); "prompt", box (stringSchema factory) ]
-
-        createObj
-            [ "fork", box (applyTool factory (definition "Fork or nudge an agent" forkArgs forkExecute))
-              "join", box (applyTool factory (definition "Wait for any agent completion" (createObj []) joinExecute))
-              "list", box (applyTool factory (definition "List active agents" (createObj []) listExecute)) ]
+    let private toolHooks
+        (toolModule: obj)
+        (sessionPort: ISessionHostPort)
+        (journal: AgentJournal option)
+        (gitTreePort: GitTreePort option)
+        (sessionParents: Dictionary<string, string>)
+        (sessionRoles: Dictionary<string, string>)
+        (verdictSessions: HashSet<string>)
+        : obj =
+        ToolSurface.create toolModule sessionPort journal gitTreePort sessionParents sessionRoles verdictSessions
 
     let initSpikePlugin (input: obj) : Task<obj> =
         task {
@@ -233,7 +159,55 @@ module SpikePlugin =
                 let companions = Dictionary<string, CompanionHost>()
                 let companionGate = obj ()
                 let sessionRoles = Dictionary<string, string>()
+                let sessionParents = Dictionary<string, string>()
+                let verdictSessions = HashSet<string>()
+                let nudgeSent = HashSet<string>()
+                let gitTreePort = gitTreePortFromInput input
                 let mutable latestSessionId = ""
+
+                let rawEvent (raw: obj) =
+                    if isNull raw || isNull raw?event then raw else raw?event
+
+                let rawProperties (raw: obj) =
+                    let event = rawEvent raw
+                    if isNull event then null else event?properties
+
+                let rawSessionId (raw: obj) =
+                    let event = rawEvent raw
+                    let properties = rawProperties raw
+
+                    if not (isNull properties) && not (isNull properties?sessionID) then
+                        Some(unbox<string> properties?sessionID)
+                    elif not (isNull event) && not (isNull event?sessionID) then
+                        Some(unbox<string> event?sessionID)
+                    else
+                        None
+
+                let rawParentSessionId (raw: obj) =
+                    let event = rawEvent raw
+                    let properties = rawProperties raw
+
+                    if not (isNull properties) && not (isNull properties?parentID) then
+                        Some(unbox<string> properties?parentID)
+                    elif
+                        not (isNull properties)
+                        && not (isNull properties?info)
+                        && not (isNull properties?info?parentID)
+                    then
+                        Some(unbox<string> properties?info?parentID)
+                    elif not (isNull event) && not (isNull event?parentID) then
+                        Some(unbox<string> event?parentID)
+                    else
+                        None
+
+                let isTerminalEvent (raw: obj) =
+                    let event = rawEvent raw
+
+                    if isNull event || isNull event?``type`` then
+                        false
+                    else
+                        let eventType = unbox<string> event?``type``
+                        eventType = "session.idle" || eventType = "session.aborted"
 
                 let transform inObj outObj =
                     if
@@ -274,6 +248,18 @@ module SpikePlugin =
 
                                 role |> Option.iter (fun value -> sessionRoles.[sessionId] <- value)
 
+                                rawParentSessionId raw
+                                |> Option.iter (fun parentId ->
+                                    if not (String.IsNullOrWhiteSpace parentId) then
+                                        sessionParents.[sessionId] <- parentId)
+
+                                if isTerminalEvent raw then
+                                    match sessionRoles.TryGetValue sessionId with
+                                    | true, agent when agent.Equals("reviewer", StringComparison.OrdinalIgnoreCase) ->
+                                        if not (verdictSessions.Contains sessionId) then
+                                            nudgeReviewer sessionPort nudgeSent sessionId
+                                    | _ -> ()
+
                             observe raw))
 
                 let client = if isNull input then null else input?client
@@ -281,7 +267,16 @@ module SpikePlugin =
                 if not (isNull client) then
                     try
                         let! toolModule = importToolModule ()
-                        hooks?tool <- toolHooks toolModule sessionPort journal
+
+                        hooks?tool <-
+                            toolHooks
+                                toolModule
+                                sessionPort
+                                journal
+                                gitTreePort
+                                sessionParents
+                                sessionRoles
+                                verdictSessions
                     with ex ->
                         raise (InvalidOperationException(sprintf "Failed to load OpenCode tool module: %s" ex.Message))
 

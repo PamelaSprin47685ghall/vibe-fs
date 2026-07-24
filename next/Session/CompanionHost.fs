@@ -3,12 +3,58 @@ namespace Wanxiangshu.Next.Session
 open System
 open System.Threading.Tasks
 open Wanxiangshu.Next.OpenCode
+open Wanxiangshu.Next.Journal
+open Wanxiangshu.Next.Kernel
+open Wanxiangshu.Next.Kernel.Fact
 open Wanxiangshu.Next.Tools
 open Wanxiangshu.Next.Kernel.Identity
 open Fable.Core.JsInterop
 
-type CompanionHost(primaryId: SessionId, sessions: ISessionHostPort) =
-    let companion = Companion()
+type AgentJournalCompanionPort(journal: AgentJournal) =
+    let append (sessionId: SessionId) (fact: AgentFact) =
+        match AgentJournal.appendAgent (StreamId.Session sessionId) None fact journal with
+        | Ok _ -> Ok()
+        | Error failure -> Error(sprintf "%A" failure.Failure)
+
+    interface ICompanionDurablePort with
+        member _.Load(sessionId: SessionId) : CompanionMemory option =
+            let projection = AgentJournal.snapshot journal
+
+            projection.AgentProjections.Sessions
+            |> Map.tryFind sessionId
+            |> Option.bind (fun session ->
+                session.Companion
+                |> Option.map (fun companion ->
+                    { LastSuccessfulProjection = companion.LastSuccessfulProjection
+                      CurrentB = companion.CurrentB
+                      BloggerBusy = false
+                      ReplacementActive = companion.ReplacementActive }))
+
+        member _.AppendSuccessful(sessionId, projection, content) =
+            match
+                append
+                    sessionId
+                    (AgentFact.CompanionBaselineSet
+                        {| SessionId = sessionId
+                           Projection = projection |})
+            with
+            | Error error -> Error error
+            | Ok() ->
+                append
+                    sessionId
+                    (AgentFact.CompanionCheckpointReplaced
+                        {| SessionId = sessionId
+                           Content = content |})
+
+        member _.EnableReplacement(sessionId) =
+            append
+                sessionId
+                (AgentFact.CompanionReplacementActiveSet
+                    {| SessionId = sessionId
+                       Active = true |})
+
+type CompanionHost(primaryId: SessionId, sessions: ISessionHostPort, ?durable: ICompanionDurablePort) =
+    let companion = Companion(?durable = durable, ?sessionId = Some primaryId)
     let gate = obj ()
     let mutable bloggerTask: Task<SessionId> option = None
 
@@ -107,6 +153,8 @@ type CompanionHost(primaryId: SessionId, sessions: ISessionHostPort) =
 
     member _.SubmitProjection(projection: ProjectionSnapshot) : CompanionOutcome = companion.Submit(projection, blog)
 
+    member _.EnablePrefixReplacement() : bool = companion.TryEnableReplacement()
+
     member _.Memory = companion.Memory
 
     member _.WaitInFlightAsync() = companion.WaitInFlightAsync()
@@ -122,8 +170,8 @@ type CompanionHost(primaryId: SessionId, sessions: ISessionHostPort) =
 
         companion.Submit(current, blog) |> ignore
 
-        match before.CurrentB, before.LastSuccessfulProjection with
-        | Some b, Some _ when watermark > 0 ->
+        match before.ReplacementActive, before.CurrentB, before.LastSuccessfulProjection with
+        | true, Some b, Some _ when watermark > 0 ->
             let synthetic = createObj [ "role", box "system"; "text", box b ]
             synthetic :: (messages |> List.skip watermark)
         | _ -> messages
@@ -133,3 +181,5 @@ type CompanionHost(primaryId: SessionId, sessions: ISessionHostPort) =
 
     member _.BloggerSession =
         lock gate (fun () -> bloggerTask |> Option.map (fun task -> task.Result))
+
+    member _.PrimarySessionId = primaryId

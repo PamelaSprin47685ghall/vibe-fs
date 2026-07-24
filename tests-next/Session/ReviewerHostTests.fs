@@ -84,10 +84,35 @@ module ReviewerHostTests =
                     host.SubmitVerdict("call-1", ReviewGuardVerdict.Perfect)
                 )
 
+                let firstProjection = AgentJournal.snapshot journal
+
+                let firstGuard =
+                    firstProjection.AgentProjections.Sessions.[manager].ReviewGuard.Value
+
+                Assert.Equal(Some(GitTreeHash.create "tree-a"), firstGuard.LastGitTreeHash)
+                Assert.Equal([ "call-1" ], firstGuard.RecentToolCallIds)
+
                 Assert.Equal(
                     Ok ReviewFinishResult.NeedsReview,
                     host.SubmitVerdict("call-1", ReviewGuardVerdict.Perfect)
                 )
+
+                treeHash <- "tree-b"
+
+                Assert.Equal(
+                    Ok ReviewFinishResult.NeedsReview,
+                    host.SubmitVerdict("call-1", ReviewGuardVerdict.Perfect)
+                )
+
+                let duplicateProjection = AgentJournal.snapshot journal
+
+                let duplicateGuard =
+                    duplicateProjection.AgentProjections.Sessions.[manager].ReviewGuard.Value
+
+                Assert.Equal(Some(GitTreeHash.create "tree-a"), duplicateGuard.LastGitTreeHash)
+                Assert.Equal([ "call-1" ], duplicateGuard.RecentToolCallIds)
+
+                treeHash <- "tree-a"
 
                 Assert.Equal(Ok ReviewFinishResult.Confirmed, host.SubmitVerdict("call-2", ReviewGuardVerdict.Perfect))
                 Assert.Equal(ReviewFinishResult.Confirmed, host.TryFinish())

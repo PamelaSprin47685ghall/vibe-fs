@@ -2,7 +2,9 @@ namespace Wanxiangshu.Next.Session
 
 open System
 open System.Threading.Tasks
+open Wanxiangshu.Next.Kernel.Identity
 open Wanxiangshu.Next.Kernel
+open Wanxiangshu.Next.Journal
 open Wanxiangshu.Next.Tools
 
 type ProjectionSnapshot = string
@@ -17,6 +19,13 @@ type CompanionMemory =
       CurrentB: BlogText option
       BloggerBusy: bool
       ReplacementActive: bool }
+
+    member this.PrefixReplacementEnabled = this.ReplacementActive
+
+type ICompanionDurablePort =
+    abstract Load: SessionId -> CompanionMemory option
+    abstract AppendSuccessful: SessionId * ProjectionSnapshot * BlogText -> Result<unit, string>
+    abstract EnableReplacement: SessionId -> Result<unit, string>
 
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
 module Companion =
@@ -82,22 +91,38 @@ module Companion =
         compressPrefix messages (Some currentB) watermarkIndex
 
 /// Companion state wrapper with a single mutable in-flight Task gate.
-type Companion(?initialMemory: CompanionMemory) =
+type Companion(?initialMemory: CompanionMemory, ?durable: ICompanionDurablePort, ?sessionId: SessionId) =
     let lockObj = obj ()
 
+    let restoredMemory =
+        match initialMemory with
+        | Some memory -> Some memory
+        | None ->
+            match durable, sessionId with
+            | Some port, Some sid -> port.Load sid
+            | _ -> None
+
     let mutable lastSuccessfulProjection: ProjectionSnapshot option =
-        initialMemory |> Option.bind (fun m -> m.LastSuccessfulProjection)
+        restoredMemory |> Option.bind (fun m -> m.LastSuccessfulProjection)
 
     let mutable currentB: BlogText option =
-        initialMemory |> Option.bind (fun m -> m.CurrentB)
+        restoredMemory |> Option.bind (fun m -> m.CurrentB)
 
     let mutable replacementActive: bool =
-        initialMemory
+        restoredMemory
         |> Option.map (fun m -> m.ReplacementActive)
         |> Option.defaultValue false
 
     let mutable inFlightTask: Task<unit> option = None
     let mutable busy = false
+
+    let persistSuccessful (projection: ProjectionSnapshot) (content: BlogText) =
+        match durable, sessionId with
+        | Some port, Some sid ->
+            match port.AppendSuccessful(sid, projection, content) with
+            | Ok() -> ()
+            | Error error -> raise (InvalidOperationException error)
+        | _ -> ()
 
     let startAsTask (work: Async<unit>) : Task<unit> =
         let completion = TaskCompletionSource<unit>()
@@ -147,6 +172,22 @@ type Companion(?initialMemory: CompanionMemory) =
         with get () = lock lockObj (fun () -> replacementActive)
         and set value = lock lockObj (fun () -> replacementActive <- value)
 
+    member this.TryEnableReplacement() : bool =
+        lock lockObj (fun () ->
+            if replacementActive then
+                true
+            else
+                match durable, sessionId with
+                | Some port, Some sid ->
+                    match port.EnableReplacement sid with
+                    | Ok() ->
+                        replacementActive <- true
+                        true
+                    | Error _ -> false
+                | _ ->
+                    replacementActive <- true
+                    true)
+
     /// Blogger context reset (self-rebase): updates B and baseline if idle, returns true; returns false if busy.
     member this.TryRebase(newB: BlogText option, newBaseline: ProjectionSnapshot option) : bool =
         lock lockObj (fun () ->
@@ -171,6 +212,8 @@ type Companion(?initialMemory: CompanionMemory) =
                     async {
                         try
                             let! (b, proj) = rebaseFn ()
+
+                            persistSuccessful proj b
 
                             lock lockObj (fun () ->
                                 currentB <- Some b
@@ -206,6 +249,8 @@ type Companion(?initialMemory: CompanionMemory) =
                         async {
                             try
                                 let! content = blogFn delta
+
+                                persistSuccessful currentProjection content
 
                                 lock lockObj (fun () ->
                                     currentB <- Some content

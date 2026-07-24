@@ -22,6 +22,26 @@ module internal AgentFactsFoldHelpers =
 
         Map.add sessionId (updateFn existing) map
 
+    let foldOrchestratorManagerJobCreated
+        (proj: AgentProjectionSet)
+        (managerId: string)
+        (worktreePath: string)
+        (branch: string)
+        =
+        let mgrId = ManagerId.create managerId
+
+        let job =
+            { WorktreePath = worktreePath
+              Branch = branch
+              CandidateId = None
+              CandidateCommit = None
+              PublishedCommit = None }
+
+        { proj with
+            Orchestrator =
+                { proj.Orchestrator with
+                    ManagerJobs = Map.add mgrId job proj.Orchestrator.ManagerJobs } }
+
     let foldOrchestratorCandidateRegistered
         (proj: AgentProjectionSet)
         (managerId: string)
@@ -35,15 +55,21 @@ module internal AgentFactsFoldHelpers =
 
         let existingMgr =
             match Map.tryFind mgrId proj.Orchestrator.Managers with
-            | Some m ->
-                { Status = Some status
-                  History = status :: m.History }
-            | None ->
-                { Status = Some status
-                  History = [ status ] }
+            | Some _ -> { Status = Some status }
+            | None -> { Status = Some status }
 
         let orch =
             { proj.Orchestrator with
+                ManagerJobs =
+                    match Map.tryFind mgrId proj.Orchestrator.ManagerJobs with
+                    | Some job ->
+                        Map.add
+                            mgrId
+                            { job with
+                                CandidateId = Some candId
+                                CandidateCommit = Some commitHash }
+                            proj.Orchestrator.ManagerJobs
+                    | None -> proj.Orchestrator.ManagerJobs
                 Managers = Map.add mgrId existingMgr proj.Orchestrator.Managers }
 
         { proj with Orchestrator = orch }
@@ -60,18 +86,23 @@ module internal AgentFactsFoldHelpers =
 
         let existingMgr =
             match Map.tryFind mgrId proj.Orchestrator.Managers with
-            | Some m ->
-                { Status = Some status
-                  History = status :: m.History }
-            | None ->
-                { Status = Some status
-                  History = [ status ] }
-
-        let published = proj.Orchestrator.PublishedCommits @ [ commitHash ]
+            | Some _ -> { Status = Some status }
+            | None -> { Status = Some status }
 
         let orch =
-            { Managers = Map.add mgrId existingMgr proj.Orchestrator.Managers
-              PublishedCommits = published }
+            { ManagerJobs =
+                match Map.tryFind mgrId proj.Orchestrator.ManagerJobs with
+                | Some job ->
+                    Map.add
+                        mgrId
+                        { job with
+                            CandidateId = Some candId
+                            CandidateCommit = Some commitHash
+                            PublishedCommit = Some commitHash }
+                        proj.Orchestrator.ManagerJobs
+                | None -> proj.Orchestrator.ManagerJobs
+              Managers = Map.add mgrId existingMgr proj.Orchestrator.Managers
+              PublishedCommit = Some commitHash }
 
         { proj with Orchestrator = orch }
 
@@ -82,12 +113,8 @@ module internal AgentFactsFoldHelpers =
 
         let existingMgr =
             match Map.tryFind mgrId proj.Orchestrator.Managers with
-            | Some m ->
-                { Status = Some status
-                  History = status :: m.History }
-            | None ->
-                { Status = Some status
-                  History = [ status ] }
+            | Some _ -> { Status = Some status }
+            | None -> { Status = Some status }
 
         let orch =
             { proj.Orchestrator with
@@ -108,10 +135,7 @@ module internal AgentFactsFoldHelpers =
             updateSession
                 sessionId
                 (fun s ->
-                    let effs =
-                        match s.Effects with
-                        | Some existing -> { Effects = Map.add effId (Requested(target, payload)) existing.Effects }
-                        | None -> { Effects = Map.ofList [ (effId, Requested(target, payload)) ] }
+                    let effs = { Current = Some(effId, Requested(target, payload)) }
 
                     { s with Effects = Some effs })
                 proj.Sessions
@@ -134,13 +158,15 @@ module internal AgentFactsFoldHelpers =
                         match s.Effects with
                         | Some existing ->
                             let updated =
-                                match Map.tryFind effId existing.Effects with
-                                | Some(Requested(target, payload)) -> Accepted(target, payload, result)
-                                | Some(Accepted(target, payload, _)) -> Accepted(target, payload, result)
-                                | None -> Accepted("", "", result)
+                                match existing.Current with
+                                | Some(currentId, Requested(target, payload)) when currentId = effId ->
+                                    Accepted(target, payload, result)
+                                | Some(currentId, Accepted(target, payload, _)) when currentId = effId ->
+                                    Accepted(target, payload, result)
+                                | _ -> Accepted("", "", result)
 
-                            { Effects = Map.add effId updated existing.Effects }
-                        | None -> { Effects = Map.ofList [ (effId, Accepted("", "", result)) ] }
+                            { Current = Some(effId, updated) }
+                        | None -> { Current = Some(effId, Accepted("", "", result)) }
 
                     { s with Effects = Some effs })
                 proj.Sessions

@@ -16,7 +16,7 @@ module AgentFacts =
         { LastGitTreeHash = None
           ConsecutivePerfects = 0
           IsConfirmed = false
-          AcceptedGuardKeys = Set.empty
+          AcceptedGuardKey = None
           RecentToolCallIds = [] }
 
     let emptyFallback: FallbackProjection =
@@ -26,10 +26,11 @@ module AgentFacts =
           IsDead = false }
 
     let emptyOrchestrator: OrchestratorProjection =
-        { Managers = Map.empty
-          PublishedCommits = [] }
+        { ManagerJobs = Map.empty
+          Managers = Map.empty
+          PublishedCommit = None }
 
-    let emptyEffects: DurableEffectProjection = { Effects = Map.empty }
+    let emptyEffects: DurableEffectProjection = { Current = None }
 
     let emptySessionProjection: SessionAgentProjection =
         { Companion = None
@@ -140,6 +141,9 @@ module AgentFacts =
         | AgentFact.GuardPromptAccepted p -> AgentFactsReview.foldGuardPromptAccepted proj p
 
         | AgentFact.FallbackFailureRecorded p -> AgentFactsReview.foldFallbackFailureRecorded proj p
+
+        | AgentFact.OrchestratorManagerJobCreated p ->
+            AgentFactsFoldHelpers.foldOrchestratorManagerJobCreated proj p.ManagerId p.WorktreePath p.Branch
 
         | AgentFact.OrchestratorCandidateRegistered p ->
             AgentFactsFoldHelpers.foldOrchestratorCandidateRegistered

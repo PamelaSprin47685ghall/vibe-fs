@@ -6,6 +6,8 @@ open Wanxiangshu.Next.Journal
 
 type ReviewerHost
     (journal: AgentJournal, managerSessionId: SessionId, reviewerSessionId: SessionId, ?gitTreePort: GitTreePort) =
+    let gate = obj ()
+
     let reviewState (projection: ProjectionSet) (treeHash: string) =
         match Map.tryFind managerSessionId projection.AgentProjections.Sessions with
         | Some session ->
@@ -18,29 +20,30 @@ type ReviewerHost
     member _.RecordVerdict
         (toolCallId: string, treeHash: string, verdict: ReviewGuardVerdict)
         : Result<ReviewFinishResult, string> =
-        let current = AgentJournal.snapshot journal
+        lock gate (fun () ->
+            let current = AgentJournal.snapshot journal
 
-        let duplicate =
-            match Map.tryFind managerSessionId current.AgentProjections.Sessions with
-            | Some session ->
-                session.ReviewGuard
-                |> Option.exists (fun guard -> List.contains toolCallId guard.RecentToolCallIds)
-            | None -> false
+            let duplicate =
+                match Map.tryFind managerSessionId current.AgentProjections.Sessions with
+                | Some session ->
+                    session.ReviewGuard
+                    |> Option.exists (fun guard -> List.contains toolCallId guard.RecentToolCallIds)
+                | None -> false
 
-        if duplicate then
-            Ok(reviewState current treeHash)
-        else
-            let fact =
-                AgentFact.ReviewVerdictRecorded
-                    {| ManagerSessionId = managerSessionId
-                       ReviewerSessionId = reviewerSessionId
-                       ToolCallId = toolCallId
-                       GitTreeHash = treeHash
-                       Verdict = verdict |}
+            if duplicate then
+                Ok(reviewState current treeHash)
+            else
+                let fact =
+                    AgentFact.ReviewVerdictRecorded
+                        {| ManagerSessionId = managerSessionId
+                           ReviewerSessionId = reviewerSessionId
+                           ToolCallId = toolCallId
+                           GitTreeHash = treeHash
+                           Verdict = verdict |}
 
-            match AgentJournal.appendAgent (StreamId.Session managerSessionId) None fact journal with
-            | Ok updated -> Ok(reviewState updated treeHash)
-            | Error failure -> Error(sprintf "%A" failure.Failure)
+                match AgentJournal.appendAgent (StreamId.Session managerSessionId) None fact journal with
+                | Ok updated -> Ok(reviewState updated treeHash)
+                | Error failure -> Error(sprintf "%A" failure.Failure))
 
     member this.SubmitVerdict(toolCallId: string, verdict: ReviewGuardVerdict) : Result<ReviewFinishResult, string> =
         match gitTreePort with
