@@ -15,7 +15,7 @@ import:
 - 已拆出 `OpenCode/CompanionTransform.fs`、`OpenCode/HostEventRouter.fs`、`OpenCode/ToolSurface.fs`、`OpenCode/ExecutorTool.fs`、`Orchestrator.Types.fs`、`Orchestrator.GitPort.fs`，恢复 300 行架构门禁；此前 `npm test` = 135/135、Manager contract = 1/1、TestKit = 11/11。
 - Manager provider request 已证明只暴露 `fork/join/list`，禁止 `read/write/edit/bash/glob/grep/verdict`；P0 默认 3×稳定性通过，`CANARY_REPEAT` 仍可提高门槛。
 - Companion 真实 Blogger child 已产生 B1/B2，同一 child 被复用，角色 sidecar 门禁通过；durable B/baseline/replacement 已有重启 Port/Fake 测试，真实近上限投影 E2E 仍未验收。
-- Companion 前缀覆盖比较已优先使用稳定 message ID，避免 OpenCode 对同一消息补充 summary/diff 元数据后误判前缀断裂；真实近上限 replacement 仍未验收。
+- Companion 前缀覆盖比较已优先使用稳定 message ID，避免 OpenCode 对同一消息补充 summary/diff 元数据后误判前缀断裂；真实近上限 replacement 已由 companion-replacement-canary 闭合（真实预算激活 durable replacement，3× 稳定性通过）。
 - Process 已完成 lossless pump、动态 `3×estimated_output_bytes` spool、200KB chunk、SIGKILL 后等待 pipe EOF；真实 Inspector→Executor map/reduce canary 已通过，SIGKILL/PTY 压力仍待纳入稳定性门。
 - Review verdict 已接入真实 GitTreePort、Journal、ToolCallId 去重、双 PERFECT 与 reviewer terminal nudge；真实双 PERFECT canary 已通过，Fallback 真实模型调用仍未接线。
 - Orchestrator agent 已接入 HostSessionContext 与静态 `fork/join` 权限面；真实 Manager worktree 创建、冲突回交、复审与 ff-only 发布仍未接入 OpenCode Host。
@@ -60,7 +60,9 @@ import:
 
 ### 🟢 Companion 侧车递归已阻断
 - `MessageTransform` 与 OpenCode transform 调用均按角色排除 Blogger/Executor/Inspector/Browser/Meditator/Reviewer，保留 Manager/Coder/Orchestrator。
-- 上游 `experimental.chat.messages.transform` 在每次 outbound projection 前收到空 input；OpenCode 的 model `limit.context` 只在更晚的 `experimental.chat.system.transform` 暴露，无法直接作为同一轮 projection 的可靠 near-limit 门禁；必须先冻结 Host 预算传递契约，禁止用固定字节阈值冒充真实上限。
+- Host 预算传递契约已冻结：上游 `experimental.chat.messages.transform` 收到空 input，真实预算只能来自更晚的 `experimental.chat.system.transform`（`{ sessionID, model.limit.context }`），按 session 缓存供下一轮 projection 使用；`estimatedTokens = ceil(chars/4)`（canonical messages JSON），估计值 ≥ 80% 真实上限即激活 durable PrefixReplacementEnabled；首轮无预算不激活；禁止用固定字节阈值冒充真实上限。
+- projection 回写必须原地 splice：OpenCode 在 trigger 后读原 messages 数组，换新引用会被静默丢弃；合成上下文消息必须是 MessageV2 WithParts 形状（user 角色 + 稳定 id），system 角色会被 toModelMessages 丢弃、缺 parts 会炸掉整轮。
+- Companion 递归防线：blogger child 创建时同步注册角色，Companion 门禁以 sessionRoles 为准，禁止按消息内容猜 session 归属（blogger delta 内嵌 manager sessionID 曾导致递归 companion，267MB 指数放大）。
 
 ### 🟢 Manager 工具权限已由 provider request 验证
 - `SpikePlugin` config hook 原地注入 manager agent 的 deny-all + fork/join/list allow 配置；P0 已证明真实 provider request 无 read/write/edit/bash/glob/grep/verdict。
@@ -84,7 +86,7 @@ import:
 ### 🟡 Orchestrator 纯 Port 路径已成形，真实发布仍未验收
 - 已有 AgentJournal、candidate/published facts、初次与 rebase 后双 PERFECT、冲突交回同一 Manager、Git authority reconcile 与 ff-only；真实 OpenCode Manager worktree 发布 E2E 仍未闭合。
 ## 下一阶段唯一优先级：跨域闭合
-1. 冻结真实 Host 的 projection budget 契约，补齐对应 OpenCode E2E（跨重启 reconcile 与 parent abort 已闭合）。
+1. ~~冻结真实 Host 的 projection budget 契约~~ 已闭合（跨重启 reconcile、parent abort、near-limit replacement 均有真实 canary）。
 2. 接通真实模型失败注入后的 A/B Fallback durable 恢复。
 3. 将 Process PTY、大输入、SIGKILL 与孤儿检测纳入默认 3×稳定性门。
 4. 将 Orchestrator durable Port 路径接到真实 OpenCode Manager worktree、冲突回交、复审与 ff-only 发布 E2E。
@@ -118,7 +120,7 @@ import:
   - X projection 2 → 同一 Y output B2
   - Y busy → skip，不推进基线
   - Y 空闲 → delta 含跳过内容
-  - Port/Fake 覆盖 replacement flag 与前缀保留；真实 near-limit 自动触发仍受 Host projection budget 契约阻塞
+  - Port/Fake 覆盖 replacement flag 与前缀保留；真实 near-limit 自动触发已由真实预算契约闭合
   - restart → 恢复 B/baseline/replacement
   - Y self-rebase → CurrentB 只等于 B'（旧 B 自然退出 transcript）
 

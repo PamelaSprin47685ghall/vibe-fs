@@ -33,6 +33,21 @@ module SpikePlugin =
     [<Emit("(args, context) => $0(args)(context)")>]
     let private uncurriedExecute (fn: obj) : obj = jsNative
 
+    /// Captures the real model budget exposed only to the later
+    /// system.transform hook; consumed by the next messages.transform.
+    /// Emitted as a flat (input, output) hook because Fable's currying of
+    /// inline lambdas is shape-unstable at this boundary.
+    let private systemTransformHook (sessionBudgets: Dictionary<string, int>) : obj =
+        emitJsExpr
+            sessionBudgets
+            """
+          (input, output) => {
+            if (input && input.sessionID && input.model && input.model.limit && input.model.limit.context > 0) {
+              $0.set(input.sessionID, input.model.limit.context);
+            }
+          }
+        """
+
     let private gitTreePortFromInput (input: obj) : GitTreePort option =
         if isNull input || isNull input?gitTreePort || isNull input?gitTreePort?getTreeHash then
             None
@@ -196,6 +211,8 @@ module SpikePlugin =
                     | Some port -> Some port
                     | None -> workspaceDirectory input |> Option.map GitTree.create
 
+                let sessionBudgets = Dictionary<string, int>()
+
                 let eventRouter =
                     HostEventRouter(sessionPort, sessionParents, sessionRoles, verdictSessions, nudgeSent)
 
@@ -218,7 +235,15 @@ module SpikePlugin =
                     then
                         inObj?agent <- sessionRoles.[projectionSessionId]
 
-                    CompanionTransform.handleCompanionTransform companions companionGate sessionPort inObj outObj
+                    CompanionTransform.handleCompanionTransform
+                        companions
+                        companionGate
+                        sessionPort
+                        journal
+                        sessionBudgets
+                        sessionRoles
+                        inObj
+                        outObj
 
                 let hooks =
                     createObj
@@ -229,6 +254,7 @@ module SpikePlugin =
                           "hostEventsSubscription", box subscription
                           "chat.transform", box (uncurriedExecute (box transform))
                           "experimental.chat.messages.transform", box (uncurriedExecute (box transform))
+                          "experimental.chat.system.transform", box (systemTransformHook sessionBudgets)
                           "config", box (fun (config: obj) -> configureManager config) ]
 
                 observeEvent

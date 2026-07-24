@@ -26,7 +26,7 @@
     "test:next": "node --test tests-next/runner.test.mjs && node tests-next/runner.js --build-dir build/tests-next",
     "test:manager-tools": "node --test testkit/opencode/tests/manager-tool-contract.mjs",
     "test": "npm run build && npm run test:compile && npm run test:next && npm run test:manager-tools && node testkit/opencode/tests/gate-testkit.mjs",
-    "test:e2e:p0": "node testkit/opencode/tests/agent-dsl-canary.mjs && node testkit/opencode/tests/companion-canary.mjs && node testkit/opencode/tests/reviewer-verdict-canary.mjs && node testkit/opencode/tests/executor-canary.mjs && node testkit/opencode/tests/host-nudge-canary.mjs && node testkit/opencode/tests/host-restart-canary.mjs && node testkit/opencode/tests/host-abort-canary.mjs",
+    "test:e2e:p0": "node testkit/opencode/tests/agent-dsl-canary.mjs && node testkit/opencode/tests/companion-canary.mjs && node testkit/opencode/tests/reviewer-verdict-canary.mjs && node testkit/opencode/tests/executor-canary.mjs && node testkit/opencode/tests/host-nudge-canary.mjs && node testkit/opencode/tests/host-restart-canary.mjs && node testkit/opencode/tests/host-abort-canary.mjs && node testkit/opencode/tests/companion-replacement-canary.mjs",
     "test:e2e:companion": "node testkit/opencode/tests/companion-canary.mjs",
     "test:e2e:reviewer": "node testkit/opencode/tests/reviewer-verdict-canary.mjs",
     "test:e2e:executor": "node testkit/opencode/tests/executor-canary.mjs",

@@ -53,9 +53,16 @@ type AgentJournalCompanionPort(journal: AgentJournal) =
                     {| SessionId = sessionId
                        Active = true |})
 
-type CompanionHost(primaryId: SessionId, sessions: ISessionHostPort, ?durable: ICompanionDurablePort) =
+type CompanionHost
+    (
+        primaryId: SessionId,
+        sessions: ISessionHostPort,
+        ?durable: ICompanionDurablePort,
+        ?onBloggerCreated: SessionId -> unit
+    ) =
     let companion = Companion(?durable = durable, ?sessionId = Some primaryId)
     let gate = obj ()
+    let bloggerCreated = defaultArg onBloggerCreated (fun _ -> ())
     let mutable bloggerTask: Task<SessionId> option = None
 
     let ensureBlogger () =
@@ -73,7 +80,12 @@ type CompanionHost(primaryId: SessionId, sessions: ISessionHostPort, ?durable: I
                             )
 
                         match created with
-                        | Ok id -> return id
+                        | Ok id ->
+                            // Register the blogger role synchronously so the
+                            // companion gate can never recurse into blogger
+                            // sessions, not even before its first event.
+                            bloggerCreated id
+                            return id
                         | Error error -> return raise (InvalidOperationException error)
                     }
 
@@ -184,7 +196,14 @@ type CompanionHost(primaryId: SessionId, sessions: ISessionHostPort, ?durable: I
 
         match before.ReplacementActive, before.CurrentB, before.LastSuccessfulProjection with
         | true, Some b, Some _ when watermark > 0 ->
-            let synthetic = createObj [ "role", box "system"; "text", box b ]
+            // MessageV2 WithParts shape (see CompanionTransform): the B head
+            // travels as a user-role synthetic with a stable id so prefix
+            // comparison keeps recognising it across projections.
+            let synthetic =
+                createObj
+                    [ "info", box (createObj [ "id", box "companion-b-head"; "role", box "user" ])
+                      "parts", box [| createObj [ "type", box "text"; "text", box b ] |] ]
+
             synthetic :: (messages |> List.skip watermark)
         | _ -> messages
 

@@ -153,7 +153,7 @@ export class StrictMockProvider {
     if (process.env.MOCK_TRACE) {
       const tools = (parsed.tools || []).map((t) => t?.function?.name || t?.name || '?');
       const lastUser = JSON.stringify(extractLastUserMsg(parsed) || '').slice(0, 80);
-      console.error(`[MOCK-TRACE] tools=${JSON.stringify(tools)} msgs=${(parsed.messages || []).length} lastUser=${lastUser}`);
+      console.error(`[MOCK-TRACE] tools=${JSON.stringify(tools)} msgs=${(parsed.messages || []).length} chars=${JSON.stringify(parsed.messages || []).length} lastUser=${lastUser}`);
     }
     if (s.allowBloggerRequests && JSON.stringify(extractLastUserMsg(parsed) || '').includes('You are the blogger')) {
       if (process.env.MOCK_TRACE) console.error('[MOCK-TRACE] -> blogger-bypass');
