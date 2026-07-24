@@ -35,6 +35,17 @@ module ProcessRunnerTests =
         let remaining = Deadline.remaining (fun () -> now) deadline
         equal (TimeSpan.FromSeconds(15.0)) remaining
 
+    let ``Pump_reads_complete_stream_without_truncation`` () =
+        task {
+            let expected = Array.init 300000 (fun i -> byte (i % 251))
+
+            let stream: System.IO.Stream =
+                emitJsExpr expected "(async function* (bytes) { yield Buffer.from(bytes); })($0)"
+
+            let! actual = Pump.pumpStreamAsync stream CancellationToken.None
+            equal expected actual
+        }
+
     let ``Spool_chunkBytes_splits_at_exactly_200KB_chunks`` () =
         let chunkSize = 204800 // 200 * 1024 bytes
         let totalSize = 500000
@@ -114,7 +125,7 @@ module ProcessRunnerTests =
 
             let estimate =
                 { EstimatedRuntime = RuntimeSeconds 5.0
-                  EstimatedOutput = OutputBytes 500000L
+                  EstimatedOutput = OutputBytes 50000L
                   EstimatedMemory = EstimatedMemory.Medium }
 
             let mockLauncher =

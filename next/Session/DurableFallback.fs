@@ -34,7 +34,14 @@ module DurableFallback =
         | None -> Fallback.initial
 
     let nextDecision (sessionId: SessionId) (projSet: ProjectionSet) : FallbackDecision =
-        currentState sessionId projSet |> Fallback.nextAttempt
+        let state = currentState sessionId projSet
+
+        match state.Side, state.Failures with
+        | ModelSide.A, 1 -> FallbackDecision.NextAttempt { Side = ModelSide.A; Failures = 1 }
+        | ModelSide.B, 2 -> FallbackDecision.NextAttempt { Side = ModelSide.B; Failures = 2 }
+        | ModelSide.B, 3 -> FallbackDecision.NextAttempt { Side = ModelSide.B; Failures = 3 }
+        | _, failures when failures >= 4 -> FallbackDecision.Dead
+        | _ -> Fallback.nextAttempt state
 
     let recordFailure
         (journalPort: FallbackJournalPort)

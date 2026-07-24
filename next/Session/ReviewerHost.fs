@@ -4,7 +4,8 @@ open Wanxiangshu.Next.Kernel.Fact
 open Wanxiangshu.Next.Kernel.Identity
 open Wanxiangshu.Next.Journal
 
-type ReviewerHost(journal: AgentJournal, managerSessionId: SessionId, reviewerSessionId: SessionId) =
+type ReviewerHost
+    (journal: AgentJournal, managerSessionId: SessionId, reviewerSessionId: SessionId, ?gitTreePort: GitTreePort) =
     let reviewState (projection: ProjectionSet) (treeHash: string) =
         match Map.tryFind managerSessionId projection.AgentProjections.Sessions with
         | Some session ->
@@ -41,5 +42,15 @@ type ReviewerHost(journal: AgentJournal, managerSessionId: SessionId, reviewerSe
             | Ok updated -> Ok(reviewState updated treeHash)
             | Error failure -> Error(sprintf "%A" failure.Failure)
 
+    member this.SubmitVerdict(toolCallId: string, verdict: ReviewGuardVerdict) : Result<ReviewFinishResult, string> =
+        match gitTreePort with
+        | Some port -> this.RecordVerdict(toolCallId, port.GetTreeHash(), verdict)
+        | None -> Error "ReviewerHost.SubmitVerdict requires a GitTreePort"
+
     member _.TryFinish(currentTreeHash: string) =
         reviewState (AgentJournal.snapshot journal) currentTreeHash
+
+    member _.TryFinish() =
+        match gitTreePort with
+        | Some port -> reviewState (AgentJournal.snapshot journal) (port.GetTreeHash())
+        | None -> ReviewFinishResult.NeedsReview

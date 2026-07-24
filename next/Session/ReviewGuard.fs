@@ -1,5 +1,8 @@
 namespace Wanxiangshu.Next.Session
 
+[<Struct>]
+type GitTreePort = { GetTreeHash: unit -> string }
+
 [<RequireQualifiedAccess>]
 type ReviewVerdict =
     | Perfect

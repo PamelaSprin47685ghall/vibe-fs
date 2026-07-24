@@ -63,24 +63,6 @@ module RunnerCore =
             r ()
         | None -> ()
 
-    let calculateDeadline (now: DateTimeOffset) (RuntimeSeconds estSecs: EstimatedRuntime) : Deadline =
-        let budgetSecs = 3.0 * estSecs
-        Deadline.ofBudget now (TimeSpan.FromSeconds budgetSecs)
-
-    let killProcessGroup (child: obj) : unit =
-        emitJsExpr
-            child
-            """
-            try {
-                if ($0 && $0.pid) {
-                    process.kill(-$0.pid, 'SIGKILL');
-                }
-            } catch (_) {
-                try { if ($0 && typeof $0.kill === 'function') $0.kill('SIGKILL'); } catch (_) {}
-            }
-        """
-        |> ignore
-
     /// Core execution using system Process or Node child_process.
     let execute
         (cmd: Command)
@@ -92,7 +74,9 @@ module RunnerCore =
             let (RuntimeSeconds estSecs) = estimate.EstimatedRuntime
 
             let budgetSpan = TimeSpan.FromSeconds(3.0 * estSecs)
-            let deadline = calculateDeadline DateTimeOffset.UtcNow estimate.EstimatedRuntime
+
+            let deadline =
+                RunnerPrimitives.calculateDeadline DateTimeOffset.UtcNow estimate.EstimatedRuntime
 
             let isLarge = estimate.EstimatedMemory = EstimatedMemory.Large
 
@@ -142,29 +126,52 @@ module RunnerCore =
                         if isNull child then
                             return Error(RunnerError.SpawnFailed("Failed to spawn process: " + cmd.FileName))
                         else
-                            let stdoutChunks = ResizeArray<obj>()
-                            let stderrChunks = ResizeArray<obj>()
+                            let stdoutChunks = ResizeArray<byte[]>()
+                            let stderrChunks = ResizeArray<byte[]>()
+                            let combinedChunks = ResizeArray<byte[]>()
+                            let mutable bytesObserved = 0L
+                            let mutable streamingSpool: Spool.StreamingSpool option = None
+
+                            let outputThreshold =
+                                let (OutputBytes estimated) = estimate.EstimatedOutput
+
+                                if estimated <= 0L then 0L
+                                elif estimated > Int64.MaxValue / 3L then Int64.MaxValue
+                                else estimated * 3L
+
+                            let toBytes (chunk: obj) : byte[] =
+                                emitJsExpr chunk "new Uint8Array($0.buffer, $0.byteOffset, $0.byteLength)"
+                                |> unbox<byte[]>
+
+                            let recordChunk (target: ResizeArray<byte[]>) (chunk: obj) =
+                                let bytes = toBytes chunk
+                                target.Add bytes
+                                combinedChunks.Add bytes
+                                bytesObserved <- bytesObserved + int64 bytes.Length
+
+                                match streamingSpool with
+                                | Some spool -> Spool.appendStreamingSpool spool bytes
+                                | None when bytesObserved > outputThreshold ->
+                                    let spool = Spool.startStreamingSpool ()
+
+                                    for previous in combinedChunks do
+                                        Spool.appendStreamingSpool spool previous
+
+                                    streamingSpool <- Some spool
+                                | None -> ()
 
                             emitJsExpr
-                                (child, stdoutChunks)
+                                (child, (fun chunk -> recordChunk stdoutChunks chunk))
                                 """
-                                if ($0 && $0.stdout) {
-                                    $0.stdout.on('data', function(chunk) {
-                                        $1.push(chunk);
-                                    });
-                                }
-                            """
+                                if ($0 && $0.stdout) $0.stdout.on('data', $1);
+                                """
                             |> ignore
 
                             emitJsExpr
-                                (child, stderrChunks)
+                                (child, (fun chunk -> recordChunk stderrChunks chunk))
                                 """
-                                if ($0 && $0.stderr) {
-                                    $0.stderr.on('data', function(chunk) {
-                                        $1.push(chunk);
-                                    });
-                                }
-                            """
+                                if ($0 && $0.stderr) $0.stderr.on('data', $1);
+                                """
                             |> ignore
 
                             match cmd.Stdin with
@@ -182,37 +189,51 @@ module RunnerCore =
                             let tcs = TaskCompletionSource<int * byte[] * byte[] * bool>()
                             let mutable finished = false
                             let mutable timerId: obj = null
+                            let mutable timedOut = false
+                            let mutable childClosed = false
+                            let mutable stdoutEnded = isNull (emitJsExpr child "$0 && $0.stdout")
+                            let mutable stderrEnded = isNull (emitJsExpr child "$0 && $0.stderr")
+                            let mutable exitCode = 0
 
-                            let finish (code: int) (tOut: bool) =
-                                if not finished then
+                            let concatBytes (parts: ResizeArray<byte[]>) : byte[] =
+                                if parts.Count = 0 then
+                                    [||]
+                                else
+                                    parts |> Seq.toArray |> Array.concat
+
+                            let tryFinish () =
+                                if childClosed && stdoutEnded && stderrEnded && not finished then
                                     finished <- true
 
                                     if not (isNull timerId) then
                                         emitJsExpr timerId "clearTimeout($0)" |> ignore
 
-                                    let outBuf = emitJsExpr stdoutChunks "Buffer.concat($0)"
-                                    let errBuf = emitJsExpr stderrChunks "Buffer.concat($0)"
-
-                                    let outBytes =
-                                        emitJsExpr outBuf "new Uint8Array($0.buffer, $0.byteOffset, $0.byteLength)"
-                                        |> unbox<byte[]>
-
-                                    let errBytes =
-                                        emitJsExpr errBuf "new Uint8Array($0.buffer, $0.byteOffset, $0.byteLength)"
-                                        |> unbox<byte[]>
-
-                                    tcs.SetResult(code, outBytes, errBytes, tOut)
+                                    tcs.SetResult(
+                                        exitCode,
+                                        concatBytes stdoutChunks,
+                                        concatBytes stderrChunks,
+                                        timedOut
+                                    )
 
                             timerId <-
                                 emitJsExpr
                                     (remMs,
                                      (fun () ->
-                                         killProcessGroup child
-                                         finish -1 true))
+                                         timedOut <- true
+                                         RunnerPrimitives.killProcessGroup child
+                                         tryFinish ()))
                                     "setTimeout($1, $0)"
 
                             emitJsExpr
-                                (child, (fun code -> finish code false), (fun _err -> finish -1 false))
+                                (child,
+                                 (fun code ->
+                                     exitCode <- code
+                                     childClosed <- true
+                                     tryFinish ()),
+                                 (fun _err ->
+                                     exitCode <- -1
+                                     childClosed <- true
+                                     tryFinish ()))
                                 """
                                 if ($0) {
                                     $0.on('close', function(code) {
@@ -225,22 +246,52 @@ module RunnerCore =
                             """
                             |> ignore
 
+                            emitJsExpr
+                                (child,
+                                 (fun () ->
+                                     stdoutEnded <- true
+                                     tryFinish ()))
+                                """
+                                if ($0 && $0.stdout) $0.stdout.on('end', $1);
+                                """
+                            |> ignore
+
+                            emitJsExpr
+                                (child,
+                                 (fun () ->
+                                     stderrEnded <- true
+                                     tryFinish ()))
+                                """
+                                if ($0 && $0.stderr) $0.stderr.on('end', $1);
+                                """
+                            |> ignore
+
                             let! (exitCode, stdoutBytes, stderrBytes, timedOut) = tcs.Task
 
                             if timedOut || Deadline.isExpired (fun () -> DateTimeOffset.UtcNow) deadline then
-                                killProcessGroup child
+                                RunnerPrimitives.killProcessGroup child
                                 return Error(RunnerError.TimeoutExceeded budgetSpan)
                             elif ct.IsCancellationRequested then
-                                killProcessGroup child
+                                RunnerPrimitives.killProcessGroup child
                                 return Error(RunnerError.ProcessCancelled "Cancelled by token")
                             else
                                 let totalBytes = int64 stdoutBytes.Length + int64 stderrBytes.Length
                                 let stdoutStr = Encoding.UTF8.GetString(stdoutBytes, 0, stdoutBytes.Length)
                                 let stderrStr = Encoding.UTF8.GetString(stderrBytes, 0, stderrBytes.Length)
 
-                                if totalBytes > int64 Spool.ChunkSizeBytes then
-                                    let combined = Array.append stdoutBytes stderrBytes
-                                    let (tempFile, chunks) = Spool.spoolBytesToTempFile combined
+                                if totalBytes > outputThreshold then
+                                    let combined =
+                                        if combinedChunks.Count = 0 then
+                                            [||]
+                                        else
+                                            combinedChunks |> Seq.toArray |> Array.concat
+
+                                    let chunks = Spool.chunkBytes Spool.ChunkSizeBytes combined
+
+                                    let tempFile =
+                                        match streamingSpool with
+                                        | Some spool -> spool.Path
+                                        | None -> fst (Spool.spoolBytesToTempFile combined)
 
                                     return
                                         Ok(RunnerOutcome.Spooled(exitCode, tempFile, totalBytes, chunks.Length, chunks))

@@ -84,7 +84,7 @@ module ProcessBudgetTests =
         task {
             let isWindows = false
             let cmdName = if isWindows then "cmd.exe" else "python3"
-            let pythonScript = "print('x' * 250000)"
+            let pythonScript = "print('x' * 350000)"
 
             let cmdArgs =
                 if isWindows then
@@ -115,12 +115,12 @@ module ProcessBudgetTests =
             match outcome with
             | BudgetOutcome.Spooled(exitCode, spoolPath, totalBytes, chunkCount) ->
                 Assert.Equal(0, exitCode)
-                Assert.True(totalBytes > 200000L)
+                Assert.True(totalBytes > 300000L)
                 Assert.True(chunkCount >= 1)
                 Assert.True(System.IO.File.Exists(spoolPath))
                 System.IO.File.Delete(spoolPath)
             | BudgetOutcome.OutputExceeded(totalBytes, spoolPathOpt) ->
-                Assert.True(totalBytes > 200000L)
+                Assert.True(totalBytes > 300000L)
 
                 match spoolPathOpt with
                 | Some p ->

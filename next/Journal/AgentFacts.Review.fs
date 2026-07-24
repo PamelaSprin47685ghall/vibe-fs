@@ -7,12 +7,10 @@ open AgentFactsFoldHelpers
 module internal AgentFactsReview =
 
     let private appendRecentToolCallId (ids: string list) (toolCallId: string) =
-        let updated = ids @ [ toolCallId ]
-
-        if List.length updated <= 2 then
-            updated
+        if List.contains toolCallId ids then
+            ids
         else
-            List.skip (List.length updated - 2) updated
+            ids @ [ toolCallId ]
 
     let foldReviewVerdictRecorded
         (proj: AgentProjectionSet)

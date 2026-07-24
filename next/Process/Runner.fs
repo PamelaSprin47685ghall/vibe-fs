@@ -8,7 +8,12 @@ open Fable.Core.JsInterop
 
 module Runner =
 
-    [<Emit("Promise.race([$0, new Promise((_, reject) => setTimeout(() => reject(new Error('RUNNER_DEADLINE')), $1))])")>]
+    [<Emit("""
+        new Promise((resolve, reject) => {
+            const timer = setTimeout(() => reject(new Error('RUNNER_DEADLINE')), $1);
+            $0.then(value => { clearTimeout(timer); resolve(value); }, error => { clearTimeout(timer); reject(error); });
+        })
+    """)>]
     let private withDeadline<'T> (work: Task<'T>) (milliseconds: int) : Task<'T> = jsNative
 
     let getLargeGateCount () : int = RunnerCore.getLargeGateCount ()
@@ -18,9 +23,16 @@ module Runner =
     let releaseLargeGate () : unit = RunnerCore.releaseLargeGate ()
 
     let calculateDeadline (now: DateTimeOffset) (est: EstimatedRuntime) : Deadline =
-        RunnerCore.calculateDeadline now est
+        RunnerPrimitives.calculateDeadline now est
 
-    let killProcessGroup (child: obj) : unit = RunnerCore.killProcessGroup child
+    let killProcessGroup (child: obj) : unit = RunnerPrimitives.killProcessGroup child
+
+    let private outputThreshold (estimate: ProcessEstimate) : int64 =
+        let (OutputBytes bytes) = estimate.EstimatedOutput
+
+        if bytes <= 0L then 0L
+        elif bytes > Int64.MaxValue / 3L then Int64.MaxValue
+        else bytes * 3L
 
     let execute
         (cmd: Command)
@@ -66,7 +78,7 @@ module Runner =
                                 let stdoutStr = Text.Encoding.UTF8.GetString(stdoutBytes)
                                 let stderrStr = Text.Encoding.UTF8.GetString(stderrBytes)
 
-                                if totalBytes > int64 Spool.ChunkSizeBytes then
+                                if totalBytes > outputThreshold estimate then
                                     let combined = Array.append stdoutBytes stderrBytes
                                     let (tempFile, chunks) = Spool.spoolBytesToTempFile combined
 

@@ -39,6 +39,7 @@
     <Compile Include="Session/RolesTests.fs"/>
     <Compile Include="Session/ReviewGuardTests.fs"/>
     <Compile Include="Session/ReviewerHostTests.fs"/>
+    <Compile Include="Session/FallbackContractTests.fs"/>
     <Compile Include="Review/GuardTests.fs"/>
     <Compile Include="OpenCode/SpikeHostTests.fs"/>
     <Compile Include="Tools/MessageTransformTests.fs"/>

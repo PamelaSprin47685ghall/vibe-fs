@@ -14,6 +14,8 @@ import:
 - 已拆出 `OpenCode/CompanionTransform.fs`，恢复 300 行架构门禁；尚未证明真实 provider 工具权限与真实 child-session E2E。
 - 主代理配置已同时覆盖 `manager/build/plan`，deny 全部常规工具，仅 allow `fork/join/list`；provider request 层仍待真实 canary 证明。
 - P0 canary 已改为真实 Manager→fork(coder)→join→Coder write 纵切，严格校验 Manager 禁止常规工具；当前真实 OpenCode 在 turn idle 收敛处超时，故仍不得宣称纵切闭合。
+- Process 已完成 lossless pump、动态 `3×estimated_output_bytes` spool、200KB chunk、SIGKILL 后等待 pipe EOF；默认 Executor map/reduce 未接线时明确报错，不再伪造 concat。`npm test` 当前 132/132、Manager contract 1/1、TestKit 11/11。
+- Review SubmitVerdict 已支持 GitTreePort 读 tree、Journal append、ToolCallId 全局去重；Fallback durable decision 已修正为 A1→B2→B3→Dead，仍待真实模型调用与重启 E2E。
 - 下一步必须以真实 Host per-Run terminal 与 Manager→Coder→Join 纵切为验收门，不得以既有 127 个测试替代。
 
 ## 已完成并验证
@@ -61,14 +63,12 @@ import:
 - 标准入口从 `input.directory` 推导 `<workspace>/.wanxiangshu-next/runtimes/`，Boot 后创建 AgentJournal；仍需真实 AgentLinked、Review、Fallback、Companion 恢复 E2E。
 
 ### 🟡 Fallback 阈值已修复，待真实模型调用验证
-- `Fallback.nextAttempt` 现按 A1→A2→B2→B3→B4 dead 计算；第一次失败重试 A，第二次失败才永久切 B。
+- `Fallback` 纯函数与 durable wrapper 现按 A1→B2→B3→Dead 计算；第一次失败重试 A，第二次失败才永久切 B。
 - durable projection 仍需接入真实模型请求并验证重启后的累计失败。
 
-### 🔴 Process 仍是占位实现
-- `Pump.pumpStreamAsync = task { return [||] }` 空实现。
-- 输出阈值使用固定 200KB 而非 `3 × estimated_output_bytes`。
-- launcher 返回 `int * byte[] * byte[]`，完整输出先占内存再写 temp file，非流式 spool。
-- `ExecutorSummarizer` 默认 Map = `bytes → string`，Reduce = `String.Concat`，无真实模型摘要。
+### 🟡 Process 已闭合基础物理路径，摘要模型待接线
+- Pump、增量 spool、动态输出阈值、200KB chunk、唯一 deadline 与 SIGKILL 后 EOF 已通过本地 Process 测试。
+- Executor Agent map/reduce 仍需真实 child session 接线；默认路径明确返回未实现错误，不伪造摘要。
 
 ### 🔴 Projection 内存 O(N) 增长
 - `ManagerState.History: CandidateStatus list`、`Orchestrator.PublishedCommits: string list`、`DurableEffectProjection.Effects: Map<...>`、`ReviewGuard.AcceptedGuardKeys: Set<string>` 随事件数无限增长。
