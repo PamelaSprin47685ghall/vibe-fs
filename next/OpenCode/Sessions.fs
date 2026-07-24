@@ -129,11 +129,7 @@ type InjectedSessionPort(underlyingPort: IOpenCodePort option, eventPort: IEvent
         member me.AbortSession(sessionId) =
             task {
                 recordOutput sessionId "Aborted"
-                let children = getAndRemoveChildren sessionId
-
-                for cId in children do
-                    let _ = (me :> ISessionHostPort).AbortSession(cId)
-                    ()
+                do! abortChildren sessionId
 
                 match underlyingPort with
                 | Some port ->
