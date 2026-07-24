@@ -47,6 +47,7 @@
     <Compile Include="Agent/Programs.fs"/>
     <Compile Include="Agent/ProgramCapabilities.fs"/>
     <Compile Include="Review/Guard.fs"/>
+    <Compile Include="Orchestrator.Types.fs"/>
     <Compile Include="Orchestrator.fs"/>
     <Compile Include="Orchestrator.GitPort.fs"/>
     <Compile Include="Tools/MessageTransform.fs"/>
@@ -64,6 +65,8 @@
     <Compile Include="Session/CompanionHost.fs"/>
     <Compile Include="OpenCode/CompanionTransform.fs"/>
     <Compile Include="OpenCode/HostSessionContext.fs"/>
+    <Compile Include="OpenCode/GitTree.fs"/>
+    <Compile Include="OpenCode/ExecutorTool.fs"/>
     <Compile Include="OpenCode/ToolSurface.fs"/>
     <Compile Include="OpenCode/SpikePlugin.fs"/>
     <Compile Include="OpenCode/Plugin.fs"/>

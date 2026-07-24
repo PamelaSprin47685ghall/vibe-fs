@@ -5,14 +5,19 @@ import path from 'node:path';
 import test from 'node:test';
 import { SpikePlugin_initSpikePlugin } from '../../../build/next/OpenCode/SpikePlugin.js';
 
-test('manager exposes only fork join list and executes the mailbox path', async () => {
+test('manager permission denies global executor tool and executes mailbox path', async () => {
   const journalDirectory = fs.mkdtempSync(path.join(os.tmpdir(), 'wanxiangshu-manager-'));
   try {
     const hooks = await SpikePlugin_initSpikePlugin({ client: {}, directory: journalDirectory });
     const names = Object.keys(hooks.tool).sort();
 
-    assert.deepEqual(names, ['fork', 'join', 'list', 'verdict']);
+    assert.deepEqual(names, ['executor', 'fork', 'join', 'list', 'verdict']);
     assert.deepEqual(Object.keys(hooks.tool.fork.args).sort(), ['agent', 'prompt']);
+
+    const config = {};
+    hooks.config(config);
+    assert.equal(config.agent.manager.permission['*'], 'deny');
+    assert.equal(config.agent.manager.permission.executor, undefined);
 
     const transformed = { messages: [{ role: 'user', text: 'hello' }] };
     hooks['chat.transform']({}, transformed);

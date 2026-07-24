@@ -45,6 +45,7 @@ module ToolSurface =
         (sessionPort: ISessionHostPort)
         (journal: AgentJournal option)
         (gitTreePort: GitTreePort option)
+        (workspaceDirectory: string option)
         (sessionParents: Dictionary<string, string>)
         (sessionRoles: Dictionary<string, string>)
         (verdictSessions: HashSet<string>)
@@ -255,6 +256,8 @@ module ToolSurface =
         let forkArgs =
             createObj [ "agent", box (stringSchema factory); "prompt", box (stringSchema factory) ]
 
+        let executor = ExecutorTool.create toolModule runtimeFor workspaceDirectory
+
         createObj
             [ "fork", box (applyTool factory (definition "Fork or nudge an agent" forkArgs forkExecute))
               "join", box (applyTool factory (definition "Wait for any agent completion" (createObj []) joinExecute))
@@ -264,4 +267,5 @@ module ToolSurface =
                   applyTool
                       factory
                       (definition "Submit the review verdict for the current Git tree" verdictArgs verdictExecute)
-              ) ]
+              )
+              "executor", executor ]

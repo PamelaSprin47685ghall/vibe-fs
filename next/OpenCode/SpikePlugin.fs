@@ -142,11 +142,20 @@ module SpikePlugin =
         (sessionPort: ISessionHostPort)
         (journal: AgentJournal option)
         (gitTreePort: GitTreePort option)
+        (workspaceDirectory: string option)
         (sessionParents: Dictionary<string, string>)
         (sessionRoles: Dictionary<string, string>)
         (verdictSessions: HashSet<string>)
         : obj =
-        ToolSurface.create toolModule sessionPort journal gitTreePort sessionParents sessionRoles verdictSessions
+        ToolSurface.create
+            toolModule
+            sessionPort
+            journal
+            gitTreePort
+            workspaceDirectory
+            sessionParents
+            sessionRoles
+            verdictSessions
 
     let initSpikePlugin (input: obj) : Task<obj> =
         task {
@@ -162,7 +171,12 @@ module SpikePlugin =
                 let sessionParents = Dictionary<string, string>()
                 let verdictSessions = HashSet<string>()
                 let nudgeSent = HashSet<string>()
-                let gitTreePort = gitTreePortFromInput input
+
+                let gitTreePort =
+                    match gitTreePortFromInput input with
+                    | Some port -> Some port
+                    | None -> workspaceDirectory input |> Option.map GitTree.create
+
                 let mutable latestSessionId = ""
 
                 let rawEvent (raw: obj) =
@@ -274,6 +288,7 @@ module SpikePlugin =
                                 sessionPort
                                 journal
                                 gitTreePort
+                                (workspaceDirectory input)
                                 sessionParents
                                 sessionRoles
                                 verdictSessions

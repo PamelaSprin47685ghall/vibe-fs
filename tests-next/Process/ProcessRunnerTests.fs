@@ -204,6 +204,31 @@ module ProcessRunnerTests =
             | _ -> failwith "Expected Completed outcome from echo process execution"
         }
 
+    let ``Runner_shell_command_returns_Completed`` () =
+        task {
+            let cmd =
+                { FileName = "sh"
+                  Arguments = [ "-lc"; "printf shell-output" ]
+                  WorkingDirectory = None
+                  Environment = None
+                  Stdin = None
+                  Deadline = None
+                  PtyOptions = None }
+
+            let est =
+                { EstimatedRuntime = RuntimeSeconds 2.0
+                  EstimatedOutput = OutputBytes 1024L
+                  EstimatedMemory = EstimatedMemory.Medium }
+
+            let! outcome = Runner.execute cmd est defaultCtx CancellationToken.None
+
+            match outcome with
+            | Ok(RunnerOutcome.Completed(exitCode, stdout, _, _)) ->
+                equal 0 exitCode
+                trueThat (stdout.Contains("shell-output")) "Expected shell output"
+            | _ -> failwith "Expected Completed outcome from shell process execution"
+        }
+
     let ``ExecutorSummarizer_summarizes_chunks_using_injected_port`` () =
         let port: SummarizerPort<byte[], int> =
             { MapChunk = fun bytes -> bytes.Length
