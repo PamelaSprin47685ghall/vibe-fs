@@ -21,6 +21,7 @@
     <Compile Include="Journal/Envelope.fs"/>
     <Compile Include="Journal/AgentFacts.Types.fs"/>
     <Compile Include="Journal/AgentFacts.FoldHelpers.fs"/>
+    <Compile Include="Journal/AgentFacts.Review.fs"/>
     <Compile Include="Journal/AgentFacts.fs"/>
     <Compile Include="Journal/Boot.fs"/>
     <Compile Include="Journal/Writer.fs"/>
@@ -30,6 +31,7 @@
     <Compile Include="Session/Fallback.fs"/>
     <Compile Include="Session/DurableFallback.fs"/>
     <Compile Include="Session/ReviewGuard.fs"/>
+    <Compile Include="Session/ReviewerHost.fs"/>
     <Compile Include="Process/ProcessTypes.fs"/>
     <Compile Include="Process/Deadline.fs"/>
     <Compile Include="Process/Command.fs"/>
@@ -55,6 +57,8 @@
     <Compile Include="OpenCode/Events.fs"/>
     <Compile Include="OpenCode/OpenCodePort.fs"/>
     <Compile Include="OpenCode/Sessions.fs"/>
+    <Compile Include="Session/HostForkRuntime.fs"/>
+    <Compile Include="Session/CompanionHost.fs"/>
     <Compile Include="OpenCode/SpikePlugin.fs"/>
     <Compile Include="OpenCode/Plugin.fs"/>
   </ItemGroup>

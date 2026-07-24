@@ -198,9 +198,9 @@ module Programs =
                     | Error err -> return Error(ProgramError.ExecutionError err)
                 }
 
-            let join id =
+            let join () =
                 task {
-                    match! managerPort.Join id with
+                    match! managerPort.Join() with
                     | Ok() -> return Ok()
                     | Error err -> return Error(ProgramError.ExecutionError err)
                 }
@@ -233,9 +233,9 @@ module Programs =
                     | Error err -> return Error(ProgramError.ExecutionError err)
                 }
 
-            let join id =
+            let join () =
                 task {
-                    match! managerPort.Join id with
+                    match! managerPort.Join() with
                     | Ok() -> return Ok()
                     | Error err -> return Error(ProgramError.ExecutionError err)
                 }

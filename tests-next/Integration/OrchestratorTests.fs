@@ -158,6 +158,29 @@ module OrchestratorTests =
             equal 1 maxConcurrentPublish
         }
 
+    let ``default worktree path is outside repository`` () =
+        task {
+            let mutable createdPath = ""
+
+            let git =
+                { createStubGitPort () with
+                    CreateWorktree =
+                        fun _ _ path ->
+                            createdPath <- path
+                            Task.FromResult(Ok()) }
+
+            let orch = Orchestrator(git, createStubManagerPort (), "/repo", "main")
+
+            let! result = orch.ForkManager("outside-default")
+
+            match result with
+            | Error error -> failwithf "Unexpected fork failure: %A" error
+            | Ok _ -> ()
+
+            trueThat (createdPath.StartsWith(IO.Path.GetTempPath())) "Default worktree must be outside the repository"
+            falseThat (createdPath.Contains("/repo/")) "Default worktree must not be inside the repository"
+        }
+
     let ``ProcessGitPort builds expected git command records`` () =
         task {
             let executedCommands = ResizeArray<Command>()

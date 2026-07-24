@@ -4,6 +4,7 @@ open Wanxiangshu.Next.Kernel.Fact
 
 module internal AgentFactsFoldHelpers =
 
+
     let updateSession
         (sessionId: Wanxiangshu.Next.Kernel.Identity.SessionId)
         (updateFn: SessionAgentProjection -> SessionAgentProjection)

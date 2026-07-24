@@ -42,7 +42,8 @@ type ReviewGuardProjection =
     { LastGitTreeHash: GitTreeHash option
       ConsecutivePerfects: int
       IsConfirmed: bool
-      AcceptedGuardKeys: Set<string> }
+      AcceptedGuardKeys: Set<string>
+      RecentToolCallIds: string list }
 
 type ModelSide =
     | SideA

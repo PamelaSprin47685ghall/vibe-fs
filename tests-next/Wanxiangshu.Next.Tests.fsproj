@@ -34,8 +34,11 @@
     <Compile Include="Process/PtyTests.fs"/>
     <Compile Include="Agent/ProgramsTests.fs"/>
     <Compile Include="Session/ForkRuntimeTests.fs"/>
+    <Compile Include="Session/HostForkRuntimeTests.fs"/>
+    <Compile Include="Session/CompanionHostTests.fs"/>
     <Compile Include="Session/RolesTests.fs"/>
     <Compile Include="Session/ReviewGuardTests.fs"/>
+    <Compile Include="Session/ReviewerHostTests.fs"/>
     <Compile Include="Review/GuardTests.fs"/>
     <Compile Include="OpenCode/SpikeHostTests.fs"/>
     <Compile Include="Tools/MessageTransformTests.fs"/>

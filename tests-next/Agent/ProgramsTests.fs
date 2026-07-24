@@ -25,7 +25,7 @@ module ProgramsTests =
 
     let private dummyManagerPort () : ManagerPort =
         { Fork = fun id -> Task.FromResult(Ok(sprintf "forked_%s" id))
-          Join = fun _ -> Task.FromResult(Ok())
+          Join = fun () -> Task.FromResult(Ok())
           List = fun () -> Task.FromResult(Ok [ "m1"; "m2" ]) }
 
     let private dummyRunnerPort (exitCode: int) (stdout: string) (stderr: string) : RunnerPort =

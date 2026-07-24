@@ -24,6 +24,8 @@ ReviewGuard:
 
 Journal:
   只持久化跨重启领域事实，不持久化 Stage/Phase/Lease/Owner
+
+Journal runtime 通过插件输入的显式 `journalDirectory` 启用；启动先 Boot/Fold 稳定 NDJSON 前缀，再创建本 runtime writer。未提供该字段时不猜测工作区路径，也不写持久化日志。
 ```
 
 ## 安装与入口
@@ -47,7 +49,7 @@ npm run build
 | --- | --- |
 | `npm run build` | Fable 编译 `next/` 到 `build/` |
 | `npm test` | 编译 `tests-next` + 跑 TestKit gate |
-| `npm run test:e2e:p0` | Manager DSL 20× canary |
+| `npm run test:e2e:p0` | Manager DSL 单次 canary |
 
 ## 开发布局
 

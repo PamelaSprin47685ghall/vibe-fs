@@ -79,18 +79,10 @@ type InjectedSessionPort(underlyingPort: IOpenCodePort option, eventPort: IEvent
                         let! res = port.SendPrompt sessionId text opts
 
                         match res with
-                        | Delivered msgId ->
-                            eventPort.NotifyTerminal sessionId (Completed msgId) |> ignore
-                            return Ok msgId
-                        | AcceptanceUnknown(reason, _) ->
-                            eventPort.NotifyTerminal sessionId (Failed reason) |> ignore
-                            return Error reason
-                        | Retryable err ->
-                            eventPort.NotifyTerminal sessionId (Failed err) |> ignore
-                            return Error err
-                        | Fatal err ->
-                            eventPort.NotifyTerminal sessionId (Failed err) |> ignore
-                            return Error err
+                        | Delivered msgId -> return Ok msgId
+                        | AcceptanceUnknown(reason, _) -> return Error reason
+                        | Retryable err -> return Error err
+                        | Fatal err -> return Error err
                     | None ->
                         let msgId = MessageId.create (Guid.NewGuid().ToString("N"))
                         eventPort.NotifyTerminal sessionId (Completed msgId) |> ignore
@@ -143,7 +135,14 @@ type InjectedSessionPort(underlyingPort: IOpenCodePort option, eventPort: IEvent
 
         member me.GetSessionOutput(sessionId) =
             lock lockObj (fun () ->
-                if sessionOutputs.ContainsKey(sessionId) then
-                    sessionOutputs.[sessionId] |> Seq.toList
-                else
-                    [])
+                let localOutput =
+                    if sessionOutputs.ContainsKey(sessionId) then
+                        sessionOutputs.[sessionId] |> Seq.toList
+                    else
+                        []
+
+                let capturedOutput = eventPort.GetSessionOutput sessionId
+                let existing = localOutput |> Set.ofList
+
+                localOutput
+                @ (capturedOutput |> List.filter (fun line -> not (existing.Contains line))))

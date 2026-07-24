@@ -93,20 +93,17 @@ module ManagerCanaryTests =
                 Assert.Equal("mgr-coder", h2.ManagerId)
             | _ -> Assert.True(false, "ForkManager returned error unexpectedly")
 
-            // Join when no child completed returns Empty
-            let! initialJoin = orch.JoinPublished()
-
-            match initialJoin with
-            | OrchestratorVerdict.Empty -> ()
-            | other -> Assert.True(false, sprintf "Expected Empty verdict, got %A" other)
+            // Join waits for any child completion.
+            let join1 = orch.JoinPublished()
+            let join2 = orch.JoinPublished()
 
             // Complete mgr-coder first (any-child join order)
             tcs2.SetResult(Ok())
             do! Task.FromResult(())
 
-            let! join1 = orch.JoinPublished()
+            let! verdict1 = join1
 
-            match join1 with
+            match verdict1 with
             | OrchestratorVerdict.Published(mgrId, hash) ->
                 Assert.Equal("mgr-coder", mgrId)
                 Assert.Equal("commit-canary-123", hash)
@@ -116,20 +113,14 @@ module ManagerCanaryTests =
             tcs1.SetResult(Ok())
             do! Task.FromResult(())
 
-            let! join2 = orch.JoinPublished()
+            let! verdict2 = join2
 
-            match join2 with
+            match verdict2 with
             | OrchestratorVerdict.Published(mgrId, hash) ->
                 Assert.Equal("mgr-inspector", mgrId)
                 Assert.Equal("commit-canary-123", hash)
             | other -> Assert.True(false, sprintf "Expected Published for mgr-inspector, got %A" other)
 
-            // Further join returns Empty
-            let! finalJoin = orch.JoinPublished()
-
-            match finalJoin with
-            | OrchestratorVerdict.Empty -> ()
-            | other -> Assert.True(false, sprintf "Expected Empty, got %A" other)
         }
 
     [<Fact>]

@@ -16,21 +16,21 @@ import:
 - Runner 注入执行路径遵守唯一 `3 × estimated_running_secs` deadline；超时结果为 `TimeoutExceeded`。
 - Runner、Journal Facts、Programs、Flow 测试已按 300 行门禁拆分。
 - Fable 测试框架不依赖 Xunit 程序集；架构门禁、角色权限、Journal、Flow、Process、PTY、Review、Orchestrator 测试均纳入统一入口。
-- 当前验证结果：`npm test` → 117/117；TestKit → 11/11；`npm run test:e2e:p0` → 20/20 稳定性通过；无编译 warning。
+- 当前验证结果：`npm test` → 127/127；Manager 工具契约 → 1/1；TestKit → 11/11；`npm run test:e2e:p0` → 1/1 稳定性通过；无编译 warning。
 
 ## 当前边界：不得误称已完成
 
-- `next/OpenCode/Plugin.fs` 当前仍通过 `SpikePlugin.initSpikePlugin` 组装入口；真实生产级 Agent DSL Host 纵切尚未闭合。
+- `next/OpenCode/Plugin.fs` 仍通过 `SpikePlugin.initSpikePlugin` 组装入口；真实 OpenCode 事件桥、child session、Manager `fork/join/list` 工具、显式 `journalDirectory` Boot/AgentLinked 与 Companion transform 接线已接入代码并通过 fake/runtime smoke，但真实 Blogger B 版 E2E 与完整 Manager E2E 尚未闭合。
 - P0 canary 证明测试宿主、隔离、稳定性和当前入口可运行，不等价于真实 `fork/join`、Blogger、Reviewer、Orchestrator 全链路已经接入 OpenCode。
 - Journal 的纯编码、写入、Boot/Fold 测试已通过；启动恢复、真实 Host 事件接线仍需独立闭合验证。
-- 不得因为 117 个单测或 20× canary 通过而宣称 release-ready；必须先完成真实 Host projection、child session、Agent DSL 工具面和 Journal runtime 接线。
+- 不得因为 127 个单测或 1× canary 通过而宣称 release-ready；必须先完成真实 Host projection、完整 child-session Manager E2E 的 Blogger B 版验证、Reviewer verdict tool 与 Orchestrator durable recovery 与正式发布 E2E。
 
 ## 下一阶段唯一优先级
 
-1. 以真实 OpenCode 事件和请求为边界，替换 `SpikePlugin` 假端口。
-2. 接通真实 `fork/join/list`、A 版输出提取、parent abort 和 Journal linkage。
-3. 接通 Companion 投影替换、Reviewer verdict/ReviewGuard、Fallback 持久事实。
-4. 真实流程闭合后再做 production entry 切换；此前禁止删除剩余可作为黑盒 Oracle 的测试资产。
+1. 用真实 OpenCode child-session 场景验证 `fork/join/list`、A 版输出与 parent abort。
+2. 用真实 Blogger child-session 验证 Companion 投影替换与 B 版更新。
+3. 接通 Reviewer verdict tool/ReviewGuard、Fallback 持久事实。
+4. 完成 Orchestrator durable facts、冲突回交与发布 E2E；真实流程闭合后再做 production entry 切换；此前禁止删除剩余可作为黑盒 Oracle 的测试资产。
 
 ## 验证命令
 

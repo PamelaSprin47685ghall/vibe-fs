@@ -36,6 +36,9 @@ type Orchestrator(git: GitPort, manager: ManagerPort, repoPath: string, targetBr
     let mutable publishChain: Task = Task.FromResult(()) :> Task
     let mailbox = System.Collections.Generic.Queue<ManagerCompletion>()
 
+    let waiters =
+        System.Collections.Generic.Queue<TaskCompletionSource<ManagerCompletion>>()
+
     let runSerial (fn: unit -> Task<'T>) : Task<'T> =
         task {
             let tcs = TaskCompletionSource<'T>()
@@ -66,7 +69,7 @@ type Orchestrator(git: GitPort, manager: ManagerPort, repoPath: string, targetBr
         : Task<Result<OrchestratorHandle, OrchestratorVerdict>> =
         task {
             let path =
-                defaultArg worktreePath (IO.Path.Combine(repoPath, sprintf ".worktrees/%s" managerId))
+                defaultArg worktreePath (IO.Path.Combine(IO.Path.GetTempPath(), sprintf "wanxiangshu-%s" managerId))
 
             let! isDirty = git.IsDirty repoPath
 
@@ -91,7 +94,12 @@ type Orchestrator(git: GitPort, manager: ManagerPort, repoPath: string, targetBr
                         task {
                             let! res = manager.RunManager managerId path
                             let completion = { Handle = handle; Result = res }
-                            lock lockObj (fun () -> mailbox.Enqueue(completion))
+
+                            lock lockObj (fun () ->
+                                if waiters.Count > 0 then
+                                    waiters.Dequeue().SetResult(completion)
+                                else
+                                    mailbox.Enqueue(completion))
                         }
 
                     return Ok handle
@@ -99,51 +107,51 @@ type Orchestrator(git: GitPort, manager: ManagerPort, repoPath: string, targetBr
 
     member this.JoinPublished() : Task<OrchestratorVerdict> =
         task {
-            let completionOpt =
-                lock lockObj (fun () -> if mailbox.Count > 0 then Some(mailbox.Dequeue()) else None)
+            let completion =
+                lock lockObj (fun () ->
+                    if mailbox.Count > 0 then
+                        Task.FromResult(mailbox.Dequeue())
+                    else
+                        let waiter = TaskCompletionSource<ManagerCompletion>()
+                        waiters.Enqueue(waiter)
+                        waiter.Task)
 
-            match completionOpt with
-            | None -> return OrchestratorVerdict.Empty
+            let! completion = completion
 
-            | Some completion ->
-                match completion.Result with
-                | Error err ->
-                    return
-                        OrchestratorVerdict.IntegrationFailed(
-                            completion.Handle.ManagerId,
-                            sprintf "Manager run failed: %s" err
-                        )
-                | Ok() ->
-                    return!
-                        runSerial (fun () ->
-                            task {
-                                match! git.Rebase completion.Handle.WorktreePath targetBranch with
-                                | Error err ->
-                                    return
-                                        OrchestratorVerdict.IntegrationFailed(
-                                            completion.Handle.ManagerId,
-                                            sprintf "Rebase failed: %s" err
-                                        )
+            match completion.Result with
+            | Error err ->
+                return
+                    OrchestratorVerdict.IntegrationFailed(
+                        completion.Handle.ManagerId,
+                        sprintf "Manager run failed: %s" err
+                    )
+            | Ok() ->
+                return!
+                    runSerial (fun () ->
+                        task {
+                            match! git.Rebase completion.Handle.WorktreePath targetBranch with
+                            | Error err ->
+                                return
+                                    OrchestratorVerdict.IntegrationFailed(
+                                        completion.Handle.ManagerId,
+                                        sprintf "Rebase failed: %s" err
+                                    )
+                            | Ok() ->
+                                match! manager.Reverify completion.Handle.ManagerId completion.Handle.WorktreePath with
+                                | Error err -> return OrchestratorVerdict.NeedsReview(completion.Handle.ManagerId, err)
                                 | Ok() ->
-                                    match!
-                                        manager.Reverify completion.Handle.ManagerId completion.Handle.WorktreePath
-                                    with
+                                    match! git.FfMerge completion.Handle.WorktreePath targetBranch with
                                     | Error err ->
-                                        return OrchestratorVerdict.NeedsReview(completion.Handle.ManagerId, err)
-                                    | Ok() ->
-                                        match! git.FfMerge completion.Handle.WorktreePath targetBranch with
-                                        | Error err ->
-                                            return
-                                                OrchestratorVerdict.IntegrationFailed(
-                                                    completion.Handle.ManagerId,
-                                                    sprintf "FF merge failed: %s" err
-                                                )
-                                        | Ok commitHash ->
-                                            let! _ = git.RemoveWorktree completion.Handle.WorktreePath
+                                        return
+                                            OrchestratorVerdict.IntegrationFailed(
+                                                completion.Handle.ManagerId,
+                                                sprintf "FF merge failed: %s" err
+                                            )
+                                    | Ok commitHash ->
+                                        let! _ = git.RemoveWorktree completion.Handle.WorktreePath
 
-                                            return
-                                                OrchestratorVerdict.Published(completion.Handle.ManagerId, commitHash)
-                            })
+                                        return OrchestratorVerdict.Published(completion.Handle.ManagerId, commitHash)
+                        })
         }
 
 module OrchestratorEngine =

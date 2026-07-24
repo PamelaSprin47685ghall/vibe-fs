@@ -49,7 +49,7 @@ type BrowserPort =
 
 type ManagerPort =
     { Fork: string -> Task<Result<string, string>>
-      Join: string -> Task<Result<unit, string>>
+      Join: unit -> Task<Result<unit, string>>
       List: unit -> Task<Result<string list, string>> }
 
 type CoderCapability =
@@ -79,12 +79,12 @@ type ReviewerCapability =
 
 type ManagerCapability =
     { Fork: string -> Task<Result<string, ProgramError>>
-      Join: string -> Task<Result<unit, ProgramError>>
+      Join: unit -> Task<Result<unit, ProgramError>>
       List: unit -> Task<Result<string list, ProgramError>> }
 
 type OrchestratorCapability =
     { Fork: string -> Task<Result<string, ProgramError>>
-      Join: string -> Task<Result<unit, ProgramError>> }
+      Join: unit -> Task<Result<unit, ProgramError>> }
 
 type ExecutorCapability = unit
 type BloggerCapability = unit

@@ -6,6 +6,7 @@ open Fable.Core
 open Fable.Core.JsInterop
 open Xunit
 open Wanxiangshu.Next.Kernel.Identity
+open Wanxiangshu.Next.Kernel.Outcome
 open Wanxiangshu.Next.OpenCode
 
 module SpikeHostTests =
@@ -69,6 +70,131 @@ module SpikeHostTests =
         Assert.False(secondNotify)
         Assert.Equal(1, callCount)
         Assert.True(eventPort.IsCompleted sId)
+
+    [<Fact>]
+    let ``HostEventPort_observes_idle_and_abort`` () =
+        let eventPort = Events.HostEventPort()
+        let mutable observed = []
+
+        use _sub =
+            (eventPort :> IEventObservationPort)
+                .SubscribeTerminalListener(fun sessionId outcome ->
+                    observed <- (SessionId.value sessionId, outcome) :: observed)
+
+        eventPort.Observe(
+            createObj
+                [ "type", box "session.idle"
+                  "properties", createObj [ "sessionID", box "idle-session" ] ]
+        )
+
+        eventPort.Observe(
+            createObj
+                [ "type", box "session.aborted"
+                  "properties", createObj [ "sessionId", box "abort-session" ] ]
+        )
+
+        Assert.Equal(2, List.length observed)
+
+        Assert.True(
+            observed
+            |> List.exists (fun (sessionId, outcome) ->
+                sessionId = "idle-session"
+                && match outcome with
+                   | Completed _ -> true
+                   | _ -> false)
+        )
+
+        Assert.True(
+            observed
+            |> List.exists (fun (sessionId, outcome) ->
+                sessionId = "abort-session"
+                && match outcome with
+                   | Aborted _ -> true
+                   | _ -> false)
+        )
+
+    [<Fact>]
+    let ``HostEventPort_captures_assistant_text_from_common_event_shapes`` () =
+        let eventPort = Events.HostEventPort()
+
+        let output sessionId =
+            (eventPort :> IEventObservationPort)
+                .GetSessionOutput(SessionId.create sessionId)
+
+        eventPort.Observe(
+            createObj
+                [ "type", box "message.updated"
+                  "properties",
+                  createObj
+                      [ "sessionID", box "message-parts"
+                        "message",
+                        createObj
+                            [ "role", box "assistant"
+                              "parts", box [| createObj [ "type", box "text"; "text", box "from message" ] |] ] ] ]
+        )
+
+        eventPort.Observe(
+            createObj
+                [ "type", box "message.updated"
+                  "properties",
+                  createObj
+                      [ "sessionId", box "direct-parts"
+                        "role", box "assistant"
+                        "parts", box [| createObj [ "type", box "text"; "text", box "from parts" ] |] ] ]
+        )
+
+        eventPort.Observe(
+            createObj
+                [ "type", box "assistant.delta"
+                  "properties",
+                  createObj
+                      [ "sessionID", box "direct-text"
+                        "role", box "assistant"
+                        "text", box "from text" ] ]
+        )
+
+        Assert.Equal([ "from message" ], output "message-parts")
+        Assert.Equal([ "from parts" ], output "direct-parts")
+        Assert.Equal([ "from text" ], output "direct-text")
+
+    [<Fact>]
+    let ``Underlying_prompt_acceptance_does_not_complete_synchronously`` () =
+        task {
+            let acceptance = TaskCompletionSource<SendOutcome>()
+
+            let underlying =
+                { new IOpenCodePort with
+                    member _.SendPrompt _ _ _ = acceptance.Task
+                    member _.AbortSession _ = Task.FromResult(Ok())
+
+                    member _.CreateChildSession _ _ =
+                        Task.FromResult(Ok(SessionId.create "child"))
+
+                    member _.CloseChildSession _ = Task.FromResult(Ok()) }
+
+            let eventPort = Events.DeterministicEventPort() :> IEventObservationPort
+
+            let sessionPort =
+                InjectedSessionPort(Some(underlying), eventPort) :> ISessionHostPort
+
+            let sessionId = SessionId.create "underlying-session"
+            let mutable terminalObserved = false
+
+            use _sub =
+                sessionPort.SubscribeTerminal(sessionId, (fun _ _ -> terminalObserved <- true))
+
+            let opts: OpenCodePromptOptions = { Model = None; Agent = None }
+            let sendTask = sessionPort.SendPrompt(sessionId, "pending", opts)
+
+            Assert.False(terminalObserved)
+            acceptance.SetResult(Delivered(MessageId.create "accepted"))
+
+            let! result = sendTask
+
+            match result with
+            | Ok messageId -> Assert.Equal("accepted", MessageId.value messageId)
+            | Error err -> Assert.True(false, sprintf "Expected accepted prompt, got %s" err)
+        }
 
     [<Fact>]
     let ``A_version_output_separation_isolates_session_channels`` () =

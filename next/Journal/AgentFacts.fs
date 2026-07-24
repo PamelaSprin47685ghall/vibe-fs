@@ -1,6 +1,5 @@
 namespace Wanxiangshu.Next.Journal
 
-open Wanxiangshu.Next.Kernel.Identity
 open Wanxiangshu.Next.Kernel.Fact
 open AgentFactsFoldHelpers
 
@@ -17,7 +16,8 @@ module AgentFacts =
         { LastGitTreeHash = None
           ConsecutivePerfects = 0
           IsConfirmed = false
-          AcceptedGuardKeys = Set.empty }
+          AcceptedGuardKeys = Set.empty
+          RecentToolCallIds = [] }
 
     let emptyFallback: FallbackProjection =
         { Side = SideA
@@ -135,128 +135,11 @@ module AgentFacts =
 
             { proj with Sessions = sessions }
 
-        | AgentFact.ReviewVerdictRecorded p ->
-            let hash = GitTreeHash.create p.GitTreeHash
+        | AgentFact.ReviewVerdictRecorded p -> AgentFactsReview.foldReviewVerdictRecorded proj p
 
-            let sessions =
-                updateSession
-                    p.ManagerSessionId
-                    (fun s ->
-                        let rg =
-                            match s.ReviewGuard with
-                            | Some existing ->
-                                match existing.LastGitTreeHash with
-                                | Some lastHash when lastHash = hash ->
-                                    match p.Verdict with
-                                    | ReviewGuardVerdict.Perfect ->
-                                        let count = existing.ConsecutivePerfects + 1
+        | AgentFact.GuardPromptAccepted p -> AgentFactsReview.foldGuardPromptAccepted proj p
 
-                                        { existing with
-                                            LastGitTreeHash = Some hash
-                                            ConsecutivePerfects = count
-                                            IsConfirmed = count >= 2 }
-                                    | ReviewGuardVerdict.Revise ->
-                                        { existing with
-                                            LastGitTreeHash = Some hash
-                                            ConsecutivePerfects = 0
-                                            IsConfirmed = false }
-                                | _ ->
-                                    match p.Verdict with
-                                    | ReviewGuardVerdict.Perfect ->
-                                        { existing with
-                                            LastGitTreeHash = Some hash
-                                            ConsecutivePerfects = 1
-                                            IsConfirmed = false }
-                                    | ReviewGuardVerdict.Revise ->
-                                        { existing with
-                                            LastGitTreeHash = Some hash
-                                            ConsecutivePerfects = 0
-                                            IsConfirmed = false }
-                            | None ->
-                                match p.Verdict with
-                                | ReviewGuardVerdict.Perfect ->
-                                    { LastGitTreeHash = Some hash
-                                      ConsecutivePerfects = 1
-                                      IsConfirmed = false
-                                      AcceptedGuardKeys = Set.empty }
-                                | ReviewGuardVerdict.Revise ->
-                                    { LastGitTreeHash = Some hash
-                                      ConsecutivePerfects = 0
-                                      IsConfirmed = false
-                                      AcceptedGuardKeys = Set.empty }
-
-                        { s with ReviewGuard = Some rg })
-                    proj.Sessions
-
-            { proj with Sessions = sessions }
-
-        | AgentFact.GuardPromptAccepted p ->
-            let sessions =
-                updateSession
-                    p.TargetSessionId
-                    (fun s ->
-                        let rg =
-                            match s.ReviewGuard with
-                            | Some existing ->
-                                { existing with
-                                    AcceptedGuardKeys = Set.add p.GuardKey existing.AcceptedGuardKeys }
-                            | None ->
-                                { LastGitTreeHash = None
-                                  ConsecutivePerfects = 0
-                                  IsConfirmed = false
-                                  AcceptedGuardKeys = Set.singleton p.GuardKey }
-
-                        { s with ReviewGuard = Some rg })
-                    proj.Sessions
-
-            { proj with Sessions = sessions }
-
-        | AgentFact.FallbackFailureRecorded p ->
-            let sessions =
-                updateSession
-                    p.SessionId
-                    (fun s ->
-                        let fb =
-                            match s.Fallback with
-                            | Some existing ->
-                                if existing.IsDead then
-                                    existing
-                                else
-                                    let newTotal = existing.TotalFailures + 1
-
-                                    match existing.Side with
-                                    | SideA ->
-                                        if existing.FailuresOnCurrentSide < 1 then
-                                            { Side = SideA
-                                              FailuresOnCurrentSide = existing.FailuresOnCurrentSide + 1
-                                              TotalFailures = newTotal
-                                              IsDead = false }
-                                        else
-                                            { Side = SideB
-                                              FailuresOnCurrentSide = 0
-                                              TotalFailures = newTotal
-                                              IsDead = false }
-                                    | SideB ->
-                                        if existing.FailuresOnCurrentSide < 1 then
-                                            { Side = SideB
-                                              FailuresOnCurrentSide = existing.FailuresOnCurrentSide + 1
-                                              TotalFailures = newTotal
-                                              IsDead = false }
-                                        else
-                                            { Side = SideB
-                                              FailuresOnCurrentSide = 2
-                                              TotalFailures = newTotal
-                                              IsDead = true }
-                            | None ->
-                                { Side = SideA
-                                  FailuresOnCurrentSide = 1
-                                  TotalFailures = 1
-                                  IsDead = false }
-
-                        { s with Fallback = Some fb })
-                    proj.Sessions
-
-            { proj with Sessions = sessions }
+        | AgentFact.FallbackFailureRecorded p -> AgentFactsReview.foldFallbackFailureRecorded proj p
 
         | AgentFact.OrchestratorCandidateRegistered p ->
             AgentFactsFoldHelpers.foldOrchestratorCandidateRegistered
