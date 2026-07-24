@@ -13,6 +13,7 @@ try {
   scenario.provider.allowOutOfOrder();
   scenario.provider.expectText({ id: 'child-a1', text: 'A1 terminal.', match: {} });
   scenario.provider.expectText({ id: 'child-a2', text: 'A2 terminal.', match: {} });
+  scenario.provider.expectText({ id: 'child-a3', text: 'A3 terminal.', match: {} });
 
   const parent = await scenario.client.createSession();
   const parentId = getSessionId(parent);
@@ -25,7 +26,7 @@ try {
   assert.ok(childId, `child creation failed: ${JSON.stringify(child)}`);
   scenario.sessionIds.push(childId);
 
-  for (const text of ['first run', 'second run']) {
+  for (const text of ['first run', 'second run', 'third run']) {
     const turn = scenario.turn.start(childId);
     const prompt = await scenario.client.request('POST', `/session/${childId}/prompt_async`, {
       body: { agent: 'coder', parts: [{ type: 'text', text }], model: { providerID: 'test', modelID: 'test-model' } },
@@ -36,11 +37,11 @@ try {
 
   const childTranscript = await scenario.client.messages(childId);
   const assistantTurns = childTranscript.data.filter((message) => message.info?.role === 'assistant');
-  assert.ok(assistantTurns.length >= 2, 'same child must produce two assistant turns');
+  assert.ok(assistantTurns.length >= 3, 'same child must produce three assistant turns');
 
   scenario.provider.expectSatisfied();
   await teardownScenario(scenario);
-  console.log('Host nudge canary passed: one child completed two independent turns.');
+  console.log('Host nudge canary passed: one child completed three independent turns.');
 } catch (error) {
   console.error(`Host nudge canary failed: ${error.stack || error}`);
   if (scenario?.provider?.unexpectedRequests) console.error(JSON.stringify(scenario.provider.unexpectedRequests));
