@@ -81,6 +81,8 @@ export class StrictMockProvider {
 
   expectNoMoreRequests() { pushNoMoreRequests(this._state); }
 
+  allowOutOfOrder() { this._state.allowOutOfOrder = true; }
+
   expectSatisfied() { checkSatisfied(this._state.expectations, this._state.unexpected); }
   reset() { resetState(this._state); }
 
@@ -181,7 +183,11 @@ export class StrictMockProvider {
       s.requests.push(parsed);
       return sendSSE(res, buildTextChunks(`auto_${Date.now()}`, 'ok', 1));
     }
-    const exp = s.expectations[0];
+    const expIndex = s.allowOutOfOrder
+      ? s.expectations.findIndex((candidate) => candidate.respond.type !== 'no-more-requests-boundary' && matchesExpectation(parsed, candidate))
+      : 0;
+    if (expIndex < 0) return this._recordUnexpected(res, parsed, 'no-matching-expectation');
+    const exp = s.expectations[expIndex];
     if (exp.respond.type === 'no-more-requests-boundary') {
       s.expectations.shift();
       if (s.strict) {
@@ -198,7 +204,7 @@ export class StrictMockProvider {
       return this._respond(res, exp, parsed);
     }
     s.requests.push(parsed);
-    s.expectations.shift();
+    s.expectations.splice(expIndex, 1);
     return this._respond(res, exp, parsed);
   }
 

@@ -17,6 +17,7 @@ export function createState() {
     strict: true,
     allowSyntheticContinuations: false,
     allowTitleGeneration: false,
+    allowOutOfOrder: false,
   };
 }
 

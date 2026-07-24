@@ -109,6 +109,13 @@ module SpikePlugin =
             agents?build <- managerConfig
             agents?plan <- managerConfig
             agents?coder <- StaticTools.coderAgentConfig ()
+            let toollessConfig = StaticTools.toollessAgentConfig ()
+            agents?blogger <- toollessConfig
+            agents?executor <- toollessConfig
+            agents?inspector <- StaticTools.inspectorAgentConfig ()
+            agents?browser <- toollessConfig
+            agents?meditator <- toollessConfig
+            agents?reviewer <- toollessConfig
 
     let private roleOf (agent: string) =
         match if isNull agent then "" else agent.Trim().ToLowerInvariant() with
@@ -237,8 +244,48 @@ module SpikePlugin =
             | Ok(eventPort, sessionPort, subscription, observeEvent) ->
                 let companions = Dictionary<string, CompanionHost>()
                 let companionGate = obj ()
+                let sessionRoles = Dictionary<string, string>()
+                let mutable latestSessionId = ""
+
+                let sessionContext raw =
+                    let event = if isNull raw || isNull raw?event then raw else raw?event
+                    let properties = if isNull event then null else event?properties
+
+                    let sessionId =
+                        if not (isNull properties) && not (isNull properties?sessionID) then
+                            unbox<string> properties?sessionID
+                        elif not (isNull event) && not (isNull event?sessionID) then
+                            unbox<string> event?sessionID
+                        else
+                            ""
+
+                    let role =
+                        if
+                            not (isNull properties)
+                            && not (isNull properties?info)
+                            && not (isNull properties?info?agent)
+                        then
+                            Some(unbox<string> properties?info?agent)
+                        else
+                            None
+
+                    sessionId, role
 
                 let transform inObj outObj =
+                    if
+                        not (isNull inObj)
+                        && isNull inObj?sessionID
+                        && not (String.IsNullOrWhiteSpace latestSessionId)
+                    then
+                        inObj?sessionID <- latestSessionId
+
+                    if
+                        not (isNull inObj)
+                        && isNull inObj?agent
+                        && sessionRoles.ContainsKey latestSessionId
+                    then
+                        inObj?agent <- sessionRoles.[latestSessionId]
+
                     CompanionTransform.handleCompanionTransform companions companionGate sessionPort inObj outObj
 
                 let hooks =
@@ -253,7 +300,17 @@ module SpikePlugin =
                           "config", box (fun (config: obj) -> configureManager config) ]
 
                 observeEvent
-                |> Option.iter (fun observe -> hooks?event <- box (fun raw -> observe raw))
+                |> Option.iter (fun observe ->
+                    hooks?event <-
+                        box (fun raw ->
+                            let sessionId, role = sessionContext raw
+
+                            if not (String.IsNullOrWhiteSpace sessionId) then
+                                latestSessionId <- sessionId
+
+                                role |> Option.iter (fun value -> sessionRoles.[sessionId] <- value)
+
+                            observe raw))
 
                 let client = if isNull input then null else input?client
 

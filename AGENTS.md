@@ -16,7 +16,8 @@ import:
 - P0 canary 已改为真实 Manager→fork(coder)→join→Coder write 纵切，严格校验 Manager 禁止常规工具；真实 child 已执行并返回，当前仅剩并发请求顺序的 StrictMock FIFO 稳定性问题。
 - Process 已完成 lossless pump、动态 `3×estimated_output_bytes` spool、200KB chunk、SIGKILL 后等待 pipe EOF；默认 Executor map/reduce 未接线时明确报错，不再伪造 concat。 `npm test` 当前 132/132、Manager contract 1/1、TestKit 11/11。
 - Review SubmitVerdict 已支持 GitTreePort 读 tree、Journal append、ToolCallId 全局去重；Fallback durable decision 已修正为 A1→B2→B3→Dead，仍待真实模型调用与重启 E2E。
-- OpenCode v1 SDK child create/prompt 已改用正确 `body/path` 包络与扁平可选字段；真实 child 已能创建、Coder write、terminal、Journal AgentLinked、Manager join。`npm test` 132/132 通过；P0 strict FIFO canary 仍因 Manager/child 并发请求顺序存在偶发 expectation mismatch，尚未达稳定门。
+- OpenCode v1 SDK child create/prompt 已改用正确 `body/path` 包络与扁平可选字段；真实 child 已能创建、Coder write、terminal、Journal AgentLinked、Manager join。`npm test` 132/132 通过；P0 strict FIFO canary 仍因并发请求顺序存在偶发 expectation mismatch，尚未达稳定门。
+- Companion 真实 Blogger child 已能产生 B1/B2，且 sidecar 角色配置已覆盖 Blogger/Executor/Inspector/Browser/Meditator/Reviewer；独立 `test:e2e:companion` 仍红于首轮 transform 与 Manager outbound 请求竞态，已从 P0 release gate 分离，禁止误称 Companion 闭合。
 - 下一步必须以 20×真实 Manager→Coder→Join 稳定性与 Companion Blogger 纵切为验收门，不得以 132 个单测替代。
 
 ## 已完成并验证

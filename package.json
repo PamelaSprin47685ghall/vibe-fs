@@ -27,6 +27,7 @@
     "test:manager-tools": "node --test testkit/opencode/tests/manager-tool-contract.mjs",
     "test": "npm run build && npm run test:compile && npm run test:next && npm run test:manager-tools && node testkit/opencode/tests/gate-testkit.mjs",
     "test:e2e:p0": "node testkit/opencode/tests/agent-dsl-canary.mjs",
+    "test:e2e:companion": "node testkit/opencode/tests/companion-canary.mjs",
     "test:release": "npm test && npm run test:e2e:p0",
     "format": "node scripts/pre-commit-formatter.mjs"
   },

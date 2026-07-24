@@ -12,7 +12,7 @@ module CompanionTransform =
 
     let handleTransform (rawOutObj: obj) =
         if not (isNull rawOutObj) && not (isNull rawOutObj?messages) then
-            let rawMsgs = unbox<obj list> rawOutObj?messages
+            let rawMsgs = unbox<obj array> rawOutObj?messages |> Array.toList
 
             let capsMsg =
                 createObj [ "role", box "system"; "text", box "[CAPS: coder, inspector, browser]" ]
@@ -29,6 +29,32 @@ module CompanionTransform =
         =
         handleTransform rawOutObj
 
+        let rawMsgs = unbox<obj array> rawOutObj?messages |> Array.toList
+
+        let messageContext =
+            rawMsgs
+            |> List.tryPick (fun message ->
+                if isNull message || isNull message?info then
+                    None
+                else
+                    let sessionId =
+                        if isNull message?info?sessionID then
+                            None
+                        else
+                            Some(unbox<string> message?info?sessionID)
+
+                    let role =
+                        if isNull message?info?agent then
+                            None
+                        else
+                            Some(unbox<string> message?info?agent)
+
+                    Some(sessionId, role))
+
+        match messageContext with
+        | Some(Some sessionId, _) when not (isNull inObj) && isNull inObj?sessionID -> inObj?sessionID <- sessionId
+        | _ -> ()
+
         let sessionId =
             if isNull inObj || isNull inObj?sessionID then
                 ""
@@ -37,10 +63,10 @@ module CompanionTransform =
 
         if not (String.IsNullOrWhiteSpace sessionId) && not (isNull rawOutObj?messages) then
             let agentRole =
-                if isNull inObj || isNull inObj?agent then
-                    None
-                else
-                    Some(unbox<string> inObj?agent)
+                match messageContext |> Option.bind snd with
+                | Some role -> Some role
+                | None when not (isNull inObj) && not (isNull inObj?agent) -> Some(unbox<string> inObj?agent)
+                | None -> None
 
             let allowed =
                 match agentRole with
@@ -57,5 +83,5 @@ module CompanionTransform =
                             companions.[sessionId] <- value
                             value)
 
-                let rawMsgs = unbox<obj list> rawOutObj?messages
+                let rawMsgs = unbox<obj array> rawOutObj?messages |> Array.toList
                 rawOutObj?messages <- companion.TransformRaw rawMsgs |> List.toArray

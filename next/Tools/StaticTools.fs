@@ -54,6 +54,14 @@ module StaticTools =
                         "grep", box "allow" ]
               ) ]
 
+    let toollessAgentConfig () : obj =
+        createObj [ "mode", box "primary"; "permission", box (createObj [ "*", box "deny" ]) ]
+
+    let inspectorAgentConfig () : obj =
+        createObj
+            [ "mode", box "primary"
+              "permission", box (createObj [ "*", box "deny"; "executor", box "allow" ]) ]
+
     let executorTool () : Tool =
         { Name = "executor"
           Description = "Execute shell command within timeout budget."

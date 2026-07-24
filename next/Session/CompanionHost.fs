@@ -34,8 +34,11 @@ type CompanionHost(primaryId: SessionId, sessions: ISessionHostPort) =
                 bloggerTask <- Some task
                 task)
 
-    let assistantOutput childId =
-        sessions.GetSessionOutput childId
+    let assistantOutput childId watermark =
+        let output = sessions.GetSessionOutput childId
+
+        output
+        |> List.skip (min watermark output.Length)
         |> List.filter (fun line -> not (line.StartsWith("Prompt: ")) && not (line.StartsWith("ChildPrompt: ")))
         |> String.concat "\n"
 
@@ -48,6 +51,8 @@ type CompanionHost(primaryId: SessionId, sessions: ISessionHostPort) =
 
             let completion =
                 TaskCompletionSource<TerminalOutcome>(TaskCreationOptions.RunContinuationsAsynchronously)
+
+            let watermark = sessions.GetSessionOutput childId |> List.length
 
             use subscription =
                 sessions.SubscribeTerminal(childId, (fun _ outcome -> completion.SetResult outcome))
@@ -66,7 +71,7 @@ type CompanionHost(primaryId: SessionId, sessions: ISessionHostPort) =
 
                 match outcome with
                 | Completed _ ->
-                    let text = assistantOutput childId
+                    let text = assistantOutput childId watermark
 
                     if String.IsNullOrWhiteSpace text then
                         return failBlog "Blogger returned no assistant text"
