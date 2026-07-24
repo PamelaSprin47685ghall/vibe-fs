@@ -4,6 +4,41 @@ import:
   - TASK.md
 ---
 
+# 当前工程状态（2026-07-24；优先于下方历史会话记录）
+
+下方长篇会话是设计与迁移历史，不是当前状态。当前事实以源码、`README.md`、测试入口和最近一次验证结果为准。
+
+## 已完成并验证
+
+- Fable 是唯一目标平台；`next/` 不得出现 `#if`、`#else`、`#endif` 或非 Fable 分支。
+- Structured Flow 已支持 Promise defer，递归 10000 步不栈溢出；取消异常保持外抛。
+- `ForkRuntime.Join()` 是等待型 completion mailbox；completion 先入邮箱，existing-agent fork 是 nudge。
+- Runner 注入执行路径遵守唯一 `3 × estimated_running_secs` deadline；超时结果为 `TimeoutExceeded`。
+- Runner、Journal Facts、Programs、Flow 测试已按 300 行门禁拆分。
+- Fable 测试框架不依赖 Xunit 程序集；架构门禁、角色权限、Journal、Flow、Process、PTY、Review、Orchestrator 测试均纳入统一入口。
+- 当前验证结果：`npm test` → 117/117；TestKit → 11/11；`npm run test:e2e:p0` → 20/20 稳定性通过；无编译 warning。
+
+## 当前边界：不得误称已完成
+
+- `next/OpenCode/Plugin.fs` 当前仍通过 `SpikePlugin.initSpikePlugin` 组装入口；真实生产级 Agent DSL Host 纵切尚未闭合。
+- P0 canary 证明测试宿主、隔离、稳定性和当前入口可运行，不等价于真实 `fork/join`、Blogger、Reviewer、Orchestrator 全链路已经接入 OpenCode。
+- Journal 的纯编码、写入、Boot/Fold 测试已通过；启动恢复、真实 Host 事件接线仍需独立闭合验证。
+- 不得因为 117 个单测或 20× canary 通过而宣称 release-ready；必须先完成真实 Host projection、child session、Agent DSL 工具面和 Journal runtime 接线。
+
+## 下一阶段唯一优先级
+
+1. 以真实 OpenCode 事件和请求为边界，替换 `SpikePlugin` 假端口。
+2. 接通真实 `fork/join/list`、A 版输出提取、parent abort 和 Journal linkage。
+3. 接通 Companion 投影替换、Reviewer verdict/ReviewGuard、Fallback 持久事实。
+4. 真实流程闭合后再做 production entry 切换；此前禁止删除剩余可作为黑盒 Oracle 的测试资产。
+
+## 验证命令
+
+```bash
+npm test
+npm run test:e2e:p0
+```
+
 - Mux 端允许改动 ../mux 代码，但最好只改 binding，对其他核心的修改要最小化。真正实现最好在本仓库，其次在 binding，最差在 mux 本体
 - Omp 端不允许改动 ../oh-my-pi 代码，但可以参考
 - Opencode 端参见 ../opencode 代码，不允许改上游
