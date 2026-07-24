@@ -10,6 +10,7 @@ import:
 
 - 已恢复 `next/Doc/SSOT.md`，冻结 Agent DSL、Companion、Fork/Join、durable facts、Review、Process 与 Orchestrator 最终语义。
 - 已完成 per-Run terminal listener、输出增量切片、existing-agent nudge 重装 listener、标准 workspace Journal Boot；真实 Manager→Coder→Join 与 Companion B1/B2 已通过 OpenCode P0。
+- 真实 Host parent abort 已闭合：OpenCode 无 session.aborted 事件，abort 以 `session.error` + `MessageAbortedError` 表达；HostEventRouter 据此向已登记 child 传播取消，SdkClientPort.AbortSession 修正为 SDK 契约 `{ path: { id } }`；`host-abort-canary` 证明 parent abort 取消 busy child 并关闭两条悬挂 SSE 流，3× 稳定性通过并纳入 `test:e2e:p0`。
 - 已把 tests-next 的 1s 续命看门狗移植到 testkit：Watchdog 以 SSE/provider/HTTP 事件为心跳，静默超限即诊断并退出；修复 `awaitEvent` 共享计时器句柄被并发 await 覆盖导致永不超时的失控根因；全部 P0 canary 已接入 `watchdogMs`。
 - 已拆出 `OpenCode/CompanionTransform.fs`、`OpenCode/HostEventRouter.fs`、`OpenCode/ToolSurface.fs`、`OpenCode/ExecutorTool.fs`、`Orchestrator.Types.fs`、`Orchestrator.GitPort.fs`，恢复 300 行架构门禁；此前 `npm test` = 135/135、Manager contract = 1/1、TestKit = 11/11。
 - Manager provider request 已证明只暴露 `fork/join/list`，禁止 `read/write/edit/bash/glob/grep/verdict`；P0 默认 3×稳定性通过，`CANARY_REPEAT` 仍可提高门槛。
@@ -41,7 +42,7 @@ import:
 ## 当前边界：不得误称已完成
 
 - `npm run test:release` 已通过不等于 production-ready；默认 P0 稳定性是 3×，不是 20×。
-- 真实 Host parent abort、Fallback provider failure、Process/PTY 长压、Orchestrator 发布 E2E 尚未闭合；跨重启 child reconcile 与同一 child 三轮 nudge 已有真实 canary。
+- Fallback provider failure、Process/PTY 长压、Orchestrator 发布 E2E 尚未闭合；真实 Host parent abort、跨重启 child reconcile 与同一 child 三轮 nudge 已有真实 canary。
 - 在上述边界闭合前，不切换 production entry，不删除黑盒 Oracle 测试资产，不宣称 release-ready。
 
 ## 当前已知关键 Bug 与未修复缺口
@@ -49,9 +50,9 @@ import:
 ### 🟢 SSOT 宪法已恢复
 - `next/Doc/SSOT.md` 已恢复并冻结用户最终裁决；后续实现与测试以该文件为产品语义依据。
 
-### 🟡 Host terminal：已改 per-Run，待真实验收
+### 🟢 Host terminal 与 parent abort：per-Run + 真实验收通过
 - Session 不再永久标记 terminal；每次新 prompt 都安装独立 listener，使用启动前输出边界截取本轮增量并在完成后 dispose。
-- 真实 Manager→Coder→Join 已通过；parent abort 已由 HostEventRouter 向已登记 child 传播，连续多轮、迟到 terminal 与真实 assistant part 边界仍需 E2E。
+- 真实 Manager→Coder→Join 已通过；parent abort 经 `session.error MessageAbortedError` 向已登记 child 传播并由 host-abort-canary 闭合；连续多轮、迟到 terminal 与真实 assistant part 边界仍需 E2E。
 
 ### 🟡 A 版输出：当前为新增输出切片，仍待完整 Host part 验证
 - `HostForkRuntime` 不再直接返回全历史；按 Run 启动边界截取新增输出并排除本地 prompt 标记。
@@ -83,7 +84,7 @@ import:
 ### 🟡 Orchestrator 纯 Port 路径已成形，真实发布仍未验收
 - 已有 AgentJournal、candidate/published facts、初次与 rebase 后双 PERFECT、冲突交回同一 Manager、Git authority reconcile 与 ff-only；真实 OpenCode Manager worktree 发布 E2E 仍未闭合。
 ## 下一阶段唯一优先级：跨域闭合
-1. 冻结真实 Host 的 projection budget 与 parent abort 契约，补齐对应 OpenCode E2E（跨重启 reconcile 已闭合）。
+1. 冻结真实 Host 的 projection budget 契约，补齐对应 OpenCode E2E（跨重启 reconcile 与 parent abort 已闭合）。
 2. 接通真实模型失败注入后的 A/B Fallback durable 恢复。
 3. 将 Process PTY、大输入、SIGKILL 与孤儿检测纳入默认 3×稳定性门。
 4. 将 Orchestrator durable Port 路径接到真实 OpenCode Manager worktree、冲突回交、复审与 ff-only 发布 E2E。
