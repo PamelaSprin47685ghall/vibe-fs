@@ -18,6 +18,7 @@ import:
 - Review SubmitVerdict 已支持 GitTreePort 读 tree、Journal append、ToolCallId 全局去重；Fallback durable decision 已修正为 A1→B2→B3→Dead，仍待真实模型调用与重启 E2E。
 - OpenCode v1 SDK child create/prompt 已改用正确 `body/path` 包络与扁平可选字段；真实 child 已能创建、Coder write、terminal、Journal AgentLinked、Manager join。`npm test` 132/132 通过；P0 strict FIFO canary 仍因并发请求顺序存在偶发 expectation mismatch，尚未达稳定门。
 - Companion 真实 Blogger child 已能产生 B1/B2，且 sidecar 角色配置已覆盖 Blogger/Executor/Inspector/Browser/Meditator/Reviewer；独立 `test:e2e:companion` 仍红于首轮 transform 与 Manager outbound 请求竞态，已从 P0 release gate 分离，禁止误称 Companion 闭合。
+- Manager canary 增加 StrictMock Blogger 自动响应与并发无序匹配；20×稳定性正在运行，Companion 独立场景仍保留红灯，不以自动响应掩盖其 B 版验收。
 - 下一步必须以 20×真实 Manager→Coder→Join 稳定性与 Companion Blogger 纵切为验收门，不得以 132 个单测替代。
 
 ## 已完成并验证

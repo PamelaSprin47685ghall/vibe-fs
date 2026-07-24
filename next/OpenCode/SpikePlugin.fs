@@ -117,18 +117,6 @@ module SpikePlugin =
             agents?meditator <- toollessConfig
             agents?reviewer <- toollessConfig
 
-    let private roleOf (agent: string) =
-        match if isNull agent then "" else agent.Trim().ToLowerInvariant() with
-        | "manager" -> Some AgentRole.Manager
-        | "coder" -> Some AgentRole.Coder
-        | "inspector" -> Some AgentRole.Inspector
-        | "browser" -> Some AgentRole.Browser
-        | "meditator" -> Some AgentRole.Meditator
-        | "reviewer" -> Some AgentRole.Reviewer
-        | "advisor" -> Some AgentRole.Advisor
-        | "executor" -> Some AgentRole.Executor
-        | _ -> None
-
     let private toolHooks (toolModule: obj) (sessionPort: ISessionHostPort) (journal: AgentJournal option) : obj =
         let factory = toolModule?tool
         let runtimes = Dictionary<string, HostForkRuntime>()
@@ -171,7 +159,7 @@ module SpikePlugin =
                     let prompt = textArg args "prompt"
 
                     let! result =
-                        match roleOf agent with
+                        match HostSessionContext.roleOf agent with
                         | Some role -> runtime.Fork(newAgentId (), role, prompt)
                         | None -> runtime.Reuse(agent, prompt)
 
@@ -247,30 +235,6 @@ module SpikePlugin =
                 let sessionRoles = Dictionary<string, string>()
                 let mutable latestSessionId = ""
 
-                let sessionContext raw =
-                    let event = if isNull raw || isNull raw?event then raw else raw?event
-                    let properties = if isNull event then null else event?properties
-
-                    let sessionId =
-                        if not (isNull properties) && not (isNull properties?sessionID) then
-                            unbox<string> properties?sessionID
-                        elif not (isNull event) && not (isNull event?sessionID) then
-                            unbox<string> event?sessionID
-                        else
-                            ""
-
-                    let role =
-                        if
-                            not (isNull properties)
-                            && not (isNull properties?info)
-                            && not (isNull properties?info?agent)
-                        then
-                            Some(unbox<string> properties?info?agent)
-                        else
-                            None
-
-                    sessionId, role
-
                 let transform inObj outObj =
                     if
                         not (isNull inObj)
@@ -303,7 +267,7 @@ module SpikePlugin =
                 |> Option.iter (fun observe ->
                     hooks?event <-
                         box (fun raw ->
-                            let sessionId, role = sessionContext raw
+                            let sessionId, role = HostSessionContext.read raw
 
                             if not (String.IsNullOrWhiteSpace sessionId) then
                                 latestSessionId <- sessionId

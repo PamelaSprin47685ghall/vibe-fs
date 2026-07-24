@@ -62,6 +62,7 @@
     <Compile Include="Session/HostForkRuntime.fs"/>
     <Compile Include="Session/CompanionHost.fs"/>
     <Compile Include="OpenCode/CompanionTransform.fs"/>
+    <Compile Include="OpenCode/HostSessionContext.fs"/>
     <Compile Include="OpenCode/SpikePlugin.fs"/>
     <Compile Include="OpenCode/Plugin.fs"/>
   </ItemGroup>

@@ -82,6 +82,7 @@ export class StrictMockProvider {
   expectNoMoreRequests() { pushNoMoreRequests(this._state); }
 
   allowOutOfOrder() { this._state.allowOutOfOrder = true; }
+  allowBloggerRequests() { this._state.allowBloggerRequests = true; }
 
   expectSatisfied() { checkSatisfied(this._state.expectations, this._state.unexpected); }
   reset() { resetState(this._state); }
@@ -146,6 +147,10 @@ export class StrictMockProvider {
 
   _dispatchChat(res, parsed) {
     const s = this._state;
+    if (s.allowBloggerRequests && JSON.stringify(extractLastUserMsg(parsed) || '').includes('You are the blogger')) {
+      s.requests.push(parsed);
+      return sendSSE(res, buildTextChunks(`blog_${Date.now()}`, 'Blogger paragraph.', 1));
+    }
     if (isTitleGenerationRequest(parsed) && (!s.strict || s.allowTitleGeneration)) {
       return sendSSE(res, buildTextChunks(`title_${Date.now()}`, 'E2E Test Session', 1));
     }

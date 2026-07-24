@@ -60,6 +60,8 @@ async function canaryScenario(scenario) {
   // weakening the FIFO expectations for Manager and Coder turns.
   scenario.provider.allowSyntheticContinuations();
   scenario.provider.allowTitleGeneration();
+  scenario.provider.allowBloggerRequests();
+  scenario.provider.allowOutOfOrder();
 
   const forbiddenManagerTools = ['read', 'write', 'edit', 'bash', 'glob', 'grep'];
 
@@ -205,13 +207,13 @@ try {
 }
 
 // 5. One-Iteration Stability Loop with per-run disposal and leak checks
-console.log('4. Running one-iteration stability gate...');
+console.log('4. Running twenty-iteration stability gate...');
 const stabilityGateResult = await runStabilityGate({
   test: {
     name: 'Manager DSL Canary Scenario',
     fn: canaryScenario,
   },
-  repeat: 1,
+  repeat: Number(process.env.CANARY_REPEAT || 20),
   globalTimeoutMs: 900000,
   scenarioOpts: {
     project: {

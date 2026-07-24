@@ -18,6 +18,7 @@ export function createState() {
     allowSyntheticContinuations: false,
     allowTitleGeneration: false,
     allowOutOfOrder: false,
+    allowBloggerRequests: false,
   };
 }
 

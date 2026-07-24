@@ -14,6 +14,7 @@ module CompanionHostTests =
     let private makeFake () =
         let mutable terminal: (SessionId -> TerminalOutcome -> unit) option = None
         let mutable childCount = 0
+        let mutable output = [ "history" ]
         let childId = SessionId.create "blogger-1"
 
         let host =
@@ -25,6 +26,8 @@ module CompanionHostTests =
                         member _.Dispose() = terminal <- None }
 
                 member _.SendPrompt(_, _, _) =
+                    output <- output @ [ "blog paragraph" ]
+
                     terminal
                     |> Option.iter (fun listener -> listener childId (Completed(MessageId.create "blog")))
 
@@ -37,7 +40,7 @@ module CompanionHostTests =
                     childCount <- childCount + 1
                     Task.FromResult(Ok childId)
 
-                member _.GetSessionOutput(_) = [ "blog paragraph" ] }
+                member _.GetSessionOutput(_) = output }
 
         host, (fun () -> childCount)
 
