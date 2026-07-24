@@ -17,7 +17,8 @@ type HostEventRouter
         sessionRoles: Dictionary<string, string>,
         verdictSessions: HashSet<string>,
         nudgeSent: HashSet<string>,
-        ?journal: AgentJournal
+        ?journal: AgentJournal,
+        ?recordedErrors: HashSet<string>
     ) =
 
     let mutable latestSessionId = ""
@@ -147,5 +148,7 @@ type HostEventRouter
                     ->
                     nudgeReviewer sessionId
                 | _ -> ()
+
+        FallbackDetect.observeEvent journal (defaultArg recordedErrors (HashSet<string>())) raw
 
         forward raw

@@ -204,6 +204,7 @@ module SpikePlugin =
                 let sessionRoles = Dictionary<string, string>()
                 let sessionParents = Dictionary<string, string>()
                 let verdictSessions = HashSet<string>()
+                let recordedErrors = HashSet<string>()
                 let nudgeSent = HashSet<string>()
 
                 restoreSessionRoles journal sessionRoles
