@@ -20,11 +20,18 @@ type private PendingHostRun =
       mutable Finished: bool }
 
 /// Bridges real child sessions to the existing completion mailbox.
-type HostForkRuntime(parentId: SessionId, sessions: ISessionHostPort, ?journal: AgentJournal) =
+type HostForkRuntime
+    (
+        parentId: SessionId,
+        sessions: ISessionHostPort,
+        ?journal: AgentJournal,
+        ?onChildCreated: string -> AgentRole -> SessionId -> unit
+    ) =
     let runtime = ForkRuntime()
     let children = Dictionary<string, SessionId>()
     let pendingRuns = Dictionary<string, PendingHostRun>()
     let gate = obj ()
+    let childCreated = defaultArg onChildCreated (fun _ _ _ -> ())
 
     let roleOfString (value: string) =
         if String.IsNullOrWhiteSpace value then
@@ -190,6 +197,7 @@ type HostForkRuntime(parentId: SessionId, sessions: ISessionHostPort, ?journal: 
                         let run = installRun agentId childId
 
                         lock gate (fun () -> children.[agentId] <- childId)
+                        childCreated agentId role childId
 
                         let result = runtime.Fork(agentId, role, runWork = (fun () -> run.Source.Task))
                         markReady run
@@ -226,30 +234,36 @@ type HostForkRuntime(parentId: SessionId, sessions: ISessionHostPort, ?journal: 
                     |> List.tryFind (fun agent -> agent.AgentId = agentId)
                     |> Option.map (fun agent -> agent.Role)
 
-                let result =
-                    match roleOpt with
-                    | Some role ->
-                        let run = installRun agentId childId
-                        let result = runtime.Fork(agentId, role, runWork = (fun () -> run.Source.Task))
-                        Some(run, result)
-                    | None -> None
-
-                match result with
-                | Some(run, ForkResult.Nudged _) ->
-                    markReady run
-
-                    let! sent =
-                        sessions.SendChildPromptFireAndForget(parentId, childId, prompt, { Model = None; Agent = None })
-
-                    match sent with
-                    | Ok() -> return Ok(ForkResult.Nudged agentId)
-                    | Error err ->
-                        failRun run err
-                        return Error err
-                | Some(run, result) ->
-                    failRun run (sprintf "Unknown agent id: %s" agentId)
-                    return Error(sprintf "Unknown agent id: %s" agentId)
+                match roleOpt with
                 | None -> return Error(sprintf "Unknown agent id: %s" agentId)
+                | Some role ->
+                    let run = installRun agentId childId
+                    let result = runtime.Fork(agentId, role, runWork = (fun () -> run.Source.Task))
+
+                    match result with
+                    | ForkResult.Nudged _ ->
+                        markReady run
+
+                        // The prompt must carry the role: after a host restart
+                        // OpenCode resolves an agent-less child prompt to the
+                        // default build agent, not the session's original role.
+                        let! sent =
+                            sessions.SendChildPromptFireAndForget(
+                                parentId,
+                                childId,
+                                prompt,
+                                { Model = None
+                                  Agent = Some(role.ToString().ToLowerInvariant()) }
+                            )
+
+                        match sent with
+                        | Ok() -> return Ok(ForkResult.Nudged agentId)
+                        | Error err ->
+                            failRun run err
+                            return Error err
+                    | _ ->
+                        failRun run (sprintf "Unknown agent id: %s" agentId)
+                        return Error(sprintf "Unknown agent id: %s" agentId)
         }
 
     member _.Join() : Task<Result<RunCompletion, ForkError>> = runtime.Join()

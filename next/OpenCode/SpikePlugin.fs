@@ -109,8 +109,26 @@ module SpikePlugin =
                 match session.Linkage with
                 | Some linkage ->
                     for KeyValue(childId, role) in linkage.LinkedRoles do
-                        sessionRoles.[ChildId.value childId] <- role
+                        // Journal facts persist AgentRole.ToString() ("Coder");
+                        // OpenCode agent ids are lowercase, so normalise at
+                        // this restore boundary (also heals pre-fix facts).
+                        sessionRoles.[ChildId.value childId] <- role.Trim().ToLowerInvariant()
                 | None -> ()
+
+    let private projectionSessionIdFromMessages (output: obj) =
+        if isNull output || isNull output?messages then
+            None
+        else
+            let messages = unbox<obj array> output?messages
+
+            messages
+            |> Array.tryPick (fun message ->
+                if not (isNull message?info) && not (isNull message?info?sessionID) then
+                    Some(unbox<string> message?info?sessionID)
+                elif not (isNull message?sessionID) then
+                    Some(unbox<string> message?sessionID)
+                else
+                    None)
 
     let private configureManager (config: obj) =
         if not (isNull config) then
@@ -182,7 +200,9 @@ module SpikePlugin =
                     HostEventRouter(sessionPort, sessionParents, sessionRoles, verdictSessions, nudgeSent)
 
                 let transform inObj outObj =
-                    let projectionSessionId = eventRouter.LatestSessionId
+                    let projectionSessionId =
+                        projectionSessionIdFromMessages outObj
+                        |> Option.defaultValue eventRouter.LatestSessionId
 
                     if
                         not (isNull inObj)

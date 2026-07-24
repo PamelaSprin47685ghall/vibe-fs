@@ -77,7 +77,11 @@ type HostEventRouter
 
         if not (String.IsNullOrWhiteSpace sessionId) then
             latestSessionId <- sessionId
-            role |> Option.iter (fun value -> sessionRoles.[sessionId] <- value)
+            // Event info.agent is the *resolved* OpenCode agent; a fallback
+            // (build/plan/title) must never clobber a known DSL role.
+            role
+            |> Option.filter (fun value -> HostSessionContext.roleOf value |> Option.isSome)
+            |> Option.iter (fun value -> sessionRoles.[sessionId] <- value)
 
             rawParentSessionId raw
             |> Option.iter (fun parentId ->

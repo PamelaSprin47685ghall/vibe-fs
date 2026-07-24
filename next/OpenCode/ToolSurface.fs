@@ -71,7 +71,16 @@ module ToolSurface =
                         | true, runtime -> runtime
                         | false, _ ->
                             let runtime =
-                                HostForkRuntime(SessionId.create sessionID, sessionPort, ?journal = journal)
+                                HostForkRuntime(
+                                    SessionId.create sessionID,
+                                    sessionPort,
+                                    ?journal = journal,
+                                    onChildCreated =
+                                        (fun _ role childId ->
+                                            let childSessionId = SessionId.value childId
+                                            sessionParents.[childSessionId] <- sessionID
+                                            sessionRoles.[childSessionId] <- role.ToString().ToLowerInvariant())
+                                )
 
                             runtimes.[sessionID] <- runtime
                             runtime)
