@@ -16,6 +16,7 @@ import:
 - Companion 前缀覆盖比较已优先使用稳定 message ID，避免 OpenCode 对同一消息补充 summary/diff 元数据后误判前缀断裂；真实近上限 replacement 仍未验收。
 - Process 已完成 lossless pump、动态 `3×estimated_output_bytes` spool、200KB chunk、SIGKILL 后等待 pipe EOF；真实 Inspector→Executor map/reduce canary 已通过，SIGKILL/PTY 压力仍待纳入稳定性门。
 - Review verdict 已接入真实 GitTreePort、Journal、ToolCallId 去重、双 PERFECT 与 reviewer terminal nudge；真实双 PERFECT canary 已通过，Fallback 真实模型调用仍未接线。
+- Orchestrator agent 已接入 HostSessionContext 与静态 `fork/join` 权限面；真实 Manager worktree 创建、冲突回交、复审与 ff-only 发布仍未接入 OpenCode Host。
 - Orchestrator 已有 durable facts、candidate/published 投影、rebase 冲突同 Manager 继续、post-rebase 双 Review 与 ff-only 纯 Port 路径；真实 OpenCode/Git 发布 E2E 仍未验收。
 - 用户最终裁决：稳定性门槛由 20× 降为 3×；本仓库默认执行 3 次，3×是当前验收门，不等价于 release-ready。
 
