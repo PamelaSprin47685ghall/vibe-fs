@@ -71,6 +71,10 @@ type ForkRuntime
     let cleanupPort = defaultArg cleanup ignore
 
     let mailbox = System.Collections.Generic.Queue<RunCompletion>()
+
+    let waiters =
+        System.Collections.Generic.Queue<TaskCompletionSource<Result<RunCompletion, ForkError>>>()
+
     let agents = System.Collections.Generic.Dictionary<string, AgentRecord>()
     let ptys = System.Collections.Generic.Dictionary<string, PtyRecord>()
     let lockObj = obj ()
@@ -113,8 +117,12 @@ type ForkRuntime
                 // 1. Invoke terminal listener (registered before firing prompt)
                 onTerminal completion
 
-                // 2. Put completion into channel before live status changes
-                lock lockObj (fun () -> mailbox.Enqueue(completion))
+                // 2. Deliver to an existing join before changing live status.
+                lock lockObj (fun () ->
+                    if waiters.Count > 0 then
+                        waiters.Dequeue().SetResult(Ok completion)
+                    else
+                        mailbox.Enqueue(completion))
 
                 // 3. Update status in live agent handle map
                 lock lockObj (fun () ->
@@ -127,11 +135,7 @@ type ForkRuntime
                     | _ -> ())
             }
 
-#if FABLE_COMPILER
         let _ = runTask ()
-#else
-        Task.Run(fun () -> runTask () :> Task) |> ignore
-#endif
         runId
 
     member this.Fork
@@ -175,12 +179,14 @@ type ForkRuntime
             | false, _ -> ForkResult.NotFound agentId)
 
 
-    member _.Join() : Result<RunCompletion, ForkError> =
+    member _.Join() : Task<Result<RunCompletion, ForkError>> =
         lock lockObj (fun () ->
             if mailbox.Count > 0 then
-                Ok(mailbox.Dequeue())
+                Task.FromResult(Ok(mailbox.Dequeue()))
             else
-                Error ForkError.Empty)
+                let waiter = TaskCompletionSource<Result<RunCompletion, ForkError>>()
+                waiters.Enqueue(waiter)
+                waiter.Task)
 
     member _.RegisterPty(pty: PtyRecord) : unit =
         lock lockObj (fun () -> ptys.[pty.PtyId] <- pty)

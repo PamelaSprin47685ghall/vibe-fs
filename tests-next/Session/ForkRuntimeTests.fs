@@ -10,104 +10,100 @@ module ForkRuntimeTests =
     [<Fact>]
     let ``ForkRuntime_fork_and_join_returns_ok_completion`` () =
         task {
-            let runtime = ForkRuntime()
             let agentId = "agent-alpha"
+            let completionSource = TaskCompletionSource<RunCompletion>()
+            let runtime = ForkRuntime(listener = completionSource.SetResult)
 
             let forkRes =
-                runtime.Fork(agentId, AgentRole.Coder, (fun () -> task { return Ok "hello-fork" }))
+                runtime.Fork(agentId, AgentRole.Coder, runWork = (fun () -> task { return Ok "hello-fork" }))
 
             match forkRes with
-            | Ok runId ->
-                Assert.False(String.IsNullOrEmpty(runId))
-                // Allow async completion to land in mailbox
-                do! Task.Delay(50)
+            | ForkResult.Created id -> Assert.Equal(agentId, id)
+            | other -> Assert.True(false, sprintf "Expected Created result, got: %A" other)
 
-                match runtime.Join(agentId) with
-                | Ok completion ->
-                    Assert.Equal(runId, completion.RunId)
-                    Assert.Equal(agentId, completion.AgentId)
-                    Assert.Equal(AgentRole.Coder, completion.Role)
-                    Assert.Equal(Ok "hello-fork", completion.Outcome)
-                | Error err -> Assert.True(false, sprintf "Expected Ok completion, got Error: %A" err)
-            | Error err -> Assert.True(false, sprintf "Expected Ok runId, got Error: %A" err)
+            let! observed = completionSource.Task
+
+            let! joined = runtime.Join()
+
+            match joined with
+            | Ok completion ->
+                Assert.Equal(observed.RunId, completion.RunId)
+                Assert.Equal(agentId, completion.AgentId)
+                Assert.Equal(AgentRole.Coder, completion.Role)
+                Assert.Equal(Ok "hello-fork", completion.Outcome)
+            | Error err -> Assert.True(false, sprintf "Expected completion, got Error: %A" err)
         }
 
     [<Fact>]
-    let ``ForkRuntime_busy_returns_Busy_immediately_without_queueing`` () =
+    let ``ForkRuntime_existing_agent_is_nudged_and_each_run_completes_once`` () =
         task {
-            let runtime = ForkRuntime()
-            let agentId = "agent-busy-test"
-            let tcs = TaskCompletionSource<Result<string, string>>()
+            let firstWork = TaskCompletionSource<Result<string, string>>()
+            let allCompletions = TaskCompletionSource<unit>()
+            let completions = ResizeArray<RunCompletion>()
 
-            let firstFork = runtime.Fork(agentId, AgentRole.Inspector, (fun () -> tcs.Task))
+            let listener completion =
+                completions.Add(completion)
+
+                if completions.Count = 2 then
+                    allCompletions.SetResult(())
+
+            let runtime = ForkRuntime(listener = listener)
+            let agentId = "agent-nudge-test"
+
+            let firstFork =
+                runtime.Fork(agentId, AgentRole.Inspector, runWork = (fun () -> firstWork.Task))
 
             match firstFork with
-            | Ok _ ->
-                // While first run is active (tcs not resolved), second fork on same agent should return Busy
-                let secondFork =
-                    runtime.Fork(agentId, AgentRole.Inspector, (fun () -> task { return Ok "second" }))
+            | ForkResult.Created id -> Assert.Equal(agentId, id)
+            | other -> Assert.True(false, sprintf "Expected Created result, got: %A" other)
 
-                match secondFork with
-                | Error ForkError.Busy -> ()
-                | other -> Assert.True(false, sprintf "Expected Error ForkError.Busy, got: %A" other)
+            let secondFork =
+                runtime.Fork(agentId, AgentRole.Inspector, runWork = (fun () -> task { return Ok "second" }))
 
-                // Cleanup first task
-                tcs.SetResult(Ok "done")
-                do! Task.Delay(50)
-            | Error err -> Assert.True(false, sprintf "Expected Ok on first fork, got Error: %A" err)
+            Assert.Equal(ForkResult.Nudged agentId, secondFork)
+            firstWork.SetResult(Ok "first")
+            let! _ = allCompletions.Task
+
+            Assert.Equal(2, completions.Count)
+            Assert.True(completions |> Seq.exists (fun c -> c.Outcome = Ok "first"))
+            Assert.True(completions |> Seq.exists (fun c -> c.Outcome = Ok "second"))
+
+            let! first = runtime.Join()
+            let! second = runtime.Join()
+            let joined = [ first; second ]
+
+            match joined with
+            | [ Ok first; Ok second ] ->
+                Assert.Equal(2, [ first.RunId; second.RunId ] |> Set.ofList |> Set.count)
+                Assert.Equal(agentId, first.AgentId)
+                Assert.Equal(agentId, second.AgentId)
+            | other -> Assert.True(false, sprintf "Expected two completions, got: %A" other)
         }
 
     [<Fact>]
-    let ``ForkRuntime_join_empty_returns_Empty_when_no_completion`` () =
-        let runtime = ForkRuntime()
-
-        match runtime.Join() with
-        | Error ForkError.Empty -> ()
-        | other -> Assert.True(false, sprintf "Expected Error ForkError.Empty, got: %A" other)
-
-    [<Fact>]
-    let ``ForkRuntime_mailbox_race_retains_completions_in_order`` () =
+    let ``ForkRuntime_join_waits_for_pending_completion`` () =
         task {
-            let runtime = ForkRuntime()
-            let agentCount = 10
+            let pendingWork = TaskCompletionSource<Result<string, string>>()
+            let completionSource = TaskCompletionSource<RunCompletion>()
+            let runtime = ForkRuntime(listener = completionSource.SetResult)
 
-            let! _ =
-                Task.WhenAll(
-                    [| for i in 1..agentCount ->
-                           let aid = sprintf "agent-%d" i
+            match runtime.Fork("agent-pending", AgentRole.Coder, runWork = (fun () -> pendingWork.Task)) with
+            | ForkResult.Created _ -> ()
+            | other -> Assert.True(false, sprintf "Expected Created result, got: %A" other)
 
-                           Task.Run(fun () ->
-                               runtime.Fork(aid, AgentRole.Coder, (fun () -> task { return Ok(sprintf "res-%d" i) }))) |]
-                )
-
-            do! Task.Delay(100)
-
-            let mutable receivedCount = 0
-            let mutable emptyCount = 0
-
-            for _ in 1..agentCount do
-                match runtime.Join() with
-                | Ok _ -> receivedCount <- receivedCount + 1
-                | Error ForkError.Empty -> emptyCount <- emptyCount + 1
-                | Error _ -> ()
-
-            Assert.Equal(agentCount, receivedCount)
-            Assert.Equal(0, emptyCount)
+            let joinResult = runtime.Join()
+            pendingWork.SetResult(Ok "pending")
+            let! _ = completionSource.Task
+            let! joined = joinResult
+            Assert.True(joined.IsOk, sprintf "Join did not return completion: %A" joined)
         }
-
-    [<Fact>]
-    let ``ForkRuntime_join_by_agentId_returns_NotFound_for_unknown_agent`` () =
-        let runtime = ForkRuntime()
-
-        match runtime.Join("non-existent-agent-id") with
-        | Error ForkError.NotFound -> ()
-        | other -> Assert.True(false, sprintf "Expected Error ForkError.NotFound, got: %A" other)
 
     [<Fact>]
     let ``ForkRuntime_list_returns_agents_and_ptys`` () =
         task {
-            let runtime = ForkRuntime()
             let agentId = "agent-list-test"
+            let completionSource = TaskCompletionSource<RunCompletion>()
+            let runtime = ForkRuntime(listener = completionSource.SetResult)
 
             let pty: PtyRecord =
                 { PtyId = "pty-1"
@@ -118,10 +114,13 @@ module ForkRuntimeTests =
             runtime.RegisterPty(pty)
 
             let forkRes =
-                runtime.Fork(agentId, AgentRole.Manager, (fun () -> task { return Ok "ok" }))
+                runtime.Fork(agentId, AgentRole.Manager, runWork = (fun () -> task { return Ok "ok" }))
 
-            Assert.True(forkRes.IsOk)
-            do! Task.Delay(50)
+            match forkRes with
+            | ForkResult.Created id -> Assert.Equal(agentId, id)
+            | other -> Assert.True(false, sprintf "Expected Created result, got: %A" other)
+
+            let! _ = completionSource.Task
 
             let (agentList, ptyList) = runtime.List()
             Assert.Equal(1, agentList.Length)

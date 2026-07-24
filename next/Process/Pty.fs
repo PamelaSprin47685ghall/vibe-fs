@@ -1,9 +1,6 @@
 namespace Wanxiangshu.Next.Process
 
 open System
-#if !FABLE_COMPILER
-open System.Threading.Channels
-#endif
 open Wanxiangshu.Next.Session
 
 [<RequireQualifiedAccess>]
@@ -37,21 +34,9 @@ type PtyHandle =
 type PtyBackendHandler = PtyId -> PtyCommand -> unit
 
 type PtyPort
-    (
-#if !FABLE_COMPILER
-        ?mailbox: Channel<RunCompletion>,
-#else
-        ?mailboxSender: RunCompletion -> unit,
-#endif
-        ?handler: PtyBackendHandler,
-        ?agentProvider: unit -> AgentRecord list
-    ) =
+    (?mailboxSender: RunCompletion -> unit, ?handler: PtyBackendHandler, ?agentProvider: unit -> AgentRecord list) =
 
-#if !FABLE_COMPILER
-    let mailboxWriter = mailbox |> Option.map (fun m -> m.Writer)
-#else
     let mailboxSender = mailboxSender
-#endif
     let handler = defaultArg handler (fun _ _ -> ())
     let agentProvider = defaultArg agentProvider (fun () -> [])
     let lockObj = obj ()
@@ -59,11 +44,7 @@ type PtyPort
     let activePtys =
         System.Collections.Generic.Dictionary<PtyId, PtyHandle * ref<bool>>()
 
-#if !FABLE_COMPILER
-    member internal _.MailboxWriter = mailboxWriter
-#else
     member internal _.MailboxSender = mailboxSender
-#endif
     member internal _.Handler = handler
     member internal _.AgentProvider = agentProvider
     member internal _.Ptys = activePtys
@@ -125,18 +106,7 @@ type PtyPort
             if not wasAlreadyClosed then
                 handler id (PtyCommand.Signal PtySignal.Terminate)
                 lock lockObj (fun () -> activePtys.Remove(id) |> ignore)
-#if !FABLE_COMPILER
-                mailboxWriter
-                |> Option.iter (fun writer ->
-                    let completion: RunCompletion =
-                        { RunId = id.Value
-                          AgentId = defaultArg handle.AgentId id.Value
-                          Role = defaultArg handle.Role AgentRole.Executor
-                          Outcome = defaultArg outcome (Ok "closed")
-                          CompletedAt = DateTimeOffset.UtcNow }
 
-                    writer.TryWrite(completion) |> ignore)
-#else
                 mailboxSender
                 |> Option.iter (fun sender ->
                     let completion: RunCompletion =
@@ -147,7 +117,6 @@ type PtyPort
                           CompletedAt = DateTimeOffset.UtcNow }
 
                     sender completion)
-#endif
         | None -> ()
 
     member this.CloseAll() =

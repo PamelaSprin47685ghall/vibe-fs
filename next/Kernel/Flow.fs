@@ -1,23 +1,20 @@
 namespace Wanxiangshu.Next.Kernel
 
 open System
-open System.Runtime.ExceptionServices
 open System.Threading
 open System.Threading.Tasks
 
 module FlowHelpers =
-#if FABLE_COMPILER
     open Fable.Core
 
     [<Emit("($0 && typeof $0.then === 'function') ? $0 : Promise.resolve()")>]
     let awaitValueTask (vt: obj) : Task = jsNative
-#else
-    let awaitValueTask (vt: obj) : Task =
-        match vt with
-        | :? ValueTask as v -> v.AsTask()
-        | :? Task as t -> t
-        | _ -> Task.CompletedTask
-#endif
+
+    [<Emit("Promise.resolve().then($0)")>]
+    let defer<'T> (work: unit -> Task<'T>) : Task<'T> = jsNative
+
+    [<Emit("Promise.reject($0)")>]
+    let reject<'T> (error: exn) : Task<'T> = jsNative
 
 type Flow<'ctx, 'error, 'a> = private Flow of ('ctx -> CancellationToken -> Task<Result<'a, 'error>>)
 
@@ -48,8 +45,9 @@ type FlowBuilder<'ctx, 'error>(progress: ProgressGuard<'ctx, 'error> option) =
 
     member _.Delay(create: unit -> Flow<'ctx, 'error, 'a>) : Flow<'ctx, 'error, 'a> =
         Flow(fun ctx ct ->
-            let (Flow f) = create ()
-            f ctx ct)
+            FlowHelpers.defer (fun () ->
+                let (Flow f) = create ()
+                f ctx ct))
 
     member this.Combine(first: Flow<'ctx, 'error, unit>, second: Flow<'ctx, 'error, 'a>) : Flow<'ctx, 'error, 'a> =
         this.Bind(first, (fun () -> second))
@@ -87,18 +85,11 @@ type FlowBuilder<'ctx, 'error>(progress: ProgressGuard<'ctx, 'error> option) =
                 try
                     return! body ctx ct
                 with ex ->
-#if FABLE_COMPILER
                     if
                         ex :? OperationCanceledException
                         || (not (isNull ex) && ex.ToString().Contains("OperationCanceledException"))
                     then
-#else
-                    if
-                        ex :? OperationCanceledException
-                        || (not (isNull ex) && ex.GetType().Name = "OperationCanceledException")
-                    then
-#endif
-                        return raise ex
+                        return! FlowHelpers.defer (fun () -> FlowHelpers.reject ex)
                     else
                         let (Flow h) = handler ex
                         return! h ctx ct

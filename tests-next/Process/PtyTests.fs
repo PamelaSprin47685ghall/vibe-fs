@@ -1,25 +1,30 @@
 namespace Wanxiangshu.Next.Tests.ProcessTests
 
 open System
-open System.Collections.Concurrent
-open System.Threading.Channels
-open System.Threading.Tasks
-open Xunit
+open System.Collections.Generic
 open Wanxiangshu.Next.Process
 open Wanxiangshu.Next.Session
 
 module PtyTests =
 
-    [<Fact>]
-    let ``Pty_spawn_write_read_signal_resize_exit_preserves_command_ordering`` () =
-        let commandLog = ConcurrentQueue<PtyId * PtyCommand>()
-        let backendHandler id cmd = commandLog.Enqueue(id, cmd)
+    let private equal expected actual =
+        if not (Unchecked.equals expected actual) then
+            failwithf "Expected %A, got %A" expected actual
 
-        let mailbox = Channel.CreateUnbounded<RunCompletion>()
-        let port = PtyPort(mailbox = mailbox, handler = backendHandler)
+    let private trueThat condition message =
+        if not condition then
+            failwith message
+
+    let ``Pty_spawn_write_read_signal_resize_exit_preserves_command_ordering`` () =
+        let commandLog = ResizeArray<PtyId * PtyCommand>()
+        let completions = ResizeArray<RunCompletion>()
+        let backendHandler id cmd = commandLog.Add(id, cmd)
+
+        let port =
+            PtyPort(mailboxSender = (fun completion -> completions.Add completion), handler = backendHandler)
 
         let ptyId = Pty.forkPty port "sh -c cat"
-        Assert.False(String.IsNullOrEmpty(ptyId.Value))
+        trueThat (not (String.IsNullOrEmpty(ptyId.Value))) "PTY fork must return an id"
 
         Pty.send port ptyId (PtyCommand.Write [| 65uy; 66uy; 67uy |])
         Pty.send port ptyId PtyCommand.Read
@@ -27,43 +32,40 @@ module PtyTests =
         Pty.send port ptyId (PtyCommand.Signal PtySignal.Interrupt)
         Pty.close port ptyId
 
-        let loggedCommands = commandLog.ToArray() |> Array.map snd
+        let loggedCommands = commandLog |> Seq.map snd |> Seq.toArray
 
-        Assert.Equal(6, loggedCommands.Length)
+        equal 6 loggedCommands.Length
 
         match loggedCommands.[0] with
-        | PtyCommand.Spawn cmd -> Assert.Equal("sh -c cat", cmd)
-        | other -> Assert.True(false, sprintf "Expected Spawn, got %A" other)
+        | PtyCommand.Spawn cmd -> equal "sh -c cat" cmd
+        | other -> failwithf "Expected Spawn, got %A" other
 
         match loggedCommands.[1] with
-        | PtyCommand.Write bytes -> Assert.Equal<byte[]>([| 65uy; 66uy; 67uy |], bytes)
-        | other -> Assert.True(false, sprintf "Expected Write, got %A" other)
+        | PtyCommand.Write bytes -> equal [| 65uy; 66uy; 67uy |] bytes
+        | other -> failwithf "Expected Write, got %A" other
 
         match loggedCommands.[2] with
         | PtyCommand.Read -> ()
-        | other -> Assert.True(false, sprintf "Expected Read, got %A" other)
+        | other -> failwithf "Expected Read, got %A" other
 
         match loggedCommands.[3] with
         | PtyCommand.Resize(w, h) ->
-            Assert.Equal(120, w)
-            Assert.Equal(40, h)
-        | other -> Assert.True(false, sprintf "Expected Resize, got %A" other)
+            equal 120 w
+            equal 40 h
+        | other -> failwithf "Expected Resize, got %A" other
 
         match loggedCommands.[4] with
         | PtyCommand.Signal PtySignal.Interrupt -> ()
-        | other -> Assert.True(false, sprintf "Expected Signal Interrupt, got %A" other)
+        | other -> failwithf "Expected Signal Interrupt, got %A" other
 
         match loggedCommands.[5] with
         | PtyCommand.Signal PtySignal.Terminate -> ()
-        | other -> Assert.True(false, sprintf "Expected Signal Terminate on close, got %A" other)
+        | other -> failwithf "Expected Signal Terminate on close, got %A" other
 
-        // Check completion delivered to mailbox
-        let mutable completion = Unchecked.defaultof<RunCompletion>
-        Assert.True(mailbox.Reader.TryRead(&completion))
-        Assert.Equal(ptyId.Value, completion.RunId)
-        Assert.Equal(Ok "closed", completion.Outcome)
+        equal 1 completions.Count
+        equal ptyId.Value completions.[0].RunId
+        equal (Ok "closed") completions.[0].Outcome
 
-    [<Fact>]
     let ``Pty_mixed_list_returns_agent_and_pty_snapshots`` () =
         let mockAgents () : AgentRecord list =
             [ { AgentId = "agent-alpha"
@@ -76,20 +78,19 @@ module PtyTests =
 
         let (agentSnapshots, ptySnapshots) = Pty.list port
 
-        Assert.Single(agentSnapshots)
-        Assert.Equal("agent-alpha", agentSnapshots.[0].AgentId)
-        Assert.Equal(AgentStatus.Busy, agentSnapshots.[0].Status)
+        equal 1 agentSnapshots.Length
+        equal "agent-alpha" agentSnapshots.[0].AgentId
+        equal AgentStatus.Busy agentSnapshots.[0].Status
 
-        Assert.Single(ptySnapshots)
-        Assert.Equal(ptyId, ptySnapshots.[0].Id)
-        Assert.Equal("top", ptySnapshots.[0].Command)
-        Assert.Equal(Some "agent-alpha", ptySnapshots.[0].AgentId)
-        Assert.Equal(Some AgentRole.Coder, ptySnapshots.[0].Role)
+        equal 1 ptySnapshots.Length
+        equal ptyId ptySnapshots.[0].Id
+        equal "top" ptySnapshots.[0].Command
+        equal (Some "agent-alpha") ptySnapshots.[0].AgentId
+        equal (Some AgentRole.Coder) ptySnapshots.[0].Role
 
-    [<Fact>]
     let ``Pty_completion_delivered_exactly_once_on_repeated_close_and_parent_cancellation`` () =
-        let mailbox = Channel.CreateUnbounded<RunCompletion>()
-        let port = PtyPort(mailbox = mailbox)
+        let completions = ResizeArray<RunCompletion>()
+        let port = PtyPort(mailboxSender = (fun completion -> completions.Add completion))
 
         let ptyId = Pty.forkPty port "tail -f log"
 
@@ -99,17 +100,9 @@ module PtyTests =
         Pty.send port ptyId (PtyCommand.Signal PtySignal.Kill)
         port.CloseAll()
 
-        // Verify mailbox received exactly one completion item
-        let completions = System.Collections.Generic.List<RunCompletion>()
-        let mutable item = Unchecked.defaultof<RunCompletion>
+        equal 1 completions.Count
+        equal ptyId.Value completions.[0].RunId
 
-        while mailbox.Reader.TryRead(&item) do
-            completions.Add(item)
-
-        Assert.Single(completions)
-        Assert.Equal(ptyId.Value, completions.[0].RunId)
-
-    [<Fact>]
     let ``Pty_typed_commands_no_magic_string_parsing`` () =
         let testCmd (cmd: PtyCommand) =
             match cmd with
@@ -123,8 +116,8 @@ module PtyTests =
                 | PtySignal.Interrupt -> "signal:interrupt"
             | PtyCommand.Resize(w, h) -> sprintf "resize:%dx%d" w h
 
-        Assert.Equal("spawn:ls", testCmd (PtyCommand.Spawn "ls"))
-        Assert.Equal("write:4", testCmd (PtyCommand.Write [| 1uy; 2uy; 3uy; 4uy |]))
-        Assert.Equal("read", testCmd PtyCommand.Read)
-        Assert.Equal("signal:interrupt", testCmd (PtyCommand.Signal PtySignal.Interrupt))
-        Assert.Equal("resize:80x24", testCmd (PtyCommand.Resize(80, 24)))
+        equal "spawn:ls" (testCmd (PtyCommand.Spawn "ls"))
+        equal "write:4" (testCmd (PtyCommand.Write [| 1uy; 2uy; 3uy; 4uy |]))
+        equal "read" (testCmd PtyCommand.Read)
+        equal "signal:interrupt" (testCmd (PtyCommand.Signal PtySignal.Interrupt))
+        equal "resize:80x24" (testCmd (PtyCommand.Resize(80, 24)))

@@ -19,6 +19,8 @@
     <Compile Include="Kernel/Roles.fs"/>
     <Compile Include="Journal/FactCodec.fs"/>
     <Compile Include="Journal/Envelope.fs"/>
+    <Compile Include="Journal/AgentFacts.Types.fs"/>
+    <Compile Include="Journal/AgentFacts.FoldHelpers.fs"/>
     <Compile Include="Journal/AgentFacts.fs"/>
     <Compile Include="Journal/Boot.fs"/>
     <Compile Include="Journal/Writer.fs"/>
@@ -33,11 +35,13 @@
     <Compile Include="Process/Command.fs"/>
     <Compile Include="Process/Pump.fs"/>
     <Compile Include="Process/Spool.fs"/>
+    <Compile Include="Process/RunnerCore.fs"/>
     <Compile Include="Process/Runner.fs"/>
     <Compile Include="Process/ExecutorSummarizer.fs"/>
     <Compile Include="Process/ProcessBudget.fs"/>
     <Compile Include="Process/Pty.fs"/>
     <Compile Include="Agent/Programs.fs"/>
+    <Compile Include="Agent/ProgramCapabilities.fs"/>
     <Compile Include="Review/Guard.fs"/>
     <Compile Include="Orchestrator.fs"/>
     <Compile Include="Tools/MessageTransform.fs"/>

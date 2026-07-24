@@ -1,11 +1,9 @@
 namespace Wanxiangshu.Next.Process
 
 open System
-open System.IO
 
 module Spool =
 
-#if FABLE_COMPILER
     open Fable.Core
     open Fable.Core.JsInterop
 
@@ -21,12 +19,8 @@ module Spool =
     [<Import("writeFile", "node:fs/promises")>]
     let private writeFileAsync (path: string) (data: byte[]) : JS.Promise<unit> = jsNative
 
-    [<Global("Buffer")>]
-    let private nodeBuffer: obj = jsNative
-
     [<Emit("Math.random().toString(36).substring(2, 10)")>]
     let private randomString () : string = jsNative
-#endif
 
     [<Literal>]
     let ChunkSizeBytes: int = 204800 // Exactly 200 * 1024 bytes (200KB)
@@ -48,17 +42,11 @@ module Spool =
 
     /// Spools complete bytes to a temp file and splits them into 200KB chunks.
     let spoolBytesToTempFile (bytes: byte[]) : string * byte[][] =
-#if FABLE_COMPILER
         let tempPath = pathJoin (tmpdir ()) (sprintf "spool-%s.tmp" (randomString ()))
         writeFileSync tempPath bytes
-#else
-        let tempPath = Path.GetTempFileName()
-        File.WriteAllBytes(tempPath, bytes)
-#endif
         let chunks = chunkBytes ChunkSizeBytes bytes
         (tempPath, chunks)
 
-#if FABLE_COMPILER
     let spoolBytesToTempFileAsync (bytes: byte[]) : JS.Promise<string * byte[][]> =
         JS.Constructors.Promise.Create(fun resolve reject ->
             let tempPath = pathJoin (tmpdir ()) (sprintf "spool-%s.tmp" (randomString ()))
@@ -73,4 +61,3 @@ module Spool =
                  (fun err -> reject err))
                 "$0.then($1, $2)"
             |> ignore)
-#endif

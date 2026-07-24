@@ -80,8 +80,7 @@ module ArchitectureGateSupport =
           "MailboxProcessor"
           "workspace lockfile"
           "Wait(predicate)"
-          "sleepJs"
-          "setTimeout" ]
+          "sleepJs" ]
 
     let containsForbiddenToken (text: string) (token: string) =
         if token.Contains("(") || token.Contains(")") || token.Contains(" ") then

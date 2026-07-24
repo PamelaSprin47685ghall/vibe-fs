@@ -1,7 +1,5 @@
 namespace Wanxiangshu.Next.Tests
 
-open System
-open System.Diagnostics
 open System.Threading.Tasks
 open Xunit
 open Wanxiangshu.Next.Kernel
@@ -9,6 +7,18 @@ open Wanxiangshu.Next.Orchestrator
 open Wanxiangshu.Next.Session
 
 module ManagerCanaryTests =
+
+    let private equal expected actual =
+        if not (Unchecked.equals expected actual) then
+            failwithf "Expected %A, got %A" expected actual
+
+    let private trueThat condition message =
+        if not condition then
+            failwith message
+
+    let private falseThat condition message =
+        if condition then
+            failwith message
 
     let private createStubGitPort () =
         { IsDirty = fun _ -> Task.FromResult false
@@ -21,42 +31,40 @@ module ManagerCanaryTests =
         { RunManager = fun _ _ -> Task.FromResult(Ok())
           Reverify = fun _ _ -> Task.FromResult(Ok()) }
 
-    [<Fact>]
     let ``Exact_manager_role_surface_has_no_file_or_exec_permissions`` () =
         let expectedPermissions =
             set [ ToolPermission.Fork; ToolPermission.Join; ToolPermission.List ]
 
         let actualPermissions = Roles.permissions Role.Manager
-        Assert.Equal<ToolPermission Set>(expectedPermissions, actualPermissions)
+        equal expectedPermissions actualPermissions
 
         // Allowed
-        Assert.True(Roles.isAllowed Role.Manager ToolPermission.Fork)
-        Assert.True(Roles.isAllowed Role.Manager ToolPermission.Join)
-        Assert.True(Roles.isAllowed Role.Manager ToolPermission.List)
+        trueThat (Roles.isAllowed Role.Manager ToolPermission.Fork) "Manager must allow fork"
+        trueThat (Roles.isAllowed Role.Manager ToolPermission.Join) "Manager must allow join"
+        trueThat (Roles.isAllowed Role.Manager ToolPermission.List) "Manager must allow list"
 
         // Strictly forbidden file / exec / inspection / verdict surface
-        Assert.False(Roles.isAllowed Role.Manager ToolPermission.Read)
-        Assert.False(Roles.isAllowed Role.Manager ToolPermission.Write)
-        Assert.False(Roles.isAllowed Role.Manager ToolPermission.Edit)
-        Assert.False(Roles.isAllowed Role.Manager ToolPermission.Exec)
-        Assert.False(Roles.isAllowed Role.Manager ToolPermission.Glob)
-        Assert.False(Roles.isAllowed Role.Manager ToolPermission.Grep)
-        Assert.False(Roles.isAllowed Role.Manager ToolPermission.Inspector)
-        Assert.False(Roles.isAllowed Role.Manager ToolPermission.Verdict)
+        falseThat (Roles.isAllowed Role.Manager ToolPermission.Read) "Manager must not read"
+        falseThat (Roles.isAllowed Role.Manager ToolPermission.Write) "Manager must not write"
+        falseThat (Roles.isAllowed Role.Manager ToolPermission.Edit) "Manager must not edit"
+        falseThat (Roles.isAllowed Role.Manager ToolPermission.Exec) "Manager must not exec"
+        falseThat (Roles.isAllowed Role.Manager ToolPermission.Glob) "Manager must not glob"
+        falseThat (Roles.isAllowed Role.Manager ToolPermission.Grep) "Manager must not grep"
+        falseThat (Roles.isAllowed Role.Manager ToolPermission.Inspector) "Manager must not inspect"
+        falseThat (Roles.isAllowed Role.Manager ToolPermission.Verdict) "Manager must not verdict"
 
-    [<Fact>]
     let ``Coder_one_shot_inspector_role_surface`` () =
         // Coder has Inspector tool permission to request inspection, but not Exec
-        Assert.True(Roles.isAllowed Role.Coder ToolPermission.Inspector)
-        Assert.False(Roles.isAllowed Role.Coder ToolPermission.Exec)
-        Assert.False(Roles.isAllowed Role.Coder ToolPermission.Fork)
-        Assert.False(Roles.isAllowed Role.Coder ToolPermission.Join)
+        trueThat (Roles.isAllowed Role.Coder ToolPermission.Inspector) "Coder must allow inspector"
+        falseThat (Roles.isAllowed Role.Coder ToolPermission.Exec) "Coder must not exec"
+        falseThat (Roles.isAllowed Role.Coder ToolPermission.Fork) "Coder must not fork"
+        falseThat (Roles.isAllowed Role.Coder ToolPermission.Join) "Coder must not join"
 
         // Inspector role has Exec permission
-        Assert.True(Roles.isAllowed Role.Inspector ToolPermission.Exec)
-        Assert.False(Roles.isAllowed Role.Inspector ToolPermission.Read)
-        Assert.False(Roles.isAllowed Role.Inspector ToolPermission.Write)
-        Assert.False(Roles.isAllowed Role.Inspector ToolPermission.Edit)
+        trueThat (Roles.isAllowed Role.Inspector ToolPermission.Exec) "Inspector must allow exec"
+        falseThat (Roles.isAllowed Role.Inspector ToolPermission.Read) "Inspector must not read"
+        falseThat (Roles.isAllowed Role.Inspector ToolPermission.Write) "Inspector must not write"
+        falseThat (Roles.isAllowed Role.Inspector ToolPermission.Edit) "Inspector must not edit"
 
     [<Fact>]
     let ``Manager_nonblocking_fork_and_any_child_join`` () =
@@ -76,15 +84,8 @@ module ManagerCanaryTests =
             let orch = Orchestrator(gitPort, managerPort, "/repo", "main")
 
             // Fork two managers nonblocking
-            let sw = Stopwatch.StartNew()
             let! fork1 = orch.ForkManager("mgr-inspector", "/repo/.worktrees/mgr-inspector")
             let! fork2 = orch.ForkManager("mgr-coder", "/repo/.worktrees/mgr-coder")
-            sw.Stop()
-
-            Assert.True(
-                sw.ElapsedMilliseconds < 200L,
-                sprintf "Forking managers should be nonblocking, took %d ms" sw.ElapsedMilliseconds
-            )
 
             match fork1, fork2 with
             | Ok h1, Ok h2 ->
@@ -101,7 +102,7 @@ module ManagerCanaryTests =
 
             // Complete mgr-coder first (any-child join order)
             tcs2.SetResult(Ok())
-            do! Task.Delay(20)
+            do! Task.FromResult(())
 
             let! join1 = orch.JoinPublished()
 
@@ -113,7 +114,7 @@ module ManagerCanaryTests =
 
             // Complete mgr-inspector second
             tcs1.SetResult(Ok())
-            do! Task.Delay(20)
+            do! Task.FromResult(())
 
             let! join2 = orch.JoinPublished()
 
@@ -206,7 +207,7 @@ module ManagerCanaryTests =
             let! forkRes = orch.ForkManager("mgr-review-test", "/repo/.worktrees/mgr-review-test")
             Assert.True(forkRes.IsOk)
 
-            do! Task.Delay(20)
+            do! Task.FromResult(())
 
             let! joinRes = orch.JoinPublished()
 

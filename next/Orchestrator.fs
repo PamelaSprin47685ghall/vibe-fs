@@ -33,7 +33,7 @@ type ManagerPort =
 
 type Orchestrator(git: GitPort, manager: ManagerPort, repoPath: string, targetBranch: string) =
     let lockObj = obj ()
-    let mutable publishChain: Task = Task.CompletedTask
+    let mutable publishChain: Task = Task.FromResult(()) :> Task
     let mailbox = System.Collections.Generic.Queue<ManagerCompletion>()
 
     let runSerial (fn: unit -> Task<'T>) : Task<'T> =
@@ -88,13 +88,11 @@ type Orchestrator(git: GitPort, manager: ManagerPort, repoPath: string, targetBr
                           WorktreePath = path }
 
                     let _ =
-                        Task.Run(fun () ->
-                            task {
-                                let! res = manager.RunManager managerId path
-                                let completion = { Handle = handle; Result = res }
-                                lock lockObj (fun () -> mailbox.Enqueue(completion))
-                            }
-                            :> Task)
+                        task {
+                            let! res = manager.RunManager managerId path
+                            let completion = { Handle = handle; Result = res }
+                            lock lockObj (fun () -> mailbox.Enqueue(completion))
+                        }
 
                     return Ok handle
         }

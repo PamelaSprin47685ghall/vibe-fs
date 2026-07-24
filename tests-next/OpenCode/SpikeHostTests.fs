@@ -125,7 +125,7 @@ module SpikeHostTests =
 
             Assert.Equal(1, childTerminalCount)
             let childOut = sessionPort.GetSessionOutput(childId)
-            Assert.Contains("Aborted", childOut)
+            Assert.True(childOut |> List.exists (fun line -> line.Contains("Aborted")))
         }
 
     [<Fact>]

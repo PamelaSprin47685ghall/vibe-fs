@@ -2,11 +2,16 @@ namespace Wanxiangshu.Next.Tests.Session
 
 open System
 open System.Threading.Tasks
+open Fable.Core
+open Fable.Core.JsInterop
 open Xunit
 open Wanxiangshu.Next.Session
 open Wanxiangshu.Next.Tools
 
 module CompanionTests =
+
+    let private failedTask () : Task<string> =
+        emitJsExpr () "Promise.reject(new Error('Blogger crashed'))"
 
     [<Fact>]
     let ``jsonDelta_with_no_previous_checkpoint_returns_all_events`` () =
@@ -167,11 +172,7 @@ module CompanionTests =
             let companion = Companion()
             let events = [ { Cursor = 1; Json = "{\"e\":1}" } ]
 
-            let outcome =
-                companion.Submit(
-                    events,
-                    fun _ -> Task.FromException<string>(InvalidOperationException("Blogger crashed"))
-                )
+            let outcome = companion.Submit(events, (fun _ -> failedTask ()))
 
             Assert.Equal(Submitted, outcome)
 

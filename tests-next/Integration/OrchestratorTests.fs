@@ -1,13 +1,23 @@
 namespace Wanxiangshu.Next.Tests.Integration
 
 open System
-open System.Threading
 open System.Threading.Tasks
-open Xunit
 open Wanxiangshu.Next.Orchestrator
 open Wanxiangshu.Next.Process
 
 module OrchestratorTests =
+
+    let private equal expected actual =
+        if not (Unchecked.equals expected actual) then
+            failwithf "Expected %A, got %A" expected actual
+
+    let private trueThat condition message =
+        if not condition then
+            failwith message
+
+    let private falseThat condition message =
+        if condition then
+            failwith message
 
     let private createStubGitPort () =
         { IsDirty = fun _ -> Task.FromResult false
@@ -20,17 +30,16 @@ module OrchestratorTests =
         { RunManager = fun _ _ -> Task.FromResult(Ok())
           Reverify = fun _ _ -> Task.FromResult(Ok()) }
 
-    [<Fact>]
     let ``forkManager rejects dirty worktree before fork`` () =
         task {
-            let worktreeCreated = ref false
+            let mutable worktreeCreated = false
 
             let git =
                 { createStubGitPort () with
                     IsDirty = fun _ -> Task.FromResult true
                     CreateWorktree =
                         fun _ _ _ ->
-                            worktreeCreated := true
+                            worktreeCreated <- true
                             Task.FromResult(Ok()) }
 
             let mgr = createStubManagerPort ()
@@ -39,31 +48,30 @@ module OrchestratorTests =
             let! forkResult = orch.ForkManager("m1", "/repo/.worktrees/m1")
 
             match forkResult with
-            | Ok _ -> Assert.True(false, "Expected forkManager to fail on dirty worktree")
+            | Ok _ -> failwith "Expected forkManager to fail on dirty worktree"
             | Error verdict ->
                 match verdict with
                 | OrchestratorVerdict.RejectedDirty reason ->
-                    Assert.True(reason.Contains("dirty"), "Reason should indicate dirty worktree")
-                | other -> Assert.True(false, sprintf "Expected RejectedDirty, got %A" other)
+                    trueThat (reason.Contains("dirty")) "Reason should indicate dirty worktree"
+                | other -> failwithf "Expected RejectedDirty, got %A" other
 
-            Assert.False(!worktreeCreated, "CreateWorktree must not be called when dirty")
+            falseThat worktreeCreated "CreateWorktree must not be called when dirty"
         }
 
-    [<Fact>]
     let ``failed review prevents merge and returns NeedsReview`` () =
         task {
-            let ffMergeCalled = ref false
-            let removeWorktreeCalled = ref false
+            let mutable ffMergeCalled = false
+            let mutable removeWorktreeCalled = false
 
             let git =
                 { createStubGitPort () with
                     FfMerge =
                         fun _ _ ->
-                            ffMergeCalled := true
+                            ffMergeCalled <- true
                             Task.FromResult(Ok "should-not-merge")
                     RemoveWorktree =
                         fun _ ->
-                            removeWorktreeCalled := true
+                            removeWorktreeCalled <- true
                             Task.FromResult(Ok()) }
 
             let mgr =
@@ -75,45 +83,48 @@ module OrchestratorTests =
             let! forkResult = orch.ForkManager("m1", "/repo/.worktrees/m1")
 
             match forkResult with
-            | Error e -> Assert.True(false, sprintf "Fork failed unexpectedly: %A" e)
+            | Error e -> failwithf "Fork failed unexpectedly: %A" e
             | Ok _ -> ()
 
-            let! joinVerdict = orch.JoinPublished("m1")
+            let! joinVerdict = orch.JoinPublished()
 
             match joinVerdict with
             | OrchestratorVerdict.NeedsReview(id, details) ->
-                Assert.Equal("m1", id)
-                Assert.Equal("Review failed: lint errors detected", details)
-            | other -> Assert.True(false, sprintf "Expected NeedsReview verdict, got %A" other)
+                equal "m1" id
+                equal "Review failed: lint errors detected" details
+            | other -> failwithf "Expected NeedsReview verdict, got %A" other
 
-            Assert.False(!ffMergeCalled, "FF merge must NOT be called when review fails")
-            Assert.False(!removeWorktreeCalled, "Remove worktree must NOT be called when review fails")
+            falseThat ffMergeCalled "FF merge must NOT be called when review fails"
+            falseThat removeWorktreeCalled "Remove worktree must NOT be called when review fails"
         }
 
-    [<Fact>]
     let ``serialized publish order under SemaphoreSlim`` () =
         task {
-            let activePublishCount = ref 0
-            let maxConcurrentPublish = ref 0
+            let mutable activePublishCount = 0
+            let mutable maxConcurrentPublish = 0
+            let rebaseEntered = TaskCompletionSource<unit>()
+            let releaseRebase = TaskCompletionSource<unit>()
+            let mutable rebaseCalls = 0
 
             let recordStart () =
-                let current = Interlocked.Increment(activePublishCount)
-                let mutable prev = !maxConcurrentPublish
-
-                while current > prev do
-                    let swapped = Interlocked.CompareExchange(maxConcurrentPublish, current, prev)
-                    if swapped = prev then () else prev <- !maxConcurrentPublish
+                activePublishCount <- activePublishCount + 1
+                maxConcurrentPublish <- max maxConcurrentPublish activePublishCount
 
             let recordEnd () =
-                Interlocked.Decrement(activePublishCount) |> ignore
+                activePublishCount <- activePublishCount - 1
 
             let git =
                 { createStubGitPort () with
                     Rebase =
                         fun _ _ ->
                             task {
+                                rebaseCalls <- rebaseCalls + 1
                                 recordStart ()
-                                do! Task.Delay(50)
+
+                                if rebaseCalls = 1 then
+                                    rebaseEntered.SetResult(())
+                                    do! releaseRebase.Task
+
                                 recordEnd ()
                                 return Ok()
                             } }
@@ -126,27 +137,30 @@ module OrchestratorTests =
 
             match res1, res2 with
             | Ok _, Ok _ -> ()
-            | _ -> Assert.True(false, "Fork managers failed")
+            | _ -> failwith "Fork managers failed"
 
-            let joinTask1 = orch.JoinPublished("m1")
-            let joinTask2 = orch.JoinPublished("m2")
+            let joinTask1 = orch.JoinPublished()
+            let joinTask2 = orch.JoinPublished()
+            do! rebaseEntered.Task
 
-            let! verdicts = Task.WhenAll([| joinTask1; joinTask2 |])
+            releaseRebase.SetResult(())
+            let! verdict1 = joinTask1
+            let! verdict2 = joinTask2
+            let verdicts = [| verdict1; verdict2 |]
 
-            Assert.Equal(2, verdicts.Length)
+            equal 2 verdicts.Length
 
             for v in verdicts do
                 match v with
                 | OrchestratorVerdict.Published _ -> ()
-                | other -> Assert.True(false, sprintf "Expected Published verdict, got %A" other)
+                | other -> failwithf "Expected Published verdict, got %A" other
 
-            Assert.Equal(1, !maxConcurrentPublish)
+            equal 1 maxConcurrentPublish
         }
 
-    [<Fact>]
     let ``ProcessGitPort builds expected git command records`` () =
         task {
-            let executedCommands = System.Collections.Generic.List<Command>()
+            let executedCommands = ResizeArray<Command>()
 
             let runner (cmd: Command) =
                 executedCommands.Add(cmd)
@@ -161,13 +175,13 @@ module OrchestratorTests =
             let gitPort = ProcessGitPort.createWithRunner runner
 
             let! isDirty = gitPort.IsDirty "/my/repo"
-            Assert.True(isDirty)
-            Assert.Equal("git", executedCommands.[0].FileName)
-            Assert.Equal<string list>([ "status"; "--porcelain" ], executedCommands.[0].Arguments)
+            trueThat isDirty "Expected dirty status"
+            equal "git" executedCommands.[0].FileName
+            equal [ "status"; "--porcelain" ] executedCommands.[0].Arguments
 
             let! createRes = gitPort.CreateWorktree "/my/repo" "m1" "/my/repo/.worktrees/m1"
-            Assert.Equal(Ok(), createRes)
+            equal (Ok()) createRes
 
             let! mergeRes = gitPort.FfMerge "/my/repo/.worktrees/m1" "main"
-            Assert.Equal(Ok "abc1234", mergeRes)
+            equal (Ok "abc1234") mergeRes
         }

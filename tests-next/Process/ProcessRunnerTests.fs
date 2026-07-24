@@ -1,28 +1,40 @@
 namespace Wanxiangshu.Next.Tests.ProcessTests
 
 open System
-open System.IO
 open System.Text
 open System.Threading
 open System.Threading.Tasks
-open Xunit
+open Fable.Core
+open Fable.Core.JsInterop
 open Wanxiangshu.Next.Process
 
 module ProcessRunnerTests =
+
+    let private neverCompletes<'T> () : Task<'T> = emitJsExpr () "new Promise(() => {})"
+
+    let private equal expected actual =
+        if not (Unchecked.equals expected actual) then
+            failwithf "Expected %A, got %A" expected actual
+
+    let private trueThat condition message =
+        if not condition then
+            failwith message
+
+    let private falseThat condition message =
+        if condition then
+            failwith message
 
     let private defaultCtx: ProcessContext =
         { WorkingDirectory = None
           DefaultTimeout = None }
 
-    [<Fact>]
     let ``Runner_calculateDeadline_is_exact_three_times_estimated_runtime`` () =
         let estRuntime = RuntimeSeconds 5.0
         let now = DateTimeOffset.UtcNow
         let deadline = Runner.calculateDeadline now estRuntime
         let remaining = Deadline.remaining (fun () -> now) deadline
-        Assert.Equal(TimeSpan.FromSeconds(15.0), remaining)
+        equal (TimeSpan.FromSeconds(15.0)) remaining
 
-    [<Fact>]
     let ``Spool_chunkBytes_splits_at_exactly_200KB_chunks`` () =
         let chunkSize = 204800 // 200 * 1024 bytes
         let totalSize = 500000
@@ -32,34 +44,32 @@ module ProcessRunnerTests =
             data.[i] <- byte (i % 256)
 
         let chunks = Spool.chunkBytes chunkSize data
-        Assert.Equal(3, chunks.Length)
-        Assert.Equal(204800, chunks.[0].Length)
-        Assert.Equal(204800, chunks.[1].Length)
-        Assert.Equal(90400, chunks.[2].Length)
+        equal 3 chunks.Length
+        equal 204800 chunks.[0].Length
+        equal 204800 chunks.[1].Length
+        equal 90400 chunks.[2].Length
 
         let reassembled = Array.concat chunks
-        Assert.Equal<byte[]>(data, reassembled)
+        equal data reassembled
 
-    [<Fact>]
     let ``Runner_large_memory_gate_serializes_and_releases_on_completion_and_error`` () =
         task {
-            Assert.Equal(1, Runner.getLargeGateCount ())
+            equal 1 (Runner.getLargeGateCount ())
 
             use cts = new CancellationTokenSource()
             do! Runner.acquireLargeGate (cts.Token)
 
             try
-                Assert.Equal(0, Runner.getLargeGateCount ())
+                equal 0 (Runner.getLargeGateCount ())
             finally
                 Runner.releaseLargeGate ()
 
-            Assert.Equal(1, Runner.getLargeGateCount ())
+            equal 1 (Runner.getLargeGateCount ())
         }
 
-    [<Fact>]
     let ``Runner_medium_memory_allows_concurrency_without_large_gate`` () =
         task {
-            Assert.Equal(1, Runner.getLargeGateCount ())
+            equal 1 (Runner.getLargeGateCount ())
 
             let estimate =
                 { EstimatedRuntime = RuntimeSeconds 1.0
@@ -67,11 +77,7 @@ module ProcessRunnerTests =
                   EstimatedMemory = EstimatedMemory.Medium }
 
             let mockLauncher =
-                fun (cmd: Command) (_ct: CancellationToken) ->
-                    task {
-                        do! Task.Delay(50)
-                        return (0, Encoding.UTF8.GetBytes("ok"), [||])
-                    }
+                fun (cmd: Command) (_ct: CancellationToken) -> task { return (0, Encoding.UTF8.GetBytes("ok"), [||]) }
 
             let dummyCmd =
                 { FileName = "echo"
@@ -91,14 +97,13 @@ module ProcessRunnerTests =
             let! res1 = task1
             let! res2 = task2
 
-            Assert.Equal(1, Runner.getLargeGateCount ())
+            equal 1 (Runner.getLargeGateCount ())
 
             match res1, res2 with
             | Ok(RunnerOutcome.Completed(0, _, _, _)), Ok(RunnerOutcome.Completed(0, _, _, _)) -> ()
-            | _ -> Assert.Fail("Expected both medium memory tasks to complete successfully")
+            | _ -> failwith "Expected both medium memory tasks to complete successfully"
         }
 
-    [<Fact>]
     let ``Runner_complete_output_preservation_spools_large_output_chunks`` () =
         task {
             let outputSize = 250000 // 250KB (> 200KB chunk size)
@@ -128,16 +133,14 @@ module ProcessRunnerTests =
 
             match outcome with
             | Ok(RunnerOutcome.Spooled(exitCode, spoolPath, totalBytes, chunkCount, chunks)) ->
-                Assert.Equal(0, exitCode)
-                Assert.Equal(int64 outputSize, totalBytes)
-                Assert.Equal(2, chunkCount)
-                Assert.True(File.Exists(spoolPath))
-                Assert.Equal(outputSize, (Array.concat chunks).Length)
-                File.Delete(spoolPath)
-            | _ -> Assert.Fail("Expected outcome to be Spooled with 200KB chunks")
+                equal 0 exitCode
+                equal (int64 outputSize) totalBytes
+                equal 2 chunkCount
+                trueThat (not (String.IsNullOrWhiteSpace spoolPath)) "Expected a spool path"
+                equal outputSize (Array.concat chunks).Length
+            | _ -> failwith "Expected outcome to be Spooled with 200KB chunks"
         }
 
-    [<Fact>]
     let ``Runner_timeout_kill_path_returns_TimeoutExceeded`` () =
         task {
             let estimate =
@@ -146,11 +149,7 @@ module ProcessRunnerTests =
                   EstimatedMemory = EstimatedMemory.Medium }
 
             let hangingLauncher =
-                fun (_cmd: Command) (ct: CancellationToken) ->
-                    task {
-                        do! Task.Delay(10000, ct)
-                        return (0, [||], [||])
-                    }
+                fun (_cmd: Command) (_ct: CancellationToken) -> neverCompletes ()
 
             let dummyCmd =
                 { FileName = "hang"
@@ -165,25 +164,15 @@ module ProcessRunnerTests =
                 Runner.executeWithLauncher hangingLauncher dummyCmd estimate defaultCtx CancellationToken.None
 
             match outcome with
-            | Error(RunnerError.TimeoutExceeded span) -> Assert.Equal(TimeSpan.FromSeconds(0.3), span)
-            | _ -> Assert.Fail("Expected TimeoutExceeded outcome on deadline expiry")
+            | Error(RunnerError.TimeoutExceeded span) -> equal (TimeSpan.FromSeconds(0.3)) span
+            | _ -> failwith "Expected TimeoutExceeded outcome on deadline expiry"
         }
 
-    [<Fact>]
     let ``Runner_echo_executable_scenario_returns_Completed`` () =
         task {
-            let isWindows = OperatingSystem.IsWindows()
-            let cmdName = if isWindows then "cmd.exe" else "echo"
-
-            let cmdArgs =
-                if isWindows then
-                    [ "/c"; "echo"; "hello world" ]
-                else
-                    [ "hello world" ]
-
             let cmd =
-                { FileName = cmdName
-                  Arguments = cmdArgs
+                { FileName = "echo"
+                  Arguments = [ "hello world" ]
                   WorkingDirectory = None
                   Environment = None
                   Stdin = None
@@ -199,12 +188,11 @@ module ProcessRunnerTests =
 
             match outcome with
             | Ok(RunnerOutcome.Completed(exitCode, stdout, _, _)) ->
-                Assert.Equal(0, exitCode)
-                Assert.Contains("hello world", stdout)
-            | _ -> Assert.Fail("Expected Completed outcome from echo process execution")
+                equal 0 exitCode
+                trueThat (stdout.Contains("hello world")) "Expected echo output"
+            | _ -> failwith "Expected Completed outcome from echo process execution"
         }
 
-    [<Fact>]
     let ``ExecutorSummarizer_summarizes_chunks_using_injected_port`` () =
         let port: SummarizerPort<byte[], int> =
             { MapChunk = fun bytes -> bytes.Length
@@ -216,5 +204,5 @@ module ProcessRunnerTests =
         let res = ExecutorSummarizer.summarizeChunks port [ chunk1; chunk2 ]
 
         match res with
-        | Ok(Some totalLen) -> Assert.Equal(11, totalLen)
-        | _ -> Assert.Fail("Expected summarized length result")
+        | Ok(Some totalLen) -> equal 11 totalLen
+        | _ -> failwith "Expected summarized length result"

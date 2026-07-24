@@ -5,8 +5,9 @@ open System.Threading.Tasks
 open Fable.Core
 open Fable.Core.JsInterop
 
+[<AttributeUsage(AttributeTargets.Method, AllowMultiple = false)>]
 type FactAttribute() =
-    inherit global.Xunit.FactAttribute()
+    inherit Attribute()
 
 module private AssertHelper =
     let resetHeartbeat () : unit = ()
@@ -17,6 +18,18 @@ type Assert =
 
         if not (Unchecked.equals expected actual) then
             failwithf "Assert.Equal failed.\nExpected: %A\nActual:   %A" expected actual
+
+    static member Same(expected: obj, actual: obj) =
+        AssertHelper.resetHeartbeat ()
+
+        if not (obj.ReferenceEquals(expected, actual)) then
+            failwithf "Assert.Same failed.\nExpected: %A\nActual:   %A" expected actual
+
+    static member Contains(expected: string, actual: string) =
+        AssertHelper.resetHeartbeat ()
+
+        if isNull actual || not (actual.Contains(expected)) then
+            failwithf "Assert.Contains failed.\nExpected substring: %s\nActual: %s" expected actual
 
     static member True(condition: bool) =
         AssertHelper.resetHeartbeat ()

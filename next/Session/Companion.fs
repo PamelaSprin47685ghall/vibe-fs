@@ -31,8 +31,6 @@ module Companion =
                 None
             else
                 try
-
-#if FABLE_COMPILER
                     let prevObj = Fable.Core.JS.JSON.parse prev
                     let currObj = Fable.Core.JS.JSON.parse current
 
@@ -60,44 +58,6 @@ module Companion =
                         if changed then Some(stringify diffObj) else None
                     else
                         Some current
-#else
-                    use docPrev = System.Text.Json.JsonDocument.Parse prev
-                    use docCurr = System.Text.Json.JsonDocument.Parse current
-
-                    if
-                        docPrev.RootElement.ValueKind = System.Text.Json.JsonValueKind.Object
-                        && docCurr.RootElement.ValueKind = System.Text.Json.JsonValueKind.Object
-                    then
-                        let prevProps =
-                            docPrev.RootElement.EnumerateObject()
-                            |> Seq.map (fun p -> p.Name, p.Value.GetRawText())
-                            |> Map.ofSeq
-
-                        let changedProps =
-                            docCurr.RootElement.EnumerateObject()
-                            |> Seq.filter (fun p ->
-                                match Map.tryFind p.Name prevProps with
-                                | Some prevRaw -> prevRaw <> p.Value.GetRawText()
-                                | None -> true)
-                            |> Seq.toList
-
-                        if List.isEmpty changedProps then
-                            None
-                        else
-                            use stream = new System.IO.MemoryStream()
-                            use writer = new System.Text.Json.Utf8JsonWriter(stream)
-                            writer.WriteStartObject()
-
-                            for p in changedProps do
-                                writer.WritePropertyName(p.Name)
-                                p.Value.WriteTo(writer)
-
-                            writer.WriteEndObject()
-                            writer.Flush()
-                            Some(System.Text.Encoding.UTF8.GetString(stream.ToArray()))
-                    else
-                        Some current
-#endif
                 with _ ->
                     Some current
 
@@ -130,11 +90,24 @@ type Companion(?initialMemory: CompanionMemory) =
         |> Option.defaultValue false
 
     let mutable inFlightTask: Task<unit> option = None
+    let mutable busy = false
 
-    let isBusyUnlocked () =
-        match inFlightTask with
-        | Some t -> not t.IsCompleted
-        | None -> false
+    let startAsTask (work: Async<unit>) : Task<unit> =
+        let completion = TaskCompletionSource<unit>()
+
+        Async.StartImmediate(
+            async {
+                try
+                    do! work
+                finally
+                    busy <- false
+                    completion.SetResult(())
+            }
+        )
+
+        completion.Task
+
+    let isBusyUnlocked () = busy
 
     /// Returns current CompanionMemory state.
     member _.Memory: CompanionMemory =
@@ -161,7 +134,7 @@ type Companion(?initialMemory: CompanionMemory) =
 
         match tOpt with
         | Some t -> t :> Task
-        | None -> Task.CompletedTask
+        | None -> Task.FromResult(()) :> Task
 
     member _.ReplacementActive
         with get () = lock lockObj (fun () -> replacementActive)
@@ -185,19 +158,20 @@ type Companion(?initialMemory: CompanionMemory) =
             if isBusyUnlocked () then
                 false
             else
-                let t =
-                    Task.Run<unit>(fun () ->
-                        async {
-                            try
-                                let! (b, proj) = rebaseFn ()
+                busy <- true
 
-                                lock lockObj (fun () ->
-                                    currentB <- Some b
-                                    lastSuccessfulProjection <- Some proj)
-                            with _ ->
-                                ()
-                        }
-                        |> Async.StartAsTask)
+                let t =
+                    async {
+                        try
+                            let! (b, proj) = rebaseFn ()
+
+                            lock lockObj (fun () ->
+                                currentB <- Some b
+                                lastSuccessfulProjection <- Some proj)
+                        with _ ->
+                            ()
+                    }
+                    |> startAsTask
 
                 inFlightTask <- Some t
                 true)
@@ -219,19 +193,20 @@ type Companion(?initialMemory: CompanionMemory) =
                 match deltaOpt with
                 | None -> Submitted
                 | Some delta ->
-                    let t =
-                        Task.Run<unit>(fun () ->
-                            async {
-                                try
-                                    let! content = blogFn delta
+                    busy <- true
 
-                                    lock lockObj (fun () ->
-                                        currentB <- Some content
-                                        lastSuccessfulProjection <- Some currentProjection)
-                                with _ ->
-                                    ()
-                            }
-                            |> Async.StartAsTask)
+                    let t =
+                        async {
+                            try
+                                let! content = blogFn delta
+
+                                lock lockObj (fun () ->
+                                    currentB <- Some content
+                                    lastSuccessfulProjection <- Some currentProjection)
+                            with _ ->
+                                ()
+                        }
+                        |> startAsTask
 
                     inFlightTask <- Some t
                     Submitted)
