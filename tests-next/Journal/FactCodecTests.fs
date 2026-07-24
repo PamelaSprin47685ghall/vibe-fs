@@ -73,3 +73,25 @@ module FactCodecTests =
             Assert.Equal("agent-1", linked.TargetAgent)
             Assert.Equal(Some "Coder", linked.Role)
         | _ -> Assert.True(false, "Expected AgentLinked fact")
+
+    [<Fact>]
+    let Deserialize_legacy_AgentLinked_without_role () =
+        let fact =
+            Fact.Agent(
+                AgentFact.AgentLinked
+                    {| ParentId = SessionId.create "parent"
+                       ChildId = ChildId.create "child"
+                       TargetAgent = "agent-legacy"
+                       Role = None |}
+            )
+
+        let legacyJson =
+            (FactCodec.serializeFact fact)
+                .Replace("\"Role\":null,", "")
+                .Replace(",\"Role\":null", "")
+
+        Assert.False(legacyJson.Contains("\"Role\""))
+
+        match FactCodec.deserializeFact legacyJson with
+        | Ok(Fact.Agent(AgentFact.AgentLinked linked)) -> Assert.Equal(None, linked.Role)
+        | _ -> Assert.True(false, "Expected legacy AgentLinked fact")
