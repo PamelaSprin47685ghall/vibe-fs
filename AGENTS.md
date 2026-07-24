@@ -79,7 +79,7 @@ import:
 
 ### 🟢 Process 已闭合命令与摘要主路径，压力边界待验收
 - Pump、增量 spool、动态输出阈值、200KB chunk、唯一 deadline 与 SIGKILL 后 EOF 已通过本地 Process 测试。
-- Inspector executor 已真实创建无工具 Executor child，完成 200KB map/reduce；SIGKILL、PTY、大输入与孤儿检测仍待稳定性 E2E。
+- Inspector executor 已真实创建无工具 Executor child，完成 200KB map/reduce；SIGKILL 与孤儿检测已由 process-stress-canary 闭合（P0 3×）；大输出 450KB map/reduce 已由 executor-canary 闭合；PTY E2E 仍待工具面接线。
 
 ### 🟢 Projection 历史复制已压成有界槽位
 - Manager、Orchestrator、DurableEffect、ReviewGuard Projection 已移除无限 History/PublishedCommits/Effects/AcceptedGuardKeys；审计历史仍只在 NDJSON，bounded recent ToolCallId 仅用于重复投递防护。
@@ -89,7 +89,7 @@ import:
 ## 下一阶段唯一优先级：跨域闭合
 1. ~~冻结真实 Host 的 projection budget 契约~~ 已闭合（跨重启 reconcile、parent abort、near-limit replacement 均有真实 canary）。
 2. ~~接通真实模型失败注入后的 A/B Fallback durable 恢复~~ 已闭合（FallbackDetect SSE 内容判据 + fallback-canary 3×待验收）。
-3. 将 Process PTY、大输入、SIGKILL 与孤儿检测纳入默认 3×稳定性门。
+3. ~~将 Process SIGKILL、孤儿检测、大输出纳入默认 3×稳定性门~~ 已闭合（process-stress-canary + executor-canary）；PTY E2E 待工具面接线。
 4. 将 Orchestrator durable Port 路径接到真实 OpenCode Manager worktree、冲突回交、复审与 ff-only 发布 E2E。
 5. 全部边界通过后才允许 release 入口切换与旧资产删除。
 ## 已完成路线与剩余门禁
