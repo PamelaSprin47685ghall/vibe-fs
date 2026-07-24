@@ -19,6 +19,7 @@ type ISessionHostPort =
             Task<Result<unit, string>>
 
     abstract AbortSession: sessionId: SessionId -> Task<Result<unit, string>>
+    abstract AbortChildren: parentId: SessionId -> Task
     abstract CreateChildSession: parentId: SessionId * options: OpenCodeChildOptions -> Task<Result<SessionId, string>>
     abstract GetSessionOutput: sessionId: SessionId -> string list
 
@@ -57,7 +58,26 @@ type InjectedSessionPort(underlyingPort: IOpenCodePort option, eventPort: IEvent
             else
                 [])
 
+    let abortChildren (parentId: SessionId) =
+        task {
+            let children = getAndRemoveChildren parentId
+
+            for childId in children do
+                recordOutput childId "Aborted"
+
+                match underlyingPort with
+                | Some port ->
+                    let! _ = port.AbortSession childId
+                    ()
+                | None -> ()
+
+                eventPort.NotifyTerminal childId (Aborted "Parent session aborted") |> ignore
+                ()
+        }
+
     interface ISessionHostPort with
+        member _.AbortChildren(parentId) = abortChildren parentId
+
         member me.SubscribeTerminal(sessionId, listener) =
             lock lockObj (fun () -> activeListeners.Add(sessionId) |> ignore)
 

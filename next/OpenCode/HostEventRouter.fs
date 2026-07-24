@@ -58,9 +58,7 @@ type HostEventRouter
         | _ -> false
 
     let abortChildren parentId =
-        sessionParents
-        |> Seq.choose (fun pair -> if pair.Value = parentId then Some pair.Key else None)
-        |> Seq.iter (fun childId -> sessionPort.AbortSession(SessionId.create childId) |> ignore)
+        sessionPort.AbortChildren(SessionId.create parentId) |> ignore
 
     let nudgeReviewer sessionId =
         if nudgeSent.Add sessionId then

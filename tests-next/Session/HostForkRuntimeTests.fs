@@ -32,6 +32,7 @@ module HostForkRuntimeTests =
                 member _.SendChildPromptFireAndForget(_, _, _, _) = Task.FromResult(Ok())
 
                 member _.AbortSession(_) = Task.FromResult(Ok())
+                member _.AbortChildren(_) = Task.FromResult(()) :> Task
 
                 member _.CreateChildSession(_, _) =
                     childCount <- childCount + 1
@@ -101,6 +102,7 @@ module HostForkRuntimeTests =
 
                         member _.SendChildPromptFireAndForget(_, _, _, _) = Task.FromResult(Ok())
                         member _.AbortSession(_) = Task.FromResult(Ok())
+                        member _.AbortChildren(_) = Task.FromResult(()) :> Task
                         member _.CreateChildSession(_, _) = Task.FromResult(Ok childId)
                         member _.GetSessionOutput(_) = [] }
 
