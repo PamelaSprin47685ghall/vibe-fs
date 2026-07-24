@@ -88,7 +88,7 @@ module FallbackDetect =
                 else
                     xmlTag.IsMatch text && not (hasToolCallPart msg)
 
-    let private messageId (msg: obj) : string =
+    let messageId (msg: obj) : string =
         let info = msg?info
 
         if not (isNull info) && not (isNull info?id) then

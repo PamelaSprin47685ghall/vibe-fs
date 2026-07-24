@@ -21,6 +21,9 @@ type HostEventRouter
         ?recordedErrors: HashSet<string>
     ) =
 
+    /// Zero-width space: invisible nudge that prompts LLM to continue.
+    let ZWSP = "​"
+
     let mutable latestSessionId = ""
 
     let rawEvent (raw: obj) =
@@ -114,6 +117,23 @@ type HostEventRouter
             )
             |> ignore
 
+    let nudgedMessages = HashSet<string>()
+    let nudgeCounts = Dictionary<string, int>()
+    let maxNudgesPerSession = 3
+
+    let nudgeContinue (sessionId: string) (msgId: string) =
+        if nudgedMessages.Add msgId then
+            let count =
+                match nudgeCounts.TryGetValue sessionId with
+                | true, c -> c
+                | false, _ -> 0
+
+            if count < maxNudgesPerSession then
+                nudgeCounts.[sessionId] <- count + 1
+
+                sessionPort.SendPrompt(SessionId.create sessionId, ZWSP, { Model = None; Agent = None })
+                |> ignore
+
     member _.LatestSessionId = latestSessionId
 
     member _.Observe(raw: obj, forward: obj -> unit) =
@@ -150,5 +170,33 @@ type HostEventRouter
                 | _ -> ()
 
         FallbackDetect.observeEvent journal (defaultArg recordedErrors (HashSet<string>())) raw
+
+        // Zero-width nudge: empty/XML-only assistant turn with no tool calls
+        let ev = if isNull raw?event then raw else raw?event
+
+        if not (isNull ev) then
+            let props = ev?properties
+
+            if not (isNull props) then
+                let msg = props?message
+                let target = if isNull msg then props else msg
+
+                if FallbackDetect.isFailedAssistant target then
+                    let msgId = FallbackDetect.messageId target
+
+                    let sid =
+                        let info = target?info
+
+                        if not (isNull info) && not (isNull info?sessionID) then
+                            unbox<string> info?sessionID
+                        elif not (isNull props?sessionID) then
+                            unbox<string> props?sessionID
+                        elif not (String.IsNullOrWhiteSpace sessionId) then
+                            sessionId
+                        else
+                            ""
+
+                    if not (String.IsNullOrWhiteSpace sid) then
+                        nudgeContinue sid msgId
 
         forward raw
