@@ -57,6 +57,7 @@ import:
 
 ### 🟢 Companion 侧车递归已阻断
 - `MessageTransform` 与 OpenCode transform 调用均按角色排除 Blogger/Executor/Inspector/Browser/Meditator/Reviewer，保留 Manager/Coder/Orchestrator。
+- 上游 `experimental.chat.messages.transform` 在每次 outbound projection 前收到空 input；OpenCode 的 model `limit.context` 只在更晚的 `experimental.chat.system.transform` 暴露，无法直接作为同一轮 projection 的可靠 near-limit 门禁；必须先冻结 Host 预算传递契约，禁止用固定字节阈值冒充真实上限。
 
 ### 🟢 Manager 工具权限已由 provider request 验证
 - `SpikePlugin` config hook 原地注入 manager agent 的 deny-all + fork/join/list allow 配置；P0 已证明真实 provider request 无 read/write/edit/bash/glob/grep/verdict。
