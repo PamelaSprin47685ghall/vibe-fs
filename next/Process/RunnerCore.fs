@@ -32,38 +32,7 @@ module RunnerCore =
     [<Emit("((child) => { try { if (child && child.stdin) child.stdin.end(); } catch (_) {} return undefined; })($0)")>]
     let private closeStdin (child: obj) : unit = jsNative
 
-    let mutable private gatePromise: JS.Promise<unit> =
-        JS.Constructors.Promise.resolve ()
 
-    let mutable private releaseCurrent: (unit -> unit) option = None
-
-    let getLargeGateCount () : int = if releaseCurrent.IsNone then 1 else 0
-
-    let acquireLargeGate (_ct: CancellationToken) : Task =
-        let mutable res = ignore
-        let p = JS.Constructors.Promise.Create(fun resolve _ -> res <- resolve)
-        let prev = gatePromise
-        gatePromise <- p
-        let tcs = TaskCompletionSource<unit>()
-
-        emitJsExpr
-            (prev,
-             (fun () ->
-                 releaseCurrent <- Some res
-                 tcs.SetResult(())))
-            "$0.then($1)"
-        |> ignore
-
-        tcs.Task
-
-    let releaseLargeGate () : unit =
-        match releaseCurrent with
-        | Some r ->
-            releaseCurrent <- None
-            r ()
-        | None -> ()
-
-    /// Core execution using system Process or Node child_process.
     let execute
         (cmd: Command)
         (estimate: ProcessEstimate)
@@ -81,7 +50,7 @@ module RunnerCore =
             let isLarge = estimate.EstimatedMemory = EstimatedMemory.Large
 
             if isLarge then
-                do! acquireLargeGate ct
+                do! LargeGate.acquire ct
 
             try
                 try
@@ -301,5 +270,5 @@ module RunnerCore =
                     return Error(RunnerError.ExecutionFailed ex.Message)
             finally
                 if isLarge then
-                    releaseLargeGate ()
+                    LargeGate.release ()
         }

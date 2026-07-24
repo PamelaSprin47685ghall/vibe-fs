@@ -16,11 +16,11 @@ module Runner =
     """)>]
     let private withDeadline<'T> (work: Task<'T>) (milliseconds: int) : Task<'T> = jsNative
 
-    let getLargeGateCount () : int = RunnerCore.getLargeGateCount ()
+    let getLargeGateCount () : int = LargeGate.getCount ()
 
-    let acquireLargeGate (ct: CancellationToken) : Task = RunnerCore.acquireLargeGate ct
+    let acquireLargeGate (ct: CancellationToken) : Task = LargeGate.acquire ct
 
-    let releaseLargeGate () : unit = RunnerCore.releaseLargeGate ()
+    let releaseLargeGate () : unit = LargeGate.release ()
 
     let calculateDeadline (now: DateTimeOffset) (est: EstimatedRuntime) : Deadline =
         RunnerPrimitives.calculateDeadline now est

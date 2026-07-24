@@ -40,6 +40,20 @@ module StaticTools =
                         "list", box "allow" ]
               ) ]
 
+    let coderAgentConfig () : obj =
+        createObj
+            [ "mode", box "primary"
+              "permission",
+              box (
+                  createObj
+                      [ "*", box "deny"
+                        "read", box "allow"
+                        "write", box "allow"
+                        "edit", box "allow"
+                        "glob", box "allow"
+                        "grep", box "allow" ]
+              ) ]
+
     let executorTool () : Tool =
         { Name = "executor"
           Description = "Execute shell command within timeout budget."

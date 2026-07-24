@@ -122,7 +122,7 @@ type HostForkRuntime(parentId: SessionId, sessions: ISessionHostPort, ?journal: 
                     sessions.CreateChildSession(
                         parentId,
                         { Title = Some agentId
-                          Agent = Some(role.ToString()) }
+                          Agent = Some(role.ToString().ToLowerInvariant()) }
                     )
 
                 match childResult with
@@ -153,7 +153,14 @@ type HostForkRuntime(parentId: SessionId, sessions: ISessionHostPort, ?journal: 
 
                         let result = runtime.Fork(agentId, role, runWork = (fun () -> run.Source.Task))
                         markReady run
-                        let! sent = sessions.SendPrompt(childId, prompt, { Model = None; Agent = None })
+
+                        let! sent =
+                            sessions.SendPrompt(
+                                childId,
+                                prompt,
+                                { Model = None
+                                  Agent = Some(role.ToString().ToLowerInvariant()) }
+                            )
 
                         match sent with
                         | Ok _ -> return Ok result

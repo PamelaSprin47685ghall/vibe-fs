@@ -128,7 +128,11 @@ module MessageOriginDecoder =
             |> Option.map (fun value -> value.ToLowerInvariant())
 
         let isAssistant =
-            role = Some "assistant" || (role.IsNone && eventType.Contains("assistant"))
+            role = Some "assistant"
+            || (role.IsNone && eventType.Contains("assistant"))
+            || (role.IsNone
+                && eventType.StartsWith("message.part")
+                && not (isNull properties?part))
 
         if not isAssistant then
             None
@@ -144,8 +148,17 @@ module MessageOriginDecoder =
                 match textFromParts properties?parts with
                 | Some text -> Some text
                 | None ->
-                    asString properties?text
-                    |> Option.filter (fun text -> not (String.IsNullOrWhiteSpace text))
+                    match asString properties?text with
+                    | Some text when not (String.IsNullOrWhiteSpace text) -> Some text
+                    | _ ->
+                        match asString properties?delta with
+                        | Some text when not (String.IsNullOrWhiteSpace text) -> Some text
+                        | _ ->
+                            if not (isNull properties?part) then
+                                asString properties?part?text
+                                |> Option.filter (fun text -> not (String.IsNullOrWhiteSpace text))
+                            else
+                                None
 
     let sessionIdOf properties eventObj =
         [ properties?sessionID

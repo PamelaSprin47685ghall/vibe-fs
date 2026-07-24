@@ -10,13 +10,14 @@ import:
 
 - 已恢复 `next/Doc/SSOT.md`，冻结 Agent DSL、Companion、Fork/Join、durable facts、Review、Process 与 Orchestrator 最终语义。
 - 已加入 Companion 角色纯门禁：仅 Manager/Coder/Orchestrator 可创建 Blogger，其他角色禁止 sidecar。
-- 已完成 per-Run terminal listener、输出增量切片、existing-agent nudge 重装 listener、标准 workspace Journal Boot；`npm test` 当前 127/127、Manager contract 1/1、TestKit 11/11。
+- 已完成 per-Run terminal listener、输出增量切片、existing-agent nudge 重装 listener、标准 workspace Journal Boot；`npm test` 当前 132/132、Manager contract 1/1、TestKit 11/11。
 - 已拆出 `OpenCode/CompanionTransform.fs`，恢复 300 行架构门禁；尚未证明真实 provider 工具权限与真实 child-session E2E。
 - 主代理配置已同时覆盖 `manager/build/plan`，deny 全部常规工具，仅 allow `fork/join/list`；provider request 层仍待真实 canary 证明。
-- P0 canary 已改为真实 Manager→fork(coder)→join→Coder write 纵切，严格校验 Manager 禁止常规工具；当前真实 OpenCode 在 turn idle 收敛处超时，故仍不得宣称纵切闭合。
-- Process 已完成 lossless pump、动态 `3×estimated_output_bytes` spool、200KB chunk、SIGKILL 后等待 pipe EOF；默认 Executor map/reduce 未接线时明确报错，不再伪造 concat。`npm test` 当前 132/132、Manager contract 1/1、TestKit 11/11。
+- P0 canary 已改为真实 Manager→fork(coder)→join→Coder write 纵切，严格校验 Manager 禁止常规工具；真实 child 已执行并返回，当前仅剩并发请求顺序的 StrictMock FIFO 稳定性问题。
+- Process 已完成 lossless pump、动态 `3×estimated_output_bytes` spool、200KB chunk、SIGKILL 后等待 pipe EOF；默认 Executor map/reduce 未接线时明确报错，不再伪造 concat。 `npm test` 当前 132/132、Manager contract 1/1、TestKit 11/11。
 - Review SubmitVerdict 已支持 GitTreePort 读 tree、Journal append、ToolCallId 全局去重；Fallback durable decision 已修正为 A1→B2→B3→Dead，仍待真实模型调用与重启 E2E。
-- 下一步必须以真实 Host per-Run terminal 与 Manager→Coder→Join 纵切为验收门，不得以既有 127 个测试替代。
+- OpenCode v1 SDK child create/prompt 已改用正确 `body/path` 包络与扁平可选字段；真实 child 已能创建、Coder write、terminal、Journal AgentLinked、Manager join。`npm test` 132/132 通过；P0 strict FIFO canary 仍因 Manager/child 并发请求顺序存在偶发 expectation mismatch，尚未达稳定门。
+- 下一步必须以 20×真实 Manager→Coder→Join 稳定性与 Companion Blogger 纵切为验收门，不得以 132 个单测替代。
 
 ## 已完成并验证
 

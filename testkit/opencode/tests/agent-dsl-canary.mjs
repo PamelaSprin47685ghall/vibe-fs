@@ -80,16 +80,6 @@ async function canaryScenario(scenario) {
   });
 
   scenario.provider.expectToolCall({
-    id: 'manager-join-coder',
-    tool: 'join',
-    args: {},
-    match: {
-      requiredTools: ['fork', 'join', 'list'],
-      forbiddenTools: forbiddenManagerTools,
-    },
-  });
-
-  scenario.provider.expectToolCall({
     id: 'coder-write-file',
     tool: 'write',
     args: { filePath: 'canary_output.txt', content: 'Coder canary slice OK\n' },
@@ -100,6 +90,16 @@ async function canaryScenario(scenario) {
     id: 'coder-completed',
     text: 'Coder completed the canary write.',
     match: { requiredTools: ['write'] },
+  });
+
+  scenario.provider.expectToolCall({
+    id: 'manager-join-coder',
+    tool: 'join',
+    args: {},
+    match: {
+      requiredTools: ['fork', 'join', 'list'],
+      forbiddenTools: forbiddenManagerTools,
+    },
   });
 
   scenario.provider.expectText({
@@ -186,6 +186,18 @@ try {
   console.log('  ✓ Single isolated scenario passed successfully\n');
 } catch (err) {
   console.error(`  ✗ Single isolated scenario failed: ${err.message}`);
+  if (scenario?.provider?.requests) {
+    const requests = scenario.provider.requests.map((request) => ({
+      sessionId: request.sessionId,
+      tools: request.tools?.map((tool) => tool.function?.name || tool.name),
+      messages: request.messages?.length,
+    }));
+    console.error(`  provider requests: ${JSON.stringify(requests)}`);
+  }
+  if (scenario?.provider?.unexpectedRequests) console.error(`  unexpected: ${JSON.stringify(scenario.provider.unexpectedRequests)}`);
+  if (scenario?.events?._events) console.error(`  events: ${JSON.stringify(scenario.events._events.slice(-20))}`);
+  if (scenario?.host?.stdoutLog) console.error(`  host stdout: ${scenario.host.stdoutLog.slice(-4000)}`);
+  if (scenario?.host?.stderrLog) console.error(`  host stderr: ${scenario.host.stderrLog.slice(-4000)}`);
   if (scenario) {
     try { await teardownScenario(scenario, { keepOnFailure: true }); } catch {}
   }

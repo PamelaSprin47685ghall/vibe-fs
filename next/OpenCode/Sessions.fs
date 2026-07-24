@@ -99,8 +99,11 @@ type InjectedSessionPort(underlyingPort: IOpenCodePort option, eventPort: IEvent
             task {
                 registerChild parentId childId
                 recordOutput childId (sprintf "ChildPrompt: %s" text)
-                let _ = (me :> ISessionHostPort).SendPrompt(childId, text, opts)
-                return Ok()
+                let! result = (me :> ISessionHostPort).SendPrompt(childId, text, opts)
+
+                match result with
+                | Ok _ -> return Ok()
+                | Error err -> return Error err
             }
 
         member me.AbortSession(sessionId) =

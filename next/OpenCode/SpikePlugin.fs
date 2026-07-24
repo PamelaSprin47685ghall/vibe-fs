@@ -56,7 +56,7 @@ module SpikePlugin =
     let private createHost
         (input: obj)
         (portOpt: IOpenCodePort option)
-        : Result<IEventObservationPort * ISessionHostPort * IDisposable option, string> =
+        : Result<IEventObservationPort * ISessionHostPort * IDisposable option * (obj -> unit) option, string> =
         if hasHostEventCapability input then
             let hostEventPort = Events.HostEventPort()
 
@@ -65,10 +65,12 @@ module SpikePlugin =
             | Ok subscription ->
                 let eventPort = hostEventPort :> IEventObservationPort
                 let sessionPort = InjectedSessionPort(portOpt, eventPort) :> ISessionHostPort
-                Ok(eventPort, sessionPort, subscription)
+                Ok(eventPort, sessionPort, subscription, Some(fun raw -> hostEventPort.Observe raw))
         else
-            let eventPort, sessionPort = createSpikeHost portOpt
-            Ok(eventPort, sessionPort, None)
+            let hostEventPort = Events.HostEventPort()
+            let eventPort = hostEventPort :> IEventObservationPort
+            let sessionPort = InjectedSessionPort(portOpt, eventPort) :> ISessionHostPort
+            Ok(eventPort, sessionPort, None, Some(fun raw -> hostEventPort.Observe raw))
 
     let private workspaceDirectory (input: obj) : string option =
         if isNull input || isNull input?directory then
@@ -106,6 +108,7 @@ module SpikePlugin =
             agents?manager <- managerConfig
             agents?build <- managerConfig
             agents?plan <- managerConfig
+            agents?coder <- StaticTools.coderAgentConfig ()
 
     let private roleOf (agent: string) =
         match if isNull agent then "" else agent.Trim().ToLowerInvariant() with
@@ -231,7 +234,7 @@ module SpikePlugin =
 
             match createHost input portOpt with
             | Error err -> return raise (InvalidOperationException err)
-            | Ok(eventPort, sessionPort, subscription) ->
+            | Ok(eventPort, sessionPort, subscription, observeEvent) ->
                 let companions = Dictionary<string, CompanionHost>()
                 let companionGate = obj ()
 
@@ -248,6 +251,9 @@ module SpikePlugin =
                           "chat.transform", box (uncurriedExecute (box transform))
                           "experimental.chat.messages.transform", box (uncurriedExecute (box transform))
                           "config", box (fun (config: obj) -> configureManager config) ]
+
+                observeEvent
+                |> Option.iter (fun observe -> hooks?event <- box (fun raw -> observe raw))
 
                 let client = if isNull input then null else input?client
 

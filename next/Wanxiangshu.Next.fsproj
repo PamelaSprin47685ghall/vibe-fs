@@ -37,6 +37,7 @@
     <Compile Include="Process/Command.fs"/>
     <Compile Include="Process/Pump.fs"/>
     <Compile Include="Process/Spool.fs"/>
+    <Compile Include="Process/LargeGate.fs"/>
     <Compile Include="Process/RunnerPrimitives.fs"/>
     <Compile Include="Process/RunnerCore.fs"/>
     <Compile Include="Process/Runner.fs"/>

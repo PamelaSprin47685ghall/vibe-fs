@@ -37,23 +37,25 @@ module OpenCodePort =
                     let sId = SessionId.value sessionId
                     let parts = [| {| ``type`` = "text"; text = text |} |]
 
+                    let bodyFields =
+                        [ "parts", box parts ]
+                        @ (opts.Model
+                           |> Option.map (fun model -> [ "model", box model ])
+                           |> Option.defaultValue [])
+                        @ (opts.Agent
+                           |> Option.map (fun agent -> [ "agent", box agent ])
+                           |> Option.defaultValue [])
+
                     let payload =
-                        {| sessionID = sId
-                           parts = parts
-                           model = opts.Model
-                           agent = opts.Agent |}
+                        createObj
+                            [ "path", box (createObj [ "id", box sId ])
+                              "body", box (createObj bodyFields) ]
 
                     try
                         let sessObj = client?session
-                        let promptFn = sessObj?prompt
-                        let! res = unbox<Task<obj>> (promptFn?call (sessObj, payload))
-
-                        if not (isNull res) && not (isNull res?id) then
-                            return Delivered(MessageId.create (unbox<string> res?id))
-                        elif not (isNull res) && not (isNull res?info) && not (isNull res?info?id) then
-                            return Delivered(MessageId.create (unbox<string> res?info?id))
-                        else
-                            return AcceptanceUnknown("Missing message id in SDK response", None)
+                        let promptFn = sessObj?promptAsync
+                        let! _ = unbox<Task<obj>> (promptFn?call (sessObj, payload))
+                        return Delivered(MessageId.create (sprintf "accepted-%s" sId))
                     with ex ->
                         return Retryable ex.Message
                 }
@@ -85,8 +87,14 @@ module OpenCodePort =
                         let createFn = sessObj?create
                         let! res = unbox<Task<obj>> (createFn?call (sessObj, payload))
 
-                        if not (isNull res) && not (isNull res?id) then
-                            return Ok(SessionId.create (unbox<string> res?id))
+                        let body =
+                            if not (isNull res) && not (isNull res?data) then
+                                res?data
+                            else
+                                res
+
+                        if not (isNull body) && not (isNull body?id) then
+                            return Ok(SessionId.create (unbox<string> body?id))
                         else
                             return Error "Missing session id in response"
                     with ex ->
@@ -176,10 +184,16 @@ module OpenCodePort =
                 task {
                     let pId = SessionId.value parentId
 
-                    let payload =
-                        {| parentID = pId
-                           title = opts.Title
-                           agent = opts.Agent |}
+                    let bodyFields =
+                        [ "parentID", box pId ]
+                        @ (opts.Title
+                           |> Option.map (fun title -> [ "title", box title ])
+                           |> Option.defaultValue [])
+                        @ (opts.Agent
+                           |> Option.map (fun agent -> [ "agent", box agent ])
+                           |> Option.defaultValue [])
+
+                    let payload = createObj [ "body", box (createObj bodyFields) ]
 
                     let! res = postJson "/session" payload
 
