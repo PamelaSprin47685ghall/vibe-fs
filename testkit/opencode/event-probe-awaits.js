@@ -14,28 +14,30 @@ function removeCallback(probe, callback) {
   if (idx >= 0) probe._onEventCallbacks.splice(idx, 1);
 }
 
-function makeAwaitTimeout(probe, callback, predicate, timeoutMs, resolve, reject) {
-  return setTimeout(() => {
-    removeCallback(probe, callback);
-    reject(new Error(`awaitEvent timed out after ${timeoutMs}ms`));
-  }, timeoutMs);
-}
-
 function bindAwaitCallback(probe, predicate, timeoutMs, resolve, reject) {
+  // The timer handle must stay closure-local: storing it on the probe
+  // let concurrent awaits clobber each other's handle, so the loser
+  // never timed out and hung forever (host-restart canary runaway).
   const callback = (event) => {
     if (predicate(event)) {
-      clearTimeout(probe._awaitTimer);
+      clearTimeout(timer);
       removeCallback(probe, callback);
       resolve(event);
     }
   };
-  probe._awaitTimer = makeAwaitTimeout(
-    probe, callback, predicate, timeoutMs, resolve, reject,
-  );
+  const timer = setTimeout(() => {
+    removeCallback(probe, callback);
+    reject(new Error(`awaitEvent timed out after ${timeoutMs}ms`));
+  }, timeoutMs);
   probe._onEventCallbacks.push(callback);
 }
 
 export function attachEventProbeAwaits(proto) {
+  proto.onEvent = function onEvent(callback) {
+    this._onEventCallbacks.push(callback);
+    return () => removeCallback(this, callback);
+  };
+
   proto.awaitEvent = function awaitEvent(predicate, timeoutMs = DEFAULT_AWAIT_TIMEOUT_MS) {
     const existing = this._events.find(predicate);
     if (existing) return Promise.resolve(existing);

@@ -81,6 +81,7 @@ try {
   scenario = await setupScenario({
     project: { files: { [TREE_FILE]: 'review target\n' } },
     strict: true,
+    watchdogMs: 30000,
   });
   await runScenario(scenario);
   scenario.provider.expectSatisfied();

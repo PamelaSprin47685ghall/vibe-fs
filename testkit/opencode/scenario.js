@@ -32,6 +32,7 @@ export async function setupScenario(opts = {}) {
 export async function teardownScenario(scenario, { keepOnFailure = false } = {}) {
   if (scenario._tornDown) return;
   scenario._tornDown = true;
+  scenario.watchdog?.stop();
   const errors = [];
 
   // 1. 停止继续发送 mock 响应

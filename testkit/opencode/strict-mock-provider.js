@@ -57,6 +57,7 @@ export class StrictMockProvider {
     this._port = null;
     this._url = null;
     this._activeResponses = new Set();
+    this.onRequest = null;
   }
 
   expectToolCall(opts) { pushExpectation(this._state, { type: 'tool-call', tool: opts.tool, args: opts.args || {} }, opts); }
@@ -146,12 +147,20 @@ export class StrictMockProvider {
   }
 
   _dispatchChat(res, parsed) {
+    this.onRequest?.(parsed);
     const s = this._state;
+    if (process.env.MOCK_TRACE) {
+      const tools = (parsed.tools || []).map((t) => t?.function?.name || t?.name || '?');
+      const lastUser = JSON.stringify(extractLastUserMsg(parsed) || '').slice(0, 80);
+      console.error(`[MOCK-TRACE] tools=${JSON.stringify(tools)} msgs=${(parsed.messages || []).length} lastUser=${lastUser}`);
+    }
     if (s.allowBloggerRequests && JSON.stringify(extractLastUserMsg(parsed) || '').includes('You are the blogger')) {
+      if (process.env.MOCK_TRACE) console.error('[MOCK-TRACE] -> blogger-bypass');
       s.requests.push(parsed);
       return sendSSE(res, buildTextChunks(`blog_${Date.now()}`, 'Blogger paragraph.', 1));
     }
     if (isTitleGenerationRequest(parsed) && (!s.strict || s.allowTitleGeneration)) {
+      if (process.env.MOCK_TRACE) console.error('[MOCK-TRACE] -> title-bypass');
       return sendSSE(res, buildTextChunks(`title_${Date.now()}`, 'E2E Test Session', 1));
     }
     if (isSyntheticContinuation(parsed) && (!s.strict || s.allowSyntheticContinuations)) {
@@ -208,6 +217,7 @@ export class StrictMockProvider {
       s.expectations.shift();
       return this._respond(res, exp, parsed);
     }
+    if (process.env.MOCK_TRACE) console.error(`[MOCK-TRACE] -> matched ${exp.id}`);
     s.requests.push(parsed);
     s.expectations.splice(expIndex, 1);
     return this._respond(res, exp, parsed);

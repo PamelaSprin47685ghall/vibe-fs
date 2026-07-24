@@ -22,6 +22,7 @@ import { FsOracle, HttpClient } from './scenario-http.js';
 import { initGitWorkspace } from './process-host-utils.js';
 import { resolvePluginPath } from './scenario-paths.js';
 import { createScenarioTurn } from './scenario-turn.js';
+import { Watchdog } from './watchdog.js';
 
 export class Scenario {
   constructor(ctx) {
@@ -104,6 +105,19 @@ export async function setupScenarioParallel(opts, tmpDir) {
     client.onSessionCreated = (sid) => {
       if (!scenario.sessionIds.includes(sid)) scenario.sessionIds.push(sid);
     };
+    if (opts.watchdogMs) {
+      const watchdog = new Watchdog({
+        timeoutMs: opts.watchdogMs,
+        label: opts.watchdogLabel,
+        onTimeout: async () => {
+          console.error(`── watchdog event tail ──\n${events.dump(20)}`);
+        },
+      });
+      scenario.watchdog = watchdog;
+      events.onEvent((e) => watchdog.pet(`sse:${e.type}`));
+      provider.onRequest = () => watchdog.pet('provider-request');
+      client.onRequest = () => watchdog.pet('client-request');
+    }
     return scenario;
   } catch (err) {
     if (host.stdoutLog || host.stderrLog) {

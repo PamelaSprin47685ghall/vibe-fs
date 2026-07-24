@@ -41,8 +41,10 @@ export class HttpClient {
     this._baseUrl = baseUrl;
     this._workDir = workDir;
     this.onSessionCreated = null;
+    this.onRequest = null;
   }
   async request(method, urlPath, opts = {}) {
+    this.onRequest?.(method, urlPath);
     const qs = opts.query ? '?' + new URLSearchParams(opts.query).toString() : '';
     const res = await fetch(this._baseUrl + urlPath + qs, {
       method,

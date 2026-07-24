@@ -8,6 +8,7 @@
  */
 
 import { cases } from './gate-cases.mjs';
+import { timeoutCases } from './gate-timeout-cases.mjs';
 
 let passed = 0;
 let failed = 0;
@@ -26,7 +27,7 @@ async function runCase({ name, fn }) {
 
 console.log('Running testkit/opencode gate tests...\n');
 
-for (const c of cases) {
+for (const c of [...cases, ...timeoutCases]) {
   await runCase(c);
 }
 

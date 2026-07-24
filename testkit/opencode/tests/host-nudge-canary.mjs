@@ -7,7 +7,7 @@ const __filename = fileURLToPath(import.meta.url);
 let scenario;
 try {
   if (!runStaticGate([__filename]).passed) throw new Error('host lifecycle canary contains prohibited polling');
-  scenario = await setupScenario({ project: { files: { 'AGENTS.md': 'host lifecycle canary\n' } }, strict: true });
+  scenario = await setupScenario({ project: { files: { 'AGENTS.md': 'host lifecycle canary\n' } }, strict: true, watchdogMs: 30000 });
   scenario.provider.allowTitleGeneration();
   scenario.provider.allowBloggerRequests();
   scenario.provider.allowOutOfOrder();
