@@ -67,7 +67,8 @@ module OpenCodePort =
                     try
                         let sessObj = client?session
                         let abortFn = sessObj?abort
-                        let! _ = unbox<Task<obj>> (abortFn?call (sessObj, {| sessionID = sId |}))
+                        let payload = createObj [ "path", createObj [ "id", box sId ] ]
+                        let! _ = unbox<Task<obj>> (abortFn?call (sessObj, payload))
                         return Ok()
                     with ex ->
                         return Error ex.Message

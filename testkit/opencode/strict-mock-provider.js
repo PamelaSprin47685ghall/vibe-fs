@@ -94,6 +94,7 @@ export class StrictMockProvider {
   get unexpectedRequests() { return this._state.unexpected; }
   get remainingExpectations() { return this._state.expectations.length; }
   get nudgeBypassed() { return this._state.nudgeBypassed; }
+  get activeRequestCount() { return this._activeResponses.size; }
   get syntheticRequests() { return this._state.syntheticRequests; }
 
   get strict() { return this._state.strict; }

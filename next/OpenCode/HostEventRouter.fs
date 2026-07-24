@@ -57,6 +57,19 @@ type HostEventRouter
         | "session.aborted" -> true
         | _ -> false
 
+    /// Real OpenCode has no session.aborted event: an abort surfaces as
+    /// session.error with name MessageAbortedError, followed by idle.
+    let isAbortError (raw: obj) =
+        if eventType raw <> "session.error" then
+            false
+        else
+            let properties = rawProperties raw
+
+            not (isNull properties)
+            && not (isNull properties?error)
+            && not (isNull properties?error?name)
+            && unbox<string> properties?error?name = "MessageAbortedError"
+
     let abortChildren parentId =
         sessionPort.AbortChildren(SessionId.create parentId) |> ignore
 
@@ -87,6 +100,9 @@ type HostEventRouter
             |> Option.iter (fun parentId ->
                 if not (String.IsNullOrWhiteSpace parentId) then
                     sessionParents.[sessionId] <- parentId)
+
+            if isAbortError raw then
+                abortChildren sessionId
 
             if isTerminalEvent raw then
                 if eventType raw = "session.aborted" then
