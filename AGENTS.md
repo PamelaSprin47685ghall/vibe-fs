@@ -79,9 +79,9 @@ import:
 ### 🟡 Orchestrator 纯 Port 路径已成形，真实发布仍未验收
 - 已有 AgentJournal、candidate/published facts、初次与 rebase 后双 PERFECT、冲突交回同一 Manager、Git authority reconcile 与 ff-only；真实 OpenCode Manager worktree 发布 E2E 仍未闭合。
 ## 下一阶段唯一优先级：跨域闭合
-1. 将真实 Reviewer、Executor 的 E2E 门禁纳入 P0，并保持默认 3×稳定性口径。
-2. 验证已接通的 parent abort、三轮 existing-agent nudge、近上限投影替换与跨重启 Host reconcile。
-3. 接通真实模型失败注入后的 A/B Fallback durable 恢复。
+1. 冻结真实 Host 的 projection budget、parent abort、三轮 nudge 与跨重启 reconcile 契约，补齐对应 OpenCode E2E。
+2. 接通真实模型失败注入后的 A/B Fallback durable 恢复。
+3. 将 Process PTY、大输入、SIGKILL 与孤儿检测纳入默认 3×稳定性门。
 4. 将 Orchestrator durable Port 路径接到真实 OpenCode Manager worktree、冲突回交、复审与 ff-only 发布 E2E。
 5. 全部边界通过后才允许 release 入口切换与旧资产删除。
 ## 已完成路线与剩余门禁
@@ -113,7 +113,7 @@ import:
   - X projection 2 → 同一 Y output B2
   - Y busy → skip，不推进基线
   - Y 空闲 → delta 含跳过内容
-  - context near limit → 启用 prefix replacement
+  - Port/Fake 覆盖 replacement flag 与前缀保留；真实 near-limit 自动触发仍受 Host projection budget 契约阻塞
   - restart → 恢复 B/baseline/replacement
   - Y self-rebase → CurrentB 只等于 B'（旧 B 自然退出 transcript）
 
