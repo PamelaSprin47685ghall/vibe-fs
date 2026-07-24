@@ -13,6 +13,7 @@ import:
 - 已拆出 `OpenCode/CompanionTransform.fs`、`OpenCode/HostEventRouter.fs`、`OpenCode/ToolSurface.fs`、`OpenCode/ExecutorTool.fs`、`Orchestrator.Types.fs`、`Orchestrator.GitPort.fs`，恢复 300 行架构门禁；此前 `npm test` = 135/135、Manager contract = 1/1、TestKit = 11/11。
 - Manager provider request 已证明只暴露 `fork/join/list`，禁止 `read/write/edit/bash/glob/grep/verdict`；P0 默认 3×稳定性通过，`CANARY_REPEAT` 仍可提高门槛。
 - Companion 真实 Blogger child 已产生 B1/B2，同一 child 被复用，角色 sidecar 门禁通过；durable B/baseline/replacement 已有重启 Port/Fake 测试，真实近上限投影 E2E 仍未验收。
+- Companion 前缀覆盖比较已优先使用稳定 message ID，避免 OpenCode 对同一消息补充 summary/diff 元数据后误判前缀断裂；真实近上限 replacement 仍未验收。
 - Process 已完成 lossless pump、动态 `3×estimated_output_bytes` spool、200KB chunk、SIGKILL 后等待 pipe EOF；真实 Inspector→Executor map/reduce canary 已通过，SIGKILL/PTY 压力仍待纳入稳定性门。
 - Review verdict 已接入真实 GitTreePort、Journal、ToolCallId 去重、双 PERFECT 与 reviewer terminal nudge；真实双 PERFECT canary 已通过，Fallback 真实模型调用仍未接线。
 - Orchestrator 已有 durable facts、candidate/published 投影、rebase 冲突同 Manager 继续、post-rebase 双 Review 与 ff-only 纯 Port 路径；真实 OpenCode/Git 发布 E2E 仍未验收。

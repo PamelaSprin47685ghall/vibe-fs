@@ -135,6 +135,18 @@ type CompanionHost(primaryId: SessionId, sessions: ISessionHostPort, ?durable: I
             let oldMessages = Fable.Core.JS.JSON.parse previous
             let newMessages = Fable.Core.JS.JSON.parse current
             let stringify value = Fable.Core.JS.JSON.stringify value
+
+            let messageId value =
+                if isNull value || isNull value?info || isNull value?info?id then
+                    None
+                else
+                    Some(unbox<string> value?info?id)
+
+            let sameMessage oldValue newValue =
+                match messageId oldValue, messageId newValue with
+                | Some oldId, Some newId -> oldId = newId
+                | _ -> stringify oldValue = stringify newValue
+
             let mutable index = 0
             let mutable stopped = false
 
@@ -142,7 +154,7 @@ type CompanionHost(primaryId: SessionId, sessions: ISessionHostPort, ?durable: I
                 let oldValue: obj = emitJsExpr (oldMessages, index) "$0[$1]"
                 let newValue: obj = emitJsExpr (newMessages, index) "$0[$1]"
 
-                if stringify oldValue <> stringify newValue then
+                if not (sameMessage oldValue newValue) then
                     stopped <- true
                 else
                     index <- index + 1
