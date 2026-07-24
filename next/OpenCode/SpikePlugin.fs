@@ -223,6 +223,18 @@ module SpikePlugin =
                         let eventType = unbox<string> event?``type``
                         eventType = "session.idle" || eventType = "session.aborted"
 
+                let isAbortEvent (raw: obj) =
+                    let event = rawEvent raw
+
+                    not (isNull event)
+                    && not (isNull event?``type``)
+                    && unbox<string> event?``type`` = "session.aborted"
+
+                let abortChildren parentId =
+                    sessionParents
+                    |> Seq.choose (fun pair -> if pair.Value = parentId then Some pair.Key else None)
+                    |> Seq.iter (fun childId -> sessionPort.AbortSession(SessionId.create childId) |> ignore)
+
                 let transform inObj outObj =
                     if
                         not (isNull inObj)
@@ -266,6 +278,9 @@ module SpikePlugin =
                                 |> Option.iter (fun parentId ->
                                     if not (String.IsNullOrWhiteSpace parentId) then
                                         sessionParents.[sessionId] <- parentId)
+
+                                if isAbortEvent raw then
+                                    abortChildren sessionId
 
                                 if isTerminalEvent raw then
                                     match sessionRoles.TryGetValue sessionId with

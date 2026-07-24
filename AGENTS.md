@@ -45,7 +45,7 @@ import:
 
 ### 🟡 Host terminal：已改 per-Run，待真实验收
 - Session 不再永久标记 terminal；每次新 prompt 都安装独立 listener，使用启动前输出边界截取本轮增量并在完成后 dispose。
-- 真实 Manager→Coder→Join 已通过；连续多轮、迟到 terminal、parent abort 与真实 assistant part 边界仍是独立缺口。
+- 真实 Manager→Coder→Join 已通过；parent abort 已由 Host event 向已登记 child 传播，连续多轮、迟到 terminal 与真实 assistant part 边界仍需 E2E。
 
 ### 🟡 A 版输出：当前为新增输出切片，仍待完整 Host part 验证
 - `HostForkRuntime` 不再直接返回全历史；按 Run 启动边界截取新增输出并排除本地 prompt 标记。
@@ -75,7 +75,7 @@ import:
 - 已有 AgentJournal、candidate/published facts、初次与 rebase 后双 PERFECT、冲突交回同一 Manager、Git authority reconcile 与 ff-only；真实 OpenCode Manager worktree 发布 E2E 仍未闭合。
 ## 下一阶段唯一优先级：跨域闭合
 1. 将真实 Reviewer、Executor 的 E2E 门禁纳入 P0，并保持默认 3×稳定性口径。
-2. 补齐 parent abort、三轮 existing-agent nudge、近上限投影替换与跨重启 Host reconcile。
+2. 验证已接通的 parent abort、三轮 existing-agent nudge、近上限投影替换与跨重启 Host reconcile。
 3. 接通真实模型失败注入后的 A/B Fallback durable 恢复。
 4. 将 Orchestrator durable Port 路径接到真实 OpenCode Manager worktree、冲突回交、复审与 ff-only 发布 E2E。
 5. 全部边界通过后才允许 release 入口切换与旧资产删除。

@@ -218,4 +218,7 @@ type HostForkRuntime(parentId: SessionId, sessions: ISessionHostPort, ?journal: 
 
     member _.Cancel() =
         runtime.Cancel()
-        sessions.AbortSession(parentId) |> ignore
+
+        let childIds = lock gate (fun () -> children.Values |> Seq.distinct |> Seq.toList)
+
+        childIds |> List.iter (fun childId -> sessions.AbortSession childId |> ignore)
