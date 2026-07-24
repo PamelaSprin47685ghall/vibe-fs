@@ -85,7 +85,8 @@ module CompanionHostTests =
             Assert.True(companion2.EnablePrefixReplacement())
             let projected = companion2.TransformRaw second
             Assert.Equal(2, projected.Length)
-            Assert.Equal("blog paragraph", (projected.Head: obj)?text)
+            let headParts = unbox<obj array> ((projected.Head: obj)?parts)
+            Assert.Equal("blog paragraph", (headParts.[0]: obj)?text)
             Assert.Equal("tail", (projected.[1]: obj)?text)
         }
 

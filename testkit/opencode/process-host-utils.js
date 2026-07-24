@@ -11,6 +11,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { getDescendantPids } from './process-host-checks.js';
 
+export const OPENCODE_BIN = process.env.OPENCODE_BIN || 'opencode';
+
 const STDOUT_RING_MAX = 100;
 
 export const SIGTERM_GRACE_MS = 5000;
@@ -98,7 +100,7 @@ export async function initGitWorkspace(workDir) {
 
 export function spawnOpencodeServe(workDir, env, hooks) {
   const child = spawn(
-    'opencode',
+    OPENCODE_BIN,
     ['serve', '--port', '0', '--hostname', '127.0.0.1'],
     {
       cwd: workDir,

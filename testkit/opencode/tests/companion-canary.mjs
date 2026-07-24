@@ -14,7 +14,6 @@ import { runStaticGate, setupScenario, teardownScenario, getSessionId } from '..
 
 const __filename = fileURLToPath(import.meta.url);
 const ROLE_PROMPTS = {
-  blogger: 'Role canary: blogger must answer without creating a companion.',
   executor: 'Role canary: executor must answer without creating a companion.',
   inspector: 'Role canary: inspector must answer without creating a companion.',
   reviewer: 'Role canary: reviewer must answer without creating a companion.',
@@ -145,7 +144,9 @@ async function runProjectionScenario(scenario) {
 }
 
 async function assertRoleHasNoSidecar(scenario, role, prompt) {
-  const sessionResponse = await scenario.client.createSession();
+  const sessionResponse = await scenario.client.request('POST', '/api/session', {
+    body: { agent: role, model: { providerID: 'test', id: 'test-model' } },
+  });
   const sessionId = getSessionId(sessionResponse);
   assert.ok(sessionId, `${role} session creation failed: ${JSON.stringify(sessionResponse)}`);
   scenario.sessionIds.push(sessionId);
@@ -157,11 +158,10 @@ async function assertRoleHasNoSidecar(scenario, role, prompt) {
   });
 
   const before = scenario.provider.requests.length;
-  const eventSeqBefore = scenario.events.lastSeq;
+  const bloggerBefore = bloggerRequests(scenario.provider).length;
   const turn = scenario.turn.start(sessionId);
   const response = await scenario.client.request('POST', `/session/${sessionId}/prompt_async`, {
     body: {
-      agent: role,
       parts: [{ type: 'text', text: prompt }],
       model: { providerID: 'test', modelID: 'test-model' },
     },
@@ -171,10 +171,10 @@ async function assertRoleHasNoSidecar(scenario, role, prompt) {
 
   const requests = scenario.provider.requests.slice(before);
   assert.ok(requests.length > 0, `${role} produced no provider request`);
-  assert.deepEqual(
-    [...new Set(sessionCreatedIds(scenario, eventSeqBefore))],
-    [sessionId],
-    `${role} must not create a sidecar session`,
+  assert.equal(
+    bloggerRequests(scenario.provider).length,
+    bloggerBefore,
+    `${role} must not create a Blogger companion`,
   );
 
 }

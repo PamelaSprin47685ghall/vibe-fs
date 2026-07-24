@@ -25,8 +25,8 @@ test('manager permission denies global executor tool and executes mailbox path',
 
     const transformed = { messages: [{ role: 'user', text: 'hello' }] };
     hooks['chat.transform']({}, transformed);
-    assert.equal(transformed.messages[0].role, 'system');
-    assert.match(transformed.messages[0].text, /CAPS:/);
+    assert.equal(transformed.messages[0].info?.role, 'user');
+    assert.ok(transformed.messages[0]?.parts?.some((p) => p.type === 'text' && /CAPS:/.test(p.text)));
 
     const context = { sessionID: 'manager-contract' };
     const fork = JSON.parse(await hooks.tool.fork.execute({ agent: 'coder', prompt: 'work' }, context));
