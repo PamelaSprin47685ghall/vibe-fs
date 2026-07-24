@@ -2,6 +2,7 @@ namespace Wanxiangshu.Next.Session
 
 open System
 open System.Threading.Tasks
+open Wanxiangshu.Next.Kernel
 open Wanxiangshu.Next.Tools
 
 type ProjectionSnapshot = string
@@ -19,6 +20,12 @@ type CompanionMemory =
 
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
 module Companion =
+
+    let canCreateForRole (role: Role) : bool =
+        MessageTransform.companionAllowedRole role
+
+    let shouldCreateForAgent (agent: string option) : bool =
+        MessageTransform.shouldCreateCompanion agent
 
     /// Pure jsonDelta: returns None when previous and current are equal canonical JSON;
     /// otherwise returns a JSON object string containing top-level fields changed in current.

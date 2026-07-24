@@ -17,6 +17,38 @@ type MessageWatermark = Index of int
 
 module MessageTransform =
 
+    let roleOfAgent (agent: string option) : Role option =
+        match agent with
+        | None -> None
+        | Some value when String.IsNullOrWhiteSpace value -> None
+        | Some value ->
+            match value.Trim().ToLowerInvariant() with
+            | "manager" -> Some Role.Manager
+            | "coder" -> Some Role.Coder
+            | "orchestrator" -> Some Role.Orchestrator
+            | "inspector" -> Some Role.Inspector
+            | "browser" -> Some Role.Browser
+            | "meditator" -> Some Role.Meditator
+            | "reviewer" -> Some Role.Reviewer
+            | "executor" -> Some Role.Executor
+            | "blogger" -> Some Role.Blogger
+            | _ -> None
+
+    let companionAllowedRole (role: Role) : bool =
+        match role with
+        | Role.Manager
+        | Role.Coder
+        | Role.Orchestrator -> true
+        | Role.Blogger
+        | Role.Executor
+        | Role.Inspector
+        | Role.Browser
+        | Role.Meditator
+        | Role.Reviewer -> false
+
+    let shouldCreateCompanion (agent: string option) : bool =
+        agent |> roleOfAgent |> Option.exists companionAllowedRole
+
     let sanitize (messages: HostMessage list) : HostMessage list =
         messages
         |> List.filter (fun m ->

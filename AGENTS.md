@@ -9,6 +9,7 @@ import:
 # 本轮推进记录
 
 - 已恢复 `next/Doc/SSOT.md`，冻结 Agent DSL、Companion、Fork/Join、durable facts、Review、Process 与 Orchestrator 最终语义。
+- 已加入 Companion 角色纯门禁：仅 Manager/Coder/Orchestrator 可创建 Blogger，其他角色禁止 sidecar。
 - 下一步必须以真实 Host per-Run terminal 与 Manager→Coder→Join 纵切为验收门，不得以既有 127 个测试替代。
 
 ## 已完成并验证
