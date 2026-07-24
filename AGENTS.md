@@ -217,9 +217,9 @@ npm run test:release
 
 ## 一、唯一真理源原则 (SSOT Authority)
 
-1. `AGENTS.md` 是全局唯一真理源。彻底废除 `todowrite`、通用 `Nudge` 协调器、`select_methodology`、`fuzzy_*` 工具与上一代 Stage/Phase 状态机。
-2. 裁决优先级：`SSOT.md` 用户最后明确纠正 > 最终 Agent DSL 架构设计 > `next/Doc/kiss-docs/` > 当前代码 > 旧 `src/`。
-3. ⚠ **`next/Doc/SSOT.md` 当前已被删除**，本条引用文件不存在。**必须立即恢复 `next/Doc/SSOT.md`** 并将用户全部最终纠正逐字写入。恢复前 AGENTS.md 为临时裁决依据；恢复后 SSOT.md 重新获得最高优先级。
+1. `next/Doc/SSOT.md` 是产品语义唯一真理源；`AGENTS.md` 是工程约束与当前状态真理源。彻底废除 `todowrite`、通用 `Nudge` 协调器、`select_methodology`、`fuzzy_*` 工具与上一代 Stage/Phase 状态机。
+2. 产品语义裁决优先级：`next/Doc/SSOT.md` 用户最后明确纠正 > 最终 Agent DSL 架构设计 > `next/Doc/kiss-docs/` > 当前代码 > 旧 `src/`。
+3. `next/Doc/SSOT.md` 已恢复，记录用户最终纠正；实现前必须读取并遵守该文件，恢复后的 SSOT 获得本项目产品语义最高优先级。
 
 ## 二、双层 DSL 架构 (Dual-Layer DSL Architecture)
 
@@ -235,7 +235,7 @@ npm run test:release
 
 ## 三、15 条冻结架构不变量 (15 Architectural Invariants)
 
-1. **Context 压缩法则**：X 的上下文压缩永远是 `B through cursor C + raw tail messages (C, current]`，绝不丢弃未覆盖尾部。
+1. **Context 投影法则**：X 每次模型请求都先构造 canonical JSON projection；启用 replacement 后，以当前 B 等价替换已覆盖前缀，未覆盖 raw tail 必须原样保留。
 2. **Blogger 隔离**：Companion Blogger (Y) 失败、延迟或崩溃永远不阻塞主会话 (X)。
 3. **稳定 Cursor 增量**：Delta 由稳定消息/事件身份 JSON 粒度产生，不做模糊文本 diff。
 4. **认知与控制分离**：B 版工作记录是认知缓存与背景上下文，不是控制与调度事实。
@@ -243,9 +243,9 @@ npm run test:release
 6. ** Run 独立身份**：每次 fork/prompt 分配全局唯一 `RunId`，防止迟到输出覆盖新一轮 Run。
 7. **邮箱优先 (Mailbox First)**：Completion 必须先入 `completionChannel` 邮箱，`join()` 消费邮箱，避免 Fast Completion 丢失。
 8. ** Join 无侧重**：`join()` 随机/顺序弹出邮箱中任意最早到达的 completion，严禁按指定 AgentId 阻塞筛选。
-9. ** Join 空状态**：无 active/ready 任务时，`join()` 立即返回 `EMPTY`，不永久 hang。
+9. ** Join 空状态**：completion mailbox 为空但仍可能有 active Run 时，`join()` 等待下一项；只有明确无 active Run 且协议要求结束时才返回 Empty。
 10. **父级取消作用域**：父 Session 取消/abort 时，通过 CancellationToken 递归有界清理所有子 Run 和 PTY。
-11. **Fallback 单 Turn 内闭环**：模型 Fallback 仅在单次 RunTurn 内尾递归重试；AcceptanceUnknown 时停止并 reconcile，不盲目切模型。
+11. **Fallback Session 闭环**：Fallback 按 Session 累计失败，A1→B2→B3→Dead；成功不清零、不切回 A，失败事实持久化并可从 Projection 恢复。
 12. **Reviewer Hash 绑定**：Reviewer `PERFECT` 结论严格绑定审查时的精确 Git tree hash。
 13. **Reviewer 变化失效**：`PERFECT` 之后工作区发生任何修改，连续确认数立即清零。
 14. **串行发布门禁**：多个 ManagerJob 共享目标 Git ref 的发布过程必须过 `SemaphoreSlim(1)` 严格串行。
@@ -295,7 +295,7 @@ npm run test:release
 ### 3. Process, Command & 200KB Map/Reduce 摘要
 - **绝对 Deadline**：唯一进程超时时间为 `3 × estimated_running_secs`。超时触发 SIGKILL 进程树。
 - **内存 Semaphore**：`Medium` 不限并发；`Large` 内存全局限制 `SemaphoreSlim(1)` 串行。
-- **Spool & Summarizer**：进程启动即安装 byte pump；总输出超 3 倍 `estimated_output_bytes` 时流式写入临时 spool 文件。输出超过 200KB 启动 Executor Agent 按 200KB 分块 Map/Reduce 摘要。
+- **Spool & Summarizer**：进程启动即安装 byte pump；总输出超 3 倍 `estimated_output_bytes` 时流式写入临时 spool 文件；200KB 只是 Executor Map/Reduce 分块大小。
 
 ### 4. Reviewer & ReviewGuard 双 PERFECT 确认
 - **Reviewer 程序**：`verdict` 工具仅接受 `PERFECT | REVISE`，以 `ToolCallId` 去重。第一次 `PERFECT` 工具返回“请再次确认”；同一 tree hash 下第二次连续 `PERFECT` 确认通过。
@@ -324,8 +324,7 @@ npm run test:release
 - **Phase 5 (ReviewGuard)**：完成双 PERFECT 挑战与 Manager 结束门禁。
 - **Phase 6 (PTY)**：完成结构化 PTY 句柄、读写、信号与 completion 统一化。
 - **Phase 7 (Orchestrator)**：完成隔离 worktree、ManagerJob、rebase 复审、串行 FF 发布。
-- **Phase 8 (删除旧实现)**：物理删除 `src/` 旧代码、旧测试与万象阵 DAG 基础设施。
- **Phase 8 (删除旧实现)**：物理删除 `src/` 旧代码、旧测试与万象阵 DAG 基础设施。
+- **Phase 8 (删除旧实现)**：仅在真实 Host/Provider/PTY/Orchestrator 边界全部闭合并完成 release 审计后，才物理删除旧代码、旧测试与万象阵 DAG 基础设施；当前阶段禁止执行。
 
 # 设计决策历史与补充规范
 

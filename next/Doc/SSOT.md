@@ -33,7 +33,7 @@
 - 新 child：create → 注册 linkage → 安装本 Run terminal listener → send prompt → 返回 AgentId。
 - existing child：为本次 nudge 重新安装 listener，fire-and-forget send，独立等待本 Run terminal。
 - terminal listener 以 per-Run watermark/边界提取本轮 assistant 正文；不得按 session 永久标记 terminal，不得返回全历史。
-- Completion 先入 mailbox，`join()` 消费任意最早 completion；无 active/ready 时返回 `EMPTY`。父 abort 传播 CancellationToken，清理所有 child Run 与 PTY；迟到 terminal 按 RunId 忽略。
+- Completion 先入 mailbox，`join()` 消费任意最早 completion；mailbox 为空时挂起等待下一项 completion，不按 AgentId 筛选，也不因暂时没有 ready 项返回 `EMPTY`。父 abort 传播 CancellationToken，清理所有 child Run 与 PTY；迟到 terminal 按 RunId 忽略。
 
 ## 5. 持久事实与 CQRS
 
@@ -59,7 +59,7 @@ A/B 角色切换与失败计数必须持久化；禁止 AcceptanceUnknown/Reconc
 
 - 唯一进程 deadline = `3 × estimated_running_secs`；estimate 可极大，不 clamp；超时 SIGKILL 进程树。SIGKILL 无法返回是实现 bug，不加第二层兜底 timeout。
 - Medium 不限并发；Large 由进程级单一 semaphore 串行。
-- 启动即无损 byte pump；总输出超过 `3 × estimated_output_bytes` 后流式 spool。超过 200KB 按 200KB 分块，由无工具 Executor Agent map/reduce 摘要；200KB 是摘要块，不是总输出上限。
+- 启动即无损 byte pump；总输出超过 `3 × estimated_output_bytes` 后流式 spool；spool 完成后按 200KB 分块，由无工具 Executor Agent map/reduce 摘要。200KB 是摘要块大小，不是触发阈值或总输出上限。
 
 ## 8. ReviewGuard
 
