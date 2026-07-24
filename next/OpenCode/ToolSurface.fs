@@ -49,6 +49,7 @@ module ToolSurface =
         (sessionParents: Dictionary<string, string>)
         (sessionRoles: Dictionary<string, string>)
         (verdictSessions: HashSet<string>)
+        (modelConfig: ModelResolver.ModelConfig option)
         : obj =
         let factory = toolModule?tool
         let runtimes = Dictionary<string, HostForkRuntime>()

@@ -46,6 +46,11 @@ function makeConfig(llmUrl, pluginPaths = [], opts = {}) {
     cost: { input: 0, output: 0 },
     options: {},
   };
+  const modelBDef = {
+    ...modelDef,
+    id: 'test-model-b',
+    name: 'Test Model B',
+  };
   return {
     formatter: false,
     lsp: false,
@@ -57,7 +62,7 @@ function makeConfig(llmUrl, pluginPaths = [], opts = {}) {
         id: 'test',
         env: [],
         npm: '@ai-sdk/openai-compatible',
-        models: { 'test-model': { ...modelDef } },
+        models: { 'test-model': { ...modelDef }, 'test-model-b': { ...modelBDef } },
         options: { apiKey: opts.apiKey || 'test-key', baseURL: `${llmUrl}` },
       },
       opencode: {

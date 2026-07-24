@@ -5,6 +5,8 @@ open System.Collections.Generic
 open Fable.Core.JsInterop
 open Wanxiangshu.Next.Session
 open Wanxiangshu.Next.Kernel.Identity
+open Wanxiangshu.Next.Kernel.Fact
+open Wanxiangshu.Next.Journal
 
 /// Keeps host event facts at the adapter boundary: session identity, parentage,
 /// role, terminal nudge, and parent-abort propagation.
@@ -14,7 +16,8 @@ type HostEventRouter
         sessionParents: Dictionary<string, string>,
         sessionRoles: Dictionary<string, string>,
         verdictSessions: HashSet<string>,
-        nudgeSent: HashSet<string>
+        nudgeSent: HashSet<string>,
+        ?journal: AgentJournal
     ) =
 
     let mutable latestSessionId = ""
@@ -73,6 +76,33 @@ type HostEventRouter
     let abortChildren parentId =
         sessionPort.AbortChildren(SessionId.create parentId) |> ignore
 
+    let errorReason (raw: obj) =
+        let properties = rawProperties raw
+
+        if not (isNull properties) && not (isNull properties?error) then
+            let err = properties?error
+            let name = if isNull err?name then "" else unbox<string> err?name
+            let message = if isNull err?message then "" else unbox<string> err?message
+
+            if String.IsNullOrWhiteSpace name then
+                message
+            else
+                sprintf "%s: %s" name message
+        else
+            "unknown provider error"
+
+    let recordProviderError sessionId raw =
+        match journal with
+        | None -> ()
+        | Some journal ->
+            let fact =
+                AgentFact.FallbackFailureRecorded
+                    {| SessionId = SessionId.create sessionId
+                       Reason = errorReason raw |}
+
+            AgentJournal.appendAgent (StreamId.Session(SessionId.create sessionId)) None fact journal
+            |> ignore
+
     let nudgeReviewer sessionId =
         if nudgeSent.Add sessionId then
             sessionPort.SendPrompt(
@@ -103,6 +133,8 @@ type HostEventRouter
 
             if isAbortError raw then
                 abortChildren sessionId
+            elif eventType raw = "session.error" then
+                recordProviderError sessionId raw
 
             if isTerminalEvent raw then
                 if eventType raw = "session.aborted" then

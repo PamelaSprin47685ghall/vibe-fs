@@ -56,6 +56,7 @@
     <Compile Include="Tools/StaticTools.fs"/>
     <Compile Include="Tools/FileTools.fs"/>
     <Compile Include="OpenCode/OpencodeTypes.fs"/>
+    <Compile Include="OpenCode/ModelResolver.fs"/>
     <Compile Include="OpenCode/MessageOriginDecoder.fs"/>
     <Compile Include="OpenCode/Projection.fs"/>
     <Compile Include="OpenCode/Events.fs"/>

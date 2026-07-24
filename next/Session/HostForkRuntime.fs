@@ -25,13 +25,20 @@ type HostForkRuntime
         parentId: SessionId,
         sessions: ISessionHostPort,
         ?journal: AgentJournal,
-        ?onChildCreated: string -> AgentRole -> SessionId -> unit
+        ?onChildCreated: string -> AgentRole -> SessionId -> unit,
+        ?modelResolver: ModelResolver.ModelConfig
     ) =
     let runtime = ForkRuntime()
     let children = Dictionary<string, SessionId>()
     let pendingRuns = Dictionary<string, PendingHostRun>()
     let gate = obj ()
     let childCreated = defaultArg onChildCreated (fun _ _ _ -> ())
+
+    let resolveModel (childId: SessionId) : OpencodeModel option =
+        match modelResolver, journal with
+        | Some resolver, Some journal ->
+            ModelResolver.resolveForSession resolver childId (AgentJournal.snapshot journal)
+        | _ -> None
 
     let roleOfString (value: string) =
         if String.IsNullOrWhiteSpace value then
@@ -153,7 +160,13 @@ type HostForkRuntime
                     markReady run
 
                     let! sent =
-                        sessions.SendChildPromptFireAndForget(parentId, childId, prompt, { Model = None; Agent = None })
+                        sessions.SendChildPromptFireAndForget(
+                            parentId,
+                            childId,
+                            prompt,
+                            { Model = resolveModel childId
+                              Agent = Some(role.ToString().ToLowerInvariant()) }
+                        )
 
                     match sent with
                     | Ok() -> return Ok result
@@ -206,7 +219,7 @@ type HostForkRuntime
                             sessions.SendPrompt(
                                 childId,
                                 prompt,
-                                { Model = None
+                                { Model = resolveModel childId
                                   Agent = Some(role.ToString().ToLowerInvariant()) }
                             )
 
@@ -252,7 +265,7 @@ type HostForkRuntime
                                 parentId,
                                 childId,
                                 prompt,
-                                { Model = None
+                                { Model = resolveModel childId
                                   Agent = Some(role.ToString().ToLowerInvariant()) }
                             )
 

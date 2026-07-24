@@ -178,6 +178,7 @@ module SpikePlugin =
         (sessionParents: Dictionary<string, string>)
         (sessionRoles: Dictionary<string, string>)
         (verdictSessions: HashSet<string>)
+        (modelConfig: ModelResolver.ModelConfig option)
         : obj =
         ToolSurface.create
             toolModule
@@ -188,6 +189,7 @@ module SpikePlugin =
             sessionParents
             sessionRoles
             verdictSessions
+            modelConfig
 
     let initSpikePlugin (input: obj) : Task<obj> =
         task {
@@ -214,7 +216,14 @@ module SpikePlugin =
                 let sessionBudgets = Dictionary<string, int>()
 
                 let eventRouter =
-                    HostEventRouter(sessionPort, sessionParents, sessionRoles, verdictSessions, nudgeSent)
+                    HostEventRouter(
+                        sessionPort,
+                        sessionParents,
+                        sessionRoles,
+                        verdictSessions,
+                        nudgeSent,
+                        ?journal = journal
+                    )
 
                 let transform inObj outObj =
                     let projectionSessionId =
@@ -262,6 +271,8 @@ module SpikePlugin =
 
                 let client = if isNull input then null else input?client
 
+                let modelConfig = ModelResolver.fromEnv ()
+
                 if not (isNull client) then
                     try
                         let! toolModule = importToolModule ()
@@ -276,6 +287,7 @@ module SpikePlugin =
                                 sessionParents
                                 sessionRoles
                                 verdictSessions
+                                modelConfig
                     with ex ->
                         raise (InvalidOperationException(sprintf "Failed to load OpenCode tool module: %s" ex.Message))
 
