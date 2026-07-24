@@ -99,6 +99,34 @@ module SpikePlugin =
             let runtimeId = RuntimeId.create (Guid.NewGuid().ToString("N").Substring(0, 12))
             Some(AgentJournal.createFromBoot directory runtimeId processId DateTimeOffset.UtcNow boot)
 
+    let private restoreSessionRoles (journal: AgentJournal option) (sessionRoles: Dictionary<string, string>) =
+        match journal with
+        | None -> ()
+        | Some journal ->
+            let snapshot = AgentJournal.snapshot journal
+
+            for KeyValue(_, session) in snapshot.AgentProjections.Sessions do
+                match session.Linkage with
+                | Some linkage ->
+                    for KeyValue(childId, role) in linkage.LinkedRoles do
+                        sessionRoles.[ChildId.value childId] <- role
+                | None -> ()
+
+    let private sessionIdFromMessages (output: obj) =
+        if isNull output || isNull output?messages then
+            None
+        else
+            let messages = unbox<obj array> output?messages
+
+            messages
+            |> Array.tryPick (fun message ->
+                if not (isNull message?info) && not (isNull message?info?sessionID) then
+                    Some(unbox<string> message?info?sessionID)
+                elif not (isNull message?sessionID) then
+                    Some(unbox<string> message?sessionID)
+                else
+                    None)
+
     let private configureManager (config: obj) =
         if not (isNull config) then
             let agents =
@@ -158,6 +186,8 @@ module SpikePlugin =
                 let verdictSessions = HashSet<string>()
                 let nudgeSent = HashSet<string>()
 
+                restoreSessionRoles journal sessionRoles
+
                 let gitTreePort =
                     match gitTreePortFromInput input with
                     | Some port -> Some port
@@ -167,19 +197,22 @@ module SpikePlugin =
                     HostEventRouter(sessionPort, sessionParents, sessionRoles, verdictSessions, nudgeSent)
 
                 let transform inObj outObj =
+                    let projectionSessionId =
+                        sessionIdFromMessages outObj |> Option.defaultValue eventRouter.LatestSessionId
+
                     if
                         not (isNull inObj)
                         && isNull inObj?sessionID
-                        && not (String.IsNullOrWhiteSpace eventRouter.LatestSessionId)
+                        && not (String.IsNullOrWhiteSpace projectionSessionId)
                     then
-                        inObj?sessionID <- eventRouter.LatestSessionId
+                        inObj?sessionID <- projectionSessionId
 
                     if
                         not (isNull inObj)
                         && isNull inObj?agent
-                        && sessionRoles.ContainsKey eventRouter.LatestSessionId
+                        && sessionRoles.ContainsKey projectionSessionId
                     then
-                        inObj?agent <- sessionRoles.[eventRouter.LatestSessionId]
+                        inObj?agent <- sessionRoles.[projectionSessionId]
 
                     CompanionTransform.handleCompanionTransform companions companionGate sessionPort inObj outObj
 
