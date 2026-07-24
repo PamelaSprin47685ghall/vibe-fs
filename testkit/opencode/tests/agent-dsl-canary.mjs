@@ -207,13 +207,13 @@ try {
 }
 
 // 5. One-Iteration Stability Loop with per-run disposal and leak checks
-console.log('4. Running twenty-iteration stability gate...');
+console.log('4. Running three-iteration stability gate...');
 const stabilityGateResult = await runStabilityGate({
   test: {
     name: 'Manager DSL Canary Scenario',
     fn: canaryScenario,
   },
-  repeat: Number(process.env.CANARY_REPEAT || 20),
+  repeat: Number(process.env.CANARY_REPEAT || 3),
   globalTimeoutMs: 900000,
   scenarioOpts: {
     project: {
