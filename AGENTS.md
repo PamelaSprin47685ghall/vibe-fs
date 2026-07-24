@@ -35,7 +35,7 @@ import:
 - `HostEventPort`/`DeterministicEventPort` 已移除按 Session 永久吞 terminal；真实 P0 已覆盖 child 创建、terminal、A 版切片与 Manager join。
 - Companion 角色纯门禁与真实两轮 Blogger 请求已通过；真实 near-limit projection replacement 与 OpenCode 进程重启仍需单独 E2E。
 - `Reviewer` verdict 已读 Git tree、写 Journal、按 ToolCallId 去重，并以同 tree 双 PERFECT 确认；真实 Reviewer tool→Git 工作区→重启 E2E 仍未闭合。
-- 标准入口从 `input.directory` 自动启用 `<workspace>/.wanxiangshu-next/runtimes/` Boot + AgentJournal；真实 AgentLinked 生成已由 Manager canary 覆盖，跨重启 reconcile 仍需验证。
+- 标准入口从 `input.directory` 自动启用 `<workspace>/.wanxiangshu-next/runtimes/` Boot + AgentJournal；真实 AgentLinked 生成已由 Manager canary 覆盖，HostForkRuntime 已按持久 child/session/role linkage 恢复可 nudge 句柄，真实 OpenCode 重启 reconcile 仍需验证。
 
 ## 当前边界：不得误称已完成
 
@@ -64,7 +64,7 @@ import:
 - `SpikePlugin` config hook 原地注入 manager agent 的 deny-all + fork/join/list allow 配置；P0 已证明真实 provider request 无 read/write/edit/bash/glob/grep/verdict。
 
 ### 🟡 Journal 默认路径已接线，跨重启仍待生产验证
-- 标准入口从 `input.directory` 推导 `<workspace>/.wanxiangshu-next/runtimes/`，Boot 后创建 AgentJournal；AgentLinked 写入已进入真实 Manager 纵切，Review/Fallback/Companion 跨重启与 reconcile 仍未闭合。
+- 标准入口从 `input.directory` 推导 `<workspace>/.wanxiangshu-next/runtimes/`，Boot 后创建 AgentJournal；AgentLinked 写入已进入真实 Manager 纵切，child/session/role linkage 的 Port/Fake 恢复测试已通过，真实 OpenCode 重启与 Review/Fallback/Companion reconcile 仍未闭合。
 
 ### 🟡 Fallback 阈值已修复，待真实模型调用验证
 - `Fallback` 纯函数与 durable wrapper 现按 A1→B2→B3→Dead 计算；第一次失败重试 A，第二次失败才永久切 B。

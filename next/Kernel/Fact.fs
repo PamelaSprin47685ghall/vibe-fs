@@ -28,7 +28,8 @@ module Fact =
         | AgentLinked of
             {| ParentId: SessionId
                ChildId: ChildId
-               TargetAgent: string |}
+               TargetAgent: string
+               Role: string option |}
         | AgentUnlinked of
             {| ParentId: SessionId
                ChildId: ChildId |}

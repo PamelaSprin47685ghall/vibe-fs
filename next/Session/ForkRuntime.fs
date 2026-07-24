@@ -194,6 +194,15 @@ type ForkRuntime
     member _.RegisterPty(pty: PtyRecord) : unit =
         lock lockObj (fun () -> ptys.[pty.PtyId] <- pty)
 
+    member _.Restore(agentId: string, role: AgentRole) : unit =
+        lock lockObj (fun () ->
+            if not (agents.ContainsKey agentId) then
+                agents.[agentId] <-
+                    { AgentId = agentId
+                      Role = role
+                      Status = AgentStatus.Idle
+                      CurrentRunId = None })
+
     member _.UnregisterPty(ptyId: string) : unit =
         lock lockObj (fun () -> ptys.Remove(ptyId) |> ignore)
 

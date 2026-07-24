@@ -26,8 +26,47 @@ type HostForkRuntime(parentId: SessionId, sessions: ISessionHostPort, ?journal: 
     let pendingRuns = Dictionary<string, PendingHostRun>()
     let gate = obj ()
 
+    let roleOfString (value: string) =
+        if String.IsNullOrWhiteSpace value then
+            None
+        else
+            match value.Trim().ToLowerInvariant() with
+            | "manager" -> Some AgentRole.Manager
+            | "orchestrator" -> Some AgentRole.Orchestrator
+            | "coder" -> Some AgentRole.Coder
+            | "inspector" -> Some AgentRole.Inspector
+            | "browser" -> Some AgentRole.Browser
+            | "meditator" -> Some AgentRole.Meditator
+            | "reviewer" -> Some AgentRole.Reviewer
+            | "advisor" -> Some AgentRole.Advisor
+            | "executor" -> Some AgentRole.Executor
+            | _ -> None
+
     let completionSource () : TaskCompletionSource<Result<string, string>> =
         TaskCompletionSource<Result<string, string>>(TaskCreationOptions.RunContinuationsAsynchronously)
+
+    let restoreChildren () =
+        match journal with
+        | None -> ()
+        | Some journal ->
+            let snapshot = AgentJournal.snapshot journal
+
+            match Map.tryFind parentId snapshot.AgentProjections.Sessions with
+            | Some session when session.Linkage.IsSome ->
+                let linkage = session.Linkage.Value
+
+                for KeyValue(childId, agentId) in linkage.LinkedChildren do
+                    let role = linkage.LinkedRoles |> Map.tryFind childId |> Option.bind roleOfString
+
+                    match role with
+                    | Some role ->
+                        let childSessionId = SessionId.create (ChildId.value childId)
+                        children.[agentId] <- childSessionId
+                        runtime.Restore(agentId, role)
+                    | None -> ()
+            | _ -> ()
+
+    do restoreChildren ()
 
     let outputSince (run: PendingHostRun) =
         let all = sessions.GetSessionOutput run.ChildId
@@ -136,7 +175,8 @@ type HostForkRuntime(parentId: SessionId, sessions: ISessionHostPort, ?journal: 
                                 AgentFact.AgentLinked
                                     {| ParentId = parentId
                                        ChildId = ChildId.create (SessionId.value childId)
-                                       TargetAgent = agentId |}
+                                       TargetAgent = agentId
+                                       Role = Some(role.ToString()) |}
 
                             match AgentJournal.appendAgent (StreamId.Session parentId) None fact journal with
                             | Ok _ -> Ok()

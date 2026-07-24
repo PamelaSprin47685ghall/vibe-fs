@@ -227,7 +227,8 @@ module AgentFactsTests =
             AgentFact.AgentLinked
                 {| ParentId = parentSid
                    ChildId = childId
-                   TargetAgent = "WorkerAgent" |}
+                   TargetAgent = "WorkerAgent"
+                   Role = Some "Coder" |}
 
         let reqEffect =
             AgentFact.DurableEffectRequested

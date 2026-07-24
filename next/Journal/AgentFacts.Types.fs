@@ -38,7 +38,8 @@ type CompanionProjection =
     member this.PrefixReplacementEnabled = this.ReplacementActive
 
 type AgentLinkageProjection =
-    { LinkedChildren: Map<ChildId, string> }
+    { LinkedChildren: Map<ChildId, string>
+      LinkedRoles: Map<ChildId, string> }
 
 type ReviewGuardProjection =
     { LastGitTreeHash: GitTreeHash option

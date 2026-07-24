@@ -55,4 +55,21 @@ module FactCodecTests =
             Assert.Equal("call123", r.ToolCallId)
             Assert.Equal("tree123", r.GitTreeHash)
             Assert.Equal(ReviewGuardVerdict.Perfect, r.Verdict)
-        | _ -> Assert.True(false, sprintf "Expected Ok ReviewVerdictRecorded, got: %A" res)
+        | _ -> Assert.True(false, sprintf "Expected Ok ReviewVerdict, got: %A" res)
+
+    [<Fact>]
+    let Serialize_and_deserialize_AgentLinked_role () =
+        let fact =
+            Fact.Agent(
+                AgentFact.AgentLinked
+                    {| ParentId = SessionId.create "parent"
+                       ChildId = ChildId.create "child"
+                       TargetAgent = "agent-1"
+                       Role = Some "Coder" |}
+            )
+
+        match FactCodec.deserializeFact (FactCodec.serializeFact fact) with
+        | Ok(Fact.Agent(AgentFact.AgentLinked linked)) ->
+            Assert.Equal("agent-1", linked.TargetAgent)
+            Assert.Equal(Some "Coder", linked.Role)
+        | _ -> Assert.True(false, "Expected AgentLinked fact")

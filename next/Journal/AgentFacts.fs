@@ -1,5 +1,6 @@
 namespace Wanxiangshu.Next.Journal
 
+open System
 open Wanxiangshu.Next.Kernel.Fact
 open AgentFactsFoldHelpers
 
@@ -10,7 +11,9 @@ module AgentFacts =
           CurrentB = None
           ReplacementActive = false }
 
-    let emptyLinkage: AgentLinkageProjection = { LinkedChildren = Map.empty }
+    let emptyLinkage: AgentLinkageProjection =
+        { LinkedChildren = Map.empty
+          LinkedRoles = Map.empty }
 
     let emptyReviewGuard: ReviewGuardProjection =
         { LastGitTreeHash = None
@@ -106,6 +109,10 @@ module AgentFacts =
             { proj with Sessions = sessions }
 
         | AgentFact.AgentLinked p ->
+            let role =
+                p.Role
+                |> Option.bind (fun value -> if String.IsNullOrWhiteSpace value then None else Some value)
+
             let sessions =
                 updateSession
                     p.ParentId
@@ -113,8 +120,17 @@ module AgentFacts =
                         let link =
                             match s.Linkage with
                             | Some existing ->
-                                { LinkedChildren = Map.add p.ChildId p.TargetAgent existing.LinkedChildren }
-                            | None -> { LinkedChildren = Map.ofList [ (p.ChildId, p.TargetAgent) ] }
+                                { LinkedChildren = Map.add p.ChildId p.TargetAgent existing.LinkedChildren
+                                  LinkedRoles =
+                                    match role with
+                                    | Some role -> Map.add p.ChildId role existing.LinkedRoles
+                                    | None -> existing.LinkedRoles }
+                            | None ->
+                                { LinkedChildren = Map.ofList [ (p.ChildId, p.TargetAgent) ]
+                                  LinkedRoles =
+                                    role
+                                    |> Option.map (fun role -> Map.ofList [ (p.ChildId, role) ])
+                                    |> Option.defaultValue Map.empty }
 
                         { s with Linkage = Some link })
                     proj.Sessions
@@ -128,7 +144,9 @@ module AgentFacts =
                     (fun s ->
                         let link =
                             match s.Linkage with
-                            | Some existing -> { LinkedChildren = Map.remove p.ChildId existing.LinkedChildren }
+                            | Some existing ->
+                                { LinkedChildren = Map.remove p.ChildId existing.LinkedChildren
+                                  LinkedRoles = Map.remove p.ChildId existing.LinkedRoles }
                             | None -> emptyLinkage
 
                         { s with Linkage = Some link })

@@ -4,6 +4,7 @@ open System
 open System.Threading.Tasks
 open Xunit
 open Wanxiangshu.Next.Kernel.Identity
+open Wanxiangshu.Next.Kernel.Fact
 open Wanxiangshu.Next.Journal
 open Wanxiangshu.Next.OpenCode
 open Wanxiangshu.Next.Session
@@ -110,4 +111,31 @@ module HostForkRuntimeTests =
                 let! result = bridge.Fork("agent-durable", AgentRole.Coder, "work")
                 Assert.Equal(Ok(ForkResult.Created "agent-durable"), result)
                 Assert.True(promptSawLink)
+            })
+
+    [<Fact>]
+    let ``HostForkRuntime_restores_linked_child_for_nudge`` () =
+        withTempDir (fun tempDir ->
+            task {
+                let parentId = SessionId.create "parent-restored"
+                let childId = ChildId.create "child-1"
+
+                use journal =
+                    AgentJournal.create tempDir (RuntimeId.create "runtime-restored") 1 DateTimeOffset.UtcNow
+
+                let linkFact =
+                    AgentFact.AgentLinked
+                        {| ParentId = parentId
+                           ChildId = childId
+                           TargetAgent = "agent-restored"
+                           Role = Some "Coder" |}
+
+                Assert.True(Result.isOk (AgentJournal.appendAgent (StreamId.Session parentId) None linkFact journal))
+
+                let host, _, childCount = makeFake ()
+                let bridge = HostForkRuntime(parentId, host, journal = journal)
+                let! result = bridge.Reuse("agent-restored", "continue")
+
+                Assert.Equal(Ok(ForkResult.Nudged "agent-restored"), result)
+                Assert.Equal(0, childCount ())
             })
