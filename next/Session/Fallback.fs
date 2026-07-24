@@ -18,7 +18,7 @@ module Fallback =
     let nextAttempt (state: FallbackState) : FallbackDecision =
         match state.Side with
         | ModelSide.A ->
-            if state.Failures < 1 then
+            if state.Failures < 2 then
                 FallbackDecision.NextAttempt
                     { Side = ModelSide.A
                       Failures = state.Failures + 1 }
@@ -27,7 +27,7 @@ module Fallback =
                     { Side = ModelSide.B
                       Failures = state.Failures + 1 }
         | ModelSide.B ->
-            if state.Failures < 3 then
+            if state.Failures < 4 then
                 FallbackDecision.NextAttempt
                     { Side = ModelSide.B
                       Failures = state.Failures + 1 }

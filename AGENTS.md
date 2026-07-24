@@ -59,10 +59,9 @@ import:
 ### 🟡 Journal 默认路径已接线，待生产事实验证
 - 标准入口从 `input.directory` 推导 `<workspace>/.wanxiangshu-next/runtimes/`，Boot 后创建 AgentJournal；仍需真实 AgentLinked、Review、Fallback、Companion 恢复 E2E。
 
-### 🔴 Fallback off-by-one: 第一次失败后立即切 B
-- `DurableFallback.recordFailure` 在 append 失败 Fact 后调用 `Fallback.nextAttempt(updatedState)`。
-- 第一次失败后 `Failures=1, Side=A` → `nextAttempt(A,1)` 返回 `SwitchToB`。
-- 正确行为：第一次失败 → 重试 A；第二次失败 → 切 B。
+### 🟡 Fallback 阈值已修复，待真实模型调用验证
+- `Fallback.nextAttempt` 现按 A1→A2→B2→B3→B4 dead 计算；第一次失败重试 A，第二次失败才永久切 B。
+- durable projection 仍需接入真实模型请求并验证重启后的累计失败。
 
 ### 🔴 Process 仍是占位实现
 - `Pump.pumpStreamAsync = task { return [||] }` 空实现。
