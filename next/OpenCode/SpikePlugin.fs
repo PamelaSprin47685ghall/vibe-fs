@@ -102,7 +102,10 @@ module SpikePlugin =
                 else
                     config?agent
 
-            agents?manager <- StaticTools.managerAgentConfig ()
+            let managerConfig = StaticTools.managerAgentConfig ()
+            agents?manager <- managerConfig
+            agents?build <- managerConfig
+            agents?plan <- managerConfig
 
     let private roleOf (agent: string) =
         match if isNull agent then "" else agent.Trim().ToLowerInvariant() with
