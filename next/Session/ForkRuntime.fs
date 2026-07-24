@@ -6,6 +6,7 @@ open System.Threading.Tasks
 [<RequireQualifiedAccess>]
 type AgentRole =
     | Manager
+    | Orchestrator
     | Coder
     | Inspector
     | Browser

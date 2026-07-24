@@ -54,6 +54,11 @@ module StaticTools =
                         "verdict", box "deny" ]
               ) ]
 
+    let orchestratorAgentConfig () : obj =
+        createObj
+            [ "mode", box "primary"
+              "permission", box (createObj [ "*", box "deny"; "fork", box "allow"; "join", box "allow" ]) ]
+
     let coderAgentConfig () : obj =
         createObj
             [ "mode", box "primary"

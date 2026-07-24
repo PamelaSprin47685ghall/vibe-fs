@@ -10,6 +10,7 @@ module HostSessionContext =
     let roleOf (agent: string) =
         match if isNull agent then "" else agent.Trim().ToLowerInvariant() with
         | "manager" -> Some AgentRole.Manager
+        | "orchestrator" -> Some AgentRole.Orchestrator
         | "coder" -> Some AgentRole.Coder
         | "inspector" -> Some AgentRole.Inspector
         | "browser" -> Some AgentRole.Browser

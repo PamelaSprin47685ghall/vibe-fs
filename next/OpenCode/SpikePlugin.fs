@@ -113,6 +113,7 @@ module SpikePlugin =
             agents?manager <- managerConfig
             agents?build <- managerConfig
             agents?plan <- managerConfig
+            agents?orchestrator <- StaticTools.orchestratorAgentConfig ()
             agents?coder <- StaticTools.coderAgentConfig ()
             let toollessConfig = StaticTools.toollessAgentConfig ()
             agents?blogger <- toollessConfig

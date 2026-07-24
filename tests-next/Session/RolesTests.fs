@@ -6,6 +6,16 @@ open Wanxiangshu.Next.Kernel
 module RolesTests =
 
     [<Fact>]
+    let ``Orchestrator_role_permission_matrix`` () =
+        let allowed = set [ ToolPermission.Fork; ToolPermission.Join ]
+
+        Assert.Equal<ToolPermission Set>(allowed, Roles.permissions Role.Orchestrator)
+        Assert.True(Roles.isAllowed Role.Orchestrator ToolPermission.Fork)
+        Assert.True(Roles.isAllowed Role.Orchestrator ToolPermission.Join)
+        Assert.False(Roles.isAllowed Role.Orchestrator ToolPermission.List)
+        Assert.False(Roles.isAllowed Role.Orchestrator ToolPermission.Read)
+
+    [<Fact>]
     let ``Manager_role_permission_matrix`` () =
         let allowed = set [ ToolPermission.Fork; ToolPermission.Join; ToolPermission.List ]
 
