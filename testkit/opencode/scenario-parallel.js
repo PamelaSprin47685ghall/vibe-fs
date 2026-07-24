@@ -88,6 +88,7 @@ export async function setupScenarioParallel(opts, tmpDir) {
       providerUrl: `${providerUrl}/v1`,
       pluginPaths,
       contextLimit: opts.contextLimit,
+      extraEnv: opts.extraEnv,
     });
 
     const client = new HttpClient(host.baseUrl, host.workDir);
