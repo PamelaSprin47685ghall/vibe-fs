@@ -8,7 +8,7 @@ import { SpikePlugin_initSpikePlugin } from '../../../build/next/OpenCode/SpikeP
 test('manager exposes only fork join list and executes the mailbox path', async () => {
   const journalDirectory = fs.mkdtempSync(path.join(os.tmpdir(), 'wanxiangshu-manager-'));
   try {
-    const hooks = await SpikePlugin_initSpikePlugin({ client: {}, journalDirectory });
+    const hooks = await SpikePlugin_initSpikePlugin({ client: {}, directory: journalDirectory });
     const names = Object.keys(hooks.tool).sort();
 
     assert.deepEqual(names, ['fork', 'join', 'list']);
@@ -29,7 +29,8 @@ test('manager exposes only fork join list and executes the mailbox path', async 
     assert.equal(join.outcome[0], 'Ok');
     assert.equal(list[0].agentId, fork.agentId);
     assert.equal(list[0].role, 'Coder');
-    assert.equal(fs.readdirSync(journalDirectory).filter((name) => name.endsWith('.ndjson')).length, 1);
+    const runtimeDirectory = path.join(journalDirectory, '.wanxiangshu-next', 'runtimes');
+    assert.equal(fs.readdirSync(runtimeDirectory).filter((name) => name.endsWith('.ndjson')).length, 1);
   } finally {
     fs.rmSync(journalDirectory, { recursive: true, force: true });
   }

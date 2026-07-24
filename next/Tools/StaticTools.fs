@@ -28,6 +28,17 @@ module NodeProcess =
 
 module StaticTools =
 
+    let managerAgentConfig () : obj =
+        createObj
+            [ "mode", box "primary"
+              "permission",
+              box (
+                  createObj
+                      [ "*", box "deny"
+                        "fork", box "allow"
+                        "join", box "allow"
+                        "list", box "allow" ]
+              ) ]
 
     let executorTool () : Tool =
         { Name = "executor"

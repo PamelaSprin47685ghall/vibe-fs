@@ -8,12 +8,17 @@ open Fable.Core.JsInterop
 open Wanxiangshu.Next.Kernel.Identity
 open Wanxiangshu.Next.Journal
 open Wanxiangshu.Next.Session
+open Wanxiangshu.Next.Tools
 
 type SpikePluginConfig =
     { Directory: string
       Port: IOpenCodePort option }
 
 module SpikePlugin =
+
+    module NodePath =
+        [<Import("join", "node:path")>]
+        let join (a: string, b: string) : string = jsNative
 
     [<Import("pid", "node:process")>]
     let private processId: int = jsNative
@@ -65,57 +70,39 @@ module SpikePlugin =
             let eventPort, sessionPort = createSpikeHost portOpt
             Ok(eventPort, sessionPort, None)
 
-    let private createJournal (input: obj) : AgentJournal option =
-        if isNull input || isNull input?journalDirectory then
+    let private workspaceDirectory (input: obj) : string option =
+        if isNull input || isNull input?directory then
             None
         else
-            let directory = unbox<string> input?journalDirectory
+            let directory = unbox<string> input?directory
 
             if String.IsNullOrWhiteSpace directory then
                 None
             else
-                let boot = Boot.boot directory
-                let runtimeId = RuntimeId.create (Guid.NewGuid().ToString("N").Substring(0, 12))
-                Some(AgentJournal.createFromBoot directory runtimeId processId DateTimeOffset.UtcNow boot)
+                Some directory
 
-    let handleTransform (rawOutObj: obj) =
-        if not (isNull rawOutObj) && not (isNull rawOutObj?messages) then
-            let rawMsgs = unbox<obj list> rawOutObj?messages
-            let canonMsgs = Projection.projectMessages rawMsgs
+    let private createJournal (input: obj) : AgentJournal option =
+        match workspaceDirectory input with
+        | None -> None
+        | Some workspace ->
+            let directory =
+                NodePath.join (NodePath.join (workspace, ".wanxiangshu-next"), "runtimes")
 
-            let capsMsg =
-                createObj [ "role", box "system"; "text", box "[CAPS: coder, inspector, browser]" ]
+            let boot = Boot.boot directory
+            let runtimeId = RuntimeId.create (Guid.NewGuid().ToString("N").Substring(0, 12))
+            Some(AgentJournal.createFromBoot directory runtimeId processId DateTimeOffset.UtcNow boot)
 
-            let transformed = Projection.preserveRawTail [ capsMsg ] rawMsgs
-            rawOutObj?messages <- List.toArray transformed
+    let private configureManager (config: obj) =
+        if not (isNull config) then
+            let agents =
+                if isNull config?agent then
+                    let created = createObj []
+                    config?agent <- created
+                    created
+                else
+                    config?agent
 
-    let handleCompanionTransform
-        (companions: Dictionary<string, CompanionHost>)
-        (gate: obj)
-        (sessionPort: ISessionHostPort)
-        (inObj: obj)
-        (rawOutObj: obj)
-        =
-        handleTransform rawOutObj
-
-        let sessionID =
-            if isNull inObj || isNull inObj?sessionID then
-                ""
-            else
-                unbox<string> inObj?sessionID
-
-        if not (String.IsNullOrWhiteSpace sessionID) && not (isNull rawOutObj?messages) then
-            let companion =
-                lock gate (fun () ->
-                    match companions.TryGetValue sessionID with
-                    | true, value -> value
-                    | false, _ ->
-                        let value = CompanionHost(SessionId.create sessionID, sessionPort)
-                        companions.[sessionID] <- value
-                        value)
-
-            let rawMsgs = unbox<obj list> rawOutObj?messages
-            rawOutObj?messages <- companion.TransformRaw rawMsgs |> List.toArray
+            agents?manager <- StaticTools.managerAgentConfig ()
 
     let private roleOf (agent: string) =
         match if isNull agent then "" else agent.Trim().ToLowerInvariant() with
@@ -246,7 +233,7 @@ module SpikePlugin =
                 let companionGate = obj ()
 
                 let transform inObj outObj =
-                    handleCompanionTransform companions companionGate sessionPort inObj outObj
+                    CompanionTransform.handleCompanionTransform companions companionGate sessionPort inObj outObj
 
                 let hooks =
                     createObj
@@ -257,7 +244,7 @@ module SpikePlugin =
                           "hostEventsSubscription", box subscription
                           "chat.transform", box (uncurriedExecute (box transform))
                           "experimental.chat.messages.transform", box (uncurriedExecute (box transform))
-                          "config", box (fun (config: obj) -> ()) ]
+                          "config", box (fun (config: obj) -> configureManager config) ]
 
                 let client = if isNull input then null else input?client
 

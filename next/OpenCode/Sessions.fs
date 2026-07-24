@@ -22,6 +22,12 @@ type ISessionHostPort =
     abstract CreateChildSession: parentId: SessionId * options: OpenCodeChildOptions -> Task<Result<SessionId, string>>
     abstract GetSessionOutput: sessionId: SessionId -> string list
 
+/// Optional per-session output boundary. Implementations expose only output appended
+/// after a caller's watermark; older ISessionHostPort implementations can omit it.
+type ISessionOutputBoundaryPort =
+    abstract GetSessionOutputWatermark: sessionId: SessionId -> int
+    abstract GetSessionOutputSince: sessionId: SessionId * watermark: int -> string list
+
 type InjectedSessionPort(underlyingPort: IOpenCodePort option, eventPort: IEventObservationPort) =
     let activeListeners = HashSet<SessionId>()
     let parentChildMap = Dictionary<SessionId, HashSet<SessionId>>()

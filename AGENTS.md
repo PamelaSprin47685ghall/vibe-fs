@@ -10,6 +10,8 @@ import:
 
 - 已恢复 `next/Doc/SSOT.md`，冻结 Agent DSL、Companion、Fork/Join、durable facts、Review、Process 与 Orchestrator 最终语义。
 - 已加入 Companion 角色纯门禁：仅 Manager/Coder/Orchestrator 可创建 Blogger，其他角色禁止 sidecar。
+- 已完成 per-Run terminal listener、输出增量切片、existing-agent nudge 重装 listener、标准 workspace Journal Boot；`npm test` 当前 127/127、Manager contract 1/1、TestKit 11/11。
+- 已拆出 `OpenCode/CompanionTransform.fs`，恢复 300 行架构门禁；尚未证明真实 provider 工具权限与真实 child-session E2E。
 - 下一步必须以真实 Host per-Run terminal 与 Manager→Coder→Join 纵切为验收门，不得以既有 127 个测试替代。
 
 ## 已完成并验证
@@ -25,47 +27,36 @@ import:
 
 - `npm test` 及 `npm run test:release` 已真正执行 F# 测试与 TestKit，不再只编译测试项目.
 - Manager 工具契约测试仅验证插件导出 `fork/join/list` 三个工具名，未捕获实际 provider request 中 OpenCode 内置工具 (`read/write/edit/bash/glob/grep`) 的残留.
-- `ForkRuntime` 首轮 fork→join 在 Fake Host 下可走通；复用同一 child 的第二轮 nudge 因 `completedSessions` HashSet 永久认定 Session terminal 而确定性挂死。
-- `Companion` 未按角色排除，会对 Blogger/Executor/Inspector/Reviewer 内部 child session 也创建 Blogger, 形成 sidecar-of-sidecar 递归。
+- `HostEventPort`/`DeterministicEventPort` 已移除按 Session 永久吞 terminal；`HostForkRuntime` 已改为每次 Run 独立 listener、token、输出边界与清理，仍需真实 OpenCode E2E 验证。
+- Companion 角色纯门禁与 Spike 调用门禁已接入，仅 Manager/Coder/Orchestrator 创建 Blogger；仍需真实 Blogger 两轮与重启 E2E。
 - `Reviewer` 持久 verdict 核心初成（ToolCallId 去重、journal append），但 `SubmitVerdict` 仍未读 Git tree hash、未写入 Journal。
-- `HostEventPort` 的 `GetSessionOutput` 返回该 child 全历史文本，不是本次 Run 的 assistant 正文；A 版提取与 B 版提取均建立在此错误方法之上。
+- A 版当前按 Run 启动前的 session output 数量截取新增文本并过滤 prompt 前缀；真实 host 的 part/assistant 边界仍需验证。
+- 标准入口已从 `input.directory` 自动启用 `<workspace>/.wanxiangshu-next/runtimes/` Boot + AgentJournal；仍需验证真实 AgentLinked 恢复。
 
 ## 当前边界：不得误称已完成
 
 
 ## 当前已知关键 Bug 与未修复缺口
 
-### 🔴 SSOT 宪法文件被删除
-- `next/Doc/SSOT.md` 已从主干物理删除，但 `AGENTS.md` 及 `MIGRATION.md` 仍以其为最高裁决优先级。这造成法律真空——工程师无法确认当前实现是否符合最终用户纠正。
-- **必须立即恢复 `next/Doc/SSOT.md`**，将用户对话中全部最终纠正逐字冻结，然后 `AGENTS.md` 只引用 SSOT。
+### 🟢 SSOT 宪法已恢复
+- `next/Doc/SSOT.md` 已恢复并冻结用户最终裁决；后续实现与测试以该文件为产品语义依据。
 
-### 🔴 Host terminal 边界：Session terminal ≠ Run terminal (确定性挂死)
-- `next/OpenCode/Events.fs` 中 `HostEventPort` 和 `DeterministicEventPort` 均维护 `completedSessions: HashSet<SessionId>`。
-- 第一次 child terminal 到达后，`completedSessions.Add(sessionId)` 将该 Session 标记为永久完成。之后该 child 同一 Session 的任何后续 assistant terminal 被永久忽略。
-- 后果：
-  - **Existing-agent nudge 第二轮永久不返回**：`HostForkRuntime.Reuse` 未重新安装 listener，且 HostEventPort 认为 Session 已完成。
-  - **Blogger 第二轮永久不返回**：同因，`Companion.BloggerBusy` 将永远保持 `true`，之后所有投影全部 `SkippedBusy`。
-  - **Reviewer 多轮**：Reviewer 第二轮同样无法收到 terminal。
-- 这是当前最核心的架构错误。**正确模型**是 per-Run listener + event watermark: 发送 prompt 时记录事件序列位置，terminal 后只提取 watermark 之后的本轮 assistant 正文，然后 dispose listener。
+### 🟡 Host terminal：已改 per-Run，待真实验收
+- Session 不再永久标记 terminal；每次新 prompt 都安装独立 listener，使用启动前输出边界截取本轮增量并在完成后 dispose。
+- 仍需真实 child session 连续三轮、迟到 terminal、parent abort 与真实 assistant part 边界 E2E。
 
-### 🔴 A 版输出提取基于全历史，不是本轮 Run
-- `HostForkRuntime.finish` 调用 `sessions.GetSessionOutput childId`，返回该 child 从出生起全部 transcript 文本拼接。
-- `CompanionHost.assistantOutput` 同样调用 `GetSessionOutput` 并过滤 `Prompt:` / `ChildPrompt:` 前缀——脆弱的字符串启发式。
-- 后果：join 收到的是“prompt + 旧 A + 新 A”混合体；B 版获取的是“旧 B1+B2+B3”拼接，不符合“B = 当前 blogger assistant 正文”定义。
+### 🟡 A 版输出：当前为新增输出切片，仍待 Host part 验证
+- `HostForkRuntime` 不再直接返回全历史；按 Run 启动边界截取新增输出并排除本地 prompt 标记。
+- `CompanionHost` 仍需接入真实 assistant 正文边界，禁止以全历史字符串拼接冒充 B。
 
-### 🔴 Companion 侧车递归 (sidecar-of-sidecar)
-- `MessageTransform.fs` 对 `每个 session` 都执行“获取或创建 CompanionHost”，未排除 blogger、executor、inspector、reviewer 及其内部 child session。
-- 当 Blogger 自身触发 transform 时，会创建 Blogger 的 Blogger，形成 Y→Y2→Y3 递归链。
+### 🟢 Companion 侧车递归已阻断
+- `MessageTransform` 与 OpenCode transform 调用均按角色排除 Blogger/Executor/Inspector/Browser/Meditator/Reviewer，保留 Manager/Coder/Orchestrator。
 
-### 🔴 Manager 真实工具权限未实现
-- 当前 `Plugin.fs` 的 `config` 回调为 `"config", fun _ -> ()`，完全没有配置 Manager agent、关闭 built-in tools 或按角色过滤工具。
-- P0 canary 直接调用主模型的 `write` 工具并以文件写入为通过条件——这证明当前 canary 中的“Manager”仍然拥有 write 权限。
-- 核心不变量 `Manager only fork/join/list` 尚未在真实 provider request 层面实现。
+### 🟡 Manager 工具权限已注入，待 provider request 验证
+- `SpikePlugin` config hook 原地注入 manager agent 的 deny-all + fork/join/list allow 配置；既有 contract 仍只验证导出名，真实 provider request 仍需 E2E 证明无 read/write/edit/bash/glob/grep。
 
-### 🔴 Journal 默认不启用
-- Journal 仅在 `input.journalDirectory` 自定义字段提供时创建。标准 OpenCode 插件输入不自动提供此字段。
-- 生产路径：`journal = None` → `AgentLinked` 不写、`Review` 不持久、`Fallback` 不持久、`Companion` 不持久。
-- 应从 `<workspace>/.wanxiangshu-next/runtimes/` 自动确定目录，而非 opt-in。
+### 🟡 Journal 默认路径已接线，待生产事实验证
+- 标准入口从 `input.directory` 推导 `<workspace>/.wanxiangshu-next/runtimes/`，Boot 后创建 AgentJournal；仍需真实 AgentLinked、Review、Fallback、Companion 恢复 E2E。
 
 ### 🔴 Fallback off-by-one: 第一次失败后立即切 B
 - `DurableFallback.recordFailure` 在 append 失败 Fact 后调用 `Fallback.nextAttempt(updatedState)`。

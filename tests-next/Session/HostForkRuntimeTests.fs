@@ -15,6 +15,7 @@ module HostForkRuntimeTests =
     let private makeFake () =
         let mutable terminal: (SessionId -> TerminalOutcome -> unit) option = None
         let mutable childCount = 0
+        let mutable output: string list = []
         let childId = SessionId.create "child-1"
 
         let host =
@@ -36,9 +37,11 @@ module HostForkRuntimeTests =
                     childCount <- childCount + 1
                     Task.FromResult(Ok childId)
 
-                member _.GetSessionOutput(_) = [ "A version output" ] }
+                member _.GetSessionOutput(_) = output }
 
         let trigger () =
+            output <- output @ [ "A version output" ]
+
             terminal
             |> Option.iter (fun listener -> listener childId (Completed(MessageId.create "m-1")))
 

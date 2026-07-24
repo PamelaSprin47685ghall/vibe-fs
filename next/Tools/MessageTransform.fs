@@ -1,5 +1,6 @@
 namespace Wanxiangshu.Next.Tools
 
+open System
 open Wanxiangshu.Next.Kernel
 
 type HostMessage =

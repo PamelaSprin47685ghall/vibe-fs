@@ -53,7 +53,7 @@ module SpikeHostTests =
         }
 
     [<Fact>]
-    let ``Terminal_completion_notifies_listeners_strictly_once`` () =
+    let ``Terminal_completion_notifies_each_run_listener`` () =
         let eventPort = Events.DeterministicEventPort() :> IEventObservationPort
         let sId = SessionId.create "sess-once-test"
         let mutable callCount = 0
@@ -67,9 +67,9 @@ module SpikeHostTests =
         Assert.Equal(1, callCount)
 
         let secondNotify = eventPort.NotifyTerminal sId (Completed msgId)
-        Assert.False(secondNotify)
-        Assert.Equal(1, callCount)
-        Assert.True(eventPort.IsCompleted sId)
+        Assert.True(secondNotify)
+        Assert.Equal(2, callCount)
+        Assert.False(eventPort.IsCompleted sId)
 
     [<Fact>]
     let ``HostEventPort_observes_idle_and_abort`` () =

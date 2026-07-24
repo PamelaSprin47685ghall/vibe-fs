@@ -8,36 +8,86 @@ open Wanxiangshu.Next.Kernel.Identity
 open Wanxiangshu.Next.Kernel.Fact
 open Wanxiangshu.Next.Journal
 
+type private PendingHostRun =
+    { Token: obj
+      AgentId: string
+      ChildId: SessionId
+      Source: TaskCompletionSource<Result<string, string>>
+      OutputWatermark: int option
+      FallbackOutputCount: int
+      mutable Subscription: IDisposable option
+      mutable Ready: bool
+      mutable Finished: bool }
+
 /// Bridges real child sessions to the existing completion mailbox.
 type HostForkRuntime(parentId: SessionId, sessions: ISessionHostPort, ?journal: AgentJournal) =
     let runtime = ForkRuntime()
     let children = Dictionary<string, SessionId>()
-    let subscriptions = Dictionary<string, IDisposable>()
+    let pendingRuns = Dictionary<string, PendingHostRun>()
     let gate = obj ()
 
     let completionSource () : TaskCompletionSource<Result<string, string>> =
         TaskCompletionSource<Result<string, string>>(TaskCreationOptions.RunContinuationsAsynchronously)
 
-    let finish
-        (agentId: string)
-        (childId: SessionId)
-        (source: TaskCompletionSource<Result<string, string>>)
-        (outcome: TerminalOutcome)
-        =
-        let output () =
-            sessions.GetSessionOutput childId |> String.concat "\n"
+    let outputSince (run: PendingHostRun) =
+        let all = sessions.GetSessionOutput run.ChildId
+        let start = max 0 (min run.FallbackOutputCount all.Length)
+        let output = all |> List.skip start
+
+        output
+        |> List.filter (fun line -> not (line.StartsWith("Prompt: ")) && not (line.StartsWith("ChildPrompt: ")))
+        |> String.concat "\n"
+
+    let complete (run: PendingHostRun) (outcome: TerminalOutcome) =
+        let subscriptionToDispose =
+            lock gate (fun () ->
+                match pendingRuns.TryGetValue run.AgentId with
+                | true, current when obj.ReferenceEquals(current.Token, run.Token) && run.Ready && not run.Finished ->
+                    run.Finished <- true
+                    pendingRuns.Remove run.AgentId |> ignore
+                    run.Subscription
+                | _ -> None)
+
+        subscriptionToDispose
+        |> Option.iter (fun subscription -> subscription.Dispose())
 
         match outcome with
-        | Completed _ -> source.SetResult(Ok(output ()))
-        | Aborted reason -> source.SetResult(Error reason)
-        | Failed error -> source.SetResult(Error error)
+        | Completed _ -> run.Source.SetResult(Ok(outputSince run))
+        | Aborted reason -> run.Source.SetResult(Error reason)
+        | Failed error -> run.Source.SetResult(Error error)
 
-        lock gate (fun () ->
-            match subscriptions.TryGetValue agentId with
-            | true, subscription ->
-                subscriptions.Remove agentId |> ignore
-                subscription.Dispose()
-            | false, _ -> ())
+    let installRun (agentId: string) (childId: SessionId) =
+        let run =
+            { Token = obj ()
+              AgentId = agentId
+              ChildId = childId
+              Source = completionSource ()
+              OutputWatermark = None
+              FallbackOutputCount = sessions.GetSessionOutput childId |> List.length
+              Subscription = None
+              Ready = false
+              Finished = false }
+
+        lock gate (fun () -> pendingRuns.[agentId] <- run)
+
+        let subscription =
+            sessions.SubscribeTerminal(childId, (fun _ outcome -> complete run outcome))
+
+        let disposeImmediately =
+            lock gate (fun () ->
+                run.Subscription <- Some subscription
+                run.Finished)
+
+        if disposeImmediately then
+            subscription.Dispose()
+
+        run
+
+    let failRun (run: PendingHostRun) (error: string) =
+        lock gate (fun () -> run.Ready <- true)
+        complete run (Failed error)
+
+    let markReady (run: PendingHostRun) = lock gate (fun () -> run.Ready <- true)
 
     member _.Fork(agentId: string, role: AgentRole, prompt: string) : Task<Result<ForkResult, string>> =
         task {
@@ -49,20 +99,24 @@ type HostForkRuntime(parentId: SessionId, sessions: ISessionHostPort, ?journal: 
 
             match existing with
             | Some childId ->
-                let source = completionSource ()
-                let result = runtime.Fork(agentId, role, runWork = (fun () -> source.Task))
+                let run = installRun agentId childId
+                let result = runtime.Fork(agentId, role, runWork = (fun () -> run.Source.Task))
 
                 match result with
                 | ForkResult.Nudged _ ->
+                    markReady run
+
                     let! sent =
                         sessions.SendChildPromptFireAndForget(parentId, childId, prompt, { Model = None; Agent = None })
 
                     match sent with
                     | Ok() -> return Ok result
                     | Error err ->
-                        source.SetResult(Error err)
+                        failRun run err
                         return Error err
-                | _ -> return Ok result
+                | _ ->
+                    failRun run (sprintf "Unknown agent id: %s" agentId)
+                    return Error(sprintf "Unknown agent id: %s" agentId)
             | None ->
                 let! childResult =
                     sessions.CreateChildSession(
@@ -74,11 +128,6 @@ type HostForkRuntime(parentId: SessionId, sessions: ISessionHostPort, ?journal: 
                 match childResult with
                 | Error err -> return Error err
                 | Ok childId ->
-                    let source = completionSource ()
-
-                    let subscription =
-                        sessions.SubscribeTerminal(childId, (fun _ outcome -> finish agentId childId source outcome))
-
                     let linkageResult =
                         match journal with
                         | None -> Ok()
@@ -95,21 +144,21 @@ type HostForkRuntime(parentId: SessionId, sessions: ISessionHostPort, ?journal: 
 
                     match linkageResult with
                     | Error err ->
-                        subscription.Dispose()
                         let! _ = sessions.AbortSession childId
                         return Error err
                     | Ok() ->
-                        lock gate (fun () ->
-                            children.[agentId] <- childId
-                            subscriptions.[agentId] <- subscription)
+                        let run = installRun agentId childId
 
-                        let result = runtime.Fork(agentId, role, runWork = (fun () -> source.Task))
+                        lock gate (fun () -> children.[agentId] <- childId)
+
+                        let result = runtime.Fork(agentId, role, runWork = (fun () -> run.Source.Task))
+                        markReady run
                         let! sent = sessions.SendPrompt(childId, prompt, { Model = None; Agent = None })
 
                         match sent with
                         | Ok _ -> return Ok result
                         | Error err ->
-                            source.SetResult(Error err)
+                            failRun run err
                             return Error err
         }
 
@@ -124,8 +173,6 @@ type HostForkRuntime(parentId: SessionId, sessions: ISessionHostPort, ?journal: 
             match existing with
             | None -> return Error(sprintf "Unknown agent id: %s" agentId)
             | Some childId ->
-                let source = completionSource ()
-
                 let roleOpt =
                     runtime.List()
                     |> fst
@@ -134,21 +181,28 @@ type HostForkRuntime(parentId: SessionId, sessions: ISessionHostPort, ?journal: 
 
                 let result =
                     match roleOpt with
-                    | Some role -> runtime.Fork(agentId, role, runWork = (fun () -> source.Task))
-                    | None -> ForkResult.NotFound agentId
+                    | Some role ->
+                        let run = installRun agentId childId
+                        let result = runtime.Fork(agentId, role, runWork = (fun () -> run.Source.Task))
+                        Some(run, result)
+                    | None -> None
 
                 match result with
-                | ForkResult.Nudged _ ->
+                | Some(run, ForkResult.Nudged _) ->
+                    markReady run
+
                     let! sent =
                         sessions.SendChildPromptFireAndForget(parentId, childId, prompt, { Model = None; Agent = None })
 
                     match sent with
-                    | Ok() -> return Ok result
+                    | Ok() -> return Ok(ForkResult.Nudged agentId)
                     | Error err ->
-                        source.SetResult(Error err)
+                        failRun run err
                         return Error err
-                | ForkResult.NotFound _ -> return Error(sprintf "Unknown agent id: %s" agentId)
-                | ForkResult.Created _ -> return Error(sprintf "Unknown agent id: %s" agentId)
+                | Some(run, result) ->
+                    failRun run (sprintf "Unknown agent id: %s" agentId)
+                    return Error(sprintf "Unknown agent id: %s" agentId)
+                | None -> return Error(sprintf "Unknown agent id: %s" agentId)
         }
 
     member _.Join() : Task<Result<RunCompletion, ForkError>> = runtime.Join()
