@@ -37,7 +37,7 @@ const CANARY_TESTS = [
   "testkit/opencode/tests/reviewer-restart-canary.mjs",
 ];
 
-const STAGGER_DELAY_MS = 500;
+const STAGGER_DELAY_MS = parsePositiveInt(process.env.STAGGER_DELAY_MS, 500, "STAGGER_DELAY_MS");
 const activeCanaryPids = new Set();
 
 function cleanupCanaries() {
@@ -58,15 +58,30 @@ process.on("SIGTERM", () => { cleanupCanaries(); process.exit(143); });
 
 async function runPool(items, limit, worker) {
   const results = new Array(items.length);
-  let next = 0;
-  async function lane() {
-    while (next < items.length) {
-      const i = next++;
-      if (i > 0) await new Promise((r) => setTimeout(r, STAGGER_DELAY_MS));
-      results[i] = await worker(items[i]);
+  let active = 0;
+  const waiters = [];
+  const acquire = () => {
+    if (active < limit) {
+      active += 1;
+      return Promise.resolve();
     }
-  }
-  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, lane));
+    return new Promise((resolve) => waiters.push(resolve));
+  };
+  const release = () => {
+    const waiter = waiters.shift();
+    if (waiter) waiter();
+    else active -= 1;
+  };
+
+  await Promise.all(items.map(async (item, index) => {
+    if (index > 0) await new Promise((resolve) => setTimeout(resolve, index * STAGGER_DELAY_MS));
+    await acquire();
+    try {
+      results[index] = await worker(item);
+    } finally {
+      release();
+    }
+  }));
   return results;
 }
 
@@ -75,7 +90,7 @@ function runCanary(file) {
     const name = path.basename(file);
     const child = spawn(process.execPath, [file], {
       stdio: ["ignore", "pipe", "pipe"],
-      env: { ...process.env, WANXIANG_RUN_ID: RUN_ID },
+      env: { ...process.env, CANARY_REPEAT: "1", WANXIANG_RUN_ID: RUN_ID },
       detached: process.platform !== "win32",
     });
 
@@ -126,6 +141,9 @@ function runCanary(file) {
 
 async function main() {
   const repeats = Number(process.env.CANARY_REPEAT || 1);
+  if (!Number.isInteger(repeats) || repeats < 1 || repeats > 3) {
+    throw new Error(`CANARY_REPEAT must be an integer from 1 through 3, got ${repeats}`);
+  }
   console.log("Starting " + CANARY_TESTS.length + " canary tests in staggered parallel mode (" + repeats + " iteration(s))...\n");
 
   for (let rep = 1; rep <= repeats; rep++) {

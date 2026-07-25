@@ -64,6 +64,7 @@
     <Compile Include="OpenCode/OpenCodePort.fs"/>
     <Compile Include="OpenCode/Sessions.fs"/>
     <Compile Include="Session/AgentRoleHelpers.fs"/>
+    <Compile Include="Session/HostPendingRun.fs"/>
     <Compile Include="Session/HostForkRuntime.fs"/>
     <Compile Include="Session/CompanionHost.fs"/>
     <Compile Include="OpenCode/HostSessionContext.fs"/>

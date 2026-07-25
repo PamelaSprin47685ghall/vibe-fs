@@ -18,6 +18,7 @@ export class Scenario {
     this.fs = ctx.fs;
     this.scenarioDir = ctx.scenarioDir;
     this.sessionIds = [];
+    this.sessionCreatedDiagnostics = [];
     this.turn = createScenarioTurn(this);
     this.watchdog = null;
     this._tornDown = false;
@@ -100,10 +101,10 @@ export async function setupScenarioParallel(opts, tmpDir) {
     });
     client.onSessionCreated = (sid) => {
       if (!scenario.sessionIds.includes(sid)) scenario.sessionIds.push(sid);
-      scenario.watchdog?.advance({
-        reason: 'session-created',
-        lane: `session:${sid}`,
-        blocking: true,
+      scenario.sessionCreatedDiagnostics.push({
+        sessionID: sid,
+        observedAt: Date.now(),
+        causal: false,
       });
     };
 

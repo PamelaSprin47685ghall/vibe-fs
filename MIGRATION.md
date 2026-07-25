@@ -24,7 +24,9 @@
 | --- | --- | --- | --- | --- |
 | AG-LISTENER-BEFORE-SEND | Fork listener 在 prompt 前安装 | `tests-next/Session/HostForkRuntimeTests.fs` | Port proof | 真实 Host 因果 E2E |
 | AG-FAST-COMPLETION-NOT-LOST | completion 先入 mailbox | `tests-next/Session/ForkRuntimeTests.fs` | Port proof | deterministic fast terminal |
-| AG-BUSY-NUDGE-ONE-COMPLETION | busy nudge 不替换 active run | `tests-next/Session/ForkRuntimeTests.fs` | Port proof | barrier 真实 child E2E |
+| AG-BUSY-NUDGE-ONE-COMPLETION | busy nudge 不替换 active run | `tests-next/Session/ForkRuntimeTests.fs` + `HostForkRuntimeTests.fs` | overlap barrier + mailbox count | 真实 child E2E 仍待补 |
+| TESTKIT-SESSION-CREATED-NOISE | 未匹配的 session.created 不续命 Watchdog | `scenario-parallel.js` + `gate-testkit.mjs` | scenario-local diagnostics | 13-way P0 隔离门 |
+| TESTKIT-SINGLE-REPEAT-LAYER | canary 只执行一次，重复由 runner 控制 | `agent-dsl-canary.mjs` + `run-canary-staggered.mjs` | runner proof | 默认/13-way P0 |
 | BLOG-BUSY-SKIPS | Blogger 不阻塞主会话 | `tests-next/Session/CompanionTests.fs` | Port proof | explicit Blogger lanes |
 | BLOG-B-ACCUMULATES | 普通 Blogger 回合累积 B | `tests-next/Session/CompanionTests.fs` | Port proof | restart/real Host proof |
 | PROC-THREE-X-DEADLINE | 唯一 3× deadline | `tests-next/Process/ProcessBudgetTests.fs` | local proof | owned process-tree E2E |

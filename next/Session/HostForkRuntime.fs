@@ -9,17 +9,6 @@ open Wanxiangshu.Next.Kernel.Fact
 open Wanxiangshu.Next.Journal
 open Wanxiangshu.Next.Session.AgentRoleHelpers
 
-type private PendingHostRun =
-    { Token: obj
-      AgentId: string
-      ChildId: SessionId
-      Source: TaskCompletionSource<Result<string, string>>
-      OutputWatermark: int option
-      FallbackOutputCount: int
-      mutable Subscription: IDisposable option
-      mutable Ready: bool
-      mutable Finished: bool }
-
 /// Bridges real child sessions to the existing completion mailbox.
 type HostForkRuntime
     (
@@ -35,14 +24,6 @@ type HostForkRuntime
     let gate = obj ()
     let childCreated = defaultArg onChildCreated (fun _ _ _ -> ())
 
-    let resolveModel (childId: SessionId) : OpencodeModel option =
-        match modelResolver, journal with
-        | Some resolver, Some journal ->
-            ModelResolver.resolveForSession resolver childId (AgentJournal.snapshot journal)
-        | _ -> None
-
-    let completionSource () : TaskCompletionSource<Result<string, string>> =
-        TaskCompletionSource<Result<string, string>>(TaskCreationOptions.RunContinuationsAsynchronously)
 
     let restoreChildren () =
         match journal with
@@ -99,7 +80,7 @@ type HostForkRuntime
             { Token = obj ()
               AgentId = agentId
               ChildId = childId
-              Source = completionSource ()
+              Source = HostPendingRun.completionSource ()
               OutputWatermark = None
               FallbackOutputCount = sessions.GetSessionOutput childId |> List.length
               Subscription = None
@@ -137,17 +118,29 @@ type HostForkRuntime
 
             match existing with
             | Some childId ->
-                // Busy existing nudge: fire-and-forget, reuse existing pending run.
-                let run =
+                let activeRun =
                     lock gate (fun () ->
                         match pendingRuns.TryGetValue agentId with
-                        | true, existing -> existing
-                        | false, _ -> installRun agentId childId)
+                        | true, run -> Some run
+                        | false, _ -> None)
 
-                let result = runtime.Fork(agentId, role, runWork = (fun () -> run.Source.Task))
+                match activeRun with
+                | Some _ ->
+                    let! sent =
+                        sessions.SendChildPromptFireAndForget(
+                            parentId,
+                            childId,
+                            prompt,
+                            { Model = HostPendingRun.resolveModel modelResolver journal childId
+                              Agent = Some(role.ToString().ToLowerInvariant()) }
+                        )
 
-                match result with
-                | ForkResult.Nudged _ ->
+                    match sent with
+                    | Ok() -> return Ok(ForkResult.Nudged agentId)
+                    | Error err -> return Error err
+                | None ->
+                    let run = installRun agentId childId
+                    let result = runtime.Fork(agentId, role, runWork = (fun () -> run.Source.Task))
                     markReady run
 
                     let! sent =
@@ -155,18 +148,18 @@ type HostForkRuntime
                             parentId,
                             childId,
                             prompt,
-                            { Model = resolveModel childId
+                            { Model = HostPendingRun.resolveModel modelResolver journal childId
                               Agent = Some(role.ToString().ToLowerInvariant()) }
                         )
 
-                    match sent with
-                    | Ok() -> return Ok result
-                    | Error err ->
+                    match sent, result with
+                    | Ok(), ForkResult.Nudged _ -> return Ok result
+                    | Ok(), _ ->
+                        failRun run "Existing agent did not accept a new run"
+                        return Error "Existing agent did not accept a new run"
+                    | Error err, _ ->
                         failRun run err
                         return Error err
-                | _ ->
-                    failRun run (sprintf "Unknown agent id: %s" agentId)
-                    return Error(sprintf "Unknown agent id: %s" agentId)
             | None ->
                 let! childResult =
                     sessions.CreateChildSession(
@@ -210,7 +203,7 @@ type HostForkRuntime
                             sessions.SendPrompt(
                                 childId,
                                 prompt,
-                                { Model = resolveModel childId
+                                { Model = HostPendingRun.resolveModel modelResolver journal childId
                                   Agent = Some(role.ToString().ToLowerInvariant()) }
                             )
 
@@ -241,18 +234,14 @@ type HostForkRuntime
                 match roleOpt with
                 | None -> return Error(sprintf "Unknown agent id: %s" agentId)
                 | Some role ->
-                    let run =
+                    let activeRun =
                         lock gate (fun () ->
                             match pendingRuns.TryGetValue agentId with
-                            | true, existing -> existing
-                            | false, _ -> installRun agentId childId)
+                            | true, run -> Some run
+                            | false, _ -> None)
 
-                    let result = runtime.Fork(agentId, role, runWork = (fun () -> run.Source.Task))
-
-                    match result with
-                    | ForkResult.Nudged _ ->
-                        markReady run
-
+                    match activeRun with
+                    | Some _ ->
                         // The prompt must carry the role: after a host restart
                         // OpenCode resolves an agent-less child prompt to the
                         // default build agent, not the session's original role.
@@ -261,23 +250,44 @@ type HostForkRuntime
                                 parentId,
                                 childId,
                                 prompt,
-                                { Model = resolveModel childId
+                                { Model = HostPendingRun.resolveModel modelResolver journal childId
                                   Agent = Some(role.ToString().ToLowerInvariant()) }
                             )
 
                         match sent with
                         | Ok() -> return Ok(ForkResult.Nudged agentId)
-                        | Error err ->
+                        | Error err -> return Error err
+                    | None ->
+                        let run = installRun agentId childId
+                        let result = runtime.Fork(agentId, role, runWork = (fun () -> run.Source.Task))
+                        markReady run
+
+                        let! sent =
+                            sessions.SendChildPromptFireAndForget(
+                                parentId,
+                                childId,
+                                prompt,
+                                { Model = HostPendingRun.resolveModel modelResolver journal childId
+                                  Agent = Some(role.ToString().ToLowerInvariant()) }
+                            )
+
+                        match sent, result with
+                        | Ok(), ForkResult.Nudged _ -> return Ok result
+                        | Ok(), _ ->
+                            failRun run "Existing agent did not accept a new run"
+                            return Error "Existing agent did not accept a new run"
+                        | Error err, _ ->
                             failRun run err
                             return Error err
-                    | _ ->
-                        failRun run (sprintf "Unknown agent id: %s" agentId)
-                        return Error(sprintf "Unknown agent id: %s" agentId)
         }
 
     member _.Join() : Task<Result<RunCompletion, ForkError>> = runtime.Join()
 
     member _.List() = runtime.List()
+
+    member _.PendingRunCount = lock gate (fun () -> pendingRuns.Count)
+
+    member _.PendingCompletionCount = runtime.PendingCompletionCount
 
     member _.Cancel() =
         runtime.Cancel()

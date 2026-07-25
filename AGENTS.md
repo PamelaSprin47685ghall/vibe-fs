@@ -51,22 +51,30 @@ import:
 
 ## 本轮 TestKit 因果证据
 
+本轮只推进四项，不向 Fallback、Process、PTY 或 Orchestrator 提前扩张：
+
+1. busy existing agent 的 nudge 不再经过带 `runWork` 的新 `Fork`；同一 active source 只允许一个 completion。
+2. SSOT 将 idle existing 与 busy existing 明确分开：前者建 Run，后者只 nudge。
+3. `session.created` 不再是全局 Watchdog 心跳；只有显式等待后的因果 barrier 才能推进 1s Watchdog。
+4. 重复控制只保留 runner 外层；每个 canary 子进程强制 `CANARY_REPEAT=1`。除默认开发门外，另有 `MAX_PARALLEL_CANARIES=13` 的全 P0 隔离门。
+
 - `StrictMockProvider` 的 expectation lane 已包含 scenario、session alias、role、turn、request-kind；真实 OpenCode 请求以 `x-session-affinity` 绑定 session，child 首请求还校验 `x-parent-session-id`。已绑定 session 优先于未绑定 sibling lane；错 parent、错顺序、extra、missing、ambiguous 全部返回 500。
 - 每个实际产生的 title、零宽 continuation、Blogger、Executor、Reviewer 请求都是显式 expectation；`allowOutOfOrder`、`allowBloggerRequests`、`allowTitleGeneration`、`allowSyntheticContinuations` 已删除。没有自动吞请求路径。
 - `afterExpectation()` 在已消费 expectation 的同一因果边界注册后继 lane；它避免多 child/session 交错时的注册竞态，不引入 retry 或生产状态。
-- Watchdog 固定 1s。只接受 blocking expectation 消费、显式 session/restart/barrier；background Blogger 默认只留诊断。replacement busy-skip 仅在测试显式等待该事实时作为 blocking barrier。
-- `testkit/opencode/tests/gate-testkit.mjs` 已覆盖 lane 交错/FIFO、extra/missing、真实 session-parent 绑定、原子后继、title 分类、background-only watchdog。`npm run test:e2e:p0` 保持 staggered parallel，13 个 canary 以显式 lane 运行。
+- Watchdog 固定 1s。只接受 blocking expectation 消费、显式 session/restart/barrier；background Blogger 默认只留诊断。未知 `session.created` 只进入 `sessionCreatedDiagnostics`，不重置 Watchdog。replacement busy-skip 仅在测试显式等待该事实时作为 blocking barrier。
+- `testkit/opencode/tests/gate-testkit.mjs` 的 22 项 gate 已覆盖 lane 交错/FIFO、extra/missing、真实 session-parent 绑定、原子后继、title 分类、background-only watchdog、未知 `session.created` 噪音。`npm run test:e2e:p0` 是默认有界并发门；`npm run test:e2e:p0:parallel` 才证明 13 个 canary 同时存在时的环境隔离。
 - Journal 运行时路径已在 Git common directory 的 `wanxiangshu-next/runtimes`；测试依赖不再创建 workspace `node_modules`，Reviewer canary 断言工作树没有 `.wanxiangshu-next`。
 - Manager→Coder→Join 现以 child-created、Coder write completed、Coder terminal、Manager join completed、Manager terminal 五个真实 Host barrier 收口；不再以全局 idle 推断因果。
 - `HostEventRouter` 以 `messageID`/`messageId` 聚合 `message.part.updated`，再在 terminal 判定空助手轮：有 text/tool part 的完成轮不会误发零宽续命；真正空轮仍会续命。Manager terminal 的当前 Git tree 未获双 PERFECT 时，用 listener-before-send 发 guard 并 append `GuardPromptAccepted`；Reviewer 无 verdict terminal nudge 同一会话；abort terminal 不发 guard/continuation。`session.status=retry` 的每个 attempt 一次性 append `FallbackFailureRecorded`，500→即时 retry→重启累计由 fallback canary 覆盖。
 - Companion 成功回合以单条 `CompanionAdvanced(SessionId, Projection, Content)` 原子 append；`Content` 是累积后的完整 B，不再分两条事实留下 baseline/B 撕裂窗口。`companion-replacement-canary` 真实触发 replacement、重启 OpenCode、恢复 B1+B2、保留 raw tail，并验证新 Blogger 仍为 nonblocking。
-- 本轮直接验证：`npm test`（145/145 Fable、Manager contract 1/1、21 TestKit gates、13 个 P0 canary）及 `CANARY_REPEAT=3 node scripts/run-canary-staggered.mjs`（13/13 × 3）均通过。
+- 本轮已直接验证：`npm test`（146/146 Fable、Manager contract 1/1、22/22 TestKit gates、13/13 默认 P0）、`CANARY_REPEAT=3 node scripts/run-canary-staggered.mjs`（13/13 × 3）及 `npm run test:e2e:p0:parallel`（13-way，13/13）通过。
 
 ## 当前未闭合边界
 
-1. Fallback、Process、PTY、Orchestrator 的产品边界仍按下方顺序重验；当前 TestKit 改造不证明其余生产语义闭合。
-2. 真实 PTY 还未成为统一 `fork` 表面。只能保留 Process/PTy 窄 Port，不得将普通 Runner 包装成 PTY。
-3. Fallback 的真实 provider A/A/B/B 请求序列、Orchestrator 真实 worktree 发布仍需单独证据。当前 fallback canary 证明 500 retry failure fact 跨重启累计，不得外推模型切换。
+1. 四项因果纠偏已完成直接验证：Host overlap 测试证明 busy nudge 保持一个 active completion；Watchdog gate 拒绝未知 `session.created` 心跳；runner 子进程强制单次执行；13-way P0 隔离门通过。
+2. Fallback、Process、PTY、Orchestrator 的产品边界仍按下方顺序重验；当前 TestKit 修复不证明其余生产语义闭合。
+3. Companion 前缀内容 hash、完整 JSON 删除 delta、Blogger cheap model、Reviewer durable nudge、Fallback 单次 attempt 归因、Process 有界 spool 仍是独立缺口。不得顺手实现。
+4. 真实 PTY 还未成为统一 `fork` 表面；真实 Fallback A/A/B/B 与 Orchestrator worktree 发布也未闭合。不得宣称 release-ready。
 
 ## 解冻后的严格顺序
 
@@ -78,7 +86,7 @@ import:
 - 只读 build、fixture、源码可以共享；运行中不得改共享 build。
 - expectation key 至少包含 scenario、session、role、turn、request-kind；实现必须能拒绝错 lane、错顺序、额外请求和缺失请求。
 - Blogger 是显式 lane，不是背景噪音；Manager Blogger 与 Coder Blogger 分离；禁止 Blogger-of-Blogger。
-- 继续使用并行 P0，最多 3 次；不可用串行掩盖隔离错误。
+- 继续使用并行 P0，最多 3 次；默认开发门可有界并发，但必须另跑 `npm run test:e2e:p0:parallel` 验证全套件同时存在。不可用串行掩盖隔离错误。
 - Watchdog 保持 1s，但只接受当前场景的因果进展。诊断必须列出最后进展、阻塞 lane 和剩余 expectation。
 - Reaper 只能作为人工诊断命令，不能挂在 npm lifecycle；TestKit 清理自己创建的进程树，不扫描全机、不猜归属。
 
@@ -131,7 +139,7 @@ node testkit/opencode/tests/gate-testkit.mjs
 npm run test:e2e:p0
 ```
 
-当前纠偏后先跑最小目标测试；全量测试只能在对应阶段完成后运行。P0 默认并行，稳定性上限固定 3 次，不再用高重复次数掩盖竞态。禁止 fixed sleep；使用 SSE、Provider、HTTP 事件和明确 barrier，但 Watchdog 只记录因果进展。
+当前纠偏后先跑最小目标测试；全量测试只能在对应阶段完成后运行。稳定性上限固定 3 次，且只允许 runner 外层控制重复；canary 自身只能执行一次。`npm run test:e2e:p0` 使用默认开发并发，`npm run test:e2e:p0:parallel` 使用 13-way 全并发隔离门。禁止 fixed sleep；使用 SSE、Provider、HTTP 事件和明确 barrier，但 Watchdog 只记录因果进展。
 
 每个 E2E 场景必须具备：独立环境、显式 expectation、场景级 diagnostics、1s causal-progress watchdog、拥有者清理、无 PID/端口/session/worktree 泄漏检查。测试失败首先检查 expectation 因果模型、Mock 假设、等待事件和资源归属，不得先改生产代码迎合夹具。
 
@@ -155,8 +163,9 @@ npm run test:e2e:p0
 
 ## 当前解冻动作
 
-1. 用现有 lane 基座把 Manager→Coder→Join 的每个 Host 语义事件固定成 deterministic barrier；先找 Harness 缺口，禁止借生产 retry 或状态污染掩盖。
-2. 之后按 Companion → Reviewer → Fallback → Process → PTY → Orchestrator 顺序重验生产边界；每一步只接受对应 SSOT 的直接证据。
-3. `MIGRATION.md` 继续记录行为接管和删除门槛；不把旧实现重新引入。
+1. 先证明 busy existing nudge 只有一个 active completion；再跑 Host overlap barrier。
+2. 修正 SSOT 与 Watchdog 的因果定义，统一 runner 重复层，并通过 13-way P0 隔离门。
+3. 只有四项全部有直接证据后，才按 Companion → Reviewer → Fallback → Process → PTY → Orchestrator 顺序重验生产边界。
+4. `MIGRATION.md` 继续记录行为接管和删除门槛；不把旧实现重新引入。
 
 任何“为了让测试不挂”“先加几十次重试”“测试环境才设置变量”“以后换真正 PTY”“读不到就忽略”“方便清理所以全局 kill”的修改均拒绝。测试必须证明 SSOT；生产不得追着测试夹具跑。

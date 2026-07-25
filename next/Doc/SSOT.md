@@ -29,9 +29,10 @@
 
 ## 4. Fork、Run、Join
 
-- 一个物理 Agent 同时最多一个活跃 Run；每次 prompt/fork 有唯一 RunId。
+- 一个物理 Agent 同时最多一个活跃 Run。Idle existing child 的新 prompt/fork 才创建唯一新 RunId；busy existing child 的 nudge 归属于当前 active Run，不创建第二 RunId。
 - 新 child：create → 注册 linkage → 安装本 Run terminal listener → send prompt → 返回 AgentId。
-- existing child：为本次 nudge 重新安装 listener，fire-and-forget send，独立等待本 Run terminal。
+- idle existing child：安装新 Run listener，fire-and-forget send，建立新 completion。
+- busy existing child：只向同一 child fire-and-forget 发送 nudge；不创建第二 Run、listener、Task 或 completion，不替换当前 active completion，立即返回 Nudged。
 - terminal listener 以 per-Run watermark/边界提取本轮 assistant 正文；不得按 session 永久标记 terminal，不得返回全历史。
 - Completion 先入 mailbox，`join()` 消费任意最早 completion；mailbox 为空时挂起等待下一项 completion，不按 AgentId 筛选，也不因暂时没有 ready 项返回 `EMPTY`。父 abort 传播 CancellationToken，清理所有 child Run 与 PTY；迟到 terminal 按 RunId 忽略。
 

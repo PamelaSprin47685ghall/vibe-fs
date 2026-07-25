@@ -15,6 +15,7 @@ npm run build
 npm run test:manager-tools
 node testkit/opencode/tests/gate-testkit.mjs
 npm run test:e2e:p0
+npm run test:e2e:p0:parallel
 ```
 
 TestKit 以 scenario/session/role/turn/request-kind lane 匹配真实 OpenCode session/parent headers；每个实际产生的 title、zero-width continuation、Blogger、Reviewer 请求均须显式 expectation。Manager→Coder→Join 使用 child、write、terminal、join、terminal 的真实 Host barrier；Companion 成功回合原子持久完整 B 与 projection，replacement restart canary 验证 B 恢复与 raw tail。`HostEventRouter` 用 terminal 前的 text/tool part 还原 assistant，并在未确认的 Manager terminal 以 listener-before-send 发送 durable ReviewGuard；Reviewer 无 verdict 同样 nudge，abort terminal 不发送 guard 或 continuation。P0 保持并行，最多重复 3 次；每个场景使用 1s causal-progress Watchdog。500 provider retry 会写入 durable failure fact，且 restart canary 验证其累计；上述不构成 release 资格，也不证明 Fallback A/A/B/B、PTY fork surface 或 Orchestrator Git 发布。

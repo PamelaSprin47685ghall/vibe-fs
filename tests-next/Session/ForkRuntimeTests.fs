@@ -38,28 +38,33 @@ module ForkRuntimeTests =
     let ``ForkRuntime_nudge_on_busy_agent_does_not_create_new_pending_run`` () =
         task {
             let agentId = "agent-busy-nudge"
+            let pendingWork = TaskCompletionSource<Result<string, string>>()
             let runtime = ForkRuntime()
 
             // First fork creates a pending run.
             let firstFork =
-                runtime.Fork(agentId, AgentRole.Inspector, runWork = (fun () -> task { return Ok "first" }))
+                runtime.Fork(agentId, AgentRole.Inspector, runWork = (fun () -> pendingWork.Task))
 
             match firstFork with
             | ForkResult.Created id -> Assert.Equal(agentId, id)
             | other -> Assert.True(false, sprintf "Expected Created, got %A" other)
 
-            // Nudge on busy agent: returns Nudged but must NOT create a second pending run.
+            Assert.Equal(1, runtime.ActiveRunCount)
+
             let secondFork =
                 runtime.Fork(agentId, AgentRole.Inspector, runWork = (fun () -> task { return Ok "second" }))
 
             Assert.Equal(ForkResult.Nudged agentId, secondFork)
+            Assert.Equal(1, runtime.ActiveRunCount)
 
-            // Only one completion can be dequeued from the mailbox.
+            pendingWork.SetResult(Ok "first")
             let! result = runtime.Join()
 
             match result with
-            | Ok _ -> ()
+            | Ok completion -> Assert.Equal(Ok "first", completion.Outcome)
             | Error err -> Assert.True(false, sprintf "Expected completion, got Error: %A" err)
+
+            Assert.Equal(0, runtime.PendingCompletionCount)
         }
 
     [<Fact>]

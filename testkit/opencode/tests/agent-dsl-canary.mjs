@@ -13,14 +13,15 @@ import { fileURLToPath } from 'node:url';
 import { execSync } from 'node:child_process';
 import {
   runStaticGate,
-  runStabilityGate,
   getSessionId,
+  setupScenario,
+  teardownScenario,
 } from '../index.js';
 import { bindLaneSession, expectationLane } from './lane.mjs';
 
 const __filename = fileURLToPath(import.meta.url);
 
-console.log('--- Manager DSL Canary & Stability Gate ---\n');
+console.log('--- Manager DSL Canary ---\n');
 
 // 1. Static Analysis Gate: Ensure no fixed sleeps or prohibited patterns
 console.log('1. Running static analysis gate...');
@@ -49,7 +50,7 @@ try {
 
 console.log(`  - CLI Binary ('opencode'): ${opencodeCliAvailable ? `Available (v${opencodeVersion})` : 'UNAVAILABLE (Host capabilities limited)'}`);
 console.log('  - Isolated Env: Supported (Temp HOME, XDG_CONFIG_HOME)');
-console.log('  - Strict Mock Provider: Available (causal lane matching, explicit synthetic expectations)');
+console.log('  - Strict Mock Provider: Available (causal lane matching, explicit request expectations)');
 console.log('  - Event Probe: Available (SSE stream reconnect, sequence tracking)');
 console.log('  - Resource Leak Detection: Active (Port/PID/Process-tree tracking)\n');
 
@@ -247,31 +248,26 @@ async function canaryScenario(scenario) {
   assert.match(transcriptBody, /"tool"/, 'join result should appear as a tool message in the Manager session');
 }
 
-console.log('3. Running up-to-three-iteration stability gate...');
-const stabilityGateResult = await runStabilityGate({
-  test: {
-    name: 'Manager DSL Canary Scenario',
-    fn: canaryScenario,
-  },
-  repeat: Number(process.env.CANARY_REPEAT || 3),
-  globalTimeoutMs: 900000,
-  scenarioOpts: {
+console.log('3. Running one causal Manager DSL scenario...');
+let scenario;
+try {
+  scenario = await setupScenario({
     project: {
       files: {
         'AGENTS.md': '- manager dsl canary iteration\n',
       },
     },
     strict: true,
-  },
-});
-
-if (!stabilityGateResult.passed) {
-  console.error(`\n  ✗ Stability gate failed: ${stabilityGateResult.failures.length} failure(s) recorded`);
-  for (const f of stabilityGateResult.failures) {
-    console.error(`    Run ${f.run} error: ${f.error.message}`);
+  });
+  await canaryScenario(scenario);
+  await teardownScenario(scenario);
+} catch (error) {
+  console.error(`\n  ✗ Manager DSL scenario failed: ${error.stack || error}`);
+  if (scenario) {
+    try { await teardownScenario(scenario, { keepOnFailure: true }); } catch {}
   }
   process.exit(1);
 }
 
-console.log('\n✓ Manager DSL canary and stability gate completed cleanly with 0 failures.');
+console.log('\n✓ Manager DSL canary completed cleanly.');
 process.exit(0);

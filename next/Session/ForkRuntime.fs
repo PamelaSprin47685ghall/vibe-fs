@@ -141,8 +141,9 @@ type ForkRuntime
         : ForkResult =
         lock lockObj (fun () ->
             match agents.TryGetValue(agentId) with
-            | true, rec' when rec'.Status = AgentStatus.Busy && runWork.IsNone ->
-                // Busy existing agent without new work: fire-and-forget nudge only
+            | true, rec' when rec'.Status = AgentStatus.Busy ->
+                // A busy agent owns its current completion. A nudge never
+                // creates another run waiting on the same physical terminal.
                 ForkResult.Nudged agentId
             | true, rec' ->
                 let runId, launch = startRun agentId role prompt runWork
@@ -212,6 +213,14 @@ type ForkRuntime
             let agentList = agents.Values |> Seq.toList
             let ptyList = ptys.Values |> Seq.toList
             (agentList, ptyList))
+
+    member _.ActiveRunCount =
+        lock lockObj (fun () ->
+            agents.Values
+            |> Seq.filter (fun record' -> record'.Status = AgentStatus.Busy)
+            |> Seq.length)
+
+    member _.PendingCompletionCount = lock lockObj (fun () -> mailbox.Count)
 
     member _.Cancel() : unit =
         let toClean =

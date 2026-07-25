@@ -118,6 +118,12 @@ function runTitleHistoryIsolation() {
   assertEq(requestKindOf(body), 'chat', 'historical title prompt must not classify the current request as title');
 }
 
+function runSessionCreatedIsNotWatchdogHeartbeat() {
+  const scenarioCode = fs.readFileSync(new URL('../scenario-parallel.js', import.meta.url), 'utf8');
+  assertTrue(scenarioCode.includes('sessionCreatedDiagnostics'), 'session.created must remain diagnostic data');
+  assertTrue(!scenarioCode.includes("reason: 'session-created'"), 'session.created must not be a global watchdog heartbeat');
+}
+
 async function runEventProbeReconnectAndStatus() {
   const server1 = await startSseServer([
     { type: 'session.status', properties: { sessionID: 's1', status: { type: 'busy' } } },
@@ -303,6 +309,7 @@ export const cases = [
   ...laneCases,
   { name: 'stability repeat cap is three', fn: runStabilityRepeatCap },
   { name: 'title classification uses current user turn', fn: runTitleHistoryIsolation },
+  { name: 'session.created noise does not renew watchdog', fn: runSessionCreatedIsNotWatchdogHeartbeat },
   { name: 'EventProbe reconnect and status normalisation', fn: runEventProbeReconnectAndStatus },
   { name: 'EventProbe session and tool normalisation', fn: runEventProbeSessionAndToolNormalisation },
   { name: 'terminal idle with object status', fn: runTerminalIdleWithObjectStatus },

@@ -16,6 +16,7 @@ module HostForkRuntimeTests =
     let private makeFake () =
         let mutable terminal: (SessionId -> TerminalOutcome -> unit) option = None
         let mutable childCount = 0
+        let mutable childPromptCount = 0
         let mutable output: string list = []
         let childId = SessionId.create "child-1"
 
@@ -30,7 +31,9 @@ module HostForkRuntimeTests =
                 member _.SendPrompt(_, _, _) =
                     Task.FromResult(Ok(MessageId.create "accepted"))
 
-                member _.SendChildPromptFireAndForget(_, _, _, _) = Task.FromResult(Ok())
+                member _.SendChildPromptFireAndForget(_, _, _, _) =
+                    childPromptCount <- childPromptCount + 1
+                    Task.FromResult(Ok())
 
                 member _.AbortSession(_) = Task.FromResult(Ok())
                 member _.AbortChildren(_) = Task.FromResult(()) :> Task
@@ -47,12 +50,12 @@ module HostForkRuntimeTests =
             terminal
             |> Option.iter (fun listener -> listener childId (Completed(MessageId.create "m-1")))
 
-        host, trigger, (fun () -> childCount)
+        host, trigger, (fun () -> childCount), (fun () -> childPromptCount)
 
     [<Fact>]
     let ``HostForkRuntime_creates_child_reuses_it_and_joins_A_output`` () =
         task {
-            let host, trigger, childCount = makeFake ()
+            let host, trigger, childCount, _ = makeFake ()
             let bridge = HostForkRuntime(SessionId.create "parent", host)
 
             let! first = bridge.Fork("agent-1", AgentRole.Coder, "work")
@@ -132,10 +135,36 @@ module HostForkRuntimeTests =
 
                 Assert.True(Result.isOk (AgentJournal.appendAgent (StreamId.Session parentId) None linkFact journal))
 
-                let host, _, childCount = makeFake ()
+                let host, _, childCount, _ = makeFake ()
                 let bridge = HostForkRuntime(parentId, host, journal = journal)
                 let! result = bridge.Reuse("agent-restored", "continue")
 
                 Assert.Equal(Ok(ForkResult.Nudged "agent-restored"), result)
                 Assert.Equal(0, childCount ())
             })
+
+    [<Fact>]
+    let ``HostForkRuntime_busy_nudge_reuses_one_active_completion`` () =
+        task {
+            let host, trigger, _, childPromptCount = makeFake ()
+            let bridge = HostForkRuntime(SessionId.create "parent-overlap", host)
+
+            let! first = bridge.Fork("agent-overlap", AgentRole.Coder, "start")
+            Assert.Equal(Ok(ForkResult.Created "agent-overlap"), first)
+            Assert.Equal(1, bridge.PendingRunCount)
+
+            let! nudged = bridge.Reuse("agent-overlap", "continue while busy")
+            Assert.Equal(Ok(ForkResult.Nudged "agent-overlap"), nudged)
+            Assert.Equal(1, bridge.PendingRunCount)
+            Assert.Equal(1, childPromptCount ())
+
+            trigger ()
+            let! joined = bridge.Join()
+
+            match joined with
+            | Ok completion -> Assert.Equal(Ok "A version output", completion.Outcome)
+            | Error error -> Assert.True(false, sprintf "Expected completion, got %A" error)
+
+            Assert.Equal(0, bridge.PendingRunCount)
+            Assert.Equal(0, bridge.PendingCompletionCount)
+        }
