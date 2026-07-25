@@ -5,6 +5,7 @@ open System.Collections.Generic
 open System.Threading.Tasks
 open Wanxiangshu.Next.Kernel.Identity
 open Wanxiangshu.Next.Kernel.Outcome
+open Fable.Core.JsInterop
 
 type SessionPromptOptions = OpenCodePromptOptions
 
@@ -30,6 +31,9 @@ type ISessionOutputBoundaryPort =
     abstract GetSessionOutputSince: sessionId: SessionId * watermark: int -> string list
 
 type InjectedSessionPort(underlyingPort: IOpenCodePort option, eventPort: IEventObservationPort) =
+    let delayMs (ms: int) : Task<unit> =
+        emitJsExpr ms "new Promise(r => setTimeout(r, $0))"
+
     let activeListeners = HashSet<SessionId>()
     let parentChildMap = Dictionary<SessionId, HashSet<SessionId>>()
     let sessionOutputs = Dictionary<SessionId, List<string>>()
@@ -119,9 +123,28 @@ type InjectedSessionPort(underlyingPort: IOpenCodePort option, eventPort: IEvent
             task {
                 registerChild parentId childId
                 recordOutput childId (sprintf "ChildPrompt: %s" text)
-                let! result = (me :> ISessionHostPort).SendPrompt(childId, text, opts)
+                let mutable attempts = 0
+                let mutable outcome = Error "Not started"
 
-                match result with
+                while attempts < 60
+                      && (match outcome with
+                          | Error _ -> true
+                          | Ok _ -> false) do
+                    attempts <- attempts + 1
+                    let! result = (me :> ISessionHostPort).SendPrompt(childId, text, opts)
+
+                    match result with
+                    | Ok res -> outcome <- Ok res
+                    | Error err ->
+                        printfn "[SendChildPrompt] attempt %d error: %s" attempts err
+
+                        if attempts < 60 then
+                            let! _ = delayMs 50
+                            ()
+                        else
+                            outcome <- Error err
+
+                match outcome with
                 | Ok _ -> return Ok()
                 | Error err -> return Error err
             }

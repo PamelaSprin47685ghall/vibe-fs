@@ -114,18 +114,13 @@ type ForkRuntime
                       Outcome = outcome
                       CompletedAt = DateTimeOffset.UtcNow }
 
-                // Deliver to an existing join before changing live status.
+                // Deliver to an existing join and update live status.
                 lock lockObj (fun () ->
                     if waiters.Count > 0 then
                         waiters.Dequeue().SetResult(Ok completion)
                     else
-                        mailbox.Enqueue(completion))
+                        mailbox.Enqueue(completion)
 
-                // Notify observers after the completion is available to Join.
-                onTerminal completion
-
-                // Update status in live agent handle map.
-                lock lockObj (fun () ->
                     match agents.TryGetValue(agentId) with
                     | true, rec' when rec'.Status <> AgentStatus.Closed ->
                         agents.[agentId] <-
@@ -133,6 +128,9 @@ type ForkRuntime
                                 Status = AgentStatus.Idle
                                 CurrentRunId = None }
                     | _ -> ())
+
+                // Notify observers after the completion is available to Join and status is updated.
+                onTerminal completion
             }
 
         let launch () = runTask () |> ignore
@@ -143,9 +141,8 @@ type ForkRuntime
         : ForkResult =
         lock lockObj (fun () ->
             match agents.TryGetValue(agentId) with
-            | true, rec' when rec'.Status = AgentStatus.Busy ->
-                // Busy existing agent: fire-and-forget nudge only,
-                // do not replace the active pending run.
+            | true, rec' when rec'.Status = AgentStatus.Busy && runWork.IsNone ->
+                // Busy existing agent without new work: fire-and-forget nudge only
                 ForkResult.Nudged agentId
             | true, rec' ->
                 let runId, launch = startRun agentId role prompt runWork

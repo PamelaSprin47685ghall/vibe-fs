@@ -30,7 +30,12 @@ module OpenCodePort =
     [<Emit("fetch($0, $1)")>]
     let private jsFetch (url: string) (init: obj) : Task<obj> = jsNative
 
-    type SdkClientPort(client: obj) =
+    type SdkClientPort(client: obj, workspaceDirectory: string option) =
+        let headersObj () =
+            match workspaceDirectory with
+            | Some dir -> createObj [ "x-opencode-directory", box dir ]
+            | None -> createObj []
+
         interface IOpenCodePort with
             member _.SendPrompt (sessionId: SessionId) text opts =
                 task {
@@ -49,7 +54,8 @@ module OpenCodePort =
                     let payload =
                         createObj
                             [ "path", box (createObj [ "id", box sId ])
-                              "body", box (createObj bodyFields) ]
+                              "body", box (createObj bodyFields)
+                              "headers", box (headersObj ()) ]
 
                     try
                         let sessObj = client?session
@@ -67,7 +73,10 @@ module OpenCodePort =
                     try
                         let sessObj = client?session
                         let abortFn = sessObj?abort
-                        let payload = createObj [ "path", createObj [ "id", box sId ] ]
+
+                        let payload =
+                            createObj [ "path", box (createObj [ "id", box sId ]); "headers", box (headersObj ()) ]
+
                         let! _ = unbox<Task<obj>> (abortFn?call (sessObj, payload))
                         return Ok()
                     with ex ->
@@ -79,9 +88,13 @@ module OpenCodePort =
                     let pId = SessionId.value parentId
 
                     let payload =
-                        {| parentID = pId
-                           title = opts.Title
-                           agent = opts.Agent |}
+                        createObj
+                            [ "body",
+                              box
+                                  {| parentID = pId
+                                     title = opts.Title
+                                     agent = opts.Agent |}
+                              "headers", box (headersObj ()) ]
 
                     try
                         let sessObj = client?session
@@ -218,10 +231,17 @@ module OpenCodePort =
                 }
 
     let create (input: obj) : IOpenCodePort option =
+        let workDir =
+            if not (isNull input) && not (isNull input?directory) then
+                let d = unbox<string> input?directory
+                if String.IsNullOrWhiteSpace d then None else Some d
+            else
+                None
+
         if isNull input then
             None
         elif not (isNull input?client) && not (isNull input?client?session) then
-            Some(SdkClientPort(input?client) :> IOpenCodePort)
+            Some(SdkClientPort(input?client, workDir) :> IOpenCodePort)
         elif not (isNull input?serverUrl) then
             Some(HttpPort(unbox<string> input?serverUrl) :> IOpenCodePort)
         elif not (isNull input?baseUrl) then

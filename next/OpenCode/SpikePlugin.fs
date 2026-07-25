@@ -52,14 +52,7 @@ module SpikePlugin =
         if isNull input || isNull input?gitTreePort || isNull input?gitTreePort?getTreeHash then
             None
         else
-            let rawPort = input?gitTreePort
-
-            Some
-                { GetTreeHash =
-                    fun () ->
-                        let getTreeHash = rawPort?getTreeHash
-                        unbox<string> (getTreeHash ()) }
-
+            Some { GetTreeHash = (fun () -> unbox<string> (input?gitTreePort?getTreeHash ())) }
 
     let createSpikeHost (portOpt: IOpenCodePort option) =
         let eventPort = Events.DeterministicEventPort() :> IEventObservationPort
@@ -120,13 +113,12 @@ module SpikePlugin =
         | Some journal ->
             let snapshot = AgentJournal.snapshot journal
 
-            for KeyValue(_, session) in snapshot.AgentProjections.Sessions do
+            for KeyValue(sid, session) in snapshot.AgentProjections.Sessions do
                 match session.Linkage with
                 | Some linkage ->
+                    sessionRoles.[SessionId.value sid] <- "manager"
+
                     for KeyValue(childId, role) in linkage.LinkedRoles do
-                        // Journal facts persist AgentRole.ToString() ("Coder");
-                        // OpenCode agent ids are lowercase, so normalise at
-                        // this restore boundary (also heals pre-fix facts).
                         sessionRoles.[ChildId.value childId] <- role.Trim().ToLowerInvariant()
                 | None -> ()
 
@@ -230,6 +222,16 @@ module SpikePlugin =
                     let projectionSessionId =
                         projectionSessionIdFromMessages outObj
                         |> Option.defaultValue eventRouter.LatestSessionId
+
+                    match observeEvent with
+                    | Some observe ->
+                        let evt =
+                            createObj
+                                [ "type", box "plugin.transform"
+                                  "properties", box (createObj [ "sessionID", box projectionSessionId ]) ]
+
+                        observe evt
+                    | None -> ()
 
                     if
                         not (isNull inObj)

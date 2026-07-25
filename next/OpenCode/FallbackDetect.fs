@@ -17,52 +17,68 @@ open Wanxiangshu.Next.Journal
 /// Each unique message id is recorded once as FallbackFailureRecorded.
 module FallbackDetect =
 
-    let private xmlTag = Regex("<[a-zA-Z_][^>]*>", RegexOptions.Compiled)
+    let private xmlTag =
+        Regex("<(?:tool_call|use_tool|call|function_call|invoke)[^>]*>", RegexOptions.Compiled)
+
+    let private getPartsArray (msg: obj) : obj array option =
+        if isNull msg then
+            None
+        elif not (isNull msg?parts) then
+            Some(unbox<obj array> msg?parts)
+        elif not (isNull msg?properties) && not (isNull msg?properties?parts) then
+            Some(unbox<obj array> msg?properties?parts)
+        elif
+            not (isNull msg?properties)
+            && not (isNull msg?properties?message)
+            && not (isNull msg?properties?message?parts)
+        then
+            Some(unbox<obj array> msg?properties?message?parts)
+        else
+            None
 
     let private partsText (msg: obj) : string =
-        if isNull msg?parts then
-            ""
-        else
-            let parts: obj[] = unbox msg?parts
+        match getPartsArray msg with
+        | None -> ""
+        | Some parts ->
+            parts
+            |> Array.choose (fun p ->
+                if isNull p then
+                    None
+                else
+                    let t = p?``type``
 
-            if isNull parts then
-                ""
-            else
-                parts
-                |> Array.choose (fun p ->
-                    if isNull p then
+                    if isNull t then
                         None
                     else
-                        let t = p?``type``
+                        let s = unbox<string> t
 
-                        if isNull t then
+                        if s <> "text" then
                             None
                         else
-                            let s = unbox<string> t
-
-                            if s <> "text" then
-                                None
-                            else
-                                let txt = p?text
-                                if isNull txt then None else Some(unbox<string> txt))
-                |> String.concat ""
+                            let txt = p?text
+                            if isNull txt then None else Some(unbox<string> txt))
+            |> String.concat ""
 
     let private hasToolCallPart (msg: obj) : bool =
-        if isNull msg?parts then
-            false
-        else
-            let parts: obj[] = unbox msg?parts
+        match getPartsArray msg with
+        | None -> false
+        | Some parts ->
+            parts
+            |> Array.exists (fun p ->
+                if isNull p then
+                    false
+                else
+                    let t = p?``type``
 
-            if isNull parts then
-                false
-            else
-                parts
-                |> Array.exists (fun p ->
-                    if isNull p then
-                        false
-                    else
-                        let t = p?``type``
-                        not (isNull t) && let s = unbox<string> t in s = "tool-call" || s = "tool_call")
+                    not (isNull t)
+                    && let s = unbox<string> t in
+
+                       s = "tool-call"
+                       || s = "tool_call"
+                       || s = "tool"
+                       || s = "patch"
+                       || s = "step-start"
+                       || s = "step-finish")
 
     let isFailedAssistant (msg: obj) : bool =
         if isNull msg then
@@ -70,23 +86,36 @@ module FallbackDetect =
         else
             let info = msg?info
 
-            let role =
-                if not (isNull info) && not (isNull info?role) then
-                    unbox<string> info?role
-                elif not (isNull msg?role) then
-                    unbox<string> msg?role
+            let finish =
+                if not (isNull info) && not (isNull info?finish) then
+                    unbox<string> info?finish
+                elif not (isNull msg?finish) then
+                    unbox<string> msg?finish
+                elif not (isNull msg?finishReason) then
+                    unbox<string> msg?finishReason
                 else
                     ""
 
-            if role <> "assistant" then
+            if finish <> "stop" then
                 false
             else
-                let text = partsText msg
+                let role =
+                    if not (isNull info) && not (isNull info?role) then
+                        unbox<string> info?role
+                    elif not (isNull msg?role) then
+                        unbox<string> msg?role
+                    else
+                        ""
 
-                if String.IsNullOrWhiteSpace text && not (hasToolCallPart msg) then
-                    true
+                if role <> "assistant" then
+                    false
                 else
-                    xmlTag.IsMatch text && not (hasToolCallPart msg)
+                    let text = partsText msg
+
+                    if String.IsNullOrWhiteSpace text && not (hasToolCallPart msg) then
+                        true
+                    else
+                        xmlTag.IsMatch text && not (hasToolCallPart msg)
 
     let messageId (msg: obj) : string =
         let info = msg?info
