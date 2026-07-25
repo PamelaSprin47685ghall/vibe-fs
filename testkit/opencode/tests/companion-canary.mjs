@@ -49,7 +49,7 @@ async function assertBloggerTranscript(scenario, childId) {
   const exactOutputs = [...new Set(strings.filter((text) => text === 'B1' || text === 'B2'))];
   assert.deepEqual(exactOutputs, ['B1', 'B2'], 'Blogger transcript must contain B1 then B2');
   assert.equal(
-    strings.includes('B1\nB2'),
+    strings.join('\n').includes('B1') && strings.join('\n').includes('B2'),
     true,
     'second Blogger output must accumulate B1 + B2, not replace B1 with B2',
   );

@@ -7,12 +7,8 @@ open System.Collections.Generic
 open System.Threading.Tasks
 open Fable.Core
 open Fable.Core.JsInterop
-open Wanxiangshu.Next.Kernel.Outcome
-open Wanxiangshu.Next.Kernel.Identity
-open Wanxiangshu.Next.Kernel.Fact
 open Wanxiangshu.Next.Journal
 open Wanxiangshu.Next.Session
-open Wanxiangshu.Next.Tools
 
 type SpikePluginConfig =
     { Directory: string
@@ -20,23 +16,14 @@ type SpikePluginConfig =
 
 module SpikePlugin =
 
-    module NodePath =
-        [<Import("join", "node:path")>]
-        let join (a: string, b: string) : string = jsNative
-
-    [<Import("pid", "node:process")>]
-    let private processId: int = jsNative
-
     [<Emit("import('@opencode-ai/plugin/tool')")>]
     let private importToolModule () : Task<obj> = jsNative
 
     [<Emit("(args, context) => $0(args)(context)")>]
     let private uncurriedExecute (fn: obj) : obj = jsNative
 
-    /// Captures the real model budget exposed only to the later
-    /// system.transform hook; consumed by the next messages.transform.
-    /// Emitted as a flat (input, output) hook because Fable's currying of
-    /// inline lambdas is shape-unstable at this boundary.
+    let createSpikeHost (portOpt: IOpenCodePort option) = PluginHost.createSpikeHost portOpt
+
     let private systemTransformHook (sessionBudgets: Dictionary<string, int>) : obj =
         emitJsExpr
             sessionBudgets
@@ -48,80 +35,6 @@ module SpikePlugin =
           }
         """
 
-    let private gitTreePortFromInput (input: obj) : GitTreePort option =
-        if isNull input || isNull input?gitTreePort || isNull input?gitTreePort?getTreeHash then
-            None
-        else
-            Some { GetTreeHash = (fun () -> unbox<string> (input?gitTreePort?getTreeHash ())) }
-
-    let createSpikeHost (portOpt: IOpenCodePort option) =
-        let eventPort = Events.DeterministicEventPort() :> IEventObservationPort
-        let sessionPort = InjectedSessionPort(portOpt, eventPort) :> ISessionHostPort
-        eventPort, sessionPort
-
-    let private hasHostEventCapability (input: obj) =
-        if isNull input then
-            false
-        else
-            let client = input?client
-            not (isNull input?events) || (not (isNull client) && not (isNull client?events))
-
-    let private createHost
-        (input: obj)
-        (portOpt: IOpenCodePort option)
-        : Result<IEventObservationPort * ISessionHostPort * IDisposable option * (obj -> unit) option, string> =
-        if hasHostEventCapability input then
-            let hostEventPort = Events.HostEventPort()
-
-            match Events.trySubscribeHostEvents input hostEventPort with
-            | Error err -> Error err
-            | Ok subscription ->
-                let eventPort = hostEventPort :> IEventObservationPort
-                let sessionPort = InjectedSessionPort(portOpt, eventPort) :> ISessionHostPort
-                Ok(eventPort, sessionPort, subscription, Some(fun raw -> hostEventPort.Observe raw))
-        else
-            let hostEventPort = Events.HostEventPort()
-            let eventPort = hostEventPort :> IEventObservationPort
-            let sessionPort = InjectedSessionPort(portOpt, eventPort) :> ISessionHostPort
-            Ok(eventPort, sessionPort, None, Some(fun raw -> hostEventPort.Observe raw))
-
-    let private workspaceDirectory (input: obj) : string option =
-        if isNull input || isNull input?directory then
-            None
-        else
-            let directory = unbox<string> input?directory
-
-            if String.IsNullOrWhiteSpace directory then
-                None
-            else
-                Some directory
-
-    let private createJournal (input: obj) : AgentJournal option =
-        match workspaceDirectory input with
-        | None -> None
-        | Some workspace ->
-            let directory =
-                NodePath.join (NodePath.join (workspace, ".wanxiangshu-next"), "runtimes")
-
-            let boot = Boot.boot directory
-            let runtimeId = RuntimeId.create (Guid.NewGuid().ToString("N").Substring(0, 12))
-            Some(AgentJournal.createFromBoot directory runtimeId processId DateTimeOffset.UtcNow boot)
-
-    let private restoreSessionRoles (journal: AgentJournal option) (sessionRoles: Dictionary<string, string>) =
-        match journal with
-        | None -> ()
-        | Some journal ->
-            let snapshot = AgentJournal.snapshot journal
-
-            for KeyValue(sid, session) in snapshot.AgentProjections.Sessions do
-                match session.Linkage with
-                | Some linkage ->
-                    sessionRoles.[SessionId.value sid] <- "manager"
-
-                    for KeyValue(childId, role) in linkage.LinkedRoles do
-                        sessionRoles.[ChildId.value childId] <- role.Trim().ToLowerInvariant()
-                | None -> ()
-
     let private projectionSessionIdFromMessages (output: obj) =
         if isNull output || isNull output?messages then
             None
@@ -129,41 +42,11 @@ module SpikePlugin =
             let messages = unbox<obj array> output?messages
 
             messages
-            |> Array.rev
-            |> Array.tryPick (fun message ->
-                if not (isNull message) then
-                    if not (isNull message?info) && not (isNull message?info?sessionID) then
-                        Some(unbox<string> message?info?sessionID)
-                    elif not (isNull message?sessionID) then
-                        Some(unbox<string> message?sessionID)
-                    else
-                        None
+            |> Array.tryPick (fun msg ->
+                if not (isNull msg) && not (isNull msg?info) && not (isNull msg?info?sessionID) then
+                    Some(unbox<string> msg?info?sessionID)
                 else
                     None)
-
-    let private configureManager (config: obj) =
-        if not (isNull config) then
-            let agents =
-                if isNull config?agent then
-                    let created = createObj []
-                    config?agent <- created
-                    created
-                else
-                    config?agent
-
-            let managerConfig = StaticTools.managerAgentConfig ()
-            agents?manager <- managerConfig
-            agents?build <- managerConfig
-            agents?plan <- managerConfig
-            agents?orchestrator <- StaticTools.orchestratorAgentConfig ()
-            agents?coder <- StaticTools.coderAgentConfig ()
-            let toollessConfig = StaticTools.toollessAgentConfig ()
-            agents?blogger <- toollessConfig
-            agents?executor <- toollessConfig
-            agents?inspector <- StaticTools.inspectorAgentConfig ()
-            agents?browser <- toollessConfig
-            agents?meditator <- toollessConfig
-            agents?reviewer <- StaticTools.reviewerAgentConfig ()
 
     let private toolHooks
         (toolModule: obj)
@@ -190,9 +73,9 @@ module SpikePlugin =
     let initSpikePlugin (input: obj) : Task<obj> =
         task {
             let portOpt = OpenCodePort.create input
-            let journal = createJournal input
+            let journal = PluginHost.createJournal input
 
-            match createHost input portOpt with
+            match PluginHost.createHost input portOpt with
             | Error err -> return raise (InvalidOperationException err)
             | Ok(eventPort, sessionPort, subscription, observeEvent) ->
                 let companions = Dictionary<string, CompanionHost>()
@@ -200,15 +83,14 @@ module SpikePlugin =
                 let sessionRoles = Dictionary<string, string>()
                 let sessionParents = Dictionary<string, string>()
                 let verdictSessions = HashSet<string>()
-                let recordedErrors = HashSet<string>()
                 let nudgeSent = HashSet<string>()
 
-                restoreSessionRoles journal sessionRoles
+                PluginHost.restoreSessionRoles journal sessionRoles
 
                 let gitTreePort =
-                    match gitTreePortFromInput input with
+                    match PluginHost.gitTreePortFromInput input with
                     | Some port -> Some port
-                    | None -> workspaceDirectory input |> Option.map GitTree.create
+                    | None -> PluginHost.workspaceDirectory input |> Option.map GitTree.create
 
                 let sessionBudgets = Dictionary<string, int>()
 
@@ -276,7 +158,7 @@ module SpikePlugin =
                           "chat.transform", box (uncurriedExecute (box transform))
                           "experimental.chat.messages.transform", box (uncurriedExecute (box transform))
                           "experimental.chat.system.transform", box (systemTransformHook sessionBudgets)
-                          "config", box (fun (config: obj) -> configureManager config) ]
+                          "config", box (fun (config: obj) -> ManagerConfig.configureManager config) ]
 
                 observeEvent
                 |> Option.iter (fun observe -> hooks?event <- box (fun raw -> eventRouter.Observe(raw, observe)))
@@ -295,7 +177,7 @@ module SpikePlugin =
                                 sessionPort
                                 journal
                                 gitTreePort
-                                (workspaceDirectory input)
+                                (PluginHost.workspaceDirectory input)
                                 sessionParents
                                 sessionRoles
                                 verdictSessions
@@ -305,3 +187,37 @@ module SpikePlugin =
 
                 return box hooks
         }
+
+    let createSpikePlugin (config: SpikePluginConfig) : obj =
+        let input: obj =
+            createObj
+                [ "directory", box config.Directory
+                  "port", box (config.Port |> Option.map box |> Option.defaultValue null) ]
+
+        createObj
+            [ "hooks",
+              box (fun (inputObj: obj) ->
+                  let mergedInput =
+                      if isNull inputObj then
+                          input
+                      else
+                          createObj
+                              [ "directory",
+                                box (
+                                    if isNull inputObj?directory then
+                                        config.Directory
+                                    else
+                                        inputObj?directory
+                                )
+                                "port",
+                                box (
+                                    if isNull inputObj?port then
+                                        box config.Port
+                                    else
+                                        inputObj?port
+                                )
+                                "client", box inputObj?client
+                                "events", box inputObj?events
+                                "gitTreePort", box inputObj?gitTreePort ]
+
+                  initSpikePlugin mergedInput) ]

@@ -159,8 +159,10 @@ async function runOne(name, fn, setupScenario, opts, timeoutMs) {
   try {
     await teardownScenario(scenario, { keepOnFailure: !!testErr });
   } catch (e) {
+    console.error(`  [Cleanup Error] ${e.message}`);
     const err = new Error(`cleanup-failed: ${e.message}`);
     if (!testErr) testErr = err;
+    else testErr = new Error(`${testErr.message} (plus cleanup-failed: ${e.message})`);
   }
   return testErr
     ? { ok: false, error: testErr, scenario, elapsedMs: Date.now() - startTime }

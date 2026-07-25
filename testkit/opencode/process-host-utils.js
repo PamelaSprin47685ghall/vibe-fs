@@ -6,20 +6,38 @@
  * the 200-line Kolmogorov line budget.
  */
 
-import { spawn } from 'node:child_process';
-import fs from 'node:fs';
-import path from 'node:path';
-import { getDescendantPids } from './process-host-checks.js';
+import { spawn } from "node:child_process";
+import fs from "node:fs";
+import path from "node:path";
+import { getDescendantPids } from "./process-host-checks.js";
+import { terminateTree } from "../process-lifecycle.js";
 
-export const OPENCODE_BIN = process.env.OPENCODE_BIN || 'opencode';
+export const OPENCODE_BIN = process.env.OPENCODE_BIN || "opencode";
 
 const STDOUT_RING_MAX = 100;
+const activeChildPids = new Set();
 
 export const SIGTERM_GRACE_MS = 5000;
 export const SIGKILL_GRACE_MS = 1000;
 export const READY_POLL_INTERVAL_MS = 100;
 export const READY_POLL_MAX_TRIES = 50;
 export const PROCESS_TREE_TIMEOUT_MS = 2000;
+
+function cleanupAllActiveChildren() {
+  for (const pid of activeChildPids) {
+    try {
+      if (process.platform !== "win32") {
+        process.kill(-pid, "SIGKILL");
+      }
+    } catch {}
+    try { process.kill(pid, "SIGKILL"); } catch {}
+  }
+  activeChildPids.clear();
+}
+
+process.on("exit", cleanupAllActiveChildren);
+process.on("SIGINT", () => { cleanupAllActiveChildren(); process.exit(130); });
+process.on("SIGTERM", () => { cleanupAllActiveChildren(); process.exit(143); });
 
 export function parseListenPort(listenLine) {
   const m = listenLine.match(/http:\/\/127\.0\.0\.1:(\d+)/)
@@ -33,8 +51,8 @@ export function pidIsAlive(pid) {
     process.kill(pid, 0);
     return true;
   } catch (err) {
-    if (err.code === 'ESRCH') return false;
-    if (err.code === 'EPERM') return true;
+    if (err.code === "ESRCH") return false;
+    if (err.code === "EPERM") return true;
     return false;
   }
 }
@@ -44,55 +62,36 @@ export function ringPush(buffer, s) {
   if (buffer.length > STDOUT_RING_MAX) buffer.shift();
 }
 
-export async function terminateChild(child, termMs, killMs) {
-  const pid = child.pid;
+export async function terminateChild(child, termMs = SIGTERM_GRACE_MS, killMs = SIGKILL_GRACE_MS) {
+  const pid = child?.pid;
   if (!pid) return;
+  activeChildPids.delete(pid);
 
   try {
     const descendants = await getDescendantPids(pid);
     for (const dpid of descendants) {
-      try { process.kill(dpid, 'SIGKILL'); } catch {}
+      try { process.kill(dpid, "SIGKILL"); } catch {}
     }
+  } catch {}
+
+  try {
+    await terminateTree(child, { termGraceMs: termMs || 500, killGraceMs: killMs || 1000 });
   } catch (err) {
-    console.error(`[ProcessHost] failed to kill descendants: ${err.message}`);
+    console.error(`[ProcessHost] terminateTree error: ${err.message}`);
   }
-
-  try { child.kill('SIGTERM'); } catch {}
-
-  const exited = await new Promise((resolve) => {
-    if (child.exitCode !== null || child.signalCode !== null) {
-      resolve(true);
-      return;
-    }
-    const timer = setTimeout(() => resolve(false), 500);
-    child.once('exit', () => { clearTimeout(timer); resolve(true); });
-  });
-
-  if (exited) return;
-
-  try { child.kill('SIGKILL'); } catch {}
-
-  await new Promise((resolve) => {
-    if (child.exitCode !== null || child.signalCode !== null) {
-      resolve();
-      return;
-    }
-    const timer = setTimeout(resolve, killMs);
-    child.once('exit', () => { clearTimeout(timer); resolve(); });
-  });
 }
 
 export async function initGitWorkspace(workDir) {
-  const gitDir = path.join(workDir, '.git');
+  const gitDir = path.join(workDir, ".git");
   if (fs.existsSync(gitDir)) return;
   try {
-    const { execSync } = await import('node:child_process');
-    execSync('git init', { cwd: workDir, stdio: 'ignore' });
-    execSync('git config user.email test@example.com', { cwd: workDir, stdio: 'ignore' });
-    execSync('git config user.name test', { cwd: workDir, stdio: 'ignore' });
-    fs.writeFileSync(path.join(workDir, 'AGENTS.md'), '- e2e workspace\n');
-    execSync('git add -A', { cwd: workDir, stdio: 'ignore' });
-    execSync('git commit -m init', { cwd: workDir, stdio: 'ignore' });
+    const { execSync } = await import("node:child_process");
+    execSync("git init", { cwd: workDir, stdio: "ignore" });
+    execSync("git config user.email test@example.com", { cwd: workDir, stdio: "ignore" });
+    execSync("git config user.name test", { cwd: workDir, stdio: "ignore" });
+    fs.writeFileSync(path.join(workDir, "AGENTS.md"), "- e2e workspace\n");
+    execSync("git add -A", { cwd: workDir, stdio: "ignore" });
+    execSync("git commit -m init", { cwd: workDir, stdio: "ignore" });
   } catch {
     // Non-fatal.
   }
@@ -101,17 +100,21 @@ export async function initGitWorkspace(workDir) {
 export function spawnOpencodeServe(workDir, env, hooks) {
   const child = spawn(
     OPENCODE_BIN,
-    ['serve', '--port', '0', '--hostname', '127.0.0.1'],
+    ["serve", "--port", "0", "--hostname", "127.0.0.1"],
     {
       cwd: workDir,
       env,
-      stdio: ['pipe', 'pipe', 'pipe'],
+      stdio: ["pipe", "pipe", "pipe"],
       windowsHide: true,
-      detached: process.platform !== 'win32',
+      detached: process.platform !== "win32",
     },
   );
-  child.stdout.on('data', (chunk) => hooks.onStdoutChunk(chunk.toString()));
-  child.stderr.on('data', (chunk) => hooks.onStderrChunk(chunk.toString()));
-  child.on('exit', (code, signal) => hooks.onExit(code, signal));
+  if (child.pid) activeChildPids.add(child.pid);
+  child.stdout.on("data", (chunk) => hooks.onStdoutChunk(chunk.toString()));
+  child.stderr.on("data", (chunk) => hooks.onStderrChunk(chunk.toString()));
+  child.on("exit", (code, signal) => {
+    if (child.pid) activeChildPids.delete(child.pid);
+    hooks.onExit(code, signal);
+  });
   return child;
 }

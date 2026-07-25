@@ -26,7 +26,7 @@ function processIsRunning(pid) {
 
 async function waitUntilStopped(pid) {
   for (let attempt = 0; attempt < 100 && processIsRunning(pid); attempt++) {
-    await new Promise(setImmediate);
+    await new Promise((resolve) => setTimeout(resolve, 50));
   }
 }
 

@@ -106,19 +106,27 @@ export async function setupScenarioParallel(opts, tmpDir) {
     client.onSessionCreated = (sid) => {
       if (!scenario.sessionIds.includes(sid)) scenario.sessionIds.push(sid);
     };
-    if (opts.watchdogMs) {
-      const watchdog = new Watchdog({
-        timeoutMs: opts.watchdogMs,
-        label: opts.watchdogLabel,
-        onTimeout: async () => {
-          console.error(`── watchdog event tail ──\n${events.dump(20)}`);
-        },
-      });
-      scenario.watchdog = watchdog;
-      events.onEvent((e) => watchdog.pet(`sse:${e.type}`));
-      provider.onRequest = () => watchdog.pet('provider-request');
-      client.onRequest = () => watchdog.pet('client-request');
-    }
+    const watchdogTimeout = opts.watchdogMs || 15000;
+    const watchdog = new Watchdog({
+      timeoutMs: watchdogTimeout,
+      label: opts.watchdogLabel || "canary",
+      onTimeout: async () => {
+        console.error(`── watchdog event tail ──\n${events.dump(20)}`);
+        try {
+          await Promise.race([
+            host.stop({ assert: false }),
+            new Promise((r) => setTimeout(r, 3000)),
+          ]);
+        } catch (e) {
+          console.error(`[Watchdog Cleanup Error] host.stop failed: ${e.message}`);
+        }
+        try { await provider.stop(); } catch {}
+      },
+    });
+    scenario.watchdog = watchdog;
+    events.onEvent((e) => watchdog.pet(`sse:${e.type}`));
+    provider.onRequest = () => watchdog.pet("provider-request");
+    client.onRequest = () => watchdog.pet("client-request");
     return scenario;
   } catch (err) {
     if (host.stdoutLog || host.stderrLog) {
