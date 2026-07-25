@@ -6,6 +6,7 @@ import {
   teardownScenario,
   getSessionId,
 } from '../index.js';
+import { expectationLane } from './lane.mjs';
 
 const __filename = fileURLToPath(import.meta.url);
 const BLOGGER_MARKER = 'You are the blogger of a coding agent session.';
@@ -34,10 +35,10 @@ async function assertBloggerTranscript(scenario, bloggerId) {
 async function runProjectionScenario(scenario) {
   scenario.provider.allowSyntheticContinuations();
   scenario.provider.allowTitleGeneration();
-  scenario.provider.allowOutOfOrder();
 
   scenario.provider.expectText({
     id: 'manager-first',
+    lane: expectationLane('companion-projection', 'manager', 'manager', 1),
     text: 'Manager first projection complete.',
     match: {
       containsText: ['first projection'],
@@ -47,11 +48,13 @@ async function runProjectionScenario(scenario) {
   });
   scenario.provider.expectText({
     id: 'blogger-b1',
+    lane: expectationLane('companion-projection', 'manager-blogger', 'blogger', 1),
     text: 'B1',
     match: { containsText: [BLOGGER_MARKER] },
   });
   scenario.provider.expectText({
     id: 'manager-second',
+    lane: expectationLane('companion-projection', 'manager', 'manager', 2),
     text: 'Manager second projection complete.',
     match: {
       containsText: ['second projection'],
@@ -61,6 +64,7 @@ async function runProjectionScenario(scenario) {
   });
   scenario.provider.expectText({
     id: 'blogger-b2',
+    lane: expectationLane('companion-projection', 'manager-blogger', 'blogger', 2),
     text: 'B2',
     match: { containsText: [BLOGGER_MARKER] },
   });
@@ -93,6 +97,7 @@ async function runProjectionScenario(scenario) {
     (event) => event.type === 'session.idle' && event.sessionID === bloggerId,
     1000,
   );
+  scenario.watchdog?.advance({ reason: 'manager-blogger-idle', lane: 'manager-blogger', blocking: true });
 
   const secondSeqBefore = scenario.events.lastSeq;
   const secondTurn = scenario.turn.start(managerId);
@@ -110,6 +115,7 @@ async function runProjectionScenario(scenario) {
     (event) => event.seq > secondSeqBefore && event.type === 'session.idle' && event.sessionID === bloggerId,
     1000,
   );
+  scenario.watchdog?.advance({ reason: 'manager-blogger-idle', lane: 'manager-blogger', blocking: true });
 
   const allBlogRequests = bloggerRequests(scenario.provider);
   assert.equal(allBlogRequests.length, 2, 'two Manager projections must produce exactly two Blogger requests');
@@ -120,7 +126,6 @@ async function runProjectionScenario(scenario) {
     'Blogger must be the same child session for both projections',
   );
   await assertBloggerTranscript(scenario, bloggerId);
-  scenario.provider.allowOutOfOrder();
 
   return { managerId, bloggerId };
 }
@@ -135,6 +140,7 @@ async function assertRoleHasNoSidecar(scenario, role, prompt) {
 
   scenario.provider.expectText({
     id: `role-${role}`,
+    lane: expectationLane('companion-projection', `role-${role}`, role, 1),
     text: 'Role complete.',
     match: { containsText: [prompt] },
   });

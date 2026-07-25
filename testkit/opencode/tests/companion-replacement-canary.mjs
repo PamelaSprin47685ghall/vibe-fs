@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { getSessionId, runStaticGate, setupScenario, teardownScenario } from '../index.js';
+import { expectationLane } from './lane.mjs';
 
 const __filename = fileURLToPath(import.meta.url);
 const managerTools = ['fork', 'join', 'list'];
@@ -49,8 +50,6 @@ try {
   });
   scenario.provider.allowSyntheticContinuations();
   scenario.provider.allowTitleGeneration();
-  scenario.provider.allowBloggerRequests();
-  scenario.provider.allowOutOfOrder();
 
   const parent = await scenario.client.createSession();
   const parentId = getSessionId(parent);
@@ -60,9 +59,20 @@ try {
   for (let round = 1; round <= rounds; round++) {
     scenario.provider.expectText({
       id: `round-${round}`,
+      lane: expectationLane('companion-replacement', 'manager', 'manager', round),
       text: `round ${round}: ${longText}`,
       match: { requiredTools: managerTools, forbiddenTools: forbiddenManagerTools },
     });
+    if (round < rounds) {
+      scenario.provider.expectText({
+        id: `manager-blogger-${round}`,
+        lane: expectationLane('companion-replacement', 'manager-blogger', 'blogger', round),
+        text: `Blogger paragraph ${round}.`,
+        match: {
+          containsText: ['You are the blogger of a coding agent session.', '"agent":"manager"'],
+        },
+      });
+    }
     const turn = scenario.turn.start(parentId);
     const prompt = await scenario.client.request('POST', `/session/${parentId}/prompt_async`, {
       body: {

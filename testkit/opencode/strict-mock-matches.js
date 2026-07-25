@@ -87,6 +87,8 @@ export function requestRoleOf(body) {
 
   const lastUser = extractLastUserMsg(body) || '';
   if (lastUser.includes('You are the blogger')) return 'blogger';
+  const roleCanary = lastUser.match(/Role canary: (executor|inspector|reviewer)\b/);
+  if (roleCanary) return roleCanary[1];
   if (lastUser.includes('Summarize command output chunk') || lastUser.includes('Reduce these command-output summaries')) {
     return 'executor';
   }
