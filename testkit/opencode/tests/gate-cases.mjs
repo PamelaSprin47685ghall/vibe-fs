@@ -14,6 +14,7 @@ import {
   postJson,
 } from './gate-lib.mjs';
 import { StrictMockProvider } from '../strict-mock-provider.js';
+import { requestKindOf } from '../strict-mock-matches.js';
 import { EventProbe } from '../event-probe.js';
 import { ProcessHost } from '../process-host.js';
 import { createIsolatedEnv } from '../isolated-env.js';
@@ -39,6 +40,7 @@ async function runIsolationHardening() {
   assertTrue(env.PATH.includes('/custom/bin'), 'PATH must include custom extraEnv segment');
   assertTrue(typeof env.PATH === 'string' && env.PATH.length > 0, 'PATH must remain defined');
   assertEq(env.CUSTOM_VAR, 'kept', 'non-isolation extraEnv vars preserved');
+  assertTrue(!fs.existsSync(path.join(scenarioDir, 'workspace', 'node_modules')), 'dependency links must stay outside the Git worktree');
 }
 
 async function runProcessHostEnvIsolation() {
@@ -199,6 +201,17 @@ async function runStabilityRepeatCap() {
     assertTrue(err.message.includes('1 through 3'), 'repeat cap diagnostics must name the allowed range');
   }
   assertTrue(rejected, 'stability gate must reject more than three runs');
+}
+
+function runTitleHistoryIsolation() {
+  const body = {
+    messages: [
+      { role: 'user', content: 'Generate a title for this conversation: old request' },
+      { role: 'assistant', content: 'Old title' },
+      { role: 'user', content: 'Continue the real task.' },
+    ],
+  };
+  assertEq(requestKindOf(body), 'chat', 'historical title prompt must not classify the current request as title');
 }
 
 async function runEventProbeReconnectAndStatus() {
@@ -363,6 +376,7 @@ export const cases = [
   { name: 'ProcessHost stderr/stdout ring buffer capture', fn: runProcessHostStderrCapture },
   { name: 'strict mock lanes and unexpected requests', fn: runStrictMockLanes },
   { name: 'stability repeat cap is three', fn: runStabilityRepeatCap },
+  { name: 'title classification uses current user turn', fn: runTitleHistoryIsolation },
   { name: 'EventProbe reconnect and status normalisation', fn: runEventProbeReconnectAndStatus },
   { name: 'terminal idle with object status', fn: runTerminalIdleWithObjectStatus },
   { name: 'no fixed-sleep critical assertion', fn: runNoFixedSleepCriticalAssertion },

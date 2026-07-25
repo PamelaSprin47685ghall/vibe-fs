@@ -10,10 +10,6 @@ open Wanxiangshu.Next.Session
 
 module PluginHost =
 
-    module NodePath =
-        [<Import("join", "node:path")>]
-        let join (a: string, b: string) : string = jsNative
-
     [<Import("pid", "node:process")>]
     let processId: int = jsNative
 
@@ -28,7 +24,7 @@ module PluginHost =
         match workspaceDirectory input with
         | None -> None
         | Some workspace ->
-            let dir = NodePath.join (NodePath.join (workspace, ".wanxiangshu-next"), "runtimes")
+            let dir = RuntimePath.forWorkspace workspace
             let boot = Boot.boot dir
             let runtimeId = RuntimeId.create (Guid.NewGuid().ToString("N").Substring(0, 12))
             Some(AgentJournal.createFromBoot dir runtimeId processId DateTimeOffset.UtcNow boot)
@@ -69,7 +65,6 @@ module PluginHost =
     let createHost
         (input: obj)
         (portOpt: IOpenCodePort option)
-        (journal: AgentJournal option)
         : Result<IEventObservationPort * ISessionHostPort * IDisposable option * (obj -> unit) option, string> =
         if hasHostEventCapability input then
             let hostEventPort = Events.HostEventPort()

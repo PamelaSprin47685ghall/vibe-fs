@@ -27,6 +27,7 @@
     <Compile Include="Journal/Writer.fs"/>
     <Compile Include="Journal/Fold.fs"/>
     <Compile Include="Journal/AgentJournal.fs"/>
+    <Compile Include="Journal/RuntimePath.fs"/>
     <Compile Include="Session/ForkRuntime.fs"/>
     <Compile Include="Session/Fallback.fs"/>
     <Compile Include="Session/DurableFallback.fs"/>

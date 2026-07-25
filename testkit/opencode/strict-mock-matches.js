@@ -66,11 +66,16 @@ export function detectSyntheticMarker(body) {
 
 export function isTitleGenerationRequest(body) {
   const messages = body?.messages || [];
-  for (const msg of messages) {
-    const texts = extractTextsFromContent(msg?.content);
-    for (const t of texts) {
-      if (t.includes(TITLE_GENERATION_MARKER) || t.includes('Please name the conversation')) return true;
-    }
+  const systemPrompt = messages.find((message) => message?.role === 'system');
+  const systemTexts = extractTextsFromContent(systemPrompt?.content);
+  if (systemTexts.some((text) => text.includes('You are a title generator') || text.includes('Generate a brief title'))) {
+    return true;
+  }
+  const lastUser = [...messages].reverse().find((message) => message?.role === 'user');
+  if (!lastUser) return false;
+  const texts = extractTextsFromContent(lastUser.content);
+  for (const text of texts) {
+    if (text.includes(TITLE_GENERATION_MARKER) || text.includes('Please name the conversation')) return true;
   }
   return false;
 }

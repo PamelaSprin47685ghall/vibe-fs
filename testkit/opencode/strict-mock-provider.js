@@ -231,15 +231,16 @@ export class StrictMockProvider {
     const sessId = parsed?.sessionId || '(no-session-id)';
     const msgs = parsed?.messages || [];
     const hasToolResults = msgs.some((m) => m?.role === 'tool' || m?.role === 'toolResult');
+    const candidateLabels = candidates.map(({ expectation }) => `${expectation.id}@${laneLabel(expectation.lane)}`);
     this._state.unexpected.push({
       body: parsed,
       sessId,
       hasToolResults,
       reason,
-      candidates: candidates.map(({ expectation }) => `${expectation.id}@${laneLabel(expectation.lane)}`),
+      candidates: candidateLabels,
     });
     const lastUser = JSON.stringify(extractLastUserMsg(parsed));
-    console.error(`[MOCK-500] reason=${reason} session=${sessId} tools=${JSON.stringify(extractToolNames(parsed))} msgs=${msgs.length} lastUser=${lastUser.slice(0, 400)}`);
+    console.error(`[MOCK-500] reason=${reason} session=${sessId} tools=${JSON.stringify(extractToolNames(parsed))} msgs=${msgs.length} lastUser=${lastUser.slice(0, 400)} candidates=${JSON.stringify(candidateLabels)}`);
     return sendJSON(res, 500, { error: reason, sessionId: sessId, tools: extractToolNames(parsed) });
   }
 

@@ -140,12 +140,6 @@ export function createIsolatedEnv(opts) {
     if (!fs.existsSync(destNodeModules)) {
       try { fs.symlinkSync(repoNodeModules, destNodeModules, 'dir'); } catch {}
     }
-    const workDir = path.join(scenarioDir, 'workspace');
-    fs.mkdirSync(workDir, { recursive: true });
-    const workDirNodeModules = path.join(workDir, 'node_modules');
-    if (!fs.existsSync(workDirNodeModules)) {
-      try { fs.symlinkSync(repoNodeModules, workDirNodeModules, 'dir'); } catch {}
-    }
   }
 
   const mockApiBase = llmUrl.replace(/\/v1$/, '') + '/api';
