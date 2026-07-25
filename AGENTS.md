@@ -129,7 +129,7 @@ import:
   - Y self-rebase → CurrentB 只等于 B'（旧 B 自然退出 transcript）
 
 ### 当前未闭合
-- Process：真实 Executor map/reduce canary 已通过（450KB 大输出）；SIGKILL 压力已纳入默认 P0；PTY stress canary 已通过 3× 待验收。
+- Process：真实 Executor map/reduce canary 已通过（450KB 大输出）；SIGKILL 压力已纳入默认 P0；PTY stress canary 已通过 3×。
 
 ## 验证命令
 
@@ -1040,7 +1040,7 @@ Manager→Coder(异步)→Inspector(一次性同步)→Command(同步)。Coder�
 - 真实 parent abort 已闭合：parent abort 传播到 busy child 并关闭两条悬挂 SSE 流。
 - 迟到 terminal/reasoning-part 混合仍未完全闭合；当前已有 per-run listener 和真实 nudge 输出切片，但 reasoning 与 assistant part 混排的真实 Host 边界仍需补充 E2E。
 - Fallback provider failure 注入 E2E 已由 fallback-canary 覆盖（真实 500 注入→journal 记录→重启恢复→累计 8 次通过）。
-- SIGKILL/孤儿进程真实 E2E 已纳入默认 P0；PTY stress canary 已通过 3×；大输入压力仍待补充 canary。
+- SIGKILL/孤儿进程真实 E2E 已纳入默认 P0；PTY stress canary 已通过 3×；大输入压力由 executor-canary（450KB）覆盖。
 - Orchestrator durable Port 路径 + Manager worktree 创建/rebase/冲突回交/评审/ff-only 发布 E2E 已由 orchestrator-canary 闭合。
 - 因此禁止宣称 production release-ready，禁止提前删除仍可作为黑盒 Oracle 的旧测试资产。
 
