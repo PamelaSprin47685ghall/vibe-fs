@@ -1065,7 +1065,7 @@ Manager→Coder(异步)→Inspector(一次性同步)→Command(同步)。Coder�
 
 1. ~~补真实 parent abort、nudge 三轮、跨重启 reconcile 的 OpenCode 场景~~ 已完成。
 2. ~~修 busy nudge 丢 completion~~ 已完成（commit cfd07e9f）。
-3. ~~修 Companion B 累积语义~~ 已完成（commit e57a4d46）。
+3. ~~修 Companion B 累积语义~~ 已完成（commit 30b51e85）。
 4. ~~加入 Process SIGKILL/孤儿进程门禁~~ 已完成（默认 P0）。
 4. ~~闭合真实 Orchestrator 发布 E2E；rebase 后重新双 PERFECT，再 ff-only~~ 已完成（orchestrator-canary 通过 test:e2e:p0）。
 5. ~~加入 PTY/大输入压力的单独 canary 提高覆盖~~ 已完成（pty-stress-canary 已新增，已接入 test:e2e:p0，已通过验证）。
