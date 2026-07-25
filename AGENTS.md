@@ -129,7 +129,7 @@ import:
   - Y self-rebase → CurrentB 只等于 B'（旧 B 自然退出 transcript）
 
 ### 当前未闭合
-- Process：真实 Executor map/reduce canary 已通过；SIGKILL 压力已纳入默认 P0；PTY stress canary 已通过 3× 待验收，大输入压力仍待补充 canary。
+- Process：真实 Executor map/reduce canary 已通过（450KB 大输出）；SIGKILL 压力已纳入默认 P0；PTY stress canary 已通过 3× 待验收。
 
 ## 验证命令
 
@@ -1051,7 +1051,7 @@ Manager→Coder(异步)→Inspector(一次性同步)→Command(同步)。Coder�
 3. ~~闭合真实 Orchestrator 发布 E2E；rebase 后重新双 PERFECT，再 ff-only~~ 已完成（orchestrator-canary 通过 test:e2e:p0）。
 4. ~~加入 PTY/大输入压力的单独 canary 提高覆盖~~ 已完成（pty-stress-canary 已新增，已接入 test:e2e:p0，已通过验证）。
 5. ~~Reviewer parent terminal 无 verdict 重复 nudge 与 restart reconcile E2E~~ 已完成（reviewer-restart-canary 通过 test:e2e:p0）。
-5. 所有边界通过后才切换 production entry、清理旧实现与旧测试。
+6. 所有边界通过后才切换 production entry、清理旧实现与旧测试。
 
 ## 资产处理纪律
 
