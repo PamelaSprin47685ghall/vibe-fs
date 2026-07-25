@@ -1066,7 +1066,8 @@ Manager→Coder(异步)→Inspector(一次性同步)→Command(同步)。Coder�
 1. ~~补真实 parent abort、nudge 三轮、跨重启 reconcile 的 OpenCode 场景~~ 已完成。
 2. ~~修 busy nudge 丢 completion~~ 已完成（commit cfd07e9f）。
 3. ~~修 Companion B 累积语义~~ 已完成（commit 30b51e85）。
-4. ~~加入 Process SIGKILL/孤儿进程门禁~~ 已完成（默认 P0）。
+4. ~~重做 Process 流式 spool~~ 已完成（commit 834cb579）。
+5. ~~加入 Process SIGKILL/孤儿进程门禁~~ 已完成（默认 P0）。
 4. ~~闭合真实 Orchestrator 发布 E2E；rebase 后重新双 PERFECT，再 ff-only~~ 已完成（orchestrator-canary 通过 test:e2e:p0）。
 5. ~~加入 PTY/大输入压力的单独 canary 提高覆盖~~ 已完成（pty-stress-canary 已新增，已接入 test:e2e:p0，已通过验证）。
 6. ~~Reviewer parent terminal 无 verdict 重复 nudge 与 restart reconcile E2E~~ 已完成（reviewer-restart-canary 通过 test:e2e:p0）。
@@ -1109,7 +1110,7 @@ Manager→Coder(异步)→Inspector(一次性同步)→Command(同步)。Coder�
 | Journal               | 🟡 已接生产，但有原子性和 dirty 问题      |
 | Review                | 🟡 verdict 核心成立，两个 Guard 未闭合 |
 | Fallback              | 🟡 持久计数有了，真实模型切换未闭合          |
-| Process               | 🔴 表面 spool，实际仍 O(输出量) 内存    |
+| Process               | 🟢 流式 spool，内存有界               |
 | PTY                   | 🟡 底层可测，尚未成为统一 fork DSL      |
 | Orchestrator          | 🔴 程序存在，但生产 canary 绕过了它      |
 | 发布资格                  | 🔴 不准发布                      |
@@ -1815,7 +1816,7 @@ join()
 战役 5：Fork / Join                 🟢 nudge 不丢 completion
 战役 6：Companion                   🟢 B 累积已修复
 战役 7：角色能力                    🟡 Manager 正确，其余未齐
-战役 8：Process                     🔴 非真正流式
+战役 8：Process                     🟢 流式 spool 已修复
 战役 9：Fallback                    🟡 durable facts 有，执行链无
 战役 10：Review                     🟡 verdict 有，Guard 未闭环
 战役 11：PTY                        🟡 底层有，统一 DSL 无
@@ -1891,9 +1892,7 @@ join()
 
 这是质变，值得肯定。
 
-但当前尚有一个不能妥协的核心错误：
-
-1. **Process 虽写 spool，仍把完整输出留在内存。**
+但当前尚无不能妥协的核心内存错误。
 
 这三条不解决，分别会导致：
 
