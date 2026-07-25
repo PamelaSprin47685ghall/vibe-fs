@@ -1,7 +1,6 @@
 ---
 import: 
   - README.md
-  - TASK.md
 ---
 
 # 当前工程状态
@@ -1074,3 +1073,851 @@ Manager→Coder(异步)→Inspector(一次性同步)→Command(同步)。Coder�
 - 旧测试只按行为迁移：保留测试基础设施、提炼外部契约、淘汰绑定 Stage/Phase/Lease/Actor/Todo/Methodology/fuzzy/Squad 的实现与断言。
 - 事件溯源只保存跨重启领域事实；结构化 Flow/普通程序负责当前控制流；不得把 ReviewPhase、FallbackPhase、JoinOwner、NudgeLease、CompactionGeneration 写进 Journal。
 - 每次功能闭合必须：更新本文件 → npm test/目标 E2E → 单独 commit → push。未经直接证据不得上调完成状态。
+
+---
+# 总裁决
+
+**这次终于跨过了“纯 Fake Host 骨架”阶段。**
+
+当前版本已经具备真实 OpenCode 纵切的雏形：
+
+* `next/Doc/SSOT.md` 已恢复；
+* Manager 的真实 provider 工具面开始受控；
+* Manager → Coder → `join()` 有真实 OpenCode canary；
+* 同一 child 连续 prompt、重启后复用、父级 abort 都有独立测试；
+* Reviewer verdict、Executor、Process、Companion、Fallback、Orchestrator、PTY 都出现了 canary；
+* Journal 默认从工作区启动并 Boot/Fold，而不再只是测试注入。
+
+但还不能宣布 Host Spike 完成，更不能 release。当前最大的危险已经从“代码没接线”变成：
+
+> **Happy path 接通了，但几个核心语义在并发、重启和大数据量下仍然必错。**
+
+综合定性：
+
+| 领域                    | 裁决                           |
+| --------------------- | ---------------------------- |
+| SSOT                  | 🟢 已恢复，外围文档仍冲突               |
+| 真实 Manager→Coder→Join | 🟢 首次纵切成立                    |
+| 同 child 顺序复用          | 🟢 有明显进展                     |
+| busy 时再次 fork         | 🔴 会丢失旧运行 completion         |
+| Companion 多轮          | 🔴 B 语义实现错误                  |
+| Journal               | 🟡 已接生产，但有原子性和 dirty 问题      |
+| Review                | 🟡 verdict 核心成立，两个 Guard 未闭合 |
+| Fallback              | 🟡 持久计数有了，真实模型切换未闭合          |
+| Process               | 🔴 表面 spool，实际仍 O(输出量) 内存    |
+| PTY                   | 🟡 底层可测，尚未成为统一 fork DSL      |
+| Orchestrator          | 🔴 程序存在，但生产 canary 绕过了它      |
+| 发布资格                  | 🔴 不准发布                      |
+
+以上基于本次完整仓库快照的静态验收。
+
+---
+
+# 一、这次真正做对了什么
+
+## 1. SSOT 已恢复，而且核心裁决基本正确
+
+新的 `next/Doc/SSOT.md` 已明确：
+
+* Manager 只有 `fork/join/list`；
+* busy existing agent 的 `fork` 是同 child fire-and-forget nudge；
+* Companion 在 JSON 投影层计算 delta；
+* Y busy 时跳过，不排队；
+* Event Sourcing、CQRS、Per-Runtime NDJSON 保留；
+* 不持久化调用栈、Stage、Phase、Lease；
+* Fallback 是每 session 累计四次失败；
+* Process 使用唯一 `3×estimate` deadline；
+* Review 是同 tree 两次 PERFECT；
+* Orchestrator 要 rebase 后重新审查。
+
+这意味着工程队终于有了可执行宪法，不再只能从聊天记录猜。
+
+不过 README、AGENTS 和部分注释仍有旧措辞，例如 watermark、busy agent 不排队、Journal 显式启用等。它们必须降级为说明文件，不能再复制一份架构条款。
+
+## 2. Manager 工具面不再只是检查插件导出对象
+
+现在有真正的角色配置：
+
+```text
+Manager:
+  *      deny
+  fork   allow
+  join   allow
+  list   allow
+```
+
+真实 Manager canary 还会检查 provider request 中不存在：
+
+```text
+read / write / edit / bash / glob / grep / verdict
+```
+
+并要求 Coder 那一轮才出现 `write`。
+
+这修复了上一快照最根本的假测试：Manager 自己直接写文件。
+
+## 3. Host terminal 不再永久绑定 SessionId
+
+上一版的：
+
+```text
+completedSessions: Set<SessionId>
+```
+
+已经被删除。
+
+`HostForkRuntime` 现在为每次运行建立：
+
+* 单独的 completion source；
+* output watermark；
+* terminal subscription；
+* token；
+* 当前运行边界。
+
+这让“同一个 child 顺序运行多轮”终于成为可能。
+
+## 4. 测试军团开始覆盖真实故障面
+
+当前已经出现：
+
+```text
+host-nudge-canary
+host-restart-canary
+host-abort-canary
+companion-canary
+companion-replacement-canary
+reviewer-verdict-canary
+reviewer-restart-canary
+fallback-canary
+executor-canary
+process-stress-canary
+pty-stress-canary
+orchestrator-canary
+```
+
+这比只写大量 Port 单元测试健康得多。
+
+但必须注意：**文件名叫 canary，不等于它证明了同名领域的完整行为。** 后面几个红线正是如此。
+
+---
+
+# 二、第一颗致命红雷：busy nudge 仍会丢 completion
+
+这是当前 ForkRuntime 最大的问题。
+
+`HostForkRuntime` 的 pending run 仍以：
+
+```text
+agentId
+```
+
+作为唯一 key。
+
+设 Coder 正在执行第一次 prompt：
+
+```text
+pendingRuns["coder-1"] = Run A
+```
+
+Manager 在它仍 busy 时再次：
+
+```text
+fork(agent="coder-1", prompt="补充要求")
+```
+
+当前实现会安装新的 Run B，并覆盖：
+
+```text
+pendingRuns["coder-1"] = Run B
+```
+
+随后 child 出现 terminal：
+
+* Run A 的 listener 也收到事件；
+* 它检查 token，发现字典中已经是 Run B；
+* Run A 不完成；
+* Run B 完成；
+* 原始 `fork` 对应的 completion 永久丢失；
+* 某个 `join()` 永久等待。
+
+这与用户冻结的语义相反。
+
+## 正确结构
+
+busy existing agent 的 fork 不应创建第二个待完成运行：
+
+```text
+首次 fork
+→ 建立唯一 active completion
+
+busy existing fork
+→ 只向同一个 child SendPromptFireAndForget
+→ 不替换 active completion
+→ 不创建第二个 pending run
+→ 立即返回 Nudged
+
+child 最终 terminal
+→ 完成原 active completion
+→ join 收回一次结果
+```
+
+只有 child 已经 idle 后再次 fork，才建立下一次 completion 边界。
+
+## 现在的测试没有覆盖这一点
+
+`host-nudge-canary` 测试的是：
+
+```text
+第一轮 terminal
+→ 第二轮 prompt
+→ 第二轮 terminal
+→ 第三轮 prompt
+```
+
+这是**顺序复用**，不是 busy nudge。
+
+下一条必须新增真实 E2E：
+
+```text
+AG-BUSY-NUDGE-DOES-NOT-REPLACE-ACTIVE-RUN
+```
+
+场景：
+
+1. Coder 第一次响应保持运行中；
+2. Manager 在 terminal 前再次 fork 同一 AgentId；
+3. 第二次 fork 立即返回；
+4. child session 数量仍为 1；
+5. 原始 completion 不丢；
+6. 最终只向 mailbox 写一次；
+7. 无永久 waiter。
+
+在这条测试通过前，不能宣布 fork/nudge 完成。
+
+---
+
+# 三、第二颗致命红雷：B 版的定义实现错了
+
+你定义的 B 是：
+
+> Y 截至目前所有正式 assistant 输出的累计内容；Y 自压缩后，新的 B′ 替代旧 B。
+
+当前 `Companion.Submit` 每次 Blogger 成功后大致做的是：
+
+```text
+CurrentB = 本次 Blogger 输出
+```
+
+于是：
+
+```text
+第一次 Y 输出 B1
+第二次 Y 输出 B2
+第三次 Y 输出 B3
+```
+
+当前系统得到：
+
+```text
+CurrentB = B3
+```
+
+而正确结果应是：
+
+```text
+CurrentB = B1 + B2 + B3
+```
+
+直到发生 Y 自压缩：
+
+```text
+旧 B 作为 Y 输入
+→ Y 输出 B'
+→ CurrentB = B'
+```
+
+## 最小正确实现
+
+普通 Blogger 回合：
+
+```fsharp
+CurrentB =
+    match CurrentB with
+    | None -> paragraph
+    | Some old -> old + "\n\n" + paragraph
+```
+
+Y 自压缩回合：
+
+```fsharp
+CurrentB = rebasedOutput
+```
+
+二者不能共用一个“总是替换”的赋值。
+
+## 当前还缺 Y 自压缩程序
+
+代码中虽然出现了 `TryRebase` 一类原语，但尚未看到完整自动流程：
+
+```text
+检测 Y 接近上下文上限
+→ 本轮 delta 只包含当前 B
+→ 要求 Y 写成独立的新 B'
+→ 用 B' 替换 CurrentB
+→ 更新 JSON baseline
+```
+
+所以现在只能说：
+
+> X 的 Blogger 多轮调用有了；B 的认知压缩语义尚未实现。
+
+---
+
+# 四、Companion 还有四个必须一起修的问题
+
+## 1. Companion 持久化不是原子的
+
+当前成功后分两次写：
+
+```text
+先写 projection baseline
+再写 B checkpoint
+```
+
+崩溃窗口：
+
+```text
+新 baseline 已持久化
+→ B 尚未持久化
+→ 进程崩溃
+```
+
+重启后系统会认为该投影已经被 Blogger 消化，却仍持有旧 B，于是永久丢掉一段内容。
+
+应改为一个事实：
+
+```fsharp
+CompanionAdvanced {
+    SessionId
+    BloggerSessionId
+    SuccessfulProjection
+    CurrentB
+}
+```
+
+一次 append、一次 flush、一次 Fold。
+
+`PrefixReplacementEnabled` 可以是另一条独立事实，因为它是一次性的状态转换。
+
+## 2. Prefix watermark 只比较 message ID
+
+当前前缀判断倾向于：
+
+```text
+旧消息 ID == 新消息 ID
+→ 认为相同
+```
+
+但 OpenCode 的 message/part 会原地更新：
+
+```text
+tool pending → completed
+assistant text 继续追加
+reasoning part 更新
+```
+
+若 ID 相同而内容已变，系统仍会把它当作已被 B 覆盖的前缀删除，导致最新工具结果或 assistant 内容消失。
+
+必须比较：
+
+```text
+canonical message JSON/hash
+```
+
+而不是只比较 ID。
+
+## 3. 角色白名单默认值反了
+
+当前未知角色可能默认允许 Companion。
+
+正确原则应是：
+
+```text
+明确 Manager/Coder/Orchestrator → 开启
+其他一律关闭
+```
+
+不能：
+
+```text
+无法识别角色 → 猜它可能需要 Blogger
+```
+
+同时 `build`、`plan` 被配置成 Manager 工具面，却未必在 Companion 角色解析中映射为 Manager。应先做唯一角色正规化：
+
+```text
+build / plan / manager → Manager
+```
+
+## 4. Blogger 没有明确使用便宜模型
+
+当前 Blogger child prompt 中未看到稳定的 cheap-model 配置注入；它很可能继承主模型或默认模型。
+
+这违背最初产品定义，也会显著增加成本。
+
+应在静态角色配置中定义：
+
+```text
+blogger:
+  model = configuredCheapModel
+  tools = none
+```
+
+而不是临时在每次 prompt 时猜模型。
+
+---
+
+# 五、Journal 已经进入生产，但可能亲手弄脏 Git 工作区
+
+当前 Journal 默认位于类似：
+
+```text
+<workspace>/.wanxiangshu-next/runtimes/
+```
+
+而 `.gitignore` 中没有确认忽略该目录。
+
+Orchestrator 的第一道门是：
+
+```text
+git status --porcelain
+非空 → RejectedDirty
+```
+
+因此很可能发生：
+
+```text
+插件启动
+→ 创建 .wanxiangshu-next
+→ Git 看到未跟踪文件
+→ Orchestrator 永远拒绝用户
+```
+
+这不是小问题，而是两个核心模块互相击穿。
+
+## 正确位置
+
+运行时事实应放在：
+
+```text
+git rev-parse --git-common-dir
+```
+
+下的插件命名目录，例如：
+
+```text
+.git/wanxiangshu/runtimes/
+```
+
+或者系统 cache 中按 repository identity 分区。
+
+不得依赖用户项目的 `.gitignore` 掩盖插件自身状态。
+
+同理：
+
+* worktree；
+* spool；
+* runtime 日志；
+  -临时 review 文件；
+
+都不能污染用户工作树。
+
+---
+
+# 六、Process 的“流式 spool”目前仍是假象
+
+这次确实修了很多表面合同：
+
+* executor 接受 estimate 字段；
+* threshold 变成 `3 × estimated_output_bytes`；
+* deadline 是 `3 × estimated_running_secs`；
+* Large 有全局 gate；
+* 200KB 用作 chunk；
+* Executor child 用于 map/reduce。
+
+但底层 Runner 仍然把全部 stdout/stderr chunk 放入内存数组。
+
+实际流程近似：
+
+```text
+每次 data
+→ 写 spool
+→ 同时加入内存数组
+
+进程结束
+→ 把所有数组 concat 成完整 byte[]
+→ 再切成 200KB chunks
+```
+
+所以 30GB 输出时仍然需要接近 30GB 甚至更多内存。
+
+这不是 streaming spool，只是：
+
+> 一边写文件，一边仍然完整缓存。
+
+## 正确实现
+
+超过摘要阈值后：
+
+```text
+小前缀可留内存
+完整内容只进入 spool
+内存不再保存后续 byte[]
+```
+
+摘要时：
+
+```text
+打开 spool
+→ 每次 read 200KB
+→ 发送一次性 Executor
+→ 释放 chunk
+→ 继续下一块
+→ reduce summaries
+```
+
+内存复杂度必须是：
+
+```text
+O(200KB + 摘要文本)
+```
+
+而不是：
+
+```text
+O(完整输出)
+```
+
+## 取消也没闭合
+
+当前 Executor 运行路径仍有使用 `CancellationToken.None` 的迹象，Large gate 也未充分绑定取消。
+
+这意味着 parent abort 后，command 可能继续跑到其 `3×estimate` deadline。
+
+唯一 deadline 并不等于无取消。正确语义是：
+
+```text
+先发生者：
+- process exit
+- parent cancellation
+- 3×estimate deadline
+```
+
+parent cancellation 应立即 SIGKILL 进程树，然后正常等待 EOF/pump 结束；不增加第二层 timeout。
+
+---
+
+# 七、Fallback：持久计数有了，真实 A/B 执行仍未闭合
+
+目前可以确认的只是：
+
+```text
+失败事实写入 NDJSON
+→ 重启后累计失败数仍在
+```
+
+但产品真正要求的是：
+
+```text
+失败 1 → 自动重试 A
+失败 2 → 永久切 B，并自动尝试 B
+失败 3 → 自动重试 B
+失败 4 → SessionDead
+```
+
+当前仍有几个问题：
+
+1. `DurableFallback` 与纯 `Fallback.nextAttempt` 的边界复杂，仍容易出现推进两次的 off-by-one。
+2. ModelResolver 虽然存在，但 ForkRuntime 构造路径不一定真正传入并使用。
+3. 顶层 Manager session 的模型切换链没有完整接入。
+4. `fallback-canary` 主要检查 NDJSON 事件和累计数，没有验证实际 provider request 的模型 A/A/B/B。
+5. provider error 和 assistant failed 可能通过两个观察路径重复记一次失败。
+6. 无 message ID 时使用随机 ID，会让重复事件无法去重。
+
+下一条真正有意义的 E2E 必须捕获四次 provider request，断言模型序列：
+
+```text
+A
+A
+B
+B
+```
+
+第五次请求不得发生，session 明确进入 dead。
+
+---
+
+# 八、Review：verdict 工具成立，但 Guard 仍只完成一半
+
+## 已完成
+
+* verdict 是真实结构化工具；
+* REVISE 立即生效；
+* 两个不同 ToolCallId 的 PERFECT；
+* 同 Git tree 才确认；
+* restart 后可恢复第一次 PERFECT。
+
+这些属于实质性成果。
+
+## 未完成一：Reviewer 不返回 verdict
+
+当前缺失 verdict 的 nudge 仍接近：
+
+```text
+每个 reviewer session 最多 nudge 一次
+```
+
+而不是：
+
+```text
+每个 reviewer run 若 terminal 且本轮无 verdict
+→ nudge 同一 reviewer
+```
+
+进程内 HashSet 也不能跨重启去重，且第一次 review 用过 verdict 后，第二次 review 若漏 verdict 可能无法正确判断。
+
+必须使用本轮 assistant/tool boundary 和 durable `GuardPromptAccepted`。
+
+## 未完成二：Manager Finish Guard
+
+尚未形成完整真实链路：
+
+```text
+Manager assistant terminal
+→ 读取当前 Git tree
+→ 查看 Review Projection
+→ 未双 PERFECT：nudge 同一 Manager
+→ 已双 PERFECT且 tree 相同：允许结束
+```
+
+当前 Review canary 主要直接调用 verdict 工具，不等价于 Manager 被 Guard 拦截。
+
+---
+
+# 九、Orchestrator canary 没有测试 Orchestrator
+
+这是目前最严重的“名称大于内容”测试。
+
+生产 `Orchestrator.fs` 已经出现：
+
+* worktree；
+* publish semaphore；
+* candidate；
+* rebase；
+* reverify；
+* ff-only；
+* durable facts。
+
+但 OpenCode 的 Orchestrator `fork(manager)` 仍然走通用 `HostForkRuntime`，而不是这套 Git 发布程序。
+
+现有 canary 做的是：
+
+```text
+Orchestrator LLM
+→ fork Manager child
+→ list
+→ join
+```
+
+它没有证明：
+
+```text
+创建隔离 worktree
+→ Manager 在 worktree 工作
+→ 初次双 PERFECT
+→ 自动 candidate commit
+→ 串行 rebase
+→ 冲突回交同 Manager
+→ rebase 后双 PERFECT
+→ ff-only
+→ Published fact
+```
+
+甚至存在合同冲突：
+
+* SSOT：Orchestrator 只有 `fork/join`；
+* canary：要求 `fork/list/join`；
+  -静态角色配置：可能禁止 `list`。
+
+必须删除这个假 canary 的“publish”称谓，把它降级为：
+
+```text
+orchestrator-agent-tool-surface-canary
+```
+
+然后另建真正的 Git E2E。
+
+---
+
+# 十、角色矩阵仍未完整接线
+
+当前至少有这些缺口：
+
+| 角色           | SSOT                             | 当前问题                    |
+| ------------ | -------------------------------- | ----------------------- |
+| Coder        | 文件工具 + 一次性 Inspector             | 没有清楚的 `inspector` 工具接线  |
+| Inspector    | 仅 executor                       | 基本接近                    |
+| Browser      | read + web                       | 目前接近无工具配置               |
+| Meditator    | read/glob/grep/inspector         | 目前接近无工具配置               |
+| Reviewer     | read/glob/grep/inspector/verdict | 配置允许 inspector，但实际工具未注册 |
+| Executor     | 无工具                              | 方向正确                    |
+| Blogger      | 无工具 + cheap model                | 无工具正确，cheap model 未闭合   |
+| Orchestrator | fork/join                        | canary 仍要求 list         |
+
+不能只验证 Manager，必须为每个角色捕获真实 provider tool snapshot。
+
+---
+
+# 十一、PTY 还没有成为统一 DSL
+
+底层 PTY 和 stress canary 已存在，但模型侧统一协议尚未落地。
+
+目标是：
+
+```text
+fork(agent="pty", prompt="command")
+fork(agent="<pty-id>", prompt="stdin")
+fork(agent="<pty-id>", prompt="")
+fork(agent="<pty-id>", signal="TERM" | "KILL")
+list()
+join()
+```
+
+当前 ToolSurface 的 `fork` 主要识别 AgentRole，`pty` 并未完整进入同一 handle/completion mailbox；`list()` 也主要列 agent。
+
+因此 PTY stress 只能证明底层 PTY 封装，而不能证明“PTY 与 Agent 统一工具表面”。
+
+---
+
+# 十三、当前战役位置
+
+```text
+战役 0：SSOT                         🟢 基本恢复
+战役 1：TestKit                     🟢 完成
+战役 2：旧架构清理                  🟢 完成
+战役 3：Flow / Journal 基座         🟢 基本完成
+战役 4：真实 Host Spike             🟡 顺序运行通过，busy 并发未过
+战役 5：Fork / Join                 🟡 happy path 通过
+战役 6：Companion                   🔴 B 语义不正确
+战役 7：角色能力                    🟡 Manager 正确，其余未齐
+战役 8：Process                     🔴 非真正流式
+战役 9：Fallback                    🟡 durable facts 有，执行链无
+战役 10：Review                     🟡 verdict 有，Guard 未闭环
+战役 11：PTY                        🟡 底层有，统一 DSL 无
+战役 12：Manager 产品纵切           🟢 首次真实成立
+战役 13：Orchestrator               🔴 canary 绕过生产程序
+战役 15：20× 稳定军团               🔴 未达门槛
+战役 16：发布                       🔴 禁止
+```
+
+项目已经不必再退回 Fake Host 阶段。
+
+但也不能继续横向铺新模块。现在必须进入：
+
+> **并发语义与耐久语义收口阶段。**
+
+---
+
+# 十四、下一步只准五个提交
+
+## 提交 1：修 busy nudge
+
+* 一个 child 最多一个 active completion；
+* busy existing fork 只发送 prompt，不替换 pending run；
+* idle 后再 fork 才创建新 completion；
+* 增加真实 overlapping nudge E2E；
+* 连续随机 nudge 20×，不得丢 completion。
+
+## 提交 2：修 Companion 真正语义
+
+* B 普通回合累积；
+* B 自压缩时替换；
+* `CompanionAdvanced` 单 Fact 原子提交；
+* canonical JSON message hash；
+* build/plan 归一为 Manager；
+* unknown role 默认关闭；
+* Blogger 固定 cheap model；
+  -真实 Y 自压缩与 restart E2E。
+
+## 提交 3：重做 Process spool
+
+* 超阈值后停止内存累积；
+* 从 spool 流式读 200KB；
+* chunk 用后释放；
+* parent cancellation 贯穿 Runner、LargeGate 和 process；
+* summary 后清理 spool；
+* 10GB 等价生成器压力测试验证 RSS 有界。
+
+## 提交 4：闭合 Review 与 Fallback
+
+* Reviewer missing-verdict 按 run Guard；
+* Manager finish Guard；
+* Guard claim 持久化；
+* provider 请求实测 A/A/B/B；
+* 单一失败归因和稳定 dedup ID；
+  -第四次失败后 session dead。
+
+## 提交 5：真正接线 Orchestrator
+
+* Orchestrator fork 调用 ManagerJob 程序，而非普通 HostForkRuntime；
+  -去掉 Orchestrator `list`；
+* Journal 移出工作树；
+  -自动 candidate commit；
+  -真实 Git conflict 同 Manager 修复；
+  -rebase 后真实 Reviewer 双 PERFECT；
+  -ff-only + Published；
+  -重启恢复 pending job；
+  -真实 Git E2E。
+
+---
+
+# 最终评价
+
+这次工程师终于不是在“造看起来正确的目录”了，已经真正接入了 OpenCode、真实 child session、角色工具面、Journal 和多种 canary。
+
+这是质变，值得肯定。
+
+但当前尚有三个不能妥协的核心错误：
+
+1. **busy nudge 会覆盖 active run，丢 completion；**
+2. **B 只保存最后一段，不是累计工作记录；**
+3. **Process 虽写 spool，仍把完整输出留在内存。**
+
+这三条不解决，分别会导致：
+
+```text
+join 永久挂起
+上下文压缩丢失历史
+大输出吃光内存
+```
+
+所以总指挥命令是：
+
+> **停止增加 canary 名称和模块数量；开始证明最坏路径。**
+
+跨过这三条以后，项目才算真正从“能跑 happy path”进入“架构可信”。
+
+---
+
+今后本项目的重复稳定性测试**上限固定为 3 次**，不再要求更高次数。
+
+路线图中的门禁统一改为：
+
+```text
+关键 canary：1～3 次
+随机延迟/乱序场景：固定种子，最多 3 组
+可靠性来源：确定性竞态注入、故障测试、属性测试、不变量和泄漏检查
+禁止用大量重复运行掩盖时序不确定性
+```
+
+上一版所有高次数重复要求全部作废。
