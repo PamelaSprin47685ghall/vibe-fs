@@ -33,6 +33,11 @@ import:
 
 ## 已验证通过但存在关键限制
 
+### FallbackDetect false-positive fix
+- `isFailedAssistant` now guards empty-text detection with `hasToolCallPart`: tool-call-only assistant turns (write, fork prompts etc.) are no longer incorrectly flagged as failed, preventing unnecessary zwsp nudges.
+- This fixes agent-dsl-canary (join result verification) and companion-canary (zwsp nudge 500 errors).
+- Can also be affected by zwsp nudge bypass in mock provider; added `allowSyntheticContinuations()` to companion-canary to handle remaining zwsp nudges correctly.
+
 - `npm test` 及 `npm run test:release` 已真正执行 F# 测试与 TestKit，不再只编译测试项目.
 - `HostEventPort`/`DeterministicEventPort` 已移除按 Session 永久吞 terminal；真实 P0 已覆盖 child 创建、terminal、A 版切片与 Manager join。
 - Companion 角色纯门禁与真实两轮 Blogger 请求已通过；真实 near-limit projection replacement 与 OpenCode 进程重启仍需单独 E2E。
