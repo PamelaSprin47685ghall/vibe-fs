@@ -1,77 +1,77 @@
 # 万象术
 
-OpenCode Agent DSL 多代理插件。模型侧只有 `fork` / `join` / `list` / `verdict` 等极小工具面；实现侧是 F# Structured Flow、Per-Runtime NDJSON 事实日志、Completion Mailbox、Companion 投影与 Git 发布。
+OpenCode Agent DSL 插件。模型侧工具面由角色静态装配；实现侧使用 F# Structured Flow、per-runtime NDJSON 领域事实、completion mailbox、Companion 投影和 Git 发布端口。
 
-## 产品模型
+产品语义：[`next/Doc/SSOT.md`](next/Doc/SSOT.md)。工程执行状态与纠偏顺序：[`AGENTS.md`](AGENTS.md)。
+
+## 当前边界
+
+当前分支已回滚测试驱动的生产污染：没有生产进程台账、全局进程 kill、传输层 prompt 重试/伪造失败、fail-open Git tree 或伪 PTY 工具面。
+
+直接验证过：
 
 ```text
-Orchestrator
+npm run build
+npm run test:manager-tools
+```
+
+真实 E2E 基座正在按 scenario/lane 因果模型重建；不要把历史 canary 结果解释为当前 release 资格。P0 保持并行，最多重复 3 次；每个场景使用 1s 的 causal-progress Watchdog。
+
+## 角色模型
+
+```text
+Orchestrator (fork/join)
   └── Manager (fork/join/list)
-        ├── Coder + Companion Blogger
-        ├── Inspector (exec only)
+        ├── Coder
+        ├── Inspector (executor)
         ├── Browser
         ├── Meditator
         └── Reviewer (PERFECT/REVISE)
-
-Companion:
-  X 的 B 版工作记录 + 前缀替换，Y 忙时跳过不阻塞
-
-Process:
-  3×estimate 唯一 deadline + 完整输出 spool + 200KB map/reduce 摘要
-
-ReviewGuard:
-  同一 Git tree 连续两次 PERFECT 才确认
-
-Journal:
-  只持久化跨重启领域事实，不持久化 Stage/Phase/Lease/Owner
-
-Journal runtime 通过插件输入的显式 `journalDirectory` 启用；启动先 Boot/Fold 稳定 NDJSON 前缀，再创建本 runtime writer。未提供该字段时不猜测工作区路径，也不写持久化日志。
 ```
 
-## 安装与入口
+Companion Blogger 仅是认知上下文；它不能决定调度、Review、Git 或进程事实。角色和精确权限以 SSOT 为准。
 
-构建产物是 npm 包 `wanxiangshu`，OpenCode 生产入口：
+## 核心不变量
+
+1. Busy existing agent 的 `fork` 是同 child fire-and-forget nudge；不得创建 prompt queue。
+2. completion 先写 mailbox；`join()` 消费任意可用 completion。
+3. 进程只有一个 `3 × estimated_running_secs` deadline；进程资源只由拥有者清理。
+4. Review 必须同 Git tree 的连续两次 `PERFECT`。
+5. Fallback 是每 session 累计 A/A/B/B/Dead；Transport 不得归因。
+6. Git tree 读取失败必须 fail closed。
+7. 真实 PTY 未接入前，不得把 shell command 宣称为 PTY。
+
+## 构建与测试
+
+```bash
+npm run build
+npm run test:compile
+npm run test:next
+npm run test:manager-tools
+node testkit/opencode/tests/gate-testkit.mjs
+npm run test:e2e:p0
+```
+
+先运行当前改动的最小目标测试；只有该阶段的契约已证明后才运行更广的套件。TestKit 每个 scenario 必须独占 workspace、HOME/XDG、Provider、端口、Journal、spool、进程组、diagnostics 和 expectation store。
+
+## 生产入口
 
 ```text
 wanxiangshu
 → build/next/OpenCode/Plugin.js
 ```
 
-```bash
-npm run build
-```
-
-默认 `main` / `exports["."]` 都指向 `build/next/OpenCode/Plugin.js`。不再导出 Mux/OMP/万象阵旧入口。
-
-## 命令
-
-| 命令 | 作用 |
-| --- | --- |
-| `npm run build` | Fable 编译 `next/` 到 `build/` |
-| `npm test` | 编译 `tests-next` + 跑 TestKit gate |
-| `npm run test:e2e:p0` | Manager DSL 单次 canary |
+`package.json` 的 `main` 与 `exports["."]` 指向该入口。
 
 ## 开发布局
 
 ```text
-next/                 Agent DSL 生产源码
-tests-next/           新架构测试
-testkit/opencode/     独立 OpenCode harness
-AGENTS.md             唯一产品宪法
-MIGRATION.md          行为总账
+next/                 生产 Agent DSL
+ tests-next/           Fable contract/Port tests
+ testkit/opencode/     独立 OpenCode harness
+ next/Doc/SSOT.md      产品语义
+ AGENTS.md             工程纪律与当前证据
+ MIGRATION.md          行为迁移总账
 ```
 
-旧 `src/` / `tests/` / Mux / OMP / 万象阵实现已冻结，不作为生产路径。
-
-## 不变式
-
-1. 上下文压缩 = `B` + watermark 后的 Raw Tail。
-2. Blogger 失败/延迟不阻塞主会话。
-3. 控制流看强类型 DU 与 Git Hash，不看聊天文本。
-4. Busy agent 不隐式排队。
-5. Process 只有一个 `3×estimate` deadline。
-6. 业务失败走 DU，不抛伪装异常。
-7. Completion 先入邮箱再消费。
-8. 双 PERFECT 绑定 Git Tree Hash。
-9. Orchestrator 发布串行。
-10. 禁止 Stage/Phase/Lease/Owner 复合状态机。
+旧实现不作为生产依赖。历史代码仅可作逐符号行为证据；禁止整版本 checkout 或无审查覆盖。
