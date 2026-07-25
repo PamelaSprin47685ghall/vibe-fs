@@ -168,7 +168,7 @@ module ManagerCanaryTests =
             Assert.Contains("\"step\":3", computedDelta)
             Assert.Contains("\"data\":\"final\"", computedDelta)
             Assert.Equal(Some p3, companion.Memory.LastSuccessfulProjection)
-            Assert.Equal(Some "Summary 3", companion.Memory.CurrentB)
+            Assert.Equal(Some "Summary 1\n\nSummary 3", companion.Memory.CurrentB)
         }
 
     [<Fact>]

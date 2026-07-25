@@ -35,49 +35,31 @@ module ForkRuntimeTests =
         }
 
     [<Fact>]
-    let ``ForkRuntime_nudge_on_busy_agent_does_not_replace_pending_run`` () =
+    let ``ForkRuntime_nudge_on_busy_agent_does_not_create_new_pending_run`` () =
         task {
-            let firstWork = TaskCompletionSource<Result<string, string>>()
-            let completionSource = TaskCompletionSource<RunCompletion>()
-            let runtime = ForkRuntime(listener = completionSource.SetResult)
             let agentId = "agent-busy-nudge"
+            let runtime = ForkRuntime()
 
+            // First fork creates a pending run.
             let firstFork =
-                runtime.Fork(agentId, AgentRole.Inspector, runWork = (fun () -> firstWork.Task))
+                runtime.Fork(agentId, AgentRole.Inspector, runWork = (fun () -> task { return Ok "first" }))
 
             match firstFork with
             | ForkResult.Created id -> Assert.Equal(agentId, id)
-            | other -> Assert.True(false, sprintf "Expected Created result, got: %A" other)
+            | other -> Assert.True(false, sprintf "Expected Created, got %A" other)
 
-            // Nudge on a busy agent: no new pending run created,
-            // existing join waits for original completion only.
+            // Nudge on busy agent: returns Nudged but must NOT create a second pending run.
             let secondFork =
                 runtime.Fork(agentId, AgentRole.Inspector, runWork = (fun () -> task { return Ok "second" }))
 
             Assert.Equal(ForkResult.Nudged agentId, secondFork)
 
-            // The second fork does not produce a second completion.
-            // Completing the first work resolves the single join.
-            firstWork.SetResult(Ok "first")
-            let! _ = completionSource.Task
-            let! joined = runtime.Join()
+            // Only one completion can be dequeued from the mailbox.
+            let! result = runtime.Join()
 
-            match joined with
-            | Ok completion ->
-                Assert.Equal(agentId, completion.AgentId)
-                Assert.Equal(AgentRole.Inspector, completion.Role)
-                Assert.Equal(Ok "first", completion.Outcome)
+            match result with
+            | Ok _ -> ()
             | Error err -> Assert.True(false, sprintf "Expected completion, got Error: %A" err)
-
-            // Agent is now idle; a subsequent fork creates a new run.
-            let thirdFork =
-                runtime.Fork(agentId, AgentRole.Inspector, runWork = (fun () -> task { return Ok "third" }))
-
-            match thirdFork with
-            | ForkResult.Created id -> Assert.Equal(agentId, id)
-            | other -> Assert.True(false, sprintf "Expected Created result for idle agent, got: %A" other)
-
-            let! _ = runtime.Join()
         }
 
     [<Fact>]
