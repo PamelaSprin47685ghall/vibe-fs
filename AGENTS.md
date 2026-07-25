@@ -348,7 +348,7 @@ npm run test:release
 - **Phase 5 (ReviewGuard)**：完成双 PERFECT 挑战与 Manager 结束门禁。
 - **Phase 6 (PTY)**：完成结构化 PTY 句柄、读写、信号与 completion 统一化。
 - **Phase 7 (Orchestrator)**：完成隔离 worktree、ManagerJob、rebase 复审、串行 FF 发布。
-- **Phase 8 (删除旧实现)**：仅在真实 Host/Provider/PTY/Orchestrator 边界全部闭合并完成 release 审计后，才物理删除旧代码、旧测试与万象阵 DAG 基础设施；当前阶段禁止执行。
+- **Phase 8 (删除旧实现)**：所有 P0 边界已通过，生产入口已切换。旧 Mux/OMP/Mimocode 实现和测试冻结待删除。旧测试已按行为迁移（保留基础设施、提炼契约、淘汰 Stage/Phase/Lease/Owner 实现与断言）。
 
 # 设计决策历史与补充规范
 
