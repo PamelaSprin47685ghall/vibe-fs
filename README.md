@@ -34,14 +34,14 @@ Journal runtime 通过插件输入的显式 `journalDirectory` 启用；启动�
 
 ```text
 wanxiangshu
-→ build/OpenCode/Plugin.js
+→ build/next/OpenCode/Plugin.js
 ```
 
 ```bash
 npm run build
 ```
 
-默认 `main` / `exports["."]` 都指向 `build/OpenCode/Plugin.js`。不再导出 Mux/OMP/万象阵旧入口。
+默认 `main` / `exports["."]` 都指向 `build/next/OpenCode/Plugin.js`。不再导出 Mux/OMP/万象阵旧入口。
 
 ## 命令
 
