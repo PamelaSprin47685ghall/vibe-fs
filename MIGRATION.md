@@ -45,7 +45,7 @@
 
 ## 近期接管顺序
 
-1. Manager→Coder→Join 的 child-created、write、terminal、join、terminal Host barrier。
+1. ✅ Manager→Coder→Join 的 child-created、write、terminal、join、terminal Host barrier。
 2. Companion production projection/restart semantics。
 3. Reviewer → Fallback → Process → PTY → Orchestrator。
 
@@ -56,5 +56,6 @@
 - `afterExpectation()` 在消费点同步注册合法后继，避免并发 child response 在 test continuation 之前到达的竞态。
 - P0 维持 staggered parallel；Companion replacement 以一个明确的 busy Blogger response 验证 busy skip，而不是靠 timing 接受任意额外 Blogger 请求。
 - Journal runtime files 位于 Git common directory；隔离环境不再在受测 workspace 创建 `node_modules`。这些是 harness/host 边界，不是 Orchestrator ff-only 发布证据。
+- `HostEventRouter` 用 message ID 合并 `message.updated` 与 `message.part.updated`；真实 text/tool part 的 terminal 不会被误判为空轮，空 terminal 仍发送零宽续命。provider 500 的 `session.status=retry` 每 attempt 只 append 一个 durable failure fact；fallback canary 以零延迟 retry、重启和累计事实证明该边界，不声称 A/A/B/B 模型切换。
 
 旧资产只能在相应行为有新层级证据后删除。任何未列入总账的旧测试先分类，再决定保留、提炼或废弃。

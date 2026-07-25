@@ -57,19 +57,21 @@ import:
 - Watchdog 固定 1s。只接受 blocking expectation 消费、显式 session/restart/barrier；background Blogger 默认只留诊断。replacement busy-skip 仅在测试显式等待该事实时作为 blocking barrier。
 - `testkit/opencode/tests/gate-testkit.mjs` 已覆盖 lane 交错/FIFO、extra/missing、真实 session-parent 绑定、原子后继、title 分类、background-only watchdog。`npm run test:e2e:p0` 保持 staggered parallel，13 个 canary 以显式 lane 运行。
 - Journal 运行时路径已在 Git common directory 的 `wanxiangshu-next/runtimes`；测试依赖不再创建 workspace `node_modules`，Reviewer canary 断言工作树没有 `.wanxiangshu-next`。
+- Manager→Coder→Join 现以 child-created、Coder write completed、Coder terminal、Manager join completed、Manager terminal 五个真实 Host barrier 收口；不再以全局 idle 推断因果。
+- `HostEventRouter` 以 message ID 聚合 `message.part.updated`，再在 terminal 判定空助手轮：有 text/tool part 的完成轮不会误发零宽续命；真正空轮仍会续命。`session.status=retry` 的每个 attempt 一次性 append `FallbackFailureRecorded`，500→即时 retry→重启累计由 fallback canary 覆盖。
+- 本轮直接验证：`npm test`（142/142 Fable、Manager contract、21 TestKit gates、P0）及 `CANARY_REPEAT=3 node scripts/run-canary-staggered.mjs`（13/13 × 3）均通过。
 
 ## 当前未闭合边界
 
-1. 最小 Manager→Coder→Join 已有显式 Provider lane 和真实 P0，但仍需把 child-created、Coder write completed、Coder terminal、Manager join completed、Manager terminal 逐项固定为语义 barrier；不得用全局 idle 或固定 sleep 代替。
-2. Companion、Reviewer、Fallback、Process、PTY、Orchestrator 的产品边界仍按下方顺序重验；当前 TestKit 改造不证明生产语义闭合。
-3. 真实 PTY 还未成为统一 `fork` 表面。只能保留 Process/PTy 窄 Port，不得将普通 Runner 包装成 PTY。
-4. Fallback 的真实 provider A/A/B/B 请求序列、ReviewGuard Manager finish、Orchestrator 真实 worktree 发布仍需单独证据。当前 fallback canary 只证明失败事实跨重启累计，不得外推模型切换。
+1. Companion、Reviewer、Fallback、Process、PTY、Orchestrator 的产品边界仍按下方顺序重验；当前 TestKit 改造不证明生产语义闭合。
+2. 真实 PTY 还未成为统一 `fork` 表面。只能保留 Process/PTy 窄 Port，不得将普通 Runner 包装成 PTY。
+3. Fallback 的真实 provider A/A/B/B 请求序列、ReviewGuard Manager finish、Orchestrator 真实 worktree 发布仍需单独证据。当前 fallback canary 证明 500 retry failure fact 跨重启累计，不得外推模型切换。
 
 ## 解冻后的严格顺序
 
 ### 阶段一：TestKit 因果模型
 
-先修测试基座，不改生产语义。
+先修测试基座；若真实 Host event payload 暴露错误归因，修正 adapter 的事实提取，不得用 permissive expectation 掩盖。
 
 - 每个 scenario 独占 workspace、HOME、XDG、OpenCode 数据、Provider、端口、Journal、spool、PTY namespace、diagnostics 和 expectation store。
 - 只读 build、fixture、源码可以共享；运行中不得改共享 build。
