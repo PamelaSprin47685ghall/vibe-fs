@@ -177,7 +177,7 @@ const singleScenarioOpts = {
     },
   },
   strict: true,
-  watchdogMs: 30000,
+  watchdogMs: 1000,
 };
 
 let scenario;

@@ -45,7 +45,7 @@ try {
     project: { files: { 'AGENTS.md': 'companion replacement canary\n' } },
     strict: true,
     contextLimit,
-    watchdogMs: 30000,
+    watchdogMs: 1000,
   });
   scenario.provider.allowTitleGeneration();
   scenario.provider.allowBloggerRequests();

@@ -12,7 +12,7 @@ function names(request) {
 let scenario;
 try {
   if (!runStaticGate([__filename]).passed) throw new Error('executor canary contains prohibited polling');
-  scenario = await setupScenario({ project: { files: { 'AGENTS.md': 'executor canary\n' } }, strict: true, watchdogMs: 30000 });
+  scenario = await setupScenario({ project: { files: { 'AGENTS.md': 'executor canary\n' } }, strict: true, watchdogMs: 1000 });
   scenario.provider.allowTitleGeneration();
   scenario.provider.allowOutOfOrder();
 

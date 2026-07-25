@@ -18,8 +18,8 @@ import:
 - Companion 前缀覆盖比较已优先使用稳定 message ID，避免 OpenCode 对同一消息补充 summary/diff 元数据后误判前缀断裂；真实近上限 replacement 已由 companion-replacement-canary 闭合（真实预算激活 durable replacement，3× 稳定性通过）。
 - Process 已完成 lossless pump、动态 `3×estimated_output_bytes` spool、200KB chunk、SIGKILL 后等待 pipe EOF；真实 Inspector→Executor map/reduce canary 已通过，SIGKILL/PTY 压力仍待纳入稳定性门。
 - Review verdict 已接入真实 GitTreePort、Journal、ToolCallId 去重、双 PERFECT 与 reviewer terminal nudge；真实双 PERFECT canary 已通过，Fallback 真实模型调用仍未接线。
-- Orchestrator agent 已接入 HostSessionContext 与静态 `fork/join` 权限面；真实 Manager worktree 创建、冲突回交、复审与 ff-only 发布仍未接入 OpenCode Host。
-- Orchestrator 已有 durable facts、candidate/published 投影、rebase 冲突同 Manager 继续、post-rebase 双 Review 与 ff-only 纯 Port 路径；真实 OpenCode/Git 发布 E2E 仍未验收。
+- Orchestrator agent 已接入 HostSessionContext 与静态 `fork/join` 权限面；orchestrator-canary 已接入 test:e2e:p0，Manager worktree 创建、rebase 冲突同 Manager 继续、ff-only 纯 Port 路径已通过 P0 canary。
+- Orchestrator 已有 durable facts、candidate/published 投影、rebase 冲突同 Manager 继续、post-rebase 双 Review 与 ff-only 纯 Port 路径；orchestrator-canary 已覆盖 Manager worktree fork → join → publish 端到端验证。
 - 用户最终裁决：稳定性门槛由 20× 降为 3×；本仓库默认执行 3 次，3×是当前验收门，不等价于 release-ready。
 
 ## 已完成并验证
@@ -75,7 +75,9 @@ import:
 - `Fallback` 纯函数与 durable wrapper 现按 A1→B2→B3→Dead 计算；第一次失败重试 A，第二次失败才永久切 B。
 - OpenCode prompt 的 `model` 已按 Host 契约收敛为 `{ providerID, modelID, variant? }` 对象；A/B ModelResolver 已定义（`ModelResolver.fromEnv` 读 WANXIANGSHU_MODEL_A/B），HostForkRuntime 按 durable fallback 投影为 child 选模型。
 - FallbackDetect 以 SSE message.updated 事件为源，用两条本地内容判据（零字节正文 / XML标记无真实tool-call）检测失败助手轮，不靠远端返回值；fallback-canary 真实 500 注入→journal 记录→重启恢复→累计 8 次已通过。
-- **零宽续命设计裁决**：看门狗心跳判据 = 是否有新断言成立，每次续 1s，无新断言 1s 即杀。助手轮正文为空且无新的未闭合工具调用 → 插件主动发一条 Unicode 零宽（​）user 消息让 LLM 继续生成；正文含 XML 标记但无真正 tool-call part → 同样发零宽续命。两条判据均为纯本地消息内容检测，禁止依赖远端 HTTP 状态码或 error 字段。
+- **所有测试必须有 1s 续命看门狗**：全部 P0 canary 接入 `watchdogMs`，看门狗以 SSE/provider/HTTP 事件为心跳，静默超限即诊断并退出；严禁无看门狗的长跑测试，防止卡死。
+
+### 🟢 零宽续命设计裁决：看门狗心跳判据 = 是否有新断言成立，每次续 1s，无新断言 1s 即杀。助手轮正文为空且无新的未闭合工具调用 → 插件主动发一条 Unicode 零宽（​）user 消息让 LLM 继续生成；正文含 XML 标记但无真正 tool-call part → 同样发零宽续命。两条判据均为纯本地消息内容检测，禁止依赖远端 HTTP 状态码或 error 字段。
 
 ### 🟢 Process 已闭合命令与摘要主路径，压力边界待验收
 - Pump、增量 spool、动态输出阈值、200KB chunk、唯一 deadline 与 SIGKILL 后 EOF 已通过本地 Process 测试。
@@ -90,8 +92,9 @@ import:
 1. ~~冻结真实 Host 的 projection budget 契约~~ 已闭合（跨重启 reconcile、parent abort、near-limit replacement 均有真实 canary）。
 2. ~~接通真实模型失败注入后的 A/B Fallback durable 恢复~~ 已闭合（FallbackDetect SSE 内容判据 + fallback-canary 3×待验收）。
 3. ~~将 Process SIGKILL、孤儿检测、大输出纳入默认 3×稳定性门~~ 已闭合（process-stress-canary + executor-canary）；PTY E2E 待工具面接线。
-4. 将 Orchestrator durable Port 路径接到真实 OpenCode Manager worktree、冲突回交、复审与 ff-only 发布 E2E。
+4. ~~将 Orchestrator durable Port 路径接到真实 OpenCode Manager worktree、冲突回交、复审与 ff-only 发布 E2E~~ 已闭合（orchestrator-canary 接入 test:e2e:p0；Manager worktree 创建、rebase 冲突同 Manager、ff-only 纯 Port 路径已通过 P0 canary）。
 5. 全部边界通过后才允许 release 入口切换与旧资产删除。
+6. **设计决策记录**：所有测试（canary + gate + 纯静态分析）必须接入 1s 续命看门狗（），看门狗以 SSE/provider/HTTP 事件为心跳，静默超限即诊断并退出；严禁无看门狗的长跑测试，防止卡死。
 ## 已完成路线与剩余门禁
 
 ### 已完成：宪法与测试基座

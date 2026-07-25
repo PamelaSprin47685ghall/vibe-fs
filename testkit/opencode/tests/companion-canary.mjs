@@ -200,7 +200,7 @@ try {
   scenario = await setupScenario({
     project: { files: { 'AGENTS.md': '- companion projection canary\n' } },
     strict: true,
-    watchdogMs: 30000,
+    watchdogMs: 1000,
   });
 
   await runProjectionScenario(scenario);
