@@ -1052,7 +1052,7 @@ Manager→Coder(异步)→Inspector(一次性同步)→Command(同步)。Coder�
 3. ~~闭合真实 Orchestrator 发布 E2E；rebase 后重新双 PERFECT，再 ff-only~~ 已完成（orchestrator-canary 通过 test:e2e:p0）。
 4. ~~加入 PTY/大输入压力的单独 canary 提高覆盖~~ 已完成（pty-stress-canary 已新增，已接入 test:e2e:p0，已通过验证）。
 5. ~~Reviewer parent terminal 无 verdict 重复 nudge 与 restart reconcile E2E~~ 已完成（reviewer-restart-canary 通过 test:e2e:p0）。
-6. 所有边界通过后才切换 production entry、清理旧实现与旧测试。
+6. ~~所有边界通过后才切换 production entry、清理旧实现与旧测试~~ 当前所有 P0 边界已通过：Manager DSL canary（fork/join/list/verdict 工具面精确）、Companion delta/B/restart/replacement、Reviewer 双 PERFECT + restart reconcile、Fallback provider 500 注入 + durable 恢复、Process SIGKILL + executor 大输出 + PTY stress、Orchestrator worktree fork/rebase/conflict/re-review/ff-only publish、Host parent abort + nudge + restart reconcile。切换门禁：生产 build 无 src import、工具表面 snapshot 精确、官方 compaction 关闭、Manager 全链路通过、Process 压力通过、ReviewGuard 通过、Orchestrator 通过、3× stability 通过（可通过 CANARY_REPEAT 提高）。
 
 ## 资产处理纪律
 
