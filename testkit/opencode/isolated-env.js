@@ -25,6 +25,7 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
+import { provisionPluginDependency } from './plugin-dependency.js';
 
 /**
  * Generate the OpenCode config for a mock provider.
@@ -122,6 +123,7 @@ export function createIsolatedEnv(opts) {
   for (const dir of [home, xdgData, xdgConfig, xdgCache, xdgState, tmpDir]) {
     fs.mkdirSync(dir, { recursive: true });
   }
+  provisionPluginDependency(path.join(xdgConfig, 'opencode'));
 
   const mockApiBase = llmUrl.replace(/\/v1$/, '') + '/api';
   const config = makeConfig(llmUrl, opts.pluginPaths, opts);
