@@ -115,19 +115,22 @@ module RunnerCore =
                             let recordChunk (target: ResizeArray<byte[]>) (chunk: obj) =
                                 let bytes = toBytes chunk
                                 target.Add bytes
-                                combinedChunks.Add bytes
                                 bytesObserved <- bytesObserved + int64 bytes.Length
 
                                 match streamingSpool with
                                 | Some spool -> Spool.appendStreamingSpool spool bytes
+                                // Release memory: chunk already on disk
                                 | None when bytesObserved > outputThreshold ->
                                     let spool = Spool.startStreamingSpool ()
 
                                     for previous in combinedChunks do
                                         Spool.appendStreamingSpool spool previous
 
+                                    Spool.appendStreamingSpool spool bytes
                                     streamingSpool <- Some spool
-                                | None -> ()
+                                    // Release memory: switch to streaming
+                                    combinedChunks.Clear()
+                                | None -> combinedChunks.Add bytes
 
                             emitJsExpr
                                 (child, (fun chunk -> recordChunk stdoutChunks chunk))
@@ -249,18 +252,25 @@ module RunnerCore =
                                 let stderrStr = Encoding.UTF8.GetString(stderrBytes, 0, stderrBytes.Length)
 
                                 if totalBytes > outputThreshold then
-                                    let combined =
-                                        if combinedChunks.Count = 0 then
-                                            [||]
-                                        else
-                                            combinedChunks |> Seq.toArray |> Array.concat
-
-                                    let chunks = Spool.chunkBytes Spool.ChunkSizeBytes combined
+                                    let chunks =
+                                        match streamingSpool with
+                                        | Some spool ->
+                                            Spool.chunkBytes
+                                                Spool.ChunkSizeBytes
+                                                (System.IO.File.ReadAllBytes spool.Path)
+                                        | None ->
+                                            let combined = combinedChunks |> Seq.toArray |> Array.concat
+                                            Spool.chunkBytes Spool.ChunkSizeBytes combined
 
                                     let tempFile =
                                         match streamingSpool with
                                         | Some spool -> spool.Path
-                                        | None -> fst (Spool.spoolBytesToTempFile combined)
+                                        | None ->
+                                            fst (
+                                                Spool.spoolBytesToTempFile (
+                                                    combinedChunks |> Seq.toArray |> Array.concat
+                                                )
+                                            )
 
                                     return
                                         Ok(RunnerOutcome.Spooled(exitCode, tempFile, totalBytes, chunks.Length, chunks))
