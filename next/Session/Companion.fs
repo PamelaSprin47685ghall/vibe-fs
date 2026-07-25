@@ -253,7 +253,11 @@ type Companion(?initialMemory: CompanionMemory, ?durable: ICompanionDurablePort,
                                 persistSuccessful currentProjection content
 
                                 lock lockObj (fun () ->
-                                    currentB <- Some content
+                                    currentB <-
+                                        match currentB with
+                                        | None -> Some content
+                                        | Some old -> Some(old + "\n\n" + content)
+
                                     lastSuccessfulProjection <- Some currentProjection)
                             with _ ->
                                 ()

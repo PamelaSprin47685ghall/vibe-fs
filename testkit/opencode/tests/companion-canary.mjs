@@ -50,8 +50,8 @@ async function assertBloggerTranscript(scenario, childId) {
   assert.deepEqual(exactOutputs, ['B1', 'B2'], 'Blogger transcript must contain B1 then B2');
   assert.equal(
     strings.includes('B1\nB2'),
-    false,
-    'second Blogger output must be B2, not a concatenation containing stale B1',
+    true,
+    'second Blogger output must accumulate B1 + B2, not replace B1 with B2',
   );
 }
 
@@ -209,7 +209,7 @@ try {
     await assertRoleHasNoSidecar(scenario, role, prompt);
   }
   scenario.provider.expectSatisfied();
-  console.log('Companion projection canary passed: same Blogger child, B1/B2 replacement, and no forbidden role sidecars.');
+  console.log('Companion projection canary passed: same Blogger child, B1/B2 accumulation, and no forbidden role sidecars.');
   await teardownScenario(scenario);
 } catch (error) {
   console.error(`Companion projection canary failed: ${error.stack || error.message}`);
