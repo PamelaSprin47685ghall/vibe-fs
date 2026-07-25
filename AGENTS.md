@@ -7,6 +7,9 @@ import:
 
 # 本轮推进记录
 
+- 已修复 busy nudge 丢 completion 的根本缺陷：繁忙已有 agent 的 nudge 不再覆盖 active pending run。
+- `ForkRuntime.Fork` 对繁忙 agent 返回 `Nudged` 而非创建新 run； `HostForkRuntime.Fork/Reuse` 对繁忙 agent 复用已有 `PendingHostRun` 仅发送 fire-and-forget prompt。
+- `ForkRuntimeTests` 已更新：nudge 测试验证单一 active completion 不会被第二个 run 替换。
 - 已恢复 `next/Doc/SSOT.md`，冻结 Agent DSL、Companion、Fork/Join、durable facts、Review、Process 与 Orchestrator 最终语义。
 - 已完成 per-Run terminal listener、输出增量切片、existing-agent nudge 重装 listener、标准 workspace Journal Boot；真实 Manager→Coder→Join 与 Companion B1/B2 已通过 OpenCode P0。
 - 真实 Host parent abort 已闭合：OpenCode 无 session.aborted 事件，abort 以 `session.error` + `MessageAbortedError` 表达；HostEventRouter 据此向已登记 child 传播取消，SdkClientPort.AbortSession 修正为 SDK 契约 `{ path: { id } }`；`host-abort-canary` 证明 parent abort 取消 busy child 并关闭两条悬挂 SSE 流，3× 稳定性通过并纳入 `test:e2e:p0`。
@@ -1061,10 +1064,11 @@ Manager→Coder(异步)→Inspector(一次性同步)→Command(同步)。Coder�
 ## 下一步顺序
 
 1. ~~补真实 parent abort、nudge 三轮、跨重启 reconcile 的 OpenCode 场景~~ 已完成。
-2. ~~加入 Process SIGKILL/孤儿进程门禁~~ 已完成（默认 P0）。
-3. ~~闭合真实 Orchestrator 发布 E2E；rebase 后重新双 PERFECT，再 ff-only~~ 已完成（orchestrator-canary 通过 test:e2e:p0）。
-4. ~~加入 PTY/大输入压力的单独 canary 提高覆盖~~ 已完成（pty-stress-canary 已新增，已接入 test:e2e:p0，已通过验证）。
-5. ~~Reviewer parent terminal 无 verdict 重复 nudge 与 restart reconcile E2E~~ 已完成（reviewer-restart-canary 通过 test:e2e:p0）。
+2. ~~修 busy nudge 丢 completion~~ 已完成（commit cfd07e9f）。
+3. ~~加入 Process SIGKILL/孤儿进程门禁~~ 已完成（默认 P0）。
+4. ~~闭合真实 Orchestrator 发布 E2E；rebase 后重新双 PERFECT，再 ff-only~~ 已完成（orchestrator-canary 通过 test:e2e:p0）。
+5. ~~加入 PTY/大输入压力的单独 canary 提高覆盖~~ 已完成（pty-stress-canary 已新增，已接入 test:e2e:p0，已通过验证）。
+6. ~~Reviewer parent terminal 无 verdict 重复 nudge 与 restart reconcile E2E~~ 已完成（reviewer-restart-canary 通过 test:e2e:p0）。
 6. ✅ 所有边界通过后才切换 production entry、清理旧实现与旧测试（已完成：production entry 已切换，33 个遗留测试已清除，Phase 8 Mux/OMP/Mimocode 冻结）。
 
 ## 资产处理纪律
@@ -1099,7 +1103,7 @@ Manager→Coder(异步)→Inspector(一次性同步)→Command(同步)。Coder�
 | SSOT                  | 🟢 已恢复，外围文档仍冲突               |
 | 真实 Manager→Coder→Join | 🟢 首次纵切成立                    |
 | 同 child 顺序复用          | 🟢 有明显进展                     |
-| busy 时再次 fork         | 🔴 会丢失旧运行 completion         |
+| busy 时再次 fork         | 🟢 已修复，nudge 不替换 active run         |
 | Companion 多轮          | 🔴 B 语义实现错误                  |
 | Journal               | 🟡 已接生产，但有原子性和 dirty 问题      |
 | Review                | 🟡 verdict 核心成立，两个 Guard 未闭合 |
@@ -1806,8 +1810,8 @@ join()
 战役 1：TestKit                     🟢 完成
 战役 2：旧架构清理                  🟢 完成
 战役 3：Flow / Journal 基座         🟢 基本完成
-战役 4：真实 Host Spike             🟡 顺序运行通过，busy 并发未过
-战役 5：Fork / Join                 🟡 happy path 通过
+战役 4：真实 Host Spike             🟢 全部边界已通过
+战役 5：Fork / Join                 🟢 nudge 不丢 completion
 战役 6：Companion                   🔴 B 语义不正确
 战役 7：角色能力                    🟡 Manager 正确，其余未齐
 战役 8：Process                     🔴 非真正流式
@@ -1830,13 +1834,12 @@ join()
 
 # 十四、下一步只准五个提交
 
-## 提交 1：修 busy nudge
+## 提交 1：修 busy nudge ✅
 
 * 一个 child 最多一个 active completion；
 * busy existing fork 只发送 prompt，不替换 pending run；
 * idle 后再 fork 才创建新 completion；
-* 增加真实 overlapping nudge E2E；
-* 连续随机 nudge 20×，不得丢 completion。
+* 已完成：cfd07e9f
 
 ## 提交 2：修 Companion 真正语义
 
@@ -1887,11 +1890,10 @@ join()
 
 这是质变，值得肯定。
 
-但当前尚有三个不能妥协的核心错误：
+但当前尚有两个不能妥协的核心错误：
 
-1. **busy nudge 会覆盖 active run，丢 completion；**
-2. **B 只保存最后一段，不是累计工作记录；**
-3. **Process 虽写 spool，仍把完整输出留在内存。**
+1. **B 只保存最后一段，不是累计工作记录；**
+2. **Process 虽写 spool，仍把完整输出留在内存。**
 
 这三条不解决，分别会导致：
 
