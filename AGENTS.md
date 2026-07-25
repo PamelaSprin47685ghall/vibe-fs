@@ -139,9 +139,12 @@ import:
   - restart → 恢复 B/baseline/replacement
   - Y self-rebase → CurrentB 只等于 B'（旧 B 自然退出 transcript）
 
-### 当前未闭合
+### ✅ 全部边界已通过 - 生产入口切换准备就绪
 - 全部稳定性门禁已通过（P0 canary 全部接入 test:e2e:p0），3× 验收门已满足。
-- 生产入口切换与旧资产删除需等待全部边界通过确认。
+- FallbackDetect false-positive 修复完成，zwsp 续命环不再干扰 canary 测试。
+- agent-dsl-canary、companion-canary、reviewer-verdict-canary、executor-canary、process-stress-canary 全部通过。
+- 生产入口切换：package.json main/exports 指向 build/next/OpenCode/Plugin.js，README 已正确记录，等待发布执行切换。
+- 旧资产删除：在发布入口切换完成后按 Phase 8 执行。
 
 ## 验证命令
 
