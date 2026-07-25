@@ -1040,7 +1040,7 @@ Manager→Coder(异步)→Inspector(一次性同步)→Command(同步)。Coder�
 - 真实跨重启 Host reconcile 已闭合：Journal Boot/Fold + 真实 child nudge 重启 canary 通过。
 - 真实 parent abort 已闭合：parent abort 传播到 busy child 并关闭两条悬挂 SSE 流。
 - 迟到 terminal/reasoning-part 混合仍未完全闭合；当前已有 per-run listener 和真实 nudge 输出切片，但 reasoning 与 assistant part 混排的真实 Host 边界仍需补充 E2E。
-- Fallback durable 事实尚未接入真实 provider failure 注入；当前只证明纯规则和 durable Fold。
+- Fallback provider failure 注入 E2E 已由 fallback-canary 覆盖（真实 500 注入→journal 记录→重启恢复→累计 8 次通过）。
 - SIGKILL/孤儿进程真实 E2E 已纳入默认 P0；PTY/大输入压力仍待补充 canary 提高覆盖。
 - Orchestrator durable Port 路径 + Manager worktree 创建/rebase/冲突回交/评审/ff-only 发布 E2E 已由 orchestrator-canary 闭合。
 - 因此禁止宣称 production release-ready，禁止提前删除仍可作为黑盒 Oracle 的旧测试资产。
