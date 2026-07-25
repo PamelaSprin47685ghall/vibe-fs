@@ -7,8 +7,9 @@ import { getSessionId, runStaticGate, setupScenario, teardownScenario } from '..
 import { bindLaneSession, expectationLane } from './lane.mjs';
 
 const __filename = fileURLToPath(import.meta.url);
-const managerTools = ['fork', 'join', 'list'];
-const forbiddenManagerTools = ['read', 'write', 'edit', 'bash', 'glob', 'grep', 'verdict'];
+const primaryRole = 'orchestrator';
+const primaryTools = ['fork', 'join'];
+const forbiddenPrimaryTools = ['read', 'write', 'edit', 'bash', 'glob', 'grep', 'list', 'verdict'];
 const contextLimit = 1000;
 // Activation: estimateTokens >= 0.8 * 1000 = 800 tokens = 3200 chars/4.
 const longText = 'dense work record sentence. '.repeat(70); // ~1960 chars per round
@@ -25,7 +26,7 @@ function journalContains(workDir, needle) {
   return false;
 }
 
-function managerRequests(scenario) {
+function primaryRequests(scenario) {
   return scenario.provider.requests.filter((body) =>
     (body.tools || []).some((t) => (t?.function?.name || t?.name) === 'fork'));
 }
@@ -48,51 +49,54 @@ try {
     project: { files: { 'AGENTS.md': 'companion replacement canary\n' } },
     strict: true,
     contextLimit,
-   watchdogMs: 1000,
+    watchdogMs: 1000,
   });
   scenario.provider.expectTitle({
-    id: 'manager-title',
-    lane: expectationLane('companion-replacement', 'manager-title', 'title', 1, 'title'),
+    id: 'primary-title',
+    lane: expectationLane('companion-replacement', 'primary-title', 'title', 1, 'title'),
   });
 
-  const parent = await scenario.client.createSession();
+  const parent = await scenario.client.request('POST', '/api/session', {
+    body: { agent: primaryRole, model: { providerID: 'test', id: 'test-model' } },
+  });
   const parentId = getSessionId(parent);
   assert.ok(parentId, `parent creation failed: ${JSON.stringify(parent)}`);
   scenario.sessionIds.push(parentId);
-  bindLaneSession(scenario.provider, parentId, 'manager-title', 'manager');
+  bindLaneSession(scenario.provider, parentId, 'primary-title', 'primary');
 
   for (let round = 1; round <= rounds; round++) {
     scenario.provider.expectText({
       id: `round-${round}`,
-      lane: expectationLane('companion-replacement', 'manager', 'manager', round),
+      lane: expectationLane('companion-replacement', 'primary', primaryRole, round),
       text: `round ${round}: ${longText}`,
-      match: { requiredTools: managerTools, forbiddenTools: forbiddenManagerTools },
+      match: { requiredTools: primaryTools, forbiddenTools: forbiddenPrimaryTools },
     });
     if (round <= 2) {
       scenario.provider.expectText({
         id: `manager-blogger-${round}`,
-        lane: expectationLane('companion-replacement', 'manager-blogger', 'blogger', round, 'chat', 'manager'),
+        lane: expectationLane('companion-replacement', 'primary-blogger', 'blogger', round, 'chat', 'primary'),
         text: `Blogger paragraph ${round}.`,
         match: {
-          containsText: ['You are the blogger of a coding agent session.', '"agent":"manager"'],
+          containsText: ['You are the blogger of a coding agent session.', '"agent":"orchestrator"'],
         },
       });
     }
     if (round === 3) {
       scenario.provider.expectText({
         id: 'manager-blogger-3',
-        lane: expectationLane('companion-replacement', 'manager-blogger', 'blogger', 3, 'chat', 'manager'),
+        lane: expectationLane('companion-replacement', 'primary-blogger', 'blogger', 3, 'chat', 'primary'),
         neverEnd: true,
+        blocking: false,
         text: 'Blogger replacement background remains busy.',
         match: {
-          containsText: ['You are the blogger of a coding agent session.', '"agent":"manager"'],
+          containsText: ['You are the blogger of a coding agent session.', '"agent":"orchestrator"'],
         },
       });
     }
     const turn = scenario.turn.start(parentId);
     const prompt = await scenario.client.request('POST', `/session/${parentId}/prompt_async`, {
       body: {
-        agent: 'manager',
+        agent: primaryRole,
         parts: [{ type: 'text', text: `Record round ${round}.` }],
         model: { providerID: 'test', modelID: 'test-model' },
       },
@@ -125,24 +129,25 @@ try {
   await scenario.restart();
   scenario.provider.expectText({
     id: 'round-restarted',
-    lane: expectationLane('companion-replacement', 'manager', 'manager', 5),
+    lane: expectationLane('companion-replacement', 'primary', primaryRole, 5),
     text: `round restarted: ${longText}`,
-    match: { requiredTools: managerTools, forbiddenTools: forbiddenManagerTools },
+    match: { requiredTools: primaryTools, forbiddenTools: forbiddenPrimaryTools },
   });
   scenario.provider.expectText({
     id: 'manager-blogger-restarted',
-    lane: expectationLane('companion-replacement', 'manager-blogger-restarted', 'blogger', 1, 'chat', 'manager'),
+    lane: expectationLane('companion-replacement', 'primary-blogger-restarted', 'blogger', 1, 'chat', 'primary'),
     neverEnd: true,
+    blocking: false,
     text: 'Blogger restart background remains busy.',
     match: {
-      containsText: ['You are the blogger of a coding agent session.', '"agent":"manager"'],
+      containsText: ['You are the blogger of a coding agent session.', '"agent":"orchestrator"'],
     },
   });
 
   const restartedTurn = scenario.turn.start(parentId);
   const restartedPrompt = await scenario.client.request('POST', `/session/${parentId}/prompt_async`, {
     body: {
-      agent: 'manager',
+      agent: primaryRole,
       parts: [{ type: 'text', text: 'Record round restarted.' }],
       model: { providerID: 'test', modelID: 'test-model' },
     },
@@ -156,8 +161,8 @@ try {
     blocking: true,
   });
 
-  const requests = managerRequests(scenario);
-  assert.ok(requests.length >= rounds + 1, `expected manager requests, got ${requests.length}`);
+  const requests = primaryRequests(scenario);
+  assert.ok(requests.length >= rounds + 1, `expected primary requests, got ${requests.length}`);
   const last = requests[requests.length - 1];
   const bIndex = last.messages.findIndex((m) => messageText(m).includes('Blogger paragraph'));
   assert.ok(bIndex >= 0, `replaced projection must carry the current B: ${JSON.stringify(last.messages.map(messageRole))}`);

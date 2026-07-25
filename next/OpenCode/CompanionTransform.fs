@@ -92,7 +92,7 @@ module CompanionTransform =
                 unbox<string> inObj?sessionID
 
         if not (String.IsNullOrWhiteSpace sessionId) && not (isNull rawOutObj?messages) then
-            let agentRole =
+            let rawAgentRole =
                 match sessionRoles.TryGetValue sessionId with
                 | true, role -> Some role
                 | _ ->
@@ -101,9 +101,14 @@ module CompanionTransform =
                     | None when not (isNull inObj) && not (isNull inObj?agent) -> Some(unbox<string> inObj?agent)
                     | None -> None
 
+            let agentRole = rawAgentRole |> Option.bind HostSessionContext.canonicalRole
+
+            if not (sessionRoles.ContainsKey sessionId) then
+                agentRole |> Option.iter (fun role -> sessionRoles.[sessionId] <- role)
+
             let allowed =
                 match agentRole with
-                | None -> true
+                | None -> false
                 | Some _ -> Companion.shouldCreateForAgent agentRole
 
             if allowed then

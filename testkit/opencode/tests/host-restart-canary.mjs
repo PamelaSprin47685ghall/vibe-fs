@@ -95,6 +95,12 @@ async function nudge(parentId, childId, agentId, marker, managerMarker, scenario
 
   const parentTurnFinal = scenario.turn.start(parentId, { afterSeq: parentTurn.terminalSeq });
   await parentTurnFinal.awaitTerminal({ timeoutMs: 1000, requireActivity: true, requireAssistantTerminal: true, requireIdleAfterActivity: true });
+
+  await Promise.all([
+    scenario.provider.waitForExpectation('manager-blogger-2', 1000),
+    scenario.provider.waitForExpectation('coder-blogger-2', 1000),
+  ]);
+  scenario.watchdog?.advance({ reason: 'restarted-blogger-sidecars', lane: 'restart', blocking: true });
 }
 
 let scenario;
@@ -118,6 +124,7 @@ try {
   scenario.provider.expectText({
     id: 'manager-blogger-1',
     lane: expectationLane('host-restart', 'manager-blogger-initial', 'blogger', 1, 'chat', 'manager'),
+    blocking: false,
     neverEnd: true,
     text: 'Manager created background.',
     match: { containsText: ['You are the blogger of a coding agent session.', '"agent":"manager"'] },
@@ -131,6 +138,7 @@ try {
   scenario.provider.expectText({
     id: 'coder-blogger-1',
     lane: expectationLane('host-restart', 'coder-blogger-initial', 'blogger', 1, 'chat', 'coder'),
+    blocking: false,
     neverEnd: true,
     text: 'Coder created background.',
     match: { containsText: ['You are the blogger of a coding agent session.', '"agent":"coder"'] },
@@ -185,6 +193,7 @@ try {
     scenario.provider.waitForExpectation('manager-blogger-1', 1000),
     scenario.provider.waitForExpectation('coder-blogger-1', 1000),
   ]);
+  scenario.watchdog?.advance({ reason: 'initial-blogger-sidecars', lane: 'initial', blocking: true });
 
   await scenario.restart();
   await nudge(parentId, childId, agentId, 'child-a2', 'manager-a2', scenario);

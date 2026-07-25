@@ -11,6 +11,9 @@ import { requestRoleOf } from '../strict-mock-matches.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const BLOGGER_MARKER = 'You are the blogger of a coding agent session.';
+const primaryRole = 'orchestrator';
+const primaryTools = ['fork', 'join'];
+const forbiddenPrimaryTools = ['read', 'write', 'edit', 'bash', 'glob', 'grep', 'list', 'verdict'];
 
 function bloggerRequests(provider) {
   return provider.requests.filter((body) => requestRoleOf(body) === 'blogger');
@@ -32,95 +35,97 @@ async function assertBloggerTranscript(scenario, bloggerId) {
 
 async function runProjectionScenario(scenario) {
   scenario.provider.expectTitle({
-    id: 'manager-title',
-    lane: expectationLane('companion-projection', 'manager-title', 'title', 1, 'title'),
+    id: 'primary-title',
+    lane: expectationLane('companion-projection', 'primary-title', 'title', 1, 'title'),
   });
 
   scenario.provider.expectText({
-    id: 'manager-first',
-    lane: expectationLane('companion-projection', 'manager', 'manager', 1),
-    text: 'Manager first projection complete.',
+    id: 'primary-first',
+    lane: expectationLane('companion-projection', 'primary', primaryRole, 1),
+    text: 'Orchestrator first projection complete.',
     match: {
       containsText: ['first projection'],
-      requiredTools: ['fork', 'join', 'list'],
-      forbiddenTools: ['read', 'write', 'edit', 'bash', 'glob', 'grep', 'verdict'],
+      requiredTools: primaryTools,
+      forbiddenTools: forbiddenPrimaryTools,
     },
   });
   scenario.provider.expectText({
     id: 'blogger-b1',
-    lane: expectationLane('companion-projection', 'manager-blogger', 'blogger', 1, 'chat', 'manager'),
+    lane: expectationLane('companion-projection', 'primary-blogger', 'blogger', 1, 'chat', 'primary'),
     text: 'B1',
     match: { containsText: [BLOGGER_MARKER] },
   });
   scenario.provider.expectText({
-    id: 'manager-second',
-    lane: expectationLane('companion-projection', 'manager', 'manager', 2),
-    text: 'Manager second projection complete.',
+    id: 'primary-second',
+    lane: expectationLane('companion-projection', 'primary', primaryRole, 2),
+    text: 'Orchestrator second projection complete.',
     match: {
       containsText: ['second projection'],
-      requiredTools: ['fork', 'join', 'list'],
-      forbiddenTools: ['read', 'write', 'edit', 'bash', 'glob', 'grep', 'verdict'],
+      requiredTools: primaryTools,
+      forbiddenTools: forbiddenPrimaryTools,
     },
   });
   scenario.provider.expectText({
     id: 'blogger-b2',
-    lane: expectationLane('companion-projection', 'manager-blogger', 'blogger', 2, 'chat', 'manager'),
+    lane: expectationLane('companion-projection', 'primary-blogger', 'blogger', 2, 'chat', 'primary'),
     text: 'B2',
     match: { containsText: [BLOGGER_MARKER] },
   });
 
-  const managerResponse = await scenario.client.createSession();
-  const managerId = getSessionId(managerResponse);
-  assert.ok(managerId, `Manager session creation failed: ${JSON.stringify(managerResponse)}`);
-  scenario.sessionIds.push(managerId);
-  bindLaneSession(scenario.provider, managerId, 'manager-title', 'manager');
+  const primaryResponse = await scenario.client.request('POST', '/api/session', {
+    body: { agent: primaryRole, model: { providerID: 'test', id: 'test-model' } },
+  });
+  const primaryId = getSessionId(primaryResponse);
+  assert.ok(primaryId, `primary session creation failed: ${JSON.stringify(primaryResponse)}`);
+  scenario.sessionIds.push(primaryId);
+  bindLaneSession(scenario.provider, primaryId, 'primary-title', 'primary');
 
-  const firstTurn = scenario.turn.start(managerId);
-  const firstPrompt = await scenario.client.request('POST', `/session/${managerId}/prompt_async`, {
+  const firstTurn = scenario.turn.start(primaryId);
+  const firstPrompt = await scenario.client.request('POST', `/session/${primaryId}/prompt_async`, {
     body: {
-      agent: 'manager',
-      parts: [{ type: 'text', text: 'Produce the first projection for Manager X.' }],
+      agent: primaryRole,
+      parts: [{ type: 'text', text: 'Produce the first projection for Orchestrator X.' }],
       model: { providerID: 'test', modelID: 'test-model' },
     },
   });
-  assert.ok(firstPrompt.ok, `first Manager prompt failed: ${JSON.stringify(firstPrompt.data)}`);
+  assert.ok(firstPrompt.ok, `first primary prompt failed: ${JSON.stringify(firstPrompt.data)}`);
   await firstTurn.awaitTerminal({ timeoutMs: 1000, requireActivity: true, requireAssistantTerminal: true, requireIdleAfterActivity: true });
 
   const firstBlogRequests = bloggerRequests(scenario.provider);
   assert.ok(
     firstBlogRequests.length >= 1,
-    'Companion gap: first Manager projection did not emit a real Blogger child request',
+    'Companion gap: first primary projection did not emit a real Blogger child request',
   );
-  const childIdsAfterFirstProjection = [...new Set(sessionCreatedIds(scenario))].filter((id) => id !== managerId);
-  assert.equal(childIdsAfterFirstProjection.length, 1, 'first Manager projection must create exactly one Blogger child session');
+  const childIdsAfterFirstProjection = [...new Set(sessionCreatedIds(scenario))].filter((id) => id !== primaryId);
+  assert.equal(childIdsAfterFirstProjection.length, 1, 'first primary projection must create exactly one Blogger child session');
   const bloggerId = childIdsAfterFirstProjection[0];
   await scenario.events.awaitEvent(
     (event) => event.type === 'session.idle' && event.sessionID === bloggerId,
     1000,
   );
-  scenario.watchdog?.advance({ reason: 'manager-blogger-idle', lane: 'manager-blogger', blocking: true });
+  scenario.watchdog?.advance({ reason: 'primary-blogger-idle', lane: 'primary-blogger', blocking: true });
 
   const secondSeqBefore = scenario.events.lastSeq;
-  const secondTurn = scenario.turn.start(managerId);
-  const secondPrompt = await scenario.client.request('POST', `/session/${managerId}/prompt_async`, {
+  const secondTurn = scenario.turn.start(primaryId);
+  const secondPrompt = await scenario.client.request('POST', `/session/${primaryId}/prompt_async`, {
     body: {
-      agent: 'manager',
-      parts: [{ type: 'text', text: 'Produce the second projection for Manager X.' }],
+      agent: primaryRole,
+      parts: [{ type: 'text', text: 'Produce the second projection for Orchestrator X.' }],
       model: { providerID: 'test', modelID: 'test-model' },
     },
   });
-  assert.ok(secondPrompt.ok, `second Manager prompt failed: ${JSON.stringify(secondPrompt.data)}`);
+  assert.ok(secondPrompt.ok, `second primary prompt failed: ${JSON.stringify(secondPrompt.data)}`);
   await secondTurn.awaitTerminal({ timeoutMs: 1000, requireActivity: true, requireAssistantTerminal: true, requireIdleAfterActivity: true });
 
   await scenario.events.awaitEvent(
     (event) => event.seq > secondSeqBefore && event.type === 'session.idle' && event.sessionID === bloggerId,
     1000,
   );
-  scenario.watchdog?.advance({ reason: 'manager-blogger-idle', lane: 'manager-blogger', blocking: true });
+  scenario.watchdog?.advance({ reason: 'primary-blogger-idle', lane: 'primary-blogger', blocking: true });
 
   const allBlogRequests = bloggerRequests(scenario.provider);
-  assert.equal(allBlogRequests.length, 2, 'two Manager projections must produce exactly two Blogger requests');
-  const childIdsAfterSecondProjection = [...new Set(sessionCreatedIds(scenario))].filter((id) => id !== managerId);
+  assert.equal(allBlogRequests.length, 2, 'two primary projections must produce exactly two Blogger requests');
+  const childIdsAfterSecondProjection = [...new Set(sessionCreatedIds(scenario))].filter((id) => id !== primaryId);
   assert.deepEqual(
     childIdsAfterSecondProjection,
     [bloggerId],
@@ -128,7 +133,7 @@ async function runProjectionScenario(scenario) {
   );
   await assertBloggerTranscript(scenario, bloggerId);
 
-  return { managerId, bloggerId };
+  return { primaryId, bloggerId };
 }
 
 async function assertRoleHasNoSidecar(scenario, role, prompt) {
@@ -157,6 +162,7 @@ async function assertRoleHasNoSidecar(scenario, role, prompt) {
   const turn = scenario.turn.start(sessionId);
   const response = await scenario.client.request('POST', `/session/${sessionId}/prompt_async`, {
     body: {
+      agent: role,
       parts: [{ type: 'text', text: prompt }],
       model: { providerID: 'test', modelID: 'test-model' },
     },
