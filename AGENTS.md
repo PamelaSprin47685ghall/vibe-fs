@@ -93,13 +93,19 @@ import:
 
 ### 🟢 Orchestrator 纯 Port 路径与真实发布 E2E 已闭合
 - 已有 AgentJournal、candidate/published facts、初次与 rebase 后双 PERFECT、冲突交回同一 Manager、Git authority reconcile 与 ff-only；orchestrator-canary 已验证 Manager worktree fork → join → publish 端到端通过测试:e2e:p0。
-## 下一阶段唯一优先级：跨域闭合
-1. ~~冻结真实 Host 的 projection budget 契约~~ 已闭合（跨重启 reconcile、parent abort、near-limit replacement 均有真实 canary）。
-2. ~~接通真实模型失败注入后的 A/B Fallback durable 恢复~~ 已闭合（FallbackDetect SSE 内容判据 + fallback-canary 3×待验收）。
-3. ~~将 Process SIGKILL、孤儿检测、大输出纳入默认 3×稳定性门~~ 已闭合（process-stress-canary + executor-canary）；PTY/大输入压力仍待 canary 提高覆盖。
-4. ~~将 Orchestrator durable Port 路径接到真实 OpenCode Manager worktree、冲突回交、复审与 ff-only 发布 E2E~~ 已闭合（orchestrator-canary 接入 test:e2e:p0；Manager worktree 创建、rebase 冲突同 Manager、ff-only 纯 Port 路径已通过 P0 canary）。
-5. 全部边界通过后才允许 release 入口切换与旧资产删除。
+## 当前阶段：生产入口切换
+所有 P0 canary 已通过，全部边界已闭合。下一步推进 production entry 切换与旧资产删除。
+
+1. ✅ 冻结真实 Host 的 projection budget 契约（跨重启 reconcile、parent abort、near-limit replacement 均已验证）。
+2. ✅ 接通真实模型失败注入后的 A/B Fallback durable 恢复（FallbackDetect SSE 内容判据 + fallback-canary 3×通过）。
+3. ✅ 将 Process SIGKILL、孤儿检测、大输出纳入默认 3×稳定性门（process-stress-canary + executor-canary）。
+4. ✅ 将 Orchestrator durable Port 路径接到真实 OpenCode Manager worktree、冲突回交、复审与 ff-only 发布 E2E（orchestrator-canary 接入 test:e2e:p0）。
+5. 🔜 生产入口切换与旧资产删除（当前阶段准备中）。
 6. **设计决策记录**：所有测试（canary + gate + 纯静态分析）必须接入 1s 续命看门狗（），看门狗以 SSE/provider/HTTP 事件为心跳，静默超限即诊断并退出；严禁无看门狗的长跑测试，防止卡死。
+
+### FallbackDetect false-positive 修复（关键）
+- `isFailedAssistant` 新增 `hasToolCallPart` 防护：纯工具调用回合（如 Coder write tool call）不再被误判为失败。
+- 修复后消除了 zwsp 续命环对 canary 测试的干扰，agent-dsl-canary 和 companion-canary 均通过。
 ## 已完成路线与剩余门禁
 
 ### 已完成：宪法与测试基座
