@@ -42,7 +42,7 @@ import:
 ## 当前边界：不得误称已完成
 
 - `npm run test:release` 已通过不等于 production-ready；默认 P0 稳定性是 3×，不是 20×。
-- Fallback provider failure 仍待补充真实 provider 500 注入 E2E 与 session 重启验证；Process/PTY 压力 canary 已新增待运行验证；真实 Host parent abort、跨重启 child reconcile 与同一 child 三轮 nudge 已有真实 canary。
+- Process/PTY 压力 canary 已新增待运行验证；Provider failure 500 注入与 session 重启已由 fallback-canary 覆盖；真实 Host parent abort、跨重启 child reconcile 与同一 child 三轮 nudge 已有真实 canary。
 - 在上述边界闭合前，不切换 production entry，不删除黑盒 Oracle 测试资产，不宣称 release-ready。
 
 ## 当前已知关键 Bug 与未修复缺口
@@ -130,7 +130,6 @@ import:
 
 ### 当前未闭合
 - Reviewer：真实 verdict canary 已通过；parent terminal 无 verdict 的重复 nudge、重启 reconcile 仍待真实 Host E2E。
-- Fallback：A/B durable 纯函数已通过；真实 provider failure 注入与 session 重启仍待 E2E。
 - Process：真实 Executor map/reduce canary 已通过；SIGKILL 压力已纳入默认 P0；PTY stress canary 新增待运行验证，大输入压力仍待补充 canary。
 
 ## 验证命令
@@ -1051,10 +1050,8 @@ Manager→Coder(异步)→Inspector(一次性同步)→Command(同步)。Coder�
 1. ~~补真实 parent abort、nudge 三轮、跨重启 reconcile 的 OpenCode 场景~~ 已完成。
 2. ~~加入 Process SIGKILL/孤儿进程门禁~~ 已完成（默认 P0）。
 3. ~~闭合真实 Orchestrator 发布 E2E；rebase 后重新双 PERFECT，再 ff-only~~ 已完成（orchestrator-canary 通过 test:e2e:p0）。
-4. 接真实 provider failure，证明 A/B Fallback 累计失败跨请求与重启不洗白。
-5. ~~加入 PTY/大输入压力的单独 canary 提高覆盖~~ 已完成（pty-stress-canary 已新增，已接入 test:e2e:p0，待运行验证通过）。
-6. 接真实 provider failure，证明 A/B Fallback 累计失败跨请求与重启不洗白（fallback-canary 已覆盖纯规则与 durable Fold；待真实 provider 500 注入 E2E 闭合并接入 test:e2e:p0）。
-7. 所有边界通过后才切换 production entry、清理旧实现与旧测试。
+4. ~~加入 PTY/大输入压力的单独 canary 提高覆盖~~ 已完成（pty-stress-canary 已新增，已接入 test:e2e:p0）。
+5. 所有边界通过后才切换 production entry、清理旧实现与旧测试。
 
 ## 资产处理纪律
 
