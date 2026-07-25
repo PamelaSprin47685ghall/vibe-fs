@@ -46,7 +46,7 @@
 ## 近期接管顺序
 
 1. ✅ Manager→Coder→Join 的 child-created、write、terminal、join、terminal Host barrier。
-2. Companion production projection/restart semantics。
+2. ✅ Companion production projection/restart semantics：`CompanionAdvanced` 原子持久 B+baseline；真实 replacement restart 恢复完整 B 与 raw tail。
 3. Reviewer → Fallback → Process → PTY → Orchestrator。
 
 ## TestKit 因果接管证据

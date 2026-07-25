@@ -59,11 +59,12 @@ import:
 - Journal 运行时路径已在 Git common directory 的 `wanxiangshu-next/runtimes`；测试依赖不再创建 workspace `node_modules`，Reviewer canary 断言工作树没有 `.wanxiangshu-next`。
 - Manager→Coder→Join 现以 child-created、Coder write completed、Coder terminal、Manager join completed、Manager terminal 五个真实 Host barrier 收口；不再以全局 idle 推断因果。
 - `HostEventRouter` 以 message ID 聚合 `message.part.updated`，再在 terminal 判定空助手轮：有 text/tool part 的完成轮不会误发零宽续命；真正空轮仍会续命。`session.status=retry` 的每个 attempt 一次性 append `FallbackFailureRecorded`，500→即时 retry→重启累计由 fallback canary 覆盖。
+- Companion 成功回合以单条 `CompanionAdvanced(SessionId, Projection, Content)` 原子 append；`Content` 是累积后的完整 B，不再分两条事实留下 baseline/B 撕裂窗口。`companion-replacement-canary` 真实触发 replacement、重启 OpenCode、恢复 B1+B2、保留 raw tail，并验证新 Blogger 仍为 nonblocking。
 - 本轮直接验证：`npm test`（142/142 Fable、Manager contract、21 TestKit gates、P0）及 `CANARY_REPEAT=3 node scripts/run-canary-staggered.mjs`（13/13 × 3）均通过。
 
 ## 当前未闭合边界
 
-1. Companion、Reviewer、Fallback、Process、PTY、Orchestrator 的产品边界仍按下方顺序重验；当前 TestKit 改造不证明生产语义闭合。
+1. Reviewer、Fallback、Process、PTY、Orchestrator 的产品边界仍按下方顺序重验；当前 TestKit 改造不证明其余生产语义闭合。
 2. 真实 PTY 还未成为统一 `fork` 表面。只能保留 Process/PTy 窄 Port，不得将普通 Runner 包装成 PTY。
 3. Fallback 的真实 provider A/A/B/B 请求序列、ReviewGuard Manager finish、Orchestrator 真实 worktree 发布仍需单独证据。当前 fallback canary 证明 500 retry failure fact 跨重启累计，不得外推模型切换。
 
