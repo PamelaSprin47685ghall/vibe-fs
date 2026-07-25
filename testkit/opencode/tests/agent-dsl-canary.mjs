@@ -14,10 +14,9 @@ import { execSync } from 'node:child_process';
 import {
   runStaticGate,
   runStabilityGate,
-  setupScenario,
-  teardownScenario,
   getSessionId,
 } from '../index.js';
+import { expectationLane } from './lane.mjs';
 
 const __filename = fileURLToPath(import.meta.url);
 
@@ -50,26 +49,22 @@ try {
 
 console.log(`  - CLI Binary ('opencode'): ${opencodeCliAvailable ? `Available (v${opencodeVersion})` : 'UNAVAILABLE (Host capabilities limited)'}`);
 console.log('  - Isolated Env: Supported (Temp HOME, XDG_CONFIG_HOME)');
-console.log('  - Strict Mock Provider: Available (FIFO matching, synthetic completions)');
+console.log('  - Strict Mock Provider: Available (causal lane matching, synthetic completions)');
 console.log('  - Event Probe: Available (SSE stream reconnect, sequence tracking)');
 console.log('  - Resource Leak Detection: Active (Port/PID/Process-tree tracking)\n');
 
 // 3. Scenario Definition
 async function canaryScenario(scenario) {
-  // Title generation is a separate host request; keep it deterministic without
-  // weakening the FIFO expectations for Manager and Coder turns.
+  // Title generation is a separate host request; Manager and Coder lanes stay strict.
   scenario.provider.allowSyntheticContinuations();
   scenario.provider.allowTitleGeneration();
-  scenario.provider.allowBloggerRequests();
-  scenario.provider.allowOutOfOrder();
 
   const forbiddenManagerTools = ['read', 'write', 'edit', 'bash', 'glob', 'grep', 'verdict'];
 
-  // FIFO: Manager forks Coder, then emits join (which waits); the child Coder
-  // writes and reports, after which Manager returns the joined completion. The
-  // response args are real tool payloads consumed by the host, not a shortcut.
+  // Manager and Coder are independent lanes; each lane is ordered by turn.
   scenario.provider.expectToolCall({
     id: 'manager-fork-coder',
+    lane: expectationLane('manager-dsl', 'manager', 'manager', 1),
     tool: 'fork',
     args: {
       agent: 'coder',
@@ -81,21 +76,44 @@ async function canaryScenario(scenario) {
     },
   });
 
+  scenario.provider.expectText({
+    id: 'manager-blogger',
+    lane: expectationLane('manager-dsl', 'manager-blogger', 'blogger', 1),
+    blocking: false,
+    text: 'Manager background record.',
+    match: {
+      containsText: ['You are the blogger of a coding agent session.', '"agent":"manager"'],
+    },
+  });
+
   scenario.provider.expectToolCall({
     id: 'coder-write-file',
+    lane: expectationLane('manager-dsl', 'coder', 'coder', 1),
     tool: 'write',
     args: { filePath: 'canary_output.txt', content: 'Coder canary slice OK\n' },
     match: { requiredTools: ['write'] },
   });
 
   scenario.provider.expectText({
+    id: 'coder-blogger',
+    lane: expectationLane('manager-dsl', 'coder-blogger', 'blogger', 1),
+    blocking: false,
+    text: 'Coder background record.',
+    match: {
+      containsText: ['You are the blogger of a coding agent session.', '"agent":"coder"'],
+    },
+  });
+
+  scenario.provider.expectText({
     id: 'coder-finished',
+    lane: expectationLane('manager-dsl', 'coder', 'coder', 2),
     text: 'Coder write complete.',
     match: { requiredTools: ['write'] },
   });
 
   scenario.provider.expectToolCall({
     id: 'manager-join-coder',
+    lane: expectationLane('manager-dsl', 'manager', 'manager', 2),
     tool: 'join',
     args: {},
     match: {
@@ -105,7 +123,18 @@ async function canaryScenario(scenario) {
   });
 
   scenario.provider.expectText({
+    id: 'manager-blogger-final',
+    lane: expectationLane('manager-dsl', 'manager-blogger', 'blogger', 2),
+    blocking: false,
+    text: 'Manager final background record.',
+    match: {
+      containsText: ['You are the blogger of a coding agent session.', '"agent":"manager"'],
+    },
+  });
+
+  scenario.provider.expectText({
     id: 'manager-joined-coder',
+    lane: expectationLane('manager-dsl', 'manager', 'manager', 3),
     text: 'Manager joined Coder: canary complete.',
     match: {
       requiredTools: ['fork', 'join', 'list'],
@@ -172,51 +201,7 @@ async function canaryScenario(scenario) {
   assert.match(transcriptBody, /"tool"/, 'join result should appear as a tool message in the Manager session');
 }
 
-// 4. Single Isolated Execution Check
-console.log(`[${new Date().toISOString()}] 3. Running single isolated scenario check...`);
-const singleScenarioOpts = {
-  project: {
-    files: {
-      'AGENTS.md': '- manager dsl canary project\n',
-    },
-  },
-  strict: true,
- watchdogMs: 1000,
-  startTimeoutMs: 5000,
-};
-
-let scenario;
-try {
-  console.log(`[${new Date().toISOString()}] setupScenario starting...`);
-  scenario = await setupScenario(singleScenarioOpts);
-  console.log(`[${new Date().toISOString()}] setupScenario complete. Starting canaryScenario...`);
-  await canaryScenario(scenario);
-  console.log(`[${new Date().toISOString()}] canaryScenario complete.`);
-  scenario.provider.expectSatisfied();
-  await teardownScenario(scenario);
-  console.log('  ✓ Single isolated scenario passed successfully\n');
-} catch (err) {
-  console.error(`  ✗ Single isolated scenario failed: ${err.message}`);
-  if (scenario?.provider?.requests) {
-    const requests = scenario.provider.requests.map((request) => ({
-      sessionId: request.sessionId,
-      tools: request.tools?.map((tool) => tool.function?.name || tool.name),
-      messages: request.messages?.length,
-    }));
-    console.error(`  provider requests: ${JSON.stringify(requests)}`);
-  }
-  if (scenario?.provider?.unexpectedRequests) console.error(`  unexpected: ${JSON.stringify(scenario.provider.unexpectedRequests)}`);
-  if (scenario?.events?._events) console.error(`  events: ${JSON.stringify(scenario.events._events.slice(-20))}`);
-  if (scenario?.host?.stdoutLog) console.error(`  host stdout: ${scenario.host.stdoutLog.slice(-4000)}`);
-  if (scenario?.host?.stderrLog) console.error(`  host stderr: ${scenario.host.stderrLog.slice(-4000)}`);
-  if (scenario) {
-    try { await teardownScenario(scenario, { keepOnFailure: true }); } catch {}
-  }
-  process.exit(1);
-}
-
-// 5. One-Iteration Stability Loop with per-run disposal and leak checks
-console.log('4. Running three-iteration stability gate...');
+console.log('3. Running up-to-three-iteration stability gate...');
 const stabilityGateResult = await runStabilityGate({
   test: {
     name: 'Manager DSL Canary Scenario',

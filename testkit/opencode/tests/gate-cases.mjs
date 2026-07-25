@@ -19,6 +19,7 @@ import { ProcessHost } from '../process-host.js';
 import { createIsolatedEnv } from '../isolated-env.js';
 import { gatherDiagnostics } from '../diagnostics.js';
 import { createScenarioTurn } from '../scenario-turn.js';
+import { runStabilityGate } from '../stability-checker.js';
 
 async function runIsolationHardening() {
   const scenarioDir = tmpScenarioDir();
@@ -186,6 +187,20 @@ async function runStrictMockLanes() {
   }
 }
 
+async function runStabilityRepeatCap() {
+  let rejected = false;
+  try {
+    await runStabilityGate({
+      test: { name: 'repeat-cap', fn: async () => {} },
+      repeat: 4,
+    });
+  } catch (err) {
+    rejected = true;
+    assertTrue(err.message.includes('1 through 3'), 'repeat cap diagnostics must name the allowed range');
+  }
+  assertTrue(rejected, 'stability gate must reject more than three runs');
+}
+
 async function runEventProbeReconnectAndStatus() {
   const server1 = await startSseServer([
     { type: 'session.status', properties: { sessionID: 's1', status: { type: 'busy' } } },
@@ -347,6 +362,7 @@ export const cases = [
   { name: 'ProcessHost env isolation + dispose reset', fn: runProcessHostEnvIsolation },
   { name: 'ProcessHost stderr/stdout ring buffer capture', fn: runProcessHostStderrCapture },
   { name: 'strict mock lanes and unexpected requests', fn: runStrictMockLanes },
+  { name: 'stability repeat cap is three', fn: runStabilityRepeatCap },
   { name: 'EventProbe reconnect and status normalisation', fn: runEventProbeReconnectAndStatus },
   { name: 'terminal idle with object status', fn: runTerminalIdleWithObjectStatus },
   { name: 'no fixed-sleep critical assertion', fn: runNoFixedSleepCriticalAssertion },

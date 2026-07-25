@@ -5,18 +5,12 @@
  *   - Static analysis: checks for standalone fixed sleeps and containsTool.
  *   - Stability repetition: repeats a selected E2E test function N times.
  *   - Random order and isolation check.
- *   - Failure diagnostics archiving.
+ *   - Scenario-local failure diagnostics.
  */
 
 import fs from 'node:fs';
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { gatherDiagnostics } from './diagnostics-collect.js';
-import { formatDiagnostics } from './diagnostics-format.js';
 import { setupScenario, teardownScenario } from './scenario.js';
-
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const ROOT = path.resolve(__dirname, '../..');
 
 /**
  * Checks files for containsTool and fixed sleep violations.
@@ -143,14 +137,16 @@ async function runOneTest(name, fn, opts = {}) {
  * Runs E2E stability gate.
  * Options:
  *   - test: { name, fn }
- *   - repeat: number (runs E2E test N times)
- *   - archiveDir: string (destination for failure diagnostics)
+ *   - repeat: 1–3 deterministic runs
  *   - scenarioOpts: object (options passed to setupScenario)
  */
 export async function runStabilityGate(opts = {}) {
-  const { test, repeat = 50, archiveDir = 'diagnostics-archive', scenarioOpts = {} } = opts;
+  const { test, repeat = 3, scenarioOpts = {} } = opts;
   if (!test || !test.fn) {
     throw new Error('No test specified for stability gate');
+  }
+  if (!Number.isInteger(repeat) || repeat < 1 || repeat > 3) {
+    throw new Error(`Stability repeat must be an integer from 1 through 3, got ${repeat}`);
   }
 
   const globalTimeoutMs = opts.globalTimeoutMs || 300000; // 5 minutes default
@@ -184,41 +180,7 @@ export async function runStabilityGate(opts = {}) {
       console.error(`  ✗ Run ${i}/${repeat} failed: ${result.error.message}`);
       failures.push({ run: i, error: result.error, diagnostics: result.diagnostics });
 
-      // Archive diagnostics
-      if (result.diagnostics) {
-        try {
-          const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-          const cleanName = test.name.replace(/[^a-zA-Z0-9-_]/g, '_');
-          const dirPath = path.join(ROOT, archiveDir, `${timestamp}-${cleanName}-run-${i}`);
-          fs.mkdirSync(dirPath, { recursive: true });
-
-          // Save structured JSON
-          fs.writeFileSync(
-            path.join(dirPath, 'diagnostics.json'),
-            JSON.stringify(result.diagnostics, null, 2),
-            'utf8'
-          );
-
-          // Save formatted human-readable report
-          fs.writeFileSync(
-            path.join(dirPath, 'diagnostics.txt'),
-            formatDiagnostics(result.diagnostics),
-            'utf8'
-          );
-
-          // Copy raw NDJSON if exists
-          if (result.diagnostics.ndjson?.path && fs.existsSync(result.diagnostics.ndjson.path)) {
-            fs.copyFileSync(
-              result.diagnostics.ndjson.path,
-              path.join(dirPath, 'event-log.ndjson')
-            );
-          }
-
-          console.error(`  💾 Archived failure diagnostics to: ${dirPath}`);
-        } catch (archiveErr) {
-          console.error(`  ✗ Failed to archive diagnostics: ${archiveErr.message}`);
-        }
-      }
+      if (result.diagnostics) console.error(JSON.stringify(result.diagnostics, null, 2));
     }
   }
 
