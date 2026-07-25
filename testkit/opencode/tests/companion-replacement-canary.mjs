@@ -1,9 +1,10 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
+import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { getSessionId, runStaticGate, setupScenario, teardownScenario } from '../index.js';
-import { expectationLane } from './lane.mjs';
+import { bindLaneSession, expectationLane } from './lane.mjs';
 
 const __filename = fileURLToPath(import.meta.url);
 const managerTools = ['fork', 'join', 'list'];
@@ -14,7 +15,8 @@ const longText = 'dense work record sentence. '.repeat(70); // ~1960 chars per r
 const rounds = 4;
 
 function journalContains(workDir, needle) {
-  const runtimeDir = path.join(workDir, '.wanxiangshu-next', 'runtimes');
+  const common = execFileSync('git', ['-C', workDir, 'rev-parse', '--git-common-dir'], { encoding: 'utf8' }).trim();
+  const runtimeDir = path.join(path.isAbsolute(common) ? common : path.resolve(workDir, common), 'wanxiangshu-next', 'runtimes');
   if (!fs.existsSync(runtimeDir)) return false;
   for (const file of fs.readdirSync(runtimeDir)) {
     if (!file.endsWith('.ndjson')) continue;
@@ -48,13 +50,22 @@ try {
     contextLimit,
    watchdogMs: 1000,
   });
-  scenario.provider.allowSyntheticContinuations();
-  scenario.provider.allowTitleGeneration();
+  scenario.provider.expectTitle({
+    id: 'manager-title',
+    lane: expectationLane('companion-replacement', 'manager-title', 'title', 1, 'title'),
+  });
+  scenario.provider.expectText({
+    id: 'manager-zwsp',
+    lane: expectationLane('companion-replacement', 'manager-blogger', 'synthetic', 1, 'synthetic'),
+    text: 'done',
+    match: { containsText: ['\u200B'] },
+  });
 
   const parent = await scenario.client.createSession();
   const parentId = getSessionId(parent);
   assert.ok(parentId, `parent creation failed: ${JSON.stringify(parent)}`);
   scenario.sessionIds.push(parentId);
+  bindLaneSession(scenario.provider, parentId, 'manager-title', 'manager');
 
   for (let round = 1; round <= rounds; round++) {
     scenario.provider.expectText({
@@ -63,11 +74,12 @@ try {
       text: `round ${round}: ${longText}`,
       match: { requiredTools: managerTools, forbiddenTools: forbiddenManagerTools },
     });
-    if (round < rounds) {
+    if (round <= 2) {
       scenario.provider.expectText({
         id: `manager-blogger-${round}`,
-        lane: expectationLane('companion-replacement', 'manager-blogger', 'blogger', round),
+        lane: expectationLane('companion-replacement', 'manager-blogger', 'blogger', round, 'chat', 'manager'),
         text: `Blogger paragraph ${round}.`,
+        neverEnd: round === 2,
         match: {
           containsText: ['You are the blogger of a coding agent session.', '"agent":"manager"'],
         },
@@ -82,7 +94,19 @@ try {
       },
     });
     assert.ok(prompt.ok, `round ${round} prompt failed: ${JSON.stringify(prompt.data)}`);
-   await turn.awaitTerminal({ timeoutMs: 1000, requireActivity: true, requireAssistantTerminal: false, requireIdleAfterActivity: true });
+    await turn.awaitTerminal({ timeoutMs: 1000, requireActivity: true, requireAssistantTerminal: false, requireIdleAfterActivity: true });
+    if (round === 1) {
+      await scenario.provider.waitForExpectation('manager-blogger-1', 1000);
+      await scenario.provider.waitForIdle(1000);
+    }
+    if (round === 2) {
+      await scenario.provider.waitForExpectation('manager-blogger-2', 1000);
+      scenario.watchdog?.advance({
+        reason: 'replacement-blogger-busy',
+        lane: 'manager-blogger:2',
+        blocking: true,
+      });
+    }
   }
 
   assert.ok(

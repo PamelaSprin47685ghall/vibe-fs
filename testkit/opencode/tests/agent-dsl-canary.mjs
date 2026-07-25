@@ -16,7 +16,7 @@ import {
   runStabilityGate,
   getSessionId,
 } from '../index.js';
-import { expectationLane } from './lane.mjs';
+import { bindLaneSession, expectationLane } from './lane.mjs';
 
 const __filename = fileURLToPath(import.meta.url);
 
@@ -49,15 +49,22 @@ try {
 
 console.log(`  - CLI Binary ('opencode'): ${opencodeCliAvailable ? `Available (v${opencodeVersion})` : 'UNAVAILABLE (Host capabilities limited)'}`);
 console.log('  - Isolated Env: Supported (Temp HOME, XDG_CONFIG_HOME)');
-console.log('  - Strict Mock Provider: Available (causal lane matching, synthetic completions)');
+console.log('  - Strict Mock Provider: Available (causal lane matching, explicit synthetic expectations)');
 console.log('  - Event Probe: Available (SSE stream reconnect, sequence tracking)');
 console.log('  - Resource Leak Detection: Active (Port/PID/Process-tree tracking)\n');
 
 // 3. Scenario Definition
 async function canaryScenario(scenario) {
-  // Title generation is a separate host request; Manager and Coder lanes stay strict.
-  scenario.provider.allowSyntheticContinuations();
-  scenario.provider.allowTitleGeneration();
+  scenario.provider.expectTitle({
+    id: 'manager-title',
+    lane: expectationLane('manager-dsl', 'manager-title', 'title', 1, 'title'),
+  });
+  scenario.provider.expectText({
+    id: 'manager-zwsp',
+    lane: expectationLane('manager-dsl', 'manager-blogger', 'synthetic', 1, 'synthetic'),
+    text: 'done',
+    match: { containsText: ['\u200B'] },
+  });
 
   const forbiddenManagerTools = ['read', 'write', 'edit', 'bash', 'glob', 'grep', 'verdict'];
 
@@ -78,7 +85,7 @@ async function canaryScenario(scenario) {
 
   scenario.provider.expectText({
     id: 'manager-blogger',
-    lane: expectationLane('manager-dsl', 'manager-blogger', 'blogger', 1),
+    lane: expectationLane('manager-dsl', 'manager-blogger', 'blogger', 1, 'chat', 'manager'),
     blocking: false,
     text: 'Manager background record.',
     match: {
@@ -87,8 +94,8 @@ async function canaryScenario(scenario) {
   });
 
   scenario.provider.expectToolCall({
-    id: 'coder-write-file',
-    lane: expectationLane('manager-dsl', 'coder', 'coder', 1),
+    id: 'coder-write',
+    lane: expectationLane('manager-dsl', 'coder', 'coder', 1, 'chat', 'manager'),
     tool: 'write',
     args: { filePath: 'canary_output.txt', content: 'Coder canary slice OK\n' },
     match: { requiredTools: ['write'] },
@@ -96,7 +103,7 @@ async function canaryScenario(scenario) {
 
   scenario.provider.expectText({
     id: 'coder-blogger',
-    lane: expectationLane('manager-dsl', 'coder-blogger', 'blogger', 1),
+    lane: expectationLane('manager-dsl', 'coder-blogger', 'blogger', 1, 'chat', 'coder'),
     blocking: false,
     text: 'Coder background record.',
     match: {
@@ -106,7 +113,7 @@ async function canaryScenario(scenario) {
 
   scenario.provider.expectText({
     id: 'coder-finished',
-    lane: expectationLane('manager-dsl', 'coder', 'coder', 2),
+    lane: expectationLane('manager-dsl', 'coder', 'coder', 2, 'chat', 'manager'),
     text: 'Coder write complete.',
     match: { requiredTools: ['write'] },
   });
@@ -123,22 +130,23 @@ async function canaryScenario(scenario) {
   });
 
   scenario.provider.expectText({
-    id: 'manager-blogger-final',
-    lane: expectationLane('manager-dsl', 'manager-blogger', 'blogger', 2),
-    blocking: false,
-    text: 'Manager final background record.',
-    match: {
-      containsText: ['You are the blogger of a coding agent session.', '"agent":"manager"'],
-    },
-  });
-
-  scenario.provider.expectText({
     id: 'manager-joined-coder',
     lane: expectationLane('manager-dsl', 'manager', 'manager', 3),
     text: 'Manager joined Coder: canary complete.',
     match: {
       requiredTools: ['fork', 'join', 'list'],
       forbiddenTools: forbiddenManagerTools,
+    },
+  });
+  scenario.provider.expectText({
+    id: 'manager-blogger-final',
+    lane: expectationLane('manager-dsl', 'manager-blogger', 'blogger', 2, 'chat', 'manager'),
+    blocking: false,
+    // The Manager must finish while its non-blocking Blogger is still busy.
+    neverEnd: true,
+    text: 'Manager final background record.',
+    match: {
+      containsText: ['You are the blogger of a coding agent session.', '"agent":"manager"'],
     },
   });
 
@@ -149,6 +157,7 @@ async function canaryScenario(scenario) {
     throw new Error(`Failed to obtain valid session ID, got: ${JSON.stringify(sessionRes)}`);
   }
   scenario.sessionIds.push(sessionID);
+  bindLaneSession(scenario.provider, sessionID, 'manager-title', 'manager');
 
   // Monitor turn with event-driven watermark tracking
   const turn = scenario.turn.start(sessionID);

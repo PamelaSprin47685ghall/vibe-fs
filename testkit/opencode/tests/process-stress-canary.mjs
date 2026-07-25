@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { fileURLToPath } from 'node:url';
 import { runStaticGate, setupScenario, teardownScenario, getSessionId } from '../index.js';
-import { expectationLane } from './lane.mjs';
+import { bindLaneSession, expectationLane } from './lane.mjs';
 
 const __filename = fileURLToPath(import.meta.url);
 const SIGKILL_COMMAND = 'sh -lc \'trap "" TERM; sleep 1000\'';
@@ -10,8 +10,10 @@ let scenario;
 try {
   if (!runStaticGate([__filename]).passed) throw new Error('process stress canary contains prohibited polling');
   scenario = await setupScenario({ project: { files: { 'AGENTS.md': 'process stress canary\n' } }, strict: true, watchdogMs: 1000 });
-  scenario.provider.allowSyntheticContinuations();
-  scenario.provider.allowTitleGeneration();
+  scenario.provider.expectTitle({
+    id: 'inspector-title',
+    lane: expectationLane('process-stress', 'inspector-title', 'title', 1, 'title'),
+  });
 
   scenario.provider.expectToolCall({
     id: 'inspector-executor-sigkill',
@@ -36,6 +38,7 @@ try {
   const sessionId = getSessionId(created);
   assert.ok(sessionId, `inspector creation failed: ${JSON.stringify(created)}`);
   scenario.sessionIds.push(sessionId);
+  bindLaneSession(scenario.provider, sessionId, 'inspector-title', 'inspector');
   const turn = scenario.turn.start(sessionId);
   const prompt = await scenario.client.request('POST', `/session/${sessionId}/prompt_async`, {
     body: {

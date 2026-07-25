@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { fileURLToPath } from 'node:url';
 import { runStaticGate, setupScenario, teardownScenario, getSessionId } from '../index.js';
-import { expectationLane } from './lane.mjs';
+import { bindLaneSession, expectationLane } from './lane.mjs';
 
 const __filename = fileURLToPath(import.meta.url);
 const COMMAND = "node -e \"process.stdout.write('x'.repeat(10000))\"";
@@ -13,9 +13,25 @@ function names(request) {
 let scenario;
 try {
   if (!runStaticGate([__filename]).passed) throw new Error('executor canary contains prohibited polling');
-  scenario = await setupScenario({ project: { files: { 'AGENTS.md': 'executor canary\n' } }, strict: true, watchdogMs: 3000 });
-  scenario.provider.allowSyntheticContinuations();
-  scenario.provider.allowTitleGeneration();
+  scenario = await setupScenario({ project: { files: { 'AGENTS.md': 'executor canary\n' } }, strict: true, watchdogMs: 1000 });
+  scenario.provider.expectTitle({
+    id: 'inspector-title',
+    lane: expectationLane('executor', 'inspector-title', 'title', 1, 'title'),
+  });
+  scenario.provider.expectText({
+    id: 'executor-zwsp-1',
+    lane: expectationLane('executor', 'executor-synthetic-1', 'synthetic', 1, 'synthetic', 'inspector'),
+    text: 'done',
+    match: { containsText: ['\u200B'] },
+  });
+  scenario.provider.afterExpectation('executor-zwsp-1', () => {
+    scenario.provider.expectText({
+      id: 'executor-zwsp-2',
+      lane: expectationLane('executor', 'executor-synthetic-2', 'synthetic', 1, 'synthetic', 'inspector'),
+      text: 'done',
+      match: { containsText: ['\u200B'] },
+    });
+  });
 
   scenario.provider.expectToolCall({
     id: 'inspector-executor',
@@ -31,13 +47,13 @@ try {
   });
   scenario.provider.expectText({
     id: 'executor-map-0',
-    lane: expectationLane('executor', 'map-0', 'executor', 1),
+    lane: expectationLane('executor', 'map-0', 'executor', 1, 'chat', 'inspector'),
     text: 'chunk-0',
     match: { containsText: ['Summarize command output chunk'] },
   });
   scenario.provider.expectText({
     id: 'executor-reduce',
-    lane: expectationLane('executor', 'reduce', 'executor', 1),
+    lane: expectationLane('executor', 'reduce', 'executor', 1, 'chat', 'inspector'),
     text: 'reduced-output',
     match: { containsText: ['Reduce these command-output summaries'] },
   });
@@ -52,6 +68,7 @@ try {
   const sessionId = getSessionId(created);
   assert.ok(sessionId, `inspector creation failed: ${JSON.stringify(created)}`);
   scenario.sessionIds.push(sessionId);
+  bindLaneSession(scenario.provider, sessionId, 'inspector-title', 'inspector');
   const turn = scenario.turn.start(sessionId);
   const prompt = await scenario.client.request('POST', `/session/${sessionId}/prompt_async`, {
     body: {
@@ -75,6 +92,7 @@ try {
   assert.equal(reduceRequests.length, 1, 'Executor must reduce map summaries exactly once');
   assert.ok(requests.some((request) => names(request).includes('executor') && request !== requests[0]), 'Reduced result did not return to Inspector');
 
+  await scenario.provider.waitForExpectation('executor-zwsp-2', 1000);
   scenario.provider.expectSatisfied();
   await teardownScenario(scenario);
   console.log('Executor canary passed: real command, spool map/reduce, and Inspector result return.');

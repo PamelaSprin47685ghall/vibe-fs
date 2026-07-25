@@ -9,7 +9,7 @@ import {
   teardownScenario,
   getSessionId,
 } from '../index.js';
-import { expectationLane } from './lane.mjs';
+import { bindLaneSession, expectationLane } from './lane.mjs';
 
 const __filename = fileURLToPath(import.meta.url);
 const TREE_FILE = 'review_target.txt';
@@ -48,8 +48,16 @@ function valuesOf(value, fieldName, values = []) {
 }
 
 async function runScenario(scenario) {
-  scenario.provider.allowSyntheticContinuations();
-  scenario.provider.allowTitleGeneration();
+  scenario.provider.expectTitle({
+    id: 'manager-title',
+    lane: expectationLane('reviewer-verdict', 'manager-title', 'title', 1, 'title'),
+  });
+  scenario.provider.expectText({
+    id: 'manager-zwsp',
+    lane: expectationLane('reviewer-verdict', 'manager-blogger', 'synthetic', 1, 'synthetic'),
+    text: 'done',
+    match: { containsText: ['\u200B'] },
+  });
 
   scenario.provider.expectToolCall({
     id: 'manager-fork-reviewer',
@@ -64,7 +72,7 @@ async function runScenario(scenario) {
   });
   scenario.provider.expectText({
     id: 'manager-blogger-first',
-    lane: expectationLane('reviewer-verdict', 'manager-blogger', 'blogger', 1),
+    lane: expectationLane('reviewer-verdict', 'manager-blogger', 'blogger', 1, 'chat', 'manager'),
     blocking: false,
     text: 'Manager review background.',
     match: { containsText: [bloggerMarker, '"agent":"manager"'] },
@@ -78,28 +86,29 @@ async function runScenario(scenario) {
   });
   scenario.provider.expectText({
     id: 'manager-blogger-final',
-    lane: expectationLane('reviewer-verdict', 'manager-blogger', 'blogger', 2),
+    lane: expectationLane('reviewer-verdict', 'manager-blogger', 'blogger', 2, 'chat', 'manager'),
     blocking: false,
+    neverEnd: true,
     text: 'Manager final review background.',
     match: { containsText: [bloggerMarker, '"agent":"manager"'] },
   });
   scenario.provider.expectToolCall({
     id: 'review-perfect-1',
-    lane: expectationLane('reviewer-verdict', 'reviewer', 'reviewer', 1),
+    lane: expectationLane('reviewer-verdict', 'reviewer', 'reviewer', 1, 'chat', 'manager'),
     tool: 'verdict',
     args: { verdict: 'PERFECT' },
     match: { requiredTools: ['verdict'] },
   });
   scenario.provider.expectToolCall({
     id: 'review-perfect-2',
-    lane: expectationLane('reviewer-verdict', 'reviewer', 'reviewer', 2),
+    lane: expectationLane('reviewer-verdict', 'reviewer', 'reviewer', 2, 'chat', 'manager'),
     tool: 'verdict',
     args: { verdict: 'PERFECT' },
     match: { requiredTools: ['verdict'] },
   });
   scenario.provider.expectText({
     id: 'review-finished',
-    lane: expectationLane('reviewer-verdict', 'reviewer', 'reviewer', 3),
+    lane: expectationLane('reviewer-verdict', 'reviewer', 'reviewer', 3, 'chat', 'manager'),
     text: 'Review confirmed.',
     match: { requiredTools: ['verdict'] },
   });
@@ -109,18 +118,11 @@ async function runScenario(scenario) {
     text: 'Reviewer joined and confirmed.',
     match: { requiredTools: managerTools, forbiddenTools: forbiddenManagerTools },
   });
-  scenario.provider.expectText({
-    id: 'manager-blogger-complete',
-    lane: expectationLane('reviewer-verdict', 'manager-blogger', 'blogger', 3),
-    blocking: false,
-    text: 'Manager completed review background.',
-    match: { containsText: [bloggerMarker, '"agent":"manager"'] },
-  });
-
   const manager = await scenario.client.createSession();
   const managerId = getSessionId(manager);
   assert.ok(managerId, `manager creation failed: ${JSON.stringify(manager)}`);
   scenario.sessionIds.push(managerId);
+  bindLaneSession(scenario.provider, managerId, 'manager-title', 'manager');
 
   const turn = scenario.turn.start(managerId);
   const prompt = await scenario.client.request('POST', `/session/${managerId}/prompt_async`, {

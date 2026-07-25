@@ -13,6 +13,7 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
+import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import {
   runStaticGate,
@@ -20,11 +21,13 @@ import {
   teardownScenario,
   getSessionId,
 } from '../index.js';
+import { bindLaneSession, expectationLane } from './lane.mjs';
 
 const __filename = fileURLToPath(import.meta.url);
 
 function journalLines(workDir) {
-  const runtimeDir = path.join(workDir, '.wanxiangshu-next', 'runtimes');
+  const common = execFileSync('git', ['-C', workDir, 'rev-parse', '--git-common-dir'], { encoding: 'utf8' }).trim();
+  const runtimeDir = path.join(path.isAbsolute(common) ? common : path.resolve(workDir, common), 'wanxiangshu-next', 'runtimes');
   if (!fs.existsSync(runtimeDir)) return [];
   const lines = [];
   for (const file of fs.readdirSync(runtimeDir)) {
@@ -41,14 +44,26 @@ function countFallbackFacts(workDir) {
     JSON.stringify(entry).includes('FallbackFailureRecorded')).length;
 }
 
-async function drainExpectations(scenario, timeoutMs) {
-  const deadline = Date.now() + timeoutMs;
-  while (scenario.provider.remainingExpectations > 0 && Date.now() < deadline) {
-    scenario.watchdog?.pet('drain-expectations');
-    await new Promise((r) => setTimeout(r, 100));
-  }
-  scenario.watchdog?.pet('drain-expectations');
-  await new Promise((r) => setTimeout(r, 100));
+function expectFailure(scenario, phase, prompt, model) {
+  const blogger = phase === 'round1' ? 'manager-blogger-initial' : 'manager-blogger-restarted';
+  scenario.provider.expectError({
+    id: `${phase}-failure`,
+    lane: expectationLane('fallback', phase, 'manager', 1),
+    status: 500,
+    body: { error: { message: `mock provider failure ${phase}`, type: 'server_error' } },
+    match: { containsText: [prompt], model },
+  });
+  scenario.provider.expectText({
+    id: `${phase}-zwsp`,
+    lane: expectationLane('fallback', blogger, 'synthetic', 1, 'synthetic', 'round1'),
+    text: 'done',
+    match: { containsText: ['\u200B'] },
+  });
+}
+
+async function awaitFailureSequence(scenario, lastExpectationId) {
+  await scenario.provider.waitForExpectation(lastExpectationId, 1000);
+  await scenario.provider.waitForIdle(1000);
 }
 
 let scenario;
@@ -64,24 +79,27 @@ try {
       WANXIANGSHU_MODEL_B: 'test/test-model-b',
     },
   });
-  scenario.provider.allowSyntheticContinuations();
-  scenario.provider.allowTitleGeneration();
-  scenario.provider.allowBloggerRequests();
-  scenario.provider.allowOutOfOrder();
+  scenario.provider.expectText({
+    id: 'manager-blogger',
+    lane: expectationLane('fallback', 'manager-blogger-initial', 'blogger', 1, 'chat', 'round1'),
+    blocking: false,
+    text: 'Fallback background.',
+    match: { containsText: ['You are the blogger of a coding agent session.', '"agent":"build"'] },
+  });
+
+  scenario.provider.expectTitle({
+    id: 'fallback-title',
+    lane: expectationLane('fallback', 'fallback-title', 'title', 1, 'title'),
+  });
 
   // Phase 1: provider failure → journal records FallbackFailureRecorded.
-  for (let i = 0; i < 4; i++) {
-    scenario.provider.expectError({
-      id: `fail-round1-${i}`,
-      status: 500,
-      body: { error: { message: 'mock provider failure', type: 'server_error' } },
-    });
-  }
+  expectFailure(scenario, 'round1', 'Hello, this will fail.', 'test-model');
 
   const created = await scenario.client.createSession();
   const sessionId = getSessionId(created);
   assert.ok(sessionId, `session creation failed: ${JSON.stringify(created)}`);
   scenario.sessionIds.push(sessionId);
+  bindLaneSession(scenario.provider, sessionId, 'fallback-title', 'round1', 'round2');
 
   const prompt1 = await scenario.client.request('POST', `/session/${sessionId}/prompt_async`, {
     body: {
@@ -91,7 +109,7 @@ try {
   });
   assert.ok(prompt1.ok, `prompt failed: ${JSON.stringify(prompt1.data)}`);
 
-  await drainExpectations(scenario, 1000);
+  await awaitFailureSequence(scenario, 'round1-zwsp');
 
   const factsAfterRound1 = countFallbackFacts(scenario.host.workDir);
   assert.ok(factsAfterRound1 >= 1,
@@ -100,13 +118,15 @@ try {
   // Phase 2: restart → fallback state recovered → second failure accumulates.
   await scenario.restart();
 
-  for (let i = 0; i < 4; i++) {
-    scenario.provider.expectError({
-      id: `fail-round2-${i}`,
-      status: 500,
-      body: { error: { message: 'mock provider failure round 2', type: 'server_error' } },
-    });
-  }
+  scenario.provider.expectText({
+    id: 'manager-blogger-restart',
+    lane: expectationLane('fallback', 'manager-blogger-restarted', 'blogger', 1, 'chat', 'round1'),
+    blocking: false,
+    text: 'Fallback restart background.',
+    match: { containsText: ['You are the blogger of a coding agent session.', '"agent":"build"'] },
+  });
+
+  expectFailure(scenario, 'round2', 'Hello again, this will also fail.', 'test-model');
 
   const prompt2 = await scenario.client.request('POST', `/session/${sessionId}/prompt_async`, {
     body: {
@@ -116,7 +136,7 @@ try {
   });
   assert.ok(prompt2.ok, `prompt2 failed: ${JSON.stringify(prompt2.data)}`);
 
-  await drainExpectations(scenario, 1000);
+  await awaitFailureSequence(scenario, 'round2-zwsp');
 
   const factsAfterRound2 = countFallbackFacts(scenario.host.workDir);
   assert.ok(factsAfterRound2 > factsAfterRound1,

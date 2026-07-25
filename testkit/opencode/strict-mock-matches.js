@@ -86,6 +86,21 @@ export function requestKindOf(body) {
   return 'chat';
 }
 
+export function requestSessionOf(body) {
+  return body?.sessionId
+    || body?.sessionID
+    || body?.__testkitHeaders?.['x-session-affinity']
+    || body?.__testkitHeaders?.['x-session-id']
+    || null;
+}
+
+export function requestParentSessionOf(body) {
+  return body?.parentSessionId
+    || body?.parentSessionID
+    || body?.__testkitHeaders?.['x-parent-session-id']
+    || null;
+}
+
 export function requestRoleOf(body) {
   const requestKind = requestKindOf(body);
   if (requestKind !== 'chat') return requestKind;
@@ -132,9 +147,18 @@ export function extractLastUserMsg(body) {
   return null;
 }
 
-export function matchesExpectation(body, expectation) {
+export function matchesExpectation(body, expectation, sessionBindings) {
   const match = expectation.match || {};
-  if (match.sessionId && (body?.sessionId || '') !== match.sessionId) return false;
+  const sessionID = requestSessionOf(body);
+  const parentSessionID = requestParentSessionOf(body);
+  const expectedSessionID = sessionBindings?.get(expectation.lane.session);
+  const expectedParentSessionID = expectation.lane.parentSession
+    ? sessionBindings?.get(expectation.lane.parentSession)
+    : null;
+  if (match.sessionId && sessionID !== match.sessionId) return false;
+  if (sessionID && expectedSessionID && sessionID !== expectedSessionID) return false;
+  if (sessionID && !expectedSessionID && !expectedParentSessionID) return false;
+  if (expectedParentSessionID && parentSessionID !== expectedParentSessionID) return false;
   if (match.model && (body?.model || '') !== match.model) return false;
   if (match.requestKind && requestKindOf(body) !== match.requestKind) return false;
   if (match.role && requestRoleOf(body) !== match.role) return false;

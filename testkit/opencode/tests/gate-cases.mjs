@@ -21,6 +21,7 @@ import { createIsolatedEnv } from '../isolated-env.js';
 import { gatherDiagnostics } from '../diagnostics.js';
 import { createScenarioTurn } from '../scenario-turn.js';
 import { runStabilityGate } from '../stability-checker.js';
+import { laneCases } from './gate-lane-cases.mjs';
 
 async function runIsolationHardening() {
   const scenarioDir = tmpScenarioDir();
@@ -83,111 +84,13 @@ async function runProcessHostStderrCapture() {
   assertTrue(host.stdoutLog.includes('stdout-line'), 'stdout ring buffer captured');
 }
 
-function lane(role, turn, session = role) {
-  return { scenario: 'gate', session, role, turn, requestKind: 'chat' };
-}
 
-function chat(content, tools = []) {
-  return {
-    model: 'test-model',
-    messages: [{ role: 'user', content }],
-    tools: tools.map((name) => ({ type: 'function', function: { name } })),
-  };
-}
 
-async function runStrictMockLanes() {
-  const provider = new StrictMockProvider();
-  provider.strict = true;
-  assertEq(typeof provider.allowOutOfOrder, 'undefined', 'global out-of-order bypass must not exist');
-  assertEq(typeof provider.allowBloggerRequests, 'undefined', 'Blogger bypass must not exist');
-  const consumed = [];
-  provider.onExpectationConsumed = ({ id, lane: consumedLane }) => consumed.push(`${id}:${consumedLane.role}:${consumedLane.turn}`);
-  await provider.start();
 
-  try {
-    provider.expectToolCall({
-      id: 'manager-first',
-      lane: lane('manager', 1),
-      tool: 'fork',
-      args: { agent: 'coder', prompt: 'work' },
-      match: { requiredTools: ['fork', 'join', 'list'], containsText: ['manager first'] },
-    });
-    provider.expectText({
-      id: 'manager-second',
-      lane: lane('manager', 2),
-      text: 'manager done',
-      match: { requiredTools: ['fork', 'join', 'list'], containsText: ['manager second'] },
-    });
-    provider.expectToolCall({
-      id: 'coder-write',
-      lane: lane('coder', 1),
-      tool: 'write',
-      args: { filePath: 'x.txt', content: 'ok\n' },
-      match: { requiredTools: ['write'] },
-    });
 
-    const coderFirst = await postJson(`${provider.url}/v1/chat/completions`, chat('write x.txt', ['write']));
-    assertTrue(coderFirst.ok, 'independent coder lane may run before manager lane');
-    const managerFirst = await postJson(`${provider.url}/v1/chat/completions`, chat('manager first', ['fork', 'join', 'list']));
-    assertTrue(managerFirst.ok, 'manager lane head should match after coder interleaving');
-    const managerSecond = await postJson(`${provider.url}/v1/chat/completions`, chat('manager second', ['fork', 'join', 'list']));
-    assertTrue(managerSecond.ok, 'manager lane second turn should follow its first turn');
-    assertEq(provider.remainingExpectations, 0, 'all lane expectations should be consumed');
-    assertEq(consumed.join(','), 'coder-write:coder:1,manager-first:manager:1,manager-second:manager:2', 'consumption records causal lane order');
-    provider.expectSatisfied();
 
-    const noExpRes = await postJson(`${provider.url}/v1/chat/completions`, chat('unexpected blogger', []));
-    assertEq(noExpRes.status, 500, 'empty queue should return 500');
-    assertEq(provider.unexpectedRequests.length, 1, 'empty queue should record unexpected');
 
-    let satisfiedThrew = false;
-    try { provider.expectSatisfied(); } catch (err) {
-      satisfiedThrew = true;
-      assertTrue(err.message.includes('unexpected'), 'expectSatisfied should fail on unexpected request');
-    }
-    assertTrue(satisfiedThrew, 'expectSatisfied must throw');
 
-    const order = new StrictMockProvider();
-    order.strict = true;
-    await order.start();
-    try {
-      order.expectText({
-        id: 'order-first',
-        lane: lane('manager', 1, 'order'),
-        text: 'first',
-        match: { requiredTools: ['fork', 'join', 'list'], containsText: ['manager first'] },
-      });
-      order.expectText({
-        id: 'order-second',
-        lane: lane('manager', 2, 'order'),
-        text: 'second',
-        match: { requiredTools: ['fork', 'join', 'list'], containsText: ['manager second'] },
-      });
-      const mismatchRes = await postJson(`${order.url}/v1/chat/completions`, chat('manager second', ['fork', 'join', 'list']));
-      assertEq(mismatchRes.status, 500, 'later turn must not bypass its lane head');
-      assertEq(order.remainingExpectations, 2, 'lane-order mismatch must not consume expectation');
-    } finally {
-      await order.stop();
-    }
-
-    const missing = new StrictMockProvider();
-    missing.expectText({
-      id: 'missing-review',
-      lane: lane('reviewer', 1),
-      text: 'review',
-      match: { requiredTools: ['verdict'] },
-    });
-    let missingThrew = false;
-    try { missing.expectSatisfied(); } catch (err) {
-      missingThrew = true;
-      assertTrue(err.message.includes('remaining'), 'missing lane head must be reported');
-      assertTrue(err.message.includes('gate/reviewer/reviewer/turn-1/chat'), 'missing diagnostic names its lane');
-    }
-    assertTrue(missingThrew, 'expectSatisfied must fail on missing lane expectation');
-  } finally {
-    await provider.stop();
-  }
-}
 
 async function runStabilityRepeatCap() {
   let rejected = false;
@@ -374,7 +277,7 @@ export const cases = [
   { name: 'isolation hardening', fn: runIsolationHardening },
   { name: 'ProcessHost env isolation + dispose reset', fn: runProcessHostEnvIsolation },
   { name: 'ProcessHost stderr/stdout ring buffer capture', fn: runProcessHostStderrCapture },
-  { name: 'strict mock lanes and unexpected requests', fn: runStrictMockLanes },
+  ...laneCases,
   { name: 'stability repeat cap is three', fn: runStabilityRepeatCap },
   { name: 'title classification uses current user turn', fn: runTitleHistoryIsolation },
   { name: 'EventProbe reconnect and status normalisation', fn: runEventProbeReconnectAndStatus },

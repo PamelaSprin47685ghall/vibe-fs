@@ -10,14 +10,11 @@ export function createState() {
   return {
     lanes: new Map(),
     lastTurnByLane: new Map(),
+    sessionBindings: new Map(),
     unexpected: [],
     requests: [],
-    syntheticRequests: [],
-    nudgeBypassed: 0,
     idCounter: 0,
     strict: true,
-    allowSyntheticContinuations: false,
-    allowTitleGeneration: false,
   };
 }
 
@@ -62,9 +59,8 @@ export function pushExpectation(state, respond, opts) {
 export function resetState(state) {
   state.lanes.clear();
   state.lastTurnByLane.clear();
+  state.sessionBindings.clear();
   state.unexpected.length = 0;
   state.requests.length = 0;
-  state.syntheticRequests.length = 0;
   state.stopped = false;
-  state.nudgeBypassed = 0;
 }

@@ -1,4 +1,4 @@
-import { matchesExpectation } from './strict-mock-matches.js';
+import { matchesExpectation, requestSessionOf } from './strict-mock-matches.js';
 
 const requiredFields = ['scenario', 'session', 'role', 'turn', 'requestKind'];
 
@@ -22,12 +22,17 @@ export function normalizeLane(lane) {
     throw new Error('StrictMock lane turn must be a positive integer');
   }
 
+  const parentSession = lane.parentSession === undefined
+    ? null
+    : requiredString(lane.parentSession, 'parentSession');
+
   return {
     scenario: requiredString(lane.scenario, 'scenario'),
     session: requiredString(lane.session, 'session'),
     role: requiredString(lane.role, 'role'),
     turn: lane.turn,
     requestKind: requiredString(lane.requestKind, 'requestKind'),
+    parentSession,
   };
 }
 
@@ -51,19 +56,31 @@ export function pendingLaneHeads(state) {
 
 export function selectExpectation(state, body) {
   const heads = pendingLaneHeads(state);
-  const matches = heads.filter(({ expectation }) => matchesExpectation(body, expectation));
+  const matches = heads.filter(({ expectation }) => matchesExpectation(body, expectation, state.sessionBindings));
+  const sessionID = requestSessionOf(body);
+  const exact = sessionID
+    ? matches.filter(({ expectation }) => state.sessionBindings.get(expectation.lane.session) === sessionID)
+    : [];
+  const selected = exact.length > 0 ? exact : matches;
 
-  if (matches.length === 1) return { match: matches[0], candidates: heads };
-  if (matches.length === 0) return { match: null, reason: 'no-lane-head-matched', candidates: heads };
-  return { match: null, reason: 'ambiguous-lane-heads', candidates: matches };
+  if (selected.length === 1) return { match: selected[0], candidates: heads };
+  if (selected.length === 0) return { match: null, reason: 'no-lane-head-matched', candidates: heads };
+  return { match: null, reason: 'ambiguous-lane-heads', candidates: selected };
 }
 
-export function consumeExpectation(state, match) {
+export function consumeExpectation(state, match, requestSessionID) {
   const queue = state.lanes.get(match.key);
   if (!queue || queue.expectations[0] !== match.expectation) {
     throw new Error(`StrictMock lane head changed before consuming ${match.expectation.id}`);
   }
   queue.expectations.shift();
   if (queue.expectations.length === 0) state.lanes.delete(match.key);
+  if (requestSessionID) {
+    const bound = state.sessionBindings.get(match.expectation.lane.session);
+    if (bound && bound !== requestSessionID) {
+      throw new Error(`StrictMock lane ${match.expectation.lane.session} changed session identity`);
+    }
+    if (!bound) state.sessionBindings.set(match.expectation.lane.session, requestSessionID);
+  }
   return match.expectation;
 }

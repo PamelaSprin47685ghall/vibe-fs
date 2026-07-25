@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { fileURLToPath } from 'node:url';
 import { runStaticGate, setupScenario, teardownScenario, getSessionId } from '../index.js';
+import { bindLaneSession, expectationLane } from './lane.mjs';
 
 const __filename = fileURLToPath(import.meta.url);
 
@@ -12,7 +13,7 @@ try {
   scenario = await setupScenario({
     project: {
       files: {
-        'AGENTS.md': '- orchestrator durable port canary\n',
+        'AGENTS.md': '- orchestrator role-surface canary\n',
         'README.md': '# orchestrator-canary project\n',
       },
     },
@@ -20,28 +21,58 @@ try {
     watchdogMs: 1000,
   });
 
-  scenario.provider.allowTitleGeneration();
-  scenario.provider.allowOutOfOrder();
-  scenario.provider.allowSyntheticContinuations();
-  scenario.provider.allowBloggerRequests();
+  scenario.provider.expectTitle({
+    id: 'orchestrator-title',
+    lane: expectationLane('orchestrator', 'title', 'title', 1, 'title'),
+  });
 
   // Orchestrator must only expose fork/join in its tool surface
   // and must never expose forbidden file/process/verdict tools.
   scenario.provider.expectToolCall({
-    id: 'orchestrator-worktree-fork',
+    id: 'orchestrator-fork-manager',
+    lane: expectationLane('orchestrator', 'orchestrator', 'orchestrator', 1),
     tool: 'fork',
-    args: { agent: 'manager', prompt: 'Fork a ManagerJob for worktree deploy.' },
+    args: { agent: 'manager', prompt: 'Run the isolated Manager child task.' },
     match: { requiredTools: ['fork', 'join'], forbiddenTools: ['read', 'write', 'edit', 'bash', 'glob', 'grep', 'verdict', 'list'] },
+  });
+  scenario.provider.expectText({
+    id: 'orchestrator-blogger',
+    lane: expectationLane('orchestrator', 'orchestrator-blogger', 'blogger', 1, 'chat', 'orchestrator'),
+    blocking: false,
+    text: 'Orchestrator background.',
+    match: { containsText: ['You are the blogger of a coding agent session.', '"agent":"orchestrator"'] },
+  });
+  scenario.provider.expectText({
+    id: 'orchestrator-blogger-final',
+    lane: expectationLane('orchestrator', 'orchestrator-blogger', 'blogger', 2, 'chat', 'orchestrator'),
+    neverEnd: true,
+    text: 'Orchestrator final background.',
+    match: { containsText: ['You are the blogger of a coding agent session.', '"agent":"orchestrator"'] },
   });
 
   scenario.provider.expectText({
     id: 'manager-job-done',
-    text: 'ManagerJob completed.',
+    lane: expectationLane('orchestrator', 'manager', 'manager', 1, 'chat', 'orchestrator'),
+    text: 'Manager child completed.',
     match: { requiredTools: ['fork', 'join', 'list'] },
+  });
+  scenario.provider.expectText({
+    id: 'manager-zwsp',
+    lane: expectationLane('orchestrator', 'orchestrator-blogger', 'synthetic', 1, 'synthetic'),
+    text: 'done',
+    match: { containsText: ['\u200B'] },
+  });
+  scenario.provider.expectText({
+    id: 'manager-blogger',
+    lane: expectationLane('orchestrator', 'manager-blogger', 'blogger', 1, 'chat', 'manager'),
+    blocking: false,
+    text: 'Manager job background.',
+    match: { containsText: ['You are the blogger of a coding agent session.', '"agent":"manager"'] },
   });
 
   scenario.provider.expectToolCall({
     id: 'orchestrator-join-result',
+    lane: expectationLane('orchestrator', 'orchestrator', 'orchestrator', 2),
     tool: 'join',
     args: {},
     match: { requiredTools: ['fork', 'join'], forbiddenTools: ['list'] },
@@ -49,7 +80,8 @@ try {
 
   scenario.provider.expectText({
     id: 'orchestrator-published',
-    text: 'Orchestrator published ff-only.',
+    lane: expectationLane('orchestrator', 'orchestrator', 'orchestrator', 3),
+    text: 'Orchestrator joined the Manager child.',
     match: { requiredTools: ['fork', 'join'], forbiddenTools: ['list'] },
   });
 
@@ -57,20 +89,29 @@ try {
   const orchestratorId = getSessionId(orchestrator);
   assert.ok(orchestratorId, `orchestrator session creation failed: ${JSON.stringify(orchestrator)}`);
   scenario.sessionIds.push(orchestratorId);
+  bindLaneSession(scenario.provider, orchestratorId, 'title', 'orchestrator');
 
-  const turn1 = scenario.turn.start(orchestratorId);
   const prompt = await scenario.client.request('POST', `/session/${orchestratorId}/prompt_async`, {
     body: {
       agent: 'orchestrator',
-      parts: [{ type: 'text', text: 'Run orchestrator cycle: fork a ManagerJob for worktree deploy.' }],
+      parts: [{ type: 'text', text: 'Run the role-surface cycle: fork and join a Manager child.' }],
       model: { providerID: 'test', modelID: 'test-model' },
     },
   });
   assert.ok(prompt.ok, `orchestrator prompt failed: ${JSON.stringify(prompt.data)}`);
-  await turn1.awaitTerminal({ timeoutMs: 1000, requireActivity: true, requireAssistantTerminal: true, requireIdleAfterActivity: false });
-
-  const turn2 = scenario.turn.start(orchestratorId);
-  await turn2.awaitTerminal({ timeoutMs: 1000, requireActivity: true, requireAssistantTerminal: true, requireIdleAfterActivity: false });
+  await scenario.provider.waitForExpectation('orchestrator-fork-manager', 1000);
+  const managerCreated = await scenario.events.awaitEvent(
+    (event) => event.type === 'session.created' && event.sessionID !== orchestratorId,
+    1000,
+  );
+  scenario.watchdog?.advance({
+    reason: 'manager-job-session-created',
+    lane: `session:${managerCreated.sessionID}`,
+    blocking: true,
+  });
+  await scenario.provider.waitForExpectation('manager-job-done', 1000);
+  await scenario.provider.waitForExpectation('orchestrator-published', 1000);
+  await scenario.provider.waitForExpectation('orchestrator-blogger-final', 1000);
 
   const orchestratorRequests = scenario.provider.requests.filter(
     (request) => {
@@ -96,7 +137,7 @@ try {
 
   scenario.provider.expectSatisfied();
   await teardownScenario(scenario);
-  console.log('Orchestrator canary passed: Manager worktree fork, join, and publish cycle through real OpenCode Host.');
+  console.log('Orchestrator tool-surface canary passed: real Host fork/join delegation only; no Git publish claim.');
 } catch (error) {
   console.error(`Orchestrator canary failed: ${error.stack || error}`);
   if (scenario?.provider?.unexpectedRequests) console.error(JSON.stringify(scenario.provider.unexpectedRequests));

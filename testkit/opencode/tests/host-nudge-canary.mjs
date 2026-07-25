@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { fileURLToPath } from 'node:url';
 import { runStaticGate, setupScenario, teardownScenario, getSessionId } from '../index.js';
+import { bindLaneSession, expectationLane } from './lane.mjs';
 
 const __filename = fileURLToPath(import.meta.url);
 
@@ -8,13 +9,48 @@ let scenario;
 try {
   if (!runStaticGate([__filename]).passed) throw new Error('host lifecycle canary contains prohibited polling');
   scenario = await setupScenario({ project: { files: { 'AGENTS.md': 'host lifecycle canary\n' } }, strict: true, watchdogMs: 1000 });
-  scenario.provider.allowSyntheticContinuations();
-  scenario.provider.allowTitleGeneration();
-  scenario.provider.allowBloggerRequests();
-  scenario.provider.allowOutOfOrder();
-  scenario.provider.expectText({ id: 'child-a1', text: 'A1 terminal.', match: {} });
-  scenario.provider.expectText({ id: 'child-a2', text: 'A2 terminal.', match: {} });
-  scenario.provider.expectText({ id: 'child-a3', text: 'A3 terminal.', match: {} });
+  scenario.provider.expectTitle({
+    id: 'parent-title',
+    lane: expectationLane('host-nudge', 'parent-title', 'title', 1, 'title'),
+  });
+  scenario.provider.expectText({
+    id: 'manager-zwsp',
+    lane: expectationLane('host-nudge', 'coder-blogger', 'synthetic', 1, 'synthetic'),
+    text: 'done',
+    match: { containsText: ['\u200B'] },
+  });
+  scenario.provider.expectText({
+    id: 'child-a1',
+    lane: expectationLane('host-nudge', 'coder', 'coder', 1),
+    text: 'A1 terminal.',
+    match: { containsText: ['first run'] },
+  });
+  scenario.provider.expectText({
+    id: 'coder-blogger-1',
+    lane: expectationLane('host-nudge', 'coder-blogger', 'blogger', 1, 'chat', 'coder'),
+    blocking: false,
+    text: 'Coder first background.',
+    match: { containsText: ['You are the blogger of a coding agent session.', '"agent":"coder"'] },
+  });
+  scenario.provider.expectText({
+    id: 'child-a2',
+    lane: expectationLane('host-nudge', 'coder', 'coder', 2),
+    text: 'A2 terminal.',
+    match: { containsText: ['second run'] },
+  });
+  scenario.provider.expectText({
+    id: 'coder-blogger-2',
+    lane: expectationLane('host-nudge', 'coder-blogger', 'blogger', 2, 'chat', 'coder'),
+    blocking: false,
+    text: 'Coder second background.',
+    match: { containsText: ['You are the blogger of a coding agent session.', '"agent":"coder"'] },
+  });
+  scenario.provider.expectText({
+    id: 'child-a3',
+    lane: expectationLane('host-nudge', 'coder', 'coder', 3),
+    text: 'A3 terminal.',
+    match: { containsText: ['third run'] },
+  });
 
   const parent = await scenario.client.createSession();
   const parentId = getSessionId(parent);
@@ -26,6 +62,7 @@ try {
   const childId = getSessionId(child);
   assert.ok(childId, `child creation failed: ${JSON.stringify(child)}`);
   scenario.sessionIds.push(childId);
+  bindLaneSession(scenario.provider, childId, 'parent-title', 'coder');
 
   for (const text of ['first run', 'second run', 'third run']) {
     const turn = scenario.turn.start(childId);

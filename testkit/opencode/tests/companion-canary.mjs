@@ -6,16 +6,14 @@ import {
   teardownScenario,
   getSessionId,
 } from '../index.js';
-import { expectationLane } from './lane.mjs';
+import { bindLaneSession, expectationLane } from './lane.mjs';
+import { requestRoleOf } from '../strict-mock-matches.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const BLOGGER_MARKER = 'You are the blogger of a coding agent session.';
 
 function bloggerRequests(provider) {
-  return provider.requests.filter((body) => {
-    const msgs = body.messages || [];
-    return msgs.some((m) => typeof m.content === 'string' && m.content.includes(BLOGGER_MARKER));
-  });
+  return provider.requests.filter((body) => requestRoleOf(body) === 'blogger');
 }
 
 function sessionCreatedIds(scenario) {
@@ -33,8 +31,16 @@ async function assertBloggerTranscript(scenario, bloggerId) {
 }
 
 async function runProjectionScenario(scenario) {
-  scenario.provider.allowSyntheticContinuations();
-  scenario.provider.allowTitleGeneration();
+  scenario.provider.expectTitle({
+    id: 'manager-title',
+    lane: expectationLane('companion-projection', 'manager-title', 'title', 1, 'title'),
+  });
+  scenario.provider.expectText({
+    id: 'manager-zwsp',
+    lane: expectationLane('companion-projection', 'manager-blogger', 'synthetic', 1, 'synthetic'),
+    text: 'done',
+    match: { containsText: ['\u200B'] },
+  });
 
   scenario.provider.expectText({
     id: 'manager-first',
@@ -48,7 +54,7 @@ async function runProjectionScenario(scenario) {
   });
   scenario.provider.expectText({
     id: 'blogger-b1',
-    lane: expectationLane('companion-projection', 'manager-blogger', 'blogger', 1),
+    lane: expectationLane('companion-projection', 'manager-blogger', 'blogger', 1, 'chat', 'manager'),
     text: 'B1',
     match: { containsText: [BLOGGER_MARKER] },
   });
@@ -64,7 +70,7 @@ async function runProjectionScenario(scenario) {
   });
   scenario.provider.expectText({
     id: 'blogger-b2',
-    lane: expectationLane('companion-projection', 'manager-blogger', 'blogger', 2),
+    lane: expectationLane('companion-projection', 'manager-blogger', 'blogger', 2, 'chat', 'manager'),
     text: 'B2',
     match: { containsText: [BLOGGER_MARKER] },
   });
@@ -73,6 +79,7 @@ async function runProjectionScenario(scenario) {
   const managerId = getSessionId(managerResponse);
   assert.ok(managerId, `Manager session creation failed: ${JSON.stringify(managerResponse)}`);
   scenario.sessionIds.push(managerId);
+  bindLaneSession(scenario.provider, managerId, 'manager-title', 'manager');
 
   const firstTurn = scenario.turn.start(managerId);
   const firstPrompt = await scenario.client.request('POST', `/session/${managerId}/prompt_async`, {
@@ -137,6 +144,12 @@ async function assertRoleHasNoSidecar(scenario, role, prompt) {
   const sessionId = getSessionId(sessionResponse);
   assert.ok(sessionId, `${role} session creation failed: ${JSON.stringify(sessionResponse)}`);
   scenario.sessionIds.push(sessionId);
+  bindLaneSession(scenario.provider, sessionId, `role-${role}-title`, `role-${role}`);
+
+  scenario.provider.expectTitle({
+    id: `role-${role}-title`,
+    lane: expectationLane('companion-projection', `role-${role}-title`, 'title', 1, 'title'),
+  });
 
   scenario.provider.expectText({
     id: `role-${role}`,

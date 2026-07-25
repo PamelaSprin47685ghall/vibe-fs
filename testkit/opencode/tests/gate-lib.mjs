@@ -52,10 +52,10 @@ export async function startSseServer(events) {
   });
 }
 
-export async function postJson(url, body) {
+export async function postJson(url, body, headers = {}) {
   const res = await fetch(url, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...headers },
     body: JSON.stringify(body),
   });
   const text = await res.text();

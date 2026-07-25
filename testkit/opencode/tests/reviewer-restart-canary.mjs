@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { fileURLToPath } from 'node:url';
 import { runStaticGate, setupScenario, teardownScenario, getSessionId } from '../index.js';
-import { expectationLane } from './lane.mjs';
+import { bindLaneSession, expectationLane } from './lane.mjs';
 
 const __filename = fileURLToPath(import.meta.url);
 
@@ -24,11 +24,13 @@ try {
   scenario = await setupScenario({
     project: { files: { 'AGENTS.md': 'reviewer restart reconcile canary\n' } },
     strict: true,
-    watchdogMs: 3000,
+    watchdogMs: 1000,
   });
 
-  scenario.provider.allowTitleGeneration();
-  scenario.provider.allowSyntheticContinuations();
+  scenario.provider.expectTitle({
+    id: 'reviewer-title',
+    lane: expectationLane('reviewer-restart', 'reviewer-title', 'title', 1, 'title'),
+  });
 
   // Create a manager session first (parent), then fork a reviewer child.
   // After restart, the reviewer child keeps its coder-style tool surface.
@@ -65,6 +67,7 @@ try {
   const reviewerId = getSessionId(child);
   assert.ok(reviewerId, `reviewer child creation failed: ${JSON.stringify(child)}`);
   scenario.sessionIds.push(reviewerId);
+  bindLaneSession(scenario.provider, reviewerId, 'reviewer-title', 'reviewer');
 
   // First turn: reviewer does first PERFECT
   const turn1 = scenario.turn.start(reviewerId);
@@ -76,7 +79,7 @@ try {
     },
   });
   assert.ok(prompt1.ok, `reviewer first prompt failed: ${JSON.stringify(prompt1.data)}`);
-  await turn1.awaitTerminal({ timeoutMs: 3000, requireActivity: true, requireAssistantTerminal: true, requireIdleAfterActivity: true });
+  await turn1.awaitTerminal({ timeoutMs: 1000, requireActivity: true, requireAssistantTerminal: true, requireIdleAfterActivity: true });
 
   // Verify verdict tool was called (not forbidden tools: write, edit, bash, glob, grep)
   const verdictRequests = scenario.provider.requests.filter(
@@ -119,7 +122,7 @@ try {
     },
   });
   assert.ok(prompt2.ok, `reviewer restart prompt failed: ${JSON.stringify(prompt2.data)}`);
-  await turn2.awaitTerminal({ timeoutMs: 3000, requireActivity: true, requireAssistantTerminal: true, requireIdleAfterActivity: true });
+  await turn2.awaitTerminal({ timeoutMs: 1000, requireActivity: true, requireAssistantTerminal: true, requireIdleAfterActivity: true });
 
   // Verify post-restart verdict calls also don't include forbidden tools
   const postRestartVerdicts = scenario.provider.requests.filter(

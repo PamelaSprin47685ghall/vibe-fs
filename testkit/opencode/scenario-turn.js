@@ -19,17 +19,18 @@ function isIdleEvent(e) {
 
 export function createScenarioTurn(scenario) {
   return {
-    start: (sessionID) => new Turn(scenario, sessionID),
+    start: (sessionID, options = {}) => new Turn(scenario, sessionID, options),
   };
 }
 
 class Turn {
-  constructor(scenario, sessionID) {
+  constructor(scenario, sessionID, options) {
     this._scenario = scenario;
     this._sessionID = sessionID || null;
     this._startedAt = Date.now();
-    this._eventSeqBefore = scenario.events.lastSeq;
+    this._eventSeqBefore = options.afterSeq ?? scenario.events.lastSeq;
     this._activitySeq = null;
+    this._terminalSeq = null;
   }
 
   _matchesSession(e) {
@@ -40,6 +41,7 @@ class Turn {
 
   get eventSeqBefore() { return this._eventSeqBefore; }
   get activitySeq() { return this._activitySeq; }
+  get terminalSeq() { return this._terminalSeq; }
 
   async awaitTerminal(opts = {}) {
     const o = {
@@ -56,7 +58,8 @@ class Turn {
       this._activitySeq = this._eventSeqBefore;
     }
     if (o.requireAssistantTerminal) {
-      await this._awaitAssistantTerminal(o.timeoutMs);
+      const terminalEvent = await this._awaitAssistantTerminal(o.timeoutMs);
+      this._terminalSeq = terminalEvent.seq;
       this._recordProgress('turn-assistant-terminal');
     }
     if (o.requireIdleAfterActivity) {
@@ -97,7 +100,7 @@ class Turn {
 
   async _awaitAssistantTerminal(timeoutMs) {
     try {
-      await this._scenario.events.awaitEvent(
+      return await this._scenario.events.awaitEvent(
         (e) => e.type === 'message.updated' && Boolean(e.finishReason) && e.seq > this._eventSeqBefore && this._matchesSession(e),
         timeoutMs,
       );

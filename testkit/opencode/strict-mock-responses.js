@@ -1,0 +1,171 @@
+import { buildToolCallChunks, buildTextChunks, sendJSON } from './strict-mock-sse.js';
+import { estimatePromptTokens } from './strict-mock-matches.js';
+import { decorateLegacyArgs } from './strict-mock-decorate.js';
+
+const MOCK_MODEL = 'mock';
+const SSE_HEADERS = {
+  'Content-Type': 'text/event-stream',
+  'Cache-Control': 'no-cache',
+  'Connection': 'keep-alive',
+};
+
+async function respondStream(res, chunks, exp) {
+  res.writeHead(200, { ...SSE_HEADERS, 'X-Accel-Buffering': 'no' });
+
+  if (exp.respond.missingUsage) {
+    for (const chunk of chunks) delete chunk.usage;
+  }
+
+  for (let index = 0; index < chunks.length; index++) {
+    if (index === 0 && exp.respond.delayFirstToken > 0) {
+      await new Promise((resolve) => setTimeout(resolve, exp.respond.delayFirstToken));
+    }
+    if (exp.respond.disconnectMidSse && index === Math.floor(chunks.length / 2)) {
+      res.destroy();
+      return;
+    }
+    res.write(`data: ${JSON.stringify(chunks[index])}\n\n`);
+  }
+
+  if (exp.respond.neverEnd) return;
+  if (exp.respond.delayDone > 0) {
+    await new Promise((resolve) => setTimeout(resolve, exp.respond.delayDone));
+  }
+  res.write('data: [DONE]\n\n');
+  res.end();
+}
+
+function toolCallChunks(id, exp, parsed, strict, promptTokens) {
+  const args = typeof exp.respond.args === 'function'
+    ? exp.respond.args(parsed)
+    : { ...exp.respond.args };
+  if (!strict) decorateLegacyArgs(args);
+
+  const argsText = exp.respond.malformedArgs
+    ? '{malformed_json_arguments:'
+    : JSON.stringify(args);
+
+  if (exp.respond.toolCallAsText) {
+    return buildTextChunks(id, `call tool ${exp.respond.tool} with args ${argsText}`, promptTokens);
+  }
+  if (exp.respond.fragmentArgs) return fragmentedToolCallChunks(id, exp, argsText, promptTokens);
+  if (exp.respond.duplicateToolCallId) return duplicateToolCallChunks(id, exp, argsText, promptTokens);
+  return buildToolCallChunks(id, exp.respond.tool, argsText, promptTokens);
+}
+
+function fragmentedToolCallChunks(id, exp, argsText, promptTokens) {
+  const chunks = [{
+    id,
+    object: 'chat.completion.chunk',
+    created: 1,
+    model: MOCK_MODEL,
+    choices: [{ index: 0, delta: { role: 'assistant', content: null }, finish_reason: null }],
+  }];
+  const fragmentSize = exp.respond.fragmentSize || 3;
+  for (let index = 0; index < argsText.length; index += fragmentSize) {
+    chunks.push({
+      id,
+      object: 'chat.completion.chunk',
+      created: 1,
+      model: MOCK_MODEL,
+      choices: [{
+        index: 0,
+        delta: {
+          tool_calls: [{
+            index: 0,
+            id,
+            type: 'function',
+            function: {
+              name: index === 0 ? exp.respond.tool : undefined,
+              arguments: argsText.slice(index, index + fragmentSize),
+            },
+          }],
+        },
+        finish_reason: null,
+      }],
+    });
+  }
+  chunks.push(finishedToolCallChunk(id, promptTokens));
+  return chunks;
+}
+
+function duplicateToolCallChunks(id, exp, argsText, promptTokens) {
+  const toolCall = {
+    index: 0,
+    id,
+    type: 'function',
+    function: { name: exp.respond.tool, arguments: argsText },
+  };
+  return [
+    { id, object: 'chat.completion.chunk', created: 1, model: MOCK_MODEL, choices: [{ index: 0, delta: { role: 'assistant', content: null }, finish_reason: null }] },
+    { id, object: 'chat.completion.chunk', created: 1, model: MOCK_MODEL, choices: [{ index: 0, delta: { tool_calls: [toolCall] }, finish_reason: null }] },
+    { id, object: 'chat.completion.chunk', created: 1, model: MOCK_MODEL, choices: [{ index: 0, delta: { tool_calls: [toolCall] }, finish_reason: null }] },
+    finishedToolCallChunk(id, promptTokens),
+  ];
+}
+
+function finishedToolCallChunk(id, promptTokens) {
+  return {
+    id,
+    object: 'chat.completion.chunk',
+    created: 1,
+    model: MOCK_MODEL,
+    choices: [{ index: 0, delta: {}, finish_reason: 'tool_calls' }],
+    usage: { prompt_tokens: promptTokens, completion_tokens: 100, total_tokens: promptTokens + 100 },
+  };
+}
+
+function reasoningOnlyChunks(id, exp, promptTokens) {
+  const text = typeof exp.respond.reasoningOnly === 'string' ? exp.respond.reasoningOnly : 'thinking...';
+  return [
+    { id, object: 'chat.completion.chunk', created: 1, model: MOCK_MODEL, choices: [{ index: 0, delta: { role: 'assistant', reasoning_content: text }, finish_reason: null }] },
+    { id, object: 'chat.completion.chunk', created: 1, model: MOCK_MODEL, choices: [{ index: 0, delta: {}, finish_reason: 'stop' }], usage: { prompt_tokens: promptTokens, completion_tokens: 100, total_tokens: promptTokens + 100 } },
+  ];
+}
+
+export async function respond(state, res, exp, parsed) {
+  const id = exp.respond.type === 'title' ? `title_${Date.now()}` : `call_${Date.now()}`;
+  const promptTokens = estimatePromptTokens(parsed);
+
+  if (exp.respond.type === 'error') {
+    return sendJSON(res, exp.respond.status || 500, exp.respond.body || { error: 'mock error' });
+  }
+  if (exp.respond.contextOverflow) {
+    return sendJSON(res, 400, {
+      error: {
+        message: "This model's maximum context length is 100000 tokens.",
+        type: 'invalid_request_error',
+        code: 'context_length_exceeded',
+      },
+    });
+  }
+  if (exp.respond.type === 'disconnect') return respondDisconnect(res, id);
+
+  const chunks = exp.respond.type === 'tool-call'
+    ? toolCallChunks(id, exp, parsed, state.strict, promptTokens)
+    : exp.respond.emptyAssistant
+      ? buildTextChunks(id, '', promptTokens)
+      : exp.respond.reasoningOnly
+        ? reasoningOnlyChunks(id, exp, promptTokens)
+        : buildTextChunks(id, exp.respond.text, promptTokens);
+
+  if (exp.respond.errorAfterToolCall) {
+    res.writeHead(200, { ...SSE_HEADERS, 'X-Accel-Buffering': 'no' });
+    res.write(`data: ${JSON.stringify(chunks[0])}\n\n`);
+    res.destroy();
+    return;
+  }
+  return respondStream(res, chunks, exp);
+}
+
+function respondDisconnect(res, id) {
+  res.writeHead(200, SSE_HEADERS);
+  res.write(`data: ${JSON.stringify({
+    id,
+    object: 'chat.completion.chunk',
+    created: 1,
+    model: MOCK_MODEL,
+    choices: [{ index: 0, delta: { role: 'assistant' }, finish_reason: null }],
+  })}\n\n`);
+  res.destroy();
+}

@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { fileURLToPath } from 'node:url';
 import { runStaticGate, setupScenario, teardownScenario, getSessionId } from '../index.js';
-import { expectationLane } from './lane.mjs';
+import { bindLaneSession, expectationLane } from './lane.mjs';
 
 const __filename = fileURLToPath(import.meta.url);
 
@@ -16,8 +16,10 @@ try {
     watchdogMs: 1000,
   });
 
-  scenario.provider.allowTitleGeneration();
-  scenario.provider.allowSyntheticContinuations();
+  scenario.provider.expectTitle({
+    id: 'inspector-title',
+    lane: expectationLane('pty-stress', 'inspector-title', 'title', 1, 'title'),
+  });
 
   // Inspector uses executor tool with bounded PTY-style budget.
   scenario.provider.expectToolCall({
@@ -44,6 +46,7 @@ try {
   const inspectorId = getSessionId(inspector);
   assert.ok(inspectorId, `inspector session creation failed: ${JSON.stringify(inspector)}`);
   scenario.sessionIds.push(inspectorId);
+  bindLaneSession(scenario.provider, inspectorId, 'inspector-title', 'inspector');
 
   const turn = scenario.turn.start(inspectorId);
   const prompt = await scenario.client.request('POST', `/session/${inspectorId}/prompt_async`, {
@@ -54,7 +57,7 @@ try {
     },
   });
   assert.ok(prompt.ok, `inspector prompt failed: ${JSON.stringify(prompt.data)}`);
-  await turn.awaitTerminal({ timeoutMs: 20000, requireActivity: true, requireAssistantTerminal: true, requireIdleAfterActivity: true });
+  await turn.awaitTerminal({ timeoutMs: 1000, requireActivity: true, requireAssistantTerminal: true, requireIdleAfterActivity: true });
 
   // Verify boundedExecutor args are reasonable.
   const execRequests = scenario.provider.requests.filter(
