@@ -32,12 +32,12 @@
 | REV-DOUBLE-PERFECT | 同 tree 双 PERFECT | `tests-next/Session/ReviewGuardTests.fs` | Port proof | Manager finish guard E2E |
 | FB-A-A-B-B | session 累计 A/A/B/B | `tests-next/Session/FallbackContractTests.fs` | pure proof | provider request model sequence |
 | ORCH-FF-ONLY | rebase 后复审与 ff-only | `tests-next/Integration/OrchestratorTests.fs` | Port proof | real Git worktree E2E |
-| TESTKIT-LANES | scenario/lane 内有序、lane 间可交错 | pending | next task | pure TestKit gate |
-| TESTKIT-CAUSAL-WATCHDOG | 1s watchdog 仅接受因果进展 | pending | next task | scenario-local diagnostics |
+| TESTKIT-LANES | scenario/session/role/turn/request-kind lane；真实 session/parent 绑定 | `gate-testkit.mjs` + P0 canaries | Gate + real-host harness proof | 生产语义仍逐阶段验收 |
+| TESTKIT-CAUSAL-WATCHDOG | 1s watchdog 仅接受 blocking 因果进展 | `watchdog.js` + `gate-timeout-cases.mjs` | Gate + P0 proof | 每个新场景保持同一门槛 |
 
 ## 不得迁移
 
-- 全局 FIFO、`allowOutOfOrder`、`allowBloggerRequests`、自动吞请求。
+- 全局 FIFO、`allowOutOfOrder`、`allowBloggerRequests`、`allowTitleGeneration`、`allowSyntheticContinuations`、自动吞请求。
 - 生产 `WANXIANG_RUN_ID`、ledger、全局 active process 表、全局 kill、跨 scenario 进程扫描。
 - 传输层 prompt 重试、Transport 侧 fallback 计数、伪造 terminal。
 - 把普通 Runner 包装成 PTY 的模型工具面。
@@ -45,9 +45,16 @@
 
 ## 近期接管顺序
 
-1. TestKit scenario/lane expectation + causal Watchdog gate。
-2. 一个 Manager→Coder→Join 真实纵切。
-3. Companion explicit Blogger lanes。
-4. Reviewer → Fallback → Process → PTY → Orchestrator。
+1. Manager→Coder→Join 的 child-created、write、terminal、join、terminal Host barrier。
+2. Companion production projection/restart semantics。
+3. Reviewer → Fallback → Process → PTY → Orchestrator。
+
+## TestKit 因果接管证据
+
+- `StrictMockProvider` 读取 OpenCode `x-session-affinity` 与 `x-parent-session-id`。direct session 先由 scenario 绑定；child session 仅能由已绑定 parent 的 lane 首次认领，之后固定同一 session identity。
+- title、synthetic continuation、Blogger、Executor、Reviewer 都必须显式声明 lane。没有 allow-list 或传输层自动响应；extra、missing、wrong-parent、ambiguous 和 lane FIFO 违规均为测试失败。
+- `afterExpectation()` 在消费点同步注册合法后继，避免并发 child response 在 test continuation 之前到达的竞态。
+- P0 维持 staggered parallel；Companion replacement 以一个明确的 busy Blogger response 验证 busy skip，而不是靠 timing 接受任意额外 Blogger 请求。
+- Journal runtime files 位于 Git common directory；隔离环境不再在受测 workspace 创建 `node_modules`。这些是 harness/host 边界，不是 Orchestrator ff-only 发布证据。
 
 旧资产只能在相应行为有新层级证据后删除。任何未列入总账的旧测试先分类，再决定保留、提炼或废弃。

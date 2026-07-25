@@ -49,16 +49,21 @@ import:
 
 上述是本轮直接证据。未在本轮重新执行的旧 canary、全量测试和 release 结论不得重新写成“已通过”。
 
+## 本轮 TestKit 因果证据
+
+- `StrictMockProvider` 的 expectation lane 已包含 scenario、session alias、role、turn、request-kind；真实 OpenCode 请求以 `x-session-affinity` 绑定 session，child 首请求还校验 `x-parent-session-id`。已绑定 session 优先于未绑定 sibling lane；错 parent、错顺序、extra、missing、ambiguous 全部返回 500。
+- title generation、零宽 continuation、Blogger、Executor、Reviewer 都是显式 expectation；`allowOutOfOrder`、`allowBloggerRequests`、`allowTitleGeneration`、`allowSyntheticContinuations` 已删除。没有自动吞请求路径。
+- `afterExpectation()` 在已消费 expectation 的同一因果边界注册后继 lane；它避免多 child/session 交错时的注册竞态，不引入 retry 或生产状态。
+- Watchdog 固定 1s。只接受 blocking expectation 消费、显式 session/restart/barrier；background Blogger 默认只留诊断。replacement busy-skip 仅在测试显式等待该事实时作为 blocking barrier。
+- `testkit/opencode/tests/gate-testkit.mjs` 已覆盖 lane 交错/FIFO、extra/missing、真实 session-parent 绑定、原子后继、title 分类、background-only watchdog。`npm run test:e2e:p0` 保持 staggered parallel，13 个 canary 以显式 lane 运行。
+- Journal 运行时路径已在 Git common directory 的 `wanxiangshu-next/runtimes`；测试依赖不再创建 workspace `node_modules`，Reviewer canary 断言工作树没有 `.wanxiangshu-next`。
+
 ## 当前未闭合边界
 
-1. TestKit 仍需从全局 FIFO/宽松乱序收敛为 scenario + session/role/turn/request-kind 的因果 lane；每个 lane 保序，lane 间可交错，每个请求必须消费显式 expectation。
-2. 不得使用 `allowOutOfOrder`、`allowBloggerRequests` 或任何自动吞 Blogger 请求的 bypass。多余请求立即失败，场景结束必须没有剩余 expectation。
-3. Watchdog 需要记录 `lastProgressAt`、`lastProgressReason`、`lastProgressLane`、`lastConsumedExpectation`；有后台活动但关键 lane 一秒不推进仍必须失败。
-4. 最小 Manager→Coder→Join 真实场景需按语义事件等待：child created、Coder write completed、Coder terminal、Manager join completed、Manager terminal；不得用全局 idle 或固定 sleep 代替。
-5. Companion、Reviewer、Fallback、Process、PTY、Orchestrator 的真实边界需要按下方顺序重新验收；当前代码和旧文档中的“全闭合”措辞一律不采信。
-6. `.wanxiangshu-next` 工作区 Journal 的 dirty 影响尚未在本轮修复。迁移到仓库外或 `.git` 私有目录前，不得宣称 Orchestrator dirty gate 完整。
-7. 真实 PTY 还未成为统一 `fork` 表面。只能保留 Process/PTy 窄 Port，不得将普通 Runner 包装成 PTY。
-8. Fallback 的真实 provider A/A/B/B 请求序列、ReviewGuard Manager finish、Orchestrator 真实 worktree 发布仍需单独证据。
+1. 最小 Manager→Coder→Join 已有显式 Provider lane 和真实 P0，但仍需把 child-created、Coder write completed、Coder terminal、Manager join completed、Manager terminal 逐项固定为语义 barrier；不得用全局 idle 或固定 sleep 代替。
+2. Companion、Reviewer、Fallback、Process、PTY、Orchestrator 的产品边界仍按下方顺序重验；当前 TestKit 改造不证明生产语义闭合。
+3. 真实 PTY 还未成为统一 `fork` 表面。只能保留 Process/PTy 窄 Port，不得将普通 Runner 包装成 PTY。
+4. Fallback 的真实 provider A/A/B/B 请求序列、ReviewGuard Manager finish、Orchestrator 真实 worktree 发布仍需单独证据。当前 fallback canary 只证明失败事实跨重启累计，不得外推模型切换。
 
 ## 解冻后的严格顺序
 
@@ -74,7 +79,7 @@ import:
 - Watchdog 保持 1s，但只接受当前场景的因果进展。诊断必须列出最后进展、阻塞 lane 和剩余 expectation。
 - Reaper 只能作为人工诊断命令，不能挂在 npm lifecycle；TestKit 清理自己创建的进程树，不扫描全机、不猜归属。
 
-完成标准：纯 TestKit gate 证明 lane 间交错、lane 内保序、extra/missing/unmatched request 均失败；不跑全量 E2E 充当替代证据。
+完成标准：`gate-testkit` 已证明 lane 间交错、lane 内保序、extra/missing/unmatched request、真实 parent/session 绑定和原子后继；并行 P0 是夹具迁移的补充，不替代生产语义证据。
 
 ### 阶段二：最小真实纵切
 
@@ -147,8 +152,8 @@ npm run test:e2e:p0
 
 ## 当前解冻动作
 
-1. 建立 `MIGRATION.md` 行为总账，记录冻结旧资产、纠偏提交和新测试接管关系；不把旧实现重新引入。
-2. 重写 TestKit expectation store 为 scenario/lane 因果模型，保留并行 P0 与严格 1s watchdog。
-3. 只恢复最小 Manager→Coder→Join 真实场景，拿到直接证据后再进入 Companion。
+1. 用现有 lane 基座把 Manager→Coder→Join 的每个 Host 语义事件固定成 deterministic barrier；先找 Harness 缺口，禁止借生产 retry 或状态污染掩盖。
+2. 之后按 Companion → Reviewer → Fallback → Process → PTY → Orchestrator 顺序重验生产边界；每一步只接受对应 SSOT 的直接证据。
+3. `MIGRATION.md` 继续记录行为接管和删除门槛；不把旧实现重新引入。
 
 任何“为了让测试不挂”“先加几十次重试”“测试环境才设置变量”“以后换真正 PTY”“读不到就忽略”“方便清理所以全局 kill”的修改均拒绝。测试必须证明 SSOT；生产不得追着测试夹具跑。

@@ -13,9 +13,11 @@ OpenCode Agent DSL 插件。模型侧工具面由角色静态装配；实现侧�
 ```text
 npm run build
 npm run test:manager-tools
+node testkit/opencode/tests/gate-testkit.mjs
+npm run test:e2e:p0
 ```
 
-真实 E2E 基座正在按 scenario/lane 因果模型重建；不要把历史 canary 结果解释为当前 release 资格。P0 保持并行，最多重复 3 次；每个场景使用 1s 的 causal-progress Watchdog。
+TestKit 以 scenario/session/role/turn/request-kind lane 匹配真实 OpenCode session/parent headers；title、synthetic continuation 与 Blogger 均为显式 expectation。P0 保持并行，最多重复 3 次；每个场景使用 1s causal-progress Watchdog。上述不构成 release 资格，也不证明 Fallback A/A/B/B、ReviewGuard finish、PTY fork surface 或 Orchestrator Git 发布。
 
 ## 角色模型
 
@@ -53,6 +55,8 @@ npm run test:e2e:p0
 ```
 
 先运行当前改动的最小目标测试；只有该阶段的契约已证明后才运行更广的套件。TestKit 每个 scenario 必须独占 workspace、HOME/XDG、Provider、端口、Journal、spool、进程组、diagnostics 和 expectation store。
+
+Journal 位于 Git common directory 的私有 `wanxiangshu-next/runtimes` 路径；TestKit 不在受测 workspace 创建 `node_modules` 或 `.wanxiangshu-next`。
 
 ## 生产入口
 
