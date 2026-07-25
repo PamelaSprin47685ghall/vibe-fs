@@ -19,7 +19,7 @@ export async function runScenarioTests(opts, tests, setupScenario) {
   let passed = 0;
   let failed = 0;
   const failures = [];
-  const defaultTimeoutMs = opts.timeoutMs || 120000;
+  const defaultTimeoutMs = opts.timeoutMs || 1000;
   const globalTimeoutMs = opts.globalTimeoutMs || 500000; // 500s default to prevent 600s overall timeout
   const suiteStart = Date.now();
 

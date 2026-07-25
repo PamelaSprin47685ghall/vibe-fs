@@ -70,11 +70,21 @@ module PtySurface =
     let activePtys () : (string * DateTimeOffset) list =
         lock ptyGate (fun () -> ptyAgents |> Seq.map (fun kv -> kv.Key, kv.Value) |> Seq.toList)
 
+    /// Kill all active process groups and clear PTY session registrations.
+    let killAllPtys () : unit =
+        RunnerCore.killAllActive ()
+        lock ptyGate (fun () -> ptyAgents.Clear())
+
+    let MAX_ACTIVE_PTYS = 8
+
     /// Create and launch a one-shot PTY session.
     /// The command runs in the background via runCommand; the PTY id
     /// is returned immediately so the model can track it through list().
     /// Waits for the command to complete, then removes the PTY from active set.
     let ptyFork (commandText: string) (workspaceDirectory: string option) : string =
+        if (activePtys ()).Length >= MAX_ACTIVE_PTYS then
+            failwith "PTY limit reached (8); close existing sessions first"
+
         let id = "pty-" + Guid.NewGuid().ToString("N").Substring(0, 8)
         registerPty id
 

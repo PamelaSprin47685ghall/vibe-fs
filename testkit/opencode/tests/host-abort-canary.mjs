@@ -62,7 +62,7 @@ async function waitForProvider(predicate, label, timeoutMs) {
 let scenario;
 try {
   assert.equal(runStaticGate([__filename]).passed, true);
-  scenario = await setupScenario({ project: { files: { 'AGENTS.md': 'parent abort canary\n' } }, strict: true, watchdogMs: 30000 });
+  scenario = await setupScenario({ project: { files: { 'AGENTS.md': 'parent abort canary\n' } }, strict: true, watchdogMs: 1000 });
   scenario.provider.allowSyntheticContinuations();
   scenario.provider.allowTitleGeneration();
   scenario.provider.allowBloggerRequests();
@@ -116,13 +116,13 @@ try {
 
   await scenario.events.awaitEvent(
     (e) => e.seq > watermark && isTerminalFor(childId)(e),
-    15000,
+    1000,
   );
   await scenario.events.awaitEvent(
     (e) => e.seq > watermark && isTerminalFor(parentId)(e),
-    15000,
+    1000,
   );
-  await waitForProvider(() => scenario.provider.activeRequestCount === 0, 'hanging streams aborted', 15000);
+  await waitForProvider(() => scenario.provider.activeRequestCount === 0, 'hanging streams aborted', 1000);
 
   scenario.provider.expectSatisfied();
   await teardownScenario(scenario);

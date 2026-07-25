@@ -50,7 +50,7 @@ async function runProcessHostEnvIsolation() {
     await host.start({
       scenarioDir,
       providerUrl: `${providerUrl}/v1`,
-      startTimeoutMs: 15000,
+      startTimeoutMs: 1000,
       extraEnv: {
         HOME: '/evil',
         XDG_CONFIG_HOME: '/evil',
@@ -177,7 +177,7 @@ async function runNoFixedSleepCriticalAssertion() {
   const probe = new EventProbe('http://127.0.0.1:1', '/tmp');
   probe._events.push({ seq: 1, type: 'message.updated', finishReason: 'stop' });
   const start = Date.now();
-  await probe.awaitEvent((e) => e.type === 'message.updated', 30000);
+  await probe.awaitEvent((e) => e.type === 'message.updated', 1000);
   const elapsed = Date.now() - start;
   assertTrue(elapsed < 20, `awaitEvent on existing event should be immediate, took ${elapsed}ms`);
 }

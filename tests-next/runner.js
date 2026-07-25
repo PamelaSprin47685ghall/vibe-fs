@@ -3,7 +3,7 @@ import path from "node:path";
 import { fork } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { terminateTree } from "../testkit/process-lifecycle.js";
-import { recordSpawn, recordExit } from "../testkit/spawn-ledger.js";
+import { recordSpawn, recordExit, RUN_ID } from "../testkit/spawn-ledger.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.join(__dirname, "..");
@@ -43,7 +43,8 @@ export function discoverTestExports(file) {
     const worker = fork(workerPath, ["--discover", file], {
       cwd: repoRoot,
       detached: true,
-      stdio: ["ignore", "inherit", "inherit", "ipc"]
+      stdio: ["ignore", "inherit", "inherit", "ipc"],
+      env: { ...process.env, WANXIANG_RUN_ID: RUN_ID }
     });
     if (worker.pid) {
       activeWorkers.add(worker.pid);
@@ -75,7 +76,8 @@ export function runTestInWorker(file, exportName, timeoutMs = 1000) {
     const worker = fork(workerPath, [file, exportName], {
       cwd: repoRoot,
       detached: true,
-      stdio: ["ignore", "inherit", "inherit", "ipc"]
+      stdio: ["ignore", "inherit", "inherit", "ipc"],
+      env: { ...process.env, WANXIANG_RUN_ID: RUN_ID }
     });
 
     if (worker.pid) {

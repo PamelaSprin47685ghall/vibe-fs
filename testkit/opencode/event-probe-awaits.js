@@ -5,7 +5,7 @@
  * stay within the 60-line function budget.
  */
 
-const DEFAULT_AWAIT_TIMEOUT_MS = 30000;
+const DEFAULT_AWAIT_TIMEOUT_MS = 1000;
 const DEFAULT_NEVER_TIMEOUT_MS = 5000;
 const TIMED_OUT_SENTINEL = 'timed out';
 
@@ -15,9 +15,6 @@ function removeCallback(probe, callback) {
 }
 
 function bindAwaitCallback(probe, predicate, timeoutMs, resolve, reject) {
-  // The timer handle must stay closure-local: storing it on the probe
-  // let concurrent awaits clobber each other's handle, so the loser
-  // never timed out and hung forever (host-restart canary runaway).
   const callback = (event) => {
     if (predicate(event)) {
       clearTimeout(timer);

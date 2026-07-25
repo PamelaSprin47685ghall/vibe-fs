@@ -12,7 +12,7 @@ try {
   scenario = await setupScenario({
     project: { files: { 'AGENTS.md': 'PTY stress canary\n' } },
     strict: true,
-    watchdogMs: 30000,
+    watchdogMs: 1000,
   });
 
   scenario.provider.allowTitleGeneration();

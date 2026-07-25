@@ -11,6 +11,7 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
+import http from 'node:http';
 import { createIsolatedEnv } from './isolated-env.js';
 import {
   SIGTERM_GRACE_MS,
@@ -67,13 +68,15 @@ export class ProcessHost {
     this._scenarioDir = opts.scenarioDir;
     this._workDir = ensureWorkspace(opts.scenarioDir);
     this._env = buildEnv(opts);
+    const ht0 = Date.now();
     this._child = spawnOpencodeServe(this._workDir, this._env, {
       onStdoutChunk: this._onStdout.bind(this),
       onStderrChunk: this._onStderr.bind(this),
       onExit: this._onChildExit.bind(this),
     });
-    const startTimeout = opts.startTimeoutMs || 30000;
+    const startTimeout = opts.startTimeoutMs || 5000;
     const listenLine = await this._waitForListening(startTimeout);
+    const ht1 = Date.now(); console.log(`[host.start] _waitForListening took ${ht1 - ht0}ms`);
     if (!listenLine) {
       try { this._child?.kill('SIGKILL'); } catch {}
       throw new Error(
@@ -85,25 +88,27 @@ export class ProcessHost {
     this._pid = this._child?.pid || null;
     this._port = parseListenPort(listenLine);
     this._baseUrl = `http://127.0.0.1:${this._port}`;
-    await this._waitForHealth(startTimeout);
+    await this._waitForHealth(5000);
+    const ht2 = Date.now(); console.log(`[host.start] _waitForHealth took ${ht2 - ht1}ms`);
   }
 
-  async _waitForHealth(timeoutMs) {
+  async _waitForHealth(timeoutMs = 5000) {
     const deadline = Date.now() + timeoutMs;
-    for (let i = 0; i < READY_POLL_MAX_TRIES; i++) {
+    while (Date.now() < deadline) {
       try {
-        const res = await fetch(`${this._baseUrl}/api/session`, { method: 'GET' });
-        if (res.ok || res.status === 200) return;
-      } catch {}
-      if (Date.now() > deadline) {
-        throw new Error(
-          'Health-check failed: server not responding\n' +
-          `stdout tail:\n${this._stdoutBuffer.slice(-20).join('\n')}\n` +
-          `stderr tail:\n${this._stderrBuffer.slice(-20).join('\n')}`,
-        );
-      }
+        const res = await fetch(`${this._baseUrl}/path`, {
+          method: 'GET',
+          headers: { 'x-opencode-directory': this._workDir },
+        });
+        if (res && res.status > 0) return;
+      } catch (err) {}
       await new Promise((r) => setTimeout(r, READY_POLL_INTERVAL_MS));
     }
+    throw new Error(
+      'Health-check failed: server not responding\n' +
+      `stdout tail:\n${this._stdoutBuffer.slice(-20).join('\n')}\n` +
+      `stderr tail:\n${this._stderrBuffer.slice(-20).join('\n')}`,
+    );
   }
 
   async stop({ assert = true } = {}) {
@@ -113,30 +118,32 @@ export class ProcessHost {
       // Already stopped, but reset flags so a fresh host can be started.
       this._started = false;
       this._stopped = false;
+      this._baseUrl = null;
+      this._port = null;
+      this._pid = null;
+      this._exitInfo = null;
       return;
     }
-    await terminateChild(this._child, SIGTERM_GRACE_MS, SIGKILL_GRACE_MS);
-    try { this._child.stdout.destroy(); } catch {}
-    try { this._child.stderr.destroy(); } catch {}
-    try { this._child.stdin.destroy(); } catch {}
-    this._child = null;
-    if (!assert) {
-      // Clean up state for reuse but keep _pid/_port until the caller
-      // explicitly asserts or re-starts.
+    try {
+      await terminateChild(this._child, SIGTERM_GRACE_MS, SIGKILL_GRACE_MS);
+      try { this._child.stdout.destroy(); } catch {}
+      try { this._child.stderr.destroy(); } catch {}
+      try { this._child.stdin.destroy(); } catch {}
+      this._child = null;
+      if (assert) {
+        await this.assertNoLeak();
+      }
+    } finally {
+      // Allow the same ProcessHost instance to be re-used in a future
+      // scenario. New scenarios must always get a fresh instance via
+      // `new ProcessHost()`, but resetting here keeps the API forgiving.
       this._started = false;
       this._stopped = false;
-      return;
+      this._baseUrl = null;
+      this._port = null;
+      this._pid = null;
+      this._exitInfo = null;
     }
-    await this.assertNoLeak();
-    // Allow the same ProcessHost instance to be re-used in a future
-    // scenario. New scenarios must always get a fresh instance via
-    // `new ProcessHost()`, but resetting here keeps the API forgiving.
-    this._started = false;
-    this._stopped = false;
-    this._baseUrl = null;
-    this._port = null;
-    this._pid = null;
-    this._exitInfo = null;
   }
 
   async assertNoLeak() {

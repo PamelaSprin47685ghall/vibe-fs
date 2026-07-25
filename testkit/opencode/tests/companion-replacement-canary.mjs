@@ -45,7 +45,7 @@ try {
     project: { files: { 'AGENTS.md': 'companion replacement canary\n' } },
     strict: true,
     contextLimit,
-    watchdogMs: 30000,
+    watchdogMs: 1000,
   });
   scenario.provider.allowSyntheticContinuations();
   scenario.provider.allowTitleGeneration();
@@ -72,7 +72,7 @@ try {
       },
     });
     assert.ok(prompt.ok, `round ${round} prompt failed: ${JSON.stringify(prompt.data)}`);
-    await turn.awaitTerminal({ timeoutMs: 30000, requireActivity: true, requireAssistantTerminal: false, requireIdleAfterActivity: true });
+    await turn.awaitTerminal({ timeoutMs: 1000, requireActivity: true, requireAssistantTerminal: false, requireIdleAfterActivity: true });
   }
 
   assert.ok(

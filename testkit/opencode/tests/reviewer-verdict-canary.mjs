@@ -62,7 +62,7 @@ async function runScenario(scenario) {
     },
   });
   assert.ok(prompt.ok, `reviewer prompt failed: ${JSON.stringify(prompt.data)}`);
-  await turn.awaitTerminal({ timeoutMs: 30000, requireActivity: true, requireAssistantTerminal: true, requireIdleAfterActivity: true });
+  await turn.awaitTerminal({ timeoutMs: 1000, requireActivity: true, requireAssistantTerminal: true, requireIdleAfterActivity: true });
 
   const reviewerRequests = scenario.provider.requests.filter((request) => JSON.stringify(request).includes('Review review_target.txt'));
   assert.ok(reviewerRequests.length >= 3, 'Reviewer must receive two tool results and then finish');
@@ -82,7 +82,7 @@ try {
   scenario = await setupScenario({
     project: { files: { [TREE_FILE]: 'review target\n' } },
     strict: true,
-    watchdogMs: 30000,
+    watchdogMs: 1000,
   });
   await runScenario(scenario);
   scenario.provider.expectSatisfied();

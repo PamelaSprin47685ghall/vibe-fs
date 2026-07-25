@@ -76,7 +76,7 @@ class Turn {
    */
   async awaitTerminal(opts = {}) {
     const o = {
-      timeoutMs: opts.timeoutMs || 60000,
+      timeoutMs: opts.timeoutMs || 1000,
       requireActivity: opts.requireActivity !== false,
       requireAssistantTerminal: opts.requireAssistantTerminal !== false,
       requireIdleAfterActivity: opts.requireIdleAfterActivity !== false,

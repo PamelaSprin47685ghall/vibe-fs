@@ -80,9 +80,12 @@ export async function setupScenarioParallel(opts, tmpDir) {
   const pluginPaths = opts.plugin !== false ? [resolvePluginPath(opts.variant || 'opencode')] : [];
 
   try {
+    const t0 = Date.now();
     const providerUrl = await provider.start();
+    const t1 = Date.now(); console.log(`[setupScenario] provider.start took ${t1 - t0}ms`);
     // Prepare workspace before starting opencode; it reads AGENTS.md at startup.
     await prepareWorkspace(workDir, opts.project);
+    const t2 = Date.now(); console.log(`[setupScenario] prepareWorkspace took ${t2 - t1}ms`);
     await host.start({
       scenarioDir,
       providerUrl: `${providerUrl}/v1`,
@@ -90,10 +93,12 @@ export async function setupScenarioParallel(opts, tmpDir) {
       contextLimit: opts.contextLimit,
       extraEnv: opts.extraEnv,
     });
+    const t3 = Date.now(); console.log(`[setupScenario] host.start took ${t3 - t2}ms`);
 
     const client = new HttpClient(host.baseUrl, host.workDir);
     const events = new EventProbe(host.baseUrl, host.workDir);
     await events.connect();
+    const t4 = Date.now(); console.log(`[setupScenario] events.connect took ${t4 - t3}ms`);
 
     const scenario = new Scenario({
       host,
@@ -106,7 +111,7 @@ export async function setupScenarioParallel(opts, tmpDir) {
     client.onSessionCreated = (sid) => {
       if (!scenario.sessionIds.includes(sid)) scenario.sessionIds.push(sid);
     };
-    const watchdogTimeout = opts.watchdogMs || 15000;
+    const watchdogTimeout = opts.watchdogMs || 1000;
     const watchdog = new Watchdog({
       timeoutMs: watchdogTimeout,
       label: opts.watchdogLabel || "canary",

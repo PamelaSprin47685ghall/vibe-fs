@@ -56,7 +56,7 @@ try {
   scenario = await setupScenario({
     project: { files: { 'AGENTS.md': 'fallback canary\n' } },
     strict: true,
-    watchdogMs: 30000,
+    watchdogMs: 1000,
     extraEnv: {
       WANXIANGSHU_MODEL_A: 'test/test-model',
       WANXIANGSHU_MODEL_B: 'test/test-model-b',
@@ -89,7 +89,7 @@ try {
   });
   assert.ok(prompt1.ok, `prompt failed: ${JSON.stringify(prompt1.data)}`);
 
-  await drainExpectations(scenario, 15000);
+  await drainExpectations(scenario, 1000);
 
   const factsAfterRound1 = countFallbackFacts(scenario.host.workDir);
   assert.ok(factsAfterRound1 >= 1,
@@ -114,7 +114,7 @@ try {
   });
   assert.ok(prompt2.ok, `prompt2 failed: ${JSON.stringify(prompt2.data)}`);
 
-  await drainExpectations(scenario, 15000);
+  await drainExpectations(scenario, 1000);
 
   const factsAfterRound2 = countFallbackFacts(scenario.host.workDir);
   assert.ok(factsAfterRound2 > factsAfterRound1,

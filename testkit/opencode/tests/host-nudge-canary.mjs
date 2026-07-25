@@ -7,7 +7,7 @@ const __filename = fileURLToPath(import.meta.url);
 let scenario;
 try {
   if (!runStaticGate([__filename]).passed) throw new Error('host lifecycle canary contains prohibited polling');
-  scenario = await setupScenario({ project: { files: { 'AGENTS.md': 'host lifecycle canary\n' } }, strict: true, watchdogMs: 30000 });
+  scenario = await setupScenario({ project: { files: { 'AGENTS.md': 'host lifecycle canary\n' } }, strict: true, watchdogMs: 1000 });
   scenario.provider.allowSyntheticContinuations();
   scenario.provider.allowTitleGeneration();
   scenario.provider.allowBloggerRequests();
@@ -33,7 +33,7 @@ try {
       body: { agent: 'coder', parts: [{ type: 'text', text }], model: { providerID: 'test', modelID: 'test-model' } },
     });
     assert.ok(prompt.ok, `child prompt failed: ${JSON.stringify(prompt.data)}`);
-    await turn.awaitTerminal({ timeoutMs: 30000, requireActivity: true, requireAssistantTerminal: true, requireIdleAfterActivity: true });
+    await turn.awaitTerminal({ timeoutMs: 1000, requireActivity: true, requireAssistantTerminal: true, requireIdleAfterActivity: true });
   }
 
   const childTranscript = await scenario.client.messages(childId);

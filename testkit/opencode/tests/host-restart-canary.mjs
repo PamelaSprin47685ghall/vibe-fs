@@ -72,15 +72,15 @@ async function nudge(parentId, childId, agentId, marker, managerMarker, scenario
   });
   assert.ok(response.ok, `manager nudge failed: ${JSON.stringify(response.data)}`);
   await Promise.all([
-    childTurn.awaitTerminal({ timeoutMs: 30000, requireActivity: true, requireAssistantTerminal: true, requireIdleAfterActivity: true }),
-    parentTurn.awaitTerminal({ timeoutMs: 30000, requireActivity: true, requireAssistantTerminal: false, requireIdleAfterActivity: true }),
+    childTurn.awaitTerminal({ timeoutMs: 1000, requireActivity: true, requireAssistantTerminal: true, requireIdleAfterActivity: true }),
+    parentTurn.awaitTerminal({ timeoutMs: 1000, requireActivity: true, requireAssistantTerminal: false, requireIdleAfterActivity: true }),
   ]);
 }
 
 let scenario;
 try {
   assert.equal(runStaticGate([__filename]).passed, true);
-  scenario = await setupScenario({ project: { files: { 'AGENTS.md': 'restart reconcile canary\n' } }, strict: true, watchdogMs: 30000 });
+  scenario = await setupScenario({ project: { files: { 'AGENTS.md': 'restart reconcile canary\n' } }, strict: true, watchdogMs: 1000 });
   scenario.provider.allowSyntheticContinuations();
   scenario.provider.allowTitleGeneration();
   scenario.provider.allowBloggerRequests();
@@ -112,7 +112,7 @@ try {
     },
   });
   assert.ok(firstPrompt.ok, `manager create failed: ${JSON.stringify(firstPrompt.data)}`);
-  await firstTurn.awaitTerminal({ timeoutMs: 30000, requireActivity: true, requireAssistantTerminal: false, requireIdleAfterActivity: true });
+  await firstTurn.awaitTerminal({ timeoutMs: 1000, requireActivity: true, requireAssistantTerminal: false, requireIdleAfterActivity: true });
 
   const messages = await scenario.client.messages(parentId);
   const messageJson = JSON.stringify(messages.data);
@@ -127,7 +127,7 @@ try {
   // and the written file, or the interrupted continuation silently
   // consumes later rounds' expectations after the restart.
   await scenario.turn.start(childId).awaitTerminal({
-    timeoutMs: 30000,
+    timeoutMs: 1000,
     requireActivity: true,
     requireAssistantTerminal: true,
     requireIdleAfterActivity: true,

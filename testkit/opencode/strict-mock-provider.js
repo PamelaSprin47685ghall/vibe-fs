@@ -134,6 +134,10 @@ export class StrictMockProvider {
     res.on('close', () => this._activeResponses.delete(res));
 
     const url = new URL(req.url, `http://${req.headers.host}`);
+    console.error(`[mock-req] ${req.method} ${url.pathname}`);
+    if ((url.pathname === '/v1/models' || url.pathname === '/models' || url.pathname === '/api/models') && req.method === 'GET') {
+      return sendJSON(res, 200, { object: 'list', data: [{ id: 'test-model', object: 'model' }] });
+    }
     if (url.pathname === '/api/web_search' && req.method === 'POST') return handleWebSearch(req, res);
     if (url.pathname === '/api/web_fetch' && req.method === 'POST') return handleWebFetch(req, res);
     if ((url.pathname === '/v1/chat/completions' || url.pathname === '/v1/responses') && req.method === 'POST') {

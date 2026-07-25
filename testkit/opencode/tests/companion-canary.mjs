@@ -103,7 +103,7 @@ async function runProjectionScenario(scenario) {
     },
   });
   assert.ok(firstPrompt.ok, `first Manager prompt failed: ${JSON.stringify(firstPrompt.data)}`);
-  await firstTurn.awaitTerminal({ timeoutMs: 30000, requireActivity: true, requireAssistantTerminal: true, requireIdleAfterActivity: true });
+  await firstTurn.awaitTerminal({ timeoutMs: 1000, requireActivity: true, requireAssistantTerminal: true, requireIdleAfterActivity: true });
 
   const firstBlogRequests = bloggerRequests(scenario.provider);
   assert.equal(
@@ -116,7 +116,7 @@ async function runProjectionScenario(scenario) {
   const bloggerId = childIdsAfterFirstProjection[0];
   await scenario.events.awaitEvent(
     (event) => event.type === 'session.idle' && event.sessionID === bloggerId,
-    30000,
+    1000,
   );
 
   const secondTurn = scenario.turn.start(managerId);
@@ -128,7 +128,7 @@ async function runProjectionScenario(scenario) {
     },
   });
   assert.ok(secondPrompt.ok, `second Manager prompt failed: ${JSON.stringify(secondPrompt.data)}`);
-  await secondTurn.awaitTerminal({ timeoutMs: 30000, requireActivity: true, requireAssistantTerminal: true, requireIdleAfterActivity: true });
+  await secondTurn.awaitTerminal({ timeoutMs: 1000, requireActivity: true, requireAssistantTerminal: true, requireIdleAfterActivity: true });
 
   const allBlogRequests = bloggerRequests(scenario.provider);
   assert.equal(allBlogRequests.length, 2, 'two Manager projections must produce exactly two Blogger requests');
@@ -168,7 +168,7 @@ async function assertRoleHasNoSidecar(scenario, role, prompt) {
     },
   });
   assert.ok(response.ok, `${role} prompt failed: ${JSON.stringify(response.data)}`);
-  await turn.awaitTerminal({ timeoutMs: 30000, requireActivity: true, requireAssistantTerminal: true, requireIdleAfterActivity: true });
+  await turn.awaitTerminal({ timeoutMs: 1000, requireActivity: true, requireAssistantTerminal: true, requireIdleAfterActivity: true });
 
   const requests = scenario.provider.requests.slice(before);
   assert.ok(requests.length > 0, `${role} produced no provider request`);
@@ -201,7 +201,7 @@ try {
   scenario = await setupScenario({
     project: { files: { 'AGENTS.md': '- companion projection canary\n' } },
     strict: true,
-    watchdogMs: 30000,
+    watchdogMs: 1000,
   });
 
   await runProjectionScenario(scenario);

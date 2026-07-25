@@ -81,7 +81,7 @@ export class HttpClient {
     }
     return res;
   }
-  async prompt(sessionID, text, model, timeoutMs = 120000) {
+  async prompt(sessionID, text, model, timeoutMs = 1000) {
     const ac = new AbortController();
     const promptModel = model || { providerID: 'test', modelID: 'test-model' };
     const timer = setTimeout(() => ac.abort(), timeoutMs);
@@ -100,7 +100,7 @@ export class HttpClient {
   }
   async messages(sessionID) { return this.request('GET', `/session/${sessionID}/message`); }
   async sessionStatus(sessionID) { return this.request('GET', `/session/${sessionID}`); }
-  async runCommand(sessionID, command, args = '', timeoutMs = 30000) {
+  async runCommand(sessionID, command, args = '', timeoutMs = 1000) {
     const ac = new AbortController();
     const timer = setTimeout(() => ac.abort(), timeoutMs);
     try {
@@ -110,7 +110,7 @@ export class HttpClient {
   }
   async abort(sessionID) { return this.request('POST', `/session/${sessionID}/abort`, { body: {} }); }
 
-  async waitForSessionIdle(sessionID, timeoutMs = 30000) {
+  async waitForSessionIdle(sessionID, timeoutMs = 1000) {
     const deadline = Date.now() + timeoutMs;
     let sawNonIdle = false;
     while (Date.now() < deadline) {

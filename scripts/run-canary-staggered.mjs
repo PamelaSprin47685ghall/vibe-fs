@@ -19,7 +19,7 @@ function parsePositiveInt(value, fallback, name) {
 }
 
 const MAX_PARALLEL = parsePositiveInt(process.env.MAX_PARALLEL_CANARIES, 4, "MAX_PARALLEL_CANARIES");
-const CANARY_TIMEOUT_MS = parsePositiveInt(process.env.CANARY_TIMEOUT_MS, 180000, "CANARY_TIMEOUT_MS");
+const CANARY_TIMEOUT_MS = parsePositiveInt(process.env.CANARY_TIMEOUT_MS, 30000, "CANARY_TIMEOUT_MS");
 const CANARY_TESTS = [
   "testkit/opencode/tests/agent-dsl-canary.mjs",
   "testkit/opencode/tests/companion-canary.mjs",

@@ -12,7 +12,7 @@ function names(request) {
 let scenario;
 try {
   if (!runStaticGate([__filename]).passed) throw new Error('executor canary contains prohibited polling');
-  scenario = await setupScenario({ project: { files: { 'AGENTS.md': 'executor canary\n' } }, strict: true, watchdogMs: 30000 });
+  scenario = await setupScenario({ project: { files: { 'AGENTS.md': 'executor canary\n' } }, strict: true, watchdogMs: 1000 });
   scenario.provider.allowSyntheticContinuations();
   scenario.provider.allowTitleGeneration();
   scenario.provider.allowOutOfOrder();
@@ -59,7 +59,7 @@ try {
     },
   });
   assert.ok(prompt.ok, `inspector prompt failed: ${JSON.stringify(prompt.data)}`);
-  await turn.awaitTerminal({ timeoutMs: 60000, requireActivity: true, requireAssistantTerminal: true, requireIdleAfterActivity: true });
+  await turn.awaitTerminal({ timeoutMs: 1000, requireActivity: true, requireAssistantTerminal: true, requireIdleAfterActivity: true });
 
   const requests = scenario.provider.requests;
   const childRequests = requests.filter((request) =>

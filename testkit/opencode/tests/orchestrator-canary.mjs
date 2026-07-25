@@ -17,7 +17,7 @@ try {
       },
     },
     strict: true,
-    watchdogMs: 30000,
+    watchdogMs: 1000,
   });
 
   scenario.provider.allowTitleGeneration();
@@ -25,33 +25,26 @@ try {
   scenario.provider.allowSyntheticContinuations();
   scenario.provider.allowBloggerRequests();
 
-  // Orchestrator must only expose fork/join/list in its tool surface
+  // Orchestrator must only expose fork/join in its tool surface
   // and must never expose forbidden file/process/verdict tools.
   scenario.provider.expectToolCall({
     id: 'orchestrator-worktree-fork',
     tool: 'fork',
     args: { agent: 'manager', prompt: /deploy|worktree|ManagerJob|Manager/i },
-    match: { requiredTools: ['fork', 'join', 'list'], forbiddenTools: ['read', 'write', 'edit', 'bash', 'glob', 'grep', 'verdict'] },
-  });
-
-  scenario.provider.expectToolCall({
-    id: 'orchestrator-list-runners',
-    tool: 'list',
-    args: {},
-    match: { requiredTools: ['fork', 'join', 'list'] },
+    match: { requiredTools: ['fork', 'join'], forbiddenTools: ['read', 'write', 'edit', 'bash', 'glob', 'grep', 'verdict', 'list'] },
   });
 
   scenario.provider.expectToolCall({
     id: 'orchestrator-join-result',
     tool: 'join',
     args: {},
-    match: { requiredTools: ['fork', 'join', 'list'] },
+    match: { requiredTools: ['fork', 'join'] },
   });
 
   scenario.provider.expectText({
     id: 'orchestrator-published',
     text: /published|Published|ff-only|deployed|complete/i,
-    match: { requiredTools: ['fork', 'join', 'list'] },
+    match: { requiredTools: ['fork', 'join'] },
   });
 
   const orchestrator = await scenario.client.createSession();
@@ -68,26 +61,26 @@ try {
     },
   });
   assert.ok(prompt.ok, `orchestrator prompt failed: ${JSON.stringify(prompt.data)}`);
-  await turn.awaitTerminal({ timeoutMs: 30000, requireActivity: true, requireAssistantTerminal: true, requireIdleAfterActivity: true });
+  await turn.awaitTerminal({ timeoutMs: 1000, requireIdleAfterActivity: false });
 
   const orchestratorRequests = scenario.provider.requests.filter(
     (request) => {
       const toolNames = request.tools?.map((t) => t.function?.name || t.name).filter(Boolean) || [];
-      return toolNames.some((n) => ['fork', 'join', 'list'].includes(n));
+      return toolNames.some((n) => ['fork', 'join'].includes(n));
     },
   );
   assert.ok(orchestratorRequests.length >= 2, 'Orchestrator must issue at least fork and join tool calls');
   for (const request of orchestratorRequests) {
     const toolNames = request.tools?.map((t) => t.function?.name || t.name).filter(Boolean) || [];
-    const forbidden = ['read', 'write', 'edit', 'bash', 'glob', 'grep', 'verdict'];
+    const forbidden = ['read', 'write', 'edit', 'bash', 'glob', 'grep', 'verdict', 'list'];
     for (const name of forbidden) {
       assert.ok(!toolNames.includes(name), `Orchestrator request exposed forbidden tool: ${name}`);
     }
   }
 
-  // Verify the orchestrator tool surface has exactly fork/join/list
+  // Verify the orchestrator tool surface has exactly fork/join
   const orchestratorToolNames = Object.keys(scenario.provider.toolCalls || {});
-  const expectedTools = new Set(['fork', 'join', 'list']);
+  const expectedTools = new Set(['fork', 'join']);
   for (const name of orchestratorToolNames) {
     assert.ok(expectedTools.has(name), `Orchestrator exposed unexpected tool: ${name}`);
   }

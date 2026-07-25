@@ -88,6 +88,12 @@ async function canaryScenario(scenario) {
     match: { requiredTools: ['write'] },
   });
 
+  scenario.provider.expectText({
+    id: 'coder-finished',
+    text: 'Coder write complete.',
+    match: { requiredTools: ['write'] },
+  });
+
   scenario.provider.expectToolCall({
     id: 'manager-join-coder',
     tool: 'join',
@@ -133,7 +139,7 @@ async function canaryScenario(scenario) {
 
   // Event-driven wait: require activity + terminal idle state without fixed sleep
   await turn.awaitTerminal({
-    timeoutMs: 30000,
+    timeoutMs: 5000,
     requireActivity: true,
     requireAssistantTerminal: false,
     requireIdleAfterActivity: true,
@@ -167,7 +173,7 @@ async function canaryScenario(scenario) {
 }
 
 // 4. Single Isolated Execution Check
-console.log('3. Running single isolated scenario check...');
+console.log(`[${new Date().toISOString()}] 3. Running single isolated scenario check...`);
 const singleScenarioOpts = {
   project: {
     files: {
@@ -175,13 +181,17 @@ const singleScenarioOpts = {
     },
   },
   strict: true,
-  watchdogMs: 30000,
+  watchdogMs: 1000,
+  startTimeoutMs: 5000,
 };
 
 let scenario;
 try {
+  console.log(`[${new Date().toISOString()}] setupScenario starting...`);
   scenario = await setupScenario(singleScenarioOpts);
+  console.log(`[${new Date().toISOString()}] setupScenario complete. Starting canaryScenario...`);
   await canaryScenario(scenario);
+  console.log(`[${new Date().toISOString()}] canaryScenario complete.`);
   scenario.provider.expectSatisfied();
   await teardownScenario(scenario);
   console.log('  ✓ Single isolated scenario passed successfully\n');

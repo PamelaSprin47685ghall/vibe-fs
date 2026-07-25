@@ -125,6 +125,29 @@ export function createIsolatedEnv(opts) {
   }
   provisionPluginDependency(path.join(xdgConfig, 'opencode'));
 
+  const realCacheDir = process.env.XDG_CACHE_HOME || path.join(process.env.HOME || '', '.cache');
+  if (fs.existsSync(realCacheDir)) {
+    const src = path.join(realCacheDir, 'tree-sitter-language-pack');
+    const dest = path.join(xdgCache, 'tree-sitter-language-pack');
+    if (fs.existsSync(src) && !fs.existsSync(dest)) {
+      try { fs.symlinkSync(src, dest, 'dir'); } catch {}
+    }
+  }
+
+  const repoNodeModules = path.resolve(process.cwd(), 'node_modules');
+  if (fs.existsSync(repoNodeModules)) {
+    const destNodeModules = path.join(scenarioDir, 'node_modules');
+    if (!fs.existsSync(destNodeModules)) {
+      try { fs.symlinkSync(repoNodeModules, destNodeModules, 'dir'); } catch {}
+    }
+    const workDir = path.join(scenarioDir, 'workspace');
+    fs.mkdirSync(workDir, { recursive: true });
+    const workDirNodeModules = path.join(workDir, 'node_modules');
+    if (!fs.existsSync(workDirNodeModules)) {
+      try { fs.symlinkSync(repoNodeModules, workDirNodeModules, 'dir'); } catch {}
+    }
+  }
+
   const mockApiBase = llmUrl.replace(/\/v1$/, '') + '/api';
   const config = makeConfig(llmUrl, opts.pluginPaths, opts);
   const fixturePath = opts.mcpFixturePath || '';
@@ -148,6 +171,11 @@ export function createIsolatedEnv(opts) {
     TEMP: tmpDir,
 
     // OpenCode configuration
+    NO_PROXY: '*',
+    OPENCODE_OFFLINE: '1',
+    OPENCODE_TELEMETRY_DISABLED: '1',
+    CHECK_UPDATE: '0',
+    DISABLE_TELEMETRY: '1',
     OPENCODE_DISABLE_AUTOUPDATE: '1',
     OPENCODE_DISABLE_AUTOCOMPACT: '1',
     OPENCODE_DISABLE_MODELS_FETCH: '1',
@@ -162,6 +190,7 @@ export function createIsolatedEnv(opts) {
     OLLAMA_API_BASE: mockApiBase,
 
     // Prevent Bun/Node debug ports and heap profiling from leaking into spawned opencode
+    NODE_PATH: `${path.join(scenarioDir, 'node_modules')}${path.delimiter}${repoNodeModules}${path.delimiter}${extraEnv.NODE_PATH || process.env.NODE_PATH || ''}`,
     NODE_OPTIONS: '',
     BUN_OPTIONS: '',
 

@@ -14,4 +14,6 @@ module Plugin =
     let defaultExport =
         createObj
             [ "id", box "wanxiangshu-next"
-              "server", box (fun (input: obj) -> initPlugin input) ]
+              "server", box (fun (input: obj) -> initPlugin input)
+              "dispose", box (fun () -> PtySurface.killAllPtys ())
+              "unload", box (fun () -> PtySurface.killAllPtys ()) ]

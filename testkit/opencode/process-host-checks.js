@@ -5,21 +5,9 @@
  */
 
 import net from 'node:net';
+import { pidIsAlive } from '../process-lifecycle.js';
 
-const SOCKET_CHECK_TIMEOUT_MS = 2000;
-const PROCESS_TREE_TIMEOUT_MS = 2000;
-
-export function isPidAlive(pid) {
-  if (!pid) return false;
-  try {
-    process.kill(pid, 0);
-    return true;
-  } catch (err) {
-    if (err.code === 'ESRCH') return false;
-    if (err.code === 'EPERM') return true;
-    return false;
-  }
-}
+export const isPidAlive = pidIsAlive;
 
 export async function checkSocketClosed(port, timeoutMs = SOCKET_CHECK_TIMEOUT_MS) {
   if (!port) return true;

@@ -1,9 +1,8 @@
 /**
- * spawn-ledger.js — Append-only spawn registry, survives parent death.
+ * spawn-ledger.js — Append-only spawn registry + run-liveness marker.
  *
- * Every suite entry generates/inherits WANXIANG_RUN_ID; every spawn is
- * recorded with a /proc startTime fingerprint and an expiry. The reaper
- * (reaper.mjs) kills anything from dead runs at next startup.
+ * 每个套件根进程 import 本模块时写入 <runId>.run 存活标记（独占创建，
+ * 先到先得）。收割器据此判断台账属主是否活着：活着则不碰，死了才收。
  */
 
 import fs from "node:fs";
@@ -26,7 +25,19 @@ function ensureDir() {
   try { fs.mkdirSync(LEDGER_DIR, { recursive: true }); } catch {}
 }
 
-/** Call immediately after every spawn (worker, canary, opencode serve, sh -lc). */
+// 运行存活标记：wx 独占创建，同一 runId 下第一个 import 的进程（即套件根）获胜。
+// 后续同 runId 的 import 不覆盖——根进程的生死才是属主生死。
+try {
+  ensureDir();
+  const marker = {
+    pid: process.pid,
+    startTime: process.platform === "linux" ? procStartTime(process.pid) : null,
+    runId: RUN_ID,
+    startedAt: Date.now(),
+  };
+  fs.writeFileSync(path.join(LEDGER_DIR, `${RUN_ID}.run`), JSON.stringify(marker) + "\n", { flag: "wx" });
+} catch {}
+
 export function recordSpawn(pid, cmd, ttlMs = 30 * 60 * 1000) {
   if (!pid) return;
   ensureDir();
@@ -41,13 +52,8 @@ export function recordSpawn(pid, cmd, ttlMs = 30 * 60 * 1000) {
   try { fs.appendFileSync(LEDGER_FILE, JSON.stringify(entry) + "\n"); } catch {}
 }
 
-/** Call when a child is confirmed reaped; keeps ledgers small. */
 export function recordExit(pid) {
   if (!pid) return;
   ensureDir();
   try { fs.appendFileSync(LEDGER_FILE, JSON.stringify({ pid, runId: RUN_ID, exited: true }) + "\n"); } catch {}
-}
-
-export function ledgerFileFor(runId) {
-  return path.join(LEDGER_DIR, `${runId}.jsonl`);
 }

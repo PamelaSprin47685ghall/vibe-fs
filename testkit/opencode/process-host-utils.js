@@ -11,6 +11,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { getDescendantPids } from "./process-host-checks.js";
 import { terminateTree } from "../process-lifecycle.js";
+import { recordSpawn, recordExit } from "../spawn-ledger.js";
 
 export const OPENCODE_BIN = process.env.OPENCODE_BIN || "opencode";
 
@@ -109,11 +110,17 @@ export function spawnOpencodeServe(workDir, env, hooks) {
       detached: process.platform !== "win32",
     },
   );
-  if (child.pid) activeChildPids.add(child.pid);
+  if (child.pid) {
+    activeChildPids.add(child.pid);
+    recordSpawn(child.pid, `opencode serve ${workDir}`);
+  }
   child.stdout.on("data", (chunk) => hooks.onStdoutChunk(chunk.toString()));
   child.stderr.on("data", (chunk) => hooks.onStderrChunk(chunk.toString()));
   child.on("exit", (code, signal) => {
-    if (child.pid) activeChildPids.delete(child.pid);
+    if (child.pid) {
+      activeChildPids.delete(child.pid);
+      recordExit(child.pid);
+    }
     hooks.onExit(code, signal);
   });
   return child;
