@@ -101,7 +101,8 @@ module SpikePlugin =
                         sessionRoles,
                         verdictSessions,
                         nudgeSent,
-                        ?journal = journal
+                        ?journal = journal,
+                        ?gitTreePort = gitTreePort
                     )
 
                 let transform inObj outObj =
@@ -127,6 +128,16 @@ module SpikePlugin =
 
                     match projectionSessionIdOpt with
                     | Some projectionSessionId ->
+                        if
+                            not (isNull inObj)
+                            && not (isNull inObj?agent)
+                            && not (sessionRoles.ContainsKey projectionSessionId)
+                        then
+                            let requestedAgent = unbox<string> inObj?agent
+
+                            HostSessionContext.canonicalRole requestedAgent
+                            |> Option.iter (fun role -> sessionRoles.[projectionSessionId] <- role)
+
                         if not (isNull inObj) && isNull inObj?sessionID then
                             inObj?sessionID <- projectionSessionId
 
@@ -160,8 +171,10 @@ module SpikePlugin =
                           "experimental.chat.system.transform", box (systemTransformHook sessionBudgets)
                           "config", box (fun (config: obj) -> ManagerConfig.configureManager config) ]
 
-                observeEvent
-                |> Option.iter (fun observe -> hooks?event <- box (fun raw -> eventRouter.Observe(raw, observe)))
+                hooks?event <-
+                    box (fun raw ->
+                        eventRouter.Observe(raw, ignore)
+                        observeEvent |> Option.iter (fun observe -> observe raw))
 
                 let client = if isNull input then null else input?client
 

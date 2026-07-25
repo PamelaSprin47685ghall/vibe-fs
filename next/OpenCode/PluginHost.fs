@@ -76,7 +76,7 @@ module PluginHost =
 
                 let sessionPort = InjectedSessionPort(portOpt, eventPort) :> ISessionHostPort
 
-                Ok(eventPort, sessionPort, subscription, Some(fun raw -> hostEventPort.Observe raw))
+                Ok(eventPort, sessionPort, subscription, None)
         else
             let hostEventPort = Events.HostEventPort()
             let eventPort = hostEventPort :> IEventObservationPort

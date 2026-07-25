@@ -66,9 +66,13 @@
     <Compile Include="Session/AgentRoleHelpers.fs"/>
     <Compile Include="Session/HostForkRuntime.fs"/>
     <Compile Include="Session/CompanionHost.fs"/>
-    <Compile Include="OpenCode/CompanionTransform.fs"/>
     <Compile Include="OpenCode/HostSessionContext.fs"/>
+    <Compile Include="OpenCode/HostSessionNudge.fs"/>
+    <Compile Include="OpenCode/CompanionTransform.fs"/>
     <Compile Include="OpenCode/FallbackDetect.fs"/>
+    <Compile Include="OpenCode/AssistantParts.fs"/>
+    <Compile Include="OpenCode/AbortTracker.fs"/>
+    <Compile Include="OpenCode/HostReviewGuard.fs"/>
     <Compile Include="OpenCode/HostEventRouter.fs"/>
     <Compile Include="OpenCode/GitTree.fs"/>
     <Compile Include="OpenCode/ExecutorTool.fs"/>

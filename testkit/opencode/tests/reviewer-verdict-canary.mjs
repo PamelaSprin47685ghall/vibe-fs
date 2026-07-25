@@ -34,6 +34,18 @@ function reviewFacts(workDir) {
     .filter((fact) => JSON.stringify(fact).includes('ReviewVerdictRecorded'));
 }
 
+function guardFacts(workDir) {
+  const common = execFileSync('git', ['-C', workDir, 'rev-parse', '--git-common-dir'], { encoding: 'utf8' }).trim();
+  const runtimeDir = path.join(path.isAbsolute(common) ? common : path.resolve(workDir, common), 'wanxiangshu-next', 'runtimes');
+  if (!fs.existsSync(runtimeDir)) return [];
+  return fs.readdirSync(runtimeDir)
+    .filter((file) => file.endsWith('.ndjson'))
+    .flatMap((file) => fs.readFileSync(path.join(runtimeDir, file), 'utf8').split('\n'))
+    .filter(Boolean)
+    .map((line) => JSON.parse(line))
+    .filter((fact) => JSON.stringify(fact).includes('GuardPromptAccepted'));
+}
+
 function valuesOf(value, fieldName, values = []) {
   if (!value || typeof value !== 'object') return values;
   if (Array.isArray(value)) {
@@ -139,6 +151,115 @@ async function runScenario(scenario) {
   assert.ok(facts.every((fact) => JSON.stringify(fact).includes('Perfect')), 'both persisted facts must be PERFECT');
   assert.equal(new Set(valuesOf(facts, 'ToolCallId')).size, 2, 'two verdict facts require distinct tool call IDs');
   assert.equal(new Set(valuesOf(facts, 'GitTreeHash')).size, 1, 'double PERFECT must bind one tree hash');
+
+  scenario.provider.expectTitle({
+    id: 'guard-manager-title',
+    lane: expectationLane('reviewer-verdict', 'guard-manager-title', 'title', 1, 'title'),
+  });
+  scenario.provider.expectText({
+    id: 'guard-manager-first',
+    lane: expectationLane('reviewer-verdict', 'guard-manager', 'manager', 1),
+    text: 'Manager attempted completion without review.',
+    match: {
+      containsText: ['Attempt completion without review.'],
+      requiredTools: managerTools,
+      forbiddenTools: forbiddenManagerTools,
+    },
+  });
+  scenario.provider.expectText({
+    id: 'guard-manager-blogger',
+    lane: expectationLane('reviewer-verdict', 'guard-manager-blogger', 'blogger', 1, 'chat', 'guard-manager'),
+    blocking: false,
+    neverEnd: true,
+    text: 'Manager guard background remains busy.',
+    match: { containsText: [bloggerMarker, '"agent":"manager"'] },
+  });
+  scenario.provider.expectText({
+    id: 'guard-manager-nudged',
+    lane: expectationLane('reviewer-verdict', 'guard-manager', 'manager', 2),
+    blocking: false,
+    neverEnd: true,
+    text: 'Manager received the review guard.',
+    match: {
+      containsText: ['Review is required before completion.'],
+      requiredTools: managerTools,
+      forbiddenTools: forbiddenManagerTools,
+    },
+  });
+
+  const guardManager = await scenario.client.request('POST', '/api/session', {
+    body: { agent: 'manager', model: { providerID: 'test', id: 'test-model' } },
+  });
+  const guardManagerId = getSessionId(guardManager);
+  assert.ok(guardManagerId, `guard manager creation failed: ${JSON.stringify(guardManager)}`);
+  scenario.sessionIds.push(guardManagerId);
+  bindLaneSession(scenario.provider, guardManagerId, 'guard-manager-title', 'guard-manager');
+
+  const guardTurn = scenario.turn.start(guardManagerId);
+  const guardPrompt = await scenario.client.request('POST', `/session/${guardManagerId}/prompt_async`, {
+    body: {
+      agent: 'manager',
+      parts: [{ type: 'text', text: 'Attempt completion without review.' }],
+      model: { providerID: 'test', modelID: 'test-model' },
+    },
+  });
+  assert.ok(guardPrompt.ok, `guard manager prompt failed: ${JSON.stringify(guardPrompt.data)}`);
+  await guardTurn.awaitTerminal({ timeoutMs: 1000, requireActivity: true, requireAssistantTerminal: true, requireIdleAfterActivity: true });
+  scenario.watchdog?.advance({
+    reason: 'manager-review-guard-terminal',
+    lane: `session:${guardManagerId}`,
+    blocking: true,
+  });
+  await scenario.provider.waitForExpectation('guard-manager-nudged', 1000);
+  await scenario.provider.waitForExpectation('guard-manager-blogger', 1000);
+  const guards = guardFacts(scenario.host.workDir);
+  assert.equal(guards.length, 1, `missing durable Manager guard acceptance: ${JSON.stringify(guards)}`);
+
+  scenario.provider.expectTitle({
+    id: 'reviewer-nudge-title',
+    lane: expectationLane('reviewer-verdict', 'reviewer-nudge-title', 'title', 1, 'title'),
+  });
+  scenario.provider.expectText({
+    id: 'reviewer-without-verdict',
+    lane: expectationLane('reviewer-verdict', 'reviewer-nudge', 'reviewer', 1),
+    text: 'I reviewed the tree but omitted the structured verdict.',
+    match: { requiredTools: ['verdict'] },
+  });
+  scenario.provider.expectText({
+    id: 'reviewer-nudged',
+    lane: expectationLane('reviewer-verdict', 'reviewer-nudge', 'reviewer', 2),
+    neverEnd: true,
+    text: 'The structured verdict prompt was received.',
+    match: {
+      containsText: ['Submit a structured verdict with the verdict tool'],
+      requiredTools: ['verdict'],
+    },
+  });
+
+  const nudgeReviewer = await scenario.client.request('POST', '/api/session', {
+    body: { agent: 'reviewer', model: { providerID: 'test', id: 'test-model' } },
+  });
+  const nudgeReviewerId = getSessionId(nudgeReviewer);
+  assert.ok(nudgeReviewerId, `nudge reviewer creation failed: ${JSON.stringify(nudgeReviewer)}`);
+  scenario.sessionIds.push(nudgeReviewerId);
+  bindLaneSession(scenario.provider, nudgeReviewerId, 'reviewer-nudge-title', 'reviewer-nudge');
+
+  const nudgeTurn = scenario.turn.start(nudgeReviewerId);
+  const nudgePrompt = await scenario.client.request('POST', `/session/${nudgeReviewerId}/prompt_async`, {
+    body: {
+      agent: 'reviewer',
+      parts: [{ type: 'text', text: 'Review the tree but do not submit a verdict.' }],
+      model: { providerID: 'test', modelID: 'test-model' },
+    },
+  });
+  assert.ok(nudgePrompt.ok, `reviewer nudge prompt failed: ${JSON.stringify(nudgePrompt.data)}`);
+  await nudgeTurn.awaitTerminal({ timeoutMs: 1000, requireActivity: true, requireAssistantTerminal: true, requireIdleAfterActivity: true });
+  scenario.watchdog?.advance({
+    reason: 'reviewer-terminal-without-verdict',
+    lane: `session:${nudgeReviewerId}`,
+    blocking: true,
+  });
+  await scenario.provider.waitForExpectation('reviewer-nudged', 1000);
 }
 
 if (!runStaticGate([__filename]).passed) {
@@ -155,10 +276,18 @@ try {
   await runScenario(scenario);
   scenario.provider.expectSatisfied();
   await teardownScenario(scenario);
-  console.log('Reviewer verdict canary passed: Manager fork/join, two persisted PERFECT facts, and one Git tree hash.');
+  console.log('Reviewer verdict canary passed: double PERFECT and durable Manager ReviewGuard nudge.');
 } catch (error) {
   console.error(`Reviewer verdict canary failed: ${error.stack || error}`);
   if (scenario?.provider?.unexpectedRequests) console.error(JSON.stringify(scenario.provider.unexpectedRequests));
+  if (scenario?.events?.allEvents) {
+    console.error(JSON.stringify(scenario.events.allEvents.slice(-30).map((event) => ({
+      type: event.type,
+      sessionID: event.sessionID,
+      sessionAgent: event.sessionAgent,
+      properties: event.properties,
+    })), null, 2));
+  }
   if (scenario) {
     try { await teardownScenario(scenario, { keepOnFailure: true }); } catch {}
   }

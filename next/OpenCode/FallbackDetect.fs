@@ -80,7 +80,7 @@ module FallbackDetect =
                        || s = "step-start"
                        || s = "step-finish")
 
-    let isFailedAssistant (msg: obj) : bool =
+    let isTerminalAssistant (msg: obj) : bool =
         if isNull msg then
             false
         else
@@ -96,26 +96,26 @@ module FallbackDetect =
                 else
                     ""
 
-            if finish <> "stop" then
-                false
-            else
-                let role =
-                    if not (isNull info) && not (isNull info?role) then
-                        unbox<string> info?role
-                    elif not (isNull msg?role) then
-                        unbox<string> msg?role
-                    else
-                        ""
-
-                if role <> "assistant" then
-                    false
+            let role =
+                if not (isNull info) && not (isNull info?role) then
+                    unbox<string> info?role
+                elif not (isNull msg?role) then
+                    unbox<string> msg?role
                 else
-                    let text = partsText msg
+                    ""
 
-                    if String.IsNullOrWhiteSpace text && not (hasToolCallPart msg) then
-                        true
-                    else
-                        xmlTag.IsMatch text && not (hasToolCallPart msg)
+            finish = "stop" && role = "assistant"
+
+    let isFailedAssistant (msg: obj) : bool =
+        if not (isTerminalAssistant msg) then
+            false
+        else
+            let text = partsText msg
+
+            if String.IsNullOrWhiteSpace text && not (hasToolCallPart msg) then
+                true
+            else
+                xmlTag.IsMatch text && not (hasToolCallPart msg)
 
     let messageId (msg: obj) : string =
         let info = msg?info

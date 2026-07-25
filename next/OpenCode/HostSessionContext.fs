@@ -9,7 +9,9 @@ module HostSessionContext =
 
     let roleOf (agent: string) =
         match if isNull agent then "" else agent.Trim().ToLowerInvariant() with
-        | "manager" -> Some AgentRole.Manager
+        | "manager"
+        | "build"
+        | "plan" -> Some AgentRole.Manager
         | "orchestrator" -> Some AgentRole.Orchestrator
         | "coder" -> Some AgentRole.Coder
         | "inspector" -> Some AgentRole.Inspector
@@ -19,6 +21,9 @@ module HostSessionContext =
         | "advisor" -> Some AgentRole.Advisor
         | "executor" -> Some AgentRole.Executor
         | _ -> None
+
+    let canonicalRole (agent: string) =
+        roleOf agent |> Option.map (fun role -> role.ToString().ToLowerInvariant())
 
     let read raw =
         let event = if isNull raw || isNull raw?event then raw else raw?event

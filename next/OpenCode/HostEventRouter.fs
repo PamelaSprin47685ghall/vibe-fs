@@ -18,6 +18,7 @@ type HostEventRouter
         verdictSessions: HashSet<string>,
         nudgeSent: HashSet<string>,
         ?journal: AgentJournal,
+        ?gitTreePort: GitTreePort,
         ?recordedErrors: HashSet<string>
     ) =
 
@@ -25,8 +26,9 @@ type HostEventRouter
     let ZWSP = "​"
 
     let lastAssistantMsgs = Dictionary<string, obj>()
-    let assistantParts = Dictionary<string, Dictionary<string, obj>>()
+    let assistantParts = AssistantParts()
     let fallbackFailures = defaultArg recordedErrors (HashSet<string>())
+    let abortedSessions = AbortTracker()
 
     let rawEvent (raw: obj) =
         if isNull raw || isNull raw?event then raw else raw?event
@@ -140,15 +142,19 @@ type HostEventRouter
                     AgentJournal.appendAgent (StreamId.Session(SessionId.create sessionId)) None fact journal
                     |> ignore
 
-    let nudgeReviewer sessionId =
-        if nudgeSent.Add sessionId then
-            sessionPort.SendPrompt(
-                SessionId.create sessionId,
-                "Submit a structured verdict with the verdict tool: PERFECT or REVISE. Do not put a verdict in prose.",
+    let nudgeReviewer sessionId messageId =
+        let key = $"reviewer:{sessionId}:{messageId}"
+
+        if nudgeSent.Add key then
+            HostSessionNudge.send
+                sessionPort
+                (SessionId.create sessionId)
+                "Submit a structured verdict with the verdict tool: PERFECT or REVISE. Do not put a verdict in prose."
                 { Model = None
                   Agent = Some "reviewer" }
-            )
-            |> ignore
+                ignore
+
+    let managerGuardNudges = HashSet<string>()
 
     let nudgedMessages = HashSet<string>()
     let nudgeCounts = Dictionary<string, int>()
@@ -164,46 +170,21 @@ type HostEventRouter
             if count < maxNudgesPerSession then
                 nudgeCounts.[sessionId] <- count + 1
 
-                sessionPort.SendPrompt(SessionId.create sessionId, ZWSP, { Model = None; Agent = None })
-                |> ignore
+                HostSessionNudge.send
+                    sessionPort
+                    (SessionId.create sessionId)
+                    ZWSP
+                    { Model = None; Agent = None }
+                    ignore
 
-    let getPartsArray (msg: obj) : obj array option =
-        if isNull msg then
-            None
-        elif not (isNull msg?parts) then
-            Some(unbox<obj array> msg?parts)
-        elif not (isNull msg?properties) && not (isNull msg?properties?parts) then
-            Some(unbox<obj array> msg?properties?parts)
-        else
-            None
-
-    let recordAssistantPart props =
-        let part = if isNull props then null else props?part
-
-        if not (isNull part) && not (isNull part?messageID) then
-            let messageId = unbox<string> part?messageID
-
-            let partId =
-                if isNull part?id then
-                    Guid.NewGuid().ToString("N")
-                else
-                    unbox<string> part?id
-
-            let parts =
-                match assistantParts.TryGetValue messageId with
-                | true, existing -> existing
-                | false, _ ->
-                    let created = Dictionary<string, obj>()
-                    assistantParts.[messageId] <- created
-                    created
-
-            parts.[partId] <- part
-
-    let hydrateAssistantParts messageId lastMsg =
-        match assistantParts.TryGetValue messageId with
-        | true, parts when parts.Count > 0 ->
-            createObj [ "info", box lastMsg?info; "parts", box (parts.Values |> Seq.toArray) ]
-        | _ -> lastMsg
+    let terminalRole sessionId =
+        match lastAssistantMsgs.TryGetValue sessionId with
+        | true, message when not (isNull message?info) && not (isNull message?info?agent) ->
+            HostSessionContext.canonicalRole (unbox<string> message?info?agent)
+        | _ ->
+            match sessionRoles.TryGetValue sessionId with
+            | true, role -> Some role
+            | false, _ -> None
 
     member _.Observe(raw: obj, forward: obj -> unit) =
         let sessionId, role = HostSessionContext.read raw
@@ -212,7 +193,7 @@ type HostEventRouter
             // Event info.agent is the *resolved* OpenCode agent; a fallback
             // (build/plan/title) must never clobber a known DSL role.
             role
-            |> Option.filter (fun value -> HostSessionContext.roleOf value |> Option.isSome)
+            |> Option.bind HostSessionContext.canonicalRole
             |> Option.iter (fun value -> sessionRoles.[sessionId] <- value)
 
             rawParentSessionId raw
@@ -225,7 +206,7 @@ type HostEventRouter
             let msg = if isNull props then null else props?message
             let target = if isNull msg then props else msg
 
-            recordAssistantPart props
+            assistantParts.Record props
 
             if not (isNull target) then
                 let info = target?info
@@ -242,34 +223,63 @@ type HostEventRouter
                     lastAssistantMsgs.[sessionId] <- target
 
             if isAbortError raw then
+                abortedSessions.Mark sessionId
                 abortChildren sessionId
             elif eventType raw = "session.error" then
                 recordProviderError sessionId raw
             elif eventType raw = "session.status" then
                 recordRetryFailure sessionId raw
 
+            abortedSessions.Observe(raw, sessionId)
+
             if isTerminalEvent raw then
                 if eventType raw = "session.aborted" then
+                    abortedSessions.Mark sessionId
                     abortChildren sessionId
 
-                match sessionRoles.TryGetValue sessionId with
-                | true, agent when
-                    agent.Equals("reviewer", StringComparison.OrdinalIgnoreCase)
-                    && not (verdictSessions.Contains sessionId)
-                    ->
-                    nudgeReviewer sessionId
-                | _ -> ()
+                let aborted = abortedSessions.Contains sessionId
 
-                match lastAssistantMsgs.TryGetValue sessionId with
-                | true, lastMsg ->
-                    let messageId = FallbackDetect.messageId lastMsg
-                    let completeMsg = hydrateAssistantParts messageId lastMsg
-                    assistantParts.Remove messageId |> ignore
+                let terminalMessageId =
+                    match lastAssistantMsgs.TryGetValue sessionId with
+                    | true, lastMsg -> FallbackDetect.messageId lastMsg
+                    | false, _ -> "terminal"
 
-                    FallbackDetect.observeIdle journal fallbackFailures sessionId completeMsg
+                let completedAssistant =
+                    match lastAssistantMsgs.TryGetValue sessionId with
+                    | true, lastMsg -> Some(assistantParts.Hydrate(terminalMessageId, lastMsg))
+                    | false, _ -> None
 
-                    if FallbackDetect.isFailedAssistant completeMsg then
-                        nudgeContinue sessionId messageId
-                | false, _ -> ()
+                let hasTerminalAssistant =
+                    completedAssistant |> Option.exists FallbackDetect.isTerminalAssistant
+
+                if not aborted then
+                    match terminalRole sessionId with
+                    | Some agent when
+                        agent.Equals("reviewer", StringComparison.OrdinalIgnoreCase)
+                        && not (verdictSessions.Remove sessionId)
+                        ->
+                        nudgeReviewer sessionId terminalMessageId
+                    | Some agent when agent.Equals("manager", StringComparison.OrdinalIgnoreCase) ->
+                        HostReviewGuard.missingTree journal gitTreePort sessionId
+                        |> Option.iter (
+                            HostReviewGuard.nudgeManager
+                                sessionPort
+                                journal
+                                managerGuardNudges
+                                sessionId
+                                terminalMessageId
+                        )
+                    | _ -> ()
+
+                    match completedAssistant with
+                    | Some completeMsg when hasTerminalAssistant ->
+                        FallbackDetect.observeIdle journal fallbackFailures sessionId completeMsg
+
+                        if FallbackDetect.isFailedAssistant completeMsg then
+                            nudgeContinue sessionId terminalMessageId
+                    | _ -> ()
+
+                completedAssistant
+                |> Option.iter (fun _ -> assistantParts.Remove terminalMessageId)
 
         forward raw

@@ -107,6 +107,21 @@ try {
   });
   assert.ok(prompt.ok, `manager prompt failed: ${JSON.stringify(prompt.data)}`);
 
+  await scenario.provider.waitForExpectation('manager-fork', 1000);
+  scenario.watchdog?.advance({ reason: 'manager-fork-coder', lane: 'manager', blocking: true });
+
+  const childCreated = await scenario.events.awaitEvent(
+    (event) => event.type === 'session.created'
+      && event.parentSessionID === parentId
+      && event.sessionAgent === 'coder',
+    1000,
+  );
+  const childId = childCreated.sessionID;
+  assert.ok(childId, `coder child creation lacked a session ID: ${JSON.stringify(childCreated)}`);
+  scenario.sessionIds.push(childId);
+  bindLaneSession(scenario.provider, childId, 'coder');
+  scenario.watchdog?.advance({ reason: 'coder-child-created', lane: `session:${childId}`, blocking: true });
+
   await Promise.all([
     scenario.provider.waitForExpectation('child-long', 1000),
     scenario.provider.waitForExpectation('manager-long', 1000),
@@ -114,9 +129,8 @@ try {
   assert.equal(scenario.provider.activeRequestCount, 2, 'manager and child streams must both hang');
 
   const children = await scenario.client.request('GET', `/session/${parentId}/children`);
-  const childId = getSessionId(childrenOf(children)[0]) || journalValue(scenario.host.workDir, 'ChildId');
-  assert.ok(childId, `child session was not recoverable: ${JSON.stringify(children.data)}`);
-  scenario.sessionIds.push(childId);
+  const discoveredChildId = getSessionId(childrenOf(children)[0]) || journalValue(scenario.host.workDir, 'ChildId');
+  assert.equal(discoveredChildId, childId, `child session was not recoverable: ${JSON.stringify(children.data)}`);
 
   const watermark = scenario.events.lastSeq;
   const abort = await scenario.client.abort(parentId);
