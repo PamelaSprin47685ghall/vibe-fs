@@ -158,9 +158,7 @@ module SpikePlugin =
                           "chat.transform", box (uncurriedExecute (box transform))
                           "experimental.chat.messages.transform", box (uncurriedExecute (box transform))
                           "experimental.chat.system.transform", box (systemTransformHook sessionBudgets)
-                          "config", box (fun (config: obj) -> ManagerConfig.configureManager config)
-                          "dispose", box (fun () -> PtySurface.killAllPtys ())
-                          "unload", box (fun () -> PtySurface.killAllPtys ()) ]
+                          "config", box (fun (config: obj) -> ManagerConfig.configureManager config) ]
 
                 observeEvent
                 |> Option.iter (fun observe -> hooks?event <- box (fun raw -> eventRouter.Observe(raw, observe)))

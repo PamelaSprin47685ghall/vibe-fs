@@ -32,21 +32,6 @@ module RunnerCore =
     [<Emit("((child) => { try { if (child && child.stdin) child.stdin.end(); } catch (_) {} return undefined; })($0)")>]
     let private closeStdin (child: obj) : unit = jsNative
 
-    let private activeChildrenJs: obj = emitJsExpr () "new Set()"
-
-    let killAllActive () : unit =
-        emitJsExpr
-            activeChildrenJs
-            """
-            for (const c of $0) {
-                try { process.kill(-c.pid, 'SIGKILL'); } catch (_) {}
-                try { c.kill('SIGKILL'); } catch (_) {}
-            }
-            $0.clear();
-        """
-        |> ignore
-
-
     let execute
         (cmd: Command)
         (estimate: ProcessEstimate)
@@ -109,13 +94,6 @@ module RunnerCore =
                         if isNull child then
                             return Error(RunnerError.SpawnFailed("Failed to spawn process: " + cmd.FileName))
                         else
-                            emitJsExpr (activeChildrenJs, child) "if ($1 && $1.pid) $0.add($1);" |> ignore
-
-                            emitJsExpr
-                                (child, cmd.FileName)
-                                """if ($0 && $0.pid) { Promise.all([import('node:fs'), import('node:os'), import('node:path')]).then(function(mods) { try { var _fs = mods[0].default || mods[0], _os = mods[1].default || mods[1], _path = mods[2].default || mods[2]; var dir = _path.join(_os.tmpdir(), 'wanxiang-ledger'); try { _fs.mkdirSync(dir, { recursive: true }); } catch (_) {} var runId = (typeof process !== 'undefined' && process.env && process.env.WANXIANG_RUN_ID) ? process.env.WANXIANG_RUN_ID : (Date.now() + '-' + process.pid + '-plugin'); var startTime = null; if (process.platform === 'linux') { try { var raw = _fs.readFileSync('/proc/' + $0.pid + '/stat', 'utf8'); var rest = raw.slice(raw.lastIndexOf(')') + 2).split(' '); startTime = rest[19]; } catch (_) {} } var file = _path.join(dir, runId + '.jsonl'); var entry = JSON.stringify({ pid: $0.pid, pgid: $0.pid, startTime: startTime, cmd: String($1).slice(0, 300), runId: runId, expiresAt: Date.now() + 1800000 }) + '\n'; _fs.appendFileSync(file, entry); $0.on('close', function() { try { _fs.appendFileSync(file, JSON.stringify({ pid: $0.pid, runId: runId, exited: true }) + '\n'); } catch (_) {} }); } catch (_) {} }).catch(function() {}); }"""
-                            |> ignore
-
                             let stdoutChunks = ResizeArray<byte[]>()
                             let stderrChunks = ResizeArray<byte[]>()
                             let combinedChunks = ResizeArray<byte[]>()
@@ -214,12 +192,10 @@ module RunnerCore =
                             emitJsExpr
                                 (child,
                                  (fun code ->
-                                     emitJsExpr (activeChildrenJs, child) "$0.delete($1)" |> ignore
                                      exitCode <- code
                                      childClosed <- true
                                      tryFinish ()),
                                  (fun _err ->
-                                     emitJsExpr (activeChildrenJs, child) "$0.delete($1)" |> ignore
                                      exitCode <- -1
                                      childClosed <- true
                                      tryFinish ()))

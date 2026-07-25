@@ -15,12 +15,6 @@ module GitTree =
     [<Import("readFileSync", "node:fs")>]
     let private readFileSync (path: string) (encoding: string) : string = jsNative
 
-    [<Import("statSync", "node:fs")>]
-    let private statSync (path: string) : obj = jsNative
-
-    [<Emit("$0.isFile()")>]
-    let private isFile (stat: obj) : bool = jsNative
-
     [<Import("createHash", "node:crypto")>]
     let private createHash (algorithm: string) : obj = jsNative
 
@@ -42,19 +36,9 @@ module GitTree =
         let files =
             untracked.Split([| '\n'; '\r' |], StringSplitOptions.RemoveEmptyEntries)
             |> Array.sort
-            |> Array.choose (fun path ->
-                let fullPath = joinPath directory path
-
-                try
-                    let st = statSync fullPath
-
-                    if isFile st then
-                        let content = readFileSync fullPath "utf8"
-                        Some(sprintf "\n--UNTRACKED %s--\n%s" path content)
-                    else
-                        None
-                with _ ->
-                    None)
+            |> Array.map (fun path ->
+                let content = readFileSync (joinPath directory path) "utf8"
+                sprintf "\n--UNTRACKED %s--\n%s" path content)
             |> String.concat ""
 
         diff + files
