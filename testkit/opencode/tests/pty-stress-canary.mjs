@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { fileURLToPath } from 'node:url';
 import { runStaticGate, setupScenario, teardownScenario, getSessionId } from '../index.js';
+import { expectationLane } from './lane.mjs';
 
 const __filename = fileURLToPath(import.meta.url);
 
@@ -16,13 +17,12 @@ try {
   });
 
   scenario.provider.allowTitleGeneration();
-  scenario.provider.allowOutOfOrder();
   scenario.provider.allowSyntheticContinuations();
-  scenario.provider.allowBloggerRequests();
 
   // Inspector uses executor tool with bounded PTY-style budget.
   scenario.provider.expectToolCall({
     id: 'inspector-exec-pty',
+    lane: expectationLane('pty-stress', 'inspector', 'inspector', 1),
     tool: 'executor',
     args: {
       command: /sh -c|pty|stress|chunk/i,
@@ -35,6 +35,7 @@ try {
 
   scenario.provider.expectText({
     id: 'inspector-pty-done',
+    lane: expectationLane('pty-stress', 'inspector', 'inspector', 2),
     text: /completed|done|ok/i,
     match: { requiredTools: ['executor'] },
   });

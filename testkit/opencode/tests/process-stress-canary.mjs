@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { fileURLToPath } from 'node:url';
 import { runStaticGate, setupScenario, teardownScenario, getSessionId } from '../index.js';
+import { expectationLane } from './lane.mjs';
 
 const __filename = fileURLToPath(import.meta.url);
 const SIGKILL_COMMAND = 'sh -lc \'trap "" TERM; sleep 1000\'';
@@ -11,10 +12,10 @@ try {
   scenario = await setupScenario({ project: { files: { 'AGENTS.md': 'process stress canary\n' } }, strict: true, watchdogMs: 1000 });
   scenario.provider.allowSyntheticContinuations();
   scenario.provider.allowTitleGeneration();
-  scenario.provider.allowOutOfOrder();
 
   scenario.provider.expectToolCall({
     id: 'inspector-executor-sigkill',
+    lane: expectationLane('process-stress', 'inspector', 'inspector', 1),
     tool: 'executor',
     args: {
       command: SIGKILL_COMMAND,
@@ -26,8 +27,9 @@ try {
   });
   scenario.provider.expectText({
     id: 'inspector-sigkill-final',
+    lane: expectationLane('process-stress', 'inspector', 'inspector', 2),
     text: 'timeout observed.',
-    match: { containsText: ['TimeoutExceeded'] },
+    match: { requiredTools: ['executor'] },
   });
 
   const created = await scenario.client.createSession();

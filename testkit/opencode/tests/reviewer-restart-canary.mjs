@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { fileURLToPath } from 'node:url';
 import { runStaticGate, setupScenario, teardownScenario, getSessionId } from '../index.js';
+import { expectationLane } from './lane.mjs';
 
 const __filename = fileURLToPath(import.meta.url);
 
@@ -27,14 +28,13 @@ try {
   });
 
   scenario.provider.allowTitleGeneration();
-  scenario.provider.allowOutOfOrder();
   scenario.provider.allowSyntheticContinuations();
-  scenario.provider.allowBloggerRequests();
 
   // Create a manager session first (parent), then fork a reviewer child.
   // After restart, the reviewer child keeps its coder-style tool surface.
   scenario.provider.expectToolCall({
     id: 'review-perfect-first',
+    lane: expectationLane('reviewer-restart', 'reviewer', 'reviewer', 1),
     tool: 'verdict',
     args: { verdict: 'PERFECT' },
     match: { requiredTools: ['verdict'] },
@@ -42,6 +42,7 @@ try {
 
   scenario.provider.expectText({
     id: 'reviewer-first-turn',
+    lane: expectationLane('reviewer-restart', 'reviewer', 'reviewer', 2),
     text: 'NEEDS_REVIEW',
     match: { requiredTools: ['verdict'] },
   });
@@ -96,6 +97,7 @@ try {
   // After restart, reviewer nudge must still use verdict tool, not read/write/edit.
   scenario.provider.expectToolCall({
     id: 'review-perfect-restart',
+    lane: expectationLane('reviewer-restart', 'reviewer', 'reviewer', 3),
     tool: 'verdict',
     args: { verdict: 'PERFECT' },
     match: { requiredTools: ['verdict'] },
@@ -103,6 +105,7 @@ try {
 
   scenario.provider.expectText({
     id: 'reviewer-restart-done',
+    lane: expectationLane('reviewer-restart', 'reviewer', 'reviewer', 4),
     text: 'CONFIRMED',
     match: { requiredTools: ['verdict'] },
   });
