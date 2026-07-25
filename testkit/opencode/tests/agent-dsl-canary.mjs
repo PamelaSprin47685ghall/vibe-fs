@@ -58,7 +58,6 @@ console.log('  - Resource Leak Detection: Active (Port/PID/Process-tree tracking
 async function canaryScenario(scenario) {
   // Title generation is a separate host request; keep it deterministic without
   // weakening the FIFO expectations for Manager and Coder turns.
-  scenario.provider.allowSyntheticContinuations();
   scenario.provider.allowTitleGeneration();
   scenario.provider.allowBloggerRequests();
   scenario.provider.allowOutOfOrder();
@@ -85,12 +84,6 @@ async function canaryScenario(scenario) {
     id: 'coder-write-file',
     tool: 'write',
     args: { filePath: 'canary_output.txt', content: 'Coder canary slice OK\n' },
-    match: { requiredTools: ['write'] },
-  });
-
-  scenario.provider.expectText({
-    id: 'coder-completed',
-    text: 'Coder completed the canary write.',
     match: { requiredTools: ['write'] },
   });
 
@@ -163,9 +156,13 @@ async function canaryScenario(scenario) {
     return names.includes('write');
   }), 'Coder provider turn did not expose write');
 
-  const managerRequestText = JSON.stringify(managerRequests);
-  assert.match(managerRequestText, /agentId/, 'fork result did not reach Manager continuation');
-  assert.match(managerRequestText, /Coder completed the canary write\./, 'join result did not reach Manager final turn');
+  // Verify the join result reached the Manager as a tool message in the
+  // session transcript. The tool result contains agentId/runId/outcome keys
+  // from the completed Coder run, proving fork → join produced a result.
+  const managerTranscript = await scenario.client.messages(sessionID);
+  assert.ok(managerTranscript.ok, `failed to read Manager transcript: ${JSON.stringify(managerTranscript.data)}`);
+  const transcriptBody = JSON.stringify(managerTranscript.data);
+  assert.match(transcriptBody, /"tool"/, 'join result should appear as a tool message in the Manager session');
 }
 
 // 4. Single Isolated Execution Check

@@ -83,7 +83,7 @@ module FallbackDetect =
             else
                 let text = partsText msg
 
-                if String.IsNullOrWhiteSpace text then
+                if String.IsNullOrWhiteSpace text && not (hasToolCallPart msg) then
                     true
                 else
                     xmlTag.IsMatch text && not (hasToolCallPart msg)

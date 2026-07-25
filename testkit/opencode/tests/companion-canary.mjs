@@ -56,6 +56,7 @@ async function assertBloggerTranscript(scenario, childId) {
 }
 
 async function runProjectionScenario(scenario) {
+  scenario.provider.allowSyntheticContinuations();
   scenario.provider.allowTitleGeneration();
   scenario.provider.allowOutOfOrder();
 
