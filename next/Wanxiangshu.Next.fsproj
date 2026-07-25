@@ -72,6 +72,7 @@
     <Compile Include="OpenCode/GitTree.fs"/>
     <Compile Include="OpenCode/ExecutorTool.fs"/>
     <Compile Include="OpenCode/PtySurface.fs"/>
+    <Compile Include="OpenCode/VerdictSurface.fs"/>
     <Compile Include="OpenCode/ToolSurface.fs"/>
     <Compile Include="OpenCode/PluginHost.fs"/>
     <Compile Include="OpenCode/ManagerConfig.fs"/>
