@@ -168,7 +168,32 @@ async function runSessionBoundLanes() {
   }
 }
 
+async function runSyntheticSessionLane() {
+  const provider = new StrictMockProvider();
+  await provider.start();
+  try {
+    provider.bindSession('inspector', 'inspector-1');
+    provider.expectText({
+      id: 'inspector-zwsp',
+      lane: { ...lane('synthetic', 1, 'inspector'), requestKind: 'synthetic' },
+      text: 'continued',
+      match: { containsText: ['\u200B'] },
+    });
+
+    const response = await postJson(
+      `${provider.url}/v1/chat/completions`,
+      chat('\u200B', ['executor']),
+      { 'x-session-affinity': 'inspector-1' },
+    );
+    assertTrue(response.ok, 'session-bound zero-width request must consume its explicit synthetic lane');
+    provider.expectSatisfied();
+  } finally {
+    await provider.stop();
+  }
+}
+
 export const laneCases = [
   { name: 'strict mock lanes and unexpected requests', fn: runStrictMockLanes },
   { name: 'session-bound lanes and causal successors', fn: runSessionBoundLanes },
+  { name: 'session-bound synthetic continuation lane', fn: runSyntheticSessionLane },
 ];

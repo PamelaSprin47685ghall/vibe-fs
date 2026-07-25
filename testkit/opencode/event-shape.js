@@ -14,6 +14,15 @@ function pickSessionID(parsed) {
     || parsed?.sessionId;
 }
 
+function pickParentSessionID(parsed) {
+  return parsed?.properties?.info?.parentID
+    || parsed?.properties?.info?.parentId;
+}
+
+function pickSessionAgent(parsed) {
+  return parsed?.properties?.info?.agent;
+}
+
 function pickMessageID(parsed) {
   return parsed?.properties?.messageID;
 }
@@ -53,6 +62,18 @@ function pickStatus(parsed) {
   return s;
 }
 
+function pickToolName(parsed) {
+  return parsed?.properties?.part?.type === 'tool'
+    ? parsed.properties.part.tool
+    : undefined;
+}
+
+function pickToolStatus(parsed) {
+  return parsed?.properties?.part?.type === 'tool'
+    ? parsed.properties.part.state?.status
+    : undefined;
+}
+
 /**
  * Map a parsed SSE JSON payload to the internal eventObj shape used by
  * EventProbe. If `parsed.type` is missing, mark type as 'unknown' and stash
@@ -64,6 +85,8 @@ export function shapeFromParsed(parsed) {
       type: parsed.type,
       properties: parsed.properties || {},
       sessionID: pickSessionID(parsed),
+      parentSessionID: pickParentSessionID(parsed),
+      sessionAgent: pickSessionAgent(parsed),
       messageID: pickMessageID(parsed),
       partID: pickPartID(parsed),
       toolCallID: pickToolCallID(parsed),
@@ -71,6 +94,8 @@ export function shapeFromParsed(parsed) {
       errorName: pickErrorName(parsed),
       finishReason: pickFinishReason(parsed),
       status: pickStatus(parsed),
+      toolName: pickToolName(parsed),
+      toolStatus: pickToolStatus(parsed),
     };
   }
   return {

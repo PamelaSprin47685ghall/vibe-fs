@@ -55,6 +55,7 @@ async function nudge(parentId, childId, agentId, marker, managerMarker, scenario
     id: 'manager-blogger-2',
     lane: expectationLane('host-restart', 'manager-blogger-restarted', 'blogger', 1, 'chat', 'manager'),
     blocking: false,
+    neverEnd: true,
     text: 'Manager restart background.',
     match: { containsText: ['You are the blogger of a coding agent session.', '"agent":"manager"'] },
   });
@@ -68,6 +69,7 @@ async function nudge(parentId, childId, agentId, marker, managerMarker, scenario
     id: 'coder-blogger-2',
     lane: expectationLane('host-restart', 'coder-blogger-restarted', 'blogger', 1, 'chat', 'coder'),
     blocking: false,
+    neverEnd: true,
     text: 'Coder restart background.',
     match: { containsText: ['You are the blogger of a coding agent session.', '"agent":"coder"'] },
   });
@@ -105,18 +107,6 @@ try {
     lane: expectationLane('host-restart', 'parent-title', 'title', 1, 'title'),
     text: 'E2E Test Session',
   });
-  scenario.provider.expectText({
-    id: 'manager-zwsp-initial',
-    lane: expectationLane('host-restart', 'manager-blogger-initial', 'synthetic', 1, 'synthetic'),
-    text: 'done',
-    match: { containsText: ['\u200B'] },
-  });
-  scenario.provider.expectText({
-    id: 'manager-zwsp-restarted',
-    lane: expectationLane('host-restart', 'manager-blogger-restarted', 'synthetic', 1, 'synthetic', 'manager'),
-    text: 'done',
-    match: { containsText: ['\u200B'] },
-  });
 
   scenario.provider.expectToolCall({
     id: 'manager-fork-coder',
@@ -128,6 +118,7 @@ try {
   scenario.provider.expectText({
     id: 'manager-blogger-1',
     lane: expectationLane('host-restart', 'manager-blogger-initial', 'blogger', 1, 'chat', 'manager'),
+    neverEnd: true,
     text: 'Manager created background.',
     match: { containsText: ['You are the blogger of a coding agent session.', '"agent":"manager"'] },
   });
@@ -140,6 +131,7 @@ try {
   scenario.provider.expectText({
     id: 'coder-blogger-1',
     lane: expectationLane('host-restart', 'coder-blogger-initial', 'blogger', 1, 'chat', 'coder'),
+    neverEnd: true,
     text: 'Coder created background.',
     match: { containsText: ['You are the blogger of a coding agent session.', '"agent":"coder"'] },
   });

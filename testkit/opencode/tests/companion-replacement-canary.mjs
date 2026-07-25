@@ -54,12 +54,6 @@ try {
     id: 'manager-title',
     lane: expectationLane('companion-replacement', 'manager-title', 'title', 1, 'title'),
   });
-  scenario.provider.expectText({
-    id: 'manager-zwsp',
-    lane: expectationLane('companion-replacement', 'manager-blogger', 'synthetic', 1, 'synthetic'),
-    text: 'done',
-    match: { containsText: ['\u200B'] },
-  });
 
   const parent = await scenario.client.createSession();
   const parentId = getSessionId(parent);

@@ -52,12 +52,6 @@ async function runScenario(scenario) {
     id: 'manager-title',
     lane: expectationLane('reviewer-verdict', 'manager-title', 'title', 1, 'title'),
   });
-  scenario.provider.expectText({
-    id: 'manager-zwsp',
-    lane: expectationLane('reviewer-verdict', 'manager-blogger', 'synthetic', 1, 'synthetic'),
-    text: 'done',
-    match: { containsText: ['\u200B'] },
-  });
 
   scenario.provider.expectToolCall({
     id: 'manager-fork-reviewer',

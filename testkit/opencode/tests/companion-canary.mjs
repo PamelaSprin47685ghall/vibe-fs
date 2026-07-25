@@ -35,12 +35,6 @@ async function runProjectionScenario(scenario) {
     id: 'manager-title',
     lane: expectationLane('companion-projection', 'manager-title', 'title', 1, 'title'),
   });
-  scenario.provider.expectText({
-    id: 'manager-zwsp',
-    lane: expectationLane('companion-projection', 'manager-blogger', 'synthetic', 1, 'synthetic'),
-    text: 'done',
-    match: { containsText: ['\u200B'] },
-  });
 
   scenario.provider.expectText({
     id: 'manager-first',

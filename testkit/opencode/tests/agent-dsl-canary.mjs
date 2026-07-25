@@ -59,12 +59,6 @@ async function canaryScenario(scenario) {
     id: 'manager-title',
     lane: expectationLane('manager-dsl', 'manager-title', 'title', 1, 'title'),
   });
-  scenario.provider.expectText({
-    id: 'manager-zwsp',
-    lane: expectationLane('manager-dsl', 'manager-blogger', 'synthetic', 1, 'synthetic'),
-    text: 'done',
-    match: { containsText: ['\u200B'] },
-  });
 
   const forbiddenManagerTools = ['read', 'write', 'edit', 'bash', 'glob', 'grep', 'verdict'];
 
@@ -87,7 +81,8 @@ async function canaryScenario(scenario) {
     id: 'manager-blogger',
     lane: expectationLane('manager-dsl', 'manager-blogger', 'blogger', 1, 'chat', 'manager'),
     blocking: false,
-    text: 'Manager background record.',
+    neverEnd: true,
+    text: 'Manager background remains busy.',
     match: {
       containsText: ['You are the blogger of a coding agent session.', '"agent":"manager"'],
     },
@@ -105,7 +100,8 @@ async function canaryScenario(scenario) {
     id: 'coder-blogger',
     lane: expectationLane('manager-dsl', 'coder-blogger', 'blogger', 1, 'chat', 'coder'),
     blocking: false,
-    text: 'Coder background record.',
+    neverEnd: true,
+    text: 'Coder background remains busy.',
     match: {
       containsText: ['You are the blogger of a coding agent session.', '"agent":"coder"'],
     },
@@ -138,17 +134,6 @@ async function canaryScenario(scenario) {
       forbiddenTools: forbiddenManagerTools,
     },
   });
-  scenario.provider.expectText({
-    id: 'manager-blogger-final',
-    lane: expectationLane('manager-dsl', 'manager-blogger', 'blogger', 2, 'chat', 'manager'),
-    blocking: false,
-    // The Manager must finish while its non-blocking Blogger is still busy.
-    neverEnd: true,
-    text: 'Manager final background record.',
-    match: {
-      containsText: ['You are the blogger of a coding agent session.', '"agent":"manager"'],
-    },
-  });
 
   // Create session on real host process
   const sessionRes = await scenario.client.createSession();
@@ -159,8 +144,7 @@ async function canaryScenario(scenario) {
   scenario.sessionIds.push(sessionID);
   bindLaneSession(scenario.provider, sessionID, 'manager-title', 'manager');
 
-  // Monitor turn with event-driven watermark tracking
-  const turn = scenario.turn.start(sessionID);
+  const managerStartSeq = scenario.events.lastSeq;
 
   // Prompt the real Manager agent explicitly. Do not use the default primary
   // agent: that would make a direct Manager write look like a passing canary.
@@ -175,11 +159,64 @@ async function canaryScenario(scenario) {
     throw new Error(`Prompt failed with status ${promptRes.status}: ${JSON.stringify(promptRes.data)}`);
   }
 
-  // Event-driven wait: require activity + terminal idle state without fixed sleep
-  await turn.awaitTerminal({
+  await scenario.provider.waitForExpectation('manager-fork-coder', 1000);
+  const coderCreated = await scenario.events.awaitEvent(
+    (event) => event.seq > managerStartSeq
+      && event.type === 'session.created'
+      && event.parentSessionID === sessionID
+      && event.sessionAgent === 'coder',
+    1000,
+  );
+  const coderSessionID = coderCreated.sessionID;
+  assert.ok(coderSessionID, 'Manager fork must create a real Coder child session');
+  bindLaneSession(scenario.provider, coderSessionID, 'coder');
+  scenario.watchdog?.advance({
+    reason: 'manager-coder-child-created',
+    lane: `session:${coderSessionID}`,
+    blocking: true,
+  });
+
+  const coderWriteCompleted = await scenario.events.awaitEvent(
+    (event) => event.seq > coderCreated.seq
+      && event.type === 'message.part.updated'
+      && event.sessionID === coderSessionID
+      && event.toolName === 'write'
+      && event.toolStatus === 'completed',
+    1000,
+  );
+  scenario.watchdog?.advance({
+    reason: 'manager-coder-write-completed',
+    lane: `session:${coderSessionID}`,
+    blocking: true,
+  });
+
+  const coderFinalTurn = scenario.turn.start(coderSessionID, { afterSeq: coderWriteCompleted.seq });
+  await coderFinalTurn.awaitTerminal({
+    timeoutMs: 1000,
+    requireActivity: true,
+    requireAssistantTerminal: true,
+    requireIdleAfterActivity: true,
+  });
+
+  const managerJoinCompleted = await scenario.events.awaitEvent(
+    (event) => event.seq > coderFinalTurn.terminalSeq
+      && event.type === 'message.part.updated'
+      && event.sessionID === sessionID
+      && event.toolName === 'join'
+      && event.toolStatus === 'completed',
+    1000,
+  );
+  scenario.watchdog?.advance({
+    reason: 'manager-coder-join-completed',
+    lane: `session:${sessionID}`,
+    blocking: true,
+  });
+
+  const managerFinalTurn = scenario.turn.start(sessionID, { afterSeq: managerJoinCompleted.seq });
+  await managerFinalTurn.awaitTerminal({
     timeoutMs: 5000,
     requireActivity: true,
-    requireAssistantTerminal: false,
+    requireAssistantTerminal: true,
     requireIdleAfterActivity: true,
   });
 

@@ -16,6 +16,7 @@ import {
 import { StrictMockProvider } from '../strict-mock-provider.js';
 import { requestKindOf } from '../strict-mock-matches.js';
 import { EventProbe } from '../event-probe.js';
+import { shapeFromParsed } from '../event-shape.js';
 import { ProcessHost } from '../process-host.js';
 import { createIsolatedEnv } from '../isolated-env.js';
 import { gatherDiagnostics } from '../diagnostics.js';
@@ -140,6 +141,28 @@ async function runEventProbeReconnectAndStatus() {
 
   await server1.close();
   await server2.close();
+}
+
+function runEventProbeSessionAndToolNormalisation() {
+  const childCreated = shapeFromParsed({
+    type: 'session.created',
+    properties: {
+      sessionID: 'child',
+      info: { parentID: 'parent', agent: 'coder' },
+    },
+  });
+  assertEq(childCreated.parentSessionID, 'parent', 'session parent identity extracted');
+  assertEq(childCreated.sessionAgent, 'coder', 'session agent extracted');
+
+  const completedTool = shapeFromParsed({
+    type: 'message.part.updated',
+    properties: {
+      sessionID: 'child',
+      part: { type: 'tool', tool: 'write', state: { status: 'completed' } },
+    },
+  });
+  assertEq(completedTool.toolName, 'write', 'tool name extracted');
+  assertEq(completedTool.toolStatus, 'completed', 'tool completion extracted');
 }
 
 async function runTerminalIdleWithObjectStatus() {
@@ -281,6 +304,7 @@ export const cases = [
   { name: 'stability repeat cap is three', fn: runStabilityRepeatCap },
   { name: 'title classification uses current user turn', fn: runTitleHistoryIsolation },
   { name: 'EventProbe reconnect and status normalisation', fn: runEventProbeReconnectAndStatus },
+  { name: 'EventProbe session and tool normalisation', fn: runEventProbeSessionAndToolNormalisation },
   { name: 'terminal idle with object status', fn: runTerminalIdleWithObjectStatus },
   { name: 'no fixed-sleep critical assertion', fn: runNoFixedSleepCriticalAssertion },
   { name: 'ProcessHost leak probe', fn: runProcessHostLeakProbe },

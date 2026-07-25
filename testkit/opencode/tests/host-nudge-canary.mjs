@@ -14,12 +14,6 @@ try {
     lane: expectationLane('host-nudge', 'parent-title', 'title', 1, 'title'),
   });
   scenario.provider.expectText({
-    id: 'manager-zwsp',
-    lane: expectationLane('host-nudge', 'coder-blogger', 'synthetic', 1, 'synthetic'),
-    text: 'done',
-    match: { containsText: ['\u200B'] },
-  });
-  scenario.provider.expectText({
     id: 'child-a1',
     lane: expectationLane('host-nudge', 'coder', 'coder', 1),
     text: 'A1 terminal.',
@@ -29,7 +23,8 @@ try {
     id: 'coder-blogger-1',
     lane: expectationLane('host-nudge', 'coder-blogger', 'blogger', 1, 'chat', 'coder'),
     blocking: false,
-    text: 'Coder first background.',
+    neverEnd: true,
+    text: 'Coder background remains busy.',
     match: { containsText: ['You are the blogger of a coding agent session.', '"agent":"coder"'] },
   });
   scenario.provider.expectText({
@@ -37,13 +32,6 @@ try {
     lane: expectationLane('host-nudge', 'coder', 'coder', 2),
     text: 'A2 terminal.',
     match: { containsText: ['second run'] },
-  });
-  scenario.provider.expectText({
-    id: 'coder-blogger-2',
-    lane: expectationLane('host-nudge', 'coder-blogger', 'blogger', 2, 'chat', 'coder'),
-    blocking: false,
-    text: 'Coder second background.',
-    match: { containsText: ['You are the blogger of a coding agent session.', '"agent":"coder"'] },
   });
   scenario.provider.expectText({
     id: 'child-a3',

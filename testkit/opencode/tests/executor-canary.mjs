@@ -18,21 +18,6 @@ try {
     id: 'inspector-title',
     lane: expectationLane('executor', 'inspector-title', 'title', 1, 'title'),
   });
-  scenario.provider.expectText({
-    id: 'executor-zwsp-1',
-    lane: expectationLane('executor', 'executor-synthetic-1', 'synthetic', 1, 'synthetic', 'inspector'),
-    text: 'done',
-    match: { containsText: ['\u200B'] },
-  });
-  scenario.provider.afterExpectation('executor-zwsp-1', () => {
-    scenario.provider.expectText({
-      id: 'executor-zwsp-2',
-      lane: expectationLane('executor', 'executor-synthetic-2', 'synthetic', 1, 'synthetic', 'inspector'),
-      text: 'done',
-      match: { containsText: ['\u200B'] },
-    });
-  });
-
   scenario.provider.expectToolCall({
     id: 'inspector-executor',
     lane: expectationLane('executor', 'inspector', 'inspector', 1),
@@ -92,7 +77,6 @@ try {
   assert.equal(reduceRequests.length, 1, 'Executor must reduce map summaries exactly once');
   assert.ok(requests.some((request) => names(request).includes('executor') && request !== requests[0]), 'Reduced result did not return to Inspector');
 
-  await scenario.provider.waitForExpectation('executor-zwsp-2', 1000);
   scenario.provider.expectSatisfied();
   await teardownScenario(scenario);
   console.log('Executor canary passed: real command, spool map/reduce, and Inspector result return.');

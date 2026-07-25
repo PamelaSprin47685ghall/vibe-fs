@@ -57,12 +57,6 @@ try {
     match: { requiredTools: ['fork', 'join', 'list'] },
   });
   scenario.provider.expectText({
-    id: 'manager-zwsp',
-    lane: expectationLane('orchestrator', 'orchestrator-blogger', 'synthetic', 1, 'synthetic'),
-    text: 'done',
-    match: { containsText: ['\u200B'] },
-  });
-  scenario.provider.expectText({
     id: 'manager-blogger',
     lane: expectationLane('orchestrator', 'manager-blogger', 'blogger', 1, 'chat', 'manager'),
     blocking: false,
