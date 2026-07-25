@@ -7,6 +7,7 @@ open Wanxiangshu.Next.OpenCode
 open Wanxiangshu.Next.Kernel.Identity
 open Wanxiangshu.Next.Kernel.Fact
 open Wanxiangshu.Next.Journal
+open Wanxiangshu.Next.Session.AgentRoleHelpers
 
 type private PendingHostRun =
     { Token: obj
@@ -39,22 +40,6 @@ type HostForkRuntime
         | Some resolver, Some journal ->
             ModelResolver.resolveForSession resolver childId (AgentJournal.snapshot journal)
         | _ -> None
-
-    let roleOfString (value: string) =
-        if String.IsNullOrWhiteSpace value then
-            None
-        else
-            match value.Trim().ToLowerInvariant() with
-            | "manager" -> Some AgentRole.Manager
-            | "orchestrator" -> Some AgentRole.Orchestrator
-            | "coder" -> Some AgentRole.Coder
-            | "inspector" -> Some AgentRole.Inspector
-            | "browser" -> Some AgentRole.Browser
-            | "meditator" -> Some AgentRole.Meditator
-            | "reviewer" -> Some AgentRole.Reviewer
-            | "advisor" -> Some AgentRole.Advisor
-            | "executor" -> Some AgentRole.Executor
-            | _ -> None
 
     let completionSource () : TaskCompletionSource<Result<string, string>> =
         TaskCompletionSource<Result<string, string>>(TaskCreationOptions.RunContinuationsAsynchronously)
