@@ -129,11 +129,15 @@ module SpikePlugin =
             let messages = unbox<obj array> output?messages
 
             messages
+            |> Array.rev
             |> Array.tryPick (fun message ->
-                if not (isNull message?info) && not (isNull message?info?sessionID) then
-                    Some(unbox<string> message?info?sessionID)
-                elif not (isNull message?sessionID) then
-                    Some(unbox<string> message?sessionID)
+                if not (isNull message) then
+                    if not (isNull message?info) && not (isNull message?info?sessionID) then
+                        Some(unbox<string> message?info?sessionID)
+                    elif not (isNull message?sessionID) then
+                        Some(unbox<string> message?sessionID)
+                    else
+                        None
                 else
                     None)
 
@@ -219,33 +223,38 @@ module SpikePlugin =
                     )
 
                 let transform inObj outObj =
-                    let projectionSessionId =
-                        projectionSessionIdFromMessages outObj
-                        |> Option.defaultValue eventRouter.LatestSessionId
+                    let projectionSessionIdOpt =
+                        if
+                            not (isNull inObj)
+                            && not (isNull inObj?sessionID)
+                            && not (String.IsNullOrWhiteSpace(unbox<string> inObj?sessionID))
+                        then
+                            Some(unbox<string> inObj?sessionID)
+                        else
+                            projectionSessionIdFromMessages outObj
 
-                    match observeEvent with
-                    | Some observe ->
+                    match observeEvent, projectionSessionIdOpt with
+                    | Some observe, Some sid ->
                         let evt =
                             createObj
                                 [ "type", box "plugin.transform"
-                                  "properties", box (createObj [ "sessionID", box projectionSessionId ]) ]
+                                  "properties", box (createObj [ "sessionID", box sid ]) ]
 
                         observe evt
+                    | _ -> ()
+
+                    match projectionSessionIdOpt with
+                    | Some projectionSessionId ->
+                        if not (isNull inObj) && isNull inObj?sessionID then
+                            inObj?sessionID <- projectionSessionId
+
+                        if
+                            not (isNull inObj)
+                            && isNull inObj?agent
+                            && sessionRoles.ContainsKey projectionSessionId
+                        then
+                            inObj?agent <- sessionRoles.[projectionSessionId]
                     | None -> ()
-
-                    if
-                        not (isNull inObj)
-                        && isNull inObj?sessionID
-                        && not (String.IsNullOrWhiteSpace projectionSessionId)
-                    then
-                        inObj?sessionID <- projectionSessionId
-
-                    if
-                        not (isNull inObj)
-                        && isNull inObj?agent
-                        && sessionRoles.ContainsKey projectionSessionId
-                    then
-                        inObj?agent <- sessionRoles.[projectionSessionId]
 
                     CompanionTransform.handleCompanionTransform
                         companions

@@ -24,8 +24,6 @@ type HostEventRouter
     /// Zero-width space: invisible nudge that prompts LLM to continue.
     let ZWSP = "​"
 
-    let mutable latestSessionId = ""
-
     let rawEvent (raw: obj) =
         if isNull raw || isNull raw?event then raw else raw?event
 
@@ -134,13 +132,10 @@ type HostEventRouter
                 sessionPort.SendPrompt(SessionId.create sessionId, ZWSP, { Model = None; Agent = None })
                 |> ignore
 
-    member _.LatestSessionId = latestSessionId
-
     member _.Observe(raw: obj, forward: obj -> unit) =
         let sessionId, role = HostSessionContext.read raw
 
         if not (String.IsNullOrWhiteSpace sessionId) then
-            latestSessionId <- sessionId
             // Event info.agent is the *resolved* OpenCode agent; a fallback
             // (build/plan/title) must never clobber a known DSL role.
             role
