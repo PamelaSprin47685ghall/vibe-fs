@@ -35,20 +35,12 @@ module ForkRuntimeTests =
         }
 
     [<Fact>]
-    let ``ForkRuntime_existing_agent_is_nudged_and_each_run_completes_once`` () =
+    let ``ForkRuntime_nudge_on_busy_agent_does_not_replace_pending_run`` () =
         task {
             let firstWork = TaskCompletionSource<Result<string, string>>()
-            let allCompletions = TaskCompletionSource<unit>()
-            let completions = ResizeArray<RunCompletion>()
-
-            let listener completion =
-                completions.Add(completion)
-
-                if completions.Count = 2 then
-                    allCompletions.SetResult(())
-
-            let runtime = ForkRuntime(listener = listener)
-            let agentId = "agent-nudge-test"
+            let completionSource = TaskCompletionSource<RunCompletion>()
+            let runtime = ForkRuntime(listener = completionSource.SetResult)
+            let agentId = "agent-busy-nudge"
 
             let firstFork =
                 runtime.Fork(agentId, AgentRole.Inspector, runWork = (fun () -> firstWork.Task))
@@ -57,27 +49,35 @@ module ForkRuntimeTests =
             | ForkResult.Created id -> Assert.Equal(agentId, id)
             | other -> Assert.True(false, sprintf "Expected Created result, got: %A" other)
 
+            // Nudge on a busy agent: no new pending run created,
+            // existing join waits for original completion only.
             let secondFork =
                 runtime.Fork(agentId, AgentRole.Inspector, runWork = (fun () -> task { return Ok "second" }))
 
             Assert.Equal(ForkResult.Nudged agentId, secondFork)
+
+            // The second fork does not produce a second completion.
+            // Completing the first work resolves the single join.
             firstWork.SetResult(Ok "first")
-            let! _ = allCompletions.Task
-
-            Assert.Equal(2, completions.Count)
-            Assert.True(completions |> Seq.exists (fun c -> c.Outcome = Ok "first"))
-            Assert.True(completions |> Seq.exists (fun c -> c.Outcome = Ok "second"))
-
-            let! first = runtime.Join()
-            let! second = runtime.Join()
-            let joined = [ first; second ]
+            let! _ = completionSource.Task
+            let! joined = runtime.Join()
 
             match joined with
-            | [ Ok first; Ok second ] ->
-                Assert.Equal(2, [ first.RunId; second.RunId ] |> Set.ofList |> Set.count)
-                Assert.Equal(agentId, first.AgentId)
-                Assert.Equal(agentId, second.AgentId)
-            | other -> Assert.True(false, sprintf "Expected two completions, got: %A" other)
+            | Ok completion ->
+                Assert.Equal(agentId, completion.AgentId)
+                Assert.Equal(AgentRole.Inspector, completion.Role)
+                Assert.Equal(Ok "first", completion.Outcome)
+            | Error err -> Assert.True(false, sprintf "Expected completion, got Error: %A" err)
+
+            // Agent is now idle; a subsequent fork creates a new run.
+            let thirdFork =
+                runtime.Fork(agentId, AgentRole.Inspector, runWork = (fun () -> task { return Ok "third" }))
+
+            match thirdFork with
+            | ForkResult.Created id -> Assert.Equal(agentId, id)
+            | other -> Assert.True(false, sprintf "Expected Created result for idle agent, got: %A" other)
+
+            let! _ = runtime.Join()
         }
 
     [<Fact>]

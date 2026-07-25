@@ -143,6 +143,10 @@ type ForkRuntime
         : ForkResult =
         lock lockObj (fun () ->
             match agents.TryGetValue(agentId) with
+            | true, rec' when rec'.Status = AgentStatus.Busy ->
+                // Busy existing agent: fire-and-forget nudge only,
+                // do not replace the active pending run.
+                ForkResult.Nudged agentId
             | true, rec' ->
                 let runId, launch = startRun agentId role prompt runWork
 

@@ -152,7 +152,13 @@ type HostForkRuntime
 
             match existing with
             | Some childId ->
-                let run = installRun agentId childId
+                // Busy existing nudge: fire-and-forget, reuse existing pending run.
+                let run =
+                    lock gate (fun () ->
+                        match pendingRuns.TryGetValue agentId with
+                        | true, existing -> existing
+                        | false, _ -> installRun agentId childId)
+
                 let result = runtime.Fork(agentId, role, runWork = (fun () -> run.Source.Task))
 
                 match result with
@@ -250,7 +256,12 @@ type HostForkRuntime
                 match roleOpt with
                 | None -> return Error(sprintf "Unknown agent id: %s" agentId)
                 | Some role ->
-                    let run = installRun agentId childId
+                    let run =
+                        lock gate (fun () ->
+                            match pendingRuns.TryGetValue agentId with
+                            | true, existing -> existing
+                            | false, _ -> installRun agentId childId)
+
                     let result = runtime.Fork(agentId, role, runWork = (fun () -> run.Source.Task))
 
                     match result with
@@ -287,5 +298,4 @@ type HostForkRuntime
         runtime.Cancel()
 
         let childIds = lock gate (fun () -> children.Values |> Seq.distinct |> Seq.toList)
-
         childIds |> List.iter (fun childId -> sessions.AbortSession childId |> ignore)
