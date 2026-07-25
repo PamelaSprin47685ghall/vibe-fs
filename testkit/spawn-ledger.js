@@ -11,9 +11,14 @@ import os from "node:os";
 import path from "node:path";
 import { procStartTime } from "./process-lifecycle.js";
 
+const SAFE_ID_RE = /^[A-Za-z0-9_.-]+$/;
+function sanitizeRunId(raw) {
+  if (typeof raw === "string" && SAFE_ID_RE.test(raw) && raw.length <= 128) return raw;
+  return `${Date.now()}-${process.pid}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
 export const LEDGER_DIR = path.join(os.tmpdir(), "wanxiang-ledger");
-export const RUN_ID = process.env.WANXIANG_RUN_ID
-  || `${Date.now()}-${process.pid}-${Math.random().toString(36).slice(2, 8)}`;
+export const RUN_ID = sanitizeRunId(process.env.WANXIANG_RUN_ID);
 
 const LEDGER_FILE = path.join(LEDGER_DIR, `${RUN_ID}.jsonl`);
 

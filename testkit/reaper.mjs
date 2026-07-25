@@ -11,12 +11,22 @@
 import fs from "node:fs";
 import path from "node:path";
 import { execSync } from "node:child_process";
-import { LEDGER_DIR, RUN_ID } from "./spawn-ledger.js";
+import { LEDGER_DIR } from "./spawn-ledger.js";
+const RUN_ID = (await import("./spawn-ledger.js")).RUN_ID;
 import { pidIsAlive, procStartTime, groupMembers } from "./process-lifecycle.js";
 
+function parsePositiveInt(value, fallback, name) {
+  const n = Number(value);
+  if (!Number.isFinite(n) || Number.isNaN(n) || n <= 1 || n !== Math.floor(n)) {
+    console.error(`REAPER: invalid ${name}=${value}; using fallback ${fallback}`);
+    return fallback;
+  }
+  return n;
+}
+
 const FORCE = process.argv.includes("--force");
-const MIN_FREE_MB = Number(process.env.REAPER_MIN_FREE_MB || 2048);
-const ORPHAN_MIN_AGE_MS = Number(process.env.REAPER_ORPHAN_MIN_AGE_MS || 60000);
+const MIN_FREE_MB = parsePositiveInt(process.env.REAPER_MIN_FREE_MB, 2048, "REAPER_MIN_FREE_MB");
+const ORPHAN_MIN_AGE_MS = parsePositiveInt(process.env.REAPER_ORPHAN_MIN_AGE_MS, 60000, "REAPER_ORPHAN_MIN_AGE_MS");
 // Must be specific enough to never match a human-run process.
 const ORPHAN_MARKERS = ["oc-e2e-", "tests-next/worker.js", "wanxiang-ledger", ".wanxiangshu-next"];
 

@@ -9,7 +9,17 @@ import path from "node:path";
 import { terminateTree } from "../testkit/process-lifecycle.js";
 import { recordSpawn, recordExit, RUN_ID } from "../testkit/spawn-ledger.js";
 
-const MAX_PARALLEL = Number(process.env.MAX_PARALLEL_CANARIES || 4);
+function parsePositiveInt(value, fallback, name) {
+  const n = Number(value);
+  if (!Number.isFinite(n) || Number.isNaN(n) || n <= 1 || n !== Math.floor(n)) {
+    console.error(`CANARY: invalid ${name}=${value}; using fallback ${fallback}`);
+    return fallback;
+  }
+  return n;
+}
+
+const MAX_PARALLEL = parsePositiveInt(process.env.MAX_PARALLEL_CANARIES, 4, "MAX_PARALLEL_CANARIES");
+const CANARY_TIMEOUT_MS = parsePositiveInt(process.env.CANARY_TIMEOUT_MS, 180000, "CANARY_TIMEOUT_MS");
 const CANARY_TESTS = [
   "testkit/opencode/tests/agent-dsl-canary.mjs",
   "testkit/opencode/tests/companion-canary.mjs",
@@ -27,7 +37,6 @@ const CANARY_TESTS = [
 ];
 
 const STAGGER_DELAY_MS = 500;
-const CANARY_TIMEOUT_MS = Number(process.env.CANARY_TIMEOUT_MS || 180000);
 const activeCanaryPids = new Set();
 
 function cleanupCanaries() {
