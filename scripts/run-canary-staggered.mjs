@@ -7,7 +7,9 @@
 import { spawn } from "node:child_process";
 import path from "node:path";
 import { terminateTree } from "../testkit/process-lifecycle.js";
+import { recordSpawn, recordExit, RUN_ID } from "../testkit/spawn-ledger.js";
 
+const MAX_PARALLEL = Number(process.env.MAX_PARALLEL_CANARIES || 4);
 const CANARY_TESTS = [
   "testkit/opencode/tests/agent-dsl-canary.mjs",
   "testkit/opencode/tests/companion-canary.mjs",
@@ -44,16 +46,33 @@ process.on("exit", cleanupCanaries);
 process.on("SIGINT", () => { cleanupCanaries(); process.exit(130); });
 process.on("SIGTERM", () => { cleanupCanaries(); process.exit(143); });
 
+async function runPool(items, limit, worker) {
+  const results = new Array(items.length);
+  let next = 0;
+  async function lane() {
+    while (next < items.length) {
+      const i = next++;
+      if (i > 0) await new Promise((r) => setTimeout(r, STAGGER_DELAY_MS));
+      results[i] = await worker(items[i]);
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, lane));
+  return results;
+}
+
 function runCanary(file) {
   return new Promise((resolve) => {
     const name = path.basename(file);
     const child = spawn(process.execPath, [file], {
       stdio: ["ignore", "pipe", "pipe"],
-      env: process.env,
+      env: { ...process.env, WANXIANG_RUN_ID: RUN_ID },
       detached: process.platform !== "win32",
     });
 
-    if (child.pid) activeCanaryPids.add(child.pid);
+    if (child.pid) {
+      activeCanaryPids.add(child.pid);
+      recordSpawn(child.pid, file);
+    }
 
     let stdout = "";
     let stderr = "";
@@ -62,10 +81,13 @@ function runCanary(file) {
     const timer = setTimeout(async () => {
       if (settled) return;
       settled = true;
-      if (child.pid) activeCanaryPids.delete(child.pid);
       try {
         await terminateTree(child, { termGraceMs: 500, killGraceMs: 1000 });
-      } catch {}
+        recordExit(child.pid);
+      } catch (err) {
+        console.error("  ⚠ canary " + name + " cleanup: " + err.message);
+      }
+      if (child.pid) activeCanaryPids.delete(child.pid);
       resolve({
         file,
         name,
@@ -83,7 +105,10 @@ function runCanary(file) {
       if (settled) return;
       settled = true;
       clearTimeout(timer);
-      if (child.pid) activeCanaryPids.delete(child.pid);
+      if (child.pid) {
+        recordExit(child.pid);
+        activeCanaryPids.delete(child.pid);
+      }
       resolve({ file, name, code, signal, stdout, stderr });
     });
   });
@@ -95,20 +120,12 @@ async function main() {
 
   for (let rep = 1; rep <= repeats; rep++) {
     if (repeats > 1) console.log("--- Canary Iteration " + rep + "/" + repeats + " ---");
-    const promises = [];
+    console.log("\nConcurrency cap: " + MAX_PARALLEL + "\n");
 
-    for (let i = 0; i < CANARY_TESTS.length; i++) {
-      if (i > 0) {
-        await new Promise((r) => setTimeout(r, STAGGER_DELAY_MS));
-      }
-      const file = CANARY_TESTS[i];
-      const offset = (i * 0.5).toFixed(1);
-      console.log("[Launch +" + offset + "s] " + path.basename(file));
-      promises.push(runCanary(file));
-    }
-
-    console.log("\nAll canary tests launched. Awaiting completions...\n");
-    const results = await Promise.all(promises);
+    const results = await runPool(CANARY_TESTS, MAX_PARALLEL, (file) => {
+      console.log("[Launch] " + path.basename(file));
+      return runCanary(file);
+    });
 
     let failed = false;
     for (const r of results) {

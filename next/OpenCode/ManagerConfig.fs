@@ -25,6 +25,6 @@ module ManagerConfig =
             agents?blogger <- toollessConfig
             agents?executor <- toollessConfig
             agents?inspector <- StaticTools.inspectorAgentConfig ()
-            agents?browser <- toollessConfig
-            agents?meditator <- toollessConfig
+            agents?browser <- StaticTools.browserAgentConfig ()
+            agents?meditator <- StaticTools.meditatorAgentConfig ()
             agents?reviewer <- StaticTools.reviewerAgentConfig ()

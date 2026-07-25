@@ -91,6 +91,24 @@ module StaticTools =
     let toollessAgentConfig () : obj =
         createObj [ "mode", box "primary"; "permission", box (createObj [ "*", box "deny" ]) ]
 
+    let meditatorAgentConfig () : obj =
+        createObj
+            [ "mode", box "primary"
+              "permission",
+              box (
+                  createObj
+                      [ "*", box "deny"
+                        "read", box "allow"
+                        "glob", box "allow"
+                        "grep", box "allow"
+                        "inspector", box "allow" ]
+              ) ]
+
+    let browserAgentConfig () : obj =
+        createObj
+            [ "mode", box "primary"
+              "permission", box (createObj [ "*", box "deny"; "read", box "allow"; "network", box "allow" ]) ]
+
     let inspectorAgentConfig () : obj =
         createObj
             [ "mode", box "primary"

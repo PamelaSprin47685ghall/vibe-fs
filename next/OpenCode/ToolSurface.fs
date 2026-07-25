@@ -33,12 +33,109 @@ module ToolSurface =
     [<Emit("JSON.stringify($0)")>]
     let private stringify (value: obj) : string = jsNative
 
-    let private contextString (context: obj) (name: string) =
-        if isNull context || isNull context?(name) then
+    [<Emit("$0.toISOString()")>]
+    let private dateToString (value: obj) : string = jsNative
+
+    let private contextString (ctx: obj) (name: string) =
+        if isNull ctx || isNull ctx?(name) then
             None
         else
-            let value = unbox<string> context?(name)
-            if String.IsNullOrWhiteSpace value then None else Some value
+            let v = unbox<string> ctx?(name) in if String.IsNullOrWhiteSpace v then None else Some v
+
+    let private textArg (args: obj) (name: string) =
+        if isNull args || isNull args?(name) then
+            ""
+        else
+            unbox<string> args?(name)
+
+    let private mkSid (s: string) = SessionId.create s
+
+    let private verdictExec
+        (sessionParents: Dictionary<string, string>)
+        (sessionRoles: Dictionary<string, string>)
+        (journal: AgentJournal option)
+        (gitTreePort: GitTreePort option)
+        (reviewerHosts: Dictionary<string, ReviewerHost>)
+        (gate: obj)
+        (verdictSessions: HashSet<string>)
+        =
+        fun (args: obj) (ctx: obj) ->
+            task {
+                let sid = contextString ctx "sessionID"
+
+                let role =
+                    contextString ctx "agent"
+                    |> Option.orElseWith (fun () ->
+                        sid
+                        |> Option.bind (fun id ->
+                            match sessionRoles.TryGetValue id with
+                            | true, v -> Some v
+                            | false, _ -> None))
+
+                let callId =
+                    contextString ctx "toolCallId" |> Option.orElse (contextString ctx "callID")
+
+                let vResult =
+                    if
+                        role
+                        |> Option.exists (fun v -> not (v.Equals("reviewer", StringComparison.OrdinalIgnoreCase)))
+                    then
+                        Error "The verdict tool is available only to reviewer sessions"
+                    elif sid.IsNone then
+                        Error "Missing sessionID"
+                    elif callId.IsNone then
+                        Error "Missing tool call id"
+                    elif isNull args || isNull args?verdict then
+                        Error "Missing verdict"
+                    else
+                        try
+                            StaticTools.reviewerVerdictOfString (unbox<string> args?verdict)
+                        with _ ->
+                            Error "verdict must be exactly PERFECT or REVISE"
+
+                match vResult, sid, callId with
+                | Error err, _, _ -> return box (stringify (createObj [ "error", box err ]))
+                | Ok verdict, Some reviewerId, Some toolCallId ->
+                    let mgrId =
+                        match sessionParents.TryGetValue reviewerId with
+                        | true, p -> Some p
+                        | false, _ -> None
+
+                    match journal, mgrId, gitTreePort with
+                    | None, _, _ ->
+                        return box (stringify (createObj [ "error", box "Reviewer verdict requires a journal" ]))
+                    | _, None, _ -> return box (stringify (createObj [ "error", box "Missing manager session" ]))
+                    | _, _, None ->
+                        return box (stringify (createObj [ "error", box "Reviewer verdict requires a GitTreePort" ]))
+                    | Some j, Some mId, Some gtp ->
+                        let host =
+                            lock gate (fun () ->
+                                match reviewerHosts.TryGetValue reviewerId with
+                                | true, h -> h
+                                | false, _ ->
+                                    let h = ReviewerHost(j, mkSid mId, mkSid reviewerId, ?gitTreePort = Some gtp)
+                                    reviewerHosts.[reviewerId] <- h
+                                    h)
+
+                        match host.SubmitVerdict(toolCallId, verdict) with
+                        | Error err -> return box (stringify (createObj [ "error", box err ]))
+                        | Ok result ->
+                            lock gate (fun () -> verdictSessions.Add reviewerId |> ignore)
+
+                            let status =
+                                match result with
+                                | ReviewFinishResult.Confirmed -> "CONFIRMED"
+                                | ReviewFinishResult.NeedsReview -> "NEEDS_REVIEW"
+
+                            let vText =
+                                if verdict = ReviewGuardVerdict.Perfect then
+                                    "PERFECT"
+                                else
+                                    "REVISE"
+
+                            return box (stringify (createObj [ "verdict", box vText; "status", box status ]))
+                | Ok _, _, _ -> return box (stringify (createObj [ "error", box "Missing reviewer tool context" ]))
+            }
 
     let create
         (toolModule: obj)
@@ -56,226 +153,149 @@ module ToolSurface =
         let reviewerHosts = Dictionary<string, ReviewerHost>()
         let gate = obj ()
 
-        let runtimeFor (context: obj) =
-            let sessionID =
-                if isNull context || isNull context?sessionID then
+        let runtimeFor (ctx: obj) =
+            let sid =
+                if isNull ctx || isNull ctx?sessionID then
                     ""
                 else
-                    unbox<string> context?sessionID
+                    unbox<string> ctx?sessionID
 
-            if String.IsNullOrWhiteSpace sessionID then
+            if String.IsNullOrWhiteSpace sid then
                 Error "Missing sessionID"
             else
                 Ok(
                     lock gate (fun () ->
-                        match runtimes.TryGetValue sessionID with
-                        | true, runtime -> runtime
+                        match runtimes.TryGetValue sid with
+                        | true, r -> r
                         | false, _ ->
-                            let runtime =
+                            let r =
                                 HostForkRuntime(
-                                    SessionId.create sessionID,
+                                    mkSid sid,
                                     sessionPort,
                                     ?journal = journal,
                                     onChildCreated =
                                         (fun _ role childId ->
-                                            let childSessionId = SessionId.value childId
-                                            sessionParents.[childSessionId] <- sessionID
-                                            sessionRoles.[childSessionId] <- role.ToString().ToLowerInvariant())
+                                            let cid = SessionId.value childId
+                                            sessionParents.[cid] <- sid
+                                            sessionRoles.[cid] <- role.ToString().ToLowerInvariant())
                                 )
 
-                            runtimes.[sessionID] <- runtime
-                            runtime)
+                            runtimes.[sid] <- r
+                            r)
                 )
 
-        let textArg (args: obj) (name: string) =
-            if isNull args || isNull args?(name) then
-                ""
-            else
-                unbox<string> args?(name)
-
-        let forkExecute (args: obj) (context: obj) =
+        let forkExecute (args: obj) (ctx: obj) =
             task {
-                match runtimeFor context with
-                | Error err -> return box (stringify (createObj [ "error", box err ]))
-                | Ok runtime ->
-                    let agent = textArg args "agent"
-                    let prompt = textArg args "prompt"
+                let agent = textArg args "agent"
+                let prompt = textArg args "prompt"
+                let signalStr = textArg args "signal"
 
-                    let! result =
-                        match HostSessionContext.roleOf agent with
-                        | Some role -> runtime.Fork(newAgentId (), role, prompt)
-                        | None -> runtime.Reuse(agent, prompt)
+                if agent = "pty" && prompt <> "" then
+                    return
+                        box (
+                            stringify (
+                                createObj
+                                    [ "agentId", box (PtySurface.ptyFork prompt workspaceDirectory)
+                                      "pty", box true ]
+                            )
+                        )
+                elif agent.StartsWith("pty-") && signalStr <> "" then
+                    match PtySurface.ptySignalOfString signalStr with
+                    | Some _ ->
+                        PtySurface.removePty agent
+                        return box (stringify (createObj [ "signal", box signalStr; "agentId", box agent ]))
+                    | None ->
+                        return box (stringify (createObj [ "error", box (sprintf "Unknown PTY signal: %s" signalStr) ]))
+                elif agent.StartsWith("pty-") then
+                    PtySurface.removePty agent
 
-                    match result with
-                    | Ok fork -> return box (stringify (createObj [ "agentId", box fork.AgentId ]))
+                    return
+                        box (stringify (createObj [ "agentId", box agent; "pty", box true; "status", box "completed" ]))
+                else
+                    match runtimeFor ctx with
                     | Error err -> return box (stringify (createObj [ "error", box err ]))
+                    | Ok runtime ->
+                        let! result =
+                            match HostSessionContext.roleOf agent with
+                            | Some role -> runtime.Fork(newAgentId (), role, prompt)
+                            | None -> runtime.Reuse(agent, prompt)
+
+                        match result with
+                        | Ok fork -> return box (stringify (createObj [ "agentId", box fork.AgentId ]))
+                        | Error err -> return box (stringify (createObj [ "error", box err ]))
             }
 
-        let joinExecute (_args: obj) (context: obj) =
+        let joinExecute (_args: obj) (ctx: obj) =
             task {
-                match runtimeFor context with
+                match runtimeFor ctx with
                 | Error err -> return box (stringify (createObj [ "error", box err ]))
                 | Ok runtime ->
                     let! result = runtime.Join()
 
                     match result with
-                    | Ok completion ->
+                    | Ok c ->
                         return
                             box (
                                 stringify (
                                     createObj
-                                        [ "agentId", box completion.AgentId
-                                          "runId", box completion.RunId
-                                          "outcome", box completion.Outcome ]
+                                        [ "agentId", box c.AgentId; "runId", box c.RunId; "outcome", box c.Outcome ]
                                 )
                             )
-                    | Error error -> return box (stringify (createObj [ "error", box (error.ToString()) ]))
+                    | Error e -> return box (stringify (createObj [ "error", box (e.ToString()) ]))
             }
 
-        let listExecute (_args: obj) (context: obj) =
+        let listExecute (_args: obj) (ctx: obj) =
             task {
-                match runtimeFor context with
+                match runtimeFor ctx with
                 | Error err -> return box (stringify (createObj [ "error", box err ]))
                 | Ok runtime ->
                     let agents, _ = runtime.List()
 
-                    let result =
+                    let agentEntries =
                         agents
-                        |> List.map (fun agent ->
+                        |> List.map (fun a ->
                             createObj
-                                [ "agentId", box agent.AgentId
-                                  "role", box (agent.Role.ToString())
-                                  "status", box (agent.Status.ToString()) ])
-                        |> List.toArray
+                                [ "agentId", box a.AgentId
+                                  "role", box (a.Role.ToString())
+                                  "status", box (a.Status.ToString()) ])
 
-                    return box (stringify (box result))
+                    let ptyEntries =
+                        PtySurface.activePtys ()
+                        |> List.map (fun (id, ts) ->
+                            createObj
+                                [ "agentId", box id
+                                  "role", box "Pty"
+                                  "status", box "active"
+                                  "startedAt", box (dateToString (unbox<obj> ts)) ])
+
+                    return box (stringify (box (agentEntries @ ptyEntries |> List.toArray)))
             }
 
-        let verdictExecute (args: obj) (context: obj) =
-            task {
-                let sessionId = contextString context "sessionID"
+        let verdictExecute =
+            verdictExec sessionParents sessionRoles journal gitTreePort reviewerHosts gate verdictSessions
 
-                let role =
-                    contextString context "agent"
-                    |> Option.orElseWith (fun () ->
-                        sessionId
-                        |> Option.bind (fun id ->
-                            match sessionRoles.TryGetValue id with
-                            | true, value -> Some value
-                            | false, _ -> None))
-
-                let callId =
-                    contextString context "toolCallId"
-                    |> Option.orElse (contextString context "callID")
-
-                let verdictResult =
-                    if
-                        role
-                        |> Option.exists (fun value ->
-                            not (value.Equals("reviewer", StringComparison.OrdinalIgnoreCase)))
-                    then
-                        Error "The verdict tool is available only to reviewer sessions"
-                    elif sessionId.IsNone then
-                        Error "Missing sessionID"
-                    elif callId.IsNone then
-                        Error "Missing tool call id"
-                    elif isNull args || isNull args?verdict then
-                        Error "Missing verdict"
-                    else
-                        try
-                            StaticTools.reviewerVerdictOfString (unbox<string> args?verdict)
-                        with _ ->
-                            Error "verdict must be exactly PERFECT or REVISE"
-
-                match verdictResult, sessionId, callId with
-                | Error error, _, _ -> return box (stringify (createObj [ "error", box error ]))
-                | Ok verdict, Some reviewerId, Some toolCallId ->
-                    let managerId =
-                        match sessionParents.TryGetValue reviewerId with
-                        | true, parentId -> Some parentId
-                        | false, _ ->
-                            contextString context "managerSessionID"
-                            |> Option.orElse (contextString context "managerSessionId")
-
-                    match journal, managerId, gitTreePort with
-                    | None, _, _ ->
-                        return box (stringify (createObj [ "error", box "Reviewer verdict requires a journal" ]))
-                    | _, None, _ ->
-                        return
-                            box (
-                                stringify (
-                                    createObj
-                                        [ "error", box "Reviewer verdict requires the manager session relationship" ]
-                                )
-                            )
-                    | _, _, None ->
-                        return box (stringify (createObj [ "error", box "Reviewer verdict requires a GitTreePort" ]))
-                    | Some journal, Some managerId, Some gitTreePort ->
-                        let host =
-                            lock gate (fun () ->
-                                match reviewerHosts.TryGetValue reviewerId with
-                                | true, existing -> existing
-                                | false, _ ->
-                                    let created =
-                                        ReviewerHost(
-                                            journal,
-                                            SessionId.create managerId,
-                                            SessionId.create reviewerId,
-                                            ?gitTreePort = Some gitTreePort
-                                        )
-
-                                    reviewerHosts.[reviewerId] <- created
-                                    created)
-
-                        match host.SubmitVerdict(toolCallId, verdict) with
-                        | Error error -> return box (stringify (createObj [ "error", box error ]))
-                        | Ok result ->
-                            lock gate (fun () -> verdictSessions.Add reviewerId |> ignore)
-
-                            let status =
-                                match result with
-                                | ReviewFinishResult.Confirmed -> "CONFIRMED"
-                                | ReviewFinishResult.NeedsReview -> "NEEDS_REVIEW"
-
-                            return
-                                box (
-                                    stringify (
-                                        createObj
-                                            [ "verdict",
-                                              box (
-                                                  if verdict = ReviewGuardVerdict.Perfect then
-                                                      "PERFECT"
-                                                  else
-                                                      "REVISE"
-                                              )
-                                              "status", box status ]
-                                    )
-                                )
-                | Ok _, _, _ -> return box (stringify (createObj [ "error", box "Missing reviewer tool context" ]))
-            }
+        let forkArgs =
+            createObj
+                [ "agent", box (stringSchema factory)
+                  "prompt", box (stringSchema factory)
+                  "signal", box (enumSchema factory [| "TERM"; "KILL"; "INT" |]) ]
 
         let verdictArgs =
             createObj [ "verdict", box (enumSchema factory [| "PERFECT"; "REVISE" |]) ]
 
-        let definition description args execute =
+        let definition desc args execute =
             createObj
-                [ "description", box description
+                [ "description", box desc
                   "args", box args
                   "execute", uncurriedExecute (box execute) ]
-
-        let forkArgs =
-            createObj [ "agent", box (stringSchema factory); "prompt", box (stringSchema factory) ]
 
         let executor = ExecutorTool.create toolModule runtimeFor workspaceDirectory
 
         createObj
-            [ "fork", box (applyTool factory (definition "Fork or nudge an agent" forkArgs forkExecute))
+            [ "fork",
+              box (applyTool factory (definition "Fork, nudge, or create/interact with a PTY" forkArgs forkExecute))
               "join", box (applyTool factory (definition "Wait for any agent completion" (createObj []) joinExecute))
-              "list", box (applyTool factory (definition "List active agents" (createObj []) listExecute))
-              "verdict",
-              box (
-                  applyTool
-                      factory
-                      (definition "Submit the review verdict for the current Git tree" verdictArgs verdictExecute)
-              )
+              "list",
+              box (applyTool factory (definition "List active agents and PTY sessions" (createObj []) listExecute))
+              "verdict", box (applyTool factory (definition "Submit the review verdict" verdictArgs verdictExecute))
               "executor", executor ]

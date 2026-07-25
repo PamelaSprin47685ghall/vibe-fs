@@ -3,16 +3,22 @@ import path from "node:path";
 import { fork } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { terminateTree } from "../testkit/process-lifecycle.js";
+import { recordSpawn, recordExit } from "../testkit/spawn-ledger.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.join(__dirname, "..");
 const workerPath = path.join(__dirname, "worker.js");
 const activeWorkers = new Set();
 
-function stopWorker(worker, signal) {
+async function stopWorker(worker) {
   if (!worker || !worker.pid) return;
   activeWorkers.delete(worker.pid);
-  terminateTree(worker, { termGraceMs: 300, killGraceMs: 500 }).catch(() => {});
+  try {
+    await terminateTree(worker, { termGraceMs: 300, killGraceMs: 500 });
+    recordExit(worker.pid);
+  } catch (err) {
+    console.error("  ⚠ worker " + worker.pid + " cleanup: " + err.message);
+  }
 }
 
 function cleanupAllWorkers() {
@@ -39,13 +45,16 @@ export function discoverTestExports(file) {
       detached: true,
       stdio: ["ignore", "inherit", "inherit", "ipc"]
     });
-    if (worker.pid) activeWorkers.add(worker.pid);
+    if (worker.pid) {
+      activeWorkers.add(worker.pid);
+      recordSpawn(worker.pid, `worker discover ${path.basename(file)}`);
+    }
 
     let finished = false;
     const finish = (err, result) => {
       if (finished) return;
       finished = true;
-      stopWorker(worker, "SIGKILL");
+      stopWorker(worker);
       if (err) reject(err);
       else resolve(result);
     };
@@ -69,7 +78,10 @@ export function runTestInWorker(file, exportName, timeoutMs = 1000) {
       stdio: ["ignore", "inherit", "inherit", "ipc"]
     });
 
-    if (worker.pid) activeWorkers.add(worker.pid);
+    if (worker.pid) {
+      activeWorkers.add(worker.pid);
+      recordSpawn(worker.pid, `worker ${exportName}`);
+    }
 
     let finished = false;
     let silenceTimer;
@@ -85,7 +97,7 @@ export function runTestInWorker(file, exportName, timeoutMs = 1000) {
       finished = true;
       clearTimeout(silenceTimer);
       clearTimeout(absoluteTimer);
-      stopWorker(worker, signal);
+      stopWorker(worker);
       settle(value);
     };
 
@@ -97,8 +109,7 @@ export function runTestInWorker(file, exportName, timeoutMs = 1000) {
           new Error(
             "TIMEOUT: Assertion step in '" + exportName + "' (" + path.basename(file) + ") exceeded " + silenceMs + "ms limit; " +
             "last assertion " + (Date.now() - lastAssertionAt) + "ms ago (" + assertionCount + " total)"
-          ),
-          "SIGKILL"
+          )
         );
       }, silenceMs);
     };
@@ -109,8 +120,7 @@ export function runTestInWorker(file, exportName, timeoutMs = 1000) {
         new Error(
           "TIMEOUT: Absolute cap of " + absoluteMs + "ms exceeded for '" + exportName + "' (" + path.basename(file) + "); " +
           "last assertion " + (Date.now() - lastAssertionAt) + "ms ago (" + assertionCount + " total)"
-        ),
-        "SIGKILL"
+        )
       );
     }, absoluteMs);
 
@@ -124,22 +134,21 @@ export function runTestInWorker(file, exportName, timeoutMs = 1000) {
           resetSilenceTimer();
         }
       } else if (msg.status === "ok") {
-        finish(resolve, msg.result, "SIGTERM");
+        finish(resolve, msg.result);
       } else {
-        finish(reject, new Error(msg.message), "SIGTERM");
+        finish(reject, new Error(msg.message));
       }
     });
 
     worker.on("error", (err) => {
-      finish(reject, err, "SIGTERM");
+      finish(reject, err);
     });
 
     worker.on("exit", (code, signal) => {
       if (worker.pid) activeWorkers.delete(worker.pid);
       finish(
         reject,
-        new Error("Worker stopped before reporting a result (exit code " + code + ", signal " + signal + ")"),
-        "SIGTERM"
+        new Error("Worker stopped before reporting a result (exit code " + code + ", signal " + signal + ")")
       );
     });
   });

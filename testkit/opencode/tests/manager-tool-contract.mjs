@@ -12,7 +12,8 @@ test('manager permission denies global executor tool and executes mailbox path',
     const names = Object.keys(hooks.tool).sort();
 
     assert.deepEqual(names, ['executor', 'fork', 'join', 'list', 'verdict']);
-    assert.deepEqual(Object.keys(hooks.tool.fork.args).sort(), ['agent', 'prompt']);
+    // fork tool now has signal arg for PTY unified DSL: fork(agent, prompt, signal?)
+    assert.deepEqual(Object.keys(hooks.tool.fork.args).sort(), ['agent', 'prompt', 'signal']);
 
     const config = {};
     hooks.config(config);
