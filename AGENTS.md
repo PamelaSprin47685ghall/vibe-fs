@@ -42,7 +42,7 @@ import:
 ## 当前边界：不得误称已完成
 
 - `npm run test:release` 已通过不等于 production-ready；默认 P0 稳定性是 3×，不是 20×。
-- Process/PTY 压力 canary 已新增待运行验证；Provider failure 500 注入与 session 重启已由 fallback-canary 覆盖；真实 Host parent abort、跨重启 child reconcile 与同一 child 三轮 nudge 已有真实 canary。
+- PTY stress canary 和 orchestrator-canary 已接入 test:e2e:p0；Provider failure 500 注入与 session 重启已由 fallback-canary 覆盖；真实 Host parent abort、跨重启 child reconcile 与同一 child 三轮 nudge 已有真实 canary。
 - 在上述边界闭合前，不切换 production entry，不删除黑盒 Oracle 测试资产，不宣称 release-ready。
 
 ## 当前已知关键 Bug 与未修复缺口
@@ -1041,7 +1041,7 @@ Manager→Coder(异步)→Inspector(一次性同步)→Command(同步)。Coder�
 - 真实 parent abort 已闭合：parent abort 传播到 busy child 并关闭两条悬挂 SSE 流。
 - 迟到 terminal/reasoning-part 混合仍未完全闭合；当前已有 per-run listener 和真实 nudge 输出切片，但 reasoning 与 assistant part 混排的真实 Host 边界仍需补充 E2E。
 - Fallback provider failure 注入 E2E 已由 fallback-canary 覆盖（真实 500 注入→journal 记录→重启恢复→累计 8 次通过）。
-- SIGKILL/孤儿进程真实 E2E 已纳入默认 P0；PTY/大输入压力仍待补充 canary 提高覆盖。
+- SIGKILL/孤儿进程真实 E2E 已纳入默认 P0；PTY stress canary 已通过 3× 待验收；大输入压力仍待补充 canary 提高覆盖。
 - Orchestrator durable Port 路径 + Manager worktree 创建/rebase/冲突回交/评审/ff-only 发布 E2E 已由 orchestrator-canary 闭合。
 - 因此禁止宣称 production release-ready，禁止提前删除仍可作为黑盒 Oracle 的旧测试资产。
 
