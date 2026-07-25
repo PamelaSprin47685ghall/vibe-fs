@@ -88,6 +88,27 @@ module AgentFacts =
 
             { proj with Sessions = sessions }
 
+        | AgentFact.CompanionAdvanced p ->
+            let sessions =
+                updateSession
+                    p.SessionId
+                    (fun s ->
+                        let comp =
+                            match s.Companion with
+                            | Some existing ->
+                                { existing with
+                                    LastSuccessfulProjection = Some p.Projection
+                                    CurrentB = Some p.Content }
+                            | None ->
+                                { LastSuccessfulProjection = Some p.Projection
+                                  CurrentB = Some p.Content
+                                  ReplacementActive = false }
+
+                        { s with Companion = Some comp })
+                    proj.Sessions
+
+            { proj with Sessions = sessions }
+
         | AgentFact.CompanionReplacementActiveSet p ->
             let sessions =
                 updateSession

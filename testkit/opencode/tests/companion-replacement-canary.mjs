@@ -73,7 +73,17 @@ try {
         id: `manager-blogger-${round}`,
         lane: expectationLane('companion-replacement', 'manager-blogger', 'blogger', round, 'chat', 'manager'),
         text: `Blogger paragraph ${round}.`,
-        neverEnd: round === 2,
+        match: {
+          containsText: ['You are the blogger of a coding agent session.', '"agent":"manager"'],
+        },
+      });
+    }
+    if (round === 3) {
+      scenario.provider.expectText({
+        id: 'manager-blogger-3',
+        lane: expectationLane('companion-replacement', 'manager-blogger', 'blogger', 3, 'chat', 'manager'),
+        neverEnd: true,
+        text: 'Blogger replacement background remains busy.',
         match: {
           containsText: ['You are the blogger of a coding agent session.', '"agent":"manager"'],
         },
@@ -89,15 +99,15 @@ try {
     });
     assert.ok(prompt.ok, `round ${round} prompt failed: ${JSON.stringify(prompt.data)}`);
     await turn.awaitTerminal({ timeoutMs: 1000, requireActivity: true, requireAssistantTerminal: false, requireIdleAfterActivity: true });
-    if (round === 1) {
-      await scenario.provider.waitForExpectation('manager-blogger-1', 1000);
+    if (round <= 2) {
+      await scenario.provider.waitForExpectation(`manager-blogger-${round}`, 1000);
       await scenario.provider.waitForIdle(1000);
     }
-    if (round === 2) {
-      await scenario.provider.waitForExpectation('manager-blogger-2', 1000);
+    if (round === 3) {
+      await scenario.provider.waitForExpectation('manager-blogger-3', 1000);
       scenario.watchdog?.advance({
         reason: 'replacement-blogger-busy',
-        lane: 'manager-blogger:2',
+        lane: 'manager-blogger:3',
         blocking: true,
       });
     }
@@ -107,26 +117,69 @@ try {
     journalContains(scenario.host.workDir, 'CompanionReplacementActiveSet'),
     'journal must record the durable PrefixReplacementEnabled fact',
   );
+  assert.ok(
+    journalContains(scenario.host.workDir, 'CompanionAdvanced'),
+    'each successful Blogger checkpoint must atomically persist its B and baseline',
+  );
+
+  await scenario.restart();
+  scenario.provider.expectText({
+    id: 'round-restarted',
+    lane: expectationLane('companion-replacement', 'manager', 'manager', 5),
+    text: `round restarted: ${longText}`,
+    match: { requiredTools: managerTools, forbiddenTools: forbiddenManagerTools },
+  });
+  scenario.provider.expectText({
+    id: 'manager-blogger-restarted',
+    lane: expectationLane('companion-replacement', 'manager-blogger-restarted', 'blogger', 1, 'chat', 'manager'),
+    neverEnd: true,
+    text: 'Blogger restart background remains busy.',
+    match: {
+      containsText: ['You are the blogger of a coding agent session.', '"agent":"manager"'],
+    },
+  });
+
+  const restartedTurn = scenario.turn.start(parentId);
+  const restartedPrompt = await scenario.client.request('POST', `/session/${parentId}/prompt_async`, {
+    body: {
+      agent: 'manager',
+      parts: [{ type: 'text', text: 'Record round restarted.' }],
+      model: { providerID: 'test', modelID: 'test-model' },
+    },
+  });
+  assert.ok(restartedPrompt.ok, `restarted round failed: ${JSON.stringify(restartedPrompt.data)}`);
+  await restartedTurn.awaitTerminal({ timeoutMs: 1000, requireActivity: true, requireAssistantTerminal: false, requireIdleAfterActivity: true });
+  await scenario.provider.waitForExpectation('manager-blogger-restarted', 1000);
+  scenario.watchdog?.advance({
+    reason: 'replacement-blogger-restarted-busy',
+    lane: 'manager-blogger-restarted:1',
+    blocking: true,
+  });
 
   const requests = managerRequests(scenario);
-  assert.ok(requests.length >= rounds - 1, `expected manager requests, got ${requests.length}`);
+  assert.ok(requests.length >= rounds + 1, `expected manager requests, got ${requests.length}`);
   const last = requests[requests.length - 1];
   const bIndex = last.messages.findIndex((m) => messageText(m).includes('Blogger paragraph'));
   assert.ok(bIndex >= 0, `replaced projection must carry the current B: ${JSON.stringify(last.messages.map(messageRole))}`);
   assert.equal(messageRole(last.messages[bIndex]), 'user', 'the B head travels as a user-role synthetic');
+  assert.ok(
+    messageText(last.messages[bIndex]).includes('Blogger paragraph 1.')
+      && messageText(last.messages[bIndex]).includes('Blogger paragraph 2.'),
+    'restarted projection must restore the complete accumulated B',
+  );
   const lastUser = last.messages[last.messages.length - 1];
   assert.ok(
-    messageText(lastUser).includes(`Record round ${rounds}.`),
+    messageText(lastUser).includes('Record round restarted.'),
     'uncovered raw tail must be preserved verbatim',
   );
   assert.ok(
-   last.messages.length < rounds * 2 + 1,
-    `covered prefix must be skipped, got ${last.messages.length} messages after ${rounds} rounds`,
+   last.messages.length < rounds * 2 + 3,
+    `covered prefix must be skipped, got ${last.messages.length} messages after restart`,
   );
 
   scenario.provider.expectSatisfied();
   await teardownScenario(scenario);
-  console.log('Companion replacement canary passed: real budget activated durable prefix replacement.');
+  console.log('Companion replacement canary passed: real budget activated atomic B persistence and restart-safe prefix replacement.');
 } catch (error) {
   console.error(`Companion replacement canary failed: ${error.stack || error}`);
   if (scenario?.host?.stderrLog) console.error(`── host stderr tail ──\n${scenario.host.stderrLog.slice(-4000)}`);

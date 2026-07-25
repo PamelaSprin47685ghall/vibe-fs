@@ -103,9 +103,11 @@ module CompanionHostTests =
 
                 Assert.Equal(Submitted, companion.SubmitProjection("{\"step\":1}"))
                 do! companion.WaitInFlightAsync()
+                Assert.Equal(Submitted, companion.SubmitProjection("{\"step\":2}"))
+                do! companion.WaitInFlightAsync()
                 Assert.True(companion.EnablePrefixReplacement())
-                Assert.Equal(Some "blog paragraph", companion.Memory.CurrentB)
-                Assert.Equal(Some "{\"step\":1}", companion.Memory.LastSuccessfulProjection)
+                Assert.Equal(Some "blog paragraph\n\nblog paragraph", companion.Memory.CurrentB)
+                Assert.Equal(Some "{\"step\":2}", companion.Memory.LastSuccessfulProjection)
                 Assert.True(companion.Memory.ReplacementActive)
 
                 (journal :> IDisposable).Dispose()
@@ -125,8 +127,8 @@ module CompanionHostTests =
                 let restoredHost, _ = makeFake ()
                 let restored = CompanionHost(primaryId, restoredHost, restoredDurable)
 
-                Assert.Equal(Some "blog paragraph", restored.Memory.CurrentB)
-                Assert.Equal(Some "{\"step\":1}", restored.Memory.LastSuccessfulProjection)
+                Assert.Equal(Some "blog paragraph\n\nblog paragraph", restored.Memory.CurrentB)
+                Assert.Equal(Some "{\"step\":2}", restored.Memory.LastSuccessfulProjection)
                 Assert.True(restored.Memory.ReplacementActive)
                 (restoredJournal :> IDisposable).Dispose()
             })

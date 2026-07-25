@@ -24,6 +24,10 @@ module Fact =
         | CompanionCheckpointReplaced of
             {| SessionId: SessionId
                Content: string |}
+        | CompanionAdvanced of
+            {| SessionId: SessionId
+               Projection: string
+               Content: string |}
         | CompanionReplacementActiveSet of {| SessionId: SessionId; Active: bool |}
         | AgentLinked of
             {| ParentId: SessionId

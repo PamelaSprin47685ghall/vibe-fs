@@ -31,20 +31,12 @@ type AgentJournalCompanionPort(journal: AgentJournal) =
                       ReplacementActive = companion.ReplacementActive }))
 
         member _.AppendSuccessful(sessionId, projection, content) =
-            match
-                append
-                    sessionId
-                    (AgentFact.CompanionBaselineSet
-                        {| SessionId = sessionId
-                           Projection = projection |})
-            with
-            | Error error -> Error error
-            | Ok() ->
-                append
-                    sessionId
-                    (AgentFact.CompanionCheckpointReplaced
-                        {| SessionId = sessionId
-                           Content = content |})
+            append
+                sessionId
+                (AgentFact.CompanionAdvanced
+                    {| SessionId = sessionId
+                       Projection = projection
+                       Content = content |})
 
         member _.EnableReplacement(sessionId) =
             append

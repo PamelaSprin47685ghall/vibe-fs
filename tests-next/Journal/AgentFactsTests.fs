@@ -153,29 +153,24 @@ module AgentFactsTests =
         Assert.True(fb4.IsDead)
 
     [<Fact>]
-    let Companion_baseline_and_replacement () =
+    let Companion_advanced_and_replacement () =
         let rt = RuntimeId.create "rt-companion-1"
         let sid = SessionId.create "session-companion"
         let t0 = DateTimeOffset.UtcNow
 
-        let baseFact =
-            AgentFact.CompanionBaselineSet
+        let advancedFact =
+            AgentFact.CompanionAdvanced
                 {| SessionId = sid
-                   Projection = "{\"state\":\"base\"}" |}
-
-        let replaceFact =
-            AgentFact.CompanionCheckpointReplaced
-                {| SessionId = sid
+                   Projection = "{\"state\":\"base\"}"
                    Content = "Updated Blog Post" |}
 
         let activeFact =
             AgentFact.CompanionReplacementActiveSet {| SessionId = sid; Active = true |}
 
-        let env1 = createTestEnv 1L t0 baseFact rt (Some sid)
-        let env2 = createTestEnv 2L (t0.AddSeconds 1.0) replaceFact rt (Some sid)
-        let env3 = createTestEnv 3L (t0.AddSeconds 2.0) activeFact rt (Some sid)
+        let env1 = createTestEnv 1L t0 advancedFact rt (Some sid)
+        let env2 = createTestEnv 2L (t0.AddSeconds 1.0) activeFact rt (Some sid)
 
-        let proj = AgentFacts.apply AgentFacts.empty [ env1; env2; env3 ]
+        let proj = AgentFacts.apply AgentFacts.empty [ env1; env2 ]
 
         let comp = proj.Sessions.[sid].Companion.Value
         Assert.Equal(Some "{\"state\":\"base\"}", comp.LastSuccessfulProjection)

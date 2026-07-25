@@ -250,14 +250,15 @@ type Companion(?initialMemory: CompanionMemory, ?durable: ICompanionDurablePort,
                             try
                                 let! content = blogFn delta
 
-                                persistSuccessful currentProjection content
+                                let nextB =
+                                    match currentB with
+                                    | None -> content
+                                    | Some old -> old + "\n\n" + content
+
+                                persistSuccessful currentProjection nextB
 
                                 lock lockObj (fun () ->
-                                    currentB <-
-                                        match currentB with
-                                        | None -> Some content
-                                        | Some old -> Some(old + "\n\n" + content)
-
+                                    currentB <- Some nextB
                                     lastSuccessfulProjection <- Some currentProjection)
                             with _ ->
                                 ()
