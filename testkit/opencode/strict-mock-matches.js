@@ -75,6 +75,31 @@ export function isTitleGenerationRequest(body) {
   return false;
 }
 
+export function requestKindOf(body) {
+  if (isTitleGenerationRequest(body)) return 'title';
+  if (isSyntheticContinuation(body)) return 'synthetic';
+  return 'chat';
+}
+
+export function requestRoleOf(body) {
+  const requestKind = requestKindOf(body);
+  if (requestKind !== 'chat') return requestKind;
+
+  const lastUser = extractLastUserMsg(body) || '';
+  if (lastUser.includes('You are the blogger')) return 'blogger';
+  if (lastUser.includes('Summarize command output chunk') || lastUser.includes('Reduce these command-output summaries')) {
+    return 'executor';
+  }
+
+  const tools = extractToolNames(body);
+  if (tools.includes('verdict')) return 'reviewer';
+  if (tools.includes('executor')) return 'inspector';
+  if (tools.includes('write') || tools.includes('edit')) return 'coder';
+  if (tools.includes('fork') && tools.includes('join') && tools.includes('list')) return 'manager';
+  if (tools.includes('fork') && tools.includes('join')) return 'orchestrator';
+  return 'unknown';
+}
+
 function pickToolName(t) {
   return t?.function?.name ?? t?.name;
 }
@@ -104,6 +129,8 @@ export function matchesExpectation(body, expectation) {
   const match = expectation.match || {};
   if (match.sessionId && (body?.sessionId || '') !== match.sessionId) return false;
   if (match.model && (body?.model || '') !== match.model) return false;
+  if (match.requestKind && requestKindOf(body) !== match.requestKind) return false;
+  if (match.role && requestRoleOf(body) !== match.role) return false;
   if (match.requiredTools && match.requiredTools.length > 0) {
     const names = extractToolNames(body);
     for (const r of match.requiredTools) {

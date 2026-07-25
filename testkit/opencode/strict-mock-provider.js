@@ -23,10 +23,16 @@ import {
   detectSyntheticMarker,
   isTitleGenerationRequest,
   extractToolNames,
-  matchesExpectation,
   estimatePromptTokens,
   extractLastUserMsg,
+  requestKindOf,
 } from './strict-mock-matches.js';
+import {
+  consumeExpectation,
+  laneLabel,
+  pendingExpectations,
+  selectExpectation,
+} from './strict-mock-lanes.js';
 import { decorateLegacyArgs } from './strict-mock-decorate.js';
 import {
   startHttpServer,
@@ -39,7 +45,6 @@ import { checkSatisfied } from './strict-mock-satisfy.js';
 import {
   createState,
   pushExpectation,
-  pushNoMoreRequests,
   resetState,
 } from './strict-mock-state.js';
 
@@ -58,6 +63,7 @@ export class StrictMockProvider {
     this._url = null;
     this._activeResponses = new Set();
     this.onRequest = null;
+    this.onExpectationConsumed = null;
   }
 
   expectToolCall(opts) { pushExpectation(this._state, { type: 'tool-call', tool: opts.tool, args: opts.args || {} }, opts); }
@@ -69,30 +75,50 @@ export class StrictMockProvider {
   allowTitleGeneration() { this._state.allowTitleGeneration = true; }
 
   expectSyntheticTodoNudge(opts = {}) {
-    this.expectText({ id: opts.id || 'synthetic-todo-nudge', text: 'done', match: { containsText: ['There are still incomplete todos. Continue working through the remaining items.'] } });
+    this.expectText({
+      ...opts,
+      id: opts.id || 'synthetic-todo-nudge',
+      lane: { ...opts.lane, requestKind: 'synthetic' },
+      text: 'done',
+      match: { ...opts.match, containsText: ['There are still incomplete todos. Continue working through the remaining items.'] },
+    });
   }
 
   expectLoopNudge(opts = {}) {
-    this.expectText({ id: opts.id || 'synthetic-loop-nudge', text: 'done', match: { containsText: ['You are in loop mode. You must call the submit_review tool'] } });
+    this.expectText({
+      ...opts,
+      id: opts.id || 'synthetic-loop-nudge',
+      lane: { ...opts.lane, requestKind: 'synthetic' },
+      text: 'done',
+      match: { ...opts.match, containsText: ['You are in loop mode. You must call the submit_review tool'] },
+    });
   }
 
   expectSyntheticBudgetNudge(opts = {}) {
-    this.expectText({ id: opts.id || 'synthetic-budget-nudge', text: 'done', match: { containsText: ['the system context is about to be suspended'] } });
+    this.expectText({
+      ...opts,
+      id: opts.id || 'synthetic-budget-nudge',
+      lane: { ...opts.lane, requestKind: 'synthetic' },
+      text: 'done',
+      match: { ...opts.match, containsText: ['the system context is about to be suspended'] },
+    });
   }
 
-  expectNoMoreRequests() { pushNoMoreRequests(this._state); }
-
-  allowOutOfOrder() { this._state.allowOutOfOrder = true; }
-  allowBloggerRequests() { this._state.allowBloggerRequests = true; }
-
-  expectSatisfied() { checkSatisfied(this._state.expectations, this._state.unexpected); }
+  expectSatisfied() { checkSatisfied(this._state); }
   reset() { resetState(this._state); }
 
   get requests() { return this._state.requests; }
   get url() { return this._url; }
   get port() { return this._port; }
   get unexpectedRequests() { return this._state.unexpected; }
-  get remainingExpectations() { return this._state.expectations.length; }
+  get remainingExpectations() { return pendingExpectations(this._state).length; }
+  get blockedExpectations() {
+    return pendingExpectations(this._state).map((expectation) => ({
+      id: expectation.id,
+      lane: laneLabel(expectation.lane),
+      blocking: expectation.blocking,
+    }));
+  }
   get nudgeBypassed() { return this._state.nudgeBypassed; }
   get activeRequestCount() { return this._activeResponses.size; }
   get syntheticRequests() { return this._state.syntheticRequests; }
@@ -159,28 +185,18 @@ export class StrictMockProvider {
       const lastUser = JSON.stringify(extractLastUserMsg(parsed) || '').slice(0, 80);
       console.error(`[MOCK-TRACE] tools=${JSON.stringify(tools)} msgs=${(parsed.messages || []).length} chars=${JSON.stringify(parsed.messages || []).length} lastUser=${lastUser}`);
     }
-    if (s.allowBloggerRequests && JSON.stringify(extractLastUserMsg(parsed) || '').includes('You are the blogger')) {
-      if (process.env.MOCK_TRACE) console.error('[MOCK-TRACE] -> blogger-bypass');
-      s.requests.push(parsed);
-      return sendSSE(res, buildTextChunks(`blog_${Date.now()}`, 'Blogger paragraph.', 1));
-    }
+    const selection = selectExpectation(s, parsed);
+    if (selection.match) return this._dispatchMatched(res, parsed, selection.match);
+
     if (isTitleGenerationRequest(parsed) && (!s.strict || s.allowTitleGeneration)) {
       if (process.env.MOCK_TRACE) console.error('[MOCK-TRACE] -> title-bypass');
       return sendSSE(res, buildTextChunks(`title_${Date.now()}`, 'E2E Test Session', 1));
     }
 
-    const expIndex = s.allowOutOfOrder
-      ? s.expectations.findIndex((candidate) => candidate.respond.type !== 'no-more-requests-boundary' && matchesExpectation(parsed, candidate))
-      : (s.expectations.length > 0 && matchesExpectation(parsed, s.expectations[0]) ? 0 : -1);
-
-    if (expIndex >= 0) {
-      return this._dispatchFifo(res, parsed);
-    }
-
     if (isSyntheticContinuation(parsed) && (!s.strict || s.allowSyntheticContinuations)) {
       return this._bypassSynthetic(res, parsed, detectSyntheticMarker(parsed));
     }
-    this._dispatchFifo(res, parsed);
+    this._recordUnexpected(res, parsed, selection.reason, selection.candidates);
   }
 
   _bypassSynthetic(res, parsed, marker) {
@@ -197,51 +213,31 @@ export class StrictMockProvider {
     return sendSSE(res, buildTextChunks(`synth_${Date.now()}`, text, 1));
   }
 
-  _dispatchFifo(res, parsed) {
+  _dispatchMatched(res, parsed, match) {
     const s = this._state;
-    if (isSyntheticContinuation(parsed)) {
-      const marker = detectSyntheticMarker(parsed);
-      s.syntheticRequests.push({ body: parsed, marker, time: Date.now() });
-      console.error(`[MOCK-SYNTH-FIFO] session=${parsed?.sessionId || '?'} marker=${marker}`);
-    }
-    if (s.expectations.length === 0) {
-      if (s.strict) {
-        return this._recordUnexpected(res, parsed, 'no-expectations-queued');
-      }
-      s.requests.push(parsed);
-      return sendSSE(res, buildTextChunks(`auto_${Date.now()}`, 'ok', 1));
-    }
-    const expIndex = s.allowOutOfOrder
-      ? s.expectations.findIndex((candidate) => candidate.respond.type !== 'no-more-requests-boundary' && matchesExpectation(parsed, candidate))
-      : 0;
-    if (expIndex < 0) return this._recordUnexpected(res, parsed, 'no-matching-expectation');
-    const exp = s.expectations[expIndex];
-    if (exp.respond.type === 'no-more-requests-boundary') {
-      s.expectations.shift();
-      if (s.strict) {
-        return this._recordUnexpected(res, parsed, 'request-after-no-more-requests-boundary');
-      }
-      s.requests.push(parsed);
-      return sendSSE(res, buildTextChunks(`auto_${Date.now()}`, 'ok', 1));
-    }
-    if (!matchesExpectation(parsed, exp)) {
-      if (s.strict) return this._recordUnexpected(res, parsed, `expectation-mismatch:${exp.id}`);
-      console.error(`[MOCK-MISMATCH] expected=${exp.id} tools=${JSON.stringify(extractToolNames(parsed))}`);
-      s.requests.push(parsed);
-      s.expectations.shift();
-      return this._respond(res, exp, parsed);
-    }
-    if (process.env.MOCK_TRACE) console.error(`[MOCK-TRACE] -> matched ${exp.id}`);
+    const exp = consumeExpectation(s, match);
+    if (process.env.MOCK_TRACE) console.error(`[MOCK-TRACE] -> matched ${exp.id} ${laneLabel(exp.lane)}`);
     s.requests.push(parsed);
-    s.expectations.splice(expIndex, 1);
+    this.onExpectationConsumed?.({
+      id: exp.id,
+      lane: exp.lane,
+      blocking: exp.blocking,
+      requestKind: requestKindOf(parsed),
+    });
     return this._respond(res, exp, parsed);
   }
 
-  _recordUnexpected(res, parsed, reason) {
+  _recordUnexpected(res, parsed, reason, candidates = []) {
     const sessId = parsed?.sessionId || '(no-session-id)';
     const msgs = parsed?.messages || [];
     const hasToolResults = msgs.some((m) => m?.role === 'tool' || m?.role === 'toolResult');
-    this._state.unexpected.push({ body: parsed, sessId, hasToolResults, reason });
+    this._state.unexpected.push({
+      body: parsed,
+      sessId,
+      hasToolResults,
+      reason,
+      candidates: candidates.map(({ expectation }) => `${expectation.id}@${laneLabel(expectation.lane)}`),
+    });
     const lastUser = JSON.stringify(extractLastUserMsg(parsed));
     console.error(`[MOCK-500] reason=${reason} session=${sessId} tools=${JSON.stringify(extractToolNames(parsed))} msgs=${msgs.length} lastUser=${lastUser.slice(0, 400)}`);
     return sendJSON(res, 500, { error: reason, sessionId: sessId, tools: extractToolNames(parsed) });

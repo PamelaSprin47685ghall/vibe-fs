@@ -4,11 +4,12 @@
  * stays under the 200-line Kolmogorov line budget.
  */
 
-export const NO_MORE_REQUESTS_ID = 'no-more-requests';
+import { laneKey, normalizeLane } from './strict-mock-lanes.js';
 
 export function createState() {
   return {
-    expectations: [],
+    lanes: new Map(),
+    lastTurnByLane: new Map(),
     unexpected: [],
     requests: [],
     syntheticRequests: [],
@@ -17,12 +18,25 @@ export function createState() {
     strict: true,
     allowSyntheticContinuations: false,
     allowTitleGeneration: false,
-    allowOutOfOrder: false,
-    allowBloggerRequests: false,
   };
 }
 
 export function pushExpectation(state, respond, opts) {
+  const lane = normalizeLane(opts.lane);
+  const key = laneKey(lane);
+  let queue = state.lanes.get(key);
+  const expectedTurn = (state.lastTurnByLane.get(key) || 0) + 1;
+  if (lane.turn !== expectedTurn) {
+    throw new Error(`StrictMock lane ${key} expected turn ${expectedTurn}, got ${lane.turn}`);
+  }
+  if (!queue) {
+    queue = { expectations: [] };
+    state.lanes.set(key, queue);
+  }
+
+  const match = { ...(opts.match || {}) };
+  if (lane.role !== '*' && match.role === undefined) match.role = lane.role;
+  if (lane.requestKind !== '*' && match.requestKind === undefined) match.requestKind = lane.requestKind;
   const flags = {};
   const flagKeys = [
     'delayFirstToken', 'delayDone', 'disconnectMidSse', 'contextOverflow',
@@ -35,24 +49,19 @@ export function pushExpectation(state, respond, opts) {
       flags[k] = opts[k];
     }
   }
-  state.expectations.push({
+  queue.expectations.push({
     id: opts.id || `exp-${++state.idCounter}`,
-    match: opts.match || {},
+    lane,
+    match,
+    blocking: opts.blocking !== false,
     respond: { ...respond, ...flags },
   });
-}
-
-export function pushNoMoreRequests(state) {
-  state.expectations.push({
-    id: NO_MORE_REQUESTS_ID,
-    match: {},
-    respond: { type: 'no-more-requests-boundary' },
-    terminal: true,
-  });
+  state.lastTurnByLane.set(key, lane.turn);
 }
 
 export function resetState(state) {
-  state.expectations.length = 0;
+  state.lanes.clear();
+  state.lastTurnByLane.clear();
   state.unexpected.length = 0;
   state.requests.length = 0;
   state.syntheticRequests.length = 0;

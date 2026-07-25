@@ -36,15 +36,25 @@ async function runWatchdogFiresOnSilence() {
   assertTrue(r.stderr.includes('gate-silent'), 'diagnostic carries the label');
 }
 
-async function runWatchdogRenewsOnPet() {
+async function runWatchdogRenewsOnProgress() {
   const script =
     `import { Watchdog } from '${watchdogUrl}';\n` +
-    `const w = new Watchdog({ timeoutMs: 200, label: 'gate-pet' });\n` +
-    `const iv = setInterval(() => w.pet('tick'), 50);\n` +
+    `const w = new Watchdog({ timeoutMs: 200, label: 'gate-progress' });\n` +
+    `const iv = setInterval(() => w.advance({ reason: 'tick', lane: 'gate' }), 50);\n` +
     `setTimeout(() => { clearInterval(iv); w.stop(); }, 500);\n`;
   const r = await runWatchdogChild(script);
-  assertEq(r.code, 0, `petted watchdog must not fire: ${r.stderr}`);
+  assertEq(r.code, 0, `causal progress must renew watchdog: ${r.stderr}`);
   assertTrue(!r.stderr.includes('WATCHDOG'), 'no diagnostic on clean exit');
+}
+
+async function runWatchdogRejectsBackgroundNoise() {
+  const script =
+    `import { Watchdog } from '${watchdogUrl}';\n` +
+    `const w = new Watchdog({ timeoutMs: 150, label: 'gate-background' });\n` +
+    `setInterval(() => w.advance({ reason: 'blogger', lane: 'blogger', blocking: false }), 30);\n`;
+  const r = await runWatchdogChild(script);
+  assertEq(r.code, 1, 'background-only activity must not renew watchdog');
+  assertTrue(r.stderr.includes('background progress'), 'diagnostic must preserve background activity');
 }
 
 function startDelayedSseServer(events, delayMs) {
@@ -89,6 +99,7 @@ async function runConcurrentAwaitTimeouts() {
 
 export const timeoutCases = [
   { name: 'watchdog fires on silence', fn: runWatchdogFiresOnSilence },
-  { name: 'watchdog renews on pet', fn: runWatchdogRenewsOnPet },
+  { name: 'watchdog renews on causal progress', fn: runWatchdogRenewsOnProgress },
+  { name: 'watchdog rejects background-only noise', fn: runWatchdogRejectsBackgroundNoise },
   { name: 'concurrent awaitEvent timeouts stay independent', fn: runConcurrentAwaitTimeouts },
 ];

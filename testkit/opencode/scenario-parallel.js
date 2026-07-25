@@ -24,17 +24,17 @@ export class Scenario {
   }
 
   async restart() {
-    this.watchdog?.pet("restart-stop-host");
+    this.watchdog?.advance({ reason: 'restart-stop-host', lane: 'runtime', blocking: true });
     await this.host.stop({ assert: true });
-    this.watchdog?.pet("restart-close-events");
+    this.watchdog?.advance({ reason: 'restart-close-events', lane: 'runtime', blocking: true });
     await this.events.close();
-    this.watchdog?.pet("restart-start-host");
+    this.watchdog?.advance({ reason: 'restart-start-host', lane: 'runtime', blocking: true });
     await this.host.start(this.host._startOpts);
     this.client._baseUrl = this.host.baseUrl;
     this.events._baseUrl = this.host.baseUrl;
-    this.watchdog?.pet("restart-connect-events");
+    this.watchdog?.advance({ reason: 'restart-connect-events', lane: 'runtime', blocking: true });
     await this.events.connect();
-    this.watchdog?.pet("restart-complete");
+    this.watchdog?.advance({ reason: 'restart-complete', lane: 'runtime', blocking: true });
   }
 }
 
@@ -100,6 +100,11 @@ export async function setupScenarioParallel(opts, tmpDir) {
     });
     client.onSessionCreated = (sid) => {
       if (!scenario.sessionIds.includes(sid)) scenario.sessionIds.push(sid);
+      scenario.watchdog?.advance({
+        reason: 'session-created',
+        lane: `session:${sid}`,
+        blocking: true,
+      });
     };
 
     const watchdogTimeout = opts.watchdogMs || 1000;
@@ -108,6 +113,10 @@ export async function setupScenarioParallel(opts, tmpDir) {
       label: opts.watchdogLabel || "canary",
       onTimeout: async () => {
         console.error(`── watchdog event tail ──\n${events.dump(20)}`);
+        console.error('── watchdog blocked expectations ──');
+        for (const expectation of provider.blockedExpectations) {
+          console.error(`  ${expectation.blocking ? 'blocking' : 'background'} ${expectation.id} ${expectation.lane}`);
+        }
         try {
           await Promise.race([
             host.stop({ assert: false }),
@@ -120,9 +129,14 @@ export async function setupScenarioParallel(opts, tmpDir) {
       },
     });
     scenario.watchdog = watchdog;
-    events.onEvent((e) => watchdog.pet(`sse:${e.type}`));
-    provider.onRequest = () => watchdog.pet("provider-request");
-    client.onRequest = () => watchdog.pet("client-request");
+    provider.onExpectationConsumed = ({ id, lane, blocking }) => {
+      watchdog.advance({
+        reason: `expectation:${id}`,
+        lane: `${lane.scenario}/${lane.session}/${lane.role}/turn-${lane.turn}`,
+        expectationId: id,
+        blocking,
+      });
+    };
     return scenario;
   } catch (err) {
     if (host.stdoutLog || host.stderrLog) {

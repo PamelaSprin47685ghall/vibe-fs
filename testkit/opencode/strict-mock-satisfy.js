@@ -5,22 +5,24 @@
  */
 
 import { extractToolNames, extractLastUserMsg } from './strict-mock-matches.js';
+import { laneLabel, pendingExpectations } from './strict-mock-lanes.js';
 
 const PREVIEW_LIMIT = 5;
 
-export function checkSatisfied(expectations, unexpected) {
-  const remaining = expectations.filter((e) => e.respond?.type !== 'no-more-requests-boundary').length;
-  const unexpectedCount = unexpected.length;
+export function checkSatisfied(state) {
+  const expectations = pendingExpectations(state);
+  const remaining = expectations.length;
+  const unexpectedCount = state.unexpected.length;
   const errors = [];
   if (remaining > 0) {
     const detail = expectations.slice(0, PREVIEW_LIMIT).map((e) =>
-      `  [${e.id}] respond=${e.respond.type} match=${JSON.stringify(e.match)}`,
+      `  [${e.id}] lane=${laneLabel(e.lane)} respond=${e.respond.type} match=${JSON.stringify(e.match)}`,
     ).join('\n');
     errors.push(`remaining expectations = ${remaining}:\n${detail}`);
   }
   if (unexpectedCount > 0) {
-    const detail = unexpected.slice(0, PREVIEW_LIMIT).map((u) =>
-      `  session=${u.sessId || '?'} tools=${JSON.stringify(extractToolNames(u.body))} msgs=${u.body?.messages?.length || 0} toolResults=${u.hasToolResults || false} lastUser=${extractLastUserMsg(u.body) || '(none)'} reason=${u.reason || '?'}`,
+    const detail = state.unexpected.slice(0, PREVIEW_LIMIT).map((u) =>
+      `  session=${u.sessId || '?'} tools=${JSON.stringify(extractToolNames(u.body))} msgs=${u.body?.messages?.length || 0} toolResults=${u.hasToolResults || false} lastUser=${extractLastUserMsg(u.body) || '(none)'} reason=${u.reason || '?'} candidates=${JSON.stringify(u.candidates || [])}`,
     ).join('\n');
     errors.push(`unexpected requests = ${unexpectedCount} (UnexpectedLlmRequest):\n${detail}`);
   }

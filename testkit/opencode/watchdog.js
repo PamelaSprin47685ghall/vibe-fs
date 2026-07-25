@@ -3,8 +3,8 @@
  *
  * tests-next: every assertion IPCs a heartbeat; 1s of silence SIGKILLs
  * the worker process group. testkit canaries run in-process, so the
- * heartbeats are observable progress (SSE events, provider requests,
- * HTTP client calls, explicit pet() checkpoints) and the kill is
+ * progress is a consumed expectation or an explicit semantic checkpoint;
+ * arbitrary SSE, provider requests, and HTTP traffic do not renew it. The kill is
  * process.exit(1) after a best-effort diagnostic dump. A runaway
  * canary costs one silence window instead of hanging until the outer
  * CI timeout.
@@ -24,15 +24,29 @@ export class Watchdog {
     this._count = 0;
     this._lastAt = Date.now();
     this._lastReason = 'start';
+    this._lastLane = 'startup';
+    this._lastExpectationId = null;
+    this._lastBackground = null;
     this._stopped = false;
     this._arm();
   }
 
-  pet(reason) {
+  advance(progress) {
     if (this._stopped) return;
+    const update = typeof progress === 'string' ? { reason: progress } : (progress || {});
+    const reason = update.reason || 'progress';
+    const lane = update.lane || 'unattributed';
+    const expectationId = update.expectationId || null;
+    const blocking = update.blocking !== false;
     this._count++;
+    if (!blocking) {
+      this._lastBackground = { at: Date.now(), reason, lane, expectationId };
+      return;
+    }
     this._lastAt = Date.now();
-    this._lastReason = reason || 'progress';
+    this._lastReason = reason;
+    this._lastLane = lane;
+    this._lastExpectationId = expectationId;
     this._arm();
   }
 
@@ -54,8 +68,16 @@ export class Watchdog {
     this._stopped = true;
     console.error(
       `WATCHDOG: '${this._label}' silent for ${Date.now() - this._lastAt}ms ` +
-      `(limit ${this._timeoutMs}ms); ${this._count} heartbeat(s), last: ${this._lastReason}`
+      `(limit ${this._timeoutMs}ms); ${this._count} progress update(s), ` +
+      `last: ${this._lastReason} lane=${this._lastLane || 'unattributed'} ` +
+      `expectation=${this._lastExpectationId || 'none'}`
     );
+    if (this._lastBackground) {
+      console.error(
+        `WATCHDOG: background progress was ${Date.now() - this._lastBackground.at}ms ago ` +
+        `(${this._lastBackground.reason} lane=${this._lastBackground.lane})`,
+      );
+    }
     try {
       if (this._onTimeout) {
         await Promise.race([this._onTimeout(), new Promise((resolve) => setTimeout(resolve, 3000))]);

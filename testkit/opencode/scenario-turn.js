@@ -51,15 +51,26 @@ class Turn {
     if (o.requireActivity) {
       const activityEvent = await this._awaitActivity(o.timeoutMs);
       this._activitySeq = activityEvent.seq;
+      this._recordProgress('turn-activity');
     } else {
       this._activitySeq = this._eventSeqBefore;
     }
     if (o.requireAssistantTerminal) {
       await this._awaitAssistantTerminal(o.timeoutMs);
+      this._recordProgress('turn-assistant-terminal');
     }
     if (o.requireIdleAfterActivity) {
       await this._awaitIdleAfterActivity(o.timeoutMs);
+      this._recordProgress('turn-idle-after-activity');
     }
+  }
+
+  _recordProgress(reason) {
+    this._scenario.watchdog?.advance({
+      reason,
+      lane: `session:${this._sessionID || 'any'}`,
+      blocking: true,
+    });
   }
 
   async _awaitActivity(timeoutMs) {
