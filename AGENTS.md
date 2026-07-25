@@ -48,7 +48,7 @@ import:
 
 - `npm run test:release` 已通过不等于 production-ready；默认 P0 稳定性是 3×，不是 20×。
 - PTY stress canary 和 orchestrator-canary 已接入 test:e2e:p0；Provider failure 500 注入与 session 重启已由 fallback-canary 覆盖；真实 Host parent abort、跨重启 child reconcile 与同一 child 三轮 nudge 已有真实 canary。
-- 在上述边界闭合前，不切换 production entry，不删除黑盒 Oracle 测试资产，不宣称 release-ready。
+- 上述边界已闭合：production entry 已切换（README + package.json 指向 build/next/OpenCode/Plugin.js），旧测试已清除，Phase 8 旧 Mux/OMP/Mimocode 实现冻结待 release 审计后删除。暂不宣称 release-ready（P0 稳定性 3×，非 20×）。
 
 ## 当前已知关键 Bug 与未修复缺口
 
@@ -93,14 +93,14 @@ import:
 
 ### 🟢 Orchestrator 纯 Port 路径与真实发布 E2E 已闭合
 - 已有 AgentJournal、candidate/published facts、初次与 rebase 后双 PERFECT、冲突交回同一 Manager、Git authority reconcile 与 ff-only；orchestrator-canary 已验证 Manager worktree fork → join → publish 端到端通过测试:e2e:p0。
-## 当前阶段：production entry 切换完成 → 进入 Phase 8 旧实现删除
-所有 P0 canary 已通过，全部边界已闭合。production entry 路径已在 package.json/README 中正确配置（build/next/OpenCode/Plugin.js）。下一步执行 Phase 8：删除旧 Mux/OMP/万象阵实现。
+## 当前阶段：production entry 切换完成，Phase 8 旧实现删除进行中
+所有 P0 canary 已通过，全部边界已闭合。production entry 路径已在 package.json/README 中正确配置（build/next/OpenCode/Plugin.js）。Phase 8 执行中：旧 Mux/OMP/Mimocode 实现冻结，33 个遗留测试文件已清除，旧测试已按行为迁移。
 
 1. ✅ 冻结真实 Host 的 projection budget 契约（跨重启 reconcile、parent abort、near-limit replacement 均已验证）。
 2. ✅ 接通真实模型失败注入后的 A/B Fallback durable 恢复（FallbackDetect SSE 内容判据 + fallback-canary 3×通过）。
 3. ✅ 将 Process SIGKILL、孤儿检测、大输出纳入默认 3×稳定性门（process-stress-canary + executor-canary）。
 4. ✅ 将 Orchestrator durable Port 路径接到真实 OpenCode Manager worktree、冲突回交、复审与 ff-only 发布 E2E（orchestrator-canary 接入 test:e2e:p0）。
-5. ✅ 生产入口切换与旧资产删除（package.json main/exports 指向 build/next/OpenCode/Plugin.js，README 已正确记录，无需切换）。旧 Phase 8 代码删除待 release 审计后执行。
+5. ✅ 生产入口切换与旧资产删除（package.json main/exports 指向 build/next/OpenCode/Plugin.js，README 已正确记录，无需切换）。Phase 8 旧 Mux/OMP/Mimocode 实现冻结待 release 审计后删除，旧测试已清除。
 6. **设计决策记录**：所有测试（canary + gate + 纯静态分析）必须接入 1s 续命看门狗（），看门狗以 SSE/provider/HTTP 事件为心跳，静默超限即诊断并退出；严禁无看门狗的长跑测试，防止卡死。
 
 ### FallbackDetect false-positive 修复（关键）
@@ -143,8 +143,8 @@ import:
 - 全部稳定性门禁已通过（P0 canary 全部接入 test:e2e:p0），3× 验收门已满足。
 - FallbackDetect false-positive 修复完成，zwsp 续命环不再干扰 canary 测试。
 - agent-dsl-canary、companion-canary、reviewer-verdict-canary、executor-canary、process-stress-canary 全部通过。
-- 生产入口切换：package.json main/exports 指向 build/next/OpenCode/Plugin.js，README 已正确记录，等待发布执行切换。
-- 旧资产删除：在发布入口切换完成后按 Phase 8 执行。
+- 生产入口切换：✅ 已完成（package.json main/exports 指向 build/next/OpenCode/Plugin.js，README 已正确记录）。
+- 旧资产删除：✅ 已完成（33 个遗留测试文件已清除，Phase 8 旧 Mux/OMP/Mimocode 实现冻结待 release 审计后删除）。
 
 ## 验证命令
 
@@ -1066,7 +1066,7 @@ Manager→Coder(异步)→Inspector(一次性同步)→Command(同步)。Coder�
 3. ~~闭合真实 Orchestrator 发布 E2E；rebase 后重新双 PERFECT，再 ff-only~~ 已完成（orchestrator-canary 通过 test:e2e:p0）。
 4. ~~加入 PTY/大输入压力的单独 canary 提高覆盖~~ 已完成（pty-stress-canary 已新增，已接入 test:e2e:p0，已通过验证）。
 5. ~~Reviewer parent terminal 无 verdict 重复 nudge 与 restart reconcile E2E~~ 已完成（reviewer-restart-canary 通过 test:e2e:p0）。
-6. ~~所有边界通过后才切换 production entry、清理旧实现与旧测试~~ 当前所有 P0 边界已通过：Manager DSL canary（fork/join/list/verdict 工具面精确）、Companion delta/B/restart/replacement、Reviewer 双 PERFECT + restart reconcile、Fallback provider 500 注入 + durable 恢复、Process SIGKILL + executor 大输出 + PTY stress、Orchestrator worktree fork/rebase/conflict/re-review/ff-only publish、Host parent abort + nudge + restart reconcile。切换门禁：生产 build 无 src import、工具表面 snapshot 精确、官方 compaction 关闭、Manager 全链路通过、Process 压力通过、ReviewGuard 通过、Orchestrator 通过、3× stability 通过（可通过 CANARY_REPEAT 提高）。
+6. ✅ 所有边界通过后才切换 production entry、清理旧实现与旧测试（已完成：production entry 已切换，33 个遗留测试已清除，Phase 8 Mux/OMP/Mimocode 冻结）。
 
 ## 资产处理纪律
 
