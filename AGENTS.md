@@ -1856,7 +1856,7 @@ join()
 * Blogger 固定 cheap model；
   -真实 Y 自压缩与 restart E2E。
 
-## 提交 3：重做 Process spool
+## 提交 3：重做 Process spool ✅
 
 * 超阈值后停止内存累积；
 * 从 spool 流式读 200KB；
@@ -1864,6 +1864,7 @@ join()
 * parent cancellation 贯穿 Runner、LargeGate 和 process；
 * summary 后清理 spool；
 * 10GB 等价生成器压力测试验证 RSS 有界。
+* 已完成：834cb579
 
 ## 提交 4：闭合 Review 与 Fallback
 
