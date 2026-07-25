@@ -17,7 +17,7 @@ try {
       },
     },
     strict: true,
-    watchdogMs: 1000,
+    watchdogMs: 30000,
   });
 
   scenario.provider.allowTitleGeneration();

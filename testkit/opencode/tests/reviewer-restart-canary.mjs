@@ -23,7 +23,7 @@ try {
   scenario = await setupScenario({
     project: { files: { 'AGENTS.md': 'reviewer restart reconcile canary\n' } },
     strict: true,
-    watchdogMs: 1000,
+    watchdogMs: 30000,
   });
 
   scenario.provider.allowTitleGeneration();

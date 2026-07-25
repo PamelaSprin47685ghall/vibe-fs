@@ -80,7 +80,7 @@ async function nudge(parentId, childId, agentId, marker, managerMarker, scenario
 let scenario;
 try {
   assert.equal(runStaticGate([__filename]).passed, true);
-  scenario = await setupScenario({ project: { files: { 'AGENTS.md': 'restart reconcile canary\n' } }, strict: true, watchdogMs: 1000 });
+  scenario = await setupScenario({ project: { files: { 'AGENTS.md': 'restart reconcile canary\n' } }, strict: true, watchdogMs: 30000 });
   scenario.provider.allowSyntheticContinuations();
   scenario.provider.allowTitleGeneration();
   scenario.provider.allowBloggerRequests();

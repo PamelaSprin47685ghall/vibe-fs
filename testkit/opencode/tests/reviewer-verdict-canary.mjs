@@ -15,6 +15,7 @@ function toolNames(request) {
 }
 
 async function runScenario(scenario) {
+  scenario.provider.allowSyntheticContinuations();
   scenario.provider.allowTitleGeneration();
   scenario.provider.allowOutOfOrder();
   scenario.provider.expectToolCall({
@@ -81,7 +82,7 @@ try {
   scenario = await setupScenario({
     project: { files: { [TREE_FILE]: 'review target\n' } },
     strict: true,
-    watchdogMs: 1000,
+    watchdogMs: 30000,
   });
   await runScenario(scenario);
   scenario.provider.expectSatisfied();

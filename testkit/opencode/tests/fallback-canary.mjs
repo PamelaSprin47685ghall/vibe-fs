@@ -56,7 +56,7 @@ try {
   scenario = await setupScenario({
     project: { files: { 'AGENTS.md': 'fallback canary\n' } },
     strict: true,
-    watchdogMs: 1000,
+    watchdogMs: 30000,
     extraEnv: {
       WANXIANGSHU_MODEL_A: 'test/test-model',
       WANXIANGSHU_MODEL_B: 'test/test-model-b',

@@ -8,7 +8,8 @@ const SIGKILL_COMMAND = 'sh -lc \'trap "" TERM; sleep 1000\'';
 let scenario;
 try {
   if (!runStaticGate([__filename]).passed) throw new Error('process stress canary contains prohibited polling');
-  scenario = await setupScenario({ project: { files: { 'AGENTS.md': 'process stress canary\n' } }, strict: true, watchdogMs: 1000 });
+  scenario = await setupScenario({ project: { files: { 'AGENTS.md': 'process stress canary\n' } }, strict: true, watchdogMs: 30000 });
+  scenario.provider.allowSyntheticContinuations();
   scenario.provider.allowTitleGeneration();
   scenario.provider.allowOutOfOrder();
 

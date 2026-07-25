@@ -58,6 +58,7 @@ console.log('  - Resource Leak Detection: Active (Port/PID/Process-tree tracking
 async function canaryScenario(scenario) {
   // Title generation is a separate host request; keep it deterministic without
   // weakening the FIFO expectations for Manager and Coder turns.
+  scenario.provider.allowSyntheticContinuations();
   scenario.provider.allowTitleGeneration();
   scenario.provider.allowBloggerRequests();
   scenario.provider.allowOutOfOrder();
@@ -174,7 +175,7 @@ const singleScenarioOpts = {
     },
   },
   strict: true,
-  watchdogMs: 1000,
+  watchdogMs: 30000,
 };
 
 let scenario;

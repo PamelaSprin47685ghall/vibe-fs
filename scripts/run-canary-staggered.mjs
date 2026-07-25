@@ -72,8 +72,7 @@ function runCanary(file) {
         code: -1,
         signal: "TIMEOUT",
         stdout,
-        stderr: stderr + "
-[CANARY TIMEOUT] Process exceeded " + CANARY_TIMEOUT_MS + "ms limit",
+        stderr: stderr + "\n[CANARY TIMEOUT] Process exceeded " + CANARY_TIMEOUT_MS + "ms limit",
       });
     }, CANARY_TIMEOUT_MS);
 
@@ -92,8 +91,7 @@ function runCanary(file) {
 
 async function main() {
   const repeats = Number(process.env.CANARY_REPEAT || 1);
-  console.log("Starting " + CANARY_TESTS.length + " canary tests in staggered parallel mode (" + repeats + " iteration(s))...
-");
+  console.log("Starting " + CANARY_TESTS.length + " canary tests in staggered parallel mode (" + repeats + " iteration(s))...\n");
 
   for (let rep = 1; rep <= repeats; rep++) {
     if (repeats > 1) console.log("--- Canary Iteration " + rep + "/" + repeats + " ---");
@@ -109,9 +107,7 @@ async function main() {
       promises.push(runCanary(file));
     }
 
-    console.log("
-All canary tests launched. Awaiting completions...
-");
+    console.log("\nAll canary tests launched. Awaiting completions...\n");
     const results = await Promise.all(promises);
 
     let failed = false;
@@ -121,22 +117,18 @@ All canary tests launched. Awaiting completions...
       } else {
         failed = true;
         console.error("  ✗ " + r.name + " FAILED (code " + r.code + ", signal " + r.signal + ")");
-        if (r.stdout) console.error("── stdout ──
-" + r.stdout);
-        if (r.stderr) console.error("── stderr ──
-" + r.stderr);
+        if (r.stdout) console.error("── stdout ──\n" + r.stdout);
+        if (r.stderr) console.error("── stderr ──\n" + r.stderr);
       }
     }
 
     if (failed) {
-      console.error("
-Staggered parallel canary suite failed on iteration " + rep + ".");
+      console.error("\nStaggered parallel canary suite failed on iteration " + rep + ".");
       process.exit(1);
     }
   }
 
-  console.log("
-All staggered parallel canary tests passed cleanly across " + repeats + " iteration(s).");
+  console.log("\nAll staggered parallel canary tests passed cleanly across " + repeats + " iteration(s).");
   process.exit(0);
 }
 
