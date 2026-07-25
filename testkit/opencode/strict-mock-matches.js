@@ -117,9 +117,10 @@ export function matchesExpectation(body, expectation) {
     }
   }
   if (match.containsText && match.containsText.length > 0) {
-    const bodyStr = JSON.stringify(body);
+    const lastUser = extractLastUserMsg(body) || '';
+    const lastUserStr = typeof lastUser === 'string' ? lastUser : JSON.stringify(lastUser);
     for (const t of match.containsText) {
-      if (!bodyStr.includes(t)) return false;
+      if (!lastUserStr.includes(t)) return false;
     }
   }
   if (match.messageCount !== undefined) {

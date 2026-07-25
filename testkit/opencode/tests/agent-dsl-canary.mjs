@@ -181,7 +181,7 @@ const singleScenarioOpts = {
     },
   },
   strict: true,
-  watchdogMs: 1000,
+ watchdogMs: 1000,
   startTimeoutMs: 5000,
 };
 

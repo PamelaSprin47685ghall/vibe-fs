@@ -69,6 +69,7 @@ module PluginHost =
     let createHost
         (input: obj)
         (portOpt: IOpenCodePort option)
+        (journal: AgentJournal option)
         : Result<IEventObservationPort * ISessionHostPort * IDisposable option * (obj -> unit) option, string> =
         if hasHostEventCapability input then
             let hostEventPort = Events.HostEventPort()
@@ -77,10 +78,16 @@ module PluginHost =
             | Error err -> Error err
             | Ok subscription ->
                 let eventPort = hostEventPort :> IEventObservationPort
-                let sessionPort = InjectedSessionPort(portOpt, eventPort) :> ISessionHostPort
+
+                let sessionPort =
+                    InjectedSessionPort(portOpt, eventPort, ?journal = journal) :> ISessionHostPort
+
                 Ok(eventPort, sessionPort, subscription, Some(fun raw -> hostEventPort.Observe raw))
         else
             let hostEventPort = Events.HostEventPort()
             let eventPort = hostEventPort :> IEventObservationPort
-            let sessionPort = InjectedSessionPort(portOpt, eventPort) :> ISessionHostPort
+
+            let sessionPort =
+                InjectedSessionPort(portOpt, eventPort, ?journal = journal) :> ISessionHostPort
+
             Ok(eventPort, sessionPort, None, Some(fun raw -> hostEventPort.Observe raw))

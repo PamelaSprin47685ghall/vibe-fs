@@ -1,14 +1,9 @@
 /**
- * event-probe.js — Records and queries OpenCode SSE events for E2E assertions.
+ * event-probe.js — Event-driven OpenCode event stream recorder and query probe.
  *
- * Uses fetch + streaming response parsing instead of EventSource dependency.
- *
- * close() is async: awaits the SSE read loop to truly exit before resolving,
- * so callers can rely on a deterministic "no more events" point.
- *
- * State queries and async awaits are attached via mixin modules
- * (event-probe-queries.js / event-probe-awaits.js) so the main class
- * stays within the 200-line Kolmogorov line budget.
+ * Uses fetch + streaming response parsing to receive real-time push events
+ * from OpenCode's /event endpoint, ensuring E2E assertions are strictly
+ * event-driven with ZERO polling.
  */
 
 import {

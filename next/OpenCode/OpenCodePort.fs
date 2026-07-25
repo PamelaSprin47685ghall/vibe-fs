@@ -173,7 +173,7 @@ module OpenCodePort =
                            model = opts.Model
                            agent = opts.Agent |}
 
-                    let! res = postJson $"/session/{sId}/prompt" payload
+                    let! res = postJson $"/session/{sId}/prompt_async" payload
 
                     match res with
                     | Ok data ->
@@ -207,7 +207,7 @@ module OpenCodePort =
                            |> Option.map (fun agent -> [ "agent", box agent ])
                            |> Option.defaultValue [])
 
-                    let payload = createObj [ "body", box (createObj bodyFields) ]
+                    let payload = createObj bodyFields
 
                     let! res = postJson "/session" payload
 

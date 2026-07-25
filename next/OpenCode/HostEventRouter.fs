@@ -24,6 +24,8 @@ type HostEventRouter
     /// Zero-width space: invisible nudge that prompts LLM to continue.
     let ZWSP = "​"
 
+    let lastAssistantMsgs = Dictionary<string, obj>()
+
     let rawEvent (raw: obj) =
         if isNull raw || isNull raw?event then raw else raw?event
 
@@ -132,6 +134,16 @@ type HostEventRouter
                 sessionPort.SendPrompt(SessionId.create sessionId, ZWSP, { Model = None; Agent = None })
                 |> ignore
 
+    let getPartsArray (msg: obj) : obj array option =
+        if isNull msg then
+            None
+        elif not (isNull msg?parts) then
+            Some(unbox<obj array> msg?parts)
+        elif not (isNull msg?properties) && not (isNull msg?properties?parts) then
+            Some(unbox<obj array> msg?properties?parts)
+        else
+            None
+
     member _.Observe(raw: obj, forward: obj -> unit) =
         let sessionId, role = HostSessionContext.read raw
 
@@ -146,6 +158,29 @@ type HostEventRouter
             |> Option.iter (fun parentId ->
                 if not (String.IsNullOrWhiteSpace parentId) then
                     sessionParents.[sessionId] <- parentId)
+
+            let ev = if isNull raw?event then raw else raw?event
+            let props = if isNull ev then null else ev?properties
+            let msg = if isNull props then null else props?message
+            let target = if isNull msg then props else msg
+
+            if not (isNull target) then
+                let info = target?info
+
+                let r =
+                    if not (isNull info) && not (isNull info?role) then
+                        unbox<string> info?role
+                    elif not (isNull target?role) then
+                        unbox<string> target?role
+                    else
+                        ""
+
+                if r = "assistant" then
+                    match getPartsArray target with
+                    | Some _ -> lastAssistantMsgs.[sessionId] <- target
+                    | None ->
+                        if not (lastAssistantMsgs.ContainsKey sessionId) then
+                            lastAssistantMsgs.[sessionId] <- target
 
             if isAbortError raw then
                 abortChildren sessionId
@@ -164,34 +199,13 @@ type HostEventRouter
                     nudgeReviewer sessionId
                 | _ -> ()
 
-        FallbackDetect.observeEvent journal (defaultArg recordedErrors (HashSet<string>())) raw
+                match lastAssistantMsgs.TryGetValue sessionId with
+                | true, lastMsg ->
+                    FallbackDetect.observeIdle journal (defaultArg recordedErrors (HashSet<string>())) sessionId lastMsg
 
-        // Zero-width nudge: empty/XML-only assistant turn with no tool calls
-        let ev = if isNull raw?event then raw else raw?event
-
-        if not (isNull ev) then
-            let props = ev?properties
-
-            if not (isNull props) then
-                let msg = props?message
-                let target = if isNull msg then props else msg
-
-                if FallbackDetect.isFailedAssistant target then
-                    let msgId = FallbackDetect.messageId target
-
-                    let sid =
-                        let info = target?info
-
-                        if not (isNull info) && not (isNull info?sessionID) then
-                            unbox<string> info?sessionID
-                        elif not (isNull props?sessionID) then
-                            unbox<string> props?sessionID
-                        elif not (String.IsNullOrWhiteSpace sessionId) then
-                            sessionId
-                        else
-                            ""
-
-                    if not (String.IsNullOrWhiteSpace sid) then
-                        nudgeContinue sid msgId
+                    if FallbackDetect.isFailedAssistant lastMsg then
+                        let msgId = FallbackDetect.messageId lastMsg
+                        nudgeContinue sessionId msgId
+                | false, _ -> ()
 
         forward raw

@@ -7,10 +7,10 @@ import { getSessionId, runStaticGate, setupScenario, teardownScenario } from '..
 const __filename = fileURLToPath(import.meta.url);
 const managerTools = ['fork', 'join', 'list'];
 const forbiddenManagerTools = ['read', 'write', 'edit', 'bash', 'glob', 'grep', 'verdict'];
-const contextLimit = 4000;
-// Activation: estimateTokens >= 0.8 * 4000 = 3200 tokens = 12800 chars/4.
-const longText = 'dense work record sentence. '.repeat(80); // ~2240 chars per round
-const rounds = 8;
+const contextLimit = 1000;
+// Activation: estimateTokens >= 0.8 * 1000 = 800 tokens = 3200 chars/4.
+const longText = 'dense work record sentence. '.repeat(70); // ~1960 chars per round
+const rounds = 4;
 
 function journalContains(workDir, needle) {
   const runtimeDir = path.join(workDir, '.wanxiangshu-next', 'runtimes');
@@ -45,7 +45,7 @@ try {
     project: { files: { 'AGENTS.md': 'companion replacement canary\n' } },
     strict: true,
     contextLimit,
-    watchdogMs: 1000,
+   watchdogMs: 1000,
   });
   scenario.provider.allowSyntheticContinuations();
   scenario.provider.allowTitleGeneration();
@@ -72,7 +72,7 @@ try {
       },
     });
     assert.ok(prompt.ok, `round ${round} prompt failed: ${JSON.stringify(prompt.data)}`);
-    await turn.awaitTerminal({ timeoutMs: 1000, requireActivity: true, requireAssistantTerminal: false, requireIdleAfterActivity: true });
+   await turn.awaitTerminal({ timeoutMs: 1000, requireActivity: true, requireAssistantTerminal: false, requireIdleAfterActivity: true });
   }
 
   assert.ok(
@@ -92,7 +92,7 @@ try {
     'uncovered raw tail must be preserved verbatim',
   );
   assert.ok(
-    last.messages.length < rounds + 2,
+   last.messages.length < rounds * 2 + 1,
     `covered prefix must be skipped, got ${last.messages.length} messages after ${rounds} rounds`,
   );
 

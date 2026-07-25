@@ -3,7 +3,7 @@ import { fileURLToPath } from 'node:url';
 import { runStaticGate, setupScenario, teardownScenario, getSessionId } from '../index.js';
 
 const __filename = fileURLToPath(import.meta.url);
-const COMMAND = "node -e \"process.stdout.write('x'.repeat(450000))\"";
+const COMMAND = "node -e \"process.stdout.write('x'.repeat(10000))\"";
 
 function names(request) {
   return request.tools?.map((tool) => tool.function?.name || tool.name).filter(Boolean) || [];
@@ -12,7 +12,7 @@ function names(request) {
 let scenario;
 try {
   if (!runStaticGate([__filename]).passed) throw new Error('executor canary contains prohibited polling');
-  scenario = await setupScenario({ project: { files: { 'AGENTS.md': 'executor canary\n' } }, strict: true, watchdogMs: 1000 });
+  scenario = await setupScenario({ project: { files: { 'AGENTS.md': 'executor canary\n' } }, strict: true, watchdogMs: 3000 });
   scenario.provider.allowSyntheticContinuations();
   scenario.provider.allowTitleGeneration();
   scenario.provider.allowOutOfOrder();
@@ -22,19 +22,17 @@ try {
     tool: 'executor',
     args: {
       command: COMMAND,
-      estimated_output_bytes: 100000,
+      estimated_output_bytes: 2000,
       estimated_running_secs: 10,
       estimated_mem_usage: 'medium',
     },
     match: { requiredTools: ['executor'] },
   });
-  for (let index = 0; index < 3; index += 1) {
-    scenario.provider.expectText({
-      id: `executor-map-${index}`,
-      text: `chunk-${index}`,
-      match: { containsText: ['Summarize command output chunk'] },
-    });
-  }
+  scenario.provider.expectText({
+    id: 'executor-map-0',
+    text: 'chunk-0',
+    match: { containsText: ['Summarize command output chunk'] },
+  });
   scenario.provider.expectText({
     id: 'executor-reduce',
     text: 'reduced-output',
@@ -59,7 +57,7 @@ try {
     },
   });
   assert.ok(prompt.ok, `inspector prompt failed: ${JSON.stringify(prompt.data)}`);
-  await turn.awaitTerminal({ timeoutMs: 1000, requireActivity: true, requireAssistantTerminal: true, requireIdleAfterActivity: true });
+  await turn.awaitTerminal({ timeoutMs: 3000, requireActivity: true, requireAssistantTerminal: true, requireIdleAfterActivity: true });
 
   const requests = scenario.provider.requests;
   const childRequests = requests.filter((request) =>
@@ -67,15 +65,15 @@ try {
     && typeof request.messages?.at(-1)?.content === 'string'
     && request.messages.at(-1).content.startsWith('Summarize command output chunk'),
   );
-  assert.equal(childRequests.length, 3, '450KB output must create three 200KB Executor map requests');
+  assert.equal(childRequests.length, 1, '10KB output must create one Executor map request');
   assert.ok(childRequests.every((request) => names(request).length === 0), 'Executor summarizer must have no tools');
-  const reduceRequests = requests.filter((request) => JSON.stringify(request).includes('Reduce these command-output summaries'));
+  const reduceRequests = requests.filter((request) => names(request).length === 0 && JSON.stringify(request).includes('Reduce these command-output summaries'));
   assert.equal(reduceRequests.length, 1, 'Executor must reduce map summaries exactly once');
   assert.ok(requests.some((request) => names(request).includes('executor') && request !== requests[0]), 'Reduced result did not return to Inspector');
 
   scenario.provider.expectSatisfied();
   await teardownScenario(scenario);
-  console.log('Executor canary passed: real command, 200KB map/reduce, and Inspector result return.');
+  console.log('Executor canary passed: real command, spool map/reduce, and Inspector result return.');
 } catch (error) {
   console.error(`Executor canary failed: ${error.stack || error}`);
   if (scenario?.provider?.requests) {

@@ -168,6 +168,15 @@ export class StrictMockProvider {
       if (process.env.MOCK_TRACE) console.error('[MOCK-TRACE] -> title-bypass');
       return sendSSE(res, buildTextChunks(`title_${Date.now()}`, 'E2E Test Session', 1));
     }
+
+    const expIndex = s.allowOutOfOrder
+      ? s.expectations.findIndex((candidate) => candidate.respond.type !== 'no-more-requests-boundary' && matchesExpectation(parsed, candidate))
+      : (s.expectations.length > 0 && matchesExpectation(parsed, s.expectations[0]) ? 0 : -1);
+
+    if (expIndex >= 0) {
+      return this._dispatchFifo(res, parsed);
+    }
+
     if (isSyntheticContinuation(parsed) && (!s.strict || s.allowSyntheticContinuations)) {
       return this._bypassSynthetic(res, parsed, detectSyntheticMarker(parsed));
     }

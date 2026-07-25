@@ -30,21 +30,27 @@ try {
   scenario.provider.expectToolCall({
     id: 'orchestrator-worktree-fork',
     tool: 'fork',
-    args: { agent: 'manager', prompt: /deploy|worktree|ManagerJob|Manager/i },
+    args: { agent: 'manager', prompt: 'Fork a ManagerJob for worktree deploy.' },
     match: { requiredTools: ['fork', 'join'], forbiddenTools: ['read', 'write', 'edit', 'bash', 'glob', 'grep', 'verdict', 'list'] },
+  });
+
+  scenario.provider.expectText({
+    id: 'manager-job-done',
+    text: 'ManagerJob completed.',
+    match: { requiredTools: ['fork', 'join', 'list'] },
   });
 
   scenario.provider.expectToolCall({
     id: 'orchestrator-join-result',
     tool: 'join',
     args: {},
-    match: { requiredTools: ['fork', 'join'] },
+    match: { requiredTools: ['fork', 'join'], forbiddenTools: ['list'] },
   });
 
   scenario.provider.expectText({
     id: 'orchestrator-published',
-    text: /published|Published|ff-only|deployed|complete/i,
-    match: { requiredTools: ['fork', 'join'] },
+    text: 'Orchestrator published ff-only.',
+    match: { requiredTools: ['fork', 'join'], forbiddenTools: ['list'] },
   });
 
   const orchestrator = await scenario.client.createSession();
@@ -52,21 +58,24 @@ try {
   assert.ok(orchestratorId, `orchestrator session creation failed: ${JSON.stringify(orchestrator)}`);
   scenario.sessionIds.push(orchestratorId);
 
-  const turn = scenario.turn.start(orchestratorId);
+  const turn1 = scenario.turn.start(orchestratorId);
   const prompt = await scenario.client.request('POST', `/session/${orchestratorId}/prompt_async`, {
     body: {
       agent: 'orchestrator',
-      parts: [{ type: 'text', text: 'Run orchestrator cycle: fork a ManagerJob, join the Manager, and confirm the ff-only publish.' }],
+      parts: [{ type: 'text', text: 'Run orchestrator cycle: fork a ManagerJob for worktree deploy.' }],
       model: { providerID: 'test', modelID: 'test-model' },
     },
   });
   assert.ok(prompt.ok, `orchestrator prompt failed: ${JSON.stringify(prompt.data)}`);
-  await turn.awaitTerminal({ timeoutMs: 1000, requireIdleAfterActivity: false });
+  await turn1.awaitTerminal({ timeoutMs: 1000, requireActivity: true, requireAssistantTerminal: true, requireIdleAfterActivity: false });
+
+  const turn2 = scenario.turn.start(orchestratorId);
+  await turn2.awaitTerminal({ timeoutMs: 1000, requireActivity: true, requireAssistantTerminal: true, requireIdleAfterActivity: false });
 
   const orchestratorRequests = scenario.provider.requests.filter(
     (request) => {
       const toolNames = request.tools?.map((t) => t.function?.name || t.name).filter(Boolean) || [];
-      return toolNames.some((n) => ['fork', 'join'].includes(n));
+      return toolNames.length > 0 && !toolNames.includes('list') && toolNames.every((n) => ['fork', 'join'].includes(n));
     },
   );
   assert.ok(orchestratorRequests.length >= 2, 'Orchestrator must issue at least fork and join tool calls');

@@ -9,8 +9,8 @@ open Wanxiangshu.Next.Kernel.Identity
 open Wanxiangshu.Next.Kernel.Fact
 open Wanxiangshu.Next.Journal
 
-/// Detects failed assistant turns from SSE message events.
-/// Does NOT rely on remote error fields.  Two local heuristics:
+/// Detects failed assistant turns when a session reaches IDLE status.
+/// Does NOT rely on remote error fields or raw SSE streaming chunks.
 ///   1. Assistant message with zero-byte text → failed turn.
 ///   2. Assistant text contains XML markup but the message carries no
 ///      real tool-call parts → model wrote a tool call as prose.
@@ -127,42 +127,18 @@ module FallbackDetect =
         else
             Guid.NewGuid().ToString("N")
 
-    let observeEvent (journal: AgentJournal option) (recorded: HashSet<string>) (raw: obj) : unit =
+    let observeIdle (journal: AgentJournal option) (recorded: HashSet<string>) (sessionId: string) (msg: obj) : unit =
         match journal with
         | None -> ()
         | Some journal ->
-            let ev = if isNull raw?event then raw else raw?event
+            if not (isNull msg) && isFailedAssistant msg then
+                let msgId = messageId msg
 
-            if isNull ev then
-                ()
-            else
-                let props = ev?properties
+                if recorded.Add msgId then
+                    let fact =
+                        AgentFact.FallbackFailureRecorded
+                            {| SessionId = SessionId.create sessionId
+                               Reason = "empty or xml-only assistant turn" |}
 
-                if isNull props then
-                    ()
-                else
-                    let msg = props?message
-                    let target = if isNull msg then props else msg
-
-                    if isFailedAssistant target then
-                        let msgId = messageId target
-
-                        if recorded.Add msgId then
-                            let sid =
-                                let info = target?info
-
-                                if not (isNull info) && not (isNull info?sessionID) then
-                                    unbox<string> info?sessionID
-                                elif not (isNull props?sessionID) then
-                                    unbox<string> props?sessionID
-                                else
-                                    ""
-
-                            if not (String.IsNullOrWhiteSpace sid) then
-                                let fact =
-                                    AgentFact.FallbackFailureRecorded
-                                        {| SessionId = SessionId.create sid
-                                           Reason = "empty or xml-only assistant turn" |}
-
-                                AgentJournal.appendAgent (StreamId.Session(SessionId.create sid)) None fact journal
-                                |> ignore
+                    AgentJournal.appendAgent (StreamId.Session(SessionId.create sessionId)) None fact journal
+                    |> ignore

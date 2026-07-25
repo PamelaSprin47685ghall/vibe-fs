@@ -19,7 +19,7 @@ try {
     args: {
       command: SIGKILL_COMMAND,
       estimated_output_bytes: 1024,
-      estimated_running_secs: 1,
+      estimated_running_secs: 0.2,
       estimated_mem_usage: 'medium',
     },
     match: { requiredTools: ['executor'] },

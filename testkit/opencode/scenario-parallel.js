@@ -1,26 +1,11 @@
-/**
- * scenario-parallel.js — Parallel setup helpers.
- *
- * Setup has two independent branches that can run concurrently:
- *   1. Mock provider start (HTTP server, ~10ms).
- *   2. Scenario dir + project files + git init + AGENTS.md.
- *
- * The host branch (3) must start after the workspace is fully prepared,
- * because `opencode serve` reads AGENTS.md/git state at startup and
- * concurrent `git init`/`git commit` calls from the old parallel layout
- * caused intermittent `fetch failed` setup errors.
- *
- * Kept in its own module so scenario.js stays under the 200-line budget.
- */
-
-import fs from 'node:fs';
 import path from 'node:path';
-import { StrictMockProvider } from './strict-mock-provider.js';
+import fs from 'node:fs';
 import { ProcessHost } from './process-host.js';
 import { EventProbe } from './event-probe.js';
 import { FsOracle, HttpClient } from './scenario-http.js';
 import { initGitWorkspace } from './process-host-utils.js';
 import { resolvePluginPath } from './scenario-paths.js';
+import { StrictMockProvider } from './strict-mock-provider.js';
 import { createScenarioTurn } from './scenario-turn.js';
 import { Watchdog } from './watchdog.js';
 
@@ -33,39 +18,44 @@ export class Scenario {
     this.fs = ctx.fs;
     this.scenarioDir = ctx.scenarioDir;
     this.sessionIds = [];
-    this._tornDown = false;
     this.turn = createScenarioTurn(this);
+    this.watchdog = null;
+    this._tornDown = false;
   }
 
   async restart() {
+    this.watchdog?.pet("restart-stop-host");
     await this.host.stop({ assert: true });
+    this.watchdog?.pet("restart-close-events");
     await this.events.close();
+    this.watchdog?.pet("restart-start-host");
     await this.host.start(this.host._startOpts);
     this.client._baseUrl = this.host.baseUrl;
     this.events._baseUrl = this.host.baseUrl;
+    this.watchdog?.pet("restart-connect-events");
     await this.events.connect();
+    this.watchdog?.pet("restart-complete");
   }
 }
 
-export function configureProvider(provider, opts) {
-  if (opts.strict) provider.strict = true;
-  if (opts.allowSynthetic) provider.allowSyntheticContinuations();
-  if (opts.allowTitleGen) provider.allowTitleGeneration();
+function configureProvider(provider, opts) {
+  if (opts.strict !== undefined) provider.strict = !!opts.strict;
   return provider;
 }
 
-async function writeProjectFiles(workDir, project) {
-  for (const [file, content] of Object.entries(project)) {
-    const abs = path.join(workDir, file);
-    fs.mkdirSync(path.dirname(abs), { recursive: true });
-    fs.writeFileSync(abs, content);
-  }
+function ensureWorkspace(scenarioDir) {
+  const workDir = path.join(scenarioDir, 'workspace');
+  fs.mkdirSync(workDir, { recursive: true });
+  return workDir;
 }
 
 async function prepareWorkspace(workDir, project) {
   if (project) {
-    const files = project.files || project;
-    await writeProjectFiles(workDir, files);
+    for (const [relPath, content] of Object.entries(project.files || {})) {
+      const absPath = path.join(workDir, relPath);
+      fs.mkdirSync(path.dirname(absPath), { recursive: true });
+      fs.writeFileSync(absPath, content);
+    }
   }
   await initGitWorkspace(workDir);
 }
@@ -111,6 +101,7 @@ export async function setupScenarioParallel(opts, tmpDir) {
     client.onSessionCreated = (sid) => {
       if (!scenario.sessionIds.includes(sid)) scenario.sessionIds.push(sid);
     };
+
     const watchdogTimeout = opts.watchdogMs || 1000;
     const watchdog = new Watchdog({
       timeoutMs: watchdogTimeout,
@@ -135,9 +126,9 @@ export async function setupScenarioParallel(opts, tmpDir) {
     return scenario;
   } catch (err) {
     if (host.stdoutLog || host.stderrLog) {
-      console.error(`\n── setup failed host logs ──`);
-      if (host.stdoutLog) console.error(host.stdoutLog.slice(-2000));
-      if (host.stderrLog) console.error(host.stderrLog.slice(-3000));
+      console.error('--- Setup Scenario Host Logs ---');
+      if (host.stdoutLog) console.error(`stdout:\n${host.stdoutLog}`);
+      if (host.stderrLog) console.error(`stderr:\n${host.stderrLog}`);
     }
     try { await host.stop({ assert: false }); } catch {}
     try { await provider.stop(); } catch {}

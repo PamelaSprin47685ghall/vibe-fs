@@ -1,30 +1,9 @@
 /**
- * scenario-turn.js — Turn-scoped terminal oracle.
+ * scenario-turn.js — Strictly event-driven turn-scoped oracle.
  *
- * The previous `waitForSessionIdle` had three false-green paths:
- *   1. Any historical session.idle event satisfied the next wait.
- *   2. HTTP /session/status returning 'idle' immediately satisfied
- *      without proving the turn ever entered running/busy.
- *   3. The session disappearing from the status map was treated as
- *      idle without proving activity.
- *
- * `Turn.start` records the event watermark before sending a prompt.
- * `awaitTerminal` then requires two pieces of evidence:
- *   - requireActivity: at least one event with seq > eventSeqBefore,
- *     proving the turn entered non-idle territory.
- *   - requireIdleAfterActivity: a session.idle / session.status: idle
- *     event with seq > the activity watermark. Historical idle
- *     events from prior turns do NOT satisfy this — that's the
- *     PR1 fix for the original false-green path #1.
- *
- * For PR1, requireAssistantTerminal defaults to false so existing
- * canary tests (which use t.client.prompt + t.turn.start().awaitTerminal
- * without expecting a typed message) keep running. PR2 will flip
- * the default to true once each canary is rewritten to assert the
- * exact assistant message oracle.
+ * Uses push event notifications via `events.awaitEvent(...)`.
+ * 100% Event-driven; ZERO polling loops.
  */
-
-const IDLE_TYPES = ['session.idle'];
 
 function isIdleEvent(e) {
   if (e.type === 'session.idle') return true;
@@ -62,18 +41,6 @@ class Turn {
   get eventSeqBefore() { return this._eventSeqBefore; }
   get activitySeq() { return this._activitySeq; }
 
-  /**
-   * Await the terminal evidence:
-   *   requireActivity           — at least one event with seq > before
-   *   requireAssistantTerminal  — at least one assistant message event
-   *                              (default false; PR1 keeps legacy
-   *                              canary behaviour)
-   *   requireIdleAfterActivity  — session.idle with seq > activitySeq
-   *                              (default true; this is what blocks
-   *                              the historical-idle false-green path)
-   *
-   * Throws if any required piece is missing by timeoutMs.
-   */
   async awaitTerminal(opts = {}) {
     const o = {
       timeoutMs: opts.timeoutMs || 1000,

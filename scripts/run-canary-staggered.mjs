@@ -10,15 +10,16 @@ import { terminateTree } from "../testkit/process-lifecycle.js";
 import { recordSpawn, recordExit, RUN_ID } from "../testkit/spawn-ledger.js";
 
 function parsePositiveInt(value, fallback, name) {
+  if (value === undefined || value === null || value === '') return fallback;
   const n = Number(value);
-  if (!Number.isFinite(n) || Number.isNaN(n) || n <= 1 || n !== Math.floor(n)) {
+  if (!Number.isFinite(n) || Number.isNaN(n) || n <= 0 || n !== Math.floor(n)) {
     console.error(`CANARY: invalid ${name}=${value}; using fallback ${fallback}`);
     return fallback;
   }
   return n;
 }
 
-const MAX_PARALLEL = parsePositiveInt(process.env.MAX_PARALLEL_CANARIES, 4, "MAX_PARALLEL_CANARIES");
+const MAX_PARALLEL = parsePositiveInt(process.env.MAX_PARALLEL_CANARIES, 2, "MAX_PARALLEL_CANARIES");
 const CANARY_TIMEOUT_MS = parsePositiveInt(process.env.CANARY_TIMEOUT_MS, 30000, "CANARY_TIMEOUT_MS");
 const CANARY_TESTS = [
   "testkit/opencode/tests/agent-dsl-canary.mjs",

@@ -4,7 +4,9 @@ open System
 open System.Collections.Generic
 open System.Threading.Tasks
 open Wanxiangshu.Next.Kernel.Identity
+open Wanxiangshu.Next.Kernel.Fact
 open Wanxiangshu.Next.Kernel.Outcome
+open Wanxiangshu.Next.Journal
 open Fable.Core.JsInterop
 
 type SessionPromptOptions = OpenCodePromptOptions
@@ -30,7 +32,8 @@ type ISessionOutputBoundaryPort =
     abstract GetSessionOutputWatermark: sessionId: SessionId -> int
     abstract GetSessionOutputSince: sessionId: SessionId * watermark: int -> string list
 
-type InjectedSessionPort(underlyingPort: IOpenCodePort option, eventPort: IEventObservationPort) =
+type InjectedSessionPort(underlyingPort: IOpenCodePort option, eventPort: IEventObservationPort, ?journal: AgentJournal)
+    =
     let delayMs (ms: int) : Task<unit> =
         emitJsExpr ms "new Promise(r => setTimeout(r, $0))"
 
@@ -45,6 +48,14 @@ type InjectedSessionPort(underlyingPort: IOpenCodePort option, eventPort: IEvent
                 sessionOutputs.[sId] <- List<string>()
 
             sessionOutputs.[sId].Add(text))
+
+    let recordFailure (sId: SessionId) (reason: string) =
+        match journal with
+        | None -> ()
+        | Some j ->
+            let fact = AgentFact.FallbackFailureRecorded {| SessionId = sId; Reason = reason |}
+
+            AgentJournal.appendAgent (StreamId.Session sId) None fact j |> ignore
 
     let registerChild (pId: SessionId) (cId: SessionId) =
         lock lockObj (fun () ->
@@ -110,9 +121,18 @@ type InjectedSessionPort(underlyingPort: IOpenCodePort option, eventPort: IEvent
 
                         match res with
                         | Delivered msgId -> return Ok msgId
-                        | AcceptanceUnknown(reason, _) -> return Error reason
-                        | Retryable err -> return Error err
-                        | Fatal err -> return Error err
+                        | AcceptanceUnknown(reason, _) ->
+                            recordFailure sessionId reason
+                            eventPort.NotifyTerminal sessionId (Failed reason) |> ignore
+                            return Error reason
+                        | Retryable err ->
+                            recordFailure sessionId err
+                            eventPort.NotifyTerminal sessionId (Failed err) |> ignore
+                            return Error err
+                        | Fatal err ->
+                            recordFailure sessionId err
+                            eventPort.NotifyTerminal sessionId (Failed err) |> ignore
+                            return Error err
                     | None ->
                         let msgId = MessageId.create (Guid.NewGuid().ToString("N"))
                         eventPort.NotifyTerminal sessionId (Completed msgId) |> ignore
@@ -136,8 +156,6 @@ type InjectedSessionPort(underlyingPort: IOpenCodePort option, eventPort: IEvent
                     match result with
                     | Ok res -> outcome <- Ok res
                     | Error err ->
-                        printfn "[SendChildPrompt] attempt %d error: %s" attempts err
-
                         if attempts < 60 then
                             let! _ = delayMs 50
                             ()

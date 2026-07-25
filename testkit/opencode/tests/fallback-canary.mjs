@@ -44,9 +44,11 @@ function countFallbackFacts(workDir) {
 async function drainExpectations(scenario, timeoutMs) {
   const deadline = Date.now() + timeoutMs;
   while (scenario.provider.remainingExpectations > 0 && Date.now() < deadline) {
-    await new Promise((r) => setTimeout(r, 200));
+    scenario.watchdog?.pet('drain-expectations');
+    await new Promise((r) => setTimeout(r, 100));
   }
-  await new Promise((r) => setTimeout(r, 500));
+  scenario.watchdog?.pet('drain-expectations');
+  await new Promise((r) => setTimeout(r, 100));
 }
 
 let scenario;

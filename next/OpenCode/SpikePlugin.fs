@@ -75,7 +75,7 @@ module SpikePlugin =
             let portOpt = OpenCodePort.create input
             let journal = PluginHost.createJournal input
 
-            match PluginHost.createHost input portOpt with
+            match PluginHost.createHost input portOpt journal with
             | Error err -> return raise (InvalidOperationException err)
             | Ok(eventPort, sessionPort, subscription, observeEvent) ->
                 let companions = Dictionary<string, CompanionHost>()

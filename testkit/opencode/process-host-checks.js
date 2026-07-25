@@ -9,16 +9,22 @@ import { pidIsAlive } from '../process-lifecycle.js';
 
 export const isPidAlive = pidIsAlive;
 
-export async function checkSocketClosed(port, timeoutMs = SOCKET_CHECK_TIMEOUT_MS) {
+export async function checkSocketClosed(port, timeoutMs = 2000) {
   if (!port) return true;
-  return new Promise((resolve) => {
-    const socket = new net.Socket();
-    socket.setTimeout(timeoutMs);
-    socket.on('connect', () => { socket.destroy(); resolve(false); });
-    socket.on('error', () => { resolve(true); });
-    socket.on('timeout', () => { socket.destroy(); resolve(false); });
-    try { socket.connect(port, '127.0.0.1'); } catch { resolve(true); }
-  });
+  const start = Date.now();
+  while (Date.now() - start < timeoutMs) {
+    const closed = await new Promise((resolve) => {
+      const socket = new net.Socket();
+      socket.setTimeout(150);
+      socket.on('connect', () => { socket.destroy(); resolve(false); });
+      socket.on('error', () => { resolve(true); });
+      socket.on('timeout', () => { socket.destroy(); resolve(false); });
+      try { socket.connect(port, '127.0.0.1'); } catch { resolve(true); }
+    });
+    if (closed) return true;
+    await new Promise((r) => setTimeout(r, 30));
+  }
+  return false;
 }
 
 export async function checkProcessTree(pid, timeoutMs = PROCESS_TREE_TIMEOUT_MS) {

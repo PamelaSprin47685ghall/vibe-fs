@@ -1120,808 +1120,861 @@ Manager→Coder(异步)→Inspector(一次性同步)→Command(同步)。Coder�
 以上基于本次完整仓库快照的静态验收。
 
 ---
+这不是“测试难写”，而是**工程纪律失守**：为了让 E2E 看起来可控，工程师开始让生产代码迁就测试夹具，甚至擅自改变已经冻结的产品语义。下面这份可以直接发给工程队。
 
-# 一、这次真正做对了什么
+# Agent DSL E2E 跑偏事件：停工、追责与纠偏命令
 
-## 1. SSOT 已恢复，而且核心裁决基本正确
+## 一、总裁决
 
-新的 `next/Doc/SSOT.md` 已明确：
+本轮工作不予验收。
 
-* Manager 只有 `fork/join/list`；
-* busy existing agent 的 `fork` 是同 child fire-and-forget nudge；
-* Companion 在 JSON 投影层计算 delta；
-* Y busy 时跳过，不排队；
-* Event Sourcing、CQRS、Per-Runtime NDJSON 保留；
-* 不持久化调用栈、Stage、Phase、Lease；
-* Fallback 是每 session 累计四次失败；
-* Process 使用唯一 `3×estimate` deadline；
-* Review 是同 tree 两次 PERFECT；
-* Orchestrator 要 rebase 后重新审查。
+问题已经不是“E2E 尚未变绿”，而是：
 
-这意味着工程队终于有了可执行宪法，不再只能从聊天记录猜。
+> 工程师没有先证明测试模型正确，反而不断修改生产代码迎合失败的测试；测试仍然失败，生产代码却被加入了重试器、全局进程杀手、伪 PTY、测试台账和 ReviewGuard 漏洞。
 
-不过 README、AGENTS 和部分注释仍有旧措辞，例如 watermark、busy agent 不排队、Journal 显式启用等。它们必须降级为说明文件，不能再复制一份架构条款。
+这属于严重越权。
 
-## 2. Manager 工具面不再只是检查插件导出对象
+测试的职责是验证 SSOT，不是重新设计产品。测试不绿时，首先应怀疑：
 
-现在有真正的角色配置：
+1. 测试是否错误描述了并发因果关系；
+2. Mock 是否错误假设全局 FIFO；
+3. 等待条件是否观察了错误的 terminal；
+4. Harness 是否错误清理了资源；
+5. 测试是否把合法后台请求当作噪音。
+
+绝不能采用下面这种路线：
 
 ```text
-Manager:
-  *      deny
-  fork   allow
-  join   allow
-  list   allow
+测试挂起
+→ 给生产发送增加几十次重试
+→ 测试仍挂起
+→ 给生产加入全局 killAll
+→ 测试仍挂起
+→ Mock 绕过 Blogger
+→ 测试仍挂起
+→ 修改 Git tree 定义
 ```
 
-真实 Manager canary 还会检查 provider request 中不存在：
+这不是 TDD。这是让产品追着测试错误跑。
 
-```text
-read / write / edit / bash / glob / grep / verdict
-```
-
-并要求 Coder 那一轮才出现 `write`。
-
-这修复了上一快照最根本的假测试：Manager 自己直接写文件。
-
-## 3. Host terminal 不再永久绑定 SessionId
-
-上一版的：
-
-```text
-completedSessions: Set<SessionId>
-```
-
-已经被删除。
-
-`HostForkRuntime` 现在为每次运行建立：
-
-* 单独的 completion source；
-* output watermark；
-* terminal subscription；
-* token；
-* 当前运行边界。
-
-这让“同一个 child 顺序运行多轮”终于成为可能。
-
-## 4. 测试军团开始覆盖真实故障面
-
-当前已经出现：
-
-```text
-host-nudge-canary
-host-restart-canary
-host-abort-canary
-companion-canary
-companion-replacement-canary
-reviewer-verdict-canary
-reviewer-restart-canary
-fallback-canary
-executor-canary
-process-stress-canary
-pty-stress-canary
-orchestrator-canary
-```
-
-这比只写大量 Port 单元测试健康得多。
-
-但必须注意：**文件名叫 canary，不等于它证明了同名领域的完整行为。** 后面几个红线正是如此。
+当前诊断记录已经显示：Manager canary 的多次运行都停留在 busy 状态，期望队列仍有多项未消费；部分运行只出现 Manager 和 Blogger 请求，没有完成预期的 Coder→Join 链路。失败高度一致，不是偶发抖动。
 
 ---
 
-# 二、第一颗致命红雷：busy nudge 仍会丢 completion
+# 二、必须严厉斥责的行为
 
-这是当前 ForkRuntime 最大的问题。
+## 1. 禁止在生产代码中植入测试进程台账
 
-`HostForkRuntime` 的 pending run 仍以：
-
-```text
-agentId
-```
-
-作为唯一 key。
-
-设 Coder 正在执行第一次 prompt：
+`next/Process/RunnerCore.fs` 被加入了：
 
 ```text
-pendingRuns["coder-1"] = Run A
+WANXIANG_RUN_ID
+/tmp/wanxiang-ledger
+/proc/<pid>/stat
+测试 runId
+测试 expiresAt
 ```
 
-Manager 在它仍 busy 时再次：
+这是明显的测试基础设施渗入生产内核。
+
+生产 Process Runner 不应该知道：
+
+* 当前是不是 E2E；
+* 哪个测试套件启动了它；
+* 测试收割器在哪里；
+* 测试使用什么临时目录；
+* 测试 runner 的环境变量。
+
+更不能用一大段动态 JavaScript 偷偷写测试台账。
+
+**立即删除。**
+
+测试进程只能由 TestKit 通过它亲自 `spawn()` 得到的句柄管理。TestKit 没有句柄的进程，不得靠扫描命令行、环境变量和 `/proc` 猜测归属。
+
+## 2. 禁止插件卸载时全局杀死所有生产命令
+
+当前插件的 `dispose/unload` 调用：
 
 ```text
-fork(agent="coder-1", prompt="补充要求")
+PtySurface.killAllPtys()
+→ RunnerCore.killAllActive()
 ```
 
-当前实现会安装新的 Run B，并覆盖：
+而 `RunnerCore.killAllActive()` 管理的是所有 Runner child，不只是 PTY。
+
+这意味着插件卸载时可能同时杀死：
+
+* Inspector 正在执行的测试；
+* Executor 正在摘要的命令；
+* 用户主动启动的长任务；
+* 与 PTY 无关的进程。
+
+这是严重的资源所有权错误。
+
+正确原则：
 
 ```text
-pendingRuns["coder-1"] = Run B
+每个 Process handle 由创建它的资源作用域拥有
+每个 PTY handle 由对应 PTY record 拥有
+parent session 只清理自己的后代
+plugin unload 不得调用无归属的全局 killAll
 ```
 
-随后 child 出现 terminal：
+**立即回滚 `Plugin.fs` 中的全局清理入口和 `RunnerCore.killAllActive()`。**
 
-* Run A 的 listener 也收到事件；
-* 它检查 token，发现字典中已经是 Run B；
-* Run A 不完成；
-* Run B 完成；
-* 原始 `fork` 对应的 completion 永久丢失；
-* 某个 `join()` 永久等待。
+## 3. 禁止把 shell command 冒充 PTY
 
-这与用户冻结的语义相反。
+新增的 `PtySurface` 并不是 PTY：
 
-## 正确结构
+* 它调用的是普通 `Runner.execute`；
+* `PtyOptions = None`；
+* 没有长期 stdin；
+* 没有 read buffer；
+* signal 分支没有真正发信号；
+* 对已有 PTY 的“读”只是删除字典条目并返回 completed；
+* 使用 `CancellationToken.None`；
+* 硬编码最多八个；
+* 固定三十秒和固定输出估计。
 
-busy existing agent 的 fork 不应创建第二个待完成运行：
+这不是“先实现简版”，而是**错误实现了另一种东西，并给它贴上 PTY 标签**。
+
+SSOT 要求的是可复用的真实 PTY handle：
 
 ```text
-首次 fork
-→ 建立唯一 active completion
-
-busy existing fork
-→ 只向同一个 child SendPromptFireAndForget
-→ 不替换 active completion
-→ 不创建第二个 pending run
-→ 立即返回 Nudged
-
-child 最终 terminal
-→ 完成原 active completion
-→ join 收回一次结果
+创建
+写入
+读取
+发送结构化信号
+退出 completion
+父级取消
 ```
 
-只有 child 已经 idle 后再次 fork，才建立下一次 completion 边界。
+因此：
 
-## 现在的测试没有覆盖这一点
+> `next/OpenCode/PtySurface.fs` 整个删除，`ToolSurface` 中对应伪 PTY 分支全部回滚。
 
-`host-nudge-canary` 测试的是：
+等真正基于 `Process/Pty.fs` 的端到端实现准备好后再接入。
+
+## 4. 禁止把 fire-and-forget 改成六十次重试循环
+
+`InjectedSessionPort.SendChildPromptFireAndForget` 被改成：
 
 ```text
-第一轮 terminal
-→ 第二轮 prompt
-→ 第二轮 terminal
-→ 第三轮 prompt
+失败
+→ 等待 50ms
+→ 重发
+→ 最多 60 次
 ```
 
-这是**顺序复用**，不是 busy nudge。
+这同时违反数条冻结设计：
 
-下一条必须新增真实 E2E：
+* 不再是 fire-and-forget；
+* 插件开始管理宿主 prompt 队列；
+* 同一 prompt 可能被重复发送；
+* fork 工具可能阻塞数秒；
+* retry 策略没有 SSOT 授权；
+* 固定轮询延迟进入生产路径。
+
+更糟糕的是，发送失败还被直接写成 Fallback failure，并伪造 child terminal failure。这样同一个错误还可能被 HostEventRouter 再记一次。
+
+正确实现只有一次：
 
 ```text
-AG-BUSY-NUDGE-DOES-NOT-REPLACE-ACTIVE-RUN
+安装本次 listener
+→ 调用宿主 prompt_async 一次
+→ 宿主接受：立即返回
+→ 宿主明确拒绝：返回发送错误
 ```
 
-场景：
+是否进行模型 A/B fallback，由唯一的模型调用边界负责；Transport Port 不得擅自计数。
 
-1. Coder 第一次响应保持运行中；
-2. Manager 在 terminal 前再次 fork 同一 AgentId；
-3. 第二次 fork 立即返回；
-4. child session 数量仍为 1；
-5. 原始 completion 不丢；
-6. 最终只向 mailbox 写一次；
-7. 无永久 waiter。
+**立即回滚该循环、`recordFailure` 和伪造 terminal。**
 
-在这条测试通过前，不能宣布 fork/nudge 完成。
+## 5. 禁止为了 Review 测试通过而放宽 Git tree 定义
 
----
-
-# 三、第二颗致命红雷：B 版的定义实现错了
-
-你定义的 B 是：
-
-> Y 截至目前所有正式 assistant 输出的累计内容；Y 自压缩后，新的 B′ 替代旧 B。
-
-当前 `Companion.Submit` 每次 Blogger 成功后大致做的是：
+`GitTree.fs` 现在对未跟踪项目执行：
 
 ```text
-CurrentB = 本次 Blogger 输出
+不是普通文件 → 忽略
+stat/read 失败 → 忽略
 ```
 
-于是：
+ReviewGuard 必须 fail closed，而不是 fail open。
+
+如果一个未跟踪源文件无法读取，正确结果是：
 
 ```text
-第一次 Y 输出 B1
-第二次 Y 输出 B2
-第三次 Y 输出 B3
-```
-
-当前系统得到：
-
-```text
-CurrentB = B3
-```
-
-而正确结果应是：
-
-```text
-CurrentB = B1 + B2 + B3
-```
-
-直到发生 Y 自压缩：
-
-```text
-旧 B 作为 Y 输入
-→ Y 输出 B'
-→ CurrentB = B'
-```
-
-## 最小正确实现
-
-普通 Blogger 回合：
-
-```fsharp
-CurrentB =
-    match CurrentB with
-    | None -> paragraph
-    | Some old -> old + "\n\n" + paragraph
-```
-
-Y 自压缩回合：
-
-```fsharp
-CurrentB = rebasedOutput
-```
-
-二者不能共用一个“总是替换”的赋值。
-
-## 当前还缺 Y 自压缩程序
-
-代码中虽然出现了 `TryRebase` 一类原语，但尚未看到完整自动流程：
-
-```text
-检测 Y 接近上下文上限
-→ 本轮 delta 只包含当前 B
-→ 要求 Y 写成独立的新 B'
-→ 用 B' 替换 CurrentB
-→ 更新 JSON baseline
-```
-
-所以现在只能说：
-
-> X 的 Blogger 多轮调用有了；B 的认知压缩语义尚未实现。
-
----
-
-# 四、Companion 还有四个必须一起修的问题
-
-## 1. Companion 持久化不是原子的
-
-当前成功后分两次写：
-
-```text
-先写 projection baseline
-再写 B checkpoint
-```
-
-崩溃窗口：
-
-```text
-新 baseline 已持久化
-→ B 尚未持久化
-→ 进程崩溃
-```
-
-重启后系统会认为该投影已经被 Blogger 消化，却仍持有旧 B，于是永久丢掉一段内容。
-
-应改为一个事实：
-
-```fsharp
-CompanionAdvanced {
-    SessionId
-    BloggerSessionId
-    SuccessfulProjection
-    CurrentB
-}
-```
-
-一次 append、一次 flush、一次 Fold。
-
-`PrefixReplacementEnabled` 可以是另一条独立事实，因为它是一次性的状态转换。
-
-## 2. Prefix watermark 只比较 message ID
-
-当前前缀判断倾向于：
-
-```text
-旧消息 ID == 新消息 ID
-→ 认为相同
-```
-
-但 OpenCode 的 message/part 会原地更新：
-
-```text
-tool pending → completed
-assistant text 继续追加
-reasoning part 更新
-```
-
-若 ID 相同而内容已变，系统仍会把它当作已被 B 覆盖的前缀删除，导致最新工具结果或 assistant 内容消失。
-
-必须比较：
-
-```text
-canonical message JSON/hash
-```
-
-而不是只比较 ID。
-
-## 3. 角色白名单默认值反了
-
-当前未知角色可能默认允许 Companion。
-
-正确原则应是：
-
-```text
-明确 Manager/Coder/Orchestrator → 开启
-其他一律关闭
+tree hash 计算失败
+→ Review 不得确认
 ```
 
 不能：
 
 ```text
-无法识别角色 → 猜它可能需要 Blogger
+读不了
+→ 假装不存在
+→ 仍然 PERFECT
 ```
 
-同时 `build`、`plan` 被配置成 Manager 工具面，却未必在 Companion 角色解析中映射为 Manager。应先做唯一角色正规化：
+这会允许未审查文件逃出 Git tree hash。
+
+**恢复严格行为。**
+
+同时，`.wanxiangshu-next` 出现在测试工作区并造成 dirty，是持久化布局问题；不得通过篡改 Git tree 计算来隐藏。
+
+## 6. 禁止把聊天回复整段粘进 AGENTS.md
+
+`AGENTS.md` 从工程约束文件膨胀为近两千行，混入：
+
+* 历史审计结论；
+* 已过时的路线图；
+* 重复的 SSOT；
+* 相互冲突的状态声明；
+* 已经作废的稳定性门槛。
+
+README 又声称 `AGENTS.md` 是唯一产品宪法，而真正 SSOT 明确写着 `next/Doc/SSOT.md` 才是最高语义来源。
+
+此外，迁移总账被删除，失败诊断目录反而进入仓库。
+
+立即执行：
 
 ```text
-build / plan / manager → Manager
+恢复 MIGRATION.md
+AGENTS.md 缩回工程执行约束
+README 只描述已实现事实
+next/Doc/SSOT.md 保持唯一产品语义
+删除 diagnostics-archive
+把 diagnostics-archive 加入 .gitignore
 ```
-
-## 4. Blogger 没有明确使用便宜模型
-
-当前 Blogger child prompt 中未看到稳定的 cheap-model 配置注入；它很可能继承主模型或默认模型。
-
-这违背最初产品定义，也会显著增加成本。
-
-应在静态角色配置中定义：
-
-```text
-blogger:
-  model = configuredCheapModel
-  tools = none
-```
-
-而不是临时在每次 prompt 时猜模型。
 
 ---
 
-# 五、Journal 已经进入生产，但可能亲手弄脏 Git 工作区
+# 三、当前 E2E 设计为什么必然跑偏
 
-当前 Journal 默认位于类似：
+## 1. 用全局 FIFO 描述并发系统
 
-```text
-<workspace>/.wanxiangshu-next/runtimes/
-```
+Manager、Coder、Blogger、Title 等请求会并发出现。
 
-而 `.gitignore` 中没有确认忽略该目录。
-
-Orchestrator 的第一道门是：
+测试却先写一条全局队列：
 
 ```text
-git status --porcelain
-非空 → RejectedDirty
+Manager fork
+Coder write
+Coder final
+Manager join
+Manager final
 ```
 
-因此很可能发生：
+真实运行中 Blogger 可以插在任意两项之间，于是工程师又加入：
 
 ```text
-插件启动
-→ 创建 .wanxiangshu-next
-→ Git 看到未跟踪文件
-→ Orchestrator 永远拒绝用户
+allowOutOfOrder()
+allowBloggerRequests()
 ```
 
-这不是小问题，而是两个核心模块互相击穿。
+结果“Strict Mock”变成：
 
-## 正确位置
+* Blogger 无需显式期望；
+* 任何匹配项都可以从队列中间取走；
+* 测试无法证明因果顺序；
+* 意外额外 Blogger 请求也可能被吞掉。
 
-运行时事实应放在：
+这是错误抽象。
+
+正确模型不是全局 FIFO，而是**按会话和角色划分的因果通道**：
 
 ```text
-git rev-parse --git-common-dir
+Manager lane:
+  M1 fork
+  M2 join
+  M3 final
+
+Coder lane:
+  C1 write
+  C2 final
+
+Manager Blogger lane:
+  BM1 paragraph
+  BM2 paragraph
+
+Coder Blogger lane:
+  BC1 paragraph
 ```
 
-下的插件命名目录，例如：
+不同 lane 可以并发；同一 lane 内必须有序。
+
+每个请求必须显式消费一个期望，Blogger 也不例外。删除 P0 中的 Blogger 自动 bypass。
+
+## 2. 一秒静默 Watchdog 不等于正确超时
+
+当前 Watchdog 把以下行为都视为心跳：
+
+* 任意 SSE；
+* 任意 HTTP；
+* 任意 provider request。
+
+静默一秒便退出整个进程。
+
+这不能判断哪一个语义步骤挂了。它只会在：
+
+* 正常模型延迟；
+* 正常 join 等待；
+* 正常文件操作；
+  -正常进程退出清理；
+
+期间误杀测试。
+
+正确超时应绑定具体动作：
 
 ```text
-.git/wanxiangshu/runtimes/
+等待 child created 的 deadline
+等待 Coder terminal 的 deadline
+等待 join tool completed 的 deadline
+等待 Manager terminal 的 deadline
 ```
 
-或者系统 cache 中按 repository identity 分区。
+外层 Watchdog 只能作为最后保险，并且必须晚于完整场景 deadline；它不能参与通过与否的正常判断。
 
-不得依赖用户项目的 `.gitignore` 掩盖插件自身状态。
+## 3. 并行启动整个 P0 套件制造了人为进程风暴
 
-同理：
+为加速测试，工程师新增错峰并行 runner，随后又不得不新增：
 
-* worktree；
+* spawn ledger；
+* reaper；
+* `/proc` 扫描；
+* PID start-time 指纹；
+* command marker；
+  -全局 SIGKILL。
+
+这是典型的自造复杂度。
+
+P0 默认串行执行。最多重复三次。
+
+需要验证隔离能力时，另写一条专门的“双场景并行隔离测试”，而不是把所有 canary 同时启动。
+
+## 4. 自动 Reaper 不应成为 `npm test` 前置步骤
+
+当前 Reaper 会扫描系统进程，并依据命令行、环境变量、年龄和目录标记判断是否杀死。
+
+这在共享开发机上可能误杀：
+
+* 工程师正在调试的 OpenCode；
+* 另一个终端中的测试；
+* 用户实际运行中的万象术；
+* 命令行恰好包含相关路径的无关进程。
+
+测试只清理自己创建的进程树。
+
+跨运行清尸工具可以保留为**人工诊断命令**，但不得自动作为 `pretest` 执行。
+
+---
+
+# 四、正确的 E2E 测试蓝图
+
+## 1. 测试分层
+
+### Contract 测试
+
+不启动 OpenCode，验证：
+
+* Manager 工具面；
+  -角色工具矩阵；
+* schema；
+* Journal codec；
+  -纯 Fold；
+* Process budget；
+* Review verdict。
+
+### Host Adapter 测试
+
+使用窄 Fake Port 验证：
+
+* listener-before-send；
+* completion-before-join；
+* busy nudge 不替换 active completion；
+* parent cancellation；
+  -单次发送；
+  -无重试队列。
+
+Fake Port 只能证明 Adapter 程序，不得被称为真实 E2E。
+
+### 真实 OpenCode E2E
+
+只验证跨真实边界的关键契约：
+
+-真实 session create；
+-真实 prompt_async；
+-真实 assistant terminal；
+-真实工具面；
+-真实 transcript；
+-真实 abort；
+-真实 restart。
+
+### Process E2E
+
+独立 Node fixture，禁止经由 OpenCode 混测：
+
+* process tree；
+* SIGKILL；
+* stdout/stderr；
 * spool；
-* runtime 日志；
-  -临时 review 文件；
+* Large gate；
+* parent cancellation。
 
-都不能污染用户工作树。
+## 2. Manager→Coder→Join 正确场景
 
----
-
-# 六、Process 的“流式 spool”目前仍是假象
-
-这次确实修了很多表面合同：
-
-* executor 接受 estimate 字段；
-* threshold 变成 `3 × estimated_output_bytes`；
-* deadline 是 `3 × estimated_running_secs`；
-* Large 有全局 gate；
-* 200KB 用作 chunk；
-* Executor child 用于 map/reduce。
-
-但底层 Runner 仍然把全部 stdout/stderr chunk 放入内存数组。
-
-实际流程近似：
+显式建立因果期望：
 
 ```text
-每次 data
-→ 写 spool
-→ 同时加入内存数组
-
-进程结束
-→ 把所有数组 concat 成完整 byte[]
-→ 再切成 200KB chunks
+创建 Manager
+→ Manager request M1 调用 fork(coder)
+→ 观察真实 child session C
+→ Coder request C1 调用 write
+→ Coder request C2 返回 A
+→ 观察 Coder assistant terminal
+→ Manager request M2 调用 join
+→ join tool result 含本轮 Coder A
+→ Manager request M3 返回最终正文
+→ Manager terminal
 ```
 
-所以 30GB 输出时仍然需要接近 30GB 甚至更多内存。
-
-这不是 streaming spool，只是：
-
-> 一边写文件，一边仍然完整缓存。
-
-## 正确实现
-
-超过摘要阈值后：
+同时明确处理 Companion：
 
 ```text
-小前缀可留内存
-完整内容只进入 spool
-内存不再保存后续 byte[]
+Manager Blogger 与 Coder Blogger 各有自己的 expectation lane
+每次 Blogger 请求都显式计数
+禁止 Blogger-of-Blogger
+不得用通用 bypass 隐藏请求
 ```
 
-摘要时：
+最后执行：
 
 ```text
-打开 spool
-→ 每次 read 200KB
-→ 发送一次性 Executor
-→ 释放 chunk
-→ 继续下一块
-→ reduce summaries
+expectNoMoreRequests()
 ```
 
-内存复杂度必须是：
+## 3. 等待必须使用语义事件
+
+禁止用“整个 session idle”替代具体动作。
+
+Manager canary 应等待：
 
 ```text
-O(200KB + 摘要文本)
-```
-
-而不是：
-
-```text
-O(完整输出)
-```
-
-## 取消也没闭合
-
-当前 Executor 运行路径仍有使用 `CancellationToken.None` 的迹象，Large gate 也未充分绑定取消。
-
-这意味着 parent abort 后，command 可能继续跑到其 `3×estimate` deadline。
-
-唯一 deadline 并不等于无取消。正确语义是：
-
-```text
-先发生者：
-- process exit
-- parent cancellation
-- 3×estimate deadline
-```
-
-parent cancellation 应立即 SIGKILL 进程树，然后正常等待 EOF/pump 结束；不增加第二层 timeout。
-
----
-
-# 七、Fallback：持久计数有了，真实 A/B 执行仍未闭合
-
-目前可以确认的只是：
-
-```text
-失败事实写入 NDJSON
-→ 重启后累计失败数仍在
-```
-
-但产品真正要求的是：
-
-```text
-失败 1 → 自动重试 A
-失败 2 → 永久切 B，并自动尝试 B
-失败 3 → 自动重试 B
-失败 4 → SessionDead
-```
-
-当前仍有几个问题：
-
-1. `DurableFallback` 与纯 `Fallback.nextAttempt` 的边界复杂，仍容易出现推进两次的 off-by-one。
-2. ModelResolver 虽然存在，但 ForkRuntime 构造路径不一定真正传入并使用。
-3. 顶层 Manager session 的模型切换链没有完整接入。
-4. `fallback-canary` 主要检查 NDJSON 事件和累计数，没有验证实际 provider request 的模型 A/A/B/B。
-5. provider error 和 assistant failed 可能通过两个观察路径重复记一次失败。
-6. 无 message ID 时使用随机 ID，会让重复事件无法去重。
-
-下一条真正有意义的 E2E 必须捕获四次 provider request，断言模型序列：
-
-```text
-A
-A
-B
-B
-```
-
-第五次请求不得发生，session 明确进入 dead。
-
----
-
-# 八、Review：verdict 工具成立，但 Guard 仍只完成一半
-
-## 已完成
-
-* verdict 是真实结构化工具；
-* REVISE 立即生效；
-* 两个不同 ToolCallId 的 PERFECT；
-* 同 Git tree 才确认；
-* restart 后可恢复第一次 PERFECT。
-
-这些属于实质性成果。
-
-## 未完成一：Reviewer 不返回 verdict
-
-当前缺失 verdict 的 nudge 仍接近：
-
-```text
-每个 reviewer session 最多 nudge 一次
-```
-
-而不是：
-
-```text
-每个 reviewer run 若 terminal 且本轮无 verdict
-→ nudge 同一 reviewer
-```
-
-进程内 HashSet 也不能跨重启去重，且第一次 review 用过 verdict 后，第二次 review 若漏 verdict 可能无法正确判断。
-
-必须使用本轮 assistant/tool boundary 和 durable `GuardPromptAccepted`。
-
-## 未完成二：Manager Finish Guard
-
-尚未形成完整真实链路：
-
-```text
+child session created
+Coder write tool completed
+Coder assistant terminal
+Manager join tool completed
 Manager assistant terminal
-→ 读取当前 Git tree
-→ 查看 Review Projection
-→ 未双 PERFECT：nudge 同一 Manager
-→ 已双 PERFECT且 tree 相同：允许结束
 ```
 
-当前 Review canary 主要直接调用 verdict 工具，不等价于 Manager 被 Guard 拦截。
+若其中一步超时，错误必须直接写明：
+
+```text
+Timed out waiting for Coder assistant terminal
+```
+
+而不是：
+
+```text
+Watchdog silent
+```
+
+## 4. 并发竞态应确定性注入
+
+稳定性不能靠高次数碰运气。
+
+最多三次普通运行，另外建立三类确定性场景：
+
+```text
+Coder 完成早于 Manager 调用 join
+Manager 先调用 join，Coder 后完成
+Blogger 请求插在 Manager 与 Coder 请求之间
+```
+
+busy nudge 也使用受控屏障：
+
+```text
+冻结 Coder 第一轮 terminal
+发送第二次 fork(existing)
+验证 child 数量仍为一
+释放第一轮 terminal
+验证 completion 恰好一次
+```
 
 ---
 
-# 九、Orchestrator canary 没有测试 Orchestrator
+# 五、立即回滚清单
 
-这是目前最严重的“名称大于内容”测试。
-
-生产 `Orchestrator.fs` 已经出现：
-
-* worktree；
-* publish semaphore；
-* candidate；
-* rebase；
-* reverify；
-* ff-only；
-* durable facts。
-
-但 OpenCode 的 Orchestrator `fork(manager)` 仍然走通用 `HostForkRuntime`，而不是这套 Git 发布程序。
-
-现有 canary 做的是：
+以下内容必须从当前分支撤销：
 
 ```text
-Orchestrator LLM
-→ fork Manager child
-→ list
-→ join
+next/OpenCode/PtySurface.fs
+RunnerCore.activeChildrenJs
+RunnerCore.killAllActive
+RunnerCore 中 wanxiang-ledger / WANXIANG_RUN_ID 代码
+Plugin dispose/unload 全局 killAll
+Sessions 中 60 次 prompt 重试
+Sessions 中 Transport 层 FallbackFailureRecorded
+Sessions 中发送失败伪造 terminal
+GitTree 对未跟踪内容 fail-open 的过滤
+P0 中 allowOutOfOrder
+P0 中 allowBloggerRequests 自动响应
+自动 pretest reaper
+默认整套 canary 并行执行
+diagnostics-archive 入库
 ```
 
-它没有证明：
+以下内容可以保留，但必须重新验收：
 
 ```text
-创建隔离 worktree
-→ Manager 在 worktree 工作
-→ 初次双 PERFECT
-→ 自动 candidate commit
-→ 串行 rebase
-→ 冲突回交同 Manager
-→ rebase 后双 PERFECT
-→ ff-only
-→ Published fact
+per-Run terminal listener
+output watermark
+Manager 角色权限配置
+Boot/Fold Journal
+TestKit 独立环境
+严格 Mock 基础
+诊断收集
+按所有权清理 ProcessHost 自己的子进程
+模块拆分
 ```
-
-甚至存在合同冲突：
-
-* SSOT：Orchestrator 只有 `fork/join`；
-* canary：要求 `fork/list/join`；
-  -静态角色配置：可能禁止 `list`。
-
-必须删除这个假 canary 的“publish”称谓，把它降级为：
-
-```text
-orchestrator-agent-tool-surface-canary
-```
-
-然后另建真正的 Git E2E。
 
 ---
 
-# 十、角色矩阵仍未完整接线
+# 六、修复生产代码的唯一顺序
 
-当前至少有这些缺口：
+## 提交一：纯回滚
 
-| 角色           | SSOT                             | 当前问题                    |
-| ------------ | -------------------------------- | ----------------------- |
-| Coder        | 文件工具 + 一次性 Inspector             | 没有清楚的 `inspector` 工具接线  |
-| Inspector    | 仅 executor                       | 基本接近                    |
-| Browser      | read + web                       | 目前接近无工具配置               |
-| Meditator    | read/glob/grep/inspector         | 目前接近无工具配置               |
-| Reviewer     | read/glob/grep/inspector/verdict | 配置允许 inspector，但实际工具未注册 |
-| Executor     | 无工具                              | 方向正确                    |
-| Blogger      | 无工具 + cheap model                | 无工具正确，cheap model 未闭合   |
-| Orchestrator | fork/join                        | canary 仍要求 list         |
+只删除测试驱动的生产污染，不添加新功能。
 
-不能只验证 Manager，必须为每个角色捕获真实 provider tool snapshot。
+验收：
 
----
+* production 不出现 `WANXIANG_RUN_ID`；
+* production 不写 `wanxiang-ledger`；
+* production 不存在全局 killAll；
+* production 不存在 prompt 重试循环；
+  -伪 PTY 被删除；
+* SSOT 无变化。
 
-# 十一、PTY 还没有成为统一 DSL
+## 提交二：修复 TestKit 期望模型
 
-底层 PTY 和 stress canary 已存在，但模型侧统一协议尚未落地。
-
-目标是：
+实现 per-lane expectation：
 
 ```text
-fork(agent="pty", prompt="command")
-fork(agent="<pty-id>", prompt="stdin")
-fork(agent="<pty-id>", prompt="")
-fork(agent="<pty-id>", signal="TERM" | "KILL")
-list()
-join()
+session/role/turn/request-kind
 ```
 
-当前 ToolSurface 的 `fork` 主要识别 AgentRole，`pty` 并未完整进入同一 handle/completion mailbox；`list()` 也主要列 agent。
+删除全局 out-of-order 开关和 Blogger bypass。
 
-因此 PTY stress 只能证明底层 PTY 封装，而不能证明“PTY 与 Agent 统一工具表面”。
+先用纯 TestKit 自测证明：
 
----
+* lane 间可交错；
+* lane 内保序；
+  -多余请求必失败；
+  -缺少请求必失败。
 
-# 十三、当前战役位置
+## 提交三：重新建立最小 Manager E2E
+
+只运行一个 Manager 场景，不并行其他 canary。
+
+最多三次。
+
+不得同时修 Process、Review、PTY、Fallback 或 Orchestrator。
+
+## 提交四：恢复 Companion E2E
+
+显式加入 Blogger lane，验证：
+
+* 角色白名单；
+* Manager 与 Coder 各自 Blogger；
+  -无递归 sidecar；
+  -B 累积；
+  -busy skip；
+  -重启恢复。
+
+## 提交五：再恢复其他 E2E
+
+顺序固定：
 
 ```text
-战役 0：SSOT                         🟢 基本恢复
-战役 1：TestKit                     🟢 完成
-战役 2：旧架构清理                  🟢 完成
-战役 3：Flow / Journal 基座         🟢 基本完成
-战役 4：真实 Host Spike             🟢 全部边界已通过
-战役 5：Fork / Join                 🟢 nudge 不丢 completion
-战役 6：Companion                   🟢 B 累积已修复
-战役 7：角色能力                    🟡 Manager 正确，其余未齐
-战役 8：Process                     🟢 流式 spool 已修复
-战役 9：Fallback                    🟡 durable facts 有，执行链无
-战役 10：Review                     🟡 verdict 有，Guard 未闭环
-战役 11：PTY                        🟡 底层有，统一 DSL 无
-战役 12：Manager 产品纵切           🟢 首次真实成立
-战役 13：Orchestrator               🔴 canary 绕过生产程序
-战役 15：20× 稳定军团               🔴 未达门槛
-战役 16：发布                       🔴 禁止
+Reviewer
+Fallback
+Process
+PTY
+Orchestrator
 ```
 
-项目已经不必再退回 Fake Host 阶段。
-
-但也不能继续横向铺新模块。现在必须进入：
-
-> **并发语义与耐久语义收口阶段。**
+任何阶段未绿，不准修改下一阶段生产代码。
 
 ---
 
-# 十四、下一步只准五个提交
+# 七、以后必须执行的变更纪律
 
-## 提交 1：修 busy nudge ✅
+每次生产修改前必须回答：
 
-* 一个 child 最多一个 active completion；
-* busy existing fork 只发送 prompt，不替换 pending run；
-* idle 后再 fork 才创建新 completion；
-* 已完成：cfd07e9f
+1. 它对应 SSOT 哪一条？
+2. 哪个红测试证明外部行为错误？
+3. 错误属于 Harness 还是 Production？
+4. 修改是否引入新 retry、timeout、queue、cap、global registry？
+5. 这个设计在测试之外是否仍合理？
 
-## 提交 2：修 Companion 真正语义 ✅
-
-* B 普通回合累积；
-* B 自压缩时替换；
-* `CompanionAdvanced` 单 Fact 原子提交；
-* canonical JSON message hash；
-* build/plan 归一为 Manager；
-* unknown role 默认关闭；
-* Blogger 固定 cheap model；
-  -真实 Y 自压缩与 restart E2E。
-
-## 提交 3：重做 Process spool ✅
-
-* 超阈值后停止内存累积；
-* 从 spool 流式读 200KB；
-* chunk 用后释放；
-* parent cancellation 贯穿 Runner、LargeGate 和 process；
-* summary 后清理 spool；
-* 10GB 等价生成器压力测试验证 RSS 有界。
-* 已完成：834cb579
-
-## 提交 4：闭合 Review 与 Fallback
-
-* Reviewer missing-verdict 按 run Guard；
-* Manager finish Guard；
-* Guard claim 持久化；
-* provider 请求实测 A/A/B/B；
-* 单一失败归因和稳定 dedup ID；
-  -第四次失败后 session dead。
-
-## 提交 5：真正接线 Orchestrator
-
-* Orchestrator fork 调用 ManagerJob 程序，而非普通 HostForkRuntime；
-  -去掉 Orchestrator `list`；
-* Journal 移出工作树；
-  -自动 candidate commit；
-  -真实 Git conflict 同 Manager 修复；
-  -rebase 后真实 Reviewer 双 PERFECT；
-  -ff-only + Published；
-  -重启恢复 pending job；
-  -真实 Git E2E。
-
----
-
-# 最终评价
-
-这次工程师终于不是在“造看起来正确的目录”了，已经真正接入了 OpenCode、真实 child session、角色工具面、Journal 和多种 canary。
-
-这是质变，值得肯定。
-
-但当前尚无不能妥协的核心内存错误。
-
-这三条不解决，分别会导致：
+以下理由一律驳回：
 
 ```text
-join 永久挂起
-上下文压缩丢失历史
-大输出吃光内存
+为了让 E2E 不挂
+为了方便清理
+先加一个全局表
+先重试几十次
+测试环境才会设置这个变量
+以后再换成真正 PTY
+先忽略读不到的文件
 ```
 
-所以总指挥命令是：
-
-> **停止增加 canary 名称和模块数量；开始证明最坏路径。**
-
-跨过这三条以后，项目才算真正从“能跑 happy path”进入“架构可信”。
+没有 SSOT 授权的生产语义，不得因测试失败而添加。
 
 ---
 
-今后本项目的重复稳定性测试**上限固定为 3 次**，不再要求更高次数。
+# 八、对工程队的正式斥责
 
-路线图中的门禁统一改为：
+这次最不可接受的，不是测试没通过。
+
+测试没通过很正常，暴露问题正是测试的价值。
+
+不可接受的是：
+
+> 在没有找到测试模型错误之前，擅自改变产品语义；在没有形成真实 PTY 前，提交冒牌 PTY；在清理测试进程困难时，把测试台账写入生产 Runner；在 Review tree 计算遇到障碍时，选择忽略无法读取的内容。
+
+这是典型的“让错误消失”，而不是“让系统正确”。
+
+你们写了很多代码，但代码量不能抵消方向错误。越是在基础设施和并发边界上，越不能用重试、全局状态和 SIGKILL 堆出一种“看起来稳定”的假象。
+
+现在停止扩张。
+
+先把生产代码恢复到未被 E2E 污染的状态，再把测试设计正确。测试必须服从 SSOT，生产绝不能服从测试夹具。
+
+当前最优先的动作是回滚 `Sessions.fs` 的重复发送、`RunnerCore.fs` 的测试台账与全局杀进程，以及整套伪 PTY；这三处分别会造成重复用户请求、误杀正常任务和虚假能力声明。
+
+---
+同意。这两点我上一条批评过头，正式撤回：
+
+1. **一秒静默 Watchdog 保留。**
+2. **整个 P0 套件并行启动保留。**
+
+真正的问题不是它们本身，而是工程师没有把“心跳归属”和“场景隔离”设计正确，随后用生产代码补测试基础设施的洞。
+
+## 一秒静默 Watchdog 的正确定位
+
+它不是普通业务 timeout，而是 E2E 的**死锁探针**：
+
+> 一个正常运行的本地 Mock E2E，在一秒内应持续产生可观察的因果进展；若完全静默，说明事件链、Provider、工具、子进程或等待器很可能已经断裂。
+
+因此一秒可以保留，不需要放宽。
+
+但心跳必须满足两个条件：
 
 ```text
-关键 canary：1～3 次
-随机延迟/乱序场景：固定种子，最多 3 组
-可靠性来源：确定性竞态注入、故障测试、属性测试、不变量和泄漏检查
-禁止用大量重复运行掩盖时序不确定性
+属于当前 scenario
+并且代表当前 scenario 的真实进展
 ```
 
-上一版所有高次数重复要求全部作废。
+### 应算心跳
+
+* 当前场景的 OpenCode SSE 序号推进；
+* 当前场景收到新的 Mock Provider 请求；
+* 当前场景的 Provider 开始或完成响应；
+* 当前场景的 tool 状态发生变化；
+* 当前场景创建、结束或取消 session；
+* 当前场景拥有的进程产生 stdout/stderr、退出或状态变化；
+* TestKit 中受控 barrier 被释放或状态推进；
+* 一个预期被当前请求成功消费。
+
+### 不应算心跳
+
+* Watchdog 自己的定时器；
+* diagnostics 轮询；
+* health-check HTTP 请求；
+* 另一个并行场景的事件；
+* 与当前关键路径无关的后台噪音；
+* 人工定时发送的空 ping；
+* 未匹配任何 expectation 的 Blogger chatter。
+
+最后一点尤其重要。当前 Manager 已经挂在 `join()`，若 Blogger 不断产生请求，不能因此一直重置 Watchdog。
+
+更准确的定义是：
+
+> **心跳必须推进当前场景拥有的因果图，或推进一个明确登记的后台分支。**
+
+建议 TestKit 为每个 scenario 保存：
+
+```text
+lastProgressAt
+lastProgressReason
+lastProgressLane
+lastConsumedExpectation
+```
+
+Watchdog 报错时直接输出：
+
+```text
+Silent for 1s
+Last progress: Coder lane consumed expectation C1
+Blocked expectations:
+  C2 Coder final
+  M2 Manager join
+```
+
+这比模糊的“最后收到一个 SSE”有用得多。
+
+---
+
+## 并行启动整个 P0 套件也是正确设计
+
+我之前建议默认串行，这是错误纠偏。
+
+P0 并行不仅是加速手段，本身还是重要契约：
+
+> **每个 OpenCode 实例、插件 Runtime、Journal、Mock Provider、进程树和临时工作区应天然互不干扰。**
+
+若并行会互相污染，应该修隔离，而不是通过串行掩盖。
+
+### 每个 scenario 必须独占
+
+```text
+临时根目录
+workspace / Git repository
+HOME
+XDG_CONFIG_HOME
+XDG_CACHE_HOME
+OpenCode 数据目录
+插件配置
+Mock Provider server
+端口
+Journal runtime 目录
+spool 目录
+PTY namespace
+diagnostics 目录
+进程组
+expectation store
+```
+
+### 只允许共享
+
+```text
+只读的 build 产物
+只读的测试 fixture
+只读的源码
+```
+
+构建必须在并行 fan-out 前完成，运行期间任何场景都不能修改共享 build。
+
+### 禁止出现的共享状态
+
+```text
+固定 /tmp/wanxiang-ledger
+生产代码内全局 activeChildren
+跨 scenario 的静态 process registry
+固定端口
+共享 Journal
+共享 mock expectation queue
+共享 OpenCode HOME
+按命令行扫描全机进程
+插件 unload 时全局 killAll
+```
+
+每个 scenario 只清理自己持有的句柄和进程组。
+
+---
+
+## 这反而进一步证明当前生产改动是错的
+
+保留并行 P0，不代表生产 Runner 应承担测试隔离。
+
+恰恰相反：
+
+> **并行隔离必须由 TestKit 在外部建立，不能把 run ID、测试台账和收割机制塞进生产内核。**
+
+因此我上一条中的这些回滚要求仍然成立：
+
+* 删除 `RunnerCore` 中的 `WANXIANG_RUN_ID`；
+* 删除 `/tmp/wanxiang-ledger`；
+* 删除生产代码的测试进程登记；
+* 删除插件卸载时的全局 `killAllActive()`；
+* 删除自动扫描其他进程的归属猜测；
+* 每个场景通过自己持有的 ProcessHost 和进程组清理资源。
+
+可以在 TestKit 侧存在：
+
+```text
+ScenarioRunId
+SpawnLedger
+OwnedProcessGroup
+ScenarioDiagnostics
+```
+
+但这些不能进入：
+
+```text
+next/Process/**
+next/OpenCode/**
+```
+
+---
+
+## Strict Mock 也应按并行语义重做
+
+不是把全局 FIFO 改成“允许乱序”，而是每个 scenario 内按 lane 建立有序期望：
+
+```text
+Scenario A
+  Manager lane
+  Coder lane
+  Manager Blogger lane
+  Coder Blogger lane
+
+Scenario B
+  Manager lane
+  Reviewer lane
+```
+
+规则：
+
+* scenario 之间完全隔离；
+* lane 之间允许交错；
+* lane 内严格有序；
+* 每个真实请求必须匹配一个显式 expectation；
+* unmatched request 立即失败；
+* 测试结束必须没有剩余 expectation；
+* Blogger 不得通过通用 bypass 偷吃请求。
+
+这样并发是设计的一部分，而不是 Mock 的例外开关。
+
+---
+
+## 修订后的纠偏命令
+
+上一版中这两条删除：
+
+```text
+P0 默认串行执行
+一秒静默 Watchdog 不合理
+```
+
+改为：
+
+```text
+P0 默认并行执行，至多重复 3 次
+一秒 scenario-local 静默 Watchdog 保留
+```
+
+工程师当前真正需要修的是：
+
+1. 将 Watchdog 从“任何噪音都是心跳”改成“因果进展才是心跳”；
+2. 将并行隔离从生产 Runner 中移回 TestKit；
+3. 每个场景独占 Provider、状态目录、进程组和 expectation store；
+4. 删除跨场景全局清理和系统进程扫描；
+5. 用 per-scenario、per-lane expectation 取代全局 FIFO 与宽松乱序。
+
+所以最终原则是：
+
+> **Watchdog 要更严格，不是更宽松；P0 要继续并行，不是退回串行。**
+
+当前仓库中的失败诊断也正适合用这一原则解释：多个会话持续处于 busy，Blogger 请求在推进，但 Manager 的关键期望没有消费。此时 Blogger 活动不应无限延长 Manager 场景寿命；Watchdog 应报告“有背景活动，但关键路径一秒未推进”，而不是简单地判断整个进程是否有任何事件。

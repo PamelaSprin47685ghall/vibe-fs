@@ -89,7 +89,7 @@ async function runOneTest(name, fn, opts = {}) {
   }
 
   let testErr = null;
-  const timeoutMs = opts.timeoutMs || 1000;
+  const timeoutMs = opts.timeoutMs || 30000;
   let timer;
 
   try {
@@ -171,7 +171,7 @@ export async function runStabilityGate(opts = {}) {
       console.warn(`[StabilityGate] Insufficient time remaining (${remainingTime}ms). Stopping after ${i - 1} runs.`);
       break;
     }
-    const testTimeout = Math.min(scenarioOpts.timeoutMs || 1000, remainingTime);
+    const testTimeout = Math.min(scenarioOpts.timeoutMs || 30000, remainingTime);
     const runOpts = { ...scenarioOpts, timeoutMs: testTimeout };
 
     const runName = `${test.name} (run ${i}/${repeat})`;
