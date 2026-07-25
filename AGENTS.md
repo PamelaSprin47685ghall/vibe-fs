@@ -129,7 +129,8 @@ import:
   - Y self-rebase → CurrentB 只等于 B'（旧 B 自然退出 transcript）
 
 ### 当前未闭合
-- Process：真实 Executor map/reduce canary 已通过（450KB 大输出）；SIGKILL 压力已纳入默认 P0；PTY stress canary 已通过 3×。
+- 全部稳定性门禁已通过（P0 canary 全部接入 test:e2e:p0），3× 验收门已满足。
+- 生产入口切换与旧资产删除需等待全部边界通过确认。
 
 ## 验证命令
 
