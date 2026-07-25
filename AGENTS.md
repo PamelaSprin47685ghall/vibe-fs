@@ -129,7 +129,6 @@ import:
   - Y self-rebase → CurrentB 只等于 B'（旧 B 自然退出 transcript）
 
 ### 当前未闭合
-- Reviewer：真实 verdict canary 已通过；parent terminal 无 verdict 的重复 nudge、重启 reconcile 仍待真实 Host E2E。
 - Process：真实 Executor map/reduce canary 已通过；SIGKILL 压力已纳入默认 P0；PTY stress canary 已通过 3× 待验收，大输入压力仍待补充 canary。
 
 ## 验证命令
@@ -1041,7 +1040,7 @@ Manager→Coder(异步)→Inspector(一次性同步)→Command(同步)。Coder�
 - 真实 parent abort 已闭合：parent abort 传播到 busy child 并关闭两条悬挂 SSE 流。
 - 迟到 terminal/reasoning-part 混合仍未完全闭合；当前已有 per-run listener 和真实 nudge 输出切片，但 reasoning 与 assistant part 混排的真实 Host 边界仍需补充 E2E。
 - Fallback provider failure 注入 E2E 已由 fallback-canary 覆盖（真实 500 注入→journal 记录→重启恢复→累计 8 次通过）。
-- SIGKILL/孤儿进程真实 E2E 已纳入默认 P0；PTY stress canary 已通过 3× 待验收；大输入压力仍待补充 canary 提高覆盖。
+- SIGKILL/孤儿进程真实 E2E 已纳入默认 P0；PTY stress canary 已通过 3×；大输入压力仍待补充 canary。
 - Orchestrator durable Port 路径 + Manager worktree 创建/rebase/冲突回交/评审/ff-only 发布 E2E 已由 orchestrator-canary 闭合。
 - 因此禁止宣称 production release-ready，禁止提前删除仍可作为黑盒 Oracle 的旧测试资产。
 
@@ -1051,6 +1050,7 @@ Manager→Coder(异步)→Inspector(一次性同步)→Command(同步)。Coder�
 2. ~~加入 Process SIGKILL/孤儿进程门禁~~ 已完成（默认 P0）。
 3. ~~闭合真实 Orchestrator 发布 E2E；rebase 后重新双 PERFECT，再 ff-only~~ 已完成（orchestrator-canary 通过 test:e2e:p0）。
 4. ~~加入 PTY/大输入压力的单独 canary 提高覆盖~~ 已完成（pty-stress-canary 已新增，已接入 test:e2e:p0，已通过验证）。
+5. ~~Reviewer parent terminal 无 verdict 重复 nudge 与 restart reconcile E2E~~ 已完成（reviewer-restart-canary 通过 test:e2e:p0）。
 5. 所有边界通过后才切换 production entry、清理旧实现与旧测试。
 
 ## 资产处理纪律
