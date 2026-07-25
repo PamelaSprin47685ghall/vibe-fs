@@ -128,7 +128,7 @@ export async function respond(state, res, exp, parsed) {
   const promptTokens = estimatePromptTokens(parsed);
 
   if (exp.respond.type === 'error') {
-    return sendJSON(res, exp.respond.status || 500, exp.respond.body || { error: 'mock error' });
+    return sendJSON(res, exp.respond.status || 500, exp.respond.body || { error: 'mock error' }, exp.respond.headers);
   }
   if (exp.respond.contextOverflow) {
     return sendJSON(res, 400, {

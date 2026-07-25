@@ -45,25 +45,46 @@ function countFallbackFacts(workDir) {
 }
 
 function expectFailure(scenario, phase, prompt, model) {
-  const blogger = phase === 'round1' ? 'manager-blogger-initial' : 'manager-blogger-restarted';
   scenario.provider.expectError({
     id: `${phase}-failure`,
     lane: expectationLane('fallback', phase, 'manager', 1),
     status: 500,
+    headers: { 'retry-after-ms': '0' },
     body: { error: { message: `mock provider failure ${phase}`, type: 'server_error' } },
     match: { containsText: [prompt], model },
   });
   scenario.provider.expectText({
-    id: `${phase}-zwsp`,
-    lane: expectationLane('fallback', blogger, 'synthetic', 1, 'synthetic', 'round1'),
-    text: 'done',
-    match: { containsText: ['\u200B'] },
+    id: `${phase}-retry`,
+    lane: expectationLane('fallback', phase, 'manager', 2),
+    text: `${phase} retry completed.`,
+    match: { containsText: [prompt] },
   });
 }
 
-async function awaitFailureSequence(scenario, lastExpectationId) {
-  await scenario.provider.waitForExpectation(lastExpectationId, 1000);
-  await scenario.provider.waitForIdle(1000);
+async function awaitFailureSequence(scenario, phase, sessionId, afterSeq) {
+  await scenario.provider.waitForExpectation(`${phase}-failure`, 1000);
+  await scenario.events.awaitEvent(
+    (event) => event.seq > afterSeq
+      && event.type === 'session.status'
+      && event.sessionID === sessionId
+      && event.properties?.status?.type === 'retry',
+    1000,
+  );
+  scenario.watchdog?.advance({
+    reason: 'fallback-provider-retry-recorded',
+    lane: `session:${sessionId}`,
+    blocking: true,
+  });
+  await scenario.provider.waitForExpectation(`${phase}-retry`, 1000);
+  await scenario.events.awaitEvent(
+    (event) => event.seq > afterSeq && event.type === 'session.idle' && event.sessionID === sessionId,
+    1000,
+  );
+  scenario.watchdog?.advance({
+    reason: 'fallback-failed-session-idle',
+    lane: `session:${sessionId}`,
+    blocking: true,
+  });
 }
 
 let scenario;
@@ -92,7 +113,7 @@ try {
     lane: expectationLane('fallback', 'fallback-title', 'title', 1, 'title'),
   });
 
-  // Phase 1: provider failure → journal records FallbackFailureRecorded.
+  // Phase 1: provider retry → journal records FallbackFailureRecorded.
   expectFailure(scenario, 'round1', 'Hello, this will fail.', 'test-model');
 
   const created = await scenario.client.createSession();
@@ -101,6 +122,7 @@ try {
   scenario.sessionIds.push(sessionId);
   bindLaneSession(scenario.provider, sessionId, 'fallback-title', 'round1', 'round2');
 
+  const round1Seq = scenario.events.lastSeq;
   const prompt1 = await scenario.client.request('POST', `/session/${sessionId}/prompt_async`, {
     body: {
       parts: [{ type: 'text', text: 'Hello, this will fail.' }],
@@ -109,7 +131,7 @@ try {
   });
   assert.ok(prompt1.ok, `prompt failed: ${JSON.stringify(prompt1.data)}`);
 
-  await awaitFailureSequence(scenario, 'round1-zwsp');
+  await awaitFailureSequence(scenario, 'round1', sessionId, round1Seq);
 
   const factsAfterRound1 = countFallbackFacts(scenario.host.workDir);
   assert.ok(factsAfterRound1 >= 1,
@@ -128,6 +150,7 @@ try {
 
   expectFailure(scenario, 'round2', 'Hello again, this will also fail.', 'test-model');
 
+  const round2Seq = scenario.events.lastSeq;
   const prompt2 = await scenario.client.request('POST', `/session/${sessionId}/prompt_async`, {
     body: {
       parts: [{ type: 'text', text: 'Hello again, this will also fail.' }],
@@ -136,7 +159,7 @@ try {
   });
   assert.ok(prompt2.ok, `prompt2 failed: ${JSON.stringify(prompt2.data)}`);
 
-  await awaitFailureSequence(scenario, 'round2-zwsp');
+  await awaitFailureSequence(scenario, 'round2', sessionId, round2Seq);
 
   const factsAfterRound2 = countFallbackFacts(scenario.host.workDir);
   assert.ok(factsAfterRound2 > factsAfterRound1,

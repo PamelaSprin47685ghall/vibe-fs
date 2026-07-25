@@ -3,8 +3,8 @@
  * mock completions. Pure helpers, no I/O.
  */
 
-export function sendJSON(res, status, body) {
-  res.writeHead(status, { 'Content-Type': 'application/json' });
+export function sendJSON(res, status, body, headers = {}) {
+  res.writeHead(status, { 'Content-Type': 'application/json', ...headers });
   res.end(JSON.stringify(body));
 }
 

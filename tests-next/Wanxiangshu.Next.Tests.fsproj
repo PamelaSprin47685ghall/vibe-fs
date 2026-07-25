@@ -42,6 +42,7 @@
     <Compile Include="Session/FallbackContractTests.fs"/>
     <Compile Include="Review/GuardTests.fs"/>
     <Compile Include="OpenCode/SpikeHostTests.fs"/>
+    <Compile Include="OpenCode/HostEventRouterTests.fs"/>
     <Compile Include="Tools/MessageTransformTests.fs"/>
     <Compile Include="Integration/OrchestratorTests.fs"/>
     <Compile Include="Integration/ManagerCanaryTests.fs"/>

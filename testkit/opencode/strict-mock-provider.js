@@ -59,7 +59,14 @@ export class StrictMockProvider {
   expectToolCall(opts) { pushExpectation(this._state, { type: 'tool-call', tool: opts.tool, args: opts.args || {} }, opts); }
   expectText(opts) { pushExpectation(this._state, { type: 'text', text: opts.text ?? 'ok' }, opts); }
   expectTitle(opts) { pushExpectation(this._state, { type: 'title', text: opts.text ?? 'E2E Test Session' }, opts); }
-  expectError(opts) { pushExpectation(this._state, { type: 'error', status: opts.status || 500, body: opts.body || { error: 'mock error' } }, opts); }
+  expectError(opts) {
+    pushExpectation(this._state, {
+      type: 'error',
+      status: opts.status || 500,
+      body: opts.body || { error: 'mock error' },
+      headers: opts.headers,
+    }, opts);
+  }
   expectDisconnect(opts = {}) { pushExpectation(this._state, { type: 'disconnect' }, opts); }
 
   expectSyntheticTodoNudge(opts = {}) {

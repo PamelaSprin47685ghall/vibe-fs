@@ -25,6 +25,8 @@ type HostEventRouter
     let ZWSP = "​"
 
     let lastAssistantMsgs = Dictionary<string, obj>()
+    let assistantParts = Dictionary<string, Dictionary<string, obj>>()
+    let fallbackFailures = defaultArg recordedErrors (HashSet<string>())
 
     let rawEvent (raw: obj) =
         if isNull raw || isNull raw?event then raw else raw?event
@@ -107,6 +109,37 @@ type HostEventRouter
             AgentJournal.appendAgent (StreamId.Session(SessionId.create sessionId)) None fact journal
             |> ignore
 
+    let recordRetryFailure sessionId raw =
+        let properties = rawProperties raw
+        let status = if isNull properties then null else properties?status
+
+        if not (isNull status) && not (isNull status?``type``) && status?``type`` = "retry" then
+            let attempt =
+                if isNull status?attempt then
+                    "unknown"
+                else
+                    string status?attempt
+
+            let key = $"retry:{sessionId}:{attempt}"
+
+            if fallbackFailures.Add key then
+                match journal with
+                | None -> ()
+                | Some journal ->
+                    let reason =
+                        if isNull status?message then
+                            "provider retry"
+                        else
+                            unbox<string> status?message
+
+                    let fact =
+                        AgentFact.FallbackFailureRecorded
+                            {| SessionId = SessionId.create sessionId
+                               Reason = reason |}
+
+                    AgentJournal.appendAgent (StreamId.Session(SessionId.create sessionId)) None fact journal
+                    |> ignore
+
     let nudgeReviewer sessionId =
         if nudgeSent.Add sessionId then
             sessionPort.SendPrompt(
@@ -144,6 +177,34 @@ type HostEventRouter
         else
             None
 
+    let recordAssistantPart props =
+        let part = if isNull props then null else props?part
+
+        if not (isNull part) && not (isNull part?messageID) then
+            let messageId = unbox<string> part?messageID
+
+            let partId =
+                if isNull part?id then
+                    Guid.NewGuid().ToString("N")
+                else
+                    unbox<string> part?id
+
+            let parts =
+                match assistantParts.TryGetValue messageId with
+                | true, existing -> existing
+                | false, _ ->
+                    let created = Dictionary<string, obj>()
+                    assistantParts.[messageId] <- created
+                    created
+
+            parts.[partId] <- part
+
+    let hydrateAssistantParts messageId lastMsg =
+        match assistantParts.TryGetValue messageId with
+        | true, parts when parts.Count > 0 ->
+            createObj [ "info", box lastMsg?info; "parts", box (parts.Values |> Seq.toArray) ]
+        | _ -> lastMsg
+
     member _.Observe(raw: obj, forward: obj -> unit) =
         let sessionId, role = HostSessionContext.read raw
 
@@ -164,6 +225,8 @@ type HostEventRouter
             let msg = if isNull props then null else props?message
             let target = if isNull msg then props else msg
 
+            recordAssistantPart props
+
             if not (isNull target) then
                 let info = target?info
 
@@ -176,16 +239,14 @@ type HostEventRouter
                         ""
 
                 if r = "assistant" then
-                    match getPartsArray target with
-                    | Some _ -> lastAssistantMsgs.[sessionId] <- target
-                    | None ->
-                        if not (lastAssistantMsgs.ContainsKey sessionId) then
-                            lastAssistantMsgs.[sessionId] <- target
+                    lastAssistantMsgs.[sessionId] <- target
 
             if isAbortError raw then
                 abortChildren sessionId
             elif eventType raw = "session.error" then
                 recordProviderError sessionId raw
+            elif eventType raw = "session.status" then
+                recordRetryFailure sessionId raw
 
             if isTerminalEvent raw then
                 if eventType raw = "session.aborted" then
@@ -201,11 +262,14 @@ type HostEventRouter
 
                 match lastAssistantMsgs.TryGetValue sessionId with
                 | true, lastMsg ->
-                    FallbackDetect.observeIdle journal (defaultArg recordedErrors (HashSet<string>())) sessionId lastMsg
+                    let messageId = FallbackDetect.messageId lastMsg
+                    let completeMsg = hydrateAssistantParts messageId lastMsg
+                    assistantParts.Remove messageId |> ignore
 
-                    if FallbackDetect.isFailedAssistant lastMsg then
-                        let msgId = FallbackDetect.messageId lastMsg
-                        nudgeContinue sessionId msgId
+                    FallbackDetect.observeIdle journal fallbackFailures sessionId completeMsg
+
+                    if FallbackDetect.isFailedAssistant completeMsg then
+                        nudgeContinue sessionId messageId
                 | false, _ -> ()
 
         forward raw
