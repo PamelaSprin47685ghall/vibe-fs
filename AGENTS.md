@@ -52,21 +52,21 @@ import:
 ## 本轮 TestKit 因果证据
 
 - `StrictMockProvider` 的 expectation lane 已包含 scenario、session alias、role、turn、request-kind；真实 OpenCode 请求以 `x-session-affinity` 绑定 session，child 首请求还校验 `x-parent-session-id`。已绑定 session 优先于未绑定 sibling lane；错 parent、错顺序、extra、missing、ambiguous 全部返回 500。
-- title generation、零宽 continuation、Blogger、Executor、Reviewer 都是显式 expectation；`allowOutOfOrder`、`allowBloggerRequests`、`allowTitleGeneration`、`allowSyntheticContinuations` 已删除。没有自动吞请求路径。
+- 每个实际产生的 title、零宽 continuation、Blogger、Executor、Reviewer 请求都是显式 expectation；`allowOutOfOrder`、`allowBloggerRequests`、`allowTitleGeneration`、`allowSyntheticContinuations` 已删除。没有自动吞请求路径。
 - `afterExpectation()` 在已消费 expectation 的同一因果边界注册后继 lane；它避免多 child/session 交错时的注册竞态，不引入 retry 或生产状态。
 - Watchdog 固定 1s。只接受 blocking expectation 消费、显式 session/restart/barrier；background Blogger 默认只留诊断。replacement busy-skip 仅在测试显式等待该事实时作为 blocking barrier。
 - `testkit/opencode/tests/gate-testkit.mjs` 已覆盖 lane 交错/FIFO、extra/missing、真实 session-parent 绑定、原子后继、title 分类、background-only watchdog。`npm run test:e2e:p0` 保持 staggered parallel，13 个 canary 以显式 lane 运行。
 - Journal 运行时路径已在 Git common directory 的 `wanxiangshu-next/runtimes`；测试依赖不再创建 workspace `node_modules`，Reviewer canary 断言工作树没有 `.wanxiangshu-next`。
 - Manager→Coder→Join 现以 child-created、Coder write completed、Coder terminal、Manager join completed、Manager terminal 五个真实 Host barrier 收口；不再以全局 idle 推断因果。
-- `HostEventRouter` 以 message ID 聚合 `message.part.updated`，再在 terminal 判定空助手轮：有 text/tool part 的完成轮不会误发零宽续命；真正空轮仍会续命。`session.status=retry` 的每个 attempt 一次性 append `FallbackFailureRecorded`，500→即时 retry→重启累计由 fallback canary 覆盖。
+- `HostEventRouter` 以 `messageID`/`messageId` 聚合 `message.part.updated`，再在 terminal 判定空助手轮：有 text/tool part 的完成轮不会误发零宽续命；真正空轮仍会续命。Manager terminal 的当前 Git tree 未获双 PERFECT 时，用 listener-before-send 发 guard 并 append `GuardPromptAccepted`；Reviewer 无 verdict terminal nudge 同一会话；abort terminal 不发 guard/continuation。`session.status=retry` 的每个 attempt 一次性 append `FallbackFailureRecorded`，500→即时 retry→重启累计由 fallback canary 覆盖。
 - Companion 成功回合以单条 `CompanionAdvanced(SessionId, Projection, Content)` 原子 append；`Content` 是累积后的完整 B，不再分两条事实留下 baseline/B 撕裂窗口。`companion-replacement-canary` 真实触发 replacement、重启 OpenCode、恢复 B1+B2、保留 raw tail，并验证新 Blogger 仍为 nonblocking。
-- 本轮直接验证：`npm test`（142/142 Fable、Manager contract、21 TestKit gates、P0）及 `CANARY_REPEAT=3 node scripts/run-canary-staggered.mjs`（13/13 × 3）均通过。
+- 本轮直接验证：`npm test`（145/145 Fable、Manager contract 1/1、21 TestKit gates、13 个 P0 canary）及 `CANARY_REPEAT=3 node scripts/run-canary-staggered.mjs`（13/13 × 3）均通过。
 
 ## 当前未闭合边界
 
-1. Reviewer、Fallback、Process、PTY、Orchestrator 的产品边界仍按下方顺序重验；当前 TestKit 改造不证明其余生产语义闭合。
+1. Fallback、Process、PTY、Orchestrator 的产品边界仍按下方顺序重验；当前 TestKit 改造不证明其余生产语义闭合。
 2. 真实 PTY 还未成为统一 `fork` 表面。只能保留 Process/PTy 窄 Port，不得将普通 Runner 包装成 PTY。
-3. Fallback 的真实 provider A/A/B/B 请求序列、ReviewGuard Manager finish、Orchestrator 真实 worktree 发布仍需单独证据。当前 fallback canary 证明 500 retry failure fact 跨重启累计，不得外推模型切换。
+3. Fallback 的真实 provider A/A/B/B 请求序列、Orchestrator 真实 worktree 发布仍需单独证据。当前 fallback canary 证明 500 retry failure fact 跨重启累计，不得外推模型切换。
 
 ## 解冻后的严格顺序
 
