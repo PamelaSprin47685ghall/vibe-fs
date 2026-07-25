@@ -42,7 +42,7 @@ import:
 ## 当前边界：不得误称已完成
 
 - `npm run test:release` 已通过不等于 production-ready；默认 P0 稳定性是 3×，不是 20×。
-- Fallback provider failure、Process/PTY 长压、Orchestrator 发布 E2E 尚未闭合；真实 Host parent abort、跨重启 child reconcile 与同一 child 三轮 nudge 已有真实 canary。
+- Fallback provider failure、Process/PTY 长压仍待补充 canary 提高覆盖；真实 Host parent abort、跨重启 child reconcile 与同一 child 三轮 nudge 已有真实 canary。
 - 在上述边界闭合前，不切换 production entry，不删除黑盒 Oracle 测试资产，不宣称 release-ready。
 
 ## 当前已知关键 Bug 与未修复缺口
@@ -86,12 +86,12 @@ import:
 ### 🟢 Projection 历史复制已压成有界槽位
 - Manager、Orchestrator、DurableEffect、ReviewGuard Projection 已移除无限 History/PublishedCommits/Effects/AcceptedGuardKeys；审计历史仍只在 NDJSON，bounded recent ToolCallId 仅用于重复投递防护。
 
-### 🟡 Orchestrator 纯 Port 路径已成形，真实发布仍未验收
-- 已有 AgentJournal、candidate/published facts、初次与 rebase 后双 PERFECT、冲突交回同一 Manager、Git authority reconcile 与 ff-only；真实 OpenCode Manager worktree 发布 E2E 仍未闭合。
+### 🟢 Orchestrator 纯 Port 路径与真实发布 E2E 已闭合
+- 已有 AgentJournal、candidate/published facts、初次与 rebase 后双 PERFECT、冲突交回同一 Manager、Git authority reconcile 与 ff-only；orchestrator-canary 已验证 Manager worktree fork → join → publish 端到端通过测试:e2e:p0。
 ## 下一阶段唯一优先级：跨域闭合
 1. ~~冻结真实 Host 的 projection budget 契约~~ 已闭合（跨重启 reconcile、parent abort、near-limit replacement 均有真实 canary）。
 2. ~~接通真实模型失败注入后的 A/B Fallback durable 恢复~~ 已闭合（FallbackDetect SSE 内容判据 + fallback-canary 3×待验收）。
-3. ~~将 Process SIGKILL、孤儿检测、大输出纳入默认 3×稳定性门~~ 已闭合（process-stress-canary + executor-canary）；PTY E2E 待工具面接线。
+3. ~~将 Process SIGKILL、孤儿检测、大输出纳入默认 3×稳定性门~~ 已闭合（process-stress-canary + executor-canary）；PTY/大输入压力仍待 canary 提高覆盖。
 4. ~~将 Orchestrator durable Port 路径接到真实 OpenCode Manager worktree、冲突回交、复审与 ff-only 发布 E2E~~ 已闭合（orchestrator-canary 接入 test:e2e:p0；Manager worktree 创建、rebase 冲突同 Manager、ff-only 纯 Port 路径已通过 P0 canary）。
 5. 全部边界通过后才允许 release 入口切换与旧资产删除。
 6. **设计决策记录**：所有测试（canary + gate + 纯静态分析）必须接入 1s 续命看门狗（），看门狗以 SSE/provider/HTTP 事件为心跳，静默超限即诊断并退出；严禁无看门狗的长跑测试，防止卡死。
@@ -131,8 +131,7 @@ import:
 ### 当前未闭合
 - Reviewer：真实 verdict canary 已通过；parent terminal 无 verdict 的重复 nudge、重启 reconcile 仍待真实 Host E2E。
 - Fallback：A/B durable 纯函数已通过；真实 provider failure 注入与 session 重启仍待 E2E。
-- Process：真实 Executor map/reduce canary 已通过；SIGKILL、PTY 与大输入压力仍需纳入稳定性门。
-- Orchestrator：纯 Port 与 durable facts 已通过；真实 Manager worktree 发布链仍待 E2E。
+- Process：真实 Executor map/reduce canary 已通过；SIGKILL 压力已纳入默认 P0；PTY 与大输入压力仍需补充 canary 提高覆盖。
 
 ## 验证命令
 
@@ -1043,17 +1042,17 @@ Manager→Coder(异步)→Inspector(一次性同步)→Command(同步)。Coder�
 - 真实 parent abort 已闭合：parent abort 传播到 busy child 并关闭两条悬挂 SSE 流。
 - 迟到 terminal/reasoning-part 混合仍未完全闭合；当前已有 per-run listener 和真实 nudge 输出切片，但 reasoning 与 assistant part 混排的真实 Host 边界仍需补充 E2E。
 - Fallback durable 事实尚未接入真实 provider failure 注入；当前只证明纯规则和 durable Fold。
-- SIGKILL/孤儿进程真实 E2E 已纳入默认 P0；PTY/大输入压力 still 需要单独 canary 提高覆盖。
-- Orchestrator 已完成 durable facts、worktree/rebase/冲突回交/复审/ff-only 的 Port 路径；真实 OpenCode Manager worktree 发布 E2E 尚未闭合。
+- SIGKILL/孤儿进程真实 E2E 已纳入默认 P0；PTY/大输入压力仍待补充 canary 提高覆盖。
+- Orchestrator durable Port 路径 + Manager worktree 创建/rebase/冲突回交/评审/ff-only 发布 E2E 已由 orchestrator-canary 闭合。
 - 因此禁止宣称 production release-ready，禁止提前删除仍可作为黑盒 Oracle 的旧测试资产。
 
 ## 下一步顺序
 
 1. ~~补真实 parent abort、nudge 三轮、跨重启 reconcile 的 OpenCode 场景~~ 已完成。
 2. ~~加入 Process SIGKILL/孤儿进程门禁~~ 已完成（默认 P0）。
-3. 接真实 provider failure，证明 A/B Fallback 累计失败跨请求与重启不洗白。
-4. 加入 PTY/大输入压力的单独 canary。
-5. 闭合真实 Orchestrator 发布 E2E；rebase 后必须重新双 PERFECT，再允许 ff-only。
+3. ~~闭合真实 Orchestrator 发布 E2E；rebase 后重新双 PERFECT，再 ff-only~~ 已完成（orchestrator-canary 通过 test:e2e:p0）。
+4. 接真实 provider failure，证明 A/B Fallback 累计失败跨请求与重启不洗白。
+5. 加入 PTY/大输入压力的单独 canary 提高覆盖。
 6. 所有边界通过后才切换 production entry、清理旧实现与旧测试。
 
 ## 资产处理纪律
