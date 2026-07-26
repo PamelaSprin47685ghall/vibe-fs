@@ -18,7 +18,8 @@ type HostForkRuntime
         ?journal: AgentJournal,
         ?onChildCreated: string -> AgentRole -> SessionId -> unit,
         ?modelResolver: ModelResolver.ModelConfig,
-        ?ptyPort: PtyPort
+        ?ptyPort: PtyPort,
+        ?directoryFor: string -> string option
     ) as this =
     let runtime = ForkRuntime()
     let children = Dictionary<string, SessionId>()
@@ -28,6 +29,7 @@ type HostForkRuntime
     let childCreated = defaultArg onChildCreated (fun _ _ _ -> ())
     let ptyPort = defaultArg ptyPort (PtyPort())
     let parentKey = SessionId.value parentId
+    let directoryOf = defaultArg directoryFor (fun _ -> None)
     let parentAbortToken = Pty.registerParentAbort parentKey (fun () -> this.Cancel())
 
     do
@@ -94,7 +96,8 @@ type HostForkRuntime
                             childId,
                             prompt,
                             { Model = HostPendingRun.resolveModel modelResolver journal childId
-                              Agent = Some(role.ToString().ToLowerInvariant()) }
+                              Agent = Some(role.ToString().ToLowerInvariant())
+                              Directory = directoryOf agentId }
                         )
 
                     match sent with
@@ -111,7 +114,8 @@ type HostForkRuntime
                             childId,
                             prompt,
                             { Model = HostPendingRun.resolveModel modelResolver journal childId
-                              Agent = Some(role.ToString().ToLowerInvariant()) }
+                              Agent = Some(role.ToString().ToLowerInvariant())
+                              Directory = directoryOf agentId }
                         )
 
                     match sent, result with
@@ -127,7 +131,8 @@ type HostForkRuntime
                     sessions.CreateChildSession(
                         parentId,
                         { Title = Some agentId
-                          Agent = Some(role.ToString().ToLowerInvariant()) }
+                          Agent = Some(role.ToString().ToLowerInvariant())
+                          Directory = directoryOf agentId }
                     )
 
                 match childResult with
@@ -164,7 +169,8 @@ type HostForkRuntime
                                 childId,
                                 prompt,
                                 { Model = HostPendingRun.resolveModel modelResolver journal childId
-                                  Agent = Some(role.ToString().ToLowerInvariant()) }
+                                  Agent = Some(role.ToString().ToLowerInvariant())
+                                  Directory = directoryOf agentId }
                             )
 
                         match sent with
@@ -211,7 +217,8 @@ type HostForkRuntime
                                 childId,
                                 prompt,
                                 { Model = HostPendingRun.resolveModel modelResolver journal childId
-                                  Agent = Some(role.ToString().ToLowerInvariant()) }
+                                  Agent = Some(role.ToString().ToLowerInvariant())
+                                  Directory = directoryOf agentId }
                             )
 
                         match sent with
@@ -228,7 +235,8 @@ type HostForkRuntime
                                 childId,
                                 prompt,
                                 { Model = HostPendingRun.resolveModel modelResolver journal childId
-                                  Agent = Some(role.ToString().ToLowerInvariant()) }
+                                  Agent = Some(role.ToString().ToLowerInvariant())
+                                  Directory = directoryOf agentId }
                             )
 
                         match sent, result with

@@ -27,7 +27,7 @@ module OrchestratorTests =
           RemoveWorktree = fun _ -> Task.FromResult(Ok()) }
 
     let private createStubManagerPort () =
-        { RunManager = fun _ _ -> Task.FromResult(Ok())
+        { RunManager = fun _ _ _ -> Task.FromResult(Ok())
           Reverify = fun _ _ -> Task.FromResult(Ok()) }
 
     let ``forkManager rejects dirty worktree before fork`` () =
@@ -45,7 +45,7 @@ module OrchestratorTests =
             let mgr = createStubManagerPort ()
             let orch = Orchestrator(git, mgr, "/repo", "main")
 
-            let! forkResult = orch.ForkManager("m1", "/repo/.worktrees/m1")
+            let! forkResult = orch.ForkManager("m1", "task", worktreePath = "/repo/.worktrees/m1")
 
             match forkResult with
             | Ok _ -> failwith "Expected forkManager to fail on dirty worktree"
@@ -77,13 +77,13 @@ module OrchestratorTests =
             let mgr =
                 { createStubManagerPort () with
                     RunManager =
-                        fun _ _ ->
+                        fun _ _ _ ->
                             managerCalls <- managerCalls + 1
                             Task.FromResult(Ok()) }
 
             let orch = Orchestrator(git, mgr, "/repo", "main")
 
-            let! forkResult = orch.ForkManager("m1", "/repo/.worktrees/m1")
+            let! forkResult = orch.ForkManager("m1", "task", worktreePath = "/repo/.worktrees/m1")
 
             match forkResult with
             | Error e -> failwithf "Fork failed: %A" e
@@ -123,7 +123,7 @@ module OrchestratorTests =
 
             let orch = Orchestrator(git, mgr, "/repo", "main")
 
-            let! forkResult = orch.ForkManager("m1", "/repo/.worktrees/m1")
+            let! forkResult = orch.ForkManager("m1", "task", worktreePath = "/repo/.worktrees/m1")
 
             match forkResult with
             | Error e -> failwithf "Fork failed: %A" e
@@ -160,7 +160,7 @@ module OrchestratorTests =
 
             let orch = Orchestrator(git, mgr, "/repo", "main")
 
-            let! forkResult = orch.ForkManager("m1", "/repo/.worktrees/m1")
+            let! forkResult = orch.ForkManager("m1", "task", worktreePath = "/repo/.worktrees/m1")
 
             match forkResult with
             | Error e -> failwithf "Fork failed unexpectedly: %A" e
@@ -212,8 +212,8 @@ module OrchestratorTests =
             let mgr = createStubManagerPort ()
             let orch = Orchestrator(git, mgr, "/repo", "main")
 
-            let! res1 = orch.ForkManager("m1", "/repo/.worktrees/m1")
-            let! res2 = orch.ForkManager("m2", "/repo/.worktrees/m2")
+            let! res1 = orch.ForkManager("m1", "task", worktreePath = "/repo/.worktrees/m1")
+            let! res2 = orch.ForkManager("m2", "task", worktreePath = "/repo/.worktrees/m2")
 
             match res1, res2 with
             | Ok _, Ok _ -> ()
@@ -251,7 +251,7 @@ module OrchestratorTests =
 
             let orch = Orchestrator(git, createStubManagerPort (), "/repo", "main")
 
-            let! result = orch.ForkManager("outside-default")
+            let! result = orch.ForkManager("outside-default", "task")
 
             match result with
             | Error error -> failwithf "Unexpected fork failure: %A" error

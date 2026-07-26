@@ -28,7 +28,7 @@ type GitPort =
       RemoveWorktree: string -> Task<Result<unit, string>> }
 
 type ManagerPort =
-    { RunManager: string -> string -> Task<Result<unit, string>>
+    { RunManager: string -> string -> string -> Task<Result<unit, string>>
       Reverify: string -> string -> Task<Result<unit, string>> }
 
 type OrchestratorJournalPort =

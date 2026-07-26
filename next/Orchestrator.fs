@@ -19,6 +19,7 @@ type Orchestrator
     let mailbox = System.Collections.Generic.Queue<ManagerCompletion>()
     let journalPort = journal
     let authorityPort = authority
+    let prompts = System.Collections.Generic.Dictionary<string, string>()
 
     let appendFact stream fact =
         match journalPort with
@@ -84,7 +85,7 @@ type Orchestrator
         }
 
     member this.ForkManager
-        (managerId: string, ?worktreePath: string)
+        (managerId: string, prompt: string, ?worktreePath: string)
         : Task<Result<OrchestratorHandle, OrchestratorVerdict>> =
         task {
             let path =
@@ -105,6 +106,8 @@ type Orchestrator
                             )
                         )
                 | Ok() ->
+                    prompts.[managerId] <- prompt
+
                     let handle =
                         { ManagerId = managerId
                           WorktreePath = path }
@@ -130,7 +133,7 @@ type Orchestrator
                     | Ok() ->
                         let _ =
                             task {
-                                let! res = manager.RunManager managerId path
+                                let! res = manager.RunManager managerId path prompt
                                 let completion = { Handle = handle; Result = res }
 
                                 lock lockObj (fun () ->
@@ -216,7 +219,12 @@ type Orchestrator
                                                 | Error conflict ->
                                                     task {
                                                         // A conflict is a continuation of this ManagerJob, never a new manager.
-                                                        match! manager.RunManager managerId worktreePath with
+                                                        let prompt =
+                                                            match prompts.TryGetValue managerId with
+                                                            | true, saved -> saved
+                                                            | false, _ -> ""
+
+                                                        match! manager.RunManager managerId worktreePath prompt with
                                                         | Error err ->
                                                             return
                                                                 Error(
@@ -284,12 +292,3 @@ type Orchestrator
                                                                     )
                         })
         }
-
-module OrchestratorEngine =
-    let create git manager repoPath targetBranch =
-        Orchestrator(git, manager, repoPath, targetBranch)
-
-    let forkManager (orch: Orchestrator) managerId (worktreePath: string option) =
-        orch.ForkManager(managerId, ?worktreePath = worktreePath)
-
-    let joinPublished (orch: Orchestrator) = orch.JoinPublished()

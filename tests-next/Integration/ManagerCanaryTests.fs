@@ -28,7 +28,7 @@ module ManagerCanaryTests =
           RemoveWorktree = fun _ -> Task.FromResult(Ok()) }
 
     let private createStubManagerPort () =
-        { RunManager = fun _ _ -> Task.FromResult(Ok())
+        { RunManager = fun _ _ _ -> Task.FromResult(Ok())
           Reverify = fun _ _ -> Task.FromResult(Ok()) }
 
     let ``Exact_manager_role_surface_has_no_file_or_exec_permissions`` () =
@@ -74,7 +74,7 @@ module ManagerCanaryTests =
 
             let managerPort =
                 { RunManager =
-                    fun mgrId _ ->
+                    fun mgrId _ _ ->
                         if mgrId = "mgr-inspector" then tcs1.Task
                         elif mgrId = "mgr-coder" then tcs2.Task
                         else Task.FromResult(Ok())

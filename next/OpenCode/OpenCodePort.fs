@@ -9,7 +9,8 @@ open Wanxiangshu.Next.Kernel.Outcome
 
 type OpenCodePromptOptions =
     { Model: OpencodeModel option
-      Agent: string option }
+      Agent: string option
+      Directory: string option }
 
 type IPromptPort =
     abstract SendPrompt:
@@ -17,7 +18,8 @@ type IPromptPort =
 
 type OpenCodeChildOptions =
     { Title: string option
-      Agent: string option }
+      Agent: string option
+      Directory: string option }
 
 type IOpenCodePort =
     inherit IPromptPort
@@ -31,8 +33,8 @@ module OpenCodePort =
     let private jsFetch (url: string) (init: obj) : Task<obj> = jsNative
 
     type SdkClientPort(client: obj, workspaceDirectory: string option) =
-        let headersObj () =
-            match workspaceDirectory with
+        let headersObj (directory: string option) =
+            match directory |> Option.orElse workspaceDirectory with
             | Some dir -> createObj [ "x-opencode-directory", box dir ]
             | None -> createObj []
 
@@ -55,7 +57,7 @@ module OpenCodePort =
                         createObj
                             [ "path", box (createObj [ "id", box sId ])
                               "body", box (createObj bodyFields)
-                              "headers", box (headersObj ()) ]
+                              "headers", box (headersObj opts.Directory) ]
 
                     try
                         let sessObj = client?session
@@ -75,7 +77,7 @@ module OpenCodePort =
                         let abortFn = sessObj?abort
 
                         let payload =
-                            createObj [ "path", box (createObj [ "id", box sId ]); "headers", box (headersObj ()) ]
+                            createObj [ "path", box (createObj [ "id", box sId ]); "headers", box (headersObj None) ]
 
                         let! _ = unbox<Task<obj>> (abortFn?call (sessObj, payload))
                         return Ok()
@@ -94,7 +96,7 @@ module OpenCodePort =
                                   {| parentID = pId
                                      title = opts.Title
                                      agent = opts.Agent |}
-                              "headers", box (headersObj ()) ]
+                              "headers", box (headersObj opts.Directory) ]
 
                     try
                         let sessObj = client?session

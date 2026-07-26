@@ -30,7 +30,7 @@ module VerdictSurface =
         (sessionParents: Dictionary<string, string>)
         (sessionRoles: Dictionary<string, string>)
         (journal: AgentJournal option)
-        (gitTreePort: GitTreePort option)
+        (gitTreePortFor: string -> GitTreePort option)
         (reviewerHosts: Dictionary<string, ReviewerHost>)
         (verdictSessions: HashSet<string>)
         : (obj -> obj -> Task<obj>) =
@@ -78,7 +78,7 @@ module VerdictSurface =
                         | true, p -> Some p
                         | false, _ -> None
 
-                    match journal, mgrId, gitTreePort with
+                    match journal, mgrId, gitTreePortFor reviewerId with
                     | None, _, _ ->
                         return box (stringify (createObj [ "error", box "Reviewer verdict requires a journal" ]))
                     | _, None, _ -> return box (stringify (createObj [ "error", box "Missing manager session" ]))

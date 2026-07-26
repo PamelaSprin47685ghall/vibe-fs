@@ -50,6 +50,7 @@
     <Compile Include="Review/Guard.fs"/>
     <Compile Include="Orchestrator.Types.fs"/>
     <Compile Include="Orchestrator.fs"/>
+    <Compile Include="Orchestrator.Engine.fs"/>
     <Compile Include="Orchestrator.GitPort.fs"/>
     <Compile Include="Tools/MessageTransform.fs"/>
     <Compile Include="Session/CompanionDelta.fs"/>
@@ -82,6 +83,10 @@
     <Compile Include="OpenCode/GitTree.fs"/>
     <Compile Include="OpenCode/ExecutorTool.fs"/>
     <Compile Include="OpenCode/VerdictSurface.fs"/>
+    <Compile Include="OpenCode/OrchestratorGit.fs"/>
+    <Compile Include="OpenCode/OrchestratorHost.fs"/>
+    <Compile Include="OpenCode/ToolSurfaceEmit.fs"/>
+    <Compile Include="OpenCode/ToolSurfaceOrchestrator.fs"/>
     <Compile Include="OpenCode/ToolSurface.fs"/>
     <Compile Include="OpenCode/PluginHost.fs"/>
     <Compile Include="OpenCode/ManagerConfig.fs"/>

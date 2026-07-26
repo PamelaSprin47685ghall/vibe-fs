@@ -61,7 +61,11 @@ module SpikeHostTests =
             let sessionPort = InjectedSessionPort(None, eventPort) :> ISessionHostPort
             let sId = SessionId.create "sess-no-listener"
 
-            let opts: OpenCodePromptOptions = { Model = None; Agent = None }
+            let opts: OpenCodePromptOptions =
+                { Model = None
+                  Agent = None
+                  Directory = None }
+
             let! errRes = sessionPort.SendPrompt(sId, "hello without listener", opts)
 
             match errRes with
@@ -207,7 +211,11 @@ module SpikeHostTests =
             use _sub =
                 sessionPort.SubscribeTerminal(sessionId, (fun _ _ -> terminalObserved <- true))
 
-            let opts: OpenCodePromptOptions = { Model = None; Agent = None }
+            let opts: OpenCodePromptOptions =
+                { Model = None
+                  Agent = None
+                  Directory = None }
+
             let sendTask = sessionPort.SendPrompt(sessionId, "pending", opts)
 
             Assert.False(terminalObserved)
@@ -231,7 +239,11 @@ module SpikeHostTests =
             use _subA = sessionPort.SubscribeTerminal(sA, (fun _ _ -> ()))
             use _subB = sessionPort.SubscribeTerminal(sB, (fun _ _ -> ()))
 
-            let opts: OpenCodePromptOptions = { Model = None; Agent = None }
+            let opts: OpenCodePromptOptions =
+                { Model = None
+                  Agent = None
+                  Directory = None }
+
             let! _ = sessionPort.SendPrompt(sA, "Prompt for A", opts)
             let! _ = sessionPort.SendPrompt(sB, "Prompt for B", opts)
 
@@ -253,7 +265,11 @@ module SpikeHostTests =
             let parentId = SessionId.create "parent-sess"
 
             let mutable childTerminalCount = 0
-            let childOptions: OpenCodeChildOptions = { Title = Some "Child 1"; Agent = None }
+
+            let childOptions: OpenCodeChildOptions =
+                { Title = Some "Child 1"
+                  Agent = None
+                  Directory = None }
 
             let! childIdRes = sessionPort.CreateChildSession(parentId, childOptions)
 

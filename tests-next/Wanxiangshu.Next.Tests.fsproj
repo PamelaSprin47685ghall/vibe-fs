@@ -46,6 +46,8 @@
     <Compile Include="OpenCode/HostReviewGuardTests.fs"/>
     <Compile Include="OpenCode/HostEventRouterTests.fs"/>
     <Compile Include="Tools/MessageTransformTests.fs"/>
+    <Compile Include="OpenCode/OrchestratorHostTestSupport.fs"/>
+    <Compile Include="OpenCode/OrchestratorHostTests.fs"/>
     <Compile Include="Integration/OrchestratorTests.fs"/>
     <Compile Include="Integration/ManagerCanaryTests.fs"/>
     <Compile Include="Gates/ArchitectureGateSupport.fs"/>

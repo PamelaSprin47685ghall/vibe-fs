@@ -14,45 +14,7 @@ open Wanxiangshu.Next.Session
 
 module ToolSurface =
 
-    [<Emit("$0.schema.string()")>]
-    let private stringSchema (tool: obj) : obj = jsNative
-
-    [<Emit("$0.schema.enum($1)")>]
-    let private enumSchema (tool: obj) (values: string array) : obj = jsNative
-
-    [<Emit("$0.schema.enum($1).optional()")>]
-    let private optionalEnumSchema (tool: obj) (values: string array) : obj = jsNative
-
-    [<Emit("$0.schema.string().optional()")>]
-    let private optionalStringSchema (tool: obj) : obj = jsNative
-
-    [<Emit("$0($1)")>]
-    let private applyTool (factory: obj) (definition: obj) : obj = jsNative
-
-    [<Emit("(args, context) => $0(args)(context)")>]
-    let private uncurriedExecute (fn: obj) : obj = jsNative
-
-    [<Emit("Math.random().toString(36).slice(2, 8)")>]
-    let private newAgentId () : string = jsNative
-
-    [<Emit("JSON.stringify($0)")>]
-    let private stringify (value: obj) : string = jsNative
-
-    let private contextString (ctx: obj) (name: string) =
-        if isNull ctx || isNull ctx?(name) then
-            None
-        else
-            let v = unbox<string> ctx?(name) in if String.IsNullOrWhiteSpace v then None else Some v
-
-    let private textArg (args: obj) (name: string) =
-        if isNull args || isNull args?(name) then
-            ""
-        else
-            unbox<string> args?(name)
-
-    let private optionalTextArg (args: obj) (name: string) =
-        let value = textArg args name
-        if String.IsNullOrWhiteSpace value then None else Some value
+    open ToolSurfaceEmit
 
     [<RequireQualifiedAccess>]
     module private ForkField =
@@ -89,7 +51,22 @@ module ToolSurface =
         let factory = toolModule?tool
         let runtimes = Dictionary<string, HostForkRuntime>()
         let reviewerHosts = Dictionary<string, ReviewerHost>()
+        let worktreeTreePorts = Dictionary<string, GitTreePort>()
+        let orchestratorHosts = Dictionary<string, OrchestratorHost>()
         let gate = obj ()
+
+        let orchestratorHostFor (sid: string) =
+            ToolSurfaceOrchestrator.hostFor
+                { Sessions = sessionPort
+                  Journal = journal
+                  ModelConfig = modelConfig
+                  WorkspaceDirectory = workspaceDirectory
+                  SessionParents = sessionParents
+                  SessionRoles = sessionRoles
+                  TreePorts = worktreeTreePorts }
+                gate
+                orchestratorHosts
+                sid
 
         let runtimeFor (ctx: obj) =
             let sid =
@@ -113,9 +90,12 @@ module ToolSurface =
                                     ?journal = journal,
                                     onChildCreated =
                                         (fun _ role childId ->
-                                            let cid = SessionId.value childId
-                                            sessionParents.[cid] <- sid
-                                            sessionRoles.[cid] <- role.ToString().ToLowerInvariant()),
+                                            ToolSurfaceOrchestrator.registerChild
+                                                sessionParents
+                                                sessionRoles
+                                                sid
+                                                role
+                                                childId),
                                     ?modelResolver = modelConfig
                                 )
 
@@ -163,34 +143,66 @@ module ToolSurface =
                             | Some _ ->
                                 return box (stringify (createObj [ "error", box "Signal target is not an active PTY" ]))
                             | None ->
-                                let! result =
-                                    match HostSessionContext.roleOf agent with
-                                    | Some role -> runtime.Fork(newAgentId (), role, prompt)
-                                    | None -> runtime.Reuse(agent, prompt)
+                                let sid = contextString ctx "sessionID" |> Option.defaultValue ""
 
-                                match result with
-                                | Ok fork -> return box (stringify (createObj [ "agentId", box fork.AgentId ]))
-                                | Error err -> return box (stringify (createObj [ "error", box err ]))
+                                if ToolSurfaceOrchestrator.isOrchestratorSession sessionRoles sid then
+                                    if agent <> "manager" then
+                                        return
+                                            box (
+                                                stringify (
+                                                    createObj [ "error", box "Orchestrator may only fork manager jobs" ]
+                                                )
+                                            )
+                                    else
+                                        let managerId = newAgentId ()
+                                        let host = orchestratorHostFor sid
+                                        let! started = host.ForkManagerJob(managerId, prompt)
+
+                                        match started with
+                                        | Ok worktree ->
+                                            return
+                                                box (
+                                                    stringify (
+                                                        createObj [ "agentId", box managerId; "worktree", box worktree ]
+                                                    )
+                                                )
+                                        | Error err -> return box (stringify (createObj [ "error", box err ]))
+                                else
+                                    let! result =
+                                        match HostSessionContext.roleOf agent with
+                                        | Some role -> runtime.Fork(newAgentId (), role, prompt)
+                                        | None -> runtime.Reuse(agent, prompt)
+
+                                    match result with
+                                    | Ok fork -> return box (stringify (createObj [ "agentId", box fork.AgentId ]))
+                                    | Error err -> return box (stringify (createObj [ "error", box err ]))
             }
 
         let joinExecute (_args: obj) (ctx: obj) =
             task {
-                match runtimeFor ctx with
-                | Error err -> return box (stringify (createObj [ "error", box err ]))
-                | Ok runtime ->
-                    let! result = runtime.Join()
+                let sid = contextString ctx "sessionID" |> Option.defaultValue ""
 
-                    match result with
-                    | Ok c ->
-                        let fields =
-                            [ "agentId", box c.AgentId; "runId", box c.RunId; "outcome", box c.Outcome ]
-                            @ (if runtime.IsPtyCompletion c.RunId then
-                                   [ "ptyId", box c.RunId ]
-                               else
-                                   [])
+                if ToolSurfaceOrchestrator.isOrchestratorSession sessionRoles sid then
+                    let host = orchestratorHostFor sid
+                    let! verdict = host.JoinPublished()
+                    return box (stringify (createObj [ "outcome", box verdict ]))
+                else
+                    match runtimeFor ctx with
+                    | Error err -> return box (stringify (createObj [ "error", box err ]))
+                    | Ok runtime ->
+                        let! result = runtime.Join()
 
-                        return box (stringify (createObj fields))
-                    | Error e -> return box (stringify (createObj [ "error", box (e.ToString()) ]))
+                        match result with
+                        | Ok c ->
+                            let fields =
+                                [ "agentId", box c.AgentId; "runId", box c.RunId; "outcome", box c.Outcome ]
+                                @ (if runtime.IsPtyCompletion c.RunId then
+                                       [ "ptyId", box c.RunId ]
+                                   else
+                                       [])
+
+                            return box (stringify (createObj fields))
+                        | Error e -> return box (stringify (createObj [ "error", box (e.ToString()) ]))
             }
 
         let listExecute (_args: obj) (ctx: obj) =
@@ -224,7 +236,16 @@ module ToolSurface =
             }
 
         let verdictExecute =
-            VerdictSurface.create sessionParents sessionRoles journal gitTreePort reviewerHosts verdictSessions
+            VerdictSurface.create
+                sessionParents
+                sessionRoles
+                journal
+                (fun reviewerId ->
+                    match worktreeTreePorts.TryGetValue reviewerId with
+                    | true, port -> Some port
+                    | false, _ -> gitTreePort)
+                reviewerHosts
+                verdictSessions
 
         let forkArgs =
             createObj

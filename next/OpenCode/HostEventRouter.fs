@@ -145,7 +145,9 @@ type HostEventRouter
                     sessionPort
                     (SessionId.create sessionId)
                     ZWSP
-                    { Model = None; Agent = None }
+                    { Model = None
+                      Agent = None
+                      Directory = None }
                     ignore
 
     let terminalRole sessionId =
@@ -232,7 +234,10 @@ type HostEventRouter
                         && not (verdictSessions.Remove sessionId)
                         ->
                         HostReviewGuard.nudgeReviewer sessionPort journal nudgeSent sessionId terminalMessageId
-                    | Some agent when agent.Equals("manager", StringComparison.OrdinalIgnoreCase) ->
+                    | Some agent when
+                        agent.Equals("manager", StringComparison.OrdinalIgnoreCase)
+                        && not (sessionParents.ContainsKey sessionId)
+                        ->
                         match HostReviewGuard.missingTree journal gitTreePort sessionId with
                         | HostReviewGuard.ReviewGuardMissing treeHash ->
                             HostReviewGuard.nudgeManager

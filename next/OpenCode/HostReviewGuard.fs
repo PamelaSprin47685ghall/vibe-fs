@@ -82,7 +82,9 @@ module HostReviewGuard =
                 sessionPort
                 targetSessionId
                 prompt
-                { Model = None; Agent = Some agent }
+                { Model = None
+                  Agent = Some agent
+                  Directory = None }
                 (fun hostMessageId ->
                     let fact =
                         AgentFact.GuardPromptAccepted

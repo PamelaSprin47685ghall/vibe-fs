@@ -73,7 +73,8 @@ type CompanionHost
                             sessions.CreateChildSession(
                                 primaryId,
                                 { Title = Some "blogger"
-                                  Agent = Some "blogger" }
+                                  Agent = Some "blogger"
+                                  Directory = None }
                             )
 
                         match created with
@@ -125,7 +126,8 @@ type CompanionHost
                         childId,
                         prompt,
                         { Model = Some model
-                          Agent = Some "blogger" }
+                          Agent = Some "blogger"
+                          Directory = None }
                     )
 
                 match sent with
