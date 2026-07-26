@@ -26,7 +26,8 @@ module GitTree =
     let private command directory fileName arguments =
         execFileSync fileName (Array.append [| "-C"; directory |] arguments) options
 
-    let private currentWorkspacePayload directory =
+    /// Dirty payload only: empty when the worktree matches HEAD with no untracked files.
+    let private dirtyPayload directory =
         let diff =
             command directory "git" [| "diff"; "HEAD"; "--binary"; "--no-ext-diff"; "--" |]
 
@@ -43,5 +44,21 @@ module GitTree =
 
         diff + files
 
+    /// HEAD tree object when clean; otherwise HEAD tree + dirty payload.
+    /// A fully clean worktree must never collapse to the empty-string hash.
+    let private treeHash directory =
+        let headTree =
+            try
+                (command directory "git" [| "rev-parse"; "HEAD^{tree}" |]).Trim()
+            with _ ->
+                "NO_HEAD_TREE"
+
+        let dirty = dirtyPayload directory
+
+        if String.IsNullOrEmpty dirty then
+            headTree
+        else
+            digest (createHash "sha256") (headTree + "\n" + dirty)
+
     let create (directory: string) : GitTreePort =
-        { GetTreeHash = fun () -> digest (createHash "sha256") (currentWorkspacePayload directory) }
+        { GetTreeHash = fun () -> treeHash directory }

@@ -90,13 +90,30 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
                     | Ok _ -> return! OrchestratorGit.finalizeWorktree OrchestratorGit.run managerId worktree
         }
 
+    /// Worktree-scoped prompts load a second OpenCode plugin instance that writes
+    /// ReviewVerdict into a sibling runtime file. Re-boot the workspace journal
+    /// directory so those durable facts are visible to this host's reviewState.
+    let reviewProjection (local: AgentJournal) =
+        let dir = RuntimePath.forWorkspace deps.RepoPath
+        let boot = Boot.boot dir
+        let fromDisk = Fold.apply Fold.empty boot.Envelopes
+        let localSnap = AgentJournal.snapshot local
+
+        // Prefer the richer of disk merge vs live local appends: disk already
+        // includes this runtime's committed prefix; fold local-only tail by
+        // using disk as authority for cross-runtime reviewer facts.
+        if Map.isEmpty fromDisk.AgentProjections.Sessions then
+            localSnap
+        else
+            fromDisk
+
     let reviewState (worktree: string) : Task<Result<bool, string>> =
         task {
             match deps.Journal with
             | None -> return Error "Orchestrator review requires a journal"
             | Some journal ->
                 let tree = (GitTree.create worktree).GetTreeHash()
-                let snapshot = AgentJournal.snapshot journal
+                let snapshot = reviewProjection journal
 
                 match Map.tryFind orchestratorId snapshot.AgentProjections.Sessions with
                 | Some session ->
