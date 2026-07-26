@@ -2,6 +2,8 @@ namespace Wanxiangshu.Next.Tests.OpenCode
 
 open System
 open System.Threading.Tasks
+open Fable.Core.JsInterop
+open Xunit
 open Wanxiangshu.Next.OpenCode
 open Wanxiangshu.Next.Kernel.Identity
 open Wanxiangshu.Next.Kernel.Outcome
@@ -13,6 +15,34 @@ module OrchestratorHostTests =
 
     let private mkSid s = SessionId.create s
 
+    /// Worktree-scoped manager idle arrives via /global/event as
+    /// { directory, payload: { type, properties } }. HostEventPort must see it.
+    [<Fact>]
+    let ``normalizeHostEvent unwraps global SSE payload for idle`` () =
+        let eventPort = Events.HostEventPort()
+        let mutable observed = []
+
+        use _sub =
+            (eventPort :> IEventObservationPort)
+                .SubscribeTerminalListener(fun sessionId outcome ->
+                    observed <- (SessionId.value sessionId, outcome) :: observed)
+
+        HostEventSubscribe.observe
+            eventPort
+            (createObj
+                [ "directory", box "/tmp/wanxiangshu-mgr"
+                  "payload",
+                  box (
+                      createObj
+                          [ "type", box "session.idle"
+                            "properties", createObj [ "sessionID", box "mgr-child" ] ]
+                  ) ])
+
+        match observed with
+        | [ (sessionId, Completed _) ] when sessionId = "mgr-child" -> ()
+        | other -> failwithf "expected completed mgr-child, got %A" other
+
+    [<Fact>]
     let ``OrchestratorHost fork fails on non-repo without creating child`` () =
         task {
             let log = OrchestratorHostTestSupport.createLog ()
@@ -39,4 +69,16 @@ module OrchestratorHostTests =
                     failwithf
                         "CreateChildSession must not be called when worktree fails, got %d calls"
                         log.CreateChild.Length
+        }
+
+    [<Fact>]
+    let ``SpikePlugin_initSpikePlugin_exposes_hooks_and_ports`` () =
+        task {
+            let input = createObj []
+            let! hooksObj = SpikePlugin.initSpikePlugin input
+            Assert.False(isNull hooksObj)
+            Assert.False(isNull hooksObj?projection)
+            Assert.False(isNull hooksObj?events)
+            Assert.False(isNull hooksObj?sessions)
+            Assert.False(isNull hooksObj?``chat.transform``)
         }

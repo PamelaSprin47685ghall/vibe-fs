@@ -293,15 +293,3 @@ module SpikeHostTests =
             let childOut = sessionPort.GetSessionOutput(childId)
             Assert.True(childOut |> List.exists (fun line -> line.Contains("Aborted")))
         }
-
-    [<Fact>]
-    let ``SpikePlugin_initSpikePlugin_exposes_hooks_and_ports`` () =
-        task {
-            let input = createObj []
-            let! hooksObj = SpikePlugin.initSpikePlugin input
-            Assert.False(isNull hooksObj)
-            Assert.False(isNull hooksObj?projection)
-            Assert.False(isNull hooksObj?events)
-            Assert.False(isNull hooksObj?sessions)
-            Assert.False(isNull hooksObj?``chat.transform``)
-        }

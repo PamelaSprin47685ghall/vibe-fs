@@ -23,22 +23,25 @@ module HostForkRunLifecycle =
         (run: PendingHostRun)
         (outcome: TerminalOutcome)
         =
-        let subscriptionToDispose =
+        // Only the first matching terminal may claim the run. Duplicate idle/
+        // abort from dual event streams must not SetResult twice.
+        let claimed, subscriptionToDispose =
             lock gate (fun () ->
                 match pendingRuns.TryGetValue run.AgentId with
                 | true, current when obj.ReferenceEquals(current.Token, run.Token) && run.Ready && not run.Finished ->
                     run.Finished <- true
                     pendingRuns.Remove run.AgentId |> ignore
-                    run.Subscription
-                | _ -> None)
+                    true, run.Subscription
+                | _ -> false, None)
 
-        subscriptionToDispose
-        |> Option.iter (fun subscription -> subscription.Dispose())
+        if claimed then
+            subscriptionToDispose
+            |> Option.iter (fun subscription -> subscription.Dispose())
 
-        match outcome with
-        | Completed _ -> run.Source.SetResult(Ok(outputSince sessions run))
-        | Aborted reason -> run.Source.SetResult(Error reason)
-        | Failed error -> run.Source.SetResult(Error error)
+            match outcome with
+            | Completed _ -> run.Source.SetResult(Ok(outputSince sessions run))
+            | Aborted reason -> run.Source.SetResult(Error reason)
+            | Failed error -> run.Source.SetResult(Error error)
 
     let installRun
         (gate: obj)

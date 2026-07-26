@@ -64,6 +64,7 @@
     <Compile Include="OpenCode/CanonicalJson.fs"/>
     <Compile Include="OpenCode/Projection.fs"/>
     <Compile Include="OpenCode/Events.fs"/>
+    <Compile Include="OpenCode/HostEventSubscribe.fs"/>
     <Compile Include="OpenCode/OpenCodePort.fs"/>
     <Compile Include="OpenCode/Sessions.fs"/>
     <Compile Include="Session/AgentRoleHelpers.fs"/>

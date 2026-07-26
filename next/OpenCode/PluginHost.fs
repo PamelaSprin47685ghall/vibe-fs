@@ -55,32 +55,18 @@ module PluginHost =
         let sessionPort = InjectedSessionPort(portOpt, eventPort) :> ISessionHostPort
         eventPort, sessionPort
 
-    let hasHostEventCapability (input: obj) =
-        if isNull input then
-            false
-        else
-            let c = input?client
-            not (isNull input?events) || (not (isNull c) && not (isNull c?events))
-
     let createHost
         (input: obj)
         (portOpt: IOpenCodePort option)
         : Result<IEventObservationPort * ISessionHostPort * IDisposable option * (obj -> unit) option, string> =
-        if hasHostEventCapability input then
-            let hostEventPort = Events.HostEventPort()
+        // Always keep the plugin event-hook observer: it covers main-directory
+        // sessions. Also open /global/event when available so worktree-scoped
+        // manager/coder/reviewer terminals still complete HostForkRuntime runs.
+        let hostEventPort = Events.HostEventPort()
+        let eventPort = hostEventPort :> IEventObservationPort
+        let sessionPort = InjectedSessionPort(portOpt, eventPort) :> ISessionHostPort
+        let observe = Some(fun raw -> HostEventSubscribe.observe hostEventPort raw)
 
-            match Events.trySubscribeHostEvents input hostEventPort with
-            | Error err -> Error err
-            | Ok subscription ->
-                let eventPort = hostEventPort :> IEventObservationPort
-
-                let sessionPort = InjectedSessionPort(portOpt, eventPort) :> ISessionHostPort
-
-                Ok(eventPort, sessionPort, subscription, None)
-        else
-            let hostEventPort = Events.HostEventPort()
-            let eventPort = hostEventPort :> IEventObservationPort
-
-            let sessionPort = InjectedSessionPort(portOpt, eventPort) :> ISessionHostPort
-
-            Ok(eventPort, sessionPort, None, Some(fun raw -> hostEventPort.Observe raw))
+        match HostEventSubscribe.trySubscribeHostEvents input hostEventPort with
+        | Error err -> Error err
+        | Ok subscription -> Ok(eventPort, sessionPort, subscription, observe)
