@@ -108,9 +108,12 @@ try {
     text: 'Coder background.',
   });
 
-  // JoinPublished runs reverifyTwice before candidate and again after rebase.
-  // Each reverify is one reviewer run when the first verdict is PERFECT → 4 rounds.
-  for (const [n, label] of [[1, 'one'], [2, 'two'], [3, 'three'], [4, 'four']]) {
+  // JoinPublished runs reverifyTwice (two reverify calls) before the candidate and
+  // again (two more) after the rebase: four reverify calls total. The review gate now
+  // requires TWO distinct PERFECTs on the same tree, so the first reverify needs two
+  // verdicts to reach IsConfirmed, and each later reverify short-circuits at the already
+  // confirmed guard after one verdict: 2 + 1 + 1 + 1 = 5 reviewer PERFECT verdicts.
+  for (const [n, label] of [[1, 'one'], [2, 'two'], [3, 'three'], [4, 'four'], [5, 'five']]) {
     scenario.provider.expectToolCall({
       id: `reviewer-perfect-${n}`,
       lane: expectationLane('orch-publish', 'reviewer', 'reviewer', n * 2 - 1, 'chat', 'orchestrator'),
@@ -148,6 +151,7 @@ try {
   await scenario.provider.waitForExpectation('reviewer-perfect-2', WATCHDOG_TIMEOUT_MS);
   await scenario.provider.waitForExpectation('reviewer-perfect-3', WATCHDOG_TIMEOUT_MS);
   await scenario.provider.waitForExpectation('reviewer-perfect-4', WATCHDOG_TIMEOUT_MS);
+  await scenario.provider.waitForExpectation('reviewer-perfect-5', WATCHDOG_TIMEOUT_MS);
   await scenario.provider.waitForExpectation('orch-final', WATCHDOG_TIMEOUT_MS);
   scenario.provider.expectSatisfied();
 

@@ -92,40 +92,31 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
                     | Ok _ -> return! OrchestratorGit.finalizeWorktree OrchestratorGit.run managerId worktree
         }
 
-    /// Worktree-scoped prompts load a second OpenCode plugin instance that writes
-    /// ReviewVerdict into a sibling runtime file. Re-boot the workspace journal
-    /// directory so those durable facts are visible to this host's reviewState.
-    let reviewProjection (local: AgentJournal) =
-        let dir = RuntimePath.forWorkspace deps.RepoPath
-        let boot = Boot.boot dir
-        let fromDisk = Fold.apply Fold.empty boot.Envelopes
-        let localSnap = AgentJournal.snapshot local
-
-        // Prefer the richer of disk merge vs live local appends: disk already
-        // includes this runtime's committed prefix; fold local-only tail by
-        // using disk as authority for cross-runtime reviewer facts.
-        if Map.isEmpty fromDisk.AgentProjections.Sessions then
-            localSnap
-        else
-            fromDisk
-
+    /// Read the Reviewer guard for this Orchestrator's own journal (in-memory
+    /// projection). The Reviewer verdict is written to this same journal by the
+    /// verdict tool surface, so the projection is authoritative — no disk scan.
     let reviewState (worktree: string) : Task<Result<bool, string>> =
         task {
             match deps.Journal with
             | None -> return Error "Orchestrator review requires a journal"
             | Some journal ->
                 let tree = (GitTree.create worktree).GetTreeHash()
-                let snapshot = reviewProjection journal
+                let snapshot = AgentJournal.snapshot journal
 
                 match Map.tryFind orchestratorId snapshot.AgentProjections.Sessions with
                 | Some session ->
                     match session.ReviewGuard with
+                    | Some guard when guard.LastGitTreeHash = Some(GitTreeHash.create tree) && guard.IsConfirmed ->
+                        // Two distinct-ToolCallId PERFECTs on the same tree.
+                        return Ok true
                     | Some guard when
                         guard.LastGitTreeHash = Some(GitTreeHash.create tree)
                         && guard.ConsecutivePerfects >= 1
                         ->
-                        return Ok true
+                        // One PERFECT so far; needs a second distinct verdict.
+                        return Ok false
                     | Some guard when guard.LastGitTreeHash = Some(GitTreeHash.create tree) ->
+                        // A REVISE was the last verdict on this tree.
                         return Error "Reviewer requested revision"
                     | _ -> return Ok false
                 | None -> return Ok false
@@ -194,61 +185,76 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
         else
             Some deps.TargetBranch
 
-    let orchestratorBranch () : Task<string> =
+    let orchestratorBranch () : Task<Result<string, string>> =
         task {
             match detectedBranch with
-            | Some branch -> return branch
+            | Some branch -> return Ok branch
             | None ->
-                let! branch = OrchestratorGit.detectBranch OrchestratorGit.run deps.RepoPath
-                detectedBranch <- Some branch
-                return branch
+                let! branchResult = OrchestratorGit.detectBranch OrchestratorGit.run deps.RepoPath
+
+                match branchResult with
+                | Ok branch -> detectedBranch <- Some branch
+                | Error _ -> ()
+
+                return branchResult
         }
 
     let mutable engineInstance: Orchestrator option = None
 
-    let engine () : Task<Orchestrator> =
+    let engine () : Task<Result<Orchestrator, string>> =
         task {
             match engineInstance with
-            | Some value -> return value
+            | Some value -> return Ok value
             | None ->
-                let! branch = orchestratorBranch ()
+                let! branchResult = orchestratorBranch ()
 
-                do!
-                    OrchestratorAuthority.reconcilePublishedFromAuthority
-                        deps.Journal
-                        authorityPort
-                        deps.RepoPath
-                        branch
+                match branchResult with
+                | Error reason -> return Error reason
+                | Ok branch ->
+                    do!
+                        OrchestratorAuthority.reconcilePublishedFromAuthority
+                            deps.Journal
+                            authorityPort
+                            deps.RepoPath
+                            branch
 
-                let value =
-                    Orchestrator(
-                        gitPort,
-                        managerPort,
-                        deps.RepoPath,
-                        branch,
-                        ?journal = (deps.Journal |> Option.map OrchestratorJournalPort.fromAgentJournal),
-                        ?authority = Some authorityPort
-                    )
+                    let value =
+                        Orchestrator(
+                            gitPort,
+                            managerPort,
+                            deps.RepoPath,
+                            branch,
+                            ?journal = (deps.Journal |> Option.map OrchestratorJournalPort.fromAgentJournal),
+                            ?authority = Some authorityPort
+                        )
 
-                engineInstance <- Some value
-                return value
+                    engineInstance <- Some value
+                    return Ok value
         }
 
     member _.ForkManagerJob(managerId: string, prompt: string) : Task<Result<string, string>> =
         task {
-            let! engine = engine ()
-            let! result = engine.ForkManager(managerId, prompt)
+            let! engineResult = engine ()
 
-            match result with
-            | Error verdict -> return Error(sprintf "%A" verdict)
-            | Ok handle -> return Ok handle.WorktreePath
+            match engineResult with
+            | Error reason -> return Error reason
+            | Ok engine ->
+                let! result = engine.ForkManager(managerId, prompt)
+
+                match result with
+                | Error verdict -> return Error(sprintf "%A" verdict)
+                | Ok handle -> return Ok handle.WorktreePath
         }
 
     member _.JoinPublished() : Task<string> =
         task {
-            let! engine = engine ()
-            let! verdict = engine.JoinPublished()
-            return sprintf "%A" verdict
+            let! engineResult = engine ()
+
+            match engineResult with
+            | Error reason -> return sprintf "Orchestrator init failed: %s" reason
+            | Ok engine ->
+                let! verdict = engine.JoinPublished()
+                return sprintf "%A" verdict
         }
 
     member _.Cancel() = runtime.Cancel()
