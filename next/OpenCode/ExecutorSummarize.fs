@@ -157,7 +157,10 @@ module ExecutorSummarize =
                 for i in 0 .. levels.Count - 1 do
                     let batch = carry @ (levels.[i] |> Seq.toList)
 
-                    if not (List.isEmpty batch) then
+                    match batch with
+                    | [] -> ()
+                    | [ single ] when i = levels.Count - 1 -> carry <- [ single ]
+                    | _ ->
                         let! reduced = reduceBatch (i + 1) batch
                         carry <- [ reduced ]
 
