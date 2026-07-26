@@ -51,10 +51,14 @@ import:
 
 ## 本轮 TestKit 因果证据
 
-本轮只推进四项，不向 Fallback、Process、PTY 或 Orchestrator 提前扩张：
+本轮纠偏四项已闭合，Orchestrator 生产接线已落地（WIP）：
 
 1. busy existing agent 的 nudge 不再经过带 `runWork` 的新 `Fork`；同一 active source 只允许一个 completion。
 2. SSOT 将 idle existing 与 busy existing 明确分开：前者建 Run，后者只 nudge。
+3. Watchdog 的 `session.created` 不再无条件续命，只匹配 pending causal barrier 或显式 advance。
+4. 重复控制统一为外层 1～3 次，child canary 强制 `CANARY_REPEAT=1`，`test:e2e:p0:parallel` 为 13-way 全并发隔离门。
+
+Orchestrator 生产接线（WIP，commit `84bd9b99`）：`fork(agent=manager)` 从 orchestrator session 路由到 `ForkManagerJob`（worktree → manager child → finalizeWorktree → reverify → publish）；`join` 路由到 `JoinPublished`。6 个新模块拆分满足 300 行门禁。L1 fake-port 测试覆盖纯逻辑。真实 canary `orchestrator-publish-canary.mjs` 未通过——manager terminal 后 reviewer 不到达 mock provider，`finalizeWorktree` 未执行，诊断见 `困惑.md`。
 3. `session.created` 不再是全局 Watchdog 心跳；只有显式等待后的因果 barrier 才能推进 2s Watchdog。
 4. 重复控制只保留 runner 外层；每个 canary 子进程强制 `CANARY_REPEAT=1`。除默认开发门外，另有 `MAX_PARALLEL_CANARIES=13` 的全 P0 隔离门。
 
@@ -72,9 +76,9 @@ import:
 
 ## 当前未闭合边界
 
-1. 四项因果纠偏、Companion/Review 边界、Fallback A/A/B/B、Process 有界 spool、PTY 统一 DSL 均有直接测试证据；仍不得把 canary 名称外推为完整产品闭合。
-2. Orchestrator 程序在 Port/Fake 层已闭合：脏工作区拒绝、candidate、串行信号量、冲突回交同 Manager、rebase 后双 PERFECT、ff-only、worktree 清理。Orchestrator 角色的 `fork(manager)` 在 ToolSurface 仍经通用 HostForkRuntime 创建普通 child，尚未切换到 ManagerJob 发布程序；orchestrator-canary 证明的是工具面与 join，不是真实 Git 发布链。这是最后一个未闭合边界。
-3. 不得宣称 release-ready；Orchestrator 生产接线完成前不新增任何横向模块。
+1. 四项因果纠偏、Companion/Review 边界、Fallback A/A/B/B、Process 有界 spool、PTY 统一 DSL 均有直接测试证据；Orchestrator 生产接线已落地但真实 canary 未闭合。
+2. Orchestrator 程序在 Port/Fake 层已闭合：脏工作区拒绝、candidate、串行信号量、冲突回交同 Manager、rebase 后双 PERFECT、ff-only、worktree 清理。Orchestrator 角色的 `fork(manager)` 在 ToolSurface 已切换到 `OrchestratorHost.ForkManagerJob`；但真实 canary 中 manager terminal 后 `finalizeWorktree` 未执行（reviewer 不到达 mock），根因待诊断（见 `困惑.md`）。
+3. 不得宣称 release-ready；Orchestrator 真实 canary 未通过前不新增任何横向模块。
 
 ## 解冻后的严格顺序
 
