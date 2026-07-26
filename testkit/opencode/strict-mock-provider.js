@@ -37,6 +37,7 @@ import {
 } from './strict-mock-server.js';
 import { checkSatisfied } from './strict-mock-satisfy.js';
 import { StrictMockSignals } from './strict-mock-signals.js';
+import { WATCHDOG_TIMEOUT_MS } from './watchdog-constants.js';
 import { respond } from './strict-mock-responses.js';
 import {
   createState,
@@ -111,8 +112,8 @@ export class StrictMockProvider {
     if (bound && bound !== sessionID) throw new Error(`StrictMock session alias ${alias} is already bound`);
     this._state.sessionBindings.set(alias, sessionID);
   }
-  waitForExpectation(id, timeoutMs = 1000) { return this._signals.waitForExpectation(id, timeoutMs); }
-  waitForIdle(timeoutMs = 1000) { return this._signals.waitForIdle(timeoutMs); }
+  waitForExpectation(id, timeoutMs = WATCHDOG_TIMEOUT_MS) { return this._signals.waitForExpectation(id, timeoutMs); }
+  waitForIdle(timeoutMs = WATCHDOG_TIMEOUT_MS) { return this._signals.waitForIdle(timeoutMs); }
   afterExpectation(id, callback) {
     if (this._signals.hasConsumed(id)) return callback();
     const callbacks = this._afterExpectation.get(id) || [];

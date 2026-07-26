@@ -52,6 +52,7 @@
     <Compile Include="Orchestrator.fs"/>
     <Compile Include="Orchestrator.GitPort.fs"/>
     <Compile Include="Tools/MessageTransform.fs"/>
+    <Compile Include="Session/CompanionDelta.fs"/>
     <Compile Include="Session/Companion.fs"/>
     <Compile Include="Tools/ToolContext.fs"/>
     <Compile Include="Tools/StaticTools.fs"/>
@@ -59,6 +60,7 @@
     <Compile Include="OpenCode/OpencodeTypes.fs"/>
     <Compile Include="OpenCode/ModelResolver.fs"/>
     <Compile Include="OpenCode/MessageOriginDecoder.fs"/>
+    <Compile Include="OpenCode/CanonicalJson.fs"/>
     <Compile Include="OpenCode/Projection.fs"/>
     <Compile Include="OpenCode/Events.fs"/>
     <Compile Include="OpenCode/OpenCodePort.fs"/>

@@ -21,6 +21,7 @@ import {
   teardownScenario,
   getSessionId,
 } from '../index.js';
+import { WATCHDOG_TIMEOUT_MS } from '../watchdog-constants.js';
 import { bindLaneSession, expectationLane } from './lane.mjs';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -62,23 +63,23 @@ function expectFailure(scenario, phase, prompt, model) {
 }
 
 async function awaitFailureSequence(scenario, phase, sessionId, afterSeq) {
-  await scenario.provider.waitForExpectation(`${phase}-failure`, 1000);
+  await scenario.provider.waitForExpectation(`${phase}-failure`, WATCHDOG_TIMEOUT_MS);
   await scenario.events.awaitEvent(
     (event) => event.seq > afterSeq
       && event.type === 'session.status'
       && event.sessionID === sessionId
       && event.properties?.status?.type === 'retry',
-    1000,
+    WATCHDOG_TIMEOUT_MS,
   );
   scenario.watchdog?.advance({
     reason: 'fallback-provider-retry-recorded',
     lane: `session:${sessionId}`,
     blocking: true,
   });
-  await scenario.provider.waitForExpectation(`${phase}-retry`, 1000);
+  await scenario.provider.waitForExpectation(`${phase}-retry`, WATCHDOG_TIMEOUT_MS);
   await scenario.events.awaitEvent(
     (event) => event.seq > afterSeq && event.type === 'session.idle' && event.sessionID === sessionId,
-    1000,
+    WATCHDOG_TIMEOUT_MS,
   );
   scenario.watchdog?.advance({
     reason: 'fallback-failed-session-idle',
@@ -94,7 +95,7 @@ try {
   scenario = await setupScenario({
     project: { files: { 'AGENTS.md': 'fallback canary\n' } },
     strict: true,
-    watchdogMs: 1000,
+
     extraEnv: {
       WANXIANGSHU_MODEL_A: 'test/test-model',
       WANXIANGSHU_MODEL_B: 'test/test-model-b',

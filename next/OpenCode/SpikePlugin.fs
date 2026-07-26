@@ -93,6 +93,7 @@ module SpikePlugin =
                     | None -> PluginHost.workspaceDirectory input |> Option.map GitTree.create
 
                 let sessionBudgets = Dictionary<string, int>()
+                let bloggerModel = ModelResolver.bloggerModelFromEnv ()
 
                 let eventRouter =
                     HostEventRouter(
@@ -156,6 +157,7 @@ module SpikePlugin =
                         journal
                         sessionBudgets
                         sessionRoles
+                        bloggerModel
                         inObj
                         outObj
 

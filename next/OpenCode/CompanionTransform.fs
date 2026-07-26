@@ -54,6 +54,7 @@ module CompanionTransform =
         (journal: AgentJournal option)
         (sessionBudgets: Dictionary<string, int>)
         (sessionRoles: Dictionary<string, string>)
+        (bloggerModel: Result<OpencodeModel, string>)
         (inObj: obj)
         (rawOutObj: obj)
         =
@@ -126,6 +127,7 @@ module CompanionTransform =
                                     SessionId.create sessionId,
                                     sessionPort,
                                     ?durable = durable,
+                                    ?bloggerModel = Some bloggerModel,
                                     onBloggerCreated =
                                         (fun bloggerId -> sessionRoles.[SessionId.value bloggerId] <- "blogger")
                                 )

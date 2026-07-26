@@ -1,7 +1,7 @@
 /**
  * watchdog.js — Silence watchdog ported from the tests-next runner.
  *
- * tests-next: every assertion IPCs a heartbeat; 1s of silence SIGKILLs
+ * tests-next: every assertion IPCs a heartbeat; 2s of silence SIGKILLs
  * the worker process group. testkit canaries run in-process, so the
  * progress is a consumed expectation or an explicit semantic checkpoint;
  * arbitrary SSE, provider requests, and HTTP traffic do not renew it. The kill is

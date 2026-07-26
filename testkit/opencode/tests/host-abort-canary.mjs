@@ -4,6 +4,7 @@ import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { getSessionId, runStaticGate, setupScenario, teardownScenario } from '../index.js';
+import { WATCHDOG_TIMEOUT_MS } from '../watchdog-constants.js';
 import { bindLaneSession, expectationLane } from './lane.mjs';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -56,7 +57,7 @@ function isTerminalFor(sessionID) {
 let scenario;
 try {
   assert.equal(runStaticGate([__filename]).passed, true);
-  scenario = await setupScenario({ project: { files: { 'AGENTS.md': 'parent abort canary\n' } }, strict: true, watchdogMs: 1000 });
+  scenario = await setupScenario({ project: { files: { 'AGENTS.md': 'parent abort canary\n' } }, strict: true });
   scenario.provider.expectTitle({
     id: 'parent-title',
     lane: expectationLane('host-abort', 'parent-title', 'title', 1, 'title'),
@@ -107,14 +108,14 @@ try {
   });
   assert.ok(prompt.ok, `manager prompt failed: ${JSON.stringify(prompt.data)}`);
 
-  await scenario.provider.waitForExpectation('manager-fork', 1000);
+  await scenario.provider.waitForExpectation('manager-fork', WATCHDOG_TIMEOUT_MS);
   scenario.watchdog?.advance({ reason: 'manager-fork-coder', lane: 'manager', blocking: true });
 
   const childCreated = await scenario.events.awaitEvent(
     (event) => event.type === 'session.created'
       && event.parentSessionID === parentId
       && event.sessionAgent === 'coder',
-    1000,
+    WATCHDOG_TIMEOUT_MS,
   );
   const childId = childCreated.sessionID;
   assert.ok(childId, `coder child creation lacked a session ID: ${JSON.stringify(childCreated)}`);
@@ -123,8 +124,8 @@ try {
   scenario.watchdog?.advance({ reason: 'coder-child-created', lane: `session:${childId}`, blocking: true });
 
   await Promise.all([
-    scenario.provider.waitForExpectation('child-long', 1000),
-    scenario.provider.waitForExpectation('manager-long', 1000),
+    scenario.provider.waitForExpectation('child-long', WATCHDOG_TIMEOUT_MS),
+    scenario.provider.waitForExpectation('manager-long', WATCHDOG_TIMEOUT_MS),
   ]);
   assert.equal(scenario.provider.activeRequestCount, 2, 'manager and child streams must both hang');
 
@@ -138,13 +139,13 @@ try {
 
   await scenario.events.awaitEvent(
     (e) => e.seq > watermark && isTerminalFor(childId)(e),
-    1000,
+    WATCHDOG_TIMEOUT_MS,
   );
   await scenario.events.awaitEvent(
     (e) => e.seq > watermark && isTerminalFor(parentId)(e),
-    1000,
+    WATCHDOG_TIMEOUT_MS,
   );
-  await scenario.provider.waitForIdle(1000);
+  await scenario.provider.waitForIdle(WATCHDOG_TIMEOUT_MS);
 
   scenario.provider.expectSatisfied();
   await teardownScenario(scenario);

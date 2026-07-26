@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { fileURLToPath } from 'node:url';
 import { runStaticGate, setupScenario, teardownScenario, getSessionId } from '../index.js';
+import { WATCHDOG_TIMEOUT_MS } from '../watchdog-constants.js';
 import { bindLaneSession, expectationLane } from './lane.mjs';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -9,7 +10,7 @@ const SIGKILL_COMMAND = 'sh -lc \'trap "" TERM; sleep 1000\'';
 let scenario;
 try {
   if (!runStaticGate([__filename]).passed) throw new Error('process stress canary contains prohibited polling');
-  scenario = await setupScenario({ project: { files: { 'AGENTS.md': 'process stress canary\n' } }, strict: true, watchdogMs: 1000 });
+  scenario = await setupScenario({ project: { files: { 'AGENTS.md': 'process stress canary\n' } }, strict: true });
   scenario.provider.expectTitle({
     id: 'inspector-title',
     lane: expectationLane('process-stress', 'inspector-title', 'title', 1, 'title'),
@@ -48,7 +49,7 @@ try {
     },
   });
   assert.ok(prompt.ok, `inspector prompt failed: ${JSON.stringify(prompt.data)}`);
-  await turn.awaitTerminal({ timeoutMs: 1000, requireActivity: true, requireAssistantTerminal: true, requireIdleAfterActivity: true });
+  await turn.awaitTerminal({ timeoutMs: WATCHDOG_TIMEOUT_MS, requireActivity: true, requireAssistantTerminal: true, requireIdleAfterActivity: true });
 
   const anyRequest = JSON.stringify(scenario.provider.requests);
   assert.ok(

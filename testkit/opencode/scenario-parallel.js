@@ -8,6 +8,7 @@ import { resolvePluginPath } from './scenario-paths.js';
 import { StrictMockProvider } from './strict-mock-provider.js';
 import { createScenarioTurn } from './scenario-turn.js';
 import { Watchdog } from './watchdog.js';
+import { WATCHDOG_TIMEOUT_MS } from './watchdog-constants.js';
 
 export class Scenario {
   constructor(ctx) {
@@ -30,7 +31,14 @@ export class Scenario {
     this.watchdog?.advance({ reason: 'restart-close-events', lane: 'runtime', blocking: true });
     await this.events.close();
     this.watchdog?.advance({ reason: 'restart-start-host', lane: 'runtime', blocking: true });
-    await this.host.start(this.host._startOpts);
+    await this.host.start({
+      ...this.host._startOpts,
+      onProgress: (stage) => this.watchdog?.advance({
+        reason: `restart-host-${stage}`,
+        lane: 'runtime',
+        blocking: true,
+      }),
+    });
     this.client._baseUrl = this.host.baseUrl;
     this.events._baseUrl = this.host.baseUrl;
     this.watchdog?.advance({ reason: 'restart-connect-events', lane: 'runtime', blocking: true });
@@ -82,7 +90,10 @@ export async function setupScenarioParallel(opts, tmpDir) {
       providerUrl: `${providerUrl}/v1`,
       pluginPaths,
       contextLimit: opts.contextLimit,
-      extraEnv: opts.extraEnv,
+      extraEnv: {
+        WANXIANGSHU_BLOGGER_MODEL: process.env.WANXIANGSHU_BLOGGER_MODEL || 'test/test-model',
+        ...(opts.extraEnv || {}),
+      },
     });
     const t3 = Date.now(); console.log(`[setupScenario] host.start took ${t3 - t2}ms`);
 
@@ -108,7 +119,7 @@ export async function setupScenarioParallel(opts, tmpDir) {
       });
     };
 
-    const watchdogTimeout = opts.watchdogMs || 1000;
+    const watchdogTimeout = opts.watchdogMs || WATCHDOG_TIMEOUT_MS;
     const watchdog = new Watchdog({
       timeoutMs: watchdogTimeout,
       label: opts.watchdogLabel || "canary",

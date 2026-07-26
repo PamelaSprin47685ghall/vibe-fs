@@ -9,6 +9,7 @@ import {
   teardownScenario,
   getSessionId,
 } from '../index.js';
+import { WATCHDOG_TIMEOUT_MS } from '../watchdog-constants.js';
 import { bindLaneSession, expectationLane } from './lane.mjs';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -139,7 +140,7 @@ async function runScenario(scenario) {
     },
   });
   assert.ok(prompt.ok, `manager prompt failed: ${JSON.stringify(prompt.data)}`);
-  await turn.awaitTerminal({ timeoutMs: 1000, requireActivity: true, requireAssistantTerminal: true, requireIdleAfterActivity: true });
+  await turn.awaitTerminal({ timeoutMs: WATCHDOG_TIMEOUT_MS, requireActivity: true, requireAssistantTerminal: true, requireIdleAfterActivity: true });
 
   const reviewerRequests = scenario.provider.requests.filter((request) => toolNames(request).includes('verdict'));
   assert.ok(reviewerRequests.length >= 3, 'Reviewer must submit two verdicts then finish');
@@ -204,14 +205,14 @@ async function runScenario(scenario) {
     },
   });
   assert.ok(guardPrompt.ok, `guard manager prompt failed: ${JSON.stringify(guardPrompt.data)}`);
-  await guardTurn.awaitTerminal({ timeoutMs: 1000, requireActivity: true, requireAssistantTerminal: true, requireIdleAfterActivity: true });
+  await guardTurn.awaitTerminal({ timeoutMs: WATCHDOG_TIMEOUT_MS, requireActivity: true, requireAssistantTerminal: true, requireIdleAfterActivity: true });
   scenario.watchdog?.advance({
     reason: 'manager-review-guard-terminal',
     lane: `session:${guardManagerId}`,
     blocking: true,
   });
-  await scenario.provider.waitForExpectation('guard-manager-nudged', 1000);
-  await scenario.provider.waitForExpectation('guard-manager-blogger', 1000);
+  await scenario.provider.waitForExpectation('guard-manager-nudged', WATCHDOG_TIMEOUT_MS);
+  await scenario.provider.waitForExpectation('guard-manager-blogger', WATCHDOG_TIMEOUT_MS);
   const guards = guardFacts(scenario.host.workDir);
   assert.equal(guards.length, 1, `missing durable Manager guard acceptance: ${JSON.stringify(guards)}`);
 
@@ -253,13 +254,13 @@ async function runScenario(scenario) {
     },
   });
   assert.ok(nudgePrompt.ok, `reviewer nudge prompt failed: ${JSON.stringify(nudgePrompt.data)}`);
-  await nudgeTurn.awaitTerminal({ timeoutMs: 1000, requireActivity: true, requireAssistantTerminal: true, requireIdleAfterActivity: true });
+  await nudgeTurn.awaitTerminal({ timeoutMs: WATCHDOG_TIMEOUT_MS, requireActivity: true, requireAssistantTerminal: true, requireIdleAfterActivity: true });
   scenario.watchdog?.advance({
     reason: 'reviewer-terminal-without-verdict',
     lane: `session:${nudgeReviewerId}`,
     blocking: true,
   });
-  await scenario.provider.waitForExpectation('reviewer-nudged', 1000);
+  await scenario.provider.waitForExpectation('reviewer-nudged', WATCHDOG_TIMEOUT_MS);
 }
 
 if (!runStaticGate([__filename]).passed) {
@@ -271,7 +272,7 @@ try {
   scenario = await setupScenario({
     project: { files: { [TREE_FILE]: 'review target\n' } },
     strict: true,
-    watchdogMs: 1000,
+
   });
   await runScenario(scenario);
   scenario.provider.expectSatisfied();

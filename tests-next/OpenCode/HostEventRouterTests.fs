@@ -42,9 +42,10 @@ module HostEventRouterTests =
 
             member _.GetSessionOutput(_) = [] }
 
+
     let private routerFor prompts sessionId =
         let roles = Dictionary<string, string>()
-        roles.[sessionId] <- "manager"
+        roles.[sessionId] <- "coder"
 
         HostEventRouter(
             recordingPort prompts,
@@ -130,6 +131,7 @@ module HostEventRouterTests =
                         "error", box (createObj [ "name", box "MessageAbortedError" ]) ]
               ) ]
 
+
     [<Fact>]
     let ``Assistant_text_part_prevents_zero_width_continuation`` () =
         let sessionId = "manager-session"
@@ -211,6 +213,9 @@ module HostEventRouterTests =
                 Assert.Single(prompts) |> ignore
                 Assert.Contains("Review is required before completion.", snd prompts.[0])
             })
+
+
+
 
     [<Fact>]
     let ``Aborted_manager_terminal_never_receives_review_or_continuation_nudge`` () =

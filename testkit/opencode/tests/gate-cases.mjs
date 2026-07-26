@@ -22,6 +22,7 @@ import { createIsolatedEnv } from '../isolated-env.js';
 import { gatherDiagnostics } from '../diagnostics.js';
 import { createScenarioTurn } from '../scenario-turn.js';
 import { runStabilityGate } from '../stability-checker.js';
+import { WATCHDOG_TIMEOUT_MS } from '../watchdog-constants.js';
 import { laneCases } from './gate-lane-cases.mjs';
 
 async function runIsolationHardening() {
@@ -122,6 +123,15 @@ function runSessionCreatedIsNotWatchdogHeartbeat() {
   const scenarioCode = fs.readFileSync(new URL('../scenario-parallel.js', import.meta.url), 'utf8');
   assertTrue(scenarioCode.includes('sessionCreatedDiagnostics'), 'session.created must remain diagnostic data');
   assertTrue(!scenarioCode.includes("reason: 'session-created'"), 'session.created must not be a global watchdog heartbeat');
+}
+
+function runWatchdogTimeoutIsCentralized() {
+  assertEq(WATCHDOG_TIMEOUT_MS, 2000, 'scenario watchdog timeout must be the centralized 2s value');
+  const scenarioCode = fs.readFileSync(new URL('../scenario-parallel.js', import.meta.url), 'utf8');
+  assertTrue(
+    scenarioCode.includes('WATCHDOG_TIMEOUT_MS'),
+    'scenario setup must consume the centralized watchdog timeout',
+  );
 }
 
 async function runEventProbeReconnectAndStatus() {
@@ -310,6 +320,7 @@ export const cases = [
   { name: 'stability repeat cap is three', fn: runStabilityRepeatCap },
   { name: 'title classification uses current user turn', fn: runTitleHistoryIsolation },
   { name: 'session.created noise does not renew watchdog', fn: runSessionCreatedIsNotWatchdogHeartbeat },
+  { name: 'watchdog timeout is centralized at 2s', fn: runWatchdogTimeoutIsCentralized },
   { name: 'EventProbe reconnect and status normalisation', fn: runEventProbeReconnectAndStatus },
   { name: 'EventProbe session and tool normalisation', fn: runEventProbeSessionAndToolNormalisation },
   { name: 'terminal idle with object status', fn: runTerminalIdleWithObjectStatus },

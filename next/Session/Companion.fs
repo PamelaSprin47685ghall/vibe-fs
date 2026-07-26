@@ -7,7 +7,6 @@ open Wanxiangshu.Next.Kernel
 open Wanxiangshu.Next.Journal
 open Wanxiangshu.Next.Tools
 
-type ProjectionSnapshot = string
 type BlogText = string
 
 type CompanionOutcome =
@@ -36,46 +35,7 @@ module Companion =
     let shouldCreateForAgent (agent: string option) : bool =
         MessageTransform.shouldCreateCompanion agent
 
-    /// Pure jsonDelta: returns None when previous and current are equal canonical JSON;
-    /// otherwise returns a JSON object string containing top-level fields changed in current.
-    /// Absent previous returns current.
-    let jsonDelta (previous: ProjectionSnapshot option) (current: ProjectionSnapshot) : ProjectionSnapshot option =
-        match previous with
-        | None -> Some current
-        | Some prev ->
-            if prev = current then
-                None
-            else
-                try
-                    let prevObj = Fable.Core.JS.JSON.parse prev
-                    let currObj = Fable.Core.JS.JSON.parse current
-
-                    let isObject (value: obj) =
-                        Fable.Core.JsInterop.emitJsExpr value "typeof $0 === 'object' && $0 !== null"
-
-                    let stringify (value: obj) : string =
-                        Fable.Core.JsInterop.emitJsExpr value "JSON.stringify($0)"
-
-                    if isObject prevObj && isObject currObj then
-                        let currKeys: string array =
-                            Fable.Core.JsInterop.emitJsExpr currObj "Object.keys($0)"
-
-                        let diffObj: obj = Fable.Core.JsInterop.createEmpty
-                        let mutable changed = false
-
-                        for key in currKeys do
-                            let valCurr: obj = Fable.Core.JsInterop.emitJsExpr (currObj, key) "$0[$1]"
-                            let valPrev: obj = Fable.Core.JsInterop.emitJsExpr (prevObj, key) "$0[$1]"
-
-                            if stringify valCurr <> stringify valPrev then
-                                changed <- true
-                                Fable.Core.JsInterop.emitJsExpr (diffObj, key, valCurr) "$0[$1] = $2" |> ignore
-
-                        if changed then Some(stringify diffObj) else None
-                    else
-                        Some current
-                with _ ->
-                    Some current
+    let jsonDelta = CompanionDelta.jsonDelta
 
     /// Pure compressPrefix: delegates to MessageTransform.replacePrefix using currentB and explicit watermark index.
     let compressPrefix

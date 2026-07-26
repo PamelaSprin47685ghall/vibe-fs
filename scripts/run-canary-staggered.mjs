@@ -37,7 +37,7 @@ const CANARY_TESTS = [
   "testkit/opencode/tests/reviewer-restart-canary.mjs",
 ];
 
-const STAGGER_DELAY_MS = parsePositiveInt(process.env.STAGGER_DELAY_MS, 500, "STAGGER_DELAY_MS");
+const STAGGER_DELAY_MS = parsePositiveInt(process.env.STAGGER_DELAY_MS, 2000, "STAGGER_DELAY_MS");
 const activeCanaryPids = new Set();
 
 function cleanupCanaries() {

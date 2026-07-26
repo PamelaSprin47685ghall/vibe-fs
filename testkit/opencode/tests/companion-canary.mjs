@@ -6,6 +6,7 @@ import {
   teardownScenario,
   getSessionId,
 } from '../index.js';
+import { WATCHDOG_TIMEOUT_MS } from '../watchdog-constants.js';
 import { bindLaneSession, expectationLane } from './lane.mjs';
 import { requestRoleOf } from '../strict-mock-matches.js';
 
@@ -89,7 +90,7 @@ async function runProjectionScenario(scenario) {
     },
   });
   assert.ok(firstPrompt.ok, `first primary prompt failed: ${JSON.stringify(firstPrompt.data)}`);
-  await firstTurn.awaitTerminal({ timeoutMs: 1000, requireActivity: true, requireAssistantTerminal: true, requireIdleAfterActivity: true });
+  await firstTurn.awaitTerminal({ timeoutMs: WATCHDOG_TIMEOUT_MS, requireActivity: true, requireAssistantTerminal: true, requireIdleAfterActivity: true });
 
   const firstBlogRequests = bloggerRequests(scenario.provider);
   assert.ok(
@@ -101,7 +102,7 @@ async function runProjectionScenario(scenario) {
   const bloggerId = childIdsAfterFirstProjection[0];
   await scenario.events.awaitEvent(
     (event) => event.type === 'session.idle' && event.sessionID === bloggerId,
-    1000,
+    WATCHDOG_TIMEOUT_MS,
   );
   scenario.watchdog?.advance({ reason: 'primary-blogger-idle', lane: 'primary-blogger', blocking: true });
 
@@ -115,11 +116,11 @@ async function runProjectionScenario(scenario) {
     },
   });
   assert.ok(secondPrompt.ok, `second primary prompt failed: ${JSON.stringify(secondPrompt.data)}`);
-  await secondTurn.awaitTerminal({ timeoutMs: 1000, requireActivity: true, requireAssistantTerminal: true, requireIdleAfterActivity: true });
+  await secondTurn.awaitTerminal({ timeoutMs: WATCHDOG_TIMEOUT_MS, requireActivity: true, requireAssistantTerminal: true, requireIdleAfterActivity: true });
 
   await scenario.events.awaitEvent(
     (event) => event.seq > secondSeqBefore && event.type === 'session.idle' && event.sessionID === bloggerId,
-    1000,
+    WATCHDOG_TIMEOUT_MS,
   );
   scenario.watchdog?.advance({ reason: 'primary-blogger-idle', lane: 'primary-blogger', blocking: true });
 
@@ -168,7 +169,7 @@ async function assertRoleHasNoSidecar(scenario, role, prompt) {
     },
   });
   assert.ok(response.ok, `${role} prompt failed: ${JSON.stringify(response.data)}`);
-  await turn.awaitTerminal({ timeoutMs: 1000, requireActivity: true, requireAssistantTerminal: true, requireIdleAfterActivity: true });
+  await turn.awaitTerminal({ timeoutMs: WATCHDOG_TIMEOUT_MS, requireActivity: true, requireAssistantTerminal: true, requireIdleAfterActivity: true });
 
   const requests = scenario.provider.requests.slice(before);
   assert.ok(requests.length > 0, `${role} produced no provider request`);
@@ -206,7 +207,7 @@ try {
   scenario = await setupScenario({
     project: { files: { 'AGENTS.md': '- companion projection canary\n' } },
     strict: true,
-    watchdogMs: 1000,
+
   });
 
   await runProjectionScenario(scenario);

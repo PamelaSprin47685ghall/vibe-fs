@@ -165,8 +165,10 @@ module ManagerCanaryTests =
             Assert.Equal(Submitted, res3)
             do! companion.WaitInFlightAsync()
 
-            Assert.Contains("\"step\":3", computedDelta)
-            Assert.Contains("\"data\":\"final\"", computedDelta)
+            Assert.Contains("\"path\":\"/step\"", computedDelta)
+            Assert.Contains("\"value\":3", computedDelta)
+            Assert.Contains("\"path\":\"/data\"", computedDelta)
+            Assert.Contains("\"value\":\"final\"", computedDelta)
             Assert.Equal(Some p3, companion.Memory.LastSuccessfulProjection)
             Assert.Equal(Some "Summary 1\n\nSummary 3", companion.Memory.CurrentB)
         }

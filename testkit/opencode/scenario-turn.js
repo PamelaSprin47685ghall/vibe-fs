@@ -5,6 +5,8 @@
  * 100% Event-driven; ZERO polling loops.
  */
 
+import { WATCHDOG_TIMEOUT_MS } from './watchdog-constants.js';
+
 function isIdleEvent(e) {
   if (e.type === 'session.idle') return true;
   if (e.type === 'session.status') {
@@ -45,7 +47,7 @@ class Turn {
 
   async awaitTerminal(opts = {}) {
     const o = {
-      timeoutMs: opts.timeoutMs || 1000,
+      timeoutMs: opts.timeoutMs || WATCHDOG_TIMEOUT_MS,
       requireActivity: opts.requireActivity !== false,
       requireAssistantTerminal: opts.requireAssistantTerminal !== false,
       requireIdleAfterActivity: opts.requireIdleAfterActivity !== false,

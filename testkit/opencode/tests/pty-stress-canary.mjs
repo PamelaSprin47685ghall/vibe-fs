@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { fileURLToPath } from 'node:url';
 import { runStaticGate, setupScenario, teardownScenario, getSessionId } from '../index.js';
+import { WATCHDOG_TIMEOUT_MS } from '../watchdog-constants.js';
 import { bindLaneSession, expectationLane } from './lane.mjs';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -13,7 +14,7 @@ try {
   scenario = await setupScenario({
     project: { files: { 'AGENTS.md': 'PTY stress canary\n' } },
     strict: true,
-    watchdogMs: 1000,
+
   });
 
   scenario.provider.expectTitle({
@@ -57,7 +58,7 @@ try {
     },
   });
   assert.ok(prompt.ok, `inspector prompt failed: ${JSON.stringify(prompt.data)}`);
-  await turn.awaitTerminal({ timeoutMs: 1000, requireActivity: true, requireAssistantTerminal: true, requireIdleAfterActivity: true });
+  await turn.awaitTerminal({ timeoutMs: WATCHDOG_TIMEOUT_MS, requireActivity: true, requireAssistantTerminal: true, requireIdleAfterActivity: true });
 
   // Verify boundedExecutor args are reasonable.
   const execRequests = scenario.provider.requests.filter(

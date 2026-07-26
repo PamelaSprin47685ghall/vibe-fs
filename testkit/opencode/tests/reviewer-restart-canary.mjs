@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { fileURLToPath } from 'node:url';
 import { runStaticGate, setupScenario, teardownScenario, getSessionId } from '../index.js';
+import { WATCHDOG_TIMEOUT_MS } from '../watchdog-constants.js';
 import { bindLaneSession, expectationLane } from './lane.mjs';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -24,7 +25,7 @@ try {
   scenario = await setupScenario({
     project: { files: { 'AGENTS.md': 'reviewer restart reconcile canary\n' } },
     strict: true,
-    watchdogMs: 1000,
+
   });
 
   scenario.provider.expectTitle({
@@ -79,7 +80,7 @@ try {
     },
   });
   assert.ok(prompt1.ok, `reviewer first prompt failed: ${JSON.stringify(prompt1.data)}`);
-  await turn1.awaitTerminal({ timeoutMs: 1000, requireActivity: true, requireAssistantTerminal: true, requireIdleAfterActivity: true });
+  await turn1.awaitTerminal({ timeoutMs: WATCHDOG_TIMEOUT_MS, requireActivity: true, requireAssistantTerminal: true, requireIdleAfterActivity: true });
 
   // Verify verdict tool was called (not forbidden tools: write, edit, bash, glob, grep)
   const verdictRequests = scenario.provider.requests.filter(
@@ -122,7 +123,7 @@ try {
     },
   });
   assert.ok(prompt2.ok, `reviewer restart prompt failed: ${JSON.stringify(prompt2.data)}`);
-  await turn2.awaitTerminal({ timeoutMs: 1000, requireActivity: true, requireAssistantTerminal: true, requireIdleAfterActivity: true });
+  await turn2.awaitTerminal({ timeoutMs: WATCHDOG_TIMEOUT_MS, requireActivity: true, requireAssistantTerminal: true, requireIdleAfterActivity: true });
 
   // Verify post-restart verdict calls also don't include forbidden tools
   const postRestartVerdicts = scenario.provider.requests.filter(

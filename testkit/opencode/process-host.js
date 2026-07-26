@@ -88,8 +88,10 @@ export class ProcessHost {
     this._pid = this._child?.pid || null;
     this._port = parseListenPort(listenLine);
     this._baseUrl = `http://127.0.0.1:${this._port}`;
+    opts.onProgress?.('listening');
     await this._waitForHealth(5000);
     const ht2 = Date.now(); console.log(`[host.start] _waitForHealth took ${ht2 - ht1}ms`);
+    opts.onProgress?.('healthy');
   }
 
   async _waitForHealth(timeoutMs = 5000) {

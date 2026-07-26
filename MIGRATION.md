@@ -7,7 +7,7 @@
 - 旧 `src/`、旧 `tests/`、旧 integration、Mux/OMP/Mimocode 只作为黑盒 Oracle；新行为只能进入 `next/`、`tests-next/`、`testkit/opencode/`。
 - 纠偏前冻结标签：`correction-freeze-e499e41d`。
 - 细粒度历史锚点：`834cb579`。只作为符号级行为证据；禁止历史 checkout、ours/theirs、整文件覆盖或未审查 cherry-pick。
-- 首个纠偏提交：`ae51da07`。它删除生产侧测试台账、全局 kill、传输重试/伪造失败、fail-open tree hash 和伪 PTY；保留并行 P0 与 1s scenario-local Watchdog。
+- 首个纠偏提交：`ae51da07`。它删除生产侧测试台账、全局 kill、传输重试/伪造失败、fail-open tree hash 和伪 PTY；保留并行 P0 与 scenario-local 2s Watchdog。
 
 ## 状态分类
 
@@ -29,13 +29,17 @@
 | TESTKIT-SINGLE-REPEAT-LAYER | canary 只执行一次，重复由 runner 控制 | `agent-dsl-canary.mjs` + `run-canary-staggered.mjs` | runner proof | 默认/13-way P0 |
 | BLOG-BUSY-SKIPS | Blogger 不阻塞主会话 | `tests-next/Session/CompanionTests.fs` | Port proof | explicit Blogger lanes |
 | BLOG-B-ACCUMULATES | 普通 Blogger 回合累积 B | `tests-next/Session/CompanionTests.fs` | Port proof | restart/real Host proof |
+| BLOG-CANONICAL-PREFIX | 同 ID 内容更新不属于已覆盖前缀 | `CompanionHostTests.fs` | Port proof | real Host part variants |
+| BLOG-JSON-REMOVE | JSON delta 表达嵌套删除与数组缩短 | `ManagerCanaryTests.fs` + `CompanionHostTests.fs` | pure/Port proof | real projection deletion |
+| BLOG-CHEAP-MODEL | Blogger 使用显式 configured model | `CompanionHostTests.fs` | Port proof | provider model snapshot |
 | PROC-THREE-X-DEADLINE | 唯一 3× deadline | `tests-next/Process/ProcessBudgetTests.fs` | local proof | owned process-tree E2E |
 | PROC-SPOOL-COMPLETE | 全输出 spool | `tests-next/Process/ProcessRunnerTests.fs` | local proof | bounded-memory stream proof |
 | REV-DOUBLE-PERFECT | 同 tree 双 PERFECT | `tests-next/Session/ReviewGuardTests.fs` + `reviewer-verdict-canary.mjs` | Port + real Host terminal guard | 完整 Manager 审查工作流 |
+| REV-DURABLE-NUDGE | Reviewer missing-verdict nudge durable、重启去重、发送失败不写事实 | `HostReviewGuardTests.fs` | Port + Journal proof | real restart canary |
 | FB-A-A-B-B | session 累计 A/A/B/B | `tests-next/Session/FallbackContractTests.fs` | pure proof | provider request model sequence |
 | ORCH-FF-ONLY | rebase 后复审与 ff-only | `tests-next/Integration/OrchestratorTests.fs` | Port proof | real Git worktree E2E |
 | TESTKIT-LANES | scenario/session/role/turn/request-kind lane；真实 session/parent 绑定 | `gate-testkit.mjs` + P0 canaries | Gate + real-host harness proof | 生产语义仍逐阶段验收 |
-| TESTKIT-CAUSAL-WATCHDOG | 1s watchdog 仅接受 blocking 因果进展 | `watchdog.js` + `gate-timeout-cases.mjs` | Gate + P0 proof | 每个新场景保持同一门槛 |
+| TESTKIT-CAUSAL-WATCHDOG | 2s watchdog 仅接受 blocking 因果进展 | `watchdog.js` + `watchdog-constants.js` + `gate-timeout-cases.mjs` | Gate + P0 proof | 每个新场景保持同一门槛 |
 
 ## 不得迁移
 
@@ -49,8 +53,9 @@
 
 1. ✅ Manager→Coder→Join 的 child-created、write、terminal、join、terminal Host barrier。
 2. ✅ Companion production projection/restart semantics：`CompanionAdvanced` 原子持久 B+baseline；真实 replacement restart 恢复完整 B 与 raw tail。
-3. ✅ Reviewer terminal guard：Manager 无当前 tree 的双 PERFECT 会收到 durable guard；Reviewer terminal 无 verdict 会 nudge 同一会话；abort terminal 不触发 guard/continuation。
-4. Fallback → Process → PTY → Orchestrator。
+3. ✅ Reviewer terminal guard：Manager 无当前 tree 的双 PERFECT 会收到 durable guard；Reviewer terminal 无 verdict 会 nudge 同一会话并 durable 去重；abort terminal 不触发 guard/continuation。
+4. ✅ Companion canonical prefix、JSON remove delta、cheap Blogger model 配置。
+5. Fallback → Process → PTY → Orchestrator。
 
 ## TestKit 因果接管证据
 

@@ -1,0 +1,1 @@
+export const WATCHDOG_TIMEOUT_MS = 2000;

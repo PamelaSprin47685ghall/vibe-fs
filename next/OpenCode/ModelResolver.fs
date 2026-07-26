@@ -1,5 +1,6 @@
 namespace Wanxiangshu.Next.OpenCode
 
+open System
 open Wanxiangshu.Next.Kernel.Identity
 open Wanxiangshu.Next.Journal
 open Wanxiangshu.Next.OpenCode
@@ -30,6 +31,27 @@ module ModelResolver =
             { providerID = "test"
               modelID = s
               variant = None }
+
+    let private tryParseConfiguredModel (s: string) : Result<OpencodeModel, string> =
+        match s.Split('/') with
+        | [| provider; model |] when
+            not (String.IsNullOrWhiteSpace provider)
+            && not (String.IsNullOrWhiteSpace model)
+            ->
+            Ok
+                { providerID = provider
+                  modelID = model
+                  variant = None }
+        | _ -> Error "WANXIANGSHU_BLOGGER_MODEL must be provider/model"
+
+    /// Resolve the dedicated Blogger model.  Missing and malformed
+    /// configuration are both explicit errors: callers must not fall back to
+    /// the primary model implicitly.
+    let bloggerModelFromEnv () : Result<OpencodeModel, string> =
+        match envVar "WANXIANGSHU_BLOGGER_MODEL" with
+        | None -> Error "WANXIANGSHU_BLOGGER_MODEL is not configured"
+        | Some value when String.IsNullOrWhiteSpace value -> Error "WANXIANGSHU_BLOGGER_MODEL is empty"
+        | Some value -> tryParseConfiguredModel value
 
     let fromEnv () : ModelConfig option =
         match envVar "WANXIANGSHU_MODEL_A", envVar "WANXIANGSHU_MODEL_B" with

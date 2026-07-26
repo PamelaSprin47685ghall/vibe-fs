@@ -50,11 +50,16 @@ type CompanionHost
         primaryId: SessionId,
         sessions: ISessionHostPort,
         ?durable: ICompanionDurablePort,
-        ?onBloggerCreated: SessionId -> unit
+        ?onBloggerCreated: SessionId -> unit,
+        ?bloggerModel: Result<OpencodeModel, string>
     ) =
     let companion = Companion(?durable = durable, ?sessionId = Some primaryId)
     let gate = obj ()
     let bloggerCreated = defaultArg onBloggerCreated (fun _ -> ())
+
+    let configuredBloggerModel =
+        defaultArg bloggerModel (Error "WANXIANGSHU_BLOGGER_MODEL is not configured")
+
     let mutable bloggerTask: Task<SessionId> option = None
 
     let ensureBlogger () =
@@ -97,38 +102,47 @@ type CompanionHost
 
     let blog (delta: ProjectionSnapshot) : Task<BlogText> =
         task {
-            let! childId = ensureBlogger ()
-
-            let completion =
-                TaskCompletionSource<TerminalOutcome>(TaskCreationOptions.RunContinuationsAsynchronously)
-
-            let watermark = sessions.GetSessionOutput childId |> List.length
-
-            use subscription =
-                sessions.SubscribeTerminal(childId, (fun _ outcome -> completion.SetResult outcome))
-
-            let prompt =
-                sprintf
-                    "You are the blogger of a coding agent session. Write one dense paragraph for these delta messages.\n%s"
-                    delta
-
-            let! sent = sessions.SendPrompt(childId, prompt, { Model = None; Agent = Some "blogger" })
-
-            match sent with
+            match configuredBloggerModel with
             | Error error -> return failBlog error
-            | Ok _ ->
-                let! outcome = completion.Task
+            | Ok model ->
+                let! childId = ensureBlogger ()
 
-                match outcome with
-                | Completed _ ->
-                    let text = assistantOutput childId watermark
+                let completion =
+                    TaskCompletionSource<TerminalOutcome>(TaskCreationOptions.RunContinuationsAsynchronously)
 
-                    if String.IsNullOrWhiteSpace text then
-                        return failBlog "Blogger returned no assistant text"
-                    else
-                        return text
-                | Aborted reason -> return failBlog reason
-                | Failed error -> return failBlog error
+                let watermark = sessions.GetSessionOutput childId |> List.length
+
+                use subscription =
+                    sessions.SubscribeTerminal(childId, (fun _ outcome -> completion.SetResult outcome))
+
+                let prompt =
+                    sprintf
+                        "You are the blogger of a coding agent session. Write one dense paragraph for these delta messages.\n%s"
+                        delta
+
+                let! sent =
+                    sessions.SendPrompt(
+                        childId,
+                        prompt,
+                        { Model = Some model
+                          Agent = Some "blogger" }
+                    )
+
+                match sent with
+                | Error error -> return failBlog error
+                | Ok _ ->
+                    let! outcome = completion.Task
+
+                    match outcome with
+                    | Completed _ ->
+                        let text = assistantOutput childId watermark
+
+                        if String.IsNullOrWhiteSpace text then
+                            return failBlog "Blogger returned no assistant text"
+                        else
+                            return text
+                    | Aborted reason -> return failBlog reason
+                    | Failed error -> return failBlog error
         }
 
     let jsonOfMessages (messages: obj list) =
@@ -138,18 +152,11 @@ type CompanionHost
         try
             let oldMessages = Fable.Core.JS.JSON.parse previous
             let newMessages = Fable.Core.JS.JSON.parse current
-            let stringify value = Fable.Core.JS.JSON.stringify value
-
-            let messageId value =
-                if isNull value || isNull value?info || isNull value?info?id then
-                    None
-                else
-                    Some(unbox<string> value?info?id)
 
             let sameMessage oldValue newValue =
-                match messageId oldValue, messageId newValue with
-                | Some oldId, Some newId -> oldId = newId
-                | _ -> stringify oldValue = stringify newValue
+                match Projection.messageId oldValue, Projection.messageId newValue with
+                | Some oldId, Some newId when oldId <> newId -> false
+                | _ -> Projection.sameCanonicalMessage oldValue newValue
 
             let mutable index = 0
             let mutable stopped = false

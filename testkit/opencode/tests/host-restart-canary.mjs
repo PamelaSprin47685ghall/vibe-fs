@@ -4,6 +4,7 @@ import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { getSessionId, runStaticGate, setupScenario, teardownScenario } from '../index.js';
+import { WATCHDOG_TIMEOUT_MS } from '../watchdog-constants.js';
 import { bindLaneSession, expectationLane } from './lane.mjs';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -90,15 +91,15 @@ async function nudge(parentId, childId, agentId, marker, managerMarker, scenario
     },
   });
   assert.ok(response.ok, `manager nudge failed: ${JSON.stringify(response.data)}`);
-  await parentTurn.awaitTerminal({ timeoutMs: 1000, requireActivity: true, requireAssistantTerminal: true, requireIdleAfterActivity: false });
-  await childTurn.awaitTerminal({ timeoutMs: 1000, requireActivity: true, requireAssistantTerminal: false, requireIdleAfterActivity: true });
+  await parentTurn.awaitTerminal({ timeoutMs: WATCHDOG_TIMEOUT_MS, requireActivity: true, requireAssistantTerminal: true, requireIdleAfterActivity: false });
+  await childTurn.awaitTerminal({ timeoutMs: WATCHDOG_TIMEOUT_MS, requireActivity: true, requireAssistantTerminal: false, requireIdleAfterActivity: true });
 
   const parentTurnFinal = scenario.turn.start(parentId, { afterSeq: parentTurn.terminalSeq });
-  await parentTurnFinal.awaitTerminal({ timeoutMs: 1000, requireActivity: true, requireAssistantTerminal: true, requireIdleAfterActivity: true });
+  await parentTurnFinal.awaitTerminal({ timeoutMs: WATCHDOG_TIMEOUT_MS, requireActivity: true, requireAssistantTerminal: true, requireIdleAfterActivity: true });
 
   await Promise.all([
-    scenario.provider.waitForExpectation('manager-blogger-2', 1000),
-    scenario.provider.waitForExpectation('coder-blogger-2', 1000),
+    scenario.provider.waitForExpectation('manager-blogger-2', WATCHDOG_TIMEOUT_MS),
+    scenario.provider.waitForExpectation('coder-blogger-2', WATCHDOG_TIMEOUT_MS),
   ]);
   scenario.watchdog?.advance({ reason: 'restarted-blogger-sidecars', lane: 'restart', blocking: true });
 }
@@ -106,7 +107,7 @@ async function nudge(parentId, childId, agentId, marker, managerMarker, scenario
 let scenario;
 try {
   assert.equal(runStaticGate([__filename]).passed, true);
-  scenario = await setupScenario({ project: { files: { 'AGENTS.md': 'restart reconcile canary\n' } }, strict: true, watchdogMs: 1000 });
+  scenario = await setupScenario({ project: { files: { 'AGENTS.md': 'restart reconcile canary\n' } }, strict: true });
 
   scenario.provider.expectTitle({
     id: 'parent-title',
@@ -164,7 +165,7 @@ try {
     },
   });
   assert.ok(firstPrompt.ok, `manager create failed: ${JSON.stringify(firstPrompt.data)}`);
-  await firstTurn.awaitTerminal({ timeoutMs: 1000, requireActivity: true, requireAssistantTerminal: true, requireIdleAfterActivity: false });
+  await firstTurn.awaitTerminal({ timeoutMs: WATCHDOG_TIMEOUT_MS, requireActivity: true, requireAssistantTerminal: true, requireIdleAfterActivity: false });
 
   const messages = await scenario.client.messages(parentId);
   const messageJson = JSON.stringify(messages.data);
@@ -176,22 +177,22 @@ try {
   scenario.sessionIds.push(childId);
 
   await scenario.turn.start(childId, { afterSeq: firstTurn.eventSeqBefore }).awaitTerminal({
-    timeoutMs: 1000,
+    timeoutMs: WATCHDOG_TIMEOUT_MS,
     requireActivity: true,
     requireAssistantTerminal: false,
     requireIdleAfterActivity: true,
   });
 
   await scenario.turn.start(parentId, { afterSeq: firstTurn.terminalSeq }).awaitTerminal({
-    timeoutMs: 1000,
+    timeoutMs: WATCHDOG_TIMEOUT_MS,
     requireActivity: true,
     requireAssistantTerminal: true,
     requireIdleAfterActivity: true,
   });
 
   await Promise.all([
-    scenario.provider.waitForExpectation('manager-blogger-1', 1000),
-    scenario.provider.waitForExpectation('coder-blogger-1', 1000),
+    scenario.provider.waitForExpectation('manager-blogger-1', WATCHDOG_TIMEOUT_MS),
+    scenario.provider.waitForExpectation('coder-blogger-1', WATCHDOG_TIMEOUT_MS),
   ]);
   scenario.watchdog?.advance({ reason: 'initial-blogger-sidecars', lane: 'initial', blocking: true });
 

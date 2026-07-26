@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { fileURLToPath } from 'node:url';
 import { runStaticGate, setupScenario, teardownScenario, getSessionId } from '../index.js';
+import { WATCHDOG_TIMEOUT_MS } from '../watchdog-constants.js';
 import { bindLaneSession, expectationLane } from './lane.mjs';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -8,7 +9,7 @@ const __filename = fileURLToPath(import.meta.url);
 let scenario;
 try {
   if (!runStaticGate([__filename]).passed) throw new Error('host lifecycle canary contains prohibited polling');
-  scenario = await setupScenario({ project: { files: { 'AGENTS.md': 'host lifecycle canary\n' } }, strict: true, watchdogMs: 1000 });
+  scenario = await setupScenario({ project: { files: { 'AGENTS.md': 'host lifecycle canary\n' } }, strict: true });
   scenario.provider.expectTitle({
     id: 'parent-title',
     lane: expectationLane('host-nudge', 'parent-title', 'title', 1, 'title'),
@@ -58,7 +59,7 @@ try {
       body: { agent: 'coder', parts: [{ type: 'text', text }], model: { providerID: 'test', modelID: 'test-model' } },
     });
     assert.ok(prompt.ok, `child prompt failed: ${JSON.stringify(prompt.data)}`);
-    await turn.awaitTerminal({ timeoutMs: 1000, requireActivity: true, requireAssistantTerminal: true, requireIdleAfterActivity: true });
+    await turn.awaitTerminal({ timeoutMs: WATCHDOG_TIMEOUT_MS, requireActivity: true, requireAssistantTerminal: true, requireIdleAfterActivity: true });
   }
 
   const childTranscript = await scenario.client.messages(childId);

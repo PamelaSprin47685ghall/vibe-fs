@@ -4,6 +4,7 @@ import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { getSessionId, runStaticGate, setupScenario, teardownScenario } from '../index.js';
+import { WATCHDOG_TIMEOUT_MS } from '../watchdog-constants.js';
 import { bindLaneSession, expectationLane } from './lane.mjs';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -49,7 +50,7 @@ try {
     project: { files: { 'AGENTS.md': 'companion replacement canary\n' } },
     strict: true,
     contextLimit,
-    watchdogMs: 1000,
+
   });
   scenario.provider.expectTitle({
     id: 'primary-title',
@@ -102,13 +103,13 @@ try {
       },
     });
     assert.ok(prompt.ok, `round ${round} prompt failed: ${JSON.stringify(prompt.data)}`);
-    await turn.awaitTerminal({ timeoutMs: 1000, requireActivity: true, requireAssistantTerminal: false, requireIdleAfterActivity: true });
+    await turn.awaitTerminal({ timeoutMs: WATCHDOG_TIMEOUT_MS, requireActivity: true, requireAssistantTerminal: false, requireIdleAfterActivity: true });
     if (round <= 2) {
-      await scenario.provider.waitForExpectation(`manager-blogger-${round}`, 1000);
-      await scenario.provider.waitForIdle(1000);
+      await scenario.provider.waitForExpectation(`manager-blogger-${round}`, WATCHDOG_TIMEOUT_MS);
+      await scenario.provider.waitForIdle(WATCHDOG_TIMEOUT_MS);
     }
     if (round === 3) {
-      await scenario.provider.waitForExpectation('manager-blogger-3', 1000);
+      await scenario.provider.waitForExpectation('manager-blogger-3', WATCHDOG_TIMEOUT_MS);
       scenario.watchdog?.advance({
         reason: 'replacement-blogger-busy',
         lane: 'manager-blogger:3',
@@ -153,8 +154,8 @@ try {
     },
   });
   assert.ok(restartedPrompt.ok, `restarted round failed: ${JSON.stringify(restartedPrompt.data)}`);
-  await restartedTurn.awaitTerminal({ timeoutMs: 1000, requireActivity: true, requireAssistantTerminal: false, requireIdleAfterActivity: true });
-  await scenario.provider.waitForExpectation('manager-blogger-restarted', 1000);
+  await restartedTurn.awaitTerminal({ timeoutMs: WATCHDOG_TIMEOUT_MS, requireActivity: true, requireAssistantTerminal: false, requireIdleAfterActivity: true });
+  await scenario.provider.waitForExpectation('manager-blogger-restarted', WATCHDOG_TIMEOUT_MS);
   scenario.watchdog?.advance({
     reason: 'replacement-blogger-restarted-busy',
     lane: 'manager-blogger-restarted:1',

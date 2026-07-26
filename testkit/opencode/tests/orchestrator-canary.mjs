@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { fileURLToPath } from 'node:url';
 import { runStaticGate, setupScenario, teardownScenario, getSessionId } from '../index.js';
+import { WATCHDOG_TIMEOUT_MS } from '../watchdog-constants.js';
 import { bindLaneSession, expectationLane } from './lane.mjs';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -18,7 +19,7 @@ try {
       },
     },
     strict: true,
-    watchdogMs: 1000,
+
   });
 
   scenario.provider.expectTitle({
@@ -93,19 +94,19 @@ try {
     },
   });
   assert.ok(prompt.ok, `orchestrator prompt failed: ${JSON.stringify(prompt.data)}`);
-  await scenario.provider.waitForExpectation('orchestrator-fork-manager', 1000);
+  await scenario.provider.waitForExpectation('orchestrator-fork-manager', WATCHDOG_TIMEOUT_MS);
   const managerCreated = await scenario.events.awaitEvent(
     (event) => event.type === 'session.created' && event.sessionID !== orchestratorId,
-    1000,
+    WATCHDOG_TIMEOUT_MS,
   );
   scenario.watchdog?.advance({
     reason: 'manager-job-session-created',
     lane: `session:${managerCreated.sessionID}`,
     blocking: true,
   });
-  await scenario.provider.waitForExpectation('manager-job-done', 1000);
-  await scenario.provider.waitForExpectation('orchestrator-published', 1000);
-  await scenario.provider.waitForExpectation('orchestrator-blogger-final', 1000);
+  await scenario.provider.waitForExpectation('manager-job-done', WATCHDOG_TIMEOUT_MS);
+  await scenario.provider.waitForExpectation('orchestrator-published', WATCHDOG_TIMEOUT_MS);
+  await scenario.provider.waitForExpectation('orchestrator-blogger-final', WATCHDOG_TIMEOUT_MS);
 
   const orchestratorRequests = scenario.provider.requests.filter(
     (request) => {

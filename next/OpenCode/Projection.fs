@@ -26,6 +26,38 @@ type CanonicalMessage =
       Raw: obj }
 
 module Projection =
+    // Keep the canonical serializer available at the Projection boundary so
+    // callers cannot accidentally introduce a second JSON normalization rule.
+    let canonicalJson = CanonicalJson.canonicalJson
+
+    let private readField (value: obj) (name: string) : obj =
+        if isNull value then
+            null
+        else
+            emitJsExpr (value, name) "$0[$1]"
+
+    let private readStringField (value: obj) (name: string) : string =
+        let field = readField value name
+        if isNull field then "" else unbox<string> field
+
+    let private infoObject (rawObj: obj) : obj =
+        if isNull rawObj then null
+        elif not (isNull rawObj?info) then rawObj?info
+        else rawObj
+
+    let private rawParts (rawObj: obj) : obj list =
+        let parts = readField rawObj "parts"
+
+        if isNull parts then
+            []
+        else
+            emitJsExpr parts "Array.from($0)" |> unbox<obj array> |> Array.toList
+
+    let messageId (rawObj: obj) : string option =
+        let info = infoObject rawObj
+        let id = readField info "id"
+
+        if isNull id then None else Some(unbox<string> id)
 
     let parseRole (roleStr: string) =
         match if isNull roleStr then "" else roleStr.ToLowerInvariant() with
@@ -86,7 +118,7 @@ module Projection =
                     if isNull partObj?args then
                         "{}"
                     else
-                        Fable.Core.JS.JSON.stringify partObj?args
+                        canonicalJson partObj?args
 
                 ToolCallPart(id, callId, tool, argsStr)
             | "compaction" ->
@@ -109,31 +141,57 @@ module Projection =
         if isNull rawObj then
             None
         else
-            let id = if isNull rawObj?id then "" else unbox<string> rawObj?id
-            let roleStr = if isNull rawObj?role then "" else unbox<string> rawObj?role
+            let info = infoObject rawObj
+            let id = readStringField info "id"
+
+            let roleField =
+                let directRole = readField rawObj "role"
+
+                if isNull directRole then
+                    readField info "role"
+                else
+                    directRole
+
+            let roleStr = if isNull roleField then "" else unbox<string> roleField
 
             let sId =
-                if isNull rawObj?sessionID then
-                    ""
-                else
-                    unbox<string> rawObj?sessionID
+                let directSession = readField rawObj "sessionID"
+
+                let session =
+                    if isNull directSession then
+                        readField info "sessionID"
+                    else
+                        directSession
+
+                if isNull session then "" else unbox<string> session
 
             let agent =
-                if isNull rawObj?agent then
+                let directAgent = readField rawObj "agent"
+
+                let agentField =
+                    if isNull directAgent then
+                        readField info "agent"
+                    else
+                        directAgent
+
+                if isNull agentField then
                     None
                 else
-                    Some(unbox<string> rawObj?agent)
+                    Some(unbox<string> agentField)
 
-            let parts =
-                if isNull rawObj?parts then
-                    []
-                else
-                    let pList = unbox<obj list> rawObj?parts
-                    pList |> List.map projectPart
+            let parts = rawParts rawObj |> List.map projectPart
 
             let text =
-                if not (isNull rawObj?text) then
-                    unbox<string> rawObj?text
+                let directText = readField rawObj "text"
+
+                let textField =
+                    if isNull directText then
+                        readField info "text"
+                    else
+                        directText
+
+                if not (isNull textField) then
+                    unbox<string> textField
                 else
                     parts
                     |> List.choose (function
@@ -151,6 +209,61 @@ module Projection =
                   Raw = rawObj }
 
     let projectMessages (rawMsgs: obj list) : CanonicalMessage list = rawMsgs |> List.choose projectMessage
+
+    let private canonicalPartValue (part: CanonicalPart) : obj =
+        match part with
+        | TextPart(id, text, synthetic) ->
+            createObj
+                [ "id", box id
+                  "type", box "text"
+                  "text", box text
+                  "synthetic", synthetic |> Option.map box |> Option.defaultValue null ]
+        | ToolCallPart(id, callId, tool, argsStr) ->
+            createObj
+                [ "id", box id
+                  "type", box "tool-call"
+                  "callID", box callId
+                  "tool", box tool
+                  "args", box argsStr ]
+        | CompactionPart(id, auto, overflow) ->
+            createObj
+                [ "id", box id
+                  "type", box "compaction"
+                  "auto", box auto
+                  "overflow", box overflow ]
+        | RawPart(id, kind, rawObj) -> createObj [ "id", box id; "type", box kind; "raw", box rawObj ]
+
+    /// Stable message content used by Companion prefix matching.  The
+    /// message id is intentionally omitted from the content projection: it is
+    /// a locator, not evidence that a message's contents are unchanged.
+    let canonicalMessageJson (rawObj: obj) : string =
+        match projectMessage rawObj with
+        | None -> canonicalJson rawObj
+        | Some message ->
+            let info =
+                infoObject rawObj
+                |> CanonicalJson.withoutKeys [| "id"; "role"; "sessionID"; "agent"; "text"; "parts" |]
+
+            let outer =
+                rawObj
+                |> CanonicalJson.withoutKeys [| "id"; "info"; "role"; "sessionID"; "agent"; "text"; "parts" |]
+
+            let agent: obj = message.Agent |> Option.map box |> Option.defaultValue null
+
+            let normalized =
+                createObj
+                    [ "info", box info
+                      "outer", box outer
+                      "role", box (roleToString message.Role)
+                      "sessionID", box message.SessionId
+                      "agent", agent
+                      "text", box message.Text
+                      "parts", box (message.Parts |> List.map canonicalPartValue |> List.toArray) ]
+
+            canonicalJson normalized
+
+    let sameCanonicalMessage (left: obj) (right: obj) : bool =
+        canonicalMessageJson left = canonicalMessageJson right
 
     // AG-CURRENT-TAIL-PRESERVED: pure prefix replacement over raw message JSON
     let replaceRawPrefix (newPrefix: obj list) (prefixLen: int) (rawMsgs: obj list) : obj list =

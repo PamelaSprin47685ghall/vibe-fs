@@ -142,18 +142,6 @@ type HostEventRouter
                     AgentJournal.appendAgent (StreamId.Session(SessionId.create sessionId)) None fact journal
                     |> ignore
 
-    let nudgeReviewer sessionId messageId =
-        let key = $"reviewer:{sessionId}:{messageId}"
-
-        if nudgeSent.Add key then
-            HostSessionNudge.send
-                sessionPort
-                (SessionId.create sessionId)
-                "Submit a structured verdict with the verdict tool: PERFECT or REVISE. Do not put a verdict in prose."
-                { Model = None
-                  Agent = Some "reviewer" }
-                ignore
-
     let managerGuardNudges = HashSet<string>()
 
     let nudgedMessages = HashSet<string>()
@@ -258,17 +246,20 @@ type HostEventRouter
                         agent.Equals("reviewer", StringComparison.OrdinalIgnoreCase)
                         && not (verdictSessions.Remove sessionId)
                         ->
-                        nudgeReviewer sessionId terminalMessageId
+                        HostReviewGuard.nudgeReviewer sessionPort journal nudgeSent sessionId terminalMessageId
                     | Some agent when agent.Equals("manager", StringComparison.OrdinalIgnoreCase) ->
-                        HostReviewGuard.missingTree journal gitTreePort sessionId
-                        |> Option.iter (
+                        match HostReviewGuard.missingTree journal gitTreePort sessionId with
+                        | HostReviewGuard.ReviewGuardMissing treeHash ->
                             HostReviewGuard.nudgeManager
                                 sessionPort
                                 journal
                                 managerGuardNudges
                                 sessionId
                                 terminalMessageId
-                        )
+                                treeHash
+                        | HostReviewGuard.ReviewGuardConfirmed -> ()
+                        | HostReviewGuard.ReviewGuardUnavailable reason ->
+                            raise (InvalidOperationException(sprintf "Review guard unavailable: %s" reason))
                     | _ -> ()
 
                     match completedAssistant with

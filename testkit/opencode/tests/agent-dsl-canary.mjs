@@ -17,6 +17,7 @@ import {
   setupScenario,
   teardownScenario,
 } from '../index.js';
+import { WATCHDOG_TIMEOUT_MS } from '../watchdog-constants.js';
 import { bindLaneSession, expectationLane } from './lane.mjs';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -160,13 +161,13 @@ async function canaryScenario(scenario) {
     throw new Error(`Prompt failed with status ${promptRes.status}: ${JSON.stringify(promptRes.data)}`);
   }
 
-  await scenario.provider.waitForExpectation('manager-fork-coder', 1000);
+  await scenario.provider.waitForExpectation('manager-fork-coder', WATCHDOG_TIMEOUT_MS);
   const coderCreated = await scenario.events.awaitEvent(
     (event) => event.seq > managerStartSeq
       && event.type === 'session.created'
       && event.parentSessionID === sessionID
       && event.sessionAgent === 'coder',
-    1000,
+    WATCHDOG_TIMEOUT_MS,
   );
   const coderSessionID = coderCreated.sessionID;
   assert.ok(coderSessionID, 'Manager fork must create a real Coder child session');
@@ -183,7 +184,7 @@ async function canaryScenario(scenario) {
       && event.sessionID === coderSessionID
       && event.toolName === 'write'
       && event.toolStatus === 'completed',
-    1000,
+    WATCHDOG_TIMEOUT_MS,
   );
   scenario.watchdog?.advance({
     reason: 'manager-coder-write-completed',
@@ -193,7 +194,7 @@ async function canaryScenario(scenario) {
 
   const coderFinalTurn = scenario.turn.start(coderSessionID, { afterSeq: coderWriteCompleted.seq });
   await coderFinalTurn.awaitTerminal({
-    timeoutMs: 1000,
+    timeoutMs: WATCHDOG_TIMEOUT_MS,
     requireActivity: true,
     requireAssistantTerminal: true,
     requireIdleAfterActivity: true,
@@ -205,7 +206,7 @@ async function canaryScenario(scenario) {
       && event.sessionID === sessionID
       && event.toolName === 'join'
       && event.toolStatus === 'completed',
-    1000,
+    WATCHDOG_TIMEOUT_MS,
   );
   scenario.watchdog?.advance({
     reason: 'manager-coder-join-completed',
