@@ -68,14 +68,13 @@ import:
 - `HostEventRouter` 以 `messageID`/`messageId` 聚合 `message.part.updated`，再在 terminal 判定空助手轮：有 text/tool part 的完成轮不会误发零宽续命；真正空轮仍会续命。Manager terminal 的当前 Git tree 未获双 PERFECT 时，用 listener-before-send 发 guard 并 append `GuardPromptAccepted`；Reviewer 无 verdict terminal nudge 同一会话；abort terminal 不发 guard/continuation。`session.status=retry` 的每个 attempt 一次性 append `FallbackFailureRecorded`，500→即时 retry→重启累计由 fallback canary 覆盖。
 - Companion 成功回合以单条 `CompanionAdvanced(SessionId, Projection, Content)` 原子 append；`Content` 是累积后的完整 B，不再分两条事实留下 baseline/B 撕裂窗口。`prefixLength` 现在比较 canonical message content，不把同 ID 的 tool/text 更新误判为已覆盖；`jsonDelta` 输出确定性的 add/remove/replace 操作，覆盖嵌套删除和数组缩短；Blogger model 从 `WANXIANGSHU_BLOGGER_MODEL` 明确解析，缺失/非法配置 fail-closed，TestKit 显式注入 `test/test-model`。
 - ReviewGuard 的 Manager/Reviewer nudge 共用 durable `GuardPromptAccepted`，GuardKey 绑定 target、trigger、reason；重启可去重，发送失败不写事实。Journal/GitTreePort 缺失或读取异常不再返回允许完成的 `None`，而是阻止 Manager finish。
-- 本轮已直接验证：`npm run test:next`（158/158 Fable）、`node testkit/opencode/tests/gate-testkit.mjs`（23/23）、Companion projection/replacement canary、Reviewer verdict canary、Fallback A/A/B/B + restart canary、Process bounded spool/cancellation tests、PTY DSL unified surface tests、Orchestrator conflict/double-PERFECT tests、默认 P0、13-way P0、3× P0 与全量 `npm test` 均通过。
+- 本轮已直接验证：`npm run test:next`（158/158 Fable）、`node testkit/opencode/tests/gate-testkit.mjs`（23/23）、Companion projection/replacement canary、Reviewer verdict canary、Fallback A/A/B/B + restart canary、Process bounded spool/cancellation tests、PTY DSL unified surface tests、Orchestrator conflict/double-PERFECT tests、默认 P0、13-way P0、3× P0 与全量 `npm test` 均通过。HostForkRuntime 拆分后全量 `npm test`（含 13 canary）再次通过。
 
 ## 当前未闭合边界
 
-1. 四项因果纠偏与 Companion/Review 本轮边界已有直接测试证据；仍不得把 canary 名称外推为完整产品闭合。
-2. Fallback 已闭合：HostForkRuntime 注入 durable ModelResolver；每个 retry attempt 只记一条事实；同一 child 跨重启实测 A/A/B/B。
-3. Process 已闭合有界 spool/map-reduce、唯一 deadline、取消杀进程树与 pipe EOF；真实 PTY `fork` 表面、Orchestrator worktree/rebase/ff-only 发布仍未闭合。
-4. 不得宣称 release-ready；下一阶段只能按 PTY → Orchestrator 顺序推进。
+1. 四项因果纠偏、Companion/Review 边界、Fallback A/A/B/B、Process 有界 spool、PTY 统一 DSL 均有直接测试证据；仍不得把 canary 名称外推为完整产品闭合。
+2. Orchestrator 程序在 Port/Fake 层已闭合：脏工作区拒绝、candidate、串行信号量、冲突回交同 Manager、rebase 后双 PERFECT、ff-only、worktree 清理。Orchestrator 角色的 `fork(manager)` 在 ToolSurface 仍经通用 HostForkRuntime 创建普通 child，尚未切换到 ManagerJob 发布程序；orchestrator-canary 证明的是工具面与 join，不是真实 Git 发布链。这是最后一个未闭合边界。
+3. 不得宣称 release-ready；Orchestrator 生产接线完成前不新增任何横向模块。
 
 ## 解冻后的严格顺序
 
@@ -111,7 +110,7 @@ import:
 
 ### 阶段四：其他边界
 
-固定顺序：Companion → Reviewer → Fallback → Process → PTY → Orchestrator。Companion/Reviewer 本轮已有可复现直接证据；下一阶段只进入 Fallback，不能跨阶段修改 Process/PTY/Orchestrator。
+固定顺序：Companion → Reviewer → Fallback → Process → PTY → Orchestrator。前五项已按顺序闭合；只剩 Orchestrator 生产接线：Orchestrator 的 `fork(manager)` 必须调用 ManagerJob 发布程序而非通用 HostForkRuntime，并以真实 Git 发布链 E2E 验收。
 
 ## 不可违反的生产纪律
 
@@ -165,8 +164,12 @@ npm run test:e2e:p0
 ## 当前解冻动作
 
 1. busy existing nudge、Watchdog、runner 重复层和 13-way 隔离门已完成并推送。
-2. Companion canonical prefix、JSON remove delta、cheap Blogger model 与 Reviewer durable guard 已完成本轮定向验证。
-3. Fallback attempt identity/A-A-B-B 与重启恢复已完成；Process 有界 spool/取消链已完成，下一步进入 PTY，Orchestrator 继续冻结。
-4. `MIGRATION.md` 继续记录行为接管和删除门槛；不把旧实现重新引入。
+2. Companion canonical prefix、JSON remove delta、cheap Blogger model 与 Reviewer durable guard 已完成并推送。
+3. Fallback attempt identity/A-A-B/B 与重启恢复已完成并推送。
+4. Process 有界 spool、流式 map/reduce、取消杀树已完成并推送。
+5. PTY 统一 fork DSL（create/write/read/signal/list 混合/join 邮箱/parent abort）已完成并推送。
+6. `HostForkRuntime.fs` 已按拆分纪律分为生命周期模块、主类型与 PTY 扩展三个文件（331→265/76/43 行）；架构门禁文本明确禁止删空行压行数逃避拆分。
+7. Orchestrator Port/Fake 发布链（冲突回交、rebase 后双 PERFECT）已完成并推送；生产 ToolSurface 接线是唯一剩余动作。
+8. `MIGRATION.md` 继续记录行为接管和删除门槛；不把旧实现重新引入。
 
 任何“为了让测试不挂”“先加几十次重试”“测试环境才设置变量”“以后换真正 PTY”“读不到就忽略”“方便清理所以全局 kill”的修改均拒绝。测试必须证明 SSOT；生产不得追着测试夹具跑。
