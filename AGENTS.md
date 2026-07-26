@@ -56,29 +56,30 @@ import:
 1. busy existing agent 的 nudge 不再经过带 `runWork` 的新 `Fork`；同一 active source 只允许一个 completion。
 2. SSOT 将 idle existing 与 busy existing 明确分开：前者建 Run，后者只 nudge。
 3. Watchdog 的 `session.created` 不再无条件续命，只匹配 pending causal barrier 或显式 advance。
-4. 重复控制统一为外层 1～3 次，child canary 强制 `CANARY_REPEAT=1`，`test:e2e:p0:parallel` 为 13-way 全并发隔离门。
+4. 重复控制统一为外层 1～3 次，child canary 强制 `CANARY_REPEAT=1`；标准 P0 默认全套并行隔离（`MAX_PARALLEL_CANARIES` 默认等于 canary 数）。
 
-Orchestrator 生产接线（WIP，commit `84bd9b99`）：`fork(agent=manager)` 从 orchestrator session 路由到 `ForkManagerJob`（worktree → manager child → finalizeWorktree → reverify → publish）；`join` 路由到 `JoinPublished`。6 个新模块拆分满足 300 行门禁。L1 fake-port 测试覆盖纯逻辑。真实 canary `orchestrator-publish-canary.mjs` 未通过——manager terminal 后 reviewer 不到达 mock provider，`finalizeWorktree` 未执行，诊断见 `困惑.md`。
-3. `session.created` 不再是全局 Watchdog 心跳；只有显式等待后的因果 barrier 才能推进 2s Watchdog。
-4. 重复控制只保留 runner 外层；每个 canary 子进程强制 `CANARY_REPEAT=1`。除默认开发门外，另有 `MAX_PARALLEL_CANARIES=13` 的全 P0 隔离门。
+Orchestrator 生产接线（WIP）：`fork(agent=manager)` 从 orchestrator session 路由到 `ForkManagerJob`；`join` 路由到 `JoinPublished`。Git authority port 与 boot reconcile 已接线；真实 publish canary 是否全绿以当前 `npm run test:e2e:p0` 证据为准，不得预先写成完成。
 
 - `StrictMockProvider` 的 expectation lane 已包含 scenario、session alias、role、turn、request-kind；真实 OpenCode 请求以 `x-session-affinity` 绑定 session，child 首请求还校验 `x-parent-session-id`。已绑定 session 优先于未绑定 sibling lane；错 parent、错顺序、extra、missing、ambiguous 全部返回 500。
 - 每个实际产生的 title、零宽 continuation、Blogger、Executor、Reviewer 请求都是显式 expectation；`allowOutOfOrder`、`allowBloggerRequests`、`allowTitleGeneration`、`allowSyntheticContinuations` 已删除。没有自动吞请求路径。
 - `afterExpectation()` 在已消费 expectation 的同一因果边界注册后继 lane；它避免多 child/session 交错时的注册竞态，不引入 retry 或生产状态。
 - Watchdog 固定 2s。只接受 blocking expectation 消费、显式 session/restart/barrier；background Blogger 默认只留诊断。未知 `session.created` 只进入 `sessionCreatedDiagnostics`，不重置 Watchdog。replacement busy-skip 仅在测试显式等待该事实时作为 blocking barrier。
-- `testkit/opencode/tests/gate-testkit.mjs` 的 23 项 gate 已覆盖 lane 交错/FIFO、extra/missing、真实 session-parent 绑定、原子后继、title 分类、background-only watchdog、未知 `session.created` 噪音与 2s 常量集中化。`npm run test:e2e:p0` 是默认有界并发门；`npm run test:e2e:p0:parallel` 才证明 13 个 canary 同时存在时的环境隔离。
+- `testkit/opencode/tests/gate-testkit.mjs` 的 gate 覆盖 lane 交错/FIFO、extra/missing、真实 session-parent 绑定、原子后继、title 分类、background-only watchdog、未知 `session.created` 噪音与 2s 常量集中化。`npm run test:e2e:p0` 默认即全套并行隔离门（含 publish canary）；不得再用 2 路线程池冒充全套并存。
 - Journal 运行时路径已在 Git common directory 的 `wanxiangshu-next/runtimes`；测试依赖不再创建 workspace `node_modules`，Reviewer canary 断言工作树没有 `.wanxiangshu-next`。
 - Manager→Coder→Join 现以 child-created、Coder write completed、Coder terminal、Manager join completed、Manager terminal 五个真实 Host barrier 收口；不再以全局 idle 推断因果。
 - `HostEventRouter` 以 `messageID`/`messageId` 聚合 `message.part.updated`，再在 terminal 判定空助手轮：有 text/tool part 的完成轮不会误发零宽续命；真正空轮仍会续命。Manager terminal 的当前 Git tree 未获双 PERFECT 时，用 listener-before-send 发 guard 并 append `GuardPromptAccepted`；Reviewer 无 verdict terminal nudge 同一会话；abort terminal 不发 guard/continuation。`session.status=retry` 的每个 attempt 一次性 append `FallbackFailureRecorded`，500→即时 retry→重启累计由 fallback canary 覆盖。
 - Companion 成功回合以单条 `CompanionAdvanced(SessionId, Projection, Content)` 原子 append；`Content` 是累积后的完整 B，不再分两条事实留下 baseline/B 撕裂窗口。`prefixLength` 现在比较 canonical message content，不把同 ID 的 tool/text 更新误判为已覆盖；`jsonDelta` 输出确定性的 add/remove/replace 操作，覆盖嵌套删除和数组缩短；Blogger model 从 `WANXIANGSHU_BLOGGER_MODEL` 明确解析，缺失/非法配置 fail-closed，TestKit 显式注入 `test/test-model`。
 - ReviewGuard 的 Manager/Reviewer nudge 共用 durable `GuardPromptAccepted`，GuardKey 绑定 target、trigger、reason；重启可去重，发送失败不写事实。Journal/GitTreePort 缺失或读取异常不再返回允许完成的 `None`，而是阻止 Manager finish。
-- 本轮已直接验证：`npm run test:next`（158/158 Fable）、`node testkit/opencode/tests/gate-testkit.mjs`（23/23）、Companion projection/replacement canary、Reviewer verdict canary、Fallback A/A/B/B + restart canary、Process bounded spool/cancellation tests、PTY DSL unified surface tests、Orchestrator conflict/double-PERFECT tests、默认 P0、13-way P0、3× P0 与全量 `npm test` 均通过。HostForkRuntime 拆分后全量 `npm test`（含 13 canary）再次通过。
+- 完成状态只允许由当前直接测试证据提升；历史“全量通过”不得复读。Watchdog 冻结为 2s scenario-local 静默探针。
 
 ## 当前未闭合边界
 
-1. 四项因果纠偏、Companion/Review 边界、Fallback A/A/B/B、Process 有界 spool、PTY 统一 DSL 均有直接测试证据；Orchestrator 生产接线已落地但真实 canary 未闭合。
-2. Orchestrator 程序在 Port/Fake 层已闭合：脏工作区拒绝、candidate、串行信号量、冲突回交同 Manager、rebase 后双 PERFECT、ff-only、worktree 清理。Orchestrator 角色的 `fork(manager)` 在 ToolSurface 已切换到 `OrchestratorHost.ForkManagerJob`；但真实 canary 中 manager terminal 后 `finalizeWorktree` 未执行（reviewer 不到达 mock），根因待诊断（见 `困惑.md`）。
-3. 不得宣称 release-ready；Orchestrator 真实 canary 未通过前不新增任何横向模块。
+1. busy nudge 实现已有单元证据；真实 busy-overlap E2E 与标准全并行 P0（含 publish canary）正在纠偏，不得写成已验收。
+2. Process：raw spool 已流式化；仍需验证分层 reduce、spool finally 清理、Executor 目标 completion 路由。
+3. PTY：类型与 fork DSL 存在；真实 bun-pty 生产后端与 `fork(agent=pty)` canary 正在接线，**不得宣称 PTY 产品能力完成**。
+4. Companion：canonical full projection / Y 自压缩调度需当前 build+canary 证据。
+5. Fallback：A/A/B/B 有真实证据；跨重启 durable failure identity 正在落地，不得只靠进程内 HashSet。
+6. Orchestrator：ToolSurface 已接线；Git authority + boot reconcile 正在落地；真实 publish canary 与重启恢复未闭合前不得 release-ready。
 
 ## 解冻后的严格顺序
 
@@ -90,7 +91,7 @@ Orchestrator 生产接线（WIP，commit `84bd9b99`）：`fork(agent=manager)` �
 - 只读 build、fixture、源码可以共享；运行中不得改共享 build。
 - expectation key 至少包含 scenario、session、role、turn、request-kind；实现必须能拒绝错 lane、错顺序、额外请求和缺失请求。
 - Blogger 是显式 lane，不是背景噪音；Manager Blogger 与 Coder Blogger 分离；禁止 Blogger-of-Blogger。
-- 继续使用并行 P0，最多 3 次；默认开发门可有界并发，但必须另跑 `npm run test:e2e:p0:parallel` 验证全套件同时存在。不可用串行掩盖隔离错误。
+- 继续使用并行 P0，最多 3 次；标准门禁必须让全部 P0 canary 进入运行态并隔离。不可用串行或 2 路线程池掩盖隔离错误。
 - Watchdog 保持 2s，但只接受当前场景的因果进展。诊断必须列出最后进展、阻塞 lane 和剩余 expectation。
 - Reaper 只能作为人工诊断命令，不能挂在 npm lifecycle；TestKit 清理自己创建的进程树，不扫描全机、不猜归属。
 
@@ -114,7 +115,7 @@ Orchestrator 生产接线（WIP，commit `84bd9b99`）：`fork(agent=manager)` �
 
 ### 阶段四：其他边界
 
-固定顺序：Companion → Reviewer → Fallback → Process → PTY → Orchestrator。前五项已按顺序闭合；只剩 Orchestrator 生产接线：Orchestrator 的 `fork(manager)` 必须调用 ManagerJob 发布程序而非通用 HostForkRuntime，并以真实 Git 发布链 E2E 验收。
+固定顺序：Companion → Reviewer → Fallback → Process → PTY → Orchestrator。前序边界有部分证据；未闭合项见上文。Orchestrator 必须 Git 权威 + 重启 reconcile + 真实 publish E2E。
 
 ## 不可违反的生产纪律
 
@@ -143,7 +144,7 @@ node testkit/opencode/tests/gate-testkit.mjs
 npm run test:e2e:p0
 ```
 
-当前纠偏后先跑最小目标测试；全量测试只能在对应阶段完成后运行。稳定性上限固定 3 次，且只允许 runner 外层控制重复；canary 自身只能执行一次。`npm run test:e2e:p0` 使用默认开发并发，`npm run test:e2e:p0:parallel` 使用 13-way 全并发隔离门。禁止 fixed sleep；使用 SSE、Provider、HTTP 事件和明确 barrier，但 Watchdog 只记录因果进展。
+当前纠偏后先跑最小目标测试；全量测试只能在对应阶段完成后运行。稳定性上限固定 3 次，且只允许 runner 外层控制重复；canary 自身只能执行一次。`npm run test:e2e:p0` 即全套并行隔离门。禁止 fixed sleep；使用 SSE、Provider、HTTP 事件和明确 barrier，但 Watchdog 只记录因果进展。
 
 - 每个 E2E 场景必须具备：独立环境、显式 expectation、场景级 diagnostics、2s causal-progress watchdog、拥有者清理、无 PID/端口/session/worktree 泄漏检查。测试失败首先检查 expectation 因果模型、Mock 假设、等待事件和资源归属，不得先改生产代码迎合夹具。
 
@@ -167,13 +168,13 @@ npm run test:e2e:p0
 
 ## 当前解冻动作
 
-1. busy existing nudge、Watchdog、runner 重复层和 13-way 隔离门已完成并推送。
-2. Companion canonical prefix、JSON remove delta、cheap Blogger model 与 Reviewer durable guard 已完成并推送。
-3. Fallback attempt identity/A-A-B/B 与重启恢复已完成并推送。
-4. Process 有界 spool、流式 map/reduce、取消杀树已完成并推送。
-5. PTY 统一 fork DSL（create/write/read/signal/list 混合/join 邮箱/parent abort）已完成并推送。
-6. `HostForkRuntime.fs` 已按拆分纪律分为生命周期模块、主类型与 PTY 扩展三个文件（331→265/76/43 行）；架构门禁文本明确禁止删空行压行数逃避拆分。
-7. Orchestrator Port/Fake 发布链（冲突回交、rebase 后双 PERFECT）已完成并推送；生产 ToolSurface 接线是唯一剩余动作。
-8. `MIGRATION.md` 继续记录行为接管和删除门槛；不把旧实现重新引入。
+1. Watchdog 冻结 2s；心跳只认场景因果进展。
+2. 标准 P0 改为全套并行隔离，并纳入 orchestrator-publish canary。
+3. busy-overlap 真实 E2E（非顺序三轮）与危险两参数 Fork 删除。
+4. Process 分层 reduce / spool finally / 目标 join 路由。
+5. 真实 bun-pty 生产后端 + PTY fork DSL canary。
+6. Orchestrator Git authority + boot reconcile。
+7. Companion canonical full projection + Y 自压缩调度；Fallback durable failure identity。
+8. `MIGRATION.md` 继续记录行为接管和删除门槛；不把旧实现重新引入。完成状态禁止写进本文件当宣言。
 
 任何“为了让测试不挂”“先加几十次重试”“测试环境才设置变量”“以后换真正 PTY”“读不到就忽略”“方便清理所以全局 kill”的修改均拒绝。测试必须证明 SSOT；生产不得追着测试夹具跑。

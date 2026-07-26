@@ -148,7 +148,9 @@ type CompanionHost
         }
 
     let jsonOfMessages (messages: obj list) =
-        Fable.Core.JS.JSON.stringify (List.toArray messages)
+        // Full projection baseline must be the same canonical bytes as
+        // Projection.canonicalJson — not insertion-order JSON.stringify.
+        Projection.canonicalJson (List.toArray messages)
 
     let prefixLength (previous: string) (current: string) (maximum: int) =
         try
@@ -179,6 +181,8 @@ type CompanionHost
     member _.SubmitProjection(projection: ProjectionSnapshot) : CompanionOutcome = companion.Submit(projection, blog)
 
     member _.EnablePrefixReplacement() : bool = companion.TryEnableReplacement()
+
+    member _.TryRebase(newB: string, newBaseline: string) : bool = companion.TryRebase(newB, newBaseline)
 
     member _.Memory = companion.Memory
 

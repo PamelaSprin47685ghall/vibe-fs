@@ -5,6 +5,7 @@ open System.Collections.Generic
 open System.Threading
 open System.Threading.Tasks
 open Wanxiangshu.Next.Kernel.Identity
+open Wanxiangshu.Next.Kernel.Fact
 open Wanxiangshu.Next.Journal
 open Wanxiangshu.Next.Process
 open Wanxiangshu.Next.Session
@@ -26,7 +27,8 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
     let worktrees = Dictionary<string, string>()
     let stash = Dictionary<string, RunCompletion>()
 
-    let gitPort = ProcessGitPort.createWithRunner OrchestratorGit.run
+    let gitPort = ProcessGitPort.createWithRepo deps.RepoPath OrchestratorGit.run
+    let authorityPort = OrchestratorAuthority.createPort ()
 
     let onChildCreated (agentId: string) (role: AgentRole) (childId: SessionId) =
         if role = AgentRole.Reviewer then
@@ -211,13 +213,21 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
             | None ->
                 let! branch = orchestratorBranch ()
 
+                do!
+                    OrchestratorAuthority.reconcilePublishedFromAuthority
+                        deps.Journal
+                        authorityPort
+                        deps.RepoPath
+                        branch
+
                 let value =
                     Orchestrator(
                         gitPort,
                         managerPort,
                         deps.RepoPath,
                         branch,
-                        ?journal = (deps.Journal |> Option.map OrchestratorJournalPort.fromAgentJournal)
+                        ?journal = (deps.Journal |> Option.map OrchestratorJournalPort.fromAgentJournal),
+                        ?authority = Some authorityPort
                     )
 
                 engineInstance <- Some value

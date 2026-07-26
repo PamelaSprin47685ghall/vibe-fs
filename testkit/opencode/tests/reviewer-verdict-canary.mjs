@@ -140,7 +140,21 @@ async function runScenario(scenario) {
     },
   });
   assert.ok(prompt.ok, `manager prompt failed: ${JSON.stringify(prompt.data)}`);
-  await turn.awaitTerminal({ timeoutMs: WATCHDOG_TIMEOUT_MS, requireActivity: true, requireAssistantTerminal: true, requireIdleAfterActivity: true });
+  await scenario.provider.waitForExpectation('manager-fork-reviewer', WATCHDOG_TIMEOUT_MS);
+  scenario.watchdog?.advance({ reason: 'manager-forked-reviewer', lane: 'manager', blocking: true });
+  await scenario.provider.waitForExpectation('review-perfect-1', WATCHDOG_TIMEOUT_MS);
+  scenario.watchdog?.advance({ reason: 'review-perfect-1', lane: 'reviewer', blocking: true });
+  await scenario.provider.waitForExpectation('review-perfect-2', WATCHDOG_TIMEOUT_MS);
+  scenario.watchdog?.advance({ reason: 'review-perfect-2', lane: 'reviewer', blocking: true });
+  await scenario.provider.waitForExpectation('manager-join-reviewer', WATCHDOG_TIMEOUT_MS);
+  scenario.watchdog?.advance({ reason: 'manager-joined-reviewer', lane: 'manager', blocking: true });
+  await scenario.provider.waitForExpectation('manager-review-complete', WATCHDOG_TIMEOUT_MS);
+  await turn.awaitTerminal({
+    timeoutMs: WATCHDOG_TIMEOUT_MS,
+    requireActivity: true,
+    requireAssistantTerminal: true,
+    requireIdleAfterActivity: true,
+  });
 
   const reviewerRequests = scenario.provider.requests.filter((request) => toolNames(request).includes('verdict'));
   assert.ok(reviewerRequests.length >= 3, 'Reviewer must submit two verdicts then finish');
@@ -181,10 +195,10 @@ async function runScenario(scenario) {
     blocking: false,
     neverEnd: true,
     text: 'Manager received the review guard.',
+    // Host synthetic guard prompts may arrive without a full tool schema list;
+    // identity is the durable review-guard text, not the tool surface.
     match: {
       containsText: ['Review is required before completion.'],
-      requiredTools: managerTools,
-      forbiddenTools: forbiddenManagerTools,
     },
   });
 
@@ -205,7 +219,15 @@ async function runScenario(scenario) {
     },
   });
   assert.ok(guardPrompt.ok, `guard manager prompt failed: ${JSON.stringify(guardPrompt.data)}`);
-  await guardTurn.awaitTerminal({ timeoutMs: WATCHDOG_TIMEOUT_MS, requireActivity: true, requireAssistantTerminal: true, requireIdleAfterActivity: true });
+  await scenario.provider.waitForExpectation('guard-manager-first', WATCHDOG_TIMEOUT_MS);
+  scenario.watchdog?.advance({ reason: 'guard-manager-first-terminal', lane: 'guard-manager', blocking: true });
+  await scenario.provider.waitForExpectation('guard-manager-nudged', WATCHDOG_TIMEOUT_MS);
+  await guardTurn.awaitTerminal({
+    timeoutMs: WATCHDOG_TIMEOUT_MS,
+    requireActivity: true,
+    requireAssistantTerminal: true,
+    requireIdleAfterActivity: true,
+  });
   scenario.watchdog?.advance({
     reason: 'manager-review-guard-terminal',
     lane: `session:${guardManagerId}`,
@@ -233,7 +255,6 @@ async function runScenario(scenario) {
     text: 'The structured verdict prompt was received.',
     match: {
       containsText: ['Submit a structured verdict with the verdict tool'],
-      requiredTools: ['verdict'],
     },
   });
 

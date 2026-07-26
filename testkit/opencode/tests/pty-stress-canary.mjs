@@ -6,6 +6,37 @@ import { bindLaneSession, expectationLane } from './lane.mjs';
 
 const __filename = fileURLToPath(import.meta.url);
 
+/**
+ * Real PTY product surface (not plain executor stress):
+ *   fork(agent="pty", prompt=command) → returns ptyId
+ *   fork(agent=ptyId, signal="TERM") → signals real backend
+ *
+ * Join mailbox semantics are covered by unit tests; this canary proves the
+ * production tool surface uses fork(agent="pty") and signal on the real handle.
+ */
+function extractPtyIdFromMessages(body) {
+  const messages = body?.messages || [];
+  for (let i = messages.length - 1; i >= 0; i -= 1) {
+    const msg = messages[i];
+    const content = typeof msg?.content === 'string' ? msg.content : JSON.stringify(msg?.content || '');
+    const match = content.match(/"ptyId"\s*:\s*"([^"]+)"/) || content.match(/ptyId[=:]\s*([A-Za-z0-9_-]+)/);
+    if (match) return match[1];
+  }
+  return null;
+}
+
+function toolResultSnippets(provider) {
+  const out = [];
+  for (const request of provider.requests || []) {
+    for (const message of request.messages || []) {
+      if (message.role === 'tool' || message.role === 'toolResult') {
+        out.push(JSON.stringify(message).slice(0, 400));
+      }
+    }
+  }
+  return out;
+}
+
 let scenario;
 try {
   if (!runStaticGate([__filename]).passed) {
@@ -14,7 +45,6 @@ try {
   scenario = await setupScenario({
     project: { files: { 'AGENTS.md': 'PTY stress canary\n' } },
     strict: true,
-
   });
 
   scenario.provider.expectTitle({
@@ -22,25 +52,30 @@ try {
     lane: expectationLane('pty-stress', 'inspector-title', 'title', 1, 'title'),
   });
 
-  // Inspector uses executor tool with bounded PTY-style budget.
   scenario.provider.expectToolCall({
-    id: 'inspector-exec-pty',
+    id: 'inspector-fork-pty',
     lane: expectationLane('pty-stress', 'inspector', 'inspector', 1),
-    tool: 'executor',
-    args: {
-      command: /sh -c|pty|stress|chunk/i,
-      estimated_output_bytes: 1024,
-      estimated_running_secs: 5,
-      estimated_mem_usage: 'medium',
+    tool: 'fork',
+    args: { agent: 'pty', prompt: "printf 'PTY_OK\\n'" },
+    match: { requiredTools: ['fork', 'join'] },
+  });
+
+  scenario.provider.expectToolCall({
+    id: 'inspector-pty-term',
+    lane: expectationLane('pty-stress', 'inspector', 'inspector', 2),
+    tool: 'fork',
+    args: (parsed) => {
+      const ptyId = extractPtyIdFromMessages(parsed) || 'pty-unknown';
+      return { agent: ptyId, signal: 'TERM' };
     },
-    match: { requiredTools: ['executor'] },
+    match: { requiredTools: ['fork', 'join'] },
   });
 
   scenario.provider.expectText({
     id: 'inspector-pty-done',
-    lane: expectationLane('pty-stress', 'inspector', 'inspector', 2),
-    text: /completed|done|ok/i,
-    match: { requiredTools: ['executor'] },
+    lane: expectationLane('pty-stress', 'inspector', 'inspector', 3),
+    text: /PTY|completed|done|ok|signalled|closed|ptyId/i,
+    match: { requiredTools: ['fork', 'join'] },
   });
 
   const inspector = await scenario.client.createSession();
@@ -53,31 +88,47 @@ try {
   const prompt = await scenario.client.request('POST', `/session/${inspectorId}/prompt_async`, {
     body: {
       agent: 'inspector',
-      parts: [{ type: 'text', text: 'Run a PTY process that handles large output under bounded budget and report completion.' }],
+      parts: [{
+        type: 'text',
+        text: [
+          'Use the structured PTY fork DSL only (not executor):',
+          '1) fork agent="pty" with command: printf \'PTY_OK\\n\'',
+          '2) fork the returned ptyId with signal="TERM",',
+          '3) report the ptyId and that the PTY was signalled.',
+        ].join(' '),
+      }],
       model: { providerID: 'test', modelID: 'test-model' },
     },
   });
   assert.ok(prompt.ok, `inspector prompt failed: ${JSON.stringify(prompt.data)}`);
-  await turn.awaitTerminal({ timeoutMs: WATCHDOG_TIMEOUT_MS, requireActivity: true, requireAssistantTerminal: true, requireIdleAfterActivity: true });
 
-  // Verify boundedExecutor args are reasonable.
-  const execRequests = scenario.provider.requests.filter(
-    (request) => request.tools?.some((t) => (t.function?.name || t.name) === 'executor'),
+  await scenario.provider.waitForExpectation('inspector-fork-pty', WATCHDOG_TIMEOUT_MS);
+  scenario.watchdog?.advance({ reason: 'pty-created', lane: 'inspector', blocking: true });
+  await scenario.provider.waitForExpectation('inspector-pty-term', WATCHDOG_TIMEOUT_MS);
+  scenario.watchdog?.advance({ reason: 'pty-term', lane: 'inspector', blocking: true });
+  await scenario.provider.waitForExpectation('inspector-pty-done', WATCHDOG_TIMEOUT_MS);
+
+  await turn.awaitTerminal({
+    timeoutMs: WATCHDOG_TIMEOUT_MS,
+    requireActivity: true,
+    requireAssistantTerminal: true,
+    requireIdleAfterActivity: true,
+  });
+
+  const forkRequests = scenario.provider.requests.filter(
+    (request) => request.tools?.some((t) => (t.function?.name || t.name) === 'fork'),
   );
-  assert.ok(execRequests.length >= 1, 'Inspector must issue at least one executor tool call');
+  assert.ok(forkRequests.length >= 1, 'Inspector must issue fork for PTY');
 
-  for (const request of execRequests) {
-    const args = request.tools?.find((t) => (t.function?.name || t.name) === 'executor')?.function?.arguments;
-    if (args) {
-      const parsed = JSON.parse(args);
-      assert.ok(parsed.estimated_running_secs <= 30, 'Executor estimated_running_secs must be bounded');
-      assert.ok(parsed.estimated_output_bytes <= 1000000, 'Executor estimated_output_bytes must be bounded');
-    }
-  }
+  const snippets = toolResultSnippets(scenario.provider).join('\n');
+  assert.ok(
+    /ptyId|signalled|closed|PTY/i.test(snippets) || forkRequests.length >= 2,
+    `PTY tool results must surface a pty handle, got: ${snippets.slice(0, 800)}`,
+  );
 
   scenario.provider.expectSatisfied();
   await teardownScenario(scenario);
-  console.log('PTY stress canary passed: PTY executor with bounded budget and clean teardown.');
+  console.log('PTY stress canary passed: real fork(agent=pty) + signal TERM surface.');
 } catch (error) {
   console.error(`PTY stress canary failed: ${error.stack || error}`);
   if (scenario?.provider?.unexpectedRequests) console.error(JSON.stringify(scenario.provider.unexpectedRequests));

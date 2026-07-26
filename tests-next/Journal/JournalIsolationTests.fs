@@ -44,14 +44,18 @@ module JournalIsolationTests =
                     Fact.Agent(
                         AgentFact.FallbackFailureRecorded
                             {| SessionId = session1
-                               Reason = "errA" |}
+                               Reason = "errA"
+                               AssistantMessageId = "test-msg-1"
+                               ProviderAttempt = "1" |}
                     )
 
                 let factB =
                     Fact.Agent(
                         AgentFact.FallbackFailureRecorded
                             {| SessionId = session1
-                               Reason = "errB" |}
+                               Reason = "errB"
+                               AssistantMessageId = "test-msg-2"
+                               ProviderAttempt = "2" |}
                     )
 
                 let commitA = writerA.Append (StreamId.Session session1) None factA
@@ -100,7 +104,9 @@ module JournalIsolationTests =
                     Fact.Agent(
                         AgentFact.FallbackFailureRecorded
                             {| SessionId = session1
-                               Reason = "errB1" |}
+                               Reason = "errB1"
+                               AssistantMessageId = "test-msg-3"
+                               ProviderAttempt = "3" |}
                     )
 
                 let _ = writerB.Append StreamId.Workspace None factB1
@@ -112,7 +118,9 @@ module JournalIsolationTests =
                     Fact.Agent(
                         AgentFact.FallbackFailureRecorded
                             {| SessionId = session1
-                               Reason = "errB2" |}
+                               Reason = "errB2"
+                               AssistantMessageId = "test-msg-4"
+                               ProviderAttempt = "4" |}
                     )
 
                 let _ = writerB.Append StreamId.Workspace None factB2
@@ -137,7 +145,9 @@ module JournalIsolationTests =
                     Fact.Agent(
                         AgentFact.FallbackFailureRecorded
                             {| SessionId = session1
-                               Reason = "err1" |}
+                               Reason = "err1"
+                               AssistantMessageId = "test-msg-5"
+                               ProviderAttempt = "5" |}
                     )
 
                 let _ = writerA.Append StreamId.Workspace None factA
@@ -176,7 +186,9 @@ module JournalIsolationTests =
                     Fact.Agent(
                         AgentFact.FallbackFailureRecorded
                             {| SessionId = session1
-                               Reason = "err1" |}
+                               Reason = "err1"
+                               AssistantMessageId = "test-msg-6"
+                               ProviderAttempt = "6" |}
                     )
 
                 let _ = writerA.Append StreamId.Workspace None factA

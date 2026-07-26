@@ -26,7 +26,8 @@ module AgentFacts =
         { Side = SideA
           FailuresOnCurrentSide = 0
           TotalFailures = 0
-          IsDead = false }
+          IsDead = false
+          RecentFailureIds = [] }
 
     let emptyOrchestrator: OrchestratorProjection =
         { ManagerJobs = Map.empty

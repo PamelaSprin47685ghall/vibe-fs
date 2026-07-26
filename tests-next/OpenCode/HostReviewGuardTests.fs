@@ -152,12 +152,13 @@ module HostReviewGuardTests =
                 router.Observe(assistantUpdated sessionId messageId "reviewer", ignore)
                 router.Observe(assistantTextPart sessionId messageId, ignore)
                 router.Observe(idle sessionId, ignore)
-                do! yieldMicrotask ()
+                // HostSessionNudge starts a Task/Promise; drain enough microtasks
+                // for the send + durable append to land before assertions.
+                do! drainMicrotasks 8
 
                 let guardKey = sprintf "review-guard:%s:%s:%s" sessionId messageId "missing-verdict"
-                Assert.True(hasAcceptedGuard journal sessionId guardKey)
-
                 Assert.Single(prompts) |> ignore
+                Assert.True(hasAcceptedGuard journal sessionId guardKey)
 
                 (journal :> IDisposable).Dispose()
                 let boot = Boot.boot directory

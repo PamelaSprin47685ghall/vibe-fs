@@ -83,19 +83,21 @@ async function awaitFailureSequence(scenario, phase, sessionId, afterSeq) {
   });
 }
 function expectParentRound(scenario, index, turn, parentPrompt, childPrompt, agent) {
+  // Parent must be Manager (has list) — Orchestrator may only fork manager jobs
+  // and would reject fork(agent=coder).
   scenario.provider.expectToolCall({
     id: `parent-fork-${index}`,
-    lane: expectationLane('fallback', 'parent', 'orchestrator', turn),
+    lane: expectationLane('fallback', 'parent', 'manager', turn),
     tool: 'fork',
     args: { agent, prompt: childPrompt },
     match: {
-      requiredTools: ['fork', 'join'],
-      forbiddenTools: ['read', 'write', 'edit', 'bash', 'glob', 'grep', 'list', 'verdict'],
+      requiredTools: ['fork', 'join', 'list'],
+      forbiddenTools: ['read', 'write', 'edit', 'bash', 'glob', 'grep', 'verdict'],
     },
   });
   scenario.provider.expectText({
     id: `parent-round-${index}`,
-    lane: expectationLane('fallback', 'parent', 'orchestrator', turn + 1),
+    lane: expectationLane('fallback', 'parent', 'manager', turn + 1),
     text: `Parent completed fallback round ${index}.`,
     match: { containsText: [parentPrompt] },
   });
@@ -105,7 +107,7 @@ async function runChildRound(scenario, parentId, childId, index, parentPrompt) {
   const afterSeq = scenario.events.lastSeq;
   const response = await scenario.client.request('POST', `/session/${parentId}/prompt_async`, {
     body: {
-      agent: 'orchestrator',
+      agent: 'manager',
       parts: [{ type: 'text', text: parentPrompt }],
       model: { providerID: 'test', modelID: 'test-model' },
     },
@@ -168,7 +170,7 @@ try {
     blocking: false,
     neverEnd: true,
     text: 'Fallback background.',
-    match: { containsText: ['You are the blogger of a coding agent session.', '"agent":"orchestrator"'] },
+    match: { containsText: ['You are the blogger of a coding agent session.', '"agent":"manager"'] },
   });
   scenario.provider.expectTitle({
     id: 'fallback-title',
@@ -203,7 +205,7 @@ try {
   bindLaneSession(scenario.provider, sessionId, 'fallback-title', 'parent');
 
   // A/A is observed before restart.  The projection must survive restart
-  // before the B-side requests are sent.
+  // before the B-side requests are sent. Parent prompts must use manager.
   const firstRound = await runChildRound(
     scenario,
     sessionId,
@@ -238,7 +240,7 @@ try {
     blocking: false,
     neverEnd: true,
     text: 'Fallback restart background.',
-    match: { containsText: ['You are the blogger of a coding agent session.', '"agent":"orchestrator"'] },
+    match: { containsText: ['You are the blogger of a coding agent session.', '"agent":"manager"'] },
   });
   scenario.provider.expectText({
     id: 'child-blogger-restart',

@@ -112,7 +112,16 @@ module StaticTools =
     let inspectorAgentConfig () : obj =
         createObj
             [ "mode", box "primary"
-              "permission", box (createObj [ "*", box "deny"; "executor", box "allow" ]) ]
+              "permission",
+              box (
+                  createObj
+                      [ "*", box "deny"
+                        "executor", box "allow"
+                        // Structured PTY DSL reuses fork/join/list surface.
+                        "fork", box "allow"
+                        "join", box "allow"
+                        "list", box "allow" ]
+              ) ]
 
     let executorTool () : Tool =
         { Name = "executor"

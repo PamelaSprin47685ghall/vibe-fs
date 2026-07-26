@@ -19,7 +19,6 @@ function parsePositiveInt(value, fallback, name) {
   return n;
 }
 
-const MAX_PARALLEL = parsePositiveInt(process.env.MAX_PARALLEL_CANARIES, 2, "MAX_PARALLEL_CANARIES");
 const CANARY_TIMEOUT_MS = parsePositiveInt(process.env.CANARY_TIMEOUT_MS, 30000, "CANARY_TIMEOUT_MS");
 const CANARY_TESTS = [
   "testkit/opencode/tests/agent-dsl-canary.mjs",
@@ -33,11 +32,19 @@ const CANARY_TESTS = [
   "testkit/opencode/tests/companion-replacement-canary.mjs",
   "testkit/opencode/tests/fallback-canary.mjs",
   "testkit/opencode/tests/orchestrator-canary.mjs",
+  "testkit/opencode/tests/orchestrator-publish-canary.mjs",
   "testkit/opencode/tests/pty-stress-canary.mjs",
   "testkit/opencode/tests/reviewer-restart-canary.mjs",
 ];
 
-const STAGGER_DELAY_MS = parsePositiveInt(process.env.STAGGER_DELAY_MS, 2000, "STAGGER_DELAY_MS");
+// Full-suite parallel isolation is the standard gate: every canary starts under
+// one pool sized to the suite. A small stagger only reduces startup jitter.
+const MAX_PARALLEL = parsePositiveInt(
+  process.env.MAX_PARALLEL_CANARIES,
+  CANARY_TESTS.length,
+  "MAX_PARALLEL_CANARIES",
+);
+const STAGGER_DELAY_MS = parsePositiveInt(process.env.STAGGER_DELAY_MS, 50, "STAGGER_DELAY_MS");
 const activeCanaryPids = new Set();
 
 function cleanupCanaries() {
@@ -144,11 +151,14 @@ async function main() {
   if (!Number.isInteger(repeats) || repeats < 1 || repeats > 3) {
     throw new Error(`CANARY_REPEAT must be an integer from 1 through 3, got ${repeats}`);
   }
-  console.log("Starting " + CANARY_TESTS.length + " canary tests in staggered parallel mode (" + repeats + " iteration(s))...\n");
+  console.log(
+    "Starting " + CANARY_TESTS.length + " canary tests in full-parallel isolation mode (" +
+      repeats + " iteration(s), max=" + MAX_PARALLEL + ", stagger=" + STAGGER_DELAY_MS + "ms)...\n",
+  );
 
   for (let rep = 1; rep <= repeats; rep++) {
     if (repeats > 1) console.log("--- Canary Iteration " + rep + "/" + repeats + " ---");
-    console.log("\nConcurrency cap: " + MAX_PARALLEL + "\n");
+    console.log("\nConcurrency: " + MAX_PARALLEL + " / " + CANARY_TESTS.length + "\n");
 
     const results = await runPool(CANARY_TESTS, MAX_PARALLEL, (file) => {
       console.log("[Launch] " + path.basename(file));

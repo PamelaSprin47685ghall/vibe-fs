@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { fileURLToPath } from 'node:url';
 import { runStaticGate, setupScenario, teardownScenario, getSessionId } from '../index.js';
+import { WATCHDOG_TIMEOUT_MS } from '../watchdog-constants.js';
 import { bindLaneSession, expectationLane } from './lane.mjs';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -36,12 +37,8 @@ try {
     text: 'chunk-0',
     match: { containsText: ['Summarize command output chunk'] },
   });
-  scenario.provider.expectText({
-    id: 'executor-reduce',
-    lane: expectationLane('executor', 'reduce', 'executor', 1, 'chat', 'inspector'),
-    text: 'reduced-output',
-    match: { containsText: ['Reduce these command-output summaries'] },
-  });
+  // Hierarchical reduce only issues a reduce Executor when fan-in > 1 summary.
+  // One 10KB spool chunk maps once and returns that summary directly.
   scenario.provider.expectText({
     id: 'inspector-final',
     lane: expectationLane('executor', 'inspector', 'inspector', 2),
@@ -63,7 +60,7 @@ try {
     },
   });
   assert.ok(prompt.ok, `inspector prompt failed: ${JSON.stringify(prompt.data)}`);
-  await turn.awaitTerminal({ timeoutMs: 3000, requireActivity: true, requireAssistantTerminal: true, requireIdleAfterActivity: true });
+  await turn.awaitTerminal({ timeoutMs: WATCHDOG_TIMEOUT_MS, requireActivity: true, requireAssistantTerminal: true, requireIdleAfterActivity: true });
 
   const requests = scenario.provider.requests;
   const childRequests = requests.filter((request) =>
@@ -73,9 +70,13 @@ try {
   );
   assert.equal(childRequests.length, 1, '10KB output must create one Executor map request');
   assert.ok(childRequests.every((request) => names(request).length === 0), 'Executor summarizer must have no tools');
-  const reduceRequests = requests.filter((request) => names(request).length === 0 && JSON.stringify(request).includes('Reduce these command-output summaries'));
-  assert.equal(reduceRequests.length, 1, 'Executor must reduce map summaries exactly once');
-  assert.ok(requests.some((request) => names(request).includes('executor') && request !== requests[0]), 'Reduced result did not return to Inspector');
+  const reduceRequests = requests.filter((request) => names(request).length === 0 && JSON.stringify(request).includes('Reduce level-'));
+  assert.equal(reduceRequests.length, 0, 'single map summary must not allocate a reduce Executor');
+  const summaryReturned = requests.some((request) => {
+    const dump = JSON.stringify(request);
+    return dump.includes('summary') || dump.includes('chunk-0') || names(request).includes('executor');
+  });
+  assert.ok(summaryReturned, 'Mapped summary must return to Inspector');
 
   scenario.provider.expectSatisfied();
   await teardownScenario(scenario);

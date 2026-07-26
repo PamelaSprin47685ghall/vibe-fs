@@ -45,6 +45,7 @@
     <Compile Include="Process/ExecutorSummarizer.fs"/>
     <Compile Include="Process/ProcessBudget.fs"/>
     <Compile Include="Process/Pty.fs"/>
+    <Compile Include="Process/PtyBackend.fs"/>
     <Compile Include="Agent/Programs.fs"/>
     <Compile Include="Agent/ProgramCapabilities.fs"/>
     <Compile Include="Review/Guard.fs"/>
@@ -80,11 +81,14 @@
     <Compile Include="OpenCode/AssistantParts.fs"/>
     <Compile Include="OpenCode/AbortTracker.fs"/>
     <Compile Include="OpenCode/HostReviewGuard.fs"/>
+    <Compile Include="OpenCode/HostEventRetry.fs"/>
     <Compile Include="OpenCode/HostEventRouter.fs"/>
     <Compile Include="OpenCode/GitTree.fs"/>
+    <Compile Include="OpenCode/ExecutorSummarize.fs"/>
     <Compile Include="OpenCode/ExecutorTool.fs"/>
     <Compile Include="OpenCode/VerdictSurface.fs"/>
     <Compile Include="OpenCode/OrchestratorGit.fs"/>
+    <Compile Include="OpenCode/OrchestratorAuthority.fs"/>
     <Compile Include="OpenCode/OrchestratorHost.fs"/>
     <Compile Include="OpenCode/ToolSurfaceEmit.fs"/>
     <Compile Include="OpenCode/ToolSurfaceOrchestrator.fs"/>

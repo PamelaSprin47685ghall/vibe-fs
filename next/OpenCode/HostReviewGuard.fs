@@ -65,6 +65,7 @@ module HostReviewGuard =
         (reason: string)
         (prompt: string)
         (agent: string)
+        (model: OpencodeModel option)
         =
         let journal =
             match journal with
@@ -74,18 +75,23 @@ module HostReviewGuard =
         let targetSessionId = SessionId.create sessionId
         let guardKey = createGuardKey targetSessionId triggerMessageId reason
 
+        // Durable + in-memory dedupe only after a successful send. Adding the
+        // key before SendPrompt permanently blocks retries when the host rejects
+        // the first attempt (SSOT: failure must not write acceptance).
         if
             not (hasAcceptedGuardKey journal targetSessionId guardKey)
-            && nudgeKeys.Add guardKey
+            && not (nudgeKeys.Contains guardKey)
         then
             HostSessionNudge.send
                 sessionPort
                 targetSessionId
                 prompt
-                { Model = None
+                { Model = model
                   Agent = Some agent
                   Directory = None }
                 (fun hostMessageId ->
+                    nudgeKeys.Add guardKey |> ignore
+
                     let fact =
                         AgentFact.GuardPromptAccepted
                             {| TargetSessionId = targetSessionId
@@ -108,6 +114,7 @@ module HostReviewGuard =
         sessionId
         messageId
         treeHash
+        (model: OpencodeModel option)
         =
         sendGuardNudge
             sessionPort
@@ -118,6 +125,7 @@ module HostReviewGuard =
             (sprintf "missing-review:%s" treeHash)
             "Review is required before completion. Fork or nudge a Reviewer until the current Git tree has two distinct PERFECT verdicts."
             "manager"
+            model
 
     let nudgeReviewer
         (sessionPort: ISessionHostPort)
@@ -125,6 +133,7 @@ module HostReviewGuard =
         (nudgeKeys: HashSet<string>)
         sessionId
         messageId
+        (model: OpencodeModel option)
         =
         sendGuardNudge
             sessionPort
@@ -135,3 +144,4 @@ module HostReviewGuard =
             "missing-verdict"
             "Submit a structured verdict with the verdict tool: PERFECT or REVISE. Do not put a verdict in prose."
             "reviewer"
+            model

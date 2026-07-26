@@ -49,7 +49,9 @@ module Fact =
                HostMessageId: string |}
         | FallbackFailureRecorded of
             {| SessionId: SessionId
-               Reason: string |}
+               Reason: string
+               AssistantMessageId: string
+               ProviderAttempt: string |}
         | OrchestratorManagerJobCreated of
             {| ManagerId: string
                WorktreePath: string

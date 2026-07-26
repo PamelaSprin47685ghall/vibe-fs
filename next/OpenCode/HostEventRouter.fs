@@ -88,43 +88,6 @@ type HostEventRouter
         sessionPort.AbortChildren(SessionId.create parentId) |> ignore
 
 
-    let recordRetryFailure sessionId raw =
-        let properties = rawProperties raw
-        let status = if isNull properties then null else properties?status
-
-        if not (isNull status) && not (isNull status?``type``) && status?``type`` = "retry" then
-            let attempt =
-                if isNull status?attempt then
-                    "unknown"
-                else
-                    string status?attempt
-
-            let seenAttempts =
-                match retryAttempts.TryGetValue sessionId with
-                | true, values -> values
-                | false, _ ->
-                    let values = HashSet<string>()
-                    retryAttempts.[sessionId] <- values
-                    values
-
-            if seenAttempts.Add attempt then
-                match journal with
-                | None -> ()
-                | Some journal ->
-                    let reason =
-                        if isNull status?message then
-                            "provider retry"
-                        else
-                            unbox<string> status?message
-
-                    let fact =
-                        AgentFact.FallbackFailureRecorded
-                            {| SessionId = SessionId.create sessionId
-                               Reason = reason |}
-
-                    AgentJournal.appendAgent (StreamId.Session(SessionId.create sessionId)) None fact journal
-                    |> ignore
-
     let managerGuardNudges = HashSet<string>()
 
     let nudgedMessages = HashSet<string>()
@@ -169,10 +132,14 @@ type HostEventRouter
             |> Option.bind HostSessionContext.canonicalRole
             |> Option.iter (fun value -> sessionRoles.[sessionId] <- value)
 
-            rawParentSessionId raw
-            |> Option.iter (fun parentId ->
-                if not (String.IsNullOrWhiteSpace parentId) then
-                    sessionParents.[sessionId] <- parentId)
+            // Only session.created carries a session parent. Message payloads also
+            // expose parentID (message parent), which must never mark a top-level
+            // Manager as a child — that skips ReviewGuard entirely.
+            if eventType raw = "session.created" then
+                rawParentSessionId raw
+                |> Option.iter (fun parentId ->
+                    if not (String.IsNullOrWhiteSpace parentId) then
+                        sessionParents.[sessionId] <- parentId)
 
             let ev = if isNull raw?event then raw else raw?event
             let props = if isNull ev then null else ev?properties
@@ -203,7 +170,7 @@ type HostEventRouter
             elif eventType raw = "session.error" then
                 ()
             elif eventType raw = "session.status" then
-                recordRetryFailure sessionId raw
+                HostEventRetry.record journal retryAttempts sessionId raw
 
             abortedSessions.Observe(raw, sessionId)
 
@@ -216,8 +183,27 @@ type HostEventRouter
 
                 let terminalMessageId =
                     match lastAssistantMsgs.TryGetValue sessionId with
-                    | true, lastMsg -> FallbackDetect.messageId lastMsg
+                    | true, lastMsg -> FallbackDetect.messageId sessionId lastMsg
                     | false, _ -> "terminal"
+
+                let terminalModel =
+                    match lastAssistantMsgs.TryGetValue sessionId with
+                    | true, lastMsg when not (isNull lastMsg?info) ->
+                        let info = lastMsg?info
+
+                        if not (isNull info?providerID) && not (isNull info?modelID) then
+                            Some
+                                { providerID = unbox<string> info?providerID
+                                  modelID = unbox<string> info?modelID
+                                  variant = None }
+                        elif not (isNull info?model) && not (isNull info?model?providerID) then
+                            Some
+                                { providerID = unbox<string> info?model?providerID
+                                  modelID = unbox<string> info?model?modelID
+                                  variant = None }
+                        else
+                            None
+                    | _ -> None
 
                 let completedAssistant =
                     match lastAssistantMsgs.TryGetValue sessionId with
@@ -233,11 +219,20 @@ type HostEventRouter
                         agent.Equals("reviewer", StringComparison.OrdinalIgnoreCase)
                         && not (verdictSessions.Remove sessionId)
                         ->
-                        HostReviewGuard.nudgeReviewer sessionPort journal nudgeSent sessionId terminalMessageId
+                        HostReviewGuard.nudgeReviewer
+                            sessionPort
+                            journal
+                            nudgeSent
+                            sessionId
+                            terminalMessageId
+                            terminalModel
                     | Some agent when
                         agent.Equals("manager", StringComparison.OrdinalIgnoreCase)
                         && not (sessionParents.ContainsKey sessionId)
                         ->
+                        // Every unconfirmed manager terminal re-evaluates the guard.
+                        // Send is deferred one microtask so Host idle is fully released;
+                        // failed sends do not lock the guard key, so the next terminal retries.
                         match HostReviewGuard.missingTree journal gitTreePort sessionId with
                         | HostReviewGuard.ReviewGuardMissing treeHash ->
                             HostReviewGuard.nudgeManager
@@ -247,6 +242,7 @@ type HostEventRouter
                                 sessionId
                                 terminalMessageId
                                 treeHash
+                                terminalModel
                         | HostReviewGuard.ReviewGuardConfirmed -> ()
                         | HostReviewGuard.ReviewGuardUnavailable reason ->
                             raise (InvalidOperationException(sprintf "Review guard unavailable: %s" reason))

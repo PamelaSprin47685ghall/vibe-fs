@@ -1,7 +1,6 @@
 namespace Wanxiangshu.Next.OpenCode
 
 open System
-open System.Text
 open System.Threading
 open System.Threading.Tasks
 open Fable.Core
@@ -10,9 +9,6 @@ open Wanxiangshu.Next.Process
 open Wanxiangshu.Next.Session
 
 module ExecutorTool =
-    [<Emit("Math.random().toString(36).slice(2, 8)")>]
-    let private newAgentId () : string = jsNative
-
     [<Emit("$0.schema.string()")>]
     let private stringSchema (tool: obj) : obj = jsNative
 
@@ -59,68 +55,6 @@ module ExecutorTool =
         | "large" -> EstimatedMemory.Large
         | _ -> EstimatedMemory.Medium
 
-    let private completionText (completion: RunCompletion) =
-        match completion.Outcome with
-        | Ok text -> text
-        | Error error -> raise (InvalidOperationException error)
-
-    let private summarizeChunk (runtime: HostForkRuntime) (chunk: byte[]) (index: int) =
-        task {
-            let content = Encoding.UTF8.GetString chunk
-
-            let prompt =
-                sprintf
-                    "Summarize command output chunk %d. Preserve errors, decisions, paths, and exact numbers; omit raw code.\n%s"
-                    index
-                    content
-
-            let! fork = runtime.Fork(newAgentId (), AgentRole.Executor, prompt)
-
-            match fork with
-            | Error error -> return raise (InvalidOperationException error)
-            | Ok _ ->
-                let! completion = runtime.Join()
-
-                match completion with
-                | Error error -> return raise (InvalidOperationException(error.ToString()))
-                | Ok result -> return completionText result
-        }
-
-    /// Maps each bounded spool chunk sequentially, releasing it before reducing summaries.
-    let private summarizeSpool (runtime: HostForkRuntime) (spoolPath: string) =
-        task {
-            let summaries = ResizeArray<string>()
-            let mutable index = 0
-
-            do!
-                Spool.readChunks spoolPath (fun chunk ->
-                    task {
-                        let current = index
-                        index <- index + 1
-                        let! summary = summarizeChunk runtime chunk current
-                        summaries.Add summary
-                        return ()
-                    })
-
-            let combined = summaries |> Seq.toList |> String.concat "\n"
-
-            let reducePrompt =
-                sprintf
-                    "Reduce these command-output summaries into one dense report. Preserve failures and exact facts; do not include raw code.\n%s"
-                    combined
-
-            let! fork = runtime.Fork(newAgentId (), AgentRole.Executor, reducePrompt)
-
-            match fork with
-            | Error error -> return raise (InvalidOperationException error)
-            | Ok _ ->
-                let! completion = runtime.Join()
-
-                match completion with
-                | Error error -> return raise (InvalidOperationException(error.ToString()))
-                | Ok result -> return completionText result
-        }
-
     let create
         (toolModule: obj)
         (runtimeFor: obj -> Result<HostForkRuntime, string>)
@@ -155,14 +89,13 @@ module ExecutorTool =
                         use cancellation = new CancellationTokenSource()
                         let detachAbort = attachAbort context (fun () -> cancellation.Cancel())
 
+                        let procCtx: ProcessContext =
+                            { WorkingDirectory = workspaceDirectory
+                              DefaultTimeout = None }
+
                         let! result =
                             try
-                                Runner.execute
-                                    command
-                                    estimate
-                                    { WorkingDirectory = workspaceDirectory
-                                      DefaultTimeout = None }
-                                    cancellation.Token
+                                Runner.execute command estimate procCtx cancellation.Token
                             finally
                                 detachAbort ()
 
@@ -178,20 +111,25 @@ module ExecutorTool =
                                 )
                         | Ok(RunnerOutcome.Spooled(exitCode, spoolPath, totalBytes, chunkCount)) ->
                             try
-                                let! summary = summarizeSpool runtime spoolPath
+                                try
+                                    let! summary = ExecutorSummarize.summarizeSpool runtime spoolPath
 
-                                return
-                                    box (
-                                        stringify (
-                                            createObj
-                                                [ "exitCode", box exitCode
-                                                  "summary", box summary
-                                                  "spoolPath", box spoolPath
-                                                  "totalBytes", box totalBytes
-                                                  "chunkCount", box chunkCount ]
+                                    return
+                                        box (
+                                            stringify (
+                                                createObj
+                                                    [ "exitCode", box exitCode
+                                                      "summary", box summary
+                                                      "spoolPath", box spoolPath
+                                                      "totalBytes", box totalBytes
+                                                      "chunkCount", box chunkCount ]
+                                            )
                                         )
-                                    )
+                                finally
+                                    Spool.delete spoolPath
                             with ex ->
+                                Spool.delete spoolPath
+
                                 return
                                     box (
                                         stringify (
@@ -199,14 +137,18 @@ module ExecutorTool =
                                                 [ "error", box (sprintf "Executor summarizer failed: %s" ex.Message) ]
                                         )
                                     )
-                        | Ok(RunnerOutcome.OutputExceeded(bytesWritten, spoolPath)) ->
+                        | Ok(RunnerOutcome.OutputExceeded(bytesWritten, spoolPathOpt)) ->
+                            match spoolPathOpt with
+                            | Some path -> Spool.delete path
+                            | None -> ()
+
                             return
                                 box (
                                     stringify (
                                         createObj
                                             [ "error", box "Output exceeded hard limit"
                                               "bytesWritten", box bytesWritten
-                                              "spoolPath", box spoolPath ]
+                                              "spoolPath", box (defaultArg spoolPathOpt "") ]
                                     )
                                 )
             }

@@ -224,23 +224,25 @@ module HostForkRuntimeTests =
                 Assert.Equal(Some config.SideA, captured.[0].Model)
                 trigger ()
 
-                let appendFailure reason =
+                let appendFailure reason attempt =
                     AgentJournal.appendAgent
                         (StreamId.Session childId)
                         None
                         (AgentFact.FallbackFailureRecorded
                             {| SessionId = childId
-                               Reason = reason |})
+                               Reason = reason
+                               AssistantMessageId = sprintf "test-msg-%s" attempt
+                               ProviderAttempt = attempt |})
                         journal
                     |> Result.isOk
 
-                Assert.True(appendFailure "first failure")
+                Assert.True(appendFailure "first failure" "1")
                 let! second = bridge.Reuse("agent-model", "second")
                 Assert.Equal(Ok(ForkResult.Nudged "agent-model"), second)
                 Assert.Equal(Some config.SideA, captured.[1].Model)
                 trigger ()
 
-                Assert.True(appendFailure "second failure")
+                Assert.True(appendFailure "second failure" "2")
                 let! third = bridge.Reuse("agent-model", "third")
                 Assert.Equal(Ok(ForkResult.Nudged "agent-model"), third)
                 Assert.Equal(Some config.SideB, captured.[2].Model)

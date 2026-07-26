@@ -117,7 +117,7 @@ module FallbackDetect =
             else
                 xmlTag.IsMatch text && not (hasToolCallPart msg)
 
-    let messageId (msg: obj) : string =
+    let messageId (sessionId: string) (msg: obj) : string =
         let info = msg?info
 
         if not (isNull info) && not (isNull info?id) then
@@ -125,20 +125,26 @@ module FallbackDetect =
         elif not (isNull msg?id) then
             unbox<string> msg?id
         else
-            Guid.NewGuid().ToString("N")
+            // Deterministic fallback when Host omits message id: content hash +
+            // session keeps identity stable across restarts for the same turn.
+            let text = partsText msg
+            sprintf "anon-%s-%d" sessionId (hash text)
 
     let observeIdle (journal: AgentJournal option) (recorded: HashSet<string>) (sessionId: string) (msg: obj) : unit =
         match journal with
         | None -> ()
         | Some journal ->
             if not (isNull msg) && isFailedAssistant msg then
-                let msgId = messageId msg
+                let msgId = messageId sessionId msg
+                let identity = sprintf "%s|empty-xml" msgId
 
-                if recorded.Add msgId then
+                if recorded.Add identity then
                     let fact =
                         AgentFact.FallbackFailureRecorded
                             {| SessionId = SessionId.create sessionId
-                               Reason = "empty or xml-only assistant turn" |}
+                               Reason = "empty or xml-only assistant turn"
+                               AssistantMessageId = msgId
+                               ProviderAttempt = "empty-xml" |}
 
                     AgentJournal.appendAgent (StreamId.Session(SessionId.create sessionId)) None fact journal
                     |> ignore

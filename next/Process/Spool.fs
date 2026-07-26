@@ -31,6 +31,12 @@ module Spool =
     [<Import("createReadStream", "node:fs")>]
     let private createReadStream (path: string) (options: obj) : obj = jsNative
 
+    [<Import("unlinkSync", "node:fs")>]
+    let private unlinkSync (path: string) : unit = jsNative
+
+    [<Import("existsSync", "node:fs")>]
+    let private existsSync (path: string) : bool = jsNative
+
     [<Emit("""
         (async function(stream, consume) {
             for await (const input of stream) {
@@ -121,3 +127,11 @@ module Spool =
         let spool = startStreamingSpool ()
         appendStreamingSpool spool bytes
         spool.Path, spool.BytesWritten, chunkCount spool.BytesWritten
+
+    /// Best-effort spool cleanup; never throws into the summarizer path.
+    let delete (path: string) : unit =
+        try
+            if not (String.IsNullOrWhiteSpace path) && existsSync path then
+                unlinkSync path
+        with _ ->
+            ()

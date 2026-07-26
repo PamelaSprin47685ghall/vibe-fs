@@ -110,15 +110,17 @@ module AgentFactsTests =
         let sid = SessionId.create "session-fallback"
         let t0 = DateTimeOffset.UtcNow
 
-        let failFact =
+        let failFact attempt =
             AgentFact.FallbackFailureRecorded
                 {| SessionId = sid
-                   Reason = "Timeout" |}
+                   Reason = "Timeout"
+                   AssistantMessageId = sprintf "msg-%d" attempt
+                   ProviderAttempt = string attempt |}
 
-        let env1 = createTestEnv 1L t0 failFact rt (Some sid)
-        let env2 = createTestEnv 2L (t0.AddSeconds 1.0) failFact rt (Some sid)
-        let env3 = createTestEnv 3L (t0.AddSeconds 2.0) failFact rt (Some sid)
-        let env4 = createTestEnv 4L (t0.AddSeconds 3.0) failFact rt (Some sid)
+        let env1 = createTestEnv 1L t0 (failFact 1) rt (Some sid)
+        let env2 = createTestEnv 2L (t0.AddSeconds 1.0) (failFact 2) rt (Some sid)
+        let env3 = createTestEnv 3L (t0.AddSeconds 2.0) (failFact 3) rt (Some sid)
+        let env4 = createTestEnv 4L (t0.AddSeconds 3.0) (failFact 4) rt (Some sid)
 
         // Step 1: 1st failure -> SideA, 1 failure on current side, total 1, not dead
         let proj1 = AgentFacts.apply AgentFacts.empty [ env1 ]

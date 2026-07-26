@@ -9,6 +9,7 @@ open Wanxiangshu.Next.Kernel.Identity
 open Wanxiangshu.Next.Journal
 open Wanxiangshu.Next.OpenCode
 open Wanxiangshu.Next.Session
+open Wanxiangshu.Next.Tests.EventDrivenHarness
 open Wanxiangshu.Next.Tests.JournalTests.JournalTestSupport
 
 module HostEventRouterTests =
@@ -158,28 +159,34 @@ module HostEventRouterTests =
 
     [<Fact>]
     let ``Terminal_empty_assistant_receives_one_zero_width_continuation`` () =
-        let sessionId = "manager-session"
-        let prompts = ResizeArray<string * string>()
-        let router = routerFor prompts sessionId
+        task {
+            let sessionId = "manager-session"
+            let prompts = ResizeArray<string * string>()
+            let router = routerFor prompts sessionId
 
-        router.Observe(assistantUpdated sessionId "assistant-empty", ignore)
-        router.Observe(idle sessionId, ignore)
+            router.Observe(assistantUpdated sessionId "assistant-empty", ignore)
+            router.Observe(idle sessionId, ignore)
+            do! drainMicrotasks 8
 
-        Assert.Single(prompts) |> ignore
-        Assert.Equal("\u200B", snd prompts.[0])
+            Assert.Single(prompts) |> ignore
+            Assert.Equal("\u200B", snd prompts.[0])
+        }
 
     [<Fact>]
     let ``Terminal_empty_text_part_receives_one_zero_width_continuation`` () =
-        let sessionId = "manager-session"
-        let prompts = ResizeArray<string * string>()
-        let router = routerFor prompts sessionId
+        task {
+            let sessionId = "manager-session"
+            let prompts = ResizeArray<string * string>()
+            let router = routerFor prompts sessionId
 
-        router.Observe(assistantUpdated sessionId "assistant-empty-text", ignore)
-        router.Observe(assistantEmptyTextPart sessionId "assistant-empty-text", ignore)
-        router.Observe(idle sessionId, ignore)
+            router.Observe(assistantUpdated sessionId "assistant-empty-text", ignore)
+            router.Observe(assistantEmptyTextPart sessionId "assistant-empty-text", ignore)
+            router.Observe(idle sessionId, ignore)
+            do! drainMicrotasks 8
 
-        Assert.Single(prompts) |> ignore
-        Assert.Equal("\u200B", snd prompts.[0])
+            Assert.Single(prompts) |> ignore
+            Assert.Equal("\u200B", snd prompts.[0])
+        }
 
     [<Fact>]
     let ``Manager_terminal_without_current_review_receives_durable_guard_prompt`` () =
@@ -209,6 +216,7 @@ module HostEventRouterTests =
                 router.Observe(assistantUpdated sessionId "assistant-manager-guard", ignore)
                 router.Observe(assistantTextPart sessionId "assistant-manager-guard", ignore)
                 router.Observe(idle sessionId, ignore)
+                do! drainMicrotasks 8
 
                 Assert.Single(prompts) |> ignore
                 Assert.Contains("Review is required before completion.", snd prompts.[0])

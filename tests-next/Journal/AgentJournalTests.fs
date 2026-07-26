@@ -31,7 +31,9 @@ module AgentJournalTests =
                 let fact =
                     AgentFact.FallbackFailureRecorded
                         {| SessionId = sid
-                           Reason = "Timeout" |}
+                           Reason = "Timeout"
+                           AssistantMessageId = "test-msg-1"
+                           ProviderAttempt = "1" |}
 
                 let result = AgentJournal.appendAgent StreamId.Workspace None fact journal
 
@@ -68,7 +70,12 @@ module AgentJournalTests =
 
                 (journal :> IDisposable).Dispose()
 
-                let fact = AgentFact.FallbackFailureRecorded {| SessionId = sid; Reason = "Err" |}
+                let fact =
+                    AgentFact.FallbackFailureRecorded
+                        {| SessionId = sid
+                           Reason = "Err"
+                           AssistantMessageId = "test-msg-2"
+                           ProviderAttempt = "2" |}
 
                 let result = AgentJournal.appendAgent StreamId.Workspace None fact journal
 
@@ -148,7 +155,9 @@ module AgentJournalTests =
                 let fact =
                     AgentFact.FallbackFailureRecorded
                         {| SessionId = sessionId
-                           Reason = "external startup fact" |}
+                           Reason = "external startup fact"
+                           AssistantMessageId = "test-msg-3"
+                           ProviderAttempt = "3" |}
 
                 use previousJournal =
                     AgentJournal.create tempDir previousRuntimeId 4321 DateTimeOffset.UtcNow

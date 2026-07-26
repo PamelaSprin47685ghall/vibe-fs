@@ -53,10 +53,14 @@ type ModelSide =
     | SideB
 
 type FallbackProjection =
-    { Side: ModelSide
-      FailuresOnCurrentSide: int
-      TotalFailures: int
-      IsDead: bool }
+    {
+        Side: ModelSide
+        FailuresOnCurrentSide: int
+        TotalFailures: int
+        IsDead: bool
+        /// Bounded durable identities for restart-safe failure dedupe.
+        RecentFailureIds: string list
+    }
 
 type CandidateStatus =
     | Registered of candidateId: CandidateId * branch: string * commitHash: string

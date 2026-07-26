@@ -51,7 +51,9 @@ module DurableFallback =
         let fact =
             AgentFact.FallbackFailureRecorded
                 {| SessionId = sessionId
-                   Reason = reason |}
+                   Reason = reason
+                   AssistantMessageId = sprintf "manual-%s" (SessionId.value sessionId)
+                   ProviderAttempt = "manual" |}
 
         match journalPort.AppendFact (StreamId.Session sessionId) fact with
         | Ok updatedProj ->

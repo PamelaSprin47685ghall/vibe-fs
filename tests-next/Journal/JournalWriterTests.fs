@@ -35,7 +35,9 @@ module JournalWriterTests =
                     Fact.Agent(
                         AgentFact.FallbackFailureRecorded
                             {| SessionId = sid
-                               Reason = "Timeout" |}
+                               Reason = "Timeout"
+                               AssistantMessageId = "test-msg-1"
+                               ProviderAttempt = "1" |}
                     )
 
                 let result = writer.Append StreamId.Workspace None agentFact
@@ -85,7 +87,9 @@ module JournalWriterTests =
                     Fact.Agent(
                         AgentFact.FallbackFailureRecorded
                             {| SessionId = SessionId.create "s1"
-                               Reason = "err" |}
+                               Reason = "err"
+                               AssistantMessageId = "test-msg-2"
+                               ProviderAttempt = "2" |}
                     )
 
                 let res = writer.Append StreamId.Workspace None fact
@@ -113,7 +117,9 @@ module JournalWriterTests =
                             Fact.Agent(
                                 AgentFact.FallbackFailureRecorded
                                     {| SessionId = SessionId.create (sprintf "s%d" i)
-                                       Reason = "err" |}
+                                       Reason = "err"
+                                       AssistantMessageId = "test-msg-3"
+                                       ProviderAttempt = "3" |}
                             )
 
                         writer.Append StreamId.Workspace None fact)

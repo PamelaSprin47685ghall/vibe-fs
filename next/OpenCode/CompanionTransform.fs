@@ -44,7 +44,7 @@ module CompanionTransform =
     let activationRatio = 0.8
 
     let estimateTokens (messages: obj list) =
-        let json = Fable.Core.JS.JSON.stringify (List.toArray messages)
+        let json = Projection.canonicalJson (List.toArray messages)
         (String.length json + 3) / 4
 
     let handleCompanionTransform
@@ -137,10 +137,31 @@ module CompanionTransform =
 
                 let rawMsgs = unbox<obj array> rawOutObj?messages |> Array.toList
 
+                let tokenEstimate = estimateTokens rawMsgs
+
                 if not companion.Memory.ReplacementActive then
                     match sessionBudgets.TryGetValue sessionId with
-                    | true, budget when budget > 0 && float (estimateTokens rawMsgs) >= float budget * activationRatio ->
+                    | true, budget when budget > 0 && float tokenEstimate >= float budget * activationRatio ->
                         companion.EnablePrefixReplacement() |> ignore
                     | _ -> ()
+
+                // Y self-compress: when B itself approaches the model budget and
+                // prefix replacement is already active, rebase B+baseline so the
+                // sidecar stays bounded. Compressed B must NOT contain the
+                // blogger system phrase — request role classifiers look at user
+                // text and would mis-label the primary session as blogger.
+                match
+                    companion.Memory.CurrentB, companion.Memory.ReplacementActive, sessionBudgets.TryGetValue sessionId
+                with
+                | Some b, true, (true, budget) when
+                    budget > 0
+                    && float ((String.length b + 3) / 4) >= float budget * activationRatio
+                    ->
+                    let compressed =
+                        sprintf "[companion-rebase] condensed cognitive context (%d chars)" (String.length b)
+
+                    let baseline = Projection.canonicalJson (List.toArray rawMsgs)
+                    companion.TryRebase(compressed, baseline) |> ignore
+                | _ -> ()
 
                 replaceMessagesInPlace rawOutObj (companion.TransformRaw rawMsgs)

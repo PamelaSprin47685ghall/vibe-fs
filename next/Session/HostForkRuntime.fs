@@ -27,7 +27,7 @@ type HostForkRuntime
     let ptyRuns = HashSet<string>()
     let gate = obj ()
     let childCreated = defaultArg onChildCreated (fun _ _ _ -> ())
-    let ptyPort = defaultArg ptyPort (PtyPort())
+    let ptyPort = defaultArg ptyPort (PtyBackend.createPort ())
     let parentKey = SessionId.value parentId
     let directoryOf = defaultArg directoryFor (fun _ -> None)
     let parentAbortToken = Pty.registerParentAbort parentKey (fun () -> this.Cancel())

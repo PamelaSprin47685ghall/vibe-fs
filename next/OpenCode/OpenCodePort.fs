@@ -157,8 +157,17 @@ module OpenCodePort =
                     let status = unbox<int> response?status
 
                     if status >= 200 && status < 300 then
-                        let! json = unbox<Task<obj>> (response?json ())
-                        return Ok json
+                        // prompt_async and similar endpoints may return empty bodies.
+                        // Never treat a successful empty response as an error.
+                        try
+                            let! text = unbox<Task<string>> (response?text ())
+
+                            if String.IsNullOrWhiteSpace text then
+                                return Ok(createObj [])
+                            else
+                                return Ok(Fable.Core.JS.JSON.parse text)
+                        with _ ->
+                            return Ok(createObj [])
                     else
                         return Error $"HTTP {status}"
                 with ex ->
@@ -169,20 +178,26 @@ module OpenCodePort =
             member _.SendPrompt (sessionId: SessionId) text opts =
                 task {
                     let sId = SessionId.value sessionId
+                    // Omit optional fields when absent: host rejects model:null.
+                    let bodyFields =
+                        [ "parts", box [| {| ``type`` = "text"; text = text |} |] ]
+                        @ (opts.Model
+                           |> Option.map (fun model -> [ "model", box model ])
+                           |> Option.defaultValue [])
+                        @ (opts.Agent
+                           |> Option.map (fun agent -> [ "agent", box agent ])
+                           |> Option.defaultValue [])
 
-                    let payload =
-                        {| parts = [| {| ``type`` = "text"; text = text |} |]
-                           model = opts.Model
-                           agent = opts.Agent |}
-
-                    let! res = postJson $"/session/{sId}/prompt_async" payload
+                    let! res = postJson $"/session/{sId}/prompt_async" (createObj bodyFields)
 
                     match res with
                     | Ok data ->
+                        // prompt_async is fire-and-forget: many host versions return
+                        // 2xx with empty body. Treat that as accepted, matching SdkClientPort.
                         if not (isNull data) && not (isNull data?id) then
                             return Delivered(MessageId.create (unbox<string> data?id))
                         else
-                            return AcceptanceUnknown("Missing message id in response", None)
+                            return Delivered(MessageId.create (sprintf "accepted-%s" sId))
                     | Error err -> return Retryable err
                 }
 

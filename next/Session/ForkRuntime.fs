@@ -168,22 +168,6 @@ type ForkRuntime
                 launch ()
                 ForkResult.Created agentId)
 
-    member this.Fork(agentId: string, prompt: string) : ForkResult =
-        lock lockObj (fun () ->
-            match agents.TryGetValue(agentId) with
-            | true, rec' ->
-                let runId, launch = startRun agentId rec'.Role (Some prompt) None
-
-                agents.[agentId] <-
-                    { rec' with
-                        Status = AgentStatus.Busy
-                        CurrentRunId = Some runId }
-
-                launch ()
-                ForkResult.Nudged agentId
-            | false, _ -> ForkResult.NotFound agentId)
-
-
     member _.Join() : Task<Result<RunCompletion, ForkError>> =
         lock lockObj (fun () ->
             if mailbox.Count > 0 then
