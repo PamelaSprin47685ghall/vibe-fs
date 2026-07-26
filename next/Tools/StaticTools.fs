@@ -165,7 +165,7 @@ module StaticTools =
                         return
                             { Result = sprintf "Exit: %d\nStdout: %s\nStderr: %s" code stdout stderr
                               Truncated = false }
-                    | Ok(RunnerOutcome.Spooled(code, path, totalBytes, chunks, _)) ->
+                    | Ok(RunnerOutcome.Spooled(code, path, totalBytes, chunks)) ->
                         return
                             { Result = sprintf "Exit: %d\nSpool: %s\nBytes: %d\nChunks: %d" code path totalBytes chunks
                               Truncated = false }

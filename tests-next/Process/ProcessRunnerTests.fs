@@ -115,43 +115,6 @@ module ProcessRunnerTests =
             | _ -> failwith "Expected both medium memory tasks to complete successfully"
         }
 
-    let ``Runner_complete_output_preservation_spools_large_output_chunks`` () =
-        task {
-            let outputSize = 250000 // 250KB (> 200KB chunk size)
-            let rawBytes = Array.zeroCreate<byte> outputSize
-
-            for i in 0 .. outputSize - 1 do
-                rawBytes.[i] <- byte (i % 256)
-
-            let estimate =
-                { EstimatedRuntime = RuntimeSeconds 5.0
-                  EstimatedOutput = OutputBytes 50000L
-                  EstimatedMemory = EstimatedMemory.Medium }
-
-            let mockLauncher =
-                fun (_cmd: Command) (_ct: CancellationToken) -> Task.FromResult(0, rawBytes, [||])
-
-            let dummyCmd =
-                { FileName = "echo"
-                  Arguments = []
-                  WorkingDirectory = None
-                  Environment = None
-                  Stdin = None
-                  Deadline = None
-                  PtyOptions = None }
-
-            let! outcome = Runner.executeWithLauncher mockLauncher dummyCmd estimate defaultCtx CancellationToken.None
-
-            match outcome with
-            | Ok(RunnerOutcome.Spooled(exitCode, spoolPath, totalBytes, chunkCount, chunks)) ->
-                equal 0 exitCode
-                equal (int64 outputSize) totalBytes
-                equal 2 chunkCount
-                trueThat (not (String.IsNullOrWhiteSpace spoolPath)) "Expected a spool path"
-                equal outputSize (Array.concat chunks).Length
-            | _ -> failwith "Expected outcome to be Spooled with 200KB chunks"
-        }
-
     let ``Runner_timeout_kill_path_returns_TimeoutExceeded`` () =
         task {
             let estimate =

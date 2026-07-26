@@ -31,6 +31,17 @@ module ExecutorTool =
     [<Emit("JSON.stringify($0)")>]
     let private stringify (value: obj) : string = jsNative
 
+    [<Emit("""
+        (ctx, callback) => {
+          const signal = ctx && (ctx.abort || ctx.abortSignal || ctx.signal);
+          if (!signal || typeof signal.addEventListener !== "function") return () => {};
+          if (signal.aborted) callback();
+          else signal.addEventListener("abort", callback, { once: true });
+          return () => signal.removeEventListener("abort", callback);
+        }
+    """)>]
+    let private attachAbort (context: obj) (callback: unit -> unit) : (unit -> unit) = jsNative
+
     let private textArg (args: obj) name =
         if isNull args || isNull args?(name) then
             ""
@@ -75,15 +86,23 @@ module ExecutorTool =
                 | Ok result -> return completionText result
         }
 
-    let private summarize (runtime: HostForkRuntime) (chunks: byte[][]) =
+    /// Maps each bounded spool chunk sequentially, releasing it before reducing summaries.
+    let private summarizeSpool (runtime: HostForkRuntime) (spoolPath: string) =
         task {
             let summaries = ResizeArray<string>()
+            let mutable index = 0
 
-            for index in 0 .. chunks.Length - 1 do
-                let! summary = summarizeChunk runtime chunks.[index] index
-                summaries.Add summary
+            do!
+                Spool.readChunks spoolPath (fun chunk ->
+                    task {
+                        let current = index
+                        index <- index + 1
+                        let! summary = summarizeChunk runtime chunk current
+                        summaries.Add summary
+                        return ()
+                    })
 
-            let combined = String.concat "\n" summaries
+            let combined = summaries |> Seq.toList |> String.concat "\n"
 
             let reducePrompt =
                 sprintf
@@ -133,13 +152,19 @@ module ExecutorTool =
                               Deadline = None
                               PtyOptions = None }
 
+                        use cancellation = new CancellationTokenSource()
+                        let detachAbort = attachAbort context (fun () -> cancellation.Cancel())
+
                         let! result =
-                            Runner.execute
-                                command
-                                estimate
-                                { WorkingDirectory = workspaceDirectory
-                                  DefaultTimeout = None }
-                                CancellationToken.None
+                            try
+                                Runner.execute
+                                    command
+                                    estimate
+                                    { WorkingDirectory = workspaceDirectory
+                                      DefaultTimeout = None }
+                                    cancellation.Token
+                            finally
+                                detachAbort ()
 
                         match result with
                         | Error error -> return box (stringify (createObj [ "error", box (error.ToString()) ]))
@@ -151,9 +176,9 @@ module ExecutorTool =
                                             [ "exitCode", box exitCode; "stdout", box stdout; "stderr", box stderr ]
                                     )
                                 )
-                        | Ok(RunnerOutcome.Spooled(exitCode, spoolPath, totalBytes, chunkCount, chunks)) ->
+                        | Ok(RunnerOutcome.Spooled(exitCode, spoolPath, totalBytes, chunkCount)) ->
                             try
-                                let! summary = summarize runtime chunks
+                                let! summary = summarizeSpool runtime spoolPath
 
                                 return
                                     box (

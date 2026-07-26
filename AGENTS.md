@@ -74,8 +74,8 @@ import:
 
 1. 四项因果纠偏与 Companion/Review 本轮边界已有直接测试证据；仍不得把 canary 名称外推为完整产品闭合。
 2. Fallback 已闭合：HostForkRuntime 注入 durable ModelResolver；每个 retry attempt 只记一条事实；同一 child 跨重启实测 A/A/B/B。
-3. Process 的有界内存 spool/map-reduce、真实 PTY `fork` 表面、Orchestrator worktree/rebase/ff-only 发布仍未闭合。
-4. 不得宣称 release-ready；下一阶段只能按 Process → PTY → Orchestrator 顺序推进。
+3. Process 已闭合有界 spool/map-reduce、唯一 deadline、取消杀进程树与 pipe EOF；真实 PTY `fork` 表面、Orchestrator worktree/rebase/ff-only 发布仍未闭合。
+4. 不得宣称 release-ready；下一阶段只能按 PTY → Orchestrator 顺序推进。
 
 ## 解冻后的严格顺序
 
@@ -166,7 +166,7 @@ npm run test:e2e:p0
 
 1. busy existing nudge、Watchdog、runner 重复层和 13-way 隔离门已完成并推送。
 2. Companion canonical prefix、JSON remove delta、cheap Blogger model 与 Reviewer durable guard 已完成本轮定向验证。
-3. Fallback attempt identity/A-A-B-B 与重启恢复已完成；下一步进入 Process，PTY、Orchestrator 继续冻结。
+3. Fallback attempt identity/A-A-B-B 与重启恢复已完成；Process 有界 spool/取消链已完成，下一步进入 PTY，Orchestrator 继续冻结。
 4. `MIGRATION.md` 继续记录行为接管和删除门槛；不把旧实现重新引入。
 
 任何“为了让测试不挂”“先加几十次重试”“测试环境才设置变量”“以后换真正 PTY”“读不到就忽略”“方便清理所以全局 kill”的修改均拒绝。测试必须证明 SSOT；生产不得追着测试夹具跑。

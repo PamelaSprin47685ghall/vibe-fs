@@ -31,6 +31,7 @@
     <Compile Include="Journal/AgentJournalTests.fs"/>
     <Compile Include="Process/ProcessBudgetTests.fs"/>
     <Compile Include="Process/ProcessRunnerTests.fs"/>
+    <Compile Include="Process/ProcessBoundedTests.fs"/>
     <Compile Include="Process/PtyTests.fs"/>
     <Compile Include="Agent/ProgramsTests.fs"/>
     <Compile Include="Session/ForkRuntimeTests.fs"/>

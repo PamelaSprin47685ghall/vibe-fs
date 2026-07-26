@@ -19,9 +19,7 @@ module ProcessBudget =
     let calculateDeadline (now: DateTimeOffset) (est: EstimatedRuntime) : Deadline = Runner.calculateDeadline now est
 
     let getLargeGateCount () : int = Runner.getLargeGateCount ()
-
     let acquireLargeGate (ct: CancellationToken) : Task = Runner.acquireLargeGate ct
-
     let releaseLargeGate () : unit = Runner.releaseLargeGate ()
 
     let executeWithBudget
@@ -31,12 +29,12 @@ module ProcessBudget =
         (ct: CancellationToken)
         : Task<BudgetOutcome> =
         task {
-            let! res = Runner.execute cmd estimate ctx ct
+            let! result = Runner.execute cmd estimate ctx ct
 
-            match res with
+            match result with
             | Ok(RunnerOutcome.Completed(code, stdout, stderr, spooled)) ->
                 return BudgetOutcome.Completed(code, stdout, stderr, spooled)
-            | Ok(RunnerOutcome.Spooled(code, path, totalBytes, chunkCount, _chunks)) ->
+            | Ok(RunnerOutcome.Spooled(code, path, totalBytes, chunkCount)) ->
                 return BudgetOutcome.Spooled(code, path, totalBytes, chunkCount)
             | Ok(RunnerOutcome.OutputExceeded(bytes, pathOpt)) -> return BudgetOutcome.OutputExceeded(bytes, pathOpt)
             | Error(RunnerError.TimeoutExceeded span) -> return BudgetOutcome.TimeoutExceeded span

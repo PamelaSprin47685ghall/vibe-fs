@@ -37,6 +37,7 @@
 | REV-DOUBLE-PERFECT | 同 tree 双 PERFECT | `tests-next/Session/ReviewGuardTests.fs` + `reviewer-verdict-canary.mjs` | Port + real Host terminal guard | 完整 Manager 审查工作流 |
 | REV-DURABLE-NUDGE | Reviewer missing-verdict nudge durable、重启去重、发送失败不写事实 | `HostReviewGuardTests.fs` | Port + Journal proof | real restart canary |
 | FB-A-A-B-B | session 累计 A/A/B/B | `tests-next/Session/FallbackContractTests.fs` + `HostForkRuntimeTests.fs` + `fallback-canary.mjs` | pure + Port + real Host/restart proof | Process boundary |
+| PROC-BOUNDED-SPOOL | 3× estimate 阈值后只保留 spool，200KB 流式 map/reduce，取消杀树后等 EOF | `ProcessBoundedTests.fs` + `executor-canary.mjs` + `process-stress-canary.mjs` | Fable + real process proof | PTY surface |
 | ORCH-FF-ONLY | rebase 后复审与 ff-only | `tests-next/Integration/OrchestratorTests.fs` | Port proof | real Git worktree E2E |
 | TESTKIT-LANES | scenario/session/role/turn/request-kind lane；真实 session/parent 绑定 | `gate-testkit.mjs` + P0 canaries | Gate + real-host harness proof | 生产语义仍逐阶段验收 |
 | TESTKIT-CAUSAL-WATCHDOG | 2s watchdog 仅接受 blocking 因果进展 | `watchdog.js` + `watchdog-constants.js` + `gate-timeout-cases.mjs` | Gate + P0 proof | 每个新场景保持同一门槛 |
@@ -56,7 +57,8 @@
 3. ✅ Reviewer terminal guard：Manager 无当前 tree 的双 PERFECT 会收到 durable guard；Reviewer terminal 无 verdict 会 nudge 同一会话并 durable 去重；abort terminal 不触发 guard/continuation。
 4. ✅ Companion canonical prefix、JSON remove delta、cheap Blogger model 配置。
 5. ✅ Fallback durable model wiring、attempt deduplication、A/A/B/B、restart recovery。
-6. Process → PTY → Orchestrator。
+6. ✅ Process bounded spool、streaming map/reduce、cancellation kill + EOF。
+7. PTY → Orchestrator。
 
 ## TestKit 因果接管证据
 
