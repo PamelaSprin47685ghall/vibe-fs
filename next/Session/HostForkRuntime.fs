@@ -4,6 +4,7 @@ open System
 open System.Collections.Generic
 open System.Threading.Tasks
 open Wanxiangshu.Next.OpenCode
+open Wanxiangshu.Next.Process
 open Wanxiangshu.Next.Kernel.Identity
 open Wanxiangshu.Next.Kernel.Fact
 open Wanxiangshu.Next.Journal
@@ -16,14 +17,24 @@ type HostForkRuntime
         sessions: ISessionHostPort,
         ?journal: AgentJournal,
         ?onChildCreated: string -> AgentRole -> SessionId -> unit,
-        ?modelResolver: ModelResolver.ModelConfig
-    ) =
+        ?modelResolver: ModelResolver.ModelConfig,
+        ?ptyPort: PtyPort
+    ) as this =
     let runtime = ForkRuntime()
     let children = Dictionary<string, SessionId>()
     let pendingRuns = Dictionary<string, PendingHostRun>()
+    let ptyRuns = HashSet<string>()
     let gate = obj ()
     let childCreated = defaultArg onChildCreated (fun _ _ _ -> ())
+    let ptyPort = defaultArg ptyPort (PtyPort())
+    let parentKey = SessionId.value parentId
+    let parentAbortToken = Pty.registerParentAbort parentKey (fun () -> this.Cancel())
 
+    do
+        ptyPort.AddMailboxSender(fun completion ->
+            lock gate (fun () -> ptyRuns.Add completion.RunId |> ignore)
+            runtime.UnregisterPty completion.RunId
+            runtime.PublishCompletion completion)
 
     let restoreChildren () =
         match journal with
@@ -192,10 +203,8 @@ type HostForkRuntime
                         return Error err
                     | Ok() ->
                         let run = installRun agentId childId
-
                         lock gate (fun () -> children.[agentId] <- childId)
                         childCreated agentId role childId
-
                         let result = runtime.Fork(agentId, role, runWork = (fun () -> run.Source.Task))
                         markReady run
 
@@ -281,16 +290,57 @@ type HostForkRuntime
                             return Error err
         }
 
+    member _.ForkPty(command: string) : Task<Result<PtyId, string>> =
+        task {
+            if String.IsNullOrWhiteSpace command then
+                return Error "PTY command is required"
+            else
+                try
+                    let id = Pty.newId ()
+                    lock gate (fun () -> ptyRuns.Add id.Value |> ignore)
+                    ptyPort.Fork(command, ptyId = id) |> ignore
+
+                    if ptyPort.Exists id then
+                        runtime.RegisterPty
+                            { PtyId = id.Value
+                              AgentId = id.Value
+                              Command = command
+                              StartedAt = DateTimeOffset.UtcNow }
+
+                    return Ok id
+                with ex ->
+                    return Error ex.Message
+        }
+
+    member _.TryPty(id: string) =
+        let candidate = PtyId.Create id
+        if ptyPort.Exists candidate then Some candidate else None
+
+    member _.SendPty(id: PtyId, prompt: string, signal: PtySignal option) : Task<Result<PtyId, string>> =
+        task {
+            if not (ptyPort.Exists id) then
+                return Error(sprintf "Unknown PTY id: %s" id.Value)
+            else
+                match signal with
+                | Some value -> ptyPort.Send(id, PtyCommand.Signal value)
+                | None when String.IsNullOrEmpty prompt -> ptyPort.Send(id, PtyCommand.Read)
+                | None -> ptyPort.Send(id, PtyCommand.Write(Pty.bytes prompt))
+
+                return Ok id
+        }
+
+    member _.IsPtyCompletion(runId: string) =
+        lock gate (fun () -> ptyRuns.Contains runId)
+
+    member _.PtyPort = ptyPort
     member _.Join() : Task<Result<RunCompletion, ForkError>> = runtime.Join()
-
     member _.List() = runtime.List()
-
     member _.PendingRunCount = lock gate (fun () -> pendingRuns.Count)
-
     member _.PendingCompletionCount = runtime.PendingCompletionCount
 
     member _.Cancel() =
+        ptyPort.CloseAll()
         runtime.Cancel()
-
+        Pty.unregisterParentAbort parentKey parentAbortToken
         let childIds = lock gate (fun () -> children.Values |> Seq.distinct |> Seq.toList)
         childIds |> List.iter (fun childId -> sessions.AbortSession childId |> ignore)

@@ -7,6 +7,7 @@ open Wanxiangshu.Next.Session
 open Wanxiangshu.Next.Kernel.Identity
 open Wanxiangshu.Next.Kernel.Fact
 open Wanxiangshu.Next.Journal
+open Wanxiangshu.Next.Process
 
 /// Keeps host event facts at the adapter boundary: session identity, parentage,
 /// role, terminal nudge, and parent-abort propagation.
@@ -83,6 +84,7 @@ type HostEventRouter
             && unbox<string> properties?error?name = "MessageAbortedError"
 
     let abortChildren parentId =
+        Pty.abortParent parentId
         sessionPort.AbortChildren(SessionId.create parentId) |> ignore
 
 

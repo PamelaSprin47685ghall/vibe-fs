@@ -9,6 +9,7 @@ open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Next.Kernel.Identity
 open Wanxiangshu.Next.Journal
+open Wanxiangshu.Next.Process
 open Wanxiangshu.Next.Session
 
 module ToolSurface =
@@ -18,6 +19,12 @@ module ToolSurface =
 
     [<Emit("$0.schema.enum($1)")>]
     let private enumSchema (tool: obj) (values: string array) : obj = jsNative
+
+    [<Emit("$0.schema.enum($1).optional()")>]
+    let private optionalEnumSchema (tool: obj) (values: string array) : obj = jsNative
+
+    [<Emit("$0.schema.string().optional()")>]
+    let private optionalStringSchema (tool: obj) : obj = jsNative
 
     [<Emit("$0($1)")>]
     let private applyTool (factory: obj) (definition: obj) : obj = jsNative
@@ -42,6 +49,29 @@ module ToolSurface =
             ""
         else
             unbox<string> args?(name)
+
+    let private optionalTextArg (args: obj) (name: string) =
+        let value = textArg args name
+        if String.IsNullOrWhiteSpace value then None else Some value
+
+    [<RequireQualifiedAccess>]
+    module private ForkField =
+        [<Literal>]
+        let Agent = "agent"
+
+        [<Literal>]
+        let Prompt = "prompt"
+
+        [<Literal>]
+        let Signal = "signal"
+
+    [<RequireQualifiedAccess>]
+    module private ListKind =
+        [<Literal>]
+        let Agent = "agent"
+
+        [<Literal>]
+        let Pty = "pty"
 
     let private mkSid (s: string) = SessionId.create s
 
@@ -95,20 +125,52 @@ module ToolSurface =
 
         let forkExecute (args: obj) (ctx: obj) =
             task {
-                let agent = textArg args "agent"
-                let prompt = textArg args "prompt"
+                let agent = textArg args ForkField.Agent
+                let prompt = textArg args ForkField.Prompt
+                let signalText = optionalTextArg args ForkField.Signal
 
                 match runtimeFor ctx with
                 | Error err -> return box (stringify (createObj [ "error", box err ]))
                 | Ok runtime ->
-                    let! result =
-                        match HostSessionContext.roleOf agent with
-                        | Some role -> runtime.Fork(newAgentId (), role, prompt)
-                        | None -> runtime.Reuse(agent, prompt)
+                    let parsedSignal =
+                        match signalText with
+                        | None -> Ok None
+                        | Some value -> PtySignal.tryParse value |> Result.map Some
 
-                    match result with
-                    | Ok fork -> return box (stringify (createObj [ "agentId", box fork.AgentId ]))
+                    match parsedSignal with
                     | Error err -> return box (stringify (createObj [ "error", box err ]))
+                    | Ok signalOpt ->
+                        match runtime.TryPty agent with
+                        | Some ptyId ->
+                            let! result = runtime.SendPty(ptyId, prompt, signalOpt)
+
+                            match result with
+                            | Ok id -> return box (stringify (createObj [ "ptyId", box id.Value ]))
+                            | Error err -> return box (stringify (createObj [ "error", box err ]))
+                        | None when agent = Pty.AgentName ->
+                            match signalOpt with
+                            | Some _ ->
+                                return
+                                    box (stringify (createObj [ "error", box "PTY creation does not accept signal" ]))
+                            | None ->
+                                let! result = runtime.ForkPty prompt
+
+                                match result with
+                                | Ok id -> return box (stringify (createObj [ "ptyId", box id.Value ]))
+                                | Error err -> return box (stringify (createObj [ "error", box err ]))
+                        | None ->
+                            match signalOpt with
+                            | Some _ ->
+                                return box (stringify (createObj [ "error", box "Signal target is not an active PTY" ]))
+                            | None ->
+                                let! result =
+                                    match HostSessionContext.roleOf agent with
+                                    | Some role -> runtime.Fork(newAgentId (), role, prompt)
+                                    | None -> runtime.Reuse(agent, prompt)
+
+                                match result with
+                                | Ok fork -> return box (stringify (createObj [ "agentId", box fork.AgentId ]))
+                                | Error err -> return box (stringify (createObj [ "error", box err ]))
             }
 
         let joinExecute (_args: obj) (ctx: obj) =
@@ -120,13 +182,14 @@ module ToolSurface =
 
                     match result with
                     | Ok c ->
-                        return
-                            box (
-                                stringify (
-                                    createObj
-                                        [ "agentId", box c.AgentId; "runId", box c.RunId; "outcome", box c.Outcome ]
-                                )
-                            )
+                        let fields =
+                            [ "agentId", box c.AgentId; "runId", box c.RunId; "outcome", box c.Outcome ]
+                            @ (if runtime.IsPtyCompletion c.RunId then
+                                   [ "ptyId", box c.RunId ]
+                               else
+                                   [])
+
+                        return box (stringify (createObj fields))
                     | Error e -> return box (stringify (createObj [ "error", box (e.ToString()) ]))
             }
 
@@ -135,24 +198,39 @@ module ToolSurface =
                 match runtimeFor ctx with
                 | Error err -> return box (stringify (createObj [ "error", box err ]))
                 | Ok runtime ->
-                    let agents, _ = runtime.List()
+                    let agents, ptys = runtime.List()
 
                     let agentEntries =
                         agents
+                        |> List.sortBy (fun a -> a.AgentId)
                         |> List.map (fun a ->
                             createObj
-                                [ "agentId", box a.AgentId
+                                [ "kind", box ListKind.Agent
+                                  "agentId", box a.AgentId
                                   "role", box (a.Role.ToString())
                                   "status", box (a.Status.ToString()) ])
 
-                    return box (stringify (box (agentEntries |> List.toArray)))
+                    let ptyEntries =
+                        ptys
+                        |> List.sortBy (fun p -> p.PtyId)
+                        |> List.map (fun p ->
+                            createObj
+                                [ "kind", box ListKind.Pty
+                                  "ptyId", box p.PtyId
+                                  "command", box p.Command
+                                  "startedAt", box p.StartedAt ])
+
+                    return box (stringify (box (List.append agentEntries ptyEntries |> List.toArray)))
             }
 
         let verdictExecute =
             VerdictSurface.create sessionParents sessionRoles journal gitTreePort reviewerHosts verdictSessions
 
         let forkArgs =
-            createObj [ "agent", box (stringSchema factory); "prompt", box (stringSchema factory) ]
+            createObj
+                [ ForkField.Agent, box (stringSchema factory)
+                  ForkField.Prompt, box (optionalStringSchema factory)
+                  ForkField.Signal, box (optionalEnumSchema factory [| PtySignal.TermName; PtySignal.KillName |]) ]
 
         let verdictArgs =
             createObj [ "verdict", box (enumSchema factory [| "PERFECT"; "REVISE" |]) ]
@@ -166,8 +244,10 @@ module ToolSurface =
         let executor = ExecutorTool.create toolModule runtimeFor workspaceDirectory
 
         createObj
-            [ "fork", box (applyTool factory (definition "Fork or nudge an agent" forkArgs forkExecute))
-              "join", box (applyTool factory (definition "Wait for any agent completion" (createObj []) joinExecute))
-              "list", box (applyTool factory (definition "List active agents" (createObj []) listExecute))
+            [ "fork",
+              box (applyTool factory (definition "Fork, nudge, or control an agent or PTY" forkArgs forkExecute))
+              "join",
+              box (applyTool factory (definition "Wait for any agent or PTY completion" (createObj []) joinExecute))
+              "list", box (applyTool factory (definition "List active agents and PTYs" (createObj []) listExecute))
               "verdict", box (applyTool factory (definition "Submit the review verdict" verdictArgs verdictExecute))
               "executor", executor ]

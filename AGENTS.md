@@ -68,7 +68,7 @@ import:
 - `HostEventRouter` 以 `messageID`/`messageId` 聚合 `message.part.updated`，再在 terminal 判定空助手轮：有 text/tool part 的完成轮不会误发零宽续命；真正空轮仍会续命。Manager terminal 的当前 Git tree 未获双 PERFECT 时，用 listener-before-send 发 guard 并 append `GuardPromptAccepted`；Reviewer 无 verdict terminal nudge 同一会话；abort terminal 不发 guard/continuation。`session.status=retry` 的每个 attempt 一次性 append `FallbackFailureRecorded`，500→即时 retry→重启累计由 fallback canary 覆盖。
 - Companion 成功回合以单条 `CompanionAdvanced(SessionId, Projection, Content)` 原子 append；`Content` 是累积后的完整 B，不再分两条事实留下 baseline/B 撕裂窗口。`prefixLength` 现在比较 canonical message content，不把同 ID 的 tool/text 更新误判为已覆盖；`jsonDelta` 输出确定性的 add/remove/replace 操作，覆盖嵌套删除和数组缩短；Blogger model 从 `WANXIANGSHU_BLOGGER_MODEL` 明确解析，缺失/非法配置 fail-closed，TestKit 显式注入 `test/test-model`。
 - ReviewGuard 的 Manager/Reviewer nudge 共用 durable `GuardPromptAccepted`，GuardKey 绑定 target、trigger、reason；重启可去重，发送失败不写事实。Journal/GitTreePort 缺失或读取异常不再返回允许完成的 `None`，而是阻止 Manager finish。
-- 本轮已直接验证：`npm run test:next`（154/154 Fable）、`node testkit/opencode/tests/gate-testkit.mjs`（23/23）、Companion projection/replacement canary、Reviewer verdict canary、Fallback A/A/B/B + restart canary、Process bounded spool/cancellation tests、默认 P0、13-way P0、3× P0 与全量 `npm test` 均通过。
+- 本轮已直接验证：`npm run test:next`（156/156 Fable）、`node testkit/opencode/tests/gate-testkit.mjs`（23/23）、Companion projection/replacement canary、Reviewer verdict canary、Fallback A/A/B/B + restart canary、Process bounded spool/cancellation tests、PTY DSL unified surface tests、默认 P0、13-way P0、3× P0 与全量 `npm test` 均通过。
 
 ## 当前未闭合边界
 

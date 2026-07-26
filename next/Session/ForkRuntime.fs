@@ -193,6 +193,14 @@ type ForkRuntime
                 waiters.Enqueue(waiter)
                 waiter.Task)
 
+    /// Enqueue an external completion (for example, a PTY) in this runtime's Join mailbox.
+    member _.PublishCompletion(completion: RunCompletion) : unit =
+        lock lockObj (fun () ->
+            if waiters.Count > 0 then
+                waiters.Dequeue().SetResult(Ok completion)
+            else
+                mailbox.Enqueue completion)
+
     member _.RegisterPty(pty: PtyRecord) : unit =
         lock lockObj (fun () -> ptys.[pty.PtyId] <- pty)
 
