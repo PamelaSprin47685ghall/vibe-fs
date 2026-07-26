@@ -59,65 +59,16 @@ type HostForkRuntime
 
     do restoreChildren ()
 
-    let outputSince (run: PendingHostRun) =
-        let all = sessions.GetSessionOutput run.ChildId
-        let start = max 0 (min run.FallbackOutputCount all.Length)
-        let output = all |> List.skip start
+    let complete run outcome =
+        HostForkRunLifecycle.complete gate pendingRuns sessions run outcome
 
-        output
-        |> List.filter (fun line -> not (line.StartsWith("Prompt: ")) && not (line.StartsWith("ChildPrompt: ")))
-        |> String.concat "\n"
+    let installRun agentId childId =
+        HostForkRunLifecycle.installRun gate pendingRuns sessions agentId childId
 
-    let complete (run: PendingHostRun) (outcome: TerminalOutcome) =
-        let subscriptionToDispose =
-            lock gate (fun () ->
-                match pendingRuns.TryGetValue run.AgentId with
-                | true, current when obj.ReferenceEquals(current.Token, run.Token) && run.Ready && not run.Finished ->
-                    run.Finished <- true
-                    pendingRuns.Remove run.AgentId |> ignore
-                    run.Subscription
-                | _ -> None)
+    let failRun run error =
+        HostForkRunLifecycle.failRun gate pendingRuns sessions run error
 
-        subscriptionToDispose
-        |> Option.iter (fun subscription -> subscription.Dispose())
-
-        match outcome with
-        | Completed _ -> run.Source.SetResult(Ok(outputSince run))
-        | Aborted reason -> run.Source.SetResult(Error reason)
-        | Failed error -> run.Source.SetResult(Error error)
-
-    let installRun (agentId: string) (childId: SessionId) =
-        let run =
-            { Token = obj ()
-              AgentId = agentId
-              ChildId = childId
-              Source = HostPendingRun.completionSource ()
-              OutputWatermark = None
-              FallbackOutputCount = sessions.GetSessionOutput childId |> List.length
-              Subscription = None
-              Ready = false
-              Finished = false }
-
-        lock gate (fun () -> pendingRuns.[agentId] <- run)
-
-        let subscription =
-            sessions.SubscribeTerminal(childId, (fun _ outcome -> complete run outcome))
-
-        let disposeImmediately =
-            lock gate (fun () ->
-                run.Subscription <- Some subscription
-                run.Finished)
-
-        if disposeImmediately then
-            subscription.Dispose()
-
-        run
-
-    let failRun (run: PendingHostRun) (error: string) =
-        lock gate (fun () -> run.Ready <- true)
-        complete run (Failed error)
-
-    let markReady (run: PendingHostRun) = lock gate (fun () -> run.Ready <- true)
+    let markReady run = HostForkRunLifecycle.markReady gate run
 
     member _.Fork(agentId: string, role: AgentRole, prompt: string) : Task<Result<ForkResult, string>> =
         task {
@@ -290,44 +241,17 @@ type HostForkRuntime
                             return Error err
         }
 
-    member _.ForkPty(command: string) : Task<Result<PtyId, string>> =
-        task {
-            if String.IsNullOrWhiteSpace command then
-                return Error "PTY command is required"
-            else
-                let id = Pty.newId ()
-                lock gate (fun () -> ptyRuns.Add id.Value |> ignore)
+    member internal _.TrackPtyRun(id: PtyId) =
+        lock gate (fun () -> ptyRuns.Add id.Value |> ignore)
 
-                runtime.RegisterPty
-                    { PtyId = id.Value
-                      AgentId = id.Value
-                      Command = command
-                      StartedAt = DateTimeOffset.UtcNow }
+    member internal _.RegisterPtySnapshot (id: PtyId) (command: string) =
+        runtime.RegisterPty
+            { PtyId = id.Value
+              AgentId = id.Value
+              Command = command
+              StartedAt = DateTimeOffset.UtcNow }
 
-                try
-                    ptyPort.Fork(command, ptyId = id) |> ignore
-                    return Ok id
-                with ex ->
-                    runtime.UnregisterPty id.Value
-                    return Error ex.Message
-        }
-
-    member _.TryPty(id: string) =
-        let candidate = PtyId.Create id
-        if ptyPort.Exists candidate then Some candidate else None
-
-    member _.SendPty(id: PtyId, prompt: string, signal: PtySignal option) : Task<Result<PtyId, string>> =
-        task {
-            if not (ptyPort.Exists id) then
-                return Error(sprintf "Unknown PTY id: %s" id.Value)
-            else
-                match signal with
-                | Some value -> ptyPort.Send(id, PtyCommand.Signal value)
-                | None when String.IsNullOrEmpty prompt -> ptyPort.Send(id, PtyCommand.Read)
-                | None -> ptyPort.Send(id, PtyCommand.Write(Pty.bytes prompt))
-
-                return Ok id
-        }
+    member internal _.UntrackPtyRun(id: string) = runtime.UnregisterPty id
 
     member _.IsPtyCompletion(runId: string) =
         lock gate (fun () -> ptyRuns.Contains runId)

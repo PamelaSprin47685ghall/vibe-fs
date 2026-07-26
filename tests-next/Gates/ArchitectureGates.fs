@@ -154,9 +154,19 @@ module ArchitectureGates =
                     text.Split([| "\r\n"; "\n" |], System.StringSplitOptions.None).Length
 
                 if lineCount > 300 then
-                    violations.Add(sprintf "File '%s' has %d lines (exceeds maximum of 300 lines)" file lineCount)
+                    violations.Add(
+                        sprintf
+                            "File '%s' has %d lines (exceeds maximum of 300 lines): split the file; deleting blank lines or compressing statements to evade the gate is forbidden"
+                            file
+                            lineCount
+                    )
 
-        Assert.Empty(violations)
+        Assert.True(
+            violations.Count = 0,
+            sprintf
+                "Next_source_files_do_not_exceed_300_lines violations:\n%s"
+                (String.concat "\n" (violations |> Seq.toList))
+        )
 
     [<Fact>]
     let ``Next_recursive_scan_includes_subdirectory_files`` () =
