@@ -97,16 +97,22 @@ module PtyBackend =
         | PtySignal.Kill -> "SIGKILL"
         | PtySignal.Interrupt -> "SIGINT"
 
-    let private spawnSync (command: string) : obj =
+    let private spawnSync (command: string) (cwd: string) : obj =
         match spawnFn with
         | None -> failwith "bun-pty is not loaded"
         | Some spawn ->
+            let cwdValue =
+                if String.IsNullOrEmpty cwd then
+                    emitJsExpr () "process.cwd()"
+                else
+                    box cwd
+
             let options =
                 createObj
                     [ "name", box "xterm-256color"
                       "cols", box 80
                       "rows", box 24
-                      "cwd", box (emitJsExpr () "process.cwd()") ]
+                      "cwd", cwdValue ]
 
             spawn "sh" [| "-lc"; command |] options
 
@@ -126,9 +132,9 @@ module PtyBackend =
             | Some livePty ->
                 let text = livePty.Buffer.ToString()
                 livePty.Buffer.Clear() |> ignore
-
-                if livePty.Closed then
-                    port.Complete(id, Ok text)
+                // Return the buffered output to the caller immediately; do NOT
+                // complete the join here. Final exit belongs to onExit.
+                port.ReadResult(id, text, livePty.Closed)
         | PtyCommand.Signal signal ->
             match getLive id with
             | None -> enqueue id command
@@ -178,7 +184,7 @@ module PtyBackend =
 
     let private handle (port: PtyPort) (id: PtyId) (command: PtyCommand) =
         match command with
-        | PtyCommand.Spawn cmd ->
+        | PtyCommand.Spawn(cmd, cwd) ->
             let load = ensureSpawn ()
 
             load.ContinueWith(fun (t: Task<unit>) ->
@@ -187,7 +193,7 @@ module PtyBackend =
                     port.Complete(id, Error "PTY spawn load failed")
                 else
                     try
-                        let term = spawnSync cmd
+                        let term = spawnSync cmd cwd
                         attach port id term
                     with ex ->
                         drop id

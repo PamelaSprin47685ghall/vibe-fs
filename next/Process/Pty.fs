@@ -3,6 +3,9 @@ namespace Wanxiangshu.Next.Process
 open System
 open System.Collections.Generic
 open System.Text
+open System.Threading.Tasks
+open Fable.Core
+open Fable.Core.JsInterop
 open Wanxiangshu.Next.Session
 
 [<RequireQualifiedAccess>]
@@ -26,7 +29,7 @@ module PtySignal =
 
 [<RequireQualifiedAccess>]
 type PtyCommand =
-    | Spawn of command: string
+    | Spawn of command: string * cwd: string
     | Write of bytes: byte[]
     | Read
     | Signal of signal: PtySignal
@@ -48,6 +51,11 @@ type PtyHandle =
       AgentId: string option
       Role: AgentRole option }
 
+type PtyRead =
+    { Id: PtyId
+      Output: string
+      Closed: bool }
+
 type PtyBackendHandler = PtyId -> PtyCommand -> unit
 
 [<RequireQualifiedAccess>]
@@ -67,6 +75,7 @@ type PtyPort
     let mailboxSenders = ResizeArray<RunCompletion -> unit>()
     let gate = obj ()
     let active = Dictionary<PtyId, PtyHandle * ref<bool>>()
+    let readWaiters = Dictionary<PtyId, TaskCompletionSource<string * bool>>()
     do mailboxSender |> Option.iter mailboxSenders.Add
 
     let closeInternal (id: PtyId) (outcome: Result<string, string>) (sendTerminate: bool) =
@@ -118,7 +127,7 @@ type PtyPort
     member _.Handler = handler
     member _.AgentProvider = agentProvider
 
-    member this.Fork(command: string, ?agentId: string, ?role: AgentRole, ?ptyId: PtyId) : PtyId =
+    member this.Fork(command: string, ?agentId: string, ?role: AgentRole, ?ptyId: PtyId, ?cwd: string) : PtyId =
         let id =
             defaultArg ptyId (PtyId("pty-" + Guid.NewGuid().ToString("N").Substring(0, 8)))
 
@@ -130,7 +139,7 @@ type PtyPort
               Role = role }
 
         lock gate (fun () -> active.[id] <- (handle, ref false))
-        handler id (PtyCommand.Spawn command)
+        handler id (PtyCommand.Spawn(command, defaultArg cwd ""))
         id
 
     member this.Exists(id: PtyId) =
@@ -144,12 +153,45 @@ type PtyPort
                 | _ -> false)
 
         if live then
+            // Signal only forwards to the backend; completion belongs to the
+            // backend's onExit, never to Send.
             handler id command
 
-            match command with
-            | PtyCommand.Signal PtySignal.Terminate
-            | PtyCommand.Signal PtySignal.Kill -> this.Complete(id, Ok PtyOutcome.Signalled)
-            | _ -> ()
+    /// Reads the currently buffered PTY output without completing the join.
+    /// The backend resolves the waiter with (output, closed); final exit still
+    /// belongs to onExit -> Complete.
+    member this.Read(id: PtyId) : Task<Result<string * bool, string>> =
+        let live =
+            lock gate (fun () ->
+                match active.TryGetValue id with
+                | true, (_, closed) when not closed.Value -> true
+                | _ -> false)
+
+        if not live then
+            Task.FromResult(Error(sprintf "Unknown PTY id: %s" id.Value))
+        else
+            let tcs = TaskCompletionSource<string * bool>()
+            lock gate (fun () -> readWaiters.[id] <- tcs)
+            handler id PtyCommand.Read
+
+            task {
+                let! result = tcs.Task
+                return Ok result
+            }
+
+    /// Resolved by the backend when it has drained the buffer for a Read.
+    member _.ReadResult(id: PtyId, output: string, closed: bool) =
+        let tcs =
+            lock gate (fun () ->
+                match readWaiters.TryGetValue id with
+                | true, t ->
+                    readWaiters.Remove id |> ignore
+                    Some t
+                | false, _ -> None)
+
+        match tcs with
+        | Some t -> t.SetResult((output, closed))
+        | None -> ()
 
     /// Complete from a backend exit, signal notification, or read result.
     member _.Complete(id: PtyId, ?outcome: Result<string, string>) =

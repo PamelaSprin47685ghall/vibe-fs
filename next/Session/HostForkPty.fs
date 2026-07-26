@@ -8,7 +8,7 @@ open Wanxiangshu.Next.Kernel.Identity
 [<AutoOpen>]
 module HostForkRuntimePty =
     type HostForkRuntime with
-        member this.ForkPty(command: string) : Task<Result<PtyId, string>> =
+        member this.ForkPty(command: string, ?cwd: string) : Task<Result<PtyId, string>> =
             task {
                 if String.IsNullOrWhiteSpace command then
                     return Error "PTY command is required"
@@ -18,7 +18,7 @@ module HostForkRuntimePty =
                     this.RegisterPtySnapshot id command
 
                     try
-                        this.PtyPort.Fork(command, ptyId = id) |> ignore
+                        this.PtyPort.Fork(command, ptyId = id, ?cwd = cwd) |> ignore
                         return Ok id
                     with ex ->
                         this.UntrackPtyRun id.Value
@@ -33,15 +33,27 @@ module HostForkRuntimePty =
             else
                 None
 
-        member this.SendPty(id: PtyId, prompt: string, signal: PtySignal option) : Task<Result<PtyId, string>> =
+        member this.SendPty(id: PtyId, prompt: string, signal: PtySignal option) : Task<Result<PtyRead, string>> =
             task {
                 if not (this.PtyPort.Exists id) then
                     return Error(sprintf "Unknown PTY id: %s" id.Value)
                 else
                     match signal with
-                    | Some value -> this.PtyPort.Send(id, PtyCommand.Signal value)
-                    | None when String.IsNullOrEmpty prompt -> this.PtyPort.Send(id, PtyCommand.Read)
-                    | None -> this.PtyPort.Send(id, PtyCommand.Write(Pty.bytes prompt))
+                    | Some value ->
+                        this.PtyPort.Send(id, PtyCommand.Signal value)
+                        return Ok { Id = id; Output = ""; Closed = false }
+                    | None when String.IsNullOrEmpty prompt ->
+                        let! read = this.PtyPort.Read id
 
-                    return Ok id
+                        match read with
+                        | Ok(output, closed) ->
+                            return
+                                Ok
+                                    { Id = id
+                                      Output = output
+                                      Closed = closed }
+                        | Error err -> return Error err
+                    | None ->
+                        this.PtyPort.Send(id, PtyCommand.Write(Pty.bytes prompt))
+                        return Ok { Id = id; Output = ""; Closed = false }
             }

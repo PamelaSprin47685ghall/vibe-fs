@@ -50,6 +50,7 @@ module ToolSurface =
         : obj =
         let factory = toolModule?tool
         let runtimes = Dictionary<string, HostForkRuntime>()
+        let executorRuntimes = Dictionary<string, HostForkRuntime>()
         let reviewerHosts = Dictionary<string, ReviewerHost>()
         let worktreeTreePorts = Dictionary<string, GitTreePort>()
         let orchestratorHosts = Dictionary<string, OrchestratorHost>()
@@ -125,7 +126,16 @@ module ToolSurface =
                             let! result = runtime.SendPty(ptyId, prompt, signalOpt)
 
                             match result with
-                            | Ok id -> return box (stringify (createObj [ "ptyId", box id.Value ]))
+                            | Ok read ->
+                                return
+                                    box (
+                                        stringify (
+                                            createObj
+                                                [ "ptyId", box read.Id.Value
+                                                  "output", box read.Output
+                                                  "closed", box read.Closed ]
+                                        )
+                                    )
                             | Error err -> return box (stringify (createObj [ "error", box err ]))
                         | None when agent = Pty.AgentName ->
                             match signalOpt with
@@ -133,10 +143,17 @@ module ToolSurface =
                                 return
                                     box (stringify (createObj [ "error", box "PTY creation does not accept signal" ]))
                             | None ->
-                                let! result = runtime.ForkPty prompt
+                                let! result = runtime.ForkPty(prompt, ?cwd = workspaceDirectory)
 
                                 match result with
-                                | Ok id -> return box (stringify (createObj [ "ptyId", box id.Value ]))
+                                | Ok id ->
+                                    return
+                                        box (
+                                            stringify (
+                                                createObj
+                                                    [ "ptyId", box id.Value; "output", box ""; "closed", box false ]
+                                            )
+                                        )
                                 | Error err -> return box (stringify (createObj [ "error", box err ]))
                         | None ->
                             match signalOpt with
@@ -247,22 +264,21 @@ module ToolSurface =
                 reviewerHosts
                 verdictSessions
 
-        let forkArgs =
-            createObj
-                [ ForkField.Agent, box (stringSchema factory)
-                  ForkField.Prompt, box (optionalStringSchema factory)
-                  ForkField.Signal, box (optionalEnumSchema factory [| PtySignal.TermName; PtySignal.KillName |]) ]
+        let forkArgs, verdictArgs, definition =
+            ToolSurfaceOrchestrator.toolDefBuilders factory
 
-        let verdictArgs =
-            createObj [ "verdict", box (enumSchema factory [| "PERFECT"; "REVISE" |]) ]
+        let executorRuntimeFor =
+            ToolSurfaceOrchestrator.executorRuntimeFor
+                gate
+                executorRuntimes
+                mkSid
+                sessionPort
+                sessionParents
+                sessionRoles
+                modelConfig
 
-        let definition desc args execute =
-            createObj
-                [ "description", box desc
-                  "args", box args
-                  "execute", uncurriedExecute (box execute) ]
-
-        let executor = ExecutorTool.create toolModule runtimeFor workspaceDirectory
+        let executor =
+            ExecutorTool.create toolModule runtimeFor executorRuntimeFor workspaceDirectory
 
         createObj
             [ "fork",
