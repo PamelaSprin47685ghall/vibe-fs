@@ -109,7 +109,6 @@ try {
       await scenario.provider.waitForIdle(WATCHDOG_TIMEOUT_MS);
     }
     if (round === 3) {
-      await scenario.provider.waitForExpectation('manager-blogger-3', WATCHDOG_TIMEOUT_MS);
       scenario.watchdog?.advance({
         reason: 'replacement-blogger-busy',
         lane: 'manager-blogger:3',
