@@ -34,14 +34,10 @@ module PtyBackend =
     let private live = Dictionary<string, LivePty>()
     let private pending = Dictionary<string, ResizeArray<PtyCommand>>()
     let private gate = obj ()
-    let mutable private spawnFn: (string -> string array -> obj -> obj) option = None
+    let mutable private spawnFn: obj option = None
     let mutable private loadTask: Task<unit> option = None
 
-    [<Emit("""
-        (loader, onOk, onErr) => {
-          loader.then((spawn) => onOk(spawn)).catch((err) => onErr(String(err && err.message || err)));
-        }
-    """)>]
+    [<Emit("$0.then((spawn) => $1(spawn)).catch((err) => $2(String(err && err.message || err)))")>]
     let private runLoader (loader: JS.Promise<obj>) (onOk: obj -> unit) (onErr: string -> unit) : unit = jsNative
 
     let private ensureSpawn () : Task<unit> =
@@ -91,11 +87,17 @@ module PtyBackend =
                 queue |> Seq.toList
             | false, _ -> [])
 
+    [<Emit("(() => { try { process.kill(-$0.pid, $1); } catch (_) { process.kill($0.pid, $1); } })()")>]
+    let private killProcessTree (term: obj) (signal: string) : unit = jsNative
+
     let private signalName (signal: PtySignal) =
         match signal with
         | PtySignal.Terminate -> "SIGTERM"
         | PtySignal.Kill -> "SIGKILL"
         | PtySignal.Interrupt -> "SIGINT"
+
+    [<Emit("$0('sh', ['-lc', $1], $2)")>]
+    let private invokeSpawn (spawn: obj) (command: string) (options: obj) : obj = jsNative
 
     let private spawnSync (command: string) (cwd: string) : obj =
         match spawnFn with
@@ -114,7 +116,7 @@ module PtyBackend =
                       "rows", box 24
                       "cwd", cwdValue ]
 
-            spawn "sh" [| "-lc"; command |] options
+            invokeSpawn spawn command options
 
     let rec private applyLive (port: PtyPort) (id: PtyId) (command: PtyCommand) =
         match command with
@@ -141,7 +143,7 @@ module PtyBackend =
             | Some livePty when livePty.Closed -> ()
             | Some livePty ->
                 try
-                    livePty.Term?kill(signalName signal)
+                    killProcessTree livePty.Term (signalName signal)
                 with _ ->
                     ()
         | PtyCommand.Resize(width, height) ->
@@ -185,19 +187,15 @@ module PtyBackend =
     let private handle (port: PtyPort) (id: PtyId) (command: PtyCommand) =
         match command with
         | PtyCommand.Spawn(cmd, cwd) ->
-            let load = ensureSpawn ()
-
-            load.ContinueWith(fun (t: Task<unit>) ->
-                if t.IsFaulted then
+            task {
+                try
+                    do! ensureSpawn ()
+                    let term = spawnSync cmd cwd
+                    attach port id term
+                with ex ->
                     drop id
-                    port.Complete(id, Error "PTY spawn load failed")
-                else
-                    try
-                        let term = spawnSync cmd cwd
-                        attach port id term
-                    with ex ->
-                        drop id
-                        port.Complete(id, Error(sprintf "PTY spawn failed: %s" ex.Message)))
+                    port.Complete(id, Error(sprintf "PTY spawn failed: %s" ex.Message))
+            }
             |> ignore
         | other -> applyLive port id other
 

@@ -47,8 +47,8 @@ function forkResults(provider) {
   return out;
 }
 
-const PTHRU_PROMPT = "sh -lc 'echo CWD=$(pwd); cat'";
-const TRAP_PROMPT = "sh -lc 'trap \"\" TERM; echo TRAPPED; sleep 1000'";
+const PTHRU_PROMPT = 'echo CWD=$(pwd); exec cat';
+const TRAP_PROMPT = 'trap "" TERM; echo TRAPPED; exec tail -f /dev/null';
 
 let scenario;
 try {
@@ -146,6 +146,14 @@ try {
     match: { requiredTools: ['fork', 'join', 'list'] },
   });
 
+  // Final assistant summary after the 10 tool turns.
+  scenario.provider.expectText({
+    id: 'inspector-final',
+    lane: expectationLane('pty-stress', 'inspector', 'inspector', 11),
+    text: 'Both PTYs closed; no active pty remains.',
+    match: { requiredTools: ['fork', 'join', 'list'] },
+  });
+
   const inspector = await scenario.client.createSession();
   const inspectorId = getSessionId(inspector);
   assert.ok(inspectorId, `inspector session creation failed: ${JSON.stringify(inspector)}`);
@@ -178,14 +186,21 @@ try {
   });
   assert.ok(prompt.ok, `inspector prompt failed: ${JSON.stringify(prompt.data)}`);
 
-  await scenario.provider.waitForExpectation('inspector-fork-pty', WATCHDOG_TIMEOUT_MS);
-  scenario.watchdog?.advance({ reason: 'pty-created', lane: 'inspector', blocking: true });
-  await scenario.provider.waitForExpectation('inspector-pty-term', WATCHDOG_TIMEOUT_MS);
-  scenario.watchdog?.advance({ reason: 'pty-term', lane: 'inspector', blocking: true });
-  await scenario.provider.waitForExpectation('inspector-pty2-kill', WATCHDOG_TIMEOUT_MS);
-  scenario.watchdog?.advance({ reason: 'pty-kill', lane: 'inspector', blocking: true });
-  await scenario.provider.waitForExpectation('inspector-list', WATCHDOG_TIMEOUT_MS);
-  scenario.watchdog?.advance({ reason: 'pty-list', lane: 'inspector', blocking: true });
+  for (const id of [
+    'inspector-fork-pty',
+    'inspector-pty-write',
+    'inspector-pty-read',
+    'inspector-pty-term',
+    'inspector-join-term',
+    'inspector-fork-pty2',
+    'inspector-pty2-term',
+    'inspector-pty2-kill',
+    'inspector-join-kill',
+    'inspector-list',
+  ]) {
+    await scenario.provider.waitForExpectation(id, WATCHDOG_TIMEOUT_MS);
+    scenario.watchdog?.advance({ reason: id, lane: 'inspector', blocking: true });
+  }
 
   await turn.awaitTerminal({
     timeoutMs: WATCHDOG_TIMEOUT_MS,
@@ -198,8 +213,12 @@ try {
   const readResult = results.find((r) => typeof r.output === 'string' && r.output.includes('ECHO_TEST'));
   assert.ok(readResult, `read must return the echoed ECHO_TEST output: ${JSON.stringify(results)}`);
   assert.ok(readResult.output.includes('CWD='), `read must surface the session cwd via pwd: ${readResult.output}`);
+  const isClosedOutcome = (outcome) =>
+    outcome === 'closed' ||
+    (typeof outcome === 'string' && outcome.includes('closed')) ||
+    (Array.isArray(outcome) && outcome.includes('closed'));
   assert.ok(
-    results.some((r) => r.outcome === 'closed' || (typeof r.outcome === 'string' && r.outcome.includes('closed'))),
+    results.some((r) => isClosedOutcome(r.outcome)),
     `join must deliver the closed exit after TERM and after KILL: ${JSON.stringify(results)}`,
   );
   const listResult = results.find((r) => Array.isArray(r));

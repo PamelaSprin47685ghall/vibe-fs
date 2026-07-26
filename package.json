@@ -45,7 +45,7 @@
     "yaml": "^2.9.0"
   },
   "overrides": {
-    "bun-pty": "0.4.8"
+    "bun-pty": "$bun-pty"
   },
   "devDependencies": {
     "eventsource": "^3.0.7"
