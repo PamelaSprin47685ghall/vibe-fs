@@ -25,6 +25,7 @@ module ManagerCanaryTests =
           CreateWorktree = fun _ _ _ -> Task.FromResult(Ok())
           Rebase = fun _ _ -> Task.FromResult(Ok())
           FfMerge = fun _ _ -> Task.FromResult(Ok "commit-canary-123")
+          ConflictedFiles = fun _ -> Task.FromResult(Ok [])
           RemoveWorktree = fun _ -> Task.FromResult(Ok()) }
 
     let private createStubManagerPort () =

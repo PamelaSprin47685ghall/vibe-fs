@@ -74,7 +74,8 @@ type ManagerJob =
       Branch: string
       CandidateId: CandidateId option
       CandidateCommit: string option
-      PublishedCommit: string option }
+      PublishedCommit: string option
+      Prompt: string }
 
 type OrchestratorProjection =
     { ManagerJobs: Map<ManagerId, ManagerJob>

@@ -1,9 +1,44 @@
 namespace Wanxiangshu.Next.Orchestrator
 
 open System
+open System.IO
 open System.Threading.Tasks
+open Fable.Core
+open Fable.Core.JsInterop
 open Wanxiangshu.Next.Kernel.Fact
 open Wanxiangshu.Next.Journal
+
+module private PublishLock =
+    [<Import("default", "proper-lockfile")>]
+    let private lockfile: obj = jsNative
+
+    // proper-lockfile's lock(file, options) takes 2 positional JS args, so call it
+    // via Emit: a tupled F# unbox would pass a single array argument (stringifying
+    // to "path,[object Object]"), and a curried unbox would call lock(file)(options).
+    // lock() returns a release function; unlock by invoking it directly.
+    [<Emit("$0($1, $2)")>]
+    let private lockAsync (fn: obj) (path: string) (opts: obj) : Task<obj> = jsNative
+
+    /// Cross-process publication lock path: lives in the temp dir (never inside the
+    /// repo) so git status stays clean. No ".lock" suffix: proper-lockfile appends it.
+    let lockPath (repoPath: string) (branch: string) =
+        let norm = repoPath.Replace('/', '_').Replace('\\', '_')
+        let b = branch.Replace('/', '_').Replace('\\', '_')
+        Path.Combine(Path.GetTempPath(), sprintf "wanxiangshu-publish-%s-%s" norm b)
+
+    /// Acquire a cross-process publication lock on the target ref. The in-object
+    /// publishChain only serializes within one Orchestrator instance; this lock
+    /// serializes publication across sessions, runtimes, and processes on the same
+    /// repo. proper-lockfile v4 has no .sync API, so this is async and released in a
+    /// `finally`. Keep the happy path: a single instance behaves exactly as before.
+    /// realpath:false lets the lock target be a synthetic temp path that need not exist.
+    let acquire (path: string) : Task<obj> =
+        lockAsync lockfile path (createObj [ "retries", box 5; "realpath", box false ])
+
+    /// Release by invoking the release function returned by lock.
+    let release (releaseFn: obj) : Task<unit> =
+        let fn: unit -> Task<unit> = unbox releaseFn
+        fn ()
 
 type Orchestrator
     (
@@ -84,6 +119,21 @@ type Orchestrator
             return! tcs.Task
         }
 
+    let runSerialLocked (lockPath: string) (fn: unit -> Task<'T>) : Task<'T> =
+        // In-process serialization via the publishChain; the cross-process lock is
+        // acquired INSIDE the serialized region so an in-process contender never
+        // sees the lock held (no ~1s proper-lockfile retry), while two processes
+        // still serialize on the file lock.
+        runSerial (fun () ->
+            task {
+                let! release = PublishLock.acquire lockPath
+
+                try
+                    return! fn ()
+                finally
+                    PublishLock.release release |> ignore
+            })
+
     member this.ForkManager
         (managerId: string, prompt: string, ?worktreePath: string)
         : Task<Result<OrchestratorHandle, OrchestratorVerdict>> =
@@ -118,7 +168,8 @@ type Orchestrator
                             (AgentFact.OrchestratorManagerJobCreated
                                 {| ManagerId = managerId
                                    WorktreePath = path
-                                   Branch = sprintf "manager/%s" managerId |})
+                                   Branch = sprintf "manager/%s" managerId
+                                   Prompt = prompt |})
                     with
                     | Error err ->
                         let _ = git.RemoveWorktree path
@@ -167,128 +218,17 @@ type Orchestrator
                         sprintf "Manager run failed: %s" err
                     )
             | Ok() ->
+                let deps: PublishChain.Deps =
+                    { Git = git
+                      Manager = manager
+                      AppendFact = appendFact
+                      ReverifyTwice = reverifyTwice
+                      ReadHead = readHead
+                      ReconcileTarget = reconcileTarget
+                      TargetBranch = targetBranch
+                      Prompts = prompts }
+
                 return!
-                    runSerial (fun () ->
-                        task {
-                            let managerId = completion.Handle.ManagerId
-                            let worktreePath = completion.Handle.WorktreePath
-
-                            match! reconcileTarget () with
-                            | Error err ->
-                                return
-                                    OrchestratorVerdict.IntegrationFailed(
-                                        managerId,
-                                        sprintf "Git reconcile failed: %s" err
-                                    )
-                            | Ok() ->
-                                match! reverifyTwice managerId worktreePath with
-                                | Error err -> return OrchestratorVerdict.NeedsReview(managerId, err)
-                                | Ok() ->
-                                    let candidateId = sprintf "candidate-%s" managerId
-                                    let! candidateHeadResult = readHead worktreePath ""
-
-                                    match candidateHeadResult with
-                                    | Error err ->
-                                        return
-                                            OrchestratorVerdict.IntegrationFailed(
-                                                managerId,
-                                                sprintf "Git head lookup failed: %s" err
-                                            )
-                                    | Ok candidateHead ->
-                                        match
-                                            appendFact
-                                                (StreamId.Workspace)
-                                                (AgentFact.OrchestratorCandidateRegistered
-                                                    {| ManagerId = managerId
-                                                       CandidateId = candidateId
-                                                       Branch = sprintf "manager/%s" managerId
-                                                       CommitHash = candidateHead |})
-                                        with
-                                        | Error err ->
-                                            return
-                                                OrchestratorVerdict.IntegrationFailed(
-                                                    managerId,
-                                                    sprintf "Failed to persist candidate: %s" err
-                                                )
-                                        | Ok() ->
-                                            let! rebaseResult = git.Rebase worktreePath targetBranch
-
-                                            let! finalRebase =
-                                                match rebaseResult with
-                                                | Ok() -> Task.FromResult(Ok())
-                                                | Error conflict ->
-                                                    task {
-                                                        // A conflict is a continuation of this ManagerJob, never a new manager.
-                                                        let prompt =
-                                                            match prompts.TryGetValue managerId with
-                                                            | true, saved -> saved
-                                                            | false, _ -> ""
-
-                                                        match! manager.RunManager managerId worktreePath prompt with
-                                                        | Error err ->
-                                                            return
-                                                                Error(
-                                                                    sprintf
-                                                                        "Rebase conflict (%s); manager continuation failed: %s"
-                                                                        conflict
-                                                                        err
-                                                                )
-                                                        | Ok() -> return! git.Rebase worktreePath targetBranch
-                                                    }
-
-                                            match finalRebase with
-                                            | Error err ->
-                                                return
-                                                    OrchestratorVerdict.IntegrationFailed(
-                                                        managerId,
-                                                        sprintf "Rebase failed: %s" err
-                                                    )
-                                            | Ok() ->
-                                                match! reconcileTarget () with
-                                                | Error err ->
-                                                    return
-                                                        OrchestratorVerdict.IntegrationFailed(
-                                                            managerId,
-                                                            sprintf "Git reconcile failed after rebase: %s" err
-                                                        )
-                                                | Ok() ->
-                                                    match! reverifyTwice managerId worktreePath with
-                                                    | Error err ->
-                                                        return OrchestratorVerdict.NeedsReview(managerId, err)
-                                                    | Ok() ->
-                                                        // FfMerge is deliberately the only write to the target ref: the Git port
-                                                        // performs `git merge --ff-only`, keeping Git authoritative on reconcile.
-                                                        match! git.FfMerge worktreePath targetBranch with
-                                                        | Error err ->
-                                                            return
-                                                                OrchestratorVerdict.IntegrationFailed(
-                                                                    managerId,
-                                                                    sprintf "FF merge failed: %s" err
-                                                                )
-                                                        | Ok commitHash ->
-                                                            match
-                                                                appendFact
-                                                                    StreamId.Workspace
-                                                                    (AgentFact.OrchestratorPublished
-                                                                        {| ManagerId = managerId
-                                                                           CandidateId = candidateId
-                                                                           CommitHash = commitHash |})
-                                                            with
-                                                            | Error err ->
-                                                                return
-                                                                    OrchestratorVerdict.IntegrationFailed(
-                                                                        managerId,
-                                                                        sprintf
-                                                                            "Failed to persist published fact: %s"
-                                                                            err
-                                                                    )
-                                                            | Ok() ->
-                                                                let! _ = git.RemoveWorktree worktreePath
-
-                                                                return
-                                                                    OrchestratorVerdict.Published(
-                                                                        managerId,
-                                                                        commitHash
-                                                                    )
-                        })
+                    runSerialLocked (PublishLock.lockPath repoPath targetBranch) (fun () ->
+                        PublishChain.run deps completion)
         }

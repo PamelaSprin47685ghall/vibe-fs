@@ -49,8 +49,25 @@ module OrchestratorAuthority =
                                 )
                 } }
 
-    /// Reconcile durable ManagerJobs against Git authority after restart:
-    /// append missing Published when target already contains the candidate.
+    /// Proper ancestor check via `git merge-base --is-ancestor <candidate> <head>`.
+    /// String-prefix comparisons collide on short hashes and are not ancestry.
+    let private isAncestor (repoPath: string) (candidate: string) (head: string) : Task<bool> =
+        task {
+            let! code, _, _ =
+                OrchestratorGit.run (
+                    OrchestratorGit.command repoPath [ "merge-base"; "--is-ancestor"; candidate; head ]
+                )
+
+            return code = 0
+        }
+
+    /// Reconcile durable ManagerJobs against Git authority after restart.
+    /// Re-derive `Published` for jobs whose candidate is already contained in the
+    /// target branch (candidate committed but publish not yet recorded). Jobs that
+    /// are earlier in the pipeline (manager not finished, rebase in progress, post-
+    /// rebase review, awaiting publish) cannot be re-driven from a static reconcile
+    /// without the runtime Manager/Reviewer ports; the persisted prompt (on the
+    /// ManagerJobCreated fact) makes such resume possible but is wired at runtime.
     let reconcilePublishedFromAuthority
         (journal: AgentJournal option)
         (authority: GitAuthorityPort)
@@ -72,18 +89,28 @@ module OrchestratorAuthority =
                         let! targetHead = authority.GetTargetHead repoPath branch
 
                         match targetHead with
-                        | Ok head when head = candidate || head.StartsWith(candidate) || candidate.StartsWith(head) ->
-                            let candId =
-                                match job.CandidateId with
-                                | Some id -> CandidateId.value id
-                                | None -> sprintf "candidate-%s" (ManagerId.value mgrId)
+                        | Ok head ->
+                            let! contained =
+                                task {
+                                    // ponytail: exact full-hash equality, else proper ancestor check.
+                                    if head = candidate then
+                                        return true
+                                    else
+                                        return! isAncestor repoPath candidate head
+                                }
 
-                            let fact =
-                                AgentFact.OrchestratorPublished
-                                    {| ManagerId = ManagerId.value mgrId
-                                       CandidateId = candId
-                                       CommitHash = head |}
+                            if contained then
+                                let candId =
+                                    match job.CandidateId with
+                                    | Some id -> CandidateId.value id
+                                    | None -> sprintf "candidate-%s" (ManagerId.value mgrId)
 
-                            AgentJournal.appendAgent StreamId.Workspace None fact journal |> ignore
+                                let fact =
+                                    AgentFact.OrchestratorPublished
+                                        {| ManagerId = ManagerId.value mgrId
+                                           CandidateId = candId
+                                           CommitHash = head |}
+
+                                AgentJournal.appendAgent StreamId.Workspace None fact journal |> ignore
                         | _ -> ()
         }

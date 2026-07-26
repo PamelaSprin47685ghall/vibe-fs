@@ -183,7 +183,7 @@ module AgentFacts =
         | AgentFact.FallbackFailureRecorded p -> AgentFactsReview.foldFallbackFailureRecorded proj p
 
         | AgentFact.OrchestratorManagerJobCreated p ->
-            AgentFactsFoldHelpers.foldOrchestratorManagerJobCreated proj p.ManagerId p.WorktreePath p.Branch
+            AgentFactsFoldHelpers.foldOrchestratorManagerJobCreated proj p.ManagerId p.WorktreePath p.Branch p.Prompt
 
         | AgentFact.OrchestratorCandidateRegistered p ->
             AgentFactsFoldHelpers.foldOrchestratorCandidateRegistered

@@ -55,7 +55,8 @@ module Fact =
         | OrchestratorManagerJobCreated of
             {| ManagerId: string
                WorktreePath: string
-               Branch: string |}
+               Branch: string
+               Prompt: string |}
         | OrchestratorCandidateRegistered of
             {| ManagerId: string
                CandidateId: string

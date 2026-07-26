@@ -27,6 +27,7 @@ module internal AgentFactsFoldHelpers =
         (managerId: string)
         (worktreePath: string)
         (branch: string)
+        (prompt: string)
         =
         let mgrId = ManagerId.create managerId
 
@@ -35,7 +36,8 @@ module internal AgentFactsFoldHelpers =
               Branch = branch
               CandidateId = None
               CandidateCommit = None
-              PublishedCommit = None }
+              PublishedCommit = None
+              Prompt = prompt }
 
         { proj with
             Orchestrator =
@@ -67,7 +69,8 @@ module internal AgentFactsFoldHelpers =
                             mgrId
                             { job with
                                 CandidateId = Some candId
-                                CandidateCommit = Some commitHash }
+                                CandidateCommit = Some commitHash
+                                Prompt = job.Prompt }
                             proj.Orchestrator.ManagerJobs
                     | None -> proj.Orchestrator.ManagerJobs
                 Managers = Map.add mgrId existingMgr proj.Orchestrator.Managers }
@@ -90,17 +93,7 @@ module internal AgentFactsFoldHelpers =
             | None -> { Status = Some status }
 
         let orch =
-            { ManagerJobs =
-                match Map.tryFind mgrId proj.Orchestrator.ManagerJobs with
-                | Some job ->
-                    Map.add
-                        mgrId
-                        { job with
-                            CandidateId = Some candId
-                            CandidateCommit = Some commitHash
-                            PublishedCommit = Some commitHash }
-                        proj.Orchestrator.ManagerJobs
-                | None -> proj.Orchestrator.ManagerJobs
+            { ManagerJobs = Map.remove mgrId proj.Orchestrator.ManagerJobs
               Managers = Map.add mgrId existingMgr proj.Orchestrator.Managers
               PublishedCommit = Some commitHash }
 
@@ -118,7 +111,10 @@ module internal AgentFactsFoldHelpers =
 
         let orch =
             { proj.Orchestrator with
-                Managers = Map.add mgrId existingMgr proj.Orchestrator.Managers }
+                Managers = Map.add mgrId existingMgr proj.Orchestrator.Managers
+                // Terminal state: drop from the in-progress ManagerJobs map so the
+                // projection does not grow unbounded with history.
+                ManagerJobs = Map.remove mgrId proj.Orchestrator.ManagerJobs }
 
         { proj with Orchestrator = orch }
 

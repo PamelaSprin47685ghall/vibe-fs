@@ -24,6 +24,7 @@ module OrchestratorTests =
           CreateWorktree = fun _ _ _ -> Task.FromResult(Ok())
           Rebase = fun _ _ -> Task.FromResult(Ok())
           FfMerge = fun _ _ -> Task.FromResult(Ok "commit-123456")
+          ConflictedFiles = fun _ -> Task.FromResult(Ok [])
           RemoveWorktree = fun _ -> Task.FromResult(Ok()) }
 
     let private createStubManagerPort () =
@@ -270,6 +271,8 @@ module OrchestratorTests =
 
                 if cmd.Arguments |> List.contains "status" then
                     Task.FromResult(0, "M file.txt", "")
+                elif cmd.Arguments |> List.contains "symbolic-ref" then
+                    Task.FromResult(0, "main", "")
                 elif cmd.Arguments |> List.contains "rev-parse" then
                     Task.FromResult(0, "abc1234", "")
                 else
