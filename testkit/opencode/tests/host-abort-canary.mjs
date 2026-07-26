@@ -130,7 +130,11 @@ try {
   assert.equal(scenario.provider.activeRequestCount, 2, 'manager and child streams must both hang');
 
   const children = await scenario.client.request('GET', `/session/${parentId}/children`);
-  const discoveredChildId = getSessionId(childrenOf(children)[0]) || journalValue(scenario.host.workDir, 'ChildId');
+  // Managers also own a blogger sidecar child; positional selection is not
+  // stable, and raw children entries carry their session id directly.
+  const discoveredChildId =
+    childrenOf(children).find((child) => child.id === childId)?.id ||
+    (journalValue(scenario.host.workDir, 'ChildId') === childId ? childId : null);
   assert.equal(discoveredChildId, childId, `child session was not recoverable: ${JSON.stringify(children.data)}`);
 
   const watermark = scenario.events.lastSeq;

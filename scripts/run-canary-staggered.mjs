@@ -38,13 +38,17 @@ const CANARY_TESTS = [
 ];
 
 // Full-suite parallel isolation is the standard gate: every canary starts under
-// one pool sized to the suite. A small stagger only reduces startup jitter.
+// one pool sized to the suite. The stagger only de-overlaps Bun SEA boot bursts:
+// each opencode host burns ~8 CPU-seconds compiling at boot (measured 2026-07),
+// so 14 simultaneous boots saturate 16 threads and stretch every boot past the
+// 2s causal watchdog. 2s spacing keeps at most ~1 boot burst in flight while all
+// scenario phases still run fully concurrent.
 const MAX_PARALLEL = parsePositiveInt(
   process.env.MAX_PARALLEL_CANARIES,
   CANARY_TESTS.length,
   "MAX_PARALLEL_CANARIES",
 );
-const STAGGER_DELAY_MS = parsePositiveInt(process.env.STAGGER_DELAY_MS, 50, "STAGGER_DELAY_MS");
+const STAGGER_DELAY_MS = parsePositiveInt(process.env.STAGGER_DELAY_MS, 2000, "STAGGER_DELAY_MS");
 const activeCanaryPids = new Set();
 
 function cleanupCanaries() {

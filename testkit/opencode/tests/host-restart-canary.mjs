@@ -47,7 +47,7 @@ function childrenOf(response) {
 async function nudge(parentId, childId, agentId, marker, managerMarker, scenario) {
   scenario.provider.expectToolCall({
     id: `${marker}-nudge`,
-    lane: expectationLane('host-restart', 'manager', 'manager', 3),
+    lane: expectationLane('host-restart', 'manager', 'manager', 7),
     tool: 'fork',
     args: { agent: agentId, prompt: `Report ${marker}.` },
     match: { requiredTools: managerTools, forbiddenTools: forbiddenManagerTools },
@@ -76,7 +76,7 @@ async function nudge(parentId, childId, agentId, marker, managerMarker, scenario
   });
   scenario.provider.expectText({
     id: managerMarker,
-    lane: expectationLane('host-restart', 'manager', 'manager', 4),
+    lane: expectationLane('host-restart', 'manager', 'manager', 8),
     text: `${managerMarker} complete.`,
     match: { requiredTools: managerTools, forbiddenTools: forbiddenManagerTools },
   });
@@ -144,10 +144,66 @@ try {
     text: 'Coder created background.',
     match: { containsText: ['You are the blogger of a coding agent session.', '"agent":"coder"'] },
   });
+  scenario.provider.expectToolCall({
+    id: 'manager-join-coder',
+    lane: expectationLane('host-restart', 'manager', 'manager', 2),
+    tool: 'join',
+    args: {},
+    match: { requiredTools: managerTools, forbiddenTools: forbiddenManagerTools },
+  });
   scenario.provider.expectText({
     id: 'manager-created',
-    lane: expectationLane('host-restart', 'manager', 'manager', 2),
+    lane: expectationLane('host-restart', 'manager', 'manager', 3),
     text: 'manager-created complete.',
+    match: { requiredTools: managerTools, forbiddenTools: forbiddenManagerTools },
+  });
+
+  // ReviewGuard nudges the first unconfirmed manager terminal (turn-2). The
+  // manager answers by forking a Reviewer; two distinct PERFECTs confirm the
+  // tree durably, so every later terminal (including post-restart) evaluates
+  // ReviewGuardConfirmed and no further guard fires.
+  scenario.provider.expectToolCall({
+    id: 'manager-fork-reviewer',
+    lane: expectationLane('host-restart', 'manager', 'manager', 4),
+    tool: 'fork',
+    args: { agent: 'reviewer', prompt: 'Review the current tree.' },
+    match: {
+      requiredTools: managerTools,
+      forbiddenTools: forbiddenManagerTools,
+      containsText: ['Review is required before completion.'],
+    },
+  });
+  scenario.provider.expectToolCall({
+    id: 'reviewer-perfect-1',
+    lane: expectationLane('host-restart', 'reviewer', 'reviewer', 1, 'chat', 'manager'),
+    tool: 'verdict',
+    args: { verdict: 'PERFECT' },
+    match: { requiredTools: ['verdict'] },
+  });
+  scenario.provider.expectToolCall({
+    id: 'reviewer-perfect-2',
+    lane: expectationLane('host-restart', 'reviewer', 'reviewer', 2, 'chat', 'manager'),
+    tool: 'verdict',
+    args: { verdict: 'PERFECT' },
+    match: { requiredTools: ['verdict'] },
+  });
+  scenario.provider.expectText({
+    id: 'reviewer-terminal',
+    lane: expectationLane('host-restart', 'reviewer', 'reviewer', 3, 'chat', 'manager'),
+    text: 'Review confirmed.',
+    match: { requiredTools: ['verdict'] },
+  });
+  scenario.provider.expectToolCall({
+    id: 'manager-join-reviewer',
+    lane: expectationLane('host-restart', 'manager', 'manager', 5),
+    tool: 'join',
+    args: {},
+    match: { requiredTools: managerTools, forbiddenTools: forbiddenManagerTools },
+  });
+  scenario.provider.expectText({
+    id: 'manager-reviewed',
+    lane: expectationLane('host-restart', 'manager', 'manager', 6),
+    text: 'Review confirmed before restart.',
     match: { requiredTools: managerTools, forbiddenTools: forbiddenManagerTools },
   });
 
@@ -172,7 +228,11 @@ try {
   const agentId = findValue(messages.data, 'agentId') || messageJson.match(/agentId[^a-z0-9]+([a-z0-9]{6})/i)?.[1];
   assert.ok(agentId, `fork result did not expose agentId: ${messageJson}`);
   const children = await scenario.client.request('GET', `/session/${parentId}/children`);
-  const childId = getSessionId(childrenOf(children)[0]) || journalValue(scenario.host.workDir, 'ChildId');
+  // Managers now also own a blogger sidecar child; positional selection is not
+  // stable. The coding child is the non-blogger one, and raw children entries
+  // carry their session id directly (getSessionId expects API envelopes).
+  const coderChild = childrenOf(children).find((child) => (child.agent || child.title) === 'coder');
+  const childId = coderChild?.id || journalValue(scenario.host.workDir, 'ChildId');
   assert.ok(childId, `child session was not recoverable: ${JSON.stringify(children.data)}`);
   scenario.sessionIds.push(childId);
 
@@ -196,6 +256,9 @@ try {
   ]);
   scenario.watchdog?.advance({ reason: 'initial-blogger-sidecars', lane: 'initial', blocking: true });
 
+  await scenario.provider.waitForExpectation('manager-reviewed', WATCHDOG_TIMEOUT_MS);
+  scenario.watchdog?.advance({ reason: 'review-confirmed', lane: 'manager', blocking: true });
+
   await scenario.restart();
   await nudge(parentId, childId, agentId, 'child-a2', 'manager-a2', scenario);
 
@@ -204,6 +267,16 @@ try {
   console.log('Host restart reconcile canary passed: restored child retained coder tools across restart.');
 } catch (error) {
   console.error(`Host restart reconcile canary failed: ${error.stack || error}`);
+  console.error(`sessions: ${JSON.stringify(scenario?.sessionIds || [])}`);
+  for (const e of (scenario?.events?.allEvents || []).filter((e) => e.type.startsWith('session') || e.type === 'message.updated').slice(-40)) {
+    console.error(`EV seq=${e.seq} ${e.type} session=${e.sessionID || e.properties?.sessionID || '-'} ${e.finishReason || (typeof e.status === 'object' ? e.status?.type : e.status) || ''}`);
+  }
+  for (const r of scenario?.provider?.requests || []) {
+    const msgs = r.body?.messages || r.messages || [];
+    const last = msgs.filter((m) => m.role === 'user').pop();
+    const text = typeof last?.content === 'string' ? last.content : JSON.stringify(last?.content || '');
+    console.error(`REQ session=${(r.sessionID || '').slice(-6)} tools=${(r.body?.tools || r.tools || []).map((t) => t.function?.name || t.name).join(',')} lastUser=${text.replace(/\n/g, ' ').slice(0, 80)}`);
+  }
   if (scenario) {
     try { await teardownScenario(scenario, { keepOnFailure: true }); } catch {}
   }

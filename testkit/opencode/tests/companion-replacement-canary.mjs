@@ -83,14 +83,17 @@ try {
       });
     }
     if (round === 3) {
+      // Y-threshold rebase: the blogger's next request is the durable condense
+      // of FULL B, not an ordinary delta paragraph. Park it open (neverEnd) so
+      // the replacement background stays busy exactly like the old stream.
       scenario.provider.expectText({
         id: 'manager-blogger-3',
         lane: expectationLane('companion-replacement', 'primary-blogger', 'blogger', 3, 'chat', 'primary'),
         neverEnd: true,
         blocking: false,
-        text: 'Blogger replacement background remains busy.',
+        text: 'Blogger paragraph 1. Blogger paragraph 2.',
         match: {
-          containsText: ['You are the blogger of a coding agent session.', '"agent":"orchestrator"'],
+          containsText: ['Condense the following FULL companion context'],
         },
       });
     }
@@ -140,7 +143,7 @@ try {
     blocking: false,
     text: 'Blogger restart background remains busy.',
     match: {
-      containsText: ['You are the blogger of a coding agent session.', '"agent":"orchestrator"'],
+      containsText: ['Re-anchor on the FULL current companion context B'],
     },
   });
 
